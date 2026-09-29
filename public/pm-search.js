@@ -345,6 +345,9 @@
     '@media(min-width:760px){.gd{padding:20px}}',
     '.gd-h b{display:block;font-size:22px;font-weight:800}',
     '.gd-h p{font-size:14px;color:var(--mu);margin-top:4px}',
+    '.field.gq{margin-top:14px;height:50px;background:#fff;border-color:var(--pr)}',
+    '.field.gq>svg{color:var(--ok)}',
+    '.gres .gcard{margin:12px 0 0}',
     '.gsw{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:14px 0 4px}',
     '.gsw::-webkit-scrollbar{display:none}',
     '.gsw button{flex:none;height:38px;padding:0 16px;border-radius:19px;border:1.5px solid var(--ln);font-size:14px;font-weight:700}',
@@ -626,7 +629,11 @@
       if (t && t.tagName === 'IMG' && t.parentNode) t.parentNode.innerHTML = I.sprout;
     }, true);
     root.addEventListener('click', onClick);
-    root.addEventListener('input', function (e) { if (e.target !== $q) calcInput(e.target); });
+    root.addEventListener('input', function (e) {
+      if (e.target === $q) return;
+      if (e.target.getAttribute('data-k') === 'gq') { GQ = e.target.value; guideSearch(); return; }
+      calcInput(e.target);
+    });
     root.addEventListener('focusin', function (e) { calcFocus(e.target, true); });
     root.addEventListener('focusout', function (e) { calcFocus(e.target, false); });
     $panel.addEventListener('keydown', function (e) {
@@ -957,12 +964,60 @@
         : '<a class="glink" data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '">Dozları rehber sayfasında gör' + I.arrow + '</a>') +
       '</details>';
   }
+  // Bitki adı eşleşmesi: kelimenin tamamı ya da (min harften uzunsa) başı
+  function plantHit(gd, toks, min) {
+    // Önce tam kelime ("elma" → Elma), bulunamazsa kelime başı ("elm" → Elma, "dom" → Domates)
+    var find = function (exact) {
+      var hit = null;
+      (gd.groups || []).some(function (gr) {
+        return gr.plants.some(function (pl) {
+          var ws = words(fold(pl));
+          var ok = toks.some(function (t) { return ws.some(function (w) { return exact ? w === t : t.length >= min && w.indexOf(t) === 0; }); });
+          if (ok) hit = { gr: gr, pl: pl };
+          return ok;
+        });
+      });
+      return hit;
+    };
+    return find(true) || find(false);
+  }
+  function doseCard(gd, hit) {
+    var has = hit && hit.gr.steps && hit.gr.steps.length;
+    return '<div class="gcard"><div class="gc-h">' + I.book + '<div><b>' + (hit ? esc(hit.pl) + ' için ' : '') + esc(gd.title) + '</b><small>' +
+      (hit ? esc(hit.gr.name) + ' · ' : '') + (has ? 'kullanım dozu' : 'doz bilgisi rehber sayfamızda') + '</small></div></div>' +
+      (has ? stepsHtml(hit.gr.steps) : '') +
+      '<div class="gc-f"' + (has ? '' : ' style="padding-top:12px"') + '><a data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '">' + (has ? 'Tüm rehber' : 'Rehberi aç') + '</a>' +
+      (gd.product ? '<a class="pri" data-kind="product" data-name="' + esc(gd.title) + '" href="' + esc(url(gd.product)) + '">Ürünü gör</a>' : '') + '</div></div>';
+  }
+  var GQ = '';
+  // Rehber içi arama: "Hangi bitkide kullanacaksınız?" — tüm ürünlerin dozlarını birlikte göster
+  function guideSearch() {
+    var res = $guide.querySelector('.gres'), lst = $guide.querySelector('.glist');
+    if (!res) return;
+    var toks = fold(GQ).trim().split(/\s+/).filter(function (t) { return t.length >= 2; });
+    if (!toks.length) { res.innerHTML = ''; lst.style.display = ''; return; }
+    lst.style.display = 'none';
+    var hits = guides().map(function (gd) { return { gd: gd, hit: plantHit(gd, toks, 3) }; });
+    var any = hits.some(function (x) { return x.hit; });
+    if (!any) {
+      res.innerHTML = '<div class="empty" style="padding:28px 8px 8px"><div class="ic">' + I.sprout + '</div><b>“' + esc(GQ.trim()) + '” rehberde yok</b><p>Bitki adını farklı yazmayı deneyin (örn. biber, elma, çim).' +
+        (CFG.whatsapp ? ' Ya da <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + GQ.trim() + ' için gübre kullanım miktarını öğrenmek istiyorum.')) + '">WhatsApp\'tan sorun</a>.' : '') + '</p></div>';
+      return;
+    }
+    // Dozu olanlar önce; eşleşme olmayan ama grubu olmayan (henüz verisi girilmemiş) rehberler bağlantı olarak
+    hits.sort(function (a, b) { return (b.hit && b.hit.gr.steps.length ? 1 : 0) - (a.hit && a.hit.gr.steps.length ? 1 : 0); });
+    res.innerHTML = hits.filter(function (x) { return x.hit || !(x.gd.groups || []).length; }).map(function (x) {
+      return doseCard(x.gd, x.hit);
+    }).join('');
+  }
   function renderGuide() {
     var list = guides();
     if (!list.length || !$guide) return;
     var gd = list.filter(function (x) { return x.id === GID; })[0] || list[0];
     GID = gd.id;
-    var html = '<div class="gd"><div class="gd-h"><b>Kullanım rehberi</b><p>Bitkinin adını yukarıdaki aramaya yazın (örn. domates, zeytin, çim); doğru dozu hemen gösterelim.</p></div>' +
+    var html = '<div class="gd"><div class="gd-h"><b>Kullanım rehberi</b><p>Bitkinin adını yazın, tüm ürünlerimizin kullanım miktarlarını birlikte gösterelim.</p></div>' +
+      '<label class="field gq">' + I.sprout + '<input type="search" data-k="gq" autocomplete="off" enterkeyhint="search" placeholder="Hangi bitkide kullanacaksınız?" value="' + esc(GQ) + '"></label>' +
+      '<div class="gres"></div><div class="glist">' +
       '<div class="gsw">' + list.map(function (x) {
         return '<button type="button" data-act="guide" data-v="' + esc(x.id) + '" class="' + (x === gd ? 'on' : '') + '">' + esc(x.title) + '</button>';
       }).join('') + '</div>';
@@ -981,7 +1036,8 @@
         '<div class="tx"><b>' + esc(p.n) + '</b><small>' + (p.p != null ? tl(price(p)) + (p.multi ? ' başlayan fiyatlarla' : '') : '') + '</small></div>' + I.arrow + '</a>';
     }
     if (gd.note) html += '<div class="gnote">' + esc(gd.note) + '</div>';
-    $guide.innerHTML = html + '</div>';
+    $guide.innerHTML = html + '</div></div>';
+    guideSearch();
   }
   // Aramada bitki adı geçiyorsa ilgili rehber grubunu kart olarak göster
   function guideCards(tokens) {
@@ -994,21 +1050,11 @@
     if (list.length > 1) list = list.filter(function (gd) { return !list.some(function (o) { return o !== gd && (o.keywords || []).some(function (k) { return (gd.keywords || []).some(function (g) { return fold(k).indexOf(fold(g)) !== -1 && fold(k) !== fold(g); }); }); }); });
     if (!list.length) list = guides();
     list.forEach(function (gd) {
-      var hit = null;
-      (gd.groups || []).some(function (gr) {
-        return gr.plants.some(function (pl) {
-          var ws = words(fold(pl));
-          var ok = toks.some(function (t) { return ws.some(function (w) { return w === t || (t.length >= 4 && w.indexOf(t) === 0); }); });
-          if (ok) hit = { gr: gr, pl: pl };
-          return ok;
-        });
-      });
+      var hit = plantHit(gd, toks, 4);
       var kwIn = named(gd), kw = kwIn && toks.some(function (t) { return /^(kullan|doz|nasil|miktar|rehber)/.test(t); });
       if (hit && !(hit.gr.steps && hit.gr.steps.length) && !kwIn) hit = null; // doz verisi olmayan rehber sadece adı geçince
       if (hit && hit.gr.steps && hit.gr.steps.length) {
-        out.push('<div class="gcard"><div class="gc-h">' + I.book + '<div><b>' + esc(hit.pl) + ' için ' + esc(gd.title) + '</b><small>' + esc(hit.gr.name) + ' · kullanım dozu</small></div></div>' +
-          stepsHtml(hit.gr.steps) + '<div class="gc-f"><a data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '">Tüm rehber</a>' +
-          (gd.product ? '<a class="pri" data-kind="product" data-name="' + esc(gd.title) + '" href="' + esc(url(gd.product)) + '">Ürünü gör</a>' : '') + '</div></div>');
+        out.push(doseCard(gd, hit));
       } else if (kw && !hit && (gd.groups || []).length) {
         out.push('<button class="banner" type="button" data-act="goguide" data-v="' + esc(gd.id) + '" style="background:var(--soft);color:var(--prd)">' +
           '<span class="bi" style="background:#fff;color:var(--pr)">' + I.book + '</span><div class="tx"><b>' + esc(gd.title) + ' kullanım rehberi</b>' +
