@@ -75,8 +75,8 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `categoryImages`: kategori adı → görseli kullanılacak ürünün adresi (slug)
 - `pages`: "Sayfalar" sekmesindeki bağlantılar (`title`, `url`); aramada da çıkar
 - `guides`: "Kullanım Rehberi" sekmesi ve aramadaki doz kartları. Her rehber: `title`, `product` (ürün slug'ı), `url` (rehber sayfası), `keywords`, `note`, `groups` → `{cat, name, plants[], steps: [[zaman, şekil, doz]]}`. `steps` boşsa bitki aramasında rehber sayfasına bağlantı gösterilir.
-- `cart`: `enabled: false` → kartlarda "Ekle" butonunu gizle. "Ekle"ye basılınca ürün sayfası açılır; script orada seçilen seçeneği (örn. "5 Kg") işaretleyip sitenin kendi "Sepete Ekle" butonuna basar. Seçenek bulunamazsa hiçbir şey eklemez, müşteriye uyarı gösterir. (Sitede `window.UrunAramaSepet(varyantId, adet)` tanımlanırsa sayfa değiştirmeden doğrudan o kullanılır.)
-- `triggers`: sitenin kendi arama butonunun CSS seçicisi (boşsa otomatik tanınır)
+- `cart`: `enabled: false` → kartlarda "Ekle" butonunu gizle. "Ekle"ye basılınca ürün sayfası görünmez bir çerçevede (masaüstü genişliğinde) açılır; seçilen seçenek (örn. "5 Kg") işaretlenip sitenin kendi "Sepete Ekle" butonuna basılır. Müşteri panelden ayrılmaz. Eklenemezse ürün sayfasına bağlantı gösterilir. `cartUrl`: "Sepete git" adresi (varsayılan `/cart`). (Sitede `window.UrunAramaSepet(varyantId, adet)` tanımlanırsa doğrudan o kullanılır.)
+- `triggers`: sitenin kendi arama butonunun CSS seçicisi (boşsa otomatik tanınır). Tanınmayan bir buton ikas'ın aramasını açarsa panel kapatılır, bizimki açılır ve buton tarayıcıda hatırlanır.
 - `calc`: toprak hesaplayıcı — `enabled`, `extra` (oturma payı %), `recommend.pot` / `recommend.bed` (sonuçtan sonra yönlendirilecek toprak kategorilerinin adları; boşsa `categories` altındaki alt kategoriler)
 - `synonyms`: "müşteri bunu yazarsa şunu da ara" (Türkçe karakterleri yazman gerekmez)
 - `badges`: ikas'taki etiket adı → üründe görünecek sarı rozet (örn. `"3 Al 2 Öde"`)
