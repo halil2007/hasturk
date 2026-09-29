@@ -43,7 +43,7 @@
     },
     {
       "title": "İletişim",
-      "url": "/iletisim"
+      "url": "/pages/iletisim"
     },
     {
       "title": "Siparişlerim",
@@ -79,6 +79,819 @@
       ]
     }
   },
+  "guides": [
+    {
+      "id": "kati",
+      "title": "Katı Solucan Gübresi",
+      "product": "hasturk-kati-solucan-gubresi",
+      "url": "/pages/solucan-gubresi-kullanim-miktarlari",
+      "keywords": [
+        "solucan",
+        "vermikompost"
+      ],
+      "note": "Kullanım miktarları genel uygulama rehberidir. Toprak ve/veya yaprak analizi yapılması; nihai uygulamada HasTürk ürün etiketi, bitkinin gelişim dönemi ve uzman önerisinin esas alınması tavsiye edilir.",
+      "groups": [
+        {
+          "cat": "Sebzeler",
+          "name": "Meyvesi Yenen Sebzeler",
+          "plants": [
+            "Domates",
+            "Biber (Dolmalık)",
+            "Biber (Sivri)",
+            "Biber (Salçalık)",
+            "Patlıcan",
+            "Kabak",
+            "Hıyar",
+            "Acur",
+            "Taze Fasulye",
+            "Taze Bezelye",
+            "Taze Bakla",
+            "Börülce",
+            "Bamya",
+            "Balkabağı",
+            "Çekirdeklik Kabak",
+            "Kavun",
+            "Karpuz"
+          ],
+          "steps": [
+            [
+              "Toprak hazırlığında serpme şeklinde toprak altına",
+              "Serpme / Toprak altı",
+              "60-80 kg/dekar"
+            ],
+            [
+              "Fide yastığına veya tohum yatağına",
+              "Harca karıştırma",
+              "5 kg/m²"
+            ],
+            [
+              "Dikim öncesi sıra üzeri bant şeklinde",
+              "Bant uygulama",
+              "50-70 kg/dekar"
+            ],
+            [
+              "Dikim sonrası kök bölgesine çizgi şeklinde",
+              "Kök bölgesine",
+              "40-60 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Yaprağı Yenen Sebzeler",
+          "plants": [
+            "Lahana",
+            "Ispanak",
+            "Pazı",
+            "Semizotu",
+            "Marul",
+            "Salata",
+            "Brüksel Lahanası",
+            "Ebegümeci",
+            "Maydanoz",
+            "Roka",
+            "Tere",
+            "Nane",
+            "Dereotu",
+            "Hindiba"
+          ],
+          "steps": [
+            [
+              "Toprak hazırlığında serpme şeklinde toprak altına",
+              "Serpme / Toprak altı",
+              "50-60 kg/dekar"
+            ],
+            [
+              "Fide yastığına veya tohum yatağına",
+              "Harca karıştırma",
+              "5 kg/m²"
+            ],
+            [
+              "Dikim öncesi sıra üzeri bant şeklinde",
+              "Bant uygulama",
+              "40-50 kg/dekar"
+            ],
+            [
+              "Dikim sonrası kök bölgesine çizgi şeklinde",
+              "Kök bölgesine",
+              "30-40 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Sürgünü, Yaprak Sapı ve Çiçek Tablası Yenenler",
+          "plants": [
+            "Kuşkonmaz",
+            "Ravent",
+            "Yaprak Kereviz",
+            "Sap Kereviz",
+            "Enginar",
+            "Karnabahar",
+            "Brokoli"
+          ],
+          "steps": [
+            [
+              "Toprak hazırlığında serpme şeklinde toprak altına",
+              "Serpme / Toprak altı",
+              "50-70 kg/dekar"
+            ],
+            [
+              "Fide yastığına veya tohum yatağına",
+              "Harca karıştırma",
+              "5 kg/m²"
+            ],
+            [
+              "Dikim öncesi sıra üzeri bant şeklinde",
+              "Bant uygulama",
+              "40-60 kg/dekar"
+            ],
+            [
+              "Dikim sonrası kök bölgesine çizgi şeklinde",
+              "Kök bölgesine",
+              "30-50 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Kuru ve Taze Tohumları Yenenler",
+          "plants": [
+            "Kuru Fasulye",
+            "Bezelye",
+            "Barbunya",
+            "Bakla",
+            "Börülce",
+            "Mercimek",
+            "Nohut",
+            "Tatlı Mısır"
+          ],
+          "steps": [
+            [
+              "Toprak hazırlığında serpme şeklinde toprak altına",
+              "Serpme / Toprak altı",
+              "50-70 kg/dekar"
+            ],
+            [
+              "Dikim öncesi sıra üzeri bant şeklinde",
+              "Bant uygulama",
+              "40-60 kg/dekar"
+            ],
+            [
+              "Dikim sonrası kök bölgesine çizgi şeklinde",
+              "Kök bölgesine",
+              "30-50 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Soğan, Yumru ve Kökleri Yenenler",
+          "plants": [
+            "Sarımsak",
+            "Soğan",
+            "Pırasa",
+            "Patates",
+            "Tatlı Patates",
+            "Yer Elması",
+            "Havuç",
+            "Turp",
+            "Kırmızı Pancar",
+            "Şalgam",
+            "Kök Kereviz"
+          ],
+          "steps": [
+            [
+              "Toprak hazırlığında serpme şeklinde toprak altına",
+              "Serpme / Toprak altı",
+              "50-60 kg/dekar"
+            ],
+            [
+              "Dikim öncesi sıra üzeri bant şeklinde",
+              "Bant uygulama",
+              "40-50 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Yumuşak Çekirdekliler",
+          "plants": [
+            "Elma",
+            "Armut",
+            "Ayva",
+            "Alıç",
+            "Muşmula",
+            "Üvez",
+            "Kuşburnu"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1,5-2 kg/fidan"
+            ],
+            [
+              "Yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına",
+              "Taç izdüşümü / Toprak altı",
+              "Gölge çapı (m) = kg"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Taş Çekirdekliler",
+          "plants": [
+            "Kiraz",
+            "Vişne",
+            "Kayısı",
+            "Şeftali",
+            "Erik",
+            "Kızılcık",
+            "İğde",
+            "Nektarin"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1,5-2 kg/fidan"
+            ],
+            [
+              "Yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına",
+              "Taç izdüşümü / Toprak altı",
+              "Gölge çapı (m) = kg"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Sert Kabuklular",
+          "plants": [
+            "Badem",
+            "Ceviz",
+            "Kestane",
+            "Fındık",
+            "Antep Fıstığı"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1,5-2 kg/fidan"
+            ],
+            [
+              "Yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına",
+              "Taç izdüşümü / Toprak altı",
+              "Gölge çapı (m) = kg"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Üzümsü Meyveler",
+          "plants": [
+            "Üzüm",
+            "Kivi",
+            "Dut",
+            "İncir",
+            "Nar"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1-1,5 kg/asma"
+            ],
+            [
+              "Yetişkin bitkide taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına",
+              "Taç izdüşümü / Toprak altı",
+              "Gölge çapı (m) = kg"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Ahududu ve Böğürtlen",
+          "plants": [
+            "Ahududu",
+            "Böğürtlen"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1-1,5 kg/bitki"
+            ],
+            [
+              "Yetişkin bitkide kök bölgesine diskaro veya çapa ile toprak altına",
+              "Kök bölgesine",
+              "1,5-2 kg/bitki"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Çilek",
+          "plants": [
+            "Çilek"
+          ],
+          "steps": [
+            [
+              "Dikim öncesinde her fide çukuruna",
+              "Fide çukuruna",
+              "25-30 g/fide"
+            ]
+          ]
+        },
+        {
+          "cat": "Turunçgiller",
+          "name": "Turunçgiller",
+          "plants": [
+            "Portakal",
+            "Limon",
+            "Mandalina",
+            "Greyfurt",
+            "Mandarin"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1,5-2 kg/fidan"
+            ],
+            [
+              "Yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına",
+              "Taç izdüşümü / Toprak altı",
+              "Gölge çapı (m) = kg"
+            ]
+          ]
+        },
+        {
+          "cat": "Akdeniz Meyveleri",
+          "name": "Zeytin",
+          "plants": [
+            "Zeytin"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1,5-2 kg/fidan"
+            ],
+            [
+              "Yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına",
+              "Taç izdüşümü / Toprak altı",
+              "Gölge çapı (m) = kg"
+            ]
+          ]
+        },
+        {
+          "cat": "Akdeniz Meyveleri",
+          "name": "İncir, Trabzon Hurması, Yeni Dünya ve Zerdali",
+          "plants": [
+            "İncir",
+            "Trabzon Hurması",
+            "Yeni Dünya",
+            "Zerdali"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukuruna kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1,5-2 kg/fidan"
+            ],
+            [
+              "Yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına",
+              "Taç izdüşümü / Toprak altı",
+              "Gölge çapı (m) = kg"
+            ]
+          ]
+        },
+        {
+          "cat": "Akdeniz Meyveleri",
+          "name": "Muz",
+          "plants": [
+            "Muz"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde dikim yalağına",
+              "Dikim yalağına",
+              "2-2,5 kg/kök"
+            ],
+            [
+              "Yetişkin bitkide kök doğum bölgesine",
+              "Kök bölgesine",
+              "3-4 kg/ağaç"
+            ]
+          ]
+        },
+        {
+          "cat": "Tarla Bitkileri",
+          "name": "Tahıllar ve Mısır",
+          "plants": [
+            "Buğday",
+            "Arpa",
+            "Yulaf",
+            "Çavdar",
+            "Tritikale",
+            "Darı",
+            "Darılar",
+            "Mısır"
+          ],
+          "steps": [
+            [
+              "Ekim öncesinde toprak altına serpilerek",
+              "Serpme / Toprak altı",
+              "50-60 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tarla Bitkileri",
+          "name": "Çeltik",
+          "plants": [
+            "Çeltik"
+          ],
+          "steps": [
+            [
+              "Toprak hazırlığında toprak altına veya tavalara serpme şeklinde",
+              "Serpme / Toprak altı",
+              "50-60 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Endüstriyel Bitkiler",
+          "name": "Endüstriyel Bitkiler",
+          "plants": [
+            "Ayçiçeği",
+            "Soya",
+            "Kanola",
+            "Yer Fıstığı",
+            "Susam",
+            "Aspir",
+            "Yağ Keteni",
+            "Hint Yağı",
+            "Pamuk",
+            "Lif Keteni",
+            "Kenevir",
+            "Rami",
+            "Hibiskus",
+            "Şeker Pancarı",
+            "Kapok"
+          ],
+          "steps": [
+            [
+              "Ekim öncesinde toprak altına serpilerek",
+              "Serpme / Toprak altı",
+              "60-70 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tıbbi ve Aromatik Bitkiler",
+          "name": "Tıbbi, Aromatik ve Keyif Bitkileri",
+          "plants": [
+            "Tütün",
+            "Haşhaş",
+            "Yağ Gülü",
+            "Anason",
+            "Kimyon",
+            "Kekik",
+            "Adaçayı",
+            "Lavanta",
+            "Safran",
+            "Kapari"
+          ],
+          "steps": [
+            [
+              "Ekim öncesinde toprak altına serpilerek",
+              "Serpme / Toprak altı",
+              "50-60 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tıbbi ve Aromatik Bitkiler",
+          "name": "Çay, Defne ve Şerbetçi Otu",
+          "plants": [
+            "Çay",
+            "Defne",
+            "Şerbetçi Otu"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde fidan çukuruna, kökle temas edecek şekilde",
+              "Fidan çukuruna",
+              "1-2 kg/kök"
+            ],
+            [
+              "Yetişkin bitkide",
+              "Serpme",
+              "4-5 kg/kök"
+            ]
+          ]
+        },
+        {
+          "cat": "Yem Bitkileri",
+          "name": "Çayır, Mera ve Yem Bitkileri",
+          "plants": [
+            "Çayır",
+            "Mera",
+            "Yonca",
+            "Yem Bitkileri"
+          ],
+          "steps": [
+            [
+              "Ekim öncesinde toprak altına serpilerek",
+              "Serpme / Toprak altı",
+              "40-50 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Süs Bitkileri",
+          "name": "Kesme Çiçekçilik ve Süs Bitkileri",
+          "plants": [
+            "Kesme Çiçek",
+            "Süs Bitkileri"
+          ],
+          "steps": [
+            [
+              "Ekim öncesinde toprak altına serpilerek",
+              "Serpme / Toprak altı",
+              "60-70 kg/dekar"
+            ],
+            [
+              "Saksı harcı hazırlanırken harca karıştırılarak",
+              "Harca karıştırma",
+              "Harca %40-50"
+            ]
+          ]
+        },
+        {
+          "cat": "Süs Bitkileri",
+          "name": "Çiçekli İç Mekan Bitkileri",
+          "plants": [
+            "Çiçekli İç Mekan Bitkileri",
+            "Saksı Bitkileri"
+          ],
+          "steps": [
+            [
+              "Saksı harcı hazırlanırken harca karıştırılarak",
+              "Harca karıştırma",
+              "100-125 g/saksı"
+            ]
+          ]
+        },
+        {
+          "cat": "Süs Bitkileri",
+          "name": "Çim",
+          "plants": [
+            "Çim"
+          ],
+          "steps": [
+            [
+              "Önerilen dozda yüzeye serpilerek",
+              "Serpme",
+              "100-125 kg/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Yetiştiricilik",
+          "name": "Fide ve Fidan Yetiştiriciliği",
+          "plants": [
+            "Fide",
+            "Fidan",
+            "Fide Harcı",
+            "Fidan Harcı"
+          ],
+          "steps": [
+            [
+              "Kullanılacak yetiştirme harcına karıştırılarak",
+              "Harca karıştırma",
+              "Harca %40-50"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sivi",
+      "title": "Sıvı Solucan Gübresi",
+      "product": "hasturk-sivi-solucan-gubresi",
+      "url": "/pages/solucan-gubresi-kullanim-miktarlari",
+      "keywords": [
+        "sivi solucan"
+      ],
+      "groups": []
+    },
+    {
+      "id": "humik",
+      "title": "Sıvı Hümik Asit",
+      "product": "hasturk-humix-sivi-humik-asit",
+      "url": "/pages/humik-asit-nasil-kullanilir",
+      "keywords": [
+        "humik",
+        "humix",
+        "fulvik"
+      ],
+      "note": "Kullanmadan önce şişeyi iyice çalkalayınız. Toprak ve/veya yaprak analizi yaptırılarak kullanılması tavsiye edilir.",
+      "groups": [
+        {
+          "cat": "Sebzeler",
+          "name": "Meyvesi, Yaprağı, Sürgünü ve Çiçek Tablası Yenen Sebzeler",
+          "plants": [
+            "Domates",
+            "Biber",
+            "Patlıcan",
+            "Hıyar",
+            "Taze Fasulye",
+            "Taze Bezelye",
+            "Taze Bakla",
+            "Börülce",
+            "Bamya",
+            "Balkabağı",
+            "Çekirdeklik Kabak",
+            "Kavun",
+            "Karpuz",
+            "Lahana",
+            "Ispanak",
+            "Pazı",
+            "Semizotu",
+            "Marul",
+            "Salata",
+            "Brüksel Lahanası",
+            "Ebegümeci",
+            "Maydanoz",
+            "Roka",
+            "Tere",
+            "Nane",
+            "Dereotu",
+            "Hindiba",
+            "Kuşkonmaz",
+            "Ravent",
+            "Yaprak Kereviz",
+            "Sap Kereviz",
+            "Enginar",
+            "Karnabahar",
+            "Brokoli"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Tohumu, Soğanı, Yumrusu ve Kökü Yenen Sebzeler",
+          "plants": [
+            "Kuru Fasulye",
+            "Bezelye",
+            "Barbunya",
+            "Nohut",
+            "Bakla",
+            "Börülce",
+            "Mercimek",
+            "Tatlı Mısır",
+            "Sarımsak",
+            "Soğan",
+            "Pırasa",
+            "Tatlı Patates",
+            "Yer Elması",
+            "Havuç",
+            "Turp",
+            "Kırmızı Pancar",
+            "Şalgam",
+            "Kök Kereviz"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Tarla Bitkileri",
+          "name": "Tahıllar ve Mısır",
+          "plants": [
+            "Buğday",
+            "Arpa",
+            "Yulaf",
+            "Çavdar",
+            "Tritikale",
+            "Darı",
+            "Mısır"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Endüstriyel Bitkiler",
+          "name": "Yağlı Tohum ve Endüstriyel Bitkiler",
+          "plants": [
+            "Ayçiçeği",
+            "Soya",
+            "Kanola",
+            "Yer Fıstığı",
+            "Susam",
+            "Aspir",
+            "Yağ Keteni",
+            "Hint Yağı",
+            "Lif Keteni",
+            "Kenevir",
+            "Kapok",
+            "Rami",
+            "Hibiskus",
+            "Şeker Pancarı"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Endüstriyel Bitkiler",
+          "name": "Çeltik",
+          "plants": [
+            "Çeltik"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Tıbbi ve Aromatik Bitkiler",
+          "name": "Tıbbi, Aromatik ve Keyif Bitkileri",
+          "plants": [
+            "Haşhaş",
+            "Yağ Gülü",
+            "Anason",
+            "Kimyon",
+            "Adaçayı",
+            "Lavanta",
+            "Safran",
+            "Kapari",
+            "Şerbetçi Otu",
+            "Tütün"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Yem Bitkileri",
+          "name": "Çayır ve Mera Bitkileri",
+          "plants": [
+            "Yonca",
+            "Korunga",
+            "Burçak",
+            "Üçgül"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Meyveler ve Turunçgiller",
+          "name": "Meyveler, Turunçgiller ve Akdeniz Meyveleri",
+          "plants": [
+            "Elma",
+            "Armut",
+            "Ayva",
+            "Alıç",
+            "Muşmula",
+            "Üvez",
+            "Kuşburnu",
+            "Kiraz",
+            "Vişne",
+            "Kayısı",
+            "Şeftali",
+            "Erik",
+            "Kızılcık",
+            "İğde",
+            "Nektarin",
+            "Badem",
+            "Ceviz",
+            "Kestane",
+            "Fındık",
+            "Antep Fıstığı",
+            "Üzüm",
+            "Kivi",
+            "İncir",
+            "Nar",
+            "Ahududu",
+            "Böğürtlen",
+            "Portakal",
+            "Limon",
+            "Mandalina",
+            "Greyfurt",
+            "Mandarin",
+            "Zeytin",
+            "Trabzon Hurması",
+            "Yeni Dünya",
+            "Zerdali"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Süs Bitkileri ve Yeşil Alanlar",
+          "name": "Çim ve Yeşil Alanlar",
+          "plants": [
+            "Çim",
+            "Peyzaj Alanları"
+          ],
+          "steps": []
+        }
+      ]
+    }
+  ],
   "cart": {
     "enabled": true
   },

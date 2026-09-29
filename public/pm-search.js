@@ -206,6 +206,8 @@
     grid: svg('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'),
     calc: svg('<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h1M12 11h1M8.5 14.5h1M12 14.5h1M8.5 18h1M12 18h1M15.5 11v7"/>'),
     doc: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'),
+    book: svg('<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5M8 7.5h8M8 11h5"/>'),
+    drop: svg('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
     phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
     chat: svg('<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/><path d="M9 10.5c.5 2 2 3.5 4.5 4.5l1.2-1.2 1.8.8"/>'),
     minus: svg('<path d="M6 12h12"/>', 2.4),
@@ -335,8 +337,51 @@
     '@media(min-width:760px){.tabs{display:none}}',
     '.typing .tabs{display:none}',
     '.tb{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:46px;font-size:13.5px;font-weight:700;color:var(--mu);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap}',
-    '.tb svg{width:17px;height:17px}',
-    '@media(max-width:379px){.tb svg{display:none}.tb{font-size:13px}}',
+    '.tb svg{display:none}',
+    '@media(max-width:379px){.tb{font-size:12.5px}}',
+
+    /* Kullanım rehberi */
+    '.gd{padding:16px 16px 8px}',
+    '@media(min-width:760px){.gd{padding:20px}}',
+    '.gd-h b{display:block;font-size:22px;font-weight:800}',
+    '.gd-h p{font-size:14px;color:var(--mu);margin-top:4px}',
+    '.gsw{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:14px 0 4px}',
+    '.gsw::-webkit-scrollbar{display:none}',
+    '.gsw button{flex:none;height:38px;padding:0 16px;border-radius:19px;border:1.5px solid var(--ln);font-size:14px;font-weight:700}',
+    '.gsw button.on{background:var(--pr);border-color:var(--pr);color:#fff}',
+    '.gcat{margin:18px 0 8px;font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}',
+    '.gg{border:1px solid var(--ln);border-radius:16px;margin-bottom:8px;overflow:hidden}',
+    '.gg summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px}',
+    '.gg summary::-webkit-details-marker{display:none}',
+    '.gg summary div{flex:1;min-width:0}',
+    '.gg summary b{display:block;font-size:15px}',
+    '.gg summary small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;color:var(--mu);margin-top:2px}',
+    '.gg summary>svg{width:18px;height:18px;color:var(--mu);flex:none;transition:transform .2s}',
+    '.gg[open] summary>svg{transform:rotate(90deg)}',
+    '.gg[open] summary{border-bottom:1px solid var(--ln)}',
+    '.gg .pl{padding:10px 14px 0;font-size:12.5px;color:var(--mu)}',
+    '.steps{padding:8px 14px 12px}',
+    '.sr{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:9px 0;align-items:center}',
+    '.sr+.sr{border-top:1px dashed var(--ln)}',
+    '.sr b{font-size:14px}',
+    '.sr span{grid-column:1;font-size:12.5px;color:var(--mu)}',
+    '.sr em{grid-row:1/span 2;grid-column:2;font-style:normal;text-align:right;font-size:14.5px;font-weight:800;color:var(--prd);background:var(--soft);padding:6px 10px;border-radius:10px;white-space:nowrap}',
+    '.sr em small{display:block;font-size:11px;font-weight:600;color:var(--mu)}',
+    '.glink{display:flex;align-items:center;gap:8px;margin:4px 14px 12px;font-size:13.5px;font-weight:700;color:var(--pr)}',
+    '.glink svg{width:16px;height:16px}',
+    '.gprod{display:flex;align-items:center;gap:12px;margin-top:16px;padding:10px;border-radius:16px;background:var(--bg)}',
+    '.gprod .im{width:56px;height:56px;background:#fff}.gprod .im img{object-fit:contain}',
+    '.gprod div.tx{flex:1;min-width:0}.gprod b{display:block;font-size:14px}.gprod small{font-size:12.5px;color:var(--mu)}',
+    '.gprod>svg{width:18px;height:18px;color:var(--pr)}',
+    '.gnote{margin-top:14px;padding:12px 14px;border-radius:14px;background:#fff6e5;color:#6b4a00;font-size:12.5px;line-height:1.45}',
+    '.gcard{margin:12px 16px 0;border:1.5px solid var(--pr);border-radius:18px;overflow:hidden}',
+    '@media(min-width:760px){.gcard{margin:14px 20px 0}}',
+    '.gcard .gc-h{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--soft)}',
+    '.gcard .gc-h>svg{width:22px;height:22px;color:var(--pr);flex:none}',
+    '.gcard .gc-h b{display:block;font-size:15px;color:var(--prd)}.gcard .gc-h small{font-size:12.5px;color:var(--mu)}',
+    '.gcard .gc-f{display:flex;gap:8px;padding:0 14px 12px}',
+    '.gcard .gc-f a{flex:1;display:flex;align-items:center;justify-content:center;height:38px;border-radius:12px;font-size:13px;font-weight:700;background:var(--bg)}',
+    '.gcard .gc-f a.pri{background:var(--pr);color:#fff}',
     '.tb.on{color:var(--pr);border-bottom-color:var(--pr)}',
     '.clist{padding:0 8px}',
     '@media(min-width:760px){.clist{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:0 12px}}',
@@ -512,9 +557,10 @@
   ].join('\n');
 
   var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $sheet, $toast;
+  var $guide, GID = null;
   var isOpen = false, sel = -1, pushed = false;
   var onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home';
-  var TABS = [['home', 'Kategoriler', 'grid'], ['calc', 'Hacim Hesapla', 'calc'], ['pages', 'Sayfalar', 'doc']];
+  var TABS = [['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Hacim Hesapla', 'calc', 'Hacim'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
   var BY_ID = {};
 
   function build() {
@@ -536,9 +582,9 @@
         return '<button class="nav" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
       }).join('') + '<div class="help"></div></nav>' +
       '<div class="main"><div class="tabs">' + TABS.map(function (t) {
-        return '<button class="tb" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
+        return '<button class="tb" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[3] + '</span></button>';
       }).join('') + '</div><div class="tools"></div>' +
-      '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane pages"></div></div>' +
+      '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane guide"></div><div class="pane pages"></div></div>' +
       '<div class="results" aria-live="polite"></div></div>' +
       '<div class="cta"></div><div class="mfoot"></div>' +
       '<div class="sheet"></div><div class="toast"></div></div></div>' +
@@ -559,6 +605,7 @@
     $home = root.querySelector('.pane.home');
     $calc = root.querySelector('.pane.calc-p');
     $pages = root.querySelector('.pane.pages');
+    $guide = root.querySelector('.pane.guide');
     $body = root.querySelector('.body');
     $cta = root.querySelector('.cta');
     $mfoot = root.querySelector('.mfoot');
@@ -615,6 +662,8 @@
     else if (act === 'more') { shown += PAGE; render(); }
     else if (act === 'tab') { if ($q.value) { $q.value = ''; render(); } view = null; renderIdle(); setTab(v); }
     else if (act === 'gocalc') { $q.value = ''; render(); setTab('calc'); }
+    else if (act === 'guide') { GID = v; renderGuide(); }
+    else if (act === 'goguide') { GID = v; $q.value = ''; render(); setTab('guide'); }
     else if (act === 'add') openAdd(v);
     else if (act === 'vo') pickVariant(v);
     else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
@@ -626,6 +675,7 @@
   function tabOk(t) {
     if (t === 'calc') return calcEnabled();
     if (t === 'pages') return (CFG.pages || []).length > 0;
+    if (t === 'guide') return (CFG.guides || []).length > 0;
     return true;
   }
   function setTab(t) {
@@ -640,6 +690,8 @@
     $home.classList.toggle('on', t === 'home');
     $calc.classList.toggle('on', t === 'calc');
     $pages.classList.toggle('on', t === 'pages');
+    $guide.classList.toggle('on', t === 'guide');
+    if (t === 'guide') renderGuide();
     if (t === 'calc') calcBuild();
     $body.scrollTop = 0;
   }
@@ -808,6 +860,7 @@
       $cta.classList.add('on');
     } else $cta.classList.remove('on');
 
+    html += guideCards(r.tokens);
     if (calcEnabled() && r.tokens.some(function (t) { return /^(hacim|litre|kac|hesap|olcu|metrekup)/.test(t); })) {
       html += '<button class="banner" type="button" data-act="gocalc"><span class="bi">' + I.calc + '</span><div class="tx"><b>Toprak hesaplayıcı</b>' +
         '<span>Ölçüleri gir, kaç litre gerektiğini öğren</span></div>' + I.arrow + '</button>';
@@ -880,6 +933,90 @@
     try {
       (window.dataLayer = window.dataLayer || []).push({ event: 'urun_arama', search_action: kind, search_term: $q.value, search_target: name });
     } catch (e) {}
+  }
+
+  // ---------------- Kullanım rehberi ----------------
+  // config.json > guides: [{ id, title, product (slug), url (rehber sayfası), keywords, note, groups: [{ cat, name, plants[], steps: [[zaman, şekil, doz]] }] }]
+  function guides() { return CFG.guides || []; }
+  function doseHtml(d) {
+    // kg/dekar → g/m² (1 kg/dekar = 1 g/m²): ev ve bahçe kullanıcıları için
+    var m = String(d).match(/^([\d.,]+(?:\s*-\s*[\d.,]+)?)\s*kg\/dekar$/);
+    return esc(d) + (m ? '<small>≈ ' + esc(m[1]) + ' g/m²</small>' : '');
+  }
+  function stepsHtml(steps) {
+    return '<div class="steps">' + steps.map(function (st) {
+      return '<div class="sr"><b>' + esc(st[1]) + '</b><span>' + esc(st[0]) + '</span><em>' + doseHtml(st[2]) + '</em></div>';
+    }).join('') + '</div>';
+  }
+  function guideGroup(gd, gr, open) {
+    return '<details class="gg"' + (open ? ' open' : '') + '><summary><div><b>' + esc(gr.name) + '</b><small>' + esc(gr.plants.join(' · ')) + '</small></div>' + I.right + '</summary>' +
+      (gr.steps && gr.steps.length ? stepsHtml(gr.steps)
+        : '<a class="glink" data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '">Dozları rehber sayfasında gör' + I.arrow + '</a>') +
+      '</details>';
+  }
+  function renderGuide() {
+    var list = guides();
+    if (!list.length || !$guide) return;
+    var gd = list.filter(function (x) { return x.id === GID; })[0] || list[0];
+    GID = gd.id;
+    var html = '<div class="gd"><div class="gd-h"><b>Kullanım rehberi</b><p>Bitkinin adını yukarıdaki aramaya yazın (örn. domates, zeytin, çim); doğru dozu hemen gösterelim.</p></div>' +
+      '<div class="gsw">' + list.map(function (x) {
+        return '<button type="button" data-act="guide" data-v="' + esc(x.id) + '" class="' + (x === gd ? 'on' : '') + '">' + esc(x.title) + '</button>';
+      }).join('') + '</div>';
+    var groups = gd.groups || [], lastCat = null;
+    if (!groups.length) {
+      html += '<a class="gprod" data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '"><span class="im" style="display:grid;place-items:center;color:var(--pr)">' + I.book + '</span>' +
+        '<div class="tx"><b>' + esc(gd.title) + ' kullanım rehberi</b><small>Bitkiye göre dozlar rehber sayfamızda</small></div>' + I.arrow + '</a>';
+    }
+    groups.forEach(function (gr) {
+      if (gr.cat !== lastCat) { html += '<div class="gcat">' + esc(gr.cat) + '</div>'; lastCat = gr.cat; }
+      html += guideGroup(gd, gr, false);
+    });
+    var p = DATA && gd.product ? DATA.items.filter(function (x) { return x.s === gd.product; })[0] : null;
+    if (p) {
+      html += '<a class="gprod" data-kind="product" data-name="' + esc(p.n) + '" href="' + esc(url(p.s)) + '">' + thumb(p.img, 180) +
+        '<div class="tx"><b>' + esc(p.n) + '</b><small>' + (p.p != null ? tl(price(p)) + (p.multi ? ' başlayan fiyatlarla' : '') : '') + '</small></div>' + I.arrow + '</a>';
+    }
+    if (gd.note) html += '<div class="gnote">' + esc(gd.note) + '</div>';
+    $guide.innerHTML = html + '</div>';
+  }
+  // Aramada bitki adı geçiyorsa ilgili rehber grubunu kart olarak göster
+  function guideCards(tokens) {
+    var out = [], toks = tokens.filter(function (t) { return t.length >= 3; });
+    if (!toks.length) return '';
+    var q = toks.join(' ');
+    var named = function (gd) { return (gd.keywords || []).some(function (k) { return q.indexOf(fold(k)) !== -1; }); };
+    // Aramada bir ürün adı geçiyorsa (örn. "hümik asit domates") sadece o ürünün rehberi
+    var list = guides().filter(named);
+    if (list.length > 1) list = list.filter(function (gd) { return !list.some(function (o) { return o !== gd && (o.keywords || []).some(function (k) { return (gd.keywords || []).some(function (g) { return fold(k).indexOf(fold(g)) !== -1 && fold(k) !== fold(g); }); }); }); });
+    if (!list.length) list = guides();
+    list.forEach(function (gd) {
+      var hit = null;
+      (gd.groups || []).some(function (gr) {
+        return gr.plants.some(function (pl) {
+          var ws = words(fold(pl));
+          var ok = toks.some(function (t) { return ws.some(function (w) { return w === t || (t.length >= 4 && w.indexOf(t) === 0); }); });
+          if (ok) hit = { gr: gr, pl: pl };
+          return ok;
+        });
+      });
+      var kwIn = named(gd), kw = kwIn && toks.some(function (t) { return /^(kullan|doz|nasil|miktar|rehber)/.test(t); });
+      if (hit && !(hit.gr.steps && hit.gr.steps.length) && !kwIn) hit = null; // doz verisi olmayan rehber sadece adı geçince
+      if (hit && hit.gr.steps && hit.gr.steps.length) {
+        out.push('<div class="gcard"><div class="gc-h">' + I.book + '<div><b>' + esc(hit.pl) + ' için ' + esc(gd.title) + '</b><small>' + esc(hit.gr.name) + ' · kullanım dozu</small></div></div>' +
+          stepsHtml(hit.gr.steps) + '<div class="gc-f"><a data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '">Tüm rehber</a>' +
+          (gd.product ? '<a class="pri" data-kind="product" data-name="' + esc(gd.title) + '" href="' + esc(url(gd.product)) + '">Ürünü gör</a>' : '') + '</div></div>');
+      } else if (kw && !hit && (gd.groups || []).length) {
+        out.push('<button class="banner" type="button" data-act="goguide" data-v="' + esc(gd.id) + '" style="background:var(--soft);color:var(--prd)">' +
+          '<span class="bi" style="background:#fff;color:var(--pr)">' + I.book + '</span><div class="tx"><b>' + esc(gd.title) + ' kullanım rehberi</b>' +
+          '<span style="color:var(--mu)">Bitkiye göre doz ve uygulama zamanı</span></div>' + I.arrow + '</button>');
+      } else if (hit || kw || (kwIn && !(gd.groups || []).length)) {
+        out.push('<a class="banner" data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '" style="background:var(--soft);color:var(--prd)">' +
+          '<span class="bi" style="background:#fff;color:var(--pr)">' + I.book + '</span><div class="tx"><b>' + (hit ? esc(hit.pl) + ' için ' : '') + esc(gd.title) + ' nasıl kullanılır?</b>' +
+          '<span style="color:var(--mu)">Doz ve uygulama zamanı rehberimizde</span></div>' + I.arrow + '</a>');
+      }
+    });
+    return out.slice(0, 2).join('');
   }
 
   // ---------------- Sepete ekle ----------------
