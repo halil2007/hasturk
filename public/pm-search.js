@@ -198,7 +198,11 @@
     leaf: svg('<path d="M12 21c-5 0-8-3.5-8-8 6 0 8 3 8 8zm0 0c0-6 3-9 8-9 0 5-3 9-8 9zM12 13V5"/>'),
     grid: svg('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'),
     phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
-    chat: svg('<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/>')
+    chat: svg('<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/><path d="M9 10.5c.5 2 2 3.5 4.5 4.5l1.2-1.2 1.8.8"/>'),
+    ruler: svg('<path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/>'),
+    doc: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'),
+    minus: svg('<path d="M6 12h12"/>', 2.4),
+    plus: svg('<path d="M12 6v12M6 12h12"/>', 2.4)
   };
 
   var CSS = [
@@ -340,20 +344,109 @@
     '.spin{width:28px;height:28px;border:3px solid var(--ln);border-top-color:var(--pr);border-radius:50%;margin:48px auto;animation:sp .8s linear infinite}',
     '@keyframes sp{to{transform:rotate(360deg)}}',
 
-    '.foot{display:none;align-items:center;gap:16px;padding:10px 16px;border-top:1px solid var(--ln);font-size:12.5px;color:var(--mu)}',
+    '.foot{display:none;align-items:center;gap:16px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);font-size:12.5px;color:var(--mu);background:#fff}',
     '.foot.on{display:flex}',
-    '.typing .foot{display:none}',
+    '.typing .cta.on{padding-bottom:10px}',
     '.keys{display:none;gap:14px;margin-left:auto}',
-    '@media(min-width:760px){.foot{display:flex}.keys{display:flex}}',
+    '@media(min-width:760px){.foot{display:flex}.keys{display:flex}.typing .keys{display:none}}',
     '.keys kbd{font:inherit;font-size:11px;font-weight:600;border:1px solid var(--ln);border-bottom-width:2px;border-radius:5px;padding:0 5px;margin-right:4px;color:var(--ink)}',
-    '.contact{display:flex;gap:8px}',
-    '.contact a{display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:10px;background:var(--bg);color:var(--ink);font-weight:600;font-size:13px}',
-    '.contact svg{width:16px;height:16px;color:var(--pr)}'
+    '.contact{display:flex;gap:8px;min-width:0}',
+    '.contact a{display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:12px;font-weight:600;font-size:13.5px;white-space:nowrap}',
+    '.contact .wa{background:#1f9d55;color:#fff}',
+    '.contact .tel{border:1px solid var(--ln);color:var(--ink)}',
+    '.contact svg{width:18px;height:18px}',
+    '.contact .tel svg{color:var(--pr)}',
+
+    /* Sekmeler */
+    '.tabs{display:flex;gap:4px;padding:0 12px;border-bottom:1px solid var(--ln);overflow-x:auto;scrollbar-width:none;flex:none}',
+    '.tabs::-webkit-scrollbar{display:none}',
+    '.typing .tabs{display:none}',
+    '.tab{display:flex;align-items:center;gap:7px;height:44px;padding:0 10px;font-size:14px;font-weight:600;color:var(--mu);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}',
+    '.tab svg{width:17px;height:17px}',
+    '.tab:hover{color:var(--ink)}',
+    '.tab.on,.tab.on:hover{color:var(--pr);border-bottom-color:var(--pr)}',
+    '@media(max-width:759px){.tabs{padding:0 6px;gap:0}.tab{flex:1;justify-content:center;padding:0 4px;font-size:13.5px;gap:6px}}',
+    '.pane{display:none}.pane.on{display:block}',
+
+    /* Sayfalar */
+    '.pg{padding:8px 0}',
+    '.list .li .ico{width:40px;height:40px;border-radius:10px;background:var(--bg);display:grid;place-items:center;color:var(--pr);flex:none}',
+    '.list .li .ico svg{width:20px;height:20px}',
+
+    /* Aramada hesaplayıcı kısayolu */
+    '.calc-card{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border-radius:14px;background:var(--soft);color:var(--pr);text-align:left}',
+    '.calc-card>svg{width:20px;height:20px;flex:none}',
+    '.calc-card div{flex:1}.calc-card b{display:block;font-size:15px}.calc-card span{font-size:13px;color:var(--mu)}',
+
+    /* Hacim hesaplayıcı */
+    '.calc{padding:16px}',
+    '.c-in{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}',
+    '.c-in .ic{width:40px;height:40px;border-radius:12px;background:var(--soft);color:var(--pr);display:grid;place-items:center;flex:none}',
+    '.c-in .ic svg{width:20px;height:20px}',
+    '.c-in b{display:block;font-size:16px}.c-in p{font-size:13.5px;color:var(--mu);margin-top:2px}',
+    '.shp{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}',
+    '@media(min-width:760px){.shp{grid-template-columns:repeat(4,1fr)}}',
+    '.sh{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--ln);border-radius:12px;font-size:13.5px;font-weight:600;text-align:left}',
+    '.sh svg{width:24px;height:24px;flex:none;color:var(--mu)}',
+    '.sh:hover{border-color:#c9d3cf}',
+    '.sh.on{border-color:var(--pr);background:var(--soft);color:var(--pr)}.sh.on svg{color:var(--pr)}',
+    '.c-main{display:grid;gap:14px;margin-top:14px}',
+    '@media(min-width:760px){.c-main{grid-template-columns:1fr 1fr;align-items:start}.c-fig{order:2}}',
+    '.c-fig{border-radius:14px;background:var(--bg);padding:8px}',
+    '.c-fig svg{width:100%;height:auto;max-height:220px}',
+    '@media(max-width:759px){.c-fig svg{max-height:170px}}',
+    '.c-fig .ln{fill:#fff;stroke:#2b3330;stroke-width:2;stroke-linejoin:round}',
+    '.c-fig .ln2{fill:none;stroke:#2b3330;stroke-width:2}',
+    '.c-fig .soil{fill:#8b5e3c}',
+    '.c-fig .dm line{stroke:var(--pr);stroke-width:1.6;stroke-dasharray:4 3}',
+    '.c-fig .dm .cap{fill:var(--pr)}',
+    '.c-fig .dm .bd{fill:var(--pr)}',
+    '.c-fig .dm .lt{fill:#fff;font-size:12px;font-weight:700;text-anchor:middle}',
+    '.c-fig .dm .dv{fill:var(--ink);font-size:12px;font-weight:600}',
+    '.c-fig .dm.on line{stroke:var(--ac);stroke-width:2.4;stroke-dasharray:none}',
+    '.c-fig .dm.on .bd,.c-fig .dm.on .cap{fill:var(--ac)}',
+    '.cf{margin-bottom:12px}',
+    '.cf label{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;margin-bottom:6px}',
+    '.cf label i{width:20px;height:20px;border-radius:50%;background:var(--pr);color:#fff;font-style:normal;font-size:11px;display:grid;place-items:center}',
+    '.ci{display:flex;align-items:center;height:46px;border:1.5px solid var(--ln);border-radius:12px;padding:0 4px 0 12px;background:#fff}',
+    '.ci:focus-within{border-color:var(--pr)}',
+    '.ci input,.stp input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:16px;background:transparent;color:var(--ink)}',
+    '.un{display:flex;background:var(--bg);border-radius:9px;padding:3px}',
+    '.un button{height:30px;padding:0 10px;border-radius:7px;font-size:13px;font-weight:600;color:var(--mu)}',
+    '.un button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}',
+    '.cq{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px}',
+    '.cq span{font-size:13.5px;font-weight:600}',
+    '.stp{display:flex;align-items:center;height:42px;border:1.5px solid var(--ln);border-radius:12px;width:132px}',
+    '.stp button{width:40px;height:40px;display:grid;place-items:center;color:var(--ink)}',
+    '.stp button svg{width:16px;height:16px}',
+    '.stp input{text-align:center;width:40px}',
+    '.c-tip{font-size:12.5px;color:var(--mu);margin-top:10px}',
+    '.c-hint{margin-top:14px;padding:18px;border:1.5px dashed var(--ln);border-radius:14px;text-align:center;color:var(--mu);font-size:14px}',
+    '.c-res{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}',
+    '.c-res>div{border-radius:14px;padding:14px}',
+    '.c-big{background:var(--pr);color:#fff}',
+    '.c-rec{background:var(--soft);color:var(--pr)}',
+    '.c-res small{display:block;font-size:12px;font-weight:600;opacity:.85}',
+    '.c-res b{display:block;font-size:26px;font-weight:800;margin:2px 0;letter-spacing:-.01em}',
+    '.c-res span{display:block;font-size:12px;opacity:.85}',
+    '.c-note{margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff4e6;color:#8a3a0a;font-size:13px}',
+    '.c-note a{font-weight:700;text-decoration:underline}',
+    '.calc .h{padding:18px 0 8px}',
+    '.pk{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid var(--ln);border-radius:14px;margin-bottom:8px}',
+    '.pk:hover{border-color:var(--pr)}',
+    '.pk .im{width:52px;height:52px}',
+    '.pk .meta b{color:var(--ink);font-weight:600}',
+    '.best{background:var(--pr);color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:1px}',
+    '.c-sr{margin-top:6px}',
+    '.c-sr .field{height:44px;background:var(--bg)}',
+    '.c-sr .field input{font-size:15px}',
+    '.c-more{margin-top:10px}',
+    '.c-sr.hide,.c-more.hide{display:none}'
   ].join('\n');
 
-  var host, root, $wrap, $ov, $panel, $q, $clr, $tools, $res, $idle, $body, $cta, $foot, $fab;
+  var host, root, $wrap, $ov, $panel, $q, $clr, $tabs, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $foot, $fab;
   var isOpen = false, sel = -1, pushed = false;
-  var onlyStock = false, sortMode = 'rel', shown = PAGE, view = null;
+  var onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home';
 
   function build() {
     if (host) return;
@@ -369,8 +462,13 @@
       '<input type="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Ara">' +
       '<button class="clr" type="button" data-act="clear" aria-label="Temizle">' + I.x + '</button></label>' +
       '<button class="esc" type="button" data-act="close" aria-label="Kapat">Esc</button></div>' +
+      '<div class="tabs" role="tablist">' +
+      '<button class="tab on" type="button" role="tab" data-act="tab" data-v="home">' + I.grid + 'Keşfet</button>' +
+      '<button class="tab" type="button" role="tab" data-act="tab" data-v="calc">' + I.ruler + 'Hacim Hesapla</button>' +
+      '<button class="tab" type="button" role="tab" data-act="tab" data-v="pages">' + I.doc + 'Sayfalar</button></div>' +
       '<div class="tools"></div>' +
-      '<div class="body"><div class="idle"></div><div class="results" aria-live="polite"></div></div>' +
+      '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane pages"></div></div>' +
+      '<div class="results" aria-live="polite"></div></div>' +
       '<div class="cta"></div><div class="foot"></div>' +
       '</div></div></div>';
     document.body.appendChild(host);
@@ -379,11 +477,15 @@
     $fab = root.querySelector('.fab');
     $ov = root.querySelector('.ov');
     $panel = root.querySelector('.panel');
-    $q = root.querySelector('input');
+    $q = root.querySelector('.top input');
     $clr = root.querySelector('.clr');
     $tools = root.querySelector('.tools');
     $res = root.querySelector('.results');
     $idle = root.querySelector('.idle');
+    $home = root.querySelector('.pane.home');
+    $calc = root.querySelector('.pane.calc-p');
+    $pages = root.querySelector('.pane.pages');
+    $tabs = root.querySelector('.tabs');
     $body = root.querySelector('.body');
     $cta = root.querySelector('.cta');
     $foot = root.querySelector('.foot');
@@ -398,6 +500,10 @@
       if (t && t.tagName === 'IMG' && t.parentNode) t.parentNode.innerHTML = I.leaf;
     }, true);
     root.addEventListener('click', onClick);
+    root.addEventListener('input', function (e) { if (e.target !== $q) calcInput(e.target); });
+    root.addEventListener('focusin', function (e) { calcFocus(e.target, true); });
+    root.addEventListener('focusout', function (e) { calcFocus(e.target, false); });
+    $panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.target !== $q) close(); });
     setupFab();
     if (DATA) applyConfig();
   }
@@ -420,6 +526,25 @@
     else if (act === 'stock') { onlyStock = !onlyStock; shown = PAGE; render(); }
     else if (act === 'sort') { sortMode = v; shown = PAGE; render(); }
     else if (act === 'more') { shown += PAGE; render(); }
+    else if (act === 'tab') setTab(v);
+    else if (act === 'gocalc') { $q.value = ''; render(); setTab('calc'); }
+    else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
+  }
+
+  function setTab(t) {
+    if (t === 'calc' && !calcEnabled()) t = 'home';
+    if (t === 'pages' && !(CFG.pages || []).length) t = 'home';
+    tab = t;
+    [].forEach.call($tabs.querySelectorAll('.tab'), function (b) {
+      var on = b.getAttribute('data-v') === t;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $home.classList.toggle('on', t === 'home');
+    $calc.classList.toggle('on', t === 'calc');
+    $pages.classList.toggle('on', t === 'pages');
+    if (t === 'calc') calcBuild();
+    $body.scrollTop = 0;
   }
 
   function applyConfig() {
@@ -436,13 +561,22 @@
     updateFab();
 
     var contact = '';
-    if (CFG.phone) contact += '<a href="tel:' + esc(CFG.phone.replace(/\s/g, '')) + '">' + I.phone + esc(CFG.phone) + '</a>';
-    if (CFG.whatsapp) contact += '<a target="_blank" rel="noopener" href="https://wa.me/' + esc(CFG.whatsapp.replace(/\D/g, '')) + '">' + I.chat + 'WhatsApp</a>';
+    if (CFG.whatsapp) contact += '<a class="wa" data-kind="whatsapp" data-name="whatsapp" target="_blank" rel="noopener" href="' + esc(waHref()) + '">' + I.chat + 'WhatsApp ile yaz</a>';
+    if (CFG.phone) contact += '<a class="tel" data-kind="phone" data-name="phone" href="tel:' + esc(CFG.phone.replace(/[^\d+]/g, '')) + '">' + I.phone + esc(CFG.phone) + '</a>';
     $foot.innerHTML = (contact ? '<div class="contact">' + contact + '</div>' : '') +
       '<div class="keys"><span><kbd>↑</kbd><kbd>↓</kbd>gezin</span><span><kbd>Enter</kbd>aç</span><span><kbd>Esc</kbd>kapat</span></div>';
     $foot.classList.toggle('on', !!contact);
+    $tabs.querySelector('[data-v="calc"]').style.display = calcEnabled() ? '' : 'none';
+    $tabs.querySelector('[data-v="pages"]').style.display = (CFG.pages || []).length ? '' : 'none';
+    $tabs.style.display = calcEnabled() || (CFG.pages || []).length ? '' : 'none';
     renderIdle();
+    setTab(tab);
   }
+
+  function waHref(text) {
+    return 'https://wa.me/' + String(CFG.whatsapp || '').replace(/\D/g, '') + (text ? '?text=' + encodeURIComponent(text) : '');
+  }
+  function pageHref(u) { return /^(https?:|tel:|mailto:)/.test(u) ? u : STORE + '/' + String(u || '').replace(/^\//, ''); }
 
   function url(slug) { return STORE + '/' + String(slug).replace(/^\//, ''); }
 
@@ -462,9 +596,10 @@
 
   // ---- Boş kutu: son aramalar, popüler, kategoriler ----
   function renderIdle() {
-    if (!$idle) return;
-    if (!DATA) { $idle.innerHTML = '<div class="spin"></div>'; return; }
-    if (view && CATS_BY_ID[view]) { $idle.innerHTML = renderCat(CATS_BY_ID[view]); return; }
+    if (!$home) return;
+    renderPages();
+    if (!DATA) { $home.innerHTML = '<div class="spin"></div>'; return; }
+    if (view && CATS_BY_ID[view]) { $home.innerHTML = renderCat(CATS_BY_ID[view]); return; }
     view = null;
     var html = '';
     var rec = getRecent();
@@ -481,7 +616,10 @@
         pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') +
         '</div>';
     }
-    var tops = DATA.cats.filter(function (c) { return !c.p || !CATS_BY_ID[c.p]; }).sort(function (a, b) { return b.k - a.k; });
+    var last = (CFG.categoryLast || []).map(fold);
+    var rank = function (c) { var i = last.indexOf(c.f); return i < 0 ? -1 : i; };
+    var tops = DATA.cats.filter(function (c) { return !c.p || !CATS_BY_ID[c.p]; })
+      .sort(function (a, b) { return rank(a) - rank(b) || b.k - a.k; });
     if (tops.length) {
       html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="tiles">' +
         tops.map(function (c) {
@@ -491,7 +629,15 @@
             : '<a class="tile" data-kind="category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '">' + inner + '</a>';
         }).join('') + '</div>';
     }
-    $idle.innerHTML = html;
+    $home.innerHTML = html;
+  }
+
+  function renderPages() {
+    var pages = CFG.pages || [];
+    $pages.innerHTML = '<div class="pg list">' + pages.map(function (pg) {
+      return '<a class="li" data-kind="page" data-name="' + esc(pg.title) + '" href="' + esc(pageHref(pg.url)) + '">' +
+        '<span class="ico">' + I.doc + '</span><span>' + esc(pg.title) + '</span>' + I.right + '</a>';
+    }).join('') + '</div>';
   }
 
   function renderCat(c) {
@@ -549,7 +695,22 @@
       $cta.classList.add('on');
     } else $cta.classList.remove('on');
 
-    if (!items.length && !r.cats.length) {
+    if (calcEnabled() && r.tokens.some(function (t) { return /^(hacim|litre|kac|hesap|olcu|metrekup)/.test(t); })) {
+      html += '<button class="calc-card" type="button" data-act="gocalc">' + I.ruler +
+        '<div><b>Kaç litre toprak gerekir?</b><span>Ölçüleri girin, gereken toprağı ve paketleri hesaplayalım</span></div>' + I.arrow + '</button>';
+    }
+    var pages = (CFG.pages || []).filter(function (pg) {
+      var f = fold(pg.title);
+      return r.tokens.every(function (t) { return words(f).some(function (w) { return w.indexOf(t) === 0; }); });
+    });
+    if (pages.length) {
+      html += '<div class="list" style="padding-top:8px">' + pages.slice(0, 3).map(function (pg) {
+        return '<a class="li" data-kind="page" data-name="' + esc(pg.title) + '" href="' + esc(pageHref(pg.url)) + '">' +
+          '<span class="ico">' + I.doc + '</span><span>' + esc(pg.title) + '</span>' + I.right + '</a>';
+      }).join('') + '</div>';
+    }
+
+    if (!items.length && !r.cats.length && !html) {
       var pop = CFG.popular || [];
       var sugg = pop.filter(function (p) {
         return r.tokens.some(function (t) { return lev(fold(p).slice(0, t.length), t) <= 2; });
@@ -620,6 +781,271 @@
     } catch (e) {}
   }
 
+  // ---------------- Hacim hesaplayıcı ----------------
+  var SHAPES = {
+    cyl: { n: 'Yuvarlak saksı', f: [['d', 'Çap', 'cm'], ['h', 'Yükseklik', 'cm']],
+      v: function (x) { return Math.PI * Math.pow(x.d / 2, 2) * x.h; } },
+    cone: { n: 'Konik saksı', f: [['d1', 'Üst çap', 'cm'], ['d2', 'Alt çap', 'cm'], ['h', 'Yükseklik', 'cm']],
+      v: function (x) { return Math.PI * x.h / 12 * (x.d1 * x.d1 + x.d1 * x.d2 + x.d2 * x.d2); } },
+    box: { n: 'Dikdörtgen saksı', f: [['w', 'En', 'cm'], ['l', 'Boy', 'cm'], ['h', 'Yükseklik', 'cm']],
+      v: function (x) { return x.w * x.l * x.h; } },
+    bed: { n: 'Bahçe / sebze yatağı', f: [['bw', 'En', 'm'], ['bl', 'Boy', 'm'], ['bd', 'Toprak derinliği', 'cm']],
+      v: function (x) { return x.bw * x.bl * x.bd; } }
+  };
+  var SHAPE_ICON = {
+    cyl: svg('<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6"/>'),
+    cone: svg('<ellipse cx="12" cy="5.5" rx="8.5" ry="2.5"/><path d="M3.5 5.5 6.3 18.3c.3 1.3 2.8 2.2 5.7 2.2s5.4-.9 5.7-2.2l2.8-12.8"/>'),
+    box: svg('<path d="M4 8.5 8 5h12v10.5L16 19H4z"/><path d="M4 8.5h12V19M16 8.5 20 5"/>'),
+    bed: svg('<path d="M2 12.5 6 9.5h16v4l-4 3.5H2z"/><path d="M2 12.5h16V17M18 12.5l4-3M6 12.5v4.5M10 12.5v4.5M14 12.5v4.5"/>')
+  };
+  var LETTERS = ['A', 'B', 'C'];
+  var C = { shape: 'cyl', val: {}, unit: {}, qty: 1, built: false, soil: null };
+
+  function calcEnabled() { return (CFG.calc || {}).enabled !== false; }
+
+  // Ölçü çizgisi: k alan anahtarı, (x1,y1)-(x2,y2) çizgi, (bx,by) harf rozeti, (tx,ty,anchor) değer yazısı
+  function dim(k, i, x1, y1, x2, y2, bx, by, tx, ty, anchor) {
+    return '<g class="dm" data-k="' + k + '"><line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"/>' +
+      '<circle class="cap" cx="' + x1 + '" cy="' + y1 + '" r="3"/><circle class="cap" cx="' + x2 + '" cy="' + y2 + '" r="3"/>' +
+      '<circle class="bd" cx="' + bx + '" cy="' + by + '" r="11"/><text class="lt" x="' + bx + '" y="' + (by + 4) + '">' + LETTERS[i] + '</text>' +
+      '<text class="dv" x="' + tx + '" y="' + ty + '" text-anchor="' + (anchor || 'start') + '"></text></g>';
+  }
+  function figure(shape) {
+    var o = '<svg viewBox="0 0 320 220" role="img" aria-label="' + esc(SHAPES[shape].n) + ' ölçüleri">';
+    if (shape === 'cyl') {
+      o += '<path class="ln" d="M70 60V170A75 18 0 0 0 220 170V60"/>' +
+        '<path class="soil" opacity=".22" d="M70 76V170A75 18 0 0 0 220 170V76A75 18 0 0 1 70 76Z"/>' +
+        '<ellipse class="soil" opacity=".55" cx="145" cy="76" rx="75" ry="18"/>' +
+        '<ellipse class="ln2" cx="145" cy="60" rx="75" ry="18"/>' +
+        dim('d', 0, 70, 24, 220, 24, 145, 24, 162, 14) + dim('h', 1, 246, 60, 246, 170, 246, 115, 262, 119);
+    } else if (shape === 'cone') {
+      o += '<path class="ln" d="M62 58 94 170A51 13 0 0 0 196 170L228 58"/>' +
+        '<path class="soil" opacity=".22" d="M66 74 94 170A51 13 0 0 0 196 170L224 74A79 18 0 0 1 66 74Z"/>' +
+        '<ellipse class="soil" opacity=".55" cx="145" cy="74" rx="79" ry="18"/>' +
+        '<ellipse class="ln2" cx="145" cy="58" rx="83" ry="19"/>' +
+        dim('d1', 0, 62, 22, 228, 22, 145, 22, 162, 12) + dim('d2', 1, 94, 204, 196, 204, 145, 204, 162, 218) +
+        dim('h', 2, 252, 58, 252, 170, 252, 114, 268, 118);
+    } else if (shape === 'box') {
+      o += '<path class="ln" d="M60 80 104 48H234V148L190 180H60Z"/>' +
+        '<path class="ln2" d="M60 80H190V180M190 80 234 48"/>' +
+        '<path class="soil" opacity=".5" d="M60 94 104 62H234L190 94Z"/>' +
+        '<path class="soil" opacity=".18" d="M60 94H190V180H60Z"/>' +
+        dim('w', 0, 60, 202, 190, 202, 125, 202, 142, 216) + dim('l', 1, 202, 190, 246, 158, 224, 174, 240, 196) +
+        dim('h', 2, 36, 80, 36, 180, 36, 130, 36, 68, 'middle');
+    } else {
+      o += '<path class="ln" d="M24 112 74 78H290V124L240 158H24Z"/>' +
+        '<path class="ln2" d="M24 112H240V158M240 112 290 78M78 112V158M132 112V158M186 112V158"/>' +
+        '<path class="soil" opacity=".55" d="M24 120 74 86H290L240 120Z"/>' +
+        '<path class="soil" opacity=".18" d="M24 120H240V158H24Z"/>' +
+        dim('bw', 0, 252, 168, 302, 134, 277, 151, 277, 180, 'middle') + dim('bl', 1, 24, 182, 240, 182, 132, 182, 149, 204) +
+        dim('bd', 2, 12, 112, 12, 158, 12, 135, 4, 100, 'start');
+    }
+    return o + '</svg>';
+  }
+
+  function calcBuild() {
+    if (!C.built) {
+      C.built = true;
+      $calc.innerHTML = '<div class="calc">' +
+        '<div class="c-in"><div class="ic">' + I.ruler + '</div><div><b>Toprak hesaplayıcı</b>' +
+        '<p>Saksınızın ya da yatağınızın iç ölçülerini girin; kaç litre toprak gerektiğini ve hangi paketlerle en uygun şekilde alabileceğinizi gösterelim.</p></div></div>' +
+        '<div class="shp">' + Object.keys(SHAPES).map(function (k) {
+          return '<button class="sh" type="button" data-act="shape" data-v="' + k + '">' + SHAPE_ICON[k] + esc(SHAPES[k].n) + '</button>';
+        }).join('') + '</div>' +
+        '<div class="c-main"><div class="c-fig"></div><div class="c-form"></div></div>' +
+        '<div class="c-out"></div>' +
+        '<div class="c-sr hide"><div class="h">Başka bir toprak mı istiyorsunuz?</div><label class="field">' + I.search +
+        '<input type="search" data-k="soilq" autocomplete="off" placeholder="Toprak ara (ör. torf, perlit, orkide)"></label></div>' +
+        '<div class="c-more hide"></div></div>';
+    }
+    calcShape(C.shape);
+  }
+
+  function calcShape(k) {
+    C.shape = k;
+    var s = SHAPES[k];
+    [].forEach.call($calc.querySelectorAll('.sh'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === k); });
+    $calc.querySelector('.c-fig').innerHTML = figure(k);
+    $calc.querySelector('.c-form').innerHTML = s.f.map(function (f, i) {
+      var u = C.unit[f[0]] || f[2];
+      return '<div class="cf"><label for="ua-' + f[0] + '"><i>' + LETTERS[i] + '</i>' + esc(f[1]) + '</label>' +
+        '<div class="ci"><input id="ua-' + f[0] + '" data-k="' + f[0] + '" inputmode="decimal" autocomplete="off" placeholder="Değer girin" value="' + esc(C.val[f[0]] || '') + '">' +
+        '<div class="un">' + ['cm', 'm'].map(function (x) {
+          return '<button type="button" data-act="unit" data-k="' + f[0] + '" data-v="' + x + '" class="' + (u === x ? 'on' : '') + '">' + x + '</button>';
+        }).join('') + '</div></div></div>';
+    }).join('') +
+      '<div class="cq"><span>' + (k === 'bed' ? 'Yatak sayısı' : 'Saksı sayısı') + '</span><div class="stp">' +
+      '<button type="button" data-act="qty" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
+      '<input data-k="qty" inputmode="numeric" value="' + C.qty + '" aria-label="Adet">' +
+      '<button type="button" data-act="qty" data-v="1" aria-label="Artır">' + I.plus + '</button></div></div>' +
+      '<p class="c-tip">' + (k === 'bed' ? 'Derinlik: toprağın dolacağı yükseklik. Sebze için en az 25–30 cm önerilir.' : 'Kenar kalınlığı hariç, iç ölçüleri girin.') + '</p>';
+    s.f.forEach(function (f) { figValue(f[0]); });
+    calcUpdate();
+  }
+
+  function num(v) { var n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return n > 0 ? n : 0; }
+  function figValue(k) {
+    var t = $calc.querySelector('.c-fig .dm[data-k="' + k + '"] .dv');
+    if (!t) return;
+    var n = num(C.val[k]), f = SHAPES[C.shape].f.filter(function (x) { return x[0] === k; })[0];
+    t.textContent = n ? n.toLocaleString('tr-TR') + ' ' + (C.unit[k] || f[2]) : '';
+  }
+
+  function calcInput(el) {
+    var k = el.getAttribute && el.getAttribute('data-k');
+    if (!k || !$calc || !$calc.contains(el)) return;
+    if (k === 'soilq') { soilSearch(); return; }
+    if (k === 'qty') { C.qty = Math.max(1, Math.min(999, parseInt(el.value, 10) || 1)); calcUpdate(); return; }
+    C.val[k] = el.value;
+    figValue(k);
+    calcUpdate();
+  }
+  function calcFocus(el, on) {
+    var k = el.getAttribute && el.getAttribute('data-k');
+    if (!k || !$calc || !$calc.contains(el)) return;
+    var g = $calc.querySelector('.c-fig .dm[data-k="' + k + '"]');
+    if (g) g.classList.toggle('on', on);
+  }
+  function calcAction(act, v, b) {
+    if (act === 'shape') calcShape(v);
+    else if (act === 'unit') {
+      var k = b.getAttribute('data-k');
+      C.unit[k] = v;
+      [].forEach.call(b.parentNode.children, function (x) { x.classList.toggle('on', x === b); });
+      figValue(k);
+      calcUpdate();
+    } else if (act === 'qty') {
+      C.qty = Math.max(1, Math.min(999, C.qty + (+v)));
+      $calc.querySelector('.stp input').value = C.qty;
+      calcUpdate();
+    }
+  }
+
+  function need() {
+    var s = SHAPES[C.shape], x = {}, ok = true;
+    s.f.forEach(function (f) {
+      var n = num(C.val[f[0]]);
+      if (!n) ok = false;
+      x[f[0]] = n * ((C.unit[f[0]] || f[2]) === 'm' ? 100 : 1);
+    });
+    if (!ok) return null;
+    var one = s.v(x) / 1000;
+    return { one: one, total: one * C.qty };
+  }
+  function fmtL(n) {
+    return n.toLocaleString('tr-TR', { maximumFractionDigits: n < 10 ? 1 : 0 }) + ' L';
+  }
+
+  // Toprak ürünleri ve paket boyları (ürün/varyant adındaki "40 Lt", "65 L" vb.)
+  var SIZE_RE = /(\d+(?:[.,]\d+)?)\s*(?:lt|litre|litrelik|l)(?![a-zçğıöşü])/i;
+  function litres(s) { var m = String(s || '').match(SIZE_RE); return m ? parseFloat(m[1].replace(',', '.')) : 0; }
+  function soilList() {
+    if (C.soil) return C.soil;
+    var names = ((CFG.calc || {}).categories || ['Topraklar']).map(fold), set = {};
+    DATA.cats.forEach(function (c) {
+      if (names.indexOf(c.f) === -1) return;
+      (function add(id) { set[id] = 1; (KIDS[id] || []).forEach(function (k) { add(k.id); }); })(c.id);
+    });
+    C.soil = [];
+    DATA.items.forEach(function (p) {
+      if (!p.c.some(function (x) { return set[x]; })) return;
+      var sizes = p.v
+        ? p.v.map(function (v) { return { L: litres(v.name), pr: v.d != null ? v.d : v.p, ok: v.st > 0 || !!v.oos, n: v.name }; })
+        : [{ L: litres(p.n), pr: price(p), ok: !!p.st, n: '' }];
+      sizes = sizes.filter(function (z) { return z.L > 0 && z.pr != null && z.ok; });
+      sizes.forEach(function (z) { z.n = z.n || fmtL(z.L); });
+      if (sizes.length) C.soil.push({ p: p, sizes: sizes });
+    });
+    return C.soil;
+  }
+
+  // En az maliyetle en az N litreyi karşılayan paket kombinasyonu (yarım litre hassasiyet)
+  function bestCombo(sizes, N) {
+    var u = sizes.map(function (z) { return Math.max(1, Math.round(z.L * 2)); });
+    var target = Math.ceil(N * 2), max = Math.max.apply(null, u), lim = target + max;
+    if (lim > 60000) {
+      var big = sizes[u.indexOf(max)], cnt = Math.ceil(N / big.L);
+      return { cost: cnt * big.pr, L: cnt * big.L, parts: [{ z: big, c: cnt }] };
+    }
+    var dp = new Float64Array(lim + 1).fill(Infinity), ch = new Int16Array(lim + 1).fill(-1);
+    dp[0] = 0;
+    for (var x = 1; x <= lim; x++) {
+      for (var i = 0; i < u.length; i++) {
+        if (x >= u[i] && dp[x - u[i]] !== Infinity) {
+          var c = dp[x - u[i]] + sizes[i].pr + 0.001; // eşitlikte daha az paket
+          if (c < dp[x]) { dp[x] = c; ch[x] = i; }
+        }
+      }
+    }
+    var bx = -1;
+    for (var y = target; y <= lim; y++) if (dp[y] !== Infinity && (bx < 0 || dp[y] < dp[bx])) bx = y;
+    if (bx < 0) return null;
+    var cnt2 = {}, cost = 0, tot = 0;
+    for (var z = bx; z > 0; z -= u[ch[z]]) { cnt2[ch[z]] = (cnt2[ch[z]] || 0) + 1; cost += sizes[ch[z]].pr; tot += sizes[ch[z]].L; }
+    var parts = Object.keys(cnt2).map(function (i) { return { z: sizes[i], c: cnt2[i] }; })
+      .sort(function (a, b) { return b.z.L - a.z.L; });
+    return { cost: cost, L: tot, parts: parts };
+  }
+
+  function packRow(e, N, best) {
+    var cb = bestCombo(e.sizes, N);
+    if (!cb) return '';
+    return '<a class="pk" data-kind="calc_product" data-name="' + esc(e.p.n) + '" href="' + esc(url(e.p.s)) + '">' + thumb(e.p.img, 180) +
+      '<div class="info"><div class="pname">' + esc(e.p.n) + (best ? '<span class="best">En uygun</span>' : '') + '</div>' +
+      '<div class="meta"><b>' + cb.parts.map(function (x) { return x.c + ' × ' + esc(x.z.n); }).join(' + ') + '</b><span>= ' + fmtL(cb.L) + '</span></div></div>' +
+      '<div class="price"><b>' + tl(cb.cost) + '</b></div></a>';
+  }
+  function combos(list, N) {
+    return list.map(function (e) { return { e: e, cb: bestCombo(e.sizes, N) }; })
+      .filter(function (x) { return x.cb; })
+      .sort(function (a, b) { return a.cb.cost - b.cb.cost; });
+  }
+
+  function calcUpdate() {
+    var out = $calc.querySelector('.c-out'), sr = $calc.querySelector('.c-sr'), more = $calc.querySelector('.c-more');
+    var r = need();
+    if (!r) {
+      out.innerHTML = '<div class="c-hint">Ölçüleri girdiğinizde gereken toprak miktarı burada görünecek.</div>';
+      sr.classList.add('hide'); more.classList.add('hide');
+      return;
+    }
+    var extra = (CFG.calc || {}).extra != null ? +CFG.calc.extra : 10;
+    var rec = Math.max(1, Math.ceil(r.total * (1 + extra / 100)));
+    var html = '<div class="c-res"><div class="c-big"><small>Gereken toprak</small><b>' + fmtL(r.total) + '</b>' +
+      '<span>' + (C.qty > 1 ? C.qty + ' × ' + fmtL(r.one) : SHAPES[C.shape].n) + '</span></div>' +
+      '<div class="c-rec"><small>Önerilen alım</small><b>' + fmtL(rec) + '</b><span>Sulayınca toprak ~%' + extra + ' çöker</span></div></div>';
+    if (r.total >= 1000) {
+      html += '<div class="c-note">Yaklaşık ' + (r.total / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' m³ toprak gerekiyor. ' +
+        (CFG.whatsapp ? '<a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, yaklaşık ' + Math.round(rec) + ' litre toprak için fiyat almak istiyorum.')) + '">Toplu alım fiyatı için WhatsApp\'tan yazın</a>'
+          : CFG.phone ? 'Toplu alım fiyatı için bizi arayın: <a href="tel:' + esc(CFG.phone.replace(/[^\d+]/g, '')) + '">' + esc(CFG.phone) + '</a>' : 'Toplu alımlarda bizimle iletişime geçin.') + '</div>';
+    }
+    if (DATA) {
+      var sug = ((CFG.calc || {}).suggest || {})[C.shape === 'bed' ? 'bed' : 'pot'] || [];
+      var list = soilList(), pick = sug.map(function (sl) { return list.filter(function (e) { return e.p.s === sl; })[0]; }).filter(Boolean);
+      if (!pick.length) pick = list;
+      var rows = combos(pick, rec).slice(0, 4);
+      if (rows.length) {
+        html += '<div class="h">' + fmtL(rec) + ' için paket önerileri<small>stoktaki boylarla</small></div>' +
+          rows.map(function (x, i) { return packRow(x.e, rec, i === 0 && rows.length > 1); }).join('');
+      }
+      sr.classList.toggle('hide', !list.length);
+    }
+    out.innerHTML = html;
+    C.rec = rec;
+    soilSearch();
+  }
+
+  function soilSearch() {
+    var more = $calc.querySelector('.c-more'), q = $calc.querySelector('[data-k="soilq"]').value.trim();
+    if (!q || !C.rec || !DATA) { more.classList.add('hide'); more.innerHTML = ''; return; }
+    var list = soilList(), byId = {};
+    list.forEach(function (e) { byId[e.p.id] = e; });
+    var hits = search(q).items.map(function (x) { return byId[x.p.id]; }).filter(Boolean).slice(0, 5);
+    more.innerHTML = hits.length ? hits.map(function (e) { return packRow(e, C.rec, false); }).join('')
+      : '<div class="c-hint" style="margin-top:0">“' + esc(q) + '” için litre bilgisi olan toprak bulunamadı.</div>';
+    more.classList.remove('hide');
+  }
+
   // ---------------- Ürün Bul butonu ----------------
   var HIDE_PATHS = /\/(checkout|cart|sepet|odeme|account\/login)(\/|$)/i;
   function fabEnabled() {
@@ -652,24 +1078,25 @@
 
   // ---------------- Aç / kapat ----------------
   var prevOverflow = '';
-  function open(initial) {
+  function open(initial, startTab) {
     build();
     if (!isOpen) {
       isOpen = true;
       view = null;
+      setTab(startTab || 'home');
       $ov.classList.add('on');
       updateFab();
       prevOverflow = document.documentElement.style.overflow;
       document.documentElement.style.overflow = 'hidden';
       try { history.pushState({ urunArama: 1 }, ''); pushed = true; } catch (e) {}
     }
-    if (typeof initial === 'string' && initial) $q.value = initial;
-    $q.focus();
+    if (typeof initial === 'string') $q.value = initial;
+    if (tab !== 'calc') $q.focus();
     shown = PAGE;
     render();
     renderIdle();
-    load().then(function () { renderIdle(); render(); }, function () {
-      $idle.innerHTML = '<div class="empty"><b>Arama şu an yüklenemedi</b><p>Lütfen sayfayı yenileyip tekrar deneyin.</p></div>';
+    load().then(function () { renderIdle(); render(); if (tab === 'calc') calcUpdate(); }, function () {
+      $home.innerHTML = '<div class="empty"><b>Arama şu an yüklenemedi</b><p>Lütfen sayfayı yenileyip tekrar deneyin.</p></div>';
     });
   }
 
@@ -723,5 +1150,16 @@
   }
   if (document.body) boot(); else document.addEventListener('DOMContentLoaded', boot);
 
-  window.UrunArama = window.PMSearch = { open: open, close: close, search: function (q) { return load().then(function () { return search(q); }); } };
+  // Menüye "#hacim-hesapla" veya "#urun-ara" bağlantısı eklenerek açılabilir
+  function fromHash() {
+    var h = location.hash;
+    if (h !== '#hacim-hesapla' && h !== '#urun-ara') return;
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
+    var go = function () { open('', h === '#hacim-hesapla' ? 'calc' : 'home'); };
+    if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);
+  }
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
+
+  window.UrunArama = window.PMSearch = { open: open, close: close, calc: function () { open('', 'calc'); }, search: function (q) { return load().then(function () { return search(q); }); } };
 })();

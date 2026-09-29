@@ -63,10 +63,15 @@ Script satırına ekleyebileceğin ayarlar:
 - `data-trigger=".search-icon, .header-search-button"` → büyüteç ikonuna tıklayınca da açılsın.
 - `data-fab="off"` → sağ alttaki "Ürün Bul" butonunu gösterme.
 
+Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan toprak hesaplayıcı açılır (`#urun-ara` → arama).
+
 Örnek: `<script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" data-trigger=".search-icon" defer></script>`
 
 ## config.json
-- `popular`: boş kutuda görünen popüler aramalar
+- `popular`: boş kutuda görünen "çok arananlar"
+- `categoryLast`: kategori kartlarında en sona konacak ana kategoriler (örn. kedi/köpek)
+- `pages`: "Sayfalar" sekmesindeki bağlantılar (`title`, `url`); aramada da çıkar
+- `calc`: toprak hesaplayıcı — `enabled`, `extra` (sıkışma payı %), `categories` (paket önerisi yapılacak kategoriler), `suggest.pot` / `suggest.bed` (öncelikli önerilecek ürünlerin adresleri/slug)
 - `synonyms`: "müşteri bunu yazarsa şunu da ara" (Türkçe karakterleri yazman gerekmez)
 - `badges`: ikas'taki etiket adı → üründe görünecek sarı rozet (örn. `"3 Al 2 Öde"`)
 - `phone`, `whatsapp`: doluysa altta arama/WhatsApp çubuğu çıkar (`"0216 000 00 00"`, `"905xxxxxxxxx"`)

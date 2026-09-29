@@ -1,30 +1,136 @@
 {
   "searchUrl": "/search?s={q}",
   "placeholder": "Ürün, marka veya kategori ara",
-  "popular": ["kedi maması", "kedi kumu", "solucan gübresi", "torf", "perlit", "cocopeat", "sebze tohumu", "ilaçlama pompası"],
-  "badges": { "Yeni Ürün": "Yeni" },
+  "popular": [
+    "solucan gübresi",
+    "torf",
+    "perlit",
+    "cocopeat",
+    "saksı toprağı",
+    "sebze tohumu",
+    "sebze yatağı",
+    "ilaçlama pompası"
+  ],
+  "categoryLast": [
+    "Kedi Ürünleri",
+    "Köpek Ürünleri"
+  ],
+  "badges": {
+    "Yeni Ürün": "Yeni"
+  },
   "phone": "",
   "whatsapp": "",
-  "fab": { "enabled": true, "text": "Ürün Bul", "side": "right", "bottom": 20 },
-  "colors": { "primary": "#12664f", "accent": "#e8590c" },
+  "pages": [
+    {
+      "title": "Blog",
+      "url": "/blog"
+    },
+    {
+      "title": "İletişim",
+      "url": "/iletisim"
+    },
+    {
+      "title": "Siparişlerim",
+      "url": "/account/orders"
+    },
+    {
+      "title": "Favorilerim",
+      "url": "/account/favorite-products"
+    },
+    {
+      "title": "Üye girişi / Kayıt ol",
+      "url": "/account/login"
+    }
+  ],
+  "calc": {
+    "enabled": true,
+    "extra": 10,
+    "categories": [
+      "Topraklar"
+    ],
+    "suggest": {
+      "pot": [
+        "akilli-toprak-organik-bitki-topragi",
+        "genel-saksi-topragi-ozel-karisim",
+        "organik-toprak",
+        "hg-cicek-topragi",
+        "guzelbahce-ithal-torf-genel-kullanim"
+      ],
+      "bed": [
+        "solucan-gubreli-sebze-topragi",
+        "hg-bol-verimli-sebze-topragi",
+        "dogal-orman-topragi-humuslu",
+        "hg-ham-torf",
+        "organik-toprak"
+      ]
+    }
+  },
+  "fab": {
+    "enabled": true,
+    "text": "Ürün Bul",
+    "side": "right",
+    "bottom": 20
+  },
+  "colors": {
+    "primary": "#12664f",
+    "accent": "#e8590c"
+  },
   "synonyms": {
-    "kokopit": ["cocopeat"],
-    "hindistan": ["cocopeat"],
-    "turba": ["torf"],
-    "peat": ["torf"],
-    "hidroton": ["kil"],
-    "leca": ["kil"],
-    "vermikompost": ["solucan"],
-    "guano": ["yarasa"],
-    "succulent": ["sukulent", "kaktus"],
-    "besin": ["gubre"],
-    "mama": ["mamasi"],
-    "cat": ["kedi"],
-    "dog": ["kopek"],
-    "kum": ["kumu"],
-    "pompa": ["pompasi"],
-    "ilac": ["ilaci", "ilaclama"],
-    "hiyar": ["salatalik"],
-    "reyhan": ["feslegen"]
+    "kokopit": [
+      "cocopeat"
+    ],
+    "hindistan": [
+      "cocopeat"
+    ],
+    "turba": [
+      "torf"
+    ],
+    "peat": [
+      "torf"
+    ],
+    "hidroton": [
+      "kil"
+    ],
+    "leca": [
+      "kil"
+    ],
+    "vermikompost": [
+      "solucan"
+    ],
+    "guano": [
+      "yarasa"
+    ],
+    "succulent": [
+      "sukulent",
+      "kaktus"
+    ],
+    "besin": [
+      "gubre"
+    ],
+    "mama": [
+      "mamasi"
+    ],
+    "cat": [
+      "kedi"
+    ],
+    "dog": [
+      "kopek"
+    ],
+    "kum": [
+      "kumu"
+    ],
+    "pompa": [
+      "pompasi"
+    ],
+    "ilac": [
+      "ilaci",
+      "ilaclama"
+    ],
+    "hiyar": [
+      "salatalik"
+    ],
+    "reyhan": [
+      "feslegen"
+    ]
   }
 }
