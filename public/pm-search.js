@@ -10,7 +10,7 @@
  */
 (function () {
   'use strict';
-  if (window.UrunArama) return;
+  if (window.UrunArama || window.name === 'ua-sepet-cercevesi') return;
 
   var script = document.currentScript || document.querySelector('script[src*="pm-search"]');
   var ds = (script && script.dataset) || {};
@@ -491,6 +491,9 @@
     '.sh-go svg{width:18px;height:18px}',
     '.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:8px;padding:10px 16px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap}',
     '.ptoast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.3)}',
+    '.ptoast span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.ptoast a{flex:none;margin-left:4px;padding:6px 12px;border-radius:10px;background:#fff;color:var(--ink);font-size:13px;font-weight:700;white-space:nowrap}',
+    '.bspin{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;flex:none}',
     '.ptoast.on{display:flex}.ptoast svg{width:20px;height:20px;flex:none;color:#7ee2a8}.ptoast.warn svg{color:#ffd27a}',
     '.toast.on{display:flex}.toast svg{width:18px;height:18px;color:#7ee2a8}',
 
@@ -1059,37 +1062,120 @@
   }
   function doAdd() {
     var p = SH.p, v = SH.v, qty = SH.qty;
-    if (!p || !v) return;
+    if (!p || !v || SH.busy) return;
     track('add_to_cart', p.n);
     var fn = window.UrunAramaSepet;
     if (typeof fn === 'function') {
       Promise.resolve().then(function () { return fn(v.id, qty, { productId: p.id, slug: p.s, name: p.n }); }).then(function () {
         closeSheet();
-        toast('Sepete eklendi');
-      }, function () { location.href = url(p.s) + '?variantId=' + encodeURIComponent(v.id); });
+        ptoast('Sepete eklendi', false, true);
+      }, function () { addFailed(p); });
       return;
     }
-    // Doğrudan bağlantı yoksa: ürün sayfasına git, orada seçeneği seçip sitenin kendi "Sepete Ekle" butonuna bas
-    try {
-      sessionStorage.setItem(ADD_KEY, JSON.stringify({ s: p.s, n: p.n, vn: v.name || '', multi: (p.v || []).length > 1, t: Date.now() }));
-    } catch (e) {}
-    location.href = url(p.s);
+    // Ürün sayfasını görünmez bir çerçevede aç; seçeneği seçip sitenin kendi "Sepete Ekle" butonuna bas.
+    // Müşteri arama panelinden ayrılmaz.
+    setBusy(p.id, true);
+    addViaFrame(p, v).then(function () {
+      setBusy(p.id, false);
+      closeSheet();
+      ptoast('Sepete eklendi' + (v.name ? ': ' + v.name : ''), false, true);
+      track('add_to_cart_ok', p.n);
+    }, function (why) {
+      setBusy(p.id, false);
+      track('add_to_cart_fail', p.n + ' (' + why + ')');
+      addFailed(p);
+    });
+  }
+  function addFailed(p) {
+    closeSheet();
+    ptoast('Ürün şu an buradan eklenemedi.', true, false, url(p.s), 'Ürün sayfasına git');
+  }
+  function setBusy(id, on) {
+    SH.busy = on;
+    var bs = root.querySelectorAll('[data-act="add"][data-v="' + id + '"], [data-act="shgo"]');
+    [].forEach.call(bs, function (b) {
+      if (on) { b.setAttribute('data-html', b.innerHTML); b.innerHTML = '<span class="bspin"></span><span>Ekleniyor</span>'; b.disabled = true; }
+      else if (b.getAttribute('data-html') != null) { b.innerHTML = b.getAttribute('data-html'); b.removeAttribute('data-html'); b.disabled = false; }
+    });
   }
 
-  var ADD_KEY = 'ua-add';
-  function ptoast(msg, warn) {
+  var FRAME = 'ua-sepet-cercevesi';
+  // Çerçevedeki sayfanın sepet isteklerini izle (ikas sepete eklemeyi fetch/XHR ile yapar; adında "cart" geçer)
+  function watchCart(w, cb) {
+    var isCart = function (u, body) { return /cart|sepet/i.test(String(u || '')) || /cart/i.test(typeof body === 'string' ? body : ''); };
+    try {
+      var of = w.fetch;
+      if (of) w.fetch = function (u, o) {
+        var hit = isCart(u && u.url || u, o && o.body);
+        return of.apply(this, arguments).then(function (r) { if (hit && r && r.ok) cb(); return r; });
+      };
+      var X = w.XMLHttpRequest && w.XMLHttpRequest.prototype;
+      if (X) {
+        var oo = X.open, os = X.send;
+        X.open = function (m, u) { this.__ua = u; return oo.apply(this, arguments); };
+        X.send = function (b) {
+          if (isCart(this.__ua, b)) this.addEventListener('load', function () { if (this.status && this.status < 400) cb(); });
+          return os.apply(this, arguments);
+        };
+      }
+    } catch (e) {}
+  }
+  function addViaFrame(p, v) {
+    return new Promise(function (resolve, reject) {
+      var f = document.createElement('iframe'), done = false, saw = false, clicked = false;
+      f.name = FRAME;
+      f.setAttribute('aria-hidden', 'true');
+      f.tabIndex = -1;
+      // Masaüstü genişliğinde aç: telefonda da ürün sayfasının masaüstü düzeni kullanılır
+      f.style.cssText = 'position:fixed;left:-20000px;top:0;width:1280px;height:1000px;border:0;opacity:0;pointer-events:none;';
+      var finish = function (ok, why) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 4000);
+        if (ok) resolve(); else reject(why);
+      };
+      var timer = setTimeout(function () { finish(false, clicked ? 'no-response' : 'timeout'); }, 25000);
+      f.onload = function () {
+        var w, d;
+        try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return finish(false, 'blocked'); }
+        watchCart(w, function () { saw = true; if (clicked) setTimeout(function () { finish(true); }, 300); });
+        var tries = 0, picked = !((p.v || []).length > 1);
+        (function step() {
+          if (done) return;
+          tries++;
+          var btn = findAddBtn(d);
+          if (btn && !picked) {
+            if (pickOnPage(v.name, d)) { picked = true; return setTimeout(step, 800); }
+          } else if (btn) {
+            clicked = true;
+            btn.click();
+            if (saw) return finish(true);
+            // Sepet isteği görülmezse 8 sn sonra, buton tıklandığı için yine eklendi say
+            return setTimeout(function () { finish(true); }, 8000);
+          }
+          if (tries < 60) setTimeout(step, 300); else finish(false, btn ? 'variant' : 'button');
+        })();
+      };
+      f.src = url(p.s) + (url(p.s).indexOf('?') < 0 ? '?' : '&') + 'ua_frame=1';
+      document.body.appendChild(f);
+    });
+  }
+
+  function ptoast(msg, warn, cartLink, href, label) {
     if (!root) return;
     var el = root.querySelector('.ptoast');
-    el.innerHTML = (warn ? svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>', 2.2) : I.check) + '<span>' + esc(msg) + '</span>';
+    var link = cartLink ? '<a href="' + esc(pageHref(CFG.cartUrl || '/cart')) + '">Sepete git</a>' : href ? '<a href="' + esc(href) + '">' + esc(label || 'Git') + '</a>' : '';
+    el.innerHTML = (warn ? svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>', 2.2) : I.check) + '<span>' + esc(msg) + '</span>' + link;
     el.classList.toggle('warn', !!warn);
     el.classList.add('on');
     clearTimeout(ptoast.t);
-    ptoast.t = setTimeout(function () { el.classList.remove('on'); }, warn ? 6000 : 3500);
+    ptoast.t = setTimeout(function () { el.classList.remove('on'); }, warn ? 7000 : 5000);
   }
   function visible(el) { return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)); }
   function squash(t) { return fold(t).replace(/\s+/g, ''); }
-  function findAddBtn() {
-    var els = document.querySelectorAll('button,[role="button"],a,input[type="submit"]');
+  function findAddBtn(d) {
+    var els = d.querySelectorAll('button,[role="button"],a,input[type="submit"]');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (isOurs(el) || !visible(el) || el.disabled || el.getAttribute('aria-disabled') === 'true') continue;
@@ -1099,54 +1185,30 @@
     return null;
   }
   // Ürün sayfasında adı varyant adıyla birebir aynı olan seçeneği bul (buton, etiket, liste öğesi ya da select)
-  function pickOnPage(name) {
-    var want = squash(name);
+  function pickOnPage(name, d) {
+    var want = squash(name), w = d.defaultView || window;
     if (!want) return false;
-    var sels = document.querySelectorAll('select');
+    var sels = d.querySelectorAll('select');
     for (var i = 0; i < sels.length; i++) {
-      if (isOurs(sels[i])) continue;
       for (var j = 0; j < sels[i].options.length; j++) {
         if (squash(sels[i].options[j].text) === want) {
-          var setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+          var setter = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, 'value').set;
           setter.call(sels[i], sels[i].options[j].value);
-          sels[i].dispatchEvent(new Event('change', { bubbles: true }));
+          sels[i].dispatchEvent(new w.Event('change', { bubbles: true }));
           return true;
         }
       }
     }
-    var all = document.body.querySelectorAll('button,[role="radio"],[role="option"],label,li,a,span,div,p');
+    var all = d.body.querySelectorAll('button,[role="radio"],[role="option"],label,li,a,span,div,p');
     for (var k = 0; k < all.length; k++) {
       var el = all[k];
-      if (el.children.length > 3 || isOurs(el) || !visible(el) || el.closest('header,nav,footer')) continue;
+      if (el.children.length > 3 || !visible(el) || el.closest('header,nav,footer')) continue;
       if (squash(el.textContent) !== want) continue;
       var hit = el.closest('button,[role="radio"],[role="option"],label,a,li') || el;
       hit.click();
       return true;
     }
     return false;
-  }
-  function runPendingAdd() {
-    var job = null;
-    try { job = JSON.parse(sessionStorage.getItem(ADD_KEY) || 'null'); } catch (e) {}
-    if (!job || Date.now() - job.t > 60000) { try { sessionStorage.removeItem(ADD_KEY); } catch (e) {} return; }
-    var here = decodeURIComponent(location.pathname).replace(/\/+$/, '').split('/').pop();
-    if (here !== job.s) return;
-    try { sessionStorage.removeItem(ADD_KEY); } catch (e) {}
-    var tries = 0, picked = !job.multi;
-    (function step() {
-      tries++;
-      var btn = findAddBtn();
-      if (btn && !picked) {
-        if (pickOnPage(job.vn)) { picked = true; return setTimeout(step, 700); }
-      } else if (btn) {
-        btn.click();
-        ptoast('Sepete eklendi' + (job.vn ? ': ' + job.vn : ''));
-        track('add_to_cart_page', job.n);
-        return;
-      }
-      if (tries < 40) return setTimeout(step, 300);
-      ptoast(job.vn ? '"' + job.vn + '" seçeneğini seçip Sepete Ekle\'ye basın' : 'Sepete Ekle butonuna basarak ürünü ekleyebilirsiniz', true);
-    })();
   }
 
   // ---------------- Toprak hesaplayıcı ----------------
@@ -1432,11 +1494,17 @@
   function isOurs(el) { return host && (el === host || host.contains(el)); }
   function matches(el, s) { try { return s && el && el.matches && el.matches(s); } catch (e) { return false; } }
 
+  // Sitenin arama kutusu: odak/dokunma olaylarını ikas'a hiç iletme (yoksa ikas kendi aramasını açar)
+  function siteInput(el) { return el && !isOurs(el) && matches(el, SELECTOR) && !(el.ownerDocument && el.ownerDocument !== document); }
   document.addEventListener('focusin', function (e) {
     var t = e.target;
-    if (isOurs(t) || !matches(t, SELECTOR)) return;
+    if (!siteInput(t)) return;
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     var v = t.value;
     t.blur();
+    // Bir butona basıldıktan hemen sonra ikas'ın panelindeki kutu odaklandıysa: paneli kapat, butonu öğren
+    if (lastTap.el && lastTap.el !== t && Date.now() - lastTap.t < 1500) { learn(lastTap.el); closeNative(t, lastTap.el); lastTap = { el: null, t: 0 }; }
     open(v);
   }, true);
 
@@ -1452,6 +1520,8 @@
     if (!el || !el.closest || isOurs(el)) return null;
     var sel = TRIGGER || (CFG.triggers || '');
     if (sel) { try { var t = el.closest(sel); if (t) return t; } catch (e) {} }
+    var ln = learnedOf(el);
+    if (ln) return ln;
     if (ds.auto === 'off' || CFG.autoTrigger === false) return null;
     var n = el.closest('a,button,[role="button"]');
     if (n) {
@@ -1465,17 +1535,75 @@
     var r = n.getBoundingClientRect();
     return r.width <= 160 && r.height <= 100 && n.querySelector('svg,img,i') && TRIGGER_RE.test(attrs(n)) ? n : null;
   }
-  ['pointerdown', 'mousedown', 'touchstart'].forEach(function (ev) {
-    document.addEventListener(ev, function (e) { if (triggerOf(e.target)) e.stopPropagation(); }, true);
+  function stopAll(e) { e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }
+  ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { if (triggerOf(e.target) || siteInput(e.target)) stopAll(e); }, true);
   });
+  var lastTap = { el: null, t: 0 };
   document.addEventListener('click', function (e) {
+    if (siteInput(e.target)) { stopAll(e); open(e.target.value); return; }
     var t = triggerOf(e.target);
-    if (!t) return;
+    if (!t) { if (!isOurs(e.target)) lastTap = { el: e.target, t: Date.now() }; return; }
     e.preventDefault();
-    e.stopPropagation();
-    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    stopAll(e);
     open();
   }, true);
+
+  // Emniyet: ikas'ın arama paneli yine de açılırsa (tanımadığımız bir butondan) onu kapat, bizimkini aç
+  // ve o butonu hatırla; sonraki basışlarda ikas'ınki hiç açılmaz.
+  var LEARN_KEY = 'ua-trig', learned = [];
+  try { learned = JSON.parse(localStorage.getItem(LEARN_KEY) || '[]') || []; } catch (e) {}
+  function sig(n) { return n.tagName + '|' + (n.getAttribute('class') || '') + '|' + (n.getAttribute('aria-label') || ''); }
+  function learnedOf(el) {
+    for (var n = el, i = 0; n && n.nodeType === 1 && i < 5; n = n.parentElement, i++) if (learned.indexOf(sig(n)) !== -1) return n;
+    return null;
+  }
+  function learn(el) {
+    var n = el.closest && (el.closest('a,button,[role="button"]') || el);
+    if (!n || n === document.body || n.querySelector('input')) return;
+    var sg = sig(n);
+    if (learned.indexOf(sg) !== -1) return;
+    learned = [sg].concat(learned).slice(0, 5);
+    try { localStorage.setItem(LEARN_KEY, JSON.stringify(learned)); } catch (e) {}
+  }
+  function closeNative(input, tapped) {
+    // En yakın sabit konumlu kapsayıcıyı bul (ikas'ın arama paneli)
+    var box = input, cand = null;
+    for (var i = 0; box && box !== document.body && i < 12; box = box.parentElement, i++) {
+      var ps = getComputedStyle(box).position;
+      if (ps === 'fixed' || ps === 'absolute') cand = box;
+    }
+    // Tıklanan buton da aynı kapsayıcıdaysa bu bir panel değil sitenin başlığıdır; dokunma
+    if (cand && tapped && cand.contains(tapped)) cand = null;
+    if (!cand) return;
+    var scope = cand;
+    var btns = scope.querySelectorAll('button,[role="button"],a');
+    for (var j = 0; j < btns.length; j++) {
+      var b = btns[j], a = fold((b.getAttribute('aria-label') || '') + ' ' + (b.getAttribute('title') || '') + ' ' + (b.textContent || '')).trim();
+      if (/(^|\s)(kapat|close|iptal|vazgec)(\s|$)|^[x×✕✖]$/.test(a)) { b.click(); break; }
+    }
+    try { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true })); } catch (e) {}
+    setTimeout(function () { if (cand && visible(input)) cand.style.setProperty('display', 'none', 'important'); }, 150);
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(function (muts) {
+      if (Date.now() - lastTap.t > 1500 || !lastTap.el) return;
+      for (var i = 0; i < muts.length; i++) {
+        for (var j = 0; j < muts[i].addedNodes.length; j++) {
+          var n = muts[i].addedNodes[j];
+          if (n.nodeType !== 1 || isOurs(n)) continue;
+          var inp = matches(n, SELECTOR) ? n : n.querySelector && n.querySelector(SELECTOR);
+          if (!inp || isOurs(inp)) continue;
+          var tapped = lastTap.el;
+          lastTap = { el: null, t: 0 };
+          learn(tapped);
+          closeNative(inp, tapped);
+          open(inp.value || '');
+          return;
+        }
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  }
 
   // Ctrl/Cmd+K ve "/" kısayolları (masaüstü)
   document.addEventListener('keydown', function (e) {
@@ -1487,7 +1615,6 @@
   // Butonu hemen göster, veriyi boşta önceden indir (ilk açılış anında olsun)
   function boot() {
     build();
-    setTimeout(runPendingAdd, 400);
     var idle = window.requestIdleCallback || function (f) { setTimeout(f, 2500); };
     idle(function () { load().catch(function () {}); });
   }
