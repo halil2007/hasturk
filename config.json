@@ -18,8 +18,8 @@
   "badges": {
     "Yeni Ürün": "Yeni"
   },
-  "phone": "",
-  "whatsapp": "",
+  "phone": "+90 553 727 29 29",
+  "whatsapp": "905537272929",
   "pages": [
     {
       "title": "Blog",
@@ -63,6 +63,10 @@
       ]
     }
   },
+  "cart": {
+    "enabled": true
+  },
+  "triggers": "",
   "fab": {
     "enabled": true,
     "text": "Ürün Bul",
@@ -70,8 +74,9 @@
     "bottom": 20
   },
   "colors": {
-    "primary": "#b4441f",
-    "dark": "#8c3214"
+    "primary": "#0b5d73",
+    "dark": "#07404f",
+    "accent": "#d7372f"
   },
   "synonyms": {
     "kokopit": [

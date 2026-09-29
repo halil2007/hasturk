@@ -6,6 +6,7 @@
  *   data-json      products.json adresi (varsayılan: script ile aynı klasör)
  *   data-store     mağaza adresi (varsayılan: bulunulan site)
  *   data-fab       "off" → sağ alttaki "Ürün Bul" butonunu gösterme
+ *   data-auto      "off" → sitedeki arama butonlarını otomatik tanıma
  */
 (function () {
   'use strict';
@@ -19,7 +20,7 @@
   var SELECTOR = ds.selector ||
     'input[type="search"], input[name="q"], input[name="s"], input[placeholder*="ara" i], input[placeholder*="Ara"], input[placeholder*="ARA"]';
   var TRIGGER = ds.trigger || '';
-  var CACHE_KEY = 'ua-data-v3';
+  var CACHE_KEY = 'ua-data-v4';
   var RECENT_KEY = 'ua-recent';
   var CACHE_MS = 20 * 60 * 1000;
   var PAGE = 10;
@@ -192,17 +193,19 @@
     back: svg('<path d="M15 5l-7 7 7 7"/>', 2.4),
     x: svg('<path d="M6 6l12 12M18 6 6 18"/>', 2.2),
     clock: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
-    hash: svg('<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>'),
+    trend: svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'),
     right: svg('<path d="m9 6 6 6-6 6"/>', 2.4),
     arrow: svg('<path d="M5 12h14M13 6l6 6-6 6"/>', 2.2),
     sprout: svg('<path d="M12 21v-8"/><path d="M12 13c0-4 3-6 7-6 0 4-3 6-7 6zM12 11C12 8 10 6 5 6c0 3 2 5 7 5z"/>'),
     compass: svg('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'),
-    calc: svg('<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h1M12 11h1M15.5 11h0M8.5 14.5h1M12 14.5h1M8.5 18h1M12 18h1M15.5 14.5V18"/>'),
+    calc: svg('<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h1M12 11h1M8.5 14.5h1M12 14.5h1M8.5 18h1M12 18h1M15.5 11v7"/>'),
     doc: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'),
     phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
     chat: svg('<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/><path d="M9 10.5c.5 2 2 3.5 4.5 4.5l1.2-1.2 1.8.8"/>'),
     minus: svg('<path d="M6 12h12"/>', 2.4),
     plus: svg('<path d="M12 6v12M6 12h12"/>', 2.4),
+    cart: svg('<path d="M3 4h2l2.2 11h11l2-8H6.3"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/>'),
+    check: svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>', 2.6),
     bag: svg('<path d="M6 7h12l1.5 13h-15z"/><path d="M9 7V5.5a3 3 0 0 1 6 0V7"/><path d="M7.5 13c2 1.3 7 1.3 9 0"/>')
   };
 
@@ -212,169 +215,188 @@
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}',
     'a{color:inherit;text-decoration:none}',
     'svg{display:block}',
-    '.root{--pr:#b4441f;--prd:#8c3214;--soft:#fbeee8;--bg:#f7f2ec;--ln:#ece3da;--ink:#241b16;--mu:#7d716a;--ok:#2f855a;',
+    '.root{--pr:#0b5d73;--prd:#07404f;--soft:#e8f3f6;--bg:#f3f6f7;--ln:#e3e8eb;--ink:#14212b;--mu:#66737c;--ac:#d7372f;--ok:#1f8a5b;',
     ' font-family:inherit;color:var(--ink);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.35}',
 
     /* Ürün Bul butonu */
     '.fab{position:fixed;z-index:2147482990;bottom:calc(var(--fb,20px) + env(safe-area-inset-bottom,0px));right:20px;display:flex;align-items:center;gap:10px;',
-    ' height:50px;padding:0 18px 0 7px;border-radius:16px;background:var(--pr);color:#fff;font-weight:700;font-size:15px;letter-spacing:.01em;',
-    ' box-shadow:0 10px 26px rgba(90,35,10,.28);transition:padding .25s,gap .25s,transform .2s,opacity .2s}',
-    '.fab .fi{width:36px;height:36px;border-radius:11px;background:rgba(255,255,255,.16);display:grid;place-items:center;flex:none}',
+    ' height:52px;padding:0 20px 0 8px;border-radius:26px;background:var(--pr);color:#fff;font-weight:700;font-size:15px;',
+    ' box-shadow:0 10px 28px rgba(7,50,64,.3);transition:padding .25s,gap .25s,transform .2s,opacity .2s}',
+    '.fab .fi{width:36px;height:36px;border-radius:50%;background:#fff;color:var(--pr);display:grid;place-items:center;flex:none}',
     '.fab .fi svg{width:19px;height:19px}',
     '.fab.left{right:auto;left:20px}',
     '.fab span.t{max-width:120px;overflow:hidden;white-space:nowrap;transition:max-width .25s,opacity .2s}',
-    '.fab.mini{padding:0 7px;gap:0}.fab.mini span.t{max-width:0;opacity:0}',
+    '.fab.mini{padding:0 8px;gap:0}.fab.mini span.t{max-width:0;opacity:0}',
     '.fab:hover{transform:translateY(-2px)}',
     '.fab.hide{opacity:0;pointer-events:none;transform:translateY(12px)}',
-    '@media(max-width:759px){.fab{right:14px}.fab.left{left:14px}}',
+    '@media(max-width:759px){.fab{right:14px;height:50px}.fab.left{left:14px}}',
 
     /* Panel */
-    '.ov{position:fixed;inset:0;z-index:2147483000;display:none;background:rgba(36,24,18,.45);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}',
+    '.ov{position:fixed;inset:0;z-index:2147483000;display:none;background:rgba(10,24,32,.5);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}',
     '.ov.on{display:block}',
     '.panel{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;overflow:hidden;animation:up .22s cubic-bezier(.2,.8,.2,1)}',
     '@keyframes up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}',
-    '@media(min-width:760px){.panel{inset:6vh auto auto 50%;transform:translateX(-50%);width:min(900px,calc(100vw - 32px));height:min(80vh,720px);',
-    ' border-radius:22px;box-shadow:0 30px 80px rgba(36,20,10,.3);animation:none}}',
+    '@media(min-width:760px){.panel{inset:5vh auto auto 50%;transform:translateX(-50%);width:min(1000px,calc(100vw - 32px));height:min(84vh,760px);',
+    ' border-radius:24px;box-shadow:0 30px 90px rgba(5,25,35,.35);animation:none}}',
 
-    '.top{flex:none;display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--ln)}',
-    '.back,.xbtn{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;flex:none}',
+    '.top{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px}',
+    '.back,.xbtn{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none}',
     '.back svg{width:24px;height:24px}',
     '.xbtn{display:none;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
-    '.field{flex:1;display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 14px;border-radius:14px;border:1.5px solid var(--ln);background:#fff;min-width:0;transition:border-color .15s}',
-    '.field:focus-within{border-color:var(--pr)}',
-    '.field>svg{width:20px;height:20px;color:var(--mu);flex:none}',
+    '.field{flex:1;display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 16px;border-radius:24px;background:var(--bg);min-width:0;border:2px solid transparent;transition:border-color .15s,background .15s}',
+    '.field:focus-within{border-color:var(--pr);background:#fff}',
+    '.field>svg{width:20px;height:20px;color:var(--pr);flex:none}',
     '.field input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:16px;color:var(--ink);-webkit-appearance:none;appearance:none}',
-    '.field input::placeholder{color:#a0948c}',
+    '.field input::placeholder{color:#8d989f}',
     '.field input::-webkit-search-cancel-button{display:none}',
-    '.clr{width:32px;height:32px;border-radius:50%;display:none;place-items:center;color:var(--mu)}',
-    '.clr.on{display:grid}.clr svg{width:18px;height:18px}',
-    '@media(min-width:760px){.back{display:none}.xbtn{display:grid}.top{padding:14px 14px 14px 16px}.field{height:50px}.field input{font-size:17px}}',
+    '.clr{width:32px;height:32px;border-radius:50%;display:none;place-items:center;color:var(--mu);background:#fff}',
+    '.clr.on{display:grid}.clr svg{width:16px;height:16px}',
+    '@media(min-width:760px){.back{display:none}.xbtn{display:grid}.top{padding:16px 16px 12px 20px;border-bottom:1px solid var(--ln)}.field{height:52px}.field input{font-size:17px}}',
 
     '.mid{flex:1;display:flex;min-height:0}',
-    '.main{flex:1;min-width:0;display:flex;flex-direction:column}',
+    '.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}',
 
-    /* Masaüstü: sol menü */
-    '.rail{display:none;flex:none;width:208px;flex-direction:column;gap:4px;padding:12px;background:var(--bg);border-right:1px solid var(--ln)}',
+    /* Masaüstü sol menü */
+    '.rail{display:none;flex:none;width:236px;flex-direction:column;gap:4px;padding:14px 12px;border-right:1px solid var(--ln)}',
     '@media(min-width:760px){.rail{display:flex}}',
-    '.nav{display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border-radius:12px;font-size:14.5px;font-weight:600;color:#5a4e47;text-align:left}',
-    '.nav svg{width:19px;height:19px;flex:none}',
-    '.nav:hover{background:rgba(0,0,0,.035)}',
-    '.nav.on{background:#fff;color:var(--pr);box-shadow:0 1px 3px rgba(60,30,10,.12)}',
-    '.typing .nav.on{background:none;color:#5a4e47;box-shadow:none}',
-    '.help{margin-top:auto;padding:12px;border-radius:14px;background:#fff;border:1px solid var(--ln)}',
-    '.help b{display:block;font-size:13px;margin-bottom:8px}',
-    '.help a{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13.5px;font-weight:600;color:var(--ink)}',
-    '.help a+a{border-top:1px dashed var(--ln)}',
-    '.help a svg{width:17px;height:17px;color:var(--pr);flex:none}',
+    '.nav{display:flex;align-items:center;gap:12px;height:46px;padding:0 14px;border-radius:14px;font-size:14.5px;font-weight:600;color:#4b5963;text-align:left}',
+    '.nav svg{width:20px;height:20px;flex:none}',
+    '.nav:hover{background:var(--bg)}',
+    '.nav.on{background:var(--soft);color:var(--pr)}',
+    '.typing .nav.on{background:none;color:#4b5963}',
+    '.help{margin-top:auto;padding:14px;border-radius:18px;background:var(--prd);color:#fff}',
+    '.help b{display:block;font-size:14px}',
+    '.help p{font-size:12.5px;color:#b9d3db;margin:2px 0 10px}',
+    '.help a{display:flex;align-items:center;gap:7px;height:40px;padding:0 10px;border-radius:12px;font-size:13px;font-weight:700;margin-top:6px;white-space:nowrap}',
+    '.help a svg{width:18px;height:18px;flex:none}',
+    '.help .wa{background:#25a162}',
+    '.help .tel{background:rgba(255,255,255,.12)}',
 
-    /* Mobil: segmentli menü + alt iletişim çubuğu */
-    '.seg{flex:none;display:flex;gap:4px;margin:10px 12px 0;padding:4px;border-radius:14px;background:var(--bg)}',
-    '@media(min-width:760px){.seg{display:none}}',
-    '.seg button{flex:1;height:38px;border-radius:10px;font-size:13.5px;font-weight:600;color:#6a5e57;display:flex;align-items:center;justify-content:center;gap:6px}',
-    '.seg button svg{width:16px;height:16px}',
-    '.seg button.on{background:#fff;color:var(--pr);box-shadow:0 1px 3px rgba(60,30,10,.14)}',
-    '.typing .seg{display:none}',
-    '.mfoot{flex:none;display:none;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln)}',
+    /* Mobil alt çubuk */
+    '.mfoot{flex:none;display:none;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);background:#fff}',
     '.mfoot.on{display:flex}',
     '@media(min-width:760px){.mfoot.on{display:none}}',
     '.typing .mfoot{display:none!important}',
-    '.mfoot a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:12px;border:1.5px solid var(--ln);font-weight:600;font-size:14px}',
-    '.mfoot a svg{width:18px;height:18px;color:var(--pr)}',
+    '.mfoot a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:22px;font-weight:700;font-size:14px}',
+    '.mfoot a svg{width:18px;height:18px}',
+    '.mfoot .wa{background:#25a162;color:#fff}',
+    '.mfoot .tel{background:var(--bg);color:var(--ink)}',
 
     '.tools{flex:none;display:none;gap:8px;padding:10px 16px;border-bottom:1px solid var(--ln);overflow-x:auto;scrollbar-width:none;white-space:nowrap}',
     '.tools::-webkit-scrollbar{display:none}',
     '.typing .tools.on{display:flex}',
-    '.opt{height:34px;padding:0 14px;border-radius:10px;border:1px solid var(--ln);font-size:13.5px;color:#4d423c;flex:none;display:flex;align-items:center;gap:7px}',
-    '.opt.on{background:var(--pr);border-color:var(--pr);color:#fff}',
+    '.opt{height:34px;padding:0 14px;border-radius:17px;background:var(--bg);font-size:13.5px;font-weight:600;color:#44525c;flex:none;display:flex;align-items:center;gap:7px}',
+    '.opt.on{background:var(--ink);color:#fff}',
     '.opt i{width:8px;height:8px;border-radius:50%;background:var(--ok);display:block}',
-    '.opt.on i{background:#fff}',
-    '.sep{width:1px;background:var(--ln);margin:4px 2px;flex:none}',
 
-    '.body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:12px}',
+    '.body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:16px}',
     '.idle{display:block}.results{display:none}.typing .idle{display:none}.typing .results{display:block}',
     '.pane{display:none}.pane.on{display:block}',
-    '.h{display:flex;align-items:center;justify-content:space-between;padding:18px 16px 8px;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mu)}',
-    '.h small{font-weight:600;letter-spacing:0;text-transform:none;font-size:12.5px}',
-    '.h button{font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--pr);font-weight:600}',
+    '.h{display:flex;align-items:center;justify-content:space-between;padding:18px 16px 10px;font-size:16px;font-weight:800;color:var(--ink)}',
+    '.h small{font-weight:600;font-size:13px;color:var(--mu)}',
+    '.h button{font-size:13px;color:var(--pr);font-weight:700}',
+    '@media(min-width:760px){.h{padding:20px 20px 10px}}',
+    '.mo{display:block}@media(min-width:760px){.mo{display:none}}',
 
-    '.recent .row{display:flex;align-items:center}',
-    '.recent .row>button.r{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 16px;text-align:left;font-size:15px}',
-    '.recent .row svg{width:18px;height:18px;color:#b3a79f;flex:none}',
-    '.recent .del{width:40px;height:40px;display:grid;place-items:center;color:#b3a79f;margin-right:6px}',
-    '.recent .del svg{width:16px;height:16px}',
-    '.recent .row:hover{background:var(--bg)}',
+    '.recent{display:flex;gap:8px;padding:0 16px 4px;overflow-x:auto;scrollbar-width:none}',
+    '.recent::-webkit-scrollbar{display:none}',
+    '.rc{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 6px 0 12px;border-radius:18px;border:1px solid var(--ln);font-size:14px}',
+    '.rc svg{width:15px;height:15px;color:#9aa5ac}',
+    '.rc .del{width:26px;height:26px;border-radius:50%;display:grid;place-items:center}',
+    '.rc .del svg{width:13px;height:13px}',
 
-    '.trend{display:flex;flex-wrap:wrap;gap:8px;padding:2px 16px 6px}',
-    '.tq{display:flex;align-items:center;gap:5px;height:36px;padding:0 14px 0 10px;border-radius:999px;border:1px solid var(--ln);font-size:14px;background:#fff}',
-    '.tq svg{width:14px;height:14px;color:var(--pr)}',
-    '.tq:hover{border-color:var(--pr);color:var(--pr)}',
-    '.center{justify-content:center}',
+    '.trend{display:flex;gap:8px;padding:0 16px 4px;overflow-x:auto;scrollbar-width:none}',
+    '.trend::-webkit-scrollbar{display:none}',
+    '@media(min-width:760px){.trend,.recent{flex-wrap:wrap;padding:0 20px 4px}}',
+    '.tq{flex:none;display:flex;align-items:center;gap:6px;height:38px;padding:0 16px 0 12px;border-radius:19px;background:var(--soft);color:var(--prd);font-size:14px;font-weight:600}',
+    '.tq svg{width:15px;height:15px}',
+    '.tq:hover{background:#d6eaf0}',
+    '.center{justify-content:center;flex-wrap:wrap}',
 
-    '.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:4px 16px 8px}',
-    '@media(min-width:760px){.tiles{grid-template-columns:1fr 1fr 1fr}}',
-    '.tile{position:relative;display:block;border-radius:16px;overflow:hidden;background:var(--bg);text-align:left;min-width:0;aspect-ratio:4/3}',
-    '.tile .im{position:absolute;inset:0;border-radius:0;width:auto;height:auto}',
-    '.tile .im img{transition:transform .3s}',
-    '.tile:hover .im img{transform:scale(1.04)}',
-    '.tile .cap{position:absolute;left:0;right:0;bottom:0;padding:26px 12px 10px;background:linear-gradient(transparent,rgba(30,18,10,.72));color:#fff}',
-    '.tile b{display:block;font-size:14.5px;font-weight:700;line-height:1.2}',
-    '.tile small{font-size:12px;opacity:.85}',
+    /* Hesaplayıcı banner */
+    '.banner{display:flex;align-items:center;gap:14px;margin:16px 16px 0;padding:16px;border-radius:20px;background:linear-gradient(135deg,var(--prd),var(--pr));color:#fff;text-align:left;width:calc(100% - 32px)}',
+    '@media(min-width:760px){.banner{margin:20px 20px 0;width:calc(100% - 40px)}}',
+    '.banner .bi{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.14);display:grid;place-items:center;flex:none}',
+    '.banner .bi svg{width:26px;height:26px}',
+    '.banner div.tx{flex:1;min-width:0}',
+    '.banner b{display:block;font-size:16px}',
+    '.banner span{display:block;font-size:13px;color:#cfe3e9;margin-top:2px}',
+    '.banner>svg{width:22px;height:22px;flex:none}',
 
-    '.crumb{display:flex;align-items:center;gap:8px;padding:14px 12px 4px}',
-    '.crumb button{display:flex;align-items:center;gap:4px;height:34px;padding:0 10px 0 6px;border-radius:10px;font-size:14px;color:var(--mu)}',
+    /* Kategoriler */
+    '.clist{padding:0 8px}',
+    '@media(min-width:760px){.clist{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:0 12px}}',
+    '.li{display:flex;align-items:center;gap:12px;width:100%;padding:8px;border-radius:16px;text-align:left}',
+    '.li:hover{background:var(--bg)}',
+    '.li .im{width:52px;height:52px;border-radius:14px}',
+    '.li .n{flex:1;min-width:0;font-size:15px;font-weight:600}',
+    '.li .n small{display:block;color:var(--mu);font-size:13px;font-weight:500;margin-top:1px}',
+    '.li>svg{width:18px;height:18px;color:#a7b1b7;flex:none}',
+    '.li .ico{width:44px;height:44px;border-radius:14px;background:var(--soft);display:grid;place-items:center;color:var(--pr);flex:none}',
+    '.li .ico svg{width:20px;height:20px}',
+    '.list{padding:0 8px}',
+    '@media(min-width:760px){.list{padding:0 12px}}',
+
+    '.crumb{display:flex;align-items:center;gap:8px;padding:12px 10px 0}',
+    '.crumb button{display:flex;align-items:center;gap:4px;height:36px;padding:0 12px 0 6px;border-radius:18px;font-size:14px;font-weight:600;color:var(--mu)}',
     '.crumb button:hover{background:var(--bg)}',
     '.crumb svg{width:18px;height:18px}',
-    '.ctitle{padding:2px 16px 10px;font-size:21px;font-weight:800}',
-    '.all-in{display:flex;align-items:center;justify-content:space-between;margin:0 16px 8px;padding:12px 14px;border-radius:12px;background:var(--pr);color:#fff;font-weight:600;font-size:14.5px}',
+    '.ctitle{padding:6px 16px 12px;font-size:22px;font-weight:800}',
+    '@media(min-width:760px){.ctitle{padding:6px 20px 12px}}',
+    '.all-in{display:flex;align-items:center;justify-content:space-between;margin:0 16px 10px;padding:14px 16px;border-radius:16px;background:var(--pr);color:#fff;font-weight:700;font-size:14.5px}',
+    '@media(min-width:760px){.all-in{margin:0 20px 10px}}',
     '.all-in svg{width:18px;height:18px}',
-    '.list .li{display:flex;align-items:center;gap:12px;width:100%;padding:9px 16px;text-align:left}',
-    '.list .li:hover{background:var(--bg)}',
-    '.list .li .im{width:46px;height:46px}',
-    '.list .li span.n{flex:1;min-width:0;font-size:15px}',
-    '.list .li small{color:var(--mu);font-size:13px}',
-    '.list .li>svg{width:16px;height:16px;color:#c0b4ac;flex:none}',
-    '.list .li .ico{width:40px;height:40px;border-radius:12px;background:var(--soft);display:grid;place-items:center;color:var(--pr);flex:none}',
-    '.list .li .ico svg{width:19px;height:19px}',
 
-    '.im{flex:none;border-radius:12px;background:var(--bg);overflow:hidden;display:grid;place-items:center;color:#c9a38c;position:relative}',
+    '.im{flex:none;border-radius:12px;background:var(--bg);overflow:hidden;display:grid;place-items:center;color:#a9c3cc;position:relative}',
     '.im img{width:100%;height:100%;object-fit:cover;display:block}',
     '.im>svg{width:42%;height:42%}',
 
-    '.cats{display:flex;gap:8px;padding:12px 16px 4px;overflow-x:auto;scrollbar-width:none}',
+    /* Sonuçlar */
+    '.cats{display:flex;gap:8px;padding:12px 16px 0;overflow-x:auto;scrollbar-width:none}',
+    '@media(min-width:760px){.cats{padding:14px 20px 0}}',
     '.cats::-webkit-scrollbar{display:none}',
-    '.cc{flex:none;display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;background:var(--soft);color:var(--prd);font-size:13.5px;font-weight:600;white-space:nowrap}',
-    '.cc small{opacity:.7;font-weight:500}',
-    '.cc:hover{background:#f6dccf}',
-
-    '.item{display:flex;gap:14px;align-items:center;padding:10px 16px;position:relative}',
-    '.item+.item:before{content:"";position:absolute;top:0;left:94px;right:16px;border-top:1px solid var(--ln)}',
-    '.item:hover,.item.sel{background:var(--bg)}',
-    '.item .im{width:64px;height:64px}',
-    '.off{position:absolute;right:4px;bottom:4px;background:var(--ink);color:#fff;font-size:11px;font-weight:700;padding:2px 6px;border-radius:6px}',
-    '.info{flex:1;min-width:0}',
-    '.pname{font-size:15px;font-weight:500;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
-    'mark{background:none;color:inherit;font-weight:700;text-decoration:underline;text-decoration-color:var(--pr);text-decoration-thickness:2px;text-underline-offset:3px}',
-    '.meta{margin-top:4px;font-size:12.5px;color:var(--mu);display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
-    '.st{display:inline-flex;align-items:center;gap:5px}',
-    '.st i{width:7px;height:7px;border-radius:50%;background:var(--ok);display:block}',
-    '.st.no{color:#b42318}.st.no i{background:#d9cfc8}',
-    '.badge{background:var(--soft);color:var(--prd);font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px}',
-    '.price{text-align:right;flex:none;white-space:nowrap}',
-    '.price b{display:block;font-size:15.5px;font-weight:800}',
-    '.price s{display:block;font-size:12px;color:#a89c95}',
-    '.price b.dsc{color:var(--pr)}',
-    '.price small{display:block;font-size:11px;color:var(--mu);margin-top:1px}',
-    '.more{display:block;margin:10px auto 4px;height:40px;padding:0 20px;border-radius:12px;border:1px solid var(--ln);font-size:14px;font-weight:600}',
-    '.more:hover{background:var(--bg)}',
+    '.cc{flex:none;display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:17px;border:1.5px solid var(--ln);font-size:13.5px;font-weight:600;white-space:nowrap}',
+    '.cc small{color:var(--mu);font-weight:500}',
+    '.cc:hover{border-color:var(--pr);color:var(--pr)}',
+    '.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px}',
+    '@media(min-width:760px){.grid{grid-template-columns:repeat(3,1fr);gap:14px;padding:0 20px}}',
+    '@media(min-width:960px){.grid{grid-template-columns:repeat(4,1fr)}}',
+    '.card{display:flex;flex-direction:column;border-radius:18px;border:1px solid var(--ln);overflow:hidden;background:#fff;transition:box-shadow .15s,border-color .15s;min-width:0}',
+    '.card:hover,.card.sel{border-color:#c8d5da;box-shadow:0 8px 22px rgba(10,40,55,.08)}',
+    '.card>a.ph{position:relative;display:block;aspect-ratio:1/1;background:#fff}',
+    '.card>a.ph .im{position:absolute;inset:0;border-radius:0;background:#fff;width:auto;height:auto}',
+    '.card>a.ph img{object-fit:contain;padding:8px}',
+    '.off{position:absolute;left:8px;top:8px;background:var(--ac);color:#fff;font-size:11.5px;font-weight:800;padding:3px 8px;border-radius:8px}',
+    '.oosb{position:absolute;left:8px;bottom:8px;background:rgba(20,33,43,.78);color:#fff;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:8px}',
+    '.cb{flex:1;display:flex;flex-direction:column;gap:6px;padding:10px 12px 12px}',
+    '.pname{font-size:14px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}',
+    'mark{background:none;color:var(--pr);font-weight:800}',
+    '.vchip{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--prd);background:var(--soft);padding:3px 8px;border-radius:7px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.badge{align-self:flex-start;background:#fdecea;color:var(--ac);font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px}',
+    '.pr{margin-top:auto;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}',
+    '.pr b{font-size:16px;font-weight:800}',
+    '.pr b.dsc{color:var(--ac)}',
+    '.pr s{font-size:12px;color:#99a4ab}',
+    '.pr small{width:100%;font-size:11px;color:var(--mu);margin-top:-4px}',
+    '.acts{display:flex;gap:6px}',
+    '.acts a,.acts button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:38px;border-radius:12px;font-size:13px;font-weight:700;white-space:nowrap}',
+    '.acts .see{background:var(--bg);color:var(--ink)}',
+    '.acts .add{background:var(--pr);color:#fff}',
+    '.acts .add svg{width:17px;height:17px}',
+    '.acts .add[disabled]{background:#d5dde1;color:#7b878e;cursor:default}',
+    '.acts .add.ok{background:var(--ok)}',
+    '@media(max-width:380px){.acts .see{flex:0 0 auto;padding:0 10px}.acts .add span{display:none}}',
+    '.more{display:block;margin:16px auto 4px;height:42px;padding:0 22px;border-radius:21px;background:var(--bg);font-size:14px;font-weight:700}',
+    '.more:hover{background:var(--ln)}',
 
     '.cta{flex:none;display:none;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);background:#fff}',
     '.typing .cta.on{display:block}',
-    '.cta a{display:flex;align-items:center;justify-content:space-between;gap:8px;height:48px;padding:0 18px;border-radius:14px;background:var(--ink);color:#fff;font-weight:600;font-size:15px}',
+    '.cta a{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:23px;background:var(--ink);color:#fff;font-weight:700;font-size:14.5px}',
     '.cta a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.cta svg{width:18px;height:18px;flex:none}',
 
     '.empty{padding:40px 24px 12px;text-align:center}',
-    '.empty .ic{width:56px;height:56px;border-radius:18px;background:var(--soft);display:grid;place-items:center;margin:0 auto 14px;color:var(--pr)}',
+    '.empty .ic{width:60px;height:60px;border-radius:50%;background:var(--soft);display:grid;place-items:center;margin:0 auto 14px;color:var(--pr)}',
     '.empty .ic svg{width:26px;height:26px}',
     '.empty b{display:block;font-size:17px;margin-bottom:6px}',
     '.empty p{color:var(--mu);font-size:14.5px}',
@@ -382,104 +404,123 @@
     '.spin{width:28px;height:28px;border:3px solid var(--ln);border-top-color:var(--pr);border-radius:50%;margin:48px auto;animation:sp .8s linear infinite}',
     '@keyframes sp{to{transform:rotate(360deg)}}',
 
-    /* Aramada hesaplayıcı kısayolu */
-    '.calc-card{display:flex;align-items:center;gap:12px;width:calc(100% - 32px);margin:12px 16px 0;padding:12px 14px;border-radius:14px;border:1.5px dashed #e5c3b3;background:#fffaf7;text-align:left}',
-    '.calc-card>svg{width:22px;height:22px;color:var(--pr);flex:none}',
-    '.calc-card div{flex:1}.calc-card b{display:block;font-size:15px}.calc-card span{font-size:13px;color:var(--mu)}',
+    /* Varyant seçimi (alttan açılan) */
+    '.sheet{position:absolute;inset:0;z-index:5;display:none;background:rgba(10,24,32,.35)}',
+    '.sheet.on{display:flex;align-items:flex-end}',
+    '.sh-in{width:100%;max-height:80%;overflow-y:auto;background:#fff;border-radius:22px 22px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));animation:up .2s ease-out}',
+    '@media(min-width:760px){.sheet.on{align-items:center;justify-content:center}.sh-in{width:440px;border-radius:22px}}',
+    '.sh-h{display:flex;gap:12px;align-items:center}',
+    '.sh-h .im{width:64px;height:64px;background:#fff;border:1px solid var(--ln)}',
+    '.sh-h .im img{object-fit:contain}',
+    '.sh-h b{flex:1;font-size:15px;line-height:1.3}',
+    '.sh-h button{width:36px;height:36px;border-radius:50%;background:var(--bg);display:grid;place-items:center;flex:none}',
+    '.sh-h button svg{width:16px;height:16px}',
+    '.sh-l{font-size:13px;font-weight:700;color:var(--mu);margin:16px 0 8px}',
+    '.vopts{display:flex;flex-wrap:wrap;gap:8px}',
+    '.vo{display:flex;flex-direction:column;align-items:flex-start;padding:8px 12px;border-radius:12px;border:1.5px solid var(--ln);font-size:13.5px;font-weight:700;text-align:left}',
+    '.vo small{font-size:12px;font-weight:600;color:var(--mu)}',
+    '.vo.on{border-color:var(--pr);background:var(--soft);color:var(--prd)}',
+    '.vo[disabled]{opacity:.45;cursor:default;text-decoration:line-through}',
+    '.sh-f{display:flex;gap:10px;align-items:center;margin-top:18px}',
+    '.qty{display:flex;align-items:center;gap:4px;height:46px;border-radius:23px;background:var(--bg);padding:0 4px;flex:none}',
+    '.qty button{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.1)}',
+    '.qty button svg{width:15px;height:15px}',
+    '.qty input{width:36px;text-align:center;border:0;outline:0;background:transparent;font:inherit;font-size:16px;font-weight:700;color:var(--ink)}',
+    '.sh-go{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:23px;background:var(--pr);color:#fff;font-weight:800;font-size:15px}',
+    '.sh-go svg{width:18px;height:18px}',
+    '.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:8px;padding:10px 16px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap}',
+    '.toast.on{display:flex}.toast svg{width:18px;height:18px;color:#7ee2a8}',
 
-    /* Toprak hesaplayıcı: adım adım */
-    '.calc{padding:16px 16px 8px;max-width:640px}',
-    '.c-head b{display:block;font-size:20px;font-weight:800}',
+    /* Toprak hesaplayıcı */
+    '.calc{padding:16px 16px 8px;max-width:680px}',
+    '@media(min-width:760px){.calc{padding:20px}}',
+    '.c-head b{display:block;font-size:22px;font-weight:800}',
     '.c-head p{font-size:14px;color:var(--mu);margin-top:4px}',
-    '.step{position:relative;margin-top:18px;padding-left:40px}',
-    '.step:before{content:"";position:absolute;left:13px;top:30px;bottom:-14px;width:2px;background:var(--ln)}',
+    '.step{position:relative;margin-top:20px;padding-left:42px}',
+    '.step:before{content:"";position:absolute;left:14px;top:32px;bottom:-16px;width:2px;background:var(--ln)}',
     '.step:last-child:before{display:none}',
-    '.sn{position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:13px;font-weight:700;display:grid;place-items:center}',
-    '.step.done .sn{background:var(--pr)}',
-    '.st-t{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px;font-size:15px;font-weight:700;margin-bottom:10px}',
-    '.chips{display:flex;flex-wrap:wrap;gap:8px}',
-    '@media(max-width:559px){.chips{display:grid;grid-template-columns:1fr 1fr}.sh{padding:0 10px 0 8px;font-size:13px;gap:6px}.fig svg{max-height:150px}}',
-    '.sh{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px 0 10px;border-radius:999px;border:1.5px solid var(--ln);font-size:14px;font-weight:600;background:#fff}',
-    '.sh svg{width:20px;height:20px;color:var(--mu)}',
-    '.sh:hover{border-color:#d9c3b6}',
-    '.sh.on{border-color:var(--pr);background:var(--pr);color:#fff}.sh.on svg{color:#fff}',
-    '.unit{display:flex;padding:3px;border-radius:10px;background:var(--bg)}',
-    '.unit button{height:28px;padding:0 12px;border-radius:8px;font-size:13px;font-weight:700;color:var(--mu)}',
+    '.sn{position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;background:var(--bg);color:var(--mu);font-size:13px;font-weight:800;display:grid;place-items:center}',
+    '.step.done .sn{background:var(--pr);color:#fff}',
+    '.st-t{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:30px;font-size:15.5px;font-weight:800;margin-bottom:10px}',
+    '.chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+    '@media(min-width:760px){.chips{grid-template-columns:repeat(4,1fr)}}',
+    '.sh{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border-radius:16px;border:1.5px solid var(--ln);font-size:13px;font-weight:700;text-align:center}',
+    '.sh svg{width:28px;height:28px;color:var(--mu)}',
+    '.sh:hover{border-color:#c4d2d8}',
+    '.sh.on{border-color:var(--pr);background:var(--soft);color:var(--prd)}.sh.on svg{color:var(--pr)}',
+    '.unit{display:flex;padding:3px;border-radius:18px;background:var(--bg)}',
+    '.unit button{height:30px;padding:0 14px;border-radius:15px;font-size:13px;font-weight:700;color:var(--mu)}',
     '.unit button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}',
-    '.dims{display:grid;gap:12px;padding:14px;border-radius:16px;border:1px solid var(--ln)}',
+    '.dims{display:grid;gap:12px;padding:14px;border-radius:18px;background:var(--bg)}',
     '@media(min-width:560px){.dims{grid-template-columns:230px 1fr;align-items:center}}',
+    '.fig{background:#fff;border-radius:14px;padding:6px}',
     '.fig svg{width:100%;height:auto;max-height:190px}',
-    '.fig .body-f{fill:#f3e6da;stroke:#5b4033;stroke-width:1.8;stroke-linejoin:round}',
-    '.fig .edge{fill:none;stroke:#5b4033;stroke-width:1.8}',
-    '.fig .soil{fill:#6e4a36}',
-    '.fig .dl{stroke:#9b8a80;stroke-width:1.3}',
-    '.fig .pl rect{fill:#fff;stroke:#d8cbc2}',
-    '.fig .pl text{fill:#5b4d45;font-size:13px;font-weight:700;text-anchor:middle}',
+    '@media(max-width:559px){.fig svg{max-height:150px}}',
+    '.fig .body-f{fill:#e6f0f3;stroke:#37515e;stroke-width:1.8;stroke-linejoin:round}',
+    '.fig .edge{fill:none;stroke:#37515e;stroke-width:1.8}',
+    '.fig .soil{fill:#6b4a36}',
+    '.fig .dl{stroke:#9aaab2;stroke-width:1.3}',
+    '.fig .pl rect{fill:#fff;stroke:#cfdbe0}',
+    '.fig .pl text{fill:#44525c;font-size:13px;font-weight:700;text-anchor:middle}',
     '.fig .pl.v rect{fill:var(--ink);stroke:var(--ink)}.fig .pl.v text{fill:#fff}',
     '.fig .pl.on rect{fill:var(--pr);stroke:var(--pr)}.fig .pl.on text{fill:#fff}',
     '.fig .dm.on .dl{stroke:var(--pr);stroke-width:2}',
     '.inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
     '.inp label{display:block;font-size:12.5px;font-weight:700;color:var(--mu);margin-bottom:5px}',
-    '.inp div{display:flex;align-items:center;height:46px;border-radius:12px;background:var(--bg);padding:0 12px;border:1.5px solid transparent}',
-    '.inp div:focus-within{border-color:var(--pr);background:#fff}',
-    '.inp input,.qty input{flex:1;min-width:0;width:100%;border:0;outline:0;background:transparent;font:inherit;font-size:16px;font-weight:600;color:var(--ink)}',
-    '.inp em{font-style:normal;font-size:13px;color:var(--mu);font-weight:600}',
-    '.qty{display:flex;align-items:center;gap:4px;height:46px;border-radius:12px;background:var(--bg);padding:0 4px}',
-    '.qty button{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.1)}',
-    '.qty button svg{width:15px;height:15px}',
-    '.qty input{text-align:center}',
+    '.inp div.b{display:flex;align-items:center;height:46px;border-radius:14px;background:#fff;padding:0 12px;border:2px solid transparent}',
+    '.inp div.b:focus-within{border-color:var(--pr)}',
+    '.inp input{flex:1;min-width:0;width:100%;border:0;outline:0;background:transparent;font:inherit;font-size:16px;font-weight:700;color:var(--ink)}',
+    '.inp em{font-style:normal;font-size:13px;color:var(--mu);font-weight:700}',
+    '.inp .qty{background:#fff;width:100%;justify-content:space-between}',
+    '.inp .qty button{background:var(--bg);box-shadow:none}',
     '.tip{grid-column:1/-1;font-size:12.5px;color:var(--mu)}',
-    '.wait{padding:14px;border-radius:14px;background:var(--bg);color:var(--mu);font-size:14px}',
-    '.res{display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;background:var(--ink);color:#fff}',
-    '.res .ic{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.1);display:grid;place-items:center;flex:none}',
-    '.res .ic svg{width:26px;height:26px;color:#f3b89c}',
-    '.res b{display:block;font-size:28px;font-weight:800;letter-spacing:-.01em;line-height:1.1}',
-    '.res span{display:block;font-size:13px;color:#d9ccc4;margin-top:3px}',
-    '.big{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--soft);color:var(--prd);font-size:13px}',
+    '.wait{padding:14px;border-radius:14px;border:1.5px dashed var(--ln);color:var(--mu);font-size:14px}',
+    '.res{display:flex;align-items:center;gap:14px;padding:18px;border-radius:20px;background:linear-gradient(135deg,var(--prd),var(--pr));color:#fff}',
+    '.res .ic{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.14);display:grid;place-items:center;flex:none}',
+    '.res .ic svg{width:28px;height:28px}',
+    '.res b{display:block;font-size:30px;font-weight:800;letter-spacing:-.01em;line-height:1.1}',
+    '.res span{display:block;font-size:13px;color:#cfe3e9;margin-top:3px}',
+    '.big{margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff6e5;color:#7a4b00;font-size:13px}',
     '.big a{font-weight:700;text-decoration:underline}',
-    '.go{margin-top:14px;font-size:13.5px;color:var(--mu)}',
-    '.gocats{display:grid;gap:8px;margin-top:8px}',
+    '.go{margin-top:16px;font-size:14px;font-weight:700}',
+    '.go small{display:block;font-weight:500;color:var(--mu);font-size:13px;margin-top:2px}',
+    '.gocats{display:grid;gap:8px;margin-top:10px}',
     '@media(min-width:560px){.gocats{grid-template-columns:1fr 1fr}}',
-    '.gc{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 8px;border-radius:14px;border:1px solid var(--ln)}',
+    '.gc{display:flex;align-items:center;gap:10px;padding:8px 12px 8px 8px;border-radius:16px;border:1.5px solid var(--ln)}',
     '.gc:hover{border-color:var(--pr)}',
-    '.gc .im{width:46px;height:46px}',
+    '.gc .im{width:48px;height:48px}',
     '.gc .tx{flex:1;min-width:0}.gc b{display:block;font-size:14px;line-height:1.25}.gc small{font-size:12px;color:var(--mu)}',
-    '.gc>svg{width:16px;height:16px;color:var(--pr);flex:none}',
-    '.gc.first{border-color:var(--pr);background:#fffaf7}',
-    '.ask{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:13.5px;font-weight:600;color:var(--pr)}',
-    '.ask svg{width:16px;height:16px}'
+    '.gc>svg{width:18px;height:18px;color:var(--pr);flex:none}'
   ].join('\n');
 
-  var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $seg, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab;
+  var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $sheet, $toast;
   var isOpen = false, sel = -1, pushed = false;
   var onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home';
-  var TABS = [['home', 'Keşfet', 'compass', 'Keşfet'], ['calc', 'Toprak Hesapla', 'calc', 'Hesapla'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
+  var TABS = [['home', 'Keşfet', 'compass'], ['calc', 'Toprak Hesapla', 'calc'], ['pages', 'Sayfalar', 'doc']];
+  var BY_ID = {};
 
   function build() {
     if (host) return;
     host = document.createElement('div');
     host.id = 'urun-arama-root';
     root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
-    var navs = function (cls) {
-      return TABS.map(function (t) {
-        return '<button class="' + cls + '" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + (cls === 'sg' ? t[3] : t[1]) + '</span></button>';
-      }).join('');
-    };
     root.innerHTML =
       '<style>' + CSS + '</style><div class="root">' +
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
-      '<div class="top"><button class="back" type="button" data-act="close" aria-label="Kapat">' + I.back + '</button>' +
+      '<div class="top"><button class="back" type="button" data-act="back" aria-label="Geri">' + I.back + '</button>' +
       '<label class="field">' + I.search +
       '<input type="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Ara">' +
       '<button class="clr" type="button" data-act="clear" aria-label="Temizle">' + I.x + '</button></label>' +
       '<button class="xbtn" type="button" data-act="close" aria-label="Kapat">' + I.x + '</button></div>' +
-      '<div class="mid"><nav class="rail">' + navs('nav') + '<div class="help"></div></nav>' +
-      '<div class="main"><div class="seg">' + navs('sg') + '</div>' +
-      '<div class="tools"></div>' +
+      '<div class="mid"><nav class="rail">' + TABS.map(function (t) {
+        return '<button class="nav" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
+      }).join('') + '<div class="help"></div></nav>' +
+      '<div class="main"><div class="tools"></div>' +
       '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane pages"></div></div>' +
       '<div class="results" aria-live="polite"></div></div>' +
-      '<div class="cta"></div><div class="mfoot"></div></div></div>' +
+      '<div class="cta"></div><div class="mfoot"></div>' +
+      '<div class="sheet"></div><div class="toast"></div></div></div>' +
       '</div></div></div>';
     document.body.appendChild(host);
     host.style.fontFamily = getComputedStyle(document.body).fontFamily;
@@ -490,7 +531,6 @@
     $q = root.querySelector('.top input');
     $clr = root.querySelector('.clr');
     $rail = root.querySelector('.rail');
-    $seg = root.querySelector('.seg');
     $help = root.querySelector('.help');
     $tools = root.querySelector('.tools');
     $res = root.querySelector('.results');
@@ -501,12 +541,15 @@
     $body = root.querySelector('.body');
     $cta = root.querySelector('.cta');
     $mfoot = root.querySelector('.mfoot');
+    $sheet = root.querySelector('.sheet');
+    $toast = root.querySelector('.toast');
     $q.placeholder = 'Ürün, marka veya kategori ara';
 
     $q.addEventListener('input', function () { shown = PAGE; render(); });
     $q.addEventListener('keydown', onKey);
     $fab.addEventListener('click', function () { open(); });
     $ov.addEventListener('click', function (e) { if (e.target === $ov) close(); });
+    $sheet.addEventListener('click', function (e) { if (e.target === $sheet) closeSheet(); });
     root.addEventListener('error', function (e) {
       var t = e.target;
       if (t && t.tagName === 'IMG' && t.parentNode) t.parentNode.innerHTML = I.sprout;
@@ -515,7 +558,10 @@
     root.addEventListener('input', function (e) { if (e.target !== $q) calcInput(e.target); });
     root.addEventListener('focusin', function (e) { calcFocus(e.target, true); });
     root.addEventListener('focusout', function (e) { calcFocus(e.target, false); });
-    $panel.addEventListener('keydown', function (e) { if (e.key === 'Escape' && e.target !== $q) close(); });
+    $panel.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || e.target === $q) return;
+      if ($sheet.classList.contains('on')) closeSheet(); else close();
+    });
     setupFab();
     setTab(tab);
     if (DATA) applyConfig();
@@ -531,16 +577,28 @@
     }
     var act = b.getAttribute('data-act'), v = b.getAttribute('data-v');
     if (act === 'close') close();
+    else if (act === 'back') {
+      // Mobil geri: önce iç görünümden çık, en son paneli kapat
+      if ($q.value) { $q.value = ''; render(); }
+      else if (view) { view = CATS_BY_ID[view] && CATS_BY_ID[view].p && CATS_BY_ID[CATS_BY_ID[view].p] ? CATS_BY_ID[view].p : null; renderIdle(); }
+      else if (tab !== 'home') setTab('home');
+      else close();
+    }
     else if (act === 'clear') { $q.value = ''; render(); $q.focus(); }
     else if (act === 'q') { $q.value = v; shown = PAGE; render(); $q.focus(); }
-    else if (act === 'del') { var f = fold(v); setRecent(getRecent().filter(function (x) { return fold(x) !== f; })); renderIdle(); }
+    else if (act === 'del') { e.stopPropagation(); var f = fold(v); setRecent(getRecent().filter(function (x) { return fold(x) !== f; })); renderIdle(); }
     else if (act === 'delall') { setRecent([]); renderIdle(); }
     else if (act === 'cat') { view = v || null; renderIdle(); $body.scrollTop = 0; }
     else if (act === 'stock') { onlyStock = !onlyStock; shown = PAGE; render(); }
     else if (act === 'sort') { sortMode = v; shown = PAGE; render(); }
     else if (act === 'more') { shown += PAGE; render(); }
-    else if (act === 'tab') { if ($q.value) { $q.value = ''; render(); } setTab(v); }
+    else if (act === 'tab') { if ($q.value) { $q.value = ''; render(); } view = null; renderIdle(); setTab(v); }
     else if (act === 'gocalc') { $q.value = ''; render(); setTab('calc'); }
+    else if (act === 'add') openAdd(v);
+    else if (act === 'vo') pickVariant(v);
+    else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
+    else if (act === 'shx') closeSheet();
+    else if (act === 'shgo') doAdd();
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
   }
 
@@ -571,20 +629,24 @@
     if (c.primary) $wrap.style.setProperty('--pr', c.primary);
     if (c.dark) $wrap.style.setProperty('--prd', c.dark);
     if (c.soft) $wrap.style.setProperty('--soft', c.soft);
+    if (c.accent) $wrap.style.setProperty('--ac', c.accent);
     if (CFG.placeholder) $q.placeholder = CFG.placeholder;
     var fab = CFG.fab || {};
     $fab.querySelector('span.t').textContent = fab.text || 'Ürün Bul';
     $fab.classList.toggle('left', fab.side === 'left');
     if (fab.bottom != null) $wrap.style.setProperty('--fb', (+fab.bottom || 0) + 'px');
     updateFab();
+    BY_ID = {};
+    DATA.items.forEach(function (p) { BY_ID[p.id] = p; });
 
     // İletişim: masaüstünde sol menünün altında, mobilde alt çubukta
-    var wa = CFG.whatsapp ? '<a data-kind="whatsapp" data-name="whatsapp" target="_blank" rel="noopener" href="' + esc(waHref()) + '">' + I.chat + '<span>WhatsApp</span></a>' : '';
-    var tel = CFG.phone ? '<a data-kind="phone" data-name="phone" href="tel:' + esc(CFG.phone.replace(/[^\d+]/g, '')) + '">' + I.phone + '<span>' + esc(CFG.phone) + '</span></a>' : '';
-    $help.innerHTML = wa || tel ? '<b>Yardım mı lazım?</b>' + wa + tel : '';
-    $help.style.display = wa || tel ? '' : 'none';
-    $mfoot.innerHTML = wa + (CFG.phone ? '<a data-kind="phone" data-name="phone" href="tel:' + esc(CFG.phone.replace(/[^\d+]/g, '')) + '">' + I.phone + '<span>Bizi arayın</span></a>' : '');
-    $mfoot.classList.toggle('on', !!(wa || tel));
+    var telHref = CFG.phone ? 'tel:' + CFG.phone.replace(/[^\d+]/g, '') : '';
+    var wa = CFG.whatsapp ? '<a class="wa" data-kind="whatsapp" data-name="whatsapp" target="_blank" rel="noopener" href="' + esc(waHref()) + '">' + I.chat + '<span>WhatsApp</span></a>' : '';
+    $help.innerHTML = wa || telHref ? '<b>Yardım mı lazım?</b><p>Doğru ürünü birlikte seçelim.</p>' + wa +
+      (telHref ? '<a class="tel" data-kind="phone" data-name="phone" href="' + esc(telHref) + '">' + I.phone + '<span>' + esc(CFG.phone) + '</span></a>' : '') : '';
+    $help.style.display = wa || telHref ? '' : 'none';
+    $mfoot.innerHTML = wa + (telHref ? '<a class="tel" data-kind="phone" data-name="phone" href="' + esc(telHref) + '">' + I.phone + '<span>Bizi arayın</span></a>' : '');
+    $mfoot.classList.toggle('on', !!(wa || telHref));
     renderIdle();
     setTab(tab);
   }
@@ -609,74 +671,93 @@
     return STORE + (CFG.searchUrl || '/search?s={q}').replace('{q}', encodeURIComponent(q));
   }
 
-  // ---- Keşfet: son aramalar, çok arananlar, kategoriler ----
+  // ---- Keşfet ----
   function topCats() {
     var last = (CFG.categoryLast || []).map(fold);
     var rank = function (c) { return last.indexOf(c.f); };
     return DATA.cats.filter(function (c) { return !c.p || !CATS_BY_ID[c.p]; })
       .sort(function (a, b) { return rank(a) - rank(b) || b.k - a.k; });
   }
+  function catRow(c) {
+    var inner = thumb(c.img, 180) + '<span class="n">' + esc(c.n) + '<small>' + c.k + ' ürün</small></span>' + I.right;
+    return KIDS[c.id]
+      ? '<button class="li" type="button" data-act="cat" data-v="' + esc(c.id) + '">' + inner + '</button>'
+      : '<a class="li" data-kind="category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '">' + inner + '</a>';
+  }
+  function pageRows() {
+    return (CFG.pages || []).map(function (pg) {
+      return '<a class="li" data-kind="page" data-name="' + esc(pg.title) + '" href="' + esc(pageHref(pg.url)) + '">' +
+        '<span class="ico">' + I.doc + '</span><span class="n">' + esc(pg.title) + '</span>' + I.right + '</a>';
+    }).join('');
+  }
 
   function renderIdle() {
     if (!$home) return;
-    renderPages();
+    $pages.innerHTML = '<div class="h">Sayfalar</div><div class="list">' + pageRows() + '</div>';
     if (!DATA) { $home.innerHTML = '<div class="spin"></div>'; return; }
     if (view && CATS_BY_ID[view]) { $home.innerHTML = renderCat(CATS_BY_ID[view]); return; }
     view = null;
     var html = '';
     var rec = getRecent();
     if (rec.length) {
-      html += '<div class="h">Son aramaların<button type="button" data-act="delall">Temizle</button></div><div class="recent">' +
+      html += '<div class="h">Son aramalar<button type="button" data-act="delall">Temizle</button></div><div class="recent">' +
         rec.map(function (t) {
-          return '<div class="row"><button class="r" type="button" data-act="q" data-v="' + esc(t) + '">' + I.clock + esc(t) + '</button>' +
-            '<button class="del" type="button" data-act="del" data-v="' + esc(t) + '" aria-label="Sil">' + I.x + '</button></div>';
+          return '<span class="rc"><button type="button" data-act="q" data-v="' + esc(t) + '" style="display:flex;align-items:center;gap:6px">' + I.clock + esc(t) + '</button>' +
+            '<button class="del" type="button" data-act="del" data-v="' + esc(t) + '" aria-label="Sil">' + I.x + '</button></span>';
         }).join('') + '</div>';
     }
     var pop = CFG.popular || [];
     if (pop.length) {
-      html += '<div class="h">Sık aranan</div><div class="trend">' +
-        pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.hash + esc(t) + '</button>'; }).join('') +
+      html += '<div class="h">Sık arananlar</div><div class="trend">' +
+        pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') +
         '</div>';
+    }
+    if (calcEnabled()) {
+      html += '<button class="banner" type="button" data-act="gocalc"><span class="bi">' + I.calc + '</span><div class="tx"><b>Kaç litre toprak lazım?</b>' +
+        '<span>Saksının ölçülerini gir, hemen hesaplayalım</span></div>' + I.arrow + '</button>';
     }
     var tops = topCats();
     if (tops.length) {
-      html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="tiles">' +
-        tops.map(function (c) {
-          var inner = thumb(c.img, 360) + '<div class="cap"><b>' + esc(c.n) + '</b><small>' + c.k + ' ürün</small></div>';
-          return KIDS[c.id]
-            ? '<button class="tile" type="button" data-act="cat" data-v="' + esc(c.id) + '">' + inner + '</button>'
-            : '<a class="tile" data-kind="category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '">' + inner + '</a>';
-        }).join('') + '</div>';
+      html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="clist">' + tops.map(catRow).join('') + '</div>';
     }
+    if ((CFG.pages || []).length) html += '<div class="mo"><div class="h">Sayfalar</div><div class="list">' + pageRows() + '</div></div>';
     $home.innerHTML = html;
-  }
-
-  function renderPages() {
-    var pages = CFG.pages || [];
-    $pages.innerHTML = '<div class="h">Sayfalar</div><div class="list">' + pages.map(function (pg) {
-      return '<a class="li" data-kind="page" data-name="' + esc(pg.title) + '" href="' + esc(pageHref(pg.url)) + '">' +
-        '<span class="ico">' + I.doc + '</span><span class="n">' + esc(pg.title) + '</span>' + I.right + '</a>';
-    }).join('') + '</div>';
   }
 
   function renderCat(c) {
     var parent = c.p && CATS_BY_ID[c.p];
-    var html = '<div class="crumb"><button type="button" data-act="cat" data-v="' + (parent ? esc(parent.id) : '') + '">' + I.back +
+    return '<div class="crumb"><button type="button" data-act="cat" data-v="' + (parent ? esc(parent.id) : '') + '">' + I.back +
       esc(parent ? parent.n : 'Tüm kategoriler') + '</button></div>' +
       '<div class="ctitle">' + esc(c.n) + '</div>' +
       '<a class="all-in" data-kind="category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '"><span>Tüm ' + esc(c.n) + ' (' + c.k + ')</span>' + I.arrow + '</a>' +
-      '<div class="list">';
-    html += (KIDS[c.id] || []).slice().sort(function (a, b) { return b.k - a.k; }).map(function (s) {
-      var inner = thumb(s.img, 180) + '<span class="n">' + esc(s.n) + '<br><small>' + s.k + ' ürün</small></span>' + I.right;
-      return KIDS[s.id]
-        ? '<button class="li" type="button" data-act="cat" data-v="' + esc(s.id) + '">' + inner + '</button>'
-        : '<a class="li" data-kind="category" data-name="' + esc(s.n) + '" href="' + esc(url(s.s)) + '">' + inner + '</a>';
-    }).join('');
-    return html + '</div>';
+      '<div class="clist">' + (KIDS[c.id] || []).slice().sort(function (a, b) { return b.k - a.k; }).map(catRow).join('') + '</div>';
   }
 
   // ---- Sonuçlar ----
   function price(p) { return p.d != null ? p.d : p.p; }
+  function vPrice(v) { return v.d != null ? v.d : v.p; }
+  function vOk(v) { return v.st > 0 || !!v.oos; }
+
+  function card(x) {
+    var p = x.p, badges = CFG.badges || {};
+    var off = p.d != null && p.p ? Math.round((1 - p.d / p.p) * 100) : 0;
+    var tagBadges = (p.t || []).filter(function (t) { return badges[t]; })
+      .map(function (t) { return '<span class="badge">' + esc(badges[t]) + '</span>'; }).join('');
+    var vnames = (p.v || []).map(function (v) { return v.name; }).filter(Boolean);
+    var chip = vnames.length > 1 ? vnames.length + ' seçenek · ' + vnames[0] + ' – ' + vnames[vnames.length - 1] : vnames[0] || '';
+    var pr = p.p == null ? '' :
+      (p.d != null ? '<b class="dsc">' + tl(p.d) + '</b><s>' + tl(p.p) + '</s>' : '<b>' + tl(p.p) + '</b>') +
+      (p.multi ? '<small>başlayan fiyatlarla</small>' : '');
+    var href = esc(url(p.s));
+    return '<div class="card"><a class="ph" data-kind="product" data-name="' + esc(p.n) + '" href="' + href + '">' +
+      thumb(p.img, 360, (off >= 1 ? '<span class="off">-%' + off + '</span>' : '') + (p.st ? '' : '<span class="oosb">Tükendi</span>')) + '</a>' +
+      '<div class="cb"><a class="pname" data-kind="product" data-name="' + esc(p.n) + '" href="' + href + '">' + highlight(p.n, p.nf, x.h) + '</a>' +
+      (chip ? '<span class="vchip">' + esc(chip) + '</span>' : '') + tagBadges +
+      '<div class="pr">' + pr + '</div>' +
+      '<div class="acts"><a class="see" data-kind="product" data-name="' + esc(p.n) + '" href="' + href + '">İncele</a>' +
+      (cartOn() ? '<button class="add" type="button" data-act="add" data-v="' + esc(p.id) + '"' + (p.st ? '' : ' disabled') + '>' + I.cart + '<span>' + (p.st ? 'Ekle' : 'Tükendi') + '</span></button>' : '') +
+      '</div></div></div>';
+  }
 
   function render() {
     if (!$q) return;
@@ -689,7 +770,6 @@
     if (!DATA) { $res.innerHTML = '<div class="spin"></div>'; return; }
 
     var r = search(q), html = '';
-    var badges = CFG.badges || {};
     var items = r.items;
     if (onlyStock) items = items.filter(function (x) { return x.p.st; });
     if (sortMode !== 'rel') {
@@ -702,28 +782,27 @@
     }
 
     $tools.innerHTML =
-      '<button class="opt' + (onlyStock ? ' on' : '') + '" type="button" data-act="stock"><i></i>Stoktakiler</button><span class="sep"></span>' +
-      [['rel', 'Önerilen'], ['asc', 'Fiyat artan'], ['desc', 'Fiyat azalan']].map(function (o) {
+      '<button class="opt' + (onlyStock ? ' on' : '') + '" type="button" data-act="stock"><i></i>Stoktakiler</button>' +
+      [['rel', 'Önerilen'], ['asc', 'En ucuz'], ['desc', 'En pahalı']].map(function (o) {
         return '<button class="opt' + (sortMode === o[0] ? ' on' : '') + '" type="button" data-act="sort" data-v="' + o[0] + '">' + o[1] + '</button>';
       }).join('');
     $tools.classList.toggle('on', r.items.length > 1);
 
     if (r.items.length) {
-      $cta.innerHTML = '<a data-kind="all" data-name="' + esc(q) + '" href="' + esc(searchHref(q.trim())) + '"><span>“' + esc(q.trim()) +
-        '” için ' + r.items.length + ' sonucun tümü</span>' + I.arrow + '</a>';
+      $cta.innerHTML = '<a data-kind="all" data-name="' + esc(q) + '" href="' + esc(searchHref(q.trim())) + '"><span>' + r.items.length + ' sonucun tümünü gör</span>' + I.arrow + '</a>';
       $cta.classList.add('on');
     } else $cta.classList.remove('on');
 
     if (calcEnabled() && r.tokens.some(function (t) { return /^(hacim|litre|kac|hesap|olcu|metrekup)/.test(t); })) {
-      html += '<button class="calc-card" type="button" data-act="gocalc">' + I.calc +
-        '<div><b>Toprak hesaplayıcı</b><span>Saksının ölçülerini gir, kaç litre gerektiğini öğren</span></div>' + I.arrow + '</button>';
+      html += '<button class="banner" type="button" data-act="gocalc"><span class="bi">' + I.calc + '</span><div class="tx"><b>Toprak hesaplayıcı</b>' +
+        '<span>Ölçüleri gir, kaç litre gerektiğini öğren</span></div>' + I.arrow + '</button>';
     }
     var pages = (CFG.pages || []).filter(function (pg) {
       var f = fold(pg.title);
       return r.tokens.every(function (t) { return words(f).some(function (w) { return w.indexOf(t) === 0; }); });
     });
     if (pages.length) {
-      html += '<div class="list" style="padding-top:8px">' + pages.slice(0, 3).map(function (pg) {
+      html += '<div class="list" style="padding-top:10px">' + pages.slice(0, 3).map(function (pg) {
         return '<a class="li" data-kind="page" data-name="' + esc(pg.title) + '" href="' + esc(pageHref(pg.url)) + '">' +
           '<span class="ico">' + I.doc + '</span><span class="n">' + esc(pg.title) + '</span>' + I.right + '</a>';
       }).join('') + '</div>';
@@ -743,7 +822,7 @@
           (CFG.whatsapp ? ' Bulamadıysanız <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, "' + q.trim() + '" arıyorum.')) + '">WhatsApp\'tan sorun</a>.' : '')) +
         '</p></div>' +
         (filtered ? '<div class="trend center"><button class="tq" type="button" data-act="stock">Tüm ürünleri göster</button></div>'
-          : '<div class="trend center">' + sugg.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.hash + esc(t) + '</button>'; }).join('') + '</div>');
+          : '<div class="trend center">' + sugg.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') + '</div>');
       if (!filtered) track('no_results', q);
       return;
     }
@@ -754,22 +833,8 @@
       }).join('') + '</div>';
     }
     if (items.length) {
-      html += '<div class="h">Ürünler<small>' + items.length + ' sonuç</small></div>';
-      html += items.slice(0, shown).map(function (x) {
-        var p = x.p;
-        var off = p.d != null && p.p ? Math.round((1 - p.d / p.p) * 100) : 0;
-        var tagBadges = (p.t || []).filter(function (t) { return badges[t]; })
-          .map(function (t) { return '<span class="badge">' + esc(badges[t]) + '</span>'; }).join('');
-        var pr = p.p == null ? '' :
-          (p.d != null ? '<s>' + tl(p.p) + '</s><b class="dsc">' + tl(p.d) + '</b>' : '<b>' + tl(p.p) + '</b>') +
-          (p.multi ? '<small>başlayan fiyatlarla</small>' : '');
-        return '<a class="item" data-kind="product" data-name="' + esc(p.n) + '" href="' + esc(url(p.s)) + '">' +
-          thumb(p.img, 180, off >= 1 ? '<span class="off">-%' + off + '</span>' : '') +
-          '<div class="info"><div class="pname">' + highlight(p.n, p.nf, x.h) + '</div>' +
-          '<div class="meta">' + (p.st ? '<span class="st"><i></i>Stokta</span>' : '<span class="st no"><i></i>Tükendi</span>') +
-          '<span>' + esc(p.b && p.b !== p.cn ? p.b : p.cn) + '</span>' + tagBadges + '</div></div>' +
-          '<div class="price">' + pr + '</div></a>';
-      }).join('');
+      html += '<div class="h">Ürünler<small>' + items.length + ' sonuç</small></div><div class="grid">' +
+        items.slice(0, shown).map(card).join('') + '</div>';
       if (items.length > shown) {
         html += '<button class="more" type="button" data-act="more">Daha fazla göster (' + (items.length - shown) + ')</button>';
       }
@@ -779,17 +844,18 @@
 
   function onKey(e) {
     if (e.key === 'Escape') { close(); return; }
-    var els = [].slice.call($res.querySelectorAll('.item'));
-    if (e.key === 'ArrowDown') sel = Math.min(sel + 1, els.length - 1);
-    else if (e.key === 'ArrowUp') sel = Math.max(sel - 1, -1);
+    var els = [].slice.call($res.querySelectorAll('.card'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') sel = Math.min(sel + 1, els.length - 1);
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') sel = Math.max(sel - 1, -1);
     else if (e.key === 'Enter') {
       e.preventDefault();
       var q = $q.value.trim();
       if (!q) return;
-      if (sel >= 0 && els[sel]) els[sel].click();
+      if (sel >= 0 && els[sel]) els[sel].querySelector('a.ph').click();
       else { addRecent(q); track('all', q); location.href = searchHref(q); }
       return;
     } else return;
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && $q.selectionStart !== $q.value.length) { return; }
     e.preventDefault();
     els.forEach(function (el, i) { el.classList.toggle('sel', i === sel); });
     if (els[sel]) els[sel].scrollIntoView({ block: 'nearest' });
@@ -799,6 +865,59 @@
     try {
       (window.dataLayer = window.dataLayer || []).push({ event: 'urun_arama', search_action: kind, search_term: $q.value, search_target: name });
     } catch (e) {}
+  }
+
+  // ---------------- Sepete ekle ----------------
+  // Sitenin sepetine ekleme yöntemi site koduna bağlıdır. window.UrunAramaSepet(varyantId, adet, ürün)
+  // tanımlıysa (Promise dönebilir) o kullanılır; yoksa ürün sayfası seçili varyantla açılır.
+  var SH = { p: null, v: null, qty: 1 };
+  function cartOn() { return (CFG.cart || {}).enabled !== false; }
+
+  function openAdd(id) {
+    var p = BY_ID[id];
+    if (!p) return;
+    var vs = (p.v || []).filter(function (v) { return v.id; });
+    if (vs.length <= 1) { SH = { p: p, v: vs[0] || { id: p.v1, p: p.p, d: p.d, st: p.st }, qty: 1 }; doAdd(); return; }
+    var first = vs.filter(vOk)[0] || vs[0];
+    SH = { p: p, v: first, qty: 1 };
+    $sheet.innerHTML = '<div class="sh-in" role="dialog" aria-label="Seçenek seç"><div class="sh-h">' + thumb(p.img, 180) + '<b>' + esc(p.n) + '</b>' +
+      '<button type="button" data-act="shx" aria-label="Kapat">' + I.x + '</button></div>' +
+      '<div class="sh-l">Seçenek</div><div class="vopts">' + vs.map(function (v) {
+        var pr = vPrice(v);
+        return '<button class="vo' + (v === first ? ' on' : '') + '" type="button" data-act="vo" data-v="' + esc(v.id) + '"' + (vOk(v) ? '' : ' disabled') + '>' +
+          esc(v.name || 'Seçenek') + (pr != null ? '<small>' + tl(pr) + '</small>' : '') + '</button>';
+      }).join('') + '</div>' +
+      '<div class="sh-f"><div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
+      '<input value="1" inputmode="numeric" aria-label="Adet" readonly><button type="button" data-act="sq" data-v="1" aria-label="Artır">' + I.plus + '</button></div>' +
+      '<button class="sh-go" type="button" data-act="shgo">' + I.cart + 'Sepete ekle</button></div></div>';
+    $sheet.classList.add('on');
+  }
+  function pickVariant(id) {
+    var v = (SH.p.v || []).filter(function (x) { return x.id === id; })[0];
+    if (!v || !vOk(v)) return;
+    SH.v = v;
+    [].forEach.call($sheet.querySelectorAll('.vo'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === id); });
+  }
+  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; }
+  function toast(msg) {
+    $toast.innerHTML = I.check + esc(msg);
+    $toast.classList.add('on');
+    clearTimeout(toast.t);
+    toast.t = setTimeout(function () { $toast.classList.remove('on'); }, 2200);
+  }
+  function doAdd() {
+    var p = SH.p, v = SH.v, qty = SH.qty;
+    if (!p || !v) return;
+    track('add_to_cart', p.n);
+    var fn = window.UrunAramaSepet;
+    if (typeof fn === 'function') {
+      Promise.resolve().then(function () { return fn(v.id, qty, { productId: p.id, slug: p.s, name: p.n }); }).then(function () {
+        closeSheet();
+        toast('Sepete eklendi');
+      }, function () { location.href = url(p.s) + '?variantId=' + encodeURIComponent(v.id); });
+      return;
+    }
+    location.href = url(p.s) + (v.id ? '?variantId=' + encodeURIComponent(v.id) : '');
   }
 
   // ---------------- Toprak hesaplayıcı ----------------
@@ -875,7 +994,7 @@
     if (!C.built) {
       C.built = true;
       $calc.innerHTML = '<div class="calc">' +
-        '<div class="c-head"><b>Toprak hesaplayıcı</b><p>Üç adımda ne kadar toprak alacağını öğren, sonra uygun toprağa geç.</p></div>' +
+        '<div class="c-head"><b>Toprak hesaplayıcı</b><p>Kabını seç, ölçülerini gir; ne kadar toprak alman gerektiğini söyleyelim.</p></div>' +
         '<div class="step s1"><span class="sn">1</span><div class="st-t">Ne dolduracaksın?</div><div class="chips">' +
         Object.keys(SHAPES).map(function (k) {
           return '<button class="sh" type="button" data-act="shape" data-v="' + k + '">' + SHAPE_ICON[k] + esc(SHAPES[k].n) + '</button>';
@@ -897,7 +1016,7 @@
     }).join('');
     $calc.querySelector('.fig').innerHTML = figure(k);
     $calc.querySelector('.inputs').innerHTML = s.f.map(function (f) {
-      return '<div class="inp"><label for="ua-' + f[0] + '">' + esc(f[1]) + '</label><div>' +
+      return '<div class="inp"><label for="ua-' + f[0] + '">' + esc(f[1]) + '</label><div class="b">' +
         '<input id="ua-' + f[0] + '" data-k="' + f[0] + '" inputmode="decimal" autocomplete="off" placeholder="0" value="' + esc(C.val[f[0]] || '') + '">' +
         '<em data-u="' + f[0] + '">' + unitOf(f[0]) + '</em></div></div>';
     }).join('') +
@@ -1003,16 +1122,12 @@
     if (DATA) {
       var cats = soilCats();
       if (cats.length) {
-        html += '<p class="go">Şimdi ihtiyacına uygun toprağı seç; ürün sayfasında litre seçeneğini <b>' + fmtL(rec) + '</b>\'yi karşılayacak şekilde seçebilirsin.</p>' +
+        html += '<p class="go">Şimdi uygun toprağı seç<small>Ürün sayfasında toplam ' + fmtL(rec) + ' edecek litre seçeneklerini seçebilirsin.</small></p>' +
           '<div class="gocats">' + cats.map(function (c, i) {
             return '<a class="gc' + (i === 0 ? ' first' : '') + '" data-kind="calc_category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '">' +
               thumb(c.img, 180) + '<div class="tx"><b>' + esc(c.n) + '</b><small>' + c.k + ' ürün</small></div>' + I.arrow + '</a>';
           }).join('') + '</div>';
       }
-    }
-    if (CFG.whatsapp) {
-      html += '<a class="ask" target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + SHAPES[C.shape].n.toLocaleLowerCase('tr-TR') + ' için yaklaşık ' + rec + ' litre toprak gerekiyor. Hangi toprağı önerirsiniz?')) + '">' +
-        I.chat + 'Hangi toprak olmalı? Bize sor</a>';
     }
     out.innerHTML = html;
   }
@@ -1096,15 +1211,42 @@
     open(v);
   }, true);
 
-  if (TRIGGER) {
-    document.addEventListener('click', function (e) {
-      var t = e.target && e.target.closest ? e.target.closest(TRIGGER) : null;
-      if (!t || isOurs(t)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      open();
-    }, true);
+  // Sitenin kendi arama butonuna (büyüteç vb.) basılınca ikas'ın eski araması açılmadan bizimki açılsın.
+  // data-trigger / config.json "triggers" ile seçici verilebilir; verilmezse "search"/"ara" içeren
+  // buton ve bağlantılar otomatik tanınır (data-auto="off" ile kapatılır).
+  var TRIGGER_RE = /(^|[^a-z])(search|arama|ara)([^a-z]|$)/;
+  function attrs(n) {
+    var c = n.getAttribute('class') || '';
+    return fold([n.getAttribute('aria-label'), n.getAttribute('title'), n.id, c, n.getAttribute('data-testid'), n.getAttribute('name')].join(' '));
   }
+  function triggerOf(el) {
+    if (!el || !el.closest || isOurs(el)) return null;
+    var sel = TRIGGER || (CFG.triggers || '');
+    if (sel) { try { var t = el.closest(sel); if (t) return t; } catch (e) {} }
+    if (ds.auto === 'off' || CFG.autoTrigger === false) return null;
+    var n = el.closest('a,button,[role="button"]');
+    if (n) {
+      var path = (n.getAttribute('href') || '').replace(/^https?:\/\/[^/]+/, '');
+      if (/^\/(search|arama)([?\/#]|$)/i.test(path) && !/[?&](s|q)=./.test(path)) return n;
+      return TRIGGER_RE.test(attrs(n)) && !n.closest('form') ? n : null;
+    }
+    // İkon sarmalayıcı div/span (küçük ve içinde ikon olan)
+    n = el.closest('[class*="search" i],[id*="search" i],[aria-label*="ara" i]');
+    if (!n || /^(input|textarea|form|body|html)$/i.test(n.tagName) || n.querySelector('input,textarea')) return null;
+    var r = n.getBoundingClientRect();
+    return r.width <= 160 && r.height <= 100 && n.querySelector('svg,img,i') && TRIGGER_RE.test(attrs(n)) ? n : null;
+  }
+  ['pointerdown', 'mousedown', 'touchstart'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { if (triggerOf(e.target)) e.stopPropagation(); }, true);
+  });
+  document.addEventListener('click', function (e) {
+    var t = triggerOf(e.target);
+    if (!t) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    open();
+  }, true);
 
   // Ctrl/Cmd+K ve "/" kısayolları (masaüstü)
   document.addEventListener('keydown', function (e) {

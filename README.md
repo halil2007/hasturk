@@ -62,6 +62,7 @@ Script satırına ekleyebileceğin ayarlar:
 - `data-selector="#header input.search"` → yeni menü sitedeki arama kutusunu yakalamıyorsa, kutunun seçicisini yaz.
 - `data-trigger=".search-icon, .header-search-button"` → büyüteç ikonuna tıklayınca da açılsın.
 - `data-fab="off"` → sağ alttaki "Ürün Bul" butonunu gösterme.
+- `data-auto="off"` → sitedeki arama butonlarını (büyüteç vb.) otomatik yakalamayı kapat. Otomatik tanıma bir butonu kaçırırsa `config.json` → `triggers` alanına seçicisini yaz.
 
 Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan toprak hesaplayıcı açılır (`#urun-ara` → arama).
 
@@ -71,6 +72,8 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `popular`: boş kutuda görünen "çok arananlar"
 - `categoryLast`: kategori kartlarında en sona konacak ana kategoriler (örn. kedi/köpek)
 - `pages`: "Sayfalar" sekmesindeki bağlantılar (`title`, `url`); aramada da çıkar
+- `cart`: `enabled: false` → kartlarda "Ekle" butonunu gizle. Sepete doğrudan ekleme için sitede `window.UrunAramaSepet(varyantId, adet)` tanımlı olmalı; yoksa ürün sayfası seçilen varyantla açılır.
+- `triggers`: sitenin kendi arama butonunun CSS seçicisi (boşsa otomatik tanınır)
 - `calc`: toprak hesaplayıcı — `enabled`, `extra` (oturma payı %), `recommend.pot` / `recommend.bed` (sonuçtan sonra yönlendirilecek toprak kategorilerinin adları; boşsa `categories` altındaki alt kategoriler)
 - `synonyms`: "müşteri bunu yazarsa şunu da ara" (Türkçe karakterleri yazman gerekmez)
 - `badges`: ikas'taki etiket adı → üründe görünecek sarı rozet (örn. `"3 Al 2 Öde"`)
