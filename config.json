@@ -1,6 +1,6 @@
 {
   "searchUrl": "/search?s={q}",
-  "placeholder": "Ürün, marka veya kategori ara",
+  "placeholder": "Ürün veya kategori ara",
   "popular": [
     "solucan gübresi",
     "torf",
@@ -11,10 +11,26 @@
     "sebze yatağı",
     "ilaçlama pompası"
   ],
+  "categoryOrder": [
+    "Gübreler",
+    "Topraklar",
+    "Tohumlar",
+    "Bahçe Ekipmanları",
+    "Halk Sağlığı Ürünleri"
+  ],
   "categoryLast": [
     "Kedi Ürünleri",
     "Köpek Ürünleri"
   ],
+  "categoryImages": {
+    "Gübreler": "hasturk-kati-solucan-gubresi",
+    "Topraklar": "akilli-toprak-organik-bitki-topragi",
+    "Tohumlar": "altinvadi-koy-tipi-domates-tohumu-5-gr",
+    "Bahçe Ekipmanları": "bahce-yatagi-ciceklik-140x35x30cm-140-litre",
+    "Halk Sağlığı Ürünleri": "chrysamed-insektisit-max-500-ml-sprey-tahtakurusu-akrep-ilaci",
+    "Kedi Ürünleri": "proline-aktif-karbonlu-10-lt-kedi-kumu",
+    "Köpek Ürünleri": "enjoy-biftekli-yetiskin-kopek-mamasi-15-kg"
+  },
   "badges": {
     "Yeni Ürün": "Yeni"
   },

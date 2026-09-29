@@ -85,13 +85,19 @@
         .sort(function (a, b) { return (b.p ? 1 : 0) - (a.p ? 1 : 0); })[0];
       p.cn = leaf ? leaf.n : '';
     });
-    // Kategori kartı görseli: o kategorideki (alt kategoriler dahil) stoktaki ilk görselli ürün
+    // Kategori görseli: config.json > categoryImages'daki ürün; yoksa kategorideki (alt kategoriler dahil)
+    // stoktaki mağaza markalı ürün; o da yoksa stoktaki ilk görselli ürün
     function ids(id) { return [id].concat((KIDS[id] || []).reduce(function (a, k) { return a.concat(ids(k.id)); }, [])); }
+    var bySlug = {}, cover = {}, own = new RegExp(CFG.brandPattern || 'has ?t[uü]rk|^hg$', 'i');
+    d.items.forEach(function (p) { bySlug[p.s] = p; });
+    Object.keys(CFG.categoryImages || {}).forEach(function (n) { cover[fold(n)] = bySlug[CFG.categoryImages[n]]; });
     d.cats.forEach(function (c) {
       var set = {};
       ids(c.id).forEach(function (x) { set[x] = 1; });
       var inCat = d.items.filter(function (p) { return p.img && p.c.some(function (x) { return set[x]; }); });
-      var pick = inCat.filter(function (p) { return p.st; })[0] || inCat[0];
+      var inStock = inCat.filter(function (p) { return p.st; });
+      var pick = (cover[c.f] && cover[c.f].img ? cover[c.f] : null) ||
+        inStock.filter(function (p) { return own.test(p.b || ''); })[0] || inStock[0] || inCat[0];
       c.img = pick ? pick.img : '';
     });
     applyConfig();
@@ -197,7 +203,7 @@
     right: svg('<path d="m9 6 6 6-6 6"/>', 2.4),
     arrow: svg('<path d="M5 12h14M13 6l6 6-6 6"/>', 2.2),
     sprout: svg('<path d="M12 21v-8"/><path d="M12 13c0-4 3-6 7-6 0 4-3 6-7 6zM12 11C12 8 10 6 5 6c0 3 2 5 7 5z"/>'),
-    compass: svg('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'),
+    grid: svg('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'),
     calc: svg('<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h1M12 11h1M8.5 14.5h1M12 14.5h1M8.5 18h1M12 18h1M15.5 11v7"/>'),
     doc: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'),
     phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
@@ -308,6 +314,7 @@
     '.trend{display:flex;gap:8px;padding:0 16px 4px;overflow-x:auto;scrollbar-width:none}',
     '.trend::-webkit-scrollbar{display:none}',
     '@media(min-width:760px){.trend,.recent{flex-wrap:wrap;padding:0 20px 4px}}',
+    '.tq.rc{background:#fff;border:1px solid var(--ln);color:var(--ink);font-weight:500}.tq.rc svg{color:#9aa5ac}',
     '.tq{flex:none;display:flex;align-items:center;gap:6px;height:38px;padding:0 16px 0 12px;border-radius:19px;background:var(--soft);color:var(--prd);font-size:14px;font-weight:600}',
     '.tq svg{width:15px;height:15px}',
     '.tq:hover{background:#d6eaf0}',
@@ -324,11 +331,20 @@
     '.banner>svg{width:22px;height:22px;flex:none}',
 
     /* Kategoriler */
+    '.tabs{flex:none;display:flex;border-bottom:1px solid var(--ln);background:#fff}',
+    '@media(min-width:760px){.tabs{display:none}}',
+    '.typing .tabs{display:none}',
+    '.tb{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:46px;font-size:13.5px;font-weight:700;color:var(--mu);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap}',
+    '.tb svg{width:17px;height:17px}',
+    '@media(max-width:379px){.tb svg{display:none}.tb{font-size:13px}}',
+    '.tb.on{color:var(--pr);border-bottom-color:var(--pr)}',
     '.clist{padding:0 8px}',
     '@media(min-width:760px){.clist{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:0 12px}}',
     '.li{display:flex;align-items:center;gap:12px;width:100%;padding:8px;border-radius:16px;text-align:left}',
     '.li:hover{background:var(--bg)}',
-    '.li .im{width:52px;height:52px;border-radius:14px}',
+    '.li .im{width:56px;height:56px;border-radius:14px;background:#fff;border:1px solid var(--ln)}',
+    '.li .im img{object-fit:contain;padding:4px}',
+    '@media(max-width:759px){.clist .li,.list .li{border-radius:0;padding:10px 8px}.clist .li+.li,.list .li+.li{border-top:1px solid var(--ln)}}',
     '.li .n{flex:1;min-width:0;font-size:15px;font-weight:600}',
     '.li .n small{display:block;color:var(--mu);font-size:13px;font-weight:500;margin-top:1px}',
     '.li>svg{width:18px;height:18px;color:#a7b1b7;flex:none}',
@@ -496,7 +512,7 @@
   var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $sheet, $toast;
   var isOpen = false, sel = -1, pushed = false;
   var onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home';
-  var TABS = [['home', 'Keşfet', 'compass'], ['calc', 'Toprak Hesapla', 'calc'], ['pages', 'Sayfalar', 'doc']];
+  var TABS = [['home', 'Kategoriler', 'grid'], ['calc', 'Hacim Hesapla', 'calc'], ['pages', 'Sayfalar', 'doc']];
   var BY_ID = {};
 
   function build() {
@@ -516,7 +532,9 @@
       '<div class="mid"><nav class="rail">' + TABS.map(function (t) {
         return '<button class="nav" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
       }).join('') + '<div class="help"></div></nav>' +
-      '<div class="main"><div class="tools"></div>' +
+      '<div class="main"><div class="tabs">' + TABS.map(function (t) {
+        return '<button class="tb" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
+      }).join('') + '</div><div class="tools"></div>' +
       '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane pages"></div></div>' +
       '<div class="results" aria-live="polite"></div></div>' +
       '<div class="cta"></div><div class="mfoot"></div>' +
@@ -543,7 +561,7 @@
     $mfoot = root.querySelector('.mfoot');
     $sheet = root.querySelector('.sheet');
     $toast = root.querySelector('.toast');
-    $q.placeholder = 'Ürün, marka veya kategori ara';
+    $q.placeholder = 'Ürün veya kategori ara';
 
     $q.addEventListener('input', function () { shown = PAGE; render(); });
     $q.addEventListener('keydown', onKey);
@@ -672,9 +690,13 @@
   }
 
   // ---- Keşfet ----
+  // Sıra: categoryOrder'dakiler verilen sırayla, sonra diğerleri (çok üründen aza), en sonda categoryLast
   function topCats() {
-    var last = (CFG.categoryLast || []).map(fold);
-    var rank = function (c) { return last.indexOf(c.f); };
+    var first = (CFG.categoryOrder || []).map(fold), last = (CFG.categoryLast || []).map(fold);
+    var rank = function (c) {
+      var i = first.indexOf(c.f), j = last.indexOf(c.f);
+      return i >= 0 ? i : j >= 0 ? 1000 + j : 500;
+    };
     return DATA.cats.filter(function (c) { return !c.p || !CATS_BY_ID[c.p]; })
       .sort(function (a, b) { return rank(a) - rank(b) || b.k - a.k; });
   }
@@ -698,29 +720,19 @@
     if (view && CATS_BY_ID[view]) { $home.innerHTML = renderCat(CATS_BY_ID[view]); return; }
     view = null;
     var html = '';
-    var rec = getRecent();
-    if (rec.length) {
-      html += '<div class="h">Son aramalar<button type="button" data-act="delall">Temizle</button></div><div class="recent">' +
-        rec.map(function (t) {
-          return '<span class="rc"><button type="button" data-act="q" data-v="' + esc(t) + '" style="display:flex;align-items:center;gap:6px">' + I.clock + esc(t) + '</button>' +
-            '<button class="del" type="button" data-act="del" data-v="' + esc(t) + '" aria-label="Sil">' + I.x + '</button></span>';
-        }).join('') + '</div>';
-    }
-    var pop = CFG.popular || [];
-    if (pop.length) {
-      html += '<div class="h">Sık arananlar</div><div class="trend">' +
+    var rec = getRecent(), pop = CFG.popular || [];
+    var seen = rec.map(fold);
+    pop = pop.filter(function (t) { return seen.indexOf(fold(t)) === -1; });
+    if (rec.length || pop.length) {
+      html += '<div class="h">' + (rec.length ? 'Son ve sık aramalar<button type="button" data-act="delall">Geçmişi temizle</button>' : 'Sık arananlar') + '</div><div class="trend">' +
+        rec.map(function (t) { return '<button class="tq rc" type="button" data-act="q" data-v="' + esc(t) + '">' + I.clock + esc(t) + '</button>'; }).join('') +
         pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') +
         '</div>';
-    }
-    if (calcEnabled()) {
-      html += '<button class="banner" type="button" data-act="gocalc"><span class="bi">' + I.calc + '</span><div class="tx"><b>Kaç litre toprak lazım?</b>' +
-        '<span>Saksının ölçülerini gir, hemen hesaplayalım</span></div>' + I.arrow + '</button>';
     }
     var tops = topCats();
     if (tops.length) {
       html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="clist">' + tops.map(catRow).join('') + '</div>';
     }
-    if ((CFG.pages || []).length) html += '<div class="mo"><div class="h">Sayfalar</div><div class="list">' + pageRows() + '</div></div>';
     $home.innerHTML = html;
   }
 

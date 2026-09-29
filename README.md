@@ -70,7 +70,9 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 
 ## config.json
 - `popular`: boş kutuda görünen "çok arananlar"
-- `categoryLast`: kategori kartlarında en sona konacak ana kategoriler (örn. kedi/köpek)
+- `categoryOrder`: ana kategorilerin gösterim sırası (listede olmayanlar sonra, ürün sayısına göre)
+- `categoryLast`: en sona konacak ana kategoriler (örn. kedi/köpek)
+- `categoryImages`: kategori adı → görseli kullanılacak ürünün adresi (slug)
 - `pages`: "Sayfalar" sekmesindeki bağlantılar (`title`, `url`); aramada da çıkar
 - `cart`: `enabled: false` → kartlarda "Ekle" butonunu gizle. Sepete doğrudan ekleme için sitede `window.UrunAramaSepet(varyantId, adet)` tanımlı olmalı; yoksa ürün sayfası seçilen varyantla açılır.
 - `triggers`: sitenin kendi arama butonunun CSS seçicisi (boşsa otomatik tanınır)
