@@ -85,13 +85,19 @@
         .sort(function (a, b) { return (b.p ? 1 : 0) - (a.p ? 1 : 0); })[0];
       p.cn = leaf ? leaf.n : '';
     });
-    // Kategori kartı görseli: o kategorideki (alt kategoriler dahil) stoktaki ilk görselli ürün
+    // Kategori görseli: config.json > categoryImages'daki ürün; yoksa kategorideki (alt kategoriler dahil)
+    // stoktaki mağaza markalı ürün; o da yoksa stoktaki ilk görselli ürün
     function ids(id) { return [id].concat((KIDS[id] || []).reduce(function (a, k) { return a.concat(ids(k.id)); }, [])); }
+    var bySlug = {}, cover = {}, own = new RegExp(CFG.brandPattern || 'has ?t[uü]rk|^hg$', 'i');
+    d.items.forEach(function (p) { bySlug[p.s] = p; });
+    Object.keys(CFG.categoryImages || {}).forEach(function (n) { cover[fold(n)] = bySlug[CFG.categoryImages[n]]; });
     d.cats.forEach(function (c) {
       var set = {};
       ids(c.id).forEach(function (x) { set[x] = 1; });
       var inCat = d.items.filter(function (p) { return p.img && p.c.some(function (x) { return set[x]; }); });
-      var pick = inCat.filter(function (p) { return p.st; })[0] || inCat[0];
+      var inStock = inCat.filter(function (p) { return p.st; });
+      var pick = (cover[c.f] && cover[c.f].img ? cover[c.f] : null) ||
+        inStock.filter(function (p) { return own.test(p.b || ''); })[0] || inStock[0] || inCat[0];
       c.img = pick ? pick.img : '';
     });
     applyConfig();
@@ -197,7 +203,7 @@
     right: svg('<path d="m9 6 6 6-6 6"/>', 2.4),
     arrow: svg('<path d="M5 12h14M13 6l6 6-6 6"/>', 2.2),
     sprout: svg('<path d="M12 21v-8"/><path d="M12 13c0-4 3-6 7-6 0 4-3 6-7 6zM12 11C12 8 10 6 5 6c0 3 2 5 7 5z"/>'),
-    compass: svg('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'),
+    grid: svg('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'),
     calc: svg('<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h1M12 11h1M8.5 14.5h1M12 14.5h1M8.5 18h1M12 18h1M15.5 11v7"/>'),
     doc: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'),
     phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
@@ -308,6 +314,7 @@
     '.trend{display:flex;gap:8px;padding:0 16px 4px;overflow-x:auto;scrollbar-width:none}',
     '.trend::-webkit-scrollbar{display:none}',
     '@media(min-width:760px){.trend,.recent{flex-wrap:wrap;padding:0 20px 4px}}',
+    '.tq.rc{background:#fff;border:1px solid var(--ln);color:var(--ink);font-weight:500}.tq.rc svg{color:#9aa5ac}',
     '.tq{flex:none;display:flex;align-items:center;gap:6px;height:38px;padding:0 16px 0 12px;border-radius:19px;background:var(--soft);color:var(--prd);font-size:14px;font-weight:600}',
     '.tq svg{width:15px;height:15px}',
     '.tq:hover{background:#d6eaf0}',
@@ -324,11 +331,20 @@
     '.banner>svg{width:22px;height:22px;flex:none}',
 
     /* Kategoriler */
+    '.tabs{flex:none;display:flex;border-bottom:1px solid var(--ln);background:#fff}',
+    '@media(min-width:760px){.tabs{display:none}}',
+    '.typing .tabs{display:none}',
+    '.tb{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:46px;font-size:13.5px;font-weight:700;color:var(--mu);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap}',
+    '.tb svg{width:17px;height:17px}',
+    '@media(max-width:379px){.tb svg{display:none}.tb{font-size:13px}}',
+    '.tb.on{color:var(--pr);border-bottom-color:var(--pr)}',
     '.clist{padding:0 8px}',
     '@media(min-width:760px){.clist{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:0 12px}}',
     '.li{display:flex;align-items:center;gap:12px;width:100%;padding:8px;border-radius:16px;text-align:left}',
     '.li:hover{background:var(--bg)}',
-    '.li .im{width:52px;height:52px;border-radius:14px}',
+    '.li .im{width:56px;height:56px;border-radius:14px;background:#fff;border:1px solid var(--ln)}',
+    '.li .im img{object-fit:contain;padding:4px}',
+    '@media(max-width:759px){.clist .li,.list .li{border-radius:0;padding:10px 8px}.clist .li+.li,.list .li+.li{border-top:1px solid var(--ln)}}',
     '.li .n{flex:1;min-width:0;font-size:15px;font-weight:600}',
     '.li .n small{display:block;color:var(--mu);font-size:13px;font-weight:500;margin-top:1px}',
     '.li>svg{width:18px;height:18px;color:#a7b1b7;flex:none}',
@@ -429,6 +445,8 @@
     '.sh-go{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:23px;background:var(--pr);color:#fff;font-weight:800;font-size:15px}',
     '.sh-go svg{width:18px;height:18px}',
     '.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:8px;padding:10px 16px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap}',
+    '.ptoast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.3)}',
+    '.ptoast.on{display:flex}.ptoast svg{width:20px;height:20px;flex:none;color:#7ee2a8}.ptoast.warn svg{color:#ffd27a}',
     '.toast.on{display:flex}.toast svg{width:18px;height:18px;color:#7ee2a8}',
 
     /* Toprak hesaplayıcı */
@@ -496,7 +514,7 @@
   var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $sheet, $toast;
   var isOpen = false, sel = -1, pushed = false;
   var onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home';
-  var TABS = [['home', 'Keşfet', 'compass'], ['calc', 'Toprak Hesapla', 'calc'], ['pages', 'Sayfalar', 'doc']];
+  var TABS = [['home', 'Kategoriler', 'grid'], ['calc', 'Hacim Hesapla', 'calc'], ['pages', 'Sayfalar', 'doc']];
   var BY_ID = {};
 
   function build() {
@@ -507,6 +525,7 @@
     root.innerHTML =
       '<style>' + CSS + '</style><div class="root">' +
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
+      '<div class="ptoast" role="status"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
       '<div class="top"><button class="back" type="button" data-act="back" aria-label="Geri">' + I.back + '</button>' +
       '<label class="field">' + I.search +
@@ -516,7 +535,9 @@
       '<div class="mid"><nav class="rail">' + TABS.map(function (t) {
         return '<button class="nav" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
       }).join('') + '<div class="help"></div></nav>' +
-      '<div class="main"><div class="tools"></div>' +
+      '<div class="main"><div class="tabs">' + TABS.map(function (t) {
+        return '<button class="tb" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
+      }).join('') + '</div><div class="tools"></div>' +
       '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane pages"></div></div>' +
       '<div class="results" aria-live="polite"></div></div>' +
       '<div class="cta"></div><div class="mfoot"></div>' +
@@ -543,7 +564,7 @@
     $mfoot = root.querySelector('.mfoot');
     $sheet = root.querySelector('.sheet');
     $toast = root.querySelector('.toast');
-    $q.placeholder = 'Ürün, marka veya kategori ara';
+    $q.placeholder = 'Ürün veya kategori ara';
 
     $q.addEventListener('input', function () { shown = PAGE; render(); });
     $q.addEventListener('keydown', onKey);
@@ -672,9 +693,13 @@
   }
 
   // ---- Keşfet ----
+  // Sıra: categoryOrder'dakiler verilen sırayla, sonra diğerleri (çok üründen aza), en sonda categoryLast
   function topCats() {
-    var last = (CFG.categoryLast || []).map(fold);
-    var rank = function (c) { return last.indexOf(c.f); };
+    var first = (CFG.categoryOrder || []).map(fold), last = (CFG.categoryLast || []).map(fold);
+    var rank = function (c) {
+      var i = first.indexOf(c.f), j = last.indexOf(c.f);
+      return i >= 0 ? i : j >= 0 ? 1000 + j : 500;
+    };
     return DATA.cats.filter(function (c) { return !c.p || !CATS_BY_ID[c.p]; })
       .sort(function (a, b) { return rank(a) - rank(b) || b.k - a.k; });
   }
@@ -698,29 +723,19 @@
     if (view && CATS_BY_ID[view]) { $home.innerHTML = renderCat(CATS_BY_ID[view]); return; }
     view = null;
     var html = '';
-    var rec = getRecent();
-    if (rec.length) {
-      html += '<div class="h">Son aramalar<button type="button" data-act="delall">Temizle</button></div><div class="recent">' +
-        rec.map(function (t) {
-          return '<span class="rc"><button type="button" data-act="q" data-v="' + esc(t) + '" style="display:flex;align-items:center;gap:6px">' + I.clock + esc(t) + '</button>' +
-            '<button class="del" type="button" data-act="del" data-v="' + esc(t) + '" aria-label="Sil">' + I.x + '</button></span>';
-        }).join('') + '</div>';
-    }
-    var pop = CFG.popular || [];
-    if (pop.length) {
-      html += '<div class="h">Sık arananlar</div><div class="trend">' +
+    var rec = getRecent(), pop = CFG.popular || [];
+    var seen = rec.map(fold);
+    pop = pop.filter(function (t) { return seen.indexOf(fold(t)) === -1; });
+    if (rec.length || pop.length) {
+      html += '<div class="h">' + (rec.length ? 'Son ve sık aramalar<button type="button" data-act="delall">Geçmişi temizle</button>' : 'Sık arananlar') + '</div><div class="trend">' +
+        rec.map(function (t) { return '<button class="tq rc" type="button" data-act="q" data-v="' + esc(t) + '">' + I.clock + esc(t) + '</button>'; }).join('') +
         pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') +
         '</div>';
-    }
-    if (calcEnabled()) {
-      html += '<button class="banner" type="button" data-act="gocalc"><span class="bi">' + I.calc + '</span><div class="tx"><b>Kaç litre toprak lazım?</b>' +
-        '<span>Saksının ölçülerini gir, hemen hesaplayalım</span></div>' + I.arrow + '</button>';
     }
     var tops = topCats();
     if (tops.length) {
       html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="clist">' + tops.map(catRow).join('') + '</div>';
     }
-    if ((CFG.pages || []).length) html += '<div class="mo"><div class="h">Sayfalar</div><div class="list">' + pageRows() + '</div></div>';
     $home.innerHTML = html;
   }
 
@@ -887,8 +902,8 @@
         return '<button class="vo' + (v === first ? ' on' : '') + '" type="button" data-act="vo" data-v="' + esc(v.id) + '"' + (vOk(v) ? '' : ' disabled') + '>' +
           esc(v.name || 'Seçenek') + (pr != null ? '<small>' + tl(pr) + '</small>' : '') + '</button>';
       }).join('') + '</div>' +
-      '<div class="sh-f"><div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
-      '<input value="1" inputmode="numeric" aria-label="Adet" readonly><button type="button" data-act="sq" data-v="1" aria-label="Artır">' + I.plus + '</button></div>' +
+      '<div class="sh-f">' + (typeof window.UrunAramaSepet === 'function' ? '<div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
+      '<input value="1" inputmode="numeric" aria-label="Adet" readonly><button type="button" data-act="sq" data-v="1" aria-label="Artır">' + I.plus + '</button></div>' : '') +
       '<button class="sh-go" type="button" data-act="shgo">' + I.cart + 'Sepete ekle</button></div></div>';
     $sheet.classList.add('on');
   }
@@ -917,7 +932,84 @@
       }, function () { location.href = url(p.s) + '?variantId=' + encodeURIComponent(v.id); });
       return;
     }
-    location.href = url(p.s) + (v.id ? '?variantId=' + encodeURIComponent(v.id) : '');
+    // Doğrudan bağlantı yoksa: ürün sayfasına git, orada seçeneği seçip sitenin kendi "Sepete Ekle" butonuna bas
+    try {
+      sessionStorage.setItem(ADD_KEY, JSON.stringify({ s: p.s, n: p.n, vn: v.name || '', multi: (p.v || []).length > 1, t: Date.now() }));
+    } catch (e) {}
+    location.href = url(p.s);
+  }
+
+  var ADD_KEY = 'ua-add';
+  function ptoast(msg, warn) {
+    if (!root) return;
+    var el = root.querySelector('.ptoast');
+    el.innerHTML = (warn ? svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>', 2.2) : I.check) + '<span>' + esc(msg) + '</span>';
+    el.classList.toggle('warn', !!warn);
+    el.classList.add('on');
+    clearTimeout(ptoast.t);
+    ptoast.t = setTimeout(function () { el.classList.remove('on'); }, warn ? 6000 : 3500);
+  }
+  function visible(el) { return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)); }
+  function squash(t) { return fold(t).replace(/\s+/g, ''); }
+  function findAddBtn() {
+    var els = document.querySelectorAll('button,[role="button"],a,input[type="submit"]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (isOurs(el) || !visible(el) || el.disabled || el.getAttribute('aria-disabled') === 'true') continue;
+      var t = fold(el.value || el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (/sepete ?(ekle|at)|add to (cart|basket|bag)/.test(t) && t.length < 40) return el;
+    }
+    return null;
+  }
+  // Ürün sayfasında adı varyant adıyla birebir aynı olan seçeneği bul (buton, etiket, liste öğesi ya da select)
+  function pickOnPage(name) {
+    var want = squash(name);
+    if (!want) return false;
+    var sels = document.querySelectorAll('select');
+    for (var i = 0; i < sels.length; i++) {
+      if (isOurs(sels[i])) continue;
+      for (var j = 0; j < sels[i].options.length; j++) {
+        if (squash(sels[i].options[j].text) === want) {
+          var setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+          setter.call(sels[i], sels[i].options[j].value);
+          sels[i].dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+      }
+    }
+    var all = document.body.querySelectorAll('button,[role="radio"],[role="option"],label,li,a,span,div,p');
+    for (var k = 0; k < all.length; k++) {
+      var el = all[k];
+      if (el.children.length > 3 || isOurs(el) || !visible(el) || el.closest('header,nav,footer')) continue;
+      if (squash(el.textContent) !== want) continue;
+      var hit = el.closest('button,[role="radio"],[role="option"],label,a,li') || el;
+      hit.click();
+      return true;
+    }
+    return false;
+  }
+  function runPendingAdd() {
+    var job = null;
+    try { job = JSON.parse(sessionStorage.getItem(ADD_KEY) || 'null'); } catch (e) {}
+    if (!job || Date.now() - job.t > 60000) { try { sessionStorage.removeItem(ADD_KEY); } catch (e) {} return; }
+    var here = decodeURIComponent(location.pathname).replace(/\/+$/, '').split('/').pop();
+    if (here !== job.s) return;
+    try { sessionStorage.removeItem(ADD_KEY); } catch (e) {}
+    var tries = 0, picked = !job.multi;
+    (function step() {
+      tries++;
+      var btn = findAddBtn();
+      if (btn && !picked) {
+        if (pickOnPage(job.vn)) { picked = true; return setTimeout(step, 700); }
+      } else if (btn) {
+        btn.click();
+        ptoast('Sepete eklendi' + (job.vn ? ': ' + job.vn : ''));
+        track('add_to_cart_page', job.n);
+        return;
+      }
+      if (tries < 40) return setTimeout(step, 300);
+      ptoast(job.vn ? '"' + job.vn + '" seçeneğini seçip Sepete Ekle\'ye basın' : 'Sepete Ekle butonuna basarak ürünü ekleyebilirsiniz', true);
+    })();
   }
 
   // ---------------- Toprak hesaplayıcı ----------------
@@ -1258,6 +1350,7 @@
   // Butonu hemen göster, veriyi boşta önceden indir (ilk açılış anında olsun)
   function boot() {
     build();
+    setTimeout(runPendingAdd, 400);
     var idle = window.requestIdleCallback || function (f) { setTimeout(f, 2500); };
     idle(function () { load().catch(function () {}); });
   }
