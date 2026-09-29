@@ -165,6 +165,9 @@ async function fetchMerchantId() {
 }
 
 // ---------- dönüştürme ----------
+// Müşteriye gösterilmeyecek muhasebe etiketleri (kdv_20 vb.)
+const HIDDEN_TAG = /^kdv[\s_-]*\d+$/i;
+
 function pickPrice(prices = []) {
   const p = prices.find((x) => !x.priceListId) || prices[0];
   if (!p) return null;
@@ -221,7 +224,7 @@ function transform({ products, categories, variantTypes, merchantId, config }) {
       n: p.name,
       s: slug,
       c: p.categoryIds || [],
-      t: (p.tags || []).map((x) => x.name).filter(Boolean),
+      t: (p.tags || []).map((x) => x.name).filter((n) => n && !HIDDEN_TAG.test(n)),
       b: p.brand?.name || undefined,
       img,
       p: cheapest?.p ?? null,
