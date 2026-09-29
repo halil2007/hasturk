@@ -1,0 +1,24 @@
+{
+  "searchUrl": "/search?s={q}",
+  "placeholder": "Ürün, malzeme veya bitki ara",
+  "popular": ["perlit", "kokopit", "torf", "solucan gübresi", "pomza", "leca"],
+  "badges": { "3 Al 2 Öde": "3 Al 2 Öde" },
+  "phone": "",
+  "whatsapp": "",
+  "colors": { "primary": "#1e5c30", "dark": "#133a20", "accent": "#f5d90a", "close": "#d62b2b" },
+  "synonyms": {
+    "cocopeat": ["kokopit"],
+    "hindistan": ["kokopit"],
+    "turba": ["torf"],
+    "peat": ["torf"],
+    "ponza": ["pomza"],
+    "bims": ["pomza"],
+    "hidroton": ["leca"],
+    "vermikompost": ["solucan"],
+    "succulent": ["sukulent"],
+    "besin": ["gubre"],
+    "hiyar": ["salatalik"],
+    "reyhan": ["feslegen"],
+    "deve": ["monstera"]
+  }
+}
