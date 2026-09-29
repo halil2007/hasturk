@@ -1,24 +1,139 @@
 {
   "searchUrl": "/search?s={q}",
-  "placeholder": "Ürün, malzeme veya bitki ara",
-  "popular": ["perlit", "kokopit", "torf", "solucan gübresi", "pomza", "leca"],
-  "badges": { "3 Al 2 Öde": "3 Al 2 Öde" },
-  "phone": "",
-  "whatsapp": "",
-  "colors": { "primary": "#1e5c30", "dark": "#133a20", "accent": "#f5d90a", "close": "#d62b2b" },
+  "placeholder": "Ürün, marka veya kategori ara",
+  "popular": [
+    "solucan gübresi",
+    "torf",
+    "perlit",
+    "cocopeat",
+    "saksı toprağı",
+    "sebze tohumu",
+    "sebze yatağı",
+    "ilaçlama pompası"
+  ],
+  "categoryLast": [
+    "Kedi Ürünleri",
+    "Köpek Ürünleri"
+  ],
+  "badges": {
+    "Yeni Ürün": "Yeni"
+  },
+  "phone": "+90 553 727 29 29",
+  "whatsapp": "905537272929",
+  "pages": [
+    {
+      "title": "Blog",
+      "url": "/blog"
+    },
+    {
+      "title": "İletişim",
+      "url": "/iletisim"
+    },
+    {
+      "title": "Siparişlerim",
+      "url": "/account/orders"
+    },
+    {
+      "title": "Favorilerim",
+      "url": "/account/favorite-products"
+    },
+    {
+      "title": "Üye girişi / Kayıt ol",
+      "url": "/account/login"
+    }
+  ],
+  "calc": {
+    "enabled": true,
+    "extra": 10,
+    "categories": [
+      "Topraklar"
+    ],
+    "recommend": {
+      "pot": [
+        "Genel Kullanım ve Saksı Toprakları",
+        "Özel Bitki Toprakları",
+        "Torf",
+        "Toprak Düzenleyiciler ve Katkı Maddeleri"
+      ],
+      "bed": [
+        "Sebze ve Meyve Yetiştirme Toprakları",
+        "Genel Kullanım ve Saksı Toprakları",
+        "Torf",
+        "Toprak Düzenleyiciler ve Katkı Maddeleri"
+      ]
+    }
+  },
+  "cart": {
+    "enabled": true
+  },
+  "triggers": "",
+  "fab": {
+    "enabled": true,
+    "text": "Ürün Bul",
+    "side": "right",
+    "bottom": 20
+  },
+  "colors": {
+    "primary": "#0b5d73",
+    "dark": "#07404f",
+    "accent": "#d7372f"
+  },
   "synonyms": {
-    "cocopeat": ["kokopit"],
-    "hindistan": ["kokopit"],
-    "turba": ["torf"],
-    "peat": ["torf"],
-    "ponza": ["pomza"],
-    "bims": ["pomza"],
-    "hidroton": ["leca"],
-    "vermikompost": ["solucan"],
-    "succulent": ["sukulent"],
-    "besin": ["gubre"],
-    "hiyar": ["salatalik"],
-    "reyhan": ["feslegen"],
-    "deve": ["monstera"]
+    "kokopit": [
+      "cocopeat"
+    ],
+    "hindistan": [
+      "cocopeat"
+    ],
+    "turba": [
+      "torf"
+    ],
+    "peat": [
+      "torf"
+    ],
+    "hidroton": [
+      "kil"
+    ],
+    "leca": [
+      "kil"
+    ],
+    "vermikompost": [
+      "solucan"
+    ],
+    "guano": [
+      "yarasa"
+    ],
+    "succulent": [
+      "sukulent",
+      "kaktus"
+    ],
+    "besin": [
+      "gubre"
+    ],
+    "mama": [
+      "mamasi"
+    ],
+    "cat": [
+      "kedi"
+    ],
+    "dog": [
+      "kopek"
+    ],
+    "kum": [
+      "kumu"
+    ],
+    "pompa": [
+      "pompasi"
+    ],
+    "ilac": [
+      "ilaci",
+      "ilaclama"
+    ],
+    "hiyar": [
+      "salatalik"
+    ],
+    "reyhan": [
+      "feslegen"
+    ]
   }
 }

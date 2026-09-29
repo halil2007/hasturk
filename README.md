@@ -38,11 +38,11 @@ ikas API ──(GitHub Actions, 2 saatte bir)──▶ public/products.json ─�
 4. **Actions** sekmesi → "ikas ürünlerini senkronla" → **Run workflow**.
    Yeşil tik = `public/products.json` oluştu. Kırmızıysa loga tıkla, hatayı bana at.
 
-## 3. Cloudflare Pages
-1. dash.cloudflare.com → hesap aç → **Workers & Pages → Create → Pages → Connect to Git** → GitHub'ı bağla, `magaza-arama` deposunu seç.
-2. Ayarlar: **Framework: None**, **Build command: boş**, **Build output directory: `public`** → Deploy.
-3. Adresin: `https://magaza-arama.pages.dev` (ya da Cloudflare'in verdiği ad).
-4. Kontrol: `https://magaza-arama.pages.dev/test.html` aç, arama kutusuna tıkla, gerçek ürünlerin çıkmalı.
+## 3. Cloudflare (Workers)
+1. dash.cloudflare.com → **Workers & Pages → Create → Import a repository** → GitHub'ı bağla, `hasturk` deposunu seç.
+2. Ayarlar: **Build command: boş**, **Deploy command: `npx wrangler deploy`** (varsayılan). Yayın ayarı repodaki `wrangler.jsonc` dosyasında; `public/` klasörü yayınlanır.
+3. Adres: `https://hasturk-arama.halilc2007.workers.dev`
+4. Kontrol: `https://hasturk-arama.halilc2007.workers.dev/test.html` aç, arama kutusuna tıkla, gerçek ürünlerin çıkmalı.
 
 Bundan sonra GitHub her güncellemede dosyayı değiştirir, Cloudflare otomatik yeniden yayınlar.
 
@@ -50,7 +50,7 @@ Bundan sonra GitHub her güncellemede dosyayı değiştirir, Cloudflare otomatik
 Şu satırı sitenin tüm sayfalarına ekle:
 
 ```html
-<script src="https://magaza-arama.pages.dev/pm-search.js" defer></script>
+<script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" defer></script>
 ```
 
 Nereye: ikas panelinde tema/mağaza ayarlarındaki **özel kod (head/body)** alanı. O alan yoksa **Google Tag Manager** → Yeni etiket → **Özel HTML** → yukarıdaki satır → Tetikleyici: **All Pages** → Yayınla.
@@ -61,15 +61,25 @@ Artık sitendeki arama kutusuna tıklayan herkes yeni menüyü görür.
 Script satırına ekleyebileceğin ayarlar:
 - `data-selector="#header input.search"` → yeni menü sitedeki arama kutusunu yakalamıyorsa, kutunun seçicisini yaz.
 - `data-trigger=".search-icon, .header-search-button"` → büyüteç ikonuna tıklayınca da açılsın.
+- `data-fab="off"` → sağ alttaki "Ürün Bul" butonunu gösterme.
+- `data-auto="off"` → sitedeki arama butonlarını (büyüteç vb.) otomatik yakalamayı kapat. Otomatik tanıma bir butonu kaçırırsa `config.json` → `triggers` alanına seçicisini yaz.
 
-Örnek: `<script src="https://magaza-arama.pages.dev/pm-search.js" data-trigger=".search-icon" defer></script>`
+Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan toprak hesaplayıcı açılır (`#urun-ara` → arama).
+
+Örnek: `<script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" data-trigger=".search-icon" defer></script>`
 
 ## config.json
-- `popular`: boş kutuda görünen popüler aramalar
+- `popular`: boş kutuda görünen "çok arananlar"
+- `categoryLast`: kategori kartlarında en sona konacak ana kategoriler (örn. kedi/köpek)
+- `pages`: "Sayfalar" sekmesindeki bağlantılar (`title`, `url`); aramada da çıkar
+- `cart`: `enabled: false` → kartlarda "Ekle" butonunu gizle. Sepete doğrudan ekleme için sitede `window.UrunAramaSepet(varyantId, adet)` tanımlı olmalı; yoksa ürün sayfası seçilen varyantla açılır.
+- `triggers`: sitenin kendi arama butonunun CSS seçicisi (boşsa otomatik tanınır)
+- `calc`: toprak hesaplayıcı — `enabled`, `extra` (oturma payı %), `recommend.pot` / `recommend.bed` (sonuçtan sonra yönlendirilecek toprak kategorilerinin adları; boşsa `categories` altındaki alt kategoriler)
 - `synonyms`: "müşteri bunu yazarsa şunu da ara" (Türkçe karakterleri yazman gerekmez)
 - `badges`: ikas'taki etiket adı → üründe görünecek sarı rozet (örn. `"3 Al 2 Öde"`)
 - `phone`, `whatsapp`: doluysa altta arama/WhatsApp çubuğu çıkar (`"0216 000 00 00"`, `"905xxxxxxxxx"`)
-- `colors`: marka renklerin
+- `colors`: marka renklerin (`primary` ana renk, `dark` koyu ton)
+- `fab`: sağ alttaki "Ürün Bul" butonu — `enabled` (false = gizle), `text`, `side` (`"right"`/`"left"`), `bottom` (alttan px; WhatsApp butonu gibi başka bir şeyle çakışırsa artır)
 - `searchUrl`: "Tüm sonuçları gör" butonunun gittiği ikas arama sayfası. Sitende bir şey arat, adres çubuğundaki biçimi buraya yaz (`{q}` = aranan kelime).
 
 config.json'u GitHub'da düzenleyip kaydettiğinde senkron kendiliğinden çalışır.

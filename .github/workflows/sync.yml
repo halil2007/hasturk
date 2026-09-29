@@ -5,6 +5,7 @@ on:
     - cron: '17 */2 * * *'   # 2 saatte bir
   workflow_dispatch:          # Actions sekmesinden elle çalıştırma
   push:
+    branches: [main]          # sadece yayındaki dalda; çalışma dallarına commit atmasın
     paths: ['config.json', 'scripts/**']
 
 permissions:
