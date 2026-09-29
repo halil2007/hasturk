@@ -82,7 +82,7 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `badges`: ikas'taki etiket adı → üründe görünecek sarı rozet (örn. `"3 Al 2 Öde"`)
 - `phone`, `whatsapp`: doluysa altta arama/WhatsApp çubuğu çıkar (`"0216 000 00 00"`, `"905xxxxxxxxx"`)
 - `colors`: marka renklerin (`primary` ana renk, `dark` koyu ton)
-- `fab`: sağ alttaki "Ürün Bul" butonu — `enabled` (false = gizle), `text`, `side` (`"right"`/`"left"`), `bottom` (alttan px; WhatsApp butonu gibi başka bir şeyle çakışırsa artır)
+- `fab`: sağ alttaki "Ürün Bul" butonu — `enabled` (false = gizle), `text`, `side` (`"right"`/`"left"`), `bottom` (alttan px), `animate` (false = hareketsiz). Altta sabit bir şey (çerez uyarısı, sepet çubuğu vb.) belirirse buton otomatik olarak onun üstüne çıkar, kaybolunca geri iner; ekranı kaplayan pencerede gizlenir.
 - `searchUrl`: "Tüm sonuçları gör" butonunun gittiği ikas arama sayfası. Sitende bir şey arat, adres çubuğundaki biçimi buraya yaz (`{q}` = aranan kelime).
 
 config.json'u GitHub'da düzenleyip kaydettiğinde senkron kendiliğinden çalışır.
