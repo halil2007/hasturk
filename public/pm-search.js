@@ -445,6 +445,8 @@
     '.sh-go{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:23px;background:var(--pr);color:#fff;font-weight:800;font-size:15px}',
     '.sh-go svg{width:18px;height:18px}',
     '.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:8px;padding:10px 16px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap}',
+    '.ptoast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.3)}',
+    '.ptoast.on{display:flex}.ptoast svg{width:20px;height:20px;flex:none;color:#7ee2a8}.ptoast.warn svg{color:#ffd27a}',
     '.toast.on{display:flex}.toast svg{width:18px;height:18px;color:#7ee2a8}',
 
     /* Toprak hesaplayıcı */
@@ -523,6 +525,7 @@
     root.innerHTML =
       '<style>' + CSS + '</style><div class="root">' +
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
+      '<div class="ptoast" role="status"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
       '<div class="top"><button class="back" type="button" data-act="back" aria-label="Geri">' + I.back + '</button>' +
       '<label class="field">' + I.search +
@@ -899,8 +902,8 @@
         return '<button class="vo' + (v === first ? ' on' : '') + '" type="button" data-act="vo" data-v="' + esc(v.id) + '"' + (vOk(v) ? '' : ' disabled') + '>' +
           esc(v.name || 'Seçenek') + (pr != null ? '<small>' + tl(pr) + '</small>' : '') + '</button>';
       }).join('') + '</div>' +
-      '<div class="sh-f"><div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
-      '<input value="1" inputmode="numeric" aria-label="Adet" readonly><button type="button" data-act="sq" data-v="1" aria-label="Artır">' + I.plus + '</button></div>' +
+      '<div class="sh-f">' + (typeof window.UrunAramaSepet === 'function' ? '<div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
+      '<input value="1" inputmode="numeric" aria-label="Adet" readonly><button type="button" data-act="sq" data-v="1" aria-label="Artır">' + I.plus + '</button></div>' : '') +
       '<button class="sh-go" type="button" data-act="shgo">' + I.cart + 'Sepete ekle</button></div></div>';
     $sheet.classList.add('on');
   }
@@ -929,7 +932,84 @@
       }, function () { location.href = url(p.s) + '?variantId=' + encodeURIComponent(v.id); });
       return;
     }
-    location.href = url(p.s) + (v.id ? '?variantId=' + encodeURIComponent(v.id) : '');
+    // Doğrudan bağlantı yoksa: ürün sayfasına git, orada seçeneği seçip sitenin kendi "Sepete Ekle" butonuna bas
+    try {
+      sessionStorage.setItem(ADD_KEY, JSON.stringify({ s: p.s, n: p.n, vn: v.name || '', multi: (p.v || []).length > 1, t: Date.now() }));
+    } catch (e) {}
+    location.href = url(p.s);
+  }
+
+  var ADD_KEY = 'ua-add';
+  function ptoast(msg, warn) {
+    if (!root) return;
+    var el = root.querySelector('.ptoast');
+    el.innerHTML = (warn ? svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>', 2.2) : I.check) + '<span>' + esc(msg) + '</span>';
+    el.classList.toggle('warn', !!warn);
+    el.classList.add('on');
+    clearTimeout(ptoast.t);
+    ptoast.t = setTimeout(function () { el.classList.remove('on'); }, warn ? 6000 : 3500);
+  }
+  function visible(el) { return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)); }
+  function squash(t) { return fold(t).replace(/\s+/g, ''); }
+  function findAddBtn() {
+    var els = document.querySelectorAll('button,[role="button"],a,input[type="submit"]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (isOurs(el) || !visible(el) || el.disabled || el.getAttribute('aria-disabled') === 'true') continue;
+      var t = fold(el.value || el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (/sepete ?(ekle|at)|add to (cart|basket|bag)/.test(t) && t.length < 40) return el;
+    }
+    return null;
+  }
+  // Ürün sayfasında adı varyant adıyla birebir aynı olan seçeneği bul (buton, etiket, liste öğesi ya da select)
+  function pickOnPage(name) {
+    var want = squash(name);
+    if (!want) return false;
+    var sels = document.querySelectorAll('select');
+    for (var i = 0; i < sels.length; i++) {
+      if (isOurs(sels[i])) continue;
+      for (var j = 0; j < sels[i].options.length; j++) {
+        if (squash(sels[i].options[j].text) === want) {
+          var setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+          setter.call(sels[i], sels[i].options[j].value);
+          sels[i].dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+      }
+    }
+    var all = document.body.querySelectorAll('button,[role="radio"],[role="option"],label,li,a,span,div,p');
+    for (var k = 0; k < all.length; k++) {
+      var el = all[k];
+      if (el.children.length > 3 || isOurs(el) || !visible(el) || el.closest('header,nav,footer')) continue;
+      if (squash(el.textContent) !== want) continue;
+      var hit = el.closest('button,[role="radio"],[role="option"],label,a,li') || el;
+      hit.click();
+      return true;
+    }
+    return false;
+  }
+  function runPendingAdd() {
+    var job = null;
+    try { job = JSON.parse(sessionStorage.getItem(ADD_KEY) || 'null'); } catch (e) {}
+    if (!job || Date.now() - job.t > 60000) { try { sessionStorage.removeItem(ADD_KEY); } catch (e) {} return; }
+    var here = decodeURIComponent(location.pathname).replace(/\/+$/, '').split('/').pop();
+    if (here !== job.s) return;
+    try { sessionStorage.removeItem(ADD_KEY); } catch (e) {}
+    var tries = 0, picked = !job.multi;
+    (function step() {
+      tries++;
+      var btn = findAddBtn();
+      if (btn && !picked) {
+        if (pickOnPage(job.vn)) { picked = true; return setTimeout(step, 700); }
+      } else if (btn) {
+        btn.click();
+        ptoast('Sepete eklendi' + (job.vn ? ': ' + job.vn : ''));
+        track('add_to_cart_page', job.n);
+        return;
+      }
+      if (tries < 40) return setTimeout(step, 300);
+      ptoast(job.vn ? '"' + job.vn + '" seçeneğini seçip Sepete Ekle\'ye basın' : 'Sepete Ekle butonuna basarak ürünü ekleyebilirsiniz', true);
+    })();
   }
 
   // ---------------- Toprak hesaplayıcı ----------------
@@ -1270,6 +1350,7 @@
   // Butonu hemen göster, veriyi boşta önceden indir (ilk açılış anında olsun)
   function boot() {
     build();
+    setTimeout(runPendingAdd, 400);
     var idle = window.requestIdleCallback || function (f) { setTimeout(f, 2500); };
     idle(function () { load().catch(function () {}); });
   }
