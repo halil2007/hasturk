@@ -1,0 +1,37 @@
+name: ikas ürünlerini senkronla
+
+on:
+  schedule:
+    - cron: '17 */2 * * *'   # 2 saatte bir
+  workflow_dispatch:          # Actions sekmesinden elle çalıştırma
+  push:
+    paths: ['config.json', 'scripts/**']
+
+permissions:
+  contents: write
+
+concurrency: sync
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Ürünleri çek
+        run: node scripts/sync.mjs
+        env:
+          IKAS_STORE: ${{ secrets.IKAS_STORE }}
+          IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+          IKAS_MERCHANT_ID: ${{ secrets.IKAS_MERCHANT_ID }}
+          IKAS_SALES_CHANNEL_ID: ${{ secrets.IKAS_SALES_CHANNEL_ID }}
+      - name: Değiştiyse kaydet
+        run: |
+          git config user.name "urun-senkron"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/products.json
+          git diff --cached --quiet || (git commit -m "Ürünler güncellendi" && git push)
