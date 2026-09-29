@@ -674,6 +674,7 @@
     else if (act === 'gocalc') { $q.value = ''; render(); setTab('calc'); }
     else if (act === 'guide') { GID = v; renderGuide(); }
     else if (act === 'goguide') { GID = v; $q.value = ''; render(); setTab('guide'); }
+    else if (act === 'goguideq') { GQ = v; $q.value = ''; render(); setTab('guide'); }
     else if (act === 'add') openAdd(v);
     else if (act === 'vo') pickVariant(v);
     else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
@@ -949,9 +950,13 @@
   // config.json > guides: [{ id, title, product (slug), url (rehber sayfası), keywords, note, groups: [{ cat, name, plants[], steps: [[zaman, şekil, doz]] }] }]
   function guides() { return CFG.guides || []; }
   function doseHtml(d) {
-    // kg/dekar → g/m² (1 kg/dekar = 1 g/m²): ev ve bahçe kullanıcıları için
-    var m = String(d).match(/^([\d.,]+(?:\s*-\s*[\d.,]+)?)\s*kg\/dekar$/);
-    return esc(d) + (m ? '<small>≈ ' + esc(m[1]) + ' g/m²</small>' : '');
+    // Ev ve bahçe kullanıcıları için küçük alan karşılığı:
+    // 1 kg/dekar = 1 g/m² · 100 cc/dekar = 1 ml/10 m² · 1 L/dekar = 10 ml/10 m²
+    var m = String(d).match(/^([\d.,]+)(?:\s*-\s*([\d.,]+))?\s*(kg|cc|L)\/dekar$/);
+    if (!m) return esc(d);
+    var k = m[3] === 'kg' ? 1 : m[3] === 'cc' ? 0.01 : 10, unit = m[3] === 'kg' ? ' g/m²' : ' ml / 10 m²';
+    var f = function (x) { return (parseFloat(x.replace(',', '.')) * k).toLocaleString('tr-TR', { maximumFractionDigits: 1 }); };
+    return esc(d) + '<small>≈ ' + f(m[1]) + (m[2] ? '-' + f(m[2]) : '') + unit + '</small>';
   }
   function stepsHtml(steps) {
     return '<div class="steps">' + steps.map(function (st) {
@@ -960,7 +965,7 @@
   }
   function guideGroup(gd, gr, open) {
     return '<details class="gg"' + (open ? ' open' : '') + '><summary><div><b>' + esc(gr.name) + '</b><small>' + esc(gr.plants.join(' · ')) + '</small></div>' + I.right + '</summary>' +
-      (gr.steps && gr.steps.length ? stepsHtml(gr.steps)
+      (gr.steps && gr.steps.length ? stepsHtml(gr.steps) + (gr.note ? '<div class="gnote" style="margin:0 14px 12px">Not: ' + esc(gr.note) + '</div>' : '')
         : '<a class="glink" data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '">Dozları rehber sayfasında gör' + I.arrow + '</a>') +
       '</details>';
   }
@@ -985,7 +990,7 @@
     var has = hit && hit.gr.steps && hit.gr.steps.length;
     return '<div class="gcard"><div class="gc-h">' + I.book + '<div><b>' + (hit ? esc(hit.pl) + ' için ' : '') + esc(gd.title) + '</b><small>' +
       (hit ? esc(hit.gr.name) + ' · ' : '') + (has ? 'kullanım dozu' : 'doz bilgisi rehber sayfamızda') + '</small></div></div>' +
-      (has ? stepsHtml(hit.gr.steps) : '') +
+      (has ? stepsHtml(hit.gr.steps) + (hit.gr.note ? '<div class="gnote" style="margin:0 14px 12px">Not: ' + esc(hit.gr.note) + '</div>' : '') : '') +
       '<div class="gc-f"' + (has ? '' : ' style="padding-top:12px"') + '><a data-kind="guide" data-name="' + esc(gd.title) + '" href="' + esc(pageHref(gd.url)) + '">' + (has ? 'Tüm rehber' : 'Rehberi aç') + '</a>' +
       (gd.product ? '<a class="pri" data-kind="product" data-name="' + esc(gd.title) + '" href="' + esc(url(gd.product)) + '">Ürünü gör</a>' : '') + '</div></div>';
   }
@@ -1049,8 +1054,10 @@
     var list = guides().filter(named);
     if (list.length > 1) list = list.filter(function (gd) { return !list.some(function (o) { return o !== gd && (o.keywords || []).some(function (k) { return (gd.keywords || []).some(function (g) { return fold(k).indexOf(fold(g)) !== -1 && fold(k) !== fold(g); }); }); }); });
     if (!list.length) list = guides();
+    var others = [], plantName = null;
     list.forEach(function (gd) {
       var hit = plantHit(gd, toks, 4);
+      if (hit && hit.gr.steps && hit.gr.steps.length && out.length && list.length > 1) { others.push(gd.title); plantName = plantName || hit.pl; return; }
       var kwIn = named(gd), kw = kwIn && toks.some(function (t) { return /^(kullan|doz|nasil|miktar|rehber)/.test(t); });
       if (hit && !(hit.gr.steps && hit.gr.steps.length) && !kwIn) hit = null; // doz verisi olmayan rehber sadece adı geçince
       if (hit && hit.gr.steps && hit.gr.steps.length) {
@@ -1065,6 +1072,11 @@
           '<span style="color:var(--mu)">Doz ve uygulama zamanı rehberimizde</span></div>' + I.arrow + '</a>');
       }
     });
+    if (others.length) {
+      out.push('<button class="banner" type="button" data-act="goguideq" data-v="' + esc(plantName) + '" style="background:var(--soft);color:var(--prd);margin-top:8px">' +
+        '<span class="bi" style="background:#fff;color:var(--pr)">' + I.book + '</span><div class="tx"><b>' + esc(plantName) + ' için diğer ürünlerin dozları</b>' +
+        '<span style="color:var(--mu)">' + esc(others.join(', ')) + '</span></div>' + I.arrow + '</button>');
+    }
     return out.slice(0, 2).join('');
   }
 

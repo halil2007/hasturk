@@ -687,7 +687,567 @@
       "keywords": [
         "sivi solucan"
       ],
-      "groups": []
+      "groups": [
+        {
+          "cat": "Sebzeler",
+          "name": "Meyvesi Yenen Sebzeler",
+          "plants": [
+            "Domates",
+            "Patlıcan",
+            "Kabak",
+            "Acur",
+            "Taze Fasulye",
+            "Hıyar",
+            "Biber (Dolmalık)",
+            "Biber (Sivri)",
+            "Biber (Salçalık)",
+            "Taze Bezelye",
+            "Taze Bakla",
+            "Börülce",
+            "Bamya",
+            "Balkabağı",
+            "Çekirdeklik Kabak",
+            "Kavun",
+            "Karpuz"
+          ],
+          "steps": [
+            [
+              "Fide viyollerini gübreli suya bandırma",
+              "Bandırma",
+              "100 L suya 1 L"
+            ],
+            [
+              "Vejetatif kök gelişim döneminde, 15 gün arayla 3 kez",
+              "Damla sulama",
+              "400-450 cc/dekar"
+            ],
+            [
+              "Çiçeklenme veya tohuma kalkma döneminde 1 kez",
+              "Yapraktan",
+              "300-350 cc/dekar"
+            ],
+            [
+              "Çiçeklenme veya tohuma kalkma döneminin ikinci periyodunda, 15 gün arayla 2 kez",
+              "Damla sulama",
+              "400-450 cc/dekar"
+            ],
+            [
+              "Meyveyi büyütme döneminde 2 kez",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Yaprağı, Sürgünü, Sapı ve Çiçek Tablası Yenenler",
+          "plants": [
+            "Lahana",
+            "Ispanak",
+            "Pazı",
+            "Semizotu",
+            "Marul",
+            "Salata",
+            "Brüksel Lahanası",
+            "Enginar",
+            "Maydanoz",
+            "Roka",
+            "Tere",
+            "Nane",
+            "Dereotu",
+            "Kuşkonmaz",
+            "Brokoli",
+            "Yaprak Kereviz",
+            "Sap Kereviz",
+            "Karnabahar"
+          ],
+          "steps": [
+            [
+              "Fide viyollerini gübreli suya bandırma",
+              "Bandırma",
+              "100 L suya 1 L"
+            ],
+            [
+              "Vejetatif kök gelişim döneminde",
+              "Damla sulama",
+              "1 L/dekar"
+            ],
+            [
+              "Yaprak ve meyve gelişim döneminde, 15-20 gün arayla 3 kez",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Kuru ve Taze Tohumları Yenenler",
+          "plants": [
+            "Kuru Fasulye",
+            "Bezelye",
+            "Bakla",
+            "Barbunya",
+            "Börülce",
+            "Mercimek",
+            "Nohut",
+            "Tatlı Mısır"
+          ],
+          "steps": [
+            [
+              "İri tohumlarda 100 kg tohuma",
+              "Tohum ıslama",
+              "500 cc"
+            ],
+            [
+              "Ufak tohumlarda 100 kg tohuma",
+              "Tohum ıslama",
+              "350 cc"
+            ],
+            [
+              "Vejetatif kök gelişim döneminde",
+              "Damla sulama",
+              "1 L/dekar"
+            ],
+            [
+              "Çiçeklenmeden önce 1 kez ve 20 gün sonra",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ]
+          ],
+          "note": "Nohutta: Tohum ıslamada 500 cc; ilaçlama esnasında 1 kez 350 cc/dekar uygulanır."
+        },
+        {
+          "cat": "Sebzeler",
+          "name": "Soğan, Yumru ve Kökleri Yenenler",
+          "plants": [
+            "Sarımsak",
+            "Soğan",
+            "Pırasa",
+            "Patates",
+            "Tatlı Patates",
+            "Yer Elması",
+            "Havuç",
+            "Turp",
+            "Kırmızı Pancar",
+            "Şalgam",
+            "Kök Kereviz"
+          ],
+          "steps": [
+            [
+              "Vejetatif kök gelişim döneminde",
+              "Damla sulama",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Bitkiler 20-25 cm iken, 15 gün ara ile 2 kez",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Yumuşak, Taş Çekirdekli, Sert Kabuklu ve Üzümsü Meyveler",
+          "plants": [
+            "Elma",
+            "Armut",
+            "Ayva",
+            "Alıç",
+            "Muşmula",
+            "Üvez",
+            "Kuşburnu",
+            "Kiraz",
+            "Vişne",
+            "Kayısı",
+            "Şeftali",
+            "Erik",
+            "Kızılcık",
+            "İğde",
+            "Nektarin",
+            "Badem",
+            "Ceviz",
+            "Kestane",
+            "Fındık",
+            "Antep Fıstığı",
+            "Üzüm",
+            "Kivi",
+            "Dut",
+            "İncir",
+            "Nar",
+            "Ahududu",
+            "Böğürtlen"
+          ],
+          "steps": [
+            [
+              "Ağaca su yürümesi başladıktan 10 gün sonra",
+              "Damla sulama",
+              "1-1,5 L/dekar"
+            ],
+            [
+              "Çiçeklenme döneminde",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Meyve tutumunda",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ],
+            [
+              "Meyve irileştirme döneminde",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Meyveler",
+          "name": "Çilek",
+          "plants": [
+            "Çilek"
+          ],
+          "steps": [
+            [
+              "Dikimden 10 gün sonra",
+              "Damla sulama",
+              "1-1,5 L/dekar"
+            ],
+            [
+              "Bitki 4-5 yaprakta iken",
+              "Damla sulama",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Meyve tutumunda, çiçekte",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ],
+            [
+              "Meyve döneminde",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Turunçgiller ve Akdeniz Meyveleri",
+          "name": "Turunçgiller ve Akdeniz Meyveleri",
+          "plants": [
+            "Portakal",
+            "Limon",
+            "Mandalina",
+            "Greyfurt",
+            "Mandarin",
+            "Zeytin",
+            "İncir",
+            "Zerdali",
+            "Trabzon Hurması",
+            "Yeni Dünya"
+          ],
+          "steps": [
+            [
+              "Su yürümesi başladıktan 10 gün sonra",
+              "Damla sulama",
+              "1-1,5 L/dekar"
+            ],
+            [
+              "Çiçeklenme döneminde",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Meyve tutumunda",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ],
+            [
+              "Meyve irileştirme döneminde",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Turunçgiller ve Akdeniz Meyveleri",
+          "name": "Muz",
+          "plants": [
+            "Muz"
+          ],
+          "steps": [
+            [
+              "Vejetatif kök gelişim döneminde",
+              "Damla sulama",
+              "1-1,5 L/dekar"
+            ],
+            [
+              "Kök doğum döneminde",
+              "Yağmurlama",
+              "500 cc/dekar"
+            ],
+            [
+              "Meyve oluşum döneminde",
+              "Damla sulama",
+              "1-1,5 L/dekar"
+            ],
+            [
+              "Meyve doluluk döneminde",
+              "Yağmurlama",
+              "500 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tarla Bitkileri",
+          "name": "Tahıllar ve Mısır",
+          "plants": [
+            "Buğday",
+            "Arpa",
+            "Yulaf",
+            "Çavdar",
+            "Tritikale",
+            "Darı",
+            "Darılar",
+            "Mısır"
+          ],
+          "steps": [
+            [
+              "İri tohumlarda 100 kg tohuma",
+              "Tohum ıslama",
+              "500 cc"
+            ],
+            [
+              "Ufak tohumlarda 100 kg tohuma",
+              "Tohum ıslama",
+              "350 cc"
+            ],
+            [
+              "Kardeşlenme döneminde",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Sapa kalkma döneminde",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Meyve oluşum döneminde",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tarla Bitkileri",
+          "name": "Çeltik",
+          "plants": [
+            "Çeltik"
+          ],
+          "steps": [
+            [
+              "1 ton tohum için",
+              "Tohum ıslama",
+              "5 L"
+            ],
+            [
+              "Mantar ilacı ile beraber her uygulamada",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Endüstriyel Bitkiler",
+          "name": "Endüstriyel Bitkiler",
+          "plants": [
+            "Ayçiçeği",
+            "Soya",
+            "Kanola",
+            "Yer Fıstığı",
+            "Susam",
+            "Aspir",
+            "Pamuk",
+            "Lif Keteni",
+            "Kenevir",
+            "Kapok",
+            "Şeker Pancarı",
+            "Hint Yağı",
+            "Yağ Keteni"
+          ],
+          "steps": [
+            [
+              "İri tohumlarda 100 kg tohuma",
+              "Tohum ıslama",
+              "500 cc"
+            ],
+            [
+              "Ufak tohumlarda 100 kg tohuma",
+              "Tohum ıslama",
+              "350 cc"
+            ],
+            [
+              "Bitki 4-5 yaprakta iken",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ],
+            [
+              "Her 20 günde bir",
+              "Yapraktan",
+              "400-450 cc/dekar"
+            ],
+            [
+              "Pamukta kök gelişimi ve başak oluşumunda",
+              "Damla sulama",
+              "1 L/dekar"
+            ],
+            [
+              "Pamukta 2. çapa ve ilk böcek ilaçlamasında",
+              "Yapraktan",
+              "450-500 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tıbbi ve Aromatik Bitkiler",
+          "name": "Tütün",
+          "plants": [
+            "Tütün"
+          ],
+          "steps": [
+            [
+              "Fide yataklarında",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Dikim sonrası bitki 8-10 yaprakta",
+              "Damla sulama",
+              "1 L/dekar"
+            ],
+            [
+              "İlk kırım öncesi",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ],
+            [
+              "İlk kırımdan hemen sonra",
+              "Damla sulama",
+              "1 L/dekar"
+            ],
+            [
+              "Her kırım arası",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tıbbi ve Aromatik Bitkiler",
+          "name": "Tıbbi, Aromatik ve Keyif Bitkileri",
+          "plants": [
+            "Haşhaş",
+            "Yağ Gülü",
+            "Anason",
+            "Kimyon",
+            "Kekik",
+            "Adaçayı",
+            "Lavanta",
+            "Safran",
+            "Kapari",
+            "Defne",
+            "Şerbetçi Otu"
+          ],
+          "steps": [
+            [
+              "İlk yaprakların oluştuğu dönemde",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ],
+            [
+              "Her 20 günde 1 kez",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Tıbbi ve Aromatik Bitkiler",
+          "name": "Çay",
+          "plants": [
+            "Çay"
+          ],
+          "steps": [
+            [
+              "Her sürgünde",
+              "Yapraktan",
+              "2 L/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Yem Bitkileri",
+          "name": "Çayır, Mera ve Yem Bitkileri",
+          "plants": [
+            "Çayır",
+            "Mera",
+            "Yem Bitkileri",
+            "Yonca"
+          ],
+          "steps": [
+            [
+              "İlk yaprak oluştuğu dönemde, her 20 günde 1 kez",
+              "Yapraktan",
+              "350-400 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Süs Bitkileri",
+          "name": "Çim",
+          "plants": [
+            "Çim"
+          ],
+          "steps": [
+            [
+              "Her biçimden sonra",
+              "Yağmurlama",
+              "400-450 cc/dekar"
+            ]
+          ]
+        },
+        {
+          "cat": "Yetiştiricilik",
+          "name": "Fide Yetiştiriciliği",
+          "plants": [
+            "Fide",
+            "Fide Yetiştiriciliği"
+          ],
+          "steps": [
+            [
+              "İlk yaprakların oluştuğu dönemde",
+              "Yapraktan",
+              "50-400 cc/dekar"
+            ]
+          ],
+          "note": "Bu değer kaynak tabloda 50-400 cc/dekar olarak yer almaktadır; uygulama öncesinde ürün etiketinden doğrulanmalıdır."
+        },
+        {
+          "cat": "Yetiştiricilik",
+          "name": "Fidan Yetiştiriciliği",
+          "plants": [
+            "Fidan",
+            "Fidan Yetiştiriciliği"
+          ],
+          "steps": [
+            [
+              "Erken baharda ve her 20 günde bir",
+              "Damla sulama",
+              "2 L/dekar"
+            ]
+          ]
+        }
+      ],
+      "note": "Kullanım miktarları genel uygulama rehberidir. Toprak ve/veya yaprak analizi yapılması; nihai uygulamada HasTürk ürün etiketi, bitkinin gelişim dönemi ve uzman önerisinin esas alınması tavsiye edilir. Damla sulama bulunmuyorsa sıvı ürünün damla sulama dozları, uygun dönemlerde yapraktan uygulanabilir."
     },
     {
       "id": "humik",
@@ -699,16 +1259,17 @@
         "humix",
         "fulvik"
       ],
-      "note": "Kullanmadan önce şişeyi iyice çalkalayınız. Toprak ve/veya yaprak analizi yaptırılarak kullanılması tavsiye edilir.",
+      "note": "Kullanmadan önce şişeyi iyice çalkalayınız. Tek başına uygulanabildiği gibi yaprak gübreleri, bitki gelişim düzenleyicileri ve pestisitlerle birlikte de kullanılabilir. Toprak ve/veya yaprak analizi yaptırılarak kullanılması tavsiye edilir.",
       "groups": [
         {
-          "cat": "Sebzeler",
-          "name": "Meyvesi, Yaprağı, Sürgünü ve Çiçek Tablası Yenen Sebzeler",
+          "cat": "Sebzeler ve Tarla Bitkileri",
+          "name": "Sebzeler",
           "plants": [
             "Domates",
             "Biber",
             "Patlıcan",
             "Hıyar",
+            "Salatalık",
             "Taze Fasulye",
             "Taze Bezelye",
             "Taze Bakla",
@@ -738,38 +1299,46 @@
             "Sap Kereviz",
             "Enginar",
             "Karnabahar",
-            "Brokoli"
-          ],
-          "steps": []
-        },
-        {
-          "cat": "Sebzeler",
-          "name": "Tohumu, Soğanı, Yumrusu ve Kökü Yenen Sebzeler",
-          "plants": [
+            "Brokoli",
             "Kuru Fasulye",
             "Bezelye",
             "Barbunya",
             "Nohut",
             "Bakla",
-            "Börülce",
             "Mercimek",
-            "Tatlı Mısır",
-            "Sarımsak",
-            "Soğan",
-            "Pırasa",
-            "Tatlı Patates",
-            "Yer Elması",
-            "Havuç",
-            "Turp",
-            "Kırmızı Pancar",
-            "Şalgam",
-            "Kök Kereviz"
+            "Tatlı Mısır"
           ],
-          "steps": []
+          "steps": [
+            [
+              "Toprak ekime hazırlandıktan sonra tüm alana",
+              "Geniş toprak uygulaması",
+              "500-600 cc/dekar"
+            ],
+            [
+              "Ekim veya dikimi takiben",
+              "Sıra üzeri şerit uygulama",
+              "300-500 cc/dekar"
+            ],
+            [
+              "Sezon boyunca 5-6 kez",
+              "Damlama / sulama suyuna",
+              "250-300 cc/dekar"
+            ],
+            [
+              "Seralarda her ay",
+              "Damla sulama",
+              "500 cc/dekar"
+            ],
+            [
+              "Bitkiler 20-25 cm boya geldiğinde, 20 gün arayla 2 kez",
+              "Yapraktan",
+              "100 cc/dekar"
+            ]
+          ]
         },
         {
-          "cat": "Tarla Bitkileri",
-          "name": "Tahıllar ve Mısır",
+          "cat": "Sebzeler ve Tarla Bitkileri",
+          "name": "Tarla Bitkileri",
           "plants": [
             "Buğday",
             "Arpa",
@@ -777,14 +1346,9 @@
             "Çavdar",
             "Tritikale",
             "Darı",
-            "Mısır"
-          ],
-          "steps": []
-        },
-        {
-          "cat": "Endüstriyel Bitkiler",
-          "name": "Yağlı Tohum ve Endüstriyel Bitkiler",
-          "plants": [
+            "Mısır",
+            "Çeltik",
+            "Pamuk",
             "Ayçiçeği",
             "Soya",
             "Kanola",
@@ -797,50 +1361,74 @@
             "Kenevir",
             "Kapok",
             "Rami",
-            "Hibiskus",
-            "Şeker Pancarı"
+            "Hibiskus"
           ],
-          "steps": []
+          "steps": [
+            [
+              "Toprak ekime hazırlandıktan sonra tüm alana",
+              "Geniş toprak uygulaması",
+              "500-600 cc/dekar"
+            ],
+            [
+              "Ekim veya dikimi takiben",
+              "Sıra üzeri şerit uygulama",
+              "300-500 cc/dekar"
+            ],
+            [
+              "Sezon boyunca 5-6 kez",
+              "Damlama / sulama suyuna",
+              "250-300 cc/dekar"
+            ],
+            [
+              "Bitkiler 20-25 cm boya geldiğinde, 20 gün arayla 2 kez",
+              "Yapraktan",
+              "100 cc/dekar"
+            ]
+          ]
         },
         {
-          "cat": "Endüstriyel Bitkiler",
-          "name": "Çeltik",
+          "cat": "Sebzeler ve Tarla Bitkileri",
+          "name": "Yumrulu Bitkiler",
           "plants": [
-            "Çeltik"
+            "Şeker Pancarı",
+            "Patates",
+            "Tatlı Patates",
+            "Yer Elması",
+            "Havuç",
+            "Soğan",
+            "Sarımsak",
+            "Pırasa",
+            "Turp",
+            "Kırmızı Pancar",
+            "Şalgam",
+            "Kök Kereviz"
           ],
-          "steps": []
+          "steps": [
+            [
+              "Toprak ekime hazırlandıktan sonra tüm alana",
+              "Geniş toprak uygulaması",
+              "500-600 cc/dekar"
+            ],
+            [
+              "Ekimi takiben sıra üzerine",
+              "Sıra üzeri uygulama",
+              "300-500 cc/dekar"
+            ],
+            [
+              "Ekimden 10 hafta sonra",
+              "Yapraktan",
+              "250-300 cc/dekar"
+            ],
+            [
+              "İlk yaprak uygulamasından 2-3 hafta sonra (tekrar)",
+              "Yapraktan",
+              "300-350 cc/dekar"
+            ]
+          ]
         },
         {
-          "cat": "Tıbbi ve Aromatik Bitkiler",
-          "name": "Tıbbi, Aromatik ve Keyif Bitkileri",
-          "plants": [
-            "Haşhaş",
-            "Yağ Gülü",
-            "Anason",
-            "Kimyon",
-            "Adaçayı",
-            "Lavanta",
-            "Safran",
-            "Kapari",
-            "Şerbetçi Otu",
-            "Tütün"
-          ],
-          "steps": []
-        },
-        {
-          "cat": "Yem Bitkileri",
-          "name": "Çayır ve Mera Bitkileri",
-          "plants": [
-            "Yonca",
-            "Korunga",
-            "Burçak",
-            "Üçgül"
-          ],
-          "steps": []
-        },
-        {
-          "cat": "Meyveler ve Turunçgiller",
-          "name": "Meyveler, Turunçgiller ve Akdeniz Meyveleri",
+          "cat": "Meyve Bahçeleri",
+          "name": "Meyveler ve Turunçgiller",
           "plants": [
             "Elma",
             "Armut",
@@ -878,10 +1466,54 @@
             "Yeni Dünya",
             "Zerdali"
           ],
+          "steps": [
+            [
+              "Ağaca su yürümesi başladıktan sonra, ağacın taç izdüşümüne",
+              "Toprağa",
+              "10 L suya 100 cc"
+            ],
+            [
+              "Sezon boyunca 5-6 kez",
+              "Damla sulama / sulama suyuna",
+              "600 cc - 1 L/dekar"
+            ],
+            [
+              "Ağaca su yürümesi başladıktan sonra",
+              "Yapraktan",
+              "100 L suya 100 cc"
+            ]
+          ]
+        },
+        {
+          "cat": "Diğer",
+          "name": "Tıbbi, Aromatik ve Keyif Bitkileri",
+          "plants": [
+            "Haşhaş",
+            "Yağ Gülü",
+            "Anason",
+            "Kimyon",
+            "Adaçayı",
+            "Lavanta",
+            "Safran",
+            "Kapari",
+            "Şerbetçi Otu",
+            "Tütün"
+          ],
           "steps": []
         },
         {
-          "cat": "Süs Bitkileri ve Yeşil Alanlar",
+          "cat": "Diğer",
+          "name": "Çayır ve Mera Bitkileri",
+          "plants": [
+            "Yonca",
+            "Korunga",
+            "Burçak",
+            "Üçgül"
+          ],
+          "steps": []
+        },
+        {
+          "cat": "Diğer",
           "name": "Çim ve Yeşil Alanlar",
           "plants": [
             "Çim",
