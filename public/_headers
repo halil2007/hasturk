@@ -1,0 +1,8 @@
+# ikas sitesi bu dosyaları başka bir alan adından çağırdığı için CORS izni gerekir.
+/products.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300
+
+/pm-search.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
