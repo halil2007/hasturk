@@ -227,9 +227,22 @@
     ' font-family:inherit;color:var(--ink);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.35}',
 
     /* Ürün Bul butonu */
-    '.fab{position:fixed;z-index:2147482990;bottom:calc(var(--fb,20px) + env(safe-area-inset-bottom,0px));right:20px;display:flex;align-items:center;gap:10px;',
+    '.fab{position:fixed;z-index:2147482990;bottom:calc(var(--fb,20px) + var(--lift,0px) + env(safe-area-inset-bottom,0px));right:20px;display:flex;align-items:center;gap:10px;',
     ' height:52px;padding:0 20px 0 8px;border-radius:26px;background:var(--pr);color:#fff;font-weight:700;font-size:15px;',
-    ' box-shadow:0 10px 28px rgba(7,50,64,.3);transition:padding .25s,gap .25s,transform .2s,opacity .2s}',
+    ' box-shadow:0 10px 28px rgba(7,50,64,.3);transition:padding .25s,gap .25s,transform .2s,opacity .25s,bottom .35s cubic-bezier(.2,.8,.2,1)}',
+    /* Hareket: yayılan halka, parıltı, arada "etrafa bakan" büyüteç, girişte zıplama */
+    '.fab::before{content:"";position:absolute;inset:-3px;border-radius:inherit;border:2px solid var(--pr);opacity:0;pointer-events:none;animation:fring 2.8s ease-out infinite}',
+    '@keyframes fring{0%{transform:scale(1);opacity:.6}75%,100%{transform:scale(1.12,1.4);opacity:0}}',
+    '.fab .gl{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}',
+    '.fab .gl::after{content:"";position:absolute;top:0;bottom:0;left:-45%;width:35%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.38),transparent);transform:skewX(-18deg);animation:fshine 5.5s ease-in-out infinite 1.2s}',
+    '@keyframes fshine{0%,62%{left:-45%}82%,100%{left:120%}}',
+    '.fab .fi svg{animation:flook 6.5s ease-in-out infinite 2s;transform-origin:45% 45%}',
+    '@keyframes flook{0%,80%,100%{transform:none}84%{transform:rotate(-16deg) scale(1.12)}88%{transform:rotate(12deg) scale(1.12)}92%{transform:rotate(-6deg)}96%{transform:none}}',
+    '.fab.in{animation:fpop .55s cubic-bezier(.3,1.5,.5,1)}',
+    '@keyframes fpop{0%{transform:translateY(24px) scale(.8);opacity:0}100%{transform:none;opacity:1}}',
+    '.fab.still::before,.fab.still .gl::after,.fab.still .fi svg{animation:none}',
+    '@media(prefers-reduced-motion:reduce){.fab::before,.fab .gl::after,.fab .fi svg,.fab.in{animation:none!important}}',
+    '.fab.blocked{opacity:0;pointer-events:none}',
     '.fab .fi{width:36px;height:36px;border-radius:50%;background:#fff;color:var(--pr);display:grid;place-items:center;flex:none}',
     '.fab .fi svg{width:19px;height:19px}',
     '.fab.left{right:auto;left:20px}',
@@ -576,7 +589,7 @@
     root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     root.innerHTML =
       '<style>' + CSS + '</style><div class="root">' +
-      '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
+      '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="gl"></span><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
       '<div class="ptoast" role="status"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
       '<div class="top"><button class="back" type="button" data-act="back" aria-label="Geri">' + I.back + '</button>' +
@@ -1489,8 +1502,52 @@
     if (f.enabled === false) return false;
     return !HIDE_PATHS.test(location.pathname);
   }
+  var fabShown = false;
   function updateFab() {
-    if ($fab) $fab.classList.toggle('hide', isOpen || !fabEnabled());
+    if (!$fab) return;
+    var hide = isOpen || !fabEnabled();
+    $fab.classList.toggle('hide', hide);
+    if (!hide && !fabShown) { fabShown = true; $fab.classList.add('in'); setTimeout(function () { $fab.classList.remove('in'); }, 700); }
+    $fab.classList.toggle('still', (CFG.fab || {}).animate === false);
+    if (!hide) fabSpace();
+  }
+  // Çerez uyarısı, WhatsApp balonu, alt "Sepete Ekle" çubuğu gibi altta sabit duran bir şey butonun yerini
+  // kaplıyorsa buton onun üstüne çıkar; kaybolunca eski yerine döner. Ekranı kaplayan pencerede gizlenir.
+  function fixedAncestor(el) {
+    for (var n = el, i = 0; n && n.nodeType === 1 && n !== document.body && n !== document.documentElement && i < 10; n = n.parentElement, i++) {
+      var ps = getComputedStyle(n).position;
+      if (ps === 'fixed' || ps === 'sticky') return n;
+    }
+    return null;
+  }
+  function fabSpace() {
+    if (!$fab || $fab.classList.contains('hide') || !document.elementsFromPoint) return;
+    var W = window.innerWidth, H = window.innerHeight, left = $fab.classList.contains('left');
+    var base = parseFloat(getComputedStyle($wrap).getPropertyValue('--fb')) || 20;
+    var w = $fab.offsetWidth || 140, side = W < 760 ? 14 : 20;
+    var x1 = left ? side : W - side - w, x2 = x1 + w;
+    var ys = [H - base - 4, H - base - 26, H - base - 48];
+    var xs = [x1 + 6, (x1 + x2) / 2, x2 - 6];
+    var top = H, cover = false, seen = [];
+    xs.forEach(function (x) {
+      ys.forEach(function (y) {
+        if (y < 0) return;
+        document.elementsFromPoint(x, y).forEach(function (el) {
+          if (isOurs(el) || el === document.body || el === document.documentElement || seen.indexOf(el) !== -1) return;
+          seen.push(el);
+          var fa = fixedAncestor(el);
+          if (!fa || isOurs(fa)) return;
+          var r = fa.getBoundingClientRect();
+          if (r.height < 8 || r.width < 8 || r.bottom < H - base - 60) return;
+          if (r.height > H * 0.6 && r.width > W * 0.6) { cover = true; return; }
+          top = Math.min(top, r.top);
+        });
+      });
+    });
+    var lift = top < H ? Math.max(0, H - top + 12 - base) : 0;
+    if (lift > H * 0.5) lift = 0;
+    $fab.style.setProperty('--lift', Math.round(lift) + 'px');
+    $fab.classList.toggle('blocked', cover);
   }
   function setupFab() {
     var lastY = window.pageYOffset, ticking = false;
@@ -1508,6 +1565,14 @@
       var orig = history[m];
       history[m] = function () { var r = orig.apply(this, arguments); setTimeout(updateFab, 0); return r; };
     });
+    // Alt kısımdaki sabit öğeleri izle (çerez uyarısı geç gelebilir, onaylanınca kaybolur)
+    var pend = false;
+    var later = function () { if (pend) return; pend = true; setTimeout(function () { pend = false; fabSpace(); }, 250); };
+    window.addEventListener('resize', later);
+    window.addEventListener('scroll', later, { passive: true });
+    document.addEventListener('click', function () { setTimeout(later, 400); }, true);
+    if (window.MutationObserver) new MutationObserver(later).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+    setInterval(fabSpace, 2000);
     updateFab();
   }
 
