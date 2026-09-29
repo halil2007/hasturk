@@ -71,11 +71,11 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `popular`: boş kutuda görünen "çok arananlar"
 - `categoryLast`: kategori kartlarında en sona konacak ana kategoriler (örn. kedi/köpek)
 - `pages`: "Sayfalar" sekmesindeki bağlantılar (`title`, `url`); aramada da çıkar
-- `calc`: toprak hesaplayıcı — `enabled`, `extra` (sıkışma payı %), `categories` (paket önerisi yapılacak kategoriler), `suggest.pot` / `suggest.bed` (öncelikli önerilecek ürünlerin adresleri/slug)
+- `calc`: toprak hesaplayıcı — `enabled`, `extra` (oturma payı %), `recommend.pot` / `recommend.bed` (sonuçtan sonra yönlendirilecek toprak kategorilerinin adları; boşsa `categories` altındaki alt kategoriler)
 - `synonyms`: "müşteri bunu yazarsa şunu da ara" (Türkçe karakterleri yazman gerekmez)
 - `badges`: ikas'taki etiket adı → üründe görünecek sarı rozet (örn. `"3 Al 2 Öde"`)
 - `phone`, `whatsapp`: doluysa altta arama/WhatsApp çubuğu çıkar (`"0216 000 00 00"`, `"905xxxxxxxxx"`)
-- `colors`: marka renklerin (`primary` ana renk, `accent` indirim rozeti)
+- `colors`: marka renklerin (`primary` ana renk, `dark` koyu ton)
 - `fab`: sağ alttaki "Ürün Bul" butonu — `enabled` (false = gizle), `text`, `side` (`"right"`/`"left"`), `bottom` (alttan px; WhatsApp butonu gibi başka bir şeyle çakışırsa artır)
 - `searchUrl`: "Tüm sonuçları gör" butonunun gittiği ikas arama sayfası. Sitende bir şey arat, adres çubuğundaki biçimi buraya yaz (`{q}` = aranan kelime).
 

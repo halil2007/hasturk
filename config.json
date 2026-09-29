@@ -48,20 +48,18 @@
     "categories": [
       "Topraklar"
     ],
-    "suggest": {
+    "recommend": {
       "pot": [
-        "akilli-toprak-organik-bitki-topragi",
-        "genel-saksi-topragi-ozel-karisim",
-        "organik-toprak",
-        "hg-cicek-topragi",
-        "guzelbahce-ithal-torf-genel-kullanim"
+        "Genel Kullanım ve Saksı Toprakları",
+        "Özel Bitki Toprakları",
+        "Torf",
+        "Toprak Düzenleyiciler ve Katkı Maddeleri"
       ],
       "bed": [
-        "solucan-gubreli-sebze-topragi",
-        "hg-bol-verimli-sebze-topragi",
-        "dogal-orman-topragi-humuslu",
-        "hg-ham-torf",
-        "organik-toprak"
+        "Sebze ve Meyve Yetiştirme Toprakları",
+        "Genel Kullanım ve Saksı Toprakları",
+        "Torf",
+        "Toprak Düzenleyiciler ve Katkı Maddeleri"
       ]
     }
   },
@@ -72,8 +70,8 @@
     "bottom": 20
   },
   "colors": {
-    "primary": "#12664f",
-    "accent": "#e8590c"
+    "primary": "#b4441f",
+    "dark": "#8c3214"
   },
   "synonyms": {
     "kokopit": [
