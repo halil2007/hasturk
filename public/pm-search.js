@@ -99,6 +99,10 @@
         inStock.filter(function (p) { return own.test(p.b || ''); })[0] || inStock[0] || inCat[0];
       c.img = pick ? pick.img : '';
     });
+    // Öne çıkan kategorilerin kendi kapak görselleri (config.json > featured) kategori resmi olarak da kullanılır
+    (CFG.featured || []).forEach(function (f) {
+      d.cats.forEach(function (c) { if (c.f === fold(f.category) && f.img) c.img = f.img; });
+    });
     applyConfig();
   }
 
@@ -337,6 +341,15 @@
     '.center{justify-content:center;flex-wrap:wrap}',
 
     /* Hesaplayıcı banner */
+    '.feat{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 4px}',
+    '@media(min-width:760px){.feat{grid-template-columns:repeat(4,1fr);gap:14px;padding:0 20px 4px}}',
+    '.ft{display:block;min-width:0}',
+    '.ft .fi{display:block;aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 1px 0 var(--ln)}',
+    '.ft .fi img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}',
+    '.ft:hover .fi img{transform:scale(1.05)}',
+    '.ft .fn{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding:8px 2px 0}',
+    '.ft .fn b{font-size:14px;font-weight:700;line-height:1.25;min-width:0}',
+    '.ft .fn small{flex:none;font-size:12px;color:var(--mu)}',
     '.promo{margin:12px 16px 0;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,var(--prd),var(--pr));color:#fff}',
     '@media(min-width:760px){.promo{margin:18px 20px 0}}',
     '.pm1{display:flex;align-items:center;gap:12px;padding:14px}',
@@ -776,6 +789,7 @@
   function url(slug) { return STORE + '/' + String(slug).replace(/^\//, ''); }
 
   function imgSrc(img, size) {
+    if (/^https?:\/\//.test(img || '')) return img; // tam adres (kategori kapak görseli)
     if (!img || !DATA.merchant) return '';
     var parts = img.split('/');
     return 'https://cdn.myikas.com/images/' + DATA.merchant + '/' + parts[0] + '/' + size + '/' + encodeURIComponent(parts[1] || 'image') + '.webp';
@@ -810,6 +824,19 @@
     }).join('');
   }
 
+  // Görselli menü: öne çıkan kategoriler (config.json > featured: [{ category, img }])
+  function featuredHtml() {
+    var list = (CFG.featured || []).map(function (f) {
+      var c = DATA.cats.filter(function (x) { return x.f === fold(f.category); })[0];
+      return c && f.img ? { c: c, img: f.img, title: f.title || c.n } : null;
+    }).filter(Boolean);
+    if (!list.length) return '';
+    return '<div class="h">Öne çıkan kategoriler</div><div class="feat">' + list.map(function (x) {
+      return '<a class="ft" data-kind="featured" data-name="' + esc(x.c.n) + '" href="' + esc(url(x.c.s)) + '">' +
+        '<span class="fi"><img loading="lazy" alt="' + esc(x.title) + '" src="' + esc(x.img) + '"></span>' +
+        '<span class="fn"><b>' + esc(x.title) + '</b><small>' + x.c.k + ' ürün</small></span></a>';
+    }).join('') + '</div>';
+  }
   // Kampanya kartı (config.json > promo): ilk sipariş kodu ve ücretsiz kargo eşiği
   function promoHtml() {
     var pr = CFG.promo;
@@ -848,7 +875,7 @@
         pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') +
         '</div>';
     }
-    html = promoHtml() + html;
+    html = promoHtml() + featuredHtml() + html;
     var tops = topCats();
     if (tops.length) {
       html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="clist">' + tops.map(catRow).join('') + '</div>';
