@@ -54,6 +54,88 @@
     "kati-solucan-gubresi-20-kg",
     "hasturk-humix-sivi-humik-asit"
   ],
+  "crossSell": [
+    {
+      "when": [
+        "Solucan Gübresi"
+      ],
+      "offer": [
+        "hasturk-humix-sivi-humik-asit",
+        "hasturk-sivi-solucan-gubresi",
+        "hasturk-kati-solucan-gubresi"
+      ]
+    },
+    {
+      "when": [
+        "Bitki Besinleri",
+        "Hümik Asit",
+        "Leonardit",
+        "Biochar",
+        "Yarasa Gübresi"
+      ],
+      "offer": [
+        "hasturk-kati-solucan-gubresi",
+        "hasturk-humix-sivi-humik-asit"
+      ]
+    },
+    {
+      "when": [
+        "Topraklar"
+      ],
+      "offer": [
+        "hasturk-kati-solucan-gubresi",
+        "tarim-perliti",
+        "hasturk-sivi-solucan-gubresi"
+      ]
+    },
+    {
+      "when": [
+        "Dekoratif Saksılar",
+        "Saksı ve Viyoller"
+      ],
+      "offer": [
+        "genel-saksi-topragi-ozel-karisim",
+        "hasturk-sivi-solucan-gubresi"
+      ]
+    },
+    {
+      "when": [
+        "Sebze Yatağı"
+      ],
+      "offer": [
+        "solucan-gubreli-sebze-topragi",
+        "hasturk-kati-solucan-gubresi"
+      ]
+    },
+    {
+      "when": [
+        "Tohumlar"
+      ],
+      "offer": [
+        "hg-fide-topragi",
+        "45-goz-yuvarlak-fide-viyolu",
+        "hasturk-sivi-solucan-gubresi"
+      ]
+    },
+    {
+      "when": [
+        "İlaçlama Pompaları"
+      ],
+      "offer": [
+        "chrysamed-konsantre-ec-hasere-ilaci-50-ml",
+        "chrysamed-unicid-c10-konsantre-hasere-ilaci-1-lt-olcekli"
+      ]
+    },
+    {
+      "when": [
+        "Halk Sağlığı Ürünleri"
+      ],
+      "offer": [
+        "delta-5-lt-basincli-ilaclama-pompasi-k-81",
+        "delta-2-lt-ilaclama-pompasi"
+      ]
+    }
+  ],
   "categoryOrder": [
     "Gübreler",
     "Topraklar",
