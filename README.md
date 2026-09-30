@@ -71,7 +71,7 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 ## config.json
 - `popular`: boş kutuda görünen "çok arananlar"
 - `promo`: Kategoriler sekmesinin üstündeki kampanya kartı — `title`, `code` (dokununca kopyalanır), `note`, `shipping` (ücretsiz kargo metni; sepete ekle penceresinde de görünür)
-- `featured`: "Öne çıkan kategoriler" görselli menüsü — `[{ "category": "Kategori adı", "img": "görsel adresi" }]`. Görseller kırpılmadan gösterilir (masaüstünde 2, telefonda 1 sütun). Dokununca kategorinin ürünleri panelin içinde listelenir (görsel üstte). Yeni kategori için listeye bir satır eklemek yeter.
+- `featured`: "Öne çıkan kategoriler" görselli menüsü — `[{ "category": "Kategori adı", "img": "görsel adresi" }]`. Görseller **1200 × 600 px** hazırlanmalı; sadece Kategoriler sekmesinin ana bölümünde 2:1 çerçevede gösterilir (masaüstünde 2, telefonda 1 sütun). Dokununca kategorinin ürünleri panelde açılır (orada görsel tekrar gösterilmez).
 - `categoryOrder`: ana kategorilerin gösterim sırası (listede olmayanlar sonra, ürün sayısına göre)
 - `categoryLast`: en sona konacak ana kategoriler (örn. kedi/köpek)
 - `categoryImages`: kategori adı → görseli kullanılacak ürünün adresi (slug)
