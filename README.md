@@ -74,6 +74,10 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `featured`: "Öne çıkan kategoriler" görselli menüsü — `[{ "category": "Kategori adı", "img": "görsel adresi" }]`. Görseller **1200 × 600 px** hazırlanmalı; sadece Kategoriler sekmesinin ana bölümünde 2:1 çerçevede gösterilir (masaüstünde 2, telefonda 1 sütun). Dokununca kategorinin ürünleri panelde açılır (orada görsel tekrar gösterilmez).
 - `boost`: Aramada ve kategori listelerinde öne çıkarılacak ürünlerin adres (slug) listesi; en üstteki en önce gelir. Mağaza markası (HasTürk/HG) ürünleri de otomatik öne alınır.
 - `bulkPattern` / `bulkPrice`: Ton bazlı/toptan ürünleri geriye atar. Varsayılan: adında "1 Ton" gibi ifade geçenler veya fiyatı 40.000 TL ve üzeri olanlar.
+- `trust`: Ana bölümdeki güven şeridi — `[{ "icon": "leaf|shield|chat|truck", "title": "...", "text": "..." }]`. Boş liste verilirse gösterilmez.
+- `bestsellers`: Kartlarda "Çok satan" rozeti alacak ürünlerin slug listesi (verilmezse `boost` kullanılır). Mağaza markası ürünler "Üreticiden" rozeti alır.
+- `calc.packs`: Toprak hesabında önerilecek torba boyutları (litre), varsayılan `[5, 10, 20, 40]`. Sonuç %`extra` oturma payı dahil gösterilir ve bu torbalara yuvarlanır.
+- `hideNative`: ikas'ın kendi arama penceresinin CSS seçicisi; verilirse tüm ziyaretçilerde hiç görünmez. Seçiciyi bulmak için telefonda sitenin arama düğmesine bir kez basın, sonra adres çubuğuna `hasturkgubre.com.tr/#ua-debug` yazın; çıkan metni gönderin.
 - `categoryOrder`: ana kategorilerin gösterim sırası (listede olmayanlar sonra, ürün sayısına göre)
 - `categoryLast`: en sona konacak ana kategoriler (örn. kedi/köpek)
 - `categoryImages`: kategori adı → görseli kullanılacak ürünün adresi (slug)

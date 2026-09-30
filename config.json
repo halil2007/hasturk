@@ -83,6 +83,23 @@
     "note": "750 TL ve üzeri siparişlerde geçerli",
     "shipping": "975 TL ve üzeri siparişlerde kargo ücretsiz"
   },
+  "trust": [
+    {
+      "icon": "leaf",
+      "title": "Üreticiden",
+      "text": "Aracısız, taze ürün"
+    },
+    {
+      "icon": "shield",
+      "title": "Güvenli ödeme",
+      "text": "Kart bilgileriniz korunur"
+    },
+    {
+      "icon": "chat",
+      "title": "Uzman desteği",
+      "text": "WhatsApp'tan sorun"
+    }
+  ],
   "phone": "+90 553 727 29 29",
   "whatsapp": "905537272929",
   "pages": [
@@ -126,7 +143,13 @@
         "Torf",
         "Toprak Düzenleyiciler ve Katkı Maddeleri"
       ]
-    }
+    },
+    "packs": [
+      5,
+      10,
+      20,
+      40
+    ]
   },
   "guides": [
     {
