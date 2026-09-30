@@ -341,11 +341,12 @@
     '.center{justify-content:center;flex-wrap:wrap}',
 
     /* Hesaplayıcı banner */
-    '.feat{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 4px}',
-    '@media(min-width:760px){.feat{grid-template-columns:repeat(4,1fr);gap:14px;padding:0 20px 4px}}',
-    '.ft{display:block;min-width:0}',
-    '.ft .fi{display:block;aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 1px 0 var(--ln)}',
-    '.ft .fi img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}',
+    '.feat{display:grid;grid-template-columns:1fr;gap:14px;padding:0 16px 4px}',
+    '@media(min-width:760px){.feat{grid-template-columns:1fr 1fr;gap:16px;padding:0 20px 4px}}',
+    '.ft{display:block;min-width:0;width:100%;text-align:left}',
+    '.ft .fi{display:block;border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 1px 0 var(--ln)}',
+    /* Görsel kırpılmadan, kendi oranıyla */
+    '.ft .fi img{width:100%;height:auto;display:block;transition:transform .35s}',
     '.ft:hover .fi img{transform:scale(1.05)}',
     '.ft .fn{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding:8px 2px 0}',
     '.ft .fn b{font-size:14px;font-weight:700;line-height:1.25;min-width:0}',
@@ -444,10 +445,18 @@
     '.crumb button{display:flex;align-items:center;gap:4px;height:36px;padding:0 12px 0 6px;border-radius:18px;font-size:14px;font-weight:600;color:var(--mu)}',
     '.crumb button:hover{background:var(--bg)}',
     '.crumb svg{width:18px;height:18px}',
-    '.ctitle{padding:6px 16px 12px;font-size:22px;font-weight:800}',
+    '.ctitle{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:6px 16px 12px;font-size:22px;font-weight:800}',
+    '.ctitle small{font-size:13px;font-weight:600;color:var(--mu)}',
+    '.cban{margin:8px 16px 4px;border-radius:18px;overflow:hidden;background:var(--bg)}',
+    '@media(min-width:760px){.cban{margin:8px 20px 4px}}',
+    '.cban img{width:100%;height:auto;display:block}',
+    '.ctools{display:flex;gap:8px;padding:12px 16px 12px;overflow-x:auto;scrollbar-width:none;white-space:nowrap}',
+    '.ctools::-webkit-scrollbar{display:none}',
+    '@media(min-width:760px){.ctools{padding:12px 20px}}',
     '@media(min-width:760px){.ctitle{padding:6px 20px 12px}}',
     '.all-in{display:flex;align-items:center;justify-content:space-between;margin:0 16px 10px;padding:14px 16px;border-radius:16px;background:var(--pr);color:#fff;font-weight:700;font-size:14.5px}',
-    '@media(min-width:760px){.all-in{margin:0 20px 10px}}',
+    '.all-in{width:calc(100% - 32px);text-align:left}',
+    '@media(min-width:760px){.all-in{margin:0 20px 10px;width:calc(100% - 40px)}}',
     '.all-in svg{width:18px;height:18px}',
 
     '.im{flex:none;border-radius:12px;background:var(--bg);overflow:hidden;display:grid;place-items:center;color:#a9c3cc;position:relative}',
@@ -703,7 +712,7 @@
     else if (act === 'back') {
       // Mobil geri: önce iç görünümden çık, en son paneli kapat
       if ($q.value) { $q.value = ''; render(); }
-      else if (view) { view = CATS_BY_ID[view] && CATS_BY_ID[view].p && CATS_BY_ID[CATS_BY_ID[view].p] ? CATS_BY_ID[view].p : null; renderIdle(); }
+      else if (view) { var vc = CATS_BY_ID[inCatp() ? view.slice(2) : view]; view = vc && vc.p && CATS_BY_ID[vc.p] ? vc.p : null; renderIdle(); }
       else if (tab !== 'home') setTab('home');
       else close();
     }
@@ -712,8 +721,15 @@
     else if (act === 'del') { e.stopPropagation(); var f = fold(v); setRecent(getRecent().filter(function (x) { return fold(x) !== f; })); renderIdle(); }
     else if (act === 'delall') { setRecent([]); renderIdle(); }
     else if (act === 'cat') { view = v || null; renderIdle(); $body.scrollTop = 0; }
-    else if (act === 'stock') { onlyStock = !onlyStock; shown = PAGE; render(); }
-    else if (act === 'sort') { sortMode = v; shown = PAGE; render(); }
+    else if (act === 'stock') { onlyStock = !onlyStock; shown = PAGE; CSHOWN = 12; render(); if (inCatp()) renderIdle(); }
+    else if (act === 'sort') { sortMode = v; shown = PAGE; CSHOWN = 12; render(); if (inCatp()) renderIdle(); }
+    else if (act === 'cmore') { CSHOWN += 12; renderIdle(); }
+    else if (act === 'catp') {
+      view = 'p:' + v; CSHOWN = 12;
+      if ($q.value) { $q.value = ''; render(); }
+      track('category', CATS_BY_ID[v] ? CATS_BY_ID[v].n : v);
+      setTab('home'); renderIdle(); $body.scrollTop = 0;
+    }
     else if (act === 'more') { shown += PAGE; render(); }
     else if (act === 'copy') copyText(v);
     else if (act === 'tab') { if ($q.value) { $q.value = ''; render(); } view = null; renderIdle(); setTab(v); }
@@ -730,6 +746,7 @@
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
   }
 
+  function inCatp() { return view && view.indexOf('p:') === 0; }
   function tabOk(t) {
     if (t === 'calc') return calcEnabled();
     if (t === 'pages') return (CFG.pages || []).length > 0;
@@ -815,7 +832,7 @@
     var inner = thumb(c.img, 180) + '<span class="n">' + esc(c.n) + '<small>' + c.k + ' ürün</small></span>' + I.right;
     return KIDS[c.id]
       ? '<button class="li" type="button" data-act="cat" data-v="' + esc(c.id) + '">' + inner + '</button>'
-      : '<a class="li" data-kind="category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '">' + inner + '</a>';
+      : '<button class="li" type="button" data-act="catp" data-v="' + esc(c.id) + '">' + inner + '</button>';
   }
   function pageRows() {
     return (CFG.pages || []).map(function (pg) {
@@ -832,9 +849,9 @@
     }).filter(Boolean);
     if (!list.length) return '';
     return '<div class="h">Öne çıkan kategoriler</div><div class="feat">' + list.map(function (x) {
-      return '<a class="ft" data-kind="featured" data-name="' + esc(x.c.n) + '" href="' + esc(url(x.c.s)) + '">' +
+      return '<button class="ft" type="button" data-act="catp" data-v="' + esc(x.c.id) + '">' +
         '<span class="fi"><img loading="lazy" alt="' + esc(x.title) + '" src="' + esc(x.img) + '"></span>' +
-        '<span class="fn"><b>' + esc(x.title) + '</b><small>' + x.c.k + ' ürün</small></span></a>';
+        '<span class="fn"><b>' + esc(x.title) + '</b><small>' + x.c.k + ' ürün</small></span></button>';
     }).join('') + '</div>';
   }
   // Kampanya kartı (config.json > promo): ilk sipariş kodu ve ücretsiz kargo eşiği
@@ -863,6 +880,7 @@
     if (!$home) return;
     $pages.innerHTML = '<div class="h">Sayfalar</div><div class="list">' + pageRows() + '</div>';
     if (!DATA) { $home.innerHTML = '<div class="spin"></div>'; return; }
+    if (view && view.indexOf('p:') === 0 && CATS_BY_ID[view.slice(2)]) { $home.innerHTML = renderCatProducts(CATS_BY_ID[view.slice(2)]); return; }
     if (view && CATS_BY_ID[view]) { $home.innerHTML = renderCat(CATS_BY_ID[view]); return; }
     view = null;
     var html = '';
@@ -888,8 +906,47 @@
     return '<div class="crumb"><button type="button" data-act="cat" data-v="' + (parent ? esc(parent.id) : '') + '">' + I.back +
       esc(parent ? parent.n : 'Tüm kategoriler') + '</button></div>' +
       '<div class="ctitle">' + esc(c.n) + '</div>' +
-      '<a class="all-in" data-kind="category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '"><span>Tüm ' + esc(c.n) + ' (' + c.k + ')</span>' + I.arrow + '</a>' +
+      '<button class="all-in" type="button" data-act="catp" data-v="' + esc(c.id) + '"><span>Tüm ' + esc(c.n) + ' (' + c.k + ')</span>' + I.arrow + '</button>' +
       '<div class="clist">' + (KIDS[c.id] || []).slice().sort(function (a, b) { return b.k - a.k; }).map(catRow).join('') + '</div>';
+  }
+
+  // Kategori ürünleri panelin içinde (ikas'a gitmeden): kapak görseli, alt kategoriler, filtre ve ürün kartları
+  var CSHOWN = 12;
+  function catIds(id) { return [id].concat((KIDS[id] || []).reduce(function (a, k) { return a.concat(catIds(k.id)); }, [])); }
+  function renderCatProducts(c) {
+    var parent = c.p && CATS_BY_ID[c.p], set = {};
+    catIds(c.id).forEach(function (x) { set[x] = 1; });
+    var items = DATA.items.filter(function (p) { return p.c.some(function (x) { return set[x]; }); });
+    if (onlyStock) items = items.filter(function (p) { return p.st; });
+    items = items.map(function (p, i) { return { p: p, h: [], i: i }; });
+    items.sort(sortMode === 'rel'
+      ? function (a, b) { return (b.p.st ? 1 : 0) - (a.p.st ? 1 : 0) || a.i - b.i; }
+      : function (a, b) {
+        var pa = price(a.p), pb = price(b.p);
+        if (pa == null) return 1;
+        if (pb == null) return -1;
+        return sortMode === 'asc' ? pa - pb : pb - pa;
+      });
+    var feat = (CFG.featured || []).filter(function (f) { return fold(f.category) === c.f && f.img; })[0];
+    var html = '<div class="crumb"><button type="button" data-act="cat" data-v="' + (parent && KIDS[parent.id] ? esc(parent.id) : '') + '">' + I.back +
+      esc(parent ? parent.n : 'Tüm kategoriler') + '</button></div>' +
+      (feat ? '<div class="cban"><img alt="' + esc(c.n) + '" src="' + esc(feat.img) + '"></div>' : '') +
+      '<div class="ctitle">' + esc(c.n) + '<small>' + items.length + ' ürün</small></div>';
+    var kids = (KIDS[c.id] || []).slice().sort(function (a, b) { return b.k - a.k; });
+    if (kids.length) {
+      html += '<div class="cats" style="padding-top:0">' + kids.map(function (k) {
+        return '<button class="cc" type="button" data-act="catp" data-v="' + esc(k.id) + '">' + esc(k.n) + ' <small>' + k.k + '</small></button>';
+      }).join('') + '</div>';
+    }
+    html += '<div class="ctools">' +
+      '<button class="opt' + (onlyStock ? ' on' : '') + '" type="button" data-act="stock"><i></i>Stoktakiler</button>' +
+      [['rel', 'Önerilen'], ['asc', 'En ucuz'], ['desc', 'En pahalı']].map(function (o) {
+        return '<button class="opt' + (sortMode === o[0] ? ' on' : '') + '" type="button" data-act="sort" data-v="' + o[0] + '">' + o[1] + '</button>';
+      }).join('') + '</div>';
+    if (!items.length) return html + '<div class="empty"><b>Stokta ürün yok</b><p>Filtreyi kaldırıp tükenen ürünleri de görebilirsiniz.</p></div>';
+    html += '<div class="grid">' + items.slice(0, CSHOWN).map(card).join('') + '</div>';
+    if (items.length > CSHOWN) html += '<button class="more" type="button" data-act="cmore">Daha fazla göster (' + (items.length - CSHOWN) + ')</button>';
+    return html;
   }
 
   // ---- Sonuçlar ----
@@ -988,7 +1045,7 @@
 
     if (r.cats.length) {
       html += '<div class="cats">' + r.cats.slice(0, 6).map(function (c) {
-        return '<a class="cc" data-kind="category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '">' + esc(c.n) + ' <small>' + c.k + '</small></a>';
+        return '<button class="cc" type="button" data-act="catp" data-v="' + esc(c.id) + '">' + esc(c.n) + ' <small>' + c.k + '</small></button>';
       }).join('') + '</div>';
     }
     if (items.length) {
@@ -1592,8 +1649,8 @@
       if (cats.length) {
         html += '<p class="go">Şimdi uygun toprağı seç<small>Ürün sayfasında toplam ' + fmtL(rec) + ' edecek litre seçeneklerini seçebilirsin.</small></p>' +
           '<div class="gocats">' + cats.map(function (c, i) {
-            return '<a class="gc' + (i === 0 ? ' first' : '') + '" data-kind="calc_category" data-name="' + esc(c.n) + '" href="' + esc(url(c.s)) + '">' +
-              thumb(c.img, 180) + '<div class="tx"><b>' + esc(c.n) + '</b><small>' + c.k + ' ürün</small></div>' + I.arrow + '</a>';
+            return '<button type="button" data-act="catp" data-v="' + esc(c.id) + '" class="gc' + (i === 0 ? ' first' : '') + '">' +
+              thumb(c.img, 180) + '<div class="tx"><b>' + esc(c.n) + '</b><small>' + c.k + ' ürün</small></div>' + I.arrow + '</button>';
           }).join('') + '</div>';
       }
     }
