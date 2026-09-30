@@ -57,8 +57,8 @@
     return Number(n).toLocaleString('tr-TR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' TL';
   }
   // Sepet tutarı (ücretsiz kargo çubuğu için): sitenin sepet/GraphQL yanıtlarındaki ikas sepet nesnesinden okunur
-  var CART = null, CART_ID = null, CART_KEY = 'ua-cart';
-  try { var cs0 = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null'); if (cs0 && Date.now() - cs0.t < 6 * 3600e3) { CART = cs0.v; CART_ID = cs0.id || null; } } catch (e) {}
+  var CART = null, CART_N = null, CART_ID = null, CART_KEY = 'ua-cart';
+  try { var cs0 = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null'); if (cs0 && Date.now() - cs0.t < 6 * 3600e3) { CART = cs0.v; CART_N = cs0.n != null ? cs0.n : null; CART_ID = cs0.id || null; } } catch (e) {}
   function findCart(o, d) {
     if (!o || typeof o !== 'object' || d > 7) return null;
     if (Array.isArray(o.orderLineItems) && (o.totalFinalPrice != null || o.totalPrice != null)) return o;
@@ -71,8 +71,9 @@
     var v = c.orderLineItems.length ? +(c.totalFinalPrice != null ? c.totalFinalPrice : c.totalPrice) : 0;
     if (isNaN(v)) return;
     CART = v;
+    CART_N = c.orderLineItems.reduce(function (a, it) { return a + (+(it && it.quantity) || 1); }, 0);
     if (c.id) CART_ID = c.id;
-    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, t: Date.now(), id: CART_ID })); } catch (e) {}
+    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, n: CART_N, t: Date.now(), id: CART_ID })); } catch (e) {}
     updateShip();
   }
   var CART_URL = /graphql|cart|sepet/i;
@@ -326,6 +327,11 @@
     ' border-radius:24px;box-shadow:0 30px 90px rgba(5,25,35,.35);animation:none}}',
 
     '.top{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px}',
+    '.cbtn{position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none;background:var(--soft);color:var(--prd)}',
+    '.cbtn svg{width:21px;height:21px}.cbtn:hover{background:#d6eaf0}',
+    '.cn{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--ac);color:#fff;font-size:11px;font-weight:800;line-height:19px;text-align:center;box-shadow:0 0 0 2px #fff;display:none}',
+    '.cn.on{display:block;animation:cnpop .35s cubic-bezier(.3,1.6,.5,1)}',
+    '@keyframes cnpop{from{transform:scale(.3)}}',
     '.back,.xbtn{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none}',
     '.back{background:var(--bg)}.back svg{width:22px;height:22px}',
     '.back{display:none;background:var(--bg)}.panel.sub .back{display:grid}.xbtn{display:grid;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
@@ -764,6 +770,7 @@
       '<label class="field">' + I.search +
       '<input type="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Ara">' +
       '<button class="clr" type="button" data-act="clear" aria-label="Temizle">' + I.x + '</button></label>' +
+      '<a class="cbtn" data-kind="page" data-name="Sepet" aria-label="Sepetim">' + I.cart + '<b class="cn"></b></a>' +
       '<button class="xbtn" type="button" data-act="close" aria-label="Kapat">' + I.x + '</button></div>' +
       '<div class="mid"><div class="help" hidden></div>' +
       '<div class="main"><div class="tools"></div>' +
@@ -791,6 +798,7 @@
     $body = root.querySelector('.body');
     $cta = root.querySelector('.cta');
     $mfoot = root.querySelector('.mfoot');
+    updateShip();
     $sheet = root.querySelector('.sheet');
     $toast = root.querySelector('.toast');
     $q.placeholder = 'Ürün veya kategori ara';
@@ -1019,6 +1027,15 @@
   }
   function updateShip() {
     if (!root) return;
+    var cb = root.querySelector('.cbtn');
+    if (cb) cb.setAttribute('href', pageHref(CFG.cartUrl || '/cart'));
+    var cn = root.querySelector('.cn');
+    if (cn) {
+      var had = cn.textContent, txt = CART_N > 99 ? '99+' : CART_N > 0 ? String(CART_N) : '';
+      cn.textContent = txt;
+      cn.classList.toggle('on', !!txt);
+      if (txt && had && had !== txt) { cn.classList.remove('on'); void cn.offsetWidth; cn.classList.add('on'); }
+    }
     [].forEach.call(root.querySelectorAll('.pmship'), function (el) { el.innerHTML = shipText(true); });
     var bar = root.querySelector('.shipbar'), lim = shipLimit();
     if (!bar) return;
