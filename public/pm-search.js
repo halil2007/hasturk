@@ -1475,10 +1475,17 @@
     if (SOIL) return SOIL;
     var sm = CFG.soilMatch || {}, bySlug = {}, soils = {}, groups = {};
     DATA.items.forEach(function (x) { bySlug[x.s] = x; });
+    // Toprak: "pH drenaj su besin yapı|grup|bayraklar" (g=genel, o=sadece kendi bitkisi, v=tariften doğrulandı)
     var parse = function (str) {
       var a = String(str || '').split('|'), pr = a[0] || '';
       if (!/^[1-4][1-3][1-3][1-3][khd]$/.test(pr)) return null;
-      return { ph: +pr[0], dr: +pr[1], su: +pr[2], bs: +pr[3], yp: pr[4], grp: fold(a[1] || ''), gen: /g/.test(a[2] || ''), only: /o/.test(a[2] || '') };
+      return { ph: +pr[0], dr: +pr[1], su: +pr[2], bs: +pr[3], yp: pr[4], grp: fold(a[1] || ''), gen: /g/.test(a[2] || ''), only: /o/.test(a[2] || ''), v: /v/.test(a[2] || '') };
+    };
+    // Bitki: "pHmin pHmax drenaj su besin yapı"
+    var parseP = function (pr) {
+      pr = String(pr || '');
+      if (!/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(pr)) return null;
+      return { ph: +pr[0], ph2: +pr[1], dr: +pr[2], su: +pr[3], bs: +pr[4], yp: pr[5] };
     };
     Object.keys(sm.soils || {}).forEach(function (sl) { var pf = parse(sm.soils[sl]); if (pf && bySlug[sl]) soils[sl] = pf; });
     (sm.plants || []).forEach(function (pl) { groups[fold(pl[2] || '')] = 1; });
@@ -1491,10 +1498,10 @@
         if (m) v[m[1]] = m[2].trim(); else if (/^genel( amacli)?$/.test(fold(t))) v.gen = 1;
       });
       var ph = TAGV.ph[v.ph], dr = TAGV.drenaj[v.drenaj], su = TAGV.su[v.su], bs = TAGV.besin[v.besin], yp = TAGV.yapi[v.yapi];
-      if (ph && dr && su && bs && yp) soils[x.s] = { ph: ph, dr: dr, su: su, bs: bs, yp: yp, grp: fold(v.grup || ''), gen: !!v.gen, only: false };
+      if (ph && dr && su && bs && yp) soils[x.s] = { ph: ph, dr: dr, su: su, bs: bs, yp: yp, grp: fold(v.grup || ''), gen: !!v.gen, only: false, v: true };
     });
     var plants = (sm.plants || []).map(function (pl) {
-      var pf = parse(pl[3]);
+      var pf = parseP(pl[3]);
       if (!pf) return null;
       var names = [pl[0]].concat(String(pl[1] || '').split(',')).map(function (n) { return fold(n).trim(); }).filter(function (n) { return n.length >= 3; });
       return { n: pl[0], names: names, grp: fold(pl[2] || ''), pf: pf, special: pl[4] || '', strict: pl[5] === 's',
@@ -1528,7 +1535,8 @@
   }
   function soilScore(pl, pf) {
     var w = soilData().w, a = pl.pf;
-    var d = w[0] * Math.abs(a.ph - pf.ph) + w[1] * Math.abs(a.dr - pf.dr) + w[2] * Math.abs(a.su - pf.su) + w[3] * Math.abs(a.bs - pf.bs) + w[4] * (a.yp === pf.yp ? 0 : 1);
+    // Toprağın pH'ı bitkinin aralığı içindeyse fark yok
+    var d = w[0] * Math.max(0, a.ph - pf.ph, pf.ph - a.ph2) + w[1] * Math.abs(a.dr - pf.dr) + w[2] * Math.abs(a.su - pf.su) + w[3] * Math.abs(a.bs - pf.bs) + w[4] * (a.yp === pf.yp ? 0 : 1);
     return Math.max(0, 1 - d / w[5]);
   }
   // Öneri: özel toprak (ayarlardaki, yoksa adından bulunan) → yoksa profili en yakın toprak + eksik özellik için katkı
@@ -1543,7 +1551,8 @@
     var best = null, bs = -1;
     Object.keys(S.soils).forEach(function (sl) {
       var pf = S.soils[sl], x = S.bySlug[sl];
-      if (!x || !x.st || pf.only || !(pf.gen || (pf.grp && pf.grp === pl.grp))) return;
+      // Sadece tarifi doğrulanmış (ya da ikas'ta etiketlenmiş) topraklar benzerlik önerisine girer
+      if (!x || !x.st || pf.only || !pf.v || !(pf.gen || (pf.grp && pf.grp === pl.grp))) return;
       var sc = soilScore(pl, pf) + (pf.grp === pl.grp ? 0.002 : 0) + (pf.gen ? 0.001 : 0);
       if (sc > bs) { bs = sc; best = x; }
     });
@@ -1556,13 +1565,14 @@
     var S = soilData(), a = pl.pf, out = [];
     var push = function (key, why) { var x = S.bySlug[S.add[key]]; if (x && x.st) out.push({ p: x, why: why }); };
     if (a.dr > pf.dr) push('drenaj', 'daha iyi süzülmesi için');
-    if (a.ph < pf.ph) push('ph', 'pH\'ı düşürmek için');
+    if (a.ph2 < pf.ph) push('ph', 'pH\'ı düşürmek için');
     if (a.su > pf.su) push('su', 'nemi daha iyi tutması için');
     if (a.bs > pf.bs) push('besin', 'besin desteği için');
     return out.slice(0, 2);
   }
   function plantDesc(pf) {
-    return [{ 1: 'asidik', 2: 'hafif asidik', 3: 'nötr', 4: 'kireçli' }[pf.ph], { 2: 'iyi süzen', 3: 'çok iyi süzen' }[pf.dr],
+    var PH = { 1: 'asidik', 2: 'hafif asidik', 3: 'nötr', 4: 'kireçli' };
+    return [pf.ph2 && pf.ph2 !== pf.ph ? PH[pf.ph] + '–' + PH[pf.ph2] : PH[pf.ph], { 2: 'iyi süzen', 3: 'çok iyi süzen' }[pf.dr],
       { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[pf.su], { 1: 'besini az', 3: 'besince zengin' }[pf.bs],
       { k: 'kumlu', h: 'havalı' }[pf.yp]].filter(Boolean).join(', ');
   }

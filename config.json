@@ -1717,7 +1717,7 @@
     ]
   },
   "soilMatch": {
-    "_help": "Profil: pH(1-4) drenaj(1-3) su(1-3) besin(1-3) yapı(k/h/d) | grup | g=genel amaçlı o=sadece kendi bitkisi. Bitki 6. alan 's' = özel toprağı yoksa başka toprak önerme. Kaynak: docs/bitki-toprak-eslestirme.xlsx",
+    "_help": "Toprak: pH(1-4) drenaj(1-3) su(1-3) besin(1-3) yapı(k/h/d) | grup | g=genel o=sadece kendi bitkisi v=tariften doğrulandı (benzerlik önerisinde sadece v kullanılır). Bitki: pH en az, pH en çok, drenaj, su, besin, yapı; 6. alan 's' = özel toprağı yoksa başka toprak önerme. Kaynak: docs/bitki-toprak-eslestirme.xlsx",
     "weights": [
       3,
       2,
@@ -1735,52 +1735,52 @@
       "besin": "hasturk-kati-solucan-gubresi"
     },
     "soils": {
-      "hg-monstera-deve-tabani-topragi": "2322h|Salon|",
-      "hg-salon-sarmasigi-topragi": "2222h|Salon|",
-      "pasa-kilici-sansevieria-topragi": "3311k|Salon|",
-      "kaucuk-agaci-topragi": "2222d|Salon|",
-      "hg-benjamin-saksi-topragi": "2222d|Salon|",
-      "hg-difenbahya-saksi-topragi": "2222h|Salon|",
-      "baris-cicegi-spathiphyllum-topragi": "2232h|Salon|",
+      "hg-monstera-deve-tabani-topragi": "2122d|Salon|v",
+      "hg-salon-sarmasigi-topragi": "2222h|Salon|v",
+      "pasa-kilici-sansevieria-topragi": "2311h|Salon|v",
+      "kaucuk-agaci-topragi": "2222h|Salon|v",
+      "hg-benjamin-saksi-topragi": "2321h|Salon|v",
+      "hg-difenbahya-saksi-topragi": "2232h|Salon|v",
+      "baris-cicegi-spathiphyllum-topragi": "2132d|Salon|v",
       "hg-antoryum-cicegi-topragi": "2322h|Salon|",
-      "hg-dua-cicegi-saksi-topragi": "2232h|Salon|",
-      "hg-fil-kulagi-topragi": "2233h|Salon|",
-      "areka-palmiyesi-topragi": "2222h|Salon|",
-      "hg-seflera-schefflera-topragi": "2222d|Salon|",
-      "hg-cin-para-cicegi-pilea-saksi-topragi": "2222h|Salon|",
-      "yuka-yucca-topragi-ozel-karisim": "3311k|Salon|",
-      "hg-aloe-vera-topragi": "3311k|Sukulent|",
-      "kaktus-ve-sukulent-topragi": "3311k|Sukulent|g",
+      "hg-dua-cicegi-saksi-topragi": "2232h|Salon|v",
+      "hg-fil-kulagi-topragi": "2232h|Salon|v",
+      "areka-palmiyesi-topragi": "2132d|Salon|v",
+      "hg-seflera-schefflera-topragi": "2222d|Salon|v",
+      "hg-cin-para-cicegi-pilea-saksi-topragi": "2232h|Salon|v",
+      "yuka-yucca-topragi-ozel-karisim": "2221h|Salon|v",
+      "hg-aloe-vera-topragi": "2311k|Sukulent|v",
+      "kaktus-ve-sukulent-topragi": "2313k|Sukulent|gv",
       "gartengold-orkide-topragi": "2311h|Salon|",
-      "hg-menekse-topragi": "2222h|Salon|",
-      "hg-begonvil-topragi": "2312k|Çiçek|",
-      "sardunya-pelargonium-cicegi-topragi": "3312k|Çiçek|",
-      "hg-starlice-cennet-kusu-topragi": "2223d|Salon|",
-      "hg-bonsai-saksi-topragi": "2311k|Salon|",
-      "hg-para-agaci-saksi-topragi": "2312k|Salon|",
-      "salon-bitkilerine-ozel-toprak-karisimi": "2222d|Salon|g",
-      "hg-cicek-topragi": "2223d|Çiçek|g",
+      "hg-menekse-topragi": "2122d|Salon|v",
+      "hg-begonvil-topragi": "2222d|Çiçek|v",
+      "sardunya-pelargonium-cicegi-topragi": "2222d|Çiçek|v",
+      "hg-starlice-cennet-kusu-topragi": "2222d|Salon|v",
+      "hg-bonsai-saksi-topragi": "3312k|Salon|v",
+      "hg-para-agaci-saksi-topragi": "2222h|Salon|v",
+      "salon-bitkilerine-ozel-toprak-karisimi": "2231h|Salon|gv",
+      "hg-cicek-topragi": "2223d|Çiçek|gv",
       "hg-gul-topragi-gullere-ozel-toprak-karisimi": "2223d|Çiçek|",
-      "ortanca-bogurtlen-acelya-topragi": "1222d|Asit seven|g",
-      "yaban-mersini-ve-ortanca-topragi": "1222d|Asit seven|",
-      "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi": "1222d|Asit seven|",
-      "limon-agaci-topragi-ozel-organik-karisim": "2323d|Meyve|",
-      "hg-narenciye-topragi": "2323d|Meyve|",
-      "hg-kumkuat-kamkat-topragi-ozel-karisim": "2323d|Meyve|",
-      "hg-avokado-topragi-ozel-karisim": "2322h|Meyve|",
-      "trabzon-hurmasi-cennet-hurmasi-topragi": "3222d|Meyve|",
-      "hg-cilek-topragi": "2223d|Meyve|",
-      "solucan-gubreli-sebze-topragi": "3223d|Sebze|g",
-      "hg-bol-verimli-sebze-topragi": "3223d|Sebze|g",
-      "hg-aromatik-bitkiler-icin-saksi-topragi": "3312k|Aromatik|",
-      "hg-fide-topragi": "2221d|Sebze|",
-      "hg-premium-fide-topragi": "2221d|Sebze|",
-      "fide-sasirtma-topragi": "2222d|Sebze|",
-      "lotus-nilufer-cicegi-topragi": "3133d||o",
+      "ortanca-bogurtlen-acelya-topragi": "1131h|Asit seven|gv",
+      "yaban-mersini-ve-ortanca-topragi": "1133d|Asit seven|v",
+      "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi": "1222d|Asit seven|v",
+      "limon-agaci-topragi-ozel-organik-karisim": "2223d|Meyve|v",
+      "hg-narenciye-topragi": "2223d|Meyve|v",
+      "hg-kumkuat-kamkat-topragi-ozel-karisim": "2222h|Meyve|v",
+      "hg-avokado-topragi-ozel-karisim": "2221h|Meyve|v",
+      "trabzon-hurmasi-cennet-hurmasi-topragi": "2212k|Meyve|v",
+      "hg-cilek-topragi": "2223d|Meyve|v",
+      "solucan-gubreli-sebze-topragi": "2223d|Sebze|gv",
+      "hg-bol-verimli-sebze-topragi": "2223d|Sebze|gv",
+      "hg-aromatik-bitkiler-icin-saksi-topragi": "2222h|Aromatik|v",
+      "hg-fide-topragi": "2223d|Sebze|v",
+      "hg-premium-fide-topragi": "2223d|Sebze|v",
+      "fide-sasirtma-topragi": "2222d|Sebze|v",
+      "lotus-nilufer-cicegi-topragi": "2131d||ov",
       "cim-kapama-topragi-leonarditli-formul": "3222d||o",
-      "genel-saksi-topragi-ozel-karisim": "2223d||g",
-      "akilli-toprak-organik-bitki-topragi": "2223d||g",
-      "organik-toprak": "3223d||g",
+      "genel-saksi-topragi-ozel-karisim": "2223h||gv",
+      "akilli-toprak-organik-bitki-topragi": "2221h||gv",
+      "organik-toprak": "2123d||gv",
       "dogal-orman-topragi-humuslu": "2133d||g",
       "bitki-topragi-ozel-karisim-20-lt": "2122d||g",
       "klasmann-potgrond-h-70-litre-ithal-fide-torfu": "2232d||g",
@@ -1791,225 +1791,225 @@
         "Monstera",
         "deve tabanı",
         "Salon",
-        "2322h",
+        "23322h",
         "hg-monstera-deve-tabani-topragi"
       ],
       [
         "Philodendron",
         "filodendron",
         "Salon",
-        "2322h",
+        "22322h",
         ""
       ],
       [
         "Salon sarmaşığı",
         "pothos, potos, epipremnum",
         "Salon",
-        "2222h",
+        "23222h",
         "hg-salon-sarmasigi-topragi"
       ],
       [
         "Zamioculcas",
         "zz bitkisi, zamia",
         "Salon",
-        "3311k",
+        "23311h",
         ""
       ],
       [
         "Paşa kılıcı",
         "sansevieria, kaynana dili",
         "Salon",
-        "3311k",
+        "23311k",
         "pasa-kilici-sansevieria-topragi"
       ],
       [
         "Kauçuk",
         "kauçuk ağacı, ficus elastica",
         "Salon",
-        "2222d",
+        "23222d",
         "kaucuk-agaci-topragi"
       ],
       [
         "Benjamin",
         "ficus benjamina",
         "Salon",
-        "2222d",
+        "23222d",
         "hg-benjamin-saksi-topragi"
       ],
       [
         "Keman yapraklı incir",
         "ficus lyrata",
         "Salon",
-        "2222d",
+        "23222d",
         ""
       ],
       [
         "Difenbahya",
         "dieffenbachia",
         "Salon",
-        "2222h",
+        "22222h",
         "hg-difenbahya-saksi-topragi"
       ],
       [
         "Barış çiçeği",
         "spathiphyllum, spatifilyum",
         "Salon",
-        "2232h",
+        "22232h",
         "baris-cicegi-spathiphyllum-topragi"
       ],
       [
         "Antoryum",
         "anthurium",
         "Salon",
-        "2322h",
+        "22322h",
         "hg-antoryum-cicegi-topragi"
       ],
       [
         "Dua çiçeği",
         "maranta",
         "Salon",
-        "2232h",
+        "22232h",
         "hg-dua-cicegi-saksi-topragi"
       ],
       [
         "Calathea",
         "kalatea",
         "Salon",
-        "2232h",
+        "22232h",
         ""
       ],
       [
         "Fil kulağı",
         "alocasia, alokazya",
         "Salon",
-        "2233h",
+        "22233h",
         "hg-fil-kulagi-topragi"
       ],
       [
         "Areka palmiyesi",
         "areka, dypsis",
         "Salon",
-        "2222h",
+        "22222h",
         "areka-palmiyesi-topragi"
       ],
       [
         "Kentia palmiyesi",
         "kentia, howea",
         "Salon",
-        "2222h",
+        "23222h",
         ""
       ],
       [
         "Şeflera",
         "schefflera",
         "Salon",
-        "2222d",
+        "23222d",
         "hg-seflera-schefflera-topragi"
       ],
       [
         "Pilea",
         "çin para çiçeği",
         "Salon",
-        "2222h",
+        "23222h",
         "hg-cin-para-cicegi-pilea-saksi-topragi"
       ],
       [
         "Dracaena",
         "ejderha ağacı, drasena",
         "Salon",
-        "2222d",
+        "22222d",
         ""
       ],
       [
         "Aglaonema",
         "çin her dem yeşili",
         "Salon",
-        "2222h",
+        "22222h",
         ""
       ],
       [
         "Kurdele çiçeği",
         "chlorophytum, örümcek bitkisi",
         "Salon",
-        "2222d",
+        "23222d",
         ""
       ],
       [
         "Eğrelti otu",
         "fern, nephrolepis",
         "Salon",
-        "2232h",
+        "22232h",
         ""
       ],
       [
         "Guzmanya",
         "bromelya, guzmania",
         "Salon",
-        "2311h",
-        "",
+        "12311h",
+        "gartengold-orkide-topragi",
         "s"
       ],
       [
         "Begonya",
         "begonia",
         "Salon",
-        "2222h",
+        "22222h",
         ""
       ],
       [
         "Atatürk çiçeği",
         "poinsettia, ponsetya",
         "Salon",
-        "2222d",
+        "22222d",
         ""
       ],
       [
         "Yuka",
         "yucca",
         "Salon",
-        "3311k",
+        "23311k",
         "yuka-yucca-topragi-ozel-karisim"
       ],
       [
         "Aloe vera",
         "aloe, sarısabır",
         "Sukulent",
-        "3311k",
+        "23311k",
         "hg-aloe-vera-topragi"
       ],
       [
         "Kaktüs",
         "cactus",
         "Sukulent",
-        "3311k",
+        "23311k",
         "kaktus-ve-sukulent-topragi"
       ],
       [
         "Sukulent",
         "succulent, etli yapraklı",
         "Sukulent",
-        "3311k",
+        "23311k",
         "kaktus-ve-sukulent-topragi"
       ],
       [
         "Yeşim",
         "crassula, yeşim ağacı",
         "Sukulent",
-        "3311k",
+        "23311k",
         ""
       ],
       [
         "Kalanşo",
         "kalanchoe",
         "Sukulent",
-        "3311k",
+        "23311k",
         ""
       ],
       [
         "Orkide",
         "orchid, phalaenopsis",
         "Salon",
-        "2311h",
+        "22311h",
         "gartengold-orkide-topragi",
         "s"
       ],
@@ -2017,35 +2017,35 @@
         "Afrika menekşesi",
         "menekşe, saintpaulia",
         "Salon",
-        "2222h",
+        "22222h",
         "hg-menekse-topragi"
       ],
       [
         "Begonvil",
         "bougainvillea",
         "Çiçek",
-        "2312k",
+        "22312k",
         "hg-begonvil-topragi"
       ],
       [
         "Sardunya",
         "pelargonium, itır",
         "Çiçek",
-        "3312k",
+        "23312k",
         "sardunya-pelargonium-cicegi-topragi"
       ],
       [
         "Starliçe",
         "cennet kuşu, strelitzia",
         "Salon",
-        "2223d",
+        "23223d",
         "hg-starlice-cennet-kusu-topragi"
       ],
       [
         "Bonsai",
         "",
         "Salon",
-        "2311k",
+        "23311k",
         "hg-bonsai-saksi-topragi",
         "s"
       ],
@@ -2053,21 +2053,21 @@
         "Para ağacı",
         "pachira",
         "Salon",
-        "2312k",
+        "23312k",
         "hg-para-agaci-saksi-topragi"
       ],
       [
         "Gül",
         "rose",
         "Çiçek",
-        "2223d",
+        "22223d",
         "hg-gul-topragi-gullere-ozel-toprak-karisimi"
       ],
       [
         "Ortanca",
         "hortensia, hydrangea",
         "Asit seven",
-        "1222d",
+        "12222d",
         "yaban-mersini-ve-ortanca-topragi",
         "s"
       ],
@@ -2075,7 +2075,7 @@
         "Açelya",
         "azalea, azelya",
         "Asit seven",
-        "1222d",
+        "11222d",
         "ortanca-bogurtlen-acelya-topragi",
         "s"
       ],
@@ -2083,7 +2083,7 @@
         "Kamelya",
         "camellia",
         "Asit seven",
-        "1222d",
+        "12222d",
         "",
         "s"
       ],
@@ -2091,7 +2091,7 @@
         "Gardenya",
         "gardenia",
         "Asit seven",
-        "1222d",
+        "12222d",
         "",
         "s"
       ],
@@ -2099,105 +2099,105 @@
         "Lavanta",
         "lavender",
         "Aromatik",
-        "4311k",
-        "hg-aromatik-bitkiler-icin-saksi-topragi"
+        "34311k",
+        ""
       ],
       [
         "Biberiye",
         "rosemary",
         "Aromatik",
-        "3311k",
-        "hg-aromatik-bitkiler-icin-saksi-topragi"
+        "33311k",
+        ""
       ],
       [
         "Fesleğen",
         "reyhan, basil",
         "Aromatik",
-        "3222d",
+        "23222d",
         "hg-aromatik-bitkiler-icin-saksi-topragi"
       ],
       [
         "Nane",
         "mint",
         "Aromatik",
-        "3232d",
+        "23232d",
         "hg-aromatik-bitkiler-icin-saksi-topragi"
       ],
       [
         "Kekik",
         "thyme",
         "Aromatik",
-        "3311k",
-        "hg-aromatik-bitkiler-icin-saksi-topragi"
+        "34311k",
+        ""
       ],
       [
         "Adaçayı",
         "sage",
         "Aromatik",
-        "3311k",
-        "hg-aromatik-bitkiler-icin-saksi-topragi"
+        "33311k",
+        ""
       ],
       [
         "Petunya",
         "petunia",
         "Çiçek",
-        "2223d",
+        "23223d",
         ""
       ],
       [
         "Karanfil",
         "dianthus",
         "Çiçek",
-        "3312d",
+        "34312d",
         ""
       ],
       [
         "Yasemin",
         "jasmine",
         "Çiçek",
-        "2222d",
+        "23222d",
         ""
       ],
       [
         "Lale",
         "tulip, soğanlı çiçek",
         "Çiçek",
-        "3312d",
+        "23312d",
         ""
       ],
       [
         "Limon",
         "limon ağacı",
         "Meyve",
-        "2323d",
+        "23323d",
         "limon-agaci-topragi-ozel-organik-karisim"
       ],
       [
         "Narenciye",
         "portakal, mandalina, turunç, greyfurt",
         "Meyve",
-        "2323d",
+        "23323d",
         "hg-narenciye-topragi"
       ],
       [
         "Kumkuat",
         "kamkat",
         "Meyve",
-        "2323d",
+        "23323d",
         "hg-kumkuat-kamkat-topragi-ozel-karisim"
       ],
       [
         "Avokado",
         "",
         "Meyve",
-        "2322h",
+        "22322h",
         "hg-avokado-topragi-ozel-karisim"
       ],
       [
         "Yaban mersini",
         "blueberry",
         "Asit seven",
-        "1222d",
+        "11222d",
         "yaban-mersini-ve-ortanca-topragi",
         "s"
       ],
@@ -2205,7 +2205,7 @@
         "Aronya",
         "",
         "Asit seven",
-        "1222d",
+        "12222d",
         "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi",
         "s"
       ],
@@ -2213,7 +2213,7 @@
         "Böğürtlen",
         "",
         "Asit seven",
-        "1222d",
+        "12222d",
         "ortanca-bogurtlen-acelya-topragi",
         "s"
       ],
@@ -2221,168 +2221,168 @@
         "Ahududu",
         "frambuaz",
         "Meyve",
-        "2223d",
+        "22223d",
         ""
       ],
       [
         "Kivi",
         "",
         "Meyve",
-        "2223d",
+        "23223d",
         ""
       ],
       [
         "Trabzon hurması",
         "cennet hurması, hurma",
         "Meyve",
-        "3222d",
+        "23222d",
         "trabzon-hurmasi-cennet-hurmasi-topragi"
       ],
       [
         "Çilek",
         "",
         "Meyve",
-        "2223d",
+        "22223d",
         "hg-cilek-topragi"
       ],
       [
         "İncir",
         "",
         "Meyve",
-        "3222d",
+        "34222d",
         ""
       ],
       [
         "Zeytin",
         "",
         "Meyve",
-        "4311k",
+        "34311k",
         ""
       ],
       [
         "Nar",
         "",
         "Meyve",
-        "3222d",
+        "23222d",
         ""
       ],
       [
         "Muz",
         "",
         "Meyve",
-        "2233d",
+        "23233d",
         ""
       ],
       [
         "Asma",
         "üzüm",
         "Meyve",
-        "3222d",
+        "33222d",
         ""
       ],
       [
         "Meyve fidanı",
         "elma, armut, kiraz, erik, şeftali",
         "Meyve",
-        "3222d",
+        "23222d",
         ""
       ],
       [
         "Domates",
         "",
         "Sebze",
-        "3223d",
+        "23223d",
         "hg-bol-verimli-sebze-topragi"
       ],
       [
         "Biber",
         "",
         "Sebze",
-        "3223d",
+        "23223d",
         "hg-bol-verimli-sebze-topragi"
       ],
       [
         "Patlıcan",
         "",
         "Sebze",
-        "3223d",
+        "23223d",
         "hg-bol-verimli-sebze-topragi"
       ],
       [
         "Salatalık",
         "hıyar",
         "Sebze",
-        "3223d",
+        "23223d",
         "hg-bol-verimli-sebze-topragi"
       ],
       [
         "Kabak",
         "",
         "Sebze",
-        "3223d",
+        "23223d",
         "hg-bol-verimli-sebze-topragi"
       ],
       [
         "Marul",
         "yeşillik, roka, ıspanak",
         "Sebze",
-        "3222d",
+        "23222d",
         "solucan-gubreli-sebze-topragi"
       ],
       [
         "Maydanoz",
         "dereotu",
         "Sebze",
-        "3222d",
+        "23222d",
         "solucan-gubreli-sebze-topragi"
       ],
       [
         "Fasulye",
         "bezelye",
         "Sebze",
-        "3222d",
+        "23222d",
         "solucan-gubreli-sebze-topragi"
       ],
       [
         "Soğan",
         "sarımsak, pırasa",
         "Sebze",
-        "3222d",
+        "23222d",
         "solucan-gubreli-sebze-topragi"
       ],
       [
         "Havuç",
         "turp, pancar",
         "Sebze",
-        "3322k",
+        "23322k",
         "solucan-gubreli-sebze-topragi"
       ],
       [
         "Lahana",
         "brokoli, karnabahar",
         "Sebze",
-        "3223d",
+        "23223d",
         "solucan-gubreli-sebze-topragi"
       ],
       [
         "Fide",
         "tohum çimlendirme, fide yetiştirme",
         "Sebze",
-        "2221d",
+        "22221d",
         "hg-fide-topragi"
       ],
       [
         "Çim",
         "çim tohumu",
         "Bahçe",
-        "3222d",
+        "23222d",
         "cim-kapama-topragi-leonarditli-formul"
       ],
       [
         "Nilüfer",
         "lotus, su bitkisi",
         "Su bitkisi",
-        "3133d",
+        "23133d",
         "lotus-nilufer-cicegi-topragi",
         "s"
       ]
