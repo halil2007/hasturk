@@ -16,17 +16,43 @@
       "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/bb7cd94a-7934-4528-9126-90cfebc9298d/image_1080.webp"
     },
     {
+      "category": "Topraklar",
+      "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/63e570de-e326-4a38-8e78-07ce83b507d9/image_1080.webp"
+    },
+    {
       "category": "Cocopeat",
       "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/43d934df-4ef1-4270-940e-40c678345f36/image_1080.webp"
+    },
+    {
+      "category": "İlaçlama Pompaları",
+      "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/136c5969-5728-493a-94b0-085e54e6d557/image_1080.webp"
+    },
+    {
+      "category": "Halk Sağlığı Ürünleri",
+      "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/0f14b458-6dfa-4655-b220-ad0f09f7682d/image_1080.webp"
     },
     {
       "category": "Bitki Besinleri",
       "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/23be6abe-d1d0-4152-85f2-2bfb32a8c551/image_1080.webp"
     },
     {
-      "category": "İlaçlama Pompaları",
-      "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/136c5969-5728-493a-94b0-085e54e6d557/image_1080.webp"
+      "category": "Tohumlar",
+      "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/06e65017-fc7c-4693-bf66-2b9086cc2ac5/image_1080.webp"
+    },
+    {
+      "category": "Sebze Yatağı",
+      "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/947267cc-75d7-4340-9fb9-802885f79a3b/image_1080.webp"
+    },
+    {
+      "category": "Dekoratif Saksılar",
+      "img": "https://cdn.myikas.com/images/dcff75f6-d4ea-4a7a-8726-d44f86a1aac5/25cd8274-941d-4817-abd3-9ee683e39694/image_1080.webp"
     }
+  ],
+  "boost": [
+    "hasturk-kati-solucan-gubresi",
+    "hasturk-sivi-solucan-gubresi",
+    "kati-solucan-gubresi-20-kg",
+    "hasturk-humix-sivi-humik-asit"
   ],
   "categoryOrder": [
     "Gübreler",

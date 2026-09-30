@@ -72,6 +72,8 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `popular`: boş kutuda görünen "çok arananlar"
 - `promo`: Kategoriler sekmesinin üstündeki kampanya kartı — `title`, `code` (dokununca kopyalanır), `note`, `shipping` (ücretsiz kargo metni; sepete ekle penceresinde de görünür)
 - `featured`: "Öne çıkan kategoriler" görselli menüsü — `[{ "category": "Kategori adı", "img": "görsel adresi" }]`. Görseller **1200 × 600 px** hazırlanmalı; sadece Kategoriler sekmesinin ana bölümünde 2:1 çerçevede gösterilir (masaüstünde 2, telefonda 1 sütun). Dokununca kategorinin ürünleri panelde açılır (orada görsel tekrar gösterilmez).
+- `boost`: Aramada ve kategori listelerinde öne çıkarılacak ürünlerin adres (slug) listesi; en üstteki en önce gelir. Mağaza markası (HasTürk/HG) ürünleri de otomatik öne alınır.
+- `bulkPattern` / `bulkPrice`: Ton bazlı/toptan ürünleri geriye atar. Varsayılan: adında "1 Ton" gibi ifade geçenler veya fiyatı 40.000 TL ve üzeri olanlar.
 - `categoryOrder`: ana kategorilerin gösterim sırası (listede olmayanlar sonra, ürün sayısına göre)
 - `categoryLast`: en sona konacak ana kategoriler (örn. kedi/köpek)
 - `categoryImages`: kategori adı → görseli kullanılacak ürünün adresi (slug)
