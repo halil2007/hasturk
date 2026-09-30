@@ -75,6 +75,7 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `boost`: Aramada ve kategori listelerinde öne çıkarılacak ürünlerin adres (slug) listesi; en üstteki en önce gelir. Mağaza markası (HasTürk/HG) ürünleri de otomatik öne alınır.
 - `bulkPattern` / `bulkPrice`: Ton bazlı/toptan ürünleri geriye atar. Varsayılan: adında "1 Ton" gibi ifade geçenler veya fiyatı 40.000 TL ve üzeri olanlar.
 - `trust`: Ana bölümdeki güven şeridi — `[{ "icon": "leaf|shield|chat|truck", "title": "...", "text": "..." }]`. Verilmezse (varsayılan) gösterilmez.
+- `promo.freeShipping`: Ücretsiz kargo eşiği (TL). Verilmezse `promo.shipping` yazısındaki tutar kullanılır (örn. 975). Sepet tutarı sitenin kendi sepet yanıtlarından okunur; sepette ürün varken panelin altında kalan tutarı gösteren hareketli çubuk çıkar, sepete eklemede bildirimde de yazar.
 - `bestsellers`: Kartlarda "Çok satan" rozeti alacak ürünlerin slug listesi (verilmezse `boost` kullanılır).
 - `calc.packs`: Toprak hesabında önerilecek torba boyutları (litre), varsayılan `[5, 10, 20, 40]`. Sonuç %`extra` oturma payı dahil gösterilir ve bu torbalara yuvarlanır.
 - `hideNative`: ikas'ın kendi arama penceresinin CSS seçicisi; verilirse tüm ziyaretçilerde hiç görünmez. Seçiciyi bulmak için telefonda sitenin arama düğmesine bir kez basın, sonra adres çubuğuna `hasturkgubre.com.tr/#ua-debug` yazın; çıkan metni gönderin.
