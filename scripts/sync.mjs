@@ -84,6 +84,7 @@ const ALIASES = {
   brand: ['SimpleProductBrand', 'ProductBrand'],
   productVariantTypes: ['ProductVariantType'],
   variantValueIds: ['VariantValueRelation'],
+  bundleSettings: ['ProductBundleSettings', 'ProductBundleProduct', 'bundle'],
 };
 
 // ---------- veri çekme ----------
@@ -96,6 +97,8 @@ const PRODUCT_OPTIONAL = {
   productVariantTypes: 'productVariantTypes { variantTypeId variantValueIds }',
   variantValueIds: 'variantValueIds { variantTypeId variantValueId }',
   sellIfOutOfStock: 'sellIfOutOfStock',
+  // Paket (BUNDLE) ürünlerin kendi stoğu yok; içindeki ürünlerden hesaplanır
+  bundleSettings: 'bundleSettings { products { productId quantity filteredVariantIds } }',
 };
 
 const productQuery = (o) => `
@@ -104,7 +107,7 @@ query ($page: Int!) {
     hasNext
     count
     data {
-      id name type ${o.metaData} categoryIds ${o.tags} ${o.brand} ${o.salesChannelIds} ${o.hiddenSalesChannelIds}
+      id name type ${o.bundleSettings} ${o.metaData} categoryIds ${o.tags} ${o.brand} ${o.salesChannelIds} ${o.hiddenSalesChannelIds}
       ${o.productVariantTypes}
       variants {
         id sku isActive ${o.sellIfOutOfStock} ${o.variantValueIds}
@@ -182,6 +185,22 @@ function transform({ products, categories, variantTypes, merchantId, config }) {
 
   const channel = env.IKAS_SALES_CHANNEL_ID;
   const items = [];
+
+  // Paket ürün stoğu: içindeki her ürünün (varsa izin verilen varyantlarından) en az biri istenen adette stokta olmalı
+  const vStock = (v) => (v.stocks || []).reduce((s, x) => s + (x.stockCount || 0), 0);
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const isBundle = (p) => String(p.type || '').toUpperCase() === 'BUNDLE';
+  function bundleInStock(p) {
+    const parts = p.bundleSettings?.products;
+    if (!parts?.length) return true; // içerik bilinmiyorsa ikas'ın ürün sayfası karar versin, satışı engelleme
+    return parts.every((b) => {
+      const c = byId.get(b.productId);
+      if (!c) return true;
+      const allow = b.filteredVariantIds?.length ? new Set(b.filteredVariantIds) : null;
+      return (c.variants || []).some((v) => v.isActive !== false && (!allow || allow.has(v.id)) &&
+        (v.sellIfOutOfStock || vStock(v) >= (b.quantity || 1)));
+    });
+  }
   const catCount = new Map();
 
   for (const p of products) {
@@ -193,9 +212,10 @@ function transform({ products, categories, variantTypes, merchantId, config }) {
     const variants = (p.variants || []).filter((v) => v.isActive !== false);
     if (!variants.length || !slug) continue;
 
+    const bundle = isBundle(p), bundleOk = bundle && bundleInStock(p);
     const vars = variants.map((v) => {
       const price = pickPrice(v.prices);
-      const stock = (v.stocks || []).reduce((s, x) => s + (x.stockCount || 0), 0);
+      const stock = bundle ? (bundleOk ? 1 : 0) : vStock(v);
       return {
         id: v.id,
         sku: v.sku || undefined,
@@ -231,6 +251,7 @@ function transform({ products, categories, variantTypes, merchantId, config }) {
       d: cheapest?.d,
       multi: new Set(vars.map((v) => v.d ?? v.p)).size > 1 ? 1 : undefined, // "…'den başlayan"
       st: inStock ? 1 : 0,
+      bn: bundle ? 1 : undefined, // paket ürün
       v: vars.length > 1 ? vars : undefined,
       v1: vars.length === 1 ? vars[0].id : undefined,
     });
@@ -287,6 +308,11 @@ function mockData() {
     prod('p4', 'Sıvı Solucan Gübresi 1 Lt', 'sivi-solucan-gubresi', ['c2', 'c21'], [v('f', 149, 7, 119)]),
     prod('p5', 'Orkide Sıvı Besini 250 ml', 'orkide-sivi-besini', ['c2'], [v('g', 89, 0)]),
     prod('p6', 'Fesleğen Tohumu', 'feslegen-tohumu', ['c3'], [v('h', 29, 50)]),
+    // Paket ürünler: kendi stoğu 0, içerikten hesaplanır
+    { ...prod('p7', 'Toprak + Gübre Seti', 'toprak-gubre-seti', ['c1'], [v('i', 299, 0)]), type: 'BUNDLE',
+      bundleSettings: { products: [{ productId: 'p2', quantity: 1 }, { productId: 'p4', quantity: 2 }] } },
+    { ...prod('p8', 'Orkide Bakım Seti', 'orkide-bakim-seti', ['c2'], [v('j', 199, 0)]), type: 'BUNDLE',
+      bundleSettings: { products: [{ productId: 'p5', quantity: 1 }, { productId: 'p6', quantity: 1 }] } },
   ];
   return { products, categories, variantTypes, merchantId: '' };
 }
