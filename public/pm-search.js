@@ -264,7 +264,7 @@
     '.top{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px}',
     '.back,.xbtn{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none}',
     '.back{background:var(--bg)}.back svg{width:22px;height:22px}',
-    '.xbtn{display:none;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
+    '.back{display:none}.xbtn{display:grid;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
     '.field{flex:1;display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 16px;border-radius:24px;background:var(--bg);min-width:0;border:2px solid transparent;transition:border-color .15s,background .15s}',
     '.field:focus-within{border-color:var(--pr);background:#fff}',
     '.field>svg{width:20px;height:20px;color:var(--pr);flex:none}',
@@ -1702,7 +1702,8 @@
     if (!el || !matches(el, SELECTOR)) return false;
     if (ds.selector) return true;
     if (el.type === 'search' || el.name === 'q' || el.name === 's') return true;
-    return words(fold(el.getAttribute('placeholder') || '')).some(function (w) { return /^(ara|arayin|arama|aradiginiz|search)$/.test(w); });
+    // ara, arayın, arama, aramak, aramıştınız, aradığınız, aranan, search… ("araba", "aralık", "parola" hariç)
+    return words(fold(el.getAttribute('placeholder') || '')).some(function (w) { return /^(ara|aray[a-z]*|aram[a-z]*|arad[a-z]*|aran[a-z]*|search[a-z]*)$/.test(w); });
   }
   function siteInput(el) { return el && !isOurs(el) && isSearchInput(el) && !(el.ownerDocument && el.ownerDocument !== document); }
   document.addEventListener('focusin', function (e) {
@@ -1713,7 +1714,7 @@
     var v = t.value;
     t.blur();
     // Bir butona basıldıktan hemen sonra ikas'ın panelindeki kutu odaklandıysa: paneli kapat, butonu öğren
-    if (lastTap.el !== t && tapTrusted()) { if (closeNative(t, lastTap.el)) learn(lastTap.el); lastTap = { el: null, t: 0 }; }
+    if (lastTap.el !== t && tapTrusted() && (lastTap.pre || []).indexOf(t) === -1) { var tp = lastTap.el; lastTap = { el: null, t: 0 }; closeNative(t, tp); learn(tp); }
     open(v);
   }, true);
 
@@ -1750,11 +1751,17 @@
   ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { if (triggerOf(e.target) || siteInput(e.target)) stopAll(e); }, true);
   });
-  var lastTap = { el: null, t: 0, href: '' };
+  var lastTap = { el: null, t: 0, path: '' };
   document.addEventListener('click', function (e) {
     if (siteInput(e.target)) { stopAll(e); open(e.target.value); return; }
     var t = triggerOf(e.target);
-    if (!t) { if (!isOurs(e.target)) lastTap = { el: e.target, t: Date.now(), href: location.href }; return; }
+    if (!t) {
+      if (!isOurs(e.target) && !isOpen) {
+        lastTap = { el: e.target, t: Date.now(), path: location.pathname, pre: visibleSearchInputs() };
+        [150, 400, 800].forEach(function (ms) { setTimeout(checkNewSearch, ms); });
+      }
+      return;
+    }
     e.preventDefault();
     stopAll(e);
     open();
@@ -1771,7 +1778,7 @@
     return !!h && h.charAt(0) !== '#' && !/^javascript:/i.test(h);
   }
   function tapTrusted() {
-    return lastTap.el && Date.now() - lastTap.t < 1500 && lastTap.href === location.href && !isPageLink(lastTap.el);
+    return lastTap.el && Date.now() - lastTap.t < 1500 && lastTap.path === location.pathname && !isPageLink(lastTap.el);
   }
   try { learned = JSON.parse(localStorage.getItem(LEARN_KEY) || '[]') || []; } catch (e) {}
   function sig(n) { return n.tagName + '|' + (n.getAttribute('class') || '') + '|' + (n.getAttribute('aria-label') || ''); }
@@ -1808,6 +1815,23 @@
     setTimeout(function () { if (cand && visible(input)) cand.style.setProperty('display', 'none', 'important'); }, 150);
     return true;
   }
+  function visibleSearchInputs() {
+    return [].filter.call(document.querySelectorAll(SELECTOR), function (el) { return !isOurs(el) && isSearchInput(el) && visible(el); });
+  }
+  // İkas'ın arama paneli açıldı: onu kapat, açan butonu öğren, bizimkini aç
+  function handleNative(inp) {
+    var tapped = lastTap.el;
+    lastTap = { el: null, t: 0 };
+    closeNative(inp, tapped);
+    learn(tapped);
+    open(inp.value || '');
+  }
+  function checkNewSearch() {
+    if (isOpen || !tapTrusted()) return;
+    var pre = lastTap.pre || [];
+    var fresh = visibleSearchInputs().filter(function (el) { return pre.indexOf(el) === -1; });
+    if (fresh.length) handleNative(fresh[0]);
+  }
   if (window.MutationObserver) {
     new MutationObserver(function (muts) {
       if (Date.now() - lastTap.t > 1500 || !lastTap.el) return;
@@ -1817,13 +1841,8 @@
           if (n.nodeType !== 1 || isOurs(n)) continue;
           var inp = isSearchInput(n) ? n : [].filter.call(n.querySelectorAll ? n.querySelectorAll(SELECTOR) : [], isSearchInput)[0];
           if (!inp || isOurs(inp) || !visible(inp)) continue;
-          var tapped = lastTap.el;
-          if (!tapTrusted()) return;
-          lastTap = { el: null, t: 0 };
-          // Sadece gerçekten açılır bir panel (sabit konumlu kapsayıcı) ise kapat, butonu öğren ve bizimkini aç
-          if (!closeNative(inp, tapped)) return;
-          learn(tapped);
-          open(inp.value || '');
+          if (!tapTrusted() || (lastTap.pre || []).indexOf(inp) !== -1) return;
+          handleNative(inp);
           return;
         }
       }
