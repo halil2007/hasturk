@@ -56,6 +56,54 @@
   function tl(n) {
     return Number(n).toLocaleString('tr-TR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' TL';
   }
+  // Sepet tutarı (ücretsiz kargo çubuğu için): sitenin sepet/GraphQL yanıtlarındaki ikas sepet nesnesinden okunur
+  var CART = null, CART_KEY = 'ua-cart';
+  try { var cs0 = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null'); if (cs0 && Date.now() - cs0.t < 6 * 3600e3) CART = cs0.v; } catch (e) {}
+  function findCart(o, d) {
+    if (!o || typeof o !== 'object' || d > 7) return null;
+    if (Array.isArray(o.orderLineItems) && (o.totalFinalPrice != null || o.totalPrice != null)) return o;
+    for (var k in o) if (o[k] && typeof o[k] === 'object') { var r = findCart(o[k], d + 1); if (r) return r; }
+    return null;
+  }
+  function setCart(o) {
+    var c = findCart(o, 0);
+    if (!c) return;
+    var v = c.orderLineItems.length ? +(c.totalFinalPrice != null ? c.totalFinalPrice : c.totalPrice) : 0;
+    if (isNaN(v)) return;
+    CART = v;
+    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, t: Date.now() })); } catch (e) {}
+    updateShip();
+  }
+  var CART_URL = /graphql|cart|sepet/i;
+  function sniffCart(w) {
+    try {
+      var of = w.fetch;
+      if (of && !of.__uaCart) {
+        w.fetch = function () {
+          return of.apply(this, arguments).then(function (r) {
+            try {
+              if (r && CART_URL.test(String(r.url || '')) && /json/i.test(r.headers.get('content-type') || '')) r.clone().json().then(setCart, function () {});
+            } catch (e) {}
+            return r;
+          });
+        };
+        w.fetch.__uaCart = true;
+      }
+      var X = w.XMLHttpRequest && w.XMLHttpRequest.prototype;
+      if (X && !X.__uaCart) {
+        X.__uaCart = true;
+        var oo = X.open, os = X.send;
+        X.open = function (m, u) { this.__uaU = u; return oo.apply(this, arguments); };
+        X.send = function () {
+          if (CART_URL.test(String(this.__uaU || ''))) this.addEventListener('load', function () {
+            try { setCart(this.responseType === 'json' ? this.response : JSON.parse(this.responseText)); } catch (e) {}
+          });
+          return os.apply(this, arguments);
+        };
+      }
+    } catch (e) {}
+  }
+  sniffCart(window);
   var HIDDEN_TAG = /^kdv[\s_-]*\d+$/i; // muhasebe etiketleri aramada/rozette görünmesin
 
   // ---------------- Veri ----------------
@@ -374,6 +422,19 @@
     '.pcode b{font-size:14px;font-weight:800;letter-spacing:.04em}.pcode em{font-style:normal;font-size:11px;font-weight:700;color:var(--mu)}',
     '.pm2{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(0,0,0,.18);font-size:13px;font-weight:600}',
     '.pm2 svg{width:18px;height:18px;flex:none}',
+    '.pmship b{color:#ffe08a}',
+    '.shipbar{flex:none;display:none;padding:8px 14px 10px;border-top:1px solid var(--ln);background:#fff}',
+    '.shipbar.on{display:block;animation:sbin .35s ease-out}',
+    '@keyframes sbin{from{opacity:0;transform:translateY(8px)}}',
+    '.sbt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);line-height:1.3}',
+    '.sbi{width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--pr);display:grid;place-items:center;flex:none}.sbi svg{width:16px;height:16px}',
+    '.sbx{flex:1;min-width:0}.sbx b{color:var(--prd)}.sbx small{float:right;color:var(--mu);font-size:12px;margin-left:8px}',
+    '.sbr{height:8px;border-radius:4px;background:var(--bg);overflow:hidden;margin-top:7px}',
+    '.sbr i{display:block;height:100%;width:0;border-radius:4px;transition:width .8s cubic-bezier(.2,.8,.2,1);',
+    'background:linear-gradient(90deg,var(--pr),#2aa3b8);background-size:200% 100%;animation:sbmove 1.6s linear infinite}',
+    '@keyframes sbmove{from{background-position:200% 0}to{background-position:0 0}}',
+    '.shipbar.ok .sbi{background:#e5f6ec;color:#1f8a4c}.shipbar.ok .sbx b{color:#1f8a4c}.shipbar.ok .sbr i{background:#2fa35f}',
+    '@media(min-width:760px){.shipbar{padding:10px 20px 12px}}',
     '.sh-ship{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;font-size:12.5px;font-weight:600;color:var(--mu)}',
     '.sh-ship svg{width:16px;height:16px;color:var(--ok)}',
     '.banner{display:flex;align-items:center;gap:14px;margin:16px 16px 0;padding:16px;border-radius:20px;background:linear-gradient(135deg,var(--prd),var(--pr));color:#fff;text-align:left;width:calc(100% - 32px)}',
@@ -590,7 +651,9 @@
     '.sh-go svg{width:18px;height:18px}',
     '.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:8px;padding:10px 16px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap}',
     '.ptoast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.3)}',
-    '.ptoast span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.ptoast span{min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}',
+    '.ptoast span{flex:1}.ptoast{width:min(440px,calc(100vw - 32px))}',
+    '.root.sbon .ptoast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}',
     '.ptoast a{flex:none;margin-left:4px;padding:6px 12px;border-radius:10px;background:#fff;color:var(--ink);font-size:13px;font-weight:700;white-space:nowrap}',
     '.bspin{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;flex:none}',
     '.ptoast.on{display:flex}.ptoast svg{width:20px;height:20px;flex:none;color:#7ee2a8}.ptoast.warn svg{color:#ffd27a}',
@@ -705,7 +768,7 @@
       '<div class="main"><div class="tools"></div>' +
       '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane guide"></div><div class="pane pages"></div></div>' +
       '<div class="results" aria-live="polite"></div></div>' +
-      '<div class="cta"></div><div class="mfoot"></div>' +
+      '<div class="cta"></div><div class="shipbar"></div><div class="mfoot"></div>' +
       '<div class="sheet"></div><div class="toast"></div></div></div>' +
       '</div></div></div>';
     document.body.appendChild(host);
@@ -924,7 +987,7 @@
     return '<div class="promo">' + (pr.code ? '<div class="pm1"><span class="pbadge">' + I.tag + '</span><div class="tx"><b>' + esc(pr.title || 'İlk siparişe özel indirim') + '</b>' +
       (pr.note ? '<span>' + esc(pr.note) + '</span>' : '') + '</div>' +
       '<button class="pcode" type="button" data-act="copy" data-v="' + esc(pr.code) + '"><b>' + esc(pr.code) + '</b><em>Kopyala</em></button></div>' : '') +
-      (pr.shipping ? '<div class="pm2">' + I.truck + '<span>' + esc(pr.shipping) + '</span></div>' : '') + '</div>';
+      (pr.shipping ? '<div class="pm2">' + I.truck + '<span class="pmship">' + shipText(true) + '</span></div>' : '') + '</div>';
   }
   // Güven şeridi (config.json > trust: [{ icon: leaf|shield|chat|truck, title, text }])
   function trustHtml() {
@@ -933,6 +996,42 @@
     return '<div class="trust">' + list.map(function (t) {
       return '<div class="tru">' + (I[t.icon] || I.check) + '<span><b>' + esc(t.title) + '</b>' + (t.text ? '<small>' + esc(t.text) + '</small>' : '') + '</span></div>';
     }).join('') + '</div>';
+  }
+  // ---- Ücretsiz kargo ilerlemesi: sepet tutarı ikas'ın kendi sepet yanıtlarından okunur ----
+  function shipLimit() {
+    var pr = CFG.promo || {};
+    if (pr.freeShipping) return +pr.freeShipping;
+    var m = String(pr.shipping || '').replace(/\./g, '').match(/(\d+)\s*(tl|₺)/i);
+    return m ? +m[1] : 0;
+  }
+  function shipText(inPromo) {
+    var lim = shipLimit(), c = CART;
+    if (!lim || c == null) return esc((CFG.promo || {}).shipping || '');
+    var left = lim - c;
+    if (left <= 0) return '<b>Tebrikler, kargonuz ücretsiz!</b>';
+    return (inPromo && c <= 0 ? esc((CFG.promo || {}).shipping || '') : 'Ücretsiz kargo için <b>' + tl(Math.ceil(left)) + '</b>\'lik daha ürün ekleyin');
+  }
+  function shipNote() {
+    var lim = shipLimit();
+    if (!lim || CART == null) return '';
+    return CART >= lim ? ' · Kargonuz ücretsiz!' : ' · Ücretsiz kargoya ' + tl(Math.ceil(lim - CART)) + ' kaldı';
+  }
+  function updateShip() {
+    if (!root) return;
+    [].forEach.call(root.querySelectorAll('.pmship'), function (el) { el.innerHTML = shipText(true); });
+    var bar = root.querySelector('.shipbar'), lim = shipLimit();
+    if (!bar) return;
+    var on = lim > 0 && CART != null && CART > 0;
+    bar.classList.toggle('on', on);
+    if ($wrap) $wrap.classList.toggle('sbon', on);
+    if (!on) return;
+    var pct = Math.min(100, Math.round(CART / lim * 100)), ok = CART >= lim;
+    if (!bar.firstChild) bar.innerHTML = '<div class="sbt"><span class="sbi"></span><span class="sbx"></span></div><div class="sbr"><i></i></div>';
+    bar.classList.toggle('ok', ok);
+    bar.querySelector('.sbi').innerHTML = ok ? I.check : I.truck;
+    bar.querySelector('.sbx').innerHTML = shipText(false) + (ok ? '' : '<small>Sepetiniz: ' + tl(CART) + '</small>');
+    var fill = bar.querySelector('.sbr i');
+    requestAnimationFrame(function () { fill.style.width = pct + '%'; });
   }
   function copyText(t) {
     var ok = function () { ptoast('"' + t + '" kopyalandı, ödeme adımında kullanabilirsiniz.'); };
@@ -975,6 +1074,7 @@
     }
     html += promoHtml() + trustHtml() + featuredHtml();
     $home.innerHTML = homeWrap(html);
+    updateShip();
   }
 
   // Masaüstü: solda her zaman görünen kategori listesi (seçili olan ve üstleri açık), sağda içerik
@@ -1363,7 +1463,8 @@
     addViaFrame(p, v).then(function () {
       setBusy(p.id, false);
       closeSheet();
-      ptoast('Sepete eklendi' + (v.name ? ': ' + v.name : ''), false, true);
+      // Sepet yanıtı işlensin, kalan ücretsiz kargo tutarı bildirimde görünsün
+      setTimeout(function () { ptoast('Sepete eklendi' + (v.name ? ': ' + v.name : '') + shipNote(), false, true); }, 300);
       track('add_to_cart_ok', p.n);
     }, function (why) {
       setBusy(p.id, false);
@@ -1425,6 +1526,7 @@
         var w, d;
         try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return reject('blocked'); }
         watchCart(w, function () { entry.cbs.forEach(function (cb) { cb(); }); });
+        sniffCart(w);
         resolve({ f: f, w: w, d: d, entry: entry });
       };
     });
