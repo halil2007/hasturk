@@ -481,6 +481,7 @@
     '.so-h{display:flex;gap:10px;align-items:flex-start}.so-h>svg{width:22px;height:22px;flex:none;color:#3f7d4f;margin-top:1px}',
     '.so-h b{display:block;font-size:15px;color:#2d5a38}.so-h span{display:block;font-size:12.5px;color:#4b5f52;margin-top:2px;line-height:1.4}',
     '.so-l{display:grid;gap:6px;margin-top:10px}@media(min-width:760px){.so-l{grid-template-columns:1fr 1fr}}',
+    '.so-or{font-size:12px;color:#4b5f52;margin:10px 2px 6px}.so-h span a{color:#2d5a38;font-weight:700;text-decoration:underline}',
     '.soil .xs-i{background:#fff}.xs-i .tx b em{font-style:normal;font-weight:600;font-size:11.5px;color:#3f7d4f}',
     '.shipbar{flex:none;display:none;padding:8px 14px 10px;border-top:1px solid var(--ln);background:#fff}',
     '.shipbar.on{display:block;animation:sbin .35s ease-out}',
@@ -1496,25 +1497,33 @@
       var pf = parse(pl[3]);
       if (!pf) return null;
       var names = [pl[0]].concat(String(pl[1] || '').split(',')).map(function (n) { return fold(n).trim(); }).filter(function (n) { return n.length >= 3; });
-      return { n: pl[0], names: names, grp: fold(pl[2] || ''), pf: pf, special: pl[4] || '' };
+      return { n: pl[0], names: names, grp: fold(pl[2] || ''), pf: pf, special: pl[4] || '', strict: pl[5] === 's',
+        // Kelimenin kendisi ya da kısa bir ekle (güller, limonun); "gülhatmi", "narenciye" eşleşmez
+        res: names.map(function (n) { return new RegExp('(^| )' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[a-z]{0,' + (n.length <= 3 ? 3 : 4) + '}( |$)'); }) };
     }).filter(Boolean);
     // Adında bitki geçen toprak ürünleri (etiket gerekmeden): "HG Philodendron Toprağı" → Philodendron'un özel toprağı
     var soilCat = DATA.cats.filter(function (c) { return c.f === fold('Topraklar'); })[0];
     plants.forEach(function (pl) {
       pl.auto = DATA.items.filter(function (x) {
         if (!soilCat || catChain(x).indexOf(soilCat.f) === -1 || x.bn || !/topra|torf|karisim/.test(x.nf)) return false;
-        return pl.names.some(function (n) { return (' ' + words(x.nf).join(' ') + ' ').indexOf(' ' + n) !== -1; });
+        var nm = words(x.nf).join(' ');
+        return pl.res.some(function (re) { return re.test(nm); });
       }).sort(function (a, b) { return (b.st ? 1 : 0) - (a.st ? 1 : 0) || (b.r || 0) - (a.r || 0); });
     });
-    SOIL = { soils: soils, plants: plants, bySlug: bySlug, w: sm.weights || [3, 2, 2, 1, 1, 12], add: sm.addons || {} };
+    SOIL = { soils: soils, plants: plants, bySlug: bySlug, w: sm.weights || [3, 2, 2, 1, 1, 12], add: sm.addons || {},
+      min: sm.minFit != null ? +sm.minFit : 0.85, custom: sm.custom && bySlug[sm.custom] };
     return SOIL;
   }
+  // Başka bir ürün türü aranıyorsa (domates tohumu, limon gübresi) toprak kartı çıkmaz
+  var NOT_SOIL = /^(tohum|gubre|ilac|pompa|saksi|besin|vitamin|mama|fidesi|fidan|hormon|kok|sprey)/;
   function plantFor(qn) {
     if (!DATA || !CFG.soilMatch) return null;
-    var S = soilData(), q = ' ' + words(qn).join(' ') + ' ', best = null, bl = 0;
+    var S = soilData(), ws = words(qn), q = ws.join(' '), best = null, bl = 0;
     S.plants.forEach(function (pl) {
-      pl.names.forEach(function (n) { if (q.indexOf(' ' + n) !== -1 && n.length > bl) { best = pl; bl = n.length; } });
+      pl.res.forEach(function (re, i) { var n = pl.names[i]; if (re.test(q) && n.length > bl) { best = pl; bl = n.length; } });
     });
+    var own = best ? words(best.names.join(' ')) : [];
+    if (best && ws.some(function (w) { return NOT_SOIL.test(w) && own.indexOf(w) === -1; })) return null;
     return best;
   }
   function soilScore(pl, pf) {
@@ -1526,17 +1535,20 @@
   function soilFor(pl) {
     var S = soilData();
     var sp = pl.special && S.bySlug[pl.special];
-    if (sp && sp.st) return { p: sp, exact: true, adds: addonsFor(pl, S.soils[sp.s]) };
+    if (sp && sp.st) return { p: sp, exact: true, adds: [] };
     var au = (pl.auto || []).filter(function (x) { return x.st; })[0];
-    if (au) return { p: au, exact: true, adds: addonsFor(pl, S.soils[au.s]) };
+    if (au) return { p: au, exact: true, adds: [] };
+    // Ortamı çok özel bitkiler (orkide, asit sevenler…): özel toprak yoksa benzerini önermeyiz
+    if (pl.strict) return { none: true, strict: true };
     var best = null, bs = -1;
     Object.keys(S.soils).forEach(function (sl) {
       var pf = S.soils[sl], x = S.bySlug[sl];
       if (!x || !x.st || pf.only || !(pf.gen || (pf.grp && pf.grp === pl.grp))) return;
-      var sc = soilScore(pl, pf) + (pf.grp === pl.grp ? 0.002 : pf.gen ? 0.001 : 0);
+      var sc = soilScore(pl, pf) + (pf.grp === pl.grp ? 0.002 : 0) + (pf.gen ? 0.001 : 0);
       if (sc > bs) { bs = sc; best = x; }
     });
-    if (!best || bs < 0.5) return null;
+    // Yeterince benzer hazır karışım yoksa (uyum < minFit) hiçbirini önermeyiz
+    if (!best || bs < S.min) return { none: true };
     return { p: best, exact: false, fit: Math.min(1, bs), adds: addonsFor(pl, S.soils[best.s]) };
   }
   function addonsFor(pl, pf) {
@@ -1561,15 +1573,24 @@
       (cartOn() ? '<button class="add" type="button" data-act="add" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button>' : '') + '</div>';
   }
   function soilCard(pl) {
-    var r = soilFor(pl);
-    if (!r) return '';
+    var r = soilFor(pl), S = soilData();
     if (!soilCard.seen) soilCard.seen = {};
-    if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + r.p.n); }
-    return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' +
-      (r.exact ? esc(pl.n) + ' için önerdiğimiz toprak' :
-        esc(pl.n) + ' için özel toprağımız yok. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever; en yakın karışımımız:') +
-      '</span></div></div><div class="so-l">' + soilRow(r.p, r.exact ? '' : '%' + Math.round(r.fit * 100) + ' uyum') +
-      r.adds.map(function (a) { return soilRow(a.p, '+ ' + a.why); }).join('') + '</div></div>';
+    if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + (r.p ? r.p.n : 'yok')); }
+    var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın') : '';
+    var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Uzmanımıza sorun</a>' : '';
+    var head = function (txt) { return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' + txt + '</span></div></div>'; };
+    if (r.exact) return head(esc(pl.n) + ' için önerdiğimiz toprak:') + '<div class="so-l">' + soilRow(r.p, '') + '</div></div>';
+    if (r.none) {
+      return head(r.strict
+        ? esc(pl.n) + ' çok özel bir yetiştirme ortamı ister; şu an buna uygun hazır toprağımız stokta yok. Yanlış toprak bitkiye zarar verebilir.' + ask
+        : esc(pl.n) + ' için hazır karışımlarımızdan hiçbiri yeterince uygun değil. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever; ihtiyacına göre karışım hazırlatabilirsiniz.' + ask) +
+        (!r.strict && custom ? '<div class="so-l">' + custom + '</div>' : '') + '</div>';
+    }
+    return head(esc(pl.n) + ' için özel toprağımız yok. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever. Özellikleri en yakın hazır karışımımız' +
+      (r.adds.length ? ' ve eksik kalan özelliği tamamlayan ürün' : '') + ':') +
+      '<div class="so-l">' + soilRow(r.p, '%' + Math.round(r.fit * 100) + ' uyum') +
+      r.adds.map(function (a) { return soilRow(a.p, '+ ' + a.why); }).join('') + '</div>' +
+      (custom ? '<div class="so-or">ya da bitkinizin ihtiyacına göre kendi karışımınızı hazırlatın:</div><div class="so-l">' + custom + '</div>' : '') + '</div>';
   }
   function guideSearch() {
     var res = $guide.querySelector('.gres'), lst = $guide.querySelector('.glist');

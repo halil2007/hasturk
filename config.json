@@ -1717,7 +1717,7 @@
     ]
   },
   "soilMatch": {
-    "_help": "Profil: pH(1-4) drenaj(1-3) su(1-3) besin(1-3) yapı(k=kumlu h=havalı d=dengeli) | grup | g=genel amaçlı o=sadece kendi bitkisi. Kaynak: docs/bitki-toprak-eslestirme.xlsx",
+    "_help": "Profil: pH(1-4) drenaj(1-3) su(1-3) besin(1-3) yapı(k/h/d) | grup | g=genel amaçlı o=sadece kendi bitkisi. Bitki 6. alan 's' = özel toprağı yoksa başka toprak önerme. Kaynak: docs/bitki-toprak-eslestirme.xlsx",
     "weights": [
       3,
       2,
@@ -1726,6 +1726,8 @@
       1,
       12
     ],
+    "minFit": 0.85,
+    "custom": "kendi-toprak-karisimini-olustur",
     "addons": {
       "drenaj": "tarim-perliti",
       "ph": "hg-asidik-torf",
@@ -1758,7 +1760,7 @@
       "hg-para-agaci-saksi-topragi": "2312k|Salon|",
       "salon-bitkilerine-ozel-toprak-karisimi": "2222d|Salon|g",
       "hg-cicek-topragi": "2223d|Çiçek|g",
-      "hg-gul-topragi-gullere-ozel-toprak-karisimi": "3223d|Çiçek|",
+      "hg-gul-topragi-gullere-ozel-toprak-karisimi": "2223d|Çiçek|",
       "ortanca-bogurtlen-acelya-topragi": "1222d|Asit seven|g",
       "yaban-mersini-ve-ortanca-topragi": "1222d|Asit seven|",
       "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi": "1222d|Asit seven|",
@@ -1944,7 +1946,8 @@
         "bromelya, guzmania",
         "Salon",
         "2311h",
-        ""
+        "",
+        "s"
       ],
       [
         "Begonya",
@@ -1999,7 +2002,7 @@
         "Kalanşo",
         "kalanchoe",
         "Sukulent",
-        "3312k",
+        "3311k",
         ""
       ],
       [
@@ -2007,7 +2010,8 @@
         "orchid, phalaenopsis",
         "Salon",
         "2311h",
-        "gartengold-orkide-topragi"
+        "gartengold-orkide-topragi",
+        "s"
       ],
       [
         "Afrika menekşesi",
@@ -2042,7 +2046,8 @@
         "",
         "Salon",
         "2311k",
-        "hg-bonsai-saksi-topragi"
+        "hg-bonsai-saksi-topragi",
+        "s"
       ],
       [
         "Para ağacı",
@@ -2055,7 +2060,7 @@
         "Gül",
         "rose",
         "Çiçek",
-        "3223d",
+        "2223d",
         "hg-gul-topragi-gullere-ozel-toprak-karisimi"
       ],
       [
@@ -2063,28 +2068,32 @@
         "hortensia, hydrangea",
         "Asit seven",
         "1222d",
-        "yaban-mersini-ve-ortanca-topragi"
+        "yaban-mersini-ve-ortanca-topragi",
+        "s"
       ],
       [
         "Açelya",
         "azalea, azelya",
         "Asit seven",
         "1222d",
-        "ortanca-bogurtlen-acelya-topragi"
+        "ortanca-bogurtlen-acelya-topragi",
+        "s"
       ],
       [
         "Kamelya",
         "camellia",
         "Asit seven",
         "1222d",
-        ""
+        "",
+        "s"
       ],
       [
         "Gardenya",
         "gardenia",
         "Asit seven",
         "1222d",
-        ""
+        "",
+        "s"
       ],
       [
         "Lavanta",
@@ -2164,8 +2173,8 @@
         "limon-agaci-topragi-ozel-organik-karisim"
       ],
       [
-        "Portakal",
-        "mandalina, narenciye, turunç",
+        "Narenciye",
+        "portakal, mandalina, turunç, greyfurt",
         "Meyve",
         "2323d",
         "hg-narenciye-topragi"
@@ -2189,21 +2198,24 @@
         "blueberry",
         "Asit seven",
         "1222d",
-        "yaban-mersini-ve-ortanca-topragi"
+        "yaban-mersini-ve-ortanca-topragi",
+        "s"
       ],
       [
         "Aronya",
         "",
         "Asit seven",
         "1222d",
-        "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi"
+        "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi",
+        "s"
       ],
       [
         "Böğürtlen",
         "",
         "Asit seven",
         "1222d",
-        "ortanca-bogurtlen-acelya-topragi"
+        "ortanca-bogurtlen-acelya-topragi",
+        "s"
       ],
       [
         "Ahududu",
@@ -2371,7 +2383,8 @@
         "lotus, su bitkisi",
         "Su bitkisi",
         "3133d",
-        "lotus-nilufer-cicegi-topragi"
+        "lotus-nilufer-cicegi-topragi",
+        "s"
       ]
     ]
   }
