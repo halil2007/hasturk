@@ -116,24 +116,6 @@
         "45-goz-yuvarlak-fide-viyolu",
         "hasturk-sivi-solucan-gubresi"
       ]
-    },
-    {
-      "when": [
-        "İlaçlama Pompaları"
-      ],
-      "offer": [
-        "chrysamed-konsantre-ec-hasere-ilaci-50-ml",
-        "chrysamed-unicid-c10-konsantre-hasere-ilaci-1-lt-olcekli"
-      ]
-    },
-    {
-      "when": [
-        "Halk Sağlığı Ürünleri"
-      ],
-      "offer": [
-        "delta-5-lt-basincli-ilaclama-pompasi-k-81",
-        "delta-2-lt-ilaclama-pompasi"
-      ]
     }
   ],
   "categoryOrder": [
