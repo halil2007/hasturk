@@ -17,8 +17,7 @@
   var BASE = script ? new URL('.', script.src).href : '/';
   var JSON_URL = ds.json || BASE + 'products.json';
   var STORE = (ds.store || location.origin).replace(/\/$/, '');
-  var SELECTOR = ds.selector ||
-    'input[type="search"], input[name="q"], input[name="s"], input[placeholder*="ara" i], input[placeholder*="Ara"], input[placeholder*="ARA"]';
+  var SELECTOR = ds.selector || 'input[type="search"], input[name="q"], input[name="s"], input[placeholder]';
   var TRIGGER = ds.trigger || '';
   var CACHE_KEY = 'ua-data-v4';
   var RECENT_KEY = 'ua-recent';
@@ -214,6 +213,8 @@
     plus: svg('<path d="M12 6v12M6 12h12"/>', 2.4),
     cart: svg('<path d="M3 4h2l2.2 11h11l2-8H6.3"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/>'),
     check: svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>', 2.6),
+    truck: svg('<path d="M3 6h11v10H3zM14 9.5h4l3 3.5V16h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/>'),
+    tag: svg('<path d="M3 12V4h8l9.5 9.5-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>'),
     bag: svg('<path d="M6 7h12l1.5 13h-15z"/><path d="M9 7V5.5a3 3 0 0 1 6 0V7"/><path d="M7.5 13c2 1.3 7 1.3 9 0"/>')
   };
 
@@ -262,7 +263,7 @@
 
     '.top{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px}',
     '.back,.xbtn{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none}',
-    '.back svg{width:24px;height:24px}',
+    '.back{background:var(--bg)}.back svg{width:22px;height:22px}',
     '.xbtn{display:none;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
     '.field{flex:1;display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 16px;border-radius:24px;background:var(--bg);min-width:0;border:2px solid transparent;transition:border-color .15s,background .15s}',
     '.field:focus-within{border-color:var(--pr);background:#fff}',
@@ -336,6 +337,18 @@
     '.center{justify-content:center;flex-wrap:wrap}',
 
     /* Hesaplayıcı banner */
+    '.promo{margin:12px 16px 0;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,var(--prd),var(--pr));color:#fff}',
+    '@media(min-width:760px){.promo{margin:18px 20px 0}}',
+    '.pm1{display:flex;align-items:center;gap:12px;padding:14px}',
+    '.pbadge{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.15);display:grid;place-items:center;flex:none}',
+    '.pbadge svg{width:22px;height:22px}',
+    '.pm1 .tx{flex:1;min-width:0}.pm1 b{display:block;font-size:15px}.pm1 .tx span{display:block;font-size:12.5px;color:#cfe3e9;margin-top:1px}',
+    '.pcode{flex:none;display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-radius:12px;background:#fff;color:var(--prd);border:2px dashed #9cc7d3}',
+    '.pcode b{font-size:14px;font-weight:800;letter-spacing:.04em}.pcode em{font-style:normal;font-size:11px;font-weight:700;color:var(--mu)}',
+    '.pm2{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(0,0,0,.18);font-size:13px;font-weight:600}',
+    '.pm2 svg{width:18px;height:18px;flex:none}',
+    '.sh-ship{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;font-size:12.5px;font-weight:600;color:var(--mu)}',
+    '.sh-ship svg{width:16px;height:16px;color:var(--ok)}',
     '.banner{display:flex;align-items:center;gap:14px;margin:16px 16px 0;padding:16px;border-radius:20px;background:linear-gradient(135deg,var(--prd),var(--pr));color:#fff;text-align:left;width:calc(100% - 32px)}',
     '@media(min-width:760px){.banner{margin:20px 20px 0;width:calc(100% - 40px)}}',
     '.banner .bi{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.14);display:grid;place-items:center;flex:none}',
@@ -562,6 +575,12 @@
     '.res .ic svg{width:28px;height:28px}',
     '.res b{display:block;font-size:30px;font-weight:800;letter-spacing:-.01em;line-height:1.1}',
     '.res span{display:block;font-size:13px;color:#cfe3e9;margin-top:3px}',
+    '.fx{margin-top:10px;padding:12px 14px;border-radius:14px;background:var(--bg);font-size:13.5px;line-height:1.55;font-variant-numeric:tabular-nums;word-break:break-word}',
+    '.fx b{display:block;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mu);margin-bottom:2px}',
+    '.fx small{display:block;font-size:12px;color:var(--mu);margin-top:2px}',
+    '.rec{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:12px 14px;border-radius:14px;border:1.5px solid var(--pr)}',
+    '.rec>svg{width:20px;height:20px;color:var(--pr);flex:none;margin-top:1px}',
+    '.rec b{display:block;font-size:15px;color:var(--prd)}.rec span{display:block;font-size:12.5px;color:var(--mu);margin-top:2px}',
     '.big{margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff6e5;color:#7a4b00;font-size:13px}',
     '.big a{font-weight:700;text-decoration:underline}',
     '.go{margin-top:16px;font-size:14px;font-weight:700}',
@@ -592,7 +611,7 @@
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="gl"></span><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
       '<div class="ptoast" role="status"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
-      '<div class="top"><button class="back" type="button" data-act="back" aria-label="Geri">' + I.back + '</button>' +
+      '<div class="top"><button class="back" type="button" data-act="close" aria-label="Kapat">' + I.x + '</button>' +
       '<label class="field">' + I.search +
       '<input type="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Ara">' +
       '<button class="clr" type="button" data-act="clear" aria-label="Temizle">' + I.x + '</button></label>' +
@@ -683,6 +702,7 @@
     else if (act === 'stock') { onlyStock = !onlyStock; shown = PAGE; render(); }
     else if (act === 'sort') { sortMode = v; shown = PAGE; render(); }
     else if (act === 'more') { shown += PAGE; render(); }
+    else if (act === 'copy') copyText(v);
     else if (act === 'tab') { if ($q.value) { $q.value = ''; render(); } view = null; renderIdle(); setTab(v); }
     else if (act === 'gocalc') { $q.value = ''; render(); setTab('calc'); }
     else if (act === 'guide') { GID = v; renderGuide(); }
@@ -693,6 +713,7 @@
     else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
     else if (act === 'shx') closeSheet();
     else if (act === 'shgo') doAdd();
+    else if (act === 'tocm') { e.preventDefault(); var ub = $calc.querySelector('.unit [data-v="cm"]'); if (ub) calcAction('unit', 'cm', ub); }
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
   }
 
@@ -764,9 +785,6 @@
     return '<div class="im">' + (src ? '<img loading="lazy" alt="" src="' + esc(src) + '">' : I.sprout) + (extra || '') + '</div>';
   }
 
-  function searchHref(q) {
-    return STORE + (CFG.searchUrl || '/search?s={q}').replace('{q}', encodeURIComponent(q));
-  }
 
   // ---- Keşfet ----
   // Sıra: categoryOrder'dakiler verilen sırayla, sonra diğerleri (çok üründen aza), en sonda categoryLast
@@ -792,6 +810,28 @@
     }).join('');
   }
 
+  // Kampanya kartı (config.json > promo): ilk sipariş kodu ve ücretsiz kargo eşiği
+  function promoHtml() {
+    var pr = CFG.promo;
+    if (!pr || (!pr.code && !pr.shipping)) return '';
+    return '<div class="promo">' + (pr.code ? '<div class="pm1"><span class="pbadge">' + I.tag + '</span><div class="tx"><b>' + esc(pr.title || 'İlk siparişe özel indirim') + '</b>' +
+      (pr.note ? '<span>' + esc(pr.note) + '</span>' : '') + '</div>' +
+      '<button class="pcode" type="button" data-act="copy" data-v="' + esc(pr.code) + '"><b>' + esc(pr.code) + '</b><em>Kopyala</em></button></div>' : '') +
+      (pr.shipping ? '<div class="pm2">' + I.truck + '<span>' + esc(pr.shipping) + '</span></div>' : '') + '</div>';
+  }
+  function copyText(t) {
+    var ok = function () { ptoast('"' + t + '" kopyalandı, ödeme adımında kullanabilirsiniz.'); };
+    try { if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).then(ok, fallback); } catch (e) {}
+    fallback();
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = t; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      ok();
+    }
+  }
   function renderIdle() {
     if (!$home) return;
     $pages.innerHTML = '<div class="h">Sayfalar</div><div class="list">' + pageRows() + '</div>';
@@ -808,6 +848,7 @@
         pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') +
         '</div>';
     }
+    html = promoHtml() + html;
     var tops = topCats();
     if (tops.length) {
       html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="clist">' + tops.map(catRow).join('') + '</div>';
@@ -880,8 +921,7 @@
     $tools.classList.toggle('on', r.items.length > 1);
 
     if (r.items.length) {
-      $cta.innerHTML = '<a data-kind="all" data-name="' + esc(q) + '" href="' + esc(searchHref(q.trim())) + '"><span>' + r.items.length + ' sonucun tümünü gör</span>' + I.arrow + '</a>';
-      $cta.classList.add('on');
+      $cta.classList.remove('on');
     } else $cta.classList.remove('on');
 
     html += guideCards(r.tokens);
@@ -944,7 +984,7 @@
       var q = $q.value.trim();
       if (!q) return;
       if (sel >= 0 && els[sel]) els[sel].querySelector('a.ph').click();
-      else { addRecent(q); track('all', q); location.href = searchHref(q); }
+      else { addRecent(q); track('enter', q); $q.blur(); }
       return;
     } else return;
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && $q.selectionStart !== $q.value.length) { return; }
@@ -1103,6 +1143,7 @@
     var p = BY_ID[id];
     if (!p) return;
     var vs = (p.v || []).filter(function (v) { return v.id; });
+    if (typeof window.UrunAramaSepet !== 'function') loadFrame(p).catch(function () {});
     if (vs.length <= 1) { SH = { p: p, v: vs[0] || { id: p.v1, p: p.p, d: p.d, st: p.st }, qty: 1 }; doAdd(); return; }
     var first = vs.filter(vOk)[0] || vs[0];
     SH = { p: p, v: first, qty: 1 };
@@ -1115,7 +1156,8 @@
       }).join('') + '</div>' +
       '<div class="sh-f">' + (typeof window.UrunAramaSepet === 'function' ? '<div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
       '<input value="1" inputmode="numeric" aria-label="Adet" readonly><button type="button" data-act="sq" data-v="1" aria-label="Artır">' + I.plus + '</button></div>' : '') +
-      '<button class="sh-go" type="button" data-act="shgo">' + I.cart + 'Sepete ekle</button></div></div>';
+      '<button class="sh-go" type="button" data-act="shgo">' + I.cart + 'Sepete ekle</button></div>' +
+      (CFG.promo && CFG.promo.shipping ? '<div class="sh-ship">' + I.truck + esc(CFG.promo.shipping) + '</div>' : '') + '</div>';
     $sheet.classList.add('on');
   }
   function pickVariant(id) {
@@ -1191,45 +1233,70 @@
       }
     } catch (e) {}
   }
-  function addViaFrame(p, v) {
-    return new Promise(function (resolve, reject) {
-      var f = document.createElement('iframe'), done = false, saw = false, clicked = false;
-      f.name = FRAME;
-      f.setAttribute('aria-hidden', 'true');
-      f.tabIndex = -1;
-      // Masaüstü genişliğinde aç: telefonda da ürün sayfasının masaüstü düzeni kullanılır
-      f.style.cssText = 'position:fixed;left:-20000px;top:0;width:1280px;height:1000px;border:0;opacity:0;pointer-events:none;';
-      var finish = function (ok, why) {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 4000);
-        if (ok) resolve(); else reject(why);
-      };
-      var timer = setTimeout(function () { finish(false, clicked ? 'no-response' : 'timeout'); }, 25000);
+  // Ürün sayfasını görünmez çerçevede önceden yükle (müşteri "Ekle"ye bastığı an; seçenek seçerken hazır olur)
+  var FRAMES = {};
+  function loadFrame(p) {
+    var c = FRAMES[p.id];
+    if (c && Date.now() - c.t < 90000) return c.pr;
+    if (c && c.f.parentNode) c.f.parentNode.removeChild(c.f);
+    var f = document.createElement('iframe');
+    f.name = FRAME;
+    f.setAttribute('aria-hidden', 'true');
+    f.tabIndex = -1;
+    // Masaüstü genişliğinde aç: telefonda da ürün sayfasının masaüstü düzeni kullanılır
+    f.style.cssText = 'position:fixed;left:-20000px;top:0;width:1280px;height:1000px;border:0;opacity:0;pointer-events:none;';
+    var entry = { f: f, t: Date.now(), cbs: [] };
+    entry.pr = new Promise(function (resolve, reject) {
+      var to = setTimeout(function () { reject('timeout'); }, 20000);
       f.onload = function () {
+        clearTimeout(to);
         var w, d;
-        try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return finish(false, 'blocked'); }
-        watchCart(w, function () { saw = true; if (clicked) setTimeout(function () { finish(true); }, 300); });
+        try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return reject('blocked'); }
+        watchCart(w, function () { entry.cbs.forEach(function (cb) { cb(); }); });
+        resolve({ f: f, w: w, d: d, entry: entry });
+      };
+    });
+    entry.pr.catch(function () { delete FRAMES[p.id]; });
+    f.src = url(p.s) + (url(p.s).indexOf('?') < 0 ? '?' : '&') + 'ua_frame=1';
+    document.body.appendChild(f);
+    FRAMES[p.id] = entry;
+    // Kullanılmazsa 90 sn sonra kaldır
+    setTimeout(function () { if (FRAMES[p.id] === entry) { delete FRAMES[p.id]; if (f.parentNode) f.parentNode.removeChild(f); } }, 95000);
+    return entry.pr;
+  }
+  function addViaFrame(p, v) {
+    return loadFrame(p).then(function (fr) {
+      return new Promise(function (resolve, reject) {
+        var d = fr.d, done = false, clicked = false;
+        var finish = function (ok, why) {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          fr.entry.cbs = [];
+          // Aynı ürün tekrar eklenirse sayfa tazeden yüklensin
+          delete FRAMES[p.id];
+          setTimeout(function () { if (fr.f.parentNode) fr.f.parentNode.removeChild(fr.f); }, 10000);
+          if (ok) resolve(); else reject(why);
+        };
+        var timer = setTimeout(function () { finish(false, clicked ? 'no-response' : 'timeout'); }, 15000);
+        // Sadece butona basıldıktan sonraki sepet isteği sayılır (sayfa açılırken sepet sorgulanabilir)
+        fr.entry.cbs.push(function () { if (clicked) finish(true); });
         var tries = 0, picked = !((p.v || []).length > 1);
         (function step() {
           if (done) return;
           tries++;
           var btn = findAddBtn(d);
           if (btn && !picked) {
-            if (pickOnPage(v.name, d)) { picked = true; return setTimeout(step, 800); }
+            if (pickOnPage(v.name, d)) { picked = true; return setTimeout(step, 350); }
           } else if (btn) {
             clicked = true;
             btn.click();
-            if (saw) return finish(true);
-            // Sepet isteği görülmezse 8 sn sonra, buton tıklandığı için yine eklendi say
-            return setTimeout(function () { finish(true); }, 8000);
+            // Sepet isteği görülmezse 4 sn sonra, buton tıklandığı için yine eklendi say
+            return setTimeout(function () { finish(true); }, 4000);
           }
-          if (tries < 60) setTimeout(step, 300); else finish(false, btn ? 'variant' : 'button');
+          if (tries < 100) setTimeout(step, 120); else finish(false, btn ? 'variant' : 'button');
         })();
-      };
-      f.src = url(p.s) + (url(p.s).indexOf('?') < 0 ? '?' : '&') + 'ua_frame=1';
-      document.body.appendChild(f);
+      });
     });
   }
 
@@ -1291,7 +1358,7 @@
       v: function (x) { return Math.PI * x.h / 12 * (x.d1 * x.d1 + x.d1 * x.d2 + x.d2 * x.d2); } },
     box: { n: 'Dikdörtgen saksı', f: [['w', 'En'], ['l', 'Boy'], ['h', 'Yükseklik']],
       v: function (x) { return x.w * x.l * x.h; } },
-    bed: { n: 'Bahçe yatağı', f: [['bw', 'En'], ['bl', 'Boy'], ['bd', 'Toprak derinliği', 'cm']], unit: 'm',
+    bed: { n: 'Bahçe yatağı', f: [['bw', 'En'], ['bl', 'Boy'], ['bd', 'Toprak derinliği']],
       v: function (x) { return x.bw * x.bl * x.bd; } }
   };
   var SHAPE_ICON = {
@@ -1300,7 +1367,15 @@
     box: svg('<path d="M4 8.5 8 5h12v10.5L16 19H4z"/><path d="M4 8.5h12V19M16 8.5 20 5"/>'),
     bed: svg('<path d="M2 12.5 6 9.5h16v4l-4 3.5H2z"/><path d="M2 12.5h16V17M18 12.5l4-3"/>')
   };
-  var C = { shape: 'cyl', val: {}, unit: { cyl: 'cm', cone: 'cm', box: 'cm', bed: 'm' }, qty: 1, built: false };
+  var C = { shape: 'cyl', val: {}, unit: { cyl: 'cm', cone: 'cm', box: 'cm', bed: 'cm' }, qty: 1, built: false };
+  // Hesabın açık yazımı (değerler cm cinsinden): müşteri sonucu kendisi doğrulayabilsin
+  function nf(n, d) { return n.toLocaleString('tr-TR', { maximumFractionDigits: d == null ? 2 : d }); }
+  var FORMULA = {
+    cyl: function (x) { return 'π × (' + nf(x.d) + ' ÷ 2)² × ' + nf(x.h); },
+    cone: function (x) { return 'π × ' + nf(x.h) + ' ÷ 12 × (' + nf(x.d1) + '² + ' + nf(x.d1) + ' × ' + nf(x.d2) + ' + ' + nf(x.d2) + '²)'; },
+    box: function (x) { return nf(x.w) + ' × ' + nf(x.l) + ' × ' + nf(x.h); },
+    bed: function (x) { return nf(x.bw) + ' × ' + nf(x.bl) + ' × ' + nf(x.bd); }
+  };
 
   function calcEnabled() { return (CFG.calc || {}).enabled !== false; }
   function unitOf(k) {
@@ -1433,12 +1508,11 @@
       x[f[0]] = n * (unitOf(f[0]) === 'm' ? 100 : 1);
     });
     if (!ok) return null;
-    var one = s.v(x) / 1000;
-    return { one: one, total: one * C.qty };
+    var cm3 = s.v(x), one = cm3 / 1000;
+    return { x: x, cm3: cm3, one: one, total: one * C.qty };
   }
-  function fmtL(n) {
-    return n.toLocaleString('tr-TR', { maximumFractionDigits: n < 10 ? 1 : 0 }) + ' litre';
-  }
+  // 1 litre = 1.000 cm³; küçük hacimlerde 2, büyüklerde 1 ondalık
+  function fmtL(n) { return nf(n, n < 100 ? 2 : 1) + ' litre'; }
 
   // Sonuçtan sonra yönlendirilecek toprak kategorileri
   function soilCats() {
@@ -1472,10 +1546,15 @@
     }
     $calc.querySelector('.s3').classList.add('done');
     var extra = (CFG.calc || {}).extra != null ? +CFG.calc.extra : 10;
-    var rec = Math.max(1, Math.ceil(r.total * (1 + extra / 100)));
-    var html = '<div class="res"><div class="ic">' + I.bag + '</div><div><b>≈ ' + fmtL(rec) + '</b><span>' +
-      (C.qty > 1 ? C.qty + ' adet × ' + fmtL(r.one) + ' = ' + fmtL(r.total) + ' net' : 'Net hacim ' + fmtL(r.total)) +
-      ' · sulandıkça oturma payı %' + extra + ' eklendi</span></div></div>';
+    // Kayan nokta sapmasını at (100 × 1,1 = 110,00000000000001 → 111 olmasın)
+    var rec = Math.max(1, Math.ceil(+(r.total * (1 + extra / 100)).toFixed(6)));
+    var big = SHAPES[C.shape].f.some(function (f) { return num(C.val[f[0]]) > 20; }) && C.unit[C.shape] === 'm';
+    var html = (big ? '<div class="big">Metre seçiliyken 20\'den büyük değer girdiniz. Ölçüler santimetre mi? <a href="#" data-act="tocm">cm\'ye çevir</a></div>' : '') +
+      '<div class="res"><div class="ic">' + I.bag + '</div><div><b>' + fmtL(r.total) + '</b><span>' +
+      (C.qty > 1 ? C.qty + ' adet × ' + fmtL(r.one) : SHAPES[C.shape].n + ' iç hacmi') + '</span></div></div>' +
+      '<div class="fx"><b>Hesap</b>' + FORMULA[C.shape](r.x) + ' = ' + nf(r.cm3, 0) + ' cm³ = ' + fmtL(r.one) +
+      (C.qty > 1 ? '<br>' + C.qty + ' × ' + fmtL(r.one) + ' = ' + fmtL(r.total) : '') + '<small>1 litre = 1.000 cm³</small></div>' +
+      '<div class="rec">' + I.check + '<div><b>Önerilen alım: ' + nf(rec, 0) + ' litre</b><span>Toprak sulandıkça yaklaşık %' + extra + ' oturur; bu pay eklendi.</span></div></div>';
     if (r.total >= 1000) {
       html += '<div class="big">Bu yaklaşık ' + (r.total / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' m³ ediyor. ' +
         (CFG.whatsapp ? '<a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, yaklaşık ' + rec + ' litre toprak almak istiyorum.')) + '">Toplu alım için bize yazın</a>'
@@ -1618,7 +1697,14 @@
   function matches(el, s) { try { return s && el && el.matches && el.matches(s); } catch (e) { return false; } }
 
   // Sitenin arama kutusu: odak/dokunma olaylarını ikas'a hiç iletme (yoksa ikas kendi aramasını açar)
-  function siteInput(el) { return el && !isOurs(el) && matches(el, SELECTOR) && !(el.ownerDocument && el.ownerDocument !== document); }
+  // Arama kutusu mu? type=search, name=q/s ya da yer tutucusu "ara/arama/aradığınız/search" kelimesiyle başlayan bir kelime içeriyorsa
+  function isSearchInput(el) {
+    if (!el || !matches(el, SELECTOR)) return false;
+    if (ds.selector) return true;
+    if (el.type === 'search' || el.name === 'q' || el.name === 's') return true;
+    return words(fold(el.getAttribute('placeholder') || '')).some(function (w) { return /^(ara|arayin|arama|aradiginiz|search)$/.test(w); });
+  }
+  function siteInput(el) { return el && !isOurs(el) && isSearchInput(el) && !(el.ownerDocument && el.ownerDocument !== document); }
   document.addEventListener('focusin', function (e) {
     var t = e.target;
     if (!siteInput(t)) return;
@@ -1627,14 +1713,14 @@
     var v = t.value;
     t.blur();
     // Bir butona basıldıktan hemen sonra ikas'ın panelindeki kutu odaklandıysa: paneli kapat, butonu öğren
-    if (lastTap.el && lastTap.el !== t && Date.now() - lastTap.t < 1500) { learn(lastTap.el); closeNative(t, lastTap.el); lastTap = { el: null, t: 0 }; }
+    if (lastTap.el !== t && tapTrusted()) { if (closeNative(t, lastTap.el)) learn(lastTap.el); lastTap = { el: null, t: 0 }; }
     open(v);
   }, true);
 
   // Sitenin kendi arama butonuna (büyüteç vb.) basılınca ikas'ın eski araması açılmadan bizimki açılsın.
   // data-trigger / config.json "triggers" ile seçici verilebilir; verilmezse "search"/"ara" içeren
   // buton ve bağlantılar otomatik tanınır (data-auto="off" ile kapatılır).
-  var TRIGGER_RE = /(^|[^a-z])(search|arama|ara)([^a-z]|$)/;
+  var TRIGGER_RE = /(^|[^a-z])(search|arama|ara)([^a-z]|$)/;  // attrs() katlanmış metin; "parola" gibi içinde geçenler eşleşmez
   function attrs(n) {
     var c = n.getAttribute('class') || '';
     return fold([n.getAttribute('aria-label'), n.getAttribute('title'), n.id, c, n.getAttribute('data-testid'), n.getAttribute('name')].join(' '));
@@ -1650,9 +1736,11 @@
     if (n) {
       var path = (n.getAttribute('href') || '').replace(/^https?:\/\/[^/]+/, '');
       if (/^\/(search|arama)([?\/#]|$)/i.test(path) && !/[?&](s|q)=./.test(path)) return n;
+      if (isPageLink(n)) return null;
       return TRIGGER_RE.test(attrs(n)) && !n.closest('form') ? n : null;
     }
     // İkon sarmalayıcı div/span (küçük ve içinde ikon olan)
+    if (isPageLink(el)) return null;
     n = el.closest('[class*="search" i],[id*="search" i],[aria-label*="ara" i]');
     if (!n || /^(input|textarea|form|body|html)$/i.test(n.tagName) || n.querySelector('input,textarea')) return null;
     var r = n.getBoundingClientRect();
@@ -1662,11 +1750,11 @@
   ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { if (triggerOf(e.target) || siteInput(e.target)) stopAll(e); }, true);
   });
-  var lastTap = { el: null, t: 0 };
+  var lastTap = { el: null, t: 0, href: '' };
   document.addEventListener('click', function (e) {
     if (siteInput(e.target)) { stopAll(e); open(e.target.value); return; }
     var t = triggerOf(e.target);
-    if (!t) { if (!isOurs(e.target)) lastTap = { el: e.target, t: Date.now() }; return; }
+    if (!t) { if (!isOurs(e.target)) lastTap = { el: e.target, t: Date.now(), href: location.href }; return; }
     e.preventDefault();
     stopAll(e);
     open();
@@ -1674,7 +1762,17 @@
 
   // Emniyet: ikas'ın arama paneli yine de açılırsa (tanımadığımız bir butondan) onu kapat, bizimkini aç
   // ve o butonu hatırla; sonraki basışlarda ikas'ınki hiç açılmaz.
-  var LEARN_KEY = 'ua-trig', learned = [];
+  var LEARN_KEY = 'ua-trig2', learned = [];
+  try { localStorage.removeItem('ua-trig'); } catch (e) {} // eski sürümün yanlış öğrendiklerini sil
+  function isPageLink(el) {
+    var a = el && el.closest && el.closest('a[href]');
+    if (!a) return false;
+    var h = (a.getAttribute('href') || '').trim();
+    return !!h && h.charAt(0) !== '#' && !/^javascript:/i.test(h);
+  }
+  function tapTrusted() {
+    return lastTap.el && Date.now() - lastTap.t < 1500 && lastTap.href === location.href && !isPageLink(lastTap.el);
+  }
   try { learned = JSON.parse(localStorage.getItem(LEARN_KEY) || '[]') || []; } catch (e) {}
   function sig(n) { return n.tagName + '|' + (n.getAttribute('class') || '') + '|' + (n.getAttribute('aria-label') || ''); }
   function learnedOf(el) {
@@ -1682,6 +1780,7 @@
     return null;
   }
   function learn(el) {
+    if (isPageLink(el)) return;
     var n = el.closest && (el.closest('a,button,[role="button"]') || el);
     if (!n || n === document.body || n.querySelector('input')) return;
     var sg = sig(n);
@@ -1698,7 +1797,7 @@
     }
     // Tıklanan buton da aynı kapsayıcıdaysa bu bir panel değil sitenin başlığıdır; dokunma
     if (cand && tapped && cand.contains(tapped)) cand = null;
-    if (!cand) return;
+    if (!cand) return false;
     var scope = cand;
     var btns = scope.querySelectorAll('button,[role="button"],a');
     for (var j = 0; j < btns.length; j++) {
@@ -1707,6 +1806,7 @@
     }
     try { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true })); } catch (e) {}
     setTimeout(function () { if (cand && visible(input)) cand.style.setProperty('display', 'none', 'important'); }, 150);
+    return true;
   }
   if (window.MutationObserver) {
     new MutationObserver(function (muts) {
@@ -1715,12 +1815,14 @@
         for (var j = 0; j < muts[i].addedNodes.length; j++) {
           var n = muts[i].addedNodes[j];
           if (n.nodeType !== 1 || isOurs(n)) continue;
-          var inp = matches(n, SELECTOR) ? n : n.querySelector && n.querySelector(SELECTOR);
-          if (!inp || isOurs(inp)) continue;
+          var inp = isSearchInput(n) ? n : [].filter.call(n.querySelectorAll ? n.querySelectorAll(SELECTOR) : [], isSearchInput)[0];
+          if (!inp || isOurs(inp) || !visible(inp)) continue;
           var tapped = lastTap.el;
+          if (!tapTrusted()) return;
           lastTap = { el: null, t: 0 };
+          // Sadece gerçekten açılır bir panel (sabit konumlu kapsayıcı) ise kapat, butonu öğren ve bizimkini aç
+          if (!closeNative(inp, tapped)) return;
           learn(tapped);
-          closeNative(inp, tapped);
           open(inp.value || '');
           return;
         }
