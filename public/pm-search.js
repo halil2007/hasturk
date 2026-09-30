@@ -1043,7 +1043,7 @@
   function card(x) {
     var p = x.p, badges = CFG.badges || {};
     var off = p.d != null && p.p ? Math.round((1 - p.d / p.p) * 100) : 0;
-    var tagBadges = (p.best ? '<span class="badge best">' + I.star + 'Çok satan</span>' : p.own ? '<span class="badge own">' + I.leaf + 'Üreticiden</span>' : '') +
+    var tagBadges = (p.best ? '<span class="badge best">' + I.star + 'Çok satan</span>' : '') +
       (p.t || []).filter(function (t) { return badges[t]; })
       .map(function (t) { return '<span class="badge">' + esc(badges[t]) + '</span>'; }).join('');
     if (tagBadges) tagBadges = '<div class="badges">' + tagBadges + '</div>';
