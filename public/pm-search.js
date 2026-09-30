@@ -90,7 +90,9 @@
     var bulk = new RegExp(CFG.bulkPattern || '\\b\\d+([.,]\\d+)? ?ton\\b', 'i'), bulkPrice = CFG.bulkPrice || 40000;
     d.items.forEach(function (p) {
       var b = boost.indexOf(p.s);
-      p.r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (ownB.test(p.b || '') ? 2 : 0);
+      p.own = ownB.test(p.b || '');
+      p.best = (CFG.bestsellers || CFG.boost || []).indexOf(p.s) !== -1;
+      p.r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (p.own ? 2 : 0);
       if (bulk.test(p.n) || (p.p || 0) >= bulkPrice) p.r -= 8;
     });
     // Kategori görseli: config.json > categoryImages'daki ürün; yoksa kategorideki (alt kategoriler dahil)
@@ -216,6 +218,9 @@
     calc: svg('<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h1M12 11h1M8.5 14.5h1M12 14.5h1M8.5 18h1M12 18h1M15.5 11v7"/>'),
     doc: svg('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'),
     book: svg('<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5M8 7.5h8M8 11h5"/>'),
+    shield: svg('<path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-4.5"/>'),
+    leaf: svg('<path d="M5 19c0-9 6-14 15-14 0 9-5 15-14 15"/><path d="M5 19 13 11"/>'),
+    star: svg('<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>'),
     drop: svg('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
     phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
     chat: svg('<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/><path d="M9 10.5c.5 2 2 3.5 4.5 4.5l1.2-1.2 1.8.8"/>'),
@@ -518,6 +523,15 @@
     '.pname{font-size:14px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}',
     'mark{background:none;color:var(--pr);font-weight:800}',
     '.vchip{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--prd);background:var(--soft);padding:3px 8px;border-radius:7px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.badges{display:flex;flex-wrap:wrap;gap:4px}',
+    '.badge.best,.badge.own{display:inline-flex;align-items:center;gap:3px}.badge svg{width:11px;height:11px}',
+    '.badge.best{background:#fff3d6;color:#8a5a00}.badge.own{background:var(--soft);color:var(--prd)}',
+    '.trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 16px 0}',
+    '@media(min-width:760px){.trust{margin:12px 20px 0}}',
+    '.tru{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border-radius:14px;border:1px solid var(--ln);text-align:center}',
+    '.tru>svg{width:22px;height:22px;color:var(--pr)}',
+    '.tru b{display:block;font-size:12.5px;line-height:1.25;color:var(--ink)}.tru small{display:block;font-size:11px;color:var(--mu);margin-top:2px;line-height:1.3}',
+    '@media(min-width:760px){.tru{flex-direction:row;text-align:left;padding:10px 12px}.tru b{font-size:13px}}',
     '.badge{align-self:flex-start;background:#fdecea;color:var(--ac);font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px}',
     '.pr{margin-top:auto;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}',
     '.pr b{font-size:16px;font-weight:800}',
@@ -631,6 +645,7 @@
     '.res .ic svg{width:28px;height:28px}',
     '.res b{display:block;font-size:30px;font-weight:800;letter-spacing:-.01em;line-height:1.1}',
     '.res span{display:block;font-size:13px;color:#cfe3e9;margin-top:3px}',
+    '.note{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:13px;color:#44525c;line-height:1.45}.note>svg{width:17px;height:17px;flex:none;color:var(--pr);margin-top:1px}',
     '.fx{margin-top:10px;padding:12px 14px;border-radius:14px;background:var(--bg);font-size:13.5px;line-height:1.55;font-variant-numeric:tabular-nums;word-break:break-word}',
     '.fx b{display:block;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mu);margin-bottom:2px}',
     '.fx small{display:block;font-size:12px;color:var(--mu);margin-top:2px}',
@@ -665,7 +680,7 @@
   var $guide, GID = null;
   var isOpen = false, sel = -1, pushed = false;
   var catOpen = false, onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home';
-  var TABS = [['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Hacim Hesapla', 'calc', 'Hacim'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
+  var TABS = [['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
   var BY_ID = {};
 
   function build() {
@@ -819,6 +834,7 @@
   }
 
   function applyConfig() {
+    try { hideNative(); } catch (e) {}
     if (!$wrap) return;
     var c = CFG.colors || {};
     if (c.primary) $wrap.style.setProperty('--pr', c.primary);
@@ -910,6 +926,14 @@
       '<button class="pcode" type="button" data-act="copy" data-v="' + esc(pr.code) + '"><b>' + esc(pr.code) + '</b><em>Kopyala</em></button></div>' : '') +
       (pr.shipping ? '<div class="pm2">' + I.truck + '<span>' + esc(pr.shipping) + '</span></div>' : '') + '</div>';
   }
+  // Güven şeridi (config.json > trust: [{ icon: leaf|shield|chat|truck, title, text }])
+  function trustHtml() {
+    var list = CFG.trust || [];
+    if (!list.length) return '';
+    return '<div class="trust">' + list.map(function (t) {
+      return '<div class="tru">' + (I[t.icon] || I.check) + '<span><b>' + esc(t.title) + '</b>' + (t.text ? '<small>' + esc(t.text) + '</small>' : '') + '</span></div>';
+    }).join('') + '</div>';
+  }
   function copyText(t) {
     var ok = function () { ptoast('"' + t + '" kopyalandı, ödeme adımında kullanabilirsiniz.'); };
     try { if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).then(ok, fallback); } catch (e) {}
@@ -941,15 +965,15 @@
         pop.map(function (t) { return '<button class="tq" type="button" data-act="q" data-v="' + esc(t) + '">' + I.trend + esc(t) + '</button>'; }).join('') +
         '</div>';
     }
-    html = html + promoHtml() + featuredHtml();
     // Mobil: tüm kategoriler en üstte açılır-kapanır kart (masaüstünde soldaki liste var)
     var tops = topCats();
     if (tops.length) {
-      html = '<div class="catsec' + (catOpen ? ' open' : '') + '"><button class="cx" type="button" data-act="catx" aria-expanded="' + catOpen + '">' +
+      html += '<div class="catsec' + (catOpen ? ' open' : '') + '"><button class="cx" type="button" data-act="catx" aria-expanded="' + catOpen + '">' +
         '<span class="cxi">' + I.grid + '</span><span class="cxt"><b>Tüm kategoriler</b><small>' + tops.length + ' ana kategori · ' + DATA.items.length + ' ürün</small></span>' +
         '<span class="cxa">' + I.right + '</span></button>' +
-        (catOpen ? '<div class="clist">' + tops.map(catRow).join('') + '</div>' : '') + '</div>' + html;
+        (catOpen ? '<div class="clist">' + tops.map(catRow).join('') + '</div>' : '') + '</div>';
     }
+    html += promoHtml() + trustHtml() + featuredHtml();
     $home.innerHTML = homeWrap(html);
   }
 
@@ -1019,8 +1043,10 @@
   function card(x) {
     var p = x.p, badges = CFG.badges || {};
     var off = p.d != null && p.p ? Math.round((1 - p.d / p.p) * 100) : 0;
-    var tagBadges = (p.t || []).filter(function (t) { return badges[t]; })
+    var tagBadges = (p.best ? '<span class="badge best">' + I.star + 'Çok satan</span>' : '') +
+      (p.t || []).filter(function (t) { return badges[t]; })
       .map(function (t) { return '<span class="badge">' + esc(badges[t]) + '</span>'; }).join('');
+    if (tagBadges) tagBadges = '<div class="badges">' + tagBadges + '</div>';
     var vnames = (p.v || []).map(function (v) { return v.name; }).filter(Boolean);
     var chip = vnames.length > 1 ? vnames.length + ' seçenek · ' + vnames[0] + ' – ' + vnames[vnames.length - 1] : vnames[0] || '';
     var pr = p.p == null ? '' :
@@ -1516,12 +1542,7 @@
   var C = { shape: 'cyl', val: {}, unit: { cyl: 'cm', cone: 'cm', box: 'cm', bed: 'cm' }, qty: 1, built: false };
   // Hesabın açık yazımı (değerler cm cinsinden): müşteri sonucu kendisi doğrulayabilsin
   function nf(n, d) { return n.toLocaleString('tr-TR', { maximumFractionDigits: d == null ? 2 : d }); }
-  var FORMULA = {
-    cyl: function (x) { return 'π × (' + nf(x.d) + ' ÷ 2)² × ' + nf(x.h); },
-    cone: function (x) { return 'π × ' + nf(x.h) + ' ÷ 12 × (' + nf(x.d1) + '² + ' + nf(x.d1) + ' × ' + nf(x.d2) + ' + ' + nf(x.d2) + '²)'; },
-    box: function (x) { return nf(x.w) + ' × ' + nf(x.l) + ' × ' + nf(x.h); },
-    bed: function (x) { return nf(x.bw) + ' × ' + nf(x.bl) + ' × ' + nf(x.bd); }
-  };
+
 
   function calcEnabled() { return (CFG.calc || {}).enabled !== false; }
   function unitOf(k) {
@@ -1577,7 +1598,7 @@
     if (!C.built) {
       C.built = true;
       $calc.innerHTML = '<div class="calc">' +
-        '<div class="c-head"><b>Toprak hesaplayıcı</b><p>Kabını seç, ölçülerini gir; ne kadar toprak alman gerektiğini söyleyelim.</p></div>' +
+        '<div class="c-head"><b>Kaç litre toprak lazım?</b><p>Saksını ya da yatağını seç, ölçülerini gir; kaç litre toprak alman gerektiğini söyleyelim.</p></div>' +
         '<div class="step s1"><span class="sn">1</span><div class="st-t">Ne dolduracaksın?</div><div class="chips">' +
         Object.keys(SHAPES).map(function (k) {
           return '<button class="sh" type="button" data-act="shape" data-v="' + k + '">' + SHAPE_ICON[k] + esc(SHAPES[k].n) + '</button>';
@@ -1679,6 +1700,13 @@
     return picked.slice(0, 6);
   }
 
+  // En az litre (paket katına yuvarlanmış), sonra en az torba: 26 L → 30 L = 1 × 20 L + 1 × 10 L
+  function packs(l) {
+    var sizes = ((CFG.calc || {}).packs || [5, 10, 20, 40]).slice().sort(function (a, b) { return b - a; });
+    var step = sizes[sizes.length - 1], total = Math.max(step, Math.ceil(l / step - 1e-9) * step), left = total, parts = [];
+    sizes.forEach(function (z) { var n = Math.floor(left / z + 1e-9); if (n) { parts.push(n + ' × ' + z + ' L'); left -= n * z; } });
+    return { total: total, text: total >= 1000 ? 'Toplu alımda size özel fiyat verelim.' : parts.join(' + ') + ' torba' };
+  }
   function calcUpdate() {
     var out = $calc.querySelector('.out');
     if (!out) return;
@@ -1692,15 +1720,16 @@
     }
     $calc.querySelector('.s3').classList.add('done');
     var extra = (CFG.calc || {}).extra != null ? +CFG.calc.extra : 10;
-    // Kayan nokta sapmasını at (100 × 1,1 = 110,00000000000001 → 111 olmasın)
-    var rec = Math.max(1, Math.ceil(+(r.total * (1 + extra / 100)).toFixed(6)));
+    // Sulandıkça oturma payı dahil gereken miktar; alım önerisi eldeki paket boyutlarına yuvarlanır
+    var want = +(r.total * (1 + extra / 100)).toFixed(6), pk = packs(want), rec = pk.total;
     var big = SHAPES[C.shape].f.some(function (f) { return num(C.val[f[0]]) > 20; }) && C.unit[C.shape] === 'm';
     var html = (big ? '<div class="big">Metre seçiliyken 20\'den büyük değer girdiniz. Ölçüler santimetre mi? <a href="#" data-act="tocm">cm\'ye çevir</a></div>' : '') +
-      '<div class="res"><div class="ic">' + I.bag + '</div><div><b>' + fmtL(r.total) + '</b><span>' +
-      (C.qty > 1 ? C.qty + ' adet × ' + fmtL(r.one) : SHAPES[C.shape].n + ' iç hacmi') + '</span></div></div>' +
-      '<div class="fx"><b>Hesap</b>' + FORMULA[C.shape](r.x) + ' = ' + nf(r.cm3, 0) + ' cm³ = ' + fmtL(r.one) +
-      (C.qty > 1 ? '<br>' + C.qty + ' × ' + fmtL(r.one) + ' = ' + fmtL(r.total) : '') + '<small>1 litre = 1.000 cm³</small></div>' +
-      '<div class="rec">' + I.check + '<div><b>Önerilen alım: ' + nf(rec, 0) + ' litre</b><span>Toprak sulandıkça yaklaşık %' + extra + ' oturur; bu pay eklendi.</span></div></div>';
+      '<div class="res"><div class="ic">' + I.bag + '</div><div><b>' + fmtL(want) + '</b><span>' +
+      (C.qty > 1 ? C.qty + ' adet ' + SHAPES[C.shape].n.toLocaleLowerCase('tr') + ' için' : SHAPES[C.shape].n + ' için') +
+      ' gereken toprak</span></div></div>' +
+      '<div class="note">' + I.drop + '<span>Toprak sulandıkça yaklaşık %' + extra + ' oturur; bu pay hesaba <b>dahildir</b>' +
+      (extra ? ' (net hacim ' + fmtL(r.total) + ')' : '') + '.</span></div>' +
+      '<div class="rec">' + I.check + '<div><b>Önerilen alım: ' + nf(rec, 0) + ' litre</b><span>' + pk.text + '</span></div></div>';
     if (r.total >= 1000) {
       html += '<div class="big">Bu yaklaşık ' + (r.total / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' m³ ediyor. ' +
         (CFG.whatsapp ? '<a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, yaklaşık ' + rec + ' litre toprak almak istiyorum.')) + '">Toplu alım için bize yazın</a>'
@@ -1709,7 +1738,7 @@
     if (DATA) {
       var cats = soilCats();
       if (cats.length) {
-        html += '<p class="go">Şimdi uygun toprağı seç<small>Ürün sayfasında toplam ' + fmtL(rec) + ' edecek litre seçeneklerini seçebilirsin.</small></p>' +
+        html += '<p class="go">Şimdi uygun toprağı seç' + (rec < 1000 ? '<small>Ürün sayfasında ' + esc(pk.text) + ' seçebilirsin.</small>' : '') + '</p>' +
           '<div class="gocats">' + cats.map(function (c, i) {
             return '<button type="button" data-act="catp" data-v="' + esc(c.id) + '" class="gc' + (i === 0 ? ' first' : '') + '">' +
               thumb(c.img, 180) + '<div class="tx"><b>' + esc(c.n) + '</b><small>' + c.k + ' ürün</small></div>' + I.arrow + '</button>';
@@ -1959,8 +1988,34 @@
     }
     try { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true })); } catch (e) {}
     setTimeout(function () { if (cand && visible(input)) cand.style.setProperty('display', 'none', 'important'); }, 150);
+    rememberOverlay(cand);
     return true;
   }
+  // ikas'ın arama penceresi: gördüğümüzü kaydet (#ua-debug ile görülür, config.json'a eklenip herkese uygulanır)
+  var OVL_KEY = 'ua-ovl', ovl = [];
+  try { ovl = JSON.parse(localStorage.getItem(OVL_KEY) || '[]') || []; } catch (e) {}
+  function rememberOverlay(n) {
+    var cls = (n.getAttribute('class') || '').split(/\s+/).filter(function (c) { return /^[a-z_-][\w-]*$/i.test(c); });
+    var sl = n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (cls.length ? '.' + cls.join('.') : '');
+    if (ovl.indexOf(sl) !== -1) return;
+    ovl = [sl].concat(ovl).slice(0, 3);
+    try { localStorage.setItem(OVL_KEY, JSON.stringify(ovl)); } catch (e) {}
+  }
+  // config.json > hideNative: ikas'ın arama penceresinin seçicisi; tüm ziyaretçilerde hiç görünmez
+  function hideNative() {
+    if (!CFG.hideNative || document.getElementById('ua-hide-native')) return;
+    var st = document.createElement('style');
+    st.id = 'ua-hide-native';
+    st.textContent = CFG.hideNative + '{display:none!important}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+  // Arama formu gönderilirse (Enter / ara butonu) ikas'ın sonuç sayfasına gitme, bizimkini aç
+  document.addEventListener('submit', function (e) {
+    var f = e.target, inp = f && f.querySelector && [].filter.call(f.querySelectorAll(SELECTOR), function (x) { return !isOurs(x) && isSearchInput(x); })[0];
+    if (!inp || isOurs(f)) return;
+    e.preventDefault(); stopAll(e);
+    open(inp.value || '');
+  }, true);
   function visibleSearchInputs() {
     return [].filter.call(document.querySelectorAll(SELECTOR), function (el) { return !isOurs(el) && isSearchInput(el) && visible(el); });
   }
@@ -2018,8 +2073,27 @@
     var go = function () { open('', h === '#hacim-hesapla' ? 'calc' : 'home'); };
     if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);
   }
+  // #ua-debug: telefonda öğrenilen ikas arama butonu/penceresini gösterir ve kopyalar (config.json'a eklemek için)
+  function debugHash() {
+    if (location.hash !== '#ua-debug') return;
+    var txt = JSON.stringify({ trig: learned, ovl: ovl });
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
+    var go = function () { window.prompt('Bu metni kopyalayıp gönderin:', txt); };
+    if (document.body) setTimeout(go, 300); else document.addEventListener('DOMContentLoaded', go);
+  }
+  window.addEventListener('hashchange', debugHash);
+  debugHash();
   window.addEventListener('hashchange', fromHash);
   fromHash();
+
+  // ikas'ın arama sonuç sayfasına bir şekilde gelinirse (eski bağlantı, Google vb.) bizim paneli o aramayla aç
+  (function fromSearchPage() {
+    if (!/^\/(search|arama)\/?$/i.test(location.pathname) || ds.searchPage === 'off') return;
+    var m = location.search.match(/[?&](q|s|query|keyword)=([^&]*)/);
+    var q = m ? decodeURIComponent(m[2].replace(/\+/g, ' ')) : '';
+    var go = function () { open(q); };
+    if (document.body) setTimeout(go, 0); else document.addEventListener('DOMContentLoaded', go);
+  })();
 
   window.UrunArama = window.PMSearch = { open: open, close: close, calc: function () { open('', 'calc'); }, search: function (q) { return load().then(function () { return search(q); }); } };
 })();
