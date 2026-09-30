@@ -301,8 +301,9 @@
     /* Mobil alt çubuk */
     '.mfoot{flex:none;display:none;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);background:#fff}',
     '.mfoot.on{display:flex}',
-    '@media(min-width:760px){.mfoot.on{display:none}}',
-    '.typing .mfoot{display:none!important}',
+
+    '.mfoot .tel .tl{display:none}@media(min-width:760px){.mfoot .tel .tl{display:inline}}',
+    '@media(max-width:759px){.typing .mfoot{display:none!important}}',
     '.mfoot a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:22px;font-weight:700;font-size:14px}',
     '.mfoot a svg{width:18px;height:18px}',
     '.mfoot .wa{background:#25a162;color:#fff}',
@@ -374,8 +375,8 @@
 
     /* Kategoriler */
     '.tabs{flex:none;display:flex;border-bottom:1px solid var(--ln);background:#fff}',
-    '@media(min-width:760px){.tabs{display:none}}',
-    '.typing .tabs{display:none}',
+    '.tb .tl{display:none}',
+
     '.tb{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:46px;font-size:13.5px;font-weight:700;color:var(--mu);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap}',
     '.tb svg{display:none}',
     '@media(max-width:379px){.tb{font-size:12.5px}}',
@@ -426,6 +427,21 @@
     '.gcard .gc-f a{flex:1;display:flex;align-items:center;justify-content:center;height:38px;border-radius:12px;font-size:13px;font-weight:700;background:var(--bg)}',
     '.gcard .gc-f a.pri{background:var(--pr);color:#fff}',
     '.tb.on{color:var(--pr);border-bottom-color:var(--pr)}',
+    '.hw{display:block}.cside{display:none}',
+    '@media(min-width:760px){.hw{display:grid;grid-template-columns:250px minmax(0,1fr);align-items:start}',
+    ' .cside{display:block;position:sticky;top:0;max-height:calc(min(84vh,760px) - 170px);overflow-y:auto;padding:0 8px 16px 12px;border-right:1px solid var(--ln);scrollbar-width:thin}',
+    ' .hw .catsec{display:none}.hm{min-width:0}}',
+    '.cside .h{padding:18px 8px 8px}',
+    '.tr{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:8px 10px;border-radius:12px;text-align:left;font-size:14px;font-weight:600;color:#33414b}',
+    '.tr:hover{background:var(--bg)}',
+    '.tr>svg{width:16px;height:16px;flex:none;color:var(--mu);transition:transform .2s}',
+    '.tr>i{width:16px;flex:none}',
+    '.tr.op>svg{transform:rotate(90deg)}',
+    '.tr span{flex:1;min-width:0;line-height:1.3}',
+    '.tr small{flex:none;font-size:12px;font-weight:600;color:var(--mu);background:var(--bg);border-radius:10px;padding:1px 8px}',
+    '.tr.on{background:var(--soft);color:var(--prd)}.tr.on small{background:#fff}',
+    '.tr.d1{padding-left:34px;font-weight:500;min-height:36px;font-size:13.5px}',
+    '.tr.d2{padding-left:48px;font-weight:500;min-height:34px;font-size:13px}',
     '.clist{padding:0 8px}',
     '@media(min-width:760px){.clist{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:0 12px}}',
     '.li{display:flex;align-items:center;gap:12px;width:100%;padding:8px;border-radius:16px;text-align:left}',
@@ -613,7 +629,18 @@
     '.gc:hover{border-color:var(--pr)}',
     '.gc .im{width:48px;height:48px}',
     '.gc .tx{flex:1;min-width:0}.gc b{display:block;font-size:14px;line-height:1.25}.gc small{font-size:12px;color:var(--mu)}',
-    '.gc>svg{width:18px;height:18px;color:var(--pr);flex:none}'
+    '.gc>svg{width:18px;height:18px;color:var(--pr);flex:none}',
+    /* Masaüstü geçersiz kılmaları (temel kurallardan sonra) */
+    '@media(min-width:760px){',
+    ' .tabs{justify-content:flex-start;gap:4px;padding:8px 16px 0;background:var(--bg);border-bottom:1px solid var(--ln)}',
+    ' .tb{flex:none;padding:0 18px;height:44px;font-size:14px;border-radius:12px 12px 0 0;border:1px solid transparent;border-bottom:0;margin-bottom:-1px;color:#4b5963}',
+    ' .tb svg{display:block;width:18px;height:18px}.tb .tl{display:inline}.tb .ts{display:none}',
+    ' .tb:hover{color:var(--ink)}',
+    ' .tb.on{background:#fff;border-color:var(--ln);color:var(--pr)}',
+    ' .mfoot{justify-content:flex-start;padding:10px 20px}.mfoot a{flex:none;padding:0 18px;height:42px}',
+    ' .mfoot .tel .ts{display:none}',
+    ' .cban{display:flex;justify-content:center;background:var(--bg)}.cban img{width:auto;max-width:100%;max-height:300px}',
+    '}'
   ].join('\n');
 
   var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $sheet, $toast;
@@ -633,17 +660,16 @@
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="gl"></span><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
       '<div class="ptoast" role="status"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
+      '<div class="tabs" role="tablist">' + TABS.map(function (t) {
+        return '<button class="tb" type="button" role="tab" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span class="tl">' + t[1] + '</span><span class="ts">' + t[3] + '</span></button>';
+      }).join('') + '</div>' +
       '<div class="top"><button class="back" type="button" data-act="close" aria-label="Kapat">' + I.x + '</button>' +
       '<label class="field">' + I.search +
       '<input type="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Ara">' +
       '<button class="clr" type="button" data-act="clear" aria-label="Temizle">' + I.x + '</button></label>' +
       '<button class="xbtn" type="button" data-act="close" aria-label="Kapat">' + I.x + '</button></div>' +
-      '<div class="mid"><nav class="rail">' + TABS.map(function (t) {
-        return '<button class="nav" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[1] + '</span></button>';
-      }).join('') + '<div class="help"></div></nav>' +
-      '<div class="main"><div class="tabs">' + TABS.map(function (t) {
-        return '<button class="tb" type="button" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span>' + t[3] + '</span></button>';
-      }).join('') + '</div><div class="tools"></div>' +
+      '<div class="mid"><div class="help" hidden></div>' +
+      '<div class="main"><div class="tools"></div>' +
       '<div class="body"><div class="idle"><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane guide"></div><div class="pane pages"></div></div>' +
       '<div class="results" aria-live="polite"></div></div>' +
       '<div class="cta"></div><div class="mfoot"></div>' +
@@ -657,7 +683,6 @@
     $panel = root.querySelector('.panel');
     $q = root.querySelector('.top input');
     $clr = root.querySelector('.clr');
-    $rail = root.querySelector('.rail');
     $help = root.querySelector('.help');
     $tools = root.querySelector('.tools');
     $res = root.querySelector('.results');
@@ -793,7 +818,7 @@
     $help.innerHTML = wa || telHref ? '<b>Yardım mı lazım?</b><p>Doğru ürünü birlikte seçelim.</p>' + wa +
       (telHref ? '<a class="tel" data-kind="phone" data-name="phone" href="' + esc(telHref) + '">' + I.phone + '<span>' + esc(CFG.phone) + '</span></a>' : '') : '';
     $help.style.display = wa || telHref ? '' : 'none';
-    $mfoot.innerHTML = wa + (telHref ? '<a class="tel" data-kind="phone" data-name="phone" href="' + esc(telHref) + '">' + I.phone + '<span>Bizi arayın</span></a>' : '');
+    $mfoot.innerHTML = wa + (telHref ? '<a class="tel" data-kind="phone" data-name="phone" href="' + esc(telHref) + '">' + I.phone + '<span class="ts">Bizi arayın</span><span class="tl">' + esc(CFG.phone) + '</span></a>' : '');
     $mfoot.classList.toggle('on', !!(wa || telHref));
     renderIdle();
     setTab(tab);
@@ -880,8 +905,8 @@
     if (!$home) return;
     $pages.innerHTML = '<div class="h">Sayfalar</div><div class="list">' + pageRows() + '</div>';
     if (!DATA) { $home.innerHTML = '<div class="spin"></div>'; return; }
-    if (view && view.indexOf('p:') === 0 && CATS_BY_ID[view.slice(2)]) { $home.innerHTML = renderCatProducts(CATS_BY_ID[view.slice(2)]); return; }
-    if (view && CATS_BY_ID[view]) { $home.innerHTML = renderCat(CATS_BY_ID[view]); return; }
+    if (view && view.indexOf('p:') === 0 && CATS_BY_ID[view.slice(2)]) { $home.innerHTML = homeWrap(renderCatProducts(CATS_BY_ID[view.slice(2)])); return; }
+    if (view && CATS_BY_ID[view]) { $home.innerHTML = homeWrap(renderCat(CATS_BY_ID[view])); return; }
     view = null;
     var html = '';
     var rec = getRecent(), pop = CFG.popular || [];
@@ -896,9 +921,25 @@
     html = promoHtml() + featuredHtml() + html;
     var tops = topCats();
     if (tops.length) {
-      html += '<div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="clist">' + tops.map(catRow).join('') + '</div>';
+      html += '<div class="catsec"><div class="h">Kategoriler<small>' + DATA.items.length + ' ürün</small></div><div class="clist">' + tops.map(catRow).join('') + '</div></div>';
     }
-    $home.innerHTML = html;
+    $home.innerHTML = homeWrap(html);
+  }
+
+  // Masaüstü: solda her zaman görünen kategori listesi (seçili olan ve üstleri açık), sağda içerik
+  function homeWrap(main) {
+    var cur = view ? CATS_BY_ID[view.indexOf('p:') === 0 ? view.slice(2) : view] : null, open = {};
+    for (var c = cur; c; c = c.p && CATS_BY_ID[c.p]) open[c.id] = 1;
+    var row = function (c, depth) {
+      var kids = (KIDS[c.id] || []).slice().sort(function (a, b) { return b.k - a.k; });
+      var isOpen = open[c.id] && kids.length;
+      return '<button class="tr d' + depth + (cur && cur.id === c.id ? ' on' : '') + (isOpen ? ' op' : '') + '" type="button" data-act="catp" data-v="' + esc(c.id) + '">' +
+        (depth ? '' : (kids.length ? I.right : '<i></i>')) + '<span>' + esc(c.n) + '</span><small>' + c.k + '</small></button>' +
+        (isOpen ? kids.map(function (k) { return row(k, depth + 1); }).join('') : '');
+    };
+    return '<div class="hw"><aside class="cside"><div class="h">Kategoriler</div>' +
+      '<button class="tr d0' + (!cur ? ' on' : '') + '" type="button" data-act="cat" data-v="">' + I.grid + '<span>Tümü</span><small>' + DATA.items.length + '</small></button>' +
+      topCats().map(function (c) { return row(c, 0); }).join('') + '</aside><div class="hm">' + main + '</div></div>';
   }
 
   function renderCat(c) {
