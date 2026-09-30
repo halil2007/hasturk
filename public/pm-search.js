@@ -57,8 +57,8 @@
     return Number(n).toLocaleString('tr-TR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' TL';
   }
   // Sepet tutarı (ücretsiz kargo çubuğu için): sitenin sepet/GraphQL yanıtlarındaki ikas sepet nesnesinden okunur
-  var CART = null, CART_KEY = 'ua-cart';
-  try { var cs0 = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null'); if (cs0 && Date.now() - cs0.t < 6 * 3600e3) CART = cs0.v; } catch (e) {}
+  var CART = null, CART_N = null, CART_ID = null, CART_KEY = 'ua-cart';
+  try { var cs0 = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null'); if (cs0 && Date.now() - cs0.t < 6 * 3600e3) { CART = cs0.v; CART_N = cs0.n != null ? cs0.n : null; CART_ID = cs0.id || null; } } catch (e) {}
   function findCart(o, d) {
     if (!o || typeof o !== 'object' || d > 7) return null;
     if (Array.isArray(o.orderLineItems) && (o.totalFinalPrice != null || o.totalPrice != null)) return o;
@@ -71,7 +71,9 @@
     var v = c.orderLineItems.length ? +(c.totalFinalPrice != null ? c.totalFinalPrice : c.totalPrice) : 0;
     if (isNaN(v)) return;
     CART = v;
-    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, t: Date.now() })); } catch (e) {}
+    CART_N = c.orderLineItems.reduce(function (a, it) { return a + (+(it && it.quantity) || 1); }, 0);
+    if (c.id) CART_ID = c.id;
+    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, n: CART_N, t: Date.now(), id: CART_ID })); } catch (e) {}
     updateShip();
   }
   var CART_URL = /graphql|cart|sepet/i;
@@ -325,6 +327,11 @@
     ' border-radius:24px;box-shadow:0 30px 90px rgba(5,25,35,.35);animation:none}}',
 
     '.top{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px}',
+    '.cbtn{position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none;background:var(--soft);color:var(--prd)}',
+    '.cbtn svg{width:21px;height:21px}.cbtn:hover{background:#d6eaf0}',
+    '.cn{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--ac);color:#fff;font-size:11px;font-weight:800;line-height:19px;text-align:center;box-shadow:0 0 0 2px #fff;display:none}',
+    '.cn.on{display:block;animation:cnpop .35s cubic-bezier(.3,1.6,.5,1)}',
+    '@keyframes cnpop{from{transform:scale(.3)}}',
     '.back,.xbtn{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none}',
     '.back{background:var(--bg)}.back svg{width:22px;height:22px}',
     '.back{display:none;background:var(--bg)}.panel.sub .back{display:grid}.xbtn{display:grid;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
@@ -763,6 +770,7 @@
       '<label class="field">' + I.search +
       '<input type="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Ara">' +
       '<button class="clr" type="button" data-act="clear" aria-label="Temizle">' + I.x + '</button></label>' +
+      '<a class="cbtn" data-kind="page" data-name="Sepet" aria-label="Sepetim">' + I.cart + '<b class="cn"></b></a>' +
       '<button class="xbtn" type="button" data-act="close" aria-label="Kapat">' + I.x + '</button></div>' +
       '<div class="mid"><div class="help" hidden></div>' +
       '<div class="main"><div class="tools"></div>' +
@@ -790,6 +798,7 @@
     $body = root.querySelector('.body');
     $cta = root.querySelector('.cta');
     $mfoot = root.querySelector('.mfoot');
+    updateShip();
     $sheet = root.querySelector('.sheet');
     $toast = root.querySelector('.toast');
     $q.placeholder = 'Ürün veya kategori ara';
@@ -1018,6 +1027,15 @@
   }
   function updateShip() {
     if (!root) return;
+    var cb = root.querySelector('.cbtn');
+    if (cb) cb.setAttribute('href', pageHref(CFG.cartUrl || '/cart'));
+    var cn = root.querySelector('.cn');
+    if (cn) {
+      var had = cn.textContent, txt = CART_N > 99 ? '99+' : CART_N > 0 ? String(CART_N) : '';
+      cn.textContent = txt;
+      cn.classList.toggle('on', !!txt);
+      if (txt && had && had !== txt) { cn.classList.remove('on'); void cn.offsetWidth; cn.classList.add('on'); }
+    }
     [].forEach.call(root.querySelectorAll('.pmship'), function (el) { el.innerHTML = shipText(true); });
     var bar = root.querySelector('.shipbar'), lim = shipLimit();
     if (!bar) return;
@@ -1415,7 +1433,7 @@
     var p = BY_ID[id];
     if (!p) return;
     var vs = (p.v || []).filter(function (v) { return v.id; });
-    if (typeof window.UrunAramaSepet !== 'function') loadFrame(p).catch(function () {});
+    if (typeof window.UrunAramaSepet !== 'function') prepAdd(p);
     if (vs.length <= 1) { SH = { p: p, v: vs[0] || { id: p.v1, p: p.p, d: p.d, st: p.st }, qty: 1 }; doAdd(); return; }
     var first = vs.filter(vOk)[0] || vs[0];
     SH = { p: p, v: first, qty: 1 };
@@ -1460,11 +1478,11 @@
     // Ürün sayfasını görünmez bir çerçevede aç; seçeneği seçip sitenin kendi "Sepete Ekle" butonuna bas.
     // Müşteri arama panelinden ayrılmaz.
     setBusy(p.id, true);
-    addViaFrame(p, v).then(function () {
+    directAdd(p, v).catch(function () { return queueFrameAdd(p, v); }).then(function (how) {
       setBusy(p.id, false);
       closeSheet();
       // Sepet yanıtı işlensin, kalan ücretsiz kargo tutarı bildirimde görünsün
-      setTimeout(function () { ptoast('Sepete eklendi' + (v.name ? ': ' + v.name : '') + shipNote(), false, true); }, 300);
+      setTimeout(function () { ptoast('Sepete eklendi' + (v.name ? ': ' + v.name : '') + shipNote(), false, true); }, how === 'direct' ? 0 : 300);
       track('add_to_cart_ok', p.n);
     }, function (why) {
       setBusy(p.id, false);
@@ -1527,6 +1545,7 @@
         try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return reject('blocked'); }
         watchCart(w, function () { entry.cbs.forEach(function (cb) { cb(); }); });
         sniffCart(w);
+        learnAdd(w);
         resolve({ f: f, w: w, d: d, entry: entry });
       };
     });
@@ -1538,8 +1557,172 @@
     setTimeout(function () { if (FRAMES[p.id] === entry) { delete FRAMES[p.id]; if (f.parentNode) f.parentNode.removeChild(f); } }, 95000);
     return entry.pr;
   }
+  // ---- Hızlı ekleme 1: sitenin sepete ekleme isteğini bir kez öğren, sonra sayfa açmadan doğrudan gönder ----
+  var TPL_KEY = 'ua-addtpl', ADD_TPL = null, PENDING = null;
+  try { ADD_TPL = JSON.parse(localStorage.getItem(TPL_KEY) || 'null'); } catch (e) {}
+  function plainHeaders(h, w) {
+    var o = {};
+    try {
+      if (!h) return o;
+      if (w && w.Headers && h instanceof w.Headers || typeof h.forEach === 'function' && !Array.isArray(h)) h.forEach(function (v, k) { o[k] = v; });
+      else if (Array.isArray(h)) h.forEach(function (x) { o[x[0]] = x[1]; });
+      else for (var k in h) o[k] = h[k];
+    } catch (e) {}
+    return o;
+  }
+  function keepTpl(t, json) {
+    if (!json || json.errors || !findCart(json)) return;
+    var c = findCart(json);
+    if (c.id) CART_ID = c.id;
+    ADD_TPL = t;
+    try { localStorage.setItem(TPL_KEY, JSON.stringify(t)); } catch (e) {}
+  }
+  function learnAdd(w) {
+    try {
+      var of = w.fetch;
+      if (of && !of.__uaLearn) {
+        w.fetch = function (u, o) {
+          var pd = PENDING, body = o && typeof o.body === 'string' ? o.body : '', t = null;
+          if (pd && body && body.indexOf(pd.vid) !== -1) {
+            t = { url: new w.URL(u && u.url || String(u), w.location.href).href, method: (o.method || 'POST'), headers: plainHeaders(o.headers, w),
+              body: body, cred: o.credentials || '', vid: pd.vid, pid: pd.pid };
+          }
+          return of.apply(this, arguments).then(function (r) {
+            if (t && r && r.ok) r.clone().json().then(function (j) { keepTpl(t, j); }, function () {});
+            return r;
+          });
+        };
+        w.fetch.__uaLearn = true;
+      }
+      var X = w.XMLHttpRequest && w.XMLHttpRequest.prototype;
+      if (X && !X.__uaLearn) {
+        X.__uaLearn = true;
+        var oo = X.open, os = X.send, sh = X.setRequestHeader;
+        X.open = function (m, u) { this.__uaM = m; this.__uaL = new w.URL(String(u), w.location.href).href; this.__uaH = {}; return oo.apply(this, arguments); };
+        X.setRequestHeader = function (k, v) { if (this.__uaH) this.__uaH[k] = v; return sh.apply(this, arguments); };
+        X.send = function (b) {
+          var pd = PENDING;
+          if (pd && typeof b === 'string' && b.indexOf(pd.vid) !== -1) {
+            var t = { url: this.__uaL, method: this.__uaM || 'POST', headers: this.__uaH || {}, body: b, cred: this.withCredentials ? 'include' : '', vid: pd.vid, pid: pd.pid };
+            this.addEventListener('load', function () {
+              if (this.status < 400) try { keepTpl(t, this.responseType === 'json' ? this.response : JSON.parse(this.responseText)); } catch (e) {}
+            });
+          }
+          return os.apply(this, arguments);
+        };
+      }
+    } catch (e) {}
+  }
+  function directAdd(p, v) {
+    var t = ADD_TPL;
+    if (!t || p.bn || !v || !v.id || (CFG.cart || {}).direct === false) return Promise.reject('no-template');
+    var body = t.body.split(t.vid).join(v.id).split(t.pid).join(p.id), hasCart = false;
+    try {
+      var j = JSON.parse(body);
+      (function walk(o) {
+        if (!o || typeof o !== 'object') return;
+        for (var k in o) {
+          if (k === 'cartId') { if (CART_ID) o[k] = CART_ID; hasCart = !!o[k]; }
+          else walk(o[k]);
+        }
+      })(j);
+      body = JSON.stringify(j);
+    } catch (e) {}
+    if (!hasCart) return Promise.reject('no-cart'); // yeni sepet açıp sitenin sepetinden ayrı düşmesin
+    var ctl = window.AbortController ? new AbortController() : null;
+    var to = setTimeout(function () { if (ctl) ctl.abort(); }, 8000);
+    var init = { method: t.method, headers: t.headers, body: body, signal: ctl ? ctl.signal : undefined };
+    if (t.cred) init.credentials = t.cred;
+    return fetch(t.url, init).then(function (r) {
+      clearTimeout(to);
+      if (!r.ok) throw 'http-' + r.status;
+      return r.json();
+    }).then(function (j) {
+      if (j && j.errors && j.errors.length) throw 'gql';
+      setCart(j);
+      track('add_direct', p.n);
+      return 'direct';
+    }).catch(function (e) {
+      clearTimeout(to);
+      // Şablon artık geçmiyorsa (sepet kapandı, kural değişti) unut; bir sonraki eklemede tekrar öğrenilir
+      if (e === 'gql' || /^http-4/.test(String(e))) { ADD_TPL = null; try { localStorage.removeItem(TPL_KEY); } catch (x) {} }
+      throw e;
+    });
+  }
+
+  // ---- Hızlı ekleme 2: tek, önceden yüklenmiş gizli çerçeve; ürünler sitenin kendi sayfa geçişiyle açılır ----
+  var WARM = null, ADDQ = Promise.resolve();
+  function pathOf(p) { try { return new URL(url(p.s), location.href).pathname; } catch (e) { return ''; } }
+  function warmFrame() {
+    if (WARM) return WARM.pr;
+    var first = (CFG.boost || [])[0], p0 = first && DATA && DATA.items.filter(function (x) { return x.s === first; })[0] || (DATA && DATA.items[0]);
+    if (!p0 || !document.body) return Promise.reject('no-data');
+    var f = document.createElement('iframe');
+    f.name = FRAME;
+    f.setAttribute('aria-hidden', 'true');
+    f.tabIndex = -1;
+    f.style.cssText = 'position:fixed;left:-20000px;top:0;width:1280px;height:1000px;border:0;opacity:0;pointer-events:none;';
+    var entry = { f: f, cbs: [] };
+    WARM = { entry: entry };
+    WARM.pr = new Promise(function (resolve, reject) {
+      var to = setTimeout(function () { reject('timeout'); }, 25000);
+      f.onload = function () {
+        if (WARM && WARM.fr) return; // sayfa içi geçişlerde tekrar yükleme olursa
+        clearTimeout(to);
+        var w, d;
+        try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return reject('blocked'); }
+        watchCart(w, function () { entry.cbs.forEach(function (cb) { cb(); }); });
+        sniffCart(w);
+        learnAdd(w);
+        WARM.fr = { f: f, w: w, d: d, entry: entry, warm: true };
+        resolve(WARM.fr);
+      };
+    });
+    WARM.pr.catch(function () { if (f.parentNode) f.parentNode.removeChild(f); WARM = null; });
+    f.src = url(p0.s) + (url(p0.s).indexOf('?') < 0 ? '?' : '&') + 'ua_frame=1';
+    document.body.appendChild(f);
+    return WARM.pr;
+  }
+  // Sıcak çerçevede ürüne geç (Next.js yönlendiricisi varsa tam sayfa yüklemeden, genelde 1 sn altında)
+  function navWarm(p) {
+    return warmFrame().then(function (fr) {
+      var w = fr.w, r = w.next && w.next.router, path = pathOf(p);
+      if (!r || typeof r.push !== 'function' || !r.events || !path) throw 'no-router';
+      fr.d = w.document;
+      if (w.location.pathname === path) return fr;
+      return new Promise(function (resolve, reject) {
+        var done = false;
+        var end = function (ok) {
+          if (done) return;
+          done = true;
+          try { r.events.off('routeChangeComplete', okH); r.events.off('routeChangeError', errH); } catch (e) {}
+          if (ok) setTimeout(function () { fr.d = w.document; resolve(fr); }, 120); else reject('route');
+        };
+        var okH = function () { end(w.location.pathname === path); }, errH = function () { end(false); };
+        r.events.on('routeChangeComplete', okH);
+        r.events.on('routeChangeError', errH);
+        setTimeout(function () { end(false); }, 7000);
+        try { r.push(path).catch(function () { end(false); }); } catch (e) { end(false); }
+      });
+    });
+  }
+  function frameFor(p) {
+    return navWarm(p).catch(function () { return loadFrame(p); });
+  }
+  // Eklemeler sırayla (aynı gizli çerçeve iki ürüne aynı anda gitmesin)
+  function queueFrameAdd(p, v) {
+    var run = ADDQ.then(function () { return addViaFrame(p, v); });
+    ADDQ = run.catch(function () {});
+    return run;
+  }
+  // "Ekle"ye basılınca: doğrudan ekleme hazır değilse ürünü sıcak çerçevede şimdiden aç
+  function prepAdd(p) {
+    if (ADD_TPL && !p.bn && CART_ID) return;
+    if (SH.busy) return;
+    navWarm(p).catch(function () { loadFrame(p).catch(function () {}); });
+  }
   function addViaFrame(p, v) {
-    return loadFrame(p).then(function (fr) {
+    return frameFor(p).then(function (fr) {
       return new Promise(function (resolve, reject) {
         var d = fr.d, done = false, clicked = false;
         var finish = function (ok, why) {
@@ -1547,9 +1730,12 @@
           done = true;
           clearTimeout(timer);
           fr.entry.cbs = [];
-          // Aynı ürün tekrar eklenirse sayfa tazeden yüklensin
-          delete FRAMES[p.id];
-          setTimeout(function () { if (fr.f.parentNode) fr.f.parentNode.removeChild(fr.f); }, 10000);
+          PENDING = null;
+          // Aynı ürün tekrar eklenirse sayfa tazeden yüklensin (sıcak çerçeve kalır, sonraki ürüne geçer)
+          if (!fr.warm) {
+            delete FRAMES[p.id];
+            setTimeout(function () { if (fr.f.parentNode) fr.f.parentNode.removeChild(fr.f); }, 10000);
+          }
           if (ok) resolve(); else reject(why);
         };
         var timer = setTimeout(function () { finish(false, clicked ? 'no-response' : 'timeout'); }, 15000);
@@ -1564,6 +1750,7 @@
             if (pickOnPage(v.name, d)) { picked = true; return setTimeout(step, 350); }
           } else if (btn) {
             clicked = true;
+            PENDING = { vid: v.id, pid: p.id };
             btn.click();
             // Sepet isteği görülmezse 4 sn sonra, buton tıklandığı için yine eklendi say
             return setTimeout(function () { finish(true); }, 4000);
@@ -1951,7 +2138,12 @@
     shown = PAGE;
     render();
     renderIdle();
-    load().then(function () { renderIdle(); render(); if (tab === 'calc') calcUpdate(); }, function () {
+    load().then(function () {
+      renderIdle(); render(); if (tab === 'calc') calcUpdate();
+      // Sepete ekleme anında hazır olsun: gizli çerçeveyi panel açılınca arka planda yükle
+      if (cartOn() && typeof window.UrunAramaSepet !== 'function' && !(ADD_TPL && CART_ID) && (CFG.cart || {}).warm !== false)
+        setTimeout(function () { if (isOpen) warmFrame().catch(function () {}); }, 1200);
+    }, function () {
       $home.innerHTML = '<div class="empty"><b>Arama şu an yüklenemedi</b><p>Lütfen sayfayı yenileyip tekrar deneyin.</p></div>';
     });
   }
