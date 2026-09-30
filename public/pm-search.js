@@ -469,7 +469,8 @@
     '.xs-h{font-size:12px;font-weight:700;color:var(--mu);margin:8px 0 6px;letter-spacing:.02em}',
     '.xs-l{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
     '.xs-i{display:flex;align-items:center;gap:8px;min-width:0;padding:6px;border-radius:12px;background:var(--bg)}',
-    '.xs-i .im{width:40px;height:40px;border-radius:10px;flex:none;background:#fff;overflow:hidden}.xs-i .im img{width:100%;height:100%;object-fit:contain}',
+    '.xs-i .im{position:relative;width:52px;height:52px;border-radius:10px;flex:none;background:#fff;overflow:hidden;display:grid;place-items:center}',
+    '.xs-i .im img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:3px;background:#fff}.xs-i .im>svg{width:20px;height:20px;color:var(--mu)}',
     '.xs-i .tx{flex:1;min-width:0}.xs-i .tx a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;font-weight:600;line-height:1.25;color:var(--ink)}',
     '.xs-i .tx b{display:block;font-size:12.5px;margin-top:2px;color:var(--prd)}',
     '.xs-i .add{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--pr);color:#fff;padding:0}.xs-i .add svg{width:17px;height:17px}',
@@ -854,7 +855,11 @@
     $sheet.addEventListener('click', function (e) { if (e.target === $sheet) closeSheet(); });
     root.addEventListener('error', function (e) {
       var t = e.target;
-      if (t && t.tagName === 'IMG' && t.parentNode) t.parentNode.innerHTML = I.sprout;
+      if (!t || t.tagName !== 'IMG' || !t.parentNode) return;
+      // Bu boyut CDN'de yoksa bir kez standart boyutu dene, o da olmazsa simge göster
+      var src = t.getAttribute('src') || '', alt = src.replace(/\/(\d+)\/([^/]+\.webp)$/, '/360/$2');
+      if (alt !== src && !t.getAttribute('data-retry')) { t.setAttribute('data-retry', '1'); t.setAttribute('src', alt); return; }
+      t.parentNode.innerHTML = I.sprout;
     }, true);
     root.addEventListener('click', onClick);
     root.addEventListener('input', function (e) {
@@ -1113,7 +1118,7 @@
       '<button type="button" data-act="xsx" aria-label="Kapat">' + I.x + '</button></div>' +
       '<div class="xs-h">Yanına iyi gider</div><div class="xs-l">' + list.map(function (x) {
         var href = esc(url(x.s));
-        return '<div class="xs-i">' + thumb(x.img, 120) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
+        return '<div class="xs-i">' + thumb(x.img, 180) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
           (price(x) != null ? '<b>' + (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) + '</b>' : '') + '</div>' +
           '<button class="add" type="button" data-act="add" data-xs="1" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button></div>';
       }).join('') + '</div>';
