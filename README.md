@@ -70,6 +70,7 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 
 ## config.json
 - `popular`: boş kutuda görünen "çok arananlar"
+- `promo`: Kategoriler sekmesinin üstündeki kampanya kartı — `title`, `code` (dokununca kopyalanır), `note`, `shipping` (ücretsiz kargo metni; sepete ekle penceresinde de görünür)
 - `categoryOrder`: ana kategorilerin gösterim sırası (listede olmayanlar sonra, ürün sayısına göre)
 - `categoryLast`: en sona konacak ana kategoriler (örn. kedi/köpek)
 - `categoryImages`: kategori adı → görseli kullanılacak ürünün adresi (slug)
@@ -83,7 +84,6 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `phone`, `whatsapp`: doluysa altta arama/WhatsApp çubuğu çıkar (`"0216 000 00 00"`, `"905xxxxxxxxx"`)
 - `colors`: marka renklerin (`primary` ana renk, `dark` koyu ton)
 - `fab`: sağ alttaki "Ürün Bul" butonu — `enabled` (false = gizle), `text`, `side` (`"right"`/`"left"`), `bottom` (alttan px), `animate` (false = hareketsiz). Altta sabit bir şey (çerez uyarısı, sepet çubuğu vb.) belirirse buton otomatik olarak onun üstüne çıkar, kaybolunca geri iner; ekranı kaplayan pencerede gizlenir.
-- `searchUrl`: "Tüm sonuçları gör" butonunun gittiği ikas arama sayfası. Sitende bir şey arat, adres çubuğundaki biçimi buraya yaz (`{q}` = aranan kelime).
 
 config.json'u GitHub'da düzenleyip kaydettiğinde senkron kendiliğinden çalışır.
 

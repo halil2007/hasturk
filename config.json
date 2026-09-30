@@ -1,5 +1,4 @@
 {
-  "searchUrl": "/search?s={q}",
   "placeholder": "Ürün veya kategori ara",
   "popular": [
     "solucan gübresi",
@@ -33,6 +32,12 @@
   },
   "badges": {
     "Yeni Ürün": "Yeni"
+  },
+  "promo": {
+    "title": "İlk siparişe özel %5 indirim",
+    "code": "HOSGELDİN5",
+    "note": "750 TL ve üzeri siparişlerde geçerli",
+    "shipping": "975 TL ve üzeri siparişlerde kargo ücretsiz"
   },
   "phone": "+90 553 727 29 29",
   "whatsapp": "905537272929",
