@@ -120,6 +120,7 @@
     });
     CATS_BY_ID = {};
     KIDS = {};
+    SOIL = null;
     d.cats.forEach(function (c) { CATS_BY_ID[c.id] = c; c.f = fold(c.n); });
     d.cats.forEach(function (c) { if (c.p && CATS_BY_ID[c.p]) (KIDS[c.p] = KIDS[c.p] || []).push(c); });
     d.items.forEach(function (p) {
@@ -475,6 +476,12 @@
     '.xs-i .tx b{display:block;font-size:12.5px;margin-top:2px;color:var(--prd)}',
     '.xs-i .add{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--pr);color:#fff;padding:0}.xs-i .add svg{width:17px;height:17px}',
     '.xs-i .add span{display:none}',
+    '.soil{margin:12px 16px 0;padding:12px;border-radius:18px;background:#f1f8ec;border:1px solid #d9ead0}',
+    '@media(min-width:760px){.soil{margin:14px 20px 0}}',
+    '.so-h{display:flex;gap:10px;align-items:flex-start}.so-h>svg{width:22px;height:22px;flex:none;color:#3f7d4f;margin-top:1px}',
+    '.so-h b{display:block;font-size:15px;color:#2d5a38}.so-h span{display:block;font-size:12.5px;color:#4b5f52;margin-top:2px;line-height:1.4}',
+    '.so-l{display:grid;gap:6px;margin-top:10px}@media(min-width:760px){.so-l{grid-template-columns:1fr 1fr}}',
+    '.soil .xs-i{background:#fff}.xs-i .tx b em{font-style:normal;font-weight:600;font-size:11.5px;color:#3f7d4f}',
     '.shipbar{flex:none;display:none;padding:8px 14px 10px;border-top:1px solid var(--ln);background:#fff}',
     '.shipbar.on{display:block;animation:sbin .35s ease-out}',
     '@keyframes sbin{from{opacity:0;transform:translateY(8px)}}',
@@ -1324,6 +1331,8 @@
     } else $cta.classList.remove('on');
 
     html += guideCards(r.tokens);
+    var spl = plantFor(fold(q));
+    if (spl) html += soilCard(spl);
     if (calcEnabled() && r.tokens.some(function (t) { return /^(hacim|litre|kac|hesap|olcu|metrekup)/.test(t); })) {
       html += '<button class="banner" type="button" data-act="gocalc"><span class="bi">' + I.calc + '</span><div class="tx"><b>Toprak hesaplayıcı</b>' +
         '<span>Ölçüleri gir, kaç litre gerektiğini öğren</span></div>' + I.arrow + '</button>';
@@ -1448,6 +1457,120 @@
   }
   var GQ = '';
   // Rehber içi arama: "Hangi bitkide kullanacaksınız?" — tüm ürünlerin dozlarını birlikte göster
+  // ---------------- Bitkiye göre toprak ----------------
+  // config.json > soilMatch: bitki ve toprak profilleri (docs/bitki-toprak-eslestirme.xlsx). Yeni topraklar kendiliğinden
+  // tanınır: (1) adında listedeki bir bitki geçiyorsa o bitkinin özel toprağı olur; (2) ikas'ta "pH:asidik",
+  // "Drenaj:yüksek", "Su:orta", "Besin:zengin", "Yapı:havalı" (+ isteğe bağlı "Grup:salon", "Genel") etiketleri
+  // varsa benzerlik önerilerine de girer.
+  var SOIL = null;
+  var TAGV = {
+    ph: { asidik: 1, 'hafif asidik': 2, notr: 3, kirecli: 4, alkali: 4 },
+    drenaj: { orta: 1, yuksek: 2, 'cok yuksek': 3 },
+    su: { dusuk: 1, orta: 2, yuksek: 3 },
+    besin: { dusuk: 1, orta: 2, zengin: 3, yuksek: 3 },
+    yapi: { kumlu: 'k', havali: 'h', dengeli: 'd' }
+  };
+  function soilData() {
+    if (SOIL) return SOIL;
+    var sm = CFG.soilMatch || {}, bySlug = {}, soils = {}, groups = {};
+    DATA.items.forEach(function (x) { bySlug[x.s] = x; });
+    var parse = function (str) {
+      var a = String(str || '').split('|'), pr = a[0] || '';
+      if (!/^[1-4][1-3][1-3][1-3][khd]$/.test(pr)) return null;
+      return { ph: +pr[0], dr: +pr[1], su: +pr[2], bs: +pr[3], yp: pr[4], grp: fold(a[1] || ''), gen: /g/.test(a[2] || ''), only: /o/.test(a[2] || '') };
+    };
+    Object.keys(sm.soils || {}).forEach(function (sl) { var pf = parse(sm.soils[sl]); if (pf && bySlug[sl]) soils[sl] = pf; });
+    (sm.plants || []).forEach(function (pl) { groups[fold(pl[2] || '')] = 1; });
+    // ikas etiketinden profil (yeni eklenen topraklar)
+    DATA.items.forEach(function (x) {
+      if (soils[x.s]) return;
+      var v = {};
+      (x.t || []).forEach(function (t) {
+        var m = fold(t).match(/^(ph|drenaj|su|besin|yapi|grup)\s*[:=]\s*(.+)$/);
+        if (m) v[m[1]] = m[2].trim(); else if (/^genel( amacli)?$/.test(fold(t))) v.gen = 1;
+      });
+      var ph = TAGV.ph[v.ph], dr = TAGV.drenaj[v.drenaj], su = TAGV.su[v.su], bs = TAGV.besin[v.besin], yp = TAGV.yapi[v.yapi];
+      if (ph && dr && su && bs && yp) soils[x.s] = { ph: ph, dr: dr, su: su, bs: bs, yp: yp, grp: fold(v.grup || ''), gen: !!v.gen, only: false };
+    });
+    var plants = (sm.plants || []).map(function (pl) {
+      var pf = parse(pl[3]);
+      if (!pf) return null;
+      var names = [pl[0]].concat(String(pl[1] || '').split(',')).map(function (n) { return fold(n).trim(); }).filter(function (n) { return n.length >= 3; });
+      return { n: pl[0], names: names, grp: fold(pl[2] || ''), pf: pf, special: pl[4] || '' };
+    }).filter(Boolean);
+    // Adında bitki geçen toprak ürünleri (etiket gerekmeden): "HG Philodendron Toprağı" → Philodendron'un özel toprağı
+    var soilCat = DATA.cats.filter(function (c) { return c.f === fold('Topraklar'); })[0];
+    plants.forEach(function (pl) {
+      pl.auto = DATA.items.filter(function (x) {
+        if (!soilCat || catChain(x).indexOf(soilCat.f) === -1 || x.bn || !/topra|torf|karisim/.test(x.nf)) return false;
+        return pl.names.some(function (n) { return (' ' + words(x.nf).join(' ') + ' ').indexOf(' ' + n) !== -1; });
+      }).sort(function (a, b) { return (b.st ? 1 : 0) - (a.st ? 1 : 0) || (b.r || 0) - (a.r || 0); });
+    });
+    SOIL = { soils: soils, plants: plants, bySlug: bySlug, w: sm.weights || [3, 2, 2, 1, 1, 12], add: sm.addons || {} };
+    return SOIL;
+  }
+  function plantFor(qn) {
+    if (!DATA || !CFG.soilMatch) return null;
+    var S = soilData(), q = ' ' + words(qn).join(' ') + ' ', best = null, bl = 0;
+    S.plants.forEach(function (pl) {
+      pl.names.forEach(function (n) { if (q.indexOf(' ' + n) !== -1 && n.length > bl) { best = pl; bl = n.length; } });
+    });
+    return best;
+  }
+  function soilScore(pl, pf) {
+    var w = soilData().w, a = pl.pf;
+    var d = w[0] * Math.abs(a.ph - pf.ph) + w[1] * Math.abs(a.dr - pf.dr) + w[2] * Math.abs(a.su - pf.su) + w[3] * Math.abs(a.bs - pf.bs) + w[4] * (a.yp === pf.yp ? 0 : 1);
+    return Math.max(0, 1 - d / w[5]);
+  }
+  // Öneri: özel toprak (ayarlardaki, yoksa adından bulunan) → yoksa profili en yakın toprak + eksik özellik için katkı
+  function soilFor(pl) {
+    var S = soilData();
+    var sp = pl.special && S.bySlug[pl.special];
+    if (sp && sp.st) return { p: sp, exact: true, adds: addonsFor(pl, S.soils[sp.s]) };
+    var au = (pl.auto || []).filter(function (x) { return x.st; })[0];
+    if (au) return { p: au, exact: true, adds: addonsFor(pl, S.soils[au.s]) };
+    var best = null, bs = -1;
+    Object.keys(S.soils).forEach(function (sl) {
+      var pf = S.soils[sl], x = S.bySlug[sl];
+      if (!x || !x.st || pf.only || !(pf.gen || (pf.grp && pf.grp === pl.grp))) return;
+      var sc = soilScore(pl, pf) + (pf.grp === pl.grp ? 0.002 : pf.gen ? 0.001 : 0);
+      if (sc > bs) { bs = sc; best = x; }
+    });
+    if (!best || bs < 0.5) return null;
+    return { p: best, exact: false, fit: Math.min(1, bs), adds: addonsFor(pl, S.soils[best.s]) };
+  }
+  function addonsFor(pl, pf) {
+    if (!pf) return [];
+    var S = soilData(), a = pl.pf, out = [];
+    var push = function (key, why) { var x = S.bySlug[S.add[key]]; if (x && x.st) out.push({ p: x, why: why }); };
+    if (a.dr > pf.dr) push('drenaj', 'daha iyi süzülmesi için');
+    if (a.ph < pf.ph) push('ph', 'pH\'ı düşürmek için');
+    if (a.su > pf.su) push('su', 'nemi daha iyi tutması için');
+    if (a.bs > pf.bs) push('besin', 'besin desteği için');
+    return out.slice(0, 2);
+  }
+  function plantDesc(pf) {
+    return [{ 1: 'asidik', 2: 'hafif asidik', 3: 'nötr', 4: 'kireçli' }[pf.ph], { 2: 'iyi süzen', 3: 'çok iyi süzen' }[pf.dr],
+      { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[pf.su], { 1: 'besini az', 3: 'besince zengin' }[pf.bs],
+      { k: 'kumlu', h: 'havalı' }[pf.yp]].filter(Boolean).join(', ');
+  }
+  function soilRow(x, note) {
+    var href = esc(url(x.s));
+    return '<div class="xs-i">' + thumb(x.img, 180) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
+      '<b>' + (price(x) != null ? (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) : '') + (note ? ' <em>' + esc(note) + '</em>' : '') + '</b></div>' +
+      (cartOn() ? '<button class="add" type="button" data-act="add" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button>' : '') + '</div>';
+  }
+  function soilCard(pl) {
+    var r = soilFor(pl);
+    if (!r) return '';
+    if (!soilCard.seen) soilCard.seen = {};
+    if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + r.p.n); }
+    return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' +
+      (r.exact ? esc(pl.n) + ' için önerdiğimiz toprak' :
+        esc(pl.n) + ' için özel toprağımız yok. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever; en yakın karışımımız:') +
+      '</span></div></div><div class="so-l">' + soilRow(r.p, r.exact ? '' : '%' + Math.round(r.fit * 100) + ' uyum') +
+      r.adds.map(function (a) { return soilRow(a.p, '+ ' + a.why); }).join('') + '</div></div>';
+  }
   function guideSearch() {
     var res = $guide.querySelector('.gres'), lst = $guide.querySelector('.glist');
     if (!res) return;
@@ -1456,6 +1579,8 @@
     lst.style.display = 'none';
     var hits = guides().map(function (gd) { return { gd: gd, hit: plantHit(gd, toks, 3) }; });
     var any = hits.some(function (x) { return x.hit; });
+    var gpl = plantFor(fold(GQ)), soilHtml = gpl ? soilCard(gpl) : '';
+    if (!any && soilHtml) { res.innerHTML = soilHtml; return; }
     if (!any) {
       res.innerHTML = '<div class="empty" style="padding:28px 8px 8px"><div class="ic">' + I.sprout + '</div><b>“' + esc(GQ.trim()) + '” rehberde yok</b><p>Bitki adını farklı yazmayı deneyin (örn. biber, elma, çim).' +
         (CFG.whatsapp ? ' Ya da <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + GQ.trim() + ' için gübre kullanım miktarını öğrenmek istiyorum.')) + '">WhatsApp\'tan sorun</a>.' : '') + '</p></div>';
@@ -1463,7 +1588,7 @@
     }
     // Dozu olanlar önce; eşleşme olmayan ama grubu olmayan (henüz verisi girilmemiş) rehberler bağlantı olarak
     hits.sort(function (a, b) { return (b.hit && b.hit.gr.steps.length ? 1 : 0) - (a.hit && a.hit.gr.steps.length ? 1 : 0); });
-    res.innerHTML = hits.filter(function (x) { return x.hit || !(x.gd.groups || []).length; }).map(function (x) {
+    res.innerHTML = soilHtml + hits.filter(function (x) { return x.hit || !(x.gd.groups || []).length; }).map(function (x) {
       return doseCard(x.gd, x.hit);
     }).join('');
   }
