@@ -35,4 +35,5 @@ jobs:
           git config user.name "urun-senkron"
           git config user.email "actions@users.noreply.github.com"
           git add public/products.json
+          if [ -f docs/trend-raporu.md ]; then git add docs/trend-raporu.md; fi
           git diff --cached --quiet || (git commit -m "Ürünler güncellendi" && git push)

@@ -14,12 +14,14 @@ ikas API ──(GitHub Actions, 2 saatte bir)──▶ public/products.json ─�
 | `public/pm-search.js` | Arama menüsünün kendisi (tasarım + arama motoru) |
 | `config.json` | Popüler aramalar, eş anlamlılar, renkler, telefon/WhatsApp, rozetler |
 | `public/test.html` | Yayına aldıktan sonra deneme sayfası |
+| `src/worker.js` | Ziyaretçi eğilimlerini toplar (`/e`) ve özetler (`/trends`); diğer her şey statik |
+| `docs/trend-raporu.md` | Otomatik rapor: en çok satan/aranan/sepete eklenen, sonuçsuz aramalar, menü önerileri |
 
 ---
 
 ## 1. ikas: Özel uygulama
 1. ikas paneli → **Uygulamalar → Uygulamalarım → Özel uygulama oluştur**
-2. İzinler: **Ürünler (okuma)** ve **Kategoriler (okuma)** yeterli.
+2. İzinler: **Ürünler (okuma)** ve **Kategoriler (okuma)**. "Çok satan" rozeti ve satış analizi için **Siparişler (okuma)** da eklenmeli (yoksa sadece site içi eğilimler kullanılır).
 3. Çıkan **Client ID** ve **Client Secret**'ı bir kenara yaz. *Kimseyle paylaşma, sohbete yapıştırma.*
 4. Mağaza adın: panel adresindeki `XXXX.myikas.com` kısmındaki `XXXX`.
 
@@ -109,6 +111,18 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `fab`: sağ alttaki "Ürün Bul" butonu — `enabled` (false = gizle), `text`, `side` (`"right"`/`"left"`), `bottom` (alttan px), `animate` (false = hareketsiz). Altta sabit bir şey (çerez uyarısı, sepet çubuğu vb.) belirirse buton otomatik olarak onun üstüne çıkar, kaybolunca geri iner; ekranı kaplayan pencerede gizlenir.
 
 config.json'u GitHub'da düzenleyip kaydettiğinde senkron kendiliğinden çalışır.
+
+## Ziyaretçi eğilimleri (analiz)
+Widget anonim olarak (IP, çerez, kimlik tutmadan) şunları sayar: aranan kelimeler, sonuç bulunamayan aramalar, panelden/menüden ürün tıklamaları, ürün sayfası görüntülemeleri ve **sitenin her yerinden** sepete eklemeler (ikas'ın kendi butonu dahil; sepet yanıtından okunur). Her olay bir oturumda bir kez sayılır, toplu gönderilir. Cloudflare'de günlük toplamlar tutulur (D1 veritabanı `hasturk-egilim`, ilk yayında otomatik oluşur; 150 günden eski kayıtlar silinir).
+
+`scripts/sync.mjs` 2 saatte bir son 30 günün özetini ve ikas'taki son 60 günün siparişlerini birleştirir:
+- Ürün eğilim puanı `h` (0-100) = 4 × satış adedi + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme (yeni olanlar daha ağır). Aramada küçük bir öne çıkarma olarak kullanılır (alaka her zaman önce gelir) ve masaüstü menüdeki "Çok satanlar" bu puana göre seçilir.
+- "Çok satan" rozeti: gerçek siparişlerde en çok satan 12 ürün (+ `bestsellers`).
+- "Sık arananlar": en az 3 kez aranmış ve bugün de sonuç veren kelimeler; eksik kalırsa `popular` ile tamamlanır (`"trendPopular": false` sadece elle listeyi kullanır).
+- Masaüstü menüde bir kategorinin ürünlerini elle sabitlemek: `"desktopMenu": { "picks": { "Topraklar": ["urun-slug", ...] } }` (önce bunlar, kalan yerler eğilime göre).
+- Rapor: `docs/trend-raporu.md`.
+
+Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collect="off"`.
 
 ## Maliyet
 GitHub Actions (özel depo: ayda 2000 dk ücretsiz, bu iş ~360 dk kullanır) + Cloudflare Pages (statik dosya istekleri sınırsız) = **0 TL**.

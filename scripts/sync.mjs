@@ -8,6 +8,8 @@
 //   IKAS_MERCHANT_ID    görsel adresleri için (bulunamazsa API'den denenir)
 //   IKAS_SALES_CHANNEL_ID  sadece bu satış kanalındaki ürünleri al
 //   MOCK=1              API'ye gitmeden örnek veriyle çalış (test için)
+//   TRENDS_URL          ziyaretçi eğilimi özeti (varsayılan: Worker'ın /trends adresi); TRENDS_FILE ile yerel dosya
+//   ORDER_DAYS          satış analizinde bakılacak gün (varsayılan 60)
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -16,7 +18,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'products.json');
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
+const REPORT = join(ROOT, 'docs', 'trend-raporu.md');
 const env = process.env;
+const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.dev/trends';
 
 // ---------- yardımcılar ----------
 const die = (msg) => { console.error('HATA: ' + msg); process.exit(1); };
@@ -317,6 +321,145 @@ function mockData() {
   return { products, categories, variantTypes, merchantId: '' };
 }
 
+// ---------- eğilim: ziyaretçi olayları + gerçek siparişler ----------
+// Ziyaretçi olayları (src/worker.js > /trends): arama, sonuçsuz arama, tıklama, görüntüleme, sepete ekleme
+async function fetchTrends() {
+  try {
+    if (env.TRENDS_FILE) return JSON.parse(await readFile(env.TRENDS_FILE, 'utf8'));
+    if (env.MOCK) return null;
+    const res = await fetch(TRENDS_URL, { signal: AbortSignal.timeout(20000) });
+    const j = await res.json();
+    if (!j.ok) { console.warn('UYARI: eğilim verisi henüz yok (' + (j.why || res.status) + ')'); return null; }
+    console.log(`Eğilim verisi: ${j.rows} satır (son ${j.days} gün)`);
+    return j;
+  } catch (e) {
+    console.warn('UYARI: eğilim verisi alınamadı: ' + e.message.slice(0, 160));
+    return null;
+  }
+}
+
+// Gerçek satışlar: son ORDER_DAYS gündeki siparişlerde ürün başına adet (iptal/iade hariç).
+// Uygulamanın sipariş okuma izni yoksa atlanır (ürün senkronu etkilenmez).
+async function fetchOrders() {
+  if (env.MOCK) return env.ORDERS_FILE ? JSON.parse(await readFile(env.ORDERS_FILE, 'utf8')) : null;
+  const days = +env.ORDER_DAYS || 60, since = Date.now() - days * 864e5;
+  const line = 'orderLineItems { quantity status variant { id productId } }';
+  const variants = [
+    (pg) => [`query($p: PaginationInput, $d: DateFilterInput) { listOrder(pagination: $p, orderedAt: $d) { hasNext data { status orderedAt ${line} } } }`, { p: pg, d: { gte: since } }],
+    (pg) => [`query($p: PaginationInput) { listOrder(pagination: $p) { hasNext data { status orderedAt ${line} } } }`, { p: pg }],
+    (pg) => [`query($p: PaginationInput) { listOrder(pagination: $p) { hasNext data { status orderedAt orderLineItems { quantity variant { id productId } } } } }`, { p: pg }],
+  ];
+  let lastErr;
+  for (const build of variants) {
+    try {
+      const out = { days, orders: 0, lines: [] };
+      for (let page = 1; page <= 60; page++) {
+        const [q, vars] = build({ page, limit: 50 });
+        const r = (await gql(q, vars)).listOrder;
+        let old = 0;
+        for (const o of r.data || []) {
+          const t = typeof o.orderedAt === 'number' ? o.orderedAt : Date.parse(o.orderedAt);
+          if (t && t < since) { old++; continue; }
+          if (/CANCEL|REFUND|DRAFT/i.test(o.status || '')) continue;
+          out.orders++;
+          for (const li of o.orderLineItems || []) {
+            if (/CANCEL|REFUND/i.test(li.status || '')) continue;
+            if (li.variant) out.lines.push({ pid: li.variant.productId, vid: li.variant.id, q: +li.quantity || 1, t });
+          }
+        }
+        if (!r.hasNext || !(r.data || []).length || (old && old === r.data.length)) break;
+      }
+      console.log(`Siparişler: son ${days} günde ${out.orders} sipariş, ${out.lines.length} satır`);
+      return out;
+    } catch (e) { lastErr = e; }
+  }
+  console.warn('UYARI: sipariş verisi alınamadı (ikas uygulamasına "siparişleri okuma" izni gerekebilir): ' + String(lastErr && lastErr.message).slice(0, 200));
+  return null;
+}
+
+const fold = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[ışğüöçâîû]/g, (c) => ({ ı: 'i', ş: 's', ğ: 'g', ü: 'u', ö: 'o', ç: 'c', â: 'a', î: 'i', û: 'u' })[c]).replace(/̇/g, '');
+
+// Ürün başına eğilim puanı (p.h, 0-100) + "Çok satan" listesi + "Sık arananlar"
+//   ham puan = 4 × satış adedi + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme  (yeni olanlar daha ağır)
+function applyTrends(out, trends, orders, config) {
+  const bySlug = new Map(out.items.map((p) => [p.s, p]));
+  const byId = new Map(out.items.map((p) => [p.id, p]));
+  const byVar = new Map();
+  for (const p of out.items) { if (p.v1) byVar.set(p.v1, p); for (const v of p.v || []) byVar.set(v.id, p); }
+  const st = new Map(); // slug → { o, a, c, v }
+  const get = (slug) => { if (!st.has(slug)) st.set(slug, { o: 0, a: 0, c: 0, v: 0 }); return st.get(slug); };
+  if (orders) {
+    const now = Date.now();
+    for (const l of orders.lines) {
+      const p = byId.get(l.pid) || byVar.get(l.vid);
+      if (!p) continue;
+      const age = l.t ? Math.max(0, (now - l.t) / 864e5) : 0;
+      get(p.s).o += l.q * Math.pow(0.5, age / 20);
+    }
+  }
+  for (const [slug, o] of Object.entries((trends && trends.p) || {})) {
+    if (!bySlug.has(slug)) continue;
+    const g = get(slug);
+    g.a += o.a || 0; g.c += o.c || 0; g.v += o.v || 0;
+  }
+  const raw = new Map([...st].map(([s, g]) => [s, 4 * g.o + 2 * g.a + g.c + 0.3 * g.v]));
+  const max = Math.max(0, ...raw.values());
+  for (const [s, r] of raw) {
+    const h = max ? Math.round((100 * r) / max) : 0;
+    if (h > 0) bySlug.get(s).h = h;
+  }
+  // Çok satan: sadece gerçek siparişlerden (en az 2 adet), en fazla 12 ürün
+  const best = orders ? [...st].filter(([, g]) => g.o >= 2).sort((a, b) => b[1].o - a[1].o).slice(0, 12).map(([s]) => s) : [];
+  // Sık arananlar: aynı kelimenin farklı yazımları birleşir, en çok kullanılan yazım gösterilir; en az 3 arama
+  const terms = new Map();
+  for (const [x, n] of (trends && trends.q) || []) {
+    const f = fold(x).replace(/[^a-z0-9 ]/g, '').trim();
+    if (!f) continue;
+    const t = terms.get(f) || { n: 0, show: x, top: 0 };
+    t.n += n;
+    if (n > t.top) { t.top = n; t.show = x; }
+    terms.set(f, t);
+  }
+  const q = [...terms.values()].filter((t) => t.n >= 3).sort((a, b) => b.n - a.n).slice(0, 12).map((t) => t.show);
+  out.trend = { q, best, src: { orders: orders ? orders.orders : null, events: trends ? trends.rows : null } };
+  return { st, terms, best };
+}
+
+// İnsan için rapor: docs/trend-raporu.md (sadece içerik değişince yazılır)
+async function writeReport(out, trends, orders, an, config) {
+  const bySlug = new Map(out.items.map((p) => [p.s, p]));
+  const name = (s) => (bySlug.get(s) || {}).n || s;
+  const catOf = new Map(out.cats.map((c) => [c.id, c]));
+  const topCat = (p) => { let c = catOf.get(p.c[0]); while (c && c.p && catOf.get(c.p)) c = catOf.get(c.p); return c ? c.n : ''; };
+  const L = [];
+  const tbl = (head, rows) => { if (!rows.length) { L.push('_Henüz veri yok._', ''); return; } L.push('| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|', ...rows.map((r) => '| ' + r.join(' | ') + ' |'), ''); };
+  L.push('# Ziyaretçi ve satış eğilimleri', '',
+    `Kaynak: ${orders ? `son ${orders.days} günde ${orders.orders} sipariş` : 'sipariş verisi yok (ikas uygulamasına sipariş okuma izni gerekebilir)'}; ` +
+    `${trends ? `site içi olaylar son ${trends.days} gün (${trends.rows} kayıt)` : 'site içi olay verisi henüz yok'}.`,
+    '', 'Bu dosya 2 saatte bir otomatik güncellenir. Masaüstü menüdeki ürünleri sabitlemek için `config.json > desktopMenu.picks` kullanın.', '');
+  L.push('## En çok satanlar (gerçek siparişler)', '');
+  tbl(['#', 'Ürün', 'Satış puanı'], [...an.st].filter(([, g]) => g.o > 0).sort((a, b) => b[1].o - a[1].o).slice(0, 20).map(([s, g], i) => [i + 1, name(s), g.o.toFixed(1)]));
+  L.push('## En çok aranan kelimeler', '');
+  tbl(['#', 'Kelime', 'Arama'], [...an.terms.values()].sort((a, b) => b.n - a.n).slice(0, 25).map((t, i) => [i + 1, t.show, t.n]));
+  L.push('## Sonuç bulunamayan aramalar', '', 'Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlamlı tanımlamayı düşünün.', '');
+  tbl(['#', 'Kelime', 'Arama'], ((trends && trends.q0) || []).slice(0, 25).map(([x, n], i) => [i + 1, x, n]));
+  L.push('## En çok sepete eklenenler', '');
+  tbl(['#', 'Ürün', 'Sepete ekleme', 'Görüntüleme'], [...an.st].filter(([, g]) => g.a > 0).sort((a, b) => b[1].a - a[1].a).slice(0, 20).map(([s, g], i) => [i + 1, name(s), g.a.toFixed(1), g.v.toFixed(1)]));
+  L.push('## Çok bakılıp az sepete eklenenler', '', 'Fiyat, görsel veya açıklama gözden geçirilebilir.', '');
+  tbl(['Ürün', 'Görüntüleme', 'Sepete ekleme', 'Oran'], [...an.st].filter(([, g]) => g.v >= 8 && g.a / g.v < 0.05).sort((a, b) => b[1].v - a[1].v).slice(0, 15).map(([s, g]) => [name(s), g.v.toFixed(1), g.a.toFixed(1), '%' + Math.round((100 * g.a) / g.v)]));
+  L.push('## Masaüstü menü önerileri (kategori başına ilk 3)', '', 'Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazsanız menü bu sıraya göre kendini günceller.', '');
+  const groups = new Map();
+  for (const p of out.items) if (p.h && p.st && p.img) { const c = topCat(p); if (!groups.has(c)) groups.set(c, []); groups.get(c).push(p); }
+  tbl(['Kategori', 'Önerilen ürünler'], [...groups].map(([c, ps]) => [c, ps.sort((a, b) => b.h - a.h).slice(0, 3).map((p) => `${p.n} (\`${p.s}\`)`).join('<br>')]));
+  const text = L.join('\n') + '\n';
+  let prev = '';
+  try { prev = await readFile(REPORT, 'utf8'); } catch {}
+  if (prev === text) return;
+  await mkdir(dirname(REPORT), { recursive: true });
+  await writeFile(REPORT, text);
+  console.log('Rapor yazıldı: docs/trend-raporu.md');
+}
+
 // ---------- ana akış ----------
 async function main() {
   const config = JSON.parse(await readFile(join(ROOT, 'config.json'), 'utf8'));
@@ -334,6 +477,15 @@ async function main() {
   }
   const out = transform({ ...raw, config });
   if (!out.items.length) die('Hiç ürün çıkmadı; products.json güncellenmedi.');
+
+  // Eğilimler: hata olursa ürün senkronu yine de tamamlanır
+  try {
+    const [trends, orders] = await Promise.all([fetchTrends(), fetchOrders()]);
+    const an = applyTrends(out, trends, orders, config);
+    await writeReport(out, trends, orders, an, config);
+  } catch (e) {
+    console.warn('UYARI: eğilim hesaplanamadı: ' + (e.stack || e.message).slice(0, 300));
+  }
 
   // Sadece içerik değiştiyse yaz (gereksiz commit/deploy olmasın)
   let prev = null;
