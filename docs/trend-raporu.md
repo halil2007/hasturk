@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (12 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (16 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -55,7 +55,9 @@ _Henüz veri yok._
 
 ## En çok aranan kelimeler
 
-_Henüz veri yok._
+| # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
+|---|---|---|---|---|---|
+| 1 | hümik | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
@@ -65,7 +67,9 @@ _Henüz veri yok._
 
 ## En çok sepete eklenenler
 
-_Henüz veri yok._
+| # | Ürün | Sepete ekleme | Görüntüleme |
+|---|---|---|---|
+| 1 | HasTürk Hümix Sıvı Hümik Asit | 1 | 1 |
 
 ## Çok bakılıp az sepete eklenenler
 
