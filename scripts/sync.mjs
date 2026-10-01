@@ -241,6 +241,9 @@ function transform({ products, categories, variantTypes, merchantId, config }) {
     const main = imgs.find((i) => i.isMain) || imgs.sort((a, b) => a.order - b.order)[0];
     const img = main ? `${main.imageId}/${(main.fileName || 'image').replace(/\.[a-z0-9]+$/i, '')}` : undefined;
 
+    // Deneme/boş kayıtlar (kategorisi de fiyatı da olmayan, ör. "görsel") aramaya girmesin
+    if (!(p.categoryIds || []).length && !(cheapest && (cheapest.d ?? cheapest.p))) continue;
+
     (p.categoryIds || []).forEach((id) => catCount.set(id, (catCount.get(id) || 0) + 1));
 
     items.push({
