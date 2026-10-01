@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (24 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (37 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -12,8 +12,8 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 |---|---|---|---|---|
 | 1 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×8,6 | 4 | evet |
 | 2 | DSV Lippa Lisuna 6 Mix Çim Tohumu | ×2,3 | 6 | evet |
-| 3 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
-| 4 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×4,8 | 2 | evet |
+| 3 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×5 | 2 | evet |
+| 4 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
 | 5 | DSV Lippa Tamu 5 Mix Çim Tohumu | ×2,1 | 2 | evet |
 
 ## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)
@@ -37,7 +37,7 @@ _Henüz veri yok._
 | 3 | HasTürk Solucan Gübresi  | 9,6 | 11 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,9 | 2 |
 | 5 | Kullanıma Hazır Cocopeat Torfu | 8,8 | 16 |
-| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,7 | 13 |
+| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,6 | 13 |
 | 7 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,2 | 8 |
 | 8 | Premium Fide Toprağı | 6,9 | 11 |
 | 9 | Leonardit - Organik Toprak Düzenleyici | 6,1 | 9 |
@@ -47,7 +47,7 @@ _Henüz veri yok._
 | 13 | Doğal Orman Toprağı | %100 Organik ve Humuslu | 4,1 | 1 |
 | 14 | HG Paşa Kılıcı (Sansevieria) Toprağı | 3,9 | 4 |
 | 15 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 3,7 | 2 |
-| 16 | HG Tarım Perliti | 3,7 | 5 |
+| 16 | HG Tarım Perliti | 3,6 | 5 |
 | 17 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici | 3,6 | 4 |
 | 18 | HG Organik Sebze Yetiştirme Toprağı  | 3,4 | 0 |
 | 19 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 3,3 | 0 |
@@ -88,6 +88,6 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 | Topraklar | HG Paşa Kılıcı (Sansevieria) Toprağı (`pasa-kilici-sansevieria-topragi`)<br>Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>Premium Fide Toprağı (`hg-premium-fide-topragi`) |
 | Halk Sağlığı Ürünleri | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı (`chrysamed-insektisit-max-5-lt-ekonomik-tahtakurusu-akrep-ilaci`)<br>Chrysamed İnsektisit Max 2 Lt (`chrysamed-insektisit-max-2-lt-tum-ev-bahce-bocek-ilaci`)<br>Chrysamed Ratex Pasta Fare İlacı 100 Gr (`chrysamed-ratex-pasta-fare-ilaci-100-gr`) |
 | Bahçe Ekipmanları | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) (`uzman-2-lt-ilaclama-pompasi`)<br>Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  (`uzman-10-lt-basincli-ilaclama-pompasi-k-73`)<br>Uzman Lityum Akülü İlaçlama Pompası 8 Lt (`uzman-lityum-akulu-ilaclama-pompasi-8-lt`) |
-| Gübreler | HasTürk Solucan Gübresi  (`hasturk-kati-solucan-gubresi`)<br>HasTürk Sıvı Solucan Gübresi  (`hasturk-sivi-solucan-gubresi`)<br>HasTürk Hümix Sıvı Hümik Asit (`hasturk-humix-sivi-humik-asit`) |
+| Gübreler | HasTürk Sıvı Solucan Gübresi  (`hasturk-sivi-solucan-gubresi`)<br>HasTürk Solucan Gübresi  (`hasturk-kati-solucan-gubresi`)<br>HasTürk Hümix Sıvı Hümik Asit (`hasturk-humix-sivi-humik-asit`) |
 | Kedi Ürünleri | Reflex Plus Loaf Biftekli Yetişkin Kedi Konservesi 400 Gr (`reflex-plus-loaf-biftekli-yetiskin-kedi-konservesi-400-gr`)<br>Reflex Plus Sos İçinde Parça Kuzulu Yetişkin Kedi Konservesi 400gr (`reflex-plus-sos-icinde-parca-kuzulu-yetiskin-kedi-konservesi-400gr`)<br>Proline Bebek Pudra Kokulu Bentonit Kedi Kumu 10 LT (`proline-bebek-pudra-kokulu-bentonit-kedi-kumu-10-lt`) |
 
