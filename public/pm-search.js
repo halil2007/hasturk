@@ -54,7 +54,7 @@
   }
   // Sepet tutarı (ücretsiz kargo çubuğu için): sitenin sepet/GraphQL yanıtlarındaki ikas sepet nesnesinden okunur
   var CART = null, CART_N = null, CART_ID = null, CART_KEY = 'ua-cart';
-  try { var cs0 = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null'); if (cs0 && Date.now() - cs0.t < 6 * 3600e3) { CART = cs0.v; CART_N = cs0.n != null ? cs0.n : null; CART_ID = cs0.id || null; } } catch (e) {}
+  try { var cs0 = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null'); if (cs0 && Date.now() - cs0.t < 6 * 3600e3) { CART = cs0.v; CART_N = cs0.n != null ? cs0.n : null; CART_ID = cs0.id || null; CART_LINES = cs0.l || null; } } catch (e) {}
   function findCart(o, d) {
     if (!o || typeof o !== 'object' || d > 7) return null;
     if (Array.isArray(o.orderLineItems) && (o.totalFinalPrice != null || o.totalPrice != null)) return o;
@@ -78,9 +78,12 @@
     if (isNaN(v)) return;
     CART = v;
     CART_N = c.orderLineItems.reduce(function (a, it) { return a + (+(it && it.quantity) || 1); }, 0);
+    var prevLines = CART_LINES;
     CART_LINES = lineQty(c);
+    // Sitenin herhangi bir yerinden sepete eklenen ürünler (ikas'ın kendi butonu dahil) eğilim verisine yazılır
+    if (prevLines) for (var vid in CART_LINES) if (CART_LINES[vid] > (prevLines[vid] || 0)) cartAdded(vid);
     if (c.id) CART_ID = c.id;
-    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, n: CART_N, t: Date.now(), id: CART_ID })); } catch (e) {}
+    try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, n: CART_N, t: Date.now(), id: CART_ID, l: CART_LINES })); } catch (e) {}
     updateShip();
   }
   function sniffCart(w) {
@@ -118,7 +121,7 @@
   var HIDDEN_TAG = /^kdv[\s_-]*\d+$/i; // muhasebe etiketleri aramada/rozette görünmesin
 
   // ---------------- Veri ----------------
-  var DATA = null, CATS_BY_ID = {}, KIDS = {}, SYN = {}, CFG = {}, loading = null;
+  var DATA = null, CATS_BY_ID = {}, KIDS = {}, SYN = {}, CFG = {}, loading = null, BY_VAR = {}, BY_SLUG = {};
 
   function prepare(d) {
     DATA = d;
@@ -151,8 +154,9 @@
     d.items.forEach(function (p) {
       var b = boost.indexOf(p.s);
       p.own = ownB.test(p.b || '');
-      p.best = (CFG.bestsellers || CFG.boost || []).indexOf(p.s) !== -1;
-      p.r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (p.own ? 2 : 0);
+      // "Çok satan": config'deki liste + gerçek siparişlerde en çok satanlar (sync.mjs > trend.best)
+      p.best = (CFG.bestsellers || CFG.boost || []).indexOf(p.s) !== -1 || ((d.trend || {}).best || []).indexOf(p.s) !== -1;
+      p.r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (p.own ? 2 : 0) + (p.st ? Math.min(2, (p.h || 0) / 50) : 0);
       if (bulk.test(p.n) || (p.p || 0) >= bulkPrice) p.r -= 8;
     });
     // Kategori görseli: config.json > categoryImages'daki ürün; yoksa kategorideki (alt kategoriler dahil)
@@ -160,6 +164,13 @@
     function ids(id) { return [id].concat((KIDS[id] || []).reduce(function (a, k) { return a.concat(ids(k.id)); }, [])); }
     var bySlug = {}, cover = {}, own = new RegExp(CFG.brandPattern || 'has ?t[uü]rk|^hg$', 'i');
     d.items.forEach(function (p) { bySlug[p.s] = p; });
+    BY_SLUG = bySlug;
+    BY_VAR = {};
+    d.items.forEach(function (p) {
+      if (p.v1) BY_VAR[p.v1] = p;
+      (p.v || []).forEach(function (v) { if (v.id) BY_VAR[v.id] = p; });
+    });
+    evData();
     Object.keys(CFG.categoryImages || {}).forEach(function (n) { cover[fold(n)] = bySlug[CFG.categoryImages[n]]; });
     d.cats.forEach(function (c) {
       var set = {};
@@ -651,6 +662,15 @@
     'mark{background:none;color:var(--pr);font-weight:800}',
     '.vchip{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--prd);background:var(--soft);padding:3px 8px;border-radius:7px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.badges{display:flex;flex-wrap:wrap;gap:4px}',
+    '.hot{display:flex;gap:10px;overflow-x:auto;padding:0 16px 6px;scrollbar-width:none;scroll-snap-type:x proximity}',
+    '.hot::-webkit-scrollbar{display:none}',
+    '@media(min-width:760px){.hot{padding:0 20px 6px}}',
+    '.hp{flex:0 0 138px;scroll-snap-align:start;display:flex;flex-direction:column;border:1px solid var(--ln);border-radius:16px;padding:8px;background:#fff}',
+    '.hp:hover{border-color:var(--pr)}',
+    '.hp .im{width:100%;height:112px;background:#fff}.hp .im img{object-fit:contain}',
+    '.hp .hb{align-self:flex-start;margin-top:7px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;background:#fff3d6;color:#8a5a00}',
+    '.hp b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:6px;font-size:13px;font-weight:600;line-height:1.3;min-height:34px}',
+    '.hp small{margin-top:4px;font-size:14px;font-weight:800;color:var(--prd)}',
     '.badge.best,.badge.own{display:inline-flex;align-items:center;gap:3px}.badge svg{width:11px;height:11px}',
     '.badge.best{background:#fff3d6;color:#8a5a00}.badge.own{background:var(--soft);color:var(--prd)}',
     '.trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 16px 0}',
@@ -902,7 +922,11 @@
     var b = t.closest('[data-act]');
     if (!b) {
       var a = t.closest('a[data-kind]');
-      if (a) { if ($q.value.trim()) addRecent($q.value); track(a.getAttribute('data-kind'), a.getAttribute('data-name')); }
+      if (a) {
+        if ($q.value.trim()) addRecent($q.value);
+        track(a.getAttribute('data-kind'), a.getAttribute('data-name'));
+        if (a.getAttribute('data-kind') === 'product') ev('c', slugOf(a.href));
+      }
       return;
     }
     var act = b.getAttribute('data-act'), v = b.getAttribute('data-v');
@@ -1066,6 +1090,27 @@
         '<span class="fn"><b>' + esc(x.title) + '</b><small>' + x.c.k + ' ürün</small></span></button>';
     }).join('') + '</div>';
   }
+  // "Şu sıralar çok tercih edilenler": eğilim algoritmasının seçtikleri (sync.mjs > trend):
+  // bu hafta hızla yükselenler, geçmiş yıllarda bu dönemde satan ve bu yıl da tutan sezon ürünleri, çok satanlar.
+  // Sadece stoktaki ürünler; yeterli veri yoksa (4 üründen az) bölüm gösterilmez. Kapatmak: "trendBlock": false
+  function hotHtml() {
+    var t = DATA.trend || {};
+    if (CFG.trendBlock === false || !t.src || !(t.src.orders || t.src.events)) return '';
+    var tag = {}, list = [], seen = {};
+    [['rising', 'Yükselen'], ['season', 'Sezonun ürünü'], ['best', 'Çok satan']].forEach(function (k) {
+      (t[k[0]] || []).forEach(function (s) { if (!tag[s]) tag[s] = k[1]; });
+    });
+    // Ton/toptan gibi büyük hacimli ürünler (sıralamada geriye atılanlar) burada gösterilmez
+    var push = function (p) { if (p && p.st && p.img && p.r > -4 && !seen[p.s] && list.length < 8) { seen[p.s] = 1; list.push(p); } };
+    // Sıra: yükselen ve sezon önce (zamanlı fırsat), sonra çok satan, kalan yer eğilim puanına göre
+    (t.rising || []).concat(t.season || [], t.best || []).forEach(function (s) { push(BY_SLUG[s]); });
+    DATA.items.filter(function (p) { return p.h; }).sort(function (a, b) { return b.h - a.h; }).forEach(push);
+    if (list.length < 4) return '';
+    return '<div class="h">Şu sıralar çok tercih edilenler</div><div class="hot">' + list.map(function (p) {
+      return '<a class="hp" data-kind="product" data-name="' + esc(p.n) + '" href="' + esc(url(p.s)) + '">' + thumb(p.img, 180) +
+        (tag[p.s] ? '<span class="hb">' + esc(tag[p.s]) + '</span>' : '') + '<b>' + esc(p.n) + '</b><small>' + tl(price(p)) + '</small></a>';
+    }).join('') + '</div>';
+  }
   // Kampanya kartı (config.json > promo): ilk sipariş kodu ve ücretsiz kargo eşiği
   function promoHtml() {
     var pr = CFG.promo;
@@ -1209,7 +1254,7 @@
     if (view && CATS_BY_ID[view]) { $home.innerHTML = homeWrap(renderCat(CATS_BY_ID[view])); return; }
     view = null;
     var html = '';
-    var rec = getRecent(), pop = CFG.popular || [];
+    var rec = getRecent(), pop = popular();
     var seen = rec.map(fold);
     pop = pop.filter(function (t) { return seen.indexOf(fold(t)) === -1; });
     if (rec.length || pop.length) {
@@ -1226,7 +1271,7 @@
         '<span class="cxa">' + I.right + '</span></button>' +
         (catOpen ? '<div class="clist">' + tops.map(catRow).join('') + '</div>' : '') + '</div>';
     }
-    html += promoHtml() + trustHtml() + featuredHtml();
+    html += promoHtml() + trustHtml() + hotHtml() + featuredHtml();
     $home.innerHTML = homeWrap(html);
     updateShip();
   }
@@ -1329,6 +1374,7 @@
 
     var r = search(q), html = '';
     var items = r.items;
+    noteQuery(q, r.items.length);
     if (onlyStock) items = items.filter(function (x) { return x.p.st; });
     if (sortMode !== 'rel') {
       items = items.slice().sort(function (a, b) {
@@ -1369,7 +1415,7 @@
     }
 
     if (!items.length && !r.cats.length && !html) {
-      var pop = CFG.popular || [];
+      var pop = popular();
       var sugg = pop.filter(function (p) {
         return r.tokens.some(function (t) { return lev(fold(p).slice(0, t.length), t) <= 2; });
       }).slice(0, 4);
@@ -1426,6 +1472,82 @@
       (window.dataLayer = window.dataLayer || []).push({ event: 'urun_arama', search_action: kind, search_term: $q.value, search_target: name });
     } catch (e) {}
   }
+
+  // ---------------- Ziyaretçi eğilimleri ----------------
+  // Anonim olarak (IP/çerez/kimlik yok) neyin arandığı, tıklandığı, görüntülendiği ve sepete eklendiği sayılır.
+  // Olaylar toplu halde, sayfadan çıkarken tek istekle gönderilir; aynı olay bir oturumda bir kez sayılır.
+  // Günlük toplamlar Cloudflare'de tutulur, scripts/sync.mjs 2 saatte bir okuyup sıralama ve önerilere işler.
+  // Kapatmak: config.json > "analytics": false ya da script etiketine data-collect="off"
+  var EVQ = [], EV_SEEN = {}, EV_T = 0, EV_URL = ds.collect === 'off' ? '' : (ds.collect || BASE + 'e'), EV_PEND = [];
+  try { EV_SEEN = JSON.parse(sessionStorage.getItem('ua-ev') || '{}') || {}; } catch (e) {}
+  function ev(k, x) {
+    if (!EV_URL || !x || CFG.analytics === false) return;
+    x = String(x).slice(0, 80);
+    var key = k + '|' + x, n = 0;
+    if (EV_SEEN[key]) return;
+    for (var z in EV_SEEN) if (++n > 400) return;
+    EV_SEEN[key] = 1;
+    try { sessionStorage.setItem('ua-ev', JSON.stringify(EV_SEEN)); } catch (e) {}
+    EVQ.push([k, x]);
+    clearTimeout(EV_T);
+    // Sayfadan çıkaran tıklamalar (ürün/menü bağlantısı) hemen gönderilir; diğerleri birkaç saniye biriktirilir
+    EV_T = setTimeout(evFlush, EVQ.length >= 15 || k === 'c' || k === 'm' ? 0 : 4000);
+  }
+  function evFlush() {
+    clearTimeout(EV_T);
+    if (!EVQ.length || !EV_URL) return;
+    var body = JSON.stringify({ e: EVQ.splice(0, 40) });
+    try { if (navigator.sendBeacon && navigator.sendBeacon(EV_URL, body)) return; } catch (e) {}
+    try { fetch(EV_URL, { method: 'POST', body: body, keepalive: true, mode: 'no-cors', credentials: 'omit' }); } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) evFlush(); });
+  window.addEventListener('pagehide', evFlush);
+  // Aranan kelime: yazmayı 1,5 sn bırakınca (her harf ayrı sayılmasın); sonuçsuz aramalar ayrı tutulur
+  function noteQuery(q, n) {
+    clearTimeout(noteQuery.t);
+    q = String(q).toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim();
+    if (q.length < 2) return;
+    noteQuery.t = setTimeout(function () { ev(n ? 'q' : 'q0', q); }, 1500);
+  }
+  function cartAdded(vid) {
+    if (DATA) { var p = BY_VAR[vid]; if (p) ev('a', p.s); } else EV_PEND.push(vid);
+  }
+  // Ürün sayfası görüntüleme (ikas sayfa yenilemeden geçiş yapar; adres değişimi de izlenir)
+  function evPage() {
+    if (!DATA) return;
+    var s = slugOf(location.href);
+    if (s && BY_SLUG[s]) ev('v', s);
+  }
+  // "Sık arananlar": ziyaretçilerin son 30 günde en çok aradığı ve sonuç bulduğu kelimeler (sync.mjs > trend.q),
+  // eksik kalırsa config.json > popular ile tamamlanır. config.json > "trendPopular": false sadece elle listeyi kullanır.
+  function popular() {
+    if (popular.c && popular.d === DATA) return popular.c;
+    var list = CFG.trendPopular === false ? [] : (((DATA || {}).trend || {}).q || []), out = [], seen = {};
+    list.concat(CFG.popular || []).forEach(function (t) {
+      var f = fold(t);
+      if (out.length >= 8 || seen[f]) return;
+      seen[f] = 1;
+      // Sadece bugün de sonuç veren kelimeler (ürün kaldırılmış olabilir)
+      if (DATA && list.indexOf(t) !== -1 && !search(t).items.length) return;
+      out.push(t);
+    });
+    popular.d = DATA;
+    return (popular.c = out);
+  }
+  function evData() {
+    EV_PEND.splice(0).forEach(cartAdded);
+    evPage();
+  }
+  (function () {
+    var last = location.pathname;
+    var chk = function () { if (location.pathname !== last) { last = location.pathname; evPage(); } };
+    ['pushState', 'replaceState'].forEach(function (m) {
+      var o = history[m];
+      if (typeof o !== 'function') return;
+      history[m] = function () { var r = o.apply(this, arguments); setTimeout(chk, 0); return r; };
+    });
+    window.addEventListener('popstate', function () { setTimeout(chk, 0); });
+  })();
 
   // ---------------- Kullanım rehberi ----------------
   // config.json > guides: [{ id, title, product (slug), url (rehber sayfası), keywords, note, groups: [{ cat, name, plants[], steps: [[zaman, şekil, doz]] }] }]
@@ -1769,6 +1891,7 @@
       // Sepet yanıtı işlensin, kalan ücretsiz kargo tutarı bildirimde görünsün
       setTimeout(function () { addedMsg(p, v, xs); }, how === 'direct' ? 0 : 300);
       track('add_to_cart_ok', p.n);
+      ev('a', p.s);
     }, function (why) {
       setBusy(p.id, false);
       track('add_to_cart_fail', p.n + ' (' + why + ')');
@@ -2806,15 +2929,20 @@
       return decodeURIComponent(u.pathname).replace(/\/+$/, '').split('/').pop().toLowerCase();
     } catch (e) { return null; }
   }
+  // Kategorinin öne çıkan 3 ürünü: config.json > desktopMenu.picks["Kategori adı"] (elle onaylanan) önce,
+  // sonra ziyaretçi eğilimi + gerçek satışlara göre (p.h), veri yoksa çok satan/mağaza markası
   function dmProducts(c) {
-    var set = {};
+    var set = {}, picks = ((dmCfgObj().picks || {})[c.n] || []).map(function (s) { return BY_SLUG[s]; })
+      .filter(function (p) { return p && p.st && p.img; });
     (function add(id) { set[id] = 1; (KIDS[id] || []).forEach(function (k) { add(k.id); }); })(c.id);
-    return DATA.items.filter(function (p) { return p.st && p.img && p.r >= 0 && p.c.some(function (x) { return set[x]; }); })
-      .sort(function (a, b) { return (b.best ? 3 : 0) + b.r - ((a.best ? 3 : 0) + a.r); }).slice(0, 3);
+    var rest = DATA.items.filter(function (p) { return p.st && p.img && p.r >= 0 && picks.indexOf(p) === -1 && p.c.some(function (x) { return set[x]; }); })
+      .sort(function (a, b) { return (b.h || 0) - (a.h || 0) || (b.best ? 3 : 0) + b.r - ((a.best ? 3 : 0) + a.r); });
+    return picks.concat(rest).slice(0, 3);
   }
+  function dmCfgObj() { return CFG.desktopMenu && typeof CFG.desktopMenu === 'object' ? CFG.desktopMenu : {}; }
   // Menü özeti (ürün verisinden; tarayıcıda saklanır): kategoriler, alt kategoriler, çok satanlar
   function dmModel() {
-    var dc = CFG.desktopMenu, o = dc && typeof dc === 'object' ? dc : {}, hidden = {}, up = {};
+    var dc = CFG.desktopMenu, o = dmCfgObj(), hidden = {}, up = {};
     (o.hide || []).forEach(function (n) { hidden[fold(n)] = 1; });
     var keep = function (c) { return c.k > 0 && !hidden[c.f]; };
     DATA.cats.forEach(function (c) {
@@ -3146,7 +3274,9 @@
     [bar, DN.mg].forEach(function (el) {
       el.addEventListener('click', function (e) {
         var a = e.target.closest && e.target.closest('a[data-n]');
-        if (a) track('menu-desktop', a.getAttribute('data-n'));
+        if (!a) return;
+        track('menu-desktop', a.getAttribute('data-n'));
+        if (a.className === 'pr') ev('c', slugOf(a.href)); else ev('m', a.getAttribute('data-n'));
       });
     });
     DN.mg.addEventListener('keydown', function (e) { if (e.key === 'Escape') { dmClose(); try { bar.querySelector('.ti.on, .ti').focus(); } catch (x) {} } });

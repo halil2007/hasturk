@@ -8,6 +8,8 @@
 //   IKAS_MERCHANT_ID    görsel adresleri için (bulunamazsa API'den denenir)
 //   IKAS_SALES_CHANNEL_ID  sadece bu satış kanalındaki ürünleri al
 //   MOCK=1              API'ye gitmeden örnek veriyle çalış (test için)
+//   TRENDS_URL          ziyaretçi eğilimi özeti (varsayılan: Worker'ın /trends adresi); TRENDS_FILE ile yerel dosya
+//   ORDER_DAYS          satış analizinde bakılacak gün (varsayılan 60)
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -16,7 +18,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'products.json');
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
+const REPORT = join(ROOT, 'docs', 'trend-raporu.md');
 const env = process.env;
+const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.dev/trends';
 
 // ---------- yardımcılar ----------
 const die = (msg) => { console.error('HATA: ' + msg); process.exit(1); };
@@ -317,6 +321,310 @@ function mockData() {
   return { products, categories, variantTypes, merchantId: '' };
 }
 
+// ---------- eğilim: ziyaretçi olayları + gerçek siparişler ----------
+// Ziyaretçi olayları (src/worker.js > /trends): arama, sonuçsuz arama, tıklama, görüntüleme, sepete ekleme
+async function fetchTrends() {
+  try {
+    if (env.TRENDS_FILE) return JSON.parse(await readFile(env.TRENDS_FILE, 'utf8'));
+    if (env.MOCK) return null;
+    const res = await fetch(TRENDS_URL, { signal: AbortSignal.timeout(20000) });
+    const j = await res.json();
+    if (!j.ok) { console.warn('UYARI: eğilim verisi henüz yok (' + (j.why || res.status) + ')'); return null; }
+    console.log(`Eğilim verisi: ${j.rows} satır (son ${j.days} gün)`);
+    return j;
+  } catch (e) {
+    console.warn('UYARI: eğilim verisi alınamadı: ' + e.message.slice(0, 160));
+    return null;
+  }
+}
+
+// Gerçek satışlar: [from, to] aralığındaki siparişlerde ürün satırları (iptal/iade hariç).
+// Uygulamanın sipariş okuma izni yoksa atlanır (ürün senkronu etkilenmez).
+let ORDER_Q = null; // çalışan sorgu biçimi (ilk denemede bulunur)
+async function fetchOrdersRange(from, to, maxPages) {
+  const line = 'orderLineItems { quantity status variant { id productId } }';
+  const variants = [
+    (pg) => [`query($p: PaginationInput, $d: DateFilterInput) { listOrder(pagination: $p, orderedAt: $d) { hasNext data { status orderedAt ${line} } } }`, { p: pg, d: { gte: from, lte: to } }],
+    (pg) => [`query($p: PaginationInput) { listOrder(pagination: $p) { hasNext data { status orderedAt ${line} } } }`, { p: pg }],
+    (pg) => [`query($p: PaginationInput) { listOrder(pagination: $p) { hasNext data { status orderedAt orderLineItems { quantity variant { id productId } } } } }`, { p: pg }],
+  ];
+  let lastErr;
+  for (const build of ORDER_Q ? [ORDER_Q] : variants) {
+    try {
+      const out = { orders: 0, lines: [] };
+      for (let page = 1; page <= maxPages; page++) {
+        const [q, vars] = build({ page, limit: 50 });
+        const r = (await gql(q, vars)).listOrder;
+        let old = 0;
+        for (const o of r.data || []) {
+          const t = typeof o.orderedAt === 'number' ? o.orderedAt : Date.parse(o.orderedAt);
+          if (t && t < from) { old++; continue; }
+          if (t && t > to) continue;
+          if (/CANCEL|REFUND|DRAFT/i.test(o.status || '')) continue;
+          out.orders++;
+          for (const li of o.orderLineItems || []) {
+            if (/CANCEL|REFUND/i.test(li.status || '')) continue;
+            if (li.variant) out.lines.push({ pid: li.variant.productId, vid: li.variant.id, q: +li.quantity || 1, t });
+          }
+        }
+        if (!r.hasNext || !(r.data || []).length || (old && old === r.data.length)) break;
+      }
+      ORDER_Q = build;
+      return out;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+// Son ORDER_DAYS gün (bugünün eğilimi) + 1 ve 2 yıl önce aynı dönem (o günün 3 hafta öncesi – 1 ay sonrası).
+// Geçmiş yıllar iki iş görür: önümüzdeki ay hangi ürünlerin satacağını söyler (sezon) ve son 2 haftayı
+// bu yılın son 2 haftasıyla karşılaştırıp sezonun bu yıl tutup tutmadığını gösterir (teyit).
+async function fetchOrders() {
+  if (env.MOCK) return env.ORDERS_FILE ? JSON.parse(await readFile(env.ORDERS_FILE, 'utf8')) : null;
+  const days = +env.ORDER_DAYS || 60, now = Date.now(), Y = 365 * 864e5, D = 864e5;
+  try {
+    const cur = await fetchOrdersRange(now - days * D, now, 60);
+    console.log(`Siparişler: son ${days} günde ${cur.orders} sipariş, ${cur.lines.length} satır`);
+    const past = [];
+    for (const y of [1, 2]) {
+      try {
+        const r = await fetchOrdersRange(now - y * Y - 21 * D, now - y * Y + 30 * D, 200);
+        console.log(`${y} yıl önce aynı dönem: ${r.orders} sipariş, ${r.lines.length} satır`);
+        past.push({ y, ...r });
+      } catch (e) { console.warn(`UYARI: ${y} yıl önceki siparişler alınamadı: ` + String(e.message).slice(0, 160)); }
+    }
+    return { days, now, orders: cur.orders, lines: cur.lines, past };
+  } catch (e) {
+    console.warn('UYARI: sipariş verisi alınamadı (ikas uygulamasına "Siparişler (okuma)" izni gerekebilir): ' + String(e && e.message).slice(0, 200));
+    return null;
+  }
+}
+
+const fold = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[ışğüöçâîû]/g, (c) => ({ ı: 'i', ş: 's', ğ: 'g', ü: 'u', ö: 'o', ç: 'c', â: 'a', î: 'i', û: 'u' })[c]).replace(/̇/g, '');
+
+// ---------- eğilim algoritması ----------
+// Her ürün için puan (p.h, 0-100) şu parçalardan oluşur, hepsi aynı ölçekte ("talep puanı"):
+//  1) ŞİMDİ     4 × satış + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme; yeni olan ağır basar
+//               (sipariş yarı ömrü 20 gün, site olayları 10 gün) → eski ilgi yavaşça söner, sert sıfırlama yok
+//  2) İVME      son 7 günün hızı ÷ önceki 3 haftanın hızı. En az 1,5 kat hızlanan ve yeterli hacmi olan ürün
+//               "yükselen" sayılır ve ek puan alır (bu yıl yeni tutan ürünler sezon verisini beklemeden öne çıkar)
+//  3) SEZON     1 ve 2 yıl önce, bugünden 1 hafta önce – 1 ay sonrasına kadar satılanlar (geçen yıl ağırlık 1,
+//               2 yıl önce 0,5); mağazanın büyüme oranıyla ölçeklenir (bu yıl genel satış 2 katsa geçmiş de 2 kat sayılır)
+//  4) TEYİT     geçen yılın son 2 haftası ile bu yılın son 2 haftası karşılaştırılır: bu yıl geride kalan ürünün
+//               sezon puanı azalır (en az %40'ına), önde gidenin artar (en fazla %150) → geçen yıl revaçta olup
+//               bu yıl ilgi görmeyen ürün zorla öne çıkarılmaz, bu yıl erken başlayan daha da öne alınır
+//  puan = ŞİMDİ + İVME + 0,6 × SEZON × TEYİT
+// Stokta olmayan ürünler sitede öne çıkarılmaz (widget stok kontrol eder); raporda uyarı olarak listelenir.
+const W = { o: 4, a: 2, c: 1, v: 0.3 };
+const SEASON = 0.6, Y2 = 0.5, HL_ORDER = 20;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+function momentum(m7, m28, minVol) {
+  const prior = Math.max(0, m28 - m7);
+  const ratio = (m7 / 7 + 0.3) / (prior / 21 + 0.3);
+  const rising = m7 >= minVol && ratio >= 1.5;
+  return { ratio, rising, bonus: rising ? 0.5 * m7 * (Math.min(ratio, 4) - 1) : 0 };
+}
+
+function applyTrends(out, trends, orders, config) {
+  const D = 864e5, now = (orders && orders.now) || Date.now();
+  const bySlug = new Map(out.items.map((p) => [p.s, p]));
+  const byId = new Map(out.items.map((p) => [p.id, p]));
+  const byVar = new Map();
+  for (const p of out.items) { if (p.v1) byVar.set(p.v1, p); for (const v of p.v || []) byVar.set(v.id, p); }
+  const prodOf = (l) => byId.get(l.pid) || byVar.get(l.vid);
+  const st = new Map();
+  const get = (slug) => {
+    if (!st.has(slug)) st.set(slug, { o: 0, o7: 0, o14: 0, o28: 0, a: 0, c: 0, v: 0, e7: 0, e28: 0, yrs: {} });
+    return st.get(slug);
+  };
+  const yr = (g, y) => (g.yrs[y] = g.yrs[y] || { oA: 0, o14: 0, eA: 0, e14: 0 });
+
+  // Bugünkü siparişler
+  for (const l of (orders && orders.lines) || []) {
+    const p = prodOf(l);
+    if (!p) continue;
+    const g = get(p.s), age = l.t ? Math.max(0, (now - l.t) / D) : 0;
+    g.o += l.q * Math.pow(0.5, age / HL_ORDER);
+    if (age < 7) g.o7 += l.q;
+    if (age < 14) g.o14 += l.q;
+    if (age < 28) g.o28 += l.q;
+  }
+  // Geçmiş yılların siparişleri: "önümüzdeki dönem" (−7…+30 gün) ve "son 2 hafta" (−14…0 gün)
+  const years = {};
+  for (const py of (orders && orders.past) || []) {
+    years[py.y] = { o14: 0, e14: 0, has: py.orders > 0 };
+    const base = now - py.y * 365 * D;
+    for (const l of py.lines) {
+      const p = prodOf(l);
+      if (!p || !l.t) continue;
+      const rel = (l.t - base) / D, y = yr(get(p.s), py.y);
+      if (rel >= -7 && rel <= 30) y.oA += l.q;
+      if (rel >= -14 && rel <= 0) { y.o14 += l.q; years[py.y].o14 += l.q; }
+    }
+  }
+  // Site içi olaylar (bugün + geçmiş yıllar)
+  for (const [slug, o] of Object.entries((trends && trends.p) || {})) {
+    if (!bySlug.has(slug)) continue;
+    const g = get(slug);
+    g.a += o.a || 0; g.c += o.c || 0; g.v += o.v || 0; g.e7 += o.e7 || 0; g.e28 += o.e28 || 0;
+  }
+  for (const [y, key] of [[1, 'ly'], [2, 'ly2']]) {
+    const t = trends && trends[key];
+    if (!t || !t.rows) continue;
+    years[y] = years[y] || { o14: 0, e14: 0, has: false };
+    years[y].hasE = true;
+    for (const [slug, o] of Object.entries(t.p || {})) {
+      if (!bySlug.has(slug)) continue;
+      const v = yr(get(slug), y);
+      v.eA += o.e || 0; v.e14 += o.e14 || 0; years[y].e14 += o.e14 || 0;
+    }
+  }
+  // Mağaza büyümesi: bu yılın son 2 haftası ÷ o yılın aynı 2 haftası (sipariş ve olay ayrı ayrı)
+  let cur14 = 0, curE14 = 0;
+  for (const g of st.values()) { cur14 += g.o14; curE14 += g.e28 / 2; }
+  // (o yılın son 2 haftasında yeterli veri yoksa oran güvenilmez → 1 kabul edilir)
+  for (const y of Object.values(years)) {
+    y.g = y.o14 >= 5 && cur14 >= 5 ? clamp((cur14 + 3) / (y.o14 + 3), 0.5, 3) : 1;
+    y.ge = y.e14 >= 10 && curE14 >= 10 ? clamp((curE14 + 3) / (y.e14 + 3), 0.5, 3) : 1;
+  }
+
+  const rows = [];
+  for (const [slug, g] of st) {
+    const now0 = W.o * g.o + W.a * g.a + W.c * g.c + W.v * g.v;
+    const mo = momentum(W.o * g.o7 + g.e7, W.o * g.o28 + g.e28, 5);
+    const bonus = Math.min(mo.bonus, Math.max(now0, W.o * g.o7 + g.e7));
+    // Sezon: yılların ağırlıklı ortalaması (veri olan yıllar)
+    let sNum = 0, sDen = 0, lNum = 0;
+    for (const [y, w] of [[1, 1], [2, Y2]]) {
+      const Yd = years[y];
+      if (!Yd || (!Yd.has && !Yd.hasE)) continue;
+      const v = g.yrs[y] || { oA: 0, o14: 0, eA: 0, e14: 0 };
+      sNum += w * (W.o * v.oA * Yd.g + v.eA * Yd.ge);
+      lNum += w * (W.o * v.o14 * Yd.g + v.e14 * Yd.ge);
+      sDen += w;
+    }
+    const season = sDen ? sNum / sDen : 0, lastRecent = sDen ? lNum / sDen : 0;
+    const thisRecent = W.o * g.o14 + g.e28 / 2;
+    const conf = lastRecent >= 4 ? clamp((thisRecent + 2) / (lastRecent + 2), 0.4, 1.5) : 1;
+    const score = now0 + bonus + SEASON * season * conf;
+    rows.push({ slug, g, now0, mo, bonus, season, conf, lastRecent, thisRecent, score });
+  }
+  const max = Math.max(0, ...rows.map((r) => r.score));
+  for (const r of rows) {
+    const h = max ? Math.round((100 * r.score) / max) : 0;
+    if (h > 0) bySlug.get(r.slug).h = h;
+  }
+  const inStock = (r) => (bySlug.get(r.slug) || {}).st;
+  // Çok satan: gerçek siparişler (bugün + yaklaşan sezonda geçen yıl satılan), en az 2 adet, en fazla 12.
+  // Geçen yılın sezonu sadece bu yıl geride değilse sayılır (bu yıl satmayan ürüne "Çok satan" denmez)
+  const sold = (r) => r.g.o + (r.conf >= 0.8 ? SEASON * ((r.g.yrs[1] || {}).oA || 0) * r.conf : 0);
+  const best = orders ? rows.filter((r) => sold(r) >= 2).sort((a, b) => sold(b) - sold(a)).slice(0, 12).map((r) => r.slug) : [];
+  const rising = rows.filter((r) => r.mo.rising && inStock(r)).sort((a, b) => b.bonus - a.bonus).slice(0, 8).map((r) => r.slug);
+  // Sezon önerileri: bu yıl geride kalanlar hariç (teyit ≥ %70 ya da sezon henüz başlamadı)
+  const season = rows.filter((r) => r.season * r.conf >= 4 && r.conf >= 0.7 && inStock(r)).sort((a, b) => b.season * b.conf - a.season * a.conf).slice(0, 8).map((r) => r.slug);
+
+  // Aramalar: bugün (yeni olan ağır) + yükselen + geçmiş yılların aynı dönemi; farklı yazımlar birleşir
+  const terms = new Map();
+  const term = (x) => {
+    const f = fold(x).replace(/[^a-z0-9 ]/g, '').trim();
+    if (!f) return null;
+    if (!terms.has(f)) terms.set(f, { n: 0, s: 0, n7: 0, ly: 0, show: x, top: 0 });
+    return terms.get(f);
+  };
+  for (const [x, n, s, n7] of (trends && trends.q) || []) {
+    const t = term(x);
+    if (!t) continue;
+    t.n += n; t.s += s || n; t.n7 += n7 || 0;
+    if (n > t.top) { t.top = n; t.show = x; }
+  }
+  for (const [y, key, w] of [[1, 'ly', 1], [2, 'ly2', Y2]]) {
+    for (const [x, n] of (trends && trends[key] && trends[key].q) || []) {
+      const t = term(x);
+      if (t) t.ly += w * n * ((years[y] || {}).ge || 1);
+    }
+  }
+  for (const t of terms.values()) {
+    t.mo = momentum(t.n7, t.n, 3);
+    t.score = t.s + t.mo.bonus + SEASON * t.ly;
+  }
+  const q = [...terms.values()].filter((t) => t.n + t.ly >= 3).sort((a, b) => b.score - a.score).slice(0, 12).map((t) => t.show);
+  const r2 = (n) => Math.round(n * 100) / 100;
+  out.trend = {
+    q, best, rising, season,
+    src: {
+      orders: orders ? orders.orders : null,
+      years: Object.fromEntries(Object.entries(years).map(([y, v]) => [y, { growth: r2(v.g), orders: v.has, events: !!v.hasE }])),
+      events: trends ? trends.rows : null,
+    },
+  };
+  return { rows, terms, best, rising, season, years };
+}
+
+// İnsan için rapor: docs/trend-raporu.md (sadece içerik değişince yazılır)
+async function writeReport(out, trends, orders, an, config) {
+  const bySlug = new Map(out.items.map((p) => [p.s, p]));
+  const name = (s) => (bySlug.get(s) || {}).n || s;
+  const stock = (s) => ((bySlug.get(s) || {}).st ? 'evet' : '**HAYIR**');
+  const catOf = new Map(out.cats.map((c) => [c.id, c]));
+  const topCat = (p) => { let c = catOf.get(p.c[0]); while (c && c.p && catOf.get(c.p)) c = catOf.get(c.p); return c ? c.n : ''; };
+  const f1 = (n) => (Math.round(n * 10) / 10).toLocaleString('tr-TR');
+  const pct = (n) => '%' + Math.round(n * 100);
+  const L = [];
+  const tbl = (head, rows) => { if (!rows.length) { L.push('_Henüz veri yok._', ''); return; } L.push('| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|', ...rows.map((r) => '| ' + r.join(' | ') + ' |'), ''); };
+  const yrs = an.years;
+  const yearTxt = [1, 2].filter((y) => yrs[y]).map((y) => `${y} yıl önce aynı dönem (${yrs[y].has ? 'sipariş' : ''}${yrs[y].has && yrs[y].hasE ? ' + ' : ''}${yrs[y].hasE ? 'site içi' : ''}; mağaza büyümesi ×${f1(yrs[y].g)})`);
+  L.push('# Ziyaretçi ve satış eğilimleri', '',
+    'Kaynaklar: ' + [
+      orders ? `son ${orders.days} günde ${orders.orders} sipariş` : 'sipariş verisi yok (ikas uygulamasına "Siparişler (okuma)" izni gerekir)',
+      trends ? `site içi olaylar son ${trends.days} gün (${trends.rows} kayıt)` : 'site içi olay verisi henüz yok',
+      ...yearTxt,
+    ].join('; ') + '.', '',
+    'Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. ' +
+    'Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.', '');
+
+  L.push('## Yükselen ürünler (son 7 gün, önceki 3 haftaya göre)', '', 'Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkarılıyor.', '');
+  tbl(['#', 'Ürün', 'Hızlanma', 'Son 7 gün satış', 'Stokta'], an.rows.filter((r) => r.mo.rising).sort((a, b) => b.bonus - a.bonus).slice(0, 15)
+    .map((r, i) => [i + 1, name(r.slug), '×' + f1(Math.min(r.mo.ratio, 9.9)), r.g.o7, stock(r.slug)]));
+
+  L.push('## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)', '',
+    'Teyit: geçen yılın son 2 haftasına göre bu yılın durumu. %100 = aynı tempoda; altı geride, üstü önde.', '');
+  tbl(['#', 'Ürün', 'Geçen yıl (1 ay) adet', 'Teyit', 'Durum', 'Stokta'], an.rows.filter((r) => r.season > 0).sort((a, b) => b.season * b.conf - a.season * a.conf).slice(0, 20)
+    .map((r, i) => [i + 1, name(r.slug), (r.g.yrs[1] || {}).oA || 0, r.lastRecent >= 4 ? pct(r.conf) : '—',
+      r.lastRecent < 4 ? 'sezon başlamadı' : r.conf >= 1.15 ? 'bu yıl önde' : r.conf <= 0.7 ? 'bu yıl geride' : 'yolunda', stock(r.slug)]));
+
+  L.push('## Geçen yıl revaçta, bu yıl geride kalanlar', '', 'Kampanya, fiyat veya görünürlük düşünülebilir; sistem bunları zorla öne çıkarmaz.', '');
+  tbl(['Ürün', 'Geçen yıl son 2 hafta', 'Bu yıl son 2 hafta', 'Teyit'], an.rows.filter((r) => r.lastRecent >= 4 && r.conf <= 0.7).sort((a, b) => b.lastRecent - a.lastRecent).slice(0, 15)
+    .map((r) => [name(r.slug), f1(r.lastRecent), f1(r.thisRecent), pct(r.conf)]));
+
+  L.push('## En çok satanlar (son 60 gün, gerçek siparişler)', '');
+  tbl(['#', 'Ürün', 'Satış puanı', 'Son 28 gün adet'], an.rows.filter((r) => r.g.o > 0).sort((a, b) => b.g.o - a.g.o).slice(0, 20).map((r, i) => [i + 1, name(r.slug), f1(r.g.o), r.g.o28]));
+
+  L.push('## En çok aranan kelimeler', '');
+  tbl(['#', 'Kelime', 'Son 30 gün', 'Son 7 gün', 'Yükseliyor', 'Geçen yıl bu dönem'], [...an.terms.values()].sort((a, b) => b.score - a.score).slice(0, 25)
+    .map((t, i) => [i + 1, t.show, t.n, t.n7, t.mo.rising ? '↑ ×' + f1(Math.min(t.mo.ratio, 9.9)) : '', t.ly ? f1(t.ly) : '']));
+
+  L.push('## Sonuç bulunamayan aramalar', '', 'Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlamlı tanımlamayı düşünün.', '');
+  tbl(['#', 'Kelime', 'Arama'], ((trends && trends.q0) || []).slice(0, 25).map(([x, n], i) => [i + 1, x, n]));
+
+  L.push('## En çok sepete eklenenler', '');
+  tbl(['#', 'Ürün', 'Sepete ekleme', 'Görüntüleme'], an.rows.filter((r) => r.g.a > 0).sort((a, b) => b.g.a - a.g.a).slice(0, 20).map((r, i) => [i + 1, name(r.slug), f1(r.g.a), f1(r.g.v)]));
+
+  L.push('## Çok bakılıp az sepete eklenenler', '', 'Fiyat, görsel veya açıklama gözden geçirilebilir.', '');
+  tbl(['Ürün', 'Görüntüleme', 'Sepete ekleme', 'Oran'], an.rows.filter((r) => r.g.v >= 8 && r.g.a / r.g.v < 0.05).sort((a, b) => b.g.v - a.g.v).slice(0, 15)
+    .map((r) => [name(r.slug), f1(r.g.v), f1(r.g.a), pct(r.g.a / r.g.v)]));
+
+  L.push('## Masaüstü menü önerileri (kategori başına ilk 3)', '', 'Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazsanız menü bu sıraya göre kendini günceller.', '');
+  const groups = new Map();
+  for (const p of out.items) if (p.h && p.st && p.img) { const c = topCat(p); if (!groups.has(c)) groups.set(c, []); groups.get(c).push(p); }
+  tbl(['Kategori', 'Önerilen ürünler'], [...groups].map(([c, ps]) => [c, ps.sort((a, b) => b.h - a.h).slice(0, 3).map((p) => `${p.n} (\`${p.s}\`)`).join('<br>')]));
+  const text = L.join('\n') + '\n';
+  let prev = '';
+  try { prev = await readFile(REPORT, 'utf8'); } catch {}
+  if (prev === text) return;
+  await mkdir(dirname(REPORT), { recursive: true });
+  await writeFile(REPORT, text);
+  console.log('Rapor yazıldı: docs/trend-raporu.md');
+}
+
 // ---------- ana akış ----------
 async function main() {
   const config = JSON.parse(await readFile(join(ROOT, 'config.json'), 'utf8'));
@@ -334,6 +642,15 @@ async function main() {
   }
   const out = transform({ ...raw, config });
   if (!out.items.length) die('Hiç ürün çıkmadı; products.json güncellenmedi.');
+
+  // Eğilimler: hata olursa ürün senkronu yine de tamamlanır
+  try {
+    const [trends, orders] = await Promise.all([fetchTrends(), fetchOrders()]);
+    const an = applyTrends(out, trends, orders, config);
+    await writeReport(out, trends, orders, an, config);
+  } catch (e) {
+    console.warn('UYARI: eğilim hesaplanamadı: ' + (e.stack || e.message).slice(0, 300));
+  }
 
   // Sadece içerik değiştiyse yaz (gereksiz commit/deploy olmasın)
   let prev = null;

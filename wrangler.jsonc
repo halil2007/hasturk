@@ -1,8 +1,17 @@
-// Cloudflare Workers: public/ klasörünü statik dosya olarak yayınlar.
+// Cloudflare Workers: public/ klasörünü statik dosya olarak yayınlar; src/worker.js sadece /e ve /trends adreslerinde çalışır.
 {
   "name": "hasturk-arama",
   "compatibility_date": "2025-09-01",
+  "main": "src/worker.js",
   "assets": {
     "directory": "./public"
+  },
+  // Ziyaretçi eğilimleri veritabanı: kimliği (database_id) yazılmadığı için ilk yayında Cloudflare otomatik oluşturur
+  "d1_databases": [
+    { "binding": "DB", "database_name": "hasturk-egilim" }
+  ],
+  // Olay kabul edilen site(ler)
+  "vars": {
+    "ORIGINS": "hasturkgubre.com.tr"
   }
 }

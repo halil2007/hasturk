@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
       - name: Ürünleri çek
         run: node scripts/sync.mjs
         env:
@@ -35,4 +35,5 @@ jobs:
           git config user.name "urun-senkron"
           git config user.email "actions@users.noreply.github.com"
           git add public/products.json
+          if [ -f docs/trend-raporu.md ]; then git add docs/trend-raporu.md; fi
           git diff --cached --quiet || (git commit -m "Ürünler güncellendi" && git push)
