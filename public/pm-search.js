@@ -2950,7 +2950,10 @@
       while (t.p && CATS_BY_ID[t.p]) t = CATS_BY_ID[t.p];
       up[c.s] = t.s;
     });
-    var cats = topCats().filter(function (c) { return !hidden[c.f]; }).map(function (c) {
+    // config.json > desktopMenu.items: çubukta hangi ana kategoriler hangi sırayla (ikas menüsünde olmasa da) gösterilsin
+    var tops = topCats(), fixed = (o.items || []).map(fold);
+    if (fixed.length) tops = fixed.map(function (f) { return tops.filter(function (c) { return c.f === f; })[0]; }).filter(Boolean);
+    var cats = tops.filter(function (c) { return !hidden[c.f]; }).map(function (c) {
       return {
         n: c.n, l: (o.labels || {})[c.n] || c.n, s: c.s,
         k: (KIDS[c.id] || []).filter(keep).map(function (k) {
@@ -2961,7 +2964,7 @@
         })
       };
     });
-    return { v: 1, off: dc === false, sel: CFG.desktopNav || '', cats: cats, up: up };
+    return { v: 1, off: dc === false, sel: CFG.desktopNav || '', fixed: fixed.length > 0, cats: cats, up: up };
   }
   // Satırdaki boş alan: menünün solundaki (logo) ve sağındaki (ikonlar) öğeler arasında kalan genişlik
   function rowSpace(el) {
@@ -3027,7 +3030,7 @@
       var r = a.getBoundingClientRect(), t = (a.textContent || '').replace(/\s+/g, ' ').trim();
       if (s && t && !ex[s] && r.width && Math.abs(r.top - hits[0].r.top) < 24) { ex[s] = 1; extra.push({ t: t, href: a.href }); }
     });
-    var cats = M.cats.filter(function (c) { return seen[c.s]; });
+    var cats = M.fixed ? M.cats : M.cats.filter(function (c) { return seen[c.s]; });
     return { nav: nav, cats: cats, hrefs: hrefs, extra: extra, space: rowSpace(nav), w0: nav.getBoundingClientRect().width };
   }
   // İlk ziyarette (özet yokken) ikas menüsünü tahmin et: başlıktaki aynı satırda duran en az 4 kısa bağlantı.
