@@ -19,6 +19,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'products.json');
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
 const REPORT = join(ROOT, 'docs', 'trend-raporu.md');
+const MENU = join(ROOT, 'public', 'menu.json');
 const env = process.env;
 const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.dev/trends';
 
@@ -643,9 +644,59 @@ async function writeReport(out, trends, orders, an, config) {
   console.log('Rapor yazıldı: docs/trend-raporu.md');
 }
 
+// ---------- kategori görselleri + hızlı menü verisi ----------
+// Kategori kapak görseli: config.json > categoryImages'daki ürün; yoksa kategorideki (alt kategoriler dahil) stoktaki
+// mağaza markalı ürün; o da yoksa stoktaki ilk görselli ürün (daha önce telefonda hesaplanıyordu)
+function catCovers(out, config) {
+  const bySlug = new Map(out.items.map((p) => [p.s, p]));
+  const own = new RegExp(config.brandPattern || 'has ?t[uü]rk|^hg$', 'i');
+  const cover = {};
+  for (const [n, slug] of Object.entries(config.categoryImages || {})) cover[fold(n)] = bySlug.get(slug);
+  const catById = new Map(out.cats.map((c) => [c.id, c]));
+  const byCat = new Map();
+  for (const p of out.items) {
+    if (!p.img) continue;
+    const seen = new Set();
+    for (const id of p.c) {
+      for (let c = catById.get(id), n = 0; c && !seen.has(c.id) && n < 10; c = catById.get(c.p), n++) {
+        seen.add(c.id);
+        if (!byCat.has(c.id)) byCat.set(c.id, []);
+        byCat.get(c.id).push(p);
+      }
+    }
+  }
+  for (const c of out.cats) {
+    const inCat = byCat.get(c.id) || [], inStock = inCat.filter((p) => p.st), cv = cover[fold(c.n)];
+    const pick = (cv && cv.img ? cv : null) || inStock.find((p) => own.test(p.b || '')) || inStock[0] || inCat[0];
+    c.img = pick ? pick.img : '';
+  }
+}
+// public/menu.json (~5 KB): telefonda ☰ menüsü / Ürün Bul ana ekranı ürün verisinin (90+ KB) inmesini beklemeden
+// bununla anında açılır. Ağır ama ana ekranda gerekmeyen ayarlar (rehberler, toprak eşleştirme…) içinde yoktur.
+const MENU_SKIP = ['guides', 'soilMatch', 'synonyms', 'crossSell', 'boost', 'bestsellers', 'badges', 'categoryImages'];
+async function writeMenu(out) {
+  const config = Object.fromEntries(Object.entries(out.config || {}).filter(([k]) => !MENU_SKIP.includes(k)));
+  const menu = { v: 1, merchant: out.merchant, n: out.items.length, config, cats: out.cats, trend: { q: (out.trend && out.trend.q) || [] } };
+  const text = JSON.stringify(menu);
+  let prev = '';
+  try { prev = await readFile(MENU, 'utf8'); } catch {}
+  if (prev === text) return;
+  await writeFile(MENU, text);
+  console.log(`Menü verisi yazıldı: public/menu.json (${(Buffer.byteLength(text) / 1024).toFixed(1)} KB)`);
+}
+
 // ---------- ana akış ----------
 async function main() {
   const config = JSON.parse(await readFile(join(ROOT, 'config.json'), 'utf8'));
+  // Sadece menü verisini mevcut products.json'dan üret (API'ye gitmeden): MENU_ONLY=1 node scripts/sync.mjs
+  if (env.MENU_ONLY) {
+    const cur = JSON.parse(await readFile(OUT, 'utf8'));
+    cur.config = config;
+    catCovers(cur, config);
+    await writeFile(OUT, JSON.stringify(cur));
+    await writeMenu(cur);
+    return;
+  }
   let raw;
   if (env.MOCK) {
     console.log('MOCK modu: örnek veri kullanılıyor');
@@ -669,6 +720,8 @@ async function main() {
   } catch (e) {
     console.warn('UYARI: eğilim hesaplanamadı: ' + (e.stack || e.message).slice(0, 300));
   }
+  catCovers(out, config);
+  await writeMenu(out);
 
   // Sadece içerik değiştiyse yaz (gereksiz commit/deploy olmasın)
   let prev = null;

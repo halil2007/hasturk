@@ -11,7 +11,9 @@ ikas API ──(GitHub Actions, 2 saatte bir)──▶ public/products.json ─�
 |---|---|
 | `scripts/sync.mjs` | ikas'tan ürün, kategori, fiyat, stok, görsel, varyantları çeker → `public/products.json` |
 | `.github/workflows/sync.yml` | Senkronu 2 saatte bir otomatik çalıştırır |
-| `public/pm-search.js` | Arama menüsünün kendisi (tasarım + arama motoru) |
+| `widget/pm-search.js` | Arama menüsünün kendisi (tasarım + arama motoru) — **düzenlemeler burada yapılır** |
+| `public/pm-search.js` | Sitede yayınlanan küçültülmüş hali (`node scripts/build-widget.mjs` üretir; elle düzenlenmez) |
+| `public/menu.json` | ~5 KB menü verisi (kategoriler + ana ekran ayarları); ☰ menüsü ürün verisini beklemeden anında açılır. Senkron üretir |
 | `config.json` | Popüler aramalar, eş anlamlılar, renkler, telefon/WhatsApp, rozetler |
 | `public/test.html` | Yayına aldıktan sonra deneme sayfası |
 | `src/worker.js` | Ziyaretçi eğilimlerini toplar (`/e`) ve özetler (`/trends`); diğer her şey statik |
@@ -52,8 +54,10 @@ Bundan sonra GitHub her güncellemede dosyayı değiştirir, Cloudflare otomatik
 Şu satırı sitenin tüm sayfalarına ekle:
 
 ```html
-<script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" defer></script>
+<script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" async fetchpriority="high"></script>
 ```
+
+`async` önemli: `defer` ile tarayıcı bu kodu sitenin kendi büyük JavaScript paketleri inip çalışana kadar bekletir (yavaş 4G'de banner'larla birlikte 6-7 sn). `async` ile kod indiği an çalışır; ☰ menüsü ve Ürün Bul ~2 sn'de hazır olur. `fetchpriority="high"` indirmeyi banner görsellerinin önüne alır.
 
 Nereye: ikas panelinde tema/mağaza ayarlarındaki **özel kod (head/body)** alanı. O alan yoksa **Google Tag Manager** → Yeni etiket → **Özel HTML** → yukarıdaki satır → Tetikleyici: **All Pages** → Yayınla.
 
@@ -68,7 +72,7 @@ Script satırına ekleyebileceğin ayarlar:
 
 Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan toprak hesaplayıcı açılır (`#urun-ara` → arama).
 
-Örnek: `<script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" data-trigger=".search-icon" defer></script>`
+Örnek: `<script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" data-trigger=".search-icon" async fetchpriority="high"></script>`
 
 ## config.json
 - `popular`: boş kutuda görünen "çok arananlar"
@@ -130,6 +134,20 @@ Puan = şimdi + ivme + 0,6 × sezon × teyit. Kullanıldığı yerler:
 - **Rapor (`docs/trend-raporu.md`):** Yükselenler, yaklaşan sezon (teyit ve stok durumuyla), geçen yıl revaçta olup bu yıl geride kalanlar, çok satanlar, aramalar (yükselenler işaretli), sonuçsuz aramalar, çok bakılıp az sepete eklenenler, menü önerileri.
 
 Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collect="off"`.
+
+## Hız
+Ölçüm düzeneği: yavaş 4G (1,6 Mbps, 150 ms) + 4 kat yavaş işlemci, banner'lı ağır ana sayfa, Next.js benzeri ürün sayfası.
+- **Açılış**: Ürün Bul butonu sayfanın tüm görsellerini (banner'lar) beklemeden, HTML hazır olunca (boşta, en geç ~0,8 sn) kurulur. Menü verisi (`menu.json`, ~5 KB) hemen; ürün verisi (`products.json`) müşteri sayfaya ilk dokunduğunda/kaydırdığında ya da en geç ~3 sn sonra düşük öncelikle iner. Müşteri o sırada panel/menü açarsa yüksek öncelikli ikinci indirme başlar, hangisi önce biterse o kullanılır. Panel kapalıyken veri hazırlığı tarayıcı boşa çıkınca yapılır.
+- **Görseller**: arama sonuçlarının ilk 4 görseli öncelikli, diğerleri kaydırınca iner; yavaş bağlantıda / veri tasarrufunda 180 px boyut. Görsel tamamen inene kadar sade yer tutucu (yarım çizim görünmez).
+- **Sepete ekleme**: ürün sayfası gizli çerçevede açılır; tüm görselleri beklenmeden "Sepete ekle" butonu çalışır olunca basılır (erken basış site tarafından işlenmezse sayfa yüklenince bir kez daha; istek başlamışsa asla ikinci kez basılmaz). İlk başarılı eklemeden sonra çerçeve sıcak kalır; sonraki eklemelerde sitenin yönlendiricisiyle yenilemesiz geçilir (~1 sn). Basmadan önce çerçevedeki sayfanın doğru ürün olduğu doğrulanır. Sonuçlar ekrandayken müşteri 1,2 sn duraksarsa ilk ürün önceden hazırlanır. `cart.warm: false` sıcak çerçeveyi kapatır. Başarı her zaman sitenin sepet cevabıyla kanıtlanır.
+- **Sayfa geçişi**: panelden ve masaüstü menüden ürün/kategori sayfalarına sitenin Next.js yönlendiricisiyle yenilemesiz geçilir (sitenin kendi linkleri gibi); parmak değince / fare gelince sayfanın kodu önceden iner. Yönlendirici yoksa, hata verirse ya da 8 sn'de bitmezse normal geçiş. Sepet/ödeme/hesap sayfalarına her zaman normal geçilir. Panel açıkken geri tuşu sadece paneli kapatır (sayfa yenilenmez/yukarı kaymaz). `"spaNav": false` kapatır.
+- **Telefon yükü**: telefonda görünmeyen arka plan bulanıklığı kapalı, buton parıltısı sadece transform ile (yeniden çizim yok).
+- `#ua-debug` çıktısındaki `hiz` alanı canlı sitede kodun kaç ms'de çalıştığını, sayfanın ne zaman hazır olduğunu ve etiket türünü gösterir.
+
+**Banner'lar**: sitenin toplam ağırlığı her şeyi (ikas'ın kendi kodu, sepete ekleme) yavaşlatır. Testte banner'lar 250 KB yerine 80 KB olunca ilk sepete ekleme 8,7 sn → 5,5 sn, sayfanın tam yüklenmesi 13 sn → 7,4 sn oldu. Banner başına ≤150 KB (WebP, gösterildiği boyutta; telefon için ayrı ~800 px görsel), ilk slayt dışındakiler sonradan yüklensin.
+
+## Widget'ı düzenlemek
+Kaynak `widget/pm-search.js`'dir (ES5, eski telefonlar için). Değişiklikten sonra `node scripts/build-widget.mjs` çalıştırıp `public/pm-search.js` (+ `.map`) ile birlikte commit edin. PR'larda "Widget derleme kontrolü" iş akışı yayınlanan dosyanın güncel olduğunu doğrular.
 
 ## Maliyet
 GitHub Actions (özel depo: ayda 2000 dk ücretsiz, bu iş ~360 dk kullanır) + Cloudflare Pages (statik dosya istekleri sınırsız) = **0 TL**.

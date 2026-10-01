@@ -1,0 +1,24 @@
+name: Widget derleme kontrolü
+
+# public/pm-search.js, widget/pm-search.js'den derlenir (node scripts/build-widget.mjs).
+# Bu kontrol, yayınlanan küçültülmüş dosyanın kaynakla güncel olduğundan emin olur.
+on:
+  pull_request:
+    paths: ['widget/**', 'public/pm-search.js', 'public/pm-search.js.map', 'scripts/build-widget.mjs']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Derlenmiş dosya güncel mi
+        run: node scripts/build-widget.mjs --check
+      - name: Eski telefonlar için ES5 uyumu
+        run: npx --yes acorn@8 --ecma5 public/pm-search.js > /dev/null
