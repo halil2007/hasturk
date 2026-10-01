@@ -328,7 +328,13 @@ async function fetchTrends() {
     if (env.TRENDS_FILE) return JSON.parse(await readFile(env.TRENDS_FILE, 'utf8'));
     if (env.MOCK) return null;
     const res = await fetch(TRENDS_URL, { signal: AbortSignal.timeout(20000) });
-    const j = await res.json();
+    const body = await res.text();
+    let j;
+    try { j = JSON.parse(body); } catch {
+      // Worker henüz yayında değilse (ör. merge'den hemen sonra) adres 404 ya da boş döner; bir sonraki senkronda alınır
+      console.warn(`UYARI: eğilim adresi beklenen cevabı vermedi (HTTP ${res.status}, ${body.length} bayt). Cloudflare yayını bitmemiş olabilir.`);
+      return null;
+    }
     if (!j.ok) { console.warn('UYARI: eğilim verisi henüz yok (' + (j.why || res.status) + ')'); return null; }
     console.log(`Eğilim verisi: ${j.rows} satır (son ${j.days} gün)`);
     return j;
@@ -384,6 +390,13 @@ async function fetchOrders() {
   try {
     const cur = await fetchOrdersRange(now - days * D, now, 60);
     console.log(`Siparişler: son ${days} günde ${cur.orders} sipariş, ${cur.lines.length} satır`);
+    // Tarih filtresi gerçekten uygulanıyor mu? (geçmiş yıllar 0 gelirse sebebini ayırt etmek için)
+    try {
+      const half = await fetchOrdersRange(now - days * D, now - 30 * D, 60);
+      const exp = new Set(cur.lines.filter((l) => l.t && l.t <= now - 30 * D).map((l) => l.t)).size;
+      const oldest = Math.min(...cur.lines.map((l) => l.t || now));
+      console.log(`Kontrol: ${days}-30 gün önce arası ${half.orders} sipariş (beklenen ~${exp}); en eski sipariş ${new Date(oldest).toISOString().slice(0, 10)}`);
+    } catch {}
     const past = [];
     for (const y of [1, 2]) {
       try {
@@ -571,7 +584,9 @@ async function writeReport(out, trends, orders, an, config) {
   const L = [];
   const tbl = (head, rows) => { if (!rows.length) { L.push('_Henüz veri yok._', ''); return; } L.push('| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|', ...rows.map((r) => '| ' + r.join(' | ') + ' |'), ''); };
   const yrs = an.years;
-  const yearTxt = [1, 2].filter((y) => yrs[y]).map((y) => `${y} yıl önce aynı dönem (${yrs[y].has ? 'sipariş' : ''}${yrs[y].has && yrs[y].hasE ? ' + ' : ''}${yrs[y].hasE ? 'site içi' : ''}; mağaza büyümesi ×${f1(yrs[y].g)})`);
+  const yearTxt = [1, 2].filter((y) => yrs[y]).map((y) => (yrs[y].has || yrs[y].hasE)
+    ? `${y} yıl önce aynı dönem (${[yrs[y].has && 'sipariş', yrs[y].hasE && 'site içi'].filter(Boolean).join(' + ')}; mağaza büyümesi ×${f1(yrs[y].g)})`
+    : `${y} yıl önce aynı dönemde veri yok`);
   L.push('# Ziyaretçi ve satış eğilimleri', '',
     'Kaynaklar: ' + [
       orders ? `son ${orders.days} günde ${orders.orders} sipariş` : 'sipariş verisi yok (ikas uygulamasına "Siparişler (okuma)" izni gerekir)',
