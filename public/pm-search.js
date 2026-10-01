@@ -2670,11 +2670,11 @@
     learnMenu(tp);
     openMenu();
   }
+  // Menü düğmesi: panel "Ürün Bul" ile birebir aynı açılır (Tüm kategoriler kapalı)
   function openMenu() {
     track('menu', 'open');
-    catOpen = true;
+    catOpen = false;
     open('', 'home');
-    renderIdle();
   }
   // Emniyet: ikas'ın arama paneli yine de açılırsa (tanımadığımız bir butondan) onu kapat, bizimkini aç
   // ve o butonu hatırla; sonraki basışlarda ikas'ınki hiç açılmaz.
