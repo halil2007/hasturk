@@ -1,7 +1,7 @@
 // Cloudflare Worker: public/ klasöründeki dosyalar (widget, ürün verisi) doğrudan statik sunulur, bu kod onlarda çalışmaz.
 // Sadece iki adres için devreye girer:
 //   POST /e       widget'tan gelen anonim ziyaretçi olayları (arama, tıklama, görüntüleme, sepete ekleme)
-//   GET  /trends  son 30 günün özeti (scripts/sync.mjs 2 saatte bir okur, products.json'a işler)
+//   GET  /trends  son 30 günün özeti + geçen yılın aynı dönemi (scripts/sync.mjs 2 saatte bir okur, products.json'a işler)
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
 
@@ -15,7 +15,8 @@ const KINDS = {
 };
 const DAYS = 30;          // özet penceresi
 const HALF_LIFE = 10;     // gün: yeni olaylar daha ağır basar
-const KEEP_DAYS = 150;    // daha eski satırlar silinir
+const KEEP_DAYS = 420;    // daha eski satırlar silinir (geçen yılın aynı dönemi için 1 yıldan fazla tutulur)
+const LY_BEFORE = 7, LY_AFTER = 30; // geçen yıl: bugünün 1 hafta öncesi – 1 ay sonrası (yaklaşan sezon)
 
 let ready = false;
 async function init(db) {
@@ -92,8 +93,17 @@ async function trends(env, ctx) {
   for (const k of ['c', 'v', 'a']) for (const [x, o] of Object.entries(agg[k] || {})) {
     (p[x] = p[x] || {})[k] = Math.round(o.s * 100) / 100;
   }
+  // Geçen yılın aynı dönemi (sezonluk ürünler zirveye çıkmadan önce öne alınsın)
+  const lyRows = (await env.DB.prepare('SELECT k, x, SUM(n) AS n FROM ev WHERE d >= ? AND d <= ? GROUP BY k, x')
+    .bind(day(-365 - LY_BEFORE), day(-365 + LY_AFTER)).all()).results;
+  const ly = { q: [], p: {} };
+  for (const r of lyRows) {
+    if (r.k === 'q') ly.q.push([r.x, r.n]);
+    else if (r.k === 'c' || r.k === 'v' || r.k === 'a') (ly.p[r.x] = ly.p[r.x] || {})[r.k] = r.n;
+  }
+  ly.q = ly.q.sort((a, b) => b[1] - a[1]).slice(0, 60);
   if (Math.random() < 0.1) ctx.waitUntil(env.DB.prepare('DELETE FROM ev WHERE d < ?').bind(day(-KEEP_DAYS)).run().catch(() => {}));
-  return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', 80), q0: top('q0', 50), m: top('m', 40), p });
+  return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', 80), q0: top('q0', 50), m: top('m', 40), p, ly });
 }
 
 export default {

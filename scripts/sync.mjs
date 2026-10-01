@@ -338,28 +338,28 @@ async function fetchTrends() {
   }
 }
 
-// Gerçek satışlar: son ORDER_DAYS gündeki siparişlerde ürün başına adet (iptal/iade hariç).
+// Gerçek satışlar: [from, to] aralığındaki siparişlerde ürün satırları (iptal/iade hariç).
 // Uygulamanın sipariş okuma izni yoksa atlanır (ürün senkronu etkilenmez).
-async function fetchOrders() {
-  if (env.MOCK) return env.ORDERS_FILE ? JSON.parse(await readFile(env.ORDERS_FILE, 'utf8')) : null;
-  const days = +env.ORDER_DAYS || 60, since = Date.now() - days * 864e5;
+let ORDER_Q = null; // çalışan sorgu biçimi (ilk denemede bulunur)
+async function fetchOrdersRange(from, to, maxPages) {
   const line = 'orderLineItems { quantity status variant { id productId } }';
   const variants = [
-    (pg) => [`query($p: PaginationInput, $d: DateFilterInput) { listOrder(pagination: $p, orderedAt: $d) { hasNext data { status orderedAt ${line} } } }`, { p: pg, d: { gte: since } }],
+    (pg) => [`query($p: PaginationInput, $d: DateFilterInput) { listOrder(pagination: $p, orderedAt: $d) { hasNext data { status orderedAt ${line} } } }`, { p: pg, d: { gte: from, lte: to } }],
     (pg) => [`query($p: PaginationInput) { listOrder(pagination: $p) { hasNext data { status orderedAt ${line} } } }`, { p: pg }],
     (pg) => [`query($p: PaginationInput) { listOrder(pagination: $p) { hasNext data { status orderedAt orderLineItems { quantity variant { id productId } } } } }`, { p: pg }],
   ];
   let lastErr;
-  for (const build of variants) {
+  for (const build of ORDER_Q ? [ORDER_Q] : variants) {
     try {
-      const out = { days, orders: 0, lines: [] };
-      for (let page = 1; page <= 60; page++) {
+      const out = { orders: 0, lines: [] };
+      for (let page = 1; page <= maxPages; page++) {
         const [q, vars] = build({ page, limit: 50 });
         const r = (await gql(q, vars)).listOrder;
         let old = 0;
         for (const o of r.data || []) {
           const t = typeof o.orderedAt === 'number' ? o.orderedAt : Date.parse(o.orderedAt);
-          if (t && t < since) { old++; continue; }
+          if (t && t < from) { old++; continue; }
+          if (t && t > to) continue;
           if (/CANCEL|REFUND|DRAFT/i.test(o.status || '')) continue;
           out.orders++;
           for (const li of o.orderLineItems || []) {
@@ -369,29 +369,56 @@ async function fetchOrders() {
         }
         if (!r.hasNext || !(r.data || []).length || (old && old === r.data.length)) break;
       }
-      console.log(`Siparişler: son ${days} günde ${out.orders} sipariş, ${out.lines.length} satır`);
+      ORDER_Q = build;
       return out;
     } catch (e) { lastErr = e; }
   }
-  console.warn('UYARI: sipariş verisi alınamadı (ikas uygulamasına "siparişleri okuma" izni gerekebilir): ' + String(lastErr && lastErr.message).slice(0, 200));
-  return null;
+  throw lastErr;
+}
+// Son ORDER_DAYS gün (bugünün eğilimi) + geçen yılın aynı dönemi: bugünden 1 hafta önce – 1 ay sonra
+// (her sezon düzenli satılan ürünler, talep zirveye çıkmadan önce öne alınsın)
+async function fetchOrders() {
+  if (env.MOCK) return env.ORDERS_FILE ? JSON.parse(await readFile(env.ORDERS_FILE, 'utf8')) : null;
+  const days = +env.ORDER_DAYS || 60, now = Date.now(), Y = 365 * 864e5;
+  try {
+    const cur = await fetchOrdersRange(now - days * 864e5, now, 60);
+    console.log(`Siparişler: son ${days} günde ${cur.orders} sipariş, ${cur.lines.length} satır`);
+    let ly = null;
+    try {
+      ly = await fetchOrdersRange(now - Y - 7 * 864e5, now - Y + 30 * 864e5, 200);
+      console.log(`Geçen yıl aynı dönem: ${ly.orders} sipariş, ${ly.lines.length} satır`);
+    } catch (e) { console.warn('UYARI: geçen yılın siparişleri alınamadı: ' + String(e.message).slice(0, 160)); }
+    return { days, orders: cur.orders, lines: cur.lines, ly };
+  } catch (e) {
+    console.warn('UYARI: sipariş verisi alınamadı (ikas uygulamasına "Siparişler (okuma)" izni gerekebilir): ' + String(e && e.message).slice(0, 200));
+    return null;
+  }
 }
 
 const fold = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[ışğüöçâîû]/g, (c) => ({ ı: 'i', ş: 's', ğ: 'g', ü: 'u', ö: 'o', ç: 'c', â: 'a', î: 'i', û: 'u' })[c]).replace(/̇/g, '');
 
 // Ürün başına eğilim puanı (p.h, 0-100) + "Çok satan" listesi + "Sık arananlar"
-//   ham puan = 4 × satış adedi + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme  (yeni olanlar daha ağır)
+//   şimdi  = 4 × satış adedi + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme  (yeni olanlar daha ağır)
+//   sezon  = geçen yılın aynı döneminde (1 hafta önce – 1 ay sonra) aynı hesap
+//   puan   = şimdi + SEASON × sezon   → her yıl aynı dönemde satan ürünler, talep başlamadan öne çıkar
+const SEASON = 0.6;
 function applyTrends(out, trends, orders, config) {
   const bySlug = new Map(out.items.map((p) => [p.s, p]));
   const byId = new Map(out.items.map((p) => [p.id, p]));
   const byVar = new Map();
   for (const p of out.items) { if (p.v1) byVar.set(p.v1, p); for (const v of p.v || []) byVar.set(v.id, p); }
   const st = new Map(); // slug → { o, a, c, v }
-  const get = (slug) => { if (!st.has(slug)) st.set(slug, { o: 0, a: 0, c: 0, v: 0 }); return st.get(slug); };
+  const get = (slug) => { if (!st.has(slug)) st.set(slug, { o: 0, a: 0, c: 0, v: 0, s: 0, so: 0 }); return st.get(slug); };
+  const prodOf = (l) => byId.get(l.pid) || byVar.get(l.vid);
   if (orders) {
     const now = Date.now();
+    // Geçen yılın sezonu: satış adedi (ürün hâlâ satıştaysa)
+    for (const l of (orders.ly && orders.ly.lines) || []) {
+      const p = prodOf(l);
+      if (p) { get(p.s).so += l.q; get(p.s).s += 4 * l.q; }
+    }
     for (const l of orders.lines) {
-      const p = byId.get(l.pid) || byVar.get(l.vid);
+      const p = prodOf(l);
       if (!p) continue;
       const age = l.t ? Math.max(0, (now - l.t) / 864e5) : 0;
       get(p.s).o += l.q * Math.pow(0.5, age / 20);
@@ -402,17 +429,24 @@ function applyTrends(out, trends, orders, config) {
     const g = get(slug);
     g.a += o.a || 0; g.c += o.c || 0; g.v += o.v || 0;
   }
-  const raw = new Map([...st].map(([s, g]) => [s, 4 * g.o + 2 * g.a + g.c + 0.3 * g.v]));
+  for (const [slug, o] of Object.entries((trends && trends.ly && trends.ly.p) || {})) {
+    if (bySlug.has(slug)) get(slug).s += 2 * (o.a || 0) + (o.c || 0) + 0.3 * (o.v || 0);
+  }
+  const raw = new Map([...st].map(([s, g]) => [s, 4 * g.o + 2 * g.a + g.c + 0.3 * g.v + SEASON * g.s]));
   const max = Math.max(0, ...raw.values());
   for (const [s, r] of raw) {
     const h = max ? Math.round((100 * r) / max) : 0;
     if (h > 0) bySlug.get(s).h = h;
   }
   // Çok satan: sadece gerçek siparişlerden (en az 2 adet), en fazla 12 ürün
-  const best = orders ? [...st].filter(([, g]) => g.o >= 2).sort((a, b) => b[1].o - a[1].o).slice(0, 12).map(([s]) => s) : [];
+  // (bugünkü satış + geçen yılın bu sezonu birlikte; sezon başında da doğru ürünler rozet alsın)
+  const sold = (g) => g.o + SEASON * g.so;
+  const best = orders ? [...st].filter(([, g]) => sold(g) >= 2).sort((a, b) => sold(b[1]) - sold(a[1])).slice(0, 12).map(([s]) => s) : [];
   // Sık arananlar: aynı kelimenin farklı yazımları birleşir, en çok kullanılan yazım gösterilir; en az 3 arama
   const terms = new Map();
-  for (const [x, n] of (trends && trends.q) || []) {
+  const qs = ((trends && trends.q) || []).map(([x, n]) => [x, n])
+    .concat(((trends && trends.ly && trends.ly.q) || []).map(([x, n]) => [x, Math.round(n * SEASON)]));
+  for (const [x, n] of qs) {
     const f = fold(x).replace(/[^a-z0-9 ]/g, '').trim();
     if (!f) continue;
     const t = terms.get(f) || { n: 0, show: x, top: 0 };
@@ -421,7 +455,7 @@ function applyTrends(out, trends, orders, config) {
     terms.set(f, t);
   }
   const q = [...terms.values()].filter((t) => t.n >= 3).sort((a, b) => b.n - a.n).slice(0, 12).map((t) => t.show);
-  out.trend = { q, best, src: { orders: orders ? orders.orders : null, events: trends ? trends.rows : null } };
+  out.trend = { q, best, src: { orders: orders ? orders.orders : null, lastYear: orders && orders.ly ? orders.ly.orders : null, events: trends ? trends.rows : null } };
   return { st, terms, best };
 }
 
@@ -435,10 +469,15 @@ async function writeReport(out, trends, orders, an, config) {
   const tbl = (head, rows) => { if (!rows.length) { L.push('_Henüz veri yok._', ''); return; } L.push('| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|', ...rows.map((r) => '| ' + r.join(' | ') + ' |'), ''); };
   L.push('# Ziyaretçi ve satış eğilimleri', '',
     `Kaynak: ${orders ? `son ${orders.days} günde ${orders.orders} sipariş` : 'sipariş verisi yok (ikas uygulamasına sipariş okuma izni gerekebilir)'}; ` +
+    `${orders && orders.ly ? `geçen yılın aynı döneminde ${orders.ly.orders} sipariş; ` : ''}` +
     `${trends ? `site içi olaylar son ${trends.days} gün (${trends.rows} kayıt)` : 'site içi olay verisi henüz yok'}.`,
     '', 'Bu dosya 2 saatte bir otomatik güncellenir. Masaüstü menüdeki ürünleri sabitlemek için `config.json > desktopMenu.picks` kullanın.', '');
   L.push('## En çok satanlar (gerçek siparişler)', '');
   tbl(['#', 'Ürün', 'Satış puanı'], [...an.st].filter(([, g]) => g.o > 0).sort((a, b) => b[1].o - a[1].o).slice(0, 20).map(([s, g], i) => [i + 1, name(s), g.o.toFixed(1)]));
+  L.push('## Yaklaşan sezon (geçen yıl bu dönemden 1 ay sonrasına kadar en çok satanlar)', '',
+    'Bu ürünler sistemde şimdiden öne çıkarılıyor. Stok ve kampanya planlaması için kullanılabilir.', '');
+  tbl(['#', 'Ürün', 'Geçen yıl adet', 'Bugün stokta'], [...an.st].filter(([, g]) => g.so > 0).sort((a, b) => b[1].so - a[1].so).slice(0, 20)
+    .map(([s, g], i) => [i + 1, name(s), g.so, (bySlug.get(s) || {}).st ? 'evet' : '**hayır**']));
   L.push('## En çok aranan kelimeler', '');
   tbl(['#', 'Kelime', 'Arama'], [...an.terms.values()].sort((a, b) => b.n - a.n).slice(0, 25).map((t, i) => [i + 1, t.show, t.n]));
   L.push('## Sonuç bulunamayan aramalar', '', 'Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlamlı tanımlamayı düşünün.', '');
