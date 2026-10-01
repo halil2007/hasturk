@@ -359,7 +359,7 @@
     '@keyframes cnpop{from{transform:scale(.3)}}',
     '.back,.xbtn{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none}',
     '.back{background:var(--bg)}.back svg{width:22px;height:22px}',
-    '.back{display:none;background:var(--bg)}.panel.sub .back{display:grid}.xbtn{display:grid;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
+    '.back{display:none;background:var(--bg)}.panel.sub .back{display:grid}.xbtn{display:grid;background:var(--ac);color:#fff;box-shadow:0 3px 10px rgba(215,55,47,.35)}.xbtn svg{width:22px;height:22px;stroke-width:2.8}.xbtn:hover{filter:brightness(.92)}.xbtn:active{transform:scale(.94)}',
     '.field{flex:1;display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 16px;border-radius:24px;background:var(--bg);min-width:0;border:2px solid transparent;transition:border-color .15s,background .15s}',
     '.field:focus-within{border-color:var(--pr);background:#fff}',
     '.field>svg{width:20px;height:20px;color:var(--pr);flex:none}',
