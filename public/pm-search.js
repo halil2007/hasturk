@@ -2784,6 +2784,416 @@
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  // ---------------- Masaüstü ana menü ----------------
+  // Sadece masaüstünde (geniş ekran + fare): ikas'ın üst menüsündeki kategori bağlantıları (Gübreler, Topraklar …)
+  // bulunur, öğeleri gizlenip yerine düzenli bir çubuk konur. Üzerine gelince geniş bir panel açılır:
+  // alt kategoriler sütunlar halinde, kategorinin çok satanları ve "Tümünü gör". Menü bulunamazsa hiçbir şeye
+  // dokunulmaz; telefon ve tablet menüsü etkilenmez. Kapatmak: config.json > "desktopMenu": false
+  //
+  // ikas'tan önce devreye girmesi için: script çalışır çalışmaz ikas menüsü görünmez yapılır (yeri korunur,
+  // sayfa kaymaz). Menünün küçük bir özeti tarayıcıda saklanır (ua-dnav), ürün verisi beklenmeden kurulur.
+  // ikas sayfası React ile çalışır; React menüyü "canlandırmadan" önce içine öğe eklemek sayfanın yeniden
+  // çizilmesine yol açacağı için bizim çubuk menü canlandığı an eklenir. 6 sn içinde kurulamazsa ikas menüsü geri gelir.
+  var DN = null, DM = null, DM_KEY = 'ua-dnav-v1', PRE = null, PRE_T = 0, DM_WAIT = false, HYD = false;
+  function wideScreen() {
+    return window.innerWidth >= 1024 && !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+  }
+  function dmenuOn() { return !!DM && !DM.off && ds.dmenu !== 'off' && wideScreen(); }
+  function slugOf(href) {
+    try {
+      var u = new URL(href, location.href);
+      if (u.origin !== location.origin) return null;
+      return decodeURIComponent(u.pathname).replace(/\/+$/, '').split('/').pop().toLowerCase();
+    } catch (e) { return null; }
+  }
+  function dmProducts(c) {
+    var set = {};
+    (function add(id) { set[id] = 1; (KIDS[id] || []).forEach(function (k) { add(k.id); }); })(c.id);
+    return DATA.items.filter(function (p) { return p.st && p.img && p.r >= 0 && p.c.some(function (x) { return set[x]; }); })
+      .sort(function (a, b) { return (b.best ? 3 : 0) + b.r - ((a.best ? 3 : 0) + a.r); }).slice(0, 3);
+  }
+  // Menü özeti (ürün verisinden; tarayıcıda saklanır): kategoriler, alt kategoriler, çok satanlar
+  function dmModel() {
+    var dc = CFG.desktopMenu, o = dc && typeof dc === 'object' ? dc : {}, hidden = {}, up = {};
+    (o.hide || []).forEach(function (n) { hidden[fold(n)] = 1; });
+    var keep = function (c) { return c.k > 0 && !hidden[c.f]; };
+    DATA.cats.forEach(function (c) {
+      var t = c;
+      while (t.p && CATS_BY_ID[t.p]) t = CATS_BY_ID[t.p];
+      up[c.s] = t.s;
+    });
+    var cats = topCats().filter(function (c) { return !hidden[c.f]; }).map(function (c) {
+      return {
+        n: c.n, l: (o.labels || {})[c.n] || c.n, s: c.s,
+        k: (KIDS[c.id] || []).filter(keep).map(function (k) {
+          return { n: k.n, s: k.s, k: (KIDS[k.id] || []).filter(keep).map(function (g) { return { n: g.n, s: g.s }; }) };
+        }),
+        p: o.products === false ? [] : dmProducts(c).map(function (p) {
+          return { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: price(p), o: p.d != null && p.p > p.d ? p.p : 0 };
+        })
+      };
+    });
+    return { v: 1, off: dc === false, sel: CFG.desktopNav || '', cats: cats, up: up };
+  }
+  // Satırdaki boş alan: menünün solundaki (logo) ve sağındaki (ikonlar) öğeler arasında kalan genişlik
+  function rowSpace(el) {
+    var a = el, r = el.getBoundingClientRect();
+    while (a.parentElement && a.parentElement !== document.body) {
+      var sib = [].filter.call(a.parentElement.children, function (x) {
+        if (x === a || x.id === 'ua-mega') return false;
+        var q = x.getBoundingClientRect();
+        return q.width > 0 && q.height > 0 && q.top < r.bottom && q.bottom > r.top;
+      });
+      if (sib.length) {
+        var L = a.parentElement.getBoundingClientRect().left, R = a.parentElement.getBoundingClientRect().right;
+        sib.forEach(function (x) {
+          var q = x.getBoundingClientRect();
+          if (q.right <= r.left + 2) L = Math.max(L, q.right); else if (q.left >= r.right - 2) R = Math.min(R, q.left);
+        });
+        return { w: R - L, l: L, row: a.parentElement };
+      }
+      a = a.parentElement;
+    }
+    return { w: r.width, l: r.left, row: el.parentElement };
+  }
+  // Ortak ata + güvenlik: logo, arama kutusu, sepet veya hesap içeren bir kapsayıcıya dokunma; sayfanın en üstünde
+  // ya da sabit/yapışkan başlıkta olmalı (sayfa kaydırılmışken altbilgi menüsü seçilmesin)
+  function navOf(links) {
+    var nav = links[0].parentElement, y = window.pageYOffset || 0;
+    while (nav && !links.every(function (a) { return nav.contains(a); })) nav = nav.parentElement;
+    if (!nav || nav === document.body || nav === document.documentElement) return null;
+    if (nav.querySelector('input,textarea,select,a[href*="cart"],a[href*="sepet"],a[href*="account"],a[href*="hesap"],a[href*="login"]')) return null;
+    var nr = nav.getBoundingClientRect();
+    if (nr.height > 120) return null;
+    if (nr.top + y > 260) {
+      for (var pe = nav; pe && pe !== document.body; pe = pe.parentElement) if (/fixed|sticky/.test(getComputedStyle(pe).position)) break;
+      if (!pe || pe === document.body) return null;
+    }
+    return nav;
+  }
+  function findNav(M) {
+    var tops = {};
+    M.cats.forEach(function (c) { tops[c.s] = c; });
+    var hits = [], seen = {}, as = [];
+    if (M.sel) { var cn = document.querySelector(M.sel); if (cn) as = cn.querySelectorAll('a[href]'); }
+    else as = document.querySelectorAll('a[href]');
+    for (var i = 0; i < as.length; i++) {
+      var a = as[i], s = slugOf(a.href);
+      if (!s || !tops[s] || seen[s] || isOurs(a)) continue;
+      var r = a.getBoundingClientRect();
+      if (!r.width || !r.height || r.top > 260 || r.bottom < 0) continue;
+      seen[s] = 1;
+      hits.push({ a: a, c: tops[s], r: r });
+    }
+    if (hits.length < 3) return null;
+    // Hepsi aynı satırda olmalı (yan menü/altbilgi değil)
+    if (hits.some(function (h) { return Math.abs(h.r.top - hits[0].r.top) > 24; })) return null;
+    var nav = navOf(hits.map(function (h) { return h.a; }));
+    if (!nav) return null;
+    // Kategori olmayan görünür bağlantılar (Blog, İletişim …) çubuğun sonunda korunur; "Anasayfa" atlanır (logo zaten oraya gider)
+    var hrefs = {}, extra = [], ex = {};
+    [].forEach.call(nav.querySelectorAll('a[href]'), function (a) {
+      var s = slugOf(a.href);
+      if (s == null) return;
+      if (M.up[s]) { if (!hrefs[s]) hrefs[s] = a.href; return; }
+      var r = a.getBoundingClientRect(), t = (a.textContent || '').replace(/\s+/g, ' ').trim();
+      if (s && t && !ex[s] && r.width && Math.abs(r.top - hits[0].r.top) < 24) { ex[s] = 1; extra.push({ t: t, href: a.href }); }
+    });
+    var cats = M.cats.filter(function (c) { return seen[c.s]; });
+    return { nav: nav, cats: cats, hrefs: hrefs, extra: extra, space: rowSpace(nav), w0: nav.getBoundingClientRect().width };
+  }
+  // İlk ziyarette (özet yokken) ikas menüsünü tahmin et: başlıktaki aynı satırda duran en az 4 kısa bağlantı.
+  // Sadece görünmez yapılır; 6 sn içinde bizim menü kurulmazsa geri gelir.
+  function guessNav() {
+    var as = document.querySelectorAll('header a[href], nav a[href]'), rows = {}, best = null;
+    for (var i = 0; i < as.length; i++) {
+      var a = as[i], s = slugOf(a.href), t = (a.textContent || '').trim();
+      if (!s || /\//.test(s) || t.length < 2 || t.length > 40) continue;
+      var r = a.getBoundingClientRect();
+      if (!r.width || !r.height || r.top > 220 || r.bottom < 0) continue;
+      var k = Math.round(r.top / 8);
+      (rows[k] = rows[k] || []).push(a);
+    }
+    Object.keys(rows).forEach(function (k) { if (rows[k].length >= 4 && (!best || rows[k].length > best.length)) best = rows[k]; });
+    return best ? navOf(best) : null;
+  }
+  function dmStyle() {
+    if (document.getElementById('ua-dnav-css')) return;
+    var st = document.createElement('style');
+    st.id = 'ua-dnav-css';
+    st.textContent = '[data-ua-pre]>:not(.ua-dnav){visibility:hidden!important}' +
+      '[data-ua-nav]>:not(.ua-dnav){display:none!important}[data-ua-nav]{overflow:visible!important}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function preHide(el) {
+    dmStyle();
+    if (PRE && PRE !== el) PRE.removeAttribute('data-ua-pre');
+    PRE = el;
+    el.setAttribute('data-ua-pre', '');
+    clearTimeout(PRE_T);
+    PRE_T = setTimeout(function () { if (!DN) clearPre(); }, 6000);
+  }
+  function clearPre() {
+    clearTimeout(PRE_T);
+    if (PRE) PRE.removeAttribute('data-ua-pre');
+    PRE = null;
+  }
+  // React menüyü canlandırdı mı? (React değilse hemen)
+  function hydrated(el) {
+    if (HYD || !(window.__NEXT_DATA__ || document.getElementById('__NEXT_DATA__') || document.getElementById('__next'))) return true;
+    var ks = Object.keys(el);
+    for (var i = 0; i < ks.length; i++) if (/^__react(Fiber|InternalInstance|Props)\$/.test(ks[i])) return true;
+    return false;
+  }
+  function whenHydrated(el, cb) {
+    if (HYD || hydrated(el) && !document.getElementById('__next')) { HYD = true; return cb(); }
+    var t0 = Date.now(), seen = 0;
+    (function poll() {
+      if (!el.isConnected || Date.now() - t0 > 8000) { HYD = true; return cb(); }
+      // Canlandığı görüldükten sonra React'in işi bitirmesi için kısa bir süre daha bekle
+      if (hydrated(el)) { if (!seen) seen = Date.now(); else if (Date.now() - seen > 120) { HYD = true; return cb(); } }
+      setTimeout(poll, 40);
+    })();
+  }
+
+  var DCSS = [
+    ':host{all:initial;display:block;font-family:inherit}',
+    '*{box-sizing:border-box;margin:0;padding:0;font-family:inherit}',
+    'a{color:inherit;text-decoration:none}',
+    '.bar{--ac:#d7372f;--ink:#1d2a23;display:flex;align-items:center;justify-content:center;gap:2px;height:100%;min-height:44px;white-space:nowrap;--fs:15px;--px:13px}',
+    '.bar.s1{--fs:14px;--px:11px}.bar.s2{--fs:13.5px;--px:9px}.bar.s3{--fs:12.5px;--px:7px}',
+    '.ti{position:relative;display:flex;align-items:center;gap:5px;height:44px;padding:0 var(--px);font-size:var(--fs);font-weight:650;color:var(--ink);letter-spacing:.1px;border-radius:10px;transition:color .15s,background .15s}',
+    '.ti svg{width:13px;height:13px;transform:rotate(90deg);opacity:.55;transition:transform .2s,opacity .2s}',
+    '.ti::after{content:"";position:absolute;left:var(--px);right:var(--px);bottom:5px;height:2.5px;border-radius:2px;background:var(--ac);transform:scaleX(0);transition:transform .2s}',
+    '.ti:hover,.ti.op,.ti.on{color:var(--ac)}',
+    '.ti:hover::after,.ti.op::after,.ti.on::after{transform:scaleX(1)}',
+    '.ti.op svg{transform:rotate(-90deg);opacity:1}',
+    '.ti:focus-visible{outline:2px solid var(--ac);outline-offset:-2px}',
+    // Açılan panel
+    '.bd{position:fixed;left:0;right:0;bottom:0;top:var(--t,80px);background:rgba(16,24,20,.22);opacity:0;pointer-events:none;transition:opacity .18s}',
+    '.mg{position:fixed;left:0;right:0;top:var(--t,80px);background:#fff;border-top:1px solid #eceeed;box-shadow:0 18px 40px rgba(16,24,20,.16);opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .16s,transform .16s;max-height:calc(100vh - var(--t,80px) - 24px);overflow-y:auto}',
+    '.on .bd{opacity:1;pointer-events:auto}.on .mg{opacity:1;transform:none;pointer-events:auto}',
+    '.in{--ac:#d7372f;--ink:#1d2a23;--mu:#6b756f;max-width:1240px;margin:0 auto;padding:26px 32px 30px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:36px;color:var(--ink)}',
+    '.in.nos{grid-template-columns:minmax(0,1fr)}',
+    '.hd{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #eceeed}',
+    '.hd b{font-size:20px;font-weight:800}',
+    '.hd a{margin-left:auto;font-size:13.5px;font-weight:700;color:var(--ac);display:flex;align-items:center;gap:4px}',
+    '.hd a svg{width:14px;height:14px}.hd a:hover{text-decoration:underline}',
+    '.cols{columns:3 190px;column-gap:28px}',
+    '.grp{break-inside:avoid;padding:2px 0 14px}',
+    '.g{display:block;font-size:14.5px;font-weight:750;line-height:1.3;padding:5px 0}',
+    '.g:hover{color:var(--ac)}',
+    '.s{display:block;font-size:13.5px;line-height:1.35;color:#4a554f;padding:4px 0 4px 12px;border-left:2px solid #eceeed}',
+    '.s:hover{color:var(--ac);border-left-color:var(--ac)}',
+    '.side{background:#f6f8f6;border-radius:16px;padding:16px;align-self:start}',
+    '.side .h{font-size:12.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--mu);margin-bottom:8px}',
+    '.pr{display:flex;align-items:center;gap:12px;padding:8px;margin:0 -8px;border-radius:12px}',
+    '.pr:hover{background:#fff}',
+    '.pr i{width:58px;height:58px;flex:none;border-radius:12px;background:#fff;border:1px solid #eceeed;display:grid;place-items:center;overflow:hidden}',
+    '.pr img{width:100%;height:100%;object-fit:contain;padding:3px}',
+    '.pr span{min-width:0;flex:1}',
+    '.pr em{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-style:normal;font-size:13px;font-weight:600;line-height:1.3}',
+    '.pr b{display:block;margin-top:3px;font-size:14px;font-weight:800;color:var(--ac)}',
+    '.pr s{font-size:12px;font-weight:500;color:var(--mu);margin-left:6px}',
+    '.all{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;height:40px;border-radius:12px;background:var(--ac);color:#fff;font-size:13.5px;font-weight:700}',
+    '.all:hover{filter:brightness(1.07)}.all svg{width:14px;height:14px}'
+  ].join('');
+
+  function dmCat(s) { for (var i = 0; DN && i < DN.cats.length; i++) if (DN.cats[i].s === s) return DN.cats[i]; return null; }
+  function dmHref(s) { return (DN && DN.hrefs[s]) || url(s); }
+  function megaHtml(c) {
+    var all = '<a href="' + esc(dmHref(c.s)) + '" data-n="' + esc(c.n) + '">Tümünü gör' + I.right + '</a>';
+    var cols = c.k.map(function (k) {
+      return '<div class="grp"><a class="g" href="' + esc(dmHref(k.s)) + '" data-n="' + esc(k.n) + '">' + esc(k.n) + '</a>' +
+        k.k.map(function (g) { return '<a class="s" href="' + esc(dmHref(g.s)) + '" data-n="' + esc(g.n) + '">' + esc(g.n) + '</a>'; }).join('') + '</div>';
+    }).join('');
+    var side = c.p.length ? '<aside class="side"><div class="h">Çok satanlar</div>' + c.p.map(function (p) {
+      return '<a class="pr" href="' + esc(url(p.s)) + '" data-n="' + esc(p.n) + '"><i>' + (p.i ? '<img loading="lazy" alt="" src="' + esc(p.i) + '">' : I.sprout) + '</i>' +
+        '<span><em>' + esc(p.n) + '</em><b>' + tl(p.p) + (p.o ? '<s>' + tl(p.o) + '</s>' : '') + '</b></span></a>';
+    }).join('') + '<a class="all" href="' + esc(dmHref(c.s)) + '" data-n="' + esc(c.n) + '">Tüm ' + esc(c.n) + I.right + '</a></aside>' : '';
+    return '<div class="in' + (side ? '' : ' nos') + '"><div><div class="hd"><b>' + esc(c.n) + '</b>' + all + '</div>' +
+      (cols ? '<div class="cols">' + cols + '</div>' : '') + '</div>' + side + '</div>';
+  }
+
+  function dmFit() {
+    var bar = DN.bar, cls = ['', 's1', 's2', 's3'];
+    for (var i = 0; i < cls.length; i++) {
+      bar.className = 'bar ' + cls[i];
+      if (bar.scrollWidth <= DN.host.clientWidth + 1) return;
+    }
+  }
+  function dmTop() {
+    var r = (DN.row && DN.row.closest && DN.row.closest('header')) || DN.row || DN.host;
+    var b = Math.max(r.getBoundingClientRect().bottom, DN.host.getBoundingClientRect().bottom);
+    DN.mwrap.style.setProperty('--t', Math.max(0, Math.round(b)) + 'px');
+  }
+  function dmOpen(s) {
+    clearTimeout(DN.tc);
+    var c = dmCat(s);
+    if (!c || !c.k.length) return dmClose();
+    if (DN.cur !== s) {
+      DN.cur = s;
+      DN.mg.innerHTML = megaHtml(c);
+      DN.mg.scrollTop = 0;
+    }
+    [].forEach.call(DN.bar.querySelectorAll('.ti'), function (a) { a.classList.toggle('op', a.getAttribute('data-s') === s); });
+    dmTop();
+    DN.mwrap.classList.add('on');
+  }
+  function dmClose() {
+    clearTimeout(DN.to);
+    clearTimeout(DN.tc);
+    DN.cur = null;
+    DN.mwrap.classList.remove('on');
+    [].forEach.call(DN.bar.querySelectorAll('.ti.op'), function (a) { a.classList.remove('op'); });
+  }
+  function dmLater() { clearTimeout(DN.to); clearTimeout(DN.tc); DN.tc = setTimeout(dmClose, 220); }
+
+  function unmountNav() {
+    if (!DN) return;
+    try { dmClose(); } catch (e) {}
+    DN.nav.removeAttribute('data-ua-nav');
+    if (DN.host.parentNode) DN.host.parentNode.removeChild(DN.host);
+    if (DN.mhost.parentNode) DN.mhost.parentNode.removeChild(DN.mhost);
+    DN = null;
+  }
+  function mountNav() {
+    if (DN || DM_WAIT || !dmenuOn()) return;
+    var f;
+    try { f = findNav(DM); } catch (e) { f = null; }
+    if (!f) return;
+    preHide(f.nav);
+    DM_WAIT = true;
+    var ghost = null;
+    if (!HYD) try { ghost = dmGhost(f); } catch (e) {}
+    whenHydrated(f.nav, function () {
+      DM_WAIT = false;
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      if (DN || !dmenuOn()) return;
+      var g;
+      try { g = f.nav.isConnected ? findNav(DM) : null; } catch (e) { g = null; }
+      if (g) buildNav(g); else clearPre();
+    });
+  }
+  function barHtml(f) {
+    var active = DM.up[slugOf(location.href)] || '';
+    return '<style>' + DCSS + '</style><nav class="bar" aria-label="Kategoriler">' + f.cats.map(function (c) {
+      var has = c.k.length > 0;
+      return '<a class="ti' + (c.s === active ? ' on' : '') + '" href="' + esc(f.hrefs[c.s] || url(c.s)) + '" data-s="' + esc(c.s) + '" data-n="' + esc(c.n) + '"' +
+        (has ? ' aria-haspopup="true"' : '') + '>' + esc(c.l) + (has ? I.right : '') + '</a>';
+    }).join('') + f.extra.map(function (x) {
+      return '<a class="ti" href="' + esc(x.href) + '" data-n="' + esc(x.t) + '">' + esc(x.t) + '</a>';
+    }).join('') + '</nav>';
+  }
+  // ikas sayfayı canlandırana kadar menünün yeri boş kalmasın: aynı çubuğun geçici bir kopyası tam üstünde durur
+  // (sayfanın dışında, React'in alanına dokunmadan); asıl menü yerleşince kaldırılır
+  function dmGhost(f) {
+    var r = f.nav.getBoundingClientRect(), w = Math.max(f.w0, f.space.w - 24), fixed = false;
+    for (var pe = f.nav; pe && pe !== document.body; pe = pe.parentElement) if (getComputedStyle(pe).position === 'fixed') { fixed = true; break; }
+    var left = f.w0 >= f.space.w - 24 ? r.left : f.space.l + 12;
+    var g = document.createElement('div');
+    g.id = 'ua-dnav-ghost';
+    g.style.cssText = 'position:' + (fixed ? 'fixed' : 'absolute') + ';z-index:2147481000;top:' + (r.top + (fixed ? 0 : window.pageYOffset)) + 'px;left:' +
+      (left + (fixed ? 0 : window.pageXOffset)) + 'px;width:' + w + 'px;height:' + Math.max(44, r.height) + 'px;font-family:' + getComputedStyle(f.nav).fontFamily;
+    var gr = g.attachShadow ? g.attachShadow({ mode: 'open' }) : g;
+    gr.innerHTML = barHtml(f);
+    document.body.appendChild(g);
+    var bar = gr.querySelector('.bar'), cls = ['', 's1', 's2', 's3'];
+    for (var i = 0; i < cls.length; i++) { bar.className = 'bar ' + cls[i]; if (bar.scrollWidth <= w + 1) break; }
+    // Hizalama: kopyayı ikas menüsünün dikey ortasına koy
+    g.style.top = (parseFloat(g.style.top) + (r.height - g.offsetHeight) / 2) + 'px';
+    return g;
+  }
+  function buildNav(f) {
+    var font = getComputedStyle(f.nav).fontFamily;
+    var host = document.createElement('div');
+    host.className = 'ua-dnav';
+    host.style.cssText = 'display:block;flex:1 1 auto;min-width:0;list-style:none;align-self:stretch;width:' + Math.max(f.w0, f.space.w - 24) + 'px;max-width:100%;font-family:' + font;
+    var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+    root.innerHTML = barHtml(f);
+    var mhost = document.createElement('div');
+    mhost.id = 'ua-mega';
+    mhost.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;z-index:2147482000;font-family:' + font;
+    var mroot = mhost.attachShadow ? mhost.attachShadow({ mode: 'open' }) : mhost;
+    mroot.innerHTML = '<style>' + DCSS + '</style><div class="mw"><div class="bd"></div><div class="mg" role="region" aria-label="Alt kategoriler"></div></div>';
+    if (PRE && PRE !== f.nav) clearPre();
+    f.nav.setAttribute('data-ua-nav', '');
+    f.nav.appendChild(host);
+    clearPre();
+    document.body.appendChild(mhost);
+    DN = { nav: f.nav, row: f.space.row, hrefs: f.hrefs, cats: f.cats, host: host, mhost: mhost, bar: root.querySelector('.bar'),
+      mwrap: mroot.querySelector('.mw'), mg: mroot.querySelector('.mg'), cur: null };
+    dmFit();
+    var bar = DN.bar;
+    bar.addEventListener('mouseover', function (e) {
+      var a = e.target.closest && e.target.closest('.ti');
+      if (!a) return;
+      var s = a.getAttribute('data-s'), c = s && dmCat(s);
+      clearTimeout(DN.to); clearTimeout(DN.tc);
+      if (!c || !c.k.length) { DN.tc = setTimeout(dmClose, 120); return; }
+      // Panel zaten açıksa hemen geç; değilse fare yanlışlıkla üzerinden geçerken açılmasın
+      if (DN.cur) dmOpen(s); else DN.to = setTimeout(function () { dmOpen(s); }, 110);
+    });
+    bar.addEventListener('mouseleave', dmLater);
+    bar.addEventListener('focusin', function (e) {
+      var a = e.target.closest && e.target.closest('.ti'), s = a && a.getAttribute('data-s');
+      if (s) dmOpen(s); else dmClose();
+    });
+    DN.mg.addEventListener('mouseenter', function () { clearTimeout(DN.tc); clearTimeout(DN.to); });
+    DN.mg.addEventListener('mouseleave', dmLater);
+    mroot.querySelector('.bd').addEventListener('mouseenter', dmLater);
+    mroot.querySelector('.bd').addEventListener('click', dmClose);
+    [bar, DN.mg].forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[data-n]');
+        if (a) track('menu-desktop', a.getAttribute('data-n'));
+      });
+    });
+    DN.mg.addEventListener('keydown', function (e) { if (e.key === 'Escape') { dmClose(); try { bar.querySelector('.ti.on, .ti').focus(); } catch (x) {} } });
+  }
+  // Ürün verisi gelince özeti yenile; değiştiyse menüyü aynı anda (arada ikas menüsü görünmeden) yeniden kur
+  function dmRefresh() {
+    var M = dmModel(), js = JSON.stringify(M);
+    try { localStorage.setItem(DM_KEY, js); } catch (e) {}
+    if (DM && JSON.stringify(DM) === js && DN) return;
+    DM = M;
+    if (M.off) { unmountNav(); clearPre(); return; }
+    unmountNav();
+    mountNav();
+    if (!DN && !DM_WAIT) clearPre();
+  }
+  (function dmInit() {
+    if (ds.dmenu === 'off' || !wideScreen()) return;
+    var go = function () {
+      try { DM = JSON.parse(localStorage.getItem(DM_KEY) || 'null'); } catch (e) { DM = null; }
+      if (DM && DM.v !== 1) DM = null;
+      try {
+        if (DM) mountNav();
+        else { var g = guessNav(); if (g) preHide(g); }
+      } catch (e) {}
+      load().then(dmRefresh).catch(function () { if (!DN) clearPre(); });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+  })();
+  // Ekran boyutu değişince yeniden kur (masaüstünden çıkınca ikas menüsü geri gelir);
+  // ikas başlığı yeniden çizerse (sayfa geçişi) menüyü tekrar yerleştir
+  (function () {
+    var t, tries = 0;
+    window.addEventListener('resize', function () {
+      if (!DM) return;
+      clearTimeout(t);
+      t = setTimeout(function () { tries = 0; unmountNav(); mountNav(); }, 250);
+    });
+    window.addEventListener('scroll', function () { if (DN && DN.cur) dmTop(); }, { passive: true });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && DN && DN.cur) dmClose(); });
+    setInterval(function () {
+      if (document.hidden || !DM) return;
+      if (DN && (!DN.host.isConnected || !DN.nav.isConnected || !DN.mhost.isConnected)) { unmountNav(); tries = 0; }
+      // Menü hiç bulunamayan sayfalarda boşuna aramaya devam etme
+      if (!DN && dmenuOn() && tries++ < 5) mountNav();
+    }, 2000);
+  })();
+
   // Ctrl/Cmd+K ve "/" kısayolları (masaüstü)
   document.addEventListener('keydown', function (e) {
     if (isOpen) return;
