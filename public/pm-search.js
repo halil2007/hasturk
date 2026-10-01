@@ -161,7 +161,6 @@
     });
     // Kategori görseli: config.json > categoryImages'daki ürün; yoksa kategorideki (alt kategoriler dahil)
     // stoktaki mağaza markalı ürün; o da yoksa stoktaki ilk görselli ürün
-    function ids(id) { return [id].concat((KIDS[id] || []).reduce(function (a, k) { return a.concat(ids(k.id)); }, [])); }
     var bySlug = {}, cover = {}, own = new RegExp(CFG.brandPattern || 'has ?t[uü]rk|^hg$', 'i');
     d.items.forEach(function (p) { bySlug[p.s] = p; });
     BY_SLUG = bySlug;
@@ -172,10 +171,20 @@
     });
     evData();
     Object.keys(CFG.categoryImages || {}).forEach(function (n) { cover[fold(n)] = bySlug[CFG.categoryImages[n]]; });
+    // Her ürün, kendi kategorileri ve onların üst kategorileri altında bir kez listelenir (tek geçiş)
+    var byCat = {};
+    d.items.forEach(function (p) {
+      if (!p.img) return;
+      var seen = {};
+      p.c.forEach(function (id) {
+        for (var c = CATS_BY_ID[id], n = 0; c && !seen[c.id] && n < 10; c = CATS_BY_ID[c.p], n++) {
+          seen[c.id] = 1;
+          (byCat[c.id] = byCat[c.id] || []).push(p);
+        }
+      });
+    });
     d.cats.forEach(function (c) {
-      var set = {};
-      ids(c.id).forEach(function (x) { set[x] = 1; });
-      var inCat = d.items.filter(function (p) { return p.img && p.c.some(function (x) { return set[x]; }); });
+      var inCat = byCat[c.id] || [];
       var inStock = inCat.filter(function (p) { return p.st; });
       var pick = (cover[c.f] && cover[c.f].img ? cover[c.f] : null) ||
         inStock.filter(function (p) { return own.test(p.b || ''); })[0] || inStock[0] || inCat[0];
@@ -1031,8 +1040,8 @@
     $help.style.display = wa || telHref ? '' : 'none';
     $mfoot.innerHTML = wa + (telHref ? '<a class="tel" data-kind="phone" data-name="phone" href="' + esc(telHref) + '">' + I.phone + '<span class="ts">Bizi arayın</span><span class="tl">' + esc(CFG.phone) + '</span></a>' : '');
     $mfoot.classList.toggle('on', !!(wa || telHref));
-    renderIdle();
-    setTab(tab);
+    // Panel kapalıyken ana ekranı boşuna hazırlama (açılınca open() zaten çizer); veri yüklenirken telefonu yormasın
+    if (isOpen) { renderIdle(); setTab(tab); }
   }
 
   function waHref(text) {
@@ -1520,6 +1529,16 @@
   }
   // "Sık arananlar": ziyaretçilerin son 30 günde en çok aradığı ve sonuç bulduğu kelimeler (sync.mjs > trend.q),
   // eksik kalırsa config.json > popular ile tamamlanır. config.json > "trendPopular": false sadece elle listeyi kullanır.
+  function hasHit(f) {
+    var toks = words(f).filter(function (w) { return w.length >= 2; });
+    if (!toks.length) return false;
+    for (var i = 0; i < DATA.items.length; i++) {
+      var h = DATA.items[i].hay, ok = true;
+      for (var j = 0; j < toks.length && ok; j++) if (h.indexOf(toks[j].length > 4 ? toks[j].slice(0, toks[j].length - 1) : toks[j]) === -1) ok = false;
+      if (ok) return true;
+    }
+    return false;
+  }
   function popular() {
     if (popular.c && popular.d === DATA) return popular.c;
     var list = CFG.trendPopular === false ? [] : (((DATA || {}).trend || {}).q || []), out = [], seen = {};
@@ -1527,8 +1546,9 @@
       var f = fold(t);
       if (out.length >= 8 || seen[f]) return;
       seen[f] = 1;
-      // Sadece bugün de sonuç veren kelimeler (ürün kaldırılmış olabilir)
-      if (DATA && list.indexOf(t) !== -1 && !search(t).items.length) return;
+      // Sadece bugün de sonuç veren kelimeler (ürün kaldırılmış olabilir); tam arama yerine hızlı kontrol:
+      // kelimenin her parçası en az bir ürünün metninde geçiyor mu
+      if (DATA && list.indexOf(t) !== -1 && !hasHit(f)) return;
       out.push(t);
     });
     popular.d = DATA;
