@@ -2789,18 +2789,51 @@
   // bulunur, öğeleri gizlenip yerine düzenli bir çubuk konur. Üzerine gelince geniş bir panel açılır:
   // alt kategoriler sütunlar halinde, kategorinin çok satanları ve "Tümünü gör". Menü bulunamazsa hiçbir şeye
   // dokunulmaz; telefon ve tablet menüsü etkilenmez. Kapatmak: config.json > "desktopMenu": false
-  var DN = null;
+  //
+  // ikas'tan önce devreye girmesi için: script çalışır çalışmaz ikas menüsü görünmez yapılır (yeri korunur,
+  // sayfa kaymaz). Menünün küçük bir özeti tarayıcıda saklanır (ua-dnav), ürün verisi beklenmeden kurulur.
+  // ikas sayfası React ile çalışır; React menüyü "canlandırmadan" önce içine öğe eklemek sayfanın yeniden
+  // çizilmesine yol açacağı için bizim çubuk menü canlandığı an eklenir. 6 sn içinde kurulamazsa ikas menüsü geri gelir.
+  var DN = null, DM = null, DM_KEY = 'ua-dnav-v1', PRE = null, PRE_T = 0, DM_WAIT = false, HYD = false;
   function wideScreen() {
     return window.innerWidth >= 1024 && !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
   }
-  function dmenuOn() { return CFG.desktopMenu !== false && ds.dmenu !== 'off' && wideScreen(); }
-  function dmCfg() { return CFG.desktopMenu && typeof CFG.desktopMenu === 'object' ? CFG.desktopMenu : {}; }
+  function dmenuOn() { return !!DM && !DM.off && ds.dmenu !== 'off' && wideScreen(); }
   function slugOf(href) {
     try {
       var u = new URL(href, location.href);
       if (u.origin !== location.origin) return null;
       return decodeURIComponent(u.pathname).replace(/\/+$/, '').split('/').pop().toLowerCase();
     } catch (e) { return null; }
+  }
+  function dmProducts(c) {
+    var set = {};
+    (function add(id) { set[id] = 1; (KIDS[id] || []).forEach(function (k) { add(k.id); }); })(c.id);
+    return DATA.items.filter(function (p) { return p.st && p.img && p.r >= 0 && p.c.some(function (x) { return set[x]; }); })
+      .sort(function (a, b) { return (b.best ? 3 : 0) + b.r - ((a.best ? 3 : 0) + a.r); }).slice(0, 3);
+  }
+  // Menü özeti (ürün verisinden; tarayıcıda saklanır): kategoriler, alt kategoriler, çok satanlar
+  function dmModel() {
+    var dc = CFG.desktopMenu, o = dc && typeof dc === 'object' ? dc : {}, hidden = {}, up = {};
+    (o.hide || []).forEach(function (n) { hidden[fold(n)] = 1; });
+    var keep = function (c) { return c.k > 0 && !hidden[c.f]; };
+    DATA.cats.forEach(function (c) {
+      var t = c;
+      while (t.p && CATS_BY_ID[t.p]) t = CATS_BY_ID[t.p];
+      up[c.s] = t.s;
+    });
+    var cats = topCats().filter(function (c) { return !hidden[c.f]; }).map(function (c) {
+      return {
+        n: c.n, l: (o.labels || {})[c.n] || c.n, s: c.s,
+        k: (KIDS[c.id] || []).filter(keep).map(function (k) {
+          return { n: k.n, s: k.s, k: (KIDS[k.id] || []).filter(keep).map(function (g) { return { n: g.n, s: g.s }; }) };
+        }),
+        p: o.products === false ? [] : dmProducts(c).map(function (p) {
+          return { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: price(p), o: p.d != null && p.p > p.d ? p.p : 0 };
+        })
+      };
+    });
+    return { v: 1, off: dc === false, sel: CFG.desktopNav || '', cats: cats, up: up };
   }
   // Satırdaki boş alan: menünün solundaki (logo) ve sağındaki (ikonlar) öğeler arasında kalan genişlik
   function rowSpace(el) {
@@ -2817,18 +2850,33 @@
           var q = x.getBoundingClientRect();
           if (q.right <= r.left + 2) L = Math.max(L, q.right); else if (q.left >= r.right - 2) R = Math.min(R, q.left);
         });
-        return { w: R - L, row: a.parentElement };
+        return { w: R - L, l: L, row: a.parentElement };
       }
       a = a.parentElement;
     }
-    return { w: r.width, row: el.parentElement };
+    return { w: r.width, l: r.left, row: el.parentElement };
   }
-  function findNav() {
-    var tops = {}, hidden = {};
-    (dmCfg().hide || []).forEach(function (n) { hidden[fold(n)] = 1; });
-    topCats().forEach(function (c) { if (!hidden[c.f]) tops[c.s] = c; });
-    var hits = [], seen = {}, as = CFG.desktopNav ? [] : document.querySelectorAll('a[href]'), y = window.pageYOffset || 0;
-    if (CFG.desktopNav) { var cn = document.querySelector(CFG.desktopNav); if (cn) as = cn.querySelectorAll('a[href]'); }
+  // Ortak ata + güvenlik: logo, arama kutusu, sepet veya hesap içeren bir kapsayıcıya dokunma; sayfanın en üstünde
+  // ya da sabit/yapışkan başlıkta olmalı (sayfa kaydırılmışken altbilgi menüsü seçilmesin)
+  function navOf(links) {
+    var nav = links[0].parentElement, y = window.pageYOffset || 0;
+    while (nav && !links.every(function (a) { return nav.contains(a); })) nav = nav.parentElement;
+    if (!nav || nav === document.body || nav === document.documentElement) return null;
+    if (nav.querySelector('input,textarea,select,a[href*="cart"],a[href*="sepet"],a[href*="account"],a[href*="hesap"],a[href*="login"]')) return null;
+    var nr = nav.getBoundingClientRect();
+    if (nr.height > 120) return null;
+    if (nr.top + y > 260) {
+      for (var pe = nav; pe && pe !== document.body; pe = pe.parentElement) if (/fixed|sticky/.test(getComputedStyle(pe).position)) break;
+      if (!pe || pe === document.body) return null;
+    }
+    return nav;
+  }
+  function findNav(M) {
+    var tops = {};
+    M.cats.forEach(function (c) { tops[c.s] = c; });
+    var hits = [], seen = {}, as = [];
+    if (M.sel) { var cn = document.querySelector(M.sel); if (cn) as = cn.querySelectorAll('a[href]'); }
+    else as = document.querySelectorAll('a[href]');
     for (var i = 0; i < as.length; i++) {
       var a = as[i], s = slugOf(a.href);
       if (!s || !tops[s] || seen[s] || isOurs(a)) continue;
@@ -2840,31 +2888,72 @@
     if (hits.length < 3) return null;
     // Hepsi aynı satırda olmalı (yan menü/altbilgi değil)
     if (hits.some(function (h) { return Math.abs(h.r.top - hits[0].r.top) > 24; })) return null;
-    var nav = hits[0].a.parentElement;
-    while (nav && !hits.every(function (h) { return nav.contains(h.a); })) nav = nav.parentElement;
-    if (!nav || nav === document.body || nav === document.documentElement) return null;
-    // Logo, arama kutusu, sepet veya hesap içeren bir kapsayıcıya dokunma
-    if (nav.querySelector('input,textarea,select,a[href*="cart"],a[href*="sepet"],a[href*="account"],a[href*="hesap"],a[href*="login"]')) return null;
-    var nr = nav.getBoundingClientRect();
-    if (nr.height > 120) return null;
-    // Sayfanın en üstünde olmalı ya da sabit/yapışkan başlıkta (sayfa kaydırılmışken altbilgi menüsü seçilmesin)
-    if (nr.top + y > 260) {
-      for (var pe = nav; pe && pe !== document.body; pe = pe.parentElement) if (/fixed|sticky/.test(getComputedStyle(pe).position)) break;
-      if (!pe || pe === document.body) return null;
-    }
+    var nav = navOf(hits.map(function (h) { return h.a; }));
+    if (!nav) return null;
     // Kategori olmayan görünür bağlantılar (Blog, İletişim …) çubuğun sonunda korunur; "Anasayfa" atlanır (logo zaten oraya gider)
-    var catSlugs = {}; DATA.cats.forEach(function (c) { catSlugs[c.s] = 1; });
     var hrefs = {}, extra = [], ex = {};
     [].forEach.call(nav.querySelectorAll('a[href]'), function (a) {
       var s = slugOf(a.href);
       if (s == null) return;
-      if (catSlugs[s]) { if (!hrefs[s]) hrefs[s] = a.href; return; }
+      if (M.up[s]) { if (!hrefs[s]) hrefs[s] = a.href; return; }
       var r = a.getBoundingClientRect(), t = (a.textContent || '').replace(/\s+/g, ' ').trim();
       if (s && t && !ex[s] && r.width && Math.abs(r.top - hits[0].r.top) < 24) { ex[s] = 1; extra.push({ t: t, href: a.href }); }
     });
-    var order = topCats();
-    hits.sort(function (a, b) { return order.indexOf(a.c) - order.indexOf(b.c); });
-    return { nav: nav, cats: hits.map(function (h) { return h.c; }), hrefs: hrefs, extra: extra, space: rowSpace(nav), w0: nr.width };
+    var cats = M.cats.filter(function (c) { return seen[c.s]; });
+    return { nav: nav, cats: cats, hrefs: hrefs, extra: extra, space: rowSpace(nav), w0: nav.getBoundingClientRect().width };
+  }
+  // İlk ziyarette (özet yokken) ikas menüsünü tahmin et: başlıktaki aynı satırda duran en az 4 kısa bağlantı.
+  // Sadece görünmez yapılır; 6 sn içinde bizim menü kurulmazsa geri gelir.
+  function guessNav() {
+    var as = document.querySelectorAll('header a[href], nav a[href]'), rows = {}, best = null;
+    for (var i = 0; i < as.length; i++) {
+      var a = as[i], s = slugOf(a.href), t = (a.textContent || '').trim();
+      if (!s || /\//.test(s) || t.length < 2 || t.length > 40) continue;
+      var r = a.getBoundingClientRect();
+      if (!r.width || !r.height || r.top > 220 || r.bottom < 0) continue;
+      var k = Math.round(r.top / 8);
+      (rows[k] = rows[k] || []).push(a);
+    }
+    Object.keys(rows).forEach(function (k) { if (rows[k].length >= 4 && (!best || rows[k].length > best.length)) best = rows[k]; });
+    return best ? navOf(best) : null;
+  }
+  function dmStyle() {
+    if (document.getElementById('ua-dnav-css')) return;
+    var st = document.createElement('style');
+    st.id = 'ua-dnav-css';
+    st.textContent = '[data-ua-pre]>:not(.ua-dnav){visibility:hidden!important}' +
+      '[data-ua-nav]>:not(.ua-dnav){display:none!important}[data-ua-nav]{overflow:visible!important}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function preHide(el) {
+    dmStyle();
+    if (PRE && PRE !== el) PRE.removeAttribute('data-ua-pre');
+    PRE = el;
+    el.setAttribute('data-ua-pre', '');
+    clearTimeout(PRE_T);
+    PRE_T = setTimeout(function () { if (!DN) clearPre(); }, 6000);
+  }
+  function clearPre() {
+    clearTimeout(PRE_T);
+    if (PRE) PRE.removeAttribute('data-ua-pre');
+    PRE = null;
+  }
+  // React menüyü canlandırdı mı? (React değilse hemen)
+  function hydrated(el) {
+    if (HYD || !(window.__NEXT_DATA__ || document.getElementById('__NEXT_DATA__') || document.getElementById('__next'))) return true;
+    var ks = Object.keys(el);
+    for (var i = 0; i < ks.length; i++) if (/^__react(Fiber|InternalInstance|Props)\$/.test(ks[i])) return true;
+    return false;
+  }
+  function whenHydrated(el, cb) {
+    if (HYD || hydrated(el) && !document.getElementById('__next')) { HYD = true; return cb(); }
+    var t0 = Date.now(), seen = 0;
+    (function poll() {
+      if (!el.isConnected || Date.now() - t0 > 8000) { HYD = true; return cb(); }
+      // Canlandığı görüldükten sonra React'in işi bitirmesi için kısa bir süre daha bekle
+      if (hydrated(el)) { if (!seen) seen = Date.now(); else if (Date.now() - seen > 120) { HYD = true; return cb(); } }
+      setTimeout(poll, 40);
+    })();
   }
 
   var DCSS = [
@@ -2893,7 +2982,6 @@
     '.cols{columns:3 190px;column-gap:28px}',
     '.grp{break-inside:avoid;padding:2px 0 14px}',
     '.g{display:block;font-size:14.5px;font-weight:750;line-height:1.3;padding:5px 0}',
-    '.g small{font-size:12px;font-weight:600;color:var(--mu);margin-left:6px;white-space:nowrap}',
     '.g:hover{color:var(--ac)}',
     '.s{display:block;font-size:13.5px;line-height:1.35;color:#4a554f;padding:4px 0 4px 12px;border-left:2px solid #eceeed}',
     '.s:hover{color:var(--ac);border-left-color:var(--ac)}',
@@ -2911,29 +2999,18 @@
     '.all:hover{filter:brightness(1.07)}.all svg{width:14px;height:14px}'
   ].join('');
 
-  function dmHref(c) { return (DN && DN.hrefs[c.s]) || url(c.s); }
-  function dmProducts(c) {
-    var set = {};
-    (function add(id) { set[id] = 1; (KIDS[id] || []).forEach(function (k) { add(k.id); }); })(c.id);
-    return DATA.items.filter(function (p) { return p.st && p.img && p.r >= 0 && p.c.some(function (x) { return set[x]; }); })
-      .sort(function (a, b) { return (b.best ? 3 : 0) + b.r - ((a.best ? 3 : 0) + a.r); }).slice(0, 3);
-  }
+  function dmCat(s) { for (var i = 0; DN && i < DN.cats.length; i++) if (DN.cats[i].s === s) return DN.cats[i]; return null; }
+  function dmHref(s) { return (DN && DN.hrefs[s]) || url(s); }
   function megaHtml(c) {
-    var hidden = {};
-    (dmCfg().hide || []).forEach(function (n) { hidden[fold(n)] = 1; });
-    var kids = (KIDS[c.id] || []).filter(function (k) { return k.k > 0 && !hidden[k.f]; });
-    var prods = dmCfg().products === false ? [] : dmProducts(c);
-    var all = '<a href="' + esc(dmHref(c)) + '" data-n="' + esc(c.n) + '">Tümünü gör (' + c.k + ' ürün)' + I.right + '</a>';
-    var cols = kids.map(function (k) {
-      var sub = (KIDS[k.id] || []).filter(function (g) { return g.k > 0 && !hidden[g.f]; });
-      return '<div class="grp"><a class="g" href="' + esc(dmHref(k)) + '" data-n="' + esc(k.n) + '">' + esc(k.n) + '<small>' + k.k + '</small></a>' +
-        sub.map(function (g) { return '<a class="s" href="' + esc(dmHref(g)) + '" data-n="' + esc(g.n) + '">' + esc(g.n) + '</a>'; }).join('') + '</div>';
+    var all = '<a href="' + esc(dmHref(c.s)) + '" data-n="' + esc(c.n) + '">Tümünü gör' + I.right + '</a>';
+    var cols = c.k.map(function (k) {
+      return '<div class="grp"><a class="g" href="' + esc(dmHref(k.s)) + '" data-n="' + esc(k.n) + '">' + esc(k.n) + '</a>' +
+        k.k.map(function (g) { return '<a class="s" href="' + esc(dmHref(g.s)) + '" data-n="' + esc(g.n) + '">' + esc(g.n) + '</a>'; }).join('') + '</div>';
     }).join('');
-    var side = prods.length ? '<aside class="side"><div class="h">Çok satanlar</div>' + prods.map(function (p) {
-      var src = imgSrc(p.img, 180);
-      return '<a class="pr" href="' + esc(url(p.s)) + '" data-n="' + esc(p.n) + '"><i>' + (src ? '<img loading="lazy" alt="" src="' + esc(src) + '">' : I.sprout) + '</i>' +
-        '<span><em>' + esc(p.n) + '</em><b>' + tl(price(p)) + (p.d != null && p.p > p.d ? '<s>' + tl(p.p) + '</s>' : '') + '</b></span></a>';
-    }).join('') + '<a class="all" href="' + esc(dmHref(c)) + '" data-n="' + esc(c.n) + '">Tüm ' + esc(c.n) + I.right + '</a></aside>' : '';
+    var side = c.p.length ? '<aside class="side"><div class="h">Çok satanlar</div>' + c.p.map(function (p) {
+      return '<a class="pr" href="' + esc(url(p.s)) + '" data-n="' + esc(p.n) + '"><i>' + (p.i ? '<img loading="lazy" alt="" src="' + esc(p.i) + '">' : I.sprout) + '</i>' +
+        '<span><em>' + esc(p.n) + '</em><b>' + tl(p.p) + (p.o ? '<s>' + tl(p.o) + '</s>' : '') + '</b></span></a>';
+    }).join('') + '<a class="all" href="' + esc(dmHref(c.s)) + '" data-n="' + esc(c.n) + '">Tüm ' + esc(c.n) + I.right + '</a></aside>' : '';
     return '<div class="in' + (side ? '' : ' nos') + '"><div><div class="hd"><b>' + esc(c.n) + '</b>' + all + '</div>' +
       (cols ? '<div class="cols">' + cols + '</div>' : '') + '</div>' + side + '</div>';
   }
@@ -2950,16 +3027,16 @@
     var b = Math.max(r.getBoundingClientRect().bottom, DN.host.getBoundingClientRect().bottom);
     DN.mwrap.style.setProperty('--t', Math.max(0, Math.round(b)) + 'px');
   }
-  function dmOpen(id) {
+  function dmOpen(s) {
     clearTimeout(DN.tc);
-    var c = CATS_BY_ID[id];
-    if (!c || !KIDS[c.id]) return dmClose();
-    if (DN.cur !== id) {
-      DN.cur = id;
+    var c = dmCat(s);
+    if (!c || !c.k.length) return dmClose();
+    if (DN.cur !== s) {
+      DN.cur = s;
       DN.mg.innerHTML = megaHtml(c);
       DN.mg.scrollTop = 0;
     }
-    [].forEach.call(DN.bar.querySelectorAll('.ti'), function (a) { a.classList.toggle('op', a.getAttribute('data-id') === id); });
+    [].forEach.call(DN.bar.querySelectorAll('.ti'), function (a) { a.classList.toggle('op', a.getAttribute('data-s') === s); });
     dmTop();
     DN.mwrap.classList.add('on');
   }
@@ -2981,60 +3058,86 @@
     DN = null;
   }
   function mountNav() {
-    if (DN || !DATA || !dmenuOn()) return;
+    if (DN || DM_WAIT || !dmenuOn()) return;
     var f;
-    try { f = findNav(); } catch (e) { f = null; }
+    try { f = findNav(DM); } catch (e) { f = null; }
     if (!f) return;
-    if (!document.getElementById('ua-dnav-css')) {
-      var st = document.createElement('style');
-      st.id = 'ua-dnav-css';
-      st.textContent = '[data-ua-nav]>:not(.ua-dnav){display:none!important}[data-ua-nav]{overflow:visible!important}';
-      (document.head || document.documentElement).appendChild(st);
-    }
+    preHide(f.nav);
+    DM_WAIT = true;
+    var ghost = null;
+    if (!HYD) try { ghost = dmGhost(f); } catch (e) {}
+    whenHydrated(f.nav, function () {
+      DM_WAIT = false;
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      if (DN || !dmenuOn()) return;
+      var g;
+      try { g = f.nav.isConnected ? findNav(DM) : null; } catch (e) { g = null; }
+      if (g) buildNav(g); else clearPre();
+    });
+  }
+  function barHtml(f) {
+    var active = DM.up[slugOf(location.href)] || '';
+    return '<style>' + DCSS + '</style><nav class="bar" aria-label="Kategoriler">' + f.cats.map(function (c) {
+      var has = c.k.length > 0;
+      return '<a class="ti' + (c.s === active ? ' on' : '') + '" href="' + esc(f.hrefs[c.s] || url(c.s)) + '" data-s="' + esc(c.s) + '" data-n="' + esc(c.n) + '"' +
+        (has ? ' aria-haspopup="true"' : '') + '>' + esc(c.l) + (has ? I.right : '') + '</a>';
+    }).join('') + f.extra.map(function (x) {
+      return '<a class="ti" href="' + esc(x.href) + '" data-n="' + esc(x.t) + '">' + esc(x.t) + '</a>';
+    }).join('') + '</nav>';
+  }
+  // ikas sayfayı canlandırana kadar menünün yeri boş kalmasın: aynı çubuğun geçici bir kopyası tam üstünde durur
+  // (sayfanın dışında, React'in alanına dokunmadan); asıl menü yerleşince kaldırılır
+  function dmGhost(f) {
+    var r = f.nav.getBoundingClientRect(), w = Math.max(f.w0, f.space.w - 24), fixed = false;
+    for (var pe = f.nav; pe && pe !== document.body; pe = pe.parentElement) if (getComputedStyle(pe).position === 'fixed') { fixed = true; break; }
+    var left = f.w0 >= f.space.w - 24 ? r.left : f.space.l + 12;
+    var g = document.createElement('div');
+    g.id = 'ua-dnav-ghost';
+    g.style.cssText = 'position:' + (fixed ? 'fixed' : 'absolute') + ';z-index:2147481000;top:' + (r.top + (fixed ? 0 : window.pageYOffset)) + 'px;left:' +
+      (left + (fixed ? 0 : window.pageXOffset)) + 'px;width:' + w + 'px;height:' + Math.max(44, r.height) + 'px;font-family:' + getComputedStyle(f.nav).fontFamily;
+    var gr = g.attachShadow ? g.attachShadow({ mode: 'open' }) : g;
+    gr.innerHTML = barHtml(f);
+    document.body.appendChild(g);
+    var bar = gr.querySelector('.bar'), cls = ['', 's1', 's2', 's3'];
+    for (var i = 0; i < cls.length; i++) { bar.className = 'bar ' + cls[i]; if (bar.scrollWidth <= w + 1) break; }
+    // Hizalama: kopyayı ikas menüsünün dikey ortasına koy
+    g.style.top = (parseFloat(g.style.top) + (r.height - g.offsetHeight) / 2) + 'px';
+    return g;
+  }
+  function buildNav(f) {
     var font = getComputedStyle(f.nav).fontFamily;
     var host = document.createElement('div');
     host.className = 'ua-dnav';
     host.style.cssText = 'display:block;flex:1 1 auto;min-width:0;list-style:none;align-self:stretch;width:' + Math.max(f.w0, f.space.w - 24) + 'px;max-width:100%;font-family:' + font;
     var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
-    var urlNow = slugOf(location.href), active = null;
-    DATA.cats.forEach(function (c) {
-      if (c.s !== urlNow) return;
-      var t = c;
-      while (t.p && CATS_BY_ID[t.p]) t = CATS_BY_ID[t.p];
-      active = t.id;
-    });
-    root.innerHTML = '<style>' + DCSS + '</style><nav class="bar" aria-label="Kategoriler">' + f.cats.map(function (c) {
-      var has = (KIDS[c.id] || []).length > 0;
-      return '<a class="ti' + (c.id === active ? ' on' : '') + '" href="' + esc(f.hrefs[c.s] || url(c.s)) + '" data-id="' + esc(c.id) + '" data-n="' + esc(c.n) + '"' +
-        (has ? ' aria-haspopup="true"' : '') + '>' + esc((dmCfg().labels || {})[c.n] || c.n) + (has ? I.right : '') + '</a>';
-    }).join('') + f.extra.map(function (x) {
-      return '<a class="ti" href="' + esc(x.href) + '" data-n="' + esc(x.t) + '">' + esc(x.t) + '</a>';
-    }).join('') + '</nav>';
+    root.innerHTML = barHtml(f);
     var mhost = document.createElement('div');
     mhost.id = 'ua-mega';
     mhost.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;z-index:2147482000;font-family:' + font;
     var mroot = mhost.attachShadow ? mhost.attachShadow({ mode: 'open' }) : mhost;
     mroot.innerHTML = '<style>' + DCSS + '</style><div class="mw"><div class="bd"></div><div class="mg" role="region" aria-label="Alt kategoriler"></div></div>';
+    if (PRE && PRE !== f.nav) clearPre();
     f.nav.setAttribute('data-ua-nav', '');
     f.nav.appendChild(host);
+    clearPre();
     document.body.appendChild(mhost);
-    DN = { nav: f.nav, row: f.space.row, hrefs: f.hrefs, host: host, mhost: mhost, bar: root.querySelector('.bar'),
+    DN = { nav: f.nav, row: f.space.row, hrefs: f.hrefs, cats: f.cats, host: host, mhost: mhost, bar: root.querySelector('.bar'),
       mwrap: mroot.querySelector('.mw'), mg: mroot.querySelector('.mg'), cur: null };
     dmFit();
     var bar = DN.bar;
     bar.addEventListener('mouseover', function (e) {
       var a = e.target.closest && e.target.closest('.ti');
       if (!a) return;
-      var id = a.getAttribute('data-id');
+      var s = a.getAttribute('data-s'), c = s && dmCat(s);
       clearTimeout(DN.to); clearTimeout(DN.tc);
-      if (!id || !KIDS[id]) { DN.tc = setTimeout(dmClose, 120); return; }
+      if (!c || !c.k.length) { DN.tc = setTimeout(dmClose, 120); return; }
       // Panel zaten açıksa hemen geç; değilse fare yanlışlıkla üzerinden geçerken açılmasın
-      if (DN.cur) dmOpen(id); else DN.to = setTimeout(function () { dmOpen(id); }, 110);
+      if (DN.cur) dmOpen(s); else DN.to = setTimeout(function () { dmOpen(s); }, 110);
     });
     bar.addEventListener('mouseleave', dmLater);
     bar.addEventListener('focusin', function (e) {
-      var a = e.target.closest && e.target.closest('.ti'), id = a && a.getAttribute('data-id');
-      if (id && KIDS[id]) dmOpen(id); else dmClose();
+      var a = e.target.closest && e.target.closest('.ti'), s = a && a.getAttribute('data-s');
+      if (s) dmOpen(s); else dmClose();
     });
     DN.mg.addEventListener('mouseenter', function () { clearTimeout(DN.tc); clearTimeout(DN.to); });
     DN.mg.addEventListener('mouseleave', dmLater);
@@ -3047,21 +3150,44 @@
       });
     });
     DN.mg.addEventListener('keydown', function (e) { if (e.key === 'Escape') { dmClose(); try { bar.querySelector('.ti.on, .ti').focus(); } catch (x) {} } });
-    bar.addEventListener('keydown', function (e) { if (e.key === 'Escape') dmClose(); });
   }
+  // Ürün verisi gelince özeti yenile; değiştiyse menüyü aynı anda (arada ikas menüsü görünmeden) yeniden kur
+  function dmRefresh() {
+    var M = dmModel(), js = JSON.stringify(M);
+    try { localStorage.setItem(DM_KEY, js); } catch (e) {}
+    if (DM && JSON.stringify(DM) === js && DN) return;
+    DM = M;
+    if (M.off) { unmountNav(); clearPre(); return; }
+    unmountNav();
+    mountNav();
+    if (!DN && !DM_WAIT) clearPre();
+  }
+  (function dmInit() {
+    if (ds.dmenu === 'off' || !wideScreen()) return;
+    var go = function () {
+      try { DM = JSON.parse(localStorage.getItem(DM_KEY) || 'null'); } catch (e) { DM = null; }
+      if (DM && DM.v !== 1) DM = null;
+      try {
+        if (DM) mountNav();
+        else { var g = guessNav(); if (g) preHide(g); }
+      } catch (e) {}
+      load().then(dmRefresh).catch(function () { if (!DN) clearPre(); });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+  })();
   // Ekran boyutu değişince yeniden kur (masaüstünden çıkınca ikas menüsü geri gelir);
   // ikas başlığı yeniden çizerse (sayfa geçişi) menüyü tekrar yerleştir
   (function () {
     var t, tries = 0;
     window.addEventListener('resize', function () {
-      if (!DN && !DATA) return;
+      if (!DM) return;
       clearTimeout(t);
       t = setTimeout(function () { tries = 0; unmountNav(); mountNav(); }, 250);
     });
     window.addEventListener('scroll', function () { if (DN && DN.cur) dmTop(); }, { passive: true });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && DN && DN.cur) dmClose(); });
     setInterval(function () {
-      if (document.hidden || !DATA) return;
+      if (document.hidden || !DM) return;
       if (DN && (!DN.host.isConnected || !DN.nav.isConnected || !DN.mhost.isConnected)) { unmountNav(); tries = 0; }
       // Menü hiç bulunamayan sayfalarda boşuna aramaya devam etme
       if (!DN && dmenuOn() && tries++ < 5) mountNav();
@@ -3080,8 +3206,6 @@
   // birkaç saniye sonra yine boşta ürün verisini indir (panel daha önce açılırsa hemen yüklenir)
   function boot() {
     var idle = window.requestIdleCallback ? function (f, t) { window.requestIdleCallback(f, { timeout: t }); } : function (f) { setTimeout(f, 300); };
-    // Masaüstünde ana menü ürün verisiyle kurulduğu için veri sayfa yüklenince hemen indirilir (telefonda boşta, gecikmeli)
-    if (wideScreen() && ds.dmenu !== 'off') load().then(mountNav).catch(function () {});
     idle(function () {
       build();
       setTimeout(function () { idle(function () { load().catch(function () {}); }, 4000); }, 1500);
