@@ -113,14 +113,21 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 config.json'u GitHub'da düzenleyip kaydettiğinde senkron kendiliğinden çalışır.
 
 ## Ziyaretçi eğilimleri (analiz)
-Widget anonim olarak (IP, çerez, kimlik tutmadan) şunları sayar: aranan kelimeler, sonuç bulunamayan aramalar, panelden/menüden ürün tıklamaları, ürün sayfası görüntülemeleri ve **sitenin her yerinden** sepete eklemeler (ikas'ın kendi butonu dahil; sepet yanıtından okunur). Her olay bir oturumda bir kez sayılır, toplu gönderilir. Cloudflare'de günlük toplamlar tutulur (D1 veritabanı `hasturk-egilim`, ilk yayında otomatik oluşur; geçen yılın sezonu için 420 gün saklanır).
+Widget anonim olarak (IP, çerez, kimlik tutmadan) şunları sayar: aranan kelimeler, sonuç bulunamayan aramalar, panelden/menüden ürün tıklamaları, ürün sayfası görüntülemeleri ve **sitenin her yerinden** sepete eklemeler (ikas'ın kendi butonu dahil; sepet yanıtından okunur). Her olay bir oturumda bir kez sayılır, toplu gönderilir. Cloudflare'de günlük toplamlar tutulur (D1 veritabanı `hasturk-egilim`, ilk yayında otomatik oluşur; son 2 yılın sezonu için 800 gün saklanır).
 
-`scripts/sync.mjs` 2 saatte bir son 30 günün özetini, ikas'taki son 60 günün siparişlerini ve **geçen yılın aynı dönemini** (bugünün 1 hafta öncesi – 1 ay sonrası; sipariş + site içi olaylar) birleştirir:
-- Ürün eğilim puanı `h` (0-100) = şimdi (4 × satış adedi + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme; yeni olanlar daha ağır) + 0,6 × geçen yılın aynı dönemi. Böylece her sezon düzenli satan ürünler talep zirveye çıkmadan öne alınır; sezonu geçenler kendiliğinden geri düşer. Sert bir sıfırlama yoktur. Aramada küçük bir öne çıkarma olarak kullanılır (alaka her zaman önce gelir) ve masaüstü menüdeki "Çok satanlar" bu puana göre seçilir.
-- "Çok satan" rozeti: gerçek siparişlerde (bugün + geçen yılın bu sezonu) en çok satan 12 ürün (+ `bestsellers`).
-- "Sık arananlar": en az 3 kez aranmış ve bugün de sonuç veren kelimeler; eksik kalırsa `popular` ile tamamlanır (`"trendPopular": false` sadece elle listeyi kullanır).
-- Masaüstü menüde bir kategorinin ürünlerini elle sabitlemek: `"desktopMenu": { "picks": { "Topraklar": ["urun-slug", ...] } }` (önce bunlar, kalan yerler eğilime göre).
-- Rapor: `docs/trend-raporu.md` ("Yaklaşan sezon" bölümü: geçen yıl önümüzdeki haftalarda satanlar ve bugün stokta olup olmadıkları).
+`scripts/sync.mjs` 2 saatte bir şu verileri birleştirir: son 30 günün site içi olayları, ikas'taki son 60 günün siparişleri ve **1 ile 2 yıl önceki aynı dönem** (sipariş + site içi). Ürün puanı `h` (0-100) dört parçadan oluşur:
+1. **Şimdi:** 4 × satış + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme. Yeni olan ağır basar (sipariş yarı ömrü 20 gün, olaylar 10 gün); sert sıfırlama yok.
+2. **İvme:** Son 7 günün hızı ÷ önceki 3 haftanın hızı. En az 1,5 kat hızlanan ve yeterli hacmi olan ürün "yükselen" sayılır, ek puan alır. Bu yıl yeni tutan ürün sezon verisini beklemeden öne çıkar.
+3. **Sezon:** Geçmiş yıllarda bugünden 1 hafta önce ile 1 ay sonrası arasında satılanlar (geçen yıl ağırlık 1, 2 yıl önce 0,5). Mağazanın büyüme oranıyla ölçeklenir.
+4. **Teyit:** O yılın son 2 haftası ile bu yılın son 2 haftası karşılaştırılır. Bu yıl geride kalan ürünün sezon puanı %40'a kadar düşer, önde gidenin %150'ye kadar çıkar.
+
+Puan = şimdi + ivme + 0,6 × sezon × teyit. Kullanıldığı yerler:
+- **Arama:** Stoktaki ürünlere küçük bir öne çıkarma (alaka her zaman önce).
+- **Masaüstü menü "Çok satanlar":** Bu puana göre seçilir; `"desktopMenu": { "picks": { "Topraklar": ["urun-slug"] } }` ile elle sabitlenebilir.
+- **"Ürün Bul" ana ekranı "Şu sıralar çok tercih edilenler":** Yükselen, sezonun ürünü (bu yıl geride olmayan) ve çok satanlar; sadece stoktaki ürünler, ton/toptan hariç. `"trendBlock": false` kapatır.
+- **"Çok satan" rozeti:** Gerçek siparişlerde en çok satan 12 ürün (bugün + teyitli sezon) ve `bestsellers`.
+- **"Sık arananlar":** Bugün aranan + yükselen + geçmiş yılların bu dönemi; bugün sonuç vermeyen kelime gösterilmez. Eksik kalırsa `popular` ile tamamlanır (`"trendPopular": false` sadece elle listeyi kullanır).
+- **Rapor (`docs/trend-raporu.md`):** Yükselenler, yaklaşan sezon (teyit ve stok durumuyla), geçen yıl revaçta olup bu yıl geride kalanlar, çok satanlar, aramalar (yükselenler işaretli), sonuçsuz aramalar, çok bakılıp az sepete eklenenler, menü önerileri.
 
 Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collect="off"`.
 

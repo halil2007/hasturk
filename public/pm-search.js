@@ -156,7 +156,7 @@
       p.own = ownB.test(p.b || '');
       // "Çok satan": config'deki liste + gerçek siparişlerde en çok satanlar (sync.mjs > trend.best)
       p.best = (CFG.bestsellers || CFG.boost || []).indexOf(p.s) !== -1 || ((d.trend || {}).best || []).indexOf(p.s) !== -1;
-      p.r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (p.own ? 2 : 0) + Math.min(2, (p.h || 0) / 50);
+      p.r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (p.own ? 2 : 0) + (p.st ? Math.min(2, (p.h || 0) / 50) : 0);
       if (bulk.test(p.n) || (p.p || 0) >= bulkPrice) p.r -= 8;
     });
     // Kategori görseli: config.json > categoryImages'daki ürün; yoksa kategorideki (alt kategoriler dahil)
@@ -662,6 +662,15 @@
     'mark{background:none;color:var(--pr);font-weight:800}',
     '.vchip{align-self:flex-start;font-size:11.5px;font-weight:700;color:var(--prd);background:var(--soft);padding:3px 8px;border-radius:7px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.badges{display:flex;flex-wrap:wrap;gap:4px}',
+    '.hot{display:flex;gap:10px;overflow-x:auto;padding:0 16px 6px;scrollbar-width:none;scroll-snap-type:x proximity}',
+    '.hot::-webkit-scrollbar{display:none}',
+    '@media(min-width:760px){.hot{padding:0 20px 6px}}',
+    '.hp{flex:0 0 138px;scroll-snap-align:start;display:flex;flex-direction:column;border:1px solid var(--ln);border-radius:16px;padding:8px;background:#fff}',
+    '.hp:hover{border-color:var(--pr)}',
+    '.hp .im{width:100%;height:112px;background:#fff}.hp .im img{object-fit:contain}',
+    '.hp .hb{align-self:flex-start;margin-top:7px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;background:#fff3d6;color:#8a5a00}',
+    '.hp b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:6px;font-size:13px;font-weight:600;line-height:1.3;min-height:34px}',
+    '.hp small{margin-top:4px;font-size:14px;font-weight:800;color:var(--prd)}',
     '.badge.best,.badge.own{display:inline-flex;align-items:center;gap:3px}.badge svg{width:11px;height:11px}',
     '.badge.best{background:#fff3d6;color:#8a5a00}.badge.own{background:var(--soft);color:var(--prd)}',
     '.trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 16px 0}',
@@ -1081,6 +1090,27 @@
         '<span class="fn"><b>' + esc(x.title) + '</b><small>' + x.c.k + ' ürün</small></span></button>';
     }).join('') + '</div>';
   }
+  // "Şu sıralar çok tercih edilenler": eğilim algoritmasının seçtikleri (sync.mjs > trend):
+  // bu hafta hızla yükselenler, geçmiş yıllarda bu dönemde satan ve bu yıl da tutan sezon ürünleri, çok satanlar.
+  // Sadece stoktaki ürünler; yeterli veri yoksa (4 üründen az) bölüm gösterilmez. Kapatmak: "trendBlock": false
+  function hotHtml() {
+    var t = DATA.trend || {};
+    if (CFG.trendBlock === false || !t.src || !(t.src.orders || t.src.events)) return '';
+    var tag = {}, list = [], seen = {};
+    [['rising', 'Yükselen'], ['season', 'Sezonun ürünü'], ['best', 'Çok satan']].forEach(function (k) {
+      (t[k[0]] || []).forEach(function (s) { if (!tag[s]) tag[s] = k[1]; });
+    });
+    // Ton/toptan gibi büyük hacimli ürünler (sıralamada geriye atılanlar) burada gösterilmez
+    var push = function (p) { if (p && p.st && p.img && p.r > -4 && !seen[p.s] && list.length < 8) { seen[p.s] = 1; list.push(p); } };
+    // Sıra: yükselen ve sezon önce (zamanlı fırsat), sonra çok satan, kalan yer eğilim puanına göre
+    (t.rising || []).concat(t.season || [], t.best || []).forEach(function (s) { push(BY_SLUG[s]); });
+    DATA.items.filter(function (p) { return p.h; }).sort(function (a, b) { return b.h - a.h; }).forEach(push);
+    if (list.length < 4) return '';
+    return '<div class="h">Şu sıralar çok tercih edilenler</div><div class="hot">' + list.map(function (p) {
+      return '<a class="hp" data-kind="product" data-name="' + esc(p.n) + '" href="' + esc(url(p.s)) + '">' + thumb(p.img, 180) +
+        (tag[p.s] ? '<span class="hb">' + esc(tag[p.s]) + '</span>' : '') + '<b>' + esc(p.n) + '</b><small>' + tl(price(p)) + '</small></a>';
+    }).join('') + '</div>';
+  }
   // Kampanya kartı (config.json > promo): ilk sipariş kodu ve ücretsiz kargo eşiği
   function promoHtml() {
     var pr = CFG.promo;
@@ -1241,7 +1271,7 @@
         '<span class="cxa">' + I.right + '</span></button>' +
         (catOpen ? '<div class="clist">' + tops.map(catRow).join('') + '</div>' : '') + '</div>';
     }
-    html += promoHtml() + trustHtml() + featuredHtml();
+    html += promoHtml() + trustHtml() + hotHtml() + featuredHtml();
     $home.innerHTML = homeWrap(html);
     updateShip();
   }
