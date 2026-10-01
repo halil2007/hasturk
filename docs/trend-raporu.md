@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 190 sipariş; site içi olay verisi henüz yok; 1 yıl önce aynı dönem (; mağaza büyümesi ×1); 2 yıl önce aynı dönem (; mağaza büyümesi ×1).
+Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (12 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
