@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (56 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (63 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -10,7 +10,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 
 | # | Ürün | Hızlanma | Son 7 gün satış | Stokta |
 |---|---|---|---|---|
-| 1 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×8,6 | 4 | evet |
+| 1 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×9,1 | 4 | evet |
 | 2 | DSV Lippa Lisuna 6 Mix Çim Tohumu | ×2,3 | 6 | evet |
 | 3 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×5 | 2 | evet |
 | 4 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
@@ -34,7 +34,7 @@ _Henüz veri yok._
 |---|---|---|---|
 | 1 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 11,7 | 6 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 9,6 | 10 |
-| 3 | HasTürk Solucan Gübresi  | 9,6 | 11 |
+| 3 | HasTürk Solucan Gübresi  | 9,5 | 11 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,9 | 2 |
 | 5 | Kullanıma Hazır Cocopeat Torfu | 8,7 | 16 |
 | 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,6 | 13 |
@@ -57,11 +57,15 @@ _Henüz veri yok._
 
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
-| 1 | torf | 2 | 2 |  |  |
-| 2 | hümik | 1 | 1 |  |  |
-| 3 | perlit | 1 | 1 |  |  |
-| 4 | sebze tohumu | 1 | 1 |  |  |
-| 5 | solucan gübresi | 1 | 1 |  |  |
+| 1 | perlit | 2 | 2 |  |  |
+| 2 | sebze tohumu | 2 | 2 |  |  |
+| 3 | torf | 2 | 2 |  |  |
+| 4 | enjo | 1 | 1 |  |  |
+| 5 | felici | 1 | 1 |  |  |
+| 6 | hümik | 1 | 1 |  |  |
+| 7 | ilaçlama pompası | 1 | 1 |  |  |
+| 8 | saksı toprağı | 1 | 1 |  |  |
+| 9 | solucan gübresi | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
