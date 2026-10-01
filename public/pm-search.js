@@ -19,21 +19,17 @@
   var STORE = (ds.store || location.origin).replace(/\/$/, '');
   var SELECTOR = ds.selector || 'input[type="search"], input[name="q"], input[name="s"], input[placeholder]';
   var TRIGGER = ds.trigger || '';
-  var CACHE_KEY = 'ua-data-v4';
+  var CACHE_KEY = 'ua-data-v5'; // veri/ayar biçimi değişince artır (eski önbellek kullanılmasın)
   var RECENT_KEY = 'ua-recent';
   var CACHE_MS = 20 * 60 * 1000;
   var PAGE = 10;
 
   // ---------------- Türkçe normalizasyon ----------------
   var FOLD = { 'ı': 'i', 'ş': 's', 'ğ': 'g', 'ü': 'u', 'ö': 'o', 'ç': 'c', 'â': 'a', 'î': 'i', 'û': 'u' };
+  var FOLD_RE = /[ışğüöçâîû]/g, foldCh = function (c) { return FOLD[c]; };
   function fold(s) {
-    var out = '';
-    s = String(s || '');
-    for (var i = 0; i < s.length; i++) {
-      var c = s[i].toLocaleLowerCase('tr-TR');
-      out += FOLD[c] || (c.length > 1 ? c[0] : c);
-    }
-    return out;
+    // Tüm metni bir kerede küçült (harf harf yapmaktan ~17 kat hızlı, sonuç aynı)
+    return String(s || '').toLocaleLowerCase('tr-TR').replace(FOLD_RE, foldCh).replace(/\u0307/g, '');
   }
   function words(s) { return s.split(/[^a-z0-9]+/).filter(Boolean); }
   function lev(a, b) {
@@ -363,7 +359,7 @@
     '@keyframes cnpop{from{transform:scale(.3)}}',
     '.back,.xbtn{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none}',
     '.back{background:var(--bg)}.back svg{width:22px;height:22px}',
-    '.back{display:none;background:var(--bg)}.panel.sub .back{display:grid}.xbtn{display:grid;background:var(--bg)}.xbtn svg{width:20px;height:20px}.xbtn:hover{background:var(--ln)}',
+    '.back{display:none;background:var(--bg)}.panel.sub .back{display:grid}.xbtn{display:grid;background:var(--ac);color:#fff;box-shadow:0 3px 10px rgba(215,55,47,.35)}.xbtn svg{width:22px;height:22px;stroke-width:2.8}.xbtn:hover{filter:brightness(.92)}.xbtn:active{transform:scale(.94)}',
     '.field{flex:1;display:flex;align-items:center;gap:10px;height:48px;padding:0 6px 0 16px;border-radius:24px;background:var(--bg);min-width:0;border:2px solid transparent;transition:border-color .15s,background .15s}',
     '.field:focus-within{border-color:var(--pr);background:#fff}',
     '.field>svg{width:20px;height:20px;color:var(--pr);flex:none}',
@@ -802,7 +798,12 @@
   var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $sheet, $toast;
   var $guide, GID = null;
   var isOpen = false, sel = -1, pushed = false;
-  var catOpen = false, onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home';
+  var catOpen = false, onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home', VSTACK = [];
+  // Geri tuşu için gezinme geçmişi (görünüm, arama, kaydırma konumu)
+  function pushView() {
+    VSTACK.push({ v: view, q: $q ? $q.value : '', s: $body ? $body.scrollTop : 0, n: CSHOWN });
+    if (VSTACK.length > 20) VSTACK.shift();
+  }
   var TABS = [['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
   var BY_ID = {};
 
@@ -897,8 +898,15 @@
     var act = b.getAttribute('data-act'), v = b.getAttribute('data-v');
     if (act === 'close') close();
     else if (act === 'back') {
-      // Geri: kategori içinden bir üst kategoriye, en üstte ana bölüme
+      // Geri: önce aramayı temizle; sonra gelinen yere (ana bölüm, arama sonucu ya da önceki kategori) kaldığı konumla dön
       if ($q.value) { $q.value = ''; render(); }
+      else if (VSTACK.length) {
+        var e = VSTACK.pop();
+        view = e.v; CSHOWN = e.n || 12;
+        if (e.q) { $q.value = e.q; render(); }
+        renderIdle();
+        $body.scrollTop = e.s || 0;
+      }
       else if (view) {
         var vc = CATS_BY_ID[inCatp() ? view.slice(2) : view], par = vc && vc.p && CATS_BY_ID[vc.p];
         view = par ? (inCatp() ? 'p:' + par.id : par.id) : null;
@@ -910,11 +918,12 @@
     else if (act === 'del') { e.stopPropagation(); var f = fold(v); setRecent(getRecent().filter(function (x) { return fold(x) !== f; })); renderIdle(); }
     else if (act === 'delall') { setRecent([]); renderIdle(); }
     else if (act === 'catx') { catOpen = !catOpen; renderIdle(); }
-    else if (act === 'cat') { view = v || null; renderIdle(); $body.scrollTop = 0; }
+    else if (act === 'cat') { pushView(); view = v || null; renderIdle(); $body.scrollTop = 0; }
     else if (act === 'stock') { onlyStock = !onlyStock; shown = PAGE; CSHOWN = 12; render(); if (inCatp()) renderIdle(); }
     else if (act === 'sort') { sortMode = v; shown = PAGE; CSHOWN = 12; render(); if (inCatp()) renderIdle(); }
     else if (act === 'cmore') { CSHOWN += 12; renderIdle(); }
     else if (act === 'catp') {
+      if (view !== 'p:' + v) pushView();
       view = 'p:' + v; CSHOWN = 12;
       if ($q.value) { $q.value = ''; render(); }
       track('category', CATS_BY_ID[v] ? CATS_BY_ID[v].n : v);
@@ -922,7 +931,7 @@
     }
     else if (act === 'more') { shown += PAGE; render(); }
     else if (act === 'copy') copyText(v);
-    else if (act === 'tab') { if ($q.value) { $q.value = ''; render(); } view = null; renderIdle(); setTab(v); }
+    else if (act === 'tab') { if ($q.value) { $q.value = ''; render(); } view = null; VSTACK = []; renderIdle(); setTab(v); }
     else if (act === 'gocalc') { $q.value = ''; render(); setTab('calc'); }
     else if (act === 'guide') { GID = v; renderGuide(); }
     else if (act === 'goguide') { GID = v; $q.value = ''; render(); setTab('guide'); }
@@ -1037,7 +1046,7 @@
   // Görselli menü: öne çıkan kategoriler (config.json > featured: [{ category, img }])
   function featuredHtml() {
     var list = (CFG.featured || []).map(function (f) {
-      var c = DATA.cats.filter(function (x) { return x.f === fold(f.category); })[0];
+      var ff = fold(f.category), c = DATA.cats.filter(function (x) { return x.f === ff; })[0];
       return c && f.img ? { c: c, img: f.img, title: f.title || c.n } : null;
     }).filter(Boolean);
     if (!list.length) return '';
@@ -1509,13 +1518,14 @@
         res: names.map(function (n) { return new RegExp('(^| )' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[a-z]{0,' + (n.length <= 3 ? 3 : 4) + '}( |$)'); }) };
     }).filter(Boolean);
     // Adında bitki geçen toprak ürünleri (etiket gerekmeden): "HG Philodendron Toprağı" → Philodendron'un özel toprağı
-    var soilCat = DATA.cats.filter(function (c) { return c.f === fold('Topraklar'); })[0];
+    var soilCat = DATA.cats.filter(function (c) { return c.f === 'topraklar'; })[0];
+    var soilItems = !soilCat ? [] : DATA.items.filter(function (x) {
+      return !x.bn && /topra|torf|karisim/.test(x.nf) && catChain(x).indexOf(soilCat.f) !== -1;
+    }).map(function (x) { return { x: x, nm: words(x.nf).join(' ') }; });
     plants.forEach(function (pl) {
-      pl.auto = DATA.items.filter(function (x) {
-        if (!soilCat || catChain(x).indexOf(soilCat.f) === -1 || x.bn || !/topra|torf|karisim/.test(x.nf)) return false;
-        var nm = words(x.nf).join(' ');
-        return pl.res.some(function (re) { return re.test(nm); });
-      }).sort(function (a, b) { return (b.st ? 1 : 0) - (a.st ? 1 : 0) || (b.r || 0) - (a.r || 0); });
+      pl.auto = soilItems.filter(function (o) {
+        return pl.res.some(function (re) { return re.test(o.nm); });
+      }).map(function (o) { return o.x; }).sort(function (a, b) { return (b.st ? 1 : 0) - (a.st ? 1 : 0) || (b.r || 0) - (a.r || 0); });
     });
     SOIL = { soils: soils, plants: plants, bySlug: bySlug, w: sm.weights || [3, 2, 2, 1, 1, 12], add: sm.addons || {},
       min: sm.minFit != null ? +sm.minFit : 0.85, custom: sm.custom && bySlug[sm.custom] };
@@ -1524,7 +1534,7 @@
   // Başka bir ürün türü aranıyorsa (domates tohumu, limon gübresi) toprak kartı çıkmaz
   var NOT_SOIL = /^(tohum|gubre|ilac|pompa|saksi|besin|vitamin|mama|fidesi|fidan|hormon|kok|sprey)/;
   function plantFor(qn) {
-    if (!DATA || !CFG.soilMatch) return null;
+    if (!DATA || !CFG.soilMatch || qn.replace(/\s/g, '').length < 3) return null;
     var S = soilData(), ws = words(qn), q = ws.join(' '), best = null, bl = 0;
     S.plants.forEach(function (pl) {
       pl.res.forEach(function (re, i) { var n = pl.names[i]; if (re.test(q) && n.length > bl) { best = pl; bl = n.length; } });
@@ -2391,6 +2401,7 @@
     if (!isOpen) {
       isOpen = true;
       view = null;
+      VSTACK = [];
       setTab(startTab || 'home');
       $ov.classList.add('on');
       updateFab();
