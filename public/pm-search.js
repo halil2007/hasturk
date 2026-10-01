@@ -646,7 +646,10 @@
     '.all-in svg{width:18px;height:18px}',
 
     '.im{flex:none;border-radius:12px;background:var(--bg);overflow:hidden;display:grid;place-items:center;color:#a9c3cc;position:relative}',
-    '.im img{width:100%;height:100%;object-fit:cover;display:block}',
+    '.im img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .25s}',
+    '.im img.ok{opacity:1}',
+    '.im:has(img:not(.ok)){background:linear-gradient(90deg,#f1f4f5 25%,#e7ecee 50%,#f1f4f5 75%) 0 0/200% 100% !important;animation:imsk 1.2s linear infinite}',
+    '@keyframes imsk{to{background-position:-200% 0}}',
     '.im>svg{width:42%;height:42%}',
 
     /* Sonuçlar */
@@ -910,6 +913,14 @@
       t.parentNode.innerHTML = I.sprout;
     }, true);
     root.addEventListener('click', onClick);
+    // Parmak "Ekle"ye değdiği an ürün sayfasını gizli çerçevede açmaya başla (tıklama gelene kadar ~150-300 ms kazanç)
+    root.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest && e.target.closest('[data-act="add"]');
+      if (b && BY_ID[b.getAttribute('data-v')] && typeof window.UrunAramaSepet !== 'function' && cartOn()) prepAdd(BY_ID[b.getAttribute('data-v')]);
+      if (e.target.closest && e.target.closest('.fab')) load().catch(function () {});
+    }, true);
+    // Görsel tamamen inince göster (mobil veride yarım çizilmiş görsel görünmesin)
+    root.addEventListener('load', function (e) { if (e.target && e.target.tagName === 'IMG') e.target.classList.add('ok'); }, true);
     root.addEventListener('input', function (e) {
       if (e.target === $q) return;
       if (e.target.getAttribute('data-k') === 'gq') { GQ = e.target.value; guideSearch(); return; }
@@ -1985,16 +1996,23 @@
     f.style.cssText = 'position:fixed;left:-20000px;top:0;width:1280px;height:1000px;border:0;opacity:0;pointer-events:none;';
     var entry = { f: f, t: Date.now(), cbs: [] };
     entry.pr = new Promise(function (resolve, reject) {
-      var to = setTimeout(function () { reject('timeout'); }, 20000);
-      f.onload = function () {
-        clearTimeout(to);
+      var to = setTimeout(function () { reject('timeout'); }, 20000), done = false, poll;
+      var ready = function () {
+        if (done) return;
         var w, d;
-        try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return reject('blocked'); }
+        try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { done = true; clearTimeout(to); clearInterval(poll); return reject('blocked'); }
+        done = true;
+        clearTimeout(to);
+        clearInterval(poll);
         watchCart(w, function (info) { entry.cbs.forEach(function (cb) { cb(info); }); });
         sniffCart(w);
         learnAdd(w);
         resolve({ f: f, w: w, d: d, entry: entry });
       };
+      f.onload = ready;
+      // Sayfanın tüm görsellerinin inmesini bekleme: "Sepete ekle" butonu görünür ve React tarafından
+      // çalışır hale getirilmişse (tıklama işleyicisi bağlı) hemen devam et. Mobil veride birkaç saniye kazandırır.
+      poll = setInterval(function () { try { if (frameUsable(f)) ready(); } catch (e) {} }, 120);
     });
     entry.pr.catch(function () { delete FRAMES[p.id]; });
     f.src = url(p.s) + (url(p.s).indexOf('?') < 0 ? '?' : '&') + 'ua_frame=1';
@@ -2245,6 +2263,19 @@
   }
   function visible(el) { return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)); }
   function squash(t) { return fold(t).replace(/\s+/g, ''); }
+  function frameUsable(f) {
+    var d = f.contentDocument, w = f.contentWindow;
+    if (!d || !d.body || d.readyState === 'loading' || String(d.location && d.location.href).indexOf('ua_frame=1') === -1) return false;
+    var b = findAddBtn(d);
+    if (!b) return false;
+    // React (Next.js) sayfası değilse erken başlatma; normal yüklenme beklenir
+    if (!(w.__NEXT_DATA__ || d.getElementById('__next'))) return false;
+    for (var n = b, i = 0; n && i < 4; n = n.parentElement, i++) {
+      var ks = Object.keys(n);
+      for (var j = 0; j < ks.length; j++) if (/^__reactProps\$/.test(ks[j]) && n[ks[j]] && typeof n[ks[j]].onClick === 'function') return true;
+    }
+    return false;
+  }
   function findAddBtn(d) {
     var els = d.querySelectorAll('button,[role="button"],a,input[type="submit"]');
     for (var i = 0; i < els.length; i++) {
