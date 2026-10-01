@@ -61,6 +61,16 @@
     for (var k in o) if (o[k] && typeof o[k] === 'object') { var r = findCart(o[k], d + 1); if (r) return r; }
     return null;
   }
+  // Sepetteki satırlar: varyant kimliği → adet
+  var CART_LINES = null;
+  function lineQty(c) {
+    var m = {};
+    (c.orderLineItems || []).forEach(function (it) {
+      var id = it && (it.variant && it.variant.id || it.variantId || it.productVariantId);
+      if (id) m[id] = (m[id] || 0) + (+it.quantity || 1);
+    });
+    return m;
+  }
   function setCart(o) {
     var c = findCart(o, 0);
     if (!c) return;
@@ -68,6 +78,7 @@
     if (isNaN(v)) return;
     CART = v;
     CART_N = c.orderLineItems.reduce(function (a, it) { return a + (+(it && it.quantity) || 1); }, 0);
+    CART_LINES = lineQty(c);
     if (c.id) CART_ID = c.id;
     try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, n: CART_N, t: Date.now(), id: CART_ID })); } catch (e) {}
     updateShip();
@@ -1767,7 +1778,7 @@
   }
   function addFailed(p) {
     closeSheet();
-    ptoast('Ürün şu an buradan eklenemedi.', true, false, url(p.s), 'Ürün sayfasına git');
+    ptoast('Sepete eklenemedi. Ürün sayfasından ekleyebilirsiniz.', true, false, url(p.s), 'Ürün sayfasına git');
   }
   function setBusy(id, on) {
     SH.busy = on;
@@ -1780,23 +1791,42 @@
 
   var FRAME = 'ua-sepet-cercevesi';
   // Çerçevedeki sayfanın sepet isteklerini izle (ikas sepete eklemeyi fetch/XHR ile yapar; adında "cart" geçer)
+  // Çerçevedeki sayfanın isteklerini izle: istek gövdesi, durum ve cevap metni doğrulama için iletilir
   function watchCart(w, cb) {
-    var isCart = function (u, body) { return /cart|sepet/i.test(String(u || '')) || /cart/i.test(typeof body === 'string' ? body : ''); };
+    var interesting = function (u, body) { return /cart|sepet|graphql/i.test(String(u || '')) || (typeof body === 'string' && body.length < 20000); };
     try {
       var of = w.fetch;
       if (of) w.fetch = function (u, o) {
-        var hit = isCart(u && u.url || u, o && o.body);
-        return of.apply(this, arguments).then(function (r) { if (hit && r && r.ok) cb(); return r; });
+        var url = String(u && u.url || u), body = o && typeof o.body === 'string' ? o.body : '';
+        var hit = interesting(url, body);
+        return of.apply(this, arguments).then(function (r) {
+          if (hit && r) {
+            try { r.clone().text().then(function (t) { cb({ url: url, body: body, ok: r.ok, status: r.status, text: t }); }, function () { cb({ url: url, body: body, ok: r.ok, status: r.status, text: '' }); }); } catch (e) {}
+          }
+          return r;
+        });
       };
       var X = w.XMLHttpRequest && w.XMLHttpRequest.prototype;
       if (X) {
         var oo = X.open, os = X.send;
-        X.open = function (m, u) { this.__ua = u; return oo.apply(this, arguments); };
+        X.open = function (m, u) { this.__ua = String(u); return oo.apply(this, arguments); };
         X.send = function (b) {
-          if (isCart(this.__ua, b)) this.addEventListener('load', function () { if (this.status && this.status < 400) cb(); });
+          var url = this.__ua, body = typeof b === 'string' ? b : '';
+          if (interesting(url, body)) this.addEventListener('load', function () {
+            var t = '';
+            try { t = this.responseType === '' || this.responseType === 'text' ? this.responseText : JSON.stringify(this.response); } catch (e) {}
+            cb({ url: url, body: body, ok: this.status >= 200 && this.status < 300, status: this.status, text: t || '' });
+          });
           return os.apply(this, arguments);
         };
       }
+    } catch (e) {}
+  }
+  // Son eklemelerin kaydı (#ua-debug ile görülür): canlıda sorun olursa nedenini anlamak için
+  function addLog(entry) {
+    try {
+      var a = JSON.parse(localStorage.getItem('ua-addlog') || '[]');
+      a.unshift(entry); localStorage.setItem('ua-addlog', JSON.stringify(a.slice(0, 5)));
     } catch (e) {}
   }
   // Ürün sayfasını görünmez çerçevede önceden yükle (müşteri "Ekle"ye bastığı an; seçenek seçerken hazır olur)
@@ -1818,7 +1848,7 @@
         clearTimeout(to);
         var w, d;
         try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return reject('blocked'); }
-        watchCart(w, function () { entry.cbs.forEach(function (cb) { cb(); }); });
+        watchCart(w, function (info) { entry.cbs.forEach(function (cb) { cb(info); }); });
         sniffCart(w);
         learnAdd(w);
         resolve({ f: f, w: w, d: d, entry: entry });
@@ -1890,7 +1920,7 @@
   }
   function directAdd(p, v) {
     var t = ADD_TPL;
-    if (!t || p.bn || !v || !v.id || (CFG.cart || {}).direct === false) return Promise.reject('no-template');
+    if (!t || p.bn || !v || !v.id || (CFG.cart || {}).direct !== true) return Promise.reject('no-template');
     var body = t.body.split(t.vid).join(v.id).split(t.pid).join(p.id), hasCart = false;
     try {
       var j = JSON.parse(body);
@@ -1946,7 +1976,7 @@
         clearTimeout(to);
         var w, d;
         try { w = f.contentWindow; d = f.contentDocument; if (!d || !d.body) throw 0; } catch (e) { return reject('blocked'); }
-        watchCart(w, function () { entry.cbs.forEach(function (cb) { cb(); }); });
+        watchCart(w, function (info) { entry.cbs.forEach(function (cb) { cb(info); }); });
         sniffCart(w);
         learnAdd(w);
         WARM.fr = { f: f, w: w, d: d, entry: entry, warm: true };
@@ -1982,6 +2012,8 @@
     });
   }
   function frameFor(p) {
+    // Hızlı sayfa geçişi (sıcak çerçeve) canlıda doğrulanana kadar kapalı: her ürün kendi sayfasında tazeden açılır
+    if ((CFG.cart || {}).warm !== true) return loadFrame(p);
     return navWarm(p).catch(function () { return loadFrame(p); });
   }
   // Eklemeler sırayla (aynı gizli çerçeve iki ürüne aynı anda gitmesin)
@@ -1992,14 +2024,14 @@
   }
   // "Ekle"ye basılınca: doğrudan ekleme hazır değilse ürünü sıcak çerçevede şimdiden aç
   function prepAdd(p) {
-    if (ADD_TPL && !p.bn && CART_ID) return;
     if (SH.busy) return;
+    if ((CFG.cart || {}).warm !== true) { loadFrame(p).catch(function () {}); return; }
     navWarm(p).catch(function () { loadFrame(p).catch(function () {}); });
   }
   function addViaFrame(p, v) {
     return frameFor(p).then(function (fr) {
       return new Promise(function (resolve, reject) {
-        var d = fr.d, done = false, clicked = false;
+        var d = fr.d, done = false, clicked = false, before = null;
         var finish = function (ok, why) {
           if (done) return;
           done = true;
@@ -2013,9 +2045,29 @@
           }
           if (ok) resolve(); else reject(why);
         };
-        var timer = setTimeout(function () { finish(false, clicked ? 'no-response' : 'timeout'); }, 15000);
-        // Sadece butona basıldıktan sonraki sepet isteği sayılır (sayfa açılırken sepet sorgulanabilir)
-        fr.entry.cbs.push(function () { if (clicked) finish(true); });
+        var seen = [], log = { t: new Date().toISOString(), urun: p.n, secenek: v.name || '', vid: v.id, adim: 'basladi', istekler: seen };
+        var timer = setTimeout(function () { log.adim = clicked ? 'tiklandi-kanit-yok' : 'buton-bulunamadi'; addLog(log); finish(false, clicked ? 'no-proof' : 'timeout'); }, 15000);
+        // Başarı ancak KANITLA: butona basıldıktan sonra sitenin kendi kodu bu seçeneği (varyant ya da ürün kimliği)
+        // içeren bir istek gönderip hatasız cevap almalı. Kanıt yoksa "eklendi" denmez.
+        fr.entry.cbs.push(function (info) {
+          if (!clicked || done || !info) return;
+          var hasId = (info.body + ' ' + info.url).indexOf(v.id) !== -1 || (v.id !== p.id && (info.body + ' ' + info.url).indexOf(p.id) !== -1);
+          var gqlErr = /"errors"\s*:\s*\[\s*\{/.test(info.text || '');
+          // Yedek kanıt: dönen sepette bu seçeneğin adedi tıklamadan öncekine göre artmış olmalı
+          var grew = false;
+          if (!hasId && info.ok && !gqlErr && before) {
+            try { var c2 = findCart(JSON.parse(info.text)); if (c2) grew = (lineQty(c2)[v.id] || 0) > (before[v.id] || 0); } catch (e) {}
+          }
+          seen.push({ url: String(info.url).slice(0, 80), durum: info.status, kimlik: hasId, artis: grew, hata: gqlErr });
+          if ((hasId && info.ok && !gqlErr) || grew) {
+            log.adim = 'kanitlandi'; addLog(log);
+            try { setCart(JSON.parse(info.text)); } catch (e) {}
+            finish(true);
+          } else if (hasId && (!info.ok || gqlErr)) {
+            log.adim = 'site-hata-verdi'; addLog(log);
+            finish(false, 'site-error');
+          }
+        });
         var tries = 0, picked = !((p.v || []).length > 1);
         (function step() {
           if (done) return;
@@ -2025,10 +2077,13 @@
             if (pickOnPage(v.name, d)) { picked = true; return setTimeout(step, 350); }
           } else if (btn) {
             clicked = true;
+            before = CART_LINES ? JSON.parse(JSON.stringify(CART_LINES)) : null;
             PENDING = { vid: v.id, pid: p.id };
             btn.click();
-            // Sepet isteği görülmezse 4 sn sonra, buton tıklandığı için yine eklendi say
-            return setTimeout(function () { finish(true); }, 4000);
+            // Butona basıldıktan sonra en fazla 8 sn kanıt beklenir
+            clearTimeout(timer);
+            timer = setTimeout(function () { log.adim = 'tiklandi-kanit-yok'; addLog(log); finish(false, 'no-proof'); }, 8000);
+            return;
           }
           if (tries < 100) setTimeout(step, 120); else finish(false, btn ? 'variant' : 'button');
         })();
@@ -2417,7 +2472,7 @@
     load().then(function () {
       renderIdle(); render(); if (tab === 'calc') calcUpdate();
       // Sepete ekleme anında hazır olsun: gizli çerçeveyi panel açılınca arka planda yükle
-      if (cartOn() && typeof window.UrunAramaSepet !== 'function' && !(ADD_TPL && CART_ID) && (CFG.cart || {}).warm !== false)
+      if (cartOn() && typeof window.UrunAramaSepet !== 'function' && (CFG.cart || {}).warm === true)
         setTimeout(function () { if (isOpen) warmFrame().catch(function () {}); }, 1200);
     }, function () {
       $home.innerHTML = '<div class="empty"><b>Arama şu an yüklenemedi</b><p>Lütfen sayfayı yenileyip tekrar deneyin.</p></div>';
@@ -2646,7 +2701,8 @@
   // #ua-debug: telefonda öğrenilen ikas arama butonu/penceresini gösterir ve kopyalar (config.json'a eklemek için)
   function debugHash() {
     if (location.hash !== '#ua-debug') return;
-    var txt = JSON.stringify({ trig: learned, ovl: ovl });
+    var alog = []; try { alog = JSON.parse(localStorage.getItem('ua-addlog') || '[]'); } catch (e) {}
+    var txt = JSON.stringify({ trig: learned, ovl: ovl, ekleme: alog });
     try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
     var go = function () { window.prompt('Bu metni kopyalayıp gönderin:', txt); };
     if (document.body) setTimeout(go, 300); else document.addEventListener('DOMContentLoaded', go);
