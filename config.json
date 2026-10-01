@@ -2400,12 +2400,10 @@
       "Tohumlar",
       "Saksılar ve Bahçe Yatakları",
       "Bahçe Ekipmanları",
-      "Halk Sağlığı Ürünleri",
-      "Kedi Ürünleri"
+      "Halk Sağlığı Ürünleri"
     ],
     "labels": {
-      "Saksılar ve Bahçe Yatakları": "Saksı & Bahçe Yatağı",
-      "Halk Sağlığı Ürünleri": "Halk Sağlığı"
+      "Saksılar ve Bahçe Yatakları": "Saksı & Bahçe Yatağı"
     }
   }
 }
