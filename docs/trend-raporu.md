@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (37 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (45 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -36,7 +36,7 @@ _Henüz veri yok._
 | 2 | HasTürk Sıvı Solucan Gübresi  | 9,7 | 10 |
 | 3 | HasTürk Solucan Gübresi  | 9,6 | 11 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,9 | 2 |
-| 5 | Kullanıma Hazır Cocopeat Torfu | 8,8 | 16 |
+| 5 | Kullanıma Hazır Cocopeat Torfu | 8,7 | 16 |
 | 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,6 | 13 |
 | 7 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,2 | 8 |
 | 8 | Premium Fide Toprağı | 6,9 | 11 |
@@ -57,7 +57,11 @@ _Henüz veri yok._
 
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
-| 1 | hümik | 1 | 1 |  |  |
+| 1 | torf | 2 | 2 |  |  |
+| 2 | hümik | 1 | 1 |  |  |
+| 3 | perlit | 1 | 1 |  |  |
+| 4 | sebze tohumu | 1 | 1 |  |  |
+| 5 | solucan gübresi | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
@@ -70,6 +74,7 @@ _Henüz veri yok._
 | # | Ürün | Sepete ekleme | Görüntüleme |
 |---|---|---|---|
 | 1 | HasTürk Hümix Sıvı Hümik Asit | 1 | 1 |
+| 2 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | 1 | 0 |
 
 ## Çok bakılıp az sepete eklenenler
 
@@ -83,7 +88,7 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 
 | Kategori | Önerilen ürünler |
 |---|---|
-| Saksılar ve Bahçe Yatakları | 45 Göz Yuvarlak Fide Viyolü  (`45-goz-yuvarlak-fide-viyolu`)<br>Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Yuvarlak Vakum Saksı - 13 X 10,5 CM (`yuvarlak-vakum-saksi-13-x-10-5-cm`) |
+| Saksılar ve Bahçe Yatakları | 45 Göz Yuvarlak Fide Viyolü  (`45-goz-yuvarlak-fide-viyolu`)<br>Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm (`moduler-yukseltilmis-bahce-yatagi-sekilli-no-12-220x140`) |
 | Tohumlar | DSV Lippa Lisuna 6 Mix Çim Tohumu (`dsv-lippa-lisuna-6-mix-cim-tohumu`)<br>DSV Lippa Tamu 5 Mix Çim Tohumu (`dsv-lippa-tamu-5-mix-cim-tohumu`)<br>Gold Valley Süs Yoncası Tohumu (Ak Üçgül) 500 Gr (`sus-yoncasi-tohumu-ak-ucgul`) |
 | Topraklar | HG Paşa Kılıcı (Sansevieria) Toprağı (`pasa-kilici-sansevieria-topragi`)<br>Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>Premium Fide Toprağı (`hg-premium-fide-topragi`) |
 | Halk Sağlığı Ürünleri | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı (`chrysamed-insektisit-max-5-lt-ekonomik-tahtakurusu-akrep-ilaci`)<br>Chrysamed İnsektisit Max 2 Lt (`chrysamed-insektisit-max-2-lt-tum-ev-bahce-bocek-ilaci`)<br>Chrysamed Ratex Pasta Fare İlacı 100 Gr (`chrysamed-ratex-pasta-fare-ilaci-100-gr`) |
