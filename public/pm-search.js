@@ -490,8 +490,6 @@
     '.so-l{display:grid;gap:6px;margin-top:10px}@media(min-width:760px){.so-l{grid-template-columns:1fr 1fr}}',
     '.so-or{font-size:12px;color:#4b5f52;margin:10px 2px 6px}.so-h span a{color:#2d5a38;font-weight:700;text-decoration:underline}',
     '.soil .xs-i{background:#fff}.xs-i .tx b em{font-style:normal;font-weight:600;font-size:11.5px;color:#3f7d4f}',
-    '.acc{display:flex;gap:8px;padding:12px 16px 0;overflow-x:auto;scrollbar-width:none}.acc::-webkit-scrollbar{display:none}',
-    '.acc a{flex:none;height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--ln);display:flex;align-items:center;font-size:13.5px;font-weight:700;color:var(--prd);background:#fff}',
     '.shipbar{flex:none;display:none;padding:8px 14px 10px;border-top:1px solid var(--ln);background:#fff}',
     '.shipbar.on{display:block;animation:sbin .35s ease-out}',
     '@keyframes sbin{from{opacity:0;transform:translateY(8px)}}',
@@ -1211,7 +1209,7 @@
     if (view && view.indexOf('p:') === 0 && CATS_BY_ID[view.slice(2)]) { $home.innerHTML = homeWrap(renderCatProducts(CATS_BY_ID[view.slice(2)])); return; }
     if (view && CATS_BY_ID[view]) { $home.innerHTML = homeWrap(renderCat(CATS_BY_ID[view])); return; }
     view = null;
-    var html = accountHtml();
+    var html = '';
     var rec = getRecent(), pop = CFG.popular || [];
     var seen = rec.map(fold);
     pop = pop.filter(function (t) { return seen.indexOf(fold(t)) === -1; });
@@ -2484,7 +2482,6 @@
   function close(fromHistory) {
     if (!isOpen) return;
     isOpen = false;
-    MENU_MODE = false;
     $ov.classList.remove('on');
     document.documentElement.style.overflow = prevOverflow;
     $q.blur();
@@ -2638,21 +2635,11 @@
     learnMenu(tp);
     openMenu();
   }
-  var MENU_MODE = false;
   function openMenu() {
     track('menu', 'open');
-    catOpen = true; MENU_MODE = true;
+    catOpen = true;
     open('', 'home');
     renderIdle();
-  }
-  // Menüden açılınca en üstte hesap kısayolları (ikas menüsündeki Üye girişi alanının yerine)
-  function accountHtml() {
-    if (!MENU_MODE) return '';
-    var acc = (CFG.pages || []).filter(function (pg) { return /\/account/.test(pg.url); });
-    if (!acc.length) return '';
-    return '<div class="acc">' + acc.map(function (pg) {
-      return '<a data-kind="page" data-name="' + esc(pg.title) + '" href="' + esc(pageHref(pg.url)) + '">' + esc(pg.title) + '</a>';
-    }).join('') + '</div>';
   }
   // Emniyet: ikas'ın arama paneli yine de açılırsa (tanımadığımız bir butondan) onu kapat, bizimkini aç
   // ve o butonu hatırla; sonraki basışlarda ikas'ınki hiç açılmaz.

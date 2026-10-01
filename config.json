@@ -151,10 +151,6 @@
   "whatsapp": "905539422961",
   "pages": [
     {
-      "title": "Anasayfa",
-      "url": "/"
-    },
-    {
       "title": "Blog",
       "url": "/blog"
     },
