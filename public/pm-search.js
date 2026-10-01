@@ -2549,13 +2549,17 @@
   }
   function stopAll(e) { e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }
   ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend'].forEach(function (ev) {
-    document.addEventListener(ev, function (e) { if (triggerOf(e.target) || siteInput(e.target) || menuOf(e.target)) stopAll(e); }, true);
+    document.addEventListener(ev, function (e) { if (triggerOf(e.target) || siteInput(e.target)) stopAll(e); }, true);
+    // Menü düğmesi: pencere seviyesinde yakala (sitenin hiçbir dinleyicisi dokunuşu görmesin)
+    window.addEventListener(ev, function (e) { if (menuOf(e.target)) stopAll(e); }, true);
   });
+  window.addEventListener('click', function (e) {
+    if (!menuOf(e.target)) return;
+    e.preventDefault(); stopAll(e); openMenu();
+  }, true);
   var lastTap = { el: null, t: 0, path: '' };
   document.addEventListener('click', function (e) {
     if (siteInput(e.target)) { stopAll(e); open(e.target.value); return; }
-    var mt = menuOf(e.target);
-    if (mt) { e.preventDefault(); stopAll(e); openMenu(); return; }
     var t = triggerOf(e.target);
     if (!t) {
       if (!isOurs(e.target) && !isOpen) {
@@ -2576,19 +2580,47 @@
   var MENU_KEY = 'ua-menu', menuLearned = [];
   try { menuLearned = JSON.parse(localStorage.getItem(MENU_KEY) || '[]') || []; } catch (e) {}
   var MENU_RE = /(^|[^a-z])(menu|menü|hamburger|burger|drawer|offcanvas|off-canvas|nav-?toggle|navbar-toggler|mobile-?nav|mobile-?menu|sidebar-?toggle|bars)([^a-z]|$)/;
-  var NOT_MENU_RE = /(search|arama|cart|sepet|basket|bag|account|hesap|user|uye|login|giris|favori|wish|close|kapat)/;
-  function replaceMenuOn() { return CFG.replaceMenu !== false && ds.menu !== 'off' && window.innerWidth < 760; }
+  var NOT_MENU_RE = /(search|arama|cart|sepet|basket|bag|account|hesap|user|uye|login|giris|favori|wish|close|kapat|back|geri|prev|return|arrow|ok-|chevron|share|paylas|filter|filtre|sort|sirala)/;
+  // Sadece telefon/tablet: dar ekran VE dokunmatik (masaüstünde pencere daraltılsa bile ikas menüsüne dokunulmaz)
+  function isTouchPhone() {
+    var coarse = false;
+    try { coarse = window.matchMedia('(hover: none) and (pointer: coarse)').matches; } catch (e) {}
+    return coarse || /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent || '');
+  }
+  function replaceMenuOn() { return CFG.replaceMenu !== false && ds.menu !== 'off' && window.innerWidth < 760 && isTouchPhone(); }
+  // ☰ simgesi: 3 çizgi/dikdörtgen ya da 3 ayrı yatay çizgili path
+  function burgerIcon(b) {
+    var svg = b.querySelector('svg');
+    if (!svg) return false;
+    if (svg.querySelectorAll('line,rect').length === 3) return true;
+    var d = [].map.call(svg.querySelectorAll('path'), function (x) { return x.getAttribute('d') || ''; }).join(' ');
+    return (d.match(/[Mm]/g) || []).length >= 3 && /[hH]|[Ll]\s*[\d.]+[\s,]+[\d.]+/.test(d) && !/[aAcCqQ]/.test(d);
+  }
   function menuOf(el) {
     if (!el || !el.closest || isOurs(el) || !replaceMenuOn()) return null;
     var sel = CFG.menuTrigger || ds.menuTrigger;
     if (sel) { try { var m = el.closest(sel); if (m) return m; } catch (e) {} }
     for (var n = el, i = 0; n && n.nodeType === 1 && i < 5; n = n.parentElement, i++) if (menuLearned.indexOf(sig(n)) !== -1) return n;
-    var b = el.closest('button,a,[role="button"]');
-    if (!b || isPageLink(b) || b.closest('form')) return null;
+    var b = el.closest('button,a,[role="button"],label,[onclick]'), plain = false;
+    if (!b) {
+      // Düğme olmayan tıklanabilir kutu: ☰ simgesinin hemen kapsayıcısı
+      var sv = el.closest('svg');
+      b = sv ? sv.parentElement : el.closest('div,span,i');
+      plain = true;
+    }
+    if (!b || b === document.body || isPageLink(b) || b.closest('form')) return null;
     var r = b.getBoundingClientRect();
     if (r.top > 140 || r.width > 120 || r.height > 120) return null; // başlıktaki küçük düğme
-    var a = attrs(b) + ' ' + fold(b.textContent || '');
-    return MENU_RE.test(a) && !NOT_MENU_RE.test(a) ? b : null;
+    // Düğmenin ve içindeki simgelerin adları (ör. <i class="icon-menu">, <svg class="bars">)
+    var a = attrs(b) + ' ' + fold(b.textContent || '') + ' ' + [].slice.call(b.querySelectorAll('[class],[aria-label]'), 0, 6).map(attrs).join(' ');
+    if (NOT_MENU_RE.test(a)) return null;
+    if (MENU_RE.test(a) || burgerIcon(b)) return b;
+    if (plain) return null; // düz kutuda sadece ad ya da ☰ simgesiyle karar ver
+    // Başlığın sol köşesinde yazısız tek simgeli düğme (ikas temalarında menü düğmesi burada)
+    var txt = (b.textContent || '').replace(/\s+/g, '');
+    if (!txt && b.querySelector('svg,img,i') && r.left < window.innerWidth * 0.25 && r.width <= 64 && r.height <= 64 && !triggerOf(b) &&
+      (b.closest('header,nav,[class*="header" i],[id*="header" i]') || fixedAncestor(b))) return b;
+    return null;
   }
   // Sitenin açık menü çekmecesi: ana kategori adlarını taşıyan ≥3 bağlantılı, ekranı kaplayan bir kutu
   function menuDrawers() {
