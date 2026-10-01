@@ -490,6 +490,8 @@
     '.so-l{display:grid;gap:6px;margin-top:10px}@media(min-width:760px){.so-l{grid-template-columns:1fr 1fr}}',
     '.so-or{font-size:12px;color:#4b5f52;margin:10px 2px 6px}.so-h span a{color:#2d5a38;font-weight:700;text-decoration:underline}',
     '.soil .xs-i{background:#fff}.xs-i .tx b em{font-style:normal;font-weight:600;font-size:11.5px;color:#3f7d4f}',
+    '.acc{display:flex;gap:8px;padding:12px 16px 0;overflow-x:auto;scrollbar-width:none}.acc::-webkit-scrollbar{display:none}',
+    '.acc a{flex:none;height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--ln);display:flex;align-items:center;font-size:13.5px;font-weight:700;color:var(--prd);background:#fff}',
     '.shipbar{flex:none;display:none;padding:8px 14px 10px;border-top:1px solid var(--ln);background:#fff}',
     '.shipbar.on{display:block;animation:sbin .35s ease-out}',
     '@keyframes sbin{from{opacity:0;transform:translateY(8px)}}',
@@ -1209,7 +1211,7 @@
     if (view && view.indexOf('p:') === 0 && CATS_BY_ID[view.slice(2)]) { $home.innerHTML = homeWrap(renderCatProducts(CATS_BY_ID[view.slice(2)])); return; }
     if (view && CATS_BY_ID[view]) { $home.innerHTML = homeWrap(renderCat(CATS_BY_ID[view])); return; }
     view = null;
-    var html = '';
+    var html = accountHtml();
     var rec = getRecent(), pop = CFG.popular || [];
     var seen = rec.map(fold);
     pop = pop.filter(function (t) { return seen.indexOf(fold(t)) === -1; });
@@ -2482,6 +2484,7 @@
   function close(fromHistory) {
     if (!isOpen) return;
     isOpen = false;
+    MENU_MODE = false;
     $ov.classList.remove('on');
     document.documentElement.style.overflow = prevOverflow;
     $q.blur();
@@ -2549,16 +2552,18 @@
   }
   function stopAll(e) { e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }
   ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'mouseup', 'touchend'].forEach(function (ev) {
-    document.addEventListener(ev, function (e) { if (triggerOf(e.target) || siteInput(e.target)) stopAll(e); }, true);
+    document.addEventListener(ev, function (e) { if (triggerOf(e.target) || siteInput(e.target) || menuOf(e.target)) stopAll(e); }, true);
   });
   var lastTap = { el: null, t: 0, path: '' };
   document.addEventListener('click', function (e) {
     if (siteInput(e.target)) { stopAll(e); open(e.target.value); return; }
+    var mt = menuOf(e.target);
+    if (mt) { e.preventDefault(); stopAll(e); openMenu(); return; }
     var t = triggerOf(e.target);
     if (!t) {
       if (!isOurs(e.target) && !isOpen) {
-        lastTap = { el: e.target, t: Date.now(), path: location.pathname, pre: visibleSearchInputs() };
-        [150, 400, 800].forEach(function (ms) { setTimeout(checkNewSearch, ms); });
+        lastTap = { el: e.target, t: Date.now(), path: location.pathname, pre: visibleSearchInputs(), preMenu: menuDrawers() };
+        [150, 400, 800].forEach(function (ms) { setTimeout(checkNewSearch, ms); setTimeout(checkMenuDrawer, ms); });
       }
       return;
     }
@@ -2567,6 +2572,88 @@
     open();
   }, true);
 
+  // ---- Telefonda sitenin menüsü (☰) yerine bizim panel ----
+  // config.json > replaceMenu (varsayılan açık), menuTrigger: menü düğmesinin CSS seçicisi (#ua-debug çıktısından).
+  // Seçici verilmezse: başlıktaki "menu/hamburger/drawer…" adlı düğme tanınır; o da olmazsa ikas menüsü açıldığı
+  // an kapatılıp bizimki açılır ve düğme hatırlanır (bir dahaki basışta ikas menüsü hiç açılmaz).
+  var MENU_KEY = 'ua-menu', menuLearned = [];
+  try { menuLearned = JSON.parse(localStorage.getItem(MENU_KEY) || '[]') || []; } catch (e) {}
+  var MENU_RE = /(^|[^a-z])(menu|menü|hamburger|burger|drawer|offcanvas|off-canvas|nav-?toggle|navbar-toggler|mobile-?nav|mobile-?menu|sidebar-?toggle|bars)([^a-z]|$)/;
+  var NOT_MENU_RE = /(search|arama|cart|sepet|basket|bag|account|hesap|user|uye|login|giris|favori|wish|close|kapat)/;
+  function replaceMenuOn() { return CFG.replaceMenu !== false && ds.menu !== 'off' && window.innerWidth < 760; }
+  function menuOf(el) {
+    if (!el || !el.closest || isOurs(el) || !replaceMenuOn()) return null;
+    var sel = CFG.menuTrigger || ds.menuTrigger;
+    if (sel) { try { var m = el.closest(sel); if (m) return m; } catch (e) {} }
+    for (var n = el, i = 0; n && n.nodeType === 1 && i < 5; n = n.parentElement, i++) if (menuLearned.indexOf(sig(n)) !== -1) return n;
+    var b = el.closest('button,a,[role="button"]');
+    if (!b || isPageLink(b) || b.closest('form')) return null;
+    var r = b.getBoundingClientRect();
+    if (r.top > 140 || r.width > 120 || r.height > 120) return null; // başlıktaki küçük düğme
+    var a = attrs(b) + ' ' + fold(b.textContent || '');
+    return MENU_RE.test(a) && !NOT_MENU_RE.test(a) ? b : null;
+  }
+  // Sitenin açık menü çekmecesi: ana kategori adlarını taşıyan ≥3 bağlantılı, ekranı kaplayan bir kutu
+  function menuDrawers() {
+    if (!DATA || !replaceMenuOn()) return [];
+    var names = {}; topCats().forEach(function (c) { names[c.f] = 1; });
+    var boxes = [];
+    [].forEach.call(document.querySelectorAll('a,button,li,summary,[role="menuitem"]'), function (el) {
+      var tx = el.textContent || '';
+      if (tx.length > 40 || el.children.length > 3 || isOurs(el) || !names[fold(tx.trim())] || !visible(el)) return;
+      var box = fixedAncestor(el);
+      if (!box || isOurs(box)) return;
+      var r = box.getBoundingClientRect();
+      if (r.width < window.innerWidth * 0.6 || r.height < window.innerHeight * 0.5) return;
+      box.__uaHits = (boxes.indexOf(box) === -1 ? 0 : box.__uaHits) + 1;
+      if (boxes.indexOf(box) === -1) boxes.push(box);
+    });
+    return boxes.filter(function (b) { return b.__uaHits >= 3; });
+  }
+  function closeDrawer(box) {
+    var btns = box.querySelectorAll('button,[role="button"],a');
+    for (var j = 0; j < btns.length; j++) {
+      var b = btns[j], a = fold((b.getAttribute('aria-label') || '') + ' ' + (b.getAttribute('title') || '') + ' ' + (b.getAttribute('class') || '') + ' ' + (b.textContent || '')).trim();
+      if (/(^|[\s_-])(kapat|close|iptal|vazgec)([\s_-]|$)|^[x×✕✖]$/.test(a)) { b.click(); break; }
+    }
+    try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true })); } catch (e) {}
+    setTimeout(function () { if (visible(box)) box.style.setProperty('display', 'none', 'important'); }, 200);
+  }
+  function learnMenu(el) {
+    var n = el && el.closest && (el.closest('a,button,[role="button"]') || el);
+    if (!n || n === document.body || isPageLink(n)) return;
+    var sg = sig(n);
+    if (menuLearned.indexOf(sg) !== -1) return;
+    menuLearned = [sg].concat(menuLearned).slice(0, 3);
+    try { localStorage.setItem(MENU_KEY, JSON.stringify(menuLearned)); } catch (e) {}
+  }
+  function checkMenuDrawer() {
+    if (isOpen || !tapTrusted() || !replaceMenuOn()) return;
+    var pre = lastTap.preMenu || [];
+    var fresh = menuDrawers().filter(function (b) { return pre.indexOf(b) === -1; });
+    if (!fresh.length) return;
+    var tp = lastTap.el;
+    lastTap = { el: null, t: 0 };
+    closeDrawer(fresh[0]);
+    learnMenu(tp);
+    openMenu();
+  }
+  var MENU_MODE = false;
+  function openMenu() {
+    track('menu', 'open');
+    catOpen = true; MENU_MODE = true;
+    open('', 'home');
+    renderIdle();
+  }
+  // Menüden açılınca en üstte hesap kısayolları (ikas menüsündeki Üye girişi alanının yerine)
+  function accountHtml() {
+    if (!MENU_MODE) return '';
+    var acc = (CFG.pages || []).filter(function (pg) { return /\/account/.test(pg.url); });
+    if (!acc.length) return '';
+    return '<div class="acc">' + acc.map(function (pg) {
+      return '<a data-kind="page" data-name="' + esc(pg.title) + '" href="' + esc(pageHref(pg.url)) + '">' + esc(pg.title) + '</a>';
+    }).join('') + '</div>';
+  }
   // Emniyet: ikas'ın arama paneli yine de açılırsa (tanımadığımız bir butondan) onu kapat, bizimkini aç
   // ve o butonu hatırla; sonraki basışlarda ikas'ınki hiç açılmaz.
   var LEARN_KEY = 'ua-trig2', learned = [];
@@ -2702,7 +2789,7 @@
   function debugHash() {
     if (location.hash !== '#ua-debug') return;
     var alog = []; try { alog = JSON.parse(localStorage.getItem('ua-addlog') || '[]'); } catch (e) {}
-    var txt = JSON.stringify({ trig: learned, ovl: ovl, ekleme: alog });
+    var txt = JSON.stringify({ trig: learned, ovl: ovl, menu: menuLearned, ekleme: alog });
     try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
     var go = function () { window.prompt('Bu metni kopyalayıp gönderin:', txt); };
     if (document.body) setTimeout(go, 300); else document.addEventListener('DOMContentLoaded', go);
