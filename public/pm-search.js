@@ -83,15 +83,17 @@
     try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, n: CART_N, t: Date.now(), id: CART_ID })); } catch (e) {}
     updateShip();
   }
-  var CART_URL = /graphql|cart|sepet/i;
   function sniffCart(w) {
     try {
       var of = w.fetch;
       if (of && !of.__uaCart) {
-        w.fetch = function () {
+        w.fetch = function (u, o) {
+          // Sadece sepetle ilgili istekler (adresinde ya da gövdesinde "cart" geçen); ürün listesi vb. cevaplar açılmaz
+          var isCartReq = false;
+          try { isCartReq = /cart|sepet/i.test(String(u && u.url || u)) || (o && typeof o.body === 'string' && /cart/i.test(o.body.slice(0, 2000))); } catch (e) {}
           return of.apply(this, arguments).then(function (r) {
             try {
-              if (r && CART_URL.test(String(r.url || '')) && /json/i.test(r.headers.get('content-type') || '')) r.clone().json().then(setCart, function () {});
+              if (isCartReq && r && /json/i.test(r.headers.get('content-type') || '')) r.clone().json().then(setCart, function () {});
             } catch (e) {}
             return r;
           });
@@ -103,8 +105,8 @@
         X.__uaCart = true;
         var oo = X.open, os = X.send;
         X.open = function (m, u) { this.__uaU = u; return oo.apply(this, arguments); };
-        X.send = function () {
-          if (CART_URL.test(String(this.__uaU || ''))) this.addEventListener('load', function () {
+        X.send = function (b) {
+          if (/cart|sepet/i.test(String(this.__uaU || '')) || (typeof b === 'string' && /cart/i.test(b.slice(0, 2000)))) this.addEventListener('load', function () {
             try { setCart(this.responseType === 'json' ? this.response : JSON.parse(this.responseText)); } catch (e) {}
           });
           return os.apply(this, arguments);
@@ -174,14 +176,11 @@
   function load() {
     if (DATA) return Promise.resolve(DATA);
     if (loading) return loading;
-    try {
-      var c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      if (c && Date.now() - c.t < CACHE_MS && c.d && c.d.items) { prepare(c.d); return Promise.resolve(DATA); }
-    } catch (e) {}
+    // 280 KB'lık veriyi localStorage'a yazmak/okumak telefonu kilitliyordu; tarayıcının HTTP önbelleği yeterli
+    try { localStorage.removeItem(CACHE_KEY); localStorage.removeItem('ua-data-v4'); } catch (e) {}
     loading = fetch(JSON_URL, { credentials: 'omit' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (d) {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), d: d })); } catch (e) {}
         prepare(d);
         return d;
       })
@@ -2444,8 +2443,9 @@
     window.addEventListener('resize', later);
     window.addEventListener('scroll', later, { passive: true });
     document.addEventListener('click', function () { setTimeout(later, 400); }, true);
-    if (window.MutationObserver) new MutationObserver(later).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
-    setInterval(fabSpace, 2000);
+    // Çerez uyarısı / alt çubuk genelde body'ye doğrudan eklenir; tüm sayfa değişikliklerini izlemek (slider vb.) ağırdı
+    if (window.MutationObserver) new MutationObserver(later).observe(document.body, { childList: true });
+    setInterval(function () { if (!document.hidden && !isOpen) fabSpace(); }, 5000);
     updateFab();
   }
 
@@ -2563,8 +2563,11 @@
     var t = triggerOf(e.target);
     if (!t) {
       if (!isOurs(e.target) && !isOpen) {
-        lastTap = { el: e.target, t: Date.now(), path: location.pathname, pre: visibleSearchInputs(), preMenu: menuDrawers() };
-        [150, 400, 800].forEach(function (ms) { setTimeout(checkNewSearch, ms); setTimeout(checkMenuDrawer, ms); });
+        // Menü çekmecesi kontrolü sadece telefonda ve başlık bölgesine dokunulunca (her dokunuşta sayfayı taramamak için)
+        var hdr = false;
+        try { hdr = replaceMenuOn() && e.target.getBoundingClientRect().top < 160; } catch (x) {}
+        lastTap = { el: e.target, t: Date.now(), path: location.pathname, pre: visibleSearchInputs(), preMenu: hdr ? menuDrawers() : [] };
+        [150, 400, 800].forEach(function (ms) { setTimeout(checkNewSearch, ms); if (hdr) setTimeout(checkMenuDrawer, ms); });
       }
       return;
     }
@@ -2789,12 +2792,16 @@
   });
 
   // Butonu hemen göster, veriyi boşta önceden indir (ilk açılış anında olsun)
+  // Sitenin yüklenmesini yavaşlatmamak için: sayfa tamamen yüklendikten sonra boşta butonu kur,
+  // birkaç saniye sonra yine boşta ürün verisini indir (panel daha önce açılırsa hemen yüklenir)
   function boot() {
-    build();
-    var idle = window.requestIdleCallback || function (f) { setTimeout(f, 2500); };
-    idle(function () { load().catch(function () {}); });
+    var idle = window.requestIdleCallback ? function (f, t) { window.requestIdleCallback(f, { timeout: t }); } : function (f) { setTimeout(f, 300); };
+    idle(function () {
+      build();
+      setTimeout(function () { idle(function () { load().catch(function () {}); }, 4000); }, 1500);
+    }, 2000);
   }
-  if (document.body) boot(); else document.addEventListener('DOMContentLoaded', boot);
+  if (document.readyState === 'complete') boot(); else window.addEventListener('load', boot);
 
   // Menüye "#hacim-hesapla" veya "#urun-ara" bağlantısı eklenerek açılabilir
   function fromHash() {

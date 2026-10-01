@@ -1,7 +1,7 @@
 # ikas sitesi bu dosyaları başka bir alan adından çağırdığı için CORS izni gerekir.
 /products.json
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=300
+  Cache-Control: public, max-age=600, stale-while-revalidate=86400
 
 /pm-search.js
   Access-Control-Allow-Origin: *
