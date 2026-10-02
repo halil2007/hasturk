@@ -1,0 +1,14 @@
+{
+  "name": "teklif-robotu",
+  "private": true,
+  "type": "module",
+  "description": "Tek formdan tüm sigorta şirketi portallarına otomatik teklif (yerel bilgisayarda çalışır)",
+  "scripts": {
+    "start": "node sunucu.mjs",
+    "kaydet": "node kaydet.mjs",
+    "test": "node test/uctan-uca.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

@@ -1,0 +1,4 @@
+[
+  { "kod": "demo-a", "ad": "Demo Sigorta A", "aktif": true },
+  { "kod": "demo-b", "ad": "Demo Sigorta B", "aktif": true }
+]

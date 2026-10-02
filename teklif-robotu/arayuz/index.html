@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teklif Robotu</title>
+<style>
+  :root {
+    --zemin: #f4f6f9; --kart: #ffffff; --yazi: #1d2433; --soluk: #667085; --cizgi: #e3e7ee;
+    --ana: #0b5cad; --ana-yazi: #fff; --iyi: #157f3b; --iyi-zemin: #e5f5eb; --uyari: #a15c00; --uyari-zemin: #fff3df;
+    --kotu: #b42318; --kotu-zemin: #fdecea; --bekle-zemin: #eef2f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --zemin: #12161d; --kart: #1b212b; --yazi: #e6e9ef; --soluk: #98a2b3; --cizgi: #2c3441;
+      --ana: #4b9be8; --ana-yazi: #0b1220; --iyi: #5fd18a; --iyi-zemin: #183224; --uyari: #f5b75a; --uyari-zemin: #352812;
+      --kotu: #f28b82; --kotu-zemin: #3a1d1b; --bekle-zemin: #232b37; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, "Segoe UI", sans-serif; background: var(--zemin); color: var(--yazi); }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--cizgi); background: var(--kart); display: flex; gap: 12px; align-items: baseline; }
+  header h1 { font-size: 18px; margin: 0; }
+  header span { color: var(--soluk); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 16px; padding: 16px 20px; max-width: 1300px; margin: 0 auto; }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } }
+  a { color: var(--ana); }
+  section { min-width: 0; background: var(--kart); border: 1px solid var(--cizgi); border-radius: 10px; padding: 16px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--soluk); margin: 0 0 12px; }
+  .alanlar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .alanlar .tam { grid-column: 1 / -1; }
+  label { display: grid; gap: 4px; font-size: 13px; color: var(--soluk); }
+  input, select { font: inherit; color: var(--yazi); background: var(--zemin); border: 1px solid var(--cizgi); border-radius: 6px; padding: 8px 10px; width: 100%; }
+  input:focus, select:focus { outline: 2px solid var(--ana); outline-offset: -1px; }
+  button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--cizgi); background: var(--kart); color: var(--yazi); padding: 6px 10px; }
+  button.ana { background: var(--ana); color: var(--ana-yazi); border: 0; padding: 11px; font-weight: 600; width: 100%; margin-top: 14px; }
+  button:disabled { opacity: .55; cursor: wait; }
+  .sirketler { margin-top: 16px; }
+  .sirketler-ust { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .sirketler-ust button { font-size: 12px; padding: 3px 8px; }
+  .sirket { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-top: 1px solid var(--cizgi); }
+  .sirket label { display: flex; gap: 8px; align-items: center; flex: 1; color: var(--yazi); font-size: 14px; }
+  .sirket input { width: auto; }
+  .sirket button { font-size: 12px; padding: 3px 8px; }
+  .sirket .yok { font-size: 12px; color: var(--uyari); }
+  .uyari { background: var(--uyari-zemin); color: var(--uyari); border-radius: 6px; padding: 8px 10px; margin-top: 10px; font-size: 13px; }
+  .uyari:empty { display: none; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--cizgi); vertical-align: top; }
+  th { font-size: 12px; color: var(--soluk); font-weight: 600; }
+  td.fiyat { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  tr.en-iyi td { background: var(--iyi-zemin); }
+  .rozet { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--bekle-zemin); white-space: nowrap; }
+  .rozet.tamam { background: var(--iyi-zemin); color: var(--iyi); }
+  .rozet.hata { background: var(--kotu-zemin); color: var(--kotu); }
+  .rozet.giris-bekleniyor, .rozet.fiyat-yok { background: var(--uyari-zemin); color: var(--uyari); }
+  .ayrinti { font-size: 12px; color: var(--soluk); margin-top: 3px; overflow-wrap: anywhere; }
+  .bos { color: var(--soluk); padding: 30px 0; text-align: center; }
+  .tablo-kap { overflow-x: auto; }
+  .ozet { color: var(--soluk); font-size: 13px; margin-bottom: 8px; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<header><h1>Teklif Robotu</h1><span>Bilgileri bir kez girin, seçili tüm şirketlerden teklif gelsin. Veriler bu bilgisayardan çıkmaz.</span></header>
+<main>
+  <section>
+    <h2>Müşteri ve araç</h2>
+    <form id="form" autocomplete="off">
+      <div class="alanlar">
+        <label class="tam">Branş
+          <select name="brans"><option value="trafik">Trafik</option><option value="kasko">Kasko</option></select></label>
+        <label>T.C. / Vergi no <input name="tc" inputmode="numeric" maxlength="11" required></label>
+        <label>Doğum tarihi <input name="dogumTarihi" placeholder="GG.AA.YYYY"></label>
+        <label>Plaka <input name="plaka" placeholder="34ABC123" style="text-transform:uppercase"></label>
+        <label>Belge seri <input name="belgeSeri" placeholder="AB" style="text-transform:uppercase"></label>
+        <label>Belge no <input name="belgeNo" inputmode="numeric"></label>
+        <label>Cep telefonu <input name="telefon" inputmode="tel"></label>
+        <label class="tam">E-posta <input name="eposta" type="email"></label>
+      </div>
+      <div class="sirketler">
+        <div class="sirketler-ust"><h2 style="margin:0">Şirketler</h2>
+          <span><button type="button" id="tumu">Tümü</button> <button type="button" id="hicbiri">Hiçbiri</button></span></div>
+        <div id="sirketListesi"></div>
+      </div>
+      <div class="uyari" id="uyari"></div>
+      <button class="ana" id="gonder">Teklif al</button>
+    </form>
+  </section>
+  <section>
+    <h2>Sonuçlar</h2>
+    <div class="ozet" id="ozet"></div>
+    <div class="tablo-kap">
+      <table>
+        <thead><tr><th>Şirket</th><th>Durum</th><th>Prim</th><th>Süre</th><th></th></tr></thead>
+        <tbody id="sonuclar"><tr><td colspan="5" class="bos">Henüz sorgu yapılmadı.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+const DURUM = {
+  basladi: 'Sırada / başladı', calisiyor: 'Teklif alınıyor', 'giris-bekleniyor': 'Giriş bekleniyor — tarayıcıda giriş yapın',
+  tamam: 'Tamam', 'fiyat-yok': 'Fiyat okunamadı — ekrana bakın', hata: 'Hata',
+};
+const $ = s => document.querySelector(s);
+const tl = n => n == null ? '—' : n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+const kacis = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sakla = { oku(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, yaz(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+let durumlar = {};
+let siralama = [];
+
+async function sirketleriYukle() {
+  const liste = await (await fetch('/api/sirketler')).json();
+  const secili = sakla.oku('secili');
+  $('#sirketListesi').innerHTML = liste.map(s => `
+    <div class="sirket">
+      <label><input type="checkbox" value="${kacis(s.kod)}" ${(secili ? secili.includes(s.kod) : s.aktif) && s.adaptorVar ? 'checked' : ''} ${s.adaptorVar ? '' : 'disabled'}> ${kacis(s.ad)}</label>
+      ${s.adaptorVar ? `<button type="button" data-ac="${kacis(s.kod)}" title="Sekmesini aç (giriş yapmak için)">Aç</button>` : '<span class="yok">kayıt yok</span>'}
+    </div>`).join('') || '<p class="ayrinti">sirketler.json boş.</p>';
+}
+
+function seciliKodlar() { return [...document.querySelectorAll('#sirketListesi input:checked')].map(i => i.value); }
+
+$('#sirketListesi').addEventListener('change', () => sakla.yaz('secili', seciliKodlar()));
+$('#sirketListesi').addEventListener('click', async e => {
+  const kod = e.target.dataset?.ac;
+  if (!kod) return;
+  e.target.disabled = true;
+  const r = await fetch('/api/ac', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kod }) });
+  if (!r.ok) $('#uyari').textContent = (await r.json()).hata;
+  e.target.disabled = false;
+});
+$('#tumu').onclick = () => { document.querySelectorAll('#sirketListesi input:not(:disabled)').forEach(i => i.checked = true); sakla.yaz('secili', seciliKodlar()); };
+$('#hicbiri').onclick = () => { document.querySelectorAll('#sirketListesi input').forEach(i => i.checked = false); sakla.yaz('secili', []); };
+
+$('#form').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('#uyari').textContent = '';
+  const veri = Object.fromEntries(new FormData($('#form')));
+  const r = await fetch('/api/teklif', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ veri, sirketler: seciliKodlar() }) });
+  const c = await r.json();
+  if (!r.ok) { $('#uyari').textContent = c.hata; return; }
+  if (c.uyarilar?.length) $('#uyari').textContent = 'Uyarı: ' + c.uyarilar.join(' · ');
+});
+
+function ciz() {
+  const satirlar = siralama.map(k => durumlar[k]);
+  const fiyatli = satirlar.filter(s => s.fiyat != null).sort((a, b) => a.fiyat - b.fiyat);
+  const digerleri = satirlar.filter(s => s.fiyat == null);
+  const enIyi = fiyatli[0]?.kod;
+  $('#sonuclar').innerHTML = [...fiyatli, ...digerleri].map(s => `
+    <tr class="${s.kod === enIyi && fiyatli.length > 1 ? 'en-iyi' : ''}">
+      <td>${kacis(s.ad)}</td>
+      <td><span class="rozet ${kacis(s.durum)}">${kacis(DURUM[s.durum] || s.durum)}</span>
+        ${s.hata ? `<div class="ayrinti">${kacis(s.hata)}</div>` : ''}
+        ${s.fiyatMetni && s.durum !== 'tamam' ? `<div class="ayrinti">${kacis(s.fiyatMetni)}</div>` : ''}</td>
+      <td class="fiyat">${tl(s.fiyat)}</td>
+      <td>${s.sure != null ? s.sure + ' sn' : ''}</td>
+      <td>${s.ekran ? `<a href="/${kacis(s.ekran)}" target="_blank">ekran</a>` : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="5" class="bos">Henüz sorgu yapılmadı.</td></tr>';
+  const biten = satirlar.filter(s => ['tamam', 'fiyat-yok', 'hata'].includes(s.durum)).length;
+  $('#ozet').textContent = satirlar.length ? `${biten} / ${satirlar.length} şirket tamamlandı` + (fiyatli.length ? ` · en uygun: ${fiyatli[0].ad} ${tl(fiyatli[0].fiyat)}` : '') : '';
+}
+
+function baslat(v) {
+  durumlar = {};
+  siralama = v.sirketler.map(s => s.kod);
+  for (const s of v.sirketler) durumlar[s.kod] = { ...s, durum: 'basladi' };
+  ciz();
+}
+
+const olaylar = new EventSource('/api/olaylar');
+olaylar.addEventListener('merhaba', e => {
+  const { calisiyor, sonDurum } = JSON.parse(e.data);
+  $('#gonder').disabled = calisiyor;
+  if (sonDurum) { baslat(sonDurum); Object.assign(durumlar, sonDurum.durumlar); ciz(); }
+});
+olaylar.addEventListener('basladi', e => { $('#gonder').disabled = true; baslat(JSON.parse(e.data)); });
+olaylar.addEventListener('durum', e => { const d = JSON.parse(e.data); durumlar[d.kod] = d; ciz(); });
+olaylar.addEventListener('bitti', () => { $('#gonder').disabled = false; });
+olaylar.addEventListener('hata', e => { $('#uyari').textContent = JSON.parse(e.data).hata; });
+olaylar.onerror = () => { $('#ozet').textContent = 'Robot ile bağlantı yok — baslat.bat açık mı?'; };
+
+sirketleriYukle();
+</script>
+</body>
+</html>

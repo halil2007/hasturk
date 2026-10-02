@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf-8"><title>Demo Sigorta A — Acente Girişi</title>
+<style>body{font:15px sans-serif;background:#eef3f8;display:grid;place-items:center;height:100vh;margin:0}form{background:#fff;padding:28px;border-radius:8px;display:grid;gap:10px;width:280px}button{background:#0b5394;color:#fff;border:0;padding:10px}</style>
+<form id="f"><h2>Demo Sigorta A</h2>
+<label>Kullanıcı kodu <input name="kullanici" required></label>
+<label>Şifre <input name="sifre" type="password" required></label>
+<button>Giriş</button></form>
+<script>f.onsubmit=e=>{e.preventDefault();document.cookie='demoA=1;path=/';location.href='teklif.html'}</script>

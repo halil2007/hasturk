@@ -1,0 +1,10 @@
+{
+  "port": 3737,
+  "esZamanli": 6,
+  "kanal": "chrome",
+  "tarayiciYolu": "",
+  "gizli": false,
+  "girisBeklemeDk": 5,
+  "adimZamanAsimiSn": 30,
+  "sirketZamanAsimiSn": 150
+}

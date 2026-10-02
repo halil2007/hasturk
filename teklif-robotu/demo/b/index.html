@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><title>Demo Sigorta B — Portal</title>
+<style>body{font:14px sans-serif;margin:0;background:#fff8f0}header{background:#c0392b;color:#fff;padding:12px 20px}main{padding:20px}.adim{display:none}.adim.acik{display:block}label{display:block;margin:8px 0}table{border-collapse:collapse;margin-top:16px}td{border:1px solid #ccc;padding:6px 12px}</style>
+<header>Demo Sigorta B — Acente Portalı</header>
+<main>
+<section class="adim" id="giris"><h2>Oturum Aç</h2>
+  <label>E-posta <input id="ep"></label><label>Parola <input id="pw" type="password"></label>
+  <button id="girisYap">Oturum Aç</button></section>
+<section class="adim" id="musteri"><h2>1. Müşteri Bilgileri</h2>
+  <label>Kimlik Numarası <input placeholder="TCKN / VKN" id="kimlik"></label>
+  <label>Doğum Tarihi <input placeholder="GG.AA.YYYY" id="dt"></label>
+  <button id="devam">Devam</button></section>
+<section class="adim" id="arac"><h2>2. Araç Bilgileri</h2>
+  <label>Araç Plakası <input id="ap"></label>
+  <label>Belge Seri <input id="bs"></label>
+  <label>Belge Numarası <input id="bn"></label>
+  <label>Kullanım Tarzı <select id="kt"><option value="">Seçiniz</option><option value="hususi">Hususi Otomobil</option><option value="taksi">Taksi</option></select></label>
+  <button id="fiyatAl">Fiyat Al</button>
+  <div id="tablo"></div></section>
+</main>
+<script>
+const goster=id=>{document.querySelectorAll('.adim').forEach(s=>s.classList.toggle('acik',s.id===id))};
+goster(sessionStorage.demoB?'musteri':'giris');
+girisYap.onclick=()=>{sessionStorage.demoB=1;goster('musteri')};
+devam.onclick=()=>{if(!/^\d{11}$/.test(kimlik.value))return alert('Kimlik hatalı');setTimeout(()=>goster('arac'),600)};
+fiyatAl.onclick=()=>{
+  if(!kt.value)return alert('Kullanım tarzı seçin');
+  const h=[...(ap.value+kimlik.value)].reduce((a,c)=>a*17+c.charCodeAt(0)>>>0,3);
+  const net=2500+h%1800, top=net*1.05;
+  const f=n=>n.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  tablo.textContent='Sorgulanıyor (TRAMER)...';
+  setTimeout(()=>{tablo.innerHTML=`<table><tr><td>Net Prim</td><td>${f(net)} ₺</td></tr><tr><td>Ödenecek Tutar</td><td id="odenecek">${f(top)} ₺</td></tr></table>`},1500);
+};
+</script>

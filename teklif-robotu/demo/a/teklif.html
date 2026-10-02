@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>Demo Sigorta A — Trafik Teklif</title>
+<script>if(!document.cookie.includes('demoA=1'))location.replace('giris.html')</script>
+<style>body{font:15px sans-serif;margin:30px;background:#f7f9fc}fieldset{display:grid;grid-template-columns:160px 220px;gap:8px;max-width:420px}#sonuc{margin-top:20px;font-size:18px}</style>
+<h1>Trafik Sigortası Teklif</h1>
+<fieldset>
+  <label for="tc">T.C. Kimlik No</label><input id="tc">
+  <label for="plaka">Plaka</label><input id="plaka">
+  <label for="rs">Ruhsat Seri</label><input id="rs">
+  <label for="rn">Ruhsat No</label><input id="rn">
+</fieldset>
+<p><button id="hesapla">Teklif Hesapla</button></p>
+<div id="sonuc"></div>
+<script>
+hesapla.onclick=()=>{
+  sonuc.textContent='Hesaplanıyor...';
+  const h=[...(plaka.value+tc.value)].reduce((a,c)=>a*31+c.charCodeAt(0)>>>0,7);
+  const prim=3000+h%2000+0.75;
+  setTimeout(()=>{sonuc.innerHTML=`<div>Vergi: 205,37 TL</div><div>Brüt Prim: <b>${prim.toLocaleString('tr-TR',{minimumFractionDigits:2})} TL</b></div>`},1200);
+};
+</script>
