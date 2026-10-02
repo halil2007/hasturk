@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (163 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 189 sipariş; site içi olaylar son 30 gün (171 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -34,7 +34,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Sıvı Solucan Gübresi  | 10,5 | 11 |
+| 1 | HasTürk Sıvı Solucan Gübresi  | 10,4 | 11 |
 | 2 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10,3 | 6 |
 | 3 | HasTürk Solucan Gübresi  | 9,4 | 11 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,7 | 1 |
@@ -60,10 +60,10 @@ _Henüz veri yok._
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | solucan | 6 | 6 | ↑ ×3,9 |  |
-| 2 | perlit | 3 | 3 | ↑ ×2,4 |  |
-| 3 | solucan gübresi | 2 | 2 |  |  |
-| 4 | sebze tohumu | 2 | 2 |  |  |
-| 5 | torf | 2 | 2 |  |  |
+| 2 | solucan gübresi | 3 | 3 | ↑ ×2,4 |  |
+| 3 | perlit | 3 | 3 | ↑ ×2,4 |  |
+| 4 | torf | 3 | 3 | ↑ ×2,4 |  |
+| 5 | sebze tohumu | 2 | 2 |  |  |
 | 6 | biyo | 1 | 1 |  |  |
 | 7 | cocopeat | 1 | 1 |  |  |
 | 8 | fasulye | 1 | 1 |  |  |
@@ -92,6 +92,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 6 | biyokömür | 1 |
 | 7 | fidan gübresi | 1 |
 | 8 | karadeniz fasulye | 1 |
+| 9 | kompost | 1 |
 
 ## En çok sepete eklenenler
 

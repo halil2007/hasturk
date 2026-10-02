@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 61 sipariş; site içi olaylar son 30 gün (162 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 61 sipariş; site içi olaylar son 30 gün (171 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -28,7 +28,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | Katı Solucan Gübresi 20 KG Çuval | 16,5 | 38 |
+| 1 | Katı Solucan Gübresi 20 KG Çuval | 16,4 | 38 |
 | 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 12,8 | 16 |
 | 3 | Uzman 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası | 5,2 | 5 |
 | 4 | Sıvı Solucan Gübresi 1 Lt | 2,9 | 5 |
@@ -54,10 +54,10 @@ _Henüz veri yok._
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | solucan | 6 | 6 | ↑ ×3,9 |  |
-| 2 | perlit | 3 | 3 | ↑ ×2,4 |  |
-| 3 | solucan gübresi | 2 | 2 |  |  |
-| 4 | sebze tohumu | 2 | 2 |  |  |
-| 5 | torf | 2 | 2 |  |  |
+| 2 | solucan gübresi | 3 | 3 | ↑ ×2,4 |  |
+| 3 | perlit | 3 | 3 | ↑ ×2,4 |  |
+| 4 | torf | 3 | 3 | ↑ ×2,4 |  |
+| 5 | sebze tohumu | 2 | 2 |  |  |
 | 6 | biyo | 1 | 1 |  |  |
 | 7 | cocopeat | 1 | 1 |  |  |
 | 8 | fasulye | 1 | 1 |  |  |
@@ -86,6 +86,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 6 | biyokömür | 1 |
 | 7 | fidan gübresi | 1 |
 | 8 | karadeniz fasulye | 1 |
+| 9 | kompost | 1 |
 
 ## En çok sepete eklenenler
 
@@ -115,5 +116,5 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 | Halk Sağlığı Ürünleri | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı (`chrysamed-worm-ex-tahta-agac-kurdu-ilaci-5-lt`)<br>Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı (`chrysamed-insektisit-max-5-lt-ekonomik-tahtakurusu-akrep-ilaci`)<br>Chrysamed Insektisit Max 2 Lt + 500 Ml Böcek İlacı Seti (`chrysamed-insektisit-max-2-lt-500-ml-bocek-ilaci-seti`) |
 | Bahçe Ekipmanları | Uzman 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası (`uzman-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi`)<br>Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) (`uzman-2-lt-ilaclama-pompasi`)<br>Uzman 5 lt Basınçlı İlaçlama Pompası (`uzman-5-lt-basincli-ilaclama-pompasi-k-71`) |
 | Kedi Ürünleri | Reflex Plus Natural Uskumru Fileto Kedi Ödül Maması 30 Gr (`reflex-plus-natural-uskumru-fileto-kedi-odul-mamasi-30-gr`)<br>Proline Bebek Pudra Kokulu Bentonit Kedi Kumu 10 LT (`proline-bebek-pudra-kokulu-bentonit-kedi-kumu-10-lt`)<br>King Sos İçerisinde Et Parçacıklı Somonlu Kedi Konservesi 400 Gr (`king-sos-icerisinde-et-parcacikli-somonlu-kedi-konservesi-400-gr`) |
-| Saksılar ve Bahçe Yatakları | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm (`moduler-yukseltilmis-bahce-yatagi-sekilli-no-12-220x140`)<br>Serinova Kaktüs Dikim Seti (`serinova-kaktus-dikim-seti`) |
+| Saksılar ve Bahçe Yatakları | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm (`moduler-yukseltilmis-bahce-yatagi-sekilli-no-12-220x140`)<br>Serinova Kaktüs Dikim Seti (`serinova-kaktus-dikim-seti`)<br>Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 281 Litre (`moduler-yukseltilmis-bahce-yatagi-281-litre`) |
 
