@@ -2278,7 +2278,8 @@
     WARM = null;
   }
   // Kullanılmayan sıcak çerçeve (panel kapalı, 2 dk) bellekte tutulmaz
-  setInterval(function () { if (WARM && !isOpen && !ADDING && Date.now() - WARM.last > 120000) dropWarm(); }, 30000);
+  // Panel kapanınca sıcak çerçeve 10 sn içinde kaldırılır (arkada site uygulaması çalışıp telefonu yormasın)
+  setInterval(function () { if (WARM && !isOpen && !ADDING && Date.now() - WARM.last > 10000) dropWarm(); }, 5000);
   // Sıcak çerçevede ürüne geç (sitenin kendi yönlendiricisiyle, tam sayfa yüklemeden)
   function navWarm(p) {
     if (!WARM || !WARM.fr) return Promise.reject('no-warm');
@@ -2319,7 +2320,8 @@
   var PREWARM_T = 0;
   function schedulePrewarm(p) {
     clearTimeout(PREWARM_T);
-    if (!p || !p.st || WARM || ADDING || !cartOn() || !warmOn() || slowNet() || typeof window.UrunAramaSepet === 'function') return;
+    // Varsayılan kapalı (gerçek ürün sayfası arkada çalışırken telefonda kaydırma takılabilir); config.json > cart.prewarm: true açar
+    if ((CFG.cart || {}).prewarm !== true || !p || !p.st || WARM || ADDING || !cartOn() || !warmOn() || slowNet() || typeof window.UrunAramaSepet === 'function') return;
     PREWARM_T = setTimeout(function () {
       if (!isOpen || WARM || ADDING || document.hidden) return;
       loadFrame(p).then(function (fr) { if (!WARM && !ADDING) promoteWarm(fr); }, function () {});
@@ -3478,7 +3480,7 @@
     };
     place();
     var k = 0;
-    (function follow() { if (g.isConnected && f.nav.isConnected && ++k < 600) { place(); requestAnimationFrame(follow); } })();
+    (function follow() { if (g.isConnected && f.nav.isConnected && ++k < 90) { place(); requestAnimationFrame(follow); } })();
     return g;
   }
   function buildNav(f) {
@@ -3609,11 +3611,11 @@
   function boot() {
     if (boot.done) return;
     boot.done = true;
-    idle(function () { build(); loadLite(); idle(function () { prefetch('idle'); }, 3000); }, 800);
-    ['pointerdown', 'touchstart', 'keydown', 'scroll'].forEach(function (ev) {
-      var h = function () { window.removeEventListener(ev, h, true); prefetch(ev); };
-      window.addEventListener(ev, h, { capture: true, passive: true });
-    });
+    idle(function () { build(); loadLite(); }, 800);
+    // Ürün verisi (300 KB) sayfa kaydırılırken değil: sayfa tamamen yüklendikten sonra boşta iner;
+    // müşteri Ürün Bul'a / menüye dokunursa hemen iner
+    var later = function () { setTimeout(function () { idle(function () { prefetch('idle'); }, 4000); }, 1500); };
+    if (document.readyState === 'complete') later(); else window.addEventListener('load', later);
   }
   if (document.readyState !== 'loading') boot(); else document.addEventListener('DOMContentLoaded', boot);
 
