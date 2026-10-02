@@ -479,8 +479,19 @@ function applyTrends(out, trends, orders, config) {
     }
   }
   // Site içi olaylar (bugün + geçmiş yıllar)
-  for (const [slug, o] of Object.entries((trends && trends.p) || {})) {
-    if (!bySlug.has(slug)) continue;
+  // Olay anahtarı ürün adresi (slug) ya da — ürün verisi inmemiş sayfalarda sepete eklenen — varyant kimliği olabilir
+  const slugOf = (x) => bySlug.has(x) ? x : (byVar.get(x) || {}).s;
+  const evP = (src) => {
+    const m = {};
+    for (const [x, o] of Object.entries(src || {})) {
+      const s = slugOf(x);
+      if (!s) continue;
+      const t = (m[s] = m[s] || {});
+      for (const k in o) t[k] = (t[k] || 0) + (o[k] || 0);
+    }
+    return m;
+  };
+  for (const [slug, o] of Object.entries(evP(trends && trends.p))) {
     const g = get(slug);
     g.a += o.a || 0; g.c += o.c || 0; g.v += o.v || 0; g.e7 += o.e7 || 0; g.e28 += o.e28 || 0;
   }
@@ -489,8 +500,7 @@ function applyTrends(out, trends, orders, config) {
     if (!t || !t.rows) continue;
     years[y] = years[y] || { o14: 0, e14: 0, has: false };
     years[y].hasE = true;
-    for (const [slug, o] of Object.entries(t.p || {})) {
-      if (!bySlug.has(slug)) continue;
+    for (const [slug, o] of Object.entries(evP(t.p))) {
       const v = yr(get(slug), y);
       v.eA += o.e || 0; v.e14 += o.e14 || 0; years[y].e14 += o.e14 || 0;
     }
@@ -674,9 +684,40 @@ function catCovers(out, config) {
 // public/menu.json (~5 KB): telefonda ☰ menüsü / Ürün Bul ana ekranı ürün verisinin (90+ KB) inmesini beklemeden
 // bununla anında açılır. Ağır ama ana ekranda gerekmeyen ayarlar (rehberler, toprak eşleştirme…) içinde yoktur.
 const MENU_SKIP = ['guides', 'soilMatch', 'synonyms', 'crossSell', 'boost', 'bestsellers', 'badges', 'categoryImages'];
+// Masaüstü menüsünün her ana kategori için öne çıkan 3 ürünü (widget'taki dmProducts ile aynı kural):
+// config.json > desktopMenu.picks önce, sonra eğilim + satış (p.h), çok satan ve mağaza markası; toptan/ton ürünler geride.
+// Böylece masaüstü menüsü 300 KB'lık ürün verisini indirmeden kurulur.
+function dmPicks(out, config) {
+  const dm = config.desktopMenu && typeof config.desktopMenu === 'object' ? config.desktopMenu : {};
+  if (config.desktopMenu === false || dm.products === false) return {};
+  const boost = (config.boost || []).slice().reverse(), best = new Set([...(config.bestsellers || config.boost || []), ...((out.trend || {}).best || [])]);
+  const ownB = new RegExp(config.brandPattern || 'has ?t[uü]rk|^hg$', 'i'), bulk = new RegExp(config.bulkPattern || '\\b\\d+([.,]\\d+)? ?ton\\b', 'i');
+  const bulkPrice = config.bulkPrice || 40000;
+  const rank = (p) => {
+    const b = boost.indexOf(p.s);
+    let r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (ownB.test(p.b || '') ? 2 : 0) + (p.st ? Math.min(2, (p.h || 0) / 50) : 0);
+    if (bulk.test(p.n) || (p.p || 0) >= bulkPrice) r -= 8;
+    return r;
+  };
+  const kids = {}, bySlug = new Map(out.items.map((p) => [p.s, p]));
+  for (const c of out.cats) if (c.p) (kids[c.p] = kids[c.p] || []).push(c);
+  const ok = (p) => p && p.st && p.img;
+  const res = {};
+  for (const c of out.cats.filter((x) => !x.p || !out.cats.some((y) => y.id === x.p))) {
+    const set = new Set();
+    (function add(id) { set.add(id); (kids[id] || []).forEach((k) => add(k.id)); })(c.id);
+    const picks = ((dm.picks || {})[c.n] || []).map((s) => bySlug.get(s)).filter(ok);
+    const rest = out.items.filter((p) => ok(p) && rank(p) >= 0 && !picks.includes(p) && (p.c || []).some((x) => set.has(x)))
+      .sort((a, b) => (b.h || 0) - (a.h || 0) || ((best.has(b.s) ? 3 : 0) + rank(b)) - ((best.has(a.s) ? 3 : 0) + rank(a)));
+    const top = picks.concat(rest).slice(0, 3);
+    if (top.length) res[c.id] = top.map((p) => ({ n: p.n, s: p.s, img: p.img, p: p.d != null ? p.d : p.p, o: p.d != null && p.p > p.d ? p.p : 0 }));
+  }
+  return res;
+}
+
 async function writeMenu(out) {
   const config = Object.fromEntries(Object.entries(out.config || {}).filter(([k]) => !MENU_SKIP.includes(k)));
-  const menu = { v: 1, merchant: out.merchant, n: out.items.length, config, cats: out.cats, trend: { q: (out.trend && out.trend.q) || [] } };
+  const menu = { v: 1, merchant: out.merchant, n: out.items.length, config, cats: out.cats, trend: { q: (out.trend && out.trend.q) || [] }, dmp: dmPicks(out, out.config || {}) };
   const text = JSON.stringify(menu);
   let prev = '';
   try { prev = await readFile(MENU, 'utf8'); } catch {}

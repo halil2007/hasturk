@@ -1630,7 +1630,7 @@
   // Olaylar toplu halde, sayfadan çıkarken tek istekle gönderilir; aynı olay bir oturumda bir kez sayılır.
   // Günlük toplamlar Cloudflare'de tutulur, scripts/sync.mjs 2 saatte bir okuyup sıralama ve önerilere işler.
   // Kapatmak: config.json > "analytics": false ya da script etiketine data-collect="off"
-  var EVQ = [], EV_SEEN = {}, EV_T = 0, EV_URL = ds.collect === 'off' ? '' : (ds.collect || BASE + 'e'), EV_PEND = [];
+  var EVQ = [], EV_SEEN = {}, EV_T = 0, EV_URL = ds.collect === 'off' ? '' : (ds.collect || BASE + 'e');
   try { EV_SEEN = JSON.parse(sessionStorage.getItem('ua-ev') || '{}') || {}; } catch (e) {}
   function ev(k, x) {
     if (!EV_URL || !x || CFG.analytics === false) return;
@@ -1662,13 +1662,16 @@
     noteQuery.t = setTimeout(function () { ev(n ? 'q' : 'q0', q); }, 1500);
   }
   function cartAdded(vid) {
-    if (DATA) { var p = BY_VAR[vid]; if (p) ev('a', p.s); } else EV_PEND.push(vid);
+    if (DATA) { var p = BY_VAR[vid]; if (p) ev('a', p.s); } else ev('a', String(vid).toLowerCase());
   }
   // Ürün sayfası görüntüleme (ikas sayfa yenilemeden geçiş yapar; adres değişimi de izlenir)
+  // Ürün verisi gerekmez: adres tek parçalıysa (ikas ürün adresi /urun-adi) gönderilir; kategori sayfaları menü
+  // verisinden ayıklanır, ürün olmayan adresleri sync.mjs zaten yok sayar
   function evPage() {
-    if (!DATA) return;
-    var s = slugOf(location.href);
-    if (s && BY_SLUG[s]) ev('v', s);
+    var path = location.pathname.replace(/\/+$/, ''), s = slugOf(location.href);
+    if (!s || !/^[a-z0-9-]{2,140}$/.test(s) || path.split('/').length !== 2 || HIDE_PATHS.test(path) || /^(search|arama|pages|blog|account|hesap)$/.test(s)) return;
+    if (DATA ? !BY_SLUG[s] : SRC() && SRC().cats.some(function (c) { return c.s === s; })) return;
+    ev('v', s);
   }
   // "Sık arananlar": ziyaretçilerin son 30 günde en çok aradığı ve sonuç bulduğu kelimeler (sync.mjs > trend.q),
   // eksik kalırsa config.json > popular ile tamamlanır. config.json > "trendPopular": false sadece elle listeyi kullanır.
@@ -1698,7 +1701,6 @@
     return (popular.c = out);
   }
   function evData() {
-    EV_PEND.splice(0).forEach(cartAdded);
     evPage();
   }
   (function () {
@@ -3170,6 +3172,7 @@
   // Kategorinin öne çıkan 3 ürünü: config.json > desktopMenu.picks["Kategori adı"] (elle onaylanan) önce,
   // sonra ziyaretçi eğilimi + gerçek satışlara göre (p.h), veri yoksa çok satan/mağaza markası
   function dmProducts(c) {
+    if (!DATA) return ((LITE || {}).dmp || {})[c.id] || [];
     var set = {}, picks = ((dmCfgObj().picks || {})[c.n] || []).map(function (s) { return BY_SLUG[s]; })
       .filter(function (p) { return p && p.st && p.img; });
     (function add(id) { set[id] = 1; (KIDS[id] || []).forEach(function (k) { add(k.id); }); })(c.id);
@@ -3183,7 +3186,7 @@
     var dc = CFG.desktopMenu, o = dmCfgObj(), hidden = {}, up = {};
     (o.hide || []).forEach(function (n) { hidden[fold(n)] = 1; });
     var keep = function (c) { return c.k > 0 && !hidden[c.f]; };
-    DATA.cats.forEach(function (c) {
+    SRC().cats.forEach(function (c) {
       var t = c;
       while (t.p && CATS_BY_ID[t.p]) t = CATS_BY_ID[t.p];
       up[c.s] = t.s;
@@ -3198,7 +3201,8 @@
           return { n: k.n, s: k.s, k: (KIDS[k.id] || []).filter(keep).map(function (g) { return { n: g.n, s: g.s }; }) };
         }),
         p: o.products === false ? [] : dmProducts(c).map(function (p) {
-          return { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: price(p), o: p.d != null && p.p > p.d ? p.p : 0 };
+          // menu.json'daki hazır seçimde fiyat (p) ve eski fiyat (o) zaten hesaplı gelir
+          return DATA ? { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: price(p), o: p.d != null && p.p > p.d ? p.p : 0 } : { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: p.p, o: p.o };
         })
       };
     });
@@ -3562,8 +3566,13 @@
         if (DM) mountNav();
         else { var g = guessNav(); if (g) preHide(g); }
       } catch (e) {}
-      DM_NEED = true;
-      load().then(dmRefresh).catch(function () { if (!DN) clearPre(); });
+      // Menü özeti küçük menu.json'dan (~5 KB, öne çıkan ürünler sunucuda hazırlanmış) kurulur; 300 KB'lık ürün
+      // verisi beklenmez. menu.json yoksa / eskiyse ürün verisine düşülür.
+      loadLite().then(function () {
+        if (DATA || (LITE && LITE.dmp)) return dmRefresh();
+        DM_NEED = true;
+        return load().then(dmRefresh);
+      }).catch(function () { if (!DN) clearPre(); });
     };
     if (document.readyState !== 'loading') return go();
     document.addEventListener('DOMContentLoaded', go);
@@ -3603,8 +3612,10 @@
   });
 
   // Açılış: "Ürün Bul" butonu sayfanın gövdesi oluşur oluşmaz kurulur (birkaç ms; ikas'ın betiklerinin ve banner'ların
-  // bitmesi beklenmez — canlı sitede telefonda HTML hazır olması ~7 sn sürüyor). Menü verisi (~5 KB) hemen iner.
-  // Ürün verisi sayfa tamamen yüklendikten sonra boşta iner (panel daha önce açılırsa hemen iner).
+  // bitmesi beklenmez — canlı sitede telefonda HTML hazır olması ~7 sn sürüyor). Menü verisi (~5 KB) hemen iner;
+  // ana ekran, kategoriler, masaüstü menüsü ve ziyaretçi eğilimi kaydı onunla çalışır.
+  // Ürün verisi (300 KB): bilgisayarda sayfa tamamen yüklendikten sonra boşta; telefonda sadece müşteri Ürün Bul'a /
+  // menüye dokununca iner (Ürün Bul'u kullanmayan ziyaretçinin telefonu hiç yorulmaz).
   function prefetch(why) {
     if (prefetch.done) return;
     prefetch.done = true;
@@ -3613,10 +3624,10 @@
   function boot() {
     if (boot.done) return;
     boot.done = true;
-    build(); loadLite();
-    // Ürün verisi (300 KB) sayfa kaydırılırken değil: sayfa tamamen yüklendikten sonra boşta iner;
-    // müşteri Ürün Bul'a / menüye dokunursa hemen iner
+    build();
+    loadLite().then(evPage);
     var later = function () { setTimeout(function () { idle(function () { prefetch('idle'); }, 4000); }, 1500); };
+    if (!wideScreen() || slowNet()) return;
     if (document.readyState === 'complete') later(); else window.addEventListener('load', later);
   }
   if (document.body) boot();

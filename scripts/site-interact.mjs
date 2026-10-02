@@ -37,6 +37,11 @@ async function setup(browser, prof, mode) {
   if (mode.startsWith('eski-') || mode === 'yeni') {
     const body = readFileSync(`/tmp/widget-${mode === 'yeni' ? 'HEAD' : mode.slice(5)}.js`, 'utf8');
     await ctx.route(u => u.hostname === WIDGET_HOST && u.pathname === '/pm-search.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body }));
+    // Daldaki sürüm kendi menu.json'uyla denenir (biçim değişmiş olabilir)
+    if (mode === 'yeni') {
+      let menu = null; try { menu = readFileSync('/tmp/menu-HEAD.json', 'utf8'); } catch (e) {}
+      if (menu) await ctx.route(u => u.hostname === WIDGET_HOST && u.pathname === '/menu.json', r => r.fulfill({ status: 200, contentType: 'application/json', body: menu, headers: { 'Access-Control-Allow-Origin': '*' } }));
+    }
   }
   await ctx.addInitScript(INIT);
   const page = await ctx.newPage();
@@ -77,6 +82,10 @@ async function journey(browser, name, prof, mode) {
       await fab.tap().catch(() => {});
       await page.locator('#urun-arama-root >> .ov.on').waitFor({ timeout: 10000 }).catch(() => {});
       r.panelAc = Date.now() - a;
+      // İlk arama: sonuç kartı (ürün adı) görünene kadar (ürün verisi o an inmemişse inmesi dahil)
+      const q = Date.now();
+      await page.locator('#urun-arama-root >> .top input').fill('solucan').catch(() => {});
+      await page.locator('#urun-arama-root >> .results .pname').first().waitFor({ timeout: 15000 }).then(() => { r.ilkArama = Date.now() - q; }).catch(() => {});
       await page.waitForTimeout(1200);
       await page.keyboard.press('Escape').catch(() => {});
     }
@@ -127,6 +136,7 @@ for (const [name, prof] of Object.entries(PROFILES)) {
   line('Yüklendikten sonra kaydırma: donma', r => r.kaydirma.lt, ms);
   line('Yüklendikten sonra kaydırma: takılan kare', r => r.kaydirma.jank, v => v == null ? '-' : String(v));
   if (name === 'telefon') line('Ürün Bul paneli açılma', r => r.panelAc, sec);
+  if (name === 'telefon') line('İlk aramada sonuçların gelmesi', r => r.ilkArama, sec);
   line(name === 'telefon' ? 'Panel aç/kapa sırasında donma' : 'Menüde gezinirken donma', r => r.menuGez.lt, ms);
   line(name === 'telefon' ? 'Panel aç/kapa: takılan kare' : 'Menüde gezinirken takılan kare', r => r.menuGez.jank, v => v == null ? '-' : String(v));
   line('Kategori sayfasına geçiş', r => r.kategori, sec);
