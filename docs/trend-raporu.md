@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 191 sipariş; site içi olaylar son 30 gün (104 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 191 sipariş; site içi olaylar son 30 gün (115 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -35,10 +35,10 @@ _Henüz veri yok._
 | 1 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 11,6 | 6 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 10,5 | 11 |
 | 3 | HasTürk Solucan Gübresi  | 9,4 | 11 |
-| 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,8 | 2 |
+| 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,7 | 2 |
 | 5 | Kullanıma Hazır Cocopeat Torfu | 8,6 | 16 |
 | 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
-| 7 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,1 | 8 |
+| 7 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,1 | 5 |
 | 8 | Premium Fide Toprağı | 6,8 | 11 |
 | 9 | Leonardit - Organik Toprak Düzenleyici | 6 | 9 |
 | 10 | HG Akıllı Bitki ve Saksı Toprağı | 5,7 | 8 |
@@ -48,8 +48,8 @@ _Henüz veri yok._
 | 14 | HG Paşa Kılıcı (Sansevieria) Toprağı | 3,8 | 4 |
 | 15 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 3,6 | 2 |
 | 16 | HG Tarım Perliti | 3,6 | 5 |
-| 17 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici | 3,6 | 4 |
-| 18 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,6 | 3 |
+| 17 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici | 3,5 | 4 |
+| 18 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,5 | 3 |
 | 19 | HG Organik Sebze Yetiştirme Toprağı  | 3,3 | 0 |
 | 20 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 3,2 | 0 |
 
@@ -60,13 +60,15 @@ _Henüz veri yok._
 | 1 | perlit | 2 | 2 |  |  |
 | 2 | sebze tohumu | 2 | 2 |  |  |
 | 3 | torf | 2 | 2 |  |  |
-| 4 | limon | 1 | 1 |  |  |
-| 5 | enjo | 1 | 1 |  |  |
-| 6 | felici | 1 | 1 |  |  |
-| 7 | hümik | 1 | 1 |  |  |
-| 8 | ilaçlama pompası | 1 | 1 |  |  |
-| 9 | saksı toprağı | 1 | 1 |  |  |
-| 10 | solucan gübresi | 1 | 1 |  |  |
+| 4 | biyo | 1 | 1 |  |  |
+| 5 | limon | 1 | 1 |  |  |
+| 6 | lotu | 1 | 1 |  |  |
+| 7 | enjo | 1 | 1 |  |  |
+| 8 | felici | 1 | 1 |  |  |
+| 9 | hümik | 1 | 1 |  |  |
+| 10 | ilaçlama pompası | 1 | 1 |  |  |
+| 11 | saksı toprağı | 1 | 1 |  |  |
+| 12 | solucan gübresi | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
@@ -77,7 +79,10 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 1 | 2 4 yılllık fidan in | 1 |
 | 2 | 2 4 yılllık fidan için | 1 |
 | 3 | 2 4 yılllık fidan içşn | 1 |
-| 4 | fidan gübresi | 1 |
+| 4 | biy | 1 |
+| 5 | biyokö | 1 |
+| 6 | biyokömür | 1 |
+| 7 | fidan gübresi | 1 |
 
 ## En çok sepete eklenenler
 
