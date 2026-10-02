@@ -43,7 +43,15 @@ for (let i = 0; i < 14; i++) {
   for (const t of [300, 1500, 4000]) { await p.waitForTimeout(t - (row.length ? [300, 1500, 4000][row.length - 1] : 0)); row.push(await state()); }
   // Her ölçümde bizim menü yerinde ve ikas'ın kategori bağlantıları görünmüyor olmalı (başlangıçtaki sayıyı aşmamalı)
   const ok = row.every((r) => r.biz && r.ikasGorunen <= base.ikasGorunen);
-  if (!ok) bad++;
+  if (!ok) {
+    bad++;
+    // Tanı: menü neden kurulamadı? (kaydırma, başlıktaki kategori bağlantılarının konumu, işaretler)
+    const d = await p.evaluate(() => {
+      const links = [...document.querySelectorAll('a[href]')].filter((a) => !a.closest('.ua-dnav,#ua-mega,#ua-dnav-ghost')).map((a) => { const r = a.getBoundingClientRect(); return { t: (a.textContent || '').trim().slice(0, 18), h: a.getAttribute('href'), top: Math.round(r.top), w: Math.round(r.width), vis: getComputedStyle(a).visibility }; }).filter((x) => x.top < 300 && x.top > -50 && x.w > 0).slice(0, 14);
+      return { scrollY: Math.round(scrollY), pre: !!document.querySelector('[data-ua-pre]'), nav: !!document.querySelector('[data-ua-nav]'), headers: document.querySelectorAll('header').length, links };
+    });
+    log('   tanı: ' + JSON.stringify(d));
+  }
   log(`${i + 1}. ${path} → 0,3sn: ${row[0].biz ? 'bizim' : 'YOK'}/${row[0].ikasGorunen} ikas | 1,5sn: ${row[1].biz ? 'bizim' : 'YOK'}/${row[1].ikasGorunen} | 4sn: ${row[2].biz ? 'bizim' : 'YOK'}/${row[2].ikasGorunen} ${ok ? '✓' : '✗'}`);
 }
 log(`Sonuç (${MODE}, ${SITE}): ${14 - bad}/14 geçişte menü yerinde`);
