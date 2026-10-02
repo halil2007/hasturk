@@ -12,14 +12,15 @@ const out = []; const log = (s) => { out.push(s); console.log(s); };
 const b = await chromium.launch();
 // Sepete ekleme cevabı: hata var mı, sepette kaç satır/adet var
 const watchAdds = (target, tag) => target.on('response', async (r) => {
-  if (!/op=(addItemToCart|saveCart|getCart)/.test(r.url())) return;
+  if (!/op=(addItemToCart|saveCart|getCart\w*)/.test(r.url())) return;
   let t = ''; try { t = await r.text(); } catch (e) {}
   let info = '';
   try {
-    const j = JSON.parse(t), d = j.data && (j.data.addItemToCart || j.data.saveCart || j.data.getCart);
+    const j = JSON.parse(t), d = j.data && (j.data.addItemToCart || j.data.saveCart || j.data.getCart || j.data.getCartById);
     info = j.errors ? 'HATA: ' + JSON.stringify(j.errors).slice(0, 300) : d ? `sepet ${String(d.id || '').slice(0, 8)} · ${(d.orderLineItems || []).length} satır · adet ${(d.orderLineItems || []).reduce((a, x) => a + (x.quantity || 0), 0)} · ${(d.orderLineItems || []).map((x) => (x.variant && (x.variant.name || x.variant.id)) || '').join(', ').slice(0, 120)}` : 'boş cevap: ' + t.slice(0, 200);
   } catch (e) { info = 'okunamadı: ' + t.slice(0, 200); }
-  log(`  [${tag}] ${r.url().match(/op=(\w+)/)[1]} → HTTP ${r.status()} · ${info}`);
+  let reqId = ''; try { reqId = (r.request().postData() || '').match(/"(?:id|cartId)"\s*:\s*"([0-9a-f-]{8})/)[1]; } catch (e) {}
+  log(`  [${tag}] ${r.url().match(/op=(\w+)/)[1]} (istenen sepet ${reqId || '-'}) → HTTP ${r.status()} · ${info} · çerçeve: ${r.frame() && r.frame().parentFrame() ? 'GİZLİ ÇERÇEVE' : 'ana sayfa'}`);
 });
 
 const cartCount = async (p) => p.evaluate(async () => {
@@ -81,6 +82,8 @@ const cartCount = async (p) => p.evaluate(async () => {
   await p.goto(SITE + '/', { waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.locator('#urun-arama-root >> .fab:not(.hide)').waitFor({ timeout: 30000 });
   await p.waitForTimeout(3000);
+  const store = () => p.evaluate(() => ({ ls: Object.keys(localStorage).filter((k) => /cart|sepet|ikas/i.test(k)).map((k) => k + '=' + String(localStorage.getItem(k)).slice(0, 60)), ss: Object.keys(sessionStorage).filter((k) => /cart|sepet|ikas/i.test(k)).map((k) => k + '=' + String(sessionStorage.getItem(k)).slice(0, 60)), ck: document.cookie.split('; ').filter((c) => /cart|sepet/i.test(c)).map((c) => c.slice(0, 80)) }));
+  log('Sepet kimliği (önce): ' + JSON.stringify(await store()));
   log('Widget testi başlangıç sepet: ' + await cartCount(p));
   await p.locator('#urun-arama-root >> .fab').tap();
   await p.locator('#urun-arama-root >> .top input').fill(QUERY);
@@ -95,6 +98,7 @@ const cartCount = async (p) => p.evaluate(async () => {
   const alog = await p.evaluate(() => localStorage.getItem('ua-addlog'));
   log(`Widget: "${name.trim()}" eklendi mesajı: ${toast || '-'}`);
   log('Widget ekleme kaydı: ' + (alog || '-').slice(0, 600));
+  log('Sepet kimliği (sonra): ' + JSON.stringify(await store()));
   log('Widget istekleri: ' + JSON.stringify(reqs.map((r) => ({ ms: r.t - t0, url: r.url, body: r.body }))).slice(0, 2000));
   await p.goto(SITE + '/'); await p.waitForTimeout(3000);
   log('Widget testi sonra sepet: ' + await cartCount(p));
