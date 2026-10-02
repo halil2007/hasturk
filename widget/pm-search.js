@@ -2118,6 +2118,12 @@
       }
     } catch (e) {}
   }
+  // İstek bir sepet işlemi mi (ikas: /api/sf/graphql?op=addItemToCart; gövdede mutation adı da aranır)
+  function cartOp(info) {
+    var u = String(info.url || ''), b = String(info.body || '').slice(0, 600);
+    if (/[?&]op=/.test(u)) return /[?&]op=[^&]*cart/i.test(u);
+    return /cart|sepet/i.test(u) || /mutation\s+\w*cart/i.test(b);
+  }
   // Son eklemelerin kaydı (#ua-debug ile görülür): canlıda sorun olursa nedenini anlamak için
   function addLog(entry) {
     try {
@@ -2370,27 +2376,31 @@
         // Tıklamadan sonra site sepete/ürüne dair bir istek BAŞLATTI mı (cevabı beklemeden)
         fr.entry.starts = [function (info) {
           if (!clicked || done) return;
-          var t = (info.url || '') + ' ' + String(info.body || '').slice(0, 4000);
-          if (t.indexOf(v.id) !== -1 || t.indexOf(p.id) !== -1 || /cart|sepet/i.test(t)) started = true;
+          if (cartOp(info)) started = true;
         }];
         var timer = setTimeout(function () { log.adim = clicked ? 'tiklandi-kanit-yok' : 'buton-bulunamadi'; addLog(log); finish(false, clicked ? 'no-proof' : 'timeout'); }, 15000);
         // Başarı ancak KANITLA: butona basıldıktan sonra sitenin kendi kodu bu seçeneği (varyant ya da ürün kimliği)
         // içeren bir istek gönderip hatasız cevap almalı. Kanıt yoksa "eklendi" denmez.
+        // Sadece SEPET işlemleri sayılır (ör. ikas: op=addItemToCart). Ürün yorumları, ürün verisi gibi bu ürünün
+        // kimliğini içeren başka istekler kanıt değildir (Tarım Dünyası'nda "eklendi" deyip eklememe hatası buydu).
         fr.entry.cbs.push(function (info) {
           if (!clicked || done || !info) return;
+          var op = cartOp(info);
+          if (!op) return;
           var hasId = (info.body + ' ' + info.url).indexOf(v.id) !== -1 || (v.id !== p.id && (info.body + ' ' + info.url).indexOf(p.id) !== -1);
           var gqlErr = /"errors"\s*:\s*\[\s*\{/.test(info.text || '');
-          // Yedek kanıt: dönen sepette bu seçeneğin adedi tıklamadan öncekine göre artmış olmalı
-          var grew = false;
-          if (!hasId && info.ok && !gqlErr && before) {
-            try { var c2 = findCart(JSON.parse(info.text)); if (c2) grew = (lineQty(c2)[v.id] || 0) > (before[v.id] || 0); } catch (e) {}
+          // Dönen sepet okunabiliyorsa: bu seçenek sepette olmalı ve adedi tıklamadan öncekinden fazla olmalı
+          var grew = null, c2 = null;
+          if (info.ok && !gqlErr) {
+            try { c2 = findCart(JSON.parse(info.text)); } catch (e) {}
+            if (c2) { var q2 = lineQty(c2); grew = before ? (q2[v.id] || 0) > (before[v.id] || 0) : hasId ? (q2[v.id] || 0) > 0 : null; }
           }
           seen.push({ url: String(info.url).slice(0, 80), durum: info.status, kimlik: hasId, artis: grew, hata: gqlErr });
-          if ((hasId && info.ok && !gqlErr) || grew) {
+          if (grew === true || (grew === null && hasId && info.ok && !gqlErr)) {
             log.adim = 'kanitlandi'; addLog(log);
             try { setCart(JSON.parse(info.text)); } catch (e) {}
             finish(true);
-          } else if (hasId && (!info.ok || gqlErr)) {
+          } else if (hasId && (!info.ok || gqlErr || grew === false)) {
             log.adim = 'site-hata-verdi'; addLog(log);
             finish(false, 'site-error');
           }
