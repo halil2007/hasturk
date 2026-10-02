@@ -3604,12 +3604,39 @@
     });
     window.addEventListener('scroll', function () { if (DN && DN.cur) dmTop(); }, { passive: true });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && DN && DN.cur) dmClose(); });
-    setInterval(function () {
+    // ikas sayfa geçişinde başlığı yeniden çizer: bizim çubuk silinir ya da ikas'ın öğeleri geri gelir.
+    // Kontrol: başlık aynı kaldıysa çubuk anında geri takılır (yeniden kurulmaz, titreme olmaz); başlık değiştiyse
+    // yeni başlıkta kurulur. Sayfa geçişinden sonraki 5 sn boyunca 100 ms'de bir, sonra 1,5 sn'de bir bakılır.
+    // Deneme sayacı her sayfa geçişinde sıfırlanır (önceden toplam 5 denemeden sonra menü kalıcı olarak düşüyordu).
+    var check = function () {
       if (document.hidden || !DM) return;
-      if (DN && (!DN.host.isConnected || !DN.nav.isConnected || !DN.mhost.isConnected)) { unmountNav(); tries = 0; }
-      // Menü hiç bulunamayan sayfalarda boşuna aramaya devam etme
-      if (!DN && dmenuOn() && tries++ < 5) mountNav();
-    }, 2000);
+      if (DN) {
+        if (!DN.nav.isConnected) { unmountNav(); }
+        else {
+          if (!DN.host.isConnected || DN.host.parentNode !== DN.nav) DN.nav.appendChild(DN.host);
+          if (!DN.nav.hasAttribute('data-ua-nav')) DN.nav.setAttribute('data-ua-nav', '');
+          if (!DN.mhost.isConnected) document.body.appendChild(DN.mhost);
+          // ikas aynı yere yeni bir menü daha çizdiyse (eski kaldı ama görünen başka) yeni olana taşı
+          var g = null;
+          try { g = findNav(DM); } catch (e) {}
+          if (g && g.nav !== DN.nav && !DN.nav.getBoundingClientRect().height) unmountNav();
+        }
+      }
+      // Menü hiç bulunamayan sayfalarda boşuna aramaya devam etme (sayfa başına sınır)
+      if (!DN && dmenuOn() && tries++ < 60) mountNav();
+    };
+    setInterval(check, 1500);
+    var burst = function () {
+      tries = 0;
+      var n = 0;
+      (function f() { check(); if (++n < 50) setTimeout(f, 100); })();
+    };
+    ['pushState', 'replaceState'].forEach(function (m) {
+      var o = history[m];
+      if (typeof o !== 'function') return;
+      history[m] = function () { var r = o.apply(this, arguments); if (DM) setTimeout(burst, 0); return r; };
+    });
+    window.addEventListener('popstate', function () { if (DM) setTimeout(burst, 0); });
   })();
 
   // Ctrl/Cmd+K ve "/" kısayolları (masaüstü)
