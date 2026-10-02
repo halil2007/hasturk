@@ -1,20 +1,19 @@
-name: ikas ürünlerini senkronla
+name: HasTürk senkron önizleme
 
+# Çalışma dalında HasTürk senkronunu (iki mağazanın siparişleriyle) çalıştırır ve raporu dala kaydeder.
 on:
-  schedule:
-    - cron: '17 */2 * * *'   # 2 saatte bir
-  workflow_dispatch:          # Actions sekmesinden elle çalıştırma
+  workflow_dispatch:
   push:
-    branches: [main]          # sadece yayındaki dalda; çalışma dallarına commit atmasın
-    paths: ['config.json', 'config.*.json', 'scripts/**']
+    branches: ['claude/**']
+    paths: ['scripts/sync.mjs', 'config.json', '.github/workflows/sync-preview.yml']
 
 permissions:
   contents: write
 
-concurrency: sync
+concurrency: sync-preview
 
 jobs:
-  sync:
+  preview:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -22,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Ürünleri çek
+      - name: HasTürk (Tarım Dünyası siparişleri dahil)
         run: node scripts/sync.mjs
         env:
           IKAS_STORE: ${{ secrets.IKAS_STORE }}
@@ -30,32 +29,24 @@ jobs:
           IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
           IKAS_MERCHANT_ID: ${{ secrets.IKAS_MERCHANT_ID }}
           IKAS_SALES_CHANNEL_ID: ${{ secrets.IKAS_SALES_CHANNEL_ID }}
-          # Tarım Dünyası'nın siparişleri de algoritmaya katılır (aynı ürünler)
           OTHER_STORE: hasturktarimdunyasi
           OTHER_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
           OTHER_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
           OTHER_PRODUCTS: public/tarim/products.json
-      - name: Tarım Dünyası ürünlerini çek (2. mağaza)
-        # Anahtarlar yoksa atlanır; hata olursa 1. mağazanın senkronu yine kaydedilir
-        continue-on-error: true
+      - name: Tarım Dünyası (HasTürk siparişleri dahil)
         run: node scripts/sync.mjs
         env:
           SITE: tarim
           IKAS_STORE: hasturktarimdunyasi
           IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
           IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
-          # HasTürk'ün siparişleri de algoritmaya katılır
           OTHER_STORE: ${{ secrets.IKAS_STORE }}
           OTHER_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
           OTHER_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
           OTHER_PRODUCTS: public/products.json
-      - name: Değiştiyse kaydet
+      - name: Dala kaydet
         run: |
           git config user.name "urun-senkron"
           git config user.email "actions@users.noreply.github.com"
-          git add public/products.json
-          if [ -f public/menu.json ]; then git add public/menu.json; fi
-          if [ -f docs/trend-raporu.md ]; then git add docs/trend-raporu.md; fi
-          if [ -d public/tarim ]; then git add public/tarim; fi
-          if [ -f docs/trend-raporu-tarim.md ]; then git add docs/trend-raporu-tarim.md; fi
-          git diff --cached --quiet || (git commit -m "Ürünler güncellendi" && git push)
+          git add public docs 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "Senkron önizleme (iki mağazanın siparişleri)" && git push)

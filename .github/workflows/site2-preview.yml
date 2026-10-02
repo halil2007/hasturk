@@ -27,6 +27,10 @@ jobs:
           IKAS_STORE: hasturktarimdunyasi
           IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
           IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+          OTHER_STORE: ${{ secrets.IKAS_STORE }}
+          OTHER_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          OTHER_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+          OTHER_PRODUCTS: public/products.json
       - name: Site kontrolü (renkler, sayfalar)
         run: |
           S=https://tarim-dunyasi.com

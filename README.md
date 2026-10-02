@@ -168,3 +168,5 @@ Aynı widget ve menü sistemi, kendi ürünleri/fiyatları/stoğu ve kendi renk 
   <script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" data-site="tarim" async fetchpriority="high"></script>
   ```
 - Kontrol araçları: `Mağaza karşılaştırması`, `Tarım Dünyası önizleme`, `Tarım Dünyası canlı deneme` (Actions).
+- **Ortak algoritma:** iki mağaza aynı ürünleri sattığı için her senkronda iki mağazanın siparişleri birlikte kullanılır (`OTHER_*` ortam değişkenleri). Diğer mağazanın ürünü bu mağazada aynı adresle, `config.tarim.json > sameProduct` ile (HasTürk'teki çok seçenekli ürün ↔ Tarım Dünyası'ndaki ayrı boy ürünleri, seçenek adına göre) ya da aynı adla bulunur.
+- **Öne çıkarılmayan kategoriler:** `config.json > demoteCategories` (Kedi Ürünleri, Köpek Ürünleri): aranınca bulunur ama Çok satan / Yükselen / Sezon listelerine ve "Şu sıralar çok tercih edilenler"e girmez; eğilim puanı 1/5. `demoteTerms` içeren aramalar "Sık arananlar"da gösterilmez.

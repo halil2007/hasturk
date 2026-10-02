@@ -32,15 +32,15 @@ const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.d
 const die = (msg) => { console.error('HATA: ' + msg); process.exit(1); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function getToken() {
-  for (const k of ['IKAS_STORE', 'IKAS_CLIENT_ID', 'IKAS_CLIENT_SECRET']) if (!env[k]) die(`${k} tanımlı değil`);
-  const res = await fetch(`https://${env.IKAS_STORE}.myikas.com/api/admin/oauth/token`, {
+async function getToken(store = env.IKAS_STORE, id = env.IKAS_CLIENT_ID, secret = env.IKAS_CLIENT_SECRET) {
+  if (!store || !id || !secret) die('IKAS_STORE / IKAS_CLIENT_ID / IKAS_CLIENT_SECRET tanımlı değil');
+  const res = await fetch(`https://${store}.myikas.com/api/admin/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'client_credentials',
-      client_id: env.IKAS_CLIENT_ID,
-      client_secret: env.IKAS_CLIENT_SECRET,
+      client_id: id,
+      client_secret: secret,
     }),
   });
   const body = await res.text();
@@ -421,6 +421,58 @@ async function fetchOrders() {
   }
 }
 
+// İki mağaza aynı ürünleri satıyor: diğer mağazanın siparişleri de algoritmaya katılır (OTHER_STORE, OTHER_CLIENT_ID,
+// OTHER_CLIENT_SECRET, OTHER_PRODUCTS = diğer sitenin son products.json'u). Diğer mağazanın ürünü bu mağazada aynı
+// adresle → config.tarim.json > sameProduct (HasTürk'teki çok seçenekli ürün ↔ Tarım Dünyası'ndaki ayrı ürünler,
+// seçenek adına göre) → aynı adla bulunur; bulunamayan satır atlanır.
+async function fetchOtherOrders(out) {
+  if (env.MOCK || !env.OTHER_STORE || !env.OTHER_CLIENT_ID || !env.OTHER_CLIENT_SECRET || !env.OTHER_PRODUCTS) return null;
+  let other, token;
+  try { other = JSON.parse(await readFile(env.OTHER_PRODUCTS, 'utf8')); } catch { console.warn('UYARI: diğer mağazanın ürün dosyası yok: ' + env.OTHER_PRODUCTS); return null; }
+  const save = [TOKEN, ORDER_Q];
+  try {
+    TOKEN = await getToken(env.OTHER_STORE, env.OTHER_CLIENT_ID, env.OTHER_CLIENT_SECRET);
+    ORDER_Q = null;
+    const o = await fetchOrders();
+    if (!o) return null;
+    const map = await crossMapper(other, out);
+    let ok = 0, miss = 0;
+    const conv = (lines) => lines.map((l) => { const p = map(l); if (p) ok++; else miss++; return p ? { pid: p.id, vid: null, q: l.q, t: l.t } : null; }).filter(Boolean);
+    const res = { ...o, lines: conv(o.lines), past: o.past.map((py) => ({ ...py, lines: conv(py.lines) })) };
+    console.log(`Diğer mağaza (${env.OTHER_STORE}): ${o.orders} sipariş; ${ok} satır eşleşti, ${miss} satır bu mağazada karşılığı olmadığı için atlandı`);
+    return res;
+  } catch (e) {
+    console.warn('UYARI: diğer mağazanın siparişleri alınamadı: ' + String(e && e.message).slice(0, 200));
+    return null;
+  } finally { [TOKEN, ORDER_Q] = save; }
+}
+async function crossMapper(other, out) {
+  const f2 = (x) => fold(x).replace(/[^a-z0-9]+/g, ' ').trim();
+  let same = {};
+  try { same = JSON.parse(await readFile(join(ROOT, 'config.tarim.json'), 'utf8')).sameProduct || {}; } catch {}
+  const own = new Map(out.items.map((p) => [p.s, p])), ownName = new Map(out.items.map((p) => [f2(p.n), p]));
+  const oById = new Map(), oByVar = new Map();
+  for (const p of other.items) { oById.set(p.id, p); if (p.v1) oByVar.set(p.v1, { p, name: '' }); for (const v of p.v || []) oByVar.set(v.id, { p, name: v.name || '' }); }
+  // sameProduct: { "HasTürk adresi": ["Tarım Dünyası adresleri"] } — iki yönde de kullanılır
+  const toMain = {};
+  for (const [m, list] of Object.entries(same)) for (const t of list) toMain[t] = m;
+  const has = (txt, part) => part && new RegExp('(^| )' + f2(part).replace(/ /g, ' ') + '( |$)').test(f2(txt));
+  return (l) => {
+    const hit = oByVar.get(l.vid) || (oById.get(l.pid) ? { p: oById.get(l.pid), name: '' } : null);
+    if (!hit) return null;
+    const s = hit.p.s;
+    if (own.has(s)) return own.get(s);
+    if (toMain[s] && own.has(toMain[s])) return own.get(toMain[s]);
+    if (same[s]) { const c = same[s].map((x) => own.get(x)).filter(Boolean); return c.find((p) => has(p.n, hit.name)) || c[0] || null; }
+    return ownName.get(f2(hit.p.n)) || null;
+  };
+}
+function mergeOrders(a, b) {
+  if (!a || !b) return a || b;
+  const past = a.past.map((py) => { const q = b.past.find((x) => x.y === py.y); return q ? { ...py, orders: py.orders + q.orders, lines: py.lines.concat(q.lines) } : py; });
+  return { ...a, orders: a.orders + b.orders, lines: a.lines.concat(b.lines), past, stores: 2 };
+}
+
 const fold = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[ışğüöçâîû]/g, (c) => ({ ı: 'i', ş: 's', ğ: 'g', ü: 'u', ö: 'o', ç: 'c', â: 'a', î: 'i', û: 'u' })[c]).replace(/̇/g, '');
 
 // ---------- eğilim algoritması ----------
@@ -540,16 +592,26 @@ function applyTrends(out, trends, orders, config) {
     const score = now0 + bonus + SEASON * season * conf;
     rows.push({ slug, g, now0, mo, bonus, season, conf, lastRecent, thisRecent, score });
   }
-  const max = Math.max(0, ...rows.map((r) => r.score));
+  // Öne çıkarılmayacak kategoriler (config.json > demoteCategories; yoksa categoryLast, ör. kedi/köpek ürünleri):
+  // bu ürünler aranınca yine bulunur ama "Çok satan / Yükselen / Sezon" listelerine ve öne çıkanlara girmez,
+  // genel sıralamadaki eğilim katkıları da 1/5'e iner
+  const catOf = new Map(out.cats.map((c) => [c.id, c]));
+  const demoteSet = new Set((config.demoteCategories || config.categoryLast || []).map(fold));
+  const demoted = (slug) => {
+    const p = bySlug.get(slug);
+    return !!p && (p.c || []).some((id) => { for (let c = catOf.get(id); c; c = catOf.get(c.p)) if (demoteSet.has(fold(c.n))) return true; return false; });
+  };
+  const max = Math.max(0, ...rows.filter((r) => !demoted(r.slug)).map((r) => r.score));
   for (const r of rows) {
-    const h = max ? Math.round((100 * r.score) / max) : 0;
+    r.lo = demoted(r.slug);
+    const h = max ? Math.min(100, Math.round((100 * r.score * (r.lo ? 0.2 : 1)) / max)) : 0;
     if (h > 0) bySlug.get(r.slug).h = h;
   }
-  const inStock = (r) => (bySlug.get(r.slug) || {}).st;
+  const inStock = (r) => (bySlug.get(r.slug) || {}).st && !r.lo;
   // Çok satan: gerçek siparişler (bugün + yaklaşan sezonda geçen yıl satılan), en az 2 adet, en fazla 12.
   // Geçen yılın sezonu sadece bu yıl geride değilse sayılır (bu yıl satmayan ürüne "Çok satan" denmez)
   const sold = (r) => r.g.o + (r.conf >= 0.8 ? SEASON * ((r.g.yrs[1] || {}).oA || 0) * r.conf : 0);
-  const best = orders ? rows.filter((r) => sold(r) >= 2).sort((a, b) => sold(b) - sold(a)).slice(0, 12).map((r) => r.slug) : [];
+  const best = orders ? rows.filter((r) => sold(r) >= 2 && !r.lo).sort((a, b) => sold(b) - sold(a)).slice(0, 12).map((r) => r.slug) : [];
   const rising = rows.filter((r) => r.mo.rising && inStock(r)).sort((a, b) => b.bonus - a.bonus).slice(0, 8).map((r) => r.slug);
   // Sezon önerileri: bu yıl geride kalanlar hariç (teyit ≥ %70 ya da sezon henüz başlamadı)
   const season = rows.filter((r) => r.season * r.conf >= 4 && r.conf >= 0.7 && inStock(r)).sort((a, b) => b.season * b.conf - a.season * a.conf).slice(0, 8).map((r) => r.slug);
@@ -578,7 +640,8 @@ function applyTrends(out, trends, orders, config) {
     t.mo = momentum(t.n7, t.n, 3);
     t.score = t.s + t.mo.bonus + SEASON * t.ly;
   }
-  const q = [...terms.values()].filter((t) => t.n + t.ly >= 3).sort((a, b) => b.score - a.score).slice(0, 12).map((t) => t.show);
+  const lowWords = (config.demoteTerms || ['kedi', 'köpek', 'mama']).map((w) => fold(w));
+  const q = [...terms.values()].filter((t) => t.n + t.ly >= 3 && !lowWords.some((w) => fold(t.show).includes(w))).sort((a, b) => b.score - a.score).slice(0, 12).map((t) => t.show);
   const r2 = (n) => Math.round(n * 100) / 100;
   out.trend = {
     q, best, rising, season,
@@ -608,7 +671,7 @@ async function writeReport(out, trends, orders, an, config) {
     : `${y} yıl önce aynı dönemde veri yok`);
   L.push('# Ziyaretçi ve satış eğilimleri', '',
     'Kaynaklar: ' + [
-      orders ? `son ${orders.days} günde ${orders.orders} sipariş` : 'sipariş verisi yok (ikas uygulamasına "Siparişler (okuma)" izni gerekir)',
+      orders ? `son ${orders.days} günde ${orders.orders} sipariş${orders.stores === 2 ? ' (HasTürk + Tarım Dünyası birlikte)' : ''}` : 'sipariş verisi yok (ikas uygulamasına "Siparişler (okuma)" izni gerekir)',
       trends ? `site içi olaylar son ${trends.days} gün (${trends.rows} kayıt)` : 'site içi olay verisi henüz yok',
       ...yearTxt,
     ].join('; ') + '.', '',
@@ -762,7 +825,7 @@ async function remapConfig(config, out) {
   const pm = c.pageMap || {};
   if (c.guides) c.guides = c.guides.map((g) => (g.url && pm[g.url] ? { ...g, url: pm[g.url] } : g));
   if (c.pages) c.pages = c.pages.map((g) => (g.url && pm[g.url] ? { ...g, url: pm[g.url] } : g));
-  delete c.slugMap; delete c.pageMap;
+  delete c.slugMap; delete c.pageMap; delete c.sameProduct;
   if (miss.size) console.warn(`UYARI (${SITE}): bu mağazada karşılığı bulunamayan ürün adresleri atlandı (config.${SITE}.json > slugMap ile eşleştirilebilir): ${[...miss].join(', ')}`);
   // Adıyla anılan kategoriler bu mağazada var mı (yoksa o ayar sessizce etkisiz kalır)
   const cats = new Set(out.cats.map((x) => fold(x.n)));
@@ -812,7 +875,8 @@ async function main() {
 
   // Eğilimler: hata olursa ürün senkronu yine de tamamlanır
   try {
-    const [trends, orders] = await Promise.all([fetchTrends(), fetchOrders()]);
+    const [trends, own] = await Promise.all([fetchTrends(), fetchOrders()]);
+    const orders = mergeOrders(own, await fetchOtherOrders(out));
     const an = applyTrends(out, trends, orders, config);
     await writeReport(out, trends, orders, an, config);
   } catch (e) {
