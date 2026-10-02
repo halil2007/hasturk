@@ -2060,6 +2060,7 @@
       if (SH.p === p) closeSheet();
       // Sepet yanıtı kanıt anında işlendi (kalan ücretsiz kargo tutarı güncel); bildirim beklemeden gösterilir
       addedMsg(p, v, xs);
+      syncSiteCart();
       track('add_to_cart_ok', p.n);
       ev('a', p.s);
     }, function (why) {
@@ -2177,6 +2178,38 @@
     // Kullanılmazsa 90 sn sonra kaldır
     setTimeout(function () { if (FRAMES[p.id] === entry) { delete FRAMES[p.id]; if (f.parentNode) f.parentNode.removeChild(f); } }, 95000);
     return entry.pr;
+  }
+  // Gizli çerçeveden eklenen ürün sunucudaki sepete yazılır ama açık sayfadaki ikas sepeti (üstteki sayaç, açılır
+  // sepet) kendini yenilemez; sayfa sepeti boş sanıp sonraki eklemede yeni sepet açabilir. Eklemeden sonra sitenin
+  // kendi sepet deposunu (React ağacındaki store.cartStore) bulup getCart() ile sepeti yeniden okutur.
+  var SITE_CS = null;
+  function siteCartStore() {
+    if (SITE_CS) return SITE_CS;
+    try {
+      var el = document.getElementById('__next'), ks = el ? Object.keys(el) : [], ck = null;
+      for (var i = 0; i < ks.length; i++) if (ks[i].indexOf('__reactContainer$') === 0) { ck = ks[i]; break; }
+      if (!ck) return null;
+      var stack = [el[ck]], n = 0, t0 = Date.now();
+      while (stack.length && n < 5000 && Date.now() - t0 < 60) {
+        var f = stack.pop(), pr = f.memoizedProps;
+        n++;
+        if (pr && typeof pr === 'object') {
+          var st = pr.store, cs = st && typeof st === 'object' && st.cartStore;
+          if (cs && typeof cs.getCart === 'function') return (SITE_CS = cs);
+        }
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+    } catch (e) {}
+    return null;
+  }
+  function syncSiteCart() {
+    try {
+      var cs = siteCartStore();
+      if (!cs) return;
+      var r = cs.getCart();
+      if (r && r.then) r.then(null, function () {});
+    } catch (e) {}
   }
   // ---- Hızlı ekleme 1: sitenin sepete ekleme isteğini bir kez öğren, sonra sayfa açmadan doğrudan gönder ----
   var TPL_KEY = 'ua-addtpl', ADD_TPL = null, PENDING = null;

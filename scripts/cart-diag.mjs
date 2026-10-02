@@ -99,6 +99,14 @@ const cartCount = async (p) => p.evaluate(async () => {
   log(`Widget: "${name.trim()}" eklendi mesajı: ${toast || '-'}`);
   log('Widget ekleme kaydı: ' + (alog || '-').slice(0, 600));
   log('Sepet kimliği (sonra): ' + JSON.stringify(await store()));
+  // Açık sayfadaki sitenin sepeti (yenilemeden): üstteki sepet sayacı ve sitenin sepet deposu
+  log('Sayfa yenilenmeden sitenin sepeti: ' + JSON.stringify(await p.evaluate(() => {
+    const hdr = [...document.querySelectorAll('[class*="basket" i], [class*="cart" i], a[href*="cart"]')].filter((e) => e.getBoundingClientRect().top < 200 && (e.offsetWidth || e.offsetHeight)).slice(0, 3).map((e) => (e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 20));
+    let cs = null; const el = document.getElementById('__next'); const ck = el && Object.keys(el).find((k) => k.startsWith('__reactContainer$'));
+    const st = ck ? [el[ck]] : []; let n = 0;
+    while (st.length && !cs && n < 5000) { const f = st.pop(); n++; const pr = f.memoizedProps; if (pr && pr.store && pr.store.cartStore) cs = pr.store.cartStore; if (f.sibling) st.push(f.sibling); if (f.child) st.push(f.child); }
+    return { ustSayac: hdr, depo: cs ? (cs.cart ? String(cs.cart.id).slice(0, 8) + ' ' + (cs.cart.orderLineItems || []).length + ' satır' : 'boş') : 'bulunamadı' };
+  })));
   log('Widget istekleri: ' + JSON.stringify(reqs.map((r) => ({ ms: r.t - t0, url: r.url, body: r.body }))).slice(0, 2000));
   await p.goto(SITE + '/'); await p.waitForTimeout(3000);
   log('Widget testi sonra sepet: ' + await cartCount(p));
