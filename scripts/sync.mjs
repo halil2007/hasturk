@@ -10,6 +10,7 @@
 //   MOCK=1              API'ye gitmeden örnek veriyle çalış (test için)
 //   TRENDS_URL          ziyaretçi eğilimi özeti (varsayılan: Worker'ın /trends adresi); TRENDS_FILE ile yerel dosya
 //   ORDER_DAYS          satış analizinde bakılacak gün (varsayılan 60)
+//   STORE_OUT           sadece ürünleri bu dosyaya yaz (ikinci mağaza karşılaştırması: scripts/compare-stores.mjs)
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -752,6 +753,13 @@ async function main() {
   }
   const out = transform({ ...raw, config });
   if (!out.items.length) die('Hiç ürün çıkmadı; products.json güncellenmedi.');
+  // Başka bir mağazanın ürünlerini sadece dosyaya yaz (karşılaştırma için; eğilim/menü/rapor yapılmaz):
+  // STORE_OUT=/tmp/magaza2.json IKAS_STORE=... node scripts/sync.mjs
+  if (env.STORE_OUT) {
+    await writeFile(env.STORE_OUT, JSON.stringify(out));
+    console.log(`Yazıldı: ${env.STORE_OUT} (${out.items.length} ürün, ${out.cats.length} kategori)`);
+    return;
+  }
 
   // Eğilimler: hata olursa ürün senkronu yine de tamamlanır
   try {
