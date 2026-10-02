@@ -11,16 +11,27 @@ mkdirSync('shots', { recursive: true });
 const lines = [];
 const log = (s) => { lines.push(s); console.log(s); };
 
+// LIVE=1: siteye hiçbir şey enjekte edilmez; yayındaki etiket ve yayındaki dosyalar olduğu gibi denenir
+const LIVE = !!process.env.LIVE;
 async function ctxFor(b, mobile) {
   const ctx = await b.newContext(mobile
     ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36' }
     : { viewport: { width: 1440, height: 900 } });
+  if (LIVE) {
+    ctx.on('request', (r) => { if (r.url().includes(HOST)) log(`  istek: ${r.url().replace('https://' + HOST, '')}`); });
+    ctx.on('response', (r) => { if (r.url().includes(HOST) && r.status() >= 400) log(`  HATA ${r.status()}: ${r.url()}`); });
+    ctx.on('console', (m) => { if (m.type() === 'error') log('  konsol: ' + m.text().slice(0, 200)); });
+    return ctx;
+  }
   await ctx.route((u) => u.hostname === HOST, (r) => {
     const p = new URL(r.request().url()).pathname;
     if (p === '/e') return r.fulfill({ status: 204 });
     const f = { '/pm-search.js': 'public/pm-search.js', '/tarim/menu.json': 'public/tarim/menu.json', '/tarim/products.json': 'public/tarim/products.json' }[p];
     if (!f) return r.fulfill({ status: 404 });
-    return r.fulfill({ status: 200, body: readFileSync(f), contentType: f.endsWith('.js') ? 'application/javascript' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' } });
+    // CORS başlığı public/_headers'tan okunur (eksikse canlıdaki gibi hata versin; daha önce burada eklenip sorun gizleniyordu)
+    const hdr = readFileSync('public/_headers', 'utf8').split(/\n(?=\/)/).find((b) => b.split('\n')[0].trim() === p) || '';
+    const headers = /Access-Control-Allow-Origin:\s*\*/.test(hdr) ? { 'Access-Control-Allow-Origin': '*' } : {};
+    return r.fulfill({ status: 200, body: readFileSync(f), contentType: f.endsWith('.js') ? 'application/javascript' : 'application/json', headers });
   });
   await ctx.route((u) => u.origin === SITE && (u.pathname === '/' || !/\.\w+$/.test(u.pathname)), async (r) => {
     if (r.request().resourceType() !== 'document') return r.continue();

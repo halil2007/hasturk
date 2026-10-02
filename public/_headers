@@ -10,3 +10,12 @@
 /pm-search.js
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+# İkinci site (data-site="tarim"): aynı izin ve önbellek
+/tarim/products.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=600, stale-while-revalidate=86400
+
+/tarim/menu.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=600, stale-while-revalidate=86400
