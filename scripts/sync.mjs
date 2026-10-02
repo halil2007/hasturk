@@ -13,10 +13,11 @@
 //   STORE_OUT           sadece ürünleri bu dosyaya yaz (ikinci mağaza karşılaştırması: scripts/compare-stores.mjs)
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const env = process.env;
 // İkinci site (SITE=tarim): ürünler o mağazanın API'sinden, dosyalar public/<SITE>/ altına; ayarlar config.json +
 // config.<SITE>.json (üzerine yazar). Ziyaretçi eğilimleri iki sitede ortak (aynı /trends).
 const SITE = (env.SITE || '').replace(/[^a-z0-9-]/g, '');
@@ -25,7 +26,6 @@ const OUT = join(PUB, 'products.json');
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
 const REPORT = join(ROOT, 'docs', SITE ? `trend-raporu-${SITE}.md` : 'trend-raporu.md');
 const MENU = join(PUB, 'menu.json');
-const env = process.env;
 const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.dev/trends';
 
 // ---------- yardımcılar ----------
@@ -656,7 +656,7 @@ async function writeReport(out, trends, orders, an, config) {
   if (prev === text) return;
   await mkdir(dirname(REPORT), { recursive: true });
   await writeFile(REPORT, text);
-  console.log('Rapor yazıldı: docs/trend-raporu.md');
+  console.log('Rapor yazıldı: ' + relative(ROOT, REPORT));
 }
 
 // ---------- kategori görselleri + hızlı menü verisi ----------
@@ -727,8 +727,9 @@ async function writeMenu(out) {
   let prev = '';
   try { prev = await readFile(MENU, 'utf8'); } catch {}
   if (prev === text) return;
+  await mkdir(dirname(MENU), { recursive: true });
   await writeFile(MENU, text);
-  console.log(`Menü verisi yazıldı: public/menu.json (${(Buffer.byteLength(text) / 1024).toFixed(1)} KB)`);
+  console.log(`Menü verisi yazıldı: ${relative(ROOT, MENU)} (${(Buffer.byteLength(text) / 1024).toFixed(1)} KB)`);
 }
 
 // ---------- ana akış ----------
