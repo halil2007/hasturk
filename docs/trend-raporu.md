@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 189 sipariş; site içi olaylar son 30 gün (173 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 189 sipariş; site içi olaylar son 30 gün (176 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -14,9 +14,10 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 2 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×9,1 | 4 | evet |
 | 3 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×5,2 | 2 | evet |
 | 4 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
-| 5 | DSV Lippa Tamu 5 Mix Çim Tohumu | ×2,1 | 2 | evet |
-| 6 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | ×2,2 | 1 | evet |
-| 7 | HasTürk Hümix Sıvı Hümik Asit | ×1,6 | 0 | evet |
+| 5 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×3,6 | 1 | evet |
+| 6 | DSV Lippa Tamu 5 Mix Çim Tohumu | ×2,1 | 2 | evet |
+| 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | ×2,2 | 1 | evet |
+| 8 | HasTürk Hümix Sıvı Hümik Asit | ×1,6 | 0 | evet |
 
 ## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)
 
@@ -38,8 +39,8 @@ _Henüz veri yok._
 | 2 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10,2 | 6 |
 | 3 | HasTürk Solucan Gübresi  | 9,4 | 11 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,7 | 1 |
-| 5 | Kullanıma Hazır Cocopeat Torfu | 8,6 | 16 |
-| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
+| 5 | Kullanıma Hazır Cocopeat Torfu | 8,5 | 16 |
+| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,4 | 13 |
 | 7 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7 | 5 |
 | 8 | Premium Fide Toprağı | 6,7 | 11 |
 | 9 | Leonardit - Organik Toprak Düzenleyici | 5,9 | 9 |
@@ -60,23 +61,25 @@ _Henüz veri yok._
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | solucan | 6 | 6 | ↑ ×3,9 |  |
-| 2 | perlit | 4 | 4 | ↑ ×2,9 |  |
-| 3 | torf | 4 | 4 | ↑ ×2,9 |  |
-| 4 | solucan gübresi | 3 | 3 | ↑ ×2,4 |  |
+| 2 | solucan gübresi | 4 | 4 | ↑ ×2,9 |  |
+| 3 | perlit | 4 | 4 | ↑ ×2,9 |  |
+| 4 | torf | 4 | 4 | ↑ ×2,9 |  |
 | 5 | sebze tohumu | 2 | 2 |  |  |
 | 6 | biyo | 1 | 1 |  |  |
 | 7 | cocopeat | 1 | 1 |  |  |
 | 8 | fasulye | 1 | 1 |  |  |
 | 9 | gübr | 1 | 1 |  |  |
 | 10 | gübre | 1 | 1 |  |  |
-| 11 | leonar | 1 | 1 |  |  |
-| 12 | limon | 1 | 1 |  |  |
-| 13 | lotu | 1 | 1 |  |  |
-| 14 | enjo | 1 | 1 |  |  |
-| 15 | felici | 1 | 1 |  |  |
-| 16 | hümik | 1 | 1 |  |  |
-| 17 | ilaçlama pompası | 1 | 1 |  |  |
-| 18 | saksı toprağı | 1 | 1 |  |  |
+| 11 | ilaçlam | 1 | 1 |  |  |
+| 12 | leonar | 1 | 1 |  |  |
+| 13 | limon | 1 | 1 |  |  |
+| 14 | lotu | 1 | 1 |  |  |
+| 15 | soluca | 1 | 1 |  |  |
+| 16 | enjo | 1 | 1 |  |  |
+| 17 | felici | 1 | 1 |  |  |
+| 18 | hümik | 1 | 1 |  |  |
+| 19 | ilaçlama pompası | 1 | 1 |  |  |
+| 20 | saksı toprağı | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
