@@ -35,47 +35,37 @@ Veritabanı (`hasturk-panel`) ilk yayında kendiliğinden oluşur. Deneme modund
 | Ad | Değer |
 |---|---|
 | `PANEL_PASSWORD` | Panele giriş şifresi (uzun ve tahmin edilemez olsun) |
-| `PANEL_SECRET` | *(isteğe bağlı)* Rastgele uzun bir metin. Değiştirilirse tüm oturumlar kapanır |
+| `PANEL_SECRET` | *(önerilir)* Rastgele uzun bir metin (ör. 40 karakter). Panelde girilen API bilgileri bununla şifrelenir. **Sonradan değiştirmeyin**: değişirse oturumlar kapanır ve API bilgilerini yeniden girmeniz gerekir |
 
 Gerçek kanalları bağladıktan sonra `DEMO` değişkenini silin. Deneme siparişlerini de temizlemek için Cloudflare → D1 → `hasturk-panel` → Console'da `DELETE FROM orders; DELETE FROM order_items; DELETE FROM packages; DELETE FROM order_stock; DELETE FROM listings; DELETE FROM products; DELETE FROM stock_moves; DELETE FROM settings WHERE k LIKE 'cursor:%' OR k LIKE 'last:%';` çalıştırın.
 
-## 3. Kanal anahtarları
+## 3. Kanal API bilgileri (panelden)
 
-Hepsi **Secret** olarak eklenir. Hiçbirini dosyaya ya da sohbete yazmayın. Hangi anahtarın eksik olduğu panelde **Ayarlar → Satış kanalları** bölümünde görünür.
+Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bilgilerini buraya girip **Kaydet**'e, ardından **Bağlantıyı test et**'e basın. Hangi bilginin nereden alınacağı kartın üstünde yazar.
 
-### ikas (iki mağaza)
-ikas paneli → **Uygulamalar → Uygulamalarım → Özel uygulama oluştur**. İzinler: **Ürünler, Siparişler, Stok (okuma + yazma)**.
-> Arama widget'ı için açılan mevcut uygulamada yalnızca okuma izni var. Panel için **yeni bir özel uygulama** açın.
+- Bilgiler sunucuda **şifreli (AES-GCM)** saklanır ve bir daha ekranda açık gösterilmez. Gizli alanlarda sadece son 4 karakter görünür. Gizli alanı boş bırakıp kaydederseniz eski değer korunur.
+- Şifreleme anahtarı `PANEL_SECRET`'tan türetilir. Tanımlı değilse panel şifresinden türetilir; bu durumda şifreyi değiştirdiğinizde API bilgilerini yeniden girmeniz gerekir. Bu yüzden Cloudflare'de `PANEL_SECRET` tanımlamanız önerilir.
+- **Aktif** anahtarı kapatılan kanal hiç senkronlanmaz.
+- İsterseniz bilgiler Cloudflare'de gizli değişken olarak da tanımlanabilir. Panelde girilen değer, Cloudflare'deki aynı adlı değişkenin önüne geçer.
 
-| Ad | HasTürk | Tarım Dünyası |
-|---|---|---|
-| Mağaza adı (`XXXX.myikas.com`) | `IKAS1_STORE` | `IKAS2_STORE` (`hasturktarimdunyasi`) |
-| Client ID | `IKAS1_CLIENT_ID` | `IKAS2_CLIENT_ID` |
-| Client Secret | `IKAS1_CLIENT_SECRET` | `IKAS2_CLIENT_SECRET` |
-| *(isteğe bağlı)* Görseller için Merchant ID | `IKAS1_MERCHANT_ID` | `IKAS2_MERCHANT_ID` |
-| *(isteğe bağlı)* Sadece bu satış kanalı | `IKAS1_SALES_CHANNEL_ID` | `IKAS2_SALES_CHANNEL_ID` |
-| *(isteğe bağlı)* Stok lokasyonu (boşsa ilki) | `IKAS1_STOCK_LOCATION_ID` | `IKAS2_STOCK_LOCATION_ID` |
+| Kanal | Gerekli bilgiler | Nereden alınır | Cloudflare değişken adları (isteğe bağlı) |
+|---|---|---|---|
+| ikas (HasTürk / Tarım Dünyası) | Mağaza adı, Client ID, Client Secret | ikas → Uygulamalar → Özel uygulama oluştur. İzinler: Ürünler, Siparişler, Stok (okuma + yazma) | `IKAS1_*` / `IKAS2_*` (`STORE`, `CLIENT_ID`, `CLIENT_SECRET`, `NAME`, `MERCHANT_ID`, `SALES_CHANNEL_ID`, `STOCK_LOCATION_ID`) |
+| Trendyol | Satıcı ID, API Key, API Secret | Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri | `TRENDYOL_SELLER_ID`, `TRENDYOL_API_KEY`, `TRENDYOL_API_SECRET` |
+| Hepsiburada | Merchant ID, servis anahtarı | Merchant paneli → Entegrasyon / API bilgileri | `HB_MERCHANT_ID`, `HB_PASSWORD` (+ `HB_USERNAME`, `HB_USER_AGENT`, `HB_TEST`) |
+| PttAVM | API kullanıcı adı ve şifresi, depo numarası | Mağaza paneli → Entegrasyon → API kullanıcısı | `PTTAVM_USERNAME`, `PTTAVM_PASSWORD`, `PTTAVM_WAREHOUSE_ID` (+ gelişmiş ayarlar) |
 
-Mağazalar panelde "HasTürk" ve "Tarım Dünyası" olarak görünür. Değiştirmek için `IKAS1_NAME` / `IKAS2_NAME` (Text) ekleyin.
-
-> ⚠️ ikas'ın kendi pazaryeri entegrasyonu (ikas üzerinden Trendyol/Hepsiburada bağlantısı) açıksa aynı sipariş iki kez gelir ve stok iki taraftan yönetilir. Bu durumda ikas'taki pazaryeri stok senkronunu kapatın ya da `IKAS1_SALES_CHANNEL_ID` ile yalnızca web sitesi satış kanalını alın.
-
-### Trendyol
-Satıcı paneli → **Hesap Bilgilerim → Entegrasyon Bilgileri**: `TRENDYOL_SELLER_ID`, `TRENDYOL_API_KEY`, `TRENDYOL_API_SECRET`.
-
-### Hepsiburada
-Merchant paneli → **Entegrasyon / API bilgileri**: `HB_MERCHANT_ID`, `HB_PASSWORD` (servis anahtarı). Hepsiburada farklı bir kullanıcı adı ya da User-Agent verdiyse bunları da ekleyin: `HB_USERNAME`, `HB_USER_AGENT`. Test ortamı için `HB_TEST` = `1`.
-
-### PttAVM
-Mağaza paneli → **Entegrasyon → API kullanıcısı**: `PTTAVM_USERNAME`, `PTTAVM_PASSWORD`. Kargo barkodunu PttAVM'den almak için depo numarası `PTTAVM_WAREHOUSE_ID` girilir.
+> ⚠️ Arama widget'ı için açılan mevcut ikas uygulamasında yalnızca okuma izni var. Panel için **yazma izinli yeni bir özel uygulama** açın.
+>
+> ⚠️ ikas'ın kendi pazaryeri entegrasyonu (ikas üzerinden Trendyol/Hepsiburada bağlantısı) açıksa aynı sipariş iki kez gelir. Bu durumda ikas'taki pazaryeri stok senkronunu kapatın ya da gelişmiş ayarlardaki "Satış kanalı ID" ile yalnızca web sitesi kanalını alın.
 
 ## 4. İlk kurulum adımları (sırayla)
 
-1. **Ayarlar** → her kanal **Bağlı** görünmeli. Kanal için **Senkronla**'ya basın. Hata varsa mesajı ve **Kayıtlar** bölümü nedenini gösterir.
+1. **Entegrasyonlar** sayfasında API bilgilerini girin ve **Bağlantıyı test et**'e basın. Her kanal **Bağlı** görünmeli. Hata olursa mesaj kartta görünür, ayrıntısı **Ayarlar → Kayıtlar**'dadır.
 2. **Ürünler → İçe aktar:** Kanallardaki ilanlar çekilir. Aynı **SKU (stok kodu)** veya **barkod**a sahip ilanlar tek ürün altında birleşir ve stok ilk kanaldan (HasTürk) alınır.
 3. **Ürünler → Eşleştir:** Kodu farklı olan ilanları elle bir ürüne bağlayın ya da yeni ürün olarak ekleyin.
 4. Stok adetlerini kontrol edin. Gerekirse ürünün stoğuna dokunup **Sayım (=)** ile düzeltin. Kârlılık için ürünlere **alış fiyatı** girin ("Alış fiyatı eksik" filtresi).
-5. **Ayarlar → Komisyon ve giderler:** Kanal komisyonlarını, sipariş başına kargo giderini ve hizmet bedelini girin. **Gönderici** bilgileri kargo etiketinde çıkar.
+5. **Ayarlar → Komisyon ve giderler:** Kanal komisyonlarını, sipariş başına kargo giderini ve hizmet bedelini girin. **Kargo etiketi** bölümüne gönderici bilgilerini yazın.
 6. **Ayarlar → Stok senkronu: Aç.** Açıldığı andan sonraki satışlar stoktan düşer ve panel stoğu tüm kanallara gönderilir. Daha eski siparişler stoğu etkilemez.
 
 ## Nasıl çalışır?
@@ -95,12 +85,19 @@ Elle yapılan stok girişi kaydedildiği anda tüm kanallara gönderilir. Kanala
 | İşleme al | panel | ✓ "Hazırlanıyor" (Picking) | panel | panel |
 | Paketlere bölme | panel | ✓ Trendyol'da bölünür (yeni paketler birkaç dk sonra gelir) | ✓ her paket ayrı HB paketi | panel |
 | Kargoya verme | ✓ takip no müşteriye bildirilir | ✓ fatura no / takip no | panel (HB kargosu alır) | ✓ barkod (depo no varsa) |
-| Kargo etiketi | panel etiketi | ✓ Trendyol ortak etiketi (ZPL) + panel etiketi | ✓ HB etiketi (ZPL/PDF) + panel etiketi | panel etiketi |
+| Kargo etiketi | ikas kargo barkodu etikete basılır | ✓ Trendyol ortak etiketi (ZPL) | ✓ Hepsiburada paket etiketi (ZPL/PDF) | PttAVM kargo barkodu etikete basılır |
 | Stok gönderme | ✓ | ✓ | ✓ | ✓ (beta) |
 | Fiyat gönderme | ✓ | ✓ | ✓ | — |
 | Ürün oluşturma | ✓ | kanal panelinden | kanal panelinden | kanal panelinden |
 
-**Panel etiketi:** 100×150 mm (A6) boyutundadır. Alıcı, adres, paket numarası (1/2, 2/2…), paketteki ürünler ve gönderici bilgilerini içerir. Takip numarası Code 128 barkod olarak basılır. Takip numarası henüz yoksa sipariş ve paket numarasından oluşan iç barkod basılır. Ofis yazıcısında da termal yazıcıda da çalışır. ZPL dosyası Zebra ve uyumlu termal yazıcılara doğrudan gönderilir.
+**Kargo etiketi (kanalların kendi sistemlerinden):** Ayrı bir kargo firması entegrasyonu yoktur; etiket ve barkod her kanalın kendi kargo sisteminden gelir.
+- **Trendyol:** Ortak etiket (Trendyol Express / Aras) ZPL olarak alınır. Sipariş işleme alındıktan birkaç dakika sonra hazır olur.
+- **Hepsiburada:** Paket oluşturulunca paketin etiketi ZPL veya PDF olarak alınır.
+- **ikas ve PttAVM:** Bu kanallar API'den etiket dosyası vermiyor. Kanalın kargo entegrasyonunun **barkodu** (ikas paket barkodu / PttAVM kargo barkodu) senkronla gelir ve panelin 100×150 mm etiketine Code 128 olarak basılır.
+
+Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. ZPL dosyası Zebra ve uyumlu termal yazıcılarda doğrudan basılır. Normal yazıcı kullanıyorsanız **Ayarlar → Kargo etiketi → "ZPL etiketini PDF'e çevir"** seçeneğini açın. Bu çeviri Labelary servisiyle yapılır ve etiket içeriği (alıcı adı/adresi) bu servise gönderilir.
+
+**Sayfalar:** Genel Bakış, Siparişler (kanal sekmeleri, tarih/kargo filtresi, toplu işleme alma ve etiket, Excel'e aktarma), Ürünler, Stoklar (ortak stok ve her kanaldaki adet), Kargo (etiket bekleyen / kargoya verilecek / kargoda), Kârlılık, Analizler, Entegrasyonlar, Ayarlar.
 
 **Pazaryerlerinde yeni ürün açma:** Trendyol, Hepsiburada ve PttAVM her kategori için zorunlu özellikler istediğinden yeni ilan kanalın kendi panelinden açılır. İlan aynı SKU veya barkodla açıldığında bir sonraki içe aktarmada panel ürününe otomatik bağlanır.
 
@@ -109,7 +106,7 @@ Elle yapılan stok girişi kaydedildiği anda tüm kanallara gönderilir. Kanala
 - **Canlı hesapla ilk deneme:** API bağlantıları kanalların resmi dokümanlarına göre yazıldı. Örnek API cevaplarıyla test edildi ama gerçek mağaza hesaplarıyla henüz denenmedi. İlk bağlantıda **Ayarlar → Kayıtlar**'da bir hata görürseniz mesajı iletin; çoğu düzeltme tek satırlıktır.
 - **PttAVM (beta):** PttAVM'in SOAP servisinin alan adları hesaba ve sürüme göre değişebiliyor. Yöntem adları ortam değişkenleriyle değiştirilebilir: `PTTAVM_ORDER_METHOD` (varsayılan `SiparisKontrolListesiV2`), `PTTAVM_STOCK_METHOD` (`StokFiyatGuncelle3`), `PTTAVM_LIST_METHOD` (`StokKontrolListesi`), `PTTAVM_DATE_FORMAT` (`tr` = gg.aa.yyyy).
 - **Hepsiburada paket listeleri:** Kargodaki, teslim edilen ve iptal edilen paket uç noktalarından biri hesabınızda kapalıysa senkron devam eder; uyarı Kayıtlar'a yazılır.
-- **Kargo firması API'si:** Yurtiçi, Aras, MNG gibi firmaların kendi sistemlerinde gönderi oluşturma bu sürümde yok. Takip numarası pazaryerinden gelir ya da pakete elle girilir.
+- **Kargo firması entegrasyonu yok (bilerek):** Etiket ve barkod her kanalın kendi kargo sisteminden gelir. Yurtiçi, Aras, MNG gibi firmalara doğrudan bağlantı ileride eklenebilir.
 - **Cloudflare limitleri:** Ücretsiz planda istek başına işlemci süresi ve veritabanı sorgu sayısı sınırlıdır. Kayıtlarda "CPU" veya "too many" hatası görünürse **Workers Paid** planına (aylık 5 $) geçin. Kod değişikliği gerekmez.
 - **Kişisel veriler:** Müşteri adı, adresi ve telefonu yalnızca sizin Cloudflare veritabanınızda tutulur. Panel girişsiz hiçbir veri vermez. Oturum, imzalı ve HttpOnly bir çerezle tutulur. Başka sitelerden gelen yazma istekleri reddedilir.
 
@@ -128,5 +125,6 @@ npm test         # stok düşümü, iptal/iade, stok gönderimi, kâr formülü,
 | `src/sync.js` | Senkron motoru: sipariş kaydı, stok düşümü, stok ve fiyat gönderimi, içe aktarma |
 | `src/stats.js` | Ciro, adet, kâr serileri, karşılaştırma, en çok satanlar |
 | `src/channels/*.js` | Kanal bağlantıları (`ikas`, `trendyol`, `hepsiburada`, `pttavm`, `demo`) |
-| `public/` | Panel arayüzü (derleme gerektirmez): `app.js`, `views/*.js`, `chart.js`, `labels.js` (etiket + Code 128), `profit.js` (kâr formülü; sunucu da aynı dosyayı kullanır) |
+| `src/config.js` | Panelden girilen API bilgileri (şifreli saklama, maskeleme) |
+| `public/` | Panel arayüzü (derleme gerektirmez): `app.js`, `views/*.js` (sayfalar; `orderops.js` = sipariş işlemleri bileşeni), `chart.js`, `labels.js` (etiket + Code 128), `profit.js` (kâr formülü; sunucu da aynı dosyayı kullanır) |
 | `dev/` | Yerel sunucu ve D1 benzeri SQLite sarmalayıcı |

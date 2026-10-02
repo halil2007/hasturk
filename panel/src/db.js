@@ -42,11 +42,26 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS stock_moves_product ON stock_moves(product_id, created_at)',
   'CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)',
   `CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, channel TEXT, level TEXT, msg TEXT)`,
+  // Panelden girilen kanal API bilgileri (şifreli)
+  'CREATE TABLE IF NOT EXISTS channel_config (id TEXT PRIMARY KEY, data TEXT, active INTEGER NOT NULL DEFAULT 1, updated_at INTEGER)',
+];
+// Sonradan eklenen sütunlar (mevcut veritabanlarına eklenir; zaten varsa hata yok sayılır)
+const MIGRATIONS = [
+  'ALTER TABLE packages ADD COLUMN barcode TEXT',
+  'ALTER TABLE packages ADD COLUMN label_format TEXT',
+  'ALTER TABLE packages ADD COLUMN label_data TEXT',
+  'ALTER TABLE packages ADD COLUMN label_at INTEGER',
+  'ALTER TABLE orders ADD COLUMN hash TEXT',
 ];
 
 const ready = new WeakMap();
 export function init(db) {
-  if (!ready.has(db)) ready.set(db, db.batch(SCHEMA.map((s) => db.prepare(s))).catch((e) => { ready.delete(db); throw e; }));
+  if (!ready.has(db)) {
+    ready.set(db, (async () => {
+      await db.batch(SCHEMA.map((s) => db.prepare(s)));
+      for (const m of MIGRATIONS) { try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
+    })().catch((e) => { ready.delete(db); throw e; }));
+  }
   return ready.get(db);
 }
 
@@ -67,6 +82,8 @@ export const DEFAULT_SETTINGS = {
   restock_returns: false,   // iade gelen ürün stoğa geri eklensin mi
   history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (istatistik için)
   sender: { name: 'HasTürk', phone: '', address: '', city: '' },
+  // Trendyol/Hepsiburada ZPL etiketini normal yazıcıda basmak için PDF'e çevir (Labelary servisi; etiket içeriği o servise gider)
+  zpl_pdf: false,
   cargo_companies: ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'PTT Kargo', 'Sürat Kargo', 'Trendyol Express', 'HepsiJet', 'Kolay Gelsin'],
 };
 

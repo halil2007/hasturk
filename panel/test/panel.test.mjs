@@ -133,3 +133,68 @@ test('API: giriş olmadan veri vermez, başka siteden yazma isteğini reddeder',
   assert.equal((await call('/api/orders', { headers: { Cookie: cookie } })).status, 200);
   assert.equal((await call('/api/orders', { headers: { Cookie: cookie.slice(0, -3) + 'abc' } })).status, 401, 'değiştirilmiş çerez geçersiz');
 });
+
+test('Entegrasyonlar: API bilgisi şifreli saklanır, gizli değer istemciye dönmez, panel değeri kullanılır', async () => {
+  const env = { PANEL_PASSWORD: 'pw-123456', PANEL_SECRET: 'sir', DB: d1() };
+  const call = async (path, opts = {}) => {
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: env.cookie || '' } }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) env.cookie = r.headers.get('set-cookie').split(';')[0];
+    return { status: r.status, body: await r.json() };
+  };
+  await call('/api/login', { method: 'POST', body: JSON.stringify({ password: 'pw-123456' }) });
+  let r = await call('/api/integrations');
+  const ty0 = r.body.channels.find((c) => c.id === 'trendyol');
+  assert.equal(ty0.enabled, false);
+  await call('/api/integrations/trendyol', { method: 'PUT', body: JSON.stringify({ values: { TRENDYOL_SELLER_ID: '42', TRENDYOL_API_KEY: 'key', TRENDYOL_API_SECRET: 'cok-gizli-1234' } }) });
+  const row = await env.DB.prepare("SELECT data FROM channel_config WHERE id = 'trendyol'").first();
+  assert.ok(!row.data.includes('cok-gizli'), 'veritabanında açık metin olmamalı');
+  r = await call('/api/integrations');
+  const ty = r.body.channels.find((c) => c.id === 'trendyol');
+  assert.equal(ty.enabled, true);
+  const sec = ty.fields.find((f) => f.k === 'TRENDYOL_API_SECRET');
+  assert.equal(sec.value, '');
+  assert.equal(sec.masked, '••••••1234');
+  assert.ok(!JSON.stringify(r.body).includes('cok-gizli'), 'gizli değer cevapta olmamalı');
+  // Boş gizli alan gönderilince eski değer korunur
+  await call('/api/integrations/trendyol', { method: 'PUT', body: JSON.stringify({ values: { TRENDYOL_API_KEY: 'key2', TRENDYOL_API_SECRET: '' } }) });
+  r = await call('/api/integrations');
+  assert.equal(r.body.channels.find((c) => c.id === 'trendyol').fields.find((f) => f.k === 'TRENDYOL_API_SECRET').masked, '••••••1234');
+  // Pasif kanal
+  await call('/api/integrations/trendyol', { method: 'PUT', body: JSON.stringify({ active: false }) });
+  r = await call('/api/integrations');
+  const ty2 = r.body.channels.find((c) => c.id === 'trendyol');
+  assert.equal(ty2.active, false);
+  assert.equal(ty2.enabled, false);
+  // Farklı şifreleme anahtarıyla okunamaz (kilitli) olarak işaretlenir
+  const other = { ...env, PANEL_SECRET: 'baska' };
+  const { loadConfig } = await import('../src/config.js');
+  assert.equal((await loadConfig(other, env.DB)).trendyol.locked, true);
+});
+
+test('Sipariş listesi: tarih / durum filtresi, sayfalama, kâr ve CSV', async () => {
+  const db = await setup();
+  await saveOrders(db, 'trendyol', [order('A1', Date.parse('2026-09-10T10:00:00Z'), 1), order('A2', Date.parse('2026-09-20T10:00:00Z'), 2), order('A3', Date.parse('2026-09-20T12:00:00Z'), 1, { status: 'cancelled' })]);
+  await db.prepare('UPDATE products SET purchase_price = 40 WHERE id = 1').run();
+  const env = { PANEL_PASSWORD: 'x-123456', DB: db };
+  let cookie = '';
+  const call = async (path, opts = {}) => {
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: cookie } }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r;
+  };
+  await call('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+  const j = await (await call('/api/orders?status=all&from=2026-09-15&to=2026-09-30&limit=1&page=1')).json();
+  assert.equal(j.total, 2);
+  assert.equal(j.orders.length, 1);
+  assert.deepEqual(j.counts, { new: 1, cancelled: 1 });
+  const all = await (await call('/api/orders?status=new&limit=10')).json();
+  const a2 = all.orders.find((o) => o.order_number === 'A2');
+  // 200 satış − %20 komisyon (40) − 2×40 maliyet = 80
+  assert.equal(a2.profit, 80);
+  const buf = new Uint8Array(await (await call('/api/orders.csv?status=all')).arrayBuffer());
+  assert.deepEqual([...buf.slice(0, 3)], [0xef, 0xbb, 0xbf], 'Excel için UTF-8 BOM');
+  const csv = new TextDecoder().decode(buf);
+  assert.match(csv, /^Kanal;Sipariş no/);
+  assert.match(csv, /;İptal;/);
+  assert.equal(csv.trim().split('\n').length, 4);
+});

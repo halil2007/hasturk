@@ -4,32 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
-  <title>Satış Paneli</title>
+  <meta name="theme-color" content="#0f1c35">
+  <title>Satış Yönetimi</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
-  <div id="app">
-    <aside class="side">
-      <div class="brand"><span class="logo" aria-hidden="true"></span><span>Satış Paneli</span></div>
-      <nav class="nav" aria-label="Ana menü"></nav>
-      <div class="side-foot">
-        <button class="btn ghost sm" data-act="sync" title="Tüm kanalları şimdi senkronla"><i class="ico ico-sync"></i><span>Senkronla</span></button>
-        <div class="sync-state muted small"></div>
-      </div>
-    </aside>
-    <header class="top">
-      <h1 class="top-title">Özet</h1>
-      <button class="icon-btn" data-act="sync" aria-label="Senkronla"><i class="ico ico-sync"></i></button>
-      <a class="icon-btn" href="#/ayarlar" aria-label="Ayarlar"><i class="ico ico-gear"></i></a>
+  <aside class="side">
+    <div class="brand"><img class="logo" src="icon.svg" alt=""><span>Satış Yönetimi</span></div>
+    <nav class="nav" data-nav aria-label="Ana menü"></nav>
+    <div class="side-foot">
+      <nav class="nav" data-nav-foot></nav>
+      <a class="status-box" href="#/entegrasyonlar" data-status style="text-decoration:none"><span class="led"></span><div><b>Kanallar</b><span>yükleniyor…</span></div></a>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="page-head"><h1 data-title>Genel Bakış</h1><div class="sub" data-sub></div></div>
+      <label class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Sipariş, ürün veya SKU ara" data-global-search></label>
+      <button class="icon-btn" data-act="sync" aria-label="Senkronla" title="Tüm kanalları şimdi senkronla"><i class="ico ico-sync"></i></button>
+      <button class="icon-btn" data-act="bell" aria-label="Bildirimler"><i class="ico ico-bell"></i><span class="dot-red hide" data-bell-dot></span></button>
+      <button class="avatar" data-act="me" aria-label="Hesap">HT</button>
+      <a class="btn primary top-add" href="#/urunler/yeni"><i class="ico ico-plus"></i>Ürün Ekle</a>
     </header>
     <main id="view" tabindex="-1"></main>
-    <nav class="tabbar" aria-label="Alt menü"></nav>
   </div>
+  <nav class="tabbar" data-tabbar aria-label="Alt menü"></nav>
   <div id="sheet-root"></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <div id="print" aria-hidden="true"></div>

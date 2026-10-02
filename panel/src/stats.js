@@ -1,5 +1,5 @@
 // İstatistik: ciro / sipariş adedi (kanal bazında + toplam), dönem karşılaştırma, en çok satanlar, tahmini kâr.
-import { all, getSettings } from './db.js';
+import { all, first, getSettings } from './db.js';
 import { dayKey, weekKey, monthKey, TR, r2 } from './util.js';
 import { CHANNEL_IDS } from './channels/index.js';
 import { profit } from '../public/profit.js';
@@ -113,5 +113,32 @@ export async function summary(db) {
   return {
     today: by(todayP), yesterday: by(yestP), last14: { series: last14.series, totals: last14.totals, total: last14.total },
     pending: counts, lowStock: low, unlinked: unlinked[0] ? unlinked[0].n : 0,
+  };
+}
+
+// Genel bakış: seçilen dönem + aynı uzunluktaki önceki dönem, KPI serileri, kanal dağılımı, bekleyenler, stok özeti
+export async function dashboard(db, q) {
+  const settings = await getSettings(db);
+  const ok = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || '') ? s : null);
+  const today = dayKey(Date.now());
+  const from = ok(q.from) || today.slice(0, 8) + '01', to = ok(q.to) || today;
+  const fromMs = startOf(from), toMs = startOf(to) + D, len = toMs - fromMs;
+  if (len <= 0 || len > 800 * D) return { error: 'Geçersiz tarih aralığı' };
+  const group = len > 120 * D ? 'month' : len > 45 * D ? 'week' : 'day';
+  const [cur, prev] = [await period(db, fromMs, toMs, group, settings), await period(db, fromMs - len, fromMs, group, settings)];
+  const line = (p, k) => p.series.map((b) => (k === 'profit' ? b.profit : r2(Object.values(b[k]).reduce((a, x) => a + x, 0))));
+  const pack = (p) => ({ total: p.total, totals: p.totals, revenue: line(p, 'revenue'), orders: line(p, 'orders'), profit: line(p, 'profit') });
+  const [pending, low, stock, top] = await Promise.all([
+    all(db, "SELECT status, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY status"),
+    all(db, 'SELECT id, name, sku, image, stock, critical_stock FROM products WHERE active = 1 AND (stock <= critical_stock OR stock <= 0) ORDER BY stock ASC LIMIT 8'),
+    first(db, `SELECT (SELECT COUNT(*) FROM products WHERE active = 1) AS products, (SELECT COALESCE(SUM(MAX(stock, 0)), 0) FROM products WHERE active = 1) AS units,
+      (SELECT COUNT(*) FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.pushed_stock IS NOT NULL AND l.pushed_stock != MAX(p.stock, 0)) AS waiting,
+      (SELECT COUNT(*) FROM listings WHERE error IS NOT NULL) AS errors, (SELECT COUNT(*) FROM listings WHERE product_id IS NULL) AS unlinked`),
+    topProducts(db, fromMs, toMs, 6),
+  ]);
+  const p = Object.fromEntries(pending.map((r) => [r.status, r.n]));
+  return {
+    from, to, group, keys: cur.series.map((b) => b.key), current: pack(cur), previous: pack(prev), missingCost: cur.missingCost,
+    pending: { new: p.new || 0, processing: p.processing || 0 }, lowStock: low, stock, top, stockSync: !!settings.stock_sync,
   };
 }

@@ -78,7 +78,7 @@ export function hepsiburada(env, meta) {
         else bump(o, status);
         if (pkgNo && !o.packages.some((p) => p.remoteId === pkgNo)) {
           const tn = str(pk.trackingNumber || pk.trackingInfoCode || pk.barcode);
-          o.packages.push({ remoteId: pkgNo, items: lines.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: status === 'processing' ? 'open' : 'shipped', cargoCompany: str(pk.cargoCompany), tracking: tn });
+          o.packages.push({ remoteId: pkgNo, items: lines.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: status === 'processing' ? 'open' : 'shipped', cargoCompany: str(pk.cargoCompany), tracking: tn, barcode: str(pk.barcode) });
           if (tn && !o.tracking) { o.tracking = tn; o.cargoCompany = str(pk.cargoCompany) || o.cargoCompany; }
         }
       }

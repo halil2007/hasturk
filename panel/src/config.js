@@ -1,0 +1,123 @@
+// Kanal API bilgileri: panelden (Entegrasyonlar) girilir, veritabanında şifreli (AES-GCM) saklanır.
+// Panelde girilen değer, Cloudflare'de tanımlı aynı adlı gizli değişkenin önüne geçer; panelde boşsa Cloudflare'deki kullanılır.
+// Şifreleme anahtarı PANEL_SECRET'tan (yoksa panel şifresinden) türetilir; anahtarlar istemciye asla açık gönderilmez.
+import { all, first, run } from './db.js';
+
+const ikasFields = (p) => [
+  { k: `${p}NAME`, label: 'Panelde görünen ad', hint: 'ör. HasTürk' },
+  { k: `${p}STORE`, label: 'Mağaza adı', hint: 'panel adresindeki XXXX.myikas.com → XXXX', req: true },
+  { k: `${p}CLIENT_ID`, label: 'Client ID', req: true },
+  { k: `${p}CLIENT_SECRET`, label: 'Client Secret', secret: true, req: true },
+  { k: `${p}MERCHANT_ID`, label: 'Merchant ID', hint: 'ürün görselleri için (isteğe bağlı)', adv: true },
+  { k: `${p}SALES_CHANNEL_ID`, label: 'Satış kanalı ID', hint: 'sadece bu kanalın siparişleri (isteğe bağlı)', adv: true },
+  { k: `${p}STOCK_LOCATION_ID`, label: 'Stok lokasyonu ID', hint: 'boşsa ilk lokasyon', adv: true },
+];
+
+export const FIELDS = {
+  ikas1: ikasFields('IKAS1_'),
+  ikas2: ikasFields('IKAS2_'),
+  trendyol: [
+    { k: 'TRENDYOL_SELLER_ID', label: 'Satıcı ID (Cari ID)', req: true },
+    { k: 'TRENDYOL_API_KEY', label: 'API Key', req: true },
+    { k: 'TRENDYOL_API_SECRET', label: 'API Secret', secret: true, req: true },
+  ],
+  hepsiburada: [
+    { k: 'HB_MERCHANT_ID', label: 'Merchant ID', req: true },
+    { k: 'HB_PASSWORD', label: 'Servis anahtarı (şifre)', secret: true, req: true },
+    { k: 'HB_USERNAME', label: 'Kullanıcı adı', hint: 'boşsa Merchant ID', adv: true },
+    { k: 'HB_USER_AGENT', label: 'User-Agent', hint: 'Hepsiburada farklı verdiyse', adv: true },
+    { k: 'HB_TEST', label: 'Test ortamı', hint: '1 = test (SIT) ortamı', adv: true },
+  ],
+  pttavm: [
+    { k: 'PTTAVM_USERNAME', label: 'API kullanıcı adı', req: true },
+    { k: 'PTTAVM_PASSWORD', label: 'API şifresi', secret: true, req: true },
+    { k: 'PTTAVM_WAREHOUSE_ID', label: 'Depo numarası', hint: 'kargo barkodu için' },
+    { k: 'PTTAVM_SHIPMENT_USER', label: 'Kargo servisi kullanıcı adı', hint: 'boşsa API kullanıcısı', adv: true },
+    { k: 'PTTAVM_SHIPMENT_PASSWORD', label: 'Kargo servisi şifresi', secret: true, adv: true },
+    { k: 'PTTAVM_ORDER_METHOD', label: 'Sipariş servisi', hint: 'varsayılan SiparisKontrolListesiV2', adv: true },
+    { k: 'PTTAVM_STOCK_METHOD', label: 'Stok servisi', hint: 'varsayılan StokFiyatGuncelle3', adv: true },
+    { k: 'PTTAVM_LIST_METHOD', label: 'Ürün listesi servisi', hint: 'varsayılan StokKontrolListesi', adv: true },
+    { k: 'PTTAVM_DATE_FORMAT', label: 'Tarih biçimi', hint: 'tr = gg.aa.yyyy', adv: true },
+  ],
+};
+
+// ---------- şifreleme ----------
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64 = (u8) => { let s = ''; for (const x of u8) s += String.fromCharCode(x); return btoa(s); };
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+async function key(env) {
+  const base = env.PANEL_SECRET || env.PANEL_PASSWORD || (env.DEMO === '1' ? 'demo' : '');
+  const raw = await crypto.subtle.digest('SHA-256', enc.encode('hasturk-panel-config|' + base));
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+async function seal(env, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await key(env), enc.encode(JSON.stringify(obj))));
+  return b64(iv) + '.' + b64(ct);
+}
+async function open(env, s) {
+  const [iv, ct] = String(s).split('.');
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(iv) }, await key(env), unb64(ct));
+  return JSON.parse(dec.decode(pt));
+}
+
+// Kayıtlı yapılandırma: { id: { values, active, locked } }
+export async function loadConfig(env, db) {
+  const rows = await all(db, 'SELECT id, data, active, updated_at FROM channel_config');
+  const out = {};
+  for (const r of rows) {
+    let values = {}, locked = false;
+    if (r.data) { try { values = await open(env, r.data); } catch { locked = true; } }
+    out[r.id] = { values, active: r.active !== 0, locked, updated: r.updated_at };
+  }
+  return out;
+}
+
+export async function saveConfig(env, db, id, { values = {}, clear = [], active } = {}) {
+  const fields = FIELDS[id];
+  if (!fields) throw new Error('Bilinmeyen kanal');
+  const cur = (await loadConfig(env, db))[id] || { values: {}, active: true };
+  const next = cur.locked ? {} : { ...cur.values };
+  for (const f of fields) {
+    if (clear.includes(f.k)) { delete next[f.k]; continue; }
+    if (!(f.k in values)) continue;
+    const v = String(values[f.k] ?? '').trim();
+    // Gizli alan boş gönderilirse eski değer korunur (istemci gizli değeri hiç görmez)
+    if (f.secret && !v) continue;
+    if (v) next[f.k] = v; else delete next[f.k];
+  }
+  const act = active === undefined ? cur.active : !!active;
+  await run(db, `INSERT INTO channel_config (id, data, active, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT (id) DO UPDATE SET data = excluded.data, active = excluded.active, updated_at = excluded.updated_at`,
+  id, Object.keys(next).length ? await seal(env, next) : null, act ? 1 : 0, Date.now());
+}
+
+// Kanal için geçerli değişkenler: Cloudflare ortamı + panelde girilenler (panel önceliklidir)
+export function effectiveEnv(env, cfg) {
+  const out = { ...env };
+  for (const c of Object.values(cfg)) for (const [k, v] of Object.entries(c.values || {})) if (v) out[k] = v;
+  return out;
+}
+
+// İstemciye gösterilecek alanlar: gizli değerler maskelenir
+export function describe(env, cfg, id) {
+  const c = cfg[id] || { values: {}, active: true };
+  return {
+    active: c.active, locked: !!c.locked, updated: c.updated || null,
+    fields: FIELDS[id].map((f) => {
+      const p = c.values[f.k], e = env[f.k];
+      const v = p || e || '';
+      return {
+        k: f.k, label: f.label, hint: f.hint || '', secret: !!f.secret, req: !!f.req, adv: !!f.adv,
+        source: p ? 'panel' : e ? 'cloudflare' : '',
+        value: f.secret ? '' : v,
+        masked: f.secret && v ? '••••••' + String(v).slice(-4) : '',
+      };
+    }),
+  };
+}
+
+export async function configVersion(db) {
+  const r = await first(db, 'SELECT MAX(updated_at) AS v FROM channel_config');
+  return (r && r.v) || 0;
+}
