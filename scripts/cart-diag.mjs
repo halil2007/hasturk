@@ -10,6 +10,17 @@ const MODE = process.env.MODE || 'canli';
 const HOST = 'hasturk-arama.halilc2007.workers.dev';
 const out = []; const log = (s) => { out.push(s); console.log(s); };
 const b = await chromium.launch();
+// Sepete ekleme cevabı: hata var mı, sepette kaç satır/adet var
+const watchAdds = (target, tag) => target.on('response', async (r) => {
+  if (!/op=(addItemToCart|saveCart|getCart)/.test(r.url())) return;
+  let t = ''; try { t = await r.text(); } catch (e) {}
+  let info = '';
+  try {
+    const j = JSON.parse(t), d = j.data && (j.data.addItemToCart || j.data.saveCart || j.data.getCart);
+    info = j.errors ? 'HATA: ' + JSON.stringify(j.errors).slice(0, 300) : d ? `sepet ${String(d.id || '').slice(0, 8)} · ${(d.orderLineItems || []).length} satır · adet ${(d.orderLineItems || []).reduce((a, x) => a + (x.quantity || 0), 0)} · ${(d.orderLineItems || []).map((x) => (x.variant && (x.variant.name || x.variant.id)) || '').join(', ').slice(0, 120)}` : 'boş cevap: ' + t.slice(0, 200);
+  } catch (e) { info = 'okunamadı: ' + t.slice(0, 200); }
+  log(`  [${tag}] ${r.url().match(/op=(\w+)/)[1]} → HTTP ${r.status()} · ${info}`);
+});
 
 const cartCount = async (p) => p.evaluate(async () => {
   // Sepet sayfasını ayrı çerçevede açıp satırları say (sitenin kendi sepeti)
@@ -34,6 +45,7 @@ const cartCount = async (p) => p.evaluate(async () => {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 } });
   await ctx.route((u) => u.hostname === HOST, (r) => r.abort()); // widget kapalı: sitenin kendi davranışı
   const p = await ctx.newPage();
+  watchAdds(p, 'ürün sayfası');
   const reqs = [];
   p.on('request', (r) => { if (/graphql|cart|sepet/i.test(r.url()) && r.method() === 'POST') reqs.push({ t: Date.now(), url: r.url().replace(/^https?:\/\/[^/]+/, '').slice(0, 90), body: (r.postData() || '').replace(/\s+/g, ' ').slice(0, 160) }); });
   await p.goto(SITE + PRODUCT, { waitUntil: 'domcontentloaded', timeout: 90000 });
@@ -63,6 +75,7 @@ const cartCount = async (p) => p.evaluate(async () => {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   if (MODE === 'yeni') await ctx.route((u) => u.hostname === HOST && u.pathname === '/pm-search.js', (r) => r.fulfill({ status: 200, body: readFileSync('public/pm-search.js'), contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' } }));
   const p = await ctx.newPage();
+  watchAdds(ctx, 'widget');
   const reqs = [];
   ctx.on('request', (r) => { if (/graphql|cart|sepet/i.test(r.url()) && r.method() === 'POST') reqs.push({ t: Date.now(), url: r.url().replace(/^https?:\/\/[^/]+/, '').slice(0, 90), body: (r.postData() || '').replace(/\s+/g, ' ').slice(0, 140) }); });
   await p.goto(SITE + '/', { waitUntil: 'domcontentloaded', timeout: 90000 });
