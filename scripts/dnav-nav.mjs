@@ -12,7 +12,9 @@ const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
 if (MODE === 'yeni') await ctx.route((u) => u.hostname === HOST && u.pathname === '/pm-search.js', (r) => r.fulfill({ status: 200, body: readFileSync('public/pm-search.js'), contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' } }));
 const p = await ctx.newPage();
-const state = () => p.evaluate(() => {
+// Sayfa tam yeniden yüklenirken ölçüm denk gelirse biraz bekleyip tekrar dene
+const state = async () => { for (let k = 0; ; k++) { try { return await state0(); } catch (e) { if (k > 10) throw e; await p.waitForTimeout(300); } } };
+const state0 = () => p.evaluate(() => {
   const h = document.querySelector('.ua-dnav'), nav = document.querySelector('[data-ua-nav]');
   // ikas menüsünün görünen kategori bağlantıları (bizimkiler hariç)
   const vis = [...document.querySelectorAll('header a[href], nav a[href]')].filter((a) => !a.closest('.ua-dnav') && !a.closest('#ua-mega') && !a.closest('#ua-dnav-ghost')).filter((a) => { const r = a.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.top < 200 && getComputedStyle(a).visibility !== 'hidden'; }).length;
@@ -25,6 +27,7 @@ log(`Başlangıç: ${JSON.stringify(base)} (başlıktaki logo/hesap gibi menü d
 let bad = 0;
 for (let i = 0; i < 14; i++) {
   // Sırayla: bizim çubuktan kategori, sayfadaki bir ürün/kategori bağlantısı (ikas'ın kendi geçişi)
+  await p.waitForLoadState('domcontentloaded').catch(() => {});
   const target = await p.evaluate((i) => {
     const ours = [...(document.querySelector('.ua-dnav') && document.querySelector('.ua-dnav').shadowRoot ? document.querySelector('.ua-dnav').shadowRoot.querySelectorAll('.ti[href]') : [])].map((a) => a.href);
     const page = [...document.querySelectorAll('main a[href], #__next a[href]')].map((a) => a.href).filter((h) => { try { const u = new URL(h); return u.origin === location.origin && u.pathname.split('/').length === 2 && u.pathname !== location.pathname && !/cart|account|sepet|login|blog|pages/.test(u.pathname); } catch (e) { return false; } });
