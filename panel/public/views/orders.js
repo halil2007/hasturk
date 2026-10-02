@@ -1,13 +1,12 @@
 // Siparişler: kanal sekmeleri, arama / tarih / kargo filtresi, durum sekmeleri, toplu işlem, satır içi sipariş işlemleri, sayfalama.
-import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel } from '../core.js';
+import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel , activeChannels } from '../core.js';
 import { mountOps, openOrder, bulkLabels } from './orderops.js';
-import { loadSummary } from '../app.js';
+import { loadSummary, setQuery } from '../app.js';
 
 const STATUS_TABS = [['all', 'Tümü'], ['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal / İade']];
 
-export async function orders(el, rest) {
-  const f = { channel: '', status: 'all', q: state.globalQ || '', from: '', to: '', cargo: '', page: 1, limit: 25 };
-  state.globalQ = '';
+export async function orders(el, rest, query = {}) {
+  const f = { channel: query.channel || '', status: query.status || 'all', q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', page: 1, limit: 25 };
   if (rest[0] === 'kanal') f.channel = rest[1] || '';
   if (rest[0] === 'durum') f.status = rest[1] || 'all';
   if (rest[0] && !['kanal', 'durum'].includes(rest[0])) setTimeout(() => openOrder(rest[0], refresh), 0);
@@ -23,8 +22,8 @@ export async function orders(el, rest) {
     <div class="ch-tabs" data-chtabs></div>
     <div class="row wrap">
       <div class="search" style="min-width:220px"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Sipariş no, müşteri veya SKU ara" data-q value="${f.q}"></div>
-      <label class="date-pick"><i class="ico ico-cal"></i><input type="date" data-from aria-label="Başlangıç"><span class="muted">–</span><input type="date" data-to aria-label="Bitiş"></label>
-      <label class="date-pick" style="min-width:180px"><i class="ico ico-truck"></i><select data-cargo style="border:0;background:transparent;outline:none;font-weight:600;flex:1;min-height:36px"><option value="">Kargo firması</option>${((state.settings && state.settings.cargo_companies) || []).map((c) => html`<option>${c}</option>`)}</select></label>
+      <label class="date-pick"><i class="ico ico-cal"></i><input type="date" data-from aria-label="Başlangıç" value="${f.from}"><span class="muted">–</span><input type="date" data-to aria-label="Bitiş" value="${f.to}"></label>
+      <label class="date-pick" style="min-width:180px"><i class="ico ico-truck"></i><select data-cargo style="border:0;background:transparent;outline:none;font-weight:600;flex:1;min-height:36px"><option value="">Kargo firması</option>${((state.settings && state.settings.cargo_companies) || []).map((c) => html`<option ${f.cargo === c ? 'selected' : ''}>${c}</option>`)}</select></label>
       <button class="btn" data-act="clear"><i class="ico ico-filter"></i>Filtreyi temizle</button>
     </div>
     <div class="tabs" data-stabs></div>
@@ -33,7 +32,7 @@ export async function orders(el, rest) {
 
   function chTabs() {
     render($('[data-chtabs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>
-      ${state.channels.map((c) => html`<button class="ch-tab ${f.channel === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}<span>${c.type === 'ikas' ? html`<b>ikas</b> <span class="small">${c.name}</span>` : c.name}</span></button>`)}`);
+      ${activeChannels().filter((c) => c.enabled || c.demo).map((c) => { const p = (data.pendingByChannel || {})[c.id]; return html`<button class="ch-tab ${f.channel === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}" title="${p ? `${p} sipariş bekliyor` : ''}">${chLogo(c.id)}<span>${c.type === 'ikas' ? html`<b>ikas</b> <span class="small">${c.name}</span>` : c.name}</span>${p ? html`<span class="badge-n">${p}</span>` : ''}</button>`; })}`);
   }
   function statusTabs() {
     const c = data.counts, total = Object.values(c).reduce((a, x) => a + x, 0);
@@ -104,13 +103,14 @@ export async function orders(el, rest) {
     render($('[data-box]', el), html`${bulkbar()}${mobile ? cards() : table()}`);
     const box = expanded && $(`[data-ops="${CSS.escape(expanded)}"]`, el);
     if (box) mountOps(box, expanded, { mode: 'expand', onChange: () => { load(); loadSummary().catch(() => {}); } });
-    $('[data-sub]', el).textContent = `${data.total} sipariş${f.from || f.to ? ` · ${rangeLabel(f.from || f.to, f.to || f.from)}` : ''}${f.channel ? ` · ${ch(f.channel).name}` : ' · 5 satış kanalı'}`;
+    $('[data-sub]', el).textContent = `${data.total} sipariş${f.from || f.to ? ` · ${rangeLabel(f.from || f.to, f.to || f.from)}` : ''}${f.channel ? ` · ${ch(f.channel).name}` : ` · ${activeChannels().filter((c) => c.enabled || c.demo).length} satış kanalı`}`;
   }
   const params = () => { const p = new URLSearchParams({ status: f.status, page: f.page, limit: f.limit }); for (const k of ['channel', 'q', 'from', 'to', 'cargo']) if (f[k]) p.set(k, f[k]); return p; };
   async function load() {
     // Üzerinde çalışılan (açık) sipariş, durumu değişip filtre dışına çıksa da yerinde kalır
     const i = expanded ? data.orders.findIndex((o) => o.id === expanded) : -1;
     const keep = i >= 0 ? data.orders[i] : null;
+    setQuery({ status: f.status, channel: f.channel, q: f.q, from: f.from, to: f.to, cargo: f.cargo });
     data = await api('orders?' + params());
     if (keep) {
       const fresh = data.orders.find((o) => o.id === keep.id);

@@ -1,6 +1,6 @@
 // İstatistik: dönem seçimi, gün/hafta/ay gruplama, önceki dönem / geçen yıl karşılaştırma,
 // kanal bazında ve toplam ciro / sipariş / tahmini kâr, en çok satan ürünler.
-import { api, state, html, render, $, chLogo, money, money0, compact, n, pct, delta, ch, chColor, dayKey, store, toast } from '../core.js';
+import { api, state, html, render, $, chLogo, money, money0, compact, n, pct, delta, ch, chColor, dayKey, store, toast , activeChannels } from '../core.js';
 import { columnChart, legend } from '../chart.js';
 
 const D = 864e5;
@@ -67,7 +67,7 @@ export async function statsView(el) {
   }
 
   function draw() {
-    const cur = data.current, cmp = data.compare, ids = state.channels.map((c) => c.id);
+    const cur = data.current, cmp = data.compare, ids = activeChannels().map((c) => c.id);
     const k = (lab, key, fmt, invert) => {
       const d = cmp ? delta(cur.total[key], cmp.total[key]) : null;
       const cls = d == null || d === 0 ? 'flat' : (d > 0) !== !!invert ? 'up' : 'down';
@@ -106,7 +106,7 @@ export async function statsView(el) {
   }
 
   function drawChart() {
-    const cur = data.current, cmp = data.compare, ids = state.channels.map((c) => c.id), g = data.group;
+    const cur = data.current, cmp = data.compare, ids = activeChannels().map((c) => c.id), g = data.group;
     const fmt = f.metric === 'orders' ? (v) => `${n(v)} sipariş` : money0, axis = f.metric === 'orders' ? (v) => n(v) : compact;
     const series = f.metric === 'profit'
       ? [{ id: 'profit', name: 'Tahmini kâr', color: 'var(--accent)', values: cur.series.map((b) => Math.max(0, b.profit)) }]

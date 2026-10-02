@@ -44,6 +44,15 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, channel TEXT, level TEXT, msg TEXT)`,
   // Panelden girilen kanal API bilgileri (şifreli)
   'CREATE TABLE IF NOT EXISTS channel_config (id TEXT PRIMARY KEY, data TEXT, active INTEGER NOT NULL DEFAULT 1, updated_at INTEGER)',
+  // Panel kullanıcıları (şifre PBKDF2 ile özetlenir)
+  `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, name TEXT, email TEXT, pass TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'staff', active INTEGER NOT NULL DEFAULT 1, created_at INTEGER, last_login INTEGER)`,
+  // Bildirimler: senkron hataları, stok uyarıları; aynı konu (key) tek kayıtta güncellenir
+  `CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, level TEXT NOT NULL, channel TEXT, title TEXT NOT NULL, msg TEXT,
+    count INTEGER NOT NULL DEFAULT 1, first_at INTEGER, last_at INTEGER, read INTEGER NOT NULL DEFAULT 0, resolved_at INTEGER)`,
+  // Geçmiş sipariş aktarımı (kanal başına, parça parça ilerler)
+  `CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, channel TEXT NOT NULL, from_ms INTEGER NOT NULL, to_ms INTEGER NOT NULL, cursor_ms INTEGER NOT NULL,
+    status TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, error TEXT, created_at INTEGER, updated_at INTEGER)`,
 ];
 // Sonradan eklenen sütunlar (mevcut veritabanlarına eklenir; zaten varsa hata yok sayılır)
 const MIGRATIONS = [
@@ -52,6 +61,18 @@ const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN label_data TEXT',
   'ALTER TABLE packages ADD COLUMN label_at INTEGER',
   'ALTER TABLE orders ADD COLUMN hash TEXT',
+  // Ürün grubu / varyant (ikas'ta tek üründe varyant, Trendyol'da ayrı ürün olabilir: eşleştirme varyant = SKU düzeyinde)
+  'ALTER TABLE products ADD COLUMN group_name TEXT',
+  'ALTER TABLE products ADD COLUMN variant_name TEXT',
+  'ALTER TABLE listings ADD COLUMN group_name TEXT',
+  'ALTER TABLE listings ADD COLUMN variant_name TEXT',
+  // Eşleşme şekli: barcode | sku | manual | new (yeni ürün olarak açıldı); ignored = eşleştirme listesinde gösterme
+  'ALTER TABLE listings ADD COLUMN match TEXT',
+  'ALTER TABLE listings ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0',
+  // Kanala özel stok: shared (ortak stok) | limit (ortak stok, en fazla N) | own (bu kanala ayrılmış N adet)
+  "ALTER TABLE listings ADD COLUMN stock_mode TEXT NOT NULL DEFAULT 'shared'",
+  'ALTER TABLE listings ADD COLUMN stock_value INTEGER',
+  'ALTER TABLE stock_moves ADD COLUMN user TEXT',
 ];
 
 const ready = new WeakMap();
@@ -80,7 +101,10 @@ export const DEFAULT_SETTINGS = {
   stock_sync: false,
   stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)
   restock_returns: false,   // iade gelen ürün stoğa geri eklensin mi
-  history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (istatistik için)
+  history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (daha eskisi: Entegrasyonlar → Geçmiş siparişler)
+  low_stock: 5,             // ürüne özel kritik stok girilmemişse bu adet ve altı "sınırın altında" sayılır
+  catalog_channels: ['ikas1'], // eşleşmeyen ilanından otomatik ürün açılan ana katalog kanalları
+  company: { title: 'Hastürk', legal: '', phone: '', email: '', address: '', tax: '' },
   sender: { name: 'HasTürk', phone: '', address: '', city: '' },
   // Trendyol/Hepsiburada ZPL etiketini normal yazıcıda basmak için PDF'e çevir (Labelary servisi; etiket içeriği o servise gider)
   zpl_pdf: false,
@@ -100,6 +124,20 @@ export async function getSettings(db) {
 }
 export const setSetting = (db, k, v) => run(db, 'INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v', k, JSON.stringify(v));
 export async function getRaw(db, k) { const r = await first(db, 'SELECT v FROM settings WHERE k = ?', k); return r ? JSON.parse(r.v) : null; }
+
+// Bildirim: aynı key için tek kayıt (tekrar ederse sayaç artar, okunmamış olur). resolve() düzelince kapatır.
+export async function notify(db, key, { level = 'error', channel = null, title, msg = '' }) {
+  const t = Date.now();
+  try {
+    await run(db, `INSERT INTO notices (key, level, channel, title, msg, count, first_at, last_at, read, resolved_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 0, NULL)
+      ON CONFLICT (key) DO UPDATE SET level = excluded.level, title = excluded.title, msg = excluded.msg, last_at = excluded.last_at,
+        count = CASE WHEN notices.resolved_at IS NULL THEN notices.count + 1 ELSE 1 END, read = 0, resolved_at = NULL,
+        first_at = CASE WHEN notices.resolved_at IS NULL THEN notices.first_at ELSE excluded.first_at END`, key, level, channel, title, String(msg).slice(0, 1000), t, t);
+  } catch { /* bildirim yazılamazsa işi durdurma */ }
+}
+export async function resolve(db, key) {
+  try { await run(db, 'UPDATE notices SET resolved_at = ? WHERE key = ? AND resolved_at IS NULL', Date.now(), key); } catch { /* yok say */ }
+}
 
 export async function log(db, channel, level, msg) {
   try {

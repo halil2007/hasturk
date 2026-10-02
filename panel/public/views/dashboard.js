@@ -1,6 +1,6 @@
 // Genel Bakış: dönem seçimi, kanal bağlantıları, KPI'lar (eğilim çizgili), satış performansı (önceki dönemle),
 // kanal dağılımı, son siparişler + seçili siparişin işlemleri, en çok satanlar, ortak stok, hızlı kâr hesabı.
-import { api, state, html, raw, render, $, $$, money, money0, compact, n, pct, delta, ago, ch, chLogo, chBadge, chColor, chState, statusPill, thumb, actions, toast, dayKey, store, numIn, rangeLabel } from '../core.js';
+import { api, state, html, raw, render, $, $$, money, money0, compact, n, pct, delta, ago, ch, chLogo, chBadge, chColor, chState, statusPill, thumb, actions, toast, dayKey, store, numIn, rangeLabel , activeChannels } from '../core.js';
 import { lineChart, sparkline } from '../chart.js';
 import { profit } from '../profit.js';
 import { mountOps } from './orderops.js';
@@ -45,18 +45,30 @@ export async function dashboard(el) {
     const c = d.current, p = d.previous;
     const toShip = d.pending.new + d.pending.processing;
     const totalRev = c.total.revenue || 1;
-    const chs = state.channels;
+    const chs = activeChannels().filter((x) => x.enabled || x.demo).length ? activeChannels().filter((x) => x.enabled || x.demo) : activeChannels();
+    const sm = state.summary || {}, newN = (sm.pending || []).filter((x) => x.status === 'new').reduce((a, x) => a + x.n, 0);
+    const hour = new Date().getHours(), u = state.user || {};
+    const tasks = [
+      ['blue', 'orders', newN, 'Yeni sipariş', '#/siparisler?status=new'],
+      ['orange', 'truck', sm.cargoWaiting || 0, 'Kargoya hazırlanacak', '#/kargo'],
+      ['purple', 'link', sm.unmatched || 0, 'Eşleşme bekleyen ilan', '#/eslestirme'],
+      ['red', 'db', sm.stockOut || 0, 'Stokta olmayan ürün', '#/stoklar?durum=out'],
+      ['green', 'bell', (sm.notices && sm.notices.open) || 0, 'Açık sorun', '#/bildirimler'],
+    ];
     render(el, html`
+      <div class="hello"><div><h2>${hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar'}${u.name && u.id ? `, ${u.name.split(' ')[0]}` : ''}</h2>
+        <div class="muted small">${new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · bugün ${n(Object.values(sm.today || {}).reduce((a, x) => a + x.orders, 0))} sipariş, ${money0(Object.values(sm.today || {}).reduce((a, x) => a + x.revenue, 0))}</div></div></div>
+      <div class="tasks">${tasks.map(([c, i, v, t, href]) => html`<a class="task ${c} ${v ? '' : 'zero'}" href="${href}"><span class="ic"><i class="ico ico-${i}"></i></span><div style="min-width:0"><b class="num">${n(v)}</b><span>${t}</span></div></a>`)}</div>
       <div class="date-bar">
         ${[['today', 'Bugün'], ['7', '7 gün'], ['month', 'Bu ay'], ['30', '30 gün']].map(([k, t]) => html`<button class="chip ${f.preset === k ? 'on' : ''}" data-act="preset" data-k="${k}">${t}</button>`)}
         <label class="date-pick" title="${rangeLabel(f.from, f.to)}"><i class="ico ico-cal"></i><input type="date" data-from value="${f.from}" aria-label="Başlangıç"><span class="muted">–</span><input type="date" data-to value="${f.to}" aria-label="Bitiş"></label>
       </div>
       ${!chs.some((x) => x.enabled) ? html`<div class="notice warn" style="margin-bottom:14px"><i class="ico ico-warn"></i><div style="flex:1">Henüz hiçbir satış kanalı bağlı değil. API bilgilerini <b>Entegrasyonlar</b> sayfasından girin.</div><a class="btn sm primary" href="#/entegrasyonlar">Entegrasyonlar</a></div>` : ''}
-      ${chs.some((x) => x.enabled) && !d.stock.products ? html`<div class="notice" style="margin-bottom:14px"><div style="flex:1">İlk adım: kanallardaki ürünleri içe aktarın; aynı SKU/barkodlu ürünler otomatik eşleşir.</div><a class="btn sm primary" href="#/urunler/ice-aktar">İçe aktar</a></div>` : ''}
+      ${chs.some((x) => x.enabled) && !d.stock.products ? html`<div class="notice" style="margin-bottom:14px"><div style="flex:1">İlk adım: kanallardaki ürünleri görsel ve varyantlarıyla içe aktarın; barkodu/SKU'su kesin uyuşanlar otomatik eşleşir, diğerleri Eşleştirme sayfasına düşer.</div><a class="btn sm primary" href="#/urunler/ice-aktar">İçe aktar</a></div>` : ''}
       <div class="ch-cards">${chs.map((x) => { const [k, t] = chState(x); return html`<a class="ch-card" href="#/entegrasyonlar">${chLogo(x.id)}
         <div class="meta"><div class="nm"><span class="ellipsis">${x.type === 'ikas' ? x.name : x.name}</span></div>
         <div class="st ${k}"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}</div>
-        <div class="sub ellipsis">${x.last ? `Son eşitleme: ${ago(x.last.at)}` : 'Henüz eşitlenmedi'}</div></div><i class="ico ico-chev muted"></i></a>`; })}</div>
+        <div class="sub ellipsis">${x.last && x.last.ordersAt ? `Son başarılı: ${ago(x.last.ordersAt)}` : x.enabled ? 'Henüz eşitlenmedi' : 'API bilgisi girilmedi'}</div></div><i class="ico ico-chev muted"></i></a>`; })}</div>
 
       <div class="kpis" style="margin-top:16px">
         ${kpi('Toplam ciro', c.total.revenue, p.total.revenue, money0, c.revenue)}
@@ -88,7 +100,7 @@ export async function dashboard(el) {
         <div class="card flush">
           <div class="card-pad row wrap" style="gap:10px"><h2 style="margin-right:6px">Siparişler</h2>
             ${[['all', 'Tümü'], ['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda']].map(([k, t]) => html`<button class="tab ${ord.status === k ? 'on' : ''}" style="flex:0 0 auto;min-height:34px" data-act="ost" data-k="${k}">${t}</button>`)}
-            <span class="spacer"></span><a class="btn sm" href="#/siparisler"><i class="ico ico-filter"></i>Filtrele</a><a class="btn sm outline" href="#/siparisler/durum/new"><i class="ico ico-dots"></i>Toplu işlem</a></div>
+            <span class="spacer"></span><a class="btn sm" href="#/siparisler"><i class="ico ico-filter"></i>Filtrele</a><a class="btn sm outline" href="#/siparisler?status=new"><i class="ico ico-dots"></i>Toplu işlem</a></div>
           <div class="table-wrap"><table class="t"><thead><tr><th>Sipariş</th><th>Kanal</th><th>Ürün</th><th class="r">Tutar</th><th class="r">Kâr</th><th>Durum</th><th></th></tr></thead><tbody>
             ${ord.rows.length ? ord.rows.map((o) => html`<tr class="click ${selected === o.id ? 'sel-row' : ''}" data-act="pick" data-id="${o.id}">
               <td style="font-weight:750;color:var(--primary)">#${o.order_number}</td><td>${chBadge(o.channel)}</td>
@@ -108,7 +120,7 @@ export async function dashboard(el) {
         <div class="card">
           <div class="card-head"><h2 style="white-space:nowrap">Ortak stok</h2>
             <span class="row small" style="color:${d.stockSync ? 'var(--good)' : 'var(--amber)'}"><span class="led ${d.stockSync ? '' : 'demo'}"></span>${d.stockSync ? `${chs.filter((x) => x.enabled).length} kanalda güncel` : 'senkron kapalı'}</span>
-            <a class="link small" href="#/stoklar">+ Stok ekle</a></div>
+            <a class="link small" href="#/stoklar?durum=below">Tümü ›</a></div>
           <div class="row small muted" style="margin-bottom:6px">${d.stock.products} ürün · ${n(d.stock.units)} adet${d.stock.waiting ? ` · ${d.stock.waiting} ilan gönderim bekliyor` : ''}</div>
           ${d.lowStock.length ? d.lowStock.slice(0, 4).map((x) => html`<div class="li">${thumb(x.image, x.name, 'sm')}<span class="ellipsis" style="flex:1">${x.name}</span><b class="num">${x.stock} adet</b><button class="pill warn" style="border:0;cursor:pointer" data-act="stock" data-id="${x.id}"><i class="ico ico-warn"></i>Düşük stok</button></div>`)
             : html`<div class="notice good small"><i class="ico ico-check"></i>Kritik stokta ürün yok</div>`}

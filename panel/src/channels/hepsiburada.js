@@ -58,17 +58,25 @@ export function hepsiburada(env, meta) {
     }
     // Paket listeleri: uç noktaların bazıları hesapta kapalı olabilir; biri hata verirse diğerleri yine işlenir
     const iso = (ms) => new Date(ms).toISOString().slice(0, 19);
+    const range = `begindate=${iso(since)}&enddate=${iso(until)}`;
     const sources = [
-      [`${OMS}/packages/merchantid/${m}?offset=0&limit=100`, 'processing'],
-      [`${OMS}/packages/merchantid/${m}/shipped?begindate=${iso(since)}&enddate=${iso(until)}&offset=0&limit=100`, 'shipped'],
-      [`${OMS}/packages/merchantid/${m}/delivered?begindate=${iso(since)}&enddate=${iso(until)}&offset=0&limit=100`, 'delivered'],
-      [`${OMS}/orders/merchantid/${m}/cancelled?begindate=${iso(since)}&enddate=${iso(until)}&offset=0&limit=100`, 'cancelled'],
+      [`${OMS}/packages/merchantid/${m}?`, 'processing'],
+      [`${OMS}/packages/merchantid/${m}/shipped?${range}&`, 'shipped'],
+      [`${OMS}/packages/merchantid/${m}/delivered?${range}&`, 'delivered'],
+      [`${OMS}/orders/merchantid/${m}/cancelled?${range}&`, 'cancelled'],
     ];
     const errors = [];
-    for (const [url, status] of sources) {
-      let r;
-      try { r = await call(url); } catch (e) { errors.push(e.message); continue; }
-      for (const pk of list(r)) {
+    for (const [base, status] of sources) {
+      // Sayfa sayfa (geçmiş sipariş aktarımında yüzlerce paket olabilir)
+      const rows = [];
+      try {
+        for (let offset = 0; offset < 5000; offset += 100) {
+          const r = await call(`${base}offset=${offset}&limit=100`);
+          rows.push(...list(r));
+          if (list(r).length < 100) break;
+        }
+      } catch (e) { errors.push(e.message); if (!rows.length) continue; }
+      for (const pk of rows) {
         const lines = (pk.items || pk.lineItems || [pk]).map(lineOf);
         const pkgNo = str(pk.packageNumber || pk.packageId);
         let o = null;
@@ -101,8 +109,9 @@ export function hepsiburada(env, meta) {
       const rows = list(r);
       for (const l of rows) {
         out.push({
-          remoteId: str(l.hepsiburadaSku || l.hbSku), remoteProductId: str(l.hepsiburadaSku), sku: str(l.merchantSku), barcode: '', name: str(l.productName || l.merchantSku),
-          image: '', price: money(l.price), listPrice: money(l.price), stock: num(l.availableStock),
+          remoteId: str(l.hepsiburadaSku || l.hbSku), remoteProductId: str(l.hepsiburadaSku), sku: str(l.merchantSku), barcode: str(l.barcode || ''), name: str(l.productName || l.merchantSku),
+          groupName: str(l.productName || ''), variantName: '',
+          image: str(l.imageUrl || l.image || ''), price: money(l.price), listPrice: money(l.price), stock: num(l.availableStock), active: l.isSalable !== false,
         });
       }
       if (rows.length < 1000) break;

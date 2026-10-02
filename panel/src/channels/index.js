@@ -16,8 +16,8 @@ export async function getChannels(env, db) {
   const cfg = db ? await loadConfig(env, db) : {};
   const e = effectiveEnv(env, cfg);
   const meta = {
-    ikas1: { id: 'ikas1', type: 'ikas', name: e.IKAS1_NAME || 'HasTürk', short: e.IKAS1_SHORT || 'İkas 1' },
-    ikas2: { id: 'ikas2', type: 'ikas', name: e.IKAS2_NAME || 'Tarım Dünyası', short: e.IKAS2_SHORT || 'İkas 2' },
+    ikas1: { id: 'ikas1', type: 'ikas', name: e.IKAS1_NAME || 'HasTürk', short: e.IKAS1_SHORT || e.IKAS1_NAME || 'HasTürk' },
+    ikas2: { id: 'ikas2', type: 'ikas', name: e.IKAS2_NAME || 'Tarım Dünyası', short: e.IKAS2_SHORT || e.IKAS2_NAME || 'Tarım Dünyası' },
     trendyol: { id: 'trendyol', type: 'trendyol', name: 'Trendyol', short: 'Trendyol' },
     hepsiburada: { id: 'hepsiburada', type: 'hepsiburada', name: 'Hepsiburada', short: 'Hepsiburada' },
     pttavm: { id: 'pttavm', type: 'pttavm', name: 'PttAVM', short: 'PttAVM' },
@@ -30,8 +30,8 @@ export async function getChannels(env, db) {
     pttavm: pttavm(e, meta.pttavm),
   };
   const list = CHANNEL_IDS.map((id) => {
-    // Panelde "pasif" yapılan kanal hiç çalışmaz
-    if (cfg[id] && cfg[id].active === false) return { ...real[id], enabled: false, paused: true };
+    // Panelde "pasif" yapılan kanal hiç çalışmaz. PttAVM şimdilik beklemede: Entegrasyonlar'dan açılana kadar pasif.
+    if ((cfg[id] && cfg[id].active === false) || (id === 'pttavm' && !cfg[id])) return { ...real[id], enabled: false, paused: true };
     // DEMO=1: anahtarı olmayan kanallar örnek veriyle çalışır (anahtarı girilmiş kanal gerçek kalır)
     return env.DEMO === '1' && !real[id].enabled ? demo(meta[id]) : real[id];
   });

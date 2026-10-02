@@ -60,7 +60,7 @@ export function demo(meta) {
         const [city, district] = CITIES[Math.floor(r() * CITIES.length)], name = NAMES[Math.floor(r() * NAMES.length)];
         const no = `${ch.slice(0, 2).toUpperCase()}${key.replace(/-/g, '').slice(2)}${String(i + 1).padStart(3, '0')}`;
         out.push({
-          remoteId: no, orderNumber: no, orderedAt: at, remoteStatus: status, status,
+          remoteId: no, orderNumber: no, orderedAt: at, remoteStatus: status, status, demo: true,
           customer: name, phone: '0555 000 00 00', email: '',
           address: { name, line: 'Örnek Mah. Deneme Sok. No:1 D:2', district, city, phone: '0555 000 00 00' },
           total: lines.reduce((s, l) => s + l.total, 0), currency: 'TRY',

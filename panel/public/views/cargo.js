@@ -1,6 +1,6 @@
 // Kargo: paketler üç aşamada — etiket bekleyen, kargoya verilecek, kargoda. Etiketler kanalların kendi kargo
 // sistemlerinden gelir (Trendyol ortak etiketi, Hepsiburada paket etiketi, ikas/PttAVM kargo barkodu).
-import { api, state, html, render, $, ch, chLogo, chBadge, shortDT, isMobile, actions, busy, toast } from '../core.js';
+import { api, state, html, render, $, ch, chLogo, chBadge, shortDT, isMobile, actions, busy, toast , activeChannels } from '../core.js';
 import { packageAction, openOrder, bulkLabels } from './orderops.js';
 
 const TABS = [['waiting', 'Etiket bekleyen'], ['ready', 'Kargoya verilecek'], ['shipped', 'Kargoda (30 gün)']];
@@ -30,7 +30,7 @@ export async function cargo(el) {
     <button class="btn sm ghost" data-act="open" data-o="${r.order_id}">Yönet</button></div>`;
   function draw() {
     const c = data.counts;
-    render($('[data-chtabs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>${state.channels.map((x) => html`<button class="ch-tab ${f.channel === x.id ? 'on' : ''}" data-act="ch" data-id="${x.id}">${chLogo(x.id)}${x.name}</button>`)}`);
+    render($('[data-chtabs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>${activeChannels().map((x) => html`<button class="ch-tab ${f.channel === x.id ? 'on' : ''}" data-act="ch" data-id="${x.id}">${chLogo(x.id)}${x.name}</button>`)}`);
     render($('[data-tabs]', el), html`${TABS.map(([k, t]) => html`<button class="tab ${f.state === k ? 'on' : ''}" data-act="tab" data-k="${k}">${t}<span class="n">${c[k] || 0}</span></button>`)}`);
     const rows = rowsOf();
     const bulk = sel.size ? html`<div class="bulk"><b>${sel.size} sipariş seçildi</b><button class="btn sm outline" data-act="bulk-label"><i class="ico ico-tag"></i>Etiketleri oluştur ve yazdır</button><button class="icon-btn" data-act="clearsel" aria-label="Seçimi temizle"><i class="ico ico-x"></i></button></div>` : '';

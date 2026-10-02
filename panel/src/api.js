@@ -2,7 +2,10 @@
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS } from './channels/index.js';
 import { loadConfig, saveConfig, describe } from './config.js';
-import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems } from './sync.js';
+import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED } from './sync.js';
+import { suggestions } from './match.js';
+import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
+import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard } from './stats.js';
 import { profit } from '../public/profit.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS } from './util.js';
@@ -77,6 +80,7 @@ async function listOrders(db, q) {
   // Durum sayıları: seçili kanal / tarih / arama içinde (durum filtresi hariç)
   const f2 = orderFilter(q, { withStatus: false });
   const counts = await all(db, `SELECT o.status, COUNT(*) AS n FROM orders o ${f2.w} GROUP BY o.status`, ...f2.args);
+  const byChannel = await all(db, "SELECT channel, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY channel");
   // Satır önizlemesi (görsel + ad + adet), ilk 2 ürün
   const items = {}, full = {};
   if (rows.length) {
@@ -97,7 +101,7 @@ async function listOrders(db, q) {
       const pr = orderProfit({ channel: r.channel, shipping_cost: r.shipping_cost, items: full[r.id] || [] }, settings);
       return { ...r, city: a.city || '', district: a.district || '', address: undefined, extra: parse(r.extra, {}), items: (items[r.id] || []).slice(0, 2), cargo: r.pkg_cargo || r.cargo_company || '', profit: ['cancelled', 'returned'].includes(r.status) ? null : pr.profit, missing_cost: pr.missingCost };
     }),
-    counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), total, page, limit,
+    counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), pendingByChannel: Object.fromEntries(byChannel.map((c) => [c.channel, c.n])), total, page, limit,
   };
 }
 
@@ -300,7 +304,7 @@ async function listPackages(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active'];
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active'];
 const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active']);
 function cleanProduct(b) {
   const o = {};
@@ -309,28 +313,37 @@ function cleanProduct(b) {
   return o;
 }
 
+// Stok durumu: kritik eşik ürüne özel (critical_stock) ya da Ayarlar'daki genel sınır
+const LIMIT = (low) => `(CASE WHEN p.critical_stock > 0 THEN p.critical_stock ELSE ${Math.max(0, Math.round(Number(low) || 0))} END)`;
 async function listProducts(db, q) {
   const where = [], args = [];
-  if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ?)'); args.push(s, s, s); }
-  if (q.filter === 'low') where.push('(p.stock <= p.critical_stock OR p.stock <= 0)');
+  const low = LIMIT((await getSettings(db)).low_stock);
+  if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.group_name LIKE ?)'); args.push(s, s, s, s); }
+  if (q.filter === 'out') where.push('p.stock <= 0');
+  if (q.filter === 'below') where.push(`p.stock > 0 AND p.stock <= ${low}`);
+  if (q.filter === 'enough') where.push(`p.stock > ${low}`);
+  if (q.filter === 'low') where.push(`p.stock <= ${low}`);
   if (q.filter === 'nocost') where.push('(p.purchase_price IS NULL OR p.purchase_price = 0)');
-  if (q.filter === 'waiting') where.push('EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != MAX(p.stock, 0))');
+  if (q.filter === 'waiting') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED})`);
   if (q.filter === 'error') where.push('EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.error IS NOT NULL)');
   if (q.filter === 'nolisting') where.push('NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)');
   if (q.filter === 'passive') where.push('p.active = 0'); else if (q.filter !== 'all') where.push('p.active = 1');
   const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const limit = Math.min(Number(q.limit) || 50, 500), page = Math.max(1, Number(q.page) || 1);
-  const rows = await all(db, `SELECT p.* FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC' : 'p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
+  const rows = await all(db, `SELECT p.*, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'COALESCE(p.group_name, p.name) COLLATE NOCASE, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
   const total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    const ls = await all(db, `SELECT product_id, channel, remote_id, price, commission, pushed_stock, remote_stock, error FROM listings WHERE product_id IN (${ids.map(() => '?').join(',')})`, ...ids);
+    const ls = await all(db, `SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ids.map(() => '?').join(',')})`, ...ids);
     for (const r of rows) r.listings = ls.filter((l) => l.product_id === r.id);
   }
-  return { products: rows, total, page, limit };
+  // Stok durumu sayıları (sekmeler için)
+  const cnt = await first(db, `SELECT SUM(p.stock <= 0) AS out_, SUM(p.stock > 0 AND p.stock <= ${low}) AS below, SUM(p.stock > ${low}) AS enough, COUNT(*) AS total FROM products p WHERE p.active = 1`);
+  return { products: rows, total, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, all: cnt.total || 0 } };
 }
 
-async function stockChange(env, db, ctx, id, b) {
+async function stockChange(env, db, ctx, id, b, user) {
   const p = await first(db, 'SELECT id, stock FROM products WHERE id = ?', id);
   if (!p) fail(404, 'Ürün bulunamadı');
   const qty = Math.round(num(b.qty));
@@ -339,14 +352,14 @@ async function stockChange(env, db, ctx, id, b) {
   const t = Date.now();
   await db.batch([
     db.prepare('UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?').bind(delta, t, id),
-    db.prepare('INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) VALUES (?, ?, (SELECT stock FROM products WHERE id = ?), ?, ?, ?)')
-      .bind(id, delta, id, b.mode === 'set' ? 'Sayım / düzeltme' : delta > 0 ? 'Stok girişi' : 'Stok çıkışı', str(b.note) || null, t),
+    db.prepare('INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at, user) VALUES (?, ?, (SELECT stock FROM products WHERE id = ?), ?, ?, ?, ?)')
+      .bind(id, delta, id, b.mode === 'set' ? 'Sayım / düzeltme' : delta > 0 ? 'Stok girişi' : 'Stok çıkışı', str(b.note) || null, t, user ? user.name : null),
   ]);
   ctx.waitUntil(pushStocks(env, db).catch(() => {}));
   return { ok: true, stock: p.stock + delta };
 }
 
-async function saveProduct(env, db, ctx, id, b) {
+async function saveProduct(env, db, ctx, id, b, user) {
   const f = cleanProduct(b), t = Date.now();
   if (f.sku) {
     const dup = await first(db, 'SELECT id FROM products WHERE LOWER(sku) = LOWER(?) AND id != ?', f.sku, id || 0);
@@ -361,7 +374,7 @@ async function saveProduct(env, db, ctx, id, b) {
   } else {
     const keys = Object.keys(f);
     if (keys.length) await run(db, `UPDATE products SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => f[k]), t, id);
-    if (b.stock !== undefined && b.stock !== '') await stockChange(env, db, ctx, id, { mode: 'set', qty: b.stock, note: 'Ürün formu' });
+    if (b.stock !== undefined && b.stock !== '') await stockChange(env, db, ctx, id, { mode: 'set', qty: b.stock, note: 'Ürün formu' }, user);
   }
   // Kanal ilanları: fiyat / komisyon
   for (const l of b.listings || []) {
@@ -393,7 +406,7 @@ async function saveProduct(env, db, ctx, id, b) {
 async function productDetail(db, id) {
   const p = await first(db, 'SELECT * FROM products WHERE id = ?', id);
   if (!p) fail(404, 'Ürün bulunamadı');
-  p.listings = await all(db, 'SELECT * FROM listings WHERE product_id = ?', id);
+  p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id = ?`, id);
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
   p.sales = await all(db, `SELECT o.channel, SUM(i.quantity) AS qty, SUM(i.total) AS revenue FROM order_items i JOIN orders o ON o.id = i.order_id
     WHERE i.product_id = ? AND o.ordered_at >= ? AND o.status NOT IN ('cancelled', 'returned') AND i.status != 'cancelled' GROUP BY o.channel`, id, Date.now() - 30 * 864e5);
@@ -401,7 +414,7 @@ async function productDetail(db, id) {
 }
 
 // ---------- ayarlar ----------
-const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS).concat(['stock_channels']);
+const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS).concat(['stock_channels', 'logo']);
 async function saveSettings(db, b) {
   const cur = await getSettings(db);
   for (const k of Object.keys(b)) {
@@ -413,6 +426,10 @@ async function saveSettings(db, b) {
     }
     if (['commission', 'shipping', 'service_fee'].includes(k)) v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, num((v || {})[c], (cur[k] || {})[c] || 0)]));
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
+    if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
+    if (k === 'catalog_channels') v = (Array.isArray(v) ? v : []).filter((c) => CHANNEL_IDS.includes(c));
+    if (k === 'company') v = Object.fromEntries(['title', 'legal', 'phone', 'email', 'address', 'tax'].map((f) => [f, str((v || {})[f]).slice(0, 300)]));
+    if (k === 'logo') { v = v ? String(v) : ''; if (v && (!/^data:image\/(png|jpeg|webp|svg\+xml);base64,/.test(v) || v.length > 400000)) fail(400, 'Logo PNG/JPG/WEBP/SVG ve en fazla ~300 KB olmalı'); }
     await setSetting(db, k, v);
   }
   return getSettings(db);
@@ -429,15 +446,91 @@ async function channelsInfo(env, db) {
 }
 
 // ---------- yönlendirme ----------
-export async function api(req, env, ctx, db, path) {
+// Sadece yöneticinin yapabileceği işlemler (kanal API bilgileri, kullanıcılar, ayarlar, toplu aktarım)
+const ADMIN_ONLY = [/^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/];
+export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönetici', role: 'admin' }) {
   const url = new URL(req.url), q = Object.fromEntries(url.searchParams), m = req.method;
   let x;
+  if (user.role !== 'admin' && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
+  if (user.role !== 'admin' && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
   if (path === 'summary' && m === 'GET') {
-    return json({ ...(await summary(db)), channels: await channelsInfo(env, db), settings: await getSettings(db) });
+    const [s, notices, match] = await Promise.all([
+      summary(db),
+      first(db, 'SELECT COUNT(*) AS open, SUM(read = 0) AS unread FROM notices WHERE resolved_at IS NULL'),
+      first(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
+    ]);
+    return json({ ...s, channels: await channelsInfo(env, db), settings: await getSettings(db), user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, demo: env.DEMO === '1' });
   }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
-  if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force })); }
-  if (path === 'import' && m === 'POST') { const b = await body(req); return json(await importListings(env, db, { only: b.channels, createMissing: b.createMissing !== false })); }
+  if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
+  if (path === 'import' && m === 'POST') { const b = await body(req); return json(await importListings(env, db, { only: b.channels })); }
+  if (path === 'purge-demo' && m === 'POST') return json(await purgeDemo(db));
+
+  // ---------- eşleştirme ----------
+  if (path === 'match' && m === 'GET') {
+    const [rows, counts] = await Promise.all([
+      suggestions(db, { channel: q.channel, q: q.q, limit: Math.min(Number(q.limit) || 60, 200) }),
+      all(db, `SELECT channel, SUM(product_id IS NULL AND ignored = 0) AS pending, SUM(product_id IS NULL AND ignored = 1) AS ignored,
+        SUM(match IN ('barcode', 'sku', 'new')) AS auto, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
+    ]);
+    return json({ listings: rows, counts });
+  }
+  if (path === 'match/linked' && m === 'GET') {
+    const where = ['l.product_id IS NOT NULL'], args = [];
+    if (q.channel) { where.push('l.channel = ?'); args.push(q.channel); }
+    if (q.how) { where.push('l.match = ?'); args.push(q.how); }
+    if (q.q) { const s = '%' + q.q + '%'; where.push('(l.name LIKE ? OR l.sku LIKE ? OR p.name LIKE ?)'); args.push(s, s, s); }
+    return json({ listings: await all(db, `SELECT l.channel, l.remote_id, l.name, l.sku, l.barcode, l.image, l.variant_name, l.match, p.id AS product_id, p.name AS product_name, p.sku AS product_sku, p.image AS product_image
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE ${where.join(' AND ')} ORDER BY l.channel, l.name LIMIT 300`, ...args) });
+  }
+  if (path === 'match/ignore' && m === 'POST') {
+    const b = await body(req);
+    await run(db, 'UPDATE listings SET ignored = ? WHERE channel = ? AND remote_id = ?', b.ignored === false ? 0 : 1, b.channel, String(b.remote_id));
+    return json({ ok: true });
+  }
+  if (path === 'match/unlink' && m === 'POST') {
+    const b = await body(req);
+    await run(db, 'UPDATE listings SET product_id = NULL, match = NULL WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
+    await run(db, 'UPDATE order_items SET product_id = NULL WHERE remote_key = ? AND order_id LIKE ?', String(b.remote_id), b.channel + ':%');
+    return json({ ok: true });
+  }
+  // Kanala özel stok kuralı: shared | limit (en fazla N) | own (bu kanala ayrılmış N adet)
+  if (path === 'listings/stock' && m === 'POST') {
+    const b = await body(req);
+    const mode = ['shared', 'limit', 'own'].includes(b.mode) ? b.mode : 'shared';
+    const v = mode === 'shared' ? null : Math.max(0, Math.round(num(b.value)));
+    await run(db, 'UPDATE listings SET stock_mode = ?, stock_value = ? WHERE channel = ? AND remote_id = ?', mode, v, b.channel, String(b.remote_id));
+    await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} stok kuralı → ${mode}${v != null ? ' ' + v : ''}`);
+    ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    return json({ ok: true });
+  }
+
+  // ---------- geçmiş sipariş aktarımı ----------
+  if (path === 'backfill' && m === 'GET') return json(await listJobs(db));
+  if (path === 'backfill' && m === 'POST') {
+    const b = await body(req);
+    const d = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || '') ? Date.parse(s + 'T00:00:00Z') - 3 * 3600e3 : null);
+    const from = d(b.from), to = d(b.to) != null ? d(b.to) + 864e5 : Date.now();
+    if (from == null || from >= to) fail(400, 'Geçerli bir tarih aralığı seçin');
+    const chs = (b.channels || []).filter((c) => CHANNEL_IDS.includes(c));
+    if (!chs.length) fail(400, 'En az bir kanal seçin');
+    for (const c of chs) await createJob(db, c, from, Math.min(to, Date.now()));
+    await log(db, null, 'info', `${user.name}: geçmiş sipariş aktarımı başlatıldı (${chs.join(', ')}, ${b.from} – ${b.to || 'bugün'})`);
+    return json({ ok: true, run: await runJobs(env, db, { budgetMs: 15000 }) });
+  }
+  if (path === 'backfill/run' && m === 'POST') return json({ ok: true, run: await runJobs(env, db, { budgetMs: 20000 }) });
+  if ((x = path.match(/^backfill\/(.+)\/cancel$/)) && m === 'POST') { await cancelJob(db, decodeURIComponent(x[1])); return json({ ok: true }); }
+
+  // ---------- kullanıcılar ----------
+  if (path === 'users' && m === 'GET') return json(await listUsers(db));
+  if (path === 'users' && m === 'POST') { const b = await body(req); try { await saveUser(db, 0, b); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı eklendi (${b.username})`); return json({ ok: true }); }
+  if ((x = path.match(/^users\/(\d+)$/)) && m === 'PUT') { try { await saveUser(db, Number(x[1]), await body(req)); } catch (e) { fail(400, e.message); } return json({ ok: true }); }
+  if (path === 'me/password' && m === 'POST') { const b = await body(req); try { await changeOwnPassword(db, user, b.old, b.new); } catch (e) { fail(400, e.message); } return json({ ok: true }); }
+
+  // ---------- bildirimler ----------
+  if (path === 'notices' && m === 'GET') return json(await all(db, `SELECT * FROM notices ${q.all ? '' : 'WHERE resolved_at IS NULL'} ORDER BY resolved_at IS NOT NULL, last_at DESC LIMIT 200`));
+  if (path === 'notices/read' && m === 'POST') { await run(db, 'UPDATE notices SET read = 1 WHERE read = 0'); return json({ ok: true }); }
+  if ((x = path.match(/^notices\/(\d+)\/resolve$/)) && m === 'POST') { await run(db, 'UPDATE notices SET resolved_at = ?, read = 1 WHERE id = ?', Date.now(), Number(x[1])); return json({ ok: true }); }
   if (path === 'push-stock' && m === 'POST') return json(await pushStocks(env, db));
 
   if (path === 'orders' && m === 'GET') return json(await listOrders(db, q));
@@ -510,11 +603,11 @@ export async function api(req, env, ctx, db, path) {
   }
 
   if (path === 'products' && m === 'GET') return json(await listProducts(db, q));
-  if (path === 'products' && m === 'POST') return json(await saveProduct(env, db, ctx, 0, await body(req)));
+  if (path === 'products' && m === 'POST') return json(await saveProduct(env, db, ctx, 0, await body(req), user));
   if ((x = path.match(/^products\/(\d+)$/))) {
     const id = Number(x[1]);
     if (m === 'GET') return json(await productDetail(db, id));
-    if (m === 'PUT') return json(await saveProduct(env, db, ctx, id, await body(req)));
+    if (m === 'PUT') return json(await saveProduct(env, db, ctx, id, await body(req), user));
     if (m === 'DELETE') {
       await db.batch([
         db.prepare('UPDATE listings SET product_id = NULL WHERE product_id = ?').bind(id),
@@ -526,7 +619,7 @@ export async function api(req, env, ctx, db, path) {
       return json({ ok: true });
     }
   }
-  if ((x = path.match(/^products\/(\d+)\/stock$/)) && m === 'POST') return json(await stockChange(env, db, ctx, Number(x[1]), await body(req)));
+  if ((x = path.match(/^products\/(\d+)\/stock$/)) && m === 'POST') return json(await stockChange(env, db, ctx, Number(x[1]), await body(req), user));
 
   if (path === 'listings' && m === 'GET') {
     const where = [], args = [];
@@ -543,12 +636,15 @@ export async function api(req, env, ctx, db, path) {
       const l = await first(db, 'SELECT * FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
       if (!l) fail(404, 'İlan bulunamadı');
       const t = Date.now();
-      const r = await first(db, 'INSERT INTO products (sku, barcode, name, image, sale_price, stock, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
-        l.sku || null, l.barcode || null, l.name || l.sku || l.remote_id, l.image || '', l.price || 0, Math.max(0, l.remote_stock || 0), t, t);
+      // SKU başka üründe varsa yeni ürün SKU'suz açılır (çakışma olmasın)
+      const dup = l.sku ? await first(db, 'SELECT id FROM products WHERE LOWER(sku) = LOWER(?)', l.sku) : null;
+      const r = await first(db, 'INSERT INTO products (sku, barcode, name, group_name, variant_name, image, sale_price, stock, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
+        dup ? null : l.sku || null, l.barcode || null, l.name || l.sku || l.remote_id, l.group_name || null, l.variant_name || null, l.image || '', l.price || 0, Math.max(0, l.remote_stock || 0), t, t);
       pid = r.id;
     }
-    await run(db, 'UPDATE listings SET product_id = ?, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?', pid, b.channel, String(b.remote_id));
+    await run(db, 'UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?', pid, pid ? (b.create ? 'new' : 'manual') : null, b.channel, String(b.remote_id));
     if (pid) await relinkItems(db);
+    await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} ${pid ? (b.create ? 'yeni ürün olarak eklendi' : 'ürüne bağlandı') : 'bağlantısı kaldırıldı'}`);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
     return json({ ok: true, product_id: pid });
   }

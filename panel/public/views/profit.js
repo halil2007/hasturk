@@ -1,6 +1,6 @@
 // Kârlılık hesapla: alış, satış, komisyon, kargo → satıştan kalan ve ürün başına kazanç. Telefonda tek elle kullanılır;
 // hesap tarayıcıda yapılır (internet gerekmez), son girilen değerler hatırlanır.
-import { api, state, html, render, $, $$, money, n, chLogo, store, debounce, numIn } from '../core.js';
+import { api, state, html, render, $, $$, money, n, chLogo, store, debounce, numIn , activeChannels } from '../core.js';
 import { profit, priceFor } from '../profit.js';
 
 const DEF = { sale: '', purchase: '', commissionRate: '', shipping: '', fee: '', extra: '', vatRate: 20, includeVat: false, qty: 1, target: 20, channel: '' };
@@ -16,7 +16,7 @@ export async function profitView(el) {
         <div class="search" style="min-width:0"><i class="ico ico-search"></i><input class="input" placeholder="Üründen doldur (ad / SKU)" data-find></div>
         <div class="list" data-found></div>
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('sale', 'Satış fiyatı')}${box('purchase', 'Alış fiyatı')}</div>
-        ${box('commissionRate', 'Komisyon', '%', html`<div class="preset">${state.channels.map((c) => html`<button class="chip ${v.channel === c.id ? 'on' : ''}" data-ch="${c.id}">${chLogo(c.id, true)}%${n((st.commission || {})[c.id] || 0)}</button>`)}</div>`)}
+        ${box('commissionRate', 'Komisyon', '%', html`<div class="preset">${activeChannels().map((c) => html`<button class="chip ${v.channel === c.id ? 'on' : ''}" data-ch="${c.id}">${chLogo(c.id, true)}%${n((st.commission || {})[c.id] || 0)}</button>`)}</div>`)}
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('shipping', 'Kargo gideri')}${box('fee', 'Hizmet / işlem bedeli')}</div>
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('extra', 'Diğer gider', '₺', html`<small class="muted tiny">paketleme, reklam…</small>`)}${box('qty', 'Adet', 'ad')}</div>
         <div class="row wrap">
@@ -57,7 +57,7 @@ export async function profitView(el) {
     </div>
     <div class="card flush"><div class="card-pad"><h3>Kanallara göre</h3><div class="muted tiny" style="margin-top:4px">Aynı fiyatlarla, her kanalın Ayarlar'daki komisyon, kargo ve hizmet bedeli kullanılır.</div></div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Kom.</th><th class="r">Kalan</th><th class="r">Kâr</th></tr></thead><tbody>
-      ${state.channels.map((c) => { const x = profit({ ...inp, commissionRate: (st.commission || {})[c.id] || 0, shipping: (st.shipping || {})[c.id] || 0, fee: (st.service_fee || {})[c.id] || 0 }); return html`<tr>
+      ${activeChannels().map((c) => { const x = profit({ ...inp, commissionRate: (st.commission || {})[c.id] || 0, shipping: (st.shipping || {})[c.id] || 0, fee: (st.service_fee || {})[c.id] || 0 }); return html`<tr>
         <td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td><td class="r num">%${n((st.commission || {})[c.id] || 0)}</td>
         <td class="r num">${money(x.payout)}</td><td class="r num" style="font-weight:750;color:${x.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(x.unitProfit)}</td></tr>`; })}
       </tbody></table></div></div>`);
