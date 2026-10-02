@@ -2,7 +2,7 @@
 // GitHub Actions'ta çalışır (.github/workflows/site-speed.yml); sonuç işin özet sayfasına yazılır.
 // Yerelde: npm i playwright && node scripts/site-speed.mjs
 import { chromium } from 'playwright';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 
 const SITE = process.env.SITE || 'https://hasturkgubre.com.tr/';
 const RUNS = +(process.env.RUNS || 5);
@@ -57,6 +57,11 @@ async function run(browser, prof, mode, liveTag) {
   page.on('requestfinished', async r => {
     try { const s = await r.sizes(); const t = r.timing(); res.push({ url: r.url(), type: r.resourceType(), kb: (s.responseBodySize + s.responseHeadersSize) / 1024, end: t.responseEnd }); } catch (e) {}
   });
+  // Eski widget sürümleri (git'ten çıkarılmış dosya) canlı sitede denenir: "önceden kasmıyordu" karşılaştırması
+  if (mode.startsWith('eski-')) {
+    const body = readFileSync(`/tmp/widget-${mode.slice(5)}.js`, 'utf8');
+    await page.route(u => u.hostname === WIDGET_HOST && u.pathname === '/pm-search.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body }));
+  }
   if (mode === 'widgetsiz') await page.route(u => u.hostname === WIDGET_HOST, r => r.abort());
   // Ne kazanılır: reCAPTCHA olmadan / reCAPTCHA + Font Awesome + çift Google Analytics olmadan
   if (mode === 'recaptchasiz' || mode === 'temiz') await page.route(u => /recaptcha/.test(u.href), r => r.abort());
@@ -97,7 +102,7 @@ const sec = v => (v / 1000).toFixed(2) + ' sn';
 const browser = await chromium.launch();
 const html = await (await fetch(SITE)).text();
 const liveTag = (html.match(TAG_RE) || ['(etiket bulunamadı)'])[0];
-const modes = (process.env.MODES || 'widgetli,widgetsiz,recaptchasiz,temiz').split(',');
+const modes = (process.env.MODES || 'widgetli,eski-25ef704,eski-149acba,widgetsiz').split(',');
 if (!/\basync\b/.test(liveTag) && TAG_RE.test(html)) modes.push('async');
 
 let out = `# Canlı site hız ölçümü\n\nSite: ${SITE}  \nSitedeki etiket: \`${liveTag.replace(/`/g, '')}\`  \nHer ölçüm ${RUNS} kez, ortanca değer (önbelleksiz, ilk ziyaret).\n`;

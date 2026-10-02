@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -25,4 +27,9 @@ jobs:
           npm i --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
       - name: Ölç
-        run: node scripts/site-speed.mjs
+        env:
+          MODES: widgetli,eski-25ef704,eski-149acba,widgetsiz
+          RUNS: 4
+        run: |
+          for c in $(echo "$MODES" | tr ',' '\n' | sed -n 's/^eski-//p'); do git show "$c:public/pm-search.js" > "/tmp/widget-$c.js"; done
+          node scripts/site-speed.mjs
