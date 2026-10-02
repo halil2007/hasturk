@@ -23,7 +23,7 @@ await p.waitForTimeout(6000);
 const base = await state();
 log(`Başlangıç: ${JSON.stringify(base)} (başlıktaki logo/hesap gibi menü dışı bağlantılar: ${base.ikasGorunen})`);
 let bad = 0;
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 14; i++) {
   // Sırayla: bizim çubuktan kategori, sayfadaki bir ürün/kategori bağlantısı (ikas'ın kendi geçişi)
   const target = await p.evaluate((i) => {
     const ours = [...(document.querySelector('.ua-dnav') && document.querySelector('.ua-dnav').shadowRoot ? document.querySelector('.ua-dnav').shadowRoot.querySelectorAll('.ti[href]') : [])].map((a) => a.href);
@@ -46,6 +46,6 @@ for (let i = 0; i < 10; i++) {
   if (!ok) bad++;
   log(`${i + 1}. ${path} → 0,3sn: ${row[0].biz ? 'bizim' : 'YOK'}/${row[0].ikasGorunen} ikas | 1,5sn: ${row[1].biz ? 'bizim' : 'YOK'}/${row[1].ikasGorunen} | 4sn: ${row[2].biz ? 'bizim' : 'YOK'}/${row[2].ikasGorunen} ${ok ? '✓' : '✗'}`);
 }
-log(`Sonuç (${MODE}, ${SITE}): ${10 - bad}/10 geçişte menü yerinde`);
+log(`Sonuç (${MODE}, ${SITE}): ${14 - bad}/14 geçişte menü yerinde`);
 await b.close();
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, '```\n' + out.join('\n') + '\n```\n');

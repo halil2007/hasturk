@@ -3596,11 +3596,11 @@
   // Ekran boyutu değişince yeniden kur (masaüstünden çıkınca ikas menüsü geri gelir);
   // ikas başlığı yeniden çizerse (sayfa geçişi) menüyü tekrar yerleştir
   (function () {
-    var t, tries = 0;
+    var t;
     window.addEventListener('resize', function () {
       if (!DM) return;
       clearTimeout(t);
-      t = setTimeout(function () { tries = 0; unmountNav(); mountNav(); }, 250);
+      t = setTimeout(function () { unmountNav(); mountNav(); }, 250);
     });
     window.addEventListener('scroll', function () { if (DN && DN.cur) dmTop(); }, { passive: true });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && DN && DN.cur) dmClose(); });
@@ -3622,21 +3622,24 @@
           if (g && g.nav !== DN.nav && !DN.nav.getBoundingClientRect().height) unmountNav();
         }
       }
-      // Menü hiç bulunamayan sayfalarda boşuna aramaya devam etme (sayfa başına sınır)
-      if (!DN && dmenuOn() && tries++ < 60) mountNav();
+      if (!DN && dmenuOn()) mountNav();
     };
+    // Arka plan kontrolü hiç durmaz (1,5 sn'de bir, çok hafif); sık kontroller sadece sayfa geçişinden sonraki 15 sn
     setInterval(check, 1500);
     // Başlık değiştiği anda (aynı karede) yakala: sayfa değişikliklerinde sadece birkaç özellik kontrol edilir,
     // menü düşmüşse bir sonraki karede kontrol çalışır (ikas menüsü göz açıp kapayıncaya kadar bile görünmesin)
-    var raf = 0, lost = function () { return !DN ? dmenuOn() && tries < 60 : !DN.host.isConnected || !DN.nav.isConnected || DN.host.parentNode !== DN.nav || !DN.nav.hasAttribute('data-ua-nav'); };
+    var since = Date.now(), lastTry = 0, raf = 0;
+    var lost = function () { return !DN ? dmenuOn() : !DN.host.isConnected || !DN.nav.isConnected || DN.host.parentNode !== DN.nav || !DN.nav.hasAttribute('data-ua-nav'); };
     if (window.MutationObserver && document.body) new MutationObserver(function () {
       if (raf || !DM || !lost()) return;
-      raf = requestAnimationFrame(function () { raf = 0; check(); });
+      // Menü yoksa ve kurulamıyorsa (başlık henüz hazır değil) yoğun sayfa değişikliklerinde en fazla 150 ms'de bir dene
+      if (!DN && (Date.now() - since > 15000 || Date.now() - lastTry < 150)) return;
+      raf = requestAnimationFrame(function () { raf = 0; lastTry = Date.now(); check(); });
     }).observe(document.body, { childList: true, subtree: true });
     var burst = function () {
-      tries = 0;
+      since = Date.now();
       var n = 0;
-      (function f() { check(); if (++n < 50) setTimeout(f, 100); })();
+      (function f() { check(); if (++n < 80) setTimeout(f, 100); })();
     };
     ['pushState', 'replaceState'].forEach(function (m) {
       var o = history[m];
