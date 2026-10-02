@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (63 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 190 sipariş; site içi olaylar son 30 gün (78 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -44,12 +44,12 @@ _Henüz veri yok._
 | 10 | HG Akıllı Bitki ve Saksı Toprağı | 5,8 | 8 |
 | 11 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 4,8 | 3 |
 | 12 | HG Mezar Toprağı | 4,1 | 6 |
-| 13 | Doğal Orman Toprağı | %100 Organik ve Humuslu | 4,1 | 1 |
+| 13 | Doğal Orman Toprağı | %100 Organik ve Humuslu | 4 | 1 |
 | 14 | HG Paşa Kılıcı (Sansevieria) Toprağı | 3,8 | 4 |
 | 15 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 3,6 | 2 |
 | 16 | HG Tarım Perliti | 3,6 | 5 |
 | 17 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici | 3,6 | 4 |
-| 18 | HG Organik Sebze Yetiştirme Toprağı  | 3,4 | 0 |
+| 18 | HG Organik Sebze Yetiştirme Toprağı  | 3,3 | 0 |
 | 19 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 3,3 | 0 |
 | 20 | Gold Valley Süs Yoncası Tohumu (Ak Üçgül) 500 Gr | 3,3 | 4 |
 
@@ -60,25 +60,32 @@ _Henüz veri yok._
 | 1 | perlit | 2 | 2 |  |  |
 | 2 | sebze tohumu | 2 | 2 |  |  |
 | 3 | torf | 2 | 2 |  |  |
-| 4 | enjo | 1 | 1 |  |  |
-| 5 | felici | 1 | 1 |  |  |
-| 6 | hümik | 1 | 1 |  |  |
-| 7 | ilaçlama pompası | 1 | 1 |  |  |
-| 8 | saksı toprağı | 1 | 1 |  |  |
-| 9 | solucan gübresi | 1 | 1 |  |  |
+| 4 | limon | 1 | 1 |  |  |
+| 5 | enjo | 1 | 1 |  |  |
+| 6 | felici | 1 | 1 |  |  |
+| 7 | hümik | 1 | 1 |  |  |
+| 8 | ilaçlama pompası | 1 | 1 |  |  |
+| 9 | saksı toprağı | 1 | 1 |  |  |
+| 10 | solucan gübresi | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
 Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlamlı tanımlamayı düşünün.
 
-_Henüz veri yok._
+| # | Kelime | Arama |
+|---|---|---|
+| 1 | 2 4 yılllık fidan in | 1 |
+| 2 | 2 4 yılllık fidan için | 1 |
+| 3 | 2 4 yılllık fidan içşn | 1 |
+| 4 | fidan gübresi | 1 |
 
 ## En çok sepete eklenenler
 
 | # | Ürün | Sepete ekleme | Görüntüleme |
 |---|---|---|---|
-| 1 | HasTürk Hümix Sıvı Hümik Asit | 0,9 | 0,9 |
-| 2 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | 0,9 | 0 |
+| 1 | Limon Ağacı Bakım Seti | 1 | 1 |
+| 2 | HasTürk Hümix Sıvı Hümik Asit | 0,9 | 0,9 |
+| 3 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | 0,9 | 0 |
 
 ## Çok bakılıp az sepete eklenenler
 
@@ -94,7 +101,7 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 |---|---|
 | Saksılar ve Bahçe Yatakları | 45 Göz Yuvarlak Fide Viyolü  (`45-goz-yuvarlak-fide-viyolu`)<br>Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm (`moduler-yukseltilmis-bahce-yatagi-sekilli-no-12-220x140`) |
 | Tohumlar | DSV Lippa Lisuna 6 Mix Çim Tohumu (`dsv-lippa-lisuna-6-mix-cim-tohumu`)<br>DSV Lippa Tamu 5 Mix Çim Tohumu (`dsv-lippa-tamu-5-mix-cim-tohumu`)<br>Gold Valley Süs Yoncası Tohumu (Ak Üçgül) 500 Gr (`sus-yoncasi-tohumu-ak-ucgul`) |
-| Gübreler | HasTürk Sıvı Solucan Gübresi  (`hasturk-sivi-solucan-gubresi`)<br>HasTürk Solucan Gübresi  (`hasturk-kati-solucan-gubresi`)<br>HasTürk Hümix Sıvı Hümik Asit (`hasturk-humix-sivi-humik-asit`) |
+| Gübreler | HasTürk Solucan Gübresi  (`hasturk-kati-solucan-gubresi`)<br>HasTürk Sıvı Solucan Gübresi  (`hasturk-sivi-solucan-gubresi`)<br>HasTürk Hümix Sıvı Hümik Asit (`hasturk-humix-sivi-humik-asit`) |
 | Topraklar | HG Paşa Kılıcı (Sansevieria) Toprağı (`pasa-kilici-sansevieria-topragi`)<br>Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>Premium Fide Toprağı (`hg-premium-fide-topragi`) |
 | Halk Sağlığı Ürünleri | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı (`chrysamed-insektisit-max-5-lt-ekonomik-tahtakurusu-akrep-ilaci`)<br>Chrysamed İnsektisit Max 2 Lt (`chrysamed-insektisit-max-2-lt-tum-ev-bahce-bocek-ilaci`)<br>Chrysamed Ratex Pasta Fare İlacı 100 Gr (`chrysamed-ratex-pasta-fare-ilaci-100-gr`) |
 | Bahçe Ekipmanları | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) (`uzman-2-lt-ilaclama-pompasi`)<br>Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  (`uzman-10-lt-basincli-ilaclama-pompasi-k-73`)<br>Uzman Lityum Akülü İlaçlama Pompası 8 Lt (`uzman-lityum-akulu-ilaclama-pompasi-8-lt`) |
