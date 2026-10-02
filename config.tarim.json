@@ -1,5 +1,5 @@
 {
-  "_help": "Tarım Dünyası (tarim-dunyasi.com) için config.json'un üzerine yazılan ayarlar. Burada olmayan her şey config.json'dan gelir. Ürün adresleri (boost, crossSell, categoryImages, guides, desktopMenu.picks) bu mağazanın adreslerine otomatik çevrilir; eşleşmeyenler slugMap ile elle eşlenir: { \"1. mağaza adresi\": \"tarım dünyası adresi\" }. Tarım Dünyası'nda olmayan sayfalar pageMap ile başka adrese yönlendirilir (o sayfalar bu sitede açılınca buradan silin).",
+  "_help": "Tarım Dünyası (tarim-dunyasi.com) için config.json'un üzerine yazılan ayarlar. Burada olmayan her şey config.json'dan gelir. Ürün adresleri (boost, crossSell, categoryImages, guides, desktopMenu.picks) bu mağazanın adreslerine otomatik çevrilir; eşleşmeyenler slugMap ile elle eşlenir: { \"1. mağaza adresi\": \"tarım dünyası adresi\" }. Tarım Dünyası'nda olmayan sayfalar pageMap ile başka adrese yönlendirilir (o sayfalar bu sitede açılınca buradan silin). sameProduct: HasTürk'teki ürün ↔ Tarım Dünyası'ndaki karşılık(lar)ı; iki mağazanın siparişleri birleştirilirken kullanılır (seçenek adı eşleşen ürüne yazılır).",
   "colors": {
     "primary": "#2d7a31",
     "dark": "#1e5622",
@@ -19,5 +19,30 @@
   "pageMap": {
     "/pages/solucan-gubresi-kullanim-miktarlari": "https://hasturkgubre.com.tr/pages/solucan-gubresi-kullanim-miktarlari",
     "/pages/humik-asit-nasil-kullanilir": "https://hasturkgubre.com.tr/pages/humik-asit-nasil-kullanilir"
+  },
+  "sameProduct": {
+    "hasturk-kati-solucan-gubresi": [
+      "kati-solucan-gubresi-1-kg",
+      "kati-solucan-gubresi-2-kg",
+      "hasturk-kati-solucan-gubresi-3-kg",
+      "kati-solucan-gubresi-5-kg",
+      "kati-solucan-gubresi-10-kg",
+      "kati-solucan-gubresi-15-kg",
+      "kati-solucan-gubresi-20-kg-cuval"
+    ],
+    "hasturk-sivi-solucan-gubresi": [
+      "hasturk-sivi-solucan-gubresi-250-ml",
+      "sivi-solucan-gubresi-500-ml",
+      "sivi-solucan-gubresi-1-lt",
+      "sivi-solucan-gubresi-5-lt",
+      "sivi-solucan-gubresi-10-lt",
+      "sivi-solucan-gubresi-20-lt"
+    ],
+    "1-ton-solucan-gubresi-fiyati": [
+      "kati-solucan-gubresi-1-ton-cuval"
+    ],
+    "1-ton-sivi-solucan-gubresi": [
+      "sivi-solucan-gubresi-1-ton-bidon"
+    ]
   }
 }

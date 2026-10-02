@@ -2405,5 +2405,14 @@
     "labels": {
       "Saksılar ve Bahçe Yatakları": "Saksı & Bahçe Yatağı"
     }
-  }
+  },
+  "demoteCategories": [
+    "Kedi Ürünleri",
+    "Köpek Ürünleri"
+  ],
+  "demoteTerms": [
+    "kedi",
+    "köpek",
+    "mama"
+  ]
 }

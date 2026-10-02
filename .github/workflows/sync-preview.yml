@@ -1,0 +1,48 @@
+name: HasTürk senkron önizleme
+
+# Çalışma dalında HasTürk senkronunu (iki mağazanın siparişleriyle) çalıştırır ve raporu dala kaydeder.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/sync.mjs', 'config.json', '.github/workflows/sync-preview.yml']
+
+permissions:
+  contents: read
+
+concurrency: sync-preview
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: HasTürk (Tarım Dünyası siparişleri dahil)
+        run: node scripts/sync.mjs
+        env:
+          IKAS_STORE: ${{ secrets.IKAS_STORE }}
+          IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+          IKAS_MERCHANT_ID: ${{ secrets.IKAS_MERCHANT_ID }}
+          IKAS_SALES_CHANNEL_ID: ${{ secrets.IKAS_SALES_CHANNEL_ID }}
+          OTHER_STORE: hasturktarimdunyasi
+          OTHER_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          OTHER_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+          OTHER_PRODUCTS: public/tarim/products.json
+      - name: Tarım Dünyası (HasTürk siparişleri dahil)
+        run: node scripts/sync.mjs
+        env:
+          SITE: tarim
+          IKAS_STORE: hasturktarimdunyasi
+          IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+          OTHER_STORE: ${{ secrets.IKAS_STORE }}
+          OTHER_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          OTHER_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+          OTHER_PRODUCTS: public/products.json
+      - name: Özet (dala kaydedilmez; veri dosyalarını sadece main'deki sync.yml yazar, çakışma olmasın)
+        run: git status --short && head -5 docs/trend-raporu*.md

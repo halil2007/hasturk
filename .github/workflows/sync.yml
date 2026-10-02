@@ -30,6 +30,11 @@ jobs:
           IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
           IKAS_MERCHANT_ID: ${{ secrets.IKAS_MERCHANT_ID }}
           IKAS_SALES_CHANNEL_ID: ${{ secrets.IKAS_SALES_CHANNEL_ID }}
+          # Tarım Dünyası'nın siparişleri de algoritmaya katılır (aynı ürünler)
+          OTHER_STORE: hasturktarimdunyasi
+          OTHER_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          OTHER_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+          OTHER_PRODUCTS: public/tarim/products.json
       - name: Tarım Dünyası ürünlerini çek (2. mağaza)
         # Anahtarlar yoksa atlanır; hata olursa 1. mağazanın senkronu yine kaydedilir
         continue-on-error: true
@@ -39,6 +44,11 @@ jobs:
           IKAS_STORE: hasturktarimdunyasi
           IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
           IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+          # HasTürk'ün siparişleri de algoritmaya katılır
+          OTHER_STORE: ${{ secrets.IKAS_STORE }}
+          OTHER_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          OTHER_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+          OTHER_PRODUCTS: public/products.json
       - name: Değiştiyse kaydet
         run: |
           git config user.name "urun-senkron"
