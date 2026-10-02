@@ -100,3 +100,70 @@ export function legend(el, items, hidden, onToggle, compareName) {
     + (compareName ? `<span class="row" style="gap:6px"><span class="ln"></span>${esc(compareName)}</span>` : '');
   el.onclick = (e) => { const b = e.target.closest('button[data-id]'); if (b) onToggle(b.dataset.id); };
 }
+
+// Çizgi grafik: bu dönem (dolu çizgi + hafif alan) ve önceki dönem (kesikli). Artı imleç ve tüm serileri gösteren ipucu.
+export function lineChart(el, { labels, titles = labels, current, previous = null, curName = 'Bu dönem', prevName = 'Önceki dönem', format = String, axisFormat = format, height }) {
+  el.classList.add('chart');
+  el.innerHTML = '';
+  const tip = document.createElement('div');
+  tip.className = 'tip hide';
+  let geo = null;
+  const draw = () => {
+    const W = Math.max(280, el.clientWidth || 600), H = height || (W < 560 ? 200 : 250);
+    const padL = 50, padR = 12, padT = 12, padB = 26;
+    const n = labels.length;
+    const max = niceMax(Math.max(0, ...current, ...(previous || [])));
+    const x = (i) => padL + (n <= 1 ? (W - padL - padR) / 2 : ((W - padL - padR) * i) / (n - 1));
+    const y = (v) => padT + (H - padT - padB) * (1 - (v || 0) / max);
+    const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+    let s = `<svg xmlns="${NS}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Satış grafiği">`;
+    for (let k = 0; k <= 4; k++) {
+      const v = (max / 4) * k, yy = Math.round(y(v)) + 0.5;
+      s += `<line class="grid-line" x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}"/><text class="axis-text" x="${padL - 8}" y="${yy + 4}" text-anchor="end">${esc(axisFormat(v))}</text>`;
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - padL) / 64))));
+    labels.forEach((lb, i) => { if (i % every === 0) s += `<text class="axis-text" x="${x(i)}" y="${H - 6}" text-anchor="middle">${esc(lb)}</text>`; });
+    if (previous) s += `<path class="cmp-line" d="${path(previous.slice(0, n))}"/>`;
+    s += `<path class="main-area" d="${path(current)}L${x(n - 1)},${y(0)}L${x(0)},${y(0)}Z"/><path class="main-line" d="${path(current)}"/>`;
+    s += `<line class="xhair hide" x1="0" x2="0" y1="${padT}" y2="${H - padB}"/><circle class="xdot hide" r="4.5" fill="var(--primary)" stroke="var(--surface)" stroke-width="2"/>`;
+    s += `<rect class="hit-layer" x="${padL}" y="${padT}" width="${W - padL - padR}" height="${H - padT - padB}" tabindex="0"/></svg>`;
+    el.innerHTML = s;
+    el.append(tip);
+    geo = { W, x, y, n };
+    const svg = el.querySelector('svg'), hit = el.querySelector('.hit-layer'), xh = el.querySelector('.xhair'), xd = el.querySelector('.xdot');
+    const show = (i) => {
+      i = Math.max(0, Math.min(n - 1, i));
+      const sc = el.clientWidth / W, px = x(i);
+      xh.setAttribute('x1', px); xh.setAttribute('x2', px); xh.classList.remove('hide');
+      xd.setAttribute('cx', px); xd.setAttribute('cy', y(current[i])); xd.classList.remove('hide');
+      tip.innerHTML = `<div class="h">${esc(titles[i])}</div><div class="r"><span class="k" style="background:var(--primary)"></span>${esc(curName)}<b>${esc(format(current[i] || 0))}</b></div>`
+        + (previous ? `<div class="r muted"><span class="k dash"></span>${esc(prevName)}<b>${esc(format(previous[i] || 0))}</b></div>` : '');
+      tip.classList.remove('hide');
+      const left = px * sc + 14 + tip.offsetWidth > el.clientWidth ? px * sc - tip.offsetWidth - 14 : px * sc + 14;
+      tip.style.left = Math.max(0, left) + 'px'; tip.style.top = '4px';
+    };
+    const idx = (ev) => { const r = svg.getBoundingClientRect(); const px = ((ev.clientX - r.left) / r.width) * W; return n <= 1 ? 0 : Math.round(((px - padL) / (W - padL - padR)) * (n - 1)); };
+    hit.addEventListener('pointermove', (ev) => show(idx(ev)));
+    hit.addEventListener('pointerdown', (ev) => show(idx(ev)));
+    let ki = n - 1;
+    hit.addEventListener('focus', () => show(ki));
+    hit.addEventListener('keydown', (ev) => { if (ev.key === 'ArrowLeft') show((ki = Math.max(0, ki - 1))); if (ev.key === 'ArrowRight') show((ki = Math.min(n - 1, ki + 1))); });
+    const hide = () => { tip.classList.add('hide'); xh.classList.add('hide'); xd.classList.add('hide'); };
+    hit.addEventListener('pointerleave', hide); hit.addEventListener('blur', hide);
+  };
+  draw();
+  let w = el.clientWidth;
+  const ro = new ResizeObserver(() => { if (Math.abs(el.clientWidth - w) > 4) { w = el.clientWidth; draw(); } });
+  ro.observe(el);
+  return { destroy: () => ro.disconnect() };
+}
+
+// KPI kartlarındaki küçük eğilim çizgisi (değerler sadece görsel eğilim; rakam kartın kendisinde)
+export function sparkline(values, color = 'var(--primary)') {
+  const v = values.length ? values : [0];
+  const W = 120, H = 44, max = Math.max(...v, 1), min = Math.min(...v, 0);
+  const x = (i) => (v.length === 1 ? W / 2 : (W * i) / (v.length - 1));
+  const y = (val) => 4 + (H - 8) * (1 - (val - min) / (max - min || 1));
+  const d = v.map((val, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(val).toFixed(1)}`).join('');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W},${H}L0,${H}Z" fill="${color}" opacity=".1"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+}

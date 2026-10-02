@@ -1,6 +1,6 @@
 // İstatistik: dönem seçimi, gün/hafta/ay gruplama, önceki dönem / geçen yıl karşılaştırma,
 // kanal bazında ve toplam ciro / sipariş / tahmini kâr, en çok satan ürünler.
-import { api, state, html, render, $, money, money0, compact, n, pct, delta, ch, chColor, dayKey, store, toast } from '../core.js';
+import { api, state, html, render, $, chLogo, money, money0, compact, n, pct, delta, ch, chColor, dayKey, store, toast } from '../core.js';
 import { columnChart, legend } from '../chart.js';
 
 const D = 864e5;
@@ -88,7 +88,7 @@ export async function statsView(el) {
       <div class="section-title"><h2>Kanallar</h2></div>
       <div class="card flush table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Ciro</th><th class="r">Pay</th><th class="r">Sipariş</th><th class="r">Sepet ort.</th><th class="r">Tahmini kâr</th><th class="r">İptal/iade</th>${cmp ? html`<th class="r">Ciro değişimi</th>` : ''}</tr></thead><tbody>
         ${ids.map((id) => { const t = cur.totals[id], c = cmp && cmp.totals[id], d = c ? delta(t.revenue, c.revenue) : null; return html`<tr>
-          <td><span class="ch-badge"><span class="dot" style="background:${chColor(id)}"></span>${ch(id).name}</span></td>
+          <td><span class="ch-name"><span class="dot" style="background:${chColor(id)}"></span>${chLogo(id, true)}${ch(id).name}</span></td>
           <td class="r num">${money0(t.revenue)}</td><td class="r num">${cur.total.revenue ? n((t.revenue / cur.total.revenue) * 100) + '%' : '—'}</td>
           <td class="r num">${t.orders}</td><td class="r num">${t.orders ? money(t.revenue / t.orders) : '—'}</td><td class="r num">${money0(t.profit)}</td>
           <td class="r num">${t.cancelled + t.returned}</td>${cmp ? html`<td class="r num ${d == null || d === 0 ? 'flat' : d > 0 ? 'up' : 'down'}">${pct(d)}</td>` : ''}</tr>`; })}

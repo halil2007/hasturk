@@ -1,12 +1,14 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
-import { getChannels, channel, publicInfo, CHANNEL_IDS } from './channels/index.js';
+import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS } from './channels/index.js';
+import { loadConfig, saveConfig, describe } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems } from './sync.js';
-import { stats, summary } from './stats.js';
+import { stats, summary, dashboard } from './stats.js';
 import { profit } from '../public/profit.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
+const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, desi, created_at, shipped_at, label_format, label_at, (label_data IS NOT NULL) AS has_label';
 
 // ---------- siparişler ----------
 async function loadOrder(db, id) {
@@ -18,7 +20,7 @@ async function loadOrder(db, id) {
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = ? AND l.remote_id = i.remote_key
     WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id);
-  o.packages = (await all(db, 'SELECT * FROM packages WHERE order_id = ? ORDER BY no', id)).map((p) => ({ ...p, items: parse(p.items, []) }));
+  o.packages = (await all(db, `SELECT ${PKG_COLS} FROM packages WHERE order_id = ? ORDER BY no`, id)).map((p) => ({ ...p, items: parse(p.items, []) }));
   return o;
 }
 
@@ -38,31 +40,79 @@ function orderProfit(o, settings) {
   return { revenue: r2(revenue), commission: r2(commission), shipping: r2(shipping), fee: r2(fee), payout: r2(net), cost: r2(cost), profit: r2(net - cost), missingCost: missing };
 }
 
-async function listOrders(db, q) {
+// Sipariş filtresi (liste, sayılar ve dışa aktarma aynı filtreyi kullanır)
+function orderFilter(q, { withStatus = true } = {}) {
   const where = [], args = [];
-  const st = q.status || 'active';
-  if (st === 'active') where.push("o.status IN ('new', 'processing')");
-  else if (st === 'cancelled') where.push("o.status IN ('cancelled', 'returned')");
-  else if (STATUS.includes(st)) { where.push('o.status = ?'); args.push(st); }
+  const st = q.status || 'all';
+  if (withStatus) {
+    if (st === 'active') where.push("o.status IN ('new', 'processing')");
+    else if (st === 'cancelled') where.push("o.status IN ('cancelled', 'returned')");
+    else if (STATUS.includes(st)) { where.push('o.status = ?'); args.push(st); }
+  }
   if (q.channel && CHANNEL_IDS.includes(q.channel)) { where.push('o.channel = ?'); args.push(q.channel); }
+  const day = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || '') ? Date.parse(s + 'T00:00:00Z') - 3 * 3600e3 : null);
+  if (day(q.from) != null) { where.push('o.ordered_at >= ?'); args.push(day(q.from)); }
+  if (day(q.to) != null) { where.push('o.ordered_at < ?'); args.push(day(q.to) + 864e5); }
+  if (q.cargo) { where.push('(o.cargo_company = ? OR EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id AND k.cargo_company = ?))'); args.push(q.cargo, q.cargo); }
   if (q.q) {
     const s = '%' + q.q.trim() + '%';
-    where.push('(o.order_number LIKE ? OR o.customer LIKE ? OR o.tracking LIKE ? OR EXISTS (SELECT 1 FROM order_items x WHERE x.order_id = o.id AND (x.name LIKE ? OR x.sku LIKE ?)))');
-    args.push(s, s, s, s, s);
+    where.push('(o.order_number LIKE ? OR o.customer LIKE ? OR o.tracking LIKE ? OR EXISTS (SELECT 1 FROM order_items x WHERE x.order_id = o.id AND (x.name LIKE ? OR x.sku LIKE ? OR x.barcode LIKE ?)))');
+    args.push(s, s, s, s, s, s);
   }
-  const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
-  const limit = Math.min(Number(q.limit) || 50, 200), page = Math.max(1, Number(q.page) || 1);
-  const rows = await all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra,
+  return { w: where.length ? 'WHERE ' + where.join(' AND ') : '', args, st };
+}
+
+async function listOrders(db, q) {
+  const { w, args, st } = orderFilter(q);
+  const limit = Math.min(Number(q.limit) || 25, 200), page = Math.max(1, Number(q.page) || 1);
+  const rows = await all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost,
       (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty,
-      (SELECT GROUP_CONCAT(quantity || '× ' || name, ' · ') FROM (SELECT quantity, name FROM order_items WHERE order_id = o.id LIMIT 3)) AS preview,
+      (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS lines,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
+      (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND status = 'open') AS open_packages,
+      (SELECT MAX(cargo_company) FROM packages WHERE order_id = o.id AND cargo_company != '') AS pkg_cargo,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id AND product_id IS NULL) AS unmatched
     FROM orders o ${w} ORDER BY ${st === 'active' ? 'o.ordered_at ASC' : 'o.ordered_at DESC'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
-  const counts = await all(db, 'SELECT status, COUNT(*) AS n FROM orders GROUP BY status');
+  const total = (await first(db, `SELECT COUNT(*) AS n FROM orders o ${w}`, ...args)).n;
+  // Durum sayıları: seçili kanal / tarih / arama içinde (durum filtresi hariç)
+  const f2 = orderFilter(q, { withStatus: false });
+  const counts = await all(db, `SELECT o.status, COUNT(*) AS n FROM orders o ${f2.w} GROUP BY o.status`, ...f2.args);
+  // Satır önizlemesi (görsel + ad + adet), ilk 2 ürün
+  const items = {}, full = {};
+  if (rows.length) {
+    const ids = rows.map((r) => r.id);
+    for (const it of await all(db, `SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
+        p.purchase_price, l.commission AS listing_commission
+      FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
+      LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
+      WHERE i.order_id IN (${ids.map(() => '?').join(',')}) ORDER BY i.rowid`, ...ids)) {
+      (items[it.order_id] = items[it.order_id] || []).push({ name: it.pname || it.name, qty: it.quantity, sku: it.sku, image: it.image || '' });
+      (full[it.order_id] = full[it.order_id] || []).push(it);
+    }
+  }
+  const settings = await getSettings(db);
   return {
-    orders: rows.map((r) => ({ ...r, city: parse(r.address, {}).city || '', address: undefined, extra: parse(r.extra, {}) })),
-    counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), page, limit,
+    orders: rows.map((r) => {
+      const a = parse(r.address, {});
+      const pr = orderProfit({ channel: r.channel, shipping_cost: r.shipping_cost, items: full[r.id] || [] }, settings);
+      return { ...r, city: a.city || '', district: a.district || '', address: undefined, extra: parse(r.extra, {}), items: (items[r.id] || []).slice(0, 2), cargo: r.pkg_cargo || r.cargo_company || '', profit: ['cancelled', 'returned'].includes(r.status) ? null : pr.profit, missing_cost: pr.missingCost };
+    }),
+    counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), total, page, limit,
   };
+}
+
+async function exportOrders(db, q) {
+  const { w, args } = orderFilter(q);
+  const rows = await all(db, `SELECT o.channel, o.order_number, o.ordered_at, o.status, o.customer, o.phone, o.address, o.total, o.cargo_company, o.tracking,
+      (SELECT GROUP_CONCAT(quantity || ' x ' || name || CASE WHEN sku != '' THEN ' (' || sku || ')' ELSE '' END, ' | ') FROM order_items WHERE order_id = o.id) AS items
+    FROM orders o ${w} ORDER BY o.ordered_at DESC LIMIT 10000`, ...args);
+  const cell = (v) => { const s = String(v ?? ''); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const fmt = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+  const head = ['Kanal', 'Sipariş no', 'Tarih', 'Durum', 'Müşteri', 'Telefon', 'İl', 'İlçe', 'Adres', 'Tutar', 'Kargo', 'Takip no', 'Ürünler'];
+  const TR = { new: 'Yeni', processing: 'Hazırlanıyor', shipped: 'Kargoda', delivered: 'Teslim edildi', cancelled: 'İptal', returned: 'İade' };
+  const lines = rows.map((r) => { const a = parse(r.address, {}); return [r.channel, r.order_number, fmt(r.ordered_at), TR[r.status] || r.status, r.customer, r.phone, a.city, a.district, a.line, String(r.total).replace('.', ','), r.cargo_company, r.tracking, r.items].map(cell).join(';'); });
+  // Excel Türkçe karakterleri doğru açsın diye UTF-8 BOM
+  return '﻿' + [head.join(';'), ...lines].join('\r\n');
 }
 
 const lineQty = (o) => new Map(o.items.filter((i) => i.status !== 'cancelled').map((i) => [String(i.line_id), i.quantity]));
@@ -97,7 +147,7 @@ async function setLocalStatus(db, o, status) {
 
 async function orderAction(env, db, id, action, b, ctx) {
   let o = await loadOrder(db, id);
-  const ch = channel(env, o.channel);
+  const ch = await channel(env, db, o.channel);
   const settings = await getSettings(db);
   if (action === 'accept') {
     if (o.status !== 'new') fail(400, 'Sadece yeni siparişler işleme alınabilir');
@@ -158,11 +208,8 @@ async function orderAction(env, db, id, action, b, ctx) {
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages[0];
     if (!pkg) fail(404, 'Paket bulunamadı');
-    let official = null, error = null;
-    if (ch && ch.enabled && ch.caps.label && ch.label) {
-      try { official = await ch.label(o, pkg); } catch (e) { error = e.message; await log(db, o.channel, 'warn', 'Etiket alınamadı: ' + e.message); }
-    }
-    return { ok: true, order: await loadOrder(db, o.id), package_id: pkg.id, official, error, sender: settings.sender };
+    const r = await packageLabel(db, ch, o, pkg, settings, { refresh: !!b.refresh });
+    return { ok: true, order: await loadOrder(db, o.id), package_id: pkg.id, ...r, sender: settings.sender };
   }
   if (action === 'status') {
     const s = str(b.status);
@@ -186,6 +233,72 @@ async function orderAction(env, db, id, action, b, ctx) {
   fail(404, 'Bilinmeyen işlem');
 }
 
+// ---------- kargo etiketi (kanalın kendi sisteminden) ----------
+// Trendyol: ortak etiket (ZPL) · Hepsiburada: paket etiketi (ZPL/PDF) · ikas ve PttAVM: kanalın kargo barkodu panel etiketine basılır.
+// Alınan etiket pakete kaydedilir; tekrar istenince kanala gidilmez.
+async function packageLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
+  if (pkg.has_label && !refresh) {
+    const r = await first(db, 'SELECT label_format, label_data FROM packages WHERE id = ?', pkg.id);
+    return { official: { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` } };
+  }
+  if (!ch || !ch.enabled || !ch.caps.label || !ch.label) {
+    // Deneme modu: kanal barkodu yerine örnek barkod
+    if (ch && ch.demo && !pkg.barcode && !pkg.tracking) {
+      pkg.barcode = `DEMO${o.order_number}${pkg.no}`.replace(/[^A-Z0-9]/gi, '');
+      await run(db, 'UPDATE packages SET barcode = ? WHERE id = ?', pkg.barcode, pkg.id);
+    }
+    const code = pkg.barcode || pkg.tracking;
+    return { official: null, panel: true, error: code ? null : `${ch ? ch.name : 'Kanal'} kargo barkodu henüz gelmedi; kanalda paketi kargoya hazırlayıp senkronlayın` };
+  }
+  let lab;
+  try { lab = await ch.label(o, pkg); } catch (e) {
+    await log(db, o.channel, 'warn', 'Etiket alınamadı: ' + e.message);
+    return { official: null, error: e.message };
+  }
+  if (!lab) return { official: null, error: `${ch.name} etiketi henüz hazır değil (kargo takip no oluşmadı). Sipariş işleme alındıktan birkaç dakika sonra tekrar deneyin.` };
+  // ZPL'yi normal yazıcı için PDF'e çevir (Ayarlar'da açıksa)
+  if (lab.format === 'zpl' && settings.zpl_pdf) {
+    try {
+      const res = await fetch('https://api.labelary.com/v1/printers/8dpmm/labels/4x6/', { method: 'POST', headers: { Accept: 'application/pdf', 'Content-Type': 'application/x-www-form-urlencoded' }, body: lab.data });
+      if (res.ok) {
+        const buf = new Uint8Array(await res.arrayBuffer());
+        let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+        lab = { format: 'pdf', data: btoa(s), filename: lab.filename.replace(/\.zpl$/, '.pdf') };
+      }
+    } catch { /* ZPL olarak kalır */ }
+  }
+  await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ? WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);
+  return { official: lab };
+}
+
+// Kargo ekranı: paketler (etiket bekleyen / kargoya verilecek / kargoda) + henüz paketlenmemiş siparişler
+async function listPackages(db, q) {
+  const where = [], args = [];
+  if (q.channel && CHANNEL_IDS.includes(q.channel)) { where.push('o.channel = ?'); args.push(q.channel); }
+  const base = `FROM packages p JOIN orders o ON o.id = p.order_id`;
+  const ready = "(p.label_data IS NOT NULL OR COALESCE(p.tracking, '') != '' OR COALESCE(p.barcode, '') != '')";
+  const live = "o.status NOT IN ('cancelled', 'returned')";
+  const states = {
+    waiting: `p.status = 'open' AND ${live} AND NOT ${ready}`,
+    ready: `p.status = 'open' AND ${live} AND ${ready}`,
+    shipped: `p.status = 'shipped' AND p.shipped_at >= ${Date.now() - 30 * 864e5}`,
+  };
+  const st = states[q.state] ? q.state : 'waiting';
+  const w = (s) => 'WHERE ' + [states[s], ...where].join(' AND ');
+  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
+      o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.status AS order_status, (SELECT COUNT(*) FROM packages x WHERE x.order_id = p.order_id) AS pkg_total
+    ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args);
+  const counts = {};
+  for (const s of Object.keys(states)) counts[s] = (await first(db, `SELECT COUNT(*) AS n ${base} ${w(s)}`, ...args)).n;
+  // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler
+  const unpacked = st === 'waiting' ? await all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.status AS order_status, o.tracking, o.cargo_company,
+      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty
+    FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''} ORDER BY o.ordered_at ASC LIMIT 300`, ...args) : [];
+  counts.waiting += st === 'waiting' ? unpacked.length : (await first(db, `SELECT COUNT(*) AS n FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''}`, ...args)).n;
+  const addr = (r) => { const a = parse(r.address, {}); return { ...r, city: a.city || '', district: a.district || '', address: undefined }; };
+  return { state: st, packages: rows.map((r) => ({ ...addr(r), items: parse(r.items, []) })), unpacked: unpacked.map(addr), counts };
+}
+
 // ---------- ürünler ----------
 const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active'];
 const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active']);
@@ -201,6 +314,9 @@ async function listProducts(db, q) {
   if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ?)'); args.push(s, s, s); }
   if (q.filter === 'low') where.push('(p.stock <= p.critical_stock OR p.stock <= 0)');
   if (q.filter === 'nocost') where.push('(p.purchase_price IS NULL OR p.purchase_price = 0)');
+  if (q.filter === 'waiting') where.push('EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != MAX(p.stock, 0))');
+  if (q.filter === 'error') where.push('EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.error IS NOT NULL)');
+  if (q.filter === 'nolisting') where.push('NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)');
   if (q.filter === 'passive') where.push('p.active = 0'); else if (q.filter !== 'all') where.push('p.active = 1');
   const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const limit = Math.min(Number(q.limit) || 50, 500), page = Math.max(1, Number(q.page) || 1);
@@ -259,7 +375,7 @@ async function saveProduct(env, db, ctx, id, b) {
   // Yeni ürünü ikas mağazalarında da aç (pazaryerlerinde kategori özellikleri gerektiği için oradan açılır, barkod/SKU ile otomatik bağlanır)
   const created = [], errors = [];
   for (const cid of b.create_on || []) {
-    const ch = channel(env, cid);
+    const ch = await channel(env, db, cid);
     if (!ch || !ch.enabled || !ch.caps.createProduct) continue;
     try {
       const p = await first(db, 'SELECT * FROM products WHERE id = ?', id);
@@ -305,7 +421,7 @@ async function saveSettings(db, b) {
 async function channelsInfo(env, db) {
   const counts = await all(db, 'SELECT channel, COUNT(*) AS n, SUM(product_id IS NOT NULL) AS linked, SUM(error IS NOT NULL) AS errors FROM listings GROUP BY channel');
   const out = [];
-  for (const c of getChannels(env)) {
+  for (const c of await getChannels(env, db)) {
     const x = counts.find((r) => r.channel === c.id) || {};
     out.push({ ...publicInfo(c), last: await getRaw(db, 'last:' + c.id), listings: x.n || 0, linked: x.linked || 0, listingErrors: x.errors || 0 });
   }
@@ -327,7 +443,7 @@ export async function api(req, env, ctx, db, path) {
   if (path === 'orders' && m === 'GET') return json(await listOrders(db, q));
   if ((x = path.match(/^orders\/([^/]+)$/)) && m === 'GET') {
     const o = await loadOrder(db, decodeURIComponent(x[1]));
-    const ch = channel(env, o.channel);
+    const ch = await channel(env, db, o.channel);
     return json({ order: o, profit: orderProfit(o, await getSettings(db)), channel: ch ? publicInfo(ch) : null });
   }
   if ((x = path.match(/^orders\/([^/]+)\/([a-z-]+)$/)) && m === 'POST') {
@@ -342,16 +458,55 @@ export async function api(req, env, ctx, db, path) {
     return json({ ok: !errors.length, done, errors });
   }
   if (path === 'labels' && m === 'POST') {
-    // Toplu etiket: seçilen siparişlerin tüm açık paketleri (paket yoksa tek paket oluşturulur)
-    const b = await body(req), out = [], errors = [];
-    for (const id of (b.ids || []).slice(0, 60)) {
+    // Toplu etiket: seçilen siparişlerin açık paketleri (paket yoksa tek paket oluşturulur); kanal etiketi istenirse alınır
+    const b = await body(req), out = [], errors = [], settings = await getSettings(db);
+    for (const id of (b.ids || []).slice(0, 40)) {
       try {
         let o = await loadOrder(db, id);
-        o = await ensurePackages(db, channel(env, o.channel), o);
-        out.push(o);
+        const ch = await channel(env, db, o.channel);
+        o = await ensurePackages(db, ch, o);
+        const labels = [];
+        for (const pkg of o.packages.filter((p) => p.status === 'open' || b.all)) {
+          const r = b.fetch ? await packageLabel(db, ch, o, pkg, settings) : {};
+          if (r.error) errors.push(`${o.order_number}/${pkg.no}: ${r.error}`);
+          labels.push({ package_id: pkg.id, official: r.official || null });
+        }
+        out.push({ order: await loadOrder(db, id), labels });
       } catch (e) { errors.push(`${id}: ${e.message}`); }
     }
-    return json({ orders: out, errors, sender: (await getSettings(db)).sender });
+    return json({ orders: out, errors, sender: settings.sender });
+  }
+  if (path === 'packages' && m === 'GET') return json(await listPackages(db, q));
+  if (path === 'orders.csv' && m === 'GET') {
+    return new Response(await exportOrders(db, q), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="siparisler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
+  }
+  if (path === 'dashboard' && m === 'GET') return json(await dashboard(db, q));
+
+  // ---------- entegrasyonlar (kanal API bilgileri) ----------
+  if (path === 'integrations' && m === 'GET') {
+    const cfg = await loadConfig(env, db), chs = await getChannels(env, db), info = await channelsInfo(env, db);
+    return json({ secretSet: !!env.PANEL_SECRET, channels: chs.map((c) => ({ ...info.find((x) => x.id === c.id), ...describe(env, cfg, c.id) })) });
+  }
+  if ((x = path.match(/^integrations\/([a-z0-9]+)$/)) && m === 'PUT') {
+    await saveConfig(env, db, x[1], await body(req));
+    resetChannels();
+    await log(db, x[1], 'info', 'API bilgileri panelden güncellendi');
+    return json({ ok: true });
+  }
+  if ((x = path.match(/^integrations\/([a-z0-9]+)\/test$/)) && m === 'POST') {
+    resetChannels();
+    const ch = await channel(env, db, x[1]);
+    if (!ch) fail(404, 'Kanal bulunamadı');
+    if (ch.paused) return json({ ok: false, message: 'Kanal pasif' });
+    if (!ch.enabled) return json({ ok: false, message: 'Eksik bilgi: ' + ch.missing.join(', ') });
+    if (ch.demo) return json({ ok: true, message: 'Deneme modu: örnek veriyle çalışıyor' });
+    const t = Date.now();
+    try {
+      const orders = await ch.fetchOrders(t - 24 * 3600e3, t);
+      return json({ ok: true, message: `Bağlantı başarılı · son 24 saatte ${orders.length} sipariş`, ms: Date.now() - t });
+    } catch (e) {
+      return json({ ok: false, message: e.message });
+    }
   }
 
   if (path === 'products' && m === 'GET') return json(await listProducts(db, q));

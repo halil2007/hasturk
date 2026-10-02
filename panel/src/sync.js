@@ -3,7 +3,7 @@
 //  2) Siparişlerdeki ürünleri merkezi stoktan düş (iptalde geri ekle) — sipariş başına kayıt tutulduğu için çift düşüm olmaz
 //  3) Stoğu değişen ürünleri tüm kanallara gönder (her ilan için son gönderilen adet saklanır, sadece fark gönderilir)
 import { all, first, run, getSettings, getRaw, setSetting, log } from './db.js';
-import { getChannels, channel } from './channels/index.js';
+import { getChannels } from './channels/index.js';
 import { mergeStatus, chunk, str } from './util.js';
 
 const D = 864e5;
@@ -74,12 +74,13 @@ export async function saveOrders(db, ch, orders, maps) {
         }
         for (const p of o.packages) {
           if (!p.remoteId) continue;
-          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, created_at, shipped_at)
-            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?)
+          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at)
+            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (order_id, remote_id) DO UPDATE SET items = excluded.items, remote_status = excluded.remote_status,
               status = CASE WHEN packages.status = 'shipped' AND excluded.status = 'open' THEN 'shipped' ELSE excluded.status END,
-              cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), packages.tracking)`)
-            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', t, p.status === 'shipped' ? t : null));
+              cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), packages.tracking),
+              barcode = COALESCE(NULLIF(excluded.barcode, ''), packages.barcode)`)
+            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', p.barcode || '', t, p.status === 'shipped' ? t : null));
         }
       }
     }
@@ -141,7 +142,7 @@ export async function pushStocks(env, db, settings, only) {
     FROM listings l JOIN products p ON p.id = l.product_id
     WHERE p.active = 1 AND (l.pushed_stock IS NULL OR l.pushed_stock != MAX(p.stock, 0)) LIMIT 3000`);
   const result = {};
-  for (const ch of getChannels(env)) {
+  for (const ch of await getChannels(env, db)) {
     if (only && !only.includes(ch.id)) continue;
     const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
     if (!items.length || !ch.enabled || !ch.pushStock) continue;
@@ -167,7 +168,7 @@ export async function pushStocks(env, db, settings, only) {
 export async function pushPrices(env, db) {
   const rows = await all(db, 'SELECT channel, remote_id, remote_product_id, sku, barcode, price, list_price FROM listings WHERE price_dirty = 1 AND price > 0 LIMIT 2000');
   const result = {};
-  for (const ch of getChannels(env)) {
+  for (const ch of await getChannels(env, db)) {
     const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: r.price, listPrice: r.list_price || 0 }));
     if (!items.length || !ch.enabled || !ch.pushPrice) continue;
     try {
@@ -194,7 +195,7 @@ export async function syncAll(env, db, { only, force } = {}) {
   const out = { channels: {}, stockMoves: 0 };
   try {
     const changed = [];
-    for (const ch of getChannels(env)) {
+    for (const ch of await getChannels(env, db)) {
       if (!ch.enabled || (only && !only.includes(ch.id))) continue;
       const cursor = await getRaw(db, 'cursor:' + ch.id);
       // İlk senkron: geçmiş N gün (deneme modunda geçen yılla karşılaştırma görülsün diye 400 gün)
@@ -227,7 +228,7 @@ export async function syncAll(env, db, { only, force } = {}) {
 export async function importListings(env, db, { only, createMissing = true } = {}) {
   const t = Date.now(), out = { channels: {}, created: 0, linked: 0 };
   const fetched = [];
-  for (const ch of getChannels(env)) {
+  for (const ch of await getChannels(env, db)) {
     if (!ch.enabled || !ch.fetchListings || (only && !only.includes(ch.id))) continue;
     try {
       const rows = await ch.fetchListings();
@@ -300,4 +301,3 @@ export async function relinkItems(db) {
     WHERE product_id IS NULL AND barcode != ''`);
 }
 
-export { channel, first };

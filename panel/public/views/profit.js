@@ -1,6 +1,6 @@
-// Kâr hesaplayıcı: alış, satış, komisyon, kargo → satıştan kalan ve ürün başı kâr. Telefonda tek elle kullanılabilir.
-// Hesap tarayıcıda yapılır (internet gerekmez); son girilen değerler hatırlanır.
-import { api, state, html, render, $, $$, money, n, ch, chColor, store, debounce, numIn } from '../core.js';
+// Kârlılık hesapla: alış, satış, komisyon, kargo → satıştan kalan ve ürün başına kazanç. Telefonda tek elle kullanılır;
+// hesap tarayıcıda yapılır (internet gerekmez), son girilen değerler hatırlanır.
+import { api, state, html, render, $, $$, money, n, chLogo, store, debounce, numIn } from '../core.js';
 import { profit, priceFor } from '../profit.js';
 
 const DEF = { sale: '', purchase: '', commissionRate: '', shipping: '', fee: '', extra: '', vatRate: 20, includeVat: false, qty: 1, target: 20, channel: '' };
@@ -8,63 +8,59 @@ const DEF = { sale: '', purchase: '', commissionRate: '', shipping: '', fee: '',
 export async function profitView(el) {
   const v = { ...DEF, ...store.get('calc', {}) };
   const st = state.settings || {};
-  const field = (k, label, suffix = '₺', hint = '') => html`<label class="field"><span>${label}</span><div class="input-group"><input class="input big num" inputmode="decimal" enterkeyhint="next" data-k="${k}" value="${v[k]}" placeholder="0"><span class="suffix">${suffix}</span></div>${hint ? html`<small class="muted tiny">${hint}</small>` : ''}</label>`;
+  const box = (k, label, suffix = '₺', extra = '') => html`<label class="calc-field"><span>${label}</span><div class="input-group"><input class="input big num" inputmode="decimal" enterkeyhint="next" data-k="${k}" value="${v[k]}" placeholder="0"><span class="suffix">${suffix}</span></div>${extra}</label>`;
   render(el, html`<div class="two-col">
     <div class="stack">
       <div class="card stack">
-        <div class="row"><h2 style="flex:1">Kâr hesapla</h2><button class="btn sm ghost" data-act="clear">Temizle</button></div>
+        <div class="row"><div style="flex:1"><h2>Kârlılık hesapla</h2><div class="muted small">Ürün başına kazancını gör</div></div><button class="btn sm ghost" data-act="clear">Temizle</button></div>
         <div class="search" style="min-width:0"><i class="ico ico-search"></i><input class="input" placeholder="Üründen doldur (ad / SKU)" data-find></div>
         <div class="list" data-found></div>
-        <div class="grid" style="grid-template-columns:1fr 1fr">${field('sale', 'Satış fiyatı')}${field('purchase', 'Alış fiyatı')}</div>
-        <div>
-          ${field('commissionRate', 'Komisyon', '%')}
-          <div class="preset">${state.channels.map((c) => html`<button class="chip ${v.channel === c.id ? 'on' : ''}" data-ch="${c.id}"><span class="dot" style="background:${chColor(c.id)}"></span>${c.short} %${n((st.commission || {})[c.id] || 0)}</button>`)}</div>
-        </div>
-        <div class="grid" style="grid-template-columns:1fr 1fr">${field('shipping', 'Kargo gideri')}${field('fee', 'Hizmet / işlem bedeli')}</div>
-        <div class="grid" style="grid-template-columns:1fr 1fr">${field('extra', 'Diğer gider', '₺', 'paketleme, reklam…')}${field('qty', 'Adet', 'ad')}</div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('sale', 'Satış fiyatı')}${box('purchase', 'Alış fiyatı')}</div>
+        ${box('commissionRate', 'Komisyon', '%', html`<div class="preset">${state.channels.map((c) => html`<button class="chip ${v.channel === c.id ? 'on' : ''}" data-ch="${c.id}">${chLogo(c.id, true)}%${n((st.commission || {})[c.id] || 0)}</button>`)}</div>`)}
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('shipping', 'Kargo gideri')}${box('fee', 'Hizmet / işlem bedeli')}</div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('extra', 'Diğer gider', '₺', html`<small class="muted tiny">paketleme, reklam…</small>`)}${box('qty', 'Adet', 'ad')}</div>
         <div class="row wrap">
           <label class="check" style="flex:1"><span class="switch"><input type="checkbox" data-k="includeVat" ${v.includeVat ? 'checked' : ''}><span></span></span> KDV'yi hesaba kat</label>
-          <label class="row small">Ürün KDV <select class="input" style="width:auto;min-height:36px" data-k="vatRate">${[0, 1, 10, 20].map((x) => html`<option value="${x}" ${Number(v.vatRate) === x ? 'selected' : ''}>%${x}</option>`)}</select></label>
+          <label class="row small">Ürün KDV <select class="input" style="width:auto;min-height:38px" data-k="vatRate">${[0, 1, 10, 20].map((x) => html`<option value="${x}" ${Number(v.vatRate) === x ? 'selected' : ''}>%${x}</option>`)}</select></label>
         </div>
-        <p class="muted tiny" style="margin:0">Tüm tutarlar KDV dahil girilir. “KDV'yi hesaba kat” açıkken satıştan doğan KDV'den alış, komisyon, kargo ve giderlerin KDV'si (%20) düşülür; kalan ödenecek KDV kârdan çıkarılır.</p>
+        <div class="row" style="padding:4px 2px"><span class="muted">Komisyon tutarı</span><span class="spacer"></span><b class="num" style="font-size:18px" data-comm></b></div>
+        <button class="btn primary lg block" data-act="go">Hesapla</button>
+        <p class="muted tiny" style="margin:0">Tutarlar KDV dahil girilir. “KDV'yi hesaba kat” açıkken satış KDV'sinden alış, komisyon, kargo ve giderlerin KDV'si (%20) düşülür; kalan ödenecek KDV kârdan çıkarılır.</p>
       </div>
-      <div class="card flush" data-compare></div>
     </div>
     <div class="stack sticky" data-result></div>
   </div>`);
 
   const calc = () => {
     const inp = { sale: numIn(v.sale), purchase: numIn(v.purchase), commissionRate: numIn(v.commissionRate), shipping: numIn(v.shipping), fee: numIn(v.fee), extra: numIn(v.extra), vatRate: Number(v.vatRate), includeVat: !!v.includeVat, qty: numIn(v.qty) || 1 };
-    const r = profit(inp);
-    const target = priceFor(inp, numIn(v.target));
-    const good = r.unitProfit >= 0;
+    const r = profit(inp), target = priceFor(inp, numIn(v.target)), good = r.unitProfit >= 0;
+    $('[data-comm]', el).textContent = money(r.commission);
     render($('[data-result]', el), html`<div class="card stack">
-      <div><div class="muted small">Satıştan kalan (hakediş)</div><div class="res-big num">${money(r.payout)}</div><div class="muted tiny">satış − komisyon − kargo − hizmet bedeli</div></div>
-      <div style="padding:14px;border-radius:12px;background:${good ? 'var(--good-soft)' : 'var(--bad-soft)'}">
-        <div class="small" style="font-weight:600">Ürün başına kâr</div>
-        <div class="res-big num" style="color:${good ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</div>
-        ${r.qty > 1 ? html`<div class="small">${r.qty} adet için toplam <b class="num">${money(r.totalProfit)}</b></div>` : ''}
+      <div class="gain" style="background:${good ? 'var(--good-soft)' : 'var(--bad-soft)'}">
+        <div class="row" style="justify-content:center;font-weight:700;color:var(--text-2)"><i class="ico ico-bars" style="color:${good ? 'var(--good)' : 'var(--bad)'}"></i>Ürün başına kazanç</div>
+        <div class="v num" style="color:${good ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</div>
+        <div style="font-weight:650;color:${good ? 'var(--good)' : 'var(--bad)'}">Kâr marjı %${n(r.margin)}</div>
+        ${r.qty > 1 ? html`<div class="small" style="margin-top:6px">${r.qty} adet için toplam <b class="num">${money(r.totalProfit)}</b></div>` : ''}
       </div>
       <div class="res-grid">
-        <div class="res-box"><div class="label">Kâr oranı (satışa göre)</div><div class="v num">%${n(r.margin)}</div></div>
+        <div class="res-box"><div class="label">Satıştan kalan (hakediş)</div><div class="v num">${money(r.payout)}</div></div>
         <div class="res-box"><div class="label">Alışa göre kâr</div><div class="v num">${inp.purchase ? `%${n(r.markup)}` : '—'}</div></div>
         <div class="res-box"><div class="label">Komisyon tutarı</div><div class="v num">${money(r.commission)}</div></div>
         <div class="res-box"><div class="label">Başabaş satış fiyatı</div><div class="v num">${r.breakEven != null ? money(r.breakEven) : '—'}</div></div>
       </div>
-      ${inp.includeVat ? html`<dl class="kv small"><dt>Satış KDV'si</dt><dd>${money(r.vat.sale)}</dd><dt>İndirilecek KDV (alış)</dt><dd>−${money(r.vat.purchase)}</dd><dt>İndirilecek KDV (hizmetler)</dt><dd>−${money(r.vat.services)}</dd><div class="total" style="display:contents"><dt>${r.vat.payable >= 0 ? 'Ödenecek KDV' : 'Devreden KDV'}</dt><dd>${money(Math.abs(r.vat.payable))}</dd></div></dl>` : ''}
+      ${inp.includeVat ? html`<dl class="kv small"><dt>Satış KDV'si</dt><dd>${money(r.vat.sale)}</dd><dt>İndirilecek KDV (alış)</dt><dd>−${money(r.vat.purchase)}</dd><dt>İndirilecek KDV (hizmetler)</dt><dd>−${money(r.vat.services)}</dd><div class="total"><dt>${r.vat.payable >= 0 ? 'Ödenecek KDV' : 'Devreden KDV'}</dt><dd>${money(Math.abs(r.vat.payable))}</dd></div></dl>` : ''}
       <div class="stack" style="border-top:1px solid var(--line);padding-top:12px">
-        <div class="row"><span class="small" style="flex:1;font-weight:600">Hedef kâr oranı</span><b class="num">%${n(numIn(v.target))}</b></div>
+        <div class="row"><span class="small" style="flex:1;font-weight:650">Hedef kâr oranı</span><b class="num">%${n(numIn(v.target))}</b></div>
         <input type="range" min="0" max="60" step="1" value="${numIn(v.target)}" data-k="target" aria-label="Hedef kâr oranı">
         <div class="row"><span class="muted small" style="flex:1">Bu oran için satış fiyatı</span><b class="num" style="font-size:18px">${target != null ? money(target) : 'mümkün değil'}</b></div>
       </div>
-    </div>`);
-    // Aynı ürün, tüm kanallarda (kanalın varsayılan komisyon/kargo/hizmet bedeliyle)
-    render($('[data-compare]', el), html`<div style="padding:14px 16px 4px"><h3>Kanallara göre</h3><p class="muted tiny" style="margin:4px 0 0">Aynı satış ve alış fiyatıyla, her kanalın Ayarlar'daki varsayılan komisyon, kargo ve hizmet bedeli kullanılır.</p></div>
+    </div>
+    <div class="card flush"><div class="card-pad"><h3>Kanallara göre</h3><div class="muted tiny" style="margin-top:4px">Aynı fiyatlarla, her kanalın Ayarlar'daki komisyon, kargo ve hizmet bedeli kullanılır.</div></div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Kom.</th><th class="r">Kalan</th><th class="r">Kâr</th></tr></thead><tbody>
       ${state.channels.map((c) => { const x = profit({ ...inp, commissionRate: (st.commission || {})[c.id] || 0, shipping: (st.shipping || {})[c.id] || 0, fee: (st.service_fee || {})[c.id] || 0 }); return html`<tr>
-        <td><span class="ch-badge"><span class="dot" style="background:${chColor(c.id)}"></span>${c.name}</span></td><td class="r num">%${n((st.commission || {})[c.id] || 0)}</td>
-        <td class="r num">${money(x.payout)}</td><td class="r num" style="font-weight:700;color:${x.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(x.unitProfit)}</td></tr>`; })}
-      </tbody></table></div>`);
+        <td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td><td class="r num">%${n((st.commission || {})[c.id] || 0)}</td>
+        <td class="r num">${money(x.payout)}</td><td class="r num" style="font-weight:750;color:${x.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(x.unitProfit)}</td></tr>`; })}
+      </tbody></table></div></div>`);
     store.set('calc', v);
   };
 
@@ -88,6 +84,7 @@ export async function profitView(el) {
       $$('[data-ch]', el).forEach((b) => b.classList.toggle('on', b === c));
       calc();
     }
+    if (e.target.closest('[data-act=go]')) { calc(); $('[data-result]', el).scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     if (e.target.closest('[data-act=clear]')) {
       Object.assign(v, DEF);
       $$('input[data-k]', el).forEach((i) => { if (i.type === 'checkbox') i.checked = false; else if (i.type !== 'range') i.value = v[i.dataset.k] ?? ''; });

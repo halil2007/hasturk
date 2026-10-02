@@ -1,310 +1,180 @@
-// Siparişler: liste, filtre, toplu işlem; sipariş detayı (işleme al, paketlere böl, kargoya ver, etiket).
-import { api, state, html, raw, render, $, $$, money, ago, dateTime, ch, chColor, chBadge, statusPill, STATUS_LABEL, actions, busy, toast, sheet, debounce, confirmBox, numIn } from '../core.js';
-import { printLabels, downloadFile } from '../labels.js';
+// Siparişler: kanal sekmeleri, arama / tarih / kargo filtresi, durum sekmeleri, toplu işlem, satır içi sipariş işlemleri, sayfalama.
+import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel } from '../core.js';
+import { mountOps, openOrder, bulkLabels } from './orderops.js';
+import { loadSummary } from '../app.js';
 
-const TABS = [['active', 'Bekleyen'], ['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda'], ['delivered', 'Teslim'], ['cancelled', 'İptal/İade'], ['all', 'Tümü']];
+const STATUS_TABS = [['all', 'Tümü'], ['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal / İade']];
 
 export async function orders(el, rest) {
-  const f = { status: 'active', channel: rest[0] === 'kanal' ? rest[1] || '' : '', q: '', page: 1 };
-  if (f.channel) f.status = 'all';
+  const f = { channel: '', status: 'all', q: state.globalQ || '', from: '', to: '', cargo: '', page: 1, limit: 25 };
+  state.globalQ = '';
+  if (rest[0] === 'kanal') f.channel = rest[1] || '';
+  if (rest[0] === 'durum') f.status = rest[1] || 'all';
+  if (rest[0] && !['kanal', 'durum'].includes(rest[0])) setTimeout(() => openOrder(rest[0], refresh), 0);
   const sel = new Set();
-  let rows = [], counts = {}, more = false;
+  let data = { orders: [], counts: {}, total: 0 }, expanded = null, mobile = isMobile();
 
-  render(el, html`
-    <div class="stack">
-      <div class="chips" data-tabs></div>
-      <div class="row wrap">
-        <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Sipariş no, müşteri, ürün, takip no" data-q></div>
-        <select class="input" style="width:auto" data-ch><option value="">Tüm kanallar</option>${state.channels.map((c) => html`<option value="${c.id}">${c.name}</option>`)}</select>
-      </div>
-      <div class="list" data-list></div>
-      <div class="row" style="justify-content:center"><button class="btn hide" data-act="more">Daha fazla göster</button></div>
+  render(el, html`<div class="stack">
+    <div class="row wrap" style="justify-content:flex-end;margin-top:-4px">
+      <span class="muted small" style="margin-right:auto" data-sub></span>
+      <button class="btn sm" data-act="reload"><i class="ico ico-sync"></i>Yenile</button>
+      <button class="btn sm" data-act="export"><i class="ico ico-download"></i>Dışa aktar <i class="ico ico-down"></i></button>
     </div>
-    <div class="bulkbar hide" data-bulk></div>`);
-  $('[data-ch]', el).value = f.channel;
+    <div class="ch-tabs" data-chtabs></div>
+    <div class="row wrap">
+      <div class="search" style="min-width:220px"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Sipariş no, müşteri veya SKU ara" data-q value="${f.q}"></div>
+      <label class="date-pick"><i class="ico ico-cal"></i><input type="date" data-from aria-label="Başlangıç"><span class="muted">–</span><input type="date" data-to aria-label="Bitiş"></label>
+      <label class="date-pick" style="min-width:180px"><i class="ico ico-truck"></i><select data-cargo style="border:0;background:transparent;outline:none;font-weight:600;flex:1;min-height:36px"><option value="">Kargo firması</option>${((state.settings && state.settings.cargo_companies) || []).map((c) => html`<option>${c}</option>`)}</select></label>
+      <button class="btn" data-act="clear"><i class="ico ico-filter"></i>Filtreyi temizle</button>
+    </div>
+    <div class="tabs" data-stabs></div>
+    <div class="card flush" data-box></div>
+  </div>`);
 
-  function tabs() {
-    const c = (k) => (k === 'active' ? (counts.new || 0) + (counts.processing || 0) : k === 'cancelled' ? (counts.cancelled || 0) + (counts.returned || 0) : k === 'all' ? null : counts[k] || 0);
-    render($('[data-tabs]', el), html`${TABS.map(([k, t]) => html`<button class="chip ${f.status === k ? 'on' : ''}" data-act="tab" data-k="${k}">${t}${c(k) != null ? html` <span class="n">${c(k)}</span>` : ''}</button>`)}`);
+  function chTabs() {
+    render($('[data-chtabs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>
+      ${state.channels.map((c) => html`<button class="ch-tab ${f.channel === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}<span>${c.type === 'ikas' ? html`<b>ikas</b> <span class="small">${c.name}</span>` : c.name}</span></button>`)}`);
   }
-  function card(o) {
-    const warn = [];
-    if (o.unmatched) warn.push(html`<span class="pill warn" title="Ürün panelde eşleşmemiş; stok düşülmez"><i class="ico ico-warn"></i>${o.unmatched} eşleşmemiş ürün</span>`);
-    if (o.extra && o.extra.awaitingPayment) warn.push(html`<span class="pill warn">Ödeme bekleniyor</span>`);
-    return html`<div class="o-card" data-act="open" data-id="${o.id}">
-      <label class="sel" data-act="noop"><input type="checkbox" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Seç"></label>
-      <div class="main">
-        <div class="o-head"><span class="dot" style="background:${chColor(o.channel)}" title="${ch(o.channel).name}"></span><span class="o-no">${o.order_number}</span><span class="muted small ellipsis" style="white-space:nowrap">${ch(o.channel).short} · ${ago(o.ordered_at)}</span></div>
-        <div class="ellipsis">${o.customer || '—'}${o.city ? html` <span class="muted">· ${o.city}</span>` : ''}</div>
-      </div>
-      <div class="amount num">${money(o.total)}</div>
-      <div class="meta"><span class="muted small ellipsis" style="flex:1;min-width:120px">${o.preview}</span>${statusPill(o.status)}
-        ${o.packages > 1 ? html`<span class="pill">${o.packages} paket</span>` : ''}${o.tracking ? html`<span class="pill"><i class="ico ico-truck"></i>${o.tracking}</span>` : ''}${warn}</div>
-    </div>`;
+  function statusTabs() {
+    const c = data.counts, total = Object.values(c).reduce((a, x) => a + x, 0);
+    const cnt = (k) => (k === 'all' ? total : k === 'cancelled' ? (c.cancelled || 0) + (c.returned || 0) : c[k] || 0);
+    render($('[data-stabs]', el), html`${STATUS_TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${cnt(k)}</span></button>`)}`);
   }
-  function list() {
-    render($('[data-list]', el), rows.length ? html`${rows.map(card)}` : html`<div class="card empty">Bu filtrede sipariş yok</div>`);
-    $('[data-act=more]', el).classList.toggle('hide', !more);
-    bulk();
+
+  function actionBtn(o) {
+    if (o.status === 'new') return html`<button class="btn sm outline" data-act="accept" data-id="${o.id}"><i class="ico ico-play"></i>İşleme al</button><button class="btn sm ghost" data-act="toggle" data-id="${o.id}" aria-label="Yönet"><i class="ico ico-${expanded === o.id ? 'up' : 'down'}"></i></button>`;
+    if (o.status === 'processing') return html`<button class="btn sm outline" data-act="toggle" data-id="${o.id}">Yönet<i class="ico ico-${expanded === o.id ? 'up' : 'down'}"></i></button>`;
+    if (o.status === 'shipped') return html`<button class="btn sm outline" data-act="track" data-id="${o.id}"><i class="ico ico-truck"></i>Takip et</button>`;
+    return html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-orders"></i>Detay</button>`;
   }
-  function bulk() {
-    const b = $('[data-bulk]', el);
-    b.classList.toggle('hide', !sel.size);
-    if (sel.size) render(b, html`<b>${sel.size} seçili</b><span class="spacer"></span><button class="btn sm" data-act="bulk-accept">İşleme al</button><button class="btn sm" data-act="bulk-label"><i class="ico ico-print"></i>Etiket</button><button class="icon-btn" style="color:inherit" data-act="clear" aria-label="Seçimi temizle"><i class="ico ico-x"></i></button>`);
+  const products = (o) => html`<div class="row" style="min-width:180px">${thumb(o.items[0] && o.items[0].image, o.items[0] && o.items[0].name, 'sm')}
+    <div style="min-width:0"><div class="ellipsis" style="max-width:200px;font-weight:600">${o.items[0] ? o.items[0].name : '—'}</div>
+    <div class="muted tiny">${o.lines > 1 ? `+ ${o.lines - 1} ürün daha · ` : ''}${o.qty || 0} adet${o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş</span>` : ''}</div></div></div>`;
+  const pkgCell = (o) => html`<span class="row small" style="white-space:nowrap"><i class="ico ico-truck muted"></i>${Math.max(1, o.packages)} paket${o.cargo ? html` • ${o.cargo}` : ''}</span>`;
+
+  function table() {
+    const allSel = data.orders.length && data.orders.every((o) => sel.has(o.id));
+    const from = (data.page - 1) * data.limit;
+    const rows = data.orders.map((o) => {
+      const on = sel.has(o.id) || expanded === o.id;
+      return html`<tr class="click ${on ? 'sel-row' : ''}" data-row="${o.id}">
+        <td style="width:40px"><input type="checkbox" class="cb" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Seç"></td>
+        <td><div style="font-weight:750">#${o.order_number}</div><div class="muted tiny">${shortDT(o.ordered_at)}</div></td>
+        <td class="col-cust"><div class="cust"><i class="ico ico-user"></i><div style="min-width:0"><div class="ellipsis" style="max-width:130px;font-weight:600">${o.customer || '—'}</div><div class="muted tiny ellipsis">${[o.district, o.city].filter(Boolean).join(', ')}</div></div></div></td>
+        <td>${chBadge(o.channel)}</td>
+        <td>${products(o)}</td>
+        <td class="r num" style="font-weight:750">${money(o.total)}${o.profit != null ? html`<div class="tiny ${o.profit >= 0 ? 'up' : 'down'}" title="Tahmini kâr${o.missing_cost ? ' (alış fiyatı eksik)' : ''}">${money(o.profit)}${o.missing_cost ? '*' : ''}</div>` : ''}</td>
+        <td class="col-pkg">${pkgCell(o)}</td>
+        <td>${statusPill(o.status)}</td>
+        <td class="r"><div class="row" style="justify-content:flex-end">${actionBtn(o)}</div></td>
+      </tr>${expanded === o.id ? html`<tr><td colspan="9" style="padding:0"><div class="expand" data-ops="${o.id}"></div></td></tr>` : ''}`;
+    });
+    return html`<div class="table-wrap"><table class="t">
+      <thead><tr><th><input type="checkbox" class="cb" data-selall ${allSel ? 'checked' : ''} aria-label="Tümünü seç"></th><th>Sipariş / Tarih</th><th class="col-cust">Müşteri</th><th>Kanal</th><th>Ürünler</th><th class="r">Tutar</th><th class="col-pkg">Paket / Kargo</th><th>Durum</th><th class="r">İşlemler</th></tr></thead>
+      <tbody>${rows.length ? rows : html`<tr><td colspan="9" class="empty">Bu filtrede sipariş yok</td></tr>`}</tbody></table></div>
+      ${pager(from)}`;
   }
-  async function load(append = false) {
-    const p = new URLSearchParams({ status: f.status, page: f.page, limit: 40 });
-    if (f.channel) p.set('channel', f.channel);
-    if (f.q) p.set('q', f.q);
-    const r = await api('orders?' + p);
-    rows = append ? rows.concat(r.orders) : r.orders;
-    counts = r.counts; more = r.orders.length === r.limit;
-    tabs(); list();
+  function cards() {
+    const from = (data.page - 1) * data.limit;
+    return html`<div style="padding:12px" class="m-list">${data.orders.length ? data.orders.map((o) => html`<div class="m-card ${sel.has(o.id) || expanded === o.id ? 'sel-row' : ''}" data-row="${o.id}">
+        <div class="top"><input type="checkbox" class="cb" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Seç">${chLogo(o.channel, true)}<b>#${o.order_number}</b><span class="muted tiny">${shortDT(o.ordered_at)}</span><span class="spacer"></span><b class="num">${money(o.total)}</b></div>
+        <div class="row small"><i class="ico ico-user muted"></i><span class="ellipsis">${o.customer || '—'}${o.city ? ` · ${o.city}` : ''}</span></div>
+        ${products(o)}
+        <div class="row wrap">${statusPill(o.status)}${pkgCell(o)}<span class="spacer"></span>${actionBtn(o)}</div>
+        ${expanded === o.id ? html`<div class="expand" style="margin:4px -14px -14px;border-radius:0 0 14px 14px;border-bottom:0" data-ops="${o.id}"></div>` : ''}
+      </div>`) : html`<div class="empty">Bu filtrede sipariş yok</div>`}</div>${pager(from)}`;
   }
-  const refresh = () => { f.page = 1; return load().catch((e) => toast(e.message, true)); };
+  function pager(from) {
+    const pages = Math.max(1, Math.ceil(data.total / data.limit)), p = data.page;
+    const list = [...new Set([1, p - 1, p, p + 1, pages].filter((x) => x >= 1 && x <= pages))].sort((a, b) => a - b);
+    return html`<div class="pager"><span class="muted small" style="margin-right:auto">${data.total} siparişten ${data.total ? `${from + 1}–${from + data.orders.length}` : '0'} gösteriliyor</span>
+      <span class="muted small">Sayfa başına</span><select class="input" style="width:auto;min-height:34px" data-limit>${[10, 25, 50, 100].map((x) => html`<option ${x === f.limit ? 'selected' : ''}>${x}</option>`)}</select>
+      ${list.map((x, i) => html`${i && x - list[i - 1] > 1 ? html`<span class="muted">…</span>` : ''}<button class="pg ${x === p ? 'on' : ''}" data-act="page" data-p="${x}">${x}</button>`)}
+      <button class="pg" data-act="page" data-p="${Math.min(pages, p + 1)}" aria-label="Sonraki"><i class="ico ico-chev"></i></button></div>`;
+  }
+  function bulkbar() {
+    return sel.size ? html`<div class="bulk"><input type="checkbox" class="cb" checked data-clear aria-label="Seçimi kaldır"><b>${sel.size} sipariş seçildi</b>
+      <button class="btn sm outline" data-act="bulk-accept"><i class="ico ico-play"></i>İşleme al</button>
+      <button class="btn sm outline" data-act="bulk-label"><i class="ico ico-tag"></i>Toplu etiket oluştur</button>
+      <button class="btn sm outline" data-act="bulk-print"><i class="ico ico-print"></i>Yazdır</button>
+      <button class="icon-btn" data-act="clearsel" aria-label="Seçimi temizle"><i class="ico ico-x"></i></button></div>` : '';
+  }
+  function draw() {
+    mobile = isMobile();
+    render($('[data-box]', el), html`${bulkbar()}${mobile ? cards() : table()}`);
+    const box = expanded && $(`[data-ops="${CSS.escape(expanded)}"]`, el);
+    if (box) mountOps(box, expanded, { mode: 'expand', onChange: () => { load(); loadSummary().catch(() => {}); } });
+    $('[data-sub]', el).textContent = `${data.total} sipariş${f.from || f.to ? ` · ${rangeLabel(f.from || f.to, f.to || f.from)}` : ''}${f.channel ? ` · ${ch(f.channel).name}` : ' · 5 satış kanalı'}`;
+  }
+  const params = () => { const p = new URLSearchParams({ status: f.status, page: f.page, limit: f.limit }); for (const k of ['channel', 'q', 'from', 'to', 'cargo']) if (f[k]) p.set(k, f[k]); return p; };
+  async function load() {
+    // Üzerinde çalışılan (açık) sipariş, durumu değişip filtre dışına çıksa da yerinde kalır
+    const i = expanded ? data.orders.findIndex((o) => o.id === expanded) : -1;
+    const keep = i >= 0 ? data.orders[i] : null;
+    data = await api('orders?' + params());
+    if (keep) {
+      const fresh = data.orders.find((o) => o.id === keep.id);
+      if (!fresh) {
+        const r = await api('orders/' + encodeURIComponent(keep.id)).catch(() => null);
+        if (r) keep.status = r.order.status;
+        data.orders.splice(Math.min(i, data.orders.length), 0, keep);
+      }
+    }
+    chTabs(); statusTabs(); draw();
+  }
+  const refresh = () => load().catch((e) => toast(e.message, true));
 
   actions(el, {
-    tab: (t) => { f.status = t.dataset.k; sel.clear(); refresh(); },
-    open: (t, e) => { if (e.target.closest('[data-sel], .sel')) return; openOrder(t.dataset.id, refresh); },
-    noop: () => {},
-    more: () => { f.page++; load(true); },
-    clear: () => { sel.clear(); list(); },
+    ch: (t) => { f.channel = t.dataset.id; f.page = 1; sel.clear(); refresh(); },
+    st: (t) => { f.status = t.dataset.k; f.page = 1; sel.clear(); refresh(); },
+    page: (t) => { f.page = Number(t.dataset.p); refresh(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+    toggle: (t) => { expanded = expanded === t.dataset.id ? null : t.dataset.id; draw(); },
+    open: (t) => openOrder(t.dataset.id, refresh),
+    track: (t) => { expanded = expanded === t.dataset.id ? null : t.dataset.id; draw(); },
+    // İşleme alınan sipariş, filtre "Yeni" olsa da listede kalır ve işlemleri açılır (paket / etiket / kargo için)
+    accept: (t) => busy(t, async () => {
+      const id = t.dataset.id;
+      const r = await api(`orders/${encodeURIComponent(id)}/accept`, { method: 'POST', body: {} });
+      toast(r.message);
+      const o = data.orders.find((x) => x.id === id);
+      if (o) { data.counts.new = Math.max(0, (data.counts.new || 0) - 1); data.counts.processing = (data.counts.processing || 0) + 1; o.status = 'processing'; }
+      expanded = id; statusTabs(); draw(); loadSummary().catch(() => {});
+    }),
+    reload: (t) => busy(t, load),
+    export: (t) => popMenu(t, [
+      { icon: 'download', label: 'Bu filtreyi Excel (CSV) olarak indir', run: () => { location.href = '/api/orders.csv?' + params(); } },
+      { icon: 'download', label: 'Seçilenleri yazdır (etiket)', run: () => sel.size ? bulkLabels([...sel], { fetch: false }) : toast('Önce sipariş seçin') },
+    ]),
+    clear: () => { Object.assign(f, { q: '', from: '', to: '', cargo: '', page: 1 }); $('[data-q]', el).value = ''; $('[data-from]', el).value = ''; $('[data-to]', el).value = ''; $('[data-cargo]', el).value = ''; refresh(); },
+    clearsel: () => { sel.clear(); draw(); },
     'bulk-accept': (t) => busy(t, async () => {
       const r = await api('orders-bulk', { method: 'POST', body: { ids: [...sel], action: 'accept' } });
-      toast(`${r.done.length} sipariş işleme alındı${r.errors.length ? `, ${r.errors.length} hata` : ''}`, !!r.errors.length);
-      if (r.errors.length) console.warn(r.errors);
-      sel.clear(); refresh();
+      toast(`${r.done.length} sipariş işleme alındı${r.errors.length ? `, ${r.errors.length} atlandı` : ''}`, !!r.errors.length && !r.done.length);
+      sel.clear(); await load(); loadSummary().catch(() => {});
     }),
-    'bulk-label': (t) => busy(t, async () => {
-      const r = await api('labels', { method: 'POST', body: { ids: [...sel] } });
-      const list = r.orders.flatMap((o) => o.packages.filter((p) => p.status === 'open' || f.status === 'shipped').map((pkg) => ({ order: o, pkg })));
-      if (!list.length) return toast('Yazdırılacak açık paket yok');
-      printLabels(list, r.sender);
-      if (r.errors.length) toast(r.errors.join(' · '), true);
-    }),
+    'bulk-label': (t) => busy(t, async () => { await bulkLabels([...sel], { fetch: true }); await load(); }),
+    'bulk-print': (t) => busy(t, async () => { await bulkLabels([...sel], { fetch: false }); }),
+  });
+  // Satıra tıklayınca işlemleri aç/kapat (kutucuk ve düğmeler hariç)
+  el.addEventListener('click', (e) => {
+    const r = e.target.closest('[data-row]');
+    if (!r || e.target.closest('button, input, a, select, [data-ops]')) return;
+    expanded = expanded === r.dataset.row ? null : r.dataset.row;
+    draw();
   });
   el.addEventListener('change', (e) => {
     const c = e.target.closest('[data-sel]');
-    if (c) { c.checked ? sel.add(c.dataset.sel) : sel.delete(c.dataset.sel); bulk(); }
-    if (e.target.matches('[data-ch]')) { f.channel = e.target.value; refresh(); }
+    if (c) { c.checked ? sel.add(c.dataset.sel) : sel.delete(c.dataset.sel); draw(); }
+    if (e.target.matches('[data-selall]')) { data.orders.forEach((o) => (e.target.checked ? sel.add(o.id) : sel.delete(o.id))); draw(); }
+    if (e.target.matches('[data-clear]')) { sel.clear(); draw(); }
+    if (e.target.matches('[data-limit]')) { f.limit = Number(e.target.value); f.page = 1; refresh(); }
+    if (e.target.matches('[data-from], [data-to]')) { f.from = $('[data-from]', el).value; f.to = $('[data-to]', el).value; f.page = 1; refresh(); }
+    if (e.target.matches('[data-cargo]')) { f.cargo = e.target.value; f.page = 1; refresh(); }
   });
-  $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); if (f.q) f.status = 'all'; refresh(); }, 300));
+  $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); f.page = 1; refresh(); }, 300));
+  const onResize = debounce(() => { if (isMobile() !== mobile) draw(); }, 150);
+  window.addEventListener('resize', onResize);
   await refresh();
-  return { refresh };
+  return { refresh, destroy: () => window.removeEventListener('resize', onResize) };
 }
-
-// ---------- sipariş detayı ----------
-export async function openOrder(id, onChange) {
-  const s = sheet({ title: 'Sipariş', size: 'wide', onClose: () => { if (location.hash.startsWith('#/siparisler/') && !location.hash.includes('/kanal/')) history.replaceState(null, '', '#/siparisler'); } });
-  s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
-  let data, mode = 'view';
-  const changed = () => onChange && onChange();
-
-  async function load() {
-    data = await api('orders/' + encodeURIComponent(id));
-    draw();
-  }
-  const caps = () => (data.channel && data.channel.caps) || {};
-  const lineName = (o, lid) => { const i = o.items.find((x) => String(x.line_id) === String(lid)); return i ? i.product_name || i.name : lid; };
-
-  function draw() {
-    const o = data.order, p = data.profit, c = caps();
-    s.title.textContent = `${ch(o.channel).name} · ${o.order_number}`;
-    const live = o.items.filter((i) => i.status !== 'cancelled');
-    const open = o.packages.filter((x) => x.status === 'open');
-    const canAct = !['cancelled', 'returned', 'delivered'].includes(o.status);
-    const a = o.address || {};
-    s.setBody(html`
-      <div class="row wrap" style="margin-bottom:14px">${statusPill(o.status)}<span class="muted small">${dateTime(o.ordered_at)}</span>
-        ${o.remote_status ? html`<span class="muted tiny" title="Kanaldaki durum">(${o.remote_status})</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}</div>
-      ${canAct ? html`<div class="row wrap" style="margin-bottom:16px">
-        ${o.status === 'new' ? html`<button class="btn primary" data-act="accept"><i class="ico ico-check"></i>İşleme al</button>` : ''}
-        ${live.length > 1 || live.some((i) => i.quantity > 1) ? html`<button class="btn" data-act="split-mode"><i class="ico ico-split"></i>Paketlere böl</button>` : ''}
-        ${o.status !== 'shipped' ? html`<button class="btn" data-act="ship-first"><i class="ico ico-truck"></i>Kargoya ver</button>` : ''}
-        <button class="btn" data-act="labels"><i class="ico ico-print"></i>Etiket${o.packages.length > 1 ? 'ler' : ''}</button>
-      </div>` : ''}
-      ${c.split === 'remote-async' ? html`<div class="notice small" style="margin-bottom:14px">Trendyol'da paket bölme Trendyol tarafında yapılır; yeni paketler birkaç dakika sonra senkronla gelir.</div>` : ''}
-      <div data-split></div>
-      <div class="two-col">
-        <div class="stack">
-          <div class="card">
-            <div class="card-head"><h3>Ürünler</h3><span class="muted small">${live.reduce((t, i) => t + i.quantity, 0)} adet</span></div>
-            ${o.items.map((i) => html`<div class="item-row" style="${i.status === 'cancelled' ? 'opacity:.5' : ''}">
-              <div class="thumb" style="${i.product_image || i.image ? `background-image:url('${(i.product_image || i.image).replace(/'/g, '')}')` : ''}">${i.product_image || i.image ? '' : (i.name || '?').slice(0, 2)}</div>
-              <div style="min-width:0"><div class="ellipsis" style="font-weight:600">${i.product_name || i.name}</div>
-                <div class="muted small">${[i.sku, i.barcode].filter(Boolean).join(' · ')}${i.status === 'cancelled' ? ' · İptal' : ''}</div>
-                ${i.product_id ? html`<div class="tiny muted">Stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--warn)">Panelde eşleşmemiş ürün — <a href="#/urunler/eslestir">eşleştir</a></div>`}
-              </div>
-              <div style="text-align:right" class="num"><div><b>${i.quantity}</b> × ${money(i.unit_price)}</div><div class="muted small">${money(i.total)}</div></div>
-            </div>`)}
-          </div>
-          <div data-pkgs>${packages(o)}</div>
-        </div>
-        <div class="stack sticky">
-          <div class="card">
-            <div class="card-head"><h3>Alıcı</h3><button class="btn sm ghost" data-act="copy-addr"><i class="ico ico-copy"></i>Kopyala</button></div>
-            <div style="font-weight:650">${a.name || o.customer}</div>
-            <div class="small">${a.line}</div><div class="small">${[a.district, a.city].filter(Boolean).join(' / ')}</div>
-            <div class="small muted">${a.phone || o.phone}${o.email ? ` · ${o.email}` : ''}</div>
-          </div>
-          <div class="card">
-            <div class="card-head"><h3>Kârlılık (tahmini)</h3></div>
-            <dl class="kv">
-              <dt>Satış</dt><dd>${money(p.revenue)}</dd>
-              <dt>Komisyon</dt><dd>−${money(p.commission)}</dd>
-              <dt>Kargo</dt><dd>−${money(p.shipping)}</dd>
-              ${p.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(p.fee)}</dd>` : ''}
-              <dt style="font-weight:600;color:var(--text)">Satıştan kalan</dt><dd style="font-weight:600">${money(p.payout)}</dd>
-              <dt>Ürün maliyeti</dt><dd>−${money(p.cost)}</dd>
-              <div class="total" style="display:contents"><dt>Kâr</dt><dd class="${p.profit >= 0 ? 'up' : 'down'}">${money(p.profit)}</dd></div>
-            </dl>
-            ${p.missingCost ? html`<div class="notice warn small" style="margin-top:10px">${p.missingCost} ürünün alış fiyatı girilmemiş; kâr olduğundan yüksek görünür.</div>` : ''}
-          </div>
-          <div class="card stack">
-            <h3>Not ve ayarlar</h3>
-            <label class="field"><span>Sipariş notu</span><textarea class="input" data-note>${o.note || ''}</textarea></label>
-            <label class="field"><span>Bu siparişin kargo gideri (boş = varsayılan)</span><div class="input-group"><input class="input" inputmode="decimal" data-shipcost value="${o.shipping_cost ?? ''}"><span class="suffix">₺</span></div></label>
-            <div class="row"><button class="btn sm" data-act="save-note">Kaydet</button><span class="spacer"></span>
-              <select class="input" style="width:auto;min-height:32px;font-size:13px" data-status aria-label="Durumu elle değiştir"><option value="">Durumu değiştir…</option>${Object.entries(STATUS_LABEL).map(([k, v]) => html`<option value="${k}">${v}</option>`)}</select></div>
-          </div>
-        </div>
-      </div>`);
-    if (mode === 'split') splitEditor();
-  }
-
-  function packages(o) {
-    if (!o.packages.length) return html`<div class="card"><div class="card-head"><h3>Paket</h3></div><div class="muted small">Sipariş tek paket olarak gönderilecek. Birden fazla pakete ayırmak için “Paketlere böl”ü kullanın.</div></div>`;
-    const companies = (state.settings && state.settings.cargo_companies) || [];
-    return html`<div class="card"><div class="card-head"><h3>Paketler (${o.packages.length})</h3>${o.packages.some((p) => !p.remote_id && p.status === 'open') ? html`<button class="btn sm ghost" data-act="reset">Paketleri sıfırla</button>` : ''}</div>
-      ${o.packages.map((p) => html`<div class="pkg" data-pkg="${p.id}">
-        <div class="row wrap"><b>Paket ${p.no}</b>${p.status === 'shipped' ? html`<span class="pill shipped">Kargoda</span>` : p.status === 'cancelled' ? html`<span class="pill bad">İptal</span>` : html`<span class="pill processing">Hazırlanıyor</span>`}
-          ${p.remote_id ? html`<span class="muted tiny">Kanal paket no: ${p.remote_id}</span>` : ''}<span class="spacer"></span>
-          <button class="btn sm" data-act="label" data-id="${p.id}"><i class="ico ico-print"></i>Etiket</button></div>
-        <div class="small" style="margin:6px 0">${p.items.map((x) => html`<div>${x.qty} × ${lineName(o, x.line_id)}</div>`)}</div>
-        ${p.status === 'open' ? html`<div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr))">
-            <label class="field"><span>Kargo firması</span><input class="input" list="cargo-list" data-f="cargo" value="${p.cargo_company || o.cargo_company || ''}"></label>
-            <label class="field"><span>Takip no</span><input class="input" data-f="tracking" value="${p.tracking || ''}" placeholder="${caps().ship === 'remote' && o.channel !== 'trendyol' ? '' : 'isteğe bağlı'}"></label>
-            ${o.channel === 'trendyol' ? html`<label class="field"><span>Fatura no (isteğe bağlı)</span><input class="input" data-f="invoice"></label>` : ''}
-            <label class="field"><span>Desi</span><input class="input" inputmode="decimal" data-f="desi" value="${p.desi || ''}"></label>
-          </div>
-          <div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="save-pkg" data-id="${p.id}">Kaydet</button><span class="spacer"></span><button class="btn sm primary" data-act="ship" data-id="${p.id}"><i class="ico ico-truck"></i>Kargoya ver</button></div>`
-        : html`<div class="small muted">${[p.cargo_company, p.tracking].filter(Boolean).join(' · ') || 'Takip no yok'}</div>`}
-      </div>`)}
-      <datalist id="cargo-list">${companies.map((c) => html`<option value="${c}">`)}</datalist></div>`;
-  }
-
-  // Paket bölme: her ürün satırının adedini paketlere dağıt
-  function splitEditor() {
-    const o = data.order, live = o.items.filter((i) => i.status !== 'cancelled');
-    let count = Math.max(2, o.packages.length);
-    const grid = new Map(live.map((i) => [String(i.line_id), Array.from({ length: 8 }, (_, k) => 0)]));
-    // Mevcut paketlerden başla, yoksa ilk paket her şeyi alır; ikinci satır ikinci pakete önerilir
-    if (o.packages.length) o.packages.forEach((p, k) => p.items.forEach((x) => { const g = grid.get(String(x.line_id)); if (g) g[k] = x.qty; }));
-    else live.forEach((i, k) => { grid.get(String(i.line_id))[live.length > 1 && k === live.length - 1 ? 1 : 0] = i.quantity; });
-    const desi = Array.from({ length: 8 }, () => '');
-    const box = $('[data-split]', s.body);
-    const drawEd = () => {
-      render(box, html`<div class="card" style="margin-bottom:16px;border-color:var(--accent)">
-        <div class="card-head"><h3>Paketlere böl</h3><button class="btn sm" data-ed="add" ${count >= 8 ? 'disabled' : ''}><i class="ico ico-plus"></i>Paket</button><button class="btn sm" data-ed="del" ${count <= 1 ? 'disabled' : ''}><i class="ico ico-minus"></i></button></div>
-        <div class="table-wrap"><table class="t split-table"><thead><tr><th>Ürün</th>${Array.from({ length: count }, (_, k) => html`<th>Paket ${k + 1}</th>`)}<th>Kalan</th></tr></thead><tbody>
-          ${live.map((i) => { const g = grid.get(String(i.line_id)); const left = i.quantity - g.slice(0, count).reduce((a, b) => a + b, 0); return html`<tr>
-            <td style="min-width:140px"><div class="ellipsis" style="max-width:240px;font-weight:600">${i.product_name || i.name}</div><div class="muted tiny">${i.quantity} adet</div></td>
-            ${Array.from({ length: count }, (_, k) => html`<td><input class="input qty-in" type="number" min="0" max="${i.quantity}" inputmode="numeric" data-cell="${i.line_id}:${k}" value="${g[k]}"></td>`)}
-            <td class="num" style="font-weight:700;color:${left ? 'var(--bad)' : 'var(--good)'}">${left}</td></tr>`; })}
-          <tr><td class="muted small">Desi (isteğe bağlı)</td>${Array.from({ length: count }, (_, k) => html`<td><input class="input qty-in" inputmode="decimal" data-desi="${k}" value="${desi[k]}"></td>`)}<td></td></tr>
-        </tbody></table></div>
-        <div class="row" style="margin-top:12px"><span class="muted small">Her paket için ayrı kargo etiketi oluşturulur.</span><span class="spacer"></span><button class="btn" data-ed="cancel">Vazgeç</button><button class="btn primary" data-ed="save">Paketleri oluştur</button></div>
-      </div>`);
-    };
-    drawEd();
-    box.oninput = (e) => {
-      const c = e.target.dataset.cell;
-      if (c) { const [lid, k] = c.split(':'); grid.get(lid)[Number(k)] = Math.max(0, Math.round(numIn(e.target.value))); }
-      if (e.target.dataset.desi) desi[Number(e.target.dataset.desi)] = e.target.value;
-    };
-    box.onchange = (e) => { if (e.target.dataset.cell) { const pos = e.target.dataset.cell; drawEd(); const n = $(`[data-cell="${pos}"]`, box); n && n.focus(); } };
-    box.onclick = async (e) => {
-      const b = e.target.closest('[data-ed]');
-      if (!b) return;
-      if (b.dataset.ed === 'add') { count++; drawEd(); }
-      if (b.dataset.ed === 'del') { for (const g of grid.values()) { g[count - 2] += g[count - 1]; g[count - 1] = 0; } count--; drawEd(); }
-      if (b.dataset.ed === 'cancel') { mode = 'view'; box.innerHTML = ''; }
-      if (b.dataset.ed === 'save') {
-        const groups = Array.from({ length: count }, (_, k) => ({ desi: numIn(desi[k]) || null, items: live.map((i) => ({ line_id: String(i.line_id), qty: grid.get(String(i.line_id))[k] })).filter((x) => x.qty > 0) })).filter((g) => g.items.length);
-        const bad = live.find((i) => grid.get(String(i.line_id)).slice(0, count).reduce((a, x) => a + x, 0) !== i.quantity);
-        if (bad) return toast(`“${bad.product_name || bad.name}” adetleri tam dağıtılmadı`, true);
-        await busy(b, async () => {
-          const r = await api(`orders/${encodeURIComponent(id)}/split`, { method: 'POST', body: { groups } });
-          toast(r.message); mode = 'view'; await load(); changed();
-        });
-      }
-    };
-    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  async function doLabel(pkgId, btn) {
-    await busy(btn, async () => {
-      const r = await api(`orders/${encodeURIComponent(id)}/label`, { method: 'POST', body: pkgId ? { package_id: pkgId } : {} });
-      const o = r.order, pkg = o.packages.find((p) => p.id === r.package_id);
-      data.order = o; draw();
-      if (!r.official) {
-        if (r.error) toast('Kanal etiketi alınamadı, panel etiketi yazdırılıyor: ' + r.error, true);
-        return printLabels([{ order: o, pkg }], r.sender);
-      }
-      // Resmi etiket var: indir veya panel etiketini yazdır
-      const ls = sheet({ title: `Paket ${pkg.no} etiketi`, size: 'narrow', body: html`<div class="stack">
-        <div class="notice good"><i class="ico ico-check"></i><div>${ch(o.channel).name} kargo etiketi hazır (${r.official.format.toUpperCase()}).</div></div>
-        <button class="btn primary block" data-l="dl"><i class="ico ico-download"></i>${r.official.format === 'pdf' ? 'PDF etiketini aç / indir' : 'ZPL dosyasını indir (termal yazıcı)'}</button>
-        <button class="btn block" data-l="print"><i class="ico ico-print"></i>Panel etiketini yazdır (A6 / 100×150)</button>
-        ${r.official.format === 'zpl' ? html`<p class="muted small" style="margin:0">ZPL dosyası Zebra ve uyumlu termal yazıcılarda doğrudan basılır. Termal yazıcınız yoksa panel etiketini kullanın; kargo barkodu aynı takip numarasıdır.</p>` : ''}
-      </div>` });
-      $('[data-l=dl]', ls.el).onclick = () => downloadFile(r.official.filename, r.official.data, r.official.format === 'pdf' ? 'application/pdf' : 'text/plain');
-      $('[data-l=print]', ls.el).onclick = () => { ls.close(); printLabels([{ order: o, pkg }], r.sender); };
-    });
-  }
-
-  actions(s.body, {
-    accept: (t) => busy(t, async () => { const r = await api(`orders/${encodeURIComponent(id)}/accept`, { method: 'POST', body: {} }); toast(r.message); await load(); changed(); }),
-    'split-mode': () => { mode = 'split'; splitEditor(); },
-    'ship-first': async (t) => {
-      const o = data.order;
-      const openP = o.packages.filter((p) => p.status === 'open');
-      if (openP.length > 1) { $('[data-pkgs]', s.body).scrollIntoView({ behavior: 'smooth' }); return toast('Her paketi kendi satırından kargoya verin'); }
-      if (openP.length === 1) { $(`[data-pkg="${openP[0].id}"]`, s.body).scrollIntoView({ behavior: 'smooth' }); $(`[data-pkg="${openP[0].id}"] [data-f=tracking]`, s.body).focus(); return; }
-      if (!(await confirmBox('Sipariş tek paket olarak kargoya verilecek. Takip numarasını sonra da girebilirsiniz.', 'Kargoya ver'))) return;
-      busy(t, async () => { const r = await api(`orders/${encodeURIComponent(id)}/ship`, { method: 'POST', body: {} }); toast(r.message); await load(); changed(); });
-    },
-    labels: async (t) => {
-      const o = data.order;
-      if (o.packages.length > 1) {
-        if (o.packages.some((p) => !p.tracking) && caps().label) toast('Kanal etiketleri için paket satırlarındaki “Etiket” düğmesini kullanın');
-        return printLabels(o.packages.map((pkg) => ({ order: o, pkg })), state.settings && state.settings.sender);
-      }
-      doLabel(o.packages[0] && o.packages[0].id, t);
-    },
-    label: (t) => doLabel(Number(t.dataset.id), t),
-    'save-pkg': (t) => busy(t, async () => {
-      const box = t.closest('[data-pkg]');
-      await api(`orders/${encodeURIComponent(id)}/tracking`, { method: 'POST', body: { package_id: Number(t.dataset.id), tracking: $('[data-f=tracking]', box).value, cargo_company: $('[data-f=cargo]', box).value, desi: $('[data-f=desi]', box).value } });
-      toast('Kaydedildi'); await load();
-    }),
-    ship: (t) => busy(t, async () => {
-      const box = t.closest('[data-pkg]'), inv = $('[data-f=invoice]', box);
-      const r = await api(`orders/${encodeURIComponent(id)}/ship`, { method: 'POST', body: { package_id: Number(t.dataset.id), tracking: $('[data-f=tracking]', box).value.trim(), cargo_company: $('[data-f=cargo]', box).value.trim(), invoice_number: inv ? inv.value.trim() : '' } });
-      toast(r.message); await load(); changed();
-    }),
-    reset: async (t) => { if (await confirmBox('Paneldeki paket bölmesi silinsin mi?', 'Sil')) busy(t, async () => { await api(`orders/${encodeURIComponent(id)}/reset-packages`, { method: 'POST', body: {} }); await load(); changed(); }); },
-    'copy-addr': () => {
-      const o = data.order, a = o.address || {};
-      navigator.clipboard.writeText([a.name || o.customer, a.line, [a.district, a.city].filter(Boolean).join(' / '), a.phone || o.phone].filter(Boolean).join('\n')).then(() => toast('Adres kopyalandı'), () => toast('Kopyalanamadı', true));
-    },
-    'save-note': (t) => busy(t, async () => { await api(`orders/${encodeURIComponent(id)}/note`, { method: 'POST', body: { note: $('[data-note]', s.body).value, shipping_cost: $('[data-shipcost]', s.body).value } }); toast('Kaydedildi'); await load(); }),
-  });
-  s.body.addEventListener('change', async (e) => {
-    if (!e.target.matches('[data-status]') || !e.target.value) return;
-    const v = e.target.value;
-    if (!(await confirmBox(`Sipariş durumu elle “${STATUS_LABEL[v]}” yapılsın mı? (Sadece panelde değişir; iptalde ürünler stoğa geri eklenir.)`, 'Değiştir'))) { e.target.value = ''; return; }
-    try { await api(`orders/${encodeURIComponent(id)}/status`, { method: 'POST', body: { status: v } }); toast('Durum güncellendi'); await load(); changed(); } catch (err) { toast(err.message, true); }
-  });
-  await load().catch((e) => s.setBody(html`<div class="notice bad">${e.message}</div>`));
-}
+export { openOrder };

@@ -39,6 +39,8 @@ export function ikas(env, p, meta) {
     for (;;) {
       try { return await gql(build(active), variables); } catch (e) {
         const msg = e.message.toLowerCase();
+        // Paket barkodu alanı eski şemada yoksa sadece o alanı çıkar
+        if (e.gql && /barcode/.test(msg) && /\bbarcode\b/.test(active.orderPackages || '') && !/barcodelist/.test(msg)) { active.orderPackages = active.orderPackages.replace(' barcode', ''); continue; }
         const bad = Object.keys(active).sort((a, b) => b.length - a.length).find((k) => active[k] && msg.includes(k.toLowerCase()));
         if (!e.gql || !bad) throw e;
         active[bad] = '';
@@ -54,7 +56,7 @@ export function ikas(env, p, meta) {
     shippingAddress: 'shippingAddress { firstName lastName phone addressLine1 addressLine2 city { name } district { name } }',
     barcodeList: 'barcodeList',
     mainImageId: 'mainImageId',
-    orderPackages: 'orderPackages { id orderLineItemIds orderPackageFulfillStatus trackingInfo { cargoCompany trackingNumber trackingLink } }',
+    orderPackages: 'orderPackages { id orderLineItemIds orderPackageFulfillStatus trackingInfo { cargoCompany trackingNumber trackingLink barcode } }',
   };
   const orderQuery = (o, filter) => `query ($p: PaginationInput, $d: DateFilterInput) {
     listOrder(pagination: $p, ${filter}: $d) { hasNext data {
@@ -92,6 +94,7 @@ export function ikas(env, p, meta) {
       items: (pk.orderLineItemIds || []).map((lid) => ({ line_id: String(lid), qty: (items.find((i) => i.lineId === String(lid)) || {}).quantity || 1 })),
       status: /DELIVERED|FULFILLED|SHIPPED/i.test(pk.orderPackageFulfillStatus || '') ? 'shipped' : 'open',
       cargoCompany: str(pk.trackingInfo && pk.trackingInfo.cargoCompany), tracking: str(pk.trackingInfo && pk.trackingInfo.trackingNumber),
+      barcode: str(pk.trackingInfo && pk.trackingInfo.barcode),
     }));
     const first = packages.find((x) => x.tracking) || {};
     return {
