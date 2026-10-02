@@ -3249,30 +3249,43 @@
     }
     return nav;
   }
+  // ikas bazı sayfalarda menü bağlantısını adresini doldurmadan çizer (href="/[slug]"): böyle adresler kullanılmaz,
+  // kategori bağlantının yazısından tanınır
+  function badHref(s) { return /[\[\]]/.test(s || ''); }
   function findNav(M) {
-    var tops = {};
-    M.cats.forEach(function (c) { tops[c.s] = c; });
+    var tops = {}, byName = {};
+    M.cats.forEach(function (c) { tops[c.s] = c; byName[fold(c.n)] = c; byName[fold(c.l || c.n)] = c; });
     var hits = [], seen = {}, as = [];
     if (M.sel) { var cn = document.querySelector(M.sel); if (cn) as = cn.querySelectorAll('a[href]'); }
     else as = document.querySelectorAll('a[href]');
     for (var i = 0; i < as.length; i++) {
-      var a = as[i], s = slugOf(a.href);
-      if (!s || !tops[s] || seen[s] || isOurs(a)) continue;
+      var a = as[i], s = slugOf(a.href), c0 = s && !badHref(s) ? tops[s] : null;
+      if (!c0 && s != null && (badHref(s) || !tops[s])) c0 = byName[fold((a.textContent || '').replace(/\s+/g, ' ').trim())] || null;
+      if (!c0 || seen[c0.s] || isOurs(a)) continue;
+      // Konum sayfanın başına göre: sayfa aşağı kaydırılmışken (ikas bazı geçişlerde başa kaydırmıyor) de bulunur
       var r = a.getBoundingClientRect();
-      if (!r.width || !r.height || r.top > 260 || r.bottom < 0) continue;
-      seen[s] = 1;
-      hits.push({ a: a, c: tops[s], r: r });
+      if (!r.width || !r.height || (r.top > 260 && r.top + (window.pageYOffset || 0) > 260)) continue;
+      seen[c0.s] = 1;
+      hits.push({ a: a, c: c0, r: r });
     }
+    // Menü satırı: en çok kategori bağlantısının bulunduğu satır (sayfadaki yol/kırıntı bağlantıları gibi başka
+    // satırlardaki aynı kategoriler elenir)
+    var best = null;
+    hits.forEach(function (h) {
+      var n = hits.filter(function (x) { return Math.abs(x.r.top - h.r.top) <= 24; }).length;
+      if (!best || n > best.n) best = { n: n, top: h.r.top };
+    });
+    if (best) hits = hits.filter(function (x) { return Math.abs(x.r.top - best.top) <= 24; });
     if (hits.length < 3) return null;
-    // Hepsi aynı satırda olmalı (yan menü/altbilgi değil)
-    if (hits.some(function (h) { return Math.abs(h.r.top - hits[0].r.top) > 24; })) return null;
+    seen = {};
+    hits.forEach(function (h) { seen[h.c.s] = 1; });
     var nav = navOf(hits.map(function (h) { return h.a; }));
     if (!nav) return null;
     // Kategori olmayan görünür bağlantılar (Blog, İletişim …) çubuğun sonunda korunur; "Anasayfa" atlanır (logo zaten oraya gider)
     var hrefs = {}, extra = [], ex = {};
     [].forEach.call(nav.querySelectorAll('a[href]'), function (a) {
       var s = slugOf(a.href);
-      if (s == null) return;
+      if (s == null || badHref(s)) return;
       if (M.up[s]) { if (!hrefs[s]) hrefs[s] = a.href; return; }
       var r = a.getBoundingClientRect(), t = (a.textContent || '').replace(/\s+/g, ' ').trim();
       if (s && t && !ex[s] && r.width && Math.abs(r.top - hits[0].r.top) < 24) { ex[s] = 1; extra.push({ t: t, href: a.href }); }
@@ -3596,20 +3609,57 @@
   // Ekran boyutu değişince yeniden kur (masaüstünden çıkınca ikas menüsü geri gelir);
   // ikas başlığı yeniden çizerse (sayfa geçişi) menüyü tekrar yerleştir
   (function () {
-    var t, tries = 0;
+    var t;
     window.addEventListener('resize', function () {
       if (!DM) return;
       clearTimeout(t);
-      t = setTimeout(function () { tries = 0; unmountNav(); mountNav(); }, 250);
+      t = setTimeout(function () { unmountNav(); mountNav(); }, 250);
     });
     window.addEventListener('scroll', function () { if (DN && DN.cur) dmTop(); }, { passive: true });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && DN && DN.cur) dmClose(); });
-    setInterval(function () {
+    // ikas sayfa geçişinde başlığı yeniden çizer: bizim çubuk silinir ya da ikas'ın öğeleri geri gelir.
+    // Kontrol: başlık aynı kaldıysa çubuk anında geri takılır (yeniden kurulmaz, titreme olmaz); başlık değiştiyse
+    // yeni başlıkta kurulur. Sayfa geçişinden sonraki 5 sn boyunca 100 ms'de bir, sonra 1,5 sn'de bir bakılır.
+    // Deneme sayacı her sayfa geçişinde sıfırlanır (önceden toplam 5 denemeden sonra menü kalıcı olarak düşüyordu).
+    var check = function () {
       if (document.hidden || !DM) return;
-      if (DN && (!DN.host.isConnected || !DN.nav.isConnected || !DN.mhost.isConnected)) { unmountNav(); tries = 0; }
-      // Menü hiç bulunamayan sayfalarda boşuna aramaya devam etme
-      if (!DN && dmenuOn() && tries++ < 5) mountNav();
-    }, 2000);
+      if (DN) {
+        if (!DN.nav.isConnected) { unmountNav(); }
+        else {
+          if (!DN.host.isConnected || DN.host.parentNode !== DN.nav) DN.nav.appendChild(DN.host);
+          if (!DN.nav.hasAttribute('data-ua-nav')) DN.nav.setAttribute('data-ua-nav', '');
+          if (!DN.mhost.isConnected) document.body.appendChild(DN.mhost);
+          // ikas aynı yere yeni bir menü daha çizdiyse (eski kaldı ama görünen başka) yeni olana taşı
+          var g = null;
+          try { g = findNav(DM); } catch (e) {}
+          if (g && g.nav !== DN.nav && !DN.nav.getBoundingClientRect().height) unmountNav();
+        }
+      }
+      if (!DN && dmenuOn()) mountNav();
+    };
+    // Arka plan kontrolü hiç durmaz (1,5 sn'de bir, çok hafif); sık kontroller sadece sayfa geçişinden sonraki 15 sn
+    setInterval(check, 1500);
+    // Başlık değiştiği anda (aynı karede) yakala: sayfa değişikliklerinde sadece birkaç özellik kontrol edilir,
+    // menü düşmüşse bir sonraki karede kontrol çalışır (ikas menüsü göz açıp kapayıncaya kadar bile görünmesin)
+    var since = Date.now(), lastTry = 0, raf = 0;
+    var lost = function () { return !DN ? dmenuOn() : !DN.host.isConnected || !DN.nav.isConnected || DN.host.parentNode !== DN.nav || !DN.nav.hasAttribute('data-ua-nav'); };
+    if (window.MutationObserver && document.body) new MutationObserver(function () {
+      if (raf || !DM || !lost()) return;
+      // Menü yoksa ve kurulamıyorsa (başlık henüz hazır değil) yoğun sayfa değişikliklerinde en fazla 150 ms'de bir dene
+      if (!DN && (Date.now() - since > 15000 || Date.now() - lastTry < 150)) return;
+      raf = requestAnimationFrame(function () { raf = 0; lastTry = Date.now(); check(); });
+    }).observe(document.body, { childList: true, subtree: true });
+    var burst = function () {
+      since = Date.now();
+      var n = 0;
+      (function f() { check(); if (++n < 80) setTimeout(f, 100); })();
+    };
+    ['pushState', 'replaceState'].forEach(function (m) {
+      var o = history[m];
+      if (typeof o !== 'function') return;
+      history[m] = function () { var r = o.apply(this, arguments); if (DM) setTimeout(burst, 0); return r; };
+    });
+    window.addEventListener('popstate', function () { if (DM) setTimeout(burst, 0); });
   })();
 
   // Ctrl/Cmd+K ve "/" kısayolları (masaüstü)
