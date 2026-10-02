@@ -28,7 +28,10 @@ async function ctxFor(b, mobile) {
     if (p === '/e') return r.fulfill({ status: 204 });
     const f = { '/pm-search.js': 'public/pm-search.js', '/tarim/menu.json': 'public/tarim/menu.json', '/tarim/products.json': 'public/tarim/products.json' }[p];
     if (!f) return r.fulfill({ status: 404 });
-    return r.fulfill({ status: 200, body: readFileSync(f), contentType: f.endsWith('.js') ? 'application/javascript' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' } });
+    // CORS başlığı public/_headers'tan okunur (eksikse canlıdaki gibi hata versin; daha önce burada eklenip sorun gizleniyordu)
+    const hdr = readFileSync('public/_headers', 'utf8').split(/\n(?=\/)/).find((b) => b.split('\n')[0].trim() === p) || '';
+    const headers = /Access-Control-Allow-Origin:\s*\*/.test(hdr) ? { 'Access-Control-Allow-Origin': '*' } : {};
+    return r.fulfill({ status: 200, body: readFileSync(f), contentType: f.endsWith('.js') ? 'application/javascript' : 'application/json', headers });
   });
   await ctx.route((u) => u.origin === SITE && (u.pathname === '/' || !/\.\w+$/.test(u.pathname)), async (r) => {
     if (r.request().resourceType() !== 'document') return r.continue();
