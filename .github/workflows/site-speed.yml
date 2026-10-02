@@ -1,0 +1,28 @@
+name: Canlı site hız ölçümü
+
+# Canlı sitenin açılışını telefon ve bilgisayar koşullarında ölçer (widget açık / kapalı karşılaştırmalı).
+# Actions > "Canlı site hız ölçümü" > Run workflow ile elle çalıştırılır; sonuç işin özet sayfasında.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/site-speed.mjs', '.github/workflows/site-speed.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Tarayıcı kur
+        run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Ölç
+        run: node scripts/site-speed.mjs
