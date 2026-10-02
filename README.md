@@ -13,7 +13,7 @@ ikas API ──(GitHub Actions, 2 saatte bir)──▶ public/products.json ─�
 | `.github/workflows/sync.yml` | Senkronu 2 saatte bir otomatik çalıştırır |
 | `widget/pm-search.js` | Arama menüsünün kendisi (tasarım + arama motoru) — **düzenlemeler burada yapılır** |
 | `public/pm-search.js` | Sitede yayınlanan küçültülmüş hali (`node scripts/build-widget.mjs` üretir; elle düzenlenmez) |
-| `public/menu.json` | ~5 KB menü verisi (kategoriler + ana ekran ayarları); ☰ menüsü ürün verisini beklemeden anında açılır. Senkron üretir |
+| `public/menu.json` | Küçük menü verisi (kategoriler, ana ekran ayarları, masaüstü menüsünün öne çıkan ürünleri — sunucuda hesaplanır); ☰ menüsü, Ürün Bul ana ekranı ve masaüstü menüsü ürün verisini beklemeden kurulur. Senkron üretir |
 | `config.json` | Popüler aramalar, eş anlamlılar, renkler, telefon/WhatsApp, rozetler |
 | `public/test.html` | Yayına aldıktan sonra deneme sayfası |
 | `src/worker.js` | Ziyaretçi eğilimlerini toplar (`/e`) ve özetler (`/trends`); diğer her şey statik |
@@ -117,7 +117,7 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 config.json'u GitHub'da düzenleyip kaydettiğinde senkron kendiliğinden çalışır.
 
 ## Ziyaretçi eğilimleri (analiz)
-Widget anonim olarak (IP, çerez, kimlik tutmadan) şunları sayar: aranan kelimeler, sonuç bulunamayan aramalar, panelden/menüden ürün tıklamaları, ürün sayfası görüntülemeleri ve **sitenin her yerinden** sepete eklemeler (ikas'ın kendi butonu dahil; sepet yanıtından okunur). Her olay bir oturumda bir kez sayılır, toplu gönderilir. Cloudflare'de günlük toplamlar tutulur (D1 veritabanı `hasturk-egilim`, ilk yayında otomatik oluşur; son 2 yılın sezonu için 800 gün saklanır).
+Widget anonim olarak (IP, çerez, kimlik tutmadan) şunları sayar: aranan kelimeler, sonuç bulunamayan aramalar, panelden/menüden ürün tıklamaları, ürün sayfası görüntülemeleri ve **sitenin her yerinden** sepete eklemeler (ikas'ın kendi butonu dahil; sepet yanıtından okunur). Her olay bir oturumda bir kez sayılır, toplu gönderilir. Kayıt için ürün verisi (`products.json`) gerekmez: görüntülemede sayfa adresi, ikas butonuyla sepete eklemede (ürün verisi inmemişse) varyant kimliği gönderilir; senkron bunları ürüne çevirir, ürün olmayan adresleri yok sayar. Cloudflare'de günlük toplamlar tutulur (D1 veritabanı `hasturk-egilim`, ilk yayında otomatik oluşur; son 2 yılın sezonu için 800 gün saklanır).
 
 `scripts/sync.mjs` 2 saatte bir şu verileri birleştirir: son 30 günün site içi olayları, ikas'taki son 60 günün siparişleri ve **1 ile 2 yıl önceki aynı dönem** (sipariş + site içi). Ürün puanı `h` (0-100) dört parçadan oluşur:
 1. **Şimdi:** 4 × satış + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme. Yeni olan ağır basar (sipariş yarı ömrü 20 gün, olaylar 10 gün); sert sıfırlama yok.
@@ -137,7 +137,7 @@ Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collec
 
 ## Hız
 Ölçüm düzeneği: yavaş 4G (1,6 Mbps, 150 ms) + 4 kat yavaş işlemci, banner'lı ağır ana sayfa, Next.js benzeri ürün sayfası.
-- **Açılış**: Ürün Bul butonu sayfanın gövdesi oluşur oluşmaz kurulur (birkaç ms); ikas'ın betiklerinin ve banner'ların bitmesi beklenmez (canlı sitede telefonda HTML'in hazır olması ~7 sn sürüyor). Menü verisi (`menu.json`, ~5 KB) hemen; ürün verisi (`products.json`) sayfa tamamen yüklendikten sonra boşta (kaydırma sırasında değil) ya da müşteri Ürün Bul'a / menüye dokunduğu an iner. Müşteri o sırada panel/menü açarsa yüksek öncelikli ikinci indirme başlar, hangisi önce biterse o kullanılır. Panel kapalıyken veri hazırlığı tarayıcı boşa çıkınca yapılır.
+- **Açılış**: Ürün Bul butonu sayfanın gövdesi oluşur oluşmaz kurulur (birkaç ms); ikas'ın betiklerinin ve banner'ların bitmesi beklenmez (canlı sitede telefonda HTML'in hazır olması ~7 sn sürüyor). Menü verisi (`menu.json`, ~5 KB) hemen; ürün verisi (`products.json`, ~300 KB) bilgisayarda sayfa tamamen yüklendikten sonra boşta; **telefonda sadece müşteri Ürün Bul'a / menüye dokunduğu an** iner (Ürün Bul'u kullanmayan ziyaretçinin telefonu hiç yorulmaz; ilk aramada veri o an iner). Müşteri o sırada panel/menü açarsa yüksek öncelikli ikinci indirme başlar, hangisi önce biterse o kullanılır. Panel kapalıyken veri hazırlığı tarayıcı boşa çıkınca yapılır.
 - **Görseller**: arama sonuçlarının ilk 4 görseli öncelikli, diğerleri kaydırınca iner; yavaş bağlantıda / veri tasarrufunda 180 px boyut. Görsel tamamen inene kadar sade yer tutucu (yarım çizim görünmez).
 - **Sepete ekleme**: ürün sayfası gizli çerçevede açılır; tüm görselleri beklenmeden "Sepete ekle" butonu çalışır olunca basılır (erken basış site tarafından işlenmezse sayfa yüklenince bir kez daha; istek başlamışsa asla ikinci kez basılmaz). İlk başarılı eklemeden sonra çerçeve sıcak kalır; sonraki eklemelerde sitenin yönlendiricisiyle yenilemesiz geçilir (~1 sn). Basmadan önce çerçevedeki sayfanın doğru ürün olduğu doğrulanır. Panel kapanınca sıcak çerçeve 10 sn içinde kaldırılır (arkada site uygulaması çalışmasın). Sonuçlardayken ilk ürünü önceden hazırlama varsayılan kapalı (gerçek ürün sayfası arkada çalışırken kaydırma takılabiliyor); `cart.prewarm: true` açar. `cart.warm: false` sıcak çerçeveyi kapatır. Başarı her zaman sitenin sepet cevabıyla kanıtlanır.
 - **Sayfa geçişi**: panelden ve masaüstü menüden ürün/kategori sayfalarına sitenin Next.js yönlendiricisiyle yenilemesiz geçilir (sitenin kendi linkleri gibi); parmak değince / fare gelince sayfanın kodu önceden iner. Yönlendirici yoksa, hata verirse ya da 8 sn'de bitmezse normal geçiş. Sepet/ödeme/hesap sayfalarına her zaman normal geçilir. Panel açıkken geri tuşu sadece paneli kapatır (sayfa yenilenmez/yukarı kaymaz). `"spaNav": false` kapatır.
@@ -155,3 +155,16 @@ GitHub Actions (özel depo: ayda 2000 dk ücretsiz, bu iş ~360 dk kullanır) + 
 ## Canlı site hız ölçümü
 
 `.github/workflows/site-speed.yml` canlı siteyi telefon (4x yavaş işlemci, 4G) ve bilgisayar koşullarında açar; widget açık / kapalı / daldaki yeni sürüm ile karşılaştırır, reCAPTCHA vb. ağır dosyaları ve kimin yüklediğini listeler. Actions > "Canlı site hız ölçümü" > Run workflow; sonuç işin özet sayfasında.
+
+## İkinci site: Tarım Dünyası (tarim-dunyasi.com)
+
+Aynı widget ve menü sistemi, kendi ürünleri/fiyatları/stoğu ve kendi renk paletiyle çalışır.
+
+- **Ürünler:** `sync.yml` 2 saatte bir `hasturktarimdunyasi` mağazasının API'sinden `public/tarim/products.json` ve `public/tarim/menu.json` üretir (anahtarlar: Secrets > `IKAS2_CLIENT_ID`, `IKAS2_CLIENT_SECRET`).
+- **Ayarlar:** `config.json` ortak; `config.tarim.json` üzerine yazar (renkler, `slugMap`, `pageMap`). `config.json`'daki ürün adresleri (öne çıkanlar, çapraz satış, kategori görselleri, rehber ürünleri) Tarım Dünyası'nın adreslerine otomatik çevrilir: aynı adres → aynı adlı ürün → `slugMap`. Bulunamayanlar senkron günlüğünde uyarı olarak yazılır.
+- **Eğilimler:** ziyaretçi olayları iki sitede ortak toplanır (aynı Worker); satış verisi her mağazanın kendi siparişlerinden. Rapor: `docs/trend-raporu-tarim.md`.
+- **ikas > Scriptler (Tarım Dünyası):**
+  ```html
+  <script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" data-site="tarim" async fetchpriority="high"></script>
+  ```
+- Kontrol araçları: `Mağaza karşılaştırması`, `Tarım Dünyası önizleme`, `Tarım Dünyası canlı deneme` (Actions).

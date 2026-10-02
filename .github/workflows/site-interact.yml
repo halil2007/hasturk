@@ -28,8 +28,9 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Ölç
         env:
-          MODES: widgetli,yeni,eski-25ef704,widgetsiz
+          MODES: widgetli,yeni,widgetsiz
           RUNS: 3
         run: |
           for c in $(echo "$MODES" | tr ',' '\n' | sed -n 's/^eski-//p;s/^yeni$/HEAD/p'); do git show "$c:public/pm-search.js" > "/tmp/widget-$c.js"; done
+          git show HEAD:public/menu.json > /tmp/menu-HEAD.json
           node scripts/site-interact.mjs

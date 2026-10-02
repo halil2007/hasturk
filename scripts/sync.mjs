@@ -10,17 +10,22 @@
 //   MOCK=1              API'ye gitmeden örnek veriyle çalış (test için)
 //   TRENDS_URL          ziyaretçi eğilimi özeti (varsayılan: Worker'ın /trends adresi); TRENDS_FILE ile yerel dosya
 //   ORDER_DAYS          satış analizinde bakılacak gün (varsayılan 60)
+//   STORE_OUT           sadece ürünleri bu dosyaya yaz (ikinci mağaza karşılaştırması: scripts/compare-stores.mjs)
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'public', 'products.json');
-const API = 'https://api.myikas.com/api/v1/admin/graphql';
-const REPORT = join(ROOT, 'docs', 'trend-raporu.md');
-const MENU = join(ROOT, 'public', 'menu.json');
 const env = process.env;
+// İkinci site (SITE=tarim): ürünler o mağazanın API'sinden, dosyalar public/<SITE>/ altına; ayarlar config.json +
+// config.<SITE>.json (üzerine yazar). Ziyaretçi eğilimleri iki sitede ortak (aynı /trends).
+const SITE = (env.SITE || '').replace(/[^a-z0-9-]/g, '');
+const PUB = SITE ? join(ROOT, 'public', SITE) : join(ROOT, 'public');
+const OUT = join(PUB, 'products.json');
+const API = 'https://api.myikas.com/api/v1/admin/graphql';
+const REPORT = join(ROOT, 'docs', SITE ? `trend-raporu-${SITE}.md` : 'trend-raporu.md');
+const MENU = join(PUB, 'menu.json');
 const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.dev/trends';
 
 // ---------- yardımcılar ----------
@@ -479,8 +484,19 @@ function applyTrends(out, trends, orders, config) {
     }
   }
   // Site içi olaylar (bugün + geçmiş yıllar)
-  for (const [slug, o] of Object.entries((trends && trends.p) || {})) {
-    if (!bySlug.has(slug)) continue;
+  // Olay anahtarı ürün adresi (slug) ya da — ürün verisi inmemiş sayfalarda sepete eklenen — varyant kimliği olabilir
+  const slugOf = (x) => bySlug.has(x) ? x : (byVar.get(x) || {}).s;
+  const evP = (src) => {
+    const m = {};
+    for (const [x, o] of Object.entries(src || {})) {
+      const s = slugOf(x);
+      if (!s) continue;
+      const t = (m[s] = m[s] || {});
+      for (const k in o) t[k] = (t[k] || 0) + (o[k] || 0);
+    }
+    return m;
+  };
+  for (const [slug, o] of Object.entries(evP(trends && trends.p))) {
     const g = get(slug);
     g.a += o.a || 0; g.c += o.c || 0; g.v += o.v || 0; g.e7 += o.e7 || 0; g.e28 += o.e28 || 0;
   }
@@ -489,8 +505,7 @@ function applyTrends(out, trends, orders, config) {
     if (!t || !t.rows) continue;
     years[y] = years[y] || { o14: 0, e14: 0, has: false };
     years[y].hasE = true;
-    for (const [slug, o] of Object.entries(t.p || {})) {
-      if (!bySlug.has(slug)) continue;
+    for (const [slug, o] of Object.entries(evP(t.p))) {
       const v = yr(get(slug), y);
       v.eA += o.e || 0; v.e14 += o.e14 || 0; years[y].e14 += o.e14 || 0;
     }
@@ -641,7 +656,7 @@ async function writeReport(out, trends, orders, an, config) {
   if (prev === text) return;
   await mkdir(dirname(REPORT), { recursive: true });
   await writeFile(REPORT, text);
-  console.log('Rapor yazıldı: docs/trend-raporu.md');
+  console.log('Rapor yazıldı: ' + relative(ROOT, REPORT));
 }
 
 // ---------- kategori görselleri + hızlı menü verisi ----------
@@ -674,24 +689,99 @@ function catCovers(out, config) {
 // public/menu.json (~5 KB): telefonda ☰ menüsü / Ürün Bul ana ekranı ürün verisinin (90+ KB) inmesini beklemeden
 // bununla anında açılır. Ağır ama ana ekranda gerekmeyen ayarlar (rehberler, toprak eşleştirme…) içinde yoktur.
 const MENU_SKIP = ['guides', 'soilMatch', 'synonyms', 'crossSell', 'boost', 'bestsellers', 'badges', 'categoryImages'];
+// Masaüstü menüsünün her ana kategori için öne çıkan 3 ürünü (widget'taki dmProducts ile aynı kural):
+// config.json > desktopMenu.picks önce, sonra eğilim + satış (p.h), çok satan ve mağaza markası; toptan/ton ürünler geride.
+// Böylece masaüstü menüsü 300 KB'lık ürün verisini indirmeden kurulur.
+function dmPicks(out, config) {
+  const dm = config.desktopMenu && typeof config.desktopMenu === 'object' ? config.desktopMenu : {};
+  if (config.desktopMenu === false || dm.products === false) return {};
+  const boost = (config.boost || []).slice().reverse(), best = new Set([...(config.bestsellers || config.boost || []), ...((out.trend || {}).best || [])]);
+  const ownB = new RegExp(config.brandPattern || 'has ?t[uü]rk|^hg$', 'i'), bulk = new RegExp(config.bulkPattern || '\\b\\d+([.,]\\d+)? ?ton\\b', 'i');
+  const bulkPrice = config.bulkPrice || 40000;
+  const rank = (p) => {
+    const b = boost.indexOf(p.s);
+    let r = (b !== -1 ? 4 + b / Math.max(boost.length, 1) : 0) + (ownB.test(p.b || '') ? 2 : 0) + (p.st ? Math.min(2, (p.h || 0) / 50) : 0);
+    if (bulk.test(p.n) || (p.p || 0) >= bulkPrice) r -= 8;
+    return r;
+  };
+  const kids = {}, bySlug = new Map(out.items.map((p) => [p.s, p]));
+  for (const c of out.cats) if (c.p) (kids[c.p] = kids[c.p] || []).push(c);
+  const ok = (p) => p && p.st && p.img;
+  const res = {};
+  for (const c of out.cats.filter((x) => !x.p || !out.cats.some((y) => y.id === x.p))) {
+    const set = new Set();
+    (function add(id) { set.add(id); (kids[id] || []).forEach((k) => add(k.id)); })(c.id);
+    const picks = ((dm.picks || {})[c.n] || []).map((s) => bySlug.get(s)).filter(ok);
+    const rest = out.items.filter((p) => ok(p) && rank(p) >= 0 && !picks.includes(p) && (p.c || []).some((x) => set.has(x)))
+      .sort((a, b) => (b.h || 0) - (a.h || 0) || ((best.has(b.s) ? 3 : 0) + rank(b)) - ((best.has(a.s) ? 3 : 0) + rank(a)));
+    const top = picks.concat(rest).slice(0, 3);
+    if (top.length) res[c.id] = top.map((p) => ({ n: p.n, s: p.s, img: p.img, p: p.d != null ? p.d : p.p, o: p.d != null && p.p > p.d ? p.p : 0 }));
+  }
+  return res;
+}
+
 async function writeMenu(out) {
   const config = Object.fromEntries(Object.entries(out.config || {}).filter(([k]) => !MENU_SKIP.includes(k)));
-  const menu = { v: 1, merchant: out.merchant, n: out.items.length, config, cats: out.cats, trend: { q: (out.trend && out.trend.q) || [] } };
+  const menu = { v: 1, merchant: out.merchant, n: out.items.length, config, cats: out.cats, trend: { q: (out.trend && out.trend.q) || [] }, dmp: dmPicks(out, out.config || {}) };
   const text = JSON.stringify(menu);
   let prev = '';
   try { prev = await readFile(MENU, 'utf8'); } catch {}
   if (prev === text) return;
+  await mkdir(dirname(MENU), { recursive: true });
   await writeFile(MENU, text);
-  console.log(`Menü verisi yazıldı: public/menu.json (${(Buffer.byteLength(text) / 1024).toFixed(1)} KB)`);
+  console.log(`Menü verisi yazıldı: ${relative(ROOT, MENU)} (${(Buffer.byteLength(text) / 1024).toFixed(1)} KB)`);
 }
 
 // ---------- ana akış ----------
+// İkinci sitenin ayarı: config.json'daki ürün adresleri (slug) o mağazanın adreslerine çevrilir.
+// Sıra: config.<SITE>.json > slugMap (elle) → aynı adres → 1. mağazadaki ürün adıyla eşleşen ürün. Bulunamayan atlanır.
+async function siteConfig(base) {
+  let over = {};
+  try { over = JSON.parse(await readFile(join(ROOT, `config.${SITE}.json`), 'utf8')); } catch {}
+  return { ...base, ...over };
+}
+async function remapConfig(config, out) {
+  const fold2 = (s) => fold(s).replace(/[^a-z0-9]+/g, ' ').trim();
+  const have = new Set(out.items.map((p) => p.s)), byName = new Map(out.items.map((p) => [fold2(p.n), p.s]));
+  let main1 = new Map();
+  try { main1 = new Map(JSON.parse(await readFile(join(ROOT, 'public', 'products.json'), 'utf8')).items.map((p) => [p.s, p.n])); } catch {}
+  const manual = config.slugMap || {}, miss = new Set();
+  const m = (s) => {
+    const r = manual[s] || (have.has(s) ? s : byName.get(fold2(main1.get(s) || '')));
+    if (!r || !have.has(r)) { miss.add(s); return null; }
+    return r;
+  };
+  const arr = (a) => (a || []).map(m).filter(Boolean);
+  const c = { ...config };
+  for (const k of ['boost', 'bestsellers']) if (c[k]) c[k] = arr(c[k]);
+  if (c.crossSell) c.crossSell = c.crossSell.map((x) => ({ ...x, offer: arr(x.offer) }));
+  if (c.categoryImages) c.categoryImages = Object.fromEntries(Object.entries(c.categoryImages).map(([n, s]) => [n, m(s)]).filter((x) => x[1]));
+  if (c.guides) c.guides = c.guides.map((g) => ({ ...g, product: g.product && m(g.product) || undefined }));
+  if (c.desktopMenu && c.desktopMenu.picks) c.desktopMenu = { ...c.desktopMenu, picks: Object.fromEntries(Object.entries(c.desktopMenu.picks).map(([n, a]) => [n, arr(a)])) };
+  // Bu sitede olmayan sayfalar: config.<SITE>.json > pageMap { "/pages/x": "başka adres" } ile yönlendirilir
+  const pm = c.pageMap || {};
+  if (c.guides) c.guides = c.guides.map((g) => (g.url && pm[g.url] ? { ...g, url: pm[g.url] } : g));
+  if (c.pages) c.pages = c.pages.map((g) => (g.url && pm[g.url] ? { ...g, url: pm[g.url] } : g));
+  delete c.slugMap; delete c.pageMap;
+  if (miss.size) console.warn(`UYARI (${SITE}): bu mağazada karşılığı bulunamayan ürün adresleri atlandı (config.${SITE}.json > slugMap ile eşleştirilebilir): ${[...miss].join(', ')}`);
+  // Adıyla anılan kategoriler bu mağazada var mı (yoksa o ayar sessizce etkisiz kalır)
+  const cats = new Set(out.cats.map((x) => fold(x.n)));
+  const names = [...(c.categoryOrder || []), ...((c.desktopMenu || {}).items || []), ...(c.featured || []).map((f) => f.category)].filter(Boolean);
+  const noCat = [...new Set(names.filter((n) => !cats.has(fold(n))))];
+  if (noCat.length) console.warn(`UYARI (${SITE}): bu mağazada bulunmayan kategori adları: ${noCat.join(', ')}`);
+  return c;
+}
+
 async function main() {
-  const config = JSON.parse(await readFile(join(ROOT, 'config.json'), 'utf8'));
+  let config = JSON.parse(await readFile(join(ROOT, 'config.json'), 'utf8'));
+  if (SITE) {
+    config = await siteConfig(config);
+    if (!env.MENU_ONLY && (!env.IKAS_CLIENT_ID || !env.IKAS_CLIENT_SECRET)) { console.warn(`UYARI: ${SITE} için API anahtarları yok, atlandı.`); return; }
+  }
   // Sadece menü verisini mevcut products.json'dan üret (API'ye gitmeden): MENU_ONLY=1 node scripts/sync.mjs
   if (env.MENU_ONLY) {
     const cur = JSON.parse(await readFile(OUT, 'utf8'));
-    cur.config = config;
+    cur.config = config = SITE ? await remapConfig(config, cur) : config;
     catCovers(cur, config);
     await writeFile(OUT, JSON.stringify(cur));
     await writeMenu(cur);
@@ -711,6 +801,14 @@ async function main() {
   }
   const out = transform({ ...raw, config });
   if (!out.items.length) die('Hiç ürün çıkmadı; products.json güncellenmedi.');
+  if (SITE) out.config = config = await remapConfig(config, out);
+  // Başka bir mağazanın ürünlerini sadece dosyaya yaz (karşılaştırma için; eğilim/menü/rapor yapılmaz):
+  // STORE_OUT=/tmp/magaza2.json IKAS_STORE=... node scripts/sync.mjs
+  if (env.STORE_OUT) {
+    await writeFile(env.STORE_OUT, JSON.stringify(out));
+    console.log(`Yazıldı: ${env.STORE_OUT} (${out.items.length} ürün, ${out.cats.length} kategori)`);
+    return;
+  }
 
   // Eğilimler: hata olursa ürün senkronu yine de tamamlanır
   try {

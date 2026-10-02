@@ -6,7 +6,7 @@ on:
   workflow_dispatch:          # Actions sekmesinden elle çalıştırma
   push:
     branches: [main]          # sadece yayındaki dalda; çalışma dallarına commit atmasın
-    paths: ['config.json', 'scripts/**']
+    paths: ['config.json', 'config.*.json', 'scripts/**']
 
 permissions:
   contents: write
@@ -30,6 +30,15 @@ jobs:
           IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
           IKAS_MERCHANT_ID: ${{ secrets.IKAS_MERCHANT_ID }}
           IKAS_SALES_CHANNEL_ID: ${{ secrets.IKAS_SALES_CHANNEL_ID }}
+      - name: Tarım Dünyası ürünlerini çek (2. mağaza)
+        # Anahtarlar yoksa atlanır; hata olursa 1. mağazanın senkronu yine kaydedilir
+        continue-on-error: true
+        run: node scripts/sync.mjs
+        env:
+          SITE: tarim
+          IKAS_STORE: hasturktarimdunyasi
+          IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
       - name: Değiştiyse kaydet
         run: |
           git config user.name "urun-senkron"
@@ -37,4 +46,6 @@ jobs:
           git add public/products.json
           if [ -f public/menu.json ]; then git add public/menu.json; fi
           if [ -f docs/trend-raporu.md ]; then git add docs/trend-raporu.md; fi
+          if [ -d public/tarim ]; then git add public/tarim; fi
+          if [ -f docs/trend-raporu-tarim.md ]; then git add docs/trend-raporu-tarim.md; fi
           git diff --cached --quiet || (git commit -m "Ürünler güncellendi" && git push)

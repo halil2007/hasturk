@@ -1,0 +1,31 @@
+name: Mağaza karşılaştırması
+
+# İkinci ikas mağazasının (hasturktarimdunyasi) ürünlerini çekip birinci mağazayla karşılaştırır.
+# Anahtarlar: Settings > Secrets > IKAS2_CLIENT_ID, IKAS2_CLIENT_SECRET. Sonuç işin özet sayfasında.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/compare-stores.mjs', '.github/workflows/compare-stores.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: 2. mağazanın ürünlerini çek
+        run: node scripts/sync.mjs
+        env:
+          STORE_OUT: /tmp/magaza2.json
+          IKAS_STORE: hasturktarimdunyasi
+          IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+      - name: Karşılaştır
+        run: node scripts/compare-stores.mjs public/products.json /tmp/magaza2.json

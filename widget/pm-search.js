@@ -5,6 +5,7 @@
  *   data-selector  hangi arama kutuları yakalansın (CSS seçici)
  *   data-trigger   tıklanınca aramayı açacak ek öğeler (örn. büyüteç ikonu)
  *   data-json      products.json adresi (varsayılan: script ile aynı klasör)
+ *   data-site      ikinci mağaza klasörü (örn. "tarim" → tarim/products.json, tarim/menu.json; kendi ürün ve renkleri)
  *   data-store     mağaza adresi (varsayılan: bulunulan site)
  *   data-fab       "off" → sağ alttaki "Ürün Bul" butonunu gösterme
  *   data-auto      "off" → sitedeki arama butonlarını otomatik tanıma
@@ -16,8 +17,10 @@
   var script = document.currentScript || document.querySelector('script[src*="pm-search"]');
   var ds = (script && script.dataset) || {};
   var BASE = script ? new URL('.', script.src).href : '/';
-  var JSON_URL = ds.json || BASE + 'products.json';
-  var MENU_URL = ds.menu === 'off' ? '' : (ds.menuJson || BASE + 'menu.json'); // ~5 KB: menü/ana ekran anında açılsın
+  // data-site="tarim": ikinci mağazanın verisi (public/tarim/: kendi ürünleri, fiyatları, ayar ve renkleri)
+  var SITE_DIR = /^[a-z0-9-]+$/.test(ds.site || '') ? ds.site + '/' : '';
+  var JSON_URL = ds.json || BASE + SITE_DIR + 'products.json';
+  var MENU_URL = ds.menu === 'off' ? '' : (ds.menuJson || BASE + SITE_DIR + 'menu.json'); // ~5 KB: menü/ana ekran anında açılsın
   var STORE = (ds.store || location.origin).replace(/\/$/, '');
   var SELECTOR = ds.selector || 'input[type="search"], input[name="q"], input[name="s"], input[placeholder]';
   var TRIGGER = ds.trigger || '';
@@ -394,7 +397,7 @@
     'button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}',
     'a{color:inherit;text-decoration:none}',
     'svg{display:block}',
-    '.root{--pr:#0b5d73;--prd:#07404f;--soft:#e8f3f6;--bg:#f3f6f7;--ln:#e3e8eb;--ink:#14212b;--mu:#66737c;--ac:#d7372f;--ok:#1f8a5b;',
+    '.root{--pr:#0b5d73;--prd:#07404f;--soft:#e8f3f6;--bg:#f3f6f7;--ln:#e3e8eb;--ink:#14212b;--mu:#66737c;--ac:#d7372f;--ok:#1f8a5b;--hov:#d6eaf0;--lt:#cfe3e9;--lt2:#b9d3db;--dash:#9cc7d3;',
     ' font-family:inherit;color:var(--ink);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.35}',
 
     /* Ürün Bul butonu */
@@ -436,7 +439,7 @@
 
     '.top{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px}',
     '.cbtn{position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:50%;flex:none;background:var(--soft);color:var(--prd)}',
-    '.cbtn svg{width:21px;height:21px}.cbtn:hover{background:#d6eaf0}',
+    '.cbtn svg{width:21px;height:21px}.cbtn:hover{background:var(--hov)}',
     '.cn{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--ac);color:#fff;font-size:11px;font-weight:800;line-height:19px;text-align:center;box-shadow:0 0 0 2px #fff;display:none}',
     '.cn.on{display:block;animation:cnpop .35s cubic-bezier(.3,1.6,.5,1)}',
     '@keyframes cnpop{from{transform:scale(.3)}}',
@@ -466,7 +469,7 @@
     '.typing .nav.on{background:none;color:#4b5963}',
     '.help{margin-top:auto;padding:14px;border-radius:18px;background:var(--prd);color:#fff}',
     '.help b{display:block;font-size:14px}',
-    '.help p{font-size:12.5px;color:#b9d3db;margin:2px 0 10px}',
+    '.help p{font-size:12.5px;color:var(--lt2);margin:2px 0 10px}',
     '.help a{display:flex;align-items:center;gap:7px;height:40px;padding:0 10px;border-radius:12px;font-size:13px;font-weight:700;margin-top:6px;white-space:nowrap}',
     '.help a svg{width:18px;height:18px;flex:none}',
     '.help .wa{background:#25a162}',
@@ -512,7 +515,7 @@
     '.tq.rc{background:#fff;border:1px solid var(--ln);color:var(--ink);font-weight:500}.tq.rc svg{color:#9aa5ac}',
     '.tq{flex:none;display:flex;align-items:center;gap:6px;height:38px;padding:0 16px 0 12px;border-radius:19px;background:var(--soft);color:var(--prd);font-size:14px;font-weight:600}',
     '.tq svg{width:15px;height:15px}',
-    '.tq:hover{background:#d6eaf0}',
+    '.tq:hover{background:var(--hov)}',
     '.center{justify-content:center;flex-wrap:wrap}',
 
     /* Hesaplayıcı banner */
@@ -532,8 +535,8 @@
     '.pm1{display:flex;align-items:center;gap:12px;padding:14px}',
     '.pbadge{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.15);display:grid;place-items:center;flex:none}',
     '.pbadge svg{width:22px;height:22px}',
-    '.pm1 .tx{flex:1;min-width:0}.pm1 b{display:block;font-size:15px}.pm1 .tx span{display:block;font-size:12.5px;color:#cfe3e9;margin-top:1px}',
-    '.pcode{flex:none;display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-radius:12px;background:#fff;color:var(--prd);border:2px dashed #9cc7d3}',
+    '.pm1 .tx{flex:1;min-width:0}.pm1 b{display:block;font-size:15px}.pm1 .tx span{display:block;font-size:12.5px;color:var(--lt);margin-top:1px}',
+    '.pcode{flex:none;display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-radius:12px;background:#fff;color:var(--prd);border:2px dashed var(--dash)}',
     '.pcode b{font-size:14px;font-weight:800;letter-spacing:.04em}.pcode em{font-style:normal;font-size:11px;font-weight:700;color:var(--mu)}',
     '.pm2{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(0,0,0,.18);font-size:13px;font-weight:600}',
     '.pm2 svg{width:18px;height:18px;flex:none}',
@@ -582,7 +585,7 @@
     '.banner .bi svg{width:26px;height:26px}',
     '.banner div.tx{flex:1;min-width:0}',
     '.banner b{display:block;font-size:16px}',
-    '.banner span{display:block;font-size:13px;color:#cfe3e9;margin-top:2px}',
+    '.banner span{display:block;font-size:13px;color:var(--lt);margin-top:2px}',
     '.banner>svg{width:22px;height:22px;flex:none}',
 
     /* Kategoriler */
@@ -858,7 +861,7 @@
     '.res .ic{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.14);display:grid;place-items:center;flex:none}',
     '.res .ic svg{width:28px;height:28px}',
     '.res b{display:block;font-size:30px;font-weight:800;letter-spacing:-.01em;line-height:1.1}',
-    '.res span{display:block;font-size:13px;color:#cfe3e9;margin-top:3px}',
+    '.res span{display:block;font-size:13px;color:var(--lt);margin-top:3px}',
     '.note{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:13px;color:#44525c;line-height:1.45}.note>svg{width:17px;height:17px;flex:none;color:var(--pr);margin-top:1px}',
     '.fx{margin-top:10px;padding:12px 14px;border-radius:14px;background:var(--bg);font-size:13.5px;line-height:1.55;font-variant-numeric:tabular-nums;word-break:break-word}',
     '.fx b{display:block;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mu);margin-bottom:2px}',
@@ -1094,6 +1097,8 @@
     if (c.dark) $wrap.style.setProperty('--prd', c.dark);
     if (c.soft) $wrap.style.setProperty('--soft', c.soft);
     if (c.accent) $wrap.style.setProperty('--ac', c.accent);
+    // İkinci site paleti için ara tonlar (config > colors: hover, light, light2, dash, bg, line)
+    [['hover', '--hov'], ['light', '--lt'], ['light2', '--lt2'], ['dash', '--dash'], ['bg', '--bg'], ['line', '--ln']].forEach(function (x) { if (c[x[0]]) $wrap.style.setProperty(x[1], c[x[0]]); });
     if (CFG.placeholder) $q.placeholder = CFG.placeholder;
     var fab = CFG.fab || {};
     $fab.querySelector('span.t').textContent = fab.text || 'Ürün Bul';
@@ -1630,7 +1635,7 @@
   // Olaylar toplu halde, sayfadan çıkarken tek istekle gönderilir; aynı olay bir oturumda bir kez sayılır.
   // Günlük toplamlar Cloudflare'de tutulur, scripts/sync.mjs 2 saatte bir okuyup sıralama ve önerilere işler.
   // Kapatmak: config.json > "analytics": false ya da script etiketine data-collect="off"
-  var EVQ = [], EV_SEEN = {}, EV_T = 0, EV_URL = ds.collect === 'off' ? '' : (ds.collect || BASE + 'e'), EV_PEND = [];
+  var EVQ = [], EV_SEEN = {}, EV_T = 0, EV_URL = ds.collect === 'off' ? '' : (ds.collect || BASE + 'e');
   try { EV_SEEN = JSON.parse(sessionStorage.getItem('ua-ev') || '{}') || {}; } catch (e) {}
   function ev(k, x) {
     if (!EV_URL || !x || CFG.analytics === false) return;
@@ -1662,13 +1667,16 @@
     noteQuery.t = setTimeout(function () { ev(n ? 'q' : 'q0', q); }, 1500);
   }
   function cartAdded(vid) {
-    if (DATA) { var p = BY_VAR[vid]; if (p) ev('a', p.s); } else EV_PEND.push(vid);
+    if (DATA) { var p = BY_VAR[vid]; if (p) ev('a', p.s); } else ev('a', String(vid).toLowerCase());
   }
   // Ürün sayfası görüntüleme (ikas sayfa yenilemeden geçiş yapar; adres değişimi de izlenir)
+  // Ürün verisi gerekmez: adres tek parçalıysa (ikas ürün adresi /urun-adi) gönderilir; kategori sayfaları menü
+  // verisinden ayıklanır, ürün olmayan adresleri sync.mjs zaten yok sayar
   function evPage() {
-    if (!DATA) return;
-    var s = slugOf(location.href);
-    if (s && BY_SLUG[s]) ev('v', s);
+    var path = location.pathname.replace(/\/+$/, ''), s = slugOf(location.href);
+    if (!s || !/^[a-z0-9-]{2,140}$/.test(s) || path.split('/').length !== 2 || HIDE_PATHS.test(path) || /^(search|arama|pages|blog|account|hesap)$/.test(s)) return;
+    if (DATA ? !BY_SLUG[s] : SRC() && SRC().cats.some(function (c) { return c.s === s; })) return;
+    ev('v', s);
   }
   // "Sık arananlar": ziyaretçilerin son 30 günde en çok aradığı ve sonuç bulduğu kelimeler (sync.mjs > trend.q),
   // eksik kalırsa config.json > popular ile tamamlanır. config.json > "trendPopular": false sadece elle listeyi kullanır.
@@ -1698,7 +1706,6 @@
     return (popular.c = out);
   }
   function evData() {
-    EV_PEND.splice(0).forEach(cartAdded);
     evPage();
   }
   (function () {
@@ -3170,6 +3177,7 @@
   // Kategorinin öne çıkan 3 ürünü: config.json > desktopMenu.picks["Kategori adı"] (elle onaylanan) önce,
   // sonra ziyaretçi eğilimi + gerçek satışlara göre (p.h), veri yoksa çok satan/mağaza markası
   function dmProducts(c) {
+    if (!DATA) return ((LITE || {}).dmp || {})[c.id] || [];
     var set = {}, picks = ((dmCfgObj().picks || {})[c.n] || []).map(function (s) { return BY_SLUG[s]; })
       .filter(function (p) { return p && p.st && p.img; });
     (function add(id) { set[id] = 1; (KIDS[id] || []).forEach(function (k) { add(k.id); }); })(c.id);
@@ -3183,7 +3191,7 @@
     var dc = CFG.desktopMenu, o = dmCfgObj(), hidden = {}, up = {};
     (o.hide || []).forEach(function (n) { hidden[fold(n)] = 1; });
     var keep = function (c) { return c.k > 0 && !hidden[c.f]; };
-    DATA.cats.forEach(function (c) {
+    SRC().cats.forEach(function (c) {
       var t = c;
       while (t.p && CATS_BY_ID[t.p]) t = CATS_BY_ID[t.p];
       up[c.s] = t.s;
@@ -3198,11 +3206,12 @@
           return { n: k.n, s: k.s, k: (KIDS[k.id] || []).filter(keep).map(function (g) { return { n: g.n, s: g.s }; }) };
         }),
         p: o.products === false ? [] : dmProducts(c).map(function (p) {
-          return { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: price(p), o: p.d != null && p.p > p.d ? p.p : 0 };
+          // menu.json'daki hazır seçimde fiyat (p) ve eski fiyat (o) zaten hesaplı gelir
+          return DATA ? { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: price(p), o: p.d != null && p.p > p.d ? p.p : 0 } : { n: p.n, s: p.s, i: imgSrc(p.img, 180), p: p.p, o: p.o };
         })
       };
     });
-    return { v: 1, off: dc === false, sel: CFG.desktopNav || '', fixed: fixed.length > 0, cats: cats, up: up };
+    return { v: 1, off: dc === false, sel: CFG.desktopNav || '', fixed: fixed.length > 0, cats: cats, up: up, ac: (CFG.colors || {}).accent || '' };
   }
   // Satırdaki boş alan: menünün solundaki (logo) ve sağındaki (ikonlar) öğeler arasında kalan genişlik
   function rowSpace(el) {
@@ -3329,7 +3338,7 @@
     ':host{all:initial;display:block;font-family:inherit}',
     '*{box-sizing:border-box;margin:0;padding:0;font-family:inherit}',
     'a{color:inherit;text-decoration:none}',
-    '.bar{--ac:#d7372f;--ink:#1d2a23;display:flex;align-items:center;justify-content:center;gap:2px;height:100%;min-height:44px;white-space:nowrap;--fs:15px;--px:13px}',
+    '.bar{--ac:var(--uac,#d7372f);--ink:#1d2a23;display:flex;align-items:center;justify-content:center;gap:2px;height:100%;min-height:44px;white-space:nowrap;--fs:15px;--px:13px}',
     '.bar.s1{--fs:14px;--px:11px}.bar.s2{--fs:13.5px;--px:9px}.bar.s3{--fs:12.5px;--px:7px}',
     '.ti{position:relative;display:flex;align-items:center;gap:5px;height:44px;padding:0 var(--px);font-size:var(--fs);font-weight:650;color:var(--ink);letter-spacing:.1px;border-radius:10px;transition:color .15s,background .15s}',
     '.ti svg{width:13px;height:13px;transform:rotate(90deg);opacity:.55;transition:transform .2s,opacity .2s}',
@@ -3342,7 +3351,7 @@
     '.bd{position:fixed;left:0;right:0;bottom:0;top:var(--t,80px);background:rgba(16,24,20,.22);opacity:0;pointer-events:none;transition:opacity .18s}',
     '.mg{position:fixed;left:0;right:0;top:var(--t,80px);background:#fff;border-top:1px solid #eceeed;box-shadow:0 18px 40px rgba(16,24,20,.16);opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .16s,transform .16s;max-height:calc(100vh - var(--t,80px) - 24px);overflow-y:auto}',
     '.on .bd{opacity:1;pointer-events:auto}.on .mg{opacity:1;transform:none;pointer-events:auto}',
-    '.in{--ac:#d7372f;--ink:#1d2a23;--mu:#6b756f;max-width:1240px;margin:0 auto;padding:26px 32px 30px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:36px;color:var(--ink)}',
+    '.in{--ac:var(--uac,#d7372f);--ink:#1d2a23;--mu:#6b756f;max-width:1240px;margin:0 auto;padding:26px 32px 30px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:36px;color:var(--ink)}',
     '.in.nos{grid-template-columns:minmax(0,1fr)}',
     '.hd{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #eceeed}',
     '.hd b{font-size:20px;font-weight:800}',
@@ -3470,6 +3479,7 @@
     g.id = 'ua-dnav-ghost';
     g.style.cssText = 'position:' + (fixed ? 'fixed' : 'absolute') + ';z-index:2147481000;top:' + (r.top + (fixed ? 0 : window.pageYOffset)) + 'px;left:' +
       (left + (fixed ? 0 : window.pageXOffset)) + 'px;width:' + w + 'px;height:' + Math.max(44, r.height) + 'px;font-family:' + getComputedStyle(f.nav).fontFamily;
+    if (DM && DM.ac) g.style.setProperty('--uac', DM.ac);
     var gr = g.attachShadow ? g.attachShadow({ mode: 'open' }) : g;
     gr.innerHTML = barHtml(f);
     document.body.appendChild(g);
@@ -3496,6 +3506,8 @@
     var mhost = document.createElement('div');
     mhost.id = 'ua-mega';
     mhost.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;z-index:2147482000;font-family:' + font;
+    // Vurgu rengi (config > colors.accent; ikinci sitenin paleti) gölge DOM'a CSS değişkeniyle geçer
+    if (DM && DM.ac) { host.style.setProperty('--uac', DM.ac); mhost.style.setProperty('--uac', DM.ac); }
     var mroot = mhost.attachShadow ? mhost.attachShadow({ mode: 'open' }) : mhost;
     mroot.innerHTML = '<style>' + DCSS + '</style><div class="mw"><div class="bd"></div><div class="mg" role="region" aria-label="Alt kategoriler"></div></div>';
     if (PRE && PRE !== f.nav) clearPre();
@@ -3562,8 +3574,13 @@
         if (DM) mountNav();
         else { var g = guessNav(); if (g) preHide(g); }
       } catch (e) {}
-      DM_NEED = true;
-      load().then(dmRefresh).catch(function () { if (!DN) clearPre(); });
+      // Menü özeti küçük menu.json'dan (~5 KB, öne çıkan ürünler sunucuda hazırlanmış) kurulur; 300 KB'lık ürün
+      // verisi beklenmez. menu.json yoksa / eskiyse ürün verisine düşülür.
+      loadLite().then(function () {
+        if (DATA || (LITE && LITE.dmp)) return dmRefresh();
+        DM_NEED = true;
+        return load().then(dmRefresh);
+      }).catch(function () { if (!DN) clearPre(); });
     };
     if (document.readyState !== 'loading') return go();
     document.addEventListener('DOMContentLoaded', go);
@@ -3603,8 +3620,10 @@
   });
 
   // Açılış: "Ürün Bul" butonu sayfanın gövdesi oluşur oluşmaz kurulur (birkaç ms; ikas'ın betiklerinin ve banner'ların
-  // bitmesi beklenmez — canlı sitede telefonda HTML hazır olması ~7 sn sürüyor). Menü verisi (~5 KB) hemen iner.
-  // Ürün verisi sayfa tamamen yüklendikten sonra boşta iner (panel daha önce açılırsa hemen iner).
+  // bitmesi beklenmez — canlı sitede telefonda HTML hazır olması ~7 sn sürüyor). Menü verisi (~5 KB) hemen iner;
+  // ana ekran, kategoriler, masaüstü menüsü ve ziyaretçi eğilimi kaydı onunla çalışır.
+  // Ürün verisi (300 KB): bilgisayarda sayfa tamamen yüklendikten sonra boşta; telefonda sadece müşteri Ürün Bul'a /
+  // menüye dokununca iner (Ürün Bul'u kullanmayan ziyaretçinin telefonu hiç yorulmaz).
   function prefetch(why) {
     if (prefetch.done) return;
     prefetch.done = true;
@@ -3613,10 +3632,10 @@
   function boot() {
     if (boot.done) return;
     boot.done = true;
-    build(); loadLite();
-    // Ürün verisi (300 KB) sayfa kaydırılırken değil: sayfa tamamen yüklendikten sonra boşta iner;
-    // müşteri Ürün Bul'a / menüye dokunursa hemen iner
+    build();
+    loadLite().then(evPage);
     var later = function () { setTimeout(function () { idle(function () { prefetch('idle'); }, 4000); }, 1500); };
+    if (!wideScreen() || slowNet()) return;
     if (document.readyState === 'complete') later(); else window.addEventListener('load', later);
   }
   if (document.body) boot();
