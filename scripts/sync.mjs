@@ -758,7 +758,11 @@ async function remapConfig(config, out) {
   if (c.categoryImages) c.categoryImages = Object.fromEntries(Object.entries(c.categoryImages).map(([n, s]) => [n, m(s)]).filter((x) => x[1]));
   if (c.guides) c.guides = c.guides.map((g) => ({ ...g, product: g.product && m(g.product) || undefined }));
   if (c.desktopMenu && c.desktopMenu.picks) c.desktopMenu = { ...c.desktopMenu, picks: Object.fromEntries(Object.entries(c.desktopMenu.picks).map(([n, a]) => [n, arr(a)])) };
-  delete c.slugMap;
+  // Bu sitede olmayan sayfalar: config.<SITE>.json > pageMap { "/pages/x": "başka adres" } ile yönlendirilir
+  const pm = c.pageMap || {};
+  if (c.guides) c.guides = c.guides.map((g) => (g.url && pm[g.url] ? { ...g, url: pm[g.url] } : g));
+  if (c.pages) c.pages = c.pages.map((g) => (g.url && pm[g.url] ? { ...g, url: pm[g.url] } : g));
+  delete c.slugMap; delete c.pageMap;
   if (miss.size) console.warn(`UYARI (${SITE}): bu mağazada karşılığı bulunamayan ürün adresleri atlandı (config.${SITE}.json > slugMap ile eşleştirilebilir): ${[...miss].join(', ')}`);
   // Adıyla anılan kategoriler bu mağazada var mı (yoksa o ayar sessizce etkisiz kalır)
   const cats = new Set(out.cats.map((x) => fold(x.n)));

@@ -1,0 +1,33 @@
+name: Tarım Dünyası canlı deneme
+
+# Daldaki widget'ı gerçek tarim-dunyasi.com sayfasına (sadece test tarayıcısında) yerleştirip dener.
+# Ekran görüntüleri işin "Artifacts" bölümünde (shots).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/site2-live.mjs', '.github/workflows/site2-live.yml', 'public/tarim/**', 'public/pm-search.js']
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Tarayıcı kur
+        run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Dene
+        run: node scripts/site2-live.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots
+          path: shots/

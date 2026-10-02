@@ -155,3 +155,16 @@ GitHub Actions (özel depo: ayda 2000 dk ücretsiz, bu iş ~360 dk kullanır) + 
 ## Canlı site hız ölçümü
 
 `.github/workflows/site-speed.yml` canlı siteyi telefon (4x yavaş işlemci, 4G) ve bilgisayar koşullarında açar; widget açık / kapalı / daldaki yeni sürüm ile karşılaştırır, reCAPTCHA vb. ağır dosyaları ve kimin yüklediğini listeler. Actions > "Canlı site hız ölçümü" > Run workflow; sonuç işin özet sayfasında.
+
+## İkinci site: Tarım Dünyası (tarim-dunyasi.com)
+
+Aynı widget ve menü sistemi, kendi ürünleri/fiyatları/stoğu ve kendi renk paletiyle çalışır.
+
+- **Ürünler:** `sync.yml` 2 saatte bir `hasturktarimdunyasi` mağazasının API'sinden `public/tarim/products.json` ve `public/tarim/menu.json` üretir (anahtarlar: Secrets > `IKAS2_CLIENT_ID`, `IKAS2_CLIENT_SECRET`).
+- **Ayarlar:** `config.json` ortak; `config.tarim.json` üzerine yazar (renkler, `slugMap`, `pageMap`). `config.json`'daki ürün adresleri (öne çıkanlar, çapraz satış, kategori görselleri, rehber ürünleri) Tarım Dünyası'nın adreslerine otomatik çevrilir: aynı adres → aynı adlı ürün → `slugMap`. Bulunamayanlar senkron günlüğünde uyarı olarak yazılır.
+- **Eğilimler:** ziyaretçi olayları iki sitede ortak toplanır (aynı Worker); satış verisi her mağazanın kendi siparişlerinden. Rapor: `docs/trend-raporu-tarim.md`.
+- **ikas > Scriptler (Tarım Dünyası):**
+  ```html
+  <script src="https://hasturk-arama.halilc2007.workers.dev/pm-search.js" data-site="tarim" async fetchpriority="high"></script>
+  ```
+- Kontrol araçları: `Mağaza karşılaştırması`, `Tarım Dünyası önizleme`, `Tarım Dünyası canlı deneme` (Actions).
