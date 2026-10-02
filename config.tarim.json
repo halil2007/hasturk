@@ -1,0 +1,19 @@
+{
+  "_help": "Tarım Dünyası (tarim-dunyasi.com) için config.json'un üzerine yazılan ayarlar. Burada olmayan her şey config.json'dan gelir. Ürün adresleri (boost, crossSell, categoryImages, guides, desktopMenu.picks) bu mağazanın adreslerine otomatik çevrilir; eşleşmeyenler slugMap ile elle eşlenir: { \"1. mağaza adresi\": \"tarım dünyası adresi\" }.",
+  "colors": {
+    "primary": "#2f6b3a",
+    "dark": "#1f4a27",
+    "accent": "#e07b1a",
+    "soft": "#eaf4ec",
+    "hover": "#d8ecdc",
+    "light": "#d5e8d8",
+    "light2": "#bdd8c2",
+    "dash": "#9fc9a8",
+    "bg": "#f4f7f3",
+    "line": "#e2e9e1"
+  },
+  "slugMap": {
+    "hasturk-kati-solucan-gubresi": "kati-solucan-gubresi-5-kg",
+    "hasturk-sivi-solucan-gubresi": "sivi-solucan-gubresi-1-lt"
+  }
+}

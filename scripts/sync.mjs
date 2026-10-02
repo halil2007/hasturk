@@ -17,10 +17,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'public', 'products.json');
+// İkinci site (SITE=tarim): ürünler o mağazanın API'sinden, dosyalar public/<SITE>/ altına; ayarlar config.json +
+// config.<SITE>.json (üzerine yazar). Ziyaretçi eğilimleri iki sitede ortak (aynı /trends).
+const SITE = (env.SITE || '').replace(/[^a-z0-9-]/g, '');
+const PUB = SITE ? join(ROOT, 'public', SITE) : join(ROOT, 'public');
+const OUT = join(PUB, 'products.json');
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
-const REPORT = join(ROOT, 'docs', 'trend-raporu.md');
-const MENU = join(ROOT, 'public', 'menu.json');
+const REPORT = join(ROOT, 'docs', SITE ? `trend-raporu-${SITE}.md` : 'trend-raporu.md');
+const MENU = join(PUB, 'menu.json');
 const env = process.env;
 const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.dev/trends';
 
@@ -728,12 +732,51 @@ async function writeMenu(out) {
 }
 
 // ---------- ana akış ----------
+// İkinci sitenin ayarı: config.json'daki ürün adresleri (slug) o mağazanın adreslerine çevrilir.
+// Sıra: config.<SITE>.json > slugMap (elle) → aynı adres → 1. mağazadaki ürün adıyla eşleşen ürün. Bulunamayan atlanır.
+async function siteConfig(base) {
+  let over = {};
+  try { over = JSON.parse(await readFile(join(ROOT, `config.${SITE}.json`), 'utf8')); } catch {}
+  return { ...base, ...over };
+}
+async function remapConfig(config, out) {
+  const fold2 = (s) => fold(s).replace(/[^a-z0-9]+/g, ' ').trim();
+  const have = new Set(out.items.map((p) => p.s)), byName = new Map(out.items.map((p) => [fold2(p.n), p.s]));
+  let main1 = new Map();
+  try { main1 = new Map(JSON.parse(await readFile(join(ROOT, 'public', 'products.json'), 'utf8')).items.map((p) => [p.s, p.n])); } catch {}
+  const manual = config.slugMap || {}, miss = new Set();
+  const m = (s) => {
+    const r = manual[s] || (have.has(s) ? s : byName.get(fold2(main1.get(s) || '')));
+    if (!r || !have.has(r)) { miss.add(s); return null; }
+    return r;
+  };
+  const arr = (a) => (a || []).map(m).filter(Boolean);
+  const c = { ...config };
+  for (const k of ['boost', 'bestsellers']) if (c[k]) c[k] = arr(c[k]);
+  if (c.crossSell) c.crossSell = c.crossSell.map((x) => ({ ...x, offer: arr(x.offer) }));
+  if (c.categoryImages) c.categoryImages = Object.fromEntries(Object.entries(c.categoryImages).map(([n, s]) => [n, m(s)]).filter((x) => x[1]));
+  if (c.guides) c.guides = c.guides.map((g) => ({ ...g, product: g.product && m(g.product) || undefined }));
+  if (c.desktopMenu && c.desktopMenu.picks) c.desktopMenu = { ...c.desktopMenu, picks: Object.fromEntries(Object.entries(c.desktopMenu.picks).map(([n, a]) => [n, arr(a)])) };
+  delete c.slugMap;
+  if (miss.size) console.warn(`UYARI (${SITE}): bu mağazada karşılığı bulunamayan ürün adresleri atlandı (config.${SITE}.json > slugMap ile eşleştirilebilir): ${[...miss].join(', ')}`);
+  // Adıyla anılan kategoriler bu mağazada var mı (yoksa o ayar sessizce etkisiz kalır)
+  const cats = new Set(out.cats.map((x) => fold(x.n)));
+  const names = [...(c.categoryOrder || []), ...((c.desktopMenu || {}).items || []), ...(c.featured || []).map((f) => f.category)].filter(Boolean);
+  const noCat = [...new Set(names.filter((n) => !cats.has(fold(n))))];
+  if (noCat.length) console.warn(`UYARI (${SITE}): bu mağazada bulunmayan kategori adları: ${noCat.join(', ')}`);
+  return c;
+}
+
 async function main() {
-  const config = JSON.parse(await readFile(join(ROOT, 'config.json'), 'utf8'));
+  let config = JSON.parse(await readFile(join(ROOT, 'config.json'), 'utf8'));
+  if (SITE) {
+    config = await siteConfig(config);
+    if (!env.MENU_ONLY && (!env.IKAS_CLIENT_ID || !env.IKAS_CLIENT_SECRET)) { console.warn(`UYARI: ${SITE} için API anahtarları yok, atlandı.`); return; }
+  }
   // Sadece menü verisini mevcut products.json'dan üret (API'ye gitmeden): MENU_ONLY=1 node scripts/sync.mjs
   if (env.MENU_ONLY) {
     const cur = JSON.parse(await readFile(OUT, 'utf8'));
-    cur.config = config;
+    cur.config = config = SITE ? await remapConfig(config, cur) : config;
     catCovers(cur, config);
     await writeFile(OUT, JSON.stringify(cur));
     await writeMenu(cur);
@@ -753,6 +796,7 @@ async function main() {
   }
   const out = transform({ ...raw, config });
   if (!out.items.length) die('Hiç ürün çıkmadı; products.json güncellenmedi.');
+  if (SITE) out.config = config = await remapConfig(config, out);
   // Başka bir mağazanın ürünlerini sadece dosyaya yaz (karşılaştırma için; eğilim/menü/rapor yapılmaz):
   // STORE_OUT=/tmp/magaza2.json IKAS_STORE=... node scripts/sync.mjs
   if (env.STORE_OUT) {

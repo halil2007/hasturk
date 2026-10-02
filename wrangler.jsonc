@@ -12,6 +12,6 @@
   ],
   // Olay kabul edilen site(ler)
   "vars": {
-    "ORIGINS": "hasturkgubre.com.tr"
+    "ORIGINS": "hasturkgubre.com.tr,tarim-dunyasi.com"
   }
 }

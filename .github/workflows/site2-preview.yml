@@ -1,0 +1,45 @@
+name: Tarım Dünyası önizleme
+
+# Çalışma dalında Tarım Dünyası verisini (public/tarim/) üretip dala kaydeder ve siteyi kontrol eder
+# (renkler, rehber sayfaları var mı). Yayındaki dalda bu işi sync.yml yapar.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['config.tarim.json', 'scripts/sync.mjs', '.github/workflows/site2-preview.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Tarım Dünyası ürünlerini çek
+        run: node scripts/sync.mjs
+        env:
+          SITE: tarim
+          IKAS_STORE: hasturktarimdunyasi
+          IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+      - name: Site kontrolü (renkler, sayfalar)
+        run: |
+          S=https://tarim-dunyasi.com
+          curl -fsSL "$S/" -o /tmp/home.html && echo "Ana sayfa: $(wc -c < /tmp/home.html) bayt"
+          echo "theme-color: $(grep -o '<meta[^>]*theme-color[^>]*>' /tmp/home.html | head -1)"
+          echo "Sık geçen renkler:"; grep -oiE '#[0-9a-f]{6}\b' /tmp/home.html | tr A-F a-f | sort | uniq -c | sort -rn | head -12
+          echo "Script etiketleri (pm-search):"; grep -o '<script[^>]*pm-search[^>]*>' /tmp/home.html || echo "  yok"
+          for u in $(node -e "const c=require('./public/tarim/menu.json').config;const g=require('./config.json');console.log([...(g.guides||[]).map(x=>x.url),...(c.pages||[]).map(x=>x.url)].filter(Boolean).join(' '))"); do
+            printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' "$S$u")" "$u"
+          done
+      - name: Dala kaydet
+        run: |
+          git config user.name "urun-senkron"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/tarim docs/trend-raporu-tarim.md 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "Tarım Dünyası önizleme verisi" && git push)
