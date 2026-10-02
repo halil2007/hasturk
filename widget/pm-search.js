@@ -3249,30 +3249,42 @@
     }
     return nav;
   }
+  // ikas bazı sayfalarda menü bağlantısını adresini doldurmadan çizer (href="/[slug]"): böyle adresler kullanılmaz,
+  // kategori bağlantının yazısından tanınır
+  function badHref(s) { return /[\[\]]/.test(s || ''); }
   function findNav(M) {
-    var tops = {};
-    M.cats.forEach(function (c) { tops[c.s] = c; });
+    var tops = {}, byName = {};
+    M.cats.forEach(function (c) { tops[c.s] = c; byName[fold(c.n)] = c; byName[fold(c.l || c.n)] = c; });
     var hits = [], seen = {}, as = [];
     if (M.sel) { var cn = document.querySelector(M.sel); if (cn) as = cn.querySelectorAll('a[href]'); }
     else as = document.querySelectorAll('a[href]');
     for (var i = 0; i < as.length; i++) {
-      var a = as[i], s = slugOf(a.href);
-      if (!s || !tops[s] || seen[s] || isOurs(a)) continue;
+      var a = as[i], s = slugOf(a.href), c0 = s && !badHref(s) ? tops[s] : null;
+      if (!c0 && s != null && (badHref(s) || !tops[s])) c0 = byName[fold((a.textContent || '').replace(/\s+/g, ' ').trim())] || null;
+      if (!c0 || seen[c0.s] || isOurs(a)) continue;
       var r = a.getBoundingClientRect();
       if (!r.width || !r.height || r.top > 260 || r.bottom < 0) continue;
-      seen[s] = 1;
-      hits.push({ a: a, c: tops[s], r: r });
+      seen[c0.s] = 1;
+      hits.push({ a: a, c: c0, r: r });
     }
+    // Menü satırı: en çok kategori bağlantısının bulunduğu satır (sayfadaki yol/kırıntı bağlantıları gibi başka
+    // satırlardaki aynı kategoriler elenir)
+    var best = null;
+    hits.forEach(function (h) {
+      var n = hits.filter(function (x) { return Math.abs(x.r.top - h.r.top) <= 24; }).length;
+      if (!best || n > best.n) best = { n: n, top: h.r.top };
+    });
+    if (best) hits = hits.filter(function (x) { return Math.abs(x.r.top - best.top) <= 24; });
     if (hits.length < 3) return null;
-    // Hepsi aynı satırda olmalı (yan menü/altbilgi değil)
-    if (hits.some(function (h) { return Math.abs(h.r.top - hits[0].r.top) > 24; })) return null;
+    seen = {};
+    hits.forEach(function (h) { seen[h.c.s] = 1; });
     var nav = navOf(hits.map(function (h) { return h.a; }));
     if (!nav) return null;
     // Kategori olmayan görünür bağlantılar (Blog, İletişim …) çubuğun sonunda korunur; "Anasayfa" atlanır (logo zaten oraya gider)
     var hrefs = {}, extra = [], ex = {};
     [].forEach.call(nav.querySelectorAll('a[href]'), function (a) {
       var s = slugOf(a.href);
-      if (s == null) return;
+      if (s == null || badHref(s)) return;
       if (M.up[s]) { if (!hrefs[s]) hrefs[s] = a.href; return; }
       var r = a.getBoundingClientRect(), t = (a.textContent || '').replace(/\s+/g, ' ').trim();
       if (s && t && !ex[s] && r.width && Math.abs(r.top - hits[0].r.top) < 24) { ex[s] = 1; extra.push({ t: t, href: a.href }); }

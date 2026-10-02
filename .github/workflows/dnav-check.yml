@@ -18,8 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        site: ['https://tarim-dunyasi.com']
-        mode: [yeni]
+        site: ['https://hasturkgubre.com.tr', 'https://tarim-dunyasi.com']
+        mode: [canli, yeni]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
