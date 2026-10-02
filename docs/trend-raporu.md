@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 191 sipariş; site içi olaylar son 30 gün (85 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 191 sipariş; site içi olaylar son 30 gün (104 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -10,9 +10,9 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 
 | # | Ürün | Hızlanma | Son 7 gün satış | Stokta |
 |---|---|---|---|---|
-| 1 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×9,1 | 4 | evet |
-| 2 | DSV Lippa Lisuna 6 Mix Çim Tohumu | ×2,3 | 6 | evet |
-| 3 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×5 | 2 | evet |
+| 1 | DSV Lippa Lisuna 6 Mix Çim Tohumu | ×2,4 | 6 | evet |
+| 2 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×9,1 | 4 | evet |
+| 3 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×5,1 | 2 | evet |
 | 4 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
 | 5 | DSV Lippa Tamu 5 Mix Çim Tohumu | ×2,1 | 2 | evet |
 
@@ -34,16 +34,16 @@ _Henüz veri yok._
 |---|---|---|---|
 | 1 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 11,6 | 6 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 10,5 | 11 |
-| 3 | HasTürk Solucan Gübresi  | 9,5 | 11 |
+| 3 | HasTürk Solucan Gübresi  | 9,4 | 11 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 8,8 | 2 |
 | 5 | Kullanıma Hazır Cocopeat Torfu | 8,6 | 16 |
 | 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
 | 7 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,1 | 8 |
 | 8 | Premium Fide Toprağı | 6,8 | 11 |
 | 9 | Leonardit - Organik Toprak Düzenleyici | 6 | 9 |
-| 10 | HG Akıllı Bitki ve Saksı Toprağı | 5,8 | 8 |
-| 11 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 4,8 | 3 |
-| 12 | HG Mezar Toprağı | 4,1 | 6 |
+| 10 | HG Akıllı Bitki ve Saksı Toprağı | 5,7 | 8 |
+| 11 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 4,7 | 3 |
+| 12 | HG Mezar Toprağı | 4 | 6 |
 | 13 | Doğal Orman Toprağı | %100 Organik ve Humuslu | 4 | 1 |
 | 14 | HG Paşa Kılıcı (Sansevieria) Toprağı | 3,8 | 4 |
 | 15 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 3,6 | 2 |
@@ -51,7 +51,7 @@ _Henüz veri yok._
 | 17 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici | 3,6 | 4 |
 | 18 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,6 | 3 |
 | 19 | HG Organik Sebze Yetiştirme Toprağı  | 3,3 | 0 |
-| 20 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 3,3 | 0 |
+| 20 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 3,2 | 0 |
 
 ## En çok aranan kelimeler
 
