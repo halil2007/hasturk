@@ -1,0 +1,47 @@
+name: Tarım Dünyası canlı kontrol
+
+# Yayındaki tarim-dunyasi.com'u olduğu gibi kontrol eder: Scriptler'deki etiket, Worker'daki dosyalar,
+# gerçek sayfada Ürün Bul / menü / arama (hiçbir şey enjekte edilmez).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/site2-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Etiket ve dosyalar
+        run: |
+          S=https://tarim-dunyasi.com; B=https://hasturk-arama.halilc2007.workers.dev
+          curl -fsSL "$S/" -o /tmp/home.html
+          echo "Sitedeki etiket(ler):"; grep -o '<script[^>]*\(pm-search\|hasturk-arama\)[^>]*>' /tmp/home.html || echo "  ETİKET YOK"
+          grep -c 'pm-search' /tmp/home.html || true
+          echo "Etiket çevresi:"; grep -o '.\{0,200\}pm-search.\{0,200\}' /tmp/home.html | head -3
+          for f in pm-search.js tarim/menu.json tarim/products.json menu.json; do
+            printf '%s %s bayt  %s\n' "$(curl -s -o /tmp/f -w '%{http_code}' "$B/$f?x=$RANDOM")" "$(wc -c < /tmp/f)" "$f"
+          done
+          echo "pm-search.js data-site desteği: $(curl -s $B/pm-search.js | grep -c 'tarim\|SITE_DIR\|ds.site' )"
+          diff <(curl -s "$B/pm-search.js?x=$RANDOM" | sha1sum) <(sha1sum < public/pm-search.js) >/dev/null && echo "pm-search.js = main" || echo "pm-search.js main'den FARKLI (yayın gecikmesi?)"
+      - name: Tarayıcı kur
+        run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Gerçek sayfada dene
+        run: node scripts/site2-live.mjs
+        env:
+          LIVE: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots
+          path: shots/
