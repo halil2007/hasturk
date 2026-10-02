@@ -3626,6 +3626,13 @@
       if (!DN && dmenuOn() && tries++ < 60) mountNav();
     };
     setInterval(check, 1500);
+    // Başlık değiştiği anda (aynı karede) yakala: sayfa değişikliklerinde sadece birkaç özellik kontrol edilir,
+    // menü düşmüşse bir sonraki karede kontrol çalışır (ikas menüsü göz açıp kapayıncaya kadar bile görünmesin)
+    var raf = 0, lost = function () { return !DN ? dmenuOn() && tries < 60 : !DN.host.isConnected || !DN.nav.isConnected || DN.host.parentNode !== DN.nav || !DN.nav.hasAttribute('data-ua-nav'); };
+    if (window.MutationObserver && document.body) new MutationObserver(function () {
+      if (raf || !DM || !lost()) return;
+      raf = requestAnimationFrame(function () { raf = 0; check(); });
+    }).observe(document.body, { childList: true, subtree: true });
     var burst = function () {
       tries = 0;
       var n = 0;

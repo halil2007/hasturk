@@ -20,7 +20,8 @@ const state = () => p.evaluate(() => {
 });
 await p.goto(SITE + '/', { waitUntil: 'domcontentloaded', timeout: 90000 });
 await p.waitForTimeout(6000);
-log(`Başlangıç: ${JSON.stringify(await state())}`);
+const base = await state();
+log(`Başlangıç: ${JSON.stringify(base)} (başlıktaki logo/hesap gibi menü dışı bağlantılar: ${base.ikasGorunen})`);
 let bad = 0;
 for (let i = 0; i < 10; i++) {
   // Sırayla: bizim çubuktan kategori, sayfadaki bir ürün/kategori bağlantısı (ikas'ın kendi geçişi)
@@ -40,7 +41,8 @@ for (let i = 0; i < 10; i++) {
   if (!clicked) await p.goto(target);
   const row = [];
   for (const t of [300, 1500, 4000]) { await p.waitForTimeout(t - (row.length ? [300, 1500, 4000][row.length - 1] : 0)); row.push(await state()); }
-  const ok = row[2].biz && row[2].gizli && row[2].ikasGorunen === 0;
+  // Her ölçümde bizim menü yerinde ve ikas'ın kategori bağlantıları görünmüyor olmalı (başlangıçtaki sayıyı aşmamalı)
+  const ok = row.every((r) => r.biz && r.ikasGorunen <= base.ikasGorunen);
   if (!ok) bad++;
   log(`${i + 1}. ${path} → 0,3sn: ${row[0].biz ? 'bizim' : 'YOK'}/${row[0].ikasGorunen} ikas | 1,5sn: ${row[1].biz ? 'bizim' : 'YOK'}/${row[1].ikasGorunen} | 4sn: ${row[2].biz ? 'bizim' : 'YOK'}/${row[2].ikasGorunen} ${ok ? '✓' : '✗'}`);
 }
