@@ -30,7 +30,7 @@ const probe = () => p.evaluate(() => {
   const found = [], seen = new WeakSet();
   const methods = (o) => { const s = new Set(); for (let q = o; q && q !== Object.prototype; q = Object.getPrototypeOf(q)) Object.getOwnPropertyNames(q).forEach((k) => { try { if (typeof o[k] === 'function' && k !== 'constructor') s.add(k); } catch (e) {} }); return [...s]; };
   const look = (o, path, d) => {
-    if (!o || typeof o !== 'object' || d > 4 || seen.has(o)) return;
+    if (!o || typeof o !== 'object' || d > 1 || seen.has(o)) return;
     seen.add(o);
     let keys = []; try { keys = Object.keys(o); } catch (e) { return; }
     if (keys.includes('cartStore') || (keys.includes('cart') && methods(o).some((m) => /cart/i.test(m)))) {
@@ -39,7 +39,7 @@ const probe = () => p.evaluate(() => {
       return;
     }
     if (found.length > 3) return;
-    for (const k of keys.slice(0, 60)) { if (/^_react|^__react|^stateNode$|^return$|^child$|^sibling$|^alternate$/.test(k)) continue; try { look(o[k], path + '.' + k, d + 1); } catch (e) {} }
+    for (const k of keys.slice(0, 25)) { if (/^_react|^__react|^stateNode$|^return$|^child$|^sibling$|^alternate$/.test(k)) continue; try { look(o[k], path + '.' + k, d + 1); } catch (e) {} }
   };
   const glob = Object.keys(window).filter((k) => /ikas|store|cart|sepet/i.test(k));
   glob.forEach((k) => { try { look(window[k], 'window.' + k, 0); } catch (e) {} });
@@ -47,7 +47,8 @@ const probe = () => p.evaluate(() => {
   const ck = rootEl && Object.keys(rootEl).find((k) => k.startsWith('__reactContainer$'));
   let fiber = ck && rootEl[ck], n = 0;
   const stack = fiber ? [fiber] : [];
-  while (stack.length && n < 6000 && found.length < 3) {
+  const T0 = performance.now();
+  while (stack.length && n < 4000 && found.length < 3 && performance.now() - T0 < 8000) {
     const f = stack.pop(); n++;
     try { look(f.memoizedProps, 'fiber' + n + '(' + (f.type && (f.type.displayName || f.type.name) || typeof f.type) + ').props', 0); } catch (e) {}
     try { if (f.dependencies && f.dependencies.firstContext) look(f.dependencies.firstContext.memoizedValue, 'fiber' + n + '.context', 0); } catch (e) {}
