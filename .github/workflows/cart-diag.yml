@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: ['claude/**']
-    paths: ['scripts/cart-diag.mjs', '.github/workflows/cart-diag.yml', 'public/pm-search.js']
+    paths: ['scripts/cart-store.mjs', 'scripts/cart-diag.mjs', '.github/workflows/cart-diag.yml', 'public/pm-search.js']
 
 permissions:
   contents: read
@@ -20,7 +20,6 @@ jobs:
       matrix:
         include:
           - { site: 'https://tarim-dunyasi.com', product: '/sivi-solucan-gubresi-1-lt', mode: canli }
-          - { site: 'https://tarim-dunyasi.com', product: '/sivi-solucan-gubresi-1-lt', mode: yeni }
           - { site: 'https://hasturkgubre.com.tr', product: '/hasturk-sivi-solucan-gubresi', mode: canli }
     steps:
       - uses: actions/checkout@v5
@@ -30,7 +29,7 @@ jobs:
       - run: |
           npm i --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
-      - run: node scripts/cart-diag.mjs
+      - run: node scripts/cart-store.mjs
         env:
           SITE_URL: ${{ matrix.site }}
           PRODUCT: ${{ matrix.product }}
