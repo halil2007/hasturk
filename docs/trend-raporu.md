@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 250 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (214 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 250 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (227 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -14,7 +14,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 2 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×9,2 | 4 | evet |
 | 3 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×5,4 | 2 | evet |
 | 4 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
-| 5 | Guanokalong Yarasa Gübresi Toz | ×3,8 | 0 | evet |
+| 5 | Guanokalong Yarasa Gübresi Toz | ×4,5 | 0 | evet |
 | 6 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×3,8 | 1 | evet |
 | 7 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | ×2,1 | 2 | evet |
 | 8 | DSV Lippa Tamu 5 Mix Çim Tohumu | ×2,1 | 2 | evet |
@@ -104,9 +104,9 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | # | Ürün | Sepete ekleme | Görüntüleme |
 |---|---|---|---|
 | 1 | HasTürk Sıvı Solucan Gübresi  | 2 | 0,9 |
-| 2 | HasTürk Hümix Sıvı Hümik Asit | 1,9 | 12,9 |
+| 2 | HasTürk Hümix Sıvı Hümik Asit | 1,9 | 15,9 |
 | 3 | Çim Kapama Toprağı (Leonarditli Formül) | 1 | 0 |
-| 4 | Guanokalong Yarasa Gübresi Toz | 1 | 13 |
+| 4 | Guanokalong Yarasa Gübresi Toz | 1 | 18 |
 | 5 | Limon Ağacı Bakım Seti | 1 | 1 |
 | 6 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | 0,9 | 2 |
 
@@ -116,11 +116,11 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 | Ürün | Görüntüleme | Sepete ekleme | Oran |
 |---|---|---|---|
-| Chrysamed Subon Hijyen Sprey | 12 | 0 | %0 |
-| Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 12 | 0 | %0 |
-| Altınvadi Pembe Domates Tohumu 5 Gr | 11 | 0 | %0 |
-| Altınvadi Arapsaçı Marul Tohumu (Kıvırcık) | 11 | 0 | %0 |
-| Raco Tel Tırmık Küçük | 11 | 0 | %0 |
+| Chrysamed Subon Hijyen Sprey | 15 | 0 | %0 |
+| Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 15 | 0 | %0 |
+| Altınvadi Pembe Domates Tohumu 5 Gr | 12 | 0 | %0 |
+| Altınvadi Arapsaçı Marul Tohumu (Kıvırcık) | 12 | 0 | %0 |
+| Raco Tel Tırmık Küçük | 12 | 0 | %0 |
 
 ## Masaüstü menü önerileri (kategori başına ilk 3)
 
