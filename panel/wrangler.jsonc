@@ -1,0 +1,20 @@
+// Satış paneli: ayrı bir Cloudflare Worker (arama widget'ından bağımsız; biri bozulsa diğeri etkilenmez).
+// Cloudflare: Workers & Pages → Create → Import a repository → hasturk → "Root directory" (Kök dizin): panel
+// API anahtarları buraya YAZILMAZ: Cloudflare → bu Worker → Settings → Variables and Secrets (bkz. panel/README.md)
+{
+  "name": "hasturk-panel",
+  "compatibility_date": "2025-09-01",
+  "main": "src/index.js",
+  "assets": {
+    "directory": "./public",
+    // /api/* her zaman koda gider; diğer adresler panel dosyalarıdır
+    "run_worker_first": ["/api/*"]
+  },
+  // Panel veritabanı (sipariş, ürün, stok). Kimliği yazılmadığı için ilk yayında Cloudflare otomatik oluşturur.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "hasturk-panel" }
+  ],
+  // 10 dakikada bir: yeni siparişleri çek, stokları düş, tüm kanallara gönder
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "observability": { "enabled": true }
+}

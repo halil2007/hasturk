@@ -1,0 +1,92 @@
+// Veritabanı (Cloudflare D1 / SQLite). Tablolar ilk istekte kendiliğinden oluşur.
+
+const SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT UNIQUE, barcode TEXT, name TEXT NOT NULL, brand TEXT, category TEXT, description TEXT, image TEXT,
+    purchase_price REAL NOT NULL DEFAULT 0, sale_price REAL NOT NULL DEFAULT 0, vat REAL NOT NULL DEFAULT 20, desi REAL NOT NULL DEFAULT 1,
+    stock INTEGER NOT NULL DEFAULT 0, critical_stock INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  'CREATE INDEX IF NOT EXISTS products_barcode ON products(barcode)',
+  // Kanal ilanı: ikas varyantı / Trendyol barkodu / Hepsiburada SKU'su / PttAVM barkodu → panel ürünü
+  `CREATE TABLE IF NOT EXISTS listings (
+    channel TEXT NOT NULL, remote_id TEXT NOT NULL, product_id INTEGER, remote_product_id TEXT,
+    sku TEXT, barcode TEXT, name TEXT, image TEXT, price REAL, list_price REAL, remote_stock INTEGER,
+    pushed_stock INTEGER, price_dirty INTEGER NOT NULL DEFAULT 0, commission REAL, error TEXT, synced_at INTEGER,
+    PRIMARY KEY (channel, remote_id))`,
+  'CREATE INDEX IF NOT EXISTS listings_product ON listings(product_id)',
+  `CREATE TABLE IF NOT EXISTS orders (
+    id TEXT PRIMARY KEY, channel TEXT NOT NULL, remote_id TEXT NOT NULL, order_number TEXT,
+    status TEXT NOT NULL, remote_status TEXT, local_status TEXT, ordered_at INTEGER NOT NULL, updated_at INTEGER,
+    customer TEXT, phone TEXT, email TEXT, address TEXT, total REAL NOT NULL DEFAULT 0, currency TEXT,
+    cargo_company TEXT, tracking TEXT, shipping_cost REAL, note TEXT, extra TEXT, hash TEXT)`,
+  'CREATE INDEX IF NOT EXISTS orders_date ON orders(ordered_at)',
+  'CREATE INDEX IF NOT EXISTS orders_status ON orders(status, ordered_at)',
+  `CREATE TABLE IF NOT EXISTS order_items (
+    order_id TEXT NOT NULL, line_id TEXT NOT NULL, product_id INTEGER, sku TEXT, barcode TEXT, name TEXT, image TEXT,
+    quantity INTEGER NOT NULL, unit_price REAL NOT NULL DEFAULT 0, total REAL NOT NULL DEFAULT 0, status TEXT, remote_key TEXT,
+    PRIMARY KEY (order_id, line_id))`,
+  'CREATE INDEX IF NOT EXISTS order_items_product ON order_items(product_id)',
+  // Paket: siparişin bir kısmı (satır + adet), kendi kargo takip no'su ve etiketiyle
+  `CREATE TABLE IF NOT EXISTS packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, no INTEGER NOT NULL, remote_id TEXT,
+    items TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', remote_status TEXT, cargo_company TEXT, tracking TEXT, desi REAL,
+    created_at INTEGER NOT NULL, shipped_at INTEGER)`,
+  'CREATE INDEX IF NOT EXISTS packages_order ON packages(order_id)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS packages_remote ON packages(order_id, remote_id)',
+  // Siparişin stoktan düştüğü adet (ürün başına). Senkron her seferinde farkı uygular → çift düşüm olmaz.
+  `CREATE TABLE IF NOT EXISTS order_stock (order_id TEXT NOT NULL, product_id INTEGER NOT NULL, qty INTEGER NOT NULL, PRIMARY KEY (order_id, product_id))`,
+  `CREATE TABLE IF NOT EXISTS stock_moves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, delta INTEGER NOT NULL, stock_after INTEGER,
+    reason TEXT, ref TEXT, created_at INTEGER NOT NULL)`,
+  'CREATE INDEX IF NOT EXISTS stock_moves_product ON stock_moves(product_id, created_at)',
+  'CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)',
+  `CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, channel TEXT, level TEXT, msg TEXT)`,
+];
+
+const ready = new WeakMap();
+export function init(db) {
+  if (!ready.has(db)) ready.set(db, db.batch(SCHEMA.map((s) => db.prepare(s))).catch((e) => { ready.delete(db); throw e; }));
+  return ready.get(db);
+}
+
+export const all = async (db, sql, ...args) => (await db.prepare(sql).bind(...args).all()).results || [];
+export const first = (db, sql, ...args) => db.prepare(sql).bind(...args).first();
+export const run = (db, sql, ...args) => db.prepare(sql).bind(...args).run();
+
+// ---------- ayarlar ----------
+export const DEFAULT_SETTINGS = {
+  // Kanal başına varsayılan komisyon (%) ve sipariş başı kargo gideri (TL); ürün/ilan bazında değiştirilebilir
+  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12 },
+  shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
+  // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)
+  service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
+  // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
+  stock_sync: false,
+  stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)
+  restock_returns: false,   // iade gelen ürün stoğa geri eklensin mi
+  history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (istatistik için)
+  sender: { name: 'HasTürk', phone: '', address: '', city: '' },
+  cargo_companies: ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'PTT Kargo', 'Sürat Kargo', 'Trendyol Express', 'HepsiJet', 'Kolay Gelsin'],
+};
+
+export async function getSettings(db) {
+  const rows = await all(db, 'SELECT k, v FROM settings');
+  const out = structuredClone(DEFAULT_SETTINGS);
+  for (const r of rows) {
+    try {
+      const v = JSON.parse(r.v);
+      out[r.k] = v && typeof v === 'object' && !Array.isArray(v) && out[r.k] && typeof out[r.k] === 'object' && !Array.isArray(out[r.k]) ? { ...out[r.k], ...v } : v;
+    } catch { /* bozuk satır */ }
+  }
+  return out;
+}
+export const setSetting = (db, k, v) => run(db, 'INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v', k, JSON.stringify(v));
+export async function getRaw(db, k) { const r = await first(db, 'SELECT v FROM settings WHERE k = ?', k); return r ? JSON.parse(r.v) : null; }
+
+export async function log(db, channel, level, msg) {
+  try {
+    await run(db, 'INSERT INTO logs (at, channel, level, msg) VALUES (?, ?, ?, ?)', Date.now(), channel || null, level, String(msg).slice(0, 1000));
+    if (Math.random() < 0.05) await run(db, 'DELETE FROM logs WHERE at < ?', Date.now() - 30 * 864e5);
+  } catch { /* günlük yazılamazsa işi durdurma */ }
+}

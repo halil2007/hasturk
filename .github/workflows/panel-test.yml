@@ -1,0 +1,24 @@
+name: Satış paneli testleri
+
+on:
+  push:
+    paths: ['panel/**', '.github/workflows/panel-test.yml']
+  pull_request:
+    paths: ['panel/**']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: panel
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node --test

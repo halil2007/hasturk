@@ -1,0 +1,168 @@
+// Trendyol Marketplace API (apigw.trendyol.com/integration).
+// Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key, API Secret.
+import { http, basic, num, str, chunk } from '../util.js';
+
+const BASE = 'https://apigw.trendyol.com/integration';
+
+const STATUS = {
+  Awaiting: 'new', Created: 'new', Picking: 'processing', Invoiced: 'processing', Repack: 'processing', UnPacked: 'processing',
+  Shipped: 'shipped', AtCollectionPoint: 'shipped', UnDelivered: 'shipped', Delivered: 'delivered',
+  Cancelled: 'cancelled', UnSupplied: 'cancelled', Returned: 'returned',
+};
+const RANKS = ['new', 'processing', 'shipped', 'delivered'];
+
+export function trendyol(env, meta) {
+  const seller = env.TRENDYOL_SELLER_ID, key = env.TRENDYOL_API_KEY, secret = env.TRENDYOL_API_SECRET;
+  const headers = () => ({
+    Authorization: basic(key, secret),
+    'User-Agent': `${seller} - SelfIntegration`,
+    storeFrontCode: env.TRENDYOL_STOREFRONT || 'TR',
+    'Content-Type': 'application/json',
+  });
+  const call = (path, opts = {}) => http(BASE + path, { ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
+
+  // Trendyol her paketi ayrı kayıt olarak verir; aynı sipariş numarasındaki paketler tek siparişte toplanır
+  function group(pkgs) {
+    const byNo = new Map();
+    for (const p of pkgs) {
+      const no = String(p.orderNumber);
+      if (!byNo.has(no)) byNo.set(no, []);
+      byNo.get(no).push(p);
+    }
+    return [...byNo.values()].map((list) => {
+      const p0 = list[0], a = p0.shipmentAddress || {};
+      const items = [], seen = new Set();
+      for (const p of list) for (const l of p.lines || []) {
+        const id = String(l.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const unit = num(l.price ?? l.amount);
+        items.push({
+          lineId: id, sku: str(l.merchantSku || l.stockCode), barcode: str(l.barcode), name: str(l.productName), image: '',
+          quantity: num(l.quantity, 1), unitPrice: unit, total: unit * num(l.quantity, 1),
+          status: /Cancel|UnSupplied|Return/i.test(l.orderLineItemStatusName || '') || STATUS[p.status] === 'cancelled' ? 'cancelled' : '',
+          remoteKey: str(l.barcode),
+        });
+      }
+      const live = list.filter((p) => !['cancelled', 'returned'].includes(STATUS[p.status]));
+      let status;
+      if (!live.length) status = list.some((p) => STATUS[p.status] === 'returned') ? 'returned' : 'cancelled';
+      else status = RANKS[Math.min(...live.map((p) => Math.max(0, RANKS.indexOf(STATUS[p.status] || 'new'))))];
+      const tracked = list.find((p) => p.cargoTrackingNumber) || {};
+      return {
+        remoteId: String(p0.orderNumber), orderNumber: String(p0.orderNumber), orderedAt: num(p0.orderDate) || Date.now(),
+        remoteStatus: list.map((p) => p.status).join(', '), status,
+        customer: [p0.customerFirstName, p0.customerLastName].filter(Boolean).join(' ') || str(a.fullName), phone: str(a.phone), email: str(p0.customerEmail),
+        address: { name: str(a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' ')), line: str(a.fullAddress || [a.address1, a.address2].filter(Boolean).join(' ')), district: str(a.district), city: str(a.city), phone: str(a.phone) },
+        total: list.reduce((s, p) => s + num(p.totalPrice ?? p.grossAmount), 0), currency: p0.currencyCode || 'TRY',
+        cargoCompany: str(tracked.cargoProviderName || p0.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),
+        awaitingPayment: list.every((p) => p.status === 'Awaiting'),
+        items,
+        packages: list.map((p) => ({
+          remoteId: String(p.id || p.shipmentPackageId),
+          items: (p.lines || []).map((l) => ({ line_id: String(l.id), qty: num(l.quantity, 1) })),
+          status: ['shipped', 'delivered'].includes(STATUS[p.status]) ? 'shipped' : STATUS[p.status] === 'cancelled' ? 'cancelled' : 'open',
+          cargoCompany: str(p.cargoProviderName), tracking: str(p.cargoTrackingNumber),
+          remoteStatus: p.status,
+        })),
+      };
+    });
+  }
+
+  async function fetchOrders(since, until) {
+    // Trendyol en fazla 2 haftalık aralık kabul eder; daha eskiyse 2 haftalık dilimlerle çekilir
+    const W = 14 * 864e5 - 60e3, pkgs = [];
+    for (let to = until; to > since; to -= W) {
+      const from = Math.max(since, to - W);
+      for (let page = 0; page < 50; page++) {
+        const r = await call(`/order/sellers/${seller}/orders?startDate=${from}&endDate=${to}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`);
+        pkgs.push(...(r.content || []));
+        if (page + 1 >= (r.totalPages || 1)) break;
+      }
+    }
+    return group(pkgs);
+  }
+
+  async function fetchListings() {
+    const out = [];
+    for (let page = 0; page < 200; page++) {
+      const r = await call(`/product/sellers/${seller}/products?page=${page}&size=100`);
+      for (const p of r.content || []) {
+        out.push({
+          remoteId: str(p.barcode), remoteProductId: str(p.productMainId || p.id), sku: str(p.stockCode), barcode: str(p.barcode), name: str(p.title),
+          image: str(((p.images || [])[0] || {}).url), price: num(p.salePrice), listPrice: num(p.listPrice), stock: num(p.quantity),
+        });
+      }
+      if (page + 1 >= (r.totalPages || 1)) break;
+    }
+    return out;
+  }
+
+  async function pushStock(items) {
+    for (const part of chunk(items, 1000)) {
+      await call(`/inventory/sellers/${seller}/products/price-and-inventory`, { method: 'POST', body: { items: part.map((x) => ({ barcode: x.remoteId, quantity: x.stock })) } });
+    }
+  }
+  async function pushPrice(items) {
+    for (const part of chunk(items, 1000)) {
+      await call(`/inventory/sellers/${seller}/products/price-and-inventory`, {
+        method: 'POST', body: { items: part.map((x) => ({ barcode: x.remoteId, salePrice: x.price, listPrice: Math.max(x.listPrice || 0, x.price) })) },
+      });
+    }
+  }
+
+  const openPkgs = (order) => order.packages.filter((p) => p.remote_id && p.status === 'open');
+  const linesOf = (pkg) => pkg.items.map((x) => ({ lineId: Number(x.line_id), quantity: x.qty }));
+
+  // İşleme al = paketleri "Picking" (hazırlanıyor) yap; müşteri siparişin hazırlandığını görür
+  async function accept(order) {
+    for (const p of openPkgs(order)) {
+      if (p.remote_status && p.remote_status !== 'Created') continue;
+      await call(`/order/sellers/${seller}/shipment-packages/${p.remote_id}`, { method: 'PUT', body: { lines: linesOf(p), params: {}, status: 'Picking' } });
+    }
+  }
+
+  // Paket bölme: Trendyol yeni paketleri birkaç dakika içinde oluşturur (bir sonraki senkronda panelde görünür)
+  async function split(order, groups) {
+    const src = openPkgs(order);
+    if (src.length !== 1) throw new Error('Trendyol\'da sadece tek paketli, henüz kargolanmamış sipariş bölünebilir');
+    await call(`/order/sellers/${seller}/shipment-packages/${src[0].remote_id}/split-packages`, {
+      method: 'POST',
+      body: { splitPackages: groups.map((g) => ({ packageDetails: g.items.map((x) => ({ orderLineId: Number(x.line_id), quantities: x.qty })) })) },
+    });
+    return { async: true, message: 'Bölme isteği Trendyol\'a gönderildi. Yeni paketler birkaç dakika içinde oluşur ve senkronla panele gelir.' };
+  }
+
+  async function ship(order, pkg, { tracking, invoiceNumber }) {
+    if (!pkg.remote_id) throw new Error('Paket Trendyol\'da henüz oluşmadı; senkronu bekleyin');
+    if (invoiceNumber) {
+      await call(`/order/sellers/${seller}/shipment-packages/${pkg.remote_id}`, { method: 'PUT', body: { lines: linesOf(pkg), params: { invoiceNumber }, status: 'Invoiced' } });
+    }
+    // Kendi kargo anlaşmanızla gönderiyorsanız takip no Trendyol'a bildirilir; Trendyol'un anlaşmalı kargosunda zaten vardır
+    if (tracking && tracking !== pkg.tracking) {
+      await call(`/order/sellers/${seller}/shipment-packages/${pkg.remote_id}/update-tracking-number`, { method: 'PUT', body: { trackingNumber: tracking } });
+    }
+    return {};
+  }
+
+  // Ortak etiket (Trendyol Express / Aras): ZPL. Önce Picking/Invoiced bildirimi yapılmış olmalı.
+  async function label(order, pkg) {
+    const tn = pkg.tracking || order.tracking;
+    if (!tn) return null;
+    try {
+      await call(`/sellers/${seller}/common-label/${encodeURIComponent(tn)}`, { method: 'POST', body: { format: 'ZPL', boxQuantity: 1 } });
+    } catch (e) {
+      if (!/exist|already|mevcut|zaten/i.test(e.message)) throw e;
+    }
+    const r = await call(`/sellers/${seller}/common-label/query?id=${encodeURIComponent(tn)}`);
+    const zpl = ((r && r.data) || []).map((x) => x.label).filter(Boolean).join('\n');
+    return zpl ? { format: 'zpl', data: zpl, filename: `trendyol-${tn}.zpl` } : null;
+  }
+
+  const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
+  return {
+    ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
+    caps: { accept: 'remote', split: 'remote-async', ship: 'remote', label: 'zpl', createProduct: false, price: true },
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label,
+  };
+}
