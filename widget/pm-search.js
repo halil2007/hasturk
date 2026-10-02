@@ -929,7 +929,10 @@
       '<div class="sheet"></div><div class="toast"></div></div></div>' +
       '</div></div></div>';
     document.body.appendChild(host);
-    host.style.fontFamily = getComputedStyle(document.body).fontFamily;
+    var setFont = function () { host.style.fontFamily = getComputedStyle(document.body).fontFamily; };
+    setFont();
+    // Erken kurulumda sitenin CSS'i henüz inmemiş olabilir: yazı tipi sayfa yüklenince tekrar alınır
+    if (document.readyState !== 'complete') window.addEventListener('load', setFont);
     $wrap = root.querySelector('.root');
     $fab = root.querySelector('.fab');
     $ov = root.querySelector('.ov');
@@ -3599,10 +3602,9 @@
     if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) { e.preventDefault(); open(); }
   });
 
-  // Açılış: sayfanın tüm görsellerinin (banner'lar) inmesi BEKLENMEZ. HTML hazır olur olmaz, tarayıcı boşa çıkınca
-  // (en geç ~0,8 sn) "Ürün Bul" butonu kurulur. Ürün verisi müşteri sayfaya ilk dokunduğunda / kaydırdığında ya da
-  // en geç ~3 sn sonra boşta iner (panel daha önce açılırsa hemen iner). Böylece reklamdan gelen müşteri beklemez,
-  // banner'lar da yavaşlamaz.
+  // Açılış: "Ürün Bul" butonu sayfanın gövdesi oluşur oluşmaz kurulur (birkaç ms; ikas'ın betiklerinin ve banner'ların
+  // bitmesi beklenmez — canlı sitede telefonda HTML hazır olması ~7 sn sürüyor). Menü verisi (~5 KB) hemen iner.
+  // Ürün verisi sayfa tamamen yüklendikten sonra boşta iner (panel daha önce açılırsa hemen iner).
   function prefetch(why) {
     if (prefetch.done) return;
     prefetch.done = true;
@@ -3611,13 +3613,17 @@
   function boot() {
     if (boot.done) return;
     boot.done = true;
-    idle(function () { build(); loadLite(); }, 800);
+    build(); loadLite();
     // Ürün verisi (300 KB) sayfa kaydırılırken değil: sayfa tamamen yüklendikten sonra boşta iner;
     // müşteri Ürün Bul'a / menüye dokunursa hemen iner
     var later = function () { setTimeout(function () { idle(function () { prefetch('idle'); }, 4000); }, 1500); };
     if (document.readyState === 'complete') later(); else window.addEventListener('load', later);
   }
-  if (document.readyState !== 'loading') boot(); else document.addEventListener('DOMContentLoaded', boot);
+  if (document.body) boot();
+  else {
+    document.addEventListener('DOMContentLoaded', boot);
+    (function waitBody() { if (document.body) boot(); else if (!boot.done) setTimeout(waitBody, 50); })();
+  }
 
   // Menüye "#hacim-hesapla" veya "#urun-ara" bağlantısı eklenerek açılabilir
   function fromHash() {

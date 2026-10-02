@@ -58,8 +58,8 @@ async function run(browser, prof, mode, liveTag) {
     try { const s = await r.sizes(); const t = r.timing(); res.push({ url: r.url(), type: r.resourceType(), kb: (s.responseBodySize + s.responseHeadersSize) / 1024, end: t.responseEnd }); } catch (e) {}
   });
   // Eski widget sürümleri (git'ten çıkarılmış dosya) canlı sitede denenir: "önceden kasmıyordu" karşılaştırması
-  if (mode.startsWith('eski-')) {
-    const body = readFileSync(`/tmp/widget-${mode.slice(5)}.js`, 'utf8');
+  if (mode.startsWith('eski-') || mode === 'yeni') {
+    const body = readFileSync(`/tmp/widget-${mode === 'yeni' ? 'HEAD' : mode.slice(5)}.js`, 'utf8');
     await page.route(u => u.hostname === WIDGET_HOST && u.pathname === '/pm-search.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body }));
   }
   if (mode === 'widgetsiz') await page.route(u => u.hostname === WIDGET_HOST, r => r.abort());

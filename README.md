@@ -137,7 +137,7 @@ Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collec
 
 ## Hız
 Ölçüm düzeneği: yavaş 4G (1,6 Mbps, 150 ms) + 4 kat yavaş işlemci, banner'lı ağır ana sayfa, Next.js benzeri ürün sayfası.
-- **Açılış**: Ürün Bul butonu sayfanın tüm görsellerini (banner'lar) beklemeden, HTML hazır olunca (boşta, en geç ~0,8 sn) kurulur. Menü verisi (`menu.json`, ~5 KB) hemen; ürün verisi (`products.json`) sayfa tamamen yüklendikten sonra boşta (kaydırma sırasında değil) ya da müşteri Ürün Bul'a / menüye dokunduğu an iner. Müşteri o sırada panel/menü açarsa yüksek öncelikli ikinci indirme başlar, hangisi önce biterse o kullanılır. Panel kapalıyken veri hazırlığı tarayıcı boşa çıkınca yapılır.
+- **Açılış**: Ürün Bul butonu sayfanın gövdesi oluşur oluşmaz kurulur (birkaç ms); ikas'ın betiklerinin ve banner'ların bitmesi beklenmez (canlı sitede telefonda HTML'in hazır olması ~7 sn sürüyor). Menü verisi (`menu.json`, ~5 KB) hemen; ürün verisi (`products.json`) sayfa tamamen yüklendikten sonra boşta (kaydırma sırasında değil) ya da müşteri Ürün Bul'a / menüye dokunduğu an iner. Müşteri o sırada panel/menü açarsa yüksek öncelikli ikinci indirme başlar, hangisi önce biterse o kullanılır. Panel kapalıyken veri hazırlığı tarayıcı boşa çıkınca yapılır.
 - **Görseller**: arama sonuçlarının ilk 4 görseli öncelikli, diğerleri kaydırınca iner; yavaş bağlantıda / veri tasarrufunda 180 px boyut. Görsel tamamen inene kadar sade yer tutucu (yarım çizim görünmez).
 - **Sepete ekleme**: ürün sayfası gizli çerçevede açılır; tüm görselleri beklenmeden "Sepete ekle" butonu çalışır olunca basılır (erken basış site tarafından işlenmezse sayfa yüklenince bir kez daha; istek başlamışsa asla ikinci kez basılmaz). İlk başarılı eklemeden sonra çerçeve sıcak kalır; sonraki eklemelerde sitenin yönlendiricisiyle yenilemesiz geçilir (~1 sn). Basmadan önce çerçevedeki sayfanın doğru ürün olduğu doğrulanır. Panel kapanınca sıcak çerçeve 10 sn içinde kaldırılır (arkada site uygulaması çalışmasın). Sonuçlardayken ilk ürünü önceden hazırlama varsayılan kapalı (gerçek ürün sayfası arkada çalışırken kaydırma takılabiliyor); `cart.prewarm: true` açar. `cart.warm: false` sıcak çerçeveyi kapatır. Başarı her zaman sitenin sepet cevabıyla kanıtlanır.
 - **Sayfa geçişi**: panelden ve masaüstü menüden ürün/kategori sayfalarına sitenin Next.js yönlendiricisiyle yenilemesiz geçilir (sitenin kendi linkleri gibi); parmak değince / fare gelince sayfanın kodu önceden iner. Yönlendirici yoksa, hata verirse ya da 8 sn'de bitmezse normal geçiş. Sepet/ödeme/hesap sayfalarına her zaman normal geçilir. Panel açıkken geri tuşu sadece paneli kapatır (sayfa yenilenmez/yukarı kaymaz). `"spaNav": false` kapatır.
@@ -151,3 +151,7 @@ Kaynak `widget/pm-search.js`'dir (ES5, eski telefonlar için). Değişiklikten s
 
 ## Maliyet
 GitHub Actions (özel depo: ayda 2000 dk ücretsiz, bu iş ~360 dk kullanır) + Cloudflare Pages (statik dosya istekleri sınırsız) = **0 TL**.
+
+## Canlı site hız ölçümü
+
+`.github/workflows/site-speed.yml` canlı siteyi telefon (4x yavaş işlemci, 4G) ve bilgisayar koşullarında açar; widget açık / kapalı / daldaki yeni sürüm ile karşılaştırır, reCAPTCHA vb. ağır dosyaları ve kimin yüklediğini listeler. Actions > "Canlı site hız ölçümü" > Run workflow; sonuç işin özet sayfasında.
