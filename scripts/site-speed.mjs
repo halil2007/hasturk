@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import { appendFileSync } from 'node:fs';
 
 const SITE = process.env.SITE || 'https://hasturkgubre.com.tr/';
-const RUNS = +(process.env.RUNS || 3);
+const RUNS = +(process.env.RUNS || 5);
 const WIDGET_HOST = 'hasturk-arama.halilc2007.workers.dev';
 const TAG_RE = /<script[^>]*pm-search\.js[^>]*><\/script>/i;
 
@@ -22,7 +22,7 @@ const PROFILES = {
 const INIT = () => {
   window.__m = { lcp: 0, fcp: 0, lt: [], fab: 0 };
   try {
-    new PerformanceObserver(l => l.getEntries().forEach(e => { window.__m.lcp = e.startTime; })).observe({ type: 'largest-contentful-paint', buffered: true });
+    new PerformanceObserver(l => l.getEntries().forEach(e => { window.__m.lcp = e.startTime; const el = e.element; window.__m.lcpEl = el ? (el.tagName + (el.id ? '#' + el.id : '') + ' ' + (e.url || '').slice(-70)) : (e.url || '').slice(-70); })).observe({ type: 'largest-contentful-paint', buffered: true });
     new PerformanceObserver(l => l.getEntries().forEach(e => { if (e.name === 'first-contentful-paint') window.__m.fcp = e.startTime; })).observe({ type: 'paint', buffered: true });
     new PerformanceObserver(l => l.getEntries().forEach(e => {
       const a = (e.attribution && e.attribution[0]) || {};
@@ -46,7 +46,14 @@ async function run(browser, prof, mode, liveTag) {
   if (prof.cpu > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: prof.cpu });
   await page.addInitScript(INIT);
 
-  const res = [];
+  const res = [], who = {};
+  cdp.on('Network.requestWillBeSent', e => {
+    if (!/recaptcha|gtag\/js|gtm\.js|font-awesome|hasturk-arama/.test(e.request.url)) return;
+    const st = e.initiator && e.initiator.stack; let f = st && st.callFrames && st.callFrames[0];
+    for (let p = st; !f && p && p.parent; p = p.parent) f = p.parent.callFrames && p.parent.callFrames[0];
+    const k = e.request.url.split('?')[0].slice(-60) + '  <=  ' + (f ? f.url.split('?')[0].slice(-70) : e.initiator.type + (e.initiator.url ? ' ' + e.initiator.url.slice(-50) : ''));
+    who[k] = (who[k] || 0) + 1;
+  });
   page.on('requestfinished', async r => {
     try { const s = await r.sizes(); const t = r.timing(); res.push({ url: r.url(), type: r.resourceType(), kb: (s.responseBodySize + s.responseHeadersSize) / 1024, end: t.responseEnd }); } catch (e) {}
   });
@@ -70,7 +77,7 @@ async function run(browser, prof, mode, liveTag) {
   await ctx.close();
   const after = m.lt.filter(x => x.s > m.fcp);
   return {
-    mode, ttfb: m.ttfb, fcp: m.fcp, lcp: m.lcp, dcl: m.dcl, load: m.load, fab: m.fab, loadWall,
+    mode, who, lcpEl: m.lcpEl, ttfb: m.ttfb, fcp: m.fcp, lcp: m.lcp, dcl: m.dcl, load: m.load, fab: m.fab, loadWall,
     tbt: after.reduce((a, x) => a + Math.max(0, x.d - 50), 0), longest: Math.max(0, ...m.lt.map(x => x.d)),
     kb: res.reduce((a, r) => a + r.kb, 0), n: res.length,
     widgetKb: res.filter(r => r.url.includes(WIDGET_HOST)).reduce((a, r) => a + r.kb, 0),
@@ -109,7 +116,9 @@ for (const [name, prof] of Object.entries(PROFILES)) {
   line('İndirilen toplam', r => r.kb, v => Math.round(v) + ' KB');
   line('İstek sayısı', r => r.n, v => String(v));
   line('Widget payı', r => r.widgetKb, v => Math.round(v) + ' KB');
+  for (const mode of modes) out += `\n${mode} LCP her ölçüm: ${rows[mode].map(r => sec(r.lcp) + ' [' + r.lcpEl + ']').join(' ; ')}\n`;
   const sample = rows.widgetli[0];
+  if (sample) { out += `\n<details><summary>Ağır betikleri kim yüklüyor (${name})</summary>\n\n| adet | dosya <= yükleyen |\n|---|---|\n`; Object.entries(sample.who).forEach(([k, v]) => { out += `| ${v} | ${k.replace(/\|/g, '/')} |\n`; }); out += `\n</details>\n`; }
   if (sample) {
     out += `\n<details><summary>En büyük 12 dosya (${name}, widgetli)</summary>\n\n| KB | tür | adres |\n|---|---|---|\n`;
     sample.big.forEach(r => { out += `| ${Math.round(r.kb)} | ${r.type} | ${r.url.slice(0, 140)} |\n`; });
