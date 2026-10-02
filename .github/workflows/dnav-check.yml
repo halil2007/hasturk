@@ -1,0 +1,34 @@
+name: Masaüstü menü gezinme testi
+
+# Canlı sitelerde kategoriler/ürünler arasında gezinirken masaüstü menüsünün yerinde kaldığını kontrol eder
+# (yayındaki ve daldaki widget). Sonuç işin özet sayfasında.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/dnav-nav.mjs', '.github/workflows/dnav-check.yml', 'public/pm-search.js']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ['https://hasturkgubre.com.tr', 'https://tarim-dunyasi.com']
+        mode: [canli, yeni]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - run: node scripts/dnav-nav.mjs
+        env:
+          SITE_URL: ${{ matrix.site }}
+          MODE: ${{ matrix.mode }}
