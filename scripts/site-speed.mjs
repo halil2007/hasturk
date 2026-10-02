@@ -58,6 +58,12 @@ async function run(browser, prof, mode, liveTag) {
     try { const s = await r.sizes(); const t = r.timing(); res.push({ url: r.url(), type: r.resourceType(), kb: (s.responseBodySize + s.responseHeadersSize) / 1024, end: t.responseEnd }); } catch (e) {}
   });
   if (mode === 'widgetsiz') await page.route(u => u.hostname === WIDGET_HOST, r => r.abort());
+  // Ne kazanılır: reCAPTCHA olmadan / reCAPTCHA + Font Awesome + çift Google Analytics olmadan
+  if (mode === 'recaptchasiz' || mode === 'temiz') await page.route(u => /recaptcha/.test(u.href), r => r.abort());
+  if (mode === 'temiz') {
+    await page.route(u => /font-awesome/.test(u.href), r => r.abort());
+    await page.route(u => /gtag\/js/.test(u.href) && /cx=c/.test(u.search), r => r.abort());
+  }
   if (mode === 'async') {
     await page.route(u => u.href === SITE, async r => {
       const resp = await r.fetch();
@@ -91,7 +97,7 @@ const sec = v => (v / 1000).toFixed(2) + ' sn';
 const browser = await chromium.launch();
 const html = await (await fetch(SITE)).text();
 const liveTag = (html.match(TAG_RE) || ['(etiket bulunamadı)'])[0];
-const modes = ['widgetli', 'widgetsiz'];
+const modes = (process.env.MODES || 'widgetli,widgetsiz,recaptchasiz,temiz').split(',');
 if (!/\basync\b/.test(liveTag) && TAG_RE.test(html)) modes.push('async');
 
 let out = `# Canlı site hız ölçümü\n\nSite: ${SITE}  \nSitedeki etiket: \`${liveTag.replace(/`/g, '')}\`  \nHer ölçüm ${RUNS} kez, ortanca değer (önbelleksiz, ilk ziyaret).\n`;
