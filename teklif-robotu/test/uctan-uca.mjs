@@ -13,7 +13,7 @@ const gecici = fs.mkdtempSync(path.join(os.tmpdir(), 'teklif-test-'));
 process.env.TEKLIF_PORT = String(PORT);
 process.env.TEKLIF_PROFIL = path.join(gecici, 'profil-motor');
 
-const { KOK, ayarlariOku, tcGecerliMi, tutarCevir, veriHazirla } = await import('../yardimci.mjs');
+const { KOK, ayarlariOku, aracDuzelt, aracOzet, tcGecerliMi, tutarCevir, veriHazirla } = await import('../yardimci.mjs');
 const { Motor } = await import('../motor.mjs');
 const { donustur } = await import('../kaydet.mjs');
 
@@ -36,6 +36,14 @@ await dene('veri hazırlama', () => {
   assert.deepEqual([v.plaka, v.plakaIl, v.plakaHarf, v.plakaNo], ['34ABC123', '34', 'ABC', '123']);
   assert.equal(v.dogumTarihi, '01.02.1985');
   assert.equal(v.dogumTarihiISO, '1985-02-01');
+});
+await dene('araç bilgisi düzeltme ve özet', () => {
+  const a = aracDuzelt({ marka: ' renault ', modelYili: 'Model 2018 ', koltuk: '5 kişi', saseNo: 'nm 123 abc' });
+  assert.equal(a.marka, 'renault');
+  assert.equal(a.modelYili, '2018');
+  assert.equal(a.koltuk, '5');
+  assert.equal(a.saseNo, 'NM123ABC');
+  assert.equal(aracOzet({ marka: 'RENAULT', model: 'CLIO', modelYili: '2018', koltuk: '5' }), 'RENAULT CLIO 2018 · 5 koltuk');
 });
 await dene('kayıt dönüştürücü (şifre satırı atılır, örnekler veriye bağlanır)', () => {
   const kayit = `const { chromium } = require('playwright');
@@ -75,15 +83,17 @@ try {
   console.log('Motor (iki demo portal)');
   const motor = new Motor({ ...ayarlariOku(), gizli: false, esZamanli: 2, girisBeklemeDk: 1 });
   const girisler = [];
-  motor.on('durum', async d => {
-    if (d.durum !== 'giris-bekleniyor') return;
-    girisler.push(d.kod);
-    const p = motor.sekmeler.get(d.kod);
-    if (d.kod === 'demo-a') { await p.fill('input[name=kullanici]', 'acente'); await p.fill('input[type=password]', 'x'); await p.click('text=Giriş'); }
-    if (d.kod === 'demo-b') { await p.fill('#ep', 'a@b'); await p.fill('#pw', 'x'); await p.click('#girisYap'); }
-  });
+  const girisYap = async kod => {
+    girisler.push(kod);
+    const p = motor.sekmeler.get(kod);
+    if (kod === 'demo-a') { await p.fill('input[name=kullanici]', 'acente'); await p.fill('input[type=password]', 'x'); await p.click('text=Giriş'); }
+    if (kod === 'demo-b') { await p.fill('#ep', 'a@b'); await p.fill('#pw', 'x'); await p.click('#girisYap'); }
+  };
+  motor.on('durum', d => d.durum === 'giris-bekleniyor' && girisYap(d.kod));
+  let egmSonuc = null;
+  motor.on('egm', d => { if (d.durum === 'giris-bekleniyor') girisYap(d.kod); if (d.durum === 'tamam') egmSonuc = d; });
   const veri = veriHazirla({ tc: '10000000146', dogumTarihi: '01.02.1985', plaka: '34ABC123', belgeSeri: 'AB', belgeNo: '123456' });
-  const sirketler = [{ kod: 'demo-a', ad: 'A' }, { kod: 'demo-b', ad: 'B' }];
+  const sirketler = [{ kod: 'demo-a', ad: 'A', egm: true }, { kod: 'demo-b', ad: 'B' }];
 
   const kontrol = sonuclar => {
     const a = sonuclar.find(s => s.kod === 'demo-a');
@@ -96,9 +106,14 @@ try {
     return [a.fiyat, b.fiyat];
   };
   let ilk;
-  await dene('ilk sorgu: giriş beklenir, iki şirketten fiyat gelir', async () => {
+  await dene('ilk sorgu: EGM araç bilgisi gelir, tüm şirketlere aktarılır', async () => {
     ilk = kontrol(await motor.teklifTopla(veri, sirketler));
     assert.deepEqual(girisler.sort(), ['demo-a', 'demo-b']);
+    assert.ok(egmSonuc?.arac?.marka && egmSonuc.arac.model, 'EGM marka/model: ' + JSON.stringify(egmSonuc));
+    assert.equal(egmSonuc.arac.modelYili.length, 4, 'model yılı 4 hane');
+    assert.equal(egmSonuc.arac.koltuk, '5');
+    assert.ok(/^NM/.test(egmSonuc.arac.saseNo), 'şase no');
+    assert.deepEqual(veri.arac, egmSonuc.arac, 'araç bilgisi tüm şirketlere aktarıldı');
   });
   await dene('ikinci sorgu: oturum korunur, tekrar giriş istenmez', async () => {
     girisler.length = 0;

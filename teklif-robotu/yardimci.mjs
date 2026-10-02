@@ -82,7 +82,28 @@ export function veriHazirla(girdi) {
     veri.dogumTarihi = `${g.padStart(2, '0')}.${a.padStart(2, '0')}.${y}`;
     veri.dogumTarihiISO = `${y}-${a.padStart(2, '0')}-${g.padStart(2, '0')}`;
   }
+  // EGM sorgusundan gelen araç bilgisi buraya yazılır; tüm şirketler okur.
+  veri.arac = {};
   return veri;
+}
+
+// EGM sorgusunun döndürdüğü araç alanlarını tek biçime getirir.
+export function aracDuzelt(ham) {
+  const temiz = s => String(s ?? '').trim();
+  const arac = {};
+  for (const [k, v] of Object.entries(ham || {})) arac[k] = temiz(v);
+  if (arac.modelYili) arac.modelYili = (arac.modelYili.match(/\d{4}/) || [''])[0];
+  if (arac.koltuk) arac.koltuk = (arac.koltuk.match(/\d+/) || [''])[0];
+  for (const k of ['saseNo', 'motorNo']) if (arac[k]) arac[k] = arac[k].toLocaleUpperCase('tr').replace(/\s/g, '');
+  return arac;
+}
+
+// Araç bilgisini kısa, okunur bir satıra çevirir (arayüz başlığı için).
+export function aracOzet(arac) {
+  if (!arac) return '';
+  const p = [arac.marka, arac.model, arac.modelYili].filter(Boolean).join(' ');
+  const k = arac.koltuk ? `${arac.koltuk} koltuk` : '';
+  return [p, arac.kullanimTarzi, k].filter(Boolean).join(' · ');
 }
 
 export function veriKontrol(veri) {

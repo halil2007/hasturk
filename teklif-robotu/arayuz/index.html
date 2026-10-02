@@ -56,6 +56,14 @@
   .bos { color: var(--soluk); padding: 30px 0; text-align: center; }
   .tablo-kap { overflow-x: auto; }
   .ozet { color: var(--soluk); font-size: 13px; margin-bottom: 8px; min-height: 1.4em; }
+  .egm { margin-bottom: 10px; font-size: 13px; }
+  .egm:empty { display: none; }
+  .egm .kutu { border: 1px solid var(--cizgi); border-radius: 8px; padding: 10px 12px; background: var(--zemin); }
+  .egm .baslik { font-weight: 600; margin-bottom: 4px; }
+  .egm.tamam .kutu { background: var(--iyi-zemin); border-color: var(--iyi); }
+  .egm.hata .kutu, .egm.atlandi .kutu { background: var(--uyari-zemin); border-color: var(--uyari); color: var(--uyari); }
+  .egm dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+  .egm dt { color: var(--soluk); } .egm dd { margin: 0; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -86,6 +94,7 @@
   </section>
   <section>
     <h2>Sonuçlar</h2>
+    <div class="egm" id="egm"></div>
     <div class="ozet" id="ozet"></div>
     <div class="tablo-kap">
       <table>
@@ -161,10 +170,24 @@ function ciz() {
   $('#ozet').textContent = satirlar.length ? `${biten} / ${satirlar.length} şirket tamamlandı` + (fiyatli.length ? ` · en uygun: ${fiyatli[0].ad} ${tl(fiyatli[0].fiyat)}` : '') : '';
 }
 
+const EGM_DURUM = {
+  basladi: 'EGM sorgusu başlıyor…', 'giris-bekleniyor': 'EGM için giriş bekleniyor — tarayıcıda giriş yapın',
+  calisiyor: 'EGM sorgulanıyor…', tamam: 'Araç bilgisi', hata: 'EGM sorgusu yapılamadı', atlandi: 'EGM atlandı',
+};
+const ARAC_ETIKET = { marka: 'Marka', model: 'Model', modelYili: 'Model yılı', kullanimTarzi: 'Kullanım tarzı', koltuk: 'Koltuk', motorNo: 'Motor no', saseNo: 'Şase no' };
+function egmCiz(e) {
+  if (!e) { $('#egm').className = 'egm'; $('#egm').innerHTML = ''; return; }
+  $('#egm').className = 'egm ' + e.durum;
+  const baslik = `${EGM_DURUM[e.durum] || e.durum}${e.ad ? ' — ' + kacis(e.ad) : ''}`;
+  const alanlar = e.arac ? Object.entries(ARAC_ETIKET).filter(([k]) => e.arac[k]).map(([k, et]) => `<dt>${et}</dt><dd>${kacis(e.arac[k])}</dd>`).join('') : '';
+  $('#egm').innerHTML = `<div class="kutu"><div class="baslik">${baslik}</div>${alanlar ? `<dl>${alanlar}</dl>` : ''}${e.hata ? `<div class="ayrinti">${kacis(e.hata)}</div>` : ''}${e.not ? `<div class="ayrinti">${kacis(e.not)}</div>` : ''}</div>`;
+}
+
 function baslat(v) {
   durumlar = {};
   siralama = v.sirketler.map(s => s.kod);
   for (const s of v.sirketler) durumlar[s.kod] = { ...s, durum: 'basladi' };
+  egmCiz(v.egm);
   ciz();
 }
 
@@ -175,6 +198,7 @@ olaylar.addEventListener('merhaba', e => {
   if (sonDurum) { baslat(sonDurum); Object.assign(durumlar, sonDurum.durumlar); ciz(); }
 });
 olaylar.addEventListener('basladi', e => { $('#gonder').disabled = true; baslat(JSON.parse(e.data)); });
+olaylar.addEventListener('egm', e => egmCiz(JSON.parse(e.data)));
 olaylar.addEventListener('durum', e => { const d = JSON.parse(e.data); durumlar[d.kod] = d; ciz(); });
 olaylar.addEventListener('bitti', () => { $('#gonder').disabled = false; });
 olaylar.addEventListener('hata', e => { $('#uyari').textContent = JSON.parse(e.data).hata; });

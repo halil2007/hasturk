@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ADAPTORLER, KOK, fiyatBul, girisSayfasiMi, tarayiciAc } from './yardimci.mjs';
+import { ADAPTORLER, KOK, aracDuzelt, aracOzet, fiyatBul, girisSayfasiMi, tarayiciAc } from './yardimci.mjs';
 
 export class Motor extends EventEmitter {
   constructor(ayar) {
@@ -65,13 +65,14 @@ export class Motor extends EventEmitter {
     this.emit('basladi', { sirketler: sirketler.map(s => ({ kod: s.kod, ad: s.ad })), klasor: path.relative(KOK, klasor) });
     try {
       await this.tarayici();
+      await this.egmAsamasi(veri, sirketler, klasor);
       const kuyruk = [...sirketler];
       const isci = async () => {
         while (kuyruk.length) sonuclar.push(await this.tekSirket(kuyruk.shift(), veri, klasor));
       };
       await Promise.all(Array.from({ length: Math.min(this.ayar.esZamanli || 4, kuyruk.length) }, isci));
-      // Kişisel veri dosyaya yazılmaz; sadece fiyatlar ve plakanın son hali.
-      fs.writeFileSync(path.join(klasor, 'sonuc.json'), JSON.stringify({ brans: veri.brans, plaka: veri.plaka, sonuclar }, null, 2));
+      // Kişisel veri dosyaya yazılmaz; sadece araç bilgisi, fiyatlar ve plaka.
+      fs.writeFileSync(path.join(klasor, 'sonuc.json'), JSON.stringify({ brans: veri.brans, plaka: veri.plaka, arac: veri.arac, sonuclar }, null, 2));
     } catch (e) {
       this.emit('hata', { hata: e.message });
     } finally {
@@ -79,6 +80,33 @@ export class Motor extends EventEmitter {
       this.emit('bitti', { sonuclar });
     }
     return sonuclar;
+  }
+
+  // EGM sorgusu: sirketler.json'da "egm": true olan ilk şirketten (adaptörü
+  // egmSorgu veriyorsa) araç bilgisini bir kez alır, veri.arac'a yazar ve tüm
+  // şirketlere aktarır. EGM kaynağı yoksa ya da başarısızsa atlanır; o zaman
+  // her şirket plaka+belge ile kendi EGM'ini yapar.
+  async egmAsamasi(veri, sirketler, klasor) {
+    const kaynak = sirketler.find(s => s.egm);
+    if (!kaynak) return;
+    this.emit('egm', { durum: 'basladi', kod: kaynak.kod, ad: kaynak.ad });
+    try {
+      const a = await this.adaptor(kaynak.kod);
+      if (typeof a.egmSorgu !== 'function') { this.emit('egm', { durum: 'atlandi', not: `${kaynak.ad} adaptörü EGM sorgusu yapmıyor` }); return; }
+      const page = await this.sekme(kaynak.kod);
+      page.setDefaultTimeout((this.ayar.adimZamanAsimiSn || 30) * 1000);
+      await page.goto(a.adres, { waitUntil: 'domcontentloaded' });
+      await this.girisBekle(page, a, (durum, ek) => this.emit('egm', { durum, kod: kaynak.kod, ad: kaynak.ad, ...ek }));
+      this.emit('egm', { durum: 'calisiyor', kod: kaynak.kod, ad: kaynak.ad });
+      const arac = { bekle: ms => page.waitForTimeout(ms), log: m => this.emit('log', { kod: kaynak.kod, mesaj: m }) };
+      const ham = await zamanAsimi(a.egmSorgu(page, veri, arac), (this.ayar.sirketZamanAsimiSn || 150) * 1000);
+      veri.arac = aracDuzelt(ham);
+      if (!veri.arac.marka && !veri.arac.model) throw new Error('Araç bilgisi okunamadı');
+      this.emit('egm', { durum: 'tamam', kod: kaynak.kod, ad: kaynak.ad, arac: veri.arac, ozet: aracOzet(veri.arac) });
+    } catch (e) {
+      this.emit('egm', { durum: 'hata', kod: kaynak.kod, ad: kaynak.ad, hata: kisalt(e.message) });
+      // Araç bilgisi gelmese de şirket sorguları denenecek
+    }
   }
 
   async tekSirket(sirket, veri, klasor) {

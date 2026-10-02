@@ -13,8 +13,9 @@ export async function teklifAl(page, veri, arac) {
   await page.getByRole('textbox', { name: 'Araç Plakası' }).fill(veri.plaka);
   await page.getByRole('textbox', { name: 'Belge Seri' }).fill(veri.belgeSeri);
   await page.getByRole('textbox', { name: 'Belge Numarası' }).fill(veri.belgeNo);
-  // Branşa göre farklı seçim gerekiyorsa veri.brans ile dallanabilirsiniz
-  await page.getByLabel('Kullanım Tarzı').selectOption('hususi');
+  // Kullanım tarzını EGM'den gelen araç bilgisinden seçer (yoksa hususi).
+  const tarz = /taksi/i.test(veri.arac?.kullanimTarzi || '') ? 'taksi' : 'hususi';
+  await page.getByLabel('Kullanım Tarzı').selectOption(tarz);
   await page.getByRole('button', { name: 'Fiyat Al' }).click();
   await page.locator(fiyatSecici).waitFor();
   return arac.fiyatBul(page, fiyatSecici);

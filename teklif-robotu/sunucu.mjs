@@ -11,12 +11,13 @@ const dinleyiciler = new Set();
 let sonDurum = null; // sayfa yenilenince son sorgu tekrar görünsün
 
 function yayinla(tur, veri) {
-  if (tur === 'basladi') sonDurum = { ...veri, durumlar: {} };
+  if (tur === 'basladi') sonDurum = { ...veri, durumlar: {}, egm: null };
   if (tur === 'durum' && sonDurum) sonDurum.durumlar[veri.kod] = veri;
+  if (tur === 'egm' && sonDurum) sonDurum.egm = veri;
   const satir = `event: ${tur}\ndata: ${JSON.stringify(veri)}\n\n`;
   for (const res of dinleyiciler) res.write(satir);
 }
-for (const tur of ['basladi', 'durum', 'bitti', 'hata', 'log']) motor.on(tur, v => yayinla(tur, v));
+for (const tur of ['basladi', 'durum', 'egm', 'bitti', 'hata', 'log']) motor.on(tur, v => yayinla(tur, v));
 
 const TURLER = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.json': 'application/json; charset=utf-8' };
 

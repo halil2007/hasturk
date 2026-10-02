@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>Demo Sigorta A — EGM Sorgu</title>
+<script>if(!document.cookie.includes('demoA=1'))location.replace('giris.html')</script>
+<style>body{font:15px sans-serif;margin:30px;background:#f7f9fc}label{display:block;margin:6px 0}#arac{margin-top:16px;border-collapse:collapse}#arac td{border:1px solid #cbd5e1;padding:6px 12px}</style>
+<h1>EGM Araç Sorgu</h1>
+<label>Plaka <input id="plaka"></label>
+<label>Belge Seri <input id="bs"></label>
+<label>Belge No <input id="bn"></label>
+<button id="sorgula">EGM Sorgula</button>
+<div id="sonuc"></div>
+<script>
+// Demo: plakaya göre sabit bir araç üretir (gerçek EGM yerine).
+const markalar=['RENAULT','FIAT','VOLKSWAGEN','TOYOTA','FORD','HYUNDAI'];
+const modeller=['CLIO','EGEA','POLO','COROLLA','FOCUS','i20'];
+sorgula.onclick=()=>{
+  if(!plaka.value||!bn.value){alert('Plaka ve belge no gerekli');return}
+  sonuc.textContent='EGM sorgulanıyor...';
+  const h=[...plaka.value.toUpperCase()].reduce((a,c)=>a*31+c.charCodeAt(0)>>>0,7);
+  const i=h%markalar.length;
+  setTimeout(()=>{sonuc.innerHTML=`<table id="arac">
+    <tr><td>Marka</td><td id="marka">${markalar[i]}</td></tr>
+    <tr><td>Model</td><td id="model">${modeller[i]}</td></tr>
+    <tr><td>Model Yılı</td><td id="yil">${2010+h%15}</td></tr>
+    <tr><td>Kullanım Tarzı</td><td id="kt">Hususi Otomobil</td></tr>
+    <tr><td>Koltuk Sayısı</td><td id="koltuk">5</td></tr>
+    <tr><td>Motor No</td><td id="motor">M${h%900000+100000}</td></tr>
+    <tr><td>Şase No</td><td id="sase">NM${(h*7).toString(36).toUpperCase().slice(0,14)}</td></tr>
+  </table>`},1200);
+};
+</script>

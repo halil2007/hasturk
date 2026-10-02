@@ -3,13 +3,34 @@
 Müşteri ve araç bilgilerini **bir kez** girersiniz; robot, kayıtlı tüm sigorta şirketlerinin acente portallarını **kendi bilgisayarınızdaki tarayıcıda** aynı anda doldurur, fiyatları okur ve tek tabloda ucuzdan pahalıya sıralar.
 
 ```
-[ Form: TC, plaka, belge… ]  →  Chrome/Edge (her şirket bir sekme)  →  [ Fiyat tablosu + ekran görüntüleri ]
-        127.0.0.1:3737              şirketin kendi ekranı, sizin oturumunuz
+[ Form: TC, plaka, belge, doğum ]
+        127.0.0.1:3737
+            │
+            ▼
+   [ EGM sorgusu: bir şirketten araç bilgisi ]  →  marka, model, yıl, motor, şase, koltuk
+            │
+            ▼
+   Chrome/Edge (her şirket bir sekme, aynı anda)  →  [ Fiyat tablosu (ucuzdan pahalıya) + ekran görüntüleri ]
+        şirketin kendi ekranı, sizin oturumunuz
 ```
 
 - **API gerekmez.** Robot, sizin elle yaptığınız tıklama ve yazmaları tekrarlar (Doğanium, Open Hızlı Teklif, İhsan Yazılım gibi ürünlerin "robot" yöntemi).
 - **Her şey sizin bilgisayarınızda kalır.** Şifre kaydedilmez, girişi siz yaparsınız (SMS kodu dahil). Sunucu yalnızca `127.0.0.1` adresinden erişilebilir, müşteri bilgisi diske yazılmaz (sadece fiyat ve ekran görüntüsü `sonuclar/` klasörüne kaydedilir).
 - Oturumlar robot açık kaldığı sürece korunur: sabah her portala bir kez girersiniz, gün boyu tekrar sormaz (portalın kendi oturum süresi kadar).
+- **EGM sorgusu bir kez yapılır.** Bilgiler girilince `"egm": true` işaretli şirketten araç bilgisi (marka, model, yıl, motor/şase, koltuk, kullanım tarzı) alınır, ekranda gösterilir ve tüm şirketlere bu bilgiyle gidilir.
+
+## EGM sorgusu
+
+Hangi şirketin EGM sorgusu yapacağını `sirketler.json` içinde `"egm": true` ile işaretlersiniz (genelde bu sorguyu en hızlı/sorunsuz yapan şirket):
+
+```json
+[
+  { "kod": "anadolu", "ad": "Anadolu Sigorta", "aktif": true, "egm": true },
+  { "kod": "axa",     "ad": "AXA Sigorta",     "aktif": true }
+]
+```
+
+O şirketin adaptörü `egmSorgu` fonksiyonu veriyorsa (kayıt sırasında EGM ekranını da gösterirseniz oluşur), teklif turundan önce bir kez çalışır; dönen araç bilgisi `veri.arac` içine yazılır ve her adaptör `veri.arac.marka`, `veri.arac.koltuk` gibi alanlardan okuyabilir. EGM kaynağı yoksa ya da sorgu başarısız olursa adım atlanır; o zaman her şirket plaka + belge ile kendi EGM'ini yapar.
 
 ## Kurulum (Windows, bir kez)
 
@@ -72,6 +93,6 @@ Değişiklik bir sonraki sorguda geçerli olur, robotu kapatıp açmak gerekmez.
 ## Geliştirici notları
 
 - `sunucu.mjs` yerel arayüz ve API (`/api/teklif`, `/api/olaylar` canlı durum), `motor.mjs` sekme yönetimi + giriş bekleme + fiyat toplama, `kaydet.mjs` Playwright kaydını adaptöre çevirir (şifre satırlarını atar, örnek değerleri `veri.*` yapar), `yardimci.mjs` ortak parçalar.
-- Adaptör sözleşmesi: `export const adres` ve `export async function teklifAl(page, veri, arac)` → `{ fiyat, fiyatMetni }`. İsteğe bağlı `export async function girisGerekliMi(page)` (varsayılan: ekranda şifre kutusu var mı).
+- Adaptör sözleşmesi: `export const adres` ve `export async function teklifAl(page, veri, arac)` → `{ fiyat, fiyatMetni }`. İsteğe bağlı: `export async function egmSorgu(page, veri, arac)` → araç bilgisi nesnesi (EGM kaynağı şirket için); `export async function girisGerekliMi(page)` (varsayılan: ekranda şifre kutusu var mı).
 - Deneme: `npm test` (ekransız Linux'ta `xvfb-run -a npm test`) — iki demo portalda giriş bekleme, oturumun korunması, fiyat okuma, dönüştürücü ve API'yi dener.
 - `kaydet.mjs` Playwright'ın kayıt özelliğini kullanır; bu yüzden Playwright sürümü `package.json`'da sabittir.
