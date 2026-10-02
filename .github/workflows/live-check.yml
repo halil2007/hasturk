@@ -1,0 +1,34 @@
+name: Canlı sürüm kontrolü
+
+# Cloudflare'de yayında olan dosyalar depodaki (main) dosyalarla aynı mı? Yayın gecikmesi / eski sürüm tespiti için.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/live-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Karşılaştır
+        run: |
+          B=https://hasturk-arama.halilc2007.workers.dev
+          git fetch -q origin main
+          for f in pm-search.js menu.json; do
+            curl -fsS "$B/$f?nocache=$RANDOM" -o "/tmp/live-$f"
+            live=$(sha1sum < "/tmp/live-$f" | cut -c1-12)
+            echo "$f canlı: $live ($(wc -c < /tmp/live-$f) bayt)"
+            for c in $(git log --format=%h -12 origin/main -- "public/$f"); do
+              h=$(git show "$c:public/$f" | sha1sum | cut -c1-12)
+              [ "$h" = "$live" ] && echo "  = $c $(git log -1 --format='%ad %s' --date=format:'%d.%m %H:%M' $c)"
+            done
+          done
+          curl -sSI "$B/pm-search.js" | grep -i -E 'cache-control|age|last-modified|etag' || true
