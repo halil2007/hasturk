@@ -3262,8 +3262,9 @@
       var a = as[i], s = slugOf(a.href), c0 = s && !badHref(s) ? tops[s] : null;
       if (!c0 && s != null && (badHref(s) || !tops[s])) c0 = byName[fold((a.textContent || '').replace(/\s+/g, ' ').trim())] || null;
       if (!c0 || seen[c0.s] || isOurs(a)) continue;
+      // Konum sayfanın başına göre: sayfa aşağı kaydırılmışken (ikas bazı geçişlerde başa kaydırmıyor) de bulunur
       var r = a.getBoundingClientRect();
-      if (!r.width || !r.height || r.top > 260 || r.bottom < 0) continue;
+      if (!r.width || !r.height || (r.top > 260 && r.top + (window.pageYOffset || 0) > 260)) continue;
       seen[c0.s] = 1;
       hits.push({ a: a, c: c0, r: r });
     }

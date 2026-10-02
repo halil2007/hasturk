@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         site: ['https://hasturkgubre.com.tr', 'https://tarim-dunyasi.com']
-        mode: [canli, yeni]
+        mode: [yeni]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

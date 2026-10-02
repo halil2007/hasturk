@@ -12,6 +12,9 @@ const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
 if (MODE === 'yeni') await ctx.route((u) => u.hostname === HOST && u.pathname === '/pm-search.js', (r) => r.fulfill({ status: 200, body: readFileSync('public/pm-search.js'), contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' } }));
 const p = await ctx.newPage();
+const errs = [];
+p.on('pageerror', (e) => errs.push(e.message.slice(0, 200)));
+p.on('console', (m) => { if (m.type() === 'error' && /pm-search|ua-|urun|Ürün/i.test(m.text() + ((m.location() || {}).url || ''))) errs.push('konsol: ' + m.text().slice(0, 200)); });
 // Sayfa tam yeniden yüklenirken ölçüm denk gelirse biraz bekleyip tekrar dene
 const state = async () => { for (let k = 0; ; k++) { try { return await state0(); } catch (e) { if (k > 10) throw e; await p.waitForTimeout(300); } } };
 const state0 = () => p.evaluate(() => {
@@ -54,6 +57,7 @@ for (let i = 0; i < 14; i++) {
       return { scrollY: Math.round(scrollY), pre: !!document.querySelector('[data-ua-pre]'), nav: !!document.querySelector('[data-ua-nav]'), headers: document.querySelectorAll('header').length, links };
     });
     log('   tanı: ' + JSON.stringify(d));
+    if (errs.length) log('   hatalar: ' + errs.splice(0).join(' | '));
   }
   log(`${i + 1}. ${path} → 0,3sn: ${row[0].biz ? 'bizim' : 'YOK'}/${row[0].ikasGorunen} ikas | 1,5sn: ${row[1].biz ? 'bizim' : 'YOK'}/${row[1].ikasGorunen} | 4sn: ${row[2].biz ? 'bizim' : 'YOK'}/${row[2].ikasGorunen} ${ok ? '✓' : '✗'}`);
 }
