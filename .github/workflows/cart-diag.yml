@@ -1,0 +1,37 @@
+name: Sepete ekleme tanısı
+
+# Gerçek sitelerde sepete ekleme: ürün sayfasındaki butonlar, giden istekler, sepetin gerçekten dolması ve
+# Ürün Bul'dan ekleme (yayındaki ve daldaki widget). Anonim sepet, sipariş verilmez.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/cart-store.mjs', 'scripts/cart-diag.mjs', '.github/workflows/cart-diag.yml', 'public/pm-search.js']
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { site: 'https://tarim-dunyasi.com', product: '/sivi-solucan-gubresi-1-lt', mode: canli }
+          - { site: 'https://tarim-dunyasi.com', product: '/sivi-solucan-gubresi-1-lt', mode: yeni }
+          - { site: 'https://hasturkgubre.com.tr', product: '/hasturk-sivi-solucan-gubresi', mode: yeni }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - run: node scripts/cart-diag.mjs
+        env:
+          SITE_URL: ${{ matrix.site }}
+          PRODUCT: ${{ matrix.product }}
+          MODE: ${{ matrix.mode }}
