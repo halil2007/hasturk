@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 61 sipariş; site içi olaylar son 30 gün (173 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 61 sipariş; site içi olaylar son 30 gün (176 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -34,7 +34,7 @@ _Henüz veri yok._
 | 4 | Sıvı Solucan Gübresi 1 Lt | 2,9 | 5 |
 | 5 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 2,9 | 2 |
 | 6 | Reflex Plus Natural Uskumru Fileto Kedi Ödül Maması 30 Gr | 2,7 | 0 |
-| 7 | Katı Solucan Gübresi - 1 TON / ÇUVAL | 2,6 | 6 |
+| 7 | Katı Solucan Gübresi - 1 TON / ÇUVAL | 2,5 | 6 |
 | 8 | Sıvı Solucan Gübresi 500 ml | 2,4 | 4 |
 | 9 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 2,4 | 2 |
 | 10 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 2,3 | 0 |
@@ -54,23 +54,25 @@ _Henüz veri yok._
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | solucan | 6 | 6 | ↑ ×3,9 |  |
-| 2 | perlit | 4 | 4 | ↑ ×2,9 |  |
-| 3 | torf | 4 | 4 | ↑ ×2,9 |  |
-| 4 | solucan gübresi | 3 | 3 | ↑ ×2,4 |  |
+| 2 | solucan gübresi | 4 | 4 | ↑ ×2,9 |  |
+| 3 | perlit | 4 | 4 | ↑ ×2,9 |  |
+| 4 | torf | 4 | 4 | ↑ ×2,9 |  |
 | 5 | sebze tohumu | 2 | 2 |  |  |
 | 6 | biyo | 1 | 1 |  |  |
 | 7 | cocopeat | 1 | 1 |  |  |
 | 8 | fasulye | 1 | 1 |  |  |
 | 9 | gübr | 1 | 1 |  |  |
 | 10 | gübre | 1 | 1 |  |  |
-| 11 | leonar | 1 | 1 |  |  |
-| 12 | limon | 1 | 1 |  |  |
-| 13 | lotu | 1 | 1 |  |  |
-| 14 | enjo | 1 | 1 |  |  |
-| 15 | felici | 1 | 1 |  |  |
-| 16 | hümik | 1 | 1 |  |  |
-| 17 | ilaçlama pompası | 1 | 1 |  |  |
-| 18 | saksı toprağı | 1 | 1 |  |  |
+| 11 | ilaçlam | 1 | 1 |  |  |
+| 12 | leonar | 1 | 1 |  |  |
+| 13 | limon | 1 | 1 |  |  |
+| 14 | lotu | 1 | 1 |  |  |
+| 15 | soluca | 1 | 1 |  |  |
+| 16 | enjo | 1 | 1 |  |  |
+| 17 | felici | 1 | 1 |  |  |
+| 18 | hümik | 1 | 1 |  |  |
+| 19 | ilaçlama pompası | 1 | 1 |  |  |
+| 20 | saksı toprağı | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
@@ -93,10 +95,11 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | # | Ürün | Sepete ekleme | Görüntüleme |
 |---|---|---|---|
 | 1 | HasTürk Hümix Sıvı Hümik Asit | 1,9 | 0,9 |
-| 2 | HG Çim Kapama Toprağı (Leonarditli Formül) | 1 | 0 |
-| 3 | Guanokalong Yarasa Gübresi Toz | 1 | 0 |
-| 4 | Limon Ağacı Bakım Seti | 1 | 1 |
-| 5 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | 0,9 | 0 |
+| 2 | Sıvı Solucan Gübresi 1 Lt | 1 | 0 |
+| 3 | HG Çim Kapama Toprağı (Leonarditli Formül) | 1 | 0 |
+| 4 | Guanokalong Yarasa Gübresi Toz | 1 | 0 |
+| 5 | Limon Ağacı Bakım Seti | 1 | 1 |
+| 6 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | 0,9 | 0 |
 
 ## Çok bakılıp az sepete eklenenler
 

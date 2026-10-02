@@ -9,7 +9,7 @@ on:
     paths: ['config.tarim.json', 'scripts/sync.mjs', '.github/workflows/site2-preview.yml']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   preview:
@@ -41,9 +41,5 @@ jobs:
           for u in $(node -e "const c=require('./public/tarim/menu.json').config;const g=require('./config.json');console.log([...(g.guides||[]).map(x=>x.url),...(c.pages||[]).map(x=>x.url)].filter(Boolean).join(' '))"); do
             printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' "$S$u")" "$u"
           done
-      - name: Dala kaydet
-        run: |
-          git config user.name "urun-senkron"
-          git config user.email "actions@users.noreply.github.com"
-          git add public/tarim docs/trend-raporu-tarim.md 2>/dev/null || true
-          git diff --cached --quiet || (git commit -m "Tarım Dünyası önizleme verisi" && git push)
+      - name: Özet (dala kaydedilmez; veri dosyalarını sadece main'deki sync.yml yazar, çakışma olmasın)
+        run: git status --short && head -5 docs/trend-raporu*.md

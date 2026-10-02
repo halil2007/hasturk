@@ -8,7 +8,7 @@ on:
     paths: ['scripts/sync.mjs', 'config.json', '.github/workflows/sync-preview.yml']
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency: sync-preview
 
@@ -44,9 +44,5 @@ jobs:
           OTHER_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
           OTHER_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
           OTHER_PRODUCTS: public/products.json
-      - name: Dala kaydet
-        run: |
-          git config user.name "urun-senkron"
-          git config user.email "actions@users.noreply.github.com"
-          git add public docs 2>/dev/null || true
-          git diff --cached --quiet || (git commit -m "Senkron önizleme (iki mağazanın siparişleri)" && git push)
+      - name: Özet (dala kaydedilmez; veri dosyalarını sadece main'deki sync.yml yazar, çakışma olmasın)
+        run: git status --short && head -5 docs/trend-raporu*.md
