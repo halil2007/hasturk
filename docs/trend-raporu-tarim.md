@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 61 sipariş; site içi olaylar son 30 gün (171 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 61 sipariş; site içi olaylar son 30 gün (173 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -47,16 +47,16 @@ _Henüz veri yok._
 | 17 | HG Avokado Toprağı Özel Karışım | 1,5 | 2 |
 | 18 | Katı Solucan Gübresi 3 KG | 1,4 | 3 |
 | 19 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 1,3 | 1 |
-| 20 | Kalın Tarım Perliti 1.0–3.0 mm (200 Litre) | 1,2 | 2 |
+| 20 | Kalın Tarım Perliti 1.0–3.0 mm (200 Litre) | 1,1 | 2 |
 
 ## En çok aranan kelimeler
 
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | solucan | 6 | 6 | ↑ ×3,9 |  |
-| 2 | solucan gübresi | 3 | 3 | ↑ ×2,4 |  |
-| 3 | perlit | 3 | 3 | ↑ ×2,4 |  |
-| 4 | torf | 3 | 3 | ↑ ×2,4 |  |
+| 2 | perlit | 4 | 4 | ↑ ×2,9 |  |
+| 3 | torf | 4 | 4 | ↑ ×2,9 |  |
+| 4 | solucan gübresi | 3 | 3 | ↑ ×2,4 |  |
 | 5 | sebze tohumu | 2 | 2 |  |  |
 | 6 | biyo | 1 | 1 |  |  |
 | 7 | cocopeat | 1 | 1 |  |  |
