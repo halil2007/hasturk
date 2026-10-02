@@ -14,7 +14,9 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "hasturk-panel" }
   ],
-  // 10 dakikada bir: yeni siparişleri çek, stokları düş, tüm kanallara gönder
-  "triggers": { "crons": ["*/10 * * * *"] },
+  // 15 dakikada bir: siparişler, ürünler (görsel/varyant), stoklar kontrol edilir ve kanallara gönderilir
+  "triggers": { "crons": ["*/15 * * * *"] },
+  // Cloudflare panelinden eklenen düz metin değişkenler yayında silinmesin
+  "keep_vars": true,
   "observability": { "enabled": true }
 }

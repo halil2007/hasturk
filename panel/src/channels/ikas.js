@@ -7,7 +7,7 @@ const API = 'https://api.myikas.com/api/v1/admin/graphql';
 export function ikas(env, p, meta) {
   const store = env[p + 'STORE'], id = env[p + 'CLIENT_ID'], secret = env[p + 'CLIENT_SECRET'];
   const salesChannel = env[p + 'SALES_CHANNEL_ID'] || '';
-  const merchant = env[p + 'MERCHANT_ID'] || '';
+  let merchant = env[p + 'MERCHANT_ID'] || '', merchantTried = false;
   let token = null, tokenExp = 0, locationId = env[p + 'STOCK_LOCATION_ID'] || '';
 
   async function auth() {
@@ -84,7 +84,7 @@ export function ikas(env, p, meta) {
       const unit = num(li.finalPrice ?? li.price);
       return {
         lineId: String(li.id), sku: str(v.sku), barcode: str((v.barcodeList || [])[0]), name: str(v.name),
-        image: merchant && v.mainImageId ? `https://cdn.myikas.com/images/${merchant}/${v.mainImageId}/image_180.webp` : '',
+        image: v.mainImageId ? imgUrl({ imageId: v.mainImageId, fileName: 'image' }) : '',
         quantity: num(li.quantity, 1), unitPrice: unit, total: unit * num(li.quantity, 1),
         status: /CANCEL|REFUND/i.test(li.status || '') ? 'cancelled' : '', remoteKey: str(v.id),
       };
@@ -109,10 +109,21 @@ export function ikas(env, p, meta) {
     };
   }
 
-  async function fetchOrders(since, until) {
+  // Görsel adresleri için mağaza (merchant) kimliği: girilmediyse API'den bir kez alınır
+  async function ensureMerchant() {
+    if (merchant || merchantTried) return merchant;
+    merchantTried = true;
+    try { const d = await gql('{ getMerchant { id } }'); merchant = (d.getMerchant && d.getMerchant.id) || ''; } catch { /* görselsiz devam */ }
+    return merchant;
+  }
+  const imgUrl = (img, size = 180) => (merchant && img && img.imageId ? `https://cdn.myikas.com/images/${merchant}/${img.imageId}/${size}/${encodeURIComponent(String(img.fileName || 'image').replace(/\.[a-z0-9]+$/i, ''))}.webp` : '');
+
+  // byOrdered: geçmiş sipariş aktarımında sipariş tarihine göre (normalde son güncellenme tarihine göre) çeker
+  async function fetchOrders(since, until, { byOrdered = false } = {}) {
+    await ensureMerchant();
     const out = [];
-    let filter = 'updatedAt', optional = ORDER_OPT;
-    for (let page = 1; page <= 20; page++) {
+    let filter = byOrdered ? 'orderedAt' : 'updatedAt', optional = ORDER_OPT;
+    for (let page = 1; page <= (byOrdered ? 60 : 20); page++) {
       let data;
       try {
         data = await flex((o) => orderQuery(o, filter), optional, { p: { page, limit: 50 }, d: { gte: since, lte: until } });
@@ -132,24 +143,36 @@ export function ikas(env, p, meta) {
     return out;
   }
 
+  // Ürünler varyant düzeyinde gelir (her varyant = bir ilan = bir SKU). Varyant adı (ör. "5 Kg") ve görsel eklenir.
   async function fetchListings() {
+    await ensureMerchant();
     const out = [];
+    let values = new Map();
+    try {
+      const vt = await gql('{ listVariantType { id name values { id name } } }');
+      for (const t of vt.listVariantType || []) for (const v of t.values || []) values.set(v.id, v.name);
+    } catch { /* varyant adları olmadan devam */ }
     const q = (o) => `query ($page: Int!) { listProduct(pagination: { page: $page, limit: 100 }) { hasNext data {
-      id name ${o.salesChannelIds} variants { id sku ${o.barcodeList} isActive prices { sellPrice discountPrice } stocks { stockCount } ${o.images} } } } }`;
-    let optional = { barcodeList: 'barcodeList', images: 'images { imageId isMain }', salesChannelIds: 'salesChannelIds' };
-    for (let page = 1; page <= 100; page++) {
+      id name ${o.salesChannelIds} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice } stocks { stockCount } ${o.images} } } } }`;
+    let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }' };
+    for (let page = 1; page <= 200; page++) {
       const d = await flex(q, optional, { page });
       for (const p of d.listProduct.data || []) {
         if (salesChannel && Array.isArray(p.salesChannelIds) && !p.salesChannelIds.includes(salesChannel)) continue;
-        for (const v of p.variants || []) {
+        const vars = p.variants || [];
+        // Ürün görseli: varyantın kendi görseli yoksa ürünün ana görseli
+        const allImgs = vars.flatMap((v) => v.images || []).filter((i) => !i.isVideo && i.imageId);
+        const mainImg = allImgs.find((i) => i.isMain) || allImgs.sort((a, b) => (a.order || 0) - (b.order || 0))[0];
+        for (const v of vars) {
           const pr = (v.prices || [])[0] || {};
-          const img = (v.images || []).find((i) => i.isMain) || (v.images || [])[0];
+          const vi = (v.images || []).filter((i) => !i.isVideo && i.imageId);
+          const img = vi.find((i) => i.isMain) || vi[0] || mainImg;
+          const vname = (v.variantValueIds || []).map((x) => values.get(x.variantValueId)).filter(Boolean).join(' / ');
           out.push({
             remoteId: String(v.id), remoteProductId: String(p.id), sku: str(v.sku), barcode: str((v.barcodeList || [])[0]),
-            name: p.variants.length > 1 && v.sku ? `${p.name} (${v.sku})` : p.name,
-            image: merchant && img ? `https://cdn.myikas.com/images/${merchant}/${img.imageId}/image_180.webp` : '',
-            price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
-            stock: (v.stocks || []).reduce((s, x) => s + num(x.stockCount), 0),
+            name: vname ? `${p.name} - ${vname}` : p.name, groupName: p.name, variantName: vname,
+            image: imgUrl(img, 360), price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
+            stock: (v.stocks || []).reduce((s, x) => s + num(x.stockCount), 0), active: v.isActive !== false,
           });
         }
       }

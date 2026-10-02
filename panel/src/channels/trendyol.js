@@ -10,6 +10,7 @@ const STATUS = {
   Cancelled: 'cancelled', UnSupplied: 'cancelled', Returned: 'returned',
 };
 const RANKS = ['new', 'processing', 'shipped', 'delivered'];
+const VARIANT_ATTR = /beden|boyut|ebat|hacim|a[gğ][ıi]rl[ıi]k|renk|miktar|litre|kilo|gram|adet|paket|ölçü|olcu/i;
 
 export function trendyol(env, meta) {
   const seller = env.TRENDYOL_SELLER_ID, key = env.TRENDYOL_API_KEY, secret = env.TRENDYOL_API_SECRET;
@@ -88,9 +89,13 @@ export function trendyol(env, meta) {
     for (let page = 0; page < 200; page++) {
       const r = await call(`/product/sellers/${seller}/products?page=${page}&size=100`);
       for (const p of r.content || []) {
+        // Trendyol'da varyantlar çoğu zaman ayrı ürün olarak durur; boyut/ağırlık gibi özellik varyant adı olarak alınır
+        const attrs = (p.attributes || []).filter((a) => VARIANT_ATTR.test(a.attributeName || '')).map((a) => a.attributeValue || a.customAttributeValue).filter(Boolean);
         out.push({
           remoteId: str(p.barcode), remoteProductId: str(p.productMainId || p.id), sku: str(p.stockCode), barcode: str(p.barcode), name: str(p.title),
+          groupName: str(p.title), variantName: attrs.join(' / '),
           image: str(((p.images || [])[0] || {}).url), price: num(p.salePrice), listPrice: num(p.listPrice), stock: num(p.quantity),
+          active: p.approved !== false && !p.archived,
         });
       }
       if (page + 1 >= (r.totalPages || 1)) break;

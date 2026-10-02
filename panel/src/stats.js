@@ -3,6 +3,8 @@ import { all, first, getSettings } from './db.js';
 import { dayKey, weekKey, monthKey, TR, r2 } from './util.js';
 import { CHANNEL_IDS } from './channels/index.js';
 import { profit } from '../public/profit.js';
+import { DESIRED } from './sync.js';
+const LOW = (n) => `(CASE WHEN critical_stock > 0 THEN critical_stock ELSE ${Math.max(0, Math.round(Number(n) || 0))} END)`;
 
 const D = 864e5;
 const keyFn = { day: dayKey, week: weekKey, month: monthKey };
@@ -100,18 +102,20 @@ export async function topProducts(db, fromMs, toMs, limit = 20) {
 
 // Ana ekran özeti
 export async function summary(db) {
-  const now = Date.now(), t0 = startOf(dayKey(now));
-  const [todayP, yestP, last14, counts, low, unlinked] = await Promise.all([
+  const now = Date.now(), t0 = startOf(dayKey(now)), settings = await getSettings(db);
+  const [todayP, yestP, extra, counts, low, unlinked] = await Promise.all([
     all(db, `SELECT channel, COUNT(*) AS n, SUM(total) AS revenue FROM orders o WHERE ordered_at >= ? AND ${LIVE} GROUP BY channel`, t0),
     all(db, `SELECT channel, COUNT(*) AS n, SUM(total) AS revenue FROM orders o WHERE ordered_at >= ? AND ordered_at < ? AND ${LIVE} GROUP BY channel`, t0 - D, t0),
-    period(db, t0 - 13 * D, t0 + D, 'day', await getSettings(db)),
+    first(db, `SELECT (SELECT COUNT(*) FROM products WHERE active = 1 AND stock <= 0) AS stockOut,
+      (SELECT COUNT(*) FROM packages k JOIN orders o ON o.id = k.order_id WHERE k.status = 'open' AND o.status NOT IN ('cancelled', 'returned')) +
+      (SELECT COUNT(*) FROM orders o WHERE o.status = 'processing' AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id)) AS cargoWaiting`),
     all(db, "SELECT status, channel, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY status, channel"),
-    all(db, 'SELECT id, name, sku, stock, critical_stock FROM products WHERE active = 1 AND (stock <= critical_stock OR stock <= 0) ORDER BY stock ASC LIMIT 20'),
-    all(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL'),
+    all(db, `SELECT id, name, sku, stock, critical_stock FROM products WHERE active = 1 AND stock <= ${LOW(settings.low_stock)} ORDER BY stock ASC LIMIT 20`),
+    all(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
   ]);
   const by = (rows) => Object.fromEntries(rows.map((r) => [r.channel, { orders: r.n, revenue: r2(r.revenue) }]));
   return {
-    today: by(todayP), yesterday: by(yestP), last14: { series: last14.series, totals: last14.totals, total: last14.total },
+    today: by(todayP), yesterday: by(yestP), stockOut: extra.stockOut, cargoWaiting: extra.cargoWaiting,
     pending: counts, lowStock: low, unlinked: unlinked[0] ? unlinked[0].n : 0,
   };
 }
@@ -130,10 +134,11 @@ export async function dashboard(db, q) {
   const pack = (p) => ({ total: p.total, totals: p.totals, revenue: line(p, 'revenue'), orders: line(p, 'orders'), profit: line(p, 'profit') });
   const [pending, low, stock, top] = await Promise.all([
     all(db, "SELECT status, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY status"),
-    all(db, 'SELECT id, name, sku, image, stock, critical_stock FROM products WHERE active = 1 AND (stock <= critical_stock OR stock <= 0) ORDER BY stock ASC LIMIT 8'),
+    all(db, `SELECT id, name, sku, image, stock, critical_stock FROM products WHERE active = 1 AND stock <= ${LOW(settings.low_stock)} ORDER BY stock ASC LIMIT 8`),
     first(db, `SELECT (SELECT COUNT(*) FROM products WHERE active = 1) AS products, (SELECT COALESCE(SUM(MAX(stock, 0)), 0) FROM products WHERE active = 1) AS units,
-      (SELECT COUNT(*) FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.pushed_stock IS NOT NULL AND l.pushed_stock != MAX(p.stock, 0)) AS waiting,
-      (SELECT COUNT(*) FROM listings WHERE error IS NOT NULL) AS errors, (SELECT COUNT(*) FROM listings WHERE product_id IS NULL) AS unlinked`),
+      (SELECT COUNT(*) FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED}) AS waiting,
+      (SELECT COUNT(*) FROM listings WHERE error IS NOT NULL) AS errors, (SELECT COUNT(*) FROM listings WHERE product_id IS NULL AND ignored = 0) AS unlinked,
+      (SELECT COUNT(*) FROM products WHERE active = 1 AND stock <= 0) AS out_, (SELECT COUNT(*) FROM products WHERE active = 1 AND stock > 0 AND stock <= ${LOW(settings.low_stock)}) AS below`),
     topProducts(db, fromMs, toMs, 6),
   ]);
   const p = Object.fromEntries(pending.map((r) => [r.status, r.n]));

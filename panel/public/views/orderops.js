@@ -257,7 +257,7 @@ function splitEditor(d, extra, done) {
 
 // ---------- sipariş detayı (tam) ----------
 export async function openOrder(id, onChange) {
-  const s = sheet({ title: 'Sipariş', size: 'wide' });
+  const s = sheet({ title: 'Sipariş', size: 'wide drawer' });
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
   let d;
   const load = async () => {
@@ -274,7 +274,7 @@ export async function openOrder(id, onChange) {
           ${o.items.map((i) => html`<div class="li" style="${i.status === 'cancelled' ? 'opacity:.5' : ''}">${thumb(i.product_image || i.image, i.name)}
             <div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${i.product_name || i.name}</div>
               <div class="muted small">${[i.sku, i.barcode].filter(Boolean).join(' · ')}${i.status === 'cancelled' ? ' · İptal' : ''}</div>
-              ${i.product_id ? html`<div class="tiny muted">Ortak stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--amber)">Panelde eşleşmemiş — <a class="link" href="#/urunler/eslestir">eşleştir</a></div>`}</div>
+              ${i.product_id ? html`<div class="tiny muted">Ortak stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--amber)">Panelde eşleşmemiş — <a class="link" href="#/eslestirme">eşleştir</a></div>`}</div>
             <div style="text-align:right" class="num"><div><b>${i.quantity}</b> × ${money(i.unit_price)}</div><div class="muted small">${money(i.total)}</div></div></div>`)}
         </div>
         <div class="stack">

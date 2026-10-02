@@ -1,6 +1,9 @@
 // Ortak arayüz yardımcıları: API, güvenli HTML şablonu, biçimlendirme, kanal rozetleri, bildirim, alt pencere, menü.
 
-export const state = { channels: [], settings: null, summary: null, demo: false, onLogin: null };
+export const state = { channels: [], settings: null, summary: null, demo: false, user: null, onLogin: null };
+// Beklemedeki (pasif) kanallar listelerde gösterilmez; Entegrasyonlar sayfası hepsini gösterir
+export const activeChannels = () => state.channels.filter((c) => !c.paused);
+export const isAdmin = () => !state.user || state.user.role === 'admin';
 
 // ---------- API ----------
 export async function api(path, { method = 'GET', body } = {}) {
@@ -126,7 +129,7 @@ export async function busy(btn, fn) {
 const sheets = [];
 export function sheet({ title, body, foot, size = '', onClose } = {}) {
   const bg = document.createElement('div');
-  bg.className = 'sheet-bg';
+  bg.className = 'sheet-bg' + (size.includes('drawer') ? ' drawer-bg' : '');
   bg.innerHTML = `<div class="sheet ${size}" role="dialog" aria-modal="true"><div class="sheet-head"><h2 class="ellipsis"></h2><button class="icon-btn" data-close aria-label="Kapat"><i class="ico ico-x"></i></button></div><div class="sheet-body"></div><div class="sheet-foot hide"></div></div>`;
   const s = { el: bg, body: $('.sheet-body', bg), foot: $('.sheet-foot', bg), title: $('h2', bg) };
   s.title.textContent = title || '';

@@ -1,66 +1,99 @@
-// Panel uygulaması: yan menü, üst çubuk, alt menü (telefon), sayfa yönlendirme (#/...), giriş, senkron, bildirimler.
-import { api, state, html, render, $, $$, toast, ago, closeAllSheets, sheet, popMenu, store, chState } from './core.js';
+// Panel uygulaması: gruplu yan menü, üst çubuk, alt menü (telefon), yönlendirme (#/sayfa/...?filtre=...), giriş, senkron, bildirimler.
+import { api, state, html, render, $, $$, toast, ago, closeAllSheets, sheet, popMenu, store, busy } from './core.js';
 import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
 import { products } from './views/products.js';
 import { stocks } from './views/stocks.js';
 import { cargo } from './views/cargo.js';
+import { matching } from './views/match.js';
 import { profitView } from './views/profit.js';
 import { statsView } from './views/stats.js';
 import { integrations } from './views/integrations.js';
+import { notices } from './views/notices.js';
+import { users } from './views/users.js';
 import { settingsView } from './views/settings.js';
 
 const ROUTES = [
   { path: '', title: 'Genel Bakış', icon: 'home', view: dashboard },
-  { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: true },
+  { sec: 'Satış' },
+  { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders' },
+  { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo' },
+  { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products },
-  { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks },
-  { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo },
-  { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView },
+  { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock' },
+  { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match' },
+  { sec: 'Raporlar' },
   { path: 'analiz', title: 'Analizler', icon: 'pie', view: statsView },
-  { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'link', view: integrations },
-  { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView, foot: true },
+  { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView },
+  { sec: 'Sistem' },
+  { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
+  { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices' },
+  { path: 'kullanicilar', title: 'Kullanıcılar', icon: 'user', view: users, admin: true },
+  { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
 ];
-const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['stoklar', 'Stok', 'db'], ['kar', 'Kâr', 'bars']];
+const PAGES = ROUTES.filter((r) => r.view);
+const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kargo', 'Kargo', 'truck'], ['stoklar', 'Stok', 'db']];
+const canSee = (r) => !r.admin || !state.user || state.user.role === 'admin';
 
 function nav() {
-  const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-pending></span>` : ''}</a>`;
-  render($('[data-nav]'), html`${ROUTES.filter((r) => !r.foot).map(link)}`);
-  render($('[data-nav-foot]'), html`${ROUTES.filter((r) => r.foot).map(link)}`);
-  render($('[data-tabbar]'), html`${TABS.map(([p, t, i]) => html`<a href="#/${p}" data-path="${p}"><i class="ico ico-${i}"></i><span>${t}</span>${p === 'siparisler' ? html`<span class="dotn hide" data-pending></span>` : ''}</a>`)}<button data-act="more"><i class="ico ico-menu"></i><span>Menü</span></button>`);
+  const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-count="${r.count}"></span>` : ''}</a>`;
+  render($('[data-nav]'), html`${ROUTES.filter((r) => !r.view || canSee(r)).map((r) => (r.sec ? html`<div class="nav-sec">${r.sec}</div>` : link(r)))}`);
+  render($('[data-nav-foot]'), '');
+  render($('[data-tabbar]'), html`${TABS.map(([p, t, i]) => html`<a href="#/${p}" data-path="${p}"><i class="ico ico-${i}"></i><span>${t}</span>${p === 'siparisler' ? html`<span class="dotn hide" data-count="orders"></span>` : ''}</a>`)}<button data-act="more"><i class="ico ico-menu"></i><span>Menü</span></button>`);
 }
 
 export function refreshChrome(s = state.summary) {
   if (!s) return;
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
-  $$('[data-pending]').forEach((el) => { el.textContent = n > 99 ? '99+' : n; el.classList.toggle('hide', !n); });
-  const chs = state.channels;
-  const on = chs.filter((c) => c.enabled), err = chs.filter((c) => c.enabled && !c.demo && c.last && !c.last.ok);
+  const counts = { orders: n, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
+  $$('[data-count]').forEach((el) => { const v = counts[el.dataset.count] || 0; el.textContent = v > 99 ? '99+' : v; el.classList.toggle('hide', !v); el.classList.toggle('warn', el.dataset.count === 'match' || el.dataset.count === 'stock'); });
+  const chs = state.channels.filter((c) => !c.paused);
+  const on = chs.filter((c) => c.enabled), err = chs.filter((c) => c.enabled && !c.demo && c.last && (!c.last.ok || c.last.listingsError));
   const box = $('[data-status]');
   box.classList.toggle('warn', !!err.length || !on.length);
-  render(box, html`<span class="led"></span><div><b>${on.length} kanal bağlı</b><span>${err.length ? `${err.length} kanalda hata` : on.some((c) => c.demo) ? 'Örnek veriyle çalışıyor' : on.length ? 'Tüm sistemler aktif' : 'Entegrasyonları tamamlayın'}</span></div>`);
-  $('[data-bell-dot]').classList.toggle('hide', !(n || s.lowStock.length || err.length));
+  render(box, html`<span class="led"></span><div><b>${on.length} kanal bağlı</b><span>${err.length ? `${err.length} kanalda hata` : on.some((c) => c.demo) ? 'Örnek veriyle çalışıyor' : on.length ? `Son senkron ${ago(Math.max(...on.map((c) => (c.last && c.last.at) || 0))) || '—'}` : 'Entegrasyonları tamamlayın'}</span></div>`);
+  $('[data-bell-dot]').classList.toggle('hide', !((s.notices && s.notices.unread) || n));
+  const co = (s.settings && s.settings.company) || {};
+  $('[data-company]').textContent = co.legal || co.title || '';
+  const logo = (s.settings && s.settings.logo) || 'logo.webp';
+  $$('[data-logo]').forEach((i) => { if (i.getAttribute('src') !== logo) i.src = logo; });
+  const u = state.user || {};
+  $('[data-act=me]').textContent = (u.name || 'Y').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toLocaleUpperCase('tr');
+  $('[data-act=me]').title = `${u.name || ''} (${u.role === 'admin' ? 'Yönetici' : 'Personel'})`;
 }
 
-let current = null;
+// Adres: #/sayfa/alt/... ?anahtar=değer  (filtreler adreste tutulur; geri tuşu çalışır)
+export function parseHash() {
+  const [p, qs = ''] = location.hash.replace(/^#\/?/, '').split('?');
+  const [path = '', ...rest] = p.split('/');
+  return { path, rest: rest.map(decodeURIComponent), query: Object.fromEntries(new URLSearchParams(qs)) };
+}
+export function setQuery(query) {
+  const { path, rest } = parseHash();
+  const qs = new URLSearchParams(Object.entries(query).filter(([, v]) => v !== '' && v != null && v !== 'all')).toString();
+  history.replaceState(null, '', `#/${[path, ...rest.map(encodeURIComponent)].filter((x, i) => i === 0 || x).join('/')}${qs ? '?' + qs : ''}`);
+}
+
+let current = null, currentPath = null;
 async function route() {
-  const [, path = '', ...rest] = location.hash.replace(/^#/, '').split('/');
-  const r = ROUTES.find((x) => x.path === path) || ROUTES[0];
+  const { path, rest, query } = parseHash();
+  const r = PAGES.find((x) => x.path === path && canSee(x)) || PAGES[0];
   $$('[data-path]').forEach((a) => a.classList.toggle('on', a.dataset.path === r.path));
   $('[data-title]').textContent = r.title;
-  $('[data-sub]').textContent = state.demo ? 'Örnek veriler' : '';
-  document.title = `${r.title} · Satış Yönetimi`;
+  $('[data-sub]').textContent = state.demo ? 'Örnek veriler' : (state.settings && state.settings.company && state.settings.company.title) || '';
+  document.title = `${r.title} · ${(state.settings && state.settings.company && state.settings.company.title) || 'Hastürk'} CRM`;
   if (current && current.destroy) current.destroy();
   // Her sayfa temiz bir kapsayıcıyla başlar (önceki sayfanın olay dinleyicileri taşınmaz)
   const old = $('#view'), el = old.cloneNode(false);
   old.replaceWith(el);
-  window.scrollTo(0, 0);
-  current = (await r.view(el, rest.map(decodeURIComponent))) || null;
+  if (currentPath !== r.path) window.scrollTo(0, 0);
+  currentPath = r.path;
+  current = (await r.view(el, rest, query)) || null;
 }
 
-async function loadSummary() {
+export async function loadSummary() {
   const s = await api('summary');
-  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.demo = s.channels.some((c) => c.demo);
+  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.demo = s.demo || s.channels.some((c) => c.demo);
   refreshChrome(s);
   return s;
 }
@@ -72,35 +105,38 @@ async function sync() {
     const r = await api('sync', { method: 'POST', body: { force: true } });
     if (r.skipped) toast(r.skipped);
     else {
-      const errs = Object.entries(r.channels || {}).filter(([, v]) => typeof v === 'string');
+      const errs = [...Object.values(r.channels || {}), ...Object.values(r.listings || {})].filter((v) => typeof v === 'string');
       const count = Object.values(r.channels || {}).filter((v) => typeof v === 'number').reduce((a, b) => a + b, 0);
-      toast(errs.length ? `${errs.length} kanalda hata var (Entegrasyonlar sayfasına bakın)` : `Senkron tamam: ${count} sipariş kontrol edildi`, !!errs.length);
+      toast(errs.length ? `${errs.length} adımda hata var (Bildirimler)` : `Senkron tamam: ${count} sipariş kontrol edildi${r.match && (r.match.linked || r.match.created) ? `, ${r.match.linked + r.match.created} ürün eşleşti` : ''}`, !!errs.length);
     }
     await loadSummary();
     if (current && current.refresh) current.refresh();
   } catch (e) { toast(e.message, true); } finally { icons.forEach((i) => i.classList.remove('spin')); }
 }
 
-function bell(btn) {
+async function bell(btn) {
   const s = state.summary;
   if (!s) return;
+  const list = await api('notices').catch(() => []);
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
-  const errs = state.channels.filter((c) => c.enabled && !c.demo && c.last && !c.last.ok);
   const items = [];
-  if (n) items.push({ icon: 'orders', label: `${n} yeni sipariş işleme alınmayı bekliyor`, run: () => (location.hash = '#/siparisler/durum/new') });
-  if (s.lowStock.length) items.push({ icon: 'warn', label: `${s.lowStock.length} ürün kritik stokta`, run: () => (location.hash = '#/stoklar/kritik') });
-  if (s.unlinked) items.push({ icon: 'link', label: `${s.unlinked} ilan ürünle eşleşmemiş`, run: () => (location.hash = '#/urunler/eslestir') });
-  for (const c of errs) items.push({ icon: 'warn', label: `${c.name}: senkron hatası`, run: () => (location.hash = '#/entegrasyonlar') });
+  if (n) items.push({ icon: 'orders', label: `${n} yeni sipariş işleme alınmayı bekliyor`, run: () => (location.hash = '#/siparisler?status=new') });
+  for (const x of list.slice(0, 5)) items.push({ icon: x.level === 'error' ? 'warn' : 'bell', label: x.title, run: () => (location.hash = '#/bildirimler') });
+  if (s.unmatched) items.push({ icon: 'link', label: `${s.unmatched} ilan eşleşme bekliyor`, run: () => (location.hash = '#/eslestirme') });
   if (!items.length) items.push({ icon: 'check', label: 'Bekleyen bildirim yok', run: () => {} });
+  items.push('-', { icon: 'bell', label: 'Tüm bildirimler', run: () => (location.hash = '#/bildirimler') });
   popMenu(btn, items);
+  if (list.some((x) => !x.read)) api('notices/read', { method: 'POST' }).then(loadSummary).catch(() => {});
 }
 
 function meMenu(btn) {
   const theme = store.get('theme', 'auto');
   const setTheme = (t) => { store.set('theme', t); applyTheme(); };
+  const u = state.user || {};
   popMenu(btn, [
+    { icon: 'user', label: `${u.name || ''} · ${u.role === 'admin' ? 'Yönetici' : 'Personel'}`, run: () => {} },
+    ...(u.id ? [{ icon: 'key', label: 'Şifremi değiştir', run: changePassword }] : []),
     { icon: 'sync', label: 'Şimdi senkronla', run: sync },
-    { icon: 'link', label: 'Entegrasyonlar', run: () => (location.hash = '#/entegrasyonlar') },
     '-',
     { label: `${theme === 'light' ? '✓ ' : ''}Açık tema`, run: () => setTheme('light') },
     { label: `${theme === 'dark' ? '✓ ' : ''}Koyu tema`, run: () => setTheme('dark') },
@@ -108,6 +144,15 @@ function meMenu(btn) {
     '-',
     { icon: 'x', label: 'Çıkış yap', danger: true, run: async () => { await api('logout', { method: 'POST' }).catch(() => {}); location.reload(); } },
   ]);
+}
+function changePassword() {
+  const s = sheet({
+    title: 'Şifremi değiştir', size: 'narrow',
+    body: html`<div class="stack"><label class="field"><span>Mevcut şifre</span><input class="input" type="password" data-old autocomplete="current-password"></label>
+      <label class="field"><span>Yeni şifre (en az 8 karakter)</span><input class="input" type="password" data-new autocomplete="new-password"></label></div>`,
+    foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`,
+  });
+  $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => { await api('me/password', { method: 'POST', body: { old: $('[data-old]', s.el).value, new: $('[data-new]', s.el).value } }); toast('Şifre değişti, tekrar giriş yapın'); setTimeout(() => location.reload(), 1200); });
 }
 function applyTheme() {
   const t = store.get('theme', 'auto');
@@ -117,30 +162,34 @@ function applyTheme() {
 function moreMenu() {
   const s = sheet({
     title: 'Menü', size: 'narrow',
-    body: html`<div class="list">${ROUTES.map((r) => html`<a class="btn block" style="justify-content:flex-start" href="#/${r.path}" data-close><i class="ico ico-${r.icon}"></i>${r.title}</a>`)}</div>`,
+    body: html`${ROUTES.filter((r) => !r.view || canSee(r)).map((r) => (r.sec ? html`<div class="muted tiny" style="font-weight:700;text-transform:uppercase;margin:14px 2px 6px">${r.sec}</div>` : html`<a class="btn block" style="justify-content:flex-start;margin-bottom:6px" href="#/${r.path}"><i class="ico ico-${r.icon}"></i>${r.title}</a>`))}`,
   });
   s.body.addEventListener('click', (e) => { if (e.target.closest('a')) s.close(); });
 }
 
-function login(info = {}) {
+async function login(info = {}) {
   closeAllSheets();
   $$('.side, .main, .tabbar').forEach((e) => e.classList.add('hide'));
   if ($('.login')) return;
+  const brand = await fetch('/api/brand').then((r) => r.json()).catch(() => ({}));
   const box = document.createElement('div');
   box.className = 'login';
   render(box, html`<form class="card stack">
-    <div class="row"><img src="icon.svg" alt="" style="width:40px;height:40px"><div><h2>Satış Yönetimi</h2><div class="muted small">5 kanal, tek panel</div></div></div>
+    <img class="logo-big" src="${brand.logo || 'logo.webp'}" alt="${brand.title || 'Logo'}">
+    <div class="muted small" style="text-align:center;margin-top:-6px">${brand.legal || brand.title || ''} · Satış yönetim paneli</div>
     ${info.setup ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Panel şifresi henüz tanımlanmamış. Cloudflare → Worker → Settings → Variables and Secrets bölümüne <b>PANEL_PASSWORD</b> ekleyin.</div></div>` : ''}
-    ${info.demo ? html`<div class="notice"><div>Deneme modu: şifre <b>demo</b></div></div>` : ''}
-    <label class="field"><span>Şifre</span><input class="input" type="password" name="password" autocomplete="current-password" required autofocus></label>
+    ${info.demo || brand.demo ? html`<div class="notice"><div>Deneme modu: kullanıcı adı boş, şifre <b>demo</b></div></div>` : ''}
+    <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" placeholder="yönetici için boş bırakın"></label>
+    <label class="field"><span>Şifre</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>
     <button class="btn primary block lg" type="submit">Giriş yap</button>
     <div class="small" style="color:var(--bad)" data-err></div>
   </form>`);
   document.body.prepend(box);
+  $('[name=username]', box).focus();
   $('form', box).onsubmit = async (e) => {
     e.preventDefault();
     try {
-      await api('login', { method: 'POST', body: { password: e.target.password.value } });
+      await api('login', { method: 'POST', body: { username: e.target.username.value.trim(), password: e.target.password.value } });
       box.remove();
       $$('.side, .main, .tabbar').forEach((x) => x.classList.remove('hide'));
       start();
@@ -169,10 +218,10 @@ document.addEventListener('click', (e) => {
 });
 $('[data-global-search]').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
-  state.globalQ = e.target.value.trim();
+  const q = e.target.value.trim();
   e.target.value = '';
-  if (location.hash.startsWith('#/siparisler')) route(); else location.hash = '#/siparisler';
+  location.hash = '#/siparisler?q=' + encodeURIComponent(q);
 });
-setInterval(() => { loadSummary().catch(() => {}); }, 5 * 60e3);
+setInterval(() => { loadSummary().catch(() => {}); }, 3 * 60e3);
 start();
-export { loadSummary, ago };
+export { ago };
