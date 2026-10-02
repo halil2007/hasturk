@@ -1,0 +1,9 @@
+{
+  "name": "Satış Paneli",
+  "short_name": "Panel",
+  "start_url": "/#/",
+  "display": "standalone",
+  "background_color": "#fcfcfb",
+  "theme_color": "#1f6f43",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

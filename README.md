@@ -6,6 +6,8 @@ Tamamen ücretsiz: **GitHub** (ürünleri 2 saatte bir çeker) + **Cloudflare Pa
 ikas API ──(GitHub Actions, 2 saatte bir)──▶ public/products.json ──▶ Cloudflare Pages ──▶ sitendeki arama
 ```
 
+> **Satış paneli:** İki ikas sitesi + Trendyol + Hepsiburada + PttAVM'nin sipariş, kargo, stok, kârlılık ve istatistiklerini tek ekrandan yöneten panel `panel/` klasöründedir (ayrı bir Cloudflare Worker). Kurulum: [panel/README.md](panel/README.md).
+
 ## Dosyalar
 | Dosya | Ne işe yarar |
 |---|---|

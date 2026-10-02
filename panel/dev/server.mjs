@@ -1,0 +1,33 @@
+// Paneli yerelde çalıştırma (Cloudflare hesabı gerekmeden): node dev/server.mjs  → http://localhost:8787
+// Varsayılan DEMO=1 (örnek veri, şifre: demo). Veritabanı: dev/panel.db
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { join, dirname, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { d1 } from './d1.mjs';
+import worker from '../src/index.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const env = { DEMO: '1', ...process.env, DB: d1(process.env.DB_FILE || join(ROOT, 'dev', 'panel.db')) };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+env.ASSETS = {
+  async fetch(req) {
+    let p = new URL(req.url).pathname;
+    if (p.endsWith('/')) p += 'index.html';
+    try { return new Response(await readFile(join(ROOT, 'public', p.replace(/\.\./g, ''))), { headers: { 'Content-Type': TYPES[extname(p)] || 'application/octet-stream' } }); }
+    catch { return new Response('Bulunamadı', { status: 404 }); }
+  },
+};
+const port = Number(process.env.PORT) || 8787;
+createServer(async (req, res) => {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const request = new Request(`http://localhost:${port}${req.url}`, { method: req.method, headers: req.headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(chunks) });
+  const waits = [];
+  const r = await worker.fetch(request, env, { waitUntil: (p) => waits.push(p) });
+  res.writeHead(r.status, Object.fromEntries(r.headers));
+  res.end(Buffer.from(await r.arrayBuffer()));
+  await Promise.allSettled(waits);
+}).listen(port, () => console.log(`Panel: http://localhost:${port}  (DEMO=${env.DEMO}, şifre: ${env.PANEL_PASSWORD || 'demo'})`));
+// Zamanlanmış senkronu yerelde de çalıştır
+if (process.env.NO_CRON !== '1') setInterval(() => worker.scheduled({}, env, { waitUntil: () => {} }), 10 * 60e3);

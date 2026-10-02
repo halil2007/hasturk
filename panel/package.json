@@ -1,0 +1,12 @@
+{
+  "name": "hasturk-panel",
+  "private": true,
+  "type": "module",
+  "description": "ikas (2 mağaza) + Trendyol + Hepsiburada + PttAVM tek panel: sipariş, kargo, stok, kârlılık, istatistik",
+  "scripts": {
+    "dev": "node dev/server.mjs",
+    "test": "node --test",
+    "deploy": "npx wrangler deploy"
+  },
+  "engines": { "node": ">=22.5" }
+}
