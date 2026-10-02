@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (297 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (304 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -42,24 +42,24 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | Katı Solucan Gübresi 20 KG Çuval | 20,5 | 42 |
-| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 16,2 | 18 |
+| 1 | Katı Solucan Gübresi 20 KG Çuval | 20,4 | 42 |
+| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 16,1 | 18 |
 | 3 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10,1 | 6 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 9,9 | 1 |
 | 5 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 9,8 | 5 |
-| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,6 | 13 |
-| 7 | Kullanıma Hazır Cocopeat Torfu | 8,5 | 16 |
+| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
+| 7 | Kullanıma Hazır Cocopeat Torfu | 8,4 | 16 |
 | 8 | Leonardit - Organik Toprak Düzenleyici | 7,1 | 10 |
 | 9 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 7 | 4 |
-| 10 | Premium Fide Toprağı | 6,7 | 11 |
+| 10 | Premium Fide Toprağı | 6,6 | 11 |
 | 11 | HG Akıllı Bitki ve Saksı Toprağı | 5,6 | 6 |
 | 12 | Sıvı Solucan Gübresi 1 Lt | 5,5 | 7 |
-| 13 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 5,5 | 0 |
+| 13 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 5,4 | 0 |
 | 14 | Uzman 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası | 5,1 | 5 |
 | 15 | HG Tarım Perliti | 4,8 | 6 |
 | 16 | Sıvı Solucan Gübresi 500 ml | 4,8 | 7 |
 | 17 | HG Asidik Torf | 4,4 | 5 |
-| 18 | HG Mezar Toprağı | 4 | 6 |
+| 18 | HG Mezar Toprağı | 3,9 | 6 |
 | 19 | Sıvı Solucan Gübresi 250 ml | 3,8 | 5 |
 | 20 | Limon Ağacı Toprağı - Özel Organik Karışım | 3,7 | 3 |
 
@@ -81,17 +81,17 @@ _Henüz veri yok._
 | 12 | gübr | 1 | 1 |  |  |
 | 13 | gübre | 1 | 1 |  |  |
 | 14 | ilaçlam | 1 | 1 |  |  |
-| 15 | leonar | 1 | 1 |  |  |
-| 16 | limon | 1 | 1 |  |  |
-| 17 | lotu | 1 | 1 |  |  |
-| 18 | per | 1 | 1 |  |  |
-| 19 | sa | 1 | 1 |  |  |
-| 20 | saksı | 1 | 1 |  |  |
-| 21 | enjo | 1 | 1 |  |  |
-| 22 | felici | 1 | 1 |  |  |
-| 23 | hümik | 1 | 1 |  |  |
-| 24 | ilaçlama pompası | 1 | 1 |  |  |
-| 25 | saksı toprağı | 1 | 1 |  |  |
+| 15 | kil b | 1 | 1 |  |  |
+| 16 | leonar | 1 | 1 |  |  |
+| 17 | limon | 1 | 1 |  |  |
+| 18 | lotu | 1 | 1 |  |  |
+| 19 | per | 1 | 1 |  |  |
+| 20 | sa | 1 | 1 |  |  |
+| 21 | saksı | 1 | 1 |  |  |
+| 22 | enjo | 1 | 1 |  |  |
+| 23 | felici | 1 | 1 |  |  |
+| 24 | hümik | 1 | 1 |  |  |
+| 25 | ilaçlama pompası | 1 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
