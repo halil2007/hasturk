@@ -2132,6 +2132,12 @@
       a.unshift(entry); localStorage.setItem('ua-addlog', JSON.stringify(a.slice(0, 5)));
     } catch (e) {}
   }
+  function addLogPatch(o) {
+    try {
+      var a = JSON.parse(localStorage.getItem('ua-addlog') || '[]');
+      if (a[0]) { for (var k in o) a[0][k] = o[k]; localStorage.setItem('ua-addlog', JSON.stringify(a)); }
+    } catch (e) {}
+  }
   // Ürün sayfasını görünmez çerçevede önceden yükle (müşteri "Ekle"ye bastığı an; seçenek seçerken hazır olur)
   var FRAMES = {};
   function loadFrame(p) {
@@ -2203,13 +2209,25 @@
     } catch (e) {}
     return null;
   }
+  // Kanıt (addItemToCart cevabı) geldiği an çerçevedeki site sepet kimliğini henüz kaydetmemiş olabilir; ikas
+  // getCart() kimliği localStorage'dan okur. Kimlik görünene kadar (en fazla ~3 sn) bekleyip sonra okutur.
   function syncSiteCart() {
-    try {
-      var cs = siteCartStore();
-      if (!cs) return;
-      var r = cs.getCart();
-      if (r && r.then) r.then(null, function () {});
-    } catch (e) {}
+    var n = 0;
+    (function tick() {
+      var id = null;
+      try { id = localStorage.getItem('cartId'); } catch (e) {}
+      if ((!id || (CART_ID && id !== CART_ID)) && ++n < 20) return setTimeout(tick, 150);
+      var st = 'depo-yok';
+      try {
+        var cs = siteCartStore();
+        if (cs) {
+          var r = cs.getCart();
+          st = 'yenilendi';
+          if (r && r.then) r.then(null, function () {});
+        }
+      } catch (e) { st = 'hata'; }
+      addLogPatch({ sayfaSepeti: st, bekleme: n });
+    })();
   }
   // ---- Hızlı ekleme 1: sitenin sepete ekleme isteğini bir kez öğren, sonra sayfa açmadan doğrudan gönder ----
   var TPL_KEY = 'ua-addtpl', ADD_TPL = null, PENDING = null;

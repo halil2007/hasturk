@@ -97,7 +97,8 @@ const cartCount = async (p) => p.evaluate(async () => {
   const toast = await p.evaluate(() => { const r = document.getElementById('urun-arama-root').shadowRoot; return [...r.querySelectorAll('.ptoast,[role=status]')].map((x) => x.textContent.trim()).filter(Boolean).join(' / '); });
   const alog = await p.evaluate(() => localStorage.getItem('ua-addlog'));
   log(`Widget: "${name.trim()}" eklendi mesajı: ${toast || '-'}`);
-  log('Widget ekleme kaydı: ' + (alog || '-').slice(0, 600));
+  log('Widget ekleme kaydı: ' + (alog || '-').slice(0, 900));
+  try { const a0 = JSON.parse(alog)[0]; log('Sayfa sepeti yenileme: ' + a0.sayfaSepeti + ' (bekleme ' + a0.bekleme + ')'); } catch (e) {}
   log('Sepet kimliği (sonra): ' + JSON.stringify(await store()));
   // Açık sayfadaki sitenin sepeti (yenilemeden): üstteki sepet sayacı ve sitenin sepet deposu
   log('Sayfa yenilenmeden sitenin sepeti: ' + JSON.stringify(await p.evaluate(() => {
