@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { d1 } from '../dev/d1.mjs';
-import { init, setSetting, first } from '../src/db.js';
-import { saveOrders, applyStock, pushStocks, autoLink } from '../src/sync.js';
+import { init, setSetting, first, getSettings } from '../src/db.js';
+import { saveOrders, applyStock, pushStocks, autoLink, mirrorStock } from '../src/sync.js';
 import { profit, priceFor } from '../public/profit.js';
 import { code128Values } from '../public/labels.js';
 import { parseXml, flat } from '../src/channels/pttavm.js';
@@ -199,4 +199,41 @@ test('Sipariş listesi: tarih / durum filtresi, sayfalama, kâr ve CSV', async (
   assert.match(csv, /^Kanal;Sipariş no/);
   assert.match(csv, /;İptal;/);
   assert.equal(csv.trim().split('\n').length, 4);
+});
+
+test('stok senkronu kapalıyken: hiçbir kanala stok gitmez, panel stoğu ikas sitesinden okunur, panelden değiştirilemez', async () => {
+  const db = d1();
+  await init(db);
+  assert.equal((await getSettings(db)).stock_sync, false, 'ilk kurulumda stok gönderimi kapalı');
+  await db.prepare("INSERT INTO products (id, sku, barcode, name, stock, created_at, updated_at) VALUES (1, 'A', '111', 'Ürün A', 10, 0, 0), (2, 'B', '222', 'Ürün B', 3, 0, 0)").run();
+  await db.prepare("INSERT INTO listings (channel, remote_id, product_id, sku, barcode, pushed_stock, remote_stock) VALUES ('ikas1', 'v1', 1, 'A', '111', 7, 7), ('trendyol', '111', 1, 'A', '111', 99, 99), ('trendyol', '222', 2, 'B', '222', 50, 50)").run();
+  // Trendyol satışı stoğu düşürmez ve hiçbir kanala stok gönderilmez
+  await applyStock(db, await saveOrders(db, 'trendyol', [order('T9', Date.now(), 2)]));
+  assert.deepEqual(await pushStocks({ DEMO: '1' }, db), { skipped: 'Stok senkronu kapalı' });
+  // Panel stoğu ikas'taki adede eşitlenir; ikas ilanı olmayan ürüne dokunulmaz (Trendyol stoğu esas alınmaz)
+  assert.equal(await mirrorStock(db), 1);
+  assert.equal(await stock(db), 7);
+  assert.equal((await first(db, 'SELECT stock FROM products WHERE id = 2')).stock, 3);
+  assert.equal((await first(db, "SELECT reason FROM stock_moves WHERE product_id = 1")).reason, 'Site stoğu (ikas)');
+  assert.equal(await mirrorStock(db), 0, 'değişiklik yoksa yazılmaz');
+  // Panelden stok değiştirme: ikas ilanı olan üründe engellenir, olmayanda serbest
+  const env = { PANEL_PASSWORD: 'x-123456', DB: db };
+  let cookie = '';
+  const call = async (path, opts = {}) => {
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: cookie } }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r;
+  };
+  await call('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+  const r1 = await call('/api/products/1/stock', { method: 'POST', body: JSON.stringify({ qty: 1 }) });
+  assert.equal(r1.status, 409);
+  assert.match((await r1.json()).error, /ikas/);
+  assert.equal((await call('/api/products/2/stock', { method: 'POST', body: JSON.stringify({ qty: 1 }) })).status, 200);
+  // Senkron açılınca ikas'tan okuma durur, stok panelde tutulur
+  await setSetting(db, 'stock_sync', true);
+  await db.prepare("UPDATE listings SET remote_stock = 1 WHERE channel = 'ikas1'").run();
+  assert.equal(await mirrorStock(db), 0);
+  assert.equal(await stock(db), 7);
+  // Tek seferlik kapatma işaretlenmiştir: sonraki açılışlarda kullanıcının açtığı ayar korunur
+  assert.ok(await first(db, "SELECT 1 AS x FROM settings WHERE k = 'once:stock_off_1'"));
 });
