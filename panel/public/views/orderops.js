@@ -111,7 +111,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       <div class="hd"><span class="box"><i class="ico ico-box"></i></span><b>Paket ${p.no}</b><span class="muted small">• ${qty} ürün</span><span class="spacer"></span><span class="pill ${ls.cls}">${ls.text}</span></div>
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
         : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
-      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || o.cargo_company || (caps().cargo === 'pack' ? 'ikas Kargo (öncelik sırasına göre)' : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
+      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${o.extra && o.extra.cargoChoice ? ` · müşterinin seçtiği: ${o.extra.cargoChoice}` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
         ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company ? 'Değiştir' : 'Seç'}</button>` : ''}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
       ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
@@ -199,10 +199,20 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       <div class="notice ${r.error ? 'bad' : 'warn'}"><i class="ico ico-warn"></i><div>${r.error || r.pending}</div></div>
       ${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<div class="small muted">Kanaldan gelen gerçek gönderi barkodu: <b class="num">${pkg.barcode || pkg.tracking}</b> (${pkg.cargo_company || 'kargo'}). Kanalın etiketi gelene kadar beklemeniz önerilir; kargo firması kabul ediyorsa bu barkodla kendi etiketimizi de yazdırabilirsiniz.</div>` : html`<div class="small muted">Gerçek gönderi oluşmadığı için etiket verilmedi. Senkronda durum otomatik güncellenir; “Etiket oluştur”a tekrar basarak kontrol edebilirsiniz.</div>`}
     </div>`,
-    foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}<button class="btn primary" data-close>Kapat</button>` });
+    foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.repack ? html`<button class="btn primary" data-repack><i class="ico ico-sync"></i>ikas Kargo ile yeniden hazırla</button>` : ''}${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}<button class="btn primary" data-close>Kapat</button>` });
     $('[data-diag]', s.el).onclick = () => { s.close(); diagnoseDialog(d.order.channel, d.order.id, d.order.order_number); };
+    const rp = $('[data-repack]', s.el);
+    if (rp) rp.onclick = (e) => busy(e.currentTarget, async () => { s.close(); await repackPkg(pkg); });
     const own = $('[data-own]', s.el);
     if (own) own.onclick = async () => { s.close(); await printLabels([{ order: d.order, pkg }], state.settings && state.settings.sender); await mark(d.order.id, [pkg.id], 'viewed'); askPrinted([{ orderId: d.order.id, pkgId: pkg.id }], changed); };
+  }
+  // ikas Kargo ile yeniden hazırla, sonra etiketi tekrar iste (ikas Kargo gönderiyi açarsa etiket gelir)
+  async function repackPkg(pkg) {
+    const res = await api(`orders/${enc}/repack`, { method: 'POST', body: { package_id: pkg.id } });
+    toast(res.message); await changed();
+    const r = await fetchLabel(pkgOf(pkg.id));
+    if (r.error || r.pending) { await changed(); notReady(r); return; }
+    toast(`${chName()} etiketi hazır`); await outputLabel(r, { done: changed }); await changed();
   }
   const ops = {
     accept: (b) => busy(b, async () => { const r = await api(`orders/${enc}/accept`, { method: 'POST', body: {} }); toast(r.message); await changed(); }),
@@ -242,6 +252,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
           : { icon: 'check', label: 'Yazdırıldı olarak işaretle', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'printed'); toast('İşaretlendi'); await changed(); }) });
         items.push({ icon: 'print', label: 'Kendi etiketimizi yazdır (kanal barkoduyla)', run: async () => { await printLabels([{ order: d.order, pkg }], state.settings && state.settings.sender); await mark(d.order.id, [pkg.id], 'viewed'); askPrinted([{ orderId: d.order.id, pkgId: pkg.id }], changed); } });
       }
+      if (open && pkg.packed_at && c.repack && !pkg.barcode && !pkg.tracking) items.push({ icon: 'sync', label: 'ikas Kargo ile yeniden hazırla (barkod gelmiyorsa)', run: () => busy(null, () => repackPkg(pkg)) });
       if (open && pkg.packed_at && pkg.remote_id && c.cancelPackage) items.push('-', { icon: 'x', danger: true, label: 'Paketi iptal et (kanalda paketlemeyi geri al)', run: async () => {
         if (!(await confirmBox(`Paket ${pkg.no} ${chName()}'da iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
         busy(null, async () => { const r = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });

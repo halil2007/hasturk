@@ -1,6 +1,6 @@
 // Kargo: paketler dört aşamada — hazırlanacak (paketle + etiket al), etiketi yazdırılacak, kargoya verilecek (etiket
 // yazdırıldı), kargoda. Etiketler kanalların kendi sistemlerinden gelir: ikas Kargo, Trendyol ortak etiketi, Hepsiburada paket etiketi.
-import { api, html, render, $, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels } from '../core.js';
+import { api, html, render, $, ch, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels } from '../core.js';
 import { packageAction, openOrder, bulkLabels, labelState } from './orderops.js';
 import { setQuery, loadSummary } from '../app.js';
 
@@ -33,7 +33,7 @@ export async function cargo(el, rest, query = {}) {
     return html`<button class="btn sm" data-act="label" ${o}><i class="ico ico-print"></i>Tekrar</button><button class="btn sm primary" data-act="ship" ${o}><i class="ico ico-truck"></i>Kargoya ver</button>`;
   };
   const acts = (r) => html`<div class="row" style="justify-content:flex-end;flex-wrap:nowrap">${next(r)}
-    ${f.state !== 'shipped' && r.pkg ? html`<button class="icon-btn sm" data-act="cargo" data-o="${r.order_id}" data-p="${r.pkg}" title="Kargo firması seç / değiştir" aria-label="Kargo firması"><i class="ico ico-truck"></i></button>` : ''}
+    ${f.state !== 'shipped' && r.pkg && (ch(r.channel).caps || {}).cargo ? html`<button class="icon-btn sm" data-act="cargo" data-o="${r.order_id}" data-p="${r.pkg}" title="Kargo firması seç / değiştir" aria-label="Kargo firması"><i class="ico ico-truck"></i></button>` : ''}
     <button class="icon-btn sm" data-act="open" data-o="${r.order_id}" title="Siparişi yönet" aria-label="Siparişi yönet"><i class="ico ico-dots"></i></button></div>`;
   function draw() {
     const c = data.counts;

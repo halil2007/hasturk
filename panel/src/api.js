@@ -276,6 +276,18 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     await event(db, o, 'cargo', user, cargo.name);
     return { ok: true, message: `Kargo firması ${cargo.name} olarak değiştirildi; etiketi yeniden oluşturun` };
   }
+  if (action === 'repack') {
+    // ikas Kargo ile yeniden hazırla: elle kargo bilgisiyle oluşmuş paketi iptal edip takip bilgisi olmadan yeniden "Kargoya Hazır" yap
+    const pkg = pkgOf(b.package_id);
+    if (!ch || !ch.enabled || !ch.repack) fail(400, 'Bu kanalda desteklenmiyor');
+    if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paket yeniden hazırlanamaz');
+    const r = await ch.repack(o, pkg);
+    await run(db, "UPDATE packages SET remote_id = ?, remote_status = ?, barcode = '', tracking = '', cargo_company = ?, cargo_code = NULL, agreement = NULL, packed_at = ?, error = ? WHERE id = ?",
+      r.remoteId, r.remoteStatus || '', r.cargoCompany || '', Date.now(), r.error || null, pkg.id);
+    await clearLabel(db, pkg.id);
+    await event(db, o, 'pack', user, `Paket ${pkg.no}: ikas Kargo ile yeniden hazırlandı`);
+    return { ok: true, message: `Paket ${pkg.no} ikas'ta yeniden “Kargoya Hazır” yapıldı (kargo bilgisi ikas Kargo'ya bırakıldı)` };
+  }
   if (action === 'cancel-package') {
     const pkg = pkgOf(b.package_id);
     if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paket iptal edilemez');
@@ -385,7 +397,7 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   }
   if (r.barcode || r.tracking || r.cargoCompany || r.remoteStatus) await updPkg(db, pkg.id, { barcode: r.barcode, tracking: r.tracking, cargoCompany: r.cargoCompany, remoteStatus: r.remoteStatus, agreement: r.agreement });
   // Gerçek gönderi / etiket henüz yok: işlem tamamlanmış sayılmaz (adım ve varsa gerçek barkod bilgisiyle döner)
-  if (r.pending) return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly };
+  if (r.pending) return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly, repack: !!r.repack };
   if (r.panel) {
     await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?), error = NULL WHERE id = ?', Date.now(), pkg.id);
     return { official: null, panel: true };
