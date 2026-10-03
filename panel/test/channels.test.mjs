@@ -98,20 +98,35 @@ test('ikas Kargo: paketle "Kargoya Hazır" (FulFillOrderInput) gönderir, etiket
     }],
   ]);
   const ch = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
-  const opts = await ch.cargoOptions();
-  assert.equal(opts[0].id, '', 'ilk seçenek: ikas Kargo önceliği');
-  assert.deepEqual(opts.slice(1).map((x) => x.name), ['Aras Kargo', 'Yurtiçi Kargo']);
+  const opts = await ch.cargoOptions({ extra: { cargoChoice: 'HepsiJet' } });
+  assert.equal(opts.length, 1, 'firma panelden seçilmez; ikas Kargo belirler');
+  assert.match(opts[0].name, /ikas Kargo — müşterinin seçtiği: HepsiJet/);
+  assert.equal(ch.caps.cargo, false);
   const order = { remote_id: 'o1', order_number: '1001' };
   const pkg = { no: 1, items: [{ line_id: 'li1', qty: 2 }] };
-  const r = await ch.pack(order, [pkg], { cargo: { id: 'c2', name: 'Yurtiçi Kargo' } });
+  const r = await ch.pack(order, [pkg], { cargo: { id: 'c2', name: 'Yurtiçi Kargo' } }); // eski çağrı biçimi: firma yok sayılır
   assert.equal(r.packages[0].remoteId, 'pk1');
   const ff = bodies.filter((b) => /fulfillOrder/.test(b.query)).pop();
   assert.match(ff.query, /\$input: FulFillOrderInput!/, 'ikas şemasındaki tip adı');
   assert.equal(ff.variables.input.markAsReadyForShipment, true);
   assert.deepEqual(ff.variables.input.lines, [{ orderLineItemId: 'li1', quantity: 2 }]);
-  assert.deepEqual(ff.variables.input.trackingInfoDetail, { cargoCompanyId: 'c2', cargoCompany: 'Yurtiçi Kargo' });
+  assert.equal(ff.variables.input.trackingInfoDetail, undefined, 'takip bilgisi gönderilmez (gönderilirse ikas paketi elle kargo sayar, ikas Kargo işlemez)');
   // Barkod henüz yok → bekleniyor
-  assert.ok((await ch.label(order, { ...pkg, remote_id: 'pk1' })).pending);
+  const w = await ch.label(order, { ...pkg, remote_id: 'pk1' });
+  assert.ok(w.pending); assert.equal(w.step, 'waiting');
+  // Eski sürümün elle kargo bilgisiyle oluşturduğu paket → ikas Kargo işlemez; yeniden hazırlama önerilir ve takip bilgisi olmadan yapılır
+  pkgState = { ...pkgState, trackingInfo: { cargoCompanyId: 'c2', cargoCompany: 'Yurtiçi Kargo' } };
+  const mc = await ch.label(order, { ...pkg, remote_id: 'pk1' });
+  assert.equal(mc.step, 'manualCargo'); assert.equal(mc.repack, true);
+  pkgState = { ...pkgState, trackingInfo: {} };
+  const n0 = bodies.length;
+  await ch.repack(order, { ...pkg, remote_id: 'pk1' });
+  const after = bodies.slice(n0);
+  assert.ok(/cancelFulfillment/.test(after[0].query), 'önce ikas paketi iptal edilir');
+  const ff2 = after.find((b) => /fulfillOrder/.test(b.query));
+  assert.equal(ff2.variables.input.markAsReadyForShipment, true);
+  assert.equal(ff2.variables.input.trackingInfoDetail, undefined);
+  await assert.rejects(() => ch.repack(order, { ...pkg, remote_id: 'pk1', barcode: '7300' }), /barkodu var/);
   // ikas Kargo gönderiyi açtı (barkod var) ama etiket görseli yok → hazır SAYILMAZ, bekleniyor (gerçek barkod bilgisiyle)
   pkgState = { ...pkgState, appId: 'ikas-kargo', trackingInfo: { barcode: '7300123', cargoCompany: 'Yurtiçi Kargo' } };
   const l1 = await ch.label(order, { ...pkg, remote_id: 'pk1' });
