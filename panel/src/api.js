@@ -16,7 +16,7 @@ import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, expla
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
 const LABEL_REMOTE = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada'];
-const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, tracking, barcode, agreement, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
+const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, tracking, barcode, agreement, tracking_url, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
 
 // ---------- siparişler ----------
 async function loadOrder(db, id) {
@@ -24,7 +24,7 @@ async function loadOrder(db, id) {
   if (!o) fail(404, 'Sipariş bulunamadı');
   o.address = parse(o.address, {});
   o.extra = parse(o.extra, {});
-  o.items = await all(db, `SELECT i.*, p.name AS product_name, p.stock AS product_stock, p.purchase_price, p.desi, p.image AS product_image, l.commission AS listing_commission
+  o.items = await all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.desi, p.image AS product_image, l.commission AS listing_commission
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = ? AND l.remote_id = i.remote_key
     WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id);
@@ -433,7 +433,7 @@ async function listPackages(db, q) {
   };
   const st = states[q.state] ? q.state : 'waiting';
   const w = (s) => 'WHERE ' + [states[s], ...where].join(' AND ');
-  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.agreement, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
+  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.agreement, p.tracking_url, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
       p.packed_at, p.error, p.label_at, p.label_printed_at, p.remote_id,
       o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.ship_by, o.status AS order_status, (SELECT COUNT(*) FROM packages x WHERE x.order_id = p.order_id) AS pkg_total
     ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args);
@@ -615,6 +615,9 @@ async function saveSettings(db, b) {
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
     if (k === 'autoprice') v = !!v;
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
+    if (k === 'track_urls') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).map(([a, b]) => [str(a).slice(0, 40), str(b).slice(0, 300)]).filter(([a, b]) => a && /^https:\/\/[^\s]+$/i.test(b) && b.includes('{no}')).slice(0, 30));
+    if (k === 'label_size') v = ['100x150', 'a5', 'a4'].includes(v) ? v : '100x150';
+    if (k === 'hold_channels') v = [...new Set((Array.isArray(v) ? v : []).filter((c) => CHANNEL_IDS.includes(c)))];
     if (k === 'mail_enabled') v = !!v;
     if (k === 'mail_to') {
       v = [...new Set((Array.isArray(v) ? v : String(v || '').split(/[\s,;]+/)).map((x) => str(x).toLowerCase()).filter(Boolean))].slice(0, 10);

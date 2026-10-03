@@ -468,32 +468,53 @@ details.adv summary::-webkit-details-marker { display: none; }
 /* ---------- yazdırma (kargo etiketi) ---------- */
 #print { display: none; }
 @media print {
-  @page { size: 100mm 150mm; margin: 0; }
   body { background: #fff; display: block; }
   .side, .main, #sheet-root, #toast, .tabbar { display: none !important; }
   #print { display: block; }
 }
-.slabel { width: 100mm; height: 150mm; padding: 5mm; box-sizing: border-box; color: #000; background: #fff; font: 11pt/1.3 Arial, Helvetica, sans-serif; display: flex; flex-direction: column; gap: 2.5mm; page-break-after: always; overflow: hidden; }
-.slabel .lb-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 0.6mm solid #000; padding-bottom: 2mm; font-size: 9pt; }
-.slabel .lb-ch { font-size: 13pt; font-weight: 800; }
-.slabel .lb-to { font-size: 9pt; }
-.slabel .lb-name { font-size: 15pt; font-weight: 800; margin-top: 1mm; }
-.slabel .lb-addr { font-size: 11pt; }
-.slabel .lb-city { font-size: 14pt; font-weight: 800; }
-.slabel .lb-brand { display: flex; align-items: center; justify-content: space-between; gap: 3mm; height: 11mm; }
-.slabel .lb-logo { max-height: 10mm; max-width: 42mm; object-fit: contain; filter: grayscale(1) contrast(1.4); }
-.slabel .lb-mark { font: 900 15pt/1 Arial, Helvetica, sans-serif; letter-spacing: -0.3mm; border: 0.6mm solid #000; border-radius: 2mm; padding: 1mm 2.5mm; white-space: nowrap; }
+/* Kendi kargo etiketimiz: barkod alanı geniş ve beyaz kenarlı (okunabilirlik); boyut s-100x150 | s-a5 | s-a4 */
+.slabel { width: 100mm; height: 150mm; padding: 4.5mm; box-sizing: border-box; color: #000; background: #fff; font: 10pt/1.3 Arial, Helvetica, sans-serif; display: flex; flex-direction: column; gap: 2mm; page-break-after: always; overflow: hidden; }
+.slabel.s-a5 { width: 148mm; height: 210mm; padding: 8mm; font-size: 10.5pt; gap: 3mm; }
+.slabel.s-a4 { width: 210mm; height: 297mm; padding: 12mm; font-size: 11pt; gap: 4mm; }
+.slabel .lb-hd { display: flex; align-items: center; justify-content: space-between; gap: 3mm; padding-bottom: 2mm; border-bottom: 0.4mm solid #000; }
+.slabel .lb-logo { max-height: 11mm; max-width: 48mm; object-fit: contain; }
+.slabel.s-a5 .lb-logo, .slabel.s-a4 .lb-logo { max-height: 15mm; max-width: 70mm; }
+.slabel .lb-mark { font: 900 14pt/1 Arial, Helvetica, sans-serif; letter-spacing: -0.3mm; border: 0.6mm solid #000; border-radius: 2mm; padding: 1.2mm 2.5mm; white-space: nowrap; }
 .slabel .lb-mark.ikas { text-transform: lowercase; } .slabel .lb-mark.pttavm { letter-spacing: 0; }
-.slabel .lb-agree { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; font-size: 10pt; }
-.slabel .lb-agree b { font-size: 12pt; } .slabel .lb-agree span { font-size: 9pt; font-weight: 700; border-bottom: 0.4mm solid #000; }
-.slabel .lb-bar { text-align: center; border-top: 0.6mm solid #000; border-bottom: 0.6mm solid #000; padding: 2mm 0; }
-.slabel .lb-bar svg { width: 100%; height: 22mm; }
-.slabel .lb-bar .code { font: 700 11pt/1.2 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.5mm; }
-.slabel .lb-meta { display: flex; justify-content: space-between; font-size: 10pt; font-weight: 700; }
-.slabel .lb-items { font-size: 8.5pt; flex: 1; overflow: hidden; }
-.slabel .lb-items div { display: flex; gap: 2mm; } .slabel .lb-items b { min-width: 6mm; }
-.slabel .lb-from { font-size: 8pt; border-top: 0.3mm solid #000; padding-top: 1.5mm; }
-.slabel .lb-pkg { font-size: 22pt; font-weight: 900; border: 0.8mm solid #000; padding: 0 2mm; line-height: 1.1; }
+.slabel .lb-cargo { display: flex; align-items: center; justify-content: space-between; gap: 2mm; }
+.slabel .lb-cargo b { display: block; font-size: 15pt; font-weight: 900; line-height: 1.1; }
+.slabel .lb-agr { display: inline-block; margin-top: 1mm; font-size: 8.5pt; font-weight: 700; border: 0.35mm solid #000; border-radius: 1mm; padding: 0.4mm 1.5mm; }
+.slabel .lb-pkg { font-size: 18pt; font-weight: 900; border: 0.7mm solid #000; padding: 0 2mm; line-height: 1.15; }
+.slabel .lb-main { display: flex; flex-direction: column; gap: 2mm; }
+.slabel .lb-bar { text-align: center; padding: 1.5mm 3mm; border-top: 0.5mm solid #000; border-bottom: 0.5mm solid #000; }
+.slabel .lb-bar svg { display: block; width: 100%; height: 24mm; }
+.slabel .lb-bar .code { font: 700 12pt/1.25 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.6mm; margin-top: 0.8mm; }
+.slabel .lb-bar .warn { font-size: 7pt; }
+.slabel .lb-info { display: grid; grid-template-columns: 1fr 1.15fr; gap: 3mm; }
+.slabel .lb-info dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.6mm 2mm; font-size: 8.5pt; align-content: start; }
+.slabel .lb-info dt { color: #000; opacity: .75; } .slabel .lb-info dd { margin: 0; word-break: break-word; }
+.slabel .lb-to { border-left: 0.4mm solid #000; padding-left: 2.5mm; }
+.slabel .lb-to .lbl { font-size: 7.5pt; font-weight: 700; letter-spacing: .3mm; }
+.slabel .lb-to .nm { font-size: 13pt; font-weight: 900; line-height: 1.15; }
+.slabel .lb-to .ph { font-size: 10pt; font-weight: 700; }
+.slabel .lb-to .ad { font-size: 9pt; }
+.slabel .lb-to .ct { font-size: 12pt; font-weight: 900; }
+.slabel .lb-items { width: 100%; border-collapse: collapse; font-size: 8.5pt; flex: 0 1 auto; }
+.slabel .lb-items th { text-align: left; font-size: 7.5pt; border-bottom: 0.4mm solid #000; padding: 0.5mm 0; }
+.slabel .lb-items td { border-bottom: 0.2mm solid #999; padding: 1mm 0; vertical-align: top; }
+.slabel .lb-items .q { width: 8mm; font-weight: 900; font-size: 10pt; }
+.slabel .lb-items .n { font-weight: 700; }
+.slabel .lb-items .v { display: inline-block; margin: 0.4mm 1.5mm 0 0; padding: 0 1.2mm; border: 0.3mm solid #000; border-radius: 1mm; font-weight: 700; font-size: 8pt; }
+.slabel .lb-items .s { font-size: 7pt; opacity: .8; }
+.slabel .lb-items .p { text-align: right; white-space: nowrap; width: 18mm; }
+.slabel .lb-from { font-size: 7.5pt; border-top: 0.3mm solid #000; padding-top: 1.2mm; margin-top: auto; }
+/* A5 / A4: örnek düzen — solda bilgiler, sağda barkod */
+.slabel.s-a5 .lb-main, .slabel.s-a4 .lb-main { flex-direction: row-reverse; align-items: flex-start; gap: 6mm; }
+.slabel.s-a5 .lb-bar, .slabel.s-a4 .lb-bar { flex: 0 0 48%; border: 0; padding: 0; }
+.slabel.s-a5 .lb-info, .slabel.s-a4 .lb-info { flex: 1; grid-template-columns: 1fr; }
+.slabel.s-a5 .lb-to, .slabel.s-a4 .lb-to { border-left: 0; padding-left: 0; border-top: 0.3mm solid #000; padding-top: 2mm; }
+.slabel.s-a5 .lb-bar svg, .slabel.s-a4 .lb-bar svg { height: 26mm; }
+.slabel.s-a5 .lb-items, .slabel.s-a4 .lb-items { flex: 0 0 auto; font-size: 10pt; }
 
 /* ---------- 3. aşama: logo, gruplu menü, hızlı işler, çekmece ---------- */
 .brand-card { display: block; background: #fff; border-radius: 12px; padding: 10px 12px; margin: 0 2px 6px; }

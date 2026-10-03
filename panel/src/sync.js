@@ -6,7 +6,7 @@
 //  Başarısız adım bir kez daha denenir; üst üste başarısız olursa Bildirimler'e yazılır.
 import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
-import { mergeStatus, chunk, str, sleep } from './util.js';
+import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
 import { autoMatch, relinkItems } from './match.js';
 import { runJobs } from './backfill.js';
 import { runBuybox } from './buybox.js';
@@ -111,16 +111,17 @@ export async function saveOrders(db, ch, orders, maps) {
           const packed = p.packed ?? !/^(Created|Awaiting)$/.test(p.remoteStatus || '');
           // Kargo anlaşması: pazaryeri paketleri o pazaryerinin anlaşmasıyla; ikas paketi yalnızca ikas Kargo işlediyse
           const agreement = p.agreement || (MARKETPLACES.includes(ch) ? ch : null);
-          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at, packed_at, error, agreement)
-            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at, packed_at, error, agreement, tracking_url)
+            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (order_id, remote_id) DO UPDATE SET items = excluded.items, remote_status = excluded.remote_status,
               status = CASE WHEN packages.status = 'shipped' AND excluded.status = 'open' THEN 'shipped' ELSE excluded.status END,
               shipped_at = CASE WHEN excluded.status = 'shipped' THEN COALESCE(packages.shipped_at, excluded.shipped_at) ELSE packages.shipped_at END,
               cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), packages.tracking),
               barcode = COALESCE(NULLIF(excluded.barcode, ''), packages.barcode), error = excluded.error,
               agreement = CASE WHEN packages.agreement = 'own' THEN 'own' ELSE COALESCE(excluded.agreement, packages.agreement) END,
+              tracking_url = COALESCE(NULLIF(excluded.tracking_url, ''), packages.tracking_url),
               packed_at = CASE WHEN excluded.packed_at IS NULL THEN NULL ELSE COALESCE(packages.packed_at, excluded.packed_at) END`)
-            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', p.barcode || '', t, p.status === 'shipped' ? t : null, packed ? t : null, p.error || null, agreement));
+            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', p.barcode || '', t, p.status === 'shipped' ? t : null, packed ? t : null, p.error || null, agreement, /^https?:\/\//i.test(p.trackingUrl || '') ? p.trackingUrl : ''));
         }
       }
     }
@@ -240,7 +241,7 @@ export async function pushStocks(env, db, settings, only) {
     } catch (e) {
       result[ch.id] = 'hata: ' + e.message;
       await log(db, ch.id, 'error', 'Stok gönderilemedi: ' + e.message);
-      await notify(db, `stock:${ch.id}`, { channel: ch.id, title: `${ch.name}: stok gönderilemedi`, msg: e.message });
+      await notify(db, `stock:${ch.id}`, { channel: ch.id, title: `${ch.name}: stok gönderilemedi (${items.length} ilan bekliyor)`, msg: explainHttp(e.message) + ' · Bir sonraki senkronda yeniden denenir.' });
       for (const part of chunk(items, 90)) {
         await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND remote_id = ?').bind('Stok: ' + e.message.slice(0, 200), ch.id, x.remoteId)));
       }
@@ -260,9 +261,12 @@ export async function pushPrices(env, db) {
       for (const part of chunk(items, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL WHERE channel = ? AND remote_id = ?').bind(ch.id, x.remoteId)));
       result[ch.id] = items.length;
       await log(db, ch.id, 'info', `${items.length} ilanın fiyatı gönderildi`);
+      await resolve(db, `price:${ch.id}`);
     } catch (e) {
       result[ch.id] = 'hata: ' + e.message;
       await log(db, ch.id, 'error', 'Fiyat gönderilemedi: ' + e.message);
+      // Bekleyen fiyatlar silinmez; bir sonraki senkronda yeniden denenir
+      await notify(db, `price:${ch.id}`, { channel: ch.id, title: `${ch.name}: fiyat gönderilemedi (${items.length} ilan bekliyor)`, msg: explainHttp(e.message) + ' · Bir sonraki senkronda yeniden denenir.' });
     }
   }
   return result;
@@ -288,6 +292,11 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     const chans = (await getChannels(env, db)).filter((c) => c.enabled && (!only || only.includes(c.id)));
     for (const ch of chans) {
       const st = (await getRaw(db, 'last:' + ch.id)) || {};
+      // Art arda hata veren kanal kademeli beklenir (3. hatadan sonra 15, 30, 45 … en çok 2 saat); "Senkronla" düğmesi beklemeyi atlar
+      if (!force && st.fails >= 3 && st.at && t - st.at < Math.min(st.fails - 2, 8) * 15 * 60e3) {
+        out.channels[ch.id] = `beklemede: art arda ${st.fails} hata, sonraki deneme ${new Date(st.at + Math.min(st.fails - 2, 8) * 15 * 60e3).toISOString().slice(11, 16)} UTC`;
+        continue;
+      }
       // 1) siparişler
       const cursor = await getRaw(db, 'cursor:' + ch.id);
       const since = cursor ? Math.min(cursor - OVERLAP, ch.byOrderDate ? t - LOOKBACK : Infinity) : t - (ch.demo ? 400 : Math.max(1, Number(settings.history_days) || 30)) * D;
@@ -298,16 +307,17 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
         // Yeni sipariş e-postası: kanalın ilk aktarımında (imleç yokken) gönderilmez
         if (cursor && ids.created && ids.created.length) out.mailQueued = (out.mailQueued || 0) + await queueNew(db, ch, ids.created, settings).catch(() => 0);
         await setSetting(db, 'cursor:' + ch.id, t);
-        Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, warn: orders.warnings || null });
+        Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, nextTry: null, warn: orders.warnings || null });
         out.channels[ch.id] = orders.length;
         if (orders.warnings) await log(db, ch.id, 'warn', orders.warnings.join(' | '));
         await resolve(db, `orders:${ch.id}`);
       } catch (e) {
         out.channels[ch.id] = 'hata: ' + e.message;
-        Object.assign(st, { at: t, ok: false, error: e.message.slice(0, 500), fails: (st.fails || 0) + 1 });
+        Object.assign(st, { at: t, ok: false, error: explainHttp(e.message).slice(0, 600), fails: (st.fails || 0) + 1 });
+        if (st.fails >= 3) st.nextTry = t + Math.min(st.fails - 2, 8) * 15 * 60e3;
         await log(db, ch.id, 'error', 'Sipariş çekilemedi: ' + e.message);
         // Bir sonraki senkronda da düzelmezse (yaklaşık 15 dk) bildirim
-        if (st.fails >= 2 || force) await notify(db, `orders:${ch.id}`, { channel: ch.id, title: `${ch.name}: siparişler alınamıyor`, msg: e.message });
+        if (st.fails >= 2 || force) await notify(db, `orders:${ch.id}`, { channel: ch.id, title: `${ch.name}: siparişler alınamıyor`, msg: explainHttp(e.message) + (st.fails >= 3 ? ' · Art arda hata: kanal kademeli aralıklarla yeniden denenir (“Senkronla” hemen dener).' : '') });
       }
       // 2) ilanlar (ürün, görsel, varyant, kanaldaki stok) — en geç 14 dakikada bir
       if (ch.fetchListings && (listings || force || !st.listingsAt || t - st.listingsAt >= LISTING_EVERY)) {

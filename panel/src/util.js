@@ -45,7 +45,9 @@ export async function http(url, { method = 'GET', headers = {}, body: b, timeout
     const t = setTimeout(() => ctl.abort(), timeout);
     let res;
     try {
-      res = await fetch(url, { method, headers, body: b, signal: ctl.signal });
+      // Kimliksiz (User-Agent'sız) istekleri bazı pazaryeri güvenlik duvarları 403 ile reddeder: verilmediyse panel kimliği eklenir
+      const h = headers && !Object.keys(headers).some((k) => k.toLowerCase() === 'user-agent') ? { ...headers, 'User-Agent': 'HasturkPanel/1.0 (+https://workers.cloudflare.com)' } : headers;
+      res = await fetch(url, { method, headers: h, body: b, signal: ctl.signal });
     } catch (e) {
       clearTimeout(t);
       if (i < tries) { await sleep(800 * i); continue; }

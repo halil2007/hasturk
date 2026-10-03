@@ -15,6 +15,16 @@ export const CHANNEL_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm
 // sipariş, ürün, stok ve analiz ekranlarına ve senkrona girmez. Bilgiler değişirse yeniden onay gerekir.
 export const GATED = ['pttavm', 'n11', 'idefix', 'pazarama'];
 
+// Beklemedeki kanal (Entegrasyonlar → "Kanala yazmayı beklet"): siparişler, ürünler, stok ve etiketler okunmaya devam eder;
+// kanala yazan işlemler (paketleme / kargoya hazırlama, kargoya verme, paket iptali, stok ve fiyat gönderimi, ürün oluşturma) yapılmaz.
+export const WRITE_OPS = ['accept', 'split', 'pack', 'ship', 'repack', 'cancelPackage', 'changeCargo', 'pushStock', 'pushPrice', 'createProduct', 'answer'];
+export const DEFAULT_HOLD = ['ikas1', 'ikas2'];
+function held(c) {
+  const o = { ...c, hold: true, caps: { ...(c.caps || {}), hold: true, accept: 'local', split: 'local', pack: null, ship: 'local', cargo: false, repack: false, cancelPackage: false, createProduct: false, price: false } };
+  for (const k of WRITE_OPS) delete o[k];
+  return o;
+}
+
 // Yapılandırma değişmedikçe kanal nesneleri (ve aldıkları erişim belirteçleri) yeniden kullanılır
 let cache = null;
 export async function getChannels(env, db) {
@@ -44,6 +54,8 @@ export async function getChannels(env, db) {
   };
   const verified = {};
   if (db) for (const id of GATED) verified[id] = await getRaw(db, 'verified:' + id);
+  const holdIds = db ? (await getRaw(db, 'hold_channels')) ?? DEFAULT_HOLD : [];
+  const hold = new Set(Array.isArray(holdIds) ? holdIds : []);
   const list = CHANNEL_IDS.map((id) => {
     // Panelde "pasif" yapılan kanal hiç çalışmaz
     if (cfg[id] && cfg[id].active === false) return { ...real[id], enabled: false, paused: true };
@@ -54,11 +66,12 @@ export async function getChannels(env, db) {
       return real[id];
     }
     // DEMO=1: anahtarı olmayan kanallar örnek veriyle çalışır (anahtarı girilmiş kanal gerçek kalır)
-    return env.DEMO === '1' && !real[id].enabled ? demo(meta[id]) : real[id];
+    const c = env.DEMO === '1' && !real[id].enabled ? demo(meta[id]) : real[id];
+    return hold.has(id) && !c.demo ? held(c) : c;
   });
   cache = { env, ver, list };
   return list;
 }
 export const resetChannels = () => { cache = null; };
 export const channel = async (env, db, id) => (await getChannels(env, db)).find((c) => c.id === id);
-export const publicInfo = (c) => ({ id: c.id, type: c.type, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, beta: !!c.beta, missing: c.missing, caps: c.caps });
+export const publicInfo = (c) => ({ id: c.id, type: c.type, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, beta: !!c.beta, hold: !!c.hold, missing: c.missing, caps: c.caps });

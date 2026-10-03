@@ -1,6 +1,6 @@
 // Kargo: paketler dört aşamada — hazırlanacak (paketle + etiket al), etiketi yazdırılacak, kargoya verilecek (etiket
 // yazdırıldı), kargoda. Etiketler kanalların kendi sistemlerinden gelir: ikas Kargo, Trendyol ortak etiketi, Hepsiburada paket etiketi.
-import { api, html, render, $, ch, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels } from '../core.js';
+import { api, html, render, $, ch, trackBtn, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels } from '../core.js';
 import { packageAction, openOrder, bulkLabels, labelState } from './orderops.js';
 import { setQuery, loadSummary } from '../app.js';
 
@@ -11,7 +11,7 @@ export async function cargo(el, rest, query = {}) {
   const sel = new Set();
   let data = { packages: [], unpacked: [], counts: {} };
   render(el, html`<div class="stack">
-    <div class="notice"><i class="ico ico-truck"></i><div>Kargo etiketleri <b>kanalların kendi sistemlerinden</b> alınır: ikas Kargo (paket “Kargoya Hazır” olunca), Trendyol ortak etiketi, Hepsiburada paket etiketi. Kargo firması kanalın listesinden seçilir. “Paketle ve etiket al” her paketi kanalda kargoya hazırlar ve etiketini getirir.</div></div>
+    <div class="notice"><i class="ico ico-truck"></i><div>Kargo etiketleri <b>kanalların kendi sistemlerinden</b> alınır: Trendyol ortak etiketi, Hepsiburada paket etiketi, ikas Kargo etiketi. “Paketle ve etiket al” paketi kanalda kargoya hazırlar ve etiketini getirir; kargoya verilen pakette “Kargoyu takip et” kargo firmasının takip sayfasını açar.${activeChannels().some((x) => x.hold) ? html` <b>Beklemedeki kanallarda</b> (${activeChannels().filter((x) => x.hold).map((x) => x.name).join(', ')}) paketleme kanalın kendi panelinden yapılır; oluşan etiket buraya gelir.` : ''}</div></div>
     <div class="ch-tabs" data-chtabs></div>
     <div class="tabs" data-tabs></div>
     <div class="card flush" data-box></div>
@@ -20,14 +20,14 @@ export async function cargo(el, rest, query = {}) {
     ...data.unpacked.map((o) => ({ key: `o:${o.order_id}`, order_id: o.order_id, pkg: null, no: 1, total: 1, channel: o.channel, order_number: o.order_number, customer: o.customer, city: o.city, ordered_at: o.ordered_at, cargo: o.cargo_company, code: o.tracking, items: `${o.qty || 0} adet`, ls: { key: 'unpacked', cls: 'warn', text: 'Paketlenmedi' }, late: { ...o, status: o.order_status, packages: 0 } })),
     ...data.packages.map((p) => ({
       key: `p:${p.id}`, order_id: p.order_id, pkg: p.id, no: p.no, total: p.pkg_total, channel: p.channel, order_number: p.order_number, customer: p.customer, city: p.city, ordered_at: p.ordered_at,
-      cargo: p.cargo_company, code: p.barcode || p.tracking, items: `${p.items.reduce((a, x) => a + x.qty, 0)} adet`, ls: labelState({ channel: p.channel }, p), shipped: p.shipped_at, error: p.error,
+      cargo: p.cargo_company, code: p.barcode || p.tracking, track: { tracking_url: p.tracking_url, tracking: p.tracking, barcode: p.barcode, cargo_company: p.cargo_company }, items: `${p.items.reduce((a, x) => a + x.qty, 0)} adet`, ls: labelState({ channel: p.channel }, p), shipped: p.shipped_at, error: p.error,
       late: p.status === 'open' ? { ...p, status: p.order_status, packages: 1, open_packages: 1 } : null,
     })),
   ];
   // Satırın sıradaki adımı
   const next = (r) => {
     const o = `data-o="${r.order_id}" data-p="${r.pkg || ''}"`;
-    if (f.state === 'shipped') return html`<button class="btn sm outline" data-act="label" ${o}><i class="ico ico-print"></i>Etiket</button>`;
+    if (f.state === 'shipped') return html`${r.track ? trackBtn(r.track, {}, 'btn sm') : ''}<button class="btn sm outline" data-act="label" ${o}><i class="ico ico-print"></i>Etiket</button>`;
     if (['unpacked', 'packed', 'created', 'error'].includes(r.ls.key)) return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-${r.ls.key === 'unpacked' ? 'box' : 'tag'}"></i>${r.ls.key === 'unpacked' ? 'Paketle ve etiket al' : r.ls.key === 'error' ? 'Tekrar dene' : r.ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (r.ls.key === 'ready') return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-print"></i>Etiketi yazdır</button>`;
     return html`<button class="btn sm" data-act="label" ${o}><i class="ico ico-print"></i>Tekrar</button><button class="btn sm primary" data-act="ship" ${o}><i class="ico ico-truck"></i>Kargoya ver</button>`;

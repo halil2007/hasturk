@@ -110,6 +110,8 @@ const MIGRATIONS = [
   // Kanaldan gelen marka ve ürün açıklaması (panel ürününde boşsa buradan doldurulur)
   'ALTER TABLE listings ADD COLUMN brand TEXT',
   'ALTER TABLE listings ADD COLUMN description TEXT',
+  // Kanalın verdiği resmi kargo takip bağlantısı (yoksa panel kargo firmasının takip sayfasını kullanır)
+  'ALTER TABLE packages ADD COLUMN tracking_url TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -145,6 +147,8 @@ export const DEFAULT_SETTINGS = {
   // Kanal başına varsayılan komisyon (%) ve sipariş başı kargo gideri (TL); ürün/ilan bazında değiştirilebilir
   // Otomatik fiyatlandırma genel anahtarı (kapalıyken hiçbir fiyat değiştirilmez; yalnızca buybox izlenir)
   autoprice: false,
+  // Beklemedeki kanallar: okunur, kanala yazılmaz (ikas: resmi dokümanlar gelene kadar)
+  hold_channels: ['ikas1', 'ikas2'],
   // Yeni sipariş e-posta bildirimi: açık/kapalı, alıcılar, kanal seçimi (false = o kanaldan e-posta gelmez), panel adresi (e-postadaki bağlantı)
   mail_enabled: false,
   mail_to: [],
@@ -167,6 +171,21 @@ export const DEFAULT_SETTINGS = {
   sender: { name: 'HasTürk', phone: '', address: '', city: '' },
   // Trendyol/Hepsiburada ZPL etiketini normal yazıcıda basmak için PDF'e çevir (Labelary servisi; etiket içeriği o servise gider)
   zpl_pdf: false,
+  // Kendi kargo etiketimizin boyutu: 100x150 (termal) | a5 | a4
+  label_size: '100x150',
+  // Kargo firması takip sayfaları ({no} = takip numarası). Kanal resmi takip bağlantısı verdiyse o kullanılır.
+  track_urls: {
+    'Yurtiçi': 'https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code={no}',
+    'Aras': 'https://kargotakip.araskargo.com.tr/mainpage.aspx?code={no}',
+    'PTT': 'https://gonderitakip.ptt.gov.tr/Track/Verify?q={no}',
+    'HepsiJet': 'https://www.hepsijet.com/gonderi-takibi/{no}',
+    'Sürat': 'https://suratkargo.com.tr/KargoTakip/?kargotakipno={no}',
+    'MNG': 'https://www.mngkargo.com.tr/gonderi-takip/?takipNo={no}',
+    'DHL eCommerce': 'https://www.dhlecommerce.com.tr/gonderi-takip?trackingNumber={no}',
+    'Kolay Gelsin': 'https://www.kolaygelsin.com/gonderi-takip?trackingNumber={no}',
+    'Sendeo': 'https://www.sendeo.com.tr/gonderi-takip?code={no}',
+    'Trendyol Express': 'https://kargotakip.trendyolexpress.com/?trackingNumber={no}',
+  },
   cargo_companies: ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'PTT Kargo', 'Sürat Kargo', 'Trendyol Express', 'HepsiJet', 'Kolay Gelsin'],
 };
 
