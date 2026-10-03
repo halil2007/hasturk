@@ -40,7 +40,8 @@ function orderProfit(o, settings) {
     if (i.status === 'cancelled') continue;
     const rate = i.listing_commission ?? (settings.commission || {})[ch] ?? 0;
     revenue += i.total;
-    commission += profit({ sale: i.total, commissionRate: rate }).commission;
+    // Kanalın bildirdiği gerçek komisyon varsa o; yoksa ilan / kanal oranıyla tahmin
+    commission += i.commission != null ? i.commission : profit({ sale: i.total, commissionRate: rate }).commission;
     if (i.purchase_price) cost += i.purchase_price * i.quantity; else missing++;
   }
   const shipping = o.shipping_cost ?? (settings.shipping || {})[ch] ?? 0;
@@ -96,7 +97,7 @@ async function listOrders(db, q) {
   const items = {}, full = {};
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    for (const it of await all(db, `SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
+    for (const it of await all(db, `SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
         p.purchase_price, l.commission AS listing_commission
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
@@ -571,12 +572,15 @@ async function saveProduct(env, db, ctx, id, b, user) {
   }
   // Kanal ilanları: fiyat / komisyon
   for (const l of b.listings || []) {
-    const cur = await first(db, 'SELECT price, list_price FROM listings WHERE channel = ? AND remote_id = ? AND product_id = ?', l.channel, String(l.remote_id), id);
+    const cur = await first(db, 'SELECT price, list_price, commission, commission_src FROM listings WHERE channel = ? AND remote_id = ? AND product_id = ?', l.channel, String(l.remote_id), id);
     if (!cur) continue;
     const price = l.price === '' || l.price == null ? cur.price : num(l.price);
     const dirty = price !== cur.price ? 1 : 0;
-    await run(db, 'UPDATE listings SET price = ?, commission = ?, price_dirty = MAX(price_dirty, ?) WHERE channel = ? AND remote_id = ?',
-      price, l.commission === '' || l.commission == null ? null : num(l.commission), dirty, l.channel, String(l.remote_id));
+    // Elle girilen komisyon korunur (API'den gelen gerçek oran bunun üzerine yazmaz); boş bırakılırsa API / kanal oranı kullanılır
+    const com = l.commission === '' || l.commission == null ? null : num(l.commission);
+    const same = cur.commission != null && com != null && Math.abs(cur.commission - com) < 0.001;
+    await run(db, 'UPDATE listings SET price = ?, commission = ?, commission_src = ?, price_dirty = MAX(price_dirty, ?) WHERE channel = ? AND remote_id = ?',
+      price, com, com == null ? null : same ? cur.commission_src || 'manual' : 'manual', dirty, l.channel, String(l.remote_id));
   }
   // Yeni ürünü ikas mağazalarında da aç (pazaryerlerinde kategori özellikleri gerektiği için oradan açılır, barkod/SKU ile otomatik bağlanır)
   const created = [], errors = [];
@@ -887,7 +891,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     await saveConfig(env, db, x[1], b);
     resetChannels();
     // API bilgileri değişti: eski hata ve bekleme sıfırlanır, kanal sonraki senkronda hemen denenir
-    if (b.values || b.clear) await clearFailures(db, x[1], 'API bilgileri güncellendi; yeniden denenecek');
+    if (b.values || b.clear) {
+      await clearFailures(db, x[1], 'API bilgileri güncellendi; yeniden denenecek');
+      // Hesap değişmiş olabilir (ör. Hepsiburada testten canlıya): son 1 yıllık geçmiş aktarımı yeniden başlatılır (çift kayıt olmaz)
+      await run(db, 'DELETE FROM settings WHERE k = ?', 'auto_backfill:' + x[1]);
+    }
     await log(db, x[1], 'info', 'API bilgileri panelden güncellendi');
     return json({ ok: true });
   }

@@ -35,6 +35,8 @@ export function hepsiburada(env, meta) {
       quantity: qty, unitPrice: qty ? total / qty : total, total,
       status: /cancel|iptal/i.test(g(it, 'status') || '') ? 'cancelled' : '', remoteKey: str(g(it, 'hbSku', 'sku', 'hepsiburadaSku')),
       orderNumber: str(g(it, 'orderNumber', 'orderId')), orderDate: g(it, 'orderDate'), dueDate: Date.parse(g(it, 'dueDate') || '') || null,
+      // Hepsiburada'nın satırda bildirdiği komisyon (TL) ya da oran (%); ikisi de yoksa boş (tahmin kullanılır)
+      commission: g(it, 'commission') != null ? money(g(it, 'commission')) : g(it, 'commissionRate') != null ? Math.round(total * num(g(it, 'commissionRate'))) / 100 : null,
     };
   }
   // Adres: açık satırdaki shippingAddress / sipariş ayrıntısındaki deliveryAddress (il = city, ilçe = town, mahalle = district)

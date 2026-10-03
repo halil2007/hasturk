@@ -8,7 +8,7 @@ import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve 
 import { getChannels } from './channels/index.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
 import { autoMatch, relinkItems, repairDuplicates } from './match.js';
-import { runJobs } from './backfill.js';
+import { runJobs, createJob } from './backfill.js';
 import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
 import { queueNew, sendQueued } from './mail.js';
@@ -90,9 +90,12 @@ export async function saveOrders(db, ch, orders, maps) {
           JSON.stringify(o.address || {}), o.total || 0, o.currency || 'TRY', o.cargoCompany || '', o.tracking || '', extra, o._hash, o.shipBy || null, ext));
       st.push(db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id));
       for (const it of o.items) {
-        st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || ''));
+        const com = it.commission == null || !Number.isFinite(Number(it.commission)) ? null : Math.max(0, Number(it.commission));
+        st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key, commission)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || '', com));
+        // Kanalın bildirdiği gerçek komisyon oranı ilana yazılır (elle girilmiş oran korunur)
+        if (com != null && it.total > 0 && it.remoteKey) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src = 'api')").bind(Math.round((com / it.total) * 10000) / 100, ch, it.remoteKey));
       }
       // Kanalın kendi paketleri (Trendyol/Hepsiburada/ikas) panele aynen yansır; paneldeki taslak paketler korunur
       if (Array.isArray(o.packages)) {
@@ -354,6 +357,15 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
+    // Son 1 yılın siparişleri: her bağlı (gerçek) kanal için bir kez otomatik geçmiş aktarımı başlatılır.
+    // Parça parça (haftalık) ilerler; stoğu değiştirmez, yeni sipariş e-postası oluşturmaz.
+    if (!only) for (const ch of chans) {
+      if (ch.demo || !ch.enabled || !ch.fetchOrders) continue;
+      if (await getRaw(db, 'auto_backfill:' + ch.id)) continue;
+      await createJob(db, ch.id, t - 365 * D, t);
+      await setSetting(db, 'auto_backfill:' + ch.id, t);
+      await log(db, ch.id, 'info', 'Son 1 yılın siparişleri için geçmiş aktarımı otomatik başlatıldı');
+    }
     // 5) geçmiş sipariş aktarımı varsa bir parça daha ilerlet
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });

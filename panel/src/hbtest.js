@@ -82,7 +82,8 @@ export async function hbTest(env, db, path, m, q, b, user) {
       ]);
     }
     await run(db, "DELETE FROM listings WHERE channel = 'hepsiburada'");
-    await run(db, "DELETE FROM settings WHERE k IN ('cursor:hepsiburada', 'last:hepsiburada')");
+    await run(db, "DELETE FROM settings WHERE k IN ('cursor:hepsiburada', 'last:hepsiburada', 'auto_backfill:hepsiburada')");
+    await run(db, "DELETE FROM jobs WHERE id = 'backfill:hepsiburada'");
     await log(db, 'hepsiburada', 'info', `${user.name}: Hepsiburada test verileri temizlendi (${ids.length} sipariş)`);
     return { orders: ids.length };
   }

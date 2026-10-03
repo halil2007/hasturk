@@ -35,7 +35,7 @@ async function period(db, fromMs, toMs, group, settings) {
     if (b) { b.revenue[r.channel] += r.total; b.orders[r.channel]++; }
   }
   // Tahmini kâr: satır tutarı − komisyon − alış maliyeti; sipariş başına kargo + hizmet bedeli
-  const lines = await all(db, `SELECT o.id, o.channel, o.ordered_at, o.shipping_cost, i.total, i.quantity, p.purchase_price, l.commission
+  const lines = await all(db, `SELECT o.id, o.channel, o.ordered_at, o.shipping_cost, i.total, i.quantity, i.commission AS actual_commission, p.purchase_price, l.commission
     FROM order_items i JOIN orders o ON o.id = i.order_id
     LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
@@ -46,7 +46,9 @@ async function period(db, fromMs, toMs, group, settings) {
     const ch = l.channel, tt = totals[ch];
     if (!tt) continue;
     const rate = l.commission ?? (settings.commission || {})[ch] ?? 0;
-    let v = profit({ sale: l.total, purchase: (l.purchase_price || 0) * l.quantity, commissionRate: rate }).unitProfit;
+    // Kanalın bildirdiği gerçek komisyon varsa o kullanılır
+    const effRate = l.actual_commission != null && l.total > 0 ? (l.actual_commission / l.total) * 100 : rate;
+    let v = profit({ sale: l.total, purchase: (l.purchase_price || 0) * l.quantity, commissionRate: effRate }).unitProfit;
     if (!l.purchase_price) missingCost++;
     if (!seen.has(l.id)) {
       seen.add(l.id);

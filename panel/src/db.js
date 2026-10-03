@@ -114,6 +114,9 @@ const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN tracking_url TEXT',
   // Ana ürün kimliği (ana katalog kanalındaki ürün id'si): varyant gruplaması
   'ALTER TABLE products ADD COLUMN parent_key TEXT',
+  // Kanalın siparişte bildirdiği gerçek komisyon (TL); yoksa tahmini oran kullanılır. İlanın oranı API'den gelirse kaynağı 'api'
+  'ALTER TABLE order_items ADD COLUMN commission REAL',
+  'ALTER TABLE listings ADD COLUMN commission_src TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
