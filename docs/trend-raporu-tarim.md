@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (314 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (333 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -43,16 +43,16 @@ _Henüz veri yok._
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
 | 1 | Katı Solucan Gübresi 20 KG Çuval | 20,2 | 42 |
-| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 16 | 18 |
+| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 15,9 | 18 |
 | 3 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10 | 6 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 9,8 | 1 |
 | 5 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 9,7 | 5 |
-| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
-| 7 | Kullanıma Hazır Cocopeat Torfu | 8,4 | 16 |
+| 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,4 | 13 |
+| 7 | Kullanıma Hazır Cocopeat Torfu | 8,3 | 16 |
 | 8 | Leonardit - Organik Toprak Düzenleyici | 7 | 10 |
 | 9 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 6,9 | 4 |
 | 10 | Premium Fide Toprağı | 6,6 | 11 |
-| 11 | HG Akıllı Bitki ve Saksı Toprağı | 5,6 | 6 |
+| 11 | HG Akıllı Bitki ve Saksı Toprağı | 5,5 | 6 |
 | 12 | Sıvı Solucan Gübresi 1 Lt | 5,5 | 7 |
 | 13 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 5,4 | 0 |
 | 14 | Uzman 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası | 5,1 | 5 |
@@ -116,7 +116,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 1 | Sıvı Solucan Gübresi 1 Lt | 14 | 0 |
 | 2 | HasTürk Hümix Sıvı Hümik Asit | 3,7 | 20,5 |
 | 3 | HG Tarım Perliti | 2,8 | 6,5 |
-| 4 | Leonardit - Organik Toprak Düzenleyici | 2,8 | 6,5 |
+| 4 | Leonardit - Organik Toprak Düzenleyici | 2,8 | 8,5 |
 | 5 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | 1,8 | 1,9 |
 | 6 | Hastürk Katı Solucan Gübresi 20 Kg | 0,9 | 0,9 |
 | 7 | Katı Solucan Gübresi 5 KG | 0,9 | 0,9 |
