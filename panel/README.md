@@ -9,6 +9,8 @@
 - **Eşleştirme:** **Farklı kanallardaki** aynı ürünü/varyantı birbirine bağlar; bir panel ürününe her kanaldan yalnızca bir ilan bağlanır, ana katalog sitesinin her varyantı kendi ürünüdür (tek site bağlıyken eşleştirme yapılmaz). Otomatik: barkod aynı; ya da stok kodu aynı ve barkod çelişmiyor; ya da **ad + varyant/ölçü birebir aynı** ve tek aday. Emin olunamayanlar **Eşleştirme → Onay bekleyen**'de benzerlik puanlı önerilerle listelenir. **Eşleşmiş ürünler** sekmesinde hangi kanaldaki hangi ilanın bağlı olduğu ürün ürün görülür; yanlış eşleşme kaldırılır ya da başka ürüne taşınır (kaldırılan eşleşme otomatik olarak tekrar yapılmaz).
 - **Geçmiş siparişler:** Entegrasyonlar sayfasından tarih aralığı seçilerek kanal kanal aktarılır (haftalık parçalar halinde, kaldığı yerden sürer).
 - **Kullanıcılar:** Yönetici ve personel hesapları. Personel API bilgilerini, kullanıcıları ve ayarları değiştiremez.
+- **Müşteri soruları:** Trendyol ve Hepsiburada'daki ürün soruları her senkronda panele gelir; **Müşteri Soruları** sayfasında listelenir ve panelden cevaplanır (hazır cevaplar, karakter sınırı, son cevap süresi). Kanalın kendi panelinden verilen cevaplar da görünür. Trendyol: Soru-Cevap servisi (en fazla 2 haftalık aralık, cevap 10–2000 karakter, Trendyol onayından sonra yayımlanır). Hepsiburada: “Satıcıya Sor” servisi (cevap en fazla 2000 karakter). ikas'ın API'sinde müşteri sorusu servisi yoktur; N11 (yalnız SOAP), idefix ve Pazarama soruları bu kanallar etkinleştiğinde eklenecektir.
+- **Bağlantı tanılaması:** Entegrasyonlar'daki **Tanılama** düğmesi (ve sipariş menüsündeki “Kargo / bağlantı tanılaması”) kanalın her adımını ayrı ayrı dener: kimlik, uygulama izinleri, servisler, ikas'ta depo adresi ve kargo ayarları, seçili siparişin kanaldaki paket / barkod / etiket durumu. Sorunlu adım açıklamasıyla gösterilir; rapor kopyalanıp iletilebilir.
 - **Bildirimler:** Yeniden denemeye rağmen çözülemeyen senkron, stok gönderimi ve aktarım hataları burada toplanır; sorun düzelince kendiliğinden kapanır.
 - **Analizler:** Bugün / dün / önceki günler (ya da hafta, ay, yıl) kartları: satış, sepet ortalaması, sipariş, ürün adedi, iptal/iade oranı ve değişim; son 8 haftanın raporu; en çok gönderim yapılan iller; en çok satanlar (adet, ciro, ortalama / en yüksek / en düşük satış fiyatı). Hepsi toplam ya da kanal bazında. “Ayrıntılı grafik” sekmesinde dönem karşılaştırmalı grafikler.
 - **Buybox (Trendyol / Hepsiburada):** Buybox sırası, buybox fiyatı ve rakip fiyatları, “Buybox sizde / kaybedildi / kazanıldı” durumları ve geçmiş. **Otomatik fiyat** yalnızca sizin kural açtığınız ürün ve kanalda, genel anahtar açıkken çalışır: rakibin belirlediğiniz TL kadar altına iner, en düşük fiyatın altına inmez, rakip çekilince normal fiyata döner, en yüksek fiyatı aşmaz. Rakip verisi yoksa veya güncel değilse fiyat değiştirilmez; kendi fiyatınız rakip sayılmaz; her değişiklik (eski/yeni fiyat, zaman, neden, sonraki sıra) kaydedilir.
@@ -61,7 +63,7 @@ Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bil
 |---|---|---|---|
 | ikas (HasTürk / Tarım Dünyası) | Mağaza adı, Client ID, Client Secret | ikas → Uygulamalar → Özel uygulama oluştur. İzinler: Ürünler, Siparişler, Stok, Mağaza bilgisi (okuma + yazma) | `IKAS1_*` / `IKAS2_*` (`STORE`, `CLIENT_ID`, `CLIENT_SECRET`, `NAME`, `MERCHANT_ID`, `SALES_CHANNEL_ID`, `STOCK_LOCATION_ID`) |
 | Trendyol | Satıcı ID, API Key, API Secret | Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri | `TRENDYOL_SELLER_ID`, `TRENDYOL_API_KEY`, `TRENDYOL_API_SECRET` |
-| Hepsiburada | Merchant ID, servis anahtarı | Merchant paneli → Entegrasyon / API bilgileri | `HB_MERCHANT_ID`, `HB_PASSWORD` (+ `HB_USERNAME`, `HB_USER_AGENT`, `HB_TEST`) |
+| Hepsiburada | Merchant ID, servis anahtarı, **entegratör adı** | Merchant Portal → Hesabım → Entegrasyon | `HB_MERCHANT_ID`, `HB_PASSWORD`, `HB_USER_AGENT` (+ `HB_USERNAME`, `HB_MERCHANT_NAME`, `HB_TEST`) |
 | PttAVM *(beklemede)* | API kullanıcı adı ve şifresi, depo numarası | Mağaza paneli → Entegrasyon → API kullanıcısı | `PTTAVM_USERNAME`, `PTTAVM_PASSWORD`, `PTTAVM_WAREHOUSE_ID` (+ gelişmiş ayarlar) |
 | N11 *(beklemede, beta)* | App Key, App Secret | Satıcı Ofisi → Hesabım → API Hesapları | `N11_APP_KEY`, `N11_APP_SECRET` |
 | idefix *(beklemede, beta)* | Vendor ID, API Key, API Secret | Satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri | `IDEFIX_VENDOR_ID`, `IDEFIX_API_KEY`, `IDEFIX_API_SECRET` |
@@ -71,6 +73,8 @@ Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bil
 
 > ⚠️ Arama widget'ı için açılan mevcut ikas uygulamasında yalnızca okuma izni var. Panel için **yazma izinli yeni bir özel uygulama** açın.
 >
+> ⚠️ **Hepsiburada entegratör adı zorunludur:** Hepsiburada her isteğin `User-Agent` başlığında Merchant Portal'da tanımlı entegratör adını (ör. `hasturk_dev`) bekler; boş veya farklıysa istekler 401/403 ile reddedilir. Merchant Portal → Hesabım → Entegrasyon ekranında entegratör tanımlayın / adını kopyalayın ve Entegrasyonlar → Hepsiburada → “Entegratör adı” alanına yazın. Buybox sırası için “Mağaza adı” (ürün sayfasında görünen satıcı adı) da girilmelidir.
+
 > ⚠️ ikas'ın kendi pazaryeri entegrasyonu (ikas üzerinden Trendyol/Hepsiburada bağlantısı) açıksa aynı sipariş iki kez gelir. Bu durumda ikas'taki pazaryeri stok senkronunu kapatın ya da gelişmiş ayarlardaki "Satış kanalı ID" ile yalnızca web sitesi kanalını alın.
 
 ## 4. İlk kurulum adımları (sırayla)
@@ -123,6 +127,7 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 
 - **Canlı hesapla ilk deneme:** API bağlantıları kanalların resmi dokümanlarına (ikas: resmi `@ikas/admin-api-client` şeması) göre yazıldı. Örnek API cevaplarıyla test edildi ama Trendyol, Hepsiburada ve yeni pazaryerleri gerçek mağaza hesaplarıyla henüz denenmedi; ikas'ta panelden “Kargoya Hazır” yapılan paketin ikas Kargo'yu tetiklediği ilk gerçek siparişte doğrulanmalıdır. İlk bağlantıda **Ayarlar → Kayıtlar**'da bir hata görürseniz mesajı iletin; çoğu düzeltme tek satırlıktır.
 - **PttAVM (beklemede, beta):** PttAVM'in SOAP servisinin alan adları hesaba ve sürüme göre değişebiliyor. Yöntem adları ortam değişkenleriyle değiştirilebilir: `PTTAVM_ORDER_METHOD` (varsayılan `SiparisKontrolListesiV2`), `PTTAVM_STOCK_METHOD` (`StokFiyatGuncelle3`), `PTTAVM_LIST_METHOD` (`StokKontrolListesi`), `PTTAVM_DATE_FORMAT` (`tr` = gg.aa.yyyy).
+- **Trendyol ürün servisi:** Ürünler Trendyol'un yeni V2 servisinden (`products/approved` + `inventory-and-price`) okunur; eski V1 ürün listesi Trendyol tarafından kapatılmaktadır (yalnızca V2 erişilemezse yedek olarak kullanılır). Kaldırılan “takip numarası bildirme” servisi artık çağrılmaz.
 - **Hepsiburada paket listeleri:** Kargodaki, teslim edilen ve iptal edilen paket uç noktalarından biri hesabınızda kapalıysa senkron devam eder; uyarı Kayıtlar'a yazılır.
 - **Kargo firması entegrasyonu yok (bilerek):** Etiket ve barkod her kanalın kendi kargo sisteminden gelir. Yurtiçi, Aras, MNG gibi firmalara doğrudan bağlantı ileride eklenebilir.
 - **Cloudflare limitleri:** Ücretsiz planda istek başına işlemci süresi ve veritabanı sorgu sayısı sınırlıdır. Kayıtlarda "CPU" veya "too many" hatası görünürse **Workers Paid** planına (aylık 5 $) geçin. Kod değişikliği gerekmez.
@@ -133,8 +138,12 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 ```bash
 cd panel
 npm run dev      # http://localhost:8787 — deneme modu, şifre: demo (Node 22.5+, Cloudflare hesabı gerekmez)
-npm test         # stok düşümü, iptal/iade, kanala özel stok, eşleştirme, geçmiş aktarım, kullanıcı yetkileri, kâr formülü, kanal bağlantıları (örnek cevaplarla)
+npm test         # stok düşümü, iptal/iade, kanala özel stok, eşleştirme, kargo akışı, buybox kuralları, kanal bağlantıları (örnek cevaplarla)
+                 # ve ikas'a giden tüm GraphQL sorgularının ikas'ın resmi şemasına uygunluğu (test/fixtures/ikas-schema.json)
 ```
+
+ikas şema özetini güncellemek (ikas yeni sürüm yayınlarsa): `npm pack @ikas/admin-api-client` → paketi açın →
+`node dev/ikas-schema.mjs package/dist/src/api/admin/generated/index.d.ts <sürüm> > test/fixtures/ikas-schema.json` → `npm test`.
 
 | Dosya | Görev |
 |---|---|

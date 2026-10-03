@@ -94,11 +94,25 @@ export function demo(meta) {
     const rank = r() < 0.45 ? 1 : r() < 0.7 ? 2 : 3, rival = Math.round(price * (0.93 + r() * 0.12));
     return { remoteId: id, rank, buyboxPrice: rank === 1 ? price : rival, second: rank === 1 ? Math.round(price * (1 + r() * 0.08)) : price, third: Math.round(price * 1.1), multi: r() < 0.85 };
   });
+  // Örnek müşteri soruları (Trendyol / Hepsiburada)
+  const Q = ['Bu ürün saksı bitkileri için uygun mu?', 'Kaç günde kargoya verilir?', 'Son kullanma tarihi nedir?', 'Organik tarıma uygun sertifikası var mı?', '10 kg seçeneği olacak mı?', 'Orkide için kullanılabilir mi?'];
+  const answered = new Map();
+  async function questions({ since }) {
+    const items = [];
+    for (let i = 0; i < 6; i++) {
+      const r = rng(ch + 'q' + i), p = DEMO_PRODUCTS[Math.floor(r() * DEMO_PRODUCTS.length)], id = `${ch}-q${i}`;
+      const at = Date.now() - (i * 7 + 2) * 3600e3, ans = answered.get(id) || (i > 3 ? 'Merhaba, evet uygundur. İyi günler dileriz.' : null);
+      if (at < since) continue;
+      items.push({ remoteId: id, text: Q[i], askedAt: at, status: ans ? 'answered' : 'waiting', remoteStatus: ans ? 'ANSWERED' : 'WAITING_FOR_ANSWER', productName: p[2], barcode: p[1], sku: p[0], customer: NAMES[i].split(' ')[0] + ' ' + NAMES[i].split(' ')[1][0] + '.', answer: ans, answeredAt: ans ? at + 3600e3 : null, dueAt: at + 48 * 3600e3 });
+    }
+    return { items, hasNext: false, total: items.length };
+  }
+  const answer = async (q, text) => { answered.set(q.remote_id, text); };
   return {
     ...meta, enabled: true, missing: [], demo: true,
-    caps: { accept: 'remote', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: meta.type === 'ikas' ? 'pack' : 'change', cancelPackage: true, createProduct: meta.type === 'ikas', price: true },
+    caps: { accept: 'remote', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: meta.type === 'ikas' ? 'pack' : 'change', cancelPackage: true, createProduct: meta.type === 'ikas', price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
     fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, pack, label, cargoOptions, changeCargo, cancelPackage: ok,
-    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox } : {}),
+    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer } : {}),
     createProduct: async (pr) => ({ remoteId: `${ch}-${pr.sku || Date.now()}`, remoteProductId: '', sku: pr.sku, barcode: pr.barcode, name: pr.name, price: pr.sale_price, stock: pr.stock }),
   };
 }

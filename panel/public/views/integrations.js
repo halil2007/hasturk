@@ -3,11 +3,12 @@
 import { api, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey } from '../core.js';
 import { loadSummary } from '../app.js';
 import { importDialog } from './products.js';
+import { diagnoseDialog } from './diagnose.js';
 
 const HELP = {
   ikas: 'ikas paneli → Uygulamalar → Özel uygulama oluştur. İzinler: Ürünler, Siparişler, Stok, Mağaza bilgisi (okuma + yazma). Görseller ve varyantlar ürünlerle birlikte gelir.',
   trendyol: 'Trendyol satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri.',
-  hepsiburada: 'Hepsiburada merchant paneli → Entegrasyon / API bilgileri (Merchant ID ve servis anahtarı).',
+  hepsiburada: 'Hepsiburada Merchant Portal → Hesabım → Entegrasyon: Merchant ID, servis anahtarı ve entegratör adı (User-Agent olarak gönderilir; girilmezse Hepsiburada istekleri reddeder).',
   pttavm: 'PttAVM mağaza paneli → Entegrasyon → API kullanıcısı. Kargo barkodu için depo numarası gerekir.',
   n11: 'N11 Satıcı Ofisi (so.n11.com) → Hesabım → API Hesapları → Yeni Hesap Oluştur; App Key ve App Secret e-postayla gelir.',
   idefix: 'idefix satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri → Yeni API Oluştur (API Key, API Secret) ve Vendor ID.',
@@ -55,6 +56,7 @@ export async function integrations(el) {
       <div class="row wrap" style="margin-top:auto">
         <button class="btn primary" data-act="save" data-id="${c.id}">Kaydet</button>
         <button class="btn outline" data-act="test" data-id="${c.id}"><i class="ico ico-key"></i>Bağlantıyı test et</button>
+        <button class="btn outline" data-act="diag" data-id="${c.id}" title="Her adımı ayrı ayrı dener ve sorunu açıklar"><i class="ico ico-bolt"></i>Tanılama</button>
         <span class="spacer"></span>
         <button class="btn sm ghost" data-act="sync" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-sync"></i>Senkronla</button>
         <button class="btn sm ghost" data-act="import" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-download"></i>İlanları çek</button>
@@ -108,6 +110,7 @@ export async function integrations(el) {
     }),
     sync: (t) => busy(t, async () => { const r = await api('sync', { method: 'POST', body: { channels: [t.dataset.id], force: true } }); const v = (r.channels || {})[t.dataset.id]; toast(typeof v === 'string' ? v : `${v ?? 0} sipariş kontrol edildi`, typeof v === 'string'); await after(); }),
     import: () => importDialog(after),
+    diag: (t) => diagnoseDialog(t.dataset.id),
     bfstart: (t) => busy(t, async () => {
       const box = $('[data-bf]', el), channels = $$('[data-bfch]', box).filter((x) => x.checked).map((x) => x.value);
       const r = await api('backfill', { method: 'POST', body: { channels, from: $('[data-bffrom]', box).value, to: $('[data-bfto]', box).value } });

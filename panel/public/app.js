@@ -7,6 +7,7 @@ import { stocks } from './views/stocks.js';
 import { cargo } from './views/cargo.js';
 import { matching } from './views/match.js';
 import { buyboxView, bbChannels } from './views/buybox.js';
+import { questionsView, qChannels } from './views/questions.js';
 import { profitView } from './views/profit.js';
 import { insightsView } from './views/insights.js';
 import { integrations } from './views/integrations.js';
@@ -19,6 +20,7 @@ const ROUTES = [
   { sec: 'Satış' },
   { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders' },
   { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo' },
+  { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', when: () => qChannels().length > 0 },
   { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products },
   { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock' },
@@ -47,7 +49,7 @@ function nav() {
 export function refreshChrome(s = state.summary) {
   if (!s) return;
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
-  const counts = { orders: n, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
+  const counts = { orders: n, questions: s.questions || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
   $$('[data-count]').forEach((el) => { const v = counts[el.dataset.count] || 0; el.textContent = v > 99 ? '99+' : v; el.classList.toggle('hide', !v); el.classList.toggle('warn', el.dataset.count === 'match' || el.dataset.count === 'stock'); });
   const chs = state.channels.filter((c) => !c.paused);
   const on = chs.filter((c) => c.enabled), err = chs.filter((c) => c.enabled && !c.demo && c.last && (!c.last.ok || c.last.listingsError));
@@ -124,6 +126,7 @@ async function bell(btn) {
   const items = [];
   if (n) items.push({ icon: 'orders', label: `${n} yeni sipariş işleme alınmayı bekliyor`, run: () => (location.hash = '#/siparisler?status=new') });
   for (const x of list.slice(0, 5)) items.push({ icon: x.level === 'error' ? 'warn' : 'bell', label: x.title, run: () => (location.hash = '#/bildirimler') });
+  if (s.questions) items.push({ icon: 'chat', label: `${s.questions} müşteri sorusu cevap bekliyor`, run: () => (location.hash = '#/sorular') });
   if (s.unmatched) items.push({ icon: 'link', label: `${s.unmatched} ilan eşleşme bekliyor`, run: () => (location.hash = '#/eslestirme') });
   if (!items.length) items.push({ icon: 'check', label: 'Bekleyen bildirim yok', run: () => {} });
   items.push('-', { icon: 'bell', label: 'Tüm bildirimler', run: () => (location.hash = '#/bildirimler') });
