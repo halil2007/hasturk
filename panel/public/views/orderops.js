@@ -259,7 +259,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         if (!(await confirmBox(`Paket ${pkg.no} ${chName()}'da iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
         busy(null, async () => { const r = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
       } });
-      if (open) items.push('-', { icon: 'key', label: 'Kendi anlaşmamla gönder (takip no gir)', run: () => shipDialog(d, pkg, changed, { editOnly: true }) });
+      if (open && c.manualTracking !== false) items.push('-', { icon: 'key', label: 'Kendi anlaşmamla gönder (takip no gir)', run: () => shipDialog(d, pkg, changed, { editOnly: true }) });
       items.push('-', { icon: 'bolt', label: `Kargo / bağlantı tanılaması (${chName()})`, run: () => diagnoseDialog(d.order.channel, d.order.id, d.order.order_number) });
       items.push('-', { icon: 'orders', label: 'Sipariş detayı', run: () => openOrder(id, onChange) });
       popMenu(b, items);
@@ -320,7 +320,8 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
     title: editOnly ? `Paket ${pkg.no} · kendi anlaşmanızla gönderim` : `Paket ${pkg.no} kargoya ver`, size: 'narrow',
     body: html`<div class="stack">
       <div class="small muted">${name} · #${o.order_number} · ${o.customer}</div>
-      ${!editOnly && code ? html`<dl class="kv small"><dt>Kargo</dt><dd>${pkg.cargo_company || '—'}</dd><dt>Barkod / takip</dt><dd class="num">${code}</dd><dt>Etiket</dt><dd>${pkg.label_printed_at ? `yazdırıldı (${shortDT(pkg.label_printed_at)})` : html`<span style="color:var(--amber)">yazdırılmadı</span>`}</dd></dl>`
+      ${!editOnly && !code && c.manualTracking === false ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bu pakette henüz ikas Kargo barkodu yok. ikas siparişleri yalnızca <b>ikas Kargo</b> ile gönderilir; elle kargo/takip bilgisi girilmez. Önce “Paketle ve etiket al” ya da ikas panelinde “ikas Kargo ile Gönder”.</div></div>`
+        : !editOnly && code ? html`<dl class="kv small"><dt>Kargo</dt><dd>${pkg.cargo_company || '—'}</dd><dt>Barkod / takip</dt><dd class="num">${code}</dd><dt>Etiket</dt><dd>${pkg.label_printed_at ? `yazdırıldı (${shortDT(pkg.label_printed_at)})` : html`<span style="color:var(--amber)">yazdırılmadı</span>`}</dd></dl>`
         : html`${editOnly ? html`<div class="notice small">Kanalın kargo sistemi dışında (kendi kargo anlaşmanızla) gönderdiğiniz paketler içindir.</div>` : ''}
         <label class="field"><span>Kargo firması</span><input class="input" list="cargo-dl" data-f="cargo" value="${pkg.cargo_company || o.cargo_company || ''}"><datalist id="cargo-dl">${((state.settings && state.settings.cargo_companies) || []).map((x) => html`<option value="${x}">`)}</datalist></label>
         <label class="field"><span>Takip no</span><input class="input" data-f="tracking" value="${pkg.tracking || ''}"></label>`}

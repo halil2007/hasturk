@@ -3,7 +3,7 @@ import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED } from './channels/index.js';
 import { loadConfig, saveConfig, describe } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf } from './sync.js';
-import { suggestions, linkedGroups } from './match.js';
+import { suggestions, linkedGroups, repairDuplicates, autoMatch } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
@@ -305,6 +305,11 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
     if (!pkg) fail(400, 'Gönderilecek açık paket yok');
+    // ikas: yalnız ikas Kargo gönderisi kargoya verilebilir; elle takip bilgisi kabul edilmez
+    if (ch && ch.caps && ch.caps.manualTracking === false) {
+      if (!pkg.remote_id || !(pkg.barcode || pkg.tracking)) fail(400, `${ch.name}: bu pakette ikas Kargo gönderisi yok. Önce “Paketle ve etiket al” (ya da ikas panelinde ikas Kargo ile Gönder); elle kargo bilgisi girilmez.`);
+      b = { ...b, tracking: '', cargo_company: '' };
+    }
     const tracking = str(b.tracking) || pkg.tracking || pkg.barcode, cargo = str(b.cargo_company) || pkg.cargo_company || o.cargo_company;
     let res = {};
     if (ch && ch.enabled && ch.caps.ship === 'remote' && ch.ship) res = (await ch.ship(o, pkg, { cargoCompany: cargo, tracking, invoiceNumber: str(b.invoice_number) })) || {};
@@ -318,7 +323,8 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     return { ok: true, message: left.n ? `Paket ${pkg.no} kargoya verildi (${left.n} paket kaldı)` : 'Sipariş kargoya verildi' };
   }
   if (action === 'tracking') {
-    // Kanal dışı (kendi anlaşmanızla) gönderimde takip no elle girilir
+    // Kanal dışı (kendi anlaşmanızla) gönderimde takip no elle girilir — ikas'ta yok: gönderi yalnız ikas Kargo ile
+    if (ch && ch.caps && ch.caps.manualTracking === false) fail(400, `${ch.name}: takip / kargo bilgisi elle girilmez; gönderi ${ch.type === 'ikas' ? 'ikas Kargo' : 'kanalın kargosu'} ile yapılır`);
     const pkg = pkgOf(b.package_id);
     await run(db, "UPDATE packages SET tracking = ?, cargo_company = ?, desi = ?, agreement = 'own' WHERE id = ?", str(b.tracking), str(b.cargo_company), num(b.desi, 0) || pkg.desi, pkg.id);
     await event(db, o, 'tracking', user);
@@ -499,17 +505,17 @@ async function listProducts(db, q) {
   const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const limit = Math.min(Number(q.limit) || 50, 500), page = Math.max(1, Number(q.page) || 1);
   // Ana ürün (varyant grubu) anahtarı: grup adı yoksa ürün adı
-  const GK = "COALESCE(NULLIF(p.group_name, ''), p.name)";
+  const GK = "COALESCE(NULLIF(p.parent_key, ''), NULLIF(p.group_name, ''), p.name)";
   let rows, total, groups = null;
   if (q.group) {
     // Sayfalama ana ürün bazında: her sayfada N ana ürün ve tüm (filtreye uyan) varyantları
-    const gks = (await all(db, `SELECT ${GK} AS gk FROM products p ${w} GROUP BY gk ORDER BY gk COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit)).map((r) => r.gk);
+    const gks = (await all(db, `SELECT ${GK} AS gk, MIN(COALESCE(NULLIF(p.group_name, ''), p.name)) AS gn FROM products p ${w} GROUP BY gk ORDER BY gn COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit)).map((r) => r.gk);
     rows = gks.length ? await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${gks.map(() => '?').join(',')})
-      ORDER BY gk COLLATE NOCASE, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, ...args, ...gks) : [];
+      ORDER BY COALESCE(NULLIF(p.group_name, ''), p.name) COLLATE NOCASE, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, ...args, ...gks) : [];
     groups = (await first(db, `SELECT COUNT(DISTINCT ${GK}) AS n FROM products p ${w}`, ...args)).n;
     total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
   } else {
-    rows = await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'gk COLLATE NOCASE, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
+    rows = await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'COALESCE(NULLIF(p.group_name, \'\'), p.name) COLLATE NOCASE, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
     total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
   }
   if (rows.length) {
@@ -689,6 +695,12 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'purge-demo' && m === 'POST') return json(await purgeDemo(db));
 
   // ---------- eşleştirme ----------
+  if (path === 'match/repair' && m === 'POST') {
+    const freed = await repairDuplicates(db);
+    const r = await autoMatch(db, { catalog: (await getSettings(db)).catalog_channels || ['ikas1'] });
+    await log(db, null, 'info', `${user.name}: eşleştirme onarımı · ${freed} hatalı bağlantı ayrıldı, ${r.linked} yeniden bağlandı`);
+    return json({ freed, ...r });
+  }
   if (path === 'match' && m === 'GET') {
     const [rows, counts] = await Promise.all([
       suggestions(db, { channel: q.channel, q: q.q, limit: Math.min(Number(q.limit) || 60, 200) }),

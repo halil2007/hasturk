@@ -78,7 +78,7 @@ export function demo(meta) {
       // Örnek varyant: adın sonundaki ölçü (5 Kg, 20 Lt…) varyant, öncesi ana ürün
       const m = /^(.*?)\s+(\d+(?:[.,]\d+)?\s*(?:Kg|Lt|gr|ml))$/i.exec(p[2]);
       return {
-        remoteId: remoteKey(p), remoteProductId: remoteKey(p), sku: p[0], barcode: p[1], name: p[2], image: '',
+        remoteId: remoteKey(p), remoteProductId: `${ch}-${(m ? m[1] : p[2]).toLowerCase().replace(/\W+/g, '-')}`, sku: p[0], barcode: p[1], name: p[2], image: '',
         groupName: m ? m[1] : p[2], variantName: m ? m[2] : '', brand: /^HG\b/.test(p[2]) ? 'HG' : 'Hastürk',
         description: `<p><b>${p[2]}</b> — örnek ürün açıklaması. Bahçe ve saksı bitkileri için uygundur.</p><ul><li>Doğal içerik</li><li>Kolay kullanım</li></ul>`,
         purchasePrice: p[4], price: Math.round(p[3] * (PRICE[ch] || 1)), listPrice: Math.round(p[3] * (PRICE[ch] || 1) * 1.15), stock: 20 + ((i * 7) % 30),

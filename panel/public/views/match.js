@@ -22,6 +22,7 @@ export async function matching(el, rest, query = {}) {
       <span class="spacer"></span>
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
       <button class="btn" data-act="auto"><i class="ico ico-sync"></i>Şimdi eşleştir</button>
+      <button class="btn ghost" data-act="repair" title="Aynı kanaldan birden fazla ilanın tek ürüne bağlandığı eski eşleşmeleri ayırır">Hatalı eşleşmeleri onar</button>
     </div>
     <div class="row wrap"><div class="tabs" style="flex:1" data-chs></div><select class="input" style="width:auto" data-multi hidden>
       <option value="1">Birden fazla kanalda olanlar</option><option value="0">Tek kanalda olanlar</option><option value="">Tümü</option></select></div>
@@ -120,6 +121,7 @@ export async function matching(el, rest, query = {}) {
     ignore: (t) => busy(t, async () => { await api('match/ignore', { method: 'POST', body: keyOf(t) }); done(t, 'Yok sayıldı'); }),
     unignore: (t) => busy(t, async () => { await api('match/ignore', { method: 'POST', body: { ...keyOf(t), ignored: false } }); done(t, 'Bekleyenlere geri alındı'); }),
     unlink: (t) => busy(t, async () => { await api('match/unlink', { method: 'POST', body: keyOf(t) }); done(t, 'Eşleşme kaldırıldı; ilan tekrar otomatik olarak bu ürüne bağlanmaz'); }),
+    repair: (t) => busy(t, async () => { const r = await api('match/repair', { method: 'POST' }); toast(`${r.freed} hatalı bağlantı ayrıldı · ${r.linked} ilan yeniden kesin eşleşti`); loadSummary().catch(() => {}); refresh(); }),
     auto: (t) => busy(t, async () => { const r = await api('sync', { method: 'POST', body: { force: true, listings: true } }); toast(r.skipped || `${(r.match && r.match.linked) || 0} ilan otomatik eşleşti, ${(r.match && r.match.created) || 0} yeni ürün`); loadSummary().catch(() => {}); refresh(); }),
     find: (t) => findProduct(keyOf(t), () => done(t, 'Eşleştirildi')),
   });

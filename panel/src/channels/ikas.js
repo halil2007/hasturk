@@ -331,17 +331,11 @@ export function ikas(env, p, meta) {
   }
 
   // Kargoya ver: ikas Kargo paketi zaten varsa "Gönderildi" (FULFILLED) yapılır; yoksa takip bilgisiyle gönderilir
-  async function ship(order, pkg, { cargoCompany, tracking }) {
-    if (pkg.remote_id) {
-      await gql('mutation ($input: UpdateOrderPackageStatusInput!) { updateOrderPackageStatus(input: $input) { id } }', {
-        input: { orderId: order.remote_id, packages: [{ packageId: pkg.remote_id, status: 'FULFILLED', trackingInfo: tracking && tracking !== pkg.tracking && tracking !== pkg.barcode ? { trackingNumber: tracking, cargoCompany: cargoCompany || undefined, isSendNotification: true } : undefined }] },
-      });
-      return { remoteId: pkg.remote_id };
-    }
-    const lines = pkg.items.map((x) => ({ orderLineItemId: String(x.line_id), quantity: x.qty }));
-    const d = await gqlPkg(FULFILL, { input: { orderId: order.remote_id, lines, sendNotificationToCustomer: true, trackingInfoDetail: tracking ? { cargoCompany: cargoCompany || '', trackingNumber: tracking, isSendNotification: true } : undefined } });
-    const pk = ((d.fulfillOrder || {}).orderPackages || []).find((x) => (x.orderLineItemIds || []).some((l) => lines.some((y) => y.orderLineItemId === String(l))));
-    return { remoteId: pk ? String(pk.id) : null };
+  // Kargoya ver: ikas'a HİÇBİR takip / kargo bilgisi yazılmaz. Gönderiyi ikas Kargo yönetir; kargo firması paketi
+  // okutunca ikas durumu kendisi "Gönderildi" yapar ve senkronla panele gelir. Panel yalnızca kendi kaydını günceller.
+  async function ship(order, pkg) {
+    if (!pkg.remote_id) throw new Error('Bu paket ikas Kargo ile gönderilmemiş. Önce “Paketle ve etiket al” (ya da ikas panelinde ikas Kargo ile Gönder) yapın; elle kargo bilgisi girilmez.');
+    return { remoteId: pkg.remote_id };
   }
 
   // Paketi iptal et (ikas'ta paketlemeyi geri al) — kargo firmasını değiştirmek veya yeniden bölmek için
@@ -451,7 +445,7 @@ export function ikas(env, p, meta) {
   const missing = [p + 'STORE', p + 'CLIENT_ID', p + 'CLIENT_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'ikas', enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: false, repack: true, cancelPackage: true, createProduct: true, price: true },
+    caps: { accept: 'local', split: 'local', pack: 'remote', ship: 'local', manualTracking: false, label: 'remote', cargo: false, repack: true, cancelPackage: true, createProduct: true, price: true },
     fetchOrders, fetchListings, pushStock, pushPrice, ship, createProduct, cargoOptions, pack, label, cancelPackage, repack, diagnose,
   };
 }

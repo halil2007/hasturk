@@ -112,6 +112,8 @@ const MIGRATIONS = [
   'ALTER TABLE listings ADD COLUMN description TEXT',
   // Kanalın verdiği resmi kargo takip bağlantısı (yoksa panel kargo firmasının takip sayfasını kullanır)
   'ALTER TABLE packages ADD COLUMN tracking_url TEXT',
+  // Ana ürün kimliği (ana katalog kanalındaki ürün id'si): varyant gruplaması
+  'ALTER TABLE products ADD COLUMN parent_key TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

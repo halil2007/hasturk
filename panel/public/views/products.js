@@ -66,9 +66,9 @@ export async function products(el, rest, query = {}) {
       <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
       <td class="c">${stockCtl(p)}</td>
       <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
-    const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p));
+    const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p)), gname = p0.group_name || p0.name;
       return html`<tr class="grp-head ${on ? 'on' : ''}" data-act="tog" data-gi="${i}">
-        <td><div class="row"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', k)}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:700">${k}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}<b style="color:var(--text)">${list.length} varyant</b>${list.length <= 4 ? ` · ${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}` : ''}</div></div></div></td>
+        <td><div class="row"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}<b style="color:var(--text)">${list.length} varyant</b>${list.length <= 4 ? ` · ${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}` : ''}</div></div></div></td>
         <td>${chSummary(list)}</td>
         <td class="r num muted">${range(list.map((p) => p.purchase_price))}</td>
         <td class="r num" style="font-weight:650">${range(list.map((p) => p.sale_price))}</td>
@@ -79,9 +79,9 @@ export async function products(el, rest, query = {}) {
     const mCard = ([k, list], i) => { if (!isGroup(list)) { const p = list[0]; return html`<div class="m-card" data-pid="${p.id}">
           <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="muted tiny">${brand(p.brand)}${[p.sku, p.barcode].filter(Boolean).join(' · ')}</div></div></div>
           ${dots(p)}<div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCtl(p)}</div></div>`; }
-      const on = all || opened.has(k);
+      const on = all || opened.has(k), gname = list[0].group_name || list[0].name;
       return html`<div class="m-card grp ${on ? 'on' : ''}">
-        <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', k)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${k}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
+        <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
         ${on ? html`<div class="m-vars">${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCtl(p)}</div>`)}</div>` : ''}</div>`; };
     const body = !rows.length ? html`<div class="empty">Ürün yok. “Kanallardan içe aktar” ile ürünleri çekebilir veya “Ürün Ekle” ile ekleyebilirsiniz.</div>`
       : mob ? html`<div class="m-list" style="padding:12px">${gl.map(mCard)}</div>`

@@ -14,7 +14,7 @@ async function db0() {
   return db;
 }
 const L = (db, ch, id, o = {}) => db.prepare('INSERT INTO listings (channel, remote_id, sku, barcode, name, variant_name, remote_stock) VALUES (?, ?, ?, ?, ?, ?, ?)')
-  .bind(ch, id, o.sku ?? '', o.barcode ?? '', o.name ?? '', o.variant ?? null, o.stock ?? 0).run();
+  .bind(ch, id, o.sku ?? '', o.barcode ?? '', o.name ?? '', o.variant ?? null, o.stock ?? 5).run();
 
 test('eşleştirme: ölçü ve kelime benzerliği puanı', () => {
   assert.deepEqual([...quantities('Gübre 5 Kg')], ['5kg']);

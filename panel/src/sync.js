@@ -7,7 +7,7 @@
 import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
-import { autoMatch, relinkItems } from './match.js';
+import { autoMatch, relinkItems, repairDuplicates } from './match.js';
 import { runJobs } from './backfill.js';
 import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
@@ -187,6 +187,10 @@ export async function fillProductInfo(db, settings) {
   const cats = catalogOf(settings);
   const rank = `CASE l.channel ${cats.map((c, i) => `WHEN '${String(c).replace(/'/g, '')}' THEN ${i}`).join(' ')} ELSE 99 END`;
   let n = 0;
+  // Ana ürün (varyant grubu) kimliği: ana katalog kanalındaki ürün kimliği (ikas ürün id'si). Ürünler sayfası buna göre gruplar;
+  // adı aynı olan farklı ikas ürünleri tek gruba düşmez.
+  await run(db, `UPDATE products SET parent_key = (SELECT l.channel || ':' || l.remote_product_id FROM listings l WHERE l.product_id = products.id AND COALESCE(l.remote_product_id, '') != '' ORDER BY ${rank} LIMIT 1)
+    WHERE EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.remote_product_id, '') != '')`);
   for (const col of ['brand', 'description']) {
     const r = await run(db, `UPDATE products SET ${col} = (SELECT l.${col} FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '' ORDER BY ${rank} LIMIT 1)
       WHERE COALESCE(${col}, '') = '' AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '')`);
@@ -336,6 +340,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
       await setSetting(db, 'last:' + ch.id, st);
     }
     // 3) kesin eşleşmeler + ana katalogdan yeni ürünler
+    // Tek seferlik: eski sürümden kalma, aynı kanaldan birden fazla ilanı tek ürüne bağlamış eşleşmeleri onar
+    if (!(await getRaw(db, 'once:repair_dups_1'))) { out.repaired = await repairDuplicates(db).catch(() => 0); await setSetting(db, 'once:repair_dups_1', Date.now()); }
     out.match = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] });
     out.mirrored = await mirrorStock(db, settings);
     out.info = await fillProductInfo(db, settings).catch((e) => 'hata: ' + e.message);

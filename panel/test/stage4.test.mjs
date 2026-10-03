@@ -7,7 +7,7 @@ import { autoMatch, suggestions, nameKey } from '../src/match.js';
 
 async function db0() { const db = d1(); await init(db); return db; }
 const L = (db, ch, id, o = {}) => db.prepare('INSERT INTO listings (channel, remote_id, sku, barcode, name, variant_name, remote_stock, match) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-  .bind(ch, id, o.sku ?? '', o.barcode ?? '', o.name ?? '', o.variant ?? null, o.stock ?? 0, o.match ?? null).run();
+  .bind(ch, id, o.sku ?? '', o.barcode ?? '', o.name ?? '', o.variant ?? null, o.stock ?? 5, o.match ?? null).run();
 const pid = async (db, id) => (await first(db, 'SELECT product_id, match FROM listings WHERE remote_id = ?', id));
 
 test('tek site bağlıyken: barkodsuz/kodsuz dahil her varyant kendi ürünü olur, bekleyen eşleşme olmaz', async () => {
@@ -34,7 +34,10 @@ test('farklı kanal: ad + varyant birebir aynıysa otomatik, benzerse onaya dü�
   const db = await db0();
   await L(db, 'ikas1', 'v5', { name: 'Solucan Gübresi - 5 Kg', variant: '5 Kg' });
   await L(db, 'ikas1', 'v10', { name: 'Solucan Gübresi - 10 Kg', variant: '10 Kg' });
-  await L(db, 'trendyol', 't5', { name: 'GÜBRESİ SOLUCAN 5kg' });
+  await L(db, 'trendyol', 't5', { name: 'SOLUCAN GÜBRESİ 5000 gr' });
+  await L(db, 'trendyol', 't5r', { name: 'GÜBRESİ SOLUCAN 5kg' });
+  await L(db, 'hepsiburada', 'h0', { name: 'Organik Solucan Gübresi Paket 5 Kg', stock: 0 });
+  await L(db, 'hepsiburada', 'h1', { name: 'Solucan Gübresi 10 Kg', stock: 0 });
   await L(db, 'trendyol', 't10', { name: 'Organik Solucan Gübresi 10 KG' });
   await L(db, 'trendyol', 't5b', { name: 'Solucan Gübresi 5 Kg Paket' });
   await autoMatch(db, { catalog: ['ikas1'] });
@@ -42,6 +45,14 @@ test('farklı kanal: ad + varyant birebir aynıysa otomatik, benzerse onaya dü�
   assert.equal(t5.product_id, v5.product_id); assert.equal(t5.match, 'name');
   assert.equal((await pid(db, 't10')).product_id, null, 'fazladan kelime var: kesin değil');
   assert.equal((await pid(db, 't5b')).product_id, null);
+  assert.equal((await pid(db, 't5r')).product_id, null, 'kelime sırası farklı: adın tamamı aynı değil, onaya düşer');
+  const h0 = await first(db, "SELECT ignored, match, product_id FROM listings WHERE remote_id = 'h0'");
+  assert.equal(h0.product_id, null); assert.deepEqual([h0.ignored, h0.match], [1, 'zero'], 'stoğu sıfır, kesin eşleşmesi yok: otomatik yok sayılır');
+  assert.equal((await pid(db, 'h1')).product_id, (await pid(db, 'v10')).product_id, 'stoğu sıfır olsa da kesin (tam ad) eşleşme yapılır');
+  await db.prepare("UPDATE listings SET remote_stock = 3 WHERE remote_id = 'h0'").run();
+  await autoMatch(db, { catalog: ['ikas1'] });
+  const h0b = await first(db, "SELECT ignored, match FROM listings WHERE remote_id = 'h0'");
+  assert.deepEqual([h0b.ignored, h0b.match], [0, null], 'stok gelince yeniden onay listesine döner');
   const s = await suggestions(db, { channel: 'trendyol' });
   const t10 = s.find((x) => x.remote_id === 't10'), t5b = s.find((x) => x.remote_id === 't5b');
   assert.equal(t10.candidates[0].product_id, (await pid(db, 'v10')).product_id);
@@ -231,4 +242,17 @@ test('otomatik fiyat: genel anahtar kapalıyken ya da veri eskiyken fiyat deği�
     await db.prepare("UPDATE buybox SET checked_at = ?, buybox_price = 2985").bind(Date.now()).run();
     assert.equal((await autoPrice(env, db, await getSettings(db))).changed, 0);
   } finally { globalThis.fetch = realFetch; }
+});
+
+test('eski hatalı eşleşme onarımı: aynı kanaldan bir ürüne bağlı fazladan ilanlar ayrılır, en uygun olan kalır', async () => {
+  const { repairDuplicates } = await import('../src/match.js');
+  const db = await db0();
+  await db.prepare("INSERT INTO products (id, sku, barcode, name, stock, created_at, updated_at) VALUES (1, 'SG-5', '869005', 'Solucan Gübresi 5 Kg', 5, 0, 0)").run();
+  await L(db, 'trendyol', 'a', { sku: 'X', barcode: '111', name: 'Saksı Toprağı 20 Lt' });
+  await L(db, 'trendyol', 'b', { sku: 'SG-5', barcode: '869005', name: 'Solucan Gübresi 5 Kg' });
+  await L(db, 'trendyol', 'c', { sku: 'Y', barcode: '222', name: 'Perlit 10 Lt' });
+  await db.prepare("UPDATE listings SET product_id = 1, match = 'name'").run();
+  assert.equal(await repairDuplicates(db), 2);
+  const rows = await all(db, 'SELECT remote_id, product_id FROM listings ORDER BY remote_id');
+  assert.deepEqual(rows.map((r) => [r.remote_id, r.product_id]), [['a', null], ['b', 1], ['c', null]]);
 });
