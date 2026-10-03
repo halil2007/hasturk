@@ -9,12 +9,14 @@ export function hepsiburada(env, meta) {
   const m = env.HB_MERCHANT_ID, user = env.HB_USERNAME || m, pass = env.HB_PASSWORD;
   const test = env.HB_TEST === '1' ? '-sit' : '';
   const OMS = `https://oms-external${test}.hepsiburada.com`, LST = `https://listing-external${test}.hepsiburada.com`;
-  const headers = () => ({
+  const headers = (json = true) => ({
     Authorization: basic(user, pass),
     'User-Agent': env.HB_USER_AGENT || '',
-    'Content-Type': 'application/json', Accept: 'application/json',
+    Accept: 'application/json',
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
   });
-  const call = (url, opts = {}) => http(url, { ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
+  // Gövdesiz (GET) istekte Content-Type gönderilmez: bazı Hepsiburada sunucuları bunu reddedebiliyor (HTTP 520)
+  const call = (url, opts = {}) => http(url, { ...opts, headers: headers(!!opts.body), body: opts.body && JSON.stringify(opts.body) });
   const list = (r) => (Array.isArray(r) ? r : (r && (r.items || r.data || r.listings || r.packages)) || []);
   const money = (v) => (v && typeof v === 'object' ? num(v.amount ?? v.value) : num(v));
 
@@ -209,7 +211,7 @@ export function hepsiburada(env, meta) {
     return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.' };
   }
   async function labelFile(pkg) {
-    const res = await http(`${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(), raw: true });
+    const res = await http(`${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(false), raw: true });
     const type = res.headers.get('content-type') || '';
     if (/pdf/i.test(type)) {
       const buf = new Uint8Array(await res.arrayBuffer());
@@ -306,6 +308,23 @@ export function hepsiburada(env, meta) {
     await http(`${QNA}/issues/${encodeURIComponent(q.remote_id)}/answer`, { method: 'POST', headers: h, body: fd });
   }
 
+  // 520 incelemesi: aynı adres farklı başlık bileşimleriyle denenir; sonuçlar sorunun kaynağını gösterir
+  async function probe(url) {
+    const variants = [
+      ['Yalnız kimlik + entegratör adı', { Authorization: basic(user, pass), 'User-Agent': env.HB_USER_AGENT || '' }],
+      ['+ Accept: application/json', { Authorization: basic(user, pass), 'User-Agent': env.HB_USER_AGENT || '', Accept: 'application/json' }],
+      ['+ Content-Type (eski biçim)', headers(true)],
+    ];
+    const rows = [];
+    for (const [name, h] of variants) {
+      try {
+        const r = await fetch(url, { headers: h });
+        const t = (await r.text()).slice(0, 120).replace(/\s+/g, ' ');
+        rows.push(`${name}: HTTP ${r.status}${r.headers.get('cf-ray') ? ` · cf-ray ${r.headers.get('cf-ray')}` : ''}${r.headers.get('server') ? ` · ${r.headers.get('server')}` : ''}${t ? ` · ${t}` : ''}`);
+      } catch (e) { rows.push(`${name}: bağlantı hatası (${e.message})`); }
+    }
+    return rows;
+  }
   async function diagnose({ orderId } = {}) {
     const out = [];
     await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}` }; });
@@ -313,6 +332,12 @@ export function hepsiburada(env, meta) {
     await diagStep(out, 'Kargodaki paketler', async () => { const r = await call(`${OMS}/packages/merchantid/${m}/shipped?offset=0&limit=1`); return { detail: `erişildi · toplam ${g(r, 'totalCount') ?? '?'}` }; });
     await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
     if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ page: 0, size: 1 }); return { detail: `${r.total ?? r.items.length} soru` }; });
+    if (out.some((x) => x.ok === false && /HTTP 52\d/.test(x.detail || ''))) {
+      const rows = await probe(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`);
+      const any2xx = rows.some((r) => /HTTP 2\d\d/.test(r));
+      out.push({ name: '520 incelemesi (sipariş servisi, farklı başlıklarla)', ok: any2xx ? null : false,
+        detail: rows.join('\n') + (any2xx ? '\n→ Başlık farkı: başarılı olan biçim kullanılıyor.' : '\n→ Her biçimde 52x: Hepsiburada sunucusu bağlantıyı yanıtsız kapatıyor. Kimlik ve entegratör adı soru servisinde kabul edildiği için sorun bilgilerde değil; Hepsiburada\'ya bu raporla “SIT OMS / listing servislerinden Cloudflare 520 alıyoruz, istekler Cloudflare Workers üzerinden geliyor; IP kısıtı veya hesap tanımı eksik mi?” diye sorun.') });
+    }
     if (orderId) await diagStep(out, 'Sipariş', async () => { const r = await call(`${OMS}/orders/merchantid/${m}/ordernumber/${encodeURIComponent(orderId)}`); return { detail: JSON.stringify(r).slice(0, 600) }; });
     return out;
   }
