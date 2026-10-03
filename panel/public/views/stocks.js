@@ -2,7 +2,7 @@
 // Kural: Ortak (ortak stok olduğu gibi), En fazla N (ortak stok ama bu kanala en çok N), Ayrılmış N (bu kanalda sabit N adet;
 // o kanaldaki satış hem bu adetten hem depo stoğundan düşer). Satış olunca stok düşer ve her kanala kendi kuralına göre gönderilir.
 import { api, state, html, render, $, $$, n, ch, chLogo, thumb, isMobile, actions, busy, toast, debounce, sheet, numIn, activeChannels } from '../core.js';
-import { stockDialog, quickStock } from './products.js';
+import { stockDialog, quickStock, siteStock, siteStockVal } from './products.js';
 import { setQuery } from '../app.js';
 
 const STATUS = [['out', 'Stokta yok', 'bad'], ['below', 'Sınır altı', 'amber'], ['enough', 'Yeterli', 'good'], ['', 'Tümü', '']];
@@ -35,10 +35,11 @@ export async function stocks(el, rest, query = {}) {
     const rule = l.stock_mode && l.stock_mode !== 'shared' ? html`<div class="tiny muted">${ruleText(l)}</div>` : '';
     const pill = l.error ? html`<span class="pill bad" title="${l.error}"><i class="ico ico-warn"></i>${shown ?? '?'}</span>`
       : state.settings && state.settings.stock_sync && shown !== want ? html`<span class="pill amber" title="Gönderim bekliyor">${shown ?? '?'} → ${want}</span>`
+        : state.settings && !state.settings.stock_sync ? html`<span class="pill ${(shown ?? 0) <= 0 ? 'bad' : 'good'}" title="Kanaldaki stok (gönderim kapalı)${shown !== want ? ` · senkron açılınca ${want} olur` : ''}">${shown ?? '?'}</span>`
         : html`<span class="pill ${want <= 0 ? 'bad' : 'good'}" title="Kanaldaki stok">${want}</span>`;
     return html`<button class="plain" data-act="rule" data-id="${p.id}" title="Kanal stok kuralı">${pill}${rule}</button>`;
   }
-  const stockCtl = (p) => html`<div class="stock-ctl"><button class="round" data-act="dec" data-id="${p.id}" aria-label="Stok azalt"><i class="ico ico-minus"></i></button>
+  const stockCtl = (p) => siteStock(p) ? siteStockVal(p, p.stock <= 0 ? 'neg' : p.stock <= (p.low_limit ?? low()) ? 'low' : '') : html`<div class="stock-ctl"><button class="round" data-act="dec" data-id="${p.id}" aria-label="Stok azalt"><i class="ico ico-minus"></i></button>
     <span class="val num ${p.stock <= 0 ? 'neg' : p.stock <= (p.low_limit ?? low()) ? 'low' : ''}" data-act="stock" data-id="${p.id}" title="Stok girişi / sayım">${p.stock}</span>
     <button class="round" data-act="inc" data-id="${p.id}" aria-label="Stok artır"><i class="ico ico-plus"></i></button></div>`;
   const pname = (p) => html`<div class="ellipsis" style="max-width:320px;font-weight:650">${p.group_name || p.name}${p.variant_name ? html`<span class="var-tag">${p.variant_name}</span>` : ''}</div>`;
@@ -48,9 +49,9 @@ export async function stocks(el, rest, query = {}) {
       <a class="kpi" href="#/stoklar?durum=out"><div class="label">Stokta yok</div><div class="value num ${counts.out ? 'down' : ''}">${n(counts.out)}</div><div class="delta flat">ürün</div></a>
       <a class="kpi" href="#/stoklar?durum=below"><div class="label">Sınırın altında</div><div class="value num">${n(counts.below)}</div><div class="delta flat">sınır: ${low()} adet ve altı</div></a>
       <a class="kpi" href="#/stoklar?durum=enough"><div class="label">Yeterli stok</div><div class="value num">${n(counts.enough)}</div><div class="delta flat">ürün</div></a>
-      <a class="kpi" href="#/stoklar?f=waiting"><div class="label">Gönderim bekleyen</div><div class="value num">${n(dash ? dash.stock.waiting : 0)}</div><div class="delta flat">kanal ilanı</div></a>`);
+      <a class="kpi" href="#/stoklar?f=waiting"><div class="label">${dash && !dash.stockSync ? 'Stoğu farklı ilan' : 'Gönderim bekleyen'}</div><div class="value num">${n(dash ? dash.stock.waiting : 0)}</div><div class="delta flat">${dash && !dash.stockSync ? 'senkron açılınca güncellenir' : 'kanal ilanı'}</div></a>`);
     render($('[data-sync]', el), dash && dash.stockSync ? ''
-      : html`<div class="notice warn"><i class="ico ico-warn"></i><div style="flex:1"><b>Stok senkronu kapalı.</b> Eşleştirmeleri ve adetleri kontrol ettikten sonra açın; açılınca stoklar kanallara gönderilir.</div><a class="btn sm primary" href="#/ayarlar">Aç</a></div>`);
+      : html`<div class="notice warn"><i class="ico ico-warn"></i><div style="flex:1"><b>Stok gönderimi kapalı.</b> Hiçbir kanala stok gönderilmez; panel stokları ikas sitesindeki (ana katalog) adetlerden okunur. Sistem hazır olunca Ayarlar → Stok'tan açın; açılınca stok panelde tutulur, satışla düşer ve tüm kanallara gönderilir.</div><a class="btn sm" href="#/ayarlar">Ayarlar</a></div>`);
     render($('[data-status]', el), html`${STATUS.map(([k, t, c]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="status" data-k="${k}">${c ? html`<span class="dot" style="background:var(--${c})"></span>` : ''}${t}<span class="n">${n(k ? counts[k] : counts.all)}</span></button>`)}`);
     const body = !rows.length ? html`<div class="empty">Bu bölümde ürün yok</div>`
       : isMobile() ? html`<div class="m-list" style="padding:12px">${rows.map((p) => html`<div class="m-card" data-pid="${p.id}"><div class="top">${thumb(p.image, p.name, 'sm')}<div style="min-width:0;flex:1">${pname(p)}<div class="muted tiny">${p.sku || ''}</div></div>${stockCtl(p)}</div>

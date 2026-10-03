@@ -2,7 +2,7 @@
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED } from './channels/index.js';
 import { loadConfig, saveConfig, describe } from './config.js';
-import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED } from './sync.js';
+import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf } from './sync.js';
 import { suggestions, linkedGroups } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -498,6 +498,13 @@ async function stockChange(env, db, ctx, id, b, user) {
   const qty = Math.round(num(b.qty));
   const delta = b.mode === 'set' ? qty - p.stock : qty;
   if (!delta) return { ok: true, stock: p.stock };
+  // Stok senkronu kapalıyken ana katalog (ikas) stoğu esastır: panelde yapılan değişiklik bir sonraki senkronda geri yazılırdı
+  const settings = await getSettings(db);
+  if (!settings.stock_sync) {
+    const cats = catalogOf(settings);
+    const src = await first(db, `SELECT channel FROM listings WHERE product_id = ? AND remote_stock IS NOT NULL AND channel IN (${cats.map(() => '?').join(',')}) LIMIT 1`, id, ...cats);
+    if (src) fail(409, 'Stok senkronu kapalıyken stoklar ikas sitesinden okunur. Adedi ikas panelinden değiştirin (birkaç dakika içinde buraya yansır) ya da Ayarlar → Stok\'tan senkronu açın.');
+  }
   const t = Date.now();
   await db.batch([
     db.prepare('UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?').bind(delta, t, id),

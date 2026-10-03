@@ -111,6 +111,14 @@ export function init(db) {
     ready.set(db, (async () => {
       await db.batch(SCHEMA.map((s) => db.prepare(s)));
       for (const m of MIGRATIONS) { try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
+      // Tek seferlik: sistem tamamen hazır olana kadar kanallara stok gönderimi kapatılır (stoklar ikas sitesinden okunur).
+      // Sonradan Ayarlar → Stok'tan açılabilir; bu adım bir daha çalışmaz.
+      if (!(await db.prepare("SELECT 1 AS x FROM settings WHERE k = 'once:stock_off_1'").first())) {
+        await db.batch([
+          db.prepare("INSERT INTO settings (k, v) VALUES ('stock_sync', 'false') ON CONFLICT (k) DO UPDATE SET v = 'false'"),
+          db.prepare("INSERT INTO settings (k, v) VALUES ('once:stock_off_1', '1') ON CONFLICT (k) DO NOTHING"),
+        ]);
+      }
     })().catch((e) => { ready.delete(db); throw e; }));
   }
   return ready.get(db);

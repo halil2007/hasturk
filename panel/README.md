@@ -86,7 +86,8 @@ Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bil
 3. **Eşleştirme** sayfasında bekleyen ilanları kontrol edin: önerilen ürüne bağlayın, ürün arayın, yeni ürün olarak ekleyin veya yok sayın. "Eşleşmiş" sekmesinde otomatik bağlananları gözden geçirip gerekirse bağlantıyı kaldırabilirsiniz.
 4. **Stoklar:** Adetleri kontrol edin (stoğa dokunup **Sayım (=)**). Kanala özel adet gerekiyorsa kanal hücresine veya "Kanal stokları"na dokunup kural seçin. Kârlılık için ürünlere **alış fiyatı** girin.
 5. **Ayarlar:** Kanal komisyonları, kargo gideri, hizmet bedeli, stok sınırı, gönderici bilgileri, firma bilgileri ve logo.
-6. **Ayarlar → Stok senkronu: Aç.** Açıldığı andan sonraki satışlar stoktan düşer ve stok her kanala kendi kuralıyla gönderilir. Daha eski siparişler stoğu etkilemez.
+6. **Stok senkronu kapalıyken (varsayılan):** Hiçbir kanala stok gönderilmez. Panel stokları her senkronda ana katalog ikas sitesindeki (varsayılan HasTürk) adetlerden okunur; bu ürünlerin stoğu panelden değiştirilemez (ikas panelinden değiştirin). Stoklar ekranında her kanalın kendi stoğu görünür.
+7. **Ayarlar → Stok senkronu: Aç** (sistem tamamen hazır olunca). Açıldığı andan sonraki satışlar stoktan düşer ve stok her kanala kendi kuralıyla gönderilir. Daha eski siparişler stoğu etkilemez.
 7. İsterseniz **Entegrasyonlar → Geçmiş siparişleri aktar** ile geçmiş dönem siparişlerini alın (istatistikler için). Geçmiş siparişler stoğu değiştirmez.
 
 ## Nasıl çalışır?

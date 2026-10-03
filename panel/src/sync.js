@@ -170,6 +170,29 @@ export async function applyStock(db, orderIds, settings) {
   return moves;
 }
 
+// ---------- stok senkronu kapalıyken: ana katalog (ikas) stoğu esas ----------
+// Hiçbir kanala stok gönderilmez; panel stoğu ana katalog sitesindeki (varsayılan HasTürk ikas) stoktan okunur.
+// Senkron açılınca bu adım devre dışı kalır: stok panelde tutulur, satışla düşer ve kanallara gönderilir.
+export const catalogOf = (settings) => ((settings.catalog_channels || []).length ? settings.catalog_channels : ['ikas1']);
+export async function mirrorStock(db, settings) {
+  settings = settings || await getSettings(db);
+  if (settings.stock_sync) return 0;
+  const cats = catalogOf(settings);
+  const ls = await all(db, `SELECT l.product_id, l.channel, l.remote_stock, p.stock FROM listings l JOIN products p ON p.id = l.product_id
+    WHERE l.remote_stock IS NOT NULL AND l.channel IN (${cats.map(() => '?').join(',')})`, ...cats);
+  const src = new Map();
+  for (const l of ls.sort((a, b) => cats.indexOf(a.channel) - cats.indexOf(b.channel))) if (!src.has(l.product_id)) src.set(l.product_id, l);
+  const t = Date.now(), st = [];
+  for (const [pid, l] of src) {
+    const v = Math.max(0, Math.round(Number(l.remote_stock) || 0));
+    if (v === l.stock) continue;
+    st.push(db.prepare('UPDATE products SET stock = ?, updated_at = ? WHERE id = ?').bind(v, t, pid));
+    st.push(db.prepare('INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(pid, v - l.stock, v, 'Site stoğu (ikas)', l.channel, t));
+  }
+  for (const part of chunk(st, 90)) await db.batch(part);
+  return st.length / 2;
+}
+
 // ---------- stok / fiyat gönderimi ----------
 export async function pushStocks(env, db, settings, only) {
   settings = settings || await getSettings(db);
@@ -278,6 +301,7 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     }
     // 3) kesin eşleşmeler + ana katalogdan yeni ürünler
     out.match = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] });
+    out.mirrored = await mirrorStock(db, settings);
     // 4) stok düşümü ve gönderim
     out.stockMoves = await applyStock(db, changed, settings);
     out.stock = await pushStocks(env, db, settings);
@@ -331,8 +355,10 @@ export async function importListings(env, db, { only } = {}) {
       await log(db, ch.id, 'error', 'Ürünler alınamadı: ' + e.message);
     }
   }
-  const m = await autoMatch(db, { catalog: (await getSettings(db)).catalog_channels || ['ikas1'] });
+  const settings = await getSettings(db);
+  const m = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] });
   out.created = m.created; out.linked = m.linked;
+  out.mirrored = await mirrorStock(db, settings);
   return out;
 }
 export const autoLink = async (db) => (await autoMatch(db, { catalog: [] })).linked;
