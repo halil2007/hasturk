@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (310 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (314 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -43,7 +43,7 @@ _Henüz veri yok._
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
 | 1 | HasTürk Solucan Gübresi  | 31,2 | 63 |
-| 2 | HasTürk Sıvı Solucan Gübresi  | 19,3 | 28 |
+| 2 | HasTürk Sıvı Solucan Gübresi  | 19,2 | 28 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 16 | 18 |
 | 4 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10 | 6 |
 | 5 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 9,8 | 1 |
@@ -51,11 +51,11 @@ _Henüz veri yok._
 | 7 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
 | 8 | Kullanıma Hazır Cocopeat Torfu | 8,4 | 16 |
 | 9 | Leonardit - Organik Toprak Düzenleyici | 7 | 10 |
-| 10 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 7 | 4 |
+| 10 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 6,9 | 4 |
 | 11 | Premium Fide Toprağı | 6,6 | 11 |
 | 12 | HG Akıllı Bitki ve Saksı Toprağı | 5,6 | 6 |
 | 13 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 5,4 | 0 |
-| 14 | HG Tarım Perliti | 4,8 | 6 |
+| 14 | HG Tarım Perliti | 4,7 | 6 |
 | 15 | HG Asidik Torf | 4,3 | 5 |
 | 16 | HG Mezar Toprağı | 3,9 | 6 |
 | 17 | Doğal Orman Toprağı | %100 Organik ve Humuslu | 3,9 | 0 |
@@ -156,7 +156,7 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 | Gübreler | HasTürk Solucan Gübresi  (`hasturk-kati-solucan-gubresi`)<br>HasTürk Sıvı Solucan Gübresi  (`hasturk-sivi-solucan-gubresi`)<br>HasTürk Hümix Sıvı Hümik Asit (`hasturk-humix-sivi-humik-asit`) |
 | Saksılar ve Bahçe Yatakları | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm (`moduler-yukseltilmis-bahce-yatagi-sekilli-no-12-220x140`)<br>45 Göz Yuvarlak Fide Viyolü  (`45-goz-yuvarlak-fide-viyolu`) |
 | Tohumlar | DSV Lippa Lisuna 6 Mix Çim Tohumu (`dsv-lippa-lisuna-6-mix-cim-tohumu`)<br>DSV Lippa Tamu 5 Mix Çim Tohumu (`dsv-lippa-tamu-5-mix-cim-tohumu`)<br>Gold Valley Süs Yoncası Tohumu (Ak Üçgül) 500 Gr (`sus-yoncasi-tohumu-ak-ucgul`) |
-| Topraklar | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>HG Paşa Kılıcı (Sansevieria) Toprağı (`pasa-kilici-sansevieria-topragi`)<br>HG Tarım Perliti (`tarim-perliti`) |
+| Topraklar | HG Paşa Kılıcı (Sansevieria) Toprağı (`pasa-kilici-sansevieria-topragi`)<br>Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>HG Tarım Perliti (`tarim-perliti`) |
 | Halk Sağlığı Ürünleri | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı (`chrysamed-insektisit-max-5-lt-ekonomik-tahtakurusu-akrep-ilaci`)<br>Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı (`chrysamed-worm-ex-tahta-agac-kurdu-ilaci-5-lt`)<br>Chrysamed Ratex Pasta Fare İlacı 100 Gr (`chrysamed-ratex-pasta-fare-ilaci-100-gr`) |
 | Bahçe Ekipmanları | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) (`uzman-2-lt-ilaclama-pompasi`)<br>Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  (`uzman-10-lt-basincli-ilaclama-pompasi-k-73`)<br>Uzman Lityum Akülü İlaçlama Pompası 8 Lt (`uzman-lityum-akulu-ilaclama-pompasi-8-lt`) |
 | Kedi Ürünleri | Reflex Plus Loaf Biftekli Yetişkin Kedi Konservesi 400 Gr (`reflex-plus-loaf-biftekli-yetiskin-kedi-konservesi-400-gr`)<br>Reflex Plus Sos İçinde Parça Kuzulu Yetişkin Kedi Konservesi 400gr (`reflex-plus-sos-icinde-parca-kuzulu-yetiskin-kedi-konservesi-400gr`)<br>Proline Bebek Pudra Kokulu Bentonit Kedi Kumu 10 LT (`proline-bebek-pudra-kokulu-bentonit-kedi-kumu-10-lt`) |

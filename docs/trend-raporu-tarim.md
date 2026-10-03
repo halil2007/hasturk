@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (310 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (314 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -15,8 +15,8 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 3 | HG Paşa Kılıcı (Sansevieria) Toprağı | ×8,6 | 4 | evet |
 | 4 | HG Tarım Perliti | ×2,6 | 2 | evet |
 | 5 | Guanokalong Yarasa Gübresi Toz | ×6,2 | 0 | evet |
-| 6 | Güzelbahçe İthal Torf Genel Kullanım | ×4,4 | 1 | evet |
-| 7 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
+| 6 | TurfMaster 16-6-25 Yavaş Salınımlı Sonbahar & Kış Çim Gübresi 20 kg | ×4,8 | 2 | **HAYIR** |
+| 7 | Güzelbahçe İthal Torf Genel Kullanım | ×4,4 | 1 | evet |
 | 8 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | ×4,1 | 0 | evet |
 | 9 | Chrysamed Subon Hijyen Sprey | ×4 | 0 | evet |
 | 10 | HasTürk Hümix Sıvı Hümik Asit | ×1,8 | 0 | evet |
@@ -24,7 +24,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 12 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | ×3,7 | 1 | evet |
 | 13 | Modüler Yükseltilmiş Bahçe Yatağı Şekilli Seri No:12 - 220x140x30 cm | ×3,7 | 0 | evet |
 | 14 | Raco Tel Tırmık Küçük | ×3,7 | 0 | evet |
-| 15 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | ×2,1 | 2 | evet |
+| 15 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | ×2,2 | 2 | evet |
 
 ## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)
 
@@ -42,7 +42,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | Katı Solucan Gübresi 20 KG Çuval | 20,3 | 42 |
+| 1 | Katı Solucan Gübresi 20 KG Çuval | 20,2 | 42 |
 | 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 16 | 18 |
 | 3 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10 | 6 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 9,8 | 1 |
@@ -50,13 +50,13 @@ _Henüz veri yok._
 | 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
 | 7 | Kullanıma Hazır Cocopeat Torfu | 8,4 | 16 |
 | 8 | Leonardit - Organik Toprak Düzenleyici | 7 | 10 |
-| 9 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 7 | 4 |
+| 9 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 6,9 | 4 |
 | 10 | Premium Fide Toprağı | 6,6 | 11 |
 | 11 | HG Akıllı Bitki ve Saksı Toprağı | 5,6 | 6 |
 | 12 | Sıvı Solucan Gübresi 1 Lt | 5,5 | 7 |
 | 13 | Reflex Plus Natural Ton Balığı Fileto Kedi Ödül Maması 30 Gr | 5,4 | 0 |
 | 14 | Uzman 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası | 5,1 | 5 |
-| 15 | HG Tarım Perliti | 4,8 | 6 |
+| 15 | HG Tarım Perliti | 4,7 | 6 |
 | 16 | Sıvı Solucan Gübresi 500 ml | 4,7 | 7 |
 | 17 | HG Asidik Torf | 4,3 | 5 |
 | 18 | HG Mezar Toprağı | 3,9 | 6 |
