@@ -6,8 +6,9 @@ import { products } from './views/products.js';
 import { stocks } from './views/stocks.js';
 import { cargo } from './views/cargo.js';
 import { matching } from './views/match.js';
+import { buyboxView, bbChannels } from './views/buybox.js';
 import { profitView } from './views/profit.js';
-import { statsView } from './views/stats.js';
+import { insightsView } from './views/insights.js';
 import { integrations } from './views/integrations.js';
 import { notices } from './views/notices.js';
 import { users } from './views/users.js';
@@ -22,8 +23,9 @@ const ROUTES = [
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products },
   { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock' },
   { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match' },
+  { path: 'buybox', title: 'Buybox', icon: 'bolt', view: buyboxView, when: () => bbChannels().length > 0 },
   { sec: 'Raporlar' },
-  { path: 'analiz', title: 'Analizler', icon: 'pie', view: statsView },
+  { path: 'analiz', title: 'Analizler', icon: 'pie', view: insightsView },
   { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
@@ -33,7 +35,7 @@ const ROUTES = [
 ];
 const PAGES = ROUTES.filter((r) => r.view);
 const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kargo', 'Kargo', 'truck'], ['stoklar', 'Stok', 'db']];
-const canSee = (r) => !r.admin || !state.user || state.user.role === 'admin';
+const canSee = (r) => (!r.admin || !state.user || state.user.role === 'admin') && (!r.when || r.when());
 
 function nav() {
   const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-count="${r.count}"></span>` : ''}</a>`;

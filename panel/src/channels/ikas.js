@@ -1,6 +1,9 @@
 // ikas (GraphQL Admin API). Her ikas mağazası için bir özel uygulama gerekir:
-// ikas paneli → Uygulamalar → Özel uygulama → izinler: Ürünler, Siparişler, Stok (okuma + yazma).
-import { http, num, str } from '../util.js';
+// ikas paneli → Uygulamalar → Özel uygulama → izinler: Ürünler, Siparişler, Stok, Mağaza bilgisi (okuma + yazma).
+// Kargo (ikas Kargo): paket "Kargoya Hazır" (READY_FOR_SHIPMENT) olarak oluşturulunca ikas Kargo, ikas panelindeki
+// kargo önceliğine göre barkodu üretir; barkod ve etiket görseli paketin trackingInfo alanına yazılır, panel oradan okur.
+// Şema kaynağı: ikas'ın resmi @ikas/admin-api-client paketi (FulFillOrderInput, UpdateOrderPackageStatusInput, TrackingInfo…).
+import { http, num, str, labelFrom } from '../util.js';
 
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
 
@@ -39,8 +42,14 @@ export function ikas(env, p, meta) {
     for (;;) {
       try { return await gql(build(active), variables); } catch (e) {
         const msg = e.message.toLowerCase();
-        // Paket barkodu alanı eski şemada yoksa sadece o alanı çıkar
-        if (e.gql && /barcode/.test(msg) && /\bbarcode\b/.test(active.orderPackages || '') && !/barcodelist/.test(msg)) { active.orderPackages = active.orderPackages.replace(' barcode', ''); continue; }
+        // Şemada olmayan alt alan (ör. eski sürümde trackingInfo.shippingLabelImage): sadece o alan çıkarılır
+        const f = e.gql && /cannot query field "(\w+)"(?: on type "(\w+)")?/i.exec(e.message);
+        if (f && (!f[2] || f[2] === 'Order') && active[f[1]]) { active[f[1]] = ''; continue; }
+        if (f) {
+          const re = new RegExp(`\\s${f[1]}(\\s*\\{[^{}]*\\})?(?=[\\s}])`);
+          const k = Object.keys(active).find((x) => active[x] && active[x] !== f[1] && re.test(' ' + active[x] + ' '));
+          if (k) { active[k] = (' ' + active[k] + ' ').replace(re, '').trim(); continue; }
+        }
         const bad = Object.keys(active).sort((a, b) => b.length - a.length).find((k) => active[k] && msg.includes(k.toLowerCase()));
         if (!e.gql || !bad) throw e;
         active[bad] = '';
@@ -48,6 +57,7 @@ export function ikas(env, p, meta) {
     }
   }
 
+  const PKG_FIELDS = 'id orderPackageNumber orderLineItemIds orderPackageFulfillStatus errorMessage updatedAt trackingInfo { cargoCompany cargoCompanyId trackingNumber trackingLink barcode shippingLabelImage }';
   const ORDER_OPT = {
     salesChannelId: 'salesChannelId',
     orderPackageStatus: 'orderPackageStatus',
@@ -56,11 +66,14 @@ export function ikas(env, p, meta) {
     shippingAddress: 'shippingAddress { firstName lastName phone addressLine1 addressLine2 city { name } district { name } }',
     barcodeList: 'barcodeList',
     mainImageId: 'mainImageId',
-    orderPackages: 'orderPackages { id orderLineItemIds orderPackageFulfillStatus trackingInfo { cargoCompany trackingNumber trackingLink barcode } }',
+    shippingLines: 'shippingLines { cargoCompanyId title }',
+    cancelledAt: 'cancelledAt',
+    updatedAt: 'updatedAt',
+    orderPackages: `orderPackages { ${PKG_FIELDS} }`,
   };
-  const orderQuery = (o, filter) => `query ($p: PaginationInput, $d: DateFilterInput) {
+  const orderQuery = (o, filter) => `query ($p: PaginationInput, $d: ${filter === 'id' ? 'StringFilterInput' : 'DateFilterInput'}) {
     listOrder(pagination: $p, ${filter}: $d) { hasNext data {
-      id orderNumber orderedAt status totalFinalPrice currencyCode ${o.salesChannelId} ${o.orderPackageStatus} ${o.orderPaymentStatus}
+      id orderNumber orderedAt status totalFinalPrice currencyCode ${o.salesChannelId} ${o.orderPackageStatus} ${o.orderPaymentStatus} ${o.cancelledAt} ${o.updatedAt} ${o.shippingLines}
       ${o.customer} ${o.shippingAddress}
       orderLineItems { id quantity price finalPrice status variant { id productId sku name ${o.barcodeList} ${o.mainImageId} } }
       ${o.orderPackages}
@@ -89,13 +102,17 @@ export function ikas(env, p, meta) {
         status: /CANCEL|REFUND/i.test(li.status || '') ? 'cancelled' : '', remoteKey: str(v.id),
       };
     });
-    const packages = (o.orderPackages || []).map((pk) => ({
-      remoteId: String(pk.id),
-      items: (pk.orderLineItemIds || []).map((lid) => ({ line_id: String(lid), qty: (items.find((i) => i.lineId === String(lid)) || {}).quantity || 1 })),
-      status: /DELIVERED|FULFILLED|SHIPPED/i.test(pk.orderPackageFulfillStatus || '') ? 'shipped' : 'open',
-      cargoCompany: str(pk.trackingInfo && pk.trackingInfo.cargoCompany), tracking: str(pk.trackingInfo && pk.trackingInfo.trackingNumber),
-      barcode: str(pk.trackingInfo && pk.trackingInfo.barcode),
-    }));
+    // İptal / iade edilmiş paketler panelde gösterilmez (sipariş durumu ayrıca güncellenir)
+    const packages = (o.orderPackages || []).filter((pk) => !/^(CANCELLED|REFUNDED|RETURN_|REFUND_REQUEST_ACCEPTED)/.test(pk.orderPackageFulfillStatus || '')).map((pk) => {
+      const ti = pk.trackingInfo || {}, st = String(pk.orderPackageFulfillStatus || '');
+      return {
+        remoteId: String(pk.id),
+        items: (pk.orderLineItemIds || []).map((lid) => ({ line_id: String(lid), qty: (items.find((i) => i.lineId === String(lid)) || {}).quantity || 1 })),
+        status: /^(DELIVERED|FULFILLED|UNABLE_TO_DELIVER)$/.test(st) ? 'shipped' : 'open', remoteStatus: st,
+        cargoCompany: str(ti.cargoCompany), tracking: str(ti.trackingNumber), barcode: str(ti.barcode),
+        error: st === 'ERROR' ? str(pk.errorMessage) || 'ikas Kargo hata verdi' : '', labelReady: !!ti.shippingLabelImage,
+      };
+    });
     const first = packages.find((x) => x.tracking) || {};
     return {
       remoteId: String(o.id), orderNumber: String(o.orderNumber || o.id), orderedAt: typeof o.orderedAt === 'number' ? o.orderedAt : Date.parse(o.orderedAt),
@@ -105,6 +122,7 @@ export function ikas(env, p, meta) {
       total: num(o.totalFinalPrice), currency: o.currencyCode || 'TRY',
       cargoCompany: first.cargoCompany || '', tracking: first.tracking || '',
       awaitingPayment: /WAITING/i.test(o.orderPaymentStatus || ''),
+      cargoChoice: str(((o.shippingLines || [])[0] || {}).title), cargoChoiceId: str(((o.shippingLines || [])[0] || {}).cargoCompanyId),
       items, packages,
     };
   }
@@ -212,17 +230,95 @@ export function ikas(env, p, meta) {
     }
   }
 
-  // ikas'ta "kargoya verme" = paketi gönderildi olarak işaretleme (fulfillOrder). Takip no müşteriye bildirilir.
+  // ---------- kargo (ikas Kargo) ----------
+  let cargoCache = null;
+  async function cargoOptions() {
+    if (!cargoCache) {
+      const d = await gql('{ listCargoCompany { id name } }');
+      cargoCache = (d.listCargoCompany || []).map((c) => ({ id: String(c.id), name: c.name })).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+    }
+    return [{ id: '', name: 'ikas Kargo (ikas panelindeki kargo önceliğine göre)' }, ...cargoCache];
+  }
+  const cargoInfo = (cargo) => (cargo && cargo.id ? { cargoCompanyId: cargo.id, cargoCompany: cargo.name } : undefined);
+  // Paket alanlarıyla dönen mutasyonlar: şemada olmayan alan hata verirse o alan çıkarılıp tekrar denenir
+  let pkgFields = PKG_FIELDS;
+  async function gqlPkg(build, variables) {
+    for (;;) {
+      try { return await gql(build(pkgFields), variables); } catch (e) {
+        const f = e.gql && /cannot query field "(\w+)"/i.exec(e.message);
+        const re = f && new RegExp(`\\s${f[1]}(\\s*\\{[^{}]*\\})?(?=[\\s}])`);
+        if (!re || !re.test(' ' + pkgFields + ' ')) throw e;
+        pkgFields = (' ' + pkgFields + ' ').replace(re, '').trim();
+      }
+    }
+  }
+  const FULFILL = (pf) => `mutation ($input: FulFillOrderInput!) { fulfillOrder(input: $input) { id orderPackages { ${pf} } } }`;
+
+  // Tek siparişi kimliğiyle oku (etiket / barkod kontrolü için)
+  async function getOrder(remoteId) {
+    const d = await flex((o) => orderQuery(o, 'id'), ORDER_OPT, { p: { page: 1, limit: 1 }, d: { eq: remoteId } });
+    const o = (d.listOrder.data || [])[0];
+    if (!o) throw new Error('ikas: sipariş bulunamadı');
+    return o;
+  }
+
+  // Paketle: her yerel paket ikas'ta "Kargoya Hazır" paket olarak oluşturulur → ikas Kargo barkod/etiket üretir
+  async function pack(order, pkgs, { cargo } = {}) {
+    const out = [];
+    for (const pkg of pkgs) {
+      const lines = pkg.items.map((x) => ({ orderLineItemId: String(x.line_id), quantity: x.qty }));
+      const d = await gqlPkg(FULFILL, { input: { orderId: order.remote_id, lines, markAsReadyForShipment: true, sendNotificationToCustomer: false, trackingInfoDetail: cargoInfo(cargo) } });
+      const pks = ((d.fulfillOrder || {}).orderPackages || []).filter((x) => !/CANCEL|REFUND/.test(x.orderPackageFulfillStatus || ''));
+      const pk = pks.filter((x) => (x.orderLineItemIds || []).some((l) => lines.some((y) => y.orderLineItemId === String(l)))).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+      if (!pk) throw new Error('ikas paketi oluşturdu ama paket bilgisi dönmedi; birazdan senkronlayın');
+      const ti = pk.trackingInfo || {};
+      out.push({ remoteId: String(pk.id), remoteStatus: pk.orderPackageFulfillStatus, barcode: str(ti.barcode), tracking: str(ti.trackingNumber), cargoCompany: str(ti.cargoCompany) || (cargo && cargo.name) || '', error: pk.orderPackageFulfillStatus === 'ERROR' ? str(pk.errorMessage) : '' });
+    }
+    return { packages: out, message: `${out.length} paket ikas'ta "Kargoya Hazır" olarak oluşturuldu; ikas Kargo barkodu hazırlıyor` };
+  }
+
+  // Etiket: ikas Kargo'nun ürettiği etiket görseli; yoksa barkod (panel etiketine basılır); hata varsa ikas'ın mesajı
+  async function label(order, pkg) {
+    if (!pkg.remote_id) return { pending: 'Önce paketleyin (ikas\'ta Kargoya Hazır)' };
+    const o = await getOrder(order.remote_id);
+    const pk = (o.orderPackages || []).find((x) => String(x.id) === String(pkg.remote_id));
+    if (!pk) throw new Error('Paket ikas\'ta bulunamadı (ikas panelinden iptal edilmiş olabilir); senkronlayın');
+    if (pk.orderPackageFulfillStatus === 'ERROR') throw new Error('ikas Kargo: ' + (str(pk.errorMessage) || 'barkod oluşturulamadı') + ' (müşteri telefonu ve depo adresi eksiksiz olmalı)');
+    const ti = pk.trackingInfo || {};
+    const info = { barcode: str(ti.barcode), tracking: str(ti.trackingNumber), cargoCompany: str(ti.cargoCompany), remoteStatus: pk.orderPackageFulfillStatus };
+    if (ti.shippingLabelImage) {
+      const lab = await labelFrom(ti.shippingLabelImage, `ikas-${order.order_number}-${pkg.no}`);
+      if (lab) return { ...info, label: lab };
+    }
+    if (info.barcode || info.tracking) return { ...info, panel: true };
+    return { ...info, pending: 'ikas Kargo barkodu henüz oluşmadı. Birkaç saniye sonra tekrar deneyin; uzun sürerse ikas panelinde kargo entegrasyonu ve kargo önceliğini kontrol edin.' };
+  }
+
+  // Kargoya ver: ikas Kargo paketi zaten varsa "Gönderildi" (FULFILLED) yapılır; yoksa takip bilgisiyle gönderilir
   async function ship(order, pkg, { cargoCompany, tracking }) {
-    const lines = pkg.items.map((x) => ({ orderLineItemId: x.line_id, quantity: x.qty }));
-    const d = await gql(`mutation ($input: FulfillOrderInput!) { fulfillOrder(input: $input) { id orderPackages { id orderLineItemIds } } }`, {
-      input: {
-        orderId: order.remote_id, lines,
-        trackingInfoDetail: tracking ? { cargoCompany: cargoCompany || '', trackingNumber: tracking, isSendNotification: true } : undefined,
-      },
-    });
+    if (pkg.remote_id) {
+      await gql('mutation ($input: UpdateOrderPackageStatusInput!) { updateOrderPackageStatus(input: $input) { id } }', {
+        input: { orderId: order.remote_id, packages: [{ packageId: pkg.remote_id, status: 'FULFILLED', trackingInfo: tracking && tracking !== pkg.tracking && tracking !== pkg.barcode ? { trackingNumber: tracking, cargoCompany: cargoCompany || undefined, isSendNotification: true } : undefined }] },
+      });
+      return { remoteId: pkg.remote_id };
+    }
+    const lines = pkg.items.map((x) => ({ orderLineItemId: String(x.line_id), quantity: x.qty }));
+    const d = await gqlPkg(FULFILL, { input: { orderId: order.remote_id, lines, sendNotificationToCustomer: true, trackingInfoDetail: tracking ? { cargoCompany: cargoCompany || '', trackingNumber: tracking, isSendNotification: true } : undefined } });
     const pk = ((d.fulfillOrder || {}).orderPackages || []).find((x) => (x.orderLineItemIds || []).some((l) => lines.some((y) => y.orderLineItemId === String(l))));
     return { remoteId: pk ? String(pk.id) : null };
+  }
+
+  // Paketi iptal et (ikas'ta paketlemeyi geri al) — kargo firmasını değiştirmek veya yeniden bölmek için
+  async function cancelPackage(order, pkg) {
+    if (!pkg.remote_id) return;
+    await gql('mutation ($input: CancelFulfillmentInput!) { cancelFulfillment(input: $input) { id } }', { input: { orderId: order.remote_id, orderPackageId: pkg.remote_id } });
+  }
+  // Kargo firması değiştir: barkod oluşmadan önce paket iptal edilip seçilen firmayla yeniden "Kargoya Hazır" yapılır
+  async function changeCargo(order, pkg, cargo) {
+    if (pkg.barcode || pkg.tracking) throw new Error('Barkod oluştuktan sonra ikas Kargo firması değiştirilemez. Önce "Paketi iptal et", sonra yeniden paketleyin.');
+    await cancelPackage(order, pkg);
+    const r = await pack(order, [pkg], { cargo });
+    return r.packages[0];
   }
 
   async function createProduct(pr) {
@@ -242,7 +338,7 @@ export function ikas(env, p, meta) {
   const missing = [p + 'STORE', p + 'CLIENT_ID', p + 'CLIENT_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'ikas', enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: true, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, ship, createProduct,
+    caps: { accept: 'local', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: 'pack', cancelPackage: true, createProduct: true, price: true },
+    fetchOrders, fetchListings, pushStock, pushPrice, ship, createProduct, cargoOptions, pack, label, cancelPackage, changeCargo,
   };
 }

@@ -1,17 +1,18 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
-import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS } from './channels/index.js';
+import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED } from './channels/index.js';
 import { loadConfig, saveConfig, describe } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED } from './sync.js';
-import { suggestions } from './match.js';
+import { suggestions, linkedGroups } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
+import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
-import { stats, summary, dashboard } from './stats.js';
+import { stats, summary, dashboard, insights } from './stats.js';
 import { profit } from '../public/profit.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS } from './util.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
-const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, desi, created_at, shipped_at, label_format, label_at, (label_data IS NOT NULL) AS has_label';
+const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, tracking, barcode, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
 
 // ---------- siparişler ----------
 async function loadOrder(db, id) {
@@ -49,7 +50,7 @@ function orderFilter(q, { withStatus = true } = {}) {
   const st = q.status || 'all';
   if (withStatus) {
     if (st === 'active') where.push("o.status IN ('new', 'processing')");
-    else if (st === 'cancelled') where.push("o.status IN ('cancelled', 'returned')");
+    else if (st === 'late') where.push(LATE);
     else if (STATUS.includes(st)) { where.push('o.status = ?'); args.push(st); }
   }
   if (q.channel && CHANNEL_IDS.includes(q.channel)) { where.push('o.channel = ?'); args.push(q.channel); }
@@ -73,6 +74,10 @@ async function listOrders(db, q) {
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS lines,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND status = 'open') AS open_packages,
+      (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND label_printed_at IS NOT NULL) AS printed,
+      (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND (label_data IS NOT NULL OR label_at IS NOT NULL OR COALESCE(barcode, '') != '' OR COALESCE(tracking, '') != '')) AS labeled,
+      (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND error IS NOT NULL) AS pkg_errors,
+      o.ship_by, o.ext_action,
       (SELECT MAX(cargo_company) FROM packages WHERE order_id = o.id AND cargo_company != '') AS pkg_cargo,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id AND product_id IS NULL) AS unmatched
     FROM orders o ${w} ORDER BY ${st === 'active' ? 'o.ordered_at ASC' : 'o.ordered_at DESC'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
@@ -80,6 +85,7 @@ async function listOrders(db, q) {
   // Durum sayıları: seçili kanal / tarih / arama içinde (durum filtresi hariç)
   const f2 = orderFilter(q, { withStatus: false });
   const counts = await all(db, `SELECT o.status, COUNT(*) AS n FROM orders o ${f2.w} GROUP BY o.status`, ...f2.args);
+  counts.push({ status: 'late', n: (await first(db, `SELECT COUNT(*) AS n FROM orders o ${f2.w ? f2.w + ' AND ' : 'WHERE '}${LATE}`, ...f2.args)).n });
   const byChannel = await all(db, "SELECT channel, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY channel");
   // Satır önizlemesi (görsel + ad + adet), ilk 2 ürün
   const items = {}, full = {};
@@ -149,15 +155,67 @@ async function setLocalStatus(db, o, status) {
   return merged;
 }
 
-async function orderAction(env, db, id, action, b, ctx) {
+// Panelden yapılan sipariş işlemi kaydı (kanal tarafındaki değişikliklerden ayırmak için)
+async function event(db, o, action, user, note) {
+  await run(db, "INSERT INTO order_events (order_id, at, source, action, status, remote_status, note, user) VALUES (?, ?, 'panel', ?, ?, ?, ?, ?)",
+    o.id, Date.now(), action, o.status, o.remote_status || '', note || null, user ? user.name : null);
+}
+// Kanalın döndürdüğü paket bilgisini pakete işle
+async function updPkg(db, id, r = {}) {
+  await run(db, `UPDATE packages SET remote_id = COALESCE(?, remote_id), remote_status = COALESCE(?, remote_status), barcode = COALESCE(NULLIF(?, ''), barcode),
+    tracking = COALESCE(NULLIF(?, ''), tracking), cargo_company = COALESCE(NULLIF(?, ''), cargo_company), error = ? WHERE id = ?`,
+  r.remoteId || null, r.remoteStatus || null, r.barcode || '', r.tracking || '', r.cargoCompany || '', r.error || null, id);
+}
+const clearLabel = (db, id) => run(db, 'UPDATE packages SET label_format = NULL, label_data = NULL, label_at = NULL, label_viewed_at = NULL, label_printed_at = NULL WHERE id = ?', id);
+
+// Paketle (kargoya hazırla): paket kanalda oluşturulur / hazırlanıyor bildirilir. ikas: "Kargoya Hazır" → ikas Kargo barkod üretir.
+async function packOrder(db, ch, o, { only, invoice } = {}) {
+  o = await ensurePackages(db, ch, o);
+  const todo = o.packages.filter((p) => p.status === 'open' && !p.packed_at && (!only || p.id === only));
+  if (!todo.length) return { o, message: 'Paketler zaten hazır' };
+  const errors = [];
+  for (const p of todo) {
+    try {
+      if (ch && ch.enabled && ch.pack && !(ch.caps.pack === 'remote' && p.remote_id)) {
+        const cargo = p.cargo_code ? { id: p.cargo_code, name: p.cargo_company } : null;
+        const r = await ch.pack(o, [p], { cargo, invoiceNumber: invoice });
+        await updPkg(db, p.id, r.packages[0]);
+        if (r.packages[0] && r.packages[0].error) { errors.push(r.packages[0].error); continue; }
+      }
+      // Hepsiburada: paketlendikten sonra seçilen kargo firması uygulanır
+      if (p.cargo_code && ch && ch.caps.cargo === 'change' && ch.changeCargo) {
+        const fresh = await first(db, `SELECT ${PKG_COLS} FROM packages WHERE id = ?`, p.id);
+        if (fresh.remote_id) await updPkg(db, p.id, await ch.changeCargo(o, { ...fresh, items: parse(fresh.items, []) }, { id: p.cargo_code, name: p.cargo_company }));
+      }
+      await run(db, 'UPDATE packages SET packed_at = ? WHERE id = ?', Date.now(), p.id);
+    } catch (e) {
+      await run(db, 'UPDATE packages SET error = ? WHERE id = ?', e.message.slice(0, 500), p.id);
+      errors.push(e.message);
+    }
+  }
+  if (o.status === 'new' && errors.length < todo.length) await setLocalStatus(db, o, 'processing');
+  if (errors.length) fail(400, errors[0]);
+  return { o: await loadOrder(db, o.id), message: ch && ch.pack ? `${todo.length} paket ${ch.name}'da kargoya hazırlandı` : `${todo.length} paket hazırlandı` };
+}
+
+async function orderAction(env, db, id, action, b, ctx, user) {
   let o = await loadOrder(db, id);
   const ch = await channel(env, db, o.channel);
   const settings = await getSettings(db);
+  const live = !['cancelled', 'returned', 'delivered'].includes(o.status);
+  const pkgOf = (pid) => { const p = o.packages.find((x) => x.id === Number(pid)); if (!p) fail(404, 'Paket bulunamadı'); return p; };
   if (action === 'accept') {
     if (o.status !== 'new') fail(400, 'Sadece yeni siparişler işleme alınabilir');
     if (ch && ch.enabled && ch.caps.accept === 'remote' && ch.accept) await ch.accept(o);
     await setLocalStatus(db, o, 'processing');
-    return { ok: true, message: 'Sipariş işleme alındı' };
+    await event(db, o, 'accept', user);
+    return { ok: true, message: ch && ch.caps.accept === 'remote' ? `Sipariş işleme alındı (${ch.name}'a bildirildi)` : 'Sipariş işleme alındı' };
+  }
+  if (action === 'pack') {
+    if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
+    const r = await packOrder(db, ch, o, { only: b.package_id ? Number(b.package_id) : null, invoice: str(b.invoice_number) });
+    await event(db, o, 'pack', user);
+    return { ok: true, message: r.message };
   }
   if (action === 'split') {
     const groups = (b.groups || []).map((g) => ({ desi: num(g.desi, 0) || null, items: (g.items || []).map((x) => ({ line_id: String(x.line_id), qty: Math.round(num(x.qty)) })).filter((x) => x.qty > 0) })).filter((g) => g.items.length);
@@ -172,48 +230,107 @@ async function orderAction(env, db, id, action, b, ctx) {
     if (ch && ch.enabled && ch.caps.split === 'remote-async') {
       const r = await ch.split(o, groups);
       await setLocalStatus(db, o, 'processing');
+      await event(db, o, 'split', user);
       return { ok: true, message: r.message };
     }
+    if (o.packages.some((p) => p.remote_id && ch && ch.caps.split !== 'remote-async')) fail(400, `Bu sipariş ${ch ? ch.name : 'kanal'}da paketlenmiş. Yeniden bölmek için önce paket menüsünden "Paketi iptal et" yapın.`);
     if (ch && ch.enabled && ch.caps.split === 'remote') {
-      if (o.packages.some((p) => p.remote_id)) fail(400, 'Bu sipariş kanalda zaten paketlenmiş; yeniden bölmek için kanal panelinden paketi iptal edin');
       const r = await ch.split(o, groups);
       await run(db, 'DELETE FROM packages WHERE order_id = ? AND remote_id IS NULL', o.id);
       await insertPackages(db, o.id, r.packages.map((p, i) => ({ ...p, desi: groups[i] && groups[i].desi })));
+      await run(db, 'UPDATE packages SET packed_at = ? WHERE order_id = ? AND remote_id IS NOT NULL AND packed_at IS NULL', Date.now(), o.id);
       await setLocalStatus(db, o, 'processing');
+      await event(db, o, 'split', user);
       return { ok: true, message: r.message };
     }
     await run(db, "DELETE FROM packages WHERE order_id = ? AND remote_id IS NULL AND status = 'open'", o.id);
     await insertPackages(db, o.id, groups);
     if (o.status === 'new') await setLocalStatus(db, o, 'processing');
+    await event(db, o, 'split', user);
     return { ok: true, message: `${groups.length} paket oluşturuldu` };
+  }
+  if (action === 'cargo') {
+    // Kargo firması seç / değiştir (seçenekler kanaldan gelir)
+    const pkg = pkgOf(b.package_id), cargo = b.cargo && { id: str(b.cargo.id), name: str(b.cargo.name) };
+    if (!cargo || !cargo.name) fail(400, 'Kargo firması seçin');
+    if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paketin kargo firması değiştirilemez');
+    if (!ch || !ch.enabled || !ch.cargoOptions) fail(400, `${ch ? ch.name : 'Bu kanal'} kargo firması seçimini API ile desteklemiyor`);
+    // Henüz paketlenmemiş: seçim kaydedilir, paketlerken uygulanır
+    if (!pkg.packed_at || (ch.caps.cargo === 'change' && !pkg.remote_id)) {
+      await run(db, 'UPDATE packages SET cargo_code = ?, cargo_company = ? WHERE id = ?', cargo.id, cargo.id ? cargo.name : '', pkg.id);
+      await event(db, o, 'cargo', user, cargo.name);
+      return { ok: true, message: `Kargo firması: ${cargo.name} (paketlerken uygulanacak)` };
+    }
+    const r = await ch.changeCargo(o, pkg, cargo);
+    await updPkg(db, pkg.id, { ...r, cargoCompany: r.cargoCompany || cargo.name });
+    await run(db, 'UPDATE packages SET cargo_code = ?, packed_at = COALESCE(packed_at, ?) WHERE id = ?', cargo.id, Date.now(), pkg.id);
+    // Kargo değişince eski etiket geçersizdir; ikas'ta paket yeniden oluştuğu için eski barkod da silinir
+    if (r.resetLabel || r.remoteId !== pkg.remote_id) {
+      await clearLabel(db, pkg.id);
+      if (r.remoteId !== pkg.remote_id) await run(db, "UPDATE packages SET barcode = ?, tracking = ? WHERE id = ?", r.barcode || '', r.tracking || '', pkg.id);
+    }
+    await event(db, o, 'cargo', user, cargo.name);
+    return { ok: true, message: `Kargo firması ${cargo.name} olarak değiştirildi; etiketi yeniden oluşturun` };
+  }
+  if (action === 'cancel-package') {
+    const pkg = pkgOf(b.package_id);
+    if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paket iptal edilemez');
+    if (pkg.remote_id) {
+      if (!ch || !ch.enabled || !ch.cancelPackage) fail(400, `${ch ? ch.name : 'Kanal'} paketi API ile iptal edilemiyor; kanal panelinden yapın`);
+      await ch.cancelPackage(o, pkg);
+    }
+    await run(db, "UPDATE packages SET remote_id = NULL, remote_status = NULL, packed_at = NULL, barcode = '', tracking = '', error = NULL WHERE id = ?", pkg.id);
+    await clearLabel(db, pkg.id);
+    await event(db, o, 'cancel-package', user, `Paket ${pkg.no}`);
+    return { ok: true, message: `Paket ${pkg.no} paketlemesi iptal edildi` };
   }
   if (action === 'ship') {
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
     if (!pkg) fail(400, 'Gönderilecek açık paket yok');
-    const tracking = str(b.tracking) || pkg.tracking, cargo = str(b.cargo_company) || pkg.cargo_company || o.cargo_company;
+    const tracking = str(b.tracking) || pkg.tracking || pkg.barcode, cargo = str(b.cargo_company) || pkg.cargo_company || o.cargo_company;
     let res = {};
     if (ch && ch.enabled && ch.caps.ship === 'remote' && ch.ship) res = (await ch.ship(o, pkg, { cargoCompany: cargo, tracking, invoiceNumber: str(b.invoice_number) })) || {};
     const tn = res.tracking || tracking || '';
-    await run(db, "UPDATE packages SET status = 'shipped', tracking = ?, cargo_company = ?, shipped_at = ?, remote_id = COALESCE(remote_id, ?) WHERE id = ?", tn, cargo || '', Date.now(), res.remoteId || null, pkg.id);
+    await run(db, "UPDATE packages SET status = 'shipped', tracking = ?, cargo_company = ?, shipped_at = ?, packed_at = COALESCE(packed_at, ?), remote_id = COALESCE(remote_id, ?) WHERE id = ?", tn, cargo || '', Date.now(), Date.now(), res.remoteId || null, pkg.id);
     const left = await first(db, "SELECT COUNT(*) AS n FROM packages WHERE order_id = ? AND status = 'open'", o.id);
     if (!left.n) await setLocalStatus(db, o, 'shipped');
     else if (o.status === 'new') await setLocalStatus(db, o, 'processing');
     await run(db, "UPDATE orders SET tracking = CASE WHEN tracking IS NULL OR tracking = '' THEN ? ELSE tracking END, cargo_company = CASE WHEN cargo_company IS NULL OR cargo_company = '' THEN ? ELSE cargo_company END WHERE id = ?", tn, cargo || '', o.id);
+    await event(db, o, 'ship', user, `Paket ${pkg.no}`);
     return { ok: true, message: left.n ? `Paket ${pkg.no} kargoya verildi (${left.n} paket kaldı)` : 'Sipariş kargoya verildi' };
   }
   if (action === 'tracking') {
-    const pkg = o.packages.find((p) => p.id === Number(b.package_id));
-    if (!pkg) fail(404, 'Paket bulunamadı');
+    // Kanal dışı (kendi anlaşmanızla) gönderimde takip no elle girilir
+    const pkg = pkgOf(b.package_id);
     await run(db, 'UPDATE packages SET tracking = ?, cargo_company = ?, desi = ? WHERE id = ?', str(b.tracking), str(b.cargo_company), num(b.desi, 0) || pkg.desi, pkg.id);
+    await event(db, o, 'tracking', user);
     return { ok: true };
   }
   if (action === 'label') {
     o = await ensurePackages(db, ch, o);
-    const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages[0];
+    let pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages[0];
     if (!pkg) fail(404, 'Paket bulunamadı');
-    const r = await packageLabel(db, ch, o, pkg, settings, { refresh: !!b.refresh });
-    return { ok: true, order: await loadOrder(db, o.id), package_id: pkg.id, ...r, sender: settings.sender };
+    let packed = false;
+    // Tek tıkla: paketlenmemişse önce kanalda paketlenir (kargoya hazırlanır), sonra etiket alınır
+    if (live && pkg.status === 'open' && !pkg.packed_at && ch && ch.enabled && ch.pack) {
+      await packOrder(db, ch, o, { only: pkg.id });
+      await event(db, o, 'pack', user);
+      o = await loadOrder(db, o.id); pkg = o.packages.find((p) => p.id === pkg.id); packed = true;
+    }
+    const r = await makeLabel(db, ch, o, pkg, settings, { refresh: !!b.refresh });
+    if (r.official || r.panel) await event(db, o, 'label', user, `Paket ${pkg.no}`);
+    return { ok: true, order: await loadOrder(db, o.id), package_id: pkg.id, packed, ...r, sender: settings.sender };
+  }
+  if (action === 'label-mark') {
+    // Etiket durumu: görüntülendi / yazdırıldı (yalnızca kullanıcı onaylayınca) / yazdırılmadı
+    const pkg = pkgOf(b.package_id), t = Date.now();
+    if (b.kind === 'viewed') await run(db, 'UPDATE packages SET label_viewed_at = ? WHERE id = ?', t, pkg.id);
+    else if (b.kind === 'printed') await run(db, 'UPDATE packages SET label_printed_at = ?, label_prints = label_prints + 1, label_viewed_at = COALESCE(label_viewed_at, ?) WHERE id = ?', t, t, pkg.id);
+    else if (b.kind === 'unprinted') await run(db, 'UPDATE packages SET label_printed_at = NULL WHERE id = ?', pkg.id);
+    else fail(400, 'Geçersiz işlem');
+    if (b.kind !== 'viewed') await event(db, o, 'label-' + b.kind, user, `Paket ${pkg.no}`);
+    return { ok: true };
   }
   if (action === 'status') {
     const s = str(b.status);
@@ -223,6 +340,7 @@ async function orderAction(env, db, id, action, b, ctx) {
     else await run(db, 'UPDATE orders SET local_status = ?, status = ?, updated_at = ? WHERE id = ?', s, s, Date.now(), o.id);
     await applyStock(db, [o.id], settings);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    await event(db, o, 'status', user, s);
     return { ok: true };
   }
   if (action === 'note') {
@@ -238,40 +356,45 @@ async function orderAction(env, db, id, action, b, ctx) {
 }
 
 // ---------- kargo etiketi (kanalın kendi sisteminden) ----------
-// Trendyol: ortak etiket (ZPL) · Hepsiburada: paket etiketi (ZPL/PDF) · ikas ve PttAVM: kanalın kargo barkodu panel etiketine basılır.
-// Alınan etiket pakete kaydedilir; tekrar istenince kanala gidilmez.
-async function packageLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
+// ikas: ikas Kargo etiket görseli / barkodu · Trendyol: ortak etiket (ZPL) ya da takip barkodu · Hepsiburada: paket etiketi (ZPL/PDF).
+// Alınan etiket pakete kaydedilir; tekrar istenince kanala gidilmez. Oluşturma, görüntüleme ve yazdırma ayrı tutulur.
+async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   if (pkg.has_label && !refresh) {
     const r = await first(db, 'SELECT label_format, label_data FROM packages WHERE id = ?', pkg.id);
     return { official: { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` } };
   }
-  if (!ch || !ch.enabled || !ch.caps.label || !ch.label) {
+  if (!ch || !ch.enabled || !ch.label) {
     // Deneme modu: kanal barkodu yerine örnek barkod
     if (ch && ch.demo && !pkg.barcode && !pkg.tracking) {
       pkg.barcode = `DEMO${o.order_number}${pkg.no}`.replace(/[^A-Z0-9]/gi, '');
-      await run(db, 'UPDATE packages SET barcode = ? WHERE id = ?', pkg.barcode, pkg.id);
+      await run(db, 'UPDATE packages SET barcode = ?, packed_at = COALESCE(packed_at, ?) WHERE id = ?', pkg.barcode, Date.now(), pkg.id);
     }
     const code = pkg.barcode || pkg.tracking;
-    return { official: null, panel: true, error: code ? null : `${ch ? ch.name : 'Kanal'} kargo barkodu henüz gelmedi; kanalda paketi kargoya hazırlayıp senkronlayın` };
+    if (code) await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?) WHERE id = ?', Date.now(), pkg.id);
+    return { official: null, panel: !!code, error: code ? null : `${ch ? ch.name : 'Kanal'} kargo barkodu henüz gelmedi; kanalda paketi kargoya hazırlayıp senkronlayın` };
   }
-  let lab;
-  try { lab = await ch.label(o, pkg); } catch (e) {
-    await log(db, o.channel, 'warn', 'Etiket alınamadı: ' + e.message);
+  let r;
+  try { r = (await ch.label(o, pkg)) || {}; } catch (e) {
+    await run(db, 'UPDATE packages SET error = ? WHERE id = ?', e.message.slice(0, 500), pkg.id);
+    await log(db, o.channel, 'warn', `#${o.order_number} etiket alınamadı: ${e.message}`);
     return { official: null, error: e.message };
   }
-  if (!lab) return { official: null, error: `${ch.name} etiketi henüz hazır değil (kargo takip no oluşmadı). Sipariş işleme alındıktan birkaç dakika sonra tekrar deneyin.` };
+  if (r.barcode || r.tracking || r.cargoCompany || r.remoteStatus) await updPkg(db, pkg.id, { barcode: r.barcode, tracking: r.tracking, cargoCompany: r.cargoCompany, remoteStatus: r.remoteStatus });
+  if (r.pending) return { official: null, pending: r.pending };
+  if (r.panel) {
+    await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?), error = NULL WHERE id = ?', Date.now(), pkg.id);
+    return { official: null, panel: true };
+  }
+  let lab = r.label;
+  if (!lab) return { official: null, pending: `${ch.name} etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.` };
   // ZPL'yi normal yazıcı için PDF'e çevir (Ayarlar'da açıksa)
   if (lab.format === 'zpl' && settings.zpl_pdf) {
     try {
       const res = await fetch('https://api.labelary.com/v1/printers/8dpmm/labels/4x6/', { method: 'POST', headers: { Accept: 'application/pdf', 'Content-Type': 'application/x-www-form-urlencoded' }, body: lab.data });
-      if (res.ok) {
-        const buf = new Uint8Array(await res.arrayBuffer());
-        let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-        lab = { format: 'pdf', data: btoa(s), filename: lab.filename.replace(/\.zpl$/, '.pdf') };
-      }
+      if (res.ok) lab = { format: 'pdf', data: toB64(new Uint8Array(await res.arrayBuffer())), filename: lab.filename.replace(/\.zpl$/, '.pdf') };
     } catch { /* ZPL olarak kalır */ }
   }
-  await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ? WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);
+  await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ?, error = NULL WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);
   return { official: lab };
 }
 
@@ -280,27 +403,52 @@ async function listPackages(db, q) {
   const where = [], args = [];
   if (q.channel && CHANNEL_IDS.includes(q.channel)) { where.push('o.channel = ?'); args.push(q.channel); }
   const base = `FROM packages p JOIN orders o ON o.id = p.order_id`;
-  const ready = "(p.label_data IS NOT NULL OR COALESCE(p.tracking, '') != '' OR COALESCE(p.barcode, '') != '')";
-  const live = "o.status NOT IN ('cancelled', 'returned')";
+  const ready = "(p.label_data IS NOT NULL OR p.label_at IS NOT NULL OR COALESCE(p.tracking, '') != '' OR COALESCE(p.barcode, '') != '')";
+  const live = "o.status NOT IN ('cancelled', 'returned', 'delivered')";
+  // Hazırlanacak (etiket yok) → yazdırılacak (etiket var, yazdırılmadı) → kargoya verilecek (yazdırıldı) → kargoda
   const states = {
     waiting: `p.status = 'open' AND ${live} AND NOT ${ready}`,
-    ready: `p.status = 'open' AND ${live} AND ${ready}`,
+    ready: `p.status = 'open' AND ${live} AND ${ready} AND p.label_printed_at IS NULL`,
+    printed: `p.status = 'open' AND ${live} AND p.label_printed_at IS NOT NULL`,
     shipped: `p.status = 'shipped' AND p.shipped_at >= ${Date.now() - 30 * 864e5}`,
   };
   const st = states[q.state] ? q.state : 'waiting';
   const w = (s) => 'WHERE ' + [states[s], ...where].join(' AND ');
   const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
-      o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.status AS order_status, (SELECT COUNT(*) FROM packages x WHERE x.order_id = p.order_id) AS pkg_total
+      p.packed_at, p.error, p.label_at, p.label_printed_at, p.remote_id,
+      o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.ship_by, o.status AS order_status, (SELECT COUNT(*) FROM packages x WHERE x.order_id = p.order_id) AS pkg_total
     ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args);
   const counts = {};
   for (const s of Object.keys(states)) counts[s] = (await first(db, `SELECT COUNT(*) AS n ${base} ${w(s)}`, ...args)).n;
   // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler
-  const unpacked = st === 'waiting' ? await all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.status AS order_status, o.tracking, o.cargo_company,
+  const unpacked = st === 'waiting' ? await all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.ship_by, o.status AS order_status, o.tracking, o.cargo_company,
       (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty
     FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''} ORDER BY o.ordered_at ASC LIMIT 300`, ...args) : [];
   counts.waiting += st === 'waiting' ? unpacked.length : (await first(db, `SELECT COUNT(*) AS n FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''}`, ...args)).n;
   const addr = (r) => { const a = parse(r.address, {}); return { ...r, city: a.city || '', district: a.district || '', address: undefined }; };
   return { state: st, packages: rows.map((r) => ({ ...addr(r), items: parse(r.items, []) })), unpacked: unpacked.map(addr), counts };
+}
+
+// ---------- buybox listesi ----------
+async function listBuybox(db, q) {
+  const where = [`l.channel IN (${BUYBOX_CHANNELS.map(() => '?').join(',')})`], args = [...BUYBOX_CHANNELS];
+  if (BUYBOX_CHANNELS.includes(q.channel)) { where.push('l.channel = ?'); args.push(q.channel); }
+  if (q.q) { const s = '%' + q.q + '%'; where.push('(l.name LIKE ? OR l.barcode LIKE ? OR l.sku LIKE ? OR p.name LIKE ?)'); args.push(s, s, s, s); }
+  const F = { won: 'b.rank = 1', lost: 'b.rank > 1', multi: 'b.multi = 1', rules: 'r.enabled = 1', unchecked: 'b.checked_at IS NULL' };
+  if (F[q.status]) where.push(F[q.status]);
+  const base = `FROM listings l LEFT JOIN buybox b ON b.channel = l.channel AND b.remote_id = l.remote_id LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id LEFT JOIN products p ON p.id = l.product_id`;
+  const w = 'WHERE ' + where.join(' AND ');
+  const limit = Math.min(Number(q.limit) || 50, 200), page = Math.max(1, Number(q.page) || 1);
+  const rows = await all(db, `SELECT l.channel, l.remote_id, l.name, l.barcode, l.sku, l.price, COALESCE(NULLIF(l.image, ''), p.image) AS image, p.name AS product_name,
+      b.rank, b.prev_rank, b.buybox_price, b.second_price, b.third_price, b.multi, b.checked_at, b.error,
+      r.enabled AS rule_on, r.min_price, r.max_price, r.target_price, r.step,
+      (SELECT MAX(at) FROM price_changes c WHERE c.channel = l.channel AND c.remote_id = l.remote_id AND c.ok = 1) AS last_change
+    ${base} ${w} ORDER BY COALESCE(r.enabled, 0) DESC, CASE WHEN b.rank > 1 THEN 0 WHEN b.rank = 1 THEN 1 ELSE 2 END, l.name COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
+  const total = (await first(db, `SELECT COUNT(*) AS n ${base} ${w}`, ...args)).n;
+  const cw = BUYBOX_CHANNELS.includes(q.channel) ? 'AND l.channel = ?' : '', ca = cw ? [q.channel] : [];
+  const k = await first(db, `SELECT COUNT(*) AS total, SUM(b.checked_at IS NOT NULL) AS checked, SUM(b.rank = 1) AS won, SUM(b.rank > 1) AS lost, SUM(b.multi = 1) AS multi, SUM(r.enabled = 1) AS rules
+    ${base} WHERE l.channel IN (${BUYBOX_CHANNELS.map(() => '?').join(',')}) ${cw}`, ...BUYBOX_CHANNELS, ...ca);
+  return { rows, total, page, limit, kpi: Object.fromEntries(Object.entries(k).map(([a, v]) => [a, v || 0])) };
 }
 
 // ---------- ürünler ----------
@@ -427,6 +575,7 @@ async function saveSettings(db, b) {
     if (['commission', 'shipping', 'service_fee'].includes(k)) v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, num((v || {})[c], (cur[k] || {})[c] || 0)]));
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
+    if (k === 'autoprice') v = !!v;
     if (k === 'catalog_channels') v = (Array.isArray(v) ? v : []).filter((c) => CHANNEL_IDS.includes(c));
     if (k === 'company') v = Object.fromEntries(['title', 'legal', 'phone', 'email', 'address', 'tax'].map((f) => [f, str((v || {})[f]).slice(0, 300)]));
     if (k === 'logo') { v = v ? String(v) : ''; if (v && (!/^data:image\/(png|jpeg|webp|svg\+xml);base64,/.test(v) || v.length > 400000)) fail(400, 'Logo PNG/JPG/WEBP/SVG ve en fazla ~300 KB olmalı'); }
@@ -447,7 +596,7 @@ async function channelsInfo(env, db) {
 
 // ---------- yönlendirme ----------
 // Sadece yöneticinin yapabileceği işlemler (kanal API bilgileri, kullanıcılar, ayarlar, toplu aktarım)
-const ADMIN_ONLY = [/^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/];
+const ADMIN_ONLY = [/^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/];
 export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönetici', role: 'admin' }) {
   const url = new URL(req.url), q = Object.fromEntries(url.searchParams), m = req.method;
   let x;
@@ -471,7 +620,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const [rows, counts] = await Promise.all([
       suggestions(db, { channel: q.channel, q: q.q, limit: Math.min(Number(q.limit) || 60, 200) }),
       all(db, `SELECT channel, SUM(product_id IS NULL AND ignored = 0) AS pending, SUM(product_id IS NULL AND ignored = 1) AS ignored,
-        SUM(match IN ('barcode', 'sku', 'new')) AS auto, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
+        SUM(match IN ('barcode', 'sku', 'name')) AS auto, SUM(match = 'new') AS created, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
     ]);
     return json({ listings: rows, counts });
   }
@@ -483,6 +632,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ listings: await all(db, `SELECT l.channel, l.remote_id, l.name, l.sku, l.barcode, l.image, l.variant_name, l.match, p.id AS product_id, p.name AS product_name, p.sku AS product_sku, p.image AS product_image
       FROM listings l JOIN products p ON p.id = l.product_id WHERE ${where.join(' AND ')} ORDER BY l.channel, l.name LIMIT 300`, ...args) });
   }
+  if (path === 'match/groups' && m === 'GET') return json(await linkedGroups(db, { channel: q.channel, q: q.q, how: q.how, multi: q.multi, page: Number(q.page) || 1 }));
   if (path === 'match/ignore' && m === 'POST') {
     const b = await body(req);
     await run(db, 'UPDATE listings SET ignored = ? WHERE channel = ? AND remote_id = ?', b.ignored === false ? 0 : 1, b.channel, String(b.remote_id));
@@ -490,8 +640,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if (path === 'match/unlink' && m === 'POST') {
     const b = await body(req);
-    await run(db, 'UPDATE listings SET product_id = NULL, match = NULL WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
+    // Kaldırılan eşleşme hatırlanır ("x:<ürün>"): otomatik eşleştirme bu ilanı aynı ürüne tekrar bağlamaz
+    const l = await first(db, 'SELECT product_id, name FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
+    await run(db, 'UPDATE listings SET product_id = NULL, match = ? WHERE channel = ? AND remote_id = ?', l && l.product_id ? 'x:' + l.product_id : null, b.channel, String(b.remote_id));
     await run(db, 'UPDATE order_items SET product_id = NULL WHERE remote_key = ? AND order_id LIKE ?', String(b.remote_id), b.channel + ':%');
+    await log(db, b.channel, 'info', `${user.name}: ${l ? l.name : b.remote_id} eşleşmesi kaldırıldı`);
     return json({ ok: true });
   }
   // Kanala özel stok kuralı: shared | limit (en fazla N) | own (bu kanala ayrılmış N adet)
@@ -502,6 +655,36 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     await run(db, 'UPDATE listings SET stock_mode = ?, stock_value = ? WHERE channel = ? AND remote_id = ?', mode, v, b.channel, String(b.remote_id));
     await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} stok kuralı → ${mode}${v != null ? ' ' + v : ''}`);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    return json({ ok: true });
+  }
+
+  // ---------- buybox ----------
+  if (path === 'buybox' && m === 'GET') return json(await listBuybox(db, q));
+  if (path === 'buybox/item' && m === 'GET') {
+    const [l, b, r, history, changes] = await Promise.all([
+      first(db, 'SELECT l.channel, l.remote_id, l.name, l.price, l.image, l.barcode, l.sku, p.name AS product_name, p.image AS product_image FROM listings l LEFT JOIN products p ON p.id = l.product_id WHERE l.channel = ? AND l.remote_id = ?', q.channel, q.remote_id),
+      first(db, 'SELECT * FROM buybox WHERE channel = ? AND remote_id = ?', q.channel, q.remote_id),
+      first(db, 'SELECT * FROM price_rules WHERE channel = ? AND remote_id = ?', q.channel, q.remote_id),
+      all(db, 'SELECT at, rank, our_price, buybox_price, second_price, event FROM buybox_history WHERE channel = ? AND remote_id = ? ORDER BY at DESC LIMIT 60', q.channel, q.remote_id),
+      all(db, 'SELECT * FROM price_changes WHERE channel = ? AND remote_id = ? ORDER BY at DESC LIMIT 40', q.channel, q.remote_id),
+    ]);
+    if (!l) fail(404, 'İlan bulunamadı');
+    return json({ listing: l, buybox: b, rule: r, history, changes, preview: r && b ? decide({ ...r, enabled: 1 }, { rank: b.rank, buyboxPrice: b.buybox_price, second: b.second_price, multi: !!b.multi }, l.price) : null });
+  }
+  if (path === 'buybox/check' && m === 'POST') { const b = await body(req); return json(await checkBuybox(env, db, { channel: b.channel, ids: b.ids, limit: Math.min(Number(b.limit) || 100, 300) })); }
+  if (path === 'price-rules' && m === 'PUT') {
+    const b = await body(req);
+    if (!BUYBOX_CHANNELS.includes(b.channel)) fail(400, 'Otomatik fiyat yalnızca Trendyol ve Hepsiburada için');
+    const l = await first(db, 'SELECT price FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
+    if (!l) fail(404, 'İlan bulunamadı');
+    const min = r2(num(b.min_price)), max = r2(num(b.max_price)), target = r2(num(b.target_price) || max), step = r2(Math.max(0, num(b.step, 5)));
+    const enabled = b.enabled ? 1 : 0;
+    if (enabled && (!(min > 0) || !(max >= min))) fail(400, 'En düşük fiyat 0\'dan büyük, en yüksek fiyat en düşükten büyük ya da eşit olmalı');
+    if (enabled && (target < min || target > max)) fail(400, 'Normal (hedef) fiyat en düşük ile en yüksek fiyat arasında olmalı');
+    await run(db, `INSERT INTO price_rules (channel, remote_id, enabled, min_price, max_price, target_price, step, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (channel, remote_id) DO UPDATE SET enabled = excluded.enabled, min_price = excluded.min_price, max_price = excluded.max_price, target_price = excluded.target_price, step = excluded.step, updated_at = excluded.updated_at, user = excluded.user`,
+    b.channel, String(b.remote_id), enabled, min || null, max || null, target || null, step, Date.now(), user.name);
+    await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} otomatik fiyat kuralı ${enabled ? `açık (min ${min}, max ${max}, hedef ${target}, fark ${step} TL)` : 'kapalı'}`);
     return json({ ok: true });
   }
 
@@ -537,16 +720,26 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if ((x = path.match(/^orders\/([^/]+)$/)) && m === 'GET') {
     const o = await loadOrder(db, decodeURIComponent(x[1]));
     const ch = await channel(env, db, o.channel);
+    o.events = await all(db, 'SELECT at, source, action, status, remote_status, note, user FROM order_events WHERE order_id = ? ORDER BY at DESC LIMIT 30', o.id);
     return json({ order: o, profit: orderProfit(o, await getSettings(db)), channel: ch ? publicInfo(ch) : null });
+  }
+  // Kargo firması seçenekleri: kanalın kendi listesinden (ikas Kargo firmaları, Trendyol sağlayıcıları, HB değiştirilebilir firmalar)
+  if ((x = path.match(/^orders\/([^/]+)\/cargo-options$/)) && m === 'GET') {
+    const o = await loadOrder(db, decodeURIComponent(x[1]));
+    const ch = await channel(env, db, o.channel);
+    const pkg = o.packages.find((p) => p.id === Number(q.package_id)) || null;
+    if (!ch || !ch.enabled || !ch.cargoOptions) return json({ options: [], note: `${ch ? ch.name : 'Bu kanal'} kargo firması seçimini API ile desteklemiyor` });
+    if (ch.caps.cargo === 'change' && ch.type === 'hepsiburada' && (!pkg || !pkg.remote_id)) return json({ options: [], note: 'Hepsiburada kargo firması, paket oluşturulduktan sonra değiştirilebilir. Önce "Paketle".' });
+    try { return json({ options: await ch.cargoOptions(o, pkg), current: pkg && pkg.cargo_company, code: pkg && pkg.cargo_code, mode: ch.caps.cargo }); } catch (e) { return json({ options: [], note: e.message }); }
   }
   if ((x = path.match(/^orders\/([^/]+)\/([a-z-]+)$/)) && m === 'POST') {
     const b = await body(req);
-    return json(await orderAction(env, db, decodeURIComponent(x[1]), x[2], b, ctx));
+    return json(await orderAction(env, db, decodeURIComponent(x[1]), x[2], b, ctx, user));
   }
   if (path === 'orders-bulk' && m === 'POST') {
     const b = await body(req), done = [], errors = [];
     for (const id of (b.ids || []).slice(0, 100)) {
-      try { await orderAction(env, db, id, b.action, b, ctx); done.push(id); } catch (e) { errors.push(`${id}: ${e.message}`); }
+      try { await orderAction(env, db, id, b.action, b, ctx, user); done.push(id); } catch (e) { errors.push(`${id}: ${e.message}`); }
     }
     return json({ ok: !errors.length, done, errors });
   }
@@ -559,10 +752,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
         const ch = await channel(env, db, o.channel);
         o = await ensurePackages(db, ch, o);
         const labels = [];
+        // Etiket alınırken paketlenmemiş paketler önce kanalda kargoya hazırlanır
+        if (b.fetch && ch && ch.enabled && ch.pack && o.packages.some((p) => p.status === 'open' && !p.packed_at) && !['cancelled', 'returned'].includes(o.status)) {
+          try { o = (await packOrder(db, ch, o)).o; await event(db, o, 'pack', user); } catch (e) { errors.push(`${o.order_number}: ${e.message}`); o = await loadOrder(db, id); }
+        }
         for (const pkg of o.packages.filter((p) => p.status === 'open' || b.all)) {
-          const r = b.fetch ? await packageLabel(db, ch, o, pkg, settings) : {};
-          if (r.error) errors.push(`${o.order_number}/${pkg.no}: ${r.error}`);
-          labels.push({ package_id: pkg.id, official: r.official || null });
+          const r = b.fetch ? await makeLabel(db, ch, o, pkg, settings) : {};
+          if (r.error || r.pending) errors.push(`${o.order_number}/${pkg.no}: ${r.error || r.pending}`);
+          labels.push({ package_id: pkg.id, official: r.official || null, panel: !!r.panel });
         }
         out.push({ order: await loadOrder(db, id), labels });
       } catch (e) { errors.push(`${id}: ${e.message}`); }
@@ -588,15 +785,18 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if ((x = path.match(/^integrations\/([a-z0-9]+)\/test$/)) && m === 'POST') {
     resetChannels();
-    const ch = await channel(env, db, x[1]);
+    let ch = await channel(env, db, x[1]);
     if (!ch) fail(404, 'Kanal bulunamadı');
-    if (ch.paused) return json({ ok: false, message: 'Kanal pasif' });
+    const gated = !!ch.gated;
+    if (gated) ch = ch.real; // bekleyen kanal: gerçek bağlantı denenir, başarılıysa onaylanır
+    else if (ch.paused) return json({ ok: false, message: 'Kanal pasif' });
     if (!ch.enabled) return json({ ok: false, message: 'Eksik bilgi: ' + ch.missing.join(', ') });
     if (ch.demo) return json({ ok: true, message: 'Deneme modu: örnek veriyle çalışıyor' });
     const t = Date.now();
     try {
       const orders = await ch.fetchOrders(t - 24 * 3600e3, t);
-      return json({ ok: true, message: `Bağlantı başarılı · son 24 saatte ${orders.length} sipariş`, ms: Date.now() - t });
+      if (GATED.includes(ch.id)) { await setSetting(db, 'verified:' + ch.id, { at: Date.now() }); resetChannels(); await log(db, ch.id, 'info', 'Bağlantı onaylandı; kanal sipariş, ürün ve stok ekranlarına eklendi'); }
+      return json({ ok: true, message: `Bağlantı başarılı · son 24 saatte ${orders.length} sipariş${gated ? ' · kanal devreye alındı' : ''}`, ms: Date.now() - t });
     } catch (e) {
       return json({ ok: false, message: e.message });
     }
@@ -632,6 +832,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'listings/link' && m === 'POST') {
     const b = await body(req);
     let pid = b.product_id === null ? null : Number(b.product_id) || null;
+    // Bir ürüne her kanaldan yalnızca bir ilan bağlanabilir (aynı sitenin iki ürünü birleştirilmez)
+    if (pid && !b.create) {
+      const dup = await first(db, 'SELECT name FROM listings WHERE product_id = ? AND channel = ? AND remote_id != ?', pid, b.channel, String(b.remote_id));
+      if (dup) fail(400, `Bu ürüne aynı kanaldan zaten bir ilan bağlı (${dup.name}). Önce o bağlantıyı kaldırın.`);
+    }
     if (b.create) {
       const l = await first(db, 'SELECT * FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
       if (!l) fail(404, 'İlan bulunamadı');
@@ -650,6 +855,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
 
   if (path === 'stats' && m === 'GET') return json(await stats(db, q));
+  if (path === 'insights' && m === 'GET') return json(await insights(db, q));
   if (path === 'settings' && m === 'GET') return json(await getSettings(db));
   if (path === 'settings' && m === 'PUT') return json(await saveSettings(db, await body(req)));
   if (path === 'logs' && m === 'GET') return json(await all(db, 'SELECT * FROM logs ORDER BY id DESC LIMIT 200'));

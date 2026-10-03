@@ -26,6 +26,8 @@ export function hepsiburada(env, meta) {
       orderNumber: str(it.orderNumber || it.orderId), orderDate: it.orderDate || it.orderedDate,
       customerName: str(it.customerName || it.recipientName), address: it.shippingAddress || it.deliveryAddress || null,
       cargoCompany: str(it.cargoCompany || it.cargoCompanyName),
+      // Kargoya son teslim tarihi (HB: dueDate / lastShippingDate; alan adı hesaba göre değişebilir)
+      dueDate: Date.parse(it.dueDate || it.lastShippingDate || it.cargoDueDate || it.shippingDueDate || '') || null,
     };
   }
 
@@ -46,6 +48,7 @@ export function hepsiburada(env, meta) {
         orders.set(l.orderNumber, o);
       }
       if (!o.items.some((i) => i.lineId === l.lineId)) { o.items.push(l); o.total += l.status ? 0 : l.total; }
+      if (l.dueDate && !l.status && (!o.shipBy || l.dueDate < o.shipBy)) o.shipBy = l.dueDate;
       return o;
     };
     const rank = { new: 0, processing: 1, shipped: 2, delivered: 3 };
@@ -86,14 +89,14 @@ export function hepsiburada(env, meta) {
         else bump(o, status);
         if (pkgNo && !o.packages.some((p) => p.remoteId === pkgNo)) {
           const tn = str(pk.trackingNumber || pk.trackingInfoCode || pk.barcode);
-          o.packages.push({ remoteId: pkgNo, items: lines.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: status === 'processing' ? 'open' : 'shipped', cargoCompany: str(pk.cargoCompany), tracking: tn, barcode: str(pk.barcode) });
+          o.packages.push({ remoteId: pkgNo, items: lines.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: status === 'processing' ? 'open' : 'shipped', remoteStatus: status === 'processing' ? 'Packaged' : status, cargoCompany: str(pk.cargoCompany || pk.cargoCompanyName), tracking: tn, barcode: str(pk.barcode) });
           if (tn && !o.tracking) { o.tracking = tn; o.cargoCompany = str(pk.cargoCompany) || o.cargoCompany; }
         }
       }
     }
     for (const o of orders.values()) {
       if (o.items.length && o.items.every((i) => i.status === 'cancelled')) o.status = 'cancelled';
-      for (const i of o.items) { delete i.orderNumber; delete i.orderDate; delete i.customerName; delete i.address; delete i.cargoCompany; }
+      for (const i of o.items) { delete i.orderNumber; delete i.orderDate; delete i.customerName; delete i.address; delete i.cargoCompany; delete i.dueDate; }
       if (!o.packages.length) o.packages = null; // paket yoksa paneldeki paket bölmesi korunur
       o.remoteStatus = o.status;
     }
@@ -145,7 +148,11 @@ export function hepsiburada(env, meta) {
   }
 
   async function label(order, pkg) {
-    if (!pkg.remote_id) return null;
+    if (!pkg.remote_id) return { pending: 'Önce paketleyin (Hepsiburada paketi oluşmalı)' };
+    const lab = await labelFile(pkg);
+    return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.' };
+  }
+  async function labelFile(pkg) {
     const res = await http(`${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(), raw: true });
     const type = res.headers.get('content-type') || '';
     if (/pdf/i.test(type)) {
@@ -167,10 +174,48 @@ export function hepsiburada(env, meta) {
     return { format: 'zpl', data, filename: `hepsiburada-${pkg.remote_id}.zpl` };
   }
 
+  const pkgUrl = (pkg) => `${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}`;
+  // Paketin değiştirilebileceği kargo firmaları (yalnızca kargoya verilmemiş paketlerde)
+  async function cargoOptions(order, pkg) {
+    if (!pkg || !pkg.remote_id) return [];
+    const r = await call(`${pkgUrl(pkg)}/changablecargocompanies`);
+    return list(r).map((c) => ({ id: str(c.shortName || c.cargoCompanyShortName || c.code || c.id), name: str(c.name || c.cargoCompanyName || c.shortName), current: !!c.isSelected || !!c.selected }))
+      .filter((c) => c.id);
+  }
+  async function changeCargo(order, pkg, cargo) {
+    if (!pkg.remote_id) throw new Error('Önce paketleyin');
+    await call(`${pkgUrl(pkg)}/changecargocompany`, { method: 'PUT', body: { CargoCompanyShortName: cargo.id } });
+    return { remoteId: pkg.remote_id, cargoCompany: cargo.name, resetLabel: true };
+  }
+  // Paketi boz (unpack): satırlar tekrar "paketlenecek" durumuna döner
+  async function cancelPackage(order, pkg) {
+    if (!pkg.remote_id) return;
+    await call(`${pkgUrl(pkg)}/unpack`, { method: 'POST', body: {} });
+  }
+  const pack = (order, pkgs) => split(order, pkgs.map((p) => ({ items: p.items, desi: p.desi })));
+
+  // Buybox sıralaması (listing API). Yanıt alan adları hesaba göre değişebildiği için esnek okunur (beta).
+  async function buybox(remoteIds) {
+    const out = [];
+    for (const part of chunk(remoteIds, 20)) {
+      const r = await call(`${LST}/buybox-orders/merchantid/${m}?skuList=${part.map(encodeURIComponent).join(',')}`);
+      for (const b of list(r)) {
+        const sku = str(b.sku || b.hepsiburadaSku || b.hbSku);
+        const sellers = b.buyboxOrders || b.merchants || b.listings || b.orders || [];
+        const mine = sellers.find((x) => str(x.merchantId || x.merchantID) === String(m));
+        const sorted = sellers.slice().sort((a, c) => num(a.order ?? a.rank ?? a.buyboxOrder) - num(c.order ?? c.rank ?? c.buyboxOrder));
+        const price = (x) => money(x && (x.price ?? x.salePrice));
+        const rank = num(b.order ?? b.rank ?? b.buyboxOrder ?? (mine && (mine.order ?? mine.rank ?? mine.buyboxOrder))) || (mine ? sorted.indexOf(mine) + 1 : null);
+        out.push({ remoteId: sku, rank: rank || null, buyboxPrice: price(sorted[0]) || money(b.buyboxPrice) || null, second: price(sorted[1]) || null, third: price(sorted[2]) || null, multi: sellers.length > 1 || !!b.hasMultipleSeller });
+      }
+    }
+    return out;
+  }
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'remote', ship: 'local', label: 'zpl', createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label,
+    caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true },
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox,
   };
 }
