@@ -74,4 +74,4 @@ export async function getChannels(env, db) {
 }
 export const resetChannels = () => { cache = null; };
 export const channel = async (env, db, id) => (await getChannels(env, db)).find((c) => c.id === id);
-export const publicInfo = (c) => ({ id: c.id, type: c.type, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, beta: !!c.beta, hold: !!c.hold, missing: c.missing, caps: c.caps });
+export const publicInfo = (c) => ({ id: c.id, type: c.type, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, beta: !!c.beta, hold: !!c.hold, sandbox: !!c.sandbox, missing: c.missing, caps: c.caps });

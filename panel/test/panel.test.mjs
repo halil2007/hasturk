@@ -264,3 +264,21 @@ test('art arda hata veren kanal kademeli beklenir; "Senkronla" (force) beklemeyi
   const f = await syncAll({ DEMO: '1' }, db, { only: ['trendyol'], force: true });
   assert.equal(typeof f.channels.trendyol, 'number', 'elle senkron hemen dener');
 });
+
+test('API bilgileri kaydedilince eski hata ve kademeli bekleme sıfırlanır', async () => {
+  const db = d1();
+  await init(db);
+  await setSetting(db, 'last:hepsiburada', { at: Date.now(), ok: false, fails: 5, error: 'HTTP 401', nextTry: Date.now() + 3600e3 });
+  const env = { PANEL_PASSWORD: 'x-123456', DB: db };
+  let cookie = '';
+  const call = async (path, opts = {}) => {
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: cookie } }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r;
+  };
+  await call('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+  await call('/api/integrations/hepsiburada', { method: 'PUT', body: JSON.stringify({ values: { HB_TEST: '1' } }) });
+  const last = JSON.parse((await first(db, "SELECT v FROM settings WHERE k = 'last:hepsiburada'")).v);
+  assert.equal(last.fails, 0); assert.equal(last.error, null); assert.equal(last.nextTry, null);
+  assert.match(last.note, /güncellendi/);
+});
