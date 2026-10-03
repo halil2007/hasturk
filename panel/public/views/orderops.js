@@ -12,14 +12,18 @@ export function stepper(status) {
 }
 
 const lineOf = (o, lid) => o.items.find((i) => String(i.line_id) === String(lid)) || {};
-const hasLabel = (p) => !!(p.has_label || p.label_at || p.barcode || p.tracking);
+// Etiket var mı: kanal etiketi / geçerli panel etiketi. Etiket servisi olan kanalda (ikas Kargo, Trendyol, Hepsiburada)
+// yalnızca barkod gelmiş olması etiket sayılmaz; kendi anlaşmanızla gönderimde ve etiket servisi olmayan kanalda sayılır.
+const hasLabel = (p, chId) => !!(p.has_label || p.label_at || ((p.barcode || p.tracking) && (p.agreement === 'own' || p.virtual || (ch(chId || p.channel).caps || {}).label !== 'remote')));
 // Paket durumu: paketlenmedi → kargoya hazır (etiket bekleniyor) → etiket hazır → yazdırıldı → kargoda
 export function labelState(o, pkg) {
+  const c = o.channel || pkg.channel;
   if (pkg.status === 'shipped') return { key: 'shipped', text: 'Kargoda', cls: 'shipped' };
   if (pkg.error) return { key: 'error', text: 'Kanal hatası', cls: 'bad' };
   if (pkg.label_printed_at) return { key: 'printed', text: 'Etiket yazdırıldı', cls: 'good' };
-  if (hasLabel(pkg)) return { key: 'ready', text: 'Etiket hazır', cls: 'info' };
-  if (pkg.packed_at) return { key: 'packed', text: 'Kargoya hazır', cls: 'amber' };
+  if (hasLabel(pkg, c)) return { key: 'ready', text: 'Etiket hazır', cls: 'info' };
+  if (pkg.packed_at && (pkg.barcode || pkg.tracking)) return { key: 'created', text: 'Gönderi oluştu · etiket bekleniyor', cls: 'amber' };
+  if (pkg.packed_at) return { key: 'packed', text: c && /^ikas/.test(c) ? 'ikas Kargo bekleniyor' : 'Kargoya hazır', cls: 'amber' };
   return { key: 'unpacked', text: 'Paketlenmedi', cls: 'warn' };
 }
 
@@ -86,16 +90,16 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
 
   // Paketin sıradaki adımı tek düğme
   function mainBtn(o, p) {
-    if (p.status === 'shipped' || !live()) return hasLabel(p) ? html`<button class="btn sm outline" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi göster</button>` : '';
+    if (p.status === 'shipped' || !live()) return hasLabel(p, o.channel) ? html`<button class="btn sm outline" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi göster</button>` : '';
     const ls = labelState(o, p);
     if (ls.key === 'unpacked') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-box"></i>${caps().pack ? 'Paketle ve etiket al' : 'Etiket oluştur'}</button>`;
-    if (ls.key === 'packed' || ls.key === 'error') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${ls.key === 'error' ? 'Tekrar dene' : 'Etiket oluştur'}</button>`;
+    if (ls.key === 'packed' || ls.key === 'created' || ls.key === 'error') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${ls.key === 'error' ? 'Tekrar dene' : ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'ready') return html`<button class="btn sm primary" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi yazdır</button>`;
     return html`<button class="btn sm" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Tekrar yazdır</button><button class="btn sm primary" data-op="ship" data-id="${p.id}"><i class="ico ico-truck"></i>${caps().ship === 'remote' ? 'Kargoya ver' : 'Kargoya verildi'}</button>`;
   }
   function labelSteps(p) {
     const st = [['packed_at', 'Paketlendi'], ['label_at', 'Etiket oluşturuldu'], ['label_viewed_at', 'Görüntülendi'], ['label_printed_at', 'Yazdırıldı']];
-    const at = { ...p, label_at: p.label_at || (hasLabel(p) ? 1 : null) };
+    const at = { ...p, label_at: p.label_at || (hasLabel(p, d.order.channel) ? 1 : null) };
     return html`<div class="lbl-st">${st.map(([k, t]) => html`<span class="${at[k] ? 'on' : ''}" title="${at[k] > 1 ? dateTime(at[k]) : ''}">${at[k] ? '✓ ' : ''}${t}${k === 'label_printed_at' && p.label_prints > 1 ? ` (${p.label_prints})` : ''}</span>`)}</div>`;
   }
 
@@ -147,7 +151,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         ${stepper(o.status)}${notes}
         ${live() ? html`<div class="row wrap" style="margin-top:8px">
           ${o.status === 'new' ? html`<button class="btn primary" style="flex:1" data-op="accept"><i class="ico ico-play"></i>İşleme al</button>` : ''}
-          ${open.length > 1 && open.some((p) => !hasLabel(p)) ? html`<button class="btn primary" style="flex:1" data-op="labels"><i class="ico ico-tag"></i>Tüm etiketleri al</button>` : ''}
+          ${open.length > 1 && open.some((p) => !hasLabel(p, d.order.channel)) ? html`<button class="btn primary" style="flex:1" data-op="labels"><i class="ico ico-tag"></i>Tüm etiketleri al</button>` : ''}
           <button class="btn outline" style="flex:1" data-op="split" ${splittable ? '' : 'disabled'}><i class="ico ico-split"></i>Pakete böl</button>
           <button class="btn outline" style="flex:1" data-op="addpkg" ${splittable ? '' : 'disabled'}><i class="ico ico-plus"></i>Paket ekle</button>
         </div>` : ''}
@@ -163,15 +167,42 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   // ---------- işlemler ----------
   const pkgOf = (pid) => packagesOf(d.order).find((p) => String(p.id) === String(pid));
   const getLabel = (pkg, extra = {}) => api(`orders/${enc}/label`, { method: 'POST', body: { package_id: pkg.virtual ? undefined : pkg.id, ...extra } });
-  // Etiket al; ikas Kargo barkodu paketlemeden birkaç saniye sonra oluşur → kısa aralıklarla tekrar dener
+  // Etiket al. ikas Kargo'da gönderi ve etiket "Kargoya Hazır"dan sonra oluşur: adımlar gösterilerek yaklaşık 1 dakika izlenir.
+  // Gerçek gönderi / etiket oluşmadan işlem tamamlanmış sayılmaz.
   async function fetchLabel(pkg) {
     let r = await getLabel(pkg);
-    for (let i = 0; r.pending && r.packed !== undefined && i < 4; i++) {
-      toast(`${chName()}: barkod bekleniyor… (${i + 1}/4)`);
-      await new Promise((ok) => setTimeout(ok, 3500));
+    if (!r.pending || !['waiting', 'created'].includes(r.step)) return r;
+    let stop = false;
+    const s = sheet({ title: `${chName()} · gönderi hazırlanıyor`, size: 'narrow', onClose: () => { stop = true; } });
+    const row = (ok, text) => html`<div class="diag-row"><span class="diag-ic ${ok ? 'good' : 'amber'}">${ok ? '✓' : html`<i class="ico ico-sync spin"></i>`}</span><div style="flex:1">${text}</div></div>`;
+    const draw = (x, i, n) => s.setBody(html`<div class="stack"><div class="diag">
+      ${row(true, html`Paket ${chName()}'da <b>Kargoya Hazır</b> yapıldı`)}
+      ${row(x.step === 'created' || !!x.official, x.step === 'created' || x.official ? 'ikas Kargo gönderiyi oluşturdu (gerçek kargo barkodu alındı)' : 'ikas Kargo anlaşmalı firmada gönderiyi oluşturuyor…')}
+      ${row(!!x.official, x.official ? 'Kargo etiketi alındı' : 'Kargo etiketi bekleniyor…')}
+    </div><div class="small muted">${x.pending || ''}</div><div class="tiny muted">Kontrol ${i} / ${n} · pencereyi kapatırsanız izleme durur, işlem ikas'ta sürer.</div></div>`);
+    s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Arka planda bırak</button>`);
+    const waits = [3, 4, 5, 6, 8, 10, 12, 15];
+    for (let i = 0; i < waits.length && !stop; i++) {
+      draw(r, i + 1, waits.length);
+      await new Promise((ok) => setTimeout(ok, waits[i] * 1000));
+      if (stop) break;
       r = await getLabel({ ...pkg, id: r.package_id, virtual: false });
+      if (!r.pending || !['waiting', 'created'].includes(r.step)) break;
     }
+    s.close();
     return r;
+  }
+  // Gerçek gönderi / etiket henüz yoksa: sebep + seçenekler (tanılama; gerçek kanal barkodu varsa kendi etiketimizle yazdırma)
+  function notReady(r) {
+    const pkg = d.order.packages.find((p) => p.id === r.package_id);
+    const s = sheet({ title: `${chName()} · etiket henüz hazır değil`, size: 'narrow', body: html`<div class="stack">
+      <div class="notice ${r.error ? 'bad' : 'warn'}"><i class="ico ico-warn"></i><div>${r.error || r.pending}</div></div>
+      ${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<div class="small muted">Kanaldan gelen gerçek gönderi barkodu: <b class="num">${pkg.barcode || pkg.tracking}</b> (${pkg.cargo_company || 'kargo'}). Kanalın etiketi gelene kadar beklemeniz önerilir; kargo firması kabul ediyorsa bu barkodla kendi etiketimizi de yazdırabilirsiniz.</div>` : html`<div class="small muted">Gerçek gönderi oluşmadığı için etiket verilmedi. Senkronda durum otomatik güncellenir; “Etiket oluştur”a tekrar basarak kontrol edebilirsiniz.</div>`}
+    </div>`,
+    foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}<button class="btn primary" data-close>Kapat</button>` });
+    $('[data-diag]', s.el).onclick = () => { s.close(); diagnoseDialog(d.order.channel, d.order.id, d.order.order_number); };
+    const own = $('[data-own]', s.el);
+    if (own) own.onclick = async () => { s.close(); await printLabels([{ order: d.order, pkg }], state.settings && state.settings.sender); await mark(d.order.id, [pkg.id], 'viewed'); askPrinted([{ orderId: d.order.id, pkgId: pkg.id }], changed); };
   }
   const ops = {
     accept: (b) => busy(b, async () => { const r = await api(`orders/${enc}/accept`, { method: 'POST', body: {} }); toast(r.message); await changed(); }),
@@ -180,11 +211,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     detail: () => openOrder(id, onChange),
     label: (b) => busy(b, async () => {
       const r = await fetchLabel(pkgOf(b.dataset.id));
-      if (r.error || r.pending) {
-        await changed();
-        if (await confirmBox(html`<b>${chName()}:</b> ${r.error || r.pending}<br><br>Nedenini adım adım görmek için bağlantı tanılamasını çalıştırmak ister misiniz? (izinler, depo adresi, kargo ayarları ve bu siparişin ${chName()}'daki paket durumu kontrol edilir)`, 'Tanılamayı çalıştır')) diagnoseDialog(d.order.channel, d.order.id, d.order.order_number);
-        return;
-      }
+      if (r.error || r.pending) { await changed(); notReady(r); return; }
       else { toast(r.official ? `${chName()} etiketi hazır` : `${chName()} barkodu alındı, etiket hazır`); await outputLabel(r, { done: changed }); }
       await changed();
     }),
@@ -195,7 +222,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       const win = pkg.label_format === 'pdf' ? window.open('', '_blank') : null;
       busy(b, async () => {
         const r = await getLabel(pkg);
-        if (r.error && !r.official && !r.panel) { if (win) win.close(); toast(r.error, true); return; }
+        if ((r.error || r.pending) && !r.official && !r.panel) { if (win) win.close(); await changed(); notReady(r); return; }
         await outputLabel(r, { win, done: changed });
         await changed();
       });
@@ -207,13 +234,13 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       const pkg = pkgOf(b.dataset.id), c = caps(), open = pkg.status === 'open' && live();
       const items = [];
       if (open && c.cargo) items.push({ icon: 'truck', label: 'Kargo firmasını değiştir', run: () => cargoDialog(d, pkg, changed) });
-      if (hasLabel(pkg)) {
+      if (hasLabel(pkg, d.order.channel) || pkg.barcode || pkg.tracking) {
         items.push({ icon: 'sync', label: 'Etiketi kanaldan yeniden al', run: () => busy(null, async () => { const r = await getLabel(pkg, { refresh: true }); toast(r.official || r.panel ? 'Etiket yenilendi' : r.error || r.pending || 'Etiket alınamadı', !(r.official || r.panel)); await changed(); }) });
         if (pkg.has_label) items.push({ icon: 'download', label: 'Etiket dosyasını indir', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official) { downloadFile(r.official.filename, r.official.data, r.official.format === 'zpl' ? 'text/plain' : r.official.format === 'pdf' ? 'application/pdf' : 'image/' + r.official.format); await mark(d.order.id, [pkg.id], 'viewed'); } }) });
         items.push(pkg.label_printed_at
           ? { icon: 'x', label: 'Yazdırıldı işaretini kaldır', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'unprinted'); await changed(); }) }
           : { icon: 'check', label: 'Yazdırıldı olarak işaretle', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'printed'); toast('İşaretlendi'); await changed(); }) });
-        items.push({ icon: 'print', label: 'Panel etiketi yazdır (barkodlu A6)', run: async () => { await printLabels([{ order: d.order, pkg }], state.settings && state.settings.sender); await mark(d.order.id, [pkg.id], 'viewed'); askPrinted([{ orderId: d.order.id, pkgId: pkg.id }], changed); } });
+        items.push({ icon: 'print', label: 'Kendi etiketimizi yazdır (kanal barkoduyla)', run: async () => { await printLabels([{ order: d.order, pkg }], state.settings && state.settings.sender); await mark(d.order.id, [pkg.id], 'viewed'); askPrinted([{ orderId: d.order.id, pkgId: pkg.id }], changed); } });
       }
       if (open && pkg.packed_at && pkg.remote_id && c.cancelPackage) items.push('-', { icon: 'x', danger: true, label: 'Paketi iptal et (kanalda paketlemeyi geri al)', run: async () => {
         if (!(await confirmBox(`Paket ${pkg.no} ${chName()}'da iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
@@ -253,11 +280,11 @@ async function cargoDialog(d, pkg, done) {
   try { r = await api(`orders/${enc}/cargo-options?package_id=${pkg.id}`); } catch (e) { return s.setBody(html`<div class="notice bad">${e.message}</div>`); }
   if (!r.options.length) return s.setBody(html`<div class="notice">${r.note || 'Bu kanal için kargo firması seçeneği yok'}</div>`);
   const cur = r.code || '';
-  const note = r.mode === 'pack' ? (pkg.packed_at ? 'Barkod oluşmadan önce firma değiştirilebilir: paket ikas\'ta iptal edilip seçilen firmayla yeniden “Kargoya Hazır” yapılır.' : 'Seçilen firma paketlerken ikas\'a gönderilir.')
+  const note = r.mode === 'pack' ? (pkg.packed_at ? 'Gönderi (barkod) oluşmadan önce firma değiştirilebilir: paket ikas\'ta iptal edilip seçilen firmayla yeniden “Kargoya Hazır” yapılır, ikas Kargo gönderiyi o firmada açar.' : 'Firma seçimi “Paketle ve etiket al” adımında ikas Kargo\'ya iletilir; ikas Kargo gerçek gönderiyi bu firmada açar ve etiketi verir. Liste, ikas kargo ayarlarınızdaki firmalardır.')
     : pkg.packed_at ? 'Değişiklik kanala gönderilir; yeni etiket oluşturmanız gerekir.' : 'Seçim paketlerken kanala uygulanır.';
   s.setBody(html`<div class="stack">
     <div class="small muted">${ch(o.channel).name} · #${o.order_number} · şu an: <b>${pkg.cargo_company || 'kanalın varsayılanı'}</b></div>
-    <div class="stack" style="gap:6px">${r.options.map((c) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="cargo" value="${c.id}" data-name="${c.name}" ${(cur ? cur === c.id : c.current) ? 'checked' : ''}><span style="flex:1;font-weight:600">${c.name}</span>${c.current ? html`<span class="pill good">mevcut</span>` : ''}</label>`)}</div>
+    <div class="stack" style="gap:6px">${r.options.map((c) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="cargo" value="${c.id}" data-name="${c.name}" ${(cur ? cur === c.id : c.current) ? 'checked' : ''}><span style="flex:1"><span style="font-weight:600">${c.name}</span>${c.hint ? html`<div class="tiny muted">${c.hint}</div>` : ''}</span>${c.current ? html`<span class="pill good">mevcut</span>` : ''}</label>`)}</div>
     <div class="notice small">${note}</div></div>`);
   s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
@@ -439,7 +466,9 @@ export async function bulkLabels(ids, { fetch = true, done } = {}) {
       const pkg = order.packages.find((p) => p.id === l.package_id);
       if (!pkg) continue;
       if (l.official) (['png', 'jpg', 'gif'].includes(l.official.format) ? images : files).push(l.official);
-      else if (l.panel || pkg.barcode || pkg.tracking || !fetch) panel.push({ order, pkg });
+      // Kendi etiketimiz yalnızca: kanal bunu onayladıysa (ör. Trendyol'da ortak etiketi olmayan firma), kanalın etiket servisi yoksa
+      // ya da gönderi kendi anlaşmanızla yapıldıysa. Etiket servisi olan kanalda gerçek etiket gelmeden kendi etiketimiz basılmaz.
+      else if (l.panel || ((pkg.agreement === 'own' || (ch(order.channel).caps || {}).label !== 'remote') && (pkg.barcode || pkg.tracking))) panel.push({ order, pkg });
       else continue;
       marks.push({ orderId: order.id, pkgId: pkg.id });
     }

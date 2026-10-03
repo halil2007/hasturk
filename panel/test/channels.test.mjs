@@ -112,10 +112,11 @@ test('ikas Kargo: paketle "Kargoya Hazır" (FulFillOrderInput) gönderir, etiket
   assert.deepEqual(ff.variables.input.trackingInfoDetail, { cargoCompanyId: 'c2', cargoCompany: 'Yurtiçi Kargo' });
   // Barkod henüz yok → bekleniyor
   assert.ok((await ch.label(order, { ...pkg, remote_id: 'pk1' })).pending);
-  // Barkod geldi, etiket görseli yok → panel etiketi
-  pkgState = { ...pkgState, trackingInfo: { barcode: '7300123', cargoCompany: 'Yurtiçi Kargo' } };
+  // ikas Kargo gönderiyi açtı (barkod var) ama etiket görseli yok → hazır SAYILMAZ, bekleniyor (gerçek barkod bilgisiyle)
+  pkgState = { ...pkgState, appId: 'ikas-kargo', trackingInfo: { barcode: '7300123', cargoCompany: 'Yurtiçi Kargo' } };
   const l1 = await ch.label(order, { ...pkg, remote_id: 'pk1' });
-  assert.equal(l1.panel, true); assert.equal(l1.barcode, '7300123');
+  assert.ok(l1.pending && !l1.panel && !l1.label);
+  assert.equal(l1.barcode, '7300123'); assert.equal(l1.agreement, 'ikas'); assert.equal(l1.step, 'created');
   // Yeni şema: etiket görseli (base64 PNG) okunur
   schemaHasLabel = true;
   const ch2 = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });

@@ -24,11 +24,12 @@ function shrink(file) {
 export async function settingsView(el) {
   const admin = isAdmin();
   async function load() {
-    const [chs, st, logs] = await Promise.all([api('channels'), api('settings'), api('logs')]);
+    const [chs, st, logs, mail] = await Promise.all([api('channels'), api('settings'), api('logs'), admin ? api('integrations/mail').catch(() => null) : null]);
     state.settings = st;
     const live = chs.filter((c) => !c.paused);
     const co = st.company || {};
     const dis = admin ? '' : 'disabled';
+    const mf = (k) => (mail ? mail.fields.find((x) => x.k === k) : null) || {};
     render(el, html`<div class="stack" style="max-width:1000px">
       ${!admin ? html`<div class="notice"><i class="ico ico-warn"></i>Ayarları sadece yönetici değiştirebilir.</div>` : ''}
       <div class="card stack">
@@ -70,6 +71,28 @@ export async function settingsView(el) {
           ${['commission', 'shipping', 'service_fee'].map((k) => html`<td class="r"><input class="input" style="width:100px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${(st[k] || {})[c.id] ?? 0}" ${dis}></td>`)}</tr>`)}
       </tbody></table></div></div>
 
+      ${admin ? html`<div class="card stack" data-mailbox>
+        <h2>Yeni sipariş e-posta bildirimi</h2>
+        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="mail_enabled" ${st.mail_enabled ? 'checked' : ''}><span></span></span>
+          <span><b>Yeni sipariş gelince e-posta gönder</b><br><span class="small muted">Her sipariş için bir kez gönderilir; 15 dakikalık senkronda aynı sipariş için tekrar gönderilmez. Kanalların ilk aktarımı ve geçmiş sipariş aktarımı e-posta oluşturmaz.</span></span></label>
+        <div class="form-grid">
+          <label class="field"><span>Bildirim alacak e-postalar</span><input class="input" data-mailto value="${(st.mail_to || []).join(', ')}" placeholder="ornek@firma.com, ikinci@firma.com"><small>Virgülle ayırın (en fazla 10)</small></label>
+          <label class="field"><span>Panel adresi</span><input class="input" data-panelurl value="${st.panel_url || ''}" placeholder="https://hasturk-panel.xxx.workers.dev"><small>E-postadaki “Siparişi panelde aç” bağlantısı</small></label>
+        </div>
+        <div><div class="small" style="font-weight:650;margin-bottom:6px">E-posta alınacak mağazalar / pazaryerleri</div><div class="row wrap">${live.map((c) => html`<label class="check"><input type="checkbox" data-mailch="${c.id}" ${(st.mail_channels || {})[c.id] === false ? '' : 'checked'}> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>
+        <details ${mail && mail.fields.some((f) => f.k === 'MAIL_API_KEY' && f.masked) ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">E-posta servisi ${mf('MAIL_API_KEY').masked ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}</summary>
+          <div class="stack" style="margin-top:10px">
+            <div class="notice small"><div><b>Brevo (önerilen, ücretsiz, alan adı gerekmez):</b> brevo.com'da hesap açın → <i>Senders, Domains & Dedicated IPs → Senders</i> bölümünde gönderen e-posta adresinizi ekleyip gelen e-postadaki bağlantıyla doğrulayın → <i>SMTP & API → API Keys</i> bölümünden bir anahtar oluşturup aşağıya yapıştırın. <b>Resend</b> kullanacaksanız alan adınızı Resend'de doğrulamanız gerekir.</div></div>
+            <div class="form-grid">
+              <label class="field"><span>Servis</span><select class="input" data-mailf="MAIL_PROVIDER">${[['brevo', 'Brevo'], ['resend', 'Resend']].map(([v, t]) => html`<option value="${v}" ${(mf('MAIL_PROVIDER').value || 'brevo') === v ? 'selected' : ''}>${t}</option>`)}</select></label>
+              <label class="field"><span>API anahtarı</span><input class="input" type="password" autocomplete="off" data-mailf="MAIL_API_KEY" placeholder="${mf('MAIL_API_KEY').masked || 'yapıştırın'}"><small>${mf('MAIL_API_KEY').masked ? 'Kayıtlı (şifreli). Değiştirmek için yenisini yapıştırın.' : 'Şifreli saklanır, ekranda tekrar gösterilmez.'}</small></label>
+              <label class="field"><span>Gönderen e-posta</span><input class="input" data-mailf="MAIL_FROM" value="${mf('MAIL_FROM').value || ''}" placeholder="bildirim@firma.com"><small>Serviste doğrulanmış adres</small></label>
+              <label class="field"><span>Gönderen adı</span><input class="input" data-mailf="MAIL_FROM_NAME" value="${mf('MAIL_FROM_NAME').value || ''}" placeholder="Hastürk Panel"></label>
+            </div>
+          </div></details>
+        <div class="row wrap"><button class="btn" data-act="mail-test"><i class="ico ico-chat"></i>Deneme e-postası gönder</button><span class="spacer"></span><button class="btn primary" data-act="mail-save">Bildirim ayarlarını kaydet</button></div>
+      </div>` : ''}
+
       <div class="card stack">
         <h2>Kargo etiketi</h2>
         <div class="form-grid">
@@ -109,7 +132,16 @@ export async function settingsView(el) {
       }
     } catch (err) { toast(err.message, true); }
   });
+  const saveMail = async () => {
+    const box = $('[data-mailbox]', el);
+    const m = {}; $$('[data-mailch]', box).forEach((x) => { m[x.dataset.mailch] = x.checked; });
+    await save({ mail_to: $('[data-mailto]', box).value, mail_channels: m, panel_url: $('[data-panelurl]', box).value.trim() });
+    const values = {}; $$('[data-mailf]', box).forEach((i) => { values[i.dataset.mailf] = i.value.trim(); });
+    await api('integrations/mail', { method: 'PUT', body: { values } });
+  };
   actions(el, {
+    'mail-save': (t) => busy(t, async () => { await saveMail(); toast('Bildirim ayarları kaydedildi'); await load(); }),
+    'mail-test': (t) => busy(t, async () => { await saveMail(); const r = await api('mail/test', { method: 'POST' }); toast(r.message); }),
     'push-stock': (t) => busy(t, async () => { const r = await api('push-stock', { method: 'POST' }); toast(r.skipped || Object.entries(r).map(([k, v]) => `${ch(k).name}: ${v}`).join(' · ') || 'Gönderilecek değişiklik yok'); }),
     'logo-reset': (t) => busy(t, async () => { await save({ logo: '' }); await loadSummary(); load(); }),
     purge: async (t) => {

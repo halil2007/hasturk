@@ -1,6 +1,6 @@
 // Kargo etiketi: 100×150 mm termal/ofis yazıcısı için yazdırılabilir etiket + Code 128 barkod.
 // Pazaryerinin resmi etiketi (ZPL/PDF) varsa ayrıca indirilebilir; panel etiketi her kanalda çalışır.
-import { esc, ch, money } from './core.js';
+import { esc, ch, money, state } from './core.js';
 
 // Code 128 desen tablosu (çubuk/boşluk genişlikleri), 0–102 veri, 103–105 başlangıç A/B/C, 106 bitiş
 const P = '212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112'.split(' ');
@@ -45,6 +45,21 @@ export function barcodeSvg(text) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${m.length} 40" preserveAspectRatio="none" shape-rendering="crispEdges"><path d="${d}" fill="#000"/></svg>`;
 }
 
+// Kanal işaretleri (termal yazıcıda net basılması için siyah-beyaz yazı işaret)
+const MARK = { ikas: 'ikas', trendyol: 'trendyol', hepsiburada: 'hepsiburada', pttavm: 'PttAVM', n11: 'n11', idefix: 'idefix', pazarama: 'pazarama' };
+// Gönderinin yapıldığı gerçek kargo anlaşması → etikete yazılan ifade
+export const AGREEMENT = {
+  ikas: 'ikas Kargo anlaşmalı gönderi', trendyol: 'Trendyol anlaşmalı gönderi', hepsiburada: 'Hepsiburada anlaşmalı gönderi', pttavm: 'PttAVM anlaşmalı gönderi',
+  n11: 'N11 anlaşmalı gönderi', idefix: 'idefix anlaşmalı gönderi', pazarama: 'Pazarama anlaşmalı gönderi', own: 'Satıcı anlaşmalı gönderi',
+};
+const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama'];
+// Anlaşma: pakete kaydedilen (ikas Kargo işlediyse 'ikas', kendi anlaşmanızsa 'own'); yoksa pazaryeri barkodu o pazaryerinin anlaşmasıdır
+export function agreementOf(order, pkg) {
+  if (pkg.agreement) return pkg.agreement;
+  const t = ch(order.channel).type || order.channel;
+  return MARKETPLACES.includes(t) && (pkg.barcode || pkg.tracking) ? t : null;
+}
+
 // Etiket HTML'i (bir paket)
 export function labelHtml(order, pkg, total, sender = {}) {
   const a = order.address || {};
@@ -58,9 +73,13 @@ export function labelHtml(order, pkg, total, sender = {}) {
     return `<div><b>${esc(x.qty)}×</b><span>${esc(it.product_name || it.name || x.line_id)}${it.sku ? ` <small>(${esc(it.sku)})</small>` : ''}</span></div>`;
   }).join('');
   const desi = pkg.desi || '';
+  const c = ch(order.channel), type = c.type || order.channel;
+  const agr = internal ? null : agreementOf(order, pkg);
+  const cargo = pkg.cargo_company || order.cargo_company || '';
+  const logo = (state.settings && state.settings.logo) || 'logo.webp';
   return `<section class="slabel">
     <div class="lb-top">
-      <div><div class="lb-ch">${esc(ch(order.channel).name)}</div><div>Sipariş: <b>${esc(order.order_number)}</b></div><div>${esc(new Date(order.ordered_at).toLocaleDateString('tr-TR'))}</div></div>
+      <div><div>Sipariş: <b>${esc(order.order_number)}</b> · ${esc(c.name)}</div><div>${esc(new Date(order.ordered_at).toLocaleDateString('tr-TR'))}</div></div>
       <div class="lb-pkg">${esc(pkg.no || 1)}/${esc(total)}</div>
     </div>
     <div>
@@ -70,8 +89,10 @@ export function labelHtml(order, pkg, total, sender = {}) {
       <div class="lb-city">${esc([a.district, a.city].filter(Boolean).join(' / '))}</div>
       <div>${esc(a.phone || order.phone || '')}</div>
     </div>
-    <div class="lb-bar">${barcodeSvg(code)}<div class="code">${esc(code)}</div>${internal ? '<div style="font-size:7pt">İç barkod — kargo takip no girilmedi</div>' : ''}</div>
-    <div class="lb-meta"><span>${esc(pkg.cargo_company || order.cargo_company || '')}</span><span>${desi ? `Desi: ${esc(desi)}` : ''}</span></div>
+    <div class="lb-brand"><img class="lb-logo" src="${esc(logo)}" alt=""><span class="lb-mark ${esc(type)}">${esc(MARK[type] || c.name)}</span></div>
+    <div class="lb-agree"><b>${esc(cargo || 'Kargo firması belirtilmedi')}</b>${agr ? `<span>${esc(AGREEMENT[agr] || '')}</span>` : ''}</div>
+    <div class="lb-bar">${barcodeSvg(code)}<div class="code">${esc(code)}</div>${internal ? '<div style="font-size:7pt">İç barkod — kargo takip no girilmedi, kargo firması bu barkodu okutmaz</div>' : ''}</div>
+    <div class="lb-meta"><span>${desi ? `Desi: ${esc(desi)}` : ''}</span><span>${esc((pkg.items || []).reduce((n, x) => n + (Number(x.qty) || 0), 0))} adet</span></div>
     <div class="lb-items">${lines}</div>
     <div class="lb-from"><b>GÖNDEREN:</b> ${esc(sender.name || '')} ${esc(sender.phone || '')}<br>${esc([sender.address, sender.city].filter(Boolean).join(' '))}</div>
   </section>`;
@@ -84,7 +105,9 @@ function printHtml(markup) {
   return new Promise((resolve) => {
     const clear = () => { box.innerHTML = ''; window.removeEventListener('afterprint', clear); resolve(); };
     window.addEventListener('afterprint', clear);
-    setTimeout(() => window.print(), 50);
+    // Logolar yüklenmeden yazdırılmasın (en fazla 2 sn beklenir)
+    const imgs = [...box.querySelectorAll('img')].map((i) => (i.complete ? null : new Promise((ok) => { i.onload = i.onerror = ok; })));
+    Promise.race([Promise.all(imgs), new Promise((ok) => setTimeout(ok, 2000))]).then(() => setTimeout(() => window.print(), 50));
   });
 }
 // Panel etiketleri: [{ order, pkg }] (her paket ayrı sayfa)

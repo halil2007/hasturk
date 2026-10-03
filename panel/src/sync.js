@@ -11,6 +11,7 @@ import { autoMatch, relinkItems } from './match.js';
 import { runJobs } from './backfill.js';
 import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
+import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 export { relinkItems };
 
@@ -18,7 +19,8 @@ export { relinkItems };
 //   shared: ortak stok · limit: ortak stok ama en fazla N · own: bu kanala ayrılmış N adet (o kanalın satışlarıyla azalır)
 export const DESIRED = `CASE l.stock_mode WHEN 'own' THEN MAX(COALESCE(l.stock_value, 0), 0)
   WHEN 'limit' THEN MAX(MIN(p.stock, COALESCE(l.stock_value, p.stock)), 0) ELSE MAX(p.stock, 0) END`;
-const LISTING_EVERY = 14 * 60e3; // ilanlar en geç bu aralıkla yenilenir
+const LISTING_EVERY = 14 * 60e3;
+export const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama']; // ilanlar en geç bu aralıkla yenilenir
 
 const D = 864e5;
 const OVERLAP = 2 * 3600e3; // son senkrondan 2 saat öncesinden itibaren tekrar bakılır (geç güncellenen siparişler için)
@@ -55,9 +57,10 @@ export async function saveOrders(db, ch, orders, maps) {
   const recent = new Set((await all(db, "SELECT DISTINCT order_id FROM order_events WHERE source = 'panel' AND at > ?", Date.now() - 30 * 60e3)).map((r) => r.order_id));
   const t = Date.now();
   // Kanaldan aynen gelen (değişmemiş) sipariş tekrar yazılmaz: veritabanı yazma kotasını korur
-  const changed = [];
+  const changed = [], created = [];
   for (const o of orders) {
     const id = `${ch}:${o.remoteId}`, h = hash(JSON.stringify(o)), ex = existing.get(id);
+    if (!ex) created.push(id);
     if (ex && ex.hash === h) continue;
     o._hash = h;
     changed.push(o);
@@ -106,21 +109,26 @@ export async function saveOrders(db, ch, orders, maps) {
           if (!p.remoteId) continue;
           // Paketlenmiş sayılır: ikas/HB'de paket varsa; Trendyol'da "Created" sonrası (Hazırlanıyor, Faturalandı…)
           const packed = p.packed ?? !/^(Created|Awaiting)$/.test(p.remoteStatus || '');
-          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at, packed_at, error)
-            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          // Kargo anlaşması: pazaryeri paketleri o pazaryerinin anlaşmasıyla; ikas paketi yalnızca ikas Kargo işlediyse
+          const agreement = p.agreement || (MARKETPLACES.includes(ch) ? ch : null);
+          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at, packed_at, error, agreement)
+            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (order_id, remote_id) DO UPDATE SET items = excluded.items, remote_status = excluded.remote_status,
               status = CASE WHEN packages.status = 'shipped' AND excluded.status = 'open' THEN 'shipped' ELSE excluded.status END,
               shipped_at = CASE WHEN excluded.status = 'shipped' THEN COALESCE(packages.shipped_at, excluded.shipped_at) ELSE packages.shipped_at END,
               cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), packages.tracking),
               barcode = COALESCE(NULLIF(excluded.barcode, ''), packages.barcode), error = excluded.error,
+              agreement = CASE WHEN packages.agreement = 'own' THEN 'own' ELSE COALESCE(excluded.agreement, packages.agreement) END,
               packed_at = CASE WHEN excluded.packed_at IS NULL THEN NULL ELSE COALESCE(packages.packed_at, excluded.packed_at) END`)
-            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', p.barcode || '', t, p.status === 'shipped' ? t : null, packed ? t : null, p.error || null));
+            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', p.barcode || '', t, p.status === 'shipped' ? t : null, packed ? t : null, p.error || null, agreement));
         }
       }
     }
     await db.batch(st);
   }
-  return changed.map((o) => `${ch}:${o.remoteId}`);
+  const out = changed.map((o) => `${ch}:${o.remoteId}`);
+  out.created = created; // veritabanında ilk kez görülen siparişler (yeni sipariş bildirimi için)
+  return out;
 }
 
 function hash(s) {
@@ -168,6 +176,22 @@ export async function applyStock(db, orderIds, settings) {
     for (const part2 of chunk(st, 90)) if (part2.length) await db.batch(part2);
   }
   return moves;
+}
+
+// ---------- ürün bilgisi: marka ve açıklama ----------
+// Panel ürününde marka / açıklama boşsa bağlı ilanlardan doldurulur (önce ana katalog sitesi, sonra diğer kanallar).
+// Panelde elle girilen değer korunur.
+export async function fillProductInfo(db, settings) {
+  settings = settings || await getSettings(db);
+  const cats = catalogOf(settings);
+  const rank = `CASE l.channel ${cats.map((c, i) => `WHEN '${String(c).replace(/'/g, '')}' THEN ${i}`).join(' ')} ELSE 99 END`;
+  let n = 0;
+  for (const col of ['brand', 'description']) {
+    const r = await run(db, `UPDATE products SET ${col} = (SELECT l.${col} FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '' ORDER BY ${rank} LIMIT 1)
+      WHERE COALESCE(${col}, '') = '' AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '')`);
+    n += (r && r.meta && r.meta.changes) || 0;
+  }
+  return n;
 }
 
 // ---------- stok senkronu kapalıyken: ana katalog (ikas) stoğu esas ----------
@@ -271,6 +295,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
         const orders = await attempt(() => ch.fetchOrders(since, t));
         const ids = await saveOrders(db, ch.id, orders, maps);
         changed.push(...ids);
+        // Yeni sipariş e-postası: kanalın ilk aktarımında (imleç yokken) gönderilmez
+        if (cursor && ids.created && ids.created.length) out.mailQueued = (out.mailQueued || 0) + await queueNew(db, ch, ids.created, settings).catch(() => 0);
         await setSetting(db, 'cursor:' + ch.id, t);
         Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, warn: orders.warnings || null });
         out.channels[ch.id] = orders.length;
@@ -302,6 +328,7 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // 3) kesin eşleşmeler + ana katalogdan yeni ürünler
     out.match = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] });
     out.mirrored = await mirrorStock(db, settings);
+    out.info = await fillProductInfo(db, settings).catch((e) => 'hata: ' + e.message);
     // 4) stok düşümü ve gönderim
     out.stockMoves = await applyStock(db, changed, settings);
     out.stock = await pushStocks(env, db, settings);
@@ -310,6 +337,7 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     if (!only) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
+    out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
     // 5) geçmiş sipariş aktarımı varsa bir parça daha ilerlet
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });
@@ -326,14 +354,16 @@ export async function refreshListings(db, ch) {
   const rows = await ch.fetchListings();
   const t = Date.now();
   for (const part of chunk(rows, 40)) {
-    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (channel, remote_id) DO UPDATE SET remote_product_id = excluded.remote_product_id, sku = excluded.sku, barcode = excluded.barcode,
         name = excluded.name, group_name = excluded.group_name, variant_name = excluded.variant_name,
         image = COALESCE(NULLIF(excluded.image, ''), listings.image),
+        brand = COALESCE(NULLIF(excluded.brand, ''), listings.brand), description = COALESCE(NULLIF(excluded.description, ''), listings.description),
         price = CASE WHEN listings.price_dirty = 1 THEN listings.price ELSE excluded.price END,
         list_price = excluded.list_price, remote_stock = excluded.remote_stock, pushed_stock = excluded.remote_stock, synced_at = excluded.synced_at`)
-      .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t)));
+      .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t,
+        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000))));
   }
   // Deneme modu: örnek alış fiyatları (gerçek kanallar alış fiyatı vermez)
   for (const l of rows) if (l.purchasePrice) await run(db, 'UPDATE products SET purchase_price = ? WHERE sku = ? AND purchase_price = 0', l.purchasePrice, l.sku);
@@ -359,6 +389,7 @@ export async function importListings(env, db, { only } = {}) {
   const m = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] });
   out.created = m.created; out.linked = m.linked;
   out.mirrored = await mirrorStock(db, settings);
+  await fillProductInfo(db, settings).catch(() => {});
   return out;
 }
 export const autoLink = async (db) => (await autoMatch(db, { catalog: [] })).linked;
