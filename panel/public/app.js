@@ -9,6 +9,7 @@ import { matching } from './views/match.js';
 import { buyboxView, bbChannels } from './views/buybox.js';
 import { questionsView, qChannels } from './views/questions.js';
 import { hbTestView } from './views/hbtest.js';
+import { uploadView } from './views/upload.js';
 import { profitView } from './views/profit.js';
 import { insightsView } from './views/insights.js';
 import { integrations } from './views/integrations.js';
@@ -25,6 +26,7 @@ const ROUTES = [
   { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products },
   { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock' },
+  { path: 'urun-yukle', title: 'Ürün Yükle', icon: 'upload', view: uploadView },
   { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match' },
   { path: 'buybox', title: 'Buybox', icon: 'bolt', view: buyboxView, when: () => bbChannels().length > 0 },
   { sec: 'Raporlar' },

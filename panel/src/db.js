@@ -72,6 +72,12 @@ const SCHEMA = [
   // Bildirimler: senkron hataları, stok uyarıları; aynı konu (key) tek kayıtta güncellenir
   `CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, level TEXT NOT NULL, channel TEXT, title TEXT NOT NULL, msg TEXT,
     count INTEGER NOT NULL DEFAULT 1, first_at INTEGER, last_at INTEGER, read INTEGER NOT NULL DEFAULT 0, resolved_at INTEGER)`,
+  // Kategori eşleştirme: panel (ikas) kategorisi → pazaryeri kategorisi + sabit özellik değerleri (JSON)
+  `CREATE TABLE IF NOT EXISTS category_map (local TEXT NOT NULL, channel TEXT NOT NULL, remote_id TEXT NOT NULL, remote_name TEXT, attrs TEXT,
+    updated_at INTEGER, user TEXT, PRIMARY KEY (local, channel))`,
+  // Pazaryerine ürün gönderimleri: kanalın verdiği takip kimliği (HB trackingId / Trendyol batchRequestId) ve sonuç
+  `CREATE TABLE IF NOT EXISTS product_uploads (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL, ref TEXT, status TEXT NOT NULL,
+    items TEXT, result TEXT, error TEXT, user TEXT, created_at INTEGER NOT NULL, checked_at INTEGER)`,
   // Geçmiş sipariş aktarımı (kanal başına, parça parça ilerler)
   `CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, channel TEXT NOT NULL, from_ms INTEGER NOT NULL, to_ms INTEGER NOT NULL, cursor_ms INTEGER NOT NULL,
     status TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, error TEXT, created_at INTEGER, updated_at INTEGER)`,
@@ -117,6 +123,8 @@ const MIGRATIONS = [
   // Kanalın siparişte bildirdiği gerçek komisyon (TL); yoksa tahmini oran kullanılır. İlanın oranı API'den gelirse kaynağı 'api'
   'ALTER TABLE order_items ADD COLUMN commission REAL',
   'ALTER TABLE listings ADD COLUMN commission_src TEXT',
+  // Kategori (ikas kategori yolu) → ürün kategorisi; kategori eşleştirme ve ürün yüklemede kullanılır
+  'ALTER TABLE listings ADD COLUMN category TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

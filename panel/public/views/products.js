@@ -212,6 +212,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Stok kodu (SKU)</span><input class="input" name="sku" value="${p.sku || ''}" placeholder="kanallarla aynı olmalı"></label>
         <label class="field"><span>Barkod</span><input class="input" name="barcode" value="${p.barcode || ''}"></label>
         <label class="field"><span>Marka</span><input class="input" name="brand" value="${p.brand || ''}"></label>
+        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ikas'tan gelir"><small>Pazaryerine yüklemede kategori eşleştirmesi buna göre yapılır</small></label>
         <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="varyantlar bu adla gruplanır"></label>
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
       </div>
@@ -262,7 +263,7 @@ export async function productForm(id, done) {
   form.onsubmit = (e) => e.preventDefault();
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const fd = new FormData(form), b = {};
-    for (const k of ['name', 'sku', 'barcode', 'brand', 'group_name', 'variant_name', 'image', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock']) b[k] = fd.get(k);
+    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'image', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock']) b[k] = fd.get(k);
     for (const k of ['purchase_price', 'sale_price', 'desi']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
     if (!b.name.trim()) return toast('Ürün adı gerekli', true);

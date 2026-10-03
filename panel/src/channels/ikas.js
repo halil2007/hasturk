@@ -173,9 +173,20 @@ export function ikas(env, p, meta) {
       const vt = await gql('{ listVariantType { id name values { id name } } }');
       for (const t of vt.listVariantType || []) for (const v of t.values || []) values.set(v.id, v.name);
     } catch { /* varyant adları olmadan devam */ }
+    // Kategori yolu (ör. "Gübre › Sıvı Gübre"): kategori eşleştirme ve pazaryerine ürün yüklemede kullanılır
+    const cats = new Map();
+    try { for (const c of (await gql('{ listCategory { id name parentId } }')).listCategory || []) cats.set(c.id, c); } catch { /* kategori olmadan devam */ }
+    const catPath = (ids) => {
+      const list = (ids || []).filter((id) => cats.has(id));
+      const parents = new Set(list.map((id) => cats.get(id).parentId).filter(Boolean));
+      const leaf = list.find((id) => !parents.has(id)) || list[0];
+      const names = [];
+      for (let c = cats.get(leaf), i = 0; c && i < 8; c = cats.get(c.parentId), i++) names.unshift(c.name);
+      return names.join(' › ');
+    };
     const q = (o) => `query ($page: Int!) { listProduct(pagination: { page: $page, limit: 100 }) { hasNext data {
-      id name ${o.salesChannelIds} ${o.brand} ${o.description} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice } stocks { stockCount } ${o.images} } } } }`;
-    let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }', brand: 'brand { name }', description: 'description' };
+      id name ${o.salesChannelIds} ${o.brand} ${o.description} ${o.categoryIds} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice } stocks { stockCount } ${o.images} } } } }`;
+    let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }', brand: 'brand { name }', description: 'description', categoryIds: 'categoryIds' };
     for (let page = 1; page <= 200; page++) {
       const d = await flex(q, optional, { page });
       for (const p of d.listProduct.data || []) {
@@ -194,7 +205,7 @@ export function ikas(env, p, meta) {
             name: vname ? `${p.name} - ${vname}` : p.name, groupName: p.name, variantName: vname,
             image: imgUrl(img, 360), price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
             stock: (v.stocks || []).reduce((s, x) => s + num(x.stockCount), 0), active: v.isActive !== false,
-            brand: str(p.brand && p.brand.name), description: str(p.description),
+            brand: str(p.brand && p.brand.name), description: str(p.description), category: catPath(p.categoryIds),
           });
         }
       }

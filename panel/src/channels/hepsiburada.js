@@ -396,10 +396,60 @@ export function hepsiburada(env, meta) {
   }
   const sit = { test: !!test, merchantId: m, categories, attributes, attributeValues, importProducts, productStatus, uploadOne, uploadStatus, createTestOrder };
 
+  // ---------- Ürün yükleme (Ürün yükle ekranı): kategori eşleştirmesindeki değerlerle Hepsiburada ürün dosyası ----------
+  // Panelin doldurduğu temel alanlar: satıcı SKU, varyant grubu, barkod, ad, açıklama, marka, KDV, fiyat, stok, görsel, desi
+  const AUTO = ['merchantSku', 'VaryantGroupID', 'Barcode', 'UrunAdi', 'UrunAciklamasi', 'Marka', 'price', 'stock', 'Image1', 'tax_vat_rate', 'kg', 'GarantiSuresi'];
+  const attrCache = new Map();
+  const attrsOf = async (cat) => { if (!attrCache.has(cat)) attrCache.set(cat, await attributes(cat)); return attrCache.get(cat); };
+  async function build(pr, map, { opts = {}, pick } = {}) {
+    const a = {
+      merchantSku: pr.sku, VaryantGroupID: pr.group, Barcode: pr.barcode, UrunAdi: pr.name, UrunAciklamasi: pr.description || pr.name, Marka: pr.brand,
+      GarantiSuresi: String(opts.warranty ?? 0), kg: String(pr.desi || 1), tax_vat_rate: String(pr.vat ?? 20),
+      price: String(pr.price).replace('.', ','), stock: String(pr.stock), Image1: pr.image,
+    };
+    (pr.images || []).slice(1, 5).forEach((u, i) => { a['Image' + (i + 2)] = u; });
+    const missing = [];
+    for (const at of await attrsOf(map.remote_id)) {
+      if (AUTO.includes(at.id)) continue;
+      const v = (map.attrs || {})[at.id];
+      let val = v && (v.value ?? '');
+      if (val === '@variant') { const hit = /enum|list|select/i.test(at.type) ? await pick(at, pr.variant) : null; val = hit ? hit.value : pr.variant; }
+      if (val) a[at.id] = String(val);
+      else if (at.mandatory) missing.push(at.name);
+    }
+    for (const [k, label] of [['merchantSku', 'SKU'], ['UrunAdi', 'ad'], ['Marka', 'marka'], ['Image1', 'görsel']]) if (!a[k]) missing.push(label);
+    if (!(pr.price > 0)) missing.push('fiyat');
+    return { key: pr.sku, missing, payload: { categoryId: Number(map.remote_id) || map.remote_id, merchant: m, attributes: a } };
+  }
+  async function send(payloads) {
+    const out = [];
+    for (const part of chunk(payloads, 500)) out.push((await importProducts(part)).trackingId);
+    return { ref: out.join(',') };
+  }
+  // Durum: her ürün için Hepsiburada'nın döndürdüğü durum ve doğrulama hataları
+  async function status(ref) {
+    const items = [];
+    let pending = false;
+    for (const tid of String(ref).split(',').filter(Boolean)) {
+      const r = await productStatus(tid);
+      const rows = page(g(r, 'data') && !Array.isArray(g(r, 'data')) ? g(g(r, 'data'), 'items', 'data') || [] : r);
+      if (!rows.length) pending = true;
+      for (const it of rows) {
+        const st = str(g(it, 'productStatus', 'status', 'importStatus'));
+        const errs = [].concat(g(it, 'validationResults', 'errors', 'failureReasons') || []).map((e) => (typeof e === 'string' ? e : [g(e, 'attributeName'), g(e, 'message', 'description')].filter(Boolean).join(': '))).filter(Boolean);
+        const wait = /wait|progress|pending|beklen|process/i.test(st) && !errs.length;
+        if (wait) pending = true;
+        items.push({ key: str(g(it, 'merchantSku', 'sku')), status: st, ok: wait ? null : !errs.length && !/fail|error|reject|hata|red/i.test(st), error: errs.join(' · ') });
+      }
+    }
+    return { done: !pending, items };
+  }
+  const catalog = { categories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 500, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog,
   };
 }

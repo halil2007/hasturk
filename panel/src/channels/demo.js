@@ -74,13 +74,15 @@ export function demo(meta) {
   }
 
   async function fetchListings() {
-    return DEMO_PRODUCTS.map((p, i) => {
+    // Ürün yükle ekranını denemek için son iki ürün pazaryerlerinde henüz yok
+    return DEMO_PRODUCTS.filter((p, i) => meta.type === 'ikas' || i < DEMO_PRODUCTS.length - 2).map((p, i) => {
       // Örnek varyant: adın sonundaki ölçü (5 Kg, 20 Lt…) varyant, öncesi ana ürün
       const m = /^(.*?)\s+(\d+(?:[.,]\d+)?\s*(?:Kg|Lt|gr|ml))$/i.exec(p[2]);
       return {
         remoteId: remoteKey(p), remoteProductId: `${ch}-${(m ? m[1] : p[2]).toLowerCase().replace(/\W+/g, '-')}`, sku: p[0], barcode: p[1], name: p[2], image: '',
         groupName: m ? m[1] : p[2], variantName: m ? m[2] : '', brand: /^HG\b/.test(p[2]) ? 'HG' : 'Hastürk',
         description: `<p><b>${p[2]}</b> — örnek ürün açıklaması. Bahçe ve saksı bitkileri için uygundur.</p><ul><li>Doğal içerik</li><li>Kolay kullanım</li></ul>`,
+        category: meta.type === 'ikas' ? (/topra|torf|perlit|cocopeat|zeolit/i.test(p[2]) ? 'Toprak ve Harç' : /gübre|besin/i.test(p[2]) ? 'Gübre' : /pompa/i.test(p[2]) ? 'Bahçe Ekipmanları' : 'Tohum') : '',
         purchasePrice: p[4], price: Math.round(p[3] * (PRICE[ch] || 1)), listPrice: Math.round(p[3] * (PRICE[ch] || 1) * 1.15), stock: 20 + ((i * 7) % 30),
       };
     });
@@ -114,11 +116,34 @@ export function demo(meta) {
     return { items, hasNext: false, total: items.length };
   }
   const answer = async (q, text) => { answered.set(q.remote_id, text); };
+  // Örnek katalog (Ürün yükle ekranını denemek için): birkaç kategori, zorunlu özellik ve değer listesi
+  const CATS = [['501', 'Organik Gübre', 'Bahçe › Gübre'], ['502', 'Saksı Toprağı', 'Bahçe › Toprak'], ['503', 'İlaçlama Pompası', 'Bahçe › Ekipman'], ['504', 'Sebze Tohumu', 'Bahçe › Tohum']];
+  const ATTRS = [{ id: '10', name: 'Ağırlık / Hacim', mandatory: true, kind: 'variant', type: 'enum', custom: true }, { id: '11', name: 'Menşei', mandatory: true, kind: 'category', type: 'enum' }, { id: '12', name: 'Kullanım Alanı', mandatory: false, kind: 'category', type: 'text', custom: true }];
+  const VALS = { 10: ['1 Lt', '3 Lt', '5 Kg', '10 Kg', '10 Lt', '20 Lt', '2 Lt', '16 Lt'], 11: ['TR', 'CN', 'DE'] };
+  const uploads = new Map();
+  const catalog = {
+    categories: async (q) => { const k = String(q || '').toLocaleLowerCase('tr'); const items = CATS.map(([id, name, path]) => ({ id, name, path })).filter((c) => !k || `${c.name} ${c.path}`.toLocaleLowerCase('tr').includes(k)); return { total: CATS.length, items }; },
+    attributes: async () => ATTRS,
+    values: async (c, a) => (VALS[a] || []).map((v, i) => ({ id: String(a * 100 + i), value: v })),
+    async build(pr, map, { pick }) {
+      const missing = [];
+      for (const a of ATTRS) {
+        const v = (map.attrs || {})[a.id]; let val = v && v.value;
+        if (val === '@variant') { const hit = await pick(a, pr.variant); val = hit ? hit.value : pr.variant; }
+        if (!val && a.mandatory) missing.push(a.name);
+      }
+      if (!pr.barcode) missing.push('barkod'); if (!(pr.price > 0)) missing.push('fiyat');
+      return { key: pr.barcode || pr.sku, missing, payload: { barcode: pr.barcode, title: pr.name, price: pr.price, stock: pr.stock } };
+    },
+    async send(items) { const ref = 'DEMO-' + Date.now().toString(36); uploads.set(ref, items.map((x) => x.barcode)); return { ref }; },
+    async status(ref) { return { done: true, items: (uploads.get(ref) || []).map((k) => ({ key: k, status: 'SUCCESS', ok: true, error: '' })) }; },
+    options: ch === 'trendyol' ? [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] : [{ k: 'warranty', label: 'Garanti süresi (ay)' }],
+  };
   return {
     ...meta, enabled: true, missing: [], demo: true,
     caps: { accept: 'remote', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: meta.type === 'ikas' ? 'pack' : 'change', cancelPackage: true, createProduct: meta.type === 'ikas', price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
     fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, pack, label, cargoOptions, changeCargo, cancelPackage: ok,
-    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer } : {}),
+    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog } : {}),
     createProduct: async (pr) => ({ remoteId: `${ch}-${pr.sku || Date.now()}`, remoteProductId: '', sku: pr.sku, barcode: pr.barcode, name: pr.name, price: pr.sale_price, stock: pr.stock }),
   };
 }

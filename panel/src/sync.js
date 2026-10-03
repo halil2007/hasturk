@@ -194,7 +194,7 @@ export async function fillProductInfo(db, settings) {
   // adı aynı olan farklı ikas ürünleri tek gruba düşmez.
   await run(db, `UPDATE products SET parent_key = (SELECT l.channel || ':' || l.remote_product_id FROM listings l WHERE l.product_id = products.id AND COALESCE(l.remote_product_id, '') != '' ORDER BY ${rank} LIMIT 1)
     WHERE EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.remote_product_id, '') != '')`);
-  for (const col of ['brand', 'description']) {
+  for (const col of ['brand', 'description', 'category']) {
     const r = await run(db, `UPDATE products SET ${col} = (SELECT l.${col} FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '' ORDER BY ${rank} LIMIT 1)
       WHERE COALESCE(${col}, '') = '' AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '')`);
     n += (r && r.meta && r.meta.changes) || 0;
@@ -382,16 +382,17 @@ export async function refreshListings(db, ch) {
   const rows = await ch.fetchListings();
   const t = Date.now();
   for (const part of chunk(rows, 40)) {
-    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (channel, remote_id) DO UPDATE SET remote_product_id = excluded.remote_product_id, sku = excluded.sku, barcode = excluded.barcode,
         name = excluded.name, group_name = excluded.group_name, variant_name = excluded.variant_name,
         image = COALESCE(NULLIF(excluded.image, ''), listings.image),
         brand = COALESCE(NULLIF(excluded.brand, ''), listings.brand), description = COALESCE(NULLIF(excluded.description, ''), listings.description),
+        category = COALESCE(NULLIF(excluded.category, ''), listings.category),
         price = CASE WHEN listings.price_dirty = 1 THEN listings.price ELSE excluded.price END,
         list_price = excluded.list_price, remote_stock = excluded.remote_stock, pushed_stock = excluded.remote_stock, synced_at = excluded.synced_at`)
       .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t,
-        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000))));
+        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), str(l.category).slice(0, 300))));
   }
   // Deneme modu: örnek alış fiyatları (gerçek kanallar alış fiyatı vermez)
   for (const l of rows) if (l.purchasePrice) await run(db, 'UPDATE products SET purchase_price = ? WHERE sku = ? AND purchase_price = 0', l.purchasePrice, l.sku);

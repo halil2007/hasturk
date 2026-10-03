@@ -278,10 +278,93 @@ export function trendyol(env, meta) {
     return out;
   }
 
+  // ---------- Ürün yükleme (Ürün yükle ekranı) ----------
+  // Kategori ağacı: /product/product-categories · özellikler (değerleriyle): /product/product-categories/{id}/attributes
+  // Marka kimliği: /product/brands/by-name · ürün oluşturma: v2/products (yoksa v1) → batchRequestId · durum: batch-requests/{id}
+  let catCache = null;
+  async function categories(q) {
+    if (!catCache || Date.now() - catCache.at > 6 * 3600e3) {
+      const all = [];
+      const walk = (list, path) => { for (const c of list || []) { const p = path.concat(c.name); if ((c.subCategories || []).length) walk(c.subCategories, p); else all.push({ id: String(c.id), name: str(c.name), path: path.join(' › ') }); } };
+      walk((await call('/product/product-categories')).categories, []);
+      catCache = { at: Date.now(), all };
+    }
+    const k = String(q || '').toLocaleLowerCase('tr').trim();
+    return { total: catCache.all.length, items: catCache.all.filter((c) => !k || `${c.name} ${c.path} ${c.id}`.toLocaleLowerCase('tr').includes(k)).slice(0, 60) };
+  }
+  const attrCache = new Map();
+  async function rawAttrs(cat) {
+    if (!attrCache.has(cat)) attrCache.set(cat, (await call(`/product/product-categories/${encodeURIComponent(cat)}/attributes`)).categoryAttributes || []);
+    return attrCache.get(cat);
+  }
+  const attributes = async (cat) => (await rawAttrs(cat)).map((a) => ({ id: String(a.attribute && a.attribute.id), name: str(a.attribute && a.attribute.name), mandatory: !!a.required,
+    kind: a.varianter ? 'variant' : 'category', type: (a.attributeValues || []).length ? 'enum' : 'text', custom: !!a.allowCustom }));
+  const values = async (cat, attr) => ((await rawAttrs(cat)).find((a) => String(a.attribute && a.attribute.id) === String(attr))?.attributeValues || []).map((v) => ({ id: String(v.id), value: str(v.name) }));
+  const brands = new Map();
+  async function brandId(name) {
+    const k = str(name).toLocaleLowerCase('tr');
+    if (!k) return null;
+    if (!brands.has(k)) {
+      const r = await call(`/product/brands/by-name?name=${encodeURIComponent(name)}`);
+      const list = Array.isArray(r) ? r : r.brands || [];
+      brands.set(k, (list.find((b) => str(b.name).toLocaleLowerCase('tr') === k) || {}).id || null);
+    }
+    return brands.get(k);
+  }
+  async function build(pr, map, { opts = {}, pick } = {}) {
+    const missing = [], attrs = [];
+    for (const a of await rawAttrs(map.remote_id)) {
+      const id = String(a.attribute && a.attribute.id), v = (map.attrs || {})[id];
+      let valueId = v && v.id, text = v && v.value;
+      if (text === '@variant') { const hit = (a.attributeValues || []).length ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
+      if (valueId) attrs.push({ attributeId: Number(id), attributeValueId: Number(valueId) });
+      else if (text && a.allowCustom) attrs.push({ attributeId: Number(id), customAttributeValue: String(text) });
+      else if (a.required) missing.push(str(a.attribute && a.attribute.name) + (text ? ' (listeden seçilmeli)' : ''));
+    }
+    const bid = pr.brand ? await brandId(pr.brand) : null;
+    if (!pr.brand) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” Trendyol'da bulunamadı`);
+    if (!pr.barcode) missing.push('barkod');
+    if (!pr.image) missing.push('görsel');
+    if (!(pr.price > 0)) missing.push('fiyat');
+    const item = {
+      barcode: pr.barcode, title: str(pr.name).slice(0, 100), productMainId: str(pr.group).slice(0, 40), brandId: bid, categoryId: Number(map.remote_id),
+      quantity: pr.stock, stockCode: pr.sku, dimensionalWeight: pr.desi || 1, description: pr.description || pr.name, currencyType: 'TRY',
+      listPrice: Math.max(pr.listPrice || 0, pr.price), salePrice: pr.price, vatRate: pr.vat ?? 20,
+      images: [pr.image, ...(pr.images || []).slice(1, 8)].filter(Boolean).map((url) => ({ url })), attributes: attrs,
+    };
+    if (opts.cargoCompanyId) item.cargoCompanyId = Number(opts.cargoCompanyId);
+    return { key: pr.barcode, missing, payload: item };
+  }
+  async function send(items) {
+    const refs = [];
+    for (const part of chunk(items, 1000)) {
+      let r;
+      try { r = await call(`/product/sellers/${seller}/v2/products`, { method: 'POST', body: { items: part } }); }
+      catch (e) { if (!/\b(404|405)\b/.test(e.message)) throw e; r = await call(`/product/sellers/${seller}/products`, { method: 'POST', body: { items: part } }); }
+      if (!r.batchRequestId) throw new Error('Trendyol batchRequestId döndürmedi: ' + JSON.stringify(r).slice(0, 300));
+      refs.push(r.batchRequestId);
+    }
+    return { ref: refs.join(',') };
+  }
+  async function status(ref) {
+    const items = [];
+    let pending = false;
+    for (const id of String(ref).split(',').filter(Boolean)) {
+      const r = await call(`/product/sellers/${seller}/products/batch-requests/${encodeURIComponent(id)}`);
+      if (!/COMPLETED|DONE|FAILED/i.test(r.status || '')) pending = true;
+      for (const it of r.items || []) {
+        const req = it.requestItem || {}, st = str(it.status);
+        items.push({ key: str(req.barcode || (req.product && req.product.barcode)), status: st, ok: /SUCCESS/i.test(st) ? true : /FAIL/i.test(st) ? false : null, error: (it.failureReasons || []).map((x) => (typeof x === 'string' ? x : x.message || JSON.stringify(x))).join(' · ') });
+      }
+    }
+    return { done: !pending, items };
+  }
+  const catalog = { categories, attributes, values, build, send, status, chunk: 1000, options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] };
+
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose,
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog,
   };
 }

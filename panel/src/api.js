@@ -9,6 +9,7 @@ import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { hbTest } from './hbtest.js';
+import { catalogApi } from './catalog.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { profit } from '../public/profit.js';
@@ -479,7 +480,7 @@ async function listBuybox(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active'];
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active'];
 const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active']);
 function cleanProduct(b) {
   const o = {};
@@ -667,7 +668,7 @@ async function channelsInfo(env, db) {
 
 // ---------- yönlendirme ----------
 // Sadece yöneticinin yapabileceği işlemler (kanal API bilgileri, kullanıcılar, ayarlar, toplu aktarım)
-const ADMIN_ONLY = [/^mail\//, /^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/];
+const ADMIN_ONLY = [/^mail\//, /^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/, /^catalog\//];
 export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönetici', role: 'admin' }) {
   const url = new URL(req.url), q = Object.fromEntries(url.searchParams), m = req.method;
   let x;
@@ -680,6 +681,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (user.role !== 'admin') fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
     return json(await hbTest(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
   }
+  // Kategori eşleştirme ve pazaryerine ürün yükleme
+  if (path.startsWith('catalog/')) return json(await catalogApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
   if (path === 'summary' && m === 'GET') {
     const [qs, s, notices, match, st, chInfo] = await Promise.all([
       first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'"),
