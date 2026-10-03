@@ -11,7 +11,7 @@ export function ikas(env, p, meta) {
   const store = env[p + 'STORE'], id = env[p + 'CLIENT_ID'], secret = env[p + 'CLIENT_SECRET'];
   const salesChannel = env[p + 'SALES_CHANNEL_ID'] || '';
   let merchant = env[p + 'MERCHANT_ID'] || '', merchantTried = false;
-  let token = null, tokenExp = 0, locationId = env[p + 'STOCK_LOCATION_ID'] || '';
+  let token = null, tokenScope = '', tokenExp = 0, locationId = env[p + 'STOCK_LOCATION_ID'] || '';
 
   async function auth() {
     if (token && Date.now() < tokenExp) return token;
@@ -22,6 +22,7 @@ export function ikas(env, p, meta) {
     });
     if (!r || !r.access_token) throw new Error('ikas token alınamadı');
     token = r.access_token;
+    tokenScope = String(r.scope || '');
     tokenExp = Date.now() + Math.max(60, (r.expires_in || 3600) - 120) * 1000;
     return token;
   }
@@ -63,6 +64,7 @@ export function ikas(env, p, meta) {
     orderPackageStatus: 'orderPackageStatus',
     orderPaymentStatus: 'orderPaymentStatus',
     customer: 'customer { firstName lastName email phone }',
+    billingAddress: 'billingAddress { phone }',
     shippingAddress: 'shippingAddress { firstName lastName phone addressLine1 addressLine2 city { name } district { name } }',
     barcodeList: 'barcodeList',
     mainImageId: 'mainImageId',
@@ -74,7 +76,7 @@ export function ikas(env, p, meta) {
   const orderQuery = (o, filter) => `query ($p: PaginationInput, $d: ${filter === 'id' ? 'StringFilterInput' : 'DateFilterInput'}) {
     listOrder(pagination: $p, ${filter}: $d) { hasNext data {
       id orderNumber orderedAt status totalFinalPrice currencyCode ${o.salesChannelId} ${o.orderPackageStatus} ${o.orderPaymentStatus} ${o.cancelledAt} ${o.updatedAt} ${o.shippingLines}
-      ${o.customer} ${o.shippingAddress}
+      ${o.customer} ${o.shippingAddress} ${o.billingAddress}
       orderLineItems { id quantity price finalPrice status variant { id productId sku name ${o.barcodeList} ${o.mainImageId} } }
       ${o.orderPackages}
     } }
@@ -118,7 +120,7 @@ export function ikas(env, p, meta) {
     return {
       remoteId: String(o.id), orderNumber: String(o.orderNumber || o.id), orderedAt: typeof o.orderedAt === 'number' ? o.orderedAt : Date.parse(o.orderedAt),
       remoteStatus: [o.status, o.orderPackageStatus, o.orderPaymentStatus].filter(Boolean).join(' / '), status: mapStatus(o),
-      customer: [a.firstName || c.firstName, a.lastName || c.lastName].filter(Boolean).join(' '), phone: str(a.phone || c.phone), email: str(c.email),
+      customer: [a.firstName || c.firstName, a.lastName || c.lastName].filter(Boolean).join(' '), phone: str(a.phone || (o.billingAddress || {}).phone || c.phone), email: str(c.email),
       address: { name: [a.firstName, a.lastName].filter(Boolean).join(' '), line: [a.addressLine1, a.addressLine2].filter(Boolean).join(' '), district: str(a.district && a.district.name), city: str(a.city && a.city.name), phone: str(a.phone) },
       total: num(o.totalFinalPrice), currency: o.currencyCode || 'TRY',
       cargoCompany: first.cargoCompany || '', tracking: first.tracking || '',
@@ -381,13 +383,16 @@ export function ikas(env, p, meta) {
     };
     const tok = await step('ikas bağlantısı (OAuth)', async () => { await auth(); return { ok: true, detail: `${store}.myikas.com için erişim anahtarı alındı` }; });
     if (!tok) return out;
+    // İzinler: resmi adlar read_/write_ + orders, products, inventories (ikas OAuth). Önce erişim anahtarının izin listesi,
+    // yoksa uygulama kaydı. ikas listeyi boş döndürürse "eksik" denmez; izinler aşağıdaki gerçek işlemlerle doğrulanır.
     await step('Uygulama izinleri', async () => {
-      const d = await gql('{ getAuthorizedApp { scope storeAppId salesChannelId } }');
-      const sc = String((d.getAuthorizedApp || {}).scope || '');
-      const need = [['order', 'Siparişler'], ['product', 'Ürünler'], ['stock', 'Stok'], ['inventory', 'Stok']];
-      const lc = sc.toLowerCase(), miss = [...new Set(need.filter(([k]) => !lc.includes(k)).map(([, t]) => t))].filter((t) => !(t === 'Stok' && /stock|inventory|product/.test(lc)));
-      const write = /write/.test(lc);
-      return { ok: !miss.length && write ? true : null, detail: `${miss.length ? `Eksik görünen izin: ${miss.join(', ')}. ` : ''}${write ? '' : 'Yazma izni görünmüyor (paketleme ve stok gönderimi için gerekli). '}İzinler: ${sc || '(ikas boş döndü)'}` };
+      let sc = tokenScope;
+      if (!sc) { try { sc = String(((await gql('{ getAuthorizedApp { scope } }')).getAuthorizedApp || {}).scope || ''); } catch { /* okunamadı */ } }
+      const have = new Set(sc.toLowerCase().split(/[\s,;]+/).filter(Boolean));
+      if (!have.size) return { ok: null, detail: 'ikas izin listesini bildirmedi (özel uygulamalarda olağan). İzinler aşağıdaki adımlarda gerçek işlemlerle kontrol edilir: siparişler okunabiliyorsa okuma izni vardır; paketleme hatasında ikas yazma izni eksikse bunu açıkça söyler.' };
+      const need = [['read_orders', 'Siparişler – Görüntüleme', true], ['write_orders', 'Siparişler – Düzenleme (paketleme / Kargoya Hazır)', true], ['read_products', 'Ürünler – Görüntüleme', true], ['write_products', 'Ürünler – Düzenleme (fiyat gönderimi)', false], ['read_inventories', 'Envanter – Görüntüleme (depo adresi)', false], ['write_inventories', 'Envanter – Düzenleme (stok gönderimi)', false]];
+      const miss = need.filter(([k]) => !have.has(k));
+      return { ok: miss.some((x) => x[2]) ? false : miss.length ? null : true, detail: `${miss.length ? `Kapalı izin: ${miss.map((x) => x[1]).join(', ')}. ` : 'Gerekli izinler açık. '}(ikas: ${[...have].join(', ')})` };
     });
     await step('Mağaza (görseller için)', async () => { const d = await gql('{ getMerchant { id } }'); return { ok: !!(d.getMerchant && d.getMerchant.id), detail: `Merchant ID: ${(d.getMerchant || {}).id || '-'}` }; });
     await step('Depo / stok lokasyonu adresi', async () => {
@@ -407,18 +412,35 @@ export function ikas(env, p, meta) {
     if (orderId) {
       await step('Sipariş ve paketleri (ikas)', async () => {
         const o = await getOrder(orderId);
-        const a = o.shippingAddress || {}, phone = a.phone || (o.customer || {}).phone;
+        const a = o.shippingAddress || {}, bill = o.billingAddress || {}, cu = o.customer || {};
+        const phone = a.phone || bill.phone || cu.phone;
+        const phoneSrc = a.phone ? 'teslimat adresi' : bill.phone ? 'fatura adresi (teslimat adresinde yok)' : cu.phone ? 'müşteri kaydı (teslimat adresinde yok)' : '';
         const sl = (o.shippingLines || [])[0] || {};
+        const names = new Map((await carriers().catch(() => [])).map((c) => [c.id, c.name]));
+        const chosen = sl.cargoCompanyId ? names.get(String(sl.cargoCompanyId)) || sl.cargoCompanyId : '';
+        let inSettings = null;
+        try {
+          const d = await gql('{ listShippingSettings { isPassive zoneRate { cargoCompanyId } } }');
+          const ids = new Set((d.listShippingSettings || []).filter((x) => !x.isPassive).flatMap((x) => (x.zoneRate || []).map((r) => String(r.cargoCompanyId || ''))));
+          if (sl.cargoCompanyId) inSettings = ids.has(String(sl.cargoCompanyId));
+        } catch { /* ayarlar okunamadı */ }
         const pk = o.orderPackages || [];
-        const lines = [`Sipariş #${o.orderNumber} · durum ${o.status} / ${o.orderPackageStatus || '-'}`, `Müşterinin seçtiği kargo: ${sl.title || '-'}${sl.cargoCompanyId ? ` (${sl.cargoCompanyId})` : ''}`, `Alıcı telefonu: ${phone || 'YOK'}`];
+        const lines = [`Sipariş #${o.orderNumber} · durum ${o.status} / ${o.orderPackageStatus || '-'}`,
+          `Müşterinin ödeme sayfasında seçtiği kargo: ${sl.title || '-'}${chosen ? ` → ${chosen}` : ' (kargo firmasına bağlı değil)'}${inSettings === false ? ' · ⚠ bu firma aktif kargo ayarlarınızda yok' : ''}`,
+          `Alıcı telefonu: ${phone ? `${phone} (${phoneSrc})` : 'YOK (teslimat, fatura ve müşteri kaydında)'}`];
         let ok = true;
-        if (!phone) { ok = false; lines.push('⚠ Alıcı telefonu yok: kargo firmaları barkod oluşturmaz.'); }
-        if (!pk.length) { ok = null; lines.push('Pakette değil: panelden “Paketle ve etiket al” henüz ikas\'a ulaşmamış ya da paket iptal edilmiş.'); }
+        if (!phone) { ok = false; lines.push('⚠ Alıcı telefonu yok: kargo firması gönderi açmaz. ikas\'ta siparişin teslimat adresine telefon ekleyin.'); }
+        else if (!a.phone) lines.push('⚠ Telefon teslimat adresinde değil; bazı kargo firmaları yalnızca teslimat adresindeki telefonu kabul eder. ikas\'ta teslimat adresine telefonu ekleyin.');
+        if (!pk.length) { ok = null; lines.push('Paket yok: panelden “Paketle ve etiket al” yapılmamış ya da paket ikas\'ta iptal edilmiş.'); }
         for (const x of pk) {
           const ti = x.trackingInfo || {};
           lines.push(`Paket ${x.orderPackageNumber || x.id}: ${x.orderPackageFulfillStatus}${x.appId ? ` · işleyen uygulama ${x.appId}` : ' · hiçbir kargo uygulaması işlememiş'} · kargo ${ti.cargoCompany || '-'} · barkod ${ti.barcode || '-'} · takip ${ti.trackingNumber || '-'} · etiket görseli ${ti.shippingLabelImage ? 'VAR' : 'yok'}${x.errorMessage ? ` · HATA: ${x.errorMessage}` : ''}`);
           if (x.orderPackageFulfillStatus === 'ERROR') ok = false;
-          if (x.orderPackageFulfillStatus === 'READY_FOR_SHIPMENT' && !ti.barcode && !ti.trackingNumber && !x.errorMessage) { ok = false; lines.push('⚠ Paket “Kargoya Hazır” ama ikas Kargo barkod üretmemiş. ikas panelinde: Uygulamalar → ikas Kargo → gönderim ayarı “otomatik” mi, kargo anlaşması/önceliği tanımlı mı kontrol edin; ya da aynı paketi ikas panelinde açıp “Kargoya Gönder / Barkod oluştur” deneyin.'); }
+          if (ti.cargoCompanyId && sl.cargoCompanyId && String(ti.cargoCompanyId) !== String(sl.cargoCompanyId)) lines.push(`Not: paket ${ti.cargoCompany || ti.cargoCompanyId} firmasına, müşteri ise ${chosen || sl.title} seçmiş.`);
+          if (x.orderPackageFulfillStatus === 'READY_FOR_SHIPMENT' && !ti.barcode && !ti.trackingNumber && !x.errorMessage) {
+            ok = false;
+            lines.push(`⚠ Paket “Kargoya Hazır” ama ikas Kargo gönderiyi açmamış (barkod yok). Panel kendi başına barkod üretemez; barkodu ikas Kargo, ${chosen || 'seçilen firma'} anlaşmanızla üretir. Kontrol: (1) ikas → Ayarlar → Kargo / ikas Kargo'da ${chosen || 'bu firma'} anlaşması aktif mi, (2) gönderim “Kargoya Hazır olunca otomatik” mi, (3) aynı siparişi ikas panelinde açıp ikas Kargo ile barkod oluşturmayı deneyin: ikas panelinde de oluşmuyorsa sorun ikas Kargo hesabı/anlaşmasındadır; ikas panelinde oluşuyor, panelde oluşmuyorsa bu raporu iletin.`);
+          }
         }
         return { ok, detail: lines.join('\n') };
       });
