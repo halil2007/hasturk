@@ -155,7 +155,7 @@ export function chLogo(id, sm = false) {
   return html`<span class="logo-b${k}" style="background:${chColor(id)}">${(c.name || '?').slice(0, 1)}</span>`;
 }
 export const chBadge = (id) => html`<span class="ch-name">${chLogo(id, true)}<span class="ellipsis">${ch(id).short || ch(id).name}</span></span>`;
-export const chState = (c) => (c.gated ? ['off', (c.missing || []).length ? 'Beklemede · bilgi girilmedi' : 'Beklemede · bağlantı testi bekleniyor'] : c.paused ? ['off', 'Pasif'] : !c.enabled ? ['off', 'Bağlı değil'] : c.demo ? ['demo', 'Örnek veri'] : c.last && !c.last.ok ? ['err', 'Hata'] : ['', 'Bağlı']);
+export const chState = (c) => (c.gated ? ['off', (c.missing || []).length ? 'Beklemede · bilgi girilmedi' : 'Beklemede · bağlantı testi bekleniyor'] : c.paused ? ['off', 'Pasif'] : !c.enabled ? ['off', 'Bağlı değil'] : c.demo ? ['demo', 'Örnek veri'] : c.last && c.last.ok === false ? ['err', 'Hata'] : c.last && c.last.ok == null && !c.last.ordersAt ? ['demo', 'Bağlantı bekleniyor'] : ['', 'Bağlı']);
 export const thumb = (img, name, cls = '') => html`<span class="thumb ${cls}" style="${img ? `background-image:url('${String(img).replace(/['"()\\]/g, '')}')` : ''}">${img ? '' : (name || '?').slice(0, 2)}</span>`;
 
 // ---------- bildirim ----------

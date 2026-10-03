@@ -282,3 +282,21 @@ test('API bilgileri kaydedilince eski hata ve kademeli bekleme sıfırlanır', a
   assert.equal(last.fails, 0); assert.equal(last.error, null); assert.equal(last.nextTry, null);
   assert.match(last.note, /güncellendi/);
 });
+
+test('API bilgisi biçim kontrolü: Hepsiburada Merchant ID yerine yazı girilirse kaydedilmez', async () => {
+  const db = d1();
+  await init(db);
+  const env = { PANEL_PASSWORD: 'x-123456', DB: db };
+  let cookie = '';
+  const call = async (path, opts = {}) => {
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: cookie } }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r;
+  };
+  await call('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+  const bad = await call('/api/integrations/hepsiburada', { method: 'PUT', body: JSON.stringify({ values: { HB_MERCHANT_ID: 'Merchant ID' } }) });
+  assert.equal(bad.status, 400);
+  assert.match((await bad.json()).error, /36 karakterlik/);
+  const ok = await call('/api/integrations/hepsiburada', { method: 'PUT', body: JSON.stringify({ values: { HB_MERCHANT_ID: '10012bc1-3a53-4306-b782-11eed9083af2' } }) });
+  assert.equal(ok.status, 200);
+});

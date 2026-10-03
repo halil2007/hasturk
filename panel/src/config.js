@@ -2,6 +2,7 @@
 // Panelde girilen değer, Cloudflare'de tanımlı aynı adlı gizli değişkenin önüne geçer; panelde boşsa Cloudflare'deki kullanılır.
 // Şifreleme anahtarı PANEL_SECRET'tan (yoksa panel şifresinden) türetilir; anahtarlar istemciye asla açık gönderilmez.
 import { all, first, run } from './db.js';
+import { fail } from './util.js';
 
 const ikasFields = (p) => [
   { k: `${p}NAME`, label: 'Panelde görünen ad', hint: 'ör. HasTürk' },
@@ -17,7 +18,7 @@ export const FIELDS = {
   ikas1: ikasFields('IKAS1_'),
   ikas2: ikasFields('IKAS2_'),
   trendyol: [
-    { k: 'TRENDYOL_SELLER_ID', label: 'Satıcı ID (Cari ID)', req: true },
+    { k: 'TRENDYOL_SELLER_ID', label: 'Satıcı ID (Cari ID)', req: true, pattern: '^\\d+$', patternMsg: 'Trendyol Satıcı ID yalnızca rakamlardan oluşur' },
     { k: 'TRENDYOL_API_KEY', label: 'API Key', req: true },
     { k: 'TRENDYOL_API_SECRET', label: 'API Secret', secret: true, req: true },
   ],
@@ -29,7 +30,7 @@ export const FIELDS = {
     { k: 'MAIL_FROM_NAME', label: 'Gönderen adı', hint: 'ör. Hastürk Panel' },
   ],
   hepsiburada: [
-    { k: 'HB_MERCHANT_ID', label: 'Merchant ID', req: true },
+    { k: 'HB_MERCHANT_ID', label: 'Merchant ID', req: true, hint: 'ör. 10012bc1-3a53-4306-b782-11eed9083af2', pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$', patternMsg: 'Merchant ID, Hepsiburada\'nın verdiği 36 karakterlik kimlik olmalı (ör. 10012bc1-3a53-4306-b782-11eed9083af2)' },
     { k: 'HB_PASSWORD', label: 'Servis anahtarı (şifre)', secret: true, req: true },
     { k: 'HB_USERNAME', label: 'Kullanıcı adı', hint: 'boşsa Merchant ID', adv: true },
     { k: 'HB_USER_AGENT', label: 'Entegratör adı (User-Agent)', req: true, hint: 'Merchant Portal → Hesabım → Entegrasyon (Entegratör Bilgileri) ekranındaki entegratör adı, ör. hasturk_dev. Boşsa ya da farklıysa Hepsiburada isteği 401/403 ile reddeder.' },
@@ -105,6 +106,7 @@ export async function saveConfig(env, db, id, { values = {}, clear = [], active 
     const v = String(values[f.k] ?? '').trim();
     // Gizli alan boş gönderilirse eski değer korunur (istemci gizli değeri hiç görmez)
     if (f.secret && !v) continue;
+    if (v && f.pattern && !new RegExp(f.pattern).test(v)) fail(400, `${f.label}: ${f.patternMsg || 'geçersiz değer'} (girilen: “${v.slice(0, 40)}”)`);
     if (v) next[f.k] = v; else delete next[f.k];
   }
   const act = active === undefined ? cur.active : !!active;
