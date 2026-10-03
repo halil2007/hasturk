@@ -8,6 +8,7 @@ import { cargo } from './views/cargo.js';
 import { matching } from './views/match.js';
 import { buyboxView, bbChannels } from './views/buybox.js';
 import { questionsView, qChannels } from './views/questions.js';
+import { hbTestView } from './views/hbtest.js';
 import { profitView } from './views/profit.js';
 import { insightsView } from './views/insights.js';
 import { integrations } from './views/integrations.js';
@@ -31,6 +32,7 @@ const ROUTES = [
   { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
+  { path: 'hb-test', title: 'Hepsiburada test adımları', icon: 'check', view: hbTestView, admin: true, hidden: true },
   { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices' },
   { path: 'kullanicilar', title: 'Kullanıcılar', icon: 'user', view: users, admin: true },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
@@ -41,7 +43,7 @@ const canSee = (r) => (!r.admin || !state.user || state.user.role === 'admin') &
 
 function nav() {
   const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-count="${r.count}"></span>` : ''}</a>`;
-  render($('[data-nav]'), html`${ROUTES.filter((r) => !r.view || canSee(r)).map((r) => (r.sec ? html`<div class="nav-sec">${r.sec}</div>` : link(r)))}`);
+  render($('[data-nav]'), html`${ROUTES.filter((r) => (!r.view || canSee(r)) && !r.hidden).map((r) => (r.sec ? html`<div class="nav-sec">${r.sec}</div>` : link(r)))}`);
   render($('[data-nav-foot]'), '');
   render($('[data-tabbar]'), html`${TABS.map(([p, t, i]) => html`<a href="#/${p}" data-path="${p}"><i class="ico ico-${i}"></i><span>${t}</span>${p === 'siparisler' ? html`<span class="dotn hide" data-count="orders"></span>` : ''}</a>`)}<button data-act="more"><i class="ico ico-menu"></i><span>Menü</span></button>`);
 }
@@ -181,7 +183,7 @@ function applyTheme() {
 function moreMenu() {
   const s = sheet({
     title: 'Menü', size: 'narrow',
-    body: html`${ROUTES.filter((r) => !r.view || canSee(r)).map((r) => (r.sec ? html`<div class="muted tiny" style="font-weight:700;text-transform:uppercase;margin:14px 2px 6px">${r.sec}</div>` : html`<a class="btn block" style="justify-content:flex-start;margin-bottom:6px" href="#/${r.path}"><i class="ico ico-${r.icon}"></i>${r.title}</a>`))}`,
+    body: html`${ROUTES.filter((r) => (!r.view || canSee(r)) && !r.hidden).map((r) => (r.sec ? html`<div class="muted tiny" style="font-weight:700;text-transform:uppercase;margin:14px 2px 6px">${r.sec}</div>` : html`<a class="btn block" style="justify-content:flex-start;margin-bottom:6px" href="#/${r.path}"><i class="ico ico-${r.icon}"></i>${r.title}</a>`))}`,
   });
   s.body.addEventListener('click', (e) => { if (e.target.closest('a')) s.close(); });
 }

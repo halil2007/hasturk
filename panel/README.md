@@ -81,6 +81,16 @@ Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bil
 
 > ⚠️ ikas'ın kendi pazaryeri entegrasyonu (ikas üzerinden Trendyol/Hepsiburada bağlantısı) açıksa aynı sipariş iki kez gelir. Bu durumda ikas'taki pazaryeri stok senkronunu kapatın ya da gelişmiş ayarlardaki "Satış kanalı ID" ile yalnızca web sitesi kanalını alın.
 
+### Hepsiburada canlıya geçiş testi (SIT)
+
+Hepsiburada canlı API bilgilerini, test ortamında üç adım tamamlandıktan sonra verir. Panelde **Entegrasyonlar → Hepsiburada → Test adımları** sayfası bu adımları yapar ve sonuçları saklar:
+
+1. **Ürün entegrasyonu (katalog):** Panel ürünü + Hepsiburada kategorisi seçilir, kategori özellikleri (zorunlular işaretli) gelir, ürün `POST /product/api/products/import` (JSON dosyası) ile gönderilir; dönen **trackingId** saklanır, durumu sorgulanabilir.
+2. **Listeleme:** “Envanteri çek” ile Hepsiburada'nın test hesabına yüklediği ürünler alınır; seçilen üründe stok ve fiyat gönderilir (stock-uploads / price-uploads), yükleme kimlikleri ve durumları görünür. (Genel stok senkronu kapalı olsa da bu tek ürünlük test gönderimi yapılır.)
+3. **Sipariş entegrasyonu:** Test siparişi Hepsiburada'nın test servisine (`oms-stub-external-sit`) gönderilir; gövde seçili ürünle doldurulur ve Hepsiburada'nın “Test Siparişi Oluşturma” dokümanına göre düzenlenebilir. “Siparişleri çek” ile sipariş API'den listelenir, Siparişler'de açılıp **Paketle** ile paketlenir.
+
+En alttaki **özet** (trackingId, yükleme kimlikleri, test siparişi, paket no) kopyalanıp Hepsiburada'da yeni talep açılır. Canlı bilgiler gelince Entegrasyonlar'da Merchant ID / servis anahtarını değiştirin, **Test ortamı** alanını boşaltın ve test sayfasındaki **“Test verilerini temizle”** ile test siparişlerini panelden silin.
+
 ## 4. İlk kurulum adımları (sırayla)
 
 Öncelik sırası: önce iki ikas sitesi, sonra Hepsiburada, sonra Trendyol.

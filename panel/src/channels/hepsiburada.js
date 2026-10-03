@@ -317,10 +317,62 @@ export function hepsiburada(env, meta) {
     return out;
   }
 
+  // ---------- Katalog (ürün gönderme) ve canlıya geçiş testi (SIT) ----------
+  // Katalog: mpop(-sit).hepsiburada.com/product · Test siparişi: oms-stub-external-sit (yalnız test ortamı)
+  const CAT = `https://mpop${test}.hepsiburada.com/product`;
+  let catCache = null;
+  async function categories(q) {
+    if (!catCache || Date.now() - catCache.at > 3600e3) {
+      const all = [];
+      for (let p = 0; p < 40; p++) {
+        const r = await call(`${CAT}/api/categories/get-all-categories?leaf=true&status=ACTIVE&available=true&page=${p}&size=2000&version=1`);
+        const rows = g(r, 'data') || (Array.isArray(r) ? r : []);
+        all.push(...rows.map((c) => ({ id: str(g(c, 'categoryId', 'id')), name: str(g(c, 'name', 'displayName')), path: [].concat(g(c, 'paths') || []).join(' › ') })));
+        const pages = num(g(r, 'totalPages'));
+        if (rows.length < 2000 || (pages && p + 1 >= pages) || g(r, 'last') === true) break;
+      }
+      catCache = { at: Date.now(), all };
+    }
+    const k = String(q || '').toLocaleLowerCase('tr').trim();
+    return { total: catCache.all.length, items: catCache.all.filter((c) => !k || `${c.name} ${c.path} ${c.id}`.toLocaleLowerCase('tr').includes(k)).slice(0, 60) };
+  }
+  async function attributes(catId) {
+    const r = await call(`${CAT}/api/categories/${encodeURIComponent(catId)}/attributes`);
+    const d = g(r, 'data') || r || {};
+    const map = (list, kind) => (list || []).map((a) => ({ id: str(g(a, 'id')), name: str(g(a, 'name')), mandatory: !!g(a, 'mandatory'), type: str(g(a, 'type')), multi: !!g(a, 'multiValue'), kind }));
+    return [...map(g(d, 'baseAttributes'), 'base'), ...map(g(d, 'attributes'), 'category'), ...map(g(d, 'variantAttributes'), 'variant')];
+  }
+  async function attributeValues(catId, attrId) {
+    const r = await call(`${CAT}/api/categories/${encodeURIComponent(catId)}/attribute/${encodeURIComponent(attrId)}/values?page=0&size=1000`);
+    return (g(r, 'data') || g(r, 'items') || (Array.isArray(r) ? r : [])).map((v) => ({ id: str(g(v, 'id')), value: str(g(v, 'value', 'name')) }));
+  }
+  // Ürün bilgisi gönderme: JSON dosyası (multipart "file"); cevaptaki trackingId ile durum sorgulanır
+  async function importProducts(products) {
+    const fd = new FormData();
+    fd.append('file', new Blob([JSON.stringify(products)], { type: 'application/json' }), 'products.json');
+    const h = headers(); delete h['Content-Type'];
+    const r = await http(`${CAT}/api/products/import`, { method: 'POST', headers: h, body: fd });
+    const tid = g(g(r, 'data') || {}, 'trackingId') || g(r, 'trackingId');
+    if (!tid) throw new Error('Hepsiburada trackingId döndürmedi: ' + JSON.stringify(r).slice(0, 400));
+    return { trackingId: str(tid), response: r };
+  }
+  const productStatus = (tid) => call(`${CAT}/api/products/status/${encodeURIComponent(tid)}?page=0&size=50&version=1`);
+  // Tek ilan için stok / fiyat yükleme: Hepsiburada yükleme kimliği döner, durumu ayrıca sorgulanır
+  async function uploadOne(kind, rows) {
+    const r = await call(`${LST}/listings/merchantid/${m}/${kind}-uploads`, { method: 'POST', body: rows });
+    return { id: str(g(r, 'id')), response: r };
+  }
+  const uploadStatus = (kind, id) => call(`${LST}/listings/merchantid/${m}/${kind}-uploads/id/${encodeURIComponent(id)}`);
+  async function createTestOrder(body) {
+    if (!test) throw new Error('Test siparişi yalnızca test (SIT) ortamında oluşturulur: Entegrasyonlar → Hepsiburada → Gelişmiş → Test ortamı = 1');
+    return http(`https://oms-stub-external-sit.hepsiburada.com/orders/merchantId/${encodeURIComponent(m)}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+  }
+  const sit = { test: !!test, merchantId: m, categories, attributes, attributeValues, importProducts, productStatus, uploadOne, uploadStatus, createTestOrder };
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit,
   };
 }

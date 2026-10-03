@@ -8,6 +8,7 @@ import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
+import { hbTest } from './hbtest.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { profit } from '../public/profit.js';
@@ -658,6 +659,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   const diag = /^integrations\/[a-z0-9]+\/diagnose$/.test(path);
   if (user.role !== 'admin' && !diag && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
   if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
+  // Hepsiburada canlıya geçiş testi (yalnız yönetici)
+  if (path.startsWith('hbtest/')) {
+    if (user.role !== 'admin') fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
+    return json(await hbTest(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
+  }
   if (path === 'summary' && m === 'GET') {
     const [qs, s, notices, match, st, chInfo] = await Promise.all([
       first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'"),
