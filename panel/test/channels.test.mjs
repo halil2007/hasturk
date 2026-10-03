@@ -40,9 +40,9 @@ test('Trendyol: aynı sipariş numaralı paketler tek siparişte birleşir, işl
 
 test('Hepsiburada: açık satırlar ve paketler birleşir; paket oluşturma lineItemRequests gönderir', async () => {
   const calls = mockFetch([
-    [/\/orders\/merchantid\/M1\?/, { items: [{ id: 'L1', orderNumber: '500', orderDate: '2026-10-01T10:00:00', quantity: 2, merchantSku: 'A', sku: 'HBV1', productName: 'A', totalPrice: { amount: 200 }, customerName: 'Can', shippingAddress: { address: 'Adr', city: 'Bursa', district: 'Nilüfer' } }] }],
-    [/\/packages\/merchantid\/M1\?/, []],
-    [/\/packages\/merchantid\/M1$/, { packageNumber: 'P77' }],
+    [/\/orders\/merchantId\/M1\?/, { items: [{ id: 'L1', orderNumber: '500', orderDate: '2026-10-01T10:00:00', quantity: 2, merchantSku: 'A', sku: 'HBV1', productName: 'A', totalPrice: { amount: 200 }, customerName: 'Can', shippingAddress: { address: 'Adr', city: 'Bursa', district: 'Nilüfer' } }] }],
+    [/\/packages\/merchantId\/M1\?/, []],
+    [/\/packages\/merchantId\/M1$/, { packageNumber: 'P77' }],
     [/shipped|delivered|cancelled/, []],
   ]);
   const ch = hepsiburada({ HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x' }, { id: 'hepsiburada' });
@@ -230,12 +230,12 @@ test('ikas tanılama: izinler, eksik depo adresi, telefonsuz sipariş ve barkod 
 test('Hepsiburada: entegratör adı User-Agent olur; paketler Offset ile, kargodaki paketler sipariş ayrıntısıyla okunur', async () => {
   const now = Date.now(), iso = (t) => new Date(t).toISOString();
   const calls = mockFetch([
-    [/\/orders\/merchantid\/M1\?offset=/, { items: [], totalCount: 0 }],
-    [/\/packages\/merchantid\/M1\?Offset=0&limit=10$/, [{ packageNumber: 'P1', barcode: 'B1', cargoCompany: 'Yurtiçi Kargo', dueDate: iso(now + 864e5), orderDate: iso(now - 3600e3), recipientName: 'Can Y', customerName: 'Can Y',
+    [/\/orders\/merchantId\/M1\?offset=/, { items: [], totalCount: 0 }],
+    [/\/packages\/merchantId\/M1\?Offset=0&limit=10$/, [{ packageNumber: 'P1', barcode: 'B1', cargoCompany: 'Yurtiçi Kargo', dueDate: iso(now + 864e5), orderDate: iso(now - 3600e3), recipientName: 'Can Y', customerName: 'Can Y',
       shippingAddressDetail: 'Cad. 1', shippingCity: 'Bursa', shippingTown: 'Nilüfer', shippingDistrict: 'Görükle', phoneNumber: '0555', items: [{ lineItemId: 'L1', hbSku: 'HBV1', merchantSku: 'A', productName: 'Ürün A', orderNumber: '700', quantity: 1, price: { amount: 80 }, totalPrice: { amount: 80 } }] }]],
-    [/\/packages\/merchantid\/M1\/shipped\?offset=0&limit=50$/, [{ Id: 'x', Barcode: 'TB9', PackageNumber: 'P9', OrderNumber: '800', ShippedDate: iso(now - 7200e3) }]],
-    [/\/packages\/merchantid\/M1\/delivered/, []],
-    [/\/orders\/merchantid\/M1\/cancelled/, []],
+    [/\/packages\/merchantId\/M1\/shipped\?offset=0&limit=50$/, [{ Id: 'x', Barcode: 'TB9', PackageNumber: 'P9', OrderNumber: '800', ShippedDate: iso(now - 7200e3) }]],
+    [/\/packages\/merchantId\/M1\/delivered/, []],
+    [/\/orders\/merchantId\/M1\/cancelled/, []],
     [/\/ordernumber\/800$/, { orderNumber: '800', orderDate: iso(now - 864e5), customer: { name: 'Ece' }, deliveryAddress: { name: 'Ece T', address: 'Sk. 2', city: 'Ankara', town: 'Çankaya', district: 'Kızılay', phoneNumber: '0532' },
       items: [{ id: 'L9', merchantSKU: 'B', sku: 'HBV9', name: 'Ürün B', quantity: 2, totalPrice: { amount: 100 }, orderNumber: '800' }] }],
   ]);
@@ -382,7 +382,7 @@ test('idefix: "shipment_" önekli durumlar doğru eşlenir, istekler kimlik (Use
 test('Hepsiburada: gövdesiz GET isteğinde Content-Type gönderilmez; 520 alınca tanılama farklı başlıklarla dener', async () => {
   let n = 0;
   const calls = mockFetch([
-    [/oms-external-sit\.hepsiburada\.com\/orders\/merchantid\/M1\?offset=0&limit=1$/, (url, opts) => { n++; return n <= 2 ? { __status: 520 } : { items: [] }; }],
+    [/oms-external-sit\.hepsiburada\.com\/orders\/merchantId\/M1\?offset=0&limit=1$/, (url, opts) => { n++; return n <= 2 ? { __status: 520 } : { items: [] }; }],
     [/asktoseller/, { data: [], totalItemCount: 0, currentPage: 1, totalPageCount: 1 }],
   ]);
   const real = globalThis.fetch;
@@ -394,7 +394,7 @@ test('Hepsiburada: gövdesiz GET isteğinde Content-Type gönderilmez; 520 alın
   try {
     const ch = hepsiburada({ HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x', HB_USER_AGENT: 'u', HB_TEST: '1' }, { id: 'hepsiburada' });
     const d = await ch.diagnose({});
-    const first = calls.find((c) => /orders\/merchantid/.test(c.url));
+    const first = calls.find((c) => /orders\/merchantId/.test(c.url));
     assert.ok(!Object.keys(first.headers).some((k) => k.toLowerCase() === 'content-type'), 'GET isteğinde Content-Type yok');
     const p = d.find((x) => /520 incelemesi/.test(x.name));
     assert.ok(p, '520 incelemesi adımı eklendi');

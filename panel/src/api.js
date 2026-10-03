@@ -13,7 +13,7 @@ import { catalogApi } from './catalog.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { profit } from '../public/profit.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp } from './util.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
@@ -838,15 +838,32 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if (path === 'orders-bulk' && m === 'POST') {
     const b = await body(req), done = [], errors = [];
-    for (const id of (b.ids || []).slice(0, 100)) {
+    await pool((b.ids || []).slice(0, 100), 4, async (id) => {
       try { await orderAction(env, db, id, b.action, b, ctx, user); done.push(id); } catch (e) { errors.push(`${id}: ${e.message}`); }
-    }
+    });
     return json({ ok: !errors.length, done, errors });
+  }
+  // Toplu etiket işareti (görüntülendi / yazdırıldı): tek istekte
+  if (path === 'labels/mark' && m === 'POST') {
+    const b = await body(req), t = Date.now();
+    if (!['viewed', 'printed'].includes(b.kind)) fail(400, 'Geçersiz işlem');
+    const items = (b.items || []).slice(0, 300).map((x) => Number(x.pkgId)).filter(Boolean);
+    for (let i = 0; i < items.length; i += 80) {
+      const part = items.slice(i, i + 80), ph = part.map(() => '?').join(',');
+      if (b.kind === 'viewed') await run(db, `UPDATE packages SET label_viewed_at = ? WHERE id IN (${ph})`, t, ...part);
+      else await run(db, `UPDATE packages SET label_printed_at = ?, label_prints = label_prints + 1, label_viewed_at = COALESCE(label_viewed_at, ?) WHERE id IN (${ph})`, t, t, ...part);
+    }
+    if (b.kind === 'printed') {
+      const orders = [...new Set((b.items || []).map((x) => String(x.orderId)))].slice(0, 300);
+      for (const id of orders) { const o = await first(db, 'SELECT id, status, remote_status FROM orders WHERE id = ?', id); if (o) await event(db, o, 'label-printed', user, 'Toplu yazdırma'); }
+    }
+    return json({ ok: true, count: items.length });
   }
   if (path === 'labels' && m === 'POST') {
     // Toplu etiket: seçilen siparişlerin açık paketleri (paket yoksa tek paket oluşturulur); kanal etiketi istenirse alınır
-    const b = await body(req), out = [], errors = [], settings = await getSettings(db);
-    for (const id of (b.ids || []).slice(0, 40)) {
+    const b = await body(req), errors = [], settings = await getSettings(db);
+    // Siparişler 4'erli paralel işlenir (her biri kanalda paketleme + etiket isteği); sonuç sırası korunur
+    const out = (await pool((b.ids || []).slice(0, 60), 4, async (id) => {
       try {
         let o = await loadOrder(db, id);
         const ch = await channel(env, db, o.channel);
@@ -861,9 +878,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
           if (r.error || r.pending) errors.push(`${o.order_number}/${pkg.no}: ${r.error || r.pending}`);
           labels.push({ package_id: pkg.id, official: r.official || null, panel: !!r.panel });
         }
-        out.push({ order: await loadOrder(db, id), labels });
-      } catch (e) { errors.push(`${id}: ${e.message}`); }
-    }
+        return { order: await loadOrder(db, id), labels };
+      } catch (e) { errors.push(`${id}: ${e.message}`); return null; }
+    })).filter(Boolean);
     return json({ orders: out, errors, sender: settings.sender });
   }
   if (path === 'packages' && m === 'GET') return json(await listPackages(db, q));
@@ -1002,5 +1019,17 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'settings' && m === 'GET') return json(await getSettings(db));
   if (path === 'settings' && m === 'PUT') return json(await saveSettings(db, await body(req)));
   if (path === 'logs' && m === 'GET') return json(await all(db, 'SELECT * FROM logs ORDER BY id DESC LIMIT 200'));
+  // Hata özeti (son 30 gün): aynı hata (sayılar / kimlikler ayıklanarak) kanal bazında gruplanır; açıklama ve kopyalanabilir rapor
+  if (path === 'logs/errors' && m === 'GET') {
+    const rows = await all(db, "SELECT at, channel, msg FROM logs WHERE level = 'error' AND at > ? ORDER BY at DESC LIMIT 3000", Date.now() - 30 * 864e5);
+    const groups = new Map();
+    for (const r of rows) {
+      const k = (r.channel || '') + '|' + String(r.msg || '').replace(/\d{3,}/g, '#').replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, '#').slice(0, 220);
+      const g = groups.get(k) || { channel: r.channel, msg: explainHttp(r.msg), count: 0, first: r.at, last: r.at };
+      g.count++; g.first = Math.min(g.first, r.at); g.last = Math.max(g.last, r.at);
+      groups.set(k, g);
+    }
+    return json({ total: rows.length, groups: [...groups.values()].sort((a, b) => b.last - a.last).slice(0, 100) });
+  }
   fail(404, 'Bulunamadı');
 }

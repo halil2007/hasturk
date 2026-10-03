@@ -157,18 +157,36 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
   if (mm && m === 'POST') {
     const u = await first(db, 'SELECT * FROM product_uploads WHERE id = ?', Number(mm[1]));
     if (!u || !u.ref) fail(404, 'Gönderim bulunamadı');
-    const c = await target(env, db, u.channel);
-    const st = await c.catalog.status(u.ref);
-    const res = new Map(st.items.map((x) => [x.key, x]));
-    const items = JSON.parse(u.items || '[]').map((x) => { const r = res.get(x.key); return r ? { ...x, ok: r.ok, status: r.status, error: r.error } : x; });
-    const status = st.done ? 'done' : 'sent';
-    await run(db, 'UPDATE product_uploads SET status = ?, items = ?, result = ?, checked_at = ? WHERE id = ?', status, JSON.stringify(items), JSON.stringify(st.items.slice(0, 500)), Date.now(), u.id);
-    // Onaylanan ürünler: kanalın ilanları çekilip barkod / SKU ile panel ürününe bağlanır
-    if (st.done && items.some((x) => x.ok)) {
+    return checkUpload(env, db, ctx, u, await target(env, db, u.channel));
+  }
+  fail(404, 'Bilinmeyen işlem');
+}
+
+// Gönderimin sonucunu kanaldan sorgula; tamamlandıysa ilanlar çekilip onaylanan ürünler panel ürününe bağlanır
+async function checkUpload(env, db, ctx, u, c) {
+  const st = await c.catalog.status(u.ref);
+  const res = new Map(st.items.map((x) => [x.key, x]));
+  const items = JSON.parse(u.items || '[]').map((x) => { const r = res.get(x.key); return r ? { ...x, ok: r.ok, status: r.status, error: r.error } : x; });
+  const status = st.done ? 'done' : 'sent';
+  await run(db, 'UPDATE product_uploads SET status = ?, items = ?, result = ?, checked_at = ? WHERE id = ?', status, JSON.stringify(items), JSON.stringify(st.items.slice(0, 500)), Date.now(), u.id);
+  if (st.done) {
+    const ok = items.filter((x) => x.ok).length, bad = items.filter((x) => x.ok === false).length;
+    await log(db, c.id, bad ? 'error' : 'info', `Ürün gönderimi #${u.id} tamamlandı: ${ok} onay${bad ? `, ${bad} hata (${items.filter((x) => x.ok === false).slice(0, 2).map((x) => `${x.name}: ${x.error || x.status}`).join(' · ')})` : ''}`);
+    if (ok) {
       const job = importListings(env, db, { only: [c.id] }).catch(() => {});
       if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job;
     }
-    return { status, items, done: st.done };
   }
-  fail(404, 'Bilinmeyen işlem');
+  return { status, items, done: st.done };
+}
+// Senkron sırasında: son 4 saatte gönderilip sonucu henüz alınmamış gönderimler sorgulanır (Trendyol sonucu 4 saat saklar)
+export async function checkPendingUploads(env, db) {
+  const rows = await all(db, "SELECT * FROM product_uploads WHERE status = 'sent' AND ref IS NOT NULL AND created_at BETWEEN ? AND ? ORDER BY id LIMIT 5", Date.now() - 4 * 3600e3, Date.now() - 60e3);
+  let n = 0;
+  for (const u of rows) {
+    const c = (await getChannels(env, db)).find((x) => x.id === u.channel && x.enabled && x.catalog && !x.hold);
+    if (!c) continue;
+    try { if ((await checkUpload(env, db, null, u, c)).done) n++; } catch (e) { await log(db, u.channel, 'error', `Ürün gönderimi #${u.id} sorgulanamadı: ${e.message}`); }
+  }
+  return n;
 }

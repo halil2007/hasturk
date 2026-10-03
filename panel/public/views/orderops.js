@@ -49,9 +49,7 @@ export function askPrinted(items, done) {
   });
   $('[data-no]', s.el).onclick = () => s.close();
   $('[data-yes]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
-    const by = new Map();
-    for (const x of items) by.set(x.orderId, [...(by.get(x.orderId) || []), x.pkgId]);
-    for (const [oid, ids] of by) await mark(oid, ids, 'printed');
+    await api('labels/mark', { method: 'POST', body: { kind: 'printed', items } });
     s.close(); toast('Etiket yazdırıldı olarak işaretlendi'); done && done();
   });
 }
@@ -473,7 +471,13 @@ export async function openOrder(id, onChange) {
 // Toplu etiket: seçilen siparişler paketlenir (kanalda kargoya hazırlanır) ve etiketleri alınır; görsel/panel etiketleri
 // tek seferde yazdırılır, PDF/ZPL dosyaları indirilir. Sonra yazdırma onayı istenir.
 export async function bulkLabels(ids, { fetch = true, done } = {}) {
-  const r = await api('labels', { method: 'POST', body: { ids, fetch } });
+  // Çok sayıda sipariş 30'arlık parçalarla işlenir (sunucu her parçada 4 siparişi paralel işler)
+  const r = { orders: [], errors: [], sender: null };
+  for (let i = 0; i < ids.length; i += 30) {
+    if (ids.length > 30) toast(`Etiketler hazırlanıyor: ${Math.min(i + 30, ids.length)} / ${ids.length}`);
+    const part = await api('labels', { method: 'POST', body: { ids: ids.slice(i, i + 30), fetch } });
+    r.orders.push(...part.orders); r.errors.push(...part.errors); r.sender = part.sender;
+  }
   const panel = [], images = [], files = [], marks = [];
   for (const { order, labels } of r.orders) {
     for (const l of labels) {
@@ -490,9 +494,7 @@ export async function bulkLabels(ids, { fetch = true, done } = {}) {
   for (const f of files) downloadFile(f.filename, f.data, f.format === 'pdf' ? 'application/pdf' : 'text/plain');
   if (images.length) await printImages(images);
   if (panel.length) await printLabels(panel, r.sender);
-  const by = new Map();
-  for (const x of marks) by.set(x.orderId, [...(by.get(x.orderId) || []), x.pkgId]);
-  for (const [oid, pids] of by) await mark(oid, pids, 'viewed');
+  if (marks.length) api('labels/mark', { method: 'POST', body: { kind: 'viewed', items: marks } }).catch(() => {});
   if (r.errors.length) toast(r.errors.slice(0, 3).join(' · ') + (r.errors.length > 3 ? ` (+${r.errors.length - 3})` : ''), true);
   else toast(`${marks.length} etiket hazırlandı${files.length ? ` (${files.length} dosya indirildi)` : ''}`);
   if (marks.length) askPrinted(marks, done);

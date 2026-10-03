@@ -292,14 +292,36 @@ export function trendyol(env, meta) {
     const k = String(q || '').toLocaleLowerCase('tr').trim();
     return { total: catCache.all.length, items: catCache.all.filter((c) => !k || `${c.name} ${c.path} ${c.id}`.toLocaleLowerCase('tr').includes(k)).slice(0, 60) };
   }
-  const attrCache = new Map();
+  // Özellikler: /product/categories/{id}/attributes (değer listesi bazen boş gelir; o zaman .../attributes/{attr}/values sayfalı okunur)
+  const attrCache = new Map(), valCache = new Map();
   async function rawAttrs(cat) {
-    if (!attrCache.has(cat)) attrCache.set(cat, (await call(`/product/product-categories/${encodeURIComponent(cat)}/attributes`)).categoryAttributes || []);
+    if (!attrCache.has(cat)) {
+      let r;
+      try { r = await call(`/product/categories/${encodeURIComponent(cat)}/attributes`); }
+      catch (e) { if (!/\b(404|405)\b/.test(e.message)) throw e; r = await call(`/product/product-categories/${encodeURIComponent(cat)}/attributes`); }
+      attrCache.set(cat, Array.isArray(r) ? r : r.categoryAttributes || r.attributes || []);
+    }
     return attrCache.get(cat);
   }
-  const attributes = async (cat) => (await rawAttrs(cat)).map((a) => ({ id: String(a.attribute && a.attribute.id), name: str(a.attribute && a.attribute.name), mandatory: !!a.required,
-    kind: a.varianter ? 'variant' : 'category', type: (a.attributeValues || []).length ? 'enum' : 'text', custom: !!a.allowCustom }));
-  const values = async (cat, attr) => ((await rawAttrs(cat)).find((a) => String(a.attribute && a.attribute.id) === String(attr))?.attributeValues || []).map((v) => ({ id: String(v.id), value: str(v.name) }));
+  const attrId = (a) => String((a.attribute && a.attribute.id) ?? a.id);
+  const attrName = (a) => str((a.attribute && a.attribute.name) ?? a.name);
+  const attributes = async (cat) => (await rawAttrs(cat)).map((a) => ({ id: attrId(a), name: attrName(a), mandatory: !!a.required,
+    kind: a.varianter ? 'variant' : 'category', type: a.allowCustom && !(a.attributeValues || []).length ? 'text' : 'enum', custom: !!a.allowCustom, multi: !!a.allowMultipleAttributeValues }));
+  async function values(cat, attr) {
+    const a = (await rawAttrs(cat)).find((x) => attrId(x) === String(attr));
+    if (a && (a.attributeValues || []).length) return a.attributeValues.map((v) => ({ id: String(v.id), value: str(v.name) }));
+    const k = cat + ':' + attr;
+    if (!valCache.has(k)) {
+      const out = [];
+      for (let page = 0; page < 20; page++) {
+        const r = await call(`/product/categories/${encodeURIComponent(cat)}/attributes/${encodeURIComponent(attr)}/values?page=${page}&size=1000`);
+        out.push(...(r.content || []).map((v) => ({ id: String(v.attributeValueId ?? v.id), value: str(v.attributeValue ?? v.attributeValueName ?? v.name) })));
+        if (page + 1 >= (r.totalPages || 1)) break;
+      }
+      valCache.set(k, out);
+    }
+    return valCache.get(k);
+  }
   const brands = new Map();
   async function brandId(name) {
     const k = str(name).toLocaleLowerCase('tr');
@@ -314,12 +336,13 @@ export function trendyol(env, meta) {
   async function build(pr, map, { opts = {}, pick } = {}) {
     const missing = [], attrs = [];
     for (const a of await rawAttrs(map.remote_id)) {
-      const id = String(a.attribute && a.attribute.id), v = (map.attrs || {})[id];
+      const id = attrId(a), v = (map.attrs || {})[id];
       let valueId = v && v.id, text = v && v.value;
-      if (text === '@variant') { const hit = (a.attributeValues || []).length ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
-      if (valueId) attrs.push({ attributeId: Number(id), attributeValueId: Number(valueId) });
-      else if (text && a.allowCustom) attrs.push({ attributeId: Number(id), customAttributeValue: String(text) });
-      else if (a.required) missing.push(str(a.attribute && a.attribute.name) + (text ? ' (listeden seçilmeli)' : ''));
+      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
+      // V2 biçimi: listeden değer → attributeValueIds, serbest metin (izin varsa) → attributeValue
+      if (valueId) attrs.push({ attributeId: Number(id), attributeValueIds: [Number(valueId)] });
+      else if (text && a.allowCustom) attrs.push({ attributeId: Number(id), attributeValue: String(text) });
+      else if (a.required) missing.push(attrName(a) + (text ? ` (“${text}” listede yok)` : ''));
     }
     const bid = pr.brand ? await brandId(pr.brand) : null;
     if (!pr.brand) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” Trendyol'da bulunamadı`);
@@ -340,7 +363,12 @@ export function trendyol(env, meta) {
     for (const part of chunk(items, 1000)) {
       let r;
       try { r = await call(`/product/sellers/${seller}/v2/products`, { method: 'POST', body: { items: part } }); }
-      catch (e) { if (!/\b(404|405)\b/.test(e.message)) throw e; r = await call(`/product/sellers/${seller}/products`, { method: 'POST', body: { items: part } }); }
+      catch (e) {
+        if (!/\b(404|405)\b/.test(e.message)) throw e;
+        // V2 yoksa V1: özellik biçimi attributeValueId / customAttributeValue
+        const v1 = part.map((x) => ({ ...x, attributes: x.attributes.map((a) => (a.attributeValueIds ? { attributeId: a.attributeId, attributeValueId: a.attributeValueIds[0] } : { attributeId: a.attributeId, customAttributeValue: a.attributeValue })) }));
+        r = await call(`/product/sellers/${seller}/products`, { method: 'POST', body: { items: v1 } });
+      }
       if (!r.batchRequestId) throw new Error('Trendyol batchRequestId döndürmedi: ' + JSON.stringify(r).slice(0, 300));
       refs.push(r.batchRequestId);
     }
