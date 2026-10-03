@@ -9,10 +9,13 @@ const HELP = {
   trendyol: 'Trendyol satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri.',
   hepsiburada: 'Hepsiburada merchant paneli → Entegrasyon / API bilgileri (Merchant ID ve servis anahtarı).',
   pttavm: 'PttAVM mağaza paneli → Entegrasyon → API kullanıcısı. Kargo barkodu için depo numarası gerekir.',
+  n11: 'N11 Satıcı Ofisi (so.n11.com) → Hesabım → API Hesapları → Yeni Hesap Oluştur; App Key ve App Secret e-postayla gelir.',
+  idefix: 'idefix satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri → Yeni API Oluştur (API Key, API Secret) ve Vendor ID.',
+  pazarama: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri (API Key = Client ID, API Secret).',
 };
 
 // Öncelik sırası: iki ikas sitesi, Hepsiburada, Trendyol; PttAVM şimdilik beklemede
-const ORDER = ['ikas1', 'ikas2', 'hepsiburada', 'trendyol', 'pttavm'];
+const ORDER = ['ikas1', 'ikas2', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama'];
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
 export async function integrations(el) {
@@ -87,8 +90,8 @@ export async function integrations(el) {
       <div class="notice good small"><i class="ico ico-sync"></i><div>Tüm aktif kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: yeni/değişen siparişler, ürünler, görseller, varyantlar ve stoklar güncellenir; eşleştirmeler ve kanala özel stok kuralları korunur. Başarısız işlemler yeniden denenir, çözülemeyenler <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer.</div></div>
       <div class="integ">${live.map(card)}</div>
       ${backfill()}
-      ${paused.length ? html`<details class="card adv"><summary><b>Beklemedeki kanallar</b> <span class="muted small">(${paused.map((c) => c.name).join(', ')})</span></summary>
-        <p class="muted small">Bu kanallar şimdilik kapalı ve senkronlanmıyor. API bilgileri girilip kaydedildiğinde devreye alınır.</p><div class="integ">${paused.map(card)}</div></details>` : ''}
+      ${paused.length ? html`<details class="card adv" ${paused.some((c) => c.updated) ? 'open' : ''}><summary><b>Beklemedeki kanallar</b> <span class="muted small">(${paused.map((c) => c.name).join(', ')})</span></summary>
+        <p class="muted small">Bu kanallar kapalıdır; sipariş, ürün, stok ve analiz ekranlarında görünmez ve senkronlanmaz. API bilgilerini girip <b>Kaydet</b>, ardından <b>Bağlantıyı test et</b>'e basın: test başarılı olunca kanal devreye girer. Bilgiler sonradan değişirse yeniden test gerekir.</p><div class="integ">${paused.map(card)}</div></details>` : ''}
     </div>`);
   }
   const values = (id) => { const o = {}; $$(`[data-ch="${id}"] [data-k]`, el).forEach((i) => { o[i.dataset.k] = i.value; }); return o; };

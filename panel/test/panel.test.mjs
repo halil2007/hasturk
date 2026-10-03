@@ -186,7 +186,9 @@ test('Sipariş listesi: tarih / durum filtresi, sayfalama, kâr ve CSV', async (
   const j = await (await call('/api/orders?status=all&from=2026-09-15&to=2026-09-30&limit=1&page=1')).json();
   assert.equal(j.total, 2);
   assert.equal(j.orders.length, 1);
-  assert.deepEqual(j.counts, { new: 1, cancelled: 1 });
+  const { late, ...counts } = j.counts;
+  assert.deepEqual(counts, { new: 1, cancelled: 1 });
+  assert.equal(late, 1, '1 günü aşan yeni sipariş gecikmede sayılır');
   const all = await (await call('/api/orders?status=new&limit=10')).json();
   const a2 = all.orders.find((o) => o.order_number === 'A2');
   // 200 satış − %20 komisyon (40) − 2×40 maliyet = 80

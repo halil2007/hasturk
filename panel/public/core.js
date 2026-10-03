@@ -90,6 +90,25 @@ export const rangeLabel = (from, to) => {
   return `${f.toLocaleDateString('tr-TR', o)} – ${t.toLocaleDateString('tr-TR', { ...o, year: 'numeric' })}`;
 };
 
+// Kargo gecikme uyarısı: kanalın son kargoya teslim tarihi (varsa) ve sipariş yaşı (1 günü aşan) dikkate alınır
+export function lateInfo(o, now = Date.now()) {
+  if (!['new', 'processing'].includes(o.status) || (o.open_packages === 0 && o.packages > 0)) return null;
+  const H = 3600e3;
+  if (o.ship_by && now > o.ship_by) return { cls: 'bad', text: 'Gecikti', title: `Son kargoya teslim: ${dateTime(o.ship_by)}` };
+  if (o.ship_by && o.ship_by - now < 12 * H) return { cls: 'bad', text: 'Gecikme riski', title: `Son kargoya teslim: ${dateTime(o.ship_by)} (${Math.max(0, Math.round((o.ship_by - now) / H))} sa kaldı)` };
+  if (now - o.ordered_at > 24 * H) return { cls: 'warn', text: 'Henüz kargoya verilmedi', title: `${Math.floor((now - o.ordered_at) / 864e5) || 1} günü aştı${o.ship_by ? ` · son teslim ${dateTime(o.ship_by)}` : ''}` };
+  return null;
+}
+export const lateBadge = (o) => { const l = lateInfo(o); return l ? html`<span class="late ${l.cls}" title="${l.title}"><b>!</b>${l.text}</span>` : ''; };
+// Kanal tarafında (panel dışından) yapılan işlem notu. Kaynak yalnızca satıcı işlemi kesinse belirtilir.
+export function extNote(o) {
+  let x = o.ext_action;
+  try { x = typeof x === 'string' ? JSON.parse(x) : x; } catch { x = null; }
+  if (!x || x.status !== o.status) return null;
+  const name = ch(o.channel).name;
+  return { seller: x.seller, at: x.at, text: x.seller ? `${name} üzerinden işlem yapıldı` : `${name}'da durum güncellendi`, detail: `${x.from || '?'} → ${x.to || '?'}` };
+}
+
 export const STATUS_LABEL = { new: 'Yeni', processing: 'Hazırlanıyor', shipped: 'Kargoda', delivered: 'Teslim edildi', cancelled: 'İptal', returned: 'İade' };
 export const statusPill = (s) => html`<span class="pill ${s}">${STATUS_LABEL[s] || s}</span>`;
 
@@ -103,10 +122,13 @@ export function chLogo(id, sm = false) {
   if (t === 'trendyol') return html`<span class="logo-b trendyol${k}" title="Trendyol">T</span>`;
   if (t === 'hepsiburada') return html`<span class="logo-b hepsiburada${k}" title="Hepsiburada">hb</span>`;
   if (t === 'pttavm') return html`<span class="logo-b pttavm${k}" title="PttAVM">Ptt</span>`;
+  if (t === 'n11') return html`<span class="logo-b${k}" style="background:#7b3fe4;color:#fff" title="N11">n11</span>`;
+  if (t === 'idefix') return html`<span class="logo-b${k}" style="background:#ffc20e;color:#1c1c1c" title="idefix">id</span>`;
+  if (t === 'pazarama') return html`<span class="logo-b${k}" style="background:#00a2e8;color:#fff" title="Pazarama">pz</span>`;
   return html`<span class="logo-b${k}" style="background:${chColor(id)}">${(c.name || '?').slice(0, 1)}</span>`;
 }
 export const chBadge = (id) => html`<span class="ch-name">${chLogo(id, true)}<span class="ellipsis">${ch(id).short || ch(id).name}</span></span>`;
-export const chState = (c) => (c.paused ? ['off', 'Pasif'] : !c.enabled ? ['off', 'Bağlı değil'] : c.demo ? ['demo', 'Örnek veri'] : c.last && !c.last.ok ? ['err', 'Hata'] : ['', 'Bağlı']);
+export const chState = (c) => (c.gated ? ['off', (c.missing || []).length ? 'Beklemede · bilgi girilmedi' : 'Beklemede · bağlantı testi bekleniyor'] : c.paused ? ['off', 'Pasif'] : !c.enabled ? ['off', 'Bağlı değil'] : c.demo ? ['demo', 'Örnek veri'] : c.last && !c.last.ok ? ['err', 'Hata'] : ['', 'Bağlı']);
 export const thumb = (img, name, cls = '') => html`<span class="thumb ${cls}" style="${img ? `background-image:url('${String(img).replace(/['"()\\]/g, '')}')` : ''}">${img ? '' : (name || '?').slice(0, 2)}</span>`;
 
 // ---------- bildirim ----------

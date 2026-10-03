@@ -80,3 +80,102 @@ test('ikas: token alınır, sipariş okunur, stok saveVariantStocks ile gönderi
   const save = gqlBodies.find((b) => /saveVariantStocks/.test(b.query));
   assert.deepEqual(save.variables.input.productStockLocationInputs, [{ productId: 'p1', variantId: 'v1', stockLocationId: 'loc1', stockCount: 7 }]);
 });
+
+test('ikas Kargo: paketle "Kargoya Hazır" (FulFillOrderInput) gönderir, etiket görseli ve hata okunur, alan eksikse uyum sağlar', async () => {
+  const bodies = [];
+  let pkgState = { id: 'pk1', orderPackageFulfillStatus: 'READY_FOR_SHIPMENT', orderLineItemIds: ['li1'], trackingInfo: { barcode: '', trackingNumber: '' } };
+  let schemaHasLabel = false; // önce eski şema: shippingLabelImage alanı yok
+  mockFetch([
+    [/oauth\/token/, { access_token: 'T', expires_in: 3600 }],
+    [/graphql/, (url, opts) => {
+      const b = JSON.parse(opts.body); bodies.push(b);
+      if (!schemaHasLabel && /shippingLabelImage/.test(b.query)) return { errors: [{ message: 'Cannot query field "shippingLabelImage" on type "TrackingInfo".' }] };
+      if (/listCargoCompany/.test(b.query)) return { data: { listCargoCompany: [{ id: 'c2', name: 'Yurtiçi Kargo' }, { id: 'c1', name: 'Aras Kargo' }] } };
+      if (/fulfillOrder/.test(b.query)) return { data: { fulfillOrder: { id: 'o1', orderPackages: [pkgState] } } };
+      if (/listOrder/.test(b.query)) return { data: { listOrder: { hasNext: false, data: [{ id: 'o1', orderNumber: 1001, orderedAt: 1, status: 'CREATED', orderLineItems: [], orderPackages: [pkgState] }] } } };
+      if (/cancelFulfillment/.test(b.query)) return { data: { cancelFulfillment: { id: 'o1' } } };
+      return { data: {} };
+    }],
+  ]);
+  const ch = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
+  const opts = await ch.cargoOptions();
+  assert.equal(opts[0].id, '', 'ilk seçenek: ikas Kargo önceliği');
+  assert.deepEqual(opts.slice(1).map((x) => x.name), ['Aras Kargo', 'Yurtiçi Kargo']);
+  const order = { remote_id: 'o1', order_number: '1001' };
+  const pkg = { no: 1, items: [{ line_id: 'li1', qty: 2 }] };
+  const r = await ch.pack(order, [pkg], { cargo: { id: 'c2', name: 'Yurtiçi Kargo' } });
+  assert.equal(r.packages[0].remoteId, 'pk1');
+  const ff = bodies.filter((b) => /fulfillOrder/.test(b.query)).pop();
+  assert.match(ff.query, /\$input: FulFillOrderInput!/, 'ikas şemasındaki tip adı');
+  assert.equal(ff.variables.input.markAsReadyForShipment, true);
+  assert.deepEqual(ff.variables.input.lines, [{ orderLineItemId: 'li1', quantity: 2 }]);
+  assert.deepEqual(ff.variables.input.trackingInfoDetail, { cargoCompanyId: 'c2', cargoCompany: 'Yurtiçi Kargo' });
+  // Barkod henüz yok → bekleniyor
+  assert.ok((await ch.label(order, { ...pkg, remote_id: 'pk1' })).pending);
+  // Barkod geldi, etiket görseli yok → panel etiketi
+  pkgState = { ...pkgState, trackingInfo: { barcode: '7300123', cargoCompany: 'Yurtiçi Kargo' } };
+  const l1 = await ch.label(order, { ...pkg, remote_id: 'pk1' });
+  assert.equal(l1.panel, true); assert.equal(l1.barcode, '7300123');
+  // Yeni şema: etiket görseli (base64 PNG) okunur
+  schemaHasLabel = true;
+  const ch2 = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
+  pkgState = { ...pkgState, trackingInfo: { ...pkgState.trackingInfo, shippingLabelImage: 'iVBORw0KGgoAAAANSUhEUg' } };
+  const l2 = await ch2.label(order, { ...pkg, remote_id: 'pk1' });
+  assert.equal(l2.label.format, 'png');
+  // ikas Kargo hatası (ör. telefon eksik) kullanıcıya iletilir
+  pkgState = { ...pkgState, orderPackageFulfillStatus: 'ERROR', errorMessage: 'Alıcı telefon numarası eksik' };
+  await assert.rejects(() => ch2.label(order, { ...pkg, remote_id: 'pk1' }), /telefon numarası eksik/);
+  await ch2.cancelPackage(order, { remote_id: 'pk1' });
+  assert.deepEqual(bodies.pop().variables.input, { orderId: 'o1', orderPackageId: 'pk1' });
+});
+
+test('Trendyol: kargo firması değiştirme ve ortak etiket', async () => {
+  const calls = mockFetch([
+    [/cargo-providers$/, {}],
+    [/orders\?orderNumber=/, { content: [{ id: 5, cargoProviderName: 'Aras Kargo Marketplace', cargoTrackingNumber: '733' }] }],
+    [/common-label\/733$/, (url, opts) => (opts.method === 'POST' ? {} : { data: [{ label: '^XA^FDtest^XZ' }] })],
+  ]);
+  const ch = trendyol({ TRENDYOL_SELLER_ID: '42', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' }, { id: 'trendyol' });
+  const r = await ch.changeCargo({ remote_id: '900' }, { remote_id: '5', remote_status: 'Picking' }, { id: 'ARASMP', name: 'Aras Kargo' });
+  assert.deepEqual(JSON.parse(calls[0].body), { cargoProvider: 'ARASMP' });
+  assert.equal(r.tracking, '733');
+  await assert.rejects(() => ch.changeCargo({ remote_id: '900' }, { remote_id: '5', remote_status: 'Shipped' }, { id: 'YKMP' }), /yalnızca/);
+  const l = await ch.label({ order_number: '900' }, { tracking: '733', cargo_company: 'Aras Kargo' });
+  assert.equal(l.label.format, 'zpl');
+  assert.match(l.label.data, /\^XA/);
+  const y = await ch.label({}, { tracking: '999', cargo_company: 'Yurtiçi Kargo' });
+  assert.equal(y.panel, true, 'Yurtiçi için Trendyol ortak etiket vermez: takip barkodu panel etiketine basılır');
+});
+
+test('N11, idefix, Pazarama: siparişler okunur, işleme al doğru çağrıyı yapar', async () => {
+  const { n11 } = await import('../src/channels/n11.js');
+  const { idefix } = await import('../src/channels/idefix.js');
+  const { pazarama } = await import('../src/channels/pazarama.js');
+  let calls = mockFetch([[/shipmentPackages/, { totalPages: 1, content: [
+    { id: 9, orderNumber: 'N1', shipmentPackageStatus: 'Created', customerfullName: 'Ece', shippingAddress: { city: 'Adana', district: 'Seyhan', address: 'A', gsm: '05' }, totalAmount: 50, agreedDeliveryDate: 1795000000000,
+      packageHistories: [{ status: 'Created', createdDate: 1790000000000 }], lines: [{ orderLineId: 77, stockCode: 'S1', barcode: 'B1', productName: 'Ürün', quantity: 2, price: 25 }] }] }], [/order\/v1\/update/, {}]]);
+  const n = n11({ N11_APP_KEY: 'k', N11_APP_SECRET: 's' }, { id: 'n11' });
+  const [o] = await n.fetchOrders(1789000000000, 1790500000000);
+  assert.equal(o.orderNumber, 'N1'); assert.equal(o.items[0].total, 50); assert.equal(o.shipBy, 1795000000000); assert.equal(o.orderedAt, 1790000000000);
+  assert.equal(calls[0].headers.appkey, 'k');
+  await n.accept({ items: [{ line_id: '77', status: '' }] });
+  assert.deepEqual(JSON.parse(calls.pop().body), { lines: [{ lineId: 77 }], status: 'Picking' });
+
+  calls = mockFetch([[/\/oms\/V1\/list/, { items: [{ id: 'S9', orderNumber: 'I1', orderDate: '2026-10-01T10:00:00', status: 'created', shippingAddress: { city: 'Bursa', county: 'Osmangazi', fullName: 'Can' }, items: [{ id: 'it1', barcode: 'B2', merchantSku: 'S2', productName: 'X', quantity: 1, price: 40 }] }] }], [/update-shipment-status/, {}]]);
+  const i = idefix({ IDEFIX_API_KEY: 'a', IDEFIX_API_SECRET: 'b', IDEFIX_VENDOR_ID: 'V1' }, { id: 'idefix' });
+  const [io] = await i.fetchOrders(Date.now() - 864e5, Date.now());
+  assert.equal(io.status, 'new'); assert.equal(io.address.district, 'Osmangazi');
+  assert.equal(calls[0].headers['X-API-KEY'], btoa('a:b'));
+  await i.accept({ packages: [{ remote_id: 'S9', status: 'open' }] });
+  assert.deepEqual(JSON.parse(calls.pop().body), { status: 'picking' });
+
+  calls = mockFetch([[/connect\/token/, { success: true, data: { accessToken: 'TT', expiresIn: 3600 } }],
+    [/getOrdersForApi/, { success: true, data: [{ orderNumber: 555, orderDate: '2026-10-01T10:00:00', orderAmount: { value: 30 }, customerName: 'Deniz', shipmentAddress: { cityName: 'Mersin', districtName: 'Yenişehir' },
+      items: [{ orderItemId: 'q1', orderItemStatus: 12, quantity: 1, totalPrice: { value: 30 }, product: { code: 'B3', stockCode: 'S3', name: 'Y' } }] }] }], [/updateOrderStatusList/, { success: true }]]);
+  const pz = pazarama({ PAZARAMA_CLIENT_ID: 'c', PAZARAMA_CLIENT_SECRET: 'd' }, { id: 'pazarama' });
+  const [po] = await pz.fetchOrders(Date.now() - 864e5, Date.now());
+  assert.equal(po.status, 'processing'); assert.equal(po.total, 30); assert.equal(po.items[0].remoteKey, 'B3');
+  assert.equal(calls[1].headers.Authorization, 'Bearer TT');
+  await pz.accept({ remote_id: '555' });
+  assert.deepEqual(JSON.parse(calls.pop().body), { orderNumber: 555, status: 12 });
+});

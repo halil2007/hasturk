@@ -83,3 +83,44 @@ export function mergeStatus(remote, local) {
   if (!local) return remote;
   return (RANK[local] ?? 0) > (RANK[remote] ?? 0) ? local : remote;
 }
+
+// Kanalın verdiği etiketi (adres, data: URI, base64 PDF/PNG/JPG ya da ZPL metni) pakete kaydedilecek biçime çevirir
+export function toB64(buf) {
+  let s = '';
+  for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+const MAGIC = [['JVBER', 'pdf'], ['iVBOR', 'png'], ['/9j/', 'jpg'], ['R0lGOD', 'gif']];
+const fromMime = (m) => (/pdf/i.test(m) ? 'pdf' : /png/i.test(m) ? 'png' : /jpe?g/i.test(m) ? 'jpg' : /gif/i.test(m) ? 'gif' : /zpl|text\/plain/i.test(m) ? 'zpl' : '');
+export async function labelFrom(v, base) {
+  const s = String(v || '').trim();
+  if (!s) return null;
+  let format = '', data = '';
+  if (/^https?:\/\//i.test(s)) {
+    const res = await fetch(s);
+    if (!res.ok) throw new Error(`Etiket dosyası alınamadı (HTTP ${res.status})`);
+    const buf = new Uint8Array(await res.arrayBuffer());
+    format = fromMime(res.headers.get('content-type') || '');
+    if (format === 'zpl' || (!format && /\^XA/.test(new TextDecoder().decode(buf.subarray(0, 200))))) return { format: 'zpl', data: new TextDecoder().decode(buf), filename: base + '.zpl' };
+    data = toB64(buf);
+  } else if (/^data:/i.test(s)) {
+    const m = /^data:([^;,]*)(;base64)?,(.*)$/is.exec(s);
+    if (!m) return null;
+    format = fromMime(m[1]);
+    data = m[2] ? m[3] : btoa(unescape(encodeURIComponent(decodeURIComponent(m[3]))));
+  } else if (/\^XA/.test(s)) {
+    return { format: 'zpl', data: s, filename: base + '.zpl' };
+  } else {
+    data = s.replace(/\s+/g, '');
+  }
+  if (!format) format = (MAGIC.find(([k]) => data.startsWith(k)) || [, ''])[1];
+  if (!format) {
+    try { const txt = atob(data.slice(0, 400)); if (/\^XA/.test(txt)) return { format: 'zpl', data: atob(data), filename: base + '.zpl' }; } catch { /* base64 değil */ }
+    return null;
+  }
+  return { format, data, filename: `${base}.${format}` };
+}
+
+// Geciken / gecikme riskli: açık paketi olan (ya da paketsiz) hazırlanmayı bekleyen sipariş; son teslime 12 saatten az kaldı ya da 1 günü aştı
+export const LATE = `(o.status IN ('new', 'processing') AND (NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) OR EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id AND k.status = 'open'))
+  AND ((o.ship_by IS NOT NULL AND o.ship_by < (CAST(strftime('%s', 'now') AS INTEGER) * 1000 + 43200000)) OR o.ordered_at < (CAST(strftime('%s', 'now') AS INTEGER) * 1000 - 86400000)))`;

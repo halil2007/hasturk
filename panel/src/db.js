@@ -47,6 +47,21 @@ const SCHEMA = [
   // Panel kullanıcıları (şifre PBKDF2 ile özetlenir)
   `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, name TEXT, email TEXT, pass TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'staff', active INTEGER NOT NULL DEFAULT 1, created_at INTEGER, last_login INTEGER)`,
+  // Sipariş olayları: panelden yapılan işlemler (kaynak = panel) ve kanalda algılanan durum değişiklikleri (kaynak = kanal)
+  `CREATE TABLE IF NOT EXISTS order_events (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, at INTEGER NOT NULL, source TEXT NOT NULL,
+    action TEXT, status TEXT, remote_status TEXT, note TEXT, user TEXT)`,
+  'CREATE INDEX IF NOT EXISTS order_events_order ON order_events(order_id, at)',
+  // Buybox (Trendyol / Hepsiburada): ilanın son buybox durumu, geçmişi, otomatik fiyat kuralı ve fiyat değişiklikleri
+  `CREATE TABLE IF NOT EXISTS buybox (channel TEXT NOT NULL, remote_id TEXT NOT NULL, rank INTEGER, buybox_price REAL, second_price REAL, third_price REAL,
+    multi INTEGER, our_price REAL, prev_rank INTEGER, checked_at INTEGER, error TEXT, PRIMARY KEY (channel, remote_id))`,
+  `CREATE TABLE IF NOT EXISTS buybox_history (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL, remote_id TEXT NOT NULL, at INTEGER NOT NULL,
+    rank INTEGER, our_price REAL, buybox_price REAL, second_price REAL, event TEXT)`,
+  'CREATE INDEX IF NOT EXISTS buybox_history_l ON buybox_history(channel, remote_id, at)',
+  `CREATE TABLE IF NOT EXISTS price_rules (channel TEXT NOT NULL, remote_id TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0, min_price REAL, max_price REAL,
+    target_price REAL, step REAL NOT NULL DEFAULT 5, updated_at INTEGER, user TEXT, PRIMARY KEY (channel, remote_id))`,
+  `CREATE TABLE IF NOT EXISTS price_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL, remote_id TEXT NOT NULL, at INTEGER NOT NULL,
+    old_price REAL, new_price REAL, competitor_price REAL, reason TEXT, rank_before INTEGER, rank_after INTEGER, ok INTEGER, error TEXT)`,
+  'CREATE INDEX IF NOT EXISTS price_changes_l ON price_changes(channel, remote_id, at)',
   // Bildirimler: senkron hataları, stok uyarıları; aynı konu (key) tek kayıtta güncellenir
   `CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, level TEXT NOT NULL, channel TEXT, title TEXT NOT NULL, msg TEXT,
     count INTEGER NOT NULL DEFAULT 1, first_at INTEGER, last_at INTEGER, read INTEGER NOT NULL DEFAULT 0, resolved_at INTEGER)`,
@@ -73,6 +88,16 @@ const MIGRATIONS = [
   "ALTER TABLE listings ADD COLUMN stock_mode TEXT NOT NULL DEFAULT 'shared'",
   'ALTER TABLE listings ADD COLUMN stock_value INTEGER',
   'ALTER TABLE stock_moves ADD COLUMN user TEXT',
+  // Kargo akışı: paketleme zamanı, kanaldan gelen hata, etiketin görüntülenme / yazdırılma durumu (paket başına), seçilen kargo
+  'ALTER TABLE packages ADD COLUMN packed_at INTEGER',
+  'ALTER TABLE packages ADD COLUMN error TEXT',
+  'ALTER TABLE packages ADD COLUMN cargo_code TEXT',
+  'ALTER TABLE packages ADD COLUMN label_viewed_at INTEGER',
+  'ALTER TABLE packages ADD COLUMN label_printed_at INTEGER',
+  'ALTER TABLE packages ADD COLUMN label_prints INTEGER NOT NULL DEFAULT 0',
+  // Kanalın son kargoya teslim tarihi ve kanal tarafında yapılan son işlem (panel dışından)
+  'ALTER TABLE orders ADD COLUMN ship_by INTEGER',
+  'ALTER TABLE orders ADD COLUMN ext_action TEXT',
 ];
 
 const ready = new WeakMap();
@@ -93,7 +118,9 @@ export const run = (db, sql, ...args) => db.prepare(sql).bind(...args).run();
 // ---------- ayarlar ----------
 export const DEFAULT_SETTINGS = {
   // Kanal başına varsayılan komisyon (%) ve sipariş başı kargo gideri (TL); ürün/ilan bazında değiştirilebilir
-  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12 },
+  // Otomatik fiyatlandırma genel anahtarı (kapalıyken hiçbir fiyat değiştirilmez; yalnızca buybox izlenir)
+  autoprice: false,
+  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15 },
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },

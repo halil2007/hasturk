@@ -49,7 +49,8 @@ export function barcodeSvg(text) {
 export function labelHtml(order, pkg, total, sender = {}) {
   const a = order.address || {};
   // Çok paketli siparişte her paket kendi takip numarasını kullanır (siparişin numarası başka pakete ait olabilir)
-  const tn = pkg.tracking || (total <= 1 ? order.tracking : '');
+  // Kanalın kargo barkodu (ikas Kargo barkodu / HB barkodu) önceliklidir; yoksa takip numarası
+  const tn = pkg.barcode || pkg.tracking || (total <= 1 ? order.tracking : '');
   const code = tn || `${order.order_number}-${pkg.no || 1}`;
   const internal = !tn;
   const lines = (pkg.items || []).map((x) => {
@@ -76,14 +77,20 @@ export function labelHtml(order, pkg, total, sender = {}) {
   </section>`;
 }
 
-// Etiketleri yazdır: [{ order, pkg }] (her paket ayrı sayfa)
-export function printLabels(list, sender) {
+// Yazdırma penceresi kapanınca çözülür (yazdırılıp yazdırılmadığını tarayıcı bildirmez; kullanıcıya sorulur)
+function printHtml(markup) {
   const box = document.getElementById('print');
-  box.innerHTML = list.map(({ order, pkg }) => labelHtml(order, pkg, order.packages.length || 1, sender)).join('');
-  const clear = () => { box.innerHTML = ''; window.removeEventListener('afterprint', clear); };
-  window.addEventListener('afterprint', clear);
-  setTimeout(() => window.print(), 50);
+  box.innerHTML = markup;
+  return new Promise((resolve) => {
+    const clear = () => { box.innerHTML = ''; window.removeEventListener('afterprint', clear); resolve(); };
+    window.addEventListener('afterprint', clear);
+    setTimeout(() => window.print(), 50);
+  });
 }
+// Panel etiketleri: [{ order, pkg }] (her paket ayrı sayfa)
+export const printLabels = (list, sender) => printHtml(list.map(({ order, pkg }) => labelHtml(order, pkg, order.packages.length || 1, sender)).join(''));
+// Kanalın verdiği etiket görseli (ikas Kargo PNG/JPG)
+export const printImages = (list) => printHtml(list.map((x) => `<section class="slabel img"><img src="data:image/${x.format === 'jpg' ? 'jpeg' : x.format};base64,${x.data}" alt=""></section>`).join(''));
 
 export function downloadFile(name, data, type) {
   const blob = type === 'application/pdf' ? new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], { type }) : new Blob([data], { type });

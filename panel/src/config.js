@@ -39,6 +39,19 @@ export const FIELDS = {
     { k: 'PTTAVM_LIST_METHOD', label: 'Ürün listesi servisi', hint: 'varsayılan StokKontrolListesi', adv: true },
     { k: 'PTTAVM_DATE_FORMAT', label: 'Tarih biçimi', hint: 'tr = gg.aa.yyyy', adv: true },
   ],
+  n11: [
+    { k: 'N11_APP_KEY', label: 'App Key', hint: 'Satıcı Ofisi → Hesabım → API Hesapları', req: true },
+    { k: 'N11_APP_SECRET', label: 'App Secret', secret: true, req: true },
+  ],
+  idefix: [
+    { k: 'IDEFIX_VENDOR_ID', label: 'Vendor ID (satıcı no)', req: true },
+    { k: 'IDEFIX_API_KEY', label: 'API Key', req: true },
+    { k: 'IDEFIX_API_SECRET', label: 'API Secret', secret: true, req: true },
+  ],
+  pazarama: [
+    { k: 'PAZARAMA_CLIENT_ID', label: 'API Key (Client ID)', req: true },
+    { k: 'PAZARAMA_CLIENT_SECRET', label: 'API Secret', secret: true, req: true },
+  ],
 };
 
 // ---------- şifreleme ----------
@@ -117,7 +130,8 @@ export function describe(env, cfg, id) {
   };
 }
 
+// Kanal nesneleri önbelleğinin anahtarı: API bilgisi kaydı ya da bekleyen kanal onayı değişince yenilenir
 export async function configVersion(db) {
-  const r = await first(db, 'SELECT MAX(updated_at) AS v FROM channel_config');
-  return (r && r.v) || 0;
+  const r = await first(db, "SELECT (SELECT MAX(updated_at) FROM channel_config) AS v, (SELECT GROUP_CONCAT(v) FROM settings WHERE k LIKE 'verified:%') AS w");
+  return `${(r && r.v) || 0}|${(r && r.w) || ''}`;
 }

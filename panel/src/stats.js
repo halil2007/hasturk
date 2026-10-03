@@ -1,6 +1,6 @@
 // İstatistik: ciro / sipariş adedi (kanal bazında + toplam), dönem karşılaştırma, en çok satanlar, tahmini kâr.
 import { all, first, getSettings } from './db.js';
-import { dayKey, weekKey, monthKey, TR, r2 } from './util.js';
+import { dayKey, weekKey, monthKey, TR, r2, LATE } from './util.js';
 import { CHANNEL_IDS } from './channels/index.js';
 import { profit } from '../public/profit.js';
 import { DESIRED } from './sync.js';
@@ -108,14 +108,15 @@ export async function summary(db) {
     all(db, `SELECT channel, COUNT(*) AS n, SUM(total) AS revenue FROM orders o WHERE ordered_at >= ? AND ordered_at < ? AND ${LIVE} GROUP BY channel`, t0 - D, t0),
     first(db, `SELECT (SELECT COUNT(*) FROM products WHERE active = 1 AND stock <= 0) AS stockOut,
       (SELECT COUNT(*) FROM packages k JOIN orders o ON o.id = k.order_id WHERE k.status = 'open' AND o.status NOT IN ('cancelled', 'returned')) +
-      (SELECT COUNT(*) FROM orders o WHERE o.status = 'processing' AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id)) AS cargoWaiting`),
+      (SELECT COUNT(*) FROM orders o WHERE o.status = 'processing' AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id)) AS cargoWaiting,
+      (SELECT COUNT(*) FROM orders o WHERE ${LATE}) AS late`),
     all(db, "SELECT status, channel, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY status, channel"),
     all(db, `SELECT id, name, sku, stock, critical_stock FROM products WHERE active = 1 AND stock <= ${LOW(settings.low_stock)} ORDER BY stock ASC LIMIT 20`),
     all(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
   ]);
   const by = (rows) => Object.fromEntries(rows.map((r) => [r.channel, { orders: r.n, revenue: r2(r.revenue) }]));
   return {
-    today: by(todayP), yesterday: by(yestP), stockOut: extra.stockOut, cargoWaiting: extra.cargoWaiting,
+    today: by(todayP), yesterday: by(yestP), stockOut: extra.stockOut, cargoWaiting: extra.cargoWaiting, late: extra.late,
     pending: counts, lowStock: low, unlinked: unlinked[0] ? unlinked[0].n : 0,
   };
 }
@@ -146,4 +147,91 @@ export async function dashboard(db, q) {
     from, to, group, keys: cur.series.map((b) => b.key), current: pack(cur), previous: pack(prev), missingCost: cur.missingCost,
     pending: { new: p.new || 0, processing: p.processing || 0 }, lowStock: low, stock, top, stockSync: !!settings.stock_sync,
   };
+}
+
+// ---------- Analizler (raporlar) ----------
+// Dönem başlangıcı (Türkiye saatiyle): gün / hafta (pazartesi) / ay / yıl; n dönem geri
+function unitStart(unit, ms, back = 0) {
+  const d = new Date(ms + TR);
+  d.setUTCHours(0, 0, 0, 0);
+  if (unit === 'day') d.setUTCDate(d.getUTCDate() - back);
+  if (unit === 'week') d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) - 7 * back);
+  if (unit === 'month') { d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - back); }
+  if (unit === 'year') { d.setUTCMonth(0, 1); d.setUTCFullYear(d.getUTCFullYear() - back); }
+  return d.getTime() - TR;
+}
+const cityName = (s) => String(s || '').trim().toLocaleUpperCase('tr').replace(/\s+/g, ' ');
+
+// Hazır aralıklar: bugün, dün, bu hafta, bu ay, bu yıl ya da from–to
+function rangeOf(q) {
+  const now = Date.now();
+  const ok = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
+  if (q.range === 'custom' && ok(q.from) && ok(q.to)) return [startOf(q.from), startOf(q.to) + D];
+  if (q.range === 'today') return [unitStart('day', now), now + 1];
+  if (q.range === 'yesterday') return [unitStart('day', now, 1), unitStart('day', now)];
+  if (q.range === 'month') return [unitStart('month', now), now + 1];
+  if (q.range === 'year') return [unitStart('year', now), now + 1];
+  if (q.range === '30') return [unitStart('day', now, 29), now + 1];
+  return [unitStart('week', now), now + 1];
+}
+
+export async function insights(db, q) {
+  const now = Date.now(), unit = ['day', 'week', 'month', 'year'].includes(q.unit) ? q.unit : 'day';
+  const chan = CHANNEL_IDS.includes(q.channel) ? q.channel : null;
+  const cw = chan ? ' AND o.channel = ?' : '', ca = chan ? [chan] : [];
+  // 1) Son 4 dönem kartları (+ karşılaştırma için 5. dönem)
+  const starts = [0, 1, 2, 3, 4].map((b) => unitStart(unit, now, b));
+  const rows = await all(db, `SELECT o.ordered_at, o.total, o.status,
+      (SELECT COALESCE(SUM(quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled') AS items
+    FROM orders o WHERE o.ordered_at >= ?${cw}`, starts[4], ...ca);
+  const cards = starts.slice(0, 5).map((s, i) => ({ start: s, end: i ? starts[i - 1] : now + 1, revenue: 0, orders: 0, items: 0, lost: 0 }));
+  for (const r of rows) {
+    const c = cards.find((x) => r.ordered_at >= x.start && r.ordered_at < x.end);
+    if (!c) continue;
+    if (r.status === 'cancelled' || r.status === 'returned') { c.lost++; continue; }
+    c.revenue += r.total; c.orders++; c.items += r.items;
+  }
+  for (const c of cards) { c.revenue = r2(c.revenue); c.basket = c.orders ? r2(c.revenue / c.orders) : 0; c.lostRate = c.orders + c.lost ? r2((c.lost / (c.orders + c.lost)) * 100) : 0; }
+  // 2) Haftalık rapor: son 8 hafta (haftadan haftaya değişim)
+  const w0 = unitStart('week', now, 7);
+  const wrows = await all(db, `SELECT o.channel, o.ordered_at, o.total, o.status FROM orders o WHERE o.ordered_at >= ?${cw}`, w0, ...ca);
+  const weeks = Array.from({ length: 8 }, (_, i) => ({ start: unitStart('week', now, 7 - i), revenue: 0, orders: 0, lost: 0, channels: {} }));
+  for (const r of wrows) {
+    const w = [...weeks].reverse().find((x) => r.ordered_at >= x.start);
+    if (!w) continue;
+    if (r.status === 'cancelled' || r.status === 'returned') { w.lost++; continue; }
+    w.revenue += r.total; w.orders++;
+    const c = (w.channels[r.channel] = w.channels[r.channel] || { revenue: 0, orders: 0 });
+    c.revenue = r2(c.revenue + r.total); c.orders++;
+  }
+  for (const w of weeks) w.revenue = r2(w.revenue);
+  // 3) İller ve 4) en çok satanlar: seçilen aralıkta
+  const [from, to] = rangeOf(q);
+  const crows = await all(db, `SELECT o.address, o.total, o.status FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
+  const cm = new Map();
+  for (const r of crows) {
+    let a = {}; try { a = JSON.parse(r.address || '{}'); } catch { /* boş */ }
+    const k = cityName(a.city) || 'BİLİNMİYOR';
+    const x = cm.get(k) || { city: k, orders: 0, revenue: 0, shipped: 0 };
+    x.orders++; x.revenue += r.total; if (r.status === 'shipped' || r.status === 'delivered') x.shipped++;
+    cm.set(k, x);
+  }
+  const cities = [...cm.values()].map((x) => ({ ...x, revenue: r2(x.revenue) })).sort((a, b) => b.orders - a.orders);
+  const trows = await all(db, `SELECT i.product_id, COALESCE(p.name, i.name) AS name, COALESCE(p.sku, i.sku) AS sku, COALESCE(p.image, i.image) AS image, p.stock, o.channel,
+      SUM(i.quantity) AS qty, SUM(i.total) AS revenue, COUNT(DISTINCT o.id) AS orders, MIN(i.unit_price) AS min, MAX(i.unit_price) AS max
+    FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
+    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status != 'cancelled'${cw}
+    GROUP BY COALESCE(CAST(i.product_id AS TEXT), 'n:' || COALESCE(NULLIF(i.sku, ''), i.name)), o.channel`, from, to, ...ca);
+  const tm = new Map();
+  for (const r of trows) {
+    const k = r.product_id ? 'p' + r.product_id : 'n' + (r.sku || r.name);
+    const x = tm.get(k) || { product_id: r.product_id, name: r.name, sku: r.sku, image: r.image, stock: r.stock, qty: 0, revenue: 0, orders: 0, min: Infinity, max: 0, channels: {} };
+    x.qty += r.qty; x.revenue += r.revenue; x.orders += r.orders; x.min = Math.min(x.min, r.min || Infinity); x.max = Math.max(x.max, r.max || 0);
+    x.channels[r.channel] = (x.channels[r.channel] || 0) + r.qty;
+    tm.set(k, x);
+  }
+  const sort = q.sort === 'revenue' ? (a, b) => b.revenue - a.revenue : (a, b) => b.qty - a.qty || b.revenue - a.revenue;
+  const top = [...tm.values()].sort(sort).slice(0, Math.min(Number(q.limit) || 50, 200))
+    .map((x) => ({ ...x, revenue: r2(x.revenue), avg: x.qty ? r2(x.revenue / x.qty) : 0, min: Number.isFinite(x.min) ? r2(x.min) : 0, max: r2(x.max) }));
+  return { unit, channel: chan, cards, weeks, range: { from, to }, cities, top, totals: { orders: crows.length, revenue: r2(crows.reduce((s, r) => s + r.total, 0)) } };
 }

@@ -1,7 +1,8 @@
-// Ürün eşleştirme.
-//  Kesin (otomatik): barkod aynı → bağla; ya da stok kodu (SKU) aynı ve barkodlar çelişmiyor → bağla.
-//  Kesin değil: ad benzerliği + miktar/ölçü (5 Kg, 10 Lt…) uyumuna göre puanlı öneri; kullanıcı onaylar.
-// Varyant düzeyinde çalışır: ikas'ta bir ürünün varyantı olan "5 Kg", Trendyol'da ayrı ürün olsa da aynı panel ürününe bağlanır.
+// Ürün eşleştirme: FARKLI kanallardaki aynı ürünü / varyantı tek panel ürününe bağlar.
+//  Kural 1: bir panel ürününe her kanaldan en fazla BİR ilan bağlanır (aynı sitenin iki ürünü asla birleşmez).
+//  Kural 2: ana katalog kanalının (ör. HasTürk ikas) her varyantı kendi panel ürünüdür; tek kanal bağlıyken eşleştirme yapılmaz.
+//  Kesin (otomatik): barkod aynı; ya da stok kodu aynı ve barkod çelişmiyor; ya da ad + varyant/ölçü birebir aynı ve tek aday.
+//  Kesin değil: ad benzerliği + ölçü (5 Kg, 10 Lt…) + varyant özellikleri + stok kodu benzerliğiyle puanlı öneri; kullanıcı onaylar.
 import { all, run } from './db.js';
 import { chunk, str } from './util.js';
 
@@ -29,116 +30,193 @@ export function tokens(s) {
   return new Set(t.split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !STOP.has(w)));
 }
 
-// 0–100 benzerlik puanı ve gerekçeler
-export function similarity(a, b) {
-  const ta = tokens(a.name), tb = tokens(b.name);
+// Karşılaştırma için önceden hazırlanmış özellikler (binlerce üründe her seferinde yeniden ayrıştırmamak için)
+export const prep = (x) => ({
+  t: tokens(x.name), q: quantities(`${x.name || ''} ${x.variant || ''}`), v: tokens(x.variant),
+  sku: norm(x.sku).replace(/[^a-z0-9]/g, ''), barcode: str(x.barcode),
+});
+
+// 0–100 benzerlik puanı ve gerekçeler (a, b: prep() sonucu)
+export function score(a, b) {
   let inter = 0;
-  for (const w of ta) if (tb.has(w)) inter++;
-  const union = ta.size + tb.size - inter;
-  let score = union ? (inter / union) * 0.85 : 0;
+  for (const w of a.t) if (b.t.has(w)) inter++;
+  const union = a.t.size + b.t.size - inter;
+  let sc = union ? (inter / union) * 0.85 : 0;
   const why = [];
   if (inter) why.push(`${inter} ortak kelime`);
-  const qa = quantities(`${a.name} ${a.variant || ''}`), qb = quantities(`${b.name} ${b.variant || ''}`);
-  if (qa.size && qb.size) {
-    const same = [...qa].some((q) => qb.has(q));
-    if (same) { score += 0.25; why.push('ölçü aynı'); } else { score *= 0.3; why.push('ölçü farklı'); }
+  if (a.q.size && b.q.size) {
+    if ([...a.q].some((q) => b.q.has(q))) { sc += 0.25; why.push('ölçü aynı'); } else { sc *= 0.3; why.push('ölçü farklı'); }
   }
-  const sa = norm(a.sku).replace(/[^a-z0-9]/g, ''), sb = norm(b.sku).replace(/[^a-z0-9]/g, '');
-  if (sa.length >= 4 && sb.length >= 4 && (sa.includes(sb) || sb.includes(sa))) { score += 0.3; why.push('stok kodu benzer'); }
-  if (a.barcode && b.barcode && a.barcode !== b.barcode) { score *= 0.8; why.push('barkod farklı'); }
-  return { score: Math.round(Math.min(1, score) * 100), why };
+  if (a.sku.length >= 4 && b.sku.length >= 4 && (a.sku.includes(b.sku) || b.sku.includes(a.sku))) { sc += 0.3; why.push('stok kodu benzer'); }
+  // Varyant özellikleri (renk, tip…): ikisinde de varsa ve hiç ortak kelime yoksa farklı varyanttır
+  if (a.v.size && b.v.size && ![...a.v].some((w) => b.v.has(w) || b.t.has(w)) && ![...b.v].some((w) => a.t.has(w))) { sc *= 0.5; why.push('varyant farklı'); }
+  if (a.barcode && b.barcode && a.barcode !== b.barcode) { sc *= 0.8; why.push('barkod farklı'); }
+  return { score: Math.round(Math.min(1, sc) * 100), why };
+}
+export const similarity = (a, b) => score(prep(a), prep(b));
+
+// Ad + varyant anahtarı: kelime sırası, büyük/küçük harf, Türkçe karakter ve ölçü yazımından bağımsız
+export function nameKey(name, variant) {
+  const full = [name, variant && !norm(name).includes(norm(variant)) ? variant : ''].filter(Boolean).join(' ');
+  const t = [...tokens(full)].sort();
+  if (t.length < 2) return ''; // "Gübre" gibi tek kelimelik adlarla otomatik eşleştirme yapılmaz
+  return t.join(' ') + '|' + [...quantities(full)].sort().join(',');
 }
 
-// Kesin eşleşme bulunursa ürün kimliği ve şekli; yoksa null
+// Kesin eşleşme: aday ürün, ilanın kanalından henüz ilan almamış olmalı. Bulunursa { id, how }; yoksa null
 export function certain(l, idx) {
+  const no = /^x:\d+$/.test(l.match || '') ? Number(l.match.slice(2)) : 0; // kullanıcının kaldırdığı eşleşme
+  const free = (list) => (list || []).filter((p) => p.id !== no && !idx.taken(p.id, l.channel));
   const bc = str(l.barcode), sku = str(l.sku).toLowerCase();
-  const byBc = bc.length >= 6 ? idx.barcode.get(bc) : null;
-  const bySku = sku ? idx.sku.get(sku) : null;
-  if (byBc && byBc.length === 1) {
-    if (bySku && bySku[0].id !== byBc[0].id) return null; // barkod bir ürünü, SKU başka ürünü gösteriyor: emin değiliz
+  const byBc = bc.length >= 6 ? free(idx.barcode.get(bc)) : [];
+  const bySku = sku ? free(idx.sku.get(sku)) : [];
+  if (byBc.length === 1) {
+    if (bySku.length && bySku[0].id !== byBc[0].id) return null; // barkod bir ürünü, SKU başka ürünü gösteriyor: emin değiliz
     return { id: byBc[0].id, how: 'barcode' };
   }
-  if (bySku && bySku.length === 1) {
+  if (byBc.length > 1) return null;
+  if (bySku.length === 1) {
     const p = bySku[0];
     if (bc && p.barcode && p.barcode !== bc) return null; // SKU aynı ama barkod çelişiyor
     return { id: p.id, how: 'sku' };
+  }
+  if (bySku.length > 1) return null;
+  const key = nameKey(l.name, l.variant_name);
+  const byName = key ? free(idx.name.get(key)) : [];
+  if (byName.length === 1) {
+    const p = byName[0];
+    if (bc && p.barcode && p.barcode !== bc) return null;
+    if (sku && p.sku && p.sku.toLowerCase() !== sku) return null;
+    return { id: p.id, how: 'name' };
   }
   return null;
 }
 
 export async function productIndex(db) {
-  const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name, group_name, image, stock FROM products WHERE active = 1 OR active = 0');
-  const sku = new Map(), barcode = new Map();
-  for (const p of prods) {
-    if (p.sku) { const k = p.sku.toLowerCase(); sku.set(k, [...(sku.get(k) || []), p]); }
-    if (p.barcode) barcode.set(p.barcode, [...(barcode.get(p.barcode) || []), p]);
+  const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name, group_name, image, stock FROM products');
+  const used = await all(db, 'SELECT product_id, channel, name FROM listings WHERE product_id IS NOT NULL');
+  const sku = new Map(), barcode = new Map(), name = new Map(), chans = new Map();
+  const add = (m, k, p) => m.set(k, [...(m.get(k) || []), p]);
+  const idx = {
+    prods, sku, barcode, name, chans,
+    taken: (id, ch) => !!(chans.get(id) && chans.get(id).has(ch)),
+    use: (id, ch) => { if (!chans.has(id)) chans.set(id, new Set()); chans.get(id).add(ch); },
+    add: (p) => {
+      if (p.sku) add(sku, p.sku.toLowerCase(), p);
+      if (p.barcode) add(barcode, p.barcode, p);
+      const k = nameKey(p.name, p.variant_name);
+      if (k) add(name, k, p);
+    },
+  };
+  for (const p of prods) idx.add(p);
+  for (const u of used) idx.use(u.product_id, u.channel);
+  // Ürünün bağlı ilanlarının adları da ad anahtarına eklenir (aynı ürün farklı sitede farklı adla olabilir)
+  const byId = new Map(prods.map((p) => [p.id, p]));
+  for (const u of used) {
+    const p = byId.get(u.product_id), k = nameKey(u.name);
+    if (p && k && !(name.get(k) || []).includes(p)) add(name, k, p);
   }
-  return { prods, sku, barcode };
+  return idx;
 }
 
-// Eşleşmemiş ilanları kesin olanlarla bağla; ana katalog kanallarındaki karşılıksız ilanlardan yeni ürün aç
+// Ana katalog: ayarda seçilen ve ilanı olan kanallar; hiçbiri yoksa öncelik sırasındaki ilk bağlı kanal
+const PRIORITY = ['ikas1', 'ikas2', 'hepsiburada', 'trendyol', 'n11', 'idefix', 'pazarama', 'pttavm'];
+async function catalogChannels(db, wanted) {
+  const have = new Set((await all(db, 'SELECT DISTINCT channel FROM listings')).map((r) => r.channel));
+  const list = (wanted || []).filter((c) => have.has(c));
+  if (list.length) return list;
+  const first = PRIORITY.find((c) => have.has(c)) || [...have][0];
+  return first ? [first] : [];
+}
+
+const link = (db, id, how, l) => db.prepare('UPDATE listings SET product_id = ?, match = ?, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, l.channel, l.remote_id);
+
+// Eşleşmemiş ilanları kesin olanlarla bağla; ana katalog kanalındaki karşılıksız her varyant için panel ürünü aç
 export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
-  let idx = await productIndex(db);
-  const unlinked = await all(db, 'SELECT channel, remote_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock FROM listings WHERE product_id IS NULL AND ignored = 0');
-  const st = [], left = [];
+  const cats = await catalogChannels(db, catalog);
+  const idx = await productIndex(db);
+  const unlinked = await all(db, 'SELECT channel, remote_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND ignored = 0 ORDER BY channel, remote_id');
+  // Ana katalog önce işlenir (sırasıyla), sonra diğer kanallar
+  const rank = (c) => (cats.includes(c) ? cats.indexOf(c) : 99);
+  unlinked.sort((a, b) => rank(a.channel) - rank(b.channel));
+  const st = [];
+  let linked = 0, created = 0;
   for (const l of unlinked) {
     const c = certain(l, idx);
-    if (c) st.push(db.prepare('UPDATE listings SET product_id = ?, match = ?, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?').bind(c.id, c.how, l.channel, l.remote_id));
-    else left.push(l);
+    if (c) { st.push(link(db, c.id, c.how, l)); idx.use(c.id, l.channel); linked++; continue; }
+    // Ana katalog: ilk katalog kanalının her varyantı ürün olur. Diğer katalog kanalları (ör. ikinci site) yalnızca
+    // hiçbir ürüne benzemiyorsa yeni ürün açar; benziyorsa elle onaya düşer (yanlış birleştirme / mükerrer ürün olmasın).
+    const isCat = cats.includes(l.channel);
+    if (!isCat) continue;
+    if (cats.indexOf(l.channel) > 0 && bestScore(l, idx) >= 40) continue;
+    if (st.length) { for (const part of chunk(st.splice(0), 90)) await db.batch(part); }
+    const skuFree = str(l.sku) && !idx.sku.has(str(l.sku).toLowerCase());
+    const t = Date.now();
+    const r = await db.prepare(`INSERT INTO products (sku, barcode, name, group_name, variant_name, image, sale_price, stock, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
+      .bind(skuFree ? str(l.sku) : null, str(l.barcode) || null, l.name || l.sku || l.barcode || l.remote_id, l.group_name || null, l.variant_name || null, l.image || '', l.price || 0, Math.max(0, l.remote_stock || 0), t, t).first();
+    const p = { id: r.id, sku: skuFree ? str(l.sku) : null, barcode: str(l.barcode) || null, name: l.name, variant_name: l.variant_name, image: l.image, stock: Math.max(0, l.remote_stock || 0) };
+    idx.prods.push(p); idx.add(p); idx.use(p.id, l.channel);
+    st.push(link(db, p.id, 'new', l));
+    created++;
   }
   for (const part of chunk(st, 90)) await db.batch(part);
-  let created = 0, later = 0;
-  // Ana katalogdan yeni ürün (SKU veya barkodu olan, başka kesin eşleşmesi olmayan varyantlar)
-  const fresh = left.filter((l) => catalog.includes(l.channel) && (str(l.sku) || str(l.barcode)));
-  if (fresh.length) {
-    const t = Date.now(), seen = new Set();
-    const ins = [];
-    for (const l of fresh) {
-      const key = str(l.sku).toLowerCase() || 'b:' + str(l.barcode);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      ins.push(db.prepare(`INSERT INTO products (sku, barcode, name, group_name, variant_name, image, sale_price, stock, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (sku) DO NOTHING`)
-        .bind(str(l.sku) || null, str(l.barcode) || null, l.name || l.sku || l.barcode, l.group_name || null, l.variant_name || null, l.image || '', l.price || 0, Math.max(0, l.remote_stock || 0), t, t));
-    }
-    for (const part of chunk(ins, 60)) await db.batch(part);
-    created = ins.length;
-    idx = await productIndex(db);
-    // Yeni açılan ürünlere hem katalog ilanı hem de diğer kanallardaki kesin karşılıkları aynı turda bağlanır
-    const st2 = [], isNew = new Set(fresh);
-    for (const l of left) {
-      const c = certain(l, idx);
-      if (!c) continue;
-      st2.push(db.prepare('UPDATE listings SET product_id = ?, match = ?, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?').bind(c.id, isNew.has(l) ? 'new' : c.how, l.channel, l.remote_id));
-      if (!isNew.has(l)) later++;
-    }
-    for (const part of chunk(st2, 90)) await db.batch(part);
-  }
   // Ürünün eksik görsel / grup / varyant bilgisini bağlı ilandan tamamla
   await run(db, `UPDATE products SET
       image = COALESCE(NULLIF(image, ''), (SELECT l.image FROM listings l WHERE l.product_id = products.id AND l.image != '' ORDER BY l.channel LIMIT 1), ''),
-      group_name = COALESCE(group_name, (SELECT l.group_name FROM listings l WHERE l.product_id = products.id AND l.group_name IS NOT NULL AND l.group_name != '' ORDER BY l.channel LIMIT 1)),
-      variant_name = COALESCE(variant_name, (SELECT l.variant_name FROM listings l WHERE l.product_id = products.id AND l.variant_name IS NOT NULL AND l.variant_name != '' ORDER BY l.channel LIMIT 1))
-    WHERE image IS NULL OR image = '' OR group_name IS NULL OR variant_name IS NULL`);
-  const linked = st.length + later + created;
-  if (linked) await relinkItems(db);
-  return { linked: st.length + later, created };
+      group_name = COALESCE(NULLIF(group_name, ''), (SELECT l.group_name FROM listings l WHERE l.product_id = products.id AND l.group_name IS NOT NULL AND l.group_name != '' ORDER BY l.channel LIMIT 1)),
+      variant_name = COALESCE(NULLIF(variant_name, ''), (SELECT l.variant_name FROM listings l WHERE l.product_id = products.id AND l.variant_name IS NOT NULL AND l.variant_name != '' ORDER BY l.channel LIMIT 1))
+    WHERE image IS NULL OR image = '' OR group_name IS NULL OR group_name = '' OR variant_name IS NULL OR variant_name = ''`);
+  if (linked || created) await relinkItems(db);
+  return { linked, created };
 }
 
-// Eşleşme önerileri (emin olunamayan ilanlar)
+const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ');
+function candidates(l, idx, n = 3) {
+  const a = prep({ name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode });
+  const out = [];
+  for (const p of idx.prods) {
+    if (idx.taken(p.id, l.channel)) continue;
+    if (!p._prep) p._prep = prep({ name: fullName(p), variant: p.variant_name, sku: p.sku, barcode: p.barcode });
+    const s = score(a, p._prep);
+    if (s.score >= 25) out.push({ p, s });
+  }
+  return out.sort((x, y) => y.s.score - x.s.score).slice(0, n);
+}
+const bestScore = (l, idx) => (candidates(l, idx, 1)[0] || { s: { score: 0 } }).s.score;
+
+// Eşleşme önerileri (emin olunamayan ilanlar). Aday ürün, ilanın kanalından ilan almamış ürünlerdir.
 export async function suggestions(db, { channel, q, limit = 100 } = {}) {
   const idx = await productIndex(db);
   const where = ['product_id IS NULL', 'ignored = 0'], args = [];
   if (channel) { where.push('channel = ?'); args.push(channel); }
   if (q) { where.push('(name LIKE ? OR sku LIKE ? OR barcode LIKE ?)'); const s = '%' + q + '%'; args.push(s, s, s); }
   const rows = await all(db, `SELECT channel, remote_id, sku, barcode, name, variant_name, image, price, remote_stock FROM listings WHERE ${where.join(' AND ')} ORDER BY channel, name LIMIT ?`, ...args, limit);
-  const pn = idx.prods.map((p) => ({ ...p, full: [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ') }));
-  return rows.map((l) => {
-    const a = { name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode };
-    const cands = pn.map((p) => ({ p, s: similarity(a, { name: p.full, sku: p.sku, barcode: p.barcode }) }))
-      .filter((x) => x.s.score >= 25).sort((x, y) => y.s.score - x.s.score).slice(0, 3)
-      .map(({ p, s }) => ({ product_id: p.id, name: p.full, sku: p.sku, barcode: p.barcode, image: p.image, stock: p.stock, score: s.score, why: s.why }));
-    return { ...l, candidates: cands };
-  });
+  if (!rows.length) return [];
+  const on = await all(db, 'SELECT product_id, channel, name FROM listings WHERE product_id IS NOT NULL');
+  return rows.map((l) => ({
+    ...l,
+    candidates: candidates(l, idx).map(({ p, s }) => ({
+      product_id: p.id, name: fullName(p), sku: p.sku, barcode: p.barcode, image: p.image, stock: p.stock, score: s.score, why: s.why,
+      channels: on.filter((x) => x.product_id === p.id).map((x) => ({ channel: x.channel, name: x.name })),
+    })),
+  }));
+}
+
+// Eşleşmiş ürünler: her panel ürünü ve her kanaldaki bağlı ilanı (inceleme ve düzeltme için)
+export async function linkedGroups(db, { channel, q, how, multi, page = 1, limit = 40 } = {}) {
+  const where = ['EXISTS (SELECT 1 FROM listings x WHERE x.product_id = p.id)'], args = [];
+  if (channel) { where.push('EXISTS (SELECT 1 FROM listings x WHERE x.product_id = p.id AND x.channel = ?)'); args.push(channel); }
+  if (how) { where.push('EXISTS (SELECT 1 FROM listings x WHERE x.product_id = p.id AND x.match = ?)'); args.push(how); }
+  if (multi === '1') where.push('(SELECT COUNT(DISTINCT channel) FROM listings x WHERE x.product_id = p.id) > 1');
+  if (multi === '0') where.push('(SELECT COUNT(DISTINCT channel) FROM listings x WHERE x.product_id = p.id) = 1');
+  if (q) { const s = '%' + q + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR EXISTS (SELECT 1 FROM listings x WHERE x.product_id = p.id AND (x.name LIKE ? OR x.sku LIKE ? OR x.barcode LIKE ?)))'); args.push(s, s, s, s, s, s); }
+  const w = 'WHERE ' + where.join(' AND ');
+  const total = (await all(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args))[0].n;
+  const prods = await all(db, `SELECT p.id, p.name, p.sku, p.barcode, p.image, p.group_name, p.variant_name, p.stock FROM products p ${w} ORDER BY COALESCE(NULLIF(p.group_name, ''), p.name) COLLATE NOCASE, p.variant_name COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (Math.max(1, page) - 1) * limit);
+  if (!prods.length) return { products: [], total };
+  const ls = await all(db, `SELECT product_id, channel, remote_id, name, variant_name, sku, barcode, image, match, price, remote_stock FROM listings WHERE product_id IN (${prods.map(() => '?').join(',')}) ORDER BY channel`, ...prods.map((p) => p.id));
+  for (const p of prods) p.listings = ls.filter((l) => l.product_id === p.id);
+  return { products: prods, total };
 }
 
 // İlan bir ürüne bağlandığında, o ilanın eşleşmemiş sipariş satırları da bağlanır

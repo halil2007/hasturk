@@ -65,6 +65,7 @@ export function demo(meta) {
           address: { name, line: 'Örnek Mah. Deneme Sok. No:1 D:2', district, city, phone: '0555 000 00 00' },
           total: lines.reduce((s, l) => s + l.total, 0), currency: 'TRY',
           cargoCompany: status === 'shipped' || status === 'delivered' ? 'Yurtiçi Kargo' : '', tracking: status === 'shipped' || status === 'delivered' ? `DEMO${no}` : '',
+          shipBy: ['new', 'processing'].includes(status) ? at + (ch === 'trendyol' ? 1 : 2) * D : null,
           items: lines, packages: null,
         });
       }
@@ -79,10 +80,25 @@ export function demo(meta) {
     }));
   }
   const ok = async () => ({});
+  // Kargo akışı taklidi: paketle → kanal paketi, etiket → örnek barkod, kargo firması seç / değiştir
+  const CARGO = ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'Sürat Kargo', 'PTT Kargo', 'HepsiJet'];
+  const pack = async (order, pkgs, { cargo } = {}) => ({ packages: pkgs.map((p) => ({ remoteId: `D${order.order_number}-${p.no}-${Date.now() % 100000}`, remoteStatus: 'READY_FOR_SHIPMENT', cargoCompany: (cargo && cargo.name) || p.cargo_company || 'Yurtiçi Kargo' })), message: 'Paket kargoya hazırlandı (örnek)' });
+  const label = async (order, pkg) => ({ barcode: `DEMO${order.order_number}${pkg.no}`.replace(/[^A-Z0-9]/gi, ''), cargoCompany: pkg.cargo_company || 'Yurtiçi Kargo', panel: true });
+  const cargoOptions = async () => CARGO.map((n, i) => ({ id: 'C' + i, name: n }));
+  const changeCargo = async (order, pkg, cargo) => ({ remoteId: pkg.remote_id, cargoCompany: cargo.name, resetLabel: true });
+  // Örnek buybox: sıra ve rakip fiyatları (saatlik değişir)
+  const buybox = async (ids) => ids.map((id) => {
+    const p = DEMO_PRODUCTS.find((x) => remoteKey(x) === id);
+    if (!p) return { remoteId: id, rank: null };
+    const r = rng(id + Math.floor(Date.now() / 3600e3)), price = Math.round(p[3] * (PRICE[ch] || 1));
+    const rank = r() < 0.45 ? 1 : r() < 0.7 ? 2 : 3, rival = Math.round(price * (0.93 + r() * 0.12));
+    return { remoteId: id, rank, buyboxPrice: rank === 1 ? price : rival, second: rank === 1 ? Math.round(price * (1 + r() * 0.08)) : price, third: Math.round(price * 1.1), multi: r() < 0.85 };
+  });
   return {
     ...meta, enabled: true, missing: [], demo: true,
-    caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: meta.type === 'ikas', price: true },
-    fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok,
+    caps: { accept: 'remote', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: meta.type === 'ikas' ? 'pack' : 'change', cancelPackage: true, createProduct: meta.type === 'ikas', price: true },
+    fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, pack, label, cargoOptions, changeCargo, cancelPackage: ok,
+    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox } : {}),
     createProduct: async (pr) => ({ remoteId: `${ch}-${pr.sku || Date.now()}`, remoteProductId: '', sku: pr.sku, barcode: pr.barcode, name: pr.name, price: pr.sale_price, stock: pr.stock }),
   };
 }

@@ -9,6 +9,7 @@ import { getChannels } from './channels/index.js';
 import { mergeStatus, chunk, str, sleep } from './util.js';
 import { autoMatch, relinkItems } from './match.js';
 import { runJobs } from './backfill.js';
+import { runBuybox } from './buybox.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 export { relinkItems };
 
@@ -47,8 +48,10 @@ export async function saveOrders(db, ch, orders, maps) {
   const ids = orders.map((o) => `${ch}:${o.remoteId}`);
   const existing = new Map();
   for (const part of chunk(ids, 90)) {
-    for (const r of await all(db, `SELECT id, local_status, hash FROM orders WHERE id IN (${part.map(() => '?').join(',')})`, ...part)) existing.set(r.id, r);
+    for (const r of await all(db, `SELECT id, local_status, hash, status, remote_status FROM orders WHERE id IN (${part.map(() => '?').join(',')})`, ...part)) existing.set(r.id, r);
   }
+  // Son 30 dakikada panelden işlem yapılan siparişler: bu siparişlerdeki durum değişikliği panelin işidir
+  const recent = new Set((await all(db, "SELECT DISTINCT order_id FROM order_events WHERE source = 'panel' AND at > ?", Date.now() - 30 * 60e3)).map((r) => r.order_id));
   const t = Date.now();
   // Kanaldan aynen gelen (değişmemiş) sipariş tekrar yazılmaz: veritabanı yazma kotasını korur
   const changed = [];
@@ -63,15 +66,24 @@ export async function saveOrders(db, ch, orders, maps) {
     for (const o of part) {
       const id = `${ch}:${o.remoteId}`, ex = existing.get(id);
       const status = mergeStatus(o.status, ex && ex.local_status);
-      const extra = JSON.stringify(o.demo ? { awaitingPayment: !!o.awaitingPayment, demo: true } : { awaitingPayment: !!o.awaitingPayment });
-      st.push(db.prepare(`INSERT INTO orders (id, channel, remote_id, order_number, status, remote_status, ordered_at, updated_at, customer, phone, email, address, total, currency, cargo_company, tracking, extra, hash)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      const extra = JSON.stringify({ awaitingPayment: !!o.awaitingPayment, ...(o.demo ? { demo: true } : {}), ...(o.cargoChoice ? { cargoChoice: o.cargoChoice } : {}) });
+      // Kanalda durum değişti ve panelden yapılmadı → kanal tarafında işlem (satıcı paneli, kargo, müşteri…)
+      let ext = null;
+      if (ex && ex.remote_status && o.remoteStatus && ex.remote_status !== o.remoteStatus && !recent.has(id)) {
+        const seller = ex.status === 'new' && status === 'processing'; // yalnızca satıcının yapabileceği geçiş: işleme alma / paketleme
+        ext = JSON.stringify({ at: t, from: ex.remote_status, to: o.remoteStatus, status, seller });
+        st.push(db.prepare("INSERT INTO order_events (order_id, at, source, action, status, remote_status, note) VALUES (?, ?, 'channel', ?, ?, ?, ?)")
+          .bind(id, t, seller ? 'processed' : 'status', status, o.remoteStatus, ex.remote_status));
+      }
+      st.push(db.prepare(`INSERT INTO orders (id, channel, remote_id, order_number, status, remote_status, ordered_at, updated_at, customer, phone, email, address, total, currency, cargo_company, tracking, extra, hash, ship_by, ext_action)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET order_number = excluded.order_number, status = excluded.status, remote_status = excluded.remote_status,
           updated_at = excluded.updated_at, customer = excluded.customer, phone = excluded.phone, email = excluded.email, address = excluded.address,
           total = excluded.total, currency = excluded.currency,
-          cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), orders.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), orders.tracking), extra = excluded.extra, hash = excluded.hash`)
+          cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), orders.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), orders.tracking), extra = excluded.extra, hash = excluded.hash,
+          ship_by = COALESCE(excluded.ship_by, orders.ship_by), ext_action = COALESCE(excluded.ext_action, orders.ext_action)`)
         .bind(id, ch, o.remoteId, o.orderNumber, status, o.remoteStatus || '', o.orderedAt, t, o.customer || '', o.phone || '', o.email || '',
-          JSON.stringify(o.address || {}), o.total || 0, o.currency || 'TRY', o.cargoCompany || '', o.tracking || '', extra, o._hash));
+          JSON.stringify(o.address || {}), o.total || 0, o.currency || 'TRY', o.cargoCompany || '', o.tracking || '', extra, o._hash, o.shipBy || null, ext));
       st.push(db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id));
       for (const it of o.items) {
         st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key)
@@ -83,16 +95,25 @@ export async function saveOrders(db, ch, orders, maps) {
         const remoteIds = o.packages.map((p) => p.remoteId).filter(Boolean);
         if (remoteIds.length) {
           st.push(db.prepare(`DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND remote_id NOT IN (${remoteIds.map(() => '?').join(',')})`).bind(id, ...remoteIds));
+          // Kanalda paket oluştuysa (panelden ya da kanalın kendi panelinden) paneldeki taslak paketler kaldırılır
+          st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NULL AND status = 'open'").bind(id));
+        } else if (!o.packages.length) {
+          // Kanalda paket kalmadı (ör. ikas'ta paket iptal edildi): kanal paketleri kaldırılır, taslaklar korunur
+          st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND status = 'open'").bind(id));
         }
         for (const p of o.packages) {
           if (!p.remoteId) continue;
-          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at)
-            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          // Paketlenmiş sayılır: ikas/HB'de paket varsa; Trendyol'da "Created" sonrası (Hazırlanıyor, Faturalandı…)
+          const packed = p.packed ?? !/^(Created|Awaiting)$/.test(p.remoteStatus || '');
+          st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at, packed_at, error)
+            VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (order_id, remote_id) DO UPDATE SET items = excluded.items, remote_status = excluded.remote_status,
               status = CASE WHEN packages.status = 'shipped' AND excluded.status = 'open' THEN 'shipped' ELSE excluded.status END,
+              shipped_at = CASE WHEN excluded.status = 'shipped' THEN COALESCE(packages.shipped_at, excluded.shipped_at) ELSE packages.shipped_at END,
               cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), packages.tracking),
-              barcode = COALESCE(NULLIF(excluded.barcode, ''), packages.barcode)`)
-            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', p.barcode || '', t, p.status === 'shipped' ? t : null));
+              barcode = COALESCE(NULLIF(excluded.barcode, ''), packages.barcode), error = excluded.error,
+              packed_at = CASE WHEN excluded.packed_at IS NULL THEN NULL ELSE COALESCE(packages.packed_at, excluded.packed_at) END`)
+            .bind(id, id, p.remoteId, JSON.stringify(p.items || []), p.status || 'open', p.remoteStatus || '', p.cargoCompany || '', p.tracking || '', p.barcode || '', t, p.status === 'shipped' ? t : null, packed ? t : null, p.error || null));
         }
       }
     }
@@ -260,6 +281,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     out.stockMoves = await applyStock(db, changed, settings);
     out.stock = await pushStocks(env, db, settings);
     out.price = await pushPrices(env, db);
+    // Buybox kontrolü ve (açıksa) seçili ürünlerde otomatik fiyat
+    if (!only) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
     // 5) geçmiş sipariş aktarımı varsa bir parça daha ilerlet
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });
