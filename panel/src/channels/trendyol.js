@@ -70,7 +70,7 @@ export function trendyol(env, meta) {
           remoteId: String(p.id || p.shipmentPackageId),
           items: (p.lines || []).map((l) => ({ line_id: String(l.id), qty: num(l.quantity, 1) })),
           status: ['shipped', 'delivered'].includes(STATUS[p.status]) ? 'shipped' : STATUS[p.status] === 'cancelled' ? 'cancelled' : 'open',
-          cargoCompany: str(p.cargoProviderName), tracking: str(p.cargoTrackingNumber),
+          cargoCompany: str(p.cargoProviderName), tracking: str(p.cargoTrackingNumber), trackingUrl: str(p.cargoTrackingLink),
           remoteStatus: p.status,
         })).filter((x) => x.status !== 'cancelled'),
       };

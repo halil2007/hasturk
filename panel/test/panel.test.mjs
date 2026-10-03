@@ -237,3 +237,30 @@ test('stok senkronu kapalıyken: hiçbir kanala stok gitmez, panel stoğu ikas s
   // Tek seferlik kapatma işaretlenmiştir: sonraki açılışlarda kullanıcının açtığı ayar korunur
   assert.ok(await first(db, "SELECT 1 AS x FROM settings WHERE k = 'once:stock_off_1'"));
 });
+
+test('beklemedeki kanal (ikas varsayılan): okur, kanala yazmaz; ayardan kaldırılınca yazar', async () => {
+  const { getChannels, resetChannels } = await import('../src/channels/index.js');
+  const db = d1();
+  await init(db);
+  const env = { IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' };
+  resetChannels();
+  let ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
+  assert.equal(ik.hold, true);
+  assert.ok(ik.fetchOrders && ik.fetchListings && ik.label, 'okuma ve etiket okuma açık');
+  assert.ok(!ik.pack && !ik.pushStock && !ik.pushPrice && !ik.ship && !ik.createProduct && !ik.repack, 'yazma işlemleri kapalı');
+  assert.equal(ik.caps.hold, true);
+  await setSetting(db, 'hold_channels', []);
+  ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
+  assert.ok(!ik.hold && ik.pack && ik.pushStock, 'beklemeden çıkınca yazma açılır');
+});
+
+test('art arda hata veren kanal kademeli beklenir; "Senkronla" (force) beklemeyi atlar', async () => {
+  const { syncAll } = await import('../src/sync.js');
+  const db = d1();
+  await init(db);
+  await setSetting(db, 'last:trendyol', { at: Date.now() - 60e3, ok: false, fails: 4, error: 'HTTP 503' });
+  const r = await syncAll({ DEMO: '1' }, db, { only: ['trendyol'] });
+  assert.match(String(r.channels.trendyol), /beklemede: art arda 4 hata/);
+  const f = await syncAll({ DEMO: '1' }, db, { only: ['trendyol'], force: true });
+  assert.equal(typeof f.channels.trendyol, 'number', 'elle senkron hemen dener');
+});

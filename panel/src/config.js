@@ -140,6 +140,6 @@ export function describe(env, cfg, id) {
 
 // Kanal nesneleri önbelleğinin anahtarı: API bilgisi kaydı ya da bekleyen kanal onayı değişince yenilenir
 export async function configVersion(db) {
-  const r = await first(db, "SELECT (SELECT MAX(updated_at) FROM channel_config) AS v, (SELECT GROUP_CONCAT(v) FROM settings WHERE k LIKE 'verified:%') AS w");
-  return `${(r && r.v) || 0}|${(r && r.w) || ''}`;
+  const r = await first(db, "SELECT (SELECT MAX(updated_at) FROM channel_config) AS v, (SELECT GROUP_CONCAT(v) FROM settings WHERE k LIKE 'verified:%') AS w, (SELECT v FROM settings WHERE k = 'hold_channels') AS h");
+  return `${(r && r.v) || 0}|${(r && r.w) || ''}|${(r && r.h) || ''}`;
 }

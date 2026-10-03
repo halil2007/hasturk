@@ -130,6 +130,18 @@ export const statusPill = (s) => html`<span class="pill ${s}">${STATUS_LABEL[s] 
 // ---------- kanallar ----------
 export const ch = (id) => state.channels.find((c) => c.id === id) || { id, name: id, short: id, type: id };
 export const chColor = (id) => `var(--c-${id})`;
+// Kargoyu takip et: kanalın verdiği resmi takip bağlantısı; yoksa kargo firmasının takip sayfası (Ayarlar → Kargo takip adresleri)
+export function trackUrl(pkg, order = {}) {
+  if (pkg && /^https?:\/\//i.test(pkg.tracking_url || '')) return pkg.tracking_url;
+  const no = String((pkg && (pkg.tracking || pkg.barcode)) || order.tracking || '').trim();
+  const firm = String((pkg && pkg.cargo_company) || order.cargo_company || '').toLocaleLowerCase('tr');
+  if (!no || !firm) return '';
+  const urls = (state.settings && state.settings.track_urls) || {};
+  const norm = (x) => x.toLocaleLowerCase('tr').replace(/kargo|cargo|lojistik|marketplace|\s+/g, '');
+  const hit = Object.entries(urls).sort((a, b) => b[0].length - a[0].length).find(([k]) => norm(k) && norm(firm).includes(norm(k)));
+  return hit ? hit[1].replace('{no}', encodeURIComponent(no)) : '';
+}
+export const trackBtn = (pkg, order, cls = 'btn sm ghost') => { const u = trackUrl(pkg, order); return u ? html`<a class="${cls}" href="${u}" target="_blank" rel="noopener noreferrer" title="${(pkg && pkg.cargo_company) || order.cargo_company || 'Kargo'} takip sayfasını açar"><i class="ico ico-truck"></i>Kargoyu takip et</a>` : ''; };
 // Kanal rozeti (marka renginde harf); grafiklerde ise doğrulanmış kanal renkleri kullanılır
 export function chLogo(id, sm = false) {
   const c = ch(id), t = c.type || id, k = sm ? ' sm' : '';

@@ -101,8 +101,11 @@ export async function settingsView(el) {
           <label class="field"><span>Adres</span><input class="input" data-sender="address" value="${st.sender.address || ''}" ${dis}></label>
           <label class="field"><span>İlçe / il</span><input class="input" data-sender="city" value="${st.sender.city || ''}" ${dis}></label>
           <label class="field"><span>Kargo firmaları (virgülle)</span><input class="input" data-cargos value="${(st.cargo_companies || []).join(', ')}" ${dis}></label>
+          <label class="field"><span>Kendi etiketimizin boyutu</span><select class="input" data-labelsize ${dis}>${[['100x150', '10 × 15 cm (termal yazıcı)'], ['a5', 'A5 (normal yazıcı)'], ['a4', 'A4 (normal yazıcı)']].map(([v, t]) => html`<option value="${v}" ${(st.label_size || '100x150') === v ? 'selected' : ''}>${t}</option>`)}</select></label>
           <label class="field"><span>İlk senkronda geçmiş (gün)</span><input class="input" inputmode="numeric" data-history value="${st.history_days}" ${dis}></label>
         </div>
+        <label class="field"><span>Kargo takip adresleri (“Kargoyu takip et” düğmesi)</span><textarea class="input" data-track style="min-height:120px;font-family:ui-monospace,monospace;font-size:12.5px" ${dis}>${Object.entries(st.track_urls || {}).map(([k, v]) => `${k} = ${v}`).join('\n')}</textarea>
+          <small>Her satır: <b>Firma = adres</b>; adreste takip numarasının geleceği yere <b>{no}</b> yazın. Kanal resmi takip bağlantısı verdiyse (ikas, Trendyol) önce o kullanılır.</small></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="zpl_pdf" ${st.zpl_pdf ? 'checked' : ''} ${dis}><span></span></span>
           <span><b>ZPL etiketini PDF'e çevir</b><br><span class="small muted">Trendyol ve Hepsiburada etiketi termal yazıcı biçiminde (ZPL) gelir; normal yazıcı için PDF'e çevrilir. Çeviri Labelary servisiyle yapılır ve etiket içeriği (alıcı adı/adresi) bu servise gönderilir.</span></span></label>
       </div>
@@ -153,7 +156,8 @@ export async function settingsView(el) {
       $$('[data-cost]', el).forEach((i) => { const [k, c] = i.dataset.cost.split(':'); cost[k][c] = numIn(i.value); });
       const sender = {}; $$('[data-sender]', el).forEach((i) => { sender[i.dataset.sender] = i.value.trim(); });
       const company = {}; $$('[data-co]', el).forEach((i) => { company[i.dataset.co] = i.value.trim(); });
-      await save({ ...cost, sender, company, low_stock: numIn($('[data-low]', el).value), cargo_companies: $('[data-cargos]', el).value.split(',').map((x) => x.trim()).filter(Boolean), history_days: numIn($('[data-history]', el).value) });
+      const track = {}; ($('[data-track]', el).value || '').split('\n').forEach((l) => { const i = l.indexOf('='); if (i > 0) track[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });
+      await save({ ...cost, sender, company, track_urls: track, label_size: $('[data-labelsize]', el).value, low_stock: numIn($('[data-low]', el).value), cargo_companies: $('[data-cargos]', el).value.split(',').map((x) => x.trim()).filter(Boolean), history_days: numIn($('[data-history]', el).value) });
       await loadSummary();
       toast('Ayarlar kaydedildi');
     }),

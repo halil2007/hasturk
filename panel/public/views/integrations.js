@@ -1,6 +1,6 @@
 // Entegrasyonlar: pazaryeri ve site API bilgileri panelden girilir/değiştirilir (sunucuda şifreli saklanır),
 // bağlantı test edilir, kanal aktif/pasif yapılır; son başarılı senkron zamanları, hatalar ve geçmiş sipariş aktarımı buradadır.
-import { api, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey } from '../core.js';
+import { api, state, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey } from '../core.js';
 import { loadSummary } from '../app.js';
 import { importDialog } from './products.js';
 import { diagnoseDialog } from './diagnose.js';
@@ -42,12 +42,14 @@ export async function integrations(el) {
       <div class="hd">${chLogo(c.id)}<div style="flex:1;min-width:0"><h2 class="ellipsis">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2>
         <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}${c.beta ? html`<span class="pill amber" title="Canlı hesapla doğrulanması gerekiyor">Beta</span>` : ''}</div></div>
         <label class="row small" title="Pasif kanal senkronlanmaz">Aktif <span class="switch"><input type="checkbox" data-active="${c.id}" ${c.active ? 'checked' : ''}><span></span></span></label></div>
+      ${!c.gated ? html`<label class="row small" style="gap:10px;align-items:flex-start"><span class="switch"><input type="checkbox" data-hold="${c.id}" ${((state.settings && state.settings.hold_channels) || []).includes(c.id) ? 'checked' : ''}><span></span></span>
+        <span><b>Kanala yazmayı beklet</b> <span class="muted">— siparişler, ürünler, stok ve kanalda oluşan etiketler okunur; paketleme, kargo bildirimi, stok/fiyat gönderimi ve ürün oluşturma ${c.type === 'ikas' ? 'ikas' : 'kanal'} panelinden yapılır.</span></span></label>` : ''}
       ${c.locked ? html`<div class="notice bad small"><i class="ico ico-warn"></i>Kayıtlı bilgiler okunamadı (panel şifresi / PANEL_SECRET değişmiş olabilir). Bilgileri yeniden girin.</div>` : ''}
       ${c.enabled ? html`<div class="sync-grid">
         <div><span class="muted tiny">Siparişler · son başarılı</span><b>${when(c.last && c.last.ordersAt)}</b></div>
         <div><span class="muted tiny">Ürün / stok · son başarılı</span><b>${when(c.last && c.last.listingsAt)}</b></div>
         <div><span class="muted tiny">İlan · eşleşmiş</span><b>${n(c.listings)} · ${n(c.linked)}</b></div></div>` : ''}
-      ${c.last && !c.last.ok ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error}<div class="tiny muted">15 dakikada bir otomatik yeniden denenir.</div></div></div>` : ''}
+      ${c.last && !c.last.ok ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error}<div class="tiny muted">${c.last.nextTry ? `Art arda hata: sonraki otomatik deneme ${dateTime(c.last.nextTry)} (Senkronla hemen dener).` : '15 dakikada bir otomatik yeniden denenir.'}</div></div></div>` : ''}
       ${c.last && c.last.listingsError ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Ürün/stok alınamadı:</b> ${c.last.listingsError}</div></div>` : ''}
       <div class="muted small">${HELP[c.type]}</div>
       <div class="form-grid">${basic.map((f) => field(c, f))}</div>
@@ -124,6 +126,16 @@ export async function integrations(el) {
     },
   });
   el.addEventListener('change', async (e) => {
+    const h = e.target.dataset.hold;
+    if (h) {
+      try {
+        const cur = new Set((state.settings && state.settings.hold_channels) || []);
+        if (e.target.checked) cur.add(h); else cur.delete(h);
+        state.settings = await api('settings', { method: 'PUT', body: { hold_channels: [...cur] } });
+        toast(e.target.checked ? `${ch(h).name}: kanala yazma beklemede (yalnızca okunuyor)` : `${ch(h).name}: kanala yazma açıldı`); await after();
+      } catch (err) { toast(err.message, true); }
+      return;
+    }
     const id = e.target.dataset.active;
     if (!id) return;
     try { await api('integrations/' + id, { method: 'PUT', body: { active: e.target.checked } }); toast(e.target.checked ? `${ch(id).name} aktif` : `${ch(id).name} pasif: senkronlanmaz`); await after(); } catch (err) { toast(err.message, true); }

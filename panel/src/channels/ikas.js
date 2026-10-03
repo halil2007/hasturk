@@ -111,7 +111,7 @@ export function ikas(env, p, meta) {
         remoteId: String(pk.id),
         items: (pk.orderLineItemIds || []).map((lid) => ({ line_id: String(lid), qty: (items.find((i) => i.lineId === String(lid)) || {}).quantity || 1 })),
         status: /^(DELIVERED|FULFILLED|UNABLE_TO_DELIVER)$/.test(st) ? 'shipped' : 'open', remoteStatus: st,
-        cargoCompany: str(ti.cargoCompany), tracking: str(ti.trackingNumber), barcode: str(ti.barcode),
+        cargoCompany: str(ti.cargoCompany), tracking: str(ti.trackingNumber), barcode: str(ti.barcode), trackingUrl: str(ti.trackingLink),
         error: st === 'ERROR' ? str(pk.errorMessage) || 'ikas Kargo hata verdi' : '', labelReady: !!ti.shippingLabelImage,
         agreement: (ti.barcode || ti.trackingNumber) && (pk.appId || st === 'READY_FOR_SHIPMENT') ? 'ikas' : null,
       };
@@ -312,7 +312,7 @@ export function ikas(env, p, meta) {
 
   // Etiket: yalnızca ikas Kargo'nun gerçek gönderisi ve etiketi. Gönderi henüz oluşmadıysa "bekleniyor", hata varsa sebebi.
   async function label(order, pkg) {
-    if (!pkg.remote_id) return { pending: 'Paket ikas\'ta henüz “Kargoya Hazır” değil' };
+    if (!pkg.remote_id) return { pending: 'Bu sipariş ikas\'ta henüz paketlenmemiş. ikas panelinde paketleyip ikas Kargo ile gönderin; oluşan barkod ve etiket senkronla buraya gelir.' };
     const o = await getOrder(order.remote_id);
     const pk = (o.orderPackages || []).find((x) => String(x.id) === String(pkg.remote_id));
     if (!pk) throw new Error('Paket ikas\'ta bulunamadı (ikas panelinden iptal edilmiş olabilir); senkronlayın');

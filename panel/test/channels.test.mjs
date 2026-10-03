@@ -352,3 +352,29 @@ test('ikas tanılama: izin listesi boşsa "eksik izin" denmez; telefon fatura ad
   assert.match(o, /0555 \(fatura adresi/);
   assert.match(o, /HepsiJet \(\+30 TL\) → HepsiJet · ⚠ bu firma aktif kargo ayarlarınızda yok/);
 });
+
+test('idefix: "shipment_" önekli durumlar doğru eşlenir, istekler kimlik (User-Agent) ve X-API-KEY taşır', async () => {
+  const { idefix, idefixStatus } = await import('../src/channels/idefix.js');
+  assert.equal(idefixStatus('shipment_created'), 'new');
+  assert.equal(idefixStatus('shipment_picking'), 'processing');
+  assert.equal(idefixStatus('shipment_in_cargo'), 'shipped');
+  assert.equal(idefixStatus('shipment_delivered'), 'delivered');
+  assert.equal(idefixStatus('shipment_cancelled'), 'cancelled');
+  assert.equal(idefixStatus('Shipment-Unsupplied'), 'cancelled');
+  const calls = mockFetch([
+    [/\/oms\/V9\/list/, { items: [{ id: 5, orderNumber: 'ID1', orderDate: '2026-10-03T10:00:00', status: 'shipment_in_cargo', cargoCompany: 'Aras Kargo', cargoTrackingNumber: '123', shippingAddress: { fullName: 'A B', city: 'Bursa', county: 'Nilüfer' },
+      items: [{ id: 51, barcode: '111', merchantSku: 'A', productName: 'Gübre', quantity: 2, price: 50, discountedTotalPrice: 90 }] }] }],
+    [/\/pim\/pool\/V9\/list/, { products: [{ barcode: '111', title: 'Gübre', vendorStockCode: 'A', price: 50, comparePrice: 60, inventoryQuantity: 7, brandName: 'HG', status: 'approved' }] }],
+  ]);
+  const ch = idefix({ IDEFIX_API_KEY: 'k', IDEFIX_API_SECRET: 's', IDEFIX_VENDOR_ID: 'V9' }, { id: 'idefix' });
+  const [o] = await ch.fetchOrders(Date.now() - 864e5, Date.now());
+  assert.equal(o.status, 'shipped');
+  assert.equal(o.total, 90);
+  assert.equal(o.packages[0].tracking, '123');
+  assert.equal(calls[0].headers['X-API-KEY'], btoa('k:s'));
+  assert.match(calls[0].headers['User-Agent'], /HasturkPanel/);
+  const [l] = await ch.fetchListings();
+  assert.deepEqual([l.remoteId, l.stock, l.brand, l.active], ['111', 7, 'HG', true]);
+  const d = await ch.diagnose();
+  assert.equal(d.length, 2); assert.ok(d.every((x) => x.ok));
+});

@@ -2,7 +2,7 @@
 // Kargo barkodu: REST (shipment.pttavm.com/api/v1). Mağaza paneli → Entegrasyon → API kullanıcısı.
 // Not: PttAVM'in servis alan adları hesap ve sürüme göre değişebildiği için cevaplar esnek okunur;
 // yöntem adları ortam değişkenleriyle değiştirilebilir (bkz. README).
-import { http, basic, num, str } from '../util.js';
+import { http, basic, num, str, diagStep } from '../util.js';
 
 // Küçük XML okuyucu: etiket ön eklerini (a:, s:) atar, tekrar eden etiketleri diziye çevirir
 export function parseXml(xml) {
@@ -138,11 +138,21 @@ export function pttavm(env, meta) {
     return { tracking: t ? t[1] : '' };
   }
 
+  // Tanılama: servis adresi, kimlik ve yöntem adları ayrı ayrı denenir; SOAP hata metni olduğu gibi gösterilir
+  async function diagnose() {
+    const out = [], now = Date.now();
+    out.push({ name: 'Servis ayarları', ok: null, detail: `Adres ${URL_} · sipariş yöntemi ${ORDER_METHOD} · stok yöntemi ${STOCK_METHOD} · tarih biçimi ${trDate ? 'gg.aa.yyyy' : 'ISO'} (PttAVM dokümanındaki adlarla aynı olmalı)` });
+    await diagStep(out, 'Siparişler (son 24 saat)', async () => { const o = await fetchOrders(now - 864e5, now); return { detail: `${o.length} sipariş okundu` }; });
+    await diagStep(out, 'Ürün / stok listesi', async () => { const l = await fetchListings(); return { ok: l.length ? true : null, detail: l.length ? `${l.length} ürün` : 'Yanıt geldi ama ürün satırı tanınmadı (yöntem adı ya da alan adları farklı olabilir)' }; });
+    out.push({ name: 'Kargo barkodu', ok: env.PTTAVM_WAREHOUSE_ID ? null : false, detail: env.PTTAVM_WAREHOUSE_ID ? `Depo ${env.PTTAVM_WAREHOUSE_ID} tanımlı (barkod servisi ilk gönderimde denenir)` : 'Depo numarası girilmemiş: kargo barkodu alınamaz' });
+    return out;
+  }
+
   const missing = ['PTTAVM_USERNAME', 'PTTAVM_PASSWORD'].filter((k) => !env[k]);
   return {
     ...meta, type: 'pttavm', byOrderDate: true, enabled: !missing.length, missing, beta: true,
     caps: { accept: 'local', split: 'local', ship: env.PTTAVM_WAREHOUSE_ID ? 'remote' : 'local', label: null, createProduct: false, price: false },
-    fetchOrders, fetchListings, pushStock, ship,
+    fetchOrders, fetchListings, pushStock, ship, diagnose,
   };
 }
 

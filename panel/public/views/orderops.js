@@ -1,6 +1,6 @@
 // Sipariş işlemleri (ortak bileşen): işleme al → paketle (kanalda kargoya hazırla) → kargo firması seç/değiştir →
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
-import { api, state, html, render, $, $$, money, n, ch, chLogo, chBadge, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote } from '../core.js';
+import { api, state, html, render, $, $$, money, n, ch, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote } from '../core.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
@@ -92,6 +92,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   function mainBtn(o, p) {
     if (p.status === 'shipped' || !live()) return hasLabel(p, o.channel) ? html`<button class="btn sm outline" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi göster</button>` : '';
     const ls = labelState(o, p);
+    if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${chName()}'dan kontrol et</button>`;
     if (ls.key === 'unpacked') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-box"></i>${caps().pack ? 'Paketle ve etiket al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'packed' || ls.key === 'created' || ls.key === 'error') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${ls.key === 'error' ? 'Tekrar dene' : ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'ready') return html`<button class="btn sm primary" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi yazdır</button>`;
@@ -112,7 +113,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
         : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
       <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${o.extra && o.extra.cargoChoice ? ` · müşterinin seçtiği: ${o.extra.cargoChoice}` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
-        ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company ? 'Değiştir' : 'Seç'}</button>` : ''}</div>
+        ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
       ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
       <div class="acts">${mainBtn(o, p)}${mode !== 'panel' && !p.virtual ? html`<button class="btn sm" style="flex:0 0 auto" data-op="more" data-id="${p.id}" aria-label="Diğer işlemler"><i class="ico ico-dots"></i></button>` : ''}</div>
@@ -127,7 +128,8 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     const late = lateInfo({ ...o, packages: o.packages.length, open_packages: o.packages.filter((p) => p.status === 'open').length });
     const ext = extNote(o);
     const notes = html`${late ? html`<div class="notice ${late.cls === 'bad' ? 'bad' : 'warn'} small"><i class="ico ico-warn"></i><div><b>${late.text}</b> · ${late.title}</div></div>` : ''}
-      ${ext ? html`<div class="notice small" style="background:var(--purple-soft)"><i class="ico ico-bell"></i><div><b>${ext.text}</b> · ${shortDT(ext.at)} <span class="muted">(${ext.detail})</span></div></div>` : ''}`;
+      ${ext ? html`<div class="notice small" style="background:var(--purple-soft)"><i class="ico ico-bell"></i><div><b>${ext.text}</b> · ${shortDT(ext.at)} <span class="muted">(${ext.detail})</span></div></div>` : ''}
+      ${c.hold && live() ? html`<div class="notice small"><i class="ico ico-warn"></i><div><b>${chName()} işlemleri beklemede.</b> Paketleme ve kargo ${chName()} panelinden yapılır; orada oluşan barkod ve etiket senkronla buraya gelir, buradan yazdırılabilir.</div></div>` : ''}`;
     const stockNote = unmatched
       ? html`<div class="row small" style="color:var(--amber)"><i class="ico ico-warn"></i>${unmatched} ürün panelde eşleşmemiş; stoktan düşülmez</div>`
       : state.settings && state.settings.stock_sync ? html`<div class="row small" style="color:var(--good)"><i class="ico ico-check"></i>Stok tüm kanallarda güncellendi</div>`

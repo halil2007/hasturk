@@ -60,7 +60,12 @@ export function agreementOf(order, pkg) {
   return MARKETPLACES.includes(t) && (pkg.barcode || pkg.tracking) ? t : null;
 }
 
-// Etiket HTML'i (bir paket)
+// Etiket boyutları (Ayarlar → Kargo etiketi): 100×150 mm termal, A5, A4
+export const LABEL_SIZES = { '100x150': ['100mm', '150mm'], a5: ['148mm', '210mm'], a4: ['210mm', '297mm'] };
+const labelSize = () => (LABEL_SIZES[state.settings && state.settings.label_size] ? state.settings.label_size : '100x150');
+const fmtMoney = (v) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Number(v) || 0);
+
+// Etiket HTML'i (bir paket). Düzen: logolar → kargo firması ve anlaşma → gerçek kargo barkodu → sipariş / alıcı bilgileri → ürünler.
 export function labelHtml(order, pkg, total, sender = {}) {
   const a = order.address || {};
   // Çok paketli siparişte her paket kendi takip numarasını kullanır (siparişin numarası başka pakete ait olabilir)
@@ -68,40 +73,51 @@ export function labelHtml(order, pkg, total, sender = {}) {
   const tn = pkg.barcode || pkg.tracking || (total <= 1 ? order.tracking : '');
   const code = tn || `${order.order_number}-${pkg.no || 1}`;
   const internal = !tn;
-  const lines = (pkg.items || []).map((x) => {
+  const track = pkg.tracking && pkg.tracking !== code ? pkg.tracking : '';
+  const rows = (pkg.items || []).map((x) => {
     const it = order.items.find((i) => String(i.line_id) === String(x.line_id)) || {};
-    return `<div><b>${esc(x.qty)}×</b><span>${esc(it.product_name || it.name || x.line_id)}${it.sku ? ` <small>(${esc(it.sku)})</small>` : ''}</span></div>`;
+    const name = it.product_variant && it.product_group ? it.product_group : it.product_name || it.name || x.line_id;
+    const unit = Number(it.quantity) ? (Number(it.total) || 0) / Number(it.quantity) : 0;
+    return `<tr><td class="q">${esc(x.qty)}×</td><td><div class="n">${esc(name)}</div>${it.product_variant ? `<span class="v">${esc(it.product_variant)}</span>` : ''}${it.sku ? `<span class="s">${esc(it.sku)}</span>` : ''}</td><td class="p">${unit ? esc(fmtMoney(unit * x.qty)) : ''}</td></tr>`;
   }).join('');
-  const desi = pkg.desi || '';
+  const qty = (pkg.items || []).reduce((n, x) => n + (Number(x.qty) || 0), 0);
   const c = ch(order.channel), type = c.type || order.channel;
   const agr = internal ? null : agreementOf(order, pkg);
   const cargo = pkg.cargo_company || order.cargo_company || '';
   const logo = (state.settings && state.settings.logo) || 'logo.webp';
-  return `<section class="slabel">
-    <div class="lb-top">
-      <div><div>Sipariş: <b>${esc(order.order_number)}</b> · ${esc(c.name)}</div><div>${esc(new Date(order.ordered_at).toLocaleDateString('tr-TR'))}</div></div>
-      <div class="lb-pkg">${esc(pkg.no || 1)}/${esc(total)}</div>
+  const size = labelSize();
+  return `<section class="slabel s-${size}">
+    <header class="lb-hd"><img class="lb-logo" src="${esc(logo)}" alt=""><span class="lb-mark ${esc(type)}">${esc(MARK[type] || c.name)}</span></header>
+    <div class="lb-cargo"><div><b>${esc(cargo || 'Kargo firması belirtilmedi')}</b>${agr ? `<span class="lb-agr">${esc(AGREEMENT[agr] || '')}</span>` : ''}</div><div class="lb-pkg" title="Paket">${esc(pkg.no || 1)}/${esc(total)}</div></div>
+    <div class="lb-main">
+      <div class="lb-bar">${barcodeSvg(code)}<div class="code">${esc(code)}</div>${internal ? '<div class="warn">İç barkod — kargo takip numarası yok, kargo firması bu barkodu okutmaz</div>' : ''}</div>
+      <div class="lb-info">
+        <dl>
+          <dt>Sipariş No</dt><dd><b>${esc(order.order_number)}</b></dd>
+          <dt>Platform</dt><dd>${esc(c.name)}</dd>
+          ${track ? `<dt>Takip No</dt><dd>${esc(track)}</dd>` : ''}
+          <dt>Tarih</dt><dd>${esc(new Date(order.ordered_at).toLocaleDateString('tr-TR'))}</dd>
+          <dt>Gönderen</dt><dd>${esc(sender.name || '')}${sender.phone ? ` · ${esc(sender.phone)}` : ''}</dd>
+        </dl>
+        <div class="lb-to">
+          <div class="lbl">ALICI</div>
+          <div class="nm">${esc(a.name || order.customer)}</div>
+          <div class="ph">${esc(a.phone || order.phone || '')}</div>
+          <div class="ad">${esc(a.line || '')}</div>
+          <div class="ct">${esc([a.district, a.city].filter(Boolean).join(' / '))}</div>
+        </div>
+      </div>
     </div>
-    <div>
-      <div class="lb-to">ALICI</div>
-      <div class="lb-name">${esc(a.name || order.customer)}</div>
-      <div class="lb-addr">${esc(a.line || '')}</div>
-      <div class="lb-city">${esc([a.district, a.city].filter(Boolean).join(' / '))}</div>
-      <div>${esc(a.phone || order.phone || '')}</div>
-    </div>
-    <div class="lb-brand"><img class="lb-logo" src="${esc(logo)}" alt=""><span class="lb-mark ${esc(type)}">${esc(MARK[type] || c.name)}</span></div>
-    <div class="lb-agree"><b>${esc(cargo || 'Kargo firması belirtilmedi')}</b>${agr ? `<span>${esc(AGREEMENT[agr] || '')}</span>` : ''}</div>
-    <div class="lb-bar">${barcodeSvg(code)}<div class="code">${esc(code)}</div>${internal ? '<div style="font-size:7pt">İç barkod — kargo takip no girilmedi, kargo firması bu barkodu okutmaz</div>' : ''}</div>
-    <div class="lb-meta"><span>${desi ? `Desi: ${esc(desi)}` : ''}</span><span>${esc((pkg.items || []).reduce((n, x) => n + (Number(x.qty) || 0), 0))} adet</span></div>
-    <div class="lb-items">${lines}</div>
-    <div class="lb-from"><b>GÖNDEREN:</b> ${esc(sender.name || '')} ${esc(sender.phone || '')}<br>${esc([sender.address, sender.city].filter(Boolean).join(' '))}</div>
+    <table class="lb-items"><thead><tr><th colspan="2">Ürünler (${esc(qty)} adet)</th><th class="p">Tutar</th></tr></thead><tbody>${rows}</tbody></table>
+    <footer class="lb-from"><b>GÖNDEREN:</b> ${esc(sender.name || '')} ${esc(sender.phone || '')} · ${esc([sender.address, sender.city].filter(Boolean).join(' '))}</footer>
   </section>`;
 }
 
 // Yazdırma penceresi kapanınca çözülür (yazdırılıp yazdırılmadığını tarayıcı bildirmez; kullanıcıya sorulur)
-function printHtml(markup) {
+function printHtml(markup, size = labelSize()) {
   const box = document.getElementById('print');
-  box.innerHTML = markup;
+  const [w, h] = LABEL_SIZES[size] || LABEL_SIZES['100x150'];
+  box.innerHTML = `<style>@page { size: ${w} ${h}; margin: 0; }</style>` + markup;
   return new Promise((resolve) => {
     const clear = () => { box.innerHTML = ''; window.removeEventListener('afterprint', clear); resolve(); };
     window.addEventListener('afterprint', clear);
@@ -113,7 +129,7 @@ function printHtml(markup) {
 // Panel etiketleri: [{ order, pkg }] (her paket ayrı sayfa)
 export const printLabels = (list, sender) => printHtml(list.map(({ order, pkg }) => labelHtml(order, pkg, order.packages.length || 1, sender)).join(''));
 // Kanalın verdiği etiket görseli (ikas Kargo PNG/JPG)
-export const printImages = (list) => printHtml(list.map((x) => `<section class="slabel img"><img src="data:image/${x.format === 'jpg' ? 'jpeg' : x.format};base64,${x.data}" alt=""></section>`).join(''));
+export const printImages = (list) => printHtml(list.map((x) => `<section class="slabel img s-100x150"><img src="data:image/${x.format === 'jpg' ? 'jpeg' : x.format};base64,${x.data}" alt=""></section>`).join(''), '100x150');
 
 export function downloadFile(name, data, type) {
   const blob = type === 'application/pdf' ? new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], { type }) : new Blob([data], { type });
