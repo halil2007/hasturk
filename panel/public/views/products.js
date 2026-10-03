@@ -1,6 +1,6 @@
 // Ürünler: varyantlar ana ürün altında gruplanır; merkezi stok (her kanala kendi kuralıyla gönderilir), hızlı stok girişi,
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
-import { api, state, html, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels } from '../core.js';
+import { api, state, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels } from '../core.js';
 import { profit } from '../profit.js';
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
@@ -14,7 +14,7 @@ const FILTERS = [['', 'Tümü'], ['low', 'Kritik stok'], ['nocost', 'Alış fiya
 
 export async function products(el, rest, query = {}) {
   const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), page: 1 };
-  let rows = [], total = 0;
+  let rows = [], total = 0, groupsTotal = 0;
   render(el, html`<div class="stack">
     <div class="row wrap">
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
@@ -40,36 +40,65 @@ export async function products(el, rest, query = {}) {
     <span class="val num ${stockCls(p)}" data-act="stock" data-id="${p.id}" title="Stok girişi / sayım">${p.stock}</span>
     <button class="round" data-act="inc" data-id="${p.id}" aria-label="Stok artır"><i class="ico ico-plus"></i></button></div>`;
   const title = (p) => html`${p.variant_name && p.group_name ? p.group_name : p.name}${p.variant_name ? html`<span class="var-tag">${p.variant_name}</span>` : ''}`;
-  // Aynı ana ürünün (grup) birden fazla varyantı art arda geliyorsa başlık satırı eklenir
-  const groups = () => { const c = {}; rows.forEach((p) => { if (p.group_name) c[p.group_name] = (c[p.group_name] || 0) + 1; }); return c; };
+  const brand = (b) => (b ? html`<span class="brand-tag" title="Marka">${b}</span>` : '');
+  // Varyantlar ana ürün altında toplanır; ana ürün satırına tıklayınca varyantlar açılır / kapanır
+  const opened = new Set();
+  const groupList = () => { const m = new Map(); for (const p of rows) { const k = p.gk || p.group_name || p.name; if (!m.has(k)) m.set(k, []); m.get(k).push(p); } return [...m]; };
+  const isGroup = (list) => list.length > 1;
+  const range = (vals) => { const v = vals.filter((x) => x > 0); if (!v.length) return '—'; const lo = Math.min(...v), hi = Math.max(...v); return lo === hi ? money(lo) : `${money0(lo)} – ${money0(hi)}`; };
+  const chSummary = (list) => { const c = new Map(); list.forEach((p) => (p.listings || []).forEach((l) => c.set(l.channel, (c.get(l.channel) || 0) + 1))); return c.size ? html`<div class="ch-dots">${[...c].map(([id, k]) => html`<span class="ch-dot" title="${ch(id).name}: ${k} / ${list.length} varyant">${chLogo(id, true)}${k}/${list.length}</span>`)}</div>` : html`<span class="ch-dot wait">Kanalda yok</span>`; };
+  const gStock = (list) => list.reduce((a, p) => a + Math.max(0, p.stock), 0);
   function draw() {
-    const mob = isMobile(), gc = groups();
-    let lastG = null;
-    const grp = (p, cols) => { const g = p.group_name && gc[p.group_name] > 1 ? p.group_name : null; const out = g && g !== lastG ? html`<tr class="grp-row"><td colspan="${cols}">${g} <span class="muted tiny">· ${gc[g]} varyant</span></td></tr>` : ''; lastG = g; return out; };
+    const mob = isMobile(), gl = groupList(), all = !!f.q;
+    const varRow = (p) => { const m = margin(p); return html`<tr class="var-row" data-pid="${p.id}">
+      <td><div class="row" style="cursor:pointer" data-act="edit" data-id="${p.id}">${thumb(p.image, p.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:600">${p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : p.name}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="muted tiny">${[p.sku, p.barcode].filter(Boolean).join(' · ') || 'SKU yok'}</div></div></div></td>
+      <td>${dots(p)}</td>
+      <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span style="color:var(--amber)">girilmedi</span>`}</td>
+      <td class="r num" style="font-weight:650">${money(p.sale_price)}</td>
+      <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
+      <td class="c">${stockCtl(p)}</td>
+      <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
+    const single = (p) => { const m = margin(p); return html`<tr data-pid="${p.id}">
+      <td><div class="row" style="cursor:pointer" data-act="edit" data-id="${p.id}">${thumb(p.image, p.name)}<div style="min-width:0"><div class="ellipsis" style="max-width:340px;font-weight:650">${p.name}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="muted tiny">${brand(p.brand)}${[p.sku, p.barcode].filter(Boolean).join(' · ') || 'SKU yok'}</div></div></div></td>
+      <td>${dots(p)}</td>
+      <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span style="color:var(--amber)">girilmedi</span>`}</td>
+      <td class="r num" style="font-weight:650">${money(p.sale_price)}</td>
+      <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
+      <td class="c">${stockCtl(p)}</td>
+      <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
+    const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p));
+      return html`<tr class="grp-head ${on ? 'on' : ''}" data-act="tog" data-gi="${i}">
+        <td><div class="row"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', k)}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:700">${k}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}<b style="color:var(--text)">${list.length} varyant</b>${list.length <= 4 ? ` · ${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}` : ''}</div></div></div></td>
+        <td>${chSummary(list)}</td>
+        <td class="r num muted">${range(list.map((p) => p.purchase_price))}</td>
+        <td class="r num" style="font-weight:650">${range(list.map((p) => p.sale_price))}</td>
+        <td class="r num muted">—</td>
+        <td class="c"><span class="num ${low ? 'low' : ''}" style="font-weight:700" title="Varyantların toplam stoğu">${gStock(list)}</span></td>
+        <td class="r"><button class="btn sm ghost" data-act="tog" data-gi="${i}">${on ? 'Kapat' : 'Varyantlar'}</button></td></tr>
+        ${on ? list.map(varRow) : ''}`; };
+    const mCard = ([k, list], i) => { if (!isGroup(list)) { const p = list[0]; return html`<div class="m-card" data-pid="${p.id}">
+          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="muted tiny">${brand(p.brand)}${[p.sku, p.barcode].filter(Boolean).join(' · ')}</div></div></div>
+          ${dots(p)}<div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCtl(p)}</div></div>`; }
+      const on = all || opened.has(k);
+      return html`<div class="m-card grp ${on ? 'on' : ''}">
+        <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', k)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${k}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
+        ${on ? html`<div class="m-vars">${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCtl(p)}</div>`)}</div>` : ''}</div>`; };
     const body = !rows.length ? html`<div class="empty">Ürün yok. “Kanallardan içe aktar” ile ürünleri çekebilir veya “Ürün Ekle” ile ekleyebilirsiniz.</div>`
-      : mob ? html`<div class="m-list" style="padding:12px">${rows.map((p) => html`<div class="m-card" data-pid="${p.id}">
-          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${title(p)}</div><div class="muted tiny">${[p.sku, p.barcode].filter(Boolean).join(' · ')}</div></div></div>
-          ${dots(p)}<div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCtl(p)}</div></div>`)}</div>`
-        : html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th>Kanallar (fiyat)</th><th class="r">Alış</th><th class="r">Satış</th><th class="r">Marj</th><th class="c">Ortak stok</th><th></th></tr></thead><tbody>
-          ${rows.map((p) => { const m = margin(p); return html`${grp(p, 7)}<tr data-pid="${p.id}">
-            <td><div class="row" style="cursor:pointer" data-act="edit" data-id="${p.id}">${thumb(p.image, p.name)}<div style="min-width:0"><div class="ellipsis" style="max-width:340px;font-weight:650">${title(p)}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="muted tiny">${[p.sku, p.barcode].filter(Boolean).join(' · ') || 'SKU yok'}</div></div></div></td>
-            <td>${dots(p)}</td>
-            <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span style="color:var(--amber)">girilmedi</span>`}</td>
-            <td class="r num" style="font-weight:650">${money(p.sale_price)}</td>
-            <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
-            <td class="c">${stockCtl(p)}</td>
-            <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; })}
+      : mob ? html`<div class="m-list" style="padding:12px">${gl.map(mCard)}</div>`
+        : html`<div class="table-wrap"><table class="t prod-t"><thead><tr><th>Ürün</th><th>Kanallar (fiyat)</th><th class="r">Alış</th><th class="r">Satış</th><th class="r">Marj</th><th class="c">Ortak stok</th><th></th></tr></thead><tbody>
+          ${gl.map((g, i) => (isGroup(g[1]) ? head(g, i) : single(g[1][0])))}
         </tbody></table></div>`;
-    render($('[data-box]', el), html`${body}${rows.length < total ? html`<div class="pager"><span class="muted small" style="margin-right:auto">${total} üründen ${rows.length} gösteriliyor</span><button class="btn sm" data-act="more">Daha fazla</button></div>` : html`<div class="pager"><span class="muted small">${total} ürün</span></div>`}`);
+    const shown = gl.length;
+    render($('[data-box]', el), html`${body}<div class="pager"><span class="muted small" style="margin-right:auto">${n(groupsTotal)} ana ürün · ${n(total)} ürün/varyant${shown < groupsTotal ? ` · ${shown} gösteriliyor` : ''}</span>${gl.some((g) => isGroup(g[1])) && !all ? html`<button class="btn sm ghost" data-act="togall">${opened.size ? 'Tümünü kapat' : 'Tümünü aç'}</button>` : ''}${shown < groupsTotal ? html`<button class="btn sm" data-act="more">Daha fazla</button>` : ''}</div>`);
   }
   async function load(append = false) {
     setQuery({ f: f.filter, q: f.q });
-    const p = new URLSearchParams({ page: f.page, limit: 50 });
+    const p = new URLSearchParams({ page: f.page, limit: 40, group: 1 });
     if (f.q) p.set('q', f.q);
     if (f.filter) p.set('filter', f.filter);
     const r = await api('products?' + p);
     rows = append ? rows.concat(r.products) : r.products;
-    total = r.total;
+    total = r.total; groupsTotal = r.groups ?? r.total;
     render($('[data-filters]', el), html`${FILTERS.map(([k, t]) => html`<button class="tab ${f.filter === k ? 'on' : ''}" data-act="filter" data-k="${k}">${t}</button>`)}`);
     const unl = state.summary ? state.summary.unmatched : 0;
     $('[data-unl]', el).textContent = unl ? `(${unl})` : '';
@@ -79,6 +108,8 @@ export async function products(el, rest, query = {}) {
   const bump = quickStock(() => rows, el);
   actions(el, {
     filter: (t) => { f.filter = t.dataset.k; refresh(); },
+    tog: (t) => { const g = groupList()[Number(t.dataset.gi)]; if (!g) return; if (opened.has(g[0])) opened.delete(g[0]); else opened.add(g[0]); draw(); },
+    togall: () => { if (opened.size) opened.clear(); else groupList().forEach(([k]) => opened.add(k)); draw(); },
     more: () => { f.page++; load(true); },
     inc: (t) => bump(t.dataset.id, 1),
     dec: (t) => bump(t.dataset.id, -1),
@@ -149,6 +180,19 @@ export function stockDialog(p, done) {
   });
 }
 
+// Kanaldan gelen HTML açıklama: yalnızca biçim etiketleri kalır (betik, stil, olay öznitelikleri ve javascript: bağlantıları silinir)
+function safeHtml(src) {
+  const doc = new DOMParser().parseFromString(String(src || ''), 'text/html');
+  doc.querySelectorAll('script,style,iframe,object,embed,form,input,button,link,meta,base,svg').forEach((e) => e.remove());
+  doc.querySelectorAll('*').forEach((e) => [...e.attributes].forEach((a) => {
+    if (/^on/i.test(a.name) || a.name === 'style' || a.name === 'class' || a.name === 'id' || (/^(href|src|srcset|action|formaction|xlink:href)$/i.test(a.name) && !/^\s*(https?:|\/)/i.test(a.value))) e.removeAttribute(a.name);
+  }));
+  doc.querySelectorAll('a').forEach((a) => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
+  return doc.body.innerHTML;
+}
+// Açıklamanın geldiği kanal (bağlı ilanlardan aynı metni taşıyan)
+const descSource = (p) => { const l = (p.listings || []).find((x) => x.description && x.description === p.description); return l ? ch(l.channel).name : ''; };
+
 // ---------- ürün formu ----------
 export async function productForm(id, done) {
   const s = sheet({ title: id ? 'Ürünü düzenle' : 'Yeni ürün', size: 'wide' });
@@ -172,7 +216,9 @@ export async function productForm(id, done) {
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
       </div>
       <label class="field"><span>Görsel adresi</span><input class="input" name="image" value="${p.image || ''}" placeholder="https://…"></label>
-      <label class="field"><span>Açıklama</span><textarea class="input" name="description">${p.description || ''}</textarea></label>
+      ${p.description && /<[a-z][\s\S]*>/i.test(p.description) ? html`<div class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><div class="desc-view">${raw(safeHtml(p.description))}</div>
+        <details style="margin-top:6px"><summary class="small muted" style="cursor:pointer">Açıklamayı düzenle (HTML)</summary><textarea class="input" name="description" style="min-height:160px;margin-top:6px">${p.description}</textarea></details></div>`
+        : html`<label class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><textarea class="input" name="description" style="min-height:110px">${p.description || ''}</textarea></label>`}
     </div>
     <div class="card stack">
       <h3>Fiyat, maliyet ve stok</h3>

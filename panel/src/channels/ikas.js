@@ -111,6 +111,7 @@ export function ikas(env, p, meta) {
         status: /^(DELIVERED|FULFILLED|UNABLE_TO_DELIVER)$/.test(st) ? 'shipped' : 'open', remoteStatus: st,
         cargoCompany: str(ti.cargoCompany), tracking: str(ti.trackingNumber), barcode: str(ti.barcode),
         error: st === 'ERROR' ? str(pk.errorMessage) || 'ikas Kargo hata verdi' : '', labelReady: !!ti.shippingLabelImage,
+        agreement: (ti.barcode || ti.trackingNumber) && (pk.appId || st === 'READY_FOR_SHIPMENT') ? 'ikas' : null,
       };
     });
     const first = packages.find((x) => x.tracking) || {};
@@ -171,8 +172,8 @@ export function ikas(env, p, meta) {
       for (const t of vt.listVariantType || []) for (const v of t.values || []) values.set(v.id, v.name);
     } catch { /* varyant adları olmadan devam */ }
     const q = (o) => `query ($page: Int!) { listProduct(pagination: { page: $page, limit: 100 }) { hasNext data {
-      id name ${o.salesChannelIds} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice } stocks { stockCount } ${o.images} } } } }`;
-    let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }' };
+      id name ${o.salesChannelIds} ${o.brand} ${o.description} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice } stocks { stockCount } ${o.images} } } } }`;
+    let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }', brand: 'brand { name }', description: 'description' };
     for (let page = 1; page <= 200; page++) {
       const d = await flex(q, optional, { page });
       for (const p of d.listProduct.data || []) {
@@ -191,6 +192,7 @@ export function ikas(env, p, meta) {
             name: vname ? `${p.name} - ${vname}` : p.name, groupName: p.name, variantName: vname,
             image: imgUrl(img, 360), price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
             stock: (v.stocks || []).reduce((s, x) => s + num(x.stockCount), 0), active: v.isActive !== false,
+            brand: str(p.brand && p.brand.name), description: str(p.description),
           });
         }
       }
@@ -231,13 +233,31 @@ export function ikas(env, p, meta) {
   }
 
   // ---------- kargo (ikas Kargo) ----------
+  // Resmi Admin API'de (2.1.0) ikas Kargo için ayrı "gönderi oluştur" işlemi yoktur. Gönderi şöyle oluşur:
+  //   1) fulfillOrder(markAsReadyForShipment: true) → paket ikas'ta "Kargoya Hazır" (READY_FOR_SHIPMENT)
+  //   2) ikas Kargo uygulaması paketi alır (paketin appId alanı dolar), anlaşmalı firmada gönderiyi açar ve
+  //      barkod / takip no / etiket görselini paketin trackingInfo alanına yazar (hata olursa durum ERROR + errorMessage).
+  // Panel bu adımları izler; ikas Kargo gerçek gönderiyi oluşturup etiketi vermeden "etiket hazır" demez.
   let cargoCache = null;
-  async function cargoOptions() {
+  async function carriers() {
     if (!cargoCache) {
       const d = await gql('{ listCargoCompany { id name } }');
       cargoCache = (d.listCargoCompany || []).map((c) => ({ id: String(c.id), name: c.name })).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
     }
-    return [{ id: '', name: 'ikas Kargo (ikas panelindeki kargo önceliğine göre)' }, ...cargoCache];
+    return cargoCache;
+  }
+  // Seçenekler: ikas Kargo'nun kendi seçimi (önerilen) + mağazanın ikas kargo ayarlarında tanımlı firmalar
+  async function cargoOptions(order) {
+    const all = await carriers();
+    let used = null;
+    try {
+      const d = await gql('{ listShippingSettings { isPassive zoneRate { cargoCompanyId } } }');
+      used = new Set((d.listShippingSettings || []).filter((x) => !x.isPassive).flatMap((x) => (x.zoneRate || []).map((r) => String(r.cargoCompanyId || ''))).filter(Boolean));
+    } catch { /* ayarlar okunamazsa tüm firmalar */ }
+    const choice = order && order.extra && order.extra.cargoChoice;
+    const list = used && used.size ? all.filter((c) => used.has(c.id)) : all;
+    return [{ id: '', name: `ikas Kargo otomatik seçsin${choice ? ` (müşterinin seçtiği: ${choice})` : ''}`, hint: 'Önerilen: ikas Kargo, siparişin kargo yöntemine ve ikas\'taki kargo önceliğinize göre anlaşmalı firmayı seçer.' },
+      ...list.map((c) => ({ ...c, hint: 'ikas Kargo bu firmayla gönderi açar (ikas Kargo\'da bu firmanın anlaşması aktif olmalı).' }))];
   }
   const cargoInfo = (cargo) => (cargo && cargo.id ? { cargoCompanyId: cargo.id, cargoCompany: cargo.name } : undefined);
   // Paket alanlarıyla dönen mutasyonlar: şemada olmayan alan hata verirse o alan çıkarılıp tekrar denenir
@@ -262,7 +282,20 @@ export function ikas(env, p, meta) {
     return o;
   }
 
-  // Paketle: her yerel paket ikas'ta "Kargoya Hazır" paket olarak oluşturulur → ikas Kargo barkod/etiket üretir
+  // ikas paketinin gönderi durumu: kimin işlediği, gerçek gönderi oluştu mu, etiket var mı, hata ne
+  function shipment(pk) {
+    const ti = pk.trackingInfo || {}, st = String(pk.orderPackageFulfillStatus || '');
+    const code = str(ti.barcode) || str(ti.trackingNumber);
+    const base = { remoteId: String(pk.id), remoteStatus: st, barcode: str(ti.barcode), tracking: str(ti.trackingNumber), cargoCompany: str(ti.cargoCompany), appId: str(pk.appId) };
+    if (st === 'ERROR') return { ...base, state: 'error', error: `ikas Kargo gönderiyi oluşturamadı: ${str(pk.errorMessage) || 'sebep bildirilmedi'}` };
+    // "Kargoya Hazır" pakete barkodu yazan ikas Kargo'dur (ya da paketi işleyen kargo uygulaması: appId)
+    if (code && (pk.appId || st === 'READY_FOR_SHIPMENT')) return { ...base, state: ti.shippingLabelImage ? 'labeled' : 'created', agreement: 'ikas', labelImage: ti.shippingLabelImage || '' };
+    if (code) return { ...base, state: 'manual', labelImage: ti.shippingLabelImage || '' }; // takip no elle girilip gönderilmiş
+    if (st === 'READY_FOR_SHIPMENT') return { ...base, state: 'waiting' };
+    return { ...base, state: 'none' };
+  }
+
+  // Paketle = ikas Kargo ile gönderime hazırla: paket "Kargoya Hazır" oluşturulur, ikas Kargo gönderiyi açar
   async function pack(order, pkgs, { cargo } = {}) {
     const out = [];
     for (const pkg of pkgs) {
@@ -271,27 +304,30 @@ export function ikas(env, p, meta) {
       const pks = ((d.fulfillOrder || {}).orderPackages || []).filter((x) => !/CANCEL|REFUND/.test(x.orderPackageFulfillStatus || ''));
       const pk = pks.filter((x) => (x.orderLineItemIds || []).some((l) => lines.some((y) => y.orderLineItemId === String(l)))).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
       if (!pk) throw new Error('ikas paketi oluşturdu ama paket bilgisi dönmedi; birazdan senkronlayın');
-      const ti = pk.trackingInfo || {};
-      out.push({ remoteId: String(pk.id), remoteStatus: pk.orderPackageFulfillStatus, barcode: str(ti.barcode), tracking: str(ti.trackingNumber), cargoCompany: str(ti.cargoCompany) || (cargo && cargo.name) || '', error: pk.orderPackageFulfillStatus === 'ERROR' ? str(pk.errorMessage) : '' });
+      const sh = shipment(pk);
+      if (sh.state === 'none') throw new Error(`ikas paketi "Kargoya Hazır" yapmadı (durum: ${sh.remoteStatus || 'bilinmiyor'}); ikas Kargo gönderisi başlamadı`);
+      out.push({ ...sh, cargoCompany: sh.cargoCompany || (cargo && cargo.name) || '', error: sh.error || '' });
     }
-    return { packages: out, message: `${out.length} paket ikas'ta "Kargoya Hazır" olarak oluşturuldu; ikas Kargo barkodu hazırlıyor` };
+    return { packages: out, message: `${out.length} paket ikas'ta “Kargoya Hazır” yapıldı; ikas Kargo gönderiyi oluşturuyor` };
   }
 
-  // Etiket: ikas Kargo'nun ürettiği etiket görseli; yoksa barkod (panel etiketine basılır); hata varsa ikas'ın mesajı
+  // Etiket: yalnızca ikas Kargo'nun gerçek gönderisi ve etiketi. Gönderi henüz oluşmadıysa "bekleniyor", hata varsa sebebi.
   async function label(order, pkg) {
-    if (!pkg.remote_id) return { pending: 'Önce paketleyin (ikas\'ta Kargoya Hazır)' };
+    if (!pkg.remote_id) return { pending: 'Paket ikas\'ta henüz “Kargoya Hazır” değil' };
     const o = await getOrder(order.remote_id);
     const pk = (o.orderPackages || []).find((x) => String(x.id) === String(pkg.remote_id));
     if (!pk) throw new Error('Paket ikas\'ta bulunamadı (ikas panelinden iptal edilmiş olabilir); senkronlayın');
-    if (pk.orderPackageFulfillStatus === 'ERROR') throw new Error('ikas Kargo: ' + (str(pk.errorMessage) || 'barkod oluşturulamadı') + ' (müşteri telefonu ve depo adresi eksiksiz olmalı)');
-    const ti = pk.trackingInfo || {};
-    const info = { barcode: str(ti.barcode), tracking: str(ti.trackingNumber), cargoCompany: str(ti.cargoCompany), remoteStatus: pk.orderPackageFulfillStatus };
-    if (ti.shippingLabelImage) {
-      const lab = await labelFrom(ti.shippingLabelImage, `ikas-${order.order_number}-${pkg.no}`);
+    const sh = shipment(pk);
+    const info = { barcode: sh.barcode, tracking: sh.tracking, cargoCompany: sh.cargoCompany, remoteStatus: sh.remoteStatus, agreement: sh.agreement || null, step: sh.state };
+    if (sh.state === 'error') throw new Error(sh.error + ' — müşteri telefonu, gönderici (depo) adresi ve ikas Kargo\'daki firma anlaşmasını kontrol edin.');
+    if (sh.labelImage) {
+      const lab = await labelFrom(sh.labelImage, `ikas-${order.order_number}-${pkg.no}`);
       if (lab) return { ...info, label: lab };
     }
-    if (info.barcode || info.tracking) return { ...info, panel: true };
-    return { ...info, pending: 'ikas Kargo barkodu henüz oluşmadı. Birkaç saniye sonra tekrar deneyin; uzun sürerse ikas panelinde kargo entegrasyonu ve kargo önceliğini kontrol edin.' };
+    if (sh.state === 'created') return { ...info, pending: `ikas Kargo gönderiyi oluşturdu (${sh.cargoCompany || 'kargo'} · barkod ${sh.barcode || sh.tracking}) ama etiket görselini henüz vermedi. Birkaç saniye sonra tekrar deneyin.`, barcodeOnly: true };
+    if (sh.state === 'manual') return { ...info, pending: 'Bu pakete takip numarası elle girilmiş; ikas Kargo gönderisi değil, ikas etiket vermez.', barcodeOnly: true };
+    if (sh.state === 'waiting') return { ...info, pending: 'Paket “Kargoya Hazır”; ikas Kargo henüz gönderiyi oluşturmadı (barkod yok).' };
+    return { ...info, pending: `Paket ikas Kargo'ya gönderilmedi (durum: ${sh.remoteStatus || '-'})` };
   }
 
   // Kargoya ver: ikas Kargo paketi zaten varsa "Gönderildi" (FULFILLED) yapılır; yoksa takip bilgisiyle gönderilir

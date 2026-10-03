@@ -13,7 +13,9 @@ import { profit } from '../public/profit.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
-const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, tracking, barcode, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
+// Etiketi kanalın servisinden alınan kanallar
+const LABEL_REMOTE = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada'];
+const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, tracking, barcode, agreement, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
 
 // ---------- siparişler ----------
 async function loadOrder(db, id) {
@@ -76,7 +78,7 @@ async function listOrders(db, q) {
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND status = 'open') AS open_packages,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND label_printed_at IS NOT NULL) AS printed,
-      (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND (label_data IS NOT NULL OR label_at IS NOT NULL OR COALESCE(barcode, '') != '' OR COALESCE(tracking, '') != '')) AS labeled,
+      (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND (label_data IS NOT NULL OR label_at IS NOT NULL OR ((COALESCE(barcode, '') != '' OR COALESCE(tracking, '') != '') AND (agreement = 'own' OR o.channel NOT IN (${LABEL_REMOTE.map((x) => `'${x}'`).join(',')}))))) AS labeled,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND error IS NOT NULL) AS pkg_errors,
       o.ship_by, o.ext_action,
       (SELECT MAX(cargo_company) FROM packages WHERE order_id = o.id AND cargo_company != '') AS pkg_cargo,
@@ -164,8 +166,8 @@ async function event(db, o, action, user, note) {
 // Kanalın döndürdüğü paket bilgisini pakete işle
 async function updPkg(db, id, r = {}) {
   await run(db, `UPDATE packages SET remote_id = COALESCE(?, remote_id), remote_status = COALESCE(?, remote_status), barcode = COALESCE(NULLIF(?, ''), barcode),
-    tracking = COALESCE(NULLIF(?, ''), tracking), cargo_company = COALESCE(NULLIF(?, ''), cargo_company), error = ? WHERE id = ?`,
-  r.remoteId || null, r.remoteStatus || null, r.barcode || '', r.tracking || '', r.cargoCompany || '', r.error || null, id);
+    tracking = COALESCE(NULLIF(?, ''), tracking), cargo_company = COALESCE(NULLIF(?, ''), cargo_company), agreement = COALESCE(?, agreement), error = ? WHERE id = ?`,
+  r.remoteId || null, r.remoteStatus || null, r.barcode || '', r.tracking || '', r.cargoCompany || '', r.agreement || null, r.error || null, id);
 }
 const clearLabel = (db, id) => run(db, 'UPDATE packages SET label_format = NULL, label_data = NULL, label_at = NULL, label_viewed_at = NULL, label_printed_at = NULL WHERE id = ?', id);
 
@@ -304,7 +306,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   if (action === 'tracking') {
     // Kanal dışı (kendi anlaşmanızla) gönderimde takip no elle girilir
     const pkg = pkgOf(b.package_id);
-    await run(db, 'UPDATE packages SET tracking = ?, cargo_company = ?, desi = ? WHERE id = ?', str(b.tracking), str(b.cargo_company), num(b.desi, 0) || pkg.desi, pkg.id);
+    await run(db, "UPDATE packages SET tracking = ?, cargo_company = ?, desi = ?, agreement = 'own' WHERE id = ?", str(b.tracking), str(b.cargo_company), num(b.desi, 0) || pkg.desi, pkg.id);
     await event(db, o, 'tracking', user);
     return { ok: true };
   }
@@ -380,8 +382,9 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
     await log(db, o.channel, 'warn', `#${o.order_number} etiket alınamadı: ${e.message}`);
     return { official: null, error: e.message };
   }
-  if (r.barcode || r.tracking || r.cargoCompany || r.remoteStatus) await updPkg(db, pkg.id, { barcode: r.barcode, tracking: r.tracking, cargoCompany: r.cargoCompany, remoteStatus: r.remoteStatus });
-  if (r.pending) return { official: null, pending: r.pending };
+  if (r.barcode || r.tracking || r.cargoCompany || r.remoteStatus) await updPkg(db, pkg.id, { barcode: r.barcode, tracking: r.tracking, cargoCompany: r.cargoCompany, remoteStatus: r.remoteStatus, agreement: r.agreement });
+  // Gerçek gönderi / etiket henüz yok: işlem tamamlanmış sayılmaz (adım ve varsa gerçek barkod bilgisiyle döner)
+  if (r.pending) return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly };
   if (r.panel) {
     await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?), error = NULL WHERE id = ?', Date.now(), pkg.id);
     return { official: null, panel: true };
@@ -404,7 +407,9 @@ async function listPackages(db, q) {
   const where = [], args = [];
   if (q.channel && CHANNEL_IDS.includes(q.channel)) { where.push('o.channel = ?'); args.push(q.channel); }
   const base = `FROM packages p JOIN orders o ON o.id = p.order_id`;
-  const ready = "(p.label_data IS NOT NULL OR p.label_at IS NOT NULL OR COALESCE(p.tracking, '') != '' OR COALESCE(p.barcode, '') != '')";
+  // Etiket var: kanal etiketi alındı / geçerli panel etiketi oluşturuldu. Etiket servisi olan kanalda (ikas Kargo, Trendyol,
+  // Hepsiburada) yalnızca barkod gelmiş olması "etiket hazır" sayılmaz; kendi anlaşmanızla gönderimde ve etiket servisi olmayan kanalda sayılır.
+  const ready = `(p.label_data IS NOT NULL OR p.label_at IS NOT NULL OR ((COALESCE(p.tracking, '') != '' OR COALESCE(p.barcode, '') != '') AND (p.agreement = 'own' OR o.channel NOT IN (${LABEL_REMOTE.map((x) => `'${x}'`).join(',')}))))`;
   const live = "o.status NOT IN ('cancelled', 'returned', 'delivered')";
   // Hazırlanacak (etiket yok) → yazdırılacak (etiket var, yazdırılmadı) → kargoya verilecek (yazdırıldı) → kargoda
   const states = {
@@ -415,7 +420,7 @@ async function listPackages(db, q) {
   };
   const st = states[q.state] ? q.state : 'waiting';
   const w = (s) => 'WHERE ' + [states[s], ...where].join(' AND ');
-  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
+  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.agreement, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
       p.packed_at, p.error, p.label_at, p.label_printed_at, p.remote_id,
       o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.ship_by, o.status AS order_status, (SELECT COUNT(*) FROM packages x WHERE x.order_id = p.order_id) AS pkg_total
     ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args);
@@ -467,7 +472,7 @@ const LIMIT = (low) => `(CASE WHEN p.critical_stock > 0 THEN p.critical_stock EL
 async function listProducts(db, q) {
   const where = [], args = [];
   const low = LIMIT((await getSettings(db)).low_stock);
-  if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.group_name LIKE ?)'); args.push(s, s, s, s); }
+  if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.group_name LIKE ? OR p.brand LIKE ?)'); args.push(s, s, s, s, s); }
   if (q.filter === 'out') where.push('p.stock <= 0');
   if (q.filter === 'below') where.push(`p.stock > 0 AND p.stock <= ${low}`);
   if (q.filter === 'enough') where.push(`p.stock > ${low}`);
@@ -479,8 +484,20 @@ async function listProducts(db, q) {
   if (q.filter === 'passive') where.push('p.active = 0'); else if (q.filter !== 'all') where.push('p.active = 1');
   const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const limit = Math.min(Number(q.limit) || 50, 500), page = Math.max(1, Number(q.page) || 1);
-  const rows = await all(db, `SELECT p.*, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'COALESCE(p.group_name, p.name) COLLATE NOCASE, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
-  const total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
+  // Ana ürün (varyant grubu) anahtarı: grup adı yoksa ürün adı
+  const GK = "COALESCE(NULLIF(p.group_name, ''), p.name)";
+  let rows, total, groups = null;
+  if (q.group) {
+    // Sayfalama ana ürün bazında: her sayfada N ana ürün ve tüm (filtreye uyan) varyantları
+    const gks = (await all(db, `SELECT ${GK} AS gk FROM products p ${w} GROUP BY gk ORDER BY gk COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit)).map((r) => r.gk);
+    rows = gks.length ? await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${gks.map(() => '?').join(',')})
+      ORDER BY gk COLLATE NOCASE, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, ...args, ...gks) : [];
+    groups = (await first(db, `SELECT COUNT(DISTINCT ${GK}) AS n FROM products p ${w}`, ...args)).n;
+    total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
+  } else {
+    rows = await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'gk COLLATE NOCASE, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
+    total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
+  }
   if (rows.length) {
     const ids = rows.map((r) => r.id);
     const ls = await all(db, `SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
@@ -489,7 +506,7 @@ async function listProducts(db, q) {
   }
   // Stok durumu sayıları (sekmeler için)
   const cnt = await first(db, `SELECT SUM(p.stock <= 0) AS out_, SUM(p.stock > 0 AND p.stock <= ${low}) AS below, SUM(p.stock > ${low}) AS enough, COUNT(*) AS total FROM products p WHERE p.active = 1`);
-  return { products: rows, total, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, all: cnt.total || 0 } };
+  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, all: cnt.total || 0 } };
 }
 
 async function stockChange(env, db, ctx, id, b, user) {
@@ -777,7 +794,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
           try { o = (await packOrder(db, ch, o)).o; await event(db, o, 'pack', user); } catch (e) { errors.push(`${o.order_number}: ${e.message}`); o = await loadOrder(db, id); }
         }
         for (const pkg of o.packages.filter((p) => p.status === 'open' || b.all)) {
-          const r = b.fetch ? await makeLabel(db, ch, o, pkg, settings) : {};
+          const r = b.fetch || pkg.has_label ? await makeLabel(db, ch, o, pkg, settings) : {};
           if (r.error || r.pending) errors.push(`${o.order_number}/${pkg.no}: ${r.error || r.pending}`);
           labels.push({ package_id: pkg.id, official: r.official || null, panel: !!r.panel });
         }

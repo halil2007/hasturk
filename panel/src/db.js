@@ -103,6 +103,11 @@ const MIGRATIONS = [
   // Kanalın son kargoya teslim tarihi ve kanal tarafında yapılan son işlem (panel dışından)
   'ALTER TABLE orders ADD COLUMN ship_by INTEGER',
   'ALTER TABLE orders ADD COLUMN ext_action TEXT',
+  // Gönderinin yapıldığı kargo anlaşması: ikas | trendyol | hepsiburada | pttavm | n11 | idefix | pazarama | own (kendi anlaşmanız)
+  'ALTER TABLE packages ADD COLUMN agreement TEXT',
+  // Kanaldan gelen marka ve ürün açıklaması (panel ürününde boşsa buradan doldurulur)
+  'ALTER TABLE listings ADD COLUMN brand TEXT',
+  'ALTER TABLE listings ADD COLUMN description TEXT',
 ];
 
 const ready = new WeakMap();

@@ -20,7 +20,7 @@ export async function cargo(el, rest, query = {}) {
     ...data.unpacked.map((o) => ({ key: `o:${o.order_id}`, order_id: o.order_id, pkg: null, no: 1, total: 1, channel: o.channel, order_number: o.order_number, customer: o.customer, city: o.city, ordered_at: o.ordered_at, cargo: o.cargo_company, code: o.tracking, items: `${o.qty || 0} adet`, ls: { key: 'unpacked', cls: 'warn', text: 'Paketlenmedi' }, late: { ...o, status: o.order_status, packages: 0 } })),
     ...data.packages.map((p) => ({
       key: `p:${p.id}`, order_id: p.order_id, pkg: p.id, no: p.no, total: p.pkg_total, channel: p.channel, order_number: p.order_number, customer: p.customer, city: p.city, ordered_at: p.ordered_at,
-      cargo: p.cargo_company, code: p.barcode || p.tracking, items: `${p.items.reduce((a, x) => a + x.qty, 0)} adet`, ls: labelState({}, p), shipped: p.shipped_at, error: p.error,
+      cargo: p.cargo_company, code: p.barcode || p.tracking, items: `${p.items.reduce((a, x) => a + x.qty, 0)} adet`, ls: labelState({ channel: p.channel }, p), shipped: p.shipped_at, error: p.error,
       late: p.status === 'open' ? { ...p, status: p.order_status, packages: 1, open_packages: 1 } : null,
     })),
   ];
@@ -28,7 +28,7 @@ export async function cargo(el, rest, query = {}) {
   const next = (r) => {
     const o = `data-o="${r.order_id}" data-p="${r.pkg || ''}"`;
     if (f.state === 'shipped') return html`<button class="btn sm outline" data-act="label" ${o}><i class="ico ico-print"></i>Etiket</button>`;
-    if (r.ls.key === 'unpacked' || r.ls.key === 'packed' || r.ls.key === 'error') return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-${r.ls.key === 'unpacked' ? 'box' : 'tag'}"></i>${r.ls.key === 'unpacked' ? 'Paketle ve etiket al' : r.ls.key === 'error' ? 'Tekrar dene' : 'Etiket oluştur'}</button>`;
+    if (['unpacked', 'packed', 'created', 'error'].includes(r.ls.key)) return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-${r.ls.key === 'unpacked' ? 'box' : 'tag'}"></i>${r.ls.key === 'unpacked' ? 'Paketle ve etiket al' : r.ls.key === 'error' ? 'Tekrar dene' : r.ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (r.ls.key === 'ready') return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-print"></i>Etiketi yazdır</button>`;
     return html`<button class="btn sm" data-act="label" ${o}><i class="ico ico-print"></i>Tekrar</button><button class="btn sm primary" data-act="ship" ${o}><i class="ico ico-truck"></i>Kargoya ver</button>`;
   };
