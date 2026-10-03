@@ -53,13 +53,13 @@ export async function buyboxView(el, rest, query = {}) {
           <div class="row wrap"><span class="pill ${c}">${t}</span>${r.rule_on ? html`<span class="pill info">Otomatik fiyat</span>` : ''}</div>
           <div class="row small"><span>Fiyatımız <b>${money(r.price)}</b></span><span class="spacer"></span><span>Buybox <b>${r.buybox_price ? money(r.buybox_price) : '—'}</b></span></div>
           <div class="row"><span class="muted tiny" style="flex:1">${r.checked_at ? `kontrol ${ago(r.checked_at)}` : ''}</span><button class="btn sm" data-act="detail">Geçmiş</button><button class="btn sm ${r.rule_on ? 'primary' : ''}" data-act="rule">Kural</button></div></div>`; })}</div>`
-        : html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th>Kanal</th><th class="c">Sıra</th><th class="r">Fiyatımız</th><th class="r">Buybox fiyatı</th><th class="r">3. fiyat</th><th>Durum</th><th>Son kontrol</th><th class="c">Otomatik fiyat</th><th></th></tr></thead><tbody>
+        : html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th>Kanal</th><th class="c">Sıra</th><th class="r">Fiyatımız</th><th class="r">Buybox fiyatı</th><th class="r col-cust">3. fiyat</th><th>Durum</th><th class="col-cust">Son kontrol</th><th class="c">Otomatik fiyat</th><th></th></tr></thead><tbody>
           ${rows.map((r) => { const [c, t] = bbState(r); return html`<tr data-key="${r.channel}|${r.remote_id}">
             <td><div class="row">${thumb(r.image, r.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:300px;font-weight:650">${r.product_name || r.name}</div><div class="muted tiny">${r.barcode || r.remote_id}</div></div></div></td>
             <td>${chBadge(r.channel)}</td><td class="c">${r.rank ? html`<span class="rank ${r.rank === 1 ? 'one' : ''}">#${r.rank}</span>` : html`<span class="muted">—</span>`}</td>
-            <td class="r">${priceCell(r)}</td><td class="r">${bbCell(r)}</td><td class="r num muted">${r.third_price ? money(r.third_price) : '—'}</td>
+            <td class="r">${priceCell(r)}</td><td class="r">${bbCell(r)}</td><td class="r num muted col-cust">${r.third_price ? money(r.third_price) : '—'}</td>
             <td><span class="pill ${c}">${t}</span>${r.multi === 0 ? html`<div class="tiny muted">rakip yok</div>` : ''}</td>
-            <td class="small muted" title="${dateTime(r.checked_at)}">${r.checked_at ? ago(r.checked_at) : '—'}${r.last_change ? html`<div class="tiny">fiyat ${ago(r.last_change)} değişti</div>` : ''}</td>
+            <td class="small muted col-cust" title="${dateTime(r.checked_at)}">${r.checked_at ? ago(r.checked_at) : '—'}${r.last_change ? html`<div class="tiny">fiyat ${ago(r.last_change)} değişti</div>` : ''}</td>
             <td class="c"><button class="btn sm ${r.rule_on ? 'primary' : ''}" data-act="rule">${r.rule_on ? 'Açık' : 'Kapalı'}</button></td>
             <td class="r"><button class="btn sm ghost" data-act="detail">Geçmiş</button></td></tr>`; })}
         </tbody></table></div>`;

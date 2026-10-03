@@ -1,16 +1,17 @@
 # Hastürk CRM: satış kanalları tek panelde
 
-İki ikas sitesi (**HasTürk** ve **Tarım Dünyası**) ile **Hepsiburada** ve **Trendyol** mağazaları tek panelden yönetilir. **PttAVM** şimdilik beklemede (kodu hazır; Entegrasyonlar'da bilgileri girilince devreye girer).
+İki ikas sitesi (**HasTürk** ve **Tarım Dünyası**) ile **Hepsiburada** ve **Trendyol** mağazaları tek panelden yönetilir. **PttAVM, N11, idefix ve Pazarama** altyapısı hazırdır; bu kanallar bilgileri girilip **bağlantı testi başarılı olana kadar** yalnızca Entegrasyonlar'da görünür, sipariş/ürün/stok/analiz ekranlarına ve senkrona girmez.
 
-- **Siparişler:** Beş kanalın siparişleri tek listede görünür. Siparişler işleme alınır, **paketlere bölünür**, her paket ayrı ayrı **kargoya verilir** ve her paket için **ayrı kargo etiketi** basılır. Toplu işleme alma ve toplu etiket de vardır.
+- **Siparişler:** Tüm kanalların siparişleri tek listede görünür. İşleme alınır, **paketlere bölünür**, her paket **kanalda kargoya hazırlanır**, kargo firması **kanalın kendi listesinden** seçilir/değiştirilir, kanalın etiketi alınır ve yazdırılır. Etiketin oluşturulması, görüntülenmesi ve yazdırılması paket bazında ayrı izlenir (“yazdırıldı” yalnızca onayınızla işaretlenir). 1 günü aşan ve son kargoya teslim tarihi yaklaşan siparişler **Geciken** olarak işaretlenir. Kanalın kendi panelinden yapılan işlemler algılanır (ör. “Hepsiburada üzerinden işlem yapıldı”); kaynağı kesin olmayan değişiklikte kaynak iddia edilmez. İptal ve iade ayrı sekmelerde; her siparişin işlem geçmişi detayda.
 - **Stok:** Merkezi (depo) stok tutulur. Herhangi bir kanalda satış olunca stok düşer ve yeni adet **diğer tüm kanallara gönderilir**. Stok girişi yapılınca da tüm kanallar güncellenir. İptal edilen sipariş stoğa geri eklenir. Stoklar sayfası **Stokta yok / Sınır altı / Yeterli** bölümlerine ayrılır (sınır Ayarlar'dan, ürüne özel kritik stok varsa o kullanılır).
 - **Kanala özel stok:** Her ilan için kural seçilir: **Ortak stok** (depodaki adet), **En fazla N** (ör. Hepsiburada'da en çok 5 göster) veya **Ayrılmış N** (ör. Trendyol'da sabit 10; bu kanaldaki satış hem bu adetten hem depodan düşer).
 - **Ürünler:** Ürünler görselleri ve **varyantlarıyla** içe aktarılır; varyantlar ana ürün başlığı altında gruplanır. Alış/satış fiyatı, KDV, desi ve her kanaldaki fiyat/komisyon tutulur.
-- **Eşleştirme:** Barkodu veya SKU'su tek bir ürünle **kesin** uyan ilanlar otomatik bağlanır (barkod bir ürünü, SKU başka ürünü gösteriyorsa bağlanmaz). Emin olunamayanlar **Eşleştirme** sayfasında benzerlik puanlı önerilerle (ad, ölçü: 5 kg / 10 lt…, stok kodu) listelenir; tek tıkla bağlanır, yeni ürün olarak eklenir ya da yok sayılır. ikas'ta bir ürünün varyantı olan "5 Kg", Trendyol'da ayrı ürün olsa da doğru varyanta bağlanır.
+- **Eşleştirme:** **Farklı kanallardaki** aynı ürünü/varyantı birbirine bağlar; bir panel ürününe her kanaldan yalnızca bir ilan bağlanır, ana katalog sitesinin her varyantı kendi ürünüdür (tek site bağlıyken eşleştirme yapılmaz). Otomatik: barkod aynı; ya da stok kodu aynı ve barkod çelişmiyor; ya da **ad + varyant/ölçü birebir aynı** ve tek aday. Emin olunamayanlar **Eşleştirme → Onay bekleyen**'de benzerlik puanlı önerilerle listelenir. **Eşleşmiş ürünler** sekmesinde hangi kanaldaki hangi ilanın bağlı olduğu ürün ürün görülür; yanlış eşleşme kaldırılır ya da başka ürüne taşınır (kaldırılan eşleşme otomatik olarak tekrar yapılmaz).
 - **Geçmiş siparişler:** Entegrasyonlar sayfasından tarih aralığı seçilerek kanal kanal aktarılır (haftalık parçalar halinde, kaldığı yerden sürer).
 - **Kullanıcılar:** Yönetici ve personel hesapları. Personel API bilgilerini, kullanıcıları ve ayarları değiştiremez.
 - **Bildirimler:** Yeniden denemeye rağmen çözülemeyen senkron, stok gönderimi ve aktarım hataları burada toplanır; sorun düzelince kendiliğinden kapanır.
-- **İstatistik:** Günlük, haftalık ve aylık ciro ile sipariş adedi hem kanal bazında hem toplam olarak görülür. Önceki dönemle veya geçen yılla karşılaştırılabilir. Tahmini kâr ve en çok satan ürünler de listelenir.
+- **Analizler:** Bugün / dün / önceki günler (ya da hafta, ay, yıl) kartları: satış, sepet ortalaması, sipariş, ürün adedi, iptal/iade oranı ve değişim; son 8 haftanın raporu; en çok gönderim yapılan iller; en çok satanlar (adet, ciro, ortalama / en yüksek / en düşük satış fiyatı). Hepsi toplam ya da kanal bazında. “Ayrıntılı grafik” sekmesinde dönem karşılaştırmalı grafikler.
+- **Buybox (Trendyol / Hepsiburada):** Buybox sırası, buybox fiyatı ve rakip fiyatları, “Buybox sizde / kaybedildi / kazanıldı” durumları ve geçmiş. **Otomatik fiyat** yalnızca sizin kural açtığınız ürün ve kanalda, genel anahtar açıkken çalışır: rakibin belirlediğiniz TL kadar altına iner, en düşük fiyatın altına inmez, rakip çekilince normal fiyata döner, en yüksek fiyatı aşmaz. Rakip verisi yoksa veya güncel değilse fiyat değiştirilmez; kendi fiyatınız rakip sayılmaz; her değişiklik (eski/yeni fiyat, zaman, neden, sonraki sıra) kaydedilir.
 - **Kârlılık:** Alış, satış, komisyon, kargo ve diğer giderler girilince satıştan kalan tutar ve ürün başına kâr hesaplanır. Ayrıca kâr oranı, başabaş fiyatı ve hedef kâr oranı için gereken satış fiyatı gösterilir. İsteğe bağlı olarak KDV de hesaba katılır. Aynı ürünün beş kanaldaki kârı yan yana görülür. Telefonda tek elle kullanılacak şekilde tasarlandı.
 
 Panel telefon, tablet ve bilgisayarda çalışır. Telefonda "Ana ekrana ekle" ile uygulama gibi açılır. Açık ve koyu tema desteklenir.
@@ -62,6 +63,11 @@ Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bil
 | Trendyol | Satıcı ID, API Key, API Secret | Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri | `TRENDYOL_SELLER_ID`, `TRENDYOL_API_KEY`, `TRENDYOL_API_SECRET` |
 | Hepsiburada | Merchant ID, servis anahtarı | Merchant paneli → Entegrasyon / API bilgileri | `HB_MERCHANT_ID`, `HB_PASSWORD` (+ `HB_USERNAME`, `HB_USER_AGENT`, `HB_TEST`) |
 | PttAVM *(beklemede)* | API kullanıcı adı ve şifresi, depo numarası | Mağaza paneli → Entegrasyon → API kullanıcısı | `PTTAVM_USERNAME`, `PTTAVM_PASSWORD`, `PTTAVM_WAREHOUSE_ID` (+ gelişmiş ayarlar) |
+| N11 *(beklemede, beta)* | App Key, App Secret | Satıcı Ofisi → Hesabım → API Hesapları | `N11_APP_KEY`, `N11_APP_SECRET` |
+| idefix *(beklemede, beta)* | Vendor ID, API Key, API Secret | Satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri | `IDEFIX_VENDOR_ID`, `IDEFIX_API_KEY`, `IDEFIX_API_SECRET` |
+| Pazarama *(beklemede, beta)* | API Key (Client ID), API Secret | İş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri | `PAZARAMA_CLIENT_ID`, `PAZARAMA_CLIENT_SECRET` |
+
+**Bekleyen kanallar** (PttAVM, N11, idefix, Pazarama): bilgileri girip **Kaydet**, sonra **Bağlantıyı test et**. Test başarılı olunca kanal devreye girer; bilgiler sonradan değişirse yeniden test gerekir.
 
 > ⚠️ Arama widget'ı için açılan mevcut ikas uygulamasında yalnızca okuma izni var. Panel için **yazma izinli yeni bir özel uygulama** açın.
 >
@@ -94,31 +100,28 @@ Elle yapılan stok girişi kaydedildiği anda tüm kanallara gönderilir. Kanala
 
 **Kanal bazında işlemler** ("panel" yazanlar sadece panelde kaydedilir):
 
-| İşlem | ikas | Trendyol | Hepsiburada | PttAVM |
-|---|---|---|---|---|
-| Sipariş çekme | ✓ | ✓ | ✓ | ✓ (beta) |
-| İşleme al | panel | ✓ "Hazırlanıyor" (Picking) | panel | panel |
-| Paketlere bölme | panel | ✓ Trendyol'da bölünür (yeni paketler birkaç dk sonra gelir) | ✓ her paket ayrı HB paketi | panel |
-| Kargoya verme | ✓ takip no müşteriye bildirilir | ✓ fatura no / takip no | panel (HB kargosu alır) | ✓ barkod (depo no varsa) |
-| Kargo etiketi | ikas kargo barkodu etikete basılır | ✓ Trendyol ortak etiketi (ZPL) | ✓ Hepsiburada paket etiketi (ZPL/PDF) | PttAVM kargo barkodu etikete basılır |
-| Stok gönderme | ✓ | ✓ | ✓ | ✓ (beta) |
-| Fiyat gönderme | ✓ | ✓ | ✓ | — |
-| Ürün oluşturma | ✓ | kanal panelinden | kanal panelinden | kanal panelinden |
+| İşlem | ikas | Trendyol | Hepsiburada |
+|---|---|---|---|
+| İşleme al | panel | ✓ "Hazırlanıyor" (Picking) | panel |
+| Paketle (kargoya hazırla) | ✓ paket ikas'ta **"Kargoya Hazır"** olur → ikas Kargo barkodu üretir | ✓ "Hazırlanıyor" (fatura no verilirse "Faturalandı") | ✓ paket HB'de oluşturulur |
+| Kargo firması seç / değiştir | ✓ ikas'taki kargo firmaları (seçilmezse ikas panelindeki kargo önceliği); barkod oluşmadan değiştirilebilir | ✓ Trendyol firmaları (Yeni/Hazırlanıyor/Faturalandı paketlerde, 5 dk'da bir) | ✓ HB'nin paket için izin verdiği firmalar |
+| Kargo etiketi | ✓ ikas Kargo etiket görseli; yoksa ikas barkodu panel etiketine basılır | ✓ ortak etiket (Trendyol Express / Aras, ZPL); diğer firmalarda takip barkodu | ✓ paket etiketi (ZPL/PDF) |
+| Paketi iptal et | ✓ (ikas'ta paketlemeyi geri alır) | — (Trendyol panelinden) | ✓ (unpack) |
+| Kargoya verme | ✓ paket "Gönderildi" | ✓ | kargo okutunca (HB) |
+| Paketlere bölme | panel → her paket ayrı ikas paketi | ✓ Trendyol'da bölünür | ✓ her paket ayrı HB paketi |
+| Stok / fiyat gönderme | ✓ | ✓ | ✓ |
 
-**Kargo etiketi (kanalların kendi sistemlerinden):** Ayrı bir kargo firması entegrasyonu yoktur; etiket ve barkod her kanalın kendi kargo sisteminden gelir.
-- **Trendyol:** Ortak etiket (Trendyol Express / Aras) ZPL olarak alınır. Sipariş işleme alındıktan birkaç dakika sonra hazır olur.
-- **Hepsiburada:** Paket oluşturulunca paketin etiketi ZPL veya PDF olarak alınır.
-- **ikas ve PttAVM:** Bu kanallar API'den etiket dosyası vermiyor. Kanalın kargo entegrasyonunun **barkodu** (ikas paket barkodu / PttAVM kargo barkodu) senkronla gelir ve panelin 100×150 mm etiketine Code 128 olarak basılır.
+**ikas Kargo:** “Paketle ve etiket al” paketi ikas'ta **Kargoya Hazır** yapar; ikas Kargo, ikas panelindeki kargo önceliğine (ya da seçtiğiniz firmaya) göre barkodu üretir ve panel birkaç saniye içinde barkodu/etiketi okur. ikas bir hata verirse (ör. müşteri telefonu ya da depo adresi eksik) mesaj paket kartında görünür. Barkod oluşturmak için ikas panelinde **ikas Kargo entegrasyonunun açık** ve stok lokasyonu adresinin eksiksiz olması gerekir.
 
 Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. ZPL dosyası Zebra ve uyumlu termal yazıcılarda doğrudan basılır. Normal yazıcı kullanıyorsanız **Ayarlar → Kargo etiketi → "ZPL etiketini PDF'e çevir"** seçeneğini açın. Bu çeviri Labelary servisiyle yapılır ve etiket içeriği (alıcı adı/adresi) bu servise gönderilir.
 
-**Sayfalar (menü grupları):** Genel Bakış (bugünün işleri: yeni sipariş, kargo, eşleşme, stokta yok, açık sorun) · **Satış:** Siparişler (kanal sekmeleri ve bekleyen sayıları, tarih/kargo filtresi, toplu işlem, Excel; sipariş detayı sağdan açılır), Kargo · **Katalog:** Ürünler, Stoklar, Eşleştirme · **Raporlar:** Analizler, Kârlılık · **Sistem:** Entegrasyonlar, Bildirimler, Kullanıcılar, Ayarlar. Filtreler adres çubuğunda tutulur (geri tuşu çalışır, bağlantı paylaşılabilir).
+**Sayfalar (menü grupları):** Genel Bakış (bugünün işleri: yeni sipariş, geciken, kargo, eşleşme, stokta yok, açık sorun) · **Satış:** Siparişler (kanal sekmeleri, Yeni / Hazırlanıyor / Geciken / Kargoda / Teslim / İptal / İade, toplu işlem, Excel; sipariş detayı sağdan açılır), Kargo (Hazırlanacak → Etiketi yazdırılacak → Kargoya verilecek → Kargoda) · **Katalog:** Ürünler, Stoklar, Eşleştirme, Buybox · **Raporlar:** Analizler, Kârlılık · **Sistem:** Entegrasyonlar, Bildirimler, Kullanıcılar, Ayarlar. Filtreler adres çubuğunda tutulur (geri tuşu çalışır, bağlantı paylaşılabilir).
 
 **Pazaryerlerinde yeni ürün açma:** Trendyol ve Hepsiburada'da yeni ilan kanalın kendi panelinden açılır (kategori işlemleri bu aşamada kapsam dışı). İlan aynı barkod veya SKU ile açıldığında bir sonraki senkronda panel ürününe otomatik bağlanır.
 
 ## Bilinmesi gerekenler
 
-- **Canlı hesapla ilk deneme:** API bağlantıları kanalların resmi dokümanlarına göre yazıldı. Örnek API cevaplarıyla test edildi ama gerçek mağaza hesaplarıyla henüz denenmedi. İlk bağlantıda **Ayarlar → Kayıtlar**'da bir hata görürseniz mesajı iletin; çoğu düzeltme tek satırlıktır.
+- **Canlı hesapla ilk deneme:** API bağlantıları kanalların resmi dokümanlarına (ikas: resmi `@ikas/admin-api-client` şeması) göre yazıldı. Örnek API cevaplarıyla test edildi ama Trendyol, Hepsiburada ve yeni pazaryerleri gerçek mağaza hesaplarıyla henüz denenmedi; ikas'ta panelden “Kargoya Hazır” yapılan paketin ikas Kargo'yu tetiklediği ilk gerçek siparişte doğrulanmalıdır. İlk bağlantıda **Ayarlar → Kayıtlar**'da bir hata görürseniz mesajı iletin; çoğu düzeltme tek satırlıktır.
 - **PttAVM (beklemede, beta):** PttAVM'in SOAP servisinin alan adları hesaba ve sürüme göre değişebiliyor. Yöntem adları ortam değişkenleriyle değiştirilebilir: `PTTAVM_ORDER_METHOD` (varsayılan `SiparisKontrolListesiV2`), `PTTAVM_STOCK_METHOD` (`StokFiyatGuncelle3`), `PTTAVM_LIST_METHOD` (`StokKontrolListesi`), `PTTAVM_DATE_FORMAT` (`tr` = gg.aa.yyyy).
 - **Hepsiburada paket listeleri:** Kargodaki, teslim edilen ve iptal edilen paket uç noktalarından biri hesabınızda kapalıysa senkron devam eder; uyarı Kayıtlar'a yazılır.
 - **Kargo firması entegrasyonu yok (bilerek):** Etiket ve barkod her kanalın kendi kargo sisteminden gelir. Yurtiçi, Aras, MNG gibi firmalara doğrudan bağlantı ileride eklenebilir.
@@ -138,11 +141,12 @@ npm test         # stok düşümü, iptal/iade, kanala özel stok, eşleştirme,
 | `src/index.js` | Worker girişi: `/api/*`, giriş, zamanlanmış senkron |
 | `src/api.js` | Sipariş, ürün, ilan, ayar ve istatistik uç noktaları |
 | `src/sync.js` | Senkron motoru: sipariş kaydı, stok düşümü, kanala özel stok ve fiyat gönderimi, içe aktarma, yeniden deneme / bildirim |
-| `src/match.js` | Ürün eşleştirme: kesin eşleşme (barkod/SKU) ve benzerlik puanlı öneriler |
+| `src/match.js` | Ürün eşleştirme: kanallar arası kesin eşleşme (barkod / stok kodu / ad + varyant) ve benzerlik puanlı öneriler |
+| `src/buybox.js` | Buybox takibi ve kurallı otomatik fiyat (güvenlik kurallarıyla) |
 | `src/backfill.js` | Geçmiş sipariş aktarımı (parça parça, kaldığı yerden) |
 | `src/auth.js` | Giriş, oturum çerezi, kullanıcılar ve şifreler |
-| `src/stats.js` | Ciro, adet, kâr serileri, karşılaştırma, en çok satanlar |
-| `src/channels/*.js` | Kanal bağlantıları (`ikas`, `trendyol`, `hepsiburada`, `pttavm`, `demo`) |
+| `src/stats.js` | Ciro, adet, kâr serileri, karşılaştırma, dönem kartları, iller, en çok satanlar |
+| `src/channels/*.js` | Kanal bağlantıları (`ikas`, `trendyol`, `hepsiburada`, `pttavm`, `n11`, `idefix`, `pazarama`, `demo`) |
 | `src/config.js` | Panelden girilen API bilgileri (şifreli saklama, maskeleme) |
 | `public/` | Panel arayüzü (derleme gerektirmez): `app.js`, `views/*.js` (sayfalar; `orderops.js` = sipariş işlemleri bileşeni), `chart.js`, `labels.js` (etiket + Code 128), `profit.js` (kâr formülü; sunucu da aynı dosyayı kullanır) |
 | `dev/` | Yerel sunucu ve D1 benzeri SQLite sarmalayıcı |
