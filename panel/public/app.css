@@ -630,3 +630,16 @@ a.tab { text-decoration: none; }
 .num.low { color: var(--amber); }
 .desc-view { font-size: 13.5px; line-height: 1.55; color: var(--text-2); max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: var(--surface-2); }
 .desc-view img { max-width: 100%; height: auto; } .desc-view table { border-collapse: collapse; } .desc-view td, .desc-view th { border: 1px solid var(--line); padding: 4px 6px; }
+
+/* Sayfa geçişi: üst yükleme çubuğu ve iskelet */
+#topload { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 9999; pointer-events: none; opacity: 0; transition: opacity .2s; background: linear-gradient(90deg, transparent, var(--primary), transparent); background-size: 40% 100%; background-repeat: no-repeat; }
+#topload.on { opacity: 1; animation: topload 1s linear infinite; }
+@keyframes topload { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+.skel-page { display: flex; flex-direction: column; gap: 14px; }
+.skel-row { display: flex; gap: 12px; }
+.skel-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.skel { display: block; height: 14px; width: 100%; border-radius: 7px; background: linear-gradient(90deg, var(--surface-3) 0%, var(--surface-2) 50%, var(--surface-3) 100%); background-size: 200% 100%; animation: skel 1.2s ease-in-out infinite; }
+.skel-row .skel { height: 38px; border-radius: 10px; }
+.skel.w20 { width: 20%; } .skel.w30 { width: 30%; } .skel.w40 { width: 40%; } .skel.w50 { width: 50%; } .skel.w60 { width: 60%; } .skel.w70 { width: 70%; } .skel.w80 { width: 80%; } .skel.w90 { width: 90%; }
+@keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .skel, #topload.on { animation: none; } }

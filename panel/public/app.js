@@ -78,8 +78,11 @@ export function setQuery(query) {
   history.replaceState(null, '', `#/${[path, ...rest.map(encodeURIComponent)].filter((x, i) => i === 0 || x).join('/')}${qs ? '?' + qs : ''}`);
 }
 
-let current = null, currentPath = null;
+let current = null, currentPath = null, routeSeq = 0;
+// Sayfa iskeleti: veri gelene kadar sayfa boş kalmaz (görünüm ilk çizimde bunu değiştirir)
+const SKELETON = html`<div class="skel-page" aria-busy="true" aria-label="Yükleniyor"><div class="skel-row"><span class="skel w40"></span><span class="skel w20"></span></div><div class="skel-card"><span class="skel w30"></span><span class="skel"></span><span class="skel w80"></span><span class="skel w60"></span></div><div class="skel-card"><span class="skel"></span><span class="skel w70"></span><span class="skel w90"></span><span class="skel w50"></span><span class="skel w80"></span></div></div>`;
 async function route() {
+  const my = ++routeSeq;
   const { path, rest, query } = parseHash();
   const r = PAGES.find((x) => x.path === path && canSee(x)) || PAGES[0];
   $$('[data-path]').forEach((a) => a.classList.toggle('on', a.dataset.path === r.path));
@@ -89,10 +92,21 @@ async function route() {
   if (current && current.destroy) current.destroy();
   // Her sayfa temiz bir kapsayıcıyla başlar (önceki sayfanın olay dinleyicileri taşınmaz)
   const old = $('#view'), el = old.cloneNode(false);
+  render(el, SKELETON);
   old.replaceWith(el);
   if (currentPath !== r.path) window.scrollTo(0, 0);
   currentPath = r.path;
-  current = (await r.view(el, rest, query)) || null;
+  current = null;
+  try {
+    const v = (await r.view(el, rest, query)) || null;
+    // Bu arada başka sayfaya geçildiyse geç kalan sayfa sonucu kullanılmaz
+    if (my !== routeSeq) { if (v && v.destroy) v.destroy(); return; }
+    current = v;
+  } catch (e) {
+    if (my !== routeSeq) return;
+    render(el, html`<div class="card"><div class="notice bad"><i class="ico ico-warn"></i><div style="flex:1">Sayfa yüklenemedi: ${e.message}</div><button class="btn sm" data-retry>Tekrar dene</button></div></div>`);
+    const b = el.querySelector('[data-retry]'); if (b) b.onclick = () => route();
+  }
 }
 
 export async function loadSummary() {

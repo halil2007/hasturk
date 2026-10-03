@@ -11,6 +11,7 @@ import { autoMatch, relinkItems } from './match.js';
 import { runJobs } from './backfill.js';
 import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
+import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 export { relinkItems };
 
@@ -56,9 +57,10 @@ export async function saveOrders(db, ch, orders, maps) {
   const recent = new Set((await all(db, "SELECT DISTINCT order_id FROM order_events WHERE source = 'panel' AND at > ?", Date.now() - 30 * 60e3)).map((r) => r.order_id));
   const t = Date.now();
   // Kanaldan aynen gelen (değişmemiş) sipariş tekrar yazılmaz: veritabanı yazma kotasını korur
-  const changed = [];
+  const changed = [], created = [];
   for (const o of orders) {
     const id = `${ch}:${o.remoteId}`, h = hash(JSON.stringify(o)), ex = existing.get(id);
+    if (!ex) created.push(id);
     if (ex && ex.hash === h) continue;
     o._hash = h;
     changed.push(o);
@@ -124,7 +126,9 @@ export async function saveOrders(db, ch, orders, maps) {
     }
     await db.batch(st);
   }
-  return changed.map((o) => `${ch}:${o.remoteId}`);
+  const out = changed.map((o) => `${ch}:${o.remoteId}`);
+  out.created = created; // veritabanında ilk kez görülen siparişler (yeni sipariş bildirimi için)
+  return out;
 }
 
 function hash(s) {
@@ -291,6 +295,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
         const orders = await attempt(() => ch.fetchOrders(since, t));
         const ids = await saveOrders(db, ch.id, orders, maps);
         changed.push(...ids);
+        // Yeni sipariş e-postası: kanalın ilk aktarımında (imleç yokken) gönderilmez
+        if (cursor && ids.created && ids.created.length) out.mailQueued = (out.mailQueued || 0) + await queueNew(db, ch, ids.created, settings).catch(() => 0);
         await setSetting(db, 'cursor:' + ch.id, t);
         Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, warn: orders.warnings || null });
         out.channels[ch.id] = orders.length;
@@ -331,6 +337,7 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     if (!only) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
+    out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
     // 5) geçmiş sipariş aktarımı varsa bir parça daha ilerlet
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });

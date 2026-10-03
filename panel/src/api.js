@@ -7,6 +7,7 @@ import { suggestions, linkedGroups } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
+import { sendMail, orderMail, validEmail } from './mail.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { profit } from '../public/profit.js';
@@ -602,6 +603,14 @@ async function saveSettings(db, b) {
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
     if (k === 'autoprice') v = !!v;
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
+    if (k === 'mail_enabled') v = !!v;
+    if (k === 'mail_to') {
+      v = [...new Set((Array.isArray(v) ? v : String(v || '').split(/[\s,;]+/)).map((x) => str(x).toLowerCase()).filter(Boolean))].slice(0, 10);
+      const bad = v.filter((x) => !validEmail(x));
+      if (bad.length) fail(400, 'Geçersiz e-posta adresi: ' + bad.join(', '));
+    }
+    if (k === 'mail_channels') v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, (v || {})[c] !== false]));
+    if (k === 'panel_url') { v = str(v).replace(/\/+$/, ''); if (v && !/^https?:\/\/[^\s]+$/i.test(v)) fail(400, 'Panel adresi https:// ile başlamalı'); }
     if (k === 'catalog_channels') v = (Array.isArray(v) ? v : []).filter((c) => CHANNEL_IDS.includes(c));
     if (k === 'company') v = Object.fromEntries(['title', 'legal', 'phone', 'email', 'address', 'tax'].map((f) => [f, str((v || {})[f]).slice(0, 300)]));
     if (k === 'logo') { v = v ? String(v) : ''; if (v && (!/^data:image\/(png|jpeg|webp|svg\+xml);base64,/.test(v) || v.length > 400000)) fail(400, 'Logo PNG/JPG/WEBP/SVG ve en fazla ~300 KB olmalı'); }
@@ -611,18 +620,22 @@ async function saveSettings(db, b) {
 }
 
 async function channelsInfo(env, db) {
-  const counts = await all(db, 'SELECT channel, COUNT(*) AS n, SUM(product_id IS NOT NULL) AS linked, SUM(error IS NOT NULL) AS errors FROM listings GROUP BY channel');
-  const out = [];
-  for (const c of await getChannels(env, db)) {
+  // Tek seferde: ilan sayıları + tüm kanalların son senkron durumu (kanal başına ayrı sorgu yapılmaz)
+  const [counts, lasts, chs] = await Promise.all([
+    all(db, 'SELECT channel, COUNT(*) AS n, SUM(product_id IS NOT NULL) AS linked, SUM(error IS NOT NULL) AS errors FROM listings GROUP BY channel'),
+    all(db, "SELECT k, v FROM settings WHERE k LIKE 'last:%'"),
+    getChannels(env, db),
+  ]);
+  const last = new Map(lasts.map((r) => { try { return [r.k.slice(5), JSON.parse(r.v)]; } catch { return [r.k.slice(5), null]; } }));
+  return chs.map((c) => {
     const x = counts.find((r) => r.channel === c.id) || {};
-    out.push({ ...publicInfo(c), last: await getRaw(db, 'last:' + c.id), listings: x.n || 0, linked: x.linked || 0, listingErrors: x.errors || 0 });
-  }
-  return out;
+    return { ...publicInfo(c), last: last.get(c.id) || null, listings: x.n || 0, linked: x.linked || 0, listingErrors: x.errors || 0 };
+  });
 }
 
 // ---------- yönlendirme ----------
 // Sadece yöneticinin yapabileceği işlemler (kanal API bilgileri, kullanıcılar, ayarlar, toplu aktarım)
-const ADMIN_ONLY = [/^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/];
+const ADMIN_ONLY = [/^mail\//, /^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/];
 export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönetici', role: 'admin' }) {
   const url = new URL(req.url), q = Object.fromEntries(url.searchParams), m = req.method;
   let x;
@@ -631,13 +644,17 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (user.role !== 'admin' && !diag && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
   if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
   if (path === 'summary' && m === 'GET') {
-    const qs = await first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'");
-    const [s, notices, match] = await Promise.all([
+    const [qs, s, notices, match, st, chInfo] = await Promise.all([
+      first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'"),
       summary(db),
       first(db, 'SELECT COUNT(*) AS open, SUM(read = 0) AS unread FROM notices WHERE resolved_at IS NULL'),
       first(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
+      getSettings(db),
+      channelsInfo(env, db),
     ]);
-    return json({ ...s, channels: await channelsInfo(env, db), settings: await getSettings(db), user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
+    // E-postadaki "panelde aç" bağlantısı için panel adresi (yönetici girmediyse kullanılan adres)
+    if (!st.panel_url && user.role === 'admin' && /^https:\/\//.test(url.origin)) { await setSetting(db, 'panel_url', url.origin); st.panel_url = url.origin; }
+    return json({ ...s, channels: chInfo, settings: st, user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
   }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
   if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
@@ -813,6 +830,18 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'integrations' && m === 'GET') {
     const cfg = await loadConfig(env, db), chs = await getChannels(env, db), info = await channelsInfo(env, db);
     return json({ secretSet: !!env.PANEL_SECRET, channels: chs.map((c) => ({ ...info.find((x) => x.id === c.id), ...describe(env, cfg, c.id) })) });
+  }
+  // E-posta servisi bilgileri (gizli anahtar istemciye dönmez) ve deneme e-postası
+  if (path === 'integrations/mail' && m === 'GET') return json(describe(env, await loadConfig(env, db), 'mail'));
+  if (path === 'mail/test' && m === 'POST') {
+    const settings = await getSettings(db), to = (settings.mail_to || []).filter(validEmail);
+    if (!to.length) fail(400, 'Önce bildirim alacak e-posta adresini kaydedin');
+    const chs = await getChannels(env, db), c = chs.find((x) => x.enabled) || { id: 'ikas1', name: 'HasTürk', type: 'ikas' };
+    const sample = { id: 'deneme', order_number: 'DENEME-1', ordered_at: Date.now(), customer: 'Deneme Müşteri', address: JSON.stringify({ city: 'Konya', district: 'Selçuklu' }), total: 249.9 };
+    const mail = orderMail(sample, [{ name: 'Örnek ürün', sku: 'ORNEK-1', quantity: 1, total: 249.9, status: '' }], c, settings.panel_url || url.origin);
+    try { await sendMail(env, db, { to, subject: '[Deneme] ' + mail.subject, html: mail.html, text: mail.text }); } catch (e) { fail(400, 'E-posta gönderilemedi: ' + e.message); }
+    await log(db, null, 'info', `${user.name}: deneme e-postası gönderildi (${to.join(', ')})`);
+    return json({ ok: true, message: `Deneme e-postası gönderildi: ${to.join(', ')}` });
   }
   if ((x = path.match(/^integrations\/([a-z0-9]+)$/)) && m === 'PUT') {
     await saveConfig(env, db, x[1], await body(req));

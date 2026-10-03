@@ -21,6 +21,13 @@ export const FIELDS = {
     { k: 'TRENDYOL_API_KEY', label: 'API Key', req: true },
     { k: 'TRENDYOL_API_SECRET', label: 'API Secret', secret: true, req: true },
   ],
+  // Yeni sipariş e-posta bildirimi (kanal değil; Ayarlar → Bildirimler'den girilir)
+  mail: [
+    { k: 'MAIL_PROVIDER', label: 'E-posta servisi', hint: 'brevo (önerilen) veya resend' },
+    { k: 'MAIL_API_KEY', label: 'API anahtarı', secret: true, req: true },
+    { k: 'MAIL_FROM', label: 'Gönderen e-posta', hint: 'serviste doğrulanmış adres', req: true },
+    { k: 'MAIL_FROM_NAME', label: 'Gönderen adı', hint: 'ör. Hastürk Panel' },
+  ],
   hepsiburada: [
     { k: 'HB_MERCHANT_ID', label: 'Merchant ID', req: true },
     { k: 'HB_PASSWORD', label: 'Servis anahtarı (şifre)', secret: true, req: true },

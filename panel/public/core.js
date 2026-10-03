@@ -6,10 +6,25 @@ export const activeChannels = () => state.channels.filter((c) => !c.paused);
 export const isAdmin = () => !state.user || state.user.role === 'admin';
 
 // ---------- API ----------
+// Üst kenarda ince yükleme çubuğu: 150 ms'den uzun süren istek varken görünür (arayüz kullanılabilir kalır)
+let inflight = 0, barTimer = null;
+function busyBar(d) {
+  if (typeof document === 'undefined') return;
+  inflight = Math.max(0, inflight + d);
+  let bar = document.getElementById('topload');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'topload'; document.body.append(bar); }
+  clearTimeout(barTimer);
+  if (inflight) barTimer = setTimeout(() => bar.classList.add('on'), 150);
+  else { bar.classList.remove('on'); }
+}
 export async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch('/api/' + path, {
-    method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin',
-  });
+  busyBar(1);
+  let res;
+  try {
+    res = await fetch('/api/' + path, {
+      method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin',
+    });
+  } catch (e) { throw new Error('Sunucuya ulaşılamadı; internet bağlantınızı kontrol edin'); } finally { busyBar(-1); }
   let data = {};
   try { data = await res.json(); } catch { /* boş */ }
   if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw new Error(data.error || 'Giriş gerekli'); }

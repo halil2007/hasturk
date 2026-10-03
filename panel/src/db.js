@@ -63,6 +63,8 @@ const SCHEMA = [
     old_price REAL, new_price REAL, competitor_price REAL, reason TEXT, rank_before INTEGER, rank_after INTEGER, ok INTEGER, error TEXT)`,
   'CREATE INDEX IF NOT EXISTS price_changes_l ON price_changes(channel, remote_id, at)',
   // Müşteri soruları (pazaryerlerinden): soru, ürün, durum ve cevap. answered_by: panel | kanal
+  // Yeni sipariş e-posta kuyruğu: sipariş başına tek kayıt (aynı sipariş için ikinci e-posta gitmez)
+  `CREATE TABLE IF NOT EXISTS mail_queue (order_id TEXT PRIMARY KEY, channel TEXT, created_at INTEGER NOT NULL, sent_at INTEGER, tries INTEGER NOT NULL DEFAULT 0, error TEXT)`,
   `CREATE TABLE IF NOT EXISTS questions (channel TEXT NOT NULL, remote_id TEXT NOT NULL, text TEXT, asked_at INTEGER, status TEXT NOT NULL DEFAULT 'waiting', remote_status TEXT,
     product_name TEXT, product_image TEXT, product_url TEXT, barcode TEXT, sku TEXT, customer TEXT, answer TEXT, answered_at INTEGER, answered_by TEXT, user TEXT,
     due_at INTEGER, error TEXT, synced_at INTEGER, PRIMARY KEY (channel, remote_id))`,
@@ -110,10 +112,14 @@ const MIGRATIONS = [
   'ALTER TABLE listings ADD COLUMN description TEXT',
 ];
 
+// Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
+// (her yeni Worker örneğinde onlarca şema sorgusu çalıştırmamak için; sayfa geçişlerini hızlandırır).
+const SCHEMA_V = (() => { let h = 0; for (const c of SCHEMA.concat(MIGRATIONS).join('|')) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0; return 'v' + (h >>> 0).toString(36); })();
 const ready = new WeakMap();
 export function init(db) {
   if (!ready.has(db)) {
     ready.set(db, (async () => {
+      try { const r = await db.prepare("SELECT v FROM settings WHERE k = 'schema_v'").first(); if (r && JSON.parse(r.v) === SCHEMA_V) return; } catch { /* ilk kurulum */ }
       await db.batch(SCHEMA.map((s) => db.prepare(s)));
       for (const m of MIGRATIONS) { try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
       // Tek seferlik: sistem tamamen hazır olana kadar kanallara stok gönderimi kapatılır (stoklar ikas sitesinden okunur).
@@ -124,6 +130,7 @@ export function init(db) {
           db.prepare("INSERT INTO settings (k, v) VALUES ('once:stock_off_1', '1') ON CONFLICT (k) DO NOTHING"),
         ]);
       }
+      await db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)).run();
     })().catch((e) => { ready.delete(db); throw e; }));
   }
   return ready.get(db);
@@ -138,6 +145,11 @@ export const DEFAULT_SETTINGS = {
   // Kanal başına varsayılan komisyon (%) ve sipariş başı kargo gideri (TL); ürün/ilan bazında değiştirilebilir
   // Otomatik fiyatlandırma genel anahtarı (kapalıyken hiçbir fiyat değiştirilmez; yalnızca buybox izlenir)
   autoprice: false,
+  // Yeni sipariş e-posta bildirimi: açık/kapalı, alıcılar, kanal seçimi (false = o kanaldan e-posta gelmez), panel adresi (e-postadaki bağlantı)
+  mail_enabled: false,
+  mail_to: [],
+  mail_channels: {},
+  panel_url: '',
   // Müşteri sorularına hazır cevaplar
   answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
   commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15 },
