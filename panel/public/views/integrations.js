@@ -59,6 +59,7 @@ export async function integrations(el) {
         <button class="btn primary" data-act="save" data-id="${c.id}">Kaydet</button>
         <button class="btn outline" data-act="test" data-id="${c.id}"><i class="ico ico-key"></i>Bağlantıyı test et</button>
         <button class="btn outline" data-act="diag" data-id="${c.id}" title="Her adımı ayrı ayrı dener ve sorunu açıklar"><i class="ico ico-bolt"></i>Tanılama</button>
+        ${c.type === 'hepsiburada' ? html`<a class="btn outline" href="#/hb-test" title="Hepsiburada'nın canlıya geçiş için istediği test adımları"><i class="ico ico-check"></i>Test adımları</a>` : ''}
         <span class="spacer"></span>
         <button class="btn sm ghost" data-act="sync" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-sync"></i>Senkronla</button>
         <button class="btn sm ghost" data-act="import" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-download"></i>İlanları çek</button>
