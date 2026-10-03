@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (309 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 251 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (310 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -43,13 +43,13 @@ _Henüz veri yok._
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
 | 1 | Katı Solucan Gübresi 20 KG Çuval | 20,3 | 42 |
-| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 16,1 | 18 |
-| 3 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10,1 | 6 |
+| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 16 | 18 |
+| 3 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 10 | 6 |
 | 4 | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 9,8 | 1 |
 | 5 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 9,7 | 5 |
 | 6 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 8,5 | 13 |
 | 7 | Kullanıma Hazır Cocopeat Torfu | 8,4 | 16 |
-| 8 | Leonardit - Organik Toprak Düzenleyici | 7,1 | 10 |
+| 8 | Leonardit - Organik Toprak Düzenleyici | 7 | 10 |
 | 9 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 7 | 4 |
 | 10 | Premium Fide Toprağı | 6,6 | 11 |
 | 11 | HG Akıllı Bitki ve Saksı Toprağı | 5,6 | 6 |
