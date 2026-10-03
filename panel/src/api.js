@@ -635,6 +635,12 @@ async function saveSettings(db, b) {
   return getSettings(db);
 }
 
+async function clearFailures(db, id, note) {
+  const last = (await getRaw(db, 'last:' + id)) || {};
+  await setSetting(db, 'last:' + id, { ...last, ok: last.ordersAt ? true : null, error: null, fails: 0, nextTry: null, listingsError: null, listingsFails: 0, note, noteAt: Date.now() });
+  await run(db, "UPDATE notices SET resolved_at = ? WHERE resolved_at IS NULL AND key IN (?, ?)", Date.now(), 'orders:' + id, 'listings:' + id);
+}
+
 async function channelsInfo(env, db) {
   // Tek seferde: ilan sayıları + tüm kanalların son senkron durumu (kanal başına ayrı sorgu yapılmaz)
   const [counts, lasts, chs] = await Promise.all([
@@ -865,8 +871,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true, message: `Deneme e-postası gönderildi: ${to.join(', ')}` });
   }
   if ((x = path.match(/^integrations\/([a-z0-9]+)$/)) && m === 'PUT') {
-    await saveConfig(env, db, x[1], await body(req));
+    const b = await body(req);
+    await saveConfig(env, db, x[1], b);
     resetChannels();
+    // API bilgileri değişti: eski hata ve bekleme sıfırlanır, kanal sonraki senkronda hemen denenir
+    if (b.values || b.clear) await clearFailures(db, x[1], 'API bilgileri güncellendi; yeniden denenecek');
     await log(db, x[1], 'info', 'API bilgileri panelden güncellendi');
     return json({ ok: true });
   }
@@ -903,6 +912,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const t = Date.now();
     try {
       const orders = await ch.fetchOrders(t - 24 * 3600e3, t);
+      // Bağlantı çalışıyor: eski hata / bekleme silinir ve kanal arka planda hemen senkronlanır
+      await clearFailures(db, ch.id, 'Bağlantı testi başarılı');
+      if (!gated && ctx && ctx.waitUntil) ctx.waitUntil(syncAll(env, db, { only: [ch.id], force: true, listings: true }).catch(() => {}));
       if (GATED.includes(ch.id)) { await setSetting(db, 'verified:' + ch.id, { at: Date.now() }); resetChannels(); await log(db, ch.id, 'info', 'Bağlantı onaylandı; kanal sipariş, ürün ve stok ekranlarına eklendi'); }
       return json({ ok: true, message: `Bağlantı başarılı · son 24 saatte ${orders.length} sipariş${gated ? ' · kanal devreye alındı' : ''}`, ms: Date.now() - t });
     } catch (e) {

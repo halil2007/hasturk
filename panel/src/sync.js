@@ -307,7 +307,7 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
         // Yeni sipariş e-postası: kanalın ilk aktarımında (imleç yokken) gönderilmez
         if (cursor && ids.created && ids.created.length) out.mailQueued = (out.mailQueued || 0) + await queueNew(db, ch, ids.created, settings).catch(() => 0);
         await setSetting(db, 'cursor:' + ch.id, t);
-        Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, nextTry: null, warn: orders.warnings || null });
+        Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, nextTry: null, note: null, warn: orders.warnings || null });
         out.channels[ch.id] = orders.length;
         if (orders.warnings) await log(db, ch.id, 'warn', orders.warnings.join(' | '));
         await resolve(db, `orders:${ch.id}`);

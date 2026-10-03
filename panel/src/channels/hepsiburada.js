@@ -371,7 +371,7 @@ export function hepsiburada(env, meta) {
 
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
+    ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
     fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit,
   };

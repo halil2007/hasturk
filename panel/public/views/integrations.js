@@ -40,7 +40,7 @@ export async function integrations(el) {
     const basic = c.fields.filter((f) => !f.adv), adv = c.fields.filter((f) => f.adv);
     return html`<div class="card" data-ch="${c.id}">
       <div class="hd">${chLogo(c.id)}<div style="flex:1;min-width:0"><h2 class="ellipsis">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2>
-        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}${c.beta ? html`<span class="pill amber" title="Canlı hesapla doğrulanması gerekiyor">Beta</span>` : ''}</div></div>
+        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}${c.beta ? html`<span class="pill amber" title="Canlı hesapla doğrulanması gerekiyor">Beta</span>` : ''}${c.sandbox ? html`<span class="pill warn" title="İstekler Hepsiburada test (SIT) sunucularına gidiyor">Test ortamı</span>` : c.type === 'hepsiburada' && c.enabled && !c.demo ? html`<span class="pill" title="İstekler canlı Hepsiburada sunucularına gidiyor">Canlı</span>` : ''}</div></div>
         <label class="row small" title="Pasif kanal senkronlanmaz">Aktif <span class="switch"><input type="checkbox" data-active="${c.id}" ${c.active ? 'checked' : ''}><span></span></span></label></div>
       ${!c.gated ? html`<label class="row small" style="gap:10px;align-items:flex-start"><span class="switch"><input type="checkbox" data-hold="${c.id}" ${((state.settings && state.settings.hold_channels) || []).includes(c.id) ? 'checked' : ''}><span></span></span>
         <span><b>Kanala yazmayı beklet</b> <span class="muted">— siparişler, ürünler, stok ve kanalda oluşan etiketler okunur; paketleme, kargo bildirimi, stok/fiyat gönderimi ve ürün oluşturma ${c.type === 'ikas' ? 'ikas' : 'kanal'} panelinden yapılır.</span></span></label>` : ''}
@@ -49,7 +49,8 @@ export async function integrations(el) {
         <div><span class="muted tiny">Siparişler · son başarılı</span><b>${when(c.last && c.last.ordersAt)}</b></div>
         <div><span class="muted tiny">Ürün / stok · son başarılı</span><b>${when(c.last && c.last.listingsAt)}</b></div>
         <div><span class="muted tiny">İlan · eşleşmiş</span><b>${n(c.listings)} · ${n(c.linked)}</b></div></div>` : ''}
-      ${c.last && !c.last.ok ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error}<div class="tiny muted">${c.last.nextTry ? `Art arda hata: sonraki otomatik deneme ${dateTime(c.last.nextTry)} (Senkronla hemen dener).` : '15 dakikada bir otomatik yeniden denenir.'}</div></div></div>` : ''}
+      ${c.last && c.last.note && !c.last.error ? html`<div class="notice small"><i class="ico ico-check"></i><div>${c.last.note}${c.last.noteAt ? ` · ${dateTime(c.last.noteAt)}` : ''}</div></div>` : ''}
+      ${c.last && c.last.ok === false ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error}<div class="tiny muted">${c.last.nextTry ? `Art arda hata: sonraki otomatik deneme ${dateTime(c.last.nextTry)} (Senkronla hemen dener).` : '15 dakikada bir otomatik yeniden denenir.'}</div></div></div>` : ''}
       ${c.last && c.last.listingsError ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Ürün/stok alınamadı:</b> ${c.last.listingsError}</div></div>` : ''}
       <div class="muted small">${HELP[c.type]}</div>
       <div class="form-grid">${basic.map((f) => field(c, f))}</div>
