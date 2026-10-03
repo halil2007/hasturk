@@ -91,19 +91,50 @@ export function trendyol(env, meta) {
     return group(pkgs);
   }
 
+  // Ürünler: V2 "approved" servisi (V1 /products Trendyol tarafından kapatılıyor). Stok ayrı "inventory-and-price" servisinden gelir.
+  // Sayfalama: size ≤ 100, page × size ≤ 10.000; daha fazlası için nextPageToken. V2 hata verirse V1'e düşülür.
+  const listingOf = (p, v, stock) => {
+    const attrs = [...(v.attributes || []), ...(p.attributes || [])].filter((a) => VARIANT_ATTR.test(a.attributeName || '')).map((a) => a.attributeValue || a.customAttributeValue).filter(Boolean);
+    const price = v.price || {};
+    return {
+      remoteId: str(v.barcode), remoteProductId: str(p.productMainId || p.contentId || p.id), sku: str(v.stockCode), barcode: str(v.barcode), name: str(p.title),
+      groupName: str(p.title), variantName: [...new Set(attrs)].join(' / '),
+      image: str(((p.images || v.images || [])[0] || {}).url), price: num(price.salePrice ?? v.salePrice), listPrice: num(price.listPrice ?? v.listPrice),
+      stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
+    };
+  };
+  async function pagedV2(path) {
+    const rows = [];
+    let page = 0, token = '';
+    for (let i = 0; i < 1000; i++) {
+      const q = new URLSearchParams({ size: '100' });
+      if (token) q.set('nextPageToken', token); else q.set('page', String(page));
+      const r = await call(`${path}?${q}`);
+      rows.push(...(r.content || []));
+      if (!(r.content || []).length) break;
+      if (r.nextPageToken) token = r.nextPageToken;
+      else if ((page + 1) * 100 < 10000 && page + 1 < (r.totalPages || 1)) page++;
+      else break;
+    }
+    return rows;
+  }
   async function fetchListings() {
+    try {
+      const stock = new Map();
+      for (const p of await pagedV2(`/product/sellers/${seller}/products/approved/inventory-and-price`)) for (const v of p.variants || [p]) stock.set(str(v.barcode), num(v.quantity));
+      const out = [];
+      for (const p of await pagedV2(`/product/sellers/${seller}/products/approved`)) for (const v of p.variants || []) if (v.barcode) out.push(listingOf(p, v, stock.get(str(v.barcode))));
+      return out;
+    } catch (e) {
+      if (!/404|405|410|not\s*found/i.test(e.message)) throw e;
+    }
     const out = [];
     for (let page = 0; page < 200; page++) {
       const r = await call(`/product/sellers/${seller}/products?page=${page}&size=100`);
       for (const p of r.content || []) {
-        // Trendyol'da varyantlar çoğu zaman ayrı ürün olarak durur; boyut/ağırlık gibi özellik varyant adı olarak alınır
-        const attrs = (p.attributes || []).filter((a) => VARIANT_ATTR.test(a.attributeName || '')).map((a) => a.attributeValue || a.customAttributeValue).filter(Boolean);
-        out.push({
-          remoteId: str(p.barcode), remoteProductId: str(p.productMainId || p.id), sku: str(p.stockCode), barcode: str(p.barcode), name: str(p.title),
-          groupName: str(p.title), variantName: attrs.join(' / '),
-          image: str(((p.images || [])[0] || {}).url), price: num(p.salePrice), listPrice: num(p.listPrice), stock: num(p.quantity),
-          active: p.approved !== false && !p.archived,
-        });
+        const l = listingOf(p, { ...p, price: { salePrice: p.salePrice, listPrice: p.listPrice }, onSale: true }, p.quantity);
+        l.active = p.approved !== false && !p.archived;
+        out.push(l);
       }
       if (page + 1 >= (r.totalPages || 1)) break;
     }
@@ -145,15 +176,13 @@ export function trendyol(env, meta) {
     return { async: true, message: 'Bölme isteği Trendyol\'a gönderildi. Yeni paketler birkaç dakika içinde oluşur ve senkronla panele gelir.' };
   }
 
-  async function ship(order, pkg, { tracking, invoiceNumber }) {
+  async function ship(order, pkg, { invoiceNumber }) {
     if (!pkg.remote_id) throw new Error('Paket Trendyol\'da henüz oluşmadı; senkronu bekleyin');
     if (invoiceNumber) {
       await call(`/order/sellers/${seller}/shipment-packages/${pkg.remote_id}`, { method: 'PUT', body: { lines: linesOf(pkg), params: { invoiceNumber }, status: 'Invoiced' } });
     }
-    // Kendi kargo anlaşmanızla gönderiyorsanız takip no Trendyol'a bildirilir; Trendyol'un anlaşmalı kargosunda zaten vardır
-    if (tracking && tracking !== pkg.tracking) {
-      await call(`/order/sellers/${seller}/shipment-packages/${pkg.remote_id}/update-tracking-number`, { method: 'PUT', body: { trackingNumber: tracking } });
-    }
+    // Takip numarası Trendyol'un anlaşmalı kargosundan gelir. Elle takip no bildirme servisi (update-tracking-number)
+    // Trendyol tarafından kullanımdan kaldırıldı; kargo firması değişikliği "Kargo firmasını değiştir" ile yapılır.
     return {};
   }
 
@@ -212,13 +241,34 @@ export function trendyol(env, meta) {
     return out;
   }
 
-  const questions = null; // SORU-CEVAP: aşağıda tanımlanacak
+  // Müşteri soruları (Soru-Cevap entegrasyonu). Tarih aralığı en fazla 2 hafta, sayfa 0'dan, sayfa boyutu ≤ 50.
+  const QST = { WAITING_FOR_ANSWER: 'waiting', ANSWERED: 'answered', WAITING_FOR_APPROVE: 'answered', REJECTED: 'rejected', REPORTED: 'other' };
+  async function questions({ since, until = Date.now(), page = 0, size = 50 }) {
+    const start = Math.max(since || 0, until - 14 * 864e5 + 60e3);
+    const q = new URLSearchParams({ supplierId: seller, startDate: String(start), endDate: String(until), page: String(page), size: String(Math.min(size, 50)), orderByField: 'LastModifiedDate', orderByDirection: 'DESC' });
+    const r = await call(`/qna/sellers/${seller}/questions/filter?${q}`);
+    const items = (r.content || []).map((x) => {
+      const a = x.answer || {};
+      return {
+        remoteId: str(x.id), text: str(x.text), askedAt: num(x.creationDate) || Date.now(), status: QST[x.status] || 'other', remoteStatus: str(x.status),
+        productName: str(x.productName), productImage: str(x.imageUrl), productUrl: str(x.webUrl), barcode: '', sku: str(x.productMainId),
+        customer: x.showUserName === false ? '' : str(x.userName), answer: a.text ? str(a.text) : null, answeredAt: num(a.creationDate) || null,
+      };
+    });
+    return { items, total: num(r.totalElements), hasNext: page + 1 < num(r.totalPages) };
+  }
+  // Cevap: 10–2000 karakter; Trendyol onayından sonra müşteriye görünür
+  async function answer(q, text) {
+    await call(`/qna/sellers/${seller}/questions/${encodeURIComponent(q.remote_id)}/answers`, { method: 'POST', body: { text } });
+  }
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();
     await diagStep(out, 'Siparişler (son 24 saat)', async () => { const r = await call(`/order/sellers/${seller}/orders?startDate=${now - 864e5}&endDate=${now}&page=0&size=1`); return { detail: `${r.totalElements ?? (r.content || []).length} paket · satıcı ${seller}` }; });
-    await diagStep(out, 'Ürünler', async () => { const r = await call(`/product/sellers/${seller}/products?page=0&size=1`); return { detail: `${r.totalElements ?? '?'} ürün` }; });
-    await diagStep(out, 'Buybox servisi', async () => { const r = await call(`/product/sellers/${seller}/products?page=0&size=1`); const bc = ((r.content || [])[0] || {}).barcode; if (!bc) return { ok: null, detail: 'Ürün yok, denenemedi' }; await buybox([bc]); return { detail: 'Erişilebilir' }; });
-    if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ since: now - 7 * 864e5, page: 0, size: 1 }); return { detail: `son 7 günde ${r.total ?? r.items.length} soru` }; });
+    let bc = '';
+    await diagStep(out, 'Ürünler (V2 onaylı ürün servisi)', async () => { const r = await call(`/product/sellers/${seller}/products/approved?page=0&size=1`); bc = str((((r.content || [])[0] || {}).variants || [])[0]?.barcode); return { detail: `${r.totalElements ?? '?'} ürün` }; });
+    await diagStep(out, 'Stok / fiyat servisi', async () => { const r = await call(`/product/sellers/${seller}/products/approved/inventory-and-price?page=0&size=1`); return { detail: `erişildi · ${r.totalElements ?? (r.content || []).length} ürün` }; });
+    await diagStep(out, 'Buybox servisi', async () => { if (!bc) return { ok: null, detail: 'Ürün yok, denenemedi' }; await buybox([bc]); return { detail: 'Erişilebilir' }; });
+    await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ since: now - 7 * 864e5, page: 0, size: 1 }); return { detail: `son 7 günde ${r.total ?? r.items.length} soru` }; });
     if (orderId) await diagStep(out, 'Sipariş paketleri', async () => {
       const r = await call(`/order/sellers/${seller}/orders?orderNumber=${encodeURIComponent(orderId)}`);
       const ps = r.content || [];
@@ -230,7 +280,7 @@ export function trendyol(env, meta) {
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
-    caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, diagnose,
+    caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose,
   };
 }

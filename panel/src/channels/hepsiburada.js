@@ -1,6 +1,8 @@
-// Hepsiburada Marketplace API.
-// Merchant paneli → Entegrasyon → API bilgileri: Merchant ID ve servis anahtarı (şifre).
-//   Siparişler/paketler: oms-external.hepsiburada.com   İlan/stok/fiyat: listing-external.hepsiburada.com
+// Hepsiburada Marketplace API (yollar ve alanlar Hepsiburada'nın yayımladığı OpenAPI dokümanları ve canlı yanıt yapılarıyla doğrulandı).
+// Merchant Portal → Ayarlar → Entegrasyon: Merchant ID, kullanıcı adı / servis anahtarı ve ENTEGRATÖR ADI.
+// Önemli: User-Agent başlığı Merchant Portal'da tanımlı entegratör adıyla BİREBİR aynı olmalı (ör. "hasturk_dev");
+// "merchantId - uygulama" biçimi 401/403 ile reddedilir.
+//   Siparişler/paketler: oms-external · İlan/stok/fiyat/buybox: listing-external · Müşteri soruları: api-asktoseller-merchant
 import { http, basic, num, str, chunk, diagStep } from '../util.js';
 
 export function hepsiburada(env, meta) {
@@ -9,98 +11,152 @@ export function hepsiburada(env, meta) {
   const OMS = `https://oms-external${test}.hepsiburada.com`, LST = `https://listing-external${test}.hepsiburada.com`;
   const headers = () => ({
     Authorization: basic(user, pass),
-    'User-Agent': env.HB_USER_AGENT || `${m} - HasTurkPanel`,
+    'User-Agent': env.HB_USER_AGENT || '',
     'Content-Type': 'application/json', Accept: 'application/json',
   });
   const call = (url, opts = {}) => http(url, { ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
   const list = (r) => (Array.isArray(r) ? r : (r && (r.items || r.data || r.listings || r.packages)) || []);
   const money = (v) => (v && typeof v === 'object' ? num(v.amount ?? v.value) : num(v));
 
+  // Hepsiburada alan adları bazı servislerde PascalCase (Id, PackageNumber…): büyük/küçük harf duyarsız okuma
+  const g = (o, ...keys) => { if (!o) return undefined; for (const k of keys) { if (o[k] != null) return o[k]; const K = k[0].toUpperCase() + k.slice(1); if (o[K] != null) return o[K]; } return undefined; };
+  const page = (r) => (Array.isArray(r) ? r : (r && (g(r, 'items', 'data', 'listings') || [])) || []);
+  const D = 864e5;
+
+  // Sipariş satırı (açık satır: LineRepresentation · paket satırı: PackageLine)
   function lineOf(it) {
-    const qty = num(it.quantity, 1);
-    const total = money(it.totalPrice) || money(it.price) * qty || money(it.unitPrice) * qty;
+    const qty = num(g(it, 'quantity'), 1);
+    const total = money(g(it, 'totalPrice')) || money(g(it, 'price', 'unitPrice')) * qty;
     return {
-      lineId: str(it.lineItemId || it.id), sku: str(it.merchantSku || it.merchantSKU), barcode: str(it.barcode), name: str(it.productName || it.name), image: '',
+      lineId: str(g(it, 'lineItemId', 'id')), sku: str(g(it, 'merchantSku', 'merchantSKU')), barcode: str(g(it, 'productBarcode', 'barcode')), name: str(g(it, 'productName', 'name')),
+      image: str(g(it, 'productImageUrlFormat')).replace('{size}', '300'),
       quantity: qty, unitPrice: qty ? total / qty : total, total,
-      status: /cancel|iptal/i.test(it.status || '') ? 'cancelled' : '', remoteKey: str(it.sku || it.hbSku || it.hepsiburadaSku),
-      orderNumber: str(it.orderNumber || it.orderId), orderDate: it.orderDate || it.orderedDate,
-      customerName: str(it.customerName || it.recipientName), address: it.shippingAddress || it.deliveryAddress || null,
-      cargoCompany: str(it.cargoCompany || it.cargoCompanyName),
-      // Kargoya son teslim tarihi (HB: dueDate / lastShippingDate; alan adı hesaba göre değişebilir)
-      dueDate: Date.parse(it.dueDate || it.lastShippingDate || it.cargoDueDate || it.shippingDueDate || '') || null,
+      status: /cancel|iptal/i.test(g(it, 'status') || '') ? 'cancelled' : '', remoteKey: str(g(it, 'hbSku', 'sku', 'hepsiburadaSku')),
+      orderNumber: str(g(it, 'orderNumber', 'orderId')), orderDate: g(it, 'orderDate'), dueDate: Date.parse(g(it, 'dueDate') || '') || null,
+    };
+  }
+  // Adres: açık satırdaki shippingAddress / sipariş ayrıntısındaki deliveryAddress (il = city, ilçe = town, mahalle = district)
+  const addrOf = (a = {}, fallbackName = '') => ({ name: str(g(a, 'name') || fallbackName), line: str(g(a, 'address')), district: str(g(a, 'town') || g(a, 'district')), city: str(g(a, 'city')), phone: str(g(a, 'phoneNumber', 'phone')), email: str(g(a, 'email')) });
+
+  // Panel siparişi: Hepsiburada satırlarını sipariş numarasına göre toplar
+  function makeOrders() {
+    const map = new Map();
+    const rank = { new: 0, processing: 1, shipped: 2, delivered: 3 };
+    return {
+      map,
+      touch(orderNumber, { date, customer, address } = {}) {
+        let o = map.get(orderNumber);
+        if (!o) {
+          o = { remoteId: orderNumber, orderNumber, orderedAt: Date.parse(date) || Date.now(), remoteStatus: 'new', status: 'new', customer: '', phone: '', email: '', address: {}, total: 0, currency: 'TRY', cargoCompany: '', tracking: '', items: [], packages: [] };
+          map.set(orderNumber, o);
+        }
+        if (customer && !o.customer) o.customer = customer;
+        if (address && address.city && !o.address.city) { o.address = address; o.phone = o.phone || address.phone; o.email = o.email || address.email; if (!o.customer) o.customer = address.name; }
+        return o;
+      },
+      addLine(o, l) {
+        if (!o.items.some((i) => i.lineId === l.lineId)) { o.items.push(l); if (!l.status) o.total += l.total; }
+        if (l.dueDate && !l.status && (!o.shipBy || l.dueDate < o.shipBy)) o.shipBy = l.dueDate;
+      },
+      bump(o, s) { if ((rank[s] ?? 0) > (rank[o.status] ?? 0)) o.status = s; },
     };
   }
 
-  // Açık siparişler (paketlenmeyi bekleyen satırlar) + paketler (kargoya verilmeyi bekleyen / kargoda / teslim) birleştirilir
-  async function fetchOrders(since, until) {
-    const orders = new Map();
-    const touch = (l, status) => {
-      if (!l.orderNumber) return null;
-      let o = orders.get(l.orderNumber);
-      if (!o) {
-        const a = l.address || {};
-        o = {
-          remoteId: l.orderNumber, orderNumber: l.orderNumber, orderedAt: Date.parse(l.orderDate) || Date.now(),
-          remoteStatus: status, status, customer: l.customerName || str(a.name), phone: str(a.phoneNumber || a.phone), email: str(a.email),
-          address: { name: str(a.name || l.customerName), line: str(a.address || a.addressDetail), district: str(a.district || a.town), city: str(a.city), phone: str(a.phoneNumber || a.phone) },
-          total: 0, currency: 'TRY', cargoCompany: l.cargoCompany, tracking: '', items: [], packages: [],
-        };
-        orders.set(l.orderNumber, o);
-      }
-      if (!o.items.some((i) => i.lineId === l.lineId)) { o.items.push(l); o.total += l.status ? 0 : l.total; }
-      if (l.dueDate && !l.status && (!o.shipBy || l.dueDate < o.shipBy)) o.shipBy = l.dueDate;
-      return o;
-    };
-    const rank = { new: 0, processing: 1, shipped: 2, delivered: 3 };
-    const bump = (o, s) => { if (s === 'cancelled') return; if ((rank[s] ?? 0) > (rank[o.status] ?? 0) || o.status === 'cancelled') o.status = s; };
+  // Sayfalı okuma: en fazla max sayfa; stop(sayfa) true dönerse durur
+  async function pages(base, { limit, max, offsetKey = 'offset', stop }) {
+    const rows = [];
+    for (let i = 0; i < max; i++) {
+      const r = page(await call(`${base}${base.includes('?') ? '&' : '?'}${offsetKey}=${i * limit}&limit=${limit}`));
+      rows.push(...r);
+      if (r.length < limit || (stop && stop(r))) break;
+    }
+    return rows;
+  }
 
-    for (let offset = 0; offset < 5000; offset += 100) {
-      const r = await call(`${OMS}/orders/merchantid/${m}?offset=${offset}&limit=100`);
-      for (const it of list(r)) { const o = touch(lineOf(it), 'new'); if (o) bump(o, 'new'); }
-      if (list(r).length < 100) break;
+  // Siparişler: açık satırlar (paketlenecek) + paketler (kargoya hazır) + kargodaki / teslim edilen / iptal listeleri.
+  // Kargo/teslim/iptal listeleri yalnız paket ve sipariş numarası verir: panelde ayrıntısı gerekenler sipariş numarasıyla okunur.
+  async function fetchOrders(since, until) {
+    const O = makeOrders(), errors = [];
+    // 1) Açık satırlar (yeni siparişler)
+    for (const it of await pages(`${OMS}/orders/merchantid/${m}`, { limit: 100, max: 50 })) {
+      const l = lineOf(it);
+      if (!l.orderNumber) continue;
+      const o = O.touch(l.orderNumber, { date: l.orderDate, customer: str(g(it, 'customerName')), address: addrOf(g(it, 'shippingAddress') || {}, str(g(it, 'customerName'))) });
+      O.addLine(o, l);
+      if (str(g(it, 'cargoCompany')) && !o.cargoCompany) o.cargoCompany = str(g(it, 'cargoCompany'));
     }
-    // Paket listeleri: uç noktaların bazıları hesapta kapalı olabilir; biri hata verirse diğerleri yine işlenir
-    const iso = (ms) => new Date(ms).toISOString().slice(0, 19);
-    const range = `begindate=${iso(since)}&enddate=${iso(until)}`;
-    const sources = [
-      [`${OMS}/packages/merchantid/${m}?`, 'processing'],
-      [`${OMS}/packages/merchantid/${m}/shipped?${range}&`, 'shipped'],
-      [`${OMS}/packages/merchantid/${m}/delivered?${range}&`, 'delivered'],
-      [`${OMS}/orders/merchantid/${m}/cancelled?${range}&`, 'cancelled'],
-    ];
-    const errors = [];
-    for (const [base, status] of sources) {
-      // Sayfa sayfa (geçmiş sipariş aktarımında yüzlerce paket olabilir)
-      const rows = [];
-      try {
-        for (let offset = 0; offset < 5000; offset += 100) {
-          const r = await call(`${base}offset=${offset}&limit=100`);
-          rows.push(...list(r));
-          if (list(r).length < 100) break;
-        }
-      } catch (e) { errors.push(e.message); if (!rows.length) continue; }
-      for (const pk of rows) {
-        const lines = (pk.items || pk.lineItems || [pk]).map(lineOf);
-        const pkgNo = str(pk.packageNumber || pk.packageId);
-        let o = null;
-        for (const l of lines) { if (!l.orderNumber) l.orderNumber = str(pk.orderNumber); o = touch(l, status) || o; }
-        if (!o) continue;
-        if (status === 'cancelled') { for (const l of lines) { const it = o.items.find((i) => i.lineId === l.lineId); if (it) it.status = 'cancelled'; } }
-        else bump(o, status);
-        if (pkgNo && !o.packages.some((p) => p.remoteId === pkgNo)) {
-          const tn = str(pk.trackingNumber || pk.trackingInfoCode || pk.barcode);
-          o.packages.push({ remoteId: pkgNo, items: lines.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: status === 'processing' ? 'open' : 'shipped', remoteStatus: status === 'processing' ? 'Packaged' : status, cargoCompany: str(pk.cargoCompany || pk.cargoCompanyName), tracking: tn, barcode: str(pk.barcode) });
-          if (tn && !o.tracking) { o.tracking = tn; o.cargoCompany = str(pk.cargoCompany) || o.cargoCompany; }
-        }
+    // 2) Paketlenmiş, kargoya verilmemiş paketler (en fazla 10 / istek, "Offset" büyük harfle)
+    try {
+      for (const pk of await pages(`${OMS}/packages/merchantid/${m}`, { limit: 10, max: 100, offsetKey: 'Offset' })) {
+        const lines = (g(pk, 'items') || []).map(lineOf);
+        const no = (lines.find((l) => l.orderNumber) || {}).orderNumber;
+        if (!no) continue;
+        const address = { name: str(g(pk, 'recipientName', 'customerName')), line: str(g(pk, 'shippingAddressDetail')), district: str(g(pk, 'shippingTown') || g(pk, 'shippingDistrict')), city: str(g(pk, 'shippingCity')), phone: str(g(pk, 'phoneNumber')), email: str(g(pk, 'email')) };
+        const o = O.touch(no, { date: g(pk, 'orderDate'), customer: str(g(pk, 'customerName')), address });
+        for (const l of lines) O.addLine(o, { ...l, dueDate: l.dueDate || Date.parse(g(pk, 'dueDate') || '') || null });
+        O.bump(o, 'processing');
+        const pn = str(g(pk, 'packageNumber'));
+        if (pn && !o.packages.some((x) => x.remoteId === pn)) o.packages.push({ remoteId: pn, items: lines.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: 'open', remoteStatus: 'Packaged', cargoCompany: str(g(pk, 'cargoCompany')), tracking: '', barcode: str(g(pk, 'barcode')), packed: true });
+        if (!o.cargoCompany) o.cargoCompany = str(g(pk, 'cargoCompany'));
       }
+    } catch (e) { errors.push('paketler: ' + e.message); }
+    // 3) Kargodaki / teslim edilen paketler ve iptal edilen satırlar (tarih filtresi yok; yeniden eskiye, since'e kadar)
+    const detail = new Map();
+    const need = async (no) => {
+      if (O.map.has(no)) return O.map.get(no);
+      if (!detail.has(no)) {
+        if (detail.size >= 200) return null;
+        detail.set(no, null);
+        try {
+          const r = await call(`${OMS}/orders/merchantid/${m}/ordernumber/${encodeURIComponent(no)}`);
+          const a = addrOf(g(r, 'deliveryAddress') || {}, str(g(g(r, 'customer') || {}, 'name')));
+          const o = O.touch(no, { date: g(r, 'orderDate'), customer: str(g(g(r, 'customer') || {}, 'name')) || a.name, address: a });
+          for (const it of g(r, 'items') || []) O.addLine(o, lineOf(it));
+          detail.set(no, o);
+        } catch (e) { errors.push(`sipariş ${no}: ${e.message}`); }
+      }
+      return detail.get(no);
+    };
+    const feeds = [['shipped', 'ShippedDate', 'shipped'], ['delivered', 'DeliveredDate', 'delivered']];
+    for (const [path, dateKey, status] of feeds) {
+      try {
+        const old = (r) => r.length && r.every((x) => (Date.parse(g(x, dateKey) || '') || Infinity) < since);
+        for (const x of await pages(`${OMS}/packages/merchantid/${m}/${path}`, { limit: 50, max: 40, stop: old })) {
+          const at = Date.parse(g(x, dateKey) || '') || 0;
+          if (at && at < since) continue;
+          const no = str(g(x, 'OrderNumber') || (g(x, 'OrderNumbers') || [])[0]);
+          const o = no && await need(no);
+          if (!o) continue;
+          O.bump(o, status);
+          const pn = str(g(x, 'PackageNumber'));
+          const live = o.items.filter((i) => !i.status);
+          const pk = o.packages.find((p) => p.remoteId === pn);
+          if (pk) { pk.status = 'shipped'; pk.remoteStatus = path; pk.barcode = pk.barcode || str(g(x, 'Barcode')); }
+          else if (pn) o.packages.push({ remoteId: pn, items: live.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: 'shipped', remoteStatus: path, cargoCompany: o.cargoCompany, tracking: str(g(x, 'Barcode')), barcode: str(g(x, 'Barcode')), packed: true });
+        }
+      } catch (e) { errors.push(`${path}: ${e.message}`); }
     }
-    for (const o of orders.values()) {
+    try {
+      const old = (r) => r.length && r.every((x) => (Date.parse(g(x, 'cancelDate') || '') || Infinity) < since);
+      for (const x of await pages(`${OMS}/orders/merchantid/${m}/cancelled`, { limit: 50, max: 40, stop: old })) {
+        const at = Date.parse(g(x, 'cancelDate') || '') || 0;
+        if (at && at < since) continue;
+        const o = await need(str(g(x, 'orderNumber')));
+        if (!o) continue;
+        const it = o.items.find((i) => i.lineId === str(g(x, 'lineItemId')));
+        if (it && !it.status) { it.status = 'cancelled'; o.total -= it.total; }
+      }
+    } catch (e) { errors.push('iptaller: ' + e.message); }
+    const out = [];
+    for (const o of O.map.values()) {
       if (o.items.length && o.items.every((i) => i.status === 'cancelled')) o.status = 'cancelled';
-      for (const i of o.items) { delete i.orderNumber; delete i.orderDate; delete i.customerName; delete i.address; delete i.cargoCompany; delete i.dueDate; }
+      for (const i of o.items) { delete i.orderNumber; delete i.orderDate; delete i.dueDate; }
+      o.total = Math.max(0, Math.round(o.total * 100) / 100);
       if (!o.packages.length) o.packages = null; // paket yoksa paneldeki paket bölmesi korunur
       o.remoteStatus = o.status;
+      if (!o.cargoCompany) o.cargoCompany = ((o.packages || [])[0] || {}).cargoCompany || '';
+      out.push(o);
     }
-    const out = [...orders.values()];
     if (errors.length) out.warnings = errors;
     return out;
   }
@@ -179,7 +235,7 @@ export function hepsiburada(env, meta) {
   async function cargoOptions(order, pkg) {
     if (!pkg || !pkg.remote_id) return [];
     const r = await call(`${pkgUrl(pkg)}/changablecargocompanies`);
-    return list(r).map((c) => ({ id: str(c.shortName || c.cargoCompanyShortName || c.code || c.id), name: str(c.name || c.cargoCompanyName || c.shortName), current: !!c.isSelected || !!c.selected }))
+    return page(r).filter((c) => g(c, 'isActive') !== false).map((c) => ({ id: str(g(c, 'shortName', 'cargoCompanyShortName')), name: str(g(c, 'name') || g(c, 'shortName')), current: !!g(c, 'isSelected', 'selected') || (!!pkg.cargo_company && str(g(c, 'name')).toLowerCase() === String(pkg.cargo_company).toLowerCase()) }))
       .filter((c) => c.id);
   }
   async function changeCargo(order, pkg, cargo) {
@@ -194,39 +250,77 @@ export function hepsiburada(env, meta) {
   }
   const pack = (order, pkgs) => split(order, pkgs.map((p) => ({ items: p.items, desi: p.desi })));
 
-  // Buybox sıralaması (listing API). Yanıt alan adları hesaba göre değişebildiği için esnek okunur (beta).
+  // Buybox sıralaması (listing API): Variants[].{Sku, BuyboxOrders[{Rank, MerchantName, Price}]}. Bizim sıramız mağaza adıyla
+  // bulunur (HB_MERCHANT_NAME); tek satıcı varsa sıra 1'dir.
+  const myName = String(env.HB_MERCHANT_NAME || '').trim().toLocaleLowerCase('tr');
   async function buybox(remoteIds) {
     const out = [];
-    for (const part of chunk(remoteIds, 20)) {
+    for (const part of chunk(remoteIds, 10)) {
       const r = await call(`${LST}/buybox-orders/merchantid/${m}?skuList=${part.map(encodeURIComponent).join(',')}`);
-      for (const b of list(r)) {
-        const sku = str(b.sku || b.hepsiburadaSku || b.hbSku);
-        const sellers = b.buyboxOrders || b.merchants || b.listings || b.orders || [];
-        const mine = sellers.find((x) => str(x.merchantId || x.merchantID) === String(m));
-        const sorted = sellers.slice().sort((a, c) => num(a.order ?? a.rank ?? a.buyboxOrder) - num(c.order ?? c.rank ?? c.buyboxOrder));
-        const price = (x) => money(x && (x.price ?? x.salePrice));
-        const rank = num(b.order ?? b.rank ?? b.buyboxOrder ?? (mine && (mine.order ?? mine.rank ?? mine.buyboxOrder))) || (mine ? sorted.indexOf(mine) + 1 : null);
-        out.push({ remoteId: sku, rank: rank || null, buyboxPrice: price(sorted[0]) || money(b.buyboxPrice) || null, second: price(sorted[1]) || null, third: price(sorted[2]) || null, multi: sellers.length > 1 || !!b.hasMultipleSeller });
+      // Resmi şemada yanıt tanımı yok; görülen biçimler: {Variants:[{Sku, BuyboxOrders}]}, {Variants:{Variant:[…]}},
+      // [{Variant:{…}}] ve satır başına doğrudan sıra veren [{hepsiburadaSku, rank}]
+      let vars = g(r, 'variants') || g(r, 'data') || (Array.isArray(r) ? r : []);
+      if (vars && !Array.isArray(vars)) vars = [].concat(g(vars, 'variant') || []);
+      for (let v of vars || []) {
+        if (g(v, 'variant')) v = g(v, 'variant');
+        if (!g(v, 'buyboxOrders') && g(v, 'rank') != null) { out.push({ remoteId: str(g(v, 'hepsiburadaSku', 'sku')), rank: num(g(v, 'rank')) || null, buyboxPrice: null, second: null, third: null, multi: num(g(v, 'rank')) > 1 }); continue; }
+        const sellers = (g(v, 'buyboxOrders') || []).slice().sort((a, c) => num(g(a, 'rank')) - num(g(c, 'rank')));
+        const mine = myName ? sellers.find((x) => str(g(x, 'merchantName')).toLocaleLowerCase('tr') === myName) : null;
+        const rank = mine ? num(g(mine, 'rank')) || sellers.indexOf(mine) + 1 : sellers.length === 1 ? 1 : null;
+        out.push({ remoteId: str(g(v, 'sku', 'hepsiburadaSku')), rank, buyboxPrice: money(g(sellers[0], 'price')) || null, second: money(g(sellers[1], 'price')) || null, third: money(g(sellers[2], 'price')) || null,
+          multi: sellers.length > 1, ...(rank || sellers.length < 2 ? {} : { error: 'Mağaza adı girilmedi: Entegrasyonlar → Hepsiburada → Mağaza adı' }) });
       }
     }
     return out;
   }
 
-  const questions = null; // SORU-CEVAP: aşağıda tanımlanacak
+  // ---------- müşteri soruları ("Satıcıya Sor") ----------
+  const QNA = `https://api-asktoseller-merchant${test}.hepsiburada.com/api/v1.0`;
+  const qh = () => ({ ...headers(), merchantId: String(m) });
+  const QST = { WaitingForAnswer: 'waiting', 1: 'waiting', Answered: 'answered', 2: 'answered', Rejected: 'rejected', 3: 'rejected', AutoClosed: 'other', 4: 'other' };
+  async function questions({ since, page: p = 0, size = 50 }) {
+    const q = new URLSearchParams({ page: String(p + 1), size: String(size), desc: 'true' });
+    if (since) q.set('minModifiedAt', new Date(since).toISOString());
+    const r = await http(`${QNA}/issues?${q}`, { headers: qh() });
+    const items = (g(r, 'data') || []).map((x) => {
+      const conv = g(x, 'conversations') || [];
+      const first = conv.find((c) => /customer/i.test(g(c, 'from') || '')) || {};
+      const ans = conv.slice().reverse().find((c) => /merchant/i.test(g(c, 'from') || ''));
+      const prod = g(x, 'product') || {}, subj = g(x, 'subject') || {};
+      const st = g(x, 'status');
+      return {
+        remoteId: str(g(x, 'issueNumber') || g(x, 'id')), text: str(g(first, 'content') || g(x, 'lastContent')), askedAt: Date.parse(g(x, 'createdAt') || '') || Date.now(),
+        status: QST[st] || 'other', remoteStatus: str(st), productName: [str(g(subj, 'description')), str(g(prod, 'name'))].filter(Boolean).join(' · '),
+        productImage: str(g(prod, 'imageUrl')).replace('{size}', '300'), barcode: str(g(prod, 'sku')), sku: str(g(prod, 'stockCode')),
+        customer: g(x, 'orderNumber') ? `Sipariş #${g(x, 'orderNumber')}` : '', answer: ans ? str(g(ans, 'content')) : null, answeredAt: ans ? Date.parse(g(ans, 'createdAt') || '') || null : null,
+        dueAt: Date.parse(g(x, 'expireDate') || '') || null,
+      };
+    });
+    return { items, total: num(g(r, 'totalItemCount')), hasNext: num(g(r, 'currentPage')) < num(g(r, 'totalPageCount')) };
+  }
+  // Cevap: multipart/form-data, alan adı "Answer" (en fazla 2000 karakter)
+  async function answer(q, text) {
+    const fd = new FormData();
+    fd.append('Answer', text);
+    const h = qh(); delete h['Content-Type'];
+    await http(`${QNA}/issues/${encodeURIComponent(q.remote_id)}/answer`, { method: 'POST', headers: h, body: fd });
+  }
+
   async function diagnose({ orderId } = {}) {
     const out = [];
     await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}` }; });
-    await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length} paket örneği` }; });
+    await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantid/${m}?Offset=0&limit=1`); return { detail: `erişildi · ${page(r).length} paket örneği` }; });
+    await diagStep(out, 'Kargodaki paketler', async () => { const r = await call(`${OMS}/packages/merchantid/${m}/shipped?offset=0&limit=1`); return { detail: `erişildi · toplam ${g(r, 'totalCount') ?? '?'}` }; });
     await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
     if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ page: 0, size: 1 }); return { detail: `${r.total ?? r.items.length} soru` }; });
     if (orderId) await diagStep(out, 'Sipariş', async () => { const r = await call(`${OMS}/orders/merchantid/${m}/ordernumber/${encodeURIComponent(orderId)}`); return { detail: JSON.stringify(r).slice(0, 600) }; });
     return out;
   }
 
-  const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD'].filter((k) => !env[k]);
+  const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose,
+    caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer,
   };
 }

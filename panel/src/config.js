@@ -25,7 +25,8 @@ export const FIELDS = {
     { k: 'HB_MERCHANT_ID', label: 'Merchant ID', req: true },
     { k: 'HB_PASSWORD', label: 'Servis anahtarı (şifre)', secret: true, req: true },
     { k: 'HB_USERNAME', label: 'Kullanıcı adı', hint: 'boşsa Merchant ID', adv: true },
-    { k: 'HB_USER_AGENT', label: 'User-Agent', hint: 'Hepsiburada farklı verdiyse', adv: true },
+    { k: 'HB_USER_AGENT', label: 'Entegratör adı (User-Agent)', req: true, hint: 'Merchant Portal → Hesabım → Entegrasyon (Entegratör Bilgileri) ekranındaki entegratör adı, ör. hasturk_dev. Boşsa ya da farklıysa Hepsiburada isteği 401/403 ile reddeder.' },
+    { k: 'HB_MERCHANT_NAME', label: 'Mağaza adı (Hepsiburada\'da görünen)', hint: 'Buybox sıranızı bulmak için; ürün sayfasındaki satıcı adıyla birebir aynı', adv: true },
     { k: 'HB_TEST', label: 'Test ortamı', hint: '1 = test (SIT) ortamı', adv: true },
   ],
   pttavm: [
