@@ -200,13 +200,15 @@ test('ikas tanılama: izinler, eksik depo adresi, telefonsuz sipariş ve barkod 
   const r = await ch.diagnose({ orderId: 'o1' });
   const by = Object.fromEntries(r.map((x) => [x.name, x]));
   assert.equal(by['ikas bağlantısı (OAuth)'].ok, true);
-  assert.equal(by['Uygulama izinleri'].ok, true);
+  assert.equal(by['Uygulama izinleri'].ok, null, 'zorunlu izinler açık; yalnız envanter kapalı → uyarı, hata değil');
+  assert.match(by['Uygulama izinleri'].detail, /Envanter – Görüntüleme/);
   assert.equal(by['Depo / stok lokasyonu adresi'].ok, false, 'ilçe ve telefon eksik');
   assert.match(by['Kargo ayarları (bölgeler)'].detail, /Yurtiçi Kargo/);
   const o = by['Sipariş ve paketleri (ikas)'];
   assert.equal(o.ok, false);
   assert.match(o.detail, /Alıcı telefonu yok/);
-  assert.match(o.detail, /ikas Kargo barkod üretmemiş/);
+  assert.match(o.detail, /seçtiği kargo: Yurtiçi → Yurtiçi Kargo/);
+  assert.match(o.detail, /ikas Kargo gönderiyi açmamış/);
   assert.match(o.detail, /hiçbir kargo uygulaması işlememiş/);
 });
 
@@ -313,4 +315,25 @@ test('Hepsiburada buybox: farklı yanıt biçimleri okunur', async () => {
     assert.equal(bb.remoteId, 'HBV1');
     assert.equal(bb.rank, 2);
   }
+});
+
+test('ikas tanılama: izin listesi boşsa "eksik izin" denmez; telefon fatura adresinden okunur, seçilen firma ayarlarda yoksa uyarılır', async () => {
+  mockFetch([
+    [/oauth\/token/, { access_token: 'T', expires_in: 3600, scope: '' }],
+    [/graphql/, (url, opts) => {
+      const q = JSON.parse(opts.body).query;
+      if (/getAuthorizedApp/.test(q)) return { data: { getAuthorizedApp: { scope: '' } } };
+      if (/listCargoCompany/.test(q)) return { data: { listCargoCompany: [{ id: 'hj', name: 'HepsiJet' }, { id: 'c1', name: 'Yurtiçi Kargo' }] } };
+      if (/listShippingSettings/.test(q)) return { data: { listShippingSettings: [{ zoneName: 'TR', zoneRate: [{ rateName: 'Std', cargoCompanyId: 'c1' }] }] } };
+      if (/listOrder/.test(q)) return { data: { listOrder: { hasNext: false, data: [{ id: 'o1', orderNumber: 7, status: 'CREATED', shippingAddress: { phone: '' }, billingAddress: { phone: '0555' }, customer: {}, shippingLines: [{ title: 'HepsiJet (+30 TL)', cargoCompanyId: 'hj' }], orderLineItems: [], orderPackages: [] }] } } };
+      return { data: {} };
+    }],
+  ]);
+  const ch = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
+  const by = Object.fromEntries((await ch.diagnose({ orderId: 'o1' })).map((x) => [x.name, x]));
+  assert.equal(by['Uygulama izinleri'].ok, null);
+  assert.doesNotMatch(by['Uygulama izinleri'].detail, /Kapalı izin/);
+  const o = by['Sipariş ve paketleri (ikas)'].detail;
+  assert.match(o, /0555 \(fatura adresi/);
+  assert.match(o, /HepsiJet \(\+30 TL\) → HepsiJet · ⚠ bu firma aktif kargo ayarlarınızda yok/);
 });
