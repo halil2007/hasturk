@@ -2,6 +2,7 @@
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
 import { api, state, html, render, $, $$, money, n, ch, chLogo, chBadge, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote } from '../core.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
+import { diagnoseDialog } from './diagnose.js';
 
 const STEPS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda']];
 export function stepper(status) {
@@ -109,7 +110,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || o.cargo_company || (caps().cargo === 'pack' ? 'ikas Kargo (öncelik sırasına göre)' : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
         ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company ? 'Değiştir' : 'Seç'}</button>` : ''}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
-      ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error}</div>` : ''}
+      ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
       <div class="acts">${mainBtn(o, p)}${mode !== 'panel' && !p.virtual ? html`<button class="btn sm" style="flex:0 0 auto" data-op="more" data-id="${p.id}" aria-label="Diğer işlemler"><i class="ico ico-dots"></i></button>` : ''}</div>
     </div>`;
   }
@@ -179,8 +180,11 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     detail: () => openOrder(id, onChange),
     label: (b) => busy(b, async () => {
       const r = await fetchLabel(pkgOf(b.dataset.id));
-      if (r.error) toast(r.error, true);
-      else if (r.pending) toast(r.pending, true);
+      if (r.error || r.pending) {
+        await changed();
+        if (await confirmBox(html`<b>${chName()}:</b> ${r.error || r.pending}<br><br>Nedenini adım adım görmek için bağlantı tanılamasını çalıştırmak ister misiniz? (izinler, depo adresi, kargo ayarları ve bu siparişin ${chName()}'daki paket durumu kontrol edilir)`, 'Tanılamayı çalıştır')) diagnoseDialog(d.order.channel, d.order.id, d.order.order_number);
+        return;
+      }
       else { toast(r.official ? `${chName()} etiketi hazır` : `${chName()} barkodu alındı, etiket hazır`); await outputLabel(r, { done: changed }); }
       await changed();
     }),
@@ -198,6 +202,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     },
     ship: (b) => shipDialog(d, b.dataset.id ? pkgOf(b.dataset.id) : null, changed),
     cargo: (b) => cargoDialog(d, pkgOf(b.dataset.id), changed),
+    diag: () => diagnoseDialog(d.order.channel, d.order.id, d.order.order_number),
     more: (b) => {
       const pkg = pkgOf(b.dataset.id), c = caps(), open = pkg.status === 'open' && live();
       const items = [];
@@ -215,6 +220,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         busy(null, async () => { const r = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
       } });
       if (open) items.push('-', { icon: 'key', label: 'Kendi anlaşmamla gönder (takip no gir)', run: () => shipDialog(d, pkg, changed, { editOnly: true }) });
+      items.push('-', { icon: 'bolt', label: `Kargo / bağlantı tanılaması (${chName()})`, run: () => diagnoseDialog(d.order.channel, d.order.id, d.order.order_number) });
       items.push('-', { icon: 'orders', label: 'Sipariş detayı', run: () => openOrder(id, onChange) });
       popMenu(b, items);
     },

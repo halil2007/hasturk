@@ -124,3 +124,13 @@ export async function labelFrom(v, base) {
 // Geciken / gecikme riskli: açık paketi olan (ya da paketsiz) hazırlanmayı bekleyen sipariş; son teslime 12 saatten az kaldı ya da 1 günü aştı
 export const LATE = `(o.status IN ('new', 'processing') AND (NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) OR EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id AND k.status = 'open'))
   AND ((o.ship_by IS NOT NULL AND o.ship_by < (CAST(strftime('%s', 'now') AS INTEGER) * 1000 + 43200000)) OR o.ordered_at < (CAST(strftime('%s', 'now') AS INTEGER) * 1000 - 86400000)))`;
+
+// Tanılama adımı: işlemi çalıştırır, HTTP hatasını anlaşılır açıklamayla döndürür
+export function explainHttp(msg) {
+  const m = /HTTP (\d{3})/.exec(msg || ''), c = m ? Number(m[1]) : 0;
+  const why = { 400: 'istek reddedildi (parametre / gövde hatası)', 401: 'kimlik doğrulanamadı: API anahtarı / şifre yanlış', 403: 'yetki yok: API kullanıcısının bu servise izni kapalı ya da IP kısıtı var', 404: 'adres bulunamadı (servis yolu ya da satıcı numarası yanlış)', 429: 'çok fazla istek (kısa süre sonra tekrar deneyin)', 500: 'kanal sunucusu hata verdi', 502: 'kanal sunucusu yanıt vermedi', 503: 'kanal servisi geçici olarak kapalı' }[c];
+  return why ? `${msg} → ${why}` : msg;
+}
+export async function diagStep(out, name, fn) {
+  try { const r = await fn(); out.push({ name, ok: true, ...r }); return r || {}; } catch (e) { out.push({ name, ok: false, detail: explainHttp(e.message) }); return null; }
+}

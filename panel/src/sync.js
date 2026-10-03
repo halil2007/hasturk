@@ -10,6 +10,7 @@ import { mergeStatus, chunk, str, sleep } from './util.js';
 import { autoMatch, relinkItems } from './match.js';
 import { runJobs } from './backfill.js';
 import { runBuybox } from './buybox.js';
+import { syncQuestions } from './questions.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 export { relinkItems };
 
@@ -283,6 +284,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     out.price = await pushPrices(env, db);
     // Buybox kontrolü ve (açıksa) seçili ürünlerde otomatik fiyat
     if (!only) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
+    // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
+    out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
     // 5) geçmiş sipariş aktarımı varsa bir parça daha ilerlet
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });

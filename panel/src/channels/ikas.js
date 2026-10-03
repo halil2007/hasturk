@@ -57,7 +57,7 @@ export function ikas(env, p, meta) {
     }
   }
 
-  const PKG_FIELDS = 'id orderPackageNumber orderLineItemIds orderPackageFulfillStatus errorMessage updatedAt trackingInfo { cargoCompany cargoCompanyId trackingNumber trackingLink barcode shippingLabelImage }';
+  const PKG_FIELDS = 'id orderPackageNumber orderLineItemIds orderPackageFulfillStatus errorMessage appId updatedAt trackingInfo { cargoCompany cargoCompanyId trackingNumber trackingLink barcode shippingLabelImage }';
   const ORDER_OPT = {
     salesChannelId: 'salesChannelId',
     orderPackageStatus: 'orderPackageStatus',
@@ -211,7 +211,7 @@ export function ikas(env, p, meta) {
     const loc = await location();
     for (let i = 0; i < items.length; i += 100) {
       const part = items.slice(i, i + 100);
-      await gql('mutation ($input: SaveStockLocationsInput!) { saveVariantStocks(input: $input) }', {
+      await gql('mutation ($input: SaveStockLocationsInput!) { saveProductStockLocations(input: $input) }', {
         input: { productStockLocationInputs: part.map((x) => ({ productId: x.remoteProductId, variantId: x.remoteId, stockLocationId: loc, stockCount: x.stock })) },
       });
     }
@@ -335,10 +335,65 @@ export function ikas(env, p, meta) {
     return { ...listing, stock: Math.max(0, pr.stock) };
   }
 
+  // ---------- tanılama ----------
+  // Her adımı ayrı ayrı ikas'a sorar ve sonucu açıklar: bağlantı, uygulama izinleri, depo adresi, kargo ayarları,
+  // ve (sipariş verilirse) o siparişin paketleri: durum, ikas Kargo uygulaması işledi mi, barkod / etiket / hata.
+  async function diagnose({ orderId } = {}) {
+    const out = [];
+    const step = async (name, fn) => {
+      try { const r = await fn(); out.push({ name, ...r }); return r; } catch (e) { out.push({ name, ok: false, detail: e.message }); return null; }
+    };
+    const tok = await step('ikas bağlantısı (OAuth)', async () => { await auth(); return { ok: true, detail: `${store}.myikas.com için erişim anahtarı alındı` }; });
+    if (!tok) return out;
+    await step('Uygulama izinleri', async () => {
+      const d = await gql('{ getAuthorizedApp { scope storeAppId salesChannelId } }');
+      const sc = String((d.getAuthorizedApp || {}).scope || '');
+      const need = [['order', 'Siparişler'], ['product', 'Ürünler'], ['stock', 'Stok'], ['inventory', 'Stok']];
+      const lc = sc.toLowerCase(), miss = [...new Set(need.filter(([k]) => !lc.includes(k)).map(([, t]) => t))].filter((t) => !(t === 'Stok' && /stock|inventory|product/.test(lc)));
+      const write = /write/.test(lc);
+      return { ok: !miss.length && write ? true : null, detail: `${miss.length ? `Eksik görünen izin: ${miss.join(', ')}. ` : ''}${write ? '' : 'Yazma izni görünmüyor (paketleme ve stok gönderimi için gerekli). '}İzinler: ${sc || '(ikas boş döndü)'}` };
+    });
+    await step('Mağaza (görseller için)', async () => { const d = await gql('{ getMerchant { id } }'); return { ok: !!(d.getMerchant && d.getMerchant.id), detail: `Merchant ID: ${(d.getMerchant || {}).id || '-'}` }; });
+    await step('Depo / stok lokasyonu adresi', async () => {
+      const d = await gql('{ listStockLocation { id name type address { address phone postalCode city { name } district { name } } } }');
+      const locs = d.listStockLocation || [];
+      if (!locs.length) return { ok: false, detail: 'Stok lokasyonu yok. ikas → Ayarlar → Stok Lokasyonları' };
+      const bad = locs.filter((l) => { const a = l.address || {}; return !a.address || !(a.city && a.city.name) || !(a.district && a.district.name) || !a.phone; });
+      return { ok: bad.length ? false : true, detail: locs.map((l) => { const a = l.address || {}; return `${l.name}${l.id === locationId ? ' (stok buraya gönderiliyor)' : ''}: ${[a.address, a.district && a.district.name, a.city && a.city.name, a.phone].filter(Boolean).join(', ') || 'ADRES YOK'}`; }).join(' · ') + (bad.length ? ' — ikas Kargo barkod üretmek için gönderici adresi (adres, il, ilçe, telefon) eksiksiz olmalı.' : '') };
+    });
+    await step('Kargo firmaları (ikas)', async () => { const c = await cargoOptions(); return { ok: c.length > 1 ? true : null, detail: c.slice(1).map((x) => x.name).join(', ') || 'ikas kargo firması listesi boş' }; });
+    await step('Kargo ayarları (bölgeler)', async () => {
+      const d = await gql('{ listShippingSettings { zoneName isPassive salesChannelId type zoneRate { rateName cargoCompanyId price } } }');
+      const list = (d.listShippingSettings || []).filter((x) => !x.isPassive);
+      const names = new Map((cargoCache || []).map((c) => [c.id, c.name]));
+      return { ok: list.length ? true : null, detail: list.map((x) => `${x.zoneName}: ${(x.zoneRate || []).map((r) => `${r.rateName}${r.cargoCompanyId ? ` → ${names.get(r.cargoCompanyId) || r.cargoCompanyId}` : ' (kargo firması bağlı değil)'}`).join(', ')}`).join(' · ') || 'Aktif kargo ayarı yok' };
+    });
+    if (orderId) {
+      await step('Sipariş ve paketleri (ikas)', async () => {
+        const o = await getOrder(orderId);
+        const a = o.shippingAddress || {}, phone = a.phone || (o.customer || {}).phone;
+        const sl = (o.shippingLines || [])[0] || {};
+        const pk = o.orderPackages || [];
+        const lines = [`Sipariş #${o.orderNumber} · durum ${o.status} / ${o.orderPackageStatus || '-'}`, `Müşterinin seçtiği kargo: ${sl.title || '-'}${sl.cargoCompanyId ? ` (${sl.cargoCompanyId})` : ''}`, `Alıcı telefonu: ${phone || 'YOK'}`];
+        let ok = true;
+        if (!phone) { ok = false; lines.push('⚠ Alıcı telefonu yok: kargo firmaları barkod oluşturmaz.'); }
+        if (!pk.length) { ok = null; lines.push('Pakette değil: panelden “Paketle ve etiket al” henüz ikas\'a ulaşmamış ya da paket iptal edilmiş.'); }
+        for (const x of pk) {
+          const ti = x.trackingInfo || {};
+          lines.push(`Paket ${x.orderPackageNumber || x.id}: ${x.orderPackageFulfillStatus}${x.appId ? ` · işleyen uygulama ${x.appId}` : ' · hiçbir kargo uygulaması işlememiş'} · kargo ${ti.cargoCompany || '-'} · barkod ${ti.barcode || '-'} · takip ${ti.trackingNumber || '-'} · etiket görseli ${ti.shippingLabelImage ? 'VAR' : 'yok'}${x.errorMessage ? ` · HATA: ${x.errorMessage}` : ''}`);
+          if (x.orderPackageFulfillStatus === 'ERROR') ok = false;
+          if (x.orderPackageFulfillStatus === 'READY_FOR_SHIPMENT' && !ti.barcode && !ti.trackingNumber && !x.errorMessage) { ok = false; lines.push('⚠ Paket “Kargoya Hazır” ama ikas Kargo barkod üretmemiş. ikas panelinde: Uygulamalar → ikas Kargo → gönderim ayarı “otomatik” mi, kargo anlaşması/önceliği tanımlı mı kontrol edin; ya da aynı paketi ikas panelinde açıp “Kargoya Gönder / Barkod oluştur” deneyin.'); }
+        }
+        return { ok, detail: lines.join('\n') };
+      });
+    }
+    return out;
+  }
+
   const missing = [p + 'STORE', p + 'CLIENT_ID', p + 'CLIENT_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'ikas', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: 'pack', cancelPackage: true, createProduct: true, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, ship, createProduct, cargoOptions, pack, label, cancelPackage, changeCargo,
+    fetchOrders, fetchListings, pushStock, pushPrice, ship, createProduct, cargoOptions, pack, label, cancelPackage, changeCargo, diagnose,
   };
 }

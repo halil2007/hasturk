@@ -58,7 +58,7 @@ test('Hepsiburada: açık satırlar ve paketler birleşir; paket oluşturma line
   assert.deepEqual(JSON.parse(post[0].body), { lineItemRequests: [{ id: 'L1', quantity: 1 }], parcelQuantity: 1, deci: 1 });
 });
 
-test('ikas: token alınır, sipariş okunur, stok saveVariantStocks ile gönderilir', async () => {
+test('ikas: token alınır, sipariş okunur, stok saveProductStockLocations ile gönderilir', async () => {
   const gqlBodies = [];
   mockFetch([
     [/oauth\/token/, { access_token: 'T', expires_in: 3600 }],
@@ -68,7 +68,7 @@ test('ikas: token alınır, sipariş okunur, stok saveVariantStocks ile gönderi
         shippingAddress: { firstName: 'Ali', lastName: 'V', addressLine1: 'Sk', city: { name: 'Konya' }, district: { name: 'Selçuklu' } },
         orderLineItems: [{ id: 'li1', quantity: 3, price: 30, finalPrice: 30, variant: { id: 'v1', productId: 'p1', sku: 'A', name: 'A', barcodeList: ['111'] } }], orderPackages: [] }] } } };
       if (/listStockLocation/.test(b.query)) return { data: { listStockLocation: [{ id: 'loc1', name: 'Depo' }] } };
-      return { data: { saveVariantStocks: true } };
+      return { data: { saveProductStockLocations: true } };
     }],
   ]);
   const ch = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
@@ -77,7 +77,7 @@ test('ikas: token alınır, sipariş okunur, stok saveVariantStocks ile gönderi
   assert.equal(o.items[0].total, 90);
   assert.equal(o.status, 'new');
   await ch.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 7 }]);
-  const save = gqlBodies.find((b) => /saveVariantStocks/.test(b.query));
+  const save = gqlBodies.find((b) => /saveProductStockLocations/.test(b.query));
   assert.deepEqual(save.variables.input.productStockLocationInputs, [{ productId: 'p1', variantId: 'v1', stockLocationId: 'loc1', stockCount: 7 }]);
 });
 
@@ -178,4 +178,33 @@ test('N11, idefix, Pazarama: siparişler okunur, işleme al doğru çağrıyı y
   assert.equal(calls[1].headers.Authorization, 'Bearer TT');
   await pz.accept({ remote_id: '555' });
   assert.deepEqual(JSON.parse(calls.pop().body), { orderNumber: 555, status: 12 });
+});
+
+test('ikas tanılama: izinler, eksik depo adresi, telefonsuz sipariş ve barkod üretilmemiş "Kargoya Hazır" paket açıklanır', async () => {
+  mockFetch([
+    [/oauth\/token/, { access_token: 'T', expires_in: 3600 }],
+    [/graphql/, (url, opts) => {
+      const q = JSON.parse(opts.body).query;
+      if (/getAuthorizedApp/.test(q)) return { data: { getAuthorizedApp: { scope: 'read_orders,write_orders,read_products,write_products' } } };
+      if (/getMerchant/.test(q)) return { data: { getMerchant: { id: 'm1' } } };
+      if (/listStockLocation/.test(q)) return { data: { listStockLocation: [{ id: 'l1', name: 'Ana depo', address: { address: 'Sanayi', city: { name: 'Konya' } } }] } };
+      if (/listCargoCompany/.test(q)) return { data: { listCargoCompany: [{ id: 'c1', name: 'Yurtiçi Kargo' }] } };
+      if (/listShippingSettings/.test(q)) return { data: { listShippingSettings: [{ zoneName: 'Türkiye', zoneRate: [{ rateName: 'Standart', cargoCompanyId: 'c1', price: 0 }] }] } };
+      if (/listOrder/.test(q)) return { data: { listOrder: { hasNext: false, data: [{ id: 'o1', orderNumber: 1001, status: 'CREATED', orderPackageStatus: 'READY_FOR_SHIPMENT', shippingAddress: {}, customer: {}, shippingLines: [{ title: 'Yurtiçi', cargoCompanyId: 'c1' }],
+        orderLineItems: [], orderPackages: [{ id: 'p1', orderPackageNumber: '1001-1', orderPackageFulfillStatus: 'READY_FOR_SHIPMENT', orderLineItemIds: [], trackingInfo: {} }] }] } } };
+      return { data: {} };
+    }],
+  ]);
+  const ch = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
+  const r = await ch.diagnose({ orderId: 'o1' });
+  const by = Object.fromEntries(r.map((x) => [x.name, x]));
+  assert.equal(by['ikas bağlantısı (OAuth)'].ok, true);
+  assert.equal(by['Uygulama izinleri'].ok, true);
+  assert.equal(by['Depo / stok lokasyonu adresi'].ok, false, 'ilçe ve telefon eksik');
+  assert.match(by['Kargo ayarları (bölgeler)'].detail, /Yurtiçi Kargo/);
+  const o = by['Sipariş ve paketleri (ikas)'];
+  assert.equal(o.ok, false);
+  assert.match(o.detail, /Alıcı telefonu yok/);
+  assert.match(o.detail, /ikas Kargo barkod üretmemiş/);
+  assert.match(o.detail, /hiçbir kargo uygulaması işlememiş/);
 });

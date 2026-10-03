@@ -9,6 +9,8 @@
 - **Eşleştirme:** **Farklı kanallardaki** aynı ürünü/varyantı birbirine bağlar; bir panel ürününe her kanaldan yalnızca bir ilan bağlanır, ana katalog sitesinin her varyantı kendi ürünüdür (tek site bağlıyken eşleştirme yapılmaz). Otomatik: barkod aynı; ya da stok kodu aynı ve barkod çelişmiyor; ya da **ad + varyant/ölçü birebir aynı** ve tek aday. Emin olunamayanlar **Eşleştirme → Onay bekleyen**'de benzerlik puanlı önerilerle listelenir. **Eşleşmiş ürünler** sekmesinde hangi kanaldaki hangi ilanın bağlı olduğu ürün ürün görülür; yanlış eşleşme kaldırılır ya da başka ürüne taşınır (kaldırılan eşleşme otomatik olarak tekrar yapılmaz).
 - **Geçmiş siparişler:** Entegrasyonlar sayfasından tarih aralığı seçilerek kanal kanal aktarılır (haftalık parçalar halinde, kaldığı yerden sürer).
 - **Kullanıcılar:** Yönetici ve personel hesapları. Personel API bilgilerini, kullanıcıları ve ayarları değiştiremez.
+- **Müşteri soruları:** Trendyol ve Hepsiburada'daki ürün soruları her senkronda panele gelir; **Müşteri Soruları** sayfasında listelenir ve panelden cevaplanır (hazır cevaplar, karakter sınırı, son cevap süresi). Kanalın kendi panelinden verilen cevaplar da görünür.
+- **Bağlantı tanılaması:** Entegrasyonlar'daki **Tanılama** düğmesi (ve sipariş menüsündeki “Kargo / bağlantı tanılaması”) kanalın her adımını ayrı ayrı dener: kimlik, uygulama izinleri, servisler, ikas'ta depo adresi ve kargo ayarları, seçili siparişin kanaldaki paket / barkod / etiket durumu. Sorunlu adım açıklamasıyla gösterilir; rapor kopyalanıp iletilebilir.
 - **Bildirimler:** Yeniden denemeye rağmen çözülemeyen senkron, stok gönderimi ve aktarım hataları burada toplanır; sorun düzelince kendiliğinden kapanır.
 - **Analizler:** Bugün / dün / önceki günler (ya da hafta, ay, yıl) kartları: satış, sepet ortalaması, sipariş, ürün adedi, iptal/iade oranı ve değişim; son 8 haftanın raporu; en çok gönderim yapılan iller; en çok satanlar (adet, ciro, ortalama / en yüksek / en düşük satış fiyatı). Hepsi toplam ya da kanal bazında. “Ayrıntılı grafik” sekmesinde dönem karşılaştırmalı grafikler.
 - **Buybox (Trendyol / Hepsiburada):** Buybox sırası, buybox fiyatı ve rakip fiyatları, “Buybox sizde / kaybedildi / kazanıldı” durumları ve geçmiş. **Otomatik fiyat** yalnızca sizin kural açtığınız ürün ve kanalda, genel anahtar açıkken çalışır: rakibin belirlediğiniz TL kadar altına iner, en düşük fiyatın altına inmez, rakip çekilince normal fiyata döner, en yüksek fiyatı aşmaz. Rakip verisi yoksa veya güncel değilse fiyat değiştirilmez; kendi fiyatınız rakip sayılmaz; her değişiklik (eski/yeni fiyat, zaman, neden, sonraki sıra) kaydedilir.
@@ -133,8 +135,12 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 ```bash
 cd panel
 npm run dev      # http://localhost:8787 — deneme modu, şifre: demo (Node 22.5+, Cloudflare hesabı gerekmez)
-npm test         # stok düşümü, iptal/iade, kanala özel stok, eşleştirme, geçmiş aktarım, kullanıcı yetkileri, kâr formülü, kanal bağlantıları (örnek cevaplarla)
+npm test         # stok düşümü, iptal/iade, kanala özel stok, eşleştirme, kargo akışı, buybox kuralları, kanal bağlantıları (örnek cevaplarla)
+                 # ve ikas'a giden tüm GraphQL sorgularının ikas'ın resmi şemasına uygunluğu (test/fixtures/ikas-schema.json)
 ```
+
+ikas şema özetini güncellemek (ikas yeni sürüm yayınlarsa): `npm pack @ikas/admin-api-client` → paketi açın →
+`node dev/ikas-schema.mjs package/dist/src/api/admin/generated/index.d.ts <sürüm> > test/fixtures/ikas-schema.json` → `npm test`.
 
 | Dosya | Görev |
 |---|---|

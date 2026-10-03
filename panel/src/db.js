@@ -62,6 +62,11 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS price_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL, remote_id TEXT NOT NULL, at INTEGER NOT NULL,
     old_price REAL, new_price REAL, competitor_price REAL, reason TEXT, rank_before INTEGER, rank_after INTEGER, ok INTEGER, error TEXT)`,
   'CREATE INDEX IF NOT EXISTS price_changes_l ON price_changes(channel, remote_id, at)',
+  // Müşteri soruları (pazaryerlerinden): soru, ürün, durum ve cevap. answered_by: panel | kanal
+  `CREATE TABLE IF NOT EXISTS questions (channel TEXT NOT NULL, remote_id TEXT NOT NULL, text TEXT, asked_at INTEGER, status TEXT NOT NULL DEFAULT 'waiting', remote_status TEXT,
+    product_name TEXT, product_image TEXT, product_url TEXT, barcode TEXT, sku TEXT, customer TEXT, answer TEXT, answered_at INTEGER, answered_by TEXT, user TEXT,
+    due_at INTEGER, error TEXT, synced_at INTEGER, PRIMARY KEY (channel, remote_id))`,
+  'CREATE INDEX IF NOT EXISTS questions_status ON questions(status, asked_at)',
   // Bildirimler: senkron hataları, stok uyarıları; aynı konu (key) tek kayıtta güncellenir
   `CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, level TEXT NOT NULL, channel TEXT, title TEXT NOT NULL, msg TEXT,
     count INTEGER NOT NULL DEFAULT 1, first_at INTEGER, last_at INTEGER, read INTEGER NOT NULL DEFAULT 0, resolved_at INTEGER)`,
@@ -120,6 +125,8 @@ export const DEFAULT_SETTINGS = {
   // Kanal başına varsayılan komisyon (%) ve sipariş başı kargo gideri (TL); ürün/ilan bazında değiştirilebilir
   // Otomatik fiyatlandırma genel anahtarı (kapalıyken hiçbir fiyat değiştirilmez; yalnızca buybox izlenir)
   autoprice: false,
+  // Müşteri sorularına hazır cevaplar
+  answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
   commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15 },
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)

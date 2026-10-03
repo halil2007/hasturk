@@ -6,10 +6,11 @@ import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, 
 import { suggestions, linkedGroups } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
+import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { profit } from '../public/profit.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE } from './util.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, tracking, barcode, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
@@ -576,6 +577,7 @@ async function saveSettings(db, b) {
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
     if (k === 'autoprice') v = !!v;
+    if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
     if (k === 'catalog_channels') v = (Array.isArray(v) ? v : []).filter((c) => CHANNEL_IDS.includes(c));
     if (k === 'company') v = Object.fromEntries(['title', 'legal', 'phone', 'email', 'address', 'tax'].map((f) => [f, str((v || {})[f]).slice(0, 300)]));
     if (k === 'logo') { v = v ? String(v) : ''; if (v && (!/^data:image\/(png|jpeg|webp|svg\+xml);base64,/.test(v) || v.length > 400000)) fail(400, 'Logo PNG/JPG/WEBP/SVG ve en fazla ~300 KB olmalı'); }
@@ -600,15 +602,18 @@ const ADMIN_ONLY = [/^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^b
 export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönetici', role: 'admin' }) {
   const url = new URL(req.url), q = Object.fromEntries(url.searchParams), m = req.method;
   let x;
-  if (user.role !== 'admin' && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
-  if (user.role !== 'admin' && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
+  // Tanılama personel için de açık (API bilgilerini göstermez)
+  const diag = /^integrations\/[a-z0-9]+\/diagnose$/.test(path);
+  if (user.role !== 'admin' && !diag && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
+  if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
   if (path === 'summary' && m === 'GET') {
+    const qs = await first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'");
     const [s, notices, match] = await Promise.all([
       summary(db),
       first(db, 'SELECT COUNT(*) AS open, SUM(read = 0) AS unread FROM notices WHERE resolved_at IS NULL'),
       first(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
     ]);
-    return json({ ...s, channels: await channelsInfo(env, db), settings: await getSettings(db), user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, demo: env.DEMO === '1' });
+    return json({ ...s, channels: await channelsInfo(env, db), settings: await getSettings(db), user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
   }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
   if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
@@ -656,6 +661,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} stok kuralı → ${mode}${v != null ? ' ' + v : ''}`);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
     return json({ ok: true });
+  }
+
+  // ---------- müşteri soruları ----------
+  if (path === 'questions' && m === 'GET') return json(await listQuestions(db, q));
+  if (path === 'questions/sync' && m === 'POST') return json(await syncQuestions(env, db));
+  if ((x = path.match(/^questions\/([a-z0-9]+)\/(.+)\/answer$/)) && m === 'POST') {
+    const b = await body(req);
+    try { return json(await answerQuestion(env, db, x[1], decodeURIComponent(x[2]), b.text, user)); } catch (e) { fail(400, e.message); }
   }
 
   // ---------- buybox ----------
@@ -782,6 +795,27 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     resetChannels();
     await log(db, x[1], 'info', 'API bilgileri panelden güncellendi');
     return json({ ok: true });
+  }
+  // Adım adım bağlantı tanılaması (isteğe bağlı sipariş için kargo/paket durumu)
+  if ((x = path.match(/^integrations\/([a-z0-9]+)\/diagnose$/)) && m === 'POST') {
+    const b = await body(req);
+    resetChannels();
+    let ch = await channel(env, db, x[1]);
+    if (!ch) fail(404, 'Kanal bulunamadı');
+    if (ch.gated) ch = ch.real;
+    const checks = [{ name: 'API bilgileri', ok: ch.demo ? null : ch.enabled ? true : false, detail: ch.demo ? 'Girilmemiş' : ch.enabled ? 'Gerekli alanlar dolu' : 'Eksik: ' + (ch.missing || []).join(', ') }];
+    if (ch.demo) checks.push({ name: 'Deneme modu', ok: null, detail: 'Bu kanal örnek veriyle çalışıyor (API bilgisi girilmemiş)' });
+    let order = null;
+    if (b.order_id) order = await first(db, 'SELECT remote_id, order_number FROM orders WHERE id = ?', String(b.order_id));
+    if (ch.enabled && !ch.demo && ch.diagnose) checks.push(...await ch.diagnose({ orderId: order ? (ch.type === 'trendyol' || ch.type === 'hepsiburada' ? order.order_number : order.remote_id) : undefined }));
+    else if (ch.enabled && !ch.demo) {
+      const t = Date.now();
+      try { const o = await ch.fetchOrders(t - 864e5, t); checks.push({ name: 'Siparişler (son 24 saat)', ok: true, detail: `${o.length} sipariş` }); } catch (e) { checks.push({ name: 'Siparişler', ok: false, detail: explainHttp(e.message) }); }
+    }
+    const last = await getRaw(db, 'last:' + ch.id);
+    if (last) checks.push({ name: 'Son senkron', ok: last.ok === false ? false : true, detail: `siparişler ${last.ordersAt ? new Date(last.ordersAt).toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : 'hiç başarılı olmadı'}${last.error ? ' · hata: ' + last.error : ''}${last.listingsError ? ' · ürün hatası: ' + last.listingsError : ''}` });
+    await log(db, ch.id, 'info', `${user.name}: bağlantı tanılaması çalıştırıldı (${checks.filter((c) => c.ok === false).length} sorun)`);
+    return json({ channel: ch.id, at: Date.now(), checks });
   }
   if ((x = path.match(/^integrations\/([a-z0-9]+)\/test$/)) && m === 'POST') {
     resetChannels();

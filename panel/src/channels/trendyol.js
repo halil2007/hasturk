@@ -1,6 +1,6 @@
 // Trendyol Marketplace API (apigw.trendyol.com/integration).
 // Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key, API Secret.
-import { http, basic, num, str, chunk } from '../util.js';
+import { http, basic, num, str, chunk, diagStep } from '../util.js';
 
 const BASE = 'https://apigw.trendyol.com/integration';
 
@@ -212,10 +212,25 @@ export function trendyol(env, meta) {
     return out;
   }
 
+  const questions = null; // SORU-CEVAP: aşağıda tanımlanacak
+  async function diagnose({ orderId } = {}) {
+    const out = [], now = Date.now();
+    await diagStep(out, 'Siparişler (son 24 saat)', async () => { const r = await call(`/order/sellers/${seller}/orders?startDate=${now - 864e5}&endDate=${now}&page=0&size=1`); return { detail: `${r.totalElements ?? (r.content || []).length} paket · satıcı ${seller}` }; });
+    await diagStep(out, 'Ürünler', async () => { const r = await call(`/product/sellers/${seller}/products?page=0&size=1`); return { detail: `${r.totalElements ?? '?'} ürün` }; });
+    await diagStep(out, 'Buybox servisi', async () => { const r = await call(`/product/sellers/${seller}/products?page=0&size=1`); const bc = ((r.content || [])[0] || {}).barcode; if (!bc) return { ok: null, detail: 'Ürün yok, denenemedi' }; await buybox([bc]); return { detail: 'Erişilebilir' }; });
+    if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ since: now - 7 * 864e5, page: 0, size: 1 }); return { detail: `son 7 günde ${r.total ?? r.items.length} soru` }; });
+    if (orderId) await diagStep(out, 'Sipariş paketleri', async () => {
+      const r = await call(`/order/sellers/${seller}/orders?orderNumber=${encodeURIComponent(orderId)}`);
+      const ps = r.content || [];
+      return { ok: ps.length ? true : false, detail: ps.map((p) => `Paket ${p.id}: ${p.status} · ${p.cargoProviderName || '-'} · takip ${p.cargoTrackingNumber || '-'}${p.agreedDeliveryDate ? ` · son teslim ${new Date(p.agreedDeliveryDate).toISOString().slice(0, 16).replace('T', ' ')}` : ''}`).join('\n') || 'Trendyol bu sipariş numarasını bulamadı' };
+    });
+    return out;
+  }
+
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox,
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, diagnose,
   };
 }

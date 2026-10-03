@@ -1,7 +1,7 @@
 // Hepsiburada Marketplace API.
 // Merchant paneli → Entegrasyon → API bilgileri: Merchant ID ve servis anahtarı (şifre).
 //   Siparişler/paketler: oms-external.hepsiburada.com   İlan/stok/fiyat: listing-external.hepsiburada.com
-import { http, basic, num, str, chunk } from '../util.js';
+import { http, basic, num, str, chunk, diagStep } from '../util.js';
 
 export function hepsiburada(env, meta) {
   const m = env.HB_MERCHANT_ID, user = env.HB_USERNAME || m, pass = env.HB_PASSWORD;
@@ -212,10 +212,21 @@ export function hepsiburada(env, meta) {
     return out;
   }
 
+  const questions = null; // SORU-CEVAP: aşağıda tanımlanacak
+  async function diagnose({ orderId } = {}) {
+    const out = [];
+    await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}` }; });
+    await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length} paket örneği` }; });
+    await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
+    if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ page: 0, size: 1 }); return { detail: `${r.total ?? r.items.length} soru` }; });
+    if (orderId) await diagStep(out, 'Sipariş', async () => { const r = await call(`${OMS}/orders/merchantid/${m}/ordernumber/${encodeURIComponent(orderId)}`); return { detail: JSON.stringify(r).slice(0, 600) }; });
+    return out;
+  }
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose,
   };
 }
