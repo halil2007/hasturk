@@ -125,6 +125,7 @@ const MIGRATIONS = [
   'ALTER TABLE listings ADD COLUMN commission_src TEXT',
   // Kategori (ikas kategori yolu) → ürün kategorisi; kategori eşleştirme ve ürün yüklemede kullanılır
   'ALTER TABLE listings ADD COLUMN category TEXT',
+  'CREATE INDEX IF NOT EXISTS listings_open ON listings(product_id, ignored)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -145,6 +146,15 @@ export function init(db) {
           db.prepare("INSERT INTO settings (k, v) VALUES ('once:stock_off_1', '1') ON CONFLICT (k) DO NOTHING"),
         ]);
       }
+      // Tek seferlik: ikas mağazalarının "beklemede" kilidi kaldırılır; paketleme / ikas Kargo / etiket panelden yapılır
+      if (!(await db.prepare("SELECT 1 AS x FROM settings WHERE k = 'once:unhold_ikas_1'").first())) {
+        const h = await db.prepare("SELECT v FROM settings WHERE k = 'hold_channels'").first();
+        const list = h ? JSON.parse(h.v).filter((c) => !['ikas1', 'ikas2'].includes(c)) : [];
+        await db.batch([
+          db.prepare("INSERT INTO settings (k, v) VALUES ('hold_channels', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(list)),
+          db.prepare("INSERT INTO settings (k, v) VALUES ('once:unhold_ikas_1', '1') ON CONFLICT (k) DO NOTHING"),
+        ]);
+      }
       await db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)).run();
     })().catch((e) => { ready.delete(db); throw e; }));
   }
@@ -161,7 +171,7 @@ export const DEFAULT_SETTINGS = {
   // Otomatik fiyatlandırma genel anahtarı (kapalıyken hiçbir fiyat değiştirilmez; yalnızca buybox izlenir)
   autoprice: false,
   // Beklemedeki kanallar: okunur, kanala yazılmaz (ikas: resmi dokümanlar gelene kadar)
-  hold_channels: ['ikas1', 'ikas2'],
+  hold_channels: [],
   // Yeni sipariş e-posta bildirimi: açık/kapalı, alıcılar, kanal seçimi (false = o kanaldan e-posta gelmez), panel adresi (e-postadaki bağlantı)
   mail_enabled: false,
   mail_to: [],

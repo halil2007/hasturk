@@ -48,11 +48,13 @@ test('farklı kanal: ad + varyant birebir aynıysa otomatik, benzerse onaya dü�
   assert.equal((await pid(db, 't5r')).product_id, null, 'kelime sırası farklı: adın tamamı aynı değil, onaya düşer');
   const h0 = await first(db, "SELECT ignored, match, product_id FROM listings WHERE remote_id = 'h0'");
   assert.equal(h0.product_id, null); assert.deepEqual([h0.ignored, h0.match], [1, 'zero'], 'stoğu sıfır, kesin eşleşmesi yok: otomatik yok sayılır');
-  assert.equal((await pid(db, 'h1')).product_id, (await pid(db, 'v10')).product_id, 'stoğu sıfır olsa da kesin (tam ad) eşleşme yapılır');
-  await db.prepare("UPDATE listings SET remote_stock = 3 WHERE remote_id = 'h0'").run();
+  const h1 = await first(db, "SELECT ignored, match, product_id FROM listings WHERE remote_id = 'h1'");
+  assert.deepEqual([h1.product_id, h1.ignored, h1.match], [null, 1, 'zero'], 'stoğu sıfır: tam ad eşleşse bile eşleştirmeye girmez');
+  await db.prepare("UPDATE listings SET remote_stock = 3 WHERE remote_id IN ('h0', 'h1')").run();
   await autoMatch(db, { catalog: ['ikas1'] });
   const h0b = await first(db, "SELECT ignored, match FROM listings WHERE remote_id = 'h0'");
   assert.deepEqual([h0b.ignored, h0b.match], [0, null], 'stok gelince yeniden onay listesine döner');
+  assert.equal((await pid(db, 'h1')).product_id, (await pid(db, 'v10')).product_id, 'stok gelince kesin (tam ad) eşleşme yapılır');
   const s = await suggestions(db, { channel: 'trendyol' });
   const t10 = s.find((x) => x.remote_id === 't10'), t5b = s.find((x) => x.remote_id === 't5b');
   assert.equal(t10.candidates[0].product_id, (await pid(db, 'v10')).product_id);

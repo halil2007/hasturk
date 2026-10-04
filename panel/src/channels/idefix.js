@@ -1,7 +1,7 @@
 // idefix pazaryeri (merchantapi.idefix.com). Satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri: API Key, API Secret, Vendor ID.
 // Kimlik: X-API-KEY = base64(apiKey:apiSecret). Siparişler: /oms/{vendorId}/list · Ürün/stok/fiyat: /pim/...
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür (beta: canlı hesapla doğrulanmalı).
-import { http, num, str, chunk, diagStep } from '../util.js';
+import { http, num, str, chunk, diagStep, sleep } from '../util.js';
 
 const BASE = 'https://merchantapi.idefix.com';
 // idefix durumları "shipment_" önekiyle gelir (shipment_created, shipment_picking, shipment_in_cargo, shipment_delivered…)
@@ -16,7 +16,24 @@ export const idefixStatus = (s) => STATUS[String(s || '').trim().toLowerCase().r
 export function idefix(env, meta) {
   const key = env.IDEFIX_API_KEY, secret = env.IDEFIX_API_SECRET, vendor = env.IDEFIX_VENDOR_ID;
   const headers = () => ({ 'X-API-KEY': btoa(`${key}:${secret}`), 'Content-Type': 'application/json', Accept: 'application/json' });
-  const call = (path, opts = {}) => http(BASE + path, { ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
+  // idefix istek sınırı sıkı: 429 / 5xx'te artan beklemeyle 4 deneme (bağlantı test edilip sonra senkronda kopması bu yüzdendi)
+  const call = (path, opts = {}) => http(BASE + path, { tries: 4, timeout: 30000, ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
+  // Sayfalı okuma: sayfa boyutu reddedilirse (400/422) 50'ye, sonra 20'ye düşülür; sayfalar arasında kısa bekleme
+  let pageSize = 100;
+  async function paged(build, maxPages) {
+    const out = [];
+    for (let page = 1; page <= maxPages; page++) {
+      let rows;
+      for (;;) {
+        try { rows = list(await call(build(page, pageSize))); break; }
+        catch (e) { if (/HTTP (400|422)/.test(e.message) && pageSize > 20) { pageSize = pageSize === 100 ? 50 : 20; continue; } throw e; }
+      }
+      out.push(...rows);
+      if (rows.length < pageSize) break;
+      await sleep(250);
+    }
+    return out;
+  }
   const list = (r) => (Array.isArray(r) ? r : (r && (r.items || r.data || r.content || r.products)) || []);
   // Tarih biçimi: yyyy/MM/dd HH:mm:ss (Türkiye saati)
   const fmt = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 19).replace('T', ' ').replace(/-/g, '/');
@@ -40,29 +57,20 @@ export function idefix(env, meta) {
   }
 
   async function fetchOrders(since, until) {
-    const out = [];
-    for (let page = 1; page <= 50; page++) {
-      const r = await call(`/oms/${vendor}/list?page=${page}&limit=100&startDate=${encodeURIComponent(fmt(since))}&endDate=${encodeURIComponent(fmt(until))}&sortByField=createAt&sortDirection=desc`);
-      const rows = list(r);
-      out.push(...rows.map(norm));
-      if (rows.length < 100) break;
-    }
-    return out;
+    const rows = await paged((page, n) => `/oms/${vendor}/list?page=${page}&limit=${n}&startDate=${encodeURIComponent(fmt(since))}&endDate=${encodeURIComponent(fmt(until))}&sortByField=createAt&sortDirection=desc`, 100);
+    return rows.map(norm);
   }
 
   async function fetchListings() {
-    const out = [];
-    for (let page = 1; page <= 400; page++) {
-      const rows = list(await call(`/pim/pool/${vendor}/list?page=${page}&limit=100`));
-      for (const p of rows) {
-        const img = (p.images || p.imageUrls || [])[0];
-        out.push({ remoteId: str(p.barcode), remoteProductId: str(p.productMainId), sku: str(p.vendorStockCode || p.erpId), barcode: str(p.barcode), name: str(p.title), groupName: str(p.title), variantName: '',
-          image: str(typeof img === 'string' ? img : img && (img.url || img.imageUrl)), price: num(p.price), listPrice: num(p.comparePrice) || num(p.price), stock: num(p.inventoryQuantity ?? p.quantity),
-          active: !/reject|archive|passive/i.test(str(p.status)), brand: str(p.brandName) });
-      }
-      if (rows.length < 100) break;
-    }
-    return out;
+    const rows = await paged((page, n) => `/pim/pool/${vendor}/list?page=${page}&limit=${n}`, 1000);
+    return rows.filter((p) => p.barcode).map((p) => {
+      const img = (p.images || p.imageUrls || [])[0], q = p.inventoryQuantity ?? p.quantity ?? p.stock;
+      return { remoteId: str(p.barcode), remoteProductId: str(p.productMainId), sku: str(p.vendorStockCode || p.erpId), barcode: str(p.barcode), name: str(p.title), groupName: str(p.title), variantName: '',
+        image: str(typeof img === 'string' ? img : img && (img.url || img.imageUrl)), price: num(p.price), listPrice: num(p.comparePrice) || num(p.price),
+        // Stok bilgisi gelmezse bilinmiyor sayılır (0 sayılıp eşleştirmeden düşmesin)
+        stock: q == null ? null : num(q),
+        active: !/reject|archive|passive/i.test(str(p.status)), brand: str(p.brandName) };
+    });
   }
 
   const upload = (items) => call(`/pim/catalog/${vendor}/inventory-upload`, { method: 'POST', body: { items } });

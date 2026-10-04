@@ -18,7 +18,7 @@ export const GATED = ['pttavm', 'n11', 'idefix', 'pazarama'];
 // Beklemedeki kanal (Entegrasyonlar → "Kanala yazmayı beklet"): siparişler, ürünler, stok ve etiketler okunmaya devam eder;
 // kanala yazan işlemler (paketleme / kargoya hazırlama, kargoya verme, paket iptali, stok ve fiyat gönderimi, ürün oluşturma) yapılmaz.
 export const WRITE_OPS = ['accept', 'split', 'pack', 'ship', 'repack', 'cancelPackage', 'changeCargo', 'pushStock', 'pushPrice', 'createProduct', 'answer', 'catalog'];
-export const DEFAULT_HOLD = ['ikas1', 'ikas2'];
+export const DEFAULT_HOLD = [];
 function held(c) {
   const o = { ...c, hold: true, caps: { ...(c.caps || {}), hold: true, accept: 'local', split: 'local', pack: null, ship: 'local', cargo: false, repack: false, cancelPackage: false, createProduct: false, price: false } };
   for (const k of WRITE_OPS) delete o[k];

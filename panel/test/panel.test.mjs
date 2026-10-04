@@ -238,20 +238,31 @@ test('stok senkronu kapalıyken: hiçbir kanala stok gitmez, panel stoğu ikas s
   assert.ok(await first(db, "SELECT 1 AS x FROM settings WHERE k = 'once:stock_off_1'"));
 });
 
-test('beklemedeki kanal (ikas varsayılan): okur, kanala yazmaz; ayardan kaldırılınca yazar', async () => {
+test('ikas beklemede değil (panelden paketlenir); bekleme ayardan açılırsa kanala yazmaz', async () => {
   const { getChannels, resetChannels } = await import('../src/channels/index.js');
   const db = d1();
   await init(db);
   const env = { IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' };
   resetChannels();
   let ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
+  assert.ok(!ik.hold && ik.pack && ik.label && ik.cancelPackage, 'varsayılan: ikas işlemleri panelden yapılır');
+  await setSetting(db, 'hold_channels', ['ikas1']);
+  ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
   assert.equal(ik.hold, true);
   assert.ok(ik.fetchOrders && ik.fetchListings && ik.label, 'okuma ve etiket okuma açık');
   assert.ok(!ik.pack && !ik.pushStock && !ik.pushPrice && !ik.ship && !ik.createProduct && !ik.repack, 'yazma işlemleri kapalı');
-  assert.equal(ik.caps.hold, true);
   await setSetting(db, 'hold_channels', []);
   ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
   assert.ok(!ik.hold && ik.pack && ik.pushStock, 'beklemeden çıkınca yazma açılır');
+  resetChannels();
+});
+
+test('eski kurulumdaki ikas beklemesi bir kez kaldırılır', async () => {
+  const db = d1();
+  await db.prepare("CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)").run();
+  await db.prepare("INSERT INTO settings (k, v) VALUES ('hold_channels', '[\"ikas1\",\"ikas2\",\"pttavm\"]')").run();
+  await init(db);
+  assert.deepEqual(JSON.parse((await db.prepare("SELECT v FROM settings WHERE k = 'hold_channels'").first()).v), ['pttavm']);
 });
 
 test('art arda hata veren kanal kademeli beklenir; "Senkronla" (force) beklemeyi atlar', async () => {
