@@ -114,7 +114,7 @@ async function route() {
 }
 
 export async function loadSummary() {
-  const s = await api('summary');
+  const s = await api('summary', { fresh: true });
   state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.demo = s.demo || s.channels.some((c) => c.demo);
   refreshChrome(s);
   return s;

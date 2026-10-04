@@ -245,7 +245,7 @@ test('ikas beklemede değil (panelden paketlenir); bekleme ayardan açılırsa k
   const env = { IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' };
   resetChannels();
   let ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
-  assert.ok(!ik.hold && ik.pack && ik.label && ik.cancelPackage, 'varsayılan: ikas işlemleri panelden yapılır');
+  assert.ok(!ik.hold && ik.label && ik.cancelPackage && ik.caps.external, 'varsayılan: ikas işlemleri panelden yapılır');
   await setSetting(db, 'hold_channels', ['ikas1']);
   ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
   assert.equal(ik.hold, true);
@@ -253,7 +253,7 @@ test('ikas beklemede değil (panelden paketlenir); bekleme ayardan açılırsa k
   assert.ok(!ik.pack && !ik.pushStock && !ik.pushPrice && !ik.ship && !ik.createProduct && !ik.repack, 'yazma işlemleri kapalı');
   await setSetting(db, 'hold_channels', []);
   ik = (await getChannels(env, db)).find((c) => c.id === 'ikas1');
-  assert.ok(!ik.hold && ik.pack && ik.pushStock, 'beklemeden çıkınca yazma açılır');
+  assert.ok(!ik.hold && ik.cancelPackage && ik.pushStock, 'beklemeden çıkınca yazma açılır');
   resetChannels();
 });
 

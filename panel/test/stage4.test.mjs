@@ -86,9 +86,9 @@ test('kargo akışı (API): paketle + etiket, kargo seç, yazdırma onayı, pake
   };
   await call('login', 'POST', { password: 'pw-12345678' });
   const now = Date.now();
-  await saveOrders(db, 'ikas1', [{ remoteId: 'X1', orderNumber: 'X1', orderedAt: now - 30 * 3600e3, status: 'new', remoteStatus: 'CREATED', customer: 'Ali', address: { phone: '05' }, total: 10, shipBy: now + 3600e3,
+  await saveOrders(db, 'hepsiburada', [{ remoteId: 'X1', orderNumber: 'X1', orderedAt: now - 30 * 3600e3, status: 'new', remoteStatus: 'CREATED', customer: 'Ali', address: { phone: '05' }, total: 10, shipBy: now + 3600e3,
     items: [{ lineId: 'l1', sku: 'A', name: 'A', quantity: 2, unitPrice: 5, total: 10 }], packages: null }]);
-  const id = encodeURIComponent('ikas1:X1');
+  const id = encodeURIComponent('hepsiburada:X1');
   let list = await call('orders?status=late');
   assert.equal(list.total, 1, 'son teslime 1 saat kaldı → geciken');
   await call(`orders/${id}/accept`, 'POST', {});
@@ -121,6 +121,33 @@ test('kargo akışı (API): paketle + etiket, kargo seç, yazdırma onayı, pake
   d = await call(`orders/${id}`);
   assert.equal(d.order.packages[0].packed_at, null);
   assert.equal(d.order.packages[0].label_printed_at, null);
+});
+
+test("ikas Kargo (API): panel paketlemez; sipariş ikas'tan yenilenince ikas Kargo gönderisi ve barkodu gelir", async () => {
+  const { default: worker } = await import('../src/index.js');
+  const { saveOrders } = await import('../src/sync.js');
+  const { demo } = await import('../src/channels/demo.js');
+  const db = await db0();
+  const env = { DEMO: '1', PANEL_PASSWORD: 'pw-12345678', DB: db };
+  let cookie = '';
+  const call = async (path, method = 'GET', body) => {
+    const r = await worker.fetch(new Request('https://p.test/api/' + path, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: body && JSON.stringify(body) }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r.json();
+  };
+  await call('login', 'POST', { password: 'pw-12345678' });
+  const o = (await demo({ id: 'ikas1', type: 'ikas', name: 'HasTürk' }).fetchOrders(Date.now() - 5 * 864e5, Date.now())).find((x) => x.items.some((i) => !i.status));
+  await saveOrders(db, 'ikas1', [{ ...o, status: 'new', packages: null }]);
+  const id = encodeURIComponent('ikas1:' + o.remoteId);
+  const lab = await call(`orders/${id}/label`, 'POST', {});
+  assert.equal(lab.packed, false, 'ikas siparişi panelde paketlenmez');
+  assert.equal(lab.external, true);
+  const pk = await call(`orders/${id}/pack`, 'POST', {});
+  assert.match(pk.error, /ikas Kargo ile Gönder/);
+  const r = await call(`orders/${id}/refresh`, 'POST', {});
+  const p0 = r.order.packages[0];
+  assert.ok(p0.remote_id && p0.barcode && p0.packed_at, 'ikas Kargo gönderisi ve barkodu alındı');
+  assert.equal(p0.agreement, 'ikas');
 });
 
 test('kanal panelinden yapılan işlem algılanır; panelden yapılan işlem kanal işlemi sayılmaz', async () => {
@@ -257,4 +284,24 @@ test('eski hatalı eşleşme onarımı: aynı kanaldan bir ürüne bağlı fazla
   assert.equal(await repairDuplicates(db), 2);
   const rows = await all(db, 'SELECT remote_id, product_id FROM listings ORDER BY remote_id');
   assert.deepEqual(rows.map((r) => [r.remote_id, r.product_id]), [['a', null], ['b', 1], ['c', null]]);
+});
+
+test('barkod / stok kodu yazım farkı tolere edilir; aynı ürün grubundaki kardeş varyant ölçüsüyle bağlanır', async () => {
+  const db = await db0();
+  const LG = (ch, id, o) => db.prepare('INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, variant_name, group_name, remote_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5)')
+    .bind(ch, id, o.rp || '', o.sku || '', o.barcode || '', o.name, o.variant || null, o.group || null).run();
+  await LG('ikas1', 'i5', { rp: 'P1', sku: 'HG-SOL-5', barcode: '0869000000001', name: 'Solucan Gübresi - 5 Kg', variant: '5 Kg', group: 'Solucan Gübresi' });
+  await LG('ikas1', 'i10', { rp: 'P1', sku: 'HG-SOL-10', name: 'Solucan Gübresi - 10 Kg', variant: '10 Kg', group: 'Solucan Gübresi' });
+  await LG('ikas1', 'i20', { rp: 'P1', sku: 'HG-SOL-20', name: 'Solucan Gübresi - 20 Kg', variant: '20 Kg', group: 'Solucan Gübresi' });
+  await autoMatch(db, { catalog: ['ikas1'] });
+  // Trendyol: barkodun başındaki 0 yok; aynı ana üründe 10 Kg'ın adı farklı yazılmış, kodu / barkodu yok
+  await LG('trendyol', 't5', { rp: 'TY-M1', barcode: '869000000001', name: 'HG Organik Solucan Gübresi 5 kg' });
+  await LG('trendyol', 't10', { rp: 'TY-M1', name: 'HG Organik Solucan Gübresi 10000 gr' });
+  // Hepsiburada: stok kodu farklı yazılmış
+  await LG('hepsiburada', 'h20', { sku: 'hg sol 20', name: 'Solucan gübresi büyük boy' });
+  await autoMatch(db, { catalog: ['ikas1'] });
+  const [i5, i10, i20] = [await pid(db, 'i5'), await pid(db, 'i10'), await pid(db, 'i20')];
+  assert.deepEqual([(await pid(db, 't5')).product_id, (await pid(db, 't5')).match], [i5.product_id, 'barcode'], 'baştaki 0 farkı yok sayılır');
+  assert.deepEqual([(await pid(db, 't10')).product_id, (await pid(db, 't10')).match], [i10.product_id, 'group'], 'aynı ana üründeki 10 Kg kardeşi bulunur (10000 gr = 10 Kg)');
+  assert.deepEqual([(await pid(db, 'h20')).product_id, (await pid(db, 'h20')).match], [i20.product_id, 'sku'], 'stok kodu yazım farkı yok sayılır');
 });

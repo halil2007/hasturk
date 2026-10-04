@@ -133,14 +133,14 @@ export async function hbTestView(el) {
       try { const r = await api('hbtest/import', { method: 'POST', body: { products } }); st.results = r.results; toast('Gönderildi · trackingId ' + r.trackingId); render($('[data-out1]', el), resultBox(r.response)); await load(); }
       catch (e) { render($('[data-out1]', el), html`<div class="notice bad small">${e.message}</div>`); throw e; }
     }),
-    pstatus: (t) => busy(t, async () => { const r = await api('hbtest/product-status?trackingId=' + encodeURIComponent(st.results.trackingId)); render($('[data-out1]', el), resultBox(r.status)); }),
+    pstatus: (t) => busy(t, async () => { const r = await api('hbtest/product-status?trackingId=' + encodeURIComponent(st.results.trackingId), { fresh: true }); render($('[data-out1]', el), resultBox(r.status)); }),
     inv: (t) => busy(t, async () => { const r = await api('hbtest/inventory', { method: 'POST' }); toast(typeof r.count === 'number' ? `${r.count} ürün alındı` : String(r.count), typeof r.count !== 'number'); await load(); }),
     listing: (t) => busy(t, async () => {
       const s = selected(); if (!s) return toast('Envanterden bir ürün seçin', true);
       const r = await api('hbtest/listing', { method: 'POST', body: { ...s, stock: $('[data-lstock]', el).value, price: $('[data-lprice]', el).value.replace(',', '.') } });
       toast('Stok ve fiyat gönderildi'); st.results = r.results; await load();
     }),
-    ustatus: (t) => busy(t, async () => { const r = await api(`hbtest/upload-status?kind=${t.dataset.k}&id=${encodeURIComponent(t.dataset.id)}`); render($('[data-out2]', el), resultBox(r.status)); }),
+    ustatus: (t) => busy(t, async () => { const r = await api(`hbtest/upload-status?kind=${t.dataset.k}&id=${encodeURIComponent(t.dataset.id)}`, { fresh: true }); render($('[data-out2]', el), resultBox(r.status)); }),
     otpl: () => { $('[data-obody]', el).value = orderTemplate(); },
     order: (t) => busy(t, async () => {
       let body; try { body = JSON.parse($('[data-obody]', el).value); } catch { return toast('Gövde geçerli JSON değil', true); }

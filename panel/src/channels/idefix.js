@@ -1,5 +1,5 @@
-// idefix pazaryeri (merchantapi.idefix.com). Satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri: API Key, API Secret, Vendor ID.
-// Kimlik: X-API-KEY = base64(apiKey:apiSecret). Siparişler: /oms/{vendorId}/list · Ürün/stok/fiyat: /pim/...
+// idefix pazaryeri (merchantapi.idefix.com). Satıcı paneli → Hesabım → Entegrasyon Bilgileri: Satıcı ID, API KEY (eski hesaplarda API Secret).
+// Kimlik: X-API-KEY başlığı (biçim otomatik bulunur, aşağıya bakın). Siparişler: /oms/{vendorId}/list · Ürün/stok/fiyat: /pim/...
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür (beta: canlı hesapla doğrulanmalı).
 import { http, num, str, chunk, diagStep, sleep } from '../util.js';
 
@@ -14,10 +14,28 @@ const STATUS = {
 export const idefixStatus = (s) => STATUS[String(s || '').trim().toLowerCase().replace(/-/g, '_').replace(/^shipment_/, '')] || 'new';
 
 export function idefix(env, meta) {
-  const key = env.IDEFIX_API_KEY, secret = env.IDEFIX_API_SECRET, vendor = env.IDEFIX_VENDOR_ID;
-  const headers = () => ({ 'X-API-KEY': btoa(`${key}:${secret}`), 'Content-Type': 'application/json', Accept: 'application/json' });
+  const key = str(env.IDEFIX_API_KEY), secret = str(env.IDEFIX_API_SECRET), vendor = str(env.IDEFIX_VENDOR_ID);
+  // Kimlik: satıcı panelinde (Hesabım → Entegrasyon Bilgileri) yeni hesaplarda yalnızca Satıcı ID + API KEY verilir; eski hesaplarda
+  // ayrıca API Secret vardır. X-API-KEY biçimi buna göre denenir ve kabul edilen biçim hatırlanır (401/403 alınca sıradakine geçilir).
+  const b64 = (t) => btoa(unescape(encodeURIComponent(t)));
+  const MODES = secret ? [['anahtar:gizli (base64)', b64(`${key}:${secret}`)], ['yalnız API KEY', key]]
+    : [['yalnız API KEY', key], ['API KEY (base64)', b64(`${key}:`)], ['satıcı:API KEY (base64)', b64(`${vendor}:${key}`)]];
+  let mode = 0, modeOk = false;
+  const headers = () => ({ 'X-API-KEY': MODES[mode][1], 'Content-Type': 'application/json', Accept: 'application/json' });
   // idefix istek sınırı sıkı: 429 / 5xx'te artan beklemeyle 4 deneme (bağlantı test edilip sonra senkronda kopması bu yüzdendi)
-  const call = (path, opts = {}) => http(BASE + path, { tries: 4, timeout: 30000, ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
+  async function call(path, opts = {}) {
+    for (;;) {
+      try {
+        const r = await http(BASE + path, { tries: 4, timeout: 30000, ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
+        modeOk = true;
+        return r;
+      } catch (e) {
+        if (!modeOk && /HTTP (401|403)/.test(e.message) && mode < MODES.length - 1) { mode++; continue; }
+        if (/HTTP (401|403)/.test(e.message)) throw new Error(`${e.message} — idefix kimliği reddetti (denenen: ${MODES.slice(0, mode + 1).map((m) => m[0]).join(', ')}). Satıcı ID ve API KEY'i idefix → Hesabım → Entegrasyon Bilgileri'nden kopyalayın; birden fazla API KEY varsa en yenisini girin.`);
+        throw e;
+      }
+    }
+  }
   // Sayfalı okuma: sayfa boyutu reddedilirse (400/422) 50'ye, sonra 20'ye düşülür; sayfalar arasında kısa bekleme
   let pageSize = 100;
   async function paged(build, maxPages) {
@@ -91,12 +109,12 @@ export function idefix(env, meta) {
   // Tanılama: ürün ve sipariş servisleri ayrı ayrı denenir; HTTP hatası açıklanır (401 anahtar, 403 yetki/IP, 404 satıcı no)
   async function diagnose() {
     const out = [], now = Date.now();
-    await diagStep(out, 'Kimlik ve ürün servisi', async () => { const r = await call(`/pim/pool/${vendor}/list?page=1&limit=1`); return { detail: `erişildi · satıcı (vendor) ${vendor} · ${list(r).length ? 'ürün örneği alındı' : 'ürün yok'}` }; });
+    await diagStep(out, 'Kimlik ve ürün servisi', async () => { const r = await call(`/pim/pool/${vendor}/list?page=1&limit=1`); return { detail: `erişildi · Satıcı ID ${vendor} · kimlik biçimi: ${MODES[mode][0]} · ${list(r).length ? 'ürün örneği alındı' : 'ürün yok'}` }; });
     await diagStep(out, 'Sipariş servisi (son 24 saat)', async () => { const r = await call(`/oms/${vendor}/list?page=1&limit=1&startDate=${encodeURIComponent(fmt(now - 864e5))}&endDate=${encodeURIComponent(fmt(now))}`); const rows = list(r); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? r.totalElements) != null ? (r.totalCount ?? r.total ?? r.totalElements) + ' sipariş' : rows.length + ' sipariş örneği'}${rows[0] ? ` · örnek durum: ${rows[0].status} → ${idefixStatus(rows[0].status)}` : ''}` }; });
     return out;
   }
 
-  const missing = ['IDEFIX_API_KEY', 'IDEFIX_API_SECRET', 'IDEFIX_VENDOR_ID'].filter((k) => !env[k]);
+  const missing = ['IDEFIX_API_KEY', 'IDEFIX_VENDOR_ID'].filter((k) => !env[k]);
   return {
     ...meta, type: 'idefix', beta: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true },

@@ -1,11 +1,11 @@
 // Eşleştirme: FARKLI kanallardaki aynı ürünü / varyantı tek panel ürününe bağlar. Bir ürüne her kanaldan yalnızca bir ilan
 // bağlanır; ana katalog sitesinin her varyantı kendi ürünüdür (aynı sitenin ürünleri birbiriyle eşleştirilmez).
 // Kesin olanlar (barkod, stok kodu, ad + varyant birebir) senkronda otomatik bağlanır; tereddütlüler burada onaya düşer.
-import { api, html, render, $, n, money, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, activeChannels } from '../core.js';
+import { api, html, render, $, n, money, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, activeChannels, confirmBox } from '../core.js';
 import { setQuery, loadSummary } from '../app.js';
 
 const TABS = [['', 'Onay bekleyen'], ['linked', 'Eşleşmiş ürünler'], ['ignored', 'Yok sayılan']];
-export const HOW = { barcode: ['good', 'Barkod'], sku: ['good', 'Stok kodu'], name: ['good', 'Ad + varyant'], new: ['info', 'Katalogdan'], manual: ['amber', 'Elle'] };
+export const HOW = { barcode: ['good', 'Barkod'], sku: ['good', 'Stok kodu'], name: ['good', 'Ad + varyant'], group: ['good', 'Aynı ürün grubu'], approved: ['amber', 'Toplu onay'], new: ['info', 'Katalogdan'], manual: ['amber', 'Elle'] };
 const howPill = (m) => { const [c, t] = HOW[m] || ['', m || '—']; return html`<span class="pill ${c}" title="Eşleşme yöntemi">${t}</span>`; };
 const scoreCls = (s) => (s >= 70 ? 'hi' : s >= 45 ? 'mid' : 'lo');
 const ids = (l) => html`<div class="muted tiny">${[l.sku && `SKU ${l.sku}`, l.barcode && `Barkod ${l.barcode}`].filter(Boolean).join(' · ') || 'SKU/barkod yok'}</div>`;
@@ -15,13 +15,14 @@ export async function matching(el, rest, query = {}) {
   const f = { tab: query.tab || '', channel: query.channel || '', q: query.q || '', multi: query.multi ?? '1', page: 1 };
   let data = { listings: [], counts: [] };
   render(el, html`<div class="stack">
-    <div class="notice"><i class="ico ico-link"></i><div style="flex:1">Eşleştirme, <b>farklı kanallardaki</b> aynı ürünü birbirine bağlar; bir ürüne her kanaldan yalnızca bir ilan bağlanır. Barkod, stok kodu veya ad + varyant/ölçü birebir aynıysa <b>otomatik</b> bağlanır. Emin olunamayanlar burada önerilerle listelenir. Yanlış eşleşmeleri “Eşleşmiş ürünler” sekmesinden düzeltebilirsiniz.</div></div>
+    <div class="notice"><i class="ico ico-link"></i><div style="flex:1">Eşleştirme, <b>farklı kanallardaki</b> aynı ürünü birbirine bağlar; bir ürüne her kanaldan yalnızca bir ilan bağlanır. Barkod, stok kodu (yazım farkları yok sayılır), ad + varyant/ölçü birebir aynıysa ya da aynı ürünün başka bir varyantı zaten bağlıysa ve ölçüsü tutuyorsa <b>otomatik</b> bağlanır. Stoğu 0 olan ilanlar eşleştirmeye girmez. Emin olunamayanlar burada önerilerle listelenir. Yanlış eşleşmeleri “Eşleşmiş ürünler” sekmesinden düzeltebilirsiniz.</div></div>
     <div class="kpis" data-kpis></div>
     <div class="row wrap">
       <div class="tabs" data-tabs></div>
       <span class="spacer"></span>
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
       <button class="btn" data-act="auto"><i class="ico ico-sync"></i>Şimdi eşleştir</button>
+      <button class="btn" data-act="approve" title="En iyi aday en az 85 puan ve ikinci adaydan 15 puan öndeyse bağlar"><i class="ico ico-check"></i>Güçlü önerileri onayla</button>
       <button class="btn ghost" data-act="repair" title="Aynı kanaldan birden fazla ilanın tek ürüne bağlandığı eski eşleşmeleri ayırır">Hatalı eşleşmeleri onar</button>
     </div>
     <div class="row wrap"><div class="tabs" style="flex:1" data-chs></div><select class="input" style="width:auto" data-multi hidden>
@@ -122,6 +123,10 @@ export async function matching(el, rest, query = {}) {
     unignore: (t) => busy(t, async () => { await api('match/ignore', { method: 'POST', body: { ...keyOf(t), ignored: false } }); done(t, 'Bekleyenlere geri alındı'); }),
     unlink: (t) => busy(t, async () => { await api('match/unlink', { method: 'POST', body: keyOf(t) }); done(t, 'Eşleşme kaldırıldı; ilan tekrar otomatik olarak bu ürüne bağlanmaz'); }),
     repair: (t) => busy(t, async () => { const r = await api('match/repair', { method: 'POST' }); toast(`${r.freed} hatalı bağlantı ayrıldı · ${r.linked} ilan yeniden kesin eşleşti`); loadSummary().catch(() => {}); refresh(); }),
+    approve: (t) => busy(t, async () => {
+      if (!(await confirmBox('85 puan ve üzeri, ikinci adaydan belirgin önde olan öneriler bağlansın mı? Yanlış olanı “Eşleşmiş ürünler”den kaldırabilirsiniz.', 'Onayla'))) return;
+      const r = await api('match/approve', { method: 'POST', body: { channel: f.channel || undefined } }); toast(`${r.linked} öneri onaylandı`); loadSummary().catch(() => {}); refresh();
+    }),
     auto: (t) => busy(t, async () => { const r = await api('sync', { method: 'POST', body: { force: true, listings: true } }); toast(r.skipped || `${(r.match && r.match.linked) || 0} ilan otomatik eşleşti, ${(r.match && r.match.created) || 0} yeni ürün`); loadSummary().catch(() => {}); refresh(); }),
     find: (t) => findProduct(keyOf(t), () => done(t, 'Eşleştirildi')),
   });

@@ -2,8 +2,8 @@
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED } from './channels/index.js';
 import { loadConfig, saveConfig, describe } from './config.js';
-import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf } from './sync.js';
-import { suggestions, linkedGroups, repairDuplicates, autoMatch } from './match.js';
+import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders } from './sync.js';
+import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
@@ -177,6 +177,8 @@ const clearLabel = (db, id) => run(db, 'UPDATE packages SET label_format = NULL,
 
 // Paketle (kargoya hazırla): paket kanalda oluşturulur / hazırlanıyor bildirilir. ikas: "Kargoya Hazır" → ikas Kargo barkod üretir.
 async function packOrder(db, ch, o, { only, invoice } = {}) {
+  // ikas: gönderi ikas Kargo uygulamasıyla açılır; panel "Kargoya Hazır" işaretlemez (bkz. channels/ikas.js)
+  if (ch && ch.caps && ch.caps.pack === 'external') fail(400, `${ch.name} siparişleri “${ch.caps.external.label}” ile gönderilir; gönderi oluşunca barkod ve etiket buraya gelir.`);
   o = await ensurePackages(db, ch, o);
   const todo = o.packages.filter((p) => p.status === 'open' && !p.packed_at && (!only || p.id === only));
   if (!todo.length) return { o, message: 'Paketler zaten hazır' };
@@ -278,6 +280,13 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     }
     await event(db, o, 'cargo', user, cargo.name);
     return { ok: true, message: `Kargo firması ${cargo.name} olarak değiştirildi; etiketi yeniden oluşturun` };
+  }
+  // Siparişi kanaldan hemen yenile (ör. ikas Kargo'da gönderi oluşturulduktan sonra barkod / etiket için senkronu beklemeden)
+  if (action === 'refresh') {
+    if (!ch || !ch.enabled || !ch.fetchOne) fail(400, 'Bu kanalda desteklenmiyor');
+    const r = await ch.fetchOne(o.remote_id);
+    await saveOrders(db, ch.id, [r]);
+    return { ok: true, order: await loadOrder(db, o.id) };
   }
   if (action === 'repack') {
     // ikas Kargo ile yeniden hazırla: elle kargo bilgisiyle oluşmuş paketi iptal edip takip bilgisi olmadan yeniden "Kargoya Hazır" yap
@@ -406,7 +415,7 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   }
   if (r.barcode || r.tracking || r.cargoCompany || r.remoteStatus) await updPkg(db, pkg.id, { barcode: r.barcode, tracking: r.tracking, cargoCompany: r.cargoCompany, remoteStatus: r.remoteStatus, agreement: r.agreement });
   // Gerçek gönderi / etiket henüz yok: işlem tamamlanmış sayılmaz (adım ve varsa gerçek barkod bilgisiyle döner)
-  if (r.pending) return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly, repack: !!r.repack };
+  if (r.pending) return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly, repack: !!r.repack, external: !!r.external, cancelable: !!r.cancelable };
   if (r.panel) {
     await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?), error = NULL WHERE id = ?', Date.now(), pkg.id);
     return { official: null, panel: true };
@@ -712,9 +721,15 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const [rows, counts] = await Promise.all([
       suggestions(db, { channel: q.channel, q: q.q, limit: Math.min(Number(q.limit) || 60, 200) }),
       all(db, `SELECT channel, SUM(product_id IS NULL AND ignored = 0) AS pending, SUM(product_id IS NULL AND ignored = 1) AS ignored,
-        SUM(match IN ('barcode', 'sku', 'name')) AS auto, SUM(match = 'new') AS created, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
+        SUM(match IN ('barcode', 'sku', 'name', 'group', 'approved')) AS auto, SUM(match = 'new') AS created, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
     ]);
     return json({ listings: rows, counts });
+  }
+  if (path === 'match/approve' && m === 'POST') {
+    const b = await body(req);
+    const r = await approveConfident(db, { channel: b.channel || undefined, min: Math.max(70, Number(b.min) || 85) });
+    await log(db, b.channel || null, 'info', `${user.name}: ${r.linked} yüksek puanlı öneri toplu onaylandı`);
+    return json(r);
   }
   if (path === 'match/linked' && m === 'GET') {
     const where = ['l.product_id IS NOT NULL'], args = [];
