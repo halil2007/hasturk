@@ -91,7 +91,9 @@ export function demo(meta) {
   // Kargo akışı taklidi: paketle → kanal paketi, etiket → örnek barkod, kargo firması seç / değiştir
   const CARGO = ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'Sürat Kargo', 'PTT Kargo', 'HepsiJet'];
   const pack = async (order, pkgs, { cargo } = {}) => ({ packages: pkgs.map((p) => ({ remoteId: `D${order.order_number}-${p.no}-${Date.now() % 100000}`, remoteStatus: 'READY_FOR_SHIPMENT', cargoCompany: (cargo && cargo.name) || p.cargo_company || 'Yurtiçi Kargo' })), message: 'Paket kargoya hazırlandı (örnek)' });
-  const label = async (order, pkg) => ({ barcode: `DEMO${order.order_number}${pkg.no}`.replace(/[^A-Z0-9]/gi, ''), cargoCompany: pkg.cargo_company || 'Yurtiçi Kargo', panel: true, agreement: /^ikas/.test(ch) ? 'ikas' : ch });
+  const label = async (order, pkg) => (meta.type === 'ikas' && !pkg.remote_id
+    ? { pending: 'Bu sipariş henüz ikas Kargo ile gönderilmedi. “ikas Kargo ile Gönder”e basın (örnek).', external: true, step: 'external' }
+    : { barcode: `DEMO${order.order_number}${pkg.no}`.replace(/[^A-Z0-9]/gi, ''), cargoCompany: pkg.cargo_company || 'Yurtiçi Kargo', panel: true, agreement: /^ikas/.test(ch) ? 'ikas' : ch });
   const cargoOptions = async () => CARGO.map((n, i) => ({ id: 'C' + i, name: n }));
   const changeCargo = async (order, pkg, cargo) => ({ remoteId: pkg.remote_id, cargoCompany: cargo.name, resetLabel: true });
   // Örnek buybox: sıra ve rakip fiyatları (saatlik değişir)
@@ -139,10 +141,18 @@ export function demo(meta) {
     async status(ref) { return { done: true, items: (uploads.get(ref) || []).map((k) => ({ key: k, status: 'SUCCESS', ok: true, error: '' })) }; },
     options: ch === 'trendyol' ? [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] : [{ k: 'warranty', label: 'Garanti süresi (ay)' }],
   };
+  // ikas örneği: gerçek ikas gibi gönderi "ikas Kargo ile Gönder" ile açılır; siparişi yenileyince ikas Kargo gönderisi gelmiş olur
+  const isIkas = meta.type === 'ikas';
+  async function fetchOne(remoteId) {
+    const o = (await fetchOrders(Date.now() - 20 * 864e5, Date.now())).find((x) => x.remoteId === remoteId);
+    if (!o) throw new Error('Örnek sipariş bulunamadı');
+    const live = o.items.filter((i) => i.status !== 'cancelled');
+    return { ...o, status: 'processing', remoteStatus: 'CREATED / READY_FOR_SHIPMENT / PAID', packages: [{ remoteId: `IK-${o.orderNumber}`, items: live.map((i) => ({ line_id: i.lineId, qty: i.quantity })), status: 'open', remoteStatus: 'READY_FOR_SHIPMENT', cargoCompany: 'hepsiJET', barcode: `7300${o.orderNumber.replace(/\D/g, '')}`, agreement: 'ikas', packed: true }] };
+  }
   return {
     ...meta, enabled: true, missing: [], demo: true,
-    caps: { accept: 'remote', split: 'local', pack: 'remote', ship: 'remote', label: 'remote', cargo: meta.type === 'ikas' ? 'pack' : 'change', cancelPackage: true, createProduct: meta.type === 'ikas', price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
-    fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, pack, label, cargoOptions, changeCargo, cancelPackage: ok,
+    caps: { accept: 'remote', split: 'local', pack: isIkas ? 'external' : 'remote', ...(isIkas ? { external: { label: 'ikas Kargo ile Gönder', url: 'https://demo.myikas.com/admin/order/view/' } } : {}), ship: isIkas ? 'local' : 'remote', label: 'remote', cargo: isIkas ? false : 'change', cancelPackage: true, createProduct: isIkas, price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
+    fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, ...(isIkas ? { fetchOne } : { pack }), label, cargoOptions, changeCargo, cancelPackage: ok,
     ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog } : {}),
     createProduct: async (pr) => ({ remoteId: `${ch}-${pr.sku || Date.now()}`, remoteProductId: '', sku: pr.sku, barcode: pr.barcode, name: pr.name, price: pr.sale_price, stock: pr.stock }),
   };

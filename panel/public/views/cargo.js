@@ -1,6 +1,6 @@
 // Kargo: paketler dört aşamada — hazırlanacak (paketle + etiket al), etiketi yazdırılacak, kargoya verilecek (etiket
 // yazdırıldı), kargoda. Etiketler kanalların kendi sistemlerinden gelir: ikas Kargo, Trendyol ortak etiketi, Hepsiburada paket etiketi.
-import { api, html, render, $, ch, trackBtn, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels } from '../core.js';
+import { api, html, render, $, ch, trackBtn, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels, raw, esc } from '../core.js';
 import { packageAction, openOrder, bulkLabels, labelState, extShip } from './orderops.js';
 import { setQuery, loadSummary } from '../app.js';
 
@@ -11,7 +11,7 @@ export async function cargo(el, rest, query = {}) {
   const sel = new Set();
   let data = { packages: [], unpacked: [], counts: {} };
   render(el, html`<div class="stack">
-    <div class="notice"><i class="ico ico-truck"></i><div>Kargo etiketleri <b>kanalların kendi sistemlerinden</b> alınır: Trendyol ortak etiketi, Hepsiburada paket etiketi, ikas Kargo etiketi. “Paketle ve etiket al” paketi kanalda kargoya hazırlar ve etiketini getirir; kargoya verilen pakette “Kargoyu takip et” kargo firmasının takip sayfasını açar.${activeChannels().some((x) => x.hold) ? html` <b>Beklemedeki kanallarda</b> (${activeChannels().filter((x) => x.hold).map((x) => x.name).join(', ')}) paketleme kanalın kendi panelinden yapılır; oluşan etiket buraya gelir.` : ''}</div></div>
+    <div class="notice"><i class="ico ico-truck"></i><div>Kargo etiketleri <b>kanalların kendi sistemlerinden</b> alınır: Trendyol ortak etiketi, Hepsiburada paket etiketi, ikas Kargo etiketi. Pazaryerlerinde “Paketle ve etiket al” paketi kanalda kargoya hazırlar ve etiketini getirir. ikas siparişlerinde “ikas Kargo ile Gönder” siparişin ikas Kargo ekranını açar; firmayı seçip Devam Et dediğinizde gönderi buraya kendiliğinden gelir ve etiket buradan yazdırılır. Kargoya verilen pakette “Kargoyu takip et” kargo firmasının takip sayfasını açar.${activeChannels().some((x) => x.hold) ? html` <b>Beklemedeki kanallarda</b> (${activeChannels().filter((x) => x.hold).map((x) => x.name).join(', ')}) paketleme kanalın kendi panelinden yapılır; oluşan etiket buraya gelir.` : ''}</div></div>
     <div class="ch-tabs" data-chtabs></div>
     <div class="tabs" data-tabs></div>
     <div class="card flush" data-box></div>
@@ -26,7 +26,7 @@ export async function cargo(el, rest, query = {}) {
   ];
   // Satırın sıradaki adımı
   const next = (r) => {
-    const o = `data-o="${r.order_id}" data-p="${r.pkg || ''}"`;
+    const o = raw(`data-o="${esc(r.order_id)}" data-p="${esc(r.pkg || '')}"`);
     if (f.state === 'shipped') return html`${r.track ? trackBtn(r.track, {}, 'btn sm') : ''}<button class="btn sm outline" data-act="label" ${o}><i class="ico ico-print"></i>Etiket</button>`;
     if (r.ls.key === 'external') return html`<button class="btn sm primary" data-act="ext" ${o}><i class="ico ico-truck"></i>ikas Kargo ile Gönder</button>`;
     if (['unpacked', 'packed', 'created', 'error'].includes(r.ls.key)) return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-${r.ls.key === 'unpacked' ? 'box' : 'tag'}"></i>${r.ls.key === 'unpacked' ? 'Paketle ve etiket al' : r.ls.key === 'error' ? 'Tekrar dene' : r.ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;

@@ -86,9 +86,9 @@ test('kargo akışı (API): paketle + etiket, kargo seç, yazdırma onayı, pake
   };
   await call('login', 'POST', { password: 'pw-12345678' });
   const now = Date.now();
-  await saveOrders(db, 'ikas1', [{ remoteId: 'X1', orderNumber: 'X1', orderedAt: now - 30 * 3600e3, status: 'new', remoteStatus: 'CREATED', customer: 'Ali', address: { phone: '05' }, total: 10, shipBy: now + 3600e3,
+  await saveOrders(db, 'hepsiburada', [{ remoteId: 'X1', orderNumber: 'X1', orderedAt: now - 30 * 3600e3, status: 'new', remoteStatus: 'CREATED', customer: 'Ali', address: { phone: '05' }, total: 10, shipBy: now + 3600e3,
     items: [{ lineId: 'l1', sku: 'A', name: 'A', quantity: 2, unitPrice: 5, total: 10 }], packages: null }]);
-  const id = encodeURIComponent('ikas1:X1');
+  const id = encodeURIComponent('hepsiburada:X1');
   let list = await call('orders?status=late');
   assert.equal(list.total, 1, 'son teslime 1 saat kaldı → geciken');
   await call(`orders/${id}/accept`, 'POST', {});
@@ -121,6 +121,33 @@ test('kargo akışı (API): paketle + etiket, kargo seç, yazdırma onayı, pake
   d = await call(`orders/${id}`);
   assert.equal(d.order.packages[0].packed_at, null);
   assert.equal(d.order.packages[0].label_printed_at, null);
+});
+
+test("ikas Kargo (API): panel paketlemez; sipariş ikas'tan yenilenince ikas Kargo gönderisi ve barkodu gelir", async () => {
+  const { default: worker } = await import('../src/index.js');
+  const { saveOrders } = await import('../src/sync.js');
+  const { demo } = await import('../src/channels/demo.js');
+  const db = await db0();
+  const env = { DEMO: '1', PANEL_PASSWORD: 'pw-12345678', DB: db };
+  let cookie = '';
+  const call = async (path, method = 'GET', body) => {
+    const r = await worker.fetch(new Request('https://p.test/api/' + path, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: body && JSON.stringify(body) }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r.json();
+  };
+  await call('login', 'POST', { password: 'pw-12345678' });
+  const o = (await demo({ id: 'ikas1', type: 'ikas', name: 'HasTürk' }).fetchOrders(Date.now() - 5 * 864e5, Date.now())).find((x) => x.items.some((i) => !i.status));
+  await saveOrders(db, 'ikas1', [{ ...o, status: 'new', packages: null }]);
+  const id = encodeURIComponent('ikas1:' + o.remoteId);
+  const lab = await call(`orders/${id}/label`, 'POST', {});
+  assert.equal(lab.packed, false, 'ikas siparişi panelde paketlenmez');
+  assert.equal(lab.external, true);
+  const pk = await call(`orders/${id}/pack`, 'POST', {});
+  assert.match(pk.error, /ikas Kargo ile Gönder/);
+  const r = await call(`orders/${id}/refresh`, 'POST', {});
+  const p0 = r.order.packages[0];
+  assert.ok(p0.remote_id && p0.barcode && p0.packed_at, 'ikas Kargo gönderisi ve barkodu alındı');
+  assert.equal(p0.agreement, 'ikas');
 });
 
 test('kanal panelinden yapılan işlem algılanır; panelden yapılan işlem kanal işlemi sayılmaz', async () => {

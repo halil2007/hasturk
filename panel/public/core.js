@@ -17,7 +17,27 @@ function busyBar(d) {
   if (inflight) barTimer = setTimeout(() => bar.classList.add('on'), 150);
   else { bar.classList.remove('on'); }
 }
-export async function api(path, { method = 'GET', body } = {}) {
+// Okuma (GET) cevapları kısa süre (20 sn) bellekte tutulur: sayfalar arasında gidip gelince veri beklenmeden anında açılır;
+// aynı anda yapılan aynı istek tek istekte birleştirilir. Herhangi bir değişiklik (POST/PUT/DELETE) önbelleği tamamen temizler.
+const cache = new Map(), pending = new Map();
+const TTL = 20e3;
+export const clearCache = () => cache.clear();
+export async function api(path, { method = 'GET', body, fresh = false } = {}) {
+  const get = method === 'GET';
+  if (get && !fresh) {
+    const c = cache.get(path);
+    if (c && Date.now() - c.at < TTL) return structuredClone(c.data);
+    if (pending.has(path)) return structuredClone(await pending.get(path));
+  } else if (!get) cache.clear();
+  const p = request(path, method, body);
+  if (get) {
+    pending.set(path, p);
+    try { const data = await p; cache.set(path, { at: Date.now(), data }); if (cache.size > 120) cache.delete(cache.keys().next().value); return structuredClone(data); }
+    finally { pending.delete(path); }
+  }
+  try { return await p; } finally { cache.clear(); }
+}
+async function request(path, method, body) {
   busyBar(1);
   let res;
   try {
