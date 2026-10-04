@@ -70,7 +70,7 @@ Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bil
 | Hepsiburada | Merchant ID, servis anahtarı, **entegratör adı** | Merchant Portal → Hesabım → Entegrasyon | `HB_MERCHANT_ID`, `HB_PASSWORD`, `HB_USER_AGENT` (+ `HB_USERNAME`, `HB_MERCHANT_NAME`, `HB_TEST`) |
 | PttAVM *(beklemede)* | API kullanıcı adı ve şifresi, depo numarası | Mağaza paneli → Entegrasyon → API kullanıcısı | `PTTAVM_USERNAME`, `PTTAVM_PASSWORD`, `PTTAVM_WAREHOUSE_ID` (+ gelişmiş ayarlar) |
 | N11 *(beklemede, beta)* | App Key, App Secret | Satıcı Ofisi → Hesabım → API Hesapları | `N11_APP_KEY`, `N11_APP_SECRET` |
-| idefix *(beklemede, beta)* | Vendor ID, API Key, API Secret | Satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri | `IDEFIX_VENDOR_ID`, `IDEFIX_API_KEY`, `IDEFIX_API_SECRET` |
+| idefix *(beklemede, beta)* | Satıcı ID, API KEY (API Secret yalnız eski hesaplarda) | Satıcı paneli → Hesabım → Entegrasyon Bilgileri (birden fazla API KEY varsa en yenisi) | `IDEFIX_VENDOR_ID`, `IDEFIX_API_KEY`, (`IDEFIX_API_SECRET`) |
 | Pazarama *(beklemede, beta)* | API Key (Client ID), API Secret | İş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri | `PAZARAMA_CLIENT_ID`, `PAZARAMA_CLIENT_SECRET` |
 
 **Bekleyen kanallar** (PttAVM, N11, idefix, Pazarama): bilgileri girip **Kaydet**, sonra **Bağlantıyı test et**. Test başarılı olunca kanal devreye girer; bilgiler sonradan değişirse yeniden test gerekir.

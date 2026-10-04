@@ -81,56 +81,41 @@ test('ikas: token alınır, sipariş okunur, stok saveProductStockLocations ile 
   assert.deepEqual(save.variables.input.productStockLocationInputs, [{ productId: 'p1', variantId: 'v1', stockLocationId: 'loc1', stockCount: 7 }]);
 });
 
-test('ikas Kargo: paketle "Kargoya Hazır" (FulFillOrderInput) gönderir, etiket görseli ve hata okunur, alan eksikse uyum sağlar', async () => {
+test('ikas Kargo: panel "Kargoya Hazır" işaretlemez; ikas Kargo gönderisi (barkod / etiket görseli / hata) okunur', async () => {
   const bodies = [];
-  let pkgState = { id: 'pk1', orderPackageFulfillStatus: 'READY_FOR_SHIPMENT', orderLineItemIds: ['li1'], trackingInfo: { barcode: '', trackingNumber: '' } };
+  let pkgState = null;
   let schemaHasLabel = false; // önce eski şema: shippingLabelImage alanı yok
   mockFetch([
     [/oauth\/token/, { access_token: 'T', expires_in: 3600 }],
     [/graphql/, (url, opts) => {
       const b = JSON.parse(opts.body); bodies.push(b);
       if (!schemaHasLabel && /shippingLabelImage/.test(b.query)) return { errors: [{ message: 'Cannot query field "shippingLabelImage" on type "TrackingInfo".' }] };
-      if (/listCargoCompany/.test(b.query)) return { data: { listCargoCompany: [{ id: 'c2', name: 'Yurtiçi Kargo' }, { id: 'c1', name: 'Aras Kargo' }] } };
-      if (/fulfillOrder/.test(b.query)) return { data: { fulfillOrder: { id: 'o1', orderPackages: [pkgState] } } };
-      if (/listOrder/.test(b.query)) return { data: { listOrder: { hasNext: false, data: [{ id: 'o1', orderNumber: 1001, orderedAt: 1, status: 'CREATED', orderLineItems: [], orderPackages: [pkgState] }] } } };
+      if (/listOrder/.test(b.query)) return { data: { listOrder: { hasNext: false, data: [{ id: 'o1', orderNumber: 1001, orderedAt: 1, status: 'CREATED', orderLineItems: [{ id: 'li1', quantity: 2, price: 10, variant: { id: 'v1', sku: 'A' } }], orderPackages: pkgState ? [pkgState] : [] }] } } };
       if (/cancelFulfillment/.test(b.query)) return { data: { cancelFulfillment: { id: 'o1' } } };
       return { data: {} };
     }],
   ]);
-  const ch = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
-  const opts = await ch.cargoOptions({ extra: { cargoChoice: 'HepsiJet' } });
-  assert.equal(opts.length, 1, 'firma panelden seçilmez; ikas Kargo belirler');
-  assert.match(opts[0].name, /ikas Kargo — müşterinin seçtiği: HepsiJet/);
+  const ch = ikas({ IKAS1_STORE: 'hasturkgubre', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
   assert.equal(ch.caps.cargo, false);
+  assert.equal(ch.caps.pack, 'external');
+  assert.equal(ch.caps.external.url, 'https://hasturkgubre.myikas.com/admin/order/view/', 'siparişin ikas Kargo ekranı açılır');
+  assert.ok(!ch.pack && !ch.repack, 'panel ikas\'ta paket / Kargoya Hazır oluşturmaz');
   const order = { remote_id: 'o1', order_number: '1001' };
   const pkg = { no: 1, items: [{ line_id: 'li1', qty: 2 }] };
-  const r = await ch.pack(order, [pkg], { cargo: { id: 'c2', name: 'Yurtiçi Kargo' } }); // eski çağrı biçimi: firma yok sayılır
-  assert.equal(r.packages[0].remoteId, 'pk1');
-  const ff = bodies.filter((b) => /fulfillOrder/.test(b.query)).pop();
-  assert.match(ff.query, /\$input: FulFillOrderInput!/, 'ikas şemasındaki tip adı');
-  assert.equal(ff.variables.input.markAsReadyForShipment, true);
-  assert.deepEqual(ff.variables.input.lines, [{ orderLineItemId: 'li1', quantity: 2 }]);
-  assert.equal(ff.variables.input.trackingInfoDetail, undefined, 'takip bilgisi gönderilmez (gönderilirse ikas paketi elle kargo sayar, ikas Kargo işlemez)');
-  // Barkod henüz yok → bekleniyor
+  // ikas'ta henüz paket yok → ikas Kargo ile gönderilmesi istenir
+  const e0 = await ch.label(order, pkg);
+  assert.equal(e0.external, true); assert.match(e0.pending, /ikas Kargo ile Paketle ve Gönder/);
+  // Yalnızca "Kargoya Hazır" işaretli paket (ikas Kargo değil) → ikas Kargo ile gönderilmesi + işaretin kaldırılabilmesi
+  pkgState = { id: 'pk1', orderPackageFulfillStatus: 'READY_FOR_SHIPMENT', orderLineItemIds: ['li1'], trackingInfo: { cargoCompany: 'Aras Kargo' } };
   const w = await ch.label(order, { ...pkg, remote_id: 'pk1' });
-  assert.ok(w.pending); assert.equal(w.step, 'waiting');
-  // Eski sürümün elle kargo bilgisiyle oluşturduğu paket → ikas Kargo işlemez; yeniden hazırlama önerilir ve takip bilgisi olmadan yapılır
-  pkgState = { ...pkgState, trackingInfo: { cargoCompanyId: 'c2', cargoCompany: 'Yurtiçi Kargo' } };
-  const mc = await ch.label(order, { ...pkg, remote_id: 'pk1' });
-  assert.equal(mc.step, 'manualCargo'); assert.equal(mc.repack, true);
-  pkgState = { ...pkgState, trackingInfo: {} };
-  const n0 = bodies.length;
-  await ch.repack(order, { ...pkg, remote_id: 'pk1' });
-  const after = bodies.slice(n0);
-  assert.ok(/cancelFulfillment/.test(after[0].query), 'önce ikas paketi iptal edilir');
-  const ff2 = after.find((b) => /fulfillOrder/.test(b.query));
-  assert.equal(ff2.variables.input.markAsReadyForShipment, true);
-  assert.equal(ff2.variables.input.trackingInfoDetail, undefined);
-  await assert.rejects(() => ch.repack(order, { ...pkg, remote_id: 'pk1', barcode: '7300' }), /barkodu var/);
-  // ikas Kargo gönderiyi açtı (barkod var) ama etiket görseli yok → hazır SAYILMAZ, bekleniyor (gerçek barkod bilgisiyle)
-  pkgState = { ...pkgState, appId: 'ikas-kargo', trackingInfo: { barcode: '7300123', cargoCompany: 'Yurtiçi Kargo' } };
+  assert.equal(w.external, true); assert.equal(w.cancelable, true);
+  // Sipariş hemen yenilenebilir (ikas Kargo'da gönderi oluşturulunca)
+  pkgState = { ...pkgState, appId: 'ikas-kargo', trackingInfo: { barcode: '7300123', cargoCompany: 'hepsiJET' } };
+  const one = await ch.fetchOne('o1');
+  assert.equal(one.packages[0].barcode, '7300123'); assert.equal(one.packages[0].agreement, 'ikas');
+  // Barkod var, etiket görseli yok → bekleniyor (gerçek barkod bilgisiyle)
   const l1 = await ch.label(order, { ...pkg, remote_id: 'pk1' });
-  assert.ok(l1.pending && !l1.panel && !l1.label);
+  assert.ok(l1.pending && !l1.label);
   assert.equal(l1.barcode, '7300123'); assert.equal(l1.agreement, 'ikas'); assert.equal(l1.step, 'created');
   // Yeni şema: etiket görseli (base64 PNG) okunur
   schemaHasLabel = true;
@@ -141,8 +126,11 @@ test('ikas Kargo: paketle "Kargoya Hazır" (FulFillOrderInput) gönderir, etiket
   // ikas Kargo hatası (ör. telefon eksik) kullanıcıya iletilir
   pkgState = { ...pkgState, orderPackageFulfillStatus: 'ERROR', errorMessage: 'Alıcı telefon numarası eksik' };
   await assert.rejects(() => ch2.label(order, { ...pkg, remote_id: 'pk1' }), /telefon numarası eksik/);
+  // ikas Kargo gönderisi (barkodlu) panelden iptal edilmez; yalnızca "Kargoya Hazır" işareti kaldırılır
+  await assert.rejects(() => ch2.cancelPackage(order, { remote_id: 'pk1', barcode: '7300123' }), /ikas Kargo ekranından/);
   await ch2.cancelPackage(order, { remote_id: 'pk1' });
   assert.deepEqual(bodies.pop().variables.input, { orderId: 'o1', orderPackageId: 'pk1' });
+  assert.ok(!bodies.some((b) => /fulfillOrder|updateOrderPackageStatus/.test(b.query)), 'ikas\'a paket / takip bilgisi yazılmaz');
 });
 
 test('Trendyol: kargo firması değiştirme ve ortak etiket', async () => {
@@ -399,5 +387,26 @@ test('Hepsiburada: gövdesiz GET isteğinde Content-Type gönderilmez; 520 alın
     const p = d.find((x) => /520 incelemesi/.test(x.name));
     assert.ok(p, '520 incelemesi adımı eklendi');
     assert.match(p.detail, /Yalnız kimlik/);
+  } finally { globalThis.fetch = real; }
+});
+
+test('idefix: yalnız Satıcı ID + API KEY ile çalışır; reddedilen kimlik biçiminde sıradaki denenir ve hatırlanır', async () => {
+  const { idefix } = await import('../src/channels/idefix.js');
+  const keys = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const k = opts.headers['X-API-KEY']; keys.push(k);
+    if (k !== btoa('KEY1:')) return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ products: [{ barcode: 'B1', title: 'Ürün', price: 10 }] }), { headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const ch = idefix({ IDEFIX_VENDOR_ID: '16705', IDEFIX_API_KEY: 'KEY1' }, { id: 'idefix' });
+    assert.equal(ch.enabled, true, 'API Secret zorunlu değil');
+    const l = await ch.fetchListings();
+    assert.equal(l[0].barcode, 'B1'); assert.equal(l[0].stock, null, 'stok gelmezse bilinmiyor');
+    assert.deepEqual(keys.slice(0, 2), ['KEY1', btoa('KEY1:')]);
+    keys.length = 0;
+    await ch.fetchListings();
+    assert.deepEqual(keys, [btoa('KEY1:')], 'kabul edilen biçim hatırlanır');
   } finally { globalThis.fetch = real; }
 });

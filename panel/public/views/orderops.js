@@ -23,8 +23,50 @@ export function labelState(o, pkg) {
   if (pkg.label_printed_at) return { key: 'printed', text: 'Etiket yazdırıldı', cls: 'good' };
   if (hasLabel(pkg, c)) return { key: 'ready', text: 'Etiket hazır', cls: 'info' };
   if (pkg.packed_at && (pkg.barcode || pkg.tracking)) return { key: 'created', text: 'Gönderi oluştu · etiket bekleniyor', cls: 'amber' };
-  if (pkg.packed_at) return { key: 'packed', text: c && /^ikas/.test(c) ? 'ikas Kargo bekleniyor' : 'Kargoya hazır', cls: 'amber' };
+  if ((ch(c).caps || {}).external) return { key: 'external', text: pkg.packed_at ? 'ikas Kargo ile gönderilmedi' : 'ikas Kargo ile gönderilecek', cls: 'warn' };
+  if (pkg.packed_at) return { key: 'packed', text: 'Kargoya hazır', cls: 'amber' };
   return { key: 'unpacked', text: 'Paketlenmedi', cls: 'warn' };
+}
+
+// ikas Kargo ile Gönder: gönderi ikas'ın kendi uygulamasında açılır (genel API'de yok). Siparişin ikas sayfası yeni sekmede açılır,
+// panel siparişi ikas'tan birkaç saniyede bir (ve bu sekmeye dönülünce) yeniler; ikas Kargo gönderiyi oluşturunca barkod ve
+// etiket algılanır, etiket buradan yazdırılır. Tıklama anında çağrılmalı (sekme engellenmesin).
+export function extShip(orderId, done) {
+  const chId = String(orderId).split(':')[0], c = ch(chId), ext = (c.caps || {}).external;
+  if (!ext) return;
+  window.open(ext.url + encodeURIComponent(String(orderId).slice(chId.length + 1)), '_blank');
+  const enc = encodeURIComponent(orderId);
+  let stop = false, tries = 0, running = false;
+  const s = sheet({ title: `${c.name} · ${ext.label}`, size: 'narrow', onClose: () => { stop = true; window.removeEventListener('focus', check); } });
+  const steps = html`<ol class="small" style="margin:0;padding-left:20px;line-height:1.7">
+    <li>Açılan ikas sekmesinde ürünlerin yanındaki <b>⋮</b> menüsü → <b>ikas Kargo ile Paketle ve Gönder</b></li>
+    <li>Ürün adedini onaylayıp <b>Kaydet</b></li><li>Kargo firmasını seçip <b>Devam Et</b> (ücret ikas Kargo üzerinden alınır)</li>
+    <li>Bu sekmeye dönün: gönderi kendiliğinden algılanır, etiket buradan yazdırılır.</li></ol>`;
+  const draw = (msg, cls = '') => {
+    s.setBody(html`<div class="stack">${steps}<div class="notice ${cls} small"><i class="ico ${cls ? 'ico-warn' : 'ico-sync spin'}"></i><div>${msg}</div></div></div>`);
+    s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-chk><i class="ico ico-sync"></i>Şimdi kontrol et</button>`);
+    $('[data-chk]', s.el).onclick = () => check(true);
+  };
+  async function check(manual) {
+    if (stop || running) return;
+    running = true;
+    try {
+      const r = await api(`orders/${enc}/refresh`, { method: 'POST' });
+      const pk = r.order.packages.find((p) => p.barcode || p.tracking);
+      if (pk) return found(pk);
+      draw(manual === true ? 'ikas Kargo gönderisi henüz oluşmamış. İşlemi ikas sekmesinde tamamlayın.' : 'ikas Kargo gönderisi bekleniyor…');
+    } catch (e) { draw(e.message, 'bad'); } finally { running = false; }
+  }
+  function found(pk) {
+    stop = true; window.removeEventListener('focus', check);
+    s.setBody(html`<div class="notice small" style="background:var(--good-soft, #e7f7ee)"><i class="ico ico-check" style="color:var(--good)"></i><div><b>ikas Kargo gönderiyi oluşturdu.</b> ${pk.cargo_company || ''} · barkod <b class="num">${pk.barcode || pk.tracking}</b></div></div>`);
+    s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-print><i class="ico ico-print"></i>Etiketi yazdır</button>`);
+    $('[data-print]', s.el).onclick = (e) => busy(e.currentTarget, async () => { s.close(); await packageAction('label', orderId, pk.id, done); });
+    done && done();
+  }
+  window.addEventListener('focus', check);
+  draw('ikas Kargo gönderisi bekleniyor…');
+  (async () => { while (!stop && tries++ < 60) { await new Promise((ok) => setTimeout(ok, 5000)); if (!document.hidden) await check(); } })();
 }
 
 // Siparişin paketleri; hiç paket yoksa tüm sipariş tek "taslak" paket olarak gösterilir
@@ -91,6 +133,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     if (p.status === 'shipped' || !live()) return hasLabel(p, o.channel) ? html`<button class="btn sm outline" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi göster</button>` : '';
     const ls = labelState(o, p);
     if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${chName()}'dan kontrol et</button>`;
+    if (ls.key === 'external') return html`<button class="btn sm primary" data-op="ext"><i class="ico ico-truck"></i>${caps().external.label}</button><button class="btn sm" style="flex:0 0 auto" data-op="refresh" title="ikas'tan hemen kontrol et" aria-label="Kontrol et"><i class="ico ico-sync"></i></button>`;
     if (ls.key === 'unpacked') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-box"></i>${caps().pack ? 'Paketle ve etiket al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'packed' || ls.key === 'created' || ls.key === 'error') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${ls.key === 'error' ? 'Tekrar dene' : ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'ready') return html`<button class="btn sm primary" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi yazdır</button>`;
@@ -176,7 +219,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     const s = sheet({ title: `${chName()} · gönderi hazırlanıyor`, size: 'narrow', onClose: () => { stop = true; } });
     const row = (ok, text) => html`<div class="diag-row"><span class="diag-ic ${ok ? 'good' : 'amber'}">${ok ? '✓' : html`<i class="ico ico-sync spin"></i>`}</span><div style="flex:1">${text}</div></div>`;
     const draw = (x, i, n) => s.setBody(html`<div class="stack"><div class="diag">
-      ${row(true, html`Paket ${chName()}'da <b>Kargoya Hazır</b> yapıldı`)}
+      ${row(true, html`Paket ${chName()}'da oluşturuldu`)}
       ${row(x.step === 'created' || !!x.official, x.step === 'created' || x.official ? 'ikas Kargo gönderiyi oluşturdu (gerçek kargo barkodu alındı)' : 'ikas Kargo anlaşmalı firmada gönderiyi oluşturuyor…')}
       ${row(!!x.official, x.official ? 'Kargo etiketi alındı' : 'Kargo etiketi bekleniyor…')}
     </div><div class="small muted">${x.pending || ''}</div><div class="tiny muted">Kontrol ${i} / ${n} · pencereyi kapatırsanız izleme durur, işlem ikas'ta sürer.</div></div>`);
@@ -199,8 +242,12 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       <div class="notice ${r.error ? 'bad' : 'warn'}"><i class="ico ico-warn"></i><div>${r.error || r.pending}</div></div>
       ${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<div class="small muted">Kanaldan gelen gerçek gönderi barkodu: <b class="num">${pkg.barcode || pkg.tracking}</b> (${pkg.cargo_company || 'kargo'}). Kanalın etiketi gelene kadar beklemeniz önerilir; kargo firması kabul ediyorsa bu barkodla kendi etiketimizi de yazdırabilirsiniz.</div>` : html`<div class="small muted">Gerçek gönderi oluşmadığı için etiket verilmedi. Senkronda durum otomatik güncellenir; “Etiket oluştur”a tekrar basarak kontrol edebilirsiniz.</div>`}
     </div>`,
-    foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.repack ? html`<button class="btn primary" data-repack><i class="ico ico-sync"></i>ikas Kargo ile yeniden hazırla</button>` : ''}${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}<button class="btn primary" data-close>Kapat</button>` });
+    foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.cancelable && pkg && pkg.remote_id ? html`<button class="btn" data-unmark>Kargoya Hazır işaretini kaldır</button>` : ''}${r.external ? html`<button class="btn primary" data-ext><i class="ico ico-truck"></i>${caps().external ? caps().external.label : 'ikas Kargo ile Gönder'}</button>` : ''}${r.repack ? html`<button class="btn primary" data-repack><i class="ico ico-sync"></i>ikas Kargo ile yeniden hazırla</button>` : ''}${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}<button class="btn primary" data-close>Kapat</button>` });
     $('[data-diag]', s.el).onclick = () => { s.close(); diagnoseDialog(d.order.channel, d.order.id, d.order.order_number); };
+    const ex = $('[data-ext]', s.el);
+    if (ex) ex.onclick = () => { s.close(); extShip(d.order.id, changed); };
+    const um = $('[data-unmark]', s.el);
+    if (um) um.onclick = (e) => busy(e.currentTarget, async () => { const x = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); s.close(); toast(x.message); await changed(); });
     const rp = $('[data-repack]', s.el);
     if (rp) rp.onclick = (e) => busy(e.currentTarget, async () => { s.close(); await repackPkg(pkg); });
     const own = $('[data-own]', s.el);
@@ -216,6 +263,8 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   }
   const ops = {
     accept: (b) => busy(b, async () => { const r = await api(`orders/${enc}/accept`, { method: 'POST', body: {} }); toast(r.message); await changed(); }),
+    ext: () => extShip(d.order.id, changed),
+    refresh: (b) => busy(b, async () => { const r = await api(`orders/${enc}/refresh`, { method: 'POST' }); toast(r.order.packages.some((p) => p.barcode || p.tracking) ? 'ikas Kargo gönderisi alındı' : 'Henüz ikas Kargo gönderisi yok'); await changed(); }),
     split: () => splitEditor(d, 0, changed),
     addpkg: () => splitEditor(d, 1, changed),
     detail: () => openOrder(id, onChange),
@@ -276,7 +325,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
 
 function packHelp(channel, c) {
   const name = ch(channel).name, t = ch(channel).type;
-  if (t === 'ikas') return `“Paketle” ile paket ${name} (ikas) içinde “Kargoya Hazır” olur; ikas Kargo, seçilen firma ya da ikas panelindeki kargo önceliğine göre barkodu ve etiketi üretir.`;
+  if (t === 'ikas') return `“ikas Kargo ile Gönder” ${name} siparişini ikas'ta açar: ⋮ → ikas Kargo ile Paketle ve Gönder → firma seçip Devam Et. Gönderi oluşunca barkod ve etiket buraya kendiliğinden gelir, buradan yazdırılır.`;
   if (t === 'trendyol') return `“Paketle” Trendyol'a “Hazırlanıyor” bildirir. Kargo firması Trendyol'un anlaşmalı firmalarından seçilir/değiştirilir; Trendyol Express ve Aras'ta ortak etiket alınır.`;
   if (t === 'hepsiburada') return `“Paketle” paketi Hepsiburada'da oluşturur; kargo firması Hepsiburada'nın izin verdiği firmalar arasından değiştirilebilir ve etiket Hepsiburada'dan alınır.`;
   return c.pack ? `Paket ${name}'da hazırlanır ve etiket kanaldan alınır.` : '';

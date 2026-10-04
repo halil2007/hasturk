@@ -2,7 +2,7 @@
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED } from './channels/index.js';
 import { loadConfig, saveConfig, describe } from './config.js';
-import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf } from './sync.js';
+import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -177,6 +177,8 @@ const clearLabel = (db, id) => run(db, 'UPDATE packages SET label_format = NULL,
 
 // Paketle (kargoya hazırla): paket kanalda oluşturulur / hazırlanıyor bildirilir. ikas: "Kargoya Hazır" → ikas Kargo barkod üretir.
 async function packOrder(db, ch, o, { only, invoice } = {}) {
+  // ikas: gönderi ikas Kargo uygulamasıyla açılır; panel "Kargoya Hazır" işaretlemez (bkz. channels/ikas.js)
+  if (ch && ch.caps && ch.caps.pack === 'external') fail(400, `${ch.name} siparişleri “${ch.caps.external.label}” ile gönderilir; gönderi oluşunca barkod ve etiket buraya gelir.`);
   o = await ensurePackages(db, ch, o);
   const todo = o.packages.filter((p) => p.status === 'open' && !p.packed_at && (!only || p.id === only));
   if (!todo.length) return { o, message: 'Paketler zaten hazır' };
@@ -278,6 +280,13 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     }
     await event(db, o, 'cargo', user, cargo.name);
     return { ok: true, message: `Kargo firması ${cargo.name} olarak değiştirildi; etiketi yeniden oluşturun` };
+  }
+  // Siparişi kanaldan hemen yenile (ör. ikas Kargo'da gönderi oluşturulduktan sonra barkod / etiket için senkronu beklemeden)
+  if (action === 'refresh') {
+    if (!ch || !ch.enabled || !ch.fetchOne) fail(400, 'Bu kanalda desteklenmiyor');
+    const r = await ch.fetchOne(o.remote_id);
+    await saveOrders(db, ch.id, [r]);
+    return { ok: true, order: await loadOrder(db, o.id) };
   }
   if (action === 'repack') {
     // ikas Kargo ile yeniden hazırla: elle kargo bilgisiyle oluşmuş paketi iptal edip takip bilgisi olmadan yeniden "Kargoya Hazır" yap
