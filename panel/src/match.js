@@ -169,6 +169,8 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   const cats = await catalogChannels(db, catalog);
   // Stoğu sıfır olduğu için otomatik yok sayılan ilan, stoğu gelince yeniden eşleştirmeye döner
   await run(db, "UPDATE listings SET ignored = 0, match = NULL WHERE ignored = 1 AND match = 'zero' AND COALESCE(remote_stock, 0) > 0");
+  // Stoğu 0 olan eşleşmemiş ilanlar (ana katalog dahil) eşleştirmeye hiç girmez: ürün açılmaz, öneri / onay listesine düşmez
+  await run(db, "UPDATE listings SET ignored = 1, match = 'zero' WHERE product_id IS NULL AND ignored = 0 AND remote_stock IS NOT NULL AND remote_stock <= 0");
   const idx = await productIndex(db);
   const unlinked = await all(db, 'SELECT channel, remote_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND ignored = 0 ORDER BY channel, remote_id');
   // Ana katalog önce işlenir (sırasıyla), sonra diğer kanallar
@@ -195,8 +197,6 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
     created++;
   }
   for (const part of chunk(st, 90)) await db.batch(part);
-  // Kesin eşleşmesi olmayan ve stoğu sıfır olan (ana katalog dışı) ilanlar otomatik yok sayılır: onay listesini doldurmaz
-  if (cats.length) await run(db, `UPDATE listings SET ignored = 1, match = 'zero' WHERE product_id IS NULL AND ignored = 0 AND remote_stock IS NOT NULL AND remote_stock <= 0 AND channel NOT IN (${cats.map(() => '?').join(',')})`, ...cats);
   // Ürünün eksik görsel / grup / varyant bilgisini bağlı ilandan tamamla
   await run(db, `UPDATE products SET
       image = COALESCE(NULLIF(image, ''), (SELECT l.image FROM listings l WHERE l.product_id = products.id AND l.image != '' ORDER BY l.channel LIMIT 1), ''),

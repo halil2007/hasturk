@@ -73,7 +73,7 @@ export async function matching(el, rest, query = {}) {
   </div>`;
 
   const ignoredRow = (l) => html`<div class="cand" data-key="${l.channel}|${l.remote_id}">${chBadge(l.channel)}${thumb(l.image, l.name, 'sm')}
-    <div style="flex:1;min-width:0"><div class="ellipsis" style="font-weight:600">${l.name}</div>${ids(l)}</div><button class="btn sm" data-act="unignore">Geri al</button></div>`;
+    <div style="flex:1;min-width:0"><div class="ellipsis" style="font-weight:600">${l.name}</div>${ids(l)}</div>${l.match === 'zero' ? html`<span class="pill" title="Stoğu gelince eşleştirmeye kendiliğinden döner">Stok 0 · stok gelince döner</span>` : html`<button class="btn sm" data-act="unignore">Geri al</button>`}</div>`;
 
   function draw() {
     head();
