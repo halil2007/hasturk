@@ -458,11 +458,11 @@ async function listPackages(db, q) {
   const counts = {};
   for (const s of Object.keys(states)) counts[s] = (await first(db, `SELECT COUNT(*) AS n ${base} ${w(s)}`, ...args)).n;
   // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler
-  const unpacked = st === 'waiting' ? await all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.ship_by, o.status AS order_status, o.tracking, o.cargo_company,
+  const unpacked = st === 'waiting' ? await all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.extra, o.ordered_at, o.ship_by, o.status AS order_status, o.tracking, o.cargo_company,
       (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty
     FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''} ORDER BY o.ordered_at ASC LIMIT 300`, ...args) : [];
   counts.waiting += st === 'waiting' ? unpacked.length : (await first(db, `SELECT COUNT(*) AS n FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''}`, ...args)).n;
-  const addr = (r) => { const a = parse(r.address, {}); return { ...r, city: a.city || '', district: a.district || '', address: undefined }; };
+  const addr = (r) => { const a = parse(r.address, {}), x = parse(r.extra, {}); return { ...r, city: a.city || '', district: a.district || '', address: undefined, extra: undefined, cargo_choice: x.cargoChoice || '' }; };
   return { state: st, packages: rows.map((r) => ({ ...addr(r), items: parse(r.items, []) })), unpacked: unpacked.map(addr), counts };
 }
 

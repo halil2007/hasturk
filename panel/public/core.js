@@ -148,6 +148,11 @@ export const STATUS_LABEL = { new: 'Yeni', processing: 'Hazırlanıyor', shipped
 export const statusPill = (s) => html`<span class="pill ${s}">${STATUS_LABEL[s] || s}</span>`;
 
 // ---------- kanallar ----------
+// ikas: müşterinin ödeme sayfasında seçtiği kargo SEÇENEĞİNİN adı (ör. "HepsiJet Ücretsiz Kargo") → ikas Kargo ekranında seçilecek firma.
+// Seçenek bir bağlantı değildir; gönderiyi ikas Kargo yapar. Ad tanınmazsa boş döner (firma ikas Kargo'da elle seçilir).
+const CARRIERS = [[/hepsi\s*jet/i, 'hepsiJET'], [/aras/i, 'Aras Kargo'], [/yurt\s*i?[çc]i/i, 'Yurtiçi Kargo'], [/dhl/i, 'DHL eCommerce'], [/ptt/i, 'PTT Kargo'],
+  [/s[üu]rat/i, 'Sürat Kargo'], [/mng/i, 'MNG Kargo'], [/trendyol\s*express/i, 'Trendyol Express'], [/kolay\s*gelsin/i, 'Kolay Gelsin'], [/\bups\b/i, 'UPS Kargo'], [/sendeo/i, 'Sendeo']];
+export const carrierOf = (choice) => { const c = CARRIERS.find(([re]) => re.test(String(choice || ''))); return c ? c[1] : ''; };
 export const ch = (id) => state.channels.find((c) => c.id === id) || { id, name: id, short: id, type: id };
 export const chColor = (id) => `var(--c-${id})`;
 // Kargoyu takip et: kanalın verdiği resmi takip bağlantısı; yoksa kargo firmasının takip sayfası (Ayarlar → Kargo takip adresleri)
