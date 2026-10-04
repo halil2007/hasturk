@@ -26,10 +26,12 @@ test('ikas: tüm sorgu ve mutasyonlar resmi şemayla uyumlu (işlem, argüman, d
     await ch.fetchOrders(0, 1); await ch.fetchListings();
     await ch.pushStock([{ remoteId: 'v', remoteProductId: 'p', stock: 1 }]); await ch.pushPrice([{ remoteId: 'v', remoteProductId: 'p', price: 1 }]);
     await ch.cargoOptions(); await ch.pack(order, [{ ...pkg, remote_id: null }], {}); await ch.label(order, pkg);
-    await ch.ship(order, pkg, {}); await ch.ship(order, { ...pkg, remote_id: null }, { tracking: 'T' }); await ch.cancelPackage(order, pkg);
+    await ch.ship(order, pkg, {}); await assert.rejects(() => ch.ship(order, { ...pkg, remote_id: null }, { tracking: 'T' }), /elle kargo bilgisi girilmez/); await ch.cancelPackage(order, pkg);
+    await ch.repack(order, { ...pkg, remote_id: 'pk1' });
     await ch.createProduct({ name: 'x', sale_price: 1, stock: 1 }); await ch.diagnose({ orderId: 'o1' });
   } finally { globalThis.fetch = real; }
-  assert.ok(seen.size >= 14, `${seen.size} işlem`);
+  assert.ok(seen.size >= 12, `${seen.size} işlem`);
+  assert.ok(![...seen].some((q) => /updateOrderPackageStatus/.test(q)), 'ikas\'a takip / durum bilgisi yazılmaz');
   assert.deepEqual(validate(seen, schema), []);
 });
 

@@ -47,8 +47,7 @@ test('Hepsiburada test adımları: kategori, ürün gönderme (trackingId), stok
     const imp = await call('hbtest/import', { method: 'POST', body: JSON.stringify({ products: [{ categoryId: 60001, merchant: 'M-1', attributes: { merchantSku: 'A1', UrunAdi: 'Test' } }] }) });
     assert.equal(imp.trackingId, 'TRK-123');
     const ic = calls.find((c) => /products\/import$/.test(c.url));
-    assert.ok(ic.body instanceof FormData, 'ürün dosyası multipart gönderilir');
-    assert.deepEqual(JSON.parse(await ic.body.get('file').text())[0].attributes, { merchantSku: 'A1', UrunAdi: 'Test' });
+    assert.deepEqual(JSON.parse(ic.body)[0].attributes, { merchantSku: 'A1', UrunAdi: 'Test' }, 'ürün dizisi JSON gövdeyle gönderilir');
     assert.equal((await call('hbtest/inventory', { method: 'POST' })).count, 1);
     const ls = await call('hbtest/listing', { method: 'POST', body: JSON.stringify({ hbSku: 'HBV1', merchantSku: 'A1', stock: 7, price: '120.5' }) });
     assert.deepEqual([ls.stockUploadId, ls.priceUploadId], ['stk-1', 'prc-1']);

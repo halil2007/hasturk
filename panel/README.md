@@ -138,9 +138,20 @@ Elle yapılan stok girişi kaydedildiği anda tüm kanallara gönderilir. Kanala
 
 Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. ZPL dosyası Zebra ve uyumlu termal yazıcılarda doğrudan basılır. Normal yazıcı kullanıyorsanız **Ayarlar → Kargo etiketi → "ZPL etiketini PDF'e çevir"** seçeneğini açın. Bu çeviri Labelary servisiyle yapılır ve etiket içeriği (alıcı adı/adresi) bu servise gönderilir.
 
-**Sayfalar (menü grupları):** Genel Bakış (bugünün işleri: yeni sipariş, geciken, kargo, eşleşme, stokta yok, açık sorun) · **Satış:** Siparişler (kanal sekmeleri, Yeni / Hazırlanıyor / Geciken / Kargoda / Teslim / İptal / İade, toplu işlem, Excel; sipariş detayı sağdan açılır), Kargo (Hazırlanacak → Etiketi yazdırılacak → Kargoya verilecek → Kargoda) · **Katalog:** Ürünler, Stoklar, Eşleştirme, Buybox · **Raporlar:** Analizler, Kârlılık · **Sistem:** Entegrasyonlar, Bildirimler, Kullanıcılar, Ayarlar. Filtreler adres çubuğunda tutulur (geri tuşu çalışır, bağlantı paylaşılabilir).
+**Sayfalar (menü grupları):** Genel Bakış (bugünün işleri: yeni sipariş, geciken, kargo, eşleşme, stokta yok, açık sorun) · **Satış:** Siparişler (kanal sekmeleri, Yeni / Hazırlanıyor / Geciken / Kargoda / Teslim / İptal / İade, toplu işlem, Excel; sipariş detayı sağdan açılır), Kargo (Hazırlanacak → Etiketi yazdırılacak → Kargoya verilecek → Kargoda) · **Katalog:** Ürünler, Stoklar, Ürün Yükle, Eşleştirme, Buybox · **Raporlar:** Analizler, Kârlılık · **Sistem:** Entegrasyonlar, Bildirimler, Kullanıcılar, Ayarlar. Filtreler adres çubuğunda tutulur (geri tuşu çalışır, bağlantı paylaşılabilir).
 
-**Pazaryerlerinde yeni ürün açma:** Trendyol ve Hepsiburada'da yeni ilan kanalın kendi panelinden açılır (kategori işlemleri bu aşamada kapsam dışı). İlan aynı barkod veya SKU ile açıldığında bir sonraki senkronda panel ürününe otomatik bağlanır.
+**Ürün Yükle (Katalog → Ürün Yükle):** ikas'taki ürünler Trendyol ve Hepsiburada'ya panelden yüklenir.
+1. **Kategori eşleştirme:** Ürün kategorisi ikas'tan gelir (ör. “Gübre › Sıvı Gübre”). Her ikas kategorisi her pazaryeri için bir kez kanal kategorisine eşlenir; kanalın zorunlu özellikleri (ör. Menşei) listeden seçilir. Varyant özelliği (ör. Ağırlık) için **“Ürünün varyant adından”** seçilirse her ürünün varyant adı (“5 Kg”) kanalın değer listesinde otomatik eşlenir.
+2. **Gönder:** Kanalda henüz ilanı olmayan ürünler listelenir; eksik bilgisi olanlar (barkod, görsel, marka, zorunlu özellik) nedeniyle birlikte gösterilir ve gönderilmez. Ad, açıklama, marka (Trendyol marka kimliği otomatik bulunur), barkod, SKU, KDV, desi, görsel, varyant grubu ve fiyat üründen gelir. Kanal ayarlarında **fiyat farkı (%)** (ör. komisyonu karşılamak için) ve kanala özel alanlar (Trendyol kargo firması ID, Hepsiburada garanti süresi) tanımlanır. Stok senkronu kapalıyken “Stok 0 gönder” seçilebilir.
+3. **Takip:** Kanalın verdiği takip kimliği (Trendyol batchRequestId, Hepsiburada trackingId) saklanır; sonuç her senkronda (ilk 4 saat) ve “Durumu sorgula” ile alınır, ürün bazında onay / hata görünür. Onaylanan ürün ilanlar çekilince barkod / SKU ile panel ürününe bağlanır. idefix, PttAVM, N11 ve Pazarama'nın ürün aktarma servisleri resmi dokümanları gelince eklenecek.
+
+**Komisyon:** Kanal siparişte gerçek komisyonu bildiriyorsa (Hepsiburada satır komisyonu / oranı, idefix komisyon tutarı) kârlılıkta tahmini oran yerine o tutar kullanılır ve ilanın komisyonu otomatik güncellenir; ürün formunda elle girilen oran korunur. Kargo ücreti kanaldan gerçek tutar gelmedikçe tahmin edilmez (sipariş detayında elle girilebilir).
+
+**Geçmiş siparişler:** Her bağlı kanal için son 1 yılın siparişleri bir kez otomatik aktarılır (parça parça; stok düşmez, e-posta gitmez). API bilgileri değiştirilince aktarım yeniden başlar; aynı sipariş iki kez oluşmaz.
+
+**Toplu işlemler:** Toplu etiket ve toplu işleme alma siparişleri 4'erli paralel işler; çok sayıda sipariş 30'arlık parçalarla ilerler. Yazdırma işaretleri tek istekte kaydedilir.
+
+**Hata özeti (Bildirimler):** Son 30 günün hataları kanal ve hata türüne göre gruplanır, olası nedenle (401 kimlik, 403 yetki/IP, 520 sunucu bağlantıyı kapattı…) birlikte gösterilir; **Raporu kopyala** ile iletilebilir.
 
 ## Bilinmesi gerekenler
 

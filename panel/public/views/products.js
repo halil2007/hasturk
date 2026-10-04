@@ -66,9 +66,9 @@ export async function products(el, rest, query = {}) {
       <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
       <td class="c">${stockCtl(p)}</td>
       <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
-    const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p));
+    const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p)), gname = p0.group_name || p0.name;
       return html`<tr class="grp-head ${on ? 'on' : ''}" data-act="tog" data-gi="${i}">
-        <td><div class="row"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', k)}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:700">${k}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}<b style="color:var(--text)">${list.length} varyant</b>${list.length <= 4 ? ` · ${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}` : ''}</div></div></div></td>
+        <td><div class="row"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}<b style="color:var(--text)">${list.length} varyant</b>${list.length <= 4 ? ` · ${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}` : ''}</div></div></div></td>
         <td>${chSummary(list)}</td>
         <td class="r num muted">${range(list.map((p) => p.purchase_price))}</td>
         <td class="r num" style="font-weight:650">${range(list.map((p) => p.sale_price))}</td>
@@ -79,9 +79,9 @@ export async function products(el, rest, query = {}) {
     const mCard = ([k, list], i) => { if (!isGroup(list)) { const p = list[0]; return html`<div class="m-card" data-pid="${p.id}">
           <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="muted tiny">${brand(p.brand)}${[p.sku, p.barcode].filter(Boolean).join(' · ')}</div></div></div>
           ${dots(p)}<div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCtl(p)}</div></div>`; }
-      const on = all || opened.has(k);
+      const on = all || opened.has(k), gname = list[0].group_name || list[0].name;
       return html`<div class="m-card grp ${on ? 'on' : ''}">
-        <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', k)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${k}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
+        <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
         ${on ? html`<div class="m-vars">${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCtl(p)}</div>`)}</div>` : ''}</div>`; };
     const body = !rows.length ? html`<div class="empty">Ürün yok. “Kanallardan içe aktar” ile ürünleri çekebilir veya “Ürün Ekle” ile ekleyebilirsiniz.</div>`
       : mob ? html`<div class="m-list" style="padding:12px">${gl.map(mCard)}</div>`
@@ -212,6 +212,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Stok kodu (SKU)</span><input class="input" name="sku" value="${p.sku || ''}" placeholder="kanallarla aynı olmalı"></label>
         <label class="field"><span>Barkod</span><input class="input" name="barcode" value="${p.barcode || ''}"></label>
         <label class="field"><span>Marka</span><input class="input" name="brand" value="${p.brand || ''}"></label>
+        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ikas'tan gelir"><small>Pazaryerine yüklemede kategori eşleştirmesi buna göre yapılır</small></label>
         <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="varyantlar bu adla gruplanır"></label>
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
       </div>
@@ -232,12 +233,12 @@ export async function productForm(id, done) {
       </div>
       <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Aktif (pasif ürünün stoğu kanallara gönderilmez)</label>
     </div>
-    ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır. Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p></div>
+    ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p></div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Fiyat</th><th class="r">Komisyon %</th><th class="r">Ürün başı kâr</th><th class="r">Kanala giden stok</th></tr></thead><tbody>
         ${p.listings.map((l) => { const r = lp(l); return html`<tr data-l="${l.channel}" data-rid="${l.remote_id}">
           <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span><div class="muted tiny ellipsis" style="max-width:180px">${l.remote_id}</div>${l.error ? html`<div class="tiny" style="color:var(--bad)">${l.error}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" style="width:96px" inputmode="decimal" data-lf="price" value="${l.price ?? ''}"></td>
-          <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${(st.commission || {})[l.channel] ?? 0}"></td>
+          <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${(st.commission || {})[l.channel] ?? 0}">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? 'kanaldan (son sipariş)' : 'elle girildi'}</div>` : ''}</td>
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>
           <td class="r num"><button type="button" class="plain" data-rule style="align-items:flex-end">${l.desired ?? l.remote_stock ?? '—'}<span class="tiny muted">${ruleText(l) || 'ortak stok'}</span></button>${l.price_dirty ? html`<div class="tiny" style="color:var(--warn)">fiyat gönderilecek</div>` : ''}</td></tr>`; })}
       </tbody></table></div></div>` : ''}
@@ -262,7 +263,7 @@ export async function productForm(id, done) {
   form.onsubmit = (e) => e.preventDefault();
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const fd = new FormData(form), b = {};
-    for (const k of ['name', 'sku', 'barcode', 'brand', 'group_name', 'variant_name', 'image', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock']) b[k] = fd.get(k);
+    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'image', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock']) b[k] = fd.get(k);
     for (const k of ['purchase_price', 'sale_price', 'desi']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
     if (!b.name.trim()) return toast('Ürün adı gerekli', true);

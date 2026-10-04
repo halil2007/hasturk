@@ -35,6 +35,8 @@ export function hepsiburada(env, meta) {
       quantity: qty, unitPrice: qty ? total / qty : total, total,
       status: /cancel|iptal/i.test(g(it, 'status') || '') ? 'cancelled' : '', remoteKey: str(g(it, 'hbSku', 'sku', 'hepsiburadaSku')),
       orderNumber: str(g(it, 'orderNumber', 'orderId')), orderDate: g(it, 'orderDate'), dueDate: Date.parse(g(it, 'dueDate') || '') || null,
+      // Hepsiburada'nın satırda bildirdiği komisyon (TL) ya da oran (%); ikisi de yoksa boş (tahmin kullanılır)
+      commission: g(it, 'commission') != null ? money(g(it, 'commission')) : g(it, 'commissionRate') != null ? Math.round(total * num(g(it, 'commissionRate'))) / 100 : null,
     };
   }
   // Adres: açık satırdaki shippingAddress / sipariş ayrıntısındaki deliveryAddress (il = city, ilçe = town, mahalle = district)
@@ -80,7 +82,7 @@ export function hepsiburada(env, meta) {
   async function fetchOrders(since, until) {
     const O = makeOrders(), errors = [];
     // 1) Açık satırlar (yeni siparişler)
-    for (const it of await pages(`${OMS}/orders/merchantid/${m}`, { limit: 100, max: 50 })) {
+    for (const it of await pages(`${OMS}/orders/merchantId/${m}`, { limit: 100, max: 50 })) {
       const l = lineOf(it);
       if (!l.orderNumber) continue;
       const o = O.touch(l.orderNumber, { date: l.orderDate, customer: str(g(it, 'customerName')), address: addrOf(g(it, 'shippingAddress') || {}, str(g(it, 'customerName'))) });
@@ -89,7 +91,7 @@ export function hepsiburada(env, meta) {
     }
     // 2) Paketlenmiş, kargoya verilmemiş paketler (en fazla 10 / istek, "Offset" büyük harfle)
     try {
-      for (const pk of await pages(`${OMS}/packages/merchantid/${m}`, { limit: 10, max: 100, offsetKey: 'Offset' })) {
+      for (const pk of await pages(`${OMS}/packages/merchantId/${m}`, { limit: 10, max: 100, offsetKey: 'Offset' })) {
         const lines = (g(pk, 'items') || []).map(lineOf);
         const no = (lines.find((l) => l.orderNumber) || {}).orderNumber;
         if (!no) continue;
@@ -110,7 +112,7 @@ export function hepsiburada(env, meta) {
         if (detail.size >= 200) return null;
         detail.set(no, null);
         try {
-          const r = await call(`${OMS}/orders/merchantid/${m}/ordernumber/${encodeURIComponent(no)}`);
+          const r = await call(`${OMS}/orders/merchantId/${m}/ordernumber/${encodeURIComponent(no)}`);
           const a = addrOf(g(r, 'deliveryAddress') || {}, str(g(g(r, 'customer') || {}, 'name')));
           const o = O.touch(no, { date: g(r, 'orderDate'), customer: str(g(g(r, 'customer') || {}, 'name')) || a.name, address: a });
           for (const it of g(r, 'items') || []) O.addLine(o, lineOf(it));
@@ -123,7 +125,7 @@ export function hepsiburada(env, meta) {
     for (const [path, dateKey, status] of feeds) {
       try {
         const old = (r) => r.length && r.every((x) => (Date.parse(g(x, dateKey) || '') || Infinity) < since);
-        for (const x of await pages(`${OMS}/packages/merchantid/${m}/${path}`, { limit: 50, max: 40, stop: old })) {
+        for (const x of await pages(`${OMS}/packages/merchantId/${m}/${path}`, { limit: 50, max: 40, stop: old })) {
           const at = Date.parse(g(x, dateKey) || '') || 0;
           if (at && at < since) continue;
           const no = str(g(x, 'OrderNumber') || (g(x, 'OrderNumbers') || [])[0]);
@@ -140,7 +142,7 @@ export function hepsiburada(env, meta) {
     }
     try {
       const old = (r) => r.length && r.every((x) => (Date.parse(g(x, 'cancelDate') || '') || Infinity) < since);
-      for (const x of await pages(`${OMS}/orders/merchantid/${m}/cancelled`, { limit: 50, max: 40, stop: old })) {
+      for (const x of await pages(`${OMS}/orders/merchantId/${m}/cancelled`, { limit: 50, max: 40, stop: old })) {
         const at = Date.parse(g(x, 'cancelDate') || '') || 0;
         if (at && at < since) continue;
         const o = await need(str(g(x, 'orderNumber')));
@@ -195,7 +197,7 @@ export function hepsiburada(env, meta) {
   async function split(order, groups) {
     const packages = [];
     for (const g of groups) {
-      const r = await call(`${OMS}/packages/merchantid/${m}`, {
+      const r = await call(`${OMS}/packages/merchantId/${m}`, {
         method: 'POST',
         body: { lineItemRequests: g.items.map((x) => ({ id: x.line_id, quantity: x.qty })), parcelQuantity: 1, deci: Math.max(1, num(g.desi, 1)) },
       });
@@ -211,7 +213,7 @@ export function hepsiburada(env, meta) {
     return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.' };
   }
   async function labelFile(pkg) {
-    const res = await http(`${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(false), raw: true });
+    const res = await http(`${OMS}/packages/merchantId/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(false), raw: true });
     const type = res.headers.get('content-type') || '';
     if (/pdf/i.test(type)) {
       const buf = new Uint8Array(await res.arrayBuffer());
@@ -232,7 +234,7 @@ export function hepsiburada(env, meta) {
     return { format: 'zpl', data, filename: `hepsiburada-${pkg.remote_id}.zpl` };
   }
 
-  const pkgUrl = (pkg) => `${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}`;
+  const pkgUrl = (pkg) => `${OMS}/packages/merchantId/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}`;
   // Paketin değiştirilebileceği kargo firmaları (yalnızca kargoya verilmemiş paketlerde)
   async function cargoOptions(order, pkg) {
     if (!pkg || !pkg.remote_id) return [];
@@ -327,18 +329,20 @@ export function hepsiburada(env, meta) {
   }
   async function diagnose({ orderId } = {}) {
     const out = [];
-    await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}` }; });
-    await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantid/${m}?Offset=0&limit=1`); return { detail: `erişildi · ${page(r).length} paket örneği` }; });
-    await diagStep(out, 'Kargodaki paketler', async () => { const r = await call(`${OMS}/packages/merchantid/${m}/shipped?offset=0&limit=1`); return { detail: `erişildi · toplam ${g(r, 'totalCount') ?? '?'}` }; });
+    await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}` }; });
+    await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantId/${m}?Offset=0&limit=1`); return { detail: `erişildi · ${page(r).length} paket örneği` }; });
+    await diagStep(out, 'Kargodaki paketler', async () => { const r = await call(`${OMS}/packages/merchantId/${m}/shipped?offset=0&limit=1`); return { detail: `erişildi · toplam ${g(r, 'totalCount') ?? '?'}` }; });
     await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
     if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ page: 0, size: 1 }); return { detail: `${r.total ?? r.items.length} soru` }; });
     if (out.some((x) => x.ok === false && /HTTP 52\d/.test(x.detail || ''))) {
-      const rows = await probe(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`);
+      const rows = await probe(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`);
+      // Yol yazımı karşılaştırması: OpenAPI "merchantId"; eski sürümlerde "merchantid"
+      try { const r = await fetch(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`, { headers: headers(false) }); rows.push(`Eski yol (merchantid küçük harf): HTTP ${r.status}`); } catch (e) { rows.push(`Eski yol: bağlantı hatası (${e.message})`); }
       const any2xx = rows.some((r) => /HTTP 2\d\d/.test(r));
       out.push({ name: '520 incelemesi (sipariş servisi, farklı başlıklarla)', ok: any2xx ? null : false,
         detail: rows.join('\n') + (any2xx ? '\n→ Başlık farkı: başarılı olan biçim kullanılıyor.' : '\n→ Her biçimde 52x: Hepsiburada sunucusu bağlantıyı yanıtsız kapatıyor. Kimlik ve entegratör adı soru servisinde kabul edildiği için sorun bilgilerde değil; Hepsiburada\'ya bu raporla “SIT OMS / listing servislerinden Cloudflare 520 alıyoruz, istekler Cloudflare Workers üzerinden geliyor; IP kısıtı veya hesap tanımı eksik mi?” diye sorun.') });
     }
-    if (orderId) await diagStep(out, 'Sipariş', async () => { const r = await call(`${OMS}/orders/merchantid/${m}/ordernumber/${encodeURIComponent(orderId)}`); return { detail: JSON.stringify(r).slice(0, 600) }; });
+    if (orderId) await diagStep(out, 'Sipariş', async () => { const r = await call(`${OMS}/orders/merchantId/${m}/ordernumber/${encodeURIComponent(orderId)}`); return { detail: JSON.stringify(r).slice(0, 600) }; });
     return out;
   }
 
@@ -371,13 +375,19 @@ export function hepsiburada(env, meta) {
     const r = await call(`${CAT}/api/categories/${encodeURIComponent(catId)}/attribute/${encodeURIComponent(attrId)}/values?page=0&size=1000`);
     return (g(r, 'data') || g(r, 'items') || (Array.isArray(r) ? r : [])).map((v) => ({ id: str(g(v, 'id')), value: str(g(v, 'value', 'name')) }));
   }
-  // Ürün bilgisi gönderme: JSON dosyası (multipart "file"); cevaptaki trackingId ile durum sorgulanır
+  // Ürün bilgisi gönderme: ürün dizisi JSON gövdeyle gönderilir (SIT'te doğrulanmış biçim); sunucu dosya (multipart "file") isterse
+  // aynı içerik dosya olarak yeniden gönderilir. Cevaptaki trackingId ile durum sorgulanır.
   async function importProducts(products) {
-    const fd = new FormData();
-    fd.append('file', new Blob([JSON.stringify(products)], { type: 'application/json' }), 'products.json');
-    const h = headers(); delete h['Content-Type'];
-    const r = await http(`${CAT}/api/products/import`, { method: 'POST', headers: h, body: fd });
-    const tid = g(g(r, 'data') || {}, 'trackingId') || g(r, 'trackingId');
+    let r;
+    try { r = await call(`${CAT}/api/products/import`, { method: 'POST', body: products }); }
+    catch (e) {
+      if (!/\b415\b|multipart|file/i.test(e.message)) throw e;
+      const fd = new FormData();
+      fd.append('file', new Blob([JSON.stringify(products)], { type: 'application/json' }), 'products.json');
+      const h = headers(); delete h['Content-Type'];
+      r = await http(`${CAT}/api/products/import`, { method: 'POST', headers: h, body: fd });
+    }
+    const tid = g(g(r, 'data') || {}, 'trackingId') || g(r, 'trackingId', 'id');
     if (!tid) throw new Error('Hepsiburada trackingId döndürmedi: ' + JSON.stringify(r).slice(0, 400));
     return { trackingId: str(tid), response: r };
   }
@@ -394,10 +404,60 @@ export function hepsiburada(env, meta) {
   }
   const sit = { test: !!test, merchantId: m, categories, attributes, attributeValues, importProducts, productStatus, uploadOne, uploadStatus, createTestOrder };
 
+  // ---------- Ürün yükleme (Ürün yükle ekranı): kategori eşleştirmesindeki değerlerle Hepsiburada ürün dosyası ----------
+  // Panelin doldurduğu temel alanlar: satıcı SKU, varyant grubu, barkod, ad, açıklama, marka, KDV, fiyat, stok, görsel, desi
+  const AUTO = ['merchantSku', 'VaryantGroupID', 'Barcode', 'UrunAdi', 'UrunAciklamasi', 'Marka', 'price', 'stock', 'Image1', 'tax_vat_rate', 'kg', 'GarantiSuresi'];
+  const attrCache = new Map();
+  const attrsOf = async (cat) => { if (!attrCache.has(cat)) attrCache.set(cat, await attributes(cat)); return attrCache.get(cat); };
+  async function build(pr, map, { opts = {}, pick } = {}) {
+    const a = {
+      merchantSku: pr.sku, VaryantGroupID: pr.group, Barcode: pr.barcode, UrunAdi: pr.name, UrunAciklamasi: pr.description || pr.name, Marka: pr.brand,
+      GarantiSuresi: String(opts.warranty ?? 0), kg: String(pr.desi || 1), tax_vat_rate: String(pr.vat ?? 20),
+      price: String(pr.price).replace('.', ','), stock: String(pr.stock), Image1: pr.image,
+    };
+    (pr.images || []).slice(1, 5).forEach((u, i) => { a['Image' + (i + 2)] = u; });
+    const missing = [];
+    for (const at of await attrsOf(map.remote_id)) {
+      if (AUTO.includes(at.id)) continue;
+      const v = (map.attrs || {})[at.id];
+      let val = v && (v.value ?? '');
+      if (val === '@variant') { const hit = /enum|list|select/i.test(at.type) ? await pick(at, pr.variant) : null; val = hit ? hit.value : pr.variant; }
+      if (val) a[at.id] = String(val);
+      else if (at.mandatory) missing.push(at.name);
+    }
+    for (const [k, label] of [['merchantSku', 'SKU'], ['UrunAdi', 'ad'], ['Marka', 'marka'], ['Image1', 'görsel']]) if (!a[k]) missing.push(label);
+    if (!(pr.price > 0)) missing.push('fiyat');
+    return { key: pr.sku, missing, payload: { categoryId: Number(map.remote_id) || map.remote_id, merchant: m, attributes: a } };
+  }
+  async function send(payloads) {
+    const out = [];
+    for (const part of chunk(payloads, 500)) out.push((await importProducts(part)).trackingId);
+    return { ref: out.join(',') };
+  }
+  // Durum: her ürün için Hepsiburada'nın döndürdüğü durum ve doğrulama hataları
+  async function status(ref) {
+    const items = [];
+    let pending = false;
+    for (const tid of String(ref).split(',').filter(Boolean)) {
+      const r = await productStatus(tid);
+      const rows = page(g(r, 'data') && !Array.isArray(g(r, 'data')) ? g(g(r, 'data'), 'items', 'data') || [] : r);
+      if (!rows.length) pending = true;
+      for (const it of rows) {
+        const st = str(g(it, 'productStatus', 'status', 'importStatus'));
+        const errs = [].concat(g(it, 'validationResults', 'errors', 'failureReasons') || []).map((e) => (typeof e === 'string' ? e : [g(e, 'attributeName'), g(e, 'message', 'description')].filter(Boolean).join(': '))).filter(Boolean);
+        const wait = /wait|progress|pending|beklen|process/i.test(st) && !errs.length;
+        if (wait) pending = true;
+        items.push({ key: str(g(it, 'merchantSku', 'sku')), status: st, ok: wait ? null : !errs.length && !/fail|error|reject|hata|red/i.test(st), error: errs.join(' · ') });
+      }
+    }
+    return { done: !pending, items };
+  }
+  const catalog = { categories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 500, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog,
   };
 }

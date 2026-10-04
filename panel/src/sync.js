@@ -7,12 +7,13 @@
 import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
-import { autoMatch, relinkItems } from './match.js';
-import { runJobs } from './backfill.js';
+import { autoMatch, relinkItems, repairDuplicates } from './match.js';
+import { runJobs, createJob } from './backfill.js';
 import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
 import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
+import { checkPendingUploads } from './catalog.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -90,9 +91,12 @@ export async function saveOrders(db, ch, orders, maps) {
           JSON.stringify(o.address || {}), o.total || 0, o.currency || 'TRY', o.cargoCompany || '', o.tracking || '', extra, o._hash, o.shipBy || null, ext));
       st.push(db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id));
       for (const it of o.items) {
-        st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || ''));
+        const com = it.commission == null || !Number.isFinite(Number(it.commission)) ? null : Math.max(0, Number(it.commission));
+        st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key, commission)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || '', com));
+        // Kanalın bildirdiği gerçek komisyon oranı ilana yazılır (elle girilmiş oran korunur)
+        if (com != null && it.total > 0 && it.remoteKey) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src = 'api')").bind(Math.round((com / it.total) * 10000) / 100, ch, it.remoteKey));
       }
       // Kanalın kendi paketleri (Trendyol/Hepsiburada/ikas) panele aynen yansır; paneldeki taslak paketler korunur
       if (Array.isArray(o.packages)) {
@@ -187,7 +191,11 @@ export async function fillProductInfo(db, settings) {
   const cats = catalogOf(settings);
   const rank = `CASE l.channel ${cats.map((c, i) => `WHEN '${String(c).replace(/'/g, '')}' THEN ${i}`).join(' ')} ELSE 99 END`;
   let n = 0;
-  for (const col of ['brand', 'description']) {
+  // Ana ürün (varyant grubu) kimliği: ana katalog kanalındaki ürün kimliği (ikas ürün id'si). Ürünler sayfası buna göre gruplar;
+  // adı aynı olan farklı ikas ürünleri tek gruba düşmez.
+  await run(db, `UPDATE products SET parent_key = (SELECT l.channel || ':' || l.remote_product_id FROM listings l WHERE l.product_id = products.id AND COALESCE(l.remote_product_id, '') != '' ORDER BY ${rank} LIMIT 1)
+    WHERE EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.remote_product_id, '') != '')`);
+  for (const col of ['brand', 'description', 'category']) {
     const r = await run(db, `UPDATE products SET ${col} = (SELECT l.${col} FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '' ORDER BY ${rank} LIMIT 1)
       WHERE COALESCE(${col}, '') = '' AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '')`);
     n += (r && r.meta && r.meta.changes) || 0;
@@ -336,6 +344,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
       await setSetting(db, 'last:' + ch.id, st);
     }
     // 3) kesin eşleşmeler + ana katalogdan yeni ürünler
+    // Tek seferlik: eski sürümden kalma, aynı kanaldan birden fazla ilanı tek ürüne bağlamış eşleşmeleri onar
+    if (!(await getRaw(db, 'once:repair_dups_1'))) { out.repaired = await repairDuplicates(db).catch(() => 0); await setSetting(db, 'once:repair_dups_1', Date.now()); }
     out.match = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] });
     out.mirrored = await mirrorStock(db, settings);
     out.info = await fillProductInfo(db, settings).catch((e) => 'hata: ' + e.message);
@@ -348,6 +358,17 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
+    // Pazaryerine gönderilen ürünlerin onay sonucu
+    if (!only) out.uploads = await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message);
+    // Son 1 yılın siparişleri: her bağlı (gerçek) kanal için bir kez otomatik geçmiş aktarımı başlatılır.
+    // Parça parça (haftalık) ilerler; stoğu değiştirmez, yeni sipariş e-postası oluşturmaz.
+    if (!only) for (const ch of chans) {
+      if (ch.demo || !ch.enabled || !ch.fetchOrders) continue;
+      if (await getRaw(db, 'auto_backfill:' + ch.id)) continue;
+      await createJob(db, ch.id, t - 365 * D, t);
+      await setSetting(db, 'auto_backfill:' + ch.id, t);
+      await log(db, ch.id, 'info', 'Son 1 yılın siparişleri için geçmiş aktarımı otomatik başlatıldı');
+    }
     // 5) geçmiş sipariş aktarımı varsa bir parça daha ilerlet
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });
@@ -364,16 +385,17 @@ export async function refreshListings(db, ch) {
   const rows = await ch.fetchListings();
   const t = Date.now();
   for (const part of chunk(rows, 40)) {
-    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (channel, remote_id) DO UPDATE SET remote_product_id = excluded.remote_product_id, sku = excluded.sku, barcode = excluded.barcode,
         name = excluded.name, group_name = excluded.group_name, variant_name = excluded.variant_name,
         image = COALESCE(NULLIF(excluded.image, ''), listings.image),
         brand = COALESCE(NULLIF(excluded.brand, ''), listings.brand), description = COALESCE(NULLIF(excluded.description, ''), listings.description),
+        category = COALESCE(NULLIF(excluded.category, ''), listings.category),
         price = CASE WHEN listings.price_dirty = 1 THEN listings.price ELSE excluded.price END,
         list_price = excluded.list_price, remote_stock = excluded.remote_stock, pushed_stock = excluded.remote_stock, synced_at = excluded.synced_at`)
       .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t,
-        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000))));
+        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), str(l.category).slice(0, 300))));
   }
   // Deneme modu: örnek alış fiyatları (gerçek kanallar alış fiyatı vermez)
   for (const l of rows) if (l.purchasePrice) await run(db, 'UPDATE products SET purchase_price = ? WHERE sku = ? AND purchase_price = 0', l.purchasePrice, l.sku);

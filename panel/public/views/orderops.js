@@ -49,9 +49,7 @@ export function askPrinted(items, done) {
   });
   $('[data-no]', s.el).onclick = () => s.close();
   $('[data-yes]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
-    const by = new Map();
-    for (const x of items) by.set(x.orderId, [...(by.get(x.orderId) || []), x.pkgId]);
-    for (const [oid, ids] of by) await mark(oid, ids, 'printed');
+    await api('labels/mark', { method: 'POST', body: { kind: 'printed', items } });
     s.close(); toast('Etiket yazdırıldı olarak işaretlendi'); done && done();
   });
 }
@@ -259,7 +257,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         if (!(await confirmBox(`Paket ${pkg.no} ${chName()}'da iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
         busy(null, async () => { const r = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
       } });
-      if (open) items.push('-', { icon: 'key', label: 'Kendi anlaşmamla gönder (takip no gir)', run: () => shipDialog(d, pkg, changed, { editOnly: true }) });
+      if (open && c.manualTracking !== false) items.push('-', { icon: 'key', label: 'Kendi anlaşmamla gönder (takip no gir)', run: () => shipDialog(d, pkg, changed, { editOnly: true }) });
       items.push('-', { icon: 'bolt', label: `Kargo / bağlantı tanılaması (${chName()})`, run: () => diagnoseDialog(d.order.channel, d.order.id, d.order.order_number) });
       items.push('-', { icon: 'orders', label: 'Sipariş detayı', run: () => openOrder(id, onChange) });
       popMenu(b, items);
@@ -320,7 +318,8 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
     title: editOnly ? `Paket ${pkg.no} · kendi anlaşmanızla gönderim` : `Paket ${pkg.no} kargoya ver`, size: 'narrow',
     body: html`<div class="stack">
       <div class="small muted">${name} · #${o.order_number} · ${o.customer}</div>
-      ${!editOnly && code ? html`<dl class="kv small"><dt>Kargo</dt><dd>${pkg.cargo_company || '—'}</dd><dt>Barkod / takip</dt><dd class="num">${code}</dd><dt>Etiket</dt><dd>${pkg.label_printed_at ? `yazdırıldı (${shortDT(pkg.label_printed_at)})` : html`<span style="color:var(--amber)">yazdırılmadı</span>`}</dd></dl>`
+      ${!editOnly && !code && c.manualTracking === false ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bu pakette henüz ikas Kargo barkodu yok. ikas siparişleri yalnızca <b>ikas Kargo</b> ile gönderilir; elle kargo/takip bilgisi girilmez. Önce “Paketle ve etiket al” ya da ikas panelinde “ikas Kargo ile Gönder”.</div></div>`
+        : !editOnly && code ? html`<dl class="kv small"><dt>Kargo</dt><dd>${pkg.cargo_company || '—'}</dd><dt>Barkod / takip</dt><dd class="num">${code}</dd><dt>Etiket</dt><dd>${pkg.label_printed_at ? `yazdırıldı (${shortDT(pkg.label_printed_at)})` : html`<span style="color:var(--amber)">yazdırılmadı</span>`}</dd></dl>`
         : html`${editOnly ? html`<div class="notice small">Kanalın kargo sistemi dışında (kendi kargo anlaşmanızla) gönderdiğiniz paketler içindir.</div>` : ''}
         <label class="field"><span>Kargo firması</span><input class="input" list="cargo-dl" data-f="cargo" value="${pkg.cargo_company || o.cargo_company || ''}"><datalist id="cargo-dl">${((state.settings && state.settings.cargo_companies) || []).map((x) => html`<option value="${x}">`)}</datalist></label>
         <label class="field"><span>Takip no</span><input class="input" data-f="tracking" value="${pkg.tracking || ''}"></label>`}
@@ -472,7 +471,13 @@ export async function openOrder(id, onChange) {
 // Toplu etiket: seçilen siparişler paketlenir (kanalda kargoya hazırlanır) ve etiketleri alınır; görsel/panel etiketleri
 // tek seferde yazdırılır, PDF/ZPL dosyaları indirilir. Sonra yazdırma onayı istenir.
 export async function bulkLabels(ids, { fetch = true, done } = {}) {
-  const r = await api('labels', { method: 'POST', body: { ids, fetch } });
+  // Çok sayıda sipariş 30'arlık parçalarla işlenir (sunucu her parçada 4 siparişi paralel işler)
+  const r = { orders: [], errors: [], sender: null };
+  for (let i = 0; i < ids.length; i += 30) {
+    if (ids.length > 30) toast(`Etiketler hazırlanıyor: ${Math.min(i + 30, ids.length)} / ${ids.length}`);
+    const part = await api('labels', { method: 'POST', body: { ids: ids.slice(i, i + 30), fetch } });
+    r.orders.push(...part.orders); r.errors.push(...part.errors); r.sender = part.sender;
+  }
   const panel = [], images = [], files = [], marks = [];
   for (const { order, labels } of r.orders) {
     for (const l of labels) {
@@ -489,9 +494,7 @@ export async function bulkLabels(ids, { fetch = true, done } = {}) {
   for (const f of files) downloadFile(f.filename, f.data, f.format === 'pdf' ? 'application/pdf' : 'text/plain');
   if (images.length) await printImages(images);
   if (panel.length) await printLabels(panel, r.sender);
-  const by = new Map();
-  for (const x of marks) by.set(x.orderId, [...(by.get(x.orderId) || []), x.pkgId]);
-  for (const [oid, pids] of by) await mark(oid, pids, 'viewed');
+  if (marks.length) api('labels/mark', { method: 'POST', body: { kind: 'viewed', items: marks } }).catch(() => {});
   if (r.errors.length) toast(r.errors.slice(0, 3).join(' · ') + (r.errors.length > 3 ? ` (+${r.errors.length - 3})` : ''), true);
   else toast(`${marks.length} etiket hazırlandı${files.length ? ` (${files.length} dosya indirildi)` : ''}`);
   if (marks.length) askPrinted(marks, done);

@@ -36,6 +36,14 @@ export function weekKey(ms) {
 export const dayStart = (ms) => Date.parse(dayKey(ms) + 'T00:00:00Z') - TR;
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Sınırlı eşzamanlılık: kanal API çağrıları sırayla değil, n'er n'er yapılır (toplu etiket / toplu işlem hızı); sonuç sırası korunur
+export async function pool(items, n, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const worker = async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
 export const chunk = (arr, n) => { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; };
 
 // Dış API isteği: zaman aşımı, 429/5xx'te kısa tekrar, anlaşılır hata mesajı

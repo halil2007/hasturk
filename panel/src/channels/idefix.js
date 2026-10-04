@@ -26,7 +26,7 @@ export function idefix(env, meta) {
     const items = (s.items || []).map((it) => {
       const qty = num(it.quantity, 1), total = num(it.discountedTotalPrice) || num(it.price ?? it.productPrice) * qty;
       return { lineId: str(it.id || it.orderLineId), sku: str(it.merchantSku || it.erpId), barcode: str(it.barcode), name: str(it.productName || it.title), image: str(it.image || it.productImage), quantity: qty, unitPrice: qty ? total / qty : total, total,
-        status: st === 'cancelled' ? 'cancelled' : '', remoteKey: str(it.barcode) };
+        status: st === 'cancelled' ? 'cancelled' : '', remoteKey: str(it.barcode), commission: it.commissionAmount != null ? num(it.commissionAmount) : null };
     });
     return {
       remoteId: str(s.id), orderNumber: str(s.orderNumber || s.id), orderedAt: Date.parse(s.orderDate || s.createdAt) || Date.now(), remoteStatus: str(s.status), status: st,
