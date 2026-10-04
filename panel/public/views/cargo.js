@@ -1,6 +1,6 @@
 // Kargo: paketler dört aşamada — hazırlanacak (paketle + etiket al), etiketi yazdırılacak, kargoya verilecek (etiket
 // yazdırıldı), kargoda. Etiketler kanalların kendi sistemlerinden gelir: ikas Kargo, Trendyol ortak etiketi, Hepsiburada paket etiketi.
-import { api, html, render, $, ch, trackBtn, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels, raw, esc } from '../core.js';
+import { api, html, render, $, ch, carrierOf, trackBtn, chLogo, chBadge, shortDT, isMobile, actions, busy, toast, lateBadge, activeChannels, raw, esc } from '../core.js';
 import { packageAction, openOrder, bulkLabels, labelState, extShip } from './orderops.js';
 import { setQuery, loadSummary } from '../app.js';
 
@@ -17,10 +17,10 @@ export async function cargo(el, rest, query = {}) {
     <div class="card flush" data-box></div>
   </div>`);
   const rowsOf = () => [
-    ...data.unpacked.map((o) => ({ key: `o:${o.order_id}`, order_id: o.order_id, pkg: null, no: 1, total: 1, channel: o.channel, order_number: o.order_number, customer: o.customer, city: o.city, ordered_at: o.ordered_at, cargo: o.cargo_company, code: o.tracking, items: `${o.qty || 0} adet`, ls: labelState({ channel: o.channel }, { status: 'open' }), late: { ...o, status: o.order_status, packages: 0 } })),
+    ...data.unpacked.map((o) => ({ key: `o:${o.order_id}`, order_id: o.order_id, pkg: null, no: 1, total: 1, channel: o.channel, order_number: o.order_number, customer: o.customer, city: o.city, ordered_at: o.ordered_at, cargo: o.cargo_company || carrierOf(o.cargo_choice), choice: o.cargo_choice, code: o.tracking, items: `${o.qty || 0} adet`, ls: labelState({ channel: o.channel }, { status: 'open' }), late: { ...o, status: o.order_status, packages: 0 } })),
     ...data.packages.map((p) => ({
       key: `p:${p.id}`, order_id: p.order_id, pkg: p.id, no: p.no, total: p.pkg_total, channel: p.channel, order_number: p.order_number, customer: p.customer, city: p.city, ordered_at: p.ordered_at,
-      cargo: p.cargo_company, code: p.barcode || p.tracking, track: { tracking_url: p.tracking_url, tracking: p.tracking, barcode: p.barcode, cargo_company: p.cargo_company }, items: `${p.items.reduce((a, x) => a + x.qty, 0)} adet`, ls: labelState({ channel: p.channel }, p), shipped: p.shipped_at, error: p.error,
+      cargo: p.cargo_company || carrierOf(p.cargo_choice), choice: p.cargo_choice, code: p.barcode || p.tracking, track: { tracking_url: p.tracking_url, tracking: p.tracking, barcode: p.barcode, cargo_company: p.cargo_company }, items: `${p.items.reduce((a, x) => a + x.qty, 0)} adet`, ls: labelState({ channel: p.channel }, p), shipped: p.shipped_at, error: p.error,
       late: p.status === 'open' ? { ...p, status: p.order_status, packages: 1, open_packages: 1 } : null,
     })),
   ];
@@ -28,7 +28,7 @@ export async function cargo(el, rest, query = {}) {
   const next = (r) => {
     const o = raw(`data-o="${esc(r.order_id)}" data-p="${esc(r.pkg || '')}"`);
     if (f.state === 'shipped') return html`${r.track ? trackBtn(r.track, {}, 'btn sm') : ''}<button class="btn sm outline" data-act="label" ${o}><i class="ico ico-print"></i>Etiket</button>`;
-    if (r.ls.key === 'external') return html`<button class="btn sm primary" data-act="ext" ${o}><i class="ico ico-truck"></i>ikas Kargo ile Gönder</button>`;
+    if (r.ls.key === 'external') return html`<button class="btn sm primary" data-act="ext" ${o} data-choice="${r.choice || ''}"><i class="ico ico-truck"></i>ikas Kargo ile Gönder${carrierOf(r.choice) ? ` · ${carrierOf(r.choice)}` : ''}</button>`;
     if (['unpacked', 'packed', 'created', 'error'].includes(r.ls.key)) return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-${r.ls.key === 'unpacked' ? 'box' : 'tag'}"></i>${r.ls.key === 'unpacked' ? 'Paketle ve etiket al' : r.ls.key === 'error' ? 'Tekrar dene' : r.ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (r.ls.key === 'ready') return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-print"></i>Etiketi yazdır</button>`;
     return html`<button class="btn sm" data-act="label" ${o}><i class="ico ico-print"></i>Tekrar</button><button class="btn sm primary" data-act="ship" ${o}><i class="ico ico-truck"></i>Kargoya ver</button>`;
@@ -68,7 +68,7 @@ export async function cargo(el, rest, query = {}) {
   actions(el, {
     ch: (t) => { f.channel = t.dataset.id; sel.clear(); refresh(); },
     tab: (t) => { f.state = t.dataset.k; sel.clear(); refresh(); },
-    ext: (t) => extShip(t.dataset.o, refresh),
+    ext: (t) => extShip(t.dataset.o, refresh, t.dataset.choice),
     label: (t) => busy(t, () => packageAction('label', t.dataset.o, Number(t.dataset.p) || null, refresh)),
     ship: (t) => busy(t, () => packageAction('ship', t.dataset.o, Number(t.dataset.p) || null, refresh)),
     cargo: (t) => busy(t, () => packageAction('cargo', t.dataset.o, Number(t.dataset.p) || null, refresh)),

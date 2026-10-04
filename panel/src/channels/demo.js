@@ -67,6 +67,7 @@ export function demo(meta) {
           cargoCompany: status === 'shipped' || status === 'delivered' ? 'Yurtiçi Kargo' : '', tracking: status === 'shipped' || status === 'delivered' ? `DEMO${no}` : '',
           shipBy: ['new', 'processing'].includes(status) ? at + (ch === 'trendyol' ? 1 : 2) * D : null,
           items: lines, packages: null,
+          ...(meta.type === 'ikas' ? { cargoChoice: r() < 0.6 ? 'HepsiJet Ücretsiz Kargo' : 'Aras Kargo (Ücretli)' } : {}),
         });
       }
     }

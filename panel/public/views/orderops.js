@@ -1,6 +1,6 @@
 // Sipariş işlemleri (ortak bileşen): işleme al → paketle (kanalda kargoya hazırla) → kargo firması seç/değiştir →
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
-import { api, state, html, render, $, $$, money, n, ch, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote } from '../core.js';
+import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote } from '../core.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
@@ -31,16 +31,17 @@ export function labelState(o, pkg) {
 // ikas Kargo ile Gönder: gönderi ikas'ın kendi uygulamasında açılır (genel API'de yok). Siparişin ikas sayfası yeni sekmede açılır,
 // panel siparişi ikas'tan birkaç saniyede bir (ve bu sekmeye dönülünce) yeniler; ikas Kargo gönderiyi oluşturunca barkod ve
 // etiket algılanır, etiket buradan yazdırılır. Tıklama anında çağrılmalı (sekme engellenmesin).
-export function extShip(orderId, done) {
+export function extShip(orderId, done, choice = '') {
   const chId = String(orderId).split(':')[0], c = ch(chId), ext = (c.caps || {}).external;
   if (!ext) return;
   window.open(ext.url + encodeURIComponent(String(orderId).slice(chId.length + 1)), '_blank');
   const enc = encodeURIComponent(orderId);
   let stop = false, tries = 0, running = false;
   const s = sheet({ title: `${c.name} · ${ext.label}`, size: 'narrow', onClose: () => { stop = true; window.removeEventListener('focus', check); } });
-  const steps = html`<ol class="small" style="margin:0;padding-left:20px;line-height:1.7">
+  const firm = carrierOf(choice);
+  const steps = html`${firm ? html`<div class="notice small" style="margin-bottom:8px"><i class="ico ico-truck"></i><div>ikas Kargo'da seçilecek firma: <b style="font-size:15px">${firm}</b><div class="tiny muted">Müşterinin ödeme sayfasındaki seçimi: “${choice}”</div></div></div>` : ''}<ol class="small" style="margin:0;padding-left:20px;line-height:1.7">
     <li>Açılan ikas sekmesinde ürünlerin yanındaki <b>⋮</b> menüsü → <b>ikas Kargo ile Paketle ve Gönder</b></li>
-    <li>Ürün adedini onaylayıp <b>Kaydet</b></li><li>Kargo firmasını seçip <b>Devam Et</b> (ücret ikas Kargo üzerinden alınır)</li>
+    <li>Ürün adedini onaylayıp <b>Kaydet</b></li><li>Kargo firması olarak <b>${firm || 'uygun firmayı'}</b> seçip <b>Devam Et</b> (ücret ikas Kargo üzerinden alınır)</li>
     <li>Bu sekmeye dönün: gönderi kendiliğinden algılanır, etiket buradan yazdırılır.</li></ol>`;
   const draw = (msg, cls = '') => {
     s.setBody(html`<div class="stack">${steps}<div class="notice ${cls} small"><i class="ico ${cls ? 'ico-warn' : 'ico-sync spin'}"></i><div>${msg}</div></div></div>`);
@@ -133,7 +134,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     if (p.status === 'shipped' || !live()) return hasLabel(p, o.channel) ? html`<button class="btn sm outline" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi göster</button>` : '';
     const ls = labelState(o, p);
     if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${chName()}'dan kontrol et</button>`;
-    if (ls.key === 'external') return html`<button class="btn sm primary" data-op="ext"><i class="ico ico-truck"></i>${caps().external.label}</button><button class="btn sm" style="flex:0 0 auto" data-op="refresh" title="ikas'tan hemen kontrol et" aria-label="Kontrol et"><i class="ico ico-sync"></i></button>`;
+    if (ls.key === 'external') return html`<button class="btn sm primary" data-op="ext"><i class="ico ico-truck"></i>${caps().external.label}${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}</button><button class="btn sm" style="flex:0 0 auto" data-op="refresh" title="ikas'tan hemen kontrol et" aria-label="Kontrol et"><i class="ico ico-sync"></i></button>`;
     if (ls.key === 'unpacked') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-box"></i>${caps().pack ? 'Paketle ve etiket al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'packed' || ls.key === 'created' || ls.key === 'error') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${ls.key === 'error' ? 'Tekrar dene' : ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'ready') return html`<button class="btn sm primary" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi yazdır</button>`;
@@ -153,7 +154,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       <div class="hd"><span class="box"><i class="ico ico-box"></i></span><b>Paket ${p.no}</b><span class="muted small">• ${qty} ürün</span><span class="spacer"></span><span class="pill ${ls.cls}">${ls.text}</span></div>
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
         : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
-      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${o.extra && o.extra.cargoChoice ? ` · müşterinin seçtiği: ${o.extra.cargoChoice}` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
+      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
         ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
       ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
@@ -245,7 +246,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.cancelable && pkg && pkg.remote_id ? html`<button class="btn" data-unmark>Kargoya Hazır işaretini kaldır</button>` : ''}${r.external ? html`<button class="btn primary" data-ext><i class="ico ico-truck"></i>${caps().external ? caps().external.label : 'ikas Kargo ile Gönder'}</button>` : ''}${r.repack ? html`<button class="btn primary" data-repack><i class="ico ico-sync"></i>ikas Kargo ile yeniden hazırla</button>` : ''}${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}<button class="btn primary" data-close>Kapat</button>` });
     $('[data-diag]', s.el).onclick = () => { s.close(); diagnoseDialog(d.order.channel, d.order.id, d.order.order_number); };
     const ex = $('[data-ext]', s.el);
-    if (ex) ex.onclick = () => { s.close(); extShip(d.order.id, changed); };
+    if (ex) ex.onclick = () => { s.close(); extShip(d.order.id, changed, d.order.extra && d.order.extra.cargoChoice); };
     const um = $('[data-unmark]', s.el);
     if (um) um.onclick = (e) => busy(e.currentTarget, async () => { const x = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); s.close(); toast(x.message); await changed(); });
     const rp = $('[data-repack]', s.el);
@@ -263,7 +264,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   }
   const ops = {
     accept: (b) => busy(b, async () => { const r = await api(`orders/${enc}/accept`, { method: 'POST', body: {} }); toast(r.message); await changed(); }),
-    ext: () => extShip(d.order.id, changed),
+    ext: () => extShip(d.order.id, changed, d.order.extra && d.order.extra.cargoChoice),
     refresh: (b) => busy(b, async () => { const r = await api(`orders/${enc}/refresh`, { method: 'POST' }); toast(r.order.packages.some((p) => p.barcode || p.tracking) ? 'ikas Kargo gönderisi alındı' : 'Henüz ikas Kargo gönderisi yok'); await changed(); }),
     split: () => splitEditor(d, 0, changed),
     addpkg: () => splitEditor(d, 1, changed),

@@ -213,8 +213,8 @@ test('ikas tanılama: izinler, eksik depo adresi, telefonsuz sipariş ve barkod 
   const o = by['Sipariş ve paketleri (ikas)'];
   assert.equal(o.ok, false);
   assert.match(o.detail, /Alıcı telefonu yok/);
-  assert.match(o.detail, /seçtiği kargo: Yurtiçi → Yurtiçi Kargo/);
-  assert.match(o.detail, /ikas Kargo gönderiyi açmamış/);
+  assert.match(o.detail, /seçeneği: Yurtiçi → ikas Kargo'da seçilecek firma: Yurtiçi Kargo/);
+  assert.match(o.detail, /yalnızca “Kargoya Hazır” işaretli; ikas Kargo gönderisi değil/);
   assert.match(o.detail, /hiçbir kargo uygulaması işlememiş/);
 });
 
@@ -323,7 +323,7 @@ test('Hepsiburada buybox: farklı yanıt biçimleri okunur', async () => {
   }
 });
 
-test('ikas tanılama: izin listesi boşsa "eksik izin" denmez; telefon fatura adresinden okunur, seçilen firma ayarlarda yoksa uyarılır', async () => {
+test('ikas tanılama: izin listesi boşsa "eksik izin" denmez; telefon fatura adresinden okunur, müşteri seçeneği ikas Kargo firmasına eşlenir', async () => {
   mockFetch([
     [/oauth\/token/, { access_token: 'T', expires_in: 3600, scope: '' }],
     [/graphql/, (url, opts) => {
@@ -341,7 +341,8 @@ test('ikas tanılama: izin listesi boşsa "eksik izin" denmez; telefon fatura ad
   assert.match(by['Uygulama izinleri (gerçek işlemle denendi)'].detail, /Tüm izinler açık/);
   const o = by['Sipariş ve paketleri (ikas)'].detail;
   assert.match(o, /0555 \(fatura adresi/);
-  assert.match(o, /HepsiJet \(\+30 TL\) → HepsiJet · ⚠ bu firma aktif kargo ayarlarınızda yok/);
+  assert.match(o, /HepsiJet \(\+30 TL\) → ikas Kargo'da seçilecek firma: hepsiJET/, 'müşteri seçeneği bağlantı sayılmaz, adından firma bulunur');
+  assert.doesNotMatch(o, /kargo ayarlarınızda yok/);
 });
 
 test('idefix: "shipment_" önekli durumlar doğru eşlenir, istekler kimlik (User-Agent) ve X-API-KEY taşır', async () => {
@@ -419,4 +420,13 @@ test('ikas mağaza adı tam adresle yazılsa da doğru kullanılır', () => {
     const ch = ikas({ IKAS1_STORE: v, IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
     assert.equal(ch.caps.external.url, 'https://hasturkgubre.myikas.com/admin/order/view/');
   }
+});
+
+test('ikas: müşterinin kargo seçeneği adı ikas Kargo firmasına eşlenir (seçenek bağlantı sayılmaz)', async () => {
+  const { ikasCarrier } = await import('../src/channels/ikas.js');
+  assert.equal(ikasCarrier('HepsiJet Ücretsiz Kargo'), 'hepsiJET');
+  assert.equal(ikasCarrier('Aras Kargo (Ücretli)'), 'Aras Kargo');
+  assert.equal(ikasCarrier('Yurtici kargo'), 'Yurtiçi Kargo');
+  assert.equal(ikasCarrier('Ptt Kargo (Ücretli)'), 'PTT Kargo');
+  assert.equal(ikasCarrier('Mağazadan teslim'), '');
 });
