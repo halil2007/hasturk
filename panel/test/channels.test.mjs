@@ -189,7 +189,8 @@ test('ikas tanılama: izinler, eksik depo adresi, telefonsuz sipariş ve barkod 
     [/oauth\/token/, { access_token: 'T', expires_in: 3600 }],
     [/graphql/, (url, opts) => {
       const q = JSON.parse(opts.body).query;
-      if (/getAuthorizedApp/.test(q)) return { data: { getAuthorizedApp: { scope: 'read_orders,write_orders,read_products,write_products' } } };
+      if (/cancelFulfillment/.test(q)) return { errors: [{ message: 'Order not found' }] };
+      if (/saveProductStockLocations/.test(q)) return { errors: [{ message: 'Unauthorized: missing scope write_inventories' }] };
       if (/getMerchant/.test(q)) return { data: { getMerchant: { id: 'm1' } } };
       if (/listStockLocation/.test(q)) return { data: { listStockLocation: [{ id: 'l1', name: 'Ana depo', address: { address: 'Sanayi', city: { name: 'Konya' } } }] } };
       if (/listCargoCompany/.test(q)) return { data: { listCargoCompany: [{ id: 'c1', name: 'Yurtiçi Kargo' }] } };
@@ -203,8 +204,10 @@ test('ikas tanılama: izinler, eksik depo adresi, telefonsuz sipariş ve barkod 
   const r = await ch.diagnose({ orderId: 'o1' });
   const by = Object.fromEntries(r.map((x) => [x.name, x]));
   assert.equal(by['ikas bağlantısı (OAuth)'].ok, true);
-  assert.equal(by['Uygulama izinleri'].ok, null, 'zorunlu izinler açık; yalnız envanter kapalı → uyarı, hata değil');
-  assert.match(by['Uygulama izinleri'].detail, /Envanter – Görüntüleme/);
+  const iz = by['Uygulama izinleri (gerçek işlemle denendi)'];
+  assert.equal(iz.ok, null, 'zorunlu izinler açık; yalnız stok yazma kapalı → uyarı, hata değil');
+  assert.match(iz.detail, /✗ Envanter – düzenleme \(stok\): KAPALI/);
+  assert.match(iz.detail, /✓ Siparişler – düzenleme \(yetki var/, '"bulunamadı" cevabı yetkinin açık olduğunu gösterir');
   assert.equal(by['Depo / stok lokasyonu adresi'].ok, false, 'ilçe ve telefon eksik');
   assert.match(by['Kargo ayarları (bölgeler)'].detail, /Yurtiçi Kargo/);
   const o = by['Sipariş ve paketleri (ikas)'];
@@ -334,8 +337,8 @@ test('ikas tanılama: izin listesi boşsa "eksik izin" denmez; telefon fatura ad
   ]);
   const ch = ikas({ IKAS1_STORE: 's', IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
   const by = Object.fromEntries((await ch.diagnose({ orderId: 'o1' })).map((x) => [x.name, x]));
-  assert.equal(by['Uygulama izinleri'].ok, null);
-  assert.doesNotMatch(by['Uygulama izinleri'].detail, /Kapalı izin/);
+  assert.equal(by['Uygulama izinleri (gerçek işlemle denendi)'].ok, true, 'izin listesi boş olsa da gerçek işlemler başarılıysa izinler açık sayılır');
+  assert.match(by['Uygulama izinleri (gerçek işlemle denendi)'].detail, /Tüm izinler açık/);
   const o = by['Sipariş ve paketleri (ikas)'].detail;
   assert.match(o, /0555 \(fatura adresi/);
   assert.match(o, /HepsiJet \(\+30 TL\) → HepsiJet · ⚠ bu firma aktif kargo ayarlarınızda yok/);

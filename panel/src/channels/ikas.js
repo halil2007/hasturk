@@ -248,14 +248,9 @@ export function ikas(env, p, meta) {
   }
 
   // ---------- kargo (ikas Kargo) ----------
-  // Resmi Admin API'de (2.1.0) ikas Kargo için ayrı "gönderi oluştur" işlemi yoktur. Gönderi şöyle oluşur:
-  //   1) fulfillOrder(markAsReadyForShipment: true) → paket ikas'ta "Kargoya Hazır" (READY_FOR_SHIPMENT)
-  //   2) ikas Kargo uygulaması paketi alır (paketin appId alanı dolar), anlaşmalı firmada gönderiyi açar ve
-  //      barkod / takip no / etiket görselini paketin trackingInfo alanına yazar (hata olursa durum ERROR + errorMessage).
-  // Panel bu adımları izler; ikas Kargo gerçek gönderiyi oluşturup etiketi vermeden "etiket hazır" demez.
-  // ÖNEMLİ: paketlerken trackingInfoDetail (kargo firması / takip no) GÖNDERİLMEZ. Bu alan resmi şemada paketin dışarıdan
-  // girilen takip bilgisidir; dolu gönderilirse ikas paketi "elle girilmiş kargo" sayar ve ikas Kargo o paketi işlemez.
-  // Kargo firmasını ikas Kargo belirler (müşterinin ödeme sayfasında seçtiği kargo yöntemi / ikas'taki kargo ayarlarınız).
+  // Resmi Admin API'de ikas Kargo için "gönderi oluştur" işlemi yoktur; gönderi ikas'taki ikas Kargo uygulamasıyla açılır
+  // (bkz. aşağıda adminUrl / fetchOne). ikas Kargo paketi oluşturup barkod / takip no / etiket görselini paketin trackingInfo
+  // alanına yazar (hata olursa durum ERROR + errorMessage); panel bunu okur. Panel ikas'a hiçbir kargo / takip bilgisi yazmaz.
   let cargoCache = null;
   async function carriers() {
     if (!cargoCache) {
@@ -358,14 +353,30 @@ export function ikas(env, p, meta) {
     if (!tok) return out;
     // İzinler: resmi adlar read_/write_ + orders, products, inventories (ikas OAuth). Önce erişim anahtarının izin listesi,
     // yoksa uygulama kaydı. ikas listeyi boş döndürürse "eksik" denmez; izinler aşağıdaki gerçek işlemlerle doğrulanır.
-    await step('Uygulama izinleri', async () => {
-      let sc = tokenScope;
-      if (!sc) { try { sc = String(((await gql('{ getAuthorizedApp { scope } }')).getAuthorizedApp || {}).scope || ''); } catch { /* okunamadı */ } }
-      const have = new Set(sc.toLowerCase().split(/[\s,;]+/).filter(Boolean));
-      if (!have.size) return { ok: null, detail: 'ikas izin listesini bildirmedi (özel uygulamalarda olağan). İzinler aşağıdaki adımlarda gerçek işlemlerle kontrol edilir: siparişler okunabiliyorsa okuma izni vardır; paketleme hatasında ikas yazma izni eksikse bunu açıkça söyler.' };
-      const need = [['read_orders', 'Siparişler – Görüntüleme', true], ['write_orders', 'Siparişler – Düzenleme (paketleme / Kargoya Hazır)', true], ['read_products', 'Ürünler – Görüntüleme', true], ['write_products', 'Ürünler – Düzenleme (fiyat gönderimi)', false], ['read_inventories', 'Envanter – Görüntüleme (depo adresi)', false], ['write_inventories', 'Envanter – Düzenleme (stok gönderimi)', false]];
-      const miss = need.filter(([k]) => !have.has(k));
-      return { ok: miss.some((x) => x[2]) ? false : miss.length ? null : true, detail: `${miss.length ? `Kapalı izin: ${miss.map((x) => x[1]).join(', ')}. ` : 'Gerekli izinler açık. '}(ikas: ${[...have].join(', ')})` };
+    // İzinler: ikas özel uygulamalarda izin listesini bildirmediği için her izin GERÇEK ama HİÇBİR ŞEY DEĞİŞTİRMEYEN bir işlemle denenir:
+    // okuma → 1 kayıt okunur; yazma → boş liste kaydedilir (stok / fiyat) ya da var olmayan bir paket iptal edilmeye çalışılır
+    // ("bulunamadı" cevabı yetkinin açık olduğunu gösterir; "yetki / izin / unauthorized" cevabı kapalı olduğunu).
+    await step('Uygulama izinleri (gerçek işlemle denendi)', async () => {
+      const DENY = /unauthori[sz]ed|forbidden|permission|not allowed|access denied|scope|yetki|izin/i;
+      const ZERO = '00000000-0000-0000-0000-000000000000';
+      const tests = [
+        ['Siparişler – okuma', true, () => gql('{ listOrder(pagination: { page: 1, limit: 1 }) { data { id } } }')],
+        ['Siparişler – düzenleme', true, () => gql('mutation ($input: CancelFulfillmentInput!) { cancelFulfillment(input: $input) { id } }', { input: { orderId: ZERO, orderPackageId: ZERO } })],
+        ['Ürünler – okuma', true, () => gql('{ listProduct(pagination: { page: 1, limit: 1 }) { data { id } } }')],
+        ['Ürünler – düzenleme (fiyat)', false, () => gql('mutation ($input: SaveVariantPricesInput!) { saveVariantPrices(input: $input) }', { input: { variantPriceInputs: [] } })],
+        ['Envanter – okuma (depo)', false, () => gql('{ listStockLocation { id } }')],
+        ['Envanter – düzenleme (stok)', false, () => gql('mutation ($input: SaveStockLocationsInput!) { saveProductStockLocations(input: $input) }', { input: { productStockLocationInputs: [] } })],
+      ];
+      const rows = [];
+      let ok = true;
+      for (const [name, need, fn] of tests) {
+        try { await fn(); rows.push(`✓ ${name}`); }
+        catch (e) {
+          if (DENY.test(e.message) || /HTTP 40[13]/.test(e.message)) { rows.push(`✗ ${name}: KAPALI (${e.message.slice(0, 120)})`); if (need) ok = false; else if (ok) ok = null; }
+          else rows.push(`✓ ${name} (yetki var; deneme isteği beklendiği gibi reddedildi: ${e.message.replace(/^ikas: /, '').slice(0, 80)})`);
+        }
+      }
+      return { ok, detail: rows.join('\n') + (ok === true ? '\nTüm izinler açık.' : '\nKapalı izni ikas → Uygulamalar → Özel uygulama → izinlerden açın.') };
     });
     await step('Mağaza (görseller için)', async () => { const d = await gql('{ getMerchant { id } }'); return { ok: !!(d.getMerchant && d.getMerchant.id), detail: `Merchant ID: ${(d.getMerchant || {}).id || '-'}` }; });
     await step('Depo / stok lokasyonu adresi', async () => {
@@ -380,7 +391,7 @@ export function ikas(env, p, meta) {
       const d = await gql('{ listShippingSettings { zoneName isPassive salesChannelId type zoneRate { rateName cargoCompanyId price } } }');
       const list = (d.listShippingSettings || []).filter((x) => !x.isPassive);
       const names = new Map((cargoCache || []).map((c) => [c.id, c.name]));
-      return { ok: list.length ? true : null, detail: list.map((x) => `${x.zoneName}: ${(x.zoneRate || []).map((r) => `${r.rateName}${r.cargoCompanyId ? ` → ${names.get(r.cargoCompanyId) || r.cargoCompanyId}` : ' (kargo firması bağlı değil)'}`).join(', ')}`).join(' · ') || 'Aktif kargo ayarı yok' };
+      return { ok: list.length ? true : null, detail: 'Müşterinin ödeme sayfasında gördüğü kargo seçenekleri (gönderi firması ikas Kargo ekranında seçilir) · ' + list.map((x) => `${x.zoneName}: ${(x.zoneRate || []).map((r) => `${r.rateName}${r.cargoCompanyId ? ` → ${names.get(r.cargoCompanyId) || r.cargoCompanyId}` : ''}`).join(', ')}`).join(' · ') || 'Aktif kargo ayarı yok' };
     });
     if (orderId) {
       await step('Sipariş ve paketleri (ikas)', async () => {
