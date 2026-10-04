@@ -55,7 +55,7 @@ export const FIELDS = {
   idefix: [
     { k: 'IDEFIX_VENDOR_ID', label: 'Satıcı ID', req: true, hint: 'ör. 16705', pattern: '^\\d+$', patternMsg: 'idefix Satıcı ID yalnızca rakamlardan oluşur (Hesabım → Entegrasyon Bilgileri)' },
     { k: 'IDEFIX_API_KEY', label: 'API KEY', secret: true, req: true },
-    { k: 'IDEFIX_API_SECRET', label: 'API Secret (yalnız eski hesaplarda; idefix vermiyorsa boş bırakın)', secret: true },
+    { k: 'IDEFIX_API_SECRET', label: 'API Secret / Secret Key (idefix API KEY ile birlikte veriyorsa)', secret: true },
   ],
   pazarama: [
     { k: 'PAZARAMA_CLIENT_ID', label: 'API Key (Client ID)', req: true },

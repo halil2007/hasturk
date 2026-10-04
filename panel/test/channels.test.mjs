@@ -430,3 +430,13 @@ test('ikas: müşterinin kargo seçeneği adı ikas Kargo firmasına eşlenir (s
   assert.equal(ikasCarrier('Ptt Kargo (Ücretli)'), 'PTT Kargo');
   assert.equal(ikasCarrier('Mağazadan teslim'), '');
 });
+
+test('idefix: biçim hatasında her denenen biçim ve eski API Secret uyarısı gösterilir', async () => {
+  const { idefix } = await import('../src/channels/idefix.js');
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ message: 'VENDOR_TOKEN_NOT_FORMATED' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  try {
+    const ch = idefix({ IDEFIX_VENDOR_ID: '16705', IDEFIX_API_KEY: 'KEY1', IDEFIX_API_SECRET: 'ESKI' }, { id: 'idefix' });
+    await assert.rejects(() => ch.fetchOrders(Date.now() - 864e5, Date.now()), (e) => /API KEY:API Secret \(base64\) → VENDOR_TOKEN_NOT_FORMATED/.test(e.message) && /Panelde kayıtlı API Secret bu API KEY'e ait değil/.test(e.message) && /Satıcı ID:API KEY/.test(e.message));
+  } finally { globalThis.fetch = real; }
+});
