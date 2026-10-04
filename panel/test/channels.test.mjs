@@ -410,3 +410,10 @@ test('idefix: yalnız Satıcı ID + API KEY ile çalışır; reddedilen kimlik b
     assert.deepEqual(keys, [btoa('KEY1:')], 'kabul edilen biçim hatırlanır');
   } finally { globalThis.fetch = real; }
 });
+
+test('ikas mağaza adı tam adresle yazılsa da doğru kullanılır', () => {
+  for (const v of ['hasturkgubre', 'hasturkgubre.myikas.com', 'https://hasturkgubre.myikas.com/admin/orders']) {
+    const ch = ikas({ IKAS1_STORE: v, IKAS1_CLIENT_ID: 'i', IKAS1_CLIENT_SECRET: 'c' }, 'IKAS1_', { id: 'ikas1' });
+    assert.equal(ch.caps.external.url, 'https://hasturkgubre.myikas.com/admin/order/view/');
+  }
+});

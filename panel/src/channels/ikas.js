@@ -8,7 +8,9 @@ import { http, num, str, labelFrom } from '../util.js';
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
 
 export function ikas(env, p, meta) {
-  const store = env[p + 'STORE'], id = env[p + 'CLIENT_ID'], secret = env[p + 'CLIENT_SECRET'];
+  // Mağaza adı "hasturkgubre", "hasturkgubre.myikas.com" ya da "https://hasturkgubre.myikas.com/admin" yazılmış olabilir: yalnız ad alınır
+  const store = String(env[p + 'STORE'] || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').replace(/\.myikas\.com$/i, '');
+  const id = env[p + 'CLIENT_ID'], secret = env[p + 'CLIENT_SECRET'];
   const salesChannel = env[p + 'SALES_CHANNEL_ID'] || '';
   let merchant = env[p + 'MERCHANT_ID'] || '', merchantTried = false;
   let token = null, tokenScope = '', tokenExp = 0, locationId = env[p + 'STOCK_LOCATION_ID'] || '';

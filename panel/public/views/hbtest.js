@@ -26,6 +26,18 @@ export async function hbTestView(el) {
           : st.test ? html`<b>Test (SIT) ortamına bağlı</b> · Merchant ${st.merchantId}. Aşağıdaki üç adımı sırayla tamamlayın; sonuçlar en altta toplanır.`
             : html`<b>Dikkat: canlı ortama bağlısınız.</b> Test adımları için Entegrasyonlar → Hepsiburada → Gelişmiş → Test ortamı = 1 yapın.`}</div><a class="btn sm" href="#/entegrasyonlar">Entegrasyonlar</a></div>
 
+      <div class="card stack" style="border-color:var(--primary)">
+        <div class="card-head" style="margin:0"><h2>Panelden 520 hatası alınıyorsa: bilgisayarınızdan çalıştırın</h2></div>
+        <p class="small" style="margin:0">Hepsiburada'nın test sunucuları, panelin çalıştığı Cloudflare sunucularından gelen sipariş/listeleme isteklerine <b>520</b> veriyor. Aşağıdaki araç aynı üç adımı <b>kendi internet bağlantınızdan</b> yapar ve Hepsiburada'ya iletilecek özeti hazırlar (bilgiler hiçbir yere kaydedilmez).</p>
+        <ol class="small" style="margin:0;padding-left:20px;line-height:1.8">
+          <li><a class="btn sm primary" href="/hb-sit-test.ps1" download="hb-sit-test.ps1"><i class="ico ico-download"></i>Test aracını indir (Windows)</a></li>
+          <li>İndirilen <b>hb-sit-test.ps1</b> dosyasına sağ tıklayın → <b>PowerShell ile çalıştır</b>. (Açılmazsa: Başlat → PowerShell → <code>powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\\Downloads\\hb-sit-test.ps1"</code>)</li>
+          <li>Hepsiburada'nın test e-postasındaki <b>Merchant ID</b>, <b>servis anahtarı</b> ve <b>entegratör adını</b> girin; kategori, ürün sorularında Enter'a basmanız yeterli.</li>
+          <li>Sonunda çıkan özet panoya kopyalanır ve Masaüstü'ne kaydedilir: Hepsiburada'ya açacağınız talebe yapıştırın.</li>
+        </ol>
+        <p class="tiny muted" style="margin:0">Araçtaki “Bağlantı kontrolü” bilgisayarınızdan da 520 / 401 veriyorsa sorun hesap tanımındadır; o çıktıyı Hepsiburada'ya iletin.</p>
+      </div>
+
       <div class="card stack" data-step="1">
         <div class="card-head" style="margin:0"><h2>1) Ürün entegrasyonu (katalog) ${r.trackingId ? html`<span class="pill good">trackingId alındı</span>` : ''}</h2></div>
         <p class="muted small" style="margin:0">Panelden bir ürün seçin, Hepsiburada kategorisini bulun; kategori özellikleri gelir, zorunluları doldurup gönderin. Oluşan <b>trackingId</b> Hepsiburada'ya iletilir (testte onay beklenmez, hatasız gönderim yeterlidir).</p>
