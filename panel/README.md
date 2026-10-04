@@ -89,6 +89,8 @@ Hepsiburada canlı API bilgilerini, test ortamında üç adım tamamlandıktan s
 2. **Listeleme:** “Envanteri çek” ile Hepsiburada'nın test hesabına yüklediği ürünler alınır; seçilen üründe stok ve fiyat gönderilir (stock-uploads / price-uploads), yükleme kimlikleri ve durumları görünür. (Genel stok senkronu kapalı olsa da bu tek ürünlük test gönderimi yapılır.)
 3. **Sipariş entegrasyonu:** Test siparişi Hepsiburada'nın test servisine (`oms-stub-external-sit`) gönderilir; gövde seçili ürünle doldurulur ve Hepsiburada'nın “Test Siparişi Oluşturma” dokümanına göre düzenlenebilir. “Siparişleri çek” ile sipariş API'den listelenir, Siparişler'de açılıp **Paketle** ile paketlenir.
 
+**Panelden 520 hatası alınıyorsa (bilgisayardan test aracı):** Hepsiburada'nın test sunucuları, panelin çalıştığı Cloudflare sunucularından gelen sipariş/listeleme isteklerine 520 veriyor. Test sayfasındaki **“Test aracını indir (Windows)”** (`public/hb-sit-test.ps1`) aynı üç adımı kendi internet bağlantınızdan yapar: dosyaya sağ tık → **PowerShell ile çalıştır** → Merchant ID, servis anahtarı ve entegratör adını girin (hiçbir yere kaydedilmez). Araç bağlantıyı kontrol eder, kategori seçtirip test ürünü gönderir (trackingId), envanterdeki üründe stok + fiyat gönderir, test siparişi oluşturup API'de bulur ve paketler; özeti panoya kopyalar ve Masaüstü'ne kaydeder.
+
 En alttaki **özet** (trackingId, yükleme kimlikleri, test siparişi, paket no) kopyalanıp Hepsiburada'da yeni talep açılır. Canlı bilgiler gelince Entegrasyonlar'da Merchant ID / servis anahtarını değiştirin, **Test ortamı** alanını boşaltın ve test sayfasındaki **“Test verilerini temizle”** ile test siparişlerini panelden silin.
 
 ## 4. İlk kurulum adımları (sırayla)
