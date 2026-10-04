@@ -258,3 +258,23 @@ test('eski hatalı eşleşme onarımı: aynı kanaldan bir ürüne bağlı fazla
   const rows = await all(db, 'SELECT remote_id, product_id FROM listings ORDER BY remote_id');
   assert.deepEqual(rows.map((r) => [r.remote_id, r.product_id]), [['a', null], ['b', 1], ['c', null]]);
 });
+
+test('barkod / stok kodu yazım farkı tolere edilir; aynı ürün grubundaki kardeş varyant ölçüsüyle bağlanır', async () => {
+  const db = await db0();
+  const LG = (ch, id, o) => db.prepare('INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, variant_name, group_name, remote_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5)')
+    .bind(ch, id, o.rp || '', o.sku || '', o.barcode || '', o.name, o.variant || null, o.group || null).run();
+  await LG('ikas1', 'i5', { rp: 'P1', sku: 'HG-SOL-5', barcode: '0869000000001', name: 'Solucan Gübresi - 5 Kg', variant: '5 Kg', group: 'Solucan Gübresi' });
+  await LG('ikas1', 'i10', { rp: 'P1', sku: 'HG-SOL-10', name: 'Solucan Gübresi - 10 Kg', variant: '10 Kg', group: 'Solucan Gübresi' });
+  await LG('ikas1', 'i20', { rp: 'P1', sku: 'HG-SOL-20', name: 'Solucan Gübresi - 20 Kg', variant: '20 Kg', group: 'Solucan Gübresi' });
+  await autoMatch(db, { catalog: ['ikas1'] });
+  // Trendyol: barkodun başındaki 0 yok; aynı ana üründe 10 Kg'ın adı farklı yazılmış, kodu / barkodu yok
+  await LG('trendyol', 't5', { rp: 'TY-M1', barcode: '869000000001', name: 'HG Organik Solucan Gübresi 5 kg' });
+  await LG('trendyol', 't10', { rp: 'TY-M1', name: 'HG Organik Solucan Gübresi 10000 gr' });
+  // Hepsiburada: stok kodu farklı yazılmış
+  await LG('hepsiburada', 'h20', { sku: 'hg sol 20', name: 'Solucan gübresi büyük boy' });
+  await autoMatch(db, { catalog: ['ikas1'] });
+  const [i5, i10, i20] = [await pid(db, 'i5'), await pid(db, 'i10'), await pid(db, 'i20')];
+  assert.deepEqual([(await pid(db, 't5')).product_id, (await pid(db, 't5')).match], [i5.product_id, 'barcode'], 'baştaki 0 farkı yok sayılır');
+  assert.deepEqual([(await pid(db, 't10')).product_id, (await pid(db, 't10')).match], [i10.product_id, 'group'], 'aynı ana üründeki 10 Kg kardeşi bulunur (10000 gr = 10 Kg)');
+  assert.deepEqual([(await pid(db, 'h20')).product_id, (await pid(db, 'h20')).match], [i20.product_id, 'sku'], 'stok kodu yazım farkı yok sayılır');
+});

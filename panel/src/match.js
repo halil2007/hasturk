@@ -30,10 +30,19 @@ export function tokens(s) {
   return new Set(t.split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !STOP.has(w)));
 }
 
+// Barkod: boşluk / tire yok sayılır; yalnız rakamsa baştaki sıfırlar atılır (UPC-12 "0…" = EAN-13). Stok kodu: büyük/küçük harf,
+// boşluk, tire, nokta, alt çizgi farkları yok sayılır ("HG-SOL-5" = "hg sol 5" = "HGSOL5").
+export const normBc = (b) => { const t = str(b).replace(/[\s-]+/g, '').toUpperCase(); return /^\d+$/.test(t) ? t.replace(/^0+/, '') : t; };
+export const normSku = (s) => norm(s).replace(/[^a-z0-9]/g, '');
+// Varyant imzası: ölçüler (5kg, 10l…) yoksa varyant kelimeleri; kardeş varyantları ayırt etmek için
+const variantSig = (name, variant) => { const q = [...quantities(`${name || ''} ${variant || ''}`)].sort().join(','); return q || [...tokens(variant)].sort().join(' '); };
+// Ürünün varyant grubu (ana ürün): ana katalogdaki ürün kimliği, yoksa grup adı, yoksa ad
+const groupKey = (p) => str(p.parent_key) || norm(p.group_name) || norm(p.name);
+
 // Karşılaştırma için önceden hazırlanmış özellikler (binlerce üründe her seferinde yeniden ayrıştırmamak için)
 export const prep = (x) => ({
   t: tokens(x.name), q: quantities(`${x.name || ''} ${x.variant || ''}`), v: tokens(x.variant),
-  sku: norm(x.sku).replace(/[^a-z0-9]/g, ''), barcode: str(x.barcode),
+  sku: norm(x.sku).replace(/[^a-z0-9]/g, ''), barcode: normBc(x.barcode),
 });
 
 // 0–100 benzerlik puanı ve gerekçeler (a, b: prep() sonucu)
@@ -76,7 +85,7 @@ export function fullKey(name, variant) {
 export function certain(l, idx) {
   const no = /^x:\d+$/.test(l.match || '') ? Number(l.match.slice(2)) : 0; // kullanıcının kaldırdığı eşleşme
   const free = (list) => (list || []).filter((p) => p.id !== no && !idx.taken(p.id, l.channel));
-  const bc = str(l.barcode), sku = str(l.sku).toLowerCase();
+  const bc = normBc(l.barcode), sku = normSku(l.sku);
   const byBc = bc.length >= 6 ? free(idx.barcode.get(bc)) : [];
   const bySku = sku ? free(idx.sku.get(sku)) : [];
   if (byBc.length === 1) {
@@ -86,7 +95,7 @@ export function certain(l, idx) {
   if (byBc.length > 1) return null;
   if (bySku.length === 1) {
     const p = bySku[0];
-    if (bc && p.barcode && p.barcode !== bc) return null; // SKU aynı ama barkod çelişiyor
+    if (bc && p.barcode && normBc(p.barcode) !== bc) return null; // SKU aynı ama barkod çelişiyor
     return { id: p.id, how: 'sku' };
   }
   if (bySku.length > 1) return null;
@@ -95,33 +104,58 @@ export function certain(l, idx) {
   const byName = key ? free(idx.name.get(key)) : [];
   if (byName.length === 1) {
     const p = byName[0];
-    if (bc && p.barcode && p.barcode !== bc) return null;
-    if (sku && p.sku && p.sku.toLowerCase() !== sku) return null;
+    if (bc && p.barcode && normBc(p.barcode) !== bc) return null;
+    if (sku && p.sku && normSku(p.sku) !== sku) return null;
     return { id: p.id, how: 'name' };
+  }
+  if (byName.length > 1) return null;
+  // Aynı ürün grubu: ilanın kanaldaki ana ürünündeki başka bir varyant zaten bir panel ürününe bağlıysa, bu varyant o ürünün
+  // kardeşleri arasında aranır; ölçü / varyant imzası birebir aynı tek kardeş varsa bağlanır (ör. 5 Kg bağlıysa 10 Kg da bulunur).
+  const gks = l.remote_product_id ? idx.rgroup.get(`${l.channel}|${l.remote_product_id}`) : null;
+  if (gks && gks.size === 1) {
+    const sig = variantSig(l.name, l.variant_name);
+    if (!sig) return null;
+    const sib = free(idx.group.get([...gks][0])).filter((p) => variantSig(fullName(p), p.variant_name) === sig);
+    if (sib.length === 1) {
+      const p = sib[0];
+      if (bc && p.barcode && normBc(p.barcode) !== bc) return null;
+      if (sku && p.sku && normSku(p.sku) !== sku) return null;
+      return { id: p.id, how: 'group' };
+    }
   }
   return null;
 }
 
 export async function productIndex(db) {
-  const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name, group_name, image, stock FROM products');
-  const used = await all(db, 'SELECT product_id, channel, name FROM listings WHERE product_id IS NOT NULL');
-  const sku = new Map(), barcode = new Map(), name = new Map(), chans = new Map();
+  const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name, group_name, parent_key, image, stock FROM products');
+  const used = await all(db, 'SELECT product_id, channel, name, remote_product_id FROM listings WHERE product_id IS NOT NULL');
+  const sku = new Map(), barcode = new Map(), name = new Map(), chans = new Map(), group = new Map(), rgroup = new Map();
   const add = (m, k, p) => m.set(k, [...(m.get(k) || []), p]);
+  const byId = new Map(prods.map((p) => [p.id, p]));
   const idx = {
-    prods, sku, barcode, name, chans,
+    prods, sku, barcode, name, chans, group, rgroup,
     taken: (id, ch) => !!(chans.get(id) && chans.get(id).has(ch)),
-    use: (id, ch) => { if (!chans.has(id)) chans.set(id, new Set()); chans.get(id).add(ch); },
+    // Bağlanan ilan: ürün o kanalda dolu sayılır; ilanın kanaldaki ana ürünü → panel ürün grubu ilişkisi öğrenilir
+    use: (id, ch, rpid) => {
+      if (!chans.has(id)) chans.set(id, new Set());
+      chans.get(id).add(ch);
+      const p = byId.get(id);
+      if (p && rpid) { const k = `${ch}|${rpid}`; if (!rgroup.has(k)) rgroup.set(k, new Set()); rgroup.get(k).add(groupKey(p)); }
+    },
     add: (p) => {
-      if (p.sku) add(sku, p.sku.toLowerCase(), p);
-      if (p.barcode) add(barcode, p.barcode, p);
+      byId.set(p.id, p);
+      const sk = normSku(p.sku), bc = normBc(p.barcode);
+      if (sk) add(sku, sk, p);
+      if (bc) add(barcode, bc, p);
       const k = fullKey(p.name, p.variant_name);
       if (k) add(name, k, p);
+      const g = groupKey(p);
+      if (g) add(group, g, p);
     },
   };
   for (const p of prods) idx.add(p);
-  for (const u of used) idx.use(u.product_id, u.channel);
+  for (const u of used) idx.use(u.product_id, u.channel, u.remote_product_id);
   // Ürünün bağlı ilanlarının adları da ad anahtarına eklenir (aynı ürün farklı sitede farklı adla olabilir)
-  const byId = new Map(prods.map((p) => [p.id, p]));
   for (const u of used) {
     const p = byId.get(u.product_id), k = fullKey(u.name);
     if (p && k && !(name.get(k) || []).includes(p)) add(name, k, p);
@@ -151,7 +185,7 @@ export async function repairDuplicates(db) {
     const ls = await all(db, 'SELECT remote_id, sku, barcode, name, variant_name, match FROM listings WHERE product_id = ? AND channel = ?', d.product_id, d.channel);
     if (!p[0] || ls.length < 2) continue;
     const pp = prep({ name: fullName(p[0]), variant: p[0].variant_name, sku: p[0].sku, barcode: p[0].barcode });
-    const rank = (l) => (l.barcode && l.barcode === p[0].barcode ? 1000 : 0) + (l.sku && p[0].sku && l.sku.toLowerCase() === p[0].sku.toLowerCase() ? 500 : 0) + (l.match === 'manual' ? 50 : 0)
+    const rank = (l) => (l.barcode && normBc(l.barcode) === normBc(p[0].barcode) ? 1000 : 0) + (normSku(l.sku) && normSku(l.sku) === normSku(p[0].sku) ? 500 : 0) + (l.match === 'manual' ? 50 : 0)
       + score(prep({ name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode }), pp).score;
     const keep = ls.slice().sort((a, b) => rank(b) - rank(a))[0];
     for (const l of ls) {
@@ -172,29 +206,38 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   // Stoğu 0 olan eşleşmemiş ilanlar (ana katalog dahil) eşleştirmeye hiç girmez: ürün açılmaz, öneri / onay listesine düşmez
   await run(db, "UPDATE listings SET ignored = 1, match = 'zero' WHERE product_id IS NULL AND ignored = 0 AND remote_stock IS NOT NULL AND remote_stock <= 0");
   const idx = await productIndex(db);
-  const unlinked = await all(db, 'SELECT channel, remote_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND ignored = 0 ORDER BY channel, remote_id');
+  const unlinked = await all(db, 'SELECT channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND ignored = 0 ORDER BY channel, remote_id');
   // Ana katalog önce işlenir (sırasıyla), sonra diğer kanallar
   const rank = (c) => (cats.includes(c) ? cats.indexOf(c) : 99);
   unlinked.sort((a, b) => rank(a.channel) - rank(b.channel));
-  const st = [];
+  const st = [], rest = [];
   let linked = 0, created = 0;
   for (const l of unlinked) {
     const c = certain(l, idx);
-    if (c) { st.push(link(db, c.id, c.how, l)); idx.use(c.id, l.channel); linked++; continue; }
+    if (c) { st.push(link(db, c.id, c.how, l)); idx.use(c.id, l.channel, l.remote_product_id); linked++; continue; }
     // Ana katalog: ilk katalog kanalının her varyantı ürün olur. Diğer katalog kanalları (ör. ikinci site) yalnızca
     // hiçbir ürüne benzemiyorsa yeni ürün açar; benziyorsa elle onaya düşer (yanlış birleştirme / mükerrer ürün olmasın).
     const isCat = cats.includes(l.channel);
-    if (!isCat) continue;
+    if (!isCat) { rest.push(l); continue; }
     if (cats.indexOf(l.channel) > 0 && bestScore(l, idx) >= 40) continue;
     if (st.length) { for (const part of chunk(st.splice(0), 90)) await db.batch(part); }
-    const skuFree = str(l.sku) && !idx.sku.has(str(l.sku).toLowerCase());
+    const skuFree = str(l.sku) && !idx.sku.has(normSku(l.sku));
     const t = Date.now();
     const r = await db.prepare(`INSERT INTO products (sku, barcode, name, group_name, variant_name, image, sale_price, stock, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
       .bind(skuFree ? str(l.sku) : null, str(l.barcode) || null, l.name || l.sku || l.barcode || l.remote_id, l.group_name || null, l.variant_name || null, l.image || '', l.price || 0, Math.max(0, l.remote_stock || 0), t, t).first();
-    const p = { id: r.id, sku: skuFree ? str(l.sku) : null, barcode: str(l.barcode) || null, name: l.name, variant_name: l.variant_name, image: l.image, stock: Math.max(0, l.remote_stock || 0) };
-    idx.prods.push(p); idx.add(p); idx.use(p.id, l.channel);
+    const p = { id: r.id, sku: skuFree ? str(l.sku) : null, barcode: str(l.barcode) || null, name: l.name, variant_name: l.variant_name, group_name: l.group_name, image: l.image, stock: Math.max(0, l.remote_stock || 0) };
+    idx.prods.push(p); idx.add(p); idx.use(p.id, l.channel, l.remote_product_id);
     st.push(link(db, p.id, 'new', l));
     created++;
+  }
+  // İkinci geçiş: ilk geçişte bağlanan varyantlardan öğrenilen ürün grupları ile kardeş varyantlar (sıradan bağımsız)
+  for (let pass = 0; pass < 2 && rest.length; pass++) {
+    const left = rest.splice(0);
+    for (const l of left) {
+      const c = certain(l, idx);
+      if (c) { st.push(link(db, c.id, c.how, l)); idx.use(c.id, l.channel, l.remote_product_id); linked++; } else rest.push(l);
+    }
+    if (rest.length === left.length) break;
   }
   for (const part of chunk(st, 90)) await db.batch(part);
   // Ürünün eksik görsel / grup / varyant bilgisini bağlı ilandan tamamla
@@ -210,11 +253,13 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
 const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ');
 function candidates(l, idx, n = 3) {
   const a = prep({ name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode });
+  const gks = l.remote_product_id ? idx.rgroup.get(`${l.channel}|${l.remote_product_id}`) : null;
   const out = [];
   for (const p of idx.prods) {
     if (idx.taken(p.id, l.channel)) continue;
     if (!p._prep) p._prep = prep({ name: fullName(p), variant: p.variant_name, sku: p.sku, barcode: p.barcode });
-    const s = score(a, p._prep);
+    let s = score(a, p._prep);
+    if (gks && gks.has(groupKey(p))) s = { score: Math.min(100, s.score + 20), why: [...s.why, 'aynı ürün grubu'] };
     if (s.score >= 25) out.push({ p, s });
   }
   return out.sort((x, y) => y.s.score - x.s.score).slice(0, n);
@@ -227,7 +272,7 @@ export async function suggestions(db, { channel, q, limit = 100 } = {}) {
   const where = ['product_id IS NULL', 'ignored = 0'], args = [];
   if (channel) { where.push('channel = ?'); args.push(channel); }
   if (q) { where.push('(name LIKE ? OR sku LIKE ? OR barcode LIKE ?)'); const s = '%' + q + '%'; args.push(s, s, s); }
-  const rows = await all(db, `SELECT channel, remote_id, sku, barcode, name, variant_name, image, price, remote_stock FROM listings WHERE ${where.join(' AND ')} ORDER BY channel, name LIMIT ?`, ...args, limit);
+  const rows = await all(db, `SELECT channel, remote_id, remote_product_id, sku, barcode, name, variant_name, image, price, remote_stock FROM listings WHERE ${where.join(' AND ')} ORDER BY channel, name LIMIT ?`, ...args, limit);
   if (!rows.length) return [];
   const on = await all(db, 'SELECT product_id, channel, name FROM listings WHERE product_id IS NOT NULL');
   return rows.map((l) => ({
@@ -266,4 +311,23 @@ export async function relinkItems(db) {
     WHERE product_id IS NULL AND sku != ''`);
   await run(db, `UPDATE order_items SET product_id = (SELECT MIN(p.id) FROM products p WHERE p.barcode = order_items.barcode)
     WHERE product_id IS NULL AND barcode != ''`);
+}
+
+// Yüksek puanlı önerileri toplu onayla: en iyi aday en az `min` puan ve ikinci adaydan en az `gap` puan öndeyse bağlanır.
+// Aynı ürüne aynı kanaldan ikinci ilan bağlanmaz. Eşleşme yöntemi "approved" (toplu onay) olarak kaydedilir.
+export async function approveConfident(db, { channel, min = 85, gap = 15 } = {}) {
+  const rows = await suggestions(db, { channel, limit: 500 });
+  const taken = new Set();
+  const st = [];
+  for (const l of rows) {
+    const [a, b] = l.candidates;
+    if (!a || a.score < min || (b && a.score - b.score < gap)) continue;
+    const k = `${a.product_id}|${l.channel}`;
+    if (taken.has(k)) continue;
+    taken.add(k);
+    st.push(db.prepare("UPDATE listings SET product_id = ?, match = 'approved', pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind(a.product_id, l.channel, l.remote_id));
+  }
+  for (const part of chunk(st, 90)) await db.batch(part);
+  if (st.length) await relinkItems(db);
+  return { linked: st.length };
 }

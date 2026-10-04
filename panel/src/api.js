@@ -3,7 +3,7 @@ import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED } from './channels/index.js';
 import { loadConfig, saveConfig, describe } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders } from './sync.js';
-import { suggestions, linkedGroups, repairDuplicates, autoMatch } from './match.js';
+import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
@@ -721,9 +721,15 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const [rows, counts] = await Promise.all([
       suggestions(db, { channel: q.channel, q: q.q, limit: Math.min(Number(q.limit) || 60, 200) }),
       all(db, `SELECT channel, SUM(product_id IS NULL AND ignored = 0) AS pending, SUM(product_id IS NULL AND ignored = 1) AS ignored,
-        SUM(match IN ('barcode', 'sku', 'name')) AS auto, SUM(match = 'new') AS created, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
+        SUM(match IN ('barcode', 'sku', 'name', 'group', 'approved')) AS auto, SUM(match = 'new') AS created, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
     ]);
     return json({ listings: rows, counts });
+  }
+  if (path === 'match/approve' && m === 'POST') {
+    const b = await body(req);
+    const r = await approveConfident(db, { channel: b.channel || undefined, min: Math.max(70, Number(b.min) || 85) });
+    await log(db, b.channel || null, 'info', `${user.name}: ${r.linked} yüksek puanlı öneri toplu onaylandı`);
+    return json(r);
   }
   if (path === 'match/linked' && m === 'GET') {
     const where = ['l.product_id IS NOT NULL'], args = [];
