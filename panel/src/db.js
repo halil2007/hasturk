@@ -160,6 +160,8 @@ const MIGRATIONS = [
   'ALTER TABLE products ADD COLUMN images TEXT',
   'ALTER TABLE products ADD COLUMN images_manual INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE listings ADD COLUMN images TEXT',
+  // Anlık bildirim (Web Push) abonelikleri: cihaz başına bir satır (bkz. push.js)
+  'CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, user_id INTEGER, ua TEXT, created_at INTEGER)',
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
   'CREATE INDEX IF NOT EXISTS products_category ON products(category)',
 ];

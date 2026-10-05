@@ -11,6 +11,7 @@ import { hbTest } from './hbtest.js';
 import { suggestBarcode, assignBarcodes, barcodePrefix, missingBarcodes } from './barcodes.js';
 import { previewSkus, suggestSku, assignSkus, skuPrefix } from './skus.js';
 import { exportProducts, bulkUpdate } from './bulk.js';
+import { publicKey, subscribe, unsubscribe, latest, notify } from './push.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
@@ -1127,6 +1128,12 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/barcodes' && m === 'GET') return json({ prefix: await barcodePrefix(db), missing: await missingBarcodes(db) });
   if (path === 'products/barcodes/new' && m === 'GET') return json(await suggestBarcode(db, q.prefix));
   if (path === 'products/barcodes' && m === 'POST') { const b = await body(req); return json(await assignBarcodes(db, b.ids, { prefix: b.prefix, user: user.name })); }
+  // Anlık bildirim: cihaz aboneliği, deneme bildirimi ve servis çalışanının okuduğu son bildirim
+  if (path === 'push/key' && m === 'GET') return json({ key: await publicKey(db) });
+  if (path === 'push/subscribe' && m === 'POST') { const b = await body(req); return json(await subscribe(db, user, b.subscription, req.headers.get('user-agent'))); }
+  if (path === 'push/unsubscribe' && m === 'POST') return json(await unsubscribe(db, (await body(req)).endpoint));
+  if (path === 'push/latest' && m === 'GET') return json(await latest(db));
+  if (path === 'push/test' && m === 'POST') return json(await notify(db, { title: 'Hastürk Panel', body: `Bildirimler açık · ${user.name}`, url: '#/' }));
   // Excel ile toplu güncelleme: dışa aktar (CSV) ve geri yükle (önizleme / uygula)
   if (path === 'products.csv' && m === 'GET') return new Response(await exportProducts(env, db), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="urunler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
   if (path === 'products/bulk' && m === 'POST') {

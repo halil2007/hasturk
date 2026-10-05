@@ -19,6 +19,7 @@ import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 import { checkPendingUploads, autoUpload } from './catalog.js';
 import { customerKey, fillKeys } from './customers.js';
+import { pushDigest } from './push.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -347,6 +348,7 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
         changed.push(...ids);
         // Yeni sipariş e-postası: kanalın ilk aktarımında (imleç yokken) gönderilmez
         if (cursor && ids.created && ids.created.length) out.mailQueued = (out.mailQueued || 0) + await queueNew(db, ch, ids.created, settings).catch(() => 0);
+        if (cursor && ids.created && ids.created.length && !ch.demo) out.newOrders = (out.newOrders || 0) + ids.created.length;
         await setSetting(db, 'cursor:' + ch.id, t);
         Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, nextTry: null, note: null, warn: orders.warnings || null });
         out.channels[ch.id] = orders.length;
@@ -398,6 +400,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
     if (!only) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);
     if (!only) out.settlements = await syncSettlements(env, db).catch((e) => 'hata: ' + e.message);
+    // Anlık bildirim: yeni sipariş / iade talebi / müşteri sorusu özeti abonelere
+    if (!only) out.push = await pushDigest(env, db, { newOrders: out.newOrders || 0 }).catch((e) => 'hata: ' + e.message);
     // Eski siparişlere müşteri anahtarı (müşteriler sayfası için, parça parça)
     if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu

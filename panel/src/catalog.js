@@ -10,7 +10,7 @@ import { importListings, catalogOf } from './sync.js';
 import { fail, str, num, r2, isImageAttr } from './util.js';
 import { rank, localProfile, prepare, score } from './catmatch.js';
 
-const NO_API = { idefix: 'Ürün yükleme idefix panelinden yapılır', pttavm: 'Ürün yükleme PttAVM panelinden yapılır', n11: 'Ürün yükleme N11 panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
+const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').replace(/\s+/g, '').replace(/(lt|litre|l)$/, 'lt').replace(/(kg|kilo|kilogram)$/, 'kg');
 
 async function targets(env, db) {
