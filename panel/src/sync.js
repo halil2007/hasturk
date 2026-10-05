@@ -432,6 +432,7 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
 }
 
 // Bir kanalın ilanlarını yenile: eşleştirme, kanala özel stok kuralı ve gönderilmeyi bekleyen fiyat korunur.
+// Yalnız değişen ilan yazılır (WHERE): değişmeyen ilan her senkronda yeniden yazılmaz — çok müşterili kullanımda yazma maliyeti düşük kalır.
 // Kanaldaki gerçek stok "pushed_stock" olarak kaydedilir: olması gerekenden farklıysa bir sonraki adımda düzeltilir.
 export async function refreshListings(db, ch) {
   const rows = await ch.fetchListings();
@@ -445,7 +446,13 @@ export async function refreshListings(db, ch) {
         brand = COALESCE(NULLIF(excluded.brand, ''), listings.brand), description = COALESCE(NULLIF(excluded.description, ''), listings.description),
         category = COALESCE(NULLIF(excluded.category, ''), listings.category),
         price = CASE WHEN listings.price_dirty = 1 THEN listings.price ELSE excluded.price END,
-        list_price = excluded.list_price, remote_stock = excluded.remote_stock, pushed_stock = excluded.remote_stock, synced_at = excluded.synced_at`)
+        list_price = excluded.list_price, remote_stock = excluded.remote_stock, pushed_stock = excluded.remote_stock, synced_at = excluded.synced_at
+      WHERE listings.remote_product_id IS NOT excluded.remote_product_id OR listings.sku IS NOT excluded.sku OR listings.barcode IS NOT excluded.barcode
+        OR listings.name IS NOT excluded.name OR listings.group_name IS NOT excluded.group_name OR listings.variant_name IS NOT excluded.variant_name
+        OR (excluded.image != '' AND listings.image IS NOT excluded.image) OR (excluded.images != '' AND listings.images IS NOT excluded.images)
+        OR (excluded.brand != '' AND listings.brand IS NOT excluded.brand) OR (excluded.description != '' AND listings.description IS NOT excluded.description)
+        OR (excluded.category != '' AND listings.category IS NOT excluded.category) OR (listings.price_dirty = 0 AND listings.price IS NOT excluded.price)
+        OR listings.list_price IS NOT excluded.list_price OR listings.remote_stock IS NOT excluded.remote_stock OR listings.pushed_stock IS NOT excluded.remote_stock`)
       .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t,
         str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), str(l.category).slice(0, 300), (l.images || []).length ? JSON.stringify(l.images.slice(0, 12)) : '')));
   }
