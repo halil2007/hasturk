@@ -129,7 +129,8 @@ function printHtml(markup, size = labelSize()) {
 // Panel etiketleri: [{ order, pkg }] (her paket ayrı sayfa)
 export const printLabels = (list, sender) => printHtml(list.map(({ order, pkg }) => labelHtml(order, pkg, order.packages.length || 1, sender)).join(''));
 // Kanalın verdiği etiket görseli (ikas Kargo PNG/JPG)
-export const printImages = (list) => printHtml(list.map((x) => `<section class="slabel img s-100x150"><img src="data:image/${x.format === 'jpg' ? 'jpeg' : x.format};base64,${x.data}" alt=""></section>`).join(''), '100x150');
+// Görsel verisi yalnız base64 karakterleri ve bilinen biçim olabilir (kanaldan gelen veri HTML'e karışmasın)
+export const printImages = (list) => printHtml(list.filter((x) => /^[A-Za-z0-9+/=\s]+$/.test(String(x.data || ''))).map((x) => `<section class="slabel img s-100x150"><img src="data:image/${({ jpg: 'jpeg', jpeg: 'jpeg', gif: 'gif', webp: 'webp' })[x.format] || 'png'};base64,${String(x.data).replace(/\s+/g, '')}" alt=""></section>`).join(''), '100x150');
 
 export function downloadFile(name, data, type) {
   const blob = type === 'application/pdf' ? new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], { type }) : new Blob([data], { type });

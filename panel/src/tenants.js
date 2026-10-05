@@ -20,8 +20,10 @@ const DROP = new Set(['PANEL_PASSWORD', 'DEMO', 'DB', 'TENANT']);
 export function tenantEnv(env, t) {
   const out = {};
   for (const [k, v] of Object.entries(env)) if (!DROP.has(k) && !PRIVATE.test(k)) out[k] = v;
-  // Müşterinin API bilgileri kendi anahtarıyla şifrelenir
-  out.PANEL_SECRET = `${env.PANEL_SECRET || env.PANEL_PASSWORD || 'hasturk-panel'}|tenant:${t.slug}`;
+  // Müşterinin API bilgileri ve oturum imzası kendi anahtarıyla: ana panelin gizli anahtarı yoksa müşteri paneli açılmaz
+  // (herkesçe bilinen bir sabitten türetilen anahtarla destek oturumu taklit edilebilirdi)
+  if (!env.PANEL_SECRET && !env.PANEL_PASSWORD) fail(503, 'Müşteri panelleri için Cloudflare → Variables and Secrets → PANEL_SECRET tanımlanmalı');
+  out.PANEL_SECRET = `${env.PANEL_SECRET || env.PANEL_PASSWORD}|tenant:${t.slug}`;
   out.TENANT_SLUG = t.slug;
   out.TENANT_NAME = t.name || t.slug;
   return out;
@@ -31,8 +33,10 @@ export function tenantEnv(env, t) {
 export function cookieTenant(req) {
   const m = (req.headers.get('Cookie') || '').match(/hp_session=([^;]+)/);
   if (!m) return null;
-  const v = decodeURIComponent(m[1]), i = v.indexOf('~');
-  return i > 0 ? v.slice(0, i) : null;
+  let v = '';
+  try { v = decodeURIComponent(m[1]); } catch { return null; }
+  const i = v.indexOf('~'), slug = i > 0 ? v.slice(0, i) : '';
+  return SLUG_RE.test(slug) ? slug : null; // geçersiz kod veritabanına sorulmaz
 }
 
 // Kayıt (ana veritabanında); sık istek için 30 sn bellekte
@@ -140,6 +144,8 @@ export class TenantPanel {
   }
   async schedule() { if (!(await this.ctx.storage.get('suspended')) && !(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + SYNC_MS); }
   async fetch(req) {
+    // Silinmiş firma: önbellekteki eski kayıtla gelen istek veriyi / zamanlayıcıyı yeniden oluşturmasın (yalnız yeniden kurulum)
+    if (await this.ctx.storage.get('destroyed') && new URL(req.url).pathname !== '/__admin') return json({ error: 'Müşteri paneli yok' }, 404);
     const env = await this.meta(req);
     if (!env) return json({ error: 'Müşteri paneli tanımsız' }, 400);
     const url = new URL(req.url);
@@ -157,7 +163,7 @@ export class TenantPanel {
         if (!n.n) await run(db, "INSERT INTO users (username, name, email, pass, role, active, created_at) VALUES (?, ?, '', ?, 'admin', 1, ?)", b.username, b.username, await hashPassword(String(b.password)), Date.now());
         // Firma adı (giriş ekranı, etiket, e-posta) müşterinin adıyla başlar; Ayarlar'dan değiştirilebilir
         await run(db, "INSERT INTO settings (k, v) VALUES ('company', ?) ON CONFLICT (k) DO NOTHING", JSON.stringify({ title: b.name, legal: b.name }));
-        await this.ctx.storage.delete('suspended');
+        await this.ctx.storage.delete('suspended'); await this.ctx.storage.delete('destroyed');
         await this.schedule();
         return json({ ok: true });
       }
@@ -179,15 +185,15 @@ export class TenantPanel {
           last_order: await q('SELECT MAX(ordered_at) AS n FROM orders'), suspended: !!(await this.ctx.storage.get('suspended')),
         });
       }
-      if (b.op === 'destroy') { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); this.db = doD1(this.ctx.storage); this.t = null; this.tenv = null; return json({ ok: true }); }
+      if (b.op === 'destroy') { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); await this.ctx.storage.put('destroyed', true); this.db = doD1(this.ctx.storage); this.t = null; this.tenv = null; return json({ ok: true }); }
       return json({ error: 'Bilinmeyen işlem' }, 400);
     } catch (e) { return json({ error: e.message }, e.status || 500); }
   }
   // 15 dakikada bir: siparişler, ürünler, stoklar (ana paneldeki zamanlanmış senkronun aynısı)
   async alarm() {
     const env = await this.meta();
-    if (!env || await this.ctx.storage.get('suspended')) return;
+    if (!env || await this.ctx.storage.get('suspended') || await this.ctx.storage.get('destroyed')) return;
     try { await init(this.db); await syncAll(env, this.db); } catch (e) { console.error('müşteri paneli senkron hatası', this.t && this.t.slug, e); }
-    finally { if (!(await this.ctx.storage.get('suspended'))) await this.ctx.storage.setAlarm(Date.now() + SYNC_MS); }
+    finally { if (!(await this.ctx.storage.get('suspended')) && !(await this.ctx.storage.get('destroyed'))) await this.ctx.storage.setAlarm(Date.now() + SYNC_MS); }
   }
 }

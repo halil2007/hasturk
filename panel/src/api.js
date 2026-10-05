@@ -123,7 +123,8 @@ async function exportOrders(db, q) {
   const rows = await all(db, `SELECT o.channel, o.order_number, o.ordered_at, o.status, o.customer, o.phone, o.address, o.total, o.cargo_company, o.tracking,
       (SELECT GROUP_CONCAT(quantity || ' x ' || name || CASE WHEN sku != '' THEN ' (' || sku || ')' ELSE '' END, ' | ') FROM order_items WHERE order_id = o.id) AS items
     FROM orders o ${w} ORDER BY o.ordered_at DESC LIMIT 10000`, ...args);
-  const cell = (v) => { const s = String(v ?? ''); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  // Excel formül enjeksiyonu: = + - @ ile başlayan hücre metin olarak yazılır (alıcı adı / adres pazaryerinden gelir)
+  const cell = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s)) s = "'" + s; return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const fmt = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
   const head = ['Kanal', 'Sipariş no', 'Tarih', 'Durum', 'Müşteri', 'Telefon', 'İl', 'İlçe', 'Adres', 'Tutar', 'Kargo', 'Takip no', 'Ürünler'];
   const TR = { new: 'Yeni', processing: 'Hazırlanıyor', shipped: 'Kargoda', delivered: 'Teslim edildi', cancelled: 'İptal', returned: 'İade' };
@@ -654,6 +655,8 @@ async function productDetail(db, id) {
 
 // ---------- ayarlar ----------
 const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS).concat(['stock_channels', 'logo']);
+// Tarayıcıya yalnız panel ayarları gider; iç kayıtlar (bildirim imza anahtarı, senkron imleçleri, giriş sayaçları …) gitmez
+const publicSettings = (st) => Object.fromEntries(SETTING_KEYS.filter((k) => k in st).map((k) => [k, st[k]]));
 async function saveSettings(db, b) {
   const cur = await getSettings(db);
   for (const k of Object.keys(b)) {
@@ -759,9 +762,13 @@ async function campaignApi(env, db, path, m, q, b, user) {
 // İade reddine eklenen belge (fotoğraf / PDF): tarayıcıdan base64 gelir, en fazla 5 MB
 function claimFile(f) {
   if (!f || !f.data) return null;
+  if (String(f.data).length > 7e6) fail(400, 'Dosya en fazla 5 MB olabilir'); // çözmeden önce boyut
+  if (!/^(image\/(jpeg|png)|application\/pdf)$/.test(f.type || '')) fail(400, 'Yalnız JPEG, PNG ya da PDF eklenebilir');
   const bin = Uint8Array.from(atob(String(f.data)), (c) => c.charCodeAt(0));
   if (bin.length > 5 * 1024 * 1024) fail(400, 'Dosya en fazla 5 MB olabilir');
-  if (!/^(image\/(jpeg|png)|application\/pdf)$/.test(f.type || '')) fail(400, 'Yalnız JPEG, PNG ya da PDF eklenebilir');
+  // Dosyanın gerçek türü (bildirilen türe güvenilmez): PDF / PNG / JPEG imzası
+  const sig = (...b) => b.every((x, i) => bin[i] === x);
+  if (!(sig(0x25, 0x50, 0x44, 0x46) || sig(0x89, 0x50, 0x4e, 0x47) || sig(0xff, 0xd8, 0xff))) fail(400, 'Dosya JPEG, PNG ya da PDF değil');
   return new File([bin], String(f.name || 'belge').slice(0, 80), { type: f.type });
 }
 
@@ -802,7 +809,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
     const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
     if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
-    return json({ ...s, channels: chInfo, settings: st, user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1' });
+    return json({ ...s, channels: chInfo, settings: publicSettings(st), user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1' });
   }
   // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
   if (path === 'panel-proxy' && m === 'GET') {
@@ -1014,7 +1021,12 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'orders.csv' && m === 'GET') {
     return new Response(await exportOrders(db, q), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="siparisler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
   }
-  if (path === 'dashboard' && m === 'GET') return json(await dashboard(db, q));
+  if (path === 'dashboard' && m === 'GET') {
+    const d = await dashboard(db, q);
+    // Kâr bilgisi yalnız "Gelir, gider ve hakediş" yetkisi olana
+    if (!d.error && !can(user, 'finance')) for (const p of [d.current, d.previous]) { p.profit = p.profit.map(() => null); p.total = { ...p.total, profit: null }; for (const t of Object.values(p.totals)) t.profit = null; }
+    return json(d);
+  }
   // Gelir & gider: dönem masraf basamakları (satış → komisyon → kargo → hizmet bedeli → ek kesinti → stopaj → hakediş → alış → kâr)
   // Döviz kurları ve döviz bazlı fiyat (müşteri panellerinde yakında)
   if (path === 'fx' || path.startsWith('fx/')) {
@@ -1096,6 +1108,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // Adım adım bağlantı tanılaması (isteğe bağlı sipariş için kargo/paket durumu)
   if ((x = path.match(/^integrations\/([a-z0-9_]+)\/diagnose$/)) && m === 'POST') {
     const b = await body(req);
+    if (b.order_id && !can(user, 'orders')) fail(403, 'Sipariş ayrıntısı için Siparişler yetkisi gerekir');
     resetChannels();
     let ch = await channel(env, db, x[1]);
     if (!ch) fail(404, 'Kanal bulunamadı');
@@ -1151,9 +1164,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // Anlık bildirim: cihaz aboneliği, deneme bildirimi ve servis çalışanının okuduğu son bildirim
   if (path === 'push/key' && m === 'GET') return json({ key: await publicKey(db) });
   if (path === 'push/subscribe' && m === 'POST') { const b = await body(req); return json(await subscribe(db, user, b.subscription, req.headers.get('user-agent'))); }
-  if (path === 'push/unsubscribe' && m === 'POST') return json(await unsubscribe(db, (await body(req)).endpoint));
+  if (path === 'push/unsubscribe' && m === 'POST') return json(await unsubscribe(db, (await body(req)).endpoint, user));
   if (path === 'push/latest' && m === 'GET') return json(await latest(db));
-  if (path === 'push/test' && m === 'POST') return json(await notify(db, { title: 'Hastürk Panel', body: `Bildirimler açık · ${user.name}`, url: '#/' }));
+  if (path === 'push/test' && m === 'POST') return json(await notify(db, { title: 'Hastürk Panel', body: `Bildirimler açık · ${user.name}`, url: '#/' }, { userId: user.id ?? null }));
   // Excel ile toplu güncelleme: dışa aktar (CSV) ve geri yükle (önizleme / uygula)
   if (path === 'products.csv' && m === 'GET') return new Response(await exportProducts(env, db), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="urunler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
   if (path === 'products/bulk' && m === 'POST') {
@@ -1222,7 +1235,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
 
   if (path === 'stats' && m === 'GET') return json(await stats(db, q));
   if (path === 'insights' && m === 'GET') return json(await insights(db, q));
-  if (path === 'settings' && m === 'GET') return json(await getSettings(db));
+  if (path === 'settings' && m === 'GET') return json(publicSettings(await getSettings(db)));
   if (path === 'settings' && m === 'PUT') return json(await saveSettings(db, await body(req)));
   if (path === 'logs' && m === 'GET') return json(await all(db, 'SELECT * FROM logs ORDER BY id DESC LIMIT 200'));
   // Hata özeti (son 30 gün): aynı hata (sayılar / kimlikler ayıklanarak) kanal bazında gruplanır; açıklama ve kopyalanabilir rapor

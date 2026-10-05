@@ -25,7 +25,9 @@ export async function handle(req, env, ctx, db) {
     if (path === 'logo' && req.method === 'GET') {
       const m = /^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,(.+)$/.exec((await getSettings(db)).logo || '');
       if (!m) return new Response('Logo yok', { status: 404 });
-      return new Response(Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)), { headers: { 'Content-Type': m[1], 'Cache-Control': 'public, max-age=86400' } });
+      // Logo doğrudan açılsa bile içindeki betik çalışmaz (SVG): kum havuzu CSP + nosniff
+      return new Response(Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)), { headers: { 'Content-Type': m[1], 'Cache-Control': 'public, max-age=86400',
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox", 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline; filename="logo"' } });
     }
     if (path === 'login' && req.method === 'POST') {
       const r = await login(req, env, db, await body(req));

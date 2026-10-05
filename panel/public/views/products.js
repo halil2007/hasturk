@@ -188,15 +188,36 @@ export function stockDialog(p, done) {
   });
 }
 
-// Kanaldan gelen HTML açıklama: yalnızca biçim etiketleri kalır (betik, stil, olay öznitelikleri ve javascript: bağlantıları silinir)
+// CSS url() içine giden adres: tırnak / parantez / ters bölü atılır (stil enjeksiyonu olmasın)
+const cssUrl = (u) => String(u || '').replace(/['"()\\\s]/g, '');
+// Kanaldan gelen HTML açıklama: izin verilen biçim etiketleriyle YENİ bir belge kurulur (yorum, betik, noscript gibi her şey atılır;
+// bilinmeyen etiketin yalnız metni kalır). Ayrıştırılan belge doğrudan yeniden yazılmadığı için "mutation XSS" oluşmaz.
+const OK_TAGS = new Set('P BR B STRONG I EM U S UL OL LI H1 H2 H3 H4 H5 H6 TABLE THEAD TBODY TFOOT TR TD TH CAPTION SPAN DIV A IMG BLOCKQUOTE HR SMALL SUB SUP'.split(' '));
+const OK_ATTR = { A: ['href', 'title'], IMG: ['src', 'alt', 'title', 'width', 'height'], TD: ['colspan', 'rowspan'], TH: ['colspan', 'rowspan'] };
+const DROP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|IFRAME|FRAME|OBJECT|EMBED|SVG|MATH|TEXTAREA|TITLE|XMP|NOEMBED|NOFRAMES|SELECT|OPTION|BUTTON|FORM|INPUT|LINK|META|BASE)$/;
 function safeHtml(src) {
   const doc = new DOMParser().parseFromString(String(src || ''), 'text/html');
-  doc.querySelectorAll('script,style,iframe,object,embed,form,input,button,link,meta,base,svg').forEach((e) => e.remove());
-  doc.querySelectorAll('*').forEach((e) => [...e.attributes].forEach((a) => {
-    if (/^on/i.test(a.name) || a.name === 'style' || a.name === 'class' || a.name === 'id' || (/^(href|src|srcset|action|formaction|xlink:href)$/i.test(a.name) && !/^\s*(https?:|\/)/i.test(a.value))) e.removeAttribute(a.name);
-  }));
-  doc.querySelectorAll('a').forEach((a) => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
-  return doc.body.innerHTML;
+  const out = document.implementation.createHTMLDocument('');
+  const copy = (from, to) => {
+    for (const n of from.childNodes) {
+      if (n.nodeType === 3) { to.appendChild(out.createTextNode(n.textContent)); continue; }
+      if (n.nodeType !== 1) continue; // yorum ve diğer düğümler atılır
+      const tag = String(n.tagName).toUpperCase();
+      if (DROP_TAGS.test(tag)) continue;
+      if (!OK_TAGS.has(tag)) { copy(n, to); continue; }
+      const e = out.createElement(tag.toLowerCase());
+      for (const a of OK_ATTR[tag] || []) {
+        const v = n.getAttribute(a);
+        if (v == null || ((a === 'href' || a === 'src') && !/^https?:\/\//i.test(v.trim()))) continue;
+        e.setAttribute(a, v);
+      }
+      if (tag === 'A') { e.setAttribute('target', '_blank'); e.setAttribute('rel', 'noopener noreferrer'); }
+      to.appendChild(e);
+      copy(n, e);
+    }
+  };
+  copy(doc.body, out.body);
+  return out.body.innerHTML;
 }
 // Açıklamanın geldiği kanal (bağlı ilanlardan aynı metni taşıyan)
 const descSource = (p) => { const l = (p.listings || []).find((x) => x.description && x.description === p.description); return l ? ch(l.channel).name : ''; };
@@ -272,7 +293,7 @@ export async function productForm(id, done) {
   // Görsel galerisi: yalnız bağlantılar saklanır (görseller kanalın sunucusundan açılır, panelde yer kaplamaz)
   let gal = (() => { try { return JSON.parse(p.images || '[]'); } catch { return []; } })(), galManual = !!p.images_manual, galEdit = false, galDirty = false, galAuto = false;
   const drawGal = () => render($('[data-galbox]', form), html`<div class="stack" style="gap:8px">
-    ${gal.length ? html`<div class="row wrap" style="gap:6px">${gal.map((u, i) => html`<a href="${u}" target="_blank" rel="noopener" title="${i === 0 ? 'Ana görsel · ' : ''}${u}" style="position:relative"><span class="thumb lg" style="background-image:url('${u}')"></span>${i === 0 ? html`<span class="pill" style="position:absolute;left:2px;bottom:2px;font-size:9px;padding:0 4px">ana</span>` : ''}</a>`)}</div>`
+    ${gal.length ? html`<div class="row wrap" style="gap:6px">${gal.map((u, i) => html`<a href="${u}" target="_blank" rel="noopener" title="${i === 0 ? 'Ana görsel · ' : ''}${u}" style="position:relative"><span class="thumb lg" style="background-image:url('${cssUrl(u)}')"></span>${i === 0 ? html`<span class="pill" style="position:absolute;left:2px;bottom:2px;font-size:9px;padding:0 4px">ana</span>` : ''}</a>`)}</div>`
       : html`<div class="muted small">${id ? 'Henüz görsel bağlantısı yok; bağlı kanallardan bir sonraki senkronda gelir.' : 'Kaydettikten sonra bağlı kanallardan gelir ya da aşağıdan ekleyin.'}</div>`}
     <div class="row wrap" style="gap:8px"><span class="muted tiny" style="flex:1">${gal.length ? `${gal.length} görsel · ` : ''}${galAuto ? 'kaydedince kanaldan otomatik alınacak' : galManual ? 'panelde düzenlendi (senkron değiştirmez)' : 'kanaldan otomatik (ana katalog önce)'} · yalnız bağlantı saklanır, yer kaplamaz</span>
       <button type="button" class="btn sm" data-galedit>${galEdit ? 'Düzenlemeyi kapat' : 'Bağlantıları düzenle'}</button>${galManual && !galAuto ? html`<button type="button" class="btn sm ghost" data-galauto>Kanaldan otomatik al</button>` : ''}</div>
@@ -288,7 +309,7 @@ export async function productForm(id, done) {
     gal = [...new Set(e.target.value.split(/[\s,]+/).map((x) => x.trim()).filter((x) => /^https?:\/\//i.test(x)))].slice(0, 12);
     galDirty = true; galAuto = false; galManual = true;
     const box = $('[data-galbox] .row', form); // önizlemeyi yazarken yeniden çizme (imleç kaybolmasın)
-    if (box && box.firstElementChild && box.firstElementChild.tagName === 'A') render(box, html`${gal.map((u) => html`<a href="${u}" target="_blank" rel="noopener"><span class="thumb lg" style="background-image:url('${u}')"></span></a>`)}`);
+    if (box && box.firstElementChild && box.firstElementChild.tagName === 'A') render(box, html`${gal.map((u) => html`<a href="${u}" target="_blank" rel="noopener"><span class="thumb lg" style="background-image:url('${cssUrl(u)}')"></span></a>`)}`);
   });
   // SKU oluştur: formdaki ad / varyant / markadan benzersiz öneri; kaydedilince geçerli olur
   $('[data-gensku]', form).onclick = (e) => busy(e.currentTarget, async () => {

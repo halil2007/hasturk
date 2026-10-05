@@ -5,15 +5,30 @@ import { init } from './db.js';
 import { syncAll, quickSync } from './sync.js';
 import { handle } from './handler.js';
 import { currentUser } from './auth.js';
-import { cookieTenant, getTenant, forward, tenantLogin, tenantApi } from './tenants.js';
+import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE } from './tenants.js';
 import { json, body, HttpError } from './util.js';
 
 export { TenantPanel } from './tenants.js';
 
+// Tarayıcı güvenlik başlıkları (panel sayfaları): yalnız kendi betiğimiz çalışır, panel başka sitede çerçeve içinde açılamaz,
+// görseller https / data ile sınırlı. Bir açık olsa bile dışarıdan betik yüklenemez ve veri başka sunucuya gönderilemez.
+const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https:", "connect-src 'self'", "worker-src 'self'", "frame-src 'self' blob: data:", "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
+function secure(res) {
+  const r = new Response(res.body, res);
+  r.headers.set('Content-Security-Policy', CSP);
+  r.headers.set('X-Content-Type-Options', 'nosniff');
+  r.headers.set('X-Frame-Options', 'DENY');
+  r.headers.set('Referrer-Policy', 'same-origin');
+  r.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (new URL(res.url || 'https://x').protocol === 'https:') r.headers.set('Strict-Transport-Security', 'max-age=31536000');
+  return r;
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
-    if (!url.pathname.startsWith('/api/')) return env.ASSETS ? env.ASSETS.fetch(req) : new Response('Bulunamadı', { status: 404 });
+    if (!url.pathname.startsWith('/api/')) return env.ASSETS ? secure(await env.ASSETS.fetch(req)) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
     // Başka sitelerden gelen yazma isteklerini reddet (müşteri paneli girişi ve yönetimi dahil; panel içi istekler handle() içinde de denetlenir)
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -28,7 +43,8 @@ export default {
       }
       // Müşteri panelinin logosu (e-postalar için, oturumsuz): /api/logo?t=firma-kodu
       if (path === 'logo' && url.searchParams.get('t')) {
-        const t = env.DB ? await getTenant(env.DB, url.searchParams.get('t')) : null;
+        const s = url.searchParams.get('t');
+        const t = (req.method === 'GET' || req.method === 'HEAD') && SLUG_RE.test(s) && env.DB ? await getTenant(env.DB, s) : null;
         return t && t.active ? await forward(req, env, t) : new Response('Logo yok', { status: 404 });
       }
       // Müşteri panelinin oturumu: istek o firmanın paneline gider (çıkış ve giriş ekranı ana panelde)

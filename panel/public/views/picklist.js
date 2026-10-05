@@ -36,6 +36,8 @@ function printList(d, scope) {
     .hd{display:flex;align-items:center;gap:14px;margin-bottom:6px}.hd img{max-height:46px;max-width:180px}
   </style></head><body><div class="hd">${state.settings && state.settings.logo ? `<img src="${esc(state.settings.logo)}" alt="">` : ''}<div><h1>Toplama listesi</h1>${state.settings && state.settings.company && state.settings.company.title ? `<div class="m">${esc(state.settings.company.title)}</div>` : ''}</div></div><div class="sub">${esc(scope)} · ${d.orders} sipariş · ${d.items.length} çeşit · <b>${d.totalQty} adet</b> · ${esc(dateTime(Date.now()))}</div>
   <table><thead><tr><th></th><th>Ürün</th><th style="text-align:right">Adet</th><th style="text-align:right">Stok</th></tr></thead><tbody>${rows}</tbody></table>
-  <script>window.onload=function(){window.print()}<\/script></body></html>`);
+  </body></html>`);
   w.document.close();
+  // Betik yazdırma penceresine gömülmez (güvenlik politikası): yazdırma bu pencereden başlatılır
+  setTimeout(() => { try { w.focus(); w.print(); } catch { /* pencere kapandı */ } }, 300);
 }

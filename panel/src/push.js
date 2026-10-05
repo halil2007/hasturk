@@ -26,19 +26,26 @@ async function jwt(v, aud) {
   return `${data}.${b64u(sig)}`;
 }
 
+// Yalnız tarayıcıların gerçek push servisleri (Chrome / Edge / Firefox / Safari): sunucu başka adreslere istek atmasın
+const PUSH_HOSTS = /(^|\.)(fcm\.googleapis\.com|android\.googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com|push\.apple\.com)$/i;
 export async function subscribe(db, user, sub, ua) {
   const endpoint = str(sub && sub.endpoint);
-  if (!/^https:\/\//.test(endpoint)) fail(400, 'Geçersiz bildirim aboneliği');
+  let host = '';
+  try { const u = new URL(endpoint); if (u.protocol === 'https:') host = u.hostname; } catch { /* geçersiz */ }
+  if (!host || !PUSH_HOSTS.test(host)) fail(400, 'Geçersiz bildirim aboneliği');
+  // Kullanıcı başına en fazla 10 cihaz: en eski abonelik silinir
+  await run(db, 'DELETE FROM push_subs WHERE endpoint IN (SELECT endpoint FROM push_subs WHERE user_id IS ? AND endpoint != ? ORDER BY created_at DESC LIMIT -1 OFFSET 9)', user.id ?? null, endpoint);
   await run(db, `INSERT INTO push_subs (endpoint, user_id, ua, created_at) VALUES (?, ?, ?, ?)
     ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, ua = excluded.ua`, endpoint, user.id ?? null, str(ua).slice(0, 200), Date.now());
   return { ok: true };
 }
-export async function unsubscribe(db, endpoint) { await run(db, 'DELETE FROM push_subs WHERE endpoint = ?', str(endpoint)); return { ok: true }; }
+export async function unsubscribe(db, endpoint, user) { await run(db, 'DELETE FROM push_subs WHERE endpoint = ? AND user_id IS ?', str(endpoint), user ? user.id ?? null : null); return { ok: true }; }
 export async function latest(db) { return (await getRaw(db, 'push_latest')) || { title: 'Hastürk Panel', body: 'Yeni bildirim', url: '#/' }; }
 
 // Tüm abonelere bildirim: içerik "son bildirim" olarak saklanır, abonelere boş push gider. Süresi dolmuş abonelik silinir.
-export async function notify(db, msg, { fetchFn = fetch } = {}) {
-  const subs = await all(db, 'SELECT endpoint FROM push_subs');
+// userId verilirse yalnız o kullanıcının cihazlarına (deneme bildirimi); son bildirim metni yalnız herkese gidende güncellenir
+export async function notify(db, msg, { fetchFn = fetch, userId } = {}) {
+  const subs = userId === undefined ? await all(db, 'SELECT endpoint FROM push_subs') : await all(db, 'SELECT endpoint FROM push_subs WHERE user_id IS ?', userId);
   await setSetting(db, 'push_latest', { ...msg, at: Date.now() });
   if (!subs.length) return { sent: 0 };
   const v = await vapid(db);

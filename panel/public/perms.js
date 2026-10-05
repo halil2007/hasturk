@@ -17,6 +17,7 @@ export const PERM_KEYS = PERMS.map((p) => p[0]);
 const MAP = [
   [/^(orders|orders-bulk|orders\.csv)(\/|$)/, 'orders'],
   [/^(packages|labels|picklist)(\/|$)/, 'cargo'],
+  [/^products\/\d+\/stock$/, 'stock'],
   [/^claims(\/|$)/, 'returns'],
   [/^questions(\/|$)/, 'questions'],
   [/^(products|catalog|price-rules|buybox|campaigns)(\/|\.csv$|$)/, 'products'],
