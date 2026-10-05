@@ -5,7 +5,9 @@ import { api, state, html, render, $, $$, n, ch, chLogo, thumb, isMobile, action
 import { stockDialog, quickStock, siteStock, siteStockVal } from './products.js';
 import { setQuery } from '../app.js';
 
-const STATUS = [['out', 'Stokta yok', 'bad'], ['below', 'Sınır altı', 'amber'], ['enough', 'Yeterli', 'good'], ['', 'Tümü', '']];
+const STATUS = [['out', 'Stokta yok', 'bad'], ['runout', 'Tükenmek üzere', 'bad'], ['below', 'Sınır altı', 'amber'], ['enough', 'Yeterli', 'good'], ['', 'Tümü', '']];
+// Satış hızına göre kaç gün yeter (son 30 günün satışı); 14 gün ve altı "tükenmek üzere"
+const daysTag = (p) => (p.days_left == null || p.stock <= 0 ? '' : html`<div class="tiny ${p.days_left <= 14 ? 'neg' : 'muted'}" style="${p.days_left <= 14 ? 'color:var(--bad);font-weight:650' : ''}" title="Son 30 günde ${p.sold30} adet satıldı">≈ ${p.days_left} gün yeter</div>`);
 const EXTRA = [['', 'Hepsi'], ['waiting', 'Gönderim bekleyen'], ['error', 'Hatalı'], ['nolisting', 'Kanalda olmayan']];
 export const RULE = { shared: 'Ortak stok', limit: 'En fazla', own: 'Ayrılmış' };
 export const ruleText = (l) => (l.stock_mode === 'limit' ? `en fazla ${l.stock_value ?? 0}` : l.stock_mode === 'own' ? `ayrılmış ${l.stock_value ?? 0}` : '');
@@ -14,7 +16,7 @@ export async function stocks(el, rest, query = {}) {
   const f = { q: query.q || '', status: query.durum ?? (rest[0] === 'kritik' ? 'below' : ''), extra: query.f || '', page: 1 };
   let rows = [], total = 0, counts = {}, dash = null;
   render(el, html`<div class="stack">
-    <div class="kpis" data-kpis></div>
+    <div class="kpis five" data-kpis></div>
     <div data-sync></div>
     <div class="tabs" data-status></div>
     <div class="row wrap">
@@ -47,6 +49,7 @@ export async function stocks(el, rest, query = {}) {
   function draw() {
     render($('[data-kpis]', el), html`
       <a class="kpi" href="#/stoklar?durum=out"><div class="label">Stokta yok</div><div class="value num ${counts.out ? 'down' : ''}">${n(counts.out)}</div><div class="delta flat">ürün</div></a>
+      <a class="kpi" href="#/stoklar?durum=runout"><div class="label">Tükenmek üzere</div><div class="value num ${counts.runout ? 'down' : ''}">${n(counts.runout || 0)}</div><div class="delta flat">satış hızıyla 14 gün içinde biter</div></a>
       <a class="kpi" href="#/stoklar?durum=below"><div class="label">Sınırın altında</div><div class="value num">${n(counts.below)}</div><div class="delta flat">sınır: ${low()} adet ve altı</div></a>
       <a class="kpi" href="#/stoklar?durum=enough"><div class="label">Yeterli stok</div><div class="value num">${n(counts.enough)}</div><div class="delta flat">ürün</div></a>
       <a class="kpi" href="#/stoklar?f=waiting"><div class="label">${dash && !dash.stockSync ? 'Stoğu farklı ilan' : 'Gönderim bekleyen'}</div><div class="value num">${n(dash ? dash.stock.waiting : 0)}</div><div class="delta flat">${dash && !dash.stockSync ? 'senkron açılınca güncellenir' : 'kanal ilanı'}</div></a>`);
@@ -54,11 +57,11 @@ export async function stocks(el, rest, query = {}) {
       : html`<div class="notice warn"><i class="ico ico-warn"></i><div style="flex:1"><b>Stok gönderimi kapalı.</b> Hiçbir kanala stok gönderilmez; panel stokları ikas sitesindeki (ana katalog) adetlerden okunur. Sistem hazır olunca Ayarlar → Stok'tan açın; açılınca stok panelde tutulur, satışla düşer ve tüm kanallara gönderilir.</div><a class="btn sm" href="#/ayarlar">Ayarlar</a></div>`);
     render($('[data-status]', el), html`${STATUS.map(([k, t, c]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="status" data-k="${k}">${c ? html`<span class="dot" style="background:var(--${c})"></span>` : ''}${t}<span class="n">${n(k ? counts[k] : counts.all)}</span></button>`)}`);
     const body = !rows.length ? html`<div class="empty">Bu bölümde ürün yok</div>`
-      : isMobile() ? html`<div class="m-list" style="padding:12px">${rows.map((p) => html`<div class="m-card" data-pid="${p.id}"><div class="top">${thumb(p.image, p.name, 'sm')}<div style="min-width:0;flex:1">${pname(p)}<div class="muted tiny">${p.sku || ''}</div></div>${stockCtl(p)}</div>
+      : isMobile() ? html`<div class="m-list" style="padding:12px">${rows.map((p) => html`<div class="m-card" data-pid="${p.id}"><div class="top">${thumb(p.image, p.name, 'sm')}<div style="min-width:0;flex:1">${pname(p)}<div class="muted tiny">${p.sku || ''}</div>${daysTag(p)}</div>${stockCtl(p)}</div>
           <div class="row wrap">${chs().map((c) => html`<span class="row tiny">${chLogo(c.id, true)}${cell(p, c)}</span>`)}</div></div>`)}</div>`
         : html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th class="c">Ortak stok</th>${chs().map((c) => html`<th class="c"><span class="row" style="justify-content:center">${chLogo(c.id, true)}${c.short || c.name}</span></th>`)}<th></th></tr></thead><tbody>
           ${rows.map((p) => html`<tr data-pid="${p.id}"><td><div class="row">${thumb(p.image, p.name, 'sm')}<div style="min-width:0">${pname(p)}<div class="muted tiny">${[p.sku, p.barcode].filter(Boolean).join(' · ')}</div></div></div></td>
-            <td class="c">${stockCtl(p)}</td>${chs().map((c) => html`<td class="c">${cell(p, c)}</td>`)}<td class="r">${(p.listings || []).length ? html`<button class="btn sm ghost" data-act="rule" data-id="${p.id}">Kanal stokları</button>` : ''}</td></tr>`)}
+            <td class="c">${stockCtl(p)}${daysTag(p)}</td>${chs().map((c) => html`<td class="c">${cell(p, c)}</td>`)}<td class="r">${(p.listings || []).length ? html`<button class="btn sm ghost" data-act="rule" data-id="${p.id}">Kanal stokları</button>` : ''}</td></tr>`)}
         </tbody></table></div>`;
     render($('[data-box]', el), html`${body}<div class="pager"><span class="muted small" style="margin-right:auto">${total} ürün</span>${rows.length < total ? html`<button class="btn sm" data-act="more">Daha fazla</button>` : ''}</div>`);
   }
@@ -69,7 +72,7 @@ export async function stocks(el, rest, query = {}) {
     if (f.extra) p.set('filter', f.extra); else if (f.status) p.set('filter', f.status);
     const [r, d] = await Promise.all([api('products?' + p), dash && append ? dash : api('dashboard')]);
     rows = append ? rows.concat(r.products) : r.products; total = r.total; counts = r.counts || {}; dash = d;
-    if (f.extra && f.status) rows = rows.filter((x) => (f.status === 'out' ? x.stock <= 0 : f.status === 'below' ? x.stock > 0 && x.stock <= x.low_limit : x.stock > x.low_limit));
+    if (f.extra && f.status) rows = rows.filter((x) => (f.status === 'out' ? x.stock <= 0 : f.status === 'runout' ? x.stock > 0 && x.days_left != null && x.days_left <= 14 : f.status === 'below' ? x.stock > 0 && x.stock <= x.low_limit : x.stock > x.low_limit));
     draw();
   }
   const refresh = () => { f.page = 1; return load().catch((e) => toast(e.message, true)); };

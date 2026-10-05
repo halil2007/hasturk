@@ -509,9 +509,15 @@ function cleanProduct(b) {
 
 // Stok durumu: kritik eşik ürüne özel (critical_stock) ya da Ayarlar'daki genel sınır
 const LIMIT = (low) => `(CASE WHEN p.critical_stock > 0 THEN p.critical_stock ELSE ${Math.max(0, Math.round(Number(low) || 0))} END)`;
+// Son 30 günde satılan adet (iptal / iade hariç): stok tükenme tahmini için
+const SOLD30 = () => `(SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id = p.id AND o.ordered_at >= ${Date.now() - 30 * 864e5}
+  AND o.status NOT IN ('cancelled', 'returned') AND COALESCE(i.status, '') != 'cancelled')`;
+export const RUNOUT_DAYS = 14;
 async function listProducts(db, q) {
   const where = [], args = [];
   const low = LIMIT((await getSettings(db)).low_stock);
+  // Tükenmek üzere: mevcut satış hızıyla 14 gün içinde bitecek ürünler
+  if (q.filter === 'runout') where.push(`p.stock > 0 AND ${SOLD30()} > 0 AND p.stock * 30.0 / ${SOLD30()} <= ${RUNOUT_DAYS}`);
   if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.group_name LIKE ? OR p.brand LIKE ?)'); args.push(s, s, s, s, s); }
   if (q.filter === 'out') where.push('p.stock <= 0');
   if (q.filter === 'below') where.push(`p.stock > 0 AND p.stock <= ${low}`);
@@ -545,10 +551,14 @@ async function listProducts(db, q) {
     const ls = await all(db, `SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
       FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ids.map(() => '?').join(',')})`, ...ids);
     for (const r of rows) r.listings = ls.filter((l) => l.product_id === r.id);
+    // Satış hızı: son 30 günde satılan adet ve mevcut stokla kaç gün yeteceği
+    const sold = new Map((await all(db, `SELECT p.id, ${SOLD30()} AS n FROM products p WHERE p.id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((x) => [x.id, x.n]));
+    for (const r of rows) { r.sold30 = sold.get(r.id) || 0; r.days_left = r.sold30 > 0 ? Math.floor((Math.max(0, r.stock) * 30) / r.sold30) : null; }
   }
   // Stok durumu sayıları (sekmeler için)
   const cnt = await first(db, `SELECT SUM(p.stock <= 0) AS out_, SUM(p.stock > 0 AND p.stock <= ${low}) AS below, SUM(p.stock > ${low}) AS enough, COUNT(*) AS total FROM products p WHERE p.active = 1`);
-  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, all: cnt.total || 0 } };
+  const ro = await first(db, `SELECT COUNT(*) AS n FROM (SELECT p.stock AS st, ${SOLD30()} AS s FROM products p WHERE p.active = 1 AND p.stock > 0) WHERE s > 0 AND st * 30.0 / s <= ${RUNOUT_DAYS}`);
+  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, runout: ro.n || 0, all: cnt.total || 0 } };
 }
 
 async function stockChange(env, db, ctx, id, b, user) {
