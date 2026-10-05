@@ -10,10 +10,18 @@ export async function uploadView(el) {
   const C = () => st.channels.find((c) => c.id === chId);
   const mapOf = (local) => st.maps.find((m) => m.local === local && m.channel === chId);
 
+  // Kanal işlerken sayfa açıksa 30 saniyede bir yenilenir (sonuç beklemeden görünür)
+  let poll = null;
+  const watch = () => {
+    clearTimeout(poll);
+    if (!st || !st.uploads.some((u) => u.status === 'sent')) return;
+    poll = setTimeout(async () => { if (!el.isConnected) return; if (document.visibilityState === 'visible' && !document.querySelector('.sheet-bg')) await load().catch(() => {}); else watch(); }, 30e3);
+  };
   async function load() {
-    st = await api('catalog/state');
+    st = await api('catalog/state', { fresh: true });
     if (!st.channels.some((c) => c.id === chId && c.ready)) chId = (st.channels.find((c) => c.ready) || st.channels[0] || {}).id || '';
     draw();
+    watch();
   }
   function draw() {
     const c = C();
@@ -23,7 +31,7 @@ export async function uploadView(el) {
       <div class="ch-tabs">${st.channels.map((x) => html`<button class="ch-tab ${x.id === chId ? 'on' : ''}" data-act="ch" data-id="${x.id}" ${x.ready ? '' : 'disabled'} title="${x.reason}">${chLogo(x.id)}${x.name}${!x.ready ? html`<span class="tiny muted">${x.reason}</span>` : ''}</button>`)}</div>
       ${c && c.test ? html`<div class="notice warn"><i class="ico ico-warn"></i><div><b>${c.name} TEST ortamına (SIT) bağlı.</b> Buradan gönderilen ürünler gerçek ${c.name}'ya gitmez, satışa çıkmaz; yalnız test adımları içindir. Kanaldan gelen ilanlar da test ilanlarıdır (sizin ürünlerinizle eşleşmez). Canlı bilgiler gelince Entegrasyonlar → ${c.name} → <b>Ortam = Canlı</b> seçin.</div></div>` : ''}
       <div class="card flush" id="gonderimler">
-        <div class="card-head" style="padding:16px 16px 0"><h2>Gönderimler</h2><span class="muted small">kanalın onay sonucu burada görünür · kendiliğinden sorgulanır (ilk 4 saat 15 dk'da bir, sonra saatte bir, 3 güne kadar)</span><span class="spacer"></span>${st.uploads.length > 5 ? html`<button class="btn sm ghost" data-act="allup">${allUp ? 'Son 5' : `Tümü (${st.uploads.length})`}</button>` : ''}</div>
+        <div class="card-head" style="padding:16px 16px 0"><h2>Gönderimler</h2><span class="muted small">kanalın onay sonucu burada görünür · kendiliğinden sorgulanır (ilk 4 saat 2 dk'da bir, sonra saatte bir, 3 güne kadar) · sayfa açıkken 30 sn'de bir yenilenir</span><span class="spacer"></span>${st.uploads.length > 5 ? html`<button class="btn sm ghost" data-act="allup">${allUp ? 'Son 5' : `Tümü (${st.uploads.length})`}</button>` : ''}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Kanal</th><th class="r">Ürün</th><th>Takip no</th><th>Durum</th><th></th></tr></thead><tbody>
           ${(allUp ? st.uploads : st.uploads.slice(0, 5)).map((u) => { const ok = u.items.filter((x) => x.ok === true).length, bad = u.items.filter((x) => x.ok === false).length, s = ST[u.status] || ['', u.status]; return html`<tr>
             <td class="small">${dateTime(u.created_at)}<div class="tiny muted">${u.user || ''}</div></td><td>${chLogo(u.channel, true)}</td><td class="r num">${u.items.length}</td>
@@ -37,7 +45,7 @@ export async function uploadView(el) {
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
         <h2 style="margin:0">Otomatik işlemler · ${c.name}</h2>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="auto_upload" ${c.auto ? 'checked' : ''}><span></span></span>
-          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">15 dakikada bir eşleştirilmiş kategorilerdeki, ${c.name}'da olmayan ve stoğu olan ürünler kendiliğinden gönderilir (eksik bilgisi olanlar atlanır; kanalın reddettiği ürün düzeltilince 1 saat, düzeltilmezse 24 saat sonra yeniden denenir). Eşleştirilmemiş kategoriler günde bir kez otomatik eşleştirilir.</span></span></label>
+          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">2 dakikada bir eşleştirilmiş kategorilerdeki, ${c.name}'da olmayan ve stoğu olan ürünler kendiliğinden gönderilir (eksik bilgisi olanlar atlanır; kanalın reddettiği ürün düzeltilince 1 saat, düzeltilmezse 24 saat sonra yeniden denenir). Eşleştirilmemiş kategoriler günde bir kez otomatik eşleştirilir.</span></span></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="stock_push" ${c.stockPush ? 'checked' : ''}><span></span></span>
           <span><b>Stokları ${c.name}'a gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${c.name}'a gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
       </div>` : ''}

@@ -23,3 +23,20 @@ test('otomatik gönderimde atlanacak ürünler', async () => {
   assert.equal(skip({ id: 6 }), true, 'sonradan kabul edilen ürün tekrar gönderilmez');
   assert.equal(skip({ id: 7 }), false, 'hiç gönderilmemiş ürün gönderilir');
 });
+
+test('hızlı iş (2 dakikalık cron): kilitle çalışır, ikinci çağrı atlanır; zamanlanmış senkron gönderimi yapmaz', async () => {
+  const { quickSync } = await import('../src/sync.js');
+  const { setSetting, getRaw } = await import('../src/db.js');
+  const db = d1();
+  await init(db);
+  const env = { DB: db, PANEL_PASSWORD: 'x-123456' };
+  const r = await quickSync(env, db);
+  assert.ok('uploads' in r && 'autoUpload' in r);
+  assert.equal(await getRaw(db, 'quick_lock'), 0, 'kilit bırakılır');
+  await setSetting(db, 'quick_lock', Date.now());
+  assert.match((await quickSync(env, db)).skipped, /sürüyor/);
+  const worker = (await import('../src/index.js')).default;
+  const jobs = [];
+  await worker.scheduled({ cron: '*/2 * * * *' }, env, { waitUntil: (p) => jobs.push(p) });
+  await Promise.all(jobs);
+});

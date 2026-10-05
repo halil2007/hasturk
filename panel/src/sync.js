@@ -319,7 +319,7 @@ async function attempt(fn) {
   try { return await fn(); } catch (e) { await sleep(1500); return fn(); }
 }
 
-export async function syncAll(env, db, { only, force, listings } = {}) {
+export async function syncAll(env, db, { only, force, listings, cron } = {}) {
   const t = Date.now();
   const lock = await getRaw(db, 'sync_lock');
   if (!force && lock && t - lock < 10 * 60e3) return { skipped: 'Başka bir senkron sürüyor' };
@@ -401,9 +401,10 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // Eski siparişlere müşteri anahtarı (müşteriler sayfası için, parça parça)
     if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu
-    if (!only) out.uploads = await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message);
+    // (zamanlanmış senkronda bu ikisi 2 dakikalık hızlı işte yapılır: aynı ürün iki kez gönderilmesin)
+    if (!only && !cron) out.uploads = await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message);
     // Otomatik ürün gönderimi açık kanallar (ör. yalnız Hepsiburada): yeni ürünler kendiliğinden gönderilir
-    if (!only) out.autoUpload = await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message);
+    if (!only && !cron) out.autoUpload = await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Son 1 yılın siparişleri: her bağlı (gerçek) kanal için bir kez otomatik geçmiş aktarımı başlatılır.
     // Parça parça (haftalık) ilerler; stoğu değiştirmez, yeni sipariş e-postası oluşturmaz.
     if (!only) for (const ch of chans) {
@@ -467,6 +468,19 @@ export async function importListings(env, db, { only } = {}) {
   out.mirrored = await mirrorStock(db, settings);
   await fillProductInfo(db, settings).catch(() => {});
   return out;
+}
+// Hızlı iş (2 dakikada bir): gönderim sonuçlarını sorgula ve otomatik gönderimi çalıştır (siparişler / stoklar 15 dakikalık senkronda)
+export async function quickSync(env, db) {
+  const t = Date.now(), lock = await getRaw(db, 'quick_lock');
+  if (lock && t - lock < 5 * 60e3) return { skipped: 'Önceki hızlı iş sürüyor' };
+  await setSetting(db, 'quick_lock', t);
+  try {
+    const settings = await getSettings(db);
+    return {
+      uploads: await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message),
+      autoUpload: await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message),
+    };
+  } finally { await setSetting(db, 'quick_lock', 0); }
 }
 export const autoLink = async (db) => (await autoMatch(db, { catalog: [] })).linked;
 

@@ -2,7 +2,7 @@
 // Zamanlanmış görev (wrangler.jsonc → triggers): 15 dakikada bir tüm kanalları senkronlar.
 // Müşteri panelleri (tenants.js): firma koduyla giriş yapan müşterinin istekleri kendi Durable Object'ine iletilir.
 import { init } from './db.js';
-import { syncAll } from './sync.js';
+import { syncAll, quickSync } from './sync.js';
 import { handle } from './handler.js';
 import { currentUser } from './auth.js';
 import { cookieTenant, getTenant, forward, tenantLogin, tenantApi } from './tenants.js';
@@ -54,6 +54,7 @@ export default {
   async scheduled(event, env, ctx) {
     if (!env.DB) return;
     await init(env.DB);
-    ctx.waitUntil(syncAll(env, env.DB).then((r) => console.log('senkron', JSON.stringify(r))).catch((e) => console.error('senkron hatası', e)));
+    const quick = event && event.cron === '*/2 * * * *';
+    ctx.waitUntil((quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true })).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r))).catch((e) => console.error('senkron hatası', e)));
   },
 };
