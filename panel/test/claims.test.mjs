@@ -66,3 +66,15 @@ test('panel: senkron, liste, onay sonrası karar kaydı; karar verilmişse tekra
   assert.equal((await listClaims(db, {})).rows[0].status, 'accepted');
   resetChannels();
 });
+
+test('Hepsiburada kampanyaları: liste, yüzde indirim oluşturma ve iptal istekleri', async () => {
+  const calls = mock([[/discounts\?/, 'GET', { success: true, data: { totalCount: 1, items: [{ campaignId: 5, name: 'K1' }] } }],
+    [/percent-discount$/, 'POST', { success: true, data: { campaignId: 6 } }], [/cancel-discount$/, 'POST', { success: true }], [/tl-discount$/, 'POST', { success: false, errors: ['Bütçe yetersiz'] }]]);
+  const ch = hepsiburada({ HB_MERCHANT_ID: 'M', HB_PASSWORD: 'p', HB_USER_AGENT: 'u' }, { id: 'hepsiburada' });
+  assert.equal((await ch.campaigns.list(1, 50)).items[0].name, 'K1');
+  assert.match(calls[0].url, /diskonto-external\.hepsiburada\.com\/self-campaign\/M\/discounts\?page=1&pagesize=50/);
+  assert.deepEqual(await ch.campaigns.create('percent', { name: 'X', discountPercentage: 10 }), { campaignId: 6 });
+  await ch.campaigns.cancel('6');
+  assert.deepEqual(JSON.parse(calls[calls.length - 1].body), { campaignId: 6 });
+  await assert.rejects(ch.campaigns.create('tl', {}), /Bütçe yetersiz/);
+});

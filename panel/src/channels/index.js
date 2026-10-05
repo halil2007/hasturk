@@ -22,7 +22,7 @@ export const GATED = ['pttavm', 'n11', 'idefix', 'pazarama'];
 
 // Beklemedeki kanal (Entegrasyonlar → "Kanala yazmayı beklet"): siparişler, ürünler, stok ve etiketler okunmaya devam eder;
 // kanala yazan işlemler (paketleme / kargoya hazırlama, kargoya verme, paket iptali, stok ve fiyat gönderimi, ürün oluşturma) yapılmaz.
-export const WRITE_OPS = ['accept', 'split', 'pack', 'ship', 'repack', 'cancelPackage', 'changeCargo', 'pushStock', 'pushPrice', 'createProduct', 'answer', 'catalog', 'approveClaim', 'rejectClaim'];
+export const WRITE_OPS = ['accept', 'split', 'pack', 'ship', 'repack', 'cancelPackage', 'changeCargo', 'pushStock', 'pushPrice', 'createProduct', 'answer', 'catalog', 'approveClaim', 'rejectClaim', 'campaigns'];
 export const DEFAULT_HOLD = [];
 function held(c) {
   const o = { ...c, hold: true, caps: { ...(c.caps || {}), hold: true, accept: 'local', split: 'local', pack: null, ship: 'local', cargo: false, repack: false, cancelPackage: false, createProduct: false, price: false } };
@@ -93,4 +93,4 @@ export async function getChannels(env, db) {
 }
 export const resetChannels = () => { cache = null; };
 export const channel = async (env, db, id) => (await getChannels(env, db)).find((c) => c.id === id);
-export const publicInfo = (c) => ({ id: c.id, type: c.type, extra: !!c.extra, claims: !!c.claims, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, hold: !!c.hold, missing: c.missing, caps: c.caps });
+export const publicInfo = (c) => ({ id: c.id, type: c.type, extra: !!c.extra, claims: !!c.claims, campaigns: !!c.campaigns, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, hold: !!c.hold, missing: c.missing, caps: c.caps });

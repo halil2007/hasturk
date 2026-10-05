@@ -542,6 +542,24 @@ export function hepsiburada(env, meta) {
     return [...out.values()];
   }
 
+  // ---------- kampanyalar: satıcı sepet indirimleri (diskonto-external /self-campaign) ----------
+  // Yüzde indirim, TL indirim (bütçeli) ve X al Y öde; tüm ürünlerde, kategorilerde ya da SKU listesinde. Bütçe ve tutar sınırları servisten gelir.
+  const DSK = 'https://diskonto-external.hepsiburada.com';
+  const dsk = async (path, opts) => { const r = await call(DSK + path, opts); if (r && r.success === false) throw new Error('Hepsiburada: ' + [].concat(r.errors || r.message || 'işlem başarısız').join(', ')); return r && r.data !== undefined ? r.data : r; };
+  const campaigns = {
+    async list(page = 1, size = 50) { const d = await dsk(`/self-campaign/${m}/discounts?page=${page}&pagesize=${size}`); return { total: num(d && d.totalCount), items: (d && d.items) || [] }; },
+    detail: (id) => dsk(`/self-campaign/${m}/discount/${encodeURIComponent(id)}`),
+    budgets: () => dsk(`/self-campaign/${m}/budgets`),
+    limits: () => dsk(`/self-campaign/${m}/limits`),
+    categories: () => dsk(`/categories/${m}`),
+    async create(kind, b) {
+      const path = { percent: 'percent-discount', tl: 'tl-discount', xy: 'xy-discount' }[kind];
+      if (!path) throw new Error('Bilinmeyen kampanya türü');
+      return dsk(`/self-campaign/${m}/${path}`, { method: 'POST', body: b });
+    },
+    cancel: (id) => dsk(`/self-campaign/${m}/cancel-discount`, { method: 'POST', body: { campaignId: Number(id) || id } }),
+  };
+
   // ---------- kesilen faturalar / kesintiler (mpfinance işlemleri) ----------
   // Gider türündeki işlemler fatura numarasına göre birleştirilir (aynı faturanın satırları tek kayıt). İade (…Refund) eksi tutarla.
   // Servis tarih aralığını en fazla 1 ay kabul eder; PDF bağlantısı vermez.
@@ -580,6 +598,6 @@ export function hepsiburada(env, meta) {
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns,
   };
 }

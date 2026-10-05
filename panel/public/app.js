@@ -18,6 +18,7 @@ import { users } from './views/users.js';
 import { settingsView } from './views/settings.js';
 import { financeView } from './views/finance.js';
 import { claimsView, claimChannels } from './views/claims.js';
+import { campaignsView, campaignChannels } from './views/campaigns.js';
 import { can } from './perms.js';
 
 const ROUTES = [
@@ -32,6 +33,7 @@ const ROUTES = [
   { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock' },
   { path: 'urun-yukle', title: 'Ürün Yükle', icon: 'upload', view: uploadView, perm: 'products' },
   { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match' },
+  { path: 'kampanyalar', title: 'Kampanyalar', icon: 'tag', view: campaignsView, when: () => campaignChannels().length > 0, perm: 'products' },
   { path: 'buybox', title: 'Buybox', icon: 'bolt', view: buyboxView, when: () => bbChannels().length > 0, perm: 'products' },
   { sec: 'Raporlar' },
   { path: 'analiz', title: 'Analizler', icon: 'pie', view: insightsView, perm: 'reports' },

@@ -42,11 +42,11 @@ export async function financeView(el, rest, query = {}) {
       <div class="kpi"><div class="label">Hakediş</div><div class="value num">${money0(t.payout)}</div><div class="delta flat">hesabınıza geçen</div></div>
       <div class="kpi"><div class="label">Tahmini kâr</div><div class="value num" style="color:${t.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(t.profit)}</div><div class="delta flat">kâr marjı %${n(t.margin)}</div></div>`);
     const max = Math.max(1, ...d.steps.map((s) => Math.abs(s.v)));
-    render($('[data-steps]', el), t.orders ? html`<div class="stack" style="gap:6px">${d.steps.map((s) => html`<div class="row" style="gap:10px;${s.sum ? 'border-top:1px solid var(--line);padding-top:6px' : ''}">
-        <div style="width:190px;flex:0 0 auto"><div class="small" style="font-weight:${s.sum || s.k === 'revenue' ? 750 : 550}">${s.label}</div>${s.note ? html`<div class="tiny muted">${s.note}</div>` : ''}</div>
-        <div style="flex:1;background:var(--surface-3);border-radius:6px;height:16px;overflow:hidden"><div style="height:100%;width:${(Math.abs(s.v) / max) * 100}%;border-radius:6px;background:${s.v < 0 ? 'var(--bad)' : s.k === 'profit' ? 'var(--good)' : 'var(--primary)'};opacity:${s.sum || s.k === 'revenue' ? 1 : 0.7}"></div></div>
-        <b class="num" style="width:110px;text-align:right;color:${s.v < 0 ? 'var(--bad)' : 'inherit'}">${s.v < 0 ? '−' : ''}${money(Math.abs(s.v))}</b>
-        <span class="muted tiny" style="width:48px;text-align:right">%${n(t.revenue ? (Math.abs(s.v) / t.revenue) * 100 : 0)}</span></div>`)}</div>
+    render($('[data-steps]', el), t.orders ? html`<div class="stack" style="gap:8px">${d.steps.map((s) => html`<div class="fin-step" style="${s.sum ? 'border-top:1px solid var(--line);padding-top:8px' : ''}">
+        <div style="min-width:0"><div class="small" style="font-weight:${s.sum || s.k === 'revenue' ? 750 : 550}">${s.label}</div>${s.note ? html`<div class="tiny muted">${s.note}</div>` : ''}</div>
+        <div class="bar" style="background:var(--surface-3);border-radius:6px;height:14px;overflow:hidden"><div style="height:100%;width:${(Math.abs(s.v) / max) * 100}%;border-radius:6px;background:${s.v < 0 ? 'var(--bad)' : s.k === 'profit' ? 'var(--good)' : 'var(--primary)'};opacity:${s.sum || s.k === 'revenue' ? 1 : 0.7}"></div></div>
+        <span class="amt num" style="color:${s.v < 0 ? 'var(--bad)' : 'inherit'}">${s.v < 0 ? '−' : ''}${money(Math.abs(s.v))}</span>
+        <span class="pct muted tiny" style="text-align:right">%${n(t.revenue ? (Math.abs(s.v) / t.revenue) * 100 : 0)}</span></div>`)}</div>
       <div class="muted tiny" style="margin-top:10px">Kesinti oranları Ayarlar → Komisyon ve giderler'den gelir; kanal gerçek komisyon ve kargo tutarını bildirdiyse o kullanılır.</div>`
       : html`<div class="empty">Bu dönemde sipariş yok</div>`);
     render($('[data-chtable]', el), d.channels.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Satış</th><th class="r">Komisyon</th><th class="r">Kargo</th><th class="r">Hizmet + ek</th><th class="r">Stopaj</th><th class="r">Hakediş</th><th class="r">Kâr</th></tr></thead><tbody>

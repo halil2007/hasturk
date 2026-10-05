@@ -680,6 +680,40 @@ async function channelsInfo(env, db) {
   });
 }
 
+// Kampanya kanalı: istek kanal kimliğiyle gelir (hepsiburada, hepsiburada_2 …)
+async function campaignApi(env, db, path, m, q, b, user) {
+  const id = str(q.channel || b.channel);
+  const c = (await getChannels(env, db)).find((x) => x.id === id && x.enabled && x.campaigns);
+  if (!c) fail(400, 'Kampanya servisi olan bağlı kanal seçin');
+  const K = c.campaigns;
+  if (path === 'campaigns' && m === 'GET') return K.list(Math.max(1, Number(q.page) || 1), 50);
+  if (path === 'campaigns/meta' && m === 'GET') {
+    const [budgets, limits, categories] = await Promise.all([K.budgets().catch(() => []), K.limits().catch(() => null), K.categories().catch(() => [])]);
+    return { budgets: budgets || [], limits, categories: (categories || []).filter((x) => x.isCampaign !== false).map((x) => ({ id: x.categoryId, name: x.categoryName, leaf: !!x.isLeaf, level: x.categoryLevel })) };
+  }
+  let x;
+  if ((x = path.match(/^campaigns\/(\w+)$/)) && m === 'GET') return K.detail(x[1]);
+  if (path === 'campaigns' && m === 'POST') {
+    const kind = str(b.kind), n = (v) => Math.round(num(v));
+    const name = str(b.name).trim();
+    if (!name) fail(400, 'Kampanya adı gerekli');
+    const start = Date.parse(b.startDate), end = Date.parse(b.endDate);
+    if (!start || !end || end <= start) fail(400, 'Başlangıç ve bitiş tarihini kontrol edin');
+    const scope = { conditionCategories: (b.categories || []).length ? b.categories.map(Number) : null, conditionSkus: (b.skus || []).length ? b.skus.map(String) : null };
+    const base = { name, description: str(b.description) || name, startDate: new Date(start).toISOString(), endDate: new Date(end).toISOString(), ...scope, oneTimeUsage: !!b.oneTimeUsage };
+    let body2;
+    if (kind === 'percent') body2 = { ...base, discountPercentage: n(b.discountPercentage), conditionAmount: n(b.conditionAmount), maxDiscountAmount: n(b.maxDiscountAmount), maxCartCount: n(b.maxCartCount) };
+    else if (kind === 'tl') body2 = { ...base, budget: n(b.budget), discountAmount: n(b.discountAmount), conditionAmount: n(b.conditionAmount) };
+    else if (kind === 'xy') body2 = { ...base, conditionProductCount: n(b.conditionProductCount), mustPayProductCount: n(b.mustPayProductCount), iterationCount: n(b.iterationCount) || 1, maxCartCount: n(b.maxCartCount) };
+    else fail(400, 'Kampanya türü seçin');
+    const r = await K.create(kind, body2);
+    await log(db, c.id, 'info', `${user.name}: kampanya oluşturuldu — ${name}`);
+    return { ok: true, result: r };
+  }
+  if ((x = path.match(/^campaigns\/(\w+)\/cancel$/)) && m === 'POST') { await K.cancel(x[1]); await log(db, c.id, 'info', `${user.name}: kampanya iptal edildi (${x[1]})`); return { ok: true }; }
+  fail(404, 'Bulunamadı');
+}
+
 // İade reddine eklenen belge (fotoğraf / PDF): tarayıcıdan base64 gelir, en fazla 5 MB
 function claimFile(f) {
   if (!f || !f.data) return null;
@@ -934,6 +968,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if (path === 'dashboard' && m === 'GET') return json(await dashboard(db, q));
   // Gelir & gider: dönem masraf basamakları (satış → komisyon → kargo → hizmet bedeli → ek kesinti → stopaj → hakediş → alış → kâr)
+  // Kampanyalar (Hepsiburada sepet indirimleri)
+  if (path === 'campaigns' || path.startsWith('campaigns/')) return json(await campaignApi(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
   // İade talepleri
   if (path === 'claims' && m === 'GET') return json(await listClaims(db, { ...q, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'claims/sync' && m === 'POST') return json(await syncClaims(env, db));
