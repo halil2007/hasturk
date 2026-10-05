@@ -38,8 +38,8 @@ export async function getChannels(env, db) {
   const cfg = db ? await loadConfig(env, db) : {};
   const e = effectiveEnv(env, cfg);
   const meta = {
-    ikas1: { id: 'ikas1', type: 'ikas', name: e.IKAS1_NAME || 'HasTürk', short: e.IKAS1_SHORT || e.IKAS1_NAME || 'HasTürk' },
-    ikas2: { id: 'ikas2', type: 'ikas', name: e.IKAS2_NAME || 'Tarım Dünyası', short: e.IKAS2_SHORT || e.IKAS2_NAME || 'Tarım Dünyası' },
+    ikas1: { id: 'ikas1', type: 'ikas', name: e.IKAS1_NAME || (env.TENANT_SLUG ? 'Mağaza 1' : 'HasTürk'), short: e.IKAS1_SHORT || e.IKAS1_NAME || (env.TENANT_SLUG ? 'Mağaza 1' : 'HasTürk') },
+    ikas2: { id: 'ikas2', type: 'ikas', name: e.IKAS2_NAME || (env.TENANT_SLUG ? 'Mağaza 2' : 'Tarım Dünyası'), short: e.IKAS2_SHORT || e.IKAS2_NAME || (env.TENANT_SLUG ? 'Mağaza 2' : 'Tarım Dünyası') },
     trendyol: { id: 'trendyol', type: 'trendyol', name: 'Trendyol', short: 'Trendyol' },
     hepsiburada: { id: 'hepsiburada', type: 'hepsiburada', name: 'Hepsiburada', short: 'Hepsiburada' },
     pttavm: { id: 'pttavm', type: 'pttavm', name: 'PttAVM', short: 'PttAVM' },

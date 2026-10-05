@@ -1,7 +1,7 @@
 // Ürünler: varyantlar ana ürün altında gruplanır; merkezi stok (her kanala kendi kuralıyla gönderilir), hızlı stok girişi,
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
 import { api, state, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels } from '../core.js';
-import { profit } from '../profit.js';
+import { profit, costOf } from '../profit.js';
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
 
@@ -202,7 +202,7 @@ export async function productForm(id, done) {
   const ikasChannels = activeChannels().filter((c) => c.enabled && c.caps.createProduct);
   const lp = (l) => {
     const rate = l.commission ?? (st.commission || {})[l.channel] ?? 0;
-    return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: (st.shipping || {})[l.channel] || 0, fee: (st.service_fee || {})[l.channel] || 0 });
+    return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
   };
   s.setBody(html`<form class="stack" data-form>
     <div class="card stack">

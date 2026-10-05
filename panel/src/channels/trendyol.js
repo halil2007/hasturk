@@ -413,10 +413,44 @@ export function trendyol(env, meta) {
     return { invoices: invoices.size, items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
   }
 
+  // ---------- kesilen faturalar / kesintiler (cari hesap ekstresi: otherfinancials) ----------
+  // Kesinti faturaları (kargo, platform hizmet bedeli, reklam, komisyon ...), stopaj, komisyon sözleşme faturaları ve iade faturaları.
+  // Servis en fazla 15 günlük aralık kabul eder; PDF bağlantısı vermez (fatura no / açıklama ile Trendyol panelinden indirilir).
+  const INV = { DeductionInvoices: null, Stoppage: 'Stopaj', CommissionAgreementInvoice: 'Komisyon', ReturnInvoice: 'İade faturası' };
+  const invType = (x) => {
+    const t = `${x.transactionType || ''} ${x.description || ''}`;
+    if (/kargo|cargo/i.test(t)) return 'Kargo';
+    if (/hizmet bedeli|platform|service/i.test(t)) return 'Hizmet bedeli';
+    if (/reklam|ads|advert|influencer|sponsor/i.test(t)) return 'Reklam / pazarlama';
+    if (/komisyon|commission/i.test(t)) return 'Komisyon';
+    if (/stopaj|stoppage/i.test(t)) return 'Stopaj';
+    if (/ceza|penalt|gecik/i.test(t)) return 'Ceza';
+    return 'Diğer kesinti';
+  };
+  async function invoices(since, until) {
+    const W = 14 * 864e5, out = [];
+    for (const [tt, fixed] of Object.entries(INV)) {
+      for (let from = since; from < until; from += W) {
+        const to = Math.min(until, from + W);
+        for (let page = 0; page < 40; page++) {
+          const r = await call(`/finance/che/sellers/${seller}/otherfinancials?transactionType=${tt}&startDate=${from}&endDate=${to}&page=${page}&size=500`);
+          for (const x of r.content || []) {
+            const amount = num(x.debt) - num(x.credit);
+            if (!amount) continue;
+            out.push({ remoteId: `${tt}:${x.id}`, no: str(x.id), date: num(x.transactionDate) || from, type: fixed || invType(x), description: [x.transactionType, x.description].filter(Boolean).join(' · '),
+              amount: Math.round(amount * 100) / 100, orderNumber: str(x.orderNumber), url: '' });
+          }
+          if (page + 1 >= (r.totalPages || 1)) break;
+        }
+      }
+    }
+    return out;
+  }
+
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts,
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices,
   };
 }

@@ -1,3 +1,4 @@
 dev/panel.db*
 .wrangler/
 node_modules/
+dev/tenant-*.db*

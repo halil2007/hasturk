@@ -145,10 +145,28 @@ export function idefix(env, meta) {
     return out;
   }
 
+  // ---------- müşteri soruları: /pim/vendor/{vendor}/question/filter (sayfa 1'den, en fazla 50), cevap: .../question/{id}/answer ----------
+  async function questions({ since, until = Date.now(), page = 0, size = 50 }) {
+    const r = await call(`/pim/vendor/${vendor}/question/filter?page=${page + 1}&limit=${Math.min(50, size)}&startDate=${since}&endDate=${until}&sort=newest`);
+    const list = r.items || r.data || r.questions || r.content || (Array.isArray(r) ? r : []);
+    const items = list.map((x) => {
+      const a = (x.productQuestionAnswer || x.answers || [])[0];
+      const p = x.product && typeof x.product === 'object' ? x.product : { name: x.product };
+      return {
+        remoteId: String(x.id), text: str(x.question), askedAt: Date.parse(x.createdAt) || num(x.createdAt) || Date.now(),
+        status: a ? 'answered' : x.isArchived ? 'other' : 'waiting', remoteStatus: a ? 'answered' : x.isArchived ? 'archived' : 'waiting',
+        productName: str(p.name || p.title), productImage: str(p.image || p.imageUrl).replace('{size}', '300/'), barcode: str(p.barcode), customer: x.showMyName === false ? '' : str(x.customerName),
+        answer: a ? str(a.answerBody || a.answer_body || a.text) : null, answeredAt: a ? Date.parse(a.createdAt) || null : null,
+      };
+    });
+    return { items, hasNext: page + 1 < num(r.pageCount), total: num(r.totalCount) || items.length };
+  }
+  async function answer(q, text) { await call(`/pim/vendor/${vendor}/question/${encodeURIComponent(q.remote_id)}/answer`, { method: 'POST', body: { answer_body: text } }); }
+
   const missing = ['IDEFIX_API_KEY', 'IDEFIX_API_SECRET', 'IDEFIX_VENDOR_ID'].filter((k) => !env[k]);
   return {
     ...meta, type: 'idefix', enabled: !missing.length, missing,
-    caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, ship, diagnose,
+    caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, ship, diagnose, questions, answer,
   };
 }

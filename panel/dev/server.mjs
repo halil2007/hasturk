@@ -5,10 +5,13 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { d1 } from './d1.mjs';
-import worker from '../src/index.js';
+import worker, { TenantPanel } from '../src/index.js';
+import { doNamespace } from './do.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const env = { DEMO: '1', ...process.env, DB: d1(process.env.DB_FILE || join(ROOT, 'dev', 'panel.db')) };
+// Müşteri panelleri (Durable Object taklidi): dev/tenant-<kod>.db
+env.TENANT = doNamespace(TenantPanel, () => env, process.env.TENANT_DIR || join(ROOT, 'dev'));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
 env.ASSETS = {
   async fetch(req) {

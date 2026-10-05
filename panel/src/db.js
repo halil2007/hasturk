@@ -132,6 +132,13 @@ const MIGRATIONS = [
   'ALTER TABLE orders ADD COLUMN shipping_src TEXT',
   'CREATE INDEX IF NOT EXISTS orders_ckey ON orders(ckey, ordered_at)',
   // Hız: kanal filtreli sipariş listeleri / raporlar ve kategori bazlı ürün sorguları (eşleştirme, ürün yükleme)
+  // Müşteri panelleri kaydı (yalnız ana panelde kullanılır; müşteri verisi her firmanın kendi Durable Object'indedir)
+  `CREATE TABLE IF NOT EXISTS tenants (slug TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, note TEXT, active INTEGER NOT NULL DEFAULT 1,
+    admin_username TEXT, created_at INTEGER NOT NULL, updated_at INTEGER)`,
+  // Pazaryerlerinin kestiği faturalar / kesintiler (komisyon, kargo, hizmet bedeli, reklam, stopaj, ceza ...)
+  `CREATE TABLE IF NOT EXISTS invoices (channel TEXT NOT NULL, remote_id TEXT NOT NULL, no TEXT, date INTEGER NOT NULL, type TEXT NOT NULL, description TEXT,
+    amount REAL NOT NULL DEFAULT 0, order_number TEXT, url TEXT, synced_at INTEGER, PRIMARY KEY (channel, remote_id))`,
+  'CREATE INDEX IF NOT EXISTS invoices_date ON invoices(date)',
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
   'CREATE INDEX IF NOT EXISTS products_category ON products(category)',
 ];
@@ -191,6 +198,10 @@ export const DEFAULT_SETTINGS = {
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
+  // Satış tutarının %'si olarak ek kesinti (işlem / ödeme bedeli vb.)
+  fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0 },
+  // E-ticaret stopajı %: pazaryeri hakedişten keser (KDV hariç satış üzerinden); kendi siteniz (ikas) için 0
+  withholding: { ikas1: 0, ikas2: 0, trendyol: 1, hepsiburada: 1, pttavm: 1, n11: 1, idefix: 1, pazarama: 1 },
   // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
   stock_sync: false,
   // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar

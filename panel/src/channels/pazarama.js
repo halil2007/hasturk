@@ -84,10 +84,23 @@ export function pazarama(env, meta) {
   // İşleme al: siparişi "Hazırlanıyor" (12) yap
   async function accept(order) { await call('/order/updateOrderStatusList', { method: 'PUT', body: { orderNumber: Number(order.remote_id) || order.remote_id, status: 12 } }); }
 
+  // ---------- müşteri soruları: QuestionAnswer/getApprovalAnswersByMerchantSearch (sayfa 1'den), cevap: QuestionAnswer/sellerAnswer ----------
+  async function questions({ since, until = Date.now(), page = 0, size = 50 }) {
+    const r = await call('/QuestionAnswer/getApprovalAnswersByMerchantSearch', { method: 'POST', body: { questionStartDate: new Date(since).toISOString(), questionEndDate: new Date(until).toISOString(), pageIndex: page + 1, pageSize: size } });
+    const d = r.data || {}, list = d.approvalAnswersByMerchantSearchs || d.items || (Array.isArray(d) ? d : []);
+    const items = list.map((x) => ({
+      remoteId: String(x.questionId || x.id), text: str(x.question), askedAt: Date.parse(x.questionDate) || Date.now(),
+      status: x.answer || Number(x.questionStatus) === 1 ? 'answered' : 'waiting', remoteStatus: String(x.questionStatus ?? ''),
+      productName: str(x.productName), productImage: str(x.productImageUrl), barcode: str(x.barcode), customer: str(x.maskedUserName), answer: x.answer ? str(x.answer) : null,
+    }));
+    return { items, hasNext: items.length >= size, total: num(d.totalCount) || items.length };
+  }
+  async function answer(q, text) { await call('/QuestionAnswer/sellerAnswer', { method: 'PUT', body: { questionId: q.remote_id, text } }); }
+
   const missing = ['PAZARAMA_CLIENT_ID', 'PAZARAMA_CLIENT_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'pazarama', enabled: !missing.length, missing,
-    caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept,
+    caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, questions, answer,
   };
 }

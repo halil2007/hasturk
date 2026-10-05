@@ -14,6 +14,9 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "hasturk-panel" }
   ],
+  // Müşteri panelleri (Kullanıcılar → Müşteri panelleri): her firma kendi SQLite veritabanlı Durable Object'inde çalışır
+  "durable_objects": { "bindings": [{ "name": "TENANT", "class_name": "TenantPanel" }] },
+  "migrations": [{ "tag": "tenants-v1", "new_sqlite_classes": ["TenantPanel"] }],
   // 15 dakikada bir: siparişler, ürünler (görsel/varyant), stoklar kontrol edilir ve kanallara gönderilir
   "triggers": { "crons": ["*/15 * * * *"] },
   // Cloudflare panelinden eklenen düz metin değişkenler yayında silinmesin

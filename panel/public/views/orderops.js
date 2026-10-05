@@ -487,7 +487,7 @@ export async function openOrder(id, onChange) {
           <div class="card">
             <div class="card-head"><h3>Kârlılık (tahmini)</h3></div>
             <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon</dt><dd>−${money(p.commission)}</dd><dt>Kargo <span class="tiny muted">${p.shippingSrc === 'api' ? '(kanal faturası)' : p.shippingSrc === 'manual' ? '(elle)' : '(tahmini)'}</span></dt><dd>−${money(p.shipping)}</dd>
-              ${p.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(p.fee)}</dd>` : ''}<dt style="color:var(--text);font-weight:650">Satıştan kalan</dt><dd style="font-weight:650">${money(p.payout)}</dd>
+              ${p.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(p.fee)}</dd>` : ''}${p.rateFee ? html`<dt>Ek kesinti <span class="tiny muted">(işlem / ödeme bedeli)</span></dt><dd>−${money(p.rateFee)}</dd>` : ''}${p.withholding ? html`<dt>Stopaj <span class="tiny muted">(vergiden mahsup edilir)</span></dt><dd>−${money(p.withholding)}</dd>` : ''}<dt style="color:var(--text);font-weight:650">Satıştan kalan</dt><dd style="font-weight:650">${money(p.payout)}</dd>
               <dt>Ürün maliyeti</dt><dd>−${money(p.cost)}</dd><div class="total"><dt>Kâr</dt><dd class="${p.profit >= 0 ? 'up' : 'down'}">${money(p.profit)}</dd></div></dl>
             ${p.missingCost ? html`<div class="notice warn small" style="margin-top:10px">${p.missingCost} ürünün alış fiyatı girilmemiş; kâr olduğundan yüksek görünür.</div>` : ''}
           </div>
