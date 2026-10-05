@@ -1,5 +1,5 @@
 // Toplama listesi: kargoya çıkacak siparişlerdeki ürünlerin toplamı (depoda tek turda toplanır), yazdırılabilir.
-import { api, html, render, $, n, ch, chLogo, thumb, sheet, busy, esc, dateTime } from '../core.js';
+import { api, state, html, render, $, n, ch, chLogo, thumb, sheet, busy, esc, dateTime } from '../core.js';
 
 export async function pickSheet({ channel = '', ids = [] } = {}) {
   const s = sheet({ title: 'Toplama listesi', size: 'wide', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
@@ -33,7 +33,8 @@ function printList(d, scope) {
     table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ccc;padding:7px 6px;vertical-align:top;text-align:left}th{font-size:11px;text-transform:uppercase;color:#555}
     .box{width:18px}.box:before{content:'';display:inline-block;width:14px;height:14px;border:1.5px solid #333;border-radius:3px}.q{font-size:20px;font-weight:800;text-align:right;width:60px}.s{text-align:right;color:#666;width:50px}
     .v{background:#eee;border-radius:4px;padding:0 5px;font-size:12px}.m{color:#555;font-size:11px}.o{color:#777;font-size:10.5px;margin-top:2px}@media print{body{margin:8mm}}
-  </style></head><body><h1>Toplama listesi</h1><div class="sub">${esc(scope)} · ${d.orders} sipariş · ${d.items.length} çeşit · <b>${d.totalQty} adet</b> · ${esc(dateTime(Date.now()))}</div>
+    .hd{display:flex;align-items:center;gap:14px;margin-bottom:6px}.hd img{max-height:46px;max-width:180px}
+  </style></head><body><div class="hd">${state.settings && state.settings.logo ? `<img src="${esc(state.settings.logo)}" alt="">` : ''}<div><h1>Toplama listesi</h1>${state.settings && state.settings.company && state.settings.company.title ? `<div class="m">${esc(state.settings.company.title)}</div>` : ''}</div></div><div class="sub">${esc(scope)} · ${d.orders} sipariş · ${d.items.length} çeşit · <b>${d.totalQty} adet</b> · ${esc(dateTime(Date.now()))}</div>
   <table><thead><tr><th></th><th>Ürün</th><th style="text-align:right">Adet</th><th style="text-align:right">Stok</th></tr></thead><tbody>${rows}</tbody></table>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();

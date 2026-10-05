@@ -60,8 +60,18 @@ export async function sendMail(env, db, { to, subject, html, text }) {
   });
 }
 
+// E-postalarda firma logosu: panelin herkese açık logo adresi (müşteri panelinde firma koduyla). Logo ya da panel adresi yoksa boş.
+export function logoUrl(env, settings) {
+  const base = String((settings && settings.panel_url) || '').replace(/\/+$/, ''), logo = (settings && settings.logo) || '';
+  if (!base || !logo) return '';
+  let h = 0;
+  for (let i = 0; i < logo.length; i += 97) h = (Math.imul(h, 31) + logo.charCodeAt(i)) | 0;
+  return `${base}/api/logo?${env && env.TENANT_SLUG ? `t=${encodeURIComponent(env.TENANT_SLUG)}&` : ''}v=${(h >>> 0).toString(36)}${logo.length.toString(36)}`;
+}
+export const logoImg = (url, alt = '') => (url ? `<img src="${esc(url)}" alt="${esc(alt)}" style="display:block;max-height:52px;max-width:200px;margin:0 0 14px">` : '');
+
 // Sipariş e-postası (HTML + düz metin)
-export function orderMail(o, items, ch, panelUrl) {
+export function orderMail(o, items, ch, panelUrl, logo = '') {
   const title = mailTitle(ch);
   const link = panelUrl ? `${panelUrl.replace(/\/$/, '')}/#/siparisler/${encodeURIComponent(o.id)}` : '';
   const a = (() => { try { return JSON.parse(o.address || '{}'); } catch { return {}; } })();
@@ -71,6 +81,7 @@ export function orderMail(o, items, ch, panelUrl) {
   const html = `<!doctype html><html lang="tr"><body style="margin:0;background:#f3f5f9;font-family:Arial,Helvetica,sans-serif;color:#1c2333">
   <div style="max-width:560px;margin:0 auto;padding:20px">
     <div style="background:#fff;border-radius:12px;padding:22px;border:1px solid #e6e9f0">
+      ${logoImg(logo)}
       <div style="font-size:12px;color:#6b7385;text-transform:uppercase;letter-spacing:.5px">${esc(ch.type === 'ikas' ? 'ikas mağazası' : 'Pazaryeri')} · ${esc(ch.name)}</div>
       <h1 style="font-size:20px;margin:6px 0 14px">${esc(title)}</h1>
       <table style="width:100%;font-size:14px;border-collapse:collapse;margin-bottom:14px">
@@ -104,6 +115,7 @@ export async function sendQueued(env, db, channels, settings) {
     return 0;
   }
   const panelUrl = settings.panel_url || (await getRaw(db, 'panel_url')) || '';
+  const logo = logoUrl(env, { ...settings, panel_url: panelUrl });
   let sent = 0;
   for (const q of pending) {
     const o = await first(db, 'SELECT * FROM orders WHERE id = ?', q.order_id);
@@ -111,7 +123,7 @@ export async function sendQueued(env, db, channels, settings) {
     if (!o) { await run(db, "UPDATE mail_queue SET sent_at = ?, error = 'sipariş yok' WHERE order_id = ?", Date.now(), q.order_id); continue; }
     try {
       const items = await all(db, 'SELECT * FROM order_items WHERE order_id = ?', o.id);
-      await sendMail(env, db, { to, ...orderMail(o, items, ch, panelUrl) });
+      await sendMail(env, db, { to, ...orderMail(o, items, ch, panelUrl, logo) });
       await run(db, 'UPDATE mail_queue SET sent_at = ?, tries = tries + 1, error = NULL WHERE order_id = ?', Date.now(), q.order_id);
       sent++;
     } catch (e) {

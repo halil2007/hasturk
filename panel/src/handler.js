@@ -21,6 +21,12 @@ export async function handle(req, env, ctx, db) {
       const s = await getSettings(db);
       return json({ title: s.company.title, legal: s.company.legal, logo: s.logo || null, demo: env.DEMO === '1' });
     }
+    // Firma logosu (giriş gerektirmez): e-postalarda görünsün diye görsel olarak sunulur (ayarlardaki data: adresinden)
+    if (path === 'logo' && req.method === 'GET') {
+      const m = /^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,(.+)$/.exec((await getSettings(db)).logo || '');
+      if (!m) return new Response('Logo yok', { status: 404 });
+      return new Response(Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)), { headers: { 'Content-Type': m[1], 'Cache-Control': 'public, max-age=86400' } });
+    }
     if (path === 'login' && req.method === 'POST') {
       const r = await login(req, env, db, await body(req));
       return r.ok ? json({ ok: true, user: r.user, tenant: env.TENANT_SLUG || null }, 200, { 'Set-Cookie': r.cookie }) : json({ error: r.error }, r.status);

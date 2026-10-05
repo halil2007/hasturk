@@ -3,7 +3,7 @@
 import { all, first, getRaw, setSetting, getSettings, log } from './db.js';
 import { getChannels } from './channels/index.js';
 import { breakdown } from './finance.js';
-import { sendMail } from './mail.js';
+import { sendMail, logoUrl, logoImg } from './mail.js';
 import { LATE, r2 } from './util.js';
 
 const H = 3600e3, D = 24 * H;
@@ -34,7 +34,7 @@ export async function digestData(env, db, settings) {
   };
 }
 
-export function digestMail(d, { company = 'Hastürk', panelUrl = '' } = {}) {
+export function digestMail(d, { company = 'Hastürk', panelUrl = '', logo = '' } = {}) {
   const t = d.total, p = d.prev;
   const dRev = pct(t.revenue, p.revenue), dOrd = pct(t.orders, p.orders);
   const delta = (v) => (v == null ? '' : ` <span style="color:${v >= 0 ? '#15803d' : '#b91c1c'};font-size:12px">${v >= 0 ? '▲' : '▼'} %${Math.abs(v)}</span>`);
@@ -45,7 +45,7 @@ export function digestMail(d, { company = 'Hastürk', panelUrl = '' } = {}) {
   ].filter(([v]) => v > 0);
   const link = (h, text) => (panelUrl ? `<a href="${esc(panelUrl + '/' + h)}" style="color:#1d4ed8;text-decoration:none">${text}</a>` : text);
   const html = `<div style="font:14px/1.45 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111;max-width:640px">
-    <h2 style="margin:0 0 4px">${esc(company)} · günlük özet</h2><div style="color:#6b7280;margin-bottom:14px">${esc(d.day)} (dün)</div>
+    ${logoImg(logo, company)}<h2 style="margin:0 0 4px">${esc(company)} · günlük özet</h2><div style="color:#6b7280;margin-bottom:14px">${esc(d.day)} (dün)</div>
     <table cellspacing="6" style="width:100%;border-collapse:separate"><tr>${tile('Ciro', tl(t.revenue) + delta(dRev), `önceki gün ${tl(p.revenue)}`)}${tile('Sipariş', t.orders + delta(dOrd), `önceki gün ${p.orders}`)}${tile('Tahmini kâr', tl(t.profit), `marj %${r2(t.margin || 0)}`)}</tr></table>
     ${d.channels.length ? `<h3 style="margin:18px 0 6px;font-size:15px">Kanallar</h3><table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="color:#6b7280;text-align:left"><th style="padding:4px 0">Kanal</th><th style="text-align:right">Sipariş</th><th style="text-align:right">Ciro</th><th style="text-align:right">Kâr</th></tr>
       ${d.channels.map((c) => `<tr style="border-top:1px solid #eee"><td style="padding:5px 0">${esc(d.names[c.channel] || c.channel)}</td><td style="text-align:right">${c.orders}</td><td style="text-align:right">${tl(c.revenue)}</td><td style="text-align:right">${tl(c.profit)}</td></tr>`).join('')}</table>` : '<p style="color:#6b7280">Dün sipariş gelmedi.</p>'}
@@ -69,7 +69,7 @@ export async function dailyDigest(env, db, settings, { force = false } = {}) {
   const to = settings.mail_to || [];
   if (!to.length) throw new Error('Özet e-postası için alıcı e-posta adresi girilmemiş (Ayarlar → Bildirimler)');
   const d = await digestData(env, db, settings);
-  const m = digestMail(d, { company: (settings.company && settings.company.title) || 'Hastürk', panelUrl: settings.panel_url || '' });
+  const m = digestMail(d, { company: (settings.company && settings.company.title) || 'Hastürk', panelUrl: settings.panel_url || '', logo: logoUrl(env, settings) });
   if (!force) await setSetting(db, 'digest_sent', trDay()); // hata olsa da gün içinde tekrar tekrar denenmesin
   await sendMail(env, db, { to, subject: m.subject, html: m.html, text: m.text });
   if (!force) await log(db, null, 'info', `Günlük özet e-postası gönderildi (${to.length} alıcı)`);

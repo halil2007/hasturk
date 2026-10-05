@@ -26,9 +26,14 @@ export default {
         const b = await body(req.clone());
         if (b && String(b.tenant || '').trim()) return await tenantLogin(req, env, b);
       }
+      // Müşteri panelinin logosu (e-postalar için, oturumsuz): /api/logo?t=firma-kodu
+      if (path === 'logo' && url.searchParams.get('t')) {
+        const t = env.DB ? await getTenant(env.DB, url.searchParams.get('t')) : null;
+        return t && t.active ? await forward(req, env, t) : new Response('Logo yok', { status: 404 });
+      }
       // Müşteri panelinin oturumu: istek o firmanın paneline gider (çıkış ve giriş ekranı ana panelde)
       const slug = cookieTenant(req);
-      if (slug && path !== 'logout' && path !== 'brand' && path !== 'login') {
+      if (slug && path !== 'logout' && path !== 'brand' && path !== 'login' && path !== 'logo') {
         const t = env.DB ? await getTenant(env.DB, slug) : null;
         if (!t || !t.active) return json({ error: t ? 'Bu müşteri paneli askıya alınmış' : 'Oturum geçersiz', tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
         return await forward(req, env, t);
