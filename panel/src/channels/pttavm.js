@@ -1,8 +1,9 @@
 // PttAVM. Siparişler ve stok: SOAP servisi (ws.pttavm.com:93, WS-Security kullanıcı adı/şifre).
+// Fiyat: UpdateProductsStockPrice (aynı SOAP servisi; gönderilen alan güncellenir, gönderilmeyene dokunulmaz).
 // Kargo barkodu: REST (shipment.pttavm.com/api/v1). Mağaza paneli → Entegrasyon → API kullanıcısı.
 // Not: PttAVM'in servis alan adları hesap ve sürüme göre değişebildiği için cevaplar esnek okunur;
 // yöntem adları ortam değişkenleriyle değiştirilebilir (bkz. README).
-import { http, basic, num, str, diagStep } from '../util.js';
+import { http, basic, num, str, chunk, diagStep } from '../util.js';
 
 // Küçük XML okuyucu: etiket ön eklerini (a:, s:) atar, tekrar eden etiketleri diziye çevirir
 export function parseXml(xml) {
@@ -119,6 +120,20 @@ export function pttavm(env, meta) {
     }
   }
 
+  // Fiyat (KDV dahil satış fiyatı): UpdateProductsStockPrice, istekte en fazla 1000 ürün. İşlem kuyruğa alınır, trackingId döner.
+  // Alanlar WCF sözleşmesindeki sırayla (alfabetik) yazılır; İskonto 0 = satış fiyatı doğrudan gönderilen fiyat.
+  const REQ = 'http://schemas.datacontract.org/2004/07/ePttAVMService.Model.Requests';
+  const money = (v) => (Math.round(num(v) * 100) / 100).toFixed(2);
+  async function pushPrice(items) {
+    for (const part of chunk(items, 1000)) {
+      const rows = part.map((x) => `<r:ProductStockPriceRequest><r:Barcode>${esc(x.remoteId)}</r:Barcode><r:Discount>0</r:Discount><r:PriceWithVAT>${money(x.price)}</r:PriceWithVAT></r:ProductStockPriceRequest>`).join('');
+      const tree = await soap('UpdateProductsStockPrice', `<tem:items xmlns:r="${REQ}">${rows}</tem:items>`);
+      const res = findAll(tree, (n) => n.name === 'UpdateProductsStockPriceResult')[0];
+      const o = res ? flat(res) : {};
+      if (!res || String(pick(o, 'Success')).toLowerCase() !== 'true') throw new Error('PttAVM fiyat: ' + (pick(o, 'Message') || 'işlem kabul edilmedi'));
+    }
+  }
+
   async function fetchListings() {
     const tree = await soap(env.PTTAVM_LIST_METHOD || 'StokKontrolListesi', '');
     return findAll(tree, (n) => n.children.some((c) => /^Barkod$/i.test(c.name))).map(flat).map((o) => ({
@@ -151,8 +166,8 @@ export function pttavm(env, meta) {
   const missing = ['PTTAVM_USERNAME', 'PTTAVM_PASSWORD'].filter((k) => !env[k]);
   return {
     ...meta, type: 'pttavm', byOrderDate: true, enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'local', ship: env.PTTAVM_WAREHOUSE_ID ? 'remote' : 'local', label: null, createProduct: false, price: false },
-    fetchOrders, fetchListings, pushStock, ship, diagnose,
+    caps: { accept: 'local', split: 'local', ship: env.PTTAVM_WAREHOUSE_ID ? 'remote' : 'local', label: null, createProduct: false, price: true },
+    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose,
   };
 }
 
