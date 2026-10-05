@@ -7,7 +7,7 @@
 import { all, first, run, getRaw, setSetting, getSettings, log } from './db.js';
 import { getChannels } from './channels/index.js';
 import { importListings, catalogOf } from './sync.js';
-import { fail, str, num, r2 } from './util.js';
+import { fail, str, num, r2, isImageAttr } from './util.js';
 import { rank, localProfile, prepare, score } from './catmatch.js';
 
 const NO_API = { idefix: 'Ürün yükleme idefix panelinden yapılır', pttavm: 'Ürün yükleme PttAVM panelinden yapılır', n11: 'Ürün yükleme N11 panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
@@ -91,6 +91,7 @@ async function autoAttrs(c, catId) {
   for (const a of await c.catalog.attributes(catId)) {
     if (a.kind === 'variant') { out[a.id] = { value: '@variant' }; continue; }
     if (!a.mandatory) continue;
+    if (isImageAttr(a)) { out[a.id] = { value: '@image' }; continue; }
     if (/men[sş]e|origin|[üu]retim yeri/i.test(a.name)) {
       const v = (await c.catalog.values(catId, a.id).catch(() => [])).find((x) => /^(tr|t[üu]rkiye)$/i.test(String(x.value).trim()));
       if (v) { out[a.id] = { id: v.id, value: v.value }; continue; }

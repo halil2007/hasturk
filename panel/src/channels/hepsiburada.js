@@ -3,7 +3,7 @@
 // Önemli: User-Agent başlığı Merchant Portal'da tanımlı entegratör adıyla BİREBİR aynı olmalı (ör. "hasturk_dev");
 // "merchantId - uygulama" biçimi 401/403 ile reddedilir.
 //   Siparişler/paketler: oms-external · İlan/stok/fiyat/buybox: listing-external · Müşteri soruları: api-asktoseller-merchant
-import { http, basic, num, str, chunk, diagStep } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, isImageAttr } from '../util.js';
 
 export function hepsiburada(env, meta) {
   const m = env.HB_MERCHANT_ID, user = env.HB_USERNAME || m, pass = env.HB_PASSWORD;
@@ -424,6 +424,7 @@ export function hepsiburada(env, meta) {
   // ---------- Ürün yükleme (Ürün yükle ekranı): kategori eşleştirmesindeki değerlerle Hepsiburada ürün dosyası ----------
   // Panelin doldurduğu temel alanlar: satıcı SKU, varyant grubu, barkod, ad, açıklama, marka, KDV, fiyat, stok, görsel, desi
   const AUTO = ['merchantSku', 'VaryantGroupID', 'Barcode', 'UrunAdi', 'UrunAciklamasi', 'Marka', 'price', 'stock', 'Image1', 'tax_vat_rate', 'kg', 'GarantiSuresi'];
+  const imageFor = (at, pr) => ((/arka|back/i.test(at.name) && (pr.images || [])[1]) || pr.image || '');
   const attrCache = new Map();
   const attrsOf = async (cat) => { if (!attrCache.has(cat)) attrCache.set(cat, await attributes(cat)); return attrCache.get(cat); };
   async function build(pr, map, { opts = {}, pick } = {}) {
@@ -439,6 +440,8 @@ export function hepsiburada(env, meta) {
       const v = (map.attrs || {})[at.id];
       let val = v && (v.value ?? '');
       if (val === '@variant') { const hit = /enum|list|select/i.test(at.type) ? await pick(at, pr.variant) : null; val = hit ? hit.value : pr.variant; }
+      // Görsel özellikleri (ör. "Paket Görseli (ön)"): ürün görselinden; "arka" için varsa ikinci görsel
+      if (val === '@image' || (!val && isImageAttr(at))) val = imageFor(at, pr);
       if (val) a[at.id] = String(val);
       else if (at.mandatory) missing.push(at.name);
     }

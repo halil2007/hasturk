@@ -56,7 +56,9 @@ export async function uploadView(el) {
     const c = C(), cur = mapOf(local);
     let cat = cur ? { id: cur.remote_id, name: cur.remote_name } : null, attrs = [], vals = {};
     const s = sheet({ title: `${catName(local)} → ${c.name}`, size: 'wide' });
-    const valOf = (a) => (cur && cur.remote_id === (cat && cat.id) && cur.attrs[a.id]) || (a.kind === 'variant' ? { value: '@variant' } : null);
+    // Görsel adresi isteyen özellik (ör. Hepsiburada "Paket Görseli (ön)"): varsayılan ürün görseli
+    const isImg = (a) => /g[öo]rsel|resim|foto[gğ]raf|image|photo/i.test(a.name || '') && !/enum|list|select/i.test(a.type || '');
+    const valOf = (a) => (cur && cur.remote_id === (cat && cat.id) && cur.attrs[a.id]) || (a.kind === 'variant' ? { value: '@variant' } : isImg(a) ? { value: '@image' } : null);
     function body() {
       s.setBody(html`<div class="stack">
         <label class="field"><span>${c.name} kategorisi</span><input class="input" data-cq placeholder="Ara: gübre, toprak, pompa…" value="${cat ? cat.name : ''}"><div data-clist class="stack" style="gap:4px;margin-top:4px"></div></label>
@@ -91,10 +93,10 @@ export async function uploadView(el) {
     function drawAttrs() {
       render($('[data-attrs]', s.body), html`<div class="stack">
         <p class="muted small" style="margin:0">Ürün adı, açıklama, marka, barkod, SKU, fiyat, KDV, desi, stok ve görsel üründen otomatik gelir. Burada yalnızca kategori özellikleri seçilir; bu kategorideki tüm ürünlere uygulanır. <b>Varyant adından</b> seçilirse her ürünün varyant adı (ör. “5 Kg”) kanalın listesinde eşlenir.</p>
-        <div class="form-grid">${attrs.map((a) => { const v = valOf(a) || {}, fromVar = v.value === '@variant', list = vals[a.id]; return html`<label class="field" data-a="${a.id}"><span>${a.name}${a.mandatory ? ' *' : ''}${a.kind === 'variant' ? html` <span class="pill">varyant</span>` : ''}</span>
+        <div class="form-grid">${attrs.map((a) => { const v = valOf(a) || {}, fromVar = v.value === '@variant', fromImg = v.value === '@image', list = vals[a.id]; return html`<label class="field" data-a="${a.id}"><span>${a.name}${a.mandatory ? ' *' : ''}${a.kind === 'variant' ? html` <span class="pill">varyant</span>` : ''}</span>
           ${list && list.length ? html`<select class="input" data-v>${html`<option value="">—</option><option value="@variant" ${fromVar ? 'selected' : ''}>Ürünün varyant adından</option>`}${list.map((x) => html`<option value="${x.id}" ${v.id === x.id ? 'selected' : ''}>${x.value}</option>`)}</select>`
-            : html`<div class="row" style="gap:6px"><input class="input" data-t value="${fromVar ? '' : v.value || ''}" placeholder="${/enum|list|select/i.test(a.type) ? 'Listeden: Değerler' : 'Değer'}" ${fromVar ? 'disabled' : ''}>${/enum|list|select/i.test(a.type) ? html`<button type="button" class="btn sm" data-x="vals">Değerler</button>` : ''}</div>
-              <label class="check tiny"><input type="checkbox" data-var ${fromVar ? 'checked' : ''}> Ürünün varyant adından</label>`}</label>`; })}</div>
+            : html`<div class="row" style="gap:6px"><input class="input" data-t value="${fromVar || fromImg ? '' : v.value || ''}" placeholder="${/enum|list|select/i.test(a.type) ? 'Listeden: Değerler' : isImg(a) ? 'Görsel adresi (https://…)' : 'Değer'}" ${fromVar || fromImg ? 'disabled' : ''}>${/enum|list|select/i.test(a.type) ? html`<button type="button" class="btn sm" data-x="vals">Değerler</button>` : ''}</div>
+              ${isImg(a) ? html`<label class="check tiny"><input type="checkbox" data-img ${fromImg ? 'checked' : ''}> Ürün görselinden (her ürünün kendi görseli)</label>` : html`<label class="check tiny"><input type="checkbox" data-var ${fromVar ? 'checked' : ''}> Ürünün varyant adından</label>`}`}</label>`; })}</div>
         ${!attrs.length ? html`<div class="muted small">Bu kategoride ek özellik yok.</div>` : ''}
       </div>`);
     }
@@ -111,10 +113,11 @@ export async function uploadView(el) {
         const out = {}, miss = [];
         for (const a of attrs) {
           const f = $(`[data-a="${CSS.escape(a.id)}"]`, s.body); if (!f) continue;
-          const sel = $('[data-v]', f), t = $('[data-t]', f), cb = $('[data-var]', f);
+          const sel = $('[data-v]', f), t = $('[data-t]', f), cb = $('[data-var]', f), im = $('[data-img]', f);
           let v = null;
           if (sel && sel.value) v = sel.value === '@variant' ? { value: '@variant' } : { id: sel.value, value: sel.options[sel.selectedIndex].text };
           else if (cb && cb.checked) v = { value: '@variant' };
+          else if (im && im.checked) v = { value: '@image' };
           else if (t && t.value.trim()) { const hit = (vals[a.id] || []).find((y) => y.value.toLocaleLowerCase('tr') === t.value.trim().toLocaleLowerCase('tr')); v = hit ? { id: hit.id, value: hit.value } : { value: t.value.trim() }; }
           if (v) out[a.id] = v; else if (a.mandatory) miss.push(a.name);
         }
@@ -123,7 +126,7 @@ export async function uploadView(el) {
         s.close(); if (!miss.length) toast('Eşleştirme kaydedildi'); await load();
       });
     });
-    s.el.addEventListener('change', (e) => { if (e.target.matches('[data-var]')) { const t = $('[data-t]', e.target.closest('[data-a]')); if (t) t.disabled = e.target.checked; } });
+    s.el.addEventListener('change', (e) => { if (e.target.matches('[data-var], [data-img]')) { const t = $('[data-t]', e.target.closest('[data-a]')); if (t) t.disabled = e.target.checked; } });
     body();
   }
 
