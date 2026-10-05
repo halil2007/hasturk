@@ -3,6 +3,7 @@ import { api, html, render, $, $$, money, n, dateTime, actions, busy, toast, she
 
 const ST = { sent: ['warn', 'Kanal işliyor'], done: ['good', 'Tamamlandı'], error: ['bad', 'Gönderilemedi'] };
 const catName = (l) => l || 'Kategorisiz';
+const dur = (ms) => { const m = Math.max(1, Math.round(ms / 60e3)); return m < 60 ? `${m} dk` : m < 48 * 60 ? `${Math.round(m / 60)} saat` : `${Math.round(m / 1440)} gün`; };
 
 export async function uploadView(el) {
   let st = null, chId = store.get('upload_ch') || '', allUp = false;
@@ -23,13 +24,13 @@ export async function uploadView(el) {
       ${c && c.test ? html`<div class="notice warn"><i class="ico ico-warn"></i><div><b>${c.name} TEST ortamına (SIT) bağlı.</b> Buradan gönderilen ürünler gerçek ${c.name}'ya gitmez, satışa çıkmaz; yalnız test adımları içindir. Kanaldan gelen ilanlar da test ilanlarıdır (sizin ürünlerinizle eşleşmez). Canlı bilgiler gelince Entegrasyonlar → ${c.name} → <b>Ortam = Canlı</b> seçin.</div></div>` : ''}
       <div class="card flush" id="gonderimler">
         <div class="card-head" style="padding:16px 16px 0"><h2>Gönderimler</h2><span class="muted small">kanalın onay sonucu burada görünür · kendiliğinden sorgulanır (ilk 4 saat 15 dk'da bir, sonra saatte bir, 3 güne kadar)</span><span class="spacer"></span>${st.uploads.length > 5 ? html`<button class="btn sm ghost" data-act="allup">${allUp ? 'Son 5' : `Tümü (${st.uploads.length})`}</button>` : ''}</div>
-        <div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Kanal</th><th class="r">Ürün</th><th>Takip no</th><th>Durum</th><th></th></tr></thead><tbody>
+        <div class="table-wrap"><table class="t"><thead><tr><th>Gönderim</th><th>Durum</th><th></th></tr></thead><tbody>
           ${(allUp ? st.uploads : st.uploads.slice(0, 5)).map((u) => { const ok = u.items.filter((x) => x.ok === true).length, bad = u.items.filter((x) => x.ok === false).length, s = ST[u.status] || ['', u.status]; return html`<tr>
-            <td class="small">${dateTime(u.created_at)}<div class="tiny muted">${u.user || ''}</div></td><td>${chLogo(u.channel, true)}</td><td class="r num">${u.items.length}</td>
-            <td class="small num ellipsis" style="max-width:200px">${u.ref || '—'}</td>
-            <td><span class="pill ${s[0]}">${s[1]}</span>${ok || bad ? html` <span class="tiny">${ok ? html`<span style="color:var(--good)">${ok} kabul</span>` : ''} ${bad ? html`<span style="color:var(--bad)">${bad} hata</span>` : ''}</span>` : ''}${u.error ? html`<div class="tiny" style="color:var(--bad)">${u.error.slice(0, 160)}</div>` : ''}</td>
-            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${u.ref && (u.status !== 'done' || bad) ? html`<button class="btn sm" data-act="check" data-id="${u.id}"><i class="ico ico-sync"></i>${u.status === 'done' ? 'Hata nedenlerini yenile' : 'Durumu sorgula'}</button>` : ''}<button class="btn sm ghost" data-act="detail" data-id="${u.id}">Ayrıntı</button></div></td></tr>`; })}
-          ${!st.uploads.length ? html`<tr><td colspan="6" class="empty">Henüz gönderim yok</td></tr>` : ''}
+            <td class="small"><div class="row" style="gap:6px;flex-wrap:nowrap">${chLogo(u.channel, true)}<b>${u.items.length} ürün</b></div><div class="tiny muted">${dateTime(u.created_at)}${u.user ? ` · ${u.user}` : ''}</div><div class="tiny muted num ellipsis" style="max-width:220px" title="${u.ref || ''}">${u.ref ? `Takip: ${u.ref}` : ''}</div></td>
+            <td><span class="pill ${s[0]}">${s[1]}</span>${ok || bad ? html`<div class="tiny">${ok ? html`<span style="color:var(--good)">${ok} kabul</span>` : ''} ${bad ? html`<span style="color:var(--bad)">${bad} hata</span>` : ''}</div>` : ''}
+              <div class="tiny muted">${u.status === 'sent' ? `gönderileli ${dur(Date.now() - u.created_at)} oldu` : u.status === 'done' && u.checked_at ? `sonuç ${dur(u.checked_at - u.created_at)} içinde alındı` : ''}</div>${u.error ? html`<div class="tiny" style="color:var(--bad)">${u.error.slice(0, 160)}</div>` : ''}</td>
+            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px;flex-wrap:wrap">${u.ref && (u.status !== 'done' || bad) ? html`<button class="btn sm" data-act="check" data-id="${u.id}"><i class="ico ico-sync"></i>${u.status === 'done' ? 'Nedenleri yenile' : 'Sorgula'}</button>` : ''}<button class="btn sm ghost" data-act="detail" data-id="${u.id}">Ayrıntı</button></div></td></tr>`; })}
+          ${!st.uploads.length ? html`<tr><td colspan="3" class="empty">Henüz gönderim yok</td></tr>` : ''}
         </tbody></table></div></div>
       ${!c || !c.ready ? html`<div class="empty">Ürün yüklenebilecek bağlı pazaryeri yok. Trendyol / Hepsiburada API bilgilerini Entegrasyonlar'dan girin.</div>` : html`
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
