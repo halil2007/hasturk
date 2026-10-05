@@ -5,7 +5,7 @@ const ST = { sent: ['warn', 'Kanal işliyor'], done: ['good', 'Tamamlandı'], er
 const catName = (l) => l || 'Kategorisiz';
 
 export async function uploadView(el) {
-  let st = null, chId = store.get('upload_ch') || '';
+  let st = null, chId = store.get('upload_ch') || '', allUp = false;
   const C = () => st.channels.find((c) => c.id === chId);
   const mapOf = (local) => st.maps.find((m) => m.local === local && m.channel === chId);
 
@@ -17,9 +17,19 @@ export async function uploadView(el) {
   function draw() {
     const c = C();
     render(el, html`<div class="stack">
-      <div class="notice"><i class="ico ico-upload"></i><div style="flex:1"><b>ikas'taki ürünleri pazaryerlerine yükleyin.</b> 1) ikas kategorisini pazaryeri kategorisiyle bir kez eşleştirin (zorunlu özellikler dahil) · 2) Kanalda henüz olmayan ürünleri seçip gönderin · 3) Kanalın onay sonucunu aşağıdan takip edin. Onaylanan ürün barkod / SKU ile otomatik eşleşir.
+      <div class="notice"><i class="ico ico-upload"></i><div style="flex:1"><b>ikas'taki ürünleri pazaryerlerine yükleyin.</b> 1) ikas kategorisini pazaryeri kategorisiyle bir kez eşleştirin (zorunlu özellikler dahil) · 2) Kanalda henüz olmayan ürünleri seçip gönderin · 3) Kanalın onay sonucunu hemen alttaki “Gönderimler” bölümünden takip edin. Onaylanan ürün barkod / SKU ile otomatik eşleşir.
         ${!st.stockSync && c && !c.stockPush ? html`<div class="small" style="margin-top:4px">Stok senkronu kapalı: ürün ilk stokla gönderilir, sonraki stok değişiklikleri bu kanala gitmez (aşağıdan “Stokları gönder”i açabilirsiniz).</div>` : ''}</div></div>
       <div class="ch-tabs">${st.channels.map((x) => html`<button class="ch-tab ${x.id === chId ? 'on' : ''}" data-act="ch" data-id="${x.id}" ${x.ready ? '' : 'disabled'} title="${x.reason}">${chLogo(x.id)}${x.name}${!x.ready ? html`<span class="tiny muted">${x.reason}</span>` : ''}</button>`)}</div>
+      <div class="card flush" id="gonderimler">
+        <div class="card-head" style="padding:16px 16px 0"><h2>Gönderimler</h2><span class="muted small">kanalın onay sonucu burada görünür · 15 dakikada bir kendiliğinden sorgulanır</span><span class="spacer"></span>${st.uploads.length > 5 ? html`<button class="btn sm ghost" data-act="allup">${allUp ? 'Son 5' : `Tümü (${st.uploads.length})`}</button>` : ''}</div>
+        <div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Kanal</th><th class="r">Ürün</th><th>Takip no</th><th>Durum</th><th></th></tr></thead><tbody>
+          ${(allUp ? st.uploads : st.uploads.slice(0, 5)).map((u) => { const ok = u.items.filter((x) => x.ok === true).length, bad = u.items.filter((x) => x.ok === false).length, s = ST[u.status] || ['', u.status]; return html`<tr>
+            <td class="small">${dateTime(u.created_at)}<div class="tiny muted">${u.user || ''}</div></td><td>${chLogo(u.channel, true)}</td><td class="r num">${u.items.length}</td>
+            <td class="small num ellipsis" style="max-width:200px">${u.ref || '—'}</td>
+            <td><span class="pill ${s[0]}">${s[1]}</span>${ok || bad ? html` <span class="tiny">${ok ? html`<span style="color:var(--good)">${ok} onay</span>` : ''} ${bad ? html`<span style="color:var(--bad)">${bad} hata</span>` : ''}</span>` : ''}${u.error ? html`<div class="tiny" style="color:var(--bad)">${u.error.slice(0, 160)}</div>` : ''}</td>
+            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${u.ref && u.status !== 'done' ? html`<button class="btn sm" data-act="check" data-id="${u.id}"><i class="ico ico-sync"></i>Durumu sorgula</button>` : ''}<button class="btn sm ghost" data-act="detail" data-id="${u.id}">Ayrıntı</button></div></td></tr>`; })}
+          ${!st.uploads.length ? html`<tr><td colspan="6" class="empty">Henüz gönderim yok</td></tr>` : ''}
+        </tbody></table></div></div>
       ${!c || !c.ready ? html`<div class="empty">Ürün yüklenebilecek bağlı pazaryeri yok. Trendyol / Hepsiburada API bilgilerini Entegrasyonlar'dan girin.</div>` : html`
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
         <h2 style="margin:0">Otomatik işlemler · ${c.name}</h2>
@@ -38,16 +48,6 @@ export async function uploadView(el) {
               ${m && open > 0 && isAdmin() ? html`<button class="btn sm primary" data-act="send" data-l="${k.local}"><i class="ico ico-upload"></i>${open} ürünü gönder</button>` : ''}</div></td></tr>`; })}
           ${!st.categories.length ? html`<tr><td colspan="5" class="empty">Ürün yok. Önce ikas ürünlerini içe aktarın.</td></tr>` : ''}
         </tbody></table></div></div>`}
-      <div class="card flush">
-        <div class="card-head" style="padding:16px 16px 0"><h2>Gönderimler</h2></div>
-        <div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Kanal</th><th class="r">Ürün</th><th>Takip no</th><th>Durum</th><th></th></tr></thead><tbody>
-          ${st.uploads.map((u) => { const ok = u.items.filter((x) => x.ok === true).length, bad = u.items.filter((x) => x.ok === false).length, s = ST[u.status] || ['', u.status]; return html`<tr>
-            <td class="small">${dateTime(u.created_at)}<div class="tiny muted">${u.user || ''}</div></td><td>${chLogo(u.channel, true)}</td><td class="r num">${u.items.length}</td>
-            <td class="small num ellipsis" style="max-width:200px">${u.ref || '—'}</td>
-            <td><span class="pill ${s[0]}">${s[1]}</span>${ok || bad ? html` <span class="tiny">${ok ? html`<span style="color:var(--good)">${ok} onay</span>` : ''} ${bad ? html`<span style="color:var(--bad)">${bad} hata</span>` : ''}</span>` : ''}${u.error ? html`<div class="tiny" style="color:var(--bad)">${u.error.slice(0, 160)}</div>` : ''}</td>
-            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${u.ref && u.status !== 'done' ? html`<button class="btn sm" data-act="check" data-id="${u.id}"><i class="ico ico-sync"></i>Durumu sorgula</button>` : ''}<button class="btn sm ghost" data-act="detail" data-id="${u.id}">Ayrıntı</button></div></td></tr>`; })}
-          ${!st.uploads.length ? html`<tr><td colspan="6" class="empty">Henüz gönderim yok</td></tr>` : ''}
-        </tbody></table></div></div>
     </div>`);
   }
 
@@ -163,8 +163,9 @@ export async function uploadView(el) {
       await busy(x, async () => {
         const r = await api('catalog/upload', { method: 'POST', body: { channel: chId, ids, zeroStock: zero } });
         s.close();
-        toast(r.sent ? `${r.sent} ürün gönderildi${r.skipped.length ? ` · ${r.skipped.length} atlandı` : ''}. Kanal onayı birkaç dakika sürebilir; “Durumu sorgula” ile bakın.` : `Gönderilmedi: ${r.skipped.map((y) => y.name + ' (' + y.missing.join(', ') + ')').slice(0, 3).join('; ')}`, !r.sent);
+        toast(r.sent ? `${r.sent} ürün gönderildi${r.skipped.length ? ` · ${r.skipped.length} atlandı` : ''}. Onay sonucu sayfanın üstündeki “Gönderimler” bölümünde görünür.` : `Gönderilmedi: ${r.skipped.map((y) => y.name + ' (' + y.missing.join(', ') + ')').slice(0, 3).join('; ')}`, !r.sent);
         await load();
+        if (r.sent) $('#gonderimler', el)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
     await fill().catch((e) => s.setBody(html`<div class="notice bad">${e.message}</div>`));
@@ -228,6 +229,7 @@ export async function uploadView(el) {
     review: () => reviewSheet(),
     check: (t) => busy(t, async () => { const r = await api(`catalog/uploads/${t.dataset.id}/check`, { method: 'POST' }); toast(r.done ? 'Kanal işlemi tamamladı' : 'Kanal hâlâ işliyor, birazdan tekrar sorgulayın'); await load(); }),
     detail: (t) => detailSheet(st.uploads.find((u) => String(u.id) === t.dataset.id)),
+    allup: () => { allUp = !allUp; draw(); },
   });
   // Otomatik işlem anahtarları (kanal bazında): ayarlara kaydedilir
   el.addEventListener('change', async (e) => {
