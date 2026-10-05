@@ -437,3 +437,19 @@ test('idefix: biçim hatasında her denenen biçim ve eski API Secret uyarısı 
     await assert.rejects(() => ch.fetchOrders(Date.now() - 864e5, Date.now()), (e) => /API KEY:API Secret \(base64\) → VENDOR_TOKEN_NOT_FORMATED/.test(e.message) && /Panelde kayıtlı API Secret bu API KEY'e ait değil/.test(e.message) && /Satıcı ID:API KEY/.test(e.message));
   } finally { globalThis.fetch = real; }
 });
+
+test('Hepsiburada aracı sunucu: adres girilince tüm istekler hb-proxy.php üzerinden, anahtarla gider', async () => {
+  const { hepsiburada } = await import('../src/channels/hepsiburada.js');
+  const calls = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => { calls.push({ url: String(url), headers: opts.headers, body: opts.body }); return new Response(JSON.stringify({ items: [], data: [] }), { headers: { 'Content-Type': 'application/json' } }); };
+  try {
+    const ch = hepsiburada({ HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'sk', HB_USER_AGENT: 'ua', HB_PROXY_URL: 'https://ornek.com/hb-proxy.php', HB_PROXY_KEY: 'K' }, { id: 'hepsiburada' });
+    await ch.questions({ page: 0, size: 1 });
+    await ch.answer({ remote_id: 'Q1' }, 'cevap');
+    assert.ok(calls.every((c) => c.url.startsWith('https://ornek.com/hb-proxy.php?u=https%3A%2F%2F') && c.headers['X-Proxy-Key'] === 'K'));
+    const ans = calls[calls.length - 1];
+    assert.match(ans.headers['X-Content-Type'], /^multipart\/form-data; boundary=/, 'çok parçalı form bayt olarak, içerik türü ayrı başlıkta');
+    assert.ok(ans.body instanceof ArrayBuffer);
+  } finally { globalThis.fetch = real; }
+});

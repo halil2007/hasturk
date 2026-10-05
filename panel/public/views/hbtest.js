@@ -35,6 +35,7 @@ export async function hbTestView(el) {
           <li>Hepsiburada'nın test e-postasındaki <b>Merchant ID</b>, <b>servis anahtarı</b> ve <b>entegratör adını</b> girin; kategori, ürün sorularında Enter'a basmanız yeterli.</li>
           <li>Sonunda çıkan özet panoya kopyalanır ve Masaüstü'ne kaydedilir: Hepsiburada'ya açacağınız talebe yapıştırın.</li>
         </ol>
+        <p class="small" style="margin:0"><b>Kalıcı çözüm:</b> <a class="link" href="/hb-proxy.php" download="hb-proxy.php">hb-proxy.php</a> aracı dosyasını kendi hostinginize yükleyip Entegrasyonlar → Hepsiburada → Gelişmiş ayarlar → “Aracı sunucu” alanlarını doldurursanız panel de Hepsiburada'ya hostinginiz üzerinden bağlanır.</p>
         <p class="tiny muted" style="margin:0">Araçtaki “Bağlantı kontrolü” bilgisayarınızdan da 520 / 401 veriyorsa sorun hesap tanımındadır; o çıktıyı Hepsiburada'ya iletin.</p>
       </div>
 

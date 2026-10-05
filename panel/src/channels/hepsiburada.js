@@ -16,7 +16,23 @@ export function hepsiburada(env, meta) {
     ...(json ? { 'Content-Type': 'application/json' } : {}),
   });
   // Gövdesiz (GET) istekte Content-Type gönderilmez: bazı Hepsiburada sunucuları bunu reddedebiliyor (HTTP 520)
-  const call = (url, opts = {}) => http(url, { ...opts, headers: headers(!!opts.body), body: opts.body && JSON.stringify(opts.body) });
+  // Aracı sunucu (isteğe bağlı): Hepsiburada bazı servislerde Cloudflare'den gelen istekleri 520 ile kapatıyor. Adres girilirse tüm
+  // Hepsiburada istekleri kendi hostinginizdeki hb-proxy.php üzerinden (sabit IP) gider. Aracı yalnız *.hepsiburada.com'a iletir.
+  const proxy = str(env.HB_PROXY_URL), pkey = str(env.HB_PROXY_KEY);
+  async function hb(url, opts = {}) {
+    if (!proxy) return http(url, opts);
+    const h = { ...(opts.headers || {}), 'X-Proxy-Key': pkey };
+    let b = opts.body;
+    // Çok parçalı form (FormData): PHP ham gövdeyi okuyabilsin diye bayt olarak, gerçek içerik türü ayrı başlıkta gönderilir
+    if (b instanceof FormData) {
+      const rq = new Request('https://x.invalid/', { method: 'POST', body: b });
+      b = await rq.arrayBuffer();
+      h['X-Content-Type'] = rq.headers.get('content-type');
+      h['Content-Type'] = 'application/octet-stream';
+    }
+    return http(`${proxy}${proxy.includes('?') ? '&' : '?'}u=${encodeURIComponent(url)}`, { ...opts, headers: h, body: b });
+  }
+  const call = (url, opts = {}) => hb(url, { ...opts, headers: headers(!!opts.body), body: opts.body && JSON.stringify(opts.body) });
   const list = (r) => (Array.isArray(r) ? r : (r && (r.items || r.data || r.listings || r.packages)) || []);
   const money = (v) => (v && typeof v === 'object' ? num(v.amount ?? v.value) : num(v));
 
@@ -214,7 +230,7 @@ export function hepsiburada(env, meta) {
     return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.' };
   }
   async function labelFile(pkg) {
-    const res = await http(`${OMS}/packages/merchantId/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(false), raw: true });
+    const res = await hb(`${OMS}/packages/merchantId/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(false), raw: true });
     const type = res.headers.get('content-type') || '';
     if (/pdf/i.test(type)) {
       const buf = new Uint8Array(await res.arrayBuffer());
@@ -286,7 +302,7 @@ export function hepsiburada(env, meta) {
   async function questions({ since, page: p = 0, size = 50 }) {
     const q = new URLSearchParams({ page: String(p + 1), size: String(size), desc: 'true' });
     if (since) q.set('minModifiedAt', new Date(since).toISOString());
-    const r = await http(`${QNA}/issues?${q}`, { headers: qh() });
+    const r = await hb(`${QNA}/issues?${q}`, { headers: qh() });
     const items = (g(r, 'data') || []).map((x) => {
       const conv = g(x, 'conversations') || [];
       const first = conv.find((c) => /customer/i.test(g(c, 'from') || '')) || {};
@@ -308,7 +324,7 @@ export function hepsiburada(env, meta) {
     const fd = new FormData();
     fd.append('Answer', text);
     const h = qh(); delete h['Content-Type'];
-    await http(`${QNA}/issues/${encodeURIComponent(q.remote_id)}/answer`, { method: 'POST', headers: h, body: fd });
+    await hb(`${QNA}/issues/${encodeURIComponent(q.remote_id)}/answer`, { method: 'POST', headers: h, body: fd });
   }
 
   // 520 incelemesi: aynı adres farklı başlık bileşimleriyle denenir; sonuçlar sorunun kaynağını gösterir
@@ -330,18 +346,18 @@ export function hepsiburada(env, meta) {
   }
   async function diagnose({ orderId } = {}) {
     const out = [];
-    await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}` }; });
+    await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}${proxy ? ` · aracı sunucu: ${new URL(proxy).host}` : ''}` }; });
     await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantId/${m}?Offset=0&limit=1`); return { detail: `erişildi · ${page(r).length} paket örneği` }; });
     await diagStep(out, 'Kargodaki paketler', async () => { const r = await call(`${OMS}/packages/merchantId/${m}/shipped?offset=0&limit=1`); return { detail: `erişildi · toplam ${g(r, 'totalCount') ?? '?'}` }; });
     await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
     if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ page: 0, size: 1 }); return { detail: `${r.total ?? r.items.length} soru` }; });
-    if (out.some((x) => x.ok === false && /HTTP 52\d/.test(x.detail || ''))) {
+    if (!proxy && out.some((x) => x.ok === false && /HTTP 52\d/.test(x.detail || ''))) {
       const rows = await probe(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`);
       // Yol yazımı karşılaştırması: OpenAPI "merchantId"; eski sürümlerde "merchantid"
       try { const r = await fetch(`${OMS}/orders/merchantid/${m}?offset=0&limit=1`, { headers: headers(false) }); rows.push(`Eski yol (merchantid küçük harf): HTTP ${r.status}`); } catch (e) { rows.push(`Eski yol: bağlantı hatası (${e.message})`); }
       const any2xx = rows.some((r) => /HTTP 2\d\d/.test(r));
       out.push({ name: '520 incelemesi (sipariş servisi, farklı başlıklarla)', ok: any2xx ? null : false,
-        detail: rows.join('\n') + (any2xx ? '\n→ Başlık farkı: başarılı olan biçim kullanılıyor.' : '\n→ Her biçimde 52x: Hepsiburada sunucusu bağlantıyı yanıtsız kapatıyor. Kimlik ve entegratör adı soru servisinde kabul edildiği için sorun bilgilerde değil; Hepsiburada\'ya bu raporla “SIT OMS / listing servislerinden Cloudflare 520 alıyoruz, istekler Cloudflare Workers üzerinden geliyor; IP kısıtı veya hesap tanımı eksik mi?” diye sorun.') });
+        detail: rows.join('\n') + (any2xx ? '\n→ Başlık farkı: başarılı olan biçim kullanılıyor.' : '\n→ Her biçimde 52x: Hepsiburada sunucusu, panelin çalıştığı Cloudflare sunucularından gelen isteği yanıtsız kapatıyor (başka ağlardan aynı servis cevap veriyor). Çözüm: kendi hostinginize panel adresi/hb-proxy.php dosyasını yükleyip Gelişmiş ayarlar → “Aracı sunucu adresi / anahtarı” alanlarını doldurun; istekler hostinginizin sabit IP\'sinden gider. Ayrıca Hepsiburada\'ya sorun: IP kısıtı veya hesap tanımı eksik mi?') });
     }
     if (orderId) await diagStep(out, 'Sipariş', async () => { const r = await call(`${OMS}/orders/merchantId/${m}/ordernumber/${encodeURIComponent(orderId)}`); return { detail: JSON.stringify(r).slice(0, 600) }; });
     return out;
@@ -386,7 +402,7 @@ export function hepsiburada(env, meta) {
       const fd = new FormData();
       fd.append('file', new Blob([JSON.stringify(products)], { type: 'application/json' }), 'products.json');
       const h = headers(); delete h['Content-Type'];
-      r = await http(`${CAT}/api/products/import`, { method: 'POST', headers: h, body: fd });
+      r = await hb(`${CAT}/api/products/import`, { method: 'POST', headers: h, body: fd });
     }
     const tid = g(g(r, 'data') || {}, 'trackingId') || g(r, 'trackingId', 'id');
     if (!tid) throw new Error('Hepsiburada trackingId döndürmedi: ' + JSON.stringify(r).slice(0, 400));
@@ -401,7 +417,7 @@ export function hepsiburada(env, meta) {
   const uploadStatus = (kind, id) => call(`${LST}/listings/merchantid/${m}/${kind}-uploads/id/${encodeURIComponent(id)}`);
   async function createTestOrder(body) {
     if (!test) throw new Error('Test siparişi yalnızca test (SIT) ortamında oluşturulur: Entegrasyonlar → Hepsiburada → Gelişmiş → Test ortamı = 1');
-    return http(`https://oms-stub-external-sit.hepsiburada.com/orders/merchantId/${encodeURIComponent(m)}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+    return hb(`https://oms-stub-external-sit.hepsiburada.com/orders/merchantId/${encodeURIComponent(m)}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
   }
   const sit = { test: !!test, merchantId: m, categories, attributes, attributeValues, importProducts, productStatus, uploadOne, uploadStatus, createTestOrder };
 

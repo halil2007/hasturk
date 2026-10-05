@@ -36,6 +36,8 @@ export const FIELDS = {
     { k: 'HB_USER_AGENT', label: 'Entegratör adı (User-Agent)', req: true, hint: 'Merchant Portal → Hesabım → Entegrasyon (Entegratör Bilgileri) ekranındaki entegratör adı, ör. hasturk_dev. Boşsa ya da farklıysa Hepsiburada isteği 401/403 ile reddeder.' },
     { k: 'HB_MERCHANT_NAME', label: 'Mağaza adı (Hepsiburada\'da görünen)', hint: 'Buybox sıranızı bulmak için; ürün sayfasındaki satıcı adıyla birebir aynı', adv: true },
     { k: 'HB_TEST', label: 'Test ortamı', hint: '1 = test (SIT) ortamı', adv: true },
+    { k: 'HB_PROXY_URL', label: 'Aracı sunucu adresi (520 hatası için)', hint: 'Kendi hostinginize yüklediğiniz hb-proxy.php adresi, ör. https://alanadiniz.com/hb-proxy.php (dosya: panel adresi/hb-proxy.php)', adv: true, pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan tam adres girin' },
+    { k: 'HB_PROXY_KEY', label: 'Aracı sunucu anahtarı', hint: 'hb-proxy.php içindeki $KEY ile birebir aynı', secret: true, adv: true },
   ],
   pttavm: [
     { k: 'PTTAVM_USERNAME', label: 'API kullanıcı adı', req: true },
