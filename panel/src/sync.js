@@ -189,9 +189,10 @@ export async function applyStock(db, orderIds, settings) {
   return moves;
 }
 
-// ---------- ürün bilgisi: marka ve açıklama ----------
-// Panel ürününde marka / açıklama boşsa bağlı ilanlardan doldurulur (önce ana katalog sitesi, sonra diğer kanallar).
-// Panelde elle girilen değer korunur.
+// ---------- ürün bilgisi: eksik alanları diğer platformlardan tamamla ----------
+// Panel ürününde marka / açıklama / kategori / SKU / barkod boşsa bağlı ilanlardan doldurulur (önce ana katalog sitesi, sonra diğer kanallar).
+// Panelde elle girilen değer korunur. SKU ve barkod başka bir üründe kullanılıyorsa yazılmaz (çakışma ve yanlış eşleşme olmasın);
+// o ilanda yoksa sıradaki platformun değeri denenir.
 export async function fillProductInfo(db, settings) {
   settings = settings || await getSettings(db);
   const cats = catalogOf(settings);
@@ -206,6 +207,24 @@ export async function fillProductInfo(db, settings) {
       WHERE COALESCE(${col}, '') = '' AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = products.id AND COALESCE(l.${col}, '') != '')`);
     n += (r && r.meta && r.meta.changes) || 0;
   }
+  const filled = {};
+  for (const col of ['sku', 'barcode']) {
+    const rows = await all(db, `SELECT p.id, TRIM(l.${col}) AS v, l.channel FROM products p JOIN listings l ON l.product_id = p.id
+      WHERE COALESCE(TRIM(p.${col}), '') = '' AND COALESCE(TRIM(l.${col}), '') != '' ORDER BY p.id, ${rank}`);
+    if (!rows.length) continue;
+    const used = new Set((await all(db, `SELECT LOWER(TRIM(${col})) AS v FROM products WHERE COALESCE(TRIM(${col}), '') != ''`)).map((r) => r.v));
+    const done = new Set(), st = [], t = Date.now();
+    for (const r of rows) {
+      const k = r.v.toLowerCase();
+      if (done.has(r.id) || used.has(k)) continue;
+      used.add(k); done.add(r.id);
+      st.push(db.prepare(`UPDATE products SET ${col} = ?, updated_at = ? WHERE id = ? AND COALESCE(TRIM(${col}), '') = ''`).bind(r.v, t, r.id));
+    }
+    for (const part of chunk(st, 90)) await db.batch(part);
+    if (st.length) filled[col] = st.length;
+    n += st.length;
+  }
+  if (filled.sku || filled.barcode) await log(db, null, 'info', `Eksik ürün bilgisi diğer platformlardan tamamlandı: ${[filled.sku && `${filled.sku} SKU`, filled.barcode && `${filled.barcode} barkod`].filter(Boolean).join(', ')}`);
   return n;
 }
 

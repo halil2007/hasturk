@@ -110,7 +110,7 @@ Panelde **Entegrasyonlar** sayfasında her kanal için bir kart vardır. API bil
 
 **Senkron:** Panel **15 dakikada bir** (Cloudflare zamanlanmış görev) ve **Senkronla** düğmesine basınca çalışır. Her senkronda şu işler yapılır:
 - Her kanaldan yeni ve değişen siparişler çekilir. Değişmeyenler veritabanına yeniden yazılmaz; aynı sipariş ikinci kez oluşmaz.
-- Ürünler, görseller, varyantlar ve kanal stokları yeniden okunur; yeni ilanlar eşleştirilir (stoğu 0 olan eşleşmemiş ilanlar eşleştirmeye girmez, stok gelince döner), ürünün eksik görsel/varyant bilgisi tamamlanır. Mevcut eşleştirmeler ve kanala özel stok kuralları korunur.
+- Ürünler, görseller, varyantlar ve kanal stokları yeniden okunur; yeni ilanlar eşleştirilir (stoğu 0 olan eşleşmemiş ilanlar eşleştirmeye girmez, stok gelince döner), ürünün eksik bilgisi bağlı ilanlardan tamamlanır: görsel, varyant, marka, açıklama, kategori, **SKU ve barkod** (önce ana katalog sitesi, sonra diğer platformlar; ör. ikas'ta barkod boşsa Trendyol'daki barkod yazılır). Panelde dolu olan alan değiştirilmez; başka üründe kullanılan SKU / barkod yazılmaz, sıradaki platformun değeri denenir. Elle eşleştirme ve toplu onaydan sonra da hemen çalışır. Mevcut eşleştirmeler ve kanala özel stok kuralları korunur.
 - Siparişteki ürünler merkezi stoktan düşülür. Her sipariş için hangi üründen kaç adet düşüldüğü kaydedilir. Bu sayede aynı sipariş tekrar gelse veya paketlere bölünse bile **çift düşüm olmaz**. İptal edilen sipariş geri eklenir, iade isteğe bağlıdır.
 - Stoğu değişen ürünler, bağlı oldukları **tüm kanal ilanlarına** gönderilir. Her ilana en son gönderilen adet saklanır ve sadece fark gönderilir. Kanaldaki fiyat değişiklikleri de gönderilir.
 
