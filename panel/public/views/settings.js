@@ -31,6 +31,8 @@ export async function settingsView(el) {
     const co = st.company || {};
     const dis = admin ? '' : 'disabled';
     const mf = (k) => (mail ? mail.fields.find((x) => x.k === k) : null) || {};
+    const prov = mf('MAIL_PROVIDER').value || (mf('MAIL_API_KEY').masked ? 'brevo' : 'smtp');
+    const mailReady = prov === 'smtp' ? !!(mf('MAIL_SMTP_HOST').value && mf('MAIL_SMTP_PASS').masked) : !!mf('MAIL_API_KEY').masked;
     render(el, html`<div class="stack" style="max-width:1000px">
       ${!admin ? html`<div class="notice"><i class="ico ico-warn"></i>Ayarları sadece yönetici değiştirebilir.</div>` : ''}
       <div class="card stack">
@@ -69,7 +71,7 @@ export async function settingsView(el) {
       <div class="card flush"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
         ${live.map((c) => html`<tr><td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td>
-          ${COST_KEYS.map((k) => html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${costOf(st, k, c.id)}" ${dis}></td>`)}</tr>`)}
+          ${COST_KEYS.map((k) => { const own = (st[k] || {})[c.id], extra = /_\d+$/.test(c.id); return html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${extra ? own ?? '' : costOf(st, k, c.id)}" placeholder="${extra ? costOf(st, k, c.id) : ''}" title="${extra ? 'Boş bırakılırsa aynı türdeki ana mağazanın değeri kullanılır' : ''}" ${dis}></td>`; })}</tr>`)}
       </tbody></table></div>
         <div class="card-pad muted tiny" style="padding-top:0">Masraf basamakları: satış − komisyon − kargo − hizmet bedeli − ek kesinti − stopaj = hakediş; hakediş − alış = kâr. Stopaj, pazaryerlerinin 2025'ten beri hakedişten kestiği gelir vergisidir (KDV hariç satış üzerinden, genelde %1); yıllık vergiden mahsup edilir. Kendi siteniz (ikas) için 0 bırakın.</div></div>
 
@@ -83,14 +85,25 @@ export async function settingsView(el) {
         </div>
         <div class="notice small"><i class="ico ico-link"></i><div><b>Paneli kendi alt alan adınızdan açmak</b> (ör. crm.alanadiniz.com.tr, DNS'i taşımadan): cPanel'de alt alan adı oluşturun, <a class="link" href="/api/panel-proxy" download="index.php">index.php</a> dosyasını indirip o alt alan adının klasörüne yükleyin, AutoSSL ile sertifika alın. Panel adresi ilk girişte kendiliğinden güncellenir.</div></div>
         <div><div class="small" style="font-weight:650;margin-bottom:6px">E-posta alınacak mağazalar / pazaryerleri</div><div class="row wrap">${live.map((c) => html`<label class="check"><input type="checkbox" data-mailch="${c.id}" ${(st.mail_channels || {})[c.id] === false ? '' : 'checked'}> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>
-        <details ${mail && mail.fields.some((f) => f.k === 'MAIL_API_KEY' && f.masked) ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">E-posta servisi ${mf('MAIL_API_KEY').masked ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}</summary>
+        <details ${mailReady ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">E-posta servisi ${mailReady ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || mf('MAIL_SMTP_USER').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}</summary>
           <div class="stack" style="margin-top:10px">
-            <div class="notice small"><div><b>Brevo (önerilen, ücretsiz, alan adı gerekmez):</b> brevo.com'da hesap açın → <i>Senders, Domains & Dedicated IPs → Senders</i> bölümünde gönderen e-posta adresinizi ekleyip gelen e-postadaki bağlantıyla doğrulayın → <i>SMTP & API → API Keys</i> bölümünden bir anahtar oluşturup aşağıya yapıştırın. <b>Resend</b> kullanacaksanız alan adınızı Resend'de doğrulamanız gerekir.</div></div>
             <div class="form-grid">
-              <label class="field"><span>Servis</span><select class="input" data-mailf="MAIL_PROVIDER">${[['brevo', 'Brevo'], ['resend', 'Resend']].map(([v, t]) => html`<option value="${v}" ${(mf('MAIL_PROVIDER').value || 'brevo') === v ? 'selected' : ''}>${t}</option>`)}</select></label>
-              <label class="field"><span>API anahtarı</span><input class="input" type="password" autocomplete="off" data-mailf="MAIL_API_KEY" placeholder="${mf('MAIL_API_KEY').masked || 'yapıştırın'}"><small>${mf('MAIL_API_KEY').masked ? 'Kayıtlı (şifreli). Değiştirmek için yenisini yapıştırın.' : 'Şifreli saklanır, ekranda tekrar gösterilmez.'}</small></label>
-              <label class="field"><span>Gönderen e-posta</span><input class="input" data-mailf="MAIL_FROM" value="${mf('MAIL_FROM').value || ''}" placeholder="bildirim@firma.com"><small>Serviste doğrulanmış adres</small></label>
+              <label class="field"><span>Servis</span><select class="input" data-mailf="MAIL_PROVIDER" data-prov>${[['smtp', 'Kendi e-posta sunucum (SMTP)'], ['brevo', 'Brevo'], ['resend', 'Resend']].map(([v, t]) => html`<option value="${v}" ${prov === v ? 'selected' : ''}>${t}</option>`)}</select></label>
+              <label class="field"><span>Gönderen e-posta</span><input class="input" data-mailf="MAIL_FROM" value="${mf('MAIL_FROM').value || ''}" placeholder="bildirim@firma.com"><small>Bildirimlerin gönderileceği adres</small></label>
               <label class="field"><span>Gönderen adı</span><input class="input" data-mailf="MAIL_FROM_NAME" value="${mf('MAIL_FROM_NAME').value || ''}" placeholder="Hastürk Panel"></label>
+            </div>
+            <div class="stack" data-provbox="smtp" ${prov === 'smtp' ? '' : 'hidden'}>
+              <div class="notice small"><div><b>Kendi e-posta adresinizden gönderim:</b> hosting / kurumsal e-posta panelinizdeki (cPanel → E-posta Hesapları → Bağlan / Connect Devices) <b>giden posta (SMTP)</b> bilgilerini girin. Port <b>465</b> (SSL) ya da <b>587</b> (STARTTLS) olmalı; 25 numaralı port Cloudflare'de kapalıdır. Kullanıcı adı genelde e-posta adresinin kendisidir.</div></div>
+              <div class="form-grid">
+                <label class="field"><span>SMTP sunucusu</span><input class="input" data-mailf="MAIL_SMTP_HOST" value="${mf('MAIL_SMTP_HOST').value || ''}" placeholder="mail.alanadiniz.com.tr" autocapitalize="off"></label>
+                <label class="field"><span>Port</span><select class="input" data-mailf="MAIL_SMTP_PORT">${['465', '587'].map((v) => html`<option value="${v}" ${(mf('MAIL_SMTP_PORT').value || '465') === v ? 'selected' : ''}>${v === '465' ? '465 (SSL)' : '587 (STARTTLS)'}</option>`)}</select></label>
+                <label class="field"><span>Kullanıcı adı</span><input class="input" data-mailf="MAIL_SMTP_USER" value="${mf('MAIL_SMTP_USER').value || ''}" placeholder="bildirim@firma.com" autocapitalize="off" autocomplete="off"></label>
+                <label class="field"><span>Şifre</span><input class="input" type="password" autocomplete="new-password" data-mailf="MAIL_SMTP_PASS" placeholder="${mf('MAIL_SMTP_PASS').masked || 'e-posta hesabının şifresi'}"><small>${mf('MAIL_SMTP_PASS').masked ? 'Kayıtlı (şifreli). Değiştirmek için yenisini yazın.' : 'Şifreli saklanır, ekranda tekrar gösterilmez.'}</small></label>
+              </div>
+            </div>
+            <div class="stack" data-provbox="api" ${prov === 'smtp' ? 'hidden' : ''}>
+              <div class="notice small"><div><b>Brevo (ücretsiz, alan adı gerekmez):</b> brevo.com'da hesap açın → <i>Senders</i> bölümünde gönderen adresinizi doğrulayın → <i>SMTP & API → API Keys</i> bölümünden anahtar oluşturup yapıştırın. <b>Resend</b> için alan adınızı Resend'de doğrulamanız gerekir.</div></div>
+              <label class="field"><span>API anahtarı</span><input class="input" type="password" autocomplete="off" data-mailf="MAIL_API_KEY" placeholder="${mf('MAIL_API_KEY').masked || 'yapıştırın'}"><small>${mf('MAIL_API_KEY').masked ? 'Kayıtlı (şifreli). Değiştirmek için yenisini yapıştırın.' : 'Şifreli saklanır, ekranda tekrar gösterilmez.'}</small></label>
             </div>
           </div></details>
         <div class="row wrap"><button class="btn" data-act="mail-test"><i class="ico ico-chat"></i>Deneme e-postası gönder</button><span class="spacer"></span><button class="btn primary" data-act="mail-save">Bildirim ayarlarını kaydet</button></div>
@@ -122,6 +135,11 @@ export async function settingsView(el) {
   }
   const save = async (patch) => { state.settings = await api('settings', { method: 'PUT', body: patch }); };
   el.addEventListener('change', async (e) => {
+    if (e.target.dataset && e.target.dataset.prov !== undefined) {
+      const smtp = e.target.value === 'smtp';
+      $$('[data-provbox]', el).forEach((b) => { b.hidden = (b.dataset.provbox === 'smtp') !== smtp; });
+      return;
+    }
     const k = e.target.dataset.s;
     try {
       if (k) { await save({ [k]: e.target.checked }); toast('Kaydedildi'); if (k === 'stock_sync') load(); }
@@ -156,7 +174,7 @@ export async function settingsView(el) {
     },
     save: (t) => busy(t, async () => {
       const cost = Object.fromEntries(COST_KEYS.map((k) => [k, {}]));
-      $$('[data-cost]', el).forEach((i) => { const [k, c] = i.dataset.cost.split(':'); cost[k][c] = numIn(i.value); });
+      $$('[data-cost]', el).forEach((i) => { const [k, c] = i.dataset.cost.split(':'); cost[k][c] = i.value.trim() === '' && /_\d+$/.test(c) ? '' : numIn(i.value); });
       const sender = {}; $$('[data-sender]', el).forEach((i) => { sender[i.dataset.sender] = i.value.trim(); });
       const company = {}; $$('[data-co]', el).forEach((i) => { company[i.dataset.co] = i.value.trim(); });
       const track = {}; ($('[data-track]', el).value || '').split('\n').forEach((l) => { const i = l.indexOf('='); if (i > 0) track[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });

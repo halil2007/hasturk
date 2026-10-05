@@ -7,13 +7,15 @@ import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfiden
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
+import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
-import { orderProfit, breakdown, listInvoices, syncInvoices } from './finance.js';
+import { can, sectionOf } from '../public/perms.js';
+import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
@@ -624,7 +626,16 @@ async function saveSettings(db, b) {
       v = !!v;
       if (v && !cur.stock_sync) await setSetting(db, 'stock_since', Date.now());
     }
-    if (COST_KEYS.includes(k)) v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, num((v || {})[c], costOf(cur, k, c))]));
+    // Kanal giderleri: yalnız gönderilen kanallar yazılır; ek mağazada boş bırakılan değer silinir (ana mağazanınki kullanılır)
+    if (COST_KEYS.includes(k)) {
+      const next = { ...(cur[k] || {}) };
+      for (const [c, x] of Object.entries(v && typeof v === 'object' ? v : {})) {
+        if (!isChannelId(c)) continue;
+        if (x === '' || x == null) { if (/_\d+$/.test(c)) delete next[c]; continue; }
+        next[c] = num(x, costOf(cur, k, c));
+      }
+      v = next;
+    }
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
     if (k === 'autoprice') v = !!v;
@@ -639,7 +650,7 @@ async function saveSettings(db, b) {
       const bad = v.filter((x) => !validEmail(x));
       if (bad.length) fail(400, 'Geçersiz e-posta adresi: ' + bad.join(', '));
     }
-    if (k === 'mail_channels') v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, (v || {})[c] !== false]));
+    if (k === 'mail_channels') v = { ...(cur.mail_channels || {}), ...Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, x !== false])) };
     if (k === 'panel_url') { v = str(v).replace(/\/+$/, ''); if (v && !/^https?:\/\/[^\s]+$/i.test(v)) fail(400, 'Panel adresi https:// ile başlamalı'); }
     if (k === 'catalog_channels') v = (Array.isArray(v) ? v : []).filter((c) => isChannelId(c));
     if (k === 'company') v = Object.fromEntries(['title', 'legal', 'phone', 'email', 'address', 'tax'].map((f) => [f, str((v || {})[f]).slice(0, 300)]));
@@ -669,6 +680,49 @@ async function channelsInfo(env, db) {
   });
 }
 
+// Kampanya kanalı: istek kanal kimliğiyle gelir (hepsiburada, hepsiburada_2 …)
+async function campaignApi(env, db, path, m, q, b, user) {
+  const id = str(q.channel || b.channel);
+  const c = (await getChannels(env, db)).find((x) => x.id === id && x.enabled && x.campaigns);
+  if (!c) fail(400, 'Kampanya servisi olan bağlı kanal seçin');
+  const K = c.campaigns;
+  if (path === 'campaigns' && m === 'GET') return K.list(Math.max(1, Number(q.page) || 1), 50);
+  if (path === 'campaigns/meta' && m === 'GET') {
+    const [budgets, limits, categories] = await Promise.all([K.budgets().catch(() => []), K.limits().catch(() => null), K.categories().catch(() => [])]);
+    return { budgets: budgets || [], limits, categories: (categories || []).filter((x) => x.isCampaign !== false).map((x) => ({ id: x.categoryId, name: x.categoryName, leaf: !!x.isLeaf, level: x.categoryLevel })) };
+  }
+  let x;
+  if ((x = path.match(/^campaigns\/(\w+)$/)) && m === 'GET') return K.detail(x[1]);
+  if (path === 'campaigns' && m === 'POST') {
+    const kind = str(b.kind), n = (v) => Math.round(num(v));
+    const name = str(b.name).trim();
+    if (!name) fail(400, 'Kampanya adı gerekli');
+    const start = Date.parse(b.startDate), end = Date.parse(b.endDate);
+    if (!start || !end || end <= start) fail(400, 'Başlangıç ve bitiş tarihini kontrol edin');
+    const scope = { conditionCategories: (b.categories || []).length ? b.categories.map(Number) : null, conditionSkus: (b.skus || []).length ? b.skus.map(String) : null };
+    const base = { name, description: str(b.description) || name, startDate: new Date(start).toISOString(), endDate: new Date(end).toISOString(), ...scope, oneTimeUsage: !!b.oneTimeUsage };
+    let body2;
+    if (kind === 'percent') body2 = { ...base, discountPercentage: n(b.discountPercentage), conditionAmount: n(b.conditionAmount), maxDiscountAmount: n(b.maxDiscountAmount), maxCartCount: n(b.maxCartCount) };
+    else if (kind === 'tl') body2 = { ...base, budget: n(b.budget), discountAmount: n(b.discountAmount), conditionAmount: n(b.conditionAmount) };
+    else if (kind === 'xy') body2 = { ...base, conditionProductCount: n(b.conditionProductCount), mustPayProductCount: n(b.mustPayProductCount), iterationCount: n(b.iterationCount) || 1, maxCartCount: n(b.maxCartCount) };
+    else fail(400, 'Kampanya türü seçin');
+    const r = await K.create(kind, body2);
+    await log(db, c.id, 'info', `${user.name}: kampanya oluşturuldu — ${name}`);
+    return { ok: true, result: r };
+  }
+  if ((x = path.match(/^campaigns\/(\w+)\/cancel$/)) && m === 'POST') { await K.cancel(x[1]); await log(db, c.id, 'info', `${user.name}: kampanya iptal edildi (${x[1]})`); return { ok: true }; }
+  fail(404, 'Bulunamadı');
+}
+
+// İade reddine eklenen belge (fotoğraf / PDF): tarayıcıdan base64 gelir, en fazla 5 MB
+function claimFile(f) {
+  if (!f || !f.data) return null;
+  const bin = Uint8Array.from(atob(String(f.data)), (c) => c.charCodeAt(0));
+  if (bin.length > 5 * 1024 * 1024) fail(400, 'Dosya en fazla 5 MB olabilir');
+  if (!/^(image\/(jpeg|png)|application\/pdf)$/.test(f.type || '')) fail(400, 'Yalnız JPEG, PNG ya da PDF eklenebilir');
+  return new File([bin], String(f.name || 'belge').slice(0, 80), { type: f.type });
+}
+
 // ---------- yönlendirme ----------
 // Sadece yöneticinin yapabileceği işlemler (kanal API bilgileri, kullanıcılar, ayarlar, toplu aktarım)
 const ADMIN_ONLY = [/^mail\//, /^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/, /^catalog\//];
@@ -680,16 +734,19 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   const diag = /^integrations\/[a-z0-9_]+\/diagnose$/.test(path);
   if (user.role !== 'admin' && !diag && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
   if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
+  // Personel: yalnız yetkili olduğu bölümler (bkz. public/perms.js)
+  if (!can(user, sectionOf(path))) fail(403, 'Bu bölüm için yetkiniz yok (Kullanıcılar → yetkiler)');
   // Kategori eşleştirme ve pazaryerine ürün yükleme
   if (path.startsWith('catalog/')) return json(await catalogApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
   if (path === 'summary' && m === 'GET') {
-    const [qs, s, notices, match, st, chInfo] = await Promise.all([
+    const [qs, s, notices, match, st, chInfo, cl] = await Promise.all([
       first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'"),
       summary(db),
       first(db, 'SELECT COUNT(*) AS open, SUM(read = 0) AS unread FROM notices WHERE resolved_at IS NULL'),
       first(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
       getSettings(db),
       channelsInfo(env, db),
+      first(db, "SELECT COUNT(*) AS n FROM claims WHERE status = 'waiting'"),
     ]);
     // E-postadaki "panelde aç" bağlantısı için panel adresi (yönetici girmediyse kullanılan adres).
     // Panel sonradan kendi alan adına taşınırsa, kayıtlı workers.dev adresi yeni adresle değiştirilir.
@@ -698,7 +755,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
     const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
     if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
-    return json({ ...s, channels: chInfo, settings: st, user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
+    return json({ ...s, channels: chInfo, settings: st, user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1' });
   }
   // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
   if (path === 'panel-proxy' && m === 'GET') {
@@ -911,6 +968,18 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if (path === 'dashboard' && m === 'GET') return json(await dashboard(db, q));
   // Gelir & gider: dönem masraf basamakları (satış → komisyon → kargo → hizmet bedeli → ek kesinti → stopaj → hakediş → alış → kâr)
+  // Kampanyalar (Hepsiburada sepet indirimleri)
+  if (path === 'campaigns' || path.startsWith('campaigns/')) return json(await campaignApi(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
+  // İade talepleri
+  if (path === 'claims' && m === 'GET') return json(await listClaims(db, { ...q, channel: isChannelId(q.channel) ? q.channel : '' }));
+  if (path === 'claims/sync' && m === 'POST') return json(await syncClaims(env, db));
+  if (path === 'claims/reasons' && m === 'GET') return json({ reasons: await claimReasons(env, db, str(q.channel)) });
+  if ((x = path.match(/^claims\/([a-z0-9_]+)\/(.+)\/(approve|reject)$/)) && m === 'POST') {
+    const b = await body(req), id = decodeURIComponent(x[2]);
+    return json(x[3] === 'approve' ? await approveClaim(env, db, x[1], id, b.lines, user) : await rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user));
+  }
+  if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
+  if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncInvoices(env, db, { force: true })); }
   if (path === 'finance' && m === 'GET') return json(await breakdown(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));

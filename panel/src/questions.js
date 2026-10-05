@@ -60,7 +60,11 @@ export async function listQuestions(db, q) {
     FROM questions q ${w} ORDER BY CASE q.status WHEN 'waiting' THEN 0 ELSE 1 END, q.asked_at ${q.status === 'waiting' ? 'ASC' : 'DESC'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
   const total = (await first(db, `SELECT COUNT(*) AS n FROM questions q ${w}`, ...args)).n;
   const counts = Object.fromEntries((await all(db, `SELECT status, COUNT(*) AS n FROM questions ${q.channel ? 'WHERE channel = ?' : ''} GROUP BY status`, ...(q.channel ? [q.channel] : []))).map((r) => [r.status, r.n]));
-  return { rows, total, counts };
+  // Analiz (son 30 gün, kanal bazında): soru sayısı, bekleyen, cevaplanma oranı, ortalama cevap süresi, panelden cevaplanan
+  const stats = await all(db, `SELECT channel, COUNT(*) AS total, SUM(status = 'waiting') AS waiting, SUM(status = 'answered') AS answered, SUM(answered_by = 'panel') AS by_panel,
+      AVG(CASE WHEN status = 'answered' AND answered_at > asked_at THEN answered_at - asked_at END) AS avg_ms
+    FROM questions WHERE asked_at >= ? GROUP BY channel ORDER BY total DESC`, Date.now() - 30 * 864e5);
+  return { rows, total, counts, stats };
 }
 
 export async function answerQuestion(env, db, channel, id, text, user) {

@@ -3,6 +3,8 @@
 //  - Diğer kullanıcılar panelden eklenir (Kullanıcılar); şifreler PBKDF2-SHA256 ile özetlenip saklanır.
 //  - Oturum imzalı, HttpOnly bir çerezde tutulur; şifre değişince eski oturumlar geçersiz olur.
 import { all, first, run, getRaw, setSetting } from './db.js';
+import { PERM_KEYS } from '../public/perms.js';
+const permsOf = (v) => { try { const a = JSON.parse(v || 'null'); return Array.isArray(a) ? a.filter((k) => PERM_KEYS.includes(k)) : null; } catch { return null; } };
 
 const COOKIE = 'hp_session';
 const DAYS = 30;
@@ -65,10 +67,10 @@ export async function currentUser(req, env, db) {
     if (!password(env)) return null;
     return same(sig, await hmac(secret(env), `0.${exp}.0`)) ? ADMIN : null;
   }
-  const u = await first(db, 'SELECT id, username, name, email, role, active, pass FROM users WHERE id = ?', Number(uid));
+  const u = await first(db, 'SELECT id, username, name, email, role, active, pass, perms FROM users WHERE id = ?', Number(uid));
   if (!u || !u.active) return null;
   if (!same(sig, await hmac(secret(env), `${uid}.${exp}.${u.pass.slice(-12)}`))) return null;
-  return { id: u.id, username: u.username, name: u.name || u.username, email: u.email, role: u.role };
+  return { id: u.id, username: u.username, name: u.name || u.username, email: u.email, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) };
 }
 
 export async function login(req, env, db, { username, password: pass }) {
@@ -78,14 +80,15 @@ export async function login(req, env, db, { username, password: pass }) {
   const f = (await getRaw(db, 'login_fail')) || { n: 0, at: 0 };
   if (f.n >= 8 && Date.now() - f.at < 15 * 60e3) return { ok: false, status: 429, error: 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.' };
   let user = null, ver = '0';
-  if (isAdminName(username) && password(env)) {
+  if (!env.TENANT_SLUG && isAdminName(username) && password(env)) {
     const a = await hmac('cmp', String(pass || '')), b = await hmac('cmp', password(env));
     if (same(a, b)) user = ADMIN;
   }
-  if (!user && !isAdminName(username)) {
+  // Müşteri panelinde ana yönetici (PANEL_PASSWORD) yoktur: "admin" gibi adlar da normal kullanıcıdır
+  if (!user && username && (env.TENANT_SLUG || !isAdminName(username))) {
     const u = await first(db, 'SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND active = 1', String(username).trim());
     if (u && await checkPassword(String(pass || ''), u.pass)) {
-      user = { id: u.id, username: u.username, name: u.name || u.username, role: u.role };
+      user = { id: u.id, username: u.username, name: u.name || u.username, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) };
       ver = u.pass.slice(-12);
       await run(db, 'UPDATE users SET last_login = ? WHERE id = ?', Date.now(), u.id);
     }
@@ -103,23 +106,26 @@ export async function login(req, env, db, { username, password: pass }) {
 export const logoutCookie = () => `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;
 
 // ---------- kullanıcı yönetimi ----------
-export const listUsers = (db) => all(db, 'SELECT id, username, name, email, role, active, created_at, last_login FROM users ORDER BY name COLLATE NOCASE');
+export const listUsers = async (db) => (await all(db, 'SELECT id, username, name, email, role, active, created_at, last_login, perms FROM users ORDER BY name COLLATE NOCASE')).map((u) => ({ ...u, perms: permsOf(u.perms) }));
 export async function saveUser(db, id, b) {
   const username = String(b.username || '').trim(), name = String(b.name || '').trim();
   const role = b.role === 'admin' ? 'admin' : 'staff';
+  // Personel yetkileri: seçilen bölümler (dizi); gönderilmezse değişmez
+  const perms = Array.isArray(b.perms) ? JSON.stringify(b.perms.filter((k) => PERM_KEYS.includes(k))) : undefined;
   if (!id && !/^[\p{L}0-9._-]{3,40}$/u.test(username)) throw new Error('Kullanıcı adı 3-40 karakter olmalı (harf, rakam, . _ -)');
-  if (!id && isAdminName(username)) throw new Error('Bu kullanıcı adı ana yöneticiye ayrılmış');
+  if (!id && isAdminName(username) && !b.tenant) throw new Error('Bu kullanıcı adı ana yöneticiye ayrılmış');
   if (b.password && String(b.password).length < 8) throw new Error('Şifre en az 8 karakter olmalı');
   if (!id) {
     if (!b.password) throw new Error('Şifre gerekli');
     const dup = await first(db, 'SELECT id FROM users WHERE LOWER(username) = LOWER(?)', username);
     if (dup) throw new Error('Bu kullanıcı adı kullanılıyor');
-    await run(db, 'INSERT INTO users (username, name, email, pass, role, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)', username, name || username, String(b.email || ''), await hashPassword(String(b.password)), role, Date.now());
+    await run(db, 'INSERT INTO users (username, name, email, pass, role, active, created_at, perms) VALUES (?, ?, ?, ?, ?, 1, ?, ?)', username, name || username, String(b.email || ''), await hashPassword(String(b.password)), role, Date.now(), perms ?? null);
     return;
   }
   const cur = await first(db, 'SELECT username FROM users WHERE id = ?', id);
   if (!cur) throw new Error('Kullanıcı bulunamadı');
   await run(db, 'UPDATE users SET name = ?, email = ?, role = ?, active = ? WHERE id = ?', name || cur.username, String(b.email || ''), role, b.active === false ? 0 : 1, id);
+  if (perms !== undefined) await run(db, 'UPDATE users SET perms = ? WHERE id = ?', perms, id);
   if (b.password) await run(db, 'UPDATE users SET pass = ? WHERE id = ?', await hashPassword(String(b.password)), id);
 }
 export async function changeOwnPassword(db, user, oldPw, newPw) {

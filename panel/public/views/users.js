@@ -1,6 +1,7 @@
 // Kullanıcılar: panele giriş yapacak personel. Yönetici tüm bölümleri (entegrasyon, kullanıcı, ayar) yönetir;
 // personel siparişleri, kargoyu, ürün ve stokları kullanır. Ana yönetici Cloudflare'deki PANEL_PASSWORD ile girer.
-import { api, state, html, render, $, n, date, dateTime, ago, actions, busy, toast, sheet, confirmBox } from '../core.js';
+import { api, state, html, render, $, $$, n, date, dateTime, ago, actions, busy, toast, sheet, confirmBox } from '../core.js';
+import { PERMS } from '../perms.js';
 
 const ROLE = { admin: 'Yönetici', staff: 'Personel' };
 
@@ -11,7 +12,7 @@ export async function users(el) {
     <div class="card flush" data-box></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
       <div class="card"><h3>Yönetici</h3><p class="muted small" style="margin:6px 0 0">Tüm bölümler: entegrasyon (API) ayarları, kullanıcılar, ayarlar, geçmiş sipariş aktarımı, eşleştirme ve stok kuralları.</p></div>
-      <div class="card"><h3>Personel</h3><p class="muted small" style="margin:6px 0 0">Siparişleri işleme, kargo etiketi, paket bölme, ürün/stok güncelleme, eşleştirme ve raporlar. API bilgilerini ve kullanıcıları göremez.</p></div>
+      <div class="card"><h3>Personel</h3><p class="muted small" style="margin:6px 0 0">Kullanıcı formunda seçilen bölümleri görür (siparişler, kargo, iadeler, sorular, ürünler, stok, eşleştirme, raporlar, gelir-gider). API bilgilerini, kullanıcıları ve ayarları göremez.</p></div>
     </div>
     ${state.owner && (state.user || {}).role === 'admin' ? html`<div class="card flush" data-tenants></div>` : ''}
   </div>`);
@@ -21,7 +22,7 @@ export async function users(el) {
     const main = state.tenant ? '' : html`<tr><td><div style="font-weight:650">Ana yönetici</div><div class="muted tiny">kullanıcı adı boş · şifre Cloudflare PANEL_PASSWORD</div></td><td><span class="pill info">Yönetici</span></td><td class="muted small">—</td><td><span class="pill good">Aktif</span></td><td></td></tr>`;
     render($('[data-box]', el), html`<div class="table-wrap"><table class="t"><thead><tr><th>Kullanıcı</th><th>Yetki</th><th>Son giriş</th><th>Durum</th><th></th></tr></thead><tbody>${main}
       ${rows.map((u) => html`<tr data-id="${u.id}"><td><div style="font-weight:650">${u.name}${me.id === u.id ? html` <span class="muted tiny">(siz)</span>` : ''}</div><div class="muted tiny">${u.username}${u.email ? ' · ' + u.email : ''}</div></td>
-        <td><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role] || u.role}</span></td>
+        <td><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role] || u.role}</span>${u.role !== 'admin' && Array.isArray(u.perms) ? html`<div class="tiny muted" style="max-width:260px">${u.perms.length ? PERMS.filter(([k]) => u.perms.includes(k)).map(([, t]) => t).join(', ') : 'yalnız genel bakış'}</div>` : u.role !== 'admin' ? html`<div class="tiny muted">tüm bölümler</div>` : ''}</td>
         <td class="small" title="${dateTime(u.last_login)}">${u.last_login ? ago(u.last_login) : html`<span class="muted">hiç</span>`}</td>
         <td><span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span></td>
         <td class="r"><button class="btn sm" data-act="edit">Düzenle</button></td></tr>`)}
@@ -37,15 +38,20 @@ export async function users(el) {
         <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" value="${u ? u.username : ''}" ${u ? 'disabled' : ''} required autocapitalize="off"></label>
         <label class="field"><span>E-posta (isteğe bağlı)</span><input class="input" type="email" name="email" value="${u ? u.email || '' : ''}"></label>
         <label class="field"><span>Yetki</span><select class="input" name="role"><option value="staff" ${u && u.role === 'admin' ? '' : 'selected'}>Personel</option><option value="admin" ${u && u.role === 'admin' ? 'selected' : ''}>Yönetici</option></select></label>
+        <div class="stack" data-perms style="gap:6px" ${u && u.role === 'admin' ? 'hidden' : ''}><div class="small" style="font-weight:650">Görebileceği bölümler</div>
+          ${PERMS.map(([k, t, d]) => html`<label class="check" style="align-items:flex-start"><input type="checkbox" data-perm="${k}" ${!u || !Array.isArray(u.perms) || u.perms.includes(k) ? 'checked' : ''}> <span><b>${t}</b> <span class="muted tiny">${d}</span></span></label>`)}
+          <div class="muted tiny">Genel Bakış, bildirimler ve kendi şifresi her zaman açıktır. Entegrasyon, kullanıcı ve ayarlar yalnız yöneticidedir.</div></div>
         <label class="field"><span>${u ? 'Yeni şifre (değiştirmeyecekseniz boş bırakın)' : 'Şifre (en az 8 karakter)'}</span><input class="input" type="password" name="password" autocomplete="new-password" ${u ? '' : 'required'}></label>
         ${u ? html`<label class="check"><span class="switch"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}><span></span></span> Hesap aktif (kapalıysa giriş yapamaz)</label>` : ''}
       </form>`,
       foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`,
     });
+    $('[name=role]', s.el).onchange = (e) => { $('[data-perms]', s.el).hidden = e.target.value === 'admin'; };
     $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
       const fm = $('[data-f]', s.el);
       if (!fm.reportValidity()) return;
       const b = { name: fm.name.value.trim(), username: fm.username.value.trim(), email: fm.email.value.trim(), role: fm.role.value, password: fm.password.value };
+      if (b.role !== 'admin') b.perms = $$('[data-perm]', s.el).filter((x) => x.checked).map((x) => x.dataset.perm);
       if (u) b.active = fm.active.checked;
       await api(u ? `users/${u.id}` : 'users', { method: u ? 'PUT' : 'POST', body: b });
       s.close(); toast('Kaydedildi'); refresh();

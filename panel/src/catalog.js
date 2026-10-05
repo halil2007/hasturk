@@ -57,7 +57,10 @@ function picker(c, catId) {
     if (!text) return null;
     if (!cache.has(attr.id)) cache.set(attr.id, await c.catalog.values(catId, attr.id).catch(() => []));
     const list = cache.get(attr.id), t = norm(text);
-    return list.find((v) => norm(v.value) === t) || list.find((v) => t.includes(norm(v.value)) && norm(v.value).length > 1) || null;
+    // Tam eşleşme; yoksa sayı + birim aynı olan değer ("5 Kg" ↔ "5 kg", "2,5 Lt" ↔ "2.5 Lt"). "15 Kg" asla "5 Kg" ile eşleşmez.
+    const qty = (x) => { const m = /(\d+(?:\.\d+)?)([a-zğüşıöç]*)/.exec(norm(x)); return m ? `${Number(m[1])}|${m[2]}` : null; };
+    const q = qty(text);
+    return list.find((v) => norm(v.value) === t) || (q && list.find((v) => qty(v.value) === q && /\d/.test(t))) || null;
   };
 }
 async function buildAll(c, map, prods, opts, zeroStock) {
@@ -103,7 +106,7 @@ async function automap(db, settings, c, user, { redo = false } = {}) {
   // redo: daha önce otomatik yapılmış eşleştirmeler de yeni puanlamayla yeniden hesaplanır (elle yapılanlara dokunulmaz)
   const locals = (await all(db, `SELECT DISTINCT COALESCE(p.category, '') AS local FROM products p WHERE p.active = 1 AND COALESCE(p.category, '') != ''
     AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph}))
-    AND NOT EXISTS (SELECT 1 FROM category_map m WHERE m.local = p.category AND m.channel = ?${redo ? " AND m.user NOT LIKE 'Otomatik%'" : ''})`, ...cats, c.id)).map((r) => r.local);
+    AND NOT EXISTS (SELECT 1 FROM category_map m WHERE m.local = p.category AND m.channel = ?${redo ? " AND COALESCE(m.user, '') NOT LIKE 'Otomatik%'" : ''})`, ...cats, c.id)).map((r) => r.local);
   const mapped = [], skipped = [];
   for (const local of locals) {
     const r = await suggest(db, c, local, 2), best = r[0];

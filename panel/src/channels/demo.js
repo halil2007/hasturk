@@ -145,6 +145,32 @@ export function demo(meta) {
     async status(ref) { return { done: true, items: (uploads.get(ref) || []).map((k) => ({ key: k, status: 'SUCCESS', ok: true, error: '' })) }; },
     options: ch === 'trendyol' ? [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] : [{ k: 'warranty', label: 'Garanti süresi (ay)' }],
   };
+  // Örnek iade talepleri (Trendyol / Hepsiburada örneği): son teslim edilen siparişlerden birkaçı
+  const decided = new Map();
+  async function claims({ since, until = Date.now(), page = 0 }) {
+    if (page) return { items: [], hasNext: false };
+    const orders = (await fetchOrders(since, until)).filter((o) => o.status === 'delivered').slice(0, 4);
+    const WHY = ['Beğenmedim', 'Hasarlı ürün geldi', 'Yanlış ürün gönderildi', 'Vazgeçtim'];
+    return { hasNext: false, items: orders.map((o, i) => {
+      const id = `CLM-${o.orderNumber}`, st = decided.get(id) || (i === 3 ? 'accepted' : 'waiting');
+      const lines = o.items.slice(0, 1).map((it) => ({ id: `${id}-1`, ids: [`${id}-1`], name: it.name, barcode: it.barcode, sku: it.sku, qty: it.quantity, price: it.unitPrice, reason: WHY[i], note: i === 1 ? 'Kutu ezik geldi, içindeki şişe akmış.' : '', status: st, remoteStatus: st === 'waiting' ? 'Aksiyon bekliyor' : st === 'accepted' ? 'Onaylandı' : 'Reddedildi' }));
+      return { remoteId: id, orderNumber: o.orderNumber, claimedAt: o.orderedAt + 3 * 864e5, status: st, remoteStatus: lines[0] ? lines[0].remoteStatus : '', customer: o.customer, reason: WHY[i], note: lines[0] && lines[0].note, lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: 'Aras Kargo', tracking: `5${o.orderNumber.replace(/\D/g, '')}` };
+    }) };
+  }
+  const claimReasons = async () => [{ id: '1', name: 'Ürün kullanılmış' }, { id: '2', name: 'Ürün hasarlı (müşteri kaynaklı)' }, { id: '3', name: 'Farklı ürün gönderilmiş' }, { id: '4', name: 'Eksik parça' }];
+  const approveClaim = async (c) => { decided.set(c.remote_id, 'accepted'); };
+  const rejectClaim = async (c) => { decided.set(c.remote_id, 'rejected'); };
+  // Örnek Hepsiburada sepet indirimleri
+  const camps = [{ campaignId: 9001, name: '500 TL üzeri %10', description: 'Bahçe ürünlerinde', startDate: new Date(Date.now() - 5 * 864e5).toISOString(), endDate: new Date(Date.now() + 10 * 864e5).toISOString(), status: 1, limit: 100 }];
+  const campaigns = {
+    list: async () => ({ total: camps.length, items: camps }),
+    detail: async (id) => ({ ...camps.find((c) => String(c.campaignId) === String(id)), type: 'percent', conditionAmount: 500, discountAmount: 10, remainingUsageCount: 64 }),
+    budgets: async () => [1000, 2500, 5000],
+    limits: async () => ({ rowCount: 2, limits: [{ lowerLimit: 250, campaignAmounts: [25, 50] }, { lowerLimit: 500, campaignAmounts: [50, 75, 100] }] }),
+    categories: async () => [{ categoryId: 60001, categoryName: 'Gübreler', isLeaf: true, isCampaign: true }, { categoryId: 60002, categoryName: 'Bitki Toprakları', isLeaf: true, isCampaign: true }],
+    create: async (kind, b) => { const id = 9000 + camps.length + 1; camps.push({ campaignId: id, name: b.name, description: b.description, startDate: b.startDate, endDate: b.endDate, status: 1, limit: b.maxCartCount || 0 }); return { campaignId: id }; },
+    cancel: async (id) => { const c = camps.find((x) => String(x.campaignId) === String(id)); if (c) c.status = 3; },
+  };
   // ikas örneği: gerçek ikas gibi gönderi "ikas Kargo ile Gönder" ile açılır; siparişi yenileyince ikas Kargo gönderisi gelmiş olur
   const isIkas = meta.type === 'ikas';
   async function fetchOne(remoteId) {
@@ -157,7 +183,7 @@ export function demo(meta) {
     ...meta, enabled: true, missing: [], demo: true,
     caps: { accept: 'remote', split: 'local', pack: isIkas ? 'external' : 'remote', ...(isIkas ? { external: { label: 'ikas Kargo ile Gönder', url: 'https://demo.myikas.com/admin/order/view/' } } : {}), ship: isIkas ? 'local' : 'remote', label: 'remote', cargo: isIkas ? false : 'change', cancelPackage: true, createProduct: isIkas, price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
     fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, ...(isIkas ? { fetchOne } : { pack }), label, cargoOptions, changeCargo, cancelPackage: ok,
-    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog } : {}),
+    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim, ...(ch === 'hepsiburada' ? { campaigns } : {}) } : {}),
     createProduct: async (pr) => ({ remoteId: `${ch}-${pr.sku || Date.now()}`, remoteProductId: '', sku: pr.sku, barcode: pr.barcode, name: pr.name, price: pr.sale_price, stock: pr.stock }),
   };
 }

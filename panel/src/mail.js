@@ -2,11 +2,12 @@
 // Senkron, bir kanaldan ilk kez gelen siparişi kuyruğa yazar (mail_queue, sipariş başına tek kayıt → aynı sipariş için
 // ikinci e-posta gitmez). Kanalın ilk aktarımı (henüz senkron imleci yokken), geçmiş sipariş aktarımı, 48 saatten eski
 // siparişler ve örnek (demo) kanallar kuyruğa girmez. Kuyruk her senkron sonunda gönderilir; hata olursa birkaç kez denenir.
-// Servis: Brevo (gönderen adresini e-postayla doğrulamak yeterli, alan adı gerekmez) ya da Resend (alan adı doğrulaması gerekir).
+// Servis: kendi e-posta sunucunuz (SMTP), Brevo (gönderen adresini e-postayla doğrulamak yeterli) ya da Resend (alan adı doğrulaması gerekir).
 // API anahtarı Entegrasyonlar'daki diğer anahtarlar gibi şifreli saklanır.
 import { all, first, run, getSettings, getRaw, log, notify, resolve } from './db.js';
 import { loadConfig, effectiveEnv } from './config.js';
 import { http, chunk } from './util.js';
+import { smtpSend } from './smtp.js';
 
 const MAX_AGE = 48 * 3600e3;
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -39,9 +40,14 @@ export async function queueNew(db, ch, ids, settings) {
 export async function sendMail(env, db, { to, subject, html, text }) {
   const e = effectiveEnv(env, await loadConfig(env, db));
   const provider = String(e.MAIL_PROVIDER || 'brevo').toLowerCase().trim();
-  const key = e.MAIL_API_KEY, from = String(e.MAIL_FROM || '').trim(), name = e.MAIL_FROM_NAME || 'Hastürk Panel';
-  if (!key) throw new Error('E-posta servisi API anahtarı girilmemiş (Ayarlar → Bildirimler)');
+  const key = e.MAIL_API_KEY, from = String(e.MAIL_FROM || e.MAIL_SMTP_USER || '').trim(), name = e.MAIL_FROM_NAME || 'Hastürk Panel';
   if (!validEmail(from)) throw new Error('Gönderen e-posta adresi girilmemiş veya geçersiz (Ayarlar → Bildirimler)');
+  // Kendi e-posta sunucunuz (hosting / kurumsal e-posta): SMTP 465 (SSL) ya da 587 (STARTTLS)
+  if (provider === 'smtp') {
+    if (!e.MAIL_SMTP_HOST || !e.MAIL_SMTP_PASS) throw new Error('SMTP sunucusu ve şifresi girilmemiş (Ayarlar → Bildirimler)');
+    return smtpSend({ host: String(e.MAIL_SMTP_HOST).trim(), port: Number(e.MAIL_SMTP_PORT) || 465, user: String(e.MAIL_SMTP_USER || from).trim(), pass: e.MAIL_SMTP_PASS, from, fromName: name, to, subject, html, text }, { connect: env.__connect });
+  }
+  if (!key) throw new Error('E-posta servisi API anahtarı girilmemiş (Ayarlar → Bildirimler)');
   if (provider === 'resend') {
     return http('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },

@@ -413,6 +413,80 @@ export function trendyol(env, meta) {
     return { invoices: invoices.size, items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
   }
 
+  // ---------- iade talepleri (claims) ----------
+  // Her ürün adedi ayrı bir talep kalemi (claimItem); aynı satır + durum + gerekçe tek satırda toplanır (ids: kalem kimlikleri).
+  // Yalnız "WaitingInAction" (aksiyon bekliyor) kalemler onaylanır / reddedilir. Ret: claim issue (multipart; belge eklenebilir).
+  const CST = { WaitingInAction: 'waiting', Accepted: 'accepted', Rejected: 'rejected', Created: 'other', WaitingFraudCheck: 'other', Unresolved: 'other', Cancelled: 'other', InAnalysis: 'other' };
+  const CST_TR = { WaitingInAction: 'Aksiyon bekliyor', Accepted: 'Onaylandı', Rejected: 'Reddedildi', Created: 'Oluşturuldu (kargo yolda)', WaitingFraudCheck: 'Kontrol ediliyor', Unresolved: 'Anlaşmazlık', Cancelled: 'İptal', InAnalysis: 'Trendyol inceliyor' };
+  async function claims({ since, until = Date.now(), page = 0, size = 50 }) {
+    const r = await call(`/order/sellers/${seller}/claims?startDate=${since}&endDate=${until}&page=${page}&size=${Math.min(200, size)}`);
+    const items = (r.content || []).map((c) => {
+      const by = new Map();
+      for (const it of c.items || []) {
+        const ol = it.orderLine || {};
+        for (const ci of it.claimItems || []) {
+          const st = (ci.claimItemStatus && ci.claimItemStatus.name) || '', why = (ci.customerClaimItemReason && ci.customerClaimItemReason.name) || '';
+          const k = `${ol.id}|${st}|${why}`;
+          const l = by.get(k) || { id: String(ci.id), ids: [], name: str(ol.productName), barcode: str(ol.barcode), sku: str(ol.merchantSku), qty: 0, price: num(ol.price), reason: why, note: str(ci.customerNote || ci.note), status: CST[st] || 'other', remoteStatus: CST_TR[st] || st };
+          l.ids.push(String(ci.id)); l.qty++;
+          by.set(k, l);
+        }
+      }
+      const lines = [...by.values()];
+      const status = lines.some((l) => l.status === 'waiting') ? 'waiting' : lines.length && lines.every((l) => l.status === 'accepted') ? 'accepted' : lines.some((l) => l.status === 'rejected') ? 'rejected' : 'other';
+      return {
+        remoteId: String(c.id), orderNumber: str(c.orderNumber), claimedAt: num(c.claimDate) || Date.now(), status, remoteStatus: [...new Set(lines.map((l) => l.remoteStatus))].join(', '),
+        customer: [c.customerFirstName, c.customerLastName].filter(Boolean).join(' '), reason: [...new Set(lines.map((l) => l.reason).filter(Boolean))].join(', '),
+        note: lines.map((l) => l.note).filter(Boolean).join(' · '), lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: str(c.cargoProviderName), tracking: str(c.cargoTrackingNumber),
+      };
+    });
+    return { items, hasNext: page + 1 < num(r.totalPages) };
+  }
+  const claimIds = (lines) => lines.flatMap((l) => l.ids || [l.id]).map(String);
+  async function approveClaim(c, lines) {
+    await call(`/order/sellers/${seller}/claims/${encodeURIComponent(c.remote_id)}/items/approve`, { method: 'PUT', body: { claimLineItemIdList: claimIds(lines), params: {} } });
+  }
+  async function rejectClaim(c, lines, { reasonId, text, file }) {
+    const fd = new FormData();
+    fd.append('claimIssueReasonId', String(reasonId)); fd.append('claimItemIdList', claimIds(lines).join(',')); fd.append('description', String(text).slice(0, 500));
+    if (file) fd.append('files', file, file.name);
+    const h = headers(); delete h['Content-Type'];
+    await http(`${BASE}/order/sellers/${seller}/claims/${encodeURIComponent(c.remote_id)}/issue`, { method: 'POST', headers: h, body: fd });
+  }
+  let reasonCache = null;
+  async function claimReasons() {
+    if (!reasonCache) reasonCache = ((await call('/order/claim-issue-reasons')) || []).map((x) => ({ id: String(x.id), name: str(x.name) }));
+    return reasonCache;
+  }
+
+  // ---------- hakediş (cari hesap ekstresi: settlements) ----------
+  // Satış, iade, indirim, kupon ve komisyon düzeltmeleri; her kaydın satıcı hakedişi (sellerRevenue) ve ödeme tarihi.
+  // Önce tüm türler tek istekte (transactionTypes) denenir; servis kabul etmezse tür tür okunur. En fazla 15 günlük aralık.
+  const ST_TYPES = { Sale: 'Satış', Return: 'İade', Discount: 'İndirim', DiscountCancel: 'İndirim iptali', Coupon: 'Kupon', CouponCancel: 'Kupon iptali', SellerRevenuePositive: 'Hakediş düzeltme (+)', SellerRevenueNegative: 'Hakediş düzeltme (−)',
+    CommissionPositive: 'Komisyon düzeltme (+)', CommissionNegative: 'Komisyon düzeltme (−)', ManualRefund: 'Manuel iade', ProvisionPositive: 'Provizyon (+)', ProvisionNegative: 'Provizyon (−)', DeliveryFee: 'Teslimat bedeli' };
+  async function settlements(since, until) {
+    const W = 14 * 864e5, out = [];
+    const row = (x) => {
+      const sign = num(x.debt) > 0 && !num(x.credit) ? -1 : 1, rev = Math.abs(num(x.sellerRevenue ?? (num(x.credit) - num(x.debt))));
+      return { remoteId: String(x.id), date: num(x.transactionDate), type: ST_TYPES[x.transactionType] || str(x.transactionType), orderNumber: str(x.orderNumber), amount: Math.round(sign * rev * 100) / 100,
+        commission: Math.round(sign * Math.abs(num(x.commissionAmount)) * 100) / 100, paymentDate: num(x.paymentDate) || null, dueDate: num(x.paymentDate) || null, paid: !!x.paymentOrderId, paymentId: str(x.paymentOrderId) };
+    };
+    const read = async (q, from, to) => {
+      for (let page = 0; page < 40; page++) {
+        const r = await call(`/finance/che/sellers/${seller}/settlements?${q}&startDate=${from}&endDate=${to}&page=${page}&size=1000`);
+        out.push(...(r.content || []).map(row));
+        if (page + 1 >= (r.totalPages || 1)) break;
+      }
+    };
+    let joint = true;
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      if (joint) { try { await read(`transactionTypes=${Object.keys(ST_TYPES).join(',')}`, from, to); continue; } catch (e) { if (!/HTTP (400|422|500)/.test(e.message)) throw e; joint = false; } }
+      for (const t of Object.keys(ST_TYPES)) await read(`transactionType=${t}`, from, to);
+    }
+    return [...new Map(out.map((x) => [x.remoteId, x])).values()];
+  }
+
   // ---------- kesilen faturalar / kesintiler (cari hesap ekstresi: otherfinancials) ----------
   // Kesinti faturaları (kargo, platform hizmet bedeli, reklam, komisyon ...), stopaj, komisyon sözleşme faturaları ve iade faturaları.
   // Servis en fazla 15 günlük aralık kabul eder; PDF bağlantısı vermez (fatura no / açıklama ile Trendyol panelinden indirilir).
@@ -451,6 +525,6 @@ export function trendyol(env, meta) {
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices,
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
   };
 }

@@ -17,24 +17,29 @@ import { notices } from './views/notices.js';
 import { users } from './views/users.js';
 import { settingsView } from './views/settings.js';
 import { financeView } from './views/finance.js';
+import { claimsView, claimChannels } from './views/claims.js';
+import { campaignsView, campaignChannels } from './views/campaigns.js';
+import { can } from './perms.js';
 
 const ROUTES = [
   { path: '', title: 'Genel Bakış', icon: 'home', view: dashboard },
   { sec: 'Satış' },
-  { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders' },
-  { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo' },
-  { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', when: () => qChannels().length > 0 },
+  { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders', perm: 'orders' },
+  { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo', perm: 'cargo' },
+  { path: 'iadeler', title: 'İadeler', icon: 'back', view: claimsView, count: 'claims', when: () => claimChannels().length > 0, perm: 'returns' },
+  { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', when: () => qChannels().length > 0, perm: 'questions' },
   { sec: 'Katalog' },
-  { path: 'urunler', title: 'Ürünler', icon: 'box', view: products },
-  { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock' },
-  { path: 'urun-yukle', title: 'Ürün Yükle', icon: 'upload', view: uploadView },
-  { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match' },
-  { path: 'buybox', title: 'Buybox', icon: 'bolt', view: buyboxView, when: () => bbChannels().length > 0 },
+  { path: 'urunler', title: 'Ürünler', icon: 'box', view: products, perm: 'products' },
+  { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock' },
+  { path: 'urun-yukle', title: 'Ürün Yükle', icon: 'upload', view: uploadView, perm: 'products' },
+  { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match' },
+  { path: 'kampanyalar', title: 'Kampanyalar', icon: 'tag', view: campaignsView, when: () => campaignChannels().length > 0, perm: 'products' },
+  { path: 'buybox', title: 'Buybox', icon: 'bolt', view: buyboxView, when: () => bbChannels().length > 0, perm: 'products' },
   { sec: 'Raporlar' },
-  { path: 'analiz', title: 'Analizler', icon: 'pie', view: insightsView },
-  { path: 'gelir-gider', title: 'Gelir & Gider', icon: 'calc', view: financeView },
-  { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView },
-  { path: 'musteriler', title: 'Müşteriler', icon: 'user', view: customersView },
+  { path: 'analiz', title: 'Analizler', icon: 'pie', view: insightsView, perm: 'reports' },
+  { path: 'gelir-gider', title: 'Gelir & Gider', icon: 'calc', view: financeView, perm: 'finance' },
+  { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView, perm: 'finance' },
+  { path: 'musteriler', title: 'Müşteriler', icon: 'user', view: customersView, perm: 'reports' },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
   { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices' },
@@ -43,13 +48,13 @@ const ROUTES = [
 ];
 const PAGES = ROUTES.filter((r) => r.view);
 const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kargo', 'Kargo', 'truck'], ['stoklar', 'Stok', 'db']];
-const canSee = (r) => (!r.admin || !state.user || state.user.role === 'admin') && (!r.when || r.when());
+const canSee = (r) => (!r.admin || !state.user || state.user.role === 'admin') && can(state.user, r.perm) && (!r.when || r.when());
 
 function nav() {
   const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-count="${r.count}"></span>` : ''}</a>`;
   render($('[data-nav]'), html`${ROUTES.filter((r) => (!r.view || canSee(r)) && !r.hidden).map((r) => (r.sec ? html`<div class="nav-sec">${r.sec}</div>` : link(r)))}`);
   render($('[data-nav-foot]'), '');
-  render($('[data-tabbar]'), html`${TABS.map(([p, t, i]) => html`<a href="#/${p}" data-path="${p}"><i class="ico ico-${i}"></i><span>${t}</span>${p === 'siparisler' ? html`<span class="dotn hide" data-count="orders"></span>` : ''}</a>`)}<button data-act="more"><i class="ico ico-menu"></i><span>Menü</span></button>`);
+  render($('[data-tabbar]'), html`${TABS.filter(([p]) => { const r = PAGES.find((x) => x.path === p); return !r || canSee(r); }).map(([p, t, i]) => html`<a href="#/${p}" data-path="${p}"><i class="ico ico-${i}"></i><span>${t}</span>${p === 'siparisler' ? html`<span class="dotn hide" data-count="orders"></span>` : ''}</a>`)}<button data-act="more"><i class="ico ico-menu"></i><span>Menü</span></button>`);
 }
 
 export function refreshChrome(s = state.summary) {
@@ -64,7 +69,7 @@ export function refreshChrome(s = state.summary) {
     sb.querySelector('[data-support-exit]').onclick = async () => { await api('logout', { method: 'POST' }).catch(() => {}); store.set('firma', ''); location.reload(); };
   }
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
-  const counts = { orders: n, questions: s.questions || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
+  const counts = { orders: n, questions: s.questions || 0, claims: s.claims || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
   $$('[data-count]').forEach((el) => { const v = counts[el.dataset.count] || 0; el.textContent = v > 99 ? '99+' : v; el.classList.toggle('hide', !v); el.classList.toggle('warn', el.dataset.count === 'match' || el.dataset.count === 'stock'); });
   const chs = state.channels.filter((c) => !c.paused);
   const on = chs.filter((c) => c.enabled), err = chs.filter((c) => c.enabled && !c.demo && c.last && (!c.last.ok || c.last.listingsError));

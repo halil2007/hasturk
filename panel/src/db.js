@@ -139,6 +139,18 @@ const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS invoices (channel TEXT NOT NULL, remote_id TEXT NOT NULL, no TEXT, date INTEGER NOT NULL, type TEXT NOT NULL, description TEXT,
     amount REAL NOT NULL DEFAULT 0, order_number TEXT, url TEXT, synced_at INTEGER, PRIMARY KEY (channel, remote_id))`,
   'CREATE INDEX IF NOT EXISTS invoices_date ON invoices(date)',
+  // Hakediş kayıtları (pazaryeri hesap ekstresi: satış, iade, indirim, komisyon …; ödeme / vade tarihi)
+  `CREATE TABLE IF NOT EXISTS settlements (channel TEXT NOT NULL, remote_id TEXT NOT NULL, date INTEGER, type TEXT, order_number TEXT, amount REAL NOT NULL DEFAULT 0, commission REAL,
+    payment_date INTEGER, due_date INTEGER, paid INTEGER NOT NULL DEFAULT 0, payment_id TEXT, synced_at INTEGER, PRIMARY KEY (channel, remote_id))`,
+  'CREATE INDEX IF NOT EXISTS settlements_due ON settlements(due_date)',
+  'CREATE INDEX IF NOT EXISTS settlements_order ON settlements(channel, order_number)',
+  // İade talepleri (bkz. claims.js)
+  `CREATE TABLE IF NOT EXISTS claims (channel TEXT NOT NULL, remote_id TEXT NOT NULL, order_number TEXT, order_id TEXT, claimed_at INTEGER NOT NULL, status TEXT NOT NULL,
+    remote_status TEXT, customer TEXT, reason TEXT, note TEXT, lines TEXT, amount REAL, cargo TEXT, tracking TEXT, synced_at INTEGER, decided_at INTEGER, decided_by TEXT,
+    decision_note TEXT, error TEXT, PRIMARY KEY (channel, remote_id))`,
+  'CREATE INDEX IF NOT EXISTS claims_status ON claims(status, claimed_at)',
+  // Personel yetkileri (JSON bölüm listesi; boşsa tüm bölümler) — bkz. public/perms.js
+  'ALTER TABLE users ADD COLUMN perms TEXT',
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
   'CREATE INDEX IF NOT EXISTS products_category ON products(category)',
 ];

@@ -14,6 +14,7 @@ export async function questionsView(el, rest, query = {}) {
     <div class="row wrap"><div class="tabs" style="flex:1" data-tabs></div>
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Soru, ürün veya müşteri" data-q value="${f.q}"></div>
       <button class="btn" data-act="sync"><i class="ico ico-sync"></i>Soruları yenile</button>${isAdmin() ? html`<button class="btn ghost" data-act="tpl">Hazır cevaplar</button>` : ''}</div>
+    <div data-stats></div>
     <div data-box></div>
   </div>`);
   const tpls = () => (state.settings && state.settings.answer_templates) || [];
@@ -34,7 +35,18 @@ export async function questionsView(el, rest, query = {}) {
         <div class="row"><span class="cnt" data-cnt>0 / ${L.max}</span><span class="spacer"></span>${r.due_at ? html`<span class="muted tiny">son cevap: ${dateTime(r.due_at)}</span>` : ''}<button class="btn primary" data-act="answer"><i class="ico ico-check"></i>Cevapla</button></div>` : ''}
     </div>`;
   }
+  // Son 30 gün kanal bazında soru analizi
+  const dur = (ms) => (!ms ? '—' : ms < 3600e3 ? `${Math.max(1, Math.round(ms / 60e3))} dk` : ms < 2 * 864e5 ? `${Math.round(ms / 3600e3)} sa` : `${Math.round(ms / 864e5)} gün`);
+  function drawStats() {
+    const st = (data.stats || []).filter((x) => !f.channel || x.channel === f.channel);
+    render($('[data-stats]', el), st.length ? html`<div class="card flush"><div class="card-pad card-head"><h2>Soru analizi</h2><span class="muted small">son 30 gün</span></div>
+      <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Soru</th><th class="r">Bekleyen</th><th class="r">Cevaplanma</th><th class="r">Ort. cevap süresi</th><th class="r">Panelden</th></tr></thead><tbody>
+      ${st.map((x) => html`<tr><td>${chBadge(x.channel)}</td><td class="r num">${n(x.total)}</td><td class="r num" style="color:${x.waiting ? 'var(--bad)' : 'inherit'};font-weight:650">${n(x.waiting)}</td>
+        <td class="r num">%${n(x.total ? (x.answered / x.total) * 100 : 0)}</td><td class="r num">${dur(x.avg_ms)}</td><td class="r num">${n(x.by_panel)}</td></tr>`)}
+      </tbody></table></div></div>` : '');
+  }
   function draw() {
+    drawStats();
     const c = data.counts, total = Object.values(c).reduce((a, x) => a + x, 0);
     const chs = qChannels();
     render($('[data-chs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>${chs.map((x) => html`<button class="ch-tab ${f.channel === x.id ? 'on' : ''}" data-act="ch" data-id="${x.id}">${chLogo(x.id)}${x.name}</button>`)}`);

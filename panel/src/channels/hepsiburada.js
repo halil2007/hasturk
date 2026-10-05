@@ -488,6 +488,78 @@ export function hepsiburada(env, meta) {
     return { items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
   }
 
+  // ---------- iade talepleri (claims): oms-external /claims ----------
+  // Her talep tek ürün (SKU) satırıdır; talep numarası (number) ile onaylanır / reddedilir. "AwaitingAction" talepler karar bekler.
+  const HCS = { AwaitingAction: 'waiting', Accepted: 'accepted', Refunded: 'accepted', Rejected: 'rejected', NewRequest: 'other', InDispute: 'other', Cancelled: 'other', AwaitingPreApproval: 'other' };
+  const HCS_TR = { AwaitingAction: 'Aksiyon bekliyor', Accepted: 'Onaylandı', Refunded: 'İade edildi', Rejected: 'Reddedildi', NewRequest: 'Yeni talep (ürün yolda)', InDispute: 'İtirazda', Cancelled: 'İptal', AwaitingPreApproval: 'Ön onay bekliyor' };
+  const hbDate = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+  async function claims({ since, until = Date.now(), page: p = 0, size = 100 }) {
+    const lim = Math.min(100, size);
+    const rows = list(await call(`${OMS}/claims/merchantId/${m}?beginDate=${encodeURIComponent(hbDate(since))}&endDate=${encodeURIComponent(hbDate(until))}&offset=${p * lim}&limit=${lim}`));
+    const items = rows.map((c) => {
+      const st = str(g(c, 'status')), qty = num(g(c, 'quantity'), 1), price = money(g(c, 'priceAmount'));
+      const no = str(g(c, 'number', 'claimNumber'));
+      return {
+        remoteId: no || str(g(c, 'id')), orderNumber: str(g(c, 'orderNumber')), claimedAt: Date.parse(g(c, 'claimDate') || '') || Date.now(), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st,
+        customer: str(g(c, 'customerName')), reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')),
+        lines: [{ id: no, name: str(g(c, 'productName')) || str(g(c, 'sku')), sku: str(g(c, 'sku')), qty, price, reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st }],
+        amount: money(g(c, 'totalPriceAmount')) || price * qty, cargo: '', tracking: '',
+      };
+    });
+    return { items, hasNext: rows.length >= lim };
+  }
+  const HB_REASONS = [['BoxIsEmpty', 'Koli boş geldi'], ['WrongProduct', 'Yanlış ürün gönderilmiş'], ['ProductIsDamaged', 'Ürün hasarlı'], ['NoSuchAccessory', 'Aksesuar eksik'],
+    ['ItHasBeenSentWithOtherProducts', 'Başka ürünlerle gönderilmiş'], ['ThereIsNoCargoReport', 'Kargo hasar tutanağı yok'], ['CustomerReturnedWrongItem', 'Müşteri farklı ürün göndermiş'],
+    ['CustomerPackageIsNotInTheConditionISent', 'Paket gönderdiğim gibi değil'], ['ProductHasBeenUsed', 'Ürün kullanılmış'], ['ProductIsNotInSellableCondition', 'Ürün satılabilir durumda değil'],
+    ['MissingInvoice', 'Fatura eksik'], ['SomePartsOrSomeAccessoriesOrSomePapersAreMissing', 'Parça / aksesuar / belge eksik']];
+  const claimReasons = async () => HB_REASONS.map(([id, name]) => ({ id, name }));
+  async function approveClaim(c) { await call(`${OMS}/claims/number/${encodeURIComponent(c.remote_id)}/accept`, { method: 'POST', body: {} }); }
+  async function rejectClaim(c, lines, { reasonId, text }) {
+    await call(`${OMS}/claims/number/${encodeURIComponent(c.remote_id)}/reject`, { method: 'POST', body: { ClaimRejectionReason: reasonId, MerchantStatement: String(text).slice(0, 1000), Reports: [], UploadedReportsUrls: [] } });
+  }
+
+  // ---------- hakediş (mpfinance işlemleri): ödenecek (WillBePaid) ve ödenen (Paid) kayıtlar ----------
+  // Gelir kayıtları (+), gider kayıtları (−); vade tarihi (dueDate) ödeme günüdür. Kayıt tarihine göre en fazla 1 aylık aralıklarla.
+  const HB_TR = { Payment: 'Satış', Return: 'İade', CampaignDiscount: 'Kampanya indirimi', Commission: 'Komisyon', Stoppage: 'Stopaj' };
+  async function settlements(since, until) {
+    const W = 28 * 864e5, d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10), out = new Map();
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      for (let off = 0; off < 100000; off += 100) {
+        const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=${off}&Limit=100&Status=Paid,WillBePaid&RecordDateStart=${d(from)}&RecordDateEnd=${d(to)}`));
+        for (const x of rows) {
+          const tt = str(g(x, 'transactionType'));
+          if (/^TotalPayment$/.test(tt)) continue; // toplam ödeme satırı ayrı kalemleri tekrar eder
+          const v = Math.abs(money(g(x, 'netAmount')) || money(g(x, 'amount'))), inc = g(x, 'isIncome');
+          const amount = (inc === true || (inc == null && money(g(x, 'amount')) > 0) ? 1 : -1) * v;
+          const due = Date.parse(g(x, 'dueDate') || '') || null, paidAt = Date.parse(g(x, 'paymentDate') || '') || null;
+          out.set(str(g(x, 'id')), { remoteId: str(g(x, 'id')), date: Date.parse(g(x, 'orderDate') || g(x, 'invoiceDate') || '') || from, type: HB_TR[tt] || hbType[tt] || tt, orderNumber: str(g(x, 'orderNumber')),
+            amount: Math.round(amount * 100) / 100, commission: /^Commission/.test(tt) ? Math.round(amount * 100) / 100 : 0, paymentDate: paidAt, dueDate: due || paidAt, paid: /^Paid$/i.test(str(g(x, 'status'))), paymentId: '' });
+        }
+        if (rows.length < 100) break;
+      }
+    }
+    return [...out.values()];
+  }
+
+  // ---------- kampanyalar: satıcı sepet indirimleri (diskonto-external /self-campaign) ----------
+  // Yüzde indirim, TL indirim (bütçeli) ve X al Y öde; tüm ürünlerde, kategorilerde ya da SKU listesinde. Bütçe ve tutar sınırları servisten gelir.
+  const DSK = 'https://diskonto-external.hepsiburada.com';
+  const dsk = async (path, opts) => { const r = await call(DSK + path, opts); if (r && r.success === false) throw new Error('Hepsiburada: ' + [].concat(r.errors || r.message || 'işlem başarısız').join(', ')); return r && r.data !== undefined ? r.data : r; };
+  const campaigns = {
+    async list(page = 1, size = 50) { const d = await dsk(`/self-campaign/${m}/discounts?page=${page}&pagesize=${size}`); return { total: num(d && d.totalCount), items: (d && d.items) || [] }; },
+    detail: (id) => dsk(`/self-campaign/${m}/discount/${encodeURIComponent(id)}`),
+    budgets: () => dsk(`/self-campaign/${m}/budgets`),
+    limits: () => dsk(`/self-campaign/${m}/limits`),
+    categories: () => dsk(`/categories/${m}`),
+    async create(kind, b) {
+      const path = { percent: 'percent-discount', tl: 'tl-discount', xy: 'xy-discount' }[kind];
+      if (!path) throw new Error('Bilinmeyen kampanya türü');
+      return dsk(`/self-campaign/${m}/${path}`, { method: 'POST', body: b });
+    },
+    cancel: (id) => dsk(`/self-campaign/${m}/cancel-discount`, { method: 'POST', body: { campaignId: Number(id) || id } }),
+  };
+
   // ---------- kesilen faturalar / kesintiler (mpfinance işlemleri) ----------
   // Gider türündeki işlemler fatura numarasına göre birleştirilir (aynı faturanın satırları tek kayıt). İade (…Refund) eksi tutarla.
   // Servis tarih aralığını en fazla 1 ay kabul eder; PDF bağlantısı vermez.
@@ -526,6 +598,6 @@ export function hepsiburada(env, meta) {
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns,
   };
 }

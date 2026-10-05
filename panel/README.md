@@ -167,9 +167,17 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 - **Stopaj:** 1 Ocak 2025'ten beri pazaryerleri hakedişten **KDV hariç satış tutarının %1'ini** gelir vergisi olarak keser (9284 sayılı CBK). Pazaryerleri için varsayılan %1, kendi siteniz (ikas) için 0. Yıllık vergiden mahsup edildiği için raporda ayrıca belirtilir.
 - **Kesilen faturalar:** Trendyol (cari hesap ekstresi: kesinti faturaları — kargo, platform hizmet bedeli, reklam —, stopaj, komisyon sözleşme ve iade faturaları) ve Hepsiburada (muhasebe işlemleri: komisyon, stopaj, kargo, reklam / pazarlama, hizmet bedeli, ceza; aynı faturanın satırları birleştirilir) 6 saatte bir çekilip panelde saklanır, türlerine göre toplanır. Kanallar PDF bağlantısı vermediği için PDF, kanalın kendi panelinden fatura numarasıyla indirilir. N11, idefix, Pazarama ve PttAVM'in fatura servisi yoktur.
 
+### İadeler, hakediş, kampanyalar
+
+- **İadeler** (Satış → İadeler): Trendyol ve Hepsiburada iade talepleri her senkronda çekilir. "Aksiyon bekliyor" durumundaki talepler panelden **onaylanır** ya da gerekçe + açıklama (Trendyol'da fotoğraf / PDF eki) ile **reddedilir**. Karar doğrudan pazaryerine gider; panelde kim, ne zaman, hangi gerekçeyle karar verdi saklanır.
+- **Hakediş** (Raporlar → Gelir & Gider): Trendyol hesap ekstresi (satış, iade, indirim, kupon, komisyon düzeltmeleri; ödeme tarihi) ve Hepsiburada ödenecek / ödenen kayıtları 6 saatte bir çekilir. Ödeme günlerine göre ödenen / ödenecek / vadesi geçmiş tutarlar ve **mutabakat** (pazaryerinin hakedişi panelin tahmininden farklı olan siparişler) gösterilir.
+- **Kampanyalar** (Katalog → Kampanyalar): Hepsiburada satıcı sepet indirimleri (sepette % indirim, TL indirim, X al Y öde; tüm ürünler, kategoriler ya da SKU listesi) panelden oluşturulur ve iptal edilir. Trendyol kampanya / avantajlı ürün katılımı için açık servis sunmuyor; satıcı panelinden yönetilir.
+- **E-posta:** Bildirimler kendi e-posta sunucunuzdan (hosting / kurumsal e-posta, SMTP 465 SSL ya da 587 STARTTLS) gönderilebilir: Ayarlar → Yeni sipariş e-posta bildirimi → Servis: *Kendi e-posta sunucum*. Brevo / Resend de kullanılabilir.
+- **Personel yetkileri:** Kullanıcılar → kullanıcı formunda personelin görebileceği bölümler seçilir (siparişler, kargo, iadeler, sorular, ürünler, stok, eşleştirme, raporlar, gelir-gider). Menü ve sunucu aynı yetkiyi uygular.
+
 ### Müşteri soruları
 
-Trendyol, Hepsiburada, **N11** (SOAP ürün soru-cevap servisi; liste dakikada bir çağrılabildiği için her senkronda açık sorular), **idefix** ve **Pazarama** soruları Müşteri Soruları sayfasında toplanır ve panelden cevaplanır. PttAVM'in soru servisi yoktur.
+Trendyol, Hepsiburada, **N11** (SOAP ürün soru-cevap servisi; liste dakikada bir çağrılabildiği için her senkronda açık sorular), **idefix** ve **Pazarama** soruları Müşteri Soruları sayfasında toplanır ve panelden cevaplanır. Sayfanın üstündeki **soru analizi** son 30 günde kanal bazında soru sayısını, bekleyenleri, cevaplanma oranını ve ortalama cevap süresini gösterir. PttAVM'in soru servisi yoktur.
 
 ### Müşteri panelleri (CRM'i başka firmalara kullandırma)
 
