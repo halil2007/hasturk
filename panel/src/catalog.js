@@ -192,7 +192,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       GROUP BY 1 ORDER BY local = '', local`, ...cats);
     const maps = await all(db, 'SELECT local, channel, remote_id, remote_name, attrs, updated_at FROM category_map');
     return {
-      channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo,
+      channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo, test: !!c.sandbox,
         reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.type] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
         auto: !!(settings.auto_upload || {})[c.id], stockPush: !!(settings.stock_push || {})[c.id] })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
@@ -307,7 +307,10 @@ async function checkUpload(env, db, ctx, u, c) {
 }
 // Senkron sırasında: son 4 saatte gönderilip sonucu henüz alınmamış gönderimler sorgulanır (Trendyol sonucu 4 saat saklar)
 export async function checkPendingUploads(env, db) {
-  const rows = await all(db, "SELECT * FROM product_uploads WHERE status = 'sent' AND ref IS NOT NULL AND created_at BETWEEN ? AND ? ORDER BY id LIMIT 5", Date.now() - 4 * 3600e3, Date.now() - 60e3);
+  // Kanal onayı saatler / birkaç gün sürebilir: ilk 4 saatte her senkronda, sonra saatte bir, 3 güne kadar sorgulanır
+  const now = Date.now();
+  const rows = await all(db, `SELECT * FROM product_uploads WHERE status = 'sent' AND ref IS NOT NULL AND created_at BETWEEN ? AND ?
+    AND (created_at > ? OR COALESCE(checked_at, 0) < ?) ORDER BY COALESCE(checked_at, 0) LIMIT 5`, now - 3 * 864e5, now - 60e3, now - 4 * 3600e3, now - 3600e3);
   let n = 0;
   for (const u of rows) {
     const c = (await getChannels(env, db)).find((x) => x.id === u.channel && x.enabled && x.catalog && !x.hold);
