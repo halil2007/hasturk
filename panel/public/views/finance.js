@@ -67,7 +67,7 @@ export async function financeView(el, rest, query = {}) {
         ${inv.items.map((x) => html`<tr><td class="small" style="white-space:nowrap">${date(x.date)}</td><td>${chLogo(x.channel, true)}</td><td><span class="pill">${x.type}</span></td>
           <td class="small"><div style="font-weight:600">${x.no || '—'}</div><div class="muted tiny ellipsis" style="max-width:360px">${x.description || ''}${x.order_number ? ` · sipariş ${x.order_number}` : ''}</div></td>
           <td class="r num" style="font-weight:650">${money(x.amount)}</td>
-          <td class="r">${x.url ? html`<a class="btn sm" href="${x.url}" target="_blank" rel="noopener"><i class="ico ico-download"></i>PDF</a>` : ''}</td></tr>`)}
+          <td class="r">${/^https?:\/\//i.test(x.url || '') ? html`<a class="btn sm" href="${x.url}" target="_blank" rel="noopener"><i class="ico ico-download"></i>PDF</a>` : ''}</td></tr>`)}
       </tbody></table></div>${inv.total > inv.items.length ? html`<div class="pager"><span class="muted small">İlk ${n(inv.items.length)} fatura gösteriliyor</span></div>` : ''}`
       : html`<div class="empty">Bu dönemde fatura yok${isAdmin() ? ' — “Faturaları çek” ile kanallardan alın' : ''}</div>`}
       <div class="muted tiny" style="padding:0 16px 14px">Faturalar ${inv.supported.map((c) => ch(c).name).join(', ')} finans servisinden alınır ve panelde saklanır (6 saatte bir güncellenir). PDF bağlantısı kanal veriyorsa gösterilir.</div>`);

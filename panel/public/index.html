@@ -9,9 +9,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -29,7 +27,9 @@
       <img class="m-logo" data-logo src="logo.webp" alt="">
       <div class="page-head"><h1 data-title>Genel Bakış</h1><div class="sub" data-sub></div></div>
       <label class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Sipariş, ürün veya SKU ara" data-global-search></label>
-      <button class="icon-btn" data-act="sync" aria-label="Senkronla" title="Tüm kanalları şimdi senkronla"><i class="ico ico-sync"></i></button>
+      <button class="icon-btn m-hide" data-act="sync" aria-label="Senkronla" title="Tüm kanalları şimdi senkronla"><i class="ico ico-sync"></i></button>
+      <button class="icon-btn m-show" data-act="find" aria-label="Ara"><i class="ico ico-search"></i></button>
+      <button class="icon-btn m-show hide" data-page-more aria-label="Sayfa işlemleri"><i class="ico ico-dots"></i></button>
       <button class="icon-btn" data-act="bell" aria-label="Bildirimler"><i class="ico ico-bell"></i><span class="dot-red hide" data-bell-dot></span></button>
       <button class="avatar" data-act="me" aria-label="Hesap">HT</button>
       <a class="btn primary top-add" href="#/urunler/yeni"><i class="ico ico-plus"></i>Ürün Ekle</a>

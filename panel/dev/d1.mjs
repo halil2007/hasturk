@@ -1,15 +1,19 @@
 // Yerel geliştirme/test için Cloudflare D1 benzeri sarmalayıcı (Node 22 yerleşik node:sqlite).
 import { DatabaseSync } from 'node:sqlite';
 
+// DEV_LATENCY=ms: her sorguya ağ gecikmesi ekler (D1 gidiş-dönüşünü taklit; hız ölçümü için). d1Stats: sorgu sayacı
+const LAT = Number(process.env.DEV_LATENCY) || 0;
+export const d1Stats = { q: 0 };
+const wait = async () => { d1Stats.q++; if (LAT) await new Promise((r) => setTimeout(r, LAT)); };
 const fix = (a) => a.map((v) => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v));
 
 class Stmt {
   constructor(db, sql, args = []) { this.db = db; this.sql = sql; this.args = args; }
   bind(...args) { return new Stmt(this.db, this.sql, args); }
   st() { return this.db.prepare(this.sql); }
-  async all() { return { results: this.st().all(...fix(this.args)), success: true }; }
-  async first(col) { const r = this.st().get(...fix(this.args)); return r ? (col ? r[col] : { ...r }) : null; }
-  async run() { const r = this.st().run(...fix(this.args)); return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } }; }
+  async all() { await wait(); return { results: this.st().all(...fix(this.args)), success: true }; }
+  async first(col) { await wait(); const r = this.st().get(...fix(this.args)); return r ? (col ? r[col] : { ...r }) : null; }
+  async run() { await wait(); const r = this.st().run(...fix(this.args)); return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } }; }
   runSync() { return this.st().run(...fix(this.args)); }
 }
 
@@ -18,6 +22,7 @@ export function d1(path = ':memory:') {
   return {
     prepare: (sql) => new Stmt(db, sql),
     async batch(stmts) {
+      await wait();
       db.exec('BEGIN');
       try {
         const out = stmts.map((s) => (/^\s*(SELECT|WITH)/i.test(s.sql) || /RETURNING/i.test(s.sql) ? { results: s.st().all(...fix(s.args)) } : { success: true, meta: { changes: Number(s.runSync().changes) } }));

@@ -14,7 +14,7 @@ export async function cargo(el, rest, query = {}) {
   render(el, html`<div class="stack">
     <div class="notice"><i class="ico ico-truck"></i><div>Kargo etiketleri <b>kanalların kendi sistemlerinden</b> alınır: Trendyol ortak etiketi, Hepsiburada paket etiketi, ikas Kargo etiketi. Pazaryerlerinde “Paketle ve etiket al” paketi kanalda kargoya hazırlar ve etiketini getirir. ikas siparişlerinde “ikas Kargo ile Gönder” siparişin ikas Kargo ekranını açar; firmayı seçip Devam Et dediğinizde gönderi buraya kendiliğinden gelir ve etiket buradan yazdırılır. Kargoya verilen pakette “Kargoyu takip et” kargo firmasının takip sayfasını açar.${activeChannels().some((x) => x.hold) ? html` <b>Beklemedeki kanallarda</b> (${activeChannels().filter((x) => x.hold).map((x) => x.name).join(', ')}) paketleme kanalın kendi panelinden yapılır; oluşan etiket buraya gelir.` : ''}</div></div>
     <div class="ch-tabs" data-chtabs></div>
-    <div class="row wrap"><div class="tabs" style="flex:1" data-tabs></div><button class="btn" data-act="pick" title="Kargoya çıkacak siparişlerdeki ürünlerin toplamı (seçili paket varsa yalnız onların)"><i class="ico ico-box"></i>Toplama listesi</button></div>
+    <div class="row wrap page-actions"><div class="tabs" style="flex:1" data-tabs></div><button class="btn" data-act="pick" title="Kargoya çıkacak siparişlerdeki ürünlerin toplamı (seçili paket varsa yalnız onların)"><i class="ico ico-box"></i>Toplama listesi</button></div>
     <div class="card flush" data-box></div>
   </div>`);
   const rowsOf = () => [

@@ -19,7 +19,7 @@ export async function stocks(el, rest, query = {}) {
     <div class="kpis five" data-kpis></div>
     <div data-sync></div>
     <div class="tabs" data-status></div>
-    <div class="row wrap">
+    <div class="row wrap page-actions">
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
       <select class="input" style="width:auto" data-extra>${EXTRA.map(([k, t]) => html`<option value="${k}" ${f.extra === k ? 'selected' : ''}>${t}</option>`)}</select>
       <span class="spacer"></span>

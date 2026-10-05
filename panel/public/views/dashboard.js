@@ -27,7 +27,7 @@ export async function dashboard(el) {
   async function load() {
     store.set('dash', f);
     const [dash, s, o] = await Promise.all([
-      api(`dashboard?from=${f.from}&to=${f.to}`), loadSummary(), api(`orders?status=${ord.status}&limit=6`),
+      api(`dashboard?from=${f.from}&to=${f.to}`), loadSummary(false), api(`orders?status=${ord.status}&limit=6`),
     ]);
     d = dash; ord.rows = o.orders; ord.counts = o.counts;
     if (!selected || !ord.rows.some((x) => x.id === selected)) selected = (ord.rows.find((x) => x.status === 'processing' || x.status === 'new') || ord.rows[0] || {}).id || null;

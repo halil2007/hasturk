@@ -17,7 +17,7 @@ export async function matching(el, rest, query = {}) {
   render(el, html`<div class="stack">
     <div class="notice"><i class="ico ico-link"></i><div style="flex:1">Eşleştirme, <b>farklı kanallardaki</b> aynı ürünü birbirine bağlar; bir ürüne her kanaldan yalnızca bir ilan bağlanır. Barkod, stok kodu (yazım farkları yok sayılır), ad + varyant/ölçü birebir aynıysa ya da aynı ürünün başka bir varyantı zaten bağlıysa ve ölçüsü tutuyorsa <b>otomatik</b> bağlanır. Stoğu 0 olan ilanlar eşleştirmeye girmez. Emin olunamayanlar burada önerilerle listelenir. Yanlış eşleşmeleri “Eşleşmiş ürünler” sekmesinden düzeltebilirsiniz.</div></div>
     <div class="kpis" data-kpis></div>
-    <div class="row wrap">
+    <div class="row wrap page-actions">
       <div class="tabs" data-tabs></div>
       <span class="spacer"></span>
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>

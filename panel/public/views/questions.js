@@ -23,7 +23,7 @@ export async function questionsView(el, rest, query = {}) {
     const L = lim(r.channel), late = r.status === 'waiting' && r.due_at && r.due_at - Date.now() < 12 * 3600e3;
     return html`<div class="card stack qcard" data-key="${r.channel}|${r.remote_id}">
       <div class="row" style="align-items:flex-start">${thumb(r.image, r.product_name, 'sm')}
-        <div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${r.product_url ? html`<a class="link" href="${r.product_url}" target="_blank" rel="noopener">${r.product_name || 'Ürün'}</a>` : r.product_name || 'Ürün'}</div>
+        <div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${/^https?:\/\//i.test(r.product_url || '') ? html`<a class="link" href="${r.product_url}" target="_blank" rel="noopener">${r.product_name || 'Ürün'}</a>` : r.product_name || 'Ürün'}</div>
           <div class="row small muted wrap" style="gap:10px">${chBadge(r.channel)}<span>${r.customer || 'Müşteri'}</span><span title="${dateTime(r.asked_at)}">${ago(r.asked_at)}</span>${r.barcode ? html`<span>${r.barcode}</span>` : ''}</div></div>
         ${r.status === 'waiting' ? html`<span class="pill ${late ? 'bad' : 'warn'}">${late ? 'Süre doluyor' : 'Cevap bekliyor'}</span>` : r.status === 'answered' ? html`<span class="pill good">Cevaplandı</span>` : html`<span class="pill">${r.remote_status || r.status}</span>`}</div>
       <div class="qtext">${r.text}</div>

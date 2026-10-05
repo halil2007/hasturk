@@ -26,7 +26,8 @@ export function parseNum(v) {
   return Number.isFinite(n) ? n : NaN;
 }
 const fmt = (v) => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100).replace('.', ','));
-const cell = (v) => { const s = v == null ? '' : String(v); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+// Excel formül enjeksiyonu: = + - @ ile başlayan metin (ürün adı kanaldan gelir) formül olarak çalışmasın
+const cell = (v) => { let s = v == null ? '' : String(v); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s)) s = "'" + s; return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
 async function context(env, db) {
   const settings = await getSettings(db);

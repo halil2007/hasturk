@@ -8,7 +8,7 @@ const permsOf = (v) => { try { const a = JSON.parse(v || 'null'); return Array.i
 
 const COOKIE = 'hp_session';
 const DAYS = 30;
-const ITER = 20000;
+const ITER = 100000; // yeni şifreler; eski özetler kendi tur sayısıyla doğrulanmaya devam eder
 const enc = new TextEncoder();
 const b64 = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64 = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
@@ -62,7 +62,8 @@ export async function currentUser(req, env, db) {
   if (i >= 0) v = v.slice(i + 1);
   const [uid, exp, sig] = v.split('.');
   if (!sig || Number(exp) < Date.now()) return null;
-  if (uid === '-1') return env.TENANT_SLUG && same(sig, await hmac(secret(env), `-1.${exp}.support`)) ? { ...SUPPORT, name: 'Destek (ana panel)' } : null;
+  // Destek oturumu en fazla 2 saat: imzalı olsa bile daha uzak bitiş tarihi kabul edilmez
+  if (uid === '-1') return env.TENANT_SLUG && Number(exp) <= Date.now() + 2 * 3600e3 + 60e3 && same(sig, await hmac(secret(env), `-1.${exp}.support`)) ? { ...SUPPORT, name: 'Destek (ana panel)' } : null;
   if (uid === '0') {
     if (!password(env)) return null;
     return same(sig, await hmac(secret(env), `0.${exp}.0`)) ? ADMIN : null;
@@ -76,9 +77,16 @@ export async function currentUser(req, env, db) {
 export async function login(req, env, db, { username, password: pass }) {
   const users = await first(db, 'SELECT COUNT(*) AS n FROM users WHERE active = 1');
   if (!password(env) && !users.n) return { ok: false, status: 503, error: 'Panel şifresi tanımlı değil (Cloudflare → Settings → Variables and Secrets → PANEL_PASSWORD)' };
-  // Kaba kuvvet koruması: 15 dakikada 8 yanlış denemeden sonra bekletir
-  const f = (await getRaw(db, 'login_fail')) || { n: 0, at: 0 };
-  if (f.n >= 8 && Date.now() - f.at < 15 * 60e3) return { ok: false, status: 429, error: 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.' };
+  // Kaba kuvvet koruması: kullanıcı adı + IP başına 15 dakikada 8 deneme. Sayaç denemeden ÖNCE artırılır (eşzamanlı
+  // istekler sınırı aşamaz); başarılı girişte yalnız o sayaç silinir. Herkesi kilitleyen tek bir genel sayaç yoktur.
+  const ip = req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || '';
+  const fk = `login_fail:${String(username || 'yonetici').trim().toLocaleLowerCase('tr').slice(0, 60)}|${ip.split(',')[0].trim()}`;
+  const now = Date.now();
+  const row = await first(db, `INSERT INTO settings (k, v) VALUES (?, json_object('n', 1, 'at', ?)) ON CONFLICT (k) DO UPDATE SET
+      v = CASE WHEN json_extract(settings.v, '$.at') < ? THEN json_object('n', 1, 'at', ?) ELSE json_set(settings.v, '$.n', json_extract(settings.v, '$.n') + 1) END RETURNING v`,
+    fk, now, now - 15 * 60e3, now);
+  if (Math.random() < 0.05) await run(db, "DELETE FROM settings WHERE k LIKE 'login_fail:%' AND json_extract(v, '$.at') < ?", now - 864e5);
+  if (((row && JSON.parse(row.v)) || {}).n > 8) return { ok: false, status: 429, error: 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.' };
   let user = null, ver = '0';
   if (!env.TENANT_SLUG && isAdminName(username) && password(env)) {
     const a = await hmac('cmp', String(pass || '')), b = await hmac('cmp', password(env));
@@ -87,17 +95,16 @@ export async function login(req, env, db, { username, password: pass }) {
   // Müşteri panelinde ana yönetici (PANEL_PASSWORD) yoktur: "admin" gibi adlar da normal kullanıcıdır
   if (!user && username && (env.TENANT_SLUG || !isAdminName(username))) {
     const u = await first(db, 'SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND active = 1', String(username).trim());
+    // Kullanıcı yoksa da aynı süre harcanır (yanıt süresinden hangi kullanıcı adının var olduğu anlaşılmasın)
+    if (!u) await pbkdf2(String(pass || ''), new Uint8Array(16), ITER);
     if (u && await checkPassword(String(pass || ''), u.pass)) {
       user = { id: u.id, username: u.username, name: u.name || u.username, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) };
       ver = u.pass.slice(-12);
       await run(db, 'UPDATE users SET last_login = ? WHERE id = ?', Date.now(), u.id);
     }
   }
-  if (!user) {
-    await setSetting(db, 'login_fail', { n: Date.now() - f.at < 15 * 60e3 ? f.n + 1 : 1, at: Date.now() });
-    return { ok: false, status: 401, error: 'Kullanıcı adı veya şifre hatalı' };
-  }
-  await setSetting(db, 'login_fail', { n: 0, at: 0 });
+  if (!user) return { ok: false, status: 401, error: 'Kullanıcı adı veya şifre hatalı' };
+  await run(db, 'DELETE FROM settings WHERE k = ?', fk);
   const exp = String(Date.now() + DAYS * 864e5);
   const value = encodeURIComponent(`${pre(env)}${user.id}.${exp}.${await hmac(secret(env), `${user.id}.${exp}.${ver}`)}`);
   const secure = new URL(req.url).protocol === 'https:' ? '; Secure' : '';

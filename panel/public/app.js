@@ -1,5 +1,5 @@
 // Panel uygulaması: gruplu yan menü, üst çubuk, alt menü (telefon), yönlendirme (#/sayfa/...?filtre=...), giriş, senkron, bildirimler.
-import { api, state, html, render, $, $$, toast, ago, closeAllSheets, sheet, popMenu, store, busy } from './core.js';
+import { api, state, html, render, $, $$, toast, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder } from './core.js';
 import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
 import { products } from './views/products.js';
@@ -100,7 +100,24 @@ export function setQuery(query) {
   history.replaceState(null, '', `#/${[path, ...rest.map(encodeURIComponent)].filter((x, i) => i === 0 || x).join('/')}${qs ? '?' + qs : ''}`);
 }
 
-let current = null, currentPath = null, routeSeq = 0;
+let current = null, currentPath = null, routeSeq = 0, routeAt = 0;
+// Ön yükleme: her sayfanın açılışta okuduğu adresler (ilk ziyarette varsayılanlar, sonra öğrenilen gerçek adresler)
+const PREFETCH = {
+  '': ['summary'], siparisler: ['orders?status=new&page=1&limit=25'], kargo: ['packages?state=waiting'], iadeler: ['claims?page=1&status=waiting'],
+  sorular: ['questions?page=1&limit=30&status=waiting'], urunler: ['products?page=1&limit=40&group=1'], stoklar: ['products?page=1&limit=50&sort=stock', 'dashboard'],
+  ...store.get('prefetch', {}),
+};
+const learn = (path, list) => {
+  const l = list.filter((p) => p !== 'summary' && !/[?&]q=/.test(p) && !/^(logs|backfill)/.test(p)).slice(0, 4);
+  if (!l.length || JSON.stringify(PREFETCH[path]) === JSON.stringify(l)) return;
+  PREFETCH[path] = l;
+  store.set('prefetch', Object.fromEntries(Object.entries(PREFETCH).filter(([k]) => k)));
+};
+export function prefetchRoute(path) {
+  const r = PAGES.find((x) => x.path === path);
+  if (!r || !canSee(r) || !state.summary) return;
+  (PREFETCH[path] || []).forEach(prefetch);
+}
 // Sayfa iskeleti: veri gelene kadar sayfa boş kalmaz (görünüm ilk çizimde bunu değiştirir)
 const SKELETON = html`<div class="skel-page" aria-busy="true" aria-label="Yükleniyor"><div class="skel-row"><span class="skel w40"></span><span class="skel w20"></span></div><div class="skel-card"><span class="skel w30"></span><span class="skel"></span><span class="skel w80"></span><span class="skel w60"></span></div><div class="skel-card"><span class="skel"></span><span class="skel w70"></span><span class="skel w90"></span><span class="skel w50"></span><span class="skel w80"></span></div></div>`;
 async function route() {
@@ -119,11 +136,16 @@ async function route() {
   if (currentPath !== r.path) window.scrollTo(0, 0);
   currentPath = r.path;
   current = null;
+  routeAt = Date.now();
   try {
-    const v = (await r.view(el, rest, query)) || null;
+    // Açılışta önbellekteki veri anında kullanılır (arka planda tazelenir); okunan adresler bir sonraki ön yükleme için öğrenilir
+    const rec = [];
+    const v = (await swrScope(async () => { recorder.list = rec; try { return await r.view(el, rest, query); } finally { if (recorder.list === rec) recorder.list = null; } })) || null;
+    if (!Object.keys(query).length && !rest.length) learn(r.path, rec);
     // Bu arada başka sayfaya geçildiyse geç kalan sayfa sonucu kullanılmaz
     if (my !== routeSeq) { if (v && v.destroy) v.destroy(); return; }
     current = v;
+    performance.mark('route:' + r.path); // hız ölçümü (geliştirici araçları → Performance)
   } catch (e) {
     if (my !== routeSeq) return;
     render(el, html`<div class="card"><div class="notice bad"><i class="ico ico-warn"></i><div style="flex:1">Sayfa yüklenemedi: ${e.message}</div><button class="btn sm" data-retry>Tekrar dene</button></div></div>`);
@@ -131,8 +153,9 @@ async function route() {
   }
 }
 
-export async function loadSummary() {
-  const s = await api('summary', { fresh: true });
+// fresh = false: sayfa açılışında önbellekteki özet anında kullanılır (arka planda tazelenir)
+export async function loadSummary(fresh = true) {
+  const s = await api('summary', { fresh });
   state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.tenant = s.tenant || null; state.owner = !!s.owner; state.demo = s.demo || s.channels.some((c) => c.demo);
   refreshChrome(s);
   return s;
@@ -200,13 +223,101 @@ function applyTheme() {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
 }
 
+// Telefon menüsü: firma / kullanıcı başlığı, menüde arama, bölümlere ayrılmış simge ızgarası, hesap işlemleri
+const SEC_TONE = { '': 'blue', 'Satış': 'blue', 'Katalog': 'purple', 'Raporlar': 'green', 'Sistem': 'gray' };
 function moreMenu() {
+  const groups = [];
+  let cur = { sec: '', items: [] };
+  for (const r of ROUTES) {
+    if (r.sec) { if (cur.items.length) groups.push(cur); cur = { sec: r.sec, items: [] }; continue; }
+    if (r.view && canSee(r) && !r.hidden) cur.items.push(r);
+  }
+  if (cur.items.length) groups.push(cur);
+  // Genel Bakış tek başına bölüm olmasın: Satış bölümünün başına
+  if (groups.length > 1 && !groups[0].sec) { groups[1].items.unshift(...groups[0].items); groups.shift(); }
+  const u = state.user || {}, co = (state.settings && state.settings.company) || {};
+  const logo = (state.settings && state.settings.logo) || 'logo.webp';
   const s = sheet({
-    title: 'Menü', size: 'narrow',
-    body: html`${ROUTES.filter((r) => (!r.view || canSee(r)) && !r.hidden).map((r) => (r.sec ? html`<div class="muted tiny" style="font-weight:700;text-transform:uppercase;margin:14px 2px 6px">${r.sec}</div>` : html`<a class="btn block" style="justify-content:flex-start;margin-bottom:6px" href="#/${r.path}"><i class="ico ico-${r.icon}"></i>${r.title}</a>`))}`,
+    title: 'Menü', size: 'menu-sheet',
+    body: html`<div class="mm-head"><img src="${logo}" alt=""><div style="min-width:0"><b class="ellipsis">${co.title || 'Hastürk'}</b><span class="ellipsis">${[u.name && u.name !== 'Yönetici' ? u.name : '', u.role === 'admin' ? 'Yönetici' : 'Personel', state.tenant ? state.tenant.name : ''].filter(Boolean).join(' · ')}</span></div></div>
+      <label class="search mm-search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Menüde ara (ör. kargo, iade, stok)" data-mm-q></label>
+      ${groups.map((g) => html`<section class="mm-sec" data-mm-sec><h4>${g.sec || 'Genel'}</h4><div class="mm-grid">${g.items.map((r) => html`<a class="mm-tile ${SEC_TONE[g.sec] || 'blue'} ${currentPath === r.path ? 'on' : ''}" href="#/${r.path}" data-mm="${r.title.toLocaleLowerCase('tr')} ${r.path}"><span class="mm-ic"><i class="ico ico-${r.icon}"></i>${r.count ? html`<span class="mm-n hide" data-count="${r.count}"></span>` : ''}</span><span class="mm-t">${r.title}</span></a>`)}</div></section>`)}
+      <div class="mm-list">
+        <button data-mm-act="sync"><i class="ico ico-sync"></i>Şimdi senkronla<span class="muted tiny" style="margin-left:auto">${ago(Math.max(0, ...state.channels.map((c) => (c.last && c.last.at) || 0)))}</span></button>
+        <button data-mm-act="theme"><i class="ico ico-bolt"></i>Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[store.get('theme', 'auto')]}</button>
+        ${u.id > 0 ? html`<button data-mm-act="pass"><i class="ico ico-key"></i>Şifremi değiştir</button>` : ''}
+        <button data-mm-act="logout" class="danger"><i class="ico ico-x"></i>Çıkış yap</button>
+      </div>`,
   });
-  s.body.addEventListener('click', (e) => { if (e.target.closest('a')) s.close(); });
+  refreshChrome();
+  const q = $('[data-mm-q]', s.el);
+  q.addEventListener('input', () => {
+    const v = q.value.trim().toLocaleLowerCase('tr');
+    $$('[data-mm]', s.el).forEach((a) => a.classList.toggle('hide', !!v && !a.dataset.mm.includes(v)));
+    $$('[data-mm-sec]', s.el).forEach((x) => x.classList.toggle('hide', !$$('[data-mm]:not(.hide)', x).length));
+  });
+  s.body.addEventListener('click', (e) => {
+    if (e.target.closest('a')) return s.close();
+    const b = e.target.closest('[data-mm-act]');
+    if (!b) return;
+    const a = b.dataset.mmAct;
+    if (a === 'sync') { s.close(); sync(); }
+    if (a === 'theme') { const order = ['auto', 'light', 'dark'], t = order[(order.indexOf(store.get('theme', 'auto')) + 1) % 3]; store.set('theme', t); applyTheme(); b.lastChild.textContent = `Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[t]}`; }
+    if (a === 'pass') { s.close(); changePassword(); }
+    if (a === 'logout') api('logout', { method: 'POST' }).catch(() => {}).then(() => location.reload());
+  });
 }
+
+// Telefon araması: sipariş, ürün ya da müşteri
+function findSheet() {
+  const s = sheet({
+    title: 'Ara', size: 'narrow',
+    body: html`<form class="stack" data-find><label class="search"><i class="ico ico-search"></i><input class="input" type="search" name="q" placeholder="Sipariş no, müşteri, ürün, SKU, barkod" autocomplete="off" enterkeyhint="search"></label>
+      <div class="find-acts"><button class="btn primary" name="where" value="siparisler"><i class="ico ico-orders"></i>Siparişlerde ara</button><button class="btn" name="where" value="urunler"><i class="ico ico-box"></i>Ürünlerde ara</button></div></form>`,
+  });
+  const form = $('[data-find]', s.el), input = form.q;
+  setTimeout(() => input.focus(), 50);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = input.value.trim(), where = (e.submitter && e.submitter.value) || 'siparisler';
+    if (!v) return input.focus();
+    s.close();
+    location.hash = `#/${where}?q=${encodeURIComponent(v)}`;
+  });
+}
+
+// Telefon: sayfanın üstündeki ikincil düğmeler üst çubuktaki ⋯ menüsüne taşınır, "ekle" düğmesi yüzen düğme olur,
+// uzun açıklama kutuları iki satıra kısaltılır (dokununca açılır). Görünümlerin kendi düğmeleri aynen çalışır.
+function mobileEnhance() {
+  const view = $('#view'), more = $('[data-page-more]');
+  if (!view || !more) return;
+  const mobile = window.matchMedia('(max-width: 899px)').matches;
+  const btns = mobile ? $$('.page-actions > .btn:not([data-fab])', view).filter((b) => !b.closest('.sheet-bg')) : [];
+  more.classList.toggle('hide', !btns.length);
+  more.onclick = () => popMenu(more, btns.map((b) => ({ icon: ((b.querySelector('.ico') || {}).className || '').replace(/.*ico-([a-z-]+).*/, '$1') || null, label: b.textContent.trim(), run: () => b.click() })), { title: $('[data-title]').textContent });
+  let fab = $('.fab');
+  const src = mobile && $('[data-fab]', view);
+  if (!src) { if (fab) fab.remove(); } else {
+    if (!fab) { fab = document.createElement('button'); fab.className = 'fab'; document.body.append(fab); }
+    fab.innerHTML = src.innerHTML;
+    fab.onclick = () => src.click();
+  }
+  if (!mobile) return;
+  for (const n of $$('.notice:not([data-clamp])', view)) {
+    n.dataset.clamp = '1';
+    const t = n.querySelector(':scope > div');
+    if (!t || t.textContent.length < 150 || t.querySelector('input, select, textarea')) continue;
+    t.classList.add('clamp2');
+    const b = document.createElement('button');
+    b.className = 'more-link'; b.type = 'button'; b.textContent = 'Devamı';
+    b.onclick = (e) => { e.stopPropagation(); const open = t.classList.toggle('clamp2'); b.textContent = open ? 'Devamı' : 'Kısalt'; };
+    t.after(b);
+  }
+}
+let enhTimer = 0;
+new MutationObserver(() => { cancelAnimationFrame(enhTimer); enhTimer = requestAnimationFrame(mobileEnhance); }).observe(document.querySelector('.main'), { childList: true, subtree: true });
+window.addEventListener('resize', debounceEnh);
+function debounceEnh() { cancelAnimationFrame(enhTimer); enhTimer = requestAnimationFrame(mobileEnhance); }
 
 async function login(info = {}) {
   closeAllSheets();
@@ -217,21 +328,35 @@ async function login(info = {}) {
   const firma = new URLSearchParams(location.search).get('firma') || store.get('firma', '');
   const box = document.createElement('div');
   box.className = 'login';
-  render(box, html`<form class="card stack">
-    <img class="logo-big" src="${brand.logo || 'logo.webp'}" alt="${brand.title || 'Logo'}">
-    <div class="muted small" style="text-align:center;margin-top:-6px">${brand.legal || brand.title || ''} · Satış yönetim paneli</div>
-    ${info.setup ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Panel şifresi henüz tanımlanmamış. Cloudflare → Worker → Settings → Variables and Secrets bölümüne <b>PANEL_PASSWORD</b> ekleyin.</div></div>` : ''}
-    ${info.demo || brand.demo ? html`<div class="notice"><div>Deneme modu: kullanıcı adı boş, şifre <b>demo</b></div></div>` : ''}
-    <label class="field"><span>Firma kodu <span class="muted tiny">(müşteri paneli)</span></span><input class="input" name="tenant" autocomplete="organization" placeholder="ana panel için boş bırakın" value="${firma}"></label>
-    <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" placeholder="ana yönetici için boş bırakın"></label>
-    <label class="field"><span>Şifre</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>
-    <button class="btn primary block lg" type="submit">Giriş yap</button>
-    <div class="small" style="color:var(--bad)" data-err></div>
-  </form>`);
+  // Firma kodu yalnız müşteri panelleri için: hatırlanan kod yoksa "Firma koduyla giriş" bağlantısının arkasında durur
+  render(box, html`<div class="login-hero"><div class="login-logo"><img src="${brand.logo || 'logo.webp'}" alt="${brand.title || 'Logo'}"></div>
+      <div class="login-sub">${brand.legal || brand.title || 'Hastürk'} · Satış yönetim paneli</div></div>
+    <form class="login-card stack" novalidate>
+      <div><h2>Hoş geldiniz</h2><div class="muted small">Devam etmek için giriş yapın</div></div>
+      ${info.setup ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Panel şifresi henüz tanımlanmamış. Cloudflare → Worker → Settings → Variables and Secrets bölümüne <b>PANEL_PASSWORD</b> ekleyin.</div></div>` : ''}
+      ${info.demo || brand.demo ? html`<div class="notice"><i class="ico ico-bolt"></i><div>Deneme modu: kullanıcı adı boş, şifre <b>demo</b></div></div>` : ''}
+      <label class="field ${firma ? '' : 'hide'}" data-firma><span>Firma kodu</span><input class="input" name="tenant" autocomplete="organization" autocapitalize="none" placeholder="ör. ornek-firma" value="${firma}"></label>
+      <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" autocapitalize="none" placeholder="Yönetici için boş bırakın"></label>
+      <label class="field"><span>Şifre</span><span class="pw"><input class="input" type="password" name="password" autocomplete="current-password" required><button type="button" class="icon-btn sm" data-eye aria-label="Şifreyi göster"><i class="ico ico-eye"></i></button></span></label>
+      <div class="login-err" data-err role="alert"></div>
+      <button class="btn primary block lg" type="submit">Giriş yap</button>
+      <button type="button" class="link-btn" data-firma-toggle>${firma ? 'Ana panele giriş (firma kodu olmadan)' : 'Müşteri paneli girişi (firma kodu ile)'}</button>
+    </form>
+    <div class="login-foot">Hastürk CRM · güvenli bağlantı</div>`);
   document.body.prepend(box);
-  $(firma ? '[name=username]' : '[name=tenant]', box).focus();
+  $(firma ? '[name=username]' : '[name=password]', box).focus();
+  $('[data-eye]', box).onclick = (e) => { const i = $('[name=password]', box); i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.classList.toggle('on', i.type === 'text'); };
+  $('[data-firma-toggle]', box).onclick = (e) => {
+    const f = $('[data-firma]', box), show = f.classList.contains('hide');
+    f.classList.toggle('hide', !show);
+    if (show) $('[name=tenant]', box).focus(); else $('[name=tenant]', box).value = '';
+    e.currentTarget.textContent = show ? 'Ana panele giriş (firma kodu olmadan)' : 'Müşteri paneli girişi (firma kodu ile)';
+  };
   $('form', box).onsubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('[type=submit]');
+    if (!e.target.password.value) { $('[data-err]', box).textContent = 'Şifrenizi girin'; return e.target.password.focus(); }
+    btn.disabled = true; btn.innerHTML = '<i class="ico ico-sync spin"></i>Giriş yapılıyor';
     try {
       const tenant = e.target.tenant.value.trim().toLocaleLowerCase('tr');
       await api('login', { method: 'POST', body: { tenant, username: e.target.username.value.trim(), password: e.target.password.value } });
@@ -239,20 +364,54 @@ async function login(info = {}) {
       box.remove();
       $$('.side, .main, .tabbar').forEach((x) => x.classList.remove('hide'));
       start();
-    } catch (err) { $('[data-err]', box).textContent = err.message; }
+    } catch (err) { $('[data-err]', box).textContent = err.message; btn.disabled = false; btn.textContent = 'Giriş yap'; }
   };
 }
 state.onLogin = (info) => login(info);
 
+// Uygulama dosyaları cihazda saklanır (sw.js). Yeni yayın çıktıysa saklananlar silinir ve sayfa bir kez yenilenir.
+function shellCache(build) {
+  if (!('serviceWorker' in navigator) || /^(localhost|127\.)/.test(location.hostname)) return;
+  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  if (!build) return;
+  const old = store.get('build', null);
+  store.set('build', build);
+  if (old && old !== build && navigator.serviceWorker.controller && window.caches) caches.delete('shell-v1').finally(() => location.reload());
+}
+
 async function start() {
   try { await loadSummary(); } catch { return; }
+  shellCache(state.summary.build);
   nav();
   refreshChrome();
-  route();
+  await route();
+  // Boşta: alt menüdeki sayfaların verisi önceden alınır (ilk dokunuşta da beklemeden açılsın)
+  setTimeout(() => ['siparisler', 'kargo', 'stoklar', 'urunler'].forEach(prefetchRoute), 1200);
 }
 
 applyTheme();
 window.addEventListener('hashchange', route);
+// Arka planda tazelenen veri değiştiyse açık sayfa sessizce yeniden çizilir (kullanıcı yazı yazarken dokunulmaz)
+let updTimer = null;
+window.addEventListener('api:update', () => {
+  clearTimeout(updTimer);
+  updTimer = setTimeout(() => {
+    const a = document.activeElement;
+    if (!current || !current.refresh || Date.now() - routeAt > 20e3 || (a && a.closest && a.closest('#view') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;
+    Promise.resolve(current.refresh()).catch(() => {});
+  }, 120);
+});
+// Ön yükleme: menü bağlantısına dokunulunca (telefon) ya da imleç üstüne gelince (bilgisayar) sayfa verisi önceden istenir;
+// sipariş satırına dokununca sipariş detayı. Parmak kalkana kadar geçen ~100-200 ms'de veri yola çıkmış olur.
+const warm = (e) => {
+  const t = e.target.closest && e.target.closest('a[href^="#/"], [data-row], [data-act=open][data-o]');
+  if (!t || !state.summary) return;
+  if (t.matches('a')) return prefetchRoute(t.getAttribute('href').replace(/^#\/?/, '').split(/[/?]/)[0]);
+  const id = t.dataset.row || t.dataset.o;
+  if (id && can(state.user, 'orders')) prefetch('orders/' + encodeURIComponent(id));
+};
+document.addEventListener('pointerdown', warm, { passive: true });
+document.addEventListener('mouseover', (e) => { if (e.target.closest && e.target.closest('.side, .tabbar')) warm(e); }, { passive: true });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
   if (!b || b.closest('#view') || b.closest('.sheet-bg')) return;
@@ -261,6 +420,7 @@ document.addEventListener('click', (e) => {
   if (a === 'bell') { e.preventDefault(); bell(b); }
   if (a === 'me') { e.preventDefault(); meMenu(b); }
   if (a === 'more') { e.preventDefault(); moreMenu(); }
+  if (a === 'find') { e.preventDefault(); findSheet(); }
 });
 $('[data-global-search]').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;

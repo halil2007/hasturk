@@ -13,7 +13,9 @@ export const ikasCarrier = (choice) => { const c = CARRIERS.find(([re]) => re.te
 
 export function ikas(env, p, meta) {
   // Mağaza adı "hasturkgubre", "hasturkgubre.myikas.com" ya da "https://hasturkgubre.myikas.com/admin" yazılmış olabilir: yalnız ad alınır
-  const store = String(env[p + 'STORE'] || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').replace(/\.myikas\.com$/i, '');
+  const store0 = String(env[p + 'STORE'] || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').replace(/\.myikas\.com$/i, '');
+  // Mağaza adı yalnız harf, rakam, tire: başka bir sunucuya (ve API anahtarının oraya) yönlenmesin
+  const store = /^[a-z0-9-]+$/i.test(store0) ? store0 : '';
   const id = env[p + 'CLIENT_ID'], secret = env[p + 'CLIENT_SECRET'];
   const salesChannel = env[p + 'SALES_CHANNEL_ID'] || '';
   let merchant = env[p + 'MERCHANT_ID'] || '', merchantTried = false;
