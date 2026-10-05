@@ -307,7 +307,10 @@ async function checkUpload(env, db, ctx, u, c) {
 }
 // Senkron sırasında: son 4 saatte gönderilip sonucu henüz alınmamış gönderimler sorgulanır (Trendyol sonucu 4 saat saklar)
 export async function checkPendingUploads(env, db) {
-  const rows = await all(db, "SELECT * FROM product_uploads WHERE status = 'sent' AND ref IS NOT NULL AND created_at BETWEEN ? AND ? ORDER BY id LIMIT 5", Date.now() - 4 * 3600e3, Date.now() - 60e3);
+  // Kanal onayı saatler / birkaç gün sürebilir: ilk 4 saatte her senkronda, sonra saatte bir, 3 güne kadar sorgulanır
+  const now = Date.now();
+  const rows = await all(db, `SELECT * FROM product_uploads WHERE status = 'sent' AND ref IS NOT NULL AND created_at BETWEEN ? AND ?
+    AND (created_at > ? OR COALESCE(checked_at, 0) < ?) ORDER BY COALESCE(checked_at, 0) LIMIT 5`, now - 3 * 864e5, now - 60e3, now - 4 * 3600e3, now - 3600e3);
   let n = 0;
   for (const u of rows) {
     const c = (await getChannels(env, db)).find((x) => x.id === u.channel && x.enabled && x.catalog && !x.hold);
