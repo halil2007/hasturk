@@ -20,6 +20,7 @@ export async function uploadView(el) {
       <div class="notice"><i class="ico ico-upload"></i><div style="flex:1"><b>ikas'taki ürünleri pazaryerlerine yükleyin.</b> 1) ikas kategorisini pazaryeri kategorisiyle bir kez eşleştirin (zorunlu özellikler dahil) · 2) Kanalda henüz olmayan ürünleri seçip gönderin · 3) Kanalın onay sonucunu hemen alttaki “Gönderimler” bölümünden takip edin. Onaylanan ürün barkod / SKU ile otomatik eşleşir.
         ${!st.stockSync && c && !c.stockPush ? html`<div class="small" style="margin-top:4px">Stok senkronu kapalı: ürün ilk stokla gönderilir, sonraki stok değişiklikleri bu kanala gitmez (aşağıdan “Stokları gönder”i açabilirsiniz).</div>` : ''}</div></div>
       <div class="ch-tabs">${st.channels.map((x) => html`<button class="ch-tab ${x.id === chId ? 'on' : ''}" data-act="ch" data-id="${x.id}" ${x.ready ? '' : 'disabled'} title="${x.reason}">${chLogo(x.id)}${x.name}${!x.ready ? html`<span class="tiny muted">${x.reason}</span>` : ''}</button>`)}</div>
+      ${c && c.test ? html`<div class="notice warn"><i class="ico ico-warn"></i><div><b>${c.name} TEST ortamına (SIT) bağlı.</b> Buradan gönderilen ürünler gerçek ${c.name}'ya gitmez, satışa çıkmaz; yalnız test adımları içindir. Kanaldan gelen ilanlar da test ilanlarıdır (sizin ürünlerinizle eşleşmez). Canlı bilgiler gelince Entegrasyonlar → ${c.name} → <b>Ortam = Canlı</b> seçin.</div></div>` : ''}
       <div class="card flush" id="gonderimler">
         <div class="card-head" style="padding:16px 16px 0"><h2>Gönderimler</h2><span class="muted small">kanalın onay sonucu burada görünür · kendiliğinden sorgulanır (ilk 4 saat 15 dk'da bir, sonra saatte bir, 3 güne kadar)</span><span class="spacer"></span>${st.uploads.length > 5 ? html`<button class="btn sm ghost" data-act="allup">${allUp ? 'Son 5' : `Tümü (${st.uploads.length})`}</button>` : ''}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Kanal</th><th class="r">Ürün</th><th>Takip no</th><th>Durum</th><th></th></tr></thead><tbody>
@@ -150,7 +151,7 @@ export async function uploadView(el) {
         </tbody></table></div>
         <p class="muted tiny" style="margin:0">Fiyat: ikas satış fiyatı${c.opts.markup ? ` + %${c.opts.markup} (kanal ayarı)` : ''}. Eksikleri ürün sayfasından ya da kategori eşleştirmesinden tamamlayın.</p>
       </div>`);
-      s.setFoot(html`<div class="row" style="width:100%"><span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-x="go" ${ready.length ? '' : 'disabled'}><i class="ico ico-upload"></i>Seçilenleri gönder</button></div>`);
+      s.setFoot(html`<div class="row" style="width:100%"><span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-x="go" ${ready.length ? '' : 'disabled'}><i class="ico ico-upload"></i>${C() && C().test ? 'Seçilenleri TEST ortamına gönder' : 'Seçilenleri gönder'}</button></div>`);
     }
     s.el.addEventListener('change', (e) => {
       if (e.target.matches('[data-zero]')) { zero = e.target.checked; fill().catch((err) => toast(err.message, true)); }

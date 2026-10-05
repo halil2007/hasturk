@@ -3,7 +3,7 @@
 // Önemli: User-Agent başlığı Merchant Portal'da tanımlı entegratör adıyla BİREBİR aynı olmalı (ör. "hasturk_dev");
 // "merchantId - uygulama" biçimi 401/403 ile reddedilir.
 //   Siparişler/paketler: oms-external · İlan/stok/fiyat/buybox: listing-external · Müşteri soruları: api-asktoseller-merchant
-import { http, basic, num, str, chunk, diagStep, isImageAttr } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, isImageAttr, imageList } from '../util.js';
 
 export function hepsiburada(env, meta) {
   const m = env.HB_MERCHANT_ID, user = env.HB_USERNAME || m, pass = env.HB_PASSWORD;
@@ -203,6 +203,49 @@ export function hepsiburada(env, meta) {
         });
       }
       if (rows.length < 1000) break;
+    }
+    // İlan servisi ürün adı / barkod / görsel vermez: kataloğa alınmış ürünlerin bilgisi merchantSku ile katalog servisinden eklenir
+    // (eşleştirme barkodla da yapılabilsin, Eşleştirme sayfasında ürün adı görünsün). Servis cevap vermezse ilanlar olduğu gibi kalır.
+    if (out.some((l) => !l.barcode || l.name === l.sku)) {
+      const info = await catalogInfo().catch(() => new Map());
+      for (const l of out) {
+        const x = info.get(l.sku.toLowerCase());
+        if (!x) continue;
+        if (x.name && (!l.name || l.name === l.sku)) { l.name = x.name; l.groupName = l.groupName || x.name; }
+        if (x.barcode && !l.barcode) l.barcode = x.barcode;
+        if (x.brand) l.brand = x.brand;
+        if (x.images.length) { l.images = x.images; if (!l.image) l.image = x.images[0]; }
+      }
+    }
+    return out;
+  }
+  async function catalogInfo() {
+    const out = new Map();
+    const attrsOf = (it) => {
+      const o = {};
+      for (const src of [g(it, 'attributes'), g(it, 'baseAttributes'), g(it, 'variantTypeAttributes')]) {
+        if (Array.isArray(src)) for (const a of src) { const k = str(g(a, 'name', 'attributeName', 'key', 'id')), v = g(a, 'value', 'attributeValue'); if (k && v != null) o[k] = str(v); }
+        else if (src && typeof src === 'object') for (const [k, v] of Object.entries(src)) if (v != null && typeof v !== 'object') o[k] = str(v);
+      }
+      return o;
+    };
+    for (const st of ['MATCHED', 'CREATED', 'MATCHED_WITH_STAGED']) {
+      for (let pg = 0; pg < 30; pg++) {
+        let r;
+        try { r = await call(`${CAT}/api/products/products-by-merchant-and-status?page=${pg}&size=100&version=1&merchantId=${encodeURIComponent(m)}&productStatus=${st}`, { tries: 1 }); }
+        catch { if (!pg && st === 'MATCHED') return out; break; }
+        const d = g(r, 'data');
+        const rows = Array.isArray(d) ? d : page(d && typeof d === 'object' ? (g(d, 'content') ? { items: g(d, 'content') } : d) : r);
+        for (const it of rows) {
+          const a = attrsOf(it), sku = str(g(it, 'merchantSku') || a.merchantSku);
+          if (!sku) continue;
+          out.set(sku.toLowerCase(), {
+            name: str(g(it, 'productName', 'name') || a.UrunAdi), barcode: str(g(it, 'barcode') || a.Barcode), brand: str(g(it, 'brand') || a.Marka),
+            images: imageList([].concat(g(it, 'images') || [], [a.Image1, a.Image2, a.Image3, a.Image4, a.Image5].filter(Boolean))),
+          });
+        }
+        if (rows.length < 100) break;
+      }
     }
     return out;
   }
@@ -416,7 +459,7 @@ export function hepsiburada(env, meta) {
     if (!tid) throw new Error('Hepsiburada trackingId döndürmedi: ' + JSON.stringify(r).slice(0, 400));
     return { trackingId: str(tid), response: r };
   }
-  const productStatus = (tid) => call(`${CAT}/api/products/status/${encodeURIComponent(tid)}?page=0&size=50&version=1`);
+  const productStatus = (tid, pg = 0) => call(`${CAT}/api/products/status/${encodeURIComponent(tid)}?page=${pg}&size=100&version=1`);
   // Tek ilan için stok / fiyat yükleme: Hepsiburada yükleme kimliği döner, durumu ayrıca sorgulanır
   async function uploadOne(kind, rows) {
     const r = await call(`${LST}/listings/merchantid/${m}/${kind}-uploads`, { method: 'POST', body: rows });
@@ -459,29 +502,40 @@ export function hepsiburada(env, meta) {
   }
   async function send(payloads) {
     const out = [];
-    for (const part of chunk(payloads, 500)) out.push((await importProducts(part)).trackingId);
+    for (const part of chunk(payloads, 100)) out.push((await importProducts(part)).trackingId); // istek başına en fazla 100 ürün
     return { ref: out.join(',') };
   }
   // Durum: her ürün için Hepsiburada'nın döndürdüğü durum ve doğrulama hataları
+  // Hepsiburada ürün durumları: WAITING (işleniyor), PRE_MATCHED (ön eşleşme, onay bekliyor), MATCHED / MATCHED_WITH_STAGED /
+  // CREATED (kataloğa alındı), MISSING_INFO (eksik bilgi) ve REJECTED (reddedildi) hatadır.
+  const HB_WAIT = /^(WAITING|PRE_MATCHED|IN_PROGRESS|PROCESSING|PENDING)$/i, HB_BAD = /^(MISSING_INFO|REJECTED|FAILED|ERROR)$/i;
+  const HB_ST_TR = { WAITING: 'işleniyor', PRE_MATCHED: 'ön eşleşme · onay bekliyor', MATCHED: 'katalogdaki ürünle eşleşti', MATCHED_WITH_STAGED: 'eşleşti', CREATED: 'ürün oluşturuldu', MISSING_INFO: 'eksik bilgi', REJECTED: 'reddedildi' };
   async function status(ref) {
     const items = [];
     let pending = false;
     for (const tid of String(ref).split(',').filter(Boolean)) {
-      const r = await productStatus(tid);
-      const rows = page(g(r, 'data') && !Array.isArray(g(r, 'data')) ? g(g(r, 'data'), 'items', 'data') || [] : r);
-      if (!rows.length) pending = true;
-      for (const it of rows) {
-        const st = str(g(it, 'productStatus', 'status', 'importStatus'));
-        const errs = [].concat(g(it, 'validationResults', 'errors', 'failureReasons') || []).map((e) => (typeof e === 'string' ? e : [g(e, 'attributeName'), g(e, 'message', 'description')].filter(Boolean).join(': '))).filter(Boolean);
-        const wait = /wait|progress|pending|beklen|process/i.test(st) && !errs.length;
-        if (wait) pending = true;
-        items.push({ key: str(g(it, 'merchantSku', 'sku')), status: st, ok: wait ? null : !errs.length && !/fail|error|reject|hata|red/i.test(st), error: errs.join(' · ') });
+      let got = 0;
+      for (let pg = 0; pg < 10; pg++) {
+        const r = await productStatus(tid, pg);
+        const rows = page(g(r, 'data') && !Array.isArray(g(r, 'data')) ? g(g(r, 'data'), 'items', 'data') || [] : r);
+        got += rows.length;
+        for (const it of rows) {
+          const st = str(g(it, 'productStatus', 'status', 'importStatus'));
+          const errs = [].concat(g(it, 'validationResults', 'errors', 'failureReasons') || []).map((e) => (typeof e === 'string' ? e : [g(e, 'attributeName'), g(e, 'message', 'description')].filter(Boolean).join(': '))).filter(Boolean);
+          const wait = (HB_WAIT.test(st) || /wait|progress|pending|beklen|process/i.test(st)) && !errs.length;
+          if (wait) pending = true;
+          const bad = !wait && (errs.length > 0 || HB_BAD.test(st) || /fail|error|reject|missing|hata|red/i.test(st));
+          items.push({ key: str(g(it, 'merchantSku', 'sku')), status: HB_ST_TR[st.toUpperCase()] || st, ok: wait ? null : !bad, error: errs.join(' · ') || (bad ? HB_ST_TR[st.toUpperCase()] || st : '') });
+        }
+        const total = Number(g(r, 'totalElements', 'totalCount')) || 0;
+        if (rows.length < 100 || (total && got >= total)) break;
       }
+      if (!got) pending = true;
     }
     return { done: !pending, items };
   }
   const allCategories = async () => { await categories(''); return catCache.all; };
-  const catalog = { categories, allCategories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 500, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
+  const catalog = { categories, allCategories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 100, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
 
   // ---------- kargo gideri (gerçek) ----------
   // Kayıt bazlı muhasebe servisi (mpfinance): sipariş tarihine göre en fazla 1 aylık aralıkla işlemler okunur; türü / açıklaması
