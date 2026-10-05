@@ -1,4 +1,6 @@
-// idefix pazaryeri (merchantapi.idefix.com). Satıcı paneli → Hesabım → Entegrasyon Bilgileri: Satıcı ID, API KEY (eski hesaplarda API Secret).
+// idefix pazaryeri (merchantapi.idefix.com, developer.idefix.com dokümanına göre). Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri →
+// “Yeni API Oluştur”: API KEY ve API SECRET KEY satıcının e-posta adresine gönderilir; Satıcı ID ekranda görünür.
+// Kimlik: X-API-KEY = base64(ApiKey:ApiSecret). Canlı ortamda IP izni gerekmez (test ortamında gerekir).
 // Kimlik: X-API-KEY başlığı (biçim otomatik bulunur, aşağıya bakın). Siparişler: /oms/{vendorId}/list · Ürün/stok/fiyat: /pim/...
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür (beta: canlı hesapla doğrulanmalı).
 import { http, num, str, chunk, diagStep, sleep } from '../util.js';
@@ -6,8 +8,9 @@ import { http, num, str, chunk, diagStep, sleep } from '../util.js';
 const BASE = 'https://merchantapi.idefix.com';
 // idefix durumları "shipment_" önekiyle gelir (shipment_created, shipment_picking, shipment_in_cargo, shipment_delivered…)
 const STATUS = {
-  created: 'new', approved: 'new', awaiting: 'new', split: 'new',
-  picking: 'processing', ready: 'processing', ready_to_ship: 'processing', invoiced: 'processing',
+  // Dokümana göre: created (ödeme alındı) → ready (hazırlanabilir) → picking (iptal edilemez) → invoiced → in_cargo → delivered → approved (hak ediş)
+  created: 'new', ready: 'new', awaiting: 'new', split: 'new',
+  picking: 'processing', ready_to_ship: 'processing', invoiced: 'processing', approved: 'delivered',
   in_cargo: 'shipped', shipped: 'shipped', undeliver: 'shipped', undelivered: 'shipped', at_collection_point: 'shipped',
   delivered: 'delivered', cancelled: 'cancelled', canceled: 'cancelled', unsupplied: 'cancelled', un_supplied: 'cancelled', returned: 'returned', refunded: 'returned',
 };
@@ -52,7 +55,7 @@ export function idefix(env, meta) {
         throw new Error(`HTTP ${(/HTTP (\d{3})/.exec(e.message) || [])[1]} — idefix kimliği reddetti. Denenen biçimler: ${tried.join(' · ')}. `
           + (fmt ? 'idefix “VENDOR_TOKEN_NOT_FORMATED” diyor: anahtarı “API KEY:API Secret” çiftinden oluşmuş biçimde bekliyor. '
             + (secret ? 'Panelde kayıtlı API Secret bu API KEY\'e ait değil (eski olabilir): doğru API Secret\'ı girin ya da “Panelde kayıtlı değeri sil” ile silin.'
-              : 'idefix\'te “Yeni API Oluştur” dediğinizde API KEY ile birlikte bir gizli anahtar (API Secret / Secret Key) gösteriliyorsa onu panelde “API Secret” alanına girin; yalnız bir kez gösteriliyor olabilir.')
+              : 'idefix → Hesap Bilgilerim → Entegrasyon Bilgileri → “Yeni API Oluştur” dediğinizde API KEY ve API SECRET KEY idefix\'te kayıtlı e-posta adresinize gönderilir; ikisini de girin.')
             : 'Satıcı ID ve API KEY\'i idefix → Hesabım → Entegrasyon Bilgileri\'nden yeniden kopyalayın.'));
       }
     }
@@ -81,7 +84,7 @@ export function idefix(env, meta) {
     const a = s.shippingAddress || {}, st = idefixStatus(s.status);
     const items = (s.items || []).map((it) => {
       const qty = num(it.quantity, 1), total = num(it.discountedTotalPrice) || num(it.price ?? it.productPrice) * qty;
-      return { lineId: str(it.id || it.orderLineId), sku: str(it.merchantSku || it.erpId), barcode: str(it.barcode), name: str(it.productName || it.title), image: str(it.image || it.productImage), quantity: qty, unitPrice: qty ? total / qty : total, total,
+      return { lineId: str(it.id || it.orderLineId), sku: str(it.merchantSku || it.erpId), barcode: str(it.barcode), name: str(it.productName || it.title), image: str(it.image || it.productImage).replace('{size}', '300/'), quantity: qty, variantName: (it.productAttributes || []).map((a) => a.attributeValueName).filter(Boolean).join(' / '), unitPrice: qty ? total / qty : total, total,
         status: st === 'cancelled' ? 'cancelled' : '', remoteKey: str(it.barcode), commission: it.commissionAmount != null ? num(it.commissionAmount) : null };
     });
     return {
@@ -121,9 +124,16 @@ export function idefix(env, meta) {
     for (const p of order.packages.filter((x) => x.remote_id && x.status === 'open')) await call(`/oms/${vendor}/${p.remote_id}/update-shipment-status`, { method: 'POST', body: { status: 'picking' } });
   }
   // Kendi kargo anlaşmasıyla gönderimde takip no bildirilir (paket "kargoda" olur)
+  // Kendi kargo anlaşmanızla gönderim: takip no + takip adresi zorunlu (adres, siparişteki kargo firmasıyla uyumlu olmalı)
+  const TRACK = [[/yurt/i, 'https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code='], [/aras/i, 'https://kargotakip.araskargo.com.tr/mainpage.aspx?code='],
+    [/mng|dhl/i, 'https://www.mngkargo.com.tr/gonderi-takip/?takipNo='], [/ptt/i, 'https://gonderitakip.ptt.gov.tr/Track/Verify?q='], [/s[üu]rat/i, 'https://suratkargo.com.tr/KargoTakip/?kargotakipno='],
+    [/hepsi\s*jet/i, 'https://www.hepsijet.com/gonderi-takibi/'], [/sendeo/i, 'https://sendeo.com.tr/gonderi-takip?code=']];
   async function ship(order, pkg, { tracking }) {
     if (!pkg.remote_id || !tracking) return {};
-    await call(`/oms/${vendor}/${pkg.remote_id}/update-tracking-number`, { method: 'POST', body: { trackingNumber: tracking, trackingUrl: '' } });
+    const firm = pkg.cargo_company || order.cargo_company || '';
+    const t = TRACK.find(([re]) => re.test(firm));
+    if (!t) throw new Error(`idefix takip adresi ister: “${firm || 'kargo firması'}” için takip adresi bilinmiyor. Kargo firmasını (Yurtiçi, Aras, MNG, PTT, Sürat, HepsiJet) seçin.`);
+    await call(`/oms/${vendor}/${pkg.remote_id}/update-tracking-number`, { method: 'POST', body: { trackingNumber: tracking, trackingUrl: t[1] + encodeURIComponent(tracking) } });
     return {};
   }
 
@@ -135,7 +145,7 @@ export function idefix(env, meta) {
     return out;
   }
 
-  const missing = ['IDEFIX_API_KEY', 'IDEFIX_VENDOR_ID'].filter((k) => !env[k]);
+  const missing = ['IDEFIX_API_KEY', 'IDEFIX_API_SECRET', 'IDEFIX_VENDOR_ID'].filter((k) => !env[k]);
   return {
     ...meta, type: 'idefix', beta: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true },

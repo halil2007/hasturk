@@ -394,24 +394,21 @@ test('Hepsiburada: gövdesiz GET isteğinde Content-Type gönderilmez; 520 alın
   } finally { globalThis.fetch = real; }
 });
 
-test('idefix: yalnız Satıcı ID + API KEY ile çalışır; reddedilen kimlik biçiminde sıradaki denenir ve hatırlanır', async () => {
-  const { idefix } = await import('../src/channels/idefix.js');
+test('idefix: kimlik base64(API KEY:API SECRET) — dokümandaki biçim önce denenir; API SECRET zorunlu; doğru durum eşlemesi', async () => {
+  const { idefix, idefixStatus } = await import('../src/channels/idefix.js');
+  assert.equal(idefix({ IDEFIX_VENDOR_ID: '16705', IDEFIX_API_KEY: 'K' }, { id: 'idefix' }).enabled, false, 'API SECRET olmadan kanal açılmaz');
+  assert.equal(idefixStatus('shipment_ready'), 'new'); assert.equal(idefixStatus('shipment_approved'), 'delivered');
   const keys = [];
   const real = globalThis.fetch;
   globalThis.fetch = async (url, opts = {}) => {
-    const k = opts.headers['X-API-KEY']; keys.push(k);
-    if (k !== btoa('KEY1:')) return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    keys.push(opts.headers['X-API-KEY']);
     return new Response(JSON.stringify({ products: [{ barcode: 'B1', title: 'Ürün', price: 10 }] }), { headers: { 'Content-Type': 'application/json' } });
   };
   try {
-    const ch = idefix({ IDEFIX_VENDOR_ID: '16705', IDEFIX_API_KEY: 'KEY1' }, { id: 'idefix' });
-    assert.equal(ch.enabled, true, 'API Secret zorunlu değil');
+    const ch = idefix({ IDEFIX_VENDOR_ID: '16705', IDEFIX_API_KEY: 'KEY1', IDEFIX_API_SECRET: 'SEC1' }, { id: 'idefix' });
     const l = await ch.fetchListings();
     assert.equal(l[0].barcode, 'B1'); assert.equal(l[0].stock, null, 'stok gelmezse bilinmiyor');
-    assert.deepEqual(keys.slice(0, 2), ['KEY1', btoa('KEY1:')]);
-    keys.length = 0;
-    await ch.fetchListings();
-    assert.deepEqual(keys, [btoa('KEY1:')], 'kabul edilen biçim hatırlanır');
+    assert.deepEqual(keys, [btoa('KEY1:SEC1')]);
   } finally { globalThis.fetch = real; }
 });
 
