@@ -36,6 +36,8 @@ export const FIELDS = {
     { k: 'HB_USER_AGENT', label: 'Entegratör adı (User-Agent)', req: true, hint: 'Merchant Portal → Hesabım → Entegrasyon (Entegratör Bilgileri) ekranındaki entegratör adı, ör. hasturk_dev. Boşsa ya da farklıysa Hepsiburada isteği 401/403 ile reddeder.' },
     { k: 'HB_MERCHANT_NAME', label: 'Mağaza adı (Hepsiburada\'da görünen)', hint: 'Buybox sıranızı bulmak için; ürün sayfasındaki satıcı adıyla birebir aynı', adv: true },
     { k: 'HB_TEST', label: 'Test ortamı', hint: '1 = test (SIT) ortamı', adv: true },
+    { k: 'HB_PROXY_URL', label: 'Aracı sunucu adresi (520 hatası için)', hint: 'Kendi hostinginize yüklediğiniz hb-proxy.php adresi, ör. https://alanadiniz.com/hb-proxy.php (dosya: panel adresi/hb-proxy.php)', adv: true, pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan tam adres girin' },
+    { k: 'HB_PROXY_KEY', label: 'Aracı sunucu anahtarı', hint: 'hb-proxy.php içindeki $KEY ile birebir aynı', secret: true, adv: true },
   ],
   pttavm: [
     { k: 'PTTAVM_USERNAME', label: 'API kullanıcı adı', req: true },
@@ -55,7 +57,7 @@ export const FIELDS = {
   idefix: [
     { k: 'IDEFIX_VENDOR_ID', label: 'Satıcı ID', req: true, hint: 'ör. 16705', pattern: '^\\d+$', patternMsg: 'idefix Satıcı ID yalnızca rakamlardan oluşur (Hesabım → Entegrasyon Bilgileri)' },
     { k: 'IDEFIX_API_KEY', label: 'API KEY', secret: true, req: true },
-    { k: 'IDEFIX_API_SECRET', label: 'API Secret / Secret Key (idefix API KEY ile birlikte veriyorsa)', secret: true },
+    { k: 'IDEFIX_API_SECRET', label: 'API SECRET KEY', secret: true, req: true, hint: '“Yeni API Oluştur” sonrası idefix\'in e-posta ile gönderdiği gizli anahtar' },
   ],
   pazarama: [
     { k: 'PAZARAMA_CLIENT_ID', label: 'API Key (Client ID)', req: true },
