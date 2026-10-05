@@ -339,6 +339,7 @@ export function trendyol(env, meta) {
       const id = attrId(a), v = (map.attrs || {})[id];
       let valueId = v && v.id, text = v && v.value;
       if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
+      if (text === '@image') text = pr.image;
       // V2 biçimi: listeden değer → attributeValueIds, serbest metin (izin varsa) → attributeValue
       if (valueId) attrs.push({ attributeId: Number(id), attributeValueIds: [Number(valueId)] });
       else if (text && a.allowCustom) attrs.push({ attributeId: Number(id), attributeValue: String(text) });

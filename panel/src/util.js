@@ -21,6 +21,8 @@ export const now = () => Date.now();
 export const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 export const num = (v, d = 0) => { const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v); return Number.isFinite(n) ? n : d; };
 export const str = (v) => (v == null ? '' : String(v)).trim();
+// Pazaryeri kategori özelliği bir görsel adresi mi istiyor (ör. Hepsiburada "Paket Görseli (ön)")? Listeden seçilen özellikler hariç.
+export const isImageAttr = (a) => !!a && /g[öo]rsel|resim|foto[gğ]raf|image|photo/i.test(String(a.name || '')) && !/enum|list|select/i.test(String(a.type || ''));
 
 // Türkiye UTC+3 (yaz saati yok): gün/hafta/ay anahtarları bu saate göre
 export const TR = 3 * 3600e3;
