@@ -27,8 +27,8 @@ export async function uploadView(el) {
           ${(allUp ? st.uploads : st.uploads.slice(0, 5)).map((u) => { const ok = u.items.filter((x) => x.ok === true).length, bad = u.items.filter((x) => x.ok === false).length, s = ST[u.status] || ['', u.status]; return html`<tr>
             <td class="small">${dateTime(u.created_at)}<div class="tiny muted">${u.user || ''}</div></td><td>${chLogo(u.channel, true)}</td><td class="r num">${u.items.length}</td>
             <td class="small num ellipsis" style="max-width:200px">${u.ref || '—'}</td>
-            <td><span class="pill ${s[0]}">${s[1]}</span>${ok || bad ? html` <span class="tiny">${ok ? html`<span style="color:var(--good)">${ok} onay</span>` : ''} ${bad ? html`<span style="color:var(--bad)">${bad} hata</span>` : ''}</span>` : ''}${u.error ? html`<div class="tiny" style="color:var(--bad)">${u.error.slice(0, 160)}</div>` : ''}</td>
-            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${u.ref && u.status !== 'done' ? html`<button class="btn sm" data-act="check" data-id="${u.id}"><i class="ico ico-sync"></i>Durumu sorgula</button>` : ''}<button class="btn sm ghost" data-act="detail" data-id="${u.id}">Ayrıntı</button></div></td></tr>`; })}
+            <td><span class="pill ${s[0]}">${s[1]}</span>${ok || bad ? html` <span class="tiny">${ok ? html`<span style="color:var(--good)">${ok} kabul</span>` : ''} ${bad ? html`<span style="color:var(--bad)">${bad} hata</span>` : ''}</span>` : ''}${u.error ? html`<div class="tiny" style="color:var(--bad)">${u.error.slice(0, 160)}</div>` : ''}</td>
+            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${u.ref && (u.status !== 'done' || bad) ? html`<button class="btn sm" data-act="check" data-id="${u.id}"><i class="ico ico-sync"></i>${u.status === 'done' ? 'Hata nedenlerini yenile' : 'Durumu sorgula'}</button>` : ''}<button class="btn sm ghost" data-act="detail" data-id="${u.id}">Ayrıntı</button></div></td></tr>`; })}
           ${!st.uploads.length ? html`<tr><td colspan="6" class="empty">Henüz gönderim yok</td></tr>` : ''}
         </tbody></table></div></div>
       ${!c || !c.ready ? html`<div class="empty">Ürün yüklenebilecek bağlı pazaryeri yok. Trendyol / Hepsiburada API bilgilerini Entegrasyonlar'dan girin.</div>` : html`
@@ -213,7 +213,7 @@ export async function uploadView(el) {
       ${u.error ? html`<div class="notice bad small">${u.error}</div>` : ''}
       <div class="table-wrap" style="max-height:60vh;overflow:auto"><table class="t"><thead><tr><th>Ürün</th><th>Anahtar</th><th>Sonuç</th></tr></thead><tbody>
         ${u.items.map((x) => html`<tr><td class="ellipsis" style="max-width:300px">${x.name}</td><td class="num small">${x.key}</td>
-          <td>${x.ok === true ? html`<span class="pill good">onaylandı</span>` : x.ok === false ? html`<span class="pill bad">hata</span>` : html`<span class="pill warn">${x.status || 'bekliyor'}</span>`}${x.error ? html`<div class="tiny" style="color:var(--bad)">${x.error}</div>` : ''}</td></tr>`)}
+          <td>${x.ok === true ? html`<span class="pill good">kabul edildi</span>` : x.ok === false ? html`<span class="pill bad">hata</span>` : html`<span class="pill warn">bekliyor</span>`}${x.status && x.status !== x.error ? html`<div class="tiny muted">${x.status}</div>` : ''}${x.error ? html`<div class="tiny" style="color:var(--bad)">${x.error}</div>` : ''}</td></tr>`)}
       </tbody></table></div></div>` });
     const rb = s.el.querySelector('[data-raw]');
     if (rb) rb.onclick = () => busy(rb, async () => {

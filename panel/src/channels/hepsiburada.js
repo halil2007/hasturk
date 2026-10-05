@@ -510,6 +510,28 @@ export function hepsiburada(env, meta) {
   // CREATED (kataloğa alındı), MISSING_INFO (eksik bilgi) ve REJECTED (reddedildi) hatadır.
   const HB_WAIT = /^(WAITING|PRE_MATCHED|IN_PROGRESS|PROCESSING|PENDING)$/i, HB_BAD = /^(MISSING_INFO|REJECTED|FAILED|ERROR)$/i;
   const HB_ST_TR = { WAITING: 'işleniyor', PRE_MATCHED: 'ön eşleşme · onay bekliyor', MATCHED: 'katalogdaki ürünle eşleşti', MATCHED_WITH_STAGED: 'eşleşti', CREATED: 'ürün oluşturuldu', MISSING_INFO: 'eksik bilgi', REJECTED: 'reddedildi' };
+  // Hata nedenleri: Hepsiburada nedeni farklı alanlarda döndürebilir (validationResults, failureReasons, importMessages, errors,
+  // message …); ürün kaydının her yerindeki ileti / neden metinleri toplanır (durum ve kimlik alanları hariç).
+  function reasons(it) {
+    const out = [];
+    const walk = (v, key = '', attr = '', depth = 0) => {
+      if (v == null || depth > 5 || out.length >= 8) return;
+      if (typeof v === 'string') {
+        if (/message|reason|description|error|hata|aciklama|detail/i.test(key) && v.trim() && !/^(true|false|null|ok|success)$/i.test(v.trim())) {
+          const t = (attr ? `${attr}: ` : '') + v.trim();
+          if (!out.includes(t)) out.push(t);
+        }
+        return;
+      }
+      if (Array.isArray(v)) { v.forEach((x) => walk(x, key, attr, depth + 1)); return; }
+      if (typeof v === 'object') {
+        const a = str(v.attributeName || v.attribute || v.field || v.fieldName || attr);
+        for (const [k, x] of Object.entries(v)) if (!/^(productStatus|status|importStatus|merchantSku|merchant|sku|hbSku|barcode|trackingId|id)$/i.test(k)) walk(x, k, a, depth + 1);
+      }
+    };
+    walk(it);
+    return out;
+  }
   async function status(ref) {
     const items = [];
     let pending = false;
@@ -521,7 +543,7 @@ export function hepsiburada(env, meta) {
         got += rows.length;
         for (const it of rows) {
           const st = str(g(it, 'productStatus', 'status', 'importStatus'));
-          const errs = [].concat(g(it, 'validationResults', 'errors', 'failureReasons') || []).map((e) => (typeof e === 'string' ? e : [g(e, 'attributeName'), g(e, 'message', 'description')].filter(Boolean).join(': '))).filter(Boolean);
+          const errs = reasons(it);
           const wait = (HB_WAIT.test(st) || /wait|progress|pending|beklen|process/i.test(st)) && !errs.length;
           if (wait) pending = true;
           const bad = !wait && (errs.length > 0 || HB_BAD.test(st) || /fail|error|reject|missing|hata|red/i.test(st));
