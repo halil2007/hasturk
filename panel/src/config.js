@@ -24,10 +24,14 @@ export const FIELDS = {
   ],
   // Yeni sipariş e-posta bildirimi (kanal değil; Ayarlar → Bildirimler'den girilir)
   mail: [
-    { k: 'MAIL_PROVIDER', label: 'E-posta servisi', hint: 'brevo (önerilen) veya resend' },
-    { k: 'MAIL_API_KEY', label: 'API anahtarı', secret: true, req: true },
+    { k: 'MAIL_PROVIDER', label: 'E-posta servisi', hint: 'smtp (kendi e-posta sunucunuz), brevo veya resend' },
+    { k: 'MAIL_API_KEY', label: 'API anahtarı', secret: true },
     { k: 'MAIL_FROM', label: 'Gönderen e-posta', hint: 'serviste doğrulanmış adres', req: true },
     { k: 'MAIL_FROM_NAME', label: 'Gönderen adı', hint: 'ör. Hastürk Panel' },
+    { k: 'MAIL_SMTP_HOST', label: 'SMTP sunucusu', hint: 'ör. mail.alanadiniz.com.tr' },
+    { k: 'MAIL_SMTP_PORT', label: 'SMTP portu', hint: '465 (SSL) ya da 587 (STARTTLS)', pattern: '^(465|587|2525)$', patternMsg: 'Port 465, 587 ya da 2525 olmalı (Cloudflare 25 numaralı porta izin vermez)' },
+    { k: 'MAIL_SMTP_USER', label: 'SMTP kullanıcı adı', hint: 'genelde e-posta adresinin kendisi' },
+    { k: 'MAIL_SMTP_PASS', label: 'SMTP şifresi', secret: true },
   ],
   hepsiburada: [
     { k: 'HB_MERCHANT_ID', label: 'Merchant ID', req: true, hint: 'ör. 10012bc1-3a53-4306-b782-11eed9083af2', pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$', patternMsg: 'Merchant ID, Hepsiburada\'nın verdiği 36 karakterlik kimlik olmalı (ör. 10012bc1-3a53-4306-b782-11eed9083af2)' },

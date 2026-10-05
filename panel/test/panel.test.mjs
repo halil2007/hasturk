@@ -353,3 +353,32 @@ test('çoklu mağaza: aynı türden ek mağaza eklenir, kendi bilgileriyle çal�
   assert.ok(!list.some((c) => c.id === 'trendyol_3'));
   assert.ok(list.some((c) => c.id === 'trendyol_2'));
 });
+
+test('personel yetkileri: yalnız seçilen bölümlerin API\'si açılır, yönetici her şeyi görür', async () => {
+  const db = d1();
+  await init(db);
+  const env = { PANEL_PASSWORD: 'x-123456', DB: db };
+  const jar = { a: '', s: '' };
+  const call = (who) => async (path, opts = {}) => {
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: jar[who] } }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) jar[who] = r.headers.get('set-cookie').split(';')[0];
+    return r;
+  };
+  const A = call('a'), S = call('s');
+  await A('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+  assert.equal((await A('/api/users', { method: 'POST', body: JSON.stringify({ username: 'depo', name: 'Depo', password: 'depo-sifre-1', role: 'staff', perms: ['orders', 'cargo', 'yok-boyle'] }) })).status, 200);
+  const u = (await (await A('/api/users')).json()).find((x) => x.username === 'depo');
+  assert.deepEqual(u.perms, ['orders', 'cargo']);
+  await S('/api/login', { method: 'POST', body: JSON.stringify({ username: 'depo', password: 'depo-sifre-1' }) });
+  assert.equal((await S('/api/orders')).status, 200);
+  assert.equal((await S('/api/packages')).status, 200);
+  assert.equal((await S('/api/finance')).status, 403);
+  assert.equal((await S('/api/customers/summary')).status, 403);
+  assert.equal((await S('/api/questions')).status, 403);
+  assert.equal((await S('/api/summary')).status, 200, 'genel bakış her zaman açık');
+  assert.deepEqual((await (await S('/api/me')).json()).user.perms, ['orders', 'cargo']);
+  // Yetki genişletilince hemen geçerli olur
+  await A(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ name: 'Depo', role: 'staff', perms: ['orders', 'finance'] }) });
+  assert.equal((await S('/api/finance')).status, 200);
+  assert.equal((await A('/api/finance')).status, 200);
+});

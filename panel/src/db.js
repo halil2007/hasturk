@@ -139,6 +139,8 @@ const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS invoices (channel TEXT NOT NULL, remote_id TEXT NOT NULL, no TEXT, date INTEGER NOT NULL, type TEXT NOT NULL, description TEXT,
     amount REAL NOT NULL DEFAULT 0, order_number TEXT, url TEXT, synced_at INTEGER, PRIMARY KEY (channel, remote_id))`,
   'CREATE INDEX IF NOT EXISTS invoices_date ON invoices(date)',
+  // Personel yetkileri (JSON bölüm listesi; boşsa tüm bölümler) — bkz. public/perms.js
+  'ALTER TABLE users ADD COLUMN perms TEXT',
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
   'CREATE INDEX IF NOT EXISTS products_category ON products(category)',
 ];

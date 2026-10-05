@@ -13,6 +13,7 @@ import * as customers from './customers.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
+import { can, sectionOf } from '../public/perms.js';
 import { orderProfit, breakdown, listInvoices, syncInvoices } from './finance.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool } from './util.js';
 
@@ -680,6 +681,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   const diag = /^integrations\/[a-z0-9_]+\/diagnose$/.test(path);
   if (user.role !== 'admin' && !diag && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
   if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
+  // Personel: yalnız yetkili olduğu bölümler (bkz. public/perms.js)
+  if (!can(user, sectionOf(path))) fail(403, 'Bu bölüm için yetkiniz yok (Kullanıcılar → yetkiler)');
   // Kategori eşleştirme ve pazaryerine ürün yükleme
   if (path.startsWith('catalog/')) return json(await catalogApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
   if (path === 'summary' && m === 'GET') {
