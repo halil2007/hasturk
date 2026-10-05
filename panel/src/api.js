@@ -8,6 +8,7 @@ import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { hbTest } from './hbtest.js';
+import { suggestBarcode, assignBarcodes, barcodePrefix, missingBarcodes } from './barcodes.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
@@ -511,6 +512,7 @@ async function listProducts(db, q) {
   if (q.filter === 'nocost') where.push('(p.purchase_price IS NULL OR p.purchase_price = 0)');
   if (q.filter === 'waiting') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED})`);
   if (q.filter === 'error') where.push('EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.error IS NOT NULL)');
+  if (q.filter === 'nobarcode') where.push("COALESCE(TRIM(p.barcode), '') = ''");
   if (q.filter === 'nolisting') where.push('NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)');
   if (q.filter === 'passive') where.push('p.active = 0'); else if (q.filter !== 'all') where.push('p.active = 1');
   const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
@@ -1112,6 +1114,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     }
   }
 
+  // Barkod oluşturma: öneri (kaydedilmez), seçilen ürünlere toplu barkod, ön ek ve eksik sayısı
+  if (path === 'products/barcodes' && m === 'GET') return json({ prefix: await barcodePrefix(db), missing: await missingBarcodes(db) });
+  if (path === 'products/barcodes/new' && m === 'GET') return json(await suggestBarcode(db, q.prefix));
+  if (path === 'products/barcodes' && m === 'POST') { const b = await body(req); return json(await assignBarcodes(db, b.ids, { prefix: b.prefix, user: user.name })); }
   if (path === 'products' && m === 'GET') return json(await listProducts(db, q));
   if (path === 'products' && m === 'POST') return json(await saveProduct(env, db, ctx, 0, await body(req), user));
   if ((x = path.match(/^products\/(\d+)$/))) {

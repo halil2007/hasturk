@@ -186,6 +186,9 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 - **Değişim eşiği, yuvarlama** (kuruşuyla, tam sayı, ,90, ,99) ve **genel kâr payı** (ürüne özel değer önceliklidir).
 Müşteri panellerinde bu özellik "Yakında" olarak görünür.
 
+### Barkod oluşturma
+Barkodu olmayan ürünlere benzersiz barkod verilir: **Ürünler → Barkod oluştur** (toplu; barkodu eksik ürünler listelenir, istenenler seçilir) ya da ürün kartında Barkod alanının yanındaki **Oluştur** (kaydedince geçerli olur). Barkodlar geçerli **EAN-13**'tür (son hane kontrol hanesi), panel ürünleri ve tüm kanal ilanlarıyla çakışmaz. Varsayılan ön ek **200**: GS1'in mağaza içi kullanıma ayırdığı aralık, gerçek bir firmanın barkoduyla çakışmaz; GS1 firma önekiniz varsa (ör. 8691234) ön ek olarak girilir ve hatırlanır. Barkodu dolu ürünler toplu işlemde değişmez. Ürünler sayfasındaki **Barkod eksik** sekmesi bu ürünleri gösterir; oluşturulan liste kopyalanıp Excel'e yapıştırılabilir.
+
 ### Müşteri soruları
 
 Trendyol, Hepsiburada, **N11** (SOAP ürün soru-cevap servisi; liste dakikada bir çağrılabildiği için her senkronda açık sorular), **idefix** ve **Pazarama** soruları Müşteri Soruları sayfasında toplanır ve panelden cevaplanır. Sayfanın üstündeki **soru analizi** son 30 günde kanal bazında soru sayısını, bekleyenleri, cevaplanma oranını ve ortalama cevap süresini gösterir. PttAVM'in soru servisi yoktur.
