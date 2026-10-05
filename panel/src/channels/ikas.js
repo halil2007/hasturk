@@ -69,7 +69,7 @@ export function ikas(env, p, meta) {
     salesChannelId: 'salesChannelId',
     orderPackageStatus: 'orderPackageStatus',
     orderPaymentStatus: 'orderPaymentStatus',
-    customer: 'customer { firstName lastName email phone }',
+    customer: 'customer { id firstName lastName email phone isGuestCheckout }',
     billingAddress: 'billingAddress { phone }',
     shippingAddress: 'shippingAddress { firstName lastName phone addressLine1 addressLine2 city { name } district { name } }',
     barcodeList: 'barcodeList',
@@ -130,7 +130,7 @@ export function ikas(env, p, meta) {
       address: { name: [a.firstName, a.lastName].filter(Boolean).join(' '), line: [a.addressLine1, a.addressLine2].filter(Boolean).join(' '), district: str(a.district && a.district.name), city: str(a.city && a.city.name), phone: str(a.phone) },
       total: num(o.totalFinalPrice), currency: o.currencyCode || 'TRY',
       cargoCompany: first.cargoCompany || '', tracking: first.tracking || '',
-      awaitingPayment: /WAITING/i.test(o.orderPaymentStatus || ''),
+      awaitingPayment: /WAITING/i.test(o.orderPaymentStatus || ''), customerId: str(c.id), guest: !!c.isGuestCheckout,
       cargoChoice: str(((o.shippingLines || [])[0] || {}).title), cargoChoiceId: str(((o.shippingLines || [])[0] || {}).cargoCompanyId),
       items, packages,
     };

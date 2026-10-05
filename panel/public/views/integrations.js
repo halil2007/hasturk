@@ -3,7 +3,7 @@
 import { api, state, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey } from '../core.js';
 import { loadSummary } from '../app.js';
 import { importDialog } from './products.js';
-import { diagnoseDialog } from './diagnose.js';
+import { diagnoseDialog, systemCheck } from './diagnose.js';
 
 const HELP = {
   ikas: 'ikas paneli → Uygulamalar → Özel uygulama oluştur. İzinler: Ürünler, Siparişler, Stok, Mağaza bilgisi (okuma + yazma). Görseller ve varyantlar ürünlerle birlikte gelir.',
@@ -94,6 +94,7 @@ export async function integrations(el) {
       <div class="notice"><i class="ico ico-key"></i><div>API bilgileri sunucuda <b>şifreli</b> saklanır ve bir daha ekranda açık gösterilmez (gizli alanlar boş bırakılırsa eski değer korunur). Panelde girilen değer, Cloudflare'de tanımlı aynı bilginin önüne geçer.
         ${data.secretSet ? '' : html`<br><b>Öneri:</b> Cloudflare'de <code>PANEL_SECRET</code> (uzun rastgele metin) tanımlayın; yoksa şifreleme panel şifresine bağlıdır ve şifre değişirse API bilgilerini yeniden girmeniz gerekir.`}</div></div>
       <div class="notice good small"><i class="ico ico-sync"></i><div>Tüm aktif kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: yeni/değişen siparişler, ürünler, görseller, varyantlar ve stoklar güncellenir; eşleştirmeler ve kanala özel stok kuralları korunur. Başarısız işlemler yeniden denenir, çözülemeyenler <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer.</div></div>
+      <div class="row wrap"><button class="btn primary" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü (tüm kanallar)</button><span class="muted small">Bağlı tüm kanalların kimlik, izin, servis ve ayarlarını tek seferde dener; raporu kopyalayıp iletebilirsiniz.</span></div>
       <div class="integ">${live.map(card)}</div>
       ${backfill()}
       ${paused.length ? html`<details class="card adv" ${paused.some((c) => c.updated) ? 'open' : ''}><summary><b>Beklemedeki kanallar</b> <span class="muted small">(${paused.map((c) => c.name).join(', ')})</span></summary>
@@ -103,6 +104,7 @@ export async function integrations(el) {
   const values = (id) => { const o = {}; $$(`[data-ch="${id}"] [data-k]`, el).forEach((i) => { o[i.dataset.k] = i.value; }); return o; };
   const after = async () => { await loadSummary().catch(() => {}); await load(); };
   actions(el, {
+    syscheck: () => systemCheck(data.channels.filter((c) => (c.enabled && !c.paused) || (c.gated && !(c.missing || []).length)).map((c) => ({ id: c.id, name: c.name }))),
     save: (t) => busy(t, async () => { await api('integrations/' + t.dataset.id, { method: 'PUT', body: { values: values(t.dataset.id) } }); toast('Kaydedildi'); await after(); }),
     test: (t) => busy(t, async () => {
       const id = t.dataset.id;

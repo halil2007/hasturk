@@ -69,6 +69,98 @@ async function buildAll(c, map, prods, opts, zeroStock) {
   return out;
 }
 
+// ---------- otomatik kategori eşleştirme ----------
+// ikas kategori yolu (ör. "Bahçe › Toprak ve Harç") ile pazaryeri kategorilerinin adı / yolu kelime kelime karşılaştırılır.
+// Türkçe karakter ve ek farkları (toprak / toprağı, tohum / tohumu) yok sayılır: kelimelerin ilk 5 harfi karşılaştırılır.
+const FOLD = { ı: 'i', İ: 'i', ş: 's', Ş: 's', ğ: 'g', Ğ: 'g', ü: 'u', Ü: 'u', ö: 'o', Ö: 'o', ç: 'c', Ç: 'c', â: 'a' };
+const STOPW = new Set(['ve', 'ile', 'icin', 'diger', 'urunleri', 'urunler', 'cesitleri', 'malzemeleri']);
+const words = (s) => String(s || '').replace(/[ıİşŞğĞüÜöÖçÇâ]/g, (c) => FOLD[c]).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOPW.has(w)).map((w) => w.slice(0, 5));
+export function scoreCategory(local, c) {
+  const segs = String(local).split('›').map((x) => x.trim()).filter(Boolean);
+  const last = new Set(words(segs[segs.length - 1] || local)), all = new Set(words(local));
+  const nm = new Set(words(c.name)), pt = new Set(words(c.path));
+  let s = 0;
+  for (const w of last) s += nm.has(w) ? 3 : pt.has(w) ? 1 : 0;
+  for (const w of all) if (!last.has(w) && (nm.has(w) || pt.has(w))) s += 1;
+  if (last.size && [...last].every((w) => nm.has(w)) && [...nm].every((w) => last.has(w))) s += 3;
+  return s - Math.max(0, nm.size - last.size) * 0.3;
+}
+async function suggest(c, local, n = 5) {
+  if (!local || !c.catalog.allCategories) return [];
+  return (await c.catalog.allCategories()).map((x) => ({ ...x, score: Math.round(scoreCategory(local, x) * 10) / 10 })).filter((x) => x.score >= 2)
+    .sort((a, b) => b.score - a.score).slice(0, n);
+}
+// Kategori özelliklerini mümkün olduğunca otomatik doldur: varyant özellikleri ürünün varyant adından, Menşei = Türkiye
+async function autoAttrs(c, catId) {
+  const out = {}, missing = [];
+  for (const a of await c.catalog.attributes(catId)) {
+    if (a.kind === 'variant') { out[a.id] = { value: '@variant' }; continue; }
+    if (!a.mandatory) continue;
+    if (/men[sş]e|origin|[üu]retim yeri/i.test(a.name)) {
+      const v = (await c.catalog.values(catId, a.id).catch(() => [])).find((x) => /^(tr|t[üu]rkiye)$/i.test(String(x.value).trim()));
+      if (v) { out[a.id] = { id: v.id, value: v.value }; continue; }
+      if (a.custom || !/enum/i.test(a.type)) { out[a.id] = { value: 'Türkiye' }; continue; }
+    }
+    missing.push(a.name);
+  }
+  return { attrs: out, missing };
+}
+// Eşleştirilmemiş ikas kategorilerini en uygun pazaryeri kategorisine bağla (puanı yeterli olanlar)
+async function automap(db, settings, c, user) {
+  const cats = catalogOf(settings), ph = cats.map(() => '?').join(',');
+  const locals = (await all(db, `SELECT DISTINCT COALESCE(p.category, '') AS local FROM products p WHERE p.active = 1 AND COALESCE(p.category, '') != ''
+    AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph}))
+    AND NOT EXISTS (SELECT 1 FROM category_map m WHERE m.local = p.category AND m.channel = ?)`, ...cats, c.id)).map((r) => r.local);
+  const mapped = [], skipped = [];
+  for (const local of locals) {
+    const [best] = await suggest(c, local, 1);
+    if (!best || best.score < 2.5) { skipped.push({ local, reason: best ? `en yakın: ${best.name} (puan düşük)` : 'uygun kategori bulunamadı' }); continue; }
+    const { attrs, missing } = await autoAttrs(c, best.id);
+    await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (local, channel) DO NOTHING`, local, c.id, best.id, best.name, JSON.stringify(attrs), Date.now(), (user && user.name) || 'Otomatik');
+    mapped.push({ local, remote: best.name, path: best.path, missing });
+  }
+  if (mapped.length) await log(db, c.id, 'info', `${mapped.length} kategori otomatik eşleştirildi: ${mapped.slice(0, 5).map((x) => `${x.local} → ${x.remote}`).join(' · ')}`);
+  return { mapped, skipped };
+}
+
+// ---------- otomatik ürün gönderimi (kanal bazında açılıp kapatılır) ----------
+// Her senkronda: eşleştirilmemiş kategoriler (günde bir) otomatik eşleştirilir; eşleştirilmiş kategorilerde kanalda henüz olmayan,
+// stoğu olan ve son 14 günde gönderilmemiş ürünler (eksiği yoksa) gönderilir. Tek seferde en fazla 100 ürün.
+export async function autoUpload(env, db, settings) {
+  settings = settings || await getSettings(db);
+  const on = Object.keys(settings.auto_upload || {}).filter((k) => settings.auto_upload[k]);
+  if (!on.length) return null;
+  const out = {};
+  const allOpts = (await getRaw(db, 'upload_opts')) || {};
+  for (const c of await getChannels(env, db)) {
+    if (!on.includes(c.id) || !c.enabled || !c.catalog || c.hold) continue;
+    try {
+      const last = await getRaw(db, 'automap:' + c.id);
+      if (!last || Date.now() - last > 864e5) { await automap(db, settings, c, null); await setSetting(db, 'automap:' + c.id, Date.now()); }
+      const recent = new Set((await all(db, 'SELECT items FROM product_uploads WHERE channel = ? AND created_at > ?', c.id, Date.now() - 14 * 864e5))
+        .flatMap((u) => JSON.parse(u.items || '[]').map((x) => x.id)));
+      const ready = [];
+      for (const map of (await all(db, 'SELECT * FROM category_map WHERE channel = ?', c.id)).map((m) => ({ ...m, attrs: JSON.parse(m.attrs || '{}') }))) {
+        if (ready.length >= 100) break;
+        const prods = (await productsFor(db, settings, { local: map.local, ch: c.id })).filter((p) => !p.listed && !recent.has(p.id) && (p.stock || 0) > 0).slice(0, 100 - ready.length);
+        if (!prods.length) continue;
+        for (const x of await buildAll(c, map, prods, allOpts[c.id] || {}, false)) if (!x.missing.length) ready.push(x);
+      }
+      if (!ready.length) { out[c.id] = 0; continue; }
+      const items = ready.map((x) => ({ id: x.p.id, key: x.key, name: x.p.name }));
+      const r = await c.catalog.send(ready.map((x) => x.payload));
+      await run(db, "INSERT INTO product_uploads (channel, ref, status, items, user, created_at) VALUES (?, ?, 'sent', ?, 'Otomatik', ?)", c.id, r.ref, JSON.stringify(items), Date.now());
+      await log(db, c.id, 'info', `Otomatik gönderim: ${ready.length} yeni ürün ${c.name}'a gönderildi · takip ${r.ref}`);
+      out[c.id] = ready.length;
+    } catch (e) {
+      out[c.id] = 'hata: ' + e.message;
+      await log(db, c.id, 'error', 'Otomatik ürün gönderimi başarısız: ' + e.message);
+    }
+  }
+  return out;
+}
+
 export async function catalogApi(env, db, ctx, path, m, q, b, user) {
   const settings = await getSettings(db);
   const allOpts = (await getRaw(db, 'upload_opts')) || {};
@@ -82,7 +174,8 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const maps = await all(db, 'SELECT local, channel, remote_id, remote_name, attrs, updated_at FROM category_map');
     return {
       channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo, sandbox: !!c.sandbox,
-        reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.id] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {} })),
+        reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.id] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
+        auto: !!(settings.auto_upload || {})[c.id], stockPush: !!(settings.stock_push || {})[c.id] })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
       maps: maps.map((x) => ({ ...x, attrs: JSON.parse(x.attrs || '{}') })),
       uploads: (await all(db, 'SELECT id, channel, ref, status, items, result, error, user, created_at, checked_at FROM product_uploads ORDER BY id DESC LIMIT 30'))
@@ -90,6 +183,8 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       stockSync: !!settings.stock_sync,
     };
   }
+  if (path === 'catalog/suggest' && m === 'GET') return { items: await suggest(await target(env, db, q.channel), str(q.local)) };
+  if (path === 'catalog/automap' && m === 'POST') return automap(db, settings, await target(env, db, str(b.channel)), user);
   if (path === 'catalog/remote-categories' && m === 'GET') return (await target(env, db, q.channel)).catalog.categories(str(q.q));
   if (path === 'catalog/attributes' && m === 'GET') return { attributes: await (await target(env, db, q.channel)).catalog.attributes(str(q.category)) };
   if (path === 'catalog/values' && m === 'GET') return { values: await (await target(env, db, q.channel)).catalog.values(str(q.category), str(q.attribute)) };

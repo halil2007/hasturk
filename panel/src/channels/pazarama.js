@@ -45,7 +45,7 @@ export function pazarama(env, meta) {
     for (const i of items) { delete i._st; delete i.cargo; }
     return {
       remoteId: str(o.orderNumber || o.orderId), orderNumber: str(o.orderNumber || o.orderId), orderedAt: Date.parse(o.orderDate) || Date.now(), remoteStatus: status, status,
-      customer: str(o.customerName || a.nameSurname), phone: str(a.phoneNumber), email: str(o.customerEmail),
+      customer: str(o.customerName || a.nameSurname), phone: str(a.phoneNumber), email: str(o.customerEmail), customerId: str(o.customerId),
       address: { name: str(a.nameSurname || o.customerName), line: str(a.addressDetail || a.displayAddressText), district: str(a.districtName), city: str(a.cityName), phone: str(a.phoneNumber) },
       total: val(o.orderAmount) || live.reduce((s, i) => s + i.total, 0), currency: 'TRY', cargoCompany: str(cg.companyName), tracking: str(cg.trackingNumber),
       items, packages: null,

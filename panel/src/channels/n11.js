@@ -32,7 +32,7 @@ export function n11(env, meta) {
       return {
         remoteId: String(p0.orderNumber), orderNumber: String(p0.orderNumber), orderedAt: hist.length ? Math.min(...hist) : num(p0.lastModifiedDate) || Date.now(),
         remoteStatus: list.map((p) => p.shipmentPackageStatus).join(', '), status,
-        customer: str(p0.customerfullName || a.fullName), phone: str(a.gsm), email: '',
+        customer: str(p0.customerfullName || a.fullName), phone: str(a.gsm), email: str(p0.customerEmail), customerId: str(p0.customerId || p0.buyerId),
         address: { name: str(a.fullName || p0.customerfullName), line: str(a.address), district: str(a.district), city: str(a.city), phone: str(a.gsm) },
         total: list.reduce((s, p) => s + num(p.totalAmount), 0), currency: 'TRY',
         cargoCompany: str(tracked.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),

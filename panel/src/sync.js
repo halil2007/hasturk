@@ -13,7 +13,8 @@ import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
 import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
-import { checkPendingUploads } from './catalog.js';
+import { checkPendingUploads, autoUpload } from './catalog.js';
+import { customerKey, fillKeys } from './customers.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -71,7 +72,7 @@ export async function saveOrders(db, ch, orders, maps) {
     for (const o of part) {
       const id = `${ch}:${o.remoteId}`, ex = existing.get(id);
       const status = mergeStatus(o.status, ex && ex.local_status);
-      const extra = JSON.stringify({ awaitingPayment: !!o.awaitingPayment, ...(o.demo ? { demo: true } : {}), ...(o.cargoChoice ? { cargoChoice: o.cargoChoice } : {}) });
+      const extra = JSON.stringify({ awaitingPayment: !!o.awaitingPayment, ...(o.demo ? { demo: true } : {}), ...(o.cargoChoice ? { cargoChoice: o.cargoChoice } : {}), ...(o.customerId ? { customerId: o.customerId } : {}), ...(o.guest ? { guest: true } : {}) });
       // Kanalda durum değişti ve panelden yapılmadı → kanal tarafında işlem (satıcı paneli, kargo, müşteri…)
       let ext = null;
       if (ex && ex.remote_status && o.remoteStatus && ex.remote_status !== o.remoteStatus && !recent.has(id)) {
@@ -80,15 +81,16 @@ export async function saveOrders(db, ch, orders, maps) {
         st.push(db.prepare("INSERT INTO order_events (order_id, at, source, action, status, remote_status, note) VALUES (?, ?, 'channel', ?, ?, ?, ?)")
           .bind(id, t, seller ? 'processed' : 'status', status, o.remoteStatus, ex.remote_status));
       }
-      st.push(db.prepare(`INSERT INTO orders (id, channel, remote_id, order_number, status, remote_status, ordered_at, updated_at, customer, phone, email, address, total, currency, cargo_company, tracking, extra, hash, ship_by, ext_action)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      st.push(db.prepare(`INSERT INTO orders (id, channel, remote_id, order_number, status, remote_status, ordered_at, updated_at, customer, phone, email, address, total, currency, cargo_company, tracking, extra, hash, ship_by, ext_action, ckey)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET order_number = excluded.order_number, status = excluded.status, remote_status = excluded.remote_status,
           updated_at = excluded.updated_at, customer = excluded.customer, phone = excluded.phone, email = excluded.email, address = excluded.address,
           total = excluded.total, currency = excluded.currency,
           cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), orders.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), orders.tracking), extra = excluded.extra, hash = excluded.hash,
-          ship_by = COALESCE(excluded.ship_by, orders.ship_by), ext_action = COALESCE(excluded.ext_action, orders.ext_action)`)
+          ship_by = COALESCE(excluded.ship_by, orders.ship_by), ext_action = COALESCE(excluded.ext_action, orders.ext_action), ckey = excluded.ckey`)
         .bind(id, ch, o.remoteId, o.orderNumber, status, o.remoteStatus || '', o.orderedAt, t, o.customer || '', o.phone || '', o.email || '',
-          JSON.stringify(o.address || {}), o.total || 0, o.currency || 'TRY', o.cargoCompany || '', o.tracking || '', extra, o._hash, o.shipBy || null, ext));
+          JSON.stringify(o.address || {}), o.total || 0, o.currency || 'TRY', o.cargoCompany || '', o.tracking || '', extra, o._hash, o.shipBy || null, ext,
+          customerKey({ channel: ch, id, phone: o.phone, email: o.email, customer: o.customer, address: o.address, extra })));
       st.push(db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id));
       for (const it of o.items) {
         const com = it.commission == null || !Number.isFinite(Number(it.commission)) ? null : Math.max(0, Number(it.commission));
@@ -229,12 +231,16 @@ export async function mirrorStock(db, settings) {
 // ---------- stok / fiyat gönderimi ----------
 export async function pushStocks(env, db, settings, only) {
   settings = settings || await getSettings(db);
-  if (!settings.stock_sync) return { skipped: 'Stok senkronu kapalı' };
+  // Genel senkron kapalıyken yalnız "stok gönder" anahtarı açık kanallara (ana katalog hariç) ikas stoğu gönderilir
+  const cats = catalogOf(settings);
+  const solo = settings.stock_sync ? null : Object.keys(settings.stock_push || {}).filter((c) => settings.stock_push[c] && !cats.includes(c));
+  if (solo && !solo.length) return { skipped: 'Stok senkronu kapalı' };
   const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, ${DESIRED} AS stock
-    FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`);
+    FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1${solo ? ` AND l.channel IN (${solo.map((c) => `'${c.replace(/'/g, '')}'`).join(',')})` : ''}) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`);
   const result = {};
   for (const ch of await getChannels(env, db)) {
     if (only && !only.includes(ch.id)) continue;
+    if (solo && !solo.includes(ch.id)) continue;
     const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
     if (!items.length || !ch.enabled || !ch.pushStock) continue;
     if ((settings.stock_channels || {})[ch.id] === false) continue;
@@ -358,8 +364,14 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
+    // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
+    if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
+    // Eski siparişlere müşteri anahtarı (müşteriler sayfası için, parça parça)
+    if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu
     if (!only) out.uploads = await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message);
+    // Otomatik ürün gönderimi açık kanallar (ör. yalnız Hepsiburada): yeni ürünler kendiliğinden gönderilir
+    if (!only) out.autoUpload = await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Son 1 yılın siparişleri: her bağlı (gerçek) kanal için bir kez otomatik geçmiş aktarımı başlatılır.
     // Parça parça (haftalık) ilerler; stoğu değiştirmez, yeni sipariş e-postası oluşturmaz.
     if (!only) for (const ch of chans) {
@@ -457,4 +469,33 @@ export async function maybePurgeDemo(env, db) {
   await setSetting(db, 'demo_purged', true);
   if (r.orders || r.products) await log(db, null, 'info', `Örnek veriler temizlendi: ${r.orders} sipariş, ${r.products} ürün`);
   return r;
+}
+
+// ---------- gerçek kargo gideri ----------
+// Kanal kargo faturası / muhasebe kaydı verdiğinde siparişin kargo gideri o tutarla yazılır (kaynak: api); elle girilen tutar korunur.
+// İlk çalışmada son 60 gün, sonra son 20 gün taranır (faturalar gönderimden günler sonra kesilir).
+export async function syncCosts(env, db, chans, { force = false } = {}) {
+  const out = {};
+  for (const ch of chans || await getChannels(env, db)) {
+    if (!ch.enabled || ch.demo || !ch.cargoCosts) continue;
+    const key = 'costs:' + ch.id, last = await getRaw(db, key);
+    if (!force && last && Date.now() - last.at < 6 * 3600e3) continue;
+    const t = Date.now();
+    try {
+      const r = await ch.cargoCosts(last ? t - 20 * 864e5 : t - 60 * 864e5, t);
+      let n = 0;
+      for (const part of chunk(r.items, 80)) {
+        await db.batch(part.map((x) => db.prepare("UPDATE orders SET shipping_cost = ?, shipping_src = 'api' WHERE channel = ? AND order_number = ? AND COALESCE(shipping_src, '') != 'manual'").bind(x.amount, ch.id, x.orderNumber)));
+        n += (await first(db, `SELECT COUNT(*) AS n FROM orders WHERE channel = ? AND shipping_src = 'api' AND order_number IN (${part.map(() => '?').join(',')})`, ch.id, ...part.map((x) => x.orderNumber))).n;
+      }
+      await setSetting(db, key, { at: t, orders: n, found: r.items.length });
+      if (n) await log(db, ch.id, 'info', `Gerçek kargo gideri ${n} siparişe yazıldı (kanalın kargo faturalarından)`);
+      out[ch.id] = n;
+    } catch (e) {
+      await setSetting(db, key, { at: t, error: e.message.slice(0, 300) });
+      await log(db, ch.id, 'warn', 'Kargo gideri okunamadı: ' + e.message);
+      out[ch.id] = 'hata: ' + e.message;
+    }
+  }
+  return out;
 }

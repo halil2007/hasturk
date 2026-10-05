@@ -57,7 +57,7 @@ export function trendyol(env, meta) {
       return {
         remoteId: String(p0.orderNumber), orderNumber: String(p0.orderNumber), orderedAt: num(p0.orderDate) || Date.now(),
         remoteStatus: list.map((p) => p.status).join(', '), status,
-        customer: [p0.customerFirstName, p0.customerLastName].filter(Boolean).join(' ') || str(a.fullName), phone: str(a.phone), email: str(p0.customerEmail),
+        customer: [p0.customerFirstName, p0.customerLastName].filter(Boolean).join(' ') || str(a.fullName), phone: str(a.phone), email: str(p0.customerEmail), customerId: str(p0.customerId),
         address: { name: str(a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' ')), line: str(a.fullAddress || [a.address1, a.address2].filter(Boolean).join(' ')), district: str(a.district), city: str(a.city), phone: str(a.phone) },
         total: list.reduce((s, p) => s + num(p.totalPrice ?? p.grossAmount), 0), currency: p0.currencyCode || 'TRY',
         cargoCompany: str(tracked.cargoProviderName || p0.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),
@@ -387,12 +387,36 @@ export function trendyol(env, meta) {
     }
     return { done: !pending, items };
   }
-  const catalog = { categories, attributes, values, build, send, status, chunk: 1000, options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] };
+  const allCategories = async () => { await categories(''); return catCache.all; };
+  const catalog = { categories, allCategories, attributes, values, build, send, status, chunk: 1000, options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] };
+
+  // ---------- kargo gideri (gerçek) ----------
+  // Cari hesap ekstresindeki kesinti faturalarından (DeductionInvoices) kargo faturaları bulunur; her kargo faturasının kalemleri
+  // sipariş numarası ve kargo tutarını verir. Finans servisi en fazla 15 günlük aralık kabul eder.
+  async function cargoCosts(since, until) {
+    const W = 14 * 864e5, invoices = new Set(), byOrder = new Map();
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      for (let page = 0; page < 20; page++) {
+        const r = await call(`/finance/che/sellers/${seller}/otherfinancials?transactionType=DeductionInvoices&startDate=${from}&endDate=${to}&page=${page}&size=500`);
+        for (const x of r.content || []) if (/kargo|cargo/i.test(`${x.transactionType || ''} ${x.description || ''}`) && x.id) invoices.add(String(x.id));
+        if (page + 1 >= (r.totalPages || 1)) break;
+      }
+    }
+    for (const id of invoices) {
+      for (let page = 0; page < 50; page++) {
+        const r = await call(`/finance/che/sellers/${seller}/cargo-invoice/${encodeURIComponent(id)}/items?page=${page}&size=500`);
+        for (const it of r.content || []) if (it.orderNumber && num(it.amount)) byOrder.set(String(it.orderNumber), (byOrder.get(String(it.orderNumber)) || 0) + num(it.amount));
+        if (page + 1 >= (r.totalPages || 1)) break;
+      }
+    }
+    return { invoices: invoices.size, items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
+  }
 
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog,
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts,
   };
 }

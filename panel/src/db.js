@@ -126,6 +126,11 @@ const MIGRATIONS = [
   // Kategori (ikas kategori yolu) → ürün kategorisi; kategori eşleştirme ve ürün yüklemede kullanılır
   'ALTER TABLE listings ADD COLUMN category TEXT',
   'CREATE INDEX IF NOT EXISTS listings_open ON listings(product_id, ignored)',
+  // Müşteri anahtarı (bkz. customers.js): tekrar eden sipariş ve müşteri analizi
+  'ALTER TABLE orders ADD COLUMN ckey TEXT',
+  // Kargo gideri kaynağı: api (kanalın kargo faturasından) | manual (elle girildi)
+  'ALTER TABLE orders ADD COLUMN shipping_src TEXT',
+  'CREATE INDEX IF NOT EXISTS orders_ckey ON orders(ckey, ordered_at)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -185,6 +190,9 @@ export const DEFAULT_SETTINGS = {
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
   stock_sync: false,
+  // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar
+  stock_push: {},
+  auto_upload: {},
   stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)
   restock_returns: false,   // iade gelen ürün stoğa geri eklensin mi
   history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (daha eskisi: Entegrasyonlar → Geçmiş siparişler)

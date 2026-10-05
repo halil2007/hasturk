@@ -48,13 +48,14 @@ export function hepsiburada(env, meta) {
     const rank = { new: 0, processing: 1, shipped: 2, delivered: 3 };
     return {
       map,
-      touch(orderNumber, { date, customer, address } = {}) {
+      touch(orderNumber, { date, customer, address, customerId } = {}) {
         let o = map.get(orderNumber);
         if (!o) {
           o = { remoteId: orderNumber, orderNumber, orderedAt: Date.parse(date) || Date.now(), remoteStatus: 'new', status: 'new', customer: '', phone: '', email: '', address: {}, total: 0, currency: 'TRY', cargoCompany: '', tracking: '', items: [], packages: [] };
           map.set(orderNumber, o);
         }
         if (customer && !o.customer) o.customer = customer;
+        if (customerId && !o.customerId) o.customerId = String(customerId);
         if (address && address.city && !o.address.city) { o.address = address; o.phone = o.phone || address.phone; o.email = o.email || address.email; if (!o.customer) o.customer = address.name; }
         return o;
       },
@@ -85,7 +86,7 @@ export function hepsiburada(env, meta) {
     for (const it of await pages(`${OMS}/orders/merchantId/${m}`, { limit: 100, max: 50 })) {
       const l = lineOf(it);
       if (!l.orderNumber) continue;
-      const o = O.touch(l.orderNumber, { date: l.orderDate, customer: str(g(it, 'customerName')), address: addrOf(g(it, 'shippingAddress') || {}, str(g(it, 'customerName'))) });
+      const o = O.touch(l.orderNumber, { date: l.orderDate, customerId: g(it, 'customerId'), customer: str(g(it, 'customerName')), address: addrOf(g(it, 'shippingAddress') || {}, str(g(it, 'customerName'))) });
       O.addLine(o, l);
       if (str(g(it, 'cargoCompany')) && !o.cargoCompany) o.cargoCompany = str(g(it, 'cargoCompany'));
     }
@@ -96,7 +97,7 @@ export function hepsiburada(env, meta) {
         const no = (lines.find((l) => l.orderNumber) || {}).orderNumber;
         if (!no) continue;
         const address = { name: str(g(pk, 'recipientName', 'customerName')), line: str(g(pk, 'shippingAddressDetail')), district: str(g(pk, 'shippingTown') || g(pk, 'shippingDistrict')), city: str(g(pk, 'shippingCity')), phone: str(g(pk, 'phoneNumber')), email: str(g(pk, 'email')) };
-        const o = O.touch(no, { date: g(pk, 'orderDate'), customer: str(g(pk, 'customerName')), address });
+        const o = O.touch(no, { date: g(pk, 'orderDate'), customerId: g(pk, 'customerId'), customer: str(g(pk, 'customerName')), address });
         for (const l of lines) O.addLine(o, { ...l, dueDate: l.dueDate || Date.parse(g(pk, 'dueDate') || '') || null });
         O.bump(o, 'processing');
         const pn = str(g(pk, 'packageNumber'));
@@ -452,12 +453,36 @@ export function hepsiburada(env, meta) {
     }
     return { done: !pending, items };
   }
-  const catalog = { categories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 500, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
+  const allCategories = async () => { await categories(''); return catCache.all; };
+  const catalog = { categories, allCategories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 500, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
+
+  // ---------- kargo gideri (gerçek) ----------
+  // Kayıt bazlı muhasebe servisi (mpfinance): sipariş tarihine göre en fazla 1 aylık aralıkla işlemler okunur; türü / açıklaması
+  // kargo olan kayıtlar sipariş numarasına göre toplanır.
+  const FIN = `https://mpfinance-external${test}.hepsiburada.com`;
+  async function cargoCosts(since, until) {
+    const W = 28 * 864e5, byOrder = new Map();
+    const d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10);
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      for (let off = 0; off < 20000; off += 100) {
+        const r = await call(`${FIN}/transactions/merchantid/${m}?Offset=${off}&Limit=100&OrderDateStart=${d(from)}&OrderDateEnd=${d(to)}`);
+        const rows = list(r);
+        for (const x of rows) {
+          const t = `${g(x, 'type', 'transactionType') || ''} ${g(x, 'description', 'transactionDescription') || ''}`;
+          const no = str(g(x, 'orderNumber'));
+          if (no && /kargo|cargo|shipping|teslimat/i.test(t)) byOrder.set(no, (byOrder.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
+        }
+        if (rows.length < 100) break;
+      }
+    }
+    return { items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
+  }
 
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts,
   };
 }
