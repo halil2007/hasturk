@@ -128,6 +128,7 @@ export function demo(meta) {
   const uploads = new Map();
   const catalog = {
     categories: async (q) => { const k = String(q || '').toLocaleLowerCase('tr'); const items = CATS.map(([id, name, path]) => ({ id, name, path })).filter((c) => !k || `${c.name} ${c.path}`.toLocaleLowerCase('tr').includes(k)); return { total: CATS.length, items }; },
+    allCategories: async () => CATS.map(([id, name, path]) => ({ id, name, path })),
     attributes: async () => ATTRS,
     values: async (c, a) => (VALS[a] || []).map((v, i) => ({ id: String(a * 100 + i), value: v })),
     async build(pr, map, { pick }) {

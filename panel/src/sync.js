@@ -13,7 +13,7 @@ import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
 import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
-import { checkPendingUploads } from './catalog.js';
+import { checkPendingUploads, autoUpload } from './catalog.js';
 import { customerKey, fillKeys } from './customers.js';
 export { relinkItems };
 
@@ -231,12 +231,16 @@ export async function mirrorStock(db, settings) {
 // ---------- stok / fiyat gönderimi ----------
 export async function pushStocks(env, db, settings, only) {
   settings = settings || await getSettings(db);
-  if (!settings.stock_sync) return { skipped: 'Stok senkronu kapalı' };
+  // Genel senkron kapalıyken yalnız "stok gönder" anahtarı açık kanallara (ana katalog hariç) ikas stoğu gönderilir
+  const cats = catalogOf(settings);
+  const solo = settings.stock_sync ? null : Object.keys(settings.stock_push || {}).filter((c) => settings.stock_push[c] && !cats.includes(c));
+  if (solo && !solo.length) return { skipped: 'Stok senkronu kapalı' };
   const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, ${DESIRED} AS stock
-    FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`);
+    FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1${solo ? ` AND l.channel IN (${solo.map((c) => `'${c.replace(/'/g, '')}'`).join(',')})` : ''}) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`);
   const result = {};
   for (const ch of await getChannels(env, db)) {
     if (only && !only.includes(ch.id)) continue;
+    if (solo && !solo.includes(ch.id)) continue;
     const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
     if (!items.length || !ch.enabled || !ch.pushStock) continue;
     if ((settings.stock_channels || {})[ch.id] === false) continue;
@@ -364,6 +368,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu
     if (!only) out.uploads = await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message);
+    // Otomatik ürün gönderimi açık kanallar (ör. yalnız Hepsiburada): yeni ürünler kendiliğinden gönderilir
+    if (!only) out.autoUpload = await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Son 1 yılın siparişleri: her bağlı (gerçek) kanal için bir kez otomatik geçmiş aktarımı başlatılır.
     // Parça parça (haftalık) ilerler; stoğu değiştirmez, yeni sipariş e-postası oluşturmaz.
     if (!only) for (const ch of chans) {

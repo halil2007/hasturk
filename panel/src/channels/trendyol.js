@@ -387,7 +387,8 @@ export function trendyol(env, meta) {
     }
     return { done: !pending, items };
   }
-  const catalog = { categories, attributes, values, build, send, status, chunk: 1000, options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] };
+  const allCategories = async () => { await categories(''); return catCache.all; };
+  const catalog = { categories, allCategories, attributes, values, build, send, status, chunk: 1000, options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] };
 
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {

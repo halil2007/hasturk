@@ -188,6 +188,9 @@ export const DEFAULT_SETTINGS = {
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
   stock_sync: false,
+  // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar
+  stock_push: {},
+  auto_upload: {},
   stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)
   restock_returns: false,   // iade gelen ürün stoğa geri eklensin mi
   history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (daha eskisi: Entegrasyonlar → Geçmiş siparişler)

@@ -34,8 +34,8 @@ export async function stocks(el, rest, query = {}) {
     const want = l.desired ?? Math.max(0, p.stock), shown = l.pushed_stock ?? l.remote_stock;
     const rule = l.stock_mode && l.stock_mode !== 'shared' ? html`<div class="tiny muted">${ruleText(l)}</div>` : '';
     const pill = l.error ? html`<span class="pill bad" title="${l.error}"><i class="ico ico-warn"></i>${shown ?? '?'}</span>`
-      : state.settings && state.settings.stock_sync && shown !== want ? html`<span class="pill amber" title="Gönderim bekliyor">${shown ?? '?'} → ${want}</span>`
-        : state.settings && !state.settings.stock_sync ? html`<span class="pill ${(shown ?? 0) <= 0 ? 'bad' : 'good'}" title="Kanaldaki stok (gönderim kapalı)${shown !== want ? ` · senkron açılınca ${want} olur` : ''}">${shown ?? '?'}</span>`
+      : state.settings && (state.settings.stock_sync || (state.settings.stock_push || {})[c.id]) && shown !== want ? html`<span class="pill amber" title="Gönderim bekliyor">${shown ?? '?'} → ${want}</span>`
+        : state.settings && !state.settings.stock_sync && !(state.settings.stock_push || {})[c.id] ? html`<span class="pill ${(shown ?? 0) <= 0 ? 'bad' : 'good'}" title="Kanaldaki stok (gönderim kapalı)${shown !== want ? ` · senkron açılınca ${want} olur` : ''}">${shown ?? '?'}</span>`
         : html`<span class="pill ${want <= 0 ? 'bad' : 'good'}" title="Kanaldaki stok">${want}</span>`;
     return html`<button class="plain" data-act="rule" data-id="${p.id}" title="Kanal stok kuralı">${pill}${rule}</button>`;
   }

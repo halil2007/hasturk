@@ -1,5 +1,5 @@
 // Ürün yükle: ikas kategorilerini pazaryeri kategorileriyle eşleştir, kanalda olmayan ürünleri seçip gönder, sonucu takip et.
-import { api, html, render, $, $$, money, n, dateTime, actions, busy, toast, sheet, debounce, chLogo, thumb, isAdmin, store } from '../core.js';
+import { api, html, render, $, $$, money, n, dateTime, actions, busy, toast, sheet, debounce, chLogo, thumb, isAdmin, store, state } from '../core.js';
 
 const ST = { sent: ['warn', 'Kanal işliyor'], done: ['good', 'Tamamlandı'], error: ['bad', 'Gönderilemedi'] };
 const catName = (l) => l || 'Kategorisiz';
@@ -18,11 +18,18 @@ export async function uploadView(el) {
     const c = C();
     render(el, html`<div class="stack">
       <div class="notice"><i class="ico ico-upload"></i><div style="flex:1"><b>ikas'taki ürünleri pazaryerlerine yükleyin.</b> 1) ikas kategorisini pazaryeri kategorisiyle bir kez eşleştirin (zorunlu özellikler dahil) · 2) Kanalda henüz olmayan ürünleri seçip gönderin · 3) Kanalın onay sonucunu aşağıdan takip edin. Onaylanan ürün barkod / SKU ile otomatik eşleşir.
-        ${!st.stockSync ? html`<div class="small" style="margin-top:4px">Stok senkronu kapalı: ürün ilk stokla gönderilir, sonraki stok değişiklikleri kanala gitmez (isterseniz “stok 0 gönder” seçin).</div>` : ''}</div></div>
+        ${!st.stockSync && c && !c.stockPush ? html`<div class="small" style="margin-top:4px">Stok senkronu kapalı: ürün ilk stokla gönderilir, sonraki stok değişiklikleri bu kanala gitmez (aşağıdan “Stokları gönder”i açabilirsiniz).</div>` : ''}</div></div>
       <div class="ch-tabs">${st.channels.map((x) => html`<button class="ch-tab ${x.id === chId ? 'on' : ''}" data-act="ch" data-id="${x.id}" ${x.ready ? '' : 'disabled'} title="${x.reason}">${chLogo(x.id)}${x.name}${x.sandbox ? html`<span class="pill warn">test</span>` : ''}${!x.ready ? html`<span class="tiny muted">${x.reason}</span>` : ''}</button>`)}</div>
       ${!c || !c.ready ? html`<div class="empty">Ürün yüklenebilecek bağlı pazaryeri yok. Trendyol / Hepsiburada API bilgilerini Entegrasyonlar'dan girin.</div>` : html`
+      ${isAdmin() ? html`<div class="card stack" style="gap:10px">
+        <h2 style="margin:0">Otomatik işlemler · ${c.name}</h2>
+        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="auto_upload" ${c.auto ? 'checked' : ''}><span></span></span>
+          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Her senkronda (15 dk) eşleştirilmiş kategorilerdeki, ${c.name}'da olmayan ve stoğu olan ürünler kendiliğinden gönderilir (eksik bilgisi olanlar atlanır). Eşleştirilmemiş kategoriler günde bir kez otomatik eşleştirilir.</span></span></label>
+        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="stock_push" ${c.stockPush ? 'checked' : ''}><span></span></span>
+          <span><b>Stokları ${c.name}'a gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${c.name}'a gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
+      </div>` : ''}
       <div class="card flush">
-        <div class="card-head" style="padding:16px 16px 0"><h2>Kategori eşleştirme</h2><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
+        <div class="card-head" style="padding:16px 16px 0"><h2>Kategori eşleştirme</h2><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorilerini en uygun ${c.name} kategorisine bağlar"><i class="ico ico-bolt"></i>Otomatik eşleştir</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>ikas kategorisi</th><th class="r">Ürün</th><th class="r">${c.name}'da</th><th>${c.name} kategorisi</th><th></th></tr></thead><tbody>
           ${st.categories.map((k) => { const m = mapOf(k.local), open = k.n - (k.listed[chId] || 0); return html`<tr>
             <td><b>${catName(k.local)}</b></td><td class="r num">${n(k.n)}</td><td class="r num">${n(k.listed[chId] || 0)}</td>
@@ -53,6 +60,7 @@ export async function uploadView(el) {
     function body() {
       s.setBody(html`<div class="stack">
         <label class="field"><span>${c.name} kategorisi</span><input class="input" data-cq placeholder="Ara: gübre, toprak, pompa…" value="${cat ? cat.name : ''}"><div data-clist class="stack" style="gap:4px;margin-top:4px"></div></label>
+        ${!cat ? html`<div data-sug><div class="muted small">Önerilen kategoriler aranıyor…</div></div>` : ''}
         ${cat ? html`<div class="small">Seçili: <b>${cat.name}</b> <span class="muted">(${cat.id})</span></div>` : ''}
         <div data-attrs>${cat ? html`<div class="muted small">Özellikler yükleniyor…</div>` : html`<div class="muted small">Önce kategori seçin.</div>`}</div>
       </div>`);
@@ -66,6 +74,10 @@ export async function uploadView(el) {
         } catch (e) { render($('[data-clist]', s.body), html`<div class="notice bad small">${e.message}</div>`); }
       }, 350));
       if (cat) loadAttrs();
+      else api(`catalog/suggest?channel=${chId}&local=${encodeURIComponent(local)}`).then((r) => {
+        const box = $('[data-sug]', s.body); if (!box) return;
+        render(box, r.items.length ? html`<div class="small" style="margin-bottom:4px"><b>Önerilen ${c.name} kategorileri</b> (ikas kategorisinin adına göre)</div>${r.items.map((x, i) => html`<button class="cand" style="text-align:left;cursor:pointer" data-cid="${x.id}" data-cname="${x.name}"><span style="flex:1"><b>${x.name}</b>${i === 0 ? html` <span class="pill good">en uygun</span>` : ''}<div class="tiny muted">${x.path || ''} · ${x.id}</div></span></button>`)}` : html`<div class="muted small">Otomatik öneri bulunamadı; yukarıdan arayın.</div>`);
+      }).catch(() => {});
     }
     async function loadAttrs() {
       try {
@@ -184,8 +196,24 @@ export async function uploadView(el) {
     map: (t) => mapSheet(t.dataset.l),
     send: (t) => sendSheet(t.dataset.l),
     opts: () => optsSheet(),
+    automap: (t) => busy(t, async () => {
+      const r = await api('catalog/automap', { method: 'POST', body: { channel: chId } });
+      toast(`${r.mapped.length} kategori otomatik eşleştirildi${r.skipped.length ? ` · ${r.skipped.length} kategori için uygun eşleşme bulunamadı (elle eşleştirin)` : ''}${r.mapped.some((x) => x.missing.length) ? ' · bazılarında zorunlu özellik eksik, “Düzenle” ile tamamlayın' : ''}`);
+      await load();
+    }),
     check: (t) => busy(t, async () => { const r = await api(`catalog/uploads/${t.dataset.id}/check`, { method: 'POST' }); toast(r.done ? 'Kanal işlemi tamamladı' : 'Kanal hâlâ işliyor, birazdan tekrar sorgulayın'); await load(); }),
     detail: (t) => detailSheet(st.uploads.find((u) => String(u.id) === t.dataset.id)),
+  });
+  // Otomatik işlem anahtarları (kanal bazında): ayarlara kaydedilir
+  el.addEventListener('change', async (e) => {
+    const k = e.target.dataset && e.target.dataset.auto;
+    if (!k) return;
+    try {
+      const cur = (state.settings && state.settings[k]) || {};
+      state.settings = await api('settings', { method: 'PUT', body: { [k]: { ...cur, [chId]: e.target.checked } } });
+      toast(e.target.checked ? (k === 'auto_upload' ? 'Otomatik ürün gönderimi açıldı' : 'Stok gönderimi açıldı') : 'Kapatıldı');
+      await load();
+    } catch (err) { e.target.checked = !e.target.checked; toast(err.message, true); }
   });
   await load();
 }

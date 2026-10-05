@@ -642,6 +642,7 @@ async function saveSettings(db, b) {
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
     if (k === 'track_urls') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).map(([a, b]) => [str(a).slice(0, 40), str(b).slice(0, 300)]).filter(([a, b]) => a && /^https:\/\/[^\s]+$/i.test(b) && b.includes('{no}')).slice(0, 30));
     if (k === 'label_size') v = ['100x150', 'a5', 'a4'].includes(v) ? v : '100x150';
+    if (k === 'stock_push' || k === 'auto_upload') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => CHANNEL_IDS.includes(c)).map(([c, x]) => [c, !!x]));
     if (k === 'hold_channels') v = [...new Set((Array.isArray(v) ? v : []).filter((c) => CHANNEL_IDS.includes(c)))];
     if (k === 'mail_enabled') v = !!v;
     if (k === 'mail_to') {
