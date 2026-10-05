@@ -64,3 +64,21 @@ test('ilanlar: ad / barkod / görsel katalog servisinden eklenir; servis yoksa i
     assert.equal(ls2[0].name, 'HG-SOGU-5KG');
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('durum: hata nedeni farklı alanlarda gelse de okunur', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => J({ data: [
+      { merchantSku: 'A', productStatus: 'FAILED', importMessages: [{ attribute: 'Image1', message: 'Görsel indirilemedi' }] },
+      { merchantSku: 'B', status: 'FAILED', failureReasons: ['Barkod başka satıcıda kayıtlı'] },
+      { merchantSku: 'C', productStatus: 'FAILED', result: { errorMessage: 'Kategori pasif' } },
+      { merchantSku: 'D', productStatus: 'FAILED' },
+    ] });
+    const c = hepsiburada(ENV, { id: 'hepsiburada' });
+    const by = Object.fromEntries((await c.catalog.status('T')).items.map((x) => [x.key, x]));
+    assert.equal(by.A.error, 'Image1: Görsel indirilemedi');
+    assert.equal(by.B.error, 'Barkod başka satıcıda kayıtlı');
+    assert.equal(by.C.error, 'Kategori pasif');
+    assert.equal(by.D.ok, false); assert.equal(by.D.error, 'FAILED');
+  } finally { globalThis.fetch = realFetch; }
+});
