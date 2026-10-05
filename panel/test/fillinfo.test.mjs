@@ -39,3 +39,20 @@ test('eksik SKU ve barkod diğer platformlardan tamamlanır; dolu alan ve çakı
   // İkinci çalıştırma bir şey değiştirmez
   assert.equal(await fillProductInfo(db, { catalog_channels: ['ikas1'] }), 0);
 });
+
+test('görsel bağlantıları: ana katalog önce, kanalda değişince güncellenir, elle düzenlenen korunur', async () => {
+  const db = d1();
+  await init(db);
+  const t = Date.now();
+  await run(db, 'INSERT INTO products (id, name, created_at, updated_at) VALUES (1, ?, ?, ?), (2, ?, ?, ?)', 'A', t, t, 'B', t, t);
+  await run(db, "INSERT INTO listings (channel, remote_id, product_id, name, images) VALUES ('trendyol', 'T1', 1, 'x', ?), ('ikas1', 'I1', 1, 'x', ?), ('trendyol', 'T2', 2, 'x', ?)",
+    JSON.stringify(['https://ty/1.jpg']), JSON.stringify(['https://ikas/1.webp', 'https://ikas/2.webp']), JSON.stringify(['https://ty/9.jpg']));
+  await run(db, "UPDATE products SET images = ?, images_manual = 1 WHERE id = 2", JSON.stringify(['https://elle/1.jpg']));
+  await fillProductInfo(db, { catalog_channels: ['ikas1'] });
+  const img = async (id) => JSON.parse((await all(db, 'SELECT images FROM products WHERE id = ?', id))[0].images);
+  assert.deepEqual(await img(1), ['https://ikas/1.webp', 'https://ikas/2.webp']);
+  assert.deepEqual(await img(2), ['https://elle/1.jpg']);
+  await run(db, "UPDATE listings SET images = ? WHERE remote_id = 'I1'", JSON.stringify(['https://ikas/3.webp']));
+  await fillProductInfo(db, { catalog_channels: ['ikas1'] });
+  assert.deepEqual(await img(1), ['https://ikas/3.webp']);
+});

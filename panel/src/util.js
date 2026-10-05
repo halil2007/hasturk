@@ -22,6 +22,16 @@ export const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 export const num = (v, d = 0) => { const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v); return Number.isFinite(n) ? n : d; };
 export const str = (v) => (v == null ? '' : String(v)).trim();
 // Pazaryeri kategori özelliği bir görsel adresi mi istiyor (ör. Hepsiburada "Paket Görseli (ön)")? Listeden seçilen özellikler hariç.
+// Görsel listesi: kanaldan gelen dizi (adres ya da {url}/{imageUrl}) → tekrarsız https adresleri (en fazla 12)
+export function imageList(list, max = 12) {
+  const out = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    const u = str(typeof x === 'string' ? x : x && (x.url || x.imageUrl || x.src || x.path));
+    if (/^https?:\/\//i.test(u) && !out.includes(u)) out.push(u);
+    if (out.length >= max) break;
+  }
+  return out;
+}
 export const isImageAttr = (a) => !!a && /g[öo]rsel|resim|foto[gğ]raf|image|photo/i.test(String(a.name || '')) && !/enum|list|select/i.test(String(a.type || ''));
 
 // Türkiye UTC+3 (yaz saati yok): gün/hafta/ay anahtarları bu saate göre

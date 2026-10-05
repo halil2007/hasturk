@@ -2,7 +2,7 @@
 // Siparişler paket (shipmentPackage) düzeyinde gelir, aynı sipariş numarasındakiler birleştirilir. En fazla 15 günlük aralık.
 // Kargo: N11 anlaşmalı kargo; durum kargo okutunca kendiliğinden "Shipped" olur (API'de kargoya verme / etiket servisi yok).
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk } from '../util.js';
+import { http, num, str, chunk, imageList } from '../util.js';
 
 const BASE = 'https://api.n11.com';
 const STATUS = { Created: 'new', Picking: 'processing', UnPacked: 'processing', Shipped: 'shipped', Delivered: 'delivered', Cancelled: 'cancelled', UnSupplied: 'cancelled', Returned: 'returned' };
@@ -66,7 +66,7 @@ export function n11(env, meta) {
       const r = await call(`/ms/product-query?page=${page}&size=250`);
       for (const p of r.content || []) {
         out.push({ remoteId: str(p.stockCode), remoteProductId: str(p.n11ProductId || p.productMainId), sku: str(p.stockCode), barcode: str(p.barcode), name: str(p.title), groupName: str(p.title), variantName: '',
-          image: str((p.imageUrls || [])[0] || ((p.images || [])[0] || {}).url), price: num(p.salePrice), listPrice: num(p.listPrice), stock: num(p.quantity), active: p.status !== 'Suspended' });
+          image: str((p.imageUrls || [])[0] || ((p.images || [])[0] || {}).url), images: imageList(p.imageUrls || p.images), price: num(p.salePrice), listPrice: num(p.listPrice), stock: num(p.quantity), active: p.status !== 'Suspended' });
       }
       if (r.last || page + 1 >= (r.totalPages || 1)) break;
     }

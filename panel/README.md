@@ -186,6 +186,9 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 - **Değişim eşiği, yuvarlama** (kuruşuyla, tam sayı, ,90, ,99) ve **genel kâr payı** (ürüne özel değer önceliklidir).
 Müşteri panellerinde bu özellik "Yakında" olarak görünür.
 
+### Ürün görselleri (yalnız bağlantı)
+Her senkronda bağlı kanallardan ürünün **tüm görsellerinin bağlantıları** alınır (ikas'ta varyantın görselleri, yoksa ürünün görselleri; Trendyol, idefix, N11, Pazarama ilan görselleri) ve ürüne kaydedilir. Dosya indirilmez, panelde yer kaplamaz: görseller kanalın kendi sunucusundan (ör. ikas CDN) açılır. Kaynak sırası ana katalog önce; kanalda görsel değişince panel de güncellenir. Ürün kartında **Tüm görseller** bölümü görselleri gösterir; **Bağlantıları düzenle** ile satır satır değiştirilebilir (bu durumda senkron üzerine yazmaz), **Kanaldan otomatik al** ile kanala geri dönülür. Pazaryerine ürün gönderirken tüm görseller gider (Hepsiburada en fazla 5, Trendyol 8). Not: kaynak kanaldaki görsel silinirse bağlantı da açılmaz.
+
 ### Barkod oluşturma
 Barkodu olmayan ürünlere benzersiz barkod verilir: **Ürünler → Barkod oluştur** (toplu; barkodu eksik ürünler listelenir, istenenler seçilir) ya da ürün kartında Barkod alanının yanındaki **Oluştur** (kaydedince geçerli olur). Barkodlar geçerli **EAN-13**'tür (son hane kontrol hanesi), panel ürünleri ve tüm kanal ilanlarıyla çakışmaz. Varsayılan ön ek **200**: GS1'in mağaza içi kullanıma ayırdığı aralık, gerçek bir firmanın barkoduyla çakışmaz; GS1 firma önekiniz varsa (ör. 8691234) ön ek olarak girilir ve hatırlanır. Barkodu dolu ürünler toplu işlemde değişmez. Ürünler sayfasındaki **Barkod eksik** sekmesi bu ürünleri gösterir; oluşturulan liste kopyalanıp Excel'e yapıştırılabilir.
 

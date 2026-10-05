@@ -31,7 +31,14 @@ export function hepsiburada(env, meta) {
       h['X-Content-Type'] = rq.headers.get('content-type');
       h['Content-Type'] = 'application/octet-stream';
     }
-    return http(`${proxy}${proxy.includes('?') ? '&' : '?'}u=${encodeURIComponent(url)}`, { ...opts, headers: h, body: b });
+    try { return await http(`${proxy}${proxy.includes('?') ? '&' : '?'}u=${encodeURIComponent(url)}`, { ...opts, headers: h, body: b }); }
+    catch (e) {
+      // Hata mesajında aracı sunucu yerine gerçek Hepsiburada adresi görünsün
+      let ph = proxy; try { const x = new URL(proxy); ph = x.host + x.pathname; } catch { /* adres olduğu gibi */ }
+      let real = url; try { const x = new URL(url); real = x.host + x.pathname; } catch { /* adres olduğu gibi */ }
+      e.message = e.message.replace(ph, `${real} (aracı sunucu üzerinden)`);
+      throw e;
+    }
   }
   const call = (url, opts = {}) => hb(url, { ...opts, headers: headers(!!opts.body), body: opts.body && JSON.stringify(opts.body) });
   const list = (r) => (Array.isArray(r) ? r : (r && (r.items || r.data || r.listings || r.packages)) || []);
@@ -392,17 +399,18 @@ export function hepsiburada(env, meta) {
     const r = await call(`${CAT}/api/categories/${encodeURIComponent(catId)}/attribute/${encodeURIComponent(attrId)}/values?page=0&size=1000`);
     return (g(r, 'data') || g(r, 'items') || (Array.isArray(r) ? r : [])).map((v) => ({ id: str(g(v, 'id')), value: str(g(v, 'value', 'name')) }));
   }
-  // Ürün bilgisi gönderme: ürün dizisi JSON gövdeyle gönderilir ; sunucu dosya (multipart "file") isterse
-  // aynı içerik dosya olarak yeniden gönderilir. Cevaptaki trackingId ile durum sorgulanır.
+  // Ürün bilgisi gönderme: Hepsiburada ürün dizisini JSON dosyası olarak (multipart, alan adı "file") bekler; JSON gövdeyle gönderim
+  // bazı ortamlarda HTTP 500 (internalServerError) döndürür. Sunucu dosyayı reddederse (415 / içerik türü) JSON gövdeyle denenir.
+  // Tekrar denenmez (tries: 1): 5xx'te otomatik tekrar aynı ürünleri iki kez gönderebilir.
   async function importProducts(products) {
+    const fd = new FormData();
+    fd.append('file', new Blob([JSON.stringify(products)], { type: 'application/json' }), 'products.json');
+    const h = headers(); delete h['Content-Type'];
     let r;
-    try { r = await call(`${CAT}/api/products/import`, { method: 'POST', body: products }); }
+    try { r = await hb(`${CAT}/api/products/import`, { method: 'POST', headers: h, body: fd, tries: 1, timeout: 60000 }); }
     catch (e) {
-      if (!/\b415\b|multipart|file/i.test(e.message)) throw e;
-      const fd = new FormData();
-      fd.append('file', new Blob([JSON.stringify(products)], { type: 'application/json' }), 'products.json');
-      const h = headers(); delete h['Content-Type'];
-      r = await hb(`${CAT}/api/products/import`, { method: 'POST', headers: h, body: fd });
+      if (!/\b415\b|media type|content.?type|multipart/i.test(e.message)) throw e;
+      r = await call(`${CAT}/api/products/import`, { method: 'POST', body: products, tries: 1, timeout: 60000 });
     }
     const tid = g(g(r, 'data') || {}, 'trackingId') || g(r, 'trackingId', 'id');
     if (!tid) throw new Error('Hepsiburada trackingId döndürmedi: ' + JSON.stringify(r).slice(0, 400));

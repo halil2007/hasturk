@@ -47,7 +47,8 @@ test('Hepsiburada test adımları: kategori, ürün gönderme (trackingId), stok
     const imp = await call('hbtest/import', { method: 'POST', body: JSON.stringify({ products: [{ categoryId: 60001, merchant: 'M-1', attributes: { merchantSku: 'A1', UrunAdi: 'Test' } }] }) });
     assert.equal(imp.trackingId, 'TRK-123');
     const ic = calls.find((c) => /products\/import$/.test(c.url));
-    assert.deepEqual(JSON.parse(ic.body)[0].attributes, { merchantSku: 'A1', UrunAdi: 'Test' }, 'ürün dizisi JSON gövdeyle gönderilir');
+    assert.ok(ic.body instanceof FormData, 'ürün dizisi JSON dosyası olarak (multipart "file") gönderilir');
+    assert.deepEqual(JSON.parse(await ic.body.get('file').text())[0].attributes, { merchantSku: 'A1', UrunAdi: 'Test' });
     assert.equal((await call('hbtest/inventory', { method: 'POST' })).count, 1);
     const ls = await call('hbtest/listing', { method: 'POST', body: JSON.stringify({ hbSku: 'HBV1', merchantSku: 'A1', stock: 7, price: '120.5' }) });
     assert.deepEqual([ls.stockUploadId, ls.priceUploadId], ['stk-1', 'prc-1']);
@@ -67,4 +68,21 @@ test('Hepsiburada test siparişi canlı ortamda reddedilir', async () => {
   const { hepsiburada } = await import('../src/channels/hepsiburada.js');
   const ch = hepsiburada({ HB_MERCHANT_ID: 'M', HB_PASSWORD: 'x', HB_USER_AGENT: 'u' }, { id: 'hepsiburada' });
   await assert.rejects(() => ch.sit.createTestOrder({}), /yalnızca test \(SIT\)/);
+});
+
+test('Hepsiburada ürün gönderimi: 415 ise JSON gövdeyle; aracı sunucu hatasında gerçek adres görünür; 500 tekrar gönderilmez', async () => {
+  const { hepsiburada } = await import('../src/channels/hepsiburada.js');
+  const realFetch = globalThis.fetch, calls = [];
+  const J = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } });
+  try {
+    globalThis.fetch = async (url, o = {}) => { calls.push({ url: String(url), body: o.body }); return o.body instanceof FormData ? J({ message: 'Unsupported Media Type' }, 415) : J({ data: { trackingId: 'T-9' } }); };
+    const ch = hepsiburada({ HB_MERCHANT_ID: 'M', HB_PASSWORD: 'x', HB_USER_AGENT: 'u' }, { id: 'hepsiburada' });
+    assert.equal((await ch.sit.importProducts([{ a: 1 }])).trackingId, 'T-9');
+    assert.equal(JSON.parse(calls[1].body)[0].a, 1);
+    calls.length = 0;
+    globalThis.fetch = async (url, o = {}) => { calls.push({ url: String(url) }); return J({ message: 'global.messages.error.internalServerError' }, 500); };
+    const px = hepsiburada({ HB_MERCHANT_ID: 'M', HB_PASSWORD: 'x', HB_USER_AGENT: 'u', HB_PROXY_URL: 'https://p.halil.deno.net', HB_PROXY_KEY: 'k'.repeat(30) }, { id: 'hepsiburada' });
+    await assert.rejects(() => px.sit.importProducts([{ a: 1 }]), (e) => /mpop\.hepsiburada\.com\/product\/api\/products\/import \(aracı sunucu üzerinden\): HTTP 500/.test(e.message) && !/deno\.net/.test(e.message));
+    assert.equal(calls.length, 1, '500 hatasında ürünler ikinci kez gönderilmez');
+  } finally { globalThis.fetch = realFetch; }
 });

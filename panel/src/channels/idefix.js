@@ -3,7 +3,7 @@
 // Kimlik: X-API-KEY = base64(ApiKey:ApiSecret). Canlı ortamda IP izni gerekmez (test ortamında gerekir).
 // Kimlik: X-API-KEY başlığı (biçim otomatik bulunur, aşağıya bakın). Siparişler: /oms/{vendorId}/list · Ürün/stok/fiyat: /pim/...
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, diagStep, sleep } from '../util.js';
+import { http, num, str, chunk, diagStep, sleep, imageList } from '../util.js';
 
 const BASE = 'https://merchantapi.idefix.com';
 // idefix durumları "shipment_" önekiyle gelir (shipment_created, shipment_picking, shipment_in_cargo, shipment_delivered…)
@@ -108,7 +108,7 @@ export function idefix(env, meta) {
     return rows.filter((p) => p.barcode).map((p) => {
       const img = (p.images || p.imageUrls || [])[0], q = p.inventoryQuantity ?? p.quantity ?? p.stock;
       return { remoteId: str(p.barcode), remoteProductId: str(p.productMainId), sku: str(p.vendorStockCode || p.erpId), barcode: str(p.barcode), name: str(p.title), groupName: str(p.title), variantName: '',
-        image: str(typeof img === 'string' ? img : img && (img.url || img.imageUrl)), price: num(p.price), listPrice: num(p.comparePrice) || num(p.price),
+        image: str(typeof img === 'string' ? img : img && (img.url || img.imageUrl)), images: imageList(p.images || p.imageUrls), price: num(p.price), listPrice: num(p.comparePrice) || num(p.price),
         // Stok bilgisi gelmezse bilinmiyor sayılır (0 sayılıp eşleştirmeden düşmesin)
         stock: q == null ? null : num(q),
         active: !/reject|archive|passive/i.test(str(p.status)), brand: str(p.brandName) };

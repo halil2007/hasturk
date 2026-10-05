@@ -1,6 +1,6 @@
 // Trendyol Marketplace API (apigw.trendyol.com/integration).
 // Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key, API Secret.
-import { http, basic, num, str, chunk, diagStep } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, imageList } from '../util.js';
 
 const BASE = 'https://apigw.trendyol.com/integration';
 
@@ -99,7 +99,7 @@ export function trendyol(env, meta) {
     return {
       remoteId: str(v.barcode), remoteProductId: str(p.productMainId || p.contentId || p.id), sku: str(v.stockCode), barcode: str(v.barcode), name: str(p.title),
       groupName: str(p.title), variantName: [...new Set(attrs)].join(' / '),
-      image: str(((p.images || v.images || [])[0] || {}).url), price: num(price.salePrice ?? v.salePrice), listPrice: num(price.listPrice ?? v.listPrice),
+      image: str(((p.images || v.images || [])[0] || {}).url), images: imageList((v.images || []).length ? v.images : p.images), price: num(price.salePrice ?? v.salePrice), listPrice: num(price.listPrice ?? v.listPrice),
       stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
       brand: str((p.brand && typeof p.brand === 'object' ? p.brand.name : p.brand) || p.brandName), description: str(p.description),
     };

@@ -205,11 +205,14 @@ export function ikas(env, p, meta) {
           const pr = (v.prices || [])[0] || {};
           const vi = (v.images || []).filter((i) => !i.isVideo && i.imageId);
           const img = vi.find((i) => i.isMain) || vi[0] || mainImg;
+          // Tüm görseller (büyük boy bağlantı): varyantın kendi görselleri, yoksa ürünün görselleri; ana görsel önce
+          const ord = (list) => [...list].sort((a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0) || (a.order || 0) - (b.order || 0));
+          const gallery = [...new Map(ord(vi.length ? vi : allImgs).map((i) => [i.imageId, imgUrl(i, 1080)])).values()].filter(Boolean).slice(0, 12);
           const vname = (v.variantValueIds || []).map((x) => values.get(x.variantValueId)).filter(Boolean).join(' / ');
           out.push({
             remoteId: String(v.id), remoteProductId: String(p.id), sku: str(v.sku), barcode: str((v.barcodeList || [])[0]),
             name: vname ? `${p.name} - ${vname}` : p.name, groupName: p.name, variantName: vname,
-            image: imgUrl(img, 360), price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
+            image: imgUrl(img, 360), images: gallery, price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
             stock: (v.stocks || []).reduce((s, x) => s + num(x.stockCount), 0), active: v.isActive !== false,
             brand: str(p.brand && p.brand.name), description: str(p.description), category: catPath(p.categoryIds),
           });
