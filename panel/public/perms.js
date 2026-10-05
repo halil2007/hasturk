@@ -19,7 +19,7 @@ const MAP = [
   [/^(packages|labels)(\/|$)/, 'cargo'],
   [/^claims(\/|$)/, 'returns'],
   [/^questions(\/|$)/, 'questions'],
-  [/^(products|catalog|price-rules|buybox|campaigns)(\/|$)/, 'products'],
+  [/^(products|catalog|price-rules|buybox|campaigns)(\/|\.csv$|$)/, 'products'],
   [/^(listings\/stock|push-stock)(\/|$)/, 'stock'],
   [/^(match|listings)(\/|$)/, 'match'],
   [/^(stats|insights|customers)(\/|$)/, 'reports'],

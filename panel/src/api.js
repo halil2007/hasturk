@@ -10,6 +10,7 @@ import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { hbTest } from './hbtest.js';
 import { suggestBarcode, assignBarcodes, barcodePrefix, missingBarcodes } from './barcodes.js';
 import { previewSkus, suggestSku, assignSkus, skuPrefix } from './skus.js';
+import { exportProducts, bulkUpdate } from './bulk.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
@@ -1126,6 +1127,15 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/barcodes' && m === 'GET') return json({ prefix: await barcodePrefix(db), missing: await missingBarcodes(db) });
   if (path === 'products/barcodes/new' && m === 'GET') return json(await suggestBarcode(db, q.prefix));
   if (path === 'products/barcodes' && m === 'POST') { const b = await body(req); return json(await assignBarcodes(db, b.ids, { prefix: b.prefix, user: user.name })); }
+  // Excel ile toplu güncelleme: dışa aktar (CSV) ve geri yükle (önizleme / uygula)
+  if (path === 'products.csv' && m === 'GET') return new Response(await exportProducts(env, db), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="urunler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
+  if (path === 'products/bulk' && m === 'POST') {
+    const b = await body(req);
+    const r = await bulkUpdate(env, db, b.rows, { dry: b.dry !== false, user: user.name });
+    if (r.applied && r.stock) ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    if (r.applied && r.prices) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
+    return json(r);
+  }
   // SKU oluşturma: ürün adından öneri (önizleme, kaydedilmez), tek ürün önerisi, seçilenlere kaydet
   if (path === 'products/skus' && m === 'GET') return json({ prefix: await skuPrefix(db) });
   if (path === 'products/skus/new' && m === 'GET') return json(await suggestSku(db, q));
