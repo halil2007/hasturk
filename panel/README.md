@@ -195,6 +195,12 @@ SKU'su olmayan ürünlere **ürün adından** okunabilir stok kodu verilir: **Ü
 ### Barkod oluşturma
 Barkodu olmayan ürünlere benzersiz barkod verilir: **Ürünler → Barkod / SKU oluştur** (toplu; barkodu eksik ürünler listelenir, istenenler seçilir) ya da ürün kartında Barkod alanının yanındaki **Oluştur** (kaydedince geçerli olur). Barkodlar geçerli **EAN-13**'tür (son hane kontrol hanesi), panel ürünleri ve tüm kanal ilanlarıyla çakışmaz. Varsayılan ön ek **200**: GS1'in mağaza içi kullanıma ayırdığı aralık, gerçek bir firmanın barkoduyla çakışmaz; GS1 firma önekiniz varsa (ör. 8691234) ön ek olarak girilir ve hatırlanır. Barkodu dolu ürünler toplu işlemde değişmez. Ürünler sayfasındaki **Barkod eksik** sekmesi bu ürünleri gösterir; oluşturulan liste kopyalanıp Excel'e yapıştırılabilir.
 
+### Toplama listesi
+**Kargo → Toplama listesi** (ya da Siparişler → menü → Toplama listesi): kargoya çıkacak (yeni / hazırlanıyor) siparişlerdeki ürünler ürün bazında toplanır — depoda tek turda toplanır. Paketlenmiş siparişte yalnız açık (gönderilmemiş) paketlerdeki adetler, iptal satırlar hariç. Kanal sekmesi seçiliyse o kanal, sipariş / paket seçiliyse yalnız seçilenler. Stoğu yetmeyen ürün kırmızı görünür; **Yazdır** işaret kutulu, sipariş numaralı sade bir liste basar.
+
+### Günlük özet e-postası
+Ayarlar → Bildirimler → **Her sabah günlük özet e-postası gönder**: saat 08:00'den sonraki ilk senkronda (günde bir kez) dünün cirosu, sipariş sayısı ve tahmini kârı (önceki günle karşılaştırmalı, kanal kanal), bugün kargoya hazırlanacak / geciken siparişler, bekleyen iade ve sorular, stokta olmayan ve tükenmek üzere olan ürünler e-postayla gelir. Alıcılar ve e-posta sunucusu yeni sipariş bildirimiyle aynıdır; **Örnek günlük özet gönder** hemen bir örnek yollar. Panel adresi girilmişse e-postadaki maddeler ilgili sayfaya bağlanır.
+
 ### Müşteri soruları
 
 Trendyol, Hepsiburada, **N11** (SOAP ürün soru-cevap servisi; liste dakikada bir çağrılabildiği için her senkronda açık sorular), **idefix** ve **Pazarama** soruları Müşteri Soruları sayfasında toplanır ve panelden cevaplanır. Sayfanın üstündeki **soru analizi** son 30 günde kanal bazında soru sayısını, bekleyenleri, cevaplanma oranını ve ortalama cevap süresini gösterir. PttAVM'in soru servisi yoktur.

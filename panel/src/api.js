@@ -12,6 +12,8 @@ import { suggestBarcode, assignBarcodes, barcodePrefix, missingBarcodes } from '
 import { previewSkus, suggestSku, assignSkus, skuPrefix } from './skus.js';
 import { exportProducts, bulkUpdate } from './bulk.js';
 import { publicKey, subscribe, unsubscribe, latest, notify } from './push.js';
+import { pickList } from './picklist.js';
+import { dailyDigest } from './digest.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
@@ -684,7 +686,7 @@ async function saveSettings(db, b) {
     if (k === 'label_size') v = ['100x150', 'a5', 'a4'].includes(v) ? v : '100x150';
     if (k === 'stock_push' || k === 'auto_upload') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, !!x]));
     if (k === 'hold_channels') v = [...new Set((Array.isArray(v) ? v : []).filter((c) => isChannelId(c)))];
-    if (k === 'mail_enabled') v = !!v;
+    if (k === 'mail_enabled' || k === 'daily_digest') v = !!v;
     if (k === 'mail_to') {
       v = [...new Set((Array.isArray(v) ? v : String(v || '').split(/[\s,;]+/)).map((x) => str(x).toLowerCase()).filter(Boolean))].slice(0, 10);
       const bad = v.filter((x) => !validEmail(x));
@@ -1138,6 +1140,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/barcodes' && m === 'GET') return json({ prefix: await barcodePrefix(db), missing: await missingBarcodes(db) });
   if (path === 'products/barcodes/new' && m === 'GET') return json(await suggestBarcode(db, q.prefix));
   if (path === 'products/barcodes' && m === 'POST') { const b = await body(req); return json(await assignBarcodes(db, b.ids, { prefix: b.prefix, user: user.name })); }
+  // Günlük özet e-postası: hemen bir örnek gönder (yönetici)
+  if (path === 'digest/test' && m === 'POST') {
+    if (user.role !== 'admin') fail(403, 'Yalnızca yönetici');
+    const r = await dailyDigest(env, db, null, { force: true });
+    return json({ ok: true, message: `Günlük özet ${r.sent} alıcıya gönderildi` });
+  }
+  // Toplama listesi: kargoya çıkacak siparişlerdeki ürünlerin toplamı (kanal ya da seçili siparişler)
+  if (path === 'picklist' && m === 'GET') return json(await pickList(db, { channel: q.channel || '', ids: q.ids || '' }));
   // Anlık bildirim: cihaz aboneliği, deneme bildirimi ve servis çalışanının okuduğu son bildirim
   if (path === 'push/key' && m === 'GET') return json({ key: await publicKey(db) });
   if (path === 'push/subscribe' && m === 'POST') { const b = await body(req); return json(await subscribe(db, user, b.subscription, req.headers.get('user-agent'))); }

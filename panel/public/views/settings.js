@@ -97,6 +97,8 @@ export async function settingsView(el) {
         <h2>Yeni sipariş e-posta bildirimi</h2>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="mail_enabled" ${st.mail_enabled ? 'checked' : ''}><span></span></span>
           <span><b>Yeni sipariş gelince e-posta gönder</b><br><span class="small muted">Her sipariş için bir kez gönderilir; 15 dakikalık senkronda aynı sipariş için tekrar gönderilmez. Kanalların ilk aktarımı ve geçmiş sipariş aktarımı e-posta oluşturmaz.</span></span></label>
+        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="daily_digest" ${st.daily_digest ? 'checked' : ''}><span></span></span>
+          <span><b>Her sabah günlük özet e-postası gönder</b><br><span class="small muted">Saat 08:00'den sonra: dünün cirosu, sipariş sayısı ve tahmini kârı (önceki günle karşılaştırmalı, kanal kanal), bugün kargoya hazırlanacak / geciken siparişler, bekleyen iade ve sorular, stokta olmayan ve tükenmek üzere olan ürünler. Aşağıdaki alıcılara gider.</span></span></label>
         <div class="form-grid">
           <label class="field"><span>Bildirim alacak e-postalar</span><input class="input" data-mailto value="${(st.mail_to || []).join(', ')}" placeholder="ornek@firma.com, ikinci@firma.com"><small>Virgülle ayırın (en fazla 10)</small></label>
           <label class="field"><span>Panel adresi</span><input class="input" data-panelurl value="${st.panel_url || ''}" placeholder="https://hasturk-panel.xxx.workers.dev"><small>E-postadaki “Siparişi panelde aç” bağlantısı</small></label>
@@ -124,7 +126,7 @@ export async function settingsView(el) {
               <label class="field"><span>API anahtarı</span><input class="input" type="password" autocomplete="off" data-mailf="MAIL_API_KEY" placeholder="${mf('MAIL_API_KEY').masked || 'yapıştırın'}"><small>${mf('MAIL_API_KEY').masked ? 'Kayıtlı (şifreli). Değiştirmek için yenisini yapıştırın.' : 'Şifreli saklanır, ekranda tekrar gösterilmez.'}</small></label>
             </div>
           </div></details>
-        <div class="row wrap"><button class="btn" data-act="mail-test"><i class="ico ico-chat"></i>Deneme e-postası gönder</button><span class="spacer"></span><button class="btn primary" data-act="mail-save">Bildirim ayarlarını kaydet</button></div>
+        <div class="row wrap"><button class="btn" data-act="mail-test"><i class="ico ico-chat"></i>Deneme e-postası gönder</button><button class="btn" data-act="digest-test"><i class="ico ico-bars"></i>Örnek günlük özet gönder</button><span class="spacer"></span><button class="btn primary" data-act="mail-save">Bildirim ayarlarını kaydet</button></div>
       </div>` : ''}
 
       <div class="card stack">
@@ -215,6 +217,7 @@ export async function settingsView(el) {
     'push-off': (t) => busy(t, async () => { await disablePush(); toast('Bildirimler bu cihazda kapatıldı'); await drawPush(); }),
     'push-test': (t) => busy(t, async () => { const r = await api('push/test', { method: 'POST' }); toast(r.sent ? `Deneme bildirimi gönderildi (${r.sent} cihaz)` : 'Bildirim açık cihaz yok'); }),
     'mail-save': (t) => busy(t, async () => { await saveMail(); toast('Bildirim ayarları kaydedildi'); await load(); }),
+    'digest-test': (t) => busy(t, async () => { await saveMail(); const r = await api('digest/test', { method: 'POST' }); toast(r.message); }),
     'mail-test': (t) => busy(t, async () => { await saveMail(); const r = await api('mail/test', { method: 'POST' }); toast(r.message); }),
     'push-stock': (t) => busy(t, async () => { const r = await api('push-stock', { method: 'POST' }); toast(r.skipped || Object.entries(r).map(([k, v]) => `${ch(k).name}: ${v}`).join(' · ') || 'Gönderilecek değişiklik yok'); }),
     'logo-reset': (t) => busy(t, async () => { await save({ logo: '' }); await loadSummary(); load(); }),
