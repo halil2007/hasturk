@@ -1,7 +1,7 @@
 // İstatistik: ciro / sipariş adedi (kanal bazında + toplam), dönem karşılaştırma, en çok satanlar, tahmini kâr.
 import { all, first, getSettings } from './db.js';
 import { dayKey, weekKey, monthKey, TR, r2, LATE } from './util.js';
-import { CHANNEL_IDS } from './channels/index.js';
+import { CHANNEL_IDS, isChannelId } from './channels/index.js';
 import { profit } from '../public/profit.js';
 import { DESIRED } from './sync.js';
 const LOW = (n) => `(CASE WHEN critical_stock > 0 THEN critical_stock ELSE ${Math.max(0, Math.round(Number(n) || 0))} END)`;
@@ -25,14 +25,15 @@ async function period(db, fromMs, toMs, group, settings) {
   const series = keys.map((k) => ({ key: k, revenue: empty(), orders: empty(), profit: 0 }));
   const totals = Object.fromEntries(CHANNEL_IDS.map((c) => [c, { revenue: 0, orders: 0, cancelled: 0, returned: 0, profit: 0, items: 0 }]));
   const rows = await all(db, 'SELECT channel, ordered_at, total, status FROM orders WHERE ordered_at >= ? AND ordered_at < ?', fromMs, toMs);
+  // Listede olmayan (ör. yeni eklenen) mağaza da sayılır
+  const T = (c) => totals[c] || (totals[c] = { revenue: 0, orders: 0, cancelled: 0, returned: 0, profit: 0, items: 0 });
   for (const r of rows) {
-    const tt = totals[r.channel];
-    if (!tt) continue;
+    const tt = T(r.channel);
     if (r.status === 'cancelled') { tt.cancelled++; continue; }
     if (r.status === 'returned') { tt.returned++; continue; }
     const b = series[idx.get(f(r.ordered_at))];
     tt.revenue += r.total; tt.orders++;
-    if (b) { b.revenue[r.channel] += r.total; b.orders[r.channel]++; }
+    if (b) { b.revenue[r.channel] = (b.revenue[r.channel] || 0) + r.total; b.orders[r.channel] = (b.orders[r.channel] || 0) + 1; }
   }
   // Tahmini kâr: satır tutarı − komisyon − alış maliyeti; sipariş başına kargo + hizmet bedeli
   const lines = await all(db, `SELECT o.id, o.channel, o.ordered_at, o.shipping_cost, i.total, i.quantity, i.commission AS actual_commission, p.purchase_price, l.commission
@@ -43,8 +44,7 @@ async function period(db, fromMs, toMs, group, settings) {
   const seen = new Set();
   let missingCost = 0;
   for (const l of lines) {
-    const ch = l.channel, tt = totals[ch];
-    if (!tt) continue;
+    const ch = l.channel, tt = T(ch);
     const rate = l.commission ?? (settings.commission || {})[ch] ?? 0;
     // Kanalın bildirdiği gerçek komisyon varsa o kullanılır
     const effRate = l.actual_commission != null && l.total > 0 ? (l.actual_commission / l.total) * 100 : rate;
@@ -59,7 +59,7 @@ async function period(db, fromMs, toMs, group, settings) {
     if (b) b.profit += v;
   }
   for (const t of Object.values(totals)) { t.revenue = r2(t.revenue); t.profit = r2(t.profit); }
-  for (const b of series) { for (const c of CHANNEL_IDS) b.revenue[c] = r2(b.revenue[c]); b.profit = r2(b.profit); }
+  for (const b of series) { for (const c of Object.keys(b.revenue)) b.revenue[c] = r2(b.revenue[c]); b.profit = r2(b.profit); }
   const sum = (k) => r2(Object.values(totals).reduce((s, t) => s + t[k], 0));
   const total = { revenue: sum('revenue'), orders: sum('orders'), cancelled: sum('cancelled'), returned: sum('returned'), profit: sum('profit'), items: sum('items') };
   total.basket = total.orders ? r2(total.revenue / total.orders) : 0;
@@ -179,7 +179,7 @@ function rangeOf(q) {
 
 export async function insights(db, q) {
   const now = Date.now(), unit = ['day', 'week', 'month', 'year'].includes(q.unit) ? q.unit : 'day';
-  const chan = CHANNEL_IDS.includes(q.channel) ? q.channel : null;
+  const chan = isChannelId(q.channel) ? q.channel : null;
   const cw = chan ? ' AND o.channel = ?' : '', ca = chan ? [chan] : [];
   // 1) Son 4 dönem kartları (+ karşılaştırma için 5. dönem)
   const starts = [0, 1, 2, 3, 4].map((b) => unitStart(unit, now, b));
@@ -209,13 +209,13 @@ export async function insights(db, q) {
   for (const w of weeks) w.revenue = r2(w.revenue);
   // 3) İller ve 4) en çok satanlar: seçilen aralıkta
   const [from, to] = rangeOf(q);
-  const crows = await all(db, `SELECT o.address, o.total, o.status FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
+  const crows = await all(db, `SELECT o.address, o.total, o.status, (SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled') AS units FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
   const cm = new Map();
   for (const r of crows) {
     let a = {}; try { a = JSON.parse(r.address || '{}'); } catch { /* boş */ }
     const k = cityName(a.city) || 'BİLİNMİYOR';
-    const x = cm.get(k) || { city: k, orders: 0, revenue: 0, shipped: 0 };
-    x.orders++; x.revenue += r.total; if (r.status === 'shipped' || r.status === 'delivered') x.shipped++;
+    const x = cm.get(k) || { city: k, orders: 0, revenue: 0, shipped: 0, units: 0 };
+    x.orders++; x.revenue += r.total; x.units += r.units || 0; if (r.status === 'shipped' || r.status === 'delivered') x.shipped++;
     cm.set(k, x);
   }
   const cities = [...cm.values()].map((x) => ({ ...x, revenue: r2(x.revenue) })).sort((a, b) => b.orders - a.orders);

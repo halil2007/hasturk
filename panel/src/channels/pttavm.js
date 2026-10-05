@@ -150,7 +150,7 @@ export function pttavm(env, meta) {
 
   const missing = ['PTTAVM_USERNAME', 'PTTAVM_PASSWORD'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'pttavm', byOrderDate: true, enabled: !missing.length, missing, beta: true,
+    ...meta, type: 'pttavm', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', ship: env.PTTAVM_WAREHOUSE_ID ? 'remote' : 'local', label: null, createProduct: false, price: false },
     fetchOrders, fetchListings, pushStock, ship, diagnose,
   };

@@ -188,7 +188,10 @@ test('Sipariş listesi: tarih / durum filtresi, sayfalama, kâr ve CSV', async (
   assert.equal(j.orders.length, 1);
   const { late, ...counts } = j.counts;
   assert.deepEqual(counts, { new: 1, cancelled: 1 });
-  assert.equal(late, 1, '1 günü aşan yeni sipariş gecikmede sayılır');
+  assert.equal(late, 0, '15 günden eski sipariş gecikenlerde sayılmaz');
+  await saveOrders(db, 'trendyol', [order('A4', Date.now() - 2 * 864e5, 1)]);
+  assert.equal((await (await call('/api/orders?status=late')).json()).counts.late, 1, '1 günü aşan yeni sipariş gecikmede sayılır');
+  await db.prepare("DELETE FROM orders WHERE id = 'trendyol:A4'").run();
   const all = await (await call('/api/orders?status=new&limit=10')).json();
   const a2 = all.orders.find((o) => o.order_number === 'A2');
   // 200 satış − %20 komisyon (40) − 2×40 maliyet = 80
@@ -288,7 +291,7 @@ test('API bilgileri kaydedilince eski hata ve kademeli bekleme sıfırlanır', a
     return r;
   };
   await call('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
-  await call('/api/integrations/hepsiburada', { method: 'PUT', body: JSON.stringify({ values: { HB_TEST: '1' } }) });
+  await call('/api/integrations/hepsiburada', { method: 'PUT', body: JSON.stringify({ values: { HB_USER_AGENT: 'hasturk_dev' } }) });
   const last = JSON.parse((await first(db, "SELECT v FROM settings WHERE k = 'last:hepsiburada'")).v);
   assert.equal(last.fails, 0); assert.equal(last.error, null); assert.equal(last.nextTry, null);
   assert.match(last.note, /güncellendi/);
@@ -310,4 +313,43 @@ test('API bilgisi biçim kontrolü: Hepsiburada Merchant ID yerine yazı girilir
   assert.match((await bad.json()).error, /36 karakterlik/);
   const ok = await call('/api/integrations/hepsiburada', { method: 'PUT', body: JSON.stringify({ values: { HB_MERCHANT_ID: '10012bc1-3a53-4306-b782-11eed9083af2' } }) });
   assert.equal(ok.status, 200);
+});
+
+test('çoklu mağaza: aynı türden ek mağaza eklenir, kendi bilgileriyle çalışır, ana mağazayı etkilemez, kaldırılabilir', async () => {
+  const db = d1();
+  await init(db);
+  const env = { PANEL_PASSWORD: 'x-123456', DB: db, TRENDYOL_SELLER_ID: '111', TRENDYOL_API_KEY: 'k1', TRENDYOL_API_SECRET: 's1' };
+  let cookie = '';
+  const call = async (path, opts = {}) => {
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: cookie } }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r;
+  };
+  await call('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+  const a = await (await call('/api/integrations/add', { method: 'POST', body: JSON.stringify({ type: 'trendyol' }) })).json();
+  assert.equal(a.id, 'trendyol_2');
+  const b = await (await call('/api/integrations/add', { method: 'POST', body: JSON.stringify({ type: 'trendyol' }) })).json();
+  assert.equal(b.id, 'trendyol_3');
+  // Eklenen mağaza boşken Cloudflare'deki ana mağaza bilgilerini devralmaz
+  let list = (await (await call('/api/integrations')).json()).channels;
+  let t2 = list.find((c) => c.id === 'trendyol_2');
+  assert.equal(t2.type, 'trendyol'); assert.equal(t2.enabled, false);
+  assert.equal(t2.fields.find((f) => f.k === 'TRENDYOL_SELLER_ID').value, '');
+  assert.ok(t2.fields.some((f) => f.k === 'STORE_LABEL'));
+  const put = await call('/api/integrations/trendyol_2', { method: 'PUT', body: JSON.stringify({ values: { STORE_LABEL: 'Trendyol Bahçe', TRENDYOL_SELLER_ID: '222', TRENDYOL_API_KEY: 'k2', TRENDYOL_API_SECRET: 's2' } }) });
+  assert.equal(put.status, 200);
+  list = (await (await call('/api/integrations')).json()).channels;
+  t2 = list.find((c) => c.id === 'trendyol_2');
+  assert.equal(t2.name, 'Trendyol Bahçe'); assert.equal(t2.enabled, true);
+  const t1 = list.find((c) => c.id === 'trendyol');
+  assert.equal(t1.fields.find((f) => f.k === 'TRENDYOL_SELLER_ID').value, '111'); // ana mağaza değişmedi
+  // Ek mağazaya ait ayar (ör. stok gönderimi) kabul edilir
+  const st = await (await call('/api/settings', { method: 'PUT', body: JSON.stringify({ stock_push: { trendyol_2: true } }) })).json();
+  assert.equal(st.stock_push.trendyol_2, true);
+  // Ana mağaza kaldırılamaz, ek mağaza kaldırılır
+  assert.equal((await call('/api/integrations/trendyol/remove', { method: 'POST' })).status, 400);
+  assert.equal((await call('/api/integrations/trendyol_3/remove', { method: 'POST' })).status, 200);
+  list = (await (await call('/api/integrations')).json()).channels;
+  assert.ok(!list.some((c) => c.id === 'trendyol_3'));
+  assert.ok(list.some((c) => c.id === 'trendyol_2'));
 });

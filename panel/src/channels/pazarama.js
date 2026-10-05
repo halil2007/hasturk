@@ -1,7 +1,7 @@
 // Pazarama (isortagimapi.pazarama.com). İş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri: API Key (Client ID), API Secret.
 // Kimlik: client_credentials belirteci (isortagimgiris.pazarama.com/connect/token, kapsam merchantgatewayapi.fullaccess).
 // Cevaplar { data, success, message } ile sarılıdır. Sipariş durumu satır (orderItemStatus) düzeyinde okunur.
-// Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür (beta: canlı hesapla doğrulanmalı).
+// Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
 import { http, basic, num, str, chunk } from '../util.js';
 
 const API = 'https://isortagimapi.pazarama.com';
@@ -86,7 +86,7 @@ export function pazarama(env, meta) {
 
   const missing = ['PAZARAMA_CLIENT_ID', 'PAZARAMA_CLIENT_SECRET'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'pazarama', beta: true, enabled: !missing.length, missing,
+    ...meta, type: 'pazarama', enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true },
     fetchOrders, fetchListings, pushStock, pushPrice, accept,
   };

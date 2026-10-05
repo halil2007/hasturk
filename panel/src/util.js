@@ -131,8 +131,10 @@ export async function labelFrom(v, base) {
   return { format, data, filename: `${base}.${format}` };
 }
 
-// Geciken / gecikme riskli: açık paketi olan (ya da paketsiz) hazırlanmayı bekleyen sipariş; son teslime 12 saatten az kaldı ya da 1 günü aştı
-export const LATE = `(o.status IN ('new', 'processing') AND (NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) OR EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id AND k.status = 'open'))
+// Geciken / gecikme riskli: açık paketi olan (ya da paketsiz) hazırlanmayı bekleyen sipariş; son teslime 12 saatten az kaldı ya da 1 günü aştı.
+// 15 günden eski siparişler sayılmaz (kanalda durumu güncellenmemiş eski kayıtlar gecikenler listesini doldurmasın).
+export const LATE_MAX_DAYS = 15;
+export const LATE = `(o.status IN ('new', 'processing') AND o.ordered_at >= (CAST(strftime('%s', 'now') AS INTEGER) * 1000 - ${LATE_MAX_DAYS * 86400000}) AND (NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) OR EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id AND k.status = 'open'))
   AND ((o.ship_by IS NOT NULL AND o.ship_by < (CAST(strftime('%s', 'now') AS INTEGER) * 1000 + 43200000)) OR o.ordered_at < (CAST(strftime('%s', 'now') AS INTEGER) * 1000 - 86400000)))`;
 
 // Tanılama adımı: işlemi çalıştırır, HTTP hatasını anlaşılır açıklamayla döndürür

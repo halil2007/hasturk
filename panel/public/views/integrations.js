@@ -15,15 +15,17 @@ const HELP = {
   pazarama: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri (API Key = Client ID, API Secret).',
 };
 
-// Öncelik sırası: iki ikas sitesi, Hepsiburada, Trendyol; PttAVM şimdilik beklemede
-const ORDER = ['ikas1', 'ikas2', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama'];
+// Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
+const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama'];
+const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama' };
+const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
 export async function integrations(el) {
   let data = null, jobs = [];
   async function load() {
     [data, jobs] = await Promise.all([api('integrations'), api('backfill').catch(() => [])]);
-    data.channels.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+    data.channels.sort((a, b) => rank(a) - rank(b));
     draw();
   }
   function field(c, f) {
@@ -40,7 +42,7 @@ export async function integrations(el) {
     const basic = c.fields.filter((f) => !f.adv), adv = c.fields.filter((f) => f.adv);
     return html`<div class="card" data-ch="${c.id}">
       <div class="hd">${chLogo(c.id)}<div style="flex:1;min-width:0"><h2 class="ellipsis">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2>
-        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}${c.beta ? html`<span class="pill amber" title="Canlı hesapla doğrulanması gerekiyor">Beta</span>` : ''}${c.sandbox ? html`<span class="pill warn" title="İstekler Hepsiburada test (SIT) sunucularına gidiyor">Test ortamı</span>` : c.type === 'hepsiburada' && c.enabled && !c.demo ? html`<span class="pill" title="İstekler canlı Hepsiburada sunucularına gidiyor">Canlı</span>` : ''}</div></div>
+        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}</div></div>
         <label class="row small" title="Pasif kanal senkronlanmaz">Aktif <span class="switch"><input type="checkbox" data-active="${c.id}" ${c.active ? 'checked' : ''}><span></span></span></label></div>
       ${!c.gated ? html`<label class="row small" style="gap:10px;align-items:flex-start"><span class="switch"><input type="checkbox" data-hold="${c.id}" ${((state.settings && state.settings.hold_channels) || []).includes(c.id) ? 'checked' : ''}><span></span></span>
         <span><b>Kanala yazmayı beklet</b> <span class="muted">— siparişler, ürünler, stok ve kanalda oluşan etiketler okunur; paketleme, kargo bildirimi, stok/fiyat gönderimi ve ürün oluşturma ${c.type === 'ikas' ? 'ikas' : 'kanal'} panelinden yapılır.</span></span></label>` : ''}
@@ -53,7 +55,6 @@ export async function integrations(el) {
       ${c.last && c.last.ok === false ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error || 'ayrıntı yok — Tanılama ile kontrol edin'}<div class="tiny muted">${c.last.nextTry ? `Art arda hata: sonraki otomatik deneme ${dateTime(c.last.nextTry)} (Senkronla hemen dener).` : '15 dakikada bir otomatik yeniden denenir.'}</div></div></div>` : ''}
       ${c.last && c.last.listingsError ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Ürün/stok alınamadı:</b> ${c.last.listingsError}</div></div>` : ''}
       <div class="muted small">${HELP[c.type]}</div>
-      ${c.type === 'hepsiburada' ? html`<div class="notice small"><i class="ico ico-warn"></i><div><b>HTTP 520 alıyorsanız:</b> Hepsiburada, panelin çalıştığı Cloudflare sunucularından gelen istekleri kapatıyor. <a class="link" href="/hb-proxy.php" download="hb-proxy.php">hb-proxy.php</a> dosyasını indirip içindeki anahtarı değiştirin, kendi hostinginize (cPanel → public_html) yükleyin; sonra Gelişmiş ayarlar → <b>Aracı sunucu adresi</b> ve <b>anahtarı</b> girin. İstekler hostinginizin sabit IP'sinden gider.</div></div>` : ''}
       <div class="form-grid">${basic.map((f) => field(c, f))}</div>
       ${adv.length ? html`<details class="adv"><summary>Gelişmiş ayarlar (${adv.length})</summary><div class="form-grid" style="margin-top:10px">${adv.map((f) => field(c, f))}</div></details>` : ''}
       <div class="small muted">${c.listings} ilan · ${c.linked} eşleşmiş${c.listingErrors ? html` · <span style="color:var(--bad)">${c.listingErrors} hatalı</span>` : ''} · Kanalda: ${[c.caps.accept === 'remote' ? 'işleme alma' : '', c.caps.split && c.caps.split !== 'local' ? 'paket bölme' : '', c.caps.ship === 'remote' ? 'kargo bildirimi' : '', c.caps.label ? 'kargo etiketi' : 'kargo barkodu', 'stok', c.caps.price ? 'fiyat' : '', c.caps.createProduct ? 'ürün oluşturma' : ''].filter(Boolean).join(', ')}</div>
@@ -61,10 +62,10 @@ export async function integrations(el) {
         <button class="btn primary" data-act="save" data-id="${c.id}">Kaydet</button>
         <button class="btn outline" data-act="test" data-id="${c.id}"><i class="ico ico-key"></i>Bağlantıyı test et</button>
         <button class="btn outline" data-act="diag" data-id="${c.id}" title="Her adımı ayrı ayrı dener ve sorunu açıklar"><i class="ico ico-bolt"></i>Tanılama</button>
-        ${c.type === 'hepsiburada' ? html`<a class="btn outline" href="#/hb-test" title="Hepsiburada'nın canlıya geçiş için istediği test adımları"><i class="ico ico-check"></i>Test adımları</a>` : ''}
         <span class="spacer"></span>
         <button class="btn sm ghost" data-act="sync" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-sync"></i>Senkronla</button>
         <button class="btn sm ghost" data-act="import" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-download"></i>İlanları çek</button>
+        ${c.extra ? html`<button class="btn sm ghost" data-act="remove" data-id="${c.id}" title="Bu mağazayı panelden kaldır (siparişleri silinmez)"><i class="ico ico-x"></i>Kaldır</button>` : ''}
       </div>
       <div class="small" data-res></div>
     </div>`;
@@ -96,10 +97,13 @@ export async function integrations(el) {
         ${data.secretSet ? '' : html`<br><b>Öneri:</b> Cloudflare'de <code>PANEL_SECRET</code> (uzun rastgele metin) tanımlayın; yoksa şifreleme panel şifresine bağlıdır ve şifre değişirse API bilgilerini yeniden girmeniz gerekir.`}</div></div>
       <div class="notice good small"><i class="ico ico-sync"></i><div>Tüm aktif kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: yeni/değişen siparişler, ürünler, görseller, varyantlar ve stoklar güncellenir; eşleştirmeler ve kanala özel stok kuralları korunur. Başarısız işlemler yeniden denenir, çözülemeyenler <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer.</div></div>
       <div class="row wrap"><button class="btn primary" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü (tüm kanallar)</button><span class="muted small">Bağlı tüm kanalların kimlik, izin, servis ve ayarlarını tek seferde dener; raporu kopyalayıp iletebilirsiniz.</span></div>
+      <div class="card row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Mağaza ekle</h2><div class="muted small">Aynı pazaryerinde ya da ikas'ta birden fazla mağazanız varsa istediğiniz kadar ekleyin; her mağaza kendi API bilgileriyle ayrı çalışır.</div></div>
+        <select class="input" data-addtype style="width:auto">${TYPES.map((t) => html`<option value="${t}">${TYPE_NAME[t]}</option>`)}</select>
+        <button class="btn primary" data-act="add"><i class="ico ico-plus"></i>Mağaza ekle</button></div>
       <div class="integ">${live.map(card)}</div>
       ${backfill()}
-      ${paused.length ? html`<details class="card adv" ${paused.some((c) => c.updated) ? 'open' : ''}><summary><b>Beklemedeki kanallar</b> <span class="muted small">(${paused.map((c) => c.name).join(', ')})</span></summary>
-        <p class="muted small">Bu kanallar kapalıdır; sipariş, ürün, stok ve analiz ekranlarında görünmez ve senkronlanmaz. API bilgilerini girip <b>Kaydet</b>, ardından <b>Bağlantıyı test et</b>'e basın: test başarılı olunca kanal devreye girer. Bilgiler sonradan değişirse yeniden test gerekir.</p><div class="integ">${paused.map(card)}</div></details>` : ''}
+      ${paused.length ? html`<h2 style="margin:8px 0 0">Bağlanmamış / pasif kanallar</h2>
+        <p class="muted small" style="margin:0">API bilgilerini girip <b>Kaydet</b>, ardından <b>Bağlantıyı test et</b>'e basın; bağlantı doğrulanınca kanal siparişler, ürünler ve stok ekranlarına eklenir.</p><div class="integ">${paused.map(card)}</div>` : ''}
     </div>`);
   }
   const values = (id) => { const o = {}; $$(`[data-ch="${id}"] [data-k]`, el).forEach((i) => { o[i.dataset.k] = i.value; }); return o; };
@@ -117,6 +121,17 @@ export async function integrations(el) {
     }),
     sync: (t) => busy(t, async () => { const r = await api('sync', { method: 'POST', body: { channels: [t.dataset.id], force: true } }); const v = (r.channels || {})[t.dataset.id]; toast(typeof v === 'string' ? v : `${v ?? 0} sipariş kontrol edildi`, typeof v === 'string'); await after(); }),
     import: () => importDialog(after),
+    add: (t) => busy(t, async () => {
+      const type = $('[data-addtype]', el).value;
+      const r = await api('integrations/add', { method: 'POST', body: { type } });
+      toast(`${TYPE_NAME[type]}: yeni mağaza eklendi — API bilgilerini girin`); await after();
+      const card = $(`[data-ch="${r.id}"]`, el); if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); const i = $('[data-k]', card); if (i) i.focus(); }
+    }),
+    remove: async (t) => {
+      const id = t.dataset.id;
+      if (!(await confirmBox(`${ch(id).name || id} mağazası panelden kaldırılsın mı? API bilgileri silinir; geçmiş siparişler ve raporlar korunur.`, 'Kaldır'))) return;
+      await api(`integrations/${id}/remove`, { method: 'POST' }); toast('Mağaza kaldırıldı'); await after();
+    },
     diag: (t) => diagnoseDialog(t.dataset.id),
     bfstart: (t) => busy(t, async () => {
       const box = $('[data-bf]', el), channels = $$('[data-bfch]', box).filter((x) => x.checked).map((x) => x.value);

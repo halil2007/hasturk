@@ -68,7 +68,10 @@ export async function summary(db, q = {}) {
     if (fm === r.m) e.new++; else e.returning++;
     months.set(r.m, e);
   }
-  const cities = await all(db, `SELECT json_extract(o.address, '$.city') AS city, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders FROM orders o ${W} AND COALESCE(json_extract(o.address, '$.city'), '') != '' GROUP BY 1 ORDER BY customers DESC LIMIT 12`, ...args);
+  // İller (harita ve liste): müşteri, sipariş, satılan adet ve ciro; tüm iller
+  const cities = await all(db, `SELECT json_extract(o.address, '$.city') AS city, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue,
+      SUM((SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled')) AS units
+    FROM orders o ${W} AND COALESCE(json_extract(o.address, '$.city'), '') != '' GROUP BY 1 ORDER BY orders DESC LIMIT 200`, ...args);
   return {
     customers, orders, revenue, repeat, multi,
     repeatRate: customers ? (repeat / customers) * 100 : 0,

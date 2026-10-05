@@ -3,12 +3,13 @@ import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill
 import { mountOps, openOrder, bulkLabels } from './orderops.js';
 import { loadSummary, setQuery } from '../app.js';
 
-const STATUS_TABS = [['all', 'Tümü'], ['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['late', 'Geciken'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade']];
+// İlk sekme Yeni (açılışta seçili), Tümü en sonda
+const STATUS_TABS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['late', 'Geciken'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade'], ['all', 'Tümü']];
 
 export async function orders(el, rest, query = {}) {
-  const f = { channel: query.channel || '', status: query.status || 'all', q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', page: 1, limit: 25 };
+  const f = { channel: query.channel || '', status: query.status || (query.q ? 'all' : 'new'), q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', page: 1, limit: 25 };
   if (rest[0] === 'kanal') f.channel = rest[1] || '';
-  if (rest[0] === 'durum') f.status = rest[1] || 'all';
+  if (rest[0] === 'durum') f.status = rest[1] || 'new';
   if (rest[0] && !['kanal', 'durum'].includes(rest[0])) setTimeout(() => openOrder(rest[0], refresh), 0);
   const sel = new Set();
   let data = { orders: [], counts: {}, total: 0 }, expanded = null, mobile = isMobile();
@@ -181,7 +182,8 @@ export async function orders(el, rest, query = {}) {
     if (e.target.matches('[data-from], [data-to]')) { f.from = $('[data-from]', el).value; f.to = $('[data-to]', el).value; f.page = 1; refresh(); }
     if (e.target.matches('[data-cargo]')) { f.cargo = e.target.value; f.page = 1; refresh(); }
   });
-  $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); f.page = 1; refresh(); }, 300));
+  // Arama yapılırken Yeni sekmesindeyse tüm siparişlerde aranır (eski siparişler de bulunsun)
+  $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); if (f.q && f.status === 'new') f.status = 'all'; f.page = 1; refresh(); }, 300));
   const onResize = debounce(() => { if (isMobile() !== mobile) draw(); }, 150);
   window.addEventListener('resize', onResize);
   await refresh();

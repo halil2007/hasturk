@@ -6,6 +6,7 @@
 //  Başarısız adım bir kez daha denenir; üst üste başarısız olursa Bildirimler'e yazılır.
 import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
+import { typeOf } from './config.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
 import { autoMatch, relinkItems, repairDuplicates } from './match.js';
 import { runJobs, createJob } from './backfill.js';
@@ -116,7 +117,7 @@ export async function saveOrders(db, ch, orders, maps) {
           // Paketlenmiş sayılır: ikas/HB'de paket varsa; Trendyol'da "Created" sonrası (Hazırlanıyor, Faturalandı…)
           const packed = p.packed ?? !/^(Created|Awaiting)$/.test(p.remoteStatus || '');
           // Kargo anlaşması: pazaryeri paketleri o pazaryerinin anlaşmasıyla; ikas paketi yalnızca ikas Kargo işlediyse
-          const agreement = p.agreement || (MARKETPLACES.includes(ch) ? ch : null);
+          const agreement = p.agreement || (MARKETPLACES.includes(typeOf(ch)) ? typeOf(ch) : null);
           st.push(db.prepare(`INSERT INTO packages (order_id, no, remote_id, items, status, remote_status, cargo_company, tracking, barcode, created_at, shipped_at, packed_at, error, agreement, tracking_url)
             VALUES (?, (SELECT COALESCE(MAX(no), 0) + 1 FROM packages WHERE order_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (order_id, remote_id) DO UPDATE SET items = excluded.items, remote_status = excluded.remote_status,

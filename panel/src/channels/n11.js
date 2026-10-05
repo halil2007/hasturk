@@ -1,7 +1,7 @@
 // N11 (yeni REST API, api.n11.com). Satıcı Ofisi → Hesabım → API Hesapları: appkey + appsecret (her istekte başlıkta).
 // Siparişler paket (shipmentPackage) düzeyinde gelir, aynı sipariş numarasındakiler birleştirilir. En fazla 15 günlük aralık.
 // Kargo: N11 anlaşmalı kargo; durum kargo okutunca kendiliğinden "Shipped" olur (API'de kargoya verme / etiket servisi yok).
-// Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür (beta: canlı hesapla doğrulanmalı).
+// Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
 import { http, num, str, chunk } from '../util.js';
 
 const BASE = 'https://api.n11.com';
@@ -85,7 +85,7 @@ export function n11(env, meta) {
 
   const missing = ['N11_APP_KEY', 'N11_APP_SECRET'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'n11', byOrderDate: true, beta: true, enabled: !missing.length, missing,
+    ...meta, type: 'n11', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true },
     fetchOrders, fetchListings, pushStock, pushPrice, accept,
   };

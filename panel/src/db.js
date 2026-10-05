@@ -131,6 +131,9 @@ const MIGRATIONS = [
   // Kargo gideri kaynağı: api (kanalın kargo faturasından) | manual (elle girildi)
   'ALTER TABLE orders ADD COLUMN shipping_src TEXT',
   'CREATE INDEX IF NOT EXISTS orders_ckey ON orders(ckey, ordered_at)',
+  // Hız: kanal filtreli sipariş listeleri / raporlar ve kategori bazlı ürün sorguları (eşleştirme, ürün yükleme)
+  'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
+  'CREATE INDEX IF NOT EXISTS products_category ON products(category)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

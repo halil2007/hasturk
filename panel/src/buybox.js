@@ -42,7 +42,7 @@ export function decide(rule, b, P) {
 
 // Buybox durumunu kontrol et: önce kurallı ilanlar, sonra en uzun süredir bakılmayanlar
 export async function checkBuybox(env, db, { channel, ids, limit = 100 } = {}) {
-  const chans = (await getChannels(env, db)).filter((c) => BUYBOX_CHANNELS.includes(c.id) && c.enabled && c.buybox && (!channel || c.id === channel));
+  const chans = (await getChannels(env, db)).filter((c) => BUYBOX_CHANNELS.includes(c.type) && c.enabled && c.buybox && (!channel || c.id === channel));
   const out = {};
   for (const ch of chans) {
     const rows = ids && ids.length

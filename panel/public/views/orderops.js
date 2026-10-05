@@ -373,7 +373,7 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
         : html`${editOnly ? html`<div class="notice small">Kanalın kargo sistemi dışında (kendi kargo anlaşmanızla) gönderdiğiniz paketler içindir.</div>` : ''}
         <label class="field"><span>Kargo firması</span><input class="input" list="cargo-dl" data-f="cargo" value="${pkg.cargo_company || o.cargo_company || ''}"><datalist id="cargo-dl">${((state.settings && state.settings.cargo_companies) || []).map((x) => html`<option value="${x}">`)}</datalist></label>
         <label class="field"><span>Takip no</span><input class="input" data-f="tracking" value="${pkg.tracking || ''}"></label>`}
-      ${o.channel === 'trendyol' && !editOnly ? html`<label class="field"><span>Fatura no (isteğe bağlı, Trendyol'a "Faturalandı" bildirilir)</span><input class="input" data-f="invoice"></label>` : ''}
+      ${ch(o.channel).type === 'trendyol' && !editOnly ? html`<label class="field"><span>Fatura no (isteğe bağlı, Trendyol'a "Faturalandı" bildirilir)</span><input class="input" data-f="invoice"></label>` : ''}
       ${!editOnly ? html`<div class="notice small">${c.ship === 'remote' ? `Gönderim ${name}'a bildirilir.` : `${name}'da paket, kargo firması teslim alıp okutunca “Kargoda” olur; burada panel kaydı güncellenir.`}</div>` : ''}
     </div>`,
     foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>${editOnly ? 'Kaydet' : html`<i class="ico ico-truck"></i>Kargoya ver`}</button>`,

@@ -7,10 +7,15 @@ import { n11 } from './n11.js';
 import { idefix } from './idefix.js';
 import { pazarama } from './pazarama.js';
 import { demo } from './demo.js';
-import { loadConfig, effectiveEnv, configVersion } from '../config.js';
+import { loadConfig, effectiveEnv, configVersion, EXTRA_RE, TYPES, TYPE_NAMES, typeOf, storeEnv } from '../config.js';
 import { getRaw } from '../db.js';
 
-export const CHANNEL_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama'];
+export const BASE_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama'];
+// Geçerli kanal kimlikleri: ana mağazalar + eklenen mağazalar (getChannels her çağrıda günceller)
+export const CHANNEL_IDS = [...BASE_IDS];
+export const isChannelId = (id) => CHANNEL_IDS.includes(id) || EXTRA_RE.test(String(id || ''));
+const FACTORY = { trendyol, hepsiburada, pttavm, n11, idefix, pazarama };
+const make = (type, e, meta) => (type === 'ikas' ? ikas(e, 'IKAS1_', meta) : FACTORY[type](e, meta));
 // Bekleyen kanallar: bilgileri girilip "Bağlantıyı test et" başarılı olana kadar yalnızca Entegrasyonlar'da görünür;
 // sipariş, ürün, stok ve analiz ekranlarına ve senkrona girmez. Bilgiler değişirse yeniden onay gerekir.
 export const GATED = ['pttavm', 'n11', 'idefix', 'pazarama'];
@@ -52,19 +57,33 @@ export async function getChannels(env, db) {
     idefix: idefix(e, meta.idefix),
     pazarama: pazarama(e, meta.pazarama),
   };
+  // Eklenen mağazalar: türe göre sıralı (ikas_3, trendyol_2, ...)
+  const extras = Object.keys(cfg).filter((id) => EXTRA_RE.test(id)).sort((a, b) => {
+    const [, ta, na] = EXTRA_RE.exec(a), [, tb, nb] = EXTRA_RE.exec(b);
+    return TYPES.indexOf(ta) - TYPES.indexOf(tb) || Number(na) - Number(nb);
+  });
+  for (const id of extras) {
+    const type = typeOf(id), v = cfg[id].values || {}, n = EXTRA_RE.exec(id)[2];
+    const name = v.STORE_LABEL || (type === 'ikas' ? v.IKAS1_NAME : '') || `${TYPE_NAMES[type]} ${n}`;
+    meta[id] = { id, type, name, short: name, extra: true };
+    real[id] = make(type, storeEnv(env, type, v), meta[id]);
+  }
+  const ids = [...BASE_IDS, ...extras];
+  CHANNEL_IDS.splice(0, CHANNEL_IDS.length, ...ids);
   const verified = {};
-  if (db) for (const id of GATED) verified[id] = await getRaw(db, 'verified:' + id);
+  if (db) for (const id of ids) if (GATED.includes(typeOf(id))) verified[id] = await getRaw(db, 'verified:' + id);
   const holdIds = db ? (await getRaw(db, 'hold_channels')) ?? DEFAULT_HOLD : [];
   const hold = new Set(Array.isArray(holdIds) ? holdIds : []);
-  const list = CHANNEL_IDS.map((id) => {
+  const list = ids.map((id) => {
     // Panelde "pasif" yapılan kanal hiç çalışmaz
     if (cfg[id] && cfg[id].active === false) return { ...real[id], enabled: false, paused: true };
-    // Bekleyen kanal: bağlantı onayı (son kayıttan sonra başarılı test) yoksa gizli; test için gerçek bağlantı ayrıca tutulur
-    if (GATED.includes(id)) {
+    // Bağlantısı onaylanmamış kanal: son kayıttan sonra başarılı test yoksa listelere girmez; test için gerçek bağlantı ayrıca tutulur
+    if (GATED.includes(typeOf(id))) {
       const v = verified[id], ok = v && cfg[id] && v.at >= (cfg[id].updated || 0);
       if (!ok) return { ...real[id], enabled: false, paused: true, gated: true, real: real[id] };
-      return real[id];
+      return hold.has(id) ? held(real[id]) : real[id];
     }
+    if (meta[id].extra) return hold.has(id) ? held(real[id]) : real[id];
     // DEMO=1: anahtarı olmayan kanallar örnek veriyle çalışır (anahtarı girilmiş kanal gerçek kalır)
     const c = env.DEMO === '1' && !real[id].enabled ? demo(meta[id]) : real[id];
     return hold.has(id) && !c.demo ? held(c) : c;
@@ -74,4 +93,4 @@ export async function getChannels(env, db) {
 }
 export const resetChannels = () => { cache = null; };
 export const channel = async (env, db, id) => (await getChannels(env, db)).find((c) => c.id === id);
-export const publicInfo = (c) => ({ id: c.id, type: c.type, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, beta: !!c.beta, hold: !!c.hold, sandbox: !!c.sandbox, missing: c.missing, caps: c.caps });
+export const publicInfo = (c) => ({ id: c.id, type: c.type, extra: !!c.extra, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, hold: !!c.hold, missing: c.missing, caps: c.caps });
