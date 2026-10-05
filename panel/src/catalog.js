@@ -279,6 +279,15 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       fail(502, `${c.name} ürünleri kabul etmedi: ${e.message}`);
     }
   }
+  // Kanalın ham durum cevabı (teşhis için: Hepsiburada'nın döndürdüğü JSON olduğu gibi)
+  const mr = path.match(/^catalog\/uploads\/(\d+)\/raw$/);
+  if (mr && m === 'GET') {
+    const u = await first(db, 'SELECT * FROM product_uploads WHERE id = ?', Number(mr[1]));
+    if (!u || !u.ref) fail(404, 'Gönderim bulunamadı');
+    const c = await target(env, db, u.channel);
+    if (!c.catalog.raw) fail(400, 'Bu kanal ham durum sorgusunu desteklemiyor');
+    return { ref: u.ref, raw: await c.catalog.raw(String(u.ref).split(',')[0]) };
+  }
   const mm = path.match(/^catalog\/uploads\/(\d+)\/check$/);
   if (mm && m === 'POST') {
     const u = await first(db, 'SELECT * FROM product_uploads WHERE id = ?', Number(mm[1]));

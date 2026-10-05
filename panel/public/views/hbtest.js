@@ -23,7 +23,8 @@ export async function hbTestView(el) {
     render(el, html`<div class="stack" style="max-width:1000px">
       <div class="notice ${st.ready && st.test ? '' : 'warn'}"><i class="ico ico-${st.ready && st.test ? 'check' : 'warn'}"></i><div style="flex:1">
         ${!st.ready ? html`<b>Önce bağlantı:</b> Entegrasyonlar → Hepsiburada: Merchant ID, Servis anahtarı (Secret key), Entegratör adı (User-Agent) ve <b>Ortam = Test (SIT)</b>. Kaydedip “Bağlantıyı test et”e basın.${st.missing.length ? ` Eksik: ${st.missing.join(', ')}` : ''}`
-          : st.test ? html`<b>Test (SIT) ortamına bağlı</b> · Merchant ${st.merchantId}. Aşağıdaki üç adımı sırayla tamamlayın; sonuçlar en altta toplanır.`
+          : st.test ? html`<b>Test (SIT) ortamına bağlı</b> · Merchant ${st.merchantId}. Aşağıdaki üç adımı sırayla tamamlayın; sonuçlar en altta toplanır.
+            <div class="small" style="margin-top:4px">Not: test ortamına gönderilen ürün, stok ve siparişler <b>Hepsiburada Merchant Portal'da (canlı panelde) görünmez</b>; Hepsiburada bunları test sunucusunda, trackingId ve yükleme kimlikleriyle kontrol eder.</div>`
             : html`<b>Dikkat: canlı ortama bağlısınız.</b> Test adımları için Entegrasyonlar → Hepsiburada → Ortam = Test (SIT) seçin.`}</div><a class="btn sm" href="#/entegrasyonlar">Entegrasyonlar</a></div>
 
       <div class="card stack" style="border-color:var(--primary)">
@@ -52,7 +53,7 @@ export async function hbTestView(el) {
           <label class="field"><span>Hepsiburada kategorisi</span><input class="input" data-cq placeholder="ör. gübre, toprak, tohum"><div data-clist class="stack" style="gap:4px;margin-top:4px"></div></label>
         </div>
         <div data-attrs></div>
-        ${r.trackingId ? html`<div class="row wrap"><span>trackingId: <b class="num">${r.trackingId}</b></span><button class="btn sm" data-act="pstatus">Durumu sorgula</button></div>` : ''}
+        ${r.trackingId ? html`<div class="row wrap"><span>trackingId: <b class="num">${r.trackingId}</b>${r.fromUpload ? html` <span class="muted tiny">(Ürün yükle sayfasından yapılan gönderim)</span>` : ''}</span><button class="btn sm" data-act="pstatus">Durumu sorgula</button></div>` : ''}
         <div data-out1></div>
       </div>
 

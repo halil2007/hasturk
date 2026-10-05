@@ -22,7 +22,13 @@ export async function hbTest(env, db, path, m, q, b, user) {
     const orders = await all(db, `SELECT o.id, o.order_number, o.status, o.ordered_at, o.total,
       (SELECT GROUP_CONCAT(remote_id) FROM packages WHERE order_id = o.id AND remote_id IS NOT NULL) AS packages
       FROM orders o WHERE o.channel = 'hepsiburada' ORDER BY o.ordered_at DESC LIMIT 20`);
-    return { ready, test: !!(c && c.sit && c.sit.test), merchantId: c && c.sit ? c.sit.merchantId : '', missing: c ? c.missing || [] : [], results: (await getRaw(db, 'hb_test')) || {}, listings, orders };
+    // 1. adım: Ürün yükle sayfasından test ortamına yapılan gönderimin trackingId'si de geçerlidir
+    const results = (await getRaw(db, 'hb_test')) || {};
+    if (!results.trackingId && c && c.sit && c.sit.test) {
+      const up = await all(db, "SELECT ref, items FROM product_uploads WHERE channel = 'hepsiburada' AND ref IS NOT NULL AND ref != '' ORDER BY id DESC LIMIT 1");
+      if (up[0]) { results.trackingId = String(up[0].ref).split(',')[0]; try { results.importedSku = (JSON.parse(up[0].items || '[]')[0] || {}).key || ''; } catch { /* boş */ } results.fromUpload = true; }
+    }
+    return { ready, test: !!(c && c.sit && c.sit.test), merchantId: c && c.sit ? c.sit.merchantId : '', missing: c ? c.missing || [] : [], results, listings, orders };
   }
   const c = await hb(env, db);
   const S = c.sit;

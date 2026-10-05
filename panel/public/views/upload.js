@@ -208,13 +208,18 @@ export async function uploadView(el) {
   }
 
   function detailSheet(u) {
-    sheet({ title: `Gönderim #${u.id} · ${u.items.length} ürün`, size: 'wide', body: html`<div class="stack">
-      ${u.ref ? html`<div class="small">Takip no: <b class="num">${u.ref}</b>${u.checked_at ? html` · son sorgu ${dateTime(u.checked_at)}` : ''}</div>` : ''}
+    const s = sheet({ title: `Gönderim #${u.id} · ${u.items.length} ürün`, size: 'wide', body: html`<div class="stack">
+      ${u.ref ? html`<div class="row wrap small">Takip no: <b class="num">${u.ref}</b>${u.checked_at ? html` · son sorgu ${dateTime(u.checked_at)}` : ''}<span class="spacer"></span><button class="btn sm" data-raw="${u.id}">Kanalın ham cevabını göster</button></div><pre data-rawout class="small" style="display:none;max-height:40vh;overflow:auto;white-space:pre-wrap;background:var(--surface-2);padding:10px;border-radius:8px;margin:0"></pre>` : ''}
       ${u.error ? html`<div class="notice bad small">${u.error}</div>` : ''}
       <div class="table-wrap" style="max-height:60vh;overflow:auto"><table class="t"><thead><tr><th>Ürün</th><th>Anahtar</th><th>Sonuç</th></tr></thead><tbody>
         ${u.items.map((x) => html`<tr><td class="ellipsis" style="max-width:300px">${x.name}</td><td class="num small">${x.key}</td>
           <td>${x.ok === true ? html`<span class="pill good">onaylandı</span>` : x.ok === false ? html`<span class="pill bad">hata</span>` : html`<span class="pill warn">${x.status || 'bekliyor'}</span>`}${x.error ? html`<div class="tiny" style="color:var(--bad)">${x.error}</div>` : ''}</td></tr>`)}
       </tbody></table></div></div>` });
+    const rb = s.el.querySelector('[data-raw]');
+    if (rb) rb.onclick = () => busy(rb, async () => {
+      const r = await api(`catalog/uploads/${u.id}/raw`, { fresh: true });
+      const out = s.el.querySelector('[data-rawout]'); out.style.display = ''; out.textContent = JSON.stringify(r.raw, null, 2);
+    });
   }
 
   actions(el, {
