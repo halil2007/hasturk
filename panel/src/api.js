@@ -12,7 +12,8 @@ import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
-import { profit } from '../public/profit.js';
+import { costOf, COST_KEYS } from '../public/profit.js';
+import { orderProfit, breakdown, listInvoices, syncInvoices } from './finance.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
@@ -37,24 +38,6 @@ async function loadOrder(db, id) {
     WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id);
   o.packages = (await all(db, `SELECT ${PKG_COLS} FROM packages WHERE order_id = ? ORDER BY no`, id)).map((p) => ({ ...p, items: parse(p.items, []) }));
   return o;
-}
-
-function orderProfit(o, settings) {
-  const ch = o.channel;
-  let revenue = 0, commission = 0, cost = 0, missing = 0;
-  for (const i of o.items) {
-    if (i.status === 'cancelled') continue;
-    const rate = i.listing_commission ?? (settings.commission || {})[ch] ?? 0;
-    revenue += i.total;
-    // Kanalın bildirdiği gerçek komisyon varsa o; yoksa ilan / kanal oranıyla tahmin
-    commission += i.commission != null ? i.commission : profit({ sale: i.total, commissionRate: rate }).commission;
-    if (i.purchase_price) cost += i.purchase_price * i.quantity; else missing++;
-  }
-  const shipping = o.shipping_cost ?? (settings.shipping || {})[ch] ?? 0;
-  const fee = (settings.service_fee || {})[ch] || 0;
-  const net = revenue - commission - shipping - fee;
-  const shippingSrc = o.shipping_cost == null ? 'estimate' : o.shipping_src === 'api' ? 'api' : 'manual';
-  return { revenue: r2(revenue), commission: r2(commission), shipping: r2(shipping), shippingSrc, fee: r2(fee), payout: r2(net), cost: r2(cost), profit: r2(net - cost), missingCost: missing };
 }
 
 // Sipariş filtresi (liste, sayılar ve dışa aktarma aynı filtreyi kullanır)
@@ -641,7 +624,7 @@ async function saveSettings(db, b) {
       v = !!v;
       if (v && !cur.stock_sync) await setSetting(db, 'stock_since', Date.now());
     }
-    if (['commission', 'shipping', 'service_fee'].includes(k)) v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, num((v || {})[c], (cur[k] || {})[c] || 0)]));
+    if (COST_KEYS.includes(k)) v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, num((v || {})[c], costOf(cur, k, c))]));
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
     if (k === 'autoprice') v = !!v;
@@ -715,7 +698,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
     const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
     if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
-    return json({ ...s, channels: chInfo, settings: st, user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
+    return json({ ...s, channels: chInfo, settings: st, user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
   }
   // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
   if (path === 'panel-proxy' && m === 'GET') {
@@ -927,6 +910,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return new Response(await exportOrders(db, q), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="siparisler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
   }
   if (path === 'dashboard' && m === 'GET') return json(await dashboard(db, q));
+  // Gelir & gider: dönem masraf basamakları (satış → komisyon → kargo → hizmet bedeli → ek kesinti → stopaj → hakediş → alış → kâr)
+  if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
+  if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncInvoices(env, db, { force: true })); }
+  if (path === 'finance' && m === 'GET') return json(await breakdown(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
 
   // ---------- entegrasyonlar (kanal API bilgileri) ----------
   if (path === 'integrations' && m === 'GET') {

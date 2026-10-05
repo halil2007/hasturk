@@ -2,7 +2,7 @@
 import { all, first, getSettings } from './db.js';
 import { dayKey, weekKey, monthKey, TR, r2, LATE } from './util.js';
 import { CHANNEL_IDS, isChannelId } from './channels/index.js';
-import { profit } from '../public/profit.js';
+import { profit, costOf } from '../public/profit.js';
 import { DESIRED } from './sync.js';
 const LOW = (n) => `(CASE WHEN critical_stock > 0 THEN critical_stock ELSE ${Math.max(0, Math.round(Number(n) || 0))} END)`;
 
@@ -45,14 +45,14 @@ async function period(db, fromMs, toMs, group, settings) {
   let missingCost = 0;
   for (const l of lines) {
     const ch = l.channel, tt = T(ch);
-    const rate = l.commission ?? (settings.commission || {})[ch] ?? 0;
+    const rate = l.commission ?? costOf(settings, 'commission', ch);
     // Kanalın bildirdiği gerçek komisyon varsa o kullanılır
     const effRate = l.actual_commission != null && l.total > 0 ? (l.actual_commission / l.total) * 100 : rate;
-    let v = profit({ sale: l.total, purchase: (l.purchase_price || 0) * l.quantity, commissionRate: effRate }).unitProfit;
+    let v = profit({ sale: l.total, purchase: (l.purchase_price || 0) * l.quantity, commissionRate: effRate, feeRate: costOf(settings, 'fee_rate', ch), withholdingRate: costOf(settings, 'withholding', ch) }).unitProfit;
     if (!l.purchase_price) missingCost++;
     if (!seen.has(l.id)) {
       seen.add(l.id);
-      v -= (l.shipping_cost ?? (settings.shipping || {})[ch] ?? 0) + ((settings.service_fee || {})[ch] || 0);
+      v -= (l.shipping_cost ?? costOf(settings, 'shipping', ch)) + costOf(settings, 'service_fee', ch);
     }
     tt.profit += v; tt.items += l.quantity;
     const b = series[idx.get(f(l.ordered_at))];

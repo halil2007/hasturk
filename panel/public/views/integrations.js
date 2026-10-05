@@ -17,6 +17,8 @@ const HELP = {
 
 // Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
 const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama'];
+// Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi)
+const SOON = ['Amazon', 'Çiçeksepeti', 'Koçtaş', 'Teknosa', 'Turkcell Pasaj', 'Shopify', 'WooCommerce', 'Etsy'];
 const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama' };
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
@@ -98,8 +100,9 @@ export async function integrations(el) {
       <div class="notice good small"><i class="ico ico-sync"></i><div>Tüm aktif kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: yeni/değişen siparişler, ürünler, görseller, varyantlar ve stoklar güncellenir; eşleştirmeler ve kanala özel stok kuralları korunur. Başarısız işlemler yeniden denenir, çözülemeyenler <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer.</div></div>
       <div class="row wrap"><button class="btn primary" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü (tüm kanallar)</button><span class="muted small">Bağlı tüm kanalların kimlik, izin, servis ve ayarlarını tek seferde dener; raporu kopyalayıp iletebilirsiniz.</span></div>
       <div class="card row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Mağaza ekle</h2><div class="muted small">Aynı pazaryerinde ya da ikas'ta birden fazla mağazanız varsa istediğiniz kadar ekleyin; her mağaza kendi API bilgileriyle ayrı çalışır.</div></div>
-        <select class="input" data-addtype style="width:auto">${TYPES.map((t) => html`<option value="${t}">${TYPE_NAME[t]}</option>`)}</select>
-        <button class="btn primary" data-act="add"><i class="ico ico-plus"></i>Mağaza ekle</button></div>
+        <select class="input" data-addtype style="width:auto">${TYPES.map((t) => html`<option value="${t}">${TYPE_NAME[t]}</option>`)}<optgroup label="Yakında">${SOON.map((t) => html`<option disabled>${t} — yakında</option>`)}</optgroup></select>
+        <button class="btn primary" data-act="add"><i class="ico ico-plus"></i>Mağaza ekle</button>
+        <div style="flex-basis:100%" class="row wrap small"><span class="muted">Yakında:</span>${SOON.map((t) => html`<span class="pill" title="Yakında sisteme entegre edilecek">${t} <span class="muted tiny">yakında</span></span>`)}</div></div>
       <div class="integ">${live.map(card)}</div>
       ${backfill()}
       ${paused.length ? html`<h2 style="margin:8px 0 0">Bağlanmamış / pasif kanallar</h2>

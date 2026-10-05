@@ -40,12 +40,27 @@ const secret = (env) => (env.PANEL_SECRET || '') + '|' + password(env);
 const ADMIN = { id: 0, username: 'yonetici', name: 'Yönetici', role: 'admin' };
 const isAdminName = (u) => !u || ['yonetici', 'yönetici', 'admin'].includes(String(u).trim().toLocaleLowerCase('tr'));
 
+// Müşteri panelinde (env.TENANT_SLUG) çerez değeri firma koduyla başlar: "kod~kullanıcı.son.imza"
+const pre = (env) => (env.TENANT_SLUG ? env.TENANT_SLUG + '~' : '');
+const SUPPORT = { id: -1, username: 'destek', name: 'Destek', role: 'admin', support: true };
+// Destek oturumu: ana panel yöneticisi müşteri paneline 2 saatliğine girer (yalnız ana panel üzerinden üretilir)
+export async function supportCookie(env, secure) {
+  const exp = String(Date.now() + 2 * 3600e3);
+  const value = encodeURIComponent(`${pre(env)}-1.${exp}.${await hmac(secret(env), `-1.${exp}.support`)}`);
+  return `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=7200${secure ? '; Secure' : ''}`;
+}
+
 // Çerezden oturumdaki kullanıcıyı bul (yoksa null)
 export async function currentUser(req, env, db) {
   const m = (req.headers.get('Cookie') || '').match(new RegExp(COOKIE + '=([^;]+)'));
   if (!m) return null;
-  const [uid, exp, sig] = decodeURIComponent(m[1]).split('.');
+  let v = decodeURIComponent(m[1]);
+  const i = v.indexOf('~');
+  if (env.TENANT_SLUG ? v.slice(0, i + 1) !== pre(env) : i >= 0) return null; // başka panelin çerezi
+  if (i >= 0) v = v.slice(i + 1);
+  const [uid, exp, sig] = v.split('.');
   if (!sig || Number(exp) < Date.now()) return null;
+  if (uid === '-1') return env.TENANT_SLUG && same(sig, await hmac(secret(env), `-1.${exp}.support`)) ? { ...SUPPORT, name: 'Destek (ana panel)' } : null;
   if (uid === '0') {
     if (!password(env)) return null;
     return same(sig, await hmac(secret(env), `0.${exp}.0`)) ? ADMIN : null;
@@ -81,7 +96,7 @@ export async function login(req, env, db, { username, password: pass }) {
   }
   await setSetting(db, 'login_fail', { n: 0, at: 0 });
   const exp = String(Date.now() + DAYS * 864e5);
-  const value = encodeURIComponent(`${user.id}.${exp}.${await hmac(secret(env), `${user.id}.${exp}.${ver}`)}`);
+  const value = encodeURIComponent(`${pre(env)}${user.id}.${exp}.${await hmac(secret(env), `${user.id}.${exp}.${ver}`)}`);
   const secure = new URL(req.url).protocol === 'https:' ? '; Secure' : '';
   return { ok: true, user, cookie: `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DAYS * 86400}${secure}` };
 }
@@ -108,6 +123,7 @@ export async function saveUser(db, id, b) {
   if (b.password) await run(db, 'UPDATE users SET pass = ? WHERE id = ?', await hashPassword(String(b.password)), id);
 }
 export async function changeOwnPassword(db, user, oldPw, newPw) {
+  if (user.id === -1) throw new Error('Destek oturumunda şifre değiştirilemez');
   if (!user.id) throw new Error('Ana yönetici şifresi Cloudflare\'deki PANEL_PASSWORD ile değiştirilir');
   const u = await first(db, 'SELECT pass FROM users WHERE id = ?', user.id);
   if (!u || !(await checkPassword(String(oldPw || ''), u.pass))) throw new Error('Mevcut şifre hatalı');

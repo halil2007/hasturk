@@ -2,6 +2,7 @@
 // Kanal API bilgileri Entegrasyonlar'da, kullanıcılar Kullanıcılar sayfasındadır.
 import { api, state, html, render, $, $$, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels } from '../core.js';
 import { loadSummary } from '../app.js';
+import { costOf, COST_KEYS } from '../profit.js';
 
 // Logoyu en fazla 600×200 px PNG'ye küçült (veritabanında küçük yer kaplasın)
 function shrink(file) {
@@ -66,10 +67,11 @@ export async function settingsView(el) {
       </div>
 
       <div class="card flush"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
-        <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r">Hizmet bedeli ₺</th></tr></thead><tbody>
+        <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
         ${live.map((c) => html`<tr><td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td>
-          ${['commission', 'shipping', 'service_fee'].map((k) => html`<td class="r"><input class="input" style="width:100px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${(st[k] || {})[c.id] ?? 0}" ${dis}></td>`)}</tr>`)}
-      </tbody></table></div></div>
+          ${COST_KEYS.map((k) => html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${costOf(st, k, c.id)}" ${dis}></td>`)}</tr>`)}
+      </tbody></table></div>
+        <div class="card-pad muted tiny" style="padding-top:0">Masraf basamakları: satış − komisyon − kargo − hizmet bedeli − ek kesinti − stopaj = hakediş; hakediş − alış = kâr. Stopaj, pazaryerlerinin 2025'ten beri hakedişten kestiği gelir vergisidir (KDV hariç satış üzerinden, genelde %1); yıllık vergiden mahsup edilir. Kendi siteniz (ikas) için 0 bırakın.</div></div>
 
       ${admin ? html`<div class="card stack" data-mailbox>
         <h2>Yeni sipariş e-posta bildirimi</h2>
@@ -153,7 +155,7 @@ export async function settingsView(el) {
       busy(t, async () => { const r = await api('purge-demo', { method: 'POST' }); toast(`${r.orders} örnek sipariş ve ${r.products} örnek ürün silindi`); await loadSummary(); });
     },
     save: (t) => busy(t, async () => {
-      const cost = { commission: {}, shipping: {}, service_fee: {} };
+      const cost = Object.fromEntries(COST_KEYS.map((k) => [k, {}]));
       $$('[data-cost]', el).forEach((i) => { const [k, c] = i.dataset.cost.split(':'); cost[k][c] = numIn(i.value); });
       const sender = {}; $$('[data-sender]', el).forEach((i) => { sender[i.dataset.sender] = i.value.trim(); });
       const company = {}; $$('[data-co]', el).forEach((i) => { company[i.dataset.co] = i.value.trim(); });

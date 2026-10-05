@@ -83,10 +83,39 @@ export function n11(env, meta) {
     if (lines.length) await call('/rest/order/v1/update', { method: 'PUT', body: { lines, status: 'Picking' } });
   }
 
+  // ---------- müşteri soruları (ürün soru-cevap, SOAP: api.n11.com/ws/productService) ----------
+  // Liste servisi dakikada bir kez çağrılabilir: her senkronda açık (cevap bekleyen) sorular tek sayfada (100) alınır.
+  const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const tag = (x, t) => { const m = new RegExp(`<(?:\\w+:)?${t}>([\\s\\S]*?)</(?:\\w+:)?${t}>`).exec(x); return m ? m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim() : ''; };
+  const tags = (x, t) => [...x.matchAll(new RegExp(`<(?:\\w+:)?${t}>([\\s\\S]*?)</(?:\\w+:)?${t}>`, 'g'))].map((m) => m[1]);
+  async function soap(op, inner) {
+    const body = `<?xml version="1.0" encoding="utf-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sch="http://www.n11.com/ws/schemas"><soapenv:Header/><soapenv:Body>`
+      + `<sch:${op}Request><auth><appKey>${esc(key)}</appKey><appSecret>${esc(secret)}</appSecret></auth>${inner}</sch:${op}Request></soapenv:Body></soapenv:Envelope>`;
+    const res = await fetch(BASE + '/ws/productService/', { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: op }, body });
+    const x = await res.text();
+    const fault = tag(x, 'faultstring');
+    if (!res.ok || fault) throw new Error(`N11 ${op}: HTTP ${res.status} ${fault || x.slice(0, 200)}`);
+    if (/^failure$/i.test(tag(tag(x, 'result') || x, 'status'))) throw new Error(`N11 ${op}: ${tag(x, 'errorMessage') || 'başarısız'}`);
+    return x;
+  }
+  const dmy = (ms) => { const d = new Date(ms + 3 * 3600e3); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
+  async function questions({ since, until = Date.now(), page = 0 }) {
+    if (page > 0) return { items: [], hasNext: false };
+    const x = await soap('GetProductQuestionList', `<productQuestionSearch><productId></productId><buyerEmail></buyerEmail><subject></subject><status>OPEN</status><startDate>${dmy(since)}</startDate><endDate>${dmy(until)}</endDate></productQuestionSearch><pagingData><currentPage>0</currentPage><pageSize>100</pageSize></pagingData>`);
+    const items = tags(x, 'productQuestion').map((q) => ({
+      remoteId: tag(q, 'id'), text: [tag(q, 'questionSubject'), tag(q, 'question')].filter(Boolean).join(' — '), status: tag(q, 'answer') ? 'answered' : 'waiting', remoteStatus: tag(q, 'answer') ? 'CLOSED' : 'OPEN',
+      productName: tag(q, 'productTitle'), sku: tag(q, 'productId'), answer: tag(q, 'answer') || null,
+    })).filter((q) => q.remoteId);
+    return { items, hasNext: false, total: Number(tag(x, 'totalCount')) || items.length };
+  }
+  async function answer(q, text) {
+    await soap('SaveProductAnswer', `<productQuestionId>${esc(q.remote_id)}</productQuestionId><answer>${esc(text)}</answer>`);
+  }
+
   const missing = ['N11_APP_KEY', 'N11_APP_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'n11', byOrderDate: true, enabled: !missing.length, missing,
-    caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept,
+    caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true, answer: { min: 1, max: 2048 } },
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, questions, answer,
   };
 }

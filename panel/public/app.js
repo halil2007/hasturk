@@ -16,6 +16,7 @@ import { integrations } from './views/integrations.js';
 import { notices } from './views/notices.js';
 import { users } from './views/users.js';
 import { settingsView } from './views/settings.js';
+import { financeView } from './views/finance.js';
 
 const ROUTES = [
   { path: '', title: 'Genel Bakış', icon: 'home', view: dashboard },
@@ -31,6 +32,7 @@ const ROUTES = [
   { path: 'buybox', title: 'Buybox', icon: 'bolt', view: buyboxView, when: () => bbChannels().length > 0 },
   { sec: 'Raporlar' },
   { path: 'analiz', title: 'Analizler', icon: 'pie', view: insightsView },
+  { path: 'gelir-gider', title: 'Gelir & Gider', icon: 'calc', view: financeView },
   { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView },
   { path: 'musteriler', title: 'Müşteriler', icon: 'user', view: customersView },
   { sec: 'Sistem' },
@@ -52,6 +54,15 @@ function nav() {
 
 export function refreshChrome(s = state.summary) {
   if (!s) return;
+  // Destek oturumu (ana panelden müşteri paneline girildi): üstte uyarı ve çıkış
+  let sb = $('[data-support-bar]');
+  if (s.user && s.user.support && !sb) {
+    sb = document.createElement('div'); sb.dataset.supportBar = '1';
+    sb.style.cssText = 'position:sticky;top:0;z-index:50;background:var(--amber, #f59e0b);color:#1c1c1c;padding:6px 12px;font-weight:650;font-size:13px;display:flex;gap:10px;align-items:center';
+    render(sb, html`<span style="flex:1">Destek oturumu: ${s.tenant ? s.tenant.name : ''} müşteri paneli (2 saat geçerli)</span><button class="btn sm" data-support-exit>Ana panele dön</button>`);
+    document.body.prepend(sb);
+    sb.querySelector('[data-support-exit]').onclick = async () => { await api('logout', { method: 'POST' }).catch(() => {}); store.set('firma', ''); location.reload(); };
+  }
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
   const counts = { orders: n, questions: s.questions || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
   $$('[data-count]').forEach((el) => { const v = counts[el.dataset.count] || 0; el.textContent = v > 99 ? '99+' : v; el.classList.toggle('hide', !v); el.classList.toggle('warn', el.dataset.count === 'match' || el.dataset.count === 'stock'); });
@@ -115,7 +126,7 @@ async function route() {
 
 export async function loadSummary() {
   const s = await api('summary', { fresh: true });
-  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.demo = s.demo || s.channels.some((c) => c.demo);
+  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.tenant = s.tenant || null; state.owner = !!s.owner; state.demo = s.demo || s.channels.some((c) => c.demo);
   refreshChrome(s);
   return s;
 }
@@ -157,8 +168,8 @@ function meMenu(btn) {
   const setTheme = (t) => { store.set('theme', t); applyTheme(); };
   const u = state.user || {};
   popMenu(btn, [
-    { icon: 'user', label: `${u.name || ''} · ${u.role === 'admin' ? 'Yönetici' : 'Personel'}`, run: () => {} },
-    ...(u.id ? [{ icon: 'key', label: 'Şifremi değiştir', run: changePassword }] : []),
+    { icon: 'user', label: `${u.name || ''} · ${u.role === 'admin' ? 'Yönetici' : 'Personel'}${state.tenant ? ` · ${state.tenant.name}` : ''}`, run: () => {} },
+    ...(u.id > 0 ? [{ icon: 'key', label: 'Şifremi değiştir', run: changePassword }] : []),
     { icon: 'sync', label: 'Şimdi senkronla', run: sync },
     '-',
     { label: `${theme === 'light' ? '✓ ' : ''}Açık tema`, run: () => setTheme('light') },
@@ -195,6 +206,8 @@ async function login(info = {}) {
   $$('.side, .main, .tabbar').forEach((e) => e.classList.add('hide'));
   if ($('.login')) return;
   const brand = await fetch('/api/brand').then((r) => r.json()).catch(() => ({}));
+  // Müşteri paneli: firma kodu adresle (?firma=kod) gelebilir; son kullanılan hatırlanır
+  const firma = new URLSearchParams(location.search).get('firma') || store.get('firma', '');
   const box = document.createElement('div');
   box.className = 'login';
   render(box, html`<form class="card stack">
@@ -202,17 +215,20 @@ async function login(info = {}) {
     <div class="muted small" style="text-align:center;margin-top:-6px">${brand.legal || brand.title || ''} · Satış yönetim paneli</div>
     ${info.setup ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Panel şifresi henüz tanımlanmamış. Cloudflare → Worker → Settings → Variables and Secrets bölümüne <b>PANEL_PASSWORD</b> ekleyin.</div></div>` : ''}
     ${info.demo || brand.demo ? html`<div class="notice"><div>Deneme modu: kullanıcı adı boş, şifre <b>demo</b></div></div>` : ''}
-    <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" placeholder="yönetici için boş bırakın"></label>
+    <label class="field"><span>Firma kodu <span class="muted tiny">(müşteri paneli)</span></span><input class="input" name="tenant" autocomplete="organization" placeholder="ana panel için boş bırakın" value="${firma}"></label>
+    <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" placeholder="ana yönetici için boş bırakın"></label>
     <label class="field"><span>Şifre</span><input class="input" type="password" name="password" autocomplete="current-password" required></label>
     <button class="btn primary block lg" type="submit">Giriş yap</button>
     <div class="small" style="color:var(--bad)" data-err></div>
   </form>`);
   document.body.prepend(box);
-  $('[name=username]', box).focus();
+  $(firma ? '[name=username]' : '[name=tenant]', box).focus();
   $('form', box).onsubmit = async (e) => {
     e.preventDefault();
     try {
-      await api('login', { method: 'POST', body: { username: e.target.username.value.trim(), password: e.target.password.value } });
+      const tenant = e.target.tenant.value.trim().toLocaleLowerCase('tr');
+      await api('login', { method: 'POST', body: { tenant, username: e.target.username.value.trim(), password: e.target.password.value } });
+      store.set('firma', tenant);
       box.remove();
       $$('.side, .main, .tabbar').forEach((x) => x.classList.remove('hide'));
       start();

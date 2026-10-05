@@ -161,6 +161,25 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 
 **Hata özeti (Bildirimler):** Son 30 günün hataları kanal ve hata türüne göre gruplanır, olası nedenle (401 kimlik, 403 yetki/IP, 520 sunucu bağlantıyı kapattı…) birlikte gösterilir; **Raporu kopyala** ile iletilebilir.
 
+### Gelir & Gider ve kesilen faturalar (Raporlar → Gelir & Gider)
+
+- **Masraf basamakları:** Satış − komisyon − kargo − hizmet bedeli − ek kesinti (işlem / ödeme bedeli, %) − **stopaj** = hakediş; hakediş − alış maliyeti = kâr. Oranlar Ayarlar → *Komisyon ve giderler*'den kanal kanal girilir; kanal gerçek komisyonu / kargo faturasını bildirdiyse o kullanılır. Sipariş ayrıntısındaki kâr dökümü ve Kârlılık hesaplayıcısı aynı basamakları gösterir.
+- **Stopaj:** 1 Ocak 2025'ten beri pazaryerleri hakedişten **KDV hariç satış tutarının %1'ini** gelir vergisi olarak keser (9284 sayılı CBK). Pazaryerleri için varsayılan %1, kendi siteniz (ikas) için 0. Yıllık vergiden mahsup edildiği için raporda ayrıca belirtilir.
+- **Kesilen faturalar:** Trendyol (cari hesap ekstresi: kesinti faturaları — kargo, platform hizmet bedeli, reklam —, stopaj, komisyon sözleşme ve iade faturaları) ve Hepsiburada (muhasebe işlemleri: komisyon, stopaj, kargo, reklam / pazarlama, hizmet bedeli, ceza; aynı faturanın satırları birleştirilir) 6 saatte bir çekilip panelde saklanır, türlerine göre toplanır. Kanallar PDF bağlantısı vermediği için PDF, kanalın kendi panelinden fatura numarasıyla indirilir. N11, idefix, Pazarama ve PttAVM'in fatura servisi yoktur.
+
+### Müşteri soruları
+
+Trendyol, Hepsiburada, **N11** (SOAP ürün soru-cevap servisi; liste dakikada bir çağrılabildiği için her senkronda açık sorular), **idefix** ve **Pazarama** soruları Müşteri Soruları sayfasında toplanır ve panelden cevaplanır. PttAVM'in soru servisi yoktur.
+
+### Müşteri panelleri (CRM'i başka firmalara kullandırma)
+
+Kullanıcılar → **Müşteri panelleri** (yalnız ana panel yöneticisi): firma adı, **firma kodu** ve müşterinin yönetici kullanıcı adı / şifresiyle panel oluşturulur. Müşteri giriş ekranında firma kodunu yazar (ya da `https://panel-adresiniz/?firma=kod` bağlantısını kullanır).
+
+- Her müşteri paneli ayrı bir **Durable Object**'te kendi SQLite veritabanıyla çalışır: siparişler, ürünler, kullanıcılar ve şifreli API bilgileri yalnız o firmaya aittir; ana panelin API bilgileri, şifresi ve deneme modu müşteriye geçmez. Müşteri kendi kullanıcılarını, mağazalarını ve ayarlarını kendisi yönetir.
+- Kod ortak olduğu için panelin her güncellemesi tüm müşteri panellerine aynı anda gelir. Her müşteri paneli 15 dakikada bir kendi kanallarını senkronlar.
+- Ana panelden: askıya alma (giriş ve senkron durur, veri korunur), yönetici şifresini sıfırlama, istatistik, **Panele gir** (2 saatlik destek oturumu; üstte “Ana panele dön”) ve kalıcı silme.
+- Gereken Cloudflare ayarı `wrangler.jsonc`'de hazır (`durable_objects` + `migrations`); ilk yayında kendiliğinden oluşur. Müşterilerin API bilgileri `PANEL_SECRET`'tan türetilen anahtarla şifrelendiği için **PANEL_SECRET tanımlayın ve değiştirmeyin**.
+
 ## Bilinmesi gerekenler
 
 - **Canlı hesapla ilk deneme:** API bağlantıları kanalların resmi dokümanlarına (ikas: resmi `@ikas/admin-api-client` şeması) göre yazıldı. Örnek API cevaplarıyla test edildi ama Trendyol, Hepsiburada ve yeni pazaryerleri gerçek mağaza hesaplarıyla henüz denenmedi; ikas'ta panelden “Kargoya Hazır” yapılan paketin ikas Kargo'yu tetiklediği ilk gerçek siparişte doğrulanmalıdır. İlk bağlantıda **Ayarlar → Kayıtlar**'da bir hata görürseniz mesajı iletin; çoğu düzeltme tek satırlıktır.

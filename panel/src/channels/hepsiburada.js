@@ -480,7 +480,7 @@ export function hepsiburada(env, meta) {
         for (const x of rows) {
           const t = `${g(x, 'type', 'transactionType') || ''} ${g(x, 'description', 'transactionDescription') || ''}`;
           const no = str(g(x, 'orderNumber'));
-          if (no && /kargo|cargo|shipping|teslimat/i.test(t)) byOrder.set(no, (byOrder.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
+          if (no && /kargo|cargo|shipping|shipment|transport|delivery|teslimat/i.test(t) && !/refund/i.test(t)) byOrder.set(no, (byOrder.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
         }
         if (rows.length < 100) break;
       }
@@ -488,10 +488,44 @@ export function hepsiburada(env, meta) {
     return { items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
   }
 
+  // ---------- kesilen faturalar / kesintiler (mpfinance işlemleri) ----------
+  // Gider türündeki işlemler fatura numarasına göre birleştirilir (aynı faturanın satırları tek kayıt). İade (…Refund) eksi tutarla.
+  // Servis tarih aralığını en fazla 1 ay kabul eder; PDF bağlantısı vermez.
+  const HB_TYPES = {
+    Komisyon: ['Commission', 'CommissionCorrection', 'CommissionRefund', 'CommissionInvoiceRefund'],
+    Stopaj: ['Stoppage', 'StoppageRefund'],
+    'Reklam / pazarlama': ['MarketingExpense', 'AdSharingExpense', 'FacebookAdExpense', 'SponsorshipFee', 'StudioExpense'],
+    Kargo: ['ShipmentCostSharingExpense', 'ReturnShipmentCostSharingExpense', 'TransportExpense', 'CargoMargin', 'DeliveryProcessingFee'],
+    'Hizmet bedeli': ['ProcessingFeeExpense', 'PaymentServiceCostReflection', 'InternationalOperationFee'],
+    Ceza: ['LateInterestExpense', 'PriceDifferenceExpense', 'RefusedInvoiceExpense'],
+  };
+  const hbType = Object.fromEntries(Object.entries(HB_TYPES).flatMap(([k, list]) => list.map((t) => [t, k])));
+  async function invoices(since, until) {
+    const W = 28 * 864e5, d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10), by = new Map();
+    const types = Object.keys(hbType).join(',');
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      for (let off = 0; off < 50000; off += 100) {
+        const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=${off}&Limit=100&TransactionTypes=${types}&RecordDateStart=${d(from)}&RecordDateEnd=${d(to)}`));
+        for (const x of rows) {
+          const tt = str(g(x, 'transactionType')), type = hbType[tt] || 'Diğer kesinti';
+          const inv = str(g(x, 'invoiceNumber')), key = inv ? `${type}:${inv}` : `${tt}:${str(g(x, 'id'))}`;
+          const amt = Math.abs(money(g(x, 'amount'))) * (/Refund/.test(tt) ? -1 : 1);
+          const date = Date.parse(g(x, 'invoiceDate') || g(x, 'orderDate') || '') || from;
+          const e = by.get(key) || { remoteId: key, no: inv, date, type, description: str(g(x, 'invoiceExplanation')) || tt, amount: 0, orderNumber: inv ? '' : str(g(x, 'orderNumber')), url: '' };
+          e.amount = Math.round((e.amount + amt) * 100) / 100;
+          by.set(key, e);
+        }
+        if (rows.length < 100) break;
+      }
+    }
+    return [...by.values()].filter((x) => x.amount);
+  }
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices,
   };
 }

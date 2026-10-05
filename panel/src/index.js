@@ -1,38 +1,44 @@
 // Satış paneli Worker'ı: /api/* → panel API'si, diğer adresler → public/ (panel arayüzü).
 // Zamanlanmış görev (wrangler.jsonc → triggers): 15 dakikada bir tüm kanalları senkronlar.
-import { init, getSettings } from './db.js';
-import { api } from './api.js';
+// Müşteri panelleri (tenants.js): firma koduyla giriş yapan müşterinin istekleri kendi Durable Object'ine iletilir.
+import { init } from './db.js';
 import { syncAll } from './sync.js';
-import { currentUser, login, logoutCookie, password } from './auth.js';
+import { handle } from './handler.js';
+import { currentUser } from './auth.js';
+import { cookieTenant, getTenant, forward, tenantLogin, tenantApi } from './tenants.js';
 import { json, body, HttpError } from './util.js';
+
+export { TenantPanel } from './tenants.js';
 
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? env.ASSETS.fetch(req) : new Response('Bulunamadı', { status: 404 });
-    if (!env.DB) return json({ error: 'Veritabanı bağlı değil (wrangler.jsonc → d1_databases)' }, 503);
     const path = url.pathname.slice(5).replace(/\/+$/, '');
     try {
-      await init(env.DB);
-      // Başka sitelerden gelen yazma isteklerini reddet (çerez SameSite=Strict + Origin kontrolü)
-      if (req.method !== 'GET') {
-        const o = req.headers.get('Origin');
-        if (o && new URL(o).host !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403);
-      }
-      // Giriş ekranı için firma adı ve logo (giriş gerektirmez)
-      if (path === 'brand') {
-        const s = await getSettings(env.DB);
-        return json({ title: s.company.title, legal: s.company.legal, logo: s.logo || null, demo: env.DEMO === '1' });
-      }
+      // Firma koduyla giriş → müşteri paneli
       if (path === 'login' && req.method === 'POST') {
-        const r = await login(req, env, env.DB, await body(req));
-        return r.ok ? json({ ok: true, user: r.user }, 200, { 'Set-Cookie': r.cookie }) : json({ error: r.error }, r.status);
+        const b = await body(req.clone());
+        if (b && String(b.tenant || '').trim()) return await tenantLogin(req, env, b);
       }
-      if (path === 'logout') return json({ ok: true }, 200, { 'Set-Cookie': logoutCookie() });
-      const user = await currentUser(req, env, env.DB);
-      if (!user) return json({ error: 'Giriş gerekli', setup: !password(env), demo: env.DEMO === '1' }, 401);
-      if (path === 'me') return json({ ok: true, user, demo: env.DEMO === '1' });
-      return await api(req, env, ctx, env.DB, path, user);
+      // Müşteri panelinin oturumu: istek o firmanın paneline gider (çıkış ve giriş ekranı ana panelde)
+      const slug = cookieTenant(req);
+      if (slug && path !== 'logout' && path !== 'brand' && path !== 'login') {
+        const t = env.DB ? await getTenant(env.DB, slug) : null;
+        if (!t || !t.active) return json({ error: t ? 'Bu müşteri paneli askıya alınmış' : 'Oturum geçersiz', tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
+        return await forward(req, env, t);
+      }
+      // Ana panel: müşteri panellerinin yönetimi (Kullanıcılar → Müşteri panelleri)
+      if (path === 'tenants' || path.startsWith('tenants/')) {
+        if (!env.DB) return json({ error: 'Veritabanı bağlı değil' }, 503);
+        await init(env.DB);
+        const user = await currentUser(req, env, env.DB);
+        if (!user) return json({ error: 'Giriş gerekli' }, 401);
+        const r = await tenantApi(req, env, env.DB, path, user);
+        // Destek girişi: çerez ana panelin yanıtıyla verilir, tarayıcı müşteri paneline geçer
+        return r && r.cookie ? json({ ok: true }, 200, { 'Set-Cookie': r.cookie }) : json(r);
+      }
+      return await handle(req, env, ctx, env.DB);
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message }, e.status);
       console.error(e);
