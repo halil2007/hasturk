@@ -175,6 +175,15 @@ Alınan etiket pakete kaydedilir; tekrar yazdırırken kanala yeniden gidilmez. 
 - **E-posta:** Bildirimler kendi e-posta sunucunuzdan (hosting / kurumsal e-posta, SMTP 465 SSL ya da 587 STARTTLS) gönderilebilir: Ayarlar → Yeni sipariş e-posta bildirimi → Servis: *Kendi e-posta sunucum*. Brevo / Resend de kullanılabilir.
 - **Personel yetkileri:** Kullanıcılar → kullanıcı formunda personelin görebileceği bölümler seçilir (siparişler, kargo, iadeler, sorular, ürünler, stok, eşleştirme, raporlar, gelir-gider). Menü ve sunucu aynı yetkiyi uygular.
 
+### Döviz bazlı fiyat (dolar / euro / sterlin)
+
+Ürün formunda **Fiyat para birimi** (USD / EUR / GBP) ve **döviz fiyatı** girilir; TL satış fiyatı = döviz fiyatı × kur × (1 + kâr payı %), seçilen yuvarlamayla. Bağlı kanal fiyatları, ürünün eski TL fiyatına göre oranı korunarak (ör. Trendyol'daki %10 fark) güncellenir ve kanallara gönderilir. Ayarlar → **Döviz ve fiyat**:
+- **Kur kaynağı:** TCMB (resmi; iş günlerinde ~15:30'da günde bir açıklanır) ya da anlık piyasa kuru (her senkronda, ~15 dakikada bir okunur).
+- **Kullanılacak kur:** döviz satış / alış, efektif satış / alış.
+- **Güncelleme sıklığı:** anlık (kur eşikten fazla değişince), günlük, haftalık (pazartesi), aylık (ayın 1'i) ya da yalnız elle (**Fiyatları şimdi güncelle**).
+- **Değişim eşiği, yuvarlama** (kuruşuyla, tam sayı, ,90, ,99) ve **genel kâr payı** (ürüne özel değer önceliklidir).
+Müşteri panellerinde bu özellik "Yakında" olarak görünür.
+
 ### Müşteri soruları
 
 Trendyol, Hepsiburada, **N11** (SOAP ürün soru-cevap servisi; liste dakikada bir çağrılabildiği için her senkronda açık sorular), **idefix** ve **Pazarama** soruları Müşteri Soruları sayfasında toplanır ve panelden cevaplanır. Sayfanın üstündeki **soru analizi** son 30 günde kanal bazında soru sayısını, bekleyenleri, cevaplanma oranını ve ortalama cevap süresini gösterir. PttAVM'in soru servisi yoktur.

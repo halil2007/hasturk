@@ -13,7 +13,7 @@ export async function campaignsView(el) {
   function draw() {
     render(el, html`<div class="stack">
       <div class="notice small"><i class="ico ico-tag"></i><div><b>Hepsiburada sepet indirimleri</b> buradan oluşturulup iptal edilir. <b>Trendyol</b> kampanya ve avantajlı ürün etiketlerine katılım için açık servis sunmuyor; Trendyol kampanyaları satıcı panelinden yönetilir.</div></div>
-      ${!chs.length ? html`<div class="card empty">Kampanya servisi olan bağlı kanal yok (Hepsiburada).</div>` : html`
+      ${!chs.length ? html`<div class="card empty">Kampanya servisi olan bağlı kanal yok. Hepsiburada bağlanıp bağlantı testi geçince sepet indirimleri buradan yönetilir (Entegrasyonlar).</div>` : html`
       <div class="row wrap">${chs.length > 1 ? html`<div class="ch-tabs" style="flex:1">${chs.map((c) => html`<button class="ch-tab ${chId === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}${c.name}</button>`)}</div>` : html`<span style="flex:1"></span>`}
         <button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Yeni sepet indirimi</button></div>
       <div class="card flush">${!data ? html`<div class="empty"><i class="ico ico-sync spin"></i></div>` : data.error ? html`<div class="notice bad" style="margin:12px">${data.error}</div>` : data.items.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Kampanya</th><th>Tarih</th><th>Durum</th><th class="r">Kullanım sınırı</th><th></th></tr></thead><tbody>

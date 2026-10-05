@@ -41,6 +41,7 @@ export async function claimsView(el, rest, query = {}) {
     const c = data.counts, total = Object.values(c).reduce((a, x) => a + x, 0);
     render($('[data-chs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>${claimChannels().map((x) => html`<button class="ch-tab ${f.channel === x.id ? 'on' : ''}" data-act="ch" data-id="${x.id}">${chLogo(x.id)}${x.name}</button>`)}`);
     render($('[data-tabs]', el), html`${TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${k ? c[k] || 0 : total}</span></button>`)}`);
+    if (!claimChannels().length) return render($('[data-box]', el), html`<div class="card empty">İade servisini destekleyen bağlı kanal yok. Trendyol ya da Hepsiburada bağlanınca iade talepleri burada görünür (Entegrasyonlar).</div>`);
     render($('[data-box]', el), data.rows.length ? html`<div class="stack">${data.rows.map(card)}</div>
       <div class="pager"><span class="muted small" style="margin-right:auto">${n(data.total)} talep</span>${f.page > 1 ? html`<button class="btn sm" data-act="page" data-k="-1">Önceki</button>` : ''}${f.page * 30 < data.total ? html`<button class="btn sm" data-act="page" data-k="1">Sonraki</button>` : ''}</div>`
       : html`<div class="card empty">${f.status === 'waiting' ? 'Karar bekleyen iade talebi yok' : 'Bu filtrede iade talebi yok'}</div>`);

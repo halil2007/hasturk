@@ -1,6 +1,6 @@
 // Ayarlar: firma bilgileri ve logo, stok senkronu ve stok sınırı, ana katalog, komisyon/kargo, kargo etiketi, kayıtlar.
 // Kanal API bilgileri Entegrasyonlar'da, kullanıcılar Kullanıcılar sayfasındadır.
-import { api, state, html, render, $, $$, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels } from '../core.js';
+import { api, state, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels } from '../core.js';
 import { loadSummary } from '../app.js';
 import { costOf, COST_KEYS } from '../profit.js';
 
@@ -68,6 +68,8 @@ export async function settingsView(el) {
           <div class="muted tiny" style="margin-top:4px">Diğer kanallardaki ilanlar barkod / stok kodu kesin tutuyorsa otomatik bağlanır; tutmuyorsa Eşleştirme sayfasında onayınızı bekler.</div></div>
       </div>
 
+      <div class="card stack" data-fxcard>${state.tenant ? html`<h2>Döviz ve fiyat <span class="pill info">Yakında</span></h2><div class="muted small">Dolar, euro ve sterlin bazlı ürün fiyatı; anlık / günlük / haftalık / aylık kur güncellemesi yakında müşteri panellerinde de açılacak.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
+
       <div class="card flush"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
         ${live.map((c) => html`<tr><td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td>
@@ -132,8 +134,37 @@ export async function settingsView(el) {
         ${logs.length ? logs.map((l) => html`<tr><td class="small muted" style="white-space:nowrap">${dateTime(l.at)}</td><td class="small">${l.channel ? ch(l.channel).name : ''}</td><td class="small" style="color:${l.level === 'error' ? 'var(--bad)' : l.level === 'warn' ? 'var(--amber)' : 'inherit'}">${l.msg}</td></tr>`) : html`<tr><td class="empty">Kayıt yok</td></tr>`}
       </tbody></table></div></div>
     </div>`);
+    drawFx().catch(() => {});
   }
   const save = async (patch) => { state.settings = await api('settings', { method: 'PUT', body: patch }); };
+  // ---------- döviz ve fiyat ----------
+  const KIND = [['sell', 'Döviz satış'], ['buy', 'Döviz alış'], ['bsell', 'Efektif satış'], ['bbuy', 'Efektif alış']];
+  const MODE = [['live', 'Anlık (her senkronda, ~15 dk; eşik aşılınca)'], ['daily', 'Günlük'], ['weekly', 'Haftalık (pazartesi)'], ['monthly', 'Aylık (ayın 1\'i)'], ['manual', 'Elle (yalnız düğmeyle)']];
+  const ROUND = [['none', 'Kuruşuyla'], ['int', 'Tam sayıya'], ['90', ',90 ile bitsin'], ['99', ',99 ile bitsin']];
+  async function drawFx(refresh) {
+    const box = $('[data-fxcard]', el);
+    if (!box || state.tenant) return;
+    let d;
+    try { d = await api('fx' + (refresh ? '?refresh=1' : ''), refresh ? { fresh: true } : {}); } catch (e) { return render(box, html`<h2>Döviz ve fiyat</h2><div class="notice bad small">${e.message}</div>`); }
+    const fx = d.settings, R = (d.rates && d.rates.rates) || {}, dis = isAdmin() ? '' : 'disabled';
+    const cell = (c, k) => (R[c] && R[c][k] ? R[c][k].toFixed(4) : '—');
+    render(box, html`<div class="row wrap" style="gap:8px"><div style="flex:1;min-width:220px"><h2>Döviz ve fiyat</h2><div class="muted small">Ürüne dolar / euro / sterlin fiyatı girilir (ürün formu); TL satış fiyatı ve kanal fiyatları seçtiğiniz kur ve sıklıkla güncellenir. ${n(d.products)} ürün döviz fiyatlı.</div></div>
+        <button class="btn sm" data-act="fx-refresh"><i class="ico ico-sync"></i>Kurları yenile</button></div>
+      ${d.error ? html`<div class="notice bad small">Kur alınamadı: ${d.error}</div>` : ''}
+      <div class="table-wrap"><table class="t"><thead><tr><th>Kur</th><th class="r">Döviz alış</th><th class="r">Döviz satış</th><th class="r">Efektif alış</th><th class="r">Efektif satış</th></tr></thead><tbody>
+        ${[['USD', 'Dolar'], ['EUR', 'Euro'], ['GBP', 'Sterlin']].map(([c, t]) => html`<tr><td><b>${c}</b> <span class="muted small">${t}</span></td>${['buy', 'sell', 'bbuy', 'bsell'].map((k) => html`<td class="r num" style="${k === fx.kind ? 'font-weight:750;color:var(--primary)' : ''}">${cell(c, k)}</td>`)}</tr>`)}
+      </tbody></table></div>
+      <div class="muted tiny">${d.rates ? `${d.rates.source === 'live' ? `Anlık piyasa kuru (${d.rates.provider || ''})` : `TCMB ${d.rates.date || ''} kuru`} · okundu ${dateTime(d.rates.at)}` : 'Kur henüz okunmadı'}${d.applied ? ` · son fiyat güncellemesi ${dateTime(d.applied.at)} (${d.applied.changed} ürün)` : ''}</div>
+      <div class="form-grid">
+        <label class="field"><span>Kur kaynağı</span><select class="input" data-fx="source" ${dis}><option value="tcmb" ${fx.source === 'tcmb' ? 'selected' : ''}>TCMB (resmi, günde bir açıklanır)</option><option value="live" ${fx.source === 'live' ? 'selected' : ''}>Anlık piyasa kuru</option></select></label>
+        <label class="field"><span>Kullanılacak kur</span><select class="input" data-fx="kind" ${dis}>${KIND.map(([v, t]) => html`<option value="${v}" ${fx.kind === v ? 'selected' : ''}>${t}</option>`)}</select><small>Anlık kurda alış = satış</small></label>
+        <label class="field"><span>Fiyat güncelleme sıklığı</span><select class="input" data-fx="mode" ${dis}>${MODE.map(([v, t]) => html`<option value="${v}" ${fx.mode === v ? 'selected' : ''}>${t}</option>`)}</select></label>
+        <label class="field"><span>Değişim eşiği %</span><input class="input" data-fx="threshold" inputmode="decimal" value="${fx.threshold}" ${dis}><small>Anlık modda kur bu orandan az değiştiyse fiyat değişmez</small></label>
+        <label class="field"><span>Yuvarlama</span><select class="input" data-fx="rounding" ${dis}>${ROUND.map(([v, t]) => html`<option value="${v}" ${fx.rounding === v ? 'selected' : ''}>${t}</option>`)}</select></label>
+        <label class="field"><span>Genel kâr payı %</span><input class="input" data-fx="margin" inputmode="decimal" value="${fx.margin}" ${dis}><small>Döviz fiyatına eklenir; ürüne özel değer önceliklidir</small></label>
+      </div>
+      ${isAdmin() ? html`<div class="row wrap"><button class="btn primary" data-act="fx-save">Döviz ayarlarını kaydet</button><button class="btn" data-act="fx-apply"><i class="ico ico-bolt"></i>Fiyatları şimdi güncelle</button></div>` : ''}`);
+  }
   el.addEventListener('change', async (e) => {
     if (e.target.dataset && e.target.dataset.prov !== undefined) {
       const smtp = e.target.value === 'smtp';
@@ -172,6 +203,12 @@ export async function settingsView(el) {
       if (!(await confirmBox('Deneme modunda oluşan örnek siparişler, ilanlar ve ürünler silinsin mi? Gerçek kanal verisine dokunulmaz.', 'Temizle'))) return;
       busy(t, async () => { const r = await api('purge-demo', { method: 'POST' }); toast(`${r.orders} örnek sipariş ve ${r.products} örnek ürün silindi`); await loadSummary(); });
     },
+    'fx-refresh': (t) => busy(t, async () => { await drawFx(true); toast('Kurlar yenilendi'); }),
+    'fx-save': (t) => busy(t, async () => {
+      const o = {}; $$('[data-fx]', el).forEach((i) => { o[i.dataset.fx] = ['threshold', 'margin'].includes(i.dataset.fx) ? numIn(i.value) : i.value; });
+      await save({ fx: o }); toast('Döviz ayarları kaydedildi'); await drawFx(true);
+    }),
+    'fx-apply': (t) => busy(t, async () => { const r = await api('fx/apply', { method: 'POST' }); toast(r.changed ? `${r.changed} ürünün fiyatı güncellendi; kanal fiyatları gönderiliyor` : 'Fiyatlar zaten güncel'); await drawFx(); }),
     save: (t) => busy(t, async () => {
       const cost = Object.fromEntries(COST_KEYS.map((k) => [k, {}]));
       $$('[data-cost]', el).forEach((i) => { const [k, c] = i.dataset.cost.split(':'); cost[k][c] = i.value.trim() === '' && /_\d+$/.test(c) ? '' : numIn(i.value); });

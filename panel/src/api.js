@@ -15,6 +15,7 @@ import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
 import { can, sectionOf } from '../public/perms.js';
+import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool } from './util.js';
 
@@ -484,12 +485,15 @@ async function listBuybox(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active'];
-const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active']);
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin'];
+const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active', 'fx_price']);
 function cleanProduct(b) {
   const o = {};
   for (const k of PRODUCT_FIELDS) if (k in b) o[k] = NUMERIC.has(k) ? num(b[k]) : str(b[k]) || null;
   if ('name' in o && !o.name) fail(400, 'Ürün adı gerekli');
+  // Döviz: yalnız USD / EUR / GBP; ürüne özel kâr payı boşsa genel ayar kullanılır
+  if ('currency' in o && !CURRENCIES.includes(o.currency)) o.currency = null;
+  if ('fx_margin' in o) o.fx_margin = b.fx_margin === '' || b.fx_margin == null ? null : num(b.fx_margin);
   return o;
 }
 
@@ -601,6 +605,14 @@ async function saveProduct(env, db, ctx, id, b, user) {
     } catch (e) { errors.push(`${ch.name}: ${e.message}`); await log(db, cid, 'error', 'Ürün oluşturulamadı: ' + e.message); }
   }
   if (b.sku || b.barcode) await autoLink(db);
+  // Döviz fiyatlı ürün: TL fiyatı ve kanal fiyatları hemen güncel kurla hesaplanır
+  if (!env.TENANT_SLUG && ('fx_price' in b || 'currency' in b)) {
+    const pr = await first(db, 'SELECT currency, fx_price FROM products WHERE id = ?', id);
+    if (pr && pr.currency && pr.fx_price > 0) {
+      const settings = await getSettings(db);
+      try { await applyFx(db, settings, await refreshRates(db, settings), { user: user.name, ids: [id] }); } catch (e) { errors.push('Döviz kuru alınamadı: ' + e.message); }
+    }
+  }
   ctx.waitUntil(pushPrices(env, db).catch(() => {}));
   return { ok: true, id, created, errors };
 }
@@ -635,6 +647,11 @@ async function saveSettings(db, b) {
         next[c] = num(x, costOf(cur, k, c));
       }
       v = next;
+    }
+    if (k === 'fx') {
+      const o = v && typeof v === 'object' ? v : {};
+      v = { source: o.source === 'live' ? 'live' : 'tcmb', kind: ['buy', 'sell', 'bbuy', 'bsell'].includes(o.kind) ? o.kind : 'sell', mode: ['live', 'daily', 'weekly', 'monthly', 'manual'].includes(o.mode) ? o.mode : 'daily',
+        threshold: Math.max(0, Math.min(20, num(o.threshold, 0.5))), rounding: ['none', 'int', '90', '99'].includes(o.rounding) ? o.rounding : 'none', margin: Math.max(-50, Math.min(500, num(o.margin, 0))) };
     }
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
@@ -968,6 +985,24 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if (path === 'dashboard' && m === 'GET') return json(await dashboard(db, q));
   // Gelir & gider: dönem masraf basamakları (satış → komisyon → kargo → hizmet bedeli → ek kesinti → stopaj → hakediş → alış → kâr)
+  // Döviz kurları ve döviz bazlı fiyat (müşteri panellerinde yakında)
+  if (path === 'fx' || path.startsWith('fx/')) {
+    if (env.TENANT_SLUG) fail(403, 'Döviz bazlı fiyat yakında müşteri panellerinde de açılacak');
+    const settings = await getSettings(db);
+    if (path === 'fx' && m === 'GET') {
+      let rates = await getRaw(db, 'fx_rates'), error = null;
+      if (!rates || q.refresh) { try { rates = await refreshRates(db, settings, { force: !!q.refresh }); } catch (e) { error = e.message; } }
+      const products = (await first(db, "SELECT COUNT(*) AS n FROM products WHERE currency IN ('USD', 'EUR', 'GBP') AND fx_price > 0")).n;
+      return json({ settings: { ...FX_DEFAULTS, ...(settings.fx || {}) }, rates, applied: await getRaw(db, 'fx_applied'), products, error });
+    }
+    if (path === 'fx/apply' && m === 'POST') {
+      if (!can(user, 'products')) fail(403, 'Yetki yok');
+      const rates = await refreshRates(db, settings, { force: true });
+      const r = await applyFx(db, settings, rates, { user: user.name });
+      ctx.waitUntil(pushPrices(env, db).catch(() => {}));
+      return json(r);
+    }
+  }
   // Kampanyalar (Hepsiburada sepet indirimleri)
   if (path === 'campaigns' || path.startsWith('campaigns/')) return json(await campaignApi(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
   // İade talepleri
