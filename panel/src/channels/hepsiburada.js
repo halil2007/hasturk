@@ -456,10 +456,33 @@ export function hepsiburada(env, meta) {
   const allCategories = async () => { await categories(''); return catCache.all; };
   const catalog = { categories, allCategories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 500, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
 
+  // ---------- kargo gideri (gerçek) ----------
+  // Kayıt bazlı muhasebe servisi (mpfinance): sipariş tarihine göre en fazla 1 aylık aralıkla işlemler okunur; türü / açıklaması
+  // kargo olan kayıtlar sipariş numarasına göre toplanır.
+  const FIN = `https://mpfinance-external${test}.hepsiburada.com`;
+  async function cargoCosts(since, until) {
+    const W = 28 * 864e5, byOrder = new Map();
+    const d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10);
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      for (let off = 0; off < 20000; off += 100) {
+        const r = await call(`${FIN}/transactions/merchantid/${m}?Offset=${off}&Limit=100&OrderDateStart=${d(from)}&OrderDateEnd=${d(to)}`);
+        const rows = list(r);
+        for (const x of rows) {
+          const t = `${g(x, 'type', 'transactionType') || ''} ${g(x, 'description', 'transactionDescription') || ''}`;
+          const no = str(g(x, 'orderNumber'));
+          if (no && /kargo|cargo|shipping|teslimat/i.test(t)) byOrder.set(no, (byOrder.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
+        }
+        if (rows.length < 100) break;
+      }
+    }
+    return { items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
+  }
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts,
   };
 }

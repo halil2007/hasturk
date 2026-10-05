@@ -51,7 +51,8 @@ function orderProfit(o, settings) {
   const shipping = o.shipping_cost ?? (settings.shipping || {})[ch] ?? 0;
   const fee = (settings.service_fee || {})[ch] || 0;
   const net = revenue - commission - shipping - fee;
-  return { revenue: r2(revenue), commission: r2(commission), shipping: r2(shipping), fee: r2(fee), payout: r2(net), cost: r2(cost), profit: r2(net - cost), missingCost: missing };
+  const shippingSrc = o.shipping_cost == null ? 'estimate' : o.shipping_src === 'api' ? 'api' : 'manual';
+  return { revenue: r2(revenue), commission: r2(commission), shipping: r2(shipping), shippingSrc, fee: r2(fee), payout: r2(net), cost: r2(cost), profit: r2(net - cost), missingCost: missing };
 }
 
 // Sipariş filtresi (liste, sayılar ve dışa aktarma aynı filtreyi kullanır)
@@ -79,7 +80,7 @@ function orderFilter(q, { withStatus = true } = {}) {
 async function listOrders(db, q) {
   const { w, args, st } = orderFilter(q);
   const limit = Math.min(Number(q.limit) || 25, 200), page = Math.max(1, Number(q.page) || 1);
-  const rows = await all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost,
+  const rows = await all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src,
       (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS lines,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
@@ -115,7 +116,7 @@ async function listOrders(db, q) {
   return {
     orders: rows.map((r) => {
       const a = parse(r.address, {});
-      const pr = orderProfit({ channel: r.channel, shipping_cost: r.shipping_cost, items: full[r.id] || [] }, settings);
+      const pr = orderProfit({ channel: r.channel, shipping_cost: r.shipping_cost, shipping_src: r.shipping_src, items: full[r.id] || [] }, settings);
       return { ...r, city: a.city || '', district: a.district || '', address: undefined, extra: parse(r.extra, {}), items: (items[r.id] || []).slice(0, 2), cargo: r.pkg_cargo || r.cargo_company || '', profit: ['cancelled', 'returned'].includes(r.status) ? null : pr.profit, missing_cost: pr.missingCost };
     }),
     counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), pendingByChannel: Object.fromEntries(byChannel.map((c) => [c.channel, c.n])), total, page, limit,
@@ -382,7 +383,9 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     return { ok: true };
   }
   if (action === 'note') {
-    await run(db, 'UPDATE orders SET note = ?, shipping_cost = ? WHERE id = ?', str(b.note), b.shipping_cost === '' || b.shipping_cost == null ? null : num(b.shipping_cost), o.id);
+    const sc = b.shipping_cost === '' || b.shipping_cost == null ? null : num(b.shipping_cost);
+    // Elle girilen kargo gideri korunur (kanalın kargo faturası bunun üzerine yazmaz); boşaltılırsa yeniden kanaldan alınır
+    await run(db, 'UPDATE orders SET note = ?, shipping_cost = ?, shipping_src = ? WHERE id = ?', str(b.note), sc, sc == null ? null : sc === o.shipping_cost && o.shipping_src === 'api' ? 'api' : 'manual', o.id);
     return { ok: true };
   }
   if (action === 'reset-packages') {

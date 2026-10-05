@@ -48,3 +48,25 @@ test('otomatik gönderim: kategori otomatik eşleşir, zorunlu özellikler (vary
   assert.equal((await autoUpload({ DEMO: '1' }, db)).hepsiburada, 0, 'aynı ürün tekrar gönderilmez');
   resetChannels();
 });
+
+test('Trendyol kargo faturasından gerçek kargo gideri siparişe yazılır; elle girilen korunur', async () => {
+  const { trendyol } = await import('../src/channels/trendyol.js');
+  const { syncCosts } = await import('../src/sync.js');
+  const db = d1(); await init(db);
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url), J = (b) => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
+    if (/otherfinancials/.test(u)) return J({ content: [{ id: 'KRG2026', transactionType: 'Kargo Faturası', description: 'Kargo' }, { id: 'X1', transactionType: 'Reklam Faturası' }], totalPages: 1 });
+    if (/cargo-invoice\/KRG2026\/items/.test(u)) return J({ content: [{ orderNumber: '111', amount: 42.5 }, { orderNumber: '222', amount: 30 }, { orderNumber: '111', amount: 7.5 }], totalPages: 1 });
+    return J({ content: [] });
+  };
+  try {
+    const t = Date.now();
+    for (const [no, src, cost] of [['111', null, null], ['222', 'manual', 99]]) await run(db, "INSERT INTO orders (id, channel, remote_id, order_number, status, ordered_at, shipping_cost, shipping_src) VALUES (?, 'trendyol', ?, ?, 'delivered', ?, ?, ?)", 'trendyol:' + no, no, no, t, cost, src);
+    const ch = trendyol({ TRENDYOL_SELLER_ID: '1', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' }, { id: 'trendyol' });
+    const r = await syncCosts({}, db, [ch]);
+    assert.equal(r.trendyol, 1);
+    const o = Object.fromEntries((await all(db, 'SELECT order_number, shipping_cost, shipping_src FROM orders')).map((x) => [x.order_number, [x.shipping_cost, x.shipping_src]]));
+    assert.deepEqual(o, { 111: [50, 'api'], 222: [99, 'manual'] });
+  } finally { globalThis.fetch = real; }
+});

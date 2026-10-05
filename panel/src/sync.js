@@ -364,6 +364,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
+    // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
+    if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
     // Eski siparişlere müşteri anahtarı (müşteriler sayfası için, parça parça)
     if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu
@@ -467,4 +469,33 @@ export async function maybePurgeDemo(env, db) {
   await setSetting(db, 'demo_purged', true);
   if (r.orders || r.products) await log(db, null, 'info', `Örnek veriler temizlendi: ${r.orders} sipariş, ${r.products} ürün`);
   return r;
+}
+
+// ---------- gerçek kargo gideri ----------
+// Kanal kargo faturası / muhasebe kaydı verdiğinde siparişin kargo gideri o tutarla yazılır (kaynak: api); elle girilen tutar korunur.
+// İlk çalışmada son 60 gün, sonra son 20 gün taranır (faturalar gönderimden günler sonra kesilir).
+export async function syncCosts(env, db, chans, { force = false } = {}) {
+  const out = {};
+  for (const ch of chans || await getChannels(env, db)) {
+    if (!ch.enabled || ch.demo || !ch.cargoCosts) continue;
+    const key = 'costs:' + ch.id, last = await getRaw(db, key);
+    if (!force && last && Date.now() - last.at < 6 * 3600e3) continue;
+    const t = Date.now();
+    try {
+      const r = await ch.cargoCosts(last ? t - 20 * 864e5 : t - 60 * 864e5, t);
+      let n = 0;
+      for (const part of chunk(r.items, 80)) {
+        await db.batch(part.map((x) => db.prepare("UPDATE orders SET shipping_cost = ?, shipping_src = 'api' WHERE channel = ? AND order_number = ? AND COALESCE(shipping_src, '') != 'manual'").bind(x.amount, ch.id, x.orderNumber)));
+        n += (await first(db, `SELECT COUNT(*) AS n FROM orders WHERE channel = ? AND shipping_src = 'api' AND order_number IN (${part.map(() => '?').join(',')})`, ch.id, ...part.map((x) => x.orderNumber))).n;
+      }
+      await setSetting(db, key, { at: t, orders: n, found: r.items.length });
+      if (n) await log(db, ch.id, 'info', `Gerçek kargo gideri ${n} siparişe yazıldı (kanalın kargo faturalarından)`);
+      out[ch.id] = n;
+    } catch (e) {
+      await setSetting(db, key, { at: t, error: e.message.slice(0, 300) });
+      await log(db, ch.id, 'warn', 'Kargo gideri okunamadı: ' + e.message);
+      out[ch.id] = 'hata: ' + e.message;
+    }
+  }
+  return out;
 }

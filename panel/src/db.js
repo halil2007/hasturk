@@ -128,6 +128,8 @@ const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS listings_open ON listings(product_id, ignored)',
   // Müşteri anahtarı (bkz. customers.js): tekrar eden sipariş ve müşteri analizi
   'ALTER TABLE orders ADD COLUMN ckey TEXT',
+  // Kargo gideri kaynağı: api (kanalın kargo faturasından) | manual (elle girildi)
+  'ALTER TABLE orders ADD COLUMN shipping_src TEXT',
   'CREATE INDEX IF NOT EXISTS orders_ckey ON orders(ckey, ordered_at)',
 ];
 
