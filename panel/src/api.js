@@ -711,9 +711,20 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     ]);
     // E-postadaki "panelde aç" bağlantısı için panel adresi (yönetici girmediyse kullanılan adres).
     // Panel sonradan kendi alan adına taşınırsa, kayıtlı workers.dev adresi yeni adresle değiştirilir.
-    const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(url.host);
-    if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(url.origin)) { await setSetting(db, 'panel_url', url.origin); st.panel_url = url.origin; }
+    // Alt alan adındaki panel-proxy.php üzerinden gelindiyse o adres kullanılır (X-Forwarded-Host).
+    const fh = str(req.headers.get('X-Forwarded-Host')).toLowerCase();
+    const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
+    const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
+    if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
     return json({ ...s, channels: chInfo, settings: st, user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
+  }
+  // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
+  if (path === 'panel-proxy' && m === 'GET') {
+    if (user.role !== 'admin') fail(403, 'Yalnız yönetici');
+    if (!env.ASSETS) fail(404, 'Dosya bulunamadı');
+    const src = await (await env.ASSETS.fetch(new Request(url.origin + '/panel-proxy.php'))).text();
+    const base = /\.workers\.dev$/i.test(url.host) ? url.origin : 'https://hasturk-panel.HESABINIZ.workers.dev';
+    return new Response(src.replace('https://hasturk-panel.HESABINIZ.workers.dev', base), { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="index.php"', 'Cache-Control': 'no-store' } });
   }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
   if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
