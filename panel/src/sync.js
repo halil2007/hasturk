@@ -405,6 +405,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     if (!only) out.push = await pushDigest(env, db, { newOrders: out.newOrders || 0 }).catch((e) => 'hata: ' + e.message);
     // Günlük özet e-postası (açıksa, sabah 08:00'den sonraki ilk senkronda, günde bir kez)
     if (!only) out.digest = await dailyDigest(env, db, settings).catch(async (e) => { await log(db, null, 'error', 'Günlük özet e-postası gönderilemedi: ' + e.message); return 'hata: ' + e.message; });
+    // Günlük bakım: kargoya verileli 45 günü geçen paketlerin etiket dosyası (PDF / ZPL) silinir — depolamayı en çok büyüten veri
+    if (!only) out.housekeeping = await housekeeping(db).catch((e) => 'hata: ' + e.message);
     // Eski siparişlere müşteri anahtarı (müşteriler sayfası için, parça parça)
     if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu
@@ -511,6 +513,14 @@ export async function quickSync(env, db) {
     }
     return out;
   } finally { await setSetting(db, 'quick_lock', 0); }
+}
+// Günde bir: eski etiket dosyaları (paket kaydı, takip no ve geçmiş kalır; yalnız artık gerekmeyen etiket içeriği silinir)
+export async function housekeeping(db, { days = 45 } = {}) {
+  const t = Date.now(), last = await getRaw(db, 'housekeeping_at');
+  if (last && t - last < 864e5) return null;
+  await setSetting(db, 'housekeeping_at', t);
+  const r = await run(db, "UPDATE packages SET label_data = NULL WHERE label_data IS NOT NULL AND status = 'shipped' AND COALESCE(shipped_at, created_at) < ?", t - days * 864e5);
+  return { labels: (r && r.meta && r.meta.changes) || 0 };
 }
 export const autoLink = async (db) => (await autoMatch(db, { catalog: [] })).linked;
 

@@ -31,3 +31,18 @@ test('değişmeyen ilan yeniden yazılmaz, değişen yazılır, bekleyen fiyat k
   await refreshListings(db, ch);
   assert.equal((await at()).A.price, 130);
 });
+
+test('günlük bakım: eski gönderilmiş paketlerin etiket dosyası silinir, yenisi ve açık paket kalır', async () => {
+  const { housekeeping } = await import('../src/sync.js');
+  const db = d1();
+  await init(db);
+  const t = Date.now(), D = 864e5;
+  await run(db, `INSERT INTO packages (order_id, no, items, status, created_at, shipped_at, label_format, label_data, tracking) VALUES
+    ('a', 1, '[]', 'shipped', ?, ?, 'pdf', 'ESKI', 'TR1'), ('b', 1, '[]', 'shipped', ?, ?, 'pdf', 'YENI', 'TR2'), ('c', 1, '[]', 'open', ?, NULL, 'pdf', 'ACIK', NULL)`,
+  t - 60 * D, t - 60 * D, t - 5 * D, t - 5 * D, t - 90 * D);
+  assert.deepEqual(await housekeeping(db), { labels: 1 });
+  const rows = Object.fromEntries((await all(db, 'SELECT order_id, label_data, tracking FROM packages')).map((r) => [r.order_id, r]));
+  assert.equal(rows.a.label_data, null); assert.equal(rows.a.tracking, 'TR1');
+  assert.equal(rows.b.label_data, 'YENI'); assert.equal(rows.c.label_data, 'ACIK');
+  assert.equal(await housekeeping(db), null, 'günde bir kez');
+});
