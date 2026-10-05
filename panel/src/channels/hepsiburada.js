@@ -535,7 +535,7 @@ export function hepsiburada(env, meta) {
     return { done: !pending, items };
   }
   const allCategories = async () => { await categories(''); return catCache.all; };
-  const catalog = { categories, allCategories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, chunk: 100, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
+  const catalog = { categories, allCategories, attributes: async (c) => (await attrsOf(c)).filter((a) => !AUTO.includes(a.id)), values: attributeValues, build, send, status, raw: (tid) => productStatus(tid), chunk: 100, options: [{ k: 'warranty', label: 'Garanti süresi (ay)' }] };
 
   // ---------- kargo gideri (gerçek) ----------
   // Kayıt bazlı muhasebe servisi (mpfinance): sipariş tarihine göre en fazla 1 aylık aralıkla işlemler okunur; türü / açıklaması
