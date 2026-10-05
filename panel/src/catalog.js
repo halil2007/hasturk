@@ -146,6 +146,19 @@ async function review(db, c) {
 // ---------- otomatik ürün gönderimi (kanal bazında açılıp kapatılır) ----------
 // Her senkronda: eşleştirilmemiş kategoriler (günde bir) otomatik eşleştirilir; eşleştirilmiş kategorilerde kanalda henüz olmayan,
 // stoğu olan ve son 14 günde gönderilmemiş ürünler (eksiği yoksa) gönderilir. Tek seferde en fazla 100 ürün.
+// Otomatik gönderimde atlanacak ürünler (son 14 gün): kabul edilen ya da kanalın hâlâ işlediği ürün tekrar gönderilmez.
+// Kanalın reddettiği (ya da isteği hiç kabul edilmeyen) ürün tekrar denenir: gönderimden sonra ürün düzeltildiyse 1 saat,
+// düzeltilmediyse 24 saat sonra (aynı hatayla 15 dakikada bir tekrar gönderilmesin).
+export async function sentFilter(db, ch) {
+  const ok = new Set(), failed = new Map();
+  for (const u of await all(db, 'SELECT status, items, created_at FROM product_uploads WHERE channel = ? AND created_at > ? ORDER BY id', ch, Date.now() - 14 * 864e5)) {
+    for (const x of JSON.parse(u.items || '[]')) {
+      if (u.status === 'error' || x.ok === false) { failed.set(x.id, u.created_at); ok.delete(x.id); } else { ok.add(x.id); failed.delete(x.id); }
+    }
+  }
+  const now = Date.now();
+  return (p) => ok.has(p.id) || (failed.has(p.id) && now - failed.get(p.id) < ((p.updated_at || 0) > failed.get(p.id) ? 3600e3 : 864e5));
+}
 export async function autoUpload(env, db, settings) {
   settings = settings || await getSettings(db);
   const on = Object.keys(settings.auto_upload || {}).filter((k) => settings.auto_upload[k]);
@@ -157,12 +170,11 @@ export async function autoUpload(env, db, settings) {
     try {
       const last = await getRaw(db, 'automap:' + c.id);
       if (!last || Date.now() - last > 864e5) { await automap(db, settings, c, null); await setSetting(db, 'automap:' + c.id, Date.now()); }
-      const recent = new Set((await all(db, 'SELECT items FROM product_uploads WHERE channel = ? AND created_at > ?', c.id, Date.now() - 14 * 864e5))
-        .flatMap((u) => JSON.parse(u.items || '[]').map((x) => x.id)));
+      const skip = await sentFilter(db, c.id);
       const ready = [];
       for (const map of (await all(db, 'SELECT * FROM category_map WHERE channel = ?', c.id)).map((m) => ({ ...m, attrs: JSON.parse(m.attrs || '{}') }))) {
         if (ready.length >= 100) break;
-        const prods = (await productsFor(db, settings, { local: map.local, ch: c.id })).filter((p) => !p.listed && !recent.has(p.id) && (p.stock || 0) > 0).slice(0, 100 - ready.length);
+        const prods = (await productsFor(db, settings, { local: map.local, ch: c.id })).filter((p) => !p.listed && !skip(p) && (p.stock || 0) > 0).slice(0, 100 - ready.length);
         if (!prods.length) continue;
         for (const x of await buildAll(c, map, prods, allOpts[c.id] || {}, false)) if (!x.missing.length) ready.push(x);
       }
