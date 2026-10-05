@@ -21,16 +21,20 @@ export function idefix(env, meta) {
   // API KEY alanına zaten "anahtar:gizli" ya da onun base64 hali yapıştırılmış olabilir
   const pairB64 = (() => { try { return /^[A-Za-z0-9+/]+=*$/.test(key) && key.length >= 16 && atob(key).includes(':'); } catch { return false; } })();
   const MODES = [];
-  const addMode = (name, v) => { if (v && !MODES.some((m) => m[1] === v)) MODES.push([name, v]); };
+  // Her biçim: [ad, X-API-KEY değeri, ek başlıklar]
+  const addMode = (name, v, extra = null) => { if (v && !MODES.some((m) => m[1] === v && JSON.stringify(m[2]) === JSON.stringify(extra))) MODES.push([name, v, extra]); };
   if (secret) addMode('API KEY:API Secret (base64)', b64(`${key}:${secret}`));
   if (key.includes(':')) addMode('API KEY alanındaki anahtar:gizli (base64)', b64(key));
   if (pairB64) addMode('API KEY olduğu gibi (hazır base64)', key);
   addMode('yalnız API KEY', key);
   addMode('API KEY (base64)', b64(`${key}:`));
   addMode('Satıcı ID:API KEY (base64)', b64(`${vendor}:${key}`));
+  // Bazı pazaryerleri kimliği Authorization başlığında ister
+  if (secret) addMode('Authorization: Basic API KEY:API Secret', b64(`${key}:${secret}`), { Authorization: 'Basic ' + b64(`${key}:${secret}`) });
+  addMode('Authorization: Bearer API KEY', key, { Authorization: 'Bearer ' + key });
   let mode = 0, modeOk = false;
   const tried = [];
-  const headers = () => ({ 'X-API-KEY': MODES[mode][1], 'Content-Type': 'application/json', Accept: 'application/json' });
+  const headers = () => ({ 'X-API-KEY': MODES[mode][1], 'Content-Type': 'application/json', Accept: 'application/json', ...(MODES[mode][2] || {}) });
   // idefix istek sınırı sıkı: 429 / 5xx'te artan beklemeyle 4 deneme (bağlantı test edilip sonra senkronda kopması bu yüzdendi)
   async function call(path, opts = {}) {
     for (;;) {
