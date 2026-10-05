@@ -20,6 +20,7 @@ import { DEMO_PRODUCTS } from './channels/demo.js';
 import { checkPendingUploads, autoUpload } from './catalog.js';
 import { customerKey, fillKeys } from './customers.js';
 import { pushDigest } from './push.js';
+import { dailyDigest } from './digest.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -402,6 +403,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     if (!only) out.settlements = await syncSettlements(env, db).catch((e) => 'hata: ' + e.message);
     // Anlık bildirim: yeni sipariş / iade talebi / müşteri sorusu özeti abonelere
     if (!only) out.push = await pushDigest(env, db, { newOrders: out.newOrders || 0 }).catch((e) => 'hata: ' + e.message);
+    // Günlük özet e-postası (açıksa, sabah 08:00'den sonraki ilk senkronda, günde bir kez)
+    if (!only) out.digest = await dailyDigest(env, db, settings).catch(async (e) => { await log(db, null, 'error', 'Günlük özet e-postası gönderilemedi: ' + e.message); return 'hata: ' + e.message; });
     // Eski siparişlere müşteri anahtarı (müşteriler sayfası için, parça parça)
     if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu

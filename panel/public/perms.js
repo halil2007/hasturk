@@ -16,7 +16,7 @@ export const PERM_KEYS = PERMS.map((p) => p[0]);
 // API yolu → bölüm (sunucu tarafı denetim)
 const MAP = [
   [/^(orders|orders-bulk|orders\.csv)(\/|$)/, 'orders'],
-  [/^(packages|labels)(\/|$)/, 'cargo'],
+  [/^(packages|labels|picklist)(\/|$)/, 'cargo'],
   [/^claims(\/|$)/, 'returns'],
   [/^questions(\/|$)/, 'questions'],
   [/^(products|catalog|price-rules|buybox|campaigns)(\/|\.csv$|$)/, 'products'],

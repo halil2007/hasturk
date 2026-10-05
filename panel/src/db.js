@@ -212,6 +212,8 @@ export const DEFAULT_SETTINGS = {
   hold_channels: [],
   // Yeni sipariş e-posta bildirimi: açık/kapalı, alıcılar, kanal seçimi (false = o kanaldan e-posta gelmez), panel adresi (e-postadaki bağlantı)
   mail_enabled: false,
+  // Günlük özet e-postası (her sabah 08:00'den sonra; alıcılar mail_to)
+  daily_digest: false,
   mail_to: [],
   mail_channels: {},
   panel_url: '',

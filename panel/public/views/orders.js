@@ -2,6 +2,7 @@
 import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel, activeChannels, lateBadge, extNote } from '../core.js';
 import { mountOps, openOrder, bulkLabels } from './orderops.js';
 import { loadSummary, setQuery } from '../app.js';
+import { pickSheet } from './picklist.js';
 
 // İlk sekme Yeni (açılışta seçili), Tümü en sonda
 const STATUS_TABS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['late', 'Geciken'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade'], ['all', 'Tümü']];
@@ -155,6 +156,7 @@ export async function orders(el, rest, query = {}) {
     export: (t) => popMenu(t, [
       { icon: 'download', label: 'Bu filtreyi Excel (CSV) olarak indir', run: () => { location.href = '/api/orders.csv?' + params(); } },
       { icon: 'download', label: 'Seçilenleri yazdır (etiket)', run: () => sel.size ? bulkLabels([...sel], { fetch: false }) : toast('Önce sipariş seçin') },
+      { icon: 'box', label: sel.size ? `Toplama listesi (${sel.size} seçili sipariş)` : 'Toplama listesi (kargoya çıkacak tüm siparişler)', run: () => pickSheet({ ids: [...sel] }) },
     ]),
     clear: () => { Object.assign(f, { q: '', from: '', to: '', cargo: '', page: 1 }); $('[data-q]', el).value = ''; $('[data-from]', el).value = ''; $('[data-to]', el).value = ''; $('[data-cargo]', el).value = ''; refresh(); },
     clearsel: () => { sel.clear(); draw(); },
