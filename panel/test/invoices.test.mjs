@@ -68,3 +68,22 @@ test('Gelir & gider: komisyon, kargo, stopaj basamakları ve hakediş', async ()
   assert.equal(b.steps.find((x) => x.k === 'payout').v, 150);
   assert.equal(b.channels[0].channel, 'trendyol');
 });
+
+test('Hakediş: Trendyol ekstresi saklanır; ödeme günleri, ödenecek toplam ve mutabakat farkı', async () => {
+  const now = Date.now();
+  mock([[/settlements\?/, (u) => (/transactionTypes=/.test(u) ? { totalPages: 1, content: [
+    { id: 1, transactionType: 'Sale', transactionDate: now - 3 * 864e5, orderNumber: 'X1', credit: 240, debt: 0, sellerRevenue: 190, commissionAmount: 50, paymentDate: now + 5 * 864e5 },
+    { id: 2, transactionType: 'Sale', transactionDate: now - 20 * 864e5, orderNumber: 'X2', credit: 100, debt: 0, sellerRevenue: 80, commissionAmount: 20, paymentDate: now - 2 * 864e5, paymentOrderId: 77 },
+    { id: 3, transactionType: 'Return', transactionDate: now - 10 * 864e5, orderNumber: 'X2', credit: 0, debt: 100, sellerRevenue: 80, commissionAmount: 20, paymentDate: now - 2 * 864e5, paymentOrderId: 77 }] } : { totalPages: 1, content: [] })]]);
+  const db = d1(); await init(db); resetChannels();
+  const env = { DB: db, TRENDYOL_SELLER_ID: '42', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' };
+  const { syncSettlements, settlementReport } = await import('../src/finance.js');
+  assert.equal((await syncSettlements(env, db, { force: true })).trendyol, 3);
+  await saveOrders(db, 'trendyol', [{ remoteId: 'X1', orderNumber: 'X1', orderedAt: now - 3 * 864e5, status: 'delivered', customer: 'A', total: 240, items: [{ lineId: '1', sku: 'S', name: 'Ü', quantity: 1, unitPrice: 240, total: 240, remoteKey: 'S' }] }]);
+  const r = await settlementReport(env, db, { commission: { trendyol: 20 } }, { from: now - 30 * 864e5, to: now + 1 });
+  assert.equal(r.totals.upcoming, 190); assert.equal(r.totals.paid, 0);
+  assert.equal(r.types.find((x) => x.type === 'İade').amount, -80);
+  // Panel tahmini: 240 − %20 = 192; pazaryeri 190 → 2 TL fark
+  assert.equal(r.diffs.length, 1); assert.equal(r.diffs[0].diff, -2);
+  resetChannels();
+});

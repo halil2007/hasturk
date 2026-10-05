@@ -15,6 +15,11 @@ export default {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? env.ASSETS.fetch(req) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
+    // Başka sitelerden gelen yazma isteklerini reddet (müşteri paneli girişi ve yönetimi dahil; panel içi istekler handle() içinde de denetlenir)
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const o = req.headers.get('Origin');
+      if (o) { let h = ''; try { h = new URL(o).host; } catch { /* geçersiz */ } if (h !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403); }
+    }
     try {
       // Firma koduyla giriş → müşteri paneli
       if (path === 'login' && req.method === 'POST') {

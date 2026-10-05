@@ -518,6 +518,30 @@ export function hepsiburada(env, meta) {
     await call(`${OMS}/claims/number/${encodeURIComponent(c.remote_id)}/reject`, { method: 'POST', body: { ClaimRejectionReason: reasonId, MerchantStatement: String(text).slice(0, 1000), Reports: [], UploadedReportsUrls: [] } });
   }
 
+  // ---------- hakediş (mpfinance işlemleri): ödenecek (WillBePaid) ve ödenen (Paid) kayıtlar ----------
+  // Gelir kayıtları (+), gider kayıtları (−); vade tarihi (dueDate) ödeme günüdür. Kayıt tarihine göre en fazla 1 aylık aralıklarla.
+  const HB_TR = { Payment: 'Satış', Return: 'İade', CampaignDiscount: 'Kampanya indirimi', Commission: 'Komisyon', Stoppage: 'Stopaj' };
+  async function settlements(since, until) {
+    const W = 28 * 864e5, d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10), out = new Map();
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      for (let off = 0; off < 100000; off += 100) {
+        const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=${off}&Limit=100&Status=Paid,WillBePaid&RecordDateStart=${d(from)}&RecordDateEnd=${d(to)}`));
+        for (const x of rows) {
+          const tt = str(g(x, 'transactionType'));
+          if (/^TotalPayment$/.test(tt)) continue; // toplam ödeme satırı ayrı kalemleri tekrar eder
+          const v = Math.abs(money(g(x, 'netAmount')) || money(g(x, 'amount'))), inc = g(x, 'isIncome');
+          const amount = (inc === true || (inc == null && money(g(x, 'amount')) > 0) ? 1 : -1) * v;
+          const due = Date.parse(g(x, 'dueDate') || '') || null, paidAt = Date.parse(g(x, 'paymentDate') || '') || null;
+          out.set(str(g(x, 'id')), { remoteId: str(g(x, 'id')), date: Date.parse(g(x, 'orderDate') || g(x, 'invoiceDate') || '') || from, type: HB_TR[tt] || hbType[tt] || tt, orderNumber: str(g(x, 'orderNumber')),
+            amount: Math.round(amount * 100) / 100, commission: /^Commission/.test(tt) ? Math.round(amount * 100) / 100 : 0, paymentDate: paidAt, dueDate: due || paidAt, paid: /^Paid$/i.test(str(g(x, 'status'))), paymentId: '' });
+        }
+        if (rows.length < 100) break;
+      }
+    }
+    return [...out.values()];
+  }
+
   // ---------- kesilen faturalar / kesintiler (mpfinance işlemleri) ----------
   // Gider türündeki işlemler fatura numarasına göre birleştirilir (aynı faturanın satırları tek kayıt). İade (…Refund) eksi tutarla.
   // Servis tarih aralığını en fazla 1 ay kabul eder; PDF bağlantısı vermez.
@@ -556,6 +580,6 @@ export function hepsiburada(env, meta) {
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
   };
 }

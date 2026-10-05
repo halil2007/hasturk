@@ -11,7 +11,7 @@ function setup() {
   env.TENANT = doNamespace(TenantPanel, () => env);
   const jar = { owner: '', tenant: '' };
   const call = (who) => async (path, opts = {}) => {
-    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: jar[who] } }), env, { waitUntil() {} });
+    const r = await worker.fetch(new Request('https://panel.test' + path, { ...opts, headers: { 'Content-Type': 'application/json', Cookie: jar[who], ...(opts.headers || {}) } }), env, { waitUntil() {} });
     const sc = r.headers.get('set-cookie');
     if (sc) jar[who] = sc.split(';')[0];
     return r;
@@ -73,5 +73,17 @@ test('müşteri paneli: oluşturma, firma koduyla giriş, veri ayrımı, askıya
   assert.equal((await owner('/api/tenants/yesil-bahce/delete', J({ confirm: 'yanlis' }))).status, 400);
   assert.equal((await owner('/api/tenants/yesil-bahce/delete', J({ confirm: 'yesil-bahce' }))).status, 200);
   assert.equal((await tenant('/api/me')).status, 401);
+  resetChannels();
+});
+
+test('müşteri paneli: yönetici adı "admin" olabilir; başka siteden gelen yönetim isteği reddedilir', async () => {
+  resetChannels();
+  const { jar, owner, tenant } = setup();
+  await owner('/api/login', J({ password: 'x-123456' }));
+  assert.equal((await owner('/api/tenants', J({ slug: 'acme', name: 'Acme', admin_username: 'admin', admin_password: 'acme-sifre-1' }))).status, 200);
+  assert.equal((await tenant('/api/login', J({ tenant: 'acme', username: 'admin', password: 'acme-sifre-1' }))).status, 200);
+  assert.equal((await (await tenant('/api/me')).json()).user.username, 'admin');
+  const evil = await owner('/api/tenants/acme/password', { method: 'POST', body: JSON.stringify({ password: 'kotu-sifre-12' }), headers: { Origin: 'https://evil.example' } });
+  assert.equal(evil.status, 403);
   resetChannels();
 });

@@ -459,6 +459,34 @@ export function trendyol(env, meta) {
     return reasonCache;
   }
 
+  // ---------- hakediş (cari hesap ekstresi: settlements) ----------
+  // Satış, iade, indirim, kupon ve komisyon düzeltmeleri; her kaydın satıcı hakedişi (sellerRevenue) ve ödeme tarihi.
+  // Önce tüm türler tek istekte (transactionTypes) denenir; servis kabul etmezse tür tür okunur. En fazla 15 günlük aralık.
+  const ST_TYPES = { Sale: 'Satış', Return: 'İade', Discount: 'İndirim', DiscountCancel: 'İndirim iptali', Coupon: 'Kupon', CouponCancel: 'Kupon iptali', SellerRevenuePositive: 'Hakediş düzeltme (+)', SellerRevenueNegative: 'Hakediş düzeltme (−)',
+    CommissionPositive: 'Komisyon düzeltme (+)', CommissionNegative: 'Komisyon düzeltme (−)', ManualRefund: 'Manuel iade', ProvisionPositive: 'Provizyon (+)', ProvisionNegative: 'Provizyon (−)', DeliveryFee: 'Teslimat bedeli' };
+  async function settlements(since, until) {
+    const W = 14 * 864e5, out = [];
+    const row = (x) => {
+      const sign = num(x.debt) > 0 && !num(x.credit) ? -1 : 1, rev = Math.abs(num(x.sellerRevenue ?? (num(x.credit) - num(x.debt))));
+      return { remoteId: String(x.id), date: num(x.transactionDate), type: ST_TYPES[x.transactionType] || str(x.transactionType), orderNumber: str(x.orderNumber), amount: Math.round(sign * rev * 100) / 100,
+        commission: Math.round(sign * Math.abs(num(x.commissionAmount)) * 100) / 100, paymentDate: num(x.paymentDate) || null, dueDate: num(x.paymentDate) || null, paid: !!x.paymentOrderId, paymentId: str(x.paymentOrderId) };
+    };
+    const read = async (q, from, to) => {
+      for (let page = 0; page < 40; page++) {
+        const r = await call(`/finance/che/sellers/${seller}/settlements?${q}&startDate=${from}&endDate=${to}&page=${page}&size=1000`);
+        out.push(...(r.content || []).map(row));
+        if (page + 1 >= (r.totalPages || 1)) break;
+      }
+    };
+    let joint = true;
+    for (let from = since; from < until; from += W) {
+      const to = Math.min(until, from + W);
+      if (joint) { try { await read(`transactionTypes=${Object.keys(ST_TYPES).join(',')}`, from, to); continue; } catch (e) { if (!/HTTP (400|422|500)/.test(e.message)) throw e; joint = false; } }
+      for (const t of Object.keys(ST_TYPES)) await read(`transactionType=${t}`, from, to);
+    }
+    return [...new Map(out.map((x) => [x.remoteId, x])).values()];
+  }
+
   // ---------- kesilen faturalar / kesintiler (cari hesap ekstresi: otherfinancials) ----------
   // Kesinti faturaları (kargo, platform hizmet bedeli, reklam, komisyon ...), stopaj, komisyon sözleşme faturaları ve iade faturaları.
   // Servis en fazla 15 günlük aralık kabul eder; PDF bağlantısı vermez (fatura no / açıklama ile Trendyol panelinden indirilir).
@@ -497,6 +525,6 @@ export function trendyol(env, meta) {
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
   };
 }

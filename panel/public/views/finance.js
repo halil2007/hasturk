@@ -1,5 +1,5 @@
 // Gelir & Gider: seçilen dönemde satıştan kâra masraf basamakları (komisyon, kargo, hizmet bedeli, ek kesinti, stopaj, alış),
-// kanal bazında tablo ve pazaryerlerinin kestiği faturalar (komisyon, kargo, hizmet bedeli, reklam, ceza ...).
+// kanal bazında tablo, hakediş (ödeme günleri, ödenen / ödenecek, mutabakat) ve pazaryerlerinin kestiği faturalar.
 import { api, html, render, $, money, money0, n, ch, chLogo, chBadge, date, dateTime, store, toast, actions, busy, activeChannels, isAdmin } from '../core.js';
 import { setQuery } from '../app.js';
 
@@ -24,6 +24,7 @@ export async function financeView(el, rest, query = {}) {
       <div class="card"><div class="card-head"><h2>Masraf basamakları</h2><span class="muted small">satıştan kâra</span></div><div data-steps></div></div>
       <div class="card flush"><div class="card-pad card-head"><h2>Kanallara göre</h2></div><div data-chtable></div></div>
     </div>
+    <div class="card flush" data-stl></div>
     <div class="card flush"><div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><h2>Kesilen faturalar</h2><span class="muted small" data-invsub></span><span class="spacer"></span>
       ${isAdmin() ? html`<button class="btn sm" data-act="invsync"><i class="ico ico-sync"></i>Faturaları çek</button>` : ''}</div><div data-inv></div></div>
   </div>`);
@@ -71,6 +72,33 @@ export async function financeView(el, rest, query = {}) {
       : html`<div class="empty">Bu dönemde fatura yok${isAdmin() ? ' — “Faturaları çek” ile kanallardan alın' : ''}</div>`}
       <div class="muted tiny" style="padding:0 16px 14px">Faturalar ${inv.supported.map((c) => ch(c).name).join(', ')} finans servisinden alınır ve panelde saklanır (6 saatte bir güncellenir). PDF bağlantısı kanal veriyorsa gösterilir.</div>`);
   }
+  // Hakediş: pazaryerinin ödeme günleri (ödenen / ödenecek), kayıt türleri ve mutabakat (pazaryeri hakedişi ≠ panel tahmini)
+  let stl = null;
+  function drawSettlements() {
+    const box = $('[data-stl]', el);
+    if (!stl) return render(box, html`<div class="card-pad"><h2>Hakediş</h2></div><div class="empty"><i class="ico ico-sync spin"></i></div>`);
+    const t = stl.totals, today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+    render(box, html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:220px"><h2>Hakediş</h2><div class="muted small">Pazaryerinin hesap ekstresinden: ödeme günleri, ödenen ve ödenecek tutarlar</div></div>
+        ${isAdmin() ? html`<button class="btn sm" data-act="stlsync"><i class="ico ico-sync"></i>Hakedişi çek</button>` : ''}</div>
+      ${!stl.supported.length && !stl.days.length ? html`<div class="empty">Hakediş bilgisi veren bağlı kanal yok (Trendyol, Hepsiburada).</div>` : html`
+      <div class="kpis" style="padding:0 16px 12px">
+        <div class="kpi"><div class="label">Ödenecek (vadesi gelmemiş)</div><div class="value num">${money0(t.upcoming - t.overdue)}</div></div>
+        <div class="kpi"><div class="label">Vadesi geçmiş, ödenmemiş</div><div class="value num" style="color:${t.overdue ? 'var(--bad)' : 'inherit'}">${money0(t.overdue)}</div></div>
+        <div class="kpi"><div class="label">Dönemde ödenen</div><div class="value num">${money0(t.paid)}</div></div>
+        <div class="kpi"><div class="label">Mutabakat</div><div class="value num" style="color:${t.mismatched ? 'var(--amber, #b45309)' : 'var(--good)'}">${t.mismatched ? `${n(t.mismatched)} fark` : 'uyumlu'}</div><div class="delta flat">${n(t.checked)} sipariş karşılaştırıldı</div></div>
+      </div>
+      <div class="table-wrap"><table class="t"><thead><tr><th>Ödeme günü</th><th>Kanal</th><th class="r">Ödenen</th><th class="r">Ödenecek</th><th class="r">Kayıt</th></tr></thead><tbody>
+        ${stl.days.slice(0, 40).map((x) => html`<tr><td class="small" style="white-space:nowrap">${x.d.split('-').reverse().join('.')}${x.d > today ? html` <span class="pill info" style="font-size:11px">ileri</span>` : x.due && x.d < today ? html` <span class="pill bad" style="font-size:11px">gecikti</span>` : ''}</td>
+          <td>${chLogo(x.channel, true)}</td><td class="r num">${x.paid ? money(x.paid) : '—'}</td><td class="r num" style="font-weight:650">${x.due ? money(x.due) : '—'}</td><td class="r num muted">${n(x.n)}</td></tr>`)}
+        ${!stl.days.length ? html`<tr><td colspan="5" class="empty">Kayıt yok${isAdmin() ? ' — “Hakedişi çek” ile alın' : ''}</td></tr>` : ''}
+      </tbody></table></div>
+      ${stl.types.length ? html`<div class="row wrap" style="gap:8px;padding:12px 16px">${stl.types.map((x) => html`<span class="chip">${x.type} <b class="num" style="margin-left:4px;color:${x.amount < 0 ? 'var(--bad)' : 'inherit'}">${money0(x.amount)}</b></span>`)}</div>` : ''}
+      ${stl.diffs.length ? html`<details style="padding:0 16px 14px"><summary style="cursor:pointer;font-weight:650">Mutabakat farkları (${n(stl.diffs.length)}) — pazaryerinin hakedişi panelin tahmininden farklı olan siparişler</summary>
+        <div class="table-wrap" style="margin-top:8px"><table class="t"><thead><tr><th>Sipariş</th><th class="r">Panel tahmini</th><th class="r">Pazaryeri hakedişi</th><th class="r">Fark</th></tr></thead><tbody>
+        ${stl.diffs.map((x) => html`<tr><td>${chLogo(x.channel, true)} <b>#${x.order_number}</b> <span class="muted tiny">${date(x.ordered_at)}</span></td><td class="r num">${money(x.expected)}</td><td class="r num">${money(x.actual)}</td>
+          <td class="r num" style="font-weight:700;color:${x.diff < 0 ? 'var(--bad)' : 'var(--good)'}">${x.diff > 0 ? '+' : ''}${money(x.diff)}</td></tr>`)}
+        </tbody></table></div><div class="muted tiny" style="margin-top:6px">Tahmin: satış − komisyon (kargo ve diğer kesintiler pazaryerinde ayrı faturalanır). Farklar genelde kampanya indirimi, farklı komisyon oranı ya da kısmi iadeden kaynaklanır.</div></details>` : ''}`}`);
+  }
   async function load() {
     store.set('finance', { range: f.range });
     setQuery({ channel: f.channel });
@@ -81,14 +109,19 @@ export async function financeView(el, rest, query = {}) {
     d = await api('finance?' + p);
     draw();
     if (f.itype) p.set('type', f.itype);
-    inv = await api('invoices?' + p).catch((e) => ({ items: [], types: [], supported: [], total: 0, sum: 0, error: e.message }));
-    drawInvoices();
+    stl = null; drawSettlements();
+    [inv, stl] = await Promise.all([
+      api('invoices?' + p).catch((e) => ({ items: [], types: [], supported: [], total: 0, sum: 0, error: e.message })),
+      api('settlements?' + new URLSearchParams([...p].filter(([k]) => k !== 'type'))).catch(() => ({ totals: { paid: 0, upcoming: 0, overdue: 0, checked: 0, mismatched: 0 }, days: [], types: [], diffs: [], supported: [] })),
+    ]);
+    drawInvoices(); drawSettlements();
   }
   const refresh = () => load().catch((e) => toast(e.message, true));
   actions(el, {
     ch: (t) => { f.channel = t.dataset.id; refresh(); },
     range: (t) => { f.range = t.dataset.k; refresh(); },
     itype: (t) => { f.itype = t.dataset.k; refresh(); },
+    stlsync: (t) => busy(t, async () => { const r = await api('settlements/sync', { method: 'POST' }); toast(Object.entries(r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} kayıt`}`).join(' · ') || 'Hakediş bilgisi veren kanal yok'); await load(); }),
     invsync: (t) => busy(t, async () => { const r = await api('invoices/sync', { method: 'POST' }); toast(Object.entries(r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} fatura`}`).join(' · ') || 'Fatura bilgisi veren kanal yok'); await load(); }),
   });
   await refresh();

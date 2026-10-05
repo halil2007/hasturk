@@ -71,7 +71,7 @@ export async function settingsView(el) {
       <div class="card flush"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
         ${live.map((c) => html`<tr><td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td>
-          ${COST_KEYS.map((k) => html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${costOf(st, k, c.id)}" ${dis}></td>`)}</tr>`)}
+          ${COST_KEYS.map((k) => { const own = (st[k] || {})[c.id], extra = /_\d+$/.test(c.id); return html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${extra ? own ?? '' : costOf(st, k, c.id)}" placeholder="${extra ? costOf(st, k, c.id) : ''}" title="${extra ? 'Boş bırakılırsa aynı türdeki ana mağazanın değeri kullanılır' : ''}" ${dis}></td>`; })}</tr>`)}
       </tbody></table></div>
         <div class="card-pad muted tiny" style="padding-top:0">Masraf basamakları: satış − komisyon − kargo − hizmet bedeli − ek kesinti − stopaj = hakediş; hakediş − alış = kâr. Stopaj, pazaryerlerinin 2025'ten beri hakedişten kestiği gelir vergisidir (KDV hariç satış üzerinden, genelde %1); yıllık vergiden mahsup edilir. Kendi siteniz (ikas) için 0 bırakın.</div></div>
 
@@ -174,7 +174,7 @@ export async function settingsView(el) {
     },
     save: (t) => busy(t, async () => {
       const cost = Object.fromEntries(COST_KEYS.map((k) => [k, {}]));
-      $$('[data-cost]', el).forEach((i) => { const [k, c] = i.dataset.cost.split(':'); cost[k][c] = numIn(i.value); });
+      $$('[data-cost]', el).forEach((i) => { const [k, c] = i.dataset.cost.split(':'); cost[k][c] = i.value.trim() === '' && /_\d+$/.test(c) ? '' : numIn(i.value); });
       const sender = {}; $$('[data-sender]', el).forEach((i) => { sender[i.dataset.sender] = i.value.trim(); });
       const company = {}; $$('[data-co]', el).forEach((i) => { company[i.dataset.co] = i.value.trim(); });
       const track = {}; ($('[data-track]', el).value || '').split('\n').forEach((l) => { const i = l.indexOf('='); if (i > 0) track[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });

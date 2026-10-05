@@ -15,7 +15,7 @@ import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
 import { can, sectionOf } from '../public/perms.js';
-import { orderProfit, breakdown, listInvoices, syncInvoices } from './finance.js';
+import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
@@ -626,7 +626,16 @@ async function saveSettings(db, b) {
       v = !!v;
       if (v && !cur.stock_sync) await setSetting(db, 'stock_since', Date.now());
     }
-    if (COST_KEYS.includes(k)) v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, num((v || {})[c], costOf(cur, k, c))]));
+    // Kanal giderleri: yalnız gönderilen kanallar yazılır; ek mağazada boş bırakılan değer silinir (ana mağazanınki kullanılır)
+    if (COST_KEYS.includes(k)) {
+      const next = { ...(cur[k] || {}) };
+      for (const [c, x] of Object.entries(v && typeof v === 'object' ? v : {})) {
+        if (!isChannelId(c)) continue;
+        if (x === '' || x == null) { if (/_\d+$/.test(c)) delete next[c]; continue; }
+        next[c] = num(x, costOf(cur, k, c));
+      }
+      v = next;
+    }
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
     if (k === 'autoprice') v = !!v;
@@ -641,7 +650,7 @@ async function saveSettings(db, b) {
       const bad = v.filter((x) => !validEmail(x));
       if (bad.length) fail(400, 'Geçersiz e-posta adresi: ' + bad.join(', '));
     }
-    if (k === 'mail_channels') v = Object.fromEntries(CHANNEL_IDS.map((c) => [c, (v || {})[c] !== false]));
+    if (k === 'mail_channels') v = { ...(cur.mail_channels || {}), ...Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, x !== false])) };
     if (k === 'panel_url') { v = str(v).replace(/\/+$/, ''); if (v && !/^https?:\/\/[^\s]+$/i.test(v)) fail(400, 'Panel adresi https:// ile başlamalı'); }
     if (k === 'catalog_channels') v = (Array.isArray(v) ? v : []).filter((c) => isChannelId(c));
     if (k === 'company') v = Object.fromEntries(['title', 'legal', 'phone', 'email', 'address', 'tax'].map((f) => [f, str((v || {})[f]).slice(0, 300)]));
@@ -933,6 +942,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const b = await body(req), id = decodeURIComponent(x[2]);
     return json(x[3] === 'approve' ? await approveClaim(env, db, x[1], id, b.lines, user) : await rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user));
   }
+  if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
+  if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncInvoices(env, db, { force: true })); }
   if (path === 'finance' && m === 'GET') return json(await breakdown(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));

@@ -7,7 +7,7 @@
 import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { typeOf } from './config.js';
-import { syncInvoices } from './finance.js';
+import { syncInvoices, syncSettlements } from './finance.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
 import { autoMatch, relinkItems, repairDuplicates } from './match.js';
 import { runJobs, createJob } from './backfill.js';
@@ -371,6 +371,7 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
     if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
     if (!only) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);
+    if (!only) out.settlements = await syncSettlements(env, db).catch((e) => 'hata: ' + e.message);
     // Eski siparişlere müşteri anahtarı (müşteriler sayfası için, parça parça)
     if (!only) out.customers = await fillKeys(db, 3000).catch((e) => 'hata: ' + e.message);
     // Pazaryerine gönderilen ürünlerin onay sonucu

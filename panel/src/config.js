@@ -103,7 +103,10 @@ export async function addStore(db, type) {
 export async function removeStore(db, id) {
   if (!isExtra(id)) fail(400, 'Ana mağaza kaldırılamaz; pasif yapabilirsiniz');
   await run(db, 'DELETE FROM channel_config WHERE id = ?', id);
-  await run(db, "DELETE FROM settings WHERE k IN (?, ?, ?)", 'verified:' + id, 'last:' + id, 'auto_backfill:' + id);
+  // Mağazaya ait tüm durum kayıtları (senkron imleci, onay, fatura / hakediş / maliyet zamanları ...) ve ilanları, kategori eşleştirmeleri,
+  // fiyat kuralları silinir: aynı kimlikle yeniden eklenen mağaza eski hesabın verisiyle başlamaz. Siparişler ve raporlar korunur.
+  await run(db, "DELETE FROM settings WHERE k LIKE ? ESCAPE '\\'", '%:' + id.replace(/_/g, '\\_'));
+  for (const t of ['listings', 'category_map', 'price_rules', 'buybox']) await run(db, `DELETE FROM ${t} WHERE channel = ?`, id).catch(() => {});
 }
 
 // ---------- şifreleme ----------

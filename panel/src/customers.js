@@ -58,7 +58,8 @@ export async function summary(db, q = {}) {
   const multi = (await first(db, `SELECT COUNT(*) AS n FROM (SELECT o.ckey FROM orders o ${W} GROUP BY o.ckey HAVING COUNT(DISTINCT o.channel) > 1)`, ...args)).n;
   // Aylık: o ay ilk siparişini veren (yeni) ve daha önce sipariş vermiş (tekrar eden) müşteri sayısı (son 12 ay)
   const since = Date.now() - 365 * 864e5;
-  const firsts = new Map(per.map((r) => [r.ckey, r.first_at]));
+  // İlk sipariş tarihi dönem filtresinden bağımsız: bir müşteri ancak ilk siparişini verdiği ay "yeni" sayılır
+  const firsts = new Map((await all(db, `SELECT o.ckey, MIN(o.ordered_at) AS first_at FROM orders o WHERE ${LIVE} AND o.ckey IN (SELECT DISTINCT ckey FROM orders WHERE ordered_at >= ?) GROUP BY o.ckey`, since)).map((r) => [r.ckey, r.first_at]));
   const monthly = await all(db, `SELECT o.ckey, strftime('%Y-%m', o.ordered_at / 1000 + 10800, 'unixepoch') AS m FROM orders o WHERE ${LIVE} AND o.ordered_at >= ? GROUP BY o.ckey, m`, since);
   const months = new Map();
   for (const r of monthly) {

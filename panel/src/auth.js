@@ -80,11 +80,12 @@ export async function login(req, env, db, { username, password: pass }) {
   const f = (await getRaw(db, 'login_fail')) || { n: 0, at: 0 };
   if (f.n >= 8 && Date.now() - f.at < 15 * 60e3) return { ok: false, status: 429, error: 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.' };
   let user = null, ver = '0';
-  if (isAdminName(username) && password(env)) {
+  if (!env.TENANT_SLUG && isAdminName(username) && password(env)) {
     const a = await hmac('cmp', String(pass || '')), b = await hmac('cmp', password(env));
     if (same(a, b)) user = ADMIN;
   }
-  if (!user && !isAdminName(username)) {
+  // Müşteri panelinde ana yönetici (PANEL_PASSWORD) yoktur: "admin" gibi adlar da normal kullanıcıdır
+  if (!user && username && (env.TENANT_SLUG || !isAdminName(username))) {
     const u = await first(db, 'SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND active = 1', String(username).trim());
     if (u && await checkPassword(String(pass || ''), u.pass)) {
       user = { id: u.id, username: u.username, name: u.name || u.username, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) };
@@ -112,7 +113,7 @@ export async function saveUser(db, id, b) {
   // Personel yetkileri: seçilen bölümler (dizi); gönderilmezse değişmez
   const perms = Array.isArray(b.perms) ? JSON.stringify(b.perms.filter((k) => PERM_KEYS.includes(k))) : undefined;
   if (!id && !/^[\p{L}0-9._-]{3,40}$/u.test(username)) throw new Error('Kullanıcı adı 3-40 karakter olmalı (harf, rakam, . _ -)');
-  if (!id && isAdminName(username)) throw new Error('Bu kullanıcı adı ana yöneticiye ayrılmış');
+  if (!id && isAdminName(username) && !b.tenant) throw new Error('Bu kullanıcı adı ana yöneticiye ayrılmış');
   if (b.password && String(b.password).length < 8) throw new Error('Şifre en az 8 karakter olmalı');
   if (!id) {
     if (!b.password) throw new Error('Şifre gerekli');
