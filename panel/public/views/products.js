@@ -219,6 +219,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
       </div>
       <label class="field"><span>Görsel adresi</span><input class="input" name="image" value="${p.image || ''}" placeholder="https://…"></label>
+      <div class="field" data-gal><span>Tüm görseller</span><div data-galbox></div></div>
       ${p.description && /<[a-z][\s\S]*>/i.test(p.description) ? html`<div class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><div class="desc-view">${raw(safeHtml(p.description))}</div>
         <details style="margin-top:6px"><summary class="small muted" style="cursor:pointer">Açıklamayı düzenle (HTML)</summary><textarea class="input" name="description" style="min-height:160px;margin-top:6px">${p.description}</textarea></details></div>`
         : html`<label class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><textarea class="input" name="description" style="min-height:110px">${p.description || ''}</textarea></label>`}
@@ -262,6 +263,27 @@ export async function productForm(id, done) {
   </form>`);
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
   const form = $('[data-form]', s.body);
+  // Görsel galerisi: yalnız bağlantılar saklanır (görseller kanalın sunucusundan açılır, panelde yer kaplamaz)
+  let gal = (() => { try { return JSON.parse(p.images || '[]'); } catch { return []; } })(), galManual = !!p.images_manual, galEdit = false, galDirty = false, galAuto = false;
+  const drawGal = () => render($('[data-galbox]', form), html`<div class="stack" style="gap:8px">
+    ${gal.length ? html`<div class="row wrap" style="gap:6px">${gal.map((u, i) => html`<a href="${u}" target="_blank" rel="noopener" title="${i === 0 ? 'Ana görsel · ' : ''}${u}" style="position:relative"><span class="thumb lg" style="background-image:url('${u}')"></span>${i === 0 ? html`<span class="pill" style="position:absolute;left:2px;bottom:2px;font-size:9px;padding:0 4px">ana</span>` : ''}</a>`)}</div>`
+      : html`<div class="muted small">${id ? 'Henüz görsel bağlantısı yok; bağlı kanallardan bir sonraki senkronda gelir.' : 'Kaydettikten sonra bağlı kanallardan gelir ya da aşağıdan ekleyin.'}</div>`}
+    <div class="row wrap" style="gap:8px"><span class="muted tiny" style="flex:1">${gal.length ? `${gal.length} görsel · ` : ''}${galAuto ? 'kaydedince kanaldan otomatik alınacak' : galManual ? 'panelde düzenlendi (senkron değiştirmez)' : 'kanaldan otomatik (ana katalog önce)'} · yalnız bağlantı saklanır, yer kaplamaz</span>
+      <button type="button" class="btn sm" data-galedit>${galEdit ? 'Düzenlemeyi kapat' : 'Bağlantıları düzenle'}</button>${galManual && !galAuto ? html`<button type="button" class="btn sm ghost" data-galauto>Kanaldan otomatik al</button>` : ''}</div>
+    ${galEdit ? html`<textarea class="input" data-galtext rows="5" placeholder="Her satıra bir görsel bağlantısı (https://…). İlk satır ana görsel.">${gal.join('\n')}</textarea>` : ''}
+  </div>`);
+  drawGal();
+  form.addEventListener('click', (e) => {
+    if (e.target.closest('[data-galedit]')) { galEdit = !galEdit; drawGal(); }
+    if (e.target.closest('[data-galauto]')) { galAuto = true; galDirty = false; galManual = false; galEdit = false; drawGal(); }
+  });
+  form.addEventListener('input', (e) => {
+    if (!e.target.matches('[data-galtext]')) return;
+    gal = [...new Set(e.target.value.split(/[\s,]+/).map((x) => x.trim()).filter((x) => /^https?:\/\//i.test(x)))].slice(0, 12);
+    galDirty = true; galAuto = false; galManual = true;
+    const box = $('[data-galbox] .row', form); // önizlemeyi yazarken yeniden çizme (imleç kaybolmasın)
+    if (box && box.firstElementChild && box.firstElementChild.tagName === 'A') render(box, html`${gal.map((u) => html`<a href="${u}" target="_blank" rel="noopener"><span class="thumb lg" style="background-image:url('${u}')"></span></a>`)}`);
+  });
   // Barkod oluştur: benzersiz EAN-13 önerisi alanına yazılır, ürün kaydedilince geçerli olur
   $('[data-genbc]', form).onclick = (e) => busy(e.currentTarget, async () => {
     if (form.barcode.value.trim() && !(await confirmBox((p.listings || []).length
@@ -303,6 +325,7 @@ export async function productForm(id, done) {
     if (fd.has('stock') && (!id || Number(fd.get('stock')) !== p.stock)) b.stock = Number(fd.get('stock')) || 0;
     b.listings = $$('tr[data-l]', form).map((tr) => ({ channel: tr.dataset.l, remote_id: tr.dataset.rid, price: numIn($('[data-lf=price]', tr).value), commission: $('[data-lf=commission]', tr).value }));
     b.create_on = fd.getAll('create_on');
+    if (galAuto) b.images_auto = 1; else if (galDirty) b.images = gal;
     const r = await api(id ? 'products/' + id : 'products', { method: id ? 'PUT' : 'POST', body: b });
     if (r.errors && r.errors.length) toast(r.errors.join(' · '), true); else toast(r.created && r.created.length ? `Kaydedildi ve ${r.created.length} mağazada oluşturuldu` : 'Kaydedildi');
     s.close(); done();

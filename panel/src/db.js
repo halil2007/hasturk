@@ -155,6 +155,11 @@ const MIGRATIONS = [
   'ALTER TABLE products ADD COLUMN fx_margin REAL',
   // Personel yetkileri (JSON bölüm listesi; boşsa tüm bölümler) — bkz. public/perms.js
   'ALTER TABLE users ADD COLUMN perms TEXT',
+  // Ürün görselleri: yalnız bağlantılar (JSON dizi; dosya saklanmaz, görseller kanalın CDN'inden açılır).
+  // images_manual = 1: panelde elle düzenlendi (senkron üzerine yazmaz)
+  'ALTER TABLE products ADD COLUMN images TEXT',
+  'ALTER TABLE products ADD COLUMN images_manual INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE listings ADD COLUMN images TEXT',
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
   'CREATE INDEX IF NOT EXISTS products_category ON products(category)',
 ];

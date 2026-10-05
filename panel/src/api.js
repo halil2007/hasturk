@@ -19,7 +19,7 @@ import { costOf, COST_KEYS } from '../public/profit.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool } from './util.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
@@ -489,6 +489,8 @@ async function listBuybox(db, q) {
 // ---------- ürünler ----------
 const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin'];
 const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active', 'fx_price']);
+// Görsel bağlantıları: dizi ya da satır satır metin → tekrarsız https adresleri
+const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/[\s,]+/));
 function cleanProduct(b) {
   const o = {};
   for (const k of PRODUCT_FIELDS) if (k in b) o[k] = NUMERIC.has(k) ? num(b[k]) : str(b[k]) || null;
@@ -496,6 +498,9 @@ function cleanProduct(b) {
   // Döviz: yalnız USD / EUR / GBP; ürüne özel kâr payı boşsa genel ayar kullanılır
   if ('currency' in o && !CURRENCIES.includes(o.currency)) o.currency = null;
   if ('fx_margin' in o) o.fx_margin = b.fx_margin === '' || b.fx_margin == null ? null : num(b.fx_margin);
+  // Görseller: elle düzenlenen liste (images_manual = 1) ya da "kanaldan otomatik al" (images_auto: senkron doldurur)
+  if (b.images_auto) { o.images = null; o.images_manual = 0; }
+  else if ('images' in b) { const l = imagesIn(b.images); o.images = l.length ? JSON.stringify(l) : null; o.images_manual = 1; if (!o.image && !b.image && l[0]) o.image = l[0]; }
   return o;
 }
 
@@ -582,6 +587,7 @@ async function saveProduct(env, db, ctx, id, b, user) {
     if (keys.length) await run(db, `UPDATE products SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => f[k]), t, id);
     if (b.stock !== undefined && b.stock !== '') await stockChange(env, db, ctx, id, { mode: 'set', qty: b.stock, note: 'Ürün formu' }, user);
   }
+  if (b.images_auto) await fillProductInfo(db).catch(() => {});
   // Kanal ilanları: fiyat / komisyon
   for (const l of b.listings || []) {
     const cur = await first(db, 'SELECT price, list_price, commission, commission_src FROM listings WHERE channel = ? AND remote_id = ? AND product_id = ?', l.channel, String(l.remote_id), id);

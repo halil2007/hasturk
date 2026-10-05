@@ -42,10 +42,15 @@ async function productsFor(db, settings, { local, ch, ids }) {
 function shape(p, opts, zeroStock) {
   const base = p.cat_price > 0 ? p.cat_price : p.sale_price;
   const k = 1 + num(opts.markup) / 100;
-  const img = str(p.image).replace(/\/(180|360)\//, '/1080/');
+  const big = (u) => str(u).replace(/\/(180|360)\//, '/1080/');
+  const img = big(p.image);
+  // Tüm görsel bağlantıları (ana görsel önce, tekrarsız): pazaryerine ek görsel olarak gider
+  let extra = [];
+  try { extra = JSON.parse(p.images || '[]'); } catch { /* bozuk liste */ }
+  const images = [...new Set([img, ...extra.map(big)].filter(Boolean))].slice(0, 10);
   return {
     id: p.id, sku: str(p.sku), barcode: str(p.barcode), name: str(p.name), brand: str(p.brand), description: str(p.description) || str(p.name),
-    image: img, images: img ? [img] : [], vat: p.vat ?? 20, desi: p.desi || 1, stock: zeroStock ? 0 : Math.max(0, Math.round(p.stock || 0)),
+    image: img || images[0] || '', images, vat: p.vat ?? 20, desi: p.desi || 1, stock: zeroStock ? 0 : Math.max(0, Math.round(p.stock || 0)),
     price: r2(base * k), listPrice: r2(Math.max(p.cat_list || 0, base) * k),
     group: str(p.parent_key).split(':').pop() || str(p.sku), variant: str(p.variant_name),
   };

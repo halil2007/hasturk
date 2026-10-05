@@ -2,7 +2,7 @@
 // Kimlik: client_credentials belirteci (isortagimgiris.pazarama.com/connect/token, kapsam merchantgatewayapi.fullaccess).
 // Cevaplar { data, success, message } ile sarılıdır. Sipariş durumu satır (orderItemStatus) düzeyinde okunur.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, basic, num, str, chunk } from '../util.js';
+import { http, basic, num, str, chunk, imageList } from '../util.js';
 
 const API = 'https://isortagimapi.pazarama.com';
 // Satır durum kodları: 3 alındı, 12 hazırlanıyor, 5 kargoya verildi, 11 teslim, 6/13 iptal, 7/8/10/14/15 iade süreci
@@ -72,7 +72,7 @@ export function pazarama(env, meta) {
       const rows = ((await call(`/product/products?Approved=true&Page=${page}&Size=250`)) || {}).data || [];
       for (const p of rows) {
         out.push({ remoteId: str(p.code), remoteProductId: str(p.code), sku: str(p.stockCode), barcode: str(p.code), name: str(p.displayName || p.name), groupName: str(p.name), variantName: '',
-          image: str(((p.images || [])[0] || {}).imageUrl), price: num(p.salePrice), listPrice: num(p.listPrice) || num(p.salePrice), stock: num(p.stockCount), active: true });
+          image: str(((p.images || [])[0] || {}).imageUrl), images: imageList(p.images), price: num(p.salePrice), listPrice: num(p.listPrice) || num(p.salePrice), stock: num(p.stockCount), active: true });
       }
       if (rows.length < 250) break;
     }
