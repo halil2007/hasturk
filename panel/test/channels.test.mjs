@@ -374,7 +374,7 @@ test('idefix: "shipment_" önekli durumlar doğru eşlenir, istekler kimlik (Use
 test('Hepsiburada: gövdesiz GET isteğinde Content-Type gönderilmez; 520 alınca tanılama farklı başlıklarla dener', async () => {
   let n = 0;
   const calls = mockFetch([
-    [/oms-external-sit\.hepsiburada\.com\/orders\/merchantId\/M1\?offset=0&limit=1$/, (url, opts) => { n++; return n <= 2 ? { __status: 520 } : { items: [] }; }],
+    [/oms-external\.hepsiburada\.com\/orders\/merchantId\/M1\?offset=0&limit=1$/, (url, opts) => { n++; return n <= 2 ? { __status: 520 } : { items: [] }; }],
     [/asktoseller/, { data: [], totalItemCount: 0, currentPage: 1, totalPageCount: 1 }],
   ]);
   const real = globalThis.fetch;
@@ -384,7 +384,7 @@ test('Hepsiburada: gövdesiz GET isteğinde Content-Type gönderilmez; 520 alın
     return j && j.__status ? new Response('error code: 520', { status: 520 }) : r;
   };
   try {
-    const ch = hepsiburada({ HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x', HB_USER_AGENT: 'u', HB_TEST: '1' }, { id: 'hepsiburada' });
+    const ch = hepsiburada({ HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x', HB_USER_AGENT: 'u' }, { id: 'hepsiburada' });
     const d = await ch.diagnose({});
     const first = calls.find((c) => /orders\/merchantId/.test(c.url));
     assert.ok(!Object.keys(first.headers).some((k) => k.toLowerCase() === 'content-type'), 'GET isteğinde Content-Type yok');

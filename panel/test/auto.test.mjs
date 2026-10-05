@@ -15,6 +15,26 @@ test('kategori puanı: ek ve Türkçe karakter farkına rağmen doğru kategori 
   assert.equal(best('Gübre'), 'Organik Gübre');
 });
 
+test('kategori eşleştirme: ilaçlama pompası su pompasına, gübre / toprak / tohum yanlış alana gitmez', async () => {
+  const { rank } = await import('../src/catmatch.js');
+  const C = (id, name, path) => ({ id, name, path });
+  const cats = [C(1, 'İlaçlama Pompası', 'Bahçe › Bahçe İlaçlama'), C(2, 'Su Pompası', 'Yapı Market › Su Pompası & Hidrofor'), C(3, 'Su Motoru', 'Yapı Market'),
+    C(5, 'Akvaryum Pompası', 'Pet Shop › Akvaryum'), C(7, 'Organik Gübre', 'Bahçe › Gübre'), C(8, 'Sıvı Gübre', 'Bahçe › Gübre'), C(9, 'Kimyevi Gübre', 'Bahçe › Gübre'),
+    C(10, 'Akvaryum Gübresi', 'Pet Shop › Akvaryum'), C(11, 'Bitki Toprağı', 'Bahçe › Toprak & Torf'), C(12, 'Kedi Kumu', 'Pet Shop › Kedi'), C(13, 'Sebze Tohumu', 'Bahçe › Tohum'),
+    C(15, 'Çiçek Tohumu', 'Bahçe › Tohum'), C(17, 'Mantar İlacı', 'Bahçe › Zirai İlaç'), C(18, 'Haşere İlacı', 'Ev › Temizlik'), C(20, 'Saksı', 'Bahçe › Saksı'), C(26, 'Yaprak Gübresi', 'Bahçe › Gübre')];
+  const top = (local, names) => (rank(cats, local, names, 1)[0] || {}).name;
+  assert.equal(top('Sistemik İlaçlar › İlaç Pompaları', ['Akülü İlaçlama Pompası 16 Lt', 'Manuel Sırt Pompası 20 Lt']), 'İlaçlama Pompası');
+  assert.equal(top('Pompalar', ['Akülü İlaçlama Pompası 16 Lt']), 'İlaçlama Pompası');
+  assert.equal(top('Gübreler › Solucan Gübresi', ['Solucan Gübresi 5 Kg']), 'Organik Gübre');
+  assert.equal(top('Sıvı Gübreler', ['Sıvı Solucan Gübresi 1 Lt']), 'Sıvı Gübre');
+  assert.equal(top('Yaprak Gübreleri', ['Mikro Element Yaprak Gübresi']), 'Yaprak Gübresi');
+  assert.equal(top('Topraklar › Saksı Toprağı', ['Saksı Toprağı 20 Lt']), 'Bitki Toprağı');
+  assert.equal(top('Tohumlar › Sebze Tohumları', ['Domates Tohumu']), 'Sebze Tohumu');
+  assert.equal(top('Bitki Koruma › Fungisitler', ['Bakırlı Fungisit']), 'Mantar İlacı');
+  assert.equal(top('Su Pompaları', ['Dalgıç Su Pompası']), 'Su Pompası');
+  assert.ok(!rank(cats, 'Gübreler', ['Solucan Gübresi']).some((x) => /Akvaryum/.test(x.name)), 'akvaryum gübresi önerilmez');
+});
+
 test('genel stok senkronu kapalıyken yalnız anahtarı açık kanala (Hepsiburada) ikas stoğu gönderilir', async () => {
   const db = d1(); await init(db); resetChannels();
   const t = Date.now();

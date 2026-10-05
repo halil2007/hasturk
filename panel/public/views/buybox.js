@@ -4,7 +4,7 @@ import { api, state, html, render, $, n, money, ch, chLogo, chBadge, thumb, acti
 import { setQuery, loadSummary } from '../app.js';
 
 const STATUS = [['', 'Tümü'], ['won', 'Buybox sizde'], ['lost', 'Kaybedilen'], ['multi', 'Rakipli'], ['rules', 'Otomatik fiyat açık'], ['unchecked', 'Kontrol edilmedi']];
-export const bbChannels = () => activeChannels().filter((c) => ['trendyol', 'hepsiburada'].includes(c.id) && (c.enabled || c.demo));
+export const bbChannels = () => activeChannels().filter((c) => ['trendyol', 'hepsiburada'].includes(c.type) && (c.enabled || c.demo));
 function bbState(r) {
   if (!r.checked_at) return ['', 'Kontrol edilmedi'];
   if (!r.rank) return ['', r.error || 'Veri yok'];

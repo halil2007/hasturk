@@ -128,6 +128,7 @@ export const rangeLabel = (from, to) => {
 // Kargo gecikme uyarısı: kanalın son kargoya teslim tarihi (varsa) ve sipariş yaşı (1 günü aşan) dikkate alınır
 export function lateInfo(o, now = Date.now()) {
   if (!['new', 'processing'].includes(o.status) || (o.open_packages === 0 && o.packages > 0)) return null;
+  if (now - o.ordered_at > 15 * 864e5) return null; // çok eski kayıtlar gecikme sayılmaz (sunucudaki LATE ile aynı sınır)
   const H = 3600e3;
   if (o.ship_by && now > o.ship_by) return { cls: 'bad', text: 'Gecikti', title: `Son kargoya teslim: ${dateTime(o.ship_by)}` };
   if (o.ship_by && o.ship_by - now < 12 * H) return { cls: 'bad', text: 'Gecikme riski', title: `Son kargoya teslim: ${dateTime(o.ship_by)} (${Math.max(0, Math.round((o.ship_by - now) / H))} sa kaldı)` };
@@ -154,7 +155,12 @@ const CARRIERS = [[/hepsi\s*jet/i, 'hepsiJET'], [/aras/i, 'Aras Kargo'], [/yurt\
   [/s[üu]rat/i, 'Sürat Kargo'], [/mng/i, 'MNG Kargo'], [/trendyol\s*express/i, 'Trendyol Express'], [/kolay\s*gelsin/i, 'Kolay Gelsin'], [/\bups\b/i, 'UPS Kargo'], [/sendeo/i, 'Sendeo']];
 export const carrierOf = (choice) => { const c = CARRIERS.find(([re]) => re.test(String(choice || ''))); return c ? c[1] : ''; };
 export const ch = (id) => state.channels.find((c) => c.id === id) || { id, name: id, short: id, type: id };
-export const chColor = (id) => `var(--c-${id})`;
+// Ek mağazalar (trendyol_2, ikas_3 ...): kendi türünün rengine yakın, ayırt edilebilir bir ton
+const EXTRA_HUE = ['#5b6ee1', '#c2410c', '#0f766e', '#a16207', '#be185d', '#4d7c0f', '#7c3aed', '#0369a1'];
+export const chColor = (id) => {
+  const m = /^([a-z0-9]+)_(\d+)$/.exec(String(id || ''));
+  return m ? EXTRA_HUE[(Number(m[2]) + m[1].length) % EXTRA_HUE.length] : `var(--c-${id})`;
+};
 // Kargoyu takip et: kanalın verdiği resmi takip bağlantısı; yoksa kargo firmasının takip sayfası (Ayarlar → Kargo takip adresleri)
 export function trackUrl(pkg, order = {}) {
   if (pkg && /^https?:\/\//i.test(pkg.tracking_url || '')) return pkg.tracking_url;
@@ -180,7 +186,7 @@ export function chLogo(id, sm = false) {
   return html`<span class="logo-b${k}" style="background:${chColor(id)}">${(c.name || '?').slice(0, 1)}</span>`;
 }
 export const chBadge = (id) => html`<span class="ch-name">${chLogo(id, true)}<span class="ellipsis">${ch(id).short || ch(id).name}</span></span>`;
-export const chState = (c) => (c.gated ? ['off', (c.missing || []).length ? 'Beklemede · bilgi girilmedi' : 'Beklemede · bağlantı testi bekleniyor'] : c.paused ? ['off', 'Pasif'] : !c.enabled ? ['off', 'Bağlı değil'] : c.demo ? ['demo', 'Örnek veri'] : c.last && c.last.ok === false ? ['err', 'Hata'] : c.last && c.last.ok == null && !c.last.ordersAt ? ['demo', 'Bağlantı bekleniyor'] : ['', 'Bağlı']);
+export const chState = (c) => (c.gated ? ['off', (c.missing || []).length ? 'Bağlı değil' : 'Bağlantı testi bekleniyor'] : c.paused ? ['off', 'Pasif'] : !c.enabled ? ['off', 'Bağlı değil'] : c.demo ? ['demo', 'Örnek veri'] : c.last && c.last.ok === false ? ['err', 'Hata'] : c.last && c.last.ok == null && !c.last.ordersAt ? ['demo', 'Bağlantı bekleniyor'] : ['', 'Bağlı']);
 export const thumb = (img, name, cls = '') => html`<span class="thumb ${cls}" style="${img ? `background-image:url('${String(img).replace(/['"()\\]/g, '')}')` : ''}">${img ? '' : (name || '?').slice(0, 2)}</span>`;
 
 // ---------- bildirim ----------

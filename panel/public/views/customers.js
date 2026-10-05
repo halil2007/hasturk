@@ -4,13 +4,14 @@ import { api, html, render, $, money, money0, n, ch, chLogo, chBadge, chColor, s
 import { setQuery } from '../app.js';
 import { columnChart } from '../chart.js';
 import { openOrder } from './orderops.js';
+import { turkeyMap, cityTable } from './trmap.js';
 
 const RANGES = [['all', 'Tümü'], ['365', 'Son 1 yıl'], ['90', 'Son 90 gün'], ['30', 'Son 30 gün']];
 const SORTS = [['last', 'Son sipariş'], ['orders', 'Sipariş sayısı'], ['spend', 'Toplam harcama'], ['first', 'Yeni müşteri']];
 const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
 export async function customersView(el, rest, query = {}) {
-  const f = { range: 'all', sort: 'last', repeat: '', channel: '', q: '', page: 1, ...store.get('customers', {}), ...(query.channel ? { channel: query.channel } : {}) };
+  const f = { range: 'all', sort: 'last', repeat: '', channel: '', q: '', page: 1, cityView: 'map', ...store.get('customers', {}), ...(query.channel ? { channel: query.channel } : {}) };
   let S = null, L = null;
   const params = () => {
     const p = new URLSearchParams();
@@ -24,10 +25,8 @@ export async function customersView(el, rest, query = {}) {
       <div class="card flush"><div class="card-head" style="padding:16px 16px 0"><h2>Kanallara göre müşteriler</h2></div><div data-chs></div></div>
       <div class="card"><div class="card-head"><h2>Kaç kez sipariş verdiler?</h2></div><div data-dist></div></div>
     </div>
-    <div class="grid-2" style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))">
-      <div class="card"><div class="card-head"><h2>Aylık yeni ve tekrar eden müşteri</h2></div><div data-months></div><div class="row small muted" style="gap:14px;margin-top:6px"><span><i class="dot" style="background:var(--primary)"></i> Yeni</span><span><i class="dot" style="background:var(--good)"></i> Tekrar eden</span></div></div>
-      <div class="card flush"><div class="card-head" style="padding:16px 16px 0"><h2>İllere göre müşteriler</h2></div><div data-cities></div></div>
-    </div>
+    <div class="card"><div class="card-head" style="flex-wrap:wrap;gap:8px"><h2>İllere göre satış</h2><span class="spacer"></span><div class="seg" data-cview></div></div><div data-cities></div></div>
+    <div class="card"><div class="card-head"><h2>Aylık yeni ve tekrar eden müşteri</h2></div><div data-months></div><div class="row small muted" style="gap:14px;margin-top:6px"><span><i class="dot" style="background:var(--primary)"></i> Yeni</span><span><i class="dot" style="background:var(--good)"></i> Tekrar eden</span></div></div>
     <div class="card flush">
       <div class="card-head" style="padding:16px 16px 0;flex-wrap:wrap;gap:8px"><h2>Müşteri listesi</h2><span class="spacer"></span>
         <div class="search" style="min-width:220px"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ad, telefon, e-posta, sipariş no" data-q value="${f.q}"></div>
@@ -56,8 +55,15 @@ export async function customersView(el, rest, query = {}) {
     const box = $('[data-months]', el);
     if (S.months.length) columnChart(box, { labels: S.months.map((m) => MONTHS[Number(m.m.slice(5)) - 1]), titles: S.months.map((m) => `${MONTHS[Number(m.m.slice(5)) - 1]} ${m.m.slice(0, 4)}`), series: [{ id: 'new', name: 'Yeni', color: 'var(--primary)', values: S.months.map((m) => m.new) }, { id: 'ret', name: 'Tekrar eden', color: 'var(--good)', values: S.months.map((m) => m.returning) }], format: (v) => n(v), height: 220 });
     else render(box, html`<div class="empty">Veri yok</div>`);
-    render($('[data-cities]', el), S.cities.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>İl</th><th class="r">Müşteri</th><th class="r">Sipariş</th></tr></thead><tbody>${S.cities.map((c) => html`<tr><td>${c.city}</td><td class="r num">${n(c.customers)}</td><td class="r num">${n(c.orders)}</td></tr>`)}</tbody></table></div>` : html`<div class="empty">Veri yok</div>`);
+    drawCities();
     render($('[data-ch]', el), html`<option value="">Tüm kanallar</option>${S.channels.map((c) => html`<option value="${c.channel}" ${f.channel === c.channel ? 'selected' : ''}>${ch(c.channel).name}</option>`)}`);
+  }
+  // İller: önce Türkiye haritası (üzerine gelince adet / sipariş / ciro), Liste sekmesinde tablo
+  function drawCities() {
+    render($('[data-cview]', el), html`<button class="${f.cityView === 'map' ? 'on' : ''}" data-act="cview" data-k="map">Harita</button><button class="${f.cityView === 'list' ? 'on' : ''}" data-act="cview" data-k="list">Liste</button>`);
+    const box = $('[data-cities]', el);
+    if (f.cityView === 'list') return render(box, cityTable(S.cities));
+    turkeyMap(box, S.cities).catch((e) => render(box, html`<div class="notice bad">${e.message}</div>`));
   }
   function drawList() {
     render($('[data-list]', el), L.customers.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Müşteri</th><th>Kanallar</th><th class="r">Sipariş</th><th class="r">Toplam</th><th class="r">Ort. sepet</th><th>İlk / son sipariş</th></tr></thead><tbody>
@@ -76,7 +82,7 @@ export async function customersView(el, rest, query = {}) {
     p.set('page', f.page);
     L = await api('customers?' + p); drawList();
   }
-  const save = () => { store.set('customers', { range: f.range, sort: f.sort, repeat: f.repeat }); setQuery({ channel: f.channel }); };
+  const save = () => { store.set('customers', { range: f.range, sort: f.sort, repeat: f.repeat, cityView: f.cityView }); setQuery({ channel: f.channel }); };
 
   async function openCustomer(key) {
     const s = sheet({ title: 'Müşteri', size: 'wide', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
@@ -103,6 +109,7 @@ export async function customersView(el, rest, query = {}) {
     chpick: (t) => { f.channel = t.dataset.k; f.page = 1; save(); $('[data-ch]', el).value = f.channel; loadList().catch((e) => toast(e.message, true)); },
     page: (t) => { f.page += Number(t.dataset.k); loadList().catch((e) => toast(e.message, true)); },
     open: (t) => openCustomer(t.dataset.k),
+    cview: (t) => { f.cityView = t.dataset.k; save(); drawCities(); },
   });
   $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); f.page = 1; loadList().catch(() => {}); }, 300));
   $('[data-ch]', el).addEventListener('change', (e) => { f.channel = e.target.value; f.page = 1; save(); loadList().catch(() => {}); });

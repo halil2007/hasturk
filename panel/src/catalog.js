@@ -8,24 +8,25 @@ import { all, first, run, getRaw, setSetting, getSettings, log } from './db.js';
 import { getChannels } from './channels/index.js';
 import { importListings, catalogOf } from './sync.js';
 import { fail, str, num, r2 } from './util.js';
+import { rank, localProfile, prepare, score } from './catmatch.js';
 
-const NO_API = { idefix: 'idefix ürün aktarma servisi dokümanı gelince eklenecek', pttavm: 'PttAVM ürün aktarma servisi dokümanı gelince eklenecek', n11: 'N11 ürün servisi dokümanı gelince eklenecek', pazarama: 'Pazarama ürün servisi dokümanı gelince eklenecek' };
+const NO_API = { idefix: 'Ürün yükleme idefix panelinden yapılır', pttavm: 'Ürün yükleme PttAVM panelinden yapılır', n11: 'Ürün yükleme N11 panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').replace(/\s+/g, '').replace(/(lt|litre|l)$/, 'lt').replace(/(kg|kilo|kilogram)$/, 'kg');
 
 async function targets(env, db) {
-  return (await getChannels(env, db)).filter((c) => c.type !== 'ikas' && (c.enabled || NO_API[c.id] && !c.paused));
+  return (await getChannels(env, db)).filter((c) => c.type !== 'ikas' && (c.enabled || NO_API[c.type] && !c.paused));
 }
 async function target(env, db, id) {
   const c = (await getChannels(env, db)).find((x) => x.id === id);
   if (!c) fail(404, 'Kanal yok');
   if (c.hold) fail(400, `${c.name} beklemede: yazma işlemleri kapalı`);
-  if (!c.enabled || !c.catalog) fail(400, NO_API[c.id] || `${c.name} için ürün yükleme desteklenmiyor ya da API bilgileri girilmemiş`);
+  if (!c.enabled || !c.catalog) fail(400, NO_API[c.type] || `${c.name} için ürün yükleme desteklenmiyor ya da API bilgileri girilmemiş`);
   return c;
 }
-const mapOf = async (db, local, ch) => {
+async function mapOf(db, local, ch) {
   const m = await first(db, 'SELECT * FROM category_map WHERE local = ? AND channel = ?', local, ch);
   return m && { ...m, attrs: JSON.parse(m.attrs || '{}') };
-};
+}
 
 // Panel ürünü → kanala gidecek ortak ürün bilgisi
 async function productsFor(db, settings, { local, ch, ids }) {
@@ -70,26 +71,17 @@ async function buildAll(c, map, prods, opts, zeroStock) {
 }
 
 // ---------- otomatik kategori eşleştirme ----------
-// ikas kategori yolu (ör. "Bahçe › Toprak ve Harç") ile pazaryeri kategorilerinin adı / yolu kelime kelime karşılaştırılır.
-// Türkçe karakter ve ek farkları (toprak / toprağı, tohum / tohumu) yok sayılır: kelimelerin ilk 5 harfi karşılaştırılır.
-const FOLD = { ı: 'i', İ: 'i', ş: 's', Ş: 's', ğ: 'g', Ğ: 'g', ü: 'u', Ü: 'u', ö: 'o', Ö: 'o', ç: 'c', Ç: 'c', â: 'a' };
-const STOPW = new Set(['ve', 'ile', 'icin', 'diger', 'urunleri', 'urunler', 'cesitleri', 'malzemeleri']);
-const words = (s) => String(s || '').replace(/[ıİşŞğĞüÜöÖçÇâ]/g, (c) => FOLD[c]).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOPW.has(w)).map((w) => w.slice(0, 5));
-export function scoreCategory(local, c) {
-  const segs = String(local).split('›').map((x) => x.trim()).filter(Boolean);
-  const last = new Set(words(segs[segs.length - 1] || local)), all = new Set(words(local));
-  const nm = new Set(words(c.name)), pt = new Set(words(c.path));
-  let s = 0;
-  for (const w of last) s += nm.has(w) ? 3 : pt.has(w) ? 1 : 0;
-  for (const w of all) if (!last.has(w) && (nm.has(w) || pt.has(w))) s += 1;
-  if (last.size && [...last].every((w) => nm.has(w)) && [...nm].every((w) => last.has(w))) s += 3;
-  return s - Math.max(0, nm.size - last.size) * 0.3;
-}
-async function suggest(c, local, n = 5) {
+// Puanlama src/catmatch.js'te: ikas kategori yolu + o kategorideki ürün adları, pazaryeri kategorisinin adı ve yoluyla;
+// Türkçe ekler, eş anlamlılar ve tarım/bahçe kavramları (ilaçlama pompası ≠ su pompası, organik ≠ kimyevi gübre) dikkate alınır.
+export function scoreCategory(local, c, names = []) { return score(localProfile(local, names), prepare([c])[0]).score; }
+const namesOf = async (db, local) => (await all(db, "SELECT name FROM products WHERE active = 1 AND COALESCE(category, '') = ? ORDER BY updated_at DESC LIMIT 60", local)).map((r) => r.name);
+async function suggest(db, c, local, n = 5) {
   if (!local || !c.catalog.allCategories) return [];
-  return (await c.catalog.allCategories()).map((x) => ({ ...x, score: Math.round(scoreCategory(local, x) * 10) / 10 })).filter((x) => x.score >= 2)
-    .sort((a, b) => b.score - a.score).slice(0, n);
+  return rank(await c.catalog.allCategories(), local, await namesOf(db, local), n);
 }
+// Otomatik eşleştirme yalnız açık farkla en iyi olan kategoriye yapılır; iki aday birbirine çok yakınsa elle seçime bırakılır
+const AUTO_MIN = 5, AUTO_LEAD = 0.5;
+const confident = (r) => r[0] && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
 // Kategori özelliklerini mümkün olduğunca otomatik doldur: varyant özellikleri ürünün varyant adından, Menşei = Türkiye
 async function autoAttrs(c, catId) {
   const out = {}, missing = [];
@@ -106,22 +98,40 @@ async function autoAttrs(c, catId) {
   return { attrs: out, missing };
 }
 // Eşleştirilmemiş ikas kategorilerini en uygun pazaryeri kategorisine bağla (puanı yeterli olanlar)
-async function automap(db, settings, c, user) {
+async function automap(db, settings, c, user, { redo = false } = {}) {
   const cats = catalogOf(settings), ph = cats.map(() => '?').join(',');
+  // redo: daha önce otomatik yapılmış eşleştirmeler de yeni puanlamayla yeniden hesaplanır (elle yapılanlara dokunulmaz)
   const locals = (await all(db, `SELECT DISTINCT COALESCE(p.category, '') AS local FROM products p WHERE p.active = 1 AND COALESCE(p.category, '') != ''
     AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph}))
-    AND NOT EXISTS (SELECT 1 FROM category_map m WHERE m.local = p.category AND m.channel = ?)`, ...cats, c.id)).map((r) => r.local);
+    AND NOT EXISTS (SELECT 1 FROM category_map m WHERE m.local = p.category AND m.channel = ?${redo ? " AND m.user NOT LIKE 'Otomatik%'" : ''})`, ...cats, c.id)).map((r) => r.local);
   const mapped = [], skipped = [];
   for (const local of locals) {
-    const [best] = await suggest(c, local, 1);
-    if (!best || best.score < 2.5) { skipped.push({ local, reason: best ? `en yakın: ${best.name} (puan düşük)` : 'uygun kategori bulunamadı' }); continue; }
+    const r = await suggest(db, c, local, 2), best = r[0];
+    if (!confident(r)) { skipped.push({ local, reason: !best ? 'uygun kategori bulunamadı' : best.score < AUTO_MIN ? `en yakın: ${best.name} (benzerlik düşük)` : `iki aday çok yakın: ${best.name} / ${r[1].name}` }); continue; }
+    const cur = await mapOf(db, local, c.id);
+    if (cur && cur.remote_id === best.id) continue;
     const { attrs, missing } = await autoAttrs(c, best.id);
     await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (local, channel) DO NOTHING`, local, c.id, best.id, best.name, JSON.stringify(attrs), Date.now(), (user && user.name) || 'Otomatik');
-    mapped.push({ local, remote: best.name, path: best.path, missing });
+      ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,
+    local, c.id, best.id, best.name, JSON.stringify(attrs), Date.now(), user ? `Otomatik (${user.name})` : 'Otomatik');
+    mapped.push({ local, remote: best.name, path: best.path, missing, before: cur ? cur.remote_name : null });
   }
   if (mapped.length) await log(db, c.id, 'info', `${mapped.length} kategori otomatik eşleştirildi: ${mapped.slice(0, 5).map((x) => `${x.local} → ${x.remote}`).join(' · ')}`);
   return { mapped, skipped };
+}
+// Mevcut eşleştirmeleri denetle: seçili kategori, yeni puanlamaya göre açıkça daha uygun bir kategorinin gerisinde kalıyorsa listelenir
+async function review(db, c) {
+  const list = c.catalog.allCategories ? await c.catalog.allCategories() : [];
+  const byId = new Map(list.map((x) => [String(x.id), x])), out = [];
+  for (const m of await all(db, 'SELECT local, remote_id, remote_name, user FROM category_map WHERE channel = ?', c.id)) {
+    const names = await namesOf(db, m.local), L = localProfile(m.local, names);
+    const r = rank(list, m.local, names, 2), best = r[0], curCat = byId.get(String(m.remote_id));
+    const now = curCat ? score(L, prepare([curCat])[0]).score : null;
+    if (!best || String(best.id) === String(m.remote_id) || !confident(r)) continue;
+    if (now != null && best.score - now < 3 && now >= 3) continue;
+    out.push({ local: m.local, current: { id: m.remote_id, name: m.remote_name, score: now }, best: { id: best.id, name: best.name, path: best.path, score: best.score }, auto: /^Otomatik/.test(m.user || '') });
+  }
+  return { items: out };
 }
 
 // ---------- otomatik ürün gönderimi (kanal bazında açılıp kapatılır) ----------
@@ -173,8 +183,8 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       GROUP BY 1 ORDER BY local = '', local`, ...cats);
     const maps = await all(db, 'SELECT local, channel, remote_id, remote_name, attrs, updated_at FROM category_map');
     return {
-      channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo, sandbox: !!c.sandbox,
-        reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.id] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
+      channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo,
+        reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.type] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
         auto: !!(settings.auto_upload || {})[c.id], stockPush: !!(settings.stock_push || {})[c.id] })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
       maps: maps.map((x) => ({ ...x, attrs: JSON.parse(x.attrs || '{}') })),
@@ -183,8 +193,20 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       stockSync: !!settings.stock_sync,
     };
   }
-  if (path === 'catalog/suggest' && m === 'GET') return { items: await suggest(await target(env, db, q.channel), str(q.local)) };
-  if (path === 'catalog/automap' && m === 'POST') return automap(db, settings, await target(env, db, str(b.channel)), user);
+  if (path === 'catalog/suggest' && m === 'GET') return { items: await suggest(db, await target(env, db, q.channel), str(q.local)) };
+  if (path === 'catalog/automap' && m === 'POST') return automap(db, settings, await target(env, db, str(b.channel)), user, { redo: !!b.redo });
+  if (path === 'catalog/review' && m === 'GET') return review(db, await target(env, db, q.channel));
+  if (path === 'catalog/review/apply' && m === 'POST') {
+    const c = await target(env, db, str(b.channel)), done = [];
+    for (const x of (b.items || []).slice(0, 200)) {
+      if (!str(x.local) || !str(x.id)) continue;
+      const { attrs } = await autoAttrs(c, str(x.id));
+      await run(db, 'UPDATE category_map SET remote_id = ?, remote_name = ?, attrs = ?, updated_at = ?, user = ? WHERE local = ? AND channel = ?', str(x.id), str(x.name), JSON.stringify(attrs), Date.now(), `Otomatik (${user.name})`, str(x.local), c.id);
+      done.push(x.local);
+    }
+    await log(db, c.id, 'info', `${user.name}: ${done.length} kategori eşleştirmesi önerilen kategoriyle değiştirildi`);
+    return { ok: true, count: done.length };
+  }
   if (path === 'catalog/remote-categories' && m === 'GET') return (await target(env, db, q.channel)).catalog.categories(str(q.q));
   if (path === 'catalog/attributes' && m === 'GET') return { attributes: await (await target(env, db, q.channel)).catalog.attributes(str(q.category)) };
   if (path === 'catalog/values' && m === 'GET') return { values: await (await target(env, db, q.channel)).catalog.values(str(q.category), str(q.attribute)) };

@@ -19,7 +19,7 @@ export async function uploadView(el) {
     render(el, html`<div class="stack">
       <div class="notice"><i class="ico ico-upload"></i><div style="flex:1"><b>ikas'taki ürünleri pazaryerlerine yükleyin.</b> 1) ikas kategorisini pazaryeri kategorisiyle bir kez eşleştirin (zorunlu özellikler dahil) · 2) Kanalda henüz olmayan ürünleri seçip gönderin · 3) Kanalın onay sonucunu aşağıdan takip edin. Onaylanan ürün barkod / SKU ile otomatik eşleşir.
         ${!st.stockSync && c && !c.stockPush ? html`<div class="small" style="margin-top:4px">Stok senkronu kapalı: ürün ilk stokla gönderilir, sonraki stok değişiklikleri bu kanala gitmez (aşağıdan “Stokları gönder”i açabilirsiniz).</div>` : ''}</div></div>
-      <div class="ch-tabs">${st.channels.map((x) => html`<button class="ch-tab ${x.id === chId ? 'on' : ''}" data-act="ch" data-id="${x.id}" ${x.ready ? '' : 'disabled'} title="${x.reason}">${chLogo(x.id)}${x.name}${x.sandbox ? html`<span class="pill warn">test</span>` : ''}${!x.ready ? html`<span class="tiny muted">${x.reason}</span>` : ''}</button>`)}</div>
+      <div class="ch-tabs">${st.channels.map((x) => html`<button class="ch-tab ${x.id === chId ? 'on' : ''}" data-act="ch" data-id="${x.id}" ${x.ready ? '' : 'disabled'} title="${x.reason}">${chLogo(x.id)}${x.name}${!x.ready ? html`<span class="tiny muted">${x.reason}</span>` : ''}</button>`)}</div>
       ${!c || !c.ready ? html`<div class="empty">Ürün yüklenebilecek bağlı pazaryeri yok. Trendyol / Hepsiburada API bilgilerini Entegrasyonlar'dan girin.</div>` : html`
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
         <h2 style="margin:0">Otomatik işlemler · ${c.name}</h2>
@@ -29,7 +29,7 @@ export async function uploadView(el) {
           <span><b>Stokları ${c.name}'a gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${c.name}'a gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
       </div>` : ''}
       <div class="card flush">
-        <div class="card-head" style="padding:16px 16px 0"><h2>Kategori eşleştirme</h2><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorilerini en uygun ${c.name} kategorisine bağlar"><i class="ico ico-bolt"></i>Otomatik eşleştir</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
+        <div class="card-head" style="padding:16px 16px 0"><h2>Kategori eşleştirme</h2><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorilerini en uygun ${c.name} kategorisine bağlar"><i class="ico ico-bolt"></i>Otomatik eşleştir</button><button class="btn sm" data-act="review" title="Mevcut eşleştirmeleri yeni algoritmayla kontrol eder; yanlış görünenler için daha uygun kategori önerir"><i class="ico ico-check"></i>Eşleştirmeleri kontrol et</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>ikas kategorisi</th><th class="r">Ürün</th><th class="r">${c.name}'da</th><th>${c.name} kategorisi</th><th></th></tr></thead><tbody>
           ${st.categories.map((k) => { const m = mapOf(k.local), open = k.n - (k.listed[chId] || 0); return html`<tr>
             <td><b>${catName(k.local)}</b></td><td class="r num">${n(k.n)}</td><td class="r num">${n(k.listed[chId] || 0)}</td>
@@ -181,6 +181,27 @@ export async function uploadView(el) {
     }); });
   }
 
+  // Mevcut eşleştirmelerin denetimi: daha uygun kategori bulunanlar listelenir, seçilenler tek tıkla düzeltilir
+  async function reviewSheet() {
+    const c = C(), s = sheet({ title: `${c.name}: eşleştirme kontrolü`, size: 'wide', body: html`<div class="empty"><i class="ico ico-sync spin"></i> Kategoriler karşılaştırılıyor…</div>` });
+    const r = await api(`catalog/review?channel=${chId}`).catch((e) => { s.setBody(html`<div class="notice bad">${e.message}</div>`); return null; });
+    if (!r) return;
+    if (!r.items.length) { s.setBody(html`<div class="notice good"><i class="ico ico-check"></i>Tüm eşleştirmeler uygun görünüyor; daha iyi bir kategori bulunamadı.</div>`); return; }
+    s.setBody(html`<div class="stack"><div class="small muted">${r.items.length} eşleştirme için daha uygun kategori bulundu. Değiştirmek istediklerinizi işaretleyin (elle yaptığınız eşleştirmeler varsayılan olarak işaretsizdir).</div>
+      <div class="table-wrap"><table class="t"><thead><tr><th></th><th>ikas kategorisi</th><th>Şu anki</th><th>Önerilen</th></tr></thead><tbody>
+      ${r.items.map((x, i) => html`<tr><td><input type="checkbox" class="cb" data-ri="${i}" ${x.auto ? 'checked' : ''}></td><td><b>${catName(x.local)}</b></td>
+        <td><span class="pill bad">${x.current.name || x.current.id}</span>${x.current.score != null ? html` <span class="tiny muted">uyum ${n(x.current.score)}</span>` : ''}</td>
+        <td><span class="pill good">${x.best.name}</span> <span class="tiny muted">uyum ${n(x.best.score)}</span><div class="tiny muted">${x.best.path || ''}</div></td></tr>`)}
+      </tbody></table></div></div>`);
+    s.setFoot(html`<div class="row" style="width:100%"><span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-x="apply">Seçilenleri düzelt</button></div>`);
+    s.el.addEventListener('click', (e) => { const b = e.target.closest('[data-x=apply]'); if (!b) return; busy(b, async () => {
+      const items = $$('[data-ri]', s.body).filter((x) => x.checked).map((x) => { const it = r.items[Number(x.dataset.ri)]; return { local: it.local, id: it.best.id, name: it.best.name }; });
+      if (!items.length) return toast('Seçim yok', true);
+      const res = await api('catalog/review/apply', { method: 'POST', body: { channel: chId, items } });
+      s.close(); toast(`${res.count} eşleştirme düzeltildi — zorunlu özellikleri “Düzenle” ile kontrol edin`); await load();
+    }); });
+  }
+
   function detailSheet(u) {
     sheet({ title: `Gönderim #${u.id} · ${u.items.length} ürün`, size: 'wide', body: html`<div class="stack">
       ${u.ref ? html`<div class="small">Takip no: <b class="num">${u.ref}</b>${u.checked_at ? html` · son sorgu ${dateTime(u.checked_at)}` : ''}</div>` : ''}
@@ -201,6 +222,7 @@ export async function uploadView(el) {
       toast(`${r.mapped.length} kategori otomatik eşleştirildi${r.skipped.length ? ` · ${r.skipped.length} kategori için uygun eşleşme bulunamadı (elle eşleştirin)` : ''}${r.mapped.some((x) => x.missing.length) ? ' · bazılarında zorunlu özellik eksik, “Düzenle” ile tamamlayın' : ''}`);
       await load();
     }),
+    review: () => reviewSheet(),
     check: (t) => busy(t, async () => { const r = await api(`catalog/uploads/${t.dataset.id}/check`, { method: 'POST' }); toast(r.done ? 'Kanal işlemi tamamladı' : 'Kanal hâlâ işliyor, birazdan tekrar sorgulayın'); await load(); }),
     detail: (t) => detailSheet(st.uploads.find((u) => String(u.id) === t.dataset.id)),
   });

@@ -2,7 +2,7 @@
 // “Yeni API Oluştur”: API KEY ve API SECRET KEY satıcının e-posta adresine gönderilir; Satıcı ID ekranda görünür.
 // Kimlik: X-API-KEY = base64(ApiKey:ApiSecret). Canlı ortamda IP izni gerekmez (test ortamında gerekir).
 // Kimlik: X-API-KEY başlığı (biçim otomatik bulunur, aşağıya bakın). Siparişler: /oms/{vendorId}/list · Ürün/stok/fiyat: /pim/...
-// Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür (beta: canlı hesapla doğrulanmalı).
+// Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
 import { http, num, str, chunk, diagStep, sleep } from '../util.js';
 
 const BASE = 'https://merchantapi.idefix.com';
@@ -147,7 +147,7 @@ export function idefix(env, meta) {
 
   const missing = ['IDEFIX_API_KEY', 'IDEFIX_API_SECRET', 'IDEFIX_VENDOR_ID'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'idefix', beta: true, enabled: !missing.length, missing,
+    ...meta, type: 'idefix', enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true },
     fetchOrders, fetchListings, pushStock, pushPrice, accept, ship, diagnose,
   };

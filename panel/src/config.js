@@ -35,7 +35,6 @@ export const FIELDS = {
     { k: 'HB_USERNAME', label: 'Kullanıcı adı', hint: 'boşsa Merchant ID', adv: true },
     { k: 'HB_USER_AGENT', label: 'Entegratör adı (User-Agent)', req: true, hint: 'Merchant Portal → Hesabım → Entegrasyon (Entegratör Bilgileri) ekranındaki entegratör adı, ör. hasturk_dev. Boşsa ya da farklıysa Hepsiburada isteği 401/403 ile reddeder.' },
     { k: 'HB_MERCHANT_NAME', label: 'Mağaza adı (Hepsiburada\'da görünen)', hint: 'Buybox sıranızı bulmak için; ürün sayfasındaki satıcı adıyla birebir aynı', adv: true },
-    { k: 'HB_TEST', label: 'Test ortamı', hint: '1 = test (SIT) ortamı', adv: true },
     { k: 'HB_PROXY_URL', label: 'Aracı sunucu adresi (520 hatası için)', hint: 'Kendi hostinginize yüklediğiniz hb-proxy.php adresi, ör. https://alanadiniz.com/hb-proxy.php (dosya: panel adresi/hb-proxy.php)', adv: true, pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan tam adres girin' },
     { k: 'HB_PROXY_KEY', label: 'Aracı sunucu anahtarı', hint: 'hb-proxy.php içindeki $KEY ile birebir aynı', secret: true, adv: true },
   ],
@@ -64,6 +63,44 @@ export const FIELDS = {
     { k: 'PAZARAMA_CLIENT_SECRET', label: 'API Secret', secret: true, req: true },
   ],
 };
+
+// ---------- ek mağazalar ----------
+// Her kanal türüne istenen sayıda mağaza eklenebilir: ek mağazanın kimliği "<tür>_<n>" (ör. trendyol_2, ikas_3).
+// Ek mağazanın bilgileri ana mağazayla aynı alan adlarıyla, kendi kaydında saklanır; Cloudflare değişkenleri ek mağazaya karışmaz.
+export const TYPES = ['ikas', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama'];
+export const TYPE_NAMES = { ikas: 'ikas', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama' };
+export const EXTRA_RE = /^(ikas|trendyol|hepsiburada|pttavm|n11|idefix|pazarama)_(\d{1,3})$/;
+export const isExtra = (id) => EXTRA_RE.test(String(id || ''));
+export const typeOf = (id) => { const m = EXTRA_RE.exec(String(id || '')); return m ? m[1] : /^ikas\d$/.test(id) ? 'ikas' : id; };
+const baseFields = (type) => FIELDS[type === 'ikas' ? 'ikas1' : type] || [];
+const LABEL = { k: 'STORE_LABEL', label: 'Panelde görünen ad', hint: 'ör. Trendyol · 2. mağaza' };
+export function fieldsFor(id) {
+  if (FIELDS[id]) return FIELDS[id];
+  if (!isExtra(id)) return null;
+  return typeOf(id) === 'ikas' ? baseFields('ikas') : [LABEL, ...baseFields(typeOf(id))];
+}
+// Ek mağazanın değişkenleri: ortamdaki o türe ait anahtarlar silinir, yerine mağazanın kendi bilgileri konur
+export function storeEnv(env, type, values) {
+  const out = { ...env };
+  for (const f of baseFields(type)) delete out[f.k];
+  for (const [k, v] of Object.entries(values || {})) if (v) out[k] = v;
+  return out;
+}
+export async function addStore(db, type) {
+  if (!TYPES.includes(type)) fail(400, 'Bilinmeyen kanal türü');
+  const rows = await all(db, 'SELECT id FROM channel_config');
+  const used = new Set(rows.map((r) => r.id));
+  let n = type === 'ikas' ? 3 : 2;
+  while (used.has(`${type}_${n}`)) n++;
+  const id = `${type}_${n}`;
+  await run(db, 'INSERT INTO channel_config (id, data, active, updated_at) VALUES (?, NULL, 1, ?)', id, Date.now());
+  return id;
+}
+export async function removeStore(db, id) {
+  if (!isExtra(id)) fail(400, 'Ana mağaza kaldırılamaz; pasif yapabilirsiniz');
+  await run(db, 'DELETE FROM channel_config WHERE id = ?', id);
+  await run(db, "DELETE FROM settings WHERE k IN (?, ?, ?)", 'verified:' + id, 'last:' + id, 'auto_backfill:' + id);
+}
 
 // ---------- şifreleme ----------
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -98,7 +135,7 @@ export async function loadConfig(env, db) {
 }
 
 export async function saveConfig(env, db, id, { values = {}, clear = [], active } = {}) {
-  const fields = FIELDS[id];
+  const fields = fieldsFor(id);
   if (!fields) throw new Error('Bilinmeyen kanal');
   const cur = (await loadConfig(env, db))[id] || { values: {}, active: true };
   const next = cur.locked ? {} : { ...cur.values };
@@ -120,7 +157,7 @@ export async function saveConfig(env, db, id, { values = {}, clear = [], active 
 // Kanal için geçerli değişkenler: Cloudflare ortamı + panelde girilenler (panel önceliklidir)
 export function effectiveEnv(env, cfg) {
   const out = { ...env };
-  for (const c of Object.values(cfg)) for (const [k, v] of Object.entries(c.values || {})) if (v) out[k] = v;
+  for (const [id, c] of Object.entries(cfg)) if (!isExtra(id)) for (const [k, v] of Object.entries(c.values || {})) if (v) out[k] = v;
   return out;
 }
 
@@ -129,8 +166,8 @@ export function describe(env, cfg, id) {
   const c = cfg[id] || { values: {}, active: true };
   return {
     active: c.active, locked: !!c.locked, updated: c.updated || null,
-    fields: FIELDS[id].map((f) => {
-      const p = c.values[f.k], e = env[f.k];
+    fields: fieldsFor(id).map((f) => {
+      const p = c.values[f.k], e = isExtra(id) ? '' : env[f.k];
       const v = p || e || '';
       return {
         k: f.k, label: f.label, hint: f.hint || '', secret: !!f.secret, req: !!f.req, adv: !!f.adv,

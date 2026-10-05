@@ -8,7 +8,6 @@ import { cargo } from './views/cargo.js';
 import { matching } from './views/match.js';
 import { buyboxView, bbChannels } from './views/buybox.js';
 import { questionsView, qChannels } from './views/questions.js';
-import { hbTestView } from './views/hbtest.js';
 import { uploadView } from './views/upload.js';
 import { customersView } from './views/customers.js';
 import { profitView } from './views/profit.js';
@@ -23,7 +22,6 @@ const ROUTES = [
   { sec: 'Satış' },
   { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders' },
   { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo' },
-  { path: 'musteriler', title: 'Müşteriler', icon: 'user', view: customersView },
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', when: () => qChannels().length > 0 },
   { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products },
@@ -34,9 +32,9 @@ const ROUTES = [
   { sec: 'Raporlar' },
   { path: 'analiz', title: 'Analizler', icon: 'pie', view: insightsView },
   { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView },
+  { path: 'musteriler', title: 'Müşteriler', icon: 'user', view: customersView },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
-  { path: 'hb-test', title: 'Hepsiburada test adımları', icon: 'check', view: hbTestView, admin: true, hidden: true },
   { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices' },
   { path: 'kullanicilar', title: 'Kullanıcılar', icon: 'user', view: users, admin: true },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
