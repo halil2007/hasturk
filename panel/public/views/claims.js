@@ -64,7 +64,7 @@ export async function claimsView(el, rest, query = {}) {
       <label class="field"><span>Ret gerekçesi</span><select class="input" name="reason" required><option value="">Seçin</option>${reasons.map((x) => html`<option value="${x.id}">${x.name}</option>`)}</select></label>
       <label class="field"><span>Açıklama (müşteri ve ${ch(r.channel).name} görür)</span><textarea class="input" name="text" maxlength="500" rows="4" required placeholder="Ör. Ürün kullanılmış ve ambalajı açılmış olarak geldi; fotoğraflar ektedir."></textarea></label>
       ${ch(r.channel).type === 'trendyol' || ch(r.channel).demo ? html`<label class="field"><span>Fotoğraf / PDF (önerilir, en fazla 5 MB)</span><input class="input" type="file" name="file" accept="image/jpeg,image/png,application/pdf"></label>` : ''}
-      <div class="muted tiny">Ret kararı pazaryerine gönderilir; pazaryeri gerekirse talebi inceler.</div></form>`);
+      <div class="muted tiny">${ch(r.channel).type === 'idefix' ? 'idefix\'te ret bir taleptir: idefix inceleyip sonuçlandırır; sonuç bir sonraki senkronda görünür.' : 'Ret kararı pazaryerine gönderilir; pazaryeri gerekirse talebi inceler.'}</div></form>`);
     s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn danger" data-x="go"><i class="ico ico-x"></i>Reddet</button>`);
     s.el.addEventListener('click', (e) => { const b = e.target.closest('[data-x=go]'); if (!b) return; busy(b, async () => {
       const fm = $('[data-f]', s.el);

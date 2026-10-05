@@ -3,6 +3,7 @@
 import { api, state, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels } from '../core.js';
 import { loadSummary } from '../app.js';
 import { costOf, COST_KEYS } from '../profit.js';
+import { pushState, enablePush, disablePush } from '../push-client.js';
 
 // Logoyu en fazla 600×200 px PNG'ye küçült (veritabanında küçük yer kaplasın)
 function shrink(file) {
@@ -24,7 +25,20 @@ function shrink(file) {
 
 export async function settingsView(el) {
   const admin = isAdmin();
-  async function load() {
+  // Anlık bildirim kartı (her kullanıcı kendi cihazı için açar)
+  async function drawPush() {
+    const box = $('[data-pushbox]', el); if (!box) return;
+    const st = await pushState().catch(() => 'unsupported');
+    render(box, html`<h2>Anlık bildirim (bu cihaz)</h2>
+      <div class="muted small">Yeni sipariş, iade talebi ve müşteri sorusu bu telefona / bilgisayara bildirim olarak gelir (15 dakikalık senkronda, tek özet bildirim). Her cihazda ayrı açılır.</div>
+      ${st === 'on' ? html`<div class="row wrap"><span class="pill good">Bu cihazda açık</span><span class="spacer"></span><button class="btn" data-act="push-test">Deneme bildirimi gönder</button><button class="btn ghost" data-act="push-off">Kapat</button></div>`
+        : st === 'off' ? html`<div class="row wrap"><button class="btn primary" data-act="push-on"><i class="ico ico-bell"></i>Bu cihazda bildirimleri aç</button></div>`
+        : st === 'denied' ? html`<div class="notice warn small">Bildirim izni bu tarayıcıda reddedilmiş. Adres çubuğundaki kilit simgesi → Bildirimler → İzin ver, sonra sayfayı yenileyin.</div>`
+        : st === 'ios-install' ? html`<div class="notice small">iPhone'da bildirim için paneli ana ekrana ekleyin: Safari → <b>Paylaş</b> → <b>Ana Ekrana Ekle</b>; sonra ana ekrandaki simgeden açıp buradan bildirimleri açın (iOS 16.4 ve üzeri).</div>`
+        : html`<div class="notice warn small">Bu tarayıcı anlık bildirimi desteklemiyor. Chrome, Edge, Firefox ya da Safari'nin güncel sürümünü kullanın.</div>`}`);
+  }
+  const load = async () => { await load0(); drawPush(); };
+  async function load0() {
     const [chs, st, logs, mail] = await Promise.all([api('channels'), api('settings'), api('logs'), admin ? api('integrations/mail').catch(() => null) : null]);
     state.settings = st;
     const live = chs.filter((c) => !c.paused);
@@ -76,6 +90,8 @@ export async function settingsView(el) {
           ${COST_KEYS.map((k) => { const own = (st[k] || {})[c.id], extra = /_\d+$/.test(c.id); return html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${extra ? own ?? '' : costOf(st, k, c.id)}" placeholder="${extra ? costOf(st, k, c.id) : ''}" title="${extra ? 'Boş bırakılırsa aynı türdeki ana mağazanın değeri kullanılır' : ''}" ${dis}></td>`; })}</tr>`)}
       </tbody></table></div>
         <div class="card-pad muted tiny" style="padding-top:0">Masraf basamakları: satış − komisyon − kargo − hizmet bedeli − ek kesinti − stopaj = hakediş; hakediş − alış = kâr. Stopaj, pazaryerlerinin 2025'ten beri hakedişten kestiği gelir vergisidir (KDV hariç satış üzerinden, genelde %1); yıllık vergiden mahsup edilir. Kendi siteniz (ikas) için 0 bırakın.</div></div>
+
+      <div class="card stack" data-pushbox><h2>Anlık bildirim (bu cihaz)</h2><div class="muted small">Yükleniyor…</div></div>
 
       ${admin ? html`<div class="card stack" data-mailbox>
         <h2>Yeni sipariş e-posta bildirimi</h2>
@@ -195,6 +211,9 @@ export async function settingsView(el) {
     await api('integrations/mail', { method: 'PUT', body: { values } });
   };
   actions(el, {
+    'push-on': (t) => busy(t, async () => { await enablePush(); toast('Bildirimler bu cihazda açıldı'); await drawPush(); }),
+    'push-off': (t) => busy(t, async () => { await disablePush(); toast('Bildirimler bu cihazda kapatıldı'); await drawPush(); }),
+    'push-test': (t) => busy(t, async () => { const r = await api('push/test', { method: 'POST' }); toast(r.sent ? `Deneme bildirimi gönderildi (${r.sent} cihaz)` : 'Bildirim açık cihaz yok'); }),
     'mail-save': (t) => busy(t, async () => { await saveMail(); toast('Bildirim ayarları kaydedildi'); await load(); }),
     'mail-test': (t) => busy(t, async () => { await saveMail(); const r = await api('mail/test', { method: 'POST' }); toast(r.message); }),
     'push-stock': (t) => busy(t, async () => { const r = await api('push-stock', { method: 'POST' }); toast(r.skipped || Object.entries(r).map(([k, v]) => `${ch(k).name}: ${v}`).join(' · ') || 'Gönderilecek değişiklik yok'); }),

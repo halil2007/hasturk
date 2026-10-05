@@ -10,6 +10,8 @@ import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { hbTest } from './hbtest.js';
 import { suggestBarcode, assignBarcodes, barcodePrefix, missingBarcodes } from './barcodes.js';
 import { previewSkus, suggestSku, assignSkus, skuPrefix } from './skus.js';
+import { exportProducts, bulkUpdate } from './bulk.js';
+import { publicKey, subscribe, unsubscribe, latest, notify } from './push.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
@@ -507,9 +509,15 @@ function cleanProduct(b) {
 
 // Stok durumu: kritik eşik ürüne özel (critical_stock) ya da Ayarlar'daki genel sınır
 const LIMIT = (low) => `(CASE WHEN p.critical_stock > 0 THEN p.critical_stock ELSE ${Math.max(0, Math.round(Number(low) || 0))} END)`;
+// Son 30 günde satılan adet (iptal / iade hariç): stok tükenme tahmini için
+const SOLD30 = () => `(SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id = p.id AND o.ordered_at >= ${Date.now() - 30 * 864e5}
+  AND o.status NOT IN ('cancelled', 'returned') AND COALESCE(i.status, '') != 'cancelled')`;
+export const RUNOUT_DAYS = 14;
 async function listProducts(db, q) {
   const where = [], args = [];
   const low = LIMIT((await getSettings(db)).low_stock);
+  // Tükenmek üzere: mevcut satış hızıyla 14 gün içinde bitecek ürünler
+  if (q.filter === 'runout') where.push(`p.stock > 0 AND ${SOLD30()} > 0 AND p.stock * 30.0 / ${SOLD30()} <= ${RUNOUT_DAYS}`);
   if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.group_name LIKE ? OR p.brand LIKE ?)'); args.push(s, s, s, s, s); }
   if (q.filter === 'out') where.push('p.stock <= 0');
   if (q.filter === 'below') where.push(`p.stock > 0 AND p.stock <= ${low}`);
@@ -543,10 +551,14 @@ async function listProducts(db, q) {
     const ls = await all(db, `SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
       FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ids.map(() => '?').join(',')})`, ...ids);
     for (const r of rows) r.listings = ls.filter((l) => l.product_id === r.id);
+    // Satış hızı: son 30 günde satılan adet ve mevcut stokla kaç gün yeteceği
+    const sold = new Map((await all(db, `SELECT p.id, ${SOLD30()} AS n FROM products p WHERE p.id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((x) => [x.id, x.n]));
+    for (const r of rows) { r.sold30 = sold.get(r.id) || 0; r.days_left = r.sold30 > 0 ? Math.floor((Math.max(0, r.stock) * 30) / r.sold30) : null; }
   }
   // Stok durumu sayıları (sekmeler için)
   const cnt = await first(db, `SELECT SUM(p.stock <= 0) AS out_, SUM(p.stock > 0 AND p.stock <= ${low}) AS below, SUM(p.stock > ${low}) AS enough, COUNT(*) AS total FROM products p WHERE p.active = 1`);
-  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, all: cnt.total || 0 } };
+  const ro = await first(db, `SELECT COUNT(*) AS n FROM (SELECT p.stock AS st, ${SOLD30()} AS s FROM products p WHERE p.active = 1 AND p.stock > 0) WHERE s > 0 AND st * 30.0 / s <= ${RUNOUT_DAYS}`);
+  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, runout: ro.n || 0, all: cnt.total || 0 } };
 }
 
 async function stockChange(env, db, ctx, id, b, user) {
@@ -1126,6 +1138,21 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/barcodes' && m === 'GET') return json({ prefix: await barcodePrefix(db), missing: await missingBarcodes(db) });
   if (path === 'products/barcodes/new' && m === 'GET') return json(await suggestBarcode(db, q.prefix));
   if (path === 'products/barcodes' && m === 'POST') { const b = await body(req); return json(await assignBarcodes(db, b.ids, { prefix: b.prefix, user: user.name })); }
+  // Anlık bildirim: cihaz aboneliği, deneme bildirimi ve servis çalışanının okuduğu son bildirim
+  if (path === 'push/key' && m === 'GET') return json({ key: await publicKey(db) });
+  if (path === 'push/subscribe' && m === 'POST') { const b = await body(req); return json(await subscribe(db, user, b.subscription, req.headers.get('user-agent'))); }
+  if (path === 'push/unsubscribe' && m === 'POST') return json(await unsubscribe(db, (await body(req)).endpoint));
+  if (path === 'push/latest' && m === 'GET') return json(await latest(db));
+  if (path === 'push/test' && m === 'POST') return json(await notify(db, { title: 'Hastürk Panel', body: `Bildirimler açık · ${user.name}`, url: '#/' }));
+  // Excel ile toplu güncelleme: dışa aktar (CSV) ve geri yükle (önizleme / uygula)
+  if (path === 'products.csv' && m === 'GET') return new Response(await exportProducts(env, db), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="urunler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
+  if (path === 'products/bulk' && m === 'POST') {
+    const b = await body(req);
+    const r = await bulkUpdate(env, db, b.rows, { dry: b.dry !== false, user: user.name });
+    if (r.applied && r.stock) ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    if (r.applied && r.prices) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
+    return json(r);
+  }
   // SKU oluşturma: ürün adından öneri (önizleme, kaydedilmez), tek ürün önerisi, seçilenlere kaydet
   if (path === 'products/skus' && m === 'GET') return json({ prefix: await skuPrefix(db) });
   if (path === 'products/skus/new' && m === 'GET') return json(await suggestSku(db, q));

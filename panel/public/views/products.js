@@ -1,6 +1,7 @@
 // Ürünler: varyantlar ana ürün altında gruplanır; merkezi stok (her kanala kendi kuralıyla gönderilir), hızlı stok girişi,
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
-import { api, state, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels } from '../core.js';
+import { api, state, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
+import { readSheet } from '../sheetread.js';
 import { profit, costOf } from '../profit.js';
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
@@ -20,6 +21,7 @@ export async function products(el, rest, query = {}) {
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
       <span class="spacer"></span>
       <button class="btn" data-act="barcodes" title="Barkodu ya da SKU'su olmayan ürünlere benzersiz kod oluştur"><i class="ico ico-tag"></i>Barkod / SKU oluştur</button>
+      <button class="btn" data-act="excel" title="Fiyat, stok, maliyet ve kanal fiyatlarını Excel ile toplu güncelle"><i class="ico ico-download"></i>Excel</button>
       <button class="btn" data-act="import"><i class="ico ico-download"></i>Kanallardan içe aktar</button>
       <a class="btn" href="#/eslestirme"><i class="ico ico-link"></i>Eşleştirme <span data-unl></span></a>
       <button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün Ekle</button>
@@ -118,6 +120,10 @@ export async function products(el, rest, query = {}) {
     edit: (t) => productForm(Number(t.dataset.id), refresh),
     new: () => productForm(0, refresh),
     import: () => importDialog(refresh),
+    excel: (t) => popMenu(t, [
+      { icon: 'download', label: 'Excel\'e aktar (tüm ürünler)', run: () => { location.href = '/api/products.csv'; } },
+      { icon: 'upload', label: 'Excel\'den toplu güncelle', run: () => excelDialog(refresh) },
+    ]),
     barcodes: () => barcodeDialog(refresh, f.filter === 'nosku' ? 'sku' : 'barcode'),
   });
   $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); refresh(); }, 300));
@@ -444,4 +450,55 @@ async function barcodeDialog(done, kind = 'barcode') {
     });
   });
   await load().catch((e) => { s.close(); fail(e); });
+}
+
+// Excel ile toplu güncelleme: dosya tarayıcıda okunur, sunucu önizleme döner; onaylanınca uygulanır
+function excelDialog(done) {
+  let rows = null, file = '';
+  const s = sheet({ title: 'Excel\'den toplu güncelle', size: 'wide' });
+  const intro = () => {
+    s.setBody(html`<div class="stack">
+      <ol class="small" style="margin:0;padding-left:20px;line-height:1.8">
+        <li><a class="link" href="/api/products.csv">Ürün listesini Excel'e aktarın</a> (her ürün bir satır, ID / SKU / barkod ile).</li>
+        <li>Excel'de <b>Alış fiyatı, Satış fiyatı, Stok, Kritik stok, Desi, KDV</b> ya da <b>“Fiyat: Kanal adı”</b> sütunlarını değiştirin. Ürün adı gibi diğer sütunlar değiştirilse de dikkate alınmaz; boş hücre değişiklik sayılmaz.</li>
+        <li>Dosyayı (.xlsx ya da .csv) aşağıdan seçin; önce <b>önizleme</b> gösterilir, onaylayınca kaydedilir.</li>
+      </ol>
+      <label class="btn" style="align-self:flex-start"><i class="ico ico-upload"></i>Dosya seç (.xlsx / .csv)<input type="file" accept=".xlsx,.csv,.txt" data-file hidden></label>
+      <div class="muted tiny">Stok senkronu kapalıyken stoğu ikas'tan okunan ürünlerin stoğu değiştirilmez. Kanal fiyatları kaydedilince kanala gönderilir.</div>
+    </div>`);
+    s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>`);
+  };
+  const fmt = (v) => (v == null ? '—' : String(Math.round(v * 100) / 100).replace('.', ','));
+  function preview(r) {
+    s.setBody(html`<div class="stack">
+      <div class="notice ${r.changes ? '' : 'warn'} small"><i class="ico ico-${r.changes ? 'check' : 'warn'}"></i><div><b>${file}</b> · ${n(r.rows)} satır, ${n(r.matched)} ürün eşleşti · <b>${n(r.changes)} değişiklik</b>${Object.keys(r.counts).length ? ` (${Object.entries(r.counts).map(([k, x]) => `${k} ${x}`).join(', ')})` : ''}<div class="tiny muted">Okunan sütunlar: ${r.columns.join(', ')}</div></div></div>
+      ${r.preview.length ? html`<div class="table-wrap" style="max-height:42vh;overflow:auto"><table class="t"><thead><tr><th>Ürün</th><th>Alan</th><th class="r">Eski</th><th class="r">Yeni</th></tr></thead><tbody>
+        ${r.preview.map((c) => html`<tr><td class="ellipsis" style="max-width:320px">${c.name}</td><td class="small">${c.label}</td><td class="r num muted">${fmt(c.old)}</td><td class="r num" style="font-weight:650">${fmt(c.new)}</td></tr>`)}
+      </tbody></table></div>${r.changes > r.preview.length ? html`<div class="muted tiny">İlk ${r.preview.length} değişiklik gösteriliyor; tümü uygulanır.</div>` : ''}` : ''}
+      ${r.skippedTotal ? html`<details${r.changes ? '' : ' open'}><summary class="small" style="cursor:pointer;color:var(--warn)">${n(r.skippedTotal)} satır / hücre atlandı</summary><ul class="small" style="margin:6px 0 0;padding-left:20px">${r.skipped.map((x) => html`<li>${x.line}. satır: ${x.reason}</li>`)}</ul></details>` : ''}
+    </div>`);
+    s.setFoot(html`<button class="btn" data-again>Başka dosya</button><span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-apply ${r.changes ? '' : 'disabled'}><i class="ico ico-check"></i>${n(r.changes)} değişikliği kaydet</button>`);
+  }
+  intro();
+  s.el.addEventListener('change', async (e) => {
+    if (!e.target.matches('[data-file]')) return;
+    const f = e.target.files[0]; if (!f) return;
+    file = f.name;
+    s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i> ${f.name} okunuyor…</div>`);
+    try {
+      rows = await readSheet(f);
+      if (!rows.length) throw new Error('Dosyada satır bulunamadı');
+      preview(await api('products/bulk', { method: 'POST', body: { rows, dry: true } }));
+    } catch (err) { toast(err.message, true); intro(); }
+  });
+  s.el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-again]')) { rows = null; intro(); return; }
+    const b = e.target.closest('[data-apply]');
+    if (!b || !rows) return;
+    busy(b, async () => {
+      const r = await api('products/bulk', { method: 'POST', body: { rows, dry: false } });
+      toast(`${n(r.changes)} değişiklik kaydedildi${r.prices ? ' · kanal fiyatları gönderiliyor' : ''}${r.stock ? ' · stoklar kanallara gönderiliyor' : ''}`);
+      s.close(); done();
+    });
+  });
 }
