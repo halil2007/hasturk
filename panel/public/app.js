@@ -17,6 +17,7 @@ import { notices } from './views/notices.js';
 import { users } from './views/users.js';
 import { settingsView } from './views/settings.js';
 import { financeView } from './views/finance.js';
+import { hbTestView } from './views/hbtest.js';
 import { claimsView, claimChannels } from './views/claims.js';
 import { campaignsView, campaignChannels } from './views/campaigns.js';
 import { can } from './perms.js';
@@ -45,6 +46,7 @@ const ROUTES = [
   { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices' },
   { path: 'kullanicilar', title: 'Kullanıcılar', icon: 'user', view: users, admin: true },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
+  { path: 'hb-test', title: 'Hepsiburada test adımları', icon: 'check', view: hbTestView, admin: true, hidden: true },
 ];
 const PAGES = ROUTES.filter((r) => r.view);
 const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kargo', 'Kargo', 'truck'], ['stoklar', 'Stok', 'db']];

@@ -7,6 +7,7 @@ import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfiden
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
+import { hbTest } from './hbtest.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
@@ -753,6 +754,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
   // Personel: yalnız yetkili olduğu bölümler (bkz. public/perms.js)
   if (!can(user, sectionOf(path))) fail(403, 'Bu bölüm için yetkiniz yok (Kullanıcılar → yetkiler)');
+  // Hepsiburada canlıya geçiş testi (yalnız yönetici)
+  if (path.startsWith('hbtest/')) {
+    if (user.role !== 'admin') fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
+    return json(await hbTest(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
+  }
   // Kategori eşleştirme ve pazaryerine ürün yükleme
   if (path.startsWith('catalog/')) return json(await catalogApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
   if (path === 'summary' && m === 'GET') {
