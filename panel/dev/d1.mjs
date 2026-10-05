@@ -20,7 +20,7 @@ export function d1(path = ':memory:') {
     async batch(stmts) {
       db.exec('BEGIN');
       try {
-        const out = stmts.map((s) => (/^\s*(SELECT|WITH)/i.test(s.sql) || /RETURNING/i.test(s.sql) ? { results: s.st().all(...fix(s.args)) } : (s.runSync(), { success: true })));
+        const out = stmts.map((s) => (/^\s*(SELECT|WITH)/i.test(s.sql) || /RETURNING/i.test(s.sql) ? { results: s.st().all(...fix(s.args)) } : { success: true, meta: { changes: Number(s.runSync().changes) } }));
         db.exec('COMMIT');
         return out;
       } catch (e) { db.exec('ROLLBACK'); throw e; }
