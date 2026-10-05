@@ -19,6 +19,7 @@ export async function buyboxView(el, rest, query = {}) {
   let data = { rows: [], kpi: {}, total: 0 };
   const st = state.settings || {};
   render(el, html`<div class="stack">
+    ${!bbChannels().length ? html`<div class="notice"><i class="ico ico-warn"></i><div>Buybox takibi Trendyol ve Hepsiburada ilanları için çalışır; bu kanallardan biri bağlanınca ilanlar burada görünür (Entegrasyonlar).</div></div>` : ''}
     <div data-auto></div>
     <div class="kpis" data-kpis></div>
     <div class="row wrap"><div class="ch-tabs" style="flex:1" data-chs></div></div>

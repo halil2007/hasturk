@@ -149,6 +149,10 @@ const MIGRATIONS = [
     remote_status TEXT, customer TEXT, reason TEXT, note TEXT, lines TEXT, amount REAL, cargo TEXT, tracking TEXT, synced_at INTEGER, decided_at INTEGER, decided_by TEXT,
     decision_note TEXT, error TEXT, PRIMARY KEY (channel, remote_id))`,
   'CREATE INDEX IF NOT EXISTS claims_status ON claims(status, claimed_at)',
+  // Döviz bazlı fiyat (bkz. fx.js): para birimi (USD / EUR / GBP; boşsa TL), döviz fiyatı ve ürüne özel kâr payı %
+  'ALTER TABLE products ADD COLUMN currency TEXT',
+  'ALTER TABLE products ADD COLUMN fx_price REAL',
+  'ALTER TABLE products ADD COLUMN fx_margin REAL',
   // Personel yetkileri (JSON bölüm listesi; boşsa tüm bölümler) — bkz. public/perms.js
   'ALTER TABLE users ADD COLUMN perms TEXT',
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
@@ -204,6 +208,8 @@ export const DEFAULT_SETTINGS = {
   mail_to: [],
   mail_channels: {},
   panel_url: '',
+  // Döviz bazlı fiyat ayarları (kaynak, kur türü, güncelleme sıklığı, eşik %, yuvarlama, genel kâr payı %)
+  fx: { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 },
   // Müşteri sorularına hazır cevaplar
   answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
   commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15 },

@@ -54,7 +54,7 @@ export async function products(el, rest, query = {}) {
       <td><div class="row" style="cursor:pointer" data-act="edit" data-id="${p.id}">${thumb(p.image, p.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:600">${p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : p.name}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="muted tiny">${[p.sku, p.barcode].filter(Boolean).join(' · ') || 'SKU yok'}</div></div></div></td>
       <td>${dots(p)}</td>
       <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span style="color:var(--amber)">girilmedi</span>`}</td>
-      <td class="r num" style="font-weight:650">${money(p.sale_price)}</td>
+      <td class="r num" style="font-weight:650">${money(p.sale_price)}${p.currency && p.fx_price ? html`<div class="tiny muted">${p.fx_price} ${p.currency}</div>` : ''}</td>
       <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
       <td class="c">${stockCtl(p)}</td>
       <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
@@ -62,7 +62,7 @@ export async function products(el, rest, query = {}) {
       <td><div class="row" style="cursor:pointer" data-act="edit" data-id="${p.id}">${thumb(p.image, p.name)}<div style="min-width:0"><div class="ellipsis" style="max-width:340px;font-weight:650">${p.name}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="muted tiny">${brand(p.brand)}${[p.sku, p.barcode].filter(Boolean).join(' · ') || 'SKU yok'}</div></div></div></td>
       <td>${dots(p)}</td>
       <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span style="color:var(--amber)">girilmedi</span>`}</td>
-      <td class="r num" style="font-weight:650">${money(p.sale_price)}</td>
+      <td class="r num" style="font-weight:650">${money(p.sale_price)}${p.currency && p.fx_price ? html`<div class="tiny muted">${p.fx_price} ${p.currency}</div>` : ''}</td>
       <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
       <td class="c">${stockCtl(p)}</td>
       <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
@@ -231,6 +231,14 @@ export async function productForm(id, done) {
         ${siteStock(p) ? html`<label class="field"><span>Stok</span><input class="input" type="number" value="${p.stock}" readonly><small>ikas sitesinden okunur (stok senkronu kapalı)</small></label>` : html`<label class="field"><span>Stok</span><input class="input" name="stock" type="number" inputmode="numeric" value="${p.stock}"></label>`}
         <label class="field"><span>Kritik stok uyarısı</span><input class="input" name="critical_stock" type="number" inputmode="numeric" value="${p.critical_stock || 0}"></label>
       </div>
+      ${state.tenant ? html`<div class="notice small"><i class="ico ico-tag"></i><div><b>Döviz bazlı fiyat</b> (dolar / euro / sterlin fiyatı, kurla otomatik güncelleme) <span class="pill info">Yakında</span></div></div>` : html`<div class="stack" style="gap:8px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px">
+        <div class="row wrap" style="gap:8px"><b class="small">Döviz bazlı fiyat</b><span class="muted tiny">Döviz seçilirse TL satış fiyatı ve kanal fiyatları kurla otomatik güncellenir (Ayarlar → Döviz ve fiyat).</span></div>
+        <div class="form-grid">
+          <label class="field"><span>Fiyat para birimi</span><select class="input" name="currency" data-fx>${[['', 'TL (döviz yok)'], ['USD', 'Dolar ($)'], ['EUR', 'Euro (€)'], ['GBP', 'Sterlin (£)']].map(([v, t]) => html`<option value="${v}" ${(p.currency || '') === v ? 'selected' : ''}>${t}</option>`)}</select></label>
+          <label class="field"><span>Döviz fiyatı</span><input class="input" name="fx_price" inputmode="decimal" value="${p.fx_price || ''}" data-fx placeholder="ör. 12,50"></label>
+          <label class="field"><span>Kâr payı % (boşsa genel ayar)</span><input class="input" name="fx_margin" inputmode="decimal" value="${p.fx_margin ?? ''}" data-fx></label>
+        </div>
+        <div class="small" data-fxprev></div></div>`}
       <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Aktif (pasif ürünün stoğu kanallara gönderilmez)</label>
     </div>
     ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p></div>
@@ -261,11 +269,24 @@ export async function productForm(id, done) {
     });
   });
   form.onsubmit = (e) => e.preventDefault();
+  // Döviz fiyatı önizlemesi: güncel kur × döviz fiyatı × (1 + kâr payı) → yaklaşık TL fiyat
+  let fxInfo = null;
+  const fxPrev = () => {
+    const box = $('[data-fxprev]', form); if (!box) return;
+    const c = form.currency.value, fp = numIn(form.fx_price.value);
+    if (!c || !(fp > 0)) return render(box, html`<span class="muted">Döviz seçilmedi: fiyat TL olarak elle girilir.</span>`);
+    const fx = fxInfo && fxInfo.settings, r = fxInfo && fxInfo.rates && fxInfo.rates.rates && fxInfo.rates.rates[c];
+    if (!r) return render(box, html`<span class="muted">Kur bilgisi alınamadı${fxInfo && fxInfo.error ? `: ${fxInfo.error}` : ''}; kaydedince kur yeniden denenir.</span>`);
+    const rate = r[fx.kind] || r.sell, mg = form.fx_margin.value.trim() === '' ? fx.margin : numIn(form.fx_margin.value);
+    render(box, html`≈ <b>${money(fp * rate * (1 + (mg || 0) / 100))}</b> <span class="muted">(${c} ${rate.toFixed(4)} · ${fxInfo.rates.source === 'live' ? 'anlık kur' : `TCMB ${fxInfo.rates.date || ''}`}${mg ? ` · kâr payı %${mg}` : ''}) — kaydedince satış fiyatı ve kanal fiyatları bu kurla güncellenir</span>`);
+  };
+  if ($('[data-fxprev]', form)) { api('fx').then((r) => { fxInfo = r; fxPrev(); }).catch(() => fxPrev()); form.addEventListener('input', (e) => { if (e.target.dataset.fx !== undefined) fxPrev(); }); form.addEventListener('change', (e) => { if (e.target.dataset.fx !== undefined) fxPrev(); }); fxPrev(); }
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const fd = new FormData(form), b = {};
     for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'image', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock']) b[k] = fd.get(k);
     for (const k of ['purchase_price', 'sale_price', 'desi']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
+    if (form.currency) { b.currency = fd.get('currency') || ''; b.fx_price = numIn(fd.get('fx_price')); b.fx_margin = String(fd.get('fx_margin') || '').trim() === '' ? '' : numIn(fd.get('fx_margin')); }
     if (!b.name.trim()) return toast('Ürün adı gerekli', true);
     if (!id || Number(fd.get('stock')) !== p.stock) b.stock = Number(fd.get('stock')) || 0;
     b.listings = $$('tr[data-l]', form).map((tr) => ({ channel: tr.dataset.l, remote_id: tr.dataset.rid, price: numIn($('[data-lf=price]', tr).value), commission: $('[data-lf=commission]', tr).value }));

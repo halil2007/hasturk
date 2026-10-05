@@ -51,7 +51,7 @@ export async function questionsView(el, rest, query = {}) {
     const chs = qChannels();
     render($('[data-chs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>${chs.map((x) => html`<button class="ch-tab ${f.channel === x.id ? 'on' : ''}" data-act="ch" data-id="${x.id}">${chLogo(x.id)}${x.name}</button>`)}`);
     render($('[data-tabs]', el), html`${TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${n(k ? c[k] || 0 : total)}</span></button>`)}`);
-    render($('[data-box]', el), !chs.length ? html`<div class="card"><div class="empty">Müşteri sorularını destekleyen bağlı kanal yok (Trendyol / Hepsiburada bağlanınca sorular burada görünür).</div></div>`
+    render($('[data-box]', el), !chs.length ? html`<div class="card"><div class="empty">Müşteri sorularını destekleyen bağlı kanal yok. Trendyol, Hepsiburada, N11, idefix ya da Pazarama bağlanıp bağlantı testi geçince sorular burada görünür (Entegrasyonlar).</div></div>`
       : !data.rows.length ? html`<div class="card"><div class="empty">${f.status === 'waiting' ? 'Cevap bekleyen soru yok 🎉' : 'Kayıt yok'}</div></div>`
         : html`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:12px">${data.rows.map(card)}</div>
           <div class="pager"><span class="muted small" style="margin-right:auto">${n(data.total)} soru</span>${data.rows.length < data.total ? html`<button class="btn sm" data-act="more">Daha fazla</button>` : ''}</div>`);

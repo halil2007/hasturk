@@ -8,6 +8,7 @@ import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve 
 import { getChannels } from './channels/index.js';
 import { typeOf } from './config.js';
 import { syncInvoices, syncSettlements } from './finance.js';
+import { syncFx } from './fx.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
 import { autoMatch, relinkItems, repairDuplicates } from './match.js';
 import { runJobs, createJob } from './backfill.js';
@@ -361,6 +362,8 @@ export async function syncAll(env, db, { only, force, listings } = {}) {
     // 4) stok düşümü ve gönderim
     out.stockMoves = await applyStock(db, changed, settings);
     out.stock = await pushStocks(env, db, settings);
+    // Döviz bazlı fiyatlar: kur yenilenir, zamanı geldiyse ürün ve kanal fiyatları güncellenir (sonra fiyatlar gönderilir)
+    if (!only) out.fx = await syncFx(env, db, settings).catch((e) => 'hata: ' + e.message);
     out.price = await pushPrices(env, db);
     // Buybox kontrolü ve (açıksa) seçili ürünlerde otomatik fiyat
     if (!only) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
