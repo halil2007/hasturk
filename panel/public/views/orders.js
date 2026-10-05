@@ -16,7 +16,7 @@ export async function orders(el, rest, query = {}) {
   let data = { orders: [], counts: {}, total: 0 }, expanded = null, mobile = isMobile();
 
   render(el, html`<div class="stack">
-    <div class="row wrap" style="justify-content:flex-end;margin-top:-4px">
+    <div class="row wrap page-actions" style="justify-content:flex-end;margin-top:-4px">
       <span class="muted small" style="margin-right:auto" data-sub></span>
       <button class="btn sm" data-act="reload"><i class="ico ico-sync"></i>Yenile</button>
       <button class="btn sm" data-act="export"><i class="ico ico-download"></i>Dışa aktar <i class="ico ico-down"></i></button>
@@ -85,13 +85,17 @@ export async function orders(el, rest, query = {}) {
   }
   function cards() {
     const from = (data.page - 1) * data.limit;
-    return html`<div style="padding:12px" class="m-list">${data.orders.length ? data.orders.map((o) => html`<div class="m-card ${sel.has(o.id) || expanded === o.id ? 'sel-row' : ''}" data-row="${o.id}">
-        <div class="top"><input type="checkbox" class="cb" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Seç">${chLogo(o.channel, true)}<b>#${o.order_number}</b><span class="muted tiny">${shortDT(o.ordered_at)}</span><span class="spacer"></span><b class="num">${money(o.total)}</b></div>
-        <div class="row small"><i class="ico ico-user muted"></i><span class="ellipsis">${o.customer || '—'}${o.city ? ` · ${o.city}` : ''}</span>${o.cust_nth > 1 ? html`<span class="pill info" style="font-size:11px;padding:1px 7px">${o.cust_nth}. sipariş</span>` : ''}</div>
-        ${products(o)}
-        ${stateCell(o)}
-        <div class="row wrap">${pkgCell(o)}<span class="spacer"></span>${actionBtn(o)}</div>
-        ${expanded === o.id ? html`<div class="expand" style="margin:4px -14px -14px;border-radius:0 0 14px 14px;border-bottom:0" data-ops="${o.id}"></div>` : ''}
+    // Telefon: kompakt kart; dokununca sipariş tam ekran açılır (işlemler, paketler, etiket orada)
+    const item = (o) => o.items[0] ? html`<div class="oc-item">${thumb(o.items[0].image, o.items[0].name, 'sm')}<div style="min-width:0"><div class="ellipsis oc-name">${o.items[0].name}</div>
+      <div class="muted tiny">${o.lines > 1 ? `+${o.lines - 1} ürün · ` : ''}${o.qty || 0} adet${o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş</span>` : ''}</div></div></div>` : '';
+    const mainBtn = (o) => (o.status === 'new' ? html`<button class="btn sm primary" data-act="accept" data-id="${o.id}"><i class="ico ico-play"></i>İşleme al</button>`
+      : o.status === 'processing' ? html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Kargola</button>`
+        : o.status === 'shipped' ? html`<button class="btn sm ghost" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Takip</button>` : '');
+    return html`<div class="m-list oc-list">${data.orders.length ? data.orders.map((o) => html`<div class="m-card oc ${sel.has(o.id) ? 'sel-row' : ''}" data-row="${o.id}">
+        <div class="oc-top"><input type="checkbox" class="cb" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Seç">${chLogo(o.channel, true)}<b class="ellipsis">#${o.order_number}</b><span class="spacer"></span><b class="num oc-total">${money(o.total)}</b></div>
+        <div class="oc-meta"><span class="ellipsis">${o.customer || '—'}${o.city ? ` · ${o.city}` : ''}</span><span class="muted">${shortDT(o.ordered_at)}</span></div>
+        ${item(o)}
+        <div class="oc-foot">${stateCell(o)}<span class="spacer"></span>${mainBtn(o)}</div>
       </div>`) : html`<div class="empty">Bu filtrede sipariş yok</div>`}</div>${pager(from)}`;
   }
   function pager(from) {
@@ -149,7 +153,8 @@ export async function orders(el, rest, query = {}) {
       toast(r.message);
       const o = data.orders.find((x) => x.id === id);
       if (o) { data.counts.new = Math.max(0, (data.counts.new || 0) - 1); data.counts.processing = (data.counts.processing || 0) + 1; o.status = 'processing'; }
-      expanded = id; statusTabs(); draw(); loadSummary().catch(() => {});
+      if (mobile) { statusTabs(); draw(); openOrder(id, refresh); } else { expanded = id; statusTabs(); draw(); }
+      loadSummary().catch(() => {});
     }),
     reload: (t) => busy(t, load),
     filters: () => el.classList.toggle('show-filters'),
@@ -172,6 +177,7 @@ export async function orders(el, rest, query = {}) {
   el.addEventListener('click', (e) => {
     const r = e.target.closest('[data-row]');
     if (!r || e.target.closest('button, input, a, select, [data-ops]')) return;
+    if (mobile) return openOrder(r.dataset.row, refresh);
     expanded = expanded === r.dataset.row ? null : r.dataset.row;
     draw();
   });

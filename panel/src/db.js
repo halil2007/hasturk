@@ -261,8 +261,12 @@ export const DEFAULT_SETTINGS = {
   cargo_companies: ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'PTT Kargo', 'Sürat Kargo', 'Trendyol Express', 'HepsiJet', 'Kolay Gelsin'],
 };
 
+// Logo (base64, yüzlerce KB olabilir) her ayar okumasında taşınmaz: yerine kısa bir sürüm işareti gelir ("logo:uzunluk:son-karakterler").
+// Görselin kendisi /api/logo adresinden (tarayıcı önbellekli) sunulur; içeriği gereken yer getLogo() kullanır.
+// Giriş deneme sayaçları da ayar değildir, okunmaz.
 export async function getSettings(db) {
-  const rows = await all(db, 'SELECT k, v FROM settings');
+  const rows = await all(db, `SELECT k, CASE WHEN k = 'logo' AND length(v) > 2 THEN json_quote('logo:' || length(v) || ':' || substr(v, -24, 20)) ELSE v END AS v
+    FROM settings WHERE k NOT LIKE 'login_fail:%'`);
   const out = structuredClone(DEFAULT_SETTINGS);
   for (const r of rows) {
     try {
@@ -273,6 +277,7 @@ export async function getSettings(db) {
   return out;
 }
 export const setSetting = (db, k, v) => run(db, 'INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v', k, JSON.stringify(v));
+export async function getLogo(db) { const r = await first(db, "SELECT v FROM settings WHERE k = 'logo'"); try { return (r && JSON.parse(r.v)) || ''; } catch { return ''; } }
 export async function getRaw(db, k) { const r = await first(db, 'SELECT v FROM settings WHERE k = ?', k); return r ? JSON.parse(r.v) : null; }
 
 // Bildirim: aynı key için tek kayıt (tekrar ederse sayaç artar, okunmamış olur). resolve() düzelince kapatır.

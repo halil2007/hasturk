@@ -12,7 +12,7 @@ export { TenantPanel } from './tenants.js';
 
 // Tarayıcı güvenlik başlıkları (panel sayfaları): yalnız kendi betiğimiz çalışır, panel başka sitede çerçeve içinde açılamaz,
 // görseller https / data ile sınırlı. Bir açık olsa bile dışarıdan betik yüklenemez ve veri başka sunucuya gönderilemez.
-const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "font-src 'self' https://fonts.gstatic.com data:",
+const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "font-src 'self' data:",
   "img-src 'self' data: blob: https:", "connect-src 'self'", "worker-src 'self'", "frame-src 'self' blob: data:", "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 function secure(res) {
   const r = new Response(res.body, res);

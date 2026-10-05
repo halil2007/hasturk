@@ -1,6 +1,7 @@
 // /api/* isteklerinin işlenmesi. Ana panel (env.DB) ve müşteri panelleri (her biri kendi Durable Object veritabanında,
 // bkz. tenants.js) aynı kodu kullanır; böylece her güncelleme tüm panellere aynı anda gelir.
-import { init, getSettings } from './db.js';
+import { init, getSettings, getLogo } from './db.js';
+import { logoPath } from './mail.js';
 import { api } from './api.js';
 import { currentUser, login, logoutCookie, password } from './auth.js';
 import { json, body, HttpError } from './util.js';
@@ -19,14 +20,14 @@ export async function handle(req, env, ctx, db) {
     // Giriş ekranı için firma adı ve logo (giriş gerektirmez)
     if (path === 'brand') {
       const s = await getSettings(db);
-      return json({ title: s.company.title, legal: s.company.legal, logo: s.logo || null, demo: env.DEMO === '1' });
+      return json({ title: s.company.title, legal: s.company.legal, logo: logoPath(env, s) || null, demo: env.DEMO === '1' });
     }
     // Firma logosu (giriş gerektirmez): e-postalarda görünsün diye görsel olarak sunulur (ayarlardaki data: adresinden)
     if (path === 'logo' && req.method === 'GET') {
-      const m = /^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,(.+)$/.exec((await getSettings(db)).logo || '');
+      const m = /^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,(.+)$/.exec(await getLogo(db));
       if (!m) return new Response('Logo yok', { status: 404 });
       // Logo doğrudan açılsa bile içindeki betik çalışmaz (SVG): kum havuzu CSP + nosniff
-      return new Response(Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)), { headers: { 'Content-Type': m[1], 'Cache-Control': 'public, max-age=86400',
+      return new Response(Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)), { headers: { 'Content-Type': m[1], 'Cache-Control': url.searchParams.get('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
         'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox", 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline; filename="logo"' } });
     }
     if (path === 'login' && req.method === 'POST') {

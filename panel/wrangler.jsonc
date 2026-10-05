@@ -22,5 +22,10 @@
   "triggers": { "crons": ["*/15 * * * *", "*/2 * * * *"] },
   // Cloudflare panelinden eklenen düz metin değişkenler yayında silinmesin
   "keep_vars": true,
+  // Hız: Worker, kullanıcıya en yakın yerde değil veritabanının (D1) yanında çalışır. Bir sayfa açılırken onlarca veritabanı
+  // sorgusu yapılır; her biri okyanus ötesine gidip gelmek yerine milisaniyede biter (kullanıcı ↔ Worker arası tek gidiş-dönüş kalır)
+  "placement": { "mode": "smart" },
+  // Yayın sürümü: panel açılışta sürümü karşılaştırır, telefonda saklanan uygulama dosyaları yeni yayında yenilenir (public/sw.js)
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "observability": { "enabled": true }
 }

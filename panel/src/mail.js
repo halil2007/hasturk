@@ -61,12 +61,17 @@ export async function sendMail(env, db, { to, subject, html, text }) {
 }
 
 // E-postalarda firma logosu: panelin herkese açık logo adresi (müşteri panelinde firma koduyla). Logo ya da panel adresi yoksa boş.
-export function logoUrl(env, settings) {
-  const base = String((settings && settings.panel_url) || '').replace(/\/+$/, ''), logo = (settings && settings.logo) || '';
-  if (!base || !logo) return '';
+// Logonun panel içi adresi (/api/logo?…&v=sürüm): sürüm logo değişince değişir, tarayıcı önbelleği eskiyi göstermez
+export function logoPath(env, settings) {
+  const logo = (settings && settings.logo) || '';
+  if (!logo) return '';
   let h = 0;
-  for (let i = 0; i < logo.length; i += 97) h = (Math.imul(h, 31) + logo.charCodeAt(i)) | 0;
-  return `${base}/api/logo?${env && env.TENANT_SLUG ? `t=${encodeURIComponent(env.TENANT_SLUG)}&` : ''}v=${(h >>> 0).toString(36)}${logo.length.toString(36)}`;
+  for (let i = 0; i < logo.length; i++) h = (Math.imul(h, 31) + logo.charCodeAt(i)) | 0;
+  return `/api/logo?${env && env.TENANT_SLUG ? `t=${encodeURIComponent(env.TENANT_SLUG)}&` : ''}v=${(h >>> 0).toString(36)}${logo.length.toString(36)}`;
+}
+export function logoUrl(env, settings) {
+  const base = String((settings && settings.panel_url) || '').replace(/\/+$/, ''), p = logoPath(env, settings);
+  return base && p ? base + p : '';
 }
 export const logoImg = (url, alt = '') => (url ? `<img src="${esc(url)}" alt="${esc(alt)}" style="display:block;max-height:52px;max-width:200px;margin:0 0 14px">` : '');
 

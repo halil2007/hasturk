@@ -132,7 +132,7 @@ export async function dashboard(db, q) {
   const fromMs = startOf(from), toMs = startOf(to) + D, len = toMs - fromMs;
   if (len <= 0 || len > 800 * D) return { error: 'Geçersiz tarih aralığı' };
   const group = len > 120 * D ? 'month' : len > 45 * D ? 'week' : 'day';
-  const [cur, prev] = [await period(db, fromMs, toMs, group, settings), await period(db, fromMs - len, fromMs, group, settings)];
+  const [cur, prev] = await Promise.all([period(db, fromMs, toMs, group, settings), period(db, fromMs - len, fromMs, group, settings)]);
   const line = (p, k) => p.series.map((b) => (k === 'profit' ? b.profit : r2(Object.values(b[k]).reduce((a, x) => a + x, 0))));
   const pack = (p) => ({ total: p.total, totals: p.totals, revenue: line(p, 'revenue'), orders: line(p, 'orders'), profit: line(p, 'profit') });
   const [pending, low, stock, top] = await Promise.all([

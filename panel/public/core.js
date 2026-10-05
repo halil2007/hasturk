@@ -17,25 +17,51 @@ function busyBar(d) {
   if (inflight) barTimer = setTimeout(() => bar.classList.add('on'), 150);
   else { bar.classList.remove('on'); }
 }
-// Okuma (GET) cevapları kısa süre (20 sn) bellekte tutulur: sayfalar arasında gidip gelince veri beklenmeden anında açılır;
-// aynı anda yapılan aynı istek tek istekte birleştirilir. Herhangi bir değişiklik (POST/PUT/DELETE) önbelleği tamamen temizler.
+// Okuma (GET) cevapları bellekte tutulur; aynı anda yapılan aynı istek tek istekte birleştirilir.
+// - 20 sn'den yeni veri doğrudan kullanılır.
+// - Sayfa açılırken (swr açık) daha eski veri de (en fazla 15 dk) HEMEN gösterilir, arka planda tazelenir; yeni veri farklıysa
+//   'api:update' olayı yayınlanır ve sayfa sessizce yeniden çizilir. Böylece menüler arası geçiş ağı beklemez.
+// - Bir değişiklik (POST/PUT/DELETE) sonrası tüm kayıtlar "kirli" işaretlenir: sayfa içinden yapılan sonraki okuma ağı bekler
+//   (işlemin sonucu görülsün), başka sayfaya geçerken ise eski veri anında gösterilip tazelenir.
 const cache = new Map(), pending = new Map();
-const TTL = 20e3;
+const TTL = 20e3, STALE = 15 * 60e3;
+let swr = 0;
+export const swrScope = async (fn) => { swr++; try { return await fn(); } finally { swr--; } };
 export const clearCache = () => cache.clear();
+const remember = (path, data) => { cache.delete(path); cache.set(path, { at: Date.now(), data }); if (cache.size > 150) cache.delete(cache.keys().next().value); };
+function fetchGet(path) {
+  if (pending.has(path)) return pending.get(path);
+  const p = request(path, 'GET').then((data) => { remember(path, data); return data; }).finally(() => pending.delete(path));
+  pending.set(path, p);
+  return p;
+}
+// Arka planda tazele; değiştiyse haber ver
+function revalidate(path, old) {
+  if (pending.has(path)) return;
+  fetchGet(path).then((data) => {
+    if (JSON.stringify(data) !== JSON.stringify(old) && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('api:update', { detail: path }));
+  }).catch(() => {});
+}
+// Ön yükleme: menüye dokunulunca / imleç gelince sayfanın verisi önceden istenir (taze kayıt varsa istek atılmaz)
+export function prefetch(path) {
+  const c = cache.get(path);
+  if (c && !c.dirty && Date.now() - c.at < TTL) return;
+  fetchGet(path).catch(() => {});
+}
+// Sayfa açılırken yapılan okumalar kaydedilir (bir sonraki ziyarette menüye dokununca bu adresler önceden istenir)
+export const recorder = { list: null };
 export async function api(path, { method = 'GET', body, fresh = false } = {}) {
-  const get = method === 'GET';
-  if (get && !fresh) {
-    const c = cache.get(path);
-    if (c && Date.now() - c.at < TTL) return structuredClone(c.data);
-    if (pending.has(path)) return structuredClone(await pending.get(path));
-  } else if (!get) cache.clear();
-  const p = request(path, method, body);
-  if (get) {
-    pending.set(path, p);
-    try { const data = await p; cache.set(path, { at: Date.now(), data }); if (cache.size > 120) cache.delete(cache.keys().next().value); return structuredClone(data); }
-    finally { pending.delete(path); }
+  if (method === 'GET') {
+    if (recorder.list && !recorder.list.includes(path)) recorder.list.push(path);
+    const c = !fresh && cache.get(path), age = c ? Date.now() - c.at : Infinity;
+    if (c && !c.dirty && age < TTL) return structuredClone(c.data);
+    if (c && swr && age < STALE) { revalidate(path, c.data); return structuredClone(c.data); }
+    if (!fresh && pending.has(path)) return structuredClone(await pending.get(path));
+    return structuredClone(await (fresh ? request(path, 'GET').then((d) => { remember(path, d); return d; }) : fetchGet(path)));
   }
-  try { return await p; } finally { cache.clear(); }
+  const dirty = () => { for (const c of cache.values()) c.dirty = true; };
+  dirty();
+  try { return await request(path, method, body); } finally { dirty(); }
 }
 async function request(path, method, body) {
   busyBar(1);
@@ -242,18 +268,30 @@ export function confirmBox(text, okText = 'Tamam') {
 // ---------- açılır menü ----------
 let openMenu = null;
 const closeMenu = () => { if (openMenu) { openMenu.remove(); openMenu = null; } };
-export function popMenu(anchor, items) {
+// Telefonda menü alttan açılan işlem listesi olarak gösterilir (parmakla rahat seçilir, düğme gizli olsa da çalışır)
+export function popMenu(anchor, items, { title = '' } = {}) {
   closeMenu();
   const m = document.createElement('div');
   m.className = 'menu';
   render(m, html`${items.map((it, i) => (it === '-' ? html`<div class="sep"></div>` : html`<button data-i="${i}" ${it.danger ? 'style="color:var(--bad)"' : ''}>${it.icon ? html`<i class="ico ico-${it.icon}"></i>` : ''}${it.label}</button>`))}`);
+  m.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { const it = items[Number(b.dataset.i)]; closeMenu(); it.run(); } });
+  if (isMobile()) {
+    const bg = document.createElement('div');
+    bg.className = 'menu-bg';
+    m.classList.add('as-sheet');
+    if (title) { const h = document.createElement('div'); h.className = 'menu-title'; h.textContent = title; m.prepend(h); }
+    bg.append(m);
+    bg.addEventListener('click', (e) => { if (e.target === bg) closeMenu(); });
+    document.body.append(bg);
+    openMenu = bg;
+    return;
+  }
   document.body.append(m);
   const r = anchor.getBoundingClientRect();
   const left = Math.min(window.innerWidth - m.offsetWidth - 8, Math.max(8, r.right - m.offsetWidth));
   const top = r.bottom + 6 + m.offsetHeight > window.innerHeight ? r.top - m.offsetHeight - 6 : r.bottom + 6;
   m.style.left = left + window.scrollX + 'px';
   m.style.top = top + window.scrollY + 'px';
-  m.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { const it = items[Number(b.dataset.i)]; closeMenu(); it.run(); } });
   setTimeout(() => document.addEventListener('click', function off(e) { if (!m.contains(e.target)) { closeMenu(); document.removeEventListener('click', off); } }), 0);
   openMenu = m;
 }

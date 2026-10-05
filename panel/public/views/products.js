@@ -17,14 +17,14 @@ export async function products(el, rest, query = {}) {
   const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), page: 1 };
   let rows = [], total = 0, groupsTotal = 0;
   render(el, html`<div class="stack">
-    <div class="row wrap">
+    <div class="row wrap page-actions">
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
       <span class="spacer"></span>
       <button class="btn" data-act="barcodes" title="Barkodu ya da SKU'su olmayan ürünlere benzersiz kod oluştur"><i class="ico ico-tag"></i>Barkod / SKU oluştur</button>
       <button class="btn" data-act="excel" title="Fiyat, stok, maliyet ve kanal fiyatlarını Excel ile toplu güncelle"><i class="ico ico-download"></i>Excel</button>
       <button class="btn" data-act="import"><i class="ico ico-download"></i>Kanallardan içe aktar</button>
       <a class="btn" href="#/eslestirme"><i class="ico ico-link"></i>Eşleştirme <span data-unl></span></a>
-      <button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün Ekle</button>
+      <button class="btn primary" data-act="new" data-fab><i class="ico ico-plus"></i>Ürün Ekle</button>
     </div>
     <div class="tabs" data-filters></div>
     <div class="card flush" data-box></div>

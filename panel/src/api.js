@@ -15,7 +15,7 @@ import { publicKey, subscribe, unsubscribe, latest, notify } from './push.js';
 import { pickList } from './picklist.js';
 import { dailyDigest } from './digest.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
-import { sendMail, orderMail, validEmail } from './mail.js';
+import { sendMail, orderMail, validEmail, logoPath } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
@@ -41,12 +41,18 @@ async function loadOrder(db, id) {
   o.address = parse(o.address, {});
   o.extra = parse(o.extra, {});
   // Müşterinin kaçıncı siparişi (tekrar eden müşteri)
-  if (o.ckey) o.cust = await first(db, "SELECT COUNT(*) AS total, SUM(ordered_at <= ?) AS nth FROM orders WHERE ckey = ? AND status != 'cancelled'", o.ordered_at, o.ckey);
-  o.items = await all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.desi, p.image AS product_image, l.commission AS listing_commission
+  // Kalemler, paketler ve müşteri geçmişi aynı anda okunur (her sorgu ayrı gidiş-dönüş)
+  const [cust, items, packages] = await Promise.all([
+    o.ckey ? first(db, "SELECT COUNT(*) AS total, SUM(ordered_at <= ?) AS nth FROM orders WHERE ckey = ? AND status != 'cancelled'", o.ordered_at, o.ckey) : null,
+    all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.desi, p.image AS product_image, l.commission AS listing_commission
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = ? AND l.remote_id = i.remote_key
-    WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id);
-  o.packages = (await all(db, `SELECT ${PKG_COLS} FROM packages WHERE order_id = ? ORDER BY no`, id)).map((p) => ({ ...p, items: parse(p.items, []) }));
+    WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id),
+    all(db, `SELECT ${PKG_COLS} FROM packages WHERE order_id = ? ORDER BY no`, id),
+  ]);
+  if (cust) o.cust = cust;
+  o.items = items;
+  o.packages = packages.map((p) => ({ ...p, items: parse(p.items, []) }));
   return o;
 }
 
@@ -75,7 +81,9 @@ function orderFilter(q, { withStatus = true } = {}) {
 async function listOrders(db, q) {
   const { w, args, st } = orderFilter(q);
   const limit = Math.min(Number(q.limit) || 25, 200), page = Math.max(1, Number(q.page) || 1);
-  const rows = await all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src,
+  // Liste, toplam, durum sayıları ve ayarlar aynı anda okunur (sıralı gidiş-dönüş yerine tek bekleme)
+  const f2 = orderFilter(q, { withStatus: false });
+  const [rows, totalRow, counts, lateRow, byChannel, settings] = await Promise.all([all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src,
       (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS lines,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
@@ -87,13 +95,15 @@ async function listOrders(db, q) {
       o.ship_by, o.ext_action,
       (SELECT MAX(cargo_company) FROM packages WHERE order_id = o.id AND cargo_company != '') AS pkg_cargo,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id AND product_id IS NULL) AS unmatched
-    FROM orders o ${w} ORDER BY ${st === 'active' ? 'o.ordered_at ASC' : 'o.ordered_at DESC'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
-  const total = (await first(db, `SELECT COUNT(*) AS n FROM orders o ${w}`, ...args)).n;
+    FROM orders o ${w} ORDER BY ${st === 'active' ? 'o.ordered_at ASC' : 'o.ordered_at DESC'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit),
+  first(db, `SELECT COUNT(*) AS n FROM orders o ${w}`, ...args),
   // Durum sayıları: seçili kanal / tarih / arama içinde (durum filtresi hariç)
-  const f2 = orderFilter(q, { withStatus: false });
-  const counts = await all(db, `SELECT o.status, COUNT(*) AS n FROM orders o ${f2.w} GROUP BY o.status`, ...f2.args);
-  counts.push({ status: 'late', n: (await first(db, `SELECT COUNT(*) AS n FROM orders o ${f2.w ? f2.w + ' AND ' : 'WHERE '}${LATE}`, ...f2.args)).n });
-  const byChannel = await all(db, "SELECT channel, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY channel");
+  all(db, `SELECT o.status, COUNT(*) AS n FROM orders o ${f2.w} GROUP BY o.status`, ...f2.args),
+  first(db, `SELECT COUNT(*) AS n FROM orders o ${f2.w ? f2.w + ' AND ' : 'WHERE '}${LATE}`, ...f2.args),
+  all(db, "SELECT channel, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY channel"),
+  getSettings(db)]);
+  const total = totalRow.n;
+  counts.push({ status: 'late', n: lateRow.n });
   // Satır önizlemesi (görsel + ad + adet), ilk 2 ürün
   const items = {}, full = {};
   if (rows.length) {
@@ -107,7 +117,6 @@ async function listOrders(db, q) {
       (full[it.order_id] = full[it.order_id] || []).push(it);
     }
   }
-  const settings = await getSettings(db);
   return {
     orders: rows.map((r) => {
       const a = parse(r.address, {});
@@ -454,17 +463,20 @@ async function listPackages(db, q) {
   };
   const st = states[q.state] ? q.state : 'waiting';
   const w = (s) => 'WHERE ' + [states[s], ...where].join(' AND ');
-  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.agreement, p.tracking_url, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
+  // Paketler, sekme sayıları ve paketsiz siparişler aynı anda okunur
+  const keys = Object.keys(states), noPkg = `FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''}`;
+  const [rows, unpacked, extraWaiting, ...cn] = await Promise.all([all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.agreement, p.tracking_url, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
       p.packed_at, p.error, p.label_at, p.label_printed_at, p.remote_id,
       o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.ship_by, o.status AS order_status, (SELECT COUNT(*) FROM packages x WHERE x.order_id = p.order_id) AS pkg_total
-    ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args);
-  const counts = {};
-  for (const s of Object.keys(states)) counts[s] = (await first(db, `SELECT COUNT(*) AS n ${base} ${w(s)}`, ...args)).n;
-  // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler
-  const unpacked = st === 'waiting' ? await all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.extra, o.ordered_at, o.ship_by, o.status AS order_status, o.tracking, o.cargo_company,
+    ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args),
+    // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler
+    st === 'waiting' ? all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.extra, o.ordered_at, o.ship_by, o.status AS order_status, o.tracking, o.cargo_company,
       (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty
-    FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''} ORDER BY o.ordered_at ASC LIMIT 300`, ...args) : [];
-  counts.waiting += st === 'waiting' ? unpacked.length : (await first(db, `SELECT COUNT(*) AS n FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''}`, ...args)).n;
+    ${noPkg} ORDER BY o.ordered_at ASC LIMIT 300`, ...args) : [],
+    st === 'waiting' ? null : first(db, `SELECT COUNT(*) AS n ${noPkg}`, ...args),
+    ...keys.map((k) => first(db, `SELECT COUNT(*) AS n ${base} ${w(k)}`, ...args))]);
+  const counts = Object.fromEntries(keys.map((k, i) => [k, cn[i].n]));
+  counts.waiting += st === 'waiting' ? unpacked.length : extraWaiting.n;
   const addr = (r) => { const a = parse(r.address, {}), x = parse(r.extra, {}); return { ...r, city: a.city || '', district: a.district || '', address: undefined, extra: undefined, cargo_choice: x.cargoChoice || '' }; };
   return { state: st, packages: rows.map((r) => ({ ...addr(r), items: parse(r.items, []) })), unpacked: unpacked.map(addr), counts };
 }
@@ -537,30 +549,32 @@ async function listProducts(db, q) {
   const limit = Math.min(Number(q.limit) || 50, 500), page = Math.max(1, Number(q.page) || 1);
   // Ana ürün (varyant grubu) anahtarı: grup adı yoksa ürün adı
   const GK = "COALESCE(NULLIF(p.parent_key, ''), NULLIF(p.group_name, ''), p.name)";
-  let rows, total, groups = null;
-  if (q.group) {
+  // Sayfa satırları, toplamlar ve stok sekmesi sayıları aynı anda okunur
+  const page1 = async () => {
+    if (!q.group) return all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'COALESCE(NULLIF(p.group_name, \'\'), p.name) COLLATE NOCASE, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
     // Sayfalama ana ürün bazında: her sayfada N ana ürün ve tüm (filtreye uyan) varyantları
     const gks = (await all(db, `SELECT ${GK} AS gk, MIN(COALESCE(NULLIF(p.group_name, ''), p.name)) AS gn FROM products p ${w} GROUP BY gk ORDER BY gn COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit)).map((r) => r.gk);
-    rows = gks.length ? await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${gks.map(() => '?').join(',')})
+    return gks.length ? all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${gks.map(() => '?').join(',')})
       ORDER BY COALESCE(NULLIF(p.group_name, ''), p.name) COLLATE NOCASE, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, ...args, ...gks) : [];
-    groups = (await first(db, `SELECT COUNT(DISTINCT ${GK}) AS n FROM products p ${w}`, ...args)).n;
-    total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
-  } else {
-    rows = await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'COALESCE(NULLIF(p.group_name, \'\'), p.name) COLLATE NOCASE, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
-    total = (await first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args)).n;
-  }
+  };
+  const [rows, totalRow, groupRow, cnt, ro] = await Promise.all([
+    page1(),
+    first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args),
+    q.group ? first(db, `SELECT COUNT(DISTINCT ${GK}) AS n FROM products p ${w}`, ...args) : null,
+    first(db, `SELECT SUM(p.stock <= 0) AS out_, SUM(p.stock > 0 AND p.stock <= ${low}) AS below, SUM(p.stock > ${low}) AS enough, COUNT(*) AS total FROM products p WHERE p.active = 1`),
+    first(db, `SELECT COUNT(*) AS n FROM (SELECT p.stock AS st, ${SOLD30()} AS s FROM products p WHERE p.active = 1 AND p.stock > 0) WHERE s > 0 AND st * 30.0 / s <= ${RUNOUT_DAYS}`),
+  ]);
+  const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    const ls = await all(db, `SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
-      FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ids.map(() => '?').join(',')})`, ...ids);
-    for (const r of rows) r.listings = ls.filter((l) => l.product_id === r.id);
+    const [ls, soldRows] = await Promise.all([all(db, `SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ids.map(() => '?').join(',')})`, ...ids),
     // Satış hızı: son 30 günde satılan adet ve mevcut stokla kaç gün yeteceği
-    const sold = new Map((await all(db, `SELECT p.id, ${SOLD30()} AS n FROM products p WHERE p.id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((x) => [x.id, x.n]));
+    all(db, `SELECT p.id, ${SOLD30()} AS n FROM products p WHERE p.id IN (${ids.map(() => '?').join(',')})`, ...ids)]);
+    for (const r of rows) r.listings = ls.filter((l) => l.product_id === r.id);
+    const sold = new Map(soldRows.map((x) => [x.id, x.n]));
     for (const r of rows) { r.sold30 = sold.get(r.id) || 0; r.days_left = r.sold30 > 0 ? Math.floor((Math.max(0, r.stock) * 30) / r.sold30) : null; }
   }
-  // Stok durumu sayıları (sekmeler için)
-  const cnt = await first(db, `SELECT SUM(p.stock <= 0) AS out_, SUM(p.stock > 0 AND p.stock <= ${low}) AS below, SUM(p.stock > ${low}) AS enough, COUNT(*) AS total FROM products p WHERE p.active = 1`);
-  const ro = await first(db, `SELECT COUNT(*) AS n FROM (SELECT p.stock AS st, ${SOLD30()} AS s FROM products p WHERE p.active = 1 AND p.stock > 0) WHERE s > 0 AND st * 30.0 / s <= ${RUNOUT_DAYS}`);
   return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, runout: ro.n || 0, all: cnt.total || 0 } };
 }
 
@@ -656,11 +670,13 @@ async function productDetail(db, id) {
 // ---------- ayarlar ----------
 const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS).concat(['stock_channels', 'logo']);
 // Tarayıcıya yalnız panel ayarları gider; iç kayıtlar (bildirim imza anahtarı, senkron imleçleri, giriş sayaçları …) gitmez
-const publicSettings = (st) => Object.fromEntries(SETTING_KEYS.filter((k) => k in st).map((k) => [k, st[k]]));
+// Logo: içerik yerine önbelleklenebilir adresi gider (özet her açılışta yüzlerce KB taşımasın)
+const publicSettings = (st, env) => ({ ...Object.fromEntries(SETTING_KEYS.filter((k) => k in st).map((k) => [k, st[k]])), logo: logoPath(env, st) });
 async function saveSettings(db, b) {
   const cur = await getSettings(db);
   for (const k of Object.keys(b)) {
     if (!SETTING_KEYS.includes(k) || k === 'stock_since') continue;
+    if (k === 'logo' && /^\/api\/logo/.test(String(b[k] || ''))) continue; // değişmedi (tarayıcıdaki adres)
     let v = b[k];
     if (k === 'stock_sync') {
       v = !!v;
@@ -809,7 +825,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
     const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
     if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
-    return json({ ...s, channels: chInfo, settings: publicSettings(st), user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1' });
+    return json({ ...s, channels: chInfo, settings: publicSettings(st, env), user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1', build: (env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.id) || null });
   }
   // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
   if (path === 'panel-proxy' && m === 'GET') {
@@ -952,10 +968,12 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'customers' && m === 'GET') return json(await customers.list(db, q));
   if (path === 'customers/detail' && m === 'GET') return json(await customers.detail(db, str(q.key)));
   if ((x = path.match(/^orders\/([^/]+)$/)) && m === 'GET') {
-    const o = await loadOrder(db, decodeURIComponent(x[1]));
+    const id = decodeURIComponent(x[1]);
+    const [o, events, st] = await Promise.all([loadOrder(db, id),
+      all(db, 'SELECT at, source, action, status, remote_status, note, user FROM order_events WHERE order_id = ? ORDER BY at DESC LIMIT 30', id), getSettings(db)]);
     const ch = await channel(env, db, o.channel);
-    o.events = await all(db, 'SELECT at, source, action, status, remote_status, note, user FROM order_events WHERE order_id = ? ORDER BY at DESC LIMIT 30', o.id);
-    return json({ order: o, profit: orderProfit(o, await getSettings(db)), channel: ch ? publicInfo(ch) : null });
+    o.events = events;
+    return json({ order: o, profit: orderProfit(o, st), channel: ch ? publicInfo(ch) : null });
   }
   // Kargo firması seçenekleri: kanalın kendi listesinden (ikas Kargo firmaları, Trendyol sağlayıcıları, HB değiştirilebilir firmalar)
   if ((x = path.match(/^orders\/([^/]+)\/cargo-options$/)) && m === 'GET') {
@@ -1235,8 +1253,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
 
   if (path === 'stats' && m === 'GET') return json(await stats(db, q));
   if (path === 'insights' && m === 'GET') return json(await insights(db, q));
-  if (path === 'settings' && m === 'GET') return json(publicSettings(await getSettings(db)));
-  if (path === 'settings' && m === 'PUT') return json(await saveSettings(db, await body(req)));
+  if (path === 'settings' && m === 'GET') return json(publicSettings(await getSettings(db), env));
+  if (path === 'settings' && m === 'PUT') return json(publicSettings(await saveSettings(db, await body(req)), env));
   if (path === 'logs' && m === 'GET') return json(await all(db, 'SELECT * FROM logs ORDER BY id DESC LIMIT 200'));
   // Hata özeti (son 30 gün): aynı hata (sayılar / kimlikler ayıklanarak) kanal bazında gruplanır; açıklama ve kopyalanabilir rapor
   if (path === 'logs/errors' && m === 'GET') {

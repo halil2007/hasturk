@@ -15,7 +15,7 @@ const pct = (a, b) => (b ? Math.round(((a - b) / b) * 100) : null);
 
 export async function digestData(env, db, settings) {
   const today = dayStart(), y0 = today - D, y1 = today - 2 * D;
-  const [yday, prev] = [await breakdown(db, settings, { from: y0, to: today }), await breakdown(db, settings, { from: y1, to: y0 })];
+  const [yday, prev] = await Promise.all([breakdown(db, settings, { from: y0, to: today }), breakdown(db, settings, { from: y1, to: y0 })]);
   const names = Object.fromEntries((await getChannels(env, db)).map((c) => [c.id, c.name]));
   const n = async (sql, ...a) => (await first(db, sql, ...a)).n || 0;
   const sold30 = `(SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id = p.id AND o.ordered_at >= ${Date.now() - 30 * D}
