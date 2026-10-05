@@ -476,10 +476,26 @@ export async function quickSync(env, db) {
   await setSetting(db, 'quick_lock', t);
   try {
     const settings = await getSettings(db);
-    return {
+    const out = {
       uploads: await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message),
       autoUpload: await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message),
     };
+    // Kanalın kabul ettiği ama ilanı henüz görünmeyen ürünler (son 2 gün): kanal ilanı onaydan sonra açar; ilanlar 10 dakikada bir
+    // yeniden çekilir, ilan gelince ürün panelde kendiliğinden bağlanır.
+    const wait = new Set();
+    for (const u of await all(db, "SELECT channel, items FROM product_uploads WHERE status = 'done' AND created_at > ?", t - 2 * 864e5)) {
+      const keys = JSON.parse(u.items || '[]').filter((x) => x.ok === true).map((x) => String(x.key || '').trim().toUpperCase()).filter(Boolean);
+      if (!keys.length) continue;
+      const seen = new Set((await all(db, `SELECT UPPER(TRIM(sku)) AS s FROM listings WHERE channel = ? AND UPPER(TRIM(sku)) IN (${keys.map(() => '?').join(',')})`, u.channel, ...keys)).map((r) => r.s));
+      if (keys.some((k) => !seen.has(k))) wait.add(u.channel);
+    }
+    for (const chId of wait) {
+      const last = await getRaw(db, 'listing_refresh:' + chId);
+      if (last && t - last < 10 * 60e3) continue;
+      await setSetting(db, 'listing_refresh:' + chId, t);
+      out['listings:' + chId] = await importListings(env, db, { only: [chId] }).then((r) => r.channels[chId]).catch((e) => 'hata: ' + e.message);
+    }
+    return out;
   } finally { await setSetting(db, 'quick_lock', 0); }
 }
 export const autoLink = async (db) => (await autoMatch(db, { catalog: [] })).linked;

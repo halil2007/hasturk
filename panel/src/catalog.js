@@ -149,6 +149,20 @@ async function review(db, c) {
 // Otomatik gönderimde atlanacak ürünler (son 14 gün): kabul edilen ya da kanalın hâlâ işlediği ürün tekrar gönderilmez.
 // Kanalın reddettiği (ya da isteği hiç kabul edilmeyen) ürün tekrar denenir: gönderimden sonra ürün düzeltildiyse 1 saat,
 // düzeltilmediyse 24 saat sonra (aynı hatayla 15 dakikada bir tekrar gönderilmesin).
+// Gönderimler + her ürünün kanal envanterinde (ilan olarak) görünüp görünmediği: "kabul" kanalın dosyayı işlediğini gösterir,
+// ürünün mağazaya düştüğünü ise kanaldan çekilen ilanlarda aynı SKU'nun görünmesi kanıtlar.
+async function uploadsWithListing(db) {
+  const ups = (await all(db, 'SELECT id, channel, ref, status, items, result, error, user, created_at, checked_at FROM product_uploads ORDER BY id DESC LIMIT 30'))
+    .map((u) => ({ ...u, items: JSON.parse(u.items || '[]'), result: JSON.parse(u.result || 'null') }));
+  const chs = [...new Set(ups.map((u) => u.channel))];
+  const have = new Set(chs.length ? (await all(db, `SELECT channel, UPPER(TRIM(sku)) AS s, product_id FROM listings WHERE channel IN (${chs.map(() => '?').join(',')})`, ...chs))
+    .flatMap((l) => [`${l.channel}|s|${l.s}`, l.product_id ? `${l.channel}|p|${l.product_id}` : '']) : []);
+  for (const u of ups) {
+    for (const x of u.items) x.listed = have.has(`${u.channel}|s|${String(x.key || '').trim().toUpperCase()}`) || have.has(`${u.channel}|p|${x.id}`);
+    u.listed = u.items.filter((x) => x.listed).length;
+  }
+  return ups;
+}
 export async function sentFilter(db, ch) {
   const ok = new Set(), failed = new Map();
   for (const u of await all(db, 'SELECT status, items, created_at FROM product_uploads WHERE channel = ? AND created_at > ? ORDER BY id', ch, Date.now() - 14 * 864e5)) {
@@ -209,8 +223,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
         auto: !!(settings.auto_upload || {})[c.id], stockPush: !!(settings.stock_push || {})[c.id] })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
       maps: maps.map((x) => ({ ...x, attrs: JSON.parse(x.attrs || '{}') })),
-      uploads: (await all(db, 'SELECT id, channel, ref, status, items, result, error, user, created_at, checked_at FROM product_uploads ORDER BY id DESC LIMIT 30'))
-        .map((u) => ({ ...u, items: JSON.parse(u.items || '[]'), result: JSON.parse(u.result || 'null') })),
+      uploads: await uploadsWithListing(db),
       stockSync: !!settings.stock_sync,
     };
   }
