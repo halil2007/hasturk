@@ -39,6 +39,11 @@ Arama widget'ından (`../src/worker.js`) **ayrı bir Worker**'dır. Biri bozulsa
 
 Veritabanı (`hasturk-panel`) ilk yayında kendiliğinden oluşur.
 
+**Kendi alan adınızdan açmak (ör. `panel.hasturkgubre.com.tr`):**
+- Alan adının DNS'i Cloudflare'deyse: Workers & Pages → `hasturk-panel` → **Settings → Domains & Routes → Add → Custom domain** → `panel.alanadiniz.com` → Add. DNS kaydı ve SSL sertifikası otomatik oluşur (birkaç dakika).
+- DNS başka yerdeyse (alan adı firması / cPanel): Cloudflare özel alan adı için alan adının Cloudflare'e eklenmesi gerekir. Mağaza (ikas) bağlı ana alan adını taşımak yerine panel için **ayrı, ucuz bir alan adı** alıp Cloudflare'e eklemek en risksizidir. Ana alan adını taşıyacaksanız Cloudflare'in içe aktardığı kayıtların (ikas, e-posta/MX) eksiksiz olduğunu kontrol edin ve ikas kayıtlarını **DNS only (gri bulut)** yapın.
+- Yeni adresten giriş yapın (oturum adres başına ayrıdır). E-postalardaki "Siparişi panelde aç" bağlantısı yönetici ilk girişte yeni adrese otomatik geçer (Ayarlar → Panel adresi). workers.dev adresi çalışmaya devam eder; istemezseniz Domains & Routes'ta kapatabilirsiniz.
+
 *Deneme modu:* `DEMO = 1` (Text) değişkeni tanımlanırsa anahtarı girilmemiş kanallar örnek veriyle çalışır (şifre: demo). Gerçek kullanımda bu değişkeni **silin**; silindikten sonraki ilk senkronda örnek siparişler, ilanlar ve ürünler **otomatik temizlenir** (gerçek verilere dokunulmaz). Ayarlar sayfasındaki "Örnek (demo) verileri temizle" düğmesiyle de elle temizlenebilir.
 
 ## 2. Panel şifresi

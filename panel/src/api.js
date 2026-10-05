@@ -709,8 +709,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       getSettings(db),
       channelsInfo(env, db),
     ]);
-    // E-postadaki "panelde aç" bağlantısı için panel adresi (yönetici girmediyse kullanılan adres)
-    if (!st.panel_url && user.role === 'admin' && /^https:\/\//.test(url.origin)) { await setSetting(db, 'panel_url', url.origin); st.panel_url = url.origin; }
+    // E-postadaki "panelde aç" bağlantısı için panel adresi (yönetici girmediyse kullanılan adres).
+    // Panel sonradan kendi alan adına taşınırsa, kayıtlı workers.dev adresi yeni adresle değiştirilir.
+    const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(url.host);
+    if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(url.origin)) { await setSetting(db, 'panel_url', url.origin); st.panel_url = url.origin; }
     return json({ ...s, channels: chInfo, settings: st, user, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
   }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
