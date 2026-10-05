@@ -67,7 +67,7 @@ export async function orders(el, rest, query = {}) {
       return html`<tr class="click ${on ? 'sel-row' : ''}" data-row="${o.id}">
         <td style="width:40px"><input type="checkbox" class="cb" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Seç"></td>
         <td><div style="font-weight:750">#${o.order_number}</div><div class="muted tiny">${shortDT(o.ordered_at)}</div><div class="tiny only-narrow ellipsis" style="max-width:150px">${o.customer || ''}${o.city ? ` · ${o.city}` : ''}</div></td>
-        <td class="col-cust"><div class="cust"><i class="ico ico-user"></i><div style="min-width:0"><div class="ellipsis" style="max-width:130px;font-weight:600">${o.customer || '—'}</div><div class="muted tiny ellipsis">${[o.district, o.city].filter(Boolean).join(', ')}</div></div></div></td>
+        <td class="col-cust"><div class="cust"><i class="ico ico-user"></i><div style="min-width:0"><div class="ellipsis" style="max-width:130px;font-weight:600">${o.customer || '—'}</div>${o.cust_nth > 1 ? html`<span class="pill info" style="font-size:11px;padding:1px 7px" title="Bu müşterinin ${o.cust_nth}. siparişi">${o.cust_nth}. sipariş</span>` : ''}<div class="muted tiny ellipsis">${[o.district, o.city].filter(Boolean).join(', ')}</div></div></div></td>
         <td>${chBadge(o.channel)}</td>
         <td>${products(o)}</td>
         <td class="r num" style="font-weight:750">${money(o.total)}${o.profit != null ? html`<div class="tiny ${o.profit >= 0 ? 'up' : 'down'}" title="Tahmini kâr${o.missing_cost ? ' (alış fiyatı eksik)' : ''}">${money(o.profit)}${o.missing_cost ? '*' : ''}</div>` : ''}</td>
@@ -85,7 +85,7 @@ export async function orders(el, rest, query = {}) {
     const from = (data.page - 1) * data.limit;
     return html`<div style="padding:12px" class="m-list">${data.orders.length ? data.orders.map((o) => html`<div class="m-card ${sel.has(o.id) || expanded === o.id ? 'sel-row' : ''}" data-row="${o.id}">
         <div class="top"><input type="checkbox" class="cb" data-sel="${o.id}" ${sel.has(o.id) ? 'checked' : ''} aria-label="Seç">${chLogo(o.channel, true)}<b>#${o.order_number}</b><span class="muted tiny">${shortDT(o.ordered_at)}</span><span class="spacer"></span><b class="num">${money(o.total)}</b></div>
-        <div class="row small"><i class="ico ico-user muted"></i><span class="ellipsis">${o.customer || '—'}${o.city ? ` · ${o.city}` : ''}</span></div>
+        <div class="row small"><i class="ico ico-user muted"></i><span class="ellipsis">${o.customer || '—'}${o.city ? ` · ${o.city}` : ''}</span>${o.cust_nth > 1 ? html`<span class="pill info" style="font-size:11px;padding:1px 7px">${o.cust_nth}. sipariş</span>` : ''}</div>
         ${products(o)}
         ${stateCell(o)}
         <div class="row wrap">${pkgCell(o)}<span class="spacer"></span>${actionBtn(o)}</div>

@@ -48,13 +48,14 @@ export function hepsiburada(env, meta) {
     const rank = { new: 0, processing: 1, shipped: 2, delivered: 3 };
     return {
       map,
-      touch(orderNumber, { date, customer, address } = {}) {
+      touch(orderNumber, { date, customer, address, customerId } = {}) {
         let o = map.get(orderNumber);
         if (!o) {
           o = { remoteId: orderNumber, orderNumber, orderedAt: Date.parse(date) || Date.now(), remoteStatus: 'new', status: 'new', customer: '', phone: '', email: '', address: {}, total: 0, currency: 'TRY', cargoCompany: '', tracking: '', items: [], packages: [] };
           map.set(orderNumber, o);
         }
         if (customer && !o.customer) o.customer = customer;
+        if (customerId && !o.customerId) o.customerId = String(customerId);
         if (address && address.city && !o.address.city) { o.address = address; o.phone = o.phone || address.phone; o.email = o.email || address.email; if (!o.customer) o.customer = address.name; }
         return o;
       },
@@ -85,7 +86,7 @@ export function hepsiburada(env, meta) {
     for (const it of await pages(`${OMS}/orders/merchantId/${m}`, { limit: 100, max: 50 })) {
       const l = lineOf(it);
       if (!l.orderNumber) continue;
-      const o = O.touch(l.orderNumber, { date: l.orderDate, customer: str(g(it, 'customerName')), address: addrOf(g(it, 'shippingAddress') || {}, str(g(it, 'customerName'))) });
+      const o = O.touch(l.orderNumber, { date: l.orderDate, customerId: g(it, 'customerId'), customer: str(g(it, 'customerName')), address: addrOf(g(it, 'shippingAddress') || {}, str(g(it, 'customerName'))) });
       O.addLine(o, l);
       if (str(g(it, 'cargoCompany')) && !o.cargoCompany) o.cargoCompany = str(g(it, 'cargoCompany'));
     }
@@ -96,7 +97,7 @@ export function hepsiburada(env, meta) {
         const no = (lines.find((l) => l.orderNumber) || {}).orderNumber;
         if (!no) continue;
         const address = { name: str(g(pk, 'recipientName', 'customerName')), line: str(g(pk, 'shippingAddressDetail')), district: str(g(pk, 'shippingTown') || g(pk, 'shippingDistrict')), city: str(g(pk, 'shippingCity')), phone: str(g(pk, 'phoneNumber')), email: str(g(pk, 'email')) };
-        const o = O.touch(no, { date: g(pk, 'orderDate'), customer: str(g(pk, 'customerName')), address });
+        const o = O.touch(no, { date: g(pk, 'orderDate'), customerId: g(pk, 'customerId'), customer: str(g(pk, 'customerName')), address });
         for (const l of lines) O.addLine(o, { ...l, dueDate: l.dueDate || Date.parse(g(pk, 'dueDate') || '') || null });
         O.bump(o, 'processing');
         const pn = str(g(pk, 'packageNumber'));

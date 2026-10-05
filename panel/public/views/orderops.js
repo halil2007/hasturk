@@ -458,7 +458,8 @@ export async function openOrder(id, onChange) {
     s.setBody(html`
       <div class="row wrap" style="margin-bottom:12px">${chLogo(o.channel)}${statusPill(o.status)}<span class="muted small">${dateTime(o.ordered_at)}</span>
         ${o.remote_status ? html`<span class="muted tiny" title="Kanaldaki durum">(${o.remote_status})</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}
-        ${o.ship_by ? html`<span class="muted small">· Son kargoya teslim: <b>${dateTime(o.ship_by)}</b></span>` : ''}${o.extra && o.extra.cargoChoice ? html`<span class="muted small">· Müşterinin seçtiği: ${o.extra.cargoChoice}</span>` : ''}</div>
+        ${o.ship_by ? html`<span class="muted small">· Son kargoya teslim: <b>${dateTime(o.ship_by)}</b></span>` : ''}${o.extra && o.extra.cargoChoice ? html`<span class="muted small">· Müşterinin seçtiği: ${o.extra.cargoChoice}</span>` : ''}
+        ${o.cust && o.cust.total > 1 ? html`<a class="pill info" href="#/musteriler?key=${encodeURIComponent(o.ckey)}" title="Müşterinin tüm siparişleri">Müşterinin ${o.cust.nth}. siparişi · toplam ${o.cust.total}</a>` : ''}</div>
       <div data-ops></div>
       <div class="two-col" style="margin-top:16px">
         <div class="stack">

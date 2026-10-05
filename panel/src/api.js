@@ -10,6 +10,7 @@ import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { hbTest } from './hbtest.js';
 import { catalogApi } from './catalog.js';
+import * as customers from './customers.js';
 import { listUsers, saveUser, changeOwnPassword } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { profit } from '../public/profit.js';
@@ -26,6 +27,8 @@ async function loadOrder(db, id) {
   if (!o) fail(404, 'Sipariş bulunamadı');
   o.address = parse(o.address, {});
   o.extra = parse(o.extra, {});
+  // Müşterinin kaçıncı siparişi (tekrar eden müşteri)
+  if (o.ckey) o.cust = await first(db, "SELECT COUNT(*) AS total, SUM(ordered_at <= ?) AS nth FROM orders WHERE ckey = ? AND status != 'cancelled'", o.ordered_at, o.ckey);
   o.items = await all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.desi, p.image AS product_image, l.commission AS listing_commission
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = ? AND l.remote_id = i.remote_key
@@ -82,6 +85,7 @@ async function listOrders(db, q) {
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND status = 'open') AS open_packages,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND label_printed_at IS NOT NULL) AS printed,
+      (SELECT COUNT(*) FROM orders x WHERE x.ckey = o.ckey AND x.ordered_at <= o.ordered_at AND x.status != 'cancelled') AS cust_nth,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND (label_data IS NOT NULL OR label_at IS NOT NULL OR ((COALESCE(barcode, '') != '' OR COALESCE(tracking, '') != '') AND (agreement = 'own' OR o.channel NOT IN (${LABEL_REMOTE.map((x) => `'${x}'`).join(',')}))))) AS labeled,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND error IS NOT NULL) AS pkg_errors,
       o.ship_by, o.ext_action,
@@ -832,6 +836,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'push-stock' && m === 'POST') return json(await pushStocks(env, db));
 
   if (path === 'orders' && m === 'GET') return json(await listOrders(db, q));
+  // Müşteriler: özet / liste / tek müşteri
+  if (path === 'customers/summary' && m === 'GET') return json(await customers.summary(db, q));
+  if (path === 'customers' && m === 'GET') return json(await customers.list(db, q));
+  if (path === 'customers/detail' && m === 'GET') return json(await customers.detail(db, str(q.key)));
   if ((x = path.match(/^orders\/([^/]+)$/)) && m === 'GET') {
     const o = await loadOrder(db, decodeURIComponent(x[1]));
     const ch = await channel(env, db, o.channel);

@@ -82,7 +82,7 @@ export function idefix(env, meta) {
     });
     return {
       remoteId: str(s.id), orderNumber: str(s.orderNumber || s.id), orderedAt: Date.parse(s.orderDate || s.createdAt) || Date.now(), remoteStatus: str(s.status), status: st,
-      customer: str(s.customerContactName || a.fullName), phone: str(a.phone), email: '',
+      customer: str(s.customerContactName || a.fullName), phone: str(a.phone), email: str(s.customerContactMail || s.customerEmail), customerId: str(s.customerId),
       address: { name: str(a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' ')), line: str(a.address1 || a.address), district: str(a.county || a.district), city: str(a.city), phone: str(a.phone) },
       total: items.reduce((x, i) => x + (i.status ? 0 : i.total), 0), currency: 'TRY',
       cargoCompany: str(s.cargoCompany || s.cargoProfileName), tracking: str(s.cargoTrackingNumber || s.cargoKey), trackingUrl: str(s.cargoTrackingUrl || s.trackingUrl),

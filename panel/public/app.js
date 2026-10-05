@@ -10,6 +10,7 @@ import { buyboxView, bbChannels } from './views/buybox.js';
 import { questionsView, qChannels } from './views/questions.js';
 import { hbTestView } from './views/hbtest.js';
 import { uploadView } from './views/upload.js';
+import { customersView } from './views/customers.js';
 import { profitView } from './views/profit.js';
 import { insightsView } from './views/insights.js';
 import { integrations } from './views/integrations.js';
@@ -22,6 +23,7 @@ const ROUTES = [
   { sec: 'Satış' },
   { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders' },
   { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo' },
+  { path: 'musteriler', title: 'Müşteriler', icon: 'user', view: customersView },
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', when: () => qChannels().length > 0 },
   { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products },

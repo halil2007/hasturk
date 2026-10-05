@@ -58,11 +58,13 @@ export function demo(meta) {
         if (x < 0.04) status = 'cancelled'; else if (x < 0.06 && age > 6) status = 'returned';
         if (status === 'cancelled') lines.forEach((l) => (l.status = 'cancelled'));
         const [city, district] = CITIES[Math.floor(r() * CITIES.length)], name = NAMES[Math.floor(r() * NAMES.length)];
+        // Örnek müşteri telefonu: aynı ad + il aynı müşteri sayılır (tekrar eden müşteri analizini denemek için)
+        const phone = `0532 ${String(100 + NAMES.indexOf(name) * 7 + CITIES.findIndex((c) => c[0] === city)).padStart(3, '0')} ${ch.length % 10}0 ${String(NAMES.indexOf(name)).padStart(2, '0')}`;
         const no = `${ch.slice(0, 2).toUpperCase()}${key.replace(/-/g, '').slice(2)}${String(i + 1).padStart(3, '0')}`;
         out.push({
           remoteId: no, orderNumber: no, orderedAt: at, remoteStatus: status, status, demo: true,
-          customer: name, phone: '0555 000 00 00', email: '',
-          address: { name, line: 'Örnek Mah. Deneme Sok. No:1 D:2', district, city, phone: '0555 000 00 00' },
+          customer: name, phone, email: '',
+          address: { name, line: 'Örnek Mah. Deneme Sok. No:1 D:2', district, city, phone },
           total: lines.reduce((s, l) => s + l.total, 0), currency: 'TRY',
           cargoCompany: status === 'shipped' || status === 'delivered' ? 'Yurtiçi Kargo' : '', tracking: status === 'shipped' || status === 'delivered' ? `DEMO${no}` : '',
           shipBy: ['new', 'processing'].includes(status) ? at + (ch === 'trendyol' ? 1 : 2) * D : null,
