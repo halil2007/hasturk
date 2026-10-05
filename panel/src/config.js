@@ -38,6 +38,7 @@ export const FIELDS = {
     { k: 'HB_PASSWORD', label: 'Servis anahtarı (şifre)', secret: true, req: true },
     { k: 'HB_USERNAME', label: 'Kullanıcı adı', hint: 'boşsa Merchant ID', adv: true },
     { k: 'HB_USER_AGENT', label: 'Entegratör adı (User-Agent)', req: true, hint: 'Merchant Portal → Hesabım → Entegrasyon (Entegratör Bilgileri) ekranındaki entegratör adı, ör. hasturk_dev. Boşsa ya da farklıysa Hepsiburada isteği 401/403 ile reddeder.' },
+    { k: 'HB_TEST', label: 'Ortam', hint: 'Test (SIT): canlı bilgiler gelene kadar test bilgileriyle; Canlı: Hepsiburada canlı bilgileri', choices: [['', 'Canlı'], ['1', 'Test (SIT)']] },
     { k: 'HB_MERCHANT_NAME', label: 'Mağaza adı (Hepsiburada\'da görünen)', hint: 'Buybox sıranızı bulmak için; ürün sayfasındaki satıcı adıyla birebir aynı', adv: true },
     { k: 'HB_PROXY_URL', label: 'Aracı sunucu adresi (520 hatası için)', hint: 'Kendi hostinginize yüklediğiniz hb-proxy.php adresi, ör. https://alanadiniz.com/hb-proxy.php (dosya: panel adresi/hb-proxy.php)', adv: true, pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan tam adres girin' },
     { k: 'HB_PROXY_KEY', label: 'Aracı sunucu anahtarı', hint: 'hb-proxy.php içindeki $KEY ile birebir aynı', secret: true, adv: true },
@@ -177,7 +178,7 @@ export function describe(env, cfg, id) {
       const p = c.values[f.k], e = isExtra(id) ? '' : env[f.k];
       const v = p || e || '';
       return {
-        k: f.k, label: f.label, hint: f.hint || '', secret: !!f.secret, req: !!f.req, adv: !!f.adv,
+        k: f.k, label: f.label, hint: f.hint || '', secret: !!f.secret, req: !!f.req, adv: !!f.adv, choices: f.choices || null,
         source: p ? 'panel' : e ? 'cloudflare' : '',
         value: f.secret ? '' : v,
         masked: f.secret && v ? '••••••' + String(v).slice(-4) : '',

@@ -7,7 +7,9 @@ import { http, basic, num, str, chunk, diagStep } from '../util.js';
 
 export function hepsiburada(env, meta) {
   const m = env.HB_MERCHANT_ID, user = env.HB_USERNAME || m, pass = env.HB_PASSWORD;
-  const OMS = `https://oms-external.hepsiburada.com`, LST = `https://listing-external.hepsiburada.com`;
+  // Test ortamı (SIT): Hepsiburada canlı API bilgilerini test adımları tamamlanınca verir; o zamana kadar tüm istekler -sit sunucularına gider
+  const test = env.HB_TEST === '1' ? '-sit' : '';
+  const OMS = `https://oms-external${test}.hepsiburada.com`, LST = `https://listing-external${test}.hepsiburada.com`;
   const headers = (json = true) => ({
     Authorization: basic(user, pass),
     'User-Agent': env.HB_USER_AGENT || '',
@@ -295,7 +297,7 @@ export function hepsiburada(env, meta) {
   }
 
   // ---------- müşteri soruları ("Satıcıya Sor") ----------
-  const QNA = `https://api-asktoseller-merchant.hepsiburada.com/api/v1.0`;
+  const QNA = `https://api-asktoseller-merchant${test}.hepsiburada.com/api/v1.0`;
   const qh = () => ({ ...headers(), merchantId: String(m) });
   const QST = { WaitingForAnswer: 'waiting', 1: 'waiting', Answered: 'answered', 2: 'answered', Rejected: 'rejected', 3: 'rejected', AutoClosed: 'other', 4: 'other' };
   async function questions({ since, page: p = 0, size = 50 }) {
@@ -345,7 +347,7 @@ export function hepsiburada(env, meta) {
   }
   async function diagnose({ orderId } = {}) {
     const out = [];
-    await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${proxy ? ` · aracı sunucu: ${new URL(proxy).host}` : ''}` }; });
+    await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}${proxy ? ` · aracı sunucu: ${new URL(proxy).host}` : ''}` }; });
     await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantId/${m}?Offset=0&limit=1`); return { detail: `erişildi · ${page(r).length} paket örneği` }; });
     await diagStep(out, 'Kargodaki paketler', async () => { const r = await call(`${OMS}/packages/merchantId/${m}/shipped?offset=0&limit=1`); return { detail: `erişildi · toplam ${g(r, 'totalCount') ?? '?'}` }; });
     await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
@@ -363,7 +365,7 @@ export function hepsiburada(env, meta) {
   }
 
   // ---------- Katalog (ürün gönderme): mpop.hepsiburada.com/product ----------
-  const CAT = `https://mpop.hepsiburada.com/product`;
+  const CAT = `https://mpop${test}.hepsiburada.com/product`;
   let catCache = null;
   async function categories(q) {
     if (!catCache || Date.now() - catCache.at > 3600e3) {
@@ -413,6 +415,11 @@ export function hepsiburada(env, meta) {
     return { id: str(g(r, 'id')), response: r };
   }
   const uploadStatus = (kind, id) => call(`${LST}/listings/merchantid/${m}/${kind}-uploads/id/${encodeURIComponent(id)}`);
+  async function createTestOrder(body) {
+    if (!test) throw new Error('Test siparişi yalnızca test (SIT) ortamında oluşturulur: Entegrasyonlar → Hepsiburada → Ortam = Test');
+    return hb(`https://oms-stub-external-sit.hepsiburada.com/orders/merchantId/${encodeURIComponent(m)}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+  }
+  const sit = { test: !!test, merchantId: m, categories, attributes, attributeValues, importProducts, productStatus, uploadOne, uploadStatus, createTestOrder };
 
   // ---------- Ürün yükleme (Ürün yükle ekranı): kategori eşleştirmesindeki değerlerle Hepsiburada ürün dosyası ----------
   // Panelin doldurduğu temel alanlar: satıcı SKU, varyant grubu, barkod, ad, açıklama, marka, KDV, fiyat, stok, görsel, desi
@@ -468,7 +475,7 @@ export function hepsiburada(env, meta) {
   // ---------- kargo gideri (gerçek) ----------
   // Kayıt bazlı muhasebe servisi (mpfinance): sipariş tarihine göre en fazla 1 aylık aralıkla işlemler okunur; türü / açıklaması
   // kargo olan kayıtlar sipariş numarasına göre toplanır.
-  const FIN = `https://mpfinance-external.hepsiburada.com`;
+  const FIN = `https://mpfinance-external${test}.hepsiburada.com`;
   async function cargoCosts(since, until) {
     const W = 28 * 864e5, byOrder = new Map();
     const d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10);
@@ -544,7 +551,7 @@ export function hepsiburada(env, meta) {
 
   // ---------- kampanyalar: satıcı sepet indirimleri (diskonto-external /self-campaign) ----------
   // Yüzde indirim, TL indirim (bütçeli) ve X al Y öde; tüm ürünlerde, kategorilerde ya da SKU listesinde. Bütçe ve tutar sınırları servisten gelir.
-  const DSK = 'https://diskonto-external.hepsiburada.com';
+  const DSK = `https://diskonto-external${test}.hepsiburada.com`;
   const dsk = async (path, opts) => { const r = await call(DSK + path, opts); if (r && r.success === false) throw new Error('Hepsiburada: ' + [].concat(r.errors || r.message || 'işlem başarısız').join(', ')); return r && r.data !== undefined ? r.data : r; };
   const campaigns = {
     async list(page = 1, size = 50) { const d = await dsk(`/self-campaign/${m}/discounts?page=${page}&pagesize=${size}`); return { total: num(d && d.totalCount), items: (d && d.items) || [] }; },
@@ -596,8 +603,8 @@ export function hepsiburada(env, meta) {
 
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
+    ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns,
   };
 }

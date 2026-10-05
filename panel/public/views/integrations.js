@@ -33,7 +33,8 @@ export async function integrations(el) {
   function field(c, f) {
     const src = f.source === 'panel' ? html`<span class="src panel">panelde</span>` : f.source === 'cloudflare' ? html`<span class="src" title="Cloudflare gizli değişkeninden">Cloudflare</span>` : '';
     return html`<label class="field"><span class="row" style="gap:6px">${f.label}${f.req ? html`<b style="color:var(--bad)">*</b>` : ''}${src}</span>
-      ${f.secret
+      ${f.choices ? html`<select class="input" data-k="${f.k}">${f.choices.map(([v, t]) => html`<option value="${v}" ${(f.value || '') === v ? 'selected' : ''}>${t}</option>`)}</select>`
+        : f.secret
         ? html`<input class="input" type="password" autocomplete="new-password" data-k="${f.k}" placeholder="${f.masked ? `${f.masked} (kayıtlı — değiştirmek için yazın)` : 'gizli değer'}">`
         : html`<input class="input" data-k="${f.k}" value="${f.value}" placeholder="${f.hint || ''}" autocomplete="off">`}
       ${f.hint && (f.secret || f.value) ? html`<small>${f.hint}</small>` : ''}
@@ -44,7 +45,7 @@ export async function integrations(el) {
     const basic = c.fields.filter((f) => !f.adv), adv = c.fields.filter((f) => f.adv);
     return html`<div class="card" data-ch="${c.id}">
       <div class="hd">${chLogo(c.id)}<div style="flex:1;min-width:0"><h2 class="ellipsis">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2>
-        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}</div></div>
+        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}${c.sandbox ? html`<span class="pill warn" title="İstekler Hepsiburada test (SIT) sunucularına gidiyor">Test ortamı</span>` : ''}</div></div>
         <label class="row small" title="Pasif kanal senkronlanmaz">Aktif <span class="switch"><input type="checkbox" data-active="${c.id}" ${c.active ? 'checked' : ''}><span></span></span></label></div>
       ${!c.gated ? html`<label class="row small" style="gap:10px;align-items:flex-start"><span class="switch"><input type="checkbox" data-hold="${c.id}" ${((state.settings && state.settings.hold_channels) || []).includes(c.id) ? 'checked' : ''}><span></span></span>
         <span><b>Kanala yazmayı beklet</b> <span class="muted">— siparişler, ürünler, stok ve kanalda oluşan etiketler okunur; paketleme, kargo bildirimi, stok/fiyat gönderimi ve ürün oluşturma ${c.type === 'ikas' ? 'ikas' : 'kanal'} panelinden yapılır.</span></span></label>` : ''}
@@ -64,6 +65,7 @@ export async function integrations(el) {
         <button class="btn primary" data-act="save" data-id="${c.id}">Kaydet</button>
         <button class="btn outline" data-act="test" data-id="${c.id}"><i class="ico ico-key"></i>Bağlantıyı test et</button>
         <button class="btn outline" data-act="diag" data-id="${c.id}" title="Her adımı ayrı ayrı dener ve sorunu açıklar"><i class="ico ico-bolt"></i>Tanılama</button>
+        ${c.type === 'hepsiburada' && c.id === 'hepsiburada' ? html`<a class="btn outline" href="#/hb-test" title="Hepsiburada'nın canlı API bilgilerini vermeden önce istediği test adımları"><i class="ico ico-check"></i>Test adımları</a>` : ''}
         <span class="spacer"></span>
         <button class="btn sm ghost" data-act="sync" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-sync"></i>Senkronla</button>
         <button class="btn sm ghost" data-act="import" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-download"></i>İlanları çek</button>
