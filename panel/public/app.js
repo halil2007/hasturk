@@ -17,6 +17,7 @@ import { notices } from './views/notices.js';
 import { users } from './views/users.js';
 import { settingsView } from './views/settings.js';
 import { financeView } from './views/finance.js';
+import { claimsView, claimChannels } from './views/claims.js';
 import { can } from './perms.js';
 
 const ROUTES = [
@@ -24,6 +25,7 @@ const ROUTES = [
   { sec: 'Satış' },
   { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders', perm: 'orders' },
   { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo', perm: 'cargo' },
+  { path: 'iadeler', title: 'İadeler', icon: 'back', view: claimsView, count: 'claims', when: () => claimChannels().length > 0, perm: 'returns' },
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', when: () => qChannels().length > 0, perm: 'questions' },
   { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products, perm: 'products' },
@@ -65,7 +67,7 @@ export function refreshChrome(s = state.summary) {
     sb.querySelector('[data-support-exit]').onclick = async () => { await api('logout', { method: 'POST' }).catch(() => {}); store.set('firma', ''); location.reload(); };
   }
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
-  const counts = { orders: n, questions: s.questions || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
+  const counts = { orders: n, questions: s.questions || 0, claims: s.claims || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
   $$('[data-count]').forEach((el) => { const v = counts[el.dataset.count] || 0; el.textContent = v > 99 ? '99+' : v; el.classList.toggle('hide', !v); el.classList.toggle('warn', el.dataset.count === 'match' || el.dataset.count === 'stock'); });
   const chs = state.channels.filter((c) => !c.paused);
   const on = chs.filter((c) => c.enabled), err = chs.filter((c) => c.enabled && !c.demo && c.last && (!c.last.ok || c.last.listingsError));

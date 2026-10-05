@@ -7,6 +7,7 @@ import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfiden
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
+import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
@@ -670,6 +671,15 @@ async function channelsInfo(env, db) {
   });
 }
 
+// İade reddine eklenen belge (fotoğraf / PDF): tarayıcıdan base64 gelir, en fazla 5 MB
+function claimFile(f) {
+  if (!f || !f.data) return null;
+  const bin = Uint8Array.from(atob(String(f.data)), (c) => c.charCodeAt(0));
+  if (bin.length > 5 * 1024 * 1024) fail(400, 'Dosya en fazla 5 MB olabilir');
+  if (!/^(image\/(jpeg|png)|application\/pdf)$/.test(f.type || '')) fail(400, 'Yalnız JPEG, PNG ya da PDF eklenebilir');
+  return new File([bin], String(f.name || 'belge').slice(0, 80), { type: f.type });
+}
+
 // ---------- yönlendirme ----------
 // Sadece yöneticinin yapabileceği işlemler (kanal API bilgileri, kullanıcılar, ayarlar, toplu aktarım)
 const ADMIN_ONLY = [/^mail\//, /^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/, /^catalog\//];
@@ -686,13 +696,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // Kategori eşleştirme ve pazaryerine ürün yükleme
   if (path.startsWith('catalog/')) return json(await catalogApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
   if (path === 'summary' && m === 'GET') {
-    const [qs, s, notices, match, st, chInfo] = await Promise.all([
+    const [qs, s, notices, match, st, chInfo, cl] = await Promise.all([
       first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'"),
       summary(db),
       first(db, 'SELECT COUNT(*) AS open, SUM(read = 0) AS unread FROM notices WHERE resolved_at IS NULL'),
       first(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
       getSettings(db),
       channelsInfo(env, db),
+      first(db, "SELECT COUNT(*) AS n FROM claims WHERE status = 'waiting'"),
     ]);
     // E-postadaki "panelde aç" bağlantısı için panel adresi (yönetici girmediyse kullanılan adres).
     // Panel sonradan kendi alan adına taşınırsa, kayıtlı workers.dev adresi yeni adresle değiştirilir.
@@ -701,7 +712,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
     const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
     if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
-    return json({ ...s, channels: chInfo, settings: st, user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, demo: env.DEMO === '1' });
+    return json({ ...s, channels: chInfo, settings: st, user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1' });
   }
   // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
   if (path === 'panel-proxy' && m === 'GET') {
@@ -914,6 +925,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if (path === 'dashboard' && m === 'GET') return json(await dashboard(db, q));
   // Gelir & gider: dönem masraf basamakları (satış → komisyon → kargo → hizmet bedeli → ek kesinti → stopaj → hakediş → alış → kâr)
+  // İade talepleri
+  if (path === 'claims' && m === 'GET') return json(await listClaims(db, { ...q, channel: isChannelId(q.channel) ? q.channel : '' }));
+  if (path === 'claims/sync' && m === 'POST') return json(await syncClaims(env, db));
+  if (path === 'claims/reasons' && m === 'GET') return json({ reasons: await claimReasons(env, db, str(q.channel)) });
+  if ((x = path.match(/^claims\/([a-z0-9_]+)\/(.+)\/(approve|reject)$/)) && m === 'POST') {
+    const b = await body(req), id = decodeURIComponent(x[2]);
+    return json(x[3] === 'approve' ? await approveClaim(env, db, x[1], id, b.lines, user) : await rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user));
+  }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncInvoices(env, db, { force: true })); }
   if (path === 'finance' && m === 'GET') return json(await breakdown(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));

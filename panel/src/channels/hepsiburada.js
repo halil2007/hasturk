@@ -488,6 +488,36 @@ export function hepsiburada(env, meta) {
     return { items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
   }
 
+  // ---------- iade talepleri (claims): oms-external /claims ----------
+  // Her talep tek ürün (SKU) satırıdır; talep numarası (number) ile onaylanır / reddedilir. "AwaitingAction" talepler karar bekler.
+  const HCS = { AwaitingAction: 'waiting', Accepted: 'accepted', Refunded: 'accepted', Rejected: 'rejected', NewRequest: 'other', InDispute: 'other', Cancelled: 'other', AwaitingPreApproval: 'other' };
+  const HCS_TR = { AwaitingAction: 'Aksiyon bekliyor', Accepted: 'Onaylandı', Refunded: 'İade edildi', Rejected: 'Reddedildi', NewRequest: 'Yeni talep (ürün yolda)', InDispute: 'İtirazda', Cancelled: 'İptal', AwaitingPreApproval: 'Ön onay bekliyor' };
+  const hbDate = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+  async function claims({ since, until = Date.now(), page: p = 0, size = 100 }) {
+    const lim = Math.min(100, size);
+    const rows = list(await call(`${OMS}/claims/merchantId/${m}?beginDate=${encodeURIComponent(hbDate(since))}&endDate=${encodeURIComponent(hbDate(until))}&offset=${p * lim}&limit=${lim}`));
+    const items = rows.map((c) => {
+      const st = str(g(c, 'status')), qty = num(g(c, 'quantity'), 1), price = money(g(c, 'priceAmount'));
+      const no = str(g(c, 'number', 'claimNumber'));
+      return {
+        remoteId: no || str(g(c, 'id')), orderNumber: str(g(c, 'orderNumber')), claimedAt: Date.parse(g(c, 'claimDate') || '') || Date.now(), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st,
+        customer: str(g(c, 'customerName')), reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')),
+        lines: [{ id: no, name: str(g(c, 'productName')) || str(g(c, 'sku')), sku: str(g(c, 'sku')), qty, price, reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st }],
+        amount: money(g(c, 'totalPriceAmount')) || price * qty, cargo: '', tracking: '',
+      };
+    });
+    return { items, hasNext: rows.length >= lim };
+  }
+  const HB_REASONS = [['BoxIsEmpty', 'Koli boş geldi'], ['WrongProduct', 'Yanlış ürün gönderilmiş'], ['ProductIsDamaged', 'Ürün hasarlı'], ['NoSuchAccessory', 'Aksesuar eksik'],
+    ['ItHasBeenSentWithOtherProducts', 'Başka ürünlerle gönderilmiş'], ['ThereIsNoCargoReport', 'Kargo hasar tutanağı yok'], ['CustomerReturnedWrongItem', 'Müşteri farklı ürün göndermiş'],
+    ['CustomerPackageIsNotInTheConditionISent', 'Paket gönderdiğim gibi değil'], ['ProductHasBeenUsed', 'Ürün kullanılmış'], ['ProductIsNotInSellableCondition', 'Ürün satılabilir durumda değil'],
+    ['MissingInvoice', 'Fatura eksik'], ['SomePartsOrSomeAccessoriesOrSomePapersAreMissing', 'Parça / aksesuar / belge eksik']];
+  const claimReasons = async () => HB_REASONS.map(([id, name]) => ({ id, name }));
+  async function approveClaim(c) { await call(`${OMS}/claims/number/${encodeURIComponent(c.remote_id)}/accept`, { method: 'POST', body: {} }); }
+  async function rejectClaim(c, lines, { reasonId, text }) {
+    await call(`${OMS}/claims/number/${encodeURIComponent(c.remote_id)}/reject`, { method: 'POST', body: { ClaimRejectionReason: reasonId, MerchantStatement: String(text).slice(0, 1000), Reports: [], UploadedReportsUrls: [] } });
+  }
+
   // ---------- kesilen faturalar / kesintiler (mpfinance işlemleri) ----------
   // Gider türündeki işlemler fatura numarasına göre birleştirilir (aynı faturanın satırları tek kayıt). İade (…Refund) eksi tutarla.
   // Servis tarih aralığını en fazla 1 ay kabul eder; PDF bağlantısı vermez.
@@ -526,6 +556,6 @@ export function hepsiburada(env, meta) {
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices,
+    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, catalog, cargoCosts, invoices, claims, claimReasons, approveClaim, rejectClaim,
   };
 }
