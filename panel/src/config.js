@@ -40,7 +40,7 @@ export const FIELDS = {
     { k: 'HB_USER_AGENT', label: 'Entegratör adı (User-Agent)', req: true, hint: 'Merchant Portal → Hesabım → Entegrasyon (Entegratör Bilgileri) ekranındaki entegratör adı, ör. hasturk_dev. Boşsa ya da farklıysa Hepsiburada isteği 401/403 ile reddeder.' },
     { k: 'HB_TEST', label: 'Ortam', hint: 'Test (SIT): canlı bilgiler gelene kadar test bilgileriyle; Canlı: Hepsiburada canlı bilgileri', choices: [['', 'Canlı'], ['1', 'Test (SIT)']] },
     { k: 'HB_MERCHANT_NAME', label: 'Mağaza adı (Hepsiburada\'da görünen)', hint: 'Buybox sıranızı bulmak için; ürün sayfasındaki satıcı adıyla birebir aynı', adv: true },
-    { k: 'HB_PROXY_URL', label: 'Aracı sunucu adresi (520 hatası için)', hint: 'Hosting yoksa: panel adresi/hb-proxy-deno.js dosyasını Deno Deploy\'da yayınlayıp verilen adres (ör. https://ornek.deno.dev). Hosting varsa: yüklediğiniz hb-proxy.php adresi (ör. https://alanadiniz.com/hb-proxy.php)', adv: true, pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan tam adres girin' },
+    { k: 'HB_PROXY_URL', label: 'Aracı sunucu adresi (520 hatası için)', hint: 'Hosting yoksa: panel adresi/hb-proxy-deno.js dosyasını Deno Deploy\'da yayınlayıp verilen adres (ör. https://ornek.deno.dev). Hosting varsa: yüklediğiniz hb-proxy.php adresi (ör. https://alanadiniz.com/hb-proxy.php)', adv: true, pattern: '^https://[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(:\\d+)?(/[^\\s]*)?$', patternMsg: 'https:// ile başlayan tam adresi kopyalayıp yapıştırın (ör. https://ornek-ad.halil2007.deno.net); “…” gibi kısaltma içermemeli' },
     { k: 'HB_PROXY_KEY', label: 'Aracı sunucu anahtarı', hint: 'Aracı dosyasındaki KEY / $KEY ile birebir aynı', secret: true, adv: true },
   ],
   pttavm: [
