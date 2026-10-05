@@ -10,7 +10,7 @@ export const siteStock = (p) => !(state.settings && state.settings.stock_sync)
   && (p.listings || []).some((l) => ((state.settings && state.settings.catalog_channels) || ['ikas1']).includes(l.channel) && l.remote_stock != null);
 export const siteStockVal = (p, cls = '') => html`<span class="val num ${cls}" style="cursor:help" title="ikas sitesinden okunur (stok senkronu kapalı). Adedi ikas panelinden değiştirin.">${p.stock}<span class="tiny muted" style="margin-left:4px;font-weight:500">ikas</span></span>`;
 
-const FILTERS = [['', 'Tümü'], ['low', 'Kritik stok'], ['nocost', 'Alış fiyatı eksik'], ['nolisting', 'Kanalda olmayan'], ['passive', 'Pasif']];
+const FILTERS = [['', 'Tümü'], ['low', 'Kritik stok'], ['nocost', 'Alış fiyatı eksik'], ['nobarcode', 'Barkod eksik'], ['nolisting', 'Kanalda olmayan'], ['passive', 'Pasif']];
 
 export async function products(el, rest, query = {}) {
   const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), page: 1 };
@@ -19,6 +19,7 @@ export async function products(el, rest, query = {}) {
     <div class="row wrap">
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
       <span class="spacer"></span>
+      <button class="btn" data-act="barcodes" title="Barkodu olmayan ürünlere benzersiz EAN-13 barkod oluştur"><i class="ico ico-tag"></i>Barkod oluştur</button>
       <button class="btn" data-act="import"><i class="ico ico-download"></i>Kanallardan içe aktar</button>
       <a class="btn" href="#/eslestirme"><i class="ico ico-link"></i>Eşleştirme <span data-unl></span></a>
       <button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün Ekle</button>
@@ -117,6 +118,7 @@ export async function products(el, rest, query = {}) {
     edit: (t) => productForm(Number(t.dataset.id), refresh),
     new: () => productForm(0, refresh),
     import: () => importDialog(refresh),
+    barcodes: () => barcodeDialog(refresh),
   });
   $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); refresh(); }, 300));
   await refresh();
@@ -210,7 +212,7 @@ export async function productForm(id, done) {
       <label class="field"><span>Ürün adı *</span><input class="input" name="name" required value="${p.name}"></label>
       <div class="form-grid">
         <label class="field"><span>Stok kodu (SKU)</span><input class="input" name="sku" value="${p.sku || ''}" placeholder="kanallarla aynı olmalı"></label>
-        <label class="field"><span>Barkod</span><input class="input" name="barcode" value="${p.barcode || ''}"></label>
+        <label class="field"><span>Barkod</span><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" name="barcode" value="${p.barcode || ''}" style="flex:1;min-width:0"><button type="button" class="btn sm" data-genbc title="Benzersiz EAN-13 barkod oluştur">Oluştur</button></div></label>
         <label class="field"><span>Marka</span><input class="input" name="brand" value="${p.brand || ''}"></label>
         <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ikas'tan gelir"><small>Pazaryerine yüklemede kategori eşleştirmesi buna göre yapılır</small></label>
         <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="varyantlar bu adla gruplanır"></label>
@@ -260,6 +262,15 @@ export async function productForm(id, done) {
   </form>`);
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
   const form = $('[data-form]', s.body);
+  // Barkod oluştur: benzersiz EAN-13 önerisi alanına yazılır, ürün kaydedilince geçerli olur
+  $('[data-genbc]', form).onclick = (e) => busy(e.currentTarget, async () => {
+    if (form.barcode.value.trim() && !(await confirmBox((p.listings || []).length
+      ? 'Ürünün barkodu var ve kanallarda ilanı bağlı. Yeni barkod yalnız panelde değişir; pazaryerlerindeki ilanın barkodu değişmez. Yine de değiştirilsin mi?'
+      : 'Mevcut barkodun yerine yeni barkod yazılsın mı?', 'Yeni barkod'))) return;
+    const r = await api('products/barcodes/new');
+    form.barcode.value = r.barcode;
+    toast('Barkod oluşturuldu — kaydetmeyi unutmayın');
+  });
   form.addEventListener('click', (e) => { if (e.target.closest('[data-rule]')) ruleDialog(p, () => { s.close(); productForm(id, done); }); });
   form.addEventListener('input', () => {
     $$('tr[data-l]', form).forEach((tr) => {
@@ -288,7 +299,8 @@ export async function productForm(id, done) {
     b.active = fd.get('active') ? 1 : 0;
     if (form.currency) { b.currency = fd.get('currency') || ''; b.fx_price = numIn(fd.get('fx_price')); b.fx_margin = String(fd.get('fx_margin') || '').trim() === '' ? '' : numIn(fd.get('fx_margin')); }
     if (!b.name.trim()) return toast('Ürün adı gerekli', true);
-    if (!id || Number(fd.get('stock')) !== p.stock) b.stock = Number(fd.get('stock')) || 0;
+    // Stok alanı yalnız panelde tutulan stokta vardır (ikas'tan okunan stok salt okunur, gönderilmez)
+    if (fd.has('stock') && (!id || Number(fd.get('stock')) !== p.stock)) b.stock = Number(fd.get('stock')) || 0;
     b.listings = $$('tr[data-l]', form).map((tr) => ({ channel: tr.dataset.l, remote_id: tr.dataset.rid, price: numIn($('[data-lf=price]', tr).value), commission: $('[data-lf=commission]', tr).value }));
     b.create_on = fd.getAll('create_on');
     const r = await api(id ? 'products/' + id : 'products', { method: id ? 'PUT' : 'POST', body: b });
@@ -321,4 +333,54 @@ export function importDialog(done) {
     render($('[data-res]', s.body), html`<div class="notice good"><div>${Object.entries(r.channels).map(([k, v]) => html`<div>${ch(k).name}: ${typeof v === 'number' ? `${v} ilan` : v}</div>`)}<div style="margin-top:6px"><b>${r.created}</b> yeni ürün oluşturuldu (ana katalog kanalından), <b>${r.linked}</b> ilan otomatik eşleşti.</div><a class="btn sm" style="margin-top:8px" href="#/eslestirme">Bekleyen eşleştirmeler</a></div></div>`);
     done();
   });
+}
+
+// Toplu barkod oluşturma: barkodu olmayan ürünlerden seçilenlere benzersiz EAN-13 barkod verilir
+async function barcodeDialog(done) {
+  const s = sheet({ title: 'Barkod oluştur', size: 'wide', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
+  const [info, r] = await Promise.all([api('products/barcodes'), api('products?filter=nobarcode&limit=500')]).catch((e) => { s.close(); toast(e.message, true); return []; });
+  if (!info) return;
+  const list = r.products, sel = new Set();
+  let q = '';
+  const label = (p) => [p.variant_name && p.group_name ? p.group_name : p.name, p.variant_name].filter(Boolean).join(' · ');
+  const shown = () => (q ? list.filter((p) => `${label(p)} ${p.sku || ''}`.toLocaleLowerCase('tr').includes(q)) : list);
+  function draw() {
+    const v = shown();
+    s.setBody(html`<div class="stack">
+      <div class="notice small"><i class="ico ico-tag"></i><div>Seçtiğiniz ürünlere <b>benzersiz, geçerli EAN-13</b> barkod verilir (son hane kontrol hanesi). Panel ürünleri ve tüm kanal ilanlarıyla çakışmaz.
+        Ön ek <b>200</b>, mağaza içi kullanıma ayrılmış aralıktır; gerçek bir firmanın barkoduyla çakışmaz. GS1 firma önekiniz varsa onu yazın. Barkodu dolu ürünler değişmez.</div></div>
+      ${!list.length ? html`<div class="empty">Barkodu eksik ürün yok 🎉</div>` : html`
+      <div class="row wrap"><div class="search" style="flex:1"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı veya SKU" data-bq value="${q}"></div>
+        <label class="check"><input type="checkbox" data-all ${v.length && v.every((p) => sel.has(p.id)) ? 'checked' : ''}> Görünenlerin tümünü seç (${n(v.length)})</label></div>
+      <div class="table-wrap" style="max-height:52vh;overflow:auto"><table class="t"><tbody>
+        ${v.map((p) => html`<tr><td style="width:32px"><input type="checkbox" data-id="${p.id}" ${sel.has(p.id) ? 'checked' : ''}></td><td><div class="row">${thumb(p.image, p.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:600">${label(p)}</div><div class="muted tiny">${p.sku || 'SKU yok'}</div></div></div></td></tr>`)}
+      </tbody></table></div>
+      ${list.length >= 500 ? html`<div class="muted tiny">İlk 500 ürün listelendi; kalanlar için işlemden sonra pencereyi yeniden açın.</div>` : ''}`}
+    </div>`);
+    s.setFoot(list.length ? html`<label class="field" style="margin:0;max-width:150px"><span class="tiny">Barkod ön eki</span><input class="input" data-pre inputmode="numeric" maxlength="9" value="${info.prefix}"></label>
+      <span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-go ${sel.size ? '' : 'disabled'}><i class="ico ico-tag"></i>${sel.size ? `${n(sel.size)} ürüne barkod oluştur` : 'Ürün seçin'}</button>` : html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>`);
+    const bq = $('[data-bq]', s.body);
+    if (bq && q) { bq.focus(); bq.setSelectionRange(q.length, q.length); }
+  }
+  s.el.addEventListener('input', debounce((e) => { if (e.target.matches('[data-bq]')) { q = e.target.value.trim().toLocaleLowerCase('tr'); draw(); } }, 250));
+  s.el.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.matches('[data-all]')) shown().forEach((p) => (t.checked ? sel.add(p.id) : sel.delete(p.id)));
+    else if (t.matches('input[type=checkbox][data-id]')) { const id = Number(t.dataset.id); if (t.checked) sel.add(id); else sel.delete(id); } else return;
+    draw();
+  });
+  s.el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-go]');
+    if (!b) return;
+    busy(b, async () => {
+      const res = await api('products/barcodes', { method: 'POST', body: { ids: [...sel], prefix: $('[data-pre]', s.el).value } });
+      const csv = 'Ürün;Barkod\n' + res.assigned.map((x) => `${x.name.replace(/;/g, ',')};${x.barcode}`).join('\n');
+      s.setBody(html`<div class="stack"><div class="notice good small"><i class="ico ico-check"></i><div><b>${n(res.assigned.length)} ürüne barkod oluşturuldu</b>${res.skipped ? ` · ${n(res.skipped)} ürünün barkodu zaten vardı, değişmedi` : ''}. Pazaryerine yeni yüklenecek ürünlerde bu barkod kullanılır.</div></div>
+        <div class="table-wrap" style="max-height:55vh;overflow:auto"><table class="t"><thead><tr><th>Ürün</th><th>Barkod</th></tr></thead><tbody>${res.assigned.map((x) => html`<tr><td>${x.name}</td><td class="num" style="white-space:nowrap">${x.barcode}</td></tr>`)}</tbody></table></div></div>`);
+      s.setFoot(html`<button class="btn" data-copy><i class="ico ico-copy"></i>Listeyi kopyala</button><span class="spacer"></span><button class="btn primary" data-close>Tamam</button>`);
+      $('[data-copy]', s.el).onclick = () => navigator.clipboard.writeText(csv).then(() => toast('Liste kopyalandı (Excel\'e yapıştırılabilir)'), () => toast('Kopyalanamadı', true));
+      done();
+    });
+  });
+  draw();
 }
