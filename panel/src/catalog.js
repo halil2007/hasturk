@@ -11,10 +11,12 @@ import { fail, str, num, r2, isImageAttr } from './util.js';
 import { rank, localProfile, prepare, score } from './catmatch.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
+// Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
+const NO_UPLOAD = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'etsy'];
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').replace(/\s+/g, '').replace(/(lt|litre|l)$/, 'lt').replace(/(kg|kilo|kilogram)$/, 'kg');
 
 async function targets(env, db) {
-  return (await getChannels(env, db)).filter((c) => c.type !== 'ikas' && (c.enabled || NO_API[c.type] && !c.paused));
+  return (await getChannels(env, db)).filter((c) => c.type !== 'ikas' && !NO_UPLOAD.includes(c.type) && (c.enabled || NO_API[c.type] && !c.paused));
 }
 async function target(env, db, id) {
   const c = (await getChannels(env, db)).find((x) => x.id === id);

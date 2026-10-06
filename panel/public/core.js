@@ -213,6 +213,8 @@ export function chLogo(id, sm = false) {
   if (t === 'n11') return html`<span class="logo-b${k}" style="background:#7b3fe4;color:#fff" title="N11">n11</span>`;
   if (t === 'idefix') return html`<span class="logo-b${k}" style="background:#ffc20e;color:#1c1c1c" title="idefix">id</span>`;
   if (t === 'pazarama') return html`<span class="logo-b${k}" style="background:#00a2e8;color:#fff" title="Pazarama">pz</span>`;
+  const B = { amazon: ['#232f3e', '#ff9900', 'a'], ciceksepeti: ['#e5007d', '#fff', 'çs'], koctas: ['#e30613', '#fff', 'K'], shopify: ['#5e8e3e', '#fff', 'S'], woocommerce: ['#7f54b3', '#fff', 'W'], etsy: ['#f1641e', '#fff', 'E'] }[t];
+  if (B) return html`<span class="logo-b${k}" style="background:${B[0]};color:${B[1]}" title="${c.name}">${B[2]}</span>`;
   return html`<span class="logo-b${k}" style="background:${chColor(id)}">${(c.name || '?').slice(0, 1)}</span>`;
 }
 export const chBadge = (id) => html`<span class="ch-name">${chLogo(id, true)}<span class="ellipsis">${ch(id).short || ch(id).name}</span></span>`;

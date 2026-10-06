@@ -6,19 +6,26 @@ import { pttavm } from './pttavm.js';
 import { n11 } from './n11.js';
 import { idefix } from './idefix.js';
 import { pazarama } from './pazarama.js';
+import { amazon } from './amazon.js';
+import { ciceksepeti } from './ciceksepeti.js';
+import { koctas } from './koctas.js';
+import { shopify } from './shopify.js';
+import { woocommerce } from './woocommerce.js';
+import { etsy } from './etsy.js';
 import { demo } from './demo.js';
-import { loadConfig, effectiveEnv, configVersion, EXTRA_RE, TYPES, TYPE_NAMES, typeOf, storeEnv } from '../config.js';
-import { getRaw } from '../db.js';
+import { loadConfig, effectiveEnv, configVersion, EXTRA_RE, TYPES, TYPE_NAMES, BETA_TYPES, isBeta, typeOf, storeEnv } from '../config.js';
+import { getRaw, setSetting } from '../db.js';
 
-export const BASE_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama'];
+// Test modülündeki kanallar (BETA_TYPES) ana mağaza olarak da listelenir; müşteri panellerinde hiç oluşturulmaz
+export const BASE_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', ...BETA_TYPES];
 // Geçerli kanal kimlikleri: ana mağazalar + eklenen mağazalar (getChannels her çağrıda günceller)
 export const CHANNEL_IDS = [...BASE_IDS];
 export const isChannelId = (id) => CHANNEL_IDS.includes(id) || EXTRA_RE.test(String(id || ''));
-const FACTORY = { trendyol, hepsiburada, pttavm, n11, idefix, pazarama };
+const FACTORY = { trendyol, hepsiburada, pttavm, n11, idefix, pazarama, amazon, ciceksepeti, koctas, shopify, woocommerce, etsy };
 const make = (type, e, meta) => (type === 'ikas' ? ikas(e, 'IKAS1_', meta) : FACTORY[type](e, meta));
 // Bekleyen kanallar: bilgileri girilip "Bağlantıyı test et" başarılı olana kadar yalnızca Entegrasyonlar'da görünür;
 // sipariş, ürün, stok ve analiz ekranlarına ve senkrona girmez. Bilgiler değişirse yeniden onay gerekir.
-export const GATED = ['pttavm', 'n11', 'idefix', 'pazarama'];
+export const GATED = ['pttavm', 'n11', 'idefix', 'pazarama', ...BETA_TYPES];
 
 // Beklemedeki kanal (Entegrasyonlar → "Kanala yazmayı beklet"): siparişler, ürünler, stok ve etiketler okunmaya devam eder;
 // kanala yazan işlemler (paketleme / kargoya hazırlama, kargoya verme, paket iptali, stok ve fiyat gönderimi, ürün oluşturma) yapılmaz.
@@ -47,6 +54,9 @@ export async function getChannels(env, db) {
     idefix: { id: 'idefix', type: 'idefix', name: 'idefix', short: 'idefix' },
     pazarama: { id: 'pazarama', type: 'pazarama', name: 'Pazarama', short: 'Pazarama' },
   };
+  // Kanalın kendi sakladığı değerler (ör. yenilenen erişim belirteci): settings → "kv:<kanal>:<anahtar>"
+  const kvFor = (id) => (db ? { get: (k) => getRaw(db, `kv:${id}:${k}`), set: (k, v) => setSetting(db, `kv:${id}:${k}`, v) } : null);
+  for (const t of BETA_TYPES) meta[t] = { id: t, type: t, name: TYPE_NAMES[t], short: TYPE_NAMES[t], beta: true, kv: kvFor(t) };
   const real = {
     ikas1: ikas(e, 'IKAS1_', meta.ikas1),
     ikas2: ikas(e, 'IKAS2_', meta.ikas2),
@@ -57,18 +67,21 @@ export async function getChannels(env, db) {
     idefix: idefix(e, meta.idefix),
     pazarama: pazarama(e, meta.pazarama),
   };
+  for (const t of BETA_TYPES) real[t] = FACTORY[t](e, meta[t]);
   // Eklenen mağazalar: türe göre sıralı (ikas_3, trendyol_2, ...)
   const extras = Object.keys(cfg).filter((id) => EXTRA_RE.test(id)).sort((a, b) => {
     const [, ta, na] = EXTRA_RE.exec(a), [, tb, nb] = EXTRA_RE.exec(b);
     return TYPES.indexOf(ta) - TYPES.indexOf(tb) || Number(na) - Number(nb);
   });
   for (const id of extras) {
+    if (env.TENANT_SLUG && isBeta(id)) continue;
     const type = typeOf(id), v = cfg[id].values || {}, n = EXTRA_RE.exec(id)[2];
     const name = v.STORE_LABEL || (type === 'ikas' ? v.IKAS1_NAME : '') || `${TYPE_NAMES[type]} ${n}`;
-    meta[id] = { id, type, name, short: name, extra: true };
+    meta[id] = { id, type, name, short: name, extra: true, ...(isBeta(id) ? { beta: true, kv: kvFor(id) } : {}) };
     real[id] = make(type, storeEnv(env, type, v), meta[id]);
   }
-  const ids = [...BASE_IDS, ...extras];
+  // Müşteri panelleri: test modülündeki kanallar yok (Entegrasyonlar'da "Yakında" olarak görünür)
+  const ids = [...BASE_IDS, ...extras].filter((id) => !(env.TENANT_SLUG && isBeta(id)));
   CHANNEL_IDS.splice(0, CHANNEL_IDS.length, ...ids);
   const verified = {};
   if (db) for (const id of ids) if (GATED.includes(typeOf(id))) verified[id] = await getRaw(db, 'verified:' + id);
@@ -93,4 +106,4 @@ export async function getChannels(env, db) {
 }
 export const resetChannels = () => { cache = null; };
 export const channel = async (env, db, id) => (await getChannels(env, db)).find((c) => c.id === id);
-export const publicInfo = (c) => ({ id: c.id, type: c.type, sandbox: !!c.sandbox, extra: !!c.extra, claims: !!c.claims, campaigns: !!c.campaigns, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, hold: !!c.hold, missing: c.missing, caps: c.caps });
+export const publicInfo = (c) => ({ id: c.id, type: c.type, beta: !!c.beta, sandbox: !!c.sandbox, extra: !!c.extra, claims: !!c.claims, campaigns: !!c.campaigns, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, hold: !!c.hold, missing: c.missing, caps: c.caps });

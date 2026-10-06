@@ -279,9 +279,10 @@ export function hepsiburada(env, meta) {
     if (!pkg.remote_id) return { pending: 'Önce paketleyin (Hepsiburada paketi oluşmalı)' };
     let lab;
     try { lab = await labelFile(pkg); } catch (e) {
-      // Paketin kargo firması Hepsiburada ortak barkodu vermiyor (HepsiJet gibi ortak barkodlu firmalarda etiket gelir)
+      // Paketin kargo firması Hepsiburada ortak barkodu vermiyor (kendi anlaşmalı firma ya da test siparişi): Hepsiburada etiket üretmez.
+      // Hata yerine panel etiketi hazırlanır (alıcı, ürünler, paket no); kargo firması "Kargo firmasını değiştir" ile ortak barkodlu bir firmaya çevrilebilir.
       if (/mutual barcode/i.test(e.message)) {
-        return { pending: `Bu paketin kargo firması${pkg.cargo_company ? ` (${pkg.cargo_company})` : ''} Hepsiburada ortak barkodu vermiyor, bu yüzden Hepsiburada etiket üretmiyor. Kargo firmasını ortak barkod veren bir firmaya (ör. HepsiJet) değiştirip tekrar deneyin${pkg.barcode || pkg.tracking ? ' ya da paketin gönderi barkoduyla kendi etiketimizi yazdırın' : ''}.`, changeCargo: true, barcodeOnly: !!(pkg.barcode || pkg.tracking) };
+        return { panel: true, note: `Hepsiburada bu paketin kargo firması${pkg.cargo_company ? ` (${pkg.cargo_company})` : ''} için ortak barkod vermiyor; panel etiketi hazırlandı. Hepsiburada etiketini isterseniz paketin “⋯” menüsünden kargo firmasını ortak barkodlu bir firmaya (ör. HepsiJet) çevirip “Etiketi kanaldan yeniden al”a basın.` };
       }
       throw e;
     }

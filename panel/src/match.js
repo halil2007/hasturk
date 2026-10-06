@@ -164,7 +164,7 @@ export async function productIndex(db) {
 }
 
 // Ana katalog: ayarda seçilen ve ilanı olan kanallar; hiçbiri yoksa öncelik sırasındaki ilk bağlı kanal
-const PRIORITY = ['ikas1', 'ikas2', 'hepsiburada', 'trendyol', 'n11', 'idefix', 'pazarama', 'pttavm'];
+const PRIORITY = ['ikas1', 'ikas2', 'shopify', 'woocommerce', 'hepsiburada', 'trendyol', 'n11', 'idefix', 'pazarama', 'pttavm', 'amazon', 'ciceksepeti', 'koctas', 'etsy'];
 async function catalogChannels(db, wanted) {
   const have = new Set((await all(db, 'SELECT DISTINCT channel FROM listings')).map((r) => r.channel));
   const list = (wanted || []).filter((c) => have.has(c));

@@ -13,7 +13,7 @@
   --good: #16a34a; --good-soft: #e8f7ee; --warn: #c2410c; --warn-soft: #fff1e6; --amber: #b45309; --amber-soft: #fef3c7;
   --bad: #dc2626; --bad-soft: #fdecec; --purple: #7c3aed; --purple-soft: #f1eafe; --info: #1f63e9; --info-soft: #e8f0fe;
   /* Kanal renkleri (grafikler; sabit sıra, renk körlüğüne göre doğrulandı) */
-  --c-ikas1: #2a78d6; --c-ikas2: #eb6834; --c-trendyol: #1baf7a; --c-hepsiburada: #eda100; --c-pttavm: #e87ba4; --c-n11: #7b3fe4; --c-idefix: #ffc20e; --c-pazarama: #00a2e8;
+  --c-ikas1: #2a78d6; --c-ikas2: #eb6834; --c-trendyol: #1baf7a; --c-hepsiburada: #eda100; --c-pttavm: #e87ba4; --c-n11: #7b3fe4; --c-idefix: #ffc20e; --c-pazarama: #00a2e8; --c-amazon: #ff9900; --c-ciceksepeti: #e5007d; --c-koctas: #e30613; --c-shopify: #5e8e3e; --c-woocommerce: #7f54b3; --c-etsy: #f1641e;
   --radius: 14px; --radius-sm: 10px;
   --shadow-sm: 0 1px 2px rgb(15 23 42 / .04);
   --shadow: 0 1px 2px rgb(15 23 42 / .04), 0 8px 24px rgb(15 23 42 / .06);
@@ -1096,3 +1096,11 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 @media (min-width: 1024px) { body.nav-mini .brand-card .brand-mini { display: block; } }
 .vt td.chp .vin { background: color-mix(in srgb, var(--primary-soft) 45%, var(--surface)); }
 .vt td.chp .vin.chg { background: var(--amber-soft); }
+
+/* Fırsat etiketleri: eşik fiyatı düğmesi (kâr oranıyla) */
+.tierbtn { display: inline-block; min-width: 92px; text-align: right; padding: 5px 9px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; line-height: 1.25; font: inherit; color: inherit; }
+.tierbtn:hover:not([disabled]) { border-color: var(--primary); background: var(--surface-2); }
+.tierbtn.ok { border-color: color-mix(in srgb, var(--good) 45%, transparent); background: color-mix(in srgb, var(--good) 9%, var(--surface)); }
+.tierbtn .ico { width: 13px; height: 13px; color: var(--good); margin-left: 4px; vertical-align: -2px; }
+.tierbtn[disabled] { opacity: .55; cursor: not-allowed; }
+.tiny.pos { color: var(--good); } .tiny.neg { color: var(--bad); } .tiny.warn-t { color: var(--amber); }
