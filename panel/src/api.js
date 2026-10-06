@@ -623,7 +623,7 @@ async function stockChange(env, db, ctx, id, b, user) {
   return { ok: true, stock: p.stock + delta };
 }
 
-async function saveProduct(env, db, ctx, id, b, user) {
+async function saveProduct(env, db, ctx, id, b, user, { push = true } = {}) {
   const f = cleanProduct(b), t = Date.now();
   if (f.sku) {
     const dup = await first(db, 'SELECT id FROM products WHERE LOWER(sku) = LOWER(?) AND id != ?', f.sku, id || 0);
@@ -675,7 +675,7 @@ async function saveProduct(env, db, ctx, id, b, user) {
       try { await applyFx(db, settings, await refreshRates(db, settings), { user: user.name, ids: [id] }); } catch (e) { errors.push('Döviz kuru alınamadı: ' + e.message); }
     }
   }
-  ctx.waitUntil(pushPrices(env, db).catch(() => {}));
+  if (push) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
   return { ok: true, id, created, errors };
 }
 
@@ -684,6 +684,9 @@ async function productDetail(db, id) {
   if (!p) fail(404, 'Ürün bulunamadı');
   p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id = ?`, id);
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
+  // Aynı ana ürünün varyantları (tek ekrandan düzenleme için)
+  const gk = p.parent_key || p.group_name;
+  p.siblings = gk ? (await all(db, "SELECT id FROM products WHERE COALESCE(NULLIF(parent_key, ''), NULLIF(group_name, ''), name) = ? LIMIT 300", gk)).map((r) => r.id) : [id];
   p.sales = await all(db, `SELECT o.channel, SUM(i.quantity) AS qty, SUM(i.total) AS revenue FROM order_items i JOIN orders o ON o.id = i.order_id
     WHERE i.product_id = ? AND o.ordered_at >= ? AND o.status NOT IN ('cancelled', 'returned') AND i.status != 'cancelled' GROUP BY o.channel`, id, Date.now() - 30 * 864e5);
   return p;
@@ -1239,6 +1242,45 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/skus/preview' && m === 'POST') { const b = await body(req); return json(await previewSkus(db, b.ids, b.prefix)); }
   if (path === 'products/skus' && m === 'POST') { const b = await body(req); return json(await assignSkus(db, b.items, { prefix: b.prefix, user: user.name })); }
   if (path === 'products' && m === 'GET') return json(await listProducts(db, q));
+  // Varyant grubu: tek ekrandan tüm varyantlar (ad, kodlar, alış / satış, stok, kritik, kanal fiyatları, aktiflik) ve ortak alanlar
+  if (path === 'products-variants' && m === 'GET') {
+    const ids = str(q.ids).split(',').map(Number).filter((x) => x > 0).slice(0, 300);
+    if (!ids.length) fail(400, 'Ürün seçin');
+    const ph = ids.map(() => '?').join(',');
+    const [prods, ls] = await Promise.all([
+      all(db, `SELECT id, name, group_name, variant_name, sku, barcode, brand, image, purchase_price, sale_price, stock, critical_stock, vat, desi, active, currency, fx_price FROM products WHERE id IN (${ph}) ORDER BY variant_name COLLATE NOCASE, name COLLATE NOCASE`, ...ids),
+      all(db, `SELECT product_id, channel, remote_id, price, commission, error FROM listings WHERE product_id IN (${ph})`, ...ids),
+    ]);
+    const st = await getSettings(db), cats = catalogOf(st);
+    for (const p of prods) {
+      p.listings = ls.filter((l) => l.product_id === p.id);
+      // Stok senkronu kapalıyken ikas ilanı olan ürünün stoğu siteden okunur (burada değiştirilemez)
+      p.site_stock = !st.stock_sync && p.listings.some((l) => cats.includes(l.channel));
+    }
+    return json({ products: prods });
+  }
+  if (path === 'products-variants' && m === 'POST') {
+    const b = await body(req), items = (Array.isArray(b.items) ? b.items : []).slice(0, 300), shared = b.shared && typeof b.shared === 'object' ? b.shared : {};
+    if (!items.length) fail(400, 'Değişiklik yok');
+    const common = {};
+    for (const k of ['group_name', 'brand', 'category']) if (k in shared) common[k] = shared[k];
+    const done = [], errors = [];
+    for (const it of items) {
+      const id = Number(it.id);
+      if (!(id > 0)) continue;
+      const data = { ...common };
+      for (const k of ['variant_name', 'sku', 'barcode', 'purchase_price', 'sale_price', 'critical_stock', 'vat', 'desi', 'active']) if (k in it) data[k] = it[k];
+      if ('stock' in it) data.stock = it.stock;
+      if (Array.isArray(it.listings)) data.listings = it.listings;
+      try { await saveProduct(env, db, ctx, id, data, user, { push: false }); done.push(id); }
+      catch (e) { errors.push({ id, error: e.message }); }
+    }
+    // Kanal fiyatları tek seferde gönderilir (varyant başına ayrı gönderim olmasın)
+    ctx.waitUntil(pushPrices(env, db).catch(() => {}));
+    // Yalnız ortak alan değiştiyse (varyant satırı gönderilmeden) gruptaki tüm ürünlere yazılır
+    await log(db, null, 'info', `${user.name}: varyant grubu güncellendi (${done.length} varyant${errors.length ? `, ${errors.length} hata` : ''})`);
+    return json({ ok: !errors.length, saved: done.length, errors });
+  }
   // Toplu: aktif / pasif yap, kritik stok sınırı
   if (path === 'products-bulk' && m === 'POST') {
     const b = await body(req), ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter((x) => x > 0).slice(0, 2000);

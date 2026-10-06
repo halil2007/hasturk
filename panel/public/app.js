@@ -57,7 +57,7 @@ const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kar
 const canSee = (r) => (!r.admin || !state.user || state.user.role === 'admin') && can(state.user, r.perm) && (!r.when || r.when());
 
 function nav() {
-  const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-count="${r.count}"></span>` : ''}</a>`;
+  const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}" title="${r.title}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-count="${r.count}"></span>` : ''}</a>`;
   render($('[data-nav]'), html`${ROUTES.filter((r) => (!r.view || canSee(r)) && !r.hidden).map((r) => (r.sec ? html`<div class="nav-sec">${r.sec}</div>` : link(r)))}`);
   render($('[data-nav-foot]'), '');
   render($('[data-tabbar]'), html`${TABS.filter(([p]) => { const r = PAGES.find((x) => x.path === p); return !r || canSee(r); }).map(([p, t, i]) => html`<a href="#/${p}" data-path="${p}"><i class="ico ico-${i}"></i><span>${t}</span>${p === 'siparisler' ? html`<span class="dotn hide" data-count="orders"></span>` : ''}</a>`)}<button data-act="more"><i class="ico ico-menu"></i><span>Menü</span></button>`);
@@ -396,6 +396,14 @@ async function start() {
   setTimeout(() => ['siparisler', 'kargo', 'stoklar', 'urunler'].forEach(prefetchRoute), 1200);
 }
 
+// Yan menü: geniş ↔ dar (yalnız simgeler). Tercih bu cihazda hatırlanır.
+function setSide(mini) {
+  document.body.classList.toggle('nav-mini', mini);
+  store.set('nav-mini', mini);
+  $$('[data-act=side]').forEach((b) => { b.title = mini ? 'Menüyü genişlet' : 'Menüyü daralt'; b.setAttribute('aria-label', b.title); });
+}
+setSide(store.get('nav-mini', false));
+
 applyTheme();
 window.addEventListener('hashchange', route);
 // Arka planda tazelenen veri değiştiyse açık sayfa sessizce yeniden çizilir (kullanıcı yazı yazarken dokunulmaz)
@@ -428,6 +436,7 @@ document.addEventListener('click', (e) => {
   if (a === 'me') { e.preventDefault(); meMenu(b); }
   if (a === 'more') { e.preventDefault(); moreMenu(); }
   if (a === 'find') { e.preventDefault(); findSheet(); }
+  if (a === 'side') { e.preventDefault(); setSide(!document.body.classList.contains('nav-mini')); }
 });
 $('[data-global-search]').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;

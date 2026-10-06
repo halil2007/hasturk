@@ -1051,3 +1051,48 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
   .toolbar-card .sort-pick select { width: 100%; max-width: none; font-size: 14px; }
   .toolbar-card .sort-pick .ico { display: none; }
 }
+
+/* ---------- yan menü: daralt / genişlet ---------- */
+.side-toggle, .brand-mini, .d-only { display: none; }
+@media (min-width: 1024px) {
+  .d-only { display: inline-grid; }
+  .side { position: sticky; z-index: 25; }
+  .side-toggle { display: grid; place-items: center; position: absolute; top: 22px; right: -13px; z-index: 5; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--nav-bg-2);
+    background: var(--surface); color: var(--text-2); box-shadow: var(--shadow); cursor: pointer; padding: 0; }
+  .side-toggle .ico { width: 14px; height: 14px; transition: transform .2s; }
+  .side-toggle:hover { color: var(--primary); }
+  body { transition: grid-template-columns .2s ease; }
+  body.nav-mini { grid-template-columns: 72px 1fr; }
+  body.nav-mini .side { padding: 14px 10px; }
+  body.nav-mini .side-toggle .ico { transform: rotate(180deg); }
+  body.nav-mini .brand-card { padding: 6px; display: grid; place-items: center; }
+  body.nav-mini .brand-card [data-logo] { display: none; }
+  body.nav-mini .brand-mini { display: block; width: 30px; height: 30px; }
+  body.nav-mini .brand-title { display: none; }
+  body.nav-mini .nav a { justify-content: center; padding: 10px 0; position: relative; }
+  body.nav-mini .nav a > span:not(.count) { display: none; }
+  body.nav-mini .nav .count { position: absolute; top: 3px; right: 5px; margin: 0; padding: 0 5px; font-size: 10px; min-width: 16px; line-height: 16px; text-align: center; }
+  body.nav-mini .nav-sec { font-size: 0; padding: 8px 0 4px; }
+  body.nav-mini .nav-sec::before { content: ""; display: block; height: 1px; margin: 0 10px; background: var(--nav-bg-2); }
+  body.nav-mini .status-box { justify-content: center; padding: 10px 0; }
+  body.nav-mini .status-box > div { display: none; }
+  body.nav-mini .status-box .led { margin: 0; }
+}
+/* varyant düzenleyici */
+@media (min-width: 760px) { .sheet.xwide { max-width: min(1320px, 96vw); } }
+.vapply { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; }
+.vapply select.input, .vapply .input { width: auto; min-height: 38px; }
+.vapply [data-v] { width: 150px; }
+.vt td { padding: 6px 6px; vertical-align: middle; }
+.vt th { padding: 10px 6px; }
+.vt .vin { min-height: 36px; padding: 6px 8px; font-size: 13.5px; }
+.vt .vin.num { width: 96px; text-align: right; }
+.vt .vin.code { width: 140px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.vt .vin.chg, .vt .cb.chg, [data-shared].chg { border-color: var(--amber); background: var(--amber-soft); box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 25%, transparent); }
+.vt .ro { display: inline-block; min-width: 70px; text-align: right; font-weight: 700; }
+.vt .stick { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.vt thead .stick { z-index: 2; }
+.brand-card .brand-mini { display: none; }
+@media (min-width: 1024px) { body.nav-mini .brand-card .brand-mini { display: block; } }
+.vt td.chp .vin { background: color-mix(in srgb, var(--primary-soft) 45%, var(--surface)); }
+.vt td.chp .vin.chg { background: var(--amber-soft); }

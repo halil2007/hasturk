@@ -94,15 +94,15 @@ export async function products(el, rest, query = {}) {
       <td class="c">${stockCell(p)}</td>
       <td class="r">${kebab(p)}</td></tr>`; };
     const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p)), gname = p0.group_name || p0.name, allSel = list.every((p) => sel.has(p.id));
-      return html`<tr class="grp-head ${on ? 'on' : ''}" data-act="tog" data-gi="${i}">
+      return html`<tr class="grp-head click ${on ? 'on' : ''}" data-act="vedit" data-gi="${i}" title="Tüm varyantları birlikte düzenle">
         <td class="cbcol"><input type="checkbox" class="cb" data-gsel="${i}" ${allSel ? 'checked' : ''} aria-label="Varyantları seç"></td>
-        <td><div class="prod-cell"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="pname">${gname}</div><div class="psub">${brand(list.find((p) => p.brand)?.brand)}<span class="pill info" style="padding:1px 8px">${list.length} varyant</span>${list.length <= 4 ? html`<span class="muted tiny ellipsis">${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}</span>` : ''}</div></div></div></td>
+        <td><div class="prod-cell"><button class="icon-btn sm grp-tog" data-act="tog" data-gi="${i}" aria-label="${on ? 'Varyantları gizle' : 'Varyantları göster'}" title="${on ? 'Varyantları gizle' : 'Varyantları listede göster'}"><i class="ico ico-down grp-chev"></i></button>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="pname">${gname}</div><div class="psub">${brand(list.find((p) => p.brand)?.brand)}<span class="pill info" style="padding:1px 8px">${list.length} varyant</span>${list.length <= 4 ? html`<span class="muted tiny ellipsis">${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}</span>` : ''}</div></div></div></td>
         <td>${chans(list)}</td>
         <td class="r num muted">${range(list.map((p) => p.purchase_price))}</td>
         <td class="r num"><b>${range(list.map((p) => p.sale_price))}</b></td>
         <td class="r muted">—</td>
         <td class="c"><span class="stk ${low ? 'low' : ''}" title="Varyantların toplam stoğu"><span class="dot"></span><b class="num">${gStock(list)}</b></span></td>
-        <td class="r"><i class="ico ico-${on ? 'up' : 'down'} muted"></i></td></tr>
+        <td class="r"><button class="btn sm outline" data-act="vedit" data-gi="${i}"><i class="ico ico-gear"></i>Varyantları düzenle</button></td></tr>
         ${on ? list.map((p) => prow(p, true)) : ''}`; };
     const mCard = ([k, list], i) => { if (!isGroup(list)) { const p = list[0]; return html`<div class="m-card" data-pid="${p.id}">
           <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="psub">${brand(p.brand)}${codes(p)}</div></div></div>
@@ -111,7 +111,7 @@ export async function products(el, rest, query = {}) {
       const on = all || opened.has(k), gname = list[0].group_name || list[0].name;
       return html`<div class="m-card grp ${on ? 'on' : ''}">
         <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
-        ${on ? html`<div class="m-vars">${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCell(p)}</div>`)}</div>` : ''}</div>`; };
+        ${on ? html`<div class="m-vars"><button class="btn sm outline block" data-act="vedit" data-gi="${i}"><i class="ico ico-gear"></i>Tüm varyantları birlikte düzenle</button>${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCell(p)}</div>`)}</div>` : ''}</div>`; };
     const empty = html`<div class="empty-state"><div class="ic"><i class="ico ico-box"></i></div><b>${f.q || f.filter ? 'Bu filtrede ürün yok' : 'Henüz ürün yok'}</b>
       <span>${f.q || f.filter ? 'Aramayı ya da filtreyi değiştirin.' : 'Kanallarınızdaki ürünleri Kanal Ürünleri sayfasından seçip ekleyebilir ya da yeni ürün açabilirsiniz.'}</span>
       ${f.q || f.filter ? '' : html`<div class="row" style="justify-content:center"><a class="btn" href="#/kanal-urunleri"><i class="ico ico-grid"></i>Kanal Ürünleri</a><button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün ekle</button></div>`}</div>`;
@@ -141,6 +141,7 @@ export async function products(el, rest, query = {}) {
   actions(el, {
     filter: (t) => { f.filter = t.dataset.k; sel.clear(); refresh(); },
     tog: (t) => { const g = groupList()[Number(t.dataset.gi)]; if (!g) return; if (opened.has(g[0])) opened.delete(g[0]); else opened.add(g[0]); draw(); },
+    vedit: (t) => { const g = groupList()[Number(t.dataset.gi)]; if (g) variantEditor(g[1].map((p) => p.id), refresh, g[1][0].group_name || g[1][0].name); },
     togall: () => { if (opened.size) opened.clear(); else groupList().forEach(([k]) => opened.add(k)); draw(); },
     more: () => { f.page++; load(true); },
     stock: (t) => stockDialog(byId(t.dataset.id), refresh),
@@ -151,8 +152,10 @@ export async function products(el, rest, query = {}) {
     menu: (t) => {
       const p = byId(t.dataset.id);
       if (!p) return;
+      const grp = groupList().find(([, l]) => l.length > 1 && l.some((x) => x.id === p.id));
       popMenu(t, [
         { icon: 'gear', label: 'Düzenle', run: () => productForm(p.id, refresh) },
+        ...(grp ? [{ icon: 'grid', label: `Tüm varyantları birlikte düzenle (${grp[1].length})`, run: () => variantEditor(grp[1].map((x) => x.id), refresh, grp[1][0].group_name || grp[1][0].name) }] : []),
         siteStock(p) ? { icon: 'db', label: 'Stok ikas\'tan okunuyor', run: () => {} } : { icon: 'db', label: 'Stok girişi / sayım', run: () => stockDialog(p, refresh) },
         ...((p.listings || []).length ? [{ icon: 'link', label: 'Kanal stok kuralları', run: () => ruleDialog(p, refresh) }] : []),
         { icon: p.active ? 'minus' : 'check', label: p.active ? 'Pasife al' : 'Aktif yap', run: () => api('products-bulk', { method: 'POST', body: { ids: [p.id], action: p.active ? 'deactivate' : 'activate' } }).then(() => { toast(p.active ? 'Pasife alındı' : 'Aktif yapıldı'); refresh(); }).catch((e) => toast(e.message, true)) },
@@ -298,6 +301,7 @@ export async function productForm(id, done) {
     return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
   };
   s.setBody(html`<form class="stack" data-form>
+    ${(p.siblings || []).length > 1 ? html`<div class="notice"><i class="ico ico-grid"></i><div><b>${p.group_name || p.name}</b> ana ürününün ${p.siblings.length} varyantından biri. Fiyat, stok ve kanal fiyatlarını tüm varyantlarda tek ekrandan değiştirebilirsiniz.</div><button class="btn sm primary" type="button" data-allvar>Tüm varyantları düzenle</button></div>` : ''}
     <div class="card stack">
       <h3>Ürün bilgileri</h3>
       <label class="field"><span>Ürün adı *</span><input class="input" name="name" required value="${p.name}"></label>
@@ -352,6 +356,8 @@ export async function productForm(id, done) {
       <div class="card"><h3 style="margin-bottom:8px">Son 30 gün satış</h3>${p.sales.length ? html`<table class="t"><tbody>${p.sales.map((x) => html`<tr><td>${ch(x.channel).name}</td><td class="r num">${x.qty} adet</td><td class="r num">${money(x.revenue)}</td></tr>`)}</tbody></table>` : html`<div class="muted small">Satış yok</div>`}</div>
     </div>` : ''}
   </form>`);
+  const allv = $("[data-allvar]", s.body);
+  if (allv) allv.onclick = () => { s.close(); variantEditor(p.siblings, done, p.group_name || p.name); };
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
   const form = $('[data-form]', s.body);
   // Görsel galerisi: yalnız bağlantılar saklanır (görseller kanalın sunucusundan açılır, panelde yer kaplamaz)
@@ -585,5 +591,108 @@ function excelDialog(done) {
       toast(`${n(r.changes)} değişiklik kaydedildi${r.prices ? ' · kanal fiyatları gönderiliyor' : ''}${r.stock ? ' · stoklar kanallara gönderiliyor' : ''}`);
       s.close(); done();
     });
+  });
+}
+
+// ---------- varyant grubu: tüm varyantlar tek ekranda ----------
+// Ad, SKU, barkod, alış / satış fiyatı, stok, kritik stok, aktiflik ve her kanaldaki fiyat aynı tablodan değiştirilir.
+// "Toplu değiştir": seçili (seçim yoksa tüm) varyantlara değer / yüzde / tutar uygular; kanal fiyatını satış fiyatı + % olarak da kurar.
+// Yalnız değişen hücreler kaydedilir; kanal fiyatları tek seferde kanallara gönderilir.
+export async function variantEditor(ids, done, title = '') {
+  const s = sheet({ title: title ? `${title} · varyantlar` : 'Varyantlar', size: 'wide xwide' });
+  s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
+  let list;
+  try { list = (await api('products-variants?ids=' + ids.join(','), { fresh: true })).products; } catch (e) { return s.setBody(html`<div class="notice bad">${e.message}</div>`); }
+  if (!list.length) return s.setBody(html`<div class="empty">Ürün bulunamadı</div>`);
+  const chans = [...new Set(list.flatMap((p) => p.listings.map((l) => l.channel)))].sort((a, b) => activeChannels().findIndex((c) => c.id === a) - activeChannels().findIndex((c) => c.id === b));
+  const p0 = list[0], group0 = p0.group_name || p0.name, brand0 = list.find((p) => p.brand)?.brand || '';
+  const lst = (p, c) => p.listings.find((l) => l.channel === c);
+  const num = (v) => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100).replace('.', ','));
+  const TARGETS = [['sale_price', 'Satış fiyatı'], ['purchase_price', 'Alış fiyatı'], ...chans.map((c) => ['ch:' + c, `Fiyat: ${ch(c).name}`]), ['stock', 'Stok'], ['critical_stock', 'Kritik stok']];
+  const inp = (i, k, v, extra = '') => html`<input class="input vin num" inputmode="decimal" data-r="${i}" data-k="${k}" value="${v}" data-o="${v}" ${raw(extra)}>`;
+  s.setBody(html`<div class="stack">
+    <div class="card"><div class="form-grid">
+      <label class="field"><span>Ana ürün adı (tüm varyantlar)</span><input class="input" data-shared="group_name" value="${group0}" data-o="${group0}"></label>
+      <label class="field"><span>Marka</span><input class="input" data-shared="brand" value="${brand0}" data-o="${brand0}"></label>
+    </div></div>
+    <div class="card vapply">
+      <b class="small">Toplu değiştir</b>
+      <select class="input" data-t>${TARGETS.map(([k, t]) => html`<option value="${k}">${t}</option>`)}</select>
+      <select class="input" data-op>
+        <option value="set">değer yap</option><option value="pct">% artır (− ile azalt)</option><option value="add">₺ ekle (− ile düş)</option><option value="fromsale">satış fiyatı + %</option>
+      </select>
+      <input class="input num" data-v inputmode="decimal" placeholder="ör. 249,90 ya da 10">
+      <button class="btn" data-x="apply"><i class="ico ico-check"></i>Uygula</button>
+      <span class="muted tiny" data-scope>Tüm varyantlara uygulanır</span>
+    </div>
+    <div class="card flush"><div class="table-wrap"><table class="t vt"><thead><tr>
+      <th class="cbcol"><input type="checkbox" class="cb" data-all aria-label="Tümünü seç"></th><th class="stick">Varyant</th><th class="r">Alış ₺</th><th class="r">Satış ₺</th>
+      ${chans.map((c) => html`<th class="r"><span class="row" style="justify-content:flex-end;gap:5px" title="${ch(c).name} fiyatı">${chLogo(c, true)}${ch(c).short || ch(c).name} ₺</span></th>`)}<th class="r">Stok</th><th class="r">Kritik</th><th>SKU</th><th>Barkod</th><th class="c">Aktif</th></tr></thead><tbody>
+      ${list.map((p, i) => html`<tr data-i="${i}">
+        <td class="cbcol"><input type="checkbox" class="cb" data-sel="${i}"></td>
+        <td class="stick"><div class="row" style="gap:8px;min-width:200px">${thumb(p.image, p.variant_name || p.name, 'sm')}<input class="input vin" data-r="${i}" data-k="variant_name" value="${p.variant_name || ''}" data-o="${p.variant_name || ''}" placeholder="${p.name}"></div></td>
+        <td>${inp(i, 'purchase_price', num(p.purchase_price))}</td>
+        <td>${inp(i, 'sale_price', num(p.sale_price), p.currency && p.fx_price ? `title="Döviz fiyatlı (${p.fx_price} ${p.currency}); kur güncellemesi bunu değiştirir"` : '')}</td>
+        ${chans.map((c) => { const l = lst(p, c); return html`<td class="chp">${l ? inp(i, 'ch:' + c, num(l.price), l.error ? `title="${l.error}"` : '') : html`<span class="muted tiny" title="Bu varyantın bu kanalda ilanı yok">—</span>`}</td>`; })}
+        <td>${p.site_stock ? html`<span class="ro" title="ikas sitesinden okunur (stok senkronu kapalı)">${p.stock} <span class="muted tiny">ikas</span></span>` : inp(i, 'stock', String(p.stock))}</td>
+        <td>${inp(i, 'critical_stock', String(p.critical_stock || 0))}</td>
+        <td><input class="input vin code" data-r="${i}" data-k="sku" value="${p.sku || ''}" data-o="${p.sku || ''}"></td>
+        <td><input class="input vin code" data-r="${i}" data-k="barcode" value="${p.barcode || ''}" data-o="${p.barcode || ''}"></td>
+        <td class="c"><input type="checkbox" class="cb" data-r="${i}" data-k="active" ${p.active ? 'checked' : ''} data-o="${p.active ? '1' : '0'}"></td></tr>`)}
+    </tbody></table></div></div>
+    <div class="muted tiny">Fiyatlar kaydedilince kanallara gönderilir (pazaryerine bir fiyat, kendi sitenize başka fiyat verebilirsiniz). Stok değişikliği stok hareketi olarak kaydedilir.${list.some((p) => p.site_stock) ? ' “ikas” yazan stoklar ikas sitesinden okunur; adet ikas panelinden değişir.' : ''}</div>
+  </div>`);
+  s.setFoot(html`<span class="muted small" data-cnt>Değişiklik yok</span><span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save disabled>Kaydet</button>`);
+  const parse = (v) => numIn(v);
+  const changed = () => $$('[data-o]', s.body).filter((x) => (x.type === 'checkbox' ? (x.checked ? '1' : '0') : x.value.trim()) !== x.dataset.o);
+  const mark = () => {
+    $$('[data-o]', s.body).forEach((x) => x.classList.toggle('chg', (x.type === 'checkbox' ? (x.checked ? '1' : '0') : x.value.trim()) !== x.dataset.o));
+    const n2 = changed().length;
+    $('[data-cnt]', s.el).textContent = n2 ? `${n2} değişiklik` : 'Değişiklik yok';
+    $('[data-save]', s.el).disabled = !n2;
+  };
+  const selRows = () => $$('[data-sel]:checked', s.body).map((x) => Number(x.dataset.sel));
+  const scope = () => { const k = selRows().length; $('[data-scope]', s.body).textContent = k ? `Seçili ${k} varyanta uygulanır` : 'Tüm varyantlara uygulanır'; };
+  s.body.addEventListener('input', mark);
+  s.body.addEventListener('change', (e) => {
+    if (e.target.matches('[data-all]')) $$('[data-sel]', s.body).forEach((x) => { x.checked = e.target.checked; });
+    if (e.target.matches('[data-sel], [data-all]')) scope();
+    mark();
+  });
+  s.body.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-x=apply]')) return;
+    const t = $('[data-t]', s.body).value, op = $('[data-op]', s.body).value, raw0 = $('[data-v]', s.body).value.trim();
+    if (raw0 === '') return toast('Değer girin', true);
+    const v = parse(raw0), rowsIdx = selRows().length ? selRows() : list.map((_, i) => i);
+    let n2 = 0;
+    for (const i of rowsIdx) {
+      const el2 = $(`[data-r="${i}"][data-k="${t}"]`, s.body);
+      if (!el2) continue;
+      const cur = parse(el2.value), sale = parse(($(`[data-r="${i}"][data-k="sale_price"]`, s.body) || {}).value);
+      let nv = op === 'set' ? v : op === 'pct' ? cur * (1 + v / 100) : op === 'add' ? cur + v : sale * (1 + v / 100);
+      nv = ['stock', 'critical_stock'].includes(t) ? Math.max(0, Math.round(nv)) : Math.max(0, Math.round(nv * 100) / 100);
+      el2.value = num(nv); n2++;
+    }
+    mark();
+    toast(n2 ? `${n2} hücre güncellendi — kaydetmeyi unutmayın` : 'Uygulanacak hücre yok (bu kanalda ilanı olmayan varyantlar atlanır)', !n2);
+  });
+  $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
+    const items = new Map(), shared = {};
+    for (const x of changed()) {
+      if (x.dataset.shared) { shared[x.dataset.shared] = x.value.trim(); continue; }
+      const i = Number(x.dataset.r), p = list[i], k = x.dataset.k;
+      const it = items.get(i) || items.set(i, { id: p.id }).get(i);
+      if (k.startsWith('ch:')) { const l = lst(p, k.slice(3)); (it.listings = it.listings || []).push({ channel: l.channel, remote_id: l.remote_id, price: parse(x.value) }); }
+      else if (k === 'active') it.active = x.checked ? 1 : 0;
+      else if (['variant_name', 'sku', 'barcode'].includes(k)) it[k] = x.value.trim();
+      else if (k === 'stock' || k === 'critical_stock') it[k] = Math.round(parse(x.value));
+      else it[k] = parse(x.value);
+    }
+    // Ortak alan değişti ama satır değişmediyse: gruptaki tüm varyantlara yazılsın diye her varyant gönderilir
+    if (Object.keys(shared).length) list.forEach((p, i) => { if (!items.has(i)) items.set(i, { id: p.id }); });
+    const r = await api('products-variants', { method: 'POST', body: { items: [...items.values()], shared } });
+    if (r.errors && r.errors.length) toast(`${r.saved} varyant kaydedildi · ${r.errors.length} hata: ${r.errors.map((x) => `${(list.find((p) => p.id === x.id) || {}).variant_name || x.id}: ${x.error}`).join(' | ')}`, true);
+    else toast(`${r.saved} varyant kaydedildi${[...items.values()].some((x) => x.listings) ? ' · kanal fiyatları gönderiliyor' : ''}`);
+    s.close(); done && done();
   });
 }
