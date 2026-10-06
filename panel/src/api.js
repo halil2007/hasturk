@@ -485,6 +485,11 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   if (pkg.has_label && !refresh) {
     if (ownDesign(settings, ch) && (pkg.barcode || pkg.tracking)) return { official: null, panel: true };
     const r = await first(db, 'SELECT label_format, label_data FROM packages WHERE id = ?', pkg.id);
+    // Önceden alınmış Hepsiburada etiketi: barkod kayıtlı ZPL'den çıkarılır, bizim tasarıma basılır
+    if (ownDesign(settings, ch) && r.label_format === 'zpl') {
+      const m = /\^B[C3AEKU8Q][^\^]*(?:\^[A-Z]{2}[^\^]*)*?\^FD(?:>[0-9:;<=>])?([0-9A-Za-z-]{6,})\^FS/.exec(r.label_data || '');
+      if (m) { await updPkg(db, pkg.id, { barcode: m[1], agreement: 'hepsiburada' }); return { official: null, panel: true }; }
+    }
     let lab = { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` };
     // Kayıtlı ZPL, "PDF'e çevir" açıksa PDF olarak verilir (kayıt ZPL kalır: termal yazıcı için de indirilebilir)
     if (lab.format === 'zpl' && settings.zpl_pdf) { try { lab = await zplToPdf(lab); } catch { /* ZPL olarak */ } }
