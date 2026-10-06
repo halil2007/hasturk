@@ -202,7 +202,11 @@ export const trackBtn = (pkg, order, cls = 'btn sm ghost') => { const u = trackU
 // Kanal rozeti (marka renginde harf); grafiklerde ise doğrulanmış kanal renkleri kullanılır
 export function chLogo(id, sm = false) {
   const c = ch(id), t = c.type || id, k = sm ? ' sm' : '';
-  if (t === 'ikas') return html`<span class="logo-b ikas${k}" title="${c.name}"><i class="ico ico-bolt"></i></span>`;
+  // Birden fazla ikas mağazası varsa logonun köşesinde mağaza sırası (1, 2, 3…): ayırt edilsin
+  if (t === 'ikas') {
+    const iks = state.channels.filter((x) => (x.type || x.id) === 'ikas' && !x.paused), no = iks.length > 1 ? iks.findIndex((x) => x.id === id) + 1 : 0;
+    return html`<span class="logo-b ikas${k}" title="${c.name}"><i class="ico ico-bolt"></i>${no > 0 ? html`<span class="lb-no">${no}</span>` : ''}</span>`;
+  }
   if (t === 'trendyol') return html`<span class="logo-b trendyol${k}" title="Trendyol">T</span>`;
   if (t === 'hepsiburada') return html`<span class="logo-b hepsiburada${k}" title="Hepsiburada">hb</span>`;
   if (t === 'pttavm') return html`<span class="logo-b pttavm${k}" title="PttAVM">Ptt</span>`;

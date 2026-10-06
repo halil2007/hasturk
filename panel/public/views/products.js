@@ -11,121 +11,185 @@ export const siteStock = (p) => !(state.settings && state.settings.stock_sync)
   && (p.listings || []).some((l) => ((state.settings && state.settings.catalog_channels) || ['ikas1']).includes(l.channel) && l.remote_stock != null);
 export const siteStockVal = (p, cls = '') => html`<span class="val num ${cls}" style="cursor:help" title="ikas sitesinden okunur (stok senkronu kapalı). Adedi ikas panelinden değiştirin.">${p.stock}<span class="tiny muted" style="margin-left:4px;font-weight:500">ikas</span></span>`;
 
-const FILTERS = [['', 'Tümü'], ['low', 'Kritik stok'], ['nocost', 'Alış fiyatı eksik'], ['nosku', 'SKU eksik'], ['nobarcode', 'Barkod eksik'], ['nolisting', 'Kanalda olmayan'], ['passive', 'Pasif']];
+const FILTERS = [['', 'Tümü', 'all'], ['low', 'Kritik stok', 'low'], ['nocost', 'Alış fiyatı eksik', 'nocost'], ['nosku', 'SKU eksik', 'nosku'], ['nobarcode', 'Barkod eksik', 'nobarcode'], ['nolisting', 'Kanalda olmayan', 'nolisting'], ['passive', 'Pasif', 'passive']];
+const SORTS = [['', 'Ada göre (A–Z)'], ['new', 'En yeni eklenen'], ['sold', 'En çok satan (30 gün)'], ['stock', 'Stok (azdan çoğa)'], ['stock_desc', 'Stok (çoktan aza)'], ['price_desc', 'Fiyat (yüksekten)'], ['price_asc', 'Fiyat (düşükten)'], ['margin_desc', 'Marj (yüksekten)'], ['margin_asc', 'Marj (düşükten)']];
 
 export async function products(el, rest, query = {}) {
-  const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), page: 1 };
-  let rows = [], total = 0, groupsTotal = 0;
+  const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), sort: query.sort || '', page: 1 };
+  let rows = [], total = 0, groupsTotal = 0, counts = {}, stats = {};
+  const sel = new Set();
   render(el, html`<div class="stack">
-    <div class="row wrap page-actions">
-      <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-q value="${f.q}"></div>
-      <span class="spacer"></span>
-      <button class="btn" data-act="barcodes" title="Barkodu ya da SKU'su olmayan ürünlere benzersiz kod oluştur"><i class="ico ico-tag"></i>Barkod / SKU oluştur</button>
-      <button class="btn" data-act="excel" title="Fiyat, stok, maliyet ve kanal fiyatlarını Excel ile toplu güncelle"><i class="ico ico-download"></i>Excel</button>
-      <button class="btn" data-act="import"><i class="ico ico-download"></i>Kanallardan içe aktar</button>
-      <a class="btn" href="#/eslestirme"><i class="ico ico-link"></i>Eşleştirme <span data-unl></span></a>
-      <button class="btn primary" data-act="new" data-fab><i class="ico ico-plus"></i>Ürün Ekle</button>
+    <div class="pstats" data-stats></div>
+    <div class="card toolbar-card">
+      <div class="row wrap page-actions">
+        <div class="search grow"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU, barkod veya marka ara" data-q value="${f.q}"></div>
+        <label class="sort-pick"><i class="ico ico-bars"></i><select data-sort aria-label="Sırala">${SORTS.map(([k, t]) => html`<option value="${k}" ${f.sort === k ? 'selected' : ''}>${t}</option>`)}</select></label>
+        <button class="btn" data-act="tools"><i class="ico ico-gear"></i>Araçlar <i class="ico ico-down"></i></button>
+        <button class="btn primary" data-act="new" data-fab><i class="ico ico-plus"></i>Ürün ekle</button>
+      </div>
+      <div class="fchips" data-filters></div>
     </div>
-    <div class="tabs" data-filters></div>
     <div class="card flush" data-box></div>
   </div>`);
 
   const stockCls = (p) => (p.stock <= 0 ? 'neg' : p.stock <= (p.low_limit ?? p.critical_stock) ? 'low' : '');
-  function dots(p) {
-    return html`<div class="ch-dots">${(p.listings || []).map((l) => {
-      const cls = l.error ? 'err' : l.pushed_stock != null && l.pushed_stock !== (l.desired ?? Math.max(0, p.stock)) && state.settings && state.settings.stock_sync ? 'wait' : '';
-      const t = l.error ? l.error : cls === 'wait' ? 'Stok gönderimi bekliyor' : `${ch(l.channel).name}: ${money(l.price)} · stok ${l.desired ?? p.stock}${ruleText(l) ? ` (${ruleText(l)})` : ''}`;
-      return html`<span class="ch-dot ${cls}" title="${t}">${chLogo(l.channel, true)}${money0(l.price)}</span>`;
-    })}${!(p.listings || []).length ? html`<span class="ch-dot wait">Kanalda yok</span>` : ''}</div>`;
-  }
   const margin = (p) => (p.purchase_price && p.sale_price ? ((p.sale_price - p.purchase_price) / p.sale_price) * 100 : null);
-  const stockCtl = (p) => siteStock(p) ? siteStockVal(p, stockCls(p)) : html`<div class="stock-ctl"><button class="round" data-act="dec" data-id="${p.id}" aria-label="Stok azalt"><i class="ico ico-minus"></i></button>
-    <span class="val num ${stockCls(p)}" data-act="stock" data-id="${p.id}" title="Stok girişi / sayım">${p.stock}</span>
-    <button class="round" data-act="inc" data-id="${p.id}" aria-label="Stok artır"><i class="ico ico-plus"></i></button></div>`;
+  const marginPill = (m) => (m == null ? html`<span class="muted tiny">—</span>` : html`<span class="mpill ${m < 0 ? 'bad' : m < 15 ? 'amber' : 'good'}">%${n(m)}</span>`);
   const title = (p) => html`${p.variant_name && p.group_name ? p.group_name : p.name}${p.variant_name ? html`<span class="var-tag">${p.variant_name}</span>` : ''}`;
   const brand = (b) => (b ? html`<span class="brand-tag" title="Marka">${b}</span>` : '');
-  // Varyantlar ana ürün altında toplanır; ana ürün satırına tıklayınca varyantlar açılır / kapanır
+  const codes = (p) => html`<span class="codes">${p.sku ? html`<span title="Stok kodu (SKU)">${p.sku}</span>` : html`<span class="miss">SKU yok</span>`}${p.barcode ? html`<span title="Barkod">${p.barcode}</span>` : ''}</span>`;
+  // Kanallar: logo yığını + kanal fiyat aralığı; ayrıntı ipucunda. Hata kırmızı, kanalda yoksa uyarı.
+  function chans(list) {
+    const ls = list.flatMap((p) => p.listings || []);
+    if (!ls.length) return html`<span class="pill amber">Kanalda yok</span>`;
+    const ids = [...new Set(ls.map((l) => l.channel))], err = ls.filter((l) => l.error);
+    const prices = ls.map((l) => l.price).filter((x) => x > 0), lo = Math.min(...prices), hi = Math.max(...prices);
+    const tip = ids.map((c) => { const xs = ls.filter((l) => l.channel === c); return `${ch(c).name}: ${xs.map((l) => money(l.price)).join(', ')}${xs.some((l) => l.error) ? ' (hata)' : ''}`; }).join('\n');
+    return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => chLogo(c, true))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>
+      <span class="small num">${prices.length ? (lo === hi ? money0(lo) : `${money0(lo)} – ${money0(hi)}`) : ''}</span>${err.length ? html`<span class="pill bad" title="${err.map((l) => `${ch(l.channel).name}: ${l.error}`).join('\n')}">${err.length} hata</span>` : ''}</div>`;
+  }
+  const stockCell = (p) => {
+    const site = siteStock(p), c = stockCls(p);
+    return html`<button class="stk ${c}" data-act="${site ? 'sitestock' : 'stock'}" data-id="${p.id}" title="${site ? 'ikas sitesinden okunur (stok senkronu kapalı)' : 'Stok girişi / sayım'}"><span class="dot"></span><b class="num">${p.stock}</b></button>${p.days_left != null && p.stock > 0 ? html`<div class="tiny ${p.days_left <= 14 ? 'down' : 'muted'}">≈ ${p.days_left} gün</div>` : ''}`;
+  };
   const opened = new Set();
   const groupList = () => { const m = new Map(); for (const p of rows) { const k = p.gk || p.group_name || p.name; if (!m.has(k)) m.set(k, []); m.get(k).push(p); } return [...m]; };
   const isGroup = (list) => list.length > 1;
   const range = (vals) => { const v = vals.filter((x) => x > 0); if (!v.length) return '—'; const lo = Math.min(...v), hi = Math.max(...v); return lo === hi ? money(lo) : `${money0(lo)} – ${money0(hi)}`; };
-  const chSummary = (list) => { const c = new Map(); list.forEach((p) => (p.listings || []).forEach((l) => c.set(l.channel, (c.get(l.channel) || 0) + 1))); return c.size ? html`<div class="ch-dots">${[...c].map(([id, k]) => html`<span class="ch-dot" title="${ch(id).name}: ${k} / ${list.length} varyant">${chLogo(id, true)}${k}/${list.length}</span>`)}</div>` : html`<span class="ch-dot wait">Kanalda yok</span>`; };
   const gStock = (list) => list.reduce((a, p) => a + Math.max(0, p.stock), 0);
+  const cb = (p) => html`<input type="checkbox" class="cb" data-sel="${p.id}" ${sel.has(p.id) ? 'checked' : ''} aria-label="Seç">`;
+  const kebab = (p) => html`<button class="icon-btn sm" data-act="menu" data-id="${p.id}" aria-label="İşlemler"><i class="ico ico-dots"></i></button>`;
+
+  function drawStats() {
+    const s = stats, c = counts;
+    const missing = (s.nocost || 0) + (s.nosku || 0) + (s.nobarcode || 0);
+    render($('[data-stats]', el), html`
+      <button class="pstat" data-act="filter" data-k=""><span class="ic blue"><i class="ico ico-box"></i></span><div><b class="num">${n(c.all || 0)}</b><span>aktif ürün${s.passive ? ` · ${n(s.passive)} pasif` : ''}</span></div></button>
+      <div class="pstat"><span class="ic green"><i class="ico ico-calc"></i></span><div><b class="num">${money0(s.stock_value || 0)}</b><span>stok değeri (alış) · satışla ${money0(s.sale_value || 0)}</span></div></div>
+      <div class="pstat"><span class="ic purple"><i class="ico ico-pie"></i></span><div><b class="num">${s.margin == null ? '—' : `%${n(s.margin)}`}</b><span>ortalama marj</span></div></div>
+      <button class="pstat ${c.out || c.below ? 'warn' : ''}" data-act="filter" data-k="low"><span class="ic red"><i class="ico ico-db"></i></span><div><b class="num">${n((c.out || 0) + (c.below || 0))}</b><span>kritik stok · ${n(c.out || 0)} tükendi</span></div></button>
+      <button class="pstat ${missing ? 'warn' : ''}" data-act="filter" data-k="${s.nocost ? 'nocost' : s.nosku ? 'nosku' : 'nobarcode'}"><span class="ic amber"><i class="ico ico-warn"></i></span><div><b class="num">${n(missing)}</b><span>eksik bilgi (alış ${n(s.nocost || 0)} · SKU ${n(s.nosku || 0)} · barkod ${n(s.nobarcode || 0)})</span></div></button>`);
+    const cnt = { all: c.all, low: (c.out || 0) + (c.below || 0), nocost: s.nocost, nosku: s.nosku, nobarcode: s.nobarcode, nolisting: s.nolisting, passive: s.passive };
+    render($('[data-filters]', el), html`${FILTERS.map(([k, t, ck]) => html`<button class="fchip ${f.filter === k ? 'on' : ''}" data-act="filter" data-k="${k}">${t}${cnt[ck] ? html`<span class="n">${n(cnt[ck])}</span>` : ''}</button>`)}`);
+  }
+
+  function bulkbar() {
+    if (!sel.size) return '';
+    return html`<div class="bulk"><b>${sel.size} ürün seçildi</b>
+      <button class="btn sm" data-act="bulk" data-a="activate"><i class="ico ico-check"></i>Aktif yap</button>
+      <button class="btn sm" data-act="bulk" data-a="deactivate"><i class="ico ico-minus"></i>Pasife al</button>
+      <button class="btn sm" data-act="bulk" data-a="critical"><i class="ico ico-db"></i>Kritik stok sınırı</button>
+      <span class="spacer"></span><button class="btn sm ghost" data-act="clearsel">Seçimi kaldır</button></div>`;
+  }
   function draw() {
+    drawStats();
     const mob = isMobile(), gl = groupList(), all = !!f.q;
-    const varRow = (p) => { const m = margin(p); return html`<tr class="var-row" data-pid="${p.id}">
-      <td><div class="row" style="cursor:pointer" data-act="edit" data-id="${p.id}">${thumb(p.image, p.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:600">${p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : p.name}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="muted tiny">${[p.sku, p.barcode].filter(Boolean).join(' · ') || 'SKU yok'}</div></div></div></td>
-      <td>${dots(p)}</td>
-      <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span style="color:var(--amber)">girilmedi</span>`}</td>
-      <td class="r num" style="font-weight:650">${money(p.sale_price)}${p.currency && p.fx_price ? html`<div class="tiny muted">${p.fx_price} ${p.currency}</div>` : ''}</td>
-      <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
-      <td class="c">${stockCtl(p)}</td>
-      <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
-    const single = (p) => { const m = margin(p); return html`<tr data-pid="${p.id}">
-      <td><div class="row" style="cursor:pointer" data-act="edit" data-id="${p.id}">${thumb(p.image, p.name)}<div style="min-width:0"><div class="ellipsis" style="max-width:340px;font-weight:650">${p.name}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="muted tiny">${brand(p.brand)}${[p.sku, p.barcode].filter(Boolean).join(' · ') || 'SKU yok'}</div></div></div></td>
-      <td>${dots(p)}</td>
-      <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span style="color:var(--amber)">girilmedi</span>`}</td>
-      <td class="r num" style="font-weight:650">${money(p.sale_price)}${p.currency && p.fx_price ? html`<div class="tiny muted">${p.fx_price} ${p.currency}</div>` : ''}</td>
-      <td class="r num ${m == null ? '' : m >= 0 ? 'up' : 'down'}">${m == null ? '—' : `%${n(m)}`}</td>
-      <td class="c">${stockCtl(p)}</td>
-      <td class="r"><button class="btn sm ghost" data-act="edit" data-id="${p.id}">Düzenle</button></td></tr>`; };
-    const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p)), gname = p0.group_name || p0.name;
+    const prow = (p, variant = false) => { const m = margin(p); return html`<tr class="${variant ? 'var-row' : ''} ${sel.has(p.id) ? 'sel-row' : ''} click" data-pid="${p.id}" data-row-edit="${p.id}">
+      <td class="cbcol">${cb(p)}</td>
+      <td><div class="prod-cell">${thumb(p.image, p.name, variant ? 'sm' : '')}<div style="min-width:0"><div class="pname">${variant && p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : title(p)}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="psub">${variant ? '' : brand(p.brand)}${codes(p)}</div></div></div></td>
+      <td>${chans([p])}</td>
+      <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span class="miss" title="Alış fiyatı girilmedi; kâr hesaplanamaz">girilmedi</span>`}</td>
+      <td class="r num"><b>${money(p.sale_price)}</b>${p.currency && p.fx_price ? html`<div class="tiny muted">${p.fx_price} ${p.currency}</div>` : ''}</td>
+      <td class="r">${marginPill(m)}</td>
+      <td class="c">${stockCell(p)}</td>
+      <td class="r">${kebab(p)}</td></tr>`; };
+    const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p)), gname = p0.group_name || p0.name, allSel = list.every((p) => sel.has(p.id));
       return html`<tr class="grp-head ${on ? 'on' : ''}" data-act="tog" data-gi="${i}">
-        <td><div class="row"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}<b style="color:var(--text)">${list.length} varyant</b>${list.length <= 4 ? ` · ${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}` : ''}</div></div></div></td>
-        <td>${chSummary(list)}</td>
+        <td class="cbcol"><input type="checkbox" class="cb" data-gsel="${i}" ${allSel ? 'checked' : ''} aria-label="Varyantları seç"></td>
+        <td><div class="prod-cell"><i class="ico ico-down grp-chev"></i>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="pname">${gname}</div><div class="psub">${brand(list.find((p) => p.brand)?.brand)}<span class="pill info" style="padding:1px 8px">${list.length} varyant</span>${list.length <= 4 ? html`<span class="muted tiny ellipsis">${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}</span>` : ''}</div></div></div></td>
+        <td>${chans(list)}</td>
         <td class="r num muted">${range(list.map((p) => p.purchase_price))}</td>
-        <td class="r num" style="font-weight:650">${range(list.map((p) => p.sale_price))}</td>
-        <td class="r num muted">—</td>
-        <td class="c"><span class="num ${low ? 'low' : ''}" style="font-weight:700" title="Varyantların toplam stoğu">${gStock(list)}</span></td>
-        <td class="r"><button class="btn sm ghost" data-act="tog" data-gi="${i}">${on ? 'Kapat' : 'Varyantlar'}</button></td></tr>
-        ${on ? list.map(varRow) : ''}`; };
+        <td class="r num"><b>${range(list.map((p) => p.sale_price))}</b></td>
+        <td class="r muted">—</td>
+        <td class="c"><span class="stk ${low ? 'low' : ''}" title="Varyantların toplam stoğu"><span class="dot"></span><b class="num">${gStock(list)}</b></span></td>
+        <td class="r"><i class="ico ico-${on ? 'up' : 'down'} muted"></i></td></tr>
+        ${on ? list.map((p) => prow(p, true)) : ''}`; };
     const mCard = ([k, list], i) => { if (!isGroup(list)) { const p = list[0]; return html`<div class="m-card" data-pid="${p.id}">
-          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="muted tiny">${brand(p.brand)}${[p.sku, p.barcode].filter(Boolean).join(' · ')}</div></div></div>
-          ${dots(p)}<div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCtl(p)}</div></div>`; }
+          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="psub">${brand(p.brand)}${codes(p)}</div></div></div>
+          <div class="row">${chans([p])}<span class="spacer"></span>${marginPill(margin(p))}</div>
+          <div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCell(p)}</div></div>`; }
       const on = all || opened.has(k), gname = list[0].group_name || list[0].name;
       return html`<div class="m-card grp ${on ? 'on' : ''}">
         <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
-        ${on ? html`<div class="m-vars">${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCtl(p)}</div>`)}</div>` : ''}</div>`; };
-    const body = !rows.length ? html`<div class="empty">Ürün yok. “Kanallardan içe aktar” ile ürünleri çekebilir veya “Ürün Ekle” ile ekleyebilirsiniz.</div>`
-      : mob ? html`<div class="m-list" style="padding:12px">${gl.map(mCard)}</div>`
-        : html`<div class="table-wrap"><table class="t prod-t"><thead><tr><th>Ürün</th><th>Kanallar (fiyat)</th><th class="r">Alış</th><th class="r">Satış</th><th class="r">Marj</th><th class="c">Ortak stok</th><th></th></tr></thead><tbody>
-          ${gl.map((g, i) => (isGroup(g[1]) ? head(g, i) : single(g[1][0])))}
+        ${on ? html`<div class="m-vars">${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCell(p)}</div>`)}</div>` : ''}</div>`; };
+    const empty = html`<div class="empty-state"><div class="ic"><i class="ico ico-box"></i></div><b>${f.q || f.filter ? 'Bu filtrede ürün yok' : 'Henüz ürün yok'}</b>
+      <span>${f.q || f.filter ? 'Aramayı ya da filtreyi değiştirin.' : 'Kanallarınızdaki ürünleri Kanal Ürünleri sayfasından seçip ekleyebilir ya da yeni ürün açabilirsiniz.'}</span>
+      ${f.q || f.filter ? '' : html`<div class="row" style="justify-content:center"><a class="btn" href="#/kanal-urunleri"><i class="ico ico-grid"></i>Kanal Ürünleri</a><button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün ekle</button></div>`}</div>`;
+    const allSel = rows.length && rows.every((p) => sel.has(p.id));
+    const body = !rows.length ? empty
+      : mob ? html`<div class="m-list">${gl.map(mCard)}</div>`
+        : html`<div class="table-wrap"><table class="t prod-t"><thead><tr><th class="cbcol"><input type="checkbox" class="cb" data-selall ${allSel ? 'checked' : ''} aria-label="Tümünü seç"></th><th>Ürün</th><th>Kanallar</th><th class="r">Alış</th><th class="r">Satış</th><th class="r">Marj</th><th class="c">Stok</th><th></th></tr></thead><tbody>
+          ${gl.map((g, i) => (isGroup(g[1]) ? head(g, i) : prow(g[1][0])))}
         </tbody></table></div>`;
     const shown = gl.length;
-    render($('[data-box]', el), html`${body}<div class="pager"><span class="muted small" style="margin-right:auto">${n(groupsTotal)} ana ürün · ${n(total)} ürün/varyant${shown < groupsTotal ? ` · ${shown} gösteriliyor` : ''}</span>${gl.some((g) => isGroup(g[1])) && !all ? html`<button class="btn sm ghost" data-act="togall">${opened.size ? 'Tümünü kapat' : 'Tümünü aç'}</button>` : ''}${shown < groupsTotal ? html`<button class="btn sm" data-act="more">Daha fazla</button>` : ''}</div>`);
+    render($('[data-box]', el), html`${bulkbar()}${body}${rows.length ? html`<div class="pager"><span class="muted small" style="margin-right:auto">${n(groupsTotal)} ana ürün · ${n(total)} ürün/varyant${shown < groupsTotal ? ` · ${shown} gösteriliyor` : ''}</span>${gl.some((g) => isGroup(g[1])) && !all ? html`<button class="btn sm ghost" data-act="togall">${opened.size ? 'Varyantları kapat' : 'Tüm varyantları aç'}</button>` : ''}${shown < groupsTotal ? html`<button class="btn sm" data-act="more">Daha fazla göster</button>` : ''}</div>` : ''}`);
   }
   async function load(append = false) {
-    setQuery({ f: f.filter, q: f.q });
+    setQuery({ f: f.filter, q: f.q, sort: f.sort });
     const p = new URLSearchParams({ page: f.page, limit: 40, group: 1 });
     if (f.q) p.set('q', f.q);
     if (f.filter) p.set('filter', f.filter);
+    if (f.sort) p.set('sort', f.sort);
     const r = await api('products?' + p);
     rows = append ? rows.concat(r.products) : r.products;
-    total = r.total; groupsTotal = r.groups ?? r.total;
-    render($('[data-filters]', el), html`${FILTERS.map(([k, t]) => html`<button class="tab ${f.filter === k ? 'on' : ''}" data-act="filter" data-k="${k}">${t}</button>`)}`);
-    const unl = state.summary ? state.summary.unmatched : 0;
-    $('[data-unl]', el).textContent = unl ? `(${unl})` : '';
+    total = r.total; groupsTotal = r.groups ?? r.total; counts = r.counts || {}; stats = r.stats || {};
     draw();
   }
   const refresh = () => { f.page = 1; return load().catch((e) => toast(e.message, true)); };
-  const bump = quickStock(() => rows, el);
+  const byId = (id) => rows.find((x) => x.id === Number(id));
+  const unl = () => (state.summary ? state.summary.unmatched : 0);
   actions(el, {
-    filter: (t) => { f.filter = t.dataset.k; refresh(); },
+    filter: (t) => { f.filter = t.dataset.k; sel.clear(); refresh(); },
     tog: (t) => { const g = groupList()[Number(t.dataset.gi)]; if (!g) return; if (opened.has(g[0])) opened.delete(g[0]); else opened.add(g[0]); draw(); },
     togall: () => { if (opened.size) opened.clear(); else groupList().forEach(([k]) => opened.add(k)); draw(); },
     more: () => { f.page++; load(true); },
-    inc: (t) => bump(t.dataset.id, 1),
-    dec: (t) => bump(t.dataset.id, -1),
-    stock: (t) => stockDialog(rows.find((x) => x.id === Number(t.dataset.id)), refresh),
+    stock: (t) => stockDialog(byId(t.dataset.id), refresh),
+    sitestock: () => toast('Stok, ikas sitesinden okunuyor (stok senkronu kapalı). Adedi ikas panelinden değiştirin ya da Ayarlar → Stok\'tan senkronu açın.'),
     edit: (t) => productForm(Number(t.dataset.id), refresh),
     new: () => productForm(0, refresh),
-    import: () => importDialog(refresh),
-    excel: (t) => popMenu(t, [
+    clearsel: () => { sel.clear(); draw(); },
+    menu: (t) => {
+      const p = byId(t.dataset.id);
+      if (!p) return;
+      popMenu(t, [
+        { icon: 'gear', label: 'Düzenle', run: () => productForm(p.id, refresh) },
+        siteStock(p) ? { icon: 'db', label: 'Stok ikas\'tan okunuyor', run: () => {} } : { icon: 'db', label: 'Stok girişi / sayım', run: () => stockDialog(p, refresh) },
+        ...((p.listings || []).length ? [{ icon: 'link', label: 'Kanal stok kuralları', run: () => ruleDialog(p, refresh) }] : []),
+        { icon: p.active ? 'minus' : 'check', label: p.active ? 'Pasife al' : 'Aktif yap', run: () => api('products-bulk', { method: 'POST', body: { ids: [p.id], action: p.active ? 'deactivate' : 'activate' } }).then(() => { toast(p.active ? 'Pasife alındı' : 'Aktif yapıldı'); refresh(); }).catch((e) => toast(e.message, true)) },
+      ], { title: p.name });
+    },
+    bulk: async (t) => {
+      const a = t.dataset.a;
+      let value;
+      if (a === 'critical') { value = prompt('Seçili ürünlerin kritik stok sınırı (adet):', '5'); if (value === null) return; }
+      else if (!(await confirmBox(`${sel.size} ürün ${a === 'activate' ? 'aktif yapılsın' : 'pasife alınsın'} mı?${a === 'deactivate' ? ' Pasif ürünler listelerde gizlenir, stok gönderimi durmaz.' : ''}`, a === 'activate' ? 'Aktif yap' : 'Pasife al'))) return;
+      busy(t, async () => { const r = await api('products-bulk', { method: 'POST', body: { ids: [...sel], action: a, value } }); toast(`${n(r.changed)} ürün güncellendi`); sel.clear(); refresh(); });
+    },
+    tools: (t) => popMenu(t, [
+      { icon: 'grid', label: 'Kanal ürünlerinden seç / ekle', run: () => { location.hash = '#/kanal-urunleri'; } },
+      { icon: 'link', label: `Eşleştirme${unl() ? ` (${unl()} bekliyor)` : ''}`, run: () => { location.hash = '#/eslestirme'; } },
+      '-',
+      { icon: 'tag', label: 'Barkod / SKU oluştur', run: () => barcodeDialog(refresh, f.filter === 'nosku' ? 'sku' : 'barcode') },
       { icon: 'download', label: 'Excel\'e aktar (tüm ürünler)', run: () => { location.href = '/api/products.csv'; } },
       { icon: 'upload', label: 'Excel\'den toplu güncelle', run: () => excelDialog(refresh) },
-    ]),
-    barcodes: () => barcodeDialog(refresh, f.filter === 'nosku' ? 'sku' : 'barcode'),
+      { icon: 'sync', label: 'Kanallardan içe aktar', run: () => importDialog(refresh) },
+    ], { title: 'Araçlar' }),
   });
+  // Satıra tıklayınca ürün açılır (kutucuk, düğme ve bağlantılar hariç)
+  el.addEventListener('click', (e) => {
+    const r = e.target.closest('[data-row-edit]');
+    if (!r || e.target.closest('button, a, input, select, label')) return;
+    productForm(Number(r.dataset.rowEdit), refresh);
+  });
+  el.addEventListener('change', (e) => {
+    const c = e.target.closest('[data-sel]');
+    if (c) { c.checked ? sel.add(Number(c.dataset.sel)) : sel.delete(Number(c.dataset.sel)); draw(); return; }
+    const g = e.target.closest('[data-gsel]');
+    if (g) { const list = (groupList()[Number(g.dataset.gsel)] || [])[1] || []; list.forEach((p) => (g.checked ? sel.add(p.id) : sel.delete(p.id))); draw(); return; }
+    if (e.target.matches('[data-selall]')) { rows.forEach((p) => (e.target.checked ? sel.add(p.id) : sel.delete(p.id))); draw(); }
+    if (e.target.matches('[data-sort]')) { f.sort = e.target.value; refresh(); }
+  });
+  el.addEventListener('click', (e) => { if (e.target.closest('[data-gsel]')) e.stopPropagation(); }, true);
   $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); refresh(); }, 300));
   await refresh();
   if (rest[0] === 'ice-aktar') importDialog(refresh);
