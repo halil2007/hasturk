@@ -130,6 +130,7 @@ async function route() {
   const r = PAGES.find((x) => x.path === path && canSee(x)) || PAGES[0];
   $$('[data-path]').forEach((a) => a.classList.toggle('on', a.dataset.path === r.path));
   $('[data-title]').textContent = r.title;
+  document.body.dataset.route = r.path;
   $('[data-sub]').textContent = state.demo ? 'Örnek veriler' : (state.settings && state.settings.company && state.settings.company.title) || '';
   document.title = `${r.title} · ${(state.settings && state.settings.company && state.settings.company.title) || 'Hastürk'} CRM`;
   if (current && current.destroy) current.destroy();
@@ -308,11 +309,11 @@ function mobileEnhance() {
     fab.innerHTML = src.innerHTML;
     fab.onclick = () => src.click();
   }
-  if (!mobile) return;
+  // Uzun bilgi kutuları (telefonda 150, bilgisayarda 260 karakterden uzun) iki satıra kısalır
   for (const n of $$('.notice:not([data-clamp])', view)) {
     n.dataset.clamp = '1';
     const t = n.querySelector(':scope > div');
-    if (!t || t.textContent.length < 150 || t.querySelector('input, select, textarea')) continue;
+    if (!t || t.textContent.length < (mobile ? 150 : 260) || t.querySelector('input, select, textarea')) continue;
     t.classList.add('clamp2');
     const b = document.createElement('button');
     b.className = 'more-link'; b.type = 'button'; b.textContent = 'Devamı';

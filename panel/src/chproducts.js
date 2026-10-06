@@ -3,7 +3,7 @@
 // stok koduyla var olan ürüne bağlar, yoksa yeni ürün kartı açar. Kanal başına mod: otomatik (yeni ilan kendiliğinden ürün olur)
 // ya da "ben seçeyim" (settings.manual_import, bkz. match.js → autoMatch).
 import { all, first, run, getRaw, setSetting, getSettings, log } from './db.js';
-import { autoMatch, relinkItems, normBc, normSku, manualImport } from './match.js';
+import { autoMatch, relinkItems, normBc, normSku, manualImport, bestCandidates, approveConfident } from './match.js';
 import { fillProductInfo, catalogOf } from './sync.js';
 import { chunk, str, fail } from './util.js';
 
@@ -45,6 +45,9 @@ export async function listChannelProducts(db, q) {
     first(db, `SELECT COUNT(*) AS n FROM listings l ${f.w}`, ...f.args),
     first(db, `SELECT COUNT(*) AS total, SUM(${STATES.unlinked}) AS unlinked, SUM(${STATES.linked}) AS linked, SUM(${STATES.ignored}) AS ignored, SUM(${STATES.zero}) AS zero FROM listings l WHERE l.channel = ?`, channel),
   ]);
+  // Panelde olmayan ilanlar için önerilen eşleşme (var olan ürün; kanalda boş olan)
+  const sug = await bestCandidates(db, rows.filter((l) => !l.product_id));
+  for (const l of rows) l.suggest = sug.get(l.remote_id) || null;
   return { listings: rows, total: total.n, page, limit, counts: Object.fromEntries(Object.entries(counts || {}).map(([k, v]) => [k, v || 0])) };
 }
 
@@ -97,6 +100,15 @@ export async function addToPanel(env, db, b, user = {}) {
   await fillProductInfo(db, settings).catch(() => {});
   await log(db, channel, 'info', `${user.name || 'Panel'}: kanal ürünlerinden panele alındı · ${created} yeni ürün, ${linked} var olan ürüne bağlandı${m.linked ? `, diğer kanallardan ${m.linked} ilan eşleşti` : ''}`);
   return { created, linked, others: m.linked || 0, skipped: ids.length - ls.length };
+}
+
+// Güçlü önerileri onayla: en iyi aday en az 85 puan ve ikinciden 15 puan öndeyse bağlar
+export async function acceptStrong(db, b, user = {}) {
+  const channel = str(b.channel);
+  if (!channel) fail(400, 'Kanal seçin');
+  const r = await approveConfident(db, { channel, min: 85, gap: 15 });
+  if (r.linked) { await relinkItems(db); await log(db, channel, 'info', `${user.name || 'Panel'}: ${r.linked} güçlü eşleşme önerisi onaylandı`); }
+  return r;
 }
 
 export async function ignoreListings(db, b) {

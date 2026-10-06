@@ -55,3 +55,15 @@ test('panele ekle: var olana bağlar, yoksa ürün açar, çakışan stok kodunu
   const s = await channelSummary(db);
   assert.equal(s[0].channel, 'trendyol'); assert.equal(s[0].manual, true); assert.equal(s[0].linked, 4);
 });
+
+test('önerilen eşleşme: benzer adlı, kanalda boş ürün önerilir', async () => {
+  const db = await setup();
+  const t = Date.now();
+  await run(db, "INSERT INTO products (sku, name, sale_price, stock, created_at, updated_at) VALUES ('HG-MAKAS', 'Bahçe Makası Profesyonel 20 cm', 259, 3, ?, ?)", t, t);
+  await run(db, "INSERT INTO listings (channel, remote_id, sku, name, price, remote_stock, synced_at) VALUES ('trendyol', 'ty9', 'TY-MK', 'Bahçe Makası Profesyonel', 249, 4, ?)", t);
+  const l = await listChannelProducts(db, { channel: 'trendyol', state: 'unlinked', q: 'Makas' });
+  assert.equal(l.listings.length, 1);
+  assert.ok(l.listings[0].suggest, 'öneri var');
+  assert.equal(l.listings[0].suggest.sku, 'HG-MAKAS');
+  assert.ok(l.listings[0].suggest.score >= 40);
+});

@@ -45,8 +45,12 @@ export async function channelProductsView(el, rest, query = {}) {
 
   const stateCell = (l) => (l.product_id ? html`<a class="pill good" href="#/urunler?q=${encodeURIComponent(l.product_sku || l.product_name || '')}" title="Panel ürünü: ${l.product_name || ''}">Panelde</a>`
     : l.ignored && l.match === 'zero' ? html`<span class="pill">Stoğu yok</span>` : l.ignored ? html`<span class="pill">Yok sayıldı</span>` : html`<span class="pill amber">Panelde değil</span>`);
+  // Önerilen eşleşme: panelde var olan en benzer ürün (puan ve neden); "Bağla" ilanı o ürüne bağlar
+  const sugg = (l) => (!l.product_id && l.suggest ? html`<div class="cp-sug"><span class="score ${l.suggest.score >= 85 ? 'hi' : l.suggest.score >= 60 ? 'mid' : 'lo'}" title="${l.suggest.why || ''}">${l.suggest.score}</span>
+      <div style="min-width:0;flex:1"><div class="muted tiny">Önerilen eşleşme</div><div class="ellipsis small" style="font-weight:600;max-width:260px" title="${l.suggest.name}">${l.suggest.name}</div><div class="muted tiny ellipsis" style="max-width:260px">${[l.suggest.sku, l.suggest.barcode].filter(Boolean).join(' · ')}</div></div>
+      <button class="btn sm outline" data-act="linksug" data-pid="${l.suggest.product_id}">Bağla</button></div>` : '');
   const acts = (l) => (l.product_id ? html`<span class="muted tiny ellipsis" style="max-width:180px;display:inline-block">${l.product_name || ''}</span>`
-    : html`<button class="btn sm primary" data-act="add1">Panele ekle</button><button class="icon-btn sm" data-act="more" aria-label="Diğer"><i class="ico ico-dots"></i></button>`);
+    : html`<button class="btn sm ${l.suggest && l.suggest.score >= 60 ? '' : 'primary'}" data-act="add1" title="Yeni ürün kartı aç (aynı barkod / stok kodlu ürün varsa ona bağlanır)">Yeni ürün olarak ekle</button><button class="icon-btn sm" data-act="more" aria-label="Diğer"><i class="ico ico-dots"></i></button>`);
   const pick = (l) => (l.product_id ? html`<span style="display:inline-block;width:18px"></span>` : html`<input type="checkbox" class="cb" data-sel="${l.remote_id}" ${sel.has(l.remote_id) ? 'checked' : ''} aria-label="Seç">`);
 
   function bulkbar() {
@@ -58,7 +62,9 @@ export async function channelProductsView(el, rest, query = {}) {
     }
     const free = data.listings.filter((l) => !l.product_id);
     if (!free.length) return '';
+    const strong = free.filter((l) => l.suggest && l.suggest.score >= 85).length;
     return html`<div class="bulk"><label class="check"><input type="checkbox" class="cb" data-selall> Bu sayfadakileri seç</label>
+      ${strong ? html`<button class="btn sm outline" data-act="accept" title="En iyi aday en az 85 puan ve ikinci adaydan belirgin öndeyse bağlar"><i class="ico ico-check"></i>Güçlü önerileri bağla</button>` : ''}
       ${f.state !== 'linked' && data.total > data.listings.length ? html`<span class="spacer"></span><button class="btn sm outline" data-act="addall"><i class="ico ico-plus"></i>Filtredeki tümünü panele ekle (${n(Math.min(data.total, 2000))})</button>` : ''}</div>`;
   }
   function pager() {
@@ -82,17 +88,17 @@ export async function channelProductsView(el, rest, query = {}) {
         <div class="row" style="align-items:flex-start">${pick(l)}${thumb(l.image, l.name, 'lg')}<div style="min-width:0;flex:1"><div style="font-weight:650" class="clamp2">${l.name}${vtag(l.variant_name, l.name)}</div>
           <div class="muted tiny ellipsis">${[l.sku, l.barcode].filter(Boolean).join(' · ') || l.remote_id}</div>
           <div class="row" style="margin-top:4px;gap:10px"><b class="num">${money(l.price)}</b><span class="small ${l.remote_stock > 0 ? '' : 'down'}">${l.remote_stock ?? '—'} stok</span></div></div></div>
-        <div class="row">${stateCell(l)}<span class="spacer"></span>${acts(l)}</div></div>`) : empty}</div>${pager()}`);
+        ${sugg(l)}<div class="row">${stateCell(l)}<span class="spacer"></span>${acts(l)}</div></div>`) : empty}</div>${pager()}`);
       return;
     }
-    render(box, html`${bulkbar()}<div class="table-wrap"><table class="t"><thead><tr><th style="width:40px"></th><th>İlan</th><th>SKU / barkod</th><th class="r">Fiyat</th><th class="r">Stok</th><th>Durum</th><th class="r"></th></tr></thead><tbody>
+    render(box, html`${bulkbar()}<div class="table-wrap"><table class="t"><thead><tr><th style="width:40px"></th><th>İlan</th><th>SKU / barkod</th><th class="r">Fiyat</th><th class="r">Stok</th><th>Durum / önerilen eşleşme</th><th class="r"></th></tr></thead><tbody>
       ${L.map((l) => html`<tr data-key="${l.remote_id}" class="${sel.has(l.remote_id) ? 'sel-row' : ''}">
         <td>${pick(l)}</td>
         <td><div class="row">${thumb(l.image, l.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:420px;font-weight:600">${l.name}${vtag(l.variant_name, l.name)}</div><div class="muted tiny ellipsis" style="max-width:420px">${[l.brand, l.category].filter(Boolean).join(' · ')}</div></div></div></td>
         <td class="small"><div>${l.sku || '—'}</div><div class="muted tiny num">${l.barcode || ''}</div></td>
         <td class="r num">${money(l.price)}</td>
         <td class="r num ${l.remote_stock > 0 ? '' : 'down'}">${l.remote_stock ?? '—'}</td>
-        <td>${stateCell(l)}</td>
+        <td style="min-width:300px">${l.suggest && !l.product_id ? sugg(l) : stateCell(l)}</td>
         <td class="r"><div class="row" style="justify-content:flex-end;gap:4px">${acts(l)}</div></td></tr>`)}
     </tbody></table></div>${L.length ? '' : empty}${pager()}`);
   }
@@ -123,6 +129,11 @@ export async function channelProductsView(el, rest, query = {}) {
     ch: (t) => { f.channel = t.dataset.id; f.page = 1; sel.clear(); refresh(); },
     st: (t) => { f.state = t.dataset.k; f.page = 1; sel.clear(); refresh(); },
     page: (t) => { f.page = Number(t.dataset.p); refresh(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+    linksug: (t) => busy(t, async () => { await api('channel-products/link', { method: 'POST', body: { channel: f.channel, remote_id: keyOf(t), product_id: Number(t.dataset.pid) } }); await after('İlan önerilen ürüne bağlandı'); }),
+    accept: async (t) => {
+      if (!(await confirmBox('Güçlü öneriler (85 puan ve üzeri, ikinci adaydan belirgin önde) var olan ürünlere bağlansın mı? Yanlış olanı Eşleştirme → Eşleşmiş ürünler\'den kaldırabilirsiniz.', 'Bağla'))) return;
+      busy(t, async () => { const r = await api('channel-products/accept', { method: 'POST', body: { channel: f.channel } }); await after(`${n(r.linked || 0)} ilan önerilen ürüne bağlandı`); });
+    },
     add1: (t) => busy(t, async () => { const r = await api('channel-products/add', { method: 'POST', body: { channel: f.channel, ids: [keyOf(t)] } }); await after(added(r)); }),
     addsel: (t) => busy(t, async () => { const r = await api('channel-products/add', { method: 'POST', body: { channel: f.channel, ids: [...sel] } }); await after(added(r)); }),
     addall: async (t) => {
@@ -137,7 +148,8 @@ export async function channelProductsView(el, rest, query = {}) {
       const l = rowOf(t);
       if (!l) return;
       popMenu(t, [
-        { icon: 'link', label: 'Var olan bir ürüne bağla', run: () => findProduct({ channel: f.channel, remote_id: l.remote_id }, () => after('İlan ürüne bağlandı'), 'channel-products/link') },
+        { icon: 'plus', label: 'Yeni ürün olarak ekle', run: () => api('channel-products/add', { method: 'POST', body: { channel: f.channel, ids: [l.remote_id] } }).then((r) => after(added(r))).catch((e) => toast(e.message, true)) },
+        { icon: 'link', label: 'Var olan bir ürüne bağla (ara)', run: () => findProduct({ channel: f.channel, remote_id: l.remote_id }, () => after('İlan ürüne bağlandı'), 'channel-products/link') },
         l.ignored ? { icon: 'check', label: 'Yok saymayı kaldır', run: () => api('channel-products/ignore', { method: 'POST', body: { channel: f.channel, ids: [l.remote_id], ignored: false } }).then(() => after('Bekleyenlere alındı')).catch((e) => toast(e.message, true)) }
           : { icon: 'x', label: 'Yok say (panele alma)', run: () => api('channel-products/ignore', { method: 'POST', body: { channel: f.channel, ids: [l.remote_id] } }).then(() => after('Yok sayıldı')).catch((e) => toast(e.message, true)) },
       ], { title: l.name });

@@ -260,6 +260,16 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
 }
 
 const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ');
+// Verilen ilanlar için en iyi aday ürün (Kanal Ürünleri listesinde "önerilen eşleşme"); en az 40 puan
+export async function bestCandidates(db, listings) {
+  if (!listings.length) return new Map();
+  const idx = await productIndex(db), out = new Map();
+  for (const l of listings) {
+    const c = candidates(l, idx, 1)[0];
+    if (c && c.s.score >= 40) out.set(l.remote_id, { product_id: c.p.id, name: fullName(c.p), sku: c.p.sku, barcode: c.p.barcode, image: c.p.image, score: c.s.score, why: c.s.why });
+  }
+  return out;
+}
 function candidates(l, idx, n = 3) {
   const a = prep({ name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode });
   const gks = l.remote_product_id ? idx.rgroup.get(`${l.channel}|${l.remote_product_id}`) : null;

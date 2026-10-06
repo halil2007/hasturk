@@ -25,7 +25,7 @@ import { costOf, COST_KEYS } from '../public/profit.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList } from './util.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
@@ -550,20 +550,40 @@ async function listProducts(db, q) {
   const limit = Math.min(Number(q.limit) || 50, 500), page = Math.max(1, Number(q.page) || 1);
   // Ana ürün (varyant grubu) anahtarı: grup adı yoksa ürün adı
   const GK = "COALESCE(NULLIF(p.parent_key, ''), NULLIF(p.group_name, ''), p.name)";
+  // Sıralama: ürün (varyant) satırları için ve ana ürün (grup) için toplu karşılığı
+  const MARGIN = 'CASE WHEN p.sale_price > 0 AND p.purchase_price > 0 THEN (p.sale_price - p.purchase_price) / p.sale_price END';
+  const NAME = "COALESCE(NULLIF(p.group_name, ''), p.name) COLLATE NOCASE";
+  const SORTS = {
+    stock: ['p.stock ASC', 'SUM(p.stock) ASC'], stock_desc: ['p.stock DESC', 'SUM(p.stock) DESC'],
+    price_desc: ['p.sale_price DESC', 'MAX(p.sale_price) DESC'], price_asc: ['p.sale_price ASC', 'MIN(p.sale_price) ASC'],
+    margin_desc: [`${MARGIN} DESC NULLS LAST`, `AVG(${MARGIN}) DESC NULLS LAST`], margin_asc: [`${MARGIN} ASC NULLS LAST`, `AVG(${MARGIN}) ASC NULLS LAST`],
+    new: ['p.created_at DESC', 'MAX(p.created_at) DESC'], sold: [`${SOLD30()} DESC`, `SUM(${SOLD30()}) DESC`],
+    // Kaç gün yeter (satış hızına göre); satışı olmayan en sona
+    days: [`CASE WHEN ${SOLD30()} > 0 THEN p.stock * 30.0 / ${SOLD30()} ELSE 1e9 END ASC`, `MIN(CASE WHEN ${SOLD30()} > 0 THEN p.stock * 30.0 / ${SOLD30()} ELSE 1e9 END) ASC`],
+  };
+  const so = SORTS[q.sort];
   // Sayfa satırları, toplamlar ve stok sekmesi sayıları aynı anda okunur
   const page1 = async () => {
-    if (!q.group) return all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w} ORDER BY ${q.sort === 'stock' ? 'p.stock ASC, p.name COLLATE NOCASE' : 'COALESCE(NULLIF(p.group_name, \'\'), p.name) COLLATE NOCASE, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE'} LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
-    // Sayfalama ana ürün bazında: her sayfada N ana ürün ve tüm (filtreye uyan) varyantları
-    const gks = (await all(db, `SELECT ${GK} AS gk, MIN(COALESCE(NULLIF(p.group_name, ''), p.name)) AS gn FROM products p ${w} GROUP BY gk ORDER BY gn COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit)).map((r) => r.gk);
-    return gks.length ? all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${gks.map(() => '?').join(',')})
-      ORDER BY COALESCE(NULLIF(p.group_name, ''), p.name) COLLATE NOCASE, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, ...args, ...gks) : [];
+    if (!q.group) return all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w} ORDER BY ${so ? so[0] + ', ' : ''}${NAME}, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit);
+    // Sayfalama ana ürün bazında: her sayfada N ana ürün ve tüm (filtreye uyan) varyantları; grup sırası korunur
+    const gks = (await all(db, `SELECT ${GK} AS gk, MIN(${NAME}) AS gn FROM products p ${w} GROUP BY gk ORDER BY ${so ? so[1] + ', ' : ''}gn COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit)).map((r) => r.gk);
+    if (!gks.length) return [];
+    const list = await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${gks.map(() => '?').join(',')})
+      ORDER BY ${NAME}, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, ...args, ...gks);
+    const at = new Map(gks.map((g, i) => [g, i]));
+    return list.sort((a, b) => at.get(a.gk) - at.get(b.gk));
   };
-  const [rows, totalRow, groupRow, cnt, ro] = await Promise.all([
+  const [rows, totalRow, groupRow, cnt, ro, st] = await Promise.all([
     page1(),
     first(db, `SELECT COUNT(*) AS n FROM products p ${w}`, ...args),
     q.group ? first(db, `SELECT COUNT(DISTINCT ${GK}) AS n FROM products p ${w}`, ...args) : null,
     first(db, `SELECT SUM(p.stock <= 0) AS out_, SUM(p.stock > 0 AND p.stock <= ${low}) AS below, SUM(p.stock > ${low}) AS enough, COUNT(*) AS total FROM products p WHERE p.active = 1`),
     first(db, `SELECT COUNT(*) AS n FROM (SELECT p.stock AS st, ${SOLD30()} AS s FROM products p WHERE p.active = 1 AND p.stock > 0) WHERE s > 0 AND st * 30.0 / s <= ${RUNOUT_DAYS}`),
+    // Katalog özeti (Ürünler sayfası kartları ve filtre sayıları)
+    first(db, `SELECT SUM(active = 0) AS passive, SUM(active = 1 AND (purchase_price IS NULL OR purchase_price = 0)) AS nocost, SUM(active = 1 AND COALESCE(TRIM(sku), '') = '') AS nosku,
+      SUM(active = 1 AND COALESCE(TRIM(barcode), '') = '') AS nobarcode, SUM(active = 1 AND NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)) AS nolisting,
+      SUM(CASE WHEN active = 1 AND stock > 0 THEN stock * COALESCE(purchase_price, 0) ELSE 0 END) AS stock_value, SUM(CASE WHEN active = 1 AND stock > 0 THEN stock * sale_price ELSE 0 END) AS sale_value,
+      AVG(CASE WHEN active = 1 AND sale_price > 0 AND purchase_price > 0 THEN (sale_price - purchase_price) / sale_price END) AS margin FROM products p`),
   ]);
   const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
@@ -576,7 +596,8 @@ async function listProducts(db, q) {
     const sold = new Map(soldRows.map((x) => [x.id, x.n]));
     for (const r of rows) { r.sold30 = sold.get(r.id) || 0; r.days_left = r.sold30 > 0 ? Math.floor((Math.max(0, r.stock) * 30) / r.sold30) : null; }
   }
-  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, runout: ro.n || 0, all: cnt.total || 0 } };
+  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, runout: ro.n || 0, all: cnt.total || 0 },
+    stats: Object.fromEntries(Object.entries(st || {}).map(([k, v]) => [k, k === 'margin' ? (v == null ? null : r2(v * 100)) : Math.round(v || 0)])) };
 }
 
 async function stockChange(env, db, ctx, id, b, user) {
@@ -1218,6 +1239,18 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/skus/preview' && m === 'POST') { const b = await body(req); return json(await previewSkus(db, b.ids, b.prefix)); }
   if (path === 'products/skus' && m === 'POST') { const b = await body(req); return json(await assignSkus(db, b.items, { prefix: b.prefix, user: user.name })); }
   if (path === 'products' && m === 'GET') return json(await listProducts(db, q));
+  // Toplu: aktif / pasif yap, kritik stok sınırı
+  if (path === 'products-bulk' && m === 'POST') {
+    const b = await body(req), ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter((x) => x > 0).slice(0, 2000);
+    if (!ids.length) fail(400, 'Ürün seçin');
+    const set = b.action === 'activate' ? ['active = 1'] : b.action === 'deactivate' ? ['active = 0'] : b.action === 'critical' ? ['critical_stock = ?'] : null;
+    if (!set) fail(400, 'Geçersiz işlem');
+    const extra = b.action === 'critical' ? [Math.max(0, Math.round(num(b.value)))] : [];
+    let changed = 0;
+    for (const part of chunk(ids, 300)) changed += ((await run(db, `UPDATE products SET ${set[0]}, updated_at = ? WHERE id IN (${part.map(() => '?').join(',')})`, ...extra, Date.now(), ...part)).meta || {}).changes || 0;
+    await log(db, null, 'info', `${user.name}: ${changed} ürün toplu güncellendi (${b.action})`);
+    return json({ changed });
+  }
   if (path === 'products' && m === 'POST') return json(await saveProduct(env, db, ctx, 0, await body(req), user));
   if ((x = path.match(/^products\/(\d+)$/))) {
     const id = Number(x[1]);
@@ -1249,6 +1282,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'channel-products' && m === 'GET') return json(await chp.listChannelProducts(db, q));
   if (path === 'channel-products/add' && m === 'POST') { const r = await chp.addToPanel(env, db, await body(req), user); ctx.waitUntil(pushStocks(env, db).catch(() => {})); return json(r); }
   if (path === 'channel-products/ignore' && m === 'POST') return json(await chp.ignoreListings(db, await body(req)));
+  if (path === 'channel-products/accept' && m === 'POST') { const r = await chp.acceptStrong(db, await body(req), user); ctx.waitUntil(pushStocks(env, db).catch(() => {})); return json(r); }
   if (path === 'channel-products/mode' && m === 'POST') { const r = await chp.setMode(db, await body(req)); await log(db, null, 'info', `${user.name}: kanal ürünleri modu değişti`); return json(r); }
   if ((path === 'listings/link' || path === 'channel-products/link') && m === 'POST') {
     const b = await body(req);
