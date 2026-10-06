@@ -1,7 +1,7 @@
 // Servis çalışanı: (1) uygulama dosyaları cihazda saklanır, panel ağı beklemeden açılır; (2) anlık bildirim.
 // Veri (/api/*) hiçbir zaman saklanmaz, her zaman sunucudan gelir. Yeni yayında panel sürüm farkını görür,
 // saklanan dosyaları siler ve sayfayı bir kez yeniler (app.js → checkBuild).
-const SHELL = 'shell-v1';
+const SHELL = 'shell-v2';
 const DEV = /^(localhost|127\.0\.0\.1)$/.test(self.location.hostname);
 
 self.addEventListener('install', (e) => {
@@ -19,13 +19,17 @@ self.addEventListener('fetch', (e) => {
   if (DEV || req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.search) return;
   // Sayfa adresi (/, /?firma=…) tek kayıt: index.html
   const key = req.mode === 'navigate' ? '/' : url.pathname;
+  // Saklanan dosya anında verilir, aynı anda ağdan yenisi alınıp saklanır (bir sonraki açılış her zaman güncel);
+  // ağdan alınırken tarayıcının HTTP önbelleği atlanır (yeni yayında eski CSS / JS karışmasın)
   e.respondWith((async () => {
     const cache = await caches.open(SHELL);
     const hit = await cache.match(key);
-    if (hit) return hit;
-    const res = await fetch(req);
-    if (res.ok && res.type === 'basic') cache.put(key, res.clone()).catch(() => {});
-    return res;
+    const net = fetch(req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' })).then((res) => {
+      if (res.ok && res.type === 'basic') cache.put(key, res.clone()).catch(() => {});
+      return res;
+    });
+    if (hit) { e.waitUntil(net.catch(() => {})); return hit; }
+    return net;
   })());
 });
 self.addEventListener('message', (e) => {

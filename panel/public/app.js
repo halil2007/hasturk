@@ -383,10 +383,23 @@ function shellCache(build) {
   if (!build) return;
   const old = store.get('build', null);
   store.set('build', build);
-  if (old && old !== build && navigator.serviceWorker.controller && window.caches) caches.delete('shell-v1').finally(() => location.reload());
+  if (old && old !== build && navigator.serviceWorker.controller && window.caches) caches.delete('shell-v2').finally(() => location.reload());
+}
+
+// Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
+const ASSETS = '2026-10-06b';
+function assetsMatch() {
+  const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');
+  if (css === ASSETS) return true;
+  let last = 0;
+  try { last = Number(sessionStorage.getItem('assets_reload')) || 0; sessionStorage.setItem('assets_reload', String(Date.now())); } catch { /* yok */ }
+  if (Date.now() - last < 60e3) return true; // döngüye girmesin
+  (window.caches ? caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))) : Promise.resolve()).finally(() => location.reload());
+  return false;
 }
 
 async function start() {
+  if (!assetsMatch()) return;
   try { await loadSummary(); } catch { return; }
   shellCache(state.summary.build);
   nav();
