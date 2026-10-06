@@ -1205,9 +1205,11 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .ic-err .ico { width: 15px; height: 15px; flex: none; }
 /* Kanal ekranı: solda anahtarlar, ortada bilgiler, sağda yardım */
 .idetail { display: grid; gap: 16px; align-items: start; }
-@media (min-width: 900px) { .idetail { grid-template-columns: 270px minmax(0, 1fr); } .id-help { grid-column: 1 / -1; } }
-@media (min-width: 1280px) { .idetail { grid-template-columns: 270px minmax(0, 1fr) 300px; } .id-help { grid-column: auto; position: sticky; top: 84px; } .id-side { position: sticky; top: 84px; } }
-.id-side, .id-help { display: grid; gap: 14px; }
+@media (min-width: 900px) { .idetail { grid-template-columns: 290px minmax(0, 1fr); } .id-help { grid-column: 1 / -1; } }
+@media (min-width: 1280px) { .idetail { grid-template-columns: 290px minmax(0, 1fr) 300px; } .id-help { grid-column: auto; position: sticky; top: 84px; } .id-side { position: sticky; top: 84px; } }
+.id-side, .id-help { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.id-side > *, .id-help > * { min-width: 0; }
+.id-brand h2 { overflow-wrap: anywhere; white-space: normal; line-height: 1.25; }
 .id-brand { display: flex; align-items: center; gap: 12px; }
 .id-brand .logo-b { width: 48px; height: 48px; border-radius: 13px; font-size: 17px; }
 .id-brand h2 { margin: 0; }
@@ -1231,4 +1233,4 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-06b"; }
+:root { --assets: "2026-10-06c"; }
