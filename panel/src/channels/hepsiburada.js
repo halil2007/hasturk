@@ -296,17 +296,21 @@ export function hepsiburada(env, meta) {
     }
     return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.', changeCargo: true };
   }
-  // Etiket dosyası: önce ZPL, olmazsa biçim parametresiz / PDF denenir (Hepsiburada yanıtı düz ZPL, PDF ya da JSON içinde ZPL / base64 olabilir)
+  // Etiket dosyası: biçim değeri firmaya göre farklı kabul ediliyor (HepsiJET "ZPL" kabul eder; Aras servisi "ZPL"yi tanımayıp
+  // 500 / "Requested value 'ZPL' was not found" döner). Sırayla denenir: ZPL, biçimsiz, Zpl, zpl, PDF, Pdf, pdf.
+  const FORMATS = ['?format=ZPL', '', '?format=Zpl', '?format=zpl', '?format=PDF', '?format=Pdf', '?format=pdf'];
+  const formatErr = (e) => /requested value|was not found|format|1051|enum/i.test(e.message);
   async function labelFile(pkg) {
     const base = `${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels`;
     let lastErr = null;
-    for (const q of ['?format=ZPL', '', '?format=PDF']) {
+    for (const q of FORMATS) {
       let res;
       try { res = await hb(base + q, { headers: headers(false), raw: true, tries: 1 }); } catch (e) {
         lastErr = e;
         // Ortak barkod hatası biçimden bağımsızdır: diğer biçimleri denemeden döner
+        if (/mutual barcode|ortak barkod|common barcode/i.test(e.message)) throw e;
         const st = e.status || Number((/HTTP (\d{3})/.exec(e.message) || [])[1]);
-        if (/mutual barcode|ortak barkod|common barcode/i.test(e.message) || ![400, 404, 415, 422].includes(st)) throw e;
+        if (![400, 404, 415, 422, 500].includes(st) || (st === 500 && !formatErr(e))) throw e;
         continue;
       }
       const lab = await parseLabel(res, pkg);
