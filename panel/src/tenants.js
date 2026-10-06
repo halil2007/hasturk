@@ -158,8 +158,8 @@ export async function tenantApi(req, env, db, path, user) {
     if (slug === DEMO_SLUG) fail(400, 'Bu firma kodu web sitesindeki demo paneline ayrılmış');
     if (await first(db, 'SELECT 1 AS x FROM tenants WHERE slug = ?', slug)) fail(400, 'Bu firma kodu kullanılıyor');
     const f = fields(b);
-    // Deneme süresi: bitiş girilmediyse 14 gün
-    if (f.trial && !f.expires_at) f.expires_at = Date.now() + 14 * DAY;
+    // Deneme süresi: bitiş girilmediyse 7 gün
+    if (f.trial && !f.expires_at) f.expires_at = Date.now() + 7 * DAY;
     if (!f.starts_at) f.starts_at = Date.now();
     const t = { slug, ...f, name, active: 1, admin_username: username, created_at: Date.now(), updated_at: Date.now() };
     await admin(env, t, 'setup', { username, password: pw, name });

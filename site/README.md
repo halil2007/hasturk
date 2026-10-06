@@ -2,7 +2,7 @@
 
 Statik site (HTML + CSS + az JS); panelden bağımsız bir Cloudflare Worker olarak yayınlanır.
 
-Sayfalar: ana sayfa (`/`), `/ozellikler`, `/entegrasyonlar`, `/paketler`, `/hakkimizda` (güvenlik dahil), `/iletisim`, `/demo`,
+Sayfalar: ana sayfa (`/`), `/ozellikler` (+ her özellik için ayrı sayfa), `/entegrasyonlar` (+ her kanal için ayrı sayfa), `/paketler`, `/hakkimizda` (güvenlik dahil), `/iletisim`, `/demo`,
 yasal sayfalar (`/kvkk`, `/gizlilik`, `/kullanim-kosullari`) ve 404.
 
 ## Yayına alma
@@ -24,6 +24,8 @@ otomatik açılan, örnek verilerle çalışan firma paneline girer (bkz. `panel
 Sayfalar `src/` klasöründen derlenir; **`public/*.html` dosyalarını elle düzenlemeyin**:
 - `src/layout.html`: tüm sayfalarda ortak üst çubuk, menü, alt bilgi, WhatsApp düğmesi.
 - `src/pages/*.html`: sayfa içerikleri (başındaki yorum bloğu: başlık, açıklama, adres).
+- `src/data.mjs`: özellik ve entegrasyon sayfalarının içeriği (`/ozellikler/<ad>`, `/entegrasyonlar/<ad>`) ve üst menüdeki açılır listeler.
+  Buradaki her cümle panelin bugün yaptığıyla birebir olmalı; yeni özellik ya da kanal eklenince buraya da ekleyin.
 - `src/sprite.svg`: simgeler.
 
 Düzenledikten sonra derleyin (Node.js yeterli, bağımlılık yok) ve `public/` ile birlikte kaydedin:

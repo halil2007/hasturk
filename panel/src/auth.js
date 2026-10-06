@@ -71,7 +71,7 @@ export async function demoCookie(env, db, secure) {
 }
 // Tanıtım sitesindeki demo bağlantısı: süreli, ana panelin gizli anahtarıyla imzalı ("bitiş.imza")
 const demoKey = (env) => (env.PANEL_SECRET || env.PANEL_PASSWORD || '') + '|demo-link';
-export async function demoToken(env, days = 14) {
+export async function demoToken(env, days = 7) {
   const exp = String(Date.now() + days * 864e5);
   return `${exp}.${await hmac(demoKey(env), exp)}`;
 }

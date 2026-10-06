@@ -268,7 +268,12 @@ export function trendyol(env, meta) {
     let bc = '';
     await diagStep(out, 'Ürünler (V2 onaylı ürün servisi)', async () => { const r = await call(`/product/sellers/${seller}/products/approved?page=0&size=1`); bc = str((((r.content || [])[0] || {}).variants || [])[0]?.barcode); return { detail: `${r.totalElements ?? '?'} ürün` }; });
     await diagStep(out, 'Stok / fiyat servisi', async () => { const r = await call(`/product/sellers/${seller}/products/approved/inventory-and-price?page=0&size=1`); return { detail: `erişildi · ${r.totalElements ?? (r.content || []).length} ürün` }; });
-    await diagStep(out, 'Buybox servisi', async () => { if (!bc) return { ok: null, detail: 'Ürün yok, denenemedi' }; await buybox([bc]); return { detail: 'Erişilebilir' }; });
+    await diagStep(out, 'Buybox servisi', async () => {
+      if (!bc) return { ok: null, detail: 'Ürün yok, denenemedi' };
+      const [b] = await buybox([bc]);
+      if (!b) return { ok: false, detail: `${bc}: buybox yanıtı okunamadı` };
+      return { detail: `${bc}: buybox sırası ${b.rank ?? '?'} · buybox fiyatı ${b.buyboxPrice ?? 'yok'}${b.multi ? ` · 2. satıcı ${b.second ?? '?'}` : ' · tek satıcı'}` };
+    });
     await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ since: now - 7 * 864e5, page: 0, size: 1 }); return { detail: `son 7 günde ${r.total ?? r.items.length} soru` }; });
     if (orderId) await diagStep(out, 'Sipariş paketleri', async () => {
       const r = await call(`/order/sellers/${seller}/orders?orderNumber=${encodeURIComponent(orderId)}`);

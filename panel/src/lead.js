@@ -1,6 +1,6 @@
 // Tanıtım sitesinden demo / teklif talebi: oturumsuz, yalnız izin verilen site adreslerinden (SITE_ORIGINS) kabul edilir.
 // Talep ana panelin Destek sayfasına "Web sitesi" firmasıyla düşer ve ana panele bildirim gider. IP başına saatte 5 talep;
-// gizli "website" alanı (bot tuzağı) doluysa sessizce yok sayılır. Yanıtta demo paneline giriş bağlantısı döner (14 gün geçerli).
+// gizli "website" alanı (bot tuzağı) doluysa sessizce yok sayılır. Yanıtta demo paneline giriş bağlantısı döner (7 gün geçerli).
 import { first, run, init, notify } from './db.js';
 import { demoToken, checkDemoToken } from './auth.js';
 import { demoLogin } from './tenants.js';

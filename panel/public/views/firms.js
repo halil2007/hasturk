@@ -113,7 +113,7 @@ export async function firmsView(el) {
           <label class="field"><span>Başlangıç</span><input class="input" type="date" name="starts_at" value="${t ? iso(t.starts_at) : iso(Date.now())}"></label>
           <label class="field"><span>Bitiş (bu tarihten sonra giriş kapanır)</span><input class="input" type="date" name="expires_at" value="${t ? iso(t.expires_at) : ''}"><small>Boş = süresiz</small></label>
         </div><datalist id="f-plans">${PLANS.map((p) => html`<option value="${p}">`)}</datalist>
-          <label class="check" style="margin-top:10px"><input type="checkbox" name="trial" ${t && t.trial ? 'checked' : ''}> Deneme sürümü ${t ? '' : html`<span class="muted tiny">(bitiş boşsa 14 gün)</span>`}</label></div>
+          <label class="check" style="margin-top:10px"><input type="checkbox" name="trial" ${t && t.trial ? 'checked' : ''}> Deneme sürümü ${t ? '' : html`<span class="muted tiny">(bitiş boşsa 7 gün)</span>`}</label></div>
 
         ${t ? html`<div class="card"><label class="check"><span class="switch"><input type="checkbox" name="active" ${t.active ? 'checked' : ''}><span></span></span> Panel aktif (kapalıysa askıya alınır: giriş ve senkron durur, veriler korunur)</label></div>`
     : html`<div class="card"><h3 style="margin-bottom:10px">Firmanın panel yöneticisi</h3><div class="form-grid">
