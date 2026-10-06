@@ -21,7 +21,7 @@ export async function customersView(el, rest, query = {}) {
   render(el, html`<div class="stack">
     <div class="row wrap" style="align-items:center"><b style="margin-right:6px">Dönem:</b><div class="chips" data-ranges></div></div>
     <div class="kpis" data-kpis></div>
-    <div class="grid-2" style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))">
+    <div class="grid-2" style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr))">
       <div class="card flush"><div class="card-head" style="padding:16px 16px 0"><h2>Kanallara göre müşteriler</h2></div><div data-chs></div></div>
       <div class="card"><div class="card-head"><h2>Kaç kez sipariş verdiler?</h2></div><div data-dist></div></div>
     </div>

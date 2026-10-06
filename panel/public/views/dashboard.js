@@ -56,7 +56,25 @@ export async function dashboard(el) {
       ['red', 'db', sm.stockOut || 0, 'Stokta olmayan ürün', '#/stoklar?durum=out'],
       ['green', 'bell', (sm.notices && sm.notices.open) || 0, 'Açık sorun', '#/bildirimler'],
     ];
+    // Kurulum rehberi: kanal bağlanmadıysa boş grafikler yerine adım adım ilk kurulum; ürün yoksa panonun üstünde
+    const live = activeChannels().some((x) => x.enabled || x.demo), st = state.settings || {}, co = st.company || {}, admin = u.role === 'admin';
+    const steps = [
+      [live, 'Satış kanalınızı bağlayın', 'Sitenizi ve pazaryerlerinizi (Trendyol, Hepsiburada, ikas …) API bilgileriyle bağlayın; siparişleriniz kendiliğinden gelir.', '#/entegrasyonlar', 'Kanal bağla'],
+      [!!d.stock.products, 'Ürünlerinizi panele alın', 'Kanallardaki ilanlarınızı seçip panele ekleyin; aynı ürün farklı kanallarda barkod / stok koduyla eşleşir.', '#/kanal-urunleri', 'Ürünleri al'],
+      [!!(co.phone || co.address || co.tax), 'Firma bilgilerinizi girin', 'Logo, ünvan ve adres kargo etiketinde ve e-postalarda kullanılır.', '#/ayarlar', 'Ayarlara git'],
+      [false, 'Komisyon ve kargo giderlerini kontrol edin', 'Kâr hesapları için kanal komisyon oranlarınızı ve kargo giderinizi girin (isteğe bağlı).', '#/ayarlar', 'Giderler'],
+      [false, 'Ekibinizi ekleyin', 'Personel ekleyip her kişiye yalnız ihtiyaç duyduğu bölümleri açın (isteğe bağlı).', '#/kullanicilar', 'Personel'],
+    ];
+    const done = steps.filter((x) => x[0]).length;
+    const guide = html`<div class="card guide"><div class="row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Kurulum adımları</h2><div class="muted small">${admin ? 'Paneli birkaç adımda kullanıma hazırlayın.' : 'Kurulumu firmanızın yöneticisi tamamlar.'}</div></div>
+      <div class="guide-prog"><b>${done}/${steps.length}</b><div class="prog"><span style="width:${(done / steps.length) * 100}%"></span></div></div></div>
+      <ol class="steps">${steps.map(([ok, t, dsc, href, btn], i) => html`<li class="${ok ? 'ok' : ''}"><span class="no">${ok ? html`<i class="ico ico-check"></i>` : i + 1}</span><div style="flex:1;min-width:0"><b>${t}</b><div class="muted small">${dsc}</div></div>${!ok && admin ? html`<a class="btn sm ${i === steps.findIndex((s2) => !s2[0]) ? 'primary' : ''}" href="${href}">${btn}</a>` : ''}</li>`)}</ol></div>`;
+    if (!live) {
+      render(el, html`<div class="hello"><div><h2>Hoş geldiniz${u.name && u.id ? `, ${u.name.split(' ')[0]}` : ''}</h2><div class="muted small">Siparişleriniz, stoklarınız ve kârınız bu ekranda toplanacak. Başlamak için ilk satış kanalınızı bağlayın.</div></div></div>${guide}`);
+      return;
+    }
     render(el, html`
+      ${!d.stock.products ? guide : ''}
       <div class="hello"><div><h2>${hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar'}${u.name && u.id ? `, ${u.name.split(' ')[0]}` : ''}</h2>
         <div class="muted small">${new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · bugün ${n(Object.values(sm.today || {}).reduce((a, x) => a + x.orders, 0))} sipariş, ${money0(Object.values(sm.today || {}).reduce((a, x) => a + x.revenue, 0))}</div></div></div>
       <div class="tasks">${tasks.map(([c, i, v, t, href]) => html`<a class="task ${c} ${v ? '' : 'zero'}" href="${href}"><span class="ic"><i class="ico ico-${i}"></i></span><div style="min-width:0"><b class="num">${n(v)}</b><span>${t}</span></div></a>`)}</div>
@@ -102,12 +120,12 @@ export async function dashboard(el) {
           <div class="card-pad row wrap" style="gap:10px"><h2 style="margin-right:6px">Siparişler</h2>
             ${[['all', 'Tümü'], ['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda']].map(([k, t]) => html`<button class="tab ${ord.status === k ? 'on' : ''}" style="flex:0 0 auto;min-height:34px" data-act="ost" data-k="${k}">${t}</button>`)}
             <span class="spacer"></span><a class="btn sm" href="#/siparisler"><i class="ico ico-filter"></i>Filtrele</a><a class="btn sm outline" href="#/siparisler?status=new"><i class="ico ico-dots"></i>Toplu işlem</a></div>
-          <div class="table-wrap"><table class="t"><thead><tr><th>Sipariş</th><th>Kanal</th><th>Ürün</th><th class="r">Tutar</th><th class="r">Kâr</th><th>Durum</th><th></th></tr></thead><tbody>
+          <div class="table-wrap"><table class="t"><thead><tr><th>Sipariş</th><th>Ürün</th><th class="r">Tutar</th><th class="r xl-only">Kâr</th><th>Durum</th></tr></thead><tbody>
             ${ord.rows.length ? ord.rows.map((o) => html`<tr class="click ${selected === o.id ? 'sel-row' : ''}" data-act="pick" data-id="${o.id}">
-              <td style="font-weight:750;color:var(--primary)">#${o.order_number}</td><td>${chBadge(o.channel)}</td>
-              <td><div class="row">${thumb(o.items[0] && o.items[0].image, o.items[0] && o.items[0].name, 'sm')}<span class="ellipsis" style="max-width:150px">${o.items[0] ? o.items[0].name : ''}</span>${o.lines > 1 ? html`<span class="link small">+${o.lines - 1}</span>` : ''}</div></td>
-              <td class="r num">${money0(o.total)}</td><td class="r num ${o.profit >= 0 ? 'up' : 'down'}" style="font-weight:650">${o.profit == null ? '—' : money0(o.profit)}</td>
-              <td>${statusPill(o.status)}</td><td class="r"><i class="ico ico-chev muted"></i></td></tr>`) : html`<tr><td colspan="7" class="empty">Sipariş yok</td></tr>`}
+              <td style="white-space:nowrap"><span class="row" style="gap:8px">${chLogo(o.channel, true)}<span style="font-weight:750;color:var(--primary)">#${o.order_number}</span></span></td>
+              <td style="max-width:0;width:40%"><div class="row" style="min-width:0">${thumb(o.items[0] && o.items[0].image, o.items[0] && o.items[0].name, 'sm')}<span class="ellipsis" style="min-width:0;flex:0 1 auto">${o.items[0] ? o.items[0].name : ''}</span>${o.lines > 1 ? html`<span class="link small">+${o.lines - 1}</span>` : ''}</div></td>
+              <td class="r num">${money0(o.total)}</td><td class="r num xl-only ${o.profit >= 0 ? 'up' : 'down'}" style="font-weight:650">${o.profit == null ? '—' : money0(o.profit)}</td>
+              <td>${statusPill(o.status)}</td></tr>`) : html`<tr><td colspan="5" class="empty">Sipariş yok</td></tr>`}
           </tbody></table></div>
         </div>
         <div class="card" data-sel-panel>${selected ? '' : html`<div class="empty">Bir sipariş seçin</div>`}</div>
@@ -130,7 +148,7 @@ export async function dashboard(el) {
           <div class="card-head"><h2>Hızlı kâr hesabı</h2><a class="link small" href="#/kar">Detaylı ›</a></div>
           <div class="row" style="align-items:stretch;gap:12px">
             <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px;flex:1">
-              ${[['sale', 'Satış'], ['purchase', 'Alış'], ['rate', 'Komisyon %'], ['ship', 'Kargo']].map(([k, t]) => html`<label class="field"><span class="tiny">${t}</span><input class="input" style="min-height:36px" inputmode="decimal" data-calc="${k}" value="${calc[k]}"></label>`)}
+              ${[['sale', 'Satış'], ['purchase', 'Alış'], ['rate', 'Kom. %'], ['ship', 'Kargo']].map(([k, t]) => html`<label class="field"><span class="tiny">${t}</span><input class="input" style="min-height:36px" inputmode="decimal" data-calc="${k}" value="${calc[k]}"></label>`)}
             </div>
             <div class="gain" style="flex:0 0 42%;display:grid;align-content:center;padding:12px" data-gain></div>
           </div>

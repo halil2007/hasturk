@@ -1,5 +1,5 @@
 // Panel uygulaması: gruplu yan menü, üst çubuk, alt menü (telefon), yönlendirme (#/sayfa/...?filtre=...), giriş, senkron, bildirimler.
-import { api, state, html, render, $, $$, toast, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder } from './core.js';
+import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder } from './core.js';
 import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
 import { products } from './views/products.js';
@@ -50,7 +50,7 @@ const ROUTES = [
   { path: 'kullanicilar', title: 'Personel', icon: 'user', view: users, admin: true },
   { path: 'firmalar', title: 'Firmalar', icon: 'grid', view: firmsView, admin: true, when: () => !!state.owner },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
-  { path: 'hb-test', title: 'Hepsiburada test adımları', icon: 'check', view: hbTestView, admin: true, hidden: true },
+  { path: 'hb-test', title: 'Hepsiburada test adımları', icon: 'check', view: hbTestView, admin: true, hidden: true, when: () => !state.tenant },
 ];
 const PAGES = ROUTES.filter((r) => r.view);
 const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kargo', 'Kargo', 'truck'], ['stoklar', 'Stok', 'db']];
@@ -438,12 +438,44 @@ document.addEventListener('click', (e) => {
   if (a === 'find') { e.preventDefault(); findSheet(); }
   if (a === 'side') { e.preventDefault(); setSide(!document.body.classList.contains('nav-mini')); }
 });
-$('[data-global-search]').addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  const q = e.target.value.trim();
-  e.target.value = '';
-  location.hash = '#/siparisler?q=' + encodeURIComponent(q);
-});
+// Üst arama: yazarken sipariş ve ürün sonuçları açılır (ok tuşları + Enter); Enter tüm siparişlerde arar
+(() => {
+  const input = $('[data-global-search]'), box = document.createElement('div');
+  box.className = 'gs-pop'; box.hidden = true; input.closest('.search').append(box);
+  let seq = 0, timer = 0, items = [], idx = -1;
+  const close = () => { box.hidden = true; idx = -1; };
+  const go = (href) => { close(); input.value = ''; input.blur(); location.hash = href; };
+  const mark = () => $$('.gs-it', box).forEach((x, i) => x.classList.toggle('on', i === idx));
+  async function run(q) {
+    const my = ++seq;
+    const can2 = (k) => !state.user || can(state.user, k);
+    const [o, p] = await Promise.all([
+      can2('orders') ? api(`orders?q=${encodeURIComponent(q)}&status=all&limit=5`).catch(() => null) : null,
+      can2('products') ? api(`products?q=${encodeURIComponent(q)}&limit=5`).catch(() => null) : null,
+    ]);
+    if (my !== seq) return;
+    const os = (o && o.orders) || [], ps = (p && p.products) || [];
+    items = [...os.map((x) => `#/siparisler/${encodeURIComponent(x.id)}`), ...ps.map((x) => `#/urunler?q=${encodeURIComponent(x.sku || x.name)}`), `#/siparisler?q=${encodeURIComponent(q)}`];
+    let i = 0;
+    render(box, html`${os.length ? html`<div class="gs-h">Siparişler</div>${os.map((x) => html`<a class="gs-it" data-i="${i++}" href="${items[i - 1]}"><i class="ico ico-orders"></i><span class="ellipsis"><b>#${x.order_number}</b> · ${x.customer || ''}</span><span class="muted tiny">${ch(x.channel).name || ''}</span></a>`)}` : ''}
+      ${ps.length ? html`<div class="gs-h">Ürünler</div>${ps.map((x) => html`<a class="gs-it" data-i="${i++}" href="${items[i - 1]}"><i class="ico ico-box"></i><span class="ellipsis"><b>${x.name}</b>${x.variant_name ? ` · ${x.variant_name}` : ''}</span><span class="muted tiny">${x.sku || ''}</span></a>`)}` : ''}
+      ${!os.length && !ps.length ? html`<div class="gs-empty muted small">“${q}” için sonuç yok</div>` : ''}
+      <a class="gs-it gs-all" data-i="${i++}" href="${items[items.length - 1]}"><i class="ico ico-search"></i><span>Tüm siparişlerde ara: <b>${q}</b></span></a>`);
+    box.hidden = false; idx = -1;
+  }
+  input.addEventListener('input', () => { clearTimeout(timer); const q = input.value.trim(); if (q.length < 2) { close(); return; } timer = setTimeout(() => run(q), 220); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { close(); return; }
+    if (!box.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); idx = Math.max(0, Math.min(items.length - 1, idx + (e.key === 'ArrowDown' ? 1 : -1))); mark(); return; }
+    if (e.key !== 'Enter') return;
+    const q = input.value.trim();
+    if (!q) return;
+    go(idx >= 0 && items[idx] ? items[idx] : '#/siparisler?q=' + encodeURIComponent(q));
+  });
+  box.addEventListener('click', (e) => { const a = e.target.closest('a.gs-it'); if (a) { e.preventDefault(); go(a.getAttribute('href')); } });
+  input.addEventListener('blur', () => setTimeout(close, 180));
+  input.addEventListener('focus', () => { if (input.value.trim().length >= 2 && box.childElementCount) box.hidden = false; });
+})();
 setInterval(() => { loadSummary().catch(() => {}); }, 3 * 60e3);
 start();
 export { ago };

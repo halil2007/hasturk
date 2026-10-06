@@ -31,8 +31,12 @@ const SOON = () => [...(state.tenant ? BETA.map((t) => TYPE_NAME[t]) : []), 'Tek
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
+// Kanal kurulmuş mu: bağlı, örnek veriyle çalışıyor ya da panelde bilgi girilmiş (test bekliyor)
+const configured = (c) => c.enabled || c.demo || c.fields.some((f) => f.source) || c.extra;
+
 export async function integrations(el) {
   let data = null, jobs = [];
+  const open = new Set(); // "Bağla" ile açılan kanal formları
   async function load() {
     [data, jobs] = await Promise.all([api('integrations'), api('backfill').catch(() => [])]);
     data.channels.sort((a, b) => rank(a) - rank(b));
@@ -57,7 +61,7 @@ export async function integrations(el) {
         <label class="row small" title="Pasif kanal senkronlanmaz">Aktif <span class="switch"><input type="checkbox" data-active="${c.id}" ${c.active ? 'checked' : ''}><span></span></span></label></div>
       ${!c.gated ? html`<label class="row small" style="gap:10px;align-items:flex-start"><span class="switch"><input type="checkbox" data-hold="${c.id}" ${((state.settings && state.settings.hold_channels) || []).includes(c.id) ? 'checked' : ''}><span></span></span>
         <span><b>Kanala yazmayı beklet</b> <span class="muted">— siparişler, ürünler, stok ve kanalda oluşan etiketler okunur; paketleme, kargo bildirimi, stok/fiyat gönderimi ve ürün oluşturma ${c.type === 'ikas' ? 'ikas' : 'kanal'} panelinden yapılır.</span></span></label>` : ''}
-      ${c.locked ? html`<div class="notice bad small"><i class="ico ico-warn"></i>Kayıtlı bilgiler okunamadı (panel şifresi / PANEL_SECRET değişmiş olabilir). Bilgileri yeniden girin.</div>` : ''}
+      ${c.locked ? html`<div class="notice bad small"><i class="ico ico-warn"></i>Kayıtlı bilgiler okunamadı${state.tenant ? '' : ' (panel şifresi / PANEL_SECRET değişmiş olabilir)'}. Bilgileri yeniden girin.</div>` : ''}
       ${c.enabled ? html`<div class="sync-grid">
         <div><span class="muted tiny">Siparişler · son başarılı</span><b>${when(c.last && c.last.ordersAt)}</b></div>
         <div><span class="muted tiny">Ürün / stok · son başarılı</span><b>${when(c.last && c.last.listingsAt)}</b></div>
@@ -73,7 +77,7 @@ export async function integrations(el) {
         <button class="btn primary" data-act="save" data-id="${c.id}">Kaydet</button>
         <button class="btn outline" data-act="test" data-id="${c.id}"><i class="ico ico-key"></i>Bağlantıyı test et</button>
         <button class="btn outline" data-act="diag" data-id="${c.id}" title="Her adımı ayrı ayrı dener ve sorunu açıklar"><i class="ico ico-bolt"></i>Tanılama</button>
-        ${c.type === 'hepsiburada' && c.id === 'hepsiburada' ? html`<a class="btn outline" href="#/hb-test" title="Hepsiburada'nın canlı API bilgilerini vermeden önce istediği test adımları"><i class="ico ico-check"></i>Test adımları</a>` : ''}
+        ${c.type === 'hepsiburada' && c.id === 'hepsiburada' && !state.tenant ? html`<a class="btn outline" href="#/hb-test" title="Hepsiburada'nın canlı API bilgilerini vermeden önce istediği test adımları"><i class="ico ico-check"></i>Test adımları</a>` : ''}
         <span class="spacer"></span>
         <button class="btn sm ghost" data-act="sync" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-sync"></i>Senkronla</button>
         <button class="btn sm ghost" data-act="import" data-id="${c.id}" ${c.enabled ? '' : 'disabled'}><i class="ico ico-download"></i>İlanları çek</button>
@@ -102,27 +106,35 @@ export async function integrations(el) {
       })}</div>${jobs.some((j) => j.status === 'running') ? html`<div class="muted tiny">Aktarım her 15 dakikalık senkronda da kendiliğinden ilerler; sayfayı kapatabilirsiniz.</div>` : ''}` : ''}
     </div>`;
   }
+  // Bağlanmamış kanal: kısa kutu (logo, ad, ne gerektiği) ve "Bağla"; basınca bilgi formu açılır
+  const tile = (c) => html`<div class="ctile" data-ch="${c.id}">${chLogo(c.id)}<div style="flex:1;min-width:0"><b class="ellipsis" style="display:block">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</b>
+    <div class="tiny muted">${c.beta ? html`<b style="color:var(--primary)">Test modülü · </b>` : ''}${c.fields.filter((f) => f.req).map((f) => f.label).join(' · ') || 'API bilgileri'}</div></div>
+    <button class="btn sm primary" data-act="connect" data-id="${c.id}"><i class="ico ico-plus"></i>Bağla</button></div>`;
   function draw() {
-    const live = data.channels.filter((c) => !c.paused), paused = data.channels.filter((c) => c.paused);
+    const shown = (c) => configured(c) || open.has(c.id);
+    const live = data.channels.filter((c) => shown(c) && !(c.paused && !c.gated && !c.enabled)), idle = data.channels.filter((c) => !shown(c)), paused = data.channels.filter((c) => shown(c) && c.paused && !c.gated && !c.enabled && !live.includes(c));
     render(el, html`<div class="stack">
-      <div class="notice"><i class="ico ico-key"></i><div>API bilgileri sunucuda <b>şifreli</b> saklanır ve bir daha ekranda açık gösterilmez (gizli alanlar boş bırakılırsa eski değer korunur). Panelde girilen değer, Cloudflare'de tanımlı aynı bilginin önüne geçer.
-        ${data.secretSet ? '' : html`<br><b>Öneri:</b> Cloudflare'de <code>PANEL_SECRET</code> (uzun rastgele metin) tanımlayın; yoksa şifreleme panel şifresine bağlıdır ve şifre değişirse API bilgilerini yeniden girmeniz gerekir.`}</div></div>
+      <div class="notice"><i class="ico ico-key"></i><div>API bilgileri sunucuda <b>şifreli</b> saklanır ve bir daha ekranda açık gösterilmez (gizli alanlar boş bırakılırsa eski değer korunur).${state.tenant ? '' : ' Panelde girilen değer, Cloudflare\'de tanımlı aynı bilginin önüne geçer.'}
+        ${data.secretSet || state.tenant ? '' : html`<br><b>Öneri:</b> Cloudflare'de <code>PANEL_SECRET</code> (uzun rastgele metin) tanımlayın; yoksa şifreleme panel şifresine bağlıdır ve şifre değişirse API bilgilerini yeniden girmeniz gerekir.`}</div></div>
       <div class="notice good small"><i class="ico ico-sync"></i><div>Tüm aktif kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: yeni/değişen siparişler, ürünler, görseller, varyantlar ve stoklar güncellenir; eşleştirmeler ve kanala özel stok kuralları korunur. Başarısız işlemler yeniden denenir, çözülemeyenler <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer.</div></div>
       <div class="row wrap"><button class="btn primary" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü (tüm kanallar)</button><span class="muted small">Bağlı tüm kanalların kimlik, izin, servis ve ayarlarını tek seferde dener; raporu kopyalayıp iletebilirsiniz.</span></div>
+      ${live.length ? html`<h2 style="margin:4px 0 0">Bağlı kanallar</h2><div class="integ">${live.map(card)}</div>` : html`<div class="notice warn"><i class="ico ico-warn"></i><div>Henüz bağlı satış kanalınız yok. Aşağıdan kanalınızı seçip <b>Bağla</b>'ya basın; API bilgilerini girip <b>Bağlantıyı test et</b> deyince siparişleriniz ve ürünleriniz gelmeye başlar.</div></div>`}
+      ${idle.length ? html`<div class="card stack"><div><h2>Kanal bağla</h2><div class="muted small">Satış yaptığınız site ve pazaryerlerini bağlayın. Her kanal için gereken bilgiler kutunun altında yazar; bilgileri kanalın satıcı panelinden alırsınız.</div></div>
+        <div class="ctiles">${idle.map(tile)}</div></div>` : ''}
       <div class="card row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Mağaza ekle</h2><div class="muted small">Aynı pazaryerinde ya da ikas'ta birden fazla mağazanız varsa istediğiniz kadar ekleyin; her mağaza kendi API bilgileriyle ayrı çalışır.</div></div>
         <select class="input" data-addtype style="width:auto">${TYPES.filter((t) => !BETA.includes(t)).map((t) => html`<option value="${t}">${TYPE_NAME[t]}</option>`)}${state.tenant ? '' : html`<optgroup label="Test modülü">${BETA.map((t) => html`<option value="${t}">${TYPE_NAME[t]} — test</option>`)}</optgroup>`}<optgroup label="Yakında">${SOON().map((t) => html`<option disabled>${t} — yakında</option>`)}</optgroup></select>
         <button class="btn primary" data-act="add"><i class="ico ico-plus"></i>Mağaza ekle</button>
         <div style="flex-basis:100%" class="row wrap small"><span class="muted">Yakında:</span>${SOON().map((t) => html`<span class="pill" title="Yakında sisteme entegre edilecek">${t} <span class="muted tiny">yakında</span></span>`)}</div>
         ${state.tenant ? '' : html`<div style="flex-basis:100%" class="row wrap small"><span class="muted">Test modülü (yalnız bu panelde; firmalarda yakında):</span>${BETA.map((t) => html`<span class="pill info">${TYPE_NAME[t]}</span>`)}</div>`}</div>
-      <div class="integ">${live.map(card)}</div>
       ${backfill()}
-      ${paused.length ? html`<h2 style="margin:8px 0 0">Bağlanmamış / pasif kanallar</h2>
-        <p class="muted small" style="margin:0">API bilgilerini girip <b>Kaydet</b>, ardından <b>Bağlantıyı test et</b>'e basın; bağlantı doğrulanınca kanal siparişler, ürünler ve stok ekranlarına eklenir.</p><div class="integ">${paused.map(card)}</div>` : ''}
+      ${paused.length ? html`<h2 style="margin:8px 0 0">Pasif kanallar</h2>
+        <p class="muted small" style="margin:0">Pasif kanal senkronlanmaz; yeniden açmak için kartındaki <b>Aktif</b> anahtarını açın.</p><div class="integ">${paused.map(card)}</div>` : ''}
     </div>`);
   }
   const values = (id) => { const o = {}; $$(`[data-ch="${id}"] [data-k]`, el).forEach((i) => { o[i.dataset.k] = i.value; }); return o; };
   const after = async () => { await loadSummary().catch(() => {}); await load(); };
   actions(el, {
+    connect: (t) => { open.add(t.dataset.id); draw(); const card = $(`.integ [data-ch="${t.dataset.id}"]`, el); if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); const i = $('[data-k]', card); if (i) setTimeout(() => i.focus(), 300); } },
     syscheck: () => systemCheck(data.channels.filter((c) => (c.enabled && !c.paused) || (c.gated && !(c.missing || []).length)).map((c) => ({ id: c.id, name: c.name }))),
     save: (t) => busy(t, async () => { await api('integrations/' + t.dataset.id, { method: 'PUT', body: { values: values(t.dataset.id) } }); toast('Kaydedildi'); await after(); }),
     test: (t) => busy(t, async () => {
@@ -155,7 +167,7 @@ export async function integrations(el) {
     bfrun: (t) => busy(t, async () => { await api('backfill/run', { method: 'POST' }); await after(); }),
     bfcancel: (t) => busy(t, async () => { await api(`backfill/${encodeURIComponent(t.closest('[data-job]').dataset.job)}/cancel`, { method: 'POST' }); toast('İptal edildi'); await after(); }),
     clear: async (t) => {
-      if (!(await confirmBox('Panelde kayıtlı bu gizli değer silinsin mi? (Cloudflare\'de tanımlıysa o kullanılır.)', 'Sil'))) return;
+      if (!(await confirmBox(state.tenant ? 'Panelde kayıtlı bu gizli değer silinsin mi?' : 'Panelde kayıtlı bu gizli değer silinsin mi? (Cloudflare\'de tanımlıysa o kullanılır.)', 'Sil'))) return;
       await api('integrations/' + t.dataset.id, { method: 'PUT', body: { clear: [t.dataset.k] } }); toast('Silindi'); await after();
     },
   });

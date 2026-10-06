@@ -29,7 +29,7 @@ export async function cargo(el, rest, query = {}) {
   const next = (r) => {
     const o = raw(`data-o="${esc(r.order_id)}" data-p="${esc(r.pkg || '')}"`);
     if (f.state === 'shipped') return html`${r.track ? trackBtn(r.track, {}, 'btn sm') : ''}<button class="btn sm outline" data-act="label" ${o}><i class="ico ico-print"></i>Etiket</button>`;
-    if (r.ls.key === 'external') return html`<button class="btn sm primary" data-act="ext" ${o} data-choice="${r.choice || ''}"><i class="ico ico-truck"></i>ikas Kargo ile Gönder${carrierOf(r.choice) ? ` · ${carrierOf(r.choice)}` : ''}</button>`;
+    if (r.ls.key === 'external') return html`<button class="btn sm primary" data-act="ext" ${o} data-choice="${r.choice || ''}" title="${carrierOf(r.choice) ? `Kargo firması: ${carrierOf(r.choice)}` : 'ikas Kargo ile gönder'}"><i class="ico ico-truck"></i>ikas Kargo ile Gönder</button>`;
     if (['unpacked', 'packed', 'created', 'error'].includes(r.ls.key)) return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-${r.ls.key === 'unpacked' ? 'box' : 'tag'}"></i>${r.ls.key === 'unpacked' ? 'Paketle ve etiket al' : r.ls.key === 'error' ? 'Tekrar dene' : r.ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (r.ls.key === 'ready') return html`<button class="btn sm primary" data-act="label" ${o}><i class="ico ico-print"></i>Etiketi yazdır</button>`;
     return html`<button class="btn sm" data-act="label" ${o}><i class="ico ico-print"></i>Tekrar</button><button class="btn sm primary" data-act="ship" ${o}><i class="ico ico-truck"></i>Kargoya ver</button>`;
