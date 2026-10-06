@@ -47,6 +47,20 @@ export async function handle(req, env, ctx, db) {
   } catch (e) {
     if (e instanceof HttpError) return json({ error: e.message }, e.status);
     console.error(e);
-    return json({ error: e.message || 'Sunucu hatası' }, 500);
+    // Hata kaydı için yığın (yanıta eklenmez; panelin sarmalayıcısı okur, bkz. errors.js)
+    const r = json({ error: e.message || 'Sunucu hatası' }, 500);
+    r.errStack = String((e && e.stack) || '').slice(0, 2500);
+    return r;
   }
+}
+
+// Sunucu hatasını (5xx) ana panelin hata kayıtlarına yaz
+export async function report5xx(mainDb, req, res, c) {
+  if (!mainDb || res.status < 500) return;
+  const url = new URL(req.url), path = url.pathname.slice(5).replace(/\/+$/, '');
+  let msg = '';
+  try { msg = (await res.clone().json()).error || ''; } catch { msg = `HTTP ${res.status}`; }
+  const { recordError } = await import('./errors.js');
+  await init(mainDb);
+  await recordError(mainDb, { ...c, source: 'server', message: msg || `HTTP ${res.status}`, action: `${req.method} ${path}`, status: res.status, detail: { stack: res.errStack || '' } });
 }

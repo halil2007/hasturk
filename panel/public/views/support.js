@@ -69,9 +69,17 @@ export function openTicketForm({ category = 'bug', subject = '', body = '', erro
   });
 }
 
-export async function supportView(el, rest = []) {
+export async function supportView(root, rest = [], query = {}) {
   const id = rest[0];
   const staff = staffView();
+  // Ana panel: "Destek talepleri" ve "Müşteri hataları" (kendiliğinden kaydedilen hatalar) sekmeleri
+  let el = root;
+  if (staff && !id) {
+    const tab = query.t === 'hatalar' ? 'hatalar' : 'talepler';
+    render(root, html`<div class="stack"><div class="tabs">${[['talepler', 'Destek talepleri'], ['hatalar', 'Müşteri hataları']].map(([k, t]) => html`<a class="tab ${tab === k ? 'on' : ''}" href="#/destek${k === 'hatalar' ? '?t=hatalar' : ''}">${t}${k === 'hatalar' && state.errorCount ? html` <span class="n">${state.errorCount}</span>` : ''}</a>`)}</div><div data-sp></div></div>`);
+    el = $('[data-sp]', root);
+    if (tab === 'hatalar') { const { errorsView } = await import('./errors.js'); return errorsView(el, query); }
+  }
   let f = { status: '' };
   const img = (fl) => html`<a class="sp-img" href="/api/support/file/${fl.id}" target="_blank" rel="noopener" title="${fl.name}"><img src="/api/support/file/${fl.id}" alt="${fl.name}" loading="lazy"></a>`;
   async function list() {
@@ -140,5 +148,9 @@ export async function supportView(el, rest = []) {
 // Menü rozeti: yanıt bekleyen (ana panel) / okunmamış yanıt (firma) sayısı
 export async function refreshCount() {
   try { const r = await api('support/count', { fresh: true }); state.supportCount = r.n || 0; } catch { /* destek kapalı */ }
+  // Ana panel yöneticisi: açık müşteri hataları da rozete eklenir
+  if (staffView() && state.user && state.user.role === 'admin') {
+    try { state.errorCount = (await api('errors/count', { fresh: true })).n || 0; state.supportCount += state.errorCount; } catch { /* yok */ }
+  }
   $$('[data-count="support"]').forEach((x) => { const v = state.supportCount || 0; x.textContent = v > 99 ? '99+' : v; x.classList.toggle('hide', !v); });
 }

@@ -75,8 +75,32 @@ async function request(path, method, body) {
   try { data = await res.json(); } catch { /* boş */ }
   if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw new Error(data.error || 'Giriş gerekli'); }
   if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw new Error(data.error); }
-  if (!res.ok) { const raw = data.error || `Hata (${res.status})`, e = new Error(friendly(raw)); e.raw = raw; throw e; }
+  if (!res.ok) {
+    const raw = data.error || `Hata (${res.status})`, e = new Error(friendly(raw)); e.raw = raw;
+    // İşlem hataları (yazma istekleri) ve sunucu hataları kendiliğinden kaydedilir (ana panelin "Müşteri hataları")
+    if ((method !== 'GET' || res.status >= 500) && path !== 'login' && !path.startsWith('errors/')) logError({ source: 'api', message: raw, action: `${method} ${path.split('?')[0]}`, status: res.status });
+    throw e;
+  }
   return data;
+}
+
+// ---------- hata kaydı ----------
+// Ekran (betik) hataları ve başarısız işlemler sunucuya bildirilir; aynı hata bir oturumda bir kez, en fazla 25 kayıt.
+const sentErr = new Set();
+export function logError(e) {
+  try {
+    if (!state.user || sentErr.size >= 25) return;
+    const key = `${e.source}|${e.action || ''}|${String(e.message || '').slice(0, 120)}`;
+    if (sentErr.has(key)) return;
+    sentErr.add(key);
+    const body = { ...e, message: String(e.message || '').slice(0, 1000), stack: String(e.stack || '').slice(0, 2500), page: location.hash.replace(/^#\/?/, '').slice(0, 120) || 'genel-bakis',
+      browser: navigator.userAgent.slice(0, 200), screen: `${innerWidth}x${innerHeight}`, version: state.assets || '' };
+    fetch('/api/errors/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin', keepalive: true }).catch(() => {});
+  } catch { /* bildirim de yapılamazsa sessiz */ }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (ev) => { if (ev.filename && !ev.filename.startsWith(location.origin)) return; logError({ source: 'client', message: ev.message, stack: ev.error && ev.error.stack ? ev.error.stack : `${ev.filename}:${ev.lineno}:${ev.colno}` }); });
+  window.addEventListener('unhandledrejection', (ev) => { const r = ev.reason || {}; if (r.raw) return; logError({ source: 'client', message: r.message || String(r), stack: r.stack || '' }); });
 }
 
 // ---------- HTML şablonu (değerler her zaman kaçışlanır; raw() ile işaretlenen hariç) ----------

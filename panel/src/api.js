@@ -23,6 +23,7 @@ import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, use
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
+import { recordError, errorsApi, clientReport } from './errors.js';
 import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
@@ -1120,6 +1121,15 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     }
   }
   // Kampanyalar (Hepsiburada sepet indirimleri)
+  // Hata kayıtları: tarayıcıdan bildirim (ana panelin kendi hataları; müşteri panellerininki tenants.js'te) ve yönetici ekranı
+  if (path === 'errors/report' && m === 'POST') {
+    if (!env.TENANT_SLUG) await recordError(db, clientReport(await body(req), { slug: '', firm: '', user }));
+    return json({ ok: true });
+  }
+  if (path === 'errors' || path.startsWith('errors/')) {
+    if (env.TENANT_SLUG || user.role !== 'admin') fail(404, 'Bulunamadı');
+    return json(await errorsApi(req, db, path, q, m === 'GET' ? {} : await body(req)));
+  }
   // Destek talepleri: ana panelde gelen kutusu (müşteri panellerinin istekleri Durable Object'te karşılanır, bkz. tenants.js)
   if (path === 'support' || path.startsWith('support/')) {
     if (env.TENANT_SLUG) fail(404, 'Bulunamadı');

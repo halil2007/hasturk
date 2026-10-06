@@ -205,6 +205,11 @@ const MIGRATIONS = [
   // İşletme giderleri (kâr-zarar): tek seferlik ya da aylık tekrar eden (bkz. finance.js)
   `CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT, amount REAL NOT NULL, date INTEGER NOT NULL,
     recurring TEXT, until INTEGER, note TEXT, created_at INTEGER)`,
+  // Hata kayıtları (bkz. errors.js): müşteri panellerinden otomatik gelen hatalar, firma + hata başına tek satır
+  `CREATE TABLE IF NOT EXISTS error_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT NOT NULL UNIQUE, slug TEXT NOT NULL DEFAULT '', firm TEXT, source TEXT NOT NULL,
+    message TEXT NOT NULL, action TEXT, page TEXT, status_code INTEGER, detail TEXT, user_name TEXT, count INTEGER NOT NULL DEFAULT 1, first_at INTEGER, last_at INTEGER,
+    status TEXT NOT NULL DEFAULT 'open', reopened INTEGER NOT NULL DEFAULT 0, resolved_at INTEGER)`,
+  'CREATE INDEX IF NOT EXISTS error_reports_last ON error_reports(status, last_at)',
   // Eski Excel fırsat etiketleri tablosu kaldırıldı (yerine buybox fiyat önerileri, bkz. suggest.js)
   'DROP TABLE IF EXISTS promo_offers',
 ];
