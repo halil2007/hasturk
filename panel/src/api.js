@@ -1086,6 +1086,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if ((x = path.match(/^users\/(\d+)\/revoke$/)) && m === 'POST') { await revokeSessions(db, Number(x[1])); await log(db, null, 'info', `${user.name}: kullanıcının oturumları kapatıldı (#${x[1]})`); return json({ ok: true }); }
   if ((x = path.match(/^users\/(\d+)\/activity$/)) && m === 'GET') { try { return json(await userActivity(db, Number(x[1]))); } catch (e) { fail(404, e.message); } }
   // İki adımlı doğrulama: kendi hesabı (her kullanıcı) ve zorunluluk / sıfırlama (yönetici)
+  // Demo panelinde herkes aynı hesapla girer: şifre / iki adımlı doğrulama değiştirilirse diğer ziyaretçiler giremez
+  if (env.DEMO === '1' && env.TENANT_SLUG && (path === 'me/password' || path.startsWith('me/2fa/'))) fail(403, 'Demo panelinde şifre ve iki adımlı doğrulama değiştirilemez');
   if (path === 'me/2fa' || path.startsWith('me/2fa/')) {
     let r;
     try { r = await twofaApi(db, user, path, m === 'GET' ? {} : await body(req), { issuer: env.TENANT_NAME || (await getSettings(db)).company.title || 'Hastürk' }); } catch (e) { fail(400, e.message); }

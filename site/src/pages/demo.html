@@ -1,0 +1,53 @@
+<!--
+title: Ücretsiz Demo — Hastürk CRM
+description: Hastürk CRM demo paneline hemen girin: örnek siparişleri işleme alın, kargo adımlarını, stokları ve kâr raporlarını görün.
+url: /demo
+-->
+<section class="page-hero demo-hero">
+  <div class="wrap demo-grid">
+    <div>
+      <div class="kicker">Ücretsiz demo</div>
+      <h1>Paneli <span class="grad">Hemen Deneyin</span></h1>
+      <p>Kısa formu doldurun, örnek siparişlerle çalışan demo paneline anında girin. Sipariş, kargo, stok ve kâr ekranlarını kendiniz kullanın.</p>
+      <ul class="list">
+        <li><i class="tick"><svg><use href="#i-check"/></svg></i>Bir yıllık örnek sipariş: Trendyol, Hepsiburada, ikas</li>
+        <li><i class="tick"><svg><use href="#i-check"/></svg></i>Siparişi işleme alma, paketleme ve kargo etiketi adımları</li>
+        <li><i class="tick"><svg><use href="#i-check"/></svg></i>Stoklar, ürün eşleştirme ve fiyat önerileri</li>
+        <li><i class="tick"><svg><use href="#i-check"/></svg></i>Satış analizi, gelir & gider ve gerçek kâr raporları</li>
+      </ul>
+    </div>
+    <form class="lead card demo-form" data-lead novalidate>
+      <input type="hidden" name="topic" value="demo">
+      <div class="demo-form-h"><b>Demo paneline girin</b><span>Bağlantınız hemen hazırlanır.</span></div>
+      <label class="f">Ad soyad *<input class="in" name="name" autocomplete="name" required></label>
+      <label class="f">Firma / mağaza adı<input class="in" name="company" autocomplete="organization"></label>
+      <div class="row2"><label class="f">Telefon<input class="in" name="phone" type="tel" autocomplete="tel" inputmode="tel"></label><label class="f">E-posta<input class="in" name="email" type="email" autocomplete="email"></label></div>
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="consent"><input type="checkbox" name="consent"><span><a href="/kvkk" target="_blank">KVKK aydınlatma metnini</a> okudum; demo ve deneme hesabı için benimle iletişime geçilmesini kabul ediyorum.</span></label>
+      <div data-msg></div>
+      <button class="btn btn-primary" type="submit">Demo paneline gir <svg><use href="#i-arrow"/></svg></button>
+      <div class="demo-ok" data-demo-ok hidden>
+        <span class="ic c-green"><svg><use href="#i-check"/></svg></span>
+        <b>Demo paneliniz hazır</b>
+        <span>Bağlantı 14 gün geçerlidir. Sizi ayrıca arayıp kendi mağazalarınız için deneme hesabı açacağız.</span>
+        <a class="btn btn-primary" data-demo-link href="#" target="_blank" rel="noopener">Demo panelini aç <svg><use href="#i-arrow"/></svg></a>
+      </div>
+    </form>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">Demoda neler var?</div><h2>Gerçek Panel, Örnek Veriler</h2><p>Demo paneli müşterilerimizin kullandığı panelin aynısıdır; yalnız pazaryerlerine bağlı değildir ve veriler örnektir.</p></div>
+    <div class="grid g3">
+      <div class="card dc reveal"><div class="hd"><span class="ic c-pink"><svg><use href="#i-cart"/></svg></span><div><h3>Siparişler</h3><p>Yeni siparişi işleme alın, geciken siparişleri görün, toplu işlem yapın.</p></div></div></div>
+      <div class="card dc reveal"><div class="hd"><span class="ic c-blue"><svg><use href="#i-truck"/></svg></span><div><h3>Kargo adımları</h3><p>Paketleyin, etiketi oluşturun ve yazdırın, kargoya verildi olarak işaretleyin.</p></div></div></div>
+      <div class="card dc reveal"><div class="hd"><span class="ic c-orange"><svg><use href="#i-chart"/></svg></span><div><h3>Analiz ve kâr</h3><p>Dönem karşılaştırmalı satışlar, kanal dağılımı ve her siparişin net kârı.</p></div></div></div>
+    </div>
+    <div class="demo-notes reveal">
+      <p><svg><use href="#i-sync"/></svg>Demo paneli her gün sıfırlanır; yaptığınız değişiklikler ertesi gün silinir.</p>
+      <p><svg><use href="#i-lock"/></svg>Ayarlar, entegrasyon bilgileri ve kullanıcı yönetimi demoda kapalıdır.</p>
+      <p><svg><use href="#i-store"/></svg>Kendi mağazalarınızla denemek için 14 gün ücretsiz deneme hesabı açıyoruz.</p>
+    </div>
+  </div>
+</section>

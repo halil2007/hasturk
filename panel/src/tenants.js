@@ -11,13 +11,18 @@ import { PerfBuffer } from './perf.js';
 import { extApiInner, apiOf, apiPublic, newKey, parseIps } from './extapi.js';
 import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
-import { hashPassword, supportCookie, currentUser } from './auth.js';
+import { hashPassword, supportCookie, currentUser, demoCookie } from './auth.js';
 import { supportResponse } from './support.js';
 import { json, fail, str } from './util.js';
 import { loadConfig } from './config.js';
+import { DEMO_PRODUCTS } from './channels/demo.js';
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
 const SYNC_MS = 15 * 60e3;
+// Demo firma paneli: tanıtım sitesinden demo talep edenlerin girdiği, örnek verilerle çalışan panel (firma kodu ayrılmış).
+// Deneme modunda (DEMO=1) çalışır: kanallar örnek sipariş / ürün üretir, gerçek pazaryerine bağlanmaz. Her gün sıfırlanır.
+export const DEMO_SLUG = 'demo';
+const DEMO_RESET_MS = 24 * 3600e3;
 // Müşteri paneline geçmeyen ortam değişkenleri: ana panelin kanal / e-posta bilgileri, şifresi, deneme modu, bağlantılar
 const PRIVATE = /^(IKAS\d?_|TRENDYOL_|HB_|PTTAVM_|N11_|IDEFIX_|PAZARAMA_|MAIL_)/;
 const DROP = new Set(['PANEL_PASSWORD', 'DEMO', 'DB', 'TENANT']);
@@ -42,6 +47,7 @@ export function tenantEnv(env, t, platform = {}) {
   out.TENANT_SLUG = t.slug;
   out.TENANT_NAME = t.name || t.slug;
   if (t.maxUsers) out.TENANT_MAX_USERS = String(t.maxUsers);
+  if (t.slug === DEMO_SLUG) out.DEMO = '1';
   Object.assign(out, platform);
   // Platformun e-posta servisiyle giden bildirimlerde gönderen adı firmanın adı
   if (platform.MAIL_FROM || platform.MAIL_SMTP_USER) out.MAIL_FROM_NAME = out.TENANT_NAME;
@@ -98,6 +104,19 @@ export async function tenantLogin(req, env, b) {
   return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify(b.ticket ? { ticket: b.ticket, code: b.code } : { username: b.username, password: b.password }) }), env, t);
 }
 
+// Demo paneline giriş (tanıtım sitesindeki imzalı bağlantıdan, bkz. lead.js): kayıt yoksa oluşturulur; ana panel yöneticisi
+// Firmalar'dan askıya alırsa demo kapanır. Dönen çerez demo personel oturumudur (1 gün).
+export async function demoLogin(env, secure) {
+  if (!env.DB) fail(503, 'Demo şu an kullanılamıyor');
+  await init(env.DB);
+  const now = Date.now();
+  await run(env.DB, `INSERT INTO tenants (slug, name, note, active, admin_username, created_at, updated_at) VALUES (?, 'Demo Mağaza', ?, 1, 'demo', ?, ?)
+    ON CONFLICT (slug) DO NOTHING`, DEMO_SLUG, 'Web sitesindeki demo paneli: örnek verilerle çalışır, her gün sıfırlanır. Askıya alırsanız demo kapanır.', now, now);
+  const t = await getTenant(env.DB, DEMO_SLUG, true);
+  if (!t.active) fail(403, 'Demo paneli şu an kapalı. Lütfen bizimle iletişime geçin.');
+  return (await admin(env, t, 'demo', { secure })).cookie;
+}
+
 // ---------- ana panel: müşteri panellerini yönetme (yalnız ana panelin yöneticisi) ----------
 const parse = (s) => { try { return JSON.parse(s || 'null'); } catch { return null; } };
 const pub = (t) => ({ slug: t.slug, name: t.name, email: t.email, phone: t.phone, note: t.note, active: !!t.active, admin_username: t.admin_username, created_at: t.created_at, updated_at: t.updated_at,
@@ -136,6 +155,7 @@ export async function tenantApi(req, env, db, path, user) {
     if (!name) fail(400, 'Firma adı gerekli');
     if (!/^[\p{L}0-9._-]{3,40}$/u.test(username)) fail(400, 'Yönetici kullanıcı adı 3-40 karakter olmalı');
     if (pw.length < 8) fail(400, 'Yönetici şifresi en az 8 karakter olmalı');
+    if (slug === DEMO_SLUG) fail(400, 'Bu firma kodu web sitesindeki demo paneline ayrılmış');
     if (await first(db, 'SELECT 1 AS x FROM tenants WHERE slug = ?', slug)) fail(400, 'Bu firma kodu kullanılıyor');
     const f = fields(b);
     // Deneme süresi: bitiş girilmediyse 14 gün
@@ -326,10 +346,30 @@ export class TenantPanel {
         return json({ ok: true, username: b.username });
       }
       if (b.op === 'support') return json({ ok: true, cookie: await supportCookie(env, !!b.secure) });
+      if (b.op === 'demo') {
+        if (env.DEMO !== '1') return json({ error: 'Bu panel demo paneli değil' }, 400);
+        await this.ctx.storage.delete('suspended'); await this.ctx.storage.delete('destroyed');
+        if (Date.now() - ((await this.ctx.storage.get('demo_reset_at')) || 0) > DEMO_RESET_MS) await this.demoReset(env);
+        await this.schedule();
+        return json({ ok: true, cookie: await demoCookie(env, this.db, !!b.secure) });
+      }
       if (b.op === 'stats') return json({ ...(await this.usage()), suspended: !!(await this.ctx.storage.get('suspended')) });
       if (b.op === 'destroy') { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); await this.ctx.storage.put('destroyed', true); this.db = doD1(this.ctx.storage); this.t = null; this.tenv = null; return json({ ok: true }); }
       return json({ error: 'Bilinmeyen işlem' }, 400);
     } catch (e) { return json({ error: e.message }, e.status || 500); }
+  }
+  // Demo paneli sıfırlama (günde bir): ziyaretçilerin yaptığı değişiklikler silinir, örnek veriler baştan çekilir
+  async demoReset(env) {
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.db = doD1(this.ctx.storage);
+    if (this.t) await this.ctx.storage.put('meta', this.t);
+    await init(this.db);
+    await run(this.db, "INSERT INTO settings (k, v) VALUES ('company', ?) ON CONFLICT (k) DO NOTHING", JSON.stringify({ title: 'Demo Mağaza', legal: 'Demo Mağaza' }));
+    await this.ctx.storage.put('demo_reset_at', Date.now());
+    try { await syncAll(env, this.db); } catch (e) { console.error('demo paneli senkron hatası', e); }
+    // Örnek ürünlerin alış fiyatı ve desisi: kâr raporları gerçekçi görünsün
+    for (const [sku, , , , cost, desi] of DEMO_PRODUCTS) await run(this.db, 'UPDATE products SET purchase_price = ?, desi = ? WHERE sku = ? AND purchase_price = 0', cost, desi, sku).catch(() => {});
   }
   // Kullanım özeti (Firmalar listesi): kullanıcı, kanal, ürün, sipariş, son 30 gün sipariş / ciro, son giriş ve sipariş
   async usage() {
@@ -344,6 +384,10 @@ export class TenantPanel {
     const env = await this.meta();
     if (!env || await this.ctx.storage.get('suspended') || await this.ctx.storage.get('destroyed')) return;
     let syncErr = null;
+    if (env.DEMO === '1' && Date.now() - ((await this.ctx.storage.get('demo_reset_at')) || 0) > DEMO_RESET_MS) {
+      try { await this.demoReset(env); } catch (e) { console.error('demo paneli sıfırlanamadı', e); }
+      return void (await this.ctx.storage.setAlarm(Date.now() + SYNC_MS));
+    }
     try { await init(this.db); await syncAll(env, this.db); } catch (e) { syncErr = e; console.error('müşteri paneli senkron hatası', this.t && this.t.slug, e); }
     try { await this.reportSyncErrors(syncErr); } catch (e) { console.error('hata kayıtları aktarılamadı', e); }
     // Saatte bir yeter (ana veritabanına yazma maliyeti)

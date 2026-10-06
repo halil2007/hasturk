@@ -1,0 +1,55 @@
+<!--
+title: İletişim — Hastürk CRM
+description: Hastürk CRM ile iletişime geçin: telefon, WhatsApp, e-posta ve iletişim formu. Demo, teklif ve kanal talepleriniz için yazın.
+url: /iletisim
+nav: iletisim
+-->
+<section class="page-hero">
+  <div class="wrap">
+    <div class="kicker">İletişim</div>
+    <h1>Size Nasıl <span class="grad">Yardımcı Olabiliriz?</span></h1>
+    <p>Demo, teklif ya da merak ettiğiniz her şey için yazın; en kısa sürede dönüş yapalım. Mevcut müşterilerimiz panelin Destek bölümünü kullanabilir.</p>
+  </div>
+</section>
+
+<section class="sec" style="padding-top:24px">
+  <div class="wrap">
+    <div class="ccards">
+      <a class="cc reveal" data-show="company.phone" data-c-href="company.phone" data-kind="tel"><span class="ic c-blue"><svg><use href="#i-phone"/></svg></span><b>Telefon</b><span data-c="company.phone"></span><em>Hemen arayın</em></a>
+      <a class="cc reveal" data-show="company.whatsapp" data-c-href="company.whatsapp" data-kind="wa"><span class="ic c-green"><svg><use href="#i-wa"/></svg></span><b>WhatsApp</b><span data-c="company.phone"></span><em>Mesaj gönderin</em></a>
+      <a class="cc reveal" data-show="company.email" data-c-href="company.email" data-kind="mailto"><span class="ic c-purple"><svg><use href="#i-mail"/></svg></span><b>E-posta</b><span data-c="company.email"></span><em>Bize yazın</em></a>
+      <div class="cc reveal" data-show="company.address"><span class="ic c-orange"><svg><use href="#i-pin"/></svg></span><b>Adres</b><span data-c="company.address"></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec alt">
+  <div class="wrap contact">
+    <div class="info reveal">
+      <h3>İletişim Formu</h3>
+      <p>Formu doldurun; mesajınız doğrudan ekibimize ulaşır. Çalışma saatlerinde genellikle aynı gün dönüş yapıyoruz.</p>
+      <div class="next">
+        <b>Ne için yazabilirsiniz?</b>
+        <ol>
+          <li><span>Paneli örnek verilerle görmek ve deneme hesabı açmak</span></li>
+          <li><span>Paket ve fiyat teklifi almak</span></li>
+          <li><span>Kullandığınız bir kanalın entegrasyonunu talep etmek</span></li>
+          <li><span>Mevcut sisteminizden geçiş ve veri aktarımı</span></li>
+        </ol>
+      </div>
+    </div>
+    <form class="lead card reveal" data-lead novalidate>
+      <label class="f">Konu<select class="in" name="topic" data-topic>
+        <option value="iletisim">Genel soru</option><option value="demo">Demo ve deneme hesabı</option><option value="teklif">Paket / fiyat teklifi</option><option value="kanal">Kanal (entegrasyon) talebi</option><option value="arama">Beni arayın</option>
+      </select></label>
+      <div class="row2"><label class="f">Ad soyad *<input class="in" name="name" autocomplete="name" required></label><label class="f">Firma / mağaza adı<input class="in" name="company" autocomplete="organization"></label></div>
+      <div class="row2"><label class="f">Telefon<input class="in" name="phone" type="tel" autocomplete="tel" inputmode="tel"></label><label class="f">E-posta<input class="in" name="email" type="email" autocomplete="email"></label></div>
+      <div class="f" style="display:grid;gap:8px"><span style="font-weight:600;font-size:14.5px">Hangi kanallarda satış yapıyorsunuz?</span><div class="chips-in" data-chans></div></div>
+      <label class="f">Mesajınız<textarea class="in" name="message" placeholder="Aylık sipariş adedi, mağaza sayısı, sorunuz…"></textarea></label>
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="consent"><input type="checkbox" name="consent"><span><a href="/kvkk" target="_blank">KVKK aydınlatma metnini</a> okudum; talebime dönüş yapılması için iletişim bilgilerimin işlenmesini kabul ediyorum.</span></label>
+      <div data-msg></div>
+      <button class="btn btn-primary" type="submit">Gönder <svg><use href="#i-arrow"/></svg></button>
+    </form>
+  </div>
+</section>

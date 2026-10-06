@@ -3,7 +3,7 @@
 //  - Diğer kullanıcılar panelden eklenir (Kullanıcılar); şifreler PBKDF2-SHA256 ile özetlenip saklanır.
 //  - Oturum imzalı, HttpOnly bir çerezde tutulur; şifre değişince eski oturumlar geçersiz olur.
 import { all, first, run, getRaw, setSetting } from './db.js';
-import { PERM_VALUES } from '../public/perms.js';
+import { PERM_VALUES, PERM_KEYS } from '../public/perms.js';
 import { newSecret, verifyCode, hashCode, recoveryCodes, otpauth, qrSvg } from './totp.js';
 const permsOf = (v) => { try { const a = JSON.parse(v || 'null'); return Array.isArray(a) ? a.filter((k) => PERM_VALUES.includes(k)) : null; } catch { return null; } };
 // Oturum imzası şifreye ve oturum sürümüne bağlı: "oturumları kapat" sürümü artırır, eski çerezler geçersiz olur
@@ -53,6 +53,32 @@ export async function supportCookie(env, secure) {
   const exp = String(Date.now() + 2 * 3600e3);
   const value = encodeURIComponent(`${pre(env)}-1.${exp}.${await hmac(secret(env), `-1.${exp}.support`)}`);
   return `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=7200${secure ? '; Secure' : ''}`;
+}
+
+// Demo firma paneli (tanıtım sitesinden demo talep edenler): herkes aynı "demo" personel hesabıyla girer. Personel olduğu için
+// ayarlar, kanal API bilgileri ve kullanıcılar kapalıdır; şifre ve iki adımlı doğrulama da demo panelinde değiştirilemez (api.js).
+export const DEMO_USER = 'demo';
+export async function demoCookie(env, db, secure) {
+  let u = await first(db, 'SELECT id, pass, sess FROM users WHERE username = ?', DEMO_USER);
+  if (!u) {
+    await run(db, "INSERT INTO users (username, name, email, pass, role, active, created_at, perms) VALUES (?, 'Demo kullanıcı', '', ?, 'staff', 1, ?, ?)",
+      DEMO_USER, await hashPassword(b64(crypto.getRandomValues(new Uint8Array(24)))), Date.now(), JSON.stringify(PERM_KEYS));
+    u = await first(db, 'SELECT id, pass, sess FROM users WHERE username = ?', DEMO_USER);
+  }
+  const exp = String(Date.now() + 864e5);
+  const v = encodeURIComponent(`${pre(env)}${u.id}.${exp}.${await hmac(secret(env), `${u.id}.${exp}.${ver(u)}`)}`);
+  return `${COOKIE}=${v}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${secure ? '; Secure' : ''}`;
+}
+// Tanıtım sitesindeki demo bağlantısı: süreli, ana panelin gizli anahtarıyla imzalı ("bitiş.imza")
+const demoKey = (env) => (env.PANEL_SECRET || env.PANEL_PASSWORD || '') + '|demo-link';
+export async function demoToken(env, days = 14) {
+  const exp = String(Date.now() + days * 864e5);
+  return `${exp}.${await hmac(demoKey(env), exp)}`;
+}
+export async function checkDemoToken(env, t) {
+  const [exp, sig] = String(t || '').split('.');
+  if (!sig || !/^\d+$/.test(exp) || Number(exp) < Date.now() || !(env.PANEL_SECRET || env.PANEL_PASSWORD)) return false;
+  return same(sig, await hmac(demoKey(env), exp));
 }
 
 // Çerezden oturumdaki kullanıcıyı bul (yoksa null)
