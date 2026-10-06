@@ -1,6 +1,6 @@
 // Genel Bakış: dönem seçimi, kanal bağlantıları, KPI'lar (eğilim çizgili), satış performansı (önceki dönemle),
 // kanal dağılımı, son siparişler + seçili siparişin işlemleri, en çok satanlar, ortak stok, hızlı kâr hesabı.
-import { api, state, html, raw, render, $, $$, money, money0, compact, n, pct, delta, ago, ch, chLogo, chBadge, chColor, chState, statusPill, thumb, actions, toast, dayKey, store, numIn, rangeLabel , activeChannels } from '../core.js';
+import { api, state, html, raw, render, $, $$, money, money0, compact, n, pct, delta, ago, ch, chLogo, chBadge, chColor, chState, statusPill, thumb, actions, toast, dayKey, store, numIn, rangeLabel, activeChannels, sheet, busy } from '../core.js';
 import { lineChart, sparkline } from '../chart.js';
 import { profit } from '../profit.js';
 import { mountOps } from './orderops.js';
@@ -38,7 +38,7 @@ export async function dashboard(el) {
     const dl = delta(cur, prev), cls = dl == null || dl === 0 ? 'flat' : dl > 0 ? 'up' : 'down';
     return html`<div class="kpi"><div class="label">${lab}</div><div class="value num">${fmt(cur)}</div>
       <div class="delta ${cls}">${dl == null ? '' : dl > 0 ? '▲' : dl < 0 ? '▼' : ''} ${pct(dl)} <span class="muted" style="font-weight:500">önceki ${fmt(prev)}</span></div>
-      ${raw(sparkline(spark, opts.color))}</div>`;
+      ${opts.warn ? html`<a class="kpi-warn" href="#/urunler?f=nocost" title="Alış fiyatı girilmemiş ürünlerde kâr maliyetsiz hesaplanır; gerçek kâr daha düşüktür">⚠ ${opts.warn} satırda alış fiyatı yok · kâr olduğundan yüksek görünür</a>` : raw(sparkline(spark, opts.color))}</div>`;
   }
 
   function draw(s) {
@@ -61,20 +61,21 @@ export async function dashboard(el) {
     const steps = [
       [live, 'Satış kanalınızı bağlayın', 'Sitenizi ve pazaryerlerinizi (Trendyol, Hepsiburada, ikas …) API bilgileriyle bağlayın; siparişleriniz kendiliğinden gelir.', '#/entegrasyonlar', 'Kanal bağla'],
       [!!d.stock.products, 'Ürünlerinizi panele alın', 'Kanallardaki ilanlarınızı seçip panele ekleyin; aynı ürün farklı kanallarda barkod / stok koduyla eşleşir.', '#/kanal-urunleri', 'Ürünleri al'],
+      [!!(st.stock_sync || Object.values(st.stock_push || {}).some(Boolean) || (st.setup || {}).stock), 'Stok gönderimine karar verin', st.stock_sync ? 'Stoklar tüm kanallara otomatik gidiyor.' : 'Açarsanız bir kanalda satılan ürünün stoğu diğer kanallarda da düşer (fazla satış olmaz). Kapalıyken stoklar yalnız okunur.', '#stock-decide', 'Karar ver'],
       [!!(co.phone || co.address || co.tax), 'Firma bilgilerinizi girin', 'Logo, ünvan ve adres kargo etiketinde ve e-postalarda kullanılır.', '#/ayarlar', 'Ayarlara git'],
       [false, 'Komisyon ve kargo giderlerini kontrol edin', 'Kâr hesapları için kanal komisyon oranlarınızı ve kargo giderinizi girin (isteğe bağlı).', '#/ayarlar', 'Giderler'],
       [false, 'Ekibinizi ekleyin', 'Personel ekleyip her kişiye yalnız ihtiyaç duyduğu bölümleri açın (isteğe bağlı).', '#/kullanicilar', 'Personel'],
     ];
-    const done = steps.filter((x) => x[0]).length;
+    const done = steps.filter((x) => x[0]).length, need = steps.slice(0, 4).some((x) => !x[0]);
     const guide = html`<div class="card guide"><div class="row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Kurulum adımları</h2><div class="muted small">${admin ? 'Paneli birkaç adımda kullanıma hazırlayın.' : 'Kurulumu firmanızın yöneticisi tamamlar.'}</div></div>
-      <div class="guide-prog"><b>${done}/${steps.length}</b><div class="prog"><span style="width:${(done / steps.length) * 100}%"></span></div></div></div>
-      <ol class="steps">${steps.map(([ok, t, dsc, href, btn], i) => html`<li class="${ok ? 'ok' : ''}"><span class="no">${ok ? html`<i class="ico ico-check"></i>` : i + 1}</span><div style="flex:1;min-width:0"><b>${t}</b><div class="muted small">${dsc}</div></div>${!ok && admin ? html`<a class="btn sm ${i === steps.findIndex((s2) => !s2[0]) ? 'primary' : ''}" href="${href}">${btn}</a>` : ''}</li>`)}</ol></div>`;
+      <div class="guide-prog"><b>${done}/${steps.length}</b><div class="prog"><span style="width:${(done / steps.length) * 100}%"></span></div></div>${live && admin ? html`<button class="btn sm ghost" data-act="guide-hide" title="Rehberi gizle">Gizle</button>` : ''}</div>
+      <ol class="steps">${steps.map(([ok, t, dsc, href, btn], i) => html`<li class="${ok ? 'ok' : ''}"><span class="no">${ok ? html`<i class="ico ico-check"></i>` : i + 1}</span><div style="flex:1;min-width:0"><b>${t}</b><div class="muted small">${dsc}</div></div>${!ok && admin ? (href === '#stock-decide' ? html`<button class="btn sm ${i === steps.findIndex((s2) => !s2[0]) ? 'primary' : ''}" data-act="stock-decide">${btn}</button>` : html`<a class="btn sm ${i === steps.findIndex((s2) => !s2[0]) ? 'primary' : ''}" href="${href}">${btn}</a>`) : ''}</li>`)}</ol></div>`;
     if (!live) {
       render(el, html`<div class="hello"><div><h2>Hoş geldiniz${u.name && u.id ? `, ${u.name.split(' ')[0]}` : ''}</h2><div class="muted small">Siparişleriniz, stoklarınız ve kârınız bu ekranda toplanacak. Başlamak için ilk satış kanalınızı bağlayın.</div></div></div>${guide}`);
       return;
     }
     render(el, html`
-      ${!d.stock.products ? guide : ''}
+      ${need && !(st.setup || {}).hidden ? guide : ''}
       <div class="hello"><div><h2>${hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar'}${u.name && u.id ? `, ${u.name.split(' ')[0]}` : ''}</h2>
         <div class="muted small">${new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · bugün ${n(Object.values(sm.today || {}).reduce((a, x) => a + x.orders, 0))} sipariş, ${money0(Object.values(sm.today || {}).reduce((a, x) => a + x.revenue, 0))}</div></div></div>
       <div class="tasks">${tasks.map(([c, i, v, t, href]) => html`<a class="task ${c} ${v ? '' : 'zero'}" href="${href}"><span class="ic"><i class="ico ico-${i}"></i></span><div style="min-width:0"><b class="num">${n(v)}</b><span>${t}</span></div></a>`)}</div>
@@ -92,12 +93,12 @@ export async function dashboard(el) {
       <div class="kpis" style="margin-top:16px">
         ${kpi('Toplam ciro', c.total.revenue, p.total.revenue, money0, c.revenue)}
         ${kpi('Sipariş adedi', c.total.orders, p.total.orders, (v) => n(v), c.orders, { color: 'var(--good)' })}
-        ${kpi('Tahmini kâr', c.total.profit, p.total.profit, money0, c.profit, { color: 'var(--good)' })}
+        ${kpi(d.missingCost ? 'Tahmini kâr (eksik veri)' : 'Tahmini kâr', c.total.profit, p.total.profit, money0, c.profit, { color: 'var(--good)', warn: d.missingCost })}
         <a class="kpi" href="#/kargo"><div class="label">Bekleyen kargo</div><div class="value num">${toShip}</div>
           <span class="kpi-ico"><i class="ico ico-box"></i></span>
           <span class="kpi-link"><i class="ico ico-tag"></i>Etiket oluştur <i class="ico ico-chev"></i></span></a>
       </div>
-      ${d.missingCost ? html`<div class="tiny muted" style="margin-top:6px">* Kâr: ${d.missingCost} satış satırında alış fiyatı yok (Ürünler → “Alış fiyatı eksik”).</div>` : ''}
+
 
       <div class="dash-grid perf">
         <div class="card">
@@ -177,7 +178,23 @@ export async function dashboard(el) {
     render(g, html`<div class="tiny" style="font-weight:700;color:var(--text-2)">Kazanç</div><div class="v num" style="font-size:24px;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</div><div class="tiny muted">Kâr marjı %${n(r.margin)}</div>`);
   }
 
+  const setupSave = async (patch, msg) => {
+    state.settings = await api('settings', { method: 'PUT', body: { ...patch, setup: { ...((state.settings || {}).setup || {}), ...(patch.setup || {}) } } });
+    toast(msg); await loadSummary().catch(() => {}); draw(state.summary);
+  };
   actions(el, {
+    'guide-hide': () => setupSave({ setup: { hidden: true } }, 'Kurulum rehberi gizlendi (Ayarlar\'dan devam edebilirsiniz)'),
+    'stock-decide': () => {
+      const unmatched = (state.summary && state.summary.unmatched) || 0;
+      const s = sheet({ title: 'Stoklar pazaryerlerine gönderilsin mi?', size: 'narrow', body: html`<div class="stack">
+        <p style="margin:0"><b>Açarsanız:</b> paneldeki stok adedi bağlı tüm kanallara otomatik gönderilir. Bir kanalda satılan ürünün stoğu diğerlerinde de düşer; aynı ürünü iki kez satmazsınız.</p>
+        <p style="margin:0" class="muted"><b>Kapalı kalırsa:</b> stoklar yalnız okunur; her kanalın stoğunu o kanalın panelinden siz yönetirsiniz.</p>
+        ${unmatched ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>${n(unmatched)} ilan henüz bir ürüne eşleşmedi. Açmadan önce <a class="link" href="#/eslestirme">Eşleştirme</a>'yi tamamlamanız önerilir (eşleşmeyen ilanın stoğu gönderilmez).</div></div>` : ''}
+        <div class="muted tiny">Bu ayarı sonra Ayarlar → Stok'tan değiştirebilirsiniz; kanal bazında da Entegrasyonlar'dan açıp kapatabilirsiniz.</div></div>`,
+        foot: html`<button class="btn" data-off>Şimdilik kapalı kalsın</button><span class="spacer"></span><button class="btn primary" data-on>Evet, stokları gönder</button>` });
+      $('[data-on]', s.el).onclick = (e) => busy(e.currentTarget, async () => { s.close(); await setupSave({ stock_sync: true, setup: { stock: 'on' } }, 'Stok gönderimi açıldı; değişen stoklar kanallara gider'); });
+      $('[data-off]', s.el).onclick = (e) => busy(e.currentTarget, async () => { s.close(); await setupSave({ setup: { stock: 'off' } }, 'Stok gönderimi kapalı kaldı'); });
+    },
     preset: (t) => { f.preset = t.dataset.k; [f.from, f.to] = presetRange(f.preset); load().catch((e) => toast(e.message, true)); },
     metric: (t) => { f.metric = t.dataset.k; store.set('dash', f); $$('[data-act=metric]', el).forEach((b) => b.classList.toggle('on', b === t)); drawChart(); },
     compare: () => { f.compare = !f.compare; draw(state.summary); },

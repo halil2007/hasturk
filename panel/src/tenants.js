@@ -8,7 +8,8 @@ import { all, first, run, init } from './db.js';
 import { handle } from './handler.js';
 import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
-import { hashPassword, supportCookie } from './auth.js';
+import { hashPassword, supportCookie, currentUser } from './auth.js';
+import { supportResponse } from './support.js';
 import { json, fail, str } from './util.js';
 import { loadConfig } from './config.js';
 
@@ -230,6 +231,19 @@ export class TenantPanel {
     const url = new URL(req.url);
     if (url.pathname === '/__admin') return this.adminOp(env, await req.json().catch(() => ({})));
     if (await this.ctx.storage.get('suspended')) return json({ error: 'Bu müşteri paneli askıya alınmış' }, 403);
+    // Destek talepleri: firmanın kendi talepleri, ana panelin veritabanında (ana panel yanıtlar)
+    const sp = url.pathname.replace(/^\/api\//, '').replace(/\/+$/, '');
+    if (/^support(\/|$)/.test(sp)) {
+      if (!this.env.DB) return json({ error: 'Destek şu an kullanılamıyor' }, 503);
+      try {
+        await init(this.db);
+        const user = await currentUser(req, env, this.db);
+        if (!user) return json({ error: 'Giriş gerekli' }, 401);
+        if (req.method !== 'GET' && req.headers.get('Origin') && new URL(req.headers.get('Origin')).host !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403);
+        await init(this.env.DB);
+        return await supportResponse(req, this.env.DB, sp, { slug: this.t.slug, firm: this.t.name, user, staff: false });
+      } catch (e) { return json({ error: e.message || 'Hata' }, e.status || 500); }
+    }
     await this.schedule();
     return handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
   }

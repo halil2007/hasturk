@@ -1233,4 +1233,62 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-06c"; }
+:root { --assets: "2026-10-07a"; }
+
+/* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
+.subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }
+.subtabs::-webkit-scrollbar { display: none; }
+.subtabs[hidden] { display: none; }
+.subtabs a { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px 10px 0 0; color: var(--text-2); text-decoration: none; font-weight: 650; font-size: 14px; white-space: nowrap; border-bottom: 2px solid transparent; }
+.subtabs a .ico { width: 16px; height: 16px; opacity: .8; }
+.subtabs a:hover { color: var(--text); background: var(--surface-2); }
+.subtabs a.on { color: var(--primary); border-bottom-color: var(--primary); background: var(--surface); }
+.subtabs .n { background: var(--amber); color: #fff; border-radius: 10px; font-size: 11px; padding: 0 7px; font-weight: 700; }
+.subtabs .n.hide { display: none; }
+@media (min-width: 1024px) { .subtabs { padding: 2px 28px 0; border-bottom: 1px solid var(--line); margin-bottom: 10px; max-width: none; } }
+@media (max-width: 1023px) { .subtabs { padding-top: 8px; } .subtabs a { border-radius: 999px; border: 1px solid var(--line); background: var(--surface); padding: 7px 12px; font-size: 13px; } .subtabs a.on { background: var(--primary); color: #fff; border-color: var(--primary); } }
+.ico-help { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9M12 17.2h.01'/%3E%3C/svg%3E"); }
+.ico-image { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Ccircle cx='9' cy='10' r='2'/%3E%3Cpath d='m21 16-5-5-9 9'/%3E%3C/svg%3E"); }
+.ico-send { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 2 11 13M22 2l-7 20-4-9-9-4z'/%3E%3C/svg%3E"); }
+
+/* Destek */
+.sp-list { display: grid; }
+.sp-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: var(--text); border-bottom: 1px solid var(--line); min-width: 0; }
+.sp-row:last-child { border-bottom: 0; }
+.sp-row:hover { background: var(--surface-2); }
+.sp-row.unread b { color: var(--primary); }
+.sp-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--primary-soft); color: var(--primary); }
+.sp-ic.bug { background: var(--bad-soft); color: var(--bad); } .sp-ic.request { background: var(--good-soft); color: var(--good); } .sp-ic.billing { background: var(--amber-soft); color: var(--amber); }
+.sp-ic .ico { width: 18px; height: 18px; }
+.sp-detail { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 1100px) { .sp-detail { grid-template-columns: minmax(0, 1fr) 300px; } }
+.sp-thread { display: grid; gap: 12px; max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+.sp-msg { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; max-width: 86%; justify-self: start; }
+.sp-msg.staff { background: var(--primary-soft); border-color: transparent; justify-self: end; }
+.sp-meta { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; font-size: 13px; }
+.sp-body { white-space: pre-wrap; word-break: break-word; line-height: 1.5; font-size: 14px; }
+.sp-img img { width: 120px; height: 90px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.sp-thumb { position: relative; display: inline-block; }
+.sp-thumb img { width: 72px; height: 54px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.sp-thumb button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.sp-thumb button .ico { width: 11px; height: 11px; }
+.sp-reply { border-top: 1px solid var(--line); padding-top: 12px; }
+
+/* Hata bildiriminde "Sorun bildir" */
+.t-msg .t-act { margin-left: 10px; background: rgb(255 255 255 / .18); color: inherit; border: 1px solid rgb(255 255 255 / .35); border-radius: 7px; padding: 2px 9px; font: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+
+/* Sayfa yardımı */
+.help-sheet h3 { margin: 0 0 6px; font-size: 14px; }
+.help-steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; line-height: 1.5; }
+.help-terms { margin: 0; display: grid; gap: 4px 0; }
+.help-terms dt { font-weight: 700; margin-top: 6px; }
+.help-terms dd { margin: 0; color: var(--text-2); font-size: 13.5px; line-height: 1.45; }
+
+/* Ayarlar: sekmeler ve alt kaydet çubuğu */
+.stabs .tab .ico { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
+.savebar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.savebar[hidden] { display: none; }
+@media (max-width: 1023px) { .savebar { bottom: calc(var(--tabbar) + 10px + env(safe-area-inset-bottom)); } }
+
+.kpi .kpi-warn { display: block; margin-top: 8px; padding: 6px 9px; border-radius: 8px; background: var(--amber-soft); color: var(--amber); font-size: 12px; font-weight: 700; text-decoration: none; line-height: 1.35; position: relative; z-index: 1; }
+.kpi .kpi-warn:hover { text-decoration: underline; }

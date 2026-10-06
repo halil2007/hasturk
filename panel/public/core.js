@@ -74,7 +74,7 @@ async function request(path, method, body) {
   let data = {};
   try { data = await res.json(); } catch { /* boş */ }
   if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw new Error(data.error || 'Giriş gerekli'); }
-  if (!res.ok) throw new Error(data.error || `Hata (${res.status})`);
+  if (!res.ok) { const raw = data.error || `Hata (${res.status})`, e = new Error(friendly(raw)); e.raw = raw; throw e; }
   return data;
 }
 
@@ -222,11 +222,33 @@ export const chState = (c) => (c.gated ? ['off', (c.missing || []).length ? 'Ba�
 export const thumb = (img, name, cls = '') => html`<span class="thumb ${cls}" style="${img ? `background-image:url('${String(img).replace(/['"()\\]/g, '')}')` : ''}">${img ? '' : (name || '?').slice(0, 2)}</span>`;
 
 // ---------- bildirim ----------
+// Kanaldan gelen teknik hata metnini (HTTP kodu, adres, İngilizce mesaj) satıcının anlayacağı dile çevirir; kanalın kendi mesajı varsa sonda kalır
+export function friendly(msg) {
+  const s = String(msg || '');
+  if (!/HTTP \d{3}|https?:\/\/|Failed to fetch|NetworkError|zaman aşımı|bağlantı hatası|timeout/i.test(s)) return s;
+  const said = ((/"([^"]{6,200})"/.exec(s) || /(?:message|error)["']?\s*[:=]\s*["']([^"']{6,200})/i.exec(s) || [])[1] || '').trim();
+  const who = (/^(\S+?):/.exec(s) || [])[1];
+  const ch2 = who && !/^(GET|POST|PUT|PATCH|DELETE)$/.test(who) && who.length < 20 ? who + ': ' : '';
+  const tail = said ? ` (Kanalın mesajı: “${said}”)` : '';
+  if (/HTTP 40[13]|unauthori|forbidden/i.test(s)) return `${ch2}Kanal bağlantı bilgilerinizi kabul etmedi. Entegrasyonlar'dan API bilgilerini kontrol edin.${tail}`;
+  if (/HTTP 429|too many/i.test(s)) return `${ch2}Kanal çok sık istek nedeniyle kısa süre bekletti; birkaç dakika sonra tekrar deneyin.`;
+  if (/HTTP 5\d\d|bad gateway|unavailable|internal server/i.test(s)) return `${ch2}Kanalın sunucusu şu an yanıt vermiyor; birkaç dakika sonra tekrar deneyin. Sorun sürerse Destek'e bildirin.`;
+  if (/zaman aşımı|timeout|bağlantı hatası|Failed to fetch|NetworkError/i.test(s)) return `${ch2}Kanala bağlanılamadı ya da geç yanıt geldi; biraz sonra tekrar deneyin.`;
+  if (/HTTP 404/.test(s)) return `${ch2}Kanalda bu kayıt bulunamadı (silinmiş ya da değişmiş olabilir).${tail}`;
+  if (/HTTP 4\d\d/.test(s)) return `${ch2}Kanal işlemi kabul etmedi.${tail || ' Ayrıntı için Tanılama\'yı kullanın ya da Destek\'e bildirin.'}`;
+  return s;
+}
 export function toast(msg, err = false) {
   const box = $('#toast');
   const el = document.createElement('div');
   el.className = 't-msg' + (err ? ' err' : '');
-  el.textContent = msg;
+  el.textContent = err ? friendly(msg) : msg;
+  // Hata mesajında "Bildir": hata metni ve sayfa bilgisi destek talebine kendiliğinden eklenir
+  if (err && state.reportError && (friendly(msg) !== String(msg) || /sunucu|yüklenemedi|ulaşılamadı|başarısız|alınamadı|gönderilemedi/i.test(msg))) {
+    const b = document.createElement('button'); b.className = 't-act'; b.textContent = 'Sorun bildir';
+    b.onclick = () => { el.remove(); state.reportError(String(msg)); };
+    el.append(b);
+  }
   box.append(el);
   setTimeout(() => el.remove(), err ? 6500 : 3200);
 }
