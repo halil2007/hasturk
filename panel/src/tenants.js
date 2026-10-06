@@ -220,6 +220,8 @@ export class TenantPanel {
         if (!n.n) await run(db, "INSERT INTO users (username, name, email, pass, role, active, created_at) VALUES (?, ?, '', ?, 'admin', 1, ?)", b.username, b.username, await hashPassword(String(b.password)), Date.now());
         // Firma adı (giriş ekranı, etiket, e-posta) müşterinin adıyla başlar; Ayarlar'dan değiştirilebilir
         await run(db, "INSERT INTO settings (k, v) VALUES ('company', ?) ON CONFLICT (k) DO NOTHING", JSON.stringify({ title: b.name, legal: b.name }));
+        // Yeni firma: kanallardaki ürünler kendiliğinden ürün kartına dönüşmez; firma Kanal Ürünleri'nden istediğini seçer
+        await run(db, "INSERT INTO settings (k, v) VALUES ('manual_import', ?) ON CONFLICT (k) DO NOTHING", JSON.stringify({ '*': true }));
         await this.ctx.storage.delete('suspended'); await this.ctx.storage.delete('destroyed');
         await this.schedule();
         return json({ ok: true });

@@ -16,6 +16,7 @@ import { integrations } from './views/integrations.js';
 import { notices } from './views/notices.js';
 import { users } from './views/users.js';
 import { firmsView } from './views/firms.js';
+import { channelProductsView } from './views/chproducts.js';
 import { settingsView } from './views/settings.js';
 import { financeView } from './views/finance.js';
 import { hbTestView } from './views/hbtest.js';
@@ -32,6 +33,7 @@ const ROUTES = [
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', perm: 'questions' },
   { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products, perm: 'products' },
+  { path: 'kanal-urunleri', title: 'Kanal Ürünleri', icon: 'grid', view: channelProductsView, perm: 'products' },
   { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock' },
   { path: 'urun-yukle', title: 'Ürün Yükle', icon: 'upload', view: uploadView, perm: 'products' },
   { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match' },
@@ -106,7 +108,7 @@ let current = null, currentPath = null, routeSeq = 0, routeAt = 0;
 // Ön yükleme: her sayfanın açılışta okuduğu adresler (ilk ziyarette varsayılanlar, sonra öğrenilen gerçek adresler)
 const PREFETCH = {
   '': ['summary'], siparisler: ['orders?status=new&page=1&limit=25'], kargo: ['packages?state=waiting'], iadeler: ['claims?page=1&status=waiting'],
-  sorular: ['questions?page=1&limit=30&status=waiting'], urunler: ['products?page=1&limit=40&group=1'], stoklar: ['products?page=1&limit=50&sort=stock', 'dashboard'],
+  sorular: ['questions?page=1&limit=30&status=waiting'], 'kanal-urunleri': ['channel-products/channels'], urunler: ['products?page=1&limit=40&group=1'], stoklar: ['products?page=1&limit=50&sort=stock', 'dashboard'],
   ...store.get('prefetch', {}),
 };
 const learn = (path, list) => {

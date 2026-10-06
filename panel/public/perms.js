@@ -31,7 +31,7 @@ const MAP = [
   [/^products\/\d+\/stock$/, 'stock'],
   [/^claims(\/|$)/, 'returns'],
   [/^questions(\/|$)/, 'questions'],
-  [/^(products|catalog|price-rules|buybox|campaigns)(\/|\.csv$|$)/, 'products'],
+  [/^(products|catalog|price-rules|buybox|campaigns|channel-products)(\/|\.csv$|$)/, 'products'],
   [/^(listings\/stock|push-stock)(\/|$)/, 'stock'],
   [/^(match|listings)(\/|$)/, 'match'],
   [/^(stats|insights|customers)(\/|$)/, 'reports'],

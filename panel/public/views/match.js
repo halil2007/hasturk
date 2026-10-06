@@ -136,8 +136,8 @@ export async function matching(el, rest, query = {}) {
   return { refresh };
 }
 
-// Ürün arayıp seçilen ürüne bağla. Aynı kanaldan zaten ilanı olan ürün seçilemez.
-function findProduct(key, onDone) {
+// Ürün arayıp seçilen ürüne bağla. Aynı kanaldan zaten ilanı olan ürün seçilemez. (Kanal Ürünleri sayfası da kullanır)
+export function findProduct(key, onDone, endpoint = 'listings/link') {
   const s = sheet({
     title: `${ch(key.channel).name} ilanını bağla`, size: 'narrow',
     body: html`<div class="stack"><div class="search" style="min-width:0"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-pq></div><div data-res class="stack" style="gap:6px"></div></div>`,
@@ -156,7 +156,7 @@ function findProduct(key, onDone) {
   $('[data-pq]', s.el).addEventListener('input', debounce((e) => search(e.target.value.trim()), 250));
   res.addEventListener('click', (e) => {
     const b = e.target.closest('[data-pick]');
-    if (b) busy(b, async () => { await api('listings/link', { method: 'POST', body: { ...key, product_id: Number(b.dataset.pick) } }); s.close(); onDone(); });
+    if (b) busy(b, async () => { await api(endpoint, { method: 'POST', body: { ...key, product_id: Number(b.dataset.pick) } }); s.close(); onDone(); });
   });
   search('');
   setTimeout(() => $('[data-pq]', s.el).focus(), 50);

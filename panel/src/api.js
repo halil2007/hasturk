@@ -3,7 +3,7 @@ import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo } from './sync.js';
-import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident } from './match.js';
+import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
@@ -18,6 +18,7 @@ import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from 
 import { sendMail, orderMail, validEmail, logoPath } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
+import * as chp from './chproducts.js';
 import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
@@ -816,7 +817,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'"),
       summary(db),
       first(db, 'SELECT COUNT(*) AS open, SUM(read = 0) AS unread FROM notices WHERE resolved_at IS NULL'),
-      first(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
+      // Eşleşme bekleyen ilan: "ben seçeyim" kanallarındaki ilanlar sayılmaz (Kanal Ürünleri'nde seçilmeyi bekler, uyarı değil)
+      Promise.all([all(db, 'SELECT channel, COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0 GROUP BY channel'), manualImport(db)])
+        .then(([rows, isManual]) => ({ n: rows.filter((r) => !isManual(r.channel)).reduce((a, r) => a + r.n, 0) })),
       getSettings(db),
       channelsInfo(env, db),
       first(db, "SELECT COUNT(*) AS n FROM claims WHERE status = 'waiting'"),
@@ -1241,7 +1244,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const rows = await all(db, `SELECT l.*, p.name AS product_name FROM listings l LEFT JOIN products p ON p.id = l.product_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY l.name LIMIT 300`, ...args);
     return json({ listings: rows });
   }
-  if (path === 'listings/link' && m === 'POST') {
+  // Kanal ürünleri: kanal kanal ilanlar, seçerek panele alma, yok sayma, kanal modu (otomatik / ben seçeyim)
+  if (path === 'channel-products/channels' && m === 'GET') return json(await chp.channelSummary(db, (await getChannels(env, db)).filter((c) => (c.enabled || c.demo) && c.fetchListings).map((c) => c.id)));
+  if (path === 'channel-products' && m === 'GET') return json(await chp.listChannelProducts(db, q));
+  if (path === 'channel-products/add' && m === 'POST') { const r = await chp.addToPanel(env, db, await body(req), user); ctx.waitUntil(pushStocks(env, db).catch(() => {})); return json(r); }
+  if (path === 'channel-products/ignore' && m === 'POST') return json(await chp.ignoreListings(db, await body(req)));
+  if (path === 'channel-products/mode' && m === 'POST') { const r = await chp.setMode(db, await body(req)); await log(db, null, 'info', `${user.name}: kanal ürünleri modu değişti`); return json(r); }
+  if ((path === 'listings/link' || path === 'channel-products/link') && m === 'POST') {
     const b = await body(req);
     let pid = b.product_id === null ? null : Number(b.product_id) || null;
     // Bir ürüne her kanaldan yalnızca bir ilan bağlanabilir (aynı sitenin iki ürünü birleştirilmez)
