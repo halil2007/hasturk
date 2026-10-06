@@ -398,6 +398,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
     out.claims = await syncClaims(env, db, { only }).catch((e) => 'hata: ' + e.message);
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
+    // Eski açık siparişler: kanaldan yeniden sorgulanır; 30 günü geçip hâlâ açık görünen tamamlandı sayılır
+    if (!only) out.stale = await staleOrders(env, db, chans, maps).catch((e) => 'hata: ' + e.message);
     // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
     if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
     if (!only) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);
@@ -559,6 +561,44 @@ export async function maybePurgeDemo(env, db) {
   await setSetting(db, 'demo_purged', true);
   if (r.orders || r.products) await log(db, null, 'info', `Örnek veriler temizlendi: ${r.orders} sipariş, ${r.products} ürün`);
   return r;
+}
+
+// ---------- eski açık siparişler ----------
+// Siparişler son birkaç günün kayıtlarıyla güncellenir; sipariş daha sonra kanalda kargoya verildiyse panelde "Yeni / Hazırlanıyor"
+// kalabilir. (1) 6 saatte bir: 2 günden eski, hâlâ açık siparişler kanaldan sipariş tarihine göre yeniden okunur (son 90 gün).
+// (2) 30 günden eski ve hâlâ açık görünen sipariş tamamlandı (teslim edildi) sayılır: listelerden ve kargo ekranından çıkar,
+// sipariş geçmişine not düşülür; kanal sonradan iptal / iade bildirirse o durum geçerli olur.
+export const STALE_CLOSE_DAYS = 30;
+export async function staleOrders(env, db, chans, maps) {
+  const t = Date.now(), out = {};
+  for (const ch of chans || []) {
+    if (ch.demo || !ch.fetchOrders) continue;
+    const key = 'stale:' + ch.id, last = await getRaw(db, key);
+    if (last && t - last.at < 6 * 3600e3) continue;
+    const old = await first(db, "SELECT MIN(ordered_at) AS m, COUNT(*) AS n FROM orders WHERE channel = ? AND status IN ('new', 'processing') AND ordered_at < ? AND ordered_at >= ?", ch.id, t - 2 * D, t - 90 * D);
+    if (!old.n) { await setSetting(db, key, { at: t, open: 0 }); continue; }
+    try {
+      const orders = await ch.fetchOrders(old.m - 3600e3, t, { byOrdered: true });
+      const ids = await saveOrders(db, ch.id, orders, maps || await productMaps(db));
+      await setSetting(db, key, { at: t, open: old.n, fetched: orders.length, changed: ids.length });
+      out[ch.id] = ids.length;
+    } catch (e) {
+      await setSetting(db, key, { at: t, open: old.n, error: e.message.slice(0, 300) });
+      out[ch.id] = 'hata: ' + e.message;
+    }
+  }
+  const rows = await all(db, "SELECT id, ordered_at FROM orders WHERE status IN ('new', 'processing') AND ordered_at < ? LIMIT 500", t - STALE_CLOSE_DAYS * D);
+  for (const part of chunk(rows, 30)) {
+    await db.batch(part.flatMap((o) => [
+      db.prepare("UPDATE orders SET status = 'delivered', local_status = 'delivered', updated_at = ? WHERE id = ? AND status IN ('new', 'processing')").bind(t, o.id),
+      db.prepare("UPDATE packages SET status = 'shipped', shipped_at = COALESCE(shipped_at, ?) WHERE order_id = ? AND status = 'open'").bind(o.ordered_at + D, o.id),
+      db.prepare("INSERT INTO order_events (order_id, at, source, action, status, note, user) VALUES (?, ?, 'panel', 'auto_close', 'delivered', ?, 'Sistem')")
+        .bind(o.id, t, `${STALE_CLOSE_DAYS} günden eski ve kanaldan güncel durum gelmedi; tamamlandı sayıldı (açık listelerden çıkarıldı)`),
+    ]));
+  }
+  if (rows.length) await log(db, null, 'info', `${rows.length} eski açık sipariş (${STALE_CLOSE_DAYS} günden eski) tamamlandı sayıldı ve açık listelerden çıkarıldı`);
+  out.closed = rows.length;
+  return out;
 }
 
 // ---------- gerçek kargo gideri ----------

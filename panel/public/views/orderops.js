@@ -455,7 +455,7 @@ function splitEditor(d, extra, done) {
 }
 
 // ---------- sipariş detayı (tam) ----------
-const EV = { accept: 'İşleme alındı', pack: 'Paketlendi (kargoya hazır)', split: 'Paketlere bölündü', cargo: 'Kargo firması seçildi', 'cancel-package': 'Paket iptal edildi', ship: 'Kargoya verildi', tracking: 'Takip no girildi', label: 'Etiket oluşturuldu', 'label-printed': 'Etiket yazdırıldı', 'label-unprinted': 'Yazdırıldı işareti kaldırıldı', status: 'Durum elle değiştirildi', processed: 'Kanalda işlem yapıldı', };
+const EV = { accept: 'İşleme alındı', pack: 'Paketlendi (kargoya hazır)', split: 'Paketlere bölündü', cargo: 'Kargo firması seçildi', 'cancel-package': 'Paket iptal edildi', ship: 'Kargoya verildi', tracking: 'Takip no girildi', label: 'Etiket oluşturuldu', 'label-printed': 'Etiket yazdırıldı', 'label-unprinted': 'Yazdırıldı işareti kaldırıldı', status: 'Durum elle değiştirildi', processed: 'Kanalda işlem yapıldı', auto_close: 'Otomatik tamamlandı', };
 export async function openOrder(id, onChange) {
   const s = sheet({ title: 'Sipariş', size: 'wide drawer' });
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
