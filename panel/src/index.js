@@ -6,6 +6,7 @@ import { syncAll, quickSync } from './sync.js';
 import { handle, report5xx } from './handler.js';
 import { PerfBuffer } from './perf.js';
 import { extApi } from './extapi.js';
+import { leadRequest } from './lead.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
@@ -34,6 +35,8 @@ export default {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? secure(await env.ASSETS.fetch(req)) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
+    // Tanıtım sitesinden demo talebi (oturumsuz; yalnız izin verilen site adreslerinden, bkz. lead.js)
+    if (path === 'public/lead') return await leadRequest(req, env);
     // Başka sitelerden gelen yazma isteklerini reddet (müşteri paneli girişi ve yönetimi dahil; panel içi istekler handle() içinde de denetlenir)
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       const o = req.headers.get('Origin');
