@@ -14,7 +14,8 @@
 </head>
 <body>
   <aside class="side">
-    <a class="brand-card" href="#/" aria-label="Ana sayfa"><img data-logo src="logo.webp" alt="Logo"></a>
+    <a class="brand-card" href="#/" aria-label="Ana sayfa"><img data-logo src="logo.webp" alt="Logo"><img class="brand-mini" src="icon.svg" alt=""></a>
+    <button class="side-toggle" data-act="side" aria-label="Menüyü daralt" title="Menüyü daralt / genişlet"><i class="ico ico-back"></i></button>
     <div class="brand-title" data-company></div>
     <nav class="nav" data-nav aria-label="Ana menü"></nav>
     <div class="side-foot">
@@ -24,6 +25,7 @@
   </aside>
   <div class="main">
     <header class="topbar">
+      <button class="icon-btn d-only" data-act="side" aria-label="Menüyü daralt / genişlet" title="Menüyü daralt / genişlet"><i class="ico ico-menu"></i></button>
       <img class="m-logo" data-logo src="logo.webp" alt="">
       <div class="page-head"><h1 data-title>Genel Bakış</h1><div class="sub" data-sub></div></div>
       <label class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Sipariş, ürün veya SKU ara" data-global-search></label>
