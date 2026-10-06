@@ -35,7 +35,7 @@ async function summary(el, query) {
     <div class="row wrap" style="align-items:center"><b style="margin-right:6px">Dönem:</b><div class="chips" data-ranges></div><span class="muted small" data-rlabel></span></div>
     <div class="two-col">
       <div class="card flush"><div class="card-pad card-head"><h2>Haftalık rapor</h2><span class="muted small">son 8 hafta</span></div><div data-weeks></div></div>
-      <div class="card flush"><div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><h2 style="white-space:nowrap">İllere göre satış</h2><span class="muted small" data-ctotal></span><span class="spacer"></span><div class="seg" data-cview></div></div><div data-cities></div></div>
+      <div class="card flush"><div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><h2 style="flex:none;white-space:nowrap">İllere göre satış</h2><span class="muted small" data-ctotal></span><span class="spacer"></span><div class="seg" data-cview></div></div><div data-cities></div></div>
     </div>
     <div class="card flush"><div class="card-pad card-head"><h2>En çok satanlar</h2><div class="seg" data-sort></div></div><div data-top></div></div>
   </div>`);

@@ -46,7 +46,9 @@ export async function settingsView(el) {
     const dis = admin ? '' : 'disabled';
     const mf = (k) => (mail ? mail.fields.find((x) => x.k === k) : null) || {};
     const prov = mf('MAIL_PROVIDER').value || (mf('MAIL_API_KEY').masked ? 'brevo' : 'smtp');
-    const mailReady = prov === 'smtp' ? !!(mf('MAIL_SMTP_HOST').value && mf('MAIL_SMTP_PASS').masked) : !!mf('MAIL_API_KEY').masked;
+    const ownMail = prov === 'smtp' ? !!(mf('MAIL_SMTP_HOST').value && mf('MAIL_SMTP_PASS').masked) : !!mf('MAIL_API_KEY').masked;
+    // Müşteri panelinde e-posta varsayılan olarak hizmet sağlayıcının altyapısıyla gider (kurulum gerekmez)
+    const platformMail = !!(mail && mail.platform) && !ownMail, mailReady = ownMail || platformMail;
     render(el, html`<div class="stack" style="max-width:1000px">
       ${!admin ? html`<div class="notice"><i class="ico ico-warn"></i>Ayarları sadece yönetici değiştirebilir.</div>` : ''}
       <div class="card stack">
@@ -82,7 +84,7 @@ export async function settingsView(el) {
           <div class="muted tiny" style="margin-top:4px">Diğer kanallardaki ilanlar barkod / stok kodu kesin tutuyorsa otomatik bağlanır; tutmuyorsa Eşleştirme sayfasında onayınızı bekler.</div></div>
       </div>
 
-      <div class="card stack" data-fxcard>${state.tenant ? html`<h2>Döviz ve fiyat <span class="pill info">Yakında</span></h2><div class="muted small">Dolar, euro ve sterlin bazlı ürün fiyatı; anlık / günlük / haftalık / aylık kur güncellemesi yakında müşteri panellerinde de açılacak.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
+      <div class="card stack" data-fxcard>${state.tenant ? html`<h2>Döviz ve fiyat <span class="pill info">Yakında</span></h2><div class="muted small">Dolar, euro ve sterlin bazlı ürün fiyatı; anlık / günlük / haftalık / aylık kur güncellemesi yakında panelinizde.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
 
       <div class="card flush"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
@@ -101,11 +103,12 @@ export async function settingsView(el) {
           <span><b>Her sabah günlük özet e-postası gönder</b><br><span class="small muted">Saat 08:00'den sonra: dünün cirosu, sipariş sayısı ve tahmini kârı (önceki günle karşılaştırmalı, kanal kanal), bugün kargoya hazırlanacak / geciken siparişler, bekleyen iade ve sorular, stokta olmayan ve tükenmek üzere olan ürünler. Aşağıdaki alıcılara gider.</span></span></label>
         <div class="form-grid">
           <label class="field"><span>Bildirim alacak e-postalar</span><input class="input" data-mailto value="${(st.mail_to || []).join(', ')}" placeholder="ornek@firma.com, ikinci@firma.com"><small>Virgülle ayırın (en fazla 10)</small></label>
-          <label class="field"><span>Panel adresi</span><input class="input" data-panelurl value="${st.panel_url || ''}" placeholder="https://hasturk-panel.xxx.workers.dev"><small>E-postadaki “Siparişi panelde aç” bağlantısı</small></label>
+          ${state.tenant ? '' : html`<label class="field"><span>Panel adresi</span><input class="input" data-panelurl value="${st.panel_url || ''}" placeholder="https://hasturk-panel.xxx.workers.dev"><small>E-postadaki “Siparişi panelde aç” bağlantısı</small></label>`}
         </div>
-        <div class="notice small"><i class="ico ico-link"></i><div><b>Paneli kendi alt alan adınızdan açmak</b> (ör. crm.alanadiniz.com.tr, DNS'i taşımadan): cPanel'de alt alan adı oluşturun, <a class="link" href="/api/panel-proxy" download="index.php">index.php</a> dosyasını indirip o alt alan adının klasörüne yükleyin, AutoSSL ile sertifika alın. Panel adresi ilk girişte kendiliğinden güncellenir.</div></div>
+        ${state.tenant ? '' : html`<div class="notice small"><i class="ico ico-link"></i><div><b>Paneli kendi alt alan adınızdan açmak</b> (ör. crm.alanadiniz.com.tr, DNS'i taşımadan): cPanel'de alt alan adı oluşturun, <a class="link" href="/api/panel-proxy" download="index.php">index.php</a> dosyasını indirip o alt alan adının klasörüne yükleyin, AutoSSL ile sertifika alın. Panel adresi ilk girişte kendiliğinden güncellenir.</div></div>`}
         <div><div class="small" style="font-weight:650;margin-bottom:6px">E-posta alınacak mağazalar / pazaryerleri</div><div class="row wrap">${live.map((c) => html`<label class="check"><input type="checkbox" data-mailch="${c.id}" ${(st.mail_channels || {})[c.id] === false ? '' : 'checked'}> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>
-        <details ${mailReady ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">E-posta servisi ${mailReady ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || mf('MAIL_SMTP_USER').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}</summary>
+        ${platformMail ? html`<div class="notice good small"><i class="ico ico-check"></i><div>E-posta bildirimleri <b>hazır</b>: kurulum gerekmez, e-postalar firma adınızla gönderilir. Kendi e-posta adresinizden göndermek isterseniz aşağıdan kendi sunucunuzu girebilirsiniz.</div></div>` : ''}
+        <details ${mailReady ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">${platformMail ? 'Kendi e-posta sunucumu kullan (isteğe bağlı)' : html`E-posta servisi ${mailReady ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || mf('MAIL_SMTP_USER').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}`}</summary>
           <div class="stack" style="margin-top:10px">
             <div class="form-grid">
               <label class="field"><span>Servis</span><select class="input" data-mailf="MAIL_PROVIDER" data-prov>${[['smtp', 'Kendi e-posta sunucum (SMTP)'], ['brevo', 'Brevo'], ['resend', 'Resend']].map(([v, t]) => html`<option value="${v}" ${prov === v ? 'selected' : ''}>${t}</option>`)}</select></label>
@@ -113,7 +116,7 @@ export async function settingsView(el) {
               <label class="field"><span>Gönderen adı</span><input class="input" data-mailf="MAIL_FROM_NAME" value="${mf('MAIL_FROM_NAME').value || ''}" placeholder="Hastürk Panel"></label>
             </div>
             <div class="stack" data-provbox="smtp" ${prov === 'smtp' ? '' : 'hidden'}>
-              <div class="notice small"><div><b>Kendi e-posta adresinizden gönderim:</b> hosting / kurumsal e-posta panelinizdeki (cPanel → E-posta Hesapları → Bağlan / Connect Devices) <b>giden posta (SMTP)</b> bilgilerini girin. Port <b>465</b> (SSL) ya da <b>587</b> (STARTTLS) olmalı; 25 numaralı port Cloudflare'de kapalıdır. Kullanıcı adı genelde e-posta adresinin kendisidir.</div></div>
+              <div class="notice small"><div><b>Kendi e-posta adresinizden gönderim:</b> hosting / kurumsal e-posta panelinizdeki (cPanel → E-posta Hesapları → Bağlan / Connect Devices) <b>giden posta (SMTP)</b> bilgilerini girin. Port <b>465</b> (SSL) ya da <b>587</b> (STARTTLS) olmalı${state.tenant ? '' : "; 25 numaralı port Cloudflare'de kapalıdır"}. Kullanıcı adı genelde e-posta adresinin kendisidir.</div></div>
               <div class="form-grid">
                 <label class="field"><span>SMTP sunucusu</span><input class="input" data-mailf="MAIL_SMTP_HOST" value="${mf('MAIL_SMTP_HOST').value || ''}" placeholder="mail.alanadiniz.com.tr" autocapitalize="off"></label>
                 <label class="field"><span>Port</span><select class="input" data-mailf="MAIL_SMTP_PORT">${['465', '587'].map((v) => html`<option value="${v}" ${(mf('MAIL_SMTP_PORT').value || '465') === v ? 'selected' : ''}>${v === '465' ? '465 (SSL)' : '587 (STARTTLS)'}</option>`)}</select></label>
@@ -208,7 +211,7 @@ export async function settingsView(el) {
   const saveMail = async () => {
     const box = $('[data-mailbox]', el);
     const m = {}; $$('[data-mailch]', box).forEach((x) => { m[x.dataset.mailch] = x.checked; });
-    await save({ mail_to: $('[data-mailto]', box).value, mail_channels: m, panel_url: $('[data-panelurl]', box).value.trim() });
+    await save({ mail_to: $('[data-mailto]', box).value, mail_channels: m, ...($('[data-panelurl]', box) ? { panel_url: $('[data-panelurl]', box).value.trim() } : {}) });
     const values = {}; $$('[data-mailf]', box).forEach((i) => { values[i.dataset.mailf] = i.value.trim(); });
     await api('integrations/mail', { method: 'PUT', body: { values } });
   };

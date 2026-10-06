@@ -10,6 +10,7 @@ import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
 import { hashPassword, supportCookie } from './auth.js';
 import { json, fail, str } from './util.js';
+import { loadConfig } from './config.js';
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
 const SYNC_MS = 15 * 60e3;
@@ -19,7 +20,15 @@ const DROP = new Set(['PANEL_PASSWORD', 'DEMO', 'DB', 'TENANT']);
 
 // Abonelik bitiş tarihi geçti mi (bitiş günü sonuna kadar açık)
 export const expired = (t, now = Date.now()) => !!(t && t.expires_at && now > t.expires_at);
-export function tenantEnv(env, t) {
+// Platform değerleri: müşteriyi ilgilendirmeyen, ana panelde bir kez girilen bilgiler müşteri paneline varsayılan olarak geçer
+// (Hepsiburada entegratör adı ve aracı sunucusu, bildirim e-postası servisi). Müşteri kendi değerini girerse onunki kullanılır.
+const PLATFORM = { hepsiburada: ['HB_USER_AGENT', 'HB_PROXY_URL', 'HB_PROXY_KEY'], mail: ['MAIL_PROVIDER', 'MAIL_API_KEY', 'MAIL_FROM', 'MAIL_SMTP_HOST', 'MAIL_SMTP_PORT', 'MAIL_SMTP_USER', 'MAIL_SMTP_PASS'] };
+export async function platformValues(env, db) {
+  const cfg = db ? await loadConfig(env, db) : {}, out = {};
+  for (const [id, keys] of Object.entries(PLATFORM)) for (const k of keys) { const v = (cfg[id] && cfg[id].values && cfg[id].values[k]) || env[k]; if (v) out[k] = String(v); }
+  return out;
+}
+export function tenantEnv(env, t, platform = {}) {
   const out = {};
   for (const [k, v] of Object.entries(env)) if (!DROP.has(k) && !PRIVATE.test(k)) out[k] = v;
   // Müşterinin API bilgileri ve oturum imzası kendi anahtarıyla: ana panelin gizli anahtarı yoksa müşteri paneli açılmaz
@@ -29,6 +38,10 @@ export function tenantEnv(env, t) {
   out.TENANT_SLUG = t.slug;
   out.TENANT_NAME = t.name || t.slug;
   if (t.maxUsers) out.TENANT_MAX_USERS = String(t.maxUsers);
+  Object.assign(out, platform);
+  // Platformun e-posta servisiyle giden bildirimlerde gönderen adı firmanın adı
+  if (platform.MAIL_FROM || platform.MAIL_SMTP_USER) out.MAIL_FROM_NAME = out.TENANT_NAME;
+  out.PLATFORM_KEYS = Object.keys(platform).join(',');
   return out;
 }
 
@@ -189,14 +202,23 @@ export async function tenantApi(req, env, db, path, user) {
 
 // ---------- müşteri panelinin kendisi (Durable Object) ----------
 export class TenantPanel {
-  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; this.pf = null; this.pfAt = 0; }
+  // Platform değerleri ana veritabanından 10 dakikada bir okunur; değişince ortam yeniden kurulur
+  async platform() {
+    if (this.pf && Date.now() - this.pfAt < 600e3) return;
+    let v = this.pf || {};
+    try { v = await platformValues(this.env, this.env.DB); } catch (e) { console.error('platform değerleri okunamadı', e); }
+    this.pfAt = Date.now();
+    if (JSON.stringify(v) !== JSON.stringify(this.pf)) { this.pf = v; this.tenv = null; }
+  }
   async meta(req) {
     const slug = req && req.headers.get('X-Tenant-Slug');
     if (slug) {
       const name = decodeURIComponent(req.headers.get('X-Tenant-Name') || '') || slug, maxUsers = Number(req.headers.get('X-Tenant-Max-Users')) || 0;
       if (!this.t || this.t.slug !== slug || this.t.name !== name || (this.t.maxUsers || 0) !== maxUsers) { this.t = { slug, name, maxUsers }; this.tenv = null; await this.ctx.storage.put('meta', this.t); }
     } else if (!this.t) this.t = (await this.ctx.storage.get('meta')) || null;
-    if (this.t && !this.tenv) this.tenv = tenantEnv(this.env, this.t);
+    if (this.t) await this.platform();
+    if (this.t && !this.tenv) this.tenv = tenantEnv(this.env, this.t, this.pf || {});
     return this.tenv;
   }
   async schedule() { if (!(await this.ctx.storage.get('suspended')) && !(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + SYNC_MS); }

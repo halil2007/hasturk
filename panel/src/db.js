@@ -270,7 +270,7 @@ export const DEFAULT_SETTINGS = {
   low_stock: 5,             // ürüne özel kritik stok girilmemişse bu adet ve altı "sınırın altında" sayılır
   catalog_channels: ['ikas1'], // eşleşmeyen ilanından otomatik ürün açılan ana katalog kanalları
   company: { title: 'Hastürk', legal: '', phone: '', email: '', address: '', tax: '' },
-  sender: { name: 'HasTürk', phone: '', address: '', city: '' },
+  sender: { name: '', phone: '', address: '', city: '' },
   // Trendyol/Hepsiburada ZPL etiketini normal yazıcıda basmak için PDF'e çevir (Labelary servisi; etiket içeriği o servise gider)
   zpl_pdf: false,
   // Kendi kargo etiketimizin boyutu: 100x150 (termal) | a5 | a4
@@ -304,6 +304,8 @@ export async function getSettings(db) {
       out[r.k] = v && typeof v === 'object' && !Array.isArray(v) && out[r.k] && typeof out[r.k] === 'object' && !Array.isArray(out[r.k]) ? { ...out[r.k], ...v } : v;
     } catch { /* bozuk satır */ }
   }
+  // Etiketteki gönderen adı girilmediyse firma adı (müşteri panelinde başka firmanın adı görünmesin)
+  if (out.sender && !out.sender.name) out.sender = { ...out.sender, name: (out.company && out.company.title) || '' };
   return out;
 }
 export const setSetting = (db, k, v) => run(db, 'INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v', k, JSON.stringify(v));

@@ -1,7 +1,7 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, fieldsFor } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
@@ -1135,10 +1135,23 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // ---------- entegrasyonlar (kanal API bilgileri) ----------
   if (path === 'integrations' && m === 'GET') {
     const cfg = await loadConfig(env, db), chs = await getChannels(env, db), info = await channelsInfo(env, db);
-    return json({ secretSet: !!env.PANEL_SECRET, channels: chs.map((c) => ({ ...info.find((x) => x.id === c.id), ...describe(env, cfg, c.id) })) });
+    // Müşteri panelinde platform alanları (entegratör adı, test ortamı, aracı sunucu) gösterilmez; değerleri ana panelden gelir
+    const tenant = !!env.TENANT_SLUG;
+    const view = (c) => {
+      const d = describe(env, cfg, c.id), i = info.find((x) => x.id === c.id) || {};
+      if (!tenant) return { ...i, ...d };
+      const plat = new Set(fieldsFor(c.id).filter((f) => f.platform).map((f) => f.k));
+      return { ...i, ...d, fields: d.fields.filter((f) => !plat.has(f.k)), missing: (i.missing || []).map((k) => (plat.has(k) ? 'entegratör bilgisi (hizmet sağlayıcınız tanımlar)' : k)) };
+    };
+    return json({ secretSet: !!env.PANEL_SECRET, tenant, channels: chs.map(view) });
   }
   // E-posta servisi bilgileri (gizli anahtar istemciye dönmez) ve deneme e-postası
-  if (path === 'integrations/mail' && m === 'GET') return json(describe(env, await loadConfig(env, db), 'mail'));
+  if (path === 'integrations/mail' && m === 'GET') {
+    const d = describe(env, await loadConfig(env, db), 'mail');
+    if (!env.TENANT_SLUG) return json(d);
+    const plat = /MAIL_/.test(env.PLATFORM_KEYS || '');
+    return json({ ...d, platform: plat, fields: d.fields.map((f) => (f.source === 'cloudflare' ? { ...f, value: '', masked: '', source: '' } : f)) });
+  }
   if (path === 'mail/test' && m === 'POST') {
     const settings = await getSettings(db), to = (settings.mail_to || []).filter(validEmail);
     if (!to.length) fail(400, 'Önce bildirim alacak e-posta adresini kaydedin');
