@@ -5,6 +5,7 @@ import { init } from './db.js';
 import { syncAll, quickSync } from './sync.js';
 import { handle, report5xx } from './handler.js';
 import { PerfBuffer } from './perf.js';
+import { extApi } from './extapi.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
@@ -39,6 +40,8 @@ export default {
       if (o) { let h = ''; try { h = new URL(o).host; } catch { /* geçersiz */ } if (h !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403); }
     }
     try {
+      // Dış API (stok aktarımı): anahtarla, yalnız ana panelin yetkilendirdiği mağaza (bkz. extapi.js)
+      if (path === 'v1' || path.startsWith('v1/')) return await extApi(req, env, ctx, path, { getTenant, forward, expired });
       // Firma koduyla giriş → müşteri paneli
       if (path === 'login' && req.method === 'POST') {
         const b = await body(req.clone());

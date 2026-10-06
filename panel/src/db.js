@@ -189,6 +189,8 @@ const MIGRATIONS = [
   'ALTER TABLE tenants ADD COLUMN max_users INTEGER',
   'ALTER TABLE tenants ADD COLUMN usage TEXT',
   'ALTER TABLE tenants ADD COLUMN usage_at INTEGER',
+  // Dış API (stok aktarımı) yetkisi: JSON (açık mı, anahtar özeti, IP kısıtı, kullanım) — bkz. extapi.js
+  'ALTER TABLE tenants ADD COLUMN api TEXT',
   // Firma tahsilatları (ödeme kaydı; aboneliği uzatır)
   `CREATE TABLE IF NOT EXISTS tenant_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL, at INTEGER NOT NULL, amount REAL NOT NULL,
     months INTEGER NOT NULL DEFAULT 0, method TEXT, note TEXT, user TEXT)`,
