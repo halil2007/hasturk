@@ -1,8 +1,11 @@
-// Tanıtım sitesi: kanal listeleri, ekran sekmeleri, paketler, iletişim bilgileri (config.js) ve demo talep formu.
+// Tanıtım sitesi: kanal listeleri, ekran sekmeleri, paketler (aylık / yıllık), karşılaştırma tablosu, iletişim bilgileri (config.js),
+// iletişim ve demo formları (demo formu panelden dönen demo bağlantısını gösterir).
 (() => {
   const S = window.SITE || {}, $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const get = (k) => k.split('.').reduce((o, x) => (o ? o[x] : undefined), S);
+  const tl = (n) => Number(n).toLocaleString('tr-TR', { maximumFractionDigits: 0 });
+  const waUrl = (v) => 'https://wa.me/' + String(v).replace(/\D/g, '') + (S.waText ? '?text=' + encodeURIComponent(S.waText) : '');
 
   // Kanallar: aktif olanlar ve yakında gelecekler. [ad, tür, rozet rengi, kısa ad, yazı stili (logo şeridi)]
   const ACTIVE = [
@@ -16,17 +19,17 @@
   ];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
-  const logos = $('[data-logos]');
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
-  const wms = (dup) => ACTIVE.map((x) => `<a class="wm${dup ? ' dup' : ''}" href="#entegrasyonlar" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</a>`).join('');
+  const wms = (dup, link = true) => ACTIVE.map((x) => `<${link ? 'a href="/entegrasyonlar"' : 'span'} class="wm${dup ? ' dup' : ''}" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</${link ? 'a' : 'span'}>`).join('');
+  const logos = $('[data-logos]');
   if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
+  const logosStatic = $('[data-logos-static]');
+  if (logosStatic) logosStatic.innerHTML = wms(false, false);
   $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.length; });
   const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}</small></div></div>`).join('');
-  const ia = $('[data-integ="active"]'), is = $('[data-integ="soon"]');
-  if (ia) ia.innerHTML = integ(ACTIVE);
-  if (is) is.innerHTML = integ(SOON, true);
-  const chans = $('[data-chans]');
-  if (chans) chans.innerHTML = [...ACTIVE, ...SOON].map((x) => x[0]).concat(['Diğer']).map((n) => `<label><input type="checkbox" name="channels" value="${esc(n)}">${esc(n)}</label>`).join('');
+  $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
+  $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
+  $$('[data-chans]').forEach((el) => { el.innerHTML = [...ACTIVE, ...SOON].map((x) => x[0]).concat(['Diğer']).map((n) => `<label><input type="checkbox" name="channels" value="${esc(n)}">${esc(n)}</label>`).join(''); });
 
   // Ekran sekmeleri
   const SHOTS = [
@@ -49,22 +52,32 @@
     show(0);
   }
 
-  // Paketler
-  const plans = $('[data-plans]');
-  if (plans) plans.innerHTML = (S.plans || []).map((p) => `<div class="plan${p.featured ? ' featured' : ''} reveal">${p.featured ? '<span class="badge">En çok tercih edilen</span>' : ''}
-      <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>
-      <div class="price">${p.price ? `${esc(p.price)} <small>/ ${esc(p.period || 'ay')}</small>` : 'Teklif alın'}</div><div class="users">${esc(p.users)}</div>
+  // Paketler (aylık / yıllık)
+  let bill = 'm';
+  const priceHtml = (p) => {
+    if (!p.monthly && !p.yearly) return '<div class="price">Teklif alın</div><div class="per">&nbsp;</div>';
+    if (bill === 'y' && p.yearly) return `<div class="price">${tl(p.yearly)} ₺ <small>/ yıl</small></div><div class="per">aylık ${tl(p.yearly / 12)} ₺'ye denk gelir</div>`;
+    return `<div class="price">${tl(p.monthly)} ₺ <small>/ ay</small></div><div class="per">${p.yearly ? `yıllık ödemede ${tl(p.yearly)} ₺` : '&nbsp;'}</div>`;
+  };
+  const renderPlans = () => $$('[data-plans]').forEach((el) => {
+    el.innerHTML = (S.plans || []).map((p) => `<div class="plan${p.featured ? ' featured' : ''}">${p.featured ? '<span class="badge">En çok tercih edilen</span>' : ''}
+      <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>${priceHtml(p)}
+      <div class="limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
       <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}</ul>
-      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="#iletisim" data-plan="${esc(p.name)}">${p.price ? 'Başlayın' : 'Teklif isteyin'}</a></div>`).join('');
-  $$('[data-plan]').forEach((a) => a.addEventListener('click', () => { const m = $('[name=message]'); if (m && !m.value) m.value = `${a.dataset.plan} paketi hakkında bilgi almak istiyorum.`; }));
-  // "Biz sizi arayalım": formda arama talebini hazırla, ad alanına geç
-  $$('[data-callme]').forEach((a) => a.addEventListener('click', () => {
-    const m = $('[name=message]'); if (m && !m.value) m.value = 'Lütfen beni arayın.';
-    setTimeout(() => { const n = $('[name=name]'); if (n) n.focus({ preventScroll: true }); }, 400);
+      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">14 gün ücretsiz deneyin</a></div>`).join('');
+  });
+  renderPlans();
+  $$('[data-bill]').forEach((t) => t.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    bill = b.dataset.b; $$('[data-bill] button').forEach((x) => x.classList.toggle('on', x.dataset.b === bill)); renderPlans();
   }));
-  // KDV notu yalnız fiyat yazılmışsa
-  const priced = (S.plans || []).some((p) => p.price);
-  $$('#paketler .note').forEach((n) => { if (!priced) n.textContent = 'Fiyat teklifi; mağaza ve kanal sayınıza, aylık sipariş adedinize göre hazırlanır.'; });
+  $$('[data-vat]').forEach((el) => { el.textContent = S.vat || ''; });
+  const cmp = $('[data-compare]');
+  if (cmp && S.compare) {
+    const cell = (v) => (v === true ? '<td class="y"><svg><use href="#i-check"/></svg><span class="sr">Var</span></td>' : v === false ? '<td class="n"><svg><use href="#i-minus"/></svg><span class="sr">Yok</span></td>' : `<td class="t">${esc(v)}</td>`);
+    cmp.innerHTML = `<thead><tr><th scope="col">Özellik</th>${(S.plans || []).map((p) => `<th scope="col"${p.featured ? ' class="feat"' : ''}>${esc(p.name)}</th>`).join('')}</tr></thead>
+      <tbody>${S.compare.map(([k, ...v]) => `<tr><th scope="row">${esc(k)}</th>${v.map(cell).join('')}</tr>`).join('')}</tbody>`;
+  }
 
   // Şirket / iletişim bilgileri (config.js): boşsa ilgili satır gizlenir; yasal sayfalarda [köşeli] yer tutucu kalır
   $$('[data-show]').forEach((el) => { if (!get(el.dataset.show)) el.hidden = true; });
@@ -73,8 +86,15 @@
     if (!v) { if (el.dataset.ph) el.innerHTML = `<span class="ph">[${esc(el.dataset.ph)}]</span>`; return; }
     if (el.dataset.href === 'tel') { el.href = 'tel:' + String(v).replace(/[^\d+]/g, ''); el.textContent = v; }
     else if (el.dataset.href === 'mailto') { el.href = 'mailto:' + v; el.textContent = v; }
-    else if (el.dataset.href === 'wa') { el.href = 'https://wa.me/' + String(v).replace(/\D/g, ''); el.target = '_blank'; el.rel = 'noopener'; }
+    else if (el.dataset.href === 'wa') { el.href = waUrl(v); el.target = '_blank'; el.rel = 'noopener'; }
     else el.textContent = v;
+  });
+  // İletişim kartları (bağlantı tüm kart)
+  $$('[data-c-href]').forEach((el) => {
+    const v = get(el.dataset.cHref); if (!v) return;
+    const k = el.dataset.kind;
+    el.href = k === 'tel' ? 'tel:' + String(v).replace(/[^\d+]/g, '') : k === 'mailto' ? 'mailto:' + v : waUrl(v);
+    if (k === 'wa') { el.target = '_blank'; el.rel = 'noopener'; }
   });
   if (S.panelUrl) $$('[data-panel]').forEach((a) => { a.href = S.panelUrl; });
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
@@ -90,12 +110,22 @@
   const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('seen'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' }) : null;
   $$('.reveal').forEach((el) => (io ? io.observe(el) : el.classList.add('seen')));
 
-  // Demo talep formu → panel (Destek'e "Web sitesi" olarak düşer)
-  const form = $('[data-lead]');
-  if (form) form.addEventListener('submit', async (e) => {
+  // İletişim sayfası: adresle gelen konu (?konu=teklif&paket=Profesyonel, ?konu=arama, ?konu=kanal)
+  const q = new URLSearchParams(location.search), topicSel = $('[data-topic]');
+  if (topicSel && q.get('konu') && [...topicSel.options].some((o) => o.value === q.get('konu'))) {
+    topicSel.value = q.get('konu');
+    const m = $('[name=message]');
+    if (m && !m.value) m.value = { arama: 'Lütfen beni arayın.', kanal: 'Entegrasyonunu istediğim kanal: ', teklif: q.get('paket') ? `${q.get('paket')} paketi için teklif ve deneme hesabı istiyorum.` : '' }[q.get('konu')] || '';
+  }
+
+  // Formlar → panel (Destek'e "Web sitesi" olarak düşer); demo formu dönen bağlantıyla demo panelini açar
+  $$('[data-lead]').forEach((form) => form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const msg = $('[data-msg]', form), btn = $('button[type=submit]', form), f = new FormData(form);
-    const body = { name: f.get('name'), company: f.get('company'), phone: f.get('phone'), email: f.get('email'), message: f.get('message'), website: f.get('website'), channels: f.getAll('channels'), consent: !!f.get('consent') };
+    const raw = String(f.get('topic') || 'demo');
+    const body = { name: f.get('name'), company: f.get('company'), phone: f.get('phone'), email: f.get('email'), message: f.get('message') || '', website: f.get('website'), channels: f.getAll('channels'), consent: !!f.get('consent'),
+      topic: ['demo', 'teklif'].includes(raw) ? raw : 'iletisim', plan: q.get('paket') || '' };
+    if (raw === 'arama' && !/arayın/i.test(body.message)) body.message = 'Lütfen beni arayın. ' + body.message;
     const say = (cls, t) => { msg.className = 'form-msg ' + cls; msg.textContent = t; };
     if (String(body.name || '').trim().length < 2) return say('err', 'Lütfen adınızı yazın.');
     if (!String(body.phone || '').trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email || ''))) return say('err', 'Size ulaşabilmemiz için telefon ya da e-posta yazın.');
@@ -105,9 +135,18 @@
       const r = await fetch(S.leadUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || 'Gönderilemedi');
-      form.reset(); say('ok', 'Teşekkürler! Talebiniz bize ulaştı, en kısa sürede dönüş yapacağız.');
+      const ok = $('[data-demo-ok]', form);
+      if (ok && j.demo) {
+        $('[data-demo-link]', ok).href = j.demo;
+        $$(':scope > :not([data-demo-ok])', form).forEach((x) => { x.hidden = true; });
+        ok.hidden = false; form.classList.add('done');
+        return;
+      }
+      form.reset(); if (topicSel) topicSel.value = raw;
+      say('ok', 'Teşekkürler! Mesajınız bize ulaştı, en kısa sürede dönüş yapacağız.');
+      if (raw === 'demo' && j.demo) msg.insertAdjacentHTML('beforeend', ` <a href="${esc(j.demo)}" target="_blank" rel="noopener">Demo panelini şimdi açın →</a>`);
     } catch (x) {
       say('err', `${x.message || 'Gönderilemedi'}.${get('company.phone') ? ` Dilerseniz ${get('company.phone')} numarasından ulaşabilirsiniz.` : ''}`);
     } finally { btn.disabled = false; }
-  });
+  }));
 })();

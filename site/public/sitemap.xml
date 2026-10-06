@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://hasturkcrm.com/</loc></url>
-  <url><loc>https://hasturkcrm.com/kvkk.html</loc></url>
-  <url><loc>https://hasturkcrm.com/gizlilik.html</loc></url>
-  <url><loc>https://hasturkcrm.com/kullanim-kosullari.html</loc></url>
+  <url><loc>https://hasturkcrm.com/demo</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/entegrasyonlar</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/gizlilik</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/hakkimizda</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/iletisim</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/kullanim-kosullari</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/kvkk</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/ozellikler</loc><lastmod>2026-10-06</lastmod></url>
+  <url><loc>https://hasturkcrm.com/paketler</loc><lastmod>2026-10-06</lastmod></url>
 </urlset>

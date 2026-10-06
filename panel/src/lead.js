@@ -1,7 +1,9 @@
 // Tanıtım sitesinden demo / teklif talebi: oturumsuz, yalnız izin verilen site adreslerinden (SITE_ORIGINS) kabul edilir.
 // Talep ana panelin Destek sayfasına "Web sitesi" firmasıyla düşer ve ana panele bildirim gider. IP başına saatte 5 talep;
-// gizli "website" alanı (bot tuzağı) doluysa sessizce yok sayılır.
+// gizli "website" alanı (bot tuzağı) doluysa sessizce yok sayılır. Yanıtta demo paneline giriş bağlantısı döner (14 gün geçerli).
 import { first, run, init, notify } from './db.js';
+import { demoToken, checkDemoToken } from './auth.js';
+import { demoLogin } from './tenants.js';
 import { notify as pushNotify } from './push.js';
 import { json, str } from './util.js';
 
@@ -31,12 +33,34 @@ export async function leadRequest(req, env) {
   const row = await first(db, `INSERT INTO settings (k, v) VALUES (?, json_object('n', 1, 'at', ?)) ON CONFLICT (k) DO UPDATE SET
       v = CASE WHEN json_extract(settings.v, '$.at') < ? THEN json_object('n', 1, 'at', ?) ELSE json_set(settings.v, '$.n', json_extract(settings.v, '$.n') + 1) END RETURNING v`, k, now, now - 3600e3, now);
   if ((JSON.parse(row.v).n || 0) > 5) return json({ error: 'Çok fazla talep gönderildi; lütfen daha sonra tekrar deneyin ya da telefonla ulaşın' }, 429, h);
-  const subject = `Demo talebi: ${company || name}`.slice(0, 140);
-  const body = [`Ad soyad: ${name}`, company && `Firma: ${company}`, phone && `Telefon: ${phone}`, email && `E-posta: ${email}`, channels.length && `Satış kanalları: ${channels.join(', ')}`, message && `\nMesaj:\n${message}`, `\nKVKK aydınlatma metni onaylandı · ${new Date(now).toISOString()}`].filter(Boolean).join('\n');
+  // Konu: demo (varsayılan), teklif (paketler sayfası), iletişim (genel soru)
+  const topic = { teklif: 'Teklif talebi', iletisim: 'İletişim' }[str(b.topic)] || 'Demo talebi', plan = str(b.plan).trim().slice(0, 60);
+  const subject = `${topic}: ${company || name}`.slice(0, 140);
+  const body = [`Ad soyad: ${name}`, company && `Firma: ${company}`, phone && `Telefon: ${phone}`, email && `E-posta: ${email}`, channels.length && `Satış kanalları: ${channels.join(', ')}`, plan && `İlgilendiği paket: ${plan}`, message && `\nMesaj:\n${message}`, `\nKVKK aydınlatma metni onaylandı · ${new Date(now).toISOString()}`].filter(Boolean).join('\n');
   const t = await first(db, `INSERT INTO support_tickets (slug, firm, user_name, subject, category, status, page, context, created_at, updated_at, unread_admin, unread_user)
     VALUES ('', 'Web sitesi', ?, ?, 'request', 'open', 'web-sitesi', ?, ?, ?, 1, 0) RETURNING id`, name, subject, JSON.stringify({ ip, origin, browser: (req.headers.get('User-Agent') || '').slice(0, 200) }), now, now);
   await run(db, 'INSERT INTO support_messages (ticket_id, author, admin, body, created_at) VALUES (?, ?, 0, ?, ?)', t.id, name, body, now);
   await notify(db, `support:${t.id}`, { level: 'warn', title: `Web sitesi: ${subject}`, msg: body.slice(0, 300) }).catch(() => {});
   await pushNotify(db, { title: 'Yeni demo talebi', body: subject, url: `#/destek/${t.id}` }).catch(() => {});
-  return json({ ok: true }, 200, h);
+  return json({ ok: true, demo: await demoUrl(req, env) }, 200, h);
+}
+
+// Demo paneli bağlantısı (müşteri panelleri kuruluysa: Durable Object bağlantısı ve gizli anahtar)
+export async function demoUrl(req, env) {
+  if (!env.TENANT || !(env.PANEL_SECRET || env.PANEL_PASSWORD)) return null;
+  return `${new URL(req.url).origin}/api/public/demo?t=${encodeURIComponent(await demoToken(env))}`;
+}
+const page = (title, body, extra = {}) => new Response(`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${extra.refresh ? '<meta http-equiv="refresh" content="0;url=/">' : ''}<title>${title}</title>
+<body style="font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0;color:#0d1b34;background:#f5f8fe"><div style="max-width:440px;padding:24px;text-align:center"><h1 style="font-size:22px">${title}</h1><p style="color:#4a5872">${body}</p></div></body></html>`,
+  { status: extra.status || 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', ...(extra.cookie ? { 'Set-Cookie': extra.cookie } : {}) } });
+// Demo paneline giriş: imzalı bağlantı doğrulanır, demo personel oturumu açılır ve panele geçilir (aynı adresten yönlendirme,
+// böylece SameSite=Strict çerez ilk açılışta da gönderilir)
+export async function demoRequest(req, env) {
+  const url = new URL(req.url), site = (siteOrigins(env)[0] || '').replace(/[<>"]/g, '');
+  const back = site ? ` <a href="${site}/demo">Yeni bağlantı alın</a>.` : '';
+  if (req.method !== 'GET') return json({ error: 'Yalnız GET' }, 405);
+  if (!(await checkDemoToken(env, url.searchParams.get('t')))) return page('Demo bağlantısı geçersiz', 'Bağlantının süresi dolmuş ya da eksik kopyalanmış olabilir.' + back, { status: 403 });
+  let cookie;
+  try { cookie = await demoLogin(env, url.protocol === 'https:'); } catch (e) { return page('Demo paneli açılamadı', String(e.message || 'Lütfen biraz sonra tekrar deneyin.').replace(/[<>]/g, ''), { status: e.status || 500 }); }
+  return page('Demo paneli açılıyor…', 'Örnek verilerle çalışan panele yönlendiriliyorsunuz. <a href="/">Açılmazsa tıklayın</a>.', { refresh: true, cookie });
 }
