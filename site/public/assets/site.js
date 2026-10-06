@@ -17,8 +17,9 @@
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   const logos = $('[data-logos]');
-  if (logos) logos.innerHTML = ACTIVE.map((x) => `<a class="wm" href="#entegrasyonlar" style="${x[4]}" title="${esc(x[0])}">${esc(wordmark(x[0]))}</a>`).join('')
-    + `<a class="wm more" href="#entegrasyonlar">ve yakında daha fazlası<svg><use href="#i-arrow"/></svg></a>`;
+  // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
+  const wms = (dup) => ACTIVE.map((x) => `<a class="wm${dup ? ' dup' : ''}" href="#entegrasyonlar" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</a>`).join('');
+  if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
   $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.length; });
   const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}</small></div></div>`).join('');
   const ia = $('[data-integ="active"]'), is = $('[data-integ="soon"]');
