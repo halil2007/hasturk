@@ -37,7 +37,7 @@ const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d
 const LABEL_REMOTE = ['ikas', 'trendyol', 'hepsiburada'];
 const bbIds = () => CHANNEL_IDS.filter((c) => BUYBOX_CHANNELS.includes(typeOf(c)));
 const remoteLabel = (col) => `(${col} IN ('ikas1', 'ikas2', ${LABEL_REMOTE.slice(1).map((x) => `'${x}'`).join(', ')}) OR ${LABEL_REMOTE.map((x) => `${col} LIKE '${x}\\_%' ESCAPE '\\'`).join(' OR ')})`;
-const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, tracking, barcode, agreement, tracking_url, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
+const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, cargo_applied, tracking, barcode, agreement, tracking_url, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
 
 // ---------- siparişler ----------
 async function loadOrder(db, id) {
@@ -165,10 +165,38 @@ async function ensurePackages(db, ch, o) {
   if (ch && ch.caps.split === 'remote' && ch.split) {
     const r = await ch.split(o, [{ items, desi: orderDesi(o) }]);
     await insertPackages(db, o.id, r.packages);
+    // Hepsiburada: paket oluşunca önceden seçilen / kanalın varsayılan kargo firması uygulanır
+    const fresh = await loadOrder(db, o.id);
+    for (const p of fresh.packages) await applyCargo(db, ch, fresh, p);
   } else {
     await insertPackages(db, o.id, [{ items, desi: orderDesi(o) }]);
   }
   return loadOrder(db, o.id);
+}
+// Kargo firması tercihi: paketin kendi seçimi → siparişte paketlemeden önce seçilen → kanalın varsayılanı (Ayarlar'dan değil, kargo seçim penceresinden)
+const parseJ = (v) => { try { return JSON.parse(v || 'null'); } catch { return null; } };
+async function wantedCargo(db, o, p) {
+  if (p && p.cargo_code) return { id: p.cargo_code, name: p.cargo_company || p.cargo_code, explicit: true };
+  const pick = parseJ(o.cargo_pick);
+  if (pick && pick.id) return { ...pick, explicit: true };
+  const def = ((await getRaw(db, 'cargo_default')) || {})[o.channel];
+  return def && def.id ? def : null;
+}
+const sameFirm = (a, b) => { const k = (x) => String(x || '').toLocaleLowerCase('tr').replace(/kargo|lojistik|express|marketplace|\s|\./g, ''); return !!a && !!b && (k(a).includes(k(b)) || k(b).includes(k(a))); };
+// Paket kanalda oluştuktan sonra tercih edilen firmaya çevir (zaten o firmadaysa dokunulmaz). Hata paketi durdurmaz; etikette firma seçimi sunulur.
+async function applyCargo(db, ch, o, p) {
+  if (!ch || ch.caps.cargo !== 'change' || !ch.changeCargo || !p.remote_id || p.status !== 'open') return;
+  const want = await wantedCargo(db, o, p);
+  if (!want || p.cargo_applied === want.id || (!want.explicit && sameFirm(want.name, p.cargo_company))) return;
+  try {
+    const r = await ch.changeCargo(o, p, want);
+    await updPkg(db, p.id, { ...r, cargoCompany: r.cargoCompany || want.name });
+    await run(db, 'UPDATE packages SET cargo_code = ?, cargo_applied = ? WHERE id = ?', want.id, want.id, p.id);
+    if (r.resetLabel) await clearLabel(db, p.id);
+  } catch (e) {
+    // Varsayılan firma uygulanamadıysa (ör. paket zaten o firmada) sessiz geçilir; elle seçimde hata pakette görünür
+    if (want.explicit) await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `Kargo firması ${want.name} yapılamadı: ${e.message}`.slice(0, 500), p.id);
+  }
 }
 const orderDesi = (o) => Math.max(1, o.items.reduce((s, i) => s + (i.desi || 1) * i.quantity, 0));
 
@@ -207,10 +235,10 @@ async function packOrder(db, ch, o, { only, invoice } = {}) {
         await updPkg(db, p.id, r.packages[0]);
         if (r.packages[0] && r.packages[0].error) { errors.push(r.packages[0].error); continue; }
       }
-      // Hepsiburada: paketlendikten sonra seçilen kargo firması uygulanır
-      if (p.cargo_code && ch && ch.caps.cargo === 'change' && ch.changeCargo) {
+      // Paketlendikten sonra seçilen (ya da kanalın varsayılan) kargo firması uygulanır (Trendyol, Hepsiburada)
+      if (ch && ch.caps.cargo === 'change' && ch.changeCargo) {
         const fresh = await first(db, `SELECT ${PKG_COLS} FROM packages WHERE id = ?`, p.id);
-        if (fresh.remote_id) await updPkg(db, p.id, await ch.changeCargo(o, { ...fresh, items: parse(fresh.items, []) }, { id: p.cargo_code, name: p.cargo_company }));
+        if (fresh.remote_id) await applyCargo(db, ch, o, { ...fresh, items: parse(fresh.items, []) });
       }
       await run(db, 'UPDATE packages SET packed_at = ? WHERE id = ?', Date.now(), p.id);
     } catch (e) {
@@ -275,20 +303,33 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     return { ok: true, message: `${groups.length} paket oluşturuldu` };
   }
   if (action === 'cargo') {
-    // Kargo firması seç / değiştir (seçenekler kanaldan gelir)
-    const pkg = pkgOf(b.package_id), cargo = b.cargo && { id: str(b.cargo.id), name: str(b.cargo.name) };
+    // Kargo firması seç / değiştir (seçenekler kanaldan gelir). İsteğe bağlı: bu kanalda varsayılan yap
+    const cargo = b.cargo && { id: str(b.cargo.id), name: str(b.cargo.name) };
     if (!cargo || !cargo.name) fail(400, 'Kargo firması seçin');
+    if (b.make_default) {
+      const all_ = (await getRaw(db, 'cargo_default')) || {};
+      all_[o.channel] = { id: cargo.id, name: cargo.name };
+      await setSetting(db, 'cargo_default', all_);
+    }
+    // Paket henüz yok (Hepsiburada'da paket kanalda oluşur): seçim siparişte saklanır, paketlenince uygulanır
+    if (!b.package_id) {
+      if (!ch || !ch.enabled || !ch.cargoOptions) fail(400, `${ch ? ch.name : 'Bu kanal'} kargo firması seçimini API ile desteklemiyor`);
+      await run(db, 'UPDATE orders SET cargo_pick = ? WHERE id = ?', JSON.stringify(cargo), o.id);
+      await event(db, o, 'cargo', user, cargo.name);
+      return { ok: true, message: `Kargo firması: ${cargo.name} (paketlerken uygulanacak)${b.make_default ? ' · bu kanalda varsayılan yapıldı' : ''}` };
+    }
+    const pkg = pkgOf(b.package_id);
     if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paketin kargo firması değiştirilemez');
     if (!ch || !ch.enabled || !ch.cargoOptions) fail(400, `${ch ? ch.name : 'Bu kanal'} kargo firması seçimini API ile desteklemiyor`);
     // Henüz paketlenmemiş: seçim kaydedilir, paketlerken uygulanır
     if (!pkg.packed_at || (ch.caps.cargo === 'change' && !pkg.remote_id)) {
       await run(db, 'UPDATE packages SET cargo_code = ?, cargo_company = ? WHERE id = ?', cargo.id, cargo.id ? cargo.name : '', pkg.id);
       await event(db, o, 'cargo', user, cargo.name);
-      return { ok: true, message: `Kargo firması: ${cargo.name} (paketlerken uygulanacak)` };
+      return { ok: true, message: `Kargo firması: ${cargo.name} (paketlerken uygulanacak)${b.make_default ? ' · bu kanalda varsayılan yapıldı' : ''}` };
     }
     const r = await ch.changeCargo(o, pkg, cargo);
     await updPkg(db, pkg.id, { ...r, cargoCompany: r.cargoCompany || cargo.name });
-    await run(db, 'UPDATE packages SET cargo_code = ?, packed_at = COALESCE(packed_at, ?) WHERE id = ?', cargo.id, Date.now(), pkg.id);
+    await run(db, 'UPDATE packages SET cargo_code = ?, cargo_applied = ?, packed_at = COALESCE(packed_at, ?) WHERE id = ?', cargo.id, cargo.id, Date.now(), pkg.id);
     // Kargo değişince eski etiket geçersizdir; ikas'ta paket yeniden oluştuğu için eski barkod da silinir
     if (r.resetLabel || r.remoteId !== pkg.remote_id) {
       await clearLabel(db, pkg.id);
@@ -1042,9 +1083,20 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const o = await loadOrder(db, decodeURIComponent(x[1]));
     const ch = await channel(env, db, o.channel);
     const pkg = o.packages.find((p) => p.id === Number(q.package_id)) || null;
-    if (!ch || !ch.enabled || !ch.cargoOptions) return json({ options: [], note: `${ch ? ch.name : 'Bu kanal'} kargo firması seçimini API ile desteklemiyor` });
-    if (ch.caps.cargo === 'change' && ch.type === 'hepsiburada' && (!pkg || !pkg.remote_id)) return json({ options: [], note: 'Hepsiburada kargo firması, paket oluşturulduktan sonra değiştirilebilir. Önce "Paketle".' });
-    try { return json({ options: await ch.cargoOptions(o, pkg), current: pkg && pkg.cargo_company, code: pkg && pkg.cargo_code, mode: ch.caps.cargo }); } catch (e) { return json({ options: [], note: e.message }); }
+    if (!ch || !ch.enabled || !ch.cargoOptions) return json({ options: [], note: `${ch ? ch.name : 'Bu kanal'} kargo firması seçimini API ile desteklemiyor (firma kanalın kendi panelindeki ayardan gelir)` });
+    const def = ((await getRaw(db, 'cargo_default')) || {})[o.channel] || null, pick = parseJ(o.cargo_pick);
+    const extra = { default: def, pick, mode: ch.caps.cargo, current: pkg && pkg.cargo_company, code: (pkg && pkg.cargo_code) || (pick && pick.id) || '' };
+    // Hepsiburada: firma listesi pakete göre gelir; paket oluşmadan önce son alınan liste gösterilir, seçim paketlerken uygulanır
+    if (ch.type === 'hepsiburada' && (!pkg || !pkg.remote_id)) {
+      const cached = (await getRaw(db, 'cargo_list:' + ch.id)) || [];
+      return json({ ...extra, options: cached.map((c) => ({ ...c, current: false })), before: true,
+        note: cached.length ? '' : 'Hepsiburada kargo firması listesini paket üzerinden verir. “Paketle ve etiket al”a basın; etiket alınamazsa firma listesi açılır, seçtiğiniz firma Hepsiburada\'da uygulanır ve etiket yeniden istenir.' });
+    }
+    try {
+      const options = await ch.cargoOptions(o, pkg);
+      if (ch.type === 'hepsiburada' && options.length) await setSetting(db, 'cargo_list:' + ch.id, options.map((c) => ({ id: c.id, name: c.name })));
+      return json({ ...extra, options });
+    } catch (e) { return json({ ...extra, options: [], note: e.message }); }
   }
   if ((x = path.match(/^orders\/([^/]+)\/([a-z-]+)$/)) && m === 'POST') {
     const b = await body(req);

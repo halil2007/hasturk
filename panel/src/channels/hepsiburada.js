@@ -275,47 +275,69 @@ export function hepsiburada(env, meta) {
     return { packages, message: `${packages.length} paket Hepsiburada'da oluşturuldu.` };
   }
 
+  // Ortak barkod (Hepsiburada anlaşmalı kargo etiketi): GET .../packages/merchantid/{m}/packagenumber/{paket}/labels
+  // Yalnız Hepsiburada'nın ortak barkod verdiği firmalarda (ör. HepsiJET, Aras) gelir; paketin firması başka ise etiket verilmez ve
+  // kargo firması değiştirilince (changecargocompany) aynı servis etiketi verir. Her hata durumunda firma seçimi önerilir.
   async function label(order, pkg) {
     if (!pkg.remote_id) return { pending: 'Önce paketleyin (Hepsiburada paketi oluşmalı)' };
     let lab;
     try { lab = await labelFile(pkg); } catch (e) {
-      // "Cargo company does not provide mutual barcodes": paketin kargo firması Hepsiburada'nın ortak barkod (Hepsiburada anlaşmalı
-      // gönderi etiketi) verdiği firmalardan değil. Etiket yalnız Hepsiburada'dan alınır; kargo firması ortak barkodlu bir firmaya
-      // (changablecargocompanies listesinden) çevrilince aynı servis etiketi verir. Paketin Hepsiburada'daki firması gösterilir.
-      if (/mutual barcode/i.test(e.message)) {
-        let info = null;
-        try { info = await call(pkgUrl(pkg)); } catch { /* bilgi alınamadı */ }
-        const firm = str(g(info, 'cargoCompany')) || str(pkg.cargo_company);
-        return {
-          pending: `Hepsiburada bu paket için ortak barkod (Hepsiburada anlaşmalı kargo etiketi) vermiyor: paketin Hepsiburada'daki kargo firması${firm ? ` “${firm}”` : ''} ortak barkod verilen firmalardan değil. `
-            + `Hepsiburada anlaşmasıyla gönderimde etiket ve barkod Trendyol'daki gibi Hepsiburada'dan gelir; bunun için “Kargo firmasını değiştir”den Hepsiburada'nın sunduğu anlaşmalı bir firmayı (ör. HepsiJet) seçin, etiket hemen yeniden istenir.`
-            + `${test ? ' Test (SIT) siparişlerinde firma, test siparişi oluşturulurken gönderilen CargoCompanyId ile belirlenir.' : ''}`,
-          changeCargo: true, cargoCompany: firm || undefined,
-        };
-      }
-      throw e;
+      let info = null;
+      try { info = await call(pkgUrl(pkg)); } catch { /* bilgi alınamadı */ }
+      const firm = str(g(info, 'cargoCompany', 'cargoCompanyName')) || str(pkg.cargo_company);
+      const mutual = /mutual barcode|ortak barkod|common barcode/i.test(e.message);
+      return {
+        pending: mutual
+          ? `Hepsiburada bu paket için ortak barkod vermiyor: paketin kargo firması${firm ? ` “${firm}”` : ''} Hepsiburada'nın ortak barkod verdiği firmalardan değil. `
+            + 'Aşağıdan Hepsiburada anlaşmalı bir firma (ör. HepsiJET, Aras) seçin; firma Hepsiburada\'da değiştirilir ve etiket hemen yeniden istenir.'
+          : `Hepsiburada etiketi alınamadı: ${e.message}${firm ? ` (paketin kargo firması: ${firm})` : ''}. Kargo firmasını değiştirip yeniden deneyebilirsiniz.`,
+        changeCargo: true, cargoCompany: firm || undefined,
+      };
     }
-    return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.' };
+    return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.', changeCargo: true };
   }
+  // Etiket dosyası: önce ZPL, olmazsa biçim parametresiz / PDF denenir (Hepsiburada yanıtı düz ZPL, PDF ya da JSON içinde ZPL / base64 olabilir)
   async function labelFile(pkg) {
-    const res = await hb(`${OMS}/packages/merchantId/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels?format=ZPL`, { headers: headers(false), raw: true });
+    const base = `${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels`;
+    let lastErr = null;
+    for (const q of ['?format=ZPL', '', '?format=PDF']) {
+      let res;
+      try { res = await hb(base + q, { headers: headers(false), raw: true, tries: 1 }); } catch (e) {
+        lastErr = e;
+        // Ortak barkod hatası biçimden bağımsızdır: diğer biçimleri denemeden döner
+        const st = e.status || Number((/HTTP (\d{3})/.exec(e.message) || [])[1]);
+        if (/mutual barcode|ortak barkod|common barcode/i.test(e.message) || ![400, 404, 415, 422].includes(st)) throw e;
+        continue;
+      }
+      const lab = await parseLabel(res, pkg);
+      if (lab) return lab;
+    }
+    if (lastErr) throw lastErr;
+    return null;
+  }
+  async function parseLabel(res, pkg) {
     const type = res.headers.get('content-type') || '';
-    if (/pdf/i.test(type)) {
+    if (/pdf|octet-stream/i.test(type)) {
       const buf = new Uint8Array(await res.arrayBuffer());
+      if (!buf.length) return null;
       let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      if (/\^XA/.test(s.slice(0, 2000))) return { format: 'zpl', data: s, filename: `hepsiburada-${pkg.remote_id}.zpl` };
       return { format: 'pdf', data: btoa(s), filename: `hepsiburada-${pkg.remote_id}.pdf` };
     }
     const text = await res.text();
     let data = text;
     try {
       const j = JSON.parse(text);
-      const pick = (o) => (typeof o === 'string' ? o : o && (o.zpl || o.label || o.data || o.content || (Array.isArray(o) ? o.map(pick).join('\n') : '')));
-      data = pick(Array.isArray(j) ? j : j.data || j);
+      const pick = (o) => (typeof o === 'string' ? o : Array.isArray(o) ? o.map(pick).filter(Boolean).join('\n')
+        : o && (pick(g(o, 'zpl', 'zplData', 'label', 'labelData', 'data', 'content', 'pdf', 'barcodeLabel', 'labels', 'items')) || ''));
+      data = pick(j);
     } catch { /* düz ZPL */ }
+    data = String(data || '').trim();
     if (!data) return null;
     if (!/\^XA/.test(data) && /^[A-Za-z0-9+/=\s]+$/.test(data)) {
       try { const dec = atob(data.replace(/\s/g, '')); if (/\^XA/.test(dec)) data = dec; else if (dec.startsWith('%PDF')) return { format: 'pdf', data: data.replace(/\s/g, ''), filename: `hepsiburada-${pkg.remote_id}.pdf` }; } catch { /* olduğu gibi */ }
     }
+    if (!/\^XA/.test(data)) return null;
     return { format: 'zpl', data, filename: `hepsiburada-${pkg.remote_id}.zpl` };
   }
 

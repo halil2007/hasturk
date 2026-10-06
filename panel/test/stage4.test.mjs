@@ -305,3 +305,38 @@ test('barkod / stok kodu yazım farkı tolere edilir; aynı ürün grubundaki ka
   assert.deepEqual([(await pid(db, 't10')).product_id, (await pid(db, 't10')).match], [i10.product_id, 'group'], 'aynı ana üründeki 10 Kg kardeşi bulunur (10000 gr = 10 Kg)');
   assert.deepEqual([(await pid(db, 'h20')).product_id, (await pid(db, 'h20')).match], [i20.product_id, 'sku'], 'stok kodu yazım farkı yok sayılır');
 });
+
+test('kargo firması: paketlemeden önce seçilir, paketlenince uygulanır; kanal varsayılanı sonraki siparişlerde kendiliğinden', async () => {
+  const { default: worker } = await import('../src/index.js');
+  const { saveOrders } = await import('../src/sync.js');
+  const db = await db0();
+  const env = { DEMO: '1', PANEL_PASSWORD: 'pw-12345678', DB: db };
+  let cookie = '';
+  const call = async (path, method = 'GET', body) => {
+    const r = await worker.fetch(new Request('https://p.test/api/' + path, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: body && JSON.stringify(body) }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r.json();
+  };
+  await call('login', 'POST', { password: 'pw-12345678' });
+  const mk = (no) => ({ remoteId: no, orderNumber: no, orderedAt: Date.now() - 3600e3, status: 'new', remoteStatus: 'CREATED', customer: 'Ali', address: {}, total: 10, items: [{ lineId: 'l1', sku: 'A', name: 'A', quantity: 1, unitPrice: 10, total: 10 }] });
+  await saveOrders(db, 'trendyol', [mk('K1'), mk('K2')]);
+  const id1 = encodeURIComponent('trendyol:K1'), id2 = encodeURIComponent('trendyol:K2');
+  // Paket yokken seçenekler gelir; seçim siparişte saklanır ve varsayılan yapılır
+  const opts = await call(`orders/${id1}/cargo-options`);
+  assert.ok(opts.options.length > 2);
+  const pickR = await call(`orders/${id1}/cargo`, 'POST', { cargo: opts.options[2], make_default: true });
+  assert.match(pickR.message, /paketlerken uygulanacak/);
+  let d = await call(`orders/${id1}`);
+  assert.equal(JSON.parse(d.order.cargo_pick).name, opts.options[2].name);
+  // Paketle + etiket: paket oluşur, seçilen firma uygulanır
+  await call(`orders/${id1}/label`, 'POST', {});
+  d = await call(`orders/${id1}`);
+  assert.equal(d.order.packages[0].cargo_company, opts.options[2].name);
+  assert.equal(d.order.packages[0].cargo_applied, opts.options[2].id);
+  // İkinci sipariş: seçim yapılmadan kanal varsayılanı uygulanır
+  await call(`orders/${id2}/label`, 'POST', {});
+  d = await call(`orders/${id2}`);
+  assert.equal(d.order.packages[0].cargo_company, opts.options[2].name);
+  const o2 = await call(`orders/${id2}/cargo-options?package_id=${d.order.packages[0].id}`);
+  assert.equal(o2.default.name, opts.options[2].name);
+});
