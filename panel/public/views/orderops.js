@@ -105,12 +105,38 @@ export async function outputLabel(r, { win, ask = true, done } = {}) {
     if (win) win.location = url; else window.open(url, '_blank') || downloadFile(off.filename, off.data, 'application/pdf');
   } else {
     if (win) win.close();
-    if (off && off.format === 'zpl') { downloadFile(off.filename, off.data, 'text/plain'); toast('ZPL etiket indirildi (termal yazıcı). Normal yazıcı için Ayarlar → "ZPL etiketini PDF\'e çevir".'); }
+    if (off && off.format === 'zpl') await zplChoice(order, pkg, off);
     else if (off) await printImages([off]);
     else await printLabels([{ order, pkg }], r.sender || (state.settings && state.settings.sender));
   }
   await mark(order.id, [pkg.id], 'viewed');
   if (ask) askPrinted([{ orderId: order.id, pkgId: pkg.id }], done);
+}
+
+// ZPL (termal yazıcı) etiketi: normal yazıcı için PDF'e çevrilir ya da ZPL dosyası indirilir. "Hep PDF" seçilirse Ayarlar'daki
+// "ZPL etiketini PDF'e çevir" açılır (çeviri Labelary servisiyle yapılır; etiket içeriği bu servise gider).
+function zplChoice(order, pkg, off) {
+  return new Promise((resolve) => {
+    const s = sheet({ title: 'Etiket hazır · nasıl yazdıracaksınız?', size: 'narrow', onClose: resolve, body: html`<div class="stack">
+      <div class="small">${ch(order.channel).name} etiketi <b>termal yazıcı (ZPL)</b> biçiminde geldi.</div>
+      <button class="btn primary lg" data-pdf><i class="ico ico-print"></i>PDF olarak aç (normal yazıcı)</button>
+      <button class="btn" data-zpl><i class="ico ico-download"></i>ZPL dosyasını indir (termal yazıcı)</button>
+      <label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" data-always><span class="small">Bundan sonra etiketleri hep PDF olarak ver</span></label>
+      <div class="tiny muted">PDF'e çevirme Labelary servisiyle yapılır; etiket içeriği (alıcı adı / adresi) bu servise gönderilir.</div>
+    </div>` });
+    $('[data-zpl]', s.el).onclick = () => { downloadFile(off.filename, off.data, 'text/plain'); toast('ZPL etiket indirildi'); s.close(); };
+    $('[data-pdf]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
+      const always = $('[data-always]', s.el).checked;
+      const w = window.open('', '_blank');
+      try {
+        const r = await api(`orders/${encodeURIComponent(order.id)}/label-pdf`, { method: 'POST', body: { package_id: pkg.id, always } });
+        const url = URL.createObjectURL(new Blob([Uint8Array.from(atob(r.official.data), (c) => c.charCodeAt(0))], { type: 'application/pdf' }));
+        if (w) w.location = url; else downloadFile(r.official.filename, r.official.data, 'application/pdf');
+        if (always && state.settings) state.settings.zpl_pdf = true;
+        s.close();
+      } catch (x) { if (w) w.close(); toast(x.message, true); }
+    });
+  });
 }
 
 /**
@@ -307,6 +333,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       if (open && c.cargo) items.push({ icon: 'truck', label: 'Kargo firmasını değiştir', run: () => cargoDialog(d, pkg, changed) });
       if (hasLabel(pkg, d.order.channel) || pkg.barcode || pkg.tracking) {
         items.push({ icon: 'sync', label: 'Etiketi kanaldan yeniden al', run: () => busy(null, async () => { const r = await getLabel(pkg, { refresh: true }); toast(r.official || r.panel ? 'Etiket yenilendi' : r.error || r.pending || 'Etiket alınamadı', !(r.official || r.panel)); await changed(); }) });
+        if (pkg.has_label && pkg.label_format === 'zpl') items.push({ icon: 'print', label: 'Etiketi PDF olarak aç', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official && r.official.format === 'zpl') await zplChoice(d.order, pkg, r.official); else if (r.official) await outputLabel({ ...r, order: r.order || d.order, package_id: pkg.id }, { ask: false }); }) });
         if (pkg.has_label) items.push({ icon: 'download', label: 'Etiket dosyasını indir', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official) { downloadFile(r.official.filename, r.official.data, r.official.format === 'zpl' ? 'text/plain' : r.official.format === 'pdf' ? 'application/pdf' : 'image/' + r.official.format); await mark(d.order.id, [pkg.id], 'viewed'); } }) });
         items.push(pkg.label_printed_at
           ? { icon: 'x', label: 'Yazdırıldı işaretini kaldır', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'unprinted'); await changed(); }) }

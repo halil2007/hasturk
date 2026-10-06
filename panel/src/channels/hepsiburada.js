@@ -278,10 +278,10 @@ export function hepsiburada(env, meta) {
   // Ortak barkod (Hepsiburada anlaşmalı kargo etiketi): GET .../packages/merchantid/{m}/packagenumber/{paket}/labels
   // Yalnız Hepsiburada'nın ortak barkod verdiği firmalarda (ör. HepsiJET, Aras) gelir; paketin firması başka ise etiket verilmez ve
   // kargo firması değiştirilince (changecargocompany) aynı servis etiketi verir. Her hata durumunda firma seçimi önerilir.
-  async function label(order, pkg) {
+  async function label(order, pkg, { prefer } = {}) {
     if (!pkg.remote_id) return { pending: 'Önce paketleyin (Hepsiburada paketi oluşmalı)' };
     let lab;
-    try { lab = await labelFile(pkg); } catch (e) {
+    try { lab = await labelFile(pkg, prefer); } catch (e) {
       let info = null;
       try { info = await call(pkgUrl(pkg)); } catch { /* bilgi alınamadı */ }
       const firm = str(g(info, 'cargoCompany', 'cargoCompanyName')) || str(pkg.cargo_company);
@@ -296,17 +296,23 @@ export function hepsiburada(env, meta) {
     }
     return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.', changeCargo: true };
   }
-  // Etiket dosyası: önce ZPL, olmazsa biçim parametresiz / PDF denenir (Hepsiburada yanıtı düz ZPL, PDF ya da JSON içinde ZPL / base64 olabilir)
-  async function labelFile(pkg) {
+  // Etiket dosyası: biçim değeri firmaya göre farklı kabul ediliyor (HepsiJET "ZPL" kabul eder; Aras servisi "ZPL"yi tanımayıp
+  // 500 / "Requested value 'ZPL' was not found" döner). Sırayla denenir: ZPL, biçimsiz, Zpl, zpl, PDF, Pdf, pdf.
+  const FORMATS = ['?format=ZPL', '', '?format=Zpl', '?format=zpl', '?format=PDF', '?format=Pdf', '?format=pdf'];
+  const formatErr = (e) => /requested value|was not found|format|1051|enum/i.test(e.message);
+  // prefer 'pdf': normal yazıcı için önce Hepsiburada'nın kendi PDF'i istenir (ZPL'yi dış serviste çevirmeye gerek kalmaz)
+  async function labelFile(pkg, prefer) {
     const base = `${OMS}/packages/merchantid/${m}/packagenumber/${encodeURIComponent(pkg.remote_id)}/labels`;
+    const order = prefer === 'pdf' ? [...FORMATS.filter((q) => /pdf/i.test(q)), ...FORMATS.filter((q) => !/pdf/i.test(q))] : FORMATS;
     let lastErr = null;
-    for (const q of ['?format=ZPL', '', '?format=PDF']) {
+    for (const q of order) {
       let res;
       try { res = await hb(base + q, { headers: headers(false), raw: true, tries: 1 }); } catch (e) {
         lastErr = e;
         // Ortak barkod hatası biçimden bağımsızdır: diğer biçimleri denemeden döner
+        if (/mutual barcode|ortak barkod|common barcode/i.test(e.message)) throw e;
         const st = e.status || Number((/HTTP (\d{3})/.exec(e.message) || [])[1]);
-        if (/mutual barcode|ortak barkod|common barcode/i.test(e.message) || ![400, 404, 415, 422].includes(st)) throw e;
+        if (![400, 404, 415, 422, 500].includes(st) || (st === 500 && !formatErr(e))) throw e;
         continue;
       }
       const lab = await parseLabel(res, pkg);
