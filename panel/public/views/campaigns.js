@@ -1,19 +1,19 @@
-// Kampanyalar: (1) Fırsat etiketleri — Trendyol avantajlı ürün / Hepsiburada flaş indirim eşikleri Excel'den (bkz. promos.js);
+// Kampanyalar: (1) Fiyat önerileri — pazaryerinin rakip (buybox) fiyatlarından birinciliği alma / kâr artırma önerileri (bkz. suggest.js);
 // (2) Hepsiburada satıcı sepet indirimleri (yüzde, TL, X al Y öde) panelden listelenir, oluşturulur ve iptal edilir.
 import { api, html, render, $, $$, n, money0, date, ch, chLogo, actions, busy, toast, sheet, confirmBox, activeChannels } from '../core.js';
-import { promosView } from './promos.js';
+import { suggestView } from './suggest.js';
 
 export const campaignChannels = () => activeChannels().filter((c) => (c.enabled || c.demo) && c.campaigns);
 const KIND = [['percent', 'Sepette % indirim'], ['tl', 'Sepette TL indirim'], ['xy', 'X al Y öde']];
 const dayIn = (d) => { const x = new Date(Date.now() + 3 * 3600e3 + d * 864e5); return x.toISOString().slice(0, 16); };
 
 export async function campaignsView(el) {
-  let tab = 'offers', cur = null;
-  try { tab = sessionStorage.getItem('camp_tab') || 'offers'; } catch { /* yok */ }
+  let tab = 'suggest', cur = null;
+  try { tab = sessionStorage.getItem('camp_tab') === 'basket' ? 'basket' : 'suggest'; } catch { /* yok */ }
   async function show() {
-    render(el, html`<div class="stack"><div class="tabs" data-ctabs>${[['offers', 'Fırsat etiketleri'], ['basket', 'Sepet indirimleri']].map(([k, t]) => html`<button class="tab ${tab === k ? 'on' : ''}" data-t="${k}">${t}</button>`)}</div><div data-pane></div></div>`);
+    render(el, html`<div class="stack"><div class="tabs" data-ctabs>${[['suggest', 'Fiyat önerileri'], ['basket', 'Sepet indirimleri']].map(([k, t]) => html`<button class="tab ${tab === k ? 'on' : ''}" data-t="${k}">${t}</button>`)}</div><div data-pane></div></div>`);
     $$('[data-t]', el).forEach((b) => { b.onclick = () => { tab = b.dataset.t; try { sessionStorage.setItem('camp_tab', tab); } catch { /* yok */ } show(); }; });
-    cur = await (tab === 'basket' ? basketView : promosView)($('[data-pane]', el));
+    cur = await (tab === 'basket' ? basketView : suggestView)($('[data-pane]', el));
   }
   await show();
   return { refresh: () => cur && cur.refresh && cur.refresh() };
@@ -25,7 +25,7 @@ async function basketView(el) {
   const state = (c) => { const t = Date.now(), s = Date.parse(c.startDate), e = Date.parse(c.endDate); return c.status === 3 || c.status === 'Cancelled' ? ['', 'İptal'] : e < t ? ['', 'Bitti'] : s > t ? ['info', 'Başlayacak'] : ['good', 'Aktif']; };
   function draw() {
     render(el, html`<div class="stack">
-      <div class="notice small"><i class="ico ico-tag"></i><div><b>Hepsiburada sepet indirimleri</b> buradan oluşturulup iptal edilir. Trendyol avantajlı ürün ve Hepsiburada flaş indirim fiyatları için <b>Fırsat etiketleri</b> sekmesini kullanın.</div></div>
+      <div class="notice small"><i class="ico ico-tag"></i><div><b>Hepsiburada sepet indirimleri</b> buradan oluşturulup iptal edilir. Rakiplere göre fiyat önerileri için <b>Fiyat önerileri</b> sekmesine bakın.</div></div>
       ${!chs.length ? html`<div class="card empty">Kampanya servisi olan bağlı kanal yok. Hepsiburada bağlanıp bağlantı testi geçince sepet indirimleri buradan yönetilir (Entegrasyonlar).</div>` : html`
       <div class="row wrap">${chs.length > 1 ? html`<div class="ch-tabs" style="flex:1">${chs.map((c) => html`<button class="ch-tab ${chId === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}${c.name}</button>`)}</div>` : html`<span style="flex:1"></span>`}
         <button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Yeni sepet indirimi</button></div>

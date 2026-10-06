@@ -200,9 +200,8 @@ const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS support_messages_t ON support_messages(ticket_id)',
   'CREATE TABLE IF NOT EXISTS support_files (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, message_id INTEGER, name TEXT, type TEXT, size INTEGER, data TEXT, created_at INTEGER)',
   'CREATE INDEX IF NOT EXISTS support_files_t ON support_files(ticket_id)',
-  // Fırsat etiketleri (bkz. promos.js): Trendyol avantajlı ürün eşikleri, Hepsiburada flaş indirim davetleri (Excel'den)
-  `CREATE TABLE IF NOT EXISTS promo_offers (channel TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, remote_id TEXT, product_id INTEGER, barcode TEXT, sku TEXT, name TEXT,
-    current_price REAL, tiers TEXT, starts_at INTEGER, ends_at INTEGER, applied_price REAL, applied_at INTEGER, updated_at INTEGER, PRIMARY KEY (channel, kind, key))`,
+  // Eski Excel fırsat etiketleri tablosu kaldırıldı (yerine buybox fiyat önerileri, bkz. suggest.js)
+  'DROP TABLE IF EXISTS promo_offers',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

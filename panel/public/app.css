@@ -1097,7 +1097,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .vt td.chp .vin { background: color-mix(in srgb, var(--primary-soft) 45%, var(--surface)); }
 .vt td.chp .vin.chg { background: var(--amber-soft); }
 
-/* Fırsat etiketleri: eşik fiyatı düğmesi (kâr oranıyla) */
+/* Fiyat önerileri: önerilen fiyat düğmesi (kâr oranıyla) */
 .tierbtn { display: inline-block; min-width: 92px; text-align: right; padding: 5px 9px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; line-height: 1.25; font: inherit; color: inherit; }
 .tierbtn:hover:not([disabled]) { border-color: var(--primary); background: var(--surface-2); }
 .tierbtn.ok { border-color: color-mix(in srgb, var(--good) 45%, transparent); background: color-mix(in srgb, var(--good) 9%, var(--surface)); }
@@ -1233,7 +1233,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-07a"; }
+:root { --assets: "2026-10-07b"; }
 
 /* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
 .subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }

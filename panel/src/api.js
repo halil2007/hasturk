@@ -2,7 +2,7 @@
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, fieldsFor } from './config.js';
-import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo } from './sync.js';
+import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -22,7 +22,7 @@ import * as chp from './chproducts.js';
 import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
-import { listOffers, importOffers, applyOffers, clearOffers } from './promos.js';
+import { listSuggestions, applySuggestions } from './suggest.js';
 import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
@@ -559,7 +559,7 @@ async function listProducts(db, q) {
     stock: ['p.stock ASC', 'SUM(p.stock) ASC'], stock_desc: ['p.stock DESC', 'SUM(p.stock) DESC'],
     price_desc: ['p.sale_price DESC', 'MAX(p.sale_price) DESC'], price_asc: ['p.sale_price ASC', 'MIN(p.sale_price) ASC'],
     margin_desc: [`${MARGIN} DESC NULLS LAST`, `AVG(${MARGIN}) DESC NULLS LAST`], margin_asc: [`${MARGIN} ASC NULLS LAST`, `AVG(${MARGIN}) ASC NULLS LAST`],
-    new: ['p.created_at DESC', 'MAX(p.created_at) DESC'], sold: [`${SOLD30()} DESC`, `SUM(${SOLD30()}) DESC`],
+    new: ['p.created_at DESC', 'MAX(p.created_at) DESC'], sold: [`${SOLD30()} DESC, (p.stock > 0) DESC`, `SUM(${SOLD30()}) DESC, MAX(p.stock > 0) DESC`],
     // Kaç gün yeter (satış hızına göre); satışı olmayan en sona
     days: [`CASE WHEN ${SOLD30()} > 0 THEN p.stock * 30.0 / ${SOLD30()} ELSE 1e9 END ASC`, `MIN(CASE WHEN ${SOLD30()} > 0 THEN p.stock * 30.0 / ${SOLD30()} ELSE 1e9 END) ASC`],
   };
@@ -1115,15 +1115,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return supportResponse(req, db, path, { slug: '', firm: '', user, staff: true });
   }
   if (path === 'campaigns' || path.startsWith('campaigns/')) return json(await campaignApi(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
-  // Fırsat etiketleri (Excel'den yüklenen avantajlı ürün / flaş indirim eşikleri; bkz. promos.js)
-  if (path === 'promos' && m === 'GET') return json(await listOffers(db, { channel: str(q.channel), kind: str(q.kind) }));
-  if (path === 'promos/import' && m === 'POST') { const b = await body(req); return json(await importOffers(db, { ...b, user: user.name })); }
-  if (path === 'promos/apply' && m === 'POST') {
-    const b = await body(req), r = await applyOffers(db, { ...b, user: user.name });
+  // Fiyat önerileri (buybox servisinden okunan rakip fiyatlarına göre; bkz. suggest.js)
+  if (path === 'suggestions' && m === 'GET') { const bb = bbIds(); return json(await listSuggestions(db, bb.includes(q.channel) ? { channel: q.channel } : { channels: bb })); }
+  if (path === 'suggestions/apply' && m === 'POST') {
+    const b = await body(req), r = await applySuggestions(db, { ...b, channels: bbIds(), user: user.name });
     if (r.applied) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
     return json(r);
   }
-  if (path === 'promos/clear' && m === 'POST') return json(await clearOffers(db, await body(req)));
   // İade talepleri
   if (path === 'claims' && m === 'GET') return json(await listClaims(db, { ...q, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'claims/sync' && m === 'POST') return json(await syncClaims(env, db));
@@ -1135,7 +1133,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
-  if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncInvoices(env, db, { force: true })); }
+  if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); const [invoices, costs] = await Promise.all([syncInvoices(env, db, { force: true }), syncCosts(env, db, null, { force: true }).catch((e) => ({ error: e.message }))]); return json({ invoices, costs }); }
   if (path === 'finance' && m === 'GET') return json(await breakdown(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
 
   // ---------- entegrasyonlar (kanal API bilgileri) ----------

@@ -69,6 +69,21 @@ test('Gelir & gider: komisyon, kargo, stopaj basamakları ve hakediş', async ()
   assert.equal(b.channels[0].channel, 'trendyol');
 });
 
+test('Gelir & gider: sipariş bazında kargo gelmeyen kanalda dönemin kargo faturaları toplamı kullanılır', async () => {
+  const db = d1(); await init(db);
+  const mk = (no) => ({ remoteId: no, orderNumber: no, orderedAt: Date.now() - 864e5, status: 'delivered', customer: 'A', total: 100, items: [{ lineId: '1', sku: 'S', name: 'Ürün', quantity: 1, unitPrice: 100, total: 100, remoteKey: 'S' }] });
+  await saveOrders(db, 'trendyol', [mk('A1'), mk('A2')]);
+  await saveOrders(db, 'hepsiburada', [mk('B1')]);
+  await db.prepare("INSERT INTO invoices (channel, remote_id, no, date, type, description, amount, order_number, url, synced_at) VALUES ('trendyol', 'K1', 'K1', ?, 'Kargo', 'Kargo Fatura', 85.5, '', '', 0)").bind(Date.now() - 2 * 864e5).run();
+  const settings = { commission: {}, shipping: {}, service_fee: {}, fee_rate: {}, withholding: {} };
+  const b = await breakdown(db, settings, {});
+  const ty = b.channels.find((c) => c.channel === 'trendyol'), hb = b.channels.find((c) => c.channel === 'hepsiburada');
+  assert.equal(ty.shipping, 85.5); assert.equal(ty.shippingSrc, 'invoice'); assert.equal(ty.payout, 200 - 85.5);
+  assert.equal(hb.shipping, 0); assert.equal(hb.shippingSrc, 'estimate');
+  assert.equal(b.total.shipping, 85.5); assert.equal(b.total.payout, 300 - 85.5);
+  assert.match(b.steps.find((x) => x.k === 'shipping').note, /kargo faturaları toplamı/);
+});
+
 test('Hakediş: Trendyol ekstresi saklanır; ödeme günleri, ödenecek toplam ve mutabakat farkı', async () => {
   const now = Date.now();
   mock([[/settlements\?/, (u) => (/transactionTypes=/.test(u) ? { totalPages: 1, content: [

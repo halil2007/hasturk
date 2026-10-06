@@ -58,13 +58,33 @@ export async function breakdown(db, settings, { from, to, channel } = {}) {
       if (p.commissionSrc === 'api') x.realCommission++;
     }
   }
+  // Sipariş bazında kargo tutarı gelmeyen kanalda (siparişlerin yarısından azı) pazaryerinin dönemde kestiği kargo faturalarının
+  // toplamı kullanılır: tahmin (Ayarlar'daki sipariş başı kargo, çoğu zaman 0) yerine gerçek gider.
+  const invCargo = await all(db, `SELECT channel, ROUND(SUM(amount), 2) AS amount, COUNT(*) AS n FROM invoices WHERE type = 'Kargo' AND date >= ? AND date < ?${channel ? ' AND channel = ?' : ''} GROUP BY channel`, from, to, ...ca);
+  const costState = Object.fromEntries((await all(db, "SELECT k, v FROM settings WHERE k LIKE 'costs:%'")).map((r) => { try { return [r.k.slice(6), JSON.parse(r.v)]; } catch { return [r.k.slice(6), null]; } }));
+  total.invoiceShipping = 0;
+  for (const [c, x] of per) {
+    x.shippingSrc = x.realShipping ? (x.realShipping === x.orders ? 'api' : 'mixed') : 'estimate';
+    const inv = invCargo.find((r) => r.channel === c);
+    if (inv && inv.amount > 0 && x.realShipping < x.orders / 2) {
+      const d = inv.amount - x.shipping;
+      for (const y of [x, total]) { y.shipping += d; y.payout -= d; y.profit -= d; }
+      x.shippingSrc = 'invoice'; x.invoiceShipping = inv.amount; total.invoiceShipping += inv.amount;
+    }
+    const st = costState[c];
+    if (st && st.error) x.shippingError = st.error;
+  }
   const round = (x) => { for (const k of KEYS) x[k] = r2(x[k]); x.margin = x.revenue ? r2((x.profit / x.revenue) * 100) : 0; return x; };
   round(total);
+  const pc = [...per.values()];
+  const shipNote = pc.some((x) => x.shippingSrc === 'invoice')
+    ? [total.realShipping ? `${total.realShipping}/${total.orders} siparişte kargo faturasından` : '', `${pc.filter((x) => x.shippingSrc === 'invoice').length} kanalda dönemin kargo faturaları toplamı (${r2(total.invoiceShipping)} ₺)`].filter(Boolean).join(' · ')
+    : total.realShipping ? `${total.realShipping}/${total.orders} siparişte kargo faturasından` : total.shipping ? 'tahmin (Ayarlar → Giderler, sipariş başı kargo)' : 'kanaldan kargo tutarı gelmedi — Ayarlar → Giderler\'den sipariş başı kargo girin';
   // Şelale: satıştan kâra her basamak
   const steps = [
     { k: 'revenue', label: 'Satış (ciro)', v: total.revenue },
     { k: 'commission', label: 'Komisyon', v: -total.commission, note: `${total.realCommission}/${total.orders} siparişte kanalın bildirdiği tutar` },
-    { k: 'shipping', label: 'Kargo', v: -total.shipping, note: `${total.realShipping}/${total.orders} siparişte kargo faturasından` },
+    { k: 'shipping', label: 'Kargo', v: -total.shipping, note: shipNote },
     { k: 'fee', label: 'Hizmet bedeli', v: -total.fee },
     { k: 'rateFee', label: 'Ek kesinti (işlem / ödeme)', v: -total.rateFee },
     { k: 'withholding', label: 'Stopaj', v: -total.withholding, note: 'gelir vergisinden mahsup edilir' },

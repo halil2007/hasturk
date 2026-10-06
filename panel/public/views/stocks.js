@@ -7,12 +7,12 @@ import { setQuery } from '../app.js';
 
 const STATUS = [['', 'Tüm ürünler', 'all', 'box', 'blue'], ['out', 'Stokta yok', 'out', 'x', 'red'], ['runout', 'Tükenmek üzere', 'runout', 'warn', 'red'], ['below', 'Kritik seviyede', 'below', 'db', 'amber'], ['enough', 'Yeterli', 'enough', 'check', 'green']];
 const EXTRA = [['', 'Tüm kanal durumları'], ['waiting', 'Kanala gönderim bekleyen'], ['error', 'Kanal hatası olan'], ['nolisting', 'Hiçbir kanalda olmayan']];
-const SORTS = [['stock', 'Stok (azdan çoğa)'], ['days', 'En erken tükenecek'], ['sold', 'En çok satan (30 gün)'], ['stock_desc', 'Stok (çoktan aza)'], ['', 'Ada göre (A–Z)']];
+const SORTS = [['sold', 'En çok satan (30 gün)'], ['days', 'En erken tükenecek'], ['stock', 'Stok (azdan çoğa)'], ['stock_desc', 'Stok (çoktan aza)'], ['name', 'Ada göre (A–Z)']];
 export const RULE = { shared: 'Ortak stok', limit: 'En fazla', own: 'Ayrılmış' };
 export const ruleText = (l) => (l.stock_mode === 'limit' ? `en fazla ${l.stock_value ?? 0}` : l.stock_mode === 'own' ? `ayrılmış ${l.stock_value ?? 0}` : '');
 
 export async function stocks(el, rest, query = {}) {
-  const f = { q: query.q || '', status: query.durum ?? (rest[0] === 'kritik' ? 'below' : ''), extra: query.f || '', sort: query.sort ?? 'stock', page: 1 };
+  const f = { q: query.q || '', status: query.durum ?? (rest[0] === 'kritik' ? 'below' : ''), extra: query.f || '', sort: query.sort || 'sold', page: 1 };
   let rows = [], total = 0, counts = {}, dash = null;
   render(el, html`<div class="stack">
     <div class="sstats" data-kpis></div>
@@ -81,7 +81,7 @@ export async function stocks(el, rest, query = {}) {
     render($('[data-box]', el), html`${body}${rows.length ? html`<div class="pager"><span class="muted small" style="margin-right:auto">${n(total)} ürün${rows.length < total ? ` · ${rows.length} gösteriliyor` : ''}</span>${rows.length < total ? html`<button class="btn sm" data-act="more">Daha fazla göster</button>` : ''}</div>` : ''}`);
   }
   async function load(append = false) {
-    setQuery({ durum: f.status, f: f.extra, q: f.q, sort: f.sort === 'stock' ? '' : f.sort });
+    setQuery({ durum: f.status, f: f.extra, q: f.q, sort: f.sort === 'sold' ? '' : f.sort });
     const p = new URLSearchParams({ page: f.page, limit: 50 });
     if (f.sort) p.set('sort', f.sort);
     if (f.q) p.set('q', f.q);

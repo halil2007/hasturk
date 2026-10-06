@@ -125,7 +125,7 @@ let current = null, currentPath = null, routeSeq = 0, routeAt = 0;
 // Ön yükleme: her sayfanın açılışta okuduğu adresler (ilk ziyarette varsayılanlar, sonra öğrenilen gerçek adresler)
 const PREFETCH = {
   '': ['summary'], siparisler: ['orders?status=new&page=1&limit=25'], kargo: ['packages?state=waiting'], iadeler: ['claims?page=1&status=waiting'],
-  sorular: ['questions?page=1&limit=30&status=waiting'], 'kanal-urunleri': ['channel-products/channels'], urunler: ['products?page=1&limit=40&group=1'], stoklar: ['products?page=1&limit=50&sort=stock', 'dashboard'],
+  sorular: ['questions?page=1&limit=30&status=waiting'], 'kanal-urunleri': ['channel-products/channels'], urunler: ['products?page=1&limit=40&group=1&sort=sold'], stoklar: ['products?page=1&limit=50&sort=sold', 'dashboard'],
   ...store.get('prefetch', {}),
 };
 const learn = (path, list) => {
@@ -414,7 +414,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-07a';
+const ASSETS = '2026-10-07b';
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');
   if (css === ASSETS) return true;

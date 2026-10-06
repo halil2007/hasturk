@@ -12,10 +12,10 @@ export const siteStock = (p) => !(state.settings && state.settings.stock_sync)
 export const siteStockVal = (p, cls = '') => html`<span class="val num ${cls}" style="cursor:help" title="ikas sitesinden okunur (stok senkronu kapalı). Adedi ikas panelinden değiştirin.">${p.stock}<span class="tiny muted" style="margin-left:4px;font-weight:500">ikas</span></span>`;
 
 const FILTERS = [['', 'Tümü', 'all'], ['low', 'Kritik stok', 'low'], ['nocost', 'Alış fiyatı eksik', 'nocost'], ['nosku', 'SKU eksik', 'nosku'], ['nobarcode', 'Barkod eksik', 'nobarcode'], ['nolisting', 'Kanalda olmayan', 'nolisting'], ['passive', 'Pasif', 'passive']];
-const SORTS = [['', 'Ada göre (A–Z)'], ['new', 'En yeni eklenen'], ['sold', 'En çok satan (30 gün)'], ['stock', 'Stok (azdan çoğa)'], ['stock_desc', 'Stok (çoktan aza)'], ['price_desc', 'Fiyat (yüksekten)'], ['price_asc', 'Fiyat (düşükten)'], ['margin_desc', 'Marj (yüksekten)'], ['margin_asc', 'Marj (düşükten)']];
+const SORTS = [['sold', 'En çok satan (30 gün)'], ['name', 'Ada göre (A–Z)'], ['new', 'En yeni eklenen'], ['stock', 'Stok (azdan çoğa)'], ['stock_desc', 'Stok (çoktan aza)'], ['price_desc', 'Fiyat (yüksekten)'], ['price_asc', 'Fiyat (düşükten)'], ['margin_desc', 'Marj (yüksekten)'], ['margin_asc', 'Marj (düşükten)']];
 
 export async function products(el, rest, query = {}) {
-  const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), sort: query.sort || '', page: 1 };
+  const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), sort: query.sort || 'sold', page: 1 };
   let rows = [], total = 0, groupsTotal = 0, counts = {}, stats = {};
   const sel = new Set();
   render(el, html`<div class="stack">
@@ -125,7 +125,7 @@ export async function products(el, rest, query = {}) {
     render($('[data-box]', el), html`${bulkbar()}${body}${rows.length ? html`<div class="pager"><span class="muted small" style="margin-right:auto">${n(groupsTotal)} ana ürün · ${n(total)} ürün/varyant${shown < groupsTotal ? ` · ${shown} gösteriliyor` : ''}</span>${gl.some((g) => isGroup(g[1])) && !all ? html`<button class="btn sm ghost" data-act="togall">${opened.size ? 'Varyantları kapat' : 'Tüm varyantları aç'}</button>` : ''}${shown < groupsTotal ? html`<button class="btn sm" data-act="more">Daha fazla göster</button>` : ''}</div>` : ''}`);
   }
   async function load(append = false) {
-    setQuery({ f: f.filter, q: f.q, sort: f.sort });
+    setQuery({ f: f.filter, q: f.q, sort: f.sort === 'sold' ? '' : f.sort });
     const p = new URLSearchParams({ page: f.page, limit: 40, group: 1 });
     if (f.q) p.set('q', f.q);
     if (f.filter) p.set('filter', f.filter);

@@ -26,7 +26,7 @@ export async function financeView(el, rest, query = {}) {
     </div>
     <div class="card flush" data-stl></div>
     <div class="card flush"><div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><h2>Kesilen faturalar</h2><span class="muted small" data-invsub></span><span class="spacer"></span>
-      ${isAdmin() ? html`<button class="btn sm" data-act="invsync"><i class="ico ico-sync"></i>Faturaları çek</button>` : ''}</div><div data-inv></div></div>
+      ${isAdmin() ? html`<button class="btn sm" data-act="invsync"><i class="ico ico-sync"></i>Faturaları ve kargo giderini çek</button>` : ''}</div><div data-inv></div></div>
   </div>`);
 
   const span = () => (RANGES.find((r) => r[0] === f.range) || RANGES[0])[2]();
@@ -50,7 +50,7 @@ export async function financeView(el, rest, query = {}) {
       <div class="muted tiny" style="margin-top:10px">Kesinti oranları Ayarlar → Komisyon ve giderler'den gelir; kanal gerçek komisyon ve kargo tutarını bildirdiyse o kullanılır.</div>`
       : html`<div class="empty">Bu dönemde sipariş yok</div>`);
     render($('[data-chtable]', el), d.channels.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Satış</th><th class="r">Komisyon</th><th class="r">Kargo</th><th class="r">Hizmet + ek</th><th class="r">Stopaj</th><th class="r">Hakediş</th><th class="r">Kâr</th></tr></thead><tbody>
-      ${d.channels.map((c) => html`<tr><td>${chBadge(c.channel)}<div class="tiny muted">${n(c.orders)} sipariş</div></td><td class="r num">${money0(c.revenue)}</td><td class="r num">${money0(c.commission)}</td><td class="r num">${money0(c.shipping)}</td>
+      ${d.channels.map((c) => html`<tr><td>${chBadge(c.channel)}<div class="tiny muted">${n(c.orders)} sipariş</div></td><td class="r num">${money0(c.revenue)}</td><td class="r num">${money0(c.commission)}</td><td class="r num">${money0(c.shipping)}<div class="tiny muted" title="${c.shippingError ? 'Kargo gideri okunamadı: ' + c.shippingError : ''}">${c.shippingError && c.shippingSrc === 'estimate' ? html`<span style="color:var(--warn)">okunamadı</span>` : { api: 'fatura', mixed: 'fatura + tahmin', invoice: 'fatura toplamı', estimate: 'tahmin' }[c.shippingSrc] || ''}</div></td>
         <td class="r num">${money0(c.fee + c.rateFee)}</td><td class="r num">${money0(c.withholding)}</td><td class="r num" style="font-weight:650">${money0(c.payout)}</td>
         <td class="r num" style="font-weight:750;color:${c.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(c.profit)}<div class="tiny muted">%${n(c.margin)}</div></td></tr>`)}
     </tbody></table></div>` : html`<div class="empty">Veri yok</div>`);
@@ -122,7 +122,7 @@ export async function financeView(el, rest, query = {}) {
     range: (t) => { f.range = t.dataset.k; refresh(); },
     itype: (t) => { f.itype = t.dataset.k; refresh(); },
     stlsync: (t) => busy(t, async () => { const r = await api('settlements/sync', { method: 'POST' }); toast(Object.entries(r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} kayıt`}`).join(' · ') || 'Hakediş bilgisi veren kanal yok'); await load(); }),
-    invsync: (t) => busy(t, async () => { const r = await api('invoices/sync', { method: 'POST' }); toast(Object.entries(r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} fatura`}`).join(' · ') || 'Fatura bilgisi veren kanal yok'); await load(); }),
+    invsync: (t) => busy(t, async () => { const r = await api('invoices/sync', { method: 'POST' }); toast(Object.entries(r.invoices || r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} fatura`}${r.costs && typeof r.costs[k] === 'number' ? `, ${r.costs[k]} siparişe kargo` : ''}`).join(' · ') || 'Fatura bilgisi veren kanal yok'); await load(); }),
   });
   await refresh();
   return { refresh };

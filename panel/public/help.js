@@ -13,7 +13,7 @@ export const GLOSSARY = {
   'Hakediş': 'Pazaryerinin komisyon ve kesintiler düşüldükten sonra hesabınıza yatıracağı tutar.',
   'Stopaj': 'Pazaryerinin satıştan kesip vergi dairesine yatırdığı vergi (genelde %1); yıllık vergiden düşülür.',
   'Buybox': 'Aynı ürünü birden fazla satıcı satıyorsa pazaryerinin ürün sayfasında öne çıkardığı satıcı. Fiyatınız rakiplerden iyiyse buybox sizde olur.',
-  'Fırsat etiketi': 'Pazaryerinin belirli fiyatın altına inen ürünlere verdiği "avantajlı ürün", "flaş indirim" gibi etiketler.',
+  'Fiyat önerisi': 'Rakiplerin pazaryerindeki fiyatına göre hazırlanan öneri: birinci sırayı almak için rakibin hemen altı ya da birinci sıra sizdeyse kârı artıracak fiyat.',
   'Kritik stok': 'Bu adedin altına inen ürün için uyarı alırsınız.',
 };
 
@@ -29,7 +29,7 @@ const PAGES = {
   'kanal-urunleri': ['Kanaldaki ürünler', 'Kanallarınızdaki ilanlar. Panelde olmayanları seçip panele alırsınız.', ['Kanal sekmesini seçin, "Panelde değil" listesindeki ilanları işaretleyip "Panele ekle"ye basın.', 'Aynı barkod / stok kodlu ürün panelde varsa ona bağlanır, yoksa yeni ürün açılır.'], ['İlan', 'Eşleştirme', 'Ana katalog']],
   eslestirme: ['Eşleştirme', 'Kendiliğinden eşleşemeyen ilanları doğru ürüne bağlarsınız.', ['"Onay bekleyen" listesinde önerilen ürünü kontrol edip onaylayın.', 'Yanlış eşleşme varsa "Eşleşmiş ürünler"den bağlantıyı kaldırın.'], ['Eşleştirme', 'İlan', 'Ana katalog']],
   'urun-yukle': ['Pazaryerine yükle', 'Panelde olup pazaryerinde olmayan ürünleri pazaryerine gönderirsiniz.', ['Kategorinizi pazaryeri kategorisiyle bir kez eşleştirin.', '"… ürünü gönder" ile yükleyin.', 'Onay sonucunu "Gönderimler" bölümünde takip edin.'], ['İlan']],
-  kampanyalar: ['Kampanyalar', 'Pazaryeri fırsat etiketleri (avantajlı ürün, flaş indirim) ve Hepsiburada sepet indirimleri.', ['Pazaryeri panelinden indirdiğiniz kampanya listesini (Excel) yükleyin.', 'Her eşik fiyatında kârınızı görün; uygun olanı tek tıkla kanala gönderin.'], ['Fırsat etiketi']],
+  kampanyalar: ['Kampanyalar', 'Rakip fiyatlarına göre fiyat önerileri ve Hepsiburada sepet indirimleri.', ['"Birinciliği al" sekmesi rakibin önde olduğu ürünleri ve önerilen fiyattaki kârınızı gösterir.', '"Kâr artır" sekmesi birinci sıra sizdeyken fiyatı yükseltebileceğiniz ürünleri gösterir.', 'Uygun olanı tek tıkla ya da seçip toplu uygulayın; fiyat kanala gönderilir.'], ['Fiyat önerisi', 'Buybox']],
   buybox: ['Buybox', 'Aynı ürünü satan rakiplere göre sıranız ve fiyat farkı.', ['"Kaybedilen" sekmesi rakibin önde olduğu ürünleri gösterir.', 'Ürüne en düşük / en yüksek fiyat kuralı tanımlayıp otomatik fiyatı açabilirsiniz.'], ['Buybox']],
   analiz: ['Satış analizi', 'Günlük, haftalık, aylık satış; en çok satanlar ve illere göre satış.', ['Üstteki kanal sekmesiyle tek kanalı inceleyin.', 'Dönem düğmeleriyle karşılaştırın.'], []],
   'gelir-gider': ['Gelir & gider', 'Satıştan kâra: komisyon, kargo, hizmet bedeli, stopaj ve hakediş.', ['Kesinti oranlarınızı Ayarlar → Giderler\'den kontrol edin.', 'Alış fiyatı eksik ürünler kârı olduğundan yüksek gösterir; Ürünler\'den tamamlayın.'], ['Hakediş', 'Stopaj']],
