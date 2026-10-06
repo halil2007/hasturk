@@ -3,7 +3,7 @@ import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo } from './sync.js';
-import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident } from './match.js';
+import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
@@ -18,7 +18,8 @@ import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from 
 import { sendMail, orderMail, validEmail, logoPath } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
-import { listUsers, saveUser, changeOwnPassword } from './auth.js';
+import * as chp from './chproducts.js';
+import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
 import { can, sectionOf } from '../public/perms.js';
@@ -798,9 +799,12 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // Tanılama personel için de açık (API bilgilerini göstermez)
   const diag = /^integrations\/[a-z0-9_]+\/diagnose$/.test(path);
   if (user.role !== 'admin' && !diag && m !== 'GET' && (ADMIN_ONLY.some((r) => r.test(path)) || path === 'settings')) fail(403, 'Bu işlem için yönetici yetkisi gerekir');
-  if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
+  if (user.role !== 'admin' && !diag && (path === 'users' || path.startsWith('users/') || path.startsWith('integrations'))) fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
   // Personel: yalnız yetkili olduğu bölümler (bkz. public/perms.js)
-  if (!can(user, sectionOf(path))) fail(403, 'Bu bölüm için yetkiniz yok (Kullanıcılar → yetkiler)');
+  const sec = sectionOf(path);
+  if (!can(user, sec)) fail(403, 'Bu bölüm için yetkiniz yok (Personel → yetkiler)');
+  // Yalnız görüntüleme yetkisi: okuma serbest, değişiklik yok (etiket / dışa aktarma gibi okuma amaçlı POST'lar hariç değil)
+  if (m !== 'GET' && !can(user, sec, true)) fail(403, 'Bu bölümde yalnız görüntüleme yetkiniz var');
   // Hepsiburada canlıya geçiş testi (yalnız yönetici)
   if (path.startsWith('hbtest/')) {
     if (user.role !== 'admin') fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
@@ -813,7 +817,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       first(db, "SELECT COUNT(*) AS n FROM questions WHERE status = 'waiting'"),
       summary(db),
       first(db, 'SELECT COUNT(*) AS open, SUM(read = 0) AS unread FROM notices WHERE resolved_at IS NULL'),
-      first(db, 'SELECT COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0'),
+      // Eşleşme bekleyen ilan: "ben seçeyim" kanallarındaki ilanlar sayılmaz (Kanal Ürünleri'nde seçilmeyi bekler, uyarı değil)
+      Promise.all([all(db, 'SELECT channel, COUNT(*) AS n FROM listings WHERE product_id IS NULL AND ignored = 0 GROUP BY channel'), manualImport(db)])
+        .then(([rows, isManual]) => ({ n: rows.filter((r) => !isManual(r.channel)).reduce((a, r) => a + r.n, 0) })),
       getSettings(db),
       channelsInfo(env, db),
       first(db, "SELECT COUNT(*) AS n FROM claims WHERE status = 'waiting'"),
@@ -952,8 +958,20 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
 
   // ---------- kullanıcılar ----------
   if (path === 'users' && m === 'GET') return json(await listUsers(db));
-  if (path === 'users' && m === 'POST') { const b = await body(req); try { await saveUser(db, 0, b); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı eklendi (${b.username})`); return json({ ok: true }); }
-  if ((x = path.match(/^users\/(\d+)$/)) && m === 'PUT') { try { await saveUser(db, Number(x[1]), await body(req)); } catch (e) { fail(400, e.message); } return json({ ok: true }); }
+  const maxUsers = Number(env.TENANT_MAX_USERS) || 0;
+  if (path === 'users' && m === 'POST') { const b = await body(req); let id; try { id = await saveUser(db, 0, b, { maxUsers }); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı eklendi (${str(b.username)})`); return json({ ok: true, id }); }
+  if ((x = path.match(/^users\/(\d+)$/)) && m === 'PUT') {
+    const id = Number(x[1]), b = await body(req);
+    if (id === user.id && (b.active === false || b.role === 'staff')) fail(400, 'Kendi yönetici yetkinizi ya da hesabınızı kapatamazsınız');
+    try { await saveUser(db, id, b, { maxUsers }); } catch (e) { fail(400, e.message); }
+    // Yetki, durum ya da şifre değişince açık oturumlar hemen yeni yetkiyle çalışır; pasif / şifresi değişen hesabın oturumu kapanır
+    if (b.active === false || b.password) await revokeSessions(db, id);
+    await log(db, null, 'info', `${user.name}: kullanıcı güncellendi (#${id}${b.password ? ', şifre değişti' : ''}${b.active === false ? ', pasif' : ''})`);
+    return json({ ok: true });
+  }
+  if ((x = path.match(/^users\/(\d+)$/)) && m === 'DELETE') { try { await deleteUser(db, Number(x[1]), user); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı silindi (#${x[1]})`); return json({ ok: true }); }
+  if ((x = path.match(/^users\/(\d+)\/revoke$/)) && m === 'POST') { await revokeSessions(db, Number(x[1])); await log(db, null, 'info', `${user.name}: kullanıcının oturumları kapatıldı (#${x[1]})`); return json({ ok: true }); }
+  if ((x = path.match(/^users\/(\d+)\/activity$/)) && m === 'GET') { try { return json(await userActivity(db, Number(x[1]))); } catch (e) { fail(404, e.message); } }
   if (path === 'me/password' && m === 'POST') { const b = await body(req); try { await changeOwnPassword(db, user, b.old, b.new); } catch (e) { fail(400, e.message); } return json({ ok: true }); }
 
   // ---------- bildirimler ----------
@@ -1226,7 +1244,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const rows = await all(db, `SELECT l.*, p.name AS product_name FROM listings l LEFT JOIN products p ON p.id = l.product_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY l.name LIMIT 300`, ...args);
     return json({ listings: rows });
   }
-  if (path === 'listings/link' && m === 'POST') {
+  // Kanal ürünleri: kanal kanal ilanlar, seçerek panele alma, yok sayma, kanal modu (otomatik / ben seçeyim)
+  if (path === 'channel-products/channels' && m === 'GET') return json(await chp.channelSummary(db, (await getChannels(env, db)).filter((c) => (c.enabled || c.demo) && c.fetchListings).map((c) => c.id)));
+  if (path === 'channel-products' && m === 'GET') return json(await chp.listChannelProducts(db, q));
+  if (path === 'channel-products/add' && m === 'POST') { const r = await chp.addToPanel(env, db, await body(req), user); ctx.waitUntil(pushStocks(env, db).catch(() => {})); return json(r); }
+  if (path === 'channel-products/ignore' && m === 'POST') return json(await chp.ignoreListings(db, await body(req)));
+  if (path === 'channel-products/mode' && m === 'POST') { const r = await chp.setMode(db, await body(req)); await log(db, null, 'info', `${user.name}: kanal ürünleri modu değişti`); return json(r); }
+  if ((path === 'listings/link' || path === 'channel-products/link') && m === 'POST') {
     const b = await body(req);
     let pid = b.product_id === null ? null : Number(b.product_id) || null;
     // Bir ürüne her kanaldan yalnızca bir ilan bağlanabilir (aynı sitenin iki ürünü birleştirilmez)

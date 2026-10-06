@@ -15,12 +15,14 @@ import { insightsView } from './views/insights.js';
 import { integrations } from './views/integrations.js';
 import { notices } from './views/notices.js';
 import { users } from './views/users.js';
+import { firmsView } from './views/firms.js';
+import { channelProductsView } from './views/chproducts.js';
 import { settingsView } from './views/settings.js';
 import { financeView } from './views/finance.js';
 import { hbTestView } from './views/hbtest.js';
 import { claimsView, claimChannels } from './views/claims.js';
 import { campaignsView, campaignChannels } from './views/campaigns.js';
-import { can } from './perms.js';
+import { can, viewOnly } from './perms.js';
 
 const ROUTES = [
   { path: '', title: 'Genel Bakış', icon: 'home', view: dashboard },
@@ -31,6 +33,7 @@ const ROUTES = [
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', perm: 'questions' },
   { sec: 'Katalog' },
   { path: 'urunler', title: 'Ürünler', icon: 'box', view: products, perm: 'products' },
+  { path: 'kanal-urunleri', title: 'Kanal Ürünleri', icon: 'grid', view: channelProductsView, perm: 'products' },
   { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock' },
   { path: 'urun-yukle', title: 'Ürün Yükle', icon: 'upload', view: uploadView, perm: 'products' },
   { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match' },
@@ -44,7 +47,8 @@ const ROUTES = [
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
   { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices' },
-  { path: 'kullanicilar', title: 'Kullanıcılar', icon: 'user', view: users, admin: true },
+  { path: 'kullanicilar', title: 'Personel', icon: 'user', view: users, admin: true },
+  { path: 'firmalar', title: 'Firmalar', icon: 'grid', view: firmsView, admin: true, when: () => !!state.owner },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
   { path: 'hb-test', title: 'Hepsiburada test adımları', icon: 'check', view: hbTestView, admin: true, hidden: true },
 ];
@@ -104,7 +108,7 @@ let current = null, currentPath = null, routeSeq = 0, routeAt = 0;
 // Ön yükleme: her sayfanın açılışta okuduğu adresler (ilk ziyarette varsayılanlar, sonra öğrenilen gerçek adresler)
 const PREFETCH = {
   '': ['summary'], siparisler: ['orders?status=new&page=1&limit=25'], kargo: ['packages?state=waiting'], iadeler: ['claims?page=1&status=waiting'],
-  sorular: ['questions?page=1&limit=30&status=waiting'], urunler: ['products?page=1&limit=40&group=1'], stoklar: ['products?page=1&limit=50&sort=stock', 'dashboard'],
+  sorular: ['questions?page=1&limit=30&status=waiting'], 'kanal-urunleri': ['channel-products/channels'], urunler: ['products?page=1&limit=40&group=1'], stoklar: ['products?page=1&limit=50&sort=stock', 'dashboard'],
   ...store.get('prefetch', {}),
 };
 const learn = (path, list) => {
@@ -145,6 +149,8 @@ async function route() {
     // Bu arada başka sayfaya geçildiyse geç kalan sayfa sonucu kullanılmaz
     if (my !== routeSeq) { if (v && v.destroy) v.destroy(); return; }
     current = v;
+    // Yalnız görüntüleme yetkisi: sayfanın üstünde bilgi (değişiklik düğmeleri sunucuda reddedilir)
+    if (r.perm && viewOnly(state.user, r.perm)) el.insertAdjacentHTML('afterbegin', '<div class="notice" style="margin-bottom:12px"><i class="ico ico-eye"></i><div>Bu bölümde <b>yalnız görüntüleme</b> yetkiniz var; değişiklik yapamazsınız.</div></div>');
     performance.mark('route:' + r.path); // hız ölçümü (geliştirici araçları → Performance)
   } catch (e) {
     if (my !== routeSeq) return;

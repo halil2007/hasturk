@@ -199,8 +199,17 @@ export async function repairDuplicates(db) {
 }
 
 // Eşleşmemiş ilanları kesin olanlarla bağla; ana katalog kanalındaki karşılıksız her varyant için panel ürünü aç
+// Kanal ürünlerini panele alma biçimi (Kanal Ürünleri sayfası): { kanal: true } = "ben seçeyim" (otomatik ürün açılmaz),
+// "*" tüm kanalların varsayılanı. Elle seçilen kanalda ilanlar yine kesin eşleşmeyle var olan ürünlere bağlanır.
+export async function manualImport(db) {
+  const r = (await all(db, "SELECT v FROM settings WHERE k = 'manual_import'"))[0];
+  let m = {};
+  try { m = (r && JSON.parse(r.v)) || {}; } catch { /* bozuk */ }
+  return (ch) => (ch in m ? !!m[ch] : !!m['*']);
+}
 export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
-  const cats = await catalogChannels(db, catalog);
+  const isManual = await manualImport(db);
+  const cats = (await catalogChannels(db, catalog)).filter((c) => !isManual(c));
   // Stoğu sıfır olduğu için otomatik yok sayılan ilan, stoğu gelince yeniden eşleştirmeye döner
   await run(db, "UPDATE listings SET ignored = 0, match = NULL WHERE ignored = 1 AND match = 'zero' AND COALESCE(remote_stock, 0) > 0");
   // Stoğu 0 olan eşleşmemiş ilanlar (ana katalog dahil) eşleştirmeye hiç girmez: ürün açılmaz, öneri / onay listesine düşmez

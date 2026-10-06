@@ -164,6 +164,33 @@ const MIGRATIONS = [
   'CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, user_id INTEGER, ua TEXT, created_at INTEGER)',
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
   'CREATE INDEX IF NOT EXISTS products_category ON products(category)',
+  // Personel: telefon, görev, not, rol şablonu, oturum sürümü (oturumları kapat), son giriş IP'si
+  'ALTER TABLE users ADD COLUMN phone TEXT',
+  'ALTER TABLE users ADD COLUMN title TEXT',
+  'ALTER TABLE users ADD COLUMN note TEXT',
+  'ALTER TABLE users ADD COLUMN template TEXT',
+  'ALTER TABLE users ADD COLUMN sess INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN last_ip TEXT',
+  'CREATE INDEX IF NOT EXISTS order_events_user ON order_events(user, at)',
+  // Firmalar (müşteri panelleri): ünvan, vergi, yetkili, adres, paket, ücret, dönem, abonelik başlangıç / bitiş, kullanıcı sınırı, kullanım özeti
+  'ALTER TABLE tenants ADD COLUMN legal TEXT',
+  'ALTER TABLE tenants ADD COLUMN tax TEXT',
+  'ALTER TABLE tenants ADD COLUMN contact TEXT',
+  'ALTER TABLE tenants ADD COLUMN address TEXT',
+  'ALTER TABLE tenants ADD COLUMN city TEXT',
+  'ALTER TABLE tenants ADD COLUMN plan TEXT',
+  'ALTER TABLE tenants ADD COLUMN fee REAL',
+  "ALTER TABLE tenants ADD COLUMN period TEXT NOT NULL DEFAULT 'monthly'",
+  'ALTER TABLE tenants ADD COLUMN starts_at INTEGER',
+  'ALTER TABLE tenants ADD COLUMN expires_at INTEGER',
+  'ALTER TABLE tenants ADD COLUMN trial INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE tenants ADD COLUMN max_users INTEGER',
+  'ALTER TABLE tenants ADD COLUMN usage TEXT',
+  'ALTER TABLE tenants ADD COLUMN usage_at INTEGER',
+  // Firma tahsilatları (ödeme kaydı; aboneliği uzatır)
+  `CREATE TABLE IF NOT EXISTS tenant_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL, at INTEGER NOT NULL, amount REAL NOT NULL,
+    months INTEGER NOT NULL DEFAULT 0, method TEXT, note TEXT, user TEXT)`,
+  'CREATE INDEX IF NOT EXISTS tenant_payments_slug ON tenant_payments(slug, at)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
