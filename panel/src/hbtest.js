@@ -61,6 +61,12 @@ export async function hbTest(env, db, path, m, q, b, user) {
     if (!['stock', 'price'].includes(q.kind)) fail(400, 'Geçersiz tür');
     return { status: await S.uploadStatus(q.kind, str(q.id)) };
   }
+  // Test siparişi için kargo firmaları (son test paketinin değiştirilebilir firmaları; Id → CargoCompanyId)
+  if (path === 'hbtest/cargos' && m === 'GET') {
+    const pk = await all(db, "SELECT p.remote_id FROM packages p JOIN orders o ON o.id = p.order_id WHERE o.channel = 'hepsiburada' AND p.remote_id IS NOT NULL AND p.status = 'open' ORDER BY p.id DESC LIMIT 1");
+    if (!pk[0]) return { companies: [], note: 'Liste için önce bir test siparişini paketleyin' };
+    return { companies: await S.cargoCompanies(pk[0].remote_id), package: pk[0].remote_id };
+  }
   if (path === 'hbtest/order' && m === 'POST') {
     if (!b.body || typeof b.body !== 'object') fail(400, 'Sipariş gövdesi (JSON) gerekli');
     const r = await S.createTestOrder(b.body);

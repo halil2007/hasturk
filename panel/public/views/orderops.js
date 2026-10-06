@@ -245,7 +245,12 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     </div>`,
     foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.cancelable && pkg && pkg.remote_id ? html`<button class="btn" data-unmark>Kargoya Hazır işaretini kaldır</button>` : ''}${r.external ? html`<button class="btn primary" data-ext><i class="ico ico-truck"></i>${caps().external ? caps().external.label : 'ikas Kargo ile Gönder'}</button>` : ''}${r.repack ? html`<button class="btn primary" data-repack><i class="ico ico-sync"></i>ikas Kargo ile yeniden hazırla</button>` : ''}${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}${r.changeCargo && pkg ? html`<button class="btn primary" data-cargo><i class="ico ico-truck"></i>Kargo firmasını değiştir</button>` : html`<button class="btn primary" data-close>Kapat</button>`}` });
     const cg = $('[data-cargo]', s.el);
-    if (cg) cg.onclick = () => { s.close(); cargoDialog(d, pkg, changed); };
+    // Kargo firması değişince etiket kanaldan hemen yeniden istenir (Hepsiburada ortak barkod)
+    if (cg) cg.onclick = () => { s.close(); cargoDialog(d, pkg, changed, { after: async () => {
+      const x = await fetchLabel(pkgOf(pkg.id));
+      if (x.error || x.pending) { await changed(); notReady(x); return; }
+      toast(`${chName()} etiketi hazır`); await outputLabel(x, { done: changed }); await changed();
+    } }); };
     $('[data-diag]', s.el).onclick = () => { s.close(); diagnoseDialog(d.order.channel, d.order.id, d.order.order_number); };
     const ex = $('[data-ext]', s.el);
     if (ex) ex.onclick = () => { s.close(); extShip(d.order.id, changed, d.order.extra && d.order.extra.cargoChoice); };
@@ -335,7 +340,7 @@ function packHelp(channel, c) {
 }
 
 // ---------- kargo firması seç / değiştir (seçenekler kanaldan gelir) ----------
-async function cargoDialog(d, pkg, done) {
+async function cargoDialog(d, pkg, done, { after } = {}) {
   const o = d.order, enc = encodeURIComponent(o.id);
   if (!pkg || pkg.virtual) return toast('Önce paketleri oluşturun');
   const s = sheet({ title: `Paket ${pkg.no} · kargo firması`, size: 'narrow', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
@@ -354,7 +359,9 @@ async function cargoDialog(d, pkg, done) {
     const x = $('input[name=cargo]:checked', s.el);
     if (!x) return toast('Kargo firması seçin', true);
     const res = await api(`orders/${enc}/cargo`, { method: 'POST', body: { package_id: pkg.id, cargo: { id: x.value, name: x.dataset.name } } });
-    toast(res.message); s.close(); await done();
+    s.close();
+    if (after && pkg.packed_at) { toast(`Kargo firması ${x.dataset.name} oldu; etiket isteniyor…`); await done(); await after(); return; }
+    toast(res.message); await done();
   });
 }
 
