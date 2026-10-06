@@ -23,6 +23,7 @@ import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, use
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
 import { listOffers, importOffers, applyOffers, clearOffers } from './promos.js';
+import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
@@ -1108,6 +1109,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     }
   }
   // Kampanyalar (Hepsiburada sepet indirimleri)
+  // Destek talepleri: ana panelde gelen kutusu (müşteri panellerinin istekleri Durable Object'te karşılanır, bkz. tenants.js)
+  if (path === 'support' || path.startsWith('support/')) {
+    if (env.TENANT_SLUG) fail(404, 'Bulunamadı');
+    return supportResponse(req, db, path, { slug: '', firm: '', user, staff: true });
+  }
   if (path === 'campaigns' || path.startsWith('campaigns/')) return json(await campaignApi(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
   // Fırsat etiketleri (Excel'den yüklenen avantajlı ürün / flaş indirim eşikleri; bkz. promos.js)
   if (path === 'promos' && m === 'GET') return json(await listOffers(db, { channel: str(q.channel), kind: str(q.kind) }));

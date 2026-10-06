@@ -14,6 +14,8 @@ import { profitView } from './views/profit.js';
 import { insightsView } from './views/insights.js';
 import { integrations } from './views/integrations.js';
 import { notices } from './views/notices.js';
+import { supportView, refreshCount, openTicketForm } from './views/support.js';
+import { openHelp } from './help.js';
 import { users } from './views/users.js';
 import { firmsView } from './views/firms.js';
 import { channelProductsView } from './views/chproducts.js';
@@ -31,34 +33,48 @@ const ROUTES = [
   { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo', perm: 'cargo' },
   { path: 'iadeler', title: 'İadeler', icon: 'back', view: claimsView, count: 'claims', perm: 'returns' },
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', perm: 'questions' },
-  { sec: 'Katalog' },
-  { path: 'urunler', title: 'Ürünler', icon: 'box', view: products, perm: 'products' },
-  { path: 'kanal-urunleri', title: 'Kanal Ürünleri', icon: 'grid', view: channelProductsView, perm: 'products' },
-  { path: 'stoklar', title: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock' },
-  { path: 'urun-yukle', title: 'Ürün Yükle', icon: 'upload', view: uploadView, perm: 'products' },
-  { path: 'eslestirme', title: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match' },
-  { path: 'kampanyalar', title: 'Kampanyalar', icon: 'tag', view: campaignsView, perm: 'products' },
-  { path: 'buybox', title: 'Buybox', icon: 'bolt', view: buyboxView, perm: 'products' },
+  { sec: 'Ürünler' },
+  // Gruplu sayfalar: menüde grup tek satır; grubun sayfaları sayfanın üstünde sekme olarak (tab: sekme adı)
+  { path: 'urunler', title: 'Ürünler', tab: 'Ürün listesi', icon: 'box', view: products, perm: 'products', group: 'katalog' },
+  { path: 'stoklar', title: 'Stoklar', tab: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock', group: 'katalog' },
+  { path: 'kanal-urunleri', title: 'Kanal Ürünleri', tab: 'Kanaldaki ürünler', icon: 'grid', view: channelProductsView, perm: 'products', group: 'katalog' },
+  { path: 'eslestirme', title: 'Eşleştirme', tab: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match', group: 'katalog' },
+  { path: 'urun-yukle', title: 'Pazaryerine Yükle', tab: 'Pazaryerine yükle', icon: 'upload', view: uploadView, perm: 'products', group: 'katalog' },
+  { path: 'kampanyalar', title: 'Kampanyalar', tab: 'Kampanyalar', icon: 'tag', view: campaignsView, perm: 'products', group: 'fiyat' },
+  { path: 'buybox', title: 'Buybox', tab: 'Buybox (fiyat rekabeti)', icon: 'bolt', view: buyboxView, perm: 'products', group: 'fiyat' },
   { sec: 'Raporlar' },
-  { path: 'analiz', title: 'Analizler', icon: 'pie', view: insightsView, perm: 'reports' },
-  { path: 'gelir-gider', title: 'Gelir & Gider', icon: 'calc', view: financeView, perm: 'finance' },
-  { path: 'kar', title: 'Kârlılık', icon: 'bars', view: profitView, perm: 'finance' },
-  { path: 'musteriler', title: 'Müşteriler', icon: 'user', view: customersView, perm: 'reports' },
+  { path: 'analiz', title: 'Analizler', tab: 'Satış analizi', icon: 'pie', view: insightsView, perm: 'reports', group: 'rapor' },
+  { path: 'gelir-gider', title: 'Gelir & Gider', tab: 'Gelir & gider', icon: 'calc', view: financeView, perm: 'finance', group: 'rapor' },
+  { path: 'kar', title: 'Kârlılık', tab: 'Kâr hesapla', icon: 'bars', view: profitView, perm: 'finance', group: 'rapor' },
+  { path: 'musteriler', title: 'Müşteriler', tab: 'Müşteriler', icon: 'user', view: customersView, perm: 'reports', group: 'rapor' },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
-  { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices' },
   { path: 'kullanicilar', title: 'Personel', icon: 'user', view: users, admin: true },
   { path: 'firmalar', title: 'Firmalar', icon: 'grid', view: firmsView, admin: true, when: () => !!state.owner },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
+  { path: 'destek', title: 'Destek', icon: 'help', view: supportView, count: 'support' },
+  { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices', hidden: true },
   { path: 'hb-test', title: 'Hepsiburada test adımları', icon: 'check', view: hbTestView, admin: true, hidden: true, when: () => !state.tenant },
 ];
 const PAGES = ROUTES.filter((r) => r.view);
+// Menü grupları: menüde tek satır (ilk görülebilen sayfaya gider), rozet = grubun sayfalarının rozet toplamı
+const GROUPS = { katalog: { title: 'Ürünler', icon: 'box' }, fiyat: { title: 'Fiyat & Kampanya', icon: 'tag' }, rapor: { title: 'Raporlar', icon: 'pie' } };
+const groupPages = (g) => PAGES.filter((r) => r.group === g && canSee(r) && !r.hidden);
 const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kargo', 'Kargo', 'truck'], ['stoklar', 'Stok', 'db']];
 const canSee = (r) => (!r.admin || !state.user || state.user.role === 'admin') && can(state.user, r.perm) && (!r.when || r.when());
 
 function nav() {
   const link = (r) => html`<a href="#/${r.path}" data-path="${r.path}" title="${r.title}"><i class="ico ico-${r.icon}"></i><span>${r.title}</span>${r.count ? html`<span class="count hide" data-count="${r.count}"></span>` : ''}</a>`;
-  render($('[data-nav]'), html`${ROUTES.filter((r) => (!r.view || canSee(r)) && !r.hidden).map((r) => (r.sec ? html`<div class="nav-sec">${r.sec}</div>` : link(r)))}`);
+  const glink = (g) => { const ps = groupPages(g), G = GROUPS[g], cnt = ps.map((x) => x.count).filter(Boolean).join('+');
+    return ps.length ? html`<a href="#/${ps[0].path}" data-group="${g}" title="${G.title}: ${ps.map((x) => x.tab).join(', ')}"><i class="ico ico-${G.icon}"></i><span>${G.title}</span>${cnt ? html`<span class="count hide" data-count="${cnt}"></span>` : ''}</a>` : ''; };
+  const seen = new Set(), items = [];
+  for (const r of ROUTES) {
+    if (r.sec) { items.push(html`<div class="nav-sec">${r.sec}</div>`); continue; }
+    if (!canSee(r) || r.hidden) continue;
+    if (r.group) { if (!seen.has(r.group)) { seen.add(r.group); items.push(glink(r.group)); } continue; }
+    items.push(link(r));
+  }
+  render($('[data-nav]'), html`${items}`);
   render($('[data-nav-foot]'), '');
   render($('[data-tabbar]'), html`${TABS.filter(([p]) => { const r = PAGES.find((x) => x.path === p); return !r || canSee(r); }).map(([p, t, i]) => html`<a href="#/${p}" data-path="${p}"><i class="ico ico-${i}"></i><span>${t}</span>${p === 'siparisler' ? html`<span class="dotn hide" data-count="orders"></span>` : ''}</a>`)}<button data-act="more"><i class="ico ico-menu"></i><span>Menü</span></button>`);
 }
@@ -76,7 +92,8 @@ export function refreshChrome(s = state.summary) {
   }
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
   const counts = { orders: n, questions: s.questions || 0, claims: s.claims || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
-  $$('[data-count]').forEach((el) => { const v = counts[el.dataset.count] || 0; el.textContent = v > 99 ? '99+' : v; el.classList.toggle('hide', !v); el.classList.toggle('warn', el.dataset.count === 'match' || el.dataset.count === 'stock'); });
+  counts.support = state.supportCount || 0;
+  $$('[data-count]').forEach((el) => { const v = el.dataset.count.split('+').reduce((a, k) => a + (counts[k] || 0), 0); el.textContent = v > 99 ? '99+' : v; el.classList.toggle('hide', !v); el.classList.toggle('warn', /match|stock/.test(el.dataset.count)); });
   const chs = state.channels.filter((c) => !c.paused);
   const on = chs.filter((c) => c.enabled), err = chs.filter((c) => c.enabled && !c.demo && c.last && (!c.last.ok || c.last.listingsError));
   const box = $('[data-status]');
@@ -129,7 +146,12 @@ async function route() {
   const { path, rest, query } = parseHash();
   const r = PAGES.find((x) => x.path === path && canSee(x)) || PAGES[0];
   $$('[data-path]').forEach((a) => a.classList.toggle('on', a.dataset.path === r.path));
-  $('[data-title]').textContent = r.title;
+  $$('[data-group]').forEach((a) => a.classList.toggle('on', a.dataset.group === r.group));
+  // Gruplu sayfa: grubun diğer sayfaları üstte sekme
+  const tabsBox = $('[data-subtabs]'), sibs = r.group ? groupPages(r.group) : [];
+  tabsBox.hidden = sibs.length < 2;
+  render(tabsBox, sibs.length < 2 ? '' : html`${sibs.map((x) => html`<a href="#/${x.path}" class="${x.path === r.path ? 'on' : ''}"><i class="ico ico-${x.icon}"></i>${x.tab}${x.count ? html`<span class="n hide" data-count="${x.count}"></span>` : ''}</a>`)}`);
+  $('[data-title]').textContent = r.group ? GROUPS[r.group].title : r.title;
   document.body.dataset.route = r.path;
   $('[data-sub]').textContent = state.demo ? 'Örnek veriler' : (state.settings && state.settings.company && state.settings.company.title) || '';
   document.title = `${r.title} · ${(state.settings && state.settings.company && state.settings.company.title) || 'Hastürk'} CRM`;
@@ -165,6 +187,9 @@ export async function loadSummary(fresh = true) {
   const s = await api('summary', { fresh });
   state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.tenant = s.tenant || null; state.owner = !!s.owner; state.demo = s.demo || s.channels.some((c) => c.demo);
   refreshChrome(s);
+  refreshCount();
+  // Firma panelinde hata mesajlarından tek tıkla destek talebi (ana panel talepleri kendisi yanıtlar)
+  state.reportError = state.tenant ? (err) => openTicketForm({ category: 'bug', subject: 'Hata: ' + String(err).replace(/\s+/g, ' ').slice(0, 90), error: String(err).slice(0, 1500) }) : null;
   return s;
 }
 
@@ -231,7 +256,7 @@ function applyTheme() {
 }
 
 // Telefon menüsü: firma / kullanıcı başlığı, menüde arama, bölümlere ayrılmış simge ızgarası, hesap işlemleri
-const SEC_TONE = { '': 'blue', 'Satış': 'blue', 'Katalog': 'purple', 'Raporlar': 'green', 'Sistem': 'gray' };
+const SEC_TONE = { '': 'blue', 'Satış': 'blue', 'Ürünler': 'purple', 'Raporlar': 'green', 'Sistem': 'gray' };
 function moreMenu() {
   const groups = [];
   let cur = { sec: '', items: [] };
@@ -250,6 +275,7 @@ function moreMenu() {
       <label class="search mm-search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Menüde ara (ör. kargo, iade, stok)" data-mm-q></label>
       ${groups.map((g) => html`<section class="mm-sec" data-mm-sec><h4>${g.sec || 'Genel'}</h4><div class="mm-grid">${g.items.map((r) => html`<a class="mm-tile ${SEC_TONE[g.sec] || 'blue'} ${currentPath === r.path ? 'on' : ''}" href="#/${r.path}" data-mm="${r.title.toLocaleLowerCase('tr')} ${r.path}"><span class="mm-ic"><i class="ico ico-${r.icon}"></i>${r.count ? html`<span class="mm-n hide" data-count="${r.count}"></span>` : ''}</span><span class="mm-t">${r.title}</span></a>`)}</div></section>`)}
       <div class="mm-list">
+        <button data-mm-act="help"><i class="ico ico-help"></i>Bu sayfa nasıl kullanılır?</button>
         <button data-mm-act="sync"><i class="ico ico-sync"></i>Şimdi senkronla<span class="muted tiny" style="margin-left:auto">${ago(Math.max(0, ...state.channels.map((c) => (c.last && c.last.at) || 0)))}</span></button>
         <button data-mm-act="theme"><i class="ico ico-bolt"></i>Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[store.get('theme', 'auto')]}</button>
         ${u.id > 0 ? html`<button data-mm-act="pass"><i class="ico ico-key"></i>Şifremi değiştir</button>` : ''}
@@ -269,6 +295,7 @@ function moreMenu() {
     if (!b) return;
     const a = b.dataset.mmAct;
     if (a === 'sync') { s.close(); sync(); }
+    if (a === 'help') { s.close(); openHelp(currentPath || '', (page) => openTicketForm({ category: 'question', subject: `${page} sayfası hakkında` })); }
     if (a === 'theme') { const order = ['auto', 'light', 'dark'], t = order[(order.indexOf(store.get('theme', 'auto')) + 1) % 3]; store.set('theme', t); applyTheme(); b.lastChild.textContent = `Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[t]}`; }
     if (a === 'pass') { s.close(); changePassword(); }
     if (a === 'logout') api('logout', { method: 'POST' }).catch(() => {}).then(() => location.reload());
@@ -387,7 +414,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-06c';
+const ASSETS = '2026-10-07a';
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');
   if (css === ASSETS) return true;
@@ -449,6 +476,7 @@ document.addEventListener('click', (e) => {
   if (a === 'me') { e.preventDefault(); meMenu(b); }
   if (a === 'more') { e.preventDefault(); moreMenu(); }
   if (a === 'find') { e.preventDefault(); findSheet(); }
+  if (a === 'help') { e.preventDefault(); openHelp(currentPath || '', (page) => openTicketForm({ category: 'question', subject: `${page} sayfası hakkında` })); }
   if (a === 'side') { e.preventDefault(); setSide(!document.body.classList.contains('nav-mini')); }
 });
 // Üst arama: yazarken sipariş ve ürün sonuçları açılır (ok tuşları + Enter); Enter tüm siparişlerde arar

@@ -191,6 +191,15 @@ const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS tenant_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL, at INTEGER NOT NULL, amount REAL NOT NULL,
     months INTEGER NOT NULL DEFAULT 0, method TEXT, note TEXT, user TEXT)`,
   'CREATE INDEX IF NOT EXISTS tenant_payments_slug ON tenant_payments(slug, at)',
+  // Destek talepleri (bkz. support.js): ana panelin veritabanında; slug = talebi açan firma ('' = ana panel)
+  `CREATE TABLE IF NOT EXISTS support_tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL DEFAULT '', firm TEXT, user_name TEXT, user_id INTEGER, subject TEXT NOT NULL,
+    category TEXT, status TEXT NOT NULL DEFAULT 'open', page TEXT, context TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+    unread_admin INTEGER NOT NULL DEFAULT 1, unread_user INTEGER NOT NULL DEFAULT 0)`,
+  'CREATE INDEX IF NOT EXISTS support_slug ON support_tickets(slug, updated_at)',
+  'CREATE TABLE IF NOT EXISTS support_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, author TEXT, admin INTEGER NOT NULL DEFAULT 0, body TEXT, created_at INTEGER NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS support_messages_t ON support_messages(ticket_id)',
+  'CREATE TABLE IF NOT EXISTS support_files (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, message_id INTEGER, name TEXT, type TEXT, size INTEGER, data TEXT, created_at INTEGER)',
+  'CREATE INDEX IF NOT EXISTS support_files_t ON support_files(ticket_id)',
   // Fırsat etiketleri (bkz. promos.js): Trendyol avantajlı ürün eşikleri, Hepsiburada flaş indirim davetleri (Excel'den)
   `CREATE TABLE IF NOT EXISTS promo_offers (channel TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, remote_id TEXT, product_id INTEGER, barcode TEXT, sku TEXT, name TEXT,
     current_price REAL, tiers TEXT, starts_at INTEGER, ends_at INTEGER, applied_price REAL, applied_at INTEGER, updated_at INTEGER, PRIMARY KEY (channel, kind, key))`,
@@ -247,6 +256,8 @@ export const DEFAULT_SETTINGS = {
   mail_to: [],
   mail_channels: {},
   panel_url: '',
+  // Kurulum rehberi kararları (stok gönderimi soruldu mu, rehber gizlendi mi)
+  setup: {},
   // Döviz bazlı fiyat ayarları (kaynak, kur türü, güncelleme sıklığı, eşik %, yuvarlama, genel kâr payı %)
   fx: { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 },
   // Müşteri sorularına hazır cevaplar

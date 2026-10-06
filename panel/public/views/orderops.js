@@ -1,6 +1,6 @@
 // Sipariş işlemleri (ortak bileşen): işleme al → paketle (kanalda kargoya hazırla) → kargo firması seç/değiştir →
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
-import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote } from '../core.js';
+import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly } from '../core.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
@@ -240,7 +240,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   function notReady(r) {
     const pkg = d.order.packages.find((p) => p.id === r.package_id);
     const s = sheet({ title: `${chName()} · etiket henüz hazır değil`, size: 'narrow', body: html`<div class="stack">
-      <div class="notice ${r.error ? 'bad' : 'warn'}"><i class="ico ico-warn"></i><div>${r.error || r.pending}</div></div>
+      <div class="notice ${r.error ? 'bad' : 'warn'}"><i class="ico ico-warn"></i><div>${r.error ? friendly(r.error) : r.pending}</div></div>
       ${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<div class="small muted">Kanaldan gelen gerçek gönderi barkodu: <b class="num">${pkg.barcode || pkg.tracking}</b> (${pkg.cargo_company || 'kargo'}). Kanalın etiketi gelene kadar beklemeniz önerilir; kargo firması kabul ediyorsa bu barkodla kendi etiketimizi de yazdırabilirsiniz.</div>` : html`<div class="small muted">Gerçek gönderi oluşmadığı için etiket verilmedi. Senkronda durum otomatik güncellenir; “Etiket oluştur”a tekrar basarak kontrol edebilirsiniz.</div>`}
     </div>`,
     foot: html`<button class="btn" data-diag><i class="ico ico-bolt"></i>Tanılama</button><span class="spacer"></span>${r.cancelable && pkg && pkg.remote_id ? html`<button class="btn" data-unmark>Kargoya Hazır işaretini kaldır</button>` : ''}${r.external ? html`<button class="btn primary" data-ext><i class="ico ico-truck"></i>${caps().external ? caps().external.label : 'ikas Kargo ile Gönder'}</button>` : ''}${r.repack ? html`<button class="btn primary" data-repack><i class="ico ico-sync"></i>ikas Kargo ile yeniden hazırla</button>` : ''}${r.barcodeOnly && pkg && (pkg.barcode || pkg.tracking) ? html`<button class="btn" data-own><i class="ico ico-print"></i>Barkodla kendi etiketimiz</button>` : ''}${r.changeCargo && pkg ? html`<button class="btn primary" data-cargo><i class="ico ico-truck"></i>Kargo firmasını değiştir</button>` : html`<button class="btn primary" data-close>Kapat</button>`}` });

@@ -37,6 +37,10 @@ export async function settingsView(el) {
         : st === 'ios-install' ? html`<div class="notice small">iPhone'da bildirim için paneli ana ekrana ekleyin: Safari → <b>Paylaş</b> → <b>Ana Ekrana Ekle</b>; sonra ana ekrandaki simgeden açıp buradan bildirimleri açın (iOS 16.4 ve üzeri).</div>`
         : html`<div class="notice warn small">Bu tarayıcı anlık bildirimi desteklemiyor. Chrome, Edge, Firefox ya da Safari'nin güncel sürümünü kullanın.</div>`}`);
   }
+  let tab = 'firma';
+  try { tab = sessionStorage.getItem('settings_tab') || 'firma'; } catch { /* yok */ }
+  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(state.tenant ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ['kayit', 'İşlem kayıtları', 'orders']];
+  el.addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) showTab(b.dataset.st); });
   const load = async () => { await load0(); drawPush(); };
   async function load0() {
     const [chs, st, logs, mail] = await Promise.all([api('channels'), api('settings'), api('logs'), admin ? api('integrations/mail').catch(() => null) : null]);
@@ -51,7 +55,8 @@ export async function settingsView(el) {
     const platformMail = !!(mail && mail.platform) && !ownMail, mailReady = ownMail || platformMail;
     render(el, html`<div class="stack" style="max-width:1000px">
       ${!admin ? html`<div class="notice"><i class="ico ico-warn"></i>Ayarları sadece yönetici değiştirebilir.</div>` : ''}
-      <div class="card stack">
+      <div class="tabs stabs" data-stabs>${STABS.map(([k, t, i]) => html`<button class="tab" data-st="${k}"><i class="ico ico-${i}"></i>${t}</button>`)}</div>
+      <div class="card stack" data-stab="firma">
         <h2>Firma bilgileri</h2>
         <div class="row wrap" style="gap:16px;align-items:center">
           <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px"><img src="${st.logo || 'logo.webp'}" alt="Logo" style="height:56px;max-width:240px;object-fit:contain;display:block" data-logo-prev></div>
@@ -70,7 +75,7 @@ export async function settingsView(el) {
         </div>
       </div>
 
-      <div class="card stack">
+      <div class="card stack" data-stab="stok">
         <div class="card-head" style="margin:0"><h2>Stok</h2><button class="btn sm" data-act="push-stock"><i class="ico ico-upload"></i>Stokları şimdi gönder</button></div>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="stock_sync" ${st.stock_sync ? 'checked' : ''} ${dis}><span></span></span>
           <span><b>Stokları tüm kanallarda senkron tut</b><br><span class="small muted">Bir kanalda satış olunca ortak stok düşer ve her kanala kendi kuralına göre (ortak / üst sınır / kanala özel adet) gönderilir. ${st.stock_sync && st.stock_since ? `Açıldığı an: ${dateTime(st.stock_since)} (öncesindeki siparişler stoğu etkilemez).` : 'Kapalıyken hiçbir kanala stok gönderilmez; panel stokları ikas sitesindeki (ana katalog) adetlerden okunur. Açmadan önce Eşleştirme sayfasını tamamlayın ve stok adetlerini kontrol edin.'}</span></span></label>
@@ -84,18 +89,18 @@ export async function settingsView(el) {
           <div class="muted tiny" style="margin-top:4px">Diğer kanallardaki ilanlar barkod / stok kodu kesin tutuyorsa otomatik bağlanır; tutmuyorsa Eşleştirme sayfasında onayınızı bekler.</div></div>
       </div>
 
-      <div class="card stack" data-fxcard>${state.tenant ? html`<h2>Döviz ve fiyat <span class="pill info">Yakında</span></h2><div class="muted small">Dolar, euro ve sterlin bazlı ürün fiyatı; anlık / günlük / haftalık / aylık kur güncellemesi yakında panelinizde.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
+      <div class="card stack" data-fxcard data-stab="${state.tenant ? 'giderler' : 'doviz'}">${state.tenant ? html`<h2>Döviz ve fiyat <span class="pill info">Yakında</span></h2><div class="muted small">Dolar, euro ve sterlin bazlı ürün fiyatı; anlık / günlük / haftalık / aylık kur güncellemesi yakında panelinizde.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
 
-      <div class="card flush"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
+      <div class="card flush" data-stab="giderler"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
         ${live.map((c) => html`<tr><td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td>
           ${COST_KEYS.map((k) => { const own = (st[k] || {})[c.id], extra = /_\d+$/.test(c.id); return html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${extra ? own ?? '' : costOf(st, k, c.id)}" placeholder="${extra ? costOf(st, k, c.id) : ''}" title="${extra ? 'Boş bırakılırsa aynı türdeki ana mağazanın değeri kullanılır' : ''}" ${dis}></td>`; })}</tr>`)}
       </tbody></table></div>
         <div class="card-pad muted tiny" style="padding-top:0">Masraf basamakları: satış − komisyon − kargo − hizmet bedeli − ek kesinti − stopaj = hakediş; hakediş − alış = kâr. Stopaj, pazaryerlerinin 2025'ten beri hakedişten kestiği gelir vergisidir (KDV hariç satış üzerinden, genelde %1); yıllık vergiden mahsup edilir. Kendi siteniz (ikas) için 0 bırakın.</div></div>
 
-      <div class="card stack" data-pushbox><h2>Anlık bildirim (bu cihaz)</h2><div class="muted small">Yükleniyor…</div></div>
+      <div class="card stack" data-pushbox data-stab="bildirim"><h2>Anlık bildirim (bu cihaz)</h2><div class="muted small">Yükleniyor…</div></div>
 
-      ${admin ? html`<div class="card stack" data-mailbox>
+      ${admin ? html`<div class="card stack" data-mailbox data-stab="bildirim">
         <h2>Yeni sipariş e-posta bildirimi</h2>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="mail_enabled" ${st.mail_enabled ? 'checked' : ''}><span></span></span>
           <span><b>Yeni sipariş gelince e-posta gönder</b><br><span class="small muted">Her sipariş için bir kez gönderilir; 15 dakikalık senkronda aynı sipariş için tekrar gönderilmez. Kanalların ilk aktarımı ve geçmiş sipariş aktarımı e-posta oluşturmaz.</span></span></label>
@@ -132,7 +137,7 @@ export async function settingsView(el) {
         <div class="row wrap"><button class="btn" data-act="mail-test"><i class="ico ico-chat"></i>Deneme e-postası gönder</button><button class="btn" data-act="digest-test"><i class="ico ico-bars"></i>Örnek günlük özet gönder</button><span class="spacer"></span><button class="btn primary" data-act="mail-save">Bildirim ayarlarını kaydet</button></div>
       </div>` : ''}
 
-      <div class="card stack">
+      <div class="card stack" data-stab="etiket">
         <h2>Kargo etiketi</h2>
         <div class="form-grid">
           <label class="field"><span>Gönderen</span><input class="input" data-sender="name" value="${st.sender.name || co.title || ''}" ${dis}></label>
@@ -148,14 +153,23 @@ export async function settingsView(el) {
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="zpl_pdf" ${st.zpl_pdf ? 'checked' : ''} ${dis}><span></span></span>
           <span><b>ZPL etiketini PDF'e çevir</b><br><span class="small muted">Trendyol ve Hepsiburada etiketi termal yazıcı biçiminde (ZPL) gelir; normal yazıcı için PDF'e çevrilir. Çeviri Labelary servisiyle yapılır ve etiket içeriği (alıcı adı/adresi) bu servise gönderilir.</span></span></label>
       </div>
-      ${admin ? html`<div class="row wrap"><button class="btn ghost danger" data-act="purge">Örnek (demo) verileri temizle</button><span class="spacer"></span><button class="btn primary lg" data-act="save">Ayarları kaydet</button></div>` : ''}
+      ${admin ? html`<div class="savebar" data-savebar><span class="muted small" data-savehint>Değişiklikleri kaydetmeyi unutmayın.</span><span class="spacer"></span><button class="btn primary lg" data-act="save">Kaydet</button></div>` : ''}
 
-      <div class="card flush"><div class="card-pad row"><h2 style="flex:1">İşlem kayıtları</h2><a class="btn sm ghost" href="#/bildirimler">Bildirimler</a></div>
+      <div class="card flush" data-stab="kayit"><div class="card-pad row"><h2 style="flex:1">İşlem kayıtları</h2>${admin && state.demo ? html`<button class="btn sm ghost danger" data-act="purge">Örnek (demo) verileri temizle</button>` : ''}<a class="btn sm ghost" href="#/bildirimler">Bildirimler</a></div>
         <div class="table-wrap" style="max-height:380px;overflow:auto"><table class="t"><tbody>
         ${logs.length ? logs.map((l) => html`<tr><td class="small muted" style="white-space:nowrap">${dateTime(l.at)}</td><td class="small">${l.channel ? ch(l.channel).name : ''}</td><td class="small" style="color:${l.level === 'error' ? 'var(--bad)' : l.level === 'warn' ? 'var(--amber)' : 'inherit'}">${l.msg}</td></tr>`) : html`<tr><td class="empty">Kayıt yok</td></tr>`}
       </tbody></table></div></div>
     </div>`);
     drawFx().catch(() => {});
+    showTab(tab);
+  }
+  // Sekmeler: her sekmede tek kaydet düğmesi (bildirim ve döviz sekmelerinde kendi düğmeleri; genel düğme gizlenir)
+  function showTab(k) {
+    tab = STABS.some((x) => x[0] === k) ? k : 'firma';
+    try { sessionStorage.setItem('settings_tab', tab); } catch { /* yok */ }
+    $$('[data-stab]', el).forEach((c) => { c.hidden = c.dataset.stab !== tab; });
+    $$('[data-st]', el).forEach((b) => b.classList.toggle('on', b.dataset.st === tab));
+    const bar = $('[data-savebar]', el); if (bar) bar.hidden = !['firma', 'stok', 'giderler', 'etiket'].includes(tab);
   }
   const save = async (patch) => { state.settings = await api('settings', { method: 'PUT', body: patch }); };
   // ---------- döviz ve fiyat ----------
