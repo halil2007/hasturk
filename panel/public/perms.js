@@ -35,7 +35,7 @@ const MAP = [
   [/^(listings\/stock|push-stock)(\/|$)/, 'stock'],
   [/^(match|listings)(\/|$)/, 'match'],
   [/^(stats|insights|customers)(\/|$)/, 'reports'],
-  [/^(finance|invoices|settlements)(\/|$)/, 'finance'],
+  [/^(finance|invoices|settlements|expenses)(\/|$)/, 'finance'],
 ];
 export const sectionOf = (path) => (MAP.find(([re]) => re.test(path)) || [])[1] || null;
 // Kullanıcı bu bölümü görebilir mi (yönetici her şeyi; yetkisi tanımlanmamış personel her bölümü).

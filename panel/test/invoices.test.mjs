@@ -102,3 +102,28 @@ test('Hakediş: Trendyol ekstresi saklanır; ödeme günleri, ödenecek toplam v
   assert.equal(r.diffs.length, 1); assert.equal(r.diffs[0].diff, -2);
   resetChannels();
 });
+
+test('Kâr-zarar: reklam, ceza, iade kaybı ve işletme giderleri net kârdan düşer', async () => {
+  const { saveExpense, expenseIn, productProfit } = await import('../src/finance.js');
+  const db = d1(); await init(db);
+  const now = Date.now();
+  const mk = (no, status = 'delivered') => ({ remoteId: no, orderNumber: no, orderedAt: now - 864e5, status, customer: 'A', total: 100, items: [{ lineId: '1', sku: 'S', name: 'Ürün', quantity: 1, unitPrice: 100, total: 100, remoteKey: 'S' }] });
+  await saveOrders(db, 'trendyol', [mk('A1'), mk('A2'), mk('R1', 'returned')]);
+  const ins = (id, type, amount) => db.prepare("INSERT INTO invoices (channel, remote_id, no, date, type, description, amount, order_number, url, synced_at) VALUES ('trendyol', ?, ?, ?, ?, '', ?, '', '', 0)").bind(id, id, now - 2 * 864e5, type, amount).run();
+  await ins('AD1', 'Reklam / pazarlama', 40); await ins('C1', 'Ceza', 5); await ins('H1', 'Hizmet bedeli', 12);
+  await saveExpense(db, { title: 'Ambalaj', category: 'Paketleme', amount: 30, date: now - 3 * 864e5 });
+  const settings = { commission: { trendyol: 10 }, shipping: { trendyol: 20 }, service_fee: {}, fee_rate: {}, withholding: {} };
+  const b = await breakdown(db, settings, { from: now - 10 * 864e5, to: now + 1 });
+  const t = b.total;
+  assert.equal(t.revenue, 200); assert.equal(t.ads, 40); assert.equal(t.penalty, 5); assert.equal(t.fee, 12); assert.equal(t.returns, 1); assert.equal(t.returnLoss, 20);
+  // 200 − 20 komisyon − 40 kargo − 12 hizmet − 40 reklam − 5 ceza − 20 iade = 63
+  assert.equal(t.payout, 63); assert.equal(t.expenses, 30); assert.equal(t.net, 33);
+  assert.equal(b.steps.at(-1).k, 'net');
+  // Tek kanal seçiliyken işletme gideri yok
+  assert.equal((await breakdown(db, settings, { from: now - 10 * 864e5, to: now + 1, channel: 'trendyol' })).steps.some((s) => s.k === 'expenses'), false);
+  // Aylık gider: yarım aylık dönem ≈ yarım tutar
+  const m0 = Date.parse('2026-09-01T00:00:00+03:00'), m15 = Date.parse('2026-09-16T00:00:00+03:00');
+  assert.equal(Math.round(expenseIn({ recurring: 'monthly', amount: 3000, date: m0 - 40 * 864e5 }, m0, m15)), 1500);
+  const pp = await productProfit(db, settings, { from: now - 10 * 864e5, to: now + 1 });
+  assert.equal(pp.rows.length, 1); assert.equal(pp.rows[0].units, 2); assert.equal(pp.rows[0].returns, 1);
+});

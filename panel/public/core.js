@@ -74,6 +74,7 @@ async function request(path, method, body) {
   let data = {};
   try { data = await res.json(); } catch { /* boş */ }
   if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw new Error(data.error || 'Giriş gerekli'); }
+  if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw new Error(data.error); }
   if (!res.ok) { const raw = data.error || `Hata (${res.status})`, e = new Error(friendly(raw)); e.raw = raw; throw e; }
   return data;
 }

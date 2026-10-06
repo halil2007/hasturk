@@ -19,14 +19,14 @@ import { sendMail, orderMail, validEmail, logoPath } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
 import * as chp from './chproducts.js';
-import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity } from './auth.js';
+import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity, twofaApi, resetTfa, security, setSecurity } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
 import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
-import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
+import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
@@ -998,6 +998,17 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if ((x = path.match(/^users\/(\d+)$/)) && m === 'DELETE') { try { await deleteUser(db, Number(x[1]), user); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı silindi (#${x[1]})`); return json({ ok: true }); }
   if ((x = path.match(/^users\/(\d+)\/revoke$/)) && m === 'POST') { await revokeSessions(db, Number(x[1])); await log(db, null, 'info', `${user.name}: kullanıcının oturumları kapatıldı (#${x[1]})`); return json({ ok: true }); }
   if ((x = path.match(/^users\/(\d+)\/activity$/)) && m === 'GET') { try { return json(await userActivity(db, Number(x[1]))); } catch (e) { fail(404, e.message); } }
+  // İki adımlı doğrulama: kendi hesabı (her kullanıcı) ve zorunluluk / sıfırlama (yönetici)
+  if (path === 'me/2fa' || path.startsWith('me/2fa/')) {
+    let r;
+    try { r = await twofaApi(db, user, path, m === 'GET' ? {} : await body(req), { issuer: env.TENANT_NAME || (await getSettings(db)).company.title || 'Hastürk' }); } catch (e) { fail(400, e.message); }
+    if (!r) fail(404, 'Bulunamadı');
+    if (path !== 'me/2fa') await log(db, null, 'info', `${user.name}: iki adımlı doğrulama ${{ 'me/2fa/enable': 'açıldı', 'me/2fa/disable': 'kapatıldı', 'me/2fa/recovery': 'yedek kodları yenilendi', 'me/2fa/setup': 'kurulumu başladı' }[path] || ''}`);
+    return json(r);
+  }
+  if (path === 'users/security' && m === 'GET') return json(await security(db, true));
+  if (path === 'users/security' && m === 'PUT') { const r = await setSecurity(db, await body(req)); await log(db, null, 'info', `${user.name}: iki adımlı doğrulama tüm kullanıcılar için ${r.require2fa ? 'zorunlu yapıldı' : 'isteğe bağlı yapıldı'}`); return json(r); }
+  if ((x = path.match(/^users\/(\d+)\/2fa-reset$/)) && m === 'POST') { await resetTfa(db, Number(x[1])); await revokeSessions(db, Number(x[1])); await log(db, null, 'info', `${user.name}: kullanıcının iki adımlı doğrulaması sıfırlandı (#${x[1]})`); return json({ ok: true }); }
   if (path === 'me/password' && m === 'POST') { const b = await body(req); try { await changeOwnPassword(db, user, b.old, b.new); } catch (e) { fail(400, e.message); } return json({ ok: true }); }
 
   // ---------- bildirimler ----------
@@ -1134,6 +1145,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); const [invoices, costs] = await Promise.all([syncInvoices(env, db, { force: true }), syncCosts(env, db, null, { force: true }).catch((e) => ({ error: e.message }))]); return json({ invoices, costs }); }
+  if (path === 'finance/products' && m === 'GET') return json(await productProfit(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', sort: str(q.sort) }));
+  if (path === 'expenses' && m === 'GET') return json(await listExpenses(db));
+  if (path === 'expenses' && m === 'POST') return json(await saveExpense(db, await body(req)));
+  if ((x = path.match(/^expenses\/(\d+)$/))) {
+    if (m === 'PUT') return json(await saveExpense(db, await body(req), x[1]));
+    if (m === 'DELETE') return json(await deleteExpense(db, x[1]));
+  }
   if (path === 'finance' && m === 'GET') return json(await breakdown(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
 
   // ---------- entegrasyonlar (kanal API bilgileri) ----------

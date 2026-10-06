@@ -4,6 +4,7 @@
 //  - Oturum imzalı, HttpOnly bir çerezde tutulur; şifre değişince eski oturumlar geçersiz olur.
 import { all, first, run, getRaw, setSetting } from './db.js';
 import { PERM_VALUES } from '../public/perms.js';
+import { newSecret, verifyCode, hashCode, recoveryCodes, otpauth, qrSvg } from './totp.js';
 const permsOf = (v) => { try { const a = JSON.parse(v || 'null'); return Array.isArray(a) ? a.filter((k) => PERM_VALUES.includes(k)) : null; } catch { return null; } };
 // Oturum imzası şifreye ve oturum sürümüne bağlı: "oturumları kapat" sürümü artırır, eski çerezler geçersiz olur
 const ver = (u) => u.pass.slice(-12) + (u.sess ? ':' + u.sess : '');
@@ -68,12 +69,12 @@ export async function currentUser(req, env, db) {
   if (uid === '-1') return env.TENANT_SLUG && Number(exp) <= Date.now() + 2 * 3600e3 + 60e3 && same(sig, await hmac(secret(env), `-1.${exp}.support`)) ? { ...SUPPORT, name: 'Destek (ana panel)' } : null;
   if (uid === '0') {
     if (!password(env)) return null;
-    return same(sig, await hmac(secret(env), `0.${exp}.0`)) ? ADMIN : null;
+    return same(sig, await hmac(secret(env), `0.${exp}.0`)) ? { ...ADMIN, twofa: !!(await getTfa(db, 0)).on } : null;
   }
-  const u = await first(db, 'SELECT id, username, name, email, role, active, pass, perms, sess FROM users WHERE id = ?', Number(uid));
+  const u = await first(db, 'SELECT id, username, name, email, role, active, pass, perms, sess, totp FROM users WHERE id = ?', Number(uid));
   if (!u || !u.active) return null;
   if (!same(sig, await hmac(secret(env), `${uid}.${exp}.${ver(u)}`))) return null;
-  return { id: u.id, username: u.username, name: u.name || u.username, email: u.email, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) };
+  return { id: u.id, username: u.username, name: u.name || u.username, email: u.email, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms), twofa: !!tfaOf(u.totp).on };
 }
 
 export async function login(req, env, db, { username, password: pass }) {
@@ -107,16 +108,131 @@ export async function login(req, env, db, { username, password: pass }) {
   }
   if (!user) return { ok: false, status: 401, error: 'Kullanıcı adı veya şifre hatalı' };
   await run(db, 'DELETE FROM settings WHERE k = ?', fk);
-  const exp = String(Date.now() + DAYS * 864e5);
-  const value = encodeURIComponent(`${pre(env)}${user.id}.${exp}.${await hmac(secret(env), `${user.id}.${exp}.${sv}`)}`);
-  const secure = new URL(req.url).protocol === 'https:' ? '; Secure' : '';
-  return { ok: true, user, cookie: `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DAYS * 86400}${secure}` };
+  // İki adımlı doğrulama açıksa oturum ancak kodla verilir: 5 dakikalık imzalı bilet
+  if ((await getTfa(db, user.id)).on) return { ok: false, status: 200, twofa: true, ticket: await ticketFor(env, user.id, sv) };
+  return issue(req, env, user, sv);
 }
+function issue(req, env, user, sv) {
+  const exp = String(Date.now() + DAYS * 864e5);
+  const secure = new URL(req.url).protocol === 'https:' ? '; Secure' : '';
+  return hmac(secret(env), `${user.id}.${exp}.${sv}`).then((sig) => {
+    const v = encodeURIComponent(`${pre(env)}${user.id}.${exp}.${sig}`);
+    return { ok: true, user, cookie: `${COOKIE}=${v}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DAYS * 86400}${secure}` };
+  });
+}
+
+// ---------- iki adımlı doğrulama (TOTP) ----------
+// Kullanıcının ayarı users.totp (JSON: on, secret, last, rec[], pending); ana yöneticininki ayarlarda (totp:admin).
+// "security.require2fa" açıksa tüm kullanıcılar açmak zorundadır (açana kadar panel yalnız kurulum ekranını gösterir).
+const tfaOf = (v) => { try { const o = typeof v === 'string' ? JSON.parse(v) : v; return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
+export async function getTfa(db, uid) {
+  if (uid === 0) return tfaOf(await getRaw(db, 'totp:admin'));
+  const r = await first(db, 'SELECT totp FROM users WHERE id = ?', uid);
+  return tfaOf(r && r.totp);
+}
+async function setTfa(db, uid, o) {
+  if (uid === 0) return setSetting(db, 'totp:admin', o);
+  await run(db, 'UPDATE users SET totp = ? WHERE id = ?', o ? JSON.stringify(o) : null, uid);
+}
+const secCache = new WeakMap();
+export async function security(db, fresh = false) {
+  const c = secCache.get(db);
+  if (!fresh && c && Date.now() - c.at < 30e3) return c.v;
+  const v = { require2fa: false, ...tfaOf(await getRaw(db, 'security')) };
+  secCache.set(db, { at: Date.now(), v });
+  return v;
+}
+export async function setSecurity(db, b) {
+  const v = { ...(await security(db, true)), require2fa: !!b.require2fa };
+  await setSetting(db, 'security', v);
+  secCache.delete(db);
+  return v;
+}
+const TICKET_MS = 5 * 60e3;
+async function ticketFor(env, uid, sv) {
+  const exp = String(Date.now() + TICKET_MS);
+  return `${uid}.${exp}.${await hmac(secret(env), `2fa.${uid}.${exp}.${sv}`)}`;
+}
+// Kod (6 hane) ya da yedek kod doğru mu; doğruysa ayar güncellenir (son adım / kullanılan yedek kod silinir)
+async function checkSecond(db, uid, tf, code) {
+  const c = String(code || '').trim();
+  const at = await verifyCode(tf.secret, c, tf.last ?? -1);
+  if (at != null) { await setTfa(db, uid, { ...tf, last: at }); return 'code'; }
+  if (/[a-z]/i.test(c) && Array.isArray(tf.rec)) {
+    const h = await hashCode(c), i = tf.rec.indexOf(h);
+    if (i >= 0) { await setTfa(db, uid, { ...tf, rec: tf.rec.filter((_, j) => j !== i) }); return 'recovery'; }
+  }
+  return null;
+}
+// Girişin ikinci adımı: bilet + kod → oturum çerezi
+export async function loginSecond(req, env, db, { ticket, code }) {
+  const [uid, exp, sig] = String(ticket || '').split('.');
+  if (!sig || Number(exp) < Date.now()) return { ok: false, status: 401, error: 'Doğrulama süresi doldu, tekrar giriş yapın', restart: true };
+  const id = Number(uid);
+  let user, sv;
+  if (id === 0) { if (env.TENANT_SLUG || !password(env)) return { ok: false, status: 401, error: 'Geçersiz doğrulama', restart: true }; user = ADMIN; sv = '0'; }
+  else {
+    const u = await first(db, 'SELECT * FROM users WHERE id = ? AND active = 1', id);
+    if (!u) return { ok: false, status: 401, error: 'Geçersiz doğrulama', restart: true };
+    user = { id: u.id, username: u.username, name: u.name || u.username, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) }; sv = ver(u);
+  }
+  if (!same(sig, await hmac(secret(env), `2fa.${uid}.${exp}.${sv}`))) return { ok: false, status: 401, error: 'Geçersiz doğrulama', restart: true };
+  // Kod denemesi sınırı: kullanıcı başına 15 dakikada 6 hatalı kod
+  const fk = `tfa_fail:${id}`, now = Date.now(), f = tfaOf(await getRaw(db, fk));
+  if (f.at > now - 15 * 60e3 && f.n >= 6) return { ok: false, status: 429, error: 'Çok fazla hatalı kod. 15 dakika sonra tekrar deneyin.' };
+  const tf = await getTfa(db, id);
+  const how = tf.on ? await checkSecond(db, id, tf, code) : 'off';
+  if (!how) {
+    await setSetting(db, fk, { n: f.at > now - 15 * 60e3 ? (f.n || 0) + 1 : 1, at: f.at > now - 15 * 60e3 ? f.at : now });
+    return { ok: false, status: 401, error: 'Kod hatalı. Uygulamadaki güncel kodu girin.' };
+  }
+  await run(db, 'DELETE FROM settings WHERE k = ?', fk);
+  if (id) await run(db, 'UPDATE users SET last_login = ?, last_ip = ? WHERE id = ?', Date.now(), (req.headers.get('CF-Connecting-IP') || '').slice(0, 64) || null, id);
+  const r = await issue(req, env, user, sv);
+  return { ...r, recoveryUsed: how === 'recovery', recoveryLeft: how === 'recovery' ? ((await getTfa(db, id)).rec || []).length : undefined };
+}
+
+// Hesabım → iki adımlı doğrulama: durum, kurulum (QR), açma, kapatma, yeni yedek kodlar
+export async function twofaApi(db, user, path, b, { issuer = 'Hastürk' } = {}) {
+  if (user.support) throw new Error('Destek oturumunda kullanılamaz');
+  const id = user.id, tf = await getTfa(db, id), sec = await security(db);
+  if (path === 'me/2fa') return { on: !!tf.on, required: !!sec.require2fa, recoveryLeft: (tf.rec || []).length };
+  if (path === 'me/2fa/setup') {
+    const sk = newSecret(), uri = otpauth({ issuer, account: user.username || user.name, secret: sk });
+    await setTfa(db, id, { ...tf, pending: sk, pendingAt: Date.now() });
+    return { secret: sk.replace(/(.{4})/g, '$1 ').trim(), uri, qr: qrSvg(uri) };
+  }
+  if (path === 'me/2fa/enable') {
+    if (!tf.pending || Date.now() - (tf.pendingAt || 0) > 30 * 60e3) throw new Error('Kurulum süresi doldu; QR kodunu yeniden oluşturun');
+    const at = await verifyCode(tf.pending, b.code);
+    if (at == null) throw new Error('Kod hatalı. Uygulamada görünen güncel 6 haneli kodu girin.');
+    const r = await recoveryCodes();
+    await setTfa(db, id, { on: true, secret: tf.pending, last: at, rec: r.hashes, at: Date.now() });
+    return { ok: true, recovery: r.codes };
+  }
+  if (path === 'me/2fa/disable') {
+    if (!tf.on) return { ok: true };
+    if (sec.require2fa) throw new Error('Yöneticiniz iki adımlı doğrulamayı zorunlu tuttuğu için kapatılamaz');
+    if (!(await checkSecond(db, id, tf, b.code))) throw new Error('Kod hatalı');
+    await setTfa(db, id, null);
+    return { ok: true };
+  }
+  if (path === 'me/2fa/recovery') {
+    if (!tf.on) throw new Error('İki adımlı doğrulama kapalı');
+    if (!(await checkSecond(db, id, tf, b.code))) throw new Error('Kod hatalı');
+    const r = await recoveryCodes();
+    await setTfa(db, id, { ...(await getTfa(db, id)), rec: r.hashes });
+    return { ok: true, recovery: r.codes };
+  }
+  return null;
+}
+// Yönetici: telefonunu kaybeden kullanıcının iki adımlı doğrulamasını sıfırla (bir sonraki girişte yeniden kurar)
+export const resetTfa = (db, id) => setTfa(db, id, null);
 export const logoutCookie = () => `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;
 
 // ---------- kullanıcı yönetimi ----------
-export const listUsers = async (db) => (await all(db, `SELECT id, username, name, email, phone, title, note, role, active, created_at, last_login, last_ip, perms, template
-  FROM users ORDER BY active DESC, name COLLATE NOCASE`)).map((u) => ({ ...u, perms: permsOf(u.perms) }));
+export const listUsers = async (db) => (await all(db, `SELECT id, username, name, email, phone, title, note, role, active, created_at, last_login, last_ip, perms, template, totp
+  FROM users ORDER BY active DESC, name COLLATE NOCASE`)).map((u) => ({ ...u, totp: undefined, twofa: !!tfaOf(u.totp).on, perms: permsOf(u.perms) }));
 const clip = (v, n) => String(v ?? '').trim().slice(0, n);
 export async function saveUser(db, id, b, { maxUsers = 0 } = {}) {
   const username = String(b.username || '').trim(), name = String(b.name || '').trim();

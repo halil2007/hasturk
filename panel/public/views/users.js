@@ -26,6 +26,7 @@ export async function users(el) {
       <span class="spacer"></span>
       <button class="btn primary" data-act="add" data-fab><i class="ico ico-plus"></i>Personel ekle</button>
     </div>
+    <div class="card row wrap" data-sec style="gap:12px;align-items:center"></div>
     <div class="tabs" data-tabs></div>
     <div class="card flush" data-box></div>
     <details class="card"><summary><b>Roller ve yetki düzeyleri nasıl çalışır?</b></summary>
@@ -55,7 +56,24 @@ export async function users(el) {
   const avatar = (u) => html`<span class="u-av ${u.role === 'admin' ? 'adm' : ''} ${u.active ? '' : 'off'}">${initials(u.name)}</span>`;
   const lastIn = (u) => (u.last_login ? html`<span title="${dateTime(u.last_login)}${u.last_ip ? ` · IP ${u.last_ip}` : ''}">${ago(u.last_login)}</span>` : html`<span class="muted">hiç girmedi</span>`);
 
+  // Güvenlik: iki adımlı doğrulama herkes için zorunlu mu
+  let sec = { require2fa: false };
+  function drawSec() {
+    const on2 = rows.filter((u) => u.active && u.twofa).length, act = rows.filter((u) => u.active).length;
+    render($('[data-sec]', el), html`<i class="ico ico-key" style="color:var(--primary)"></i><div style="flex:1;min-width:220px"><b>İki adımlı doğrulama (Google Authenticator)</b>
+        <div class="muted small">${sec.require2fa ? 'Tüm kullanıcılar için zorunlu: açmayan kişi bir sonraki işleminde kurulum ekranını görür.' : 'İsteğe bağlı: her kullanıcı sağ üstteki hesap menüsünden açabilir.'} ${act ? `${on2}/${act} aktif kullanıcıda açık.` : ''}</div></div>
+      <label class="switch-row" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" data-req2 ${sec.require2fa ? 'checked' : ''}><span class="small" style="font-weight:650">Herkes için zorunlu</span></label>`);
+    $('[data-req2]', el).onchange = async (e) => {
+      const want = e.target.checked;
+      if (want && !(state.user || {}).twofa && !(await confirmBox('Zorunlu yapınca siz dahil iki adımlı doğrulamayı açmamış herkes bir sonraki işleminde kurulum ekranına yönlendirilir. Devam edilsin mi?', 'Zorunlu yap'))) { e.target.checked = false; return; }
+      sec = await api('users/security', { method: 'PUT', body: { require2fa: want } }).catch((x) => { toast(x.message, true); return sec; });
+      toast(sec.require2fa ? 'İki adımlı doğrulama herkes için zorunlu' : 'İki adımlı doğrulama isteğe bağlı');
+      drawSec();
+      if (sec.require2fa && !(state.user || {}).twofa) setTimeout(() => location.reload(), 900);
+    };
+  }
   function draw() {
+    drawSec();
     const me = state.user || {}, list = visible();
     const act = rows.filter((u) => u.active), week = rows.filter((u) => u.last_login && Date.now() - u.last_login < 7 * 864e5);
     render($('[data-kpis]', el), html`
@@ -71,7 +89,7 @@ export async function users(el) {
       render($('[data-box]', el), html`<div class="m-list">${all.map((u) => html`<div class="m-card u-card" data-id="${u.id}">
           <div class="row">${avatar(u)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${u.name}${me.id === u.id && !u.main ? html` <span class="muted tiny">(siz)</span>` : ''}</div><div class="muted tiny ellipsis">${u.title ? u.title + ' · ' : ''}${u.main ? 'şifre: Cloudflare PANEL_PASSWORD' : u.username}</div></div>
             ${u.main ? '' : html`<button class="icon-btn sm" data-act="menu" aria-label="İşlemler"><i class="ico ico-dots"></i></button>`}</div>
-          <div class="row wrap" style="gap:6px"><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role]}</span>${u.template ? html`<span class="pill">${tplName(u.template)}</span>` : ''}<span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span>${u.main ? '' : html`<span class="muted tiny" style="margin-left:auto">${lastIn(u)}</span>`}</div>
+          <div class="row wrap" style="gap:6px"><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role]}</span>${u.template ? html`<span class="pill">${tplName(u.template)}</span>` : ''}<span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span>${u.twofa ? html`<span class="pill good">2 adımlı</span>` : ''}${u.main ? '' : html`<span class="muted tiny" style="margin-left:auto">${lastIn(u)}</span>`}</div>
           ${u.main ? '' : permChips(u)}
         </div>`)}${all.length ? '' : html`<div class="empty">Kayıt yok</div>`}</div>`);
       return;
@@ -83,11 +101,14 @@ export async function users(el) {
         <td><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role]}</span>${u.template && u.role !== 'admin' ? html`<div class="muted tiny" style="margin-top:3px">${tplName(u.template)}</div>` : ''}</td>
         <td style="max-width:420px">${u.main ? html`<span class="muted tiny">Tüm bölümler ve yönetim</span>` : permChips(u)}</td>
         <td class="small">${u.main ? html`<span class="muted">—</span>` : lastIn(u)}</td>
-        <td><span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span></td>
+        <td><span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span>${u.twofa ? html`<div class="tiny" style="margin-top:3px;color:var(--good)" title="İki adımlı doğrulama açık"><i class="ico ico-key" style="width:12px;height:12px;vertical-align:-1px"></i> 2 adımlı</div>` : ''}</td>
         <td class="r">${u.main ? '' : html`<div class="row" style="justify-content:flex-end;gap:4px"><button class="btn sm" data-act="edit">Düzenle</button><button class="icon-btn sm" data-act="menu" aria-label="İşlemler"><i class="ico ico-dots"></i></button></div>`}</td></tr>`)}
     </tbody></table></div>${all.length ? '' : html`<div class="empty">${rows.length ? 'Bu filtrede kayıt yok' : 'Henüz personel eklenmedi'}</div>`}`);
   }
-  const refresh = async () => { rows = await api('users', { fresh: true }).catch((e) => { toast(e.message, true); return []; }); draw(); };
+  const refresh = async () => {
+    [rows, sec] = await Promise.all([api('users', { fresh: true }).catch((e) => { toast(e.message, true); return []; }), api('users/security', { fresh: true }).catch(() => sec)]);
+    draw();
+  };
 
   // ---------- form ----------
   function form(u) {
@@ -184,6 +205,7 @@ export async function users(el) {
         if (!(await confirmBox(`${u.name} için yeni şifre oluşturulsun mu? Açık oturumları kapanır. Yeni şifre: ${p}`, 'Şifreyi değiştir'))) return;
         await api(`users/${u.id}`, { method: 'PUT', body: { ...u, password: p, active: !!u.active } }).then(() => { navigator.clipboard && navigator.clipboard.writeText(p).catch(() => {}); toast(`Yeni şifre: ${p} (panoya kopyalandı)`); }).catch((e) => toast(e.message, true));
       } },
+      ...(u.twofa ? [{ icon: 'key', label: 'İki adımlı doğrulamayı sıfırla', run: async () => { if (await confirmBox(`${u.name} telefonunu kaybettiyse iki adımlı doğrulaması sıfırlanır ve oturumları kapanır. Bir sonraki girişte ${sec.require2fa ? 'yeniden kurması istenir' : 'yalnız şifreyle girer'}.`, 'Sıfırla')) api(`users/${u.id}/2fa-reset`, { method: 'POST' }).then(() => { toast('Sıfırlandı'); refresh(); }).catch((e) => toast(e.message, true)); } }] : []),
       { icon: 'x', label: 'Tüm cihazlardan çıkış yaptır', run: async () => { if (await confirmBox(`${u.name} tüm cihazlarda oturumdan çıkarılsın mı? Şifresi değişmez, tekrar giriş yapabilir.`, 'Çıkış yaptır')) api(`users/${u.id}/revoke`, { method: 'POST' }).then(() => toast('Oturumlar kapatıldı')).catch((e) => toast(e.message, true)); } },
       ...(me.id !== u.id ? [{ icon: u.active ? 'minus' : 'check', label: u.active ? 'Pasifleştir (giriş yapamaz)' : 'Aktifleştir', run: () => api(`users/${u.id}`, { method: 'PUT', body: { ...u, active: !u.active } }).then(() => { toast(u.active ? 'Hesap pasifleştirildi' : 'Hesap aktifleştirildi'); refresh(); }).catch((e) => toast(e.message, true)) },
         '-', { icon: 'x', label: 'Personeli sil', danger: true, run: async () => { if (await confirmBox(`${u.name} kalıcı olarak silinsin mi? Geçmiş işlem kayıtlarında adı kalır. Geçici ayrılıklar için “Pasifleştir” daha uygundur.`, 'Sil')) api(`users/${u.id}`, { method: 'DELETE' }).then(() => { toast('Silindi'); refresh(); }).catch((e) => toast(e.message, true)); } }] : []),

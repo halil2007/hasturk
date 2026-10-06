@@ -92,7 +92,7 @@ export async function tenantLogin(req, env, b) {
   if (!t.active) return json({ error: 'Bu müşteri paneli askıya alınmış. Lütfen hizmet sağlayıcınızla görüşün.' }, 403);
   if (expired(t)) return json({ error: 'Aboneliğinizin süresi doldu. Yenilemek için hizmet sağlayıcınızla görüşün.' }, 403);
   const h = new Headers(req.headers); h.set('Content-Type', 'application/json');
-  return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify({ username: b.username, password: b.password }) }), env, t);
+  return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify(b.ticket ? { ticket: b.ticket, code: b.code } : { username: b.username, password: b.password }) }), env, t);
 }
 
 // ---------- ana panel: müşteri panellerini yönetme (yalnız ana panelin yöneticisi) ----------

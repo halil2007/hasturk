@@ -14,6 +14,8 @@ export const GLOSSARY = {
   'Stopaj': 'Pazaryerinin satıştan kesip vergi dairesine yatırdığı vergi (genelde %1); yıllık vergiden düşülür.',
   'Buybox': 'Aynı ürünü birden fazla satıcı satıyorsa pazaryerinin ürün sayfasında öne çıkardığı satıcı. Fiyatınız rakiplerden iyiyse buybox sizde olur.',
   'Fiyat önerisi': 'Rakiplerin pazaryerindeki fiyatına göre hazırlanan öneri: birinci sırayı almak için rakibin hemen altı ya da birinci sıra sizdeyse kârı artıracak fiyat.',
+  'Net kâr': 'Brüt kâr (hakediş − alış maliyeti) eksi işletme giderleri (kira, personel, paketleme …). Gerçekte cebinize kalan.',
+  'İade kaybı': 'İade edilen siparişte geri gelmeyen gönderim kargosu. İade kargosu pazaryerinin kargo faturasında ayrıca yer alır.',
   'Kritik stok': 'Bu adedin altına inen ürün için uyarı alırsınız.',
 };
 
@@ -32,7 +34,7 @@ const PAGES = {
   kampanyalar: ['Kampanyalar', 'Rakip fiyatlarına göre fiyat önerileri ve Hepsiburada sepet indirimleri.', ['"Birinciliği al" sekmesi rakibin önde olduğu ürünleri ve önerilen fiyattaki kârınızı gösterir.', '"Kâr artır" sekmesi birinci sıra sizdeyken fiyatı yükseltebileceğiniz ürünleri gösterir.', 'Uygun olanı tek tıkla ya da seçip toplu uygulayın; fiyat kanala gönderilir.'], ['Fiyat önerisi', 'Buybox']],
   buybox: ['Buybox', 'Aynı ürünü satan rakiplere göre sıranız ve fiyat farkı.', ['"Kaybedilen" sekmesi rakibin önde olduğu ürünleri gösterir.', 'Ürüne en düşük / en yüksek fiyat kuralı tanımlayıp otomatik fiyatı açabilirsiniz.'], ['Buybox']],
   analiz: ['Satış analizi', 'Günlük, haftalık, aylık satış; en çok satanlar ve illere göre satış.', ['Üstteki kanal sekmesiyle tek kanalı inceleyin.', 'Dönem düğmeleriyle karşılaştırın.'], []],
-  'gelir-gider': ['Gelir & gider', 'Satıştan kâra: komisyon, kargo, hizmet bedeli, stopaj ve hakediş.', ['Kesinti oranlarınızı Ayarlar → Giderler\'den kontrol edin.', 'Alış fiyatı eksik ürünler kârı olduğundan yüksek gösterir; Ürünler\'den tamamlayın.'], ['Hakediş', 'Stopaj']],
+  'gelir-gider': ['Gelir & gider', 'Kâr-zarar: satıştan net kâra komisyon, kargo, hizmet bedeli, stopaj, reklam, ceza, iade kaybı ve işletme giderleri.', ['Kesinti oranlarınızı Ayarlar → Giderler\'den kontrol edin.', 'Kira, personel, paketleme gibi giderleri "İşletme giderleri" bölümünden ekleyin; net kâr buna göre hesaplanır.', '"Ürünlere göre kârlılık" hangi ürünün kazandırıp hangisinin zarar ettirdiğini gösterir.', 'Alış fiyatı eksik ürünler kârı olduğundan yüksek gösterir; Ürünler\'den tamamlayın.'], ['Hakediş', 'Stopaj', 'Net kâr', 'İade kaybı']],
   kar: ['Kâr hesapla', 'Bir ürünün satış fiyatında ne kadar kazandığınızı hesaplar.', ['Satış ve alış fiyatını girin; komisyon kanalı seçince dolar.', 'Hedef kâr oranına göre satış fiyatı önerisi alın.'], ['Stopaj']],
   musteriler: ['Müşteriler', 'Müşterileriniz, tekrar sipariş verenler ve illere göre dağılım.', ['Listeden müşteriye tıklayınca tüm siparişleri görünür.'], []],
   entegrasyonlar: ['Entegrasyonlar', 'Satış kanallarınızı (site ve pazaryerleri) bağladığınız yer.', ['Kanal kartında "Bağla"ya basın.', 'Kanalın satıcı panelinden aldığınız API bilgilerini girip "Kaydet ve bağlantıyı test et"e basın.', 'Bağlantı doğrulanınca siparişler ve ürünler kendiliğinden gelir.'], ['Kanala yazma', 'Stok gönderimi']],
