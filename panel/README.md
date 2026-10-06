@@ -224,6 +224,18 @@ Kullanıcılar → **Müşteri panelleri** (yalnız ana panel yöneticisi): firm
 - **Cloudflare limitleri:** Ücretsiz planda istek başına işlemci süresi ve veritabanı sorgu sayısı sınırlıdır. Kayıtlarda "CPU" veya "too many" hatası görünürse **Workers Paid** planına (aylık 5 $) geçin. Kod değişikliği gerekmez.
 - **Kişisel veriler:** Müşteri adı, adresi ve telefonu yalnızca sizin Cloudflare veritabanınızda tutulur. Panel girişsiz hiçbir veri vermez. Oturum, imzalı ve HttpOnly bir çerezle tutulur. Başka sitelerden gelen yazma istekleri reddedilir.
 
+## Dış API (stok aktarımı)
+
+Yalnız ana panelin yetkilendirdiği müşteri panelleri için: **Firmalar → firma → Dış API (stok aktarımı) → API erişimini aç**.
+Anahtar bir kez gösterilir (veritabanında yalnız özeti tutulur) ve firma koduna bağlıdır; dış sistem yalnız o mağazanın ürün ve
+stoklarını **okur** (yazma yok). Firma yöneticisi bu ayarı göremez / değiştiremez. İsteğe bağlı IP kısıtı (adres ya da IPv4 aralığı),
+dakikada 120 istek; kapatma, yeni anahtar (eskisi hemen geçersiz) ve son erişim / istek sayısı aynı kartta.
+
+```bash
+curl -H "Authorization: Bearer hst_<firma-kodu>_<gizli>" "https://<panel-adresi>/api/v1/stock?page=1&limit=500"
+# parametreler: page, limit (≤1000), updated_since (ISO / ms), sku, barcode, include_inactive=1 · bağlantı testi: /api/v1/ping
+```
+
 ## Geliştirme
 
 ```bash

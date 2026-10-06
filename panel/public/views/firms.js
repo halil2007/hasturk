@@ -159,6 +159,62 @@ export async function firmsView(el) {
     });
   }
 
+  // ---------- dış API (stok aktarımı) ----------
+  // Yalnız ana panel yetkilendirir: anahtar firma koduna bağlıdır, dış sistem yalnız o mağazanın ürün ve stoklarını okur.
+  const apiBase = () => location.origin + '/api/v1';
+  function apiCard(t2) {
+    const a = t2.api || {};
+    return html`<div class="card"><div class="card-head"><h3>Dış API (stok aktarımı)</h3><span class="pill ${a.on ? 'good' : ''}">${a.on ? 'Açık' : 'Kapalı'}</span></div>
+      <div class="muted small" style="margin-bottom:8px">Firmanın kendi sistemi (ERP, site, muhasebe) bu mağazanın ürün ve stoklarını okur. Yalnız bu mağaza; yazma yok. Firma yöneticisi bu ayarı göremez ve değiştiremez.</div>
+      ${a.hasKey ? html`<dl class="kv"><dt>Anahtar</dt><dd class="num">${a.hint}</dd><dt>Oluşturma</dt><dd>${a.created_at ? dateTime(a.created_at) : '—'}</dd>
+        <dt>Son erişim</dt><dd>${a.last_at ? html`${ago(a.last_at)}${a.last_ip ? html` <span class="muted tiny">(${a.last_ip})</span>` : ''}` : 'henüz yok'}</dd><dt>Toplam istek</dt><dd>${n(a.calls || 0)}</dd></dl>` : ''}
+      <label class="field" style="margin-top:8px"><span>İzin verilen IP adresleri (isteğe bağlı)</span><textarea class="input" rows="2" data-api-ips placeholder="Boş: her yerden · ör. 85.105.10.25, 85.105.10.0/24">${(a.ips || []).join(', ')}</textarea></label>
+      <div class="row wrap" style="gap:6px;margin-top:8px">
+        ${!a.hasKey ? html`<button class="btn sm primary" data-x="api-enable"><i class="ico ico-key"></i>API erişimini aç</button>`
+          : html`${a.on ? html`<button class="btn sm" data-x="api-disable">Kapat</button>` : html`<button class="btn sm primary" data-x="api-resume">Yeniden aç</button>`}<button class="btn sm" data-x="api-rotate"><i class="ico ico-sync"></i>Yeni anahtar</button>`}
+        <button class="btn sm ghost" data-x="api-ips">IP kısıtını kaydet</button><span class="spacer"></span><button class="btn sm ghost" data-x="api-doc"><i class="ico ico-help"></i>Kullanım kılavuzu</button>
+      </div></div>`;
+  }
+  const apiGuide = (t2, key = '<API_ANAHTARI>') => `Hastürk — Stok API (${t2.name})
+
+Adres:   ${apiBase()}/stock
+Yöntem:  GET (yalnız okuma)
+Başlık:  Authorization: Bearer ${key}
+
+Örnek:
+curl -H "Authorization: Bearer ${key}" "${apiBase()}/stock?page=1&limit=500"
+
+Parametreler (isteğe bağlı):
+  page, limit            sayfalama (limit en fazla 1000; varsayılan 500)
+  updated_since          yalnız bu tarihten sonra değişenler (ISO tarih ya da milisaniye) — düzenli çekimde önerilir
+  sku / barcode          tek ürün
+  include_inactive=1     pasif ürünler de gelsin
+
+Yanıt:
+{ "store": {...}, "page": 1, "limit": 500, "total": 1250, "has_more": true, "generated_at": "...",
+  "items": [ { "id": 12, "sku": "HG-SOL-5", "barcode": "869...", "name": "...", "variant": "5 Kg", "brand": "...",
+               "stock": 20, "price": 189.9, "vat": 20, "active": true, "updated_at": "2026-10-06T09:12:00.000Z" } ] }
+
+Bağlantı testi: ${apiBase()}/ping
+Sınır: dakikada 120 istek. Hata kodları: 401 anahtar geçersiz, 403 erişim kapalı / IP izni yok, 429 sınır aşıldı.
+Anahtarı kimseyle paylaşmayın; sızdığını düşünürseniz Hastürk'ten yenisini isteyin.`;
+  function apiKeyShow(t2, key) {
+    const s2 = sheet({ title: 'API anahtarı oluşturuldu', size: 'narrow', body: html`<div class="stack">
+      <div class="notice warn small"><i class="ico ico-warn"></i><div>Anahtar <b>yalnız bir kez</b> gösterilir. Kopyalayıp firmanın dış sistemine girin (ya da güvenli yolla firmaya iletin).</div></div>
+      <input class="input num" readonly value="${key}" data-k style="font-size:13px">
+      <div class="row wrap" style="gap:6px"><button class="btn sm primary" data-c="key"><i class="ico ico-copy"></i>Anahtarı kopyala</button><button class="btn sm" data-c="doc"><i class="ico ico-copy"></i>Kılavuzu anahtarla kopyala</button></div>
+    </div>`, foot: html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>` });
+    s2.el.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-c]');
+      if (c) navigator.clipboard.writeText(c.dataset.c === 'key' ? key : apiGuide(t2, key)).then(() => toast('Kopyalandı')).catch(() => toast('Kopyalanamadı; elle seçin', true));
+    });
+  }
+  function apiDoc(t2) {
+    const s2 = sheet({ title: 'Stok API — kullanım kılavuzu', size: 'wide', body: html`<pre class="err-stack" style="max-height:none;font-size:12.5px">${apiGuide(t2)}</pre>`,
+      foot: html`<span class="spacer"></span><button class="btn" data-copy><i class="ico ico-copy"></i>Kopyala</button><button class="btn primary" data-close>Kapat</button>` });
+    $('[data-copy]', s2.el).onclick = () => navigator.clipboard.writeText(apiGuide(t2)).then(() => toast('Kılavuz kopyalandı')).catch(() => {});
+  }
+
   // ---------- firma ayrıntısı ----------
   async function detail(slug) {
     const t = bySlug(slug);
@@ -190,6 +246,7 @@ export async function firmsView(el) {
             <div class="card"><div class="card-head"><h3>Firma bilgileri</h3></div><dl class="kv">
               ${[['Ünvan', t2.legal], ['Vergi', t2.tax], ['Yetkili', t2.contact], ['E-posta', t2.email], ['Telefon', t2.phone], ['Şehir', t2.city], ['Adres', t2.address], ['Panel yöneticisi', t2.admin_username], ['Oluşturma', date(t2.created_at)], ['Not', t2.note]].filter(([, v]) => v).map(([k, v]) => html`<dt>${k}</dt><dd>${v}</dd>`)}</dl>
               <div class="row" style="margin-top:10px"><input class="input" readonly value="${link}" style="flex:1;font-size:13px"><button class="btn sm" data-x="copy"><i class="ico ico-copy"></i>Giriş adresi</button></div></div>
+            ${apiCard(t2)}
             <div class="card"><div class="card-head"><h3>Yönetim</h3></div><div class="stack" style="gap:8px">
               <div class="row"><input class="input" type="password" data-newpw placeholder="Firma yöneticisi için yeni şifre" autocomplete="new-password" style="flex:1"><button class="btn sm" data-x="pw">Şifreyi sıfırla</button></div>
               <div class="row wrap"><button class="btn sm" data-x="toggle">${t2.active ? 'Askıya al' : 'Askıdan çıkar'}</button><span class="spacer"></span><button class="btn sm ghost" data-x="del" style="color:var(--bad)"><i class="ico ico-x"></i>Firmayı ve tüm verisini sil</button></div>
@@ -202,6 +259,18 @@ export async function firmsView(el) {
       if (!x) return;
       const t2 = bySlug(slug) || t, k = x.dataset.x;
       if (k === 'pay') payment(t2, draw2);
+      if (k.startsWith('api-')) {
+        const act = k.slice(4);
+        if (act === 'doc') return apiDoc(t2);
+        if (act === 'rotate' && !(await confirmBox('Yeni anahtar oluşturulsun mu? Eski anahtar hemen geçersiz olur; firmanın dış sistemine yenisini girmeniz gerekir.', 'Yeni anahtar'))) return;
+        if (act === 'disable' && !(await confirmBox(`${t2.name} için dış API erişimi kapatılsın mı? Dış sistem stokları okuyamaz (anahtar saklanır, yeniden açılabilir).`, 'Kapat'))) return;
+        busy(x, async () => {
+          const r = await api(`tenants/${slug}/api`, { method: 'POST', body: { action: act, ips: act === 'ips' ? $('[data-api-ips]', s.el).value : undefined } });
+          await refresh(); await draw2();
+          if (r.key) apiKeyShow(t2, r.key); else toast({ disable: 'API erişimi kapatıldı', resume: 'API erişimi açıldı', ips: 'IP kısıtı kaydedildi' }[act] || 'Kaydedildi');
+        });
+        return;
+      }
       if (k === 'edit') { s.close(); form(t2); }
       if (k === 'copy') { navigator.clipboard.writeText(location.origin + '/?firma=' + slug).then(() => toast('Giriş adresi kopyalandı')).catch(() => {}); }
       if (k === 'usage') busy(x, async () => { await api(`tenants/${slug}/stats`, { fresh: true }); await refresh(); await draw2(); });

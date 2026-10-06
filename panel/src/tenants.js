@@ -8,6 +8,7 @@ import { all, first, run, init } from './db.js';
 import { handle, report5xx } from './handler.js';
 import { recordError, clientReport } from './errors.js';
 import { PerfBuffer } from './perf.js';
+import { extApiInner, apiOf, apiPublic, newKey, parseIps } from './extapi.js';
 import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
 import { hashPassword, supportCookie, currentUser } from './auth.js';
@@ -101,7 +102,7 @@ export async function tenantLogin(req, env, b) {
 const parse = (s) => { try { return JSON.parse(s || 'null'); } catch { return null; } };
 const pub = (t) => ({ slug: t.slug, name: t.name, email: t.email, phone: t.phone, note: t.note, active: !!t.active, admin_username: t.admin_username, created_at: t.created_at, updated_at: t.updated_at,
   legal: t.legal || '', tax: t.tax || '', contact: t.contact || '', address: t.address || '', city: t.city || '', plan: t.plan || '', fee: t.fee ?? null, period: t.period || 'monthly',
-  starts_at: t.starts_at || null, expires_at: t.expires_at || null, trial: !!t.trial, max_users: t.max_users || null, usage: parse(t.usage), usage_at: t.usage_at || null, expired: expired(t) });
+  starts_at: t.starts_at || null, expires_at: t.expires_at || null, trial: !!t.trial, max_users: t.max_users || null, usage: parse(t.usage), usage_at: t.usage_at || null, expired: expired(t), api: apiPublic(t) });
 // Firma kartı alanları (oluşturma ve düzenleme)
 const DAY = 864e5;
 const dateMs = (v, end = false) => { const s = str(v); if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null; const ms = Date.parse(s + (end ? 'T23:59:59+03:00' : 'T00:00:00+03:00')); return Number.isFinite(ms) ? ms : null; };
@@ -147,7 +148,7 @@ export async function tenantApi(req, env, db, path, user) {
     cache.delete(slug);
     return { ok: true, tenant: pub(t) };
   }
-  if ((x = path.match(/^tenants\/([a-z0-9-]+)(?:\/(stats|password|support|delete|payments))?(?:\/(\d+))?$/))) {
+  if ((x = path.match(/^tenants\/([a-z0-9-]+)(?:\/(stats|password|support|delete|payments|api))?(?:\/(\d+))?$/))) {
     const t = await getTenant(db, x[1], true);
     if (!t) fail(404, 'Müşteri paneli bulunamadı');
     const op = x[2];
@@ -181,6 +182,23 @@ export async function tenantApi(req, env, db, path, user) {
       return { ok: true, expires_at: expires };
     }
     if (op === 'payments' && m === 'DELETE' && x[3]) { await run(db, 'DELETE FROM tenant_payments WHERE id = ? AND slug = ?', Number(x[3]), t.slug); return { ok: true }; }
+    // Dış API (stok aktarımı): yalnız ana panel açar / kapatır / anahtar üretir; firma yöneticisi göremez ve değiştiremez
+    if (op === 'api' && m === 'GET') return apiPublic(t);
+    if (op === 'api' && m === 'POST') {
+      const a = apiOf(t), act = str(b.action);
+      let key = null;
+      if (act === 'enable' || act === 'rotate') {
+        const k = await newKey(t.slug);
+        Object.assign(a, { on: true, hash: k.hash, hint: k.hint, created_at: Date.now(), by: user.name || '' });
+        key = k.key;
+      } else if (act === 'disable') a.on = false;
+      else if (act === 'resume') { if (!a.hash) fail(400, 'Önce anahtar oluşturun'); a.on = true; }
+      else if (act === 'ips') { try { a.ips = parseIps(b.ips); } catch (e) { fail(400, e.message); } }
+      else fail(400, 'Geçersiz işlem');
+      await run(db, 'UPDATE tenants SET api = ?, updated_at = ? WHERE slug = ?', JSON.stringify(a), Date.now(), t.slug);
+      cache.delete(t.slug);
+      return { ok: true, key, api: apiPublic({ api: JSON.stringify(a) }) };
+    }
     if (op === 'password' && m === 'POST') {
       if (String(b.password || '').length < 8) fail(400, 'Şifre en az 8 karakter olmalı');
       return admin(env, t, 'password', { username: str(b.username) || t.admin_username, password: String(b.password) });
@@ -232,6 +250,12 @@ export class TenantPanel {
     if (!env) return json({ error: 'Müşteri paneli tanımsız' }, 400);
     const url = new URL(req.url);
     if (url.pathname === '/__admin') return this.adminOp(env, await req.json().catch(() => ({})));
+    // Dış API: anahtar Worker'da doğrulandı (bu yol yalnız Worker içinden gelir; tarayıcı istekleri /api/ ile başlar)
+    if (url.pathname.startsWith('/__api/')) {
+      if (await this.ctx.storage.get('suspended')) return json({ error: 'Mağaza paneli askıda' }, 403);
+      await init(this.db);
+      return extApiInner(this.db, url, this.t);
+    }
     if (await this.ctx.storage.get('suspended')) return json({ error: 'Bu müşteri paneli askıya alınmış' }, 403);
     // Destek talepleri: firmanın kendi talepleri, ana panelin veritabanında (ana panel yanıtlar)
     const sp = url.pathname.replace(/^\/api\//, '').replace(/\/+$/, '');
