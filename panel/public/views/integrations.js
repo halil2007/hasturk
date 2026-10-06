@@ -125,7 +125,7 @@ export async function integrations(el, rest = []) {
         ${live ? html`<button class="btn sm" data-act="sync" data-id="${c.id}"><i class="ico ico-sync"></i>Siparişleri ve ürünleri çek</button>` : ''}</div>
       <div class="idetail" data-ch="${c.id}">
         <aside class="card id-side">
-          <div class="id-brand">${chLogo(c.id)}<div style="min-width:0"><h2 class="ellipsis">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2><div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${s.t}</div></div></div>
+          <div class="id-brand">${chLogo(c.id)}<div style="min-width:0"><h2>${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2><div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${s.t}</div></div></div>
           ${c.beta ? html`<div class="notice small"><div><b>Test modülü:</b> yalnız bu panelde açık; firmalarda “Yakında” görünür.</div></div>` : ''}
           <div class="id-sws">
             ${sw(`data-active="${c.id}"`, c.active, 'Kanal aktif', 'Kapalıysa senkronlanmaz', !admin)}
