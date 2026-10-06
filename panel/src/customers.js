@@ -47,20 +47,29 @@ export async function summary(db, q = {}) {
   await fillKeys(db);
   const { where, args } = range(q);
   const W = 'WHERE ' + where.join(' AND ');
-  const per = await all(db, `SELECT o.ckey, COUNT(*) AS n, SUM(o.total) AS spend, MIN(o.ordered_at) AS first_at FROM orders o ${W} GROUP BY o.ckey`, ...args);
+  const since = Date.now() - 365 * 864e5;
+  // Sorgular aynı anda gönderilir (sıralı gidiş-dönüş yerine tek bekleme)
+  const [per, byCh, rep, guests, multiRow, firstRows, monthly, cities] = await Promise.all([
+    all(db, `SELECT o.ckey, COUNT(*) AS n, SUM(o.total) AS spend, MIN(o.ordered_at) AS first_at FROM orders o ${W} GROUP BY o.ckey`, ...args),
+    // Kanal bazında: bir müşteri birden çok kanalda alışveriş yaptıysa her kanalda sayılır
+    all(db, `SELECT o.channel, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue FROM orders o ${W} GROUP BY o.channel ORDER BY orders DESC`, ...args),
+    all(db, `SELECT channel, COUNT(*) AS repeat FROM (SELECT o.channel, o.ckey FROM orders o ${W} GROUP BY o.channel, o.ckey HAVING COUNT(*) > 1) GROUP BY channel`, ...args),
+    all(db, `SELECT o.channel, COUNT(DISTINCT o.ckey) AS n FROM orders o ${W} AND o.extra LIKE '%"guest":true%' GROUP BY o.channel`, ...args),
+    first(db, `SELECT COUNT(*) AS n FROM (SELECT o.ckey FROM orders o ${W} GROUP BY o.ckey HAVING COUNT(DISTINCT o.channel) > 1)`, ...args),
+    // Aylık: o ay ilk siparişini veren (yeni) ve daha önce sipariş vermiş (tekrar eden) müşteri sayısı (son 12 ay).
+    // İlk sipariş tarihi dönem filtresinden bağımsız: bir müşteri ancak ilk siparişini verdiği ay "yeni" sayılır
+    all(db, `SELECT o.ckey, MIN(o.ordered_at) AS first_at FROM orders o WHERE ${LIVE} AND o.ckey IN (SELECT DISTINCT ckey FROM orders WHERE ordered_at >= ?) GROUP BY o.ckey`, since),
+    all(db, `SELECT o.ckey, strftime('%Y-%m', o.ordered_at / 1000 + 10800, 'unixepoch') AS m FROM orders o WHERE ${LIVE} AND o.ordered_at >= ? GROUP BY o.ckey, m`, since),
+    // İller (harita ve liste): müşteri, sipariş, satılan adet ve ciro; tüm iller
+    all(db, `SELECT json_extract(o.address, '$.city') AS city, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue,
+        SUM((SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled')) AS units
+      FROM orders o ${W} AND COALESCE(json_extract(o.address, '$.city'), '') != '' GROUP BY 1 ORDER BY orders DESC LIMIT 200`, ...args),
+  ]);
   const customers = per.length, orders = per.reduce((s, r) => s + r.n, 0), revenue = per.reduce((s, r) => s + (r.spend || 0), 0);
   const repeat = per.filter((r) => r.n > 1).length;
   const dist = [1, 2, 3, 4, 5].map((k) => ({ k: k === 5 ? '5+' : String(k), n: per.filter((r) => (k === 5 ? r.n >= 5 : r.n === k)).length }));
-  // Kanal bazında: bir müşteri birden çok kanalda alışveriş yaptıysa her kanalda sayılır
-  const byCh = await all(db, `SELECT o.channel, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue FROM orders o ${W} GROUP BY o.channel ORDER BY orders DESC`, ...args);
-  const rep = await all(db, `SELECT channel, COUNT(*) AS repeat FROM (SELECT o.channel, o.ckey FROM orders o ${W} GROUP BY o.channel, o.ckey HAVING COUNT(*) > 1) GROUP BY channel`, ...args);
-  const guests = await all(db, `SELECT o.channel, COUNT(DISTINCT o.ckey) AS n FROM orders o ${W} AND o.extra LIKE '%"guest":true%' GROUP BY o.channel`, ...args);
-  const multi = (await first(db, `SELECT COUNT(*) AS n FROM (SELECT o.ckey FROM orders o ${W} GROUP BY o.ckey HAVING COUNT(DISTINCT o.channel) > 1)`, ...args)).n;
-  // Aylık: o ay ilk siparişini veren (yeni) ve daha önce sipariş vermiş (tekrar eden) müşteri sayısı (son 12 ay)
-  const since = Date.now() - 365 * 864e5;
-  // İlk sipariş tarihi dönem filtresinden bağımsız: bir müşteri ancak ilk siparişini verdiği ay "yeni" sayılır
-  const firsts = new Map((await all(db, `SELECT o.ckey, MIN(o.ordered_at) AS first_at FROM orders o WHERE ${LIVE} AND o.ckey IN (SELECT DISTINCT ckey FROM orders WHERE ordered_at >= ?) GROUP BY o.ckey`, since)).map((r) => [r.ckey, r.first_at]));
-  const monthly = await all(db, `SELECT o.ckey, strftime('%Y-%m', o.ordered_at / 1000 + 10800, 'unixepoch') AS m FROM orders o WHERE ${LIVE} AND o.ordered_at >= ? GROUP BY o.ckey, m`, since);
+  const multi = multiRow.n;
+  const firsts = new Map(firstRows.map((r) => [r.ckey, r.first_at]));
   const months = new Map();
   for (const r of monthly) {
     const e = months.get(r.m) || { m: r.m, new: 0, returning: 0 };
@@ -69,10 +78,6 @@ export async function summary(db, q = {}) {
     if (fm === r.m) e.new++; else e.returning++;
     months.set(r.m, e);
   }
-  // İller (harita ve liste): müşteri, sipariş, satılan adet ve ciro; tüm iller
-  const cities = await all(db, `SELECT json_extract(o.address, '$.city') AS city, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue,
-      SUM((SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled')) AS units
-    FROM orders o ${W} AND COALESCE(json_extract(o.address, '$.city'), '') != '' GROUP BY 1 ORDER BY orders DESC LIMIT 200`, ...args);
   return {
     customers, orders, revenue, repeat, multi,
     repeatRate: customers ? (repeat / customers) * 100 : 0,

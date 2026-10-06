@@ -3,7 +3,10 @@
 // Müşteri panelleri (tenants.js): firma koduyla giriş yapan müşterinin istekleri kendi Durable Object'ine iletilir.
 import { init } from './db.js';
 import { syncAll, quickSync } from './sync.js';
-import { handle } from './handler.js';
+import { handle, report5xx } from './handler.js';
+import { PerfBuffer } from './perf.js';
+// Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
+const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
 import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired } from './tenants.js';
 import { json, body, HttpError } from './util.js';
@@ -68,7 +71,11 @@ export default {
         // Destek girişi: çerez ana panelin yanıtıyla verilir, tarayıcı müşteri paneline geçer
         return r && r.cookie ? json({ ok: true }, 200, { 'Set-Cookie': r.cookie }) : json(r);
       }
-      return await handle(req, env, ctx, env.DB);
+      const t0 = Date.now(), res = await handle(req, env, ctx, env.DB);
+      if (res.status >= 500) ctx.waitUntil(report5xx(env.DB, req, res, { slug: '', firm: '' }).catch(() => {}));
+      perfMain.add(req.method, path, Date.now() - t0);
+      if (perfMain.due() && env.DB) ctx.waitUntil(perfMain.flush(env.DB).catch(() => {}));
+      return res;
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message }, e.status);
       console.error(e);

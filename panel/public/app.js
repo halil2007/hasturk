@@ -24,6 +24,7 @@ import { financeView } from './views/finance.js';
 import { hbTestView } from './views/hbtest.js';
 import { claimsView, claimChannels } from './views/claims.js';
 import { campaignsView, campaignChannels } from './views/campaigns.js';
+import { codeStep, forcedSetup, twofaSettings } from './twofa.js';
 import { can, viewOnly } from './perms.js';
 
 const ROUTES = [
@@ -125,7 +126,7 @@ let current = null, currentPath = null, routeSeq = 0, routeAt = 0;
 // Ön yükleme: her sayfanın açılışta okuduğu adresler (ilk ziyarette varsayılanlar, sonra öğrenilen gerçek adresler)
 const PREFETCH = {
   '': ['summary'], siparisler: ['orders?status=new&page=1&limit=25'], kargo: ['packages?state=waiting'], iadeler: ['claims?page=1&status=waiting'],
-  sorular: ['questions?page=1&limit=30&status=waiting'], 'kanal-urunleri': ['channel-products/channels'], urunler: ['products?page=1&limit=40&group=1'], stoklar: ['products?page=1&limit=50&sort=stock', 'dashboard'],
+  sorular: ['questions?page=1&limit=30&status=waiting'], 'kanal-urunleri': ['channel-products/channels'], urunler: ['products?page=1&limit=40&group=1&sort=sold'], stoklar: ['products?page=1&limit=50&sort=sold', 'dashboard'],
   ...store.get('prefetch', {}),
 };
 const learn = (path, list) => {
@@ -232,6 +233,7 @@ function meMenu(btn) {
   popMenu(btn, [
     { icon: 'user', label: `${u.name || ''} · ${u.role === 'admin' ? 'Yönetici' : 'Personel'}${state.tenant ? ` · ${state.tenant.name}` : ''}`, run: () => {} },
     ...(u.id > 0 ? [{ icon: 'key', label: 'Şifremi değiştir', run: changePassword }] : []),
+    ...(u.id >= 0 && !u.support ? [{ icon: 'check', label: `İki adımlı doğrulama${u.twofa ? ' (açık)' : ''}`, run: twofaSettings }] : []),
     { icon: 'sync', label: 'Şimdi senkronla', run: sync },
     '-',
     { label: `${theme === 'light' ? '✓ ' : ''}Açık tema`, run: () => setTheme('light') },
@@ -393,7 +395,12 @@ async function login(info = {}) {
     btn.disabled = true; btn.innerHTML = '<i class="ico ico-sync spin"></i>Giriş yapılıyor';
     try {
       const tenant = e.target.tenant.value.trim().toLocaleLowerCase('tr');
-      await api('login', { method: 'POST', body: { tenant, username: e.target.username.value.trim(), password: e.target.password.value } });
+      let r = await api('login', { method: 'POST', body: { tenant, username: e.target.username.value.trim(), password: e.target.password.value } });
+      // İki adımlı doğrulama: form kod adımına dönüşür (bilet 5 dakika geçerli)
+      if (r.twofa) {
+        try { r = await codeStep(e.target, { ticket: r.ticket, tenant }); } catch (x) { box.remove(); toast(x.message, true); return login(); }
+        if (r.recoveryUsed) toast(`Yedek kodla giriş yapıldı; ${r.recoveryLeft} yedek kod kaldı`);
+      }
       store.set('firma', tenant);
       box.remove();
       $$('.side, .main, .tabbar').forEach((x) => x.classList.remove('hide'));
@@ -402,6 +409,7 @@ async function login(info = {}) {
   };
 }
 state.onLogin = (info) => login(info);
+state.onNeed2fa = () => forcedSetup();
 
 // Uygulama dosyaları cihazda saklanır (sw.js). Yeni yayın çıktıysa saklananlar silinir ve sayfa bir kez yenilenir.
 function shellCache(build) {
@@ -414,7 +422,8 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-07a';
+const ASSETS = '2026-10-08b';
+state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');
   if (css === ASSETS) return true;

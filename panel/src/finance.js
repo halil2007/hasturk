@@ -1,9 +1,9 @@
 // Gelir & gider: sipariş kârı ve dönem bazında masraf basamakları
 //   Satış − komisyon − kargo − hizmet bedeli − ek kesinti (işlem / ödeme bedeli) − stopaj = hakediş; hakediş − alış maliyeti = kâr.
 // Komisyon ve kargo, kanal bildirdiyse gerçek tutardır (sipariş satırı komisyonu, kargo faturası); yoksa Ayarlar'daki oranlarla tahmin edilir.
-import { all, first, getRaw, setSetting, log } from './db.js';
+import { all, first, run, getRaw, setSetting, log } from './db.js';
 import { getChannels } from './channels/index.js';
-import { chunk } from './util.js';
+import { chunk, fail } from './util.js';
 import { profit, costOf } from '../public/profit.js';
 import { r2 } from './util.js';
 
@@ -33,46 +33,210 @@ export function orderProfit(o, settings) {
 }
 
 const LIVE = "o.status NOT IN ('cancelled', 'returned')";
-const KEYS = ['revenue', 'commission', 'shipping', 'fee', 'rateFee', 'withholding', 'payout', 'cost', 'profit'];
+const KEYS = ['revenue', 'commission', 'shipping', 'fee', 'rateFee', 'withholding', 'ads', 'penalty', 'returnLoss', 'payout', 'cost', 'profit'];
+// Siparişe bağlanamayan pazaryeri kesintileri (kesilen faturalardan, fatura tarihine göre dönemde)
+const INV_ADS = ['Reklam / pazarlama'], INV_PENALTY = ['Ceza', 'Diğer kesinti'];
 
-// Dönem: siparişler kanal kanal toplanır; masraf basamakları (şelale) ve kanal tablosu
+// ---------- işletme giderleri (kira, personel, paketleme …) ----------
+// Elle girilir; tek seferlik gider tarihine göre, aylık gider başlangıç (ve varsa bitiş) arasında her aya gün bazında yayılır.
+export const EXPENSE_CATS = ['Kira', 'Personel', 'Paketleme', 'Reklam (pazaryeri dışı)', 'Yazılım / abonelik', 'Muhasebe', 'Vergi / harç', 'Fatura (elektrik, internet …)', 'Diğer'];
+const DAY = 864e5;
+// Gider kaydının [from, to) dönemine düşen tutarı
+export function expenseIn(e, from, to) {
+  if (e.recurring !== 'monthly') return e.date >= from && e.date < to ? e.amount : 0;
+  const start = Math.max(from, e.date), end = Math.min(to, e.until ? e.until + DAY : to, Date.now() + DAY);
+  if (end <= start) return 0;
+  // Ay ay: (çakışan gün / ayın gün sayısı) × aylık tutar (Türkiye saati)
+  let sum = 0, t = start;
+  while (t < end) {
+    const d = new Date(t + 3 * 3600e3), y = d.getUTCFullYear(), m = d.getUTCMonth();
+    const ms = Date.UTC(y, m, 1) - 3 * 3600e3, me = Date.UTC(y, m + 1, 1) - 3 * 3600e3;
+    const seg = Math.min(end, me) - t;
+    sum += (e.amount * seg) / (me - ms);
+    t = Math.min(end, me);
+  }
+  return sum;
+}
+export async function expenseTotals(db, from, to) {
+  const rows = await all(db, "SELECT * FROM expenses WHERE (recurring = 'monthly' AND date < ? AND (until IS NULL OR until + ? >= ?)) OR (COALESCE(recurring, '') != 'monthly' AND date >= ? AND date < ?)", to, DAY, from, from, to);
+  const byCat = new Map();
+  let total = 0;
+  for (const e of rows) {
+    const v = expenseIn(e, from, to);
+    if (!v) continue;
+    total += v;
+    byCat.set(e.category || 'Diğer', (byCat.get(e.category || 'Diğer') || 0) + v);
+  }
+  return { total: r2(total), categories: [...byCat].map(([category, amount]) => ({ category, amount: r2(amount) })).sort((a, b) => b.amount - a.amount) };
+}
+export async function listExpenses(db) {
+  return { items: await all(db, 'SELECT * FROM expenses ORDER BY (recurring = \'monthly\') DESC, date DESC LIMIT 500'), categories: EXPENSE_CATS };
+}
+export async function saveExpense(db, b, id = null) {
+  const title = String(b.title || '').trim().slice(0, 120), amount = Math.round(Number(String(b.amount ?? '').replace(',', '.')) * 100) / 100;
+  if (!title) fail(400, 'Gider adı yazın');
+  if (!(amount > 0)) fail(400, 'Tutar girin');
+  const date = Number(b.date) || Date.now(), recurring = b.recurring === 'monthly' ? 'monthly' : '';
+  const until = recurring && Number(b.until) ? Number(b.until) : null, cat = EXPENSE_CATS.includes(b.category) ? b.category : 'Diğer', note = String(b.note || '').slice(0, 300);
+  if (id) await run(db, 'UPDATE expenses SET title = ?, category = ?, amount = ?, date = ?, recurring = ?, until = ?, note = ? WHERE id = ?', title, cat, amount, date, recurring, until, note, Number(id));
+  else id = (await first(db, 'INSERT INTO expenses (title, category, amount, date, recurring, until, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id', title, cat, amount, date, recurring, until, note, Date.now())).id;
+  return { ok: true, id };
+}
+export const deleteExpense = (db, id) => run(db, 'DELETE FROM expenses WHERE id = ?', Number(id)).then(() => ({ ok: true }));
+
+// Dönemin siparişleri kanal başına veritabanında toplanır (sipariş kârı orderProfit ile aynı kurallar): satırlar panele taşınmaz,
+// 1 yıllık / on binlerce siparişlik dönem de hızlı açılır. Oranlar (komisyon, kargo, hizmet bedeli …) kanal başına CASE ile.
+async function aggregate(db, settings, { from, to, channel }) {
+  const cw = channel ? ' AND o.channel = ?' : '', ca = channel ? [channel] : [];
+  const chans = (await all(db, `SELECT DISTINCT o.channel FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca)).map((r) => r.channel).filter((c) => /^[a-z0-9_]+$/i.test(c));
+  if (!chans.length) return [];
+  const rate = (key) => `(CASE o.channel ${chans.map((c) => `WHEN '${c}' THEN ${Number(costOf(settings, key, c)) || 0}`).join(' ')} ELSE 0 END)`;
+  const LIVEI = "COALESCE(i.status, '') != 'cancelled'";
+  return all(db, `WITH it AS (
+      SELECT i.order_id, SUM(CASE WHEN ${LIVEI} THEN i.total ELSE 0 END) AS rev,
+        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission, ${rate('commission')}) / 100.0) ELSE 0 END) AS comm,
+        SUM(CASE WHEN ${LIVEI} AND i.commission IS NULL THEN 1 ELSE 0 END) AS estc,
+        SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity ELSE 0 END) AS cost,
+        SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) = 0 THEN 1 ELSE 0 END) AS miss,
+        SUM(CASE WHEN ${LIVEI} THEN 1 ELSE 0 END) AS live, COUNT(*) AS n
+      FROM orders o JOIN order_items i ON i.order_id = o.id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
+      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw} GROUP BY i.order_id)
+    SELECT o.channel, COUNT(*) AS orders, COALESCE(SUM(it.rev), 0) AS revenue, COALESCE(SUM(it.comm), 0) AS commission,
+      SUM(CASE WHEN it.n > 0 AND it.estc = 0 THEN 1 ELSE 0 END) AS realCommission, COALESCE(SUM(it.cost), 0) AS cost, COALESCE(SUM(it.miss), 0) AS missingCost,
+      SUM(CASE WHEN it.live > 0 THEN COALESCE(o.shipping_cost, ${rate('shipping')}) ELSE 0 END) AS shipping,
+      SUM(CASE WHEN o.shipping_cost IS NOT NULL AND o.shipping_src = 'api' THEN 1 ELSE 0 END) AS realShipping,
+      SUM(CASE WHEN it.live > 0 THEN ${rate('service_fee')} ELSE 0 END) AS fee,
+      SUM(COALESCE(it.rev, 0) * ${rate('fee_rate')} / 100.0) AS rateFee,
+      SUM(COALESCE(it.rev, 0) * 100.0 / 120.0 * ${rate('withholding')} / 100.0) AS withholding
+    FROM orders o LEFT JOIN it ON it.order_id = o.id WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw} GROUP BY o.channel`, from, to, ...ca, from, to, ...ca)
+    .then((rows) => rows.map((r) => { const payout = r.revenue - r.commission - r.shipping - r.fee - r.rateFee - r.withholding; return { ...r, payout, profit: payout - r.cost }; }));
+}
+
+// Dönem: siparişler kanal kanal toplanır; masraf basamakları (şelale), kanal tablosu ve işletme giderleriyle net kâr
 export async function breakdown(db, settings, { from, to, channel } = {}) {
   const now = Date.now();
   from = Number(from) || now - 30 * 864e5; to = Number(to) || now + 1;
   const cw = channel ? ' AND o.channel = ?' : '', ca = channel ? [channel] : [];
-  const orders = await all(db, `SELECT o.id, o.channel, o.shipping_cost, o.shipping_src FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
-  const items = await all(db, `SELECT i.order_id, i.total, i.quantity, i.status, i.commission, p.purchase_price, l.commission AS listing_commission
-    FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
-    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
-  const byOrder = new Map();
-  for (const i of items) (byOrder.get(i.order_id) || byOrder.set(i.order_id, []).get(i.order_id)).push(i);
-  const zero = () => ({ orders: 0, missingCost: 0, realShipping: 0, realCommission: 0, ...Object.fromEntries(KEYS.map((k) => [k, 0])) });
+  const iw = channel ? ' AND channel = ?' : '';
+  const [agg, returned, invRows, costRows, expenses] = await Promise.all([
+    aggregate(db, settings, { from, to, channel }),
+    // İade edilen siparişler: gönderim kargosu geri gelmez (iade kargosu pazaryerinin kargo faturasındadır)
+    all(db, `SELECT o.channel, COUNT(*) AS n, SUM(o.shipping_cost IS NULL) AS est, COALESCE(SUM(o.shipping_cost), 0) AS ship FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND o.status = 'returned'${cw} GROUP BY o.channel`, from, to, ...ca),
+    all(db, `SELECT channel, type, ROUND(SUM(amount), 2) AS amount, COUNT(*) AS n FROM invoices WHERE date >= ? AND date < ?${iw} GROUP BY channel, type`, from, to, ...ca),
+    all(db, "SELECT k, v FROM settings WHERE k LIKE 'costs:%'"),
+    channel ? null : expenseTotals(db, from, to),
+  ]);
+  const zero = () => ({ orders: 0, returns: 0, missingCost: 0, realShipping: 0, realCommission: 0, ...Object.fromEntries(KEYS.map((k) => [k, 0])) });
   const per = new Map(), total = zero();
-  for (const o of orders) {
-    const p = orderProfit({ ...o, items: byOrder.get(o.id) || [] }, settings);
-    const t = per.get(o.channel) || per.set(o.channel, zero()).get(o.channel);
+  const chOf = (c) => per.get(c) || per.set(c, zero()).get(c);
+  for (const a of agg) {
+    const t = chOf(a.channel);
     for (const x of [t, total]) {
-      for (const k of KEYS) x[k] += p[k];
-      x.orders++; x.missingCost += p.missingCost;
-      if (p.shippingSrc === 'api') x.realShipping++;
-      if (p.commissionSrc === 'api') x.realCommission++;
+      for (const k of KEYS) x[k] += a[k] || 0;
+      x.orders += a.orders; x.missingCost += a.missingCost; x.realShipping += a.realShipping; x.realCommission += a.realCommission;
     }
+  }
+  const inv = (c, types) => invRows.filter((r) => r.channel === c && types.includes(r.type)).reduce((a, r) => a + r.amount, 0);
+  for (const c of new Set(invRows.filter((r) => [...INV_ADS, ...INV_PENALTY].includes(r.type)).map((r) => r.channel))) chOf(c);
+  for (const r of returned) chOf(r.channel);
+  const costState = Object.fromEntries(costRows.map((r) => { try { return [r.k.slice(6), JSON.parse(r.v)]; } catch { return [r.k.slice(6), null]; } }));
+  total.invoiceShipping = 0; total.invoiceFee = 0;
+  const take = (x, k, d) => { for (const y of [x, total]) { y[k] += d; y.payout -= d; y.profit -= d; } };
+  for (const [c, x] of per) {
+    // Kargo: sipariş bazında tutar gelmeyen kanalda (siparişlerin yarısından azı) pazaryerinin dönemde kestiği kargo faturalarının toplamı
+    x.shippingSrc = x.realShipping ? (x.realShipping === x.orders ? 'api' : 'mixed') : 'estimate';
+    const cargo = inv(c, ['Kargo']);
+    if (cargo > 0 && x.realShipping < x.orders / 2) {
+      take(x, 'shipping', cargo - x.shipping);
+      x.shippingSrc = 'invoice'; x.invoiceShipping = cargo; total.invoiceShipping += cargo;
+    }
+    // Hizmet bedeli: Ayarlar'da girilmemişse (0) pazaryerinin kestiği hizmet bedeli faturaları
+    const fee = inv(c, ['Hizmet bedeli']);
+    if (fee > 0 && !x.fee) { take(x, 'fee', fee); x.feeSrc = 'invoice'; total.invoiceFee += fee; }
+    // Reklam ve ceza / diğer kesintiler (faturalardan)
+    take(x, 'ads', inv(c, INV_ADS));
+    take(x, 'penalty', inv(c, INV_PENALTY));
+    // İade: gönderim kargosu (kargo fatura toplamı kullanılan kanalda zaten içinde)
+    const r = returned.find((y) => y.channel === c);
+    if (r) {
+      for (const y of [x, total]) y.returns += r.n;
+      if (x.shippingSrc !== 'invoice') take(x, 'returnLoss', r.ship + r.est * costOf(settings, 'shipping', c));
+    }
+    const st = costState[c];
+    if (st && st.error) x.shippingError = st.error;
   }
   const round = (x) => { for (const k of KEYS) x[k] = r2(x[k]); x.margin = x.revenue ? r2((x.profit / x.revenue) * 100) : 0; return x; };
   round(total);
-  // Şelale: satıştan kâra her basamak
+  total.expenses = expenses ? expenses.total : 0;
+  total.net = r2(total.profit - total.expenses);
+  total.netMargin = total.revenue ? r2((total.net / total.revenue) * 100) : 0;
+  const pc = [...per.values()];
+  const shipNote = pc.some((x) => x.shippingSrc === 'invoice')
+    ? [total.realShipping ? `${total.realShipping}/${total.orders} siparişte kargo faturasından` : '', `${pc.filter((x) => x.shippingSrc === 'invoice').length} kanalda dönemin kargo faturaları toplamı (${r2(total.invoiceShipping)} ₺)`].filter(Boolean).join(' · ')
+    : total.realShipping ? `${total.realShipping}/${total.orders} siparişte kargo faturasından` : total.shipping ? 'tahmin (Ayarlar → Giderler, sipariş başı kargo)' : 'kanaldan kargo tutarı gelmedi — Ayarlar → Giderler\'den sipariş başı kargo girin';
+  // Şelale: satıştan net kâra her basamak
   const steps = [
-    { k: 'revenue', label: 'Satış (ciro)', v: total.revenue },
+    { k: 'revenue', label: 'Satış (ciro)', v: total.revenue, note: total.returns ? `${total.returns} iade edilen sipariş ciroya dahil değil` : '' },
     { k: 'commission', label: 'Komisyon', v: -total.commission, note: `${total.realCommission}/${total.orders} siparişte kanalın bildirdiği tutar` },
-    { k: 'shipping', label: 'Kargo', v: -total.shipping, note: `${total.realShipping}/${total.orders} siparişte kargo faturasından` },
-    { k: 'fee', label: 'Hizmet bedeli', v: -total.fee },
+    { k: 'shipping', label: 'Kargo', v: -total.shipping, note: shipNote },
+    { k: 'fee', label: 'Hizmet bedeli', v: -total.fee, note: total.invoiceFee ? 'pazaryerinin kestiği hizmet bedeli faturalarından' : '' },
     { k: 'rateFee', label: 'Ek kesinti (işlem / ödeme)', v: -total.rateFee },
     { k: 'withholding', label: 'Stopaj', v: -total.withholding, note: 'gelir vergisinden mahsup edilir' },
+    { k: 'ads', label: 'Reklam / pazarlama', v: -total.ads, note: 'pazaryerinin kestiği reklam faturaları' },
+    { k: 'penalty', label: 'Ceza ve diğer kesintiler', v: -total.penalty, note: 'gecikme cezası, fiyat farkı vb. faturalar' },
+    { k: 'returnLoss', label: 'İade kaybı', v: -total.returnLoss, note: total.returns ? `${total.returns} iadede geri gelmeyen gönderim kargosu` : 'dönemde iade yok' },
     { k: 'payout', label: 'Hakediş', v: total.payout, sum: true },
     { k: 'cost', label: 'Alış maliyeti', v: -total.cost, note: total.missingCost ? `${total.missingCost} satırda alış fiyatı yok` : '' },
-    { k: 'profit', label: 'Tahmini kâr', v: total.profit, sum: true },
+    { k: 'profit', label: 'Brüt kâr', v: total.profit, sum: true },
+    ...(channel ? [] : [
+      { k: 'expenses', label: 'İşletme giderleri', v: -total.expenses, note: expenses.categories.length ? expenses.categories.slice(0, 4).map((x) => `${x.category} ${Math.round(x.amount)} ₺`).join(' · ') : 'kira, personel, paketleme … (aşağıdan ekleyin)' },
+      { k: 'net', label: total.net >= 0 ? 'Net kâr' : 'Net zarar', v: total.net, sum: true },
+    ]),
   ];
-  return { from, to, total, steps, channels: [...per.entries()].map(([c, x]) => ({ channel: c, ...round(x) })).sort((a, b) => b.revenue - a.revenue) };
+  return { from, to, total, steps, expenses: expenses ? expenses.categories : null, channels: [...per.entries()].map(([c, x]) => ({ channel: c, ...round(x) })).sort((a, b) => b.revenue - a.revenue) };
+}
+
+// Ürünlere göre kârlılık: dönemde satılan her ürünün cirosu, kesintileri (sipariş başı giderler satır cirosuna göre paylaştırılır),
+// alış maliyeti, kârı ve iade adedi. Reklam / ceza / işletme giderleri ürüne dağıtılmaz.
+export async function productProfit(db, settings, { from, to, channel, sort = 'profit' } = {}) {
+  const now = Date.now();
+  from = Number(from) || now - 30 * 864e5; to = Number(to) || now + 1;
+  const cw = channel ? ' AND o.channel = ?' : '', ca = channel ? [channel] : [];
+  const [orders, items, ret] = await Promise.all([
+    all(db, `SELECT o.id, o.channel, o.shipping_cost, o.shipping_src FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
+    all(db, `SELECT i.order_id, i.product_id, i.name, i.sku, i.total, i.quantity, i.status, i.commission, p.purchase_price, p.name AS pname, p.variant_name, p.image, l.commission AS listing_commission
+      FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
+      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
+    all(db, `SELECT COALESCE(i.product_id, 'x:' || COALESCE(i.sku, i.name)) AS k, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id
+      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND o.status = 'returned'${cw} GROUP BY k`, from, to, ...ca),
+  ]);
+  const byOrder = new Map();
+  for (const i of items) (byOrder.get(i.order_id) || byOrder.set(i.order_id, []).get(i.order_id)).push(i);
+  const out = new Map();
+  for (const o of orders) {
+    const its = byOrder.get(o.id) || [];
+    const p = orderProfit({ ...o, items: its }, settings);
+    const other = p.shipping + p.fee + p.rateFee + p.withholding;
+    for (const i of its) {
+      if (i.status === 'cancelled') continue;
+      const share = p.revenue ? i.total / p.revenue : 0;
+      const comm = i.commission != null ? i.commission : (i.total * (i.listing_commission ?? costOf(settings, 'commission', o.channel))) / 100;
+      const k = i.product_id != null ? i.product_id : 'x:' + (i.sku || i.name);
+      const x = out.get(k) || out.set(k, { key: String(k), product_id: i.product_id, name: i.pname || i.name || i.sku || '—', variant: i.variant_name || '', image: i.image || '', units: 0, orders: 0, revenue: 0, commission: 0, other: 0, cost: 0, missingCost: 0, channels: new Set() }).get(k);
+      x.units += i.quantity; x.orders++; x.revenue += i.total; x.commission += comm; x.other += other * share; x.channels.add(o.channel);
+      if (i.purchase_price) x.cost += i.purchase_price * i.quantity; else x.missingCost += i.quantity;
+    }
+  }
+  const retBy = new Map(ret.map((r) => [String(r.k), r.n]));
+  const rows = [...out.values()].map((x) => {
+    const profit = x.revenue - x.commission - x.other - x.cost;
+    const returns = retBy.get(x.key) || 0;
+    return { ...x, channels: [...x.channels], revenue: r2(x.revenue), commission: r2(x.commission), other: r2(x.other), cost: r2(x.cost), profit: r2(profit),
+      margin: x.revenue ? r2((profit / x.revenue) * 100) : 0, unitProfit: x.units ? r2(profit / x.units) : 0, returns, returnRate: x.units + returns ? r2((returns / (x.units + returns)) * 100) : 0 };
+  });
+  const S = { profit: (a, b) => b.profit - a.profit, loss: (a, b) => a.profit - b.profit, revenue: (a, b) => b.revenue - a.revenue, margin: (a, b) => b.margin - a.margin, returns: (a, b) => b.returns - a.returns || b.returnRate - a.returnRate };
+  rows.sort(S[sort] || S.profit);
+  return { from, to, rows: rows.slice(0, 300), total: rows.length, losing: rows.filter((x) => x.profit < 0 && !x.missingCost).length, noCost: rows.filter((x) => x.missingCost).length };
 }
 
 // ---------- kesilen faturalar ----------

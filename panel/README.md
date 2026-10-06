@@ -231,7 +231,13 @@ cd panel
 npm run dev      # http://localhost:8787 — deneme modu, şifre: demo (Node 22.5+, Cloudflare hesabı gerekmez)
 npm test         # stok düşümü, iptal/iade, kanala özel stok, eşleştirme, kargo akışı, buybox kuralları, kanal bağlantıları (örnek cevaplarla)
                  # ve ikas'a giden tüm GraphQL sorgularının ikas'ın resmi şemasına uygunluğu (test/fixtures/ikas-schema.json)
+node dev/bench.mjs                               # büyük katalog hız testi: 20.000 ürün, 60.000 sipariş; sayfa başına süre ve sorgu sayısı
+PRODUCTS=50000 ORDERS=150000 DEV_LATENCY=2 node dev/bench.mjs   # daha büyük veri + her sorguya 2 ms ağ gecikmesi (D1 gidiş-dönüşü)
 ```
+
+Sistem hızı canlıda da izlenir: ana panel → Destek → **Sistem hızı** (panel başına istek süreleri, en yavaş işlemler, son otomatik
+bakım). Ortalaması 3 saniyeyi aşan işlem **Müşteri hataları**na "Yavaş işlem" olarak düşer; her gün eski kayıtlar budanır ve
+`PRAGMA optimize` çalışır (bkz. src/perf.js).
 
 ikas şema özetini güncellemek (ikas yeni sürüm yayınlarsa): `npm pack @ikas/admin-api-client` → paketi açın →
 `node dev/ikas-schema.mjs package/dist/src/api/admin/generated/index.d.ts <sürüm> > test/fixtures/ikas-schema.json` → `npm test`.

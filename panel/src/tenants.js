@@ -5,7 +5,9 @@
 // Giriş: giriş ekranında "Firma kodu" + kullanıcı adı + şifre. Oturum çerezi firma koduyla başlar ("kod~..."), istek o firmanın
 // Durable Object'ine iletilir. Ana panelin API bilgileri, şifresi ve deneme modu müşteri paneline geçmez.
 import { all, first, run, init } from './db.js';
-import { handle } from './handler.js';
+import { handle, report5xx } from './handler.js';
+import { recordError, clientReport } from './errors.js';
+import { PerfBuffer } from './perf.js';
 import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
 import { hashPassword, supportCookie, currentUser } from './auth.js';
@@ -92,7 +94,7 @@ export async function tenantLogin(req, env, b) {
   if (!t.active) return json({ error: 'Bu müşteri paneli askıya alınmış. Lütfen hizmet sağlayıcınızla görüşün.' }, 403);
   if (expired(t)) return json({ error: 'Aboneliğinizin süresi doldu. Yenilemek için hizmet sağlayıcınızla görüşün.' }, 403);
   const h = new Headers(req.headers); h.set('Content-Type', 'application/json');
-  return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify({ username: b.username, password: b.password }) }), env, t);
+  return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify(b.ticket ? { ticket: b.ticket, code: b.code } : { username: b.username, password: b.password }) }), env, t);
 }
 
 // ---------- ana panel: müşteri panellerini yönetme (yalnız ana panelin yöneticisi) ----------
@@ -203,7 +205,7 @@ export async function tenantApi(req, env, db, path, user) {
 
 // ---------- müşteri panelinin kendisi (Durable Object) ----------
 export class TenantPanel {
-  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; this.pf = null; this.pfAt = 0; }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; this.pf = null; this.pfAt = 0; this.perf = new PerfBuffer(); }
   // Platform değerleri ana veritabanından 10 dakikada bir okunur; değişince ortam yeniden kurulur
   async platform() {
     if (this.pf && Date.now() - this.pfAt < 600e3) return;
@@ -244,8 +246,36 @@ export class TenantPanel {
         return await supportResponse(req, this.env.DB, sp, { slug: this.t.slug, firm: this.t.name, user, staff: false });
       } catch (e) { return json({ error: e.message || 'Hata' }, e.status || 500); }
     }
+    // Hata bildirimi (tarayıcıdan): ana panelin hata kayıtlarına firma adıyla düşer
+    if (sp === 'errors/report' && req.method === 'POST') {
+      try {
+        await init(this.db);
+        const user = await currentUser(req, env, this.db);
+        if (!user || !this.env.DB) return json({ ok: false });
+        await init(this.env.DB);
+        await recordError(this.env.DB, clientReport(await req.json().catch(() => ({})), { slug: this.t.slug, firm: this.t.name, user }));
+        return json({ ok: true });
+      } catch (e) { return json({ ok: false }); }
+    }
     await this.schedule();
-    return handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
+    const t0 = Date.now(), res = await handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
+    if (res.status >= 500) this.ctx.waitUntil(report5xx(this.env.DB, req, res, { slug: this.t.slug, firm: this.t.name }).catch(() => {}));
+    // İstek süresi: firma adıyla ana panelin "Sistem hızı" bölümüne
+    this.perf.add(req.method, sp, Date.now() - t0);
+    if (this.perf.due() && this.env.DB) this.ctx.waitUntil(init(this.env.DB).then(() => this.perf.flush(this.env.DB, { slug: this.t.slug, firm: this.t.name })).catch(() => {}));
+    return res;
+  }
+  // Arka plan (senkron) hataları: son kontrolden beri yazılan hata günlükleri ana panelin hata kayıtlarına aktarılır
+  async reportSyncErrors(err) {
+    if (!this.env.DB || !this.t) return;
+    const since = (await this.ctx.storage.get('errlog_at')) || Date.now() - 3600e3, now = Date.now();
+    const rows = await all(this.db, "SELECT at, channel, msg FROM logs WHERE level = 'error' AND at > ? ORDER BY at LIMIT 50", since);
+    if (err) rows.push({ channel: '', msg: 'Senkron durdu: ' + (err.message || err), stack: err.stack });
+    if (rows.length) {
+      await init(this.env.DB);
+      for (const r of rows) await recordError(this.env.DB, { slug: this.t.slug, firm: this.t.name, source: 'sync', message: r.msg, action: r.channel ? `kanal: ${r.channel}` : 'senkron', detail: r.stack ? { stack: String(r.stack).slice(0, 2500) } : {} });
+    }
+    await this.ctx.storage.put('errlog_at', now);
   }
   async adminOp(env, b) {
     const db = this.db;
@@ -289,7 +319,9 @@ export class TenantPanel {
   async alarm() {
     const env = await this.meta();
     if (!env || await this.ctx.storage.get('suspended') || await this.ctx.storage.get('destroyed')) return;
-    try { await init(this.db); await syncAll(env, this.db); } catch (e) { console.error('müşteri paneli senkron hatası', this.t && this.t.slug, e); }
+    let syncErr = null;
+    try { await init(this.db); await syncAll(env, this.db); } catch (e) { syncErr = e; console.error('müşteri paneli senkron hatası', this.t && this.t.slug, e); }
+    try { await this.reportSyncErrors(syncErr); } catch (e) { console.error('hata kayıtları aktarılamadı', e); }
     // Saatte bir yeter (ana veritabanına yazma maliyeti)
     try {
       const last = (await this.ctx.storage.get('usage_at')) || 0;

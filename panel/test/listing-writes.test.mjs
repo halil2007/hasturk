@@ -40,7 +40,8 @@ test('günlük bakım: eski gönderilmiş paketlerin etiket dosyası silinir, ye
   await run(db, `INSERT INTO packages (order_id, no, items, status, created_at, shipped_at, label_format, label_data, tracking) VALUES
     ('a', 1, '[]', 'shipped', ?, ?, 'pdf', 'ESKI', 'TR1'), ('b', 1, '[]', 'shipped', ?, ?, 'pdf', 'YENI', 'TR2'), ('c', 1, '[]', 'open', ?, NULL, 'pdf', 'ACIK', NULL)`,
   t - 60 * D, t - 60 * D, t - 5 * D, t - 5 * D, t - 90 * D);
-  assert.deepEqual(await housekeeping(db), { labels: 1 });
+  const hk = await housekeeping(db);
+  assert.equal(hk.labels, 1); assert.equal(typeof hk.logs, 'number'); // hız bakımı da çalışır (bkz. perf.js)
   const rows = Object.fromEntries((await all(db, 'SELECT order_id, label_data, tracking FROM packages')).map((r) => [r.order_id, r]));
   assert.equal(rows.a.label_data, null); assert.equal(rows.a.tracking, 'TR1');
   assert.equal(rows.b.label_data, 'YENI'); assert.equal(rows.c.label_data, 'ACIK');

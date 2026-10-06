@@ -171,6 +171,8 @@ const MIGRATIONS = [
   'ALTER TABLE users ADD COLUMN template TEXT',
   'ALTER TABLE users ADD COLUMN sess INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE users ADD COLUMN last_ip TEXT',
+  // İki adımlı doğrulama (TOTP) ayarı: JSON (bkz. totp.js, auth.js)
+  'ALTER TABLE users ADD COLUMN totp TEXT',
   'CREATE INDEX IF NOT EXISTS order_events_user ON order_events(user, at)',
   // Firmalar (müşteri panelleri): ünvan, vergi, yetkili, adres, paket, ücret, dönem, abonelik başlangıç / bitiş, kullanıcı sınırı, kullanım özeti
   'ALTER TABLE tenants ADD COLUMN legal TEXT',
@@ -200,9 +202,19 @@ const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS support_messages_t ON support_messages(ticket_id)',
   'CREATE TABLE IF NOT EXISTS support_files (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL, message_id INTEGER, name TEXT, type TEXT, size INTEGER, data TEXT, created_at INTEGER)',
   'CREATE INDEX IF NOT EXISTS support_files_t ON support_files(ticket_id)',
-  // Fırsat etiketleri (bkz. promos.js): Trendyol avantajlı ürün eşikleri, Hepsiburada flaş indirim davetleri (Excel'den)
-  `CREATE TABLE IF NOT EXISTS promo_offers (channel TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, remote_id TEXT, product_id INTEGER, barcode TEXT, sku TEXT, name TEXT,
-    current_price REAL, tiers TEXT, starts_at INTEGER, ends_at INTEGER, applied_price REAL, applied_at INTEGER, updated_at INTEGER, PRIMARY KEY (channel, kind, key))`,
+  // İşletme giderleri (kâr-zarar): tek seferlik ya da aylık tekrar eden (bkz. finance.js)
+  `CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT, amount REAL NOT NULL, date INTEGER NOT NULL,
+    recurring TEXT, until INTEGER, note TEXT, created_at INTEGER)`,
+  // Hata kayıtları (bkz. errors.js): müşteri panellerinden otomatik gelen hatalar, firma + hata başına tek satır
+  `CREATE TABLE IF NOT EXISTS error_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT NOT NULL UNIQUE, slug TEXT NOT NULL DEFAULT '', firm TEXT, source TEXT NOT NULL,
+    message TEXT NOT NULL, action TEXT, page TEXT, status_code INTEGER, detail TEXT, user_name TEXT, count INTEGER NOT NULL DEFAULT 1, first_at INTEGER, last_at INTEGER,
+    status TEXT NOT NULL DEFAULT 'open', reopened INTEGER NOT NULL DEFAULT 0, resolved_at INTEGER)`,
+  'CREATE INDEX IF NOT EXISTS error_reports_last ON error_reports(status, last_at)',
+  // Sistem hızı (bkz. perf.js): panel başına günlük istek süreleri, işlem türüne göre
+  `CREATE TABLE IF NOT EXISTS perf_stats (day TEXT NOT NULL, slug TEXT NOT NULL DEFAULT '', route TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, total_ms INTEGER NOT NULL DEFAULT 0,
+    max_ms INTEGER NOT NULL DEFAULT 0, slow_n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, slug, route))`,
+  // Eski Excel fırsat etiketleri tablosu kaldırıldı (yerine buybox fiyat önerileri, bkz. suggest.js)
+  'DROP TABLE IF EXISTS promo_offers',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

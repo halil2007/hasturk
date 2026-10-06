@@ -31,11 +31,11 @@ const MAP = [
   [/^products\/\d+\/stock$/, 'stock'],
   [/^claims(\/|$)/, 'returns'],
   [/^questions(\/|$)/, 'questions'],
-  [/^(products|products-bulk|products-variants|catalog|price-rules|buybox|campaigns|promos|channel-products)(\/|\.csv$|$)/, 'products'],
+  [/^(products|products-bulk|products-variants|catalog|price-rules|buybox|campaigns|suggestions|channel-products)(\/|\.csv$|$)/, 'products'],
   [/^(listings\/stock|push-stock)(\/|$)/, 'stock'],
   [/^(match|listings)(\/|$)/, 'match'],
   [/^(stats|insights|customers)(\/|$)/, 'reports'],
-  [/^(finance|invoices|settlements)(\/|$)/, 'finance'],
+  [/^(finance|invoices|settlements|expenses)(\/|$)/, 'finance'],
 ];
 export const sectionOf = (path) => (MAP.find(([re]) => re.test(path)) || [])[1] || null;
 // Kullanıcı bu bölümü görebilir mi (yönetici her şeyi; yetkisi tanımlanmamış personel her bölümü).
