@@ -4,18 +4,22 @@
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const get = (k) => k.split('.').reduce((o, x) => (o ? o[x] : undefined), S);
 
-  // Kanallar: aktif olanlar ve yakında gelecekler (rozet: kısa ad + renk)
+  // Kanallar: aktif olanlar ve yakında gelecekler. [ad, tür, rozet rengi, kısa ad, yazı stili (logo şeridi)]
   const ACTIVE = [
-    ['ikas', 'e-ticaret sitesi', '#111827', 'ik'], ['Trendyol', 'pazaryeri', '#f27a1a', 'T'], ['Hepsiburada', 'pazaryeri', '#ff6000', 'hb'], ['N11', 'pazaryeri', '#7b3fe4', 'n11'],
-    ['PttAVM', 'pazaryeri', '#f2b705', 'Ptt'], ['idefix', 'pazaryeri', '#1d4ed8', 'id'], ['Pazarama', 'pazaryeri', '#0f9d58', 'Pz'],
+    ['Hepsiburada', 'pazaryeri', '#ff6000', 'hb', 'color:#ff6000;font-size:19px'], ['Trendyol', 'pazaryeri', '#f27a1a', 'T', 'color:#f27a1a'], ['ikas', 'e-ticaret sitesi', '#111827', 'ik', 'color:#111827;font-size:24px'],
+    ['N11', 'pazaryeri', '#7b3fe4', 'n11', 'color:#7b3fe4'], ['PttAVM', 'pazaryeri', '#e0a800', 'Ptt', 'color:#e0a800'], ['idefix', 'pazaryeri', '#1d4ed8', 'id', 'color:#1d4ed8;font-style:italic'],
+    ['Pazarama', 'pazaryeri', '#7a2bc9', 'Pz', 'color:#7a2bc9;font-size:19px'],
   ];
   const SOON = [
     ['Amazon', 'pazaryeri', '#232f3e', 'a'], ['Çiçeksepeti', 'pazaryeri', '#1e9e57', 'Çs'], ['Koçtaş', 'pazaryeri', '#e5541b', 'K'], ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S'],
     ['WooCommerce', 'e-ticaret sitesi', '#7f54b3', 'W'], ['Etsy', 'pazaryeri', '#f1641e', 'E'],
   ];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
-  const strip = $('[data-strip]');
-  if (strip) strip.insertAdjacentHTML('beforeend', ACTIVE.map((x) => `<span class="chip">${badge(x)}${esc(x[0])}</span>`).join(''));
+  const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
+  const logos = $('[data-logos]');
+  if (logos) logos.innerHTML = ACTIVE.map((x) => `<a class="wm" href="#entegrasyonlar" style="${x[4]}" title="${esc(x[0])}">${esc(wordmark(x[0]))}</a>`).join('')
+    + `<a class="wm more" href="#entegrasyonlar">ve yakında daha fazlası<svg><use href="#i-arrow"/></svg></a>`;
+  $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.length; });
   const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}</small></div></div>`).join('');
   const ia = $('[data-integ="active"]'), is = $('[data-integ="soon"]');
   if (ia) ia.innerHTML = integ(ACTIVE);
@@ -50,8 +54,13 @@
       <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>
       <div class="price">${p.price ? `${esc(p.price)} <small>/ ${esc(p.period || 'ay')}</small>` : 'Teklif alın'}</div><div class="users">${esc(p.users)}</div>
       <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}</ul>
-      <a class="btn ${p.featured ? 'btn-primary' : 'btn-line'}" href="#iletisim" data-plan="${esc(p.name)}">${p.price ? 'Başlayın' : 'Teklif isteyin'}</a></div>`).join('');
+      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="#iletisim" data-plan="${esc(p.name)}">${p.price ? 'Başlayın' : 'Teklif isteyin'}</a></div>`).join('');
   $$('[data-plan]').forEach((a) => a.addEventListener('click', () => { const m = $('[name=message]'); if (m && !m.value) m.value = `${a.dataset.plan} paketi hakkında bilgi almak istiyorum.`; }));
+  // "Biz sizi arayalım": formda arama talebini hazırla, ad alanına geç
+  $$('[data-callme]').forEach((a) => a.addEventListener('click', () => {
+    const m = $('[name=message]'); if (m && !m.value) m.value = 'Lütfen beni arayın.';
+    setTimeout(() => { const n = $('[name=name]'); if (n) n.focus({ preventScroll: true }); }, 400);
+  }));
   // KDV notu yalnız fiyat yazılmışsa
   const priced = (S.plans || []).some((p) => p.price);
   $$('#paketler .note').forEach((n) => { if (!priced) n.textContent = 'Fiyat teklifi; mağaza ve kanal sayınıza, aylık sipariş adedinize göre hazırlanır.'; });
