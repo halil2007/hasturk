@@ -475,11 +475,15 @@ export async function zplToPdf(lab) {
   return { format: 'pdf', data: toB64(new Uint8Array(await res.arrayBuffer())), filename: String(lab.filename || 'etiket.zpl').replace(/\.zpl$/, '.pdf') };
 }
 
+// Hepsiburada: etiket bizim tasarımla basılır (Ayarlar → Kargo etiketi), barkod Hepsiburada'dan gelir. Kanalın etiketi yine saklanır.
+const ownDesign = (settings, ch) => !!ch && ch.type === 'hepsiburada' && settings.label_own !== false;
+
 // ---------- kargo etiketi (kanalın kendi sisteminden) ----------
 // ikas: ikas Kargo etiket görseli / barkodu · Trendyol: ortak etiket (ZPL) ya da takip barkodu · Hepsiburada: paket etiketi (ZPL/PDF).
 // Alınan etiket pakete kaydedilir; tekrar istenince kanala gidilmez. Oluşturma, görüntüleme ve yazdırma ayrı tutulur.
 async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   if (pkg.has_label && !refresh) {
+    if (ownDesign(settings, ch) && (pkg.barcode || pkg.tracking)) return { official: null, panel: true };
     const r = await first(db, 'SELECT label_format, label_data FROM packages WHERE id = ?', pkg.id);
     let lab = { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` };
     // Kayıtlı ZPL, "PDF'e çevir" açıksa PDF olarak verilir (kayıt ZPL kalır: termal yazıcı için de indirilebilir)
@@ -497,7 +501,7 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
     return { official: null, panel: !!code, error: code ? null : `${ch ? ch.name : 'Kanal'} kargo barkodu henüz gelmedi; kanalda paketi kargoya hazırlayıp senkronlayın` };
   }
   let r;
-  try { r = (await ch.label(o, pkg, { prefer: settings.zpl_pdf ? 'pdf' : null })) || {}; } catch (e) {
+  try { r = (await ch.label(o, pkg, { prefer: ownDesign(settings, ch) ? null : settings.zpl_pdf ? 'pdf' : null })) || {}; } catch (e) {
     await run(db, 'UPDATE packages SET error = ? WHERE id = ?', e.message.slice(0, 500), pkg.id);
     await log(db, o.channel, 'warn', `#${o.order_number} etiket alınamadı: ${e.message}`);
     return { official: null, error: e.message };
@@ -511,6 +515,11 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   }
   let lab = r.label;
   if (!lab) return { official: null, pending: `${ch.name} etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.` };
+  // Bizim tasarım: kanalın etiketi saklanır (indirilebilir), yazdırılan etiket panelin tasarımı + kanalın barkodu
+  if (ownDesign(settings, ch) && (r.barcode || pkg.barcode || pkg.tracking)) {
+    await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ?, error = NULL WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);
+    return { official: null, panel: true };
+  }
   // ZPL'yi normal yazıcı için PDF'e çevir (Ayarlar'da açıksa; olmazsa ZPL kalır, çıktıda PDF'e çevirme sorulur)
   if (lab.format === 'zpl' && settings.zpl_pdf) { try { lab = await zplToPdf(lab); } catch { /* ZPL olarak kalır */ } }
   await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ?, error = NULL WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);

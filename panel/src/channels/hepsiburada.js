@@ -294,7 +294,13 @@ export function hepsiburada(env, meta) {
         changeCargo: true, cargoCompany: firm || undefined,
       };
     }
-    return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.', changeCargo: true };
+    if (!lab) return { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.', changeCargo: true };
+    // Etiketteki kargo barkodu (Hepsiburada'nın verdiği gönderi / takip numarası): panel kendi tasarımına bu barkodu basar
+    let barcode = lab.format === 'zpl' ? barcodeFromZpl(lab.data) : '', firm = '';
+    if (!barcode) {
+      try { const info = await call(pkgUrl(pkg)); barcode = str(g(info, 'barcode', 'cargoBarcode', 'shipmentBarcode', 'trackingNumber', 'cargoTrackingNumber')); firm = str(g(info, 'cargoCompany', 'cargoCompanyName')); } catch { /* barkod etiketten alınamadı */ }
+    }
+    return { label: lab, barcode: barcode || undefined, cargoCompany: firm || undefined, agreement: 'hepsiburada' };
   }
   // Etiket dosyası: biçim değeri firmaya göre farklı kabul ediliyor (HepsiJET "ZPL" kabul eder; Aras servisi "ZPL"yi tanımayıp
   // 500 / "Requested value 'ZPL' was not found" döner). Sırayla denenir: ZPL, biçimsiz, Zpl, zpl, PDF, Pdf, pdf.
@@ -320,6 +326,14 @@ export function hepsiburada(env, meta) {
     }
     if (lastErr) throw lastErr;
     return null;
+  }
+  // ZPL'deki ilk barkod alanı (^BC / ^B3 … ^FD<değer>^FS); yoksa "TES. NO : 6275…" yazısı
+  function barcodeFromZpl(z) {
+    const t = String(z || '');
+    const m = /\^B[C3AEKU8Q][^\^]*(?:\^[A-Z]{2}[^\^]*)*?\^FD(?:>[0-9:;<=>])?([0-9A-Za-z-]{6,})\^FS/.exec(t);
+    if (m) return m[1];
+    const n = /TES\.?\s*NO\s*:?\s*(?:\^FS)?[^0-9]{0,40}?(\d{8,})/i.exec(t);
+    return n ? n[1] : '';
   }
   async function parseLabel(res, pkg) {
     const type = res.headers.get('content-type') || '';

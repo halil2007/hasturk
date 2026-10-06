@@ -301,6 +301,8 @@ export const DEFAULT_SETTINGS = {
   sender: { name: '', phone: '', address: '', city: '' },
   // Trendyol/Hepsiburada ZPL etiketini normal yazıcıda basmak için PDF'e çevir (Labelary servisi; etiket içeriği o servise gider)
   zpl_pdf: false,
+  // Hepsiburada etiketi bizim tasarımla basılır (barkod / takip no Hepsiburada'dan); kapalıysa Hepsiburada'nın kendi etiketi
+  label_own: true,
   // Kendi kargo etiketimizin boyutu: 100x150 (termal) | a5 | a4
   label_size: '100x150',
   // Kargo firması takip sayfaları ({no} = takip numarası). Kanal resmi takip bağlantısı verdiyse o kullanılır.

@@ -92,3 +92,49 @@ test('PDF istenirse önce Hepsiburada\'nın kendi PDF etiketi denenir', async ()
   const z = await ch.label({}, { remote_id: 'P5' });
   assert.equal(z.label.format, 'zpl');
 });
+
+test('etiketteki kargo barkodu (takip no) panelin tasarımına basılmak üzere döner', async () => {
+  globalThis.fetch = async (url) => (/\/labels/.test(String(url)) ? res(200, { data: ['^XA^FO50,50^BY3^BCN,120,N,N^FD>;62755251497373^FS^FO50,200^A0N,30,30^FDTES. NO : 62755251497373^FS^XZ'] }) : res(404, 'yok'));
+  const ch = hepsiburada({ HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x', HB_USER_AGENT: 'ua' }, { id: 'hepsiburada' });
+  const r = await ch.label({}, { remote_id: '5525149737' });
+  assert.equal(r.barcode, '62755251497373'); assert.equal(r.agreement, 'hepsiburada'); assert.equal(r.label.format, 'zpl');
+  // ZPL'de barkod alanı yoksa paket bilgisinden
+  globalThis.fetch = async (url) => (/\/labels/.test(String(url)) ? res(200, { data: ['^XA^FDmetin^FS^XZ'] }) : res(200, { packageNumber: '1', barcode: '99887766554433', cargoCompany: 'Aras Kargo' }));
+  const r2 = await ch.label({}, { remote_id: '1' });
+  assert.equal(r2.barcode, '99887766554433'); assert.equal(r2.cargoCompany, 'Aras Kargo');
+});
+
+test('panel: Hepsiburada etiketi bizim tasarımla (panel etiketi + Hepsiburada barkodu); ayar kapalıysa kanalın etiketi', async () => {
+  const { d1 } = await import('../dev/d1.mjs');
+  const { init } = await import('../src/db.js');
+  const { default: worker } = await import('../src/index.js');
+  const { saveOrders } = await import('../src/sync.js');
+  const { resetChannels } = await import('../src/channels/index.js');
+  resetChannels();
+  const db = d1(); await init(db);
+  const env = { PANEL_PASSWORD: 'pw-12345678', DB: db, HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x', HB_USER_AGENT: 'ua' };
+  let cookie = '';
+  const call = async (path, method = 'GET', body) => {
+    const r = await worker.fetch(new Request('https://p.test/api/' + path, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: body && JSON.stringify(body) }), env, { waitUntil() {} });
+    if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+    return r.json();
+  };
+  globalThis.fetch = async (url, o = {}) => {
+    const u = String(url);
+    if (/\/labels/.test(u)) return res(200, { data: ['^XA^BCN,100,N^FD62755251497373^FS^XZ'] });
+    if (/\/packages\/merchantId\/M1$/.test(u) && o.method === 'POST') return res(200, [{ packageNumber: 'PK1' }]);
+    return res(200, {});
+  };
+  await call('login', 'POST', { password: 'pw-12345678' });
+  await saveOrders(db, 'hepsiburada', [{ remoteId: 'H1', orderNumber: 'H1', orderedAt: Date.now() - 3600e3, status: 'new', remoteStatus: 'Open', customer: 'Ali', address: {}, total: 10,
+    items: [{ lineId: 'L1', sku: 'A', name: 'A', quantity: 1, unitPrice: 10, total: 10 }] }]);
+  const id = encodeURIComponent('hepsiburada:H1');
+  const r = await call(`orders/${id}/label`, 'POST', {});
+  assert.equal(r.panel, true); assert.equal(r.official, null);
+  const pkg = r.order.packages[0];
+  assert.equal(pkg.barcode, '62755251497373'); assert.equal(pkg.agreement, 'hepsiburada'); assert.ok(pkg.has_label, 'Hepsiburada etiketi saklandı');
+  // Ayar kapalı: kanalın etiketi
+  await call('settings', 'PUT', { label_own: false });
+  const r2 = await call(`orders/${id}/label`, 'POST', { package_id: pkg.id });
+  assert.equal(r2.official.format, 'zpl');
+});

@@ -151,6 +151,8 @@ export async function settingsView(el) {
         </div>
         <label class="field"><span>Kargo takip adresleri (“Kargoyu takip et” düğmesi)</span><textarea class="input" data-track style="min-height:120px;font-family:ui-monospace,monospace;font-size:12.5px" ${dis}>${Object.entries(st.track_urls || {}).map(([k, v]) => `${k} = ${v}`).join('\n')}</textarea>
           <small>Her satır: <b>Firma = adres</b>; adreste takip numarasının geleceği yere <b>{no}</b> yazın. Kanal resmi takip bağlantısı verdiyse (ikas, Trendyol) önce o kullanılır.</small></label>
+        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="label_own" ${st.label_own !== false ? 'checked' : ''} ${dis}><span></span></span>
+          <span><b>Hepsiburada etiketini bizim tasarımla bas</b><br><span class="small muted">Kargo barkodu (takip numarası) Hepsiburada'dan alınır ve panelin etiket tasarımına basılır; Hepsiburada'nın kendi etiketi saklanır, paket menüsünden indirilebilir. Kapalıyken Hepsiburada'nın etiketi basılır.</span></span></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="zpl_pdf" ${st.zpl_pdf ? 'checked' : ''} ${dis}><span></span></span>
           <span><b>Etiketleri PDF olarak ver (normal yazıcı)</b><br><span class="small muted">Trendyol ve Hepsiburada etiketi termal yazıcı biçiminde (ZPL) gelir. Açıkken Hepsiburada'dan doğrudan PDF istenir; kanal PDF vermezse ZPL, Labelary servisiyle PDF'e çevrilir (etiket içeriği — alıcı adı / adresi — bu servise gönderilir). Kapalıyken etiket alınınca “PDF olarak aç / ZPL indir” sorulur.</span></span></label>
       </div>
