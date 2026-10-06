@@ -27,5 +27,22 @@ test('ortak barkod vermeyen kargo firması: sebep, Hepsiburada\'daki firma ve ka
   assert.ok(!r.panel && !r.label, 'panel etiketi basılmaz');
   assert.equal(r.cargoCompany, 'Sürat Kargo');
   assert.match(r.pending, /Sürat Kargo/);
-  assert.match(r.pending, /CargoCompanyId/);
+  assert.match(r.pending, /HepsiJET/);
+});
+
+test('etiket: biçim parametresi kabul edilmezse parametresiz denenir; başka hatada da kargo firması seçimi önerilir', async () => {
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    if (/\/labels\?format=ZPL/.test(String(url))) return res(400, '"Invalid format"');
+    if (/\/labels$/.test(String(url))) return res(200, { data: ['^XA^FDOK^FS^XZ'] });
+    return res(404, 'yok');
+  };
+  const ch = hepsiburada({ HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x', HB_USER_AGENT: 'ua' }, { id: 'hepsiburada' });
+  const r = await ch.label({}, { remote_id: 'P9' });
+  assert.match(r.label.data, /FDOK/);
+  assert.ok(urls.every((u) => !/sit/.test(u)) && urls.some((u) => /packages\/merchantid\/M1\/packagenumber\/P9\/labels$/.test(u)));
+  globalThis.fetch = async (url) => (/\/labels/.test(String(url)) ? res(500, 'sunucu hatası') : res(200, { cargoCompany: 'Yurtiçi Kargo' }));
+  const r2 = await ch.label({}, { remote_id: 'P9' });
+  assert.equal(r2.changeCargo, true); assert.match(r2.pending, /Yurtiçi/);
 });

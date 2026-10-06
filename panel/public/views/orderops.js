@@ -149,13 +149,15 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   function pkgCard(o, p) {
     const ls = labelState(o, p);
     const qty = p.items.reduce((a, x) => a + x.qty, 0);
-    const canCargo = live() && p.status === 'open' && caps().cargo && !p.virtual;
+    // Kargo firması: paket kanalda oluşmadan önce de seçilebilir (Hepsiburada / Trendyol; seçim paketlerken uygulanır)
+    const canCargo = live() && p.status === 'open' && caps().cargo && (!p.virtual || caps().cargo === 'change');
+    let pick = null; try { pick = JSON.parse(o.cargo_pick || 'null'); } catch { /* yok */ }
     return html`<div class="pkg-card" data-pkg="${p.id}">
       <div class="hd"><span class="box"><i class="ico ico-box"></i></span><b>Paket ${p.no}</b><span class="muted small">• ${qty} ürün</span><span class="spacer"></span><span class="pill ${ls.cls}">${ls.text}</span></div>
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
         : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
-      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
-        ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
+      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || (pick && pick.name ? `${pick.name} (seçildi, paketlerken uygulanır)` : '') || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
+        ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company || (pick && pick.name) ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
       ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
       <div class="acts">${mainBtn(o, p)}${mode !== 'panel' && !p.virtual ? html`<button class="btn sm" style="flex:0 0 auto" data-op="more" data-id="${p.id}" aria-label="Diğer işlemler"><i class="ico ico-dots"></i></button>` : ''}</div>
@@ -238,6 +240,8 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   }
   // Gerçek gönderi / etiket henüz yoksa: sebep + seçenekler (tanılama; gerçek kanal barkodu varsa kendi etiketimizle yazdırma)
   function notReady(r) {
+    // Etiket isteği paketi o anda oluşturmuş olabilir: güncel sipariş yanıttan alınır (yoksa "Kargo firmasını değiştir" görünmez)
+    if (r.order) d.order = r.order;
     const pkg = d.order.packages.find((p) => p.id === r.package_id);
     const s = sheet({ title: `${chName()} · etiket henüz hazır değil`, size: 'narrow', body: html`<div class="stack">
       <div class="notice ${r.error ? 'bad' : 'warn'}"><i class="ico ico-warn"></i><div>${r.error ? friendly(r.error) : r.pending}</div></div>
@@ -341,26 +345,26 @@ function packHelp(channel, c) {
 
 // ---------- kargo firması seç / değiştir (seçenekler kanaldan gelir) ----------
 async function cargoDialog(d, pkg, done, { after } = {}) {
-  const o = d.order, enc = encodeURIComponent(o.id);
-  if (!pkg || pkg.virtual) return toast('Önce paketleri oluşturun');
-  const s = sheet({ title: `Paket ${pkg.no} · kargo firması`, size: 'narrow', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
+  const o = d.order, enc = encodeURIComponent(o.id), virt = !pkg || pkg.virtual;
+  const s = sheet({ title: `${virt ? 'Sipariş' : `Paket ${pkg.no}`} · kargo firması`, size: 'narrow', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
   let r;
-  try { r = await api(`orders/${enc}/cargo-options?package_id=${pkg.id}`); } catch (e) { return s.setBody(html`<div class="notice bad">${e.message}</div>`); }
+  try { r = await api(`orders/${enc}/cargo-options${virt ? '' : `?package_id=${pkg.id}`}`); } catch (e) { return s.setBody(html`<div class="notice bad">${e.message}</div>`); }
   if (!r.options.length) return s.setBody(html`<div class="notice">${r.note || 'Bu kanal için kargo firması seçeneği yok'}</div>`);
   const cur = r.code || '';
-  const note = r.mode === 'pack' ? (pkg.packed_at ? 'Gönderi (barkod) oluşmadan önce firma değiştirilebilir: paket ikas\'ta iptal edilip seçilen firmayla yeniden “Kargoya Hazır” yapılır, ikas Kargo gönderiyi o firmada açar.' : 'Firma seçimi “Paketle ve etiket al” adımında ikas Kargo\'ya iletilir; ikas Kargo gerçek gönderiyi bu firmada açar ve etiketi verir. Liste, ikas kargo ayarlarınızdaki firmalardır.')
-    : pkg.packed_at ? 'Değişiklik kanala gönderilir; yeni etiket oluşturmanız gerekir.' : 'Seçim paketlerken kanala uygulanır.';
+  const note = r.mode === 'pack' ? (pkg && pkg.packed_at ? 'Gönderi (barkod) oluşmadan önce firma değiştirilebilir: paket ikas\'ta iptal edilip seçilen firmayla yeniden “Kargoya Hazır” yapılır, ikas Kargo gönderiyi o firmada açar.' : 'Firma seçimi “Paketle ve etiket al” adımında ikas Kargo\'ya iletilir; ikas Kargo gerçek gönderiyi bu firmada açar ve etiketi verir. Liste, ikas kargo ayarlarınızdaki firmalardır.')
+    : pkg && pkg.packed_at ? 'Değişiklik kanala gönderilir; etiket yeni firmadan yeniden alınır.' : 'Seçim “Paketle ve etiket al” adımında kanala uygulanır; etiket bu firmadan alınır.';
   s.setBody(html`<div class="stack">
-    <div class="small muted">${ch(o.channel).name} · #${o.order_number} · şu an: <b>${pkg.cargo_company || 'kanalın varsayılanı'}</b></div>
+    <div class="small muted">${ch(o.channel).name} · #${o.order_number} · şu an: <b>${(pkg && pkg.cargo_company) || (r.pick && r.pick.name ? `${r.pick.name} (seçildi)` : 'kanalın varsayılanı')}</b></div>
     <div class="stack" style="gap:6px">${r.options.map((c) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="cargo" value="${c.id}" data-name="${c.name}" ${(cur ? cur === c.id : c.current) ? 'checked' : ''}><span style="flex:1"><span style="font-weight:600">${c.name}</span>${c.hint ? html`<div class="tiny muted">${c.hint}</div>` : ''}</span>${c.current ? html`<span class="pill good">mevcut</span>` : ''}</label>`)}</div>
-    <div class="notice small">${note}</div></div>`);
+    <label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" data-def ${r.default ? '' : ''}><span class="small">Bu kanalda bundan sonra hep bu firmayı kullan${r.default ? html` <span class="muted">(şu an varsayılan: ${r.default.name})</span>` : ''}</span></label>
+    <div class="notice small">${note}${r.before ? ' Liste, Hepsiburada\'nın son verdiği firma listesidir.' : ''}</div></div>`);
   s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const x = $('input[name=cargo]:checked', s.el);
     if (!x) return toast('Kargo firması seçin', true);
-    const res = await api(`orders/${enc}/cargo`, { method: 'POST', body: { package_id: pkg.id, cargo: { id: x.value, name: x.dataset.name } } });
+    const res = await api(`orders/${enc}/cargo`, { method: 'POST', body: { package_id: virt ? undefined : pkg.id, cargo: { id: x.value, name: x.dataset.name }, make_default: $('[data-def]', s.el).checked } });
     s.close();
-    if (after && pkg.packed_at) { toast(`Kargo firması ${x.dataset.name} oldu; etiket isteniyor…`); await done(); await after(); return; }
+    if (after && pkg && pkg.packed_at) { toast(`Kargo firması ${x.dataset.name} oldu; etiket isteniyor…`); await done(); await after(); return; }
     toast(res.message); await done();
   });
 }

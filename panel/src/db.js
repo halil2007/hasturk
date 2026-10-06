@@ -105,6 +105,9 @@ const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN packed_at INTEGER',
   'ALTER TABLE packages ADD COLUMN error TEXT',
   'ALTER TABLE packages ADD COLUMN cargo_code TEXT',
+  // Paketlemeden önce seçilen kargo firması (JSON {id, name}); paket kanalda oluşunca uygulanır
+  'ALTER TABLE orders ADD COLUMN cargo_pick TEXT',
+  'ALTER TABLE packages ADD COLUMN cargo_applied TEXT',
   'ALTER TABLE packages ADD COLUMN label_viewed_at INTEGER',
   'ALTER TABLE packages ADD COLUMN label_printed_at INTEGER',
   'ALTER TABLE packages ADD COLUMN label_prints INTEGER NOT NULL DEFAULT 0',
