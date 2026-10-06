@@ -274,7 +274,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     label: (b) => busy(b, async () => {
       const r = await fetchLabel(pkgOf(b.dataset.id));
       if (r.error || r.pending) { await changed(); notReady(r); return; }
-      else { toast(r.official ? `${chName()} etiketi hazır` : `${chName()} barkodu alındı, etiket hazır`); await outputLabel(r, { done: changed }); }
+      else { toast(r.note || (r.official ? `${chName()} etiketi hazır` : `${chName()} barkodu alındı, etiket hazır`), !!r.note); await outputLabel(r, { done: changed }); }
       await changed();
     }),
     labels: (b) => busy(b, async () => { await bulkLabels([d.order.id], { fetch: true }); await changed(); }),

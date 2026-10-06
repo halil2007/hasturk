@@ -46,13 +46,13 @@ export function barcodeSvg(text) {
 }
 
 // Kanal işaretleri (termal yazıcıda net basılması için siyah-beyaz yazı işaret)
-const MARK = { ikas: 'ikas', trendyol: 'trendyol', hepsiburada: 'hepsiburada', pttavm: 'PttAVM', n11: 'n11', idefix: 'idefix', pazarama: 'pazarama' };
+const MARK = { ikas: 'ikas', trendyol: 'trendyol', hepsiburada: 'hepsiburada', pttavm: 'PttAVM', n11: 'n11', idefix: 'idefix', pazarama: 'pazarama', amazon: 'amazon', ciceksepeti: 'çiçeksepeti', koctas: 'Koçtaş', shopify: 'shopify', woocommerce: 'woocommerce', etsy: 'Etsy' };
 // Gönderinin yapıldığı gerçek kargo anlaşması → etikete yazılan ifade
 export const AGREEMENT = {
   ikas: 'ikas Kargo anlaşmalı gönderi', trendyol: 'Trendyol anlaşmalı gönderi', hepsiburada: 'Hepsiburada anlaşmalı gönderi', pttavm: 'PttAVM anlaşmalı gönderi',
-  n11: 'N11 anlaşmalı gönderi', idefix: 'idefix anlaşmalı gönderi', pazarama: 'Pazarama anlaşmalı gönderi', own: 'Satıcı anlaşmalı gönderi',
+  n11: 'N11 anlaşmalı gönderi', idefix: 'idefix anlaşmalı gönderi', pazarama: 'Pazarama anlaşmalı gönderi', ciceksepeti: 'Çiçeksepeti anlaşmalı gönderi', own: 'Satıcı anlaşmalı gönderi',
 };
-const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama'];
+const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', 'ciceksepeti'];
 // Anlaşma: pakete kaydedilen (ikas Kargo işlediyse 'ikas', kendi anlaşmanızsa 'own'); yoksa pazaryeri barkodu o pazaryerinin anlaşmasıdır
 export function agreementOf(order, pkg) {
   if (pkg.agreement) return pkg.agreement;

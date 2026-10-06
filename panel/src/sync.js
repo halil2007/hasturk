@@ -28,7 +28,7 @@ export { relinkItems };
 export const DESIRED = `CASE l.stock_mode WHEN 'own' THEN MAX(COALESCE(l.stock_value, 0), 0)
   WHEN 'limit' THEN MAX(MIN(p.stock, COALESCE(l.stock_value, p.stock)), 0) ELSE MAX(p.stock, 0) END`;
 const LISTING_EVERY = 14 * 60e3;
-export const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama']; // ilanlar en geç bu aralıkla yenilenir
+export const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', 'amazon', 'ciceksepeti', 'koctas', 'etsy']; // ilanlar en geç bu aralıkla yenilenir
 
 const D = 864e5;
 const OVERLAP = 2 * 3600e3; // son senkrondan 2 saat öncesinden itibaren tekrar bakılır (geç güncellenen siparişler için)

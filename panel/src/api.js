@@ -1,7 +1,7 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta } from './config.js';
 import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
@@ -22,6 +22,7 @@ import * as chp from './chproducts.js';
 import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
+import { listOffers, importOffers, applyOffers, clearOffers } from './promos.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
@@ -431,7 +432,7 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   if (r.pending) { if (r.changeCargo) await run(db, 'UPDATE packages SET error = ? WHERE id = ?', r.pending.slice(0, 500), pkg.id); return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly, repack: !!r.repack, external: !!r.external, cancelable: !!r.cancelable, changeCargo: !!r.changeCargo }; }
   if (r.panel) {
     await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?), error = NULL WHERE id = ?', Date.now(), pkg.id);
-    return { official: null, panel: true };
+    return { official: null, panel: true, note: r.note || null };
   }
   let lab = r.label;
   if (!lab) return { official: null, pending: `${ch.name} etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.` };
@@ -1108,6 +1109,15 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   // Kampanyalar (Hepsiburada sepet indirimleri)
   if (path === 'campaigns' || path.startsWith('campaigns/')) return json(await campaignApi(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
+  // Fırsat etiketleri (Excel'den yüklenen avantajlı ürün / flaş indirim eşikleri; bkz. promos.js)
+  if (path === 'promos' && m === 'GET') return json(await listOffers(db, { channel: str(q.channel), kind: str(q.kind) }));
+  if (path === 'promos/import' && m === 'POST') { const b = await body(req); return json(await importOffers(db, { ...b, user: user.name })); }
+  if (path === 'promos/apply' && m === 'POST') {
+    const b = await body(req), r = await applyOffers(db, { ...b, user: user.name });
+    if (r.applied) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
+    return json(r);
+  }
+  if (path === 'promos/clear' && m === 'POST') return json(await clearOffers(db, await body(req)));
   // İade talepleri
   if (path === 'claims' && m === 'GET') return json(await listClaims(db, { ...q, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'claims/sync' && m === 'POST') return json(await syncClaims(env, db));
@@ -1141,7 +1151,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   // Mağaza ekle / kaldır (aynı kanal türünden istenen sayıda mağaza)
   if (path === 'integrations/add' && m === 'POST') {
-    const id = await addStore(db, str((await body(req)).type));
+    const id = await addStore(db, str((await body(req)).type), { tenant: !!env.TENANT_SLUG });
     resetChannels();
     await log(db, id, 'info', `${user.name}: yeni mağaza eklendi`);
     return json({ ok: true, id });
@@ -1153,6 +1163,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true });
   }
   if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT') {
+    if (env.TENANT_SLUG && isBeta(x[1])) fail(403, 'Bu kanal yakında açılacak');
     const b = await body(req);
     await saveConfig(env, db, x[1], b);
     resetChannels();

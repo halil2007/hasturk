@@ -13,13 +13,21 @@ const HELP = {
   n11: 'N11 Satıcı Ofisi (so.n11.com) → Hesabım → API Hesapları → Yeni Hesap Oluştur; App Key ve App Secret e-postayla gelir.',
   idefix: 'idefix satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri → Yeni API Oluştur (API Key, API Secret) ve Vendor ID.',
   pazarama: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri (API Key = Client ID, API Secret).',
+  amazon: 'Amazon Seller Central → Uygulamalar ve Hizmetler → Uygulama geliştirme: özel (private) SP-API uygulaması oluşturun, kendi mağazanız için yetkilendirin; LWA Client ID / Secret ve refresh token buradan alınır. Siparişler, stok, fiyat ve kargo bildirimi (takip no) desteklenir; alıcı adres bilgisini Amazon kısıtlı veri olarak verir.',
+  ciceksepeti: 'Çiçeksepeti satıcı paneli → Hesap Ayarları → Entegrasyon Bilgileri → API anahtarı. Siparişler, ürünler, stok ve fiyat; kargo Çiçeksepeti anlaşmasıyla, etiket Çiçeksepeti panelinden.',
+  koctas: 'Koçtaş pazaryeri (Mirakl satıcı paneli) → sağ üst kullanıcı menüsü → API Anahtarı. Siparişleri onaylama, kargo/takip bildirimi, stok ve fiyat desteklenir.',
+  shopify: 'Shopify yönetimi → Ayarlar → Uygulamalar ve satış kanalları → Uygulama geliştir → özel uygulama oluşturun; Admin API izinleri: ürünler, siparişler, stok, lokasyonlar, gönderimler (okuma + yazma). Yükledikten sonra verilen shpat_… belirtecini girin.',
+  woocommerce: 'WordPress yönetimi → WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (İzin: Okuma/Yazma). Site HTTPS olmalı; kalıcı bağlantılar "Yazı adı" gibi açık olmalı.',
+  etsy: 'etsy.com/developers → Create a New App (keystring + shared secret); uygulamayı mağazanız için OAuth ile yetkilendirip refresh token alın. Siparişler, stok, fiyat ve kargo bildirimi desteklenir; panel yenilenen belirteci kendisi saklar.',
 };
+// Test modülü: bu kanallar ana panelde bağlanıp denenir; müşteri panellerinde "Yakında" görünür
+const BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'etsy'];
 
 // Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
-const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama'];
-// Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi)
-const SOON = ['Amazon', 'Çiçeksepeti', 'Koçtaş', 'Teknosa', 'Turkcell Pasaj', 'Shopify', 'WooCommerce', 'Etsy'];
-const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama' };
+const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama', ...BETA];
+const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', etsy: 'Etsy' };
+// Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi): müşteri panellerinde test modülündekiler de burada
+const SOON = () => [...(state.tenant ? BETA.map((t) => TYPE_NAME[t]) : []), 'Teknosa', 'Turkcell Pasaj'];
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
@@ -45,7 +53,7 @@ export async function integrations(el) {
     const basic = c.fields.filter((f) => !f.adv), adv = c.fields.filter((f) => f.adv);
     return html`<div class="card" data-ch="${c.id}">
       <div class="hd">${chLogo(c.id)}<div style="flex:1;min-width:0"><h2 class="ellipsis">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2>
-        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}${c.sandbox ? html`<span class="pill warn" title="İstekler Hepsiburada test (SIT) sunucularına gidiyor">Test ortamı</span>` : ''}</div></div>
+        <div class="row small"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${t}${c.sandbox ? html`<span class="pill warn" title="İstekler Hepsiburada test (SIT) sunucularına gidiyor">Test ortamı</span>` : ''}${c.beta ? html`<span class="pill info" title="Test modülü: yalnızca ana panelde açık; müşteri panellerinde “Yakında” görünür">Test modülü</span>` : ''}</div></div>
         <label class="row small" title="Pasif kanal senkronlanmaz">Aktif <span class="switch"><input type="checkbox" data-active="${c.id}" ${c.active ? 'checked' : ''}><span></span></span></label></div>
       ${!c.gated ? html`<label class="row small" style="gap:10px;align-items:flex-start"><span class="switch"><input type="checkbox" data-hold="${c.id}" ${((state.settings && state.settings.hold_channels) || []).includes(c.id) ? 'checked' : ''}><span></span></span>
         <span><b>Kanala yazmayı beklet</b> <span class="muted">— siparişler, ürünler, stok ve kanalda oluşan etiketler okunur; paketleme, kargo bildirimi, stok/fiyat gönderimi ve ürün oluşturma ${c.type === 'ikas' ? 'ikas' : 'kanal'} panelinden yapılır.</span></span></label>` : ''}
@@ -102,9 +110,10 @@ export async function integrations(el) {
       <div class="notice good small"><i class="ico ico-sync"></i><div>Tüm aktif kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: yeni/değişen siparişler, ürünler, görseller, varyantlar ve stoklar güncellenir; eşleştirmeler ve kanala özel stok kuralları korunur. Başarısız işlemler yeniden denenir, çözülemeyenler <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer.</div></div>
       <div class="row wrap"><button class="btn primary" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü (tüm kanallar)</button><span class="muted small">Bağlı tüm kanalların kimlik, izin, servis ve ayarlarını tek seferde dener; raporu kopyalayıp iletebilirsiniz.</span></div>
       <div class="card row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Mağaza ekle</h2><div class="muted small">Aynı pazaryerinde ya da ikas'ta birden fazla mağazanız varsa istediğiniz kadar ekleyin; her mağaza kendi API bilgileriyle ayrı çalışır.</div></div>
-        <select class="input" data-addtype style="width:auto">${TYPES.map((t) => html`<option value="${t}">${TYPE_NAME[t]}</option>`)}<optgroup label="Yakında">${SOON.map((t) => html`<option disabled>${t} — yakında</option>`)}</optgroup></select>
+        <select class="input" data-addtype style="width:auto">${TYPES.filter((t) => !BETA.includes(t)).map((t) => html`<option value="${t}">${TYPE_NAME[t]}</option>`)}${state.tenant ? '' : html`<optgroup label="Test modülü">${BETA.map((t) => html`<option value="${t}">${TYPE_NAME[t]} — test</option>`)}</optgroup>`}<optgroup label="Yakında">${SOON().map((t) => html`<option disabled>${t} — yakında</option>`)}</optgroup></select>
         <button class="btn primary" data-act="add"><i class="ico ico-plus"></i>Mağaza ekle</button>
-        <div style="flex-basis:100%" class="row wrap small"><span class="muted">Yakında:</span>${SOON.map((t) => html`<span class="pill" title="Yakında sisteme entegre edilecek">${t} <span class="muted tiny">yakında</span></span>`)}</div></div>
+        <div style="flex-basis:100%" class="row wrap small"><span class="muted">Yakında:</span>${SOON().map((t) => html`<span class="pill" title="Yakında sisteme entegre edilecek">${t} <span class="muted tiny">yakında</span></span>`)}</div>
+        ${state.tenant ? '' : html`<div style="flex-basis:100%" class="row wrap small"><span class="muted">Test modülü (yalnız bu panelde; firmalarda yakında):</span>${BETA.map((t) => html`<span class="pill info">${TYPE_NAME[t]}</span>`)}</div>`}</div>
       <div class="integ">${live.map(card)}</div>
       ${backfill()}
       ${paused.length ? html`<h2 style="margin:8px 0 0">Bağlanmamış / pasif kanallar</h2>

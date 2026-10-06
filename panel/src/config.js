@@ -67,14 +67,52 @@ export const FIELDS = {
     { k: 'PAZARAMA_CLIENT_ID', label: 'API Key (Client ID)', req: true },
     { k: 'PAZARAMA_CLIENT_SECRET', label: 'API Secret', secret: true, req: true },
   ],
+  // ---------- test modülündeki kanallar (yalnız ana panelde; müşteri panellerinde "Yakında") ----------
+  amazon: [
+    { k: 'AMAZON_SELLER_ID', label: 'Satıcı kimliği (Merchant Token)', req: true, hint: 'Seller Central → Ayarlar → Hesap Bilgileri → Satıcı Token (ör. A1B2C3D4E5F6G7)', pattern: '^[A-Z0-9]{8,20}$', patternMsg: 'Amazon satıcı kimliği büyük harf ve rakamlardan oluşur (ör. A1B2C3D4E5F6G7)' },
+    { k: 'AMAZON_CLIENT_ID', label: 'LWA Client ID', req: true, hint: 'Seller Central → Uygulamalar ve Hizmetler → Uygulama geliştirme → uygulamanız → LWA kimlik bilgileri (amzn1.application-oa2-client…)' },
+    { k: 'AMAZON_CLIENT_SECRET', label: 'LWA Client Secret', secret: true, req: true },
+    { k: 'AMAZON_REFRESH_TOKEN', label: 'Refresh token', secret: true, req: true, hint: 'Uygulamayı kendi mağazanız için yetkilendirince verilen Atzr|… ile başlayan belirteç' },
+    { k: 'AMAZON_MARKETPLACE_ID', label: 'Pazar yeri ID', hint: 'boşsa Amazon.com.tr (A33AVAJ2PDY3EV)', adv: true },
+    { k: 'AMAZON_REGION', label: 'Bölge', choices: [['', 'Avrupa (Türkiye dahil)'], ['na', 'Kuzey Amerika'], ['fe', 'Uzak Doğu']], adv: true },
+    { k: 'AMAZON_SANDBOX', label: 'Ortam', choices: [['', 'Canlı'], ['1', 'Test (Sandbox)']], adv: true },
+  ],
+  ciceksepeti: [
+    { k: 'CICEKSEPETI_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Çiçeksepeti satıcı paneli → Hesap Ayarları → Entegrasyon Bilgileri' },
+    { k: 'CICEKSEPETI_TEST', label: 'Ortam', choices: [['', 'Canlı'], ['1', 'Test (Sandbox)']], adv: true },
+  ],
+  koctas: [
+    { k: 'KOCTAS_URL', label: 'Koçtaş pazaryeri API adresi', req: true, hint: 'Koçtaş satıcı paneli (Mirakl) adresi, ör. https://koctas-prod.mirakl.net', pattern: '^https://[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(/[^\\s]*)?$', patternMsg: 'https:// ile başlayan panel adresini girin (ör. https://koctas-prod.mirakl.net)' },
+    { k: 'KOCTAS_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Satıcı paneli → sağ üst kullanıcı menüsü → API Anahtarı' },
+    { k: 'KOCTAS_SHOP_ID', label: 'Mağaza ID', hint: 'birden fazla mağazanız varsa', adv: true },
+  ],
+  shopify: [
+    { k: 'SHOPIFY_STORE', label: 'Mağaza adresi', req: true, hint: 'XXXX.myshopify.com → XXXX (ya da adresin tamamı)' },
+    { k: 'SHOPIFY_TOKEN', label: 'Admin API erişim belirteci', secret: true, req: true, hint: 'Shopify yönetimi → Ayarlar → Uygulamalar → Uygulama geliştir → özel uygulama (izinler: ürünler, siparişler, stok, lokasyon okuma + yazma) → shpat_…' },
+    { k: 'SHOPIFY_LOCATION_ID', label: 'Stok lokasyonu ID', hint: 'boşsa ilk lokasyon', adv: true },
+  ],
+  woocommerce: [
+    { k: 'WOO_URL', label: 'Site adresi', req: true, hint: 'ör. https://magazaniz.com', pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan site adresini girin' },
+    { k: 'WOO_KEY', label: 'Consumer key', req: true, hint: 'WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (Okuma/Yazma) → ck_…' },
+    { k: 'WOO_SECRET', label: 'Consumer secret', secret: true, req: true, hint: 'cs_…' },
+  ],
+  etsy: [
+    { k: 'ETSY_SHOP_ID', label: 'Mağaza ID', req: true, pattern: '^\\d+$', patternMsg: 'Etsy mağaza ID yalnızca rakamlardan oluşur' },
+    { k: 'ETSY_API_KEY', label: 'Keystring (API Key)', req: true, hint: 'etsy.com/developers → Your Apps → uygulamanız' },
+    { k: 'ETSY_SHARED_SECRET', label: 'Shared secret', secret: true, req: true },
+    { k: 'ETSY_REFRESH_TOKEN', label: 'Refresh token', secret: true, req: true, hint: 'Uygulamayı mağazanız için yetkilendirince (OAuth, kapsamlar: transactions_r transactions_w listings_r listings_w shops_r) verilen belirteç; panel yenisini kendisi saklar' },
+  ],
 };
 
 // ---------- ek mağazalar ----------
 // Her kanal türüne istenen sayıda mağaza eklenebilir: ek mağazanın kimliği "<tür>_<n>" (ör. trendyol_2, ikas_3).
 // Ek mağazanın bilgileri ana mağazayla aynı alan adlarıyla, kendi kaydında saklanır; Cloudflare değişkenleri ek mağazaya karışmaz.
-export const TYPES = ['ikas', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama'];
-export const TYPE_NAMES = { ikas: 'ikas', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama' };
-export const EXTRA_RE = /^(ikas|trendyol|hepsiburada|pttavm|n11|idefix|pazarama)_(\d{1,3})$/;
+// Test modülündeki kanallar: ana panelde bağlanıp denenir, müşteri panellerinde "Yakında" görünür (eklenemez, çalışmaz)
+export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'etsy'];
+export const TYPES = ['ikas', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', ...BETA_TYPES];
+export const TYPE_NAMES = { ikas: 'ikas', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', etsy: 'Etsy' };
+export const EXTRA_RE = new RegExp(`^(${TYPES.join('|')})_(\\d{1,3})$`);
+export const isBeta = (id) => BETA_TYPES.includes(typeOf(id));
 export const isExtra = (id) => EXTRA_RE.test(String(id || ''));
 export const typeOf = (id) => { const m = EXTRA_RE.exec(String(id || '')); return m ? m[1] : /^ikas\d$/.test(id) ? 'ikas' : id; };
 const baseFields = (type) => FIELDS[type === 'ikas' ? 'ikas1' : type] || [];
@@ -91,8 +129,9 @@ export function storeEnv(env, type, values) {
   for (const [k, v] of Object.entries(values || {})) if (v) out[k] = v;
   return out;
 }
-export async function addStore(db, type) {
+export async function addStore(db, type, { tenant = false } = {}) {
   if (!TYPES.includes(type)) fail(400, 'Bilinmeyen kanal türü');
+  if (tenant && BETA_TYPES.includes(type)) fail(403, `${TYPE_NAMES[type]} yakında açılacak`);
   const rows = await all(db, 'SELECT id FROM channel_config');
   const used = new Set(rows.map((r) => r.id));
   let n = type === 'ikas' ? 3 : 2;
