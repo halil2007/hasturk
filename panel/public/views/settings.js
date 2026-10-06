@@ -1,6 +1,7 @@
 // Ayarlar: firma bilgileri ve logo, stok senkronu ve stok sınırı, ana katalog, komisyon/kargo, kargo etiketi, kayıtlar.
 // Kanal API bilgileri Entegrasyonlar'da, kullanıcılar Kullanıcılar sayfasındadır.
-import { api, state, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels } from '../core.js';
+import { api, state, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels, sheet } from '../core.js';
+import { apiGuide } from '../apiguide.js';
 import { loadSummary } from '../app.js';
 import { costOf, COST_KEYS } from '../profit.js';
 import { pushState, enablePush, disablePush } from '../push-client.js';
@@ -39,7 +40,7 @@ export async function settingsView(el) {
   }
   let tab = 'firma';
   try { tab = sessionStorage.getItem('settings_tab') || 'firma'; } catch { /* yok */ }
-  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(state.tenant ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ['kayit', 'İşlem kayıtları', 'orders']];
+  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(state.tenant ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ...(state.tenant || !admin ? [] : [['api', 'Stok API', 'link']]), ['kayit', 'İşlem kayıtları', 'orders']];
   el.addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) showTab(b.dataset.st); });
   const load = async () => { await load0(); drawPush(); };
   async function load0() {
@@ -150,18 +151,67 @@ export async function settingsView(el) {
         </div>
         <label class="field"><span>Kargo takip adresleri (“Kargoyu takip et” düğmesi)</span><textarea class="input" data-track style="min-height:120px;font-family:ui-monospace,monospace;font-size:12.5px" ${dis}>${Object.entries(st.track_urls || {}).map(([k, v]) => `${k} = ${v}`).join('\n')}</textarea>
           <small>Her satır: <b>Firma = adres</b>; adreste takip numarasının geleceği yere <b>{no}</b> yazın. Kanal resmi takip bağlantısı verdiyse (ikas, Trendyol) önce o kullanılır.</small></label>
+        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="label_own" ${st.label_own !== false ? 'checked' : ''} ${dis}><span></span></span>
+          <span><b>Hepsiburada etiketini bizim tasarımla bas</b><br><span class="small muted">Kargo barkodu (takip numarası) Hepsiburada'dan alınır ve panelin etiket tasarımına basılır; Hepsiburada'nın kendi etiketi saklanır, paket menüsünden indirilebilir. Kapalıyken Hepsiburada'nın etiketi basılır.</span></span></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="zpl_pdf" ${st.zpl_pdf ? 'checked' : ''} ${dis}><span></span></span>
           <span><b>Etiketleri PDF olarak ver (normal yazıcı)</b><br><span class="small muted">Trendyol ve Hepsiburada etiketi termal yazıcı biçiminde (ZPL) gelir. Açıkken Hepsiburada'dan doğrudan PDF istenir; kanal PDF vermezse ZPL, Labelary servisiyle PDF'e çevrilir (etiket içeriği — alıcı adı / adresi — bu servise gönderilir). Kapalıyken etiket alınınca “PDF olarak aç / ZPL indir” sorulur.</span></span></label>
       </div>
       ${admin ? html`<div class="savebar" data-savebar><span class="muted small" data-savehint>Değişiklikleri kaydetmeyi unutmayın.</span><span class="spacer"></span><button class="btn primary lg" data-act="save">Kaydet</button></div>` : ''}
 
+      ${!state.tenant && admin ? html`<div class="card stack" data-stab="api" data-apibox><div class="empty"><i class="ico ico-sync spin"></i></div></div>` : ''}
       <div class="card flush" data-stab="kayit"><div class="card-pad row"><h2 style="flex:1">İşlem kayıtları</h2>${admin && state.demo ? html`<button class="btn sm ghost danger" data-act="purge">Örnek (demo) verileri temizle</button>` : ''}<a class="btn sm ghost" href="#/bildirimler">Bildirimler</a></div>
         <div class="table-wrap" style="max-height:380px;overflow:auto"><table class="t"><tbody>
         ${logs.length ? logs.map((l) => html`<tr><td class="small muted" style="white-space:nowrap">${dateTime(l.at)}</td><td class="small">${l.channel ? ch(l.channel).name : ''}</td><td class="small" style="color:${l.level === 'error' ? 'var(--bad)' : l.level === 'warn' ? 'var(--amber)' : 'inherit'}">${l.msg}</td></tr>`) : html`<tr><td class="empty">Kayıt yok</td></tr>`}
       </tbody></table></div></div>
     </div>`);
     drawFx().catch(() => {});
+    if (!state.tenant && admin) drawApi().catch(() => {});
     showTab(tab);
+  }
+  // ---------- Stok API (ana panelin kendi ürünleri): her dış sistem / bayi için ayrı anahtar ----------
+  async function drawApi(keys) {
+    const box = $('[data-apibox]', el);
+    if (!box) return;
+    if (!keys) keys = (await api('extapi', { fresh: true })).keys;
+    const store = (state.settings && state.settings.company && state.settings.company.title) || 'Ana mağaza';
+    render(box, html`<div class="row wrap" style="gap:10px;align-items:flex-start"><div style="flex:1;min-width:240px"><h2>Stok API (dış sistemlere stok aktarımı)</h2>
+        <div class="muted small" style="margin-top:4px">Bayiniz ya da kendi sisteminiz (ERP, site, muhasebe) panelinizdeki ürün ve stokları anahtarla okur; yazma yok. Her dış sistem için ayrı anahtar oluşturun, gerektiğinde tek tek kapatın. Firma panellerinin API'si Firmalar ekranından verilir.</div></div>
+        <button class="btn primary" data-api="new"><i class="ico ico-plus"></i>Yeni anahtar</button></div>
+      ${keys.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Ad</th><th>Anahtar</th><th>IP kısıtı</th><th>Son erişim</th><th class="r">İstek</th><th>Durum</th><th></th></tr></thead><tbody>
+        ${keys.map((k) => html`<tr data-kid="${k.id}"><td><b>${k.name}</b><div class="tiny muted">${dateTime(k.created_at)}${k.created_by ? ` · ${k.created_by}` : ''}</div></td><td class="num small">${k.hint}</td>
+          <td class="small">${k.ips.length ? k.ips.join(', ') : html`<span class="muted">her yerden</span>`}</td>
+          <td class="small">${k.last_at ? html`${dateTime(k.last_at)}${k.last_ip ? html`<div class="tiny muted">${k.last_ip}</div>` : ''}` : html`<span class="muted">henüz yok</span>`}</td>
+          <td class="r num">${n(k.calls)}</td><td><span class="pill ${k.on ? 'good' : ''}">${k.on ? 'Açık' : 'Kapalı'}</span></td>
+          <td class="r"><div class="row" style="justify-content:flex-end;gap:4px"><button class="btn sm" data-api="toggle">${k.on ? 'Kapat' : 'Aç'}</button><button class="btn sm ghost" data-api="ips">IP</button><button class="icon-btn sm" data-api="del" aria-label="Sil"><i class="ico ico-x"></i></button></div></td></tr>`)}
+      </tbody></table></div>` : html`<div class="empty">Henüz anahtar yok. “Yeni anahtar” ile oluşturun; anahtar bir kez gösterilir.</div>`}
+      <div class="row"><span class="spacer"></span><button class="btn sm ghost" data-api="doc"><i class="ico ico-help"></i>Kullanım kılavuzu</button></div>`);
+    box.onclick = async (e) => {
+      const b = e.target.closest('[data-api]');
+      if (!b) return;
+      const k = b.closest('[data-kid]') && keys.find((x) => x.id === b.closest('[data-kid]').dataset.kid), act = b.dataset.api;
+      if (act === 'doc') { const s2 = sheet({ title: 'Stok API — kullanım kılavuzu', size: 'wide', body: html`<pre class="err-stack" style="max-height:none;font-size:12.5px">${apiGuide(store)}</pre>` }); return s2; }
+      if (act === 'new') {
+        const s2 = sheet({ title: 'Yeni stok API anahtarı', size: 'narrow', body: html`<div class="stack">
+          <label class="field"><span>Ad (kimin için?)</span><input class="input" data-kn placeholder="ör. Bayi — Yeşil Bahçe"></label>
+          <label class="field"><span>İzin verilen IP adresleri (isteğe bağlı)</span><textarea class="input" rows="2" data-ki placeholder="Boş: her yerden · ör. 85.105.10.25, 85.105.10.0/24"></textarea></label></div>`,
+          foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-ok>Oluştur</button>` });
+        $('[data-ok]', s2.el).onclick = (ev) => busy(ev.currentTarget, async () => {
+          const r = await api('extapi', { method: 'POST', body: { name: $('[data-kn]', s2.el).value, ips: $('[data-ki]', s2.el).value } });
+          s2.close(); await drawApi(r.keys);
+          const s3 = sheet({ title: 'Anahtar oluşturuldu', size: 'narrow', body: html`<div class="stack">
+            <div class="notice warn small"><i class="ico ico-warn"></i><div>Anahtar <b>yalnız bir kez</b> gösterilir. Kopyalayıp dış sisteme girin ya da güvenli yolla iletin.</div></div>
+            <input class="input num" readonly value="${r.key}" style="font-size:13px">
+            <div class="row wrap" style="gap:6px"><button class="btn sm primary" data-c="key"><i class="ico ico-copy"></i>Anahtarı kopyala</button><button class="btn sm" data-c="doc"><i class="ico ico-copy"></i>Kılavuzu anahtarla kopyala</button></div></div>`,
+            foot: html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>` });
+          s3.el.addEventListener('click', (x) => { const c = x.target.closest('[data-c]'); if (c) navigator.clipboard.writeText(c.dataset.c === 'key' ? r.key : apiGuide(store, r.key)).then(() => toast('Kopyalandı')).catch(() => toast('Kopyalanamadı; elle seçin', true)); });
+        });
+        return;
+      }
+      if (!k) return;
+      if (act === 'toggle') return busy(b, async () => drawApi((await api('extapi/' + k.id, { method: 'PUT', body: { on: !k.on } })).keys));
+      if (act === 'ips') { const v = prompt('İzin verilen IP adresleri (virgülle; boş = her yerden):', k.ips.join(', ')); if (v !== null) busy(b, async () => drawApi((await api('extapi/' + k.id, { method: 'PUT', body: { ips: v } })).keys)); return; }
+      if (act === 'del' && (await confirmBox(`“${k.name}” anahtarı silinsin mi? Bu anahtarı kullanan sistem hemen erişemez.`, 'Sil'))) busy(b, async () => drawApi((await api('extapi/' + k.id, { method: 'DELETE' })).keys));
+    };
   }
   // Sekmeler: her sekmede tek kaydet düğmesi (bildirim ve döviz sekmelerinde kendi düğmeleri; genel düğme gizlenir)
   function showTab(k) {

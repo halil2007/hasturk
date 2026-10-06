@@ -2,6 +2,7 @@
 // Her firma ayrı bir müşteri panelidir (kendi verisi, API bilgileri, personeli). Abonelik bitiş tarihi geçince firma giriş yapamaz
 // (ana panelin destek oturumu girebilir). Ödeme kaydı aboneliği seçilen ay kadar uzatır. Kullanım özeti firmanın panelinden saatte bir gelir.
 import { api, html, render, $, $$, n, money, money0, date, dateTime, ago, actions, busy, toast, sheet, confirmBox, debounce, isMobile } from '../core.js';
+import { apiGuide as guideText } from '../apiguide.js';
 
 const DAY = 864e5;
 const PLANS = ['Başlangıç', 'Profesyonel', 'Kurumsal', 'Özel'];
@@ -161,7 +162,6 @@ export async function firmsView(el) {
 
   // ---------- dış API (stok aktarımı) ----------
   // Yalnız ana panel yetkilendirir: anahtar firma koduna bağlıdır, dış sistem yalnız o mağazanın ürün ve stoklarını okur.
-  const apiBase = () => location.origin + '/api/v1';
   function apiCard(t2) {
     const a = t2.api || {};
     return html`<div class="card"><div class="card-head"><h3>Dış API (stok aktarımı)</h3><span class="pill ${a.on ? 'good' : ''}">${a.on ? 'Açık' : 'Kapalı'}</span></div>
@@ -175,29 +175,7 @@ export async function firmsView(el) {
         <button class="btn sm ghost" data-x="api-ips">IP kısıtını kaydet</button><span class="spacer"></span><button class="btn sm ghost" data-x="api-doc"><i class="ico ico-help"></i>Kullanım kılavuzu</button>
       </div></div>`;
   }
-  const apiGuide = (t2, key = '<API_ANAHTARI>') => `Hastürk — Stok API (${t2.name})
-
-Adres:   ${apiBase()}/stock
-Yöntem:  GET (yalnız okuma)
-Başlık:  Authorization: Bearer ${key}
-
-Örnek:
-curl -H "Authorization: Bearer ${key}" "${apiBase()}/stock?page=1&limit=500"
-
-Parametreler (isteğe bağlı):
-  page, limit            sayfalama (limit en fazla 1000; varsayılan 500)
-  updated_since          yalnız bu tarihten sonra değişenler (ISO tarih ya da milisaniye) — düzenli çekimde önerilir
-  sku / barcode          tek ürün
-  include_inactive=1     pasif ürünler de gelsin
-
-Yanıt:
-{ "store": {...}, "page": 1, "limit": 500, "total": 1250, "has_more": true, "generated_at": "...",
-  "items": [ { "id": 12, "sku": "HG-SOL-5", "barcode": "869...", "name": "...", "variant": "5 Kg", "brand": "...",
-               "stock": 20, "price": 189.9, "vat": 20, "active": true, "updated_at": "2026-10-06T09:12:00.000Z" } ] }
-
-Bağlantı testi: ${apiBase()}/ping
-Sınır: dakikada 120 istek. Hata kodları: 401 anahtar geçersiz, 403 erişim kapalı / IP izni yok, 429 sınır aşıldı.
-Anahtarı kimseyle paylaşmayın; sızdığını düşünürseniz Hastürk'ten yenisini isteyin.`;
+  const apiGuide = (t2, key) => guideText(t2.name, key);
   function apiKeyShow(t2, key) {
     const s2 = sheet({ title: 'API anahtarı oluşturuldu', size: 'narrow', body: html`<div class="stack">
       <div class="notice warn small"><i class="ico ico-warn"></i><div>Anahtar <b>yalnız bir kez</b> gösterilir. Kopyalayıp firmanın dış sistemine girin (ya da güvenli yolla firmaya iletin).</div></div>
