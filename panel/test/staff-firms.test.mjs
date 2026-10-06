@@ -62,7 +62,7 @@ test('firmalar: abonelik alanları, ödeme ile uzatma, kullanıcı sınırı, s�
   assert.equal(r.status, 200, await r.clone().text());
   let t = (await (await O('/api/tenants')).json()).tenants[0];
   assert.equal(t.plan, 'Profesyonel'); assert.equal(t.legal, 'Yeşil Bahçe Ltd.'); assert.equal(t.trial, true); assert.equal(t.max_users, 2);
-  assert.ok(t.expires_at > Date.now() + 13 * 864e5 && t.expires_at < Date.now() + 15 * 864e5, 'deneme 14 gün');
+  assert.ok(t.expires_at > Date.now() + 6 * 864e5 && t.expires_at < Date.now() + 8 * 864e5, 'deneme 7 gün');
   // Kullanıcı sınırı: 2 (yönetici + 1)
   assert.equal((await T('/api/login', J({ tenant: 'yesil-bahce', username: 'ali', password: 'gizli-sifre-1' }))).status, 200);
   assert.equal((await T('/api/users', J({ username: 'veli', name: 'Veli', password: 'veli-sifre-1', role: 'staff', perms: ['orders'] }))).status, 200);

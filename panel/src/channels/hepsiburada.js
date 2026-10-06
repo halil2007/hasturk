@@ -459,7 +459,16 @@ export function hepsiburada(env, meta) {
     await diagStep(out, 'Sipariş servisi (paketlenecek satırlar)', async () => { const r = await call(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`); return { detail: `erişildi · ${list(r).length ? 'açık satır var' : 'açık satır yok'} · merchant ${m}${test ? ' (TEST ortamı)' : ''}${proxy ? ` · aracı sunucu: ${new URL(proxy).host}` : ''}` }; });
     await diagStep(out, 'Paket servisi', async () => { const r = await call(`${OMS}/packages/merchantId/${m}?Offset=0&limit=1`); return { detail: `erişildi · ${page(r).length} paket örneği` }; });
     await diagStep(out, 'Kargodaki paketler', async () => { const r = await call(`${OMS}/packages/merchantId/${m}/shipped?offset=0&limit=1`); return { detail: `erişildi · toplam ${g(r, 'totalCount') ?? '?'}` }; });
-    await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
+    let sku = '';
+    await diagStep(out, 'Ürün / listing servisi', async () => { const r = await call(`${LST}/listings/merchantid/${m}?offset=0&limit=1`); sku = str(g(list(r)[0], 'hepsiburadaSku', 'hbSku')); return { detail: `erişildi · ${r && (r.totalCount ?? r.total ?? list(r).length)} ilan` }; });
+    // Buybox: bir ilanın sırası ve buybox fiyatı okunabiliyor mu (otomatik fiyatın çalışması için gerekli)
+    await diagStep(out, 'Buybox servisi', async () => {
+      if (!sku) return { ok: null, detail: 'İlan yok, denenemedi' };
+      const [b] = await buybox([sku]);
+      if (!b) return { ok: false, detail: `${sku}: buybox yanıtı okunamadı (yanıt biçimi tanınmadı)` };
+      if (b.error) return { ok: null, detail: `${sku}: ${b.error}` };
+      return { detail: `${sku}: buybox sırası ${b.rank ?? '?'} · buybox fiyatı ${b.buyboxPrice ?? 'yok'}${b.multi ? ` · 2. satıcı ${b.second ?? '?'}` : ' · tek satıcı'}${myName ? '' : ' · Mağaza adı girilmedi: rakip varsa sıranız bulunamaz'}` };
+    });
     if (questions) await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ page: 0, size: 1 }); return { detail: `${r.total ?? r.items.length} soru` }; });
     if (!proxy && out.some((x) => x.ok === false && /HTTP 52\d/.test(x.detail || ''))) {
       const rows = await probe(`${OMS}/orders/merchantId/${m}?offset=0&limit=1`);
