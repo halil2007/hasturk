@@ -17,6 +17,8 @@ const SYNC_MS = 15 * 60e3;
 const PRIVATE = /^(IKAS\d?_|TRENDYOL_|HB_|PTTAVM_|N11_|IDEFIX_|PAZARAMA_|MAIL_)/;
 const DROP = new Set(['PANEL_PASSWORD', 'DEMO', 'DB', 'TENANT']);
 
+// Abonelik bitiş tarihi geçti mi (bitiş günü sonuna kadar açık)
+export const expired = (t, now = Date.now()) => !!(t && t.expires_at && now > t.expires_at);
 export function tenantEnv(env, t) {
   const out = {};
   for (const [k, v] of Object.entries(env)) if (!DROP.has(k) && !PRIVATE.test(k)) out[k] = v;
@@ -26,6 +28,7 @@ export function tenantEnv(env, t) {
   out.PANEL_SECRET = `${env.PANEL_SECRET || env.PANEL_PASSWORD}|tenant:${t.slug}`;
   out.TENANT_SLUG = t.slug;
   out.TENANT_NAME = t.name || t.slug;
+  if (t.maxUsers) out.TENANT_MAX_USERS = String(t.maxUsers);
   return out;
 }
 
@@ -57,11 +60,11 @@ const enc = (s) => encodeURIComponent(String(s || ''));
 // İsteği müşteri panelinin Durable Object'ine ilet (firma kodu ve adı başlıkla gider; DO yalnız buradan erişilebilir)
 export async function forward(req, env, t, url) {
   const h = new Headers(req.headers);
-  h.set('X-Tenant-Slug', t.slug); h.set('X-Tenant-Name', enc(t.name));
+  h.set('X-Tenant-Slug', t.slug); h.set('X-Tenant-Name', enc(t.name)); h.set('X-Tenant-Max-Users', String(t.max_users || 0));
   return stub(env, t.slug).fetch(new Request(url || req.url, { method: req.method, headers: h, body: ['GET', 'HEAD'].includes(req.method) ? undefined : await req.arrayBuffer() }));
 }
 async function admin(env, t, op, data = {}) {
-  const r = await stub(env, t.slug).fetch(new Request('https://tenant.internal/__admin', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': t.slug, 'X-Tenant-Name': enc(t.name) }, body: JSON.stringify({ op, ...data }) }));
+  const r = await stub(env, t.slug).fetch(new Request('https://tenant.internal/__admin', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': t.slug, 'X-Tenant-Name': enc(t.name), 'X-Tenant-Max-Users': String(t.max_users || 0) }, body: JSON.stringify({ op, ...data }) }));
   const j = await r.json().catch(() => ({}));
   if (!r.ok) fail(r.status, j.error || 'Müşteri paneli yanıt vermedi');
   return j;
@@ -73,17 +76,43 @@ export async function tenantLogin(req, env, b) {
   const t = SLUG_RE.test(slug) ? await getTenant(env.DB, slug) : null;
   if (!t) return json({ error: 'Firma kodu, kullanıcı adı veya şifre hatalı' }, 401);
   if (!t.active) return json({ error: 'Bu müşteri paneli askıya alınmış. Lütfen hizmet sağlayıcınızla görüşün.' }, 403);
+  if (expired(t)) return json({ error: 'Aboneliğinizin süresi doldu. Yenilemek için hizmet sağlayıcınızla görüşün.' }, 403);
   const h = new Headers(req.headers); h.set('Content-Type', 'application/json');
   return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify({ username: b.username, password: b.password }) }), env, t);
 }
 
 // ---------- ana panel: müşteri panellerini yönetme (yalnız ana panelin yöneticisi) ----------
-const pub = (t) => ({ slug: t.slug, name: t.name, email: t.email, phone: t.phone, note: t.note, active: !!t.active, admin_username: t.admin_username, created_at: t.created_at, updated_at: t.updated_at });
+const parse = (s) => { try { return JSON.parse(s || 'null'); } catch { return null; } };
+const pub = (t) => ({ slug: t.slug, name: t.name, email: t.email, phone: t.phone, note: t.note, active: !!t.active, admin_username: t.admin_username, created_at: t.created_at, updated_at: t.updated_at,
+  legal: t.legal || '', tax: t.tax || '', contact: t.contact || '', address: t.address || '', city: t.city || '', plan: t.plan || '', fee: t.fee ?? null, period: t.period || 'monthly',
+  starts_at: t.starts_at || null, expires_at: t.expires_at || null, trial: !!t.trial, max_users: t.max_users || null, usage: parse(t.usage), usage_at: t.usage_at || null, expired: expired(t) });
+// Firma kartı alanları (oluşturma ve düzenleme)
+const DAY = 864e5;
+const dateMs = (v, end = false) => { const s = str(v); if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null; const ms = Date.parse(s + (end ? 'T23:59:59+03:00' : 'T00:00:00+03:00')); return Number.isFinite(ms) ? ms : null; };
+function fields(b, t = {}) {
+  const has = (k) => b[k] !== undefined;
+  const fee = has('fee') ? (b.fee === '' || b.fee == null ? null : Math.max(0, Number(String(b.fee).replace(',', '.')) || 0)) : t.fee ?? null;
+  const max = has('max_users') ? (Number(b.max_users) > 0 ? Math.min(1000, Math.round(Number(b.max_users))) : null) : t.max_users ?? null;
+  const v = (k, n = 200) => (has(k) ? str(b[k]).trim().slice(0, n) : t[k] || '');
+  return {
+    name: v('name', 120) || t.name, email: v('email', 120), phone: v('phone', 40), note: v('note', 1000), legal: v('legal', 200), tax: v('tax', 80), contact: v('contact', 120),
+    address: v('address', 400), city: v('city', 60), plan: v('plan', 60), fee, period: has('period') ? (b.period === 'yearly' ? 'yearly' : 'monthly') : t.period || 'monthly',
+    starts_at: has('starts_at') ? dateMs(b.starts_at) : t.starts_at ?? null, expires_at: has('expires_at') ? dateMs(b.expires_at, true) : t.expires_at ?? null,
+    trial: has('trial') ? (b.trial ? 1 : 0) : t.trial ? 1 : 0, max_users: max,
+  };
+}
+const COLS = ['name', 'email', 'phone', 'note', 'legal', 'tax', 'contact', 'address', 'city', 'plan', 'fee', 'period', 'starts_at', 'expires_at', 'trial', 'max_users'];
+// Ay ekle (takvim ayı; 31 Ocak + 1 ay = 28/29 Şubat)
+function addMonths(ms, n) { const d = new Date(ms + 3 * 3600e3), day = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + n); d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate())); return d.getTime() - 3 * 3600e3; }
 export async function tenantApi(req, env, db, path, user) {
   if (user.role !== 'admin' || user.tenant) fail(403, 'Bu bölüm yalnız ana panel yöneticisine açıktır');
   const m = req.method, b = m === 'GET' ? {} : await req.json().catch(() => ({}));
   let x;
-  if (path === 'tenants' && m === 'GET') return { tenants: (await all(db, 'SELECT * FROM tenants ORDER BY created_at DESC')).map(pub), ready: !!env.TENANT };
+  if (path === 'tenants' && m === 'GET') {
+    const [rows, pays] = await Promise.all([all(db, 'SELECT * FROM tenants ORDER BY created_at DESC'), all(db, 'SELECT slug, MAX(at) AS last_at, SUM(amount) AS total FROM tenant_payments GROUP BY slug')]);
+    const p = new Map(pays.map((x) => [x.slug, x]));
+    return { tenants: rows.map((t) => ({ ...pub(t), paid_total: (p.get(t.slug) || {}).total || 0, last_payment: (p.get(t.slug) || {}).last_at || null })), ready: !!env.TENANT };
+  }
   if (path === 'tenants' && m === 'POST') {
     const slug = str(b.slug).toLocaleLowerCase('tr').trim(), name = str(b.name).trim(), username = str(b.admin_username).trim(), pw = String(b.admin_password || '');
     if (!SLUG_RE.test(slug)) fail(400, 'Firma kodu 3-32 karakter olmalı: küçük harf, rakam ve tire (ör. yesil-bahce)');
@@ -91,24 +120,51 @@ export async function tenantApi(req, env, db, path, user) {
     if (!/^[\p{L}0-9._-]{3,40}$/u.test(username)) fail(400, 'Yönetici kullanıcı adı 3-40 karakter olmalı');
     if (pw.length < 8) fail(400, 'Yönetici şifresi en az 8 karakter olmalı');
     if (await first(db, 'SELECT 1 AS x FROM tenants WHERE slug = ?', slug)) fail(400, 'Bu firma kodu kullanılıyor');
-    const t = { slug, name, email: str(b.email), phone: str(b.phone), note: str(b.note), active: 1, admin_username: username, created_at: Date.now(), updated_at: Date.now() };
+    const f = fields(b);
+    // Deneme süresi: bitiş girilmediyse 14 gün
+    if (f.trial && !f.expires_at) f.expires_at = Date.now() + 14 * DAY;
+    if (!f.starts_at) f.starts_at = Date.now();
+    const t = { slug, ...f, name, active: 1, admin_username: username, created_at: Date.now(), updated_at: Date.now() };
     await admin(env, t, 'setup', { username, password: pw, name });
-    await run(db, 'INSERT INTO tenants (slug, name, email, phone, note, active, admin_username, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)', slug, name, t.email, t.phone, t.note, username, t.created_at, t.updated_at);
+    await run(db, `INSERT INTO tenants (slug, ${COLS.join(', ')}, active, admin_username, created_at, updated_at) VALUES (?, ${COLS.map(() => '?').join(', ')}, 1, ?, ?, ?)`,
+      slug, ...COLS.map((k) => t[k] ?? null), username, t.created_at, t.updated_at);
     cache.delete(slug);
     return { ok: true, tenant: pub(t) };
   }
-  if ((x = path.match(/^tenants\/([a-z0-9-]+)(?:\/(stats|password|support|delete))?$/))) {
+  if ((x = path.match(/^tenants\/([a-z0-9-]+)(?:\/(stats|password|support|delete|payments))?(?:\/(\d+))?$/))) {
     const t = await getTenant(db, x[1], true);
     if (!t) fail(404, 'Müşteri paneli bulunamadı');
     const op = x[2];
     if (!op && m === 'PUT') {
       const active = b.active === undefined ? t.active : b.active ? 1 : 0;
-      await run(db, 'UPDATE tenants SET name = ?, email = ?, phone = ?, note = ?, active = ?, updated_at = ? WHERE slug = ?', str(b.name ?? t.name) || t.name, str(b.email ?? t.email), str(b.phone ?? t.phone), str(b.note ?? t.note), active, Date.now(), t.slug);
+      const f = fields(b, t);
+      await run(db, `UPDATE tenants SET ${COLS.map((k) => k + ' = ?').join(', ')}, active = ?, updated_at = ? WHERE slug = ?`, ...COLS.map((k) => f[k] ?? null), active, Date.now(), t.slug);
       if (active !== t.active) await admin(env, t, active ? 'resume' : 'suspend');
       cache.delete(t.slug);
       return { ok: true };
     }
-    if (op === 'stats' && m === 'GET') return admin(env, t, 'stats');
+    // Kullanım: panelden anlık okunur ve kayda yazılır (liste her firmaya ayrı istek atmadan gösterir)
+    if (op === 'stats' && m === 'GET') {
+      const st = await admin(env, t, 'stats');
+      await run(db, 'UPDATE tenants SET usage = ?, usage_at = ? WHERE slug = ?', JSON.stringify(st), Date.now(), t.slug);
+      return st;
+    }
+    // Tahsilatlar: ödeme kaydı aboneliği belirtilen ay kadar uzatır (bitiş geçmişse bugünden, değilse bitişten itibaren)
+    if (op === 'payments' && m === 'GET') return { payments: await all(db, 'SELECT * FROM tenant_payments WHERE slug = ? ORDER BY at DESC LIMIT 200', t.slug) };
+    if (op === 'payments' && m === 'POST') {
+      const amount = Math.max(0, Number(String(b.amount ?? '').replace(',', '.')) || 0), months = Math.max(0, Math.min(36, Math.round(Number(b.months) || 0)));
+      if (!amount && !months) fail(400, 'Tutar ya da uzatılacak süre girin');
+      const at = dateMs(b.date) || Date.now();
+      await run(db, 'INSERT INTO tenant_payments (slug, at, amount, months, method, note, user) VALUES (?, ?, ?, ?, ?, ?, ?)', t.slug, at, amount, months, str(b.method).slice(0, 40), str(b.note).slice(0, 300), user.name || '');
+      let expires = t.expires_at;
+      if (months) {
+        expires = addMonths(Math.max(Date.now(), t.expires_at || 0), months);
+        await run(db, 'UPDATE tenants SET expires_at = ?, trial = 0, updated_at = ? WHERE slug = ?', expires, Date.now(), t.slug);
+        cache.delete(t.slug);
+      }
+      return { ok: true, expires_at: expires };
+    }
+    if (op === 'payments' && m === 'DELETE' && x[3]) { await run(db, 'DELETE FROM tenant_payments WHERE id = ? AND slug = ?', Number(x[3]), t.slug); return { ok: true }; }
     if (op === 'password' && m === 'POST') {
       if (String(b.password || '').length < 8) fail(400, 'Şifre en az 8 karakter olmalı');
       return admin(env, t, 'password', { username: str(b.username) || t.admin_username, password: String(b.password) });
@@ -123,6 +179,7 @@ export async function tenantApi(req, env, db, path, user) {
       if (str(b.confirm) !== t.slug) fail(400, 'Silmek için firma kodunu yazın');
       await admin(env, t, 'destroy');
       await run(db, 'DELETE FROM tenants WHERE slug = ?', t.slug);
+      await run(db, 'DELETE FROM tenant_payments WHERE slug = ?', t.slug);
       cache.delete(t.slug);
       return { ok: true };
     }
@@ -136,8 +193,8 @@ export class TenantPanel {
   async meta(req) {
     const slug = req && req.headers.get('X-Tenant-Slug');
     if (slug) {
-      const name = decodeURIComponent(req.headers.get('X-Tenant-Name') || '') || slug;
-      if (!this.t || this.t.slug !== slug || this.t.name !== name) { this.t = { slug, name }; this.tenv = null; await this.ctx.storage.put('meta', this.t); }
+      const name = decodeURIComponent(req.headers.get('X-Tenant-Name') || '') || slug, maxUsers = Number(req.headers.get('X-Tenant-Max-Users')) || 0;
+      if (!this.t || this.t.slug !== slug || this.t.name !== name || (this.t.maxUsers || 0) !== maxUsers) { this.t = { slug, name, maxUsers }; this.tenv = null; await this.ctx.storage.put('meta', this.t); }
     } else if (!this.t) this.t = (await this.ctx.storage.get('meta')) || null;
     if (this.t && !this.tenv) this.tenv = tenantEnv(this.env, this.t);
     return this.tenv;
@@ -177,23 +234,32 @@ export class TenantPanel {
         return json({ ok: true, username: b.username });
       }
       if (b.op === 'support') return json({ ok: true, cookie: await supportCookie(env, !!b.secure) });
-      if (b.op === 'stats') {
-        const q = async (s) => ((await first(db, s)) || {}).n || 0;
-        return json({
-          users: await q('SELECT COUNT(*) AS n FROM users WHERE active = 1'), orders: await q('SELECT COUNT(*) AS n FROM orders'), products: await q('SELECT COUNT(*) AS n FROM products'),
-          channels: await q('SELECT COUNT(*) AS n FROM channel_config WHERE data IS NOT NULL'), last_login: await q('SELECT MAX(last_login) AS n FROM users'),
-          last_order: await q('SELECT MAX(ordered_at) AS n FROM orders'), suspended: !!(await this.ctx.storage.get('suspended')),
-        });
-      }
+      if (b.op === 'stats') return json({ ...(await this.usage()), suspended: !!(await this.ctx.storage.get('suspended')) });
       if (b.op === 'destroy') { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); await this.ctx.storage.put('destroyed', true); this.db = doD1(this.ctx.storage); this.t = null; this.tenv = null; return json({ ok: true }); }
       return json({ error: 'Bilinmeyen işlem' }, 400);
     } catch (e) { return json({ error: e.message }, e.status || 500); }
   }
-  // 15 dakikada bir: siparişler, ürünler, stoklar (ana paneldeki zamanlanmış senkronun aynısı)
+  // Kullanım özeti (Firmalar listesi): kullanıcı, kanal, ürün, sipariş, son 30 gün sipariş / ciro, son giriş ve sipariş
+  async usage() {
+    const db = this.db, since = Date.now() - 30 * 864e5;
+    const r = await first(db, `SELECT (SELECT COUNT(*) FROM users WHERE active = 1) AS users, (SELECT COUNT(*) FROM orders) AS orders, (SELECT COUNT(*) FROM products) AS products,
+      (SELECT COUNT(*) FROM channel_config WHERE data IS NOT NULL) AS channels, (SELECT MAX(last_login) FROM users) AS last_login, (SELECT MAX(ordered_at) FROM orders) AS last_order,
+      (SELECT COUNT(*) FROM orders WHERE ordered_at >= ? AND status NOT IN ('cancelled')) AS orders30, (SELECT COALESCE(SUM(total), 0) FROM orders WHERE ordered_at >= ? AND status NOT IN ('cancelled', 'returned')) AS revenue30`, since, since);
+    return { ...r, revenue30: Math.round(r.revenue30 || 0) };
+  }
+  // 15 dakikada bir: siparişler, ürünler, stoklar (ana paneldeki zamanlanmış senkronun aynısı); ardından kullanım özeti ana kayda yazılır
   async alarm() {
     const env = await this.meta();
     if (!env || await this.ctx.storage.get('suspended') || await this.ctx.storage.get('destroyed')) return;
     try { await init(this.db); await syncAll(env, this.db); } catch (e) { console.error('müşteri paneli senkron hatası', this.t && this.t.slug, e); }
+    // Saatte bir yeter (ana veritabanına yazma maliyeti)
+    try {
+      const last = (await this.ctx.storage.get('usage_at')) || 0;
+      if (this.env.DB && this.t && Date.now() - last > 3600e3) {
+        await run(this.env.DB, 'UPDATE tenants SET usage = ?, usage_at = ? WHERE slug = ?', JSON.stringify(await this.usage()), Date.now(), this.t.slug);
+        await this.ctx.storage.put('usage_at', Date.now());
+      }
+    } catch (e) { console.error('kullanım özeti yazılamadı', e); }
     finally { if (!(await this.ctx.storage.get('suspended')) && !(await this.ctx.storage.get('destroyed'))) await this.ctx.storage.setAlarm(Date.now() + SYNC_MS); }
   }
 }

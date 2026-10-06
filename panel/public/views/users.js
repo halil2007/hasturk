@@ -1,134 +1,208 @@
-// Kullanıcılar: panele giriş yapacak personel. Yönetici tüm bölümleri (entegrasyon, kullanıcı, ayar) yönetir;
-// personel siparişleri, kargoyu, ürün ve stokları kullanır. Ana yönetici Cloudflare'deki PANEL_PASSWORD ile girer.
-import { api, state, html, render, $, $$, n, date, dateTime, ago, actions, busy, toast, sheet, confirmBox } from '../core.js';
-import { PERMS } from '../perms.js';
+// Personel ve yetkiler: panele giriş yapacak kişiler, rolleri, bölüm bazlı yetkileri (yok / görür / tam), oturum ve etkinlik takibi.
+// Yönetici tüm bölümleri (entegrasyon, personel, ayarlar) yönetir; personel yalnız yetkili olduğu bölümleri görür.
+// "Görür" yetkisinde sunucu değişiklik isteklerini reddeder. Ana yönetici Cloudflare'deki PANEL_PASSWORD ile girer.
+import { api, state, html, render, $, $$, n, dateTime, ago, actions, busy, toast, sheet, confirmBox, popMenu, debounce, isMobile, ch } from '../core.js';
+import { PERMS, ROLE_TEMPLATES } from '../perms.js';
 
 const ROLE = { admin: 'Yönetici', staff: 'Personel' };
+const initials = (s) => String(s || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toLocaleUpperCase('tr');
+const level = (u, k) => (u.role === 'admin' || !Array.isArray(u.perms) ? 'full' : u.perms.includes(k) ? 'full' : u.perms.includes(k + ':view') ? 'view' : '');
+const tplName = (k) => (ROLE_TEMPLATES.find((t) => t[0] === k) || [])[1] || '';
+const EV = { accept: 'İşleme aldı', split: 'Pakete böldü', pack: 'Paketledi', ship: 'Kargoya verdi', label: 'Etiket aldı', cancel: 'Paket iptal', repack: 'Yeniden paketledi', cargo: 'Kargo firması değiştirdi', note: 'Not ekledi' };
+
+// Okunabilir, karışmayan karakterlerle güçlü şifre (0/O, 1/l yok)
+function genPassword() {
+  const a = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint32Array(12));
+  return [...b].map((x, i) => (i === 4 || i === 8 ? '-' : a[x % a.length])).join('');
+}
 
 export async function users(el) {
   let rows = [];
+  const f = { q: '', st: 'all' };
   render(el, html`<div class="stack">
-    <div class="row wrap"><div style="flex:1"><h2>Kullanıcılar</h2><div class="muted small">Panele giriş yapabilecek kişiler ve yetkileri</div></div><button class="btn primary" data-act="add"><i class="ico ico-plus"></i>Kullanıcı ekle</button></div>
-    <div class="card flush" data-box></div>
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px">
-      <div class="card"><h3>Yönetici</h3><p class="muted small" style="margin:6px 0 0">Tüm bölümler: entegrasyon (API) ayarları, kullanıcılar, ayarlar, geçmiş sipariş aktarımı, eşleştirme ve stok kuralları.</p></div>
-      <div class="card"><h3>Personel</h3><p class="muted small" style="margin:6px 0 0">Kullanıcı formunda seçilen bölümleri görür (siparişler, kargo, iadeler, sorular, ürünler, stok, eşleştirme, raporlar, gelir-gider). API bilgilerini, kullanıcıları ve ayarları göremez.</p></div>
+    <div class="kpis" data-kpis></div>
+    <div class="row wrap page-actions">
+      <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ad, kullanıcı adı, görev, e-posta" data-q></div>
+      <span class="spacer"></span>
+      <button class="btn primary" data-act="add" data-fab><i class="ico ico-plus"></i>Personel ekle</button>
     </div>
-    ${state.owner && (state.user || {}).role === 'admin' ? html`<div class="card flush" data-tenants></div>` : ''}
+    <div class="tabs" data-tabs></div>
+    <div class="card flush" data-box></div>
+    <details class="card"><summary><b>Roller ve yetki düzeyleri nasıl çalışır?</b></summary>
+      <div class="stack small" style="margin-top:10px">
+        <div><b>Yönetici</b> her bölümü görür ve yönetir: entegrasyon (API) bilgileri, personel, ayarlar, geçmiş sipariş aktarımı.</div>
+        <div><b>Personel</b> yalnız seçilen bölümleri görür. Her bölüm için üç düzey vardır: <b>Yok</b> (menüde görünmez), <b>Görür</b> (listeler ve ayrıntılar açılır, hiçbir değişiklik yapamaz) ve <b>Tam</b> (işlem yapar).</div>
+        <div>Rol şablonları (Depo, Müşteri hizmetleri, Muhasebe …) yetkileri tek dokunuşla doldurur; sonra tek tek değiştirilebilir.</div>
+        <div>Pasifleştirilen ya da şifresi değiştirilen hesabın açık oturumları hemen kapanır. “Oturumları kapat” şifreyi değiştirmeden tüm cihazlardan çıkış yaptırır.</div>
+        <div class="muted">Kâr bilgisi yalnız “Gelir, gider ve hakediş” yetkisi olanlara gösterilir.</div>
+      </div></details>
   </div>`);
 
-  function draw() {
-    const me = state.user || {};
-    const main = state.tenant ? '' : html`<tr><td><div style="font-weight:650">Ana yönetici</div><div class="muted tiny">kullanıcı adı boş · şifre Cloudflare PANEL_PASSWORD</div></td><td><span class="pill info">Yönetici</span></td><td class="muted small">—</td><td><span class="pill good">Aktif</span></td><td></td></tr>`;
-    render($('[data-box]', el), html`<div class="table-wrap"><table class="t"><thead><tr><th>Kullanıcı</th><th>Yetki</th><th>Son giriş</th><th>Durum</th><th></th></tr></thead><tbody>${main}
-      ${rows.map((u) => html`<tr data-id="${u.id}"><td><div style="font-weight:650">${u.name}${me.id === u.id ? html` <span class="muted tiny">(siz)</span>` : ''}</div><div class="muted tiny">${u.username}${u.email ? ' · ' + u.email : ''}</div></td>
-        <td><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role] || u.role}</span>${u.role !== 'admin' && Array.isArray(u.perms) ? html`<div class="tiny muted" style="max-width:260px">${u.perms.length ? PERMS.filter(([k]) => u.perms.includes(k)).map(([, t]) => t).join(', ') : 'yalnız genel bakış'}</div>` : u.role !== 'admin' ? html`<div class="tiny muted">tüm bölümler</div>` : ''}</td>
-        <td class="small" title="${dateTime(u.last_login)}">${u.last_login ? ago(u.last_login) : html`<span class="muted">hiç</span>`}</td>
-        <td><span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span></td>
-        <td class="r"><button class="btn sm" data-act="edit">Düzenle</button></td></tr>`)}
-    </tbody></table></div>${rows.length ? '' : html`<div class="empty">Henüz personel eklenmedi</div>`}`);
-  }
-  const refresh = async () => { rows = await api('users').catch((e) => { toast(e.message, true); return []; }); draw(); };
+  const visible = () => rows.filter((u) => {
+    if (f.st === 'active' && !u.active) return false;
+    if (f.st === 'passive' && u.active) return false;
+    if (f.st === 'admin' && u.role !== 'admin') return false;
+    if (f.st === 'staff' && u.role === 'admin') return false;
+    const q = f.q.toLocaleLowerCase('tr');
+    return !q || [u.name, u.username, u.title, u.email, u.phone].some((x) => String(x || '').toLocaleLowerCase('tr').includes(q));
+  });
+  const permChips = (u) => {
+    if (u.role === 'admin') return html`<span class="muted tiny">Tüm bölümler ve yönetim</span>`;
+    if (!Array.isArray(u.perms)) return html`<span class="pill amber" title="Eski hesap: yetki seçilmemiş, tüm bölümleri görür. Düzenleyip yetki seçin.">Tüm bölümler (sınırsız)</span>`;
+    const list = PERMS.map(([k, t]) => [t, level(u, k)]).filter(([, l]) => l);
+    return list.length ? html`<div class="perm-chips">${list.map(([t, l]) => html`<span class="pc ${l}" title="${l === 'view' ? 'Yalnız görür' : 'Tam yetki'}">${l === 'view' ? html`<i class="ico ico-eye"></i>` : ''}${t}</span>`)}</div>` : html`<span class="muted tiny">Yalnız genel bakış</span>`;
+  };
+  const avatar = (u) => html`<span class="u-av ${u.role === 'admin' ? 'adm' : ''} ${u.active ? '' : 'off'}">${initials(u.name)}</span>`;
+  const lastIn = (u) => (u.last_login ? html`<span title="${dateTime(u.last_login)}${u.last_ip ? ` · IP ${u.last_ip}` : ''}">${ago(u.last_login)}</span>` : html`<span class="muted">hiç girmedi</span>`);
 
+  function draw() {
+    const me = state.user || {}, list = visible();
+    const act = rows.filter((u) => u.active), week = rows.filter((u) => u.last_login && Date.now() - u.last_login < 7 * 864e5);
+    render($('[data-kpis]', el), html`
+      <div class="kpi"><div class="label">Toplam personel</div><div class="value num">${n(rows.length)}</div><div class="delta flat">${act.length} aktif · ${rows.length - act.length} pasif</div></div>
+      <div class="kpi"><div class="label">Yönetici</div><div class="value num">${n(rows.filter((u) => u.role === 'admin').length + (state.tenant ? 0 : 1))}</div><div class="delta flat">${state.tenant ? 'panel yöneticileri' : 'ana yönetici dahil'}</div></div>
+      <div class="kpi"><div class="label">Son 7 günde giriş</div><div class="value num">${n(week.length)}</div><div class="delta flat">kişi</div></div>
+      <div class="kpi"><div class="label">Sınırsız eski hesap</div><div class="value num ${rows.some((u) => u.role !== 'admin' && !Array.isArray(u.perms)) ? 'low' : ''}">${n(rows.filter((u) => u.role !== 'admin' && !Array.isArray(u.perms)).length)}</div><div class="delta flat">yetki seçilmemiş</div></div>`);
+    const cnt = { all: rows.length, active: act.length, passive: rows.length - act.length, admin: rows.filter((u) => u.role === 'admin').length, staff: rows.filter((u) => u.role !== 'admin').length };
+    render($('[data-tabs]', el), html`${[['all', 'Tümü'], ['active', 'Aktif'], ['passive', 'Pasif'], ['admin', 'Yönetici'], ['staff', 'Personel']].map(([k, t]) => html`<button class="tab ${f.st === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${cnt[k]}</span></button>`)}`);
+    const main = state.tenant || f.q || !['all', 'active', 'admin'].includes(f.st) ? null : { id: 0, name: 'Ana yönetici', username: 'kullanıcı adı boş', role: 'admin', active: 1, main: true };
+    const all = main ? [main, ...list] : list;
+    if (isMobile()) {
+      render($('[data-box]', el), html`<div class="m-list">${all.map((u) => html`<div class="m-card u-card" data-id="${u.id}">
+          <div class="row">${avatar(u)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${u.name}${me.id === u.id && !u.main ? html` <span class="muted tiny">(siz)</span>` : ''}</div><div class="muted tiny ellipsis">${u.title ? u.title + ' · ' : ''}${u.main ? 'şifre: Cloudflare PANEL_PASSWORD' : u.username}</div></div>
+            ${u.main ? '' : html`<button class="icon-btn sm" data-act="menu" aria-label="İşlemler"><i class="ico ico-dots"></i></button>`}</div>
+          <div class="row wrap" style="gap:6px"><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role]}</span>${u.template ? html`<span class="pill">${tplName(u.template)}</span>` : ''}<span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span>${u.main ? '' : html`<span class="muted tiny" style="margin-left:auto">${lastIn(u)}</span>`}</div>
+          ${u.main ? '' : permChips(u)}
+        </div>`)}${all.length ? '' : html`<div class="empty">Kayıt yok</div>`}</div>`);
+      return;
+    }
+    render($('[data-box]', el), html`<div class="table-wrap"><table class="t"><thead><tr><th>Kişi</th><th>Rol</th><th>Yetkiler</th><th>Son giriş</th><th>Durum</th><th></th></tr></thead><tbody>
+      ${all.map((u) => html`<tr data-id="${u.id}" class="${u.main ? '' : 'click'}">
+        <td><div class="row">${avatar(u)}<div style="min-width:0"><div style="font-weight:650">${u.name}${me.id === u.id && !u.main ? html` <span class="muted tiny">(siz)</span>` : ''}</div>
+          <div class="muted tiny">${u.main ? 'kullanıcı adı boş · şifre Cloudflare PANEL_PASSWORD' : [u.title, u.username, u.email, u.phone].filter(Boolean).join(' · ')}</div></div></div></td>
+        <td><span class="pill ${u.role === 'admin' ? 'info' : ''}">${ROLE[u.role]}</span>${u.template && u.role !== 'admin' ? html`<div class="muted tiny" style="margin-top:3px">${tplName(u.template)}</div>` : ''}</td>
+        <td style="max-width:420px">${u.main ? html`<span class="muted tiny">Tüm bölümler ve yönetim</span>` : permChips(u)}</td>
+        <td class="small">${u.main ? html`<span class="muted">—</span>` : lastIn(u)}</td>
+        <td><span class="pill ${u.active ? 'good' : 'bad'}">${u.active ? 'Aktif' : 'Pasif'}</span></td>
+        <td class="r">${u.main ? '' : html`<div class="row" style="justify-content:flex-end;gap:4px"><button class="btn sm" data-act="edit">Düzenle</button><button class="icon-btn sm" data-act="menu" aria-label="İşlemler"><i class="ico ico-dots"></i></button></div>`}</td></tr>`)}
+    </tbody></table></div>${all.length ? '' : html`<div class="empty">${rows.length ? 'Bu filtrede kayıt yok' : 'Henüz personel eklenmedi'}</div>`}`);
+  }
+  const refresh = async () => { rows = await api('users', { fresh: true }).catch((e) => { toast(e.message, true); return []; }); draw(); };
+
+  // ---------- form ----------
   function form(u) {
     const s = sheet({
-      title: u ? `${u.name} · düzenle` : 'Yeni kullanıcı', size: 'narrow',
+      title: u ? `${u.name} · düzenle` : 'Yeni personel', size: 'wide',
       body: html`<form class="stack" data-f autocomplete="off">
-        <label class="field"><span>Ad soyad</span><input class="input" name="name" value="${u ? u.name : ''}" required></label>
-        <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" value="${u ? u.username : ''}" ${u ? 'disabled' : ''} required autocapitalize="off"></label>
-        <label class="field"><span>E-posta (isteğe bağlı)</span><input class="input" type="email" name="email" value="${u ? u.email || '' : ''}"></label>
-        <label class="field"><span>Yetki</span><select class="input" name="role"><option value="staff" ${u && u.role === 'admin' ? '' : 'selected'}>Personel</option><option value="admin" ${u && u.role === 'admin' ? 'selected' : ''}>Yönetici</option></select></label>
-        <div class="stack" data-perms style="gap:6px" ${u && u.role === 'admin' ? 'hidden' : ''}><div class="small" style="font-weight:650">Görebileceği bölümler</div>
-          ${PERMS.map(([k, t, d]) => html`<label class="check" style="align-items:flex-start"><input type="checkbox" data-perm="${k}" ${!u || !Array.isArray(u.perms) || u.perms.includes(k) ? 'checked' : ''}> <span><b>${t}</b> <span class="muted tiny">${d}</span></span></label>`)}
-          <div class="muted tiny">Genel Bakış, bildirimler ve kendi şifresi her zaman açıktır. Entegrasyon, kullanıcı ve ayarlar yalnız yöneticidedir.</div></div>
-        <label class="field"><span>${u ? 'Yeni şifre (değiştirmeyecekseniz boş bırakın)' : 'Şifre (en az 8 karakter)'}</span><input class="input" type="password" name="password" autocomplete="new-password" ${u ? '' : 'required'}></label>
-        ${u ? html`<label class="check"><span class="switch"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}><span></span></span> Hesap aktif (kapalıysa giriş yapamaz)</label>` : ''}
+        <div class="card"><h3 style="margin-bottom:10px">Kişi bilgileri</h3><div class="form-grid">
+          <label class="field"><span>Ad soyad *</span><input class="input" name="name" value="${u ? u.name : ''}" required></label>
+          <label class="field"><span>Görev / unvan</span><input class="input" name="title" value="${u ? u.title || '' : ''}" placeholder="ör. Depo sorumlusu" list="u-titles"></label>
+          <label class="field"><span>Kullanıcı adı *</span><input class="input" name="username" value="${u ? u.username : ''}" ${u ? 'disabled' : ''} required autocapitalize="none" placeholder="ör. ayse.k"><small>${u ? 'Kullanıcı adı değiştirilemez' : 'Girişte kullanılır (harf, rakam, . _ -)'}</small></label>
+          <label class="field"><span>E-posta</span><input class="input" type="email" name="email" value="${u ? u.email || '' : ''}"></label>
+          <label class="field"><span>Telefon</span><input class="input" type="tel" name="phone" value="${u ? u.phone || '' : ''}"></label>
+        </div><datalist id="u-titles">${['Depo sorumlusu', 'Sevkiyat', 'Müşteri hizmetleri', 'Pazaryeri uzmanı', 'Muhasebe', 'Katalog sorumlusu', 'Mağaza müdürü'].map((t) => html`<option value="${t}">`)}</datalist></div>
+
+        <div class="card"><h3 style="margin-bottom:10px">Giriş</h3>
+          <label class="field"><span>${u ? 'Yeni şifre (değiştirmeyecekseniz boş bırakın)' : 'Şifre * (en az 8 karakter)'}</span>
+            <span class="row"><span class="pw" style="flex:1"><input class="input" type="password" name="password" autocomplete="new-password" ${u ? '' : 'required'}><button type="button" class="icon-btn sm" data-x="eye" aria-label="Göster"><i class="ico ico-eye"></i></button></span>
+            <button type="button" class="btn" data-x="gen"><i class="ico ico-key"></i>Oluştur</button></span>
+            <small data-pwinfo>Oluşturulan şifreyi kişiye iletin; ilk girişten sonra Hesap → Şifremi değiştir ile değiştirebilir.</small></label>
+          ${u ? html`<label class="check" style="margin-top:8px"><span class="switch"><input type="checkbox" name="active" ${u.active ? 'checked' : ''} ${state.user && state.user.id === u.id ? 'disabled' : ''}><span></span></span> Hesap aktif (kapalıysa giriş yapamaz, açık oturumları kapanır)</label>` : ''}
+        </div>
+
+        <div class="card"><h3 style="margin-bottom:10px">Rol</h3>
+          <div class="role-pick">
+            <label><input type="radio" name="role" value="staff" ${u && u.role === 'admin' ? '' : 'checked'}><span><b>Personel</b><small>Yalnız aşağıda seçilen bölümler</small></span></label>
+            <label><input type="radio" name="role" value="admin" ${u && u.role === 'admin' ? 'checked' : ''} ${state.user && u && state.user.id === u.id ? 'disabled' : ''}><span><b>Yönetici</b><small>Her şey: API bilgileri, personel, ayarlar</small></span></label>
+          </div>
+          <div data-perms ${u && u.role === 'admin' ? 'hidden' : ''}>
+            <div class="small" style="font-weight:650;margin:14px 0 6px">Rol şablonu</div>
+            <div class="chips wrap-chips">${ROLE_TEMPLATES.map(([k, t]) => html`<button type="button" class="chip ${u && u.template === k ? 'on' : ''}" data-tpl="${k}">${t}</button>`)}<button type="button" class="chip ${u && !u.template ? 'on' : ''}" data-tpl="">Özel</button></div>
+            <div class="small" style="font-weight:650;margin:14px 0 6px">Bölüm yetkileri</div>
+            <div class="perm-grid">${PERMS.map(([k, t, d]) => html`<div class="perm-row"><div style="min-width:0"><b>${t}</b><div class="muted tiny">${d}</div></div>
+              <div class="seg" data-perm="${k}">${[['', 'Yok'], ['view', 'Görür'], ['full', 'Tam']].map(([v, l]) => html`<button type="button" data-v="${v}" class="${(u ? level(u, k) : '') === v ? 'on' : ''}">${l}</button>`)}</div></div>`)}</div>
+            <div class="muted tiny" style="margin-top:8px">Genel Bakış, bildirimler ve kendi şifresi her zaman açıktır. Entegrasyon, personel ve ayarlar yalnız yöneticidedir.</div>
+          </div>
+        </div>
+        <div class="card"><label class="field"><span>Not (yalnız yöneticiler görür)</span><textarea class="input" name="note" rows="2" placeholder="ör. vardiya, izin, sorumlu olduğu mağaza">${u ? u.note || '' : ''}</textarea></label></div>
       </form>`,
-      foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`,
-    });
-    $('[name=role]', s.el).onchange = (e) => { $('[data-perms]', s.el).hidden = e.target.value === 'admin'; };
-    $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
-      const fm = $('[data-f]', s.el);
-      if (!fm.reportValidity()) return;
-      const b = { name: fm.name.value.trim(), username: fm.username.value.trim(), email: fm.email.value.trim(), role: fm.role.value, password: fm.password.value };
-      if (b.role !== 'admin') b.perms = $$('[data-perm]', s.el).filter((x) => x.checked).map((x) => x.dataset.perm);
-      if (u) b.active = fm.active.checked;
-      await api(u ? `users/${u.id}` : 'users', { method: u ? 'PUT' : 'POST', body: b });
-      s.close(); toast('Kaydedildi'); refresh();
-    });
-  }
-  // ---------- müşteri panelleri (yalnız ana panel yöneticisi) ----------
-  let T = null;
-  async function loadTenants() { if (!$('[data-tenants]', el)) return; T = await api('tenants').catch((e) => ({ tenants: [], error: e.message })); drawTenants(); }
-  function drawTenants() {
-    const box = $('[data-tenants]', el);
-    const link = location.origin + '/?firma=';
-    render(box, html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:240px"><h2>Müşteri panelleri</h2>
-        <div class="muted small">CRM'i başka firmalara kullandırın: her müşteri kendi API bilgileri, kendi siparişleri, ürünleri ve kullanıcılarıyla tamamen ayrı çalışır. Panel güncellemeleri tüm müşteri panellerine aynı anda gelir. Müşteri giriş ekranında <b>Firma kodu</b> ile girer.</div></div>
-      <button class="btn primary" data-act="tadd" ${T && T.ready === false ? 'disabled' : ''}><i class="ico ico-plus"></i>Müşteri paneli oluştur</button></div>
-      ${T && T.error ? html`<div class="notice bad small" style="margin:0 16px 12px">${T.error}</div>` : ''}
-      ${T && T.ready === false ? html`<div class="notice warn small" style="margin:0 16px 12px"><i class="ico ico-warn"></i><div>Müşteri panelleri için Cloudflare'de Durable Object bağlantısı gerekir; bu sürüm yayınlandığında (wrangler.jsonc) kendiliğinden oluşur.</div></div>` : ''}
-      ${T && T.tenants.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Firma</th><th>Firma kodu / giriş adresi</th><th>Yönetici</th><th>Oluşturma</th><th>Durum</th><th></th></tr></thead><tbody>
-        ${T.tenants.map((t) => html`<tr data-slug="${t.slug}"><td><div style="font-weight:650">${t.name}</div><div class="muted tiny">${[t.email, t.phone].filter(Boolean).join(' · ')}${t.note ? ` · ${t.note}` : ''}</div></td>
-          <td><b class="num">${t.slug}</b><div class="tiny"><a class="link" href="${link + t.slug}" target="_blank" rel="noopener">${link + t.slug}</a></div></td>
-          <td class="small">${t.admin_username || '—'}</td><td class="small">${date(t.created_at)}</td>
-          <td><span class="pill ${t.active ? 'good' : 'bad'}">${t.active ? 'Aktif' : 'Askıda'}</span></td>
-          <td class="r"><div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm" data-act="tinfo">Bilgi</button><button class="btn sm" data-act="tsupport" ${t.active ? '' : 'disabled'} title="Müşteri paneline destek oturumuyla girin (2 saat)">Panele gir</button><button class="btn sm ghost" data-act="tedit">Düzenle</button></div></td></tr>`)}
-      </tbody></table></div>` : html`<div class="empty">Henüz müşteri paneli yok</div>`}`);
-  }
-  const slugOf = (t) => t.closest('[data-slug]').dataset.slug;
-  function tenantForm(t) {
-    const s = sheet({
-      title: t ? `${t.name} · düzenle` : 'Yeni müşteri paneli', size: 'narrow',
-      body: html`<form class="stack" data-f autocomplete="off">
-        <label class="field"><span>Firma adı</span><input class="input" name="name" value="${t ? t.name : ''}" required></label>
-        <label class="field"><span>Firma kodu</span><input class="input" name="slug" value="${t ? t.slug : ''}" ${t ? 'disabled' : ''} required pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]" placeholder="ör. yesil-bahce" autocapitalize="off"><small>Müşteri girişte bunu yazar; küçük harf, rakam, tire. Sonradan değişmez.</small></label>
-        ${t ? '' : html`<label class="field"><span>Yönetici kullanıcı adı</span><input class="input" name="admin_username" required autocapitalize="off" placeholder="ör. ali"></label>
-        <label class="field"><span>Yönetici şifresi (en az 8 karakter)</span><input class="input" type="password" name="admin_password" autocomplete="new-password" required></label>`}
-        <label class="field"><span>E-posta</span><input class="input" type="email" name="email" value="${t ? t.email || '' : ''}"></label>
-        <label class="field"><span>Telefon</span><input class="input" name="phone" value="${t ? t.phone || '' : ''}"></label>
-        <label class="field"><span>Not (paket, ücret, sözleşme…)</span><input class="input" name="note" value="${t ? t.note || '' : ''}"></label>
-        ${t ? html`<label class="check"><span class="switch"><input type="checkbox" name="active" ${t.active ? 'checked' : ''}><span></span></span> Panel aktif (kapalıysa askıya alınır: giriş ve senkron durur, veriler korunur)</label>
-          <div class="card stack" style="background:var(--surface-2)"><b class="small">Yönetici şifresini sıfırla</b><div class="row"><input class="input" type="password" name="newpw" placeholder="yeni şifre" autocomplete="new-password"><button class="btn sm" type="button" data-x="pw">Sıfırla</button></div></div>
-          <button class="btn sm ghost" type="button" data-x="del" style="color:var(--bad);align-self:flex-start"><i class="ico ico-x"></i>Müşteri panelini ve tüm verisini sil</button>` : ''}
-      </form>`,
-      foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`,
+      foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>${u ? 'Kaydet' : 'Personeli ekle'}</button>`,
     });
     const fm = $('[data-f]', s.el);
+    let tpl = u ? u.template || '' : '';
+    const setLevel = (k, v) => $$(`[data-perm="${k}"] button`, s.el).forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+    s.el.addEventListener('click', (e) => {
+      const seg = e.target.closest('[data-perm] button');
+      if (seg) { setLevel(seg.parentElement.dataset.perm, seg.dataset.v); tpl = ''; $$('[data-tpl]', s.el).forEach((c) => c.classList.toggle('on', c.dataset.tpl === '')); return; }
+      const t = e.target.closest('[data-tpl]');
+      if (t) {
+        tpl = t.dataset.tpl;
+        $$('[data-tpl]', s.el).forEach((c) => c.classList.toggle('on', c === t));
+        const def = (ROLE_TEMPLATES.find((x) => x[0] === tpl) || [])[2];
+        if (def) PERMS.forEach(([k]) => setLevel(k, def.includes(k) ? 'full' : def.includes(k + ':view') ? 'view' : ''));
+        return;
+      }
+      const x = e.target.closest('[data-x]');
+      if (x && x.dataset.x === 'gen') { const p = genPassword(); fm.password.value = p; fm.password.type = 'text'; $('[data-pwinfo]', s.el).innerHTML = ''; $('[data-pwinfo]', s.el).append('Oluşturulan şifre: ', Object.assign(document.createElement('b'), { textContent: p }), ' — kaydetmeden önce kişiye iletin.'); navigator.clipboard && navigator.clipboard.writeText(p).then(() => toast('Şifre panoya kopyalandı')).catch(() => {}); }
+      if (x && x.dataset.x === 'eye') fm.password.type = fm.password.type === 'password' ? 'text' : 'password';
+    });
+    $$('[name=role]', s.el).forEach((r) => (r.onchange = () => { $('[data-perms]', s.el).hidden = fm.role.value === 'admin'; }));
     $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
       if (!fm.reportValidity()) return;
-      const b = { name: fm.name.value.trim(), email: fm.email.value.trim(), phone: fm.phone.value.trim(), note: fm.note.value.trim() };
-      if (t) { b.active = fm.active.checked; await api('tenants/' + t.slug, { method: 'PUT', body: b }); }
-      else await api('tenants', { method: 'POST', body: { ...b, slug: fm.slug.value.trim().toLocaleLowerCase('tr'), admin_username: fm.admin_username.value.trim(), admin_password: fm.admin_password.value } });
-      s.close(); toast(t ? 'Kaydedildi' : `Müşteri paneli oluşturuldu · giriş: ${location.origin}/?firma=${fm.slug.value.trim().toLocaleLowerCase('tr')}`); loadTenants();
-    });
-    s.el.addEventListener('click', async (e) => {
-      const x = e.target.closest('[data-x]');
-      if (!x || !t) return;
-      if (x.dataset.x === 'pw') busy(x, async () => { await api(`tenants/${t.slug}/password`, { method: 'POST', body: { password: fm.newpw.value } }); fm.newpw.value = ''; toast(`${t.admin_username} şifresi sıfırlandı`); });
-      if (x.dataset.x === 'del') {
-        const code = prompt(`Bu işlem ${t.name} panelindeki TÜM verileri (siparişler, ürünler, API bilgileri, kullanıcılar) kalıcı olarak siler. Onaylamak için firma kodunu yazın: ${t.slug}`);
-        if (code === null) return;
-        busy(x, async () => { await api(`tenants/${t.slug}/delete`, { method: 'POST', body: { confirm: code.trim() } }); s.close(); toast('Müşteri paneli silindi'); loadTenants(); });
+      const b = { name: fm.name.value.trim(), title: fm.title.value.trim(), username: fm.username.value.trim(), email: fm.email.value.trim(), phone: fm.phone.value.trim(), role: fm.role.value, password: fm.password.value, note: fm.note.value.trim(), template: tpl };
+      if (b.role !== 'admin') {
+        b.perms = $$('[data-perm]', s.el).map((g) => { const v = ($('button.on', g) || {}).dataset; const lv = v ? v.v : ''; return lv === 'full' ? g.dataset.perm : lv === 'view' ? g.dataset.perm + ':view' : null; }).filter(Boolean);
+        if (!b.perms.length && !(await confirmBox('Hiçbir bölüm seçilmedi; bu kişi yalnız Genel Bakış\'ı görür. Devam edilsin mi?', 'Devam et'))) return;
       }
+      if (u) b.active = fm.active ? fm.active.checked : true;
+      await api(u ? `users/${u.id}` : 'users', { method: u ? 'PUT' : 'POST', body: b });
+      s.close(); toast(u ? 'Kaydedildi' : `${b.name} eklendi · kullanıcı adı: ${b.username}`); refresh();
     });
   }
+
+  // ---------- etkinlik ----------
+  async function activity(u) {
+    const s = sheet({ title: `${u.name} · etkinlik`, size: 'narrow', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
+    try {
+      const a = await api(`users/${u.id}/activity`, { fresh: true });
+      s.setBody(html`<dl class="kv" style="margin-bottom:14px"><dt>Son giriş</dt><dd>${u.last_login ? dateTime(u.last_login) : '—'}</dd>${u.last_ip ? html`<dt>Son giriş IP</dt><dd class="num">${u.last_ip}</dd>` : ''}<dt>Hesap açılışı</dt><dd>${u.created_at ? dateTime(u.created_at) : '—'}</dd><dt>Son 30 gün sipariş işlemi</dt><dd>${n(a.count30)}</dd></dl>
+        <h3 style="margin-bottom:8px">Sipariş işlemleri</h3>
+        ${a.orders.length ? html`<div class="timeline">${a.orders.map((x) => html`<div class="ev"><span class="dot"></span><div style="flex:1;min-width:0"><div><b>${EV[x.action] || x.action}</b>${x.order_number ? html` · <a class="link" href="#/siparisler/${encodeURIComponent(x.order_id)}">#${x.order_number}</a>` : ''}${x.channel ? html` <span class="muted tiny">${ch(x.channel).name}</span>` : ''}</div><div class="muted tiny">${dateTime(x.at)}${x.note ? ` · ${x.note}` : ''}</div></div></div>`)}</div>` : html`<div class="muted small">Kayıt yok</div>`}
+        ${a.logs.length ? html`<h3 style="margin:16px 0 8px">Diğer işlemler</h3><div class="timeline">${a.logs.map((x) => html`<div class="ev"><span class="dot"></span><div style="flex:1;min-width:0"><div class="small">${String(x.msg).replace(/^[^:]+:\s*/, '')}</div><div class="muted tiny">${dateTime(x.at)}</div></div></div>`)}</div>` : ''}`);
+    } catch (e) { s.setBody(html`<div class="notice bad">${e.message}</div>`); }
+  }
+
+  const userOf = (t) => rows.find((u) => u.id === Number(t.closest('[data-id]').dataset.id));
+  function menu(t) {
+    const u = userOf(t), me = state.user || {};
+    if (!u) return;
+    popMenu(t, [
+      { icon: 'gear', label: 'Düzenle', run: () => form(u) },
+      { icon: 'orders', label: 'Etkinlik ve son işlemler', run: () => activity(u) },
+      { icon: 'key', label: 'Yeni şifre oluştur', run: async () => {
+        const p = genPassword();
+        if (!(await confirmBox(`${u.name} için yeni şifre oluşturulsun mu? Açık oturumları kapanır. Yeni şifre: ${p}`, 'Şifreyi değiştir'))) return;
+        await api(`users/${u.id}`, { method: 'PUT', body: { ...u, password: p, active: !!u.active } }).then(() => { navigator.clipboard && navigator.clipboard.writeText(p).catch(() => {}); toast(`Yeni şifre: ${p} (panoya kopyalandı)`); }).catch((e) => toast(e.message, true));
+      } },
+      { icon: 'x', label: 'Tüm cihazlardan çıkış yaptır', run: async () => { if (await confirmBox(`${u.name} tüm cihazlarda oturumdan çıkarılsın mı? Şifresi değişmez, tekrar giriş yapabilir.`, 'Çıkış yaptır')) api(`users/${u.id}/revoke`, { method: 'POST' }).then(() => toast('Oturumlar kapatıldı')).catch((e) => toast(e.message, true)); } },
+      ...(me.id !== u.id ? [{ icon: u.active ? 'minus' : 'check', label: u.active ? 'Pasifleştir (giriş yapamaz)' : 'Aktifleştir', run: () => api(`users/${u.id}`, { method: 'PUT', body: { ...u, active: !u.active } }).then(() => { toast(u.active ? 'Hesap pasifleştirildi' : 'Hesap aktifleştirildi'); refresh(); }).catch((e) => toast(e.message, true)) },
+        '-', { icon: 'x', label: 'Personeli sil', danger: true, run: async () => { if (await confirmBox(`${u.name} kalıcı olarak silinsin mi? Geçmiş işlem kayıtlarında adı kalır. Geçici ayrılıklar için “Pasifleştir” daha uygundur.`, 'Sil')) api(`users/${u.id}`, { method: 'DELETE' }).then(() => { toast('Silindi'); refresh(); }).catch((e) => toast(e.message, true)); } }] : []),
+    ], { title: u.name });
+  }
+
   actions(el, {
-    tadd: () => tenantForm(null),
-    tedit: (t) => tenantForm(T.tenants.find((x) => x.slug === slugOf(t))),
-    tinfo: (t) => busy(t, async () => {
-      const x = T.tenants.find((y) => y.slug === slugOf(t)), st = await api(`tenants/${x.slug}/stats`);
-      sheet({ title: x.name, size: 'narrow', body: html`<dl class="kv"><dt>Firma kodu</dt><dd>${x.slug}</dd><dt>Kullanıcı</dt><dd>${n(st.users)}</dd><dt>Bağlı kanal</dt><dd>${n(st.channels)}</dd><dt>Ürün</dt><dd>${n(st.products)}</dd><dt>Sipariş</dt><dd>${n(st.orders)}</dd>
-        <dt>Son giriş</dt><dd>${st.last_login ? dateTime(st.last_login) : '—'}</dd><dt>Son sipariş</dt><dd>${st.last_order ? dateTime(st.last_order) : '—'}</dd><dt>Durum</dt><dd>${st.suspended ? 'Askıda' : 'Aktif'}</dd></dl>` });
-    }),
-    tsupport: async (t) => {
-      const x = T.tenants.find((y) => y.slug === slugOf(t));
-      if (!(await confirmBox(`${x.name} müşteri paneline destek oturumuyla girilsin mi? Ana panelden çıkış yapılır; dönmek için üstteki “Ana panele dön”e basın.`, 'Panele gir'))) return;
-      await api(`tenants/${x.slug}/support`, { method: 'POST' }); location.hash = '#/'; location.reload();
-    },
     add: () => form(null),
-    edit: (t) => form(rows.find((u) => u.id === Number(t.closest('[data-id]').dataset.id))),
+    edit: (t) => form(userOf(t)),
+    menu: (t) => menu(t),
+    st: (t) => { f.st = t.dataset.k; draw(); },
   });
-  await Promise.all([refresh(), loadTenants()]);
+  el.addEventListener('click', (e) => {
+    const r = e.target.closest('[data-id]');
+    if (!r || e.target.closest('button, a, input') || r.dataset.id === '0') return;
+    const u = userOf(r);
+    if (u) form(u);
+  });
+  $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); draw(); }, 200));
+  await refresh();
   return { refresh };
 }

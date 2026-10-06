@@ -5,7 +5,7 @@ import { init } from './db.js';
 import { syncAll, quickSync } from './sync.js';
 import { handle } from './handler.js';
 import { currentUser } from './auth.js';
-import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE } from './tenants.js';
+import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired } from './tenants.js';
 import { json, body, HttpError } from './util.js';
 
 export { TenantPanel } from './tenants.js';
@@ -52,6 +52,10 @@ export default {
       if (slug && path !== 'logout' && path !== 'brand' && path !== 'login' && path !== 'logo') {
         const t = env.DB ? await getTenant(env.DB, slug) : null;
         if (!t || !t.active) return json({ error: t ? 'Bu müşteri paneli askıya alınmış' : 'Oturum geçersiz', tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
+        // Abonelik süresi doldu: müşteri giremez (ana panelin destek oturumu girebilir; yenileme / veri kontrolü için)
+        const raw = ((req.headers.get('Cookie') || '').match(/hp_session=([^;]+)/) || [])[1] || '';
+        if (expired(t) && !/~-1\./.test(raw.replace(/%7E/gi, '~')))
+          return json({ error: 'Aboneliğinizin süresi doldu. Yenilemek için hizmet sağlayıcınızla görüşün.', tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
         return await forward(req, env, t);
       }
       // Ana panel: müşteri panellerinin yönetimi (Kullanıcılar → Müşteri panelleri)
