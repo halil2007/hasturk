@@ -83,7 +83,7 @@ export async function users(el) {
       <div class="kpi"><div class="label">Sınırsız eski hesap</div><div class="value num ${rows.some((u) => u.role !== 'admin' && !Array.isArray(u.perms)) ? 'low' : ''}">${n(rows.filter((u) => u.role !== 'admin' && !Array.isArray(u.perms)).length)}</div><div class="delta flat">yetki seçilmemiş</div></div>`);
     const cnt = { all: rows.length, active: act.length, passive: rows.length - act.length, admin: rows.filter((u) => u.role === 'admin').length, staff: rows.filter((u) => u.role !== 'admin').length };
     render($('[data-tabs]', el), html`${[['all', 'Tümü'], ['active', 'Aktif'], ['passive', 'Pasif'], ['admin', 'Yönetici'], ['staff', 'Personel']].map(([k, t]) => html`<button class="tab ${f.st === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${cnt[k]}</span></button>`)}`);
-    const main = state.tenant || f.q || !['all', 'active', 'admin'].includes(f.st) ? null : { id: 0, name: 'Ana yönetici', username: 'kullanıcı adı boş', role: 'admin', active: 1, main: true };
+    const main = state.tenant || f.q || !['all', 'active', 'admin'].includes(f.st) ? null : { id: 0, name: 'Ana yönetici', username: 'kullanıcı adı boş', role: 'admin', active: 1, main: true, twofa: me.id === 0 && !!me.twofa };
     const all = main ? [main, ...list] : list;
     if (isMobile()) {
       render($('[data-box]', el), html`<div class="m-list">${all.map((u) => html`<div class="m-card u-card" data-id="${u.id}">

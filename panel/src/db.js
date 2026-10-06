@@ -210,6 +210,9 @@ const MIGRATIONS = [
     message TEXT NOT NULL, action TEXT, page TEXT, status_code INTEGER, detail TEXT, user_name TEXT, count INTEGER NOT NULL DEFAULT 1, first_at INTEGER, last_at INTEGER,
     status TEXT NOT NULL DEFAULT 'open', reopened INTEGER NOT NULL DEFAULT 0, resolved_at INTEGER)`,
   'CREATE INDEX IF NOT EXISTS error_reports_last ON error_reports(status, last_at)',
+  // Sistem hızı (bkz. perf.js): panel başına günlük istek süreleri, işlem türüne göre
+  `CREATE TABLE IF NOT EXISTS perf_stats (day TEXT NOT NULL, slug TEXT NOT NULL DEFAULT '', route TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, total_ms INTEGER NOT NULL DEFAULT 0,
+    max_ms INTEGER NOT NULL DEFAULT 0, slow_n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, slug, route))`,
   // Eski Excel fırsat etiketleri tablosu kaldırıldı (yerine buybox fiyat önerileri, bkz. suggest.js)
   'DROP TABLE IF EXISTS promo_offers',
 ];

@@ -75,10 +75,11 @@ export async function supportView(root, rest = [], query = {}) {
   // Ana panel: "Destek talepleri" ve "Müşteri hataları" (kendiliğinden kaydedilen hatalar) sekmeleri
   let el = root;
   if (staff && !id) {
-    const tab = query.t === 'hatalar' ? 'hatalar' : 'talepler';
-    render(root, html`<div class="stack"><div class="tabs">${[['talepler', 'Destek talepleri'], ['hatalar', 'Müşteri hataları']].map(([k, t]) => html`<a class="tab ${tab === k ? 'on' : ''}" href="#/destek${k === 'hatalar' ? '?t=hatalar' : ''}">${t}${k === 'hatalar' && state.errorCount ? html` <span class="n">${state.errorCount}</span>` : ''}</a>`)}</div><div data-sp></div></div>`);
+    const tab = ['hatalar', 'hiz'].includes(query.t) ? query.t : 'talepler';
+    render(root, html`<div class="stack"><div class="tabs">${[['talepler', 'Destek talepleri'], ['hatalar', 'Müşteri hataları'], ['hiz', 'Sistem hızı']].map(([k, t]) => html`<a class="tab ${tab === k ? 'on' : ''}" href="#/destek${k === 'talepler' ? '' : '?t=' + k}">${t}${k === 'hatalar' && state.errorCount ? html` <span class="n">${state.errorCount}</span>` : ''}</a>`)}</div><div data-sp></div></div>`);
     el = $('[data-sp]', root);
     if (tab === 'hatalar') { const { errorsView } = await import('./errors.js'); return errorsView(el, query); }
+    if (tab === 'hiz') { const { perfView } = await import('./perf.js'); return perfView(el); }
   }
   let f = { status: '' };
   const img = (fl) => html`<a class="sp-img" href="/api/support/file/${fl.id}" target="_blank" rel="noopener" title="${fl.name}"><img src="/api/support/file/${fl.id}" alt="${fl.name}" loading="lazy"></a>`;

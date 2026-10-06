@@ -7,6 +7,7 @@
 import { all, first, run, init } from './db.js';
 import { handle, report5xx } from './handler.js';
 import { recordError, clientReport } from './errors.js';
+import { PerfBuffer } from './perf.js';
 import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
 import { hashPassword, supportCookie, currentUser } from './auth.js';
@@ -204,7 +205,7 @@ export async function tenantApi(req, env, db, path, user) {
 
 // ---------- müşteri panelinin kendisi (Durable Object) ----------
 export class TenantPanel {
-  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; this.pf = null; this.pfAt = 0; }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; this.pf = null; this.pfAt = 0; this.perf = new PerfBuffer(); }
   // Platform değerleri ana veritabanından 10 dakikada bir okunur; değişince ortam yeniden kurulur
   async platform() {
     if (this.pf && Date.now() - this.pfAt < 600e3) return;
@@ -257,8 +258,11 @@ export class TenantPanel {
       } catch (e) { return json({ ok: false }); }
     }
     await this.schedule();
-    const res = await handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
+    const t0 = Date.now(), res = await handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
     if (res.status >= 500) this.ctx.waitUntil(report5xx(this.env.DB, req, res, { slug: this.t.slug, firm: this.t.name }).catch(() => {}));
+    // İstek süresi: firma adıyla ana panelin "Sistem hızı" bölümüne
+    this.perf.add(req.method, sp, Date.now() - t0);
+    if (this.perf.due() && this.env.DB) this.ctx.waitUntil(init(this.env.DB).then(() => this.perf.flush(this.env.DB, { slug: this.t.slug, firm: this.t.name })).catch(() => {}));
     return res;
   }
   // Arka plan (senkron) hataları: son kontrolden beri yazılan hata günlükleri ana panelin hata kayıtlarına aktarılır

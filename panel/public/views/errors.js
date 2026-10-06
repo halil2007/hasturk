@@ -3,7 +3,7 @@
 import { api, html, render, $, $$, n, ago, dateTime, actions, busy, toast, sheet } from '../core.js';
 import { setQuery } from '../app.js';
 
-const SRC = { client: ['Ekran hatası', 'warn'], api: ['İşlem hatası', 'bolt'], server: ['Sunucu hatası', 'x'], sync: ['Arka plan / kanal', 'sync'] };
+const SRC = { client: ['Ekran hatası', 'warn'], api: ['İşlem hatası', 'bolt'], server: ['Sunucu hatası', 'x'], sync: ['Arka plan / kanal', 'sync'], perf: ['Yavaş işlem', 'bolt'] };
 const ST = { open: ['bad', 'Açık'], resolved: ['good', 'Çözüldü'], ignored: ['', 'Yok sayıldı'] };
 
 export async function errorsView(el, query = {}) {
@@ -54,6 +54,9 @@ export async function errorsView(el, query = {}) {
   async function open(id) {
     setQuery({ t: 'hatalar', e: id });
     const s = sheet({ title: 'Hata ayrıntısı', size: 'drawer', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>`, onClose: () => setQuery({ t: 'hatalar', e: '' }) });
+    // Başka sayfaya geçilince ayrıntı kapanır
+    const off = () => s.close();
+    window.addEventListener('hashchange', off, { once: true });
     const e = await api('errors/' + id, { fresh: true }).catch((x) => { s.close(); toast(x.message, true); return null; });
     if (!e) return;
     const src = SRC[e.source] || SRC.client, st = ST[e.status] || ST.open, dt = e.detail || {};

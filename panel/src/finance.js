@@ -84,36 +84,56 @@ export async function saveExpense(db, b, id = null) {
 }
 export const deleteExpense = (db, id) => run(db, 'DELETE FROM expenses WHERE id = ?', Number(id)).then(() => ({ ok: true }));
 
+// Dönemin siparişleri kanal başına veritabanında toplanır (sipariş kârı orderProfit ile aynı kurallar): satırlar panele taşınmaz,
+// 1 yıllık / on binlerce siparişlik dönem de hızlı açılır. Oranlar (komisyon, kargo, hizmet bedeli …) kanal başına CASE ile.
+async function aggregate(db, settings, { from, to, channel }) {
+  const cw = channel ? ' AND o.channel = ?' : '', ca = channel ? [channel] : [];
+  const chans = (await all(db, `SELECT DISTINCT o.channel FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca)).map((r) => r.channel).filter((c) => /^[a-z0-9_]+$/i.test(c));
+  if (!chans.length) return [];
+  const rate = (key) => `(CASE o.channel ${chans.map((c) => `WHEN '${c}' THEN ${Number(costOf(settings, key, c)) || 0}`).join(' ')} ELSE 0 END)`;
+  const LIVEI = "COALESCE(i.status, '') != 'cancelled'";
+  return all(db, `WITH it AS (
+      SELECT i.order_id, SUM(CASE WHEN ${LIVEI} THEN i.total ELSE 0 END) AS rev,
+        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission, ${rate('commission')}) / 100.0) ELSE 0 END) AS comm,
+        SUM(CASE WHEN ${LIVEI} AND i.commission IS NULL THEN 1 ELSE 0 END) AS estc,
+        SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity ELSE 0 END) AS cost,
+        SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) = 0 THEN 1 ELSE 0 END) AS miss,
+        SUM(CASE WHEN ${LIVEI} THEN 1 ELSE 0 END) AS live, COUNT(*) AS n
+      FROM orders o JOIN order_items i ON i.order_id = o.id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
+      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw} GROUP BY i.order_id)
+    SELECT o.channel, COUNT(*) AS orders, COALESCE(SUM(it.rev), 0) AS revenue, COALESCE(SUM(it.comm), 0) AS commission,
+      SUM(CASE WHEN it.n > 0 AND it.estc = 0 THEN 1 ELSE 0 END) AS realCommission, COALESCE(SUM(it.cost), 0) AS cost, COALESCE(SUM(it.miss), 0) AS missingCost,
+      SUM(CASE WHEN it.live > 0 THEN COALESCE(o.shipping_cost, ${rate('shipping')}) ELSE 0 END) AS shipping,
+      SUM(CASE WHEN o.shipping_cost IS NOT NULL AND o.shipping_src = 'api' THEN 1 ELSE 0 END) AS realShipping,
+      SUM(CASE WHEN it.live > 0 THEN ${rate('service_fee')} ELSE 0 END) AS fee,
+      SUM(COALESCE(it.rev, 0) * ${rate('fee_rate')} / 100.0) AS rateFee,
+      SUM(COALESCE(it.rev, 0) * 100.0 / 120.0 * ${rate('withholding')} / 100.0) AS withholding
+    FROM orders o LEFT JOIN it ON it.order_id = o.id WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw} GROUP BY o.channel`, from, to, ...ca, from, to, ...ca)
+    .then((rows) => rows.map((r) => { const payout = r.revenue - r.commission - r.shipping - r.fee - r.rateFee - r.withholding; return { ...r, payout, profit: payout - r.cost }; }));
+}
+
 // Dönem: siparişler kanal kanal toplanır; masraf basamakları (şelale), kanal tablosu ve işletme giderleriyle net kâr
 export async function breakdown(db, settings, { from, to, channel } = {}) {
   const now = Date.now();
   from = Number(from) || now - 30 * 864e5; to = Number(to) || now + 1;
   const cw = channel ? ' AND o.channel = ?' : '', ca = channel ? [channel] : [];
   const iw = channel ? ' AND channel = ?' : '';
-  const [orders, items, returned, invRows, costRows, expenses] = await Promise.all([
-    all(db, `SELECT o.id, o.channel, o.shipping_cost, o.shipping_src FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
-    all(db, `SELECT i.order_id, i.total, i.quantity, i.status, i.commission, p.purchase_price, l.commission AS listing_commission
-      FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
-      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
+  const [agg, returned, invRows, costRows, expenses] = await Promise.all([
+    aggregate(db, settings, { from, to, channel }),
     // İade edilen siparişler: gönderim kargosu geri gelmez (iade kargosu pazaryerinin kargo faturasındadır)
     all(db, `SELECT o.channel, COUNT(*) AS n, SUM(o.shipping_cost IS NULL) AS est, COALESCE(SUM(o.shipping_cost), 0) AS ship FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND o.status = 'returned'${cw} GROUP BY o.channel`, from, to, ...ca),
     all(db, `SELECT channel, type, ROUND(SUM(amount), 2) AS amount, COUNT(*) AS n FROM invoices WHERE date >= ? AND date < ?${iw} GROUP BY channel, type`, from, to, ...ca),
     all(db, "SELECT k, v FROM settings WHERE k LIKE 'costs:%'"),
     channel ? null : expenseTotals(db, from, to),
   ]);
-  const byOrder = new Map();
-  for (const i of items) (byOrder.get(i.order_id) || byOrder.set(i.order_id, []).get(i.order_id)).push(i);
   const zero = () => ({ orders: 0, returns: 0, missingCost: 0, realShipping: 0, realCommission: 0, ...Object.fromEntries(KEYS.map((k) => [k, 0])) });
   const per = new Map(), total = zero();
   const chOf = (c) => per.get(c) || per.set(c, zero()).get(c);
-  for (const o of orders) {
-    const p = orderProfit({ ...o, items: byOrder.get(o.id) || [] }, settings);
-    const t = chOf(o.channel);
+  for (const a of agg) {
+    const t = chOf(a.channel);
     for (const x of [t, total]) {
-      for (const k of KEYS) x[k] += p[k] || 0;
-      x.orders++; x.missingCost += p.missingCost;
-      if (p.shippingSrc === 'api') x.realShipping++;
-      if (p.commissionSrc === 'api') x.realCommission++;
+      for (const k of KEYS) x[k] += a[k] || 0;
+      x.orders += a.orders; x.missingCost += a.missingCost; x.realShipping += a.realShipping; x.realCommission += a.realCommission;
     }
   }
   const inv = (c, types) => invRows.filter((r) => r.channel === c && types.includes(r.type)).reduce((a, r) => a + r.amount, 0);

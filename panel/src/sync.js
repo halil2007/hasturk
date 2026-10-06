@@ -8,6 +8,7 @@ import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve 
 import { getChannels } from './channels/index.js';
 import { typeOf } from './config.js';
 import { syncInvoices, syncSettlements } from './finance.js';
+import { maintain } from './perf.js';
 import { syncFx } from './fx.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
 import { autoMatch, relinkItems, repairDuplicates } from './match.js';
@@ -520,7 +521,10 @@ export async function housekeeping(db, { days = 45 } = {}) {
   if (last && t - last < 864e5) return null;
   await setSetting(db, 'housekeeping_at', t);
   const r = await run(db, "UPDATE packages SET label_data = NULL WHERE label_data IS NOT NULL AND status = 'shipped' AND COALESCE(shipped_at, created_at) < ?", t - days * 864e5);
-  return { labels: (r && r.meta && r.meta.changes) || 0 };
+  // Hız bakımı: eski günlük / geçmiş kayıtları budanır, sorgu planlayıcı istatistikleri tazelenir (bkz. perf.js)
+  const m = await maintain(db).catch((e) => ({ error: e.message }));
+  await setSetting(db, 'maint', { at: t, labels: (r && r.meta && r.meta.changes) || 0, ...m });
+  return { labels: (r && r.meta && r.meta.changes) || 0, ...m };
 }
 export const autoLink = async (db) => (await autoMatch(db, { catalog: [] })).linked;
 

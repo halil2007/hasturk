@@ -3,13 +3,14 @@
 //  - api:    kullanıcının yaptığı işlem hata verdi (ör. "Etiket alınamadı"); hangi işlem, hangi sayfa
 //  - server: sunucu hatası (500)
 //  - sync:   kanal senkronu / zamanlanmış iş hatası (müşteri panelinin arka planı)
+//  - perf:   ortalaması 3 sn'yi aşan işlem (bkz. perf.js)
 // Aynı firmadaki aynı hata (sayılar ayıklanmış mesaj + işlem) tek kayıtta toplanır: kaç kez, kimde, ilk / son ne zaman.
 // İlk kez görülen ya da çözüldü denip tekrar oluşan hata ana panele bildirim olarak düşer. "Yok say" denen hata sessizce sayılır.
 import { all, first, run, notify, resolve } from './db.js';
 import { notify as pushNotify } from './push.js';
 import { fail, str } from './util.js';
 
-export const SOURCES = { client: 'Ekran hatası', api: 'İşlem hatası', server: 'Sunucu hatası', sync: 'Arka plan / kanal' };
+export const SOURCES = { client: 'Ekran hatası', api: 'İşlem hatası', server: 'Sunucu hatası', sync: 'Arka plan / kanal', perf: 'Yavaş işlem' };
 const STATUS = ['open', 'resolved', 'ignored'];
 
 // Gruplama anahtarı: rakamlar, uzun kimlikler ve tırnak içi değerler ayıklanır (aynı hata farklı siparişte de tek kayıt)
