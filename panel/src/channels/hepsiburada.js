@@ -279,10 +279,19 @@ export function hepsiburada(env, meta) {
     if (!pkg.remote_id) return { pending: 'Önce paketleyin (Hepsiburada paketi oluşmalı)' };
     let lab;
     try { lab = await labelFile(pkg); } catch (e) {
-      // Paketin kargo firması Hepsiburada ortak barkodu vermiyor (kendi anlaşmalı firma ya da test siparişi): Hepsiburada etiket üretmez.
-      // Hata yerine panel etiketi hazırlanır (alıcı, ürünler, paket no); kargo firması "Kargo firmasını değiştir" ile ortak barkodlu bir firmaya çevrilebilir.
+      // "Cargo company does not provide mutual barcodes": paketin kargo firması Hepsiburada'nın ortak barkod (Hepsiburada anlaşmalı
+      // gönderi etiketi) verdiği firmalardan değil. Etiket yalnız Hepsiburada'dan alınır; kargo firması ortak barkodlu bir firmaya
+      // (changablecargocompanies listesinden) çevrilince aynı servis etiketi verir. Paketin Hepsiburada'daki firması gösterilir.
       if (/mutual barcode/i.test(e.message)) {
-        return { panel: true, note: `Hepsiburada bu paketin kargo firması${pkg.cargo_company ? ` (${pkg.cargo_company})` : ''} için ortak barkod vermiyor; panel etiketi hazırlandı. Hepsiburada etiketini isterseniz paketin “⋯” menüsünden kargo firmasını ortak barkodlu bir firmaya (ör. HepsiJet) çevirip “Etiketi kanaldan yeniden al”a basın.` };
+        let info = null;
+        try { info = await call(pkgUrl(pkg)); } catch { /* bilgi alınamadı */ }
+        const firm = str(g(info, 'cargoCompany')) || str(pkg.cargo_company);
+        return {
+          pending: `Hepsiburada bu paket için ortak barkod (Hepsiburada anlaşmalı kargo etiketi) vermiyor: paketin Hepsiburada'daki kargo firması${firm ? ` “${firm}”` : ''} ortak barkod verilen firmalardan değil. `
+            + `Hepsiburada anlaşmasıyla gönderimde etiket ve barkod Trendyol'daki gibi Hepsiburada'dan gelir; bunun için “Kargo firmasını değiştir”den Hepsiburada'nın sunduğu anlaşmalı bir firmayı (ör. HepsiJet) seçin, etiket hemen yeniden istenir.`
+            + `${test ? ' Test (SIT) siparişlerinde firma, test siparişi oluşturulurken gönderilen CargoCompanyId ile belirlenir.' : ''}`,
+          changeCargo: true, cargoCompany: firm || undefined,
+        };
       }
       throw e;
     }
@@ -478,7 +487,12 @@ export function hepsiburada(env, meta) {
     if (!test) throw new Error('Test siparişi yalnızca test (SIT) ortamında oluşturulur: Entegrasyonlar → Hepsiburada → Ortam = Test');
     return hb(`https://oms-stub-external-sit.hepsiburada.com/orders/merchantId/${encodeURIComponent(m)}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
   }
-  const sit = { test: !!test, merchantId: m, categories, attributes, attributeValues, importProducts, productStatus, uploadOne, uploadStatus, createTestOrder };
+  // Test siparişinde kullanılacak kargo firması kimlikleri: paketli bir siparişin değiştirilebilir kargo firmaları (Id, ad, kısa ad)
+  async function cargoCompanies(packageNumber) {
+    const r = await call(`${OMS}/packages/merchantId/${m}/packagenumber/${encodeURIComponent(packageNumber)}/changablecargocompanies`);
+    return page(r).map((c) => ({ id: num(g(c, 'id')) || null, name: str(g(c, 'name')), short: str(g(c, 'shortName')), active: g(c, 'isActive') !== false })).filter((c) => c.id || c.short);
+  }
+  const sit = { test: !!test, merchantId: m, categories, attributes, attributeValues, importProducts, productStatus, uploadOne, uploadStatus, createTestOrder, cargoCompanies };
 
   // ---------- Ürün yükleme (Ürün yükle ekranı): kategori eşleştirmesindeki değerlerle Hepsiburada ürün dosyası ----------
   // Panelin doldurduğu temel alanlar: satıcı SKU, varyant grubu, barkod, ad, açıklama, marka, KDV, fiyat, stok, görsel, desi

@@ -73,6 +73,8 @@ export async function hbTestView(el) {
         <div class="card-head" style="margin:0"><h2>3) Sipariş entegrasyonu ${r.packageNumber ? html`<span class="pill good">paketlendi</span>` : r.testOrder ? html`<span class="pill warn">sipariş oluştu</span>` : ''}</h2></div>
         <p class="muted small" style="margin:0">Test siparişi Hepsiburada'nın test servisine gönderilir. Gövde, envanterden seçtiğiniz ürünle doldurulur; Hepsiburada'nın “Test Siparişi Oluşturma” dokümanındaki alanlarla farklıysa buradan düzeltebilirsiniz. Sonra “Siparişleri çek” → sipariş panelde görünür → <b>Siparişler</b>'de açıp “Paketle”.</p>
         <textarea class="input" data-obody style="min-height:260px;font-family:ui-monospace,monospace;font-size:12px"></textarea>
+        <div class="notice small"><i class="ico ico-truck"></i><div>Etiket (ortak barkod) testi için test siparişinin kargo firması Hepsiburada'nın ortak barkod verdiği bir firma olmalı (ör. HepsiJet). Şablondaki <code>CargoCompanyId</code> bu firmayı belirler; paketlenmiş bir test siparişi varsa firmaları buradan seçebilirsiniz.
+          <div class="row wrap" style="margin-top:6px;gap:8px"><select class="input" style="width:auto" data-cargoid><option value="">Kargo firması (CargoCompanyId)</option></select><button class="btn sm" data-act="cargos"><i class="ico ico-sync"></i>Firmaları getir</button></div></div></div>
         <div class="row wrap"><button class="btn" data-act="otpl">Şablonu seçili ürünle doldur</button><button class="btn primary" data-act="order">Test siparişi oluştur</button><span class="spacer"></span><button class="btn" data-act="osync"><i class="ico ico-sync"></i>Siparişleri çek</button></div>
         ${st.orders.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Sipariş</th><th>Durum</th><th>Tarih</th><th class="r">Tutar</th><th>Paket</th><th></th></tr></thead><tbody>
           ${st.orders.map((o) => html`<tr><td class="num">${o.order_number}</td><td>${statusPill(o.status)}</td><td class="small">${dateTime(o.ordered_at)}</td><td class="r num">${money(o.total)}</td><td class="num small">${o.packages || html`<span class="muted">paketlenmedi</span>`}</td><td class="r"><a class="btn sm" href="#/siparisler/${encodeURIComponent(o.id)}">${o.packages ? 'Aç' : 'Aç ve paketle'}</a></td></tr>`)}
@@ -97,7 +99,7 @@ export async function hbTestView(el) {
       OrderNumber: '9' + id, OrderDate: now,
       Customer: { CustomerId: crypto.randomUUID(), Name: 'Test Müşteri' },
       DeliveryAddress: { AddressId: crypto.randomUUID(), Name: 'Test Müşteri', AddressDetail: 'Test Mahallesi Deneme Sokak No:1', Email: 'test@example.com', CountryCode: 'TR', PhoneNumber: '05555555555', AlternatePhoneNumber: '', Town: 'Kadıköy', District: 'Caferağa', City: 'İstanbul' },
-      LineItems: [{ Sku: s.hbSku, MerchantId: st.merchantId, Quantity: 1, Price: { Amount: s.price, Currency: 'TRY' }, Vat: 0, TotalPrice: { Amount: s.price, Currency: 'TRY' }, CargoCompanyId: 89100, DeliveryOptionId: 1 }],
+      LineItems: [{ Sku: s.hbSku, MerchantId: st.merchantId, Quantity: 1, Price: { Amount: s.price, Currency: 'TRY' }, Vat: 0, TotalPrice: { Amount: s.price, Currency: 'TRY' }, CargoCompanyId: Number(($('[data-cargoid]', el) || {}).value) || 89100, DeliveryOptionId: 1 }],
     });
   }
   function wire() {
@@ -161,6 +163,13 @@ export async function hbTestView(el) {
     }),
     ustatus: (t) => busy(t, async () => { const r = await api(`hbtest/upload-status?kind=${t.dataset.k}&id=${encodeURIComponent(t.dataset.id)}`, { fresh: true }); render($('[data-out2]', el), resultBox(r.status)); }),
     otpl: () => { $('[data-obody]', el).value = orderTemplate(); },
+    cargos: (b) => busy(b, async () => {
+      const r = await api('hbtest/cargos');
+      if (!r.companies.length) return toast(r.note || 'Kargo firması listesi boş', true);
+      render($('[data-cargoid]', el), html`<option value="">Kargo firması (CargoCompanyId)</option>${r.companies.filter((c) => c.id).map((c) => html`<option value="${c.id}" ${/hepsijet/i.test(c.name + c.short) ? 'selected' : ''}>${c.name || c.short} · ${c.id}${c.active ? '' : ' (pasif)'}</option>`)}`);
+      $('[data-obody]', el).value = orderTemplate();
+      toast(`${r.companies.length} kargo firması alındı (paket ${r.package}); şablon güncellendi`);
+    }),
     order: (t) => busy(t, async () => {
       let body; try { body = JSON.parse($('[data-obody]', el).value); } catch { return toast('Gövde geçerli JSON değil', true); }
       try { const r = await api('hbtest/order', { method: 'POST', body: { body } }); toast('Test siparişi oluşturuldu ' + (r.orderNumber || '')); render($('[data-out3]', el), resultBox(r.response)); st.results = r.results; }
