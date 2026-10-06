@@ -25,6 +25,7 @@ import { costOf, COST_KEYS } from '../public/profit.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
 import { recordError, errorsApi, clientReport } from './errors.js';
 import { perfReport } from './perf.js';
+import { mainKeysApi } from './extapi.js';
 import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
@@ -1207,6 +1208,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'errors/report' && m === 'POST') {
     if (!env.TENANT_SLUG) await recordError(db, clientReport(await body(req), { slug: '', firm: '', user }));
     return json({ ok: true });
+  }
+  // Dış API (stok aktarımı) — ana panelin kendi ürünleri için anahtarlar (yalnız ana panel yöneticisi; bkz. extapi.js)
+  if (path === 'extapi' || path.startsWith('extapi/')) {
+    if (env.TENANT_SLUG || user.role !== 'admin') fail(404, 'Bulunamadı');
+    const r = await mainKeysApi(db, path, m, m === 'GET' ? {} : await body(req), user);
+    if (m !== 'GET') await log(db, null, 'info', `${user.name}: stok API anahtarı ${m === 'POST' ? 'oluşturuldu' : m === 'DELETE' ? 'silindi' : 'güncellendi'}`);
+    return json(r);
   }
   if (path === 'perf' && m === 'GET') {
     if (env.TENANT_SLUG || user.role !== 'admin') fail(404, 'Bulunamadı');

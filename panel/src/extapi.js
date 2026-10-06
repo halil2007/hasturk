@@ -6,8 +6,8 @@
 // Uç noktalar (GET, başlık: Authorization: Bearer <anahtar>):
 //   /api/v1/ping                     bağlantı testi
 //   /api/v1/stock                    ürünler ve stoklar (sayfalı): page, limit (en fazla 1000), updated_since, sku, barcode, include_inactive
-import { first, run } from './db.js';
-import { json, str } from './util.js';
+import { first, run, init, getRaw, setSetting, getSettings } from './db.js';
+import { json, str, fail } from './util.js';
 
 const enc = new TextEncoder();
 const hex = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -47,10 +47,68 @@ export function ipAllowed(ip, list) {
 const err = (status, error, code) => json({ error, code }, status, { 'Cache-Control': 'no-store' });
 const seen = new Map(); // kullanım kaydı: firma başına dakikada en fazla bir yazma
 
+// ---------- ana panelin kendi mağazası: birden çok anahtar (ör. her bayi / dış sistem için ayrı) ----------
+// Anahtar biçimi hsm_<kimlik>_<gizli>; ayarlarda (extapi_keys) yalnız özeti tutulur. Yalnız ana panel yöneticisi yönetir.
+const MAIN_KEY = /^hsm_([a-z0-9]{8})_[A-Za-z0-9]{32}$/;
+const keysPublic = (list) => (list || []).map((k) => ({ id: k.id, name: k.name, hint: k.hint, on: !!k.on, ips: k.ips || [], created_at: k.created_at, created_by: k.created_by || '', last_at: k.last_at || null, last_ip: k.last_ip || '', calls: k.calls || 0 }));
+export async function mainKeysApi(db, path, method, b, user) {
+  const list = (await getRaw(db, 'extapi_keys')) || [];
+  const save = (l) => setSetting(db, 'extapi_keys', l);
+  if (path === 'extapi' && method === 'GET') return { keys: keysPublic(list) };
+  if (path === 'extapi' && method === 'POST') {
+    const name = str(b.name).trim().slice(0, 80);
+    if (!name) fail(400, 'Anahtara bir ad verin (ör. bayinin adı)');
+    if (list.length >= 20) fail(400, 'En fazla 20 anahtar');
+    const id = [...crypto.getRandomValues(new Uint8Array(8))].map((x) => 'abcdefghijklmnopqrstuvwxyz0123456789'[x % 36]).join('');
+    const secret = [...crypto.getRandomValues(new Uint8Array(32))].map((x) => B62[x % 62]).join('');
+    const key = `hsm_${id}_${secret}`;
+    let ips = [];
+    try { ips = parseIps(b.ips); } catch (e) { fail(400, e.message); }
+    list.push({ id, name, hash: await hex(key), hint: `hsm_${id}_…${secret.slice(-4)}`, on: true, ips, created_at: Date.now(), created_by: (user && user.name) || '' });
+    await save(list);
+    return { ok: true, key, keys: keysPublic(list) };
+  }
+  const m = /^extapi\/([a-z0-9]{8})$/.exec(path);
+  if (m) {
+    const k = list.find((x) => x.id === m[1]);
+    if (!k) fail(404, 'Anahtar bulunamadı');
+    if (method === 'DELETE') { await save(list.filter((x) => x !== k)); return { ok: true, keys: keysPublic(list.filter((x) => x !== k)) }; }
+    if (method === 'PUT') {
+      if (b.name !== undefined) k.name = str(b.name).trim().slice(0, 80) || k.name;
+      if (b.on !== undefined) k.on = !!b.on;
+      if (b.ips !== undefined) { try { k.ips = parseIps(b.ips); } catch (e) { fail(400, e.message); } }
+      await save(list);
+      return { ok: true, keys: keysPublic(list) };
+    }
+  }
+  fail(404, 'Bulunamadı');
+}
+
 // Worker: anahtarı doğrula, firmanın paneline yönlendir. getTenant / forward tenants.js'ten verilir (döngüsel içe aktarmayı önlemek için)
 export async function extApi(req, env, ctx, path, { getTenant, forward, expired }) {
   if (req.method !== 'GET') return err(405, 'Yalnız GET desteklenir', 'method');
   const auth = req.headers.get('Authorization') || '', key = (/^Bearer\s+(.+)$/i.exec(auth) || [])[1] || req.headers.get('X-Api-Key') || '';
+  // Ana panelin kendi mağazası (hsm_ anahtarı): ürünler ana veritabanından
+  const mk = MAIN_KEY.exec(key.trim());
+  if (mk && env.DB) {
+    await init(env.DB);
+    const list = (await getRaw(env.DB, 'extapi_keys')) || [];
+    const k = list.find((x) => x.id === mk[1]);
+    if (!k || !same(await hex(key.trim()), k.hash)) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
+    if (!k.on) return err(403, 'Bu API anahtarı kapalı', 'disabled');
+    const ip = req.headers.get('CF-Connecting-IP') || '';
+    if (!ipAllowed(ip, k.ips)) return err(403, `Bu IP adresine izin verilmemiş (${ip || 'bilinmiyor'})`, 'ip');
+    const s = seen.get('main:' + k.id) || { n: 0, at: 0 };
+    s.n++;
+    if (Date.now() - s.at > 60e3) {
+      const n = s.n; s.n = 0; s.at = Date.now();
+      ctx.waitUntil((async () => { const l = (await getRaw(env.DB, 'extapi_keys')) || []; const x = l.find((y) => y.id === k.id); if (x) { x.last_at = Date.now(); x.last_ip = ip; x.calls = (x.calls || 0) + n; await setSetting(env.DB, 'extapi_keys', l); } })().catch(() => {}));
+    }
+    seen.set('main:' + k.id, s);
+    const st = await getSettings(env.DB);
+    const url = new URL(req.url);
+    return extApiInner(env.DB, new URL('https://main.internal/__api/' + path.replace(/^v1\/?/, '') + url.search), { slug: 'ana-panel', name: (st.company && st.company.title) || 'Ana mağaza' }, 'main:' + k.id);
+  }
   const m = /^hst_([a-z0-9-]{3,32})_[A-Za-z0-9]{32}$/.exec(key.trim());
   if (!m) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
   const t = env.DB ? await getTenant(env.DB, m[1], true) : null;
@@ -74,10 +132,10 @@ export async function extApi(req, env, ctx, path, { getTenant, forward, expired 
 
 // Müşteri panelinin (Durable Object) içinde: kendi veritabanından ürün ve stok
 const rate = new Map();
-export async function extApiInner(db, url, store) {
-  const now = Date.now(), r = rate.get(store.slug) || { at: now, n: 0 };
+export async function extApiInner(db, url, store, rkey = store.slug) {
+  const now = Date.now(), r = rate.get(rkey) || { at: now, n: 0 };
   if (now - r.at > 60e3) { r.at = now; r.n = 0; }
-  r.n++; rate.set(store.slug, r);
+  r.n++; rate.set(rkey, r);
   if (r.n > 120) return err(429, 'Dakikada en fazla 120 istek', 'rate');
   const p = url.pathname.replace(/^\/__api\/?/, '').replace(/\/+$/, ''), q = Object.fromEntries(url.searchParams);
   if (p === 'ping') return json({ ok: true, store: { code: store.slug, name: store.name }, time: new Date().toISOString() }, 200, { 'Cache-Control': 'no-store' });

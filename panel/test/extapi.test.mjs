@@ -77,3 +77,26 @@ test('dış API: ana panel yetkilendirir; mağaza yalnız kendi stoklarını oku
   await O('/api/tenants/magaza-a', J({ active: false }, 'PUT'));
   assert.equal((await ext(call, ro.key)).status, 403);
 });
+
+test('ana panelin kendi ürünleri: birden çok adlı anahtar, kapatma, silme, IP; firma panelleri etkilenmez', async () => {
+  resetChannels();
+  const { call } = setup();
+  const O = call('owner');
+  await O('/api/login', J({ password: 'x-123456' }));
+  for (let i = 1; i <= 2; i++) await O('/api/products', J({ name: 'Ana ürün ' + i, sku: 'M-' + i, sale_price: 10 * i }));
+  assert.equal((await O('/api/extapi', J({ name: '' }))).status, 400);
+  const k1 = await (await O('/api/extapi', J({ name: 'Bayi 1' }))).json();
+  const k2 = await (await O('/api/extapi', J({ name: 'ERP', ips: '9.9.9.9' }))).json();
+  assert.match(k1.key, /^hsm_[a-z0-9]{8}_[A-Za-z0-9]{32}$/); assert.equal(k2.keys.length, 2);
+  assert.ok(!JSON.stringify(k2.keys).includes(k1.key.slice(-10)), 'anahtar listede görünmez');
+  const r = await (await ext(call, k1.key)).json();
+  assert.equal(r.total, 2); assert.deepEqual(r.items.map((x) => x.sku).sort(), ['M-1', 'M-2']);
+  assert.equal((await ext(call, k2.key, '/api/v1/stock', '1.2.3.4')).status, 403);
+  assert.equal((await ext(call, k2.key, '/api/v1/stock', '9.9.9.9')).status, 200);
+  const id1 = k2.keys.find((x) => x.name === 'Bayi 1').id;
+  await O('/api/extapi/' + id1, J({ on: false }, 'PUT'));
+  assert.equal((await ext(call, k1.key)).status, 403);
+  await O('/api/extapi/' + id1, { method: 'DELETE' });
+  assert.equal((await ext(call, k1.key)).status, 401);
+  assert.equal((await ext(call, k1.key.replace(/.$/, 'x'))).status, 401);
+});
