@@ -277,7 +277,14 @@ export function hepsiburada(env, meta) {
 
   async function label(order, pkg) {
     if (!pkg.remote_id) return { pending: 'Önce paketleyin (Hepsiburada paketi oluşmalı)' };
-    const lab = await labelFile(pkg);
+    let lab;
+    try { lab = await labelFile(pkg); } catch (e) {
+      // Paketin kargo firması Hepsiburada ortak barkodu vermiyor (HepsiJet gibi ortak barkodlu firmalarda etiket gelir)
+      if (/mutual barcode/i.test(e.message)) {
+        return { pending: `Bu paketin kargo firması${pkg.cargo_company ? ` (${pkg.cargo_company})` : ''} Hepsiburada ortak barkodu vermiyor, bu yüzden Hepsiburada etiket üretmiyor. Kargo firmasını ortak barkod veren bir firmaya (ör. HepsiJet) değiştirip tekrar deneyin${pkg.barcode || pkg.tracking ? ' ya da paketin gönderi barkoduyla kendi etiketimizi yazdırın' : ''}.`, changeCargo: true, barcodeOnly: !!(pkg.barcode || pkg.tracking) };
+      }
+      throw e;
+    }
     return lab ? { label: lab } : { pending: 'Hepsiburada etiketi henüz hazır değil; birkaç dakika sonra tekrar deneyin.' };
   }
   async function labelFile(pkg) {

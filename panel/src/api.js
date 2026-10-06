@@ -428,7 +428,7 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   }
   if (r.barcode || r.tracking || r.cargoCompany || r.remoteStatus) await updPkg(db, pkg.id, { barcode: r.barcode, tracking: r.tracking, cargoCompany: r.cargoCompany, remoteStatus: r.remoteStatus, agreement: r.agreement });
   // Gerçek gönderi / etiket henüz yok: işlem tamamlanmış sayılmaz (adım ve varsa gerçek barkod bilgisiyle döner)
-  if (r.pending) return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly, repack: !!r.repack, external: !!r.external, cancelable: !!r.cancelable };
+  if (r.pending) { if (r.changeCargo) await run(db, 'UPDATE packages SET error = ? WHERE id = ?', r.pending.slice(0, 500), pkg.id); return { official: null, pending: r.pending, step: r.step || null, barcodeOnly: !!r.barcodeOnly, repack: !!r.repack, external: !!r.external, cancelable: !!r.cancelable, changeCargo: !!r.changeCargo }; }
   if (r.panel) {
     await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?), error = NULL WHERE id = ?', Date.now(), pkg.id);
     return { official: null, panel: true };
