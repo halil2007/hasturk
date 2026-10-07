@@ -237,6 +237,13 @@ const MIGRATIONS = [
     max_ms INTEGER NOT NULL DEFAULT 0, slow_n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, slug, route))`,
   // Eski Excel fırsat etiketleri tablosu kaldırıldı (yerine buybox fiyat önerileri, bkz. suggest.js)
   'DROP TABLE IF EXISTS promo_offers',
+  // Panelden silinen siparişler (bkz. orderclean.js): kanal aynı siparişi yine gönderse de alınmaz
+  'CREATE TABLE IF NOT EXISTS deleted_orders (id TEXT PRIMARY KEY, at INTEGER NOT NULL, user TEXT, order_number TEXT)',
+  // Kanalda bulunamayan sipariş: missing_n kaç kontrolde bulunamadı (2 = kesin / uyarı), missing_why sebep; checked_at son tek sipariş kontrolü
+  'ALTER TABLE orders ADD COLUMN missing_n INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE orders ADD COLUMN missing_why TEXT',
+  'ALTER TABLE orders ADD COLUMN checked_at INTEGER',
+  'CREATE INDEX IF NOT EXISTS orders_missing ON orders(missing_n) WHERE missing_n >= 2',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

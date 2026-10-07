@@ -1,6 +1,6 @@
 // Sipariş işlemleri (ortak bileşen): işleme al → paketle (kanalda kargoya hazırla) → kargo firması seç/değiştir →
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
-import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly } from '../core.js';
+import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly, isAdmin } from '../core.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
@@ -488,6 +488,16 @@ function splitEditor(d, extra, done) {
 
 // ---------- sipariş detayı (tam) ----------
 const EV = { accept: 'İşleme alındı', pack: 'Paketlendi (kargoya hazır)', split: 'Paketlere bölündü', cargo: 'Kargo firması seçildi', 'cancel-package': 'Paket iptal edildi', ship: 'Kargoya verildi', tracking: 'Takip no girildi', label: 'Etiket oluşturuldu', 'label-printed': 'Etiket yazdırıldı', 'label-unprinted': 'Yazdırıldı işareti kaldırıldı', status: 'Durum elle değiştirildi', processed: 'Kanalda işlem yapıldı', auto_close: 'Otomatik tamamlandı', };
+// Sipariş silme: önce kanalda var mı sorulur (destekleyen kanallarda), sonuç onay penceresinde gösterilir
+export async function deleteOrder(o) {
+  const c = await api(`orders/${encodeURIComponent(o.id)}/check`).catch(() => ({ exists: null, why: '' }));
+  const head = c.exists === false ? `✓ ${c.why}. Silmeniz önerilir.` : c.exists === true ? `⚠ ${c.why}. Silerseniz panel bu siparişi bir daha almaz; kanaldaki sipariş etkilenmez.` : c.why ? `${c.why}.` : '';
+  if (!(await confirmBox(html`${head ? html`<b>${head}</b><br><br>` : ''}#${o.order_number} panelden silinsin mi? Düşülen stok geri eklenir, sipariş raporlardan çıkar ve kanaldan yeniden alınmaz. Bu işlem geri alınamaz.`, 'Siparişi sil'))) return false;
+  const r = await api('orders/' + encodeURIComponent(o.id), { method: 'DELETE' });
+  toast(r.message);
+  return true;
+}
+
 export async function openOrder(id, onChange) {
   const s = sheet({ title: 'Sipariş', size: 'wide drawer' });
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
@@ -498,7 +508,7 @@ export async function openOrder(id, onChange) {
     s.title.textContent = `#${o.order_number} · ${ch(o.channel).name}`;
     s.setBody(html`
       <div class="row wrap" style="margin-bottom:12px">${chLogo(o.channel)}${statusPill(o.status)}<span class="muted small">${dateTime(o.ordered_at)}</span>
-        ${o.remote_status ? html`<span class="muted tiny" title="Kanaldaki durum">(${o.remote_status})</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}
+        ${o.remote_status ? html`<span class="muted tiny" title="Kanaldaki durum">(${o.remote_status})</span>` : ''}${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">Kanalda bulunamadı</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}
         ${o.ship_by ? html`<span class="muted small">· Son kargoya teslim: <b>${dateTime(o.ship_by)}</b></span>` : ''}${o.extra && o.extra.cargoChoice ? html`<span class="muted small">· Müşterinin seçtiği: ${o.extra.cargoChoice}</span>` : ''}
         ${o.cust && o.cust.total > 1 ? html`<a class="pill info" href="#/musteriler?key=${encodeURIComponent(o.ckey)}" title="Müşterinin tüm siparişleri">Müşterinin ${o.cust.nth}. siparişi · toplam ${o.cust.total}</a>` : ''}</div>
       <div data-ops></div>
@@ -536,7 +546,7 @@ export async function openOrder(id, onChange) {
             <h3>Not ve ayarlar</h3>
             <label class="field"><span>Sipariş notu</span><textarea class="input" data-note>${o.note || ''}</textarea></label>
             <label class="field"><span>Bu siparişin kargo gideri (boş = varsayılan)</span><div class="input-group"><input class="input" inputmode="decimal" data-shipcost value="${o.shipping_cost ?? ''}"><span class="suffix">₺</span></div></label>
-            <div class="row wrap"><button class="btn sm" data-save-note>Kaydet</button><span class="spacer"></span>
+            <div class="row wrap"><button class="btn sm" data-save-note>Kaydet</button>${isAdmin() ? html`<button class="btn sm danger ghost" data-del-order><i class="ico ico-trash"></i>Siparişi sil</button>` : ''}<span class="spacer"></span>
               <select class="input" style="width:auto;min-height:34px;font-size:13px" data-status aria-label="Durumu elle değiştir"><option value="">Durumu elle değiştir…</option>${Object.entries(STATUS_LABEL).map(([k, v]) => html`<option value="${k}">${v}</option>`)}</select></div>
           </div>
         </div>
@@ -548,6 +558,8 @@ export async function openOrder(id, onChange) {
       const o = d.order, a = o.address || {};
       navigator.clipboard.writeText([a.name || o.customer, a.line, [a.district, a.city].filter(Boolean).join(' / '), a.phone || o.phone].filter(Boolean).join('\n')).then(() => toast('Adres kopyalandı'), () => toast('Kopyalanamadı', true));
     }
+    const del = e.target.closest('[data-del-order]');
+    if (del) busy(del, async () => { if (await deleteOrder(d.order)) { s.close(); onChange && onChange(); } });
     const sv = e.target.closest('[data-save-note]');
     if (sv) busy(sv, async () => { await api(`orders/${encodeURIComponent(id)}/note`, { method: 'POST', body: { note: $('[data-note]', s.body).value, shipping_cost: $('[data-shipcost]', s.body).value } }); toast('Kaydedildi'); });
   });

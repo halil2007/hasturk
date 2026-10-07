@@ -79,6 +79,7 @@ export async function products(el, rest, query = {}) {
       <button class="btn sm" data-act="bulk" data-a="activate"><i class="ico ico-check"></i>Aktif yap</button>
       <button class="btn sm" data-act="bulk" data-a="deactivate"><i class="ico ico-minus"></i>Pasife al</button>
       <button class="btn sm" data-act="bulk" data-a="critical"><i class="ico ico-db"></i>Kritik stok sınırı</button>
+      <button class="btn sm danger ghost" data-act="bulk" data-a="delete"><i class="ico ico-trash"></i>Sil</button>
       <span class="spacer"></span><button class="btn sm ghost" data-act="clearsel">Seçimi kaldır</button></div>`;
   }
   function draw() {
@@ -159,12 +160,21 @@ export async function products(el, rest, query = {}) {
         siteStock(p) ? { icon: 'db', label: 'Stok ikas\'tan okunuyor', run: () => {} } : { icon: 'db', label: 'Stok girişi / sayım', run: () => stockDialog(p, refresh) },
         ...((p.listings || []).length ? [{ icon: 'link', label: 'Kanal stok kuralları', run: () => ruleDialog(p, refresh) }] : []),
         { icon: p.active ? 'minus' : 'check', label: p.active ? 'Pasife al' : 'Aktif yap', run: () => api('products-bulk', { method: 'POST', body: { ids: [p.id], action: p.active ? 'deactivate' : 'activate' } }).then(() => { toast(p.active ? 'Pasife alındı' : 'Aktif yapıldı'); refresh(); }).catch((e) => toast(e.message, true)) },
+        '-',
+        { icon: 'trash', label: 'Ürünü sil', danger: true, run: async () => {
+          if (!(await confirmBox(`"${p.name}" panelden silinsin mi? Kanallardaki ilanlar silinmez; bağlı ilanlar "yok sayılanlar"a alınır ve ürün senkronla geri gelmez. Geçmiş siparişler kalır.`, 'Sil'))) return;
+          api('products/' + p.id, { method: 'DELETE' }).then(() => { toast('Ürün silindi'); sel.delete(p.id); refresh(); }).catch((e) => toast(e.message, true));
+        } },
       ], { title: p.name });
     },
     bulk: async (t) => {
       const a = t.dataset.a;
       let value;
       if (a === 'critical') { value = prompt('Seçili ürünlerin kritik stok sınırı (adet):', '5'); if (value === null) return; }
+      else if (a === 'delete') {
+        if (!(await confirmBox(`${sel.size} ürün panelden silinsin mi? Kanallardaki ilanlar silinmez; bağlı ilanlar "yok sayılanlar"a alınır ve ürünler senkronla geri gelmez. Geçmiş siparişler kalır. Bu işlem geri alınamaz.`, 'Sil'))) return;
+        return busy(t, async () => { const r = await api('products-bulk', { method: 'POST', body: { ids: [...sel], action: 'delete' } }); toast(`${n(r.changed)} ürün silindi`); sel.clear(); refresh(); });
+      }
       else if (!(await confirmBox(`${sel.size} ürün ${a === 'activate' ? 'aktif yapılsın' : 'pasife alınsın'} mı?${a === 'deactivate' ? ' Pasif ürünler listelerde gizlenir, stok gönderimi durmaz.' : ''}`, a === 'activate' ? 'Aktif yap' : 'Pasife al'))) return;
       busy(t, async () => { const r = await api('products-bulk', { method: 'POST', body: { ids: [...sel], action: a, value } }); toast(`${n(r.changed)} ürün güncellendi`); sel.clear(); refresh(); });
     },
@@ -438,7 +448,7 @@ export async function productForm(id, done) {
   });
   const del = $('[data-del]', s.el);
   if (del) del.onclick = async () => {
-    if (!(await confirmBox('Ürün panelden silinsin mi? Kanallardaki ilanlar silinmez, sadece bağlantı kalkar.', 'Sil'))) return;
+    if (!(await confirmBox('Ürün panelden silinsin mi? Kanallardaki ilanlar silinmez; bağlı ilanlar "yok sayılanlar"a alınır ve ürün senkronla geri gelmez. Geçmiş siparişler kalır.', 'Sil'))) return;
     await api('products/' + id, { method: 'DELETE' }); toast('Silindi'); s.close(); done();
   };
 }

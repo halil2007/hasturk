@@ -33,7 +33,7 @@ const ROUTES = [
   { sec: 'Satış' },
   { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders', perm: 'orders' },
   { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo', perm: 'cargo' },
-  { path: 'iadeler', title: 'İadeler', icon: 'back', view: claimsView, count: 'claims', perm: 'returns' },
+  { path: 'iadeler', title: 'İadeler', icon: 'return', view: claimsView, count: 'claims', perm: 'returns' },
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', perm: 'questions' },
   { sec: 'Ürünler' },
   // Gruplu sayfalar: menüde grup tek satır; grubun sayfaları sayfanın üstünde sekme olarak (tab: sekme adı)
@@ -51,7 +51,7 @@ const ROUTES = [
   { path: 'musteriler', title: 'Müşteriler', tab: 'Müşteriler', icon: 'user', view: customersView, perm: 'reports', group: 'rapor' },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
-  { path: 'kullanicilar', title: 'Personel', icon: 'user', view: users, admin: true },
+  { path: 'kullanicilar', title: 'Personel', icon: 'team', view: users, admin: true },
   { path: 'firmalar', title: 'Firmalar', icon: 'grid', view: firmsView, admin: true, when: () => !!state.owner },
   { path: 'paketim', title: 'Paketim', icon: 'tag', view: billingView, admin: true, when: () => !!state.tenant && !state.demo },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
@@ -486,7 +486,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-08m';
+const ASSETS = '2026-10-08o';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

@@ -275,3 +275,8 @@ ikas şema özetini güncellemek (ikas yeni sürüm yayınlarsa): `npm pack @ika
 | `src/config.js` | Panelden girilen API bilgileri (şifreli saklama, maskeleme) |
 | `public/` | Panel arayüzü (derleme gerektirmez): `app.js`, `views/*.js` (sayfalar; `orderops.js` = sipariş işlemleri bileşeni), `chart.js`, `labels.js` (etiket + Code 128), `profit.js` (kâr formülü; sunucu da aynı dosyayı kullanır) |
 | `dev/` | Yerel sunucu ve D1 benzeri SQLite sarmalayıcı |
+
+### Ürün ve sipariş silme
+- **Ürün sil** (Ürünler → satırdaki ⋯ menüsü, toplu seçim → Sil, ya da ürün düzenleme): ürün panelden silinir, kanallardaki ilanlar silinmez. Bağlı ilanlar "yok sayılanlar"a alınır (Kanal ürünleri → Yok sayılanlar'dan geri eklenebilir); ana katalog senkronu ürünü yeniden açmaz. Geçmiş sipariş satırları kalır.
+- **Sipariş sil** (yalnız yönetici; sipariş detayı → Not ve ayarlar → Siparişi sil, ya da toplu seçim → Sil): önce siparişin kanalda olup olmadığına bakılır (destekleyen kanallarda) ve sonuç onayda gösterilir. Düşülen stok geri eklenir, sipariş raporlardan çıkar ve kanal aynı siparişi yine gönderse de panel almaz (`deleted_orders`). Kanaldaki sipariş etkilenmez.
+- **Kanalda bulunamayan siparişler** (`src/orderclean.js`): senkron, açık siparişleri kanalda arar. ikas'ta sipariş kimliğiyle sorgulanır; "yok" cevabında ya da siparişin mağazası panelden kaldırılmışsa sipariş iptal sayılır (açık listelerden çıkar, stok döner). Diğer kanallarda eski açık siparişler kanaldan yeniden okunurken iki kontrolde üst üste (en az 6 saat arayla) dönmeyen sipariş yalnız işaretlenir. Siparişler sayfasının üstünde "N sipariş kanalda bulunamadı → İncele" uyarısı çıkar; listeden tek tek ya da "Hepsini sil" ile silinir. Sipariş sonradan kanalda görünürse işaret kalkar.
