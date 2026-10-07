@@ -13,7 +13,7 @@
   --good: #16a34a; --good-soft: #e8f7ee; --warn: #c2410c; --warn-soft: #fff1e6; --amber: #b45309; --amber-soft: #fef3c7;
   --bad: #dc2626; --bad-soft: #fdecec; --purple: #7c3aed; --purple-soft: #f1eafe; --info: #1f63e9; --info-soft: #e8f0fe;
   /* Kanal renkleri (grafikler; sabit sıra, renk körlüğüne göre doğrulandı) */
-  --c-ikas1: #2a78d6; --c-ikas2: #eb6834; --c-trendyol: #1baf7a; --c-hepsiburada: #eda100; --c-pttavm: #e87ba4; --c-n11: #7b3fe4; --c-idefix: #ffc20e; --c-pazarama: #00a2e8; --c-amazon: #ff9900; --c-ciceksepeti: #e5007d; --c-koctas: #e30613; --c-shopify: #5e8e3e; --c-woocommerce: #7f54b3; --c-etsy: #f1641e;
+  --c-ikas1: #2a78d6; --c-ikas2: #eb6834; --c-trendyol: #1baf7a; --c-hepsiburada: #eda100; --c-pttavm: #e87ba4; --c-n11: #7b3fe4; --c-idefix: #ffc20e; --c-pazarama: #00a2e8; --c-amazon: #ff9900; --c-ciceksepeti: #e5007d; --c-koctas: #e30613; --c-shopify: #5e8e3e; --c-woocommerce: #7f54b3; --c-opencart: #23a1d1; --c-etsy: #f1641e;
   --radius: 14px; --radius-sm: 10px;
   --shadow-sm: 0 1px 2px rgb(15 23 42 / .04);
   --shadow: 0 1px 2px rgb(15 23 42 / .04), 0 8px 24px rgb(15 23 42 / .06);
@@ -1234,7 +1234,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-08m"; }
+:root { --assets: "2026-10-08u"; }
 
 /* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
 .subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }
@@ -1309,3 +1309,48 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .perf-bars .pb { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
 .perf-bars .pb span { width: 100%; max-width: 34px; border-radius: 6px 6px 2px 2px; opacity: .85; }
 .perf-bars .pb small { font-size: 10.5px; color: var(--muted); }
+
+/* ---------- sol menü: açık temada açık zemin (koyu temada koyu kalır), sakin sayı rozetleri ---------- */
+:root { --sb-bg: #ffffff; --sb-line: #e6e9f0; --sb-text: #3b4659; --sb-muted: #97a1b3; --sb-hover: #f2f5fa; --sb-active: #e8f0fe; --sb-active-text: #1a55cc;
+  --sb-strong: #0f172a; --sb-count: #eef1f6; --sb-count-text: #4b5568; --sb-brand: transparent; --sb-thumb: rgb(15 23 42 / .14); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --sb-bg: var(--nav-bg); --sb-line: var(--nav-bg-2); --sb-text: var(--nav-text); --sb-muted: var(--nav-muted); --sb-hover: var(--nav-bg-2);
+    --sb-active: var(--nav-active); --sb-active-text: #fff; --sb-strong: #fff; --sb-count: rgb(255 255 255 / .1); --sb-count-text: #c3cde0; --sb-brand: #fff; --sb-thumb: rgb(255 255 255 / .18); }
+}
+:root[data-theme="dark"] { --sb-bg: var(--nav-bg); --sb-line: var(--nav-bg-2); --sb-text: var(--nav-text); --sb-muted: var(--nav-muted); --sb-hover: var(--nav-bg-2);
+  --sb-active: var(--nav-active); --sb-active-text: #fff; --sb-strong: #fff; --sb-count: rgb(255 255 255 / .1); --sb-count-text: #c3cde0; --sb-brand: #fff; --sb-thumb: rgb(255 255 255 / .18); }
+@media (min-width: 1024px) {
+  .side { background: var(--sb-bg); color: var(--sb-text); border-right: 1px solid var(--sb-line); }
+  .side .nav a { color: var(--sb-text); font-weight: 550; }
+  .side .nav a .ico { opacity: .8; }
+  .side .nav a:hover { background: var(--sb-hover); color: var(--sb-strong); }
+  .side .nav a.on { background: var(--sb-active); color: var(--sb-active-text); font-weight: 650; }
+  .side .nav a.on .ico { opacity: 1; }
+  .side .nav-sec { color: var(--sb-muted); }
+  .side .brand-card { background: var(--sb-brand); }
+  .side .brand-title { color: var(--sb-muted); }
+  .side .nav .count { background: var(--sb-count); color: var(--sb-count-text); font-weight: 650; }
+  .side .nav a.on .count { background: var(--primary); color: #fff; }
+  .side .nav .count.warn { background: #f59e0b; color: #fff; }
+  .side .status-box { background: var(--sb-hover); border-color: var(--sb-line); }
+  .side .status-box b { color: var(--sb-strong); }
+  .side .status-box span { color: var(--sb-muted); }
+  .side .nav[data-nav] { scrollbar-color: var(--sb-thumb) transparent; }
+  .side .nav[data-nav]::-webkit-scrollbar-thumb { background: var(--sb-thumb); }
+  .side-toggle { border-color: var(--sb-line); }
+  body.nav-mini .nav-sec::before { background: var(--sb-line); }
+}
+.ico-return { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14 4 9l5-5'/%3E%3Cpath d='M4 9h10.5a5.5 5.5 0 0 1 0 11H11'/%3E%3C/svg%3E"); }
+.ico-team { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E"); }
+.ico-trash { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6'/%3E%3C/svg%3E"); }
+/* Ürün adları siparişlerde tam görünür (kesilmez, alt satıra geçer) */
+.oc-name, .pname { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
+.oc-items { display: grid; gap: 6px; }
+.oc-item { align-items: flex-start; }
+.pkg-card .line { align-items: flex-start; }
+/* Sol menü logosu daha belirgin: varsayılan logo görselinin kenar boşluğu dengelenir (yükseklik artar, üst/alt boşluk kırpılır) */
+@media (min-width: 1024px) {
+  .side .brand-card { padding: 4px 6px; margin-bottom: 0; }
+  .side .brand-card img[data-logo] { height: 76px; margin: -10px 0; }
+}
+@media (min-width: 1024px) and (max-height: 820px) { .side .brand-card img[data-logo] { height: 62px; margin: -8px 0; } }

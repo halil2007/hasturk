@@ -87,3 +87,21 @@ test('e-posta içeriği: sipariş no, tarih, ürünler, adet, toplam; iptal sat�
   assert.match(m.text, /03\.10\.2026|3 Eki 2026/);
   assert.match(m.html, /href="https:\/\/p\.dev\/#\/siparisler\/hepsiburada%3A55"/);
 });
+
+test('e-posta: kargo farkı ara toplamla gösterilir; birden çok alıcıya ayrı kopya (Brevo messageVersions)', async () => {
+  const m = orderMail({ id: 'ikas1:9', order_number: '9', ordered_at: Date.now(), customer: 'Emir', address: '{"city":"İstanbul","district":"Avcılar"}', total: 694 },
+    [{ name: 'Toprak', sku: 'HG-1', quantity: 1, unit_price: 549, total: 549, status: '' }], IK, 'https://p.dev', '', 'HasTürk Gübre');
+  assert.match(m.html, /Ara toplam/); assert.match(m.html, /Kargo ve diğer ücretler/); assert.match(m.html, /₺145,00/);
+  assert.match(m.text, /Kargo ve diğer ücretler: ₺145,00/);
+  assert.match(m.html, /color-scheme/);
+  const db = d1();
+  await init(db);
+  const env = { PANEL_PASSWORD: 'x' };
+  await saveConfig(env, db, 'mail', { values: { MAIL_PROVIDER: 'brevo', MAIL_API_KEY: 'k', MAIL_FROM: 'bildirim@firma.com' } });
+  const sent = [];
+  globalThis.fetch = async (url, opts) => { sent.push(JSON.parse(opts.body)); return new Response('{}', { status: 201, headers: { 'Content-Type': 'application/json' } }); };
+  const { sendMail } = await import('../src/mail.js');
+  await sendMail(env, db, { to: ['a@x.com', 'b@x.com'], ...m });
+  assert.equal(sent[0].to, undefined);
+  assert.deepEqual(sent[0].messageVersions, [{ to: [{ email: 'a@x.com' }] }, { to: [{ email: 'b@x.com' }] }]);
+});

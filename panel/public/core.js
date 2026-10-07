@@ -66,15 +66,20 @@ export async function api(path, { method = 'GET', body, fresh = false } = {}) {
 async function request(path, method, body) {
   busyBar(1);
   let res;
+  // Okuma istekleri en fazla 20 sn beklenir: takılan bir bağlantı (ör. yeni yayın anında) sayfayı sonsuza kadar bekletmesin
+  const ctl = method === 'GET' && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), 20e3) : null;
   try {
     res = await fetch('/api/' + path, {
-      method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin',
+      method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
     });
-  } catch (e) { throw new Error('Sunucuya ulaşılamadı; internet bağlantınızı kontrol edin'); } finally { busyBar(-1); }
+  } catch (e) {
+    throw new Error(ctl && ctl.signal.aborted ? 'Sunucu yanıt vermedi; birazdan tekrar deneyin' : 'Sunucuya ulaşılamadı; internet bağlantınızı kontrol edin');
+  } finally { clearTimeout(timer); busyBar(-1); }
   let data = {};
   try { data = await res.json(); } catch { /* boş */ }
-  if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw new Error(data.error || 'Giriş gerekli'); }
-  if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw new Error(data.error); }
+  if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw Object.assign(new Error(data.error || 'Giriş gerekli'), { auth: true }); }
+  if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw Object.assign(new Error(data.error), { auth: true }); }
   if (!res.ok) {
     const raw = data.error || `Hata (${res.status})`, e = new Error(friendly(raw)); e.raw = raw;
     // İşlem hataları (yazma istekleri) ve sunucu hataları kendiliğinden kaydedilir (ana panelin "Müşteri hataları")
@@ -182,8 +187,9 @@ export function lateInfo(o, now = Date.now()) {
   if (now - o.ordered_at > 15 * 864e5) return null; // çok eski kayıtlar gecikme sayılmaz (sunucudaki LATE ile aynı sınır)
   const H = 3600e3;
   if (o.ship_by && now > o.ship_by) return { cls: 'bad', text: 'Gecikti', title: `Son kargoya teslim: ${dateTime(o.ship_by)}` };
-  if (o.ship_by && o.ship_by - now < 12 * H) return { cls: 'bad', text: 'Gecikme riski', title: `Son kargoya teslim: ${dateTime(o.ship_by)} (${Math.max(0, Math.round((o.ship_by - now) / H))} sa kaldı)` };
-  if (now - o.ordered_at > 24 * H) return { cls: 'warn', text: 'Henüz kargoya verilmedi', title: `${Math.floor((now - o.ordered_at) / 864e5) || 1} günü aştı${o.ship_by ? ` · son teslim ${dateTime(o.ship_by)}` : ''}` };
+  if (o.ship_by && o.ship_by - now < 12 * H) return { cls: 'warn', text: 'Gecikme riski', title: `Son kargoya teslim: ${dateTime(o.ship_by)} (${Math.max(0, Math.round((o.ship_by - now) / H))} sa kaldı)` };
+  // Kanal son teslim tarihi vermediyse: 1 günü aşan ve henüz kargoya verilmemiş sipariş
+  if (!o.ship_by && now - o.ordered_at > 24 * H) return { cls: 'warn', text: 'Gecikme riski', title: `Sipariş ${Math.floor((now - o.ordered_at) / 864e5) || 1} günü aştı, henüz kargoya verilmedi` };
   return null;
 }
 export const lateBadge = (o) => { const l = lateInfo(o); return l ? html`<span class="late ${l.cls}" title="${l.title}"><b>!</b>${l.text}</span>` : ''; };
@@ -238,7 +244,7 @@ export function chLogo(id, sm = false) {
   if (t === 'n11') return html`<span class="logo-b${k}" style="background:#7b3fe4;color:#fff" title="N11">n11</span>`;
   if (t === 'idefix') return html`<span class="logo-b${k}" style="background:#ffc20e;color:#1c1c1c" title="idefix">id</span>`;
   if (t === 'pazarama') return html`<span class="logo-b${k}" style="background:#00a2e8;color:#fff" title="Pazarama">pz</span>`;
-  const B = { amazon: ['#232f3e', '#ff9900', 'a'], ciceksepeti: ['#e5007d', '#fff', 'çs'], koctas: ['#e30613', '#fff', 'K'], shopify: ['#5e8e3e', '#fff', 'S'], woocommerce: ['#7f54b3', '#fff', 'W'], etsy: ['#f1641e', '#fff', 'E'] }[t];
+  const B = { amazon: ['#232f3e', '#ff9900', 'a'], ciceksepeti: ['#e5007d', '#fff', 'çs'], koctas: ['#e30613', '#fff', 'K'], shopify: ['#5e8e3e', '#fff', 'S'], woocommerce: ['#7f54b3', '#fff', 'W'], opencart: ['#23a1d1', '#fff', 'OC'], etsy: ['#f1641e', '#fff', 'E'] }[t];
   if (B) return html`<span class="logo-b${k}" style="background:${B[0]};color:${B[1]}" title="${c.name}">${B[2]}</span>`;
   return html`<span class="logo-b${k}" style="background:${chColor(id)}">${(c.name || '?').slice(0, 1)}</span>`;
 }
@@ -350,6 +356,12 @@ export function popMenu(anchor, items, { title = '' } = {}) {
 }
 
 export const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+// Tema: varsayılan açık; koyu ve "cihaza uy" Ayarlar → Görünüm'den (cihaz başına saklanır)
+export const themeOf = () => { const t = store.get('theme', 'light'); return ['light', 'dark', 'auto'].includes(t) ? t : 'light'; };
+export function applyTheme() {
+  const t = themeOf();
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+}
 export const store = {
   get(k, d) { try { const v = localStorage.getItem('panel:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem('panel:' + k, JSON.stringify(v)); } catch { /* özel pencere */ } },

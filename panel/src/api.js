@@ -1,13 +1,14 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, fieldsFor } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, isExtra, fieldsFor } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
 import { listQuestions, answerQuestion, syncQuestions } from './questions.js';
 import { hbTest } from './hbtest.js';
+import { deleteOrders, orderOnChannel } from './orderclean.js';
 import { suggestBarcode, assignBarcodes, barcodePrefix, missingBarcodes } from './barcodes.js';
 import { previewSkus, suggestSku, assignSkus, skuPrefix } from './skus.js';
 import { exportProducts, bulkUpdate } from './bulk.js';
@@ -15,7 +16,7 @@ import { publicKey, subscribe, unsubscribe, latest, notify } from './push.js';
 import { pickList } from './picklist.js';
 import { dailyDigest } from './digest.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
-import { sendMail, orderMail, validEmail, logoPath } from './mail.js';
+import { sendMail, orderMail, validEmail, logoPath, logoUrl } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
 import * as chp from './chproducts.js';
@@ -51,7 +52,7 @@ async function loadOrder(db, id) {
   // Kalemler, paketler ve müşteri geçmişi aynı anda okunur (her sorgu ayrı gidiş-dönüş)
   const [cust, items, packages] = await Promise.all([
     o.ckey ? first(db, "SELECT COUNT(*) AS total, SUM(ordered_at <= ?) AS nth FROM orders WHERE ckey = ? AND status != 'cancelled'", o.ordered_at, o.ckey) : null,
-    all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.desi, p.image AS product_image, l.commission AS listing_commission
+    all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.ship_cost, p.desi, p.image AS product_image, l.commission AS listing_commission
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = ? AND l.remote_id = i.remote_key
     WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id),
@@ -72,6 +73,7 @@ function orderFilter(q, { withStatus = true } = {}) {
     else if (st === 'late') where.push(LATE);
     else if (STATUS.includes(st)) { where.push('o.status = ?'); args.push(st); }
   }
+  if (q.missing) where.push('o.missing_n >= 2');
   if (q.channel && isChannelId(q.channel)) { where.push('o.channel = ?'); args.push(q.channel); }
   const day = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || '') ? Date.parse(s + 'T00:00:00Z') - 3 * 3600e3 : null);
   if (day(q.from) != null) { where.push('o.ordered_at >= ?'); args.push(day(q.from)); }
@@ -91,7 +93,7 @@ async function listOrders(db, q) {
   const limit = Math.min(Number(q.limit) || 25, 200), page = Math.max(1, Number(q.page) || 1);
   // Liste, toplam, durum sayıları ve ayarlar aynı anda okunur (sıralı gidiş-dönüş yerine tek bekleme)
   const f2 = orderFilter(q, { withStatus: false });
-  const [rows, totalRow, counts, lateRow, byChannel, settings] = await Promise.all([all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src,
+  const [rows, totalRow, counts, lateRow, byChannel, settings, missRow] = await Promise.all([all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src, o.missing_n, o.missing_why,
       (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status NOT IN ('cancelled', 'returned')) AS qty,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS lines,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
@@ -109,7 +111,7 @@ async function listOrders(db, q) {
   all(db, `SELECT o.status, COUNT(*) AS n FROM orders o ${f2.w} GROUP BY o.status`, ...f2.args),
   first(db, `SELECT COUNT(*) AS n FROM orders o ${f2.w ? f2.w + ' AND ' : 'WHERE '}${LATE}`, ...f2.args),
   all(db, "SELECT channel, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY channel"),
-  getSettings(db)]);
+  getSettings(db), first(db, 'SELECT COUNT(*) AS n FROM orders WHERE missing_n >= 2')]);
   const total = totalRow.n;
   counts.push({ status: 'late', n: lateRow.n });
   // Satır önizlemesi (görsel + ad + adet), ilk 2 ürün
@@ -117,7 +119,7 @@ async function listOrders(db, q) {
   if (rows.length) {
     const ids = rows.map((r) => r.id);
     for (const it of await all(db, `SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
-        p.purchase_price, l.commission AS listing_commission
+        p.purchase_price, p.ship_cost, l.commission AS listing_commission
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE i.order_id IN (${ids.map(() => '?').join(',')}) ORDER BY i.rowid`, ...ids)) {
@@ -131,7 +133,7 @@ async function listOrders(db, q) {
       const pr = orderProfit({ channel: r.channel, shipping_cost: r.shipping_cost, shipping_src: r.shipping_src, items: full[r.id] || [] }, settings);
       return { ...r, city: a.city || '', district: a.district || '', address: undefined, extra: parse(r.extra, {}), items: (items[r.id] || []).slice(0, 2), cargo: r.pkg_cargo || r.cargo_company || '', profit: ['cancelled', 'returned'].includes(r.status) ? null : pr.profit, missing_cost: pr.missingCost };
     }),
-    counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), pendingByChannel: Object.fromEntries(byChannel.map((c) => [c.channel, c.n])), total, page, limit,
+    counts: Object.fromEntries(counts.map((c) => [c.status, c.n])), pendingByChannel: Object.fromEntries(byChannel.map((c) => [c.channel, c.n])), total, page, limit, missing: missRow.n,
   };
 }
 
@@ -592,8 +594,8 @@ async function listBuybox(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin'];
-const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'critical_stock', 'active', 'fx_price']);
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin'];
+const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price']);
 // Görsel bağlantıları: dizi ya da satır satır metin → tekrarsız https adresleri
 const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/[\s,]+/));
 function cleanProduct(b) {
@@ -964,6 +966,30 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const base = /\.workers\.dev$/i.test(url.host) ? url.origin : 'https://hasturk-panel.HESABINIZ.workers.dev';
     return new Response(src.replace('https://hasturk-panel.HESABINIZ.workers.dev', base), { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="index.php"', 'Cache-Control': 'no-store' } });
   }
+  // OpenCart bağlantı dosyası: kanalın anahtarı gömülü olarak indirilir. Anahtar yoksa rastgele üretilip kanalın bilgilerine (şifreli) kaydedilir;
+  // yeniden indirmede aynı anahtar kullanılır. Anahtar dosyaya PHP metni olarak yazıldığından yalnız harf, rakam, - ve _ kabul edilir.
+  if (path === 'opencart-bridge' && m === 'GET') {
+    if (user.role !== 'admin') fail(403, 'Yalnız yönetici');
+    const cid = str(q.channel) || 'opencart';
+    if (typeOf(cid) !== 'opencart' || !fieldsFor(cid)) fail(400, 'Geçersiz kanal');
+    if (env.TENANT_SLUG) fail(403, 'Bu kanal yakında açılacak');
+    if (!env.ASSETS) fail(404, 'Dosya bulunamadı');
+    const v = ((await loadConfig(env, db))[cid] || {}).values || {}, cf = (k) => v[k] || (isExtra(cid) ? '' : str(env[k]));
+    let key = cf('OPENCART_KEY');
+    if (key && !/^[A-Za-z0-9_-]{24,128}$/.test(key)) fail(400, 'Kayıtlı bağlantı anahtarı dosyaya yazılamıyor (en az 24 karakter; yalnız harf, rakam, - ve _): Bağlantı anahtarı alanındaki kayıtlı değeri silip dosyayı yeniden indirin');
+    if (!key) {
+      const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+      key = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => abc[b & 63]).join('');
+      await saveConfig(env, db, cid, { values: { OPENCART_KEY: key } });
+      resetChannels();
+      await log(db, cid, 'info', `${user.name}: OpenCart bağlantı anahtarı oluşturuldu (bağlantı dosyası indirildi)`);
+    }
+    const src = await (await env.ASSETS.fetch(new Request(url.origin + '/opencart-bridge.php'))).text();
+    const PH = "define('HASTURK_KEY', '__HASTURK_KEY__');";
+    if (!src.includes(PH)) fail(500, 'Bağlantı dosyası şablonu okunamadı');
+    const name = /^[A-Za-z0-9._-]+\.php$/.test(cf('OPENCART_BRIDGE')) ? cf('OPENCART_BRIDGE') : 'hasturk-baglanti.php';
+    return new Response(src.replace(PH, () => `define('HASTURK_KEY', '${key}');`), { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' } });
+  }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
   if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
   if (path === 'import' && m === 'POST') { const b = await body(req); return json(await importListings(env, db, { only: b.channels })); }
@@ -1159,8 +1185,27 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const b = await body(req);
     return json(await orderAction(env, db, decodeURIComponent(x[1]), x[2], b, ctx, user));
   }
+  // Sipariş silme (yalnız yönetici): stok geri eklenir, sipariş kanaldan yeniden alınmaz. Önce kanalda var mı bakılabilir (check).
+  if ((x = path.match(/^orders\/([^/]+)\/check$/)) && m === 'GET') {
+    const o = await first(db, 'SELECT id, channel, remote_id FROM orders WHERE id = ?', decodeURIComponent(x[1]));
+    if (!o) fail(404, 'Sipariş bulunamadı');
+    return json(await orderOnChannel(env, db, o));
+  }
+  if ((x = path.match(/^orders\/([^/]+)$/)) && m === 'DELETE') {
+    if (user.role !== 'admin') fail(403, 'Sipariş silmek için yönetici yetkisi gerekir');
+    const r = await deleteOrders(db, [decodeURIComponent(x[1])], user.name);
+    if (!r.deleted) fail(404, 'Sipariş bulunamadı');
+    ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    return json({ ok: true, message: 'Sipariş silindi; stok geri eklendi' });
+  }
   if (path === 'orders-bulk' && m === 'POST') {
     const b = await body(req), done = [], errors = [];
+    if (b.action === 'delete') {
+      if (user.role !== 'admin') fail(403, 'Sipariş silmek için yönetici yetkisi gerekir');
+      const r = await deleteOrders(db, b.ids || [], user.name);
+      ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+      return json({ ok: true, deleted: r.deleted, done: [], errors: [] });
+    }
     await pool((b.ids || []).slice(0, 100), 4, async (id) => {
       try { await orderAction(env, db, id, b.action, b, ctx, user); done.push(id); } catch (e) { errors.push(`${id}: ${e.message}`); }
     });
@@ -1316,7 +1361,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!to.length) fail(400, 'Önce bildirim alacak e-posta adresini kaydedin');
     const chs = await getChannels(env, db), c = chs.find((x) => x.enabled) || { id: 'ikas1', name: 'HasTürk', type: 'ikas' };
     const sample = { id: 'deneme', order_number: 'DENEME-1', ordered_at: Date.now(), customer: 'Deneme Müşteri', address: JSON.stringify({ city: 'Konya', district: 'Selçuklu' }), total: 249.9 };
-    const mail = orderMail(sample, [{ name: 'Örnek ürün', sku: 'ORNEK-1', quantity: 1, total: 249.9, status: '' }], c, settings.panel_url || url.origin);
+    const pu = settings.panel_url || url.origin;
+    const mail = orderMail({ ...sample, total: 299.9 }, [{ name: 'Örnek ürün', sku: 'ORNEK-1', quantity: 1, unit_price: 249.9, total: 249.9, status: '' }], c, pu, logoUrl(env, { ...settings, panel_url: pu }), (settings.company && settings.company.title) || '');
     try { await sendMail(env, db, { to, subject: '[Deneme] ' + mail.subject, html: mail.html, text: mail.text }); } catch (e) { fail(400, 'E-posta gönderilemedi: ' + e.message); }
     await log(db, null, 'info', `${user.name}: deneme e-postası gönderildi (${to.join(', ')})`);
     return json({ ok: true, message: `Deneme e-postası gönderildi: ${to.join(', ')}` });
@@ -1477,6 +1523,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products-bulk' && m === 'POST') {
     const b = await body(req), ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter((x) => x > 0).slice(0, 2000);
     if (!ids.length) fail(400, 'Ürün seçin');
+    if (b.action === 'delete') {
+      const r = await deleteProducts(db, ids);
+      await log(db, null, 'info', `${user.name}: ${r.deleted} ürün silindi`);
+      return json({ changed: r.deleted });
+    }
     const set = b.action === 'activate' ? ['active = 1'] : b.action === 'deactivate' ? ['active = 0'] : b.action === 'critical' ? ['critical_stock = ?'] : null;
     if (!set) fail(400, 'Geçersiz işlem');
     const extra = b.action === 'critical' ? [Math.max(0, Math.round(num(b.value)))] : [];
@@ -1491,13 +1542,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (m === 'GET') return json(await productDetail(db, id));
     if (m === 'PUT') return json(await saveProduct(env, db, ctx, id, await body(req), user));
     if (m === 'DELETE') {
-      await db.batch([
-        db.prepare('UPDATE listings SET product_id = NULL WHERE product_id = ?').bind(id),
-        db.prepare('UPDATE order_items SET product_id = NULL WHERE product_id = ?').bind(id),
-        db.prepare('DELETE FROM order_stock WHERE product_id = ?').bind(id),
-        db.prepare('DELETE FROM stock_moves WHERE product_id = ?').bind(id),
-        db.prepare('DELETE FROM products WHERE id = ?').bind(id),
-      ]);
+      const r = await deleteProducts(db, [id]);
+      if (!r.deleted) fail(404, 'Ürün bulunamadı');
+      await log(db, null, 'info', `${user.name}: ürün silindi (${r.names[0]})`);
       return json({ ok: true });
     }
   }
@@ -1572,4 +1619,28 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ total: rows.length, groups: [...groups.values()].sort((a, b) => b.last - a.last).slice(0, 100) });
   }
   fail(404, 'Bulunamadı');
+}
+
+// Ürün silme (panelden): kanallardaki ilanlar silinmez; bağlı ilanlar "silindi" diye yok sayılır — ana katalog
+// senkronu ürünü yeniden açmaz, eşleştirme yeniden bağlamaz (Kanal ürünleri → Yok sayılanlar'dan geri alınabilir).
+// Sipariş satırları kalır (ürün bağı kalkar); stok hareketleri ve sipariş stok kayıtları silinir.
+export async function deleteProducts(db, ids) {
+  let deleted = 0;
+  const names = [];
+  for (const part of chunk(ids, 90)) {
+    const q = part.map(() => '?').join(',');
+    const rows = await all(db, `SELECT id, name FROM products WHERE id IN (${q})`, ...part);
+    if (!rows.length) continue;
+    const id = rows.map((r) => r.id), qq = id.map(() => '?').join(',');
+    await db.batch([
+      db.prepare(`UPDATE listings SET product_id = NULL, ignored = 1, match = 'deleted' WHERE product_id IN (${qq})`).bind(...id),
+      db.prepare(`UPDATE order_items SET product_id = NULL WHERE product_id IN (${qq})`).bind(...id),
+      db.prepare(`DELETE FROM order_stock WHERE product_id IN (${qq})`).bind(...id),
+      db.prepare(`DELETE FROM stock_moves WHERE product_id IN (${qq})`).bind(...id),
+      db.prepare(`DELETE FROM products WHERE id IN (${qq})`).bind(...id),
+    ]);
+    deleted += rows.length;
+    names.push(...rows.map((r) => r.name));
+  }
+  return { deleted, names };
 }

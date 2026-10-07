@@ -5,7 +5,7 @@ import { d1 } from '../dev/d1.mjs';
 import { init, run, first, all, setSetting } from '../src/db.js';
 import { resetChannels } from '../src/channels/index.js';
 import { pushStocks } from '../src/sync.js';
-import { autoUpload, scoreCategory } from '../src/catalog.js';
+import { autoUpload, catalogApi, scoreCategory } from '../src/catalog.js';
 
 test('kategori puanı: ek ve Türkçe karakter farkına rağmen doğru kategori öne çıkar', () => {
   const cats = [{ name: 'Sebze Tohumu', path: 'Bahçe › Tohum' }, { name: 'Saksı Toprağı', path: 'Bahçe › Toprak' }, { name: 'Organik Gübre', path: 'Bahçe › Gübre' }];
@@ -50,22 +50,54 @@ test('genel stok senkronu kapalıyken yalnız anahtarı açık kanala (Hepsibura
   resetChannels();
 });
 
-test('otomatik gönderim: kategori otomatik eşleşir, zorunlu özellikler (varyant, Menşei) doldurulur, ürün gönderilir', async () => {
+test('otomatik gönderim: kategori yalnız önerilir; kullanıcı onaylayınca eşleşir, zorunlu özellikler (varyant, Menşei) doldurulur, ürün gönderilir', async () => {
   const db = d1(); await init(db); resetChannels();
   const t = Date.now();
   await run(db, `INSERT INTO products (id, name, sku, barcode, category, variant_name, sale_price, stock, created_at, updated_at) VALUES (1, 'HG Saksı Toprağı 5 Kg', 'HG-S5', '8690000000999', 'Bahçe › Saksı Toprakları', '5 Kg', 120, 4, ?, ?)`, t, t);
   await run(db, "INSERT INTO listings (channel, remote_id, product_id, price, remote_stock) VALUES ('ikas1', 'v1', 1, 120, 4)");
   assert.equal(await autoUpload({ DEMO: '1' }, db), null, 'anahtar kapalıyken hiçbir şey yapılmaz');
   await setSetting(db, 'auto_upload', { hepsiburada: true });
+  const r0 = await autoUpload({ DEMO: '1' }, db);
+  assert.equal(r0.hepsiburada, 0, 'onaylanmış eşleşme yokken ürün gönderilmez');
+  assert.equal(await first(db, "SELECT 1 AS x FROM category_map WHERE channel = 'hepsiburada'"), null, 'sistem kendisi eşleştirmez');
+  const sg = await first(db, "SELECT remote_name, sure FROM category_suggest WHERE channel = 'hepsiburada'");
+  assert.equal(sg.remote_name, 'Saksı Toprağı');
+  const st = await catalogApi({ DEMO: '1' }, db, null, 'catalog/state', 'GET', {}, {}, { name: 'Yönetici' });
+  assert.equal(st.suggestions[0].remote_name, 'Saksı Toprağı');
+  const acc = await catalogApi({ DEMO: '1' }, db, null, 'catalog/suggest/accept', 'POST', {}, { channel: 'hepsiburada', local: 'Bahçe › Saksı Toprakları' }, { name: 'Yönetici' });
+  assert.equal(acc.remote, 'Saksı Toprağı');
+  assert.equal(await first(db, "SELECT 1 AS x FROM category_suggest WHERE channel = 'hepsiburada'"), null, 'onaylanan öneri kalkar');
   const r = await autoUpload({ DEMO: '1' }, db);
   assert.equal(r.hepsiburada, 1);
   const m = await first(db, "SELECT remote_id, remote_name, attrs, user FROM category_map WHERE channel = 'hepsiburada'");
-  assert.equal(m.remote_name, 'Saksı Toprağı'); assert.equal(m.user, 'Otomatik');
+  assert.equal(m.remote_name, 'Saksı Toprağı'); assert.equal(m.user, 'Yönetici');
   const attrs = JSON.parse(m.attrs);
   assert.equal(attrs['10'].value, '@variant'); assert.equal(attrs['11'].value, 'TR');
   const u = await first(db, "SELECT user, status, items FROM product_uploads WHERE channel = 'hepsiburada'");
   assert.equal(u.user, 'Otomatik'); assert.equal(JSON.parse(u.items)[0].id, 1);
   assert.equal((await autoUpload({ DEMO: '1' }, db)).hepsiburada, 0, 'aynı ürün tekrar gönderilmez');
+  resetChannels();
+});
+
+test('kategori önerisi: reddedilen kategori tekrar önerilmez; eski otomatik eşleştirmeler onay bekleyen öneriye çevrilir', async () => {
+  const db = d1(); await init(db); resetChannels();
+  const t = Date.now();
+  await run(db, `INSERT INTO products (id, name, sku, category, sale_price, stock, created_at, updated_at) VALUES (1, 'HG Saksı Toprağı 5 Kg', 'HG-S5', 'Bahçe › Saksı Toprakları', 100, 5, ${t}, ${t})`);
+  await run(db, "INSERT INTO listings (channel, remote_id, product_id, price, remote_stock) VALUES ('ikas1', 'v1', 1, 120, 4)");
+  const U = { name: 'Yönetici' }, api = (path, m, b = {}) => catalogApi({ DEMO: '1' }, db, null, path, m, {}, b, U);
+  await api('catalog/automap', 'POST', { channel: 'hepsiburada' });
+  const first1 = await first(db, "SELECT remote_id, remote_name FROM category_suggest WHERE channel = 'hepsiburada'");
+  await api('catalog/suggest/reject', 'POST', { channel: 'hepsiburada', local: 'Bahçe › Saksı Toprakları' });
+  await api('catalog/automap', 'POST', { channel: 'hepsiburada', redo: true });
+  const second = await first(db, "SELECT remote_id, rejected FROM category_suggest WHERE channel = 'hepsiburada'");
+  assert.notEqual(second.remote_id, first1.remote_id, 'reddedilen kategori tekrar önerilmedi');
+  assert.deepEqual(JSON.parse(second.rejected), [first1.remote_id]);
+  // Eski sürümün onaysız (Otomatik) eşleştirmesi öneriye döner, elle yapılan kalır
+  await run(db, "INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES ('A', 'trendyol', '5', 'X', '{}', 1, 'Otomatik'), ('B', 'trendyol', '6', 'Y', '{}', 1, 'Yönetici')");
+  await run(db, "DELETE FROM settings WHERE k = 'once:catsuggest_1'");
+  const st = await api('catalog/state', 'GET');
+  assert.deepEqual(st.maps.filter((x) => x.channel === 'trendyol').map((x) => x.local), ['B']);
+  assert.ok(st.suggestions.some((x) => x.local === 'A' && x.remote_id === '5'));
   resetChannels();
 });
 

@@ -1,8 +1,10 @@
-// Servis çalışanı: (1) uygulama dosyaları cihazda saklanır, panel ağı beklemeden açılır; (2) anlık bildirim.
-// Veri (/api/*) hiçbir zaman saklanmaz, her zaman sunucudan gelir. Yeni yayında panel sürüm farkını görür,
-// saklanan dosyaları siler ve sayfayı bir kez yeniler (app.js → checkBuild).
-const SHELL = 'shell-v2';
+// Servis çalışanı: (1) uygulama dosyaları cihazda yedeklenir (ağ yoksa / çok yavaşsa panel yine açılır); (2) anlık bildirim.
+// Veri (/api/*) hiçbir zaman saklanmaz, her zaman sunucudan gelir.
+// Uygulama dosyaları ÖNCE AĞDAN alınır (4 sn içinde gelmezse cihazdaki kopya): yeni yayından sonra eski ve yeni dosyaların
+// (ör. yeni app.js + eski core.js) karışıp panelin boş ekranda takılması böyle önlenir.
+const SHELL = 'shell-v3';
 const DEV = /^(localhost|127\.0\.0\.1)$/.test(self.location.hostname);
+const NET_WAIT = 4000;
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -19,17 +21,19 @@ self.addEventListener('fetch', (e) => {
   if (DEV || req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.search) return;
   // Sayfa adresi (/, /?firma=…) tek kayıt: index.html
   const key = req.mode === 'navigate' ? '/' : url.pathname;
-  // Saklanan dosya anında verilir, aynı anda ağdan yenisi alınıp saklanır (bir sonraki açılış her zaman güncel);
-  // ağdan alınırken tarayıcının HTTP önbelleği atlanır (yeni yayında eski CSS / JS karışmasın)
   e.respondWith((async () => {
     const cache = await caches.open(SHELL);
-    const hit = await cache.match(key);
+    // Ağdan alınırken tarayıcının HTTP önbelleği doğrulanır (no-cache): değişmeyen dosya hızlıca 304 ile gelir
     const net = fetch(req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' })).then((res) => {
       if (res.ok && res.type === 'basic') cache.put(key, res.clone()).catch(() => {});
       return res;
     });
+    const slow = new Promise((ok) => setTimeout(ok, NET_WAIT, null));
+    const first = await Promise.race([net.catch(() => null), slow]);
+    if (first) return first;
+    const hit = await cache.match(key);
     if (hit) { e.waitUntil(net.catch(() => {})); return hit; }
-    return net;
+    return net; // cihazda kopya yoksa ağ beklenir
   })());
 });
 self.addEventListener('message', (e) => {

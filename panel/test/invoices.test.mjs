@@ -79,7 +79,7 @@ test('Gelir & gider: sipariş bazında kargo gelmeyen kanalda dönemin kargo fat
   const b = await breakdown(db, settings, {});
   const ty = b.channels.find((c) => c.channel === 'trendyol'), hb = b.channels.find((c) => c.channel === 'hepsiburada');
   assert.equal(ty.shipping, 85.5); assert.equal(ty.shippingSrc, 'invoice'); assert.equal(ty.payout, 200 - 85.5);
-  assert.equal(hb.shipping, 0); assert.equal(hb.shippingSrc, 'estimate');
+  assert.equal(hb.shipping, 0); assert.equal(hb.shippingSrc, 'none');
   assert.equal(b.total.shipping, 85.5); assert.equal(b.total.payout, 300 - 85.5);
   assert.match(b.steps.find((x) => x.k === 'shipping').note, /kargo faturaları toplamı/);
 });

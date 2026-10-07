@@ -4,6 +4,7 @@
 //  3) Siparişlerdeki ürünleri ortak stoktan düş (iptalde geri ekle) — sipariş başına kayıt tutulur, çift düşüm olmaz
 //  4) Her ilanın olması gereken stoğunu (kanal kuralına göre) hesapla; kanaldakiyle farklıysa gönder
 //  Başarısız adım bir kez daha denenir; üst üste başarısız olursa Bildirimler'e yazılır.
+import { compareFetched, checkMissing } from './orderclean.js';
 import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { typeOf } from './config.js';
@@ -58,6 +59,11 @@ async function productMaps(db) {
 
 // ---------- siparişleri kaydet ----------
 export async function saveOrders(db, ch, orders, maps) {
+  if (!orders.length) return [];
+  // Panelden silinen siparişler yeniden alınmaz (bkz. orderclean.js)
+  const dead = new Set();
+  for (const part of chunk(orders.map((o) => `${ch}:${o.remoteId}`), 90)) for (const r of await all(db, `SELECT id FROM deleted_orders WHERE id IN (${part.map(() => '?').join(',')})`, ...part)) dead.add(r.id);
+  if (dead.size) orders = orders.filter((o) => !dead.has(`${ch}:${o.remoteId}`));
   if (!orders.length) return [];
   maps = maps || await productMaps(db);
   const ids = orders.map((o) => `${ch}:${o.remoteId}`);
@@ -514,6 +520,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
     // Eski açık siparişler: kanaldan yeniden sorgulanır; 30 günü geçip hâlâ açık görünen tamamlandı sayılır
     if (!only) out.stale = await staleOrders(env, db, chans, maps).catch((e) => 'hata: ' + e.message);
+    // Kanalda bulunamayan açık siparişler (silinmiş / deneme siparişi, kaldırılmış mağaza)
+    if (!only) out.missing = await checkMissing(env, db).catch((e) => 'hata: ' + e.message);
     // Eski siparişlerde bulunan iptal / iade ve bu senkronda kabul edilen iade talepleri: stok hemen düzeltilir
     await applyClaimReturns(db).catch(() => 0);
     out.stockMoves += await applyDirtyStock(db, settings).catch(() => 0);
@@ -697,7 +705,9 @@ export async function staleOrders(env, db, chans, maps) {
     try {
       const orders = await ch.fetchOrders(old.m - 3600e3, t, { byOrdered: true });
       const ids = await saveOrders(db, ch.id, orders, maps || await productMaps(db));
-      await setSetting(db, key, { at: t, open: old.n, fetched: orders.length, changed: ids.length });
+      // Kanaldan dönmeyen açık siparişler (tek sipariş sorgusu olan kanallar ayrıca kesin kontrol edilir: checkMissing)
+      const gone = ch.orderExists ? 0 : await compareFetched(db, ch, old.m, t - 2 * D, orders).catch(() => 0);
+      await setSetting(db, key, { at: t, open: old.n, fetched: orders.length, changed: ids.length, ...(gone ? { missing: gone } : {}) });
       out[ch.id] = ids.length;
     } catch (e) {
       await setSetting(db, key, { at: t, open: old.n, error: e.message.slice(0, 300) });

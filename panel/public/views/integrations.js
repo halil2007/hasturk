@@ -18,14 +18,15 @@ const HELP = {
   koctas: 'Koçtaş pazaryeri (Mirakl satıcı paneli) → sağ üst kullanıcı menüsü → API Anahtarı. Siparişleri onaylama, kargo/takip bildirimi, stok ve fiyat desteklenir.',
   shopify: 'Shopify yönetimi → Ayarlar → Uygulamalar ve satış kanalları → Uygulama geliştir → özel uygulama oluşturun; Admin API izinleri: ürünler, siparişler, stok, lokasyonlar, gönderimler (okuma + yazma). Yükledikten sonra verilen shpat_… belirtecini girin.',
   woocommerce: 'WordPress yönetimi → WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (İzin: Okuma/Yazma). Site HTTPS olmalı; kalıcı bağlantılar "Yazı adı" gibi açık olmalı.',
+  opencart: 'OpenCart\'ın hazır bir yönetim API\'si olmadığından bağlantı küçük bir PHP dosyasıyla kurulur: Bağlantı dosyasını indirin, OpenCart\'ın kurulu olduğu ana klasöre (config.php\'nin yanına) yükleyin, site adresini girip bağlantıyı test edin. Dosya veritabanına OpenCart\'ın kendi bilgileriyle bağlanır, yalnız panelin anahtarıyla çalışır. Siparişler, ürünler (seçenekler ayrı varyant), stok, fiyat ve kargo bildirimi desteklenir. Site HTTPS olmalı.',
   etsy: 'etsy.com/developers → Create a New App (keystring + shared secret); uygulamayı mağazanız için OAuth ile yetkilendirip refresh token alın. Siparişler, stok, fiyat ve kargo bildirimi desteklenir; panel yenilenen belirteci kendisi saklar.',
 };
 // Test modülü: bu kanallar ana panelde bağlanıp denenir; müşteri panellerinde "Yakında" görünür
-const BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'etsy'];
+const BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'opencart', 'etsy'];
 
 // Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
 const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama', ...BETA];
-const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', etsy: 'Etsy' };
+const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', etsy: 'Etsy' };
 // Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi): müşteri panellerinde test modülündekiler de burada
 const SOON = () => [...(state.tenant ? BETA.map((t) => TYPE_NAME[t]) : []), 'Teknosa', 'Turkcell Pasaj'];
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
@@ -33,7 +34,7 @@ const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>`
 
 // Kanal kurulmuş mu: bağlı, örnek veriyle çalışıyor ya da panelde bilgi girilmiş (test bekliyor)
 const configured = (c) => c.enabled || c.demo || c.fields.some((f) => f.source) || c.extra;
-const SITES = ['ikas', 'shopify', 'woocommerce'];
+const SITES = ['ikas', 'shopify', 'woocommerce', 'opencart'];
 // Satıcı panelleri (bilgilerin alındığı yer)
 const PANEL_URL = { trendyol: 'https://partner.trendyol.com', hepsiburada: 'https://merchant.hepsiburada.com', n11: 'https://so.n11.com', amazon: 'https://sellercentral.amazon.com.tr', etsy: 'https://www.etsy.com/developers/your-apps', pazarama: 'https://isortagim.pazarama.com' };
 const panelUrl = (c) => (c.type === 'ikas' ? ((c.fields.find((f) => /STORE$/.test(f.k)) || {}).value ? `https://${c.fields.find((f) => /STORE$/.test(f.k)).value}.myikas.com/admin` : 'https://ikas.com') : PANEL_URL[c.type] || '');
@@ -116,6 +117,14 @@ export async function integrations(el, rest = []) {
     return f2 ? html`<div class="ih-field"><div class="tiny muted">Seçili alan</div><b>${f2.label}${f2.req ? ' *' : ''}</b><div class="small">${f2.hint || (f2.secret ? 'Gizli bilgi: şifreli saklanır, ekranda tekrar gösterilmez.' : 'Kanalın satıcı panelindeki değerin aynısını girin.')}</div>${f2.secret ? html`<div class="tiny muted" style="margin-top:4px">Boş bırakırsanız kayıtlı değer korunur.</div>` : ''}</div>`
       : html`<div class="ih-field muted small">Bir alana tıkladığınızda o alanın açıklaması burada görünür.</div>`;
   }
+  // OpenCart: panel sitedeki bağlantı dosyasıyla konuşur; dosya kanalın anahtarı gömülü olarak sunucudan indirilir
+  function ocBridge(c, admin) {
+    const hasKey = c.fields.some((x) => x.k === 'OPENCART_KEY' && x.source);
+    return html`<div class="notice small"><i class="ico ico-download"></i><div style="min-width:0"><b>Bağlantı dosyası</b> · OpenCart'ın yönetim API'si olmadığından panel, sitenize yükleyeceğiniz küçük bir PHP dosyasıyla bağlanır.
+      <ol class="ih-steps small" style="margin:6px 0"><li><b>Bağlantı dosyasını indirin</b> (anahtar dosyaya yazılır ve burada şifreli saklanır)</li><li>Dosyayı FTP ya da hosting dosya yöneticisiyle OpenCart'ın kurulu olduğu <b>ana klasöre (config.php'nin yanına)</b> yükleyin; adını değiştirmeyin</li><li>Site adresini yazıp <b>Kaydet ve bağlantıyı test et</b>'e basın</li></ol>
+      ${admin ? html`<button class="btn sm primary" data-act="ocbridge" data-id="${c.id}"><i class="ico ico-download"></i>Bağlantı dosyasını indir</button>` : ''}
+      <div class="tiny muted" style="margin-top:6px">${hasKey ? 'Yeniden indirirseniz aynı anahtar kullanılır. Anahtarı değiştirmek için kayıtlı anahtarı silip dosyayı yeniden indirin ve sitedeki dosyayı değiştirin.' : 'Anahtar ilk indirmede oluşturulur.'} Dosya yalnız bu anahtarla çalışır; kimseyle paylaşmayın.</div></div></div>`;
+  }
   function detail() {
     const c = data.channels.find((x) => x.id === id);
     if (!c) { render(el, html`<div class="stack"><a class="link" href="#/entegrasyonlar">← Entegrasyonlar</a><div class="card empty">Kanal bulunamadı</div></div>`); return; }
@@ -152,6 +161,7 @@ export async function integrations(el, rest = []) {
             ${c.last && c.last.ok === false ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error || 'ayrıntı yok — Tanılama ile kontrol edin'}<div class="tiny muted">${c.last.nextTry ? `Sonraki otomatik deneme ${dateTime(c.last.nextTry)}.` : '15 dakikada bir otomatik yeniden denenir.'}</div></div></div>` : ''}
             ${c.last && c.last.listingsError ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Ürün / stok alınamadı:</b> ${c.last.listingsError}</div></div>` : ''}
             ${c.last && c.last.note && !c.last.error ? html`<div class="notice small"><i class="ico ico-check"></i><div>${c.last.note}</div></div>` : ''}
+            ${c.type === 'opencart' ? ocBridge(c, admin) : ''}
             <div class="form-grid">${basic.map((x) => field(c, x))}</div>
             ${adv.length ? html`<details class="adv"><summary>Gelişmiş ayarlar (${adv.length})</summary><div class="form-grid" style="margin-top:10px">${adv.map((x) => field(c, x))}</div></details>` : ''}
             ${admin ? html`<div class="row wrap" style="gap:8px"><button class="btn primary" data-act="test" data-id="${c.id}"><i class="ico ico-key"></i>Kaydet ve bağlantıyı test et</button><button class="btn" data-act="save" data-id="${c.id}">Yalnız kaydet</button></div>` : html`<div class="muted small">Bağlantı bilgilerini yalnız yönetici değiştirebilir.</div>`}
@@ -219,6 +229,18 @@ export async function integrations(el, rest = []) {
       if (box) render(box, html`<div class="notice ${r.ok ? 'good' : 'bad'}"><i class="ico ico-${r.ok ? 'check' : 'warn'}"></i><div>${r.message}${r.ok ? '' : html`<div class="tiny muted" style="margin-top:4px">Bilgileri kontrol edin ya da adım adım denemek için <b>Tanılama</b>'ya basın.</div>`}</div></div>`);
     }),
     sync: (t) => busy(t, async () => { const r = await api('sync', { method: 'POST', body: { channels: [t.dataset.id], force: true, listings: true } }); const v = (r.channels || {})[t.dataset.id]; toast(typeof v === 'string' ? v : `${v ?? 0} sipariş kontrol edildi`, typeof v === 'string'); await after(); }),
+    // Önce formdaki bilgiler kaydedilir (yazılan site adresi kaybolmasın), sonra anahtarlı dosya indirilir
+    ocbridge: (t) => busy(t, async () => {
+      const cid = t.dataset.id;
+      await api('integrations/' + cid, { method: 'PUT', body: { values: values(cid) } });
+      const res = await fetch('/api/opencart-bridge?channel=' + encodeURIComponent(cid), { credentials: 'same-origin' });
+      if (!res.ok) { let msg = ''; try { msg = (await res.json()).error; } catch { /* boş */ } throw new Error(msg || 'Bağlantı dosyası indirilemedi'); }
+      const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || 'hasturk-baglanti.php';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(await res.blob()); a.download = name; document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast(`${name} indirildi: OpenCart ana klasörüne (config.php'nin yanına) yükleyin`); await after();
+    }),
     import: () => importDialog(after),
     remove: async (t) => {
       const cid = t.dataset.id;

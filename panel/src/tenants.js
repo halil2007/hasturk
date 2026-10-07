@@ -364,7 +364,7 @@ export async function tenantApi(req, env, db, path, user) {
 
 // ---------- müşteri panelinin kendisi (Durable Object) ----------
 export class TenantPanel {
-  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; this.pf = null; this.pfAt = 0; this.perf = new PerfBuffer(); }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.db = doD1(ctx.storage); this.t = null; this.tenv = null; this.pf = null; this.pfAt = 0; this.perf = new PerfBuffer(); this.fresh = true; }
   // Platform değerleri ana veritabanından 10 dakikada bir okunur; değişince ortam yeniden kurulur
   async platform() {
     if (this.pf && Date.now() - this.pfAt < 600e3) return;
@@ -385,12 +385,20 @@ export class TenantPanel {
     if (this.t && !this.tenv) this.tenv = tenantEnv(this.env, this.t, this.pf || {});
     return this.tenv;
   }
+  // Nesne yeni başladıysa (yeni yayın / yeniden başlatma) önceki örneğin yarıda kalan senkron kilidi geçersizdir: hemen bırakılır
+  // (yoksa 10 dakika boyunca "Senkron şu an çalışıyor" denir ve senkron bekler). Bu nesnede aynı anda başka örnek çalışmaz.
+  unlockStale() {
+    if (!this.fresh) return;
+    this.fresh = false;
+    try { this.ctx.storage.sql.exec("DELETE FROM settings WHERE k IN ('sync_lock', 'quick_lock')"); } catch { /* tablo henüz yok */ }
+  }
   async schedule() { if (!(await this.ctx.storage.get('suspended')) && !(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + SYNC_MS); }
   async fetch(req) {
     // Silinmiş firma: önbellekteki eski kayıtla gelen istek veriyi / zamanlayıcıyı yeniden oluşturmasın (yalnız yeniden kurulum)
     if (await this.ctx.storage.get('destroyed') && new URL(req.url).pathname !== '/__admin') return json({ error: 'Müşteri paneli yok' }, 404);
     const env = await this.meta(req);
     if (!env) return json({ error: 'Müşteri paneli tanımsız' }, 400);
+    this.unlockStale();
     const url = new URL(req.url);
     if (url.pathname === '/__admin') return this.adminOp(env, await req.json().catch(() => ({})));
     // Dış API: anahtar Worker'da doğrulandı (bu yol yalnız Worker içinden gelir; tarayıcı istekleri /api/ ile başlar)
@@ -529,6 +537,7 @@ export class TenantPanel {
   // 15 dakikada bir: siparişler, ürünler, stoklar (ana paneldeki zamanlanmış senkronun aynısı); ardından kullanım özeti ana kayda yazılır
   async alarm() {
     const env = await this.meta();
+    this.unlockStale();
     if (!env || await this.ctx.storage.get('suspended') || await this.ctx.storage.get('destroyed')) return;
     // Sonraki tur baştan kurulur: bu tur yarıda kesilse (süre sınırı, güncelleme) bile senkron durmaz
     await this.ctx.storage.setAlarm(Date.now() + SYNC_MS);

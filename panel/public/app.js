@@ -1,5 +1,5 @@
 // Panel uygulaması: gruplu yan menü, üst çubuk, alt menü (telefon), yönlendirme (#/sayfa/...?filtre=...), giriş, senkron, bildirimler.
-import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder } from './core.js';
+import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder, themeOf, applyTheme } from './core.js';
 import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
 import { products } from './views/products.js';
@@ -33,7 +33,7 @@ const ROUTES = [
   { sec: 'Satış' },
   { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders', perm: 'orders' },
   { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo', perm: 'cargo' },
-  { path: 'iadeler', title: 'İadeler', icon: 'back', view: claimsView, count: 'claims', perm: 'returns' },
+  { path: 'iadeler', title: 'İadeler', icon: 'return', view: claimsView, count: 'claims', perm: 'returns' },
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', perm: 'questions' },
   { sec: 'Ürünler' },
   // Gruplu sayfalar: menüde grup tek satır; grubun sayfaları sayfanın üstünde sekme olarak (tab: sekme adı)
@@ -51,7 +51,7 @@ const ROUTES = [
   { path: 'musteriler', title: 'Müşteriler', tab: 'Müşteriler', icon: 'user', view: customersView, perm: 'reports', group: 'rapor' },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
-  { path: 'kullanicilar', title: 'Personel', icon: 'user', view: users, admin: true },
+  { path: 'kullanicilar', title: 'Personel', icon: 'team', view: users, admin: true },
   { path: 'firmalar', title: 'Firmalar', icon: 'grid', view: firmsView, admin: true, when: () => !!state.owner },
   { path: 'paketim', title: 'Paketim', icon: 'tag', view: billingView, admin: true, when: () => !!state.tenant && !state.demo },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
@@ -198,7 +198,7 @@ async function route() {
 // fresh = false: sayfa açılışında önbellekteki özet anında kullanılır (arka planda tazelenir)
 export async function loadSummary(fresh = true) {
   const s = await api('summary', { fresh });
-  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.tenant = s.tenant || null; state.owner = !!s.owner; state.demo = s.demo || s.channels.some((c) => c.demo);
+  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.summaryAt = Date.now(); state.user = s.user; state.tenant = s.tenant || null; state.owner = !!s.owner; state.demo = s.demo || s.channels.some((c) => c.demo);
   refreshChrome(s);
   refreshCount();
   // Firma panelinde hata mesajlarından tek tıkla destek talebi (ana panel talepleri kendisi yanıtlar)
@@ -239,7 +239,7 @@ async function bell(btn) {
 }
 
 function meMenu(btn) {
-  const theme = store.get('theme', 'auto');
+  const theme = themeOf();
   const setTheme = (t) => { store.set('theme', t); applyTheme(); };
   const u = state.user || {};
   popMenu(btn, [
@@ -264,10 +264,6 @@ function changePassword() {
   });
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => { await api('me/password', { method: 'POST', body: { old: $('[data-old]', s.el).value, new: $('[data-new]', s.el).value } }); toast('Şifre değişti, tekrar giriş yapın'); setTimeout(() => location.reload(), 1200); });
 }
-function applyTheme() {
-  const t = store.get('theme', 'auto');
-  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
-}
 
 // Telefon menüsü: firma / kullanıcı başlığı, menüde arama, bölümlere ayrılmış simge ızgarası, hesap işlemleri
 const SEC_TONE = { '': 'blue', 'Satış': 'blue', 'Ürünler': 'purple', 'Raporlar': 'green', 'Sistem': 'gray' };
@@ -291,7 +287,7 @@ function moreMenu() {
       <div class="mm-list">
         <button data-mm-act="help"><i class="ico ico-help"></i>Bu sayfa nasıl kullanılır?</button>
         <button data-mm-act="sync"><i class="ico ico-sync"></i>Şimdi senkronla<span class="muted tiny" style="margin-left:auto">${ago(Math.max(0, ...state.channels.map((c) => (c.last && c.last.at) || 0)))}</span></button>
-        <button data-mm-act="theme"><i class="ico ico-bolt"></i>Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[store.get('theme', 'auto')]}</button>
+        <button data-mm-act="theme"><i class="ico ico-bolt"></i>Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[themeOf()]}</button>
         ${u.id > 0 ? html`<button data-mm-act="pass"><i class="ico ico-key"></i>Şifremi değiştir</button>` : ''}
         <button data-mm-act="logout" class="danger"><i class="ico ico-x"></i>Çıkış yap</button>
       </div>`,
@@ -310,7 +306,7 @@ function moreMenu() {
     const a = b.dataset.mmAct;
     if (a === 'sync') { s.close(); sync(); }
     if (a === 'help') { s.close(); openHelp(currentPath || '', (page) => openTicketForm({ category: 'question', subject: `${page} sayfası hakkında` })); }
-    if (a === 'theme') { const order = ['auto', 'light', 'dark'], t = order[(order.indexOf(store.get('theme', 'auto')) + 1) % 3]; store.set('theme', t); applyTheme(); b.lastChild.textContent = `Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[t]}`; }
+    if (a === 'theme') { const order = ['light', 'dark', 'auto'], t = order[(order.indexOf(themeOf()) + 1) % 3]; store.set('theme', t); applyTheme(); b.lastChild.textContent = `Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[t]}`; }
     if (a === 'pass') { s.close(); changePassword(); }
     if (a === 'logout') api('logout', { method: 'POST' }).catch(() => {}).then(() => location.reload());
   });
@@ -482,11 +478,13 @@ function shellCache(build) {
   if (!build) return;
   const old = store.get('build', null);
   store.set('build', build);
-  if (old && old !== build && navigator.serviceWorker.controller && window.caches) caches.delete('shell-v2').finally(() => location.reload());
+  // Yeni yayın: saklanan dosyalar silinir; sayfa YENİLENMEZ (yayın yayılırken eski / yeni sürüm sırayla gelince yenileme döngüsü olmasın).
+  // Uygulama dosyaları zaten ağdan öncelikli alınır (sw.js); eski CSS + yeni JS karışırsa assetsMatch bir kez yeniler.
+  if (old && old !== build && window.caches) caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))).catch(() => {});
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-08m';
+const ASSETS = '2026-10-08u';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');
@@ -498,9 +496,22 @@ function assetsMatch() {
   return false;
 }
 
-async function start() {
-  if (!assetsMatch()) return;
-  try { await loadSummary(); } catch { return; }
+// Açılış: özet alınamazsa (yeni yayın anı, geçici sunucu hatası) boş ekranda kalınmaz — kendiliğinden 3 kez yeniden denenir,
+// sonra "Tekrar dene" düğmesi gösterilir. Giriş gerekiyorsa giriş ekranı açılmıştır (login), bir şey yapılmaz.
+async function start(attempt = 0) {
+  if (!attempt && !assetsMatch()) return;
+  try { await loadSummary(); } catch (e) {
+    if (e.auth || document.querySelector('.login')) return;
+    const view = $('#view'), wait = [2, 5, 10][attempt];
+    if (view) render(view, html`<div class="empty" data-boot-error style="padding:48px 16px"><i class="ico ico-warn"></i><div style="margin:8px 0"><b>Panel açılamadı.</b> ${e.message}</div>
+      ${wait ? html`<div class="muted small">${wait} sn içinde yeniden denenecek…</div>` : ''}<button class="btn primary" data-boot-retry style="margin-top:10px"><i class="ico ico-sync"></i>Tekrar dene</button></div>`);
+    const retry = () => { clearTimeout(t); start(attempt + 1); };
+    const t = wait ? setTimeout(retry, wait * 1000) : null;
+    const b = $('[data-boot-retry]'); if (b) b.onclick = () => (attempt >= 3 ? location.reload() : retry());
+    window.__booted = true;
+    return;
+  }
+  window.__booted = true;
   shellCache(state.summary.build);
   nav();
   refreshChrome();
@@ -590,6 +601,8 @@ document.addEventListener('click', (e) => {
   input.addEventListener('blur', () => setTimeout(close, 180));
   input.addEventListener('focus', () => { if (input.value.trim().length >= 2 && box.childElementCount) box.hidden = false; });
 })();
-setInterval(() => { loadSummary().catch(() => {}); }, 3 * 60e3);
+// Özet 3 dakikada bir tazelenir; sekme arka plandayken sunucu boşuna meşgul edilmez (öne gelince hemen tazelenir)
+setInterval(() => { if (document.visibilityState === 'visible') loadSummary().catch(() => {}); }, 3 * 60e3);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.summary && Date.now() - (state.summaryAt || 0) > 3 * 60e3) loadSummary().catch(() => {}); });
 start();
 export { ago };

@@ -1,16 +1,17 @@
 // Siparişler: kanal sekmeleri, arama / tarih / kargo filtresi, durum sekmeleri, toplu işlem, satır içi sipariş işlemleri, sayfalama.
-import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel, activeChannels, lateBadge, extNote } from '../core.js';
+import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel, activeChannels, lateBadge, extNote, isAdmin, confirmBox } from '../core.js';
 import { mountOps, openOrder, bulkLabels } from './orderops.js';
 import { loadSummary, setQuery } from '../app.js';
 import { pickSheet } from './picklist.js';
 
 // İlk sekme Yeni (açılışta seçili), Tümü en sonda
-const STATUS_TABS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['late', 'Geciken'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade'], ['all', 'Tümü']];
+// Ayrı "Geciken" sekmesi yok: gecikme ihtimali olan siparişler Yeni / Hazırlanıyor listesinde "Gecikme riski" etiketiyle görünür
+const STATUS_TABS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade'], ['all', 'Tümü']];
 
 export async function orders(el, rest, query = {}) {
-  const f = { channel: query.channel || '', status: query.status || (query.q ? 'all' : 'new'), q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', page: 1, limit: 25 };
+  const f = { channel: query.channel || '', status: (query.status === 'late' ? '' : query.status) || (query.q || query.missing ? 'all' : 'new'), q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', missing: query.missing ? '1' : '', page: 1, limit: 25 };
   if (rest[0] === 'kanal') f.channel = rest[1] || '';
-  if (rest[0] === 'durum') f.status = rest[1] || 'new';
+  if (rest[0] === 'durum') f.status = (rest[1] !== 'late' && rest[1]) || 'new';
   if (rest[0] && !['kanal', 'durum'].includes(rest[0])) setTimeout(() => openOrder(rest[0], refresh), 0);
   const sel = new Set();
   let data = { orders: [], counts: {}, total: 0 }, expanded = null, mobile = isMobile();
@@ -29,6 +30,7 @@ export async function orders(el, rest, query = {}) {
       <label class="date-pick" style="min-width:180px"><i class="ico ico-truck"></i><select data-cargo style="border:0;background:transparent;outline:none;font-weight:600;flex:1;min-height:36px"><option value="">Kargo firması</option>${((state.settings && state.settings.cargo_companies) || []).map((c) => html`<option ${f.cargo === c ? 'selected' : ''}>${c}</option>`)}</select></label>
       <button class="btn" data-act="clear"><i class="ico ico-x"></i>Filtreyi temizle</button></div>
     </div>
+    <div data-miss></div>
     <div class="tabs" data-stabs></div>
     <div class="card flush" data-box></div>
   </div>`);
@@ -37,10 +39,18 @@ export async function orders(el, rest, query = {}) {
     render($('[data-chtabs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>
       ${activeChannels().filter((c) => c.enabled || c.demo).map((c) => { const p = (data.pendingByChannel || {})[c.id]; return html`<button class="ch-tab ${f.channel === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}" title="${p ? `${p} sipariş bekliyor` : ''}">${chLogo(c.id)}<span>${c.type === 'ikas' ? html`<b>ikas</b> <span class="small">${c.name}</span>` : c.name}</span>${p ? html`<span class="badge-n">${p}</span>` : ''}</button>`; })}`);
   }
+  // Kanalda bulunamayan siparişler (silinmiş / deneme siparişi, kaldırılmış mağaza): uyarı ve tek tıkla silme
+  function missBar() {
+    const n = data.missing || 0;
+    render($('[data-miss]', el), f.missing
+      ? html`<div class="notice warn"><i class="ico ico-warn"></i><div style="flex:1"><b>Kanalda bulunamayan siparişler gösteriliyor (${n}).</b> Kanalda silinmiş, deneme siparişi ya da kaldırılmış mağazaya ait olabilirler; kanalda kesin bulunamayan açık siparişler iptal sayıldı. Silerseniz stok geri eklenir ve kanaldan yeniden alınmaz.</div>
+          <div class="row wrap">${isAdmin() && n ? html`<button class="btn sm danger" data-act="miss-del"><i class="ico ico-trash"></i>Hepsini sil</button>` : ''}<button class="btn sm" data-act="miss-off">Tüm siparişlere dön</button></div></div>`
+      : n ? html`<div class="notice warn"><i class="ico ico-warn"></i><div style="flex:1"><b>${n} sipariş kanalda bulunamadı.</b> Kanalda silinmiş ya da deneme siparişi olabilir; inceleyip tek tıkla silebilirsiniz.</div><button class="btn sm" data-act="miss-on">İncele</button></div>` : '');
+  }
   function statusTabs() {
     const c = data.counts, total = Object.entries(c).filter(([k]) => k !== 'late').reduce((a, [, x]) => a + x, 0);
     const cnt = (k) => (k === 'all' ? total : c[k] || 0);
-    render($('[data-stabs]', el), html`${STATUS_TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''} ${k === 'late' && cnt(k) ? 'warn-tab' : ''}" data-act="st" data-k="${k}">${k === 'late' && cnt(k) ? html`<b class="late-dot">!</b>` : ''}${t}<span class="n">${cnt(k)}</span></button>`)}`);
+    render($('[data-stabs]', el), html`${STATUS_TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${cnt(k)}</span></button>`)}`);
   }
 
   function actionBtn(o) {
@@ -50,14 +60,14 @@ export async function orders(el, rest, query = {}) {
     return html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-orders"></i>Detay</button>`;
   }
   const products = (o) => html`<div class="row" style="min-width:180px">${thumb(o.items[0] && o.items[0].image, o.items[0] && o.items[0].name, 'sm')}
-    <div style="min-width:0"><div class="ellipsis" style="max-width:200px;font-weight:600">${o.items[0] ? o.items[0].name : '—'}</div>
+    <div style="min-width:0"><div class="ellipsis" style="max-width:200px;font-weight:600" title="${o.items[0] ? o.items[0].name : ''}">${o.items[0] ? o.items[0].name : '—'}</div>
     <div class="muted tiny">${o.lines > 1 ? `+ ${o.lines - 1} ürün daha · ` : ''}${o.qty || 0} adet${o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş</span>` : ''}</div></div></div>`;
   // Durum + uyarılar: gecikme, kanalda yapılan işlem, etiket yazdırma durumu (paket başına)
   const stateCell = (o) => {
     const ext = extNote(o), pk = Math.max(o.packages, 1);
     const lbl = o.printed ? html`<span class="pill good" title="Kargo etiketi yazdırıldı">${o.printed >= pk ? '✓ Etiket yazdırıldı' : `✓ ${o.printed}/${pk} etiket yazdırıldı`}</span>`
       : o.labeled && ['new', 'processing'].includes(o.status) ? html`<span class="pill info">Etiket hazır</span>` : '';
-    return html`<div class="row wrap" style="gap:4px">${statusPill(o.status)}${lateBadge(o)}${lbl}${o.pkg_errors ? html`<span class="pill bad" title="Kanal paket/etiket hatası">Kargo hatası</span>` : ''}${ext ? html`<span class="ext" title="${ext.detail} · ${shortDT(ext.at)}">${ext.text}</span>` : ''}</div>`;
+    return html`<div class="row wrap" style="gap:4px">${statusPill(o.status)}${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">Kanalda yok</span>` : ''}${lateBadge(o)}${lbl}${o.pkg_errors ? html`<span class="pill bad" title="Kanal paket/etiket hatası">Kargo hatası</span>` : ''}${ext ? html`<span class="ext" title="${ext.detail} · ${shortDT(ext.at)}">${ext.text}</span>` : ''}</div>`;
   };
   const pkgCell = (o) => html`<span class="row small" style="white-space:nowrap"><i class="ico ico-truck muted"></i>${Math.max(1, o.packages)} paket${o.cargo ? html` • ${o.cargo}` : ''}</span>`;
 
@@ -86,8 +96,10 @@ export async function orders(el, rest, query = {}) {
   function cards() {
     const from = (data.page - 1) * data.limit;
     // Telefon: kompakt kart; dokununca sipariş tam ekran açılır (işlemler, paketler, etiket orada)
-    const item = (o) => o.items[0] ? html`<div class="oc-item">${thumb(o.items[0].image, o.items[0].name, 'sm')}<div style="min-width:0"><div class="ellipsis oc-name">${o.items[0].name}</div>
-      <div class="muted tiny">${o.lines > 1 ? `+${o.lines - 1} ürün · ` : ''}${o.qty || 0} adet${o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş</span>` : ''}</div></div></div>` : '';
+    // Ürün adları tam görünür (satıra sığmazsa alt satıra geçer); en fazla 2 ürün, kalanı "+N ürün daha"
+    const item = (o) => o.items.length ? html`<div class="oc-items">${o.items.map((it) => html`<div class="oc-item">${thumb(it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="oc-name">${it.name}</div>
+      <div class="muted tiny">${it.qty || 0} adet${it.sku ? ` · ${it.sku}` : ''}</div></div></div>`)}
+      ${o.lines > o.items.length || o.unmatched ? html`<div class="muted tiny" style="padding:0 4px">${o.lines > o.items.length ? `+${o.lines - o.items.length} ürün daha · toplam ${o.qty || 0} adet` : ''}${o.lines > o.items.length && o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş ürün var</span>` : ''}</div>` : ''}</div>` : '';
     const mainBtn = (o) => (o.status === 'new' ? html`<button class="btn sm primary" data-act="accept" data-id="${o.id}"><i class="ico ico-play"></i>İşleme al</button>`
       : o.status === 'processing' ? html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Kargola</button>`
         : o.status === 'shipped' ? html`<button class="btn sm ghost" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Takip</button>` : '');
@@ -111,6 +123,7 @@ export async function orders(el, rest, query = {}) {
       <button class="btn sm outline" data-act="bulk-accept"><i class="ico ico-play"></i>İşleme al</button>
       <button class="btn sm outline" data-act="bulk-label"><i class="ico ico-tag"></i>Toplu etiket oluştur</button>
       <button class="btn sm outline" data-act="bulk-print"><i class="ico ico-print"></i>Yazdır</button>
+      ${isAdmin() ? html`<button class="btn sm danger ghost" data-act="bulk-del"><i class="ico ico-trash"></i>Sil</button>` : ''}
       <button class="icon-btn" data-act="clearsel" aria-label="Seçimi temizle"><i class="ico ico-x"></i></button></div>` : '';
   }
   function draw() {
@@ -120,12 +133,12 @@ export async function orders(el, rest, query = {}) {
     if (box) mountOps(box, expanded, { mode: 'expand', onChange: () => { load(); loadSummary().catch(() => {}); } });
     $('[data-sub]', el).textContent = `${data.total} sipariş${f.from || f.to ? ` · ${rangeLabel(f.from || f.to, f.to || f.from)}` : ''}${f.channel ? ` · ${ch(f.channel).name}` : ` · ${activeChannels().filter((c) => c.enabled || c.demo).length} satış kanalı`}`;
   }
-  const params = () => { const p = new URLSearchParams({ status: f.status, page: f.page, limit: f.limit }); for (const k of ['channel', 'q', 'from', 'to', 'cargo']) if (f[k]) p.set(k, f[k]); return p; };
+  const params = () => { const p = new URLSearchParams({ status: f.status, page: f.page, limit: f.limit }); for (const k of ['channel', 'q', 'from', 'to', 'cargo', 'missing']) if (f[k]) p.set(k, f[k]); return p; };
   async function load() {
     // Üzerinde çalışılan (açık) sipariş, durumu değişip filtre dışına çıksa da yerinde kalır
     const i = expanded ? data.orders.findIndex((o) => o.id === expanded) : -1;
     const keep = i >= 0 ? data.orders[i] : null;
-    setQuery({ status: f.status, channel: f.channel, q: f.q, from: f.from, to: f.to, cargo: f.cargo });
+    setQuery({ status: f.status, channel: f.channel, q: f.q, from: f.from, to: f.to, cargo: f.cargo, missing: f.missing });
     data = await api('orders?' + params());
     if (keep) {
       const fresh = data.orders.find((o) => o.id === keep.id);
@@ -135,9 +148,19 @@ export async function orders(el, rest, query = {}) {
         data.orders.splice(Math.min(i, data.orders.length), 0, keep);
       }
     }
-    chTabs(); statusTabs(); draw();
+    chTabs(); missBar(); statusTabs(); draw();
   }
   const refresh = () => load().catch((e) => toast(e.message, true));
+  async function delOrders(t, ids) {
+    if (!ids.length) return;
+    if (!(await confirmBox(`${ids.length} sipariş panelden silinsin mi? Düşülen stok geri eklenir, siparişler raporlardan çıkar ve kanaldan yeniden alınmaz. Kanaldaki siparişler etkilenmez. Bu işlem geri alınamaz.`, 'Sil'))) return;
+    await busy(t, async () => {
+      const r = await api('orders-bulk', { method: 'POST', body: { ids, action: 'delete' } });
+      toast(`${r.deleted} sipariş silindi; stok geri eklendi`);
+      sel.clear(); if (f.missing && r.deleted >= (data.missing || 0)) Object.assign(f, { missing: '', status: 'new' });
+      await load(); loadSummary().catch(() => {});
+    });
+  }
 
   actions(el, {
     ch: (t) => { f.channel = t.dataset.id; f.page = 1; sel.clear(); refresh(); },
@@ -172,6 +195,13 @@ export async function orders(el, rest, query = {}) {
     }),
     'bulk-label': (t) => busy(t, async () => { await bulkLabels([...sel], { fetch: true, done: load }); await load(); }),
     'bulk-print': (t) => busy(t, async () => { await bulkLabels([...sel], { fetch: false }); }),
+    'bulk-del': (t) => delOrders(t, [...sel]),
+    'miss-on': () => { Object.assign(f, { missing: '1', status: 'all', page: 1 }); sel.clear(); refresh(); },
+    'miss-off': () => { Object.assign(f, { missing: '', status: 'new', page: 1 }); sel.clear(); refresh(); },
+    'miss-del': async (t) => {
+      const r = await api('orders?' + new URLSearchParams({ status: 'all', missing: '1', limit: 200, page: 1 })).catch((e) => { toast(e.message, true); return null; });
+      if (r) await delOrders(t, r.orders.map((o) => o.id));
+    },
   });
   // Satıra tıklayınca işlemleri aç/kapat (kutucuk ve düğmeler hariç)
   el.addEventListener('click', (e) => {

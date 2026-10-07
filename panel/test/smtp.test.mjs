@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { smtpSend } from '../src/smtp.js';
 
 // Sahte SMTP sunucusu: gelen satırlara sırayla cevap verir
-function fakeConnect(log, { failAuth = false } = {}) {
+function fakeConnect(log, { failAuth = false, reject = '' } = {}) {
   const make = (tls) => {
     const enc = new TextEncoder(), dec = new TextDecoder();
     let push; const q = [];
@@ -18,7 +18,8 @@ function fakeConnect(log, { failAuth = false } = {}) {
       else if (line === 'AUTH LOGIN') push('334 VXNlcm5hbWU6\r\n');
       else if (log.filter((l) => /334|AUTH/.test(l)).length && /^[A-Za-z0-9+/=]+$/.test(line) && !log.includes('pass-sent')) {
         if (log.includes('user-sent')) { log.push('pass-sent'); push(failAuth ? '535 Authentication failed\r\n' : '235 OK\r\n'); } else { log.push('user-sent'); push('334 UGFzc3dvcmQ6\r\n'); }
-      } else if (/^MAIL FROM|^RCPT TO/.test(line)) push('250 OK\r\n');
+      } else if (reject && line === `RCPT TO:<${reject}>`) push('550 No such user\r\n');
+      else if (/^MAIL FROM|^RCPT TO|^RSET/.test(line)) push('250 OK\r\n');
       else if (line === 'DATA') { data = true; push('354 Go\r\n'); } else if (line === 'QUIT') push('221 Bye\r\n');
     };
     const writable = new WritableStream({ write(chunk) { buf += dec.decode(chunk); let i; while ((i = buf.indexOf('\r\n')) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 2); reply(l); } } });
@@ -47,4 +48,15 @@ test('SMTP 587: STARTTLS sonra kimlik; hatalı şifre anlaşılır mesajla döne
   assert.ok(log.indexOf('starttls') > 0 && log.findIndex((l) => l === 'tls> AUTH LOGIN') > log.indexOf('starttls'));
   await assert.rejects(smtpSend({ ...MAIL, port: 465 }, { connect: fakeConnect([], { failAuth: true }) }), /şifre.*535/);
   await assert.rejects(smtpSend({ ...MAIL, port: 25 }, { connect: fakeConnect([]) }), /465/);
+});
+
+test('SMTP: her alıcıya ayrı ileti (alıcılar birbirini görmez); hatalı adres diğerlerini durdurmaz', async () => {
+  const log = [];
+  const r = await smtpSend({ ...MAIL, to: ['a@firma.com', 'yok@firma.com', 'b@firma.com'], port: 465 }, { connect: fakeConnect(log, { reject: 'yok@firma.com' }) });
+  const to = log.filter((l) => l.startsWith('tls> To: '));
+  assert.deepEqual(to, ['tls> To: a@firma.com', 'tls> To: b@firma.com']);
+  assert.equal(log.filter((l) => l === 'tls> DATA').length, 2);
+  assert.ok(log.includes('tls> RSET'));
+  assert.equal(r.rejected.length, 1);
+  await assert.rejects(smtpSend({ ...MAIL, to: ['yok@firma.com'], port: 465 }, { connect: fakeConnect([], { reject: 'yok@firma.com' }) }), /alıcı yok@firma\.com.*550/);
 });

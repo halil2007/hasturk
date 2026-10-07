@@ -46,7 +46,7 @@ export function barcodeSvg(text) {
 }
 
 // Kanal işaretleri (termal yazıcıda net basılması için siyah-beyaz yazı işaret)
-const MARK = { ikas: 'ikas', trendyol: 'trendyol', hepsiburada: 'hepsiburada', pttavm: 'PttAVM', n11: 'n11', idefix: 'idefix', pazarama: 'pazarama', amazon: 'amazon', ciceksepeti: 'çiçeksepeti', koctas: 'Koçtaş', shopify: 'shopify', woocommerce: 'woocommerce', etsy: 'Etsy' };
+const MARK = { ikas: 'ikas', trendyol: 'trendyol', hepsiburada: 'hepsiburada', pttavm: 'PttAVM', n11: 'n11', idefix: 'idefix', pazarama: 'pazarama', amazon: 'amazon', ciceksepeti: 'çiçeksepeti', koctas: 'Koçtaş', shopify: 'shopify', woocommerce: 'woocommerce', opencart: 'OpenCart', etsy: 'Etsy' };
 // Gönderinin yapıldığı gerçek kargo anlaşması → etikete yazılan ifade
 export const AGREEMENT = {
   ikas: 'ikas Kargo anlaşmalı gönderi', trendyol: 'Trendyol anlaşmalı gönderi', hepsiburada: 'Hepsiburada anlaşmalı gönderi', pttavm: 'PttAVM anlaşmalı gönderi',

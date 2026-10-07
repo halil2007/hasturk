@@ -12,7 +12,7 @@ import { rank, localProfile, prepare, score } from './catmatch.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
-const NO_UPLOAD = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'etsy'];
+const NO_UPLOAD = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'opencart', 'etsy'];
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').replace(/\s+/g, '').replace(/(lt|litre|l)$/, 'lt').replace(/(kg|kilo|kilogram)$/, 'kg');
 
 async function targets(env, db) {
@@ -80,7 +80,7 @@ async function buildAll(c, map, prods, opts, zeroStock) {
   return out;
 }
 
-// ---------- otomatik kategori eşleştirme ----------
+// ---------- kategori eşleştirme önerisi ----------
 // Puanlama src/catmatch.js'te: ikas kategori yolu + o kategorideki ürün adları, pazaryeri kategorisinin adı ve yoluyla;
 // Türkçe ekler, eş anlamlılar ve tarım/bahçe kavramları (ilaçlama pompası ≠ su pompası, organik ≠ kimyevi gübre) dikkate alınır.
 export function scoreCategory(local, c, names = []) { return score(localProfile(local, names), prepare([c])[0]).score; }
@@ -89,7 +89,7 @@ async function suggest(db, c, local, n = 5) {
   if (!local || !c.catalog.allCategories) return [];
   return rank(await c.catalog.allCategories(), local, await namesOf(db, local), n);
 }
-// Otomatik eşleştirme yalnız açık farkla en iyi olan kategoriye yapılır; iki aday birbirine çok yakınsa elle seçime bırakılır
+// "Güçlü öneri": açık farkla en iyi aday; iki aday birbirine çok yakınsa "zayıf öneri" (her iki durumda da onay gerekir)
 const AUTO_MIN = 5, AUTO_LEAD = 0.5;
 const confident = (r) => r[0] && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
 // Kategori özelliklerini mümkün olduğunca otomatik doldur: varyant özellikleri ürünün varyant adından, Menşei = Türkiye
@@ -108,28 +108,58 @@ async function autoAttrs(c, catId) {
   }
   return { attrs: out, missing };
 }
-// Eşleştirilmemiş ikas kategorilerini en uygun pazaryeri kategorisine bağla (puanı yeterli olanlar)
-async function automap(db, settings, c, user, { redo = false } = {}) {
+// Önerilen eşleşme: eşleştirilmemiş ikas kategorileri için en uygun pazaryeri kategorisi ÖNERİLİR (category_suggest), eşleştirilmez.
+// Kullanıcı "Onayla" derse eşleşir; beğenmezse kendisi başka kategori seçer (reddedilen kategori o ikas kategorisine tekrar önerilmez).
+// sure: açık farkla en iyi aday (yine de onay gerekir); değilse "zayıf öneri" diye gösterilir.
+async function suggestAll(db, settings, c, { redo = false } = {}) {
+  await migrateAuto(db);
   const cats = catalogOf(settings), ph = cats.map(() => '?').join(',');
-  // redo: daha önce otomatik yapılmış eşleştirmeler de yeni puanlamayla yeniden hesaplanır (elle yapılanlara dokunulmaz)
   const locals = (await all(db, `SELECT DISTINCT COALESCE(p.category, '') AS local FROM products p WHERE p.active = 1 AND COALESCE(p.category, '') != ''
     AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph}))
-    AND NOT EXISTS (SELECT 1 FROM category_map m WHERE m.local = p.category AND m.channel = ?${redo ? " AND COALESCE(m.user, '') NOT LIKE 'Otomatik%'" : ''})`, ...cats, c.id)).map((r) => r.local);
-  const mapped = [], skipped = [];
+    AND NOT EXISTS (SELECT 1 FROM category_map m WHERE m.local = p.category AND m.channel = ?)`, ...cats, c.id)).map((r) => r.local);
+  const old = new Map((await all(db, 'SELECT local, remote_id, rejected FROM category_suggest WHERE channel = ?', c.id)).map((r) => [r.local, r]));
+  const suggested = [], none = [], t = Date.now();
   for (const local of locals) {
-    const r = await suggest(db, c, local, 2), best = r[0];
-    if (!confident(r)) { skipped.push({ local, reason: !best ? 'uygun kategori bulunamadı' : best.score < AUTO_MIN ? `en yakın: ${best.name} (benzerlik düşük)` : `iki aday çok yakın: ${best.name} / ${r[1].name}` }); continue; }
-    const cur = await mapOf(db, local, c.id);
-    if (cur && cur.remote_id === best.id) continue;
-    const { attrs, missing } = await autoAttrs(c, best.id);
-    await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,
-    local, c.id, best.id, best.name, JSON.stringify(attrs), Date.now(), user ? `Otomatik (${user.name})` : 'Otomatik');
-    mapped.push({ local, remote: best.name, path: best.path, missing, before: cur ? cur.remote_name : null });
+    const prev = old.get(local);
+    if (prev && prev.remote_id && !redo) { suggested.push({ local }); continue; }
+    const rej = new Set(JSON.parse((prev && prev.rejected) || '[]').map(String));
+    const r = (await suggest(db, c, local, 5 + rej.size)).filter((x) => !rej.has(String(x.id))), best = r[0];
+    if (!best || best.score < 2) { none.push({ local, reason: best ? `en yakın: ${best.name} (benzerlik düşük)` : 'uygun kategori bulunamadı' }); }
+    await run(db, `INSERT INTO category_suggest (local, channel, remote_id, remote_name, path, score, sure, rejected, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, path = excluded.path, score = excluded.score, sure = excluded.sure, created_at = excluded.created_at`,
+    local, c.id, best && best.score >= 2 ? String(best.id) : null, best && best.score >= 2 ? best.name : null, best && best.score >= 2 ? best.path || '' : null,
+    best ? best.score : null, confident(r) ? 1 : 0, JSON.stringify([...rej]), t);
+    if (best && best.score >= 2) suggested.push({ local, remote: best.name, path: best.path, sure: confident(r) });
   }
-  if (mapped.length) await log(db, c.id, 'info', `${mapped.length} kategori otomatik eşleştirildi: ${mapped.slice(0, 5).map((x) => `${x.local} → ${x.remote}`).join(' · ')}`);
-  return { mapped, skipped };
+  return { suggested, none };
 }
+// Eski sürümün kendiliğinden yaptığı (onaysız) eşleştirmeler bir kez öneriye çevrilir: kullanıcı onaylayana kadar ürün gönderiminde kullanılmaz
+async function migrateAuto(db) {
+  if (await getRaw(db, 'once:catsuggest_1')) return;
+  const rows = await all(db, "SELECT local, channel, remote_id, remote_name FROM category_map WHERE COALESCE(user, '') LIKE 'Otomatik%'");
+  for (const r of rows) {
+    await db.batch([
+      db.prepare(`INSERT INTO category_suggest (local, channel, remote_id, remote_name, path, score, sure, rejected, created_at) VALUES (?, ?, ?, ?, '', NULL, 1, '[]', ?)
+        ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, sure = 1`).bind(r.local, r.channel, r.remote_id, r.remote_name, Date.now()),
+      db.prepare('DELETE FROM category_map WHERE local = ? AND channel = ?').bind(r.local, r.channel),
+    ]);
+  }
+  if (rows.length) await log(db, null, 'info', `${rows.length} otomatik kategori eşleştirmesi onay bekleyen öneriye çevrildi (Ürünler → Pazaryerine yükle)`);
+  await setSetting(db, 'once:catsuggest_1', Date.now());
+}
+// Öneriyi onayla: zorunlu özellikler mümkün olduğunca doldurulur, eşleşme kullanıcının adıyla kaydedilir
+async function acceptSuggestion(db, c, local, user) {
+  const sg = await first(db, 'SELECT * FROM category_suggest WHERE local = ? AND channel = ?', local, c.id);
+  if (!sg || !sg.remote_id) fail(404, 'Bu kategori için öneri yok; “Eşleştir” ile kendiniz seçin');
+  const { attrs, missing } = await autoAttrs(c, sg.remote_id);
+  await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,
+  local, c.id, sg.remote_id, sg.remote_name, JSON.stringify(attrs), Date.now(), user.name);
+  await run(db, 'DELETE FROM category_suggest WHERE local = ? AND channel = ?', local, c.id);
+  await log(db, c.id, 'info', `${user.name}: önerilen kategori onaylandı (${local} → ${sg.remote_name})`);
+  return { ok: true, remote: sg.remote_name, missing };
+}
+
 // Mevcut eşleştirmeleri denetle: seçili kategori, yeni puanlamaya göre açıkça daha uygun bir kategorinin gerisinde kalıyorsa listelenir
 async function review(db, c) {
   const list = c.catalog.allCategories ? await c.catalog.allCategories() : [];
@@ -146,7 +176,7 @@ async function review(db, c) {
 }
 
 // ---------- otomatik ürün gönderimi (kanal bazında açılıp kapatılır) ----------
-// Her senkronda: eşleştirilmemiş kategoriler (günde bir) otomatik eşleştirilir; eşleştirilmiş kategorilerde kanalda henüz olmayan,
+// Her senkronda: eşleştirilmemiş kategoriler için (günde bir) yalnız öneri hazırlanır; kullanıcının onayladığı kategorilerde kanalda henüz olmayan,
 // stoğu olan ve son 14 günde gönderilmemiş ürünler (eksiği yoksa) gönderilir. Tek seferde en fazla 100 ürün.
 // Otomatik gönderimde atlanacak ürünler (son 14 gün): kabul edilen ya da kanalın hâlâ işlediği ürün tekrar gönderilmez.
 // Kanalın reddettiği (ya da isteği hiç kabul edilmeyen) ürün tekrar denenir: gönderimden sonra ürün düzeltildiyse 1 saat,
@@ -185,8 +215,9 @@ export async function autoUpload(env, db, settings) {
     if (!on.includes(c.id) || !c.enabled || !c.catalog || c.hold) continue;
     let items = null;
     try {
+      // Eşleştirilmemiş kategoriler için yalnız öneri hazırlanır (günde bir); gönderim yalnız kullanıcının onayladığı eşleşmelerle
       const last = await getRaw(db, 'automap:' + c.id);
-      if (!last || Date.now() - last > 864e5) { await automap(db, settings, c, null); await setSetting(db, 'automap:' + c.id, Date.now()); }
+      if (!last || Date.now() - last > 864e5) { await suggestAll(db, settings, c); await setSetting(db, 'automap:' + c.id, Date.now()); }
       const skip = await sentFilter(db, c.id);
       const ready = [];
       for (const map of (await all(db, 'SELECT * FROM category_map WHERE channel = ?', c.id)).map((m) => ({ ...m, attrs: JSON.parse(m.attrs || '{}') }))) {
@@ -224,26 +255,37 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
         ${chans.map((c) => `SUM(EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel = '${c.id}')) AS "l_${c.id}"`).join(', ') || '0 AS x'}
       FROM products p WHERE p.active = 1 AND (EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) OR COALESCE(p.category, '') != '')
       GROUP BY 1 ORDER BY local = '', local`, ...cats);
+    await migrateAuto(db);
     const maps = await all(db, 'SELECT local, channel, remote_id, remote_name, attrs, updated_at FROM category_map');
+    const sugs = await all(db, 'SELECT local, channel, remote_id, remote_name, path, score, sure FROM category_suggest WHERE remote_id IS NOT NULL');
     return {
       channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo, test: !!c.sandbox,
         reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.type] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
         auto: !!(settings.auto_upload || {})[c.id], stockPush: !!(settings.stock_push || {})[c.id] })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
       maps: maps.map((x) => ({ ...x, attrs: JSON.parse(x.attrs || '{}') })),
+      suggestions: sugs,
       uploads: await uploadsWithListing(db),
       stockSync: !!settings.stock_sync,
     };
   }
   if (path === 'catalog/suggest' && m === 'GET') return { items: await suggest(db, await target(env, db, q.channel), str(q.local)) };
-  if (path === 'catalog/automap' && m === 'POST') return automap(db, settings, await target(env, db, str(b.channel)), user, { redo: !!b.redo });
+  // Öneri hazırla (eşleştirmez); onayla / reddet
+  if (path === 'catalog/automap' && m === 'POST') return suggestAll(db, settings, await target(env, db, str(b.channel)), { redo: !!b.redo });
+  if (path === 'catalog/suggest/accept' && m === 'POST') return acceptSuggestion(db, await target(env, db, str(b.channel)), str(b.local), user);
+  if (path === 'catalog/suggest/reject' && m === 'POST') {
+    const c = await target(env, db, str(b.channel)), sg = await first(db, 'SELECT remote_id, rejected FROM category_suggest WHERE local = ? AND channel = ?', str(b.local), c.id);
+    if (sg && sg.remote_id) await run(db, 'UPDATE category_suggest SET rejected = ?, remote_id = NULL, remote_name = NULL, path = NULL, sure = 0 WHERE local = ? AND channel = ?',
+      JSON.stringify([...new Set([...JSON.parse(sg.rejected || '[]'), sg.remote_id])]), str(b.local), c.id);
+    return { ok: true };
+  }
   if (path === 'catalog/review' && m === 'GET') return review(db, await target(env, db, q.channel));
   if (path === 'catalog/review/apply' && m === 'POST') {
     const c = await target(env, db, str(b.channel)), done = [];
     for (const x of (b.items || []).slice(0, 200)) {
       if (!str(x.local) || !str(x.id)) continue;
       const { attrs } = await autoAttrs(c, str(x.id));
-      await run(db, 'UPDATE category_map SET remote_id = ?, remote_name = ?, attrs = ?, updated_at = ?, user = ? WHERE local = ? AND channel = ?', str(x.id), str(x.name), JSON.stringify(attrs), Date.now(), `Otomatik (${user.name})`, str(x.local), c.id);
+      await run(db, 'UPDATE category_map SET remote_id = ?, remote_name = ?, attrs = ?, updated_at = ?, user = ? WHERE local = ? AND channel = ?', str(x.id), str(x.name), JSON.stringify(attrs), Date.now(), user.name, str(x.local), c.id);
       done.push(x.local);
     }
     await log(db, c.id, 'info', `${user.name}: ${done.length} kategori eşleştirmesi önerilen kategoriyle değiştirildi`);
@@ -260,6 +302,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,
     str(b.local), c.id, str(b.remote_id), str(b.remote_name), JSON.stringify(attrs), Date.now(), user.name);
+    await run(db, 'DELETE FROM category_suggest WHERE local = ? AND channel = ?', str(b.local), c.id);
     return { ok: true };
   }
   if (path === 'catalog/unmap' && m === 'POST') { await run(db, 'DELETE FROM category_map WHERE local = ? AND channel = ?', str(b.local), str(b.channel)); return { ok: true }; }

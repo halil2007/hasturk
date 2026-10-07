@@ -237,6 +237,19 @@ const MIGRATIONS = [
     max_ms INTEGER NOT NULL DEFAULT 0, slow_n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, slug, route))`,
   // Eski Excel fırsat etiketleri tablosu kaldırıldı (yerine buybox fiyat önerileri, bkz. suggest.js)
   'DROP TABLE IF EXISTS promo_offers',
+  // Panelden silinen siparişler (bkz. orderclean.js): kanal aynı siparişi yine gönderse de alınmaz
+  'CREATE TABLE IF NOT EXISTS deleted_orders (id TEXT PRIMARY KEY, at INTEGER NOT NULL, user TEXT, order_number TEXT)',
+  // Kanalda bulunamayan sipariş: missing_n kaç kontrolde bulunamadı (2 = kesin / uyarı), missing_why sebep; checked_at son tek sipariş kontrolü
+  'ALTER TABLE orders ADD COLUMN missing_n INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE orders ADD COLUMN missing_why TEXT',
+  'ALTER TABLE orders ADD COLUMN checked_at INTEGER',
+  'CREATE INDEX IF NOT EXISTS orders_missing ON orders(missing_n) WHERE missing_n >= 2',
+  // Önerilen kategori eşleşmesi (bkz. catalog.js): sistem kendisi eşleştirmez; öneri kullanıcı onaylayınca category_map'e yazılır.
+  // rejected: kullanıcının reddettiği pazaryeri kategorileri (JSON dizi) — tekrar önerilmez
+  `CREATE TABLE IF NOT EXISTS category_suggest (local TEXT NOT NULL, channel TEXT NOT NULL, remote_id TEXT, remote_name TEXT, path TEXT, score REAL,
+    sure INTEGER NOT NULL DEFAULT 0, rejected TEXT, created_at INTEGER, PRIMARY KEY (local, channel))`,
+  // Ürünün kargo tutarı (kullanıcı girer): kanal kargo faturası / siparişe elle girilen tutar yoksa sipariş kargo gideri bundan hesaplanır
+  'ALTER TABLE products ADD COLUMN ship_cost REAL',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -246,9 +259,17 @@ const ready = new WeakMap();
 export function init(db) {
   if (!ready.has(db)) {
     ready.set(db, (async () => {
-      try { const r = await db.prepare("SELECT v FROM settings WHERE k = 'schema_v'").first(); if (r && JSON.parse(r.v) === SCHEMA_V) return; } catch { /* ilk kurulum */ }
+      // Yeni yayında yalnız sonradan eklenen geçişler çalışır (MIGRATIONS yalnız sona eklenir): tümünü sırayla çalıştırmak
+      // büyük veritabanında açılışı saniyelerce bekletiyordu. Kayıt yoksa ya da liste beklenmedik biçimde değiştiyse hepsi çalışır.
+      let done = -1;
+      try {
+        const r = await db.prepare("SELECT k, v FROM settings WHERE k IN ('schema_v', 'schema_n')").all();
+        const m = Object.fromEntries((r.results || []).map((x) => [x.k, JSON.parse(x.v)]));
+        if (m.schema_v === SCHEMA_V) return;
+        if (Number.isInteger(m.schema_n) && m.schema_n < MIGRATIONS.length) done = m.schema_n;
+      } catch { /* ilk kurulum */ }
       await db.batch(SCHEMA.map((s) => db.prepare(s)));
-      for (const m of MIGRATIONS) { try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
+      for (const m of done >= 0 ? MIGRATIONS.slice(done) : MIGRATIONS) { try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
       // Tek seferlik: sistem tamamen hazır olana kadar kanallara stok gönderimi kapatılır (stoklar ikas sitesinden okunur).
       // Sonradan Ayarlar → Stok'tan açılabilir; bu adım bir daha çalışmaz.
       if (!(await db.prepare("SELECT 1 AS x FROM settings WHERE k = 'once:stock_off_1'").first())) {
@@ -266,7 +287,10 @@ export function init(db) {
           db.prepare("INSERT INTO settings (k, v) VALUES ('once:unhold_ikas_1', '1') ON CONFLICT (k) DO NOTHING"),
         ]);
       }
-      await db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)).run();
+      await db.batch([
+        db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)),
+        db.prepare("INSERT INTO settings (k, v) VALUES ('schema_n', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(MIGRATIONS.length)),
+      ]);
     })().catch((e) => { ready.delete(db); throw e; }));
   }
   return ready.get(db);
@@ -296,14 +320,14 @@ export const DEFAULT_SETTINGS = {
   fx: { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 },
   // Müşteri sorularına hazır cevaplar
   answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
-  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15, amazon: 15, ciceksepeti: 20, koctas: 15, shopify: 0, woocommerce: 0, etsy: 6.5 },
+  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15, amazon: 15, ciceksepeti: 20, koctas: 15, shopify: 0, woocommerce: 0, opencart: 0, etsy: 6.5 },
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Satış tutarının %'si olarak ek kesinti (işlem / ödeme bedeli vb.)
-  fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0, amazon: 0, ciceksepeti: 0, koctas: 0, shopify: 0, woocommerce: 0, etsy: 3 },
+  fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0, amazon: 0, ciceksepeti: 0, koctas: 0, shopify: 0, woocommerce: 0, opencart: 0, etsy: 3 },
   // E-ticaret stopajı %: pazaryeri hakedişten keser (KDV hariç satış üzerinden); kendi siteniz (ikas) için 0
-  withholding: { ikas1: 0, ikas2: 0, trendyol: 1, hepsiburada: 1, pttavm: 1, n11: 1, idefix: 1, pazarama: 1, amazon: 1, ciceksepeti: 1, koctas: 1, shopify: 0, woocommerce: 0, etsy: 0 },
+  withholding: { ikas1: 0, ikas2: 0, trendyol: 1, hepsiburada: 1, pttavm: 1, n11: 1, idefix: 1, pazarama: 1, amazon: 1, ciceksepeti: 1, koctas: 1, shopify: 0, woocommerce: 0, opencart: 0, etsy: 0 },
   // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
   stock_sync: false,
   // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar

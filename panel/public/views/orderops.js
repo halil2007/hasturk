@@ -1,6 +1,6 @@
 // Sipariş işlemleri (ortak bileşen): işleme al → paketle (kanalda kargoya hazırla) → kargo firması seç/değiştir →
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
-import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly } from '../core.js';
+import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly, isAdmin } from '../core.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
@@ -182,7 +182,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     return html`<div class="pkg-card" data-pkg="${p.id}">
       <div class="hd"><span class="box"><i class="ico ico-box"></i></span><b>Paket ${p.no}</b><span class="muted small">• ${qty} ürün</span><span class="spacer"></span><span class="pill ${ls.cls}">${ls.text}</span></div>
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
-        : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
+        : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="pname" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
       <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || (pick && pick.name ? `${pick.name} (seçildi, paketlerken uygulanır)` : '') || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
         ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company || (pick && pick.name) ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
@@ -488,6 +488,19 @@ function splitEditor(d, extra, done) {
 
 // ---------- sipariş detayı (tam) ----------
 const EV = { accept: 'İşleme alındı', pack: 'Paketlendi (kargoya hazır)', split: 'Paketlere bölündü', cargo: 'Kargo firması seçildi', 'cancel-package': 'Paket iptal edildi', ship: 'Kargoya verildi', tracking: 'Takip no girildi', label: 'Etiket oluşturuldu', 'label-printed': 'Etiket yazdırıldı', 'label-unprinted': 'Yazdırıldı işareti kaldırıldı', status: 'Durum elle değiştirildi', processed: 'Kanalda işlem yapıldı', auto_close: 'Otomatik tamamlandı', };
+// Sipariş silme: önce kanalda var mı sorulur (destekleyen kanallarda), sonuç onay penceresinde gösterilir
+export async function deleteOrder(o) {
+  const c = await api(`orders/${encodeURIComponent(o.id)}/check`).catch(() => ({ exists: null, why: '' }));
+  const head = c.exists === false ? `✓ ${c.why}. Silmeniz önerilir.` : c.exists === true ? `⚠ ${c.why}. Silerseniz panel bu siparişi bir daha almaz; kanaldaki sipariş etkilenmez.` : c.why ? `${c.why}.` : '';
+  if (!(await confirmBox(html`${head ? html`<b>${head}</b><br><br>` : ''}#${o.order_number} panelden silinsin mi? Düşülen stok geri eklenir, sipariş raporlardan çıkar ve kanaldan yeniden alınmaz. Bu işlem geri alınamaz.`, 'Siparişi sil'))) return false;
+  const r = await api('orders/' + encodeURIComponent(o.id), { method: 'DELETE' });
+  toast(r.message);
+  return true;
+}
+
+// Kargo giderinin kaynağı (kârlılık kartı)
+const SHIP_SRC = { api: '(kanal faturası)', manual: '(siparişe girilen)', product: '(ürüne girilen)', default: '(Ayarlar → Giderler)', none: '' };
+
 export async function openOrder(id, onChange) {
   const s = sheet({ title: 'Sipariş', size: 'wide drawer' });
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
@@ -498,7 +511,7 @@ export async function openOrder(id, onChange) {
     s.title.textContent = `#${o.order_number} · ${ch(o.channel).name}`;
     s.setBody(html`
       <div class="row wrap" style="margin-bottom:12px">${chLogo(o.channel)}${statusPill(o.status)}<span class="muted small">${dateTime(o.ordered_at)}</span>
-        ${o.remote_status ? html`<span class="muted tiny" title="Kanaldaki durum">(${o.remote_status})</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}
+        ${o.remote_status ? html`<span class="muted tiny" title="Kanaldaki durum">(${o.remote_status})</span>` : ''}${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">Kanalda bulunamadı</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}
         ${o.ship_by ? html`<span class="muted small">· Son kargoya teslim: <b>${dateTime(o.ship_by)}</b></span>` : ''}${o.extra && o.extra.cargoChoice ? html`<span class="muted small">· Müşterinin seçtiği: ${o.extra.cargoChoice}</span>` : ''}
         ${o.cust && o.cust.total > 1 ? html`<a class="pill info" href="#/musteriler?key=${encodeURIComponent(o.ckey)}" title="Müşterinin tüm siparişleri">Müşterinin ${o.cust.nth}. siparişi · toplam ${o.cust.total}</a>` : ''}</div>
       <div data-ops></div>
@@ -507,7 +520,7 @@ export async function openOrder(id, onChange) {
           <div class="card">
             <div class="card-head"><h3>Ürünler</h3><span class="muted small">${o.items.filter((i) => !DEAD_LINE(i.status)).reduce((t, i) => t + i.quantity, 0)} adet</span></div>
             ${o.items.map((i) => html`<div class="li" style="${DEAD_LINE(i.status) ? 'opacity:.5' : ''}">${thumb(i.product_image || i.image, i.name)}
-              <div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${i.product_name || i.name}</div>
+              <div style="min-width:0;flex:1"><div class="pname" style="font-weight:650">${i.product_name || i.name}</div>
                 <div class="muted small">${[i.sku, i.barcode].filter(Boolean).join(' · ')}${i.status === 'cancelled' ? ' · İptal' : i.status === 'returned' ? ' · İade' : ''}</div>
                 ${i.product_id ? html`<div class="tiny muted">Ortak stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--amber)">Panelde eşleşmemiş — <a class="link" href="#/eslestirme">eşleştir</a></div>`}</div>
               <div style="text-align:right" class="num"><div><b>${i.quantity}</b> × ${money(i.unit_price)}</div><div class="muted small">${money(i.total)}</div></div></div>`)}
@@ -527,7 +540,7 @@ export async function openOrder(id, onChange) {
           </div>
           <div class="card">
             <div class="card-head"><h3>Kârlılık (tahmini)</h3></div>
-            <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon</dt><dd>−${money(p.commission)}</dd><dt>Kargo <span class="tiny muted">${p.shippingSrc === 'api' ? '(kanal faturası)' : p.shippingSrc === 'manual' ? '(elle)' : '(tahmini)'}</span></dt><dd>−${money(p.shipping)}</dd>
+            <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon</dt><dd>−${money(p.commission)}</dd><dt>Kargo <span class="tiny muted">${SHIP_SRC[p.shippingSrc] || ''}</span></dt><dd>${p.shippingSrc === 'none' ? html`<span class="tiny" style="color:var(--amber)">ürüne girilmedi</span>` : html`−${money(p.shipping)}`}</dd>
               ${p.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(p.fee)}</dd>` : ''}${p.rateFee ? html`<dt>Ek kesinti <span class="tiny muted">(işlem / ödeme bedeli)</span></dt><dd>−${money(p.rateFee)}</dd>` : ''}${p.withholding ? html`<dt>Stopaj <span class="tiny muted">(vergiden mahsup edilir)</span></dt><dd>−${money(p.withholding)}</dd>` : ''}<dt style="color:var(--text);font-weight:650">Satıştan kalan</dt><dd style="font-weight:650">${money(p.payout)}</dd>
               <dt>Ürün maliyeti</dt><dd>−${money(p.cost)}</dd><div class="total"><dt>Kâr</dt><dd class="${p.profit >= 0 ? 'up' : 'down'}">${money(p.profit)}</dd></div></dl>
             ${p.missingCost ? html`<div class="notice warn small" style="margin-top:10px">${p.missingCost} ürünün alış fiyatı girilmemiş; kâr olduğundan yüksek görünür.</div>` : ''}
@@ -535,8 +548,8 @@ export async function openOrder(id, onChange) {
           <div class="card stack">
             <h3>Not ve ayarlar</h3>
             <label class="field"><span>Sipariş notu</span><textarea class="input" data-note>${o.note || ''}</textarea></label>
-            <label class="field"><span>Bu siparişin kargo gideri (boş = varsayılan)</span><div class="input-group"><input class="input" inputmode="decimal" data-shipcost value="${o.shipping_cost ?? ''}"><span class="suffix">₺</span></div></label>
-            <div class="row wrap"><button class="btn sm" data-save-note>Kaydet</button><span class="spacer"></span>
+            <label class="field"><span>Bu siparişin kargo gideri (boş = ürüne girilen kargo tutarı)</span><div class="input-group"><input class="input" inputmode="decimal" data-shipcost value="${o.shipping_cost ?? ''}"><span class="suffix">₺</span></div></label>
+            <div class="row wrap"><button class="btn sm" data-save-note>Kaydet</button>${isAdmin() ? html`<button class="btn sm danger ghost" data-del-order><i class="ico ico-trash"></i>Siparişi sil</button>` : ''}<span class="spacer"></span>
               <select class="input" style="width:auto;min-height:34px;font-size:13px" data-status aria-label="Durumu elle değiştir"><option value="">Durumu elle değiştir…</option>${Object.entries(STATUS_LABEL).map(([k, v]) => html`<option value="${k}">${v}</option>`)}</select></div>
           </div>
         </div>
@@ -548,6 +561,8 @@ export async function openOrder(id, onChange) {
       const o = d.order, a = o.address || {};
       navigator.clipboard.writeText([a.name || o.customer, a.line, [a.district, a.city].filter(Boolean).join(' / '), a.phone || o.phone].filter(Boolean).join('\n')).then(() => toast('Adres kopyalandı'), () => toast('Kopyalanamadı', true));
     }
+    const del = e.target.closest('[data-del-order]');
+    if (del) busy(del, async () => { if (await deleteOrder(d.order)) { s.close(); onChange && onChange(); } });
     const sv = e.target.closest('[data-save-note]');
     if (sv) busy(sv, async () => { await api(`orders/${encodeURIComponent(id)}/note`, { method: 'POST', body: { note: $('[data-note]', s.body).value, shipping_cost: $('[data-shipcost]', s.body).value } }); toast('Kaydedildi'); });
   });

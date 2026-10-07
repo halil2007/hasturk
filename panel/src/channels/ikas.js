@@ -310,6 +310,8 @@ export function ikas(env, p, meta) {
   // değildir ve ikas Kargo gönderisi açmaz). Panel siparişin ikas Kargo ekranını açar, gönderi oluşunca paketi, barkodu ve etiketi okur.
   const adminUrl = `https://${store}.myikas.com/admin/order/view/`;
   const fetchOne = async (remoteId) => normOrder(await getOrder(remoteId));
+  // Sipariş ikas'ta var mı (silinmiş / deneme siparişi tespiti, bkz. orderclean.js): kimlikle tam eşleşme sorgusu, hata = bilinmiyor
+  const orderExists = async (remoteId) => !!((await flex((o) => orderQuery(o, 'id'), ORDER_OPT, { p: { page: 1, limit: 1 }, d: { eq: remoteId } })).listOrder.data || [])[0];
   const EXT = (extra = '', firm = '') => `Bu sipariş henüz ikas Kargo ile gönderilmedi. “ikas Kargo ile Gönder”e basın: ikas'ta siparişin ⋮ menüsünden “ikas Kargo ile Paketle ve Gönder” → ürünler → Kaydet → ${firm ? `kargo firması: ${firm}` : 'kargo firması'} → Devam Et. Gönderi oluşunca barkod ve etiket buraya kendiliğinden gelir.${extra}`;
 
   // Etiket: yalnızca ikas Kargo'nun gerçek gönderisi ve etiketi. Gönderi henüz oluşmadıysa "bekleniyor", hata varsa sebebi.
@@ -446,6 +448,6 @@ export function ikas(env, p, meta) {
   return {
     ...meta, type: 'ikas', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', pack: 'external', external: { label: 'ikas Kargo ile Gönder', url: adminUrl }, ship: 'local', manualTracking: false, label: 'remote', cargo: false, repack: false, cancelPackage: true, createProduct: true, price: true },
-    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, ship, createProduct, cargoOptions, label, cancelPackage, diagnose,
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, createProduct, cargoOptions, label, cancelPackage, diagnose,
   };
 }
