@@ -11,8 +11,11 @@
 //   sitemap: no            (site haritasına girmesin; isteğe bağlı)
 //   -->
 import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import vm from 'node:vm';
 import { FEATURES, INTEGRATIONS } from './src/data.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +26,11 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').repl
 const ico = (id) => `<svg><use href="#${id}"/></svg>`;
 const tick = `<i class="tick"><svg><use href="#i-check"/></svg></i>`;
 const fById = Object.fromEntries(FEATURES.map((f) => [f.slug, f]));
+const SITE_URL = 'https://hasturkcrm.com';
+// Şirket bilgileri ve paket fiyatları tek yerden: public/assets/config.js (arama motoru verisi de buradan üretilir)
+const S = (() => { const ctx = { window: {}, document: { documentElement: { classList: { add() {} } } } }; vm.runInNewContext(readFileSync(join(OUT, 'assets', 'config.js'), 'utf8'), ctx); return ctx.window.SITE; })();
+// Önbellek kırıcı: CSS / JS içeriği değişince adresi de değişir (?v=…); tarayıcı eski dosyayı kullanmaz, değişmeyeni uzun süre saklar
+const ver = Object.fromEntries(['site.css', 'site.js', 'config.js'].map((f) => [f, createHash('sha1').update(readFileSync(join(OUT, 'assets', f))).digest('hex').slice(0, 10)]));
 
 // ---------- üst menü açılır listeleri ----------
 const menuFeatures = FEATURES.map((f) => `<a class="mi" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><span><b>${esc(f.name)}</b><small>${esc(f.short)}</small></span></a>`).join('');
@@ -128,7 +136,7 @@ ${alt([
     <div class="grid g3">${rel.map((r) => `<a class="card rel reveal" href="/ozellikler/${r.slug}"><span class="ic ${r.color}">${ico(r.icon)}</span><b>${esc(r.name)}</b><span>${esc(r.short)}</span><em>İncele ${ico('i-arrow')}</em></a>`).join('')}</div>`,
 ], !!f.why)}
 ${ctaBand}`;
-  return { meta: { title: f.title, description: f.lead.slice(0, 155), url: `/ozellikler/${f.slug}`, nav: 'ozellikler' }, body, file: `ozellikler/${f.slug}.html` };
+  return { meta: { title: f.title, description: clip(f.lead), url: `/ozellikler/${f.slug}`, nav: 'ozellikler' }, body, file: `ozellikler/${f.slug}.html` };
 }
 
 function integrationPage(x) {
@@ -166,23 +174,70 @@ function integrationPage(x) {
 <section class="sec">
   <div class="wrap">
     <div class="sec-head reveal"><div class="kicker">Diğer entegrasyonlar</div><h2>Tüm Kanallarınız Tek Panelde</h2><p>Aynı panelde birden fazla pazaryeri ve e-ticaret sitesini birlikte yönetin; stok ve fiyat hepsinde eşit kalır.</p></div>
-    <div class="integ">${others.map((o) => `<a class="it reveal" href="/entegrasyonlar/${o.slug}"><span class="b" style="background:${o.color}">${esc(o.badge)}</span><div style="min-width:0"><b>${esc(o.name)}</b><small>${esc(o.kind)}</small></div></a>`).join('')}<a class="it reveal" href="/entegrasyonlar#yakinda"><span class="b" style="background:#94a3b8">+</span><div style="min-width:0"><b>Yakında</b><small>Amazon, Çiçeksepeti, Shopify…</small></div></a></div>
+    <div class="integ">${others.map((o) => `<a class="it reveal" href="/entegrasyonlar/${o.slug}"><span class="b" style="background:${o.color}">${esc(o.badge)}</span><div style="min-width:0"><b>${esc(o.name)}</b><small>${esc(o.kind)}</small></div></a>`).join('')}<a class="it reveal" href="/entegrasyonlar#yakinda"><span class="b" style="background:#94a3b8">+</span><div style="min-width:0"><b>Yakında</b><small>Amazon, Ticimax, IdeaSoft, T-Soft…</small></div></a></div>
   </div>
 </section>
 ${ctaBand}`;
-  return { meta: { title: `${x.name} Entegrasyonu — Hastürk CRM`, description: x.lead.slice(0, 155), url: `/entegrasyonlar/${x.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${x.slug}.html` };
+  return { meta: { title: `${x.name} Entegrasyonu: Sipariş, Stok ve Fiyat | Hastürk CRM`, crumb: `${x.name} Entegrasyonu`, description: clip(x.lead), url: `/entegrasyonlar/${x.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${x.slug}.html` };
+}
+
+// ---------- arama motoru verisi (JSON-LD) ----------
+const strip = (h) => h.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+const pageName = (meta) => meta.crumb || meta.title.split(/ [—|] /)[0];
+const SECTIONS = { ozellikler: 'Özellikler', entegrasyonlar: 'Entegrasyonlar' };
+const ORG = { '@type': 'Organization', '@id': `${SITE_URL}/#org`, name: S.brand, url: `${SITE_URL}/`, logo: `${SITE_URL}/assets/logo.webp`,
+  ...(S.company.legal ? { legalName: S.company.legal } : {}), ...(S.company.email ? { email: S.company.email } : {}), ...(S.company.phone ? { telephone: S.company.phone.replace(/\s/g, '') } : {}),
+  ...(S.company.phone ? { contactPoint: [{ '@type': 'ContactPoint', telephone: S.company.phone.replace(/\s/g, ''), contactType: 'customer service', areaServed: 'TR', availableLanguage: ['Turkish'] }] } : {}) };
+const APP = { '@type': 'SoftwareApplication', '@id': `${SITE_URL}/#app`, name: S.brand, applicationCategory: 'BusinessApplication', applicationSubCategory: 'Pazaryeri entegrasyonu ve sipariş yönetimi',
+  operatingSystem: 'Web, iOS, Android (tarayıcı)', inLanguage: 'tr-TR', url: `${SITE_URL}/`, image: `${SITE_URL}/img/genel-bakis.jpg`, publisher: { '@id': `${SITE_URL}/#org` },
+  description: 'Trendyol, Hepsiburada, N11, ikas, PttAVM, idefix ve Pazarama mağazalarının siparişlerini, kargo etiketlerini, stoklarını, fiyatlarını ve kârlılığını tek panelden yöneten satış yönetim yazılımı.',
+  offers: S.plans.filter((p) => p.monthly).map((p) => ({ '@type': 'Offer', name: `${p.name} paketi (aylık)`, price: p.monthly, priceCurrency: 'TRY', url: `${SITE_URL}/paketler`, availability: 'https://schema.org/InStock',
+    priceSpecification: { '@type': 'UnitPriceSpecification', price: p.monthly, priceCurrency: 'TRY', valueAddedTaxIncluded: true, unitCode: 'MON', billingDuration: 'P1M' } })) };
+function jsonLd(meta, body) {
+  const url = SITE_URL + meta.url, graph = [ORG, { '@type': 'WebSite', '@id': `${SITE_URL}/#site`, url: `${SITE_URL}/`, name: S.brand, inLanguage: 'tr-TR', publisher: { '@id': `${SITE_URL}/#org` } }];
+  const page = { '@type': 'WebPage', '@id': `${url}#page`, url, name: meta.title, description: meta.description, inLanguage: 'tr-TR', isPartOf: { '@id': `${SITE_URL}/#site` }, about: { '@id': `${SITE_URL}/#app` },
+    primaryImageOfPage: `${SITE_URL}/img/genel-bakis.jpg` };
+  if (meta.url !== '/') {
+    const parts = meta.url.split('/').filter(Boolean), items = [{ name: 'Ana sayfa', item: `${SITE_URL}/` }];
+    if (parts.length > 1 && SECTIONS[parts[0]]) items.push({ name: SECTIONS[parts[0]], item: `${SITE_URL}/${parts[0]}` });
+    items.push({ name: pageName(meta), item: url });
+    graph.push({ '@type': 'BreadcrumbList', '@id': `${url}#crumbs`, itemListElement: items.map((x, i) => ({ '@type': 'ListItem', position: i + 1, ...x })) });
+    page.breadcrumb = { '@id': `${url}#crumbs` };
+  }
+  graph.push(page);
+  if (['/', '/paketler', '/ozellikler', '/demo'].includes(meta.url)) graph.push(APP);
+  // Sayfadaki "Sık sorulan sorular" (details/summary) aynen arama motoruna da verilir
+  const faq = [...body.matchAll(/<details[^>]*>\s*<summary>([\s\S]*?)<\/summary>\s*<p>([\s\S]*?)<\/p>\s*<\/details>/g)].map(([, q, a]) => [strip(q), strip(a)]).filter(([q, a]) => q && a);
+  if (faq.length) graph.push({ '@type': 'FAQPage', '@id': `${url}#faq`, mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) });
+  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c');
+}
+// Görseller: sayfanın ilk büyük görseli öncelikli yüklenir (LCP), diğerleri ekrana yaklaşınca
+function tuneImages(html) {
+  const at = html.indexOf('<main>');
+  let first = true;
+  return html.slice(0, at) + html.slice(at).replace(/<img\b([^>]*)>/g, (m, a) => {
+    if (/fetchpriority|loading=/.test(a) && !/loading="lazy"/.test(a)) return m;
+    if (first && !/loading="lazy"/.test(a)) { first = false; return `<img${a} fetchpriority="high" decoding="async">`; }
+    first = false;
+    return `<img${/loading=/.test(a) ? a : a + ' loading="lazy"'}${/decoding=/.test(a) ? '' : ' decoding="async"'}>`;
+  });
 }
 
 // ---------- sayfa üretimi ----------
+const ROBOTS = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
 function render(meta, body, page) {
   let head = '';
   body = body.replace(/<!-- head -->([\s\S]*?)<!-- \/head -->\s*/, (_, h) => { head = h.trim(); return ''; });
   let html = layout.replace('{{sprite}}', sprite).replace('{{body}}', body.trim()).replace('{{head}}', head)
     .replace('{{featureCards}}', featureCards).replace('{{phoneMock}}', MOCKS.phone).replace('{{featureTabs}}', body.includes('{{featureTabs}}') ? featureTabs() : '').replace('{{integrationCards}}', integrationCards).replace('{{menuFeatures}}', menuFeatures).replace('{{menuIntegrations}}', menuIntegrations).replace('{{mnavFeatures}}', mnavFeatures).replace('{{mnavIntegrations}}', mnavIntegrations)
+    .replace(/{{v:([a-z.]+)}}/g, (_, f) => ver[f]).replace('{{robots}}', meta.sitemap === 'no' ? 'noindex, follow' : ROBOTS)
     .replace(/{{title}}/g, esc(meta.title)).replace(/{{description}}/g, esc(meta.description)).replace(/{{url}}/g, meta.url).replace(/{{page}}/g, page);
+  html = html.replace('{{jsonld}}', () => jsonLd(meta, html.slice(html.indexOf('<main>'))));
   if (meta.nav) html = html.replace(new RegExp(`data-nav="${meta.nav}"`, 'g'), `data-nav="${meta.nav}" class="on" aria-current="page"`);
-  return html;
+  return tuneImages(html);
 }
+// Arama sonucunda kesik görünmesin: açıklama ~155 karakterde kelime sınırından kısaltılır
+const clip = (t, n = 155) => (t.length <= n ? t : t.slice(0, t.lastIndexOf(' ', n - 1)).replace(/[,;:]$/, '') + '…');
 
 const pages = [];
 for (const file of (await readdir(join(SRC, 'pages'))).filter((f) => f.endsWith('.html')).sort()) {

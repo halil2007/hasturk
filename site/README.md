@@ -12,8 +12,9 @@ yasal sayfalar (`/kvkk`, `/gizlilik`, `/kullanim-kosullari`) ve 404.
    Formlar bu adreslerden panele gönderilir; talepler panelde **Destek**'e "Web sitesi" olarak düşer.
 
 ## Demo paneli
-`/demo` sayfasındaki form gönderilince panel 14 gün geçerli bir demo bağlantısı döndürür. Bağlantı, panelde **demo** firma koduyla
-otomatik açılan, örnek verilerle çalışan firma paneline girer (bkz. `panel/src/tenants.js`, `panel/src/lead.js`):
+Sitedeki **Canlı Demo** düğmeleri hiçbir bilgi istemeden `https://panel.hasturkcrm.com/api/public/demo` adresini açar (IP başına saatte 30 giriş).
+Bu adres, panelde **demo** firma koduyla otomatik açılan, örnek verilerle çalışan ortak firma paneline girer (bkz. `panel/src/tenants.js`, `panel/src/lead.js`).
+Bu yalnız herkese açık örnek demodur; müşterilere açılan 7 günlük deneme panelleri kendi firmalarıdır ve hiçbir zaman sıfırlanmaz.
 - Ziyaretçi "Demo kullanıcı" personel hesabıyla girer: siparişler, kargo, stok, ürünler, raporlar, gelir & gider açık;
   ayarlar, entegrasyon bilgileri, kullanıcılar, şifre ve iki adımlı doğrulama kapalı.
 - Panel kendini sıfırlar: 20 dakika kimse kullanmazsa (son sıfırlamadan 1 saat geçtiyse) ve her durumda günde bir; ziyaretçilerin değişiklikleri silinir, örnek veriler yeniden gelir, açık oturumlar düşmez.
@@ -33,9 +34,17 @@ Düzenledikten sonra derleyin (Node.js yeterli, bağımlılık yok) ve `public/`
 cd site && node build.mjs
 ```
 
-Derleme gerektirmeyen ayarlar:
-- **Şirket bilgileri, telefon, WhatsApp, e-posta, paket fiyatları ve karşılaştırma tablosu:** `public/assets/config.js`
+Derleme ayrıca:
+- Her sayfaya arama motoru verisi (JSON-LD: kuruluş, site, sayfa yolu, yazılım + KDV dahil paket fiyatları, sayfadaki sık sorulan sorular),
+  Open Graph / Twitter kartı ve `robots` etiketini ekler, `public/sitemap.xml`'i yeniden yazar.
+- `site.css`, `site.js`, `config.js` adreslerine içerik özeti ekler (`?v=…`). Bu dosyalar tarayıcıda uzun süre saklanır (`public/_headers`);
+  değiştirdikten sonra **mutlaka derleyin**, yoksa ziyaretçiler eski sürümü görmeye devam eder (`config.js` en geç 10 dakikada yenilenir).
+- Sayfanın ilk büyük görselini öncelikli, diğerlerini ekrana yaklaşınca yükler.
+
+Ayarlar (değiştirdikten sonra `node build.mjs` çalıştırın; arama motoru verisi ve önbellek adresi de güncellenir):
+- **Şirket bilgileri, telefon, WhatsApp, e-posta, paket fiyatları (KDV dahil) ve karşılaştırma tablosu:** `public/assets/config.js`
   (boş alanlar sitede gösterilmez; yasal sayfalarda sarı `[yer tutucu]` olarak kalır — yayından önce doldurun).
+  Bir pakete henüz aktif olmayan özellik eklemek için `soon: [...]` kullanın; kartta "Yakında" rozetiyle görünür.
 - **Kanal listesi (aktif / yakında):** `public/assets/site.js` → `ACTIVE`, `SOON`. Kanal yetenek tablosu `src/pages/entegrasyonlar.html` içindedir.
 - **Rakamlar şeridi** (ana sayfa, `class="stats"`): yalnız doğrulanabilir bilgiler yazın (müşteri sayısı, memnuniyet oranı gibi değerleri gerçek veri olmadan eklemeyin).
 - **Ekran görüntüleri:** `public/img/*.jpg` (panelin deneme modundan, 1440×900).
