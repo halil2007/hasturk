@@ -244,6 +244,10 @@ const MIGRATIONS = [
   'ALTER TABLE orders ADD COLUMN missing_why TEXT',
   'ALTER TABLE orders ADD COLUMN checked_at INTEGER',
   'CREATE INDEX IF NOT EXISTS orders_missing ON orders(missing_n) WHERE missing_n >= 2',
+  // Önerilen kategori eşleşmesi (bkz. catalog.js): sistem kendisi eşleştirmez; öneri kullanıcı onaylayınca category_map'e yazılır.
+  // rejected: kullanıcının reddettiği pazaryeri kategorileri (JSON dizi) — tekrar önerilmez
+  `CREATE TABLE IF NOT EXISTS category_suggest (local TEXT NOT NULL, channel TEXT NOT NULL, remote_id TEXT, remote_name TEXT, path TEXT, score REAL,
+    sure INTEGER NOT NULL DEFAULT 0, rejected TEXT, created_at INTEGER, PRIMARY KEY (local, channel))`,
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

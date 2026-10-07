@@ -9,6 +9,7 @@ export async function uploadView(el) {
   let st = null, chId = store.get('upload_ch') || '', allUp = false;
   const C = () => st.channels.find((c) => c.id === chId);
   const mapOf = (local) => st.maps.find((m) => m.local === local && m.channel === chId);
+  const sugOf = (local) => (st.suggestions || []).find((m) => m.local === local && m.channel === chId);
 
   // Kanal işlerken sayfa açıksa 30 saniyede bir yenilenir (sonuç beklemeden görünür)
   let poll = null;
@@ -34,17 +35,19 @@ export async function uploadView(el) {
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
         <h2 style="margin:0">2 · Otomatik işlemler · ${c.name}</h2>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="auto_upload" ${c.auto ? 'checked' : ''}><span></span></span>
-          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Eşleştirilmiş kategorilerdeki, ${c.name}'da olmayan ve stoğu olan yeni ürünler kendiliğinden gönderilir; eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir.</span></span></label>
+          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Onayladığınız kategori eşleşmelerindeki, ${c.name}'da olmayan ve stoğu olan yeni ürünler kendiliğinden gönderilir; eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir.</span></span></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="stock_push" ${c.stockPush ? 'checked' : ''}><span></span></span>
           <span><b>Stokları ${c.name}'a gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${c.name}'a gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
       </div>` : ''}
       <div class="card flush">
-        <div class="card-head" style="padding:16px 16px 0"><div style="min-width:0"><h2>1 · Kategori eşleştirme ve gönderim</h2><div class="muted small">Kategoriyi eşleştirin, sonra “ürünü gönder” ile kanalda olmayan ürünleri yükleyin.</div></div><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorilerini en uygun ${c.name} kategorisine bağlar"><i class="ico ico-bolt"></i>Otomatik eşleştir</button><button class="btn sm" data-act="review" title="Mevcut eşleştirmeleri yeni algoritmayla kontrol eder; yanlış görünenler için daha uygun kategori önerir"><i class="ico ico-check"></i>Eşleştirmeleri kontrol et</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
+        <div class="card-head" style="padding:16px 16px 0"><div style="min-width:0"><h2>1 · Kategori eşleştirme ve gönderim</h2><div class="muted small">Sistem her kategori için uygun ${c.name} kategorisini önerir; öneri doğruysa “Onayla”, değilse “Başka kategori seç”. Onaylamadığınız kategoride eşleşme yapılmaz ve ürün gönderilmez.</div></div><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorileri için en uygun ${c.name} kategorisini önerir; siz onaylamadan eşleşmez"><i class="ico ico-bolt"></i>Kategori öner</button><button class="btn sm" data-act="review" title="Mevcut eşleştirmeleri yeni algoritmayla kontrol eder; yanlış görünenler için daha uygun kategori önerir"><i class="ico ico-check"></i>Eşleştirmeleri kontrol et</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>ikas kategorisi</th><th class="r">Ürün</th><th class="r">${c.name}'da</th><th>${c.name} kategorisi</th><th></th></tr></thead><tbody>
           ${st.categories.map((k) => { const m = mapOf(k.local), open = k.n - (k.listed[chId] || 0); return html`<tr>
             <td><b>${catName(k.local)}</b></td><td class="r num">${n(k.n)}</td><td class="r num">${n(k.listed[chId] || 0)}</td>
-            <td>${m ? html`<span class="pill good">${m.remote_name || m.remote_id}</span> <span class="tiny muted">${Object.keys(m.attrs).length} özellik</span>` : html`<span class="muted small">eşleştirilmedi</span>`}</td>
-            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${isAdmin() ? html`<button class="btn sm" data-act="map" data-l="${k.local}">${m ? 'Düzenle' : 'Eşleştir'}</button>` : ''}
+            <td>${m ? html`<span class="pill good">${m.remote_name || m.remote_id}</span> <span class="tiny muted">${Object.keys(m.attrs).length} özellik</span>`
+              : sugOf(k.local) ? html`<div class="row wrap" style="gap:6px"><span class="pill ${sugOf(k.local).sure ? 'info' : 'warn'}" title="Sistem önerisi: onaylamadan eşleşmez">Önerilen: ${sugOf(k.local).remote_name}</span>${sugOf(k.local).sure ? '' : html`<span class="tiny muted">zayıf öneri, kontrol edin</span>`}</div>${sugOf(k.local).path ? html`<div class="tiny muted">${sugOf(k.local).path}</div>` : ''}`
+              : html`<span class="muted small">eşleştirilmedi</span>`}</td>
+            <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${isAdmin() && !m && sugOf(k.local) ? html`<button class="btn sm primary" data-act="accept" data-l="${k.local}" title="Önerilen kategoriyle eşleştir"><i class="ico ico-check"></i>Onayla</button><button class="btn sm ghost" data-act="reject" data-l="${k.local}" title="Bu öneriyi kaldır (tekrar önerilmez)"><i class="ico ico-x"></i></button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="map" data-l="${k.local}">${m ? 'Düzenle' : sugOf(k.local) ? 'Başka kategori seç' : 'Eşleştir'}</button>` : ''}
               ${m && open > 0 && isAdmin() ? html`<button class="btn sm primary" data-act="send" data-l="${k.local}"><i class="ico ico-upload"></i>${open} ürünü gönder</button>` : ''}</div></td></tr>`; })}
           ${!st.categories.length ? html`<tr><td colspan="5" class="empty">Ürün yok. Önce ikas ürünlerini içe aktarın.</td></tr>` : ''}
         </tbody></table></div></div>`}
@@ -240,9 +243,15 @@ export async function uploadView(el) {
     opts: () => optsSheet(),
     automap: (t) => busy(t, async () => {
       const r = await api('catalog/automap', { method: 'POST', body: { channel: chId } });
-      toast(`${r.mapped.length} kategori otomatik eşleştirildi${r.skipped.length ? ` · ${r.skipped.length} kategori için uygun eşleşme bulunamadı (elle eşleştirin)` : ''}${r.mapped.some((x) => x.missing.length) ? ' · bazılarında zorunlu özellik eksik, “Düzenle” ile tamamlayın' : ''}`);
+      toast(r.suggested.length ? `${r.suggested.length} kategori için öneri hazır — doğru olanları “Onayla” ile eşleştirin${r.none.length ? ` · ${r.none.length} kategori için uygun öneri yok (kendiniz seçin)` : ''}` : r.none.length ? `${r.none.length} kategori için uygun öneri bulunamadı; “Eşleştir” ile kendiniz seçin` : 'Eşleştirilmemiş kategori yok');
       await load();
     }),
+    accept: (t) => busy(t, async () => {
+      const r = await api('catalog/suggest/accept', { method: 'POST', body: { channel: chId, local: t.dataset.l } });
+      toast(`Eşleştirildi: ${r.remote}${r.missing.length ? ` · zorunlu özellik eksik (${r.missing.slice(0, 3).join(', ')}), “Düzenle” ile tamamlayın` : ''}`, !!r.missing.length);
+      await load();
+    }),
+    reject: (t) => busy(t, async () => { await api('catalog/suggest/reject', { method: 'POST', body: { channel: chId, local: t.dataset.l } }); toast('Öneri kaldırıldı; “Eşleştir” ile kendiniz seçebilirsiniz'); await load(); }),
     review: () => reviewSheet(),
     check: (t) => busy(t, async () => { const r = await api(`catalog/uploads/${t.dataset.id}/check`, { method: 'POST' }); toast(r.done ? 'Kanal işlemi tamamladı' : 'Kanal hâlâ işliyor, birazdan tekrar sorgulayın'); await load(); }),
     detail: (t) => detailSheet(st.uploads.find((u) => String(u.id) === t.dataset.id)),
