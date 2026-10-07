@@ -259,9 +259,17 @@ const ready = new WeakMap();
 export function init(db) {
   if (!ready.has(db)) {
     ready.set(db, (async () => {
-      try { const r = await db.prepare("SELECT v FROM settings WHERE k = 'schema_v'").first(); if (r && JSON.parse(r.v) === SCHEMA_V) return; } catch { /* ilk kurulum */ }
+      // Yeni yayında yalnız sonradan eklenen geçişler çalışır (MIGRATIONS yalnız sona eklenir): tümünü sırayla çalıştırmak
+      // büyük veritabanında açılışı saniyelerce bekletiyordu. Kayıt yoksa ya da liste beklenmedik biçimde değiştiyse hepsi çalışır.
+      let done = -1;
+      try {
+        const r = await db.prepare("SELECT k, v FROM settings WHERE k IN ('schema_v', 'schema_n')").all();
+        const m = Object.fromEntries((r.results || []).map((x) => [x.k, JSON.parse(x.v)]));
+        if (m.schema_v === SCHEMA_V) return;
+        if (Number.isInteger(m.schema_n) && m.schema_n < MIGRATIONS.length) done = m.schema_n;
+      } catch { /* ilk kurulum */ }
       await db.batch(SCHEMA.map((s) => db.prepare(s)));
-      for (const m of MIGRATIONS) { try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
+      for (const m of done >= 0 ? MIGRATIONS.slice(done) : MIGRATIONS) { try { await db.prepare(m).run(); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; } }
       // Tek seferlik: sistem tamamen hazır olana kadar kanallara stok gönderimi kapatılır (stoklar ikas sitesinden okunur).
       // Sonradan Ayarlar → Stok'tan açılabilir; bu adım bir daha çalışmaz.
       if (!(await db.prepare("SELECT 1 AS x FROM settings WHERE k = 'once:stock_off_1'").first())) {
@@ -279,7 +287,10 @@ export function init(db) {
           db.prepare("INSERT INTO settings (k, v) VALUES ('once:unhold_ikas_1', '1') ON CONFLICT (k) DO NOTHING"),
         ]);
       }
-      await db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)).run();
+      await db.batch([
+        db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)),
+        db.prepare("INSERT INTO settings (k, v) VALUES ('schema_n', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(MIGRATIONS.length)),
+      ]);
     })().catch((e) => { ready.delete(db); throw e; }));
   }
   return ready.get(db);

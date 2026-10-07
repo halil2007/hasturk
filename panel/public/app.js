@@ -198,7 +198,7 @@ async function route() {
 // fresh = false: sayfa açılışında önbellekteki özet anında kullanılır (arka planda tazelenir)
 export async function loadSummary(fresh = true) {
   const s = await api('summary', { fresh });
-  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.user = s.user; state.tenant = s.tenant || null; state.owner = !!s.owner; state.demo = s.demo || s.channels.some((c) => c.demo);
+  state.channels = s.channels; state.settings = s.settings; state.summary = s; state.summaryAt = Date.now(); state.user = s.user; state.tenant = s.tenant || null; state.owner = !!s.owner; state.demo = s.demo || s.channels.some((c) => c.demo);
   refreshChrome(s);
   refreshCount();
   // Firma panelinde hata mesajlarından tek tıkla destek talebi (ana panel talepleri kendisi yanıtlar)
@@ -478,11 +478,13 @@ function shellCache(build) {
   if (!build) return;
   const old = store.get('build', null);
   store.set('build', build);
-  if (old && old !== build && navigator.serviceWorker.controller && window.caches) caches.delete('shell-v2').finally(() => location.reload());
+  // Yeni yayın: saklanan dosyalar silinir; sayfa YENİLENMEZ (yayın yayılırken eski / yeni sürüm sırayla gelince yenileme döngüsü olmasın).
+  // Uygulama dosyaları zaten ağdan öncelikli alınır (sw.js); eski CSS + yeni JS karışırsa assetsMatch bir kez yeniler.
+  if (old && old !== build && window.caches) caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))).catch(() => {});
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-08t';
+const ASSETS = '2026-10-08u';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');
@@ -494,9 +496,22 @@ function assetsMatch() {
   return false;
 }
 
-async function start() {
-  if (!assetsMatch()) return;
-  try { await loadSummary(); } catch { return; }
+// Açılış: özet alınamazsa (yeni yayın anı, geçici sunucu hatası) boş ekranda kalınmaz — kendiliğinden 3 kez yeniden denenir,
+// sonra "Tekrar dene" düğmesi gösterilir. Giriş gerekiyorsa giriş ekranı açılmıştır (login), bir şey yapılmaz.
+async function start(attempt = 0) {
+  if (!attempt && !assetsMatch()) return;
+  try { await loadSummary(); } catch (e) {
+    if (e.auth || document.querySelector('.login')) return;
+    const view = $('#view'), wait = [2, 5, 10][attempt];
+    if (view) render(view, html`<div class="empty" data-boot-error style="padding:48px 16px"><i class="ico ico-warn"></i><div style="margin:8px 0"><b>Panel açılamadı.</b> ${e.message}</div>
+      ${wait ? html`<div class="muted small">${wait} sn içinde yeniden denenecek…</div>` : ''}<button class="btn primary" data-boot-retry style="margin-top:10px"><i class="ico ico-sync"></i>Tekrar dene</button></div>`);
+    const retry = () => { clearTimeout(t); start(attempt + 1); };
+    const t = wait ? setTimeout(retry, wait * 1000) : null;
+    const b = $('[data-boot-retry]'); if (b) b.onclick = () => (attempt >= 3 ? location.reload() : retry());
+    window.__booted = true;
+    return;
+  }
+  window.__booted = true;
   shellCache(state.summary.build);
   nav();
   refreshChrome();
@@ -586,6 +601,8 @@ document.addEventListener('click', (e) => {
   input.addEventListener('blur', () => setTimeout(close, 180));
   input.addEventListener('focus', () => { if (input.value.trim().length >= 2 && box.childElementCount) box.hidden = false; });
 })();
-setInterval(() => { loadSummary().catch(() => {}); }, 3 * 60e3);
+// Özet 3 dakikada bir tazelenir; sekme arka plandayken sunucu boşuna meşgul edilmez (öne gelince hemen tazelenir)
+setInterval(() => { if (document.visibilityState === 'visible') loadSummary().catch(() => {}); }, 3 * 60e3);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.summary && Date.now() - (state.summaryAt || 0) > 3 * 60e3) loadSummary().catch(() => {}); });
 start();
 export { ago };

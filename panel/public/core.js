@@ -66,15 +66,20 @@ export async function api(path, { method = 'GET', body, fresh = false } = {}) {
 async function request(path, method, body) {
   busyBar(1);
   let res;
+  // Okuma istekleri en fazla 20 sn beklenir: takılan bir bağlantı (ör. yeni yayın anında) sayfayı sonsuza kadar bekletmesin
+  const ctl = method === 'GET' && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), 20e3) : null;
   try {
     res = await fetch('/api/' + path, {
-      method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin',
+      method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
     });
-  } catch (e) { throw new Error('Sunucuya ulaşılamadı; internet bağlantınızı kontrol edin'); } finally { busyBar(-1); }
+  } catch (e) {
+    throw new Error(ctl && ctl.signal.aborted ? 'Sunucu yanıt vermedi; birazdan tekrar deneyin' : 'Sunucuya ulaşılamadı; internet bağlantınızı kontrol edin');
+  } finally { clearTimeout(timer); busyBar(-1); }
   let data = {};
   try { data = await res.json(); } catch { /* boş */ }
-  if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw new Error(data.error || 'Giriş gerekli'); }
-  if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw new Error(data.error); }
+  if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw Object.assign(new Error(data.error || 'Giriş gerekli'), { auth: true }); }
+  if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw Object.assign(new Error(data.error), { auth: true }); }
   if (!res.ok) {
     const raw = data.error || `Hata (${res.status})`, e = new Error(friendly(raw)); e.raw = raw;
     // İşlem hataları (yazma istekleri) ve sunucu hataları kendiliğinden kaydedilir (ana panelin "Müşteri hataları")

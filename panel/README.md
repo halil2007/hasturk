@@ -289,3 +289,11 @@ ikas şema özetini güncellemek (ikas yeni sürüm yayınlarsa): `npm pack @ika
 ### Kargo gideri ve görünüm
 - **Kargo gideri (kâr hesabı):** sırasıyla kanalın kargo faturası → siparişe elle girilen tutar → **ürüne girilen kargo tutarı** (Ürünler → Düzenle → "Kargo tutarı"; siparişteki ürünlerin en yükseği, tek koli varsayımı) → Ayarlar → Giderler'deki sipariş başı tutar. Hiçbiri yoksa sipariş kârlılığında "ürüne girilmedi" yazar; tahmin yapılmaz.
 - **Tema:** varsayılan açık tema. Koyu tema ve "cihaz temasına uy" Ayarlar → Görünüm'den (ya da sağ üstteki kullanıcı menüsünden) seçilir; seçim cihaz başına saklanır.
+
+### Açılışın takılmaması (yeni yayın sırasında)
+- Uygulama dosyaları önce ağdan alınır (4 sn içinde gelmezse cihazdaki kopya, `sw.js`): yeni yayından sonra eski / yeni dosyalar karışıp panel boş ekranda kalmaz.
+- `boot.js`: panel 12 sn içinde açılmazsa saklanan dosyalar silinip sayfa bir kez yenilenir (2 dakikada en fazla bir kez).
+- Okuma istekleri en fazla 20 sn beklenir. Açılışta özet alınamazsa "Panel açılamadı · Tekrar dene" gösterilir ve 2 / 5 / 10 sn sonra kendiliğinden yeniden denenir.
+- Yeni yayın (sunucu sürümü değişti) sayfayı yenilemez, yalnız saklanan dosyaları siler (yayın yayılırken yenileme döngüsü olmaz).
+- Şema güncellemesinde yalnız yeni eklenen geçişler çalışır (`schema_n`); firma paneli yeniden başlayınca yarıda kalan senkron kilidi hemen bırakılır.
+- Özet sekme arka plandayken tazelenmez (sunucu boşuna meşgul edilmez).
