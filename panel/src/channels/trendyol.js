@@ -45,7 +45,7 @@ export function trendyol(env, meta) {
         items.push({
           lineId: id, sku: str(l.merchantSku || l.stockCode), barcode: str(l.barcode), name: str(l.productName), image: '',
           quantity: num(l.quantity, 1), unitPrice: unit, total: unit * num(l.quantity, 1),
-          status: /Cancel|UnSupplied|Return/i.test(l.orderLineItemStatusName || '') || STATUS[p.status] === 'cancelled' ? 'cancelled' : '',
+          status: /Cancel|UnSupplied/i.test(l.orderLineItemStatusName || '') || STATUS[p.status] === 'cancelled' ? 'cancelled' : /Return/i.test(l.orderLineItemStatusName || '') || STATUS[p.status] === 'returned' ? 'returned' : '',
           remoteKey: str(l.barcode),
         });
       }

@@ -3,7 +3,7 @@
 // Kanal arayüzü: claims({ since, until, page, size }) → { items, hasNext }, claimReasons(), approveClaim(c, lines), rejectClaim(c, lines, { reasonId, text, file })
 import { all, first, run, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
-import { chunk, str } from './util.js';
+import { chunk, str, DEAD_LINE } from './util.js';
 
 export const CLAIM_STATUS = ['waiting', 'accepted', 'rejected', 'other'];
 const parse = (v, d) => { try { return JSON.parse(v || ''); } catch { return d; } };
@@ -88,6 +88,10 @@ export async function approveClaim(env, db, channel, id, lineIds, user) {
   try { await ch.approveClaim(c, lines); }
   catch (e) { await run(db, 'UPDATE claims SET error = ? WHERE channel = ? AND remote_id = ?', e.message.slice(0, 400), channel, String(id)); throw e; }
   await decide(db, c, lines, 'accepted', user, '');
+  // Onaylanan iade siparişe ve (ayar açıksa) stoğa hemen yansır
+  await applyClaimReturns(db).catch(() => 0);
+  const { applyDirtyStock } = await import('./sync.js');
+  await applyDirtyStock(db).catch(() => 0);
   await log(db, channel, 'info', `${user.name}: iade onaylandı · sipariş ${c.order_number} (${lines.length} ürün)`);
   return { ok: true };
 }
@@ -119,4 +123,58 @@ export async function claimReasons(env, db, channel) {
   const ch = (await getChannels(env, db)).find((c) => c.id === channel);
   if (!ch || !ch.claimReasons) return [];
   return ch.claimReasons();
+}
+
+// ---------- kabul edilen iadeler → sipariş ve stok ----------
+// Kanal siparişi teslimden günler sonra iade edildiğinde sipariş listesi bunu her zaman göstermez (eski sipariş yeniden okunmaz).
+// Kabul edilmiş iade talebinin satırları siparişin ürün satırlarına işlenir: iade edilen adet (returned_qty), tamamı iade edilen
+// satır "iade", bütün satırları iade edilen sipariş "iade edildi" olur. Her senkronda baştan hesaplanır (sipariş kanaldan yeniden
+// yazılsa da kaybolmaz); değişen siparişin stoğu applyStock ile düzeltilir ("iadede stoğa ekle" ayarına göre).
+const keyN = (v) => str(v).trim().toUpperCase();
+export async function applyClaimReturns(db, { days = 180 } = {}) {
+  const rows = await all(db, `SELECT order_id, status, lines FROM claims WHERE order_id IS NOT NULL AND claimed_at > ? AND (status = 'accepted' OR lines LIKE '%"accepted"%')`, Date.now() - days * 864e5);
+  if (!rows.length) return 0;
+  const byOrder = new Map();
+  for (const c of rows) {
+    const acc = parse(c.lines, []).filter((l) => l.status === 'accepted' || (!l.status && c.status === 'accepted'));
+    if (acc.length) byOrder.set(c.order_id, (byOrder.get(c.order_id) || []).concat(acc));
+  }
+  let changed = 0;
+  for (const part of chunk([...byOrder.keys()], 80)) {
+    const q = part.map(() => '?').join(',');
+    const items = await all(db, `SELECT order_id, line_id, quantity, status, returned_qty, sku, barcode, remote_key, name FROM order_items WHERE order_id IN (${q}) ORDER BY order_id, line_id`, ...part);
+    const orders = new Map((await all(db, `SELECT id, status FROM orders WHERE id IN (${q})`, ...part)).map((o) => [o.id, o]));
+    const st = [], dirty = new Set();
+    for (const oid of part) {
+      const its = items.filter((i) => i.order_id === oid && i.status !== 'cancelled');
+      if (!its.length) continue;
+      const target = new Map(its.map((i) => [i.line_id, 0]));
+      for (const l of byOrder.get(oid)) {
+        let left = Math.max(1, Number(l.qty) || 1);
+        const keys = [l.barcode, l.sku].map(keyN).filter(Boolean);
+        let cand = its.filter((i) => [i.barcode, i.sku, i.remote_key].map(keyN).some((k) => k && keys.includes(k)));
+        if (!cand.length && its.length === 1) cand = its; // tek ürünlü sipariş
+        for (const i of cand) { const room = i.quantity - target.get(i.line_id), n = Math.min(room, left); if (n > 0) { target.set(i.line_id, target.get(i.line_id) + n); left -= n; } }
+      }
+      for (const i of its) {
+        const want = target.get(i.line_id), full = want >= i.quantity && i.quantity > 0;
+        // Kanalın kendi bildirdiği "iade" durumu korunur; bu adım yalnız iade ekler, geri almaz
+        if (want === (i.returned_qty || 0) && (!full || i.status === 'returned')) continue;
+        st.push(db.prepare(`UPDATE order_items SET returned_qty = ?, status = CASE WHEN ? = 1 AND COALESCE(status, '') = '' THEN 'returned' ELSE status END WHERE order_id = ? AND line_id = ?`)
+          .bind(want, full ? 1 : 0, oid, i.line_id));
+        dirty.add(oid);
+        if (full) i.status = 'returned';
+      }
+      // Bütün satırlar iade / iptal: sipariş "iade edildi"
+      const o = orders.get(oid);
+      if (o && ['shipped', 'delivered', 'processing'].includes(o.status) && items.filter((i) => i.order_id === oid).every((i) => DEAD_LINE(i.status))) {
+        st.push(db.prepare("UPDATE orders SET status = 'returned', updated_at = ? WHERE id = ?").bind(Date.now(), oid));
+        dirty.add(oid);
+      }
+    }
+    for (const oid of dirty) st.push(db.prepare('UPDATE orders SET stock_dirty = 1 WHERE id = ?').bind(oid));
+    for (const p2 of chunk(st, 90)) await db.batch(p2);
+    changed += dirty.size;
+  }
+  return changed;
 }

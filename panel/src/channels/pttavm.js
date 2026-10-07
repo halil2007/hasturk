@@ -94,7 +94,7 @@ export function pttavm(env, meta) {
           lineId: String(pick(l, 'SiparisDetayId', 'SiparisUrunId', 'LineId', 'Id') || `${no}-${i + 1}`),
           sku: str(pick(l, 'UrunKodu', 'StokKodu', 'SaticiUrunKodu')), barcode: str(pick(l, 'Barkod', 'UrunBarkod')), name: str(pick(l, 'UrunAdi', 'Urun')), image: '',
           quantity: qty, unitPrice: qty ? total / qty : total, total,
-          status: /iptal/i.test(pick(l, 'Durum', 'SiparisDurumu', 'UrunDurum')) ? 'cancelled' : '', remoteKey: str(pick(l, 'Barkod', 'UrunBarkod')),
+          status: /iptal/i.test(pick(l, 'Durum', 'SiparisDurumu', 'UrunDurum')) ? 'cancelled' : /iade/i.test(pick(l, 'Durum', 'SiparisDurumu', 'UrunDurum')) ? 'returned' : '', remoteKey: str(pick(l, 'Barkod', 'UrunBarkod')),
         };
       });
       const prev = byNo.get(no);

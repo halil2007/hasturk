@@ -1,6 +1,6 @@
 // Deneme modu (DEMO=1): API anahtarı girmeden paneli gerçekçi örnek verilerle denemek için.
 // Aynı tohum her seferinde aynı siparişleri üretir; zaman ilerledikçe yeni siparişler "gelir".
-import { dayKey } from '../util.js';
+import { dayKey, DEAD_LINE } from '../util.js';
 
 export const DEMO_PRODUCTS = [
   ['HG-SOL-5', '8690000000011', 'HG Solucan Gübresi 5 Kg', 189, 95, 1.5],
@@ -176,7 +176,7 @@ export function demo(meta) {
   async function fetchOne(remoteId) {
     const o = (await fetchOrders(Date.now() - 20 * 864e5, Date.now())).find((x) => x.remoteId === remoteId);
     if (!o) throw new Error('Örnek sipariş bulunamadı');
-    const live = o.items.filter((i) => i.status !== 'cancelled');
+    const live = o.items.filter((i) => !DEAD_LINE(i.status));
     return { ...o, status: 'processing', remoteStatus: 'CREATED / READY_FOR_SHIPMENT / PAID', packages: [{ remoteId: `IK-${o.orderNumber}`, items: live.map((i) => ({ line_id: i.lineId, qty: i.quantity })), status: 'open', remoteStatus: 'READY_FOR_SHIPMENT', cargoCompany: 'hepsiJET', barcode: `7300${o.orderNumber.replace(/\D/g, '')}`, agreement: 'ikas', packed: true }] };
   }
   return {

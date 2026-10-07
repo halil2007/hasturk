@@ -3,7 +3,7 @@
 // Kargo: N11 anlaşmalı kargo; durum kargo okutunca kendiliğinden "Shipped" olur (API'de kargoya verme / etiket servisi yok).
 // Ürün yükleme REST (cdn/categories, ms/product/tasks); iade talepleri SOAP (ws/returnService). Hakediş / fatura (finans) servisi yok.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, imageList } from '../util.js';
+import { http, num, str, chunk, imageList, DEAD_LINE } from '../util.js';
 
 const BASE = 'https://api.n11.com';
 const STATUS = { Created: 'new', Picking: 'processing', UnPacked: 'processing', Shipped: 'shipped', Delivered: 'delivered', Cancelled: 'cancelled', UnSupplied: 'cancelled', Returned: 'returned' };
@@ -23,7 +23,7 @@ export function n11(env, meta) {
         if (items.some((i) => i.lineId === String(l.orderLineId))) continue;
         const qty = num(l.quantity, 1), unit = num(l.price);
         items.push({ lineId: String(l.orderLineId), sku: str(l.stockCode), barcode: str(l.barcode), name: str(l.productName), image: '', quantity: qty, unitPrice: unit, total: num(l.dueAmount) || unit * qty,
-          status: STATUS[p.shipmentPackageStatus] === 'cancelled' ? 'cancelled' : '', remoteKey: str(l.stockCode) });
+          status: ['cancelled', 'returned'].includes(STATUS[p.shipmentPackageStatus]) ? STATUS[p.shipmentPackageStatus] : '', remoteKey: str(l.stockCode) });
       }
       const live = list.filter((p) => !['cancelled', 'returned'].includes(STATUS[p.shipmentPackageStatus]));
       const status = !live.length ? (list.some((p) => STATUS[p.shipmentPackageStatus] === 'returned') ? 'returned' : 'cancelled')
@@ -80,7 +80,7 @@ export function n11(env, meta) {
 
   // İşleme al: "Picking" (yalnızca Created satırlar)
   async function accept(order) {
-    const lines = order.items.filter((i) => i.status !== 'cancelled').map((i) => ({ lineId: Number(i.line_id) || i.line_id }));
+    const lines = order.items.filter((i) => !DEAD_LINE(i.status)).map((i) => ({ lineId: Number(i.line_id) || i.line_id }));
     if (lines.length) await call('/rest/order/v1/update', { method: 'PUT', body: { lines, status: 'Picking' } });
   }
 

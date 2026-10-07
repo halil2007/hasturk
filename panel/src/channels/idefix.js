@@ -85,7 +85,7 @@ export function idefix(env, meta) {
     const items = (s.items || []).map((it) => {
       const qty = num(it.quantity, 1), total = num(it.discountedTotalPrice) || num(it.price ?? it.productPrice) * qty;
       return { lineId: str(it.id || it.orderLineId), sku: str(it.merchantSku || it.erpId), barcode: str(it.barcode), name: str(it.productName || it.title), image: str(it.image || it.productImage).replace('{size}', '300/'), quantity: qty, variantName: (it.productAttributes || []).map((a) => a.attributeValueName).filter(Boolean).join(' / '), unitPrice: qty ? total / qty : total, total,
-        status: st === 'cancelled' ? 'cancelled' : '', remoteKey: str(it.barcode), commission: it.commissionAmount != null ? num(it.commissionAmount) : null };
+        status: st === 'cancelled' || st === 'returned' ? st : '', remoteKey: str(it.barcode), commission: it.commissionAmount != null ? num(it.commissionAmount) : null };
     });
     return {
       remoteId: str(s.id), orderNumber: str(s.orderNumber || s.id), orderedAt: Date.parse(s.orderDate || s.createdAt) || Date.now(), remoteStatus: str(s.status), status: st,
@@ -314,7 +314,7 @@ export function idefix(env, meta) {
 
   const missing = ['IDEFIX_API_KEY', 'IDEFIX_API_SECRET', 'IDEFIX_VENDOR_ID'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'idefix', enabled: !missing.length, missing,
+    ...meta, type: 'idefix', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
     fetchOrders, fetchListings, pushStock, pushPrice, accept, ship, diagnose, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim,
   };

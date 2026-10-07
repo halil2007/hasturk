@@ -37,7 +37,7 @@ export function pazarama(env, meta) {
     const items = (o.items || []).map((it) => {
       const p = it.product || {}, qty = num(it.quantity, 1), total = val(it.totalPrice) || val(it.salePrice) * qty;
       return { lineId: str(it.orderItemId), sku: str(p.stockCode), barcode: str(p.barcode || p.code), name: str(p.name), image: str(p.imageUrl), quantity: qty, unitPrice: qty ? total / qty : total, total,
-        status: ['cancelled', 'returned'].includes(ITEM(it.orderItemStatus)) ? 'cancelled' : '', remoteKey: str(p.code || p.barcode), _st: ITEM(it.orderItemStatus), cargo: it.cargo || {} };
+        status: ['cancelled', 'returned'].includes(ITEM(it.orderItemStatus)) ? ITEM(it.orderItemStatus) : '', remoteKey: str(p.code || p.barcode), _st: ITEM(it.orderItemStatus), cargo: it.cargo || {} };
     });
     const live = items.filter((i) => !['cancelled', 'returned'].includes(i._st));
     const status = !live.length ? (items.some((i) => i._st === 'returned') ? 'returned' : 'cancelled') : RANKS[Math.min(...live.map((i) => Math.max(0, RANKS.indexOf(i._st))))];
@@ -99,7 +99,7 @@ export function pazarama(env, meta) {
 
   const missing = ['PAZARAMA_CLIENT_ID', 'PAZARAMA_CLIENT_SECRET'].filter((k) => !env[k]);
   return {
-    ...meta, type: 'pazarama', enabled: !missing.length, missing,
+    ...meta, type: 'pazarama', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
     fetchOrders, fetchListings, pushStock, pushPrice, accept, questions, answer,
   };

@@ -198,6 +198,8 @@ const MIGRATIONS = [
   // Düşüm yapılınca 0 olur; senkron yarıda kesilse bile bir sonraki senkronda tamamlanır.
   'ALTER TABLE orders ADD COLUMN stock_dirty INTEGER NOT NULL DEFAULT 0',
   'CREATE INDEX IF NOT EXISTS orders_stock_dirty ON orders(stock_dirty) WHERE stock_dirty = 1',
+  // Kabul edilmiş iade talebiyle iade edilen adet (bkz. claims.js applyClaimReturns); "iadede stoğa ekle" açıksa stoğa döner
+  'ALTER TABLE order_items ADD COLUMN returned_qty INTEGER NOT NULL DEFAULT 0',
   // Firma tahsilatları (ödeme kaydı; aboneliği uzatır)
   `CREATE TABLE IF NOT EXISTS tenant_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL, at INTEGER NOT NULL, amount REAL NOT NULL,
     months INTEGER NOT NULL DEFAULT 0, method TEXT, note TEXT, user TEXT)`,

@@ -1,7 +1,7 @@
 // Toplama listesi: kargoya çıkacak (yeni / hazırlanıyor) siparişlerdeki ürünlerin toplu listesi — depoda tek turda toplanır.
 // Paketi olmayan siparişte tüm satırlar (iptaller hariç), paketlenmiş siparişte yalnız açık (gönderilmemiş) paketlerdeki adetler sayılır.
 import { all } from './db.js';
-import { chunk, str } from './util.js';
+import { chunk, str, DEAD_LINE } from './util.js';
 
 const parse = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 const inList = (n) => Array(n).fill('?').join(',');
@@ -26,7 +26,7 @@ export async function pickList(db, { channel, ids } = {}) {
   for (const o of orders) {
     const ls = byOrder.get(o.id) || [], ps = pkgs.get(o.id);
     let need;
-    if (!ps || !ps.length) need = ls.filter((l) => l.status !== 'cancelled').map((l) => [l, l.quantity]);
+    if (!ps || !ps.length) need = ls.filter((l) => !DEAD_LINE(l.status)).map((l) => [l, l.quantity]);
     else {
       const open = new Map();
       for (const p of ps) if (p.status === 'open') for (const x of parse(p.items, [])) open.set(String(x.line_id), (open.get(String(x.line_id)) || 0) + Number(x.qty || 0));

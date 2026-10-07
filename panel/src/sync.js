@@ -15,7 +15,7 @@ import { autoMatch, relinkItems, repairDuplicates } from './match.js';
 import { runJobs, createJob } from './backfill.js';
 import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
-import { syncClaims } from './claims.js';
+import { syncClaims, applyClaimReturns } from './claims.js';
 import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 import { checkPendingUploads, autoUpload } from './catalog.js';
@@ -164,7 +164,7 @@ export async function applyStock(db, orderIds, settings) {
   let moves = 0;
   for (const part of chunk(orderIds, 90)) {
     const q = part.map(() => '?').join(',');
-    const rows = await all(db, `SELECT o.id, o.status, o.ordered_at, o.order_number, o.channel, i.product_id, i.quantity, i.status AS istatus, p.created_at AS pcreated
+    const rows = await all(db, `SELECT o.id, o.status, o.ordered_at, o.order_number, o.channel, i.product_id, i.quantity, i.status AS istatus, i.returned_qty AS rqty, p.created_at AS pcreated
       FROM orders o JOIN order_items i ON i.order_id = o.id JOIN products p ON p.id = i.product_id WHERE o.id IN (${q})`, ...part);
     const recs = await all(db, `SELECT s.order_id, s.product_id, s.qty, o.ordered_at, o.order_number, o.channel, p.created_at AS pcreated
       FROM order_stock s LEFT JOIN orders o ON o.id = s.order_id LEFT JOIN products p ON p.id = s.product_id WHERE s.order_id IN (${q})`, ...part);
@@ -173,7 +173,9 @@ export async function applyStock(db, orderIds, settings) {
       const k = r.id + '\u0000' + r.product_id;
       info.set(k, r);
       const gone = r.status === 'cancelled' || (r.status === 'returned' && settings.restock_returns) || r.istatus === 'cancelled' || (r.istatus === 'returned' && settings.restock_returns);
-      want.set(k, (want.get(k) || 0) + (gone ? 0 : r.quantity));
+      // Kısmi iade (iade talebiyle): iade edilen adet, ayar açıksa stoğa döner
+      const back = settings.restock_returns ? Math.min(r.quantity, Math.max(0, r.rqty || 0)) : 0;
+      want.set(k, (want.get(k) || 0) + (gone ? 0 : r.quantity - back));
     }
     const have = new Map(recs.map((r) => [r.order_id + '\u0000' + r.product_id, r.qty]));
     // Siparişte artık olmayan (eşleşmesi kaldırılan / satırı silinen) ürün: kayıt bilgisi order_stock'tan; düşülen adet geri eklenir
@@ -421,6 +423,7 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.mirrored = await mirrorStock(db, settings);
     out.info = await fillProductInfo(db, settings).catch((e) => 'hata: ' + e.message);
     // 4) stok düşümü ve gönderim
+    out.returns = await applyClaimReturns(db).catch((e) => 'hata: ' + e.message);
     out.stockMoves = await applyStock(db, changed, settings) + await applyDirtyStock(db, settings);
     out.stock = await pushStocks(env, db, settings);
     // Döviz bazlı fiyatlar: kur yenilenir, zamanı geldiyse ürün ve kanal fiyatları güncellenir (sonra fiyatlar gönderilir)
@@ -434,8 +437,9 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
     // Eski açık siparişler: kanaldan yeniden sorgulanır; 30 günü geçip hâlâ açık görünen tamamlandı sayılır
     if (!only) out.stale = await staleOrders(env, db, chans, maps).catch((e) => 'hata: ' + e.message);
-    // Eski siparişlerde bulunan iptal / iade: stok hemen düzeltilir (bir sonraki senkronu beklemeden)
-    if (!only) out.stockMoves += await applyDirtyStock(db, settings).catch(() => 0);
+    // Eski siparişlerde bulunan iptal / iade ve bu senkronda kabul edilen iade talepleri: stok hemen düzeltilir
+    await applyClaimReturns(db).catch(() => 0);
+    out.stockMoves += await applyDirtyStock(db, settings).catch(() => 0);
     // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
     if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
     if (!only) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);

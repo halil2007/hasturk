@@ -65,7 +65,7 @@ test('Çiçeksepeti: durum metinleri ve sayısal kodlar, tamamen iptal/iade', as
   const ch = ciceksepeti({ CICEKSEPETI_API_KEY: 'K' }, { id: 'cs' });
   const by = Object.fromEntries((await ch.fetchOrders(Date.now() - D, Date.now())).map((o) => [o.remoteId, o]));
   assert.equal(by[1].status, 'processing');
-  assert.equal(by[2].status, 'returned'); assert.equal(by[2].items[0].status, 'cancelled');
+  assert.equal(by[2].status, 'returned'); assert.equal(by[2].items[0].status, 'returned');
   assert.equal(by[3].status, 'cancelled');
   assert.equal(by[4].status, 'shipped');
   assert.equal(by[5].status, 'shipped');

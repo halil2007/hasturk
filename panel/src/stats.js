@@ -40,7 +40,7 @@ async function period(db, fromMs, toMs, group, settings) {
     FROM order_items i JOIN orders o ON o.id = i.order_id
     LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
-    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status != 'cancelled'`, fromMs, toMs);
+    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status NOT IN ('cancelled', 'returned')`, fromMs, toMs);
   const seen = new Set();
   let missingCost = 0;
   for (const l of lines) {
@@ -90,7 +90,7 @@ export async function topProducts(db, fromMs, toMs, limit = 20) {
   const rows = await all(db, `SELECT i.product_id, COALESCE(p.name, i.name) AS name, COALESCE(p.sku, i.sku) AS sku, p.image, p.stock, o.channel,
       SUM(i.quantity) AS qty, SUM(i.total) AS revenue, COUNT(DISTINCT o.id) AS orders
     FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
-    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status != 'cancelled'
+    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status NOT IN ('cancelled', 'returned')
     GROUP BY COALESCE(CAST(i.product_id AS TEXT), 'n:' || COALESCE(NULLIF(i.sku, ''), i.name)), o.channel`, fromMs, toMs);
   const m = new Map();
   for (const r of rows) {
@@ -184,7 +184,7 @@ export async function insights(db, q) {
   // 1) Son 4 dönem kartları (+ karşılaştırma için 5. dönem)
   const starts = [0, 1, 2, 3, 4].map((b) => unitStart(unit, now, b));
   const rows = await all(db, `SELECT o.ordered_at, o.total, o.status,
-      (SELECT COALESCE(SUM(quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled') AS items
+      (SELECT COALESCE(SUM(quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status NOT IN ('cancelled', 'returned')) AS items
     FROM orders o WHERE o.ordered_at >= ?${cw}`, starts[4], ...ca);
   const cards = starts.slice(0, 5).map((s, i) => ({ start: s, end: i ? starts[i - 1] : now + 1, revenue: 0, orders: 0, items: 0, lost: 0 }));
   for (const r of rows) {
@@ -209,7 +209,7 @@ export async function insights(db, q) {
   for (const w of weeks) w.revenue = r2(w.revenue);
   // 3) İller ve 4) en çok satanlar: seçilen aralıkta
   const [from, to] = rangeOf(q);
-  const crows = await all(db, `SELECT o.address, o.total, o.status, (SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled') AS units FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
+  const crows = await all(db, `SELECT o.address, o.total, o.status, (SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status NOT IN ('cancelled', 'returned')) AS units FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
   const cm = new Map();
   for (const r of crows) {
     let a = {}; try { a = JSON.parse(r.address || '{}'); } catch { /* boş */ }
@@ -222,7 +222,7 @@ export async function insights(db, q) {
   const trows = await all(db, `SELECT i.product_id, COALESCE(p.name, i.name) AS name, COALESCE(p.sku, i.sku) AS sku, COALESCE(p.image, i.image) AS image, p.stock, o.channel,
       SUM(i.quantity) AS qty, SUM(i.total) AS revenue, COUNT(DISTINCT o.id) AS orders, MIN(i.unit_price) AS min, MAX(i.unit_price) AS max
     FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
-    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status != 'cancelled'${cw}
+    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status NOT IN ('cancelled', 'returned')${cw}
     GROUP BY COALESCE(CAST(i.product_id AS TEXT), 'n:' || COALESCE(NULLIF(i.sku, ''), i.name)), o.channel`, from, to, ...ca);
   const tm = new Map();
   for (const r of trows) {

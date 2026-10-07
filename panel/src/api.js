@@ -30,7 +30,7 @@ import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk } from './util.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
@@ -91,7 +91,7 @@ async function listOrders(db, q) {
   // Liste, toplam, durum sayıları ve ayarlar aynı anda okunur (sıralı gidiş-dönüş yerine tek bekleme)
   const f2 = orderFilter(q, { withStatus: false });
   const [rows, totalRow, counts, lateRow, byChannel, settings] = await Promise.all([all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src,
-      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty,
+      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status NOT IN ('cancelled', 'returned')) AS qty,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS lines,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND status = 'open') AS open_packages,
@@ -149,7 +149,7 @@ async function exportOrders(db, q) {
   return '﻿' + [head.join(';'), ...lines].join('\r\n');
 }
 
-const lineQty = (o) => new Map(o.items.filter((i) => i.status !== 'cancelled').map((i) => [String(i.line_id), i.quantity]));
+const lineQty = (o) => new Map(o.items.filter((i) => !DEAD_LINE(i.status)).map((i) => [String(i.line_id), i.quantity]));
 
 async function insertPackages(db, orderId, pkgs, status = 'open') {
   const t = Date.now();
@@ -557,7 +557,7 @@ async function listPackages(db, q) {
     ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args),
     // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler
     st === 'waiting' ? all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.extra, o.ordered_at, o.ship_by, o.status AS order_status, o.tracking, o.cargo_company,
-      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty
+      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status NOT IN ('cancelled', 'returned')) AS qty
     ${noPkg} ORDER BY o.ordered_at ASC LIMIT 300`, ...args) : [],
     st === 'waiting' ? null : first(db, `SELECT COUNT(*) AS n ${noPkg}`, ...args),
     ...keys.map((k) => first(db, `SELECT COUNT(*) AS n ${base} ${w(k)}`, ...args))]);
@@ -777,7 +777,7 @@ async function productDetail(db, id) {
   const gk = p.parent_key || p.group_name;
   p.siblings = gk ? (await all(db, "SELECT id FROM products WHERE COALESCE(NULLIF(parent_key, ''), NULLIF(group_name, ''), name) = ? LIMIT 300", gk)).map((r) => r.id) : [id];
   p.sales = await all(db, `SELECT o.channel, SUM(i.quantity) AS qty, SUM(i.total) AS revenue FROM order_items i JOIN orders o ON o.id = i.order_id
-    WHERE i.product_id = ? AND o.ordered_at >= ? AND o.status NOT IN ('cancelled', 'returned') AND i.status != 'cancelled' GROUP BY o.channel`, id, Date.now() - 30 * 864e5);
+    WHERE i.product_id = ? AND o.ordered_at >= ? AND o.status NOT IN ('cancelled', 'returned') AND i.status NOT IN ('cancelled', 'returned') GROUP BY o.channel`, id, Date.now() - 30 * 864e5);
   return p;
 }
 
