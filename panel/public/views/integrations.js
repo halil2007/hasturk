@@ -111,7 +111,8 @@ export async function integrations(el, rest = []) {
         : html`<input class="input" data-k="${f2.k}" value="${f2.value}" placeholder="${f2.hint && f2.hint.length < 48 ? f2.hint : ''}" autocomplete="off">`}
       ${f2.secret && f2.source === 'panel' ? html`<small><a href="#" class="link" data-act="clear" data-id="${c.id}" data-k="${f2.k}">Kayıtlı değeri sil</a></small>` : ''}</label>`;
   }
-  const sw = (attr, on, title, desc, dis = false) => html`<label class="iswitch ${dis ? 'dis' : ''}"><span style="flex:1;min-width:0"><b>${title}</b><span class="muted tiny">${desc}</span></span><span class="switch"><input type="checkbox" ${attr} ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span></span></span></label>`;
+  // Anahtar: data-<k>="<kanal>" (kanal kimliği değer olarak kaçışlanır; özellik metni hazır verilirse tırnaklar &quot; olur ve kimlik bozulur)
+  const sw = (k, cid, on, title, desc, dis = false) => html`<label class="iswitch ${dis ? 'dis' : ''}"><span style="flex:1;min-width:0"><b>${title}</b><span class="muted tiny">${desc}</span></span><span class="switch"><input type="checkbox" data-${k}="${cid}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span></span></span></label>`;
   function helpBox(c, k) {
     const f2 = k && c.fields.find((x) => x.k === k);
     return f2 ? html`<div class="ih-field"><div class="tiny muted">Seçili alan</div><b>${f2.label}${f2.req ? ' *' : ''}</b><div class="small">${f2.hint || (f2.secret ? 'Gizli bilgi: şifreli saklanır, ekranda tekrar gösterilmez.' : 'Kanalın satıcı panelindeki değerin aynısını girin.')}</div>${f2.secret ? html`<div class="tiny muted" style="margin-top:4px">Boş bırakırsanız kayıtlı değer korunur.</div>` : ''}</div>`
@@ -137,11 +138,11 @@ export async function integrations(el, rest = []) {
           <div class="id-brand">${chLogo(c.id)}<div style="min-width:0"><h2>${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2><div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${s.t}</div></div></div>
           ${c.beta ? html`<div class="notice small"><div><b>Test modülü:</b> yalnız bu panelde açık; firmalarda “Yakında” görünür.</div></div>` : ''}
           <div class="id-sws">
-            ${sw(`data-active="${c.id}"`, c.active, 'Kanal aktif', 'Kapalıysa senkronlanmaz', !admin)}
-            ${sw(`data-write="${c.id}"`, !held(c), 'Kanala yazma', 'Kapalıysa yalnız okunur: paketleme, stok, fiyat gönderilmez', !admin || !live)}
+            ${sw('active', c.id, c.active, 'Kanal aktif', 'Kapalıysa senkronlanmaz', !admin)}
+            ${sw('write', c.id, !held(c), 'Kanala yazma', 'Kapalıysa yalnız okunur: paketleme, stok, fiyat gönderilmez', !admin || !live)}
             ${isCatalog(c) ? html`<div class="iswitch dis"><span style="flex:1"><b>Stok gönderimi</b><span class="muted tiny">Ana katalog: stok bu kanaldan okunur</span></span></div>`
-              : sw(`data-stock="${c.id}"`, stockOn(c), 'Stok gönderimi', st().stock_sync ? 'Panel stoğu bu kanala otomatik gider' : 'Genel stok senkronu kapalıyken yalnız bu kanala gönderilir', !admin || !live)}
-            ${m ? sw(`data-mode="${c.id}"`, !m.manual, 'Yeni ilanları otomatik ekle', 'Kapalıysa yeni ilanları Kanal Ürünleri\'nden siz seçersiniz', !admin) : ''}
+              : sw('stock', c.id, stockOn(c), 'Stok gönderimi', st().stock_sync ? 'Panel stoğu bu kanala otomatik gider' : 'Genel stok senkronu kapalıyken yalnız bu kanala gönderilir', !admin || !live)}
+            ${m ? sw('mode', c.id, !m.manual, 'Yeni ilanları otomatik ekle', 'Kapalıysa yeni ilanları Kanal Ürünleri\'nden siz seçersiniz', !admin) : ''}
           </div>
           ${live ? html`<dl class="id-kv small">
             <dt>Siparişler</dt><dd>${c.last && c.last.ordersAt ? html`<span title="${dateTime(c.last.ordersAt)}">${ago(c.last.ordersAt)}</span>` : '—'}</dd>
