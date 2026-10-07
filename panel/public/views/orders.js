@@ -59,7 +59,7 @@ export async function orders(el, rest, query = {}) {
     return html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-orders"></i>Detay</button>`;
   }
   const products = (o) => html`<div class="row" style="min-width:180px">${thumb(o.items[0] && o.items[0].image, o.items[0] && o.items[0].name, 'sm')}
-    <div style="min-width:0"><div class="ellipsis" style="max-width:200px;font-weight:600">${o.items[0] ? o.items[0].name : '—'}</div>
+    <div style="min-width:0"><div class="ellipsis" style="max-width:200px;font-weight:600" title="${o.items[0] ? o.items[0].name : ''}">${o.items[0] ? o.items[0].name : '—'}</div>
     <div class="muted tiny">${o.lines > 1 ? `+ ${o.lines - 1} ürün daha · ` : ''}${o.qty || 0} adet${o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş</span>` : ''}</div></div></div>`;
   // Durum + uyarılar: gecikme, kanalda yapılan işlem, etiket yazdırma durumu (paket başına)
   const stateCell = (o) => {
@@ -95,8 +95,10 @@ export async function orders(el, rest, query = {}) {
   function cards() {
     const from = (data.page - 1) * data.limit;
     // Telefon: kompakt kart; dokununca sipariş tam ekran açılır (işlemler, paketler, etiket orada)
-    const item = (o) => o.items[0] ? html`<div class="oc-item">${thumb(o.items[0].image, o.items[0].name, 'sm')}<div style="min-width:0"><div class="ellipsis oc-name">${o.items[0].name}</div>
-      <div class="muted tiny">${o.lines > 1 ? `+${o.lines - 1} ürün · ` : ''}${o.qty || 0} adet${o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş</span>` : ''}</div></div></div>` : '';
+    // Ürün adları tam görünür (satıra sığmazsa alt satıra geçer); en fazla 2 ürün, kalanı "+N ürün daha"
+    const item = (o) => o.items.length ? html`<div class="oc-items">${o.items.map((it) => html`<div class="oc-item">${thumb(it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="oc-name">${it.name}</div>
+      <div class="muted tiny">${it.qty || 0} adet${it.sku ? ` · ${it.sku}` : ''}</div></div></div>`)}
+      ${o.lines > o.items.length || o.unmatched ? html`<div class="muted tiny" style="padding:0 4px">${o.lines > o.items.length ? `+${o.lines - o.items.length} ürün daha · toplam ${o.qty || 0} adet` : ''}${o.lines > o.items.length && o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş ürün var</span>` : ''}</div>` : ''}</div>` : '';
     const mainBtn = (o) => (o.status === 'new' ? html`<button class="btn sm primary" data-act="accept" data-id="${o.id}"><i class="ico ico-play"></i>İşleme al</button>`
       : o.status === 'processing' ? html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Kargola</button>`
         : o.status === 'shipped' ? html`<button class="btn sm ghost" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Takip</button>` : '');

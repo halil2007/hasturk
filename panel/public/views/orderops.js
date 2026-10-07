@@ -182,7 +182,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     return html`<div class="pkg-card" data-pkg="${p.id}">
       <div class="hd"><span class="box"><i class="ico ico-box"></i></span><b>Paket ${p.no}</b><span class="muted small">• ${qty} ürün</span><span class="spacer"></span><span class="pill ${ls.cls}">${ls.text}</span></div>
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
-        : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
+        : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="pname" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
       <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || (pick && pick.name ? `${pick.name} (seçildi, paketlerken uygulanır)` : '') || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}</span>
         ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company || (pick && pick.name) ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
@@ -517,7 +517,7 @@ export async function openOrder(id, onChange) {
           <div class="card">
             <div class="card-head"><h3>Ürünler</h3><span class="muted small">${o.items.filter((i) => !DEAD_LINE(i.status)).reduce((t, i) => t + i.quantity, 0)} adet</span></div>
             ${o.items.map((i) => html`<div class="li" style="${DEAD_LINE(i.status) ? 'opacity:.5' : ''}">${thumb(i.product_image || i.image, i.name)}
-              <div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${i.product_name || i.name}</div>
+              <div style="min-width:0;flex:1"><div class="pname" style="font-weight:650">${i.product_name || i.name}</div>
                 <div class="muted small">${[i.sku, i.barcode].filter(Boolean).join(' · ')}${i.status === 'cancelled' ? ' · İptal' : i.status === 'returned' ? ' · İade' : ''}</div>
                 ${i.product_id ? html`<div class="tiny muted">Ortak stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--amber)">Panelde eşleşmemiş — <a class="link" href="#/eslestirme">eşleştir</a></div>`}</div>
               <div style="text-align:right" class="num"><div><b>${i.quantity}</b> × ${money(i.unit_price)}</div><div class="muted small">${money(i.total)}</div></div></div>`)}
