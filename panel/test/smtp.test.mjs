@@ -22,7 +22,7 @@ function fakeConnect(log, { failAuth = false } = {}) {
       else if (line === 'DATA') { data = true; push('354 Go\r\n'); } else if (line === 'QUIT') push('221 Bye\r\n');
     };
     const writable = new WritableStream({ write(chunk) { buf += dec.decode(chunk); let i; while ((i = buf.indexOf('\r\n')) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 2); reply(l); } } });
-    return { readable, writable, push: (s) => push(s), startTls: () => { log.push('starttls'); const t = make(true); return t; }, close() {} };
+    return { readable, writable, push: (s) => push(s), startTls: () => { if (readable.locked || writable.locked) throw new TypeError('This WritableStream is currently locked to a writer.'); log.push('starttls'); const t = make(true); return t; }, close() {} };
   };
   return (addr, opts) => { log.push(`connect ${addr.hostname}:${addr.port} ${opts.secureTransport}`); const s = make(opts.secureTransport === 'on'); setTimeout(() => s.push('220 mail.test ESMTP\r\n'), 0); return s; };
 }
