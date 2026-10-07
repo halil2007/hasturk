@@ -6,7 +6,7 @@
 // API anahtarı Entegrasyonlar'daki diğer anahtarlar gibi şifreli saklanır.
 import { all, first, run, getSettings, getRaw, log, notify, resolve } from './db.js';
 import { loadConfig, effectiveEnv } from './config.js';
-import { http, chunk } from './util.js';
+import { http, chunk, DEAD_LINE } from './util.js';
 import { smtpSend } from './smtp.js';
 
 const MAX_AGE = 48 * 3600e3;
@@ -80,7 +80,7 @@ export function orderMail(o, items, ch, panelUrl, logo = '') {
   const title = mailTitle(ch);
   const link = panelUrl ? `${panelUrl.replace(/\/$/, '')}/#/siparisler/${encodeURIComponent(o.id)}` : '';
   const a = (() => { try { return JSON.parse(o.address || '{}'); } catch { return {}; } })();
-  const live = items.filter((i) => i.status !== 'cancelled');
+  const live = items.filter((i) => !DEAD_LINE(i.status));
   const rows = live.map((i) => `<tr><td style="padding:8px 10px;border-bottom:1px solid #eee">${esc(i.name || i.sku)}${i.sku ? `<div style="color:#888;font-size:12px">${esc(i.sku)}</div>` : ''}</td>
     <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center">${esc(i.quantity)}</td><td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${esc(tl(i.total))}</td></tr>`).join('');
   const html = `<!doctype html><html lang="tr"><body style="margin:0;background:#f3f5f9;font-family:Arial,Helvetica,sans-serif;color:#1c2333">

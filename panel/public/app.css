@@ -1234,7 +1234,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-08h"; }
+:root { --assets: "2026-10-08l"; }
 
 /* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
 .subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }

@@ -8,6 +8,7 @@
 import { all, first, run, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { r2 } from './util.js';
+import { trackPush } from './sync.js';
 
 export const BUYBOX_CHANNELS = ['trendyol', 'hepsiburada'];
 const FRESH = 20 * 60e3, COOLDOWN = 14 * 60e3;
@@ -20,6 +21,9 @@ export function decide(rule, b, P) {
   if (!(min > 0) || !(max >= min)) return { skip: 'kural eksik: en düşük ve en yüksek fiyat girilmeli' };
   if (!b || !b.rank) return { skip: 'buybox verisi alınamadı' };
   if (!(P > 0)) return { skip: 'mevcut fiyat bilinmiyor' };
+  // Mevcut fiyat sınır dışındaysa (ör. kur ya da elle değişiklik sonrası) önce sınıra çekilir
+  if (P < min - 0.004) return { price: r2(min), reason: `Fiyat en düşük sınırın (${r2(min)} TL) altındaydı; sınıra çekildi`, competitor: b.buyboxPrice || null };
+  if (P > max + 0.004) return { price: r2(max), reason: `Fiyat en yüksek sınırın (${r2(max)} TL) üstündeydi; sınıra çekildi`, competitor: b.buyboxPrice || null };
   let desired, competitor = null, reason;
   if (b.rank === 1) {
     // Buybox bizde: fiyat sadece yükseltilir (hedefe kadar ya da ikinci satıcının biraz altına)
@@ -101,7 +105,7 @@ export async function autoPrice(env, db, settings, { only } = {}) {
     const d = decide(r, { rank: r.rank, buyboxPrice: r.buybox_price, second: r.second_price, multi: !!r.multi }, r.price);
     if (d.skip) { out.skipped++; continue; }
     try {
-      await ch.pushPrice([{ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: d.price, listPrice: Math.max(r.list_price || 0, d.price) }]);
+      await trackPush(db, ch, 'price', await ch.pushPrice([{ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: d.price, listPrice: Math.max(r.list_price || 0, d.price) }]), 1);
       await run(db, 'UPDATE listings SET price = ?, price_dirty = 0 WHERE channel = ? AND remote_id = ?', d.price, r.channel, r.remote_id);
       await run(db, 'INSERT INTO price_changes (channel, remote_id, at, old_price, new_price, competitor_price, reason, rank_before, ok) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)', r.channel, r.remote_id, t, r.price, d.price, d.competitor, d.reason, r.rank);
       // Değişiklikten sonra gerçek durum bir sonraki turda öncelikle yeniden kontrol edilir

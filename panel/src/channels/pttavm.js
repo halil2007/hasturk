@@ -94,7 +94,7 @@ export function pttavm(env, meta) {
           lineId: String(pick(l, 'SiparisDetayId', 'SiparisUrunId', 'LineId', 'Id') || `${no}-${i + 1}`),
           sku: str(pick(l, 'UrunKodu', 'StokKodu', 'SaticiUrunKodu')), barcode: str(pick(l, 'Barkod', 'UrunBarkod')), name: str(pick(l, 'UrunAdi', 'Urun')), image: '',
           quantity: qty, unitPrice: qty ? total / qty : total, total,
-          status: /iptal/i.test(pick(l, 'Durum', 'SiparisDurumu', 'UrunDurum')) ? 'cancelled' : '', remoteKey: str(pick(l, 'Barkod', 'UrunBarkod')),
+          status: /iptal/i.test(pick(l, 'Durum', 'SiparisDurumu', 'UrunDurum')) ? 'cancelled' : /iade/i.test(pick(l, 'Durum', 'SiparisDurumu', 'UrunDurum')) ? 'returned' : '', remoteKey: str(pick(l, 'Barkod', 'UrunBarkod')),
         };
       });
       const prev = byNo.get(no);
@@ -114,10 +114,19 @@ export function pttavm(env, meta) {
   }
 
   // Stok güncelleme (barkod + adet). Ürün listesi PttAVM'den çekilemiyorsa ürünler barkodla panelden eşleştirilir.
+  // PttAVM ilan başına ayrı istek ister: bir turda en fazla 200 ilan (sunucu istek sınırı); gönderilenler işaretlenir, kalanı sonraki
+  // senkronda. Bir ilandaki hata diğerlerini durdurmaz (yalnız art arda hatada — ör. kimlik / servis — tur kesilir).
   async function pushStock(items) {
-    for (const x of items) {
-      await soap(STOCK_METHOD, `<tem:item><Barkod>${esc(x.remoteId)}</Barkod><Miktar>${x.stock}</Miktar></tem:item>`);
+    const done = [], errors = [];
+    let streak = 0;
+    for (const x of items.slice(0, 200)) {
+      try { await soap(STOCK_METHOD, `<tem:item><Barkod>${esc(x.remoteId)}</Barkod><Miktar>${x.stock}</Miktar></tem:item>`); done.push(x.remoteId); streak = 0; } catch (e) {
+        errors.push({ remoteId: x.remoteId, error: e.message });
+        if (++streak >= 5 && !done.length) throw e; // servis / kimlik hatası: hepsi aynı hatayı verir
+        if (streak >= 5) break;
+      }
     }
+    return { done, errors };
   }
 
   // Fiyat (KDV dahil satış fiyatı): UpdateProductsStockPrice, istekte en fazla 1000 ürün. İşlem kuyruğa alınır, trackingId döner.

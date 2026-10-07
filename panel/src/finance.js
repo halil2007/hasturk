@@ -11,7 +11,7 @@ export function orderProfit(o, settings) {
   const ch = o.channel;
   let revenue = 0, commission = 0, cost = 0, missing = 0, realCommission = true;
   for (const i of o.items) {
-    if (i.status === 'cancelled') continue;
+    if (i.status === 'cancelled' || i.status === 'returned') continue;
     const rate = i.listing_commission ?? costOf(settings, 'commission', ch);
     revenue += i.total;
     // Kanalın bildirdiği gerçek komisyon varsa o; yoksa ilan / kanal oranıyla tahmin
@@ -19,7 +19,7 @@ export function orderProfit(o, settings) {
     if (i.purchase_price) cost += i.purchase_price * i.quantity; else missing++;
   }
   // Kargo ve hizmet bedeli sipariş başınadır; tüm satırları iptal edilmiş siparişte sayılmaz (istatistiklerle aynı kural)
-  const live = o.items.some((i) => i.status !== 'cancelled');
+  const live = o.items.some((i) => i.status !== 'cancelled' && i.status !== 'returned');
   const shipping = live ? o.shipping_cost ?? costOf(settings, 'shipping', ch) : 0;
   const fee = live ? costOf(settings, 'service_fee', ch) : 0;
   // Yüzdelik kesintiler: ek kesinti (işlem / ödeme bedeli) ve stopaj (KDV hariç satış üzerinden; KDV %20 varsayılır)
@@ -91,7 +91,7 @@ async function aggregate(db, settings, { from, to, channel }) {
   const chans = (await all(db, `SELECT DISTINCT o.channel FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca)).map((r) => r.channel).filter((c) => /^[a-z0-9_]+$/i.test(c));
   if (!chans.length) return [];
   const rate = (key) => `(CASE o.channel ${chans.map((c) => `WHEN '${c}' THEN ${Number(costOf(settings, key, c)) || 0}`).join(' ')} ELSE 0 END)`;
-  const LIVEI = "COALESCE(i.status, '') != 'cancelled'";
+  const LIVEI = "COALESCE(i.status, '') NOT IN ('cancelled', 'returned')";
   return all(db, `WITH it AS (
       SELECT i.order_id, SUM(CASE WHEN ${LIVEI} THEN i.total ELSE 0 END) AS rev,
         SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission, ${rate('commission')}) / 100.0) ELSE 0 END) AS comm,
@@ -218,7 +218,7 @@ export async function productProfit(db, settings, { from, to, channel, sort = 'p
     const p = orderProfit({ ...o, items: its }, settings);
     const other = p.shipping + p.fee + p.rateFee + p.withholding;
     for (const i of its) {
-      if (i.status === 'cancelled') continue;
+      if (i.status === 'cancelled' || i.status === 'returned') continue;
       const share = p.revenue ? i.total / p.revenue : 0;
       const comm = i.commission != null ? i.commission : (i.total * (i.listing_commission ?? costOf(settings, 'commission', o.channel))) / 100;
       const k = i.product_id != null ? i.product_id : 'x:' + (i.sku || i.name);

@@ -91,6 +91,16 @@ export function refreshChrome(s = state.summary) {
     document.body.prepend(sb);
     sb.querySelector('[data-support-exit]').onclick = async () => { await api('logout', { method: 'POST' }).catch(() => {}); store.set('firma', ''); location.reload(); };
   }
+  // Abonelik / deneme bitişine 7 gün ve daha az kaldı: üstte uyarı (yalnız müşteri panelinde; demo hariç)
+  const tn = s.tenant, left = tn && tn.days_left;
+  let eb = $('[data-expiry-bar]');
+  if (tn && !s.demo && left != null && left <= 7 && !(s.user && s.user.support)) {
+    if (!eb) { eb = document.createElement('div'); eb.dataset.expiryBar = '1'; document.body.prepend(eb); }
+    const urgent = left <= 2;
+    eb.style.cssText = `position:sticky;top:0;z-index:50;background:${urgent ? '#fee2e2' : '#fef3c7'};color:${urgent ? '#7f1d1d' : '#713f12'};padding:7px 14px;font-weight:600;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap`;
+    const when = left <= 0 ? 'bugün sona eriyor' : left === 1 ? 'yarın sona eriyor' : `bitmesine ${left} gün kaldı`;
+    render(eb, html`<span style="flex:1;min-width:200px">${tn.trial ? 'Ücretsiz deneme sürenizin' : 'Aboneliğinizin'} ${when}. Süre bitince panele giriş ve kanallarla senkron durur; verileriniz silinmez.</span><a class="btn sm" href="#/destek">Paket seçin / yenileyin</a>`);
+  } else if (eb) eb.remove();
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
   const counts = { orders: n, questions: s.questions || 0, claims: s.claims || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
   counts.support = state.supportCount || 0;
@@ -355,10 +365,59 @@ new MutationObserver(() => { cancelAnimationFrame(enhTimer); enhTimer = requestA
 window.addEventListener('resize', debounceEnh);
 function debounceEnh() { cancelAnimationFrame(enhTimer); enhTimer = requestAnimationFrame(mobileEnhance); }
 
+// Şifremi unuttum: firma kodu + kullanıcı adı / e-posta → e-postaya yenileme bağlantısı (müşteri panelleri)
+function forgotForm(box, tenant, who) {
+  render($('.login-card', box), html`<div><h2>Şifremi unuttum</h2><div class="muted small">Kullanıcınıza kayıtlı e-posta adresine şifre yenileme bağlantısı gönderilir.</div></div>
+    <label class="field"><span>Firma kodu</span><input class="input" name="ft" autocapitalize="none" value="${tenant}" placeholder="ör. ornek-firma"></label>
+    <label class="field"><span>Kullanıcı adı ya da e-posta</span><input class="input" name="fw" autocapitalize="none" value="${who}"></label>
+    <div class="login-err" data-err role="alert"></div><div class="notice hide" data-ok></div>
+    <button class="btn primary block lg" type="submit">Bağlantı gönder</button>
+    <button type="button" class="link-btn" data-back>Girişe dön</button>`);
+  const f = $('.login-card', box);
+  $('[data-back]', f).onclick = () => { box.remove(); login(); };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const t = f.ft.value.trim().toLocaleLowerCase('tr'), w = f.fw.value.trim();
+    if (!t || !w) { $('[data-err]', f).textContent = 'Firma kodunu ve kullanıcı adınızı (ya da e-postanızı) girin'; return; }
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+    try { const r = await api('password/forgot', { method: 'POST', body: { tenant: t, who: w } }); $('[data-err]', f).textContent = ''; const ok = $('[data-ok]', f); ok.textContent = r.message; ok.classList.remove('hide'); }
+    catch (x) { $('[data-err]', f).textContent = x.message; }
+    btn.disabled = false;
+  };
+}
+// E-postadaki bağlantı (#/sifre/firma.anahtar): yeni şifre belirleme
+function resetForm(key) {
+  const box = document.createElement('div');
+  box.className = 'login';
+  render(box, html`<div class="login-hero"><div class="login-logo"><img src="logo.webp" alt="Logo"></div><div class="login-sub">Satış yönetim paneli</div></div>
+    <form class="login-card stack" novalidate>
+      <div><h2>Yeni şifre belirleyin</h2><div class="muted small">En az 8 karakter. Şifre değişince diğer cihazlardaki oturumlar kapanır.</div></div>
+      <label class="field"><span>Yeni şifre</span><input class="input" type="password" name="p1" autocomplete="new-password" required></label>
+      <label class="field"><span>Yeni şifre (tekrar)</span><input class="input" type="password" name="p2" autocomplete="new-password" required></label>
+      <div class="login-err" data-err role="alert"></div>
+      <button class="btn primary block lg" type="submit">Şifreyi kaydet</button>
+    </form>`);
+  document.body.prepend(box);
+  const f = $('form', box);
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    if (f.p1.value.length < 8) { $('[data-err]', f).textContent = 'Şifre en az 8 karakter olmalı'; return; }
+    if (f.p1.value !== f.p2.value) { $('[data-err]', f).textContent = 'Şifreler aynı değil'; return; }
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+    try {
+      const r = await api('password/reset', { method: 'POST', body: { key, password: f.p1.value } });
+      store.set('firma', r.tenant);
+      history.replaceState(null, '', location.pathname + location.search);
+      box.remove(); toast('Şifreniz kaydedildi; yeni şifrenizle giriş yapın'); login();
+    } catch (x) { $('[data-err]', f).textContent = x.message; btn.disabled = false; }
+  };
+}
 async function login(info = {}) {
   closeAllSheets();
   $$('.side, .main, .tabbar').forEach((e) => e.classList.add('hide'));
   if ($('.login')) return;
+  const rk = /^#\/sifre\/([a-z0-9-]+\.[0-9a-f]{48})$/.exec(location.hash);
+  if (rk) return resetForm(rk[1]);
   const brand = await fetch('/api/brand').then((r) => r.json()).catch(() => ({}));
   // Müşteri paneli: firma kodu adresle (?firma=kod) gelebilir; son kullanılan hatırlanır
   const firma = new URLSearchParams(location.search).get('firma') || store.get('firma', '');
@@ -377,14 +436,17 @@ async function login(info = {}) {
       <div class="login-err" data-err role="alert"></div>
       <button class="btn primary block lg" type="submit">Giriş yap</button>
       <button type="button" class="link-btn" data-firma-toggle>${firma ? 'Ana panele giriş (firma kodu olmadan)' : 'Müşteri paneli girişi (firma kodu ile)'}</button>
+      <button type="button" class="link-btn ${firma ? '' : 'hide'}" data-forgot>Şifremi unuttum</button>
     </form>
     <div class="login-foot">Hastürk CRM · güvenli bağlantı</div>`);
   document.body.prepend(box);
   $(firma ? '[name=username]' : '[name=password]', box).focus();
   $('[data-eye]', box).onclick = (e) => { const i = $('[name=password]', box); i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.classList.toggle('on', i.type === 'text'); };
+  $('[data-forgot]', box).onclick = () => forgotForm(box, $('[name=tenant]', box).value.trim().toLocaleLowerCase('tr'), $('[name=username]', box).value.trim());
   $('[data-firma-toggle]', box).onclick = (e) => {
     const f = $('[data-firma]', box), show = f.classList.contains('hide');
     f.classList.toggle('hide', !show);
+    $('[data-forgot]', box).classList.toggle('hide', !show);
     if (show) $('[name=tenant]', box).focus(); else $('[name=tenant]', box).value = '';
     e.currentTarget.textContent = show ? 'Ana panele giriş (firma kodu olmadan)' : 'Müşteri paneli girişi (firma kodu ile)';
   };
@@ -422,7 +484,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-08h';
+const ASSETS = '2026-10-08l';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

@@ -2,7 +2,7 @@
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, fieldsFor } from './config.js';
-import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
+import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -30,7 +30,8 @@ import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk } from './util.js';
+import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
@@ -91,7 +92,7 @@ async function listOrders(db, q) {
   // Liste, toplam, durum sayıları ve ayarlar aynı anda okunur (sıralı gidiş-dönüş yerine tek bekleme)
   const f2 = orderFilter(q, { withStatus: false });
   const [rows, totalRow, counts, lateRow, byChannel, settings] = await Promise.all([all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src,
-      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty,
+      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status NOT IN ('cancelled', 'returned')) AS qty,
       (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS lines,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id) AS packages,
       (SELECT COUNT(*) FROM packages WHERE order_id = o.id AND status = 'open') AS open_packages,
@@ -149,7 +150,7 @@ async function exportOrders(db, q) {
   return '﻿' + [head.join(';'), ...lines].join('\r\n');
 }
 
-const lineQty = (o) => new Map(o.items.filter((i) => i.status !== 'cancelled').map((i) => [String(i.line_id), i.quantity]));
+const lineQty = (o) => new Map(o.items.filter((i) => !DEAD_LINE(i.status)).map((i) => [String(i.line_id), i.quantity]));
 
 async function insertPackages(db, orderId, pkgs, status = 'open') {
   const t = Date.now();
@@ -557,7 +558,7 @@ async function listPackages(db, q) {
     ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args),
     // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler
     st === 'waiting' ? all(db, `SELECT o.id AS order_id, o.channel, o.order_number, o.customer, o.address, o.extra, o.ordered_at, o.ship_by, o.status AS order_status, o.tracking, o.cargo_company,
-      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status != 'cancelled') AS qty
+      (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id AND status NOT IN ('cancelled', 'returned')) AS qty
     ${noPkg} ORDER BY o.ordered_at ASC LIMIT 300`, ...args) : [],
     st === 'waiting' ? null : first(db, `SELECT COUNT(*) AS n ${noPkg}`, ...args),
     ...keys.map((k) => first(db, `SELECT COUNT(*) AS n ${base} ${w(k)}`, ...args))]);
@@ -736,6 +737,14 @@ async function saveProduct(env, db, ctx, id, b, user, { push = true } = {}) {
     if (!cur) continue;
     const price = l.price === '' || l.price == null ? cur.price : num(l.price);
     const dirty = price !== cur.price ? 1 : 0;
+    if (dirty) {
+      // Otomatik fiyat kuralı açık ilan: sınır dışı fiyat kabul edilmez; elle değişiklik otomatik fiyatı 14 dakika bekletir
+      const rule = await first(db, 'SELECT min_price, max_price FROM price_rules WHERE channel = ? AND remote_id = ? AND enabled = 1', l.channel, String(l.remote_id));
+      if (rule && ((rule.min_price > 0 && price < rule.min_price) || (rule.max_price > 0 && price > rule.max_price))) {
+        fail(400, `${l.channel} ilanında otomatik fiyat kuralı açık: fiyat ${rule.min_price} – ${rule.max_price} TL arasında olmalı (girilen ${price} TL). Sınırları Buybox sayfasından değiştirin ya da kuralı kapatın.`);
+      }
+      await run(db, "INSERT INTO price_changes (channel, remote_id, at, old_price, new_price, reason, ok) VALUES (?, ?, ?, ?, ?, ?, 1)", l.channel, String(l.remote_id), Date.now(), cur.price, price, `Elle değiştirildi (${user.name})`);
+    }
     // Elle girilen komisyon korunur (API'den gelen gerçek oran bunun üzerine yazmaz); boş bırakılırsa API / kanal oranı kullanılır
     const com = l.commission === '' || l.commission == null ? null : num(l.commission);
     const same = cur.commission != null && com != null && Math.abs(cur.commission - com) < 0.001;
@@ -771,13 +780,14 @@ async function saveProduct(env, db, ctx, id, b, user, { push = true } = {}) {
 async function productDetail(db, id) {
   const p = await first(db, 'SELECT * FROM products WHERE id = ?', id);
   if (!p) fail(404, 'Ürün bulunamadı');
-  p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id = ?`, id);
+  p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired, r.min_price AS rule_min, r.max_price AS rule_max FROM listings l JOIN products p ON p.id = l.product_id
+    LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.product_id = ?`, id);
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
   // Aynı ana ürünün varyantları (tek ekrandan düzenleme için)
   const gk = p.parent_key || p.group_name;
   p.siblings = gk ? (await all(db, "SELECT id FROM products WHERE COALESCE(NULLIF(parent_key, ''), NULLIF(group_name, ''), name) = ? LIMIT 300", gk)).map((r) => r.id) : [id];
   p.sales = await all(db, `SELECT o.channel, SUM(i.quantity) AS qty, SUM(i.total) AS revenue FROM order_items i JOIN orders o ON o.id = i.order_id
-    WHERE i.product_id = ? AND o.ordered_at >= ? AND o.status NOT IN ('cancelled', 'returned') AND i.status != 'cancelled' GROUP BY o.channel`, id, Date.now() - 30 * 864e5);
+    WHERE i.product_id = ? AND o.ordered_at >= ? AND o.status NOT IN ('cancelled', 'returned') AND i.status NOT IN ('cancelled', 'returned') GROUP BY o.channel`, id, Date.now() - 30 * 864e5);
   return p;
 }
 
@@ -944,7 +954,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
     const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
     if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
-    return json({ ...s, channels: chInfo, settings: publicSettings(st, env), user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1', build: (env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.id) || null });
+    return json({ ...s, channels: chInfo, settings: publicSettings(st, env), user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME, ...planInfo(env) } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1', build: (env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.id) || null });
   }
   // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
   if (path === 'panel-proxy' && m === 'GET') {
@@ -1000,7 +1010,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     // Kaldırılan eşleşme hatırlanır ("x:<ürün>"): otomatik eşleştirme bu ilanı aynı ürüne tekrar bağlamaz
     const l = await first(db, 'SELECT product_id, name FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
     await run(db, 'UPDATE listings SET product_id = NULL, match = ? WHERE channel = ? AND remote_id = ?', l && l.product_id ? 'x:' + l.product_id : null, b.channel, String(b.remote_id));
+    // Bu ilanın siparişleriyle yanlış üründen düşülen stok geri eklenir
+    await run(db, 'UPDATE orders SET stock_dirty = 1 WHERE id IN (SELECT order_id FROM order_items WHERE remote_key = ? AND order_id LIKE ? AND product_id IS NOT NULL)', String(b.remote_id), b.channel + ':%');
     await run(db, 'UPDATE order_items SET product_id = NULL WHERE remote_key = ? AND order_id LIKE ?', String(b.remote_id), b.channel + ':%');
+    await applyDirtyStock(db);
+    ctx.waitUntil(pushStocks(env, db).catch(() => {}));
     await log(db, b.channel, 'info', `${user.name}: ${l ? l.name : b.remote_id} eşleşmesi kaldırıldı`);
     return json({ ok: true });
   }
@@ -1036,9 +1050,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!l) fail(404, 'İlan bulunamadı');
     return json({ listing: l, buybox: b, rule: r, history, changes, preview: r && b ? decide({ ...r, enabled: 1 }, { rank: b.rank, buyboxPrice: b.buybox_price, second: b.second_price, multi: !!b.multi }, l.price) : null });
   }
-  if (path === 'buybox/check' && m === 'POST') { const b = await body(req); return json(await checkBuybox(env, db, { channel: b.channel, ids: b.ids, limit: Math.min(Number(b.limit) || 100, 300) })); }
+  if (path === 'buybox/check' && m === 'POST') { requireFeature(env, 'buybox'); const b = await body(req); return json(await checkBuybox(env, db, { channel: b.channel, ids: b.ids, limit: Math.min(Number(b.limit) || 100, 300) })); }
   if (path === 'price-rules' && m === 'PUT') {
     const b = await body(req);
+    if (b.enabled) requireFeature(env, 'buybox');
     if (!bbIds().includes(b.channel)) fail(400, 'Otomatik fiyat yalnızca Trendyol ve Hepsiburada için');
     const l = await first(db, 'SELECT price FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
     if (!l) fail(404, 'İlan bulunamadı');
@@ -1072,9 +1087,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // ---------- kullanıcılar ----------
   if (path === 'users' && m === 'GET') return json(await listUsers(db));
   const maxUsers = Number(env.TENANT_MAX_USERS) || 0;
-  if (path === 'users' && m === 'POST') { const b = await body(req); let id; try { id = await saveUser(db, 0, b, { maxUsers }); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı eklendi (${str(b.username)})`); return json({ ok: true, id }); }
+  if (path === 'users' && m === 'POST') { const b = await body(req); if (!allows(env, 'roles')) { delete b.perms; delete b.template; } let id; try { id = await saveUser(db, 0, b, { maxUsers }); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı eklendi (${str(b.username)})`); return json({ ok: true, id }); }
   if ((x = path.match(/^users\/(\d+)$/)) && m === 'PUT') {
     const id = Number(x[1]), b = await body(req);
+    if (!allows(env, 'roles')) { delete b.perms; delete b.template; } // paketinizde bölüm bazlı yetki yok: personel standart yetkiyle çalışır
     if (id === user.id && (b.active === false || b.role === 'staff')) fail(400, 'Kendi yönetici yetkinizi ya da hesabınızı kapatamazsınız');
     try { await saveUser(db, id, b, { maxUsers }); } catch (e) { fail(400, e.message); }
     // Yetki, durum ya da şifre değişince açık oturumlar hemen yeni yetkiyle çalışır; pasif / şifresi değişen hesabın oturumu kapanır
@@ -1261,6 +1277,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const b = await body(req), id = decodeURIComponent(x[2]);
     return json(x[3] === 'approve' ? await approveClaim(env, db, x[1], id, b.lines, user) : await rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user));
   }
+  if ((path === 'settlements' || path === 'invoices' || path.startsWith('settlements/') || path.startsWith('invoices/')) && env.TENANT_SLUG) requireFeature(env, 'finance');
   if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
@@ -1320,6 +1337,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT') {
     if (env.TENANT_SLUG && isBeta(x[1])) fail(403, 'Bu kanal yakında açılacak');
     const b = await body(req);
+    // Paketteki mağaza sınırı: yeni bir mağazanın API bilgisi kaydedilirken bağlı mağazalar sayılır (var olanı güncellemek serbest)
+    const maxStores = Number(env.TENANT_MAX_STORES) || 0;
+    if (maxStores && isChannelId(x[1]) && b.values && Object.values(b.values).some((v) => String(v || '').trim())) {
+      const rows = await all(db, 'SELECT id, data FROM channel_config WHERE data IS NOT NULL');
+      const has = rows.some((r) => r.id === x[1]), used = rows.filter((r) => r.id !== x[1] && isChannelId(r.id)).length;
+      if (!has && used >= maxStores) fail(403, `Paketinizdeki mağaza sınırına ulaşıldı (${maxStores} mağaza). Yeni mağaza bağlamak için bir mağazanın bağlantısını kaldırın ya da paketinizi yükseltin.`);
+    }
     await saveConfig(env, db, x[1], b);
     resetChannels();
     // API bilgileri değişti: eski hata ve bekleme sıfırlanır, kanal sonraki senkronda hemen denenir
@@ -1394,8 +1418,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'push/latest' && m === 'GET') return json(await latest(db));
   if (path === 'push/test' && m === 'POST') return json(await notify(db, { title: 'Hastürk Panel', body: `Bildirimler açık · ${user.name}`, url: '#/' }, { userId: user.id ?? null }));
   // Excel ile toplu güncelleme: dışa aktar (CSV) ve geri yükle (önizleme / uygula)
+  if (path === 'products.csv' && m === 'GET') requireFeature(env, 'bulk');
   if (path === 'products.csv' && m === 'GET') return new Response(await exportProducts(env, db), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="urunler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
   if (path === 'products/bulk' && m === 'POST') {
+    requireFeature(env, 'bulk');
     const b = await body(req);
     const r = await bulkUpdate(env, db, b.rows, { dry: b.dry !== false, user: user.name });
     if (r.applied && r.stock) ctx.waitUntil(pushStocks(env, db).catch(() => {}));
@@ -1511,7 +1537,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       pid = r.id;
     }
     await run(db, 'UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?', pid, pid ? (b.create ? 'new' : 'manual') : null, b.channel, String(b.remote_id));
-    if (pid) { await relinkItems(db); await fillProductInfo(db).catch(() => {}); }
+    if (pid) { await relinkItems(db); await applyDirtyStock(db); await fillProductInfo(db).catch(() => {}); }
     await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} ${pid ? (b.create ? 'yeni ürün olarak eklendi' : 'ürüne bağlandı') : 'bağlantısı kaldırıldı'}`);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
     return json({ ok: true, product_id: pid });
@@ -1520,7 +1546,18 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'stats' && m === 'GET') return json(await stats(db, q));
   if (path === 'insights' && m === 'GET') return json(await insights(db, q));
   if (path === 'settings' && m === 'GET') return json(publicSettings(await getSettings(db), env));
-  if (path === 'settings' && m === 'PUT') return json(publicSettings(await saveSettings(db, await body(req)), env));
+  if (path === 'settings' && m === 'PUT') {
+    const b = await body(req);
+    // Pakete bağlı ayarlar (otomatik fiyat, otomatik ürün gönderimi): paket izin vermiyorsa yeni açılış reddedilir, eskiden açık kalmış
+    // olan kapatılır (diğer ayarların kaydı engellenmez)
+    const cur = await getSettings(db);
+    if (!allows(env, 'buybox') && b.autoprice === true) { if (!cur.autoprice) requireFeature(env, 'buybox'); b.autoprice = false; }
+    if (!allows(env, 'autoupload') && b.auto_upload && Object.values(b.auto_upload).some(Boolean)) {
+      if (!Object.values(cur.auto_upload || {}).some(Boolean)) requireFeature(env, 'autoupload');
+      b.auto_upload = {};
+    }
+    return json(publicSettings(await saveSettings(db, b), env));
+  }
   if (path === 'logs' && m === 'GET') return json(await all(db, 'SELECT * FROM logs ORDER BY id DESC LIMIT 200'));
   // Hata özeti (son 30 gün): aynı hata (sayılar / kimlikler ayıklanarak) kanal bazında gruplanır; açıklama ve kopyalanabilir rapor
   if (path === 'logs/errors' && m === 'GET') {

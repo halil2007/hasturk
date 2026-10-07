@@ -6,6 +6,8 @@ import { apiGuide as guideText } from '../apiguide.js';
 
 const DAY = 864e5;
 const PLANS = ['Başlangıç', 'Profesyonel', 'Kurumsal', 'Özel'];
+// Paket sınırları (sunucudaki plans.js ile aynı; web sitesindeki paketler)
+const LIMITS = { 'Başlangıç': '3 mağaza, 2 kullanıcı', Profesyonel: '10 mağaza, 5 kullanıcı', Kurumsal: '25 mağaza, sınırsız kullanıcı' };
 const METHODS = ['Havale / EFT', 'Kredi kartı', 'Nakit', 'Diğer'];
 const iso = (ms) => (ms ? new Date(ms + 3 * 3600e3).toISOString().slice(0, 10) : '');
 const daysLeft = (t) => (t.expires_at ? Math.ceil((t.expires_at - Date.now()) / DAY) : null);
@@ -50,7 +52,7 @@ export async function firmsView(el) {
   const usageLine = (t) => {
     const u = t.usage;
     if (!u) return html`<span class="muted tiny">henüz veri yok</span>`;
-    return html`<div class="small"><b>${n(u.users)}</b>${t.max_users ? `/${t.max_users}` : ''} kullanıcı · <b>${n(u.channels)}</b> kanal</div><div class="muted tiny">${n(u.orders30)} sipariş / 30 gün · ${u.last_login ? `son giriş ${ago(u.last_login)}` : 'giriş yok'}</div>`;
+    return html`<div class="small"><b>${n(u.users)}</b>${t.limits && t.limits.users ? `/${t.limits.users}` : ''} kullanıcı · <b>${n(u.channels)}</b> kanal</div><div class="muted tiny">${n(u.orders30)} sipariş / 30 gün · ${u.last_login ? `son giriş ${ago(u.last_login)}` : 'giriş yok'}</div>`;
   };
   const sub = (t) => (t.expires_at ? html`<div class="small">${date(t.expires_at)}</div>` : html`<span class="muted tiny">süresiz</span>`);
   const fee = (t) => (t.fee ? html`<div class="small"><b>${money0(t.fee)}</b> / ${t.period === 'yearly' ? 'yıl' : 'ay'}</div>` : html`<span class="muted tiny">ücret girilmedi</span>`);
@@ -100,19 +102,20 @@ export async function firmsView(el) {
           <label class="field"><span>Ticari ünvan</span><input class="input" name="legal" value="${t ? t.legal : ''}" placeholder="ör. Yeşil Bahçe Tarım Ltd. Şti."></label>
           <label class="field"><span>Vergi dairesi / no</span><input class="input" name="tax" value="${t ? t.tax : ''}"></label>
           <label class="field"><span>Yetkili kişi</span><input class="input" name="contact" value="${t ? t.contact : ''}"></label>
-          <label class="field"><span>E-posta</span><input class="input" type="email" name="email" value="${t ? t.email || '' : ''}"></label>
+          <label class="field"><span>E-posta</span><input class="input" type="email" name="email" value="${t ? t.email || '' : ''}">${t ? html`<small>Süre bitimi hatırlatmaları bu adrese gider</small>` : html`<small>Giriş bilgileri ve şifre belirleme bağlantısı bu adrese gider</small>`}</label>
           <label class="field"><span>Telefon</span><input class="input" type="tel" name="phone" value="${t ? t.phone || '' : ''}"></label>
           <label class="field"><span>Şehir</span><input class="input" name="city" value="${t ? t.city : ''}"></label>
         </div><label class="field" style="margin-top:12px"><span>Adres</span><input class="input" name="address" value="${t ? t.address : ''}"></label></div>
 
         <div class="card"><h3 style="margin-bottom:10px">Paket ve abonelik</h3><div class="form-grid">
-          <label class="field"><span>Paket</span><input class="input" name="plan" value="${t ? t.plan : ''}" list="f-plans" placeholder="ör. Profesyonel"></label>
-          <label class="field"><span>Ücret (₺, KDV hariç)</span><input class="input" name="fee" inputmode="decimal" value="${t && t.fee != null ? t.fee : ''}"></label>
+          <label class="field"><span>Paket</span><select class="input" name="plan">${(t && t.plan && !PLANS.includes(t.plan) ? [t.plan, ...PLANS] : PLANS).map((p) => html`<option value="${p === 'Özel' ? 'Özel' : p}" ${(t ? t.plan || 'Özel' : 'Profesyonel') === p ? 'selected' : ''}>${p}${LIMITS[p] ? ` · ${LIMITS[p]}` : ''}</option>`)}</select><small>Mağaza / kullanıcı sınırı ve pakete özel özellikler panelde uygulanır. Özel: sınırları aşağıdan girin.</small></label>
+          <label class="field"><span>Ücret (₺, KDV dahil)</span><input class="input" name="fee" inputmode="decimal" value="${t && t.fee != null ? t.fee : ''}"></label>
           <label class="field"><span>Ödeme dönemi</span><select class="input" name="period"><option value="monthly" ${t && t.period === 'yearly' ? '' : 'selected'}>Aylık</option><option value="yearly" ${t && t.period === 'yearly' ? 'selected' : ''}>Yıllık</option></select></label>
-          <label class="field"><span>Kullanıcı sınırı</span><input class="input" name="max_users" inputmode="numeric" value="${t && t.max_users ? t.max_users : ''}" placeholder="boş = sınırsız"></label>
+          <label class="field"><span>Kullanıcı sınırı</span><input class="input" name="max_users" inputmode="numeric" value="${t && t.max_users ? t.max_users : ''}" placeholder="boş = paketin sınırı"></label>
+          <label class="field"><span>Mağaza sınırı</span><input class="input" name="max_stores" inputmode="numeric" value="${t && t.max_stores ? t.max_stores : ''}" placeholder="boş = paketin sınırı"></label>
           <label class="field"><span>Başlangıç</span><input class="input" type="date" name="starts_at" value="${t ? iso(t.starts_at) : iso(Date.now())}"></label>
           <label class="field"><span>Bitiş (bu tarihten sonra giriş kapanır)</span><input class="input" type="date" name="expires_at" value="${t ? iso(t.expires_at) : ''}"><small>Boş = süresiz</small></label>
-        </div><datalist id="f-plans">${PLANS.map((p) => html`<option value="${p}">`)}</datalist>
+        </div>
           <label class="check" style="margin-top:10px"><input type="checkbox" name="trial" ${t && t.trial ? 'checked' : ''}> Deneme sürümü ${t ? '' : html`<span class="muted tiny">(bitiş boşsa 7 gün)</span>`}</label></div>
 
         ${t ? html`<div class="card"><label class="check"><span class="switch"><input type="checkbox" name="active" ${t.active ? 'checked' : ''}><span></span></span> Panel aktif (kapalıysa askıya alınır: giriş ve senkron durur, veriler korunur)</label></div>`
@@ -127,13 +130,14 @@ export async function firmsView(el) {
     const fm = $('[data-f]', s.el);
     $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
       if (!fm.reportValidity()) return;
-      const b = Object.fromEntries(['name', 'legal', 'tax', 'contact', 'email', 'phone', 'city', 'address', 'plan', 'fee', 'period', 'max_users', 'starts_at', 'expires_at', 'note'].map((k) => [k, fm[k].value.trim()]));
+      const b = Object.fromEntries(['name', 'legal', 'tax', 'contact', 'email', 'phone', 'city', 'address', 'plan', 'fee', 'period', 'max_users', 'max_stores', 'starts_at', 'expires_at', 'note'].map((k) => [k, fm[k].value.trim()]));
       b.trial = fm.trial.checked;
       if (t) { b.active = fm.active.checked; await api('tenants/' + t.slug, { method: 'PUT', body: b }); }
       else {
         const slug = fm.slug.value.trim().toLocaleLowerCase('tr');
-        await api('tenants', { method: 'POST', body: { ...b, slug, admin_username: fm.admin_username.value.trim(), admin_password: fm.admin_password.value } });
-        toast(`Firma oluşturuldu · giriş: ${location.origin}/?firma=${slug}`);
+        const r = await api('tenants', { method: 'POST', body: { ...b, slug, admin_username: fm.admin_username.value.trim(), admin_password: fm.admin_password.value } });
+        const m = r.mail || {};
+        toast(`Firma oluşturuldu · giriş: ${location.origin}/?firma=${slug}${m.ok ? ` · hoş geldiniz e-postası ${b.email} adresine gönderildi` : m.error ? ` · e-posta gönderilemedi (${m.error}); giriş bilgilerini firmaya siz iletin` : ''}`, !!m.error);
       }
       s.close(); if (t) toast('Kaydedildi'); await refresh(); if (t) detail(t.slug);
     });
@@ -210,7 +214,8 @@ export async function firmsView(el) {
               <dt>Ücret</dt><dd>${t2.fee ? `${money(t2.fee)} / ${t2.period === 'yearly' ? 'yıl' : 'ay'}` : '—'}</dd>
               <dt>Başlangıç</dt><dd>${t2.starts_at ? date(t2.starts_at) : '—'}</dd>
               <dt>Bitiş</dt><dd>${t2.expires_at ? html`${date(t2.expires_at)} <span class="${d < 0 ? 'down' : d <= 14 ? 'low' : 'muted'}">(${d < 0 ? `${-d} gün önce doldu` : `${d} gün kaldı`})</span>` : 'süresiz'}</dd>
-              <dt>Kullanıcı sınırı</dt><dd>${t2.max_users || 'sınırsız'}</dd>
+              <dt>Kullanıcı sınırı</dt><dd>${(t2.limits && t2.limits.users) || 'sınırsız'}</dd>
+              <dt>Mağaza sınırı</dt><dd>${(t2.limits && t2.limits.stores) || 'sınırsız'}</dd>
               <dt>Toplam tahsilat</dt><dd>${money(t2.paid_total || 0)}</dd></dl></div>
             <div class="card"><div class="card-head"><h3>Tahsilatlar</h3><button class="btn sm ghost" data-x="pay"><i class="ico ico-plus"></i>Ekle</button></div>
               ${pays.payments.length ? html`<div class="list">${pays.payments.map((p) => html`<div class="li"><div style="flex:1;min-width:0"><b class="num">${money(p.amount)}</b>${p.months ? html` <span class="pill good" style="margin-left:4px">+${p.months >= 12 && p.months % 12 === 0 ? `${p.months / 12} yıl` : `${p.months} ay`}</span>` : ''}
@@ -218,7 +223,7 @@ export async function firmsView(el) {
           </div>
           <div class="stack">
             <div class="card"><div class="card-head"><h3>Kullanım</h3><button class="btn sm ghost" data-x="usage"><i class="ico ico-sync"></i>Yenile</button></div>
-              ${t2.usage ? html`<div class="fm-usage"><div><b>${n(u.users)}${t2.max_users ? `/${t2.max_users}` : ''}</b><span>kullanıcı</span></div><div><b>${n(u.channels)}</b><span>kanal</span></div><div><b>${n(u.products)}</b><span>ürün</span></div>
+              ${t2.usage ? html`<div class="fm-usage"><div><b>${n(u.users)}${t2.limits && t2.limits.users ? `/${t2.limits.users}` : ''}</b><span>kullanıcı</span></div><div><b>${n(u.channels)}</b><span>kanal</span></div><div><b>${n(u.products)}</b><span>ürün</span></div>
                 <div><b>${n(u.orders30)}</b><span>sipariş (30 gün)</span></div><div><b>${money0(u.revenue30)}</b><span>ciro (30 gün)</span></div><div><b>${n(u.orders)}</b><span>toplam sipariş</span></div></div>
                 <div class="muted tiny" style="margin-top:8px">Son giriş ${u.last_login ? dateTime(u.last_login) : '—'} · son sipariş ${u.last_order ? dateTime(u.last_order) : '—'} · güncellendi ${t2.usage_at ? ago(t2.usage_at) : '—'}</div>` : html`<div class="muted small">Henüz kullanım verisi yok — “Yenile” ile alın</div>`}</div>
             <div class="card"><div class="card-head"><h3>Firma bilgileri</h3></div><dl class="kv">

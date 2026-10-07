@@ -131,10 +131,11 @@ export function hepsiburada(env, meta) {
     } catch (e) { errors.push('paketler: ' + e.message); }
     // 3) Kargodaki / teslim edilen paketler ve iptal edilen satırlar (tarih filtresi yok; yeniden eskiye, since'e kadar)
     const detail = new Map();
+    let detailCapped = false;
     const need = async (no) => {
       if (O.map.has(no)) return O.map.get(no);
       if (!detail.has(no)) {
-        if (detail.size >= 200) return null;
+        if (detail.size >= 200) { detailCapped = true; return null; }
         detail.set(no, null);
         try {
           const r = await call(`${OMS}/orders/merchantId/${m}/ordernumber/${encodeURIComponent(no)}`);
@@ -186,7 +187,10 @@ export function hepsiburada(env, meta) {
       if (!o.cargoCompany) o.cargoCompany = ((o.packages || [])[0] || {}).cargoCompany || '';
       out.push(o);
     }
+    if (detailCapped) errors.push('bu senkronda en fazla 200 eski siparişin ayrıntısı okunabildi; kalan kargo / teslim / iptal bilgileri bir sonraki senkronda alınacak');
     if (errors.length) out.warnings = errors;
+    // Kargo / teslim / iptal akışlarından biri okunamadıysa imleç ilerlemez: o aralıktaki iptaller bir sonraki senkronda yeniden okunur
+    if (detailCapped || errors.some((x) => /^(shipped|delivered|iptaller|paketler):/.test(x))) out.partialUntil = since;
     return out;
   }
 
@@ -250,13 +254,32 @@ export function hepsiburada(env, meta) {
     return out;
   }
 
+  // Stok / fiyat yükleme: Hepsiburada yükleme kimliği döner; satır sonuçları birkaç dakika sonra pushStatus ile sorgulanır
   async function upload(kind, rows) {
+    const refs = [];
     for (const part of chunk(rows, 4000)) {
-      try { await call(`${LST}/listings/merchantid/${m}/${kind}-uploads`, { method: 'POST', body: part }); } catch (e) {
-        if (kind === 'stock' && e.status === 404) await call(`${LST}/listings/merchantid/${m}/inventory-uploads`, { method: 'POST', body: part });
+      let r, k = kind;
+      try { r = await call(`${LST}/listings/merchantid/${m}/${kind}-uploads`, { method: 'POST', body: part }); } catch (e) {
+        if (kind === 'stock' && e.status === 404) { k = 'inventory'; r = await call(`${LST}/listings/merchantid/${m}/inventory-uploads`, { method: 'POST', body: part }); }
         else throw e;
       }
+      const id = str(g(r || {}, 'id') || g(g(r || {}, 'data') || {}, 'id'));
+      if (id) refs.push(`${k}:${id}`);
     }
+    return { refs };
+  }
+  // Yükleme sonucu: { done, items: [{ key: hepsiburadaSku, ok, error }] } — yalnız reddedilen satırlar döner
+  async function pushStatus(ref) {
+    const [k, id] = String(ref).split(':');
+    const r = await call(`${LST}/listings/merchantid/${m}/${k}-uploads/id/${encodeURIComponent(id)}`);
+    const st = str(g(r || {}, 'status'));
+    const done = !st || /done|complete|finish|success|fail|error/i.test(st);
+    const errs = [].concat(g(r || {}, 'errors') || g(r || {}, 'failedItems') || []);
+    const items = errs.map((e) => {
+      const msgs = [].concat(g(e, 'errors') || g(e, 'messages') || g(e, 'message') || g(e, 'errorMessage') || []).map((x) => (typeof x === 'string' ? x : str(g(x, 'message') || JSON.stringify(x))));
+      return { key: str(g(e, 'hepsiburadaSku') || g(e, 'hbSku') || g(e, 'merchantSku') || g(e, 'sku')), ok: false, error: msgs.join(' · ') || 'reddedildi' };
+    }).filter((x) => x.key);
+    return { done, items };
   }
   const pushStock = (items) => upload('stock', items.map((x) => ({ hepsiburadaSku: x.remoteId, merchantSku: x.sku, availableStock: x.stock })));
   const pushPrice = (items) => upload('price', items.map((x) => ({ hepsiburadaSku: x.remoteId, merchantSku: x.sku, price: x.price })));
@@ -765,6 +788,6 @@ export function hepsiburada(env, meta) {
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns,
+    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns,
   };
 }

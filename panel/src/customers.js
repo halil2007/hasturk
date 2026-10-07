@@ -62,7 +62,7 @@ export async function summary(db, q = {}) {
     all(db, `SELECT o.ckey, strftime('%Y-%m', o.ordered_at / 1000 + 10800, 'unixepoch') AS m FROM orders o WHERE ${LIVE} AND o.ordered_at >= ? GROUP BY o.ckey, m`, since),
     // İller (harita ve liste): müşteri, sipariş, satılan adet ve ciro; tüm iller
     all(db, `SELECT json_extract(o.address, '$.city') AS city, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue,
-        SUM((SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status != 'cancelled')) AS units
+        SUM((SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status NOT IN ('cancelled', 'returned'))) AS units
       FROM orders o ${W} AND COALESCE(json_extract(o.address, '$.city'), '') != '' GROUP BY 1 ORDER BY orders DESC LIMIT 200`, ...args),
   ]);
   const customers = per.length, orders = per.reduce((s, r) => s + r.n, 0), revenue = per.reduce((s, r) => s + (r.spend || 0), 0);
@@ -116,7 +116,7 @@ export async function list(db, q = {}) {
 export async function detail(db, key) {
   const orders = await all(db, `SELECT id, channel, order_number, status, ordered_at, total, customer, phone, email, address FROM orders WHERE ckey = ? ORDER BY ordered_at DESC LIMIT 200`, key);
   const items = await all(db, `SELECT COALESCE(p.name, i.name) AS name, SUM(i.quantity) AS qty, SUM(i.total) AS total FROM order_items i JOIN orders o ON o.id = i.order_id
-    LEFT JOIN products p ON p.id = i.product_id WHERE o.ckey = ? AND i.status != 'cancelled' AND o.status != 'cancelled' GROUP BY 1 ORDER BY qty DESC LIMIT 20`, key);
+    LEFT JOIN products p ON p.id = i.product_id WHERE o.ckey = ? AND i.status NOT IN ('cancelled', 'returned') AND o.status != 'cancelled' GROUP BY 1 ORDER BY qty DESC LIMIT 20`, key);
   return { key, orders: orders.map((o) => ({ ...o, address: parse(o.address, {}) })), items };
 }
 

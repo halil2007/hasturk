@@ -158,3 +158,5 @@ export function explainHttp(msg) {
 export async function diagStep(out, name, fn) {
   try { const r = await fn(); out.push({ name, ok: true, ...r }); return r || {}; } catch (e) { out.push({ name, ok: false, detail: explainHttp(e.message) }); return null; }
 }
+// Sipariş satırı iptal ya da iade edildi mi (satılmış sayılmaz: paketleme, ciro, kâr, toplama listesi dışında kalır)
+export const DEAD_LINE = (s) => s === 'cancelled' || s === 'returned';

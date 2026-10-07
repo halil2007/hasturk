@@ -92,14 +92,18 @@ export function ikas(env, p, meta) {
 
   function mapStatus(o) {
     const s = String(o.status || '').toUpperCase(), ps = String(o.orderPackageStatus || '').toUpperCase();
-    if (/^(CANCELLED|CANCEL_REJECTED)$/.test(s) || ps === 'CANCELLED') return 'cancelled';
-    if (/^REFUNDED$/.test(s) || /REFUNDED|RETURN/.test(ps)) return 'returned';
+    // CANCEL_REJECTED / REFUND_REJECTED: talep reddedildi, sipariş sürüyor. *_REQUESTED: yalnız talep (karar verilmedi).
+    // PARTIALLY_REFUNDED: siparişin bir kısmı iade — iade edilen satırlar ayrıca işaretlenir, sipariş tamamı iade sayılmaz.
+    if (s === 'CANCELLED' || ps === 'CANCELLED') return 'cancelled';
+    if (s === 'REFUNDED' || ps === 'REFUNDED' || ps === 'REFUND_REQUEST_ACCEPTED') return 'returned';
     if (ps === 'DELIVERED') return 'delivered';
     if (/FULFILLED|SHIPPED|UNABLE_TO_DELIVER/.test(ps) && !/^PARTIALLY|UNFULFILLED/.test(ps)) return 'shipped';
     if (/READY|PARTIALLY|PREPAR/.test(ps)) return 'processing';
     return 'new';
   }
 
+  // Satır durumu: yalnız kesinleşen iptal / iade (talep ya da reddedilen talep satırı canlı bırakır)
+  const lineStatus = (v) => { const x = String(v || '').toUpperCase(); return x === 'CANCELLED' ? 'cancelled' : x === 'REFUNDED' || x === 'REFUND_REQUEST_ACCEPTED' ? 'returned' : ''; };
   function normOrder(o) {
     const a = o.shippingAddress || {}, c = o.customer || {};
     const items = (o.orderLineItems || []).map((li) => {
@@ -109,7 +113,7 @@ export function ikas(env, p, meta) {
         lineId: String(li.id), sku: str(v.sku), barcode: str((v.barcodeList || [])[0]), name: str(v.name),
         image: v.mainImageId ? imgUrl({ imageId: v.mainImageId, fileName: 'image' }) : '',
         quantity: num(li.quantity, 1), unitPrice: unit, total: unit * num(li.quantity, 1),
-        status: /CANCEL|REFUND/i.test(li.status || '') ? 'cancelled' : '', remoteKey: str(v.id),
+        status: lineStatus(li.status), remoteKey: str(v.id),
       };
     });
     // İptal / iade edilmiş paketler panelde gösterilmez (sipariş durumu ayrıca güncellenir)
@@ -151,8 +155,9 @@ export function ikas(env, p, meta) {
   async function fetchOrders(since, until, { byOrdered = false } = {}) {
     await ensureMerchant();
     const out = [];
-    let filter = byOrdered ? 'orderedAt' : 'updatedAt', optional = ORDER_OPT;
-    for (let page = 1; page <= (byOrdered ? 60 : 20); page++) {
+    let filter = byOrdered ? 'orderedAt' : 'updatedAt', optional = ORDER_OPT, more = false;
+    const maxPage = byOrdered ? 60 : 100;
+    for (let page = 1; page <= maxPage; page++) {
       let data;
       try {
         data = await flex((o) => orderQuery(o, filter), optional, { p: { page, limit: 50 }, d: { gte: since, lte: until } });
@@ -167,8 +172,11 @@ export function ikas(env, p, meta) {
         if (salesChannel && o.salesChannelId && o.salesChannelId !== salesChannel) continue;
         out.push(normOrder(o));
       }
+      more = !!r.hasNext;
       if (!r.hasNext) break;
     }
+    // Aralıktaki siparişlerin hepsi okunamadı (ör. uzun kesintiden sonra binlerce güncelleme): imleç ilerlemez, kalanı sonraki senkronda
+    if (more && !byOrdered) { out.warnings = [`ikas: bu aralıkta ${out.length}+ sipariş güncellemesi var; kalanlar bir sonraki senkronda alınacak`]; out.partialUntil = since; }
     return out;
   }
 

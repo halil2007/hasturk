@@ -4,6 +4,7 @@ import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBad
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
+const DEAD_LINE = (s) => s === 'cancelled' || s === 'returned'; // satır iptal / iade
 const STEPS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda']];
 export function stepper(status) {
   if (status === 'cancelled' || status === 'returned') return html`<div class="notice bad" style="margin:12px 0">${statusPill(status)}<span>Bu sipariş ${status === 'cancelled' ? 'iptal edildi' : 'iade sürecinde / iade edildi'}; kargo işlemi yapılamaz.</span></div>`;
@@ -73,7 +74,7 @@ export function extShip(orderId, done, choice = '') {
 // Siparişin paketleri; hiç paket yoksa tüm sipariş tek "taslak" paket olarak gösterilir
 function packagesOf(o) {
   if (o.packages.length) return o.packages;
-  const items = o.items.filter((i) => i.status !== 'cancelled').map((i) => ({ line_id: i.line_id, qty: i.quantity }));
+  const items = o.items.filter((i) => !DEAD_LINE(i.status)).map((i) => ({ line_id: i.line_id, qty: i.quantity }));
   return [{ id: 0, no: 1, items, status: ['shipped', 'delivered'].includes(o.status) ? 'shipped' : 'open', tracking: o.tracking, cargo_company: o.cargo_company, virtual: true }];
 }
 
@@ -192,8 +193,8 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
 
   function draw() {
     const o = d.order, pk = packagesOf(o), c = caps();
-    const qty = o.items.filter((i) => i.status !== 'cancelled').reduce((a, i) => a + i.quantity, 0);
-    const splittable = live() && o.status !== 'shipped' && !pk.some((p) => p.status === 'shipped') && (o.items.filter((i) => i.status !== 'cancelled').length > 1 || qty > 1);
+    const qty = o.items.filter((i) => !DEAD_LINE(i.status)).reduce((a, i) => a + i.quantity, 0);
+    const splittable = live() && o.status !== 'shipped' && !pk.some((p) => p.status === 'shipped') && (o.items.filter((i) => !DEAD_LINE(i.status)).length > 1 || qty > 1);
     const unmatched = o.items.filter((i) => !i.product_id).length;
     const late = lateInfo({ ...o, packages: o.packages.length, open_packages: o.packages.filter((p) => p.status === 'open').length });
     const ext = extNote(o);
@@ -435,7 +436,7 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
 
 // ---------- paketlere böl / paket ekle ----------
 function splitEditor(d, extra, done) {
-  const o = d.order, live = o.items.filter((i) => i.status !== 'cancelled');
+  const o = d.order, live = o.items.filter((i) => !DEAD_LINE(i.status));
   if (o.packages.some((p) => p.status === 'shipped')) return toast('Kargoya verilmiş paketi olan sipariş yeniden bölünemez', true);
   if (o.packages.some((p) => p.remote_id) && d.channel && d.channel.caps.split !== 'remote-async') return toast(`Paketler ${ch(o.channel).name}'da oluşturulmuş. Yeniden bölmek için önce paket menüsünden “Paketi iptal et”.`, true);
   let count = Math.min(8, Math.max(2, o.packages.length + extra));
@@ -504,10 +505,10 @@ export async function openOrder(id, onChange) {
       <div class="two-col" style="margin-top:16px">
         <div class="stack">
           <div class="card">
-            <div class="card-head"><h3>Ürünler</h3><span class="muted small">${o.items.filter((i) => i.status !== 'cancelled').reduce((t, i) => t + i.quantity, 0)} adet</span></div>
-            ${o.items.map((i) => html`<div class="li" style="${i.status === 'cancelled' ? 'opacity:.5' : ''}">${thumb(i.product_image || i.image, i.name)}
+            <div class="card-head"><h3>Ürünler</h3><span class="muted small">${o.items.filter((i) => !DEAD_LINE(i.status)).reduce((t, i) => t + i.quantity, 0)} adet</span></div>
+            ${o.items.map((i) => html`<div class="li" style="${DEAD_LINE(i.status) ? 'opacity:.5' : ''}">${thumb(i.product_image || i.image, i.name)}
               <div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${i.product_name || i.name}</div>
-                <div class="muted small">${[i.sku, i.barcode].filter(Boolean).join(' · ')}${i.status === 'cancelled' ? ' · İptal' : ''}</div>
+                <div class="muted small">${[i.sku, i.barcode].filter(Boolean).join(' · ')}${i.status === 'cancelled' ? ' · İptal' : i.status === 'returned' ? ' · İade' : ''}</div>
                 ${i.product_id ? html`<div class="tiny muted">Ortak stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--amber)">Panelde eşleşmemiş — <a class="link" href="#/eslestirme">eşleştir</a></div>`}</div>
               <div style="text-align:right" class="num"><div><b>${i.quantity}</b> × ${money(i.unit_price)}</div><div class="muted small">${money(i.total)}</div></div></div>`)}
           </div>

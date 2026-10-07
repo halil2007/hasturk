@@ -4,7 +4,7 @@
 // ya da "ben seçeyim" (settings.manual_import, bkz. match.js → autoMatch).
 import { all, first, run, getRaw, setSetting, getSettings, log } from './db.js';
 import { autoMatch, relinkItems, normBc, normSku, manualImport, bestCandidates, approveConfident } from './match.js';
-import { fillProductInfo, catalogOf } from './sync.js';
+import { fillProductInfo, catalogOf, applyDirtyStock } from './sync.js';
 import { chunk, str, fail } from './util.js';
 
 const STATES = {
@@ -96,6 +96,7 @@ export async function addToPanel(env, db, b, user = {}) {
   // Sipariş satırları yeni ürünlere bağlanır; diğer kanallardaki aynı ürünün ilanları kesin eşleşmeyle bağlanır
   await relinkItems(db);
   const settings = await getSettings(db);
+  await applyDirtyStock(db, settings);
   const m = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] }).catch(() => ({ linked: 0 }));
   await fillProductInfo(db, settings).catch(() => {});
   await log(db, channel, 'info', `${user.name || 'Panel'}: kanal ürünlerinden panele alındı · ${created} yeni ürün, ${linked} var olan ürüne bağlandı${m.linked ? `, diğer kanallardan ${m.linked} ilan eşleşti` : ''}`);
@@ -107,7 +108,7 @@ export async function acceptStrong(db, b, user = {}) {
   const channel = str(b.channel);
   if (!channel) fail(400, 'Kanal seçin');
   const r = await approveConfident(db, { channel, min: 85, gap: 15 });
-  if (r.linked) { await relinkItems(db); await log(db, channel, 'info', `${user.name || 'Panel'}: ${r.linked} güçlü eşleşme önerisi onaylandı`); }
+  if (r.linked) { await relinkItems(db); await applyDirtyStock(db); await log(db, channel, 'info', `${user.name || 'Panel'}: ${r.linked} güçlü eşleşme önerisi onaylandı`); }
   return r;
 }
 

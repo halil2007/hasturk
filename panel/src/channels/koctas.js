@@ -5,7 +5,7 @@
 // OF24 teklifi bütün olarak yazar (gönderilmeyen alanlar sıfırlanır): bu yüzden önce teklifin güncel hali OF21'den okunur ve korunarak gönderilir.
 // Kargo satıcının kendi anlaşmasıyla: takip no panelden girilir. Soru-cevap (M11), iade, ürün yükleme (P41) yok.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, imageList, diagStep, pool } from '../util.js';
+import { http, num, str, chunk, imageList, diagStep, pool, DEAD_LINE } from '../util.js';
 
 const STATUS = { WAITING_ACCEPTANCE: 'new', WAITING_DEBIT: 'new', WAITING_DEBIT_PAYMENT: 'new', STAGING: 'new', SHIPPING: 'processing', SHIPPED: 'shipped', TO_COLLECT: 'shipped',
   RECEIVED: 'delivered', CLOSED: 'delivered', REFUSED: 'cancelled', CANCELED: 'cancelled', CANCELLED: 'cancelled', REFUNDED: 'returned' };
@@ -125,7 +125,7 @@ export function koctas(env, meta) {
   // İşleme al (OR21): kabul bekleyen siparişin iptal olmayan satırları kabul edilir
   async function accept(order) {
     if (order.remote_status && order.remote_status !== 'WAITING_ACCEPTANCE') return;
-    const lines = (order.items || []).filter((i) => i.status !== 'cancelled' && i.line_id).map((i) => ({ accepted: true, id: String(i.line_id) }));
+    const lines = (order.items || []).filter((i) => !DEAD_LINE(i.status) && i.line_id).map((i) => ({ accepted: true, id: String(i.line_id) }));
     if (lines.length) await call(`/orders/${encodeURIComponent(order.remote_id)}/accept`, {}, { method: 'PUT', body: { order_lines: lines } });
   }
   // Kargo firması Mirakl taşıyıcı listesinden (SH21) adla eşlenir; bulunamazsa ad olarak gönderilir

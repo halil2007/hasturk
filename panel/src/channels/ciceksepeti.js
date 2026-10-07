@@ -55,7 +55,7 @@ export function ciceksepeti(env, meta) {
         const total = num(pick(it, 'totalPrice', 'orderItemTotalPrice', 'lineTotal')) || num(pick(it, 'itemPrice', 'price', 'salesPrice', 'unitPrice')) * qty;
         const sku = str(pick(it, 'stockCode', 'productCode', 'supplierProductCode'));
         items.push({ lineId, sku, barcode: str(pick(it, 'barcode', 'productBarcode')), name: str(pick(it, 'name', 'productName')), image: str(pick(it, 'productImageUrl', 'imageUrl', 'image')),
-          quantity: qty, unitPrice: total / qty, total, status: ['cancelled', 'returned'].includes(s.st) ? 'cancelled' : '', remoteKey: sku || str(it.code), _st: s.st, _raw: s.raw, _it: it });
+          quantity: qty, unitPrice: total / qty, total, status: ['cancelled', 'returned'].includes(s.st) ? s.st : '', remoteKey: sku || str(it.code), _st: s.st, _raw: s.raw, _it: it });
       }
       const live = items.filter((i) => !['cancelled', 'returned'].includes(i._st));
       const status = !live.length ? (items.some((i) => i._st === 'returned') ? 'returned' : 'cancelled') : RANKS[Math.min(...live.map((i) => Math.max(0, RANKS.indexOf(i._st))))];

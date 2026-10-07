@@ -7,7 +7,7 @@
 // Ürün / stok / fiyat: Listings Items 2021-08-01 (searchListingsItems; patchListingsItem SKU başına bir istek, 5 istek/sn).
 // Kargoya verme: shipmentConfirmation (takip no + kargo firması). Ürün oluşturma, etiket, iade yok.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, sleep, diagStep, imageList } from '../util.js';
+import { http, num, str, sleep, diagStep, imageList, DEAD_LINE } from '../util.js';
 
 const STATUS = { Pending: 'new', PendingAvailability: 'new', Unshipped: 'new', InvoiceUnconfirmed: 'new', PartiallyShipped: 'processing', Shipped: 'shipped', Canceled: 'cancelled', Unfulfillable: 'cancelled' };
 // Pazar yeri → para birimi (fiyat gönderiminde purchasable_offer.currency)
@@ -135,7 +135,7 @@ export function amazon(env, meta) {
   async function ship(order, pkg, { cargoCompany, tracking }) {
     if (/FBA/.test(str(order.remote_status))) throw new Error('Amazon: FBA siparişi Amazon tarafından gönderilir');
     if (!tracking) throw new Error('Amazon: kargoya vermek için takip numarası girin');
-    const lines = (pkg.items && pkg.items.length ? pkg.items : (order.items || []).filter((i) => i.status !== 'cancelled').map((i) => ({ line_id: i.line_id, qty: i.quantity })))
+    const lines = (pkg.items && pkg.items.length ? pkg.items : (order.items || []).filter((i) => !DEAD_LINE(i.status)).map((i) => ({ line_id: i.line_id, qty: i.quantity })))
       .map((i) => ({ orderItemId: String(i.line_id), quantity: num(i.qty, 1) }));
     await call(`/orders/v0/orders/${encodeURIComponent(order.remote_id)}/shipmentConfirmation`, { method: 'POST', body: {
       marketplaceId: market, packageDetail: { packageReferenceId: String(pkg.no || pkg.id || 1), carrierCode: 'Other', carrierName: str(cargoCompany) || 'Other', trackingNumber: str(tracking),
