@@ -182,8 +182,9 @@ export function lateInfo(o, now = Date.now()) {
   if (now - o.ordered_at > 15 * 864e5) return null; // çok eski kayıtlar gecikme sayılmaz (sunucudaki LATE ile aynı sınır)
   const H = 3600e3;
   if (o.ship_by && now > o.ship_by) return { cls: 'bad', text: 'Gecikti', title: `Son kargoya teslim: ${dateTime(o.ship_by)}` };
-  if (o.ship_by && o.ship_by - now < 12 * H) return { cls: 'bad', text: 'Gecikme riski', title: `Son kargoya teslim: ${dateTime(o.ship_by)} (${Math.max(0, Math.round((o.ship_by - now) / H))} sa kaldı)` };
-  if (now - o.ordered_at > 24 * H) return { cls: 'warn', text: 'Henüz kargoya verilmedi', title: `${Math.floor((now - o.ordered_at) / 864e5) || 1} günü aştı${o.ship_by ? ` · son teslim ${dateTime(o.ship_by)}` : ''}` };
+  if (o.ship_by && o.ship_by - now < 12 * H) return { cls: 'warn', text: 'Gecikme riski', title: `Son kargoya teslim: ${dateTime(o.ship_by)} (${Math.max(0, Math.round((o.ship_by - now) / H))} sa kaldı)` };
+  // Kanal son teslim tarihi vermediyse: 1 günü aşan ve henüz kargoya verilmemiş sipariş
+  if (!o.ship_by && now - o.ordered_at > 24 * H) return { cls: 'warn', text: 'Gecikme riski', title: `Sipariş ${Math.floor((now - o.ordered_at) / 864e5) || 1} günü aştı, henüz kargoya verilmedi` };
   return null;
 }
 export const lateBadge = (o) => { const l = lateInfo(o); return l ? html`<span class="late ${l.cls}" title="${l.title}"><b>!</b>${l.text}</span>` : ''; };

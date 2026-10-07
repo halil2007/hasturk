@@ -50,7 +50,7 @@ export async function dashboard(el) {
     const hour = new Date().getHours(), u = state.user || {};
     const tasks = [
       ['blue', 'orders', newN, 'Yeni sipariş', '#/siparisler?status=new'],
-      ['red', 'warn', sm.late || 0, 'Geciken / gecikme riski', '#/siparisler?status=late'],
+      ['red', 'warn', sm.late || 0, 'Gecikme riski olan sipariş', '#/siparisler?status=new'],
       ['orange', 'truck', sm.cargoWaiting || 0, 'Kargoya hazırlanacak', '#/kargo'],
       ['purple', 'link', sm.unmatched || 0, 'Eşleşme bekleyen ilan', '#/eslestirme'],
       ['red', 'db', sm.stockOut || 0, 'Stokta olmayan ürün', '#/stoklar?durum=out'],

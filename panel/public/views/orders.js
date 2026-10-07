@@ -5,12 +5,13 @@ import { loadSummary, setQuery } from '../app.js';
 import { pickSheet } from './picklist.js';
 
 // İlk sekme Yeni (açılışta seçili), Tümü en sonda
-const STATUS_TABS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['late', 'Geciken'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade'], ['all', 'Tümü']];
+// Ayrı "Geciken" sekmesi yok: gecikme ihtimali olan siparişler Yeni / Hazırlanıyor listesinde "Gecikme riski" etiketiyle görünür
+const STATUS_TABS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade'], ['all', 'Tümü']];
 
 export async function orders(el, rest, query = {}) {
-  const f = { channel: query.channel || '', status: query.status || (query.q || query.missing ? 'all' : 'new'), q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', missing: query.missing ? '1' : '', page: 1, limit: 25 };
+  const f = { channel: query.channel || '', status: (query.status === 'late' ? '' : query.status) || (query.q || query.missing ? 'all' : 'new'), q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', missing: query.missing ? '1' : '', page: 1, limit: 25 };
   if (rest[0] === 'kanal') f.channel = rest[1] || '';
-  if (rest[0] === 'durum') f.status = rest[1] || 'new';
+  if (rest[0] === 'durum') f.status = (rest[1] !== 'late' && rest[1]) || 'new';
   if (rest[0] && !['kanal', 'durum'].includes(rest[0])) setTimeout(() => openOrder(rest[0], refresh), 0);
   const sel = new Set();
   let data = { orders: [], counts: {}, total: 0 }, expanded = null, mobile = isMobile();
@@ -49,7 +50,7 @@ export async function orders(el, rest, query = {}) {
   function statusTabs() {
     const c = data.counts, total = Object.entries(c).filter(([k]) => k !== 'late').reduce((a, [, x]) => a + x, 0);
     const cnt = (k) => (k === 'all' ? total : c[k] || 0);
-    render($('[data-stabs]', el), html`${STATUS_TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''} ${k === 'late' && cnt(k) ? 'warn-tab' : ''}" data-act="st" data-k="${k}">${k === 'late' && cnt(k) ? html`<b class="late-dot">!</b>` : ''}${t}<span class="n">${cnt(k)}</span></button>`)}`);
+    render($('[data-stabs]', el), html`${STATUS_TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${cnt(k)}</span></button>`)}`);
   }
 
   function actionBtn(o) {
