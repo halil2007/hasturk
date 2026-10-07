@@ -69,7 +69,8 @@
       <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>${priceHtml(p)}
       <div class="limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
       <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-bolt"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul>
-      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>
+      ${S.checkoutUrl && p.key ? `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/satin-al?plan=${p.key}&amp;donem=yillik">Hemen satın al</a>
+      <a class="btn btn-line plan-trial" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>` : `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>`}
       <a class="plan-demo" data-demo href="/demo">ya da önce demo panelini açın →</a></div>`).join('');
   });
   $$('[data-vat]').forEach((el) => { el.textContent = S.vat || ''; });
@@ -160,4 +161,62 @@
       say('err', `${x.message || 'Gönderilemedi'}.${get('company.phone') ? ` Dilerseniz ${get('company.phone')} numarasından ulaşabilirsiniz.` : ''}`);
     } finally { btn.disabled = false; }
   }));
+
+  // ---------- Satın al (iyzico) ----------
+  const co = $('[data-checkout]');
+  if (co) {
+    const plans = (S.plans || []).filter((p) => p.key && p.monthly);
+    const st = { plan: q.get('plan') || 'profesyonel', period: q.get('donem') === 'aylik' ? 'monthly' : 'yearly', kind: q.get('firma') ? 'renew' : 'new' };
+    if (!plans.some((p) => p.key === st.plan)) st.plan = (plans[1] || plans[0] || {}).key;
+    if (q.get('firma')) { const s = $('[name=slug_renew]', co); if (s) s.value = q.get('firma'); }
+    const slugOf = (t) => String(t || '').toLocaleLowerCase('tr').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+    const firm = $('[name=firm]', co), slug = $('[name=slug]', co);
+    let slugTouched = false;
+    if (slug) slug.addEventListener('input', () => { slugTouched = true; });
+    if (firm && slug) firm.addEventListener('input', () => { if (!slugTouched) slug.value = slugOf(firm.value); });
+    const draw = () => {
+      $$('[data-co-plans]').forEach((el) => {
+        el.innerHTML = plans.map((p) => `<button type="button" class="co-plan${p.key === st.plan ? ' on' : ''}" data-plan="${p.key}"><b>${esc(p.name)}</b><span>${tl(st.period === 'yearly' ? p.yearly : p.monthly)} ₺ <small>${st.period === 'yearly' ? '/ yıl' : '/ ay'}</small></span><em>${esc((p.limits || []).join(' · '))}</em></button>`).join('');
+      });
+      $$('[data-period]', co).forEach((b) => b.classList.toggle('on', b.dataset.period === st.period));
+      $$('[data-kind]', co).forEach((b) => b.classList.toggle('on', b.dataset.kind === st.kind));
+      $$('[data-for]', co).forEach((x) => { x.hidden = x.dataset.for !== st.kind; $$('input', x).forEach((i) => { i.disabled = x.hidden; }); });
+      const p = plans.find((x) => x.key === st.plan) || {}, amount = st.period === 'yearly' ? p.yearly : p.monthly;
+      const sum = $('[data-co-sum]', co);
+      if (sum) sum.innerHTML = `<div class="co-sum-row"><span>${esc(p.name || '')} paketi · ${st.period === 'yearly' ? 'yıllık (12 ay)' : 'aylık (1 ay)'}</span><b>${tl(amount || 0)} ₺</b></div>
+        <div class="co-sum-note">KDV dahil${st.period === 'yearly' && S.installments ? ` · kredi kartına peşin fiyatına ${S.installments} taksit (${S.installments} × ${tl((amount || 0) / S.installments)} ₺)` : ''}${st.period === 'yearly' && p.monthly ? ` · ${tl(p.monthly * 12 - p.yearly)} ₺ kazanç` : ''}</div>`;
+    };
+    co.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-plan],[data-period],[data-kind]');
+      if (!b) return;
+      if (b.dataset.plan) st.plan = b.dataset.plan;
+      if (b.dataset.period) st.period = b.dataset.period;
+      if (b.dataset.kind) st.kind = b.dataset.kind;
+      draw();
+    });
+    draw();
+    co.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = $('[data-msg]', co), btn = $('button[type=submit]', co), f = new FormData(co);
+      const say = (cls, t) => { msg.className = 'form-msg ' + cls; msg.textContent = t; };
+      const val = (k) => String(f.get(k) || '').trim();
+      const body = { kind: st.kind, plan: st.plan, period: st.period, website: val('website'), consent: !!f.get('consent'),
+        contact: val('contact'), email: val(st.kind === 'renew' ? 'email_renew' : 'email'), phone: val('phone'), city: val('city'), address: val('address'), identity: val('identity') };
+      if (st.kind === 'new') Object.assign(body, { firm: val('firm'), slug: val('slug'), username: val('username'), password: String(f.get('password') || '') });
+      else body.slug = val('slug_renew');
+      if (st.kind === 'new' && body.password !== String(f.get('password2') || '')) return say('err', 'Şifreler aynı değil.');
+      if (!body.consent) return say('err', 'Lütfen mesafeli satış sözleşmesini ve ön bilgilendirme formunu onaylayın.');
+      btn.disabled = true; say('', 'Güvenli ödeme sayfası hazırlanıyor…');
+      try {
+        const r = await fetch(S.checkoutUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.url) throw new Error(j.error || 'Ödeme başlatılamadı');
+        say('ok', 'iyzico ödeme sayfasına yönlendiriliyorsunuz…');
+        location.href = j.url;
+      } catch (x) {
+        say('err', `${x.message || 'Ödeme başlatılamadı'}${get('company.phone') ? ` · Yardım için: ${get('company.phone')}` : ''}`);
+        btn.disabled = false;
+      }
+    });
+  }
 })();
