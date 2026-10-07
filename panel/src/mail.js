@@ -45,7 +45,10 @@ export async function sendMail(env, db, { to, subject, html, text }) {
   // Kendi e-posta sunucunuz (hosting / kurumsal e-posta): SMTP 465 (SSL) ya da 587 (STARTTLS)
   if (provider === 'smtp') {
     if (!e.MAIL_SMTP_HOST || !e.MAIL_SMTP_PASS) throw new Error('SMTP sunucusu ve şifresi girilmemiş (Ayarlar → Bildirimler)');
-    return smtpSend({ host: String(e.MAIL_SMTP_HOST).trim(), port: Number(e.MAIL_SMTP_PORT) || 465, user: String(e.MAIL_SMTP_USER || from).trim(), pass: e.MAIL_SMTP_PASS, from, fromName: name, to, subject, html, text }, { connect: env.__connect });
+    const host = String(e.MAIL_SMTP_HOST).trim();
+    // Google (Gmail / Workspace) uygulama şifresi "abcd efgh ijkl mnop" diye gösterilir: boşluklar şifrenin parçası değildir
+    const pass = /gmail|google/i.test(host) ? String(e.MAIL_SMTP_PASS).replace(/\s+/g, '') : e.MAIL_SMTP_PASS;
+    return smtpSend({ host, port: Number(e.MAIL_SMTP_PORT) || 465, user: String(e.MAIL_SMTP_USER || from).trim(), pass, from, fromName: name, to, subject, html, text }, { connect: env.__connect });
   }
   if (!key) throw new Error('E-posta servisi API anahtarı girilmemiş (Ayarlar → Bildirimler)');
   if (provider === 'resend') {

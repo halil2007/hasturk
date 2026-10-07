@@ -54,7 +54,9 @@ export async function smtpSend(m, { connect } = {}) {
     }
     await s.cmd('AUTH LOGIN', [334]);
     await s.cmd(b64(m.user), [334], 'kullanıcı adı');
-    await s.cmd(b64(m.pass), [235], 'şifre (kullanıcı adı / şifre hatalı olabilir)');
+    await s.cmd(b64(m.pass), [235], /gmail|google/i.test(m.host)
+      ? 'şifre (Google normal hesap şifresini kabul etmez: hesapta 2 adımlı doğrulamayı açıp myaccount.google.com/apppasswords adresinden alınan 16 haneli uygulama şifresini girin; kullanıcı adı e-posta adresinin tamamı olmalı)'
+      : 'şifre (kullanıcı adı / şifre hatalı olabilir)');
     await s.cmd(`MAIL FROM:<${m.from}>`, [250]);
     for (const t of m.to) await s.cmd(`RCPT TO:<${t}>`, [250, 251], `alıcı ${t}`);
     await s.cmd('DATA', [354]);
