@@ -15,7 +15,8 @@
   ];
   const SOON = [
     ['Amazon', 'pazaryeri', '#232f3e', 'a'], ['Çiçeksepeti', 'pazaryeri', '#1e9e57', 'Çs'], ['Koçtaş', 'pazaryeri', '#e5541b', 'K'], ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S'],
-    ['WooCommerce', 'e-ticaret sitesi', '#7f54b3', 'W'], ['Etsy', 'pazaryeri', '#f1641e', 'E'],
+    ['WooCommerce', 'e-ticaret sitesi', '#7f54b3', 'W'], ['Etsy', 'pazaryeri', '#f1641e', 'E'], ['Ticimax', 'e-ticaret sitesi', '#0b5cff', 'Tx'],
+    ['IdeaSoft', 'e-ticaret sitesi', '#00a3e0', 'iS'], ['T-Soft', 'e-ticaret sitesi', '#e30613', 'TS'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC'],
   ];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
@@ -52,29 +53,29 @@
     show(0);
   }
 
-  // Paketler (aylık / yıllık)
-  let bill = 'm';
+  // Paketler: fiyatlar KDV dahil; büyük fiyat aylık, altında yıllık alım kutusu (2 ay hediye, peşin fiyatına taksit)
   const priceHtml = (p) => {
-    if (!p.monthly && !p.yearly) return '<div class="price">Teklif alın</div><div class="per">&nbsp;</div>';
-    if (bill === 'y' && p.yearly) return `<div class="price">${tl(p.yearly)} ₺ <small>/ yıl</small></div><div class="per">aylık ${tl(p.yearly / 12)} ₺'ye denk gelir</div>`;
-    return `<div class="price">${tl(p.monthly)} ₺ <small>/ ay</small></div><div class="per">${p.yearly ? `yıllık ödemede ${tl(p.yearly)} ₺` : '&nbsp;'}</div>`;
+    if (!p.monthly && !p.yearly) return '<div class="price">Teklif alın</div>';
+    const save = p.monthly && p.yearly ? p.monthly * 12 - p.yearly : 0;
+    const inst = S.installments && p.yearly ? `${S.installments} × ${tl(p.yearly / S.installments)} ₺` : '';
+    return `<div class="price">${tl(p.monthly)} <span class="cur">₺</span><small>/ ay</small></div>
+      <div class="vatline">KDV dahil · aylık ödeme</div>
+      ${p.yearly ? `<div class="yearly"><div class="y-top"><b>Yıllık ${tl(p.yearly)} ₺</b><small>KDV dahil</small>${save ? `<span class="save">${tl(save)} ₺ kazanç</span>` : ''}</div>
+        <div class="y-sub">2 ay hediye · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
+        ${inst ? `<div class="y-inst"><b>Peşin fiyatına ${S.installments} taksit</b><span>${inst}</span></div>` : ''}</div>` : ''}`;
   };
-  const renderPlans = () => $$('[data-plans]').forEach((el) => {
+  $$('[data-plans]').forEach((el) => {
     el.innerHTML = (S.plans || []).map((p) => `<div class="plan${p.featured ? ' featured' : ''}">${p.featured ? '<span class="badge">En çok tercih edilen</span>' : ''}
       <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>${priceHtml(p)}
       <div class="limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
-      <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}</ul>
-      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a></div>`).join('');
+      <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-bolt"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul>
+      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>
+      <a class="plan-demo" data-demo href="/demo">ya da önce demo panelini açın →</a></div>`).join('');
   });
-  renderPlans();
-  $$('[data-bill]').forEach((t) => t.addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    bill = b.dataset.b; $$('[data-bill] button').forEach((x) => x.classList.toggle('on', x.dataset.b === bill)); renderPlans();
-  }));
   $$('[data-vat]').forEach((el) => { el.textContent = S.vat || ''; });
   const cmp = $('[data-compare]');
   if (cmp && S.compare) {
-    const cell = (v) => (v === true ? '<td class="y"><svg><use href="#i-check"/></svg><span class="sr">Var</span></td>' : v === false ? '<td class="n"><svg><use href="#i-minus"/></svg><span class="sr">Yok</span></td>' : `<td class="t">${esc(v)}</td>`);
+    const cell = (v) => (v === true ? '<td class="y"><svg><use href="#i-check"/></svg><span class="sr">Var</span></td>' : v === false ? '<td class="n"><svg><use href="#i-minus"/></svg><span class="sr">Yok</span></td>' : `<td class="t${v === 'Yakında' ? ' soon-cell' : ''}">${esc(v)}</td>`);
     cmp.innerHTML = `<thead><tr><th scope="col">Özellik</th>${(S.plans || []).map((p) => `<th scope="col"${p.featured ? ' class="feat"' : ''}>${esc(p.name)}</th>`).join('')}</tr></thead>
       <tbody>${S.compare.map(([k, ...v]) => `<tr><th scope="row">${esc(k)}</th>${v.map(cell).join('')}</tr>`).join('')}</tbody>`;
   }
@@ -97,6 +98,16 @@
     if (k === 'wa') { el.target = '_blank'; el.rel = 'noopener'; }
   });
   if (S.panelUrl) $$('[data-panel]').forEach((a) => { a.href = S.panelUrl; });
+  // "Canlı demo": bilgi istemeden demo paneli (yeni sekmede); "Hemen ara": telefon
+  if (S.demoUrl) $$('[data-demo]').forEach((a) => { a.href = S.demoUrl; a.target = '_blank'; a.rel = 'noopener'; });
+  const tel = get('company.phone');
+  if (tel) $$('[data-call]').forEach((a) => { a.href = 'tel:' + String(tel).replace(/[^\d+]/g, ''); a.title = tel; });
+  // Sekmeli özellik gezgini
+  $$('[data-ftabs]').forEach((box) => box.addEventListener('click', (e) => {
+    const b = e.target.closest('[role=tab]'); if (!b) return;
+    $$('[role=tab]', box).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b); });
+    $$('.ft-p', box).forEach((p) => { p.hidden = p.dataset.p !== b.dataset.i; });
+  }));
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
 
   // Mobil menü

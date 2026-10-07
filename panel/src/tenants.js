@@ -20,9 +20,12 @@ import { DEMO_PRODUCTS } from './channels/demo.js';
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
 const SYNC_MS = 15 * 60e3;
 // Demo firma paneli: tanıtım sitesinden demo talep edenlerin girdiği, örnek verilerle çalışan panel (firma kodu ayrılmış).
-// Deneme modunda (DEMO=1) çalışır: kanallar örnek sipariş / ürün üretir, gerçek pazaryerine bağlanmaz. Her gün sıfırlanır.
+// Deneme modunda (DEMO=1) çalışır: kanallar örnek sipariş / ürün üretir, gerçek pazaryerine bağlanmaz.
+// Ziyaretçilerin yaptığı değişiklikler kalıcı olmaz: panel 20 dakika kimse kullanmazsa (son sıfırlamadan 1 saat geçtiyse) ve
+// her durumda günde bir eski haline döner. Demo kullanıcısı sıfırlamada korunur, içerideki ziyaretçinin oturumu düşmez.
 export const DEMO_SLUG = 'demo';
-const DEMO_RESET_MS = 24 * 3600e3;
+const DEMO_IDLE = 20 * 60e3, DEMO_STALE = 3600e3, DEMO_MAX = 24 * 3600e3;
+export const demoDue = (now, resetAt, seenAt) => now - resetAt > DEMO_MAX || (now - resetAt > DEMO_STALE && now - seenAt > DEMO_IDLE);
 // Müşteri paneline geçmeyen ortam değişkenleri: ana panelin kanal / e-posta bilgileri, şifresi, deneme modu, bağlantılar
 const PRIVATE = /^(IKAS\d?_|TRENDYOL_|HB_|PTTAVM_|N11_|IDEFIX_|PAZARAMA_|MAIL_)/;
 const DROP = new Set(['PANEL_PASSWORD', 'DEMO', 'DB', 'TENANT']);
@@ -111,7 +114,7 @@ export async function demoLogin(env, secure) {
   await init(env.DB);
   const now = Date.now();
   await run(env.DB, `INSERT INTO tenants (slug, name, note, active, admin_username, created_at, updated_at) VALUES (?, 'Demo Mağaza', ?, 1, 'demo', ?, ?)
-    ON CONFLICT (slug) DO NOTHING`, DEMO_SLUG, 'Web sitesindeki demo paneli: örnek verilerle çalışır, her gün sıfırlanır. Askıya alırsanız demo kapanır.', now, now);
+    ON CONFLICT (slug) DO NOTHING`, DEMO_SLUG, 'Web sitesindeki demo paneli: örnek verilerle çalışır, ziyaretçi değişiklikleri kendiliğinden geri alınır. Askıya alırsanız demo kapanır.', now, now);
   const t = await getTenant(env.DB, DEMO_SLUG, true);
   if (!t.active) fail(403, 'Demo paneli şu an kapalı. Lütfen bizimle iletişime geçin.');
   return (await admin(env, t, 'demo', { secure })).cookie;
@@ -302,6 +305,7 @@ export class TenantPanel {
       } catch (e) { return json({ ok: false }); }
     }
     await this.schedule();
+    if (env.DEMO === '1' && Date.now() - (this.seen || 0) > 60e3) { this.seen = Date.now(); await this.ctx.storage.put('demo_seen', this.seen); }
     const t0 = Date.now(), res = await handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
     if (res.status >= 500) this.ctx.waitUntil(report5xx(this.env.DB, req, res, { slug: this.t.slug, firm: this.t.name }).catch(() => {}));
     // İstek süresi: firma adıyla ana panelin "Sistem hızı" bölümüne
@@ -349,7 +353,7 @@ export class TenantPanel {
       if (b.op === 'demo') {
         if (env.DEMO !== '1') return json({ error: 'Bu panel demo paneli değil' }, 400);
         await this.ctx.storage.delete('suspended'); await this.ctx.storage.delete('destroyed');
-        if (Date.now() - ((await this.ctx.storage.get('demo_reset_at')) || 0) > DEMO_RESET_MS) await this.demoReset(env);
+        if (await this.demoDue()) await this.demoReset(env);
         await this.schedule();
         return json({ ok: true, cookie: await demoCookie(env, this.db, !!b.secure) });
       }
@@ -358,13 +362,20 @@ export class TenantPanel {
       return json({ error: 'Bilinmeyen işlem' }, 400);
     } catch (e) { return json({ error: e.message }, e.status || 500); }
   }
-  // Demo paneli sıfırlama (günde bir): ziyaretçilerin yaptığı değişiklikler silinir, örnek veriler baştan çekilir
+  async demoDue() {
+    const st = this.ctx.storage;
+    return demoDue(Date.now(), (await st.get('demo_reset_at')) || 0, (await st.get('demo_seen')) || 0);
+  }
+  // Demo paneli sıfırlama: ziyaretçilerin yaptığı değişiklikler silinir, örnek veriler baştan çekilir. Demo kullanıcısı aynı
+  // kimlik ve şifre özetiyle yeniden yazılır; böylece açık oturumlar geçerli kalır.
   async demoReset(env) {
+    const keep = await first(this.db, "SELECT id, pass, perms FROM users WHERE username = 'demo'").catch(() => null);
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
     this.db = doD1(this.ctx.storage);
     if (this.t) await this.ctx.storage.put('meta', this.t);
     await init(this.db);
+    if (keep) await run(this.db, "INSERT INTO users (id, username, name, email, pass, role, active, created_at, perms) VALUES (?, 'demo', 'Demo kullanıcı', '', ?, 'staff', 1, ?, ?)", keep.id, keep.pass, Date.now(), keep.perms);
     await run(this.db, "INSERT INTO settings (k, v) VALUES ('company', ?) ON CONFLICT (k) DO NOTHING", JSON.stringify({ title: 'Demo Mağaza', legal: 'Demo Mağaza' }));
     await this.ctx.storage.put('demo_reset_at', Date.now());
     try { await syncAll(env, this.db); } catch (e) { console.error('demo paneli senkron hatası', e); }
@@ -384,7 +395,7 @@ export class TenantPanel {
     const env = await this.meta();
     if (!env || await this.ctx.storage.get('suspended') || await this.ctx.storage.get('destroyed')) return;
     let syncErr = null;
-    if (env.DEMO === '1' && Date.now() - ((await this.ctx.storage.get('demo_reset_at')) || 0) > DEMO_RESET_MS) {
+    if (env.DEMO === '1' && (await this.demoDue())) {
       try { await this.demoReset(env); } catch (e) { console.error('demo paneli sıfırlanamadı', e); }
       return void (await this.ctx.storage.setAlarm(Date.now() + SYNC_MS));
     }

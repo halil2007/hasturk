@@ -6,6 +6,8 @@ window.SITE = {
   panelUrl: 'https://panel.hasturkcrm.com',
   // Demo / iletişim formları bu adrese gönderilir; talepler panelde Destek sayfasına "Web sitesi" olarak düşer
   leadUrl: 'https://panel.hasturkcrm.com/api/public/lead',
+  // "Canlı demo" düğmeleri: bilgi istemeden örnek verilerle çalışan demo paneline girer
+  demoUrl: 'https://panel.hasturkcrm.com/api/public/demo',
   company: {
     legal: '',                      // Şirket ünvanı (ör. "Hastürk ... Ltd. Şti.")
     address: '',                    // Açık adres
@@ -19,19 +21,22 @@ window.SITE = {
   },
   // WhatsApp düğmesine basınca hazır gelen mesaj
   waText: 'Merhaba, Hastürk CRM hakkında bilgi almak istiyorum.',
-  // Paketler: aylık ve yıllık fiyat (TL, KDV hariç). Fiyat boşsa "Teklif alın" yazar.
-  vat: 'Fiyatlara KDV dahil değildir. Yıllık ödemede 12 ay yerine 10 ay ücret alınır.',
+  // Paketler: aylık ve yıllık fiyat (TL, KDV DAHİL). Fiyat boşsa "Teklif alın" yazar.
+  installments: 3,          // yıllık alımda kredi kartına peşin fiyatına taksit sayısı (0 = gösterme)
+  vat: 'Tüm fiyatlara KDV dahildir. Yıllık alımda 12 ay yerine 10 ay ücret alınır ve kredi kartına peşin fiyatına 3 taksit yapılır.',
   plans: [
     { name: 'Başlangıç', tag: 'Tek mağaza, küçük ekip', monthly: 990, yearly: 9900, limits: ['3 mağaza bağlantısı', '2 kullanıcı'],
       items: ['Tüm aktif entegrasyonlar', 'Sipariş, kargo ve etiket yönetimi', 'Stok senkronu ve ürün eşleştirme', 'Çok kanala ürün yükleme', 'Gelir & gider, kâr-zarar raporu', 'Müşteri soruları ve iade talepleri', 'E-posta ve WhatsApp destek'] },
     { name: 'Profesyonel', tag: 'Çok kanallı büyüyen işletmeler', monthly: 1990, yearly: 19900, featured: true, limits: ['10 mağaza bağlantısı', '5 kullanıcı'],
-      items: ['Başlangıç paketindeki her şey', 'Buybox takibi ve fiyat önerileri', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
-    { name: 'Kurumsal', tag: 'Yüksek hacim ve bayi ağı', monthly: 3990, yearly: 39900, limits: ['Sınırsız mağaza', 'Sınırsız kullanıcı'],
-      items: ['Profesyonel paketteki her şey', 'Stok API (kendi sisteminize / bayilerinize stok aktarımı)', 'Kurulum ve veri aktarımında birebir destek', 'Yeni kanal ve özel geliştirme talepleri önceliği', 'Telefon destek hattı'] },
+      items: ['Başlangıç paketindeki her şey', 'Buybox takibi ve otomatik fiyat', 'Otomatik ürün gönderimi', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
+    { name: 'Kurumsal', tag: 'Yüksek hacim ve bayi ağı', monthly: 3990, yearly: 39900, limits: ['25 mağaza bağlantısı', 'Sınırsız kullanıcı'],
+      items: ['Profesyonel paketteki her şey', 'Stok API (kendi sisteminize / bayilerinize stok aktarımı)', 'Kurulum ve veri aktarımında birebir destek', 'Yeni kanal ve özel geliştirme talepleri önceliği', 'Telefon destek hattı', 'Daha fazla mağaza için özel teklif'],
+      // soon: pakete eklenecek ama henüz aktif olmayan özellikler ("Yakında" rozetiyle görünür)
+      soon: ['Yapay zekâ ile ürün yönetimi: "şu ürünü kapat", "şu ürünlerin fiyatını %5 artır" deyin, sistem tek tek uğraştırmadan kendisi yapsın'] },
   ],
   // Paket karşılaştırma tablosu: [özellik, Başlangıç, Profesyonel, Kurumsal]; true = var, false = yok, metin = değer
   compare: [
-    ['Mağaza bağlantısı', '3', '10', 'Sınırsız'],
+    ['Mağaza bağlantısı', '3', '10', '25 (fazlası teklifle)'],
     ['Kullanıcı', '2', '5', 'Sınırsız'],
     ['Sipariş, ürün ve ilan sayısı', 'Sınırsız', 'Sınırsız', 'Sınırsız'],
     ['Tüm aktif entegrasyonlar', true, true, true],
@@ -43,11 +48,14 @@ window.SITE = {
     ['Gelir & gider, kâr-zarar', true, true, true],
     ['Satış analizi ve raporlar', true, true, true],
     ['İki adımlı doğrulama', true, true, true],
-    ['Buybox takibi ve fiyat önerileri', false, true, true],
+    ['Buybox takibi ve otomatik fiyat', false, true, true],
+    ['Otomatik ürün gönderimi', false, true, true],
     ['Hakediş ve kesilen faturalar', false, true, true],
     ['Excel ile toplu güncelleme', false, true, true],
     ['Personel yetkileri ve rol şablonları', false, true, true],
     ['Stok API (bayi / kendi sisteminiz)', false, false, true],
+    ['Yapay zekâ ile ürün yönetimi', false, false, 'Yakında'],
+    ['Yıllık alımda peşin fiyatına 3 taksit', true, true, true],
     ['Destek', 'E-posta, WhatsApp', 'Öncelikli', 'Telefon + birebir kurulum'],
   ],
 };

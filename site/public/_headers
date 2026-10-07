@@ -8,3 +8,15 @@
   Cache-Control: public, max-age=604800
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+# CSS / JS adresleri içerikle değişir (?v=…, build.mjs ekler): uzun süre saklanır, güncellemede yeni adres kullanılır
+/assets/site.css
+  Cache-Control: public, max-age=31536000, immutable
+/assets/site.js
+  Cache-Control: public, max-age=31536000, immutable
+# config.js elle düzenlenebildiği için kısa tutulur (derlemeden yüklense bile en geç 10 dk'da yenilenir)
+/assets/config.js
+  Cache-Control: public, max-age=600
+/assets/logo.webp
+  Cache-Control: public, max-age=2592000
+/assets/icon.svg
+  Cache-Control: public, max-age=2592000
