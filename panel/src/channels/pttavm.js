@@ -256,20 +256,38 @@ function pttavmRest(env, meta) {
   const fetchOne = async (id) => { const o = await getOrder(id); if (!o) throw new Error('PttAVM: sipariş bulunamadı'); return normPttOrder(o); };
   const orderExists = async (id) => !!(await getOrder(id));
 
-  // Ürünler: sayfalı arama (searchPage); varyantlı üründe her varyant ayrı ilan (variantBarkod)
-  // Filtreler belgede "zorunlu" ama örnekte boş: önce boş (tüm ürünler) denenir; servis reddederse aktif ürünler stoklu + stoksuz ayrı okunur
+  // Ürünler: sayfalı arama (searchPage); varyantlı üründe her varyant ayrı ilan (variantBarkod).
+  // Belgede tüm filtreler "zorunlu" ama örnekte boş; boş kategori kimliğini (sayı alanı) reddeden hesaplar var (HTTP 400). Bu yüzden
+  // biçimler sırayla denenir: (1) hepsi boş, (2) kategori 0, (3) kategori alanları hiç gönderilmeden. Servisin kabul ettiği ilk biçim
+  // kullanılır; aktif / pasif ve stoklu / stoksuz ürünler ayrı ayrı okunup barkoda göre birleştirilir.
+  const STYLES = [
+    (f) => ({ categoryId: '', subCategoryId: '', isActive: f.a, isInStock: f.s, merchantCategoryId: '' }),
+    (f) => ({ categoryId: '0', subCategoryId: '0', isActive: f.a, isInStock: f.s, merchantCategoryId: '0' }),
+    (f) => ({ isActive: f.a, isInStock: f.s }),
+  ];
+  const rejected = (e) => /HTTP 400|HTTP 422/.test(e.message);
   async function fetchListings() {
-    try { return await listingsWith({ isActive: '', isInStock: '' }); } catch (e) {
-      if (!/HTTP 400|HTTP 422/.test(e.message)) throw e;
-      const seen = new Map();
-      for (const f of [{ isActive: 'true', isInStock: 'true' }, { isActive: 'true', isInStock: 'false' }]) for (const l of await listingsWith(f)) seen.set(l.remoteId, l);
-      return [...seen.values()];
+    // Filtresiz (tüm ürünler tek seferde) kabul edilirse yeterli
+    try { return await listingsWith(STYLES[0], { a: '', s: '' }); } catch (e) { if (!rejected(e)) throw e; }
+    const combos = [{ a: 'true', s: 'true' }, { a: 'true', s: 'false' }, { a: 'false', s: 'true' }, { a: 'false', s: 'false' }];
+    let style = null, first = null, err = null;
+    for (const st of STYLES) {
+      try { first = await listingsWith(st, combos[0]); style = st; break; } catch (e) { if (!rejected(e)) throw e; err = e; }
     }
+    if (!style) throw new Error(`PttAVM ürün listesi: servis arama filtrelerini kabul etmedi (${err.message.replace(/^.*?(HTTP \d+)/, '$1').trim()}). Tanılama'yı çalıştırıp sonucu Destek'e iletin.`);
+    const seen = new Map(first.map((l) => [l.remoteId, l]));
+    for (const f of combos.slice(1)) {
+      // Pasif ürün filtresi bazı hesaplarda reddedilebilir: o parça atlanır, okunanlar kalır
+      let rows = [];
+      try { rows = await listingsWith(style, f); } catch (e) { if (!rejected(e)) throw e; }
+      for (const l of rows) if (!seen.has(l.remoteId)) seen.set(l.remoteId, l);
+    }
+    return [...seen.values()];
   }
-  async function listingsWith(f) {
+  async function listingsWith(style, f) {
     const out = [];
     for (let page = 1; page <= 200; page++) {
-      const q = new URLSearchParams({ categoryId: '', subCategoryId: '', ...f, merchantCategoryId: '', searchPage: String(page) });
+      const q = new URLSearchParams({ ...style(f), searchPage: String(page) });
       const rows = list(await call(`${API}/products/search?${q}`));
       for (const p of rows) {
         const img = str((p.resimListesi && p.resimListesi[0] && p.resimListesi[0].url) || p.resim1Url);
