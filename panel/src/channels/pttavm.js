@@ -286,9 +286,11 @@ function pttavmRest(env, meta) {
   }
   async function listingsWith(style, f) {
     const out = [];
+    let products = 0;
     for (let page = 1; page <= 200; page++) {
       const q = new URLSearchParams({ ...style(f), searchPage: String(page) });
       const rows = list(await call(`${API}/products/search?${q}`));
+      products += rows.length;
       for (const p of rows) {
         const img = str((p.resimListesi && p.resimListesi[0] && p.resimListesi[0].url) || p.resim1Url);
         const base = { remoteProductId: str(p.urunId), sku: str(p.urunKodu), name: str(p.urunAdi), groupName: str(p.urunAdi), image: img, active: p.aktif !== false };
@@ -299,7 +301,8 @@ function pttavmRest(env, meta) {
           out.push({ ...base, remoteId: str(v.variantBarkod), barcode: str(v.variantBarkod), name: vn ? `${base.name} - ${vn}` : base.name, variantName: vn, price: num(p.kdVli) + num(v.fiyat), listPrice: num(p.kdVli) + num(v.fiyat), stock: num(v.miktar) });
         }
       }
-      if (!rows.length || (rows[0] && rows[0].rowCount && out.length >= num(rows[0].rowCount))) break;
+      // rowCount ürün (satır) sayısıdır; varyantlı üründe ilan sayısı ürün sayısından fazladır, bu yüzden ürünler sayılır
+      if (!rows.length || (rows[0] && rows[0].rowCount && products >= num(rows[0].rowCount))) break;
     }
     return out.filter((l) => l.remoteId);
   }
@@ -326,23 +329,54 @@ function pttavmRest(env, meta) {
   }
 
   // Kargo barkodu: create-barcode → tracking_id → barcode-status (barkod hazır olunca). Depo: PTTAVM_WAREHOUSE_ID ya da mağazanın ilk deposu.
+  // Barkod etiket almadan ÖNCE gerekir (etiket kolinin üstüne yapıştırılır): label() barkodu yoksa oluşturur, ship() yalnız eksikse.
+  // Aynı siparişe ikinci kez barkod açılmasın: önce siparişte (kargoBarkod / barcodes) barkod var mı bakılır, bekleyen işlem
+  // (tracking_id) aynı çalışma içinde yeniden sorgulanır.
   let warehouse = str(env.PTTAVM_WAREHOUSE_ID);
+  const waiting = new Map(); // sipariş no → create-barcode tracking_id
   async function warehouses() { const r = await call(`${SHIP}/get-warehouse`, { method: 'POST', body: {} }); return list(r); }
-  async function ship(order, pkg) {
-    if (pkg && pkg.tracking) return {};
-    if (!warehouse) { const w = (await warehouses())[0]; if (!w) throw new Error('PttAVM: mağazaya tanımlı depo bulunamadı (kargo barkodu için depo gerekli)'); warehouse = str(w.id); }
-    const r = await call(`${SHIP}/create-barcode`, { method: 'POST', body: { orders: [{ order_id: order.order_number, warehouse_id: Number(warehouse) || warehouse }] } });
-    if (r && (r.success === false || r.error === true)) throw new Error('PttAVM kargo barkodu: ' + (r.message || 'oluşturulamadı'));
-    const tid = r && r.tracking_id;
+  async function pollBarcode(no, tid) {
     for (let i = 0; tid && i < 3; i++) {
       await sleep(1500);
       const s = await call(`${SHIP}/barcode-status`, { method: 'POST', body: { tracking_id: tid } }).catch(() => null);
       if (!s) continue;
-      if (s.status === 'error') throw new Error('PttAVM kargo barkodu: ' + (s.error || 'hata'));
-      const hit = (s.data || []).find((d) => String(d.order_id) === String(order.order_number) && (d.barcodes || []).length);
-      if (s.status === 'completed' && hit) return { tracking: str(hit.barcodes[0]), cargoCompany: 'PTT Kargo' };
+      if (s.status === 'error') { waiting.delete(no); throw new Error('PttAVM kargo barkodu: ' + (s.error || 'hata')); }
+      const hit = (s.data || []).find((d) => String(d.order_id) === String(no) && (d.barcodes || []).length);
+      if (s.status === 'completed' && hit) { waiting.delete(no); return str(hit.barcodes[0]); }
     }
+    return '';
+  }
+  async function barcodeFor(order) {
+    const no = str(order.order_number);
+    if (waiting.has(no)) { const b = await pollBarcode(no, waiting.get(no)); if (b) return b; }
+    const cur = await getOrder(order.remote_id || no).catch(() => null);
+    const had = cur && normPttOrder(cur).tracking;
+    if (had) return had;
+    if (waiting.has(no)) return '';
+    if (!warehouse) { const w = (await warehouses())[0]; if (!w) throw new Error('PttAVM: mağazaya tanımlı depo bulunamadı (kargo barkodu için depo gerekli)'); warehouse = str(w.id); }
+    const r = await call(`${SHIP}/create-barcode`, { method: 'POST', body: { orders: [{ order_id: no, warehouse_id: Number(warehouse) || warehouse }] } });
+    if (r && (r.success === false || r.error === true)) throw new Error('PttAVM kargo barkodu: ' + (r.message || 'oluşturulamadı'));
+    const tid = r && r.tracking_id;
+    if (tid) waiting.set(no, tid);
+    return pollBarcode(no, tid);
+  }
+  async function ship(order, pkg) {
+    if (pkg && (pkg.tracking || pkg.barcode)) return {};
+    const code = await barcodeFor(order);
+    if (code) return { tracking: code, cargoCompany: 'PTT Kargo' };
     return { tracking: '', note: 'PttAVM barkodu hazırlıyor; siparişler yenilenince barkod gelir' };
+  }
+  // Etiket: get-barcode-tag (type "zpl" → termal yazıcı ZPL; boş → HTML). ZPL gelmezse panel etiketi PttAVM barkoduyla basılır.
+  const zplOf = (r) => (typeof r === 'string' ? (/\^XA/.test(r) ? r : '') : r && typeof r === 'object' ? Object.values(r).map(zplOf).find(Boolean) || '' : '');
+  async function label(order, pkg = {}) {
+    const code = str(pkg.barcode || pkg.tracking) || await barcodeFor(order);
+    if (!code) return { pending: 'PttAVM kargo barkodunu hazırlıyor; birkaç saniye sonra tekrar deneyin.', step: 'waiting' };
+    const info = { barcode: code, tracking: code, cargoCompany: 'PTT Kargo', agreement: 'pttavm' };
+    let r = null, why = '';
+    try { r = await call(`${SHIP}/get-barcode-tag`, { method: 'POST', body: { barcode: code, order_id: str(order.order_number), type: 'zpl' } }); } catch (e) { why = e.message; }
+    const zpl = zplOf(r);
+    if (zpl) return { ...info, label: { format: 'zpl', data: zpl, filename: `pttavm-${order.order_number}-${pkg.no || 1}.zpl` } };
+    return { ...info, panel: true, note: `PttAVM etiketi alınamadı${why ? ` (${why.slice(0, 160)})` : ''}; etiket PttAVM barkoduyla panelden basıldı.` };
   }
 
   async function diagnose({ orderId } = {}) {
@@ -358,8 +392,8 @@ function pttavmRest(env, meta) {
 
   return {
     ...meta, type: 'pttavm', byOrderDate: true, enabled: true, missing: [], api: 'rest',
-    caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: false, price: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, pushStatus, ship, diagnose,
+    caps: { accept: 'local', split: 'local', ship: 'remote', label: 'remote', createProduct: false, price: true },
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, pushStatus, ship, label, diagnose,
   };
 }
 

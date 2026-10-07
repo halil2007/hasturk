@@ -37,7 +37,7 @@ import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, expla
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
 // Etiketi kanalda oluşan kanal türleri (ek mağazalar dahil: ikas_3, trendyol_2, ...)
-const LABEL_REMOTE = ['ikas', 'trendyol', 'hepsiburada'];
+const LABEL_REMOTE = ['ikas', 'trendyol', 'hepsiburada', 'pttavm'];
 const bbIds = () => CHANNEL_IDS.filter((c) => BUYBOX_CHANNELS.includes(typeOf(c)));
 const remoteLabel = (col) => `(${col} IN ('ikas1', 'ikas2', ${LABEL_REMOTE.slice(1).map((x) => `'${x}'`).join(', ')}) OR ${LABEL_REMOTE.map((x) => `${col} LIKE '${x}\\_%' ESCAPE '\\'`).join(' OR ')})`;
 const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, cargo_applied, tracking, barcode, agreement, tracking_url, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';

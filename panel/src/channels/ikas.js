@@ -90,20 +90,38 @@ export function ikas(env, p, meta) {
     } }
   }`;
 
+  // Paket / satır durumları (ikas OrderPackageStatusEnum, OrderLineItemStatusEnum):
+  //  · iptal: CANCELLED · iade kesinleşti: REFUNDED, REFUND_REQUEST_ACCEPTED ve onay sonrası iade kargosu (RETURN_PARCEL_WAITING,
+  //    RETURN_IN_TRANSIT, RETURN_DELIVERED) · teslim edilmiş ama iade talebi açık / reddedildi: REFUND_REQUESTED, REFUND_REJECTED,
+  //    RETURN_REJECTED (ürün müşteride: teslim edildi) · CANCEL_REQUESTED / CANCEL_REJECTED: talep ya da reddedilen talep, sipariş sürüyor.
+  const RETURNED = /^(REFUNDED|REFUND_REQUEST_ACCEPTED|RETURN_PARCEL_WAITING|RETURN_IN_TRANSIT|RETURN_DELIVERED)$/;
+  const AFTER_DELIVERY = /^(DELIVERED|REFUND_REQUESTED|REFUND_REJECTED|RETURN_REJECTED)$/;
+  // Kısmi durumda (PARTIALLY_*) sipariş durumu canlı satırlardan: hepsi teslim → teslim, hepsi kargoda / teslim → kargoda,
+  // aksi halde hazırlanıyor (satır durumlarında "kargoya hazır" yok; kısmi durum bir işlem yapıldığını gösterir)
+  function fromLines(lines) {
+    const st = (lines || []).map((l) => String(l.status || '').toUpperCase()).filter(Boolean);
+    const live = st.filter((x) => x !== 'CANCELLED' && !RETURNED.test(x));
+    if (!st.length) return 'processing';
+    if (!live.length) return st.some((x) => RETURNED.test(x)) ? 'returned' : 'cancelled';
+    if (live.every((x) => AFTER_DELIVERY.test(x))) return 'delivered';
+    if (live.every((x) => x === 'FULFILLED' || AFTER_DELIVERY.test(x))) return 'shipped';
+    return 'processing';
+  }
   function mapStatus(o) {
     const s = String(o.status || '').toUpperCase(), ps = String(o.orderPackageStatus || '').toUpperCase();
     // CANCEL_REJECTED / REFUND_REJECTED: talep reddedildi, sipariş sürüyor. *_REQUESTED: yalnız talep (karar verilmedi).
     // PARTIALLY_REFUNDED: siparişin bir kısmı iade — iade edilen satırlar ayrıca işaretlenir, sipariş tamamı iade sayılmaz.
     if (s === 'CANCELLED' || ps === 'CANCELLED') return 'cancelled';
-    if (s === 'REFUNDED' || ps === 'REFUNDED' || ps === 'REFUND_REQUEST_ACCEPTED') return 'returned';
-    if (ps === 'DELIVERED') return 'delivered';
-    if (/FULFILLED|SHIPPED|UNABLE_TO_DELIVER/.test(ps) && !/^PARTIALLY|UNFULFILLED/.test(ps)) return 'shipped';
-    if (/READY|PARTIALLY|PREPAR/.test(ps)) return 'processing';
+    if (s === 'REFUNDED' || RETURNED.test(ps)) return 'returned';
+    if (AFTER_DELIVERY.test(ps)) return 'delivered';
+    if (/^PARTIALLY_/.test(ps)) return fromLines(o.orderLineItems);
+    if (/^(FULFILLED|UNABLE_TO_DELIVER)$/.test(ps)) return 'shipped';
+    if (/^(READY_FOR_SHIPMENT|READY_FOR_PICK_UP)$/.test(ps)) return 'processing';
     return 'new';
   }
 
   // Satır durumu: yalnız kesinleşen iptal / iade (talep ya da reddedilen talep satırı canlı bırakır)
-  const lineStatus = (v) => { const x = String(v || '').toUpperCase(); return x === 'CANCELLED' ? 'cancelled' : x === 'REFUNDED' || x === 'REFUND_REQUEST_ACCEPTED' ? 'returned' : ''; };
+  const lineStatus = (v) => { const x = String(v || '').toUpperCase(); return x === 'CANCELLED' ? 'cancelled' : RETURNED.test(x) ? 'returned' : ''; };
   function normOrder(o) {
     const a = o.shippingAddress || {}, c = o.customer || {};
     const items = (o.orderLineItems || []).map((li) => {
@@ -117,7 +135,7 @@ export function ikas(env, p, meta) {
       };
     });
     // İptal / iade edilmiş paketler panelde gösterilmez (sipariş durumu ayrıca güncellenir)
-    const packages = (o.orderPackages || []).filter((pk) => !/^(CANCELLED|REFUNDED|RETURN_|REFUND_REQUEST_ACCEPTED)/.test(pk.orderPackageFulfillStatus || '')).map((pk) => {
+    const packages = (o.orderPackages || []).filter((pk) => { const x = String(pk.orderPackageFulfillStatus || ''); return x !== 'CANCELLED' && !RETURNED.test(x); }).map((pk) => {
       const ti = pk.trackingInfo || {}, st = String(pk.orderPackageFulfillStatus || '');
       return {
         remoteId: String(pk.id),
@@ -168,7 +186,8 @@ export function ikas(env, p, meta) {
       }
       const r = data.listOrder;
       for (const o of r.data || []) {
-        if (/DRAFT|WAITING_UPGRADE/i.test(o.status || '')) continue;
+        // Taslak ve satış sonrası teklif (upsell) ekranında bekleyen sipariş henüz kesinleşmedi: CREATED olunca (updatedAt değişir) gelir
+        if (/^(DRAFT|WAITING_UPSELL_ACTION)$/i.test(o.status || '')) continue;
         if (salesChannel && o.salesChannelId && o.salesChannelId !== salesChannel) continue;
         out.push(normOrder(o));
       }
@@ -201,7 +220,7 @@ export function ikas(env, p, meta) {
       return names.join(' › ');
     };
     const q = (o) => `query ($page: Int!) { listProduct(pagination: { page: $page, limit: 100 }) { hasNext data {
-      id name ${o.salesChannelIds} ${o.brand} ${o.description} ${o.categoryIds} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice } stocks { stockCount } ${o.images} } } } }`;
+      id name ${o.salesChannelIds} ${o.brand} ${o.description} ${o.categoryIds} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice priceListId } stocks { stockCount } ${o.images} } } } }`;
     let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }', brand: 'brand { name }', description: 'description', categoryIds: 'categoryIds' };
     for (let page = 1; page <= 200; page++) {
       const d = await flex(q, optional, { page });
@@ -212,7 +231,8 @@ export function ikas(env, p, meta) {
         const allImgs = vars.flatMap((v) => v.images || []).filter((i) => !i.isVideo && i.imageId);
         const mainImg = allImgs.find((i) => i.isMain) || allImgs.sort((a, b) => (a.order || 0) - (b.order || 0))[0];
         for (const v of vars) {
-          const pr = (v.prices || [])[0] || {};
+          // Mağazanın ana fiyatı: fiyat listesine (priceListId) bağlı olmayan kayıt; fiyat gönderimi de bu kaydı günceller
+          const pr = (v.prices || []).find((x) => !x.priceListId) || (v.prices || [])[0] || {};
           const vi = (v.images || []).filter((i) => !i.isVideo && i.imageId);
           const img = vi.find((i) => i.isMain) || vi[0] || mainImg;
           // Tüm görseller (büyük boy bağlantı): varyantın kendi görselleri, yoksa ürünün görselleri; ana görsel önce
@@ -257,7 +277,8 @@ export function ikas(env, p, meta) {
         input: {
           variantPriceInputs: items.slice(i, i + 100).map((x) => ({
             productId: x.remoteProductId, variantId: x.remoteId,
-            price: x.listPrice && x.listPrice > x.price ? { sellPrice: x.listPrice, discountPrice: x.price } : { sellPrice: x.price },
+            // İndirim yoksa discountPrice açıkça boşaltılır: eski indirimli fiyat kalırsa müşteri o fiyattan alır
+            price: x.listPrice && x.listPrice > x.price ? { sellPrice: x.listPrice, discountPrice: x.price } : { sellPrice: x.price, discountPrice: null },
           })),
         },
       });
