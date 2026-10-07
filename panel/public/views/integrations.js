@@ -12,7 +12,7 @@ const HELP = {
   pttavm: 'PttAVM satıcı paneli → mağaza adınızın altında Hesap Yönetimi → Entegrasyon Bilgileri: entegratörler arasından Hastürk\'ü seçip Ekle / Görüntüle → API Key ve Token\'ı kopyalayın. (PttAVM token doğrulamasını zorunlu yaptı; eski kullanıcı adı / şifre girişi kapanıyor.) Kargo barkodu mağazanızın deposuyla alınır.',
   n11: 'N11 Satıcı Ofisi (so.n11.com) → Hesabım → API Hesapları → Yeni Hesap Oluştur; App Key ve App Secret e-postayla gelir.',
   idefix: 'idefix satıcı paneli → Hesap Bilgileri → Entegrasyon Bilgileri → Yeni API Oluştur (API Key, API Secret) ve Vendor ID.',
-  pazarama: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri (API Key = Client ID, API Secret).',
+  pazarama: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri (API Key = Client ID, API Secret). API Secret 1 yıl geçerlidir; süresi dolunca Pazarama panelinden yenisini oluşturup buraya girin.',
   amazon: 'Amazon Seller Central → Uygulamalar ve Hizmetler → Uygulama geliştirme: özel (private) SP-API uygulaması oluşturun, kendi mağazanız için yetkilendirin; LWA Client ID / Secret ve refresh token buradan alınır. Siparişler, stok, fiyat ve kargo bildirimi (takip no) desteklenir; alıcı adres bilgisini Amazon kısıtlı veri olarak verir.',
   ciceksepeti: 'Çiçeksepeti satıcı paneli → Hesap Ayarları → Entegrasyon Bilgileri → API anahtarı. Siparişler, ürünler, stok ve fiyat; kargo Çiçeksepeti anlaşmasıyla, etiket Çiçeksepeti panelinden.',
   koctas: 'Koçtaş pazaryeri (Mirakl satıcı paneli) → sağ üst kullanıcı menüsü → API Anahtarı. Siparişleri onaylama, kargo/takip bildirimi, stok ve fiyat desteklenir.',

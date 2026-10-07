@@ -76,6 +76,8 @@ export const FIELDS = {
   ],
   ciceksepeti: [
     { k: 'CICEKSEPETI_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Çiçeksepeti satıcı paneli → Hesap Ayarları → Entegrasyon Bilgileri' },
+    { k: 'CICEKSEPETI_SELLER_ID', label: 'Satıcı ID', hint: 'Çiçeksepeti satıcı paneli → Entegrasyon Bilgilerim (her istekte user-agent olarak gönderilir)' },
+    { k: 'CICEKSEPETI_INTEGRATOR', label: 'Entegratör adı', adv: true, hint: 'Boşsa yalnız Satıcı ID gönderilir; entegratör olarak kayıtlıysanız "SatıcıId-EntegratörAdı" gider' },
     { k: 'CICEKSEPETI_TEST', label: 'Ortam', choices: [['', 'Canlı'], ['1', 'Test (Sandbox)']], adv: true },
   ],
   koctas: [
