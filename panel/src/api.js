@@ -15,7 +15,7 @@ import { publicKey, subscribe, unsubscribe, latest, notify } from './push.js';
 import { pickList } from './picklist.js';
 import { dailyDigest } from './digest.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
-import { sendMail, orderMail, validEmail, logoPath } from './mail.js';
+import { sendMail, orderMail, validEmail, logoPath, logoUrl } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
 import * as chp from './chproducts.js';
@@ -1316,7 +1316,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!to.length) fail(400, 'Önce bildirim alacak e-posta adresini kaydedin');
     const chs = await getChannels(env, db), c = chs.find((x) => x.enabled) || { id: 'ikas1', name: 'HasTürk', type: 'ikas' };
     const sample = { id: 'deneme', order_number: 'DENEME-1', ordered_at: Date.now(), customer: 'Deneme Müşteri', address: JSON.stringify({ city: 'Konya', district: 'Selçuklu' }), total: 249.9 };
-    const mail = orderMail(sample, [{ name: 'Örnek ürün', sku: 'ORNEK-1', quantity: 1, total: 249.9, status: '' }], c, settings.panel_url || url.origin);
+    const pu = settings.panel_url || url.origin;
+    const mail = orderMail({ ...sample, total: 299.9 }, [{ name: 'Örnek ürün', sku: 'ORNEK-1', quantity: 1, unit_price: 249.9, total: 249.9, status: '' }], c, pu, logoUrl(env, { ...settings, panel_url: pu }), (settings.company && settings.company.title) || '');
     try { await sendMail(env, db, { to, subject: '[Deneme] ' + mail.subject, html: mail.html, text: mail.text }); } catch (e) { fail(400, 'E-posta gönderilemedi: ' + e.message); }
     await log(db, null, 'info', `${user.name}: deneme e-postası gönderildi (${to.join(', ')})`);
     return json({ ok: true, message: `Deneme e-postası gönderildi: ${to.join(', ')}` });

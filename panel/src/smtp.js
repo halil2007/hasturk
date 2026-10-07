@@ -39,6 +39,17 @@ function session(sock) {
   };
 }
 
+function message(m, to) {
+  const bd = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2), dom = String(m.from).split('@')[1] || 'panel.local';
+  return [
+    `From: ${word(m.fromName || m.from)} <${m.from}>`, `To: ${to}`, `Subject: ${word(m.subject)}`, `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}@${dom}>`, 'MIME-Version: 1.0', `Content-Type: multipart/alternative; boundary="${bd}"`, '',
+    `--${bd}`, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', wrap(b64(m.text || '')),
+    `--${bd}`, 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', wrap(b64(m.html || '')),
+    `--${bd}--`, '.',
+  ].join('\r\n');
+}
+
 // mail: { host, port, user, pass, from, fromName, to: [..], subject, html, text }
 export async function smtpSend(m, { connect } = {}) {
   const port = Number(m.port) || 465;
@@ -60,21 +71,18 @@ export async function smtpSend(m, { connect } = {}) {
     await s.cmd(b64(m.pass), [235], /gmail|google/i.test(m.host)
       ? 'şifre (Google normal hesap şifresini kabul etmez: hesapta 2 adımlı doğrulamayı açıp myaccount.google.com/apppasswords adresinden alınan 16 haneli uygulama şifresini girin; kullanıcı adı e-posta adresinin tamamı olmalı)'
       : 'şifre (kullanıcı adı / şifre hatalı olabilir)');
-    await s.cmd(`MAIL FROM:<${m.from}>`, [250]);
-    for (const t of m.to) await s.cmd(`RCPT TO:<${t}>`, [250, 251], `alıcı ${t}`);
-    await s.cmd('DATA', [354]);
-    const bd = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2), dom = String(m.from).split('@')[1] || 'panel.local';
-    const msg = [
-      `From: ${word(m.fromName || m.from)} <${m.from}>`, `To: ${m.to.join(', ')}`, `Subject: ${word(m.subject)}`, `Date: ${new Date().toUTCString()}`,
-      `Message-ID: <${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}@${dom}>`, 'MIME-Version: 1.0', `Content-Type: multipart/alternative; boundary="${bd}"`, '',
-      `--${bd}`, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', wrap(b64(m.text || '')),
-      `--${bd}`, 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', wrap(b64(m.html || '')),
-      `--${bd}--`, '.',
-    ].join('\r\n');
-    await s.send(msg);
-    await s.cmd(null, [250], 'gönderim');
+    // Her alıcıya ayrı ileti (aynı bağlantıda): alıcılar birbirinin adresini görmez. Hatalı tek adres diğerlerini durdurmaz.
+    const bad = [];
+    for (const t of m.to) {
+      await s.cmd(`MAIL FROM:<${m.from}>`, [250]);
+      try { await s.cmd(`RCPT TO:<${t}>`, [250, 251], `alıcı ${t}`); } catch (e) { bad.push(e.message); await s.cmd('RSET', [250]); continue; }
+      await s.cmd('DATA', [354]);
+      await s.send(message(m, t));
+      await s.cmd(null, [250], 'gönderim');
+    }
+    if (bad.length === m.to.length) throw new Error(bad[0]);
     await s.send('QUIT').catch(() => {});
-    return { ok: true };
+    return { ok: true, rejected: bad };
   } finally {
     s.close();
     try { sock.close(); } catch { /* kapalı */ }
