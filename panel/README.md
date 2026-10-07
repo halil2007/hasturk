@@ -58,6 +58,8 @@ Veritabanı (`hasturk-panel`) ilk yayında kendiliğinden oluşur.
 
 `PANEL_PASSWORD` ana yönetici şifresidir: girişte kullanıcı adı **boş** bırakılır. Diğer kişiler için panelde **Kullanıcılar** sayfasından hesap açın (kendi kullanıcı adı ve şifreleriyle girerler; şifrelerini sağ üstteki menüden değiştirebilirler).
 
+**Yeni ağdan girişte e-posta kodu** (Kullanıcılar → güvenlik kartı, varsayılan açık): kullanıcı daha önce doğrulamadığı bir ağdan (IP) girince şifreden sonra e-postasına 6 haneli kod gider (10 dakika geçerli; 5 hatalı denemede geçersiz olur; “Kodu tekrar gönder” 45 sn arayla, saatte en fazla 5). Kod girilince o ağ 120 gün hatırlanır ve oradan girişte kod sorulmaz. Ağ: IPv4'te ilk üç bölüm (ör. `85.105.12.x`; aynı ev / ofis hattında son hane değişse de tanınır), IPv6'da ilk dört grup. İki adımlı doğrulaması (uygulama) açık kullanıcıya bu adım yerine uygulama kodu sorulur ve kodla girdiği ağ da hatırlanır. Ana yöneticinin kodu alacağı adres aynı karttaki **Ana yönetici e-postası**dır. E-postası olmayan kullanıcıda ya da e-posta servisi çalışmazsa giriş engellenmez (kimse panelin dışında kalmasın), olay günlüğe yazılır. Yönetici bir kullanıcının **oturumlarını kapatınca** tanınan ağları da silinir. Kod e-postası Ayarlar → Bildirimler'deki e-posta servisiyle gider; müşteri panellerinde ana panelin servisi kullanılır. Kontrol girişte yapılır; açık oturum IP değişince kapanmaz.
+
 **Firma bilgileri ve logo:** Ayarlar → Firma bilgileri bölümünden unvan, iletişim bilgileri ve logo değiştirilir. Logo menüde, giriş ekranında ve telefonda üst çubukta görünür.
 
 ## 3. Kanal API bilgileri (panelden)

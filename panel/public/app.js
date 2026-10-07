@@ -24,7 +24,7 @@ import { financeView } from './views/finance.js';
 import { hbTestView } from './views/hbtest.js';
 import { claimsView, claimChannels } from './views/claims.js';
 import { campaignsView, campaignChannels } from './views/campaigns.js';
-import { codeStep, forcedSetup, twofaSettings } from './twofa.js';
+import { codeStep, mailStep, forcedSetup, twofaSettings } from './twofa.js';
 import { can, viewOnly } from './perms.js';
 import { billingView } from './views/billing.js';
 
@@ -461,6 +461,10 @@ async function login(info = {}) {
         try { r = await codeStep(e.target, { ticket: r.ticket, tenant }); } catch (x) { box.remove(); toast(x.message, true); return login(); }
         if (r.recoveryUsed) toast(`Yedek kodla giriş yapıldı; ${r.recoveryLeft} yedek kod kaldı`);
       }
+      // Tanınmayan ağdan giriş: e-postaya giden kod (bilet 20 dakika geçerli)
+      if (r.emailcode) {
+        try { r = await mailStep(e.target, { ticket: r.ticket, tenant, to: r.to }); } catch (x) { box.remove(); toast(x.message, true); return login(); }
+      }
       store.set('firma', tenant);
       box.remove();
       $$('.side, .main, .tabbar').forEach((x) => x.classList.remove('hide'));
@@ -484,7 +488,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-08w';
+const ASSETS = '2026-10-08x';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

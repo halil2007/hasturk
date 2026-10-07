@@ -27,6 +27,7 @@ export async function users(el) {
       <button class="btn primary" data-act="add" data-fab><i class="ico ico-plus"></i>Personel ekle</button>
     </div>
     <div class="card row wrap" data-sec style="gap:12px;align-items:center"></div>
+    <div class="card row wrap" data-msec style="gap:12px;align-items:center"></div>
     <div class="tabs" data-tabs></div>
     <div class="card flush" data-box></div>
     <details class="card"><summary><b>Roller ve yetki düzeyleri nasıl çalışır?</b></summary>
@@ -57,7 +58,29 @@ export async function users(el) {
   const lastIn = (u) => (u.last_login ? html`<span title="${dateTime(u.last_login)}${u.last_ip ? ` · IP ${u.last_ip}` : ''}">${ago(u.last_login)}</span>` : html`<span class="muted">hiç girmedi</span>`);
 
   // Güvenlik: iki adımlı doğrulama herkes için zorunlu mu
-  let sec = { require2fa: false };
+  let sec = { require2fa: false, emailVerify: true, adminEmail: '' };
+  // Yeni ağdan (IP) girişte e-posta kodu: aç / kapat; ana panelde ana yöneticinin kodu alacağı e-posta
+  function drawMailSec() {
+    const me = state.user || {}, mainAdmin = !state.tenant && me.id === 0;
+    const noMail = rows.filter((u) => u.active && !u.twofa && !String(u.email || '').trim());
+    render($('[data-msec]', el), html`<i class="ico ico-send" style="color:var(--primary)"></i><div style="flex:1;min-width:220px"><b>Yeni ağdan girişte e-posta kodu</b>
+        <div class="muted small">${sec.emailVerify ? 'Açık: bir kullanıcı daha önce doğrulamadığı bir ağdan (IP) girince e-postasına 6 haneli kod gider; kod girildikten sonra o ağdan tekrar sorulmaz. İki adımlı doğrulaması açık olanlara uygulama kodu sorulur.' : 'Kapalı: girişte yalnız şifre (ve açıksa iki adımlı doğrulama) istenir.'}</div>
+        ${sec.emailVerify && noMail.length ? html`<div class="small" style="color:var(--warn,#b54708);margin-top:4px">E-postası girilmemiş ${noMail.length} kullanıcıya kod gönderilemez: ${noMail.slice(0, 5).map((u) => u.name).join(', ')}${noMail.length > 5 ? '…' : ''}. Kullanıcıyı düzenleyip e-posta ekleyin.</div>` : ''}
+        ${mainAdmin ? html`<div class="row wrap" style="gap:8px;margin-top:8px;align-items:center"><span class="small" style="font-weight:650">Ana yönetici e-postası</span>
+          <input class="input" type="email" data-admmail value="${sec.adminEmail || ''}" placeholder="ornek@firma.com" style="max-width:260px"><button class="btn sm" data-admsave>Kaydet</button>
+          ${sec.emailVerify && !sec.adminEmail ? html`<span class="small" style="color:var(--warn,#b54708)">Girilmezse ana yönetici girişinde kod gönderilemez.</span>` : ''}</div>` : ''}</div>
+      <label class="switch-row" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" data-mailv ${sec.emailVerify ? 'checked' : ''}><span class="small" style="font-weight:650">Açık</span></label>`);
+    $('[data-mailv]', el).onchange = async (e) => {
+      sec = await api('users/security', { method: 'PUT', body: { emailVerify: e.target.checked } }).catch((x) => { toast(x.message, true); return sec; });
+      toast(sec.emailVerify ? 'Yeni ağdan girişte e-posta kodu açık' : 'Yeni ağdan girişte e-posta kodu kapalı');
+      drawMailSec();
+    };
+    const sv = $('[data-admsave]', el);
+    if (sv) sv.onclick = (e) => busy(e.currentTarget, async () => {
+      sec = await api('users/security', { method: 'PUT', body: { adminEmail: $('[data-admmail]', el).value.trim() } });
+      toast('Ana yönetici e-postası kaydedildi'); drawMailSec();
+    });
+  }
   function drawSec() {
     const on2 = rows.filter((u) => u.active && u.twofa).length, act = rows.filter((u) => u.active).length;
     render($('[data-sec]', el), html`<i class="ico ico-key" style="color:var(--primary)"></i><div style="flex:1;min-width:220px"><b>İki adımlı doğrulama (Google Authenticator)</b>
@@ -73,7 +96,7 @@ export async function users(el) {
     };
   }
   function draw() {
-    drawSec();
+    drawSec(); drawMailSec();
     const me = state.user || {}, list = visible();
     const act = rows.filter((u) => u.active), week = rows.filter((u) => u.last_login && Date.now() - u.last_login < 7 * 864e5);
     render($('[data-kpis]', el), html`
