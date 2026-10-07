@@ -6,8 +6,13 @@
 import { http, num, str, chunk, imageList, DEAD_LINE } from '../util.js';
 
 const BASE = 'https://api.n11.com';
-const STATUS = { Created: 'new', Picking: 'processing', UnPacked: 'processing', Shipped: 'shipped', Delivered: 'delivered', Cancelled: 'cancelled', UnSupplied: 'cancelled', Returned: 'returned' };
+const STATUS = { created: 'new', picking: 'processing', unpacked: 'processing', shipped: 'shipped', delivered: 'delivered', cancelled: 'cancelled', unsupplied: 'cancelled', returned: 'returned' };
 const RANKS = ['new', 'processing', 'shipped', 'delivered'];
+// Paket durumu → panel durumu. Belgede "Unpacked", eski kodda "UnPacked": büyük / küçük harf ve boşluk fark etmez
+const pst = (p) => STATUS[String((p && p.shipmentPackageStatus) || '').trim().toLowerCase()];
+// Bölünen paket (Unpacked): yerine aynı sipariş numarasıyla yeni paketler oluşur; ürünleri ve tutarı yeni paketlerde tekrar gelir
+const isSplit = (p) => /^unpacked$/i.test(String((p && p.shipmentPackageStatus) || '').trim());
+const money2 = (v) => Math.round(num(v) * 100) / 100;
 
 export function n11(env, meta) {
   const key = env.N11_APP_KEY, secret = env.N11_APP_SECRET;
@@ -16,38 +21,49 @@ export function n11(env, meta) {
   function group(pkgs) {
     const by = new Map();
     for (const p of pkgs) { const k = String(p.orderNumber); by.set(k, [...(by.get(k) || []), p]); }
-    return [...by.values()].map((list) => {
+    return [...by.values()].map((all) => {
+      // Aynı paket iki sayfada / iki aralıkta gelebilir: paket numarasına göre tekilleştir (numarasız paket: konuma özel teslimat)
+      const uniq = [...new Map(all.map((p, i) => [p.id != null && p.id !== '' ? String(p.id) : `#${i}`, p])).values()];
+      // Bölünüp yerine yenileri gelen paketler sayılmaz (ürünler ve tutar iki kez sayılmasın; durum yeni paketlerden)
+      const list = uniq.some((p) => !isSplit(p)) ? uniq.filter((p) => !isSplit(p)) : uniq;
       const p0 = list[0], a = p0.shippingAddress || {};
+      const dead = (p) => ['cancelled', 'returned'].includes(pst(p));
       const items = [];
-      for (const p of list) for (const l of p.lines || []) {
+      // Canlı paketlerin satırları önce: aynı satır hem iptal hem canlı pakette görünürse canlı olan geçerli
+      for (const p of [...list.filter((x) => !dead(x)), ...list.filter(dead)]) for (const l of p.lines || []) {
         if (items.some((i) => i.lineId === String(l.orderLineId))) continue;
-        const qty = num(l.quantity, 1), unit = num(l.price);
-        items.push({ lineId: String(l.orderLineId), sku: str(l.stockCode), barcode: str(l.barcode), name: str(l.productName), image: '', quantity: qty, unitPrice: unit, total: num(l.dueAmount) || unit * qty,
-          status: ['cancelled', 'returned'].includes(STATUS[p.shipmentPackageStatus]) ? STATUS[p.shipmentPackageStatus] : '', remoteKey: str(l.stockCode) });
+        // Satır tutarı: satıcının faturalayacağı tutar (sellerInvoiceAmount = fiyat × adet − mağaza indirimleri; n11 indirimi n11'den)
+        const qty = num(l.quantity, 1), unit = num(l.price), total = num(l.sellerInvoiceAmount) || num(l.dueAmount) || unit * qty;
+        items.push({ lineId: String(l.orderLineId), sku: str(l.stockCode), barcode: str(l.barcode), name: str(l.productName), image: '', quantity: qty, unitPrice: qty ? total / qty : unit, total,
+          status: dead(p) ? pst(p) : '', remoteKey: str(l.stockCode) });
       }
-      const live = list.filter((p) => !['cancelled', 'returned'].includes(STATUS[p.shipmentPackageStatus]));
-      const status = !live.length ? (list.some((p) => STATUS[p.shipmentPackageStatus] === 'returned') ? 'returned' : 'cancelled')
-        : RANKS[Math.min(...live.map((p) => Math.max(0, RANKS.indexOf(STATUS[p.shipmentPackageStatus] || 'new'))))];
-      const hist = list.flatMap((p) => (p.packageHistories || []).map((h) => num(h.createdDate))).filter(Boolean);
-      const tracked = list.find((p) => p.cargoTrackingNumber) || {};
+      const live = list.filter((p) => !dead(p));
+      const status = !live.length ? (list.some((p) => pst(p) === 'returned') ? 'returned' : 'cancelled')
+        : RANKS[Math.min(...live.map((p) => Math.max(0, RANKS.indexOf(pst(p) || 'new'))))];
+      const hist = uniq.flatMap((p) => (p.packageHistories || []).map((h) => num(h.createdDate))).filter(Boolean);
+      const tracked = live.find((p) => p.cargoTrackingNumber) || list.find((p) => p.cargoTrackingNumber) || {};
+      const sumOf = (ps) => ps.reduce((s, p) => s + num(p.totalAmount), 0);
       return {
         remoteId: String(p0.orderNumber), orderNumber: String(p0.orderNumber), orderedAt: hist.length ? Math.min(...hist) : num(p0.lastModifiedDate) || Date.now(),
-        remoteStatus: list.map((p) => p.shipmentPackageStatus).join(', '), status,
+        remoteStatus: list.map((p) => str(p.shipmentPackageStatus)).join(', '), status,
         customer: str(p0.customerfullName || a.fullName), phone: str(a.gsm), email: str(p0.customerEmail), customerId: str(p0.customerId || p0.buyerId),
         address: { name: str(a.fullName || p0.customerfullName), line: str(a.address), district: str(a.district), city: str(a.city), phone: str(a.gsm) },
-        total: list.reduce((s, p) => s + num(p.totalAmount), 0), currency: 'TRY',
+        total: Math.round((live.length ? sumOf(live) : sumOf(list)) * 100) / 100, currency: 'TRY',
         cargoCompany: str(tracked.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),
         shipBy: Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0)) || null,
         items,
-        packages: list.filter((p) => STATUS[p.shipmentPackageStatus] !== 'cancelled').map((p) => ({
+        // Paket numarası (id) olmayan paket (konuma özel teslimat; kargosu satıcıda) panelde kanal paketi olarak tutulmaz
+        packages: list.filter((p) => pst(p) !== 'cancelled' && p.id != null && p.id !== '').map((p) => ({
           remoteId: String(p.id), items: (p.lines || []).map((l) => ({ line_id: String(l.orderLineId), qty: num(l.quantity, 1) })),
-          status: ['shipped', 'delivered'].includes(STATUS[p.shipmentPackageStatus]) ? 'shipped' : 'open', remoteStatus: p.shipmentPackageStatus,
+          status: ['shipped', 'delivered'].includes(pst(p)) ? 'shipped' : 'open', remoteStatus: str(p.shipmentPackageStatus),
           cargoCompany: str(p.cargoProviderName), tracking: str(p.cargoTrackingNumber), barcode: str(p.cargoSenderNumber),
         })),
       };
     });
   }
 
+  // Siparişler sipariş oluşturma tarihine göre (orderByField gönderilmez): bir siparişin TÜM paketleri birlikte gelir. Güncellenme
+  // tarihine göre sorguda yalnız değişen paket gelir ve diğer paketlerin satırları siparişten düşerdi. Aralık en fazla 15 gün, sayfa en çok 100.
   async function fetchOrders(since, until) {
     const W = 15 * 864e5 - 60e3, pkgs = [];
     for (let to = until; to > since; to -= W) {
@@ -74,14 +90,29 @@ export function n11(env, meta) {
     return out;
   }
 
-  const task = (skus) => call('/ms/product/tasks/price-stock-update', { method: 'POST', body: { payload: { integrator: 'HasturkPanel', skus } } });
-  async function pushStock(items) { for (const part of chunk(items, 1000)) await task(part.map((x) => ({ stockCode: x.remoteId, quantity: x.stock }))); }
-  async function pushPrice(items) { for (const part of chunk(items, 1000)) await task(part.map((x) => ({ stockCode: x.remoteId, salePrice: x.price, listPrice: Math.max(x.listPrice || 0, x.price), currencyType: 'TL' }))); }
+  // Fiyat / stok: price-stock-update görevi (en fazla 1000 SKU). Görev kuyruğa alınır (IN_QUEUE) ya da hiç işlenmez (REJECT → hata).
+  // Sonuç SKU bazında task-details ile sorgulanır (pushStatus): FAIL olan ilan panelde hata olarak görünür.
+  // Fiyatlar noktadan sonra en fazla 2 hane olmalı (aksi FAIL), listPrice satış fiyatından düşük olamaz; stok tam sayı.
+  async function task(skus) {
+    const refs = [];
+    for (const part of chunk(skus, 1000)) {
+      const r = await call('/ms/product/tasks/price-stock-update', { method: 'POST', body: { payload: { integrator: 'HasturkPanel', skus: part } } });
+      if (r && (/^REJECT$/i.test(str(r.status)) || !r.id)) throw new Error('N11 fiyat / stok görevi reddedildi: ' + (((r && r.reasons) || []).join(' · ') || JSON.stringify(r).slice(0, 300)));
+      refs.push(String(r.id));
+    }
+    return { refs };
+  }
+  const pushStock = (items) => task(items.map((x) => ({ stockCode: x.remoteId, quantity: Math.max(0, Math.round(num(x.stock))) })));
+  const pushPrice = (items) => task(items.map((x) => { const sale = money2(x.price); return { stockCode: x.remoteId, salePrice: sale, listPrice: Math.max(money2(x.listPrice), sale), currencyType: 'TL' }; }));
 
-  // İşleme al: "Picking" (yalnızca Created satırlar)
+  // İşleme al: "Picking" (yalnızca Created satırlar). Servis satır satır sonuç verir; hiçbir satır onaylanmadıysa hata.
   async function accept(order) {
     const lines = order.items.filter((i) => !DEAD_LINE(i.status)).map((i) => ({ lineId: Number(i.line_id) || i.line_id }));
-    if (lines.length) await call('/rest/order/v1/update', { method: 'PUT', body: { lines, status: 'Picking' } });
+    if (!lines.length) return;
+    const r = await call('/rest/order/v1/update', { method: 'PUT', body: { lines, status: 'Picking' } });
+    const res = (r && Array.isArray(r.content) && r.content) || [];
+    const bad = res.filter((x) => !/^SUCCESS$/i.test(str(x.status)));
+    if (res.length && bad.length === res.length) throw new Error('N11 siparişi onaylamadı: ' + bad.map((x) => `${x.lineId}: ${str(x.reasons) || str(x.status)}`).join(' · ').slice(0, 400));
   }
 
   // ---------- müşteri soruları (ürün soru-cevap, SOAP: api.n11.com/ws/productService) ----------
@@ -240,6 +271,6 @@ export function n11(env, meta) {
   return {
     ...meta, type: 'n11', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'local', label: null, createProduct: false, price: true, answer: { min: 1, max: 2048 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus: status, accept, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim,
   };
 }

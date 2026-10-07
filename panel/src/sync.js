@@ -700,7 +700,10 @@ export async function staleOrders(env, db, chans, maps) {
     if (ch.demo || !ch.fetchOrders) continue;
     const key = 'stale:' + ch.id, last = await getRaw(db, key);
     if (last && t - last.at < 6 * 3600e3) continue;
-    const old = await first(db, "SELECT MIN(ordered_at) AS m, COUNT(*) AS n FROM orders WHERE channel = ? AND status IN ('new', 'processing') AND ordered_at < ? AND ordered_at >= ?", ch.id, t - 2 * D, t - 90 * D);
+    // Sipariş tarihine göre listeleyen kanallarda (PttAVM, N11) senkron yalnız son günleri okur: kargodaki siparişin sonradan teslim /
+    // iptal / iade olması da kaçmasın diye son 30 günün kargodaki siparişleri de yeniden okunur
+    const old = await first(db, `SELECT MIN(ordered_at) AS m, COUNT(*) AS n FROM orders WHERE channel = ? AND ordered_at < ? AND ordered_at >= ?
+      AND (status IN ('new', 'processing')${ch.byOrderDate ? " OR (status = 'shipped' AND ordered_at >= ?)" : ''})`, ch.id, t - 2 * D, t - 90 * D, ...(ch.byOrderDate ? [t - 30 * D] : []));
     if (!old.n) { await setSetting(db, key, { at: t, open: 0 }); continue; }
     try {
       const orders = await ch.fetchOrders(old.m - 3600e3, t, { byOrdered: true });
