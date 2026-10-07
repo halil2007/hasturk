@@ -173,7 +173,7 @@ async function catalogChannels(db, wanted) {
   return first ? [first] : [];
 }
 
-const link = (db, id, how, l) => db.prepare('UPDATE listings SET product_id = ?, match = ?, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, l.channel, l.remote_id);
+const link = (db, id, how, l) => db.prepare('UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, l.channel, l.remote_id);
 
 // Aynı kanaldan birden fazla ilanı aynı ürüne bağlanmış (eski sürümden kalma) eşleşmeleri onarır: ürüne en uygun
 // ilan (barkod > stok kodu > ad benzerliği) kalır, diğerleri ayrılıp yeniden eşleştirmeye döner.
@@ -194,7 +194,12 @@ export async function repairDuplicates(db) {
       freed++;
     }
   }
-  if (freed) await run(db, 'UPDATE order_items SET product_id = NULL WHERE product_id IS NOT NULL AND remote_key != \'\' AND NOT EXISTS (SELECT 1 FROM listings l JOIN orders o ON o.id = order_items.order_id WHERE l.channel = o.channel AND l.remote_id = order_items.remote_key AND l.product_id = order_items.product_id)');
+  if (freed) {
+    const stale = "product_id IS NOT NULL AND remote_key != '' AND NOT EXISTS (SELECT 1 FROM listings l JOIN orders o ON o.id = order_items.order_id WHERE l.channel = o.channel AND l.remote_id = order_items.remote_key AND l.product_id = order_items.product_id)";
+    // Bağı kalkan satırların düşülmüş stoğu geri eklensin (applyStock)
+    await run(db, `UPDATE orders SET stock_dirty = 1 WHERE id IN (SELECT order_id FROM order_items WHERE ${stale})`);
+    await run(db, `UPDATE order_items SET product_id = NULL WHERE ${stale}`);
+  }
   return freed;
 }
 
@@ -212,18 +217,23 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   const cats = (await catalogChannels(db, catalog)).filter((c) => !isManual(c));
   // Stoğu sıfır olduğu için otomatik yok sayılan ilan, stoğu gelince yeniden eşleştirmeye döner
   await run(db, "UPDATE listings SET ignored = 0, match = NULL WHERE ignored = 1 AND match = 'zero' AND COALESCE(remote_stock, 0) > 0");
-  // Stoğu 0 olan eşleşmemiş ilanlar (ana katalog dahil) eşleştirmeye hiç girmez: ürün açılmaz, öneri / onay listesine düşmez
-  await run(db, "UPDATE listings SET ignored = 1, match = 'zero' WHERE product_id IS NULL AND ignored = 0 AND remote_stock IS NOT NULL AND remote_stock <= 0");
+  // Stoğu 0 olan eşleşmemiş ilanlar (ana katalog dahil) için ürün açılmaz, öneri / onay listesine düşmez. Ancak barkod / SKU ile
+  // kesin eşleşen bir ürün varsa bağlanır: depoya mal gelince panel o ilanın stoğunu da açar (tükenmiş ilan kapalı kalmaz).
+  // (Kullanıcının kaldırdığı eşleşmenin hatırası "x:<ürün>" silinmez; yoksa ilan aynı ürüne yeniden bağlanırdı.)
+  await run(db, "UPDATE listings SET ignored = 1, match = 'zero' WHERE product_id IS NULL AND ignored = 0 AND remote_stock IS NOT NULL AND remote_stock <= 0 AND COALESCE(match, '') NOT LIKE 'x:%'");
   const idx = await productIndex(db);
-  const unlinked = await all(db, 'SELECT channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND ignored = 0 ORDER BY channel, remote_id');
+  const unlinked = await all(db, "SELECT channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND (ignored = 0 OR match = 'zero') ORDER BY channel, remote_id");
   // Ana katalog önce işlenir (sırasıyla), sonra diğer kanallar
   const rank = (c) => (cats.includes(c) ? cats.indexOf(c) : 99);
   unlinked.sort((a, b) => rank(a.channel) - rank(b.channel));
   const st = [], rest = [];
   let linked = 0, created = 0;
   for (const l of unlinked) {
+    const zero = l.match === 'zero' || (l.remote_stock != null && l.remote_stock <= 0);
     const c = certain(l, idx);
-    if (c) { st.push(link(db, c.id, c.how, l)); idx.use(c.id, l.channel, l.remote_product_id); linked++; continue; }
+    // Stoksuz ilan yalnız barkod / SKU ile bağlanır (ada göre bağlanmaz, ürün açmaz, öneriye düşmez)
+    if (c && (!zero || c.how === 'barcode' || c.how === 'sku')) { st.push(link(db, c.id, c.how, l)); idx.use(c.id, l.channel, l.remote_product_id); linked++; continue; }
+    if (zero) continue;
     // Ana katalog: ilk katalog kanalının her varyantı ürün olur. Diğer katalog kanalları (ör. ikinci site) yalnızca
     // hiçbir ürüne benzemiyorsa yeni ürün açar; benziyorsa elle onaya düşer (yanlış birleştirme / mükerrer ürün olmasın).
     const isCat = cats.includes(l.channel);
@@ -321,7 +331,14 @@ export async function linkedGroups(db, { channel, q, how, multi, page = 1, limit
 }
 
 // İlan bir ürüne bağlandığında, o ilanın eşleşmemiş sipariş satırları da bağlanır
+// Bağlanan satırların siparişleri "stok düşümü bekliyor" işaretlenir: satış, bir sonraki senkronu beklemeden (applyDirtyStock) stoktan düşer.
+const LISTING_OF = `SELECT l.product_id FROM listings l JOIN orders o ON o.id = order_items.order_id
+      WHERE l.channel = o.channel AND l.remote_id = order_items.remote_key AND l.product_id IS NOT NULL`;
 export async function relinkItems(db) {
+  await run(db, `UPDATE orders SET stock_dirty = 1 WHERE stock_dirty = 0 AND id IN (SELECT order_id FROM order_items WHERE product_id IS NULL AND (
+      (remote_key != '' AND EXISTS (${LISTING_OF}))
+      OR (sku != '' AND EXISTS (SELECT 1 FROM products p WHERE p.sku IS NOT NULL AND LOWER(p.sku) = LOWER(order_items.sku)))
+      OR (barcode != '' AND EXISTS (SELECT 1 FROM products p WHERE p.barcode = order_items.barcode))))`);
   await run(db, `UPDATE order_items SET product_id = (
       SELECT l.product_id FROM listings l JOIN orders o ON o.id = order_items.order_id
       WHERE l.channel = o.channel AND l.remote_id = order_items.remote_key AND l.product_id IS NOT NULL)

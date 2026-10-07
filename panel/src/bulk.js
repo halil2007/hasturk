@@ -25,6 +25,18 @@ export function parseNum(v) {
   const n = Number(s);
   return Number.isFinite(n) ? n : NaN;
 }
+// Kontrol sütunu: dışa aktarma zamanı + her dolu hücrenin (alan:değer) kısa özeti. Geri yüklemede dokunulmamış hücre atlanır
+// (bu arada otomatik fiyat / kur / satış değiştirdiyse geri alınmaz); değiştirilen stok hücresine dosyadan sonraki satışlar yansıtılır.
+const CHECK = 'Kontrol (değiştirmeyin)';
+const canon = (k, n) => `${k}:${INT.has(k) ? Math.round(n) : Math.round(n * 100)}`;
+const h4 = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return ((h >>> 0) % 1679616).toString(36).padStart(4, '0'); };
+function readCheck(v) {
+  const m = /^([0-9a-z]+)\.([0-9a-z]*)$/.exec(str(v).trim());
+  if (!m) return null;
+  const at = parseInt(m[1], 36), set = new Set();
+  for (let i = 0; i + 4 <= m[2].length; i += 4) set.add(m[2].slice(i, i + 4));
+  return at > 1e12 && at < 1e13 ? { at, set } : null;
+}
 const fmt = (v) => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100).replace('.', ','));
 // Excel formül enjeksiyonu: = + - @ ile başlayan metin (ürün adı kanaldan gelir) formül olarak çalışmasın
 const cell = (v) => { let s = v == null ? '' : String(v); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s)) s = "'" + s; return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
@@ -43,9 +55,14 @@ export async function exportProducts(env, db) {
   const ls = await all(db, 'SELECT product_id, channel, price FROM listings WHERE product_id IS NOT NULL');
   const used = chans.filter((c) => ls.some((l) => l.channel === c.id));
   const price = new Map(ls.map((l) => [`${l.product_id}|${l.channel}`, l.price]));
-  const head = ['ID', 'SKU', 'Barkod', 'Ürün adı', 'Varyant', 'Durum', ...FIELDS.map((f) => f[1]), ...used.map((c) => `Fiyat: ${c.name}`)];
-  const rows = prods.map((p) => [p.id, p.sku || '', p.barcode || '', p.variant_name && p.group_name ? p.group_name : p.name, p.variant_name || '', p.active ? 'Aktif' : 'Pasif',
-    ...FIELDS.map(([k]) => (INT.has(k) ? p[k] ?? '' : fmt(p[k]))), ...used.map((c) => fmt(price.get(`${p.id}|${c.id}`)))]);
+  const head = ['ID', 'SKU', 'Barkod', 'Ürün adı', 'Varyant', 'Durum', ...FIELDS.map((f) => f[1]), ...used.map((c) => `Fiyat: ${c.name}`), CHECK];
+  const t36 = Date.now().toString(36);
+  const rows = prods.map((p) => {
+    const vals = [...FIELDS.map(([k]) => [k, p[k]]), ...used.map((c) => ['ch:' + c.id, price.get(`${p.id}|${c.id}`)])];
+    const code = vals.filter(([, v]) => v != null && v !== '' && Number.isFinite(Number(v))).map(([k, v]) => h4(canon(k, Number(v)))).join('');
+    return [p.id, p.sku || '', p.barcode || '', p.variant_name && p.group_name ? p.group_name : p.name, p.variant_name || '', p.active ? 'Aktif' : 'Pasif',
+      ...FIELDS.map(([k]) => (INT.has(k) ? p[k] ?? '' : fmt(p[k]))), ...used.map((c) => fmt(price.get(`${p.id}|${c.id}`))), `${t36}.${code}`];
+  });
   return '﻿' + [head, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
 }
 
@@ -63,6 +80,7 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
     else if (k === 'sku' || k === 'stokkodu') col.sku = h;
     else if (k === 'barkod' || k === 'barcode') col.barcode = h;
     else if (k === 'urunadi' || k === 'ad') col.name = h;
+    else if (k === key(CHECK) || k === 'kontrol') col.check = h;
     else {
       const f = FIELDS.find(([, label]) => key(label) === k) || (k === 'alis' ? FIELDS[0] : k === 'satis' || k === 'fiyat' ? FIELDS[1] : k === 'kdvorani' ? FIELDS[5] : null);
       if (f) { col[f[0]] = h; continue; }
@@ -82,6 +100,13 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
   const lmap = new Map(listings.map((l) => [`${l.product_id}|${l.channel}`, l]));
   const siteStock = new Set(settings.stock_sync ? [] : listings.filter((l) => cats.includes(l.channel) && l.remote_stock != null).map((l) => l.product_id));
 
+  // Dosyadan sonraki stok hareketleri (satış, iptal, elle düzeltme; Excel yüklemeleri hariç): değiştirilen stok hücresine eklenir
+  const checks = rows.map((r) => (col.check ? readCheck(r[col.check]) : null));
+  const movesAfter = new Map();
+  if (col.stock) for (const at of new Set(checks.filter(Boolean).map((c) => c.at))) {
+    const m = new Map((await all(db, "SELECT product_id, SUM(delta) AS d FROM stock_moves WHERE created_at > ? AND reason NOT LIKE 'Excel%' GROUP BY product_id", at)).map((x) => [x.product_id, x.d || 0]));
+    movesAfter.set(at, m);
+  }
   const changes = [], skipped = [], seen = new Set();
   const label = (k) => (k.startsWith('ch:') ? `Fiyat: ${(chans.find((c) => c.id === k.slice(3)) || { name: k.slice(3) }).name}` : FIELDS.find(([f]) => f === k)[1]);
   rows.forEach((r, i) => {
@@ -92,12 +117,15 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
     if (seen.has(p.id)) { skipped.push({ line, reason: `aynı ürün dosyada birden fazla satırda (${p.sku || p.id}); ilk satır kullanıldı` }); return; }
     seen.add(p.id);
     const name = [p.name, p.variant_name].filter(Boolean).join(' · ');
+    const chk = checks[i];
     for (const k of editable) {
       const raw = v(k);
       if (!raw) continue;
       let n = parseNum(raw);
       if (!Number.isFinite(n) || n < 0) { skipped.push({ line, reason: `${label(k)}: “${raw}” sayı değil` }); continue; }
       if (INT.has(k)) n = Math.round(n);
+      // Dosyada dokunulmamış hücre: dışa aktarmadaki değerle aynı → değişiklik sayılmaz (bu arada değişen güncel değer korunur)
+      if (chk && chk.set.has(h4(canon(k, n)))) continue;
       if (k === 'vat' && ![0, 1, 10, 20].includes(n)) { skipped.push({ line, reason: `KDV %0, 1, 10 ya da 20 olmalı (${raw})` }); continue; }
       if (k.startsWith('ch:')) {
         const l = lmap.get(`${p.id}|${k.slice(3)}`);
@@ -110,8 +138,13 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
       if (k === 'stock' && siteStock.has(p.id)) { skipped.push({ line, reason: `${name}: stok ikas sitesinden okunuyor (stok senkronu kapalı); ikas'tan değiştirin` }); continue; }
       if (k === 'sale_price' && p.currency && p.fx_price > 0) { skipped.push({ line, reason: `${name}: satış fiyatı döviz kurundan hesaplanıyor (${p.currency}); döviz fiyatını ürün kartından değiştirin` }); continue; }
       const old = p[k] ?? 0;
+      let note = '';
+      if (k === 'stock' && chk) {
+        const d = (movesAfter.get(chk.at) || new Map()).get(p.id) || 0;
+        if (d) { note = `Dosyadan sonra ${d < 0 ? `${-d} adet satış` : `${d} adet giriş/iade`} oldu; yeni stoğa yansıtıldı (${n} ${d < 0 ? '−' : '+'} ${Math.abs(d)})`; n = Math.max(0, n + d); }
+      }
       if (Math.abs(old - n) < 0.005) continue;
-      changes.push({ id: p.id, name, field: k, label: label(k), old, new: n });
+      changes.push({ id: p.id, name, field: k, label: label(k), old, new: n, ...(note ? { note } : {}) });
     }
   });
 

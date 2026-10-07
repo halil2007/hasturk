@@ -564,7 +564,7 @@ function excelDialog(done) {
     s.setBody(html`<div class="stack">
       <div class="notice ${r.changes ? '' : 'warn'} small"><i class="ico ico-${r.changes ? 'check' : 'warn'}"></i><div><b>${file}</b> · ${n(r.rows)} satır, ${n(r.matched)} ürün eşleşti · <b>${n(r.changes)} değişiklik</b>${Object.keys(r.counts).length ? ` (${Object.entries(r.counts).map(([k, x]) => `${k} ${x}`).join(', ')})` : ''}<div class="tiny muted">Okunan sütunlar: ${r.columns.join(', ')}</div></div></div>
       ${r.preview.length ? html`<div class="table-wrap" style="max-height:42vh;overflow:auto"><table class="t"><thead><tr><th>Ürün</th><th>Alan</th><th class="r">Eski</th><th class="r">Yeni</th></tr></thead><tbody>
-        ${r.preview.map((c) => html`<tr><td class="ellipsis" style="max-width:320px">${c.name}</td><td class="small">${c.label}</td><td class="r num muted">${fmt(c.old)}</td><td class="r num" style="font-weight:650">${fmt(c.new)}</td></tr>`)}
+        ${r.preview.map((c) => html`<tr><td class="ellipsis" style="max-width:320px">${c.name}</td><td class="small">${c.label}${c.note ? html`<div class="tiny muted">${c.note}</div>` : ''}</td><td class="r num muted">${fmt(c.old)}</td><td class="r num" style="font-weight:650">${fmt(c.new)}</td></tr>`)}
       </tbody></table></div>${r.changes > r.preview.length ? html`<div class="muted tiny">İlk ${r.preview.length} değişiklik gösteriliyor; tümü uygulanır.</div>` : ''}` : ''}
       ${r.skippedTotal ? html`<details${r.changes ? '' : ' open'}><summary class="small" style="cursor:pointer;color:var(--warn)">${n(r.skippedTotal)} satır / hücre atlandı</summary><ul class="small" style="margin:6px 0 0;padding-left:20px">${r.skipped.map((x) => html`<li>${x.line}. satır: ${x.reason}</li>`)}</ul></details>` : ''}
     </div>`);

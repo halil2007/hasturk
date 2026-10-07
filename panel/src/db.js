@@ -194,6 +194,10 @@ const MIGRATIONS = [
   'ALTER TABLE tenants ADD COLUMN usage_at INTEGER',
   // Dış API (stok aktarımı) yetkisi: JSON (açık mı, anahtar özeti, IP kısıtı, kullanım) — bkz. extapi.js
   'ALTER TABLE tenants ADD COLUMN api TEXT',
+  // Stok düşümü bekleyen sipariş (bkz. sync.js applyStock): kanaldan gelen değişiklik, sonradan kurulan / kaldırılan eşleşme.
+  // Düşüm yapılınca 0 olur; senkron yarıda kesilse bile bir sonraki senkronda tamamlanır.
+  'ALTER TABLE orders ADD COLUMN stock_dirty INTEGER NOT NULL DEFAULT 0',
+  'CREATE INDEX IF NOT EXISTS orders_stock_dirty ON orders(stock_dirty) WHERE stock_dirty = 1',
   // Firma tahsilatları (ödeme kaydı; aboneliği uzatır)
   `CREATE TABLE IF NOT EXISTS tenant_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL, at INTEGER NOT NULL, amount REAL NOT NULL,
     months INTEGER NOT NULL DEFAULT 0, method TEXT, note TEXT, user TEXT)`,

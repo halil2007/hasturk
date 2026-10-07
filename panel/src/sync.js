@@ -25,8 +25,9 @@ import { dailyDigest } from './digest.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
-//   shared: ortak stok · limit: ortak stok ama en fazla N · own: bu kanala ayrılmış N adet (o kanalın satışlarıyla azalır)
-export const DESIRED = `CASE l.stock_mode WHEN 'own' THEN MAX(COALESCE(l.stock_value, 0), 0)
+//   shared: ortak stok · limit: ortak stok ama en fazla N · own: bu kanala ayrılmış N adet (o kanalın satışlarıyla azalır;
+//   depodaki toplam stoktan fazlası gönderilmez)
+export const DESIRED = `CASE l.stock_mode WHEN 'own' THEN MAX(MIN(COALESCE(l.stock_value, 0), p.stock), 0)
   WHEN 'limit' THEN MAX(MIN(p.stock, COALESCE(l.stock_value, p.stock)), 0) ELSE MAX(p.stock, 0) END`;
 const LISTING_EVERY = 14 * 60e3;
 export const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', 'amazon', 'ciceksepeti', 'koctas', 'etsy']; // ilanlar en geç bu aralıkla yenilenir
@@ -88,13 +89,13 @@ export async function saveOrders(db, ch, orders, maps) {
         st.push(db.prepare("INSERT INTO order_events (order_id, at, source, action, status, remote_status, note) VALUES (?, ?, 'channel', ?, ?, ?, ?)")
           .bind(id, t, seller ? 'processed' : 'status', status, o.remoteStatus, ex.remote_status));
       }
-      st.push(db.prepare(`INSERT INTO orders (id, channel, remote_id, order_number, status, remote_status, ordered_at, updated_at, customer, phone, email, address, total, currency, cargo_company, tracking, extra, hash, ship_by, ext_action, ckey)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      st.push(db.prepare(`INSERT INTO orders (id, channel, remote_id, order_number, status, remote_status, ordered_at, updated_at, customer, phone, email, address, total, currency, cargo_company, tracking, extra, hash, ship_by, ext_action, ckey, stock_dirty)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ON CONFLICT (id) DO UPDATE SET order_number = excluded.order_number, status = excluded.status, remote_status = excluded.remote_status,
           updated_at = excluded.updated_at, customer = excluded.customer, phone = excluded.phone, email = excluded.email, address = excluded.address,
           total = excluded.total, currency = excluded.currency,
           cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), orders.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), orders.tracking), extra = excluded.extra, hash = excluded.hash,
-          ship_by = COALESCE(excluded.ship_by, orders.ship_by), ext_action = COALESCE(excluded.ext_action, orders.ext_action), ckey = excluded.ckey`)
+          ship_by = COALESCE(excluded.ship_by, orders.ship_by), ext_action = COALESCE(excluded.ext_action, orders.ext_action), ckey = excluded.ckey, stock_dirty = 1`)
         .bind(id, ch, o.remoteId, o.orderNumber, status, o.remoteStatus || '', o.orderedAt, t, o.customer || '', o.phone || '', o.email || '',
           JSON.stringify(o.address || {}), o.total || 0, o.currency || 'TRY', o.cargoCompany || '', o.tracking || '', extra, o._hash, o.shipBy || null, ext,
           customerKey({ channel: ch, id, phone: o.phone, email: o.email, customer: o.customer, address: o.address, extra })));
@@ -152,7 +153,11 @@ function hash(s) {
 }
 
 // ---------- stok düşümü ----------
+// Sipariş + ürün başına düşülen adet order_stock'ta tutulur; olması gereken adetle fark kadar stok değişir (çift düşüm olmaz).
+// Her (sipariş, ürün) çiftinin yazımları tek işlemde ve "kayıt hâlâ okuduğumuz değerde mi" koşuluyla yapılır: aynı anda iki iş
+// aynı siparişi işlese de stok bir kez değişir; iş yarıda kesilirse sipariş stock_dirty = 1 kalır ve sonraki senkronda tamamlanır.
 export async function applyStock(db, orderIds, settings) {
+  orderIds = [...new Set(orderIds || [])];
   if (!orderIds.length) return 0;
   settings = settings || await getSettings(db);
   const since = settings.stock_sync ? Number(settings.stock_since) || 0 : Infinity;
@@ -161,35 +166,54 @@ export async function applyStock(db, orderIds, settings) {
     const q = part.map(() => '?').join(',');
     const rows = await all(db, `SELECT o.id, o.status, o.ordered_at, o.order_number, o.channel, i.product_id, i.quantity, i.status AS istatus, p.created_at AS pcreated
       FROM orders o JOIN order_items i ON i.order_id = o.id JOIN products p ON p.id = i.product_id WHERE o.id IN (${q})`, ...part);
-    const recs = await all(db, `SELECT order_id, product_id, qty FROM order_stock WHERE order_id IN (${q})`, ...part);
+    const recs = await all(db, `SELECT s.order_id, s.product_id, s.qty, o.ordered_at, o.order_number, o.channel, p.created_at AS pcreated
+      FROM order_stock s LEFT JOIN orders o ON o.id = s.order_id LEFT JOIN products p ON p.id = s.product_id WHERE s.order_id IN (${q})`, ...part);
     const want = new Map(), info = new Map();
     for (const r of rows) {
       const k = r.id + '\u0000' + r.product_id;
       info.set(k, r);
-      const gone = r.status === 'cancelled' || (r.status === 'returned' && settings.restock_returns) || r.istatus === 'cancelled';
+      const gone = r.status === 'cancelled' || (r.status === 'returned' && settings.restock_returns) || r.istatus === 'cancelled' || (r.istatus === 'returned' && settings.restock_returns);
       want.set(k, (want.get(k) || 0) + (gone ? 0 : r.quantity));
     }
     const have = new Map(recs.map((r) => [r.order_id + '\u0000' + r.product_id, r.qty]));
-    const st = [], t = Date.now();
+    // Siparişte artık olmayan (eşleşmesi kaldırılan / satırı silinen) ürün: kayıt bilgisi order_stock'tan; düşülen adet geri eklenir
+    for (const r of recs) { const k = r.order_id + '\u0000' + r.product_id; if (!info.has(k)) info.set(k, { ...r, id: r.order_id, gone: true }); }
+    const groups = [], t = Date.now();
     for (const k of new Set([...want.keys(), ...have.keys()])) {
-      const [oid, pid] = k.split('\u0000');
+      const [oid, pidS] = k.split('\u0000'), pid = Number(pidS);
       const w = want.get(k) || 0, h = have.get(k), r = info.get(k);
-      // Stok takibinden (veya ürünün panele eklenmesinden) önceki siparişler stoğu hiç değiştirmez (sonradan iptal olsa da), sadece kaydedilir
-      const baseline = !r || r.ordered_at < since || r.ordered_at < r.pcreated;
+      if (h === w) continue;
+      // Stok takibinden (veya ürünün panele eklenmesinden) önceki siparişler stoğu hiç değiştirmez (sonradan iptal olsa da), sadece kaydedilir.
+      // Ürün silinmişse (pcreated yok) stok değişmez.
+      const baseline = !r || r.ordered_at == null || r.pcreated == null || r.ordered_at < since || r.ordered_at < r.pcreated;
       const delta = baseline ? 0 : w - (h || 0);
-      if (h !== w) st.push(db.prepare('INSERT INTO order_stock (order_id, product_id, qty) VALUES (?, ?, ?) ON CONFLICT (order_id, product_id) DO UPDATE SET qty = excluded.qty').bind(oid, Number(pid), w));
-      if (!delta) continue;
-      moves++;
-      const label = r ? `${r.channel} #${r.order_number}` : oid;
-      st.push(db.prepare('UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?').bind(delta, t, Number(pid)));
-      // Bu kanala ayrılmış (own) stok, aynı kanalın satışıyla azalır
-      if (r) st.push(db.prepare("UPDATE listings SET stock_value = COALESCE(stock_value, 0) - ? WHERE channel = ? AND product_id = ? AND stock_mode = 'own'").bind(delta, r.channel, Number(pid)));
-      st.push(db.prepare('INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) VALUES (?, ?, (SELECT stock FROM products WHERE id = ?), ?, ?, ?)')
-        .bind(Number(pid), -delta, Number(pid), delta > 0 ? 'Sipariş' : 'İptal/iade', label, t));
+      // Koşul: order_stock hâlâ okuduğumuz değerde (yoksa -1). Başka bir iş araya girdiyse bu çiftin hiçbir yazımı etkili olmaz.
+      const cond = 'COALESCE((SELECT qty FROM order_stock WHERE order_id = ? AND product_id = ?), -1) = ?', ca = [oid, pid, h == null ? -1 : h];
+      const g = [];
+      if (delta) {
+        moves++;
+        const label = r && r.channel ? `${r.channel} #${r.order_number}` : oid;
+        g.push(db.prepare(`UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ? AND ${cond}`).bind(delta, t, pid, ...ca));
+        g.push(db.prepare(`INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) SELECT ?, ?, stock, ?, ?, ? FROM products WHERE id = ? AND ${cond}`)
+          .bind(pid, -delta, delta > 0 ? 'Sipariş' : 'İptal/iade', label, t, pid, ...ca));
+        // Bu kanala ayrılmış (own) stok, aynı kanalın satışıyla azalır
+        if (r && r.channel) g.push(db.prepare(`UPDATE listings SET stock_value = COALESCE(stock_value, 0) - ? WHERE channel = ? AND product_id = ? AND stock_mode = 'own' AND ${cond}`).bind(delta, r.channel, pid, ...ca));
+      }
+      g.push(db.prepare(`INSERT INTO order_stock (order_id, product_id, qty) VALUES (?, ?, ?) ON CONFLICT (order_id, product_id) DO UPDATE SET qty = excluded.qty WHERE order_stock.qty = ?`).bind(oid, pid, w, h == null ? -1 : h));
+      groups.push(g);
     }
-    for (const part2 of chunk(st, 90)) if (part2.length) await db.batch(part2);
+    // Bir çiftin yazımları aynı işlemde kalır (parçalara bölünmez); sonra siparişlerin "düşüm bekliyor" işareti kalkar
+    let batch = [];
+    for (const g of groups) { if (batch.length && batch.length + g.length > 90) { await db.batch(batch); batch = []; } batch.push(...g); }
+    if (batch.length) await db.batch(batch);
+    await run(db, `UPDATE orders SET stock_dirty = 0 WHERE stock_dirty = 1 AND id IN (${q})`, ...part);
   }
   return moves;
+}
+// Düşüm bekleyen siparişler (yarıda kalan senkron, sonradan kurulan / kaldırılan eşleşme, elle yenilenen sipariş)
+export async function applyDirtyStock(db, settings, limit = 3000) {
+  const ids = (await all(db, 'SELECT id FROM orders WHERE stock_dirty = 1 LIMIT ?', limit)).map((r) => r.id);
+  return ids.length ? applyStock(db, ids, settings) : 0;
 }
 
 // ---------- ürün bilgisi: eksik alanları diğer platformlardan tamamla ----------
@@ -265,15 +289,17 @@ export async function pushStocks(env, db, settings, only) {
   const cats = catalogOf(settings);
   const solo = settings.stock_sync ? null : Object.keys(settings.stock_push || {}).filter((c) => settings.stock_push[c] && !cats.includes(c));
   if (solo && !solo.length) return { skipped: 'Stok senkronu kapalı' };
-  const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, ${DESIRED} AS stock
-    FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1${solo ? ` AND l.channel IN (${solo.map((c) => `'${c.replace(/'/g, '')}'`).join(',')})` : ''}) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`);
   const result = {};
   for (const ch of await getChannels(env, db)) {
     if (only && !only.includes(ch.id)) continue;
     if (solo && !solo.includes(ch.id)) continue;
-    const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
-    if (!items.length || !ch.enabled || !ch.pushStock) continue;
+    if (!ch.enabled || !ch.pushStock) continue;
     if ((settings.stock_channels || {})[ch.id] === false) continue;
+    // Kanal başına ayrı sorgu: gönderimi kapalı bir kanaldaki bekleyen ilanlar diğer kanalların sırasını tıkamaz
+    const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, ${DESIRED} AS stock
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ?) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`, ch.id);
+    const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
+    if (!items.length) continue;
     try {
       await ch.pushStock(items);
       for (const part of chunk(items, 90)) {
@@ -316,6 +342,15 @@ export async function pushPrices(env, db) {
   return result;
 }
 
+// ---------- kilit ----------
+// Yalnız kilit boşsa ya da süresi geçmişse alınır (tek sorgu: iki iş aynı anda alamaz). Bırakırken yalnız kendi kilidimiz silinir.
+export async function takeLock(db, k, t, ttl) {
+  const r = await first(db, `INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v
+    WHERE COALESCE(CAST(settings.v AS INTEGER), 0) < ? RETURNING v`, k, JSON.stringify(t), t - ttl);
+  return !!r;
+}
+export const releaseLock = (db, k, t) => run(db, "UPDATE settings SET v = '0' WHERE k = ? AND v = ?", k, JSON.stringify(t));
+
 // ---------- tam senkron ----------
 // Adımı çalıştır; hata olursa kısa bir bekleme sonrası bir kez daha dene
 async function attempt(fn) {
@@ -324,9 +359,8 @@ async function attempt(fn) {
 
 export async function syncAll(env, db, { only, force, listings, cron } = {}) {
   const t = Date.now();
-  const lock = await getRaw(db, 'sync_lock');
-  if (!force && lock && t - lock < 10 * 60e3) return { skipped: 'Başka bir senkron sürüyor' };
-  await setSetting(db, 'sync_lock', t);
+  // Kilit tek sorguda alınır (aynı anda iki senkron başlayamaz); "Senkronla" da kilide uyar, yalnız kanal beklemesini atlar
+  if (!(await takeLock(db, 'sync_lock', t, 10 * 60e3))) return { skipped: 'Otomatik senkron şu an çalışıyor; birkaç dakika içinde biter, siparişler ve stoklar kendiliğinden güncellenir.' };
   const out = { channels: {}, listings: {}, stockMoves: 0 };
   try {
     await maybePurgeDemo(env, db);
@@ -387,7 +421,7 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.mirrored = await mirrorStock(db, settings);
     out.info = await fillProductInfo(db, settings).catch((e) => 'hata: ' + e.message);
     // 4) stok düşümü ve gönderim
-    out.stockMoves = await applyStock(db, changed, settings);
+    out.stockMoves = await applyStock(db, changed, settings) + await applyDirtyStock(db, settings);
     out.stock = await pushStocks(env, db, settings);
     // Döviz bazlı fiyatlar: kur yenilenir, zamanı geldiyse ürün ve kanal fiyatları güncellenir (sonra fiyatlar gönderilir)
     if (!only) out.fx = await syncFx(env, db, settings).catch((e) => 'hata: ' + e.message);
@@ -400,6 +434,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
     // Eski açık siparişler: kanaldan yeniden sorgulanır; 30 günü geçip hâlâ açık görünen tamamlandı sayılır
     if (!only) out.stale = await staleOrders(env, db, chans, maps).catch((e) => 'hata: ' + e.message);
+    // Eski siparişlerde bulunan iptal / iade: stok hemen düzeltilir (bir sonraki senkronu beklemeden)
+    if (!only) out.stockMoves += await applyDirtyStock(db, settings).catch(() => 0);
     // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
     if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
     if (!only) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);
@@ -430,7 +466,7 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });
   } finally {
-    await setSetting(db, 'sync_lock', 0);
+    await releaseLock(db, 'sync_lock', t);
   }
   out.ms = Date.now() - t;
   return out;
@@ -490,9 +526,8 @@ export async function importListings(env, db, { only } = {}) {
 }
 // Hızlı iş (2 dakikada bir): gönderim sonuçlarını sorgula ve otomatik gönderimi çalıştır (siparişler / stoklar 15 dakikalık senkronda)
 export async function quickSync(env, db) {
-  const t = Date.now(), lock = await getRaw(db, 'quick_lock');
-  if (lock && t - lock < 5 * 60e3) return { skipped: 'Önceki hızlı iş sürüyor' };
-  await setSetting(db, 'quick_lock', t);
+  const t = Date.now();
+  if (!(await takeLock(db, 'quick_lock', t, 5 * 60e3))) return { skipped: 'Önceki hızlı iş sürüyor' };
   try {
     const settings = await getSettings(db);
     const out = {
@@ -515,7 +550,7 @@ export async function quickSync(env, db) {
       out['listings:' + chId] = await importListings(env, db, { only: [chId] }).then((r) => r.channels[chId]).catch((e) => 'hata: ' + e.message);
     }
     return out;
-  } finally { await setSetting(db, 'quick_lock', 0); }
+  } finally { await releaseLock(db, 'quick_lock', t); }
 }
 // Günde bir: eski etiket dosyaları (paket kaydı, takip no ve geçmiş kalır; yalnız artık gerekmeyen etiket içeriği silinir)
 export async function housekeeping(db, { days = 45 } = {}) {

@@ -2,7 +2,7 @@
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, fieldsFor } from './config.js';
-import { syncAll, importListings, applyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
+import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -1000,7 +1000,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     // Kaldırılan eşleşme hatırlanır ("x:<ürün>"): otomatik eşleştirme bu ilanı aynı ürüne tekrar bağlamaz
     const l = await first(db, 'SELECT product_id, name FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
     await run(db, 'UPDATE listings SET product_id = NULL, match = ? WHERE channel = ? AND remote_id = ?', l && l.product_id ? 'x:' + l.product_id : null, b.channel, String(b.remote_id));
+    // Bu ilanın siparişleriyle yanlış üründen düşülen stok geri eklenir
+    await run(db, 'UPDATE orders SET stock_dirty = 1 WHERE id IN (SELECT order_id FROM order_items WHERE remote_key = ? AND order_id LIKE ? AND product_id IS NOT NULL)', String(b.remote_id), b.channel + ':%');
     await run(db, 'UPDATE order_items SET product_id = NULL WHERE remote_key = ? AND order_id LIKE ?', String(b.remote_id), b.channel + ':%');
+    await applyDirtyStock(db);
+    ctx.waitUntil(pushStocks(env, db).catch(() => {}));
     await log(db, b.channel, 'info', `${user.name}: ${l ? l.name : b.remote_id} eşleşmesi kaldırıldı`);
     return json({ ok: true });
   }
@@ -1511,7 +1515,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       pid = r.id;
     }
     await run(db, 'UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?', pid, pid ? (b.create ? 'new' : 'manual') : null, b.channel, String(b.remote_id));
-    if (pid) { await relinkItems(db); await fillProductInfo(db).catch(() => {}); }
+    if (pid) { await relinkItems(db); await applyDirtyStock(db); await fillProductInfo(db).catch(() => {}); }
     await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} ${pid ? (b.create ? 'yeni ürün olarak eklendi' : 'ürüne bağlandı') : 'bağlantısı kaldırıldı'}`);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
     return json({ ok: true, product_id: pid });
