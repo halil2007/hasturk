@@ -18,6 +18,8 @@ import { loadConfig } from './config.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 import { limitsOf } from './plans.js';
 import { forgot, resetPassword, welcome } from './pwreset.js';
+import { tenantBilling } from './billing.js';
+import { iyzicoReady } from './iyzico.js';
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
 const SYNC_MS = 15 * 60e3;
@@ -38,6 +40,12 @@ export async function contactLine(env, short = false) {
   try { const r = env.DB && await first(env.DB, "SELECT v FROM settings WHERE k = 'company'"); c = (r && JSON.parse(r.v)) || {}; } catch { /* yok */ }
   const parts = [c.phone && `telefon ${c.phone}`, c.email && `e-posta ${c.email}`].filter(Boolean);
   return parts.length ? `${short ? '' : 'Lütfen '}bize ulaşın: ${parts.join(' · ')}` : `${short ? '' : 'Lütfen '}hizmet sağlayıcınızla görüşün.`;
+}
+// Süresi dolan firmaya: online yenileme bağlantısı (sitedeki satın alma sayfası, firma kodu dolu) ve iletişim
+export const renewUrl = (env, t) => { if (!iyzicoReady(env)) return null; const site = String(env.SITE_ORIGINS || 'https://hasturkcrm.com').split(',')[0].trim().replace(/\/+$/, ''); return `${site}/satin-al?firma=${encodeURIComponent(t.slug)}`; };
+export async function expiredMessage(env, t) {
+  const u = renewUrl(env, t);
+  return `${t.trial ? 'Ücretsiz deneme süreniz' : 'Aboneliğinizin süresi'} doldu; verileriniz silinmedi. ${u ? `Kartla hemen yenilemek için: ${u} · Yardım için ` : 'Paket seçmek / yenilemek için '}` + await contactLine(env, true);
 }
 // Abonelik bitiş tarihi geçti mi (bitiş günü sonuna kadar açık)
 export const expired = (t, now = Date.now()) => !!(t && t.expires_at && now > t.expires_at);
@@ -187,7 +195,7 @@ export async function tenantLogin(req, env, b) {
   const t = SLUG_RE.test(slug) ? await getTenant(env.DB, slug) : null;
   if (!t) return json({ error: 'Firma kodu, kullanıcı adı veya şifre hatalı' }, 401);
   if (!t.active) return json({ error: 'Bu müşteri paneli askıya alınmış. ' + await contactLine(env) }, 403);
-  if (expired(t)) return json({ error: `${t.trial ? 'Ücretsiz deneme süreniz' : 'Aboneliğinizin süresi'} doldu; verileriniz silinmedi. Paket seçmek / yenilemek için ` + await contactLine(env, true) }, 403);
+  if (expired(t)) return json({ error: await expiredMessage(env, t), renew: renewUrl(env, t) }, 403);
   const h = new Headers(req.headers); h.set('Content-Type', 'application/json');
   return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify(b.ticket ? { ticket: b.ticket, code: b.code } : { username: b.username, password: b.password }) }), env, t);
 }
@@ -229,6 +237,54 @@ function fields(b, t = {}) {
 const COLS = ['name', 'email', 'phone', 'note', 'legal', 'tax', 'contact', 'address', 'city', 'plan', 'fee', 'period', 'starts_at', 'expires_at', 'trial', 'max_users', 'max_stores'];
 // Ay ekle (takvim ayı; 31 Ocak + 1 ay = 28/29 Şubat)
 function addMonths(ms, n) { const d = new Date(ms + 3 * 3600e3), day = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + n); d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate())); return d.getTime() - 3 * 3600e3; }
+// Firma oluşturma (ana panelden ya da online satın almada): kayıt, firmanın paneli (Durable Object) ve hoş geldiniz e-postası.
+// passHash: online satışta müşterinin seçtiği şifrenin özeti (şifrenin kendisi saklanmaz).
+export async function checkNewTenant(db, b) {
+  const slug = str(b.slug).toLocaleLowerCase('tr').trim(), name = str(b.name).trim(), username = str(b.admin_username).trim();
+  if (!SLUG_RE.test(slug)) fail(400, 'Firma kodu 3-32 karakter olmalı: küçük harf, rakam ve tire (ör. yesil-bahce)');
+  if (!name) fail(400, 'Firma adı gerekli');
+  if (!/^[\p{L}0-9._-]{3,40}$/u.test(username)) fail(400, 'Yönetici kullanıcı adı 3-40 karakter olmalı (harf, rakam, . _ -)');
+  if (slug === DEMO_SLUG) fail(400, 'Bu firma kodu web sitesindeki demo paneline ayrılmış');
+  if (await first(db, 'SELECT 1 AS x FROM tenants WHERE slug = ?', slug)) fail(400, 'Bu firma kodu kullanılıyor; başka bir kod seçin');
+  return { slug, name, username };
+}
+export async function createTenant(env, db, b, { origin }) {
+  const { slug, name, username } = await checkNewTenant(db, b);
+  const pw = String(b.admin_password || '');
+  if (!b.passHash && pw.length < 8) fail(400, 'Yönetici şifresi en az 8 karakter olmalı');
+  const f = fields(b);
+  // Deneme süresi: bitiş girilmediyse 7 gün
+  if (f.trial && !f.expires_at) f.expires_at = Date.now() + 7 * DAY;
+  if (!f.starts_at) f.starts_at = Date.now();
+  const t = { slug, ...f, name, active: 1, admin_username: username, created_at: Date.now(), updated_at: Date.now() };
+  await admin(env, t, 'setup', { username, password: pw, passHash: b.passHash || null, name });
+  await run(db, `INSERT INTO tenants (slug, ${COLS.join(', ')}, active, admin_username, created_at, updated_at) VALUES (?, ${COLS.map(() => '?').join(', ')}, 1, ?, ?, ?)`,
+    slug, ...COLS.map((k) => t[k] ?? null), username, t.created_at, t.updated_at);
+  cache.delete(slug);
+  // Hoş geldiniz e-postası (firma kartında e-posta varsa): giriş bilgileri ve şifre belirleme bağlantısı
+  let mail = null;
+  if (f.email && b.welcome !== false) {
+    mail = await admin(env, t, 'welcome', { email: f.email, firm: name, slug, username, origin, link: `${origin}/#/sifre/${slug}.`, trialDays: f.trial ? Math.max(1, Math.round((f.expires_at - Date.now()) / DAY)) : 0 }).catch((e) => ({ error: e.message }));
+  }
+  return { ok: true, tenant: pub(t), mail };
+}
+
+// Tahsilat kaydı: abonelik belirtilen ay kadar uzar (bitiş geçmişse bugünden, değilse bitişten itibaren). plan verilirse paket de
+// değişir (online satın almada). Panel yeni bilgileri hemen öğrenir (süresi dolmuş panelin senkronu yeniden başlar).
+export async function recordPayment(env, db, t, { at = Date.now(), amount = 0, months = 0, method = '', note = '', user = '', plan = null }) {
+  await run(db, 'INSERT INTO tenant_payments (slug, at, amount, months, method, note, user) VALUES (?, ?, ?, ?, ?, ?, ?)', t.slug, at, amount, months, String(method).slice(0, 40), String(note).slice(0, 300), user);
+  let expires = t.expires_at;
+  const next = { ...t };
+  if (months) { expires = addMonths(Math.max(Date.now(), t.expires_at || 0), months); next.expires_at = expires; next.trial = 0; }
+  if (plan) next.plan = plan;
+  if (months || plan) {
+    await run(db, 'UPDATE tenants SET expires_at = ?, trial = ?, plan = ?, updated_at = ? WHERE slug = ?', next.expires_at ?? null, next.trial ? 1 : 0, next.plan || null, Date.now(), t.slug);
+    cache.delete(t.slug);
+    await admin(env, next, 'ping').catch(() => {});
+  }
+  return { ok: true, expires_at: expires };
+}
+
 export async function tenantApi(req, env, db, path, user) {
   if (user.role !== 'admin' || user.tenant) fail(403, 'Bu bölüm yalnız ana panel yöneticisine açıktır');
   const m = req.method, b = m === 'GET' ? {} : await req.json().catch(() => ({}));
@@ -238,31 +294,7 @@ export async function tenantApi(req, env, db, path, user) {
     const p = new Map(pays.map((x) => [x.slug, x]));
     return { tenants: rows.map((t) => ({ ...pub(t), paid_total: (p.get(t.slug) || {}).total || 0, last_payment: (p.get(t.slug) || {}).last_at || null })), ready: !!env.TENANT };
   }
-  if (path === 'tenants' && m === 'POST') {
-    const slug = str(b.slug).toLocaleLowerCase('tr').trim(), name = str(b.name).trim(), username = str(b.admin_username).trim(), pw = String(b.admin_password || '');
-    if (!SLUG_RE.test(slug)) fail(400, 'Firma kodu 3-32 karakter olmalı: küçük harf, rakam ve tire (ör. yesil-bahce)');
-    if (!name) fail(400, 'Firma adı gerekli');
-    if (!/^[\p{L}0-9._-]{3,40}$/u.test(username)) fail(400, 'Yönetici kullanıcı adı 3-40 karakter olmalı');
-    if (pw.length < 8) fail(400, 'Yönetici şifresi en az 8 karakter olmalı');
-    if (slug === DEMO_SLUG) fail(400, 'Bu firma kodu web sitesindeki demo paneline ayrılmış');
-    if (await first(db, 'SELECT 1 AS x FROM tenants WHERE slug = ?', slug)) fail(400, 'Bu firma kodu kullanılıyor');
-    const f = fields(b);
-    // Deneme süresi: bitiş girilmediyse 7 gün
-    if (f.trial && !f.expires_at) f.expires_at = Date.now() + 7 * DAY;
-    if (!f.starts_at) f.starts_at = Date.now();
-    const t = { slug, ...f, name, active: 1, admin_username: username, created_at: Date.now(), updated_at: Date.now() };
-    await admin(env, t, 'setup', { username, password: pw, name });
-    await run(db, `INSERT INTO tenants (slug, ${COLS.join(', ')}, active, admin_username, created_at, updated_at) VALUES (?, ${COLS.map(() => '?').join(', ')}, 1, ?, ?, ?)`,
-      slug, ...COLS.map((k) => t[k] ?? null), username, t.created_at, t.updated_at);
-    cache.delete(slug);
-    // Hoş geldiniz e-postası (firma kartında e-posta varsa): giriş bilgileri ve şifre belirleme bağlantısı
-    let mail = null;
-    if (f.email && b.welcome !== false) {
-      const origin = new URL(req.url).origin;
-      mail = await admin(env, t, 'welcome', { email: f.email, firm: name, slug, username, origin, link: `${origin}/#/sifre/${slug}.`, trialDays: f.trial ? Math.max(1, Math.round((f.expires_at - Date.now()) / DAY)) : 0 }).catch((e) => ({ error: e.message }));
-    }
-    return { ok: true, tenant: pub(t), mail };
-  }
+  if (path === 'tenants' && m === 'POST') return createTenant(env, db, b, { origin: new URL(req.url).origin });
   if ((x = path.match(/^tenants\/([a-z0-9-]+)(?:\/(stats|password|support|delete|payments|api))?(?:\/(\d+))?$/))) {
     const t = await getTenant(db, x[1], true);
     if (!t) fail(404, 'Müşteri paneli bulunamadı');
@@ -288,17 +320,7 @@ export async function tenantApi(req, env, db, path, user) {
     if (op === 'payments' && m === 'POST') {
       const amount = Math.max(0, Number(String(b.amount ?? '').replace(',', '.')) || 0), months = Math.max(0, Math.min(36, Math.round(Number(b.months) || 0)));
       if (!amount && !months) fail(400, 'Tutar ya da uzatılacak süre girin');
-      const at = dateMs(b.date) || Date.now();
-      await run(db, 'INSERT INTO tenant_payments (slug, at, amount, months, method, note, user) VALUES (?, ?, ?, ?, ?, ?, ?)', t.slug, at, amount, months, str(b.method).slice(0, 40), str(b.note).slice(0, 300), user.name || '');
-      let expires = t.expires_at;
-      if (months) {
-        expires = addMonths(Math.max(Date.now(), t.expires_at || 0), months);
-        await run(db, 'UPDATE tenants SET expires_at = ?, trial = 0, updated_at = ? WHERE slug = ?', expires, Date.now(), t.slug);
-        cache.delete(t.slug);
-        // Panel yeni bitiş tarihini hemen öğrenir (süresi dolmuş panelin senkronu yeniden başlar)
-        await admin(env, { ...t, expires_at: expires, trial: 0 }, 'ping').catch(() => {});
-      }
-      return { ok: true, expires_at: expires };
+      return recordPayment(env, db, t, { at: dateMs(b.date) || Date.now(), amount, months, method: str(b.method), note: str(b.note), user: user.name || '' });
     }
     if (op === 'payments' && m === 'DELETE' && x[3]) { await run(db, 'DELETE FROM tenant_payments WHERE id = ? AND slug = ?', Number(x[3]), t.slug); return { ok: true }; }
     // Dış API (stok aktarımı): yalnız ana panel açar / kapatır / anahtar üretir; firma yöneticisi göremez ve değiştiremez
@@ -391,6 +413,17 @@ export class TenantPanel {
         return await supportResponse(req, this.env.DB, sp, { slug: this.t.slug, firm: this.t.name, user, staff: false });
       } catch (e) { return json({ error: e.message || 'Hata' }, e.status || 500); }
     }
+    // Paketim (online satın alma / yenileme): ödeme ve abonelik ana panelin kaydında; yalnız bu firmanın kaydı
+    if (/^billing(\/|$)/.test(sp)) {
+      try {
+        await init(this.db);
+        const user = await currentUser(req, env, this.db);
+        if (!user) return json({ error: 'Giriş gerekli' }, 401);
+        if (req.method !== 'GET' && req.headers.get('Origin') && new URL(req.headers.get('Origin')).host !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403);
+        const b = req.method === 'GET' ? {} : await req.json().catch(() => ({}));
+        return json(await tenantBilling(this.env, this.t, user, req.method, sp, b, url.origin));
+      } catch (e) { return json({ error: e.message || 'Hata' }, e.status || 500); }
+    }
     // Hata bildirimi (tarayıcıdan): ana panelin hata kayıtlarına firma adıyla düşer
     if (sp === 'errors/report' && req.method === 'POST') {
       try {
@@ -429,7 +462,7 @@ export class TenantPanel {
       await init(db);
       if (b.op === 'setup') {
         const n = await first(db, 'SELECT COUNT(*) AS n FROM users');
-        if (!n.n) await run(db, "INSERT INTO users (username, name, email, pass, role, active, created_at) VALUES (?, ?, '', ?, 'admin', 1, ?)", b.username, b.username, await hashPassword(String(b.password)), Date.now());
+        if (!n.n) await run(db, "INSERT INTO users (username, name, email, pass, role, active, created_at) VALUES (?, ?, '', ?, 'admin', 1, ?)", b.username, b.username, b.passHash && /^pbkdf2/.test(b.passHash) ? b.passHash : await hashPassword(String(b.password)), Date.now());
         // Firma adı (giriş ekranı, etiket, e-posta) müşterinin adıyla başlar; Ayarlar'dan değiştirilebilir
         await run(db, "INSERT INTO settings (k, v) VALUES ('company', ?) ON CONFLICT (k) DO NOTHING", JSON.stringify({ title: b.name, legal: b.name }));
         // Yeni firma: kanallardaki ürünler kendiliğinden ürün kartına dönüşmez; firma Kanal Ürünleri'nden istediğini seçer

@@ -194,6 +194,11 @@ const MIGRATIONS = [
   'ALTER TABLE tenants ADD COLUMN usage_at INTEGER',
   // Dış API (stok aktarımı) yetkisi: JSON (açık mı, anahtar özeti, IP kısıtı, kullanım) — bkz. extapi.js
   'ALTER TABLE tenants ADD COLUMN api TEXT',
+  // Online paket satışı (iyzico, bkz. billing.js): sipariş, ödeme sonucu ve oluşturulan / uzatılan firma
+  `CREATE TABLE IF NOT EXISTS sales_orders (id TEXT PRIMARY KEY, kind TEXT NOT NULL, slug TEXT, plan TEXT NOT NULL, period TEXT NOT NULL, amount REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', buyer TEXT, username TEXT, pass_hash TEXT, token TEXT, payment_id TEXT, installment INTEGER, error TEXT, origin TEXT,
+    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  'CREATE INDEX IF NOT EXISTS sales_orders_t ON sales_orders(created_at)',
   // Firma kartında elle girilen mağaza sınırı (boşsa paketin sınırı; bkz. plans.js)
   'ALTER TABLE tenants ADD COLUMN max_stores INTEGER',
   // Stok düşümü bekleyen sipariş (bkz. sync.js applyStock): kanaldan gelen değişiklik, sonradan kurulan / kaldırılan eşleşme.

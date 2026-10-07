@@ -7,10 +7,11 @@ import { handle, report5xx } from './handler.js';
 import { PerfBuffer } from './perf.js';
 import { extApi } from './extapi.js';
 import { leadRequest, demoRequest } from './lead.js';
+import { publicCheckout, checkoutCallback } from './billing.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
-import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired, tenantWatchdog, contactLine, tenantPassword, expiryReminders } from './tenants.js';
+import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired, tenantWatchdog, contactLine, tenantPassword, expiryReminders, expiredMessage, renewUrl } from './tenants.js';
 import { json, body, HttpError } from './util.js';
 
 export { TenantPanel } from './tenants.js';
@@ -37,6 +38,9 @@ export default {
     const path = url.pathname.slice(5).replace(/\/+$/, '');
     // Tanıtım sitesinden demo talebi (oturumsuz; yalnız izin verilen site adreslerinden, bkz. lead.js)
     if (path === 'public/lead') return await leadRequest(req, env);
+    // Online paket satışı: siteden başlatma (CORS) ve iyzico'nun ödeme sonrası dönüşü (iyzico sayfasından gelen POST)
+    if (path === 'public/checkout') return await publicCheckout(req, env);
+    if (path === 'public/checkout/callback') return await checkoutCallback(req, env);
     // Demo paneline giriş (sitedeki imzalı bağlantı)
     if (path === 'public/demo') return await demoRequest(req, env);
     // Başka sitelerden gelen yazma isteklerini reddet (müşteri paneli girişi ve yönetimi dahil; panel içi istekler handle() içinde de denetlenir)
@@ -68,7 +72,7 @@ export default {
         // Abonelik süresi doldu: müşteri giremez (ana panelin destek oturumu girebilir; yenileme / veri kontrolü için)
         const raw = ((req.headers.get('Cookie') || '').match(/hp_session=([^;]+)/) || [])[1] || '';
         if (expired(t) && !/~-1\./.test(raw.replace(/%7E/gi, '~')))
-          return json({ error: `${t.trial ? 'Ücretsiz deneme süreniz' : 'Aboneliğinizin süresi'} doldu; verileriniz silinmedi. Paket seçmek / yenilemek için ` + await contactLine(env, true), tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
+          return json({ error: await expiredMessage(env, t), renew: renewUrl(env, t), tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
         return await forward(req, env, t);
       }
       // Ana panel: müşteri panellerinin yönetimi (Kullanıcılar → Müşteri panelleri)

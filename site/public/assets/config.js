@@ -8,6 +8,9 @@ window.SITE = {
   leadUrl: 'https://panel.hasturkcrm.com/api/public/lead',
   // "Canlı demo" düğmeleri: bilgi istemeden örnek verilerle çalışan demo paneline girer
   demoUrl: 'https://panel.hasturkcrm.com/api/public/demo',
+  // Online paket satışı (iyzico): satın alma formu buraya gönderilir; ödeme iyzico'nun güvenli sayfasında yapılır.
+  // Tutar paneldeki fiyattan alınır (panel/src/plans.js) — fiyat değişince iki yerde de güncelleyin.
+  checkoutUrl: 'https://panel.hasturkcrm.com/api/public/checkout',
   company: {
     legal: '',                      // Şirket ünvanı (ör. "Hastürk ... Ltd. Şti.")
     address: '',                    // Açık adres
@@ -25,11 +28,11 @@ window.SITE = {
   installments: 3,          // yıllık alımda kredi kartına peşin fiyatına taksit sayısı (0 = gösterme)
   vat: 'Tüm fiyatlara KDV dahildir. Yıllık alımda 12 ay yerine 10 ay ücret alınır ve kredi kartına peşin fiyatına 3 taksit yapılır.',
   plans: [
-    { name: 'Başlangıç', tag: 'Tek mağaza, küçük ekip', monthly: 990, yearly: 9900, limits: ['3 mağaza bağlantısı', '2 kullanıcı'],
+    { key: 'baslangic', name: 'Başlangıç', tag: 'Tek mağaza, küçük ekip', monthly: 990, yearly: 9900, limits: ['3 mağaza bağlantısı', '2 kullanıcı'],
       items: ['Tüm aktif entegrasyonlar', 'Sipariş, kargo ve etiket yönetimi', 'Stok senkronu ve ürün eşleştirme', 'Çok kanala ürün yükleme', 'Gelir & gider, kâr-zarar raporu', 'Müşteri soruları ve iade talepleri', 'E-posta ve WhatsApp destek'] },
-    { name: 'Profesyonel', tag: 'Çok kanallı büyüyen işletmeler', monthly: 1990, yearly: 19900, featured: true, limits: ['10 mağaza bağlantısı', '5 kullanıcı'],
+    { key: 'profesyonel', name: 'Profesyonel', tag: 'Çok kanallı büyüyen işletmeler', monthly: 1990, yearly: 19900, featured: true, limits: ['10 mağaza bağlantısı', '5 kullanıcı'],
       items: ['Başlangıç paketindeki her şey', 'Buybox takibi ve otomatik fiyat', 'Otomatik ürün gönderimi', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
-    { name: 'Kurumsal', tag: 'Yüksek hacim ve bayi ağı', monthly: 3990, yearly: 39900, limits: ['25 mağaza bağlantısı', 'Sınırsız kullanıcı'],
+    { key: 'kurumsal', name: 'Kurumsal', tag: 'Yüksek hacim ve bayi ağı', monthly: 3990, yearly: 39900, limits: ['25 mağaza bağlantısı', 'Sınırsız kullanıcı'],
       items: ['Profesyonel paketteki her şey', 'Stok API (kendi sisteminize / bayilerinize stok aktarımı)', 'Kurulum ve veri aktarımında birebir destek', 'Yeni kanal ve özel geliştirme talepleri önceliği', 'Telefon destek hattı', 'Daha fazla mağaza için özel teklif'],
       // soon: pakete eklenecek ama henüz aktif olmayan özellikler ("Yakında" rozetiyle görünür)
       soon: ['Yapay zekâ ile ürün yönetimi: "şu ürünü kapat", "şu ürünlerin fiyatını %5 artır" deyin, sistem tek tek uğraştırmadan kendisi yapsın'] },

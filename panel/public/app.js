@@ -26,6 +26,7 @@ import { claimsView, claimChannels } from './views/claims.js';
 import { campaignsView, campaignChannels } from './views/campaigns.js';
 import { codeStep, forcedSetup, twofaSettings } from './twofa.js';
 import { can, viewOnly } from './perms.js';
+import { billingView } from './views/billing.js';
 
 const ROUTES = [
   { path: '', title: 'Genel Bakış', icon: 'home', view: dashboard },
@@ -52,6 +53,7 @@ const ROUTES = [
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
   { path: 'kullanicilar', title: 'Personel', icon: 'user', view: users, admin: true },
   { path: 'firmalar', title: 'Firmalar', icon: 'grid', view: firmsView, admin: true, when: () => !!state.owner },
+  { path: 'paketim', title: 'Paketim', icon: 'tag', view: billingView, admin: true, when: () => !!state.tenant && !state.demo },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
   { path: 'destek', title: 'Destek', icon: 'help', view: supportView, count: 'support' },
   { path: 'bildirimler', title: 'Bildirimler', icon: 'bell', view: notices, count: 'notices', hidden: true },
@@ -99,7 +101,7 @@ export function refreshChrome(s = state.summary) {
     const urgent = left <= 2;
     eb.style.cssText = `position:sticky;top:0;z-index:50;background:${urgent ? '#fee2e2' : '#fef3c7'};color:${urgent ? '#7f1d1d' : '#713f12'};padding:7px 14px;font-weight:600;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap`;
     const when = left <= 0 ? 'bugün sona eriyor' : left === 1 ? 'yarın sona eriyor' : `bitmesine ${left} gün kaldı`;
-    render(eb, html`<span style="flex:1;min-width:200px">${tn.trial ? 'Ücretsiz deneme sürenizin' : 'Aboneliğinizin'} ${when}. Süre bitince panele giriş ve kanallarla senkron durur; verileriniz silinmez.</span><a class="btn sm" href="#/destek">Paket seçin / yenileyin</a>`);
+    render(eb, html`<span style="flex:1;min-width:200px">${tn.trial ? 'Ücretsiz deneme sürenizin' : 'Aboneliğinizin'} ${when}. Süre bitince panele giriş ve kanallarla senkron durur; verileriniz silinmez.</span><a class="btn sm" href="#/paketim">Paket seçin / yenileyin</a>`);
   } else if (eb) eb.remove();
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
   const counts = { orders: n, questions: s.questions || 0, claims: s.claims || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };
@@ -484,7 +486,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-08l';
+const ASSETS = '2026-10-08m';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

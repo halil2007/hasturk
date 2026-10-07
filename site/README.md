@@ -41,6 +41,8 @@ Derleme ayrıca:
   değiştirdikten sonra **mutlaka derleyin**, yoksa ziyaretçiler eski sürümü görmeye devam eder (`config.js` en geç 10 dakikada yenilenir).
 - Sayfanın ilk büyük görselini öncelikli, diğerlerini ekrana yaklaşınca yükler.
 
+Online satış: `/satin-al` sayfası (paket kartlarındaki "Hemen satın al") formu panele (`checkoutUrl`) gönderir, ödeme iyzico sayfasında alınır, sonuç sayfası panelde gösterilir. Fiyatı değiştirirseniz `public/assets/config.js` ile birlikte `panel/src/plans.js`'i de güncelleyin (tahsil edilen tutar panelden alınır). iyzico başvurusu için gereken yasal sayfalar hazır: `/mesafeli-satis-sozlesmesi`, `/on-bilgilendirme`, `/iptal-iade` (şirket bilgileri config.js'den dolar; yayından önce bir hukukçuya kontrol ettirin).
+
 Ayarlar (değiştirdikten sonra `node build.mjs` çalıştırın; arama motoru verisi ve önbellek adresi de güncellenir):
 - **Şirket bilgileri, telefon, WhatsApp, e-posta, paket fiyatları (KDV dahil) ve karşılaştırma tablosu:** `public/assets/config.js`
   (boş alanlar sitede gösterilmez; yasal sayfalarda sarı `[yer tutucu]` olarak kalır — yayından önce doldurun).

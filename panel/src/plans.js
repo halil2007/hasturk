@@ -3,11 +3,20 @@
 // (sınırlar firma kartındaki alanlardan girilir). Ana panel (kendi mağazanız) ve demo paneli hiçbir sınıra takılmaz.
 import { fail } from './util.js';
 
+// Fiyatlar (TL, KDV dahil): online satışta tutar buradan alınır (tarayıcıdan gelen tutara güvenilmez). Sitedeki fiyatlarla
+// (site/public/assets/config.js) aynı tutun. Yıllık = 10 aylık ücret (2 ay hediye); yıllıkta kartla en fazla 3 taksit.
 export const PLANS = {
-  baslangic: { name: 'Başlangıç', stores: 3, users: 2, features: [] },
-  profesyonel: { name: 'Profesyonel', stores: 10, users: 5, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles'] },
-  kurumsal: { name: 'Kurumsal', stores: 25, users: 0, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles', 'stockapi'] },
+  baslangic: { name: 'Başlangıç', stores: 3, users: 2, monthly: 990, yearly: 9900, features: [] },
+  profesyonel: { name: 'Profesyonel', stores: 10, users: 5, monthly: 1990, yearly: 19900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles'] },
+  kurumsal: { name: 'Kurumsal', stores: 25, users: 0, monthly: 3990, yearly: 39900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles', 'stockapi'] },
 };
+export const INSTALLMENTS_YEARLY = [1, 2, 3];
+// Satın alınabilir paket ve dönem → tutar, süre (ay)
+export function priceOf(plan, period) {
+  const p = PLANS[plan];
+  if (!p || !['monthly', 'yearly'].includes(period)) return null;
+  return { plan, period, name: p.name, amount: p[period], months: period === 'yearly' ? 12 : 1 };
+}
 export const FEATURES = {
   buybox: 'Buybox takibi ve otomatik fiyat', autoupload: 'Otomatik ürün gönderimi', finance: 'Hakediş ve kesilen faturalar',
   bulk: 'Excel ile toplu güncelleme', roles: 'Personel yetkileri ve rol şablonları', stockapi: 'Stok API',
