@@ -15,7 +15,13 @@ nav: paketler
 
 <section class="sec" style="padding-top:12px">
   <div class="wrap co-wrap">
-    <form class="lead card co" data-checkout novalidate>
+    <div class="card co-off" data-shop-wait><p class="muted">Yükleniyor…</p></div>
+    <div class="card co-off" data-shop-off hidden>
+      <h2>Online satış çok yakında</h2>
+      <p>Kartla online satın alma şu an kapalı. Paket almak ya da 7 gün ücretsiz denemek için bize ulaşın; aynı gün panelinizi açalım.</p>
+      <div class="co-off-actions"><a class="btn btn-primary" data-call href="/iletisim"><svg><use href="#i-phone"/></svg>Hemen arayın</a><a class="btn btn-outline" data-show="company.whatsapp" data-c="company.whatsapp" data-href="wa"><svg><use href="#i-wa"/></svg>WhatsApp</a><a class="btn btn-line" href="/iletisim?konu=teklif">Teklif isteyin</a></div>
+    </div>
+    <form class="lead card co" data-checkout data-shop hidden novalidate>
       <div class="co-tabs"><button type="button" class="co-tab" data-kind="new">Yeni müşteriyim</button><button type="button" class="co-tab" data-kind="renew">Mevcut panelimi yenile</button></div>
 
       <div class="co-step"><span class="co-n">1</span><b>Paket</b></div>

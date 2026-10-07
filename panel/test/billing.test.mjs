@@ -128,3 +128,11 @@ test('mevcut müşteri: siteden (firma kodu + e-posta) ve panelden (Paketim) yen
     assert.equal(me.tenant.planName, 'Kurumsal', 'paket panele hemen iletildi');
   } finally { s.restore(); }
 });
+
+test('site için online satış durumu: API bilgisi yokken kapalı', async () => {
+  const call = (env) => worker.fetch(new Request('https://panel.test/api/public/checkout/status', { headers: { Origin: 'https://hasturkcrm.com' } }), env, { waitUntil() {} });
+  const off = await call({ DB: d1() });
+  assert.deepEqual(await off.json(), { online: false });
+  assert.equal(off.headers.get('access-control-allow-origin'), 'https://hasturkcrm.com');
+  assert.deepEqual(await (await call({ DB: d1(), IYZICO_API_KEY: 'k', IYZICO_SECRET_KEY: 's' })).json(), { online: true });
+});

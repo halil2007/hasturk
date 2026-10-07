@@ -7,7 +7,7 @@ import { handle, report5xx } from './handler.js';
 import { PerfBuffer } from './perf.js';
 import { extApi } from './extapi.js';
 import { leadRequest, demoRequest } from './lead.js';
-import { publicCheckout, checkoutCallback } from './billing.js';
+import { publicCheckout, checkoutCallback, checkoutStatus } from './billing.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
@@ -39,6 +39,7 @@ export default {
     // Tanıtım sitesinden demo talebi (oturumsuz; yalnız izin verilen site adreslerinden, bkz. lead.js)
     if (path === 'public/lead') return await leadRequest(req, env);
     // Online paket satışı: siteden başlatma (CORS) ve iyzico'nun ödeme sonrası dönüşü (iyzico sayfasından gelen POST)
+    if (path === 'public/checkout/status') return checkoutStatus(req, env);
     if (path === 'public/checkout') return await publicCheckout(req, env);
     if (path === 'public/checkout/callback') return await checkoutCallback(req, env);
     // Demo paneline giriş (sitedeki imzalı bağlantı)
