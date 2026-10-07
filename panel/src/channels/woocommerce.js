@@ -2,8 +2,9 @@
 // Anahtar: WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (izin: Okuma/Yazma) → Consumer key (ck_…) + secret (cs_…).
 // Kimlik: HTTPS üzerinden HTTP Basic. Bazı sunucular (Apache/CGI) Authorization başlığını siler → 401: bir kez anahtarlar
 // sorgu parametresiyle (consumer_key / consumer_secret) denenir ve o yöntemle devam edilir. Kalıcı bağlantılar "Düz" ise /wp-json çalışmaz.
-// Siparişler: senkronda değiştirilme tarihine (modified_after), geçmiş aktarımında sipariş tarihine (after/before) göre.
-// Ödenmemiş (pending, failed, checkout-draft) siparişler alınmaz. Woo'da "teslim edildi" yok: completed → kargoda.
+// Siparişler: senkronda değiştirilme tarihine (modified_after, eskiden yeniye), geçmiş aktarımında sipariş tarihine (after/before) göre.
+// Ödenmemiş (pending, failed, checkout-draft) siparişler alınmaz; on-hold (havale / EFT onayı bekleniyor) "ödeme bekleniyor" işaretli gelir.
+// Woo'da "teslim edildi" yok: completed → kargoda.
 // Kargoya verme: sipariş "completed" yapılır ve müşteriye görünen not (kargo firması + takip no) eklenir.
 // Yok: ürün oluşturma, iade talepleri, soru-cevap. Tutarlar KDV dahil (satır total + total_tax).
 import { http, basic, num, str, chunk, imageList, diagStep } from '../util.js';
@@ -50,7 +51,7 @@ export function woocommerce(env, meta) {
     const tn = meta_(o, /tracking_(number|code)|takip/i), tp = meta_(o, /tracking_provider|kargo_firma/i);
     return {
       remoteId: str(o.id), orderNumber: str(o.number || o.id), orderedAt: Date.parse(o.date_created_gmt ? o.date_created_gmt + 'Z' : o.date_created) || Date.now(),
-      remoteStatus: str(o.status), status: wooStatus(str(o.status)),
+      remoteStatus: str(o.status), status: wooStatus(str(o.status)), awaitingPayment: o.status === 'on-hold',
       customer: [b.first_name, b.last_name].map(str).filter(Boolean).join(' ') || name, phone: str(b.phone || s.phone), email: str(b.email), customerId: num(o.customer_id) ? str(o.customer_id) : '',
       address: { name: name || [b.first_name, b.last_name].map(str).filter(Boolean).join(' '), line: [s.address_1, s.address_2].map(str).filter(Boolean).join(' '),
         district: il ? str(s.city) : '', city: il || str(s.city || s.state), phone: str(s.phone || b.phone) },
@@ -60,20 +61,38 @@ export function woocommerce(env, meta) {
     };
   }
 
-  // Eski sürümler modified_after'ı tanımaz (yok sayar): dönen sipariş aralık dışındaysa sipariş tarihine göre çekmeye geçilir
+  // Eski sürümler modified_after'ı tanımaz (yok sayar): dönen sipariş aralık dışındaysa sipariş tarihine göre çekmeye geçilir.
+  // Değiştirilme tarihine göre eskiden yeniye okunur: 50 sayfa (5000 sipariş) sınırına gelinirse kalanlar son okunan siparişin
+  // değiştirilme zamanından itibaren bir sonraki senkronda alınır (partialUntil)
   let modifiedOk = true;
+  const MAXP = 50;
   async function fetchOrders(since, until, { byOrdered = false } = {}) {
     const byMod = !byOrdered && modifiedOk, out = [];
-    const range = byMod ? { modified_after: iso(since), modified_before: iso(until) } : { after: iso(since), before: iso(until) };
-    for (let page = 1; page <= 50; page++) {
-      const rows = await call('/orders', { query: { ...range, dates_are_gmt: 'true', per_page: 100, page, orderby: 'date', order: 'desc' } });
+    const range = byMod ? { modified_after: iso(since), modified_before: iso(until), orderby: 'modified', order: 'asc' } : { after: iso(since), before: iso(until), orderby: 'date', order: 'desc' };
+    let last = null;
+    for (let page = 1; page <= MAXP; page++) {
+      const rows = await call('/orders', { query: { ...range, dates_are_gmt: 'true', per_page: 100, page } });
       const list = Array.isArray(rows) ? rows : [];
       if (byMod && page === 1 && list.some((o) => o.date_modified_gmt && Date.parse(o.date_modified_gmt + 'Z') < since - 864e5)) { modifiedOk = false; return fetchOrders(since, until, { byOrdered }); }
       for (const o of list) if (!SKIP.includes(o.status)) out.push(norm(o));
-      if (list.length < 100) break;
+      if (list.length < 100) return out;
+      last = list[list.length - 1];
     }
+    out.warnings = [`WooCommerce: bu aralıkta ${MAXP * 100}+ sipariş var; kalanlar bir sonraki senkronda alınacak`];
+    const t = last && Date.parse(last.date_modified_gmt + 'Z');
+    if (byMod) out.partialUntil = Number.isFinite(t) ? Math.max(since, t) : since;
     return out;
   }
+  // Tek sipariş: çöp kutusundaki (trash) sipariş kanalda yok sayılır; 404 → yok
+  async function getOrder(id) {
+    try { return await call(`/orders/${encodeURIComponent(id)}`); } catch (e) { if (e.status === 404) return null; throw e; }
+  }
+  async function fetchOne(id) {
+    const o = await getOrder(id);
+    if (!o || !o.id || o.status === 'trash') throw new Error('WooCommerce: sipariş bulunamadı');
+    return norm(o);
+  }
+  const orderExists = async (id) => { const o = await getOrder(id); return !!(o && o.id && o.status !== 'trash'); };
 
   const listing = (p, v) => {
     const x = v || p, img = str((v && v.image && v.image.src) || ((p.images || [])[0] || {}).src);
@@ -140,6 +159,14 @@ export function woocommerce(env, meta) {
     if (!okAuth) { out.push({ name: 'İpucu', ok: null, detail: '401: anahtar yanlış ya da yetkisiz · 404: WordPress → Ayarlar → Kalıcı bağlantılar "Düz" olmamalı, WooCommerce REST API açık olmalı' }); return out; }
     await diagStep(out, 'Siparişler (son 7 gün)', async () => { const o = await fetchOrders(now - 7 * 864e5, now); return { detail: `${o.length} sipariş${o[0] ? ` · örnek #${o[0].orderNumber}: ${o[0].remoteStatus} → ${o[0].status}` : ''}` }; });
     if (orderId) await diagStep(out, `Sipariş ${orderId}`, async () => { const o = await call(`/orders/${encodeURIComponent(orderId)}`); return { detail: `#${o.number || o.id}: ${o.status} → ${wooStatus(o.status)}` }; });
+    // Panel fiyatları KDV dahildir: Woo'da fiyatlar KDV hariç girilecek şekilde ayarlıysa gönderilen fiyat sitede vergi eklenerek görünür
+    await diagStep(out, 'Fiyatlar KDV dahil mi', async () => {
+      const calc = await call('/settings/general/woocommerce_calc_taxes');
+      if (str(calc && calc.value) !== 'yes') return { detail: 'Vergi hesaplama kapalı: fiyatlar sitede olduğu gibi (KDV dahil) görünür' };
+      const r = await call('/settings/tax/woocommerce_prices_include_tax');
+      const yes = str(r && r.value) === 'yes';
+      return { ok: yes ? true : null, detail: yes ? 'Evet (WooCommerce → Ayarlar → Vergi: fiyatlar vergi dahil girilir)' : 'Hayır: WooCommerce fiyatları KDV hariç tutuyor; panelden gönderilen (KDV dahil) fiyatlara sitede ayrıca KDV eklenir · WooCommerce → Ayarlar → Vergi → "Fiyatlar vergi dahil girilecek" seçin' };
+    });
     out.push({ name: 'Yazma izni', ok: null, detail: 'Stok / fiyat / kargo için anahtar izni "Okuma/Yazma" olmalı (ilk gönderimde denenir)' });
     return out;
   }
@@ -148,6 +175,6 @@ export function woocommerce(env, meta) {
   return {
     ...meta, type: 'woocommerce', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose,
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, diagnose,
   };
 }
