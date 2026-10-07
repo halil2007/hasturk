@@ -12,15 +12,15 @@ window.SITE = {
   // Tutar paneldeki fiyattan alınır (panel/src/plans.js) — fiyat değişince iki yerde de güncelleyin.
   checkoutUrl: 'https://panel.hasturkcrm.com/api/public/checkout',
   company: {
-    legal: '',                      // Şirket ünvanı (ör. "Hastürk ... Ltd. Şti.")
-    address: '',                    // Açık adres
+    legal: 'Hastürk Gübre Sanayi ve Ticaret Limited Şirketi', // Şirket tam ünvanı (Hastürk CRM Sistemleri'nin tüm hakları bu şirkete aittir)
+    address: 'Kızılcaali Mahallesi, Karakoçan Çıkmazı Sokak, No:7/1, 34540 Çatalca / İstanbul',
     phone: '+90 553 942 29 61',
     whatsapp: '905539422961',       // yalnız rakam, ülke koduyla
     email: 'info@hasturkcrm.com',
-    kvkkEmail: '',                  // KVKK başvuruları için e-posta (boşsa yukarıdaki e-posta)
+    kvkkEmail: 'info@hasturkcrm.com',                  // KVKK başvuruları için e-posta (boşsa yukarıdaki e-posta)
     taxOffice: '',                  // Vergi dairesi
     taxNo: '',                      // Vergi numarası
-    mersis: '',                     // MERSİS no (varsa)
+    mersis: '0459060180900001',                     // MERSİS no (varsa)
   },
   // WhatsApp düğmesine basınca hazır gelen mesaj
   waText: 'Merhaba, Hastürk CRM hakkında bilgi almak istiyorum.',
