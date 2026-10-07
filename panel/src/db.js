@@ -299,6 +299,16 @@ export function init(db) {
 export const all = async (db, sql, ...args) => (await db.prepare(sql).bind(...args).all()).results || [];
 export const first = (db, sql, ...args) => db.prepare(sql).bind(...args).first();
 export const run = (db, sql, ...args) => db.prepare(sql).bind(...args).run();
+// D1 bir sorguda en fazla 100 değer kabul eder ("too many SQL variables"): uzun kimlik listesi parça parça sorgulanır, sonuçlar
+// birleştirilir. build(ph, part) → [sql, argümanlar]; ph = parçanın "?, ?, …" listesi. Parçalar arası sıralama korunmaz.
+export async function allIn(db, ids, build, size = 80) {
+  const out = [];
+  for (let i = 0; i < ids.length; i += size) {
+    const part = ids.slice(i, i + size), [sql, args] = build(part.map(() => '?').join(','), part);
+    out.push(...await all(db, sql, ...args));
+  }
+  return out;
+}
 
 // ---------- ayarlar ----------
 export const DEFAULT_SETTINGS = {

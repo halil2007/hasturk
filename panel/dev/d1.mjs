@@ -5,7 +5,11 @@ import { DatabaseSync } from 'node:sqlite';
 const LAT = Number(process.env.DEV_LATENCY) || 0;
 export const d1Stats = { q: 0 };
 const wait = async () => { d1Stats.q++; if (LAT) await new Promise((r) => setTimeout(r, LAT)); };
-const fix = (a) => a.map((v) => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v));
+// Gerçek D1 gibi: bir sorguya en fazla 100 değer bağlanabilir (aşınca D1 "too many SQL variables" verir; testler de yakalasın)
+const fix = (a) => {
+  if (a.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${a.length} > 100): SQLITE_ERROR`);
+  return a.map((v) => (v === undefined ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v));
+};
 
 class Stmt {
   constructor(db, sql, args = []) { this.db = db; this.sql = sql; this.args = args; }

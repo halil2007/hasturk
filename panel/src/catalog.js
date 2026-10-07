@@ -4,7 +4,7 @@
 // Yükleme: henüz o kanalda ilanı olmayan ürünler, eşleştirmedeki değerlerle kanalın ürün servisine gönderilir; kanalın
 // verdiği takip kimliğiyle (HB trackingId / Trendyol batchRequestId) sonuç sorgulanır. Onaylanan ürün, ilanlar
 // çekilince barkod / SKU ile otomatik eşleşir.
-import { all, first, run, getRaw, setSetting, getSettings, log, notify } from './db.js';
+import { all, first, run, allIn, getRaw, setSetting, getSettings, log, notify } from './db.js';
 import { getChannels } from './channels/index.js';
 import { importListings, catalogOf } from './sync.js';
 import { fail, str, num, r2, isImageAttr } from './util.js';
@@ -34,12 +34,14 @@ async function mapOf(db, local, ch) {
 async function productsFor(db, settings, { local, ch, ids }) {
   const cats = catalogOf(settings);
   const ph = cats.map(() => '?').join(',');
-  const where = ids ? `p.id IN (${ids.map(() => '?').join(',')})` : "COALESCE(p.category, '') = ?";
-  return all(db, `SELECT p.*, (SELECT MAX(l.price) FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) AS cat_price,
+  const q = (where) => `SELECT p.*, (SELECT MAX(l.price) FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) AS cat_price,
       (SELECT MAX(l.list_price) FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) AS cat_list,
       EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel = ?) AS listed
-    FROM products p WHERE p.active = 1 AND ${where} ORDER BY COALESCE(NULLIF(p.group_name, ''), p.name), p.variant_name LIMIT 500`,
-  ...cats, ...cats, ch, ...(ids || [local]));
+    FROM products p WHERE p.active = 1 AND ${where} ORDER BY COALESCE(NULLIF(p.group_name, ''), p.name), p.variant_name LIMIT 500`;
+  if (!ids) return all(db, q("COALESCE(p.category, '') = ?"), ...cats, ...cats, ch, local);
+  // Seçili ürünler parça parça okunur (D1 sorgu başına en fazla 100 değer), sonra aynı sırayla dizilir
+  const key = (p) => `${p.group_name || p.name}\u0000${p.variant_name || ''}`;
+  return (await allIn(db, ids, (ph2, part) => [q(`p.id IN (${ph2})`), [...cats, ...cats, ch, ...part]], 60)).sort((a, b) => key(a).localeCompare(key(b))).slice(0, 500);
 }
 function shape(p, opts, zeroStock) {
   const base = p.cat_price > 0 ? p.cat_price : p.sale_price;
