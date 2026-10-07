@@ -150,3 +150,31 @@ test('PttAVM REST: ürün listesi (varyantlar ayrı ilan) ve kargo barkodu (depo
     assert.deepEqual(calls.find((x) => /create-barcode/.test(x.u)).body, { orders: [{ order_id: 'PTT-1', warehouse_id: 555 }] });
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('PttAVM REST: boş kategori filtresini reddeden hesapta (HTTP 400) kabul edilen biçim bulunur; aktif/pasif, stoklu/stoksuz birleştirilir', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    const c = pttavm(RENV, { id: 'pttavm' });
+    const seen = [];
+    globalThis.fetch = async (url) => {
+      const u = new URL(String(url));
+      if (!/products\/search/.test(u.pathname)) return J({});
+      const q = Object.fromEntries(u.searchParams); seen.push(q);
+      // Bu hesapta: kategori alanları boş ya da 0 gönderilince 400; hiç gönderilmeyince çalışır
+      if ('categoryId' in q) return new Response('', { status: 400 });
+      if (q.searchPage !== '1') return J([]);
+      const rows = { 'true|true': [{ urunId: 1, barkod: 'A', urunAdi: 'Aktif stoklu', kdVli: 10, miktar: 2, aktif: true }],
+        'true|false': [{ urunId: 2, barkod: 'B', urunAdi: 'Aktif stoksuz', kdVli: 11, miktar: 0, aktif: true }],
+        'false|true': [{ urunId: 3, barkod: 'C', urunAdi: 'Pasif', kdVli: 12, miktar: 5, aktif: false }, { urunId: 1, barkod: 'A', urunAdi: 'Aktif stoklu', kdVli: 10, miktar: 2 }],
+        'false|false': [] };
+      return J(rows[`${q.isActive}|${q.isInStock}`] || []);
+    };
+    const l = await c.fetchListings();
+    assert.deepEqual(l.map((x) => [x.remoteId, x.stock, x.active]).sort(), [['A', 2, true], ['B', 0, true], ['C', 5, false]]);
+    assert.ok(seen.some((q) => q.categoryId === '' && q.isActive === ''), 'önce filtresiz denenir');
+    assert.ok(seen.some((q) => q.categoryId === '0'), 'sonra kategori 0 denenir');
+    // Hiçbir biçim kabul edilmezse anlaşılır hata
+    globalThis.fetch = async () => new Response('', { status: 400 });
+    await assert.rejects(c.fetchListings(), /arama filtrelerini kabul etmedi \(HTTP 400\)/);
+  } finally { globalThis.fetch = realFetch; }
+});
