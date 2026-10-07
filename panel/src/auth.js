@@ -2,9 +2,10 @@
 //  - Ana yönetici: kullanıcı adı "yonetici" (ya da boş) + Cloudflare'deki PANEL_PASSWORD.
 //  - Diğer kullanıcılar panelden eklenir (Kullanıcılar); şifreler PBKDF2-SHA256 ile özetlenip saklanır.
 //  - Oturum imzalı, HttpOnly bir çerezde tutulur; şifre değişince eski oturumlar geçersiz olur.
-import { all, first, run, getRaw, setSetting } from './db.js';
+import { all, first, run, getRaw, setSetting, log } from './db.js';
 import { PERM_VALUES, PERM_KEYS } from '../public/perms.js';
 import { newSecret, verifyCode, hashCode, recoveryCodes, otpauth, qrSvg } from './totp.js';
+import { sendMail, validEmail } from './mail.js';
 const permsOf = (v) => { try { const a = JSON.parse(v || 'null'); return Array.isArray(a) ? a.filter((k) => PERM_VALUES.includes(k)) : null; } catch { return null; } };
 // Oturum imzası şifreye ve oturum sürümüne bağlı: "oturumları kapat" sürümü artırır, eski çerezler geçersiz olur
 const ver = (u) => u.pass.slice(-12) + (u.sess ? ':' + u.sess : '');
@@ -124,6 +125,9 @@ export async function login(req, env, db, { username, password: pass }) {
   await run(db, 'DELETE FROM settings WHERE k = ?', fk);
   // İki adımlı doğrulama açıksa oturum ancak kodla verilir: 5 dakikalık imzalı bilet
   if ((await getTfa(db, user.id)).on) return { ok: false, status: 200, twofa: true, ticket: await ticketFor(env, user.id, sv) };
+  // Tanınmayan ağdan (IP) giriş: e-postaya 6 haneli kod gider, kod girilince ağ hatırlanır
+  const mc = await mailCheck(req, env, db, user, sv);
+  if (mc) return mc;
   return issue(req, env, user, sv);
 }
 function issue(req, env, user, sv) {
@@ -133,6 +137,116 @@ function issue(req, env, user, sv) {
     const v = encodeURIComponent(`${pre(env)}${user.id}.${exp}.${sig}`);
     return { ok: true, user, cookie: `${COOKIE}=${v}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DAYS * 86400}${secure}` };
   });
+}
+
+// ---------- yeni ağdan girişte e-posta kodu ----------
+// Kullanıcının daha önce kodla doğruladığı ağlar settings'te (trust:<id>) tutulur. Ağ: IPv4'te ilk 3 bölüm (aynı modem /
+// ofis hattında son hane değişse de tanınır), IPv6'da ilk 4 grup. Tanınmayan ağdan girişte şifre doğruysa e-postaya 10 dakika
+// geçerli 6 haneli kod gider; kod girilince oturum açılır ve ağ 120 gün hatırlanır (her girişte süre uzar).
+// İki adımlı doğrulaması (uygulama) açık kullanıcıda bu adım atlanır: uygulama kodu zaten her girişte istenir.
+// E-postası olmayan kullanıcıda ve e-posta gönderilemezse giriş engellenmez (kimse panelin dışında kalmasın); olay günlüğe yazılır.
+const NET_MS = 120 * 864e5, CODE_MS = 10 * 60e3, MAIL_TICKET_MS = 20 * 60e3;
+const clientIp = (req) => String(req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || '').split(',')[0].trim();
+export function netOf(ip) {
+  const s = String(ip || '').trim().toLowerCase();
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) return s.split('.').slice(0, 3).join('.') + '.x';
+  if (!s.includes(':')) return '';
+  const [h, t] = s.split('::');
+  const a = h ? h.split(':') : [], b = t ? t.split(':') : [];
+  const g = t === undefined ? a : [...a, ...Array(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b];
+  return g.slice(0, 4).map((x) => x.replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+const sha = async (s) => b64(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(s))));
+const mask = (e) => String(e).replace(/^(.)(.*?)(.?)@/, (_, a, m, z) => a + '*'.repeat(Math.min(6, Math.max(2, m.length))) + z + '@');
+async function nets(db, uid) { const now = Date.now(); return ((await getRaw(db, 'trust:' + uid)) || []).filter((x) => x && x.net && now - x.at < NET_MS); }
+async function remember(db, uid, net) {
+  if (!net) return;
+  const now = Date.now(), list = (await nets(db, uid)).filter((x) => x.net !== net);
+  await setSetting(db, 'trust:' + uid, [{ net, at: now }, ...list].slice(0, 30));
+}
+// Kullanıcının tanınan ağlarını unut (oturumları kapat / şifre sıfırlama): bir sonraki girişte yeniden kod istenir
+export const forgetNets = (db, uid) => run(db, 'DELETE FROM settings WHERE k = ?', 'trust:' + uid);
+async function emailOf(db, uid) {
+  if (uid === 0) return (await security(db)).adminEmail || '';
+  const r = await first(db, 'SELECT email FROM users WHERE id = ?', uid);
+  return (r && r.email) || '';
+}
+async function sendCode(req, env, db, user, to) {
+  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1e6).padStart(6, '0'), now = Date.now();
+  const old = (await getRaw(db, 'mailcode:' + user.id)) || {};
+  const sent = (old.sent || []).filter((t) => now - t < 3600e3);
+  await setSetting(db, 'mailcode:' + user.id, { h: await sha(`${user.id}|${code}`), exp: now + CODE_MS, n: 0, sent: [...sent, now] });
+  const ip = clientIp(req), ua = String(req.headers.get('User-Agent') || '').slice(0, 160), firm = env.TENANT_NAME || 'Hastürk Panel';
+  const when = new Date(now).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+  const e = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  await sendMail(env, db, { to: [to], subject: `${code} · ${firm} giriş doğrulama kodu`,
+    text: `Merhaba ${user.name},\n\nPanelinize yeni bir ağdan giriş yapılıyor. Doğrulama kodunuz: ${code}\nKod 10 dakika geçerlidir.\n\nZaman: ${when}\nIP: ${ip || '-'}\nTarayıcı: ${ua || '-'}\n\nBu girişi siz yapmıyorsanız kodu kimseyle paylaşmayın ve şifrenizi hemen değiştirin.`,
+    html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111;max-width:520px"><h2 style="font-size:19px;margin:0 0 12px">Giriş doğrulama kodu</h2>
+      <p style="margin:0 0 10px">Merhaba ${e(user.name)}, <b>${e(firm)}</b> panelinize yeni bir ağdan giriş yapılıyor.</p>
+      <p style="font-size:30px;font-weight:bold;letter-spacing:6px;margin:16px 0;font-family:Consolas,monospace">${code}</p>
+      <p style="margin:0 0 10px">Kod <b>10 dakika</b> geçerlidir. Bu ağ doğrulandıktan sonra buradan girişlerde tekrar kod istenmez.</p>
+      <p style="color:#667;font-size:12px;margin:14px 0 0">Zaman: ${e(when)}<br>IP: ${e(ip || '-')}<br>Tarayıcı: ${e(ua || '-')}</p>
+      <p style="color:#b42318;font-size:13px;margin:14px 0 0">Bu girişi siz yapmıyorsanız kodu kimseyle paylaşmayın ve şifrenizi hemen değiştirin.</p></div>` });
+}
+async function mailTicket(env, uid, sv) {
+  const exp = String(Date.now() + MAIL_TICKET_MS);
+  return `${uid}.${exp}.${await hmac(secret(env), `mail.${uid}.${exp}.${sv}`)}`;
+}
+// Şifre doğru: ağ tanınıyorsa null (giriş devam eder), değilse kod gönderilir ve bilet döner
+async function mailCheck(req, env, db, user, sv) {
+  if (env.DEMO === '1' || user.username === DEMO_USER || (await security(db)).emailVerify === false) return null;
+  const net = netOf(clientIp(req));
+  if (!net) return null;
+  if ((await nets(db, user.id)).some((x) => x.net === net)) { await remember(db, user.id, net); return null; }
+  const to = await emailOf(db, user.id);
+  if (!validEmail(to)) { await log(db, null, 'warn', `${user.name}: yeni ağdan giriş (${net}) — e-posta adresi olmadığı için doğrulama kodu gönderilemedi`); return null; }
+  try { await sendCode(req, env, db, user, to); } catch (e) {
+    await log(db, null, 'error', `${user.name}: giriş doğrulama kodu gönderilemedi (${String(e.message).slice(0, 200)}); giriş kodsuz yapıldı`);
+    return null;
+  }
+  return { ok: false, status: 200, emailcode: true, ticket: await mailTicket(env, user.id, sv), to: mask(to) };
+}
+// Biletten kullanıcıyı çöz (iki adımlı doğrulama ve e-posta kodu adımları); geçersizse null
+async function ticketUser(env, db, ticket, kind) {
+  const [uid, exp, sig] = String(ticket || '').split('.');
+  if (!sig || Number(exp) < Date.now()) return { expired: true };
+  const id = Number(uid);
+  let user, sv;
+  if (id === 0) { if (env.TENANT_SLUG || !password(env)) return null; user = ADMIN; sv = '0'; }
+  else {
+    const u = await first(db, 'SELECT * FROM users WHERE id = ? AND active = 1', id);
+    if (!u) return null;
+    user = { id: u.id, username: u.username, name: u.name || u.username, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) }; sv = ver(u);
+  }
+  if (!same(sig, await hmac(secret(env), `${kind}.${uid}.${exp}.${sv}`))) return null;
+  return { id, user, sv };
+}
+// E-posta kodu adımı: bilet + kod → oturum çerezi; { resend: true } → yeni kod (en az 45 sn arayla, saatte en fazla 5)
+export async function loginMail(req, env, db, { mailticket, code, resend }) {
+  const t = await ticketUser(env, db, mailticket, 'mail');
+  if (!t || t.expired) return { ok: false, status: 401, error: t ? 'Doğrulama süresi doldu, tekrar giriş yapın' : 'Geçersiz doğrulama', restart: true };
+  const { id, user, sv } = t, k = 'mailcode:' + id, now = Date.now();
+  const rec = (await getRaw(db, k)) || {};
+  if (resend) {
+    const sent = (rec.sent || []).filter((x) => now - x < 3600e3);
+    if (sent.length && now - sent[sent.length - 1] < 45e3) return { ok: false, status: 429, error: 'Yeni kod için biraz bekleyin (45 sn)' };
+    if (sent.length >= 5) return { ok: false, status: 429, error: 'Bir saatte en fazla 5 kod gönderilir. Biraz sonra tekrar deneyin.' };
+    const to = await emailOf(db, id);
+    if (!validEmail(to)) return { ok: false, status: 400, error: 'Kayıtlı e-posta adresi yok', restart: true };
+    try { await sendCode(req, env, db, user, to); } catch { return { ok: false, status: 502, error: 'Kod gönderilemedi; biraz sonra tekrar deneyin' }; }
+    return { ok: false, status: 200, emailcode: true, ticket: mailticket, to: mask(to), resent: true };
+  }
+  if (!rec.h || rec.exp < now) return { ok: false, status: 401, error: 'Kodun süresi doldu. “Kodu tekrar gönder”e basın.' };
+  if (rec.n >= 5) return { ok: false, status: 429, error: 'Çok fazla hatalı deneme. “Kodu tekrar gönder” ile yeni kod isteyin.' };
+  if (!same(await sha(`${id}|${String(code || '').replace(/\D/g, '')}`), rec.h)) {
+    await setSetting(db, k, { ...rec, n: (rec.n || 0) + 1 });
+    return { ok: false, status: 401, error: 'Kod hatalı. E-postadaki 6 haneli kodu girin.' };
+  }
+  await setSetting(db, k, { sent: rec.sent || [] }); // kod tek kullanımlık; gönderim sayacı kalır
+  await remember(db, id, netOf(clientIp(req)));
+  if (id) await run(db, 'UPDATE users SET last_login = ?, last_ip = ? WHERE id = ?', now, clientIp(req).slice(0, 64) || null, id);
+  await log(db, null, 'info', `${user.name}: yeni ağdan giriş e-posta koduyla doğrulandı (${netOf(clientIp(req))})`);
+  return issue(req, env, user, sv);
 }
 
 // ---------- iki adımlı doğrulama (TOTP) ----------
@@ -152,12 +266,19 @@ const secCache = new WeakMap();
 export async function security(db, fresh = false) {
   const c = secCache.get(db);
   if (!fresh && c && Date.now() - c.at < 30e3) return c.v;
-  const v = { require2fa: false, ...tfaOf(await getRaw(db, 'security')) };
+  const v = { require2fa: false, emailVerify: true, adminEmail: '', ...tfaOf(await getRaw(db, 'security')) };
   secCache.set(db, { at: Date.now(), v });
   return v;
 }
 export async function setSecurity(db, b) {
-  const v = { ...(await security(db, true)), require2fa: !!b.require2fa };
+  const v = { ...(await security(db, true)) };
+  if (b.require2fa !== undefined) v.require2fa = !!b.require2fa;
+  if (b.emailVerify !== undefined) v.emailVerify = !!b.emailVerify;
+  if (b.adminEmail !== undefined) {
+    const e = String(b.adminEmail || '').trim().slice(0, 120);
+    if (e && !validEmail(e)) throw new Error('E-posta adresi geçersiz');
+    v.adminEmail = e;
+  }
   await setSetting(db, 'security', v);
   secCache.delete(db);
   return v;
@@ -180,17 +301,9 @@ async function checkSecond(db, uid, tf, code) {
 }
 // Girişin ikinci adımı: bilet + kod → oturum çerezi
 export async function loginSecond(req, env, db, { ticket, code }) {
-  const [uid, exp, sig] = String(ticket || '').split('.');
-  if (!sig || Number(exp) < Date.now()) return { ok: false, status: 401, error: 'Doğrulama süresi doldu, tekrar giriş yapın', restart: true };
-  const id = Number(uid);
-  let user, sv;
-  if (id === 0) { if (env.TENANT_SLUG || !password(env)) return { ok: false, status: 401, error: 'Geçersiz doğrulama', restart: true }; user = ADMIN; sv = '0'; }
-  else {
-    const u = await first(db, 'SELECT * FROM users WHERE id = ? AND active = 1', id);
-    if (!u) return { ok: false, status: 401, error: 'Geçersiz doğrulama', restart: true };
-    user = { id: u.id, username: u.username, name: u.name || u.username, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms) }; sv = ver(u);
-  }
-  if (!same(sig, await hmac(secret(env), `2fa.${uid}.${exp}.${sv}`))) return { ok: false, status: 401, error: 'Geçersiz doğrulama', restart: true };
+  const t = await ticketUser(env, db, ticket, '2fa');
+  if (!t || t.expired) return { ok: false, status: 401, error: t ? 'Doğrulama süresi doldu, tekrar giriş yapın' : 'Geçersiz doğrulama', restart: true };
+  const { id, user, sv } = t;
   // Kod denemesi sınırı: kullanıcı başına 15 dakikada 6 hatalı kod
   const fk = `tfa_fail:${id}`, now = Date.now(), f = tfaOf(await getRaw(db, fk));
   if (f.at > now - 15 * 60e3 && f.n >= 6) return { ok: false, status: 429, error: 'Çok fazla hatalı kod. 15 dakika sonra tekrar deneyin.' };
@@ -201,7 +314,8 @@ export async function loginSecond(req, env, db, { ticket, code }) {
     return { ok: false, status: 401, error: 'Kod hatalı. Uygulamadaki güncel kodu girin.' };
   }
   await run(db, 'DELETE FROM settings WHERE k = ?', fk);
-  if (id) await run(db, 'UPDATE users SET last_login = ?, last_ip = ? WHERE id = ?', Date.now(), (req.headers.get('CF-Connecting-IP') || '').slice(0, 64) || null, id);
+  if (id) await run(db, 'UPDATE users SET last_login = ?, last_ip = ? WHERE id = ?', Date.now(), clientIp(req).slice(0, 64) || null, id);
+  await remember(db, id, netOf(clientIp(req)));
   const r = await issue(req, env, user, sv);
   return { ...r, recoveryUsed: how === 'recovery', recoveryLeft: how === 'recovery' ? ((await getTfa(db, id)).rec || []).length : undefined };
 }

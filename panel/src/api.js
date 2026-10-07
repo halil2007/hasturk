@@ -20,7 +20,7 @@ import { sendMail, orderMail, validEmail, logoPath, logoUrl } from './mail.js';
 import { catalogApi } from './catalog.js';
 import * as customers from './customers.js';
 import * as chp from './chproducts.js';
-import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity, twofaApi, resetTfa, security, setSecurity } from './auth.js';
+import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity, twofaApi, resetTfa, security, setSecurity, forgetNets } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costOf, COST_KEYS } from '../public/profit.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
@@ -1125,7 +1125,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true });
   }
   if ((x = path.match(/^users\/(\d+)$/)) && m === 'DELETE') { try { await deleteUser(db, Number(x[1]), user); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı silindi (#${x[1]})`); return json({ ok: true }); }
-  if ((x = path.match(/^users\/(\d+)\/revoke$/)) && m === 'POST') { await revokeSessions(db, Number(x[1])); await log(db, null, 'info', `${user.name}: kullanıcının oturumları kapatıldı (#${x[1]})`); return json({ ok: true }); }
+  if ((x = path.match(/^users\/(\d+)\/revoke$/)) && m === 'POST') { await revokeSessions(db, Number(x[1])); await forgetNets(db, Number(x[1])); await log(db, null, 'info', `${user.name}: kullanıcının oturumları kapatıldı (#${x[1]})`); return json({ ok: true }); }
   if ((x = path.match(/^users\/(\d+)\/activity$/)) && m === 'GET') { try { return json(await userActivity(db, Number(x[1]))); } catch (e) { fail(404, e.message); } }
   // İki adımlı doğrulama: kendi hesabı (her kullanıcı) ve zorunluluk / sıfırlama (yönetici)
   // Demo panelinde herkes aynı hesapla girer: şifre / iki adımlı doğrulama değiştirilirse diğer ziyaretçiler giremez
@@ -1138,7 +1138,16 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json(r);
   }
   if (path === 'users/security' && m === 'GET') return json(await security(db, true));
-  if (path === 'users/security' && m === 'PUT') { const r = await setSecurity(db, await body(req)); await log(db, null, 'info', `${user.name}: iki adımlı doğrulama tüm kullanıcılar için ${r.require2fa ? 'zorunlu yapıldı' : 'isteğe bağlı yapıldı'}`); return json(r); }
+  if (path === 'users/security' && m === 'PUT') {
+    const b = await body(req);
+    // Ana yönetici e-postası yalnız ana panelin yöneticisi tarafından değiştirilir
+    if (b.adminEmail !== undefined && (env.TENANT_SLUG || user.id !== 0)) fail(403, 'Yalnızca ana yönetici');
+    let r; try { r = await setSecurity(db, b); } catch (e) { fail(400, e.message); }
+    if (b.require2fa !== undefined) await log(db, null, 'info', `${user.name}: iki adımlı doğrulama tüm kullanıcılar için ${r.require2fa ? 'zorunlu yapıldı' : 'isteğe bağlı yapıldı'}`);
+    if (b.emailVerify !== undefined) await log(db, null, 'info', `${user.name}: yeni ağdan girişte e-posta kodu ${r.emailVerify ? 'açıldı' : 'kapatıldı'}`);
+    if (b.adminEmail !== undefined) await log(db, null, 'info', `${user.name}: ana yönetici e-postası güncellendi`);
+    return json(r);
+  }
   if ((x = path.match(/^users\/(\d+)\/2fa-reset$/)) && m === 'POST') { await resetTfa(db, Number(x[1])); await revokeSessions(db, Number(x[1])); await log(db, null, 'info', `${user.name}: kullanıcının iki adımlı doğrulaması sıfırlandı (#${x[1]})`); return json({ ok: true }); }
   if (path === 'me/password' && m === 'POST') { const b = await body(req); try { await changeOwnPassword(db, user, b.old, b.new); } catch (e) { fail(400, e.message); } return json({ ok: true }); }
 

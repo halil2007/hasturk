@@ -4,7 +4,7 @@ import { planInfo } from './plans.js';
 import { init, getSettings, getLogo } from './db.js';
 import { logoPath } from './mail.js';
 import { api } from './api.js';
-import { currentUser, login, loginSecond, logoutCookie, password, security } from './auth.js';
+import { currentUser, login, loginSecond, loginMail, logoutCookie, password, security } from './auth.js';
 import { json, body, HttpError } from './util.js';
 
 export async function handle(req, env, ctx, db) {
@@ -33,8 +33,9 @@ export async function handle(req, env, ctx, db) {
     }
     if (path === 'login' && req.method === 'POST') {
       const b = await body(req);
-      const r = b && b.ticket ? await loginSecond(req, env, db, b) : await login(req, env, db, b);
+      const r = b && b.mailticket ? await loginMail(req, env, db, b) : b && b.ticket ? await loginSecond(req, env, db, b) : await login(req, env, db, b);
       if (r.twofa) return json({ twofa: true, ticket: r.ticket });
+      if (r.emailcode) return json({ emailcode: true, ticket: r.ticket, to: r.to, resent: !!r.resent });
       return r.ok ? json({ ok: true, user: r.user, tenant: env.TENANT_SLUG || null, recoveryUsed: r.recoveryUsed, recoveryLeft: r.recoveryLeft }, 200, { 'Set-Cookie': r.cookie }) : json({ error: r.error, restart: r.restart }, r.status);
     }
     if (path === 'logout') return json({ ok: true }, 200, { 'Set-Cookie': logoutCookie() });

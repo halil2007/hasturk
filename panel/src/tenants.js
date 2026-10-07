@@ -197,7 +197,7 @@ export async function tenantLogin(req, env, b) {
   if (!t.active) return json({ error: 'Bu müşteri paneli askıya alınmış. ' + await contactLine(env) }, 403);
   if (expired(t)) return json({ error: await expiredMessage(env, t), renew: renewUrl(env, t) }, 403);
   const h = new Headers(req.headers); h.set('Content-Type', 'application/json');
-  return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify(b.ticket ? { ticket: b.ticket, code: b.code } : { username: b.username, password: b.password }) }), env, t);
+  return forward(new Request(req.url, { method: 'POST', headers: h, body: JSON.stringify(b.mailticket ? { mailticket: b.mailticket, code: b.code, resend: !!b.resend } : b.ticket ? { ticket: b.ticket, code: b.code } : { username: b.username, password: b.password }) }), env, t);
 }
 
 // Demo paneline giriş (tanıtım sitesindeki imzalı bağlantıdan, bkz. lead.js): kayıt yoksa oluşturulur; ana panel yöneticisi

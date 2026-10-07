@@ -32,6 +32,42 @@ export function codeStep(form, { ticket, tenant }) {
   });
 }
 
+// Yeni ağdan giriş: e-postaya giden 6 haneli kod. "Kodu tekrar gönder" 45 sn'de bir açılır.
+export function mailStep(form, { ticket, tenant, to }) {
+  return new Promise((resolve, reject) => {
+    let wait = 45, timer = null;
+    render(form, html`<div><h2>E-posta doğrulaması</h2><div class="muted small">Bu ağdan ilk kez giriş yapıyorsunuz. <b>${to}</b> adresine 6 haneli bir kod gönderdik (10 dakika geçerli). Kodu girdikten sonra bu ağdan girişlerde tekrar sorulmaz.</div></div>
+      <label class="field"><span>E-postadaki kod</span>${CODE_INPUT()}</label>
+      <div class="login-err" data-err role="alert"></div>
+      <button class="btn primary block lg" type="submit">Doğrula ve giriş yap</button>
+      <button type="button" class="link-btn" data-resend disabled></button>
+      <div class="tiny muted">Kod gelmediyse gereksiz (spam) klasörüne bakın.</div>`);
+    const inp = $('[name=code]', form), rs = $('[data-resend]', form), err = $('[data-err]', form);
+    const tick = () => { rs.disabled = wait > 0; rs.textContent = wait > 0 ? `Kodu tekrar gönder (${wait} sn)` : 'Kodu tekrar gönder'; if (wait-- <= 0) clearInterval(timer); };
+    const countdown = () => { clearInterval(timer); wait = 45; tick(); timer = setInterval(tick, 1000); };
+    countdown();
+    inp.focus();
+    inp.oninput = () => { if (/^\d{6}$/.test(inp.value.replace(/\s/g, ''))) form.requestSubmit(); };
+    const restart = (x) => { clearInterval(timer); reject(x); };
+    rs.onclick = async () => {
+      rs.disabled = true; err.textContent = '';
+      try { const r = await api('login', { method: 'POST', body: { tenant, mailticket: ticket, resend: true } }); err.textContent = ''; toast(`Yeni kod ${r.to} adresine gönderildi`); countdown(); inp.value = ''; inp.focus(); } catch (x) {
+        if (/süresi doldu|Geçersiz doğrulama|e-posta adresi yok/.test(x.message)) return restart(x);
+        err.textContent = x.message; rs.disabled = false;
+      }
+    };
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector('[type=submit]');
+      btn.disabled = true;
+      try { const r = await api('login', { method: 'POST', body: { tenant, mailticket: ticket, code: inp.value.trim() } }); clearInterval(timer); resolve(r); } catch (x) {
+        if (/süresi doldu, tekrar giriş|Geçersiz doğrulama/.test(x.message)) return restart(x);
+        err.textContent = x.message; btn.disabled = false; inp.select();
+      }
+    };
+  });
+}
+
 // Yedek kodları göster (bir kez): kopyala / indir
 export function showRecovery(codes, onDone) {
   const text = codes.join('\n');
