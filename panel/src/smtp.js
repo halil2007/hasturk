@@ -32,7 +32,9 @@ function session(sock) {
   };
   return {
     read, send, cmd,
-    upgrade(s2) { reader.releaseLock(); writer.releaseLock(); reader = s2.readable.getReader(); writer = s2.writable.getWriter(); buf = ''; },
+    // STARTTLS: Cloudflare startTls() yalnız akışlar serbestken çağrılabilir — önce kilitler bırakılır, sonra yeni soket bağlanır
+    release() { reader.releaseLock(); writer.releaseLock(); },
+    attach(s2) { reader = s2.readable.getReader(); writer = s2.writable.getWriter(); buf = ''; },
     close() { try { writer.releaseLock(); reader.releaseLock(); } catch { /* yok */ } },
   };
 }
@@ -48,8 +50,9 @@ export async function smtpSend(m, { connect } = {}) {
     await s.cmd('EHLO panel.local', [250]);
     if (port !== 465) {
       await s.cmd('STARTTLS', [220]);
+      s.release();
       const tls = sock.startTls();
-      s.upgrade(tls); sock = tls;
+      s.attach(tls); sock = tls;
       await s.cmd('EHLO panel.local', [250]);
     }
     await s.cmd('AUTH LOGIN', [334]);
