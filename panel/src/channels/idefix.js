@@ -60,18 +60,21 @@ export function idefix(env, meta) {
       }
     }
   }
-  // Sayfalı okuma: sayfa boyutu reddedilirse (400/422) 50'ye, sonra 20'ye düşülür; sayfalar arasında kısa bekleme
+  // Sayfalı okuma: sayfa boyutu reddedilirse (400/422) 50'ye, sonra 20'ye düşülür; sayfalar arasında kısa bekleme.
+  // Cevapta pageCount varsa (sipariş / iade listeleri: totalCount, pageCount, currentPage, limit) sayfa sayısı ondan okunur:
+  // idefix istenen limit'i sessizce düşürürse "eksik sayfa → son sayfa" varsayımı kalan sayfaları atlamasın.
   let pageSize = 100;
   async function paged(build, maxPages) {
     const out = [];
     for (let page = 1; page <= maxPages; page++) {
-      let rows;
+      let r, rows;
       for (;;) {
-        try { rows = list(await call(build(page, pageSize))); break; }
+        try { r = await call(build(page, pageSize)); rows = list(r); break; }
         catch (e) { if (/HTTP (400|422)/.test(e.message) && pageSize > 20) { pageSize = pageSize === 100 ? 50 : 20; continue; } throw e; }
       }
       out.push(...rows);
-      if (rows.length < pageSize) break;
+      const pages = r && !Array.isArray(r) && r.pageCount != null ? num(r.pageCount) : null;
+      if (!rows.length || (pages != null ? page >= pages : rows.length < pageSize)) break;
       await sleep(250);
     }
     return out;
@@ -103,6 +106,15 @@ export function idefix(env, meta) {
     return rows.map(norm);
   }
 
+  // Tekil sevkiyat: list servisi "ids" (sevkiyat numarası) ile süzülür
+  async function getShipment(id) {
+    const r = await call(`/oms/${vendor}/list?ids=${encodeURIComponent(id)}&page=1&limit=10`);
+    return list(r).find((s) => str(s.id) === str(id)) || null;
+  }
+  // Not: orderExists bilinçli olarak yok — "ids" süzgecinin tarih aralığı olmadan eski sevkiyatları da döndürdüğü doğrulanmadı;
+  // yanlış "bulunamadı" açık siparişi iptal saydırır (orderclean.checkMissing). Eksik sipariş kontrolü toplu listeyle yapılır.
+  async function fetchOne(id) { const s = await getShipment(id); if (!s) throw new Error(`idefix: ${id} numaralı sevkiyat bulunamadı`); return norm(s); }
+
   async function fetchListings() {
     const rows = await paged((page, n) => `/pim/pool/${vendor}/list?page=${page}&limit=${n}`, 1000);
     return rows.filter((p) => p.barcode).map((p) => {
@@ -115,9 +127,29 @@ export function idefix(env, meta) {
     });
   }
 
-  const upload = (items) => call(`/pim/catalog/${vendor}/inventory-upload`, { method: 'POST', body: { items } });
-  async function pushStock(items) { for (const part of chunk(items, 1000)) await upload(part.map((x) => ({ barcode: x.remoteId, inventoryQuantity: x.stock }))); }
-  async function pushPrice(items) { for (const part of chunk(items, 1000)) await upload(part.map((x) => ({ barcode: x.remoteId, price: x.price, comparePrice: Math.max(x.listPrice || 0, x.price) }))); }
+  // Stok / fiyat gönderimi asenkron: cevaptaki batchRequestId ile inventory-result'tan satır satır sonuç okunur (pushStatus)
+  async function upload(rows) {
+    const refs = [];
+    for (const part of chunk(rows, 1000)) {
+      const r = await call(`/pim/catalog/${vendor}/inventory-upload`, { method: 'POST', body: { items: part } });
+      if (r && r.batchRequestId) refs.push(String(r.batchRequestId));
+    }
+    return { refs };
+  }
+  const pushStock = (items) => upload(items.map((x) => ({ barcode: x.remoteId, inventoryQuantity: Math.max(0, Math.round(num(x.stock))) })));
+  const pushPrice = (items) => upload(items.map((x) => ({ barcode: x.remoteId, price: x.price, comparePrice: Math.max(x.listPrice || 0, x.price) })));
+  const INV_FAIL = { DATA_PARSE_ERROR: 'veri okunamadı', BATCH_NOT_EXIST: 'gönderim bulunamadı', BATCH_ALREADY_PROCESSED: 'gönderim zaten işleniyor',
+    PRODUCT_NOT_FOUND: 'barkod idefix ürün havuzunda yok', CATALOG_PRICE_LOCKED: 'fiyat kilitli (idefix destek ile görüşün)', NO_PRICE: 'fiyat yok' };
+  // Satır durumu: created (işleniyor) · completed · decline (failureReasons ile)
+  async function pushStatus(ref) {
+    const r = (await call(`/pim/catalog/${vendor}/inventory-result/${encodeURIComponent(ref)}`)) || {};
+    const rows = r.items || [];
+    const done = /^(completed|failed|cancelled)$/i.test(str(r.status)) && !rows.some((x) => /^created$/i.test(str(x.status)));
+    return { done, items: rows.map((x) => {
+      const bad = /^decline/i.test(str(x.status)), why = [].concat(x.failureReasons || []).map((c) => INV_FAIL[c] || c).filter(Boolean).join(' · ');
+      return { key: str(x.barcode), ok: bad ? false : /^completed$/i.test(str(x.status)) ? true : null, error: bad ? why || 'idefix reddetti' : '' };
+    }) };
+  }
 
   // İşleme al: "picking" (müşteri artık iptal edemez)
   async function accept(order) {
@@ -128,9 +160,13 @@ export function idefix(env, meta) {
   const TRACK = [[/yurt/i, 'https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code='], [/aras/i, 'https://kargotakip.araskargo.com.tr/mainpage.aspx?code='],
     [/mng|dhl/i, 'https://www.mngkargo.com.tr/gonderi-takip/?takipNo='], [/ptt/i, 'https://gonderitakip.ptt.gov.tr/Track/Verify?q='], [/s[üu]rat/i, 'https://suratkargo.com.tr/KargoTakip/?kargotakipno='],
     [/hepsi\s*jet/i, 'https://www.hepsijet.com/gonderi-takibi/'], [/sendeo/i, 'https://sendeo.com.tr/gonderi-takip?code=']];
-  async function ship(order, pkg, { tracking }) {
+  // update-tracking-number sevkiyatı satıcının kendi kargo anlaşmasına geçirir (dokümana göre). Takip no idefix'in kendisinin verdiği
+  // numara ise (platform anlaşmalı gönderi: cargoKey / cargoTrackingNumber) ve satıcı kendi takip no'sunu girmediyse idefix'e bir şey
+  // gönderilmez; gönderi kargo okutunca idefix'te kendiliğinden "Kargoda" olur.
+  async function ship(order, pkg, { tracking, cargoCompany } = {}) {
     if (!pkg.remote_id || !tracking) return {};
-    const firm = pkg.cargo_company || order.cargo_company || '';
+    if (pkg.agreement !== 'own' && str(tracking) === str(pkg.tracking)) return {};
+    const firm = cargoCompany || pkg.cargo_company || order.cargo_company || '';
     const t = TRACK.find(([re]) => re.test(firm));
     if (!t) throw new Error(`idefix takip adresi ister: “${firm || 'kargo firması'}” için takip adresi bilinmiyor. Kargo firmasını (Yurtiçi, Aras, MNG, PTT, Sürat, HepsiJet) seçin.`);
     await call(`/oms/${vendor}/${pkg.remote_id}/update-tracking-number`, { method: 'POST', body: { trackingNumber: tracking, trackingUrl: t[1] + encodeURIComponent(tracking) } });
@@ -316,6 +352,6 @@ export function idefix(env, meta) {
   return {
     ...meta, type: 'idefix', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, ship, diagnose, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, pushStatus, accept, ship, diagnose, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim,
   };
 }

@@ -31,6 +31,7 @@ isortagimapi.pazarama.com
 isortagimgiris.pazarama.com
 apis.ciceksepeti.com
 sandbox-apis.ciceksepeti.com
+ciceksepeti.dev
 koctas-prod.mirakl.net
 developer.mirakl.com
 developer-docs.amazon.com

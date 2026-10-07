@@ -17,8 +17,11 @@ function byText(t) {
   if (/kargo|gönderi|yolda|dağıtım|shipped|teslim edilemedi/.test(s)) return 'shipped';
   return 'new';
 }
-// Yalnız sayısal kod geldiğinde (dokümandan doğrulanamadı, varsayım): 1 yeni, 2 hazırlanıyor, 3 kargoda, 4 teslim, 5 iptal, 6 iade
-const CODE = { 1: 'new', 2: 'processing', 3: 'shipped', 4: 'delivered', 5: 'cancelled', 6: 'returned' };
+// Yalnız sayısal kod geldiğinde (orderItemStatusId). Resmi doküman (ciceksepeti.dev) bu ortamdan okunamadı; kodlar Çiçeksepeti API'sinin
+// açık kaynak bir istemcisindeki sabitlerden: 1 Yeni · 2 Hazırlanıyor · 11 Kargoya verilecek · 5 Kargoya verildi · 7 Teslim edildi ·
+// 20 İade süreci başladı · 21 İade kargoda · 22 İade tedarikçide · 23 İade tedarikçi onayı bekliyor. (Önceki varsayımdaki "5 = iptal" kargodaki
+// siparişi iptal sayıp stoğu geri ekliyordu.) İptaller ayrı bir servisten gelir; bilinmeyen kod "yeni" sayılır.
+const CODE = { 1: 'new', 2: 'processing', 11: 'processing', 5: 'shipped', 7: 'delivered', 20: 'returned', 21: 'returned', 22: 'returned', 23: 'returned' };
 const pick = (o, ...ks) => { for (const k of ks) if (o[k] != null && o[k] !== '') return o[k]; return ''; };
 function lineStatus(it) {
   const vals = [it.orderProductStatus, it.orderItemStatus, it.orderItemStatusName, it.orderStatus, it.statusName, it.status];
@@ -40,7 +43,11 @@ function when(v) {
 export function ciceksepeti(env, meta) {
   const key = env.CICEKSEPETI_API_KEY;
   const API = String(env.CICEKSEPETI_TEST || '') === '1' ? 'https://sandbox-apis.ciceksepeti.com/api/v1' : 'https://apis.ciceksepeti.com/api/v1';
-  const call = (path, opts = {}) => http(API + path, { ...opts, headers: { 'x-api-key': key, 'Content-Type': 'application/json', Accept: 'application/json' }, body: opts.body && JSON.stringify(opts.body) });
+  // Her istekte x-api-key ve user-agent: user-agent "Satıcı ID" (entegratör adıyla "SatıcıID-EntegratörAdı"); ikisi de satıcı panelinde
+  // Entegrasyon Bilgilerim'de yazar. Satıcı ID girilmemişse panelin varsayılan kimliği gider.
+  const seller = str(env.CICEKSEPETI_SELLER_ID), integrator = str(env.CICEKSEPETI_INTEGRATOR);
+  const ua = seller ? (integrator ? `${seller}-${integrator}` : seller) : null;
+  const call = (path, opts = {}) => http(API + path, { ...opts, headers: { 'x-api-key': key, 'Content-Type': 'application/json', Accept: 'application/json', ...(ua ? { 'User-Agent': ua } : {}) }, body: opts.body && JSON.stringify(opts.body) });
 
   function group(rows) {
     const by = new Map();
