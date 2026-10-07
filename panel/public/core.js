@@ -81,9 +81,12 @@ async function request(path, method, body) {
   if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw Object.assign(new Error(data.error || 'Giriş gerekli'), { auth: true }); }
   if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw Object.assign(new Error(data.error), { auth: true }); }
   if (!res.ok) {
-    const raw = data.error || `Hata (${res.status})`, e = new Error(friendly(raw)); e.raw = raw;
+    let raw = data.error || `Hata (${res.status})`;
+    // Sunucuda karşılığı olmayan istek: hangi işlem olduğu mesajda yazsın (destek / hata kaydı için)
+    if (res.status === 404 && /^Bulunamadı$/.test(raw)) raw = `İşlem bulunamadı (${method} ${path.split('?')[0]}) — sayfayı yenileyip tekrar deneyin`;
+    const e = new Error(friendly(raw)); e.raw = raw;
     // İşlem hataları (yazma istekleri) ve sunucu hataları kendiliğinden kaydedilir (ana panelin "Müşteri hataları")
-    if ((method !== 'GET' || res.status >= 500) && path !== 'login' && !path.startsWith('errors/')) logError({ source: 'api', message: raw, action: `${method} ${path.split('?')[0]}`, status: res.status });
+    if ((method !== 'GET' || res.status >= 500 || res.status === 404) && path !== 'login' && !path.startsWith('errors/')) logError({ source: 'api', message: raw, action: `${method} ${path.split('?')[0]}`, status: res.status });
     throw e;
   }
   return data;
