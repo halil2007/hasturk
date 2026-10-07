@@ -10,7 +10,7 @@ import { leadRequest, demoRequest } from './lead.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
-import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired } from './tenants.js';
+import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired, tenantWatchdog } from './tenants.js';
 import { json, body, HttpError } from './util.js';
 
 export { TenantPanel } from './tenants.js';
@@ -96,5 +96,6 @@ export default {
     await init(env.DB);
     const quick = event && event.cron === '*/2 * * * *';
     ctx.waitUntil((quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true })).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r))).catch((e) => console.error('senkron hatası', e)));
+    if (!quick) ctx.waitUntil(tenantWatchdog(env, env.DB).catch((e) => console.error('bekçi hatası', e)));
   },
 };

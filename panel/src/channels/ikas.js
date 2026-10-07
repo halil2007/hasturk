@@ -155,8 +155,9 @@ export function ikas(env, p, meta) {
   async function fetchOrders(since, until, { byOrdered = false } = {}) {
     await ensureMerchant();
     const out = [];
-    let filter = byOrdered ? 'orderedAt' : 'updatedAt', optional = ORDER_OPT;
-    for (let page = 1; page <= (byOrdered ? 60 : 20); page++) {
+    let filter = byOrdered ? 'orderedAt' : 'updatedAt', optional = ORDER_OPT, more = false;
+    const maxPage = byOrdered ? 60 : 100;
+    for (let page = 1; page <= maxPage; page++) {
       let data;
       try {
         data = await flex((o) => orderQuery(o, filter), optional, { p: { page, limit: 50 }, d: { gte: since, lte: until } });
@@ -171,8 +172,11 @@ export function ikas(env, p, meta) {
         if (salesChannel && o.salesChannelId && o.salesChannelId !== salesChannel) continue;
         out.push(normOrder(o));
       }
+      more = !!r.hasNext;
       if (!r.hasNext) break;
     }
+    // Aralıktaki siparişlerin hepsi okunamadı (ör. uzun kesintiden sonra binlerce güncelleme): imleç ilerlemez, kalanı sonraki senkronda
+    if (more && !byOrdered) { out.warnings = [`ikas: bu aralıkta ${out.length}+ sipariş güncellemesi var; kalanlar bir sonraki senkronda alınacak`]; out.partialUntil = since; }
     return out;
   }
 

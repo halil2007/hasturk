@@ -97,6 +97,20 @@ async function admin(env, t, op, data = {}) {
 }
 
 // Müşteri paneline giriş: firma kodu doğrulanır, giriş isteği o panelin veritabanında denetlenir
+// Bekçi (ana panelin 15 dakikalık senkronunda, saatte bir): son 2 saattir senkron izi olmayan etkin firmaların
+// zamanlayıcısı yeniden kurulur. Müşteri paneli kimse açmasa da siparişler / stoklar kendiliğinden işlemeye devam eder.
+export async function tenantWatchdog(env, db) {
+  if (!env.TENANT) return null;
+  const now = Date.now(), last = (await first(db, "SELECT v FROM settings WHERE k = 'watchdog_at'")) || null;
+  if (last && now - JSON.parse(last.v) < 3600e3) return null;
+  await run(db, "INSERT INTO settings (k, v) VALUES ('watchdog_at', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", JSON.stringify(now));
+  const rows = await all(db, 'SELECT * FROM tenants WHERE active = 1 AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(usage_at, 0) < ? ORDER BY COALESCE(usage_at, 0) LIMIT 50', now, now - 2 * 3600e3);
+  let n = 0;
+  for (const t of rows) { try { await admin(env, t, 'ping'); n++; } catch (e) { console.error('bekçi: firma paneline ulaşılamadı', t.slug, e); } }
+  if (n) console.log('bekçi: zamanlayıcısı yenilenen firma', n);
+  return { checked: n };
+}
+
 export async function tenantLogin(req, env, b) {
   const slug = str(b.tenant).toLocaleLowerCase('tr').trim();
   const t = SLUG_RE.test(slug) ? await getTenant(env.DB, slug) : null;
@@ -357,6 +371,8 @@ export class TenantPanel {
         await this.schedule();
         return json({ ok: true, cookie: await demoCookie(env, this.db, !!b.secure) });
       }
+      // Ana panelin bekçisi: zamanlayıcı bir nedenle kaybolduysa yeniden kurulur
+      if (b.op === 'ping') { await this.schedule(); return json({ ok: true, alarm: await this.ctx.storage.getAlarm() }); }
       if (b.op === 'stats') return json({ ...(await this.usage()), suspended: !!(await this.ctx.storage.get('suspended')) });
       if (b.op === 'destroy') { await this.ctx.storage.deleteAlarm(); await this.ctx.storage.deleteAll(); await this.ctx.storage.put('destroyed', true); this.db = doD1(this.ctx.storage); this.t = null; this.tenv = null; return json({ ok: true }); }
       return json({ error: 'Bilinmeyen işlem' }, 400);
@@ -394,6 +410,8 @@ export class TenantPanel {
   async alarm() {
     const env = await this.meta();
     if (!env || await this.ctx.storage.get('suspended') || await this.ctx.storage.get('destroyed')) return;
+    // Sonraki tur baştan kurulur: bu tur yarıda kesilse (süre sınırı, güncelleme) bile senkron durmaz
+    await this.ctx.storage.setAlarm(Date.now() + SYNC_MS);
     let syncErr = null;
     if (env.DEMO === '1' && (await this.demoDue())) {
       try { await this.demoReset(env); } catch (e) { console.error('demo paneli sıfırlanamadı', e); }

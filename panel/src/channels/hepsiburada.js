@@ -131,10 +131,11 @@ export function hepsiburada(env, meta) {
     } catch (e) { errors.push('paketler: ' + e.message); }
     // 3) Kargodaki / teslim edilen paketler ve iptal edilen satırlar (tarih filtresi yok; yeniden eskiye, since'e kadar)
     const detail = new Map();
+    let detailCapped = false;
     const need = async (no) => {
       if (O.map.has(no)) return O.map.get(no);
       if (!detail.has(no)) {
-        if (detail.size >= 200) return null;
+        if (detail.size >= 200) { detailCapped = true; return null; }
         detail.set(no, null);
         try {
           const r = await call(`${OMS}/orders/merchantId/${m}/ordernumber/${encodeURIComponent(no)}`);
@@ -186,7 +187,10 @@ export function hepsiburada(env, meta) {
       if (!o.cargoCompany) o.cargoCompany = ((o.packages || [])[0] || {}).cargoCompany || '';
       out.push(o);
     }
+    if (detailCapped) errors.push('bu senkronda en fazla 200 eski siparişin ayrıntısı okunabildi; kalan kargo / teslim / iptal bilgileri bir sonraki senkronda alınacak');
     if (errors.length) out.warnings = errors;
+    // Kargo / teslim / iptal akışlarından biri okunamadıysa imleç ilerlemez: o aralıktaki iptaller bir sonraki senkronda yeniden okunur
+    if (detailCapped || errors.some((x) => /^(shipped|delivered|iptaller|paketler):/.test(x))) out.partialUntil = since;
     return out;
   }
 

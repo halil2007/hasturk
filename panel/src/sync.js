@@ -22,6 +22,7 @@ import { checkPendingUploads, autoUpload } from './catalog.js';
 import { customerKey, fillKeys } from './customers.js';
 import { pushDigest } from './push.js';
 import { dailyDigest } from './digest.js';
+import { urgentAlert, alertResolved } from './alerts.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -303,17 +304,27 @@ export async function pushStocks(env, db, settings, only) {
     const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
     if (!items.length) continue;
     try {
-      await trackPush(db, ch, 'stock', await ch.pushStock(items), items.length);
-      for (const part of chunk(items, 90)) {
+      const res = await ch.pushStock(items);
+      await trackPush(db, ch, 'stock', res, items.length);
+      // Kanal parça parça gönderdiyse (PttAVM) yalnız gönderilenler işaretlenir; kalanlar sonraki senkronda, hatalılar ilana yazılır
+      const doneIds = res && Array.isArray(res.done) ? new Set(res.done.map(String)) : null;
+      const sent = doneIds ? items.filter((x) => doneIds.has(String(x.remoteId))) : items;
+      for (const part of chunk(sent, 90)) {
         await db.batch(part.map((x) => db.prepare('UPDATE listings SET pushed_stock = ?, remote_stock = ?, error = NULL WHERE channel = ? AND remote_id = ?').bind(x.stock, x.stock, ch.id, x.remoteId)));
       }
-      result[ch.id] = items.length;
-      await log(db, ch.id, 'info', `${items.length} ürünün stoğu gönderildi`);
+      const errs = (res && res.errors) || [];
+      for (const part of chunk(errs, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND remote_id = ?').bind('Stok: ' + String(x.error).slice(0, 200), ch.id, x.remoteId)));
+      result[ch.id] = errs.length ? `${sent.length} gönderildi, ${errs.length} hata` : sent.length;
+      await log(db, ch.id, errs.length ? 'warn' : 'info', `${sent.length} ürünün stoğu gönderildi${errs.length ? `, ${errs.length} ilanda hata (${errs[0].error})` : ''}${sent.length + errs.length < items.length ? ` · ${items.length - sent.length - errs.length} ilan sonraki senkronda` : ''}`);
       await resolve(db, `stock:${ch.id}`);
+      await alertResolved(env, db, `stock:${ch.id}`, { title: `${ch.name}: stok gönderimi düzeldi` });
     } catch (e) {
       result[ch.id] = 'hata: ' + e.message;
       await log(db, ch.id, 'error', 'Stok gönderilemedi: ' + e.message);
       await notify(db, `stock:${ch.id}`, { channel: ch.id, title: `${ch.name}: stok gönderilemedi (${items.length} ilan bekliyor)`, msg: explainHttp(e.message) + ' · Bir sonraki senkronda yeniden denenir.' });
+      // Üst üste 3 başarısız gönderim (≈ 45 dk): fazla satış riski, telefona / e-postaya uyarı
+      const nc = await first(db, 'SELECT count FROM notices WHERE key = ? AND resolved_at IS NULL', `stock:${ch.id}`);
+      if (nc && nc.count >= 3) await urgentAlert(env, db, `stock:${ch.id}`, { title: `${ch.name}: stok gönderilemiyor`, body: `${items.length} ilanın stoğu kanala gönderilemiyor (${explainHttp(e.message).slice(0, 200)}). Satılan ürünler bu kanalda açık kalabilir.`, url: '#/bildirimler' }).catch(() => null);
       for (const part of chunk(items, 90)) {
         await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND remote_id = ?').bind('Stok: ' + e.message.slice(0, 200), ch.id, x.remoteId)));
       }
@@ -442,11 +453,16 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
         // Yeni sipariş e-postası: kanalın ilk aktarımında (imleç yokken) gönderilmez
         if (cursor && ids.created && ids.created.length) out.mailQueued = (out.mailQueued || 0) + await queueNew(db, ch, ids.created, settings).catch(() => 0);
         if (cursor && ids.created && ids.created.length && !ch.demo) out.newOrders = (out.newOrders || 0) + ids.created.length;
-        await setSetting(db, 'cursor:' + ch.id, t);
+        // Kanal aralığın tamamını okuyamadıysa (partialUntil) imleç ilerlemez — en fazla 1 gün geride kalır (kalıcı bir sorunda sonsuza büyümesin)
+        const cur = orders.partialUntil != null ? Math.max(Number(orders.partialUntil) + OVERLAP, t - D) : t;
+        await setSetting(db, 'cursor:' + ch.id, Math.min(cur, t));
+        if (orders.partialUntil != null) await notify(db, `partial:${ch.id}`, { level: 'warn', channel: ch.id, title: `${ch.name}: sipariş bilgilerinin bir kısmı alınamadı`, msg: (orders.warnings || []).join(' · ').slice(0, 600) + ' · Bir sonraki senkronda yeniden denenir.' });
+        else await resolve(db, `partial:${ch.id}`);
         Object.assign(st, { at: t, ok: true, ordersAt: t, count: orders.length, changed: ids.length, error: null, fails: 0, nextTry: null, note: null, warn: orders.warnings || null });
         out.channels[ch.id] = orders.length;
         if (orders.warnings) await log(db, ch.id, 'warn', orders.warnings.join(' | '));
         await resolve(db, `orders:${ch.id}`);
+        await alertResolved(env, db, `orders:${ch.id}`, { title: `${ch.name}: siparişler yeniden alınıyor`, body: 'Bağlantı sorunu düzeldi; kaçan siparişler bu senkronda alındı.', url: '#/siparisler' });
       } catch (e) {
         out.channels[ch.id] = 'hata: ' + e.message;
         Object.assign(st, { at: t, ok: false, error: explainHttp(e.message).slice(0, 600), fails: (st.fails || 0) + 1 });
@@ -454,6 +470,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
         await log(db, ch.id, 'error', 'Sipariş çekilemedi: ' + e.message);
         // Bir sonraki senkronda da düzelmezse (yaklaşık 15 dk) bildirim
         if (st.fails >= 2 || force) await notify(db, `orders:${ch.id}`, { channel: ch.id, title: `${ch.name}: siparişler alınamıyor`, msg: explainHttp(e.message) + (st.fails >= 3 ? ' · Art arda hata: kanal kademeli aralıklarla yeniden denenir (“Senkronla” hemen dener).' : '') });
+        // Yaklaşık yarım saattir sipariş alınamıyor: telefona ve e-postaya da uyarı (kimse paneli açmasa da haberiniz olsun)
+        if (st.fails >= 3) await urgentAlert(env, db, `orders:${ch.id}`, { title: `${ch.name}: siparişler alınamıyor`, body: `${explainHttp(e.message).slice(0, 300)} · Yeni siparişler panele düşmüyor ve bu kanaldaki satışlar diğer kanalların stoğundan düşülmüyor. API bilgilerini Entegrasyonlar sayfasından kontrol edin.`, url: '#/entegrasyonlar' }).catch(() => null);
       }
       // 2) ilanlar (ürün, görsel, varyant, kanaldaki stok) — en geç 14 dakikada bir
       if (ch.fetchListings && (listings || force || !st.listingsAt || t - st.listingsAt >= LISTING_EVERY)) {

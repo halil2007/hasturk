@@ -4,7 +4,7 @@
 // Yükleme: henüz o kanalda ilanı olmayan ürünler, eşleştirmedeki değerlerle kanalın ürün servisine gönderilir; kanalın
 // verdiği takip kimliğiyle (HB trackingId / Trendyol batchRequestId) sonuç sorgulanır. Onaylanan ürün, ilanlar
 // çekilince barkod / SKU ile otomatik eşleşir.
-import { all, first, run, getRaw, setSetting, getSettings, log } from './db.js';
+import { all, first, run, getRaw, setSetting, getSettings, log, notify } from './db.js';
 import { getChannels } from './channels/index.js';
 import { importListings, catalogOf } from './sync.js';
 import { fail, str, num, r2, isImageAttr } from './util.js';
@@ -183,6 +183,7 @@ export async function autoUpload(env, db, settings) {
   const allOpts = (await getRaw(db, 'upload_opts')) || {};
   for (const c of await getChannels(env, db)) {
     if (!on.includes(c.id) || !c.enabled || !c.catalog || c.hold) continue;
+    let items = null;
     try {
       const last = await getRaw(db, 'automap:' + c.id);
       if (!last || Date.now() - last > 864e5) { await automap(db, settings, c, null); await setSetting(db, 'automap:' + c.id, Date.now()); }
@@ -195,7 +196,7 @@ export async function autoUpload(env, db, settings) {
         for (const x of await buildAll(c, map, prods, allOpts[c.id] || {}, false)) if (!x.missing.length) ready.push(x);
       }
       if (!ready.length) { out[c.id] = 0; continue; }
-      const items = ready.map((x) => ({ id: x.p.id, key: x.key, name: x.p.name }));
+      items = ready.map((x) => ({ id: x.p.id, key: x.key, name: x.p.name }));
       const r = await c.catalog.send(ready.map((x) => x.payload));
       await run(db, "INSERT INTO product_uploads (channel, ref, status, items, user, created_at) VALUES (?, ?, 'sent', ?, 'Otomatik', ?)", c.id, r.ref, JSON.stringify(items), Date.now());
       await log(db, c.id, 'info', `Otomatik gönderim: ${ready.length} yeni ürün ${c.name}'a gönderildi · takip ${r.ref}`);
@@ -203,6 +204,11 @@ export async function autoUpload(env, db, settings) {
     } catch (e) {
       out[c.id] = 'hata: ' + e.message;
       await log(db, c.id, 'error', 'Otomatik ürün gönderimi başarısız: ' + e.message);
+      // Gönderilemeyen ürünler kaydedilir: 2 dakikada bir aynı ürünler yeniden gönderilmez (ürün düzeltilirse 1 saat, yoksa 24 saat sonra denenir)
+      if (items && items.length) {
+        await run(db, "INSERT INTO product_uploads (channel, ref, status, items, user, created_at, error) VALUES (?, '', 'error', ?, 'Otomatik', ?, ?)", c.id, JSON.stringify(items.map((x) => ({ ...x, ok: false, error: e.message.slice(0, 300) }))), Date.now(), e.message.slice(0, 400));
+        await notify(db, `autoupload:${c.id}`, { level: 'warn', channel: c.id, title: `${c.name}: otomatik ürün gönderimi başarısız (${items.length} ürün)`, msg: e.message.slice(0, 400) + ' · Ürünler 24 saat sonra (ürünü düzeltirseniz 1 saat sonra) yeniden denenir.' });
+      }
     }
   }
   return out;
@@ -334,6 +340,8 @@ async function checkUpload(env, db, ctx, u, c) {
   if (st.done) {
     const ok = items.filter((x) => x.ok).length, bad = items.filter((x) => x.ok === false).length;
     await log(db, c.id, bad ? 'error' : 'info', `Ürün gönderimi #${u.id} tamamlandı: ${ok} onay${bad ? `, ${bad} hata (${items.filter((x) => x.ok === false).slice(0, 2).map((x) => `${x.name}: ${x.error || x.status}`).join(' · ')})` : ''}`);
+    // Reddedilen ürünler Bildirimler'e de düşer (yalnız günlükte kalmasın)
+    if (bad) await notify(db, `uploadreject:${c.id}`, { level: 'warn', channel: c.id, title: `${c.name}: ${bad} ürün kabul edilmedi`, msg: `${items.filter((x) => x.ok === false).slice(0, 3).map((x) => `${x.name}: ${x.error || x.status}`).join(' · ')} · Ürün Yükle sayfasında ayrıntıları görüp düzeltebilirsiniz.` });
     if (ok) {
       const job = importListings(env, db, { only: [c.id] }).catch(() => {});
       if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job;
