@@ -13,7 +13,7 @@
   --good: #16a34a; --good-soft: #e8f7ee; --warn: #c2410c; --warn-soft: #fff1e6; --amber: #b45309; --amber-soft: #fef3c7;
   --bad: #dc2626; --bad-soft: #fdecec; --purple: #7c3aed; --purple-soft: #f1eafe; --info: #1f63e9; --info-soft: #e8f0fe;
   /* Kanal renkleri (grafikler; sabit sıra, renk körlüğüne göre doğrulandı) */
-  --c-ikas1: #2a78d6; --c-ikas2: #eb6834; --c-trendyol: #1baf7a; --c-hepsiburada: #eda100; --c-pttavm: #e87ba4; --c-n11: #7b3fe4; --c-idefix: #ffc20e; --c-pazarama: #00a2e8; --c-amazon: #ff9900; --c-ciceksepeti: #e5007d; --c-koctas: #e30613; --c-shopify: #5e8e3e; --c-woocommerce: #7f54b3; --c-etsy: #f1641e;
+  --c-ikas1: #2a78d6; --c-ikas2: #eb6834; --c-trendyol: #1baf7a; --c-hepsiburada: #eda100; --c-pttavm: #e87ba4; --c-n11: #7b3fe4; --c-idefix: #ffc20e; --c-pazarama: #00a2e8; --c-amazon: #ff9900; --c-ciceksepeti: #e5007d; --c-koctas: #e30613; --c-shopify: #5e8e3e; --c-woocommerce: #7f54b3; --c-opencart: #23a1d1; --c-etsy: #f1641e;
   --radius: 14px; --radius-sm: 10px;
   --shadow-sm: 0 1px 2px rgb(15 23 42 / .04);
   --shadow: 0 1px 2px rgb(15 23 42 / .04), 0 8px 24px rgb(15 23 42 / .06);
@@ -1234,7 +1234,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-08q"; }
+:root { --assets: "2026-10-08r"; }
 
 /* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
 .subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }

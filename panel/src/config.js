@@ -96,6 +96,13 @@ export const FIELDS = {
     { k: 'WOO_KEY', label: 'Consumer key', req: true, hint: 'WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (Okuma/Yazma) → ck_…' },
     { k: 'WOO_SECRET', label: 'Consumer secret', secret: true, req: true, hint: 'cs_…' },
   ],
+  // OpenCart: yönetim API'si yok; panelden indirilen bağlantı dosyası (public/opencart-bridge.php) sitenin ana klasörüne yüklenir
+  opencart: [
+    { k: 'OPENCART_URL', label: 'Site adresi', req: true, hint: 'ör. https://magazaniz.com (OpenCart\'ın kurulu olduğu adres; yönetim paneli adresi değil)', pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan site adresini girin' },
+    { k: 'OPENCART_KEY', label: 'Bağlantı anahtarı', secret: true, req: true, hint: 'Bağlantı dosyası indirilirken panel kendisi oluşturur ve dosyaya yazar (dosyadaki HASTURK_KEY ile aynı olmalı); elle girmeniz gerekmez', pattern: '^[A-Za-z0-9_-]{24,128}$', patternMsg: 'Anahtar en az 24 karakter olmalı ve yalnız harf, rakam, - ve _ içermeli' },
+    { k: 'OPENCART_BRIDGE', label: 'Bağlantı dosyasının adı', hint: 'boşsa hasturk-baglanti.php (sunucuya farklı adla yüklediyseniz o adı yazın)', adv: true, pattern: '^[A-Za-z0-9._-]+\\.php$', patternMsg: 'Dosya adı .php ile bitmeli; yalnız harf, rakam, nokta, - ve _ içermeli' },
+    { k: 'OPENCART_SHIP_STATUS', label: '"Kargoya verildi" durum no', hint: 'boşsa adı "Shipped" / "Kargo…" olan sipariş durumu kullanılır; numara: OpenCart → Sistem → Yerelleştirme → Sipariş Durumları (düzenle bağlantısındaki order_status_id)', adv: true, pattern: '^\\d+$', patternMsg: 'Sipariş durumu numarası yalnız rakamlardan oluşur' },
+  ],
   etsy: [
     { k: 'ETSY_SHOP_ID', label: 'Mağaza ID', req: true, pattern: '^\\d+$', patternMsg: 'Etsy mağaza ID yalnızca rakamlardan oluşur' },
     { k: 'ETSY_API_KEY', label: 'Keystring (API Key)', req: true, hint: 'etsy.com/developers → Your Apps → uygulamanız' },
@@ -108,9 +115,9 @@ export const FIELDS = {
 // Her kanal türüne istenen sayıda mağaza eklenebilir: ek mağazanın kimliği "<tür>_<n>" (ör. trendyol_2, ikas_3).
 // Ek mağazanın bilgileri ana mağazayla aynı alan adlarıyla, kendi kaydında saklanır; Cloudflare değişkenleri ek mağazaya karışmaz.
 // Test modülündeki kanallar: ana panelde bağlanıp denenir, müşteri panellerinde "Yakında" görünür (eklenemez, çalışmaz)
-export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'etsy'];
+export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'opencart', 'etsy'];
 export const TYPES = ['ikas', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', ...BETA_TYPES];
-export const TYPE_NAMES = { ikas: 'ikas', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', etsy: 'Etsy' };
+export const TYPE_NAMES = { ikas: 'ikas', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', etsy: 'Etsy' };
 export const EXTRA_RE = new RegExp(`^(${TYPES.join('|')})_(\\d{1,3})$`);
 export const isBeta = (id) => BETA_TYPES.includes(typeOf(id));
 export const isExtra = (id) => EXTRA_RE.test(String(id || ''));

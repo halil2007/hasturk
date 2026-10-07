@@ -12,7 +12,7 @@ import { rank, localProfile, prepare, score } from './catmatch.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
-const NO_UPLOAD = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'etsy'];
+const NO_UPLOAD = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'opencart', 'etsy'];
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').replace(/\s+/g, '').replace(/(lt|litre|l)$/, 'lt').replace(/(kg|kilo|kilogram)$/, 'kg');
 
 async function targets(env, db) {

@@ -11,6 +11,7 @@ import { ciceksepeti } from './ciceksepeti.js';
 import { koctas } from './koctas.js';
 import { shopify } from './shopify.js';
 import { woocommerce } from './woocommerce.js';
+import { opencart } from './opencart.js';
 import { etsy } from './etsy.js';
 import { demo } from './demo.js';
 import { loadConfig, effectiveEnv, configVersion, EXTRA_RE, TYPES, TYPE_NAMES, BETA_TYPES, isBeta, typeOf, storeEnv } from '../config.js';
@@ -21,7 +22,7 @@ export const BASE_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm', 
 // Geçerli kanal kimlikleri: ana mağazalar + eklenen mağazalar (getChannels her çağrıda günceller)
 export const CHANNEL_IDS = [...BASE_IDS];
 export const isChannelId = (id) => CHANNEL_IDS.includes(id) || EXTRA_RE.test(String(id || ''));
-const FACTORY = { trendyol, hepsiburada, pttavm, n11, idefix, pazarama, amazon, ciceksepeti, koctas, shopify, woocommerce, etsy };
+const FACTORY = { trendyol, hepsiburada, pttavm, n11, idefix, pazarama, amazon, ciceksepeti, koctas, shopify, woocommerce, opencart, etsy };
 const make = (type, e, meta) => (type === 'ikas' ? ikas(e, 'IKAS1_', meta) : FACTORY[type](e, meta));
 // Bekleyen kanallar: bilgileri girilip "Bağlantıyı test et" başarılı olana kadar yalnızca Entegrasyonlar'da görünür;
 // sipariş, ürün, stok ve analiz ekranlarına ve senkrona girmez. Bilgiler değişirse yeniden onay gerekir.

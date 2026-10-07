@@ -1,7 +1,7 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, fieldsFor } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, isExtra, fieldsFor } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
@@ -965,6 +965,30 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const src = await (await env.ASSETS.fetch(new Request(url.origin + '/panel-proxy.php'))).text();
     const base = /\.workers\.dev$/i.test(url.host) ? url.origin : 'https://hasturk-panel.HESABINIZ.workers.dev';
     return new Response(src.replace('https://hasturk-panel.HESABINIZ.workers.dev', base), { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="index.php"', 'Cache-Control': 'no-store' } });
+  }
+  // OpenCart bağlantı dosyası: kanalın anahtarı gömülü olarak indirilir. Anahtar yoksa rastgele üretilip kanalın bilgilerine (şifreli) kaydedilir;
+  // yeniden indirmede aynı anahtar kullanılır. Anahtar dosyaya PHP metni olarak yazıldığından yalnız harf, rakam, - ve _ kabul edilir.
+  if (path === 'opencart-bridge' && m === 'GET') {
+    if (user.role !== 'admin') fail(403, 'Yalnız yönetici');
+    const cid = str(q.channel) || 'opencart';
+    if (typeOf(cid) !== 'opencart' || !fieldsFor(cid)) fail(400, 'Geçersiz kanal');
+    if (env.TENANT_SLUG) fail(403, 'Bu kanal yakında açılacak');
+    if (!env.ASSETS) fail(404, 'Dosya bulunamadı');
+    const v = ((await loadConfig(env, db))[cid] || {}).values || {}, cf = (k) => v[k] || (isExtra(cid) ? '' : str(env[k]));
+    let key = cf('OPENCART_KEY');
+    if (key && !/^[A-Za-z0-9_-]{24,128}$/.test(key)) fail(400, 'Kayıtlı bağlantı anahtarı dosyaya yazılamıyor (en az 24 karakter; yalnız harf, rakam, - ve _): Bağlantı anahtarı alanındaki kayıtlı değeri silip dosyayı yeniden indirin');
+    if (!key) {
+      const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+      key = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => abc[b & 63]).join('');
+      await saveConfig(env, db, cid, { values: { OPENCART_KEY: key } });
+      resetChannels();
+      await log(db, cid, 'info', `${user.name}: OpenCart bağlantı anahtarı oluşturuldu (bağlantı dosyası indirildi)`);
+    }
+    const src = await (await env.ASSETS.fetch(new Request(url.origin + '/opencart-bridge.php'))).text();
+    const PH = "define('HASTURK_KEY', '__HASTURK_KEY__');";
+    if (!src.includes(PH)) fail(500, 'Bağlantı dosyası şablonu okunamadı');
+    const name = /^[A-Za-z0-9._-]+\.php$/.test(cf('OPENCART_BRIDGE')) ? cf('OPENCART_BRIDGE') : 'hasturk-baglanti.php';
+    return new Response(src.replace(PH, () => `define('HASTURK_KEY', '${key}');`), { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' } });
   }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
   if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
