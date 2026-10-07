@@ -3,7 +3,7 @@
 // Komisyon ve kargo, kanal bildirdiyse gerçek tutardır (sipariş satırı komisyonu, kargo faturası); yoksa Ayarlar'daki oranlarla tahmin edilir.
 import { all, first, run, getRaw, setSetting, log } from './db.js';
 import { getChannels } from './channels/index.js';
-import { chunk, fail } from './util.js';
+import { chunk, fail, PRODUCT_SHIP } from './util.js';
 import { profit, costOf } from '../public/profit.js';
 import { r2 } from './util.js';
 
@@ -20,12 +20,15 @@ export function orderProfit(o, settings) {
   }
   // Kargo ve hizmet bedeli sipariş başınadır; tüm satırları iptal edilmiş siparişte sayılmaz (istatistiklerle aynı kural)
   const live = o.items.some((i) => i.status !== 'cancelled' && i.status !== 'returned');
-  const shipping = live ? o.shipping_cost ?? costOf(settings, 'shipping', ch) : 0;
+  // Kargo: kanal faturası / siparişe elle girilen → ürünün kargo tutarı (en yükseği; tek koli) → Ayarlar'daki sipariş başı tutar
+  const prodShip = Math.max(0, ...o.items.filter((i) => i.status !== 'cancelled' && i.status !== 'returned').map((i) => Number(i.ship_cost) || 0));
+  const defShip = costOf(settings, 'shipping', ch);
+  const shipping = live ? o.shipping_cost ?? (prodShip > 0 ? prodShip : defShip) : 0;
   const fee = live ? costOf(settings, 'service_fee', ch) : 0;
   // Yüzdelik kesintiler: ek kesinti (işlem / ödeme bedeli) ve stopaj (KDV hariç satış üzerinden; KDV %20 varsayılır)
   const x = profit({ sale: revenue, feeRate: costOf(settings, 'fee_rate', ch), withholdingRate: costOf(settings, 'withholding', ch) });
   const net = revenue - commission - shipping - fee - x.rateFee - x.withholding;
-  const shippingSrc = o.shipping_cost == null ? 'estimate' : o.shipping_src === 'api' ? 'api' : 'manual';
+  const shippingSrc = o.shipping_cost != null ? (o.shipping_src === 'api' ? 'api' : 'manual') : prodShip > 0 ? 'product' : defShip > 0 ? 'default' : 'none';
   return {
     revenue: r2(revenue), commission: r2(commission), commissionSrc: realCommission && o.items.length ? 'api' : 'estimate', shipping: r2(shipping), shippingSrc,
     fee: r2(fee), rateFee: r2(x.rateFee), withholding: r2(x.withholding), payout: r2(net), cost: r2(cost), profit: r2(net - cost), missingCost: missing,
@@ -103,7 +106,8 @@ async function aggregate(db, settings, { from, to, channel }) {
       WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw} GROUP BY i.order_id)
     SELECT o.channel, COUNT(*) AS orders, COALESCE(SUM(it.rev), 0) AS revenue, COALESCE(SUM(it.comm), 0) AS commission,
       SUM(CASE WHEN it.n > 0 AND it.estc = 0 THEN 1 ELSE 0 END) AS realCommission, COALESCE(SUM(it.cost), 0) AS cost, COALESCE(SUM(it.miss), 0) AS missingCost,
-      SUM(CASE WHEN it.live > 0 THEN COALESCE(o.shipping_cost, ${rate('shipping')}) ELSE 0 END) AS shipping,
+      SUM(CASE WHEN it.live > 0 THEN COALESCE(o.shipping_cost, ${PRODUCT_SHIP}, ${rate('shipping')}) ELSE 0 END) AS shipping,
+      SUM(CASE WHEN it.live > 0 AND o.shipping_cost IS NULL AND ${PRODUCT_SHIP} IS NOT NULL THEN 1 ELSE 0 END) AS productShipping,
       SUM(CASE WHEN o.shipping_cost IS NOT NULL AND o.shipping_src = 'api' THEN 1 ELSE 0 END) AS realShipping,
       SUM(CASE WHEN it.live > 0 THEN ${rate('service_fee')} ELSE 0 END) AS fee,
       SUM(COALESCE(it.rev, 0) * ${rate('fee_rate')} / 100.0) AS rateFee,
@@ -126,14 +130,14 @@ export async function breakdown(db, settings, { from, to, channel } = {}) {
     all(db, "SELECT k, v FROM settings WHERE k LIKE 'costs:%'"),
     channel ? null : expenseTotals(db, from, to),
   ]);
-  const zero = () => ({ orders: 0, returns: 0, missingCost: 0, realShipping: 0, realCommission: 0, ...Object.fromEntries(KEYS.map((k) => [k, 0])) });
+  const zero = () => ({ orders: 0, returns: 0, missingCost: 0, realShipping: 0, productShipping: 0, realCommission: 0, ...Object.fromEntries(KEYS.map((k) => [k, 0])) });
   const per = new Map(), total = zero();
   const chOf = (c) => per.get(c) || per.set(c, zero()).get(c);
   for (const a of agg) {
     const t = chOf(a.channel);
     for (const x of [t, total]) {
       for (const k of KEYS) x[k] += a[k] || 0;
-      x.orders += a.orders; x.missingCost += a.missingCost; x.realShipping += a.realShipping; x.realCommission += a.realCommission;
+      x.orders += a.orders; x.missingCost += a.missingCost; x.realShipping += a.realShipping; x.productShipping += a.productShipping || 0; x.realCommission += a.realCommission;
     }
   }
   const inv = (c, types) => invRows.filter((r) => r.channel === c && types.includes(r.type)).reduce((a, r) => a + r.amount, 0);
@@ -144,7 +148,7 @@ export async function breakdown(db, settings, { from, to, channel } = {}) {
   const take = (x, k, d) => { for (const y of [x, total]) { y[k] += d; y.payout -= d; y.profit -= d; } };
   for (const [c, x] of per) {
     // Kargo: sipariş bazında tutar gelmeyen kanalda (siparişlerin yarısından azı) pazaryerinin dönemde kestiği kargo faturalarının toplamı
-    x.shippingSrc = x.realShipping ? (x.realShipping === x.orders ? 'api' : 'mixed') : 'estimate';
+    x.shippingSrc = x.realShipping ? (x.realShipping === x.orders ? 'api' : 'mixed') : x.productShipping ? 'product' : x.shipping ? 'default' : 'none';
     const cargo = inv(c, ['Kargo']);
     if (cargo > 0 && x.realShipping < x.orders / 2) {
       take(x, 'shipping', cargo - x.shipping);
@@ -173,7 +177,9 @@ export async function breakdown(db, settings, { from, to, channel } = {}) {
   const pc = [...per.values()];
   const shipNote = pc.some((x) => x.shippingSrc === 'invoice')
     ? [total.realShipping ? `${total.realShipping}/${total.orders} siparişte kargo faturasından` : '', `${pc.filter((x) => x.shippingSrc === 'invoice').length} kanalda dönemin kargo faturaları toplamı (${r2(total.invoiceShipping)} ₺)`].filter(Boolean).join(' · ')
-    : total.realShipping ? `${total.realShipping}/${total.orders} siparişte kargo faturasından` : total.shipping ? 'tahmin (Ayarlar → Giderler, sipariş başı kargo)' : 'kanaldan kargo tutarı gelmedi — Ayarlar → Giderler\'den sipariş başı kargo girin';
+    : [total.realShipping ? `${total.realShipping}/${total.orders} siparişte kargo faturasından` : '', total.productShipping ? `${total.productShipping} siparişte ürüne girilen kargo tutarından` : '',
+      total.shipping && !total.realShipping && !total.productShipping ? 'Ayarlar → Giderler\'deki sipariş başı kargo tutarından' : ''].filter(Boolean).join(' · ')
+      || 'kargo tutarı girilmedi — ürünlere kargo tutarı girin (Ürünler → Düzenle)';
   // Şelale: satıştan net kâra her basamak
   const steps = [
     { k: 'revenue', label: 'Satış (ciro)', v: total.revenue, note: total.returns ? `${total.returns} iade edilen sipariş ciroya dahil değil` : '' },
@@ -204,7 +210,7 @@ export async function productProfit(db, settings, { from, to, channel, sort = 'p
   const cw = channel ? ' AND o.channel = ?' : '', ca = channel ? [channel] : [];
   const [orders, items, ret] = await Promise.all([
     all(db, `SELECT o.id, o.channel, o.shipping_cost, o.shipping_src FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
-    all(db, `SELECT i.order_id, i.product_id, i.name, i.sku, i.total, i.quantity, i.status, i.commission, p.purchase_price, p.name AS pname, p.variant_name, p.image, l.commission AS listing_commission
+    all(db, `SELECT i.order_id, i.product_id, i.name, i.sku, i.total, i.quantity, i.status, i.commission, p.purchase_price, p.ship_cost, p.name AS pname, p.variant_name, p.image, l.commission AS listing_commission
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
     all(db, `SELECT COALESCE(i.product_id, 'x:' || COALESCE(i.sku, i.name)) AS k, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id

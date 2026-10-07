@@ -161,3 +161,6 @@ export async function diagStep(out, name, fn) {
 }
 // Sipariş satırı iptal ya da iade edildi mi (satılmış sayılmaz: paketleme, ciro, kâr, toplama listesi dışında kalır)
 export const DEAD_LINE = (s) => s === 'cancelled' || s === 'returned';
+
+// Siparişin ürün kargo tutarı: canlı satırlardaki ürünlerin kargo tutarlarının en yükseği (sipariş tek koli gider varsayımı)
+export const PRODUCT_SHIP = "(SELECT MAX(sp.ship_cost) FROM order_items si JOIN products sp ON sp.id = si.product_id WHERE si.order_id = o.id AND COALESCE(si.status, '') NOT IN ('cancelled', 'returned') AND sp.ship_cost > 0)";

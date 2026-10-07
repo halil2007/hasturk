@@ -351,6 +351,12 @@ export function popMenu(anchor, items, { title = '' } = {}) {
 }
 
 export const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+// Tema: varsayılan açık; koyu ve "cihaza uy" Ayarlar → Görünüm'den (cihaz başına saklanır)
+export const themeOf = () => { const t = store.get('theme', 'light'); return ['light', 'dark', 'auto'].includes(t) ? t : 'light'; };
+export function applyTheme() {
+  const t = themeOf();
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+}
 export const store = {
   get(k, d) { try { const v = localStorage.getItem('panel:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem('panel:' + k, JSON.stringify(v)); } catch { /* özel pencere */ } },

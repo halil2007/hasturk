@@ -1,6 +1,6 @@
 // Ayarlar: firma bilgileri ve logo, stok senkronu ve stok sınırı, ana katalog, komisyon/kargo, kargo etiketi, kayıtlar.
 // Kanal API bilgileri Entegrasyonlar'da, kullanıcılar Kullanıcılar sayfasındadır.
-import { api, state, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels, sheet } from '../core.js';
+import { api, state, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels, sheet, store, themeOf, applyTheme } from '../core.js';
 import { apiGuide } from '../apiguide.js';
 import { loadSummary } from '../app.js';
 import { costOf, COST_KEYS } from '../profit.js';
@@ -40,7 +40,7 @@ export async function settingsView(el) {
   }
   let tab = 'firma';
   try { tab = sessionStorage.getItem('settings_tab') || 'firma'; } catch { /* yok */ }
-  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(state.tenant ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ...(state.tenant || !admin ? [] : [['api', 'Stok API', 'link']]), ['kayit', 'İşlem kayıtları', 'orders']];
+  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(state.tenant ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ...(state.tenant || !admin ? [] : [['api', 'Stok API', 'link']]), ['kayit', 'İşlem kayıtları', 'orders'], ['gorunum', 'Görünüm', 'bolt']];
   el.addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) showTab(b.dataset.st); });
   const load = async () => { await load0(); drawPush(); };
   async function load0() {
@@ -57,6 +57,12 @@ export async function settingsView(el) {
     render(el, html`<div class="stack" style="max-width:1000px">
       ${!admin ? html`<div class="notice"><i class="ico ico-warn"></i>Ayarları sadece yönetici değiştirebilir.</div>` : ''}
       <div class="tabs stabs" data-stabs>${STABS.map(([k, t, i]) => html`<button class="tab" data-st="${k}"><i class="ico ico-${i}"></i>${t}</button>`)}</div>
+      <div class="card stack" data-stab="gorunum" hidden>
+        <h2>Görünüm</h2>
+        <div class="muted small">Bu cihaz için geçerlidir; değişiklik hemen uygulanır.</div>
+        <div class="stack" style="gap:8px">${[['light', 'Açık tema', 'Varsayılan'], ['dark', 'Koyu tema', 'Gece ya da az ışıkta göz yormaz'], ['auto', 'Cihaz temasına uy', 'Telefon / bilgisayar koyu moddaysa koyu, değilse açık']].map(([v, t, d]) => html`
+          <label class="row" style="gap:10px;align-items:flex-start;cursor:pointer"><input type="radio" name="theme" value="${v}" ${themeOf() === v ? 'checked' : ''} style="margin-top:3px"><span><b>${t}</b><br><span class="small muted">${d}</span></span></label>`)}</div>
+      </div>
       <div class="card stack" data-stab="firma">
         <h2>Firma bilgileri</h2>
         <div class="row wrap" style="gap:16px;align-items:center">
@@ -251,6 +257,7 @@ export async function settingsView(el) {
       ${isAdmin() ? html`<div class="row wrap"><button class="btn primary" data-act="fx-save">Döviz ayarlarını kaydet</button><button class="btn" data-act="fx-apply"><i class="ico ico-bolt"></i>Fiyatları şimdi güncelle</button></div>` : ''}`);
   }
   el.addEventListener('change', async (e) => {
+    if (e.target.matches('[name=theme]')) { store.set('theme', e.target.value); applyTheme(); toast('Görünüm değişti'); return; }
     if (e.target.dataset && e.target.dataset.prov !== undefined) {
       const smtp = e.target.value === 'smtp';
       $$('[data-provbox]', el).forEach((b) => { b.hidden = (b.dataset.provbox === 'smtp') !== smtp; });

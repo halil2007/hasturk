@@ -498,6 +498,9 @@ export async function deleteOrder(o) {
   return true;
 }
 
+// Kargo giderinin kaynağı (kârlılık kartı)
+const SHIP_SRC = { api: '(kanal faturası)', manual: '(siparişe girilen)', product: '(ürüne girilen)', default: '(Ayarlar → Giderler)', none: '' };
+
 export async function openOrder(id, onChange) {
   const s = sheet({ title: 'Sipariş', size: 'wide drawer' });
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
@@ -537,7 +540,7 @@ export async function openOrder(id, onChange) {
           </div>
           <div class="card">
             <div class="card-head"><h3>Kârlılık (tahmini)</h3></div>
-            <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon</dt><dd>−${money(p.commission)}</dd><dt>Kargo <span class="tiny muted">${p.shippingSrc === 'api' ? '(kanal faturası)' : p.shippingSrc === 'manual' ? '(elle)' : '(tahmini)'}</span></dt><dd>−${money(p.shipping)}</dd>
+            <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon</dt><dd>−${money(p.commission)}</dd><dt>Kargo <span class="tiny muted">${SHIP_SRC[p.shippingSrc] || ''}</span></dt><dd>${p.shippingSrc === 'none' ? html`<span class="tiny" style="color:var(--amber)">ürüne girilmedi</span>` : html`−${money(p.shipping)}`}</dd>
               ${p.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(p.fee)}</dd>` : ''}${p.rateFee ? html`<dt>Ek kesinti <span class="tiny muted">(işlem / ödeme bedeli)</span></dt><dd>−${money(p.rateFee)}</dd>` : ''}${p.withholding ? html`<dt>Stopaj <span class="tiny muted">(vergiden mahsup edilir)</span></dt><dd>−${money(p.withholding)}</dd>` : ''}<dt style="color:var(--text);font-weight:650">Satıştan kalan</dt><dd style="font-weight:650">${money(p.payout)}</dd>
               <dt>Ürün maliyeti</dt><dd>−${money(p.cost)}</dd><div class="total"><dt>Kâr</dt><dd class="${p.profit >= 0 ? 'up' : 'down'}">${money(p.profit)}</dd></div></dl>
             ${p.missingCost ? html`<div class="notice warn small" style="margin-top:10px">${p.missingCost} ürünün alış fiyatı girilmemiş; kâr olduğundan yüksek görünür.</div>` : ''}
@@ -545,7 +548,7 @@ export async function openOrder(id, onChange) {
           <div class="card stack">
             <h3>Not ve ayarlar</h3>
             <label class="field"><span>Sipariş notu</span><textarea class="input" data-note>${o.note || ''}</textarea></label>
-            <label class="field"><span>Bu siparişin kargo gideri (boş = varsayılan)</span><div class="input-group"><input class="input" inputmode="decimal" data-shipcost value="${o.shipping_cost ?? ''}"><span class="suffix">₺</span></div></label>
+            <label class="field"><span>Bu siparişin kargo gideri (boş = ürüne girilen kargo tutarı)</span><div class="input-group"><input class="input" inputmode="decimal" data-shipcost value="${o.shipping_cost ?? ''}"><span class="suffix">₺</span></div></label>
             <div class="row wrap"><button class="btn sm" data-save-note>Kaydet</button>${isAdmin() ? html`<button class="btn sm danger ghost" data-del-order><i class="ico ico-trash"></i>Siparişi sil</button>` : ''}<span class="spacer"></span>
               <select class="input" style="width:auto;min-height:34px;font-size:13px" data-status aria-label="Durumu elle değiştir"><option value="">Durumu elle değiştir…</option>${Object.entries(STATUS_LABEL).map(([k, v]) => html`<option value="${k}">${v}</option>`)}</select></div>
           </div>

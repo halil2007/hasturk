@@ -1,5 +1,5 @@
 // Panel uygulaması: gruplu yan menü, üst çubuk, alt menü (telefon), yönlendirme (#/sayfa/...?filtre=...), giriş, senkron, bildirimler.
-import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder } from './core.js';
+import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder, themeOf, applyTheme } from './core.js';
 import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
 import { products } from './views/products.js';
@@ -239,7 +239,7 @@ async function bell(btn) {
 }
 
 function meMenu(btn) {
-  const theme = store.get('theme', 'auto');
+  const theme = themeOf();
   const setTheme = (t) => { store.set('theme', t); applyTheme(); };
   const u = state.user || {};
   popMenu(btn, [
@@ -264,10 +264,6 @@ function changePassword() {
   });
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => { await api('me/password', { method: 'POST', body: { old: $('[data-old]', s.el).value, new: $('[data-new]', s.el).value } }); toast('Şifre değişti, tekrar giriş yapın'); setTimeout(() => location.reload(), 1200); });
 }
-function applyTheme() {
-  const t = store.get('theme', 'auto');
-  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
-}
 
 // Telefon menüsü: firma / kullanıcı başlığı, menüde arama, bölümlere ayrılmış simge ızgarası, hesap işlemleri
 const SEC_TONE = { '': 'blue', 'Satış': 'blue', 'Ürünler': 'purple', 'Raporlar': 'green', 'Sistem': 'gray' };
@@ -291,7 +287,7 @@ function moreMenu() {
       <div class="mm-list">
         <button data-mm-act="help"><i class="ico ico-help"></i>Bu sayfa nasıl kullanılır?</button>
         <button data-mm-act="sync"><i class="ico ico-sync"></i>Şimdi senkronla<span class="muted tiny" style="margin-left:auto">${ago(Math.max(0, ...state.channels.map((c) => (c.last && c.last.at) || 0)))}</span></button>
-        <button data-mm-act="theme"><i class="ico ico-bolt"></i>Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[store.get('theme', 'auto')]}</button>
+        <button data-mm-act="theme"><i class="ico ico-bolt"></i>Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[themeOf()]}</button>
         ${u.id > 0 ? html`<button data-mm-act="pass"><i class="ico ico-key"></i>Şifremi değiştir</button>` : ''}
         <button data-mm-act="logout" class="danger"><i class="ico ico-x"></i>Çıkış yap</button>
       </div>`,
@@ -310,7 +306,7 @@ function moreMenu() {
     const a = b.dataset.mmAct;
     if (a === 'sync') { s.close(); sync(); }
     if (a === 'help') { s.close(); openHelp(currentPath || '', (page) => openTicketForm({ category: 'question', subject: `${page} sayfası hakkında` })); }
-    if (a === 'theme') { const order = ['auto', 'light', 'dark'], t = order[(order.indexOf(store.get('theme', 'auto')) + 1) % 3]; store.set('theme', t); applyTheme(); b.lastChild.textContent = `Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[t]}`; }
+    if (a === 'theme') { const order = ['light', 'dark', 'auto'], t = order[(order.indexOf(themeOf()) + 1) % 3]; store.set('theme', t); applyTheme(); b.lastChild.textContent = `Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[t]}`; }
     if (a === 'pass') { s.close(); changePassword(); }
     if (a === 'logout') api('logout', { method: 'POST' }).catch(() => {}).then(() => location.reload());
   });
@@ -486,7 +482,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-08s';
+const ASSETS = '2026-10-08t';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

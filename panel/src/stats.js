@@ -1,6 +1,6 @@
 // İstatistik: ciro / sipariş adedi (kanal bazında + toplam), dönem karşılaştırma, en çok satanlar, tahmini kâr.
 import { all, first, getSettings } from './db.js';
-import { dayKey, weekKey, monthKey, TR, r2, LATE } from './util.js';
+import { dayKey, weekKey, monthKey, TR, r2, LATE, PRODUCT_SHIP } from './util.js';
 import { CHANNEL_IDS, isChannelId } from './channels/index.js';
 import { profit, costOf } from '../public/profit.js';
 import { DESIRED } from './sync.js';
@@ -36,7 +36,7 @@ async function period(db, fromMs, toMs, group, settings) {
     if (b) { b.revenue[r.channel] = (b.revenue[r.channel] || 0) + r.total; b.orders[r.channel] = (b.orders[r.channel] || 0) + 1; }
   }
   // Tahmini kâr: satır tutarı − komisyon − alış maliyeti; sipariş başına kargo + hizmet bedeli
-  const lines = await all(db, `SELECT o.id, o.channel, o.ordered_at, o.shipping_cost, i.total, i.quantity, i.commission AS actual_commission, p.purchase_price, l.commission
+  const lines = await all(db, `SELECT o.id, o.channel, o.ordered_at, o.shipping_cost, ${PRODUCT_SHIP} AS pship, i.total, i.quantity, i.commission AS actual_commission, p.purchase_price, l.commission
     FROM order_items i JOIN orders o ON o.id = i.order_id
     LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
@@ -52,7 +52,7 @@ async function period(db, fromMs, toMs, group, settings) {
     if (!l.purchase_price) missingCost++;
     if (!seen.has(l.id)) {
       seen.add(l.id);
-      v -= (l.shipping_cost ?? costOf(settings, 'shipping', ch)) + costOf(settings, 'service_fee', ch);
+      v -= (l.shipping_cost ?? l.pship ?? costOf(settings, 'shipping', ch)) + costOf(settings, 'service_fee', ch);
     }
     tt.profit += v; tt.items += l.quantity;
     const b = series[idx.get(f(l.ordered_at))];

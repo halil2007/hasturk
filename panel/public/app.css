@@ -1234,7 +1234,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-08s"; }
+:root { --assets: "2026-10-08t"; }
 
 /* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
 .subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }
@@ -1348,3 +1348,9 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .oc-items { display: grid; gap: 6px; }
 .oc-item { align-items: flex-start; }
 .pkg-card .line { align-items: flex-start; }
+/* Sol menü logosu daha belirgin: varsayılan logo görselinin kenar boşluğu dengelenir (yükseklik artar, üst/alt boşluk kırpılır) */
+@media (min-width: 1024px) {
+  .side .brand-card { padding: 4px 6px; margin-bottom: 0; }
+  .side .brand-card img[data-logo] { height: 76px; margin: -10px 0; }
+}
+@media (min-width: 1024px) and (max-height: 820px) { .side .brand-card img[data-logo] { height: 62px; margin: -8px 0; } }

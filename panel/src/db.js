@@ -248,6 +248,8 @@ const MIGRATIONS = [
   // rejected: kullanıcının reddettiği pazaryeri kategorileri (JSON dizi) — tekrar önerilmez
   `CREATE TABLE IF NOT EXISTS category_suggest (local TEXT NOT NULL, channel TEXT NOT NULL, remote_id TEXT, remote_name TEXT, path TEXT, score REAL,
     sure INTEGER NOT NULL DEFAULT 0, rejected TEXT, created_at INTEGER, PRIMARY KEY (local, channel))`,
+  // Ürünün kargo tutarı (kullanıcı girer): kanal kargo faturası / siparişe elle girilen tutar yoksa sipariş kargo gideri bundan hesaplanır
+  'ALTER TABLE products ADD COLUMN ship_cost REAL',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
