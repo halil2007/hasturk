@@ -16,7 +16,7 @@ yasal sayfalar (`/kvkk`, `/gizlilik`, `/kullanim-kosullari`) ve 404.
 otomatik açılan, örnek verilerle çalışan firma paneline girer (bkz. `panel/src/tenants.js`, `panel/src/lead.js`):
 - Ziyaretçi "Demo kullanıcı" personel hesabıyla girer: siparişler, kargo, stok, ürünler, raporlar, gelir & gider açık;
   ayarlar, entegrasyon bilgileri, kullanıcılar, şifre ve iki adımlı doğrulama kapalı.
-- Panel her gün kendini sıfırlar (ziyaretçilerin yaptığı değişiklikler silinir, örnek veriler yeniden gelir).
+- Panel kendini sıfırlar: 20 dakika kimse kullanmazsa (son sıfırlamadan 1 saat geçtiyse) ve her durumda günde bir; ziyaretçilerin değişiklikleri silinir, örnek veriler yeniden gelir, açık oturumlar düşmez.
 - Ana panelde **Firmalar** listesinde "Demo Mağaza" olarak görünür; askıya alırsanız demo kapanır.
 - Panelde `PANEL_SECRET` tanımlı olmalı (müşteri panelleri için zaten gerekli).
 

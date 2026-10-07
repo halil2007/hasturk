@@ -69,18 +69,6 @@ export async function demoCookie(env, db, secure) {
   const v = encodeURIComponent(`${pre(env)}${u.id}.${exp}.${await hmac(secret(env), `${u.id}.${exp}.${ver(u)}`)}`);
   return `${COOKIE}=${v}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${secure ? '; Secure' : ''}`;
 }
-// Tanıtım sitesindeki demo bağlantısı: süreli, ana panelin gizli anahtarıyla imzalı ("bitiş.imza")
-const demoKey = (env) => (env.PANEL_SECRET || env.PANEL_PASSWORD || '') + '|demo-link';
-export async function demoToken(env, days = 7) {
-  const exp = String(Date.now() + days * 864e5);
-  return `${exp}.${await hmac(demoKey(env), exp)}`;
-}
-export async function checkDemoToken(env, t) {
-  const [exp, sig] = String(t || '').split('.');
-  if (!sig || !/^\d+$/.test(exp) || Number(exp) < Date.now() || !(env.PANEL_SECRET || env.PANEL_PASSWORD)) return false;
-  return same(sig, await hmac(demoKey(env), exp));
-}
-
 // Çerezden oturumdaki kullanıcıyı bul (yoksa null)
 export async function currentUser(req, env, db) {
   const m = (req.headers.get('Cookie') || '').match(new RegExp(COOKIE + '=([^;]+)'));

@@ -52,25 +52,24 @@
     show(0);
   }
 
-  // Paketler (aylık / yıllık)
-  let bill = 'm';
+  // Paketler: büyük fiyat KDV hariç aylık; altında KDV dahil tutar ve yıllık alım kutusu (2 ay hediye, peşin fiyatına taksit)
+  const vat = (n) => n * (1 + (S.vatRate ?? 20) / 100);
   const priceHtml = (p) => {
-    if (!p.monthly && !p.yearly) return '<div class="price">Teklif alın</div><div class="per">&nbsp;</div>';
-    if (bill === 'y' && p.yearly) return `<div class="price">${tl(p.yearly)} ₺ <small>/ yıl</small></div><div class="per">aylık ${tl(p.yearly / 12)} ₺'ye denk gelir</div>`;
-    return `<div class="price">${tl(p.monthly)} ₺ <small>/ ay</small></div><div class="per">${p.yearly ? `yıllık ödemede ${tl(p.yearly)} ₺` : '&nbsp;'}</div>`;
+    if (!p.monthly && !p.yearly) return '<div class="price">Teklif alın</div>';
+    const save = p.monthly && p.yearly ? p.monthly * 12 - p.yearly : 0;
+    return `<div class="price">${tl(p.monthly)} <span class="cur">₺</span><small>+ KDV / ay</small></div>
+      <div class="vatline">KDV dahil aylık ${tl(vat(p.monthly))} ₺</div>
+      ${p.yearly ? `<div class="yearly"><div class="y-top"><b>Yıllık ${tl(p.yearly)} ₺</b><small>+ KDV</small>${save ? `<span class="save">${tl(save)} ₺ kazanç</span>` : ''}</div>
+        <div class="y-sub">2 ay hediye · aylık ${tl(p.yearly / 12)} ₺'ye gelir${S.installments ? ` · <b>peşin fiyatına ${S.installments} taksit</b>` : ''}</div></div>` : ''}`;
   };
-  const renderPlans = () => $$('[data-plans]').forEach((el) => {
+  $$('[data-plans]').forEach((el) => {
     el.innerHTML = (S.plans || []).map((p) => `<div class="plan${p.featured ? ' featured' : ''}">${p.featured ? '<span class="badge">En çok tercih edilen</span>' : ''}
       <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>${priceHtml(p)}
       <div class="limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
       <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}</ul>
-      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a></div>`).join('');
+      <a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>
+      <a class="plan-demo" data-demo href="/demo">ya da önce demo panelini açın →</a></div>`).join('');
   });
-  renderPlans();
-  $$('[data-bill]').forEach((t) => t.addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    bill = b.dataset.b; $$('[data-bill] button').forEach((x) => x.classList.toggle('on', x.dataset.b === bill)); renderPlans();
-  }));
   $$('[data-vat]').forEach((el) => { el.textContent = S.vat || ''; });
   const cmp = $('[data-compare]');
   if (cmp && S.compare) {
@@ -97,6 +96,16 @@
     if (k === 'wa') { el.target = '_blank'; el.rel = 'noopener'; }
   });
   if (S.panelUrl) $$('[data-panel]').forEach((a) => { a.href = S.panelUrl; });
+  // "Canlı demo": bilgi istemeden demo paneli (yeni sekmede); "Hemen ara": telefon
+  if (S.demoUrl) $$('[data-demo]').forEach((a) => { a.href = S.demoUrl; a.target = '_blank'; a.rel = 'noopener'; });
+  const tel = get('company.phone');
+  if (tel) $$('[data-call]').forEach((a) => { a.href = 'tel:' + String(tel).replace(/[^\d+]/g, ''); a.title = tel; });
+  // Sekmeli özellik gezgini
+  $$('[data-ftabs]').forEach((box) => box.addEventListener('click', (e) => {
+    const b = e.target.closest('[role=tab]'); if (!b) return;
+    $$('[role=tab]', box).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b); });
+    $$('.ft-p', box).forEach((p) => { p.hidden = p.dataset.p !== b.dataset.i; });
+  }));
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
 
   // Mobil menü

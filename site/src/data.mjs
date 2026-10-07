@@ -300,3 +300,83 @@ export const INTEGRATIONS = [
     help: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri. API Key (Client ID) ve API Secret bilgileriniz gerekir.',
   },
 ];
+
+// ---------- özellik sayfalarının ek bölümleri: ne işe yarar (sorun → çözüm), nasıl çalışır (adımlar), artıları ----------
+// example: 'profit' (kâr-zarar örnek hesabı) | 'buybox' (buybox örnek senaryosu)
+const MORE = {
+  'siparis-yonetimi': {
+    why: ['Her pazaryerinin paneline ayrı ayrı girip siparişleri tek tek kontrol etmek zaman alır. Bir kanalda gözden kaçan sipariş gecikmeye, gecikme de pazaryeri cezasına ve düşük mağaza puanına dönüşür.', 'Tüm kanalların siparişleri tek listede, kargoya verilme son saatine göre. Geciken ya da gecikme riski taşıyan sipariş kırmızıyla işaretlenir; hiçbir sipariş gözden kaçmaz.'],
+    steps: [['Kanallarınızı bağlayın', 'Pazaryeri ve site API bilgilerini bir kez girin.'], ['Siparişler gelsin', 'Yeni siparişler 15 dakikada bir kendiliğinden panele düşer, size bildirim gelir.'], ['İşleme alın, paketleyin', 'Tek tek ya da toplu işleme alın; etiket ve kargo adımına geçin.']],
+    benefits: [['i-clock', 'Zaman kazanırsınız', 'Panel panel gezmek yerine tek ekran'], ['i-shield', 'Gecikme cezası riski azalır', 'Son saat yaklaşınca uyarı'], ['i-users', 'Ekip aynı listeyi görür', 'Kim neyi hazırladı belli'], ['i-calc', 'Kârı satırda görürsünüz', 'Zarar eden sipariş fark edilir']],
+  },
+  'kargo-ve-etiket': {
+    why: ['Her pazaryerinde barkodu ayrı ekrandan almak, etiketi farklı biçimlerde yazdırmak ve hangi paketin kargoya verildiğini takip etmek karışık ve hataya açıktır.', 'Paketle, etiketi al, yazdır: barkod pazaryerinden gelir, etiket tek tasarımla panelden basılır. Paketlerin hangi aşamada olduğu sekmelerde görünür.'],
+    benefits: [['i-bolt', 'Hızlı paketleme', 'Toplu etiket ve toplama listesi'], ['i-tag', 'Doğru barkod', 'Barkod pazaryerinden gelir'], ['i-orders', 'Termal yazıcı', 'ZPL ya da PDF çıktı'], ['i-eye', 'Net takip', 'Hangi paket hangi aşamada']],
+  },
+  'stok-senkronizasyonu': {
+    why: ['Aynı ürünü birden fazla kanalda satarken bir kanaldaki satış diğerlerine yansımazsa stokta olmayan ürün satılır. İptal edilen sipariş hem müşteriyi hem mağaza puanınızı üzer.', 'Ürün panelde tek kart olarak tutulur; bir kanalda satılınca yeni stok diğer kanallara gider. Fazla satış ve stoksuz ilan derdi biter.'],
+    steps: [['İlanlar eşleşsin', 'Kanallardaki ilanlar barkod ve stok koduyla aynı ürüne bağlanır.'], ['Stok gönderimini açın', 'Her kanal için ayrı açılır; isterseniz kanala gösterilecek en fazla adedi belirleyin.'], ['Satış oldukça eşitlensin', 'Bir kanalda satılan ürünün yeni stoğu diğer kanallara gider.']],
+    benefits: [['i-shield', 'Fazla satış olmaz', 'Stok her kanalda aynı'], ['i-clock', 'Elle güncelleme yok', 'Panel kendisi gönderir'], ['i-eye', 'Tükenmeden haberiniz olur', 'Kaç gün yeteceği hesaplanır'], ['i-gear', 'Kontrol sizde', 'Kanal bazında aç / kapat']],
+  },
+  'urun-yonetimi': {
+    why: ['Yeni bir ürünü her pazaryerine ayrı ayrı yüklemek, kategori ve zorunlu özellikleri her kanal için yeniden doldurmak saatler alır; bir kanalı unutmak satış kaybıdır.', 'Ürünü bir kez tanımlayın. Kategori eşleştirmesi bir kez yapılır, panel ürünü kanallara gönderir. Otomatik gönderimi açtığınız kanallarda yeni ürünler kendiliğinden yüklenir.'],
+    steps: [['Kategorileri eşleştirin', 'Panel her pazaryeri için en uygun kategoriyi önerir; siz onaylarsınız.'], ['Gönderin ya da otomatiğe alın', 'Ürünleri seçip tek tıkla gönderin ya da kanal için otomatik gönderimi açın.'], ['Sonucu izleyin', 'Kabul edilen, reddedilen ve mağazada görünen ürünler ayrı ayrı listelenir.']],
+    benefits: [['i-clock', 'Saatler değil dakikalar', 'Bir kez tanımla, her yere gönder'], ['i-bolt', 'Otomatik gönderim', 'Yeni ürün kendiliğinden yüklenir'], ['i-list', 'Doğru kategori', 'Panel önerir, siz onaylarsınız'], ['i-eye', 'Şeffaf takip', 'Ret nedeni açıkça görünür']],
+  },
+  'buybox-takibi': {
+    why: ['Buybox\'ı kaybeden ilan satış yapamaz. Rakip fiyatını gün boyu kontrol edip elle güncellemek imkânsızdır; aceleyle indirilen fiyat da çoğu zaman gereğinden düşük kalır ve kârınız erir.', 'Panel buybox durumunu 15 dakikada bir kontrol eder. Kaybettiğinizde fiyatı alt sınırınızı aşmadan rakibin hemen altına çeker; buybox sizdeyken fiyatı yeniden yükseltir.'],
+    example: 'buybox',
+    benefits: [['i-up', 'Daha çok satış', 'Buybox\'ı kaybettiğiniz an tepki'], ['i-shield', 'Zararına satış yok', 'Alt sınırın altına inmez'], ['i-calc', 'Kâr korunur', 'Buybox sizdeyken fiyat yükselir'], ['i-list', 'Her adım kayıtlı', 'Neden değiştiği görünür']],
+  },
+  'kar-zarar': {
+    why: ['Ciro yüksek görünse de komisyon, kargo, hizmet bedeli, stopaj, reklam ve iadeler düşüldüğünde birçok satış zarar ettirir. Bunu Excel\'de hesaplamak hem zor hem de hep gecikmelidir.', 'Panel her siparişin gerçek kesintilerini pazaryeri faturalarından çeker, alış maliyeti ve işletme giderlerini de düşer. Hangi ürünün, hangi kanalın gerçekten kazandırdığını görürsünüz.'],
+    example: 'profit',
+    steps: [['Alış fiyatlarını girin', 'Ürün kartından ya da Excel ile toplu olarak; bir kez girmeniz yeterli.'], ['Kesintiler gelsin', 'Komisyon, kargo, hizmet bedeli, reklam ve ceza faturaları pazaryerinden kendiliğinden çekilir.'], ['Net kârı inceleyin', 'Dönem, kanal ve ürün bazında net kârınızı ve zarar eden satışları görün.']],
+    benefits: [['i-eye', 'Gerçek tablo', 'Tahmini değil, kesilen tutar'], ['i-box', 'Ürün bazında kâr', 'Zarar eden ürün fark edilir'], ['i-calendar', 'Nakit planı', 'Hakediş ne zaman yatacak'], ['i-clock', 'Excel yok', 'Her gün kendiliğinden güncel']],
+  },
+  'raporlar': {
+    why: ['Satışların nereye gittiğini görmeden verilen karar tahmindir: hangi ürün büyüyor, hangi kanal geriliyor, hangi ilde talep var?', 'Tüm kanalların satışları tek raporda; dönemleri karşılaştırın, en çok satan ürünleri, kanal ve il dağılımını, sadık müşterilerinizi görün.'],
+    steps: [['Veriler gelsin', 'Bağladığınız kanalların son bir yıllık siparişleri aktarılır.'], ['Dönemi seçin', 'Bugün, 7 gün, bu ay ya da istediğiniz tarih aralığı.'], ['Karşılaştırın', 'Önceki dönemle farkı, kanal ve ürün dağılımını inceleyin.']],
+    benefits: [['i-chart', 'Doğru karar', 'Veriye dayalı stok ve fiyat'], ['i-up', 'Büyüyeni görün', 'En çok satanlar öne çıkar'], ['i-pin', 'Bölgesel talep', 'İl bazında satış haritası'], ['i-mail', 'Her sabah özet', 'E-postanıza gelir']],
+  },
+  'musteri-sorulari-ve-iadeler': {
+    why: ['Cevapsız kalan soru kaybedilmiş satıştır; iade talepleri her pazaryerinde ayrı ekranda takip edilir ve süresi kaçırılabilir.', 'Tüm kanalların soruları ve iade talepleri tek yerde; hazır cevaplarla hızlı yanıt verin, iadeleri gerekçesiyle sonuçlandırın.'],
+    steps: [['Sorular ve talepler gelsin', 'Kanallardaki yeni sorular ve iade talepleri kendiliğinden panele düşer.'], ['Yanıtlayın', 'Hazır cevap şablonunu seçin, düzenleyin, gönderin.'], ['İadeyi sonuçlandırın', 'Onaylayın ya da gerekçe ve belgeyle reddedin.']],
+    benefits: [['i-up', 'Daha çok satış', 'Soru hızlı yanıtlanır'], ['i-clock', 'Süre kaçmaz', 'Bekleyenler hatırlatılır'], ['i-users', 'İş bölümü', 'Müşteri hizmetlerine özel yetki'], ['i-list', 'Tek ekran', 'Tüm kanallar bir arada']],
+  },
+  'ekip-ve-guvenlik': {
+    why: ['Herkesin aynı hesapla girdiği bir panelde kimin ne yaptığı bilinmez; pazaryeri şifresini paylaşmak da ciddi bir güvenlik riskidir.', 'Her personelin kendi hesabı ve yalnız işi olan bölümlere yetkisi olur; iki adımlı doğrulama ve işlem kayıtlarıyla kontrol sizde kalır.'],
+    steps: [['Personel ekleyin', 'Kullanıcı adı ve şifreyle hesap açın.'], ['Rolünü seçin', 'Hazır şablonlardan seçin ya da bölüm bölüm yetki verin.'], ['Güvenliği açın', 'İki adımlı doğrulamayı herkes için zorunlu tutun.']],
+    benefits: [['i-lock', 'Şifre paylaşımı yok', 'Herkesin kendi hesabı'], ['i-eye', 'Görünürlük', 'Kim ne yaptı kayıtlı'], ['i-shield', 'Güçlü giriş', 'İki adımlı doğrulama'], ['i-users', 'Doğru yetki', 'Herkes yalnız işini görür']],
+  },
+  'stok-api': {
+    why: ['Bayileriniz ya da kendi siteniz güncel stoğunuzu bilmezse olmayan ürünü satar. Stok listesini e-postayla ya da Excel\'le göndermek gecikmeli ve hatalıdır.', 'Bayinizin sistemi panelinizdeki güncel stoğu güvenli bir API ile kendisi okur; siz hiçbir şey göndermezsiniz.'],
+    steps: [['Anahtarı oluşturalım', 'Bayi ya da sistem için ayrı anahtar ve izin verilen IP adresleri tanımlanır.'], ['Bayiniz bağlansın', 'Hazır kılavuzla yazılımcısı birkaç saatte bağlar.'], ['Stok hep güncel', 'Her istekte paneldeki son stok ve fiyat döner.']],
+    benefits: [['i-sync', 'Anlık stok', 'Her istekte güncel'], ['i-lock', 'Güvenli', 'Anahtar + IP kısıtı'], ['i-eye', 'Yalnız okuma', 'Hiçbir şey değiştirilemez'], ['i-clock', 'Elle liste yok', 'E-posta, Excel bitti']],
+  },
+};
+for (const f of FEATURES) Object.assign(f, MORE[f.slug] || {});
+
+// Telefondan yönetim (ayrı özellik sayfası)
+FEATURES.push({
+  slug: 'mobil-yonetim', name: 'Telefondan yönetim', icon: 'i-phone', color: 'c-teal', short: 'Kurulum yok, telefonda tam panel',
+  title: 'Telefondan Yönetim — Hastürk CRM', h1: ['Mağazanız', 'Cebinizde'],
+  lead: 'Panel telefona göre tasarlandı: siparişleri işleme alın, stok güncelleyin, soruları yanıtlayın, kârınızı görün. Uygulama indirmeden, ana ekrana ekleyip uygulama gibi kullanın.',
+  mock: 'phone',
+  points: [
+    ['i-phone', 'Kurulum yok', 'Tarayıcıdan açılır; ana ekrana ekleyince uygulama gibi tam ekran çalışır.'],
+    ['i-bolt', 'Anlık bildirim', 'Yeni sipariş, müşteri sorusu ve önemli uyarılar telefonunuza bildirim olarak gelir.'],
+    ['i-list', 'Telefona özel menü', 'Panel, siparişler, kargo ve stok alt menüde tek dokunuşla; büyük, parmakla rahat basılan düğmeler.'],
+    ['i-clock', 'Hızlı açılış', 'Son görülen ekranlar telefonda saklanır; panel anında açılır, veriler arkadan yenilenir.'],
+    ['i-cart', 'Sahadan işlem', 'Siparişi işleme alın, stoğu güncelleyin, soruyu yanıtlayın, iadeyi sonuçlandırın.'],
+    ['i-shield', 'Güvenli', 'İki adımlı doğrulama ve oturum kontrolü telefonda da geçerli.'],
+  ],
+  why: ['Siparişler masa başındayken gelmez. Fuarda, depoda ya da yoldayken bir siparişi kaçırmak, bir soruyu yanıtsız bırakmak satış kaybıdır.', 'Panelin tamamı telefonda da çalışır: bildirim gelir, siparişi işleme alırsınız, stoğu güncellersiniz, kârınızı görürsünüz.'],
+  steps: [['Telefondan açın', 'panel.hasturkcrm.com adresine girip oturum açın.'], ['Ana ekrana ekleyin', 'Tarayıcı menüsünden "Ana ekrana ekle" ile uygulama gibi kullanın.'], ['Bildirimleri açın', 'Yeni sipariş ve sorular için telefon bildirimine izin verin.']],
+  benefits: [['i-phone', 'Her yerden yönetim', 'Masaya bağlı değilsiniz'], ['i-bolt', 'Anında haber', 'Yeni sipariş bildirimi'], ['i-clock', 'Hızlı', 'Anında açılan ekranlar'], ['i-shield', 'Güvenli', 'Aynı güvenlik telefonda']],
+  faq: [
+    ['Uygulama mağazasından indirmem gerekiyor mu?', 'Hayır. Panel tarayıcıda çalışır; ana ekrana ekleyince uygulama gibi açılır. Güncellemeler kendiliğinden gelir.'],
+    ['iPhone ve Android\'de çalışır mı?', 'Evet. Güncel Safari ve Chrome tarayıcılarında çalışır.'],
+  ],
+  related: ['siparis-yonetimi', 'kargo-ve-etiket', 'raporlar'],
+});
