@@ -63,7 +63,7 @@ export async function claimsView(el, rest, query = {}) {
     s.setBody(html`<form class="stack" data-f>
       <label class="field"><span>Ret gerekçesi</span><select class="input" name="reason" required><option value="">Seçin</option>${reasons.map((x) => html`<option value="${x.id}">${x.name}</option>`)}</select></label>
       <label class="field"><span>Açıklama (müşteri ve ${ch(r.channel).name} görür)</span><textarea class="input" name="text" maxlength="500" rows="4" required placeholder="Ör. Ürün kullanılmış ve ambalajı açılmış olarak geldi; fotoğraflar ektedir."></textarea></label>
-      ${ch(r.channel).type === 'trendyol' || ch(r.channel).demo ? html`<label class="field"><span>Fotoğraf / PDF (önerilir, en fazla 5 MB)</span><input class="input" type="file" name="file" accept="image/jpeg,image/png,application/pdf"></label>` : ''}
+      ${ch(r.channel).type === 'trendyol' || ch(r.channel).demo ? html`<label class="field"><span>Fotoğraf / PDF (en fazla 5 MB)${ch(r.channel).type === 'trendyol' ? ' · Trendyol çoğu gerekçede belge ister' : ''}</span><input class="input" type="file" name="file" accept="image/jpeg,image/png,application/pdf"></label>` : ''}
       <div class="muted tiny">${ch(r.channel).type === 'idefix' ? 'idefix\'te ret bir taleptir: idefix inceleyip sonuçlandırır; sonuç bir sonraki senkronda görünür.' : 'Ret kararı pazaryerine gönderilir; pazaryeri gerekirse talebi inceler.'}</div></form>`);
     s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn danger" data-x="go"><i class="ico ico-x"></i>Reddet</button>`);
     s.el.addEventListener('click', (e) => { const b = e.target.closest('[data-x=go]'); if (!b) return; busy(b, async () => {
@@ -71,6 +71,8 @@ export async function claimsView(el, rest, query = {}) {
       if (!fm.reportValidity()) return;
       let file = null;
       const fl = fm.file && fm.file.files[0];
+      // Trendyol: 1651, 451 ve 2101 dışındaki ret gerekçelerinde belge (fotoğraf / PDF) zorunludur
+      if (!fl && ch(r.channel).type === 'trendyol' && !['1651', '451', '2101'].includes(String(fm.reason.value))) return toast('Bu ret gerekçesi için Trendyol fotoğraf ya da PDF istiyor; dosya ekleyin', true);
       if (fl) {
         if (fl.size > 5 * 1024 * 1024) return toast('Dosya en fazla 5 MB olabilir', true);
         const buf = new Uint8Array(await fl.arrayBuffer()); let bin = '';

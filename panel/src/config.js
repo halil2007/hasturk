@@ -21,6 +21,7 @@ export const FIELDS = {
     { k: 'TRENDYOL_SELLER_ID', label: 'Satıcı ID (Cari ID)', req: true, pattern: '^\\d+$', patternMsg: 'Trendyol Satıcı ID yalnızca rakamlardan oluşur' },
     { k: 'TRENDYOL_API_KEY', label: 'API Key', req: true },
     { k: 'TRENDYOL_API_SECRET', label: 'API Secret', secret: true, req: true },
+    { k: 'TRENDYOL_INTEGRATOR', label: 'Entegratör adı', adv: true, hint: 'Boşsa "SelfIntegration" gönderilir. Trendyol\'da entegratör firma olarak kayıtlıysanız firma adınız (yalnız harf ve rakam, en fazla 30 karakter); istekler "SatıcıId - FirmaAdı" kimliğiyle gider' },
   ],
   // Yeni sipariş e-posta bildirimi (kanal değil; Ayarlar → Bildirimler'den girilir)
   mail: [

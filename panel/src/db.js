@@ -250,6 +250,8 @@ const MIGRATIONS = [
     sure INTEGER NOT NULL DEFAULT 0, rejected TEXT, created_at INTEGER, PRIMARY KEY (local, channel))`,
   // Ürünün kargo tutarı (kullanıcı girer): kanal kargo faturası / siparişe elle girilen tutar yoksa sipariş kargo gideri bundan hesaplanır
   'ALTER TABLE products ADD COLUMN ship_cost REAL',
+  // Trendyol sipariş saati düzeltmesi (aşağıdaki tek seferlik adım) için şema sürümü değişsin: mevcut veritabanlarında da çalışır
+  'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -287,6 +289,12 @@ export function init(db) {
           db.prepare("INSERT INTO settings (k, v) VALUES ('once:unhold_ikas_1', '1') ON CONFLICT (k) DO NOTHING"),
         ]);
       }
+      // Tek seferlik: Trendyol sipariş tarihi (orderDate) GMT+3 zaman damgası olarak gelir ve 3 saat ileri kaydediliyordu; kayıtlı Trendyol
+      // siparişleri düzeltilir. Güncelleme ve işaret aynı işlemde: aynı anda açılan iki örnek düzeltmeyi iki kez yapamaz.
+      await db.batch([
+        db.prepare("UPDATE orders SET ordered_at = ordered_at - 10800000 WHERE channel LIKE 'trendyol%' AND ordered_at > 10800000 AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:ty_gmt3_1')"),
+        db.prepare("INSERT INTO settings (k, v) VALUES ('once:ty_gmt3_1', '1') ON CONFLICT (k) DO NOTHING"),
+      ]);
       await db.batch([
         db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)),
         db.prepare("INSERT INTO settings (k, v) VALUES ('schema_n', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(MIGRATIONS.length)),

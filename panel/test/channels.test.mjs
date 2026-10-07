@@ -30,7 +30,7 @@ test('Trendyol: aynı sipariş numaralı paketler tek siparişte birleşir, işl
   assert.equal(o.status, 'new', 'en geride kalan paketin durumu');
   assert.equal(o.total, 300);
   assert.equal(o.packages.length, 2);
-  assert.match(calls[0].url, /^https:\/\/apigw\.trendyol\.com\/integration\/order\/sellers\/42\/orders\?/);
+  assert.match(calls[0].url, /^https:\/\/apigw\.trendyol\.com\/integration\/order\/sellers\/42\/v2\/orders\?/);
   assert.equal(calls[0].headers['User-Agent'], '42 - SelfIntegration');
   await ch.accept({ packages: [{ remote_id: '1', status: 'open', remote_status: 'Created', items: [{ line_id: '11', qty: 1 }] }, { remote_id: '2', status: 'shipped', items: [] }] });
   const put = calls.find((c) => c.method === 'PUT');

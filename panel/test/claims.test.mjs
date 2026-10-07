@@ -23,7 +23,7 @@ const TY_CLAIM = { totalPages: 1, content: [{ id: 'c-1', orderNumber: '900', cla
     claimItems: [1, 2].map((i) => ({ id: 'ci-' + i, customerClaimItemReason: { name: 'Beğenmedim' }, claimItemStatus: { name: 'WaitingInAction' }, customerNote: 'kokusu ağır' })) }] }] };
 
 test('Trendyol: aynı satırın kalemleri birleşir, onay tüm kalem kimlikleriyle, ret multipart claim issue ile gider', async () => {
-  const calls = mock([[/\/claims\?/, 'GET', TY_CLAIM], [/items\/approve$/, 'PUT', {}], [/\/issue$/, 'POST', {}], [/claim-issue-reasons/, 'GET', [{ id: 1, name: 'Kullanılmış' }]]]);
+  const calls = mock([[/\/claims\?/, 'GET', TY_CLAIM], [/items\/approve$/, 'PUT', {}], [/\/issue\?/, 'POST', {}], [/claim-issue-reasons/, 'GET', [{ id: 1, name: 'Kullanılmış' }]]]);
   const ch = trendyol({ TRENDYOL_SELLER_ID: '42', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' }, { id: 'trendyol' });
   const r = await ch.claims({ since: 1, until: 2, page: 0, size: 50 });
   const c = r.items[0];
@@ -32,9 +32,10 @@ test('Trendyol: aynı satırın kalemleri birleşir, onay tüm kalem kimlikleriy
   const ap = calls.find((x) => /approve/.test(x.url));
   assert.equal(ap.method, 'PUT'); assert.deepEqual(JSON.parse(ap.body), { claimLineItemIdList: ['ci-1', 'ci-2'], params: {} });
   await ch.rejectClaim({ remote_id: 'c-1' }, c.lines, { reasonId: '1', text: 'Kullanılmış geldi', file: new File([new Uint8Array([1, 2])], 'a.jpg', { type: 'image/jpeg' }) });
-  const rj = calls.find((x) => /issue$/.test(x.url));
+  // createClaimIssue: gerekçe, kalemler ve açıklama sorgu parametresi; dosya multipart "files"
+  const rj = calls.find((x) => /\/issue\?/.test(x.url)), q = new URL(rj.url).searchParams;
   assert.ok(rj.body instanceof FormData);
-  assert.equal(rj.body.get('claimItemIdList'), 'ci-1,ci-2'); assert.equal(rj.body.get('claimIssueReasonId'), '1'); assert.ok(rj.body.get('files'));
+  assert.equal(q.get('claimItemIdList'), 'ci-1,ci-2'); assert.equal(q.get('claimIssueReasonId'), '1'); assert.equal(q.get('description'), 'Kullanılmış geldi'); assert.ok(rj.body.get('files'));
   assert.deepEqual(await ch.claimReasons(), [{ id: '1', name: 'Kullanılmış' }]);
 });
 
@@ -45,8 +46,8 @@ test('Hepsiburada: talepler listelenir, talep numarasıyla onay / ret', async ()
   const r = await ch.claims({ since: Date.parse('2026-09-01'), until: Date.parse('2026-10-05'), page: 0 });
   assert.equal(r.items[0].remoteId, 'HB-77'); assert.equal(r.items[0].status, 'waiting'); assert.equal(r.items[0].lines[0].reason, 'Hasarlı ürün');
   assert.match(calls[0].url, /beginDate=2026-09-01%2003%3A00&endDate=.*&offset=0&limit=100/);
-  await ch.rejectClaim({ remote_id: 'HB-77' }, r.items[0].lines, { reasonId: 'ProductHasBeenUsed', text: 'kullanılmış' });
-  assert.deepEqual(JSON.parse(calls.find((x) => /reject/.test(x.url)).body).ClaimRejectionReason, 'ProductHasBeenUsed');
+  await ch.rejectClaim({ remote_id: 'HB-77' }, r.items[0].lines, { reasonId: 'NoSuchAccessory', text: 'kullanılmış' });
+  assert.deepEqual(JSON.parse(calls.find((x) => /reject/.test(x.url)).body).ClaimRejectionReason, 'NoSuchAccessory');
 });
 
 test('panel: senkron, liste, onay sonrası karar kaydı; karar verilmişse tekrar onaylanamaz', async () => {
