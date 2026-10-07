@@ -23,6 +23,7 @@ import { customerKey, fillKeys } from './customers.js';
 import { pushDigest } from './push.js';
 import { dailyDigest } from './digest.js';
 import { urgentAlert, alertResolved } from './alerts.js';
+import { allows } from './plans.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -505,7 +506,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     // Önceki gönderimlerin kanal tarafındaki sonucu (reddedilen fiyat / stok)
     out.pushChecks = await checkPushes(env, db).catch((e) => 'hata: ' + e.message);
     // Buybox kontrolü ve (açıksa) seçili ürünlerde otomatik fiyat
-    if (!only) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
+    // Pakete bağlı işler (müşteri panellerinde paket izin veriyorsa; bkz. plans.js)
+    if (!only && allows(env, 'buybox')) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
     out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
     out.claims = await syncClaims(env, db, { only }).catch((e) => 'hata: ' + e.message);
@@ -517,8 +519,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.stockMoves += await applyDirtyStock(db, settings).catch(() => 0);
     // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
     if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
-    if (!only) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);
-    if (!only) out.settlements = await syncSettlements(env, db).catch((e) => 'hata: ' + e.message);
+    if (!only && allows(env, 'finance')) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);
+    if (!only && allows(env, 'finance')) out.settlements = await syncSettlements(env, db).catch((e) => 'hata: ' + e.message);
     // Anlık bildirim: yeni sipariş / iade talebi / müşteri sorusu özeti abonelere
     if (!only) out.push = await pushDigest(env, db, { newOrders: out.newOrders || 0 }).catch((e) => 'hata: ' + e.message);
     // Günlük özet e-postası (açıksa, sabah 08:00'den sonraki ilk senkronda, günde bir kez)
@@ -531,7 +533,7 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     // (zamanlanmış senkronda bu ikisi 2 dakikalık hızlı işte yapılır: aynı ürün iki kez gönderilmesin)
     if (!only && !cron) out.uploads = await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message);
     // Otomatik ürün gönderimi açık kanallar (ör. yalnız Hepsiburada): yeni ürünler kendiliğinden gönderilir
-    if (!only && !cron) out.autoUpload = await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message);
+    if (!only && !cron && allows(env, 'autoupload')) out.autoUpload = await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Son 1 yılın siparişleri: her bağlı (gerçek) kanal için bir kez otomatik geçmiş aktarımı başlatılır.
     // Parça parça (haftalık) ilerler; stoğu değiştirmez, yeni sipariş e-postası oluşturmaz.
     if (!only) for (const ch of chans) {

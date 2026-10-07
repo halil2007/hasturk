@@ -30,6 +30,7 @@ import { supportResponse } from './support.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
+import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
@@ -953,7 +954,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const origin = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(fh) ? 'https://' + fh : url.origin;
     const moved = /\.workers\.dev$/i.test(str(st.panel_url)) && !/\.workers\.dev$/i.test(new URL(origin).host);
     if ((!st.panel_url || moved) && user.role === 'admin' && /^https:\/\//.test(origin)) { await setSetting(db, 'panel_url', origin); st.panel_url = origin; }
-    return json({ ...s, channels: chInfo, settings: publicSettings(st, env), user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1', build: (env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.id) || null });
+    return json({ ...s, channels: chInfo, settings: publicSettings(st, env), user, tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME, ...planInfo(env) } : null, owner: !env.TENANT_SLUG && !!env.TENANT, notices: { open: notices.open || 0, unread: notices.unread || 0 }, unmatched: match.n, questions: qs.n, claims: cl.n, demo: env.DEMO === '1', build: (env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.id) || null });
   }
   // Alt alan adı için panel-proxy.php: panelin kendi adresi doldurulmuş olarak indirilir
   if (path === 'panel-proxy' && m === 'GET') {
@@ -1049,9 +1050,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!l) fail(404, 'İlan bulunamadı');
     return json({ listing: l, buybox: b, rule: r, history, changes, preview: r && b ? decide({ ...r, enabled: 1 }, { rank: b.rank, buyboxPrice: b.buybox_price, second: b.second_price, multi: !!b.multi }, l.price) : null });
   }
-  if (path === 'buybox/check' && m === 'POST') { const b = await body(req); return json(await checkBuybox(env, db, { channel: b.channel, ids: b.ids, limit: Math.min(Number(b.limit) || 100, 300) })); }
+  if (path === 'buybox/check' && m === 'POST') { requireFeature(env, 'buybox'); const b = await body(req); return json(await checkBuybox(env, db, { channel: b.channel, ids: b.ids, limit: Math.min(Number(b.limit) || 100, 300) })); }
   if (path === 'price-rules' && m === 'PUT') {
     const b = await body(req);
+    if (b.enabled) requireFeature(env, 'buybox');
     if (!bbIds().includes(b.channel)) fail(400, 'Otomatik fiyat yalnızca Trendyol ve Hepsiburada için');
     const l = await first(db, 'SELECT price FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
     if (!l) fail(404, 'İlan bulunamadı');
@@ -1085,9 +1087,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // ---------- kullanıcılar ----------
   if (path === 'users' && m === 'GET') return json(await listUsers(db));
   const maxUsers = Number(env.TENANT_MAX_USERS) || 0;
-  if (path === 'users' && m === 'POST') { const b = await body(req); let id; try { id = await saveUser(db, 0, b, { maxUsers }); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı eklendi (${str(b.username)})`); return json({ ok: true, id }); }
+  if (path === 'users' && m === 'POST') { const b = await body(req); if (!allows(env, 'roles')) { delete b.perms; delete b.template; } let id; try { id = await saveUser(db, 0, b, { maxUsers }); } catch (e) { fail(400, e.message); } await log(db, null, 'info', `${user.name}: kullanıcı eklendi (${str(b.username)})`); return json({ ok: true, id }); }
   if ((x = path.match(/^users\/(\d+)$/)) && m === 'PUT') {
     const id = Number(x[1]), b = await body(req);
+    if (!allows(env, 'roles')) { delete b.perms; delete b.template; } // paketinizde bölüm bazlı yetki yok: personel standart yetkiyle çalışır
     if (id === user.id && (b.active === false || b.role === 'staff')) fail(400, 'Kendi yönetici yetkinizi ya da hesabınızı kapatamazsınız');
     try { await saveUser(db, id, b, { maxUsers }); } catch (e) { fail(400, e.message); }
     // Yetki, durum ya da şifre değişince açık oturumlar hemen yeni yetkiyle çalışır; pasif / şifresi değişen hesabın oturumu kapanır
@@ -1274,6 +1277,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const b = await body(req), id = decodeURIComponent(x[2]);
     return json(x[3] === 'approve' ? await approveClaim(env, db, x[1], id, b.lines, user) : await rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user));
   }
+  if ((path === 'settlements' || path === 'invoices' || path.startsWith('settlements/') || path.startsWith('invoices/')) && env.TENANT_SLUG) requireFeature(env, 'finance');
   if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
@@ -1333,6 +1337,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT') {
     if (env.TENANT_SLUG && isBeta(x[1])) fail(403, 'Bu kanal yakında açılacak');
     const b = await body(req);
+    // Paketteki mağaza sınırı: yeni bir mağazanın API bilgisi kaydedilirken bağlı mağazalar sayılır (var olanı güncellemek serbest)
+    const maxStores = Number(env.TENANT_MAX_STORES) || 0;
+    if (maxStores && isChannelId(x[1]) && b.values && Object.values(b.values).some((v) => String(v || '').trim())) {
+      const rows = await all(db, 'SELECT id, data FROM channel_config WHERE data IS NOT NULL');
+      const has = rows.some((r) => r.id === x[1]), used = rows.filter((r) => r.id !== x[1] && isChannelId(r.id)).length;
+      if (!has && used >= maxStores) fail(403, `Paketinizdeki mağaza sınırına ulaşıldı (${maxStores} mağaza). Yeni mağaza bağlamak için bir mağazanın bağlantısını kaldırın ya da paketinizi yükseltin.`);
+    }
     await saveConfig(env, db, x[1], b);
     resetChannels();
     // API bilgileri değişti: eski hata ve bekleme sıfırlanır, kanal sonraki senkronda hemen denenir
@@ -1407,8 +1418,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'push/latest' && m === 'GET') return json(await latest(db));
   if (path === 'push/test' && m === 'POST') return json(await notify(db, { title: 'Hastürk Panel', body: `Bildirimler açık · ${user.name}`, url: '#/' }, { userId: user.id ?? null }));
   // Excel ile toplu güncelleme: dışa aktar (CSV) ve geri yükle (önizleme / uygula)
+  if (path === 'products.csv' && m === 'GET') requireFeature(env, 'bulk');
   if (path === 'products.csv' && m === 'GET') return new Response(await exportProducts(env, db), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="urunler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
   if (path === 'products/bulk' && m === 'POST') {
+    requireFeature(env, 'bulk');
     const b = await body(req);
     const r = await bulkUpdate(env, db, b.rows, { dry: b.dry !== false, user: user.name });
     if (r.applied && r.stock) ctx.waitUntil(pushStocks(env, db).catch(() => {}));
@@ -1533,7 +1546,18 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'stats' && m === 'GET') return json(await stats(db, q));
   if (path === 'insights' && m === 'GET') return json(await insights(db, q));
   if (path === 'settings' && m === 'GET') return json(publicSettings(await getSettings(db), env));
-  if (path === 'settings' && m === 'PUT') return json(publicSettings(await saveSettings(db, await body(req)), env));
+  if (path === 'settings' && m === 'PUT') {
+    const b = await body(req);
+    // Pakete bağlı ayarlar (otomatik fiyat, otomatik ürün gönderimi): paket izin vermiyorsa yeni açılış reddedilir, eskiden açık kalmış
+    // olan kapatılır (diğer ayarların kaydı engellenmez)
+    const cur = await getSettings(db);
+    if (!allows(env, 'buybox') && b.autoprice === true) { if (!cur.autoprice) requireFeature(env, 'buybox'); b.autoprice = false; }
+    if (!allows(env, 'autoupload') && b.auto_upload && Object.values(b.auto_upload).some(Boolean)) {
+      if (!Object.values(cur.auto_upload || {}).some(Boolean)) requireFeature(env, 'autoupload');
+      b.auto_upload = {};
+    }
+    return json(publicSettings(await saveSettings(db, b), env));
+  }
   if (path === 'logs' && m === 'GET') return json(await all(db, 'SELECT * FROM logs ORDER BY id DESC LIMIT 200'));
   // Hata özeti (son 30 gün): aynı hata (sayılar / kimlikler ayıklanarak) kanal bazında gruplanır; açıklama ve kopyalanabilir rapor
   if (path === 'logs/errors' && m === 'GET') {

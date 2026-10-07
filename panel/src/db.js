@@ -194,6 +194,8 @@ const MIGRATIONS = [
   'ALTER TABLE tenants ADD COLUMN usage_at INTEGER',
   // Dış API (stok aktarımı) yetkisi: JSON (açık mı, anahtar özeti, IP kısıtı, kullanım) — bkz. extapi.js
   'ALTER TABLE tenants ADD COLUMN api TEXT',
+  // Firma kartında elle girilen mağaza sınırı (boşsa paketin sınırı; bkz. plans.js)
+  'ALTER TABLE tenants ADD COLUMN max_stores INTEGER',
   // Stok düşümü bekleyen sipariş (bkz. sync.js applyStock): kanaldan gelen değişiklik, sonradan kurulan / kaldırılan eşleşme.
   // Düşüm yapılınca 0 olur; senkron yarıda kesilse bile bir sonraki senkronda tamamlanır.
   'ALTER TABLE orders ADD COLUMN stock_dirty INTEGER NOT NULL DEFAULT 0',

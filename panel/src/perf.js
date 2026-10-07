@@ -58,6 +58,8 @@ export async function maintain(db) {
   await del('price_changes', 'DELETE FROM price_changes WHERE at < ?', t - 365 * 864e5);
   await del('notices', 'DELETE FROM notices WHERE resolved_at IS NOT NULL AND resolved_at < ?', t - 30 * 864e5);
   await del('fails', "DELETE FROM settings WHERE (k LIKE 'login_fail:%' OR k LIKE 'tfa_fail:%' OR k LIKE 'lead_rate:%' OR k LIKE 'demo_rate:%') AND json_extract(v, '$.at') < ?", t - 864e5);
+  await del('expmail', "DELETE FROM settings WHERE k LIKE 'expmail:%' AND CAST(substr(k, length(k) - 12) AS INTEGER) < ?", t - 30 * 864e5);
+  await del('pwreset', "DELETE FROM settings WHERE (k LIKE 'pwreset:%' AND json_extract(v, '$.exp') < ?) OR (k LIKE 'pwreset_rate:%' AND json_extract(v, '$.at') < ?) OR (k LIKE 'pw_rate:%' AND json_extract(v, '$.at') < ?)", t, t - 864e5, t - 864e5);
   await del('push_checks', "DELETE FROM push_checks WHERE at < ?", t - 7 * 864e5);
   await del('perf_stats', 'DELETE FROM perf_stats WHERE day < ?', day(t - 45 * 864e5));
   // Sorgu planlayıcı istatistikleri (indeks seçimi): SQLite'ın önerdiği bakım komutu

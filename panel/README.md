@@ -212,6 +212,11 @@ Kullanıcılar → **Müşteri panelleri** (yalnız ana panel yöneticisi): firm
 - Her müşteri paneli ayrı bir **Durable Object**'te kendi SQLite veritabanıyla çalışır: siparişler, ürünler, kullanıcılar ve şifreli API bilgileri yalnız o firmaya aittir; ana panelin API bilgileri, şifresi ve deneme modu müşteriye geçmez. Müşteri kendi kullanıcılarını, mağazalarını ve ayarlarını kendisi yönetir.
 - Kod ortak olduğu için panelin her güncellemesi tüm müşteri panellerine aynı anda gelir. Her müşteri paneli 15 dakikada bir kendi kanallarını senkronlar.
 - Ana panelden: askıya alma (giriş ve senkron durur, veri korunur), yönetici şifresini sıfırlama, istatistik, **Panele gir** (2 saatlik destek oturumu; üstte “Ana panele dön”) ve kalıcı silme.
+- **Paketler** (`src/plans.js`, sitedeki paketlerle aynı): Başlangıç 3 mağaza / 2 kullanıcı; Profesyonel 10 / 5 + buybox ve otomatik fiyat, otomatik ürün gönderimi, hakediş ve faturalar, Excel, personel yetkileri; Kurumsal 25 / sınırsız + Stok API. Firma kartında paket seçilir; mağaza ve kullanıcı sınırı elle de girilebilir ("Özel" pakette sınır yoktur). Paket yükseltilince kısıtlar hemen kalkar.
+- **Abonelik / deneme bitişi**: son 7 günde müşteri panelinin üstünde uyarı çıkar, firma kartındaki e-postaya 7, 3 ve 1 gün kala hatırlatma gider (ana panelin e-posta servisiyle). Süre dolunca giriş ve arka plan senkronu durur, veriler korunur; giriş ekranında ana panelin **Ayarlar → Firma** bölümündeki telefon ve e-posta gösterilir (doldurun). Ödeme kaydıyla süre uzayınca senkron kendiliğinden devam eder.
+- **Hoş geldiniz e-postası**: firma oluşturulurken e-posta girildiyse giriş adresi, firma kodu, kullanıcı adı ve 7 gün geçerli "şifrenizi belirleyin" bağlantısı gider.
+- **Şifremi unuttum**: giriş ekranında (firma koduyla) — kullanıcıya kayıtlı e-postaya 1 saat geçerli, tek kullanımlık bağlantı gider; şifre değişince diğer oturumlar kapanır.
+- **Bekçi**: ana panelin senkronu saatte bir, 2 saattir senkron izi olmayan etkin müşteri panellerinin zamanlayıcısını yeniden kurar.
 - Gereken Cloudflare ayarı `wrangler.jsonc`'de hazır (`durable_objects` + `migrations`); ilk yayında kendiliğinden oluşur. Müşterilerin API bilgileri `PANEL_SECRET`'tan türetilen anahtarla şifrelendiği için **PANEL_SECRET tanımlayın ve değiştirmeyin**.
 
 ## Bilinmesi gerekenler

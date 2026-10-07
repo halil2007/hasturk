@@ -1,5 +1,6 @@
 // /api/* isteklerinin işlenmesi. Ana panel (env.DB) ve müşteri panelleri (her biri kendi Durable Object veritabanında,
 // bkz. tenants.js) aynı kodu kullanır; böylece her güncelleme tüm panellere aynı anda gelir.
+import { planInfo } from './plans.js';
 import { init, getSettings, getLogo } from './db.js';
 import { logoPath } from './mail.js';
 import { api } from './api.js';
@@ -41,7 +42,7 @@ export async function handle(req, env, ctx, db) {
     if (!user) return json({ error: 'Giriş gerekli', setup: !password(env) && !env.TENANT_SLUG, demo: env.DEMO === '1' }, 401);
     // İki adımlı doğrulama zorunluysa ve kullanıcı henüz açmadıysa yalnız kurulum ekranı çalışır
     const need2fa = !user.support && !user.twofa && (await security(db)).require2fa;
-    if (path === 'me') return json({ ok: true, user, need2fa, demo: env.DEMO === '1', tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME || env.TENANT_SLUG } : null });
+    if (path === 'me') return json({ ok: true, user, need2fa, demo: env.DEMO === '1', tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME || env.TENANT_SLUG, ...planInfo(env) } : null });
     if (need2fa && !path.startsWith('me/2fa') && !/^(brand|logo)$/.test(path)) return json({ error: 'Yöneticiniz iki adımlı doğrulamayı zorunlu tuttu; devam etmek için açın', need2fa: true }, 403);
     return await api(req, env, ctx, db, path, user);
   } catch (e) {

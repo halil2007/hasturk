@@ -10,7 +10,7 @@ import { leadRequest, demoRequest } from './lead.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
-import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired, tenantWatchdog } from './tenants.js';
+import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired, tenantWatchdog, contactLine, tenantPassword, expiryReminders } from './tenants.js';
 import { json, body, HttpError } from './util.js';
 
 export { TenantPanel } from './tenants.js';
@@ -47,6 +47,8 @@ export default {
     try {
       // Dış API (stok aktarımı): anahtarla, yalnız ana panelin yetkilendirdiği mağaza (bkz. extapi.js)
       if (path === 'v1' || path.startsWith('v1/')) return await extApi(req, env, ctx, path, { getTenant, forward, expired });
+      // Şifremi unuttum / şifre yenileme (müşteri panelleri, oturumsuz)
+      if ((path === 'password/forgot' || path === 'password/reset') && req.method === 'POST') return json(await tenantPassword(req, env, path.slice(9), await body(req.clone())));
       // Firma koduyla giriş → müşteri paneli
       if (path === 'login' && req.method === 'POST') {
         const b = await body(req.clone());
@@ -66,7 +68,7 @@ export default {
         // Abonelik süresi doldu: müşteri giremez (ana panelin destek oturumu girebilir; yenileme / veri kontrolü için)
         const raw = ((req.headers.get('Cookie') || '').match(/hp_session=([^;]+)/) || [])[1] || '';
         if (expired(t) && !/~-1\./.test(raw.replace(/%7E/gi, '~')))
-          return json({ error: 'Aboneliğinizin süresi doldu. Yenilemek için hizmet sağlayıcınızla görüşün.', tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
+          return json({ error: `${t.trial ? 'Ücretsiz deneme süreniz' : 'Aboneliğinizin süresi'} doldu; verileriniz silinmedi. Paket seçmek / yenilemek için ` + await contactLine(env, true), tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
         return await forward(req, env, t);
       }
       // Ana panel: müşteri panellerinin yönetimi (Kullanıcılar → Müşteri panelleri)
@@ -97,5 +99,6 @@ export default {
     const quick = event && event.cron === '*/2 * * * *';
     ctx.waitUntil((quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true })).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r))).catch((e) => console.error('senkron hatası', e)));
     if (!quick) ctx.waitUntil(tenantWatchdog(env, env.DB).catch((e) => console.error('bekçi hatası', e)));
+    if (!quick) ctx.waitUntil(expiryReminders(env, env.DB).catch((e) => console.error('bitiş hatırlatması hatası', e)));
   },
 };
