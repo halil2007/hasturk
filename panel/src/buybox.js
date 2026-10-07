@@ -5,7 +5,7 @@
 //    bizdeyse rakip = 2. satıcı); buybox bizdeyken fiyat yalnızca hedefe doğru yükseltilir; fiyat asla min/max dışına çıkmaz;
 //    bir ilan 14 dakikada en fazla bir kez değişir; her değişiklik eski/yeni fiyat, zaman ve nedeniyle kaydedilir ve
 //    ardından gerçek buybox durumu yeniden kontrol edilir.
-import { all, first, run, log, notify, resolve } from './db.js';
+import { all, first, run, allIn, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { r2 } from './util.js';
 import { trackPush } from './sync.js';
@@ -50,7 +50,7 @@ export async function checkBuybox(env, db, { channel, ids, limit = 100 } = {}) {
   const out = {};
   for (const ch of chans) {
     const rows = ids && ids.length
-      ? await all(db, `SELECT l.remote_id, l.price, b.rank, b.checked_at FROM listings l LEFT JOIN buybox b ON b.channel = l.channel AND b.remote_id = l.remote_id WHERE l.channel = ? AND l.remote_id IN (${ids.map(() => '?').join(',')})`, ch.id, ...ids.map(String))
+      ? await allIn(db, ids.map(String), (ph, part) => [`SELECT l.remote_id, l.price, b.rank, b.checked_at FROM listings l LEFT JOIN buybox b ON b.channel = l.channel AND b.remote_id = l.remote_id WHERE l.channel = ? AND l.remote_id IN (${ph})`, [ch.id, ...part]])
       : await all(db, `SELECT l.remote_id, l.price, b.rank, b.checked_at FROM listings l
           LEFT JOIN buybox b ON b.channel = l.channel AND b.remote_id = l.remote_id LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id
           WHERE l.channel = ? AND l.remote_id != '' ORDER BY COALESCE(r.enabled, 0) DESC, COALESCE(b.checked_at, 0) ASC LIMIT ?`, ch.id, limit);

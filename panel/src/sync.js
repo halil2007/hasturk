@@ -5,7 +5,7 @@
 //  4) Her ilanın olması gereken stoğunu (kanal kuralına göre) hesapla; kanaldakiyle farklıysa gönder
 //  Başarısız adım bir kez daha denenir; üst üste başarısız olursa Bildirimler'e yazılır.
 import { compareFetched, checkMissing } from './orderclean.js';
-import { all, first, run, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
+import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { typeOf } from './config.js';
 import { syncInvoices, syncSettlements } from './finance.js';
@@ -630,7 +630,7 @@ export async function quickSync(env, db) {
     for (const u of await all(db, "SELECT channel, items FROM product_uploads WHERE status = 'done' AND created_at > ?", t - 2 * 864e5)) {
       const keys = JSON.parse(u.items || '[]').filter((x) => x.ok === true).map((x) => String(x.key || '').trim().toUpperCase()).filter(Boolean);
       if (!keys.length) continue;
-      const seen = new Set((await all(db, `SELECT UPPER(TRIM(sku)) AS s FROM listings WHERE channel = ? AND UPPER(TRIM(sku)) IN (${keys.map(() => '?').join(',')})`, u.channel, ...keys)).map((r) => r.s));
+      const seen = new Set((await allIn(db, keys, (ph, part) => [`SELECT UPPER(TRIM(sku)) AS s FROM listings WHERE channel = ? AND UPPER(TRIM(sku)) IN (${ph})`, [u.channel, ...part]])).map((r) => r.s));
       if (keys.some((k) => !seen.has(k))) wait.add(u.channel);
     }
     for (const chId of wait) {

@@ -1,5 +1,5 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
-import { all, first, run, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
+import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, isExtra, fieldsFor } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
@@ -118,11 +118,11 @@ async function listOrders(db, q) {
   const items = {}, full = {};
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    for (const it of await all(db, `SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
+    for (const it of await allIn(db, ids, (ph, part) => [`SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
         p.purchase_price, p.ship_cost, l.commission AS listing_commission
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
-      WHERE i.order_id IN (${ids.map(() => '?').join(',')}) ORDER BY i.rowid`, ...ids)) {
+      WHERE i.order_id IN (${ph}) ORDER BY i.rowid`, part])) {
       (items[it.order_id] = items[it.order_id] || []).push({ name: it.pname || it.name, qty: it.quantity, sku: it.sku, image: it.image || '' });
       (full[it.order_id] = full[it.order_id] || []).push(it);
     }
@@ -659,8 +659,8 @@ async function listProducts(db, q) {
     // Sayfalama ana ürün bazında: her sayfada N ana ürün ve tüm (filtreye uyan) varyantları; grup sırası korunur
     const gks = (await all(db, `SELECT ${GK} AS gk, MIN(${NAME}) AS gn FROM products p ${SJ} ${w} GROUP BY gk ORDER BY ${so ? so[1] + ', ' : ''}gn COLLATE NOCASE LIMIT ? OFFSET ?`, ...args, limit, (page - 1) * limit)).map((r) => r.gk);
     if (!gks.length) return [];
-    const list = await all(db, `SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${SJ} ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${gks.map(() => '?').join(',')})
-      ORDER BY ${NAME}, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, ...args, ...gks);
+    const list = await allIn(db, gks, (ph, part) => [`SELECT p.*, ${GK} AS gk, ${low} AS low_limit FROM products p ${SJ} ${w ? w + ' AND' : 'WHERE'} ${GK} IN (${ph})
+      ORDER BY ${NAME}, gk, p.variant_name COLLATE NOCASE, p.name COLLATE NOCASE`, [...args, ...part]]);
     const at = new Map(gks.map((g, i) => [g, i]));
     return list.sort((a, b) => at.get(a.gk) - at.get(b.gk));
   };
@@ -679,11 +679,11 @@ async function listProducts(db, q) {
   const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    const [ls, soldRows] = await Promise.all([all(db, `SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
-      FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ids.map(() => '?').join(',')})`, ...ids),
+    const [ls, soldRows] = await Promise.all([allIn(db, ids, (ph, part) => [`SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ph})`, part]),
     // Satış hızı: son 30 günde satılan adet ve mevcut stokla kaç gün yeteceği
-    all(db, `SELECT i.product_id AS id, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id IN (${ids.map(() => '?').join(',')}) AND o.ordered_at >= ?
-      AND o.status NOT IN ('cancelled', 'returned') AND COALESCE(i.status, '') != 'cancelled' GROUP BY i.product_id`, ...ids, Date.now() - 30 * 864e5)]);
+    allIn(db, ids, (ph, part) => [`SELECT i.product_id AS id, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id IN (${ph}) AND o.ordered_at >= ?
+      AND o.status NOT IN ('cancelled', 'returned') AND COALESCE(i.status, '') != 'cancelled' GROUP BY i.product_id`, [...part, Date.now() - 30 * 864e5]])]);
     for (const r of rows) r.listings = ls.filter((l) => l.product_id === r.id);
     const sold = new Map(soldRows.map((x) => [x.id, x.n]));
     for (const r of rows) { r.sold30 = sold.get(r.id) || 0; r.days_left = r.sold30 > 0 ? Math.floor((Math.max(0, r.stock) * 30) / r.sold30) : null; }
@@ -1484,11 +1484,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products-variants' && m === 'GET') {
     const ids = str(q.ids).split(',').map(Number).filter((x) => x > 0).slice(0, 300);
     if (!ids.length) fail(400, 'Ürün seçin');
-    const ph = ids.map(() => '?').join(',');
     const [prods, ls] = await Promise.all([
-      all(db, `SELECT id, name, group_name, variant_name, sku, barcode, brand, image, purchase_price, sale_price, stock, critical_stock, vat, desi, active, currency, fx_price FROM products WHERE id IN (${ph}) ORDER BY variant_name COLLATE NOCASE, name COLLATE NOCASE`, ...ids),
-      all(db, `SELECT product_id, channel, remote_id, price, commission, error FROM listings WHERE product_id IN (${ph})`, ...ids),
+      allIn(db, ids, (ph, part) => [`SELECT id, name, group_name, variant_name, sku, barcode, brand, image, purchase_price, sale_price, stock, critical_stock, vat, desi, active, currency, fx_price FROM products WHERE id IN (${ph}) ORDER BY variant_name COLLATE NOCASE, name COLLATE NOCASE`, part]),
+      allIn(db, ids, (ph, part) => [`SELECT product_id, channel, remote_id, price, commission, error FROM listings WHERE product_id IN (${ph})`, part]),
     ]);
+    prods.sort((a, b) => String(a.variant_name || '').localeCompare(String(b.variant_name || ''), 'tr') || String(a.name).localeCompare(String(b.name), 'tr'));
     const st = await getSettings(db), cats = catalogOf(st);
     for (const p of prods) {
       p.listings = ls.filter((l) => l.product_id === p.id);

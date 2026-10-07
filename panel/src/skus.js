@@ -54,9 +54,11 @@ export function skuFor(p, prefix = '') {
 }
 
 async function usedSkus(db, exceptIds = []) {
-  const rows = await all(db, `SELECT UPPER(TRIM(sku)) AS s FROM products WHERE COALESCE(TRIM(sku), '') != ''${exceptIds.length ? ` AND id NOT IN (${exceptIds.map(() => '?').join(',')})` : ''}
-    UNION SELECT UPPER(TRIM(sku)) FROM listings WHERE COALESCE(TRIM(sku), '') != '' AND (product_id IS NULL${exceptIds.length ? ` OR product_id NOT IN (${exceptIds.map(() => '?').join(',')})` : ''})`, ...exceptIds, ...exceptIds);
-  return new Set(rows.map((r) => r.s));
+  // Hariç tutulan ürünler sorguya değil sonuca uygulanır (uzun listede D1 "too many SQL variables" vermesin)
+  const skip = new Set(exceptIds.map(Number));
+  const rows = await all(db, `SELECT UPPER(TRIM(sku)) AS s, id AS pid FROM products WHERE COALESCE(TRIM(sku), '') != ''
+    UNION ALL SELECT UPPER(TRIM(sku)), product_id FROM listings WHERE COALESCE(TRIM(sku), '') != ''`);
+  return new Set(rows.filter((r) => r.pid == null || !skip.has(Number(r.pid))).map((r) => r.s));
 }
 function unique(sku, used) {
   let s = sku;

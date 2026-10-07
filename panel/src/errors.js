@@ -87,7 +87,7 @@ export async function errorsApi(req, db, path, q, b) {
   if (path === 'errors/bulk' && m === 'POST') {
     const ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter(Boolean).slice(0, 500);
     if (!STATUS.includes(b.status) || !ids.length) fail(400, 'Kayıt seçin');
-    await run(db, `UPDATE error_reports SET status = ?, reopened = 0, resolved_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`, b.status, b.status === 'open' ? null : Date.now(), ...ids);
+    for (let i = 0; i < ids.length; i += 90) { const part = ids.slice(i, i + 90); await run(db, `UPDATE error_reports SET status = ?, reopened = 0, resolved_at = ? WHERE id IN (${part.map(() => '?').join(',')})`, b.status, b.status === 'open' ? null : Date.now(), ...part); }
     return { ok: true, n: ids.length };
   }
   fail(404, 'Bulunamadı');
