@@ -58,15 +58,29 @@ export function opencart(env, meta) {
     };
   }
 
+  // Dosya siparişleri seçilen tarihe göre eskiden yeniye verir: 50 sayfa (5000 sipariş) sınırına gelinirse kalanlar
+  // son okunan siparişin değiştirilme zamanından itibaren bir sonraki senkronda alınır (partialUntil)
   async function fetchOrders(since, until, { byOrdered = false } = {}) {
     const out = [], range = { since: Math.floor(since / 1000), until: Math.ceil(until / 1000), by: byOrdered ? 'added' : 'modified', limit: 100 };
+    let last = null;
     for (let page = 1; page <= 50; page++) {
       const r = await call('orders', { ...range, page });
       for (const o of r.orders || []) out.push(norm(o));
-      if (!r.more) break;
+      if (!r.more) return out;
+      last = (r.orders || []).slice(-1)[0] || last;
     }
+    out.warnings = ['OpenCart: bu aralıkta 5000+ sipariş var; kalanlar bir sonraki senkronda alınacak'];
+    if (!byOrdered) out.partialUntil = last && num(last.modified) ? Math.max(since, num(last.modified) * 1000) : since;
     return out;
   }
+  // Tek sipariş: durumu 0 olan (yarım kalmış) ya da silinmiş sipariş dönmez
+  const getOrder = async (id) => ((await call('orders', { ids: [Number(id) || 0] })).orders || [])[0] || null;
+  async function fetchOne(id) {
+    const o = await getOrder(id);
+    if (!o) throw new Error('OpenCart: sipariş bulunamadı');
+    return norm(o);
+  }
+  const orderExists = async (id) => !!(await getOrder(id));
 
   // Ürün: seçeneği yoksa tek ilan; seçenek değerleri varsa her değer ayrı ilan (fiyat = ana fiyat ± fark, stok = seçenek adedi)
   const listing = (p, v) => {
@@ -123,7 +137,7 @@ export function opencart(env, meta) {
     if (!ping) { out.push({ name: 'İpucu', ok: null, detail: `404 ya da "yanıt vermedi": ${bridge} dosyasını panelden indirip OpenCart ana klasörüne (config.php'nin yanına) yükleyin · 401: dosyadaki anahtar paneldekiyle aynı değil, dosyayı yeniden indirip yükleyin · 500: config.php / veritabanı okunamadı` }); return out; }
     await diagStep(out, 'Siparişler (son 7 gün)', async () => { const o = await fetchOrders(now - 7 * 864e5, now); return { detail: `${o.length} sipariş${o[0] ? ` · örnek #${o[0].orderNumber}: ${o[0].remoteStatus} → ${o[0].status}` : ''}` }; });
     if (orderId) await diagStep(out, `Sipariş ${orderId}`, async () => {
-      const o = ((await call('orders', { ids: [Number(orderId) || 0] })).orders || [])[0];
+      const o = await getOrder(orderId);
       if (!o) throw new Error('Sipariş bulunamadı (durumu 0 olan yarım siparişler alınmaz)');
       return { detail: `#${o.order_id}: ${o.status} → ${ocStatus(o.status)} · ${(o.products || []).length} kalem` };
     });
@@ -137,6 +151,6 @@ export function opencart(env, meta) {
   return {
     ...meta, type: 'opencart', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose,
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, diagnose,
   };
 }

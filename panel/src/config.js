@@ -84,8 +84,10 @@ export const FIELDS = {
   ],
   shopify: [
     { k: 'SHOPIFY_STORE', label: 'Mağaza adresi', req: true, hint: 'XXXX.myshopify.com → XXXX (ya da adresin tamamı)' },
-    { k: 'SHOPIFY_TOKEN', label: 'Admin API erişim belirteci', secret: true, req: true, hint: 'Shopify yönetimi → Ayarlar → Uygulamalar → Uygulama geliştir → özel uygulama (izinler: ürünler, siparişler, stok, lokasyon okuma + yazma) → shpat_…' },
-    { k: 'SHOPIFY_LOCATION_ID', label: 'Stok lokasyonu ID', hint: 'boşsa ilk lokasyon', adv: true },
+    { k: 'SHOPIFY_CLIENT_ID', label: 'Client ID', hint: 'dev.shopify.com → Dev Dashboard → uygulama → Ayarlar (uygulamayı mağazanıza kurun; kapsamlar: read_orders, read_all_orders, write_products, write_inventory, read_locations, write_merchant_managed_fulfillment_orders, write_fulfillments)' },
+    { k: 'SHOPIFY_CLIENT_SECRET', label: 'Client secret', secret: true, hint: 'Dev Dashboard → uygulama → Ayarlar → Client secret' },
+    { k: 'SHOPIFY_TOKEN', label: 'Admin API erişim belirteci (eski)', secret: true, adv: true, hint: 'Yalnız eski (Shopify yönetiminde oluşturulmuş) özel uygulamalar: shpat_… — Client ID / secret girildiyse gerekmez' },
+    { k: 'SHOPIFY_LOCATION_ID', label: 'Stok lokasyonu ID', hint: 'boşsa ana (primary) lokasyon', adv: true },
   ],
   woocommerce: [
     { k: 'WOO_URL', label: 'Site adresi', req: true, hint: 'ör. https://magazaniz.com', pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan site adresini girin' },

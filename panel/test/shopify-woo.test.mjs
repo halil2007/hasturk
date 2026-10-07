@@ -61,7 +61,7 @@ test('Shopify: siparişler sayfalı okunur, kalem taşması ayrıca çekilir, al
   const ch = shopify(SENV, { id: 'shopify' });
   const since = Date.parse('2026-10-01T00:00:00Z'), until = Date.parse('2026-10-02T00:00:00Z');
   const list = await ch.fetchOrders(since, until);
-  assert.equal(calls[0].url, 'https://hasturk.myshopify.com/admin/api/2025-07/graphql.json');
+  assert.equal(calls[0].url, 'https://hasturk.myshopify.com/admin/api/2026-10/graphql.json');
   assert.equal(calls[0].method, 'POST');
   assert.equal(calls[0].headers['X-Shopify-Access-Token'], 'shpat_x');
   assert.equal(calls[0].body.variables.q, "updated_at:>='2026-10-01T00:00:00Z' updated_at:<='2026-10-02T00:00:00Z'");
@@ -100,11 +100,11 @@ test('Shopify: sorgu maliyeti aşılırsa sayfa küçülür, THROTTLED beklenip 
   });
   const ch = shopify(SENV, { id: 'shopify' });
   assert.deepEqual(await ch.fetchOrders(0, 1), []);
-  assert.equal(calls[0].body.variables.first, 10);
-  assert.equal(calls[1].body.variables.first, 4, '10 × 1000 × 0.8 / 2000');
-  assert.equal(calls[2].body.variables.first, 4);
+  assert.equal(calls[0].body.variables.first, 50);
+  assert.equal(calls[1].body.variables.first, 20, '50 × 1000 × 0.8 / 2000');
+  assert.equal(calls[2].body.variables.first, 20);
   await ch.fetchOrders(0, 1).then(() => assert.fail('hata bekleniyordu'), (e) => assert.match(e.message, /^Shopify: Access denied/));
-  assert.equal(calls[3].body.variables.first, 4, 'küçülen boyut sonraki çağrıda da kullanılır');
+  assert.equal(calls[3].body.variables.first, 20, 'küçülen boyut sonraki çağrıda da kullanılır');
 });
 
 test('Shopify: ürün listesi varyant düzeyinde', async () => {
@@ -122,7 +122,7 @@ test('Shopify: ürün listesi varyant düzeyinde', async () => {
 test('Shopify: stok inventorySetQuantities ile; lokasyon, etkinleştirme, takipsiz/silinmiş varyant atlanır', async () => {
   const calls = mockFetch((c) => {
     const q = c.body.query;
-    if (/locations\(first/.test(q)) return { data: { locations: { nodes: [{ id: 'gid://shopify/Location/5', name: 'Depo', isActive: true }] } } };
+    if (/^\{ location \{/.test(q)) return { data: { location: { id: 'gid://shopify/Location/5', isActive: true } } }; // ana lokasyon
     if (/nodes\(ids/.test(q)) return { data: { nodes: [
       { id: 'gid://shopify/ProductVariant/11', product: { id: 'gid://shopify/Product/1' }, inventoryItem: { id: 'gid://shopify/InventoryItem/111', tracked: true, inventoryLevel: { id: 'L' } } },
       { id: 'gid://shopify/ProductVariant/12', product: { id: 'gid://shopify/Product/1' }, inventoryItem: { id: 'gid://shopify/InventoryItem/112', tracked: true, inventoryLevel: null } },
@@ -136,11 +136,18 @@ test('Shopify: stok inventorySetQuantities ile; lokasyon, etkinleştirme, takips
   await shopify(SENV, {}).pushStock([{ remoteId: '11', stock: 7 }, { remoteId: '12', stock: -1 }, { remoteId: '13', stock: 3 }, { remoteId: '14', stock: 1 }]);
   const nodes = calls.find((c) => /nodes\(ids/.test(c.body.query));
   assert.deepEqual(nodes.body.variables, { ids: ['gid://shopify/ProductVariant/11', 'gid://shopify/ProductVariant/12', 'gid://shopify/ProductVariant/13', 'gid://shopify/ProductVariant/14'], loc: 'gid://shopify/Location/5' });
-  assert.deepEqual(calls.find((c) => /inventoryActivate/.test(c.body.query)).body.variables, { i: 'gid://shopify/InventoryItem/112', l: 'gid://shopify/Location/5' });
+  const act = calls.find((c) => /inventoryActivate/.test(c.body.query));
+  assert.deepEqual({ ...act.body.variables, key: undefined }, { i: 'gid://shopify/InventoryItem/112', l: 'gid://shopify/Location/5', key: undefined });
+  assert.match(act.body.query, /@idempotent\(key: \$key\)/);
+  assert.match(act.body.variables.key, /^[0-9a-f-]{36}$/);
   const set = calls.find((c) => /inventorySetQuantities/.test(c.body.query));
-  assert.deepEqual(set.body.variables.input, { name: 'available', reason: 'correction', ignoreCompareQuantity: true, quantities: [
-    { inventoryItemId: 'gid://shopify/InventoryItem/111', locationId: 'gid://shopify/Location/5', quantity: 7 },
-    { inventoryItemId: 'gid://shopify/InventoryItem/112', locationId: 'gid://shopify/Location/5', quantity: 0 },
+  // 2026-04+: ignoreCompareQuantity yok, changeFromQuantity (null) zorunlu, @idempotent anahtarı zorunlu
+  assert.match(set.body.query, /inventorySetQuantities\(input: \$input\) @idempotent\(key: \$key\)/);
+  assert.match(set.body.variables.key, /^[0-9a-f-]{36}$/);
+  assert.notEqual(set.body.variables.key, act.body.variables.key);
+  assert.deepEqual(set.body.variables.input, { name: 'available', reason: 'correction', quantities: [
+    { inventoryItemId: 'gid://shopify/InventoryItem/111', locationId: 'gid://shopify/Location/5', quantity: 7, changeFromQuantity: null },
+    { inventoryItemId: 'gid://shopify/InventoryItem/112', locationId: 'gid://shopify/Location/5', quantity: 0, changeFromQuantity: null },
   ] });
   // Lokasyon env'den (sayı) gelirse sorgulanmaz; userErrors hata olur
   const calls2 = mockFetch((c) => (/nodes\(ids/.test(c.body.query)
@@ -226,7 +233,7 @@ test('WooCommerce: siparişler Basic kimlikle, değiştirilme tarihine göre say
   assert.equal(calls.length, 2);
   assert.equal(calls[0].headers.Authorization, AUTH);
   assert.match(calls[0].url, /^https:\/\/magaza\.com\/wp-json\/wc\/v3\/orders\?/);
-  assert.deepEqual(qs(calls[0].url), { modified_after: '2026-10-01T00:00:00Z', modified_before: '2026-10-03T00:00:00Z', dates_are_gmt: 'true', per_page: '100', page: '1', orderby: 'date', order: 'desc' });
+  assert.deepEqual(qs(calls[0].url), { modified_after: '2026-10-01T00:00:00Z', modified_before: '2026-10-03T00:00:00Z', orderby: 'modified', order: 'asc', dates_are_gmt: 'true', per_page: '100', page: '1' });
   assert.equal(qs(calls[1].url).page, '2');
   assert.equal(list.length, 98, 'pending / failed / checkout-draft alınmaz');
   const o = list[0];
@@ -324,7 +331,8 @@ test('WooCommerce: kargoya verme not + completed; başka açık paket varsa yaln
 test('WooCommerce: tanılama', async () => {
   mockFetch((c) => (/\/orders\/55/.test(c.url) ? { id: 55, number: '55', status: 'on-hold' } : /\/orders/.test(c.url) ? [wOrder(5, 'completed')] : [{ id: 1 }]));
   const out = await woocommerce(WENV, {}).diagnose({ orderId: '55' });
-  assert.deepEqual(out.map((x) => x.ok), [true, true, true, null]);
+  assert.deepEqual(out.map((x) => x.ok), [true, true, true, true, null]);
+  assert.match(out[3].detail, /Vergi hesaplama kapalı/);
   assert.match(out[0].detail, /HTTP Basic · ürün örneği alındı/);
   assert.match(out[1].detail, /1 sipariş · örnek #5: completed → shipped/);
   assert.match(out[2].detail, /#55: on-hold → new/);

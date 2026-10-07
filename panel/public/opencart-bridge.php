@@ -69,6 +69,20 @@ function hb_exec($sql, $types, $params) {
 function hb_ids($list) { $ids = array(); foreach ($list as $x) { $i = (int)$x; if ($i > 0) $ids[$i] = $i; } return $ids ? implode(',', $ids) : '0'; } // IN (...) için yalnız tam sayılar
 function hb_txt($s) { return $s === null ? '' : html_entity_decode((string)$s, ENT_QUOTES, 'UTF-8'); } // OpenCart metinleri HTML kaçışlı saklar
 function hb_table($name) { static $c = array(); if (!isset($c[$name])) $c[$name] = (bool)hb_rows("SHOW TABLES LIKE '" . hb_esc(addcslashes(DB_PREFIX . $name, '_%')) . "'"); return $c[$name]; }
+function hb_col($table, $col) { static $c = array(); $k = $table . '.' . $col; if (!isset($c[$k])) $c[$k] = hb_table($table) && (bool)hb_rows('SHOW COLUMNS FROM ' . hb_t($table) . " LIKE '" . hb_esc(addcslashes($col, '_%')) . "'"); return $c[$k]; }
+// İndirimli fiyat tablosu: OpenCart 2.x–4.0 product_special; 4.1+ product_discount (special = 1, type F sabit / P yüzde / S düşülen tutar)
+function hb_special_mode() { static $m = null; if ($m === null) $m = hb_table('product_special') ? 'special' : (hb_col('product_discount', 'special') ? 'discount' : ''); return $m; }
+// Bugün geçerli indirimli fiyat (varsayılan müşteri grubu; vitrindeki gibi öncelik, sonra en düşük fiyat) — p takma adlı ürün satırı için alt sorgu
+function hb_special_sql($CG) {
+  $sm = hb_special_mode(); $CG = (int)$CG;
+  if ($sm === 'special') return '(SELECT ps.price FROM ' . hb_t('product_special') . " ps WHERE ps.product_id = p.product_id AND ps.customer_group_id = $CG
+    AND (ps.date_start = '0000-00-00' OR ps.date_start <= CURDATE()) AND (ps.date_end = '0000-00-00' OR ps.date_end > CURDATE()) ORDER BY ps.priority, ps.price LIMIT 1)";
+  // OpenCart 4.1 vitrin sorgusuyla aynı: adet 1, special = 1; yüzde / düşülen tutar türü ana fiyattan hesaplanır
+  if ($sm === 'discount') return "(SELECT (CASE WHEN ps.type = 'P' THEN p.price - (p.price * (ps.price / 100)) WHEN ps.type = 'S' THEN p.price - ps.price ELSE ps.price END) FROM " . hb_t('product_discount') . " ps
+    WHERE ps.product_id = p.product_id AND ps.customer_group_id = $CG AND ps.quantity = 1 AND ps.special = 1
+    AND (ps.date_start = '0000-00-00' OR ps.date_start <= CURDATE()) AND (ps.date_end = '0000-00-00' OR ps.date_end > CURDATE()) ORDER BY ps.priority, ps.price LIMIT 1)";
+  return 'NULL';
+}
 function hb_settings($keys) {
   $q = array(); foreach ($keys as $k) $q[] = "'" . hb_esc($k) . "'";
   $out = array(); foreach (hb_rows('SELECT `key`, `value` FROM ' . hb_t('setting') . ' WHERE store_id = 0 AND `key` IN (' . implode(',', $q) . ')') as $r) $out[$r['key']] = $r['value'];
@@ -123,7 +137,7 @@ try {
       $p = hb_rows('SELECT COUNT(*) AS n FROM ' . hb_t('product'));
       $o = hb_rows('SELECT COUNT(*) AS n FROM ' . hb_t('order') . ' WHERE order_status_id > 0');
       hb_out(array('ok' => true, 'version' => $ver, 'php' => PHP_VERSION, 'prefix' => DB_PREFIX, 'language_id' => $LANG, 'customer_group_id' => $CG,
-        'timezone' => date_default_timezone_get(), 'special' => hb_table('product_special'), 'ship_status' => $shipStatus(),
+        'timezone' => date_default_timezone_get(), 'special' => hb_special_mode() !== '', 'ship_status' => $shipStatus(),
         'counts' => array('products' => $p ? (int)$p[0]['n'] : 0, 'orders' => $o ? (int)$o[0]['n'] : 0)));
 
     case 'statuses':
@@ -174,8 +188,7 @@ try {
     // Fiyat: ana fiyat + bugün geçerli indirimli fiyat (varsayılan müşteri grubu). Seçenek fiyatı ana fiyata eklenen / düşülen farktır.
     case 'products':
       $limit = max(1, min(500, (int)hb_in($in, 'limit', 500)));
-      $special = hb_table('product_special') ? '(SELECT ps.price FROM ' . hb_t('product_special') . " ps WHERE ps.product_id = p.product_id AND ps.customer_group_id = $CG
-        AND (ps.date_start = '0000-00-00' OR ps.date_start <= CURDATE()) AND (ps.date_end = '0000-00-00' OR ps.date_end > CURDATE()) ORDER BY ps.priority, ps.price LIMIT 1)" : 'NULL';
+      $special = hb_special_sql($CG);
       $list = hb_rows("SELECT p.product_id, p.model, p.sku, p.ean, p.upc, p.mpn, p.quantity, p.subtract, p.price, p.status, p.image, $special AS special,
         (SELECT pd.name FROM " . hb_t('product_description') . " pd WHERE pd.product_id = p.product_id ORDER BY pd.language_id = $LANG DESC, pd.language_id LIMIT 1) AS name
         FROM " . hb_t('product') . ' p ORDER BY p.product_id LIMIT ' . (($page - 1) * $limit) . ", $limit");
@@ -224,6 +237,7 @@ try {
     // Seçenek fiyatı OpenCart'ta ana fiyata eklenen farktır: seçenek kalemlerinden ana fiyat geri hesaplanır (fiyat − fark);
     // aynı ürünün seçenekleri farklı ana fiyat gerektiriyorsa (farklar panelle uyuşmuyor) o ürün güncellenmez, hata döner.
     // İndirimli fiyat varsayılan müşteri grubunda, öncelik 1, bitişi 9999-12-31 olan kendi satırımızla tutulur; diğer satırlara dokunulmaz.
+    // OpenCart 4.1+: aynı satır product_discount tablosunda (special = 1, adet 1, tür F = sabit fiyat).
     case 'price':
       $items = is_array(hb_in($in, 'items')) ? array_slice($in['items'], 0, 1000) : array();
       $updated = 0; $errors = array(); $want = array();
@@ -240,20 +254,27 @@ try {
         }
         $want[$pid][] = array($price, $sp > 0 && $sp < $price ? $sp : 0, $ovid);
       }
-      $hasSpecial = hb_table('product_special');
+      $sm = hb_special_mode(); $hasSpecial = $sm !== '';
+      $stab = $sm === 'discount' ? hb_t('product_discount') : hb_t('product_special'); $sid_ = $sm === 'discount' ? 'product_discount_id' : 'product_special_id';
+      $sw = $sm === 'discount' ? ' AND special = 1 AND quantity = 1' : '';
       foreach ($want as $pid => $list) {
         list($price, $sp) = $list[0];
         foreach ($list as $w) if (abs($w[0] - $price) > 0.005 || abs($w[1] - $sp) > 0.005) { $errors[] = array('product_id' => $pid, 'message' => 'seçenek fiyatları ana fiyatla uyuşmuyor (OpenCart\'ta seçenek fiyatı fark olarak tutulur; farkları OpenCart\'ta düzenleyin)'); continue 2; }
         if (!$hasSpecial && $sp > 0) { $price = $sp; $sp = 0; } // indirimli fiyat tablosu yok: satış fiyatı ana fiyat olur
         if (hb_exec('UPDATE ' . hb_t('product') . ' SET price = ?, date_modified = NOW() WHERE product_id = ?', 'di', array($price, $pid)) < 1) { $errors[] = array('product_id' => $pid, 'message' => 'ürün bulunamadı'); continue; }
         if ($hasSpecial) {
-          $mine = hb_rows('SELECT product_special_id FROM ' . hb_t('product_special') . " WHERE product_id = $pid AND customer_group_id = $CG AND date_end = '" . HASTURK_SPECIAL_END . "' ORDER BY product_special_id");
+          $mine = hb_rows("SELECT $sid_ AS id FROM $stab WHERE product_id = $pid AND customer_group_id = $CG AND date_end = '" . HASTURK_SPECIAL_END . "'$sw ORDER BY $sid_");
           if ($sp > 0) {
-            if ($mine) hb_exec('UPDATE ' . hb_t('product_special') . " SET price = ?, priority = 1, date_start = '2000-01-01' WHERE product_special_id = ?", 'di', array($sp, (int)$mine[0]['product_special_id']));
-            else hb_exec('INSERT INTO ' . hb_t('product_special') . " (product_id, customer_group_id, priority, price, date_start, date_end) VALUES (?, ?, 1, ?, '2000-01-01', '" . HASTURK_SPECIAL_END . "')", 'iid', array($pid, $CG, $sp));
+            if ($mine) hb_exec("UPDATE $stab SET price = ?, priority = 1, date_start = '2000-01-01'" . ($sm === 'discount' ? ", type = 'F'" : '') . " WHERE $sid_ = ?", 'di', array($sp, (int)$mine[0]['id']));
+            elseif ($sm === 'discount') hb_exec("INSERT INTO $stab (product_id, customer_group_id, quantity, priority, price, type, special, date_start, date_end) VALUES (?, ?, 1, 1, ?, 'F', 1, '2000-01-01', '" . HASTURK_SPECIAL_END . "')", 'iid', array($pid, $CG, $sp));
+            else hb_exec("INSERT INTO $stab (product_id, customer_group_id, priority, price, date_start, date_end) VALUES (?, ?, 1, ?, '2000-01-01', '" . HASTURK_SPECIAL_END . "')", 'iid', array($pid, $CG, $sp));
             array_shift($mine);
           }
-          if ($mine) { $del = array(); foreach ($mine as $m) $del[] = $m['product_special_id']; $GLOBALS['hb_db']->query('DELETE FROM ' . hb_t('product_special') . ' WHERE product_special_id IN (' . hb_ids($del) . ')'); }
+          if ($mine) { $del = array(); foreach ($mine as $m) $del[] = $m['id']; $GLOBALS['hb_db']->query("DELETE FROM $stab WHERE $sid_ IN (" . hb_ids($del) . ')'); }
+          // Satıcının OpenCart'ta girdiği (daha öncelikli ya da daha düşük) indirimli fiyat panelin fiyatını geçersiz kılıyorsa bildirilir
+          $eff = hb_rows('SELECT ' . hb_special_sql($CG) . ' AS s FROM ' . hb_t('product') . " p WHERE p.product_id = $pid");
+          $e = $eff && $eff[0]['s'] !== null ? round((float)$eff[0]['s'], 4) : 0;
+          if (abs($e - $sp) > 0.005) { $errors[] = array('product_id' => $pid, 'message' => 'OpenCart\'ta panel dışı indirimli fiyat geçerli (' . $e . '; panelin fiyatı ' . ($sp > 0 ? $sp : $price) . '): ürünün "İndirimli fiyat" (Special) sekmesindeki satırı silin' . ($sp > 0 ? ' ya da önceliğini 1\'den büyük yapın' : '')); continue; }
         }
         $updated++;
       }
