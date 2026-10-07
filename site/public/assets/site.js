@@ -64,15 +64,30 @@
         <div class="y-sub">2 ay hediye · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
         ${inst ? `<div class="y-inst"><b>Peşin fiyatına ${S.installments} taksit</b><span>${inst}</span></div>` : ''}</div>` : ''}`;
   };
-  $$('[data-plans]').forEach((el) => {
+  // "Hemen satın al" yalnız online satış açıkken (panelde iyzico API bilgileri girilmişse) görünür; kapalıyken eski hali
+  const renderPlans = (shop) => $$('[data-plans]').forEach((el) => {
     el.innerHTML = (S.plans || []).map((p) => `<div class="plan${p.featured ? ' featured' : ''}">${p.featured ? '<span class="badge">En çok tercih edilen</span>' : ''}
       <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>${priceHtml(p)}
       <div class="limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
       <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-bolt"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul>
-      ${S.checkoutUrl && p.key ? `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/satin-al?plan=${p.key}&amp;donem=yillik">Hemen satın al</a>
+      ${shop && p.key ? `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/satin-al?plan=${p.key}&amp;donem=yillik">Hemen satın al</a>
       <a class="btn btn-line plan-trial" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>` : `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>`}
       <a class="plan-demo" data-demo href="/demo">ya da önce demo panelini açın →</a></div>`).join('');
   });
+  renderPlans(false);
+  const shopOn = () => {
+    document.documentElement.classList.add('shop-on');
+    renderPlans(true);
+    $$('[data-plans] [data-demo]').forEach((a) => { if (S.demoUrl) { a.href = S.demoUrl; a.target = '_blank'; a.rel = 'noopener'; } });
+  };
+  const shopState = (on) => {
+    $$('[data-shop-wait]').forEach((x) => { x.hidden = true; });
+    $$('[data-shop-off]').forEach((x) => { x.hidden = on; });
+    $$('[data-shop]').forEach((x) => { x.hidden = !on; });
+    if (on) shopOn();
+  };
+  if (S.checkoutUrl) fetch(S.checkoutUrl + '/status').then((r) => r.json()).then((j) => shopState(!!j.online)).catch(() => shopState(false));
+  else shopState(false);
   $$('[data-vat]').forEach((el) => { el.textContent = S.vat || ''; });
   const cmp = $('[data-compare]');
   if (cmp && S.compare) {

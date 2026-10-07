@@ -47,6 +47,13 @@ async function start(env, db, order, origin) {
   return { ok: true, url: r.url, order: order.id };
 }
 
+// Site: online satış açık mı (iyzico API bilgileri girildi mi). Açık değilse sitede "Satın al" bölümleri gösterilmez.
+export function checkoutStatus(req, env) {
+  const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');
+  const h = siteOrigins(env).includes(origin) ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {};
+  return json({ online: iyzicoReady(env) }, 200, { ...h, 'Cache-Control': 'public, max-age=60' });
+}
+
 // Siteden: POST /api/public/checkout  { kind: 'new' | 'renew', plan, period, ...alanlar, consent }
 export async function publicCheckout(req, env) {
   const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');

@@ -25,7 +25,7 @@
 <meta name="twitter:image" content="https://hasturkcrm.com/img/genel-bakis.jpg">
 <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://panel.hasturkcrm.com" crossorigin>
-<link rel="stylesheet" href="/assets/site.css?v=d4fe869b64">
+<link rel="stylesheet" href="/assets/site.css?v=bdfaa65e8e">
 <script src="/assets/config.js?v=c4a163eb2f"></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://hasturkcrm.com/#org","name":"Hastürk CRM","url":"https://hasturkcrm.com/","logo":"https://hasturkcrm.com/assets/logo.webp","email":"info@hasturkcrm.com","telephone":"+905539422961","contactPoint":[{"@type":"ContactPoint","telephone":"+905539422961","contactType":"customer service","areaServed":"TR","availableLanguage":["Turkish"]}]},{"@type":"WebSite","@id":"https://hasturkcrm.com/#site","url":"https://hasturkcrm.com/","name":"Hastürk CRM","inLanguage":"tr-TR","publisher":{"@id":"https://hasturkcrm.com/#org"}},{"@type":"BreadcrumbList","@id":"https://hasturkcrm.com/satin-al#crumbs","itemListElement":[{"@type":"ListItem","position":1,"name":"Ana sayfa","item":"https://hasturkcrm.com/"},{"@type":"ListItem","position":2,"name":"Satın al","item":"https://hasturkcrm.com/satin-al"}]},{"@type":"WebPage","@id":"https://hasturkcrm.com/satin-al#page","url":"https://hasturkcrm.com/satin-al","name":"Paket Satın Al — Hastürk CRM","description":"Hastürk CRM paketini kredi kartıyla hemen satın alın: ödeme iyzico güvencesiyle, yıllıkta peşin fiyatına 3 taksit. Ödemeden hemen sonra paneliniz açılır.","inLanguage":"tr-TR","isPartOf":{"@id":"https://hasturkcrm.com/#site"},"about":{"@id":"https://hasturkcrm.com/#app"},"primaryImageOfPage":"https://hasturkcrm.com/img/genel-bakis.jpg","breadcrumb":{"@id":"https://hasturkcrm.com/satin-al#crumbs"}}]}</script>
 
@@ -117,7 +117,13 @@
 
 <section class="sec" style="padding-top:12px">
   <div class="wrap co-wrap">
-    <form class="lead card co" data-checkout novalidate>
+    <div class="card co-off" data-shop-wait><p class="muted">Yükleniyor…</p></div>
+    <div class="card co-off" data-shop-off hidden>
+      <h2>Online satış çok yakında</h2>
+      <p>Kartla online satın alma şu an kapalı. Paket almak ya da 7 gün ücretsiz denemek için bize ulaşın; aynı gün panelinizi açalım.</p>
+      <div class="co-off-actions"><a class="btn btn-primary" data-call href="/iletisim"><svg><use href="#i-phone"/></svg>Hemen arayın</a><a class="btn btn-outline" data-show="company.whatsapp" data-c="company.whatsapp" data-href="wa"><svg><use href="#i-wa"/></svg>WhatsApp</a><a class="btn btn-line" href="/iletisim?konu=teklif">Teklif isteyin</a></div>
+    </div>
+    <form class="lead card co" data-checkout data-shop hidden novalidate>
       <div class="co-tabs"><button type="button" class="co-tab" data-kind="new">Yeni müşteriyim</button><button type="button" class="co-tab" data-kind="renew">Mevcut panelimi yenile</button></div>
 
       <div class="co-step"><span class="co-n">1</span><b>Paket</b></div>
@@ -169,17 +175,17 @@
           <li data-show="company.address"><svg><use href="#i-pin"/></svg><span data-c="company.address"></span></li>
         </ul>
       </div>
-      <div><h4>Ürün</h4><a href="/satin-al">Satın al</a><a data-demo href="/demo">Canlı demo</a><a href="/ozellikler">Özellikler</a><a href="/ozellikler/buybox-takibi">Buybox takibi</a><a href="/ozellikler/urun-yonetimi">Ürün yönetimi</a><a href="/entegrasyonlar">Entegrasyonlar</a><a href="/paketler">Fiyatlar</a><a data-panel href="https://panel.hasturkcrm.com">Panele giriş</a></div>
+      <div><h4>Ürün</h4><a href="/satin-al" data-shop hidden>Satın al</a><a data-demo href="/demo">Canlı demo</a><a href="/ozellikler">Özellikler</a><a href="/ozellikler/buybox-takibi">Buybox takibi</a><a href="/ozellikler/urun-yonetimi">Ürün yönetimi</a><a href="/entegrasyonlar">Entegrasyonlar</a><a href="/paketler">Fiyatlar</a><a data-panel href="https://panel.hasturkcrm.com">Panele giriş</a></div>
       <div><h4>Kurumsal</h4><a href="/hakkimizda">Hakkımızda</a><a href="/hakkimizda#guvenlik">Güvenlik</a><a href="/iletisim">İletişim</a><a href="/#sss">Sık sorulan sorular</a></div>
       <div><h4>Yasal</h4><a href="/kvkk">KVKK aydınlatma metni</a><a href="/gizlilik">Gizlilik ve çerez politikası</a><a href="/kullanim-kosullari">Kullanım koşulları</a><a href="/mesafeli-satis-sozlesmesi">Mesafeli satış sözleşmesi</a><a href="/on-bilgilendirme">Ön bilgilendirme formu</a><a href="/iptal-iade">İptal ve iade koşulları</a></div>
     </div>
-    <div class="bottom"><span>© <span data-year></span> <span data-c="company.legal">Hastürk CRM</span>. Tüm hakları saklıdır.</span><span class="pay-band" aria-label="Güvenli ödeme"><svg><use href="#i-lock"/></svg>iyzico ile güvenli ödeme · Visa · Mastercard · Troy</span></div>
+    <div class="bottom"><span>© <span data-year></span> <span data-c="company.legal">Hastürk CRM</span>. Tüm hakları saklıdır.</span><span class="pay-logos" aria-label="Kabul edilen kartlar ve güvenli ödeme"><img src="/img/pay/iyzico.svg" alt="iyzico ile Öde" width="92" height="30" loading="lazy" decoding="async"><img src="/img/pay/visa.svg" alt="Visa" width="52" height="30" loading="lazy" decoding="async"><img src="/img/pay/mastercard.svg" alt="Mastercard" width="52" height="30" loading="lazy" decoding="async"><img src="/img/pay/troy.svg" alt="Troy" width="52" height="30" loading="lazy" decoding="async"><img src="/img/pay/amex.svg" alt="American Express" width="52" height="30" loading="lazy" decoding="async"></span></div>
   </div>
 </footer>
 <div class="floats">
   <a class="call-float" data-show="company.phone" data-call href="/iletisim" aria-label="Hemen arayın"><svg><use href="#i-phone"/></svg><span>Hemen Ara</span></a>
   <a class="wa-float" data-show="company.whatsapp" data-c="company.whatsapp" data-href="wa" aria-label="WhatsApp ile yazın"><svg><use href="#i-wa"/></svg><span>WhatsApp</span></a>
 </div>
-<script src="/assets/site.js?v=360cc03339" defer></script>
+<script src="/assets/site.js?v=7baead0495" defer></script>
 </body>
 </html>

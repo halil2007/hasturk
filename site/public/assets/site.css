@@ -761,3 +761,13 @@ a.mf:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .foot .pay-band svg { width: 15px; height: 15px; }
 .foot .bottom { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 @media (max-width: 900px) { .co-wrap { grid-template-columns: 1fr; } .co-side { position: static; } .co-plans { grid-template-columns: 1fr; } }
+.foot .pay-logos { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.foot .pay-logos img { height: 28px; width: auto; display: block; }
+.co-off { text-align: center; padding: 34px 24px; display: grid; gap: 10px; justify-items: center; }
+.co-off h2 { margin: 0; font-size: 24px; }
+.co-off p { margin: 0; color: var(--text-2); max-width: 520px; }
+.co-off-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.co-off-actions svg { width: 18px; height: 18px; }
+/* Sağ alttaki Ara / WhatsApp düğmeleri kart logolarının üstüne binmesin */
+@media (min-width: 761px) { .foot .bottom { padding-right: 170px; } }
+@media (max-width: 760px) { .foot .bottom { padding-bottom: 76px; } }
