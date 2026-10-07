@@ -268,17 +268,26 @@ export function hepsiburada(env, meta) {
     }
     return { refs };
   }
-  // Yükleme sonucu: { done, items: [{ key: hepsiburadaSku, ok, error }] } — yalnız reddedilen satırlar döner
+  // Yükleme sonucu: { done, items: [{ key: hepsiburadaSku, ok, error }] } — yalnız reddedilen satırlar döner.
+  // Fiyat yüklemesinde "priceValidations" (MinLock / MaxLock): fiyat kategori eşiğinin dışında, ilan Hepsiburada'da KİLİTLENDİ;
+  // durum "Done" olsa da bu satırlar başarısız sayılır (kilit Envanter ekranından ya da eşik içinde yeni fiyatla kalkar).
   async function pushStatus(ref) {
     const [k, id] = String(ref).split(':');
     const r = await call(`${LST}/listings/merchantid/${m}/${k}-uploads/id/${encodeURIComponent(id)}`);
     const st = str(g(r || {}, 'status'));
     const done = !st || /done|complete|finish|success|fail|error/i.test(st);
     const errs = [].concat(g(r || {}, 'errors') || g(r || {}, 'failedItems') || []);
+    const keyOf = (e) => str(g(e, 'hepsiburadaSku') || g(e, 'hbSku') || g(e, 'merchantSku') || g(e, 'sku'));
     const items = errs.map((e) => {
       const msgs = [].concat(g(e, 'errors') || g(e, 'messages') || g(e, 'message') || g(e, 'errorMessage') || []).map((x) => (typeof x === 'string' ? x : str(g(x, 'message') || JSON.stringify(x))));
-      return { key: str(g(e, 'hepsiburadaSku') || g(e, 'hbSku') || g(e, 'merchantSku') || g(e, 'sku')), ok: false, error: msgs.join(' · ') || 'reddedildi' };
+      return { key: keyOf(e), ok: false, error: msgs.join(' · ') || 'reddedildi' };
     }).filter((x) => x.key);
+    for (const v of [].concat(g(r || {}, 'priceValidations') || [])) {
+      const key = keyOf(v);
+      if (!key || items.some((x) => x.key === key)) continue;
+      const range = g(v, 'minPrice') != null || g(v, 'maxPrice') != null ? ` (izin verilen aralık ${num(g(v, 'minPrice'))} – ${num(g(v, 'maxPrice'))} TL)` : '';
+      items.push({ key, ok: false, error: `${str(g(v, 'description')) || 'Fiyat kategori eşiğinin dışında; ilan kilitlendi'}${range}${g(v, 'type') ? ` [${str(g(v, 'type'))}]` : ''}` });
+    }
     return { done, items };
   }
   const pushStock = (items) => upload('stock', items.map((x) => ({ hepsiburadaSku: x.remoteId, merchantSku: x.sku, availableStock: x.stock })));
@@ -670,6 +679,8 @@ export function hepsiburada(env, meta) {
         for (const x of rows) {
           const t = `${g(x, 'type', 'transactionType') || ''} ${g(x, 'description', 'transactionDescription') || ''}`;
           const no = str(g(x, 'orderNumber'));
+          // Gelir kayıtları (ör. CargoCompensationIncome, ShipmentCostSharingIncome: Hepsiburada'nın satıcıya ödediği) gider sayılmaz
+          if (g(x, 'isIncome') === true || /Income/.test(str(g(x, 'transactionType', 'type')))) continue;
           if (no && /kargo|cargo|shipping|shipment|transport|delivery|teslimat/i.test(t) && !/refund/i.test(t)) byOrder.set(no, (byOrder.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
         }
         if (rows.length < 100) break;
@@ -698,10 +709,17 @@ export function hepsiburada(env, meta) {
     });
     return { items, hasNext: rows.length >= lim };
   }
-  const HB_REASONS = [['BoxIsEmpty', 'Koli boş geldi'], ['WrongProduct', 'Yanlış ürün gönderilmiş'], ['ProductIsDamaged', 'Ürün hasarlı'], ['NoSuchAccessory', 'Aksesuar eksik'],
-    ['ItHasBeenSentWithOtherProducts', 'Başka ürünlerle gönderilmiş'], ['ThereIsNoCargoReport', 'Kargo hasar tutanağı yok'], ['CustomerReturnedWrongItem', 'Müşteri farklı ürün göndermiş'],
-    ['CustomerPackageIsNotInTheConditionISent', 'Paket gönderdiğim gibi değil'], ['ProductHasBeenUsed', 'Ürün kullanılmış'], ['ProductIsNotInSellableCondition', 'Ürün satılabilir durumda değil'],
-    ['MissingInvoice', 'Fatura eksik'], ['SomePartsOrSomeAccessoriesOrSomePapersAreMissing', 'Parça / aksesuar / belge eksik']];
+  // Ret gerekçeleri (ClaimRejectionReason): Hepsiburada Talep Entegrasyonu dokümanındaki liste ve açıklamaları birebir.
+  // İade / Değişim (Return, RenewProduct) talepleri:
+  const HB_REASONS = [['CustomerReturnedWrongItem', 'İade edilen ürün siparişteki ürün değil'], ['ProductIsDamaged', 'İade edilen ürün kusurlu / hasarlı'], ['MissingQuantity', 'İade edilen ürünün adedi eksik'],
+    ['NoSuchAccessory', 'İade edilen ürün kullanılmış, tekrar satılabilir değil'], ['BoxIsEmptyWithReport', 'İade paketi boş (tutanak var)'], ['BoxIsEmptyWithoutReport', 'İade paketi boş (tutanak yok)'],
+    ['SomePartsOrSomeAccessoriesOrSomePapersAreMissing', 'İade edilen ürünün parçası / aksesuarı / faturası eksik'], ['ReturnedProductIsNotDelivered', 'İade edilen ürün teslim edilmedi'],
+    ['NewProductWillBeSent', 'Müşteriye yeni ürün gönderilecek'], ['ExtraProductHasBeenReturned', 'Müşteri fazla gönderilen ürünü iade etti'], ['ProductNotWrong', 'Gönderilen ürün yanlış değil'],
+    ['ProductNotDefective', 'Gönderilen ürün kusurlu değil'], ['StockProblem', 'Stok sorunu nedeniyle değişim yapılamıyor'], ['ReturnedProductHasAccountOrPassword', 'Üründe hesap / şifre tanımlı'],
+    ['MarkedAsServiceProcess', 'İade ürün servis / analiz sürecine alınacak'],
+    // Eksik ürün / eksik parça (MissingItem, MissingPart) talepleri:
+    ['ProductSentComplete', 'Ürün eksiksiz gönderildi'], ['MissingItemOrPartCannotBeSupplied', 'Eksik ürün / parça tedarik edilemiyor'], ['ClaimedComponentIsNotPartOfTheProduct', 'Talep edilen parça paket içeriğine dahil değil'],
+    ['InvoiceReplacesWarranty', 'Fatura garanti belgesi yerine geçer'], ['PartialShipmentMissingPackageWillBeDelivered', 'Parçalı sevkiyat, eksik paket teslim edilecek'], ['CustomerProblemSolved', 'Müşteri sorunu çözüldü'], ['Other', 'Diğer']];
   const claimReasons = async () => HB_REASONS.map(([id, name]) => ({ id, name }));
   async function approveClaim(c) { await call(`${OMS}/claims/number/${encodeURIComponent(c.remote_id)}/accept`, { method: 'POST', body: {} }); }
   async function rejectClaim(c, lines, { reasonId, text }) {

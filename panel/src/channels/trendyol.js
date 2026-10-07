@@ -5,11 +5,18 @@ import { http, basic, num, str, chunk, diagStep, imageList } from '../util.js';
 const BASE = 'https://apigw.trendyol.com/integration';
 
 const STATUS = {
-  Awaiting: 'new', Created: 'new', Picking: 'processing', Invoiced: 'processing', Repack: 'processing', UnPacked: 'processing',
+  Awaiting: 'new', Verified: 'new', Created: 'new', Picking: 'processing', Invoiced: 'processing', Repack: 'processing', UnPacked: 'processing',
   Shipped: 'shipped', AtCollectionPoint: 'shipped', UnDelivered: 'shipped', Delivered: 'delivered',
   Cancelled: 'cancelled', UnSupplied: 'cancelled', Returned: 'returned',
 };
 const RANKS = ['new', 'processing', 'shipped', 'delivered'];
+const H3 = 3 * 3600e3, D = 864e5;
+// Sipariş servisi: orderDate ve startDate/endDate "GMT+3" zaman damgasıdır (Türkiye saati UTC gibi yazılır; gerçek zamandan 3 saat ileride).
+// Servis en fazla 2 haftalık aralık ve son 1 aylık veri verir (5 Mart 2026'dan beri). 15 Ekim 2026'dan itibaren yalnız v2/orders çalışır.
+const MAX_BACK = 30 * D - 3600e3;
+// Ödeme onayı bekleyen paketlerde (Awaiting / Verified) stok dışında işlem yapılmaz
+const PAYMENT_WAIT = ['Awaiting', 'Verified'];
+const MAX_STOCK = 20000;
 // Trendyol kargo firmaları (getProviders). Kargo değişikliği yalnızca Created / Picking / Invoiced paketlerde, paket başına 5 dakikada bir.
 export const TY_CARGO = [['TEXMP', 'Trendyol Express'], ['ARASMP', 'Aras Kargo'], ['YKMP', 'Yurtiçi Kargo'], ['SURATMP', 'Sürat Kargo'], ['PTTMP', 'PTT Kargo'],
   ['HOROZMP', 'Horoz Lojistik'], ['DHLECOMMP', 'DHL eCommerce'], ['CEVAMP', 'CEVA Lojistik'], ['KOLAYGELSINMP', 'Kolay Gelsin']];
@@ -18,57 +25,82 @@ const VARIANT_ATTR = /beden|boyut|ebat|hacim|a[gğ][ıi]rl[ıi]k|renk|miktar|lit
 
 export function trendyol(env, meta) {
   const seller = env.TRENDYOL_SELLER_ID, key = env.TRENDYOL_API_KEY, secret = env.TRENDYOL_API_SECRET;
+  // User-Agent: "SatıcıId - SelfIntegration"; aracı firma (entegratör) ile çalışılıyorsa "SatıcıId - FirmaAdı" (alfanumerik, en fazla 30 karakter)
+  const integrator = str(env.TRENDYOL_INTEGRATOR).replace(/[^0-9A-Za-z]/g, '').slice(0, 30) || 'SelfIntegration';
   const headers = () => ({
     Authorization: basic(key, secret),
-    'User-Agent': `${seller} - SelfIntegration`,
+    'User-Agent': `${seller} - ${integrator}`,
     storeFrontCode: env.TRENDYOL_STOREFRONT || 'TR',
     'Content-Type': 'application/json',
   });
   const call = (path, opts = {}) => http(BASE + path, { ...opts, headers: headers(), body: opts.body && JSON.stringify(opts.body) });
 
-  // Trendyol her paketi ayrı kayıt olarak verir; aynı sipariş numarasındaki paketler tek siparişte toplanır
+  // Sipariş paketi alanları Nisan 2026'da yeniden adlandırıldı (id → shipmentPackageId, lines[].id → lineId, price → lineUnitPrice,
+  // totalPrice → packageTotalPrice, merchantSku → stockCode); eski adlar yalnız yedek olarak okunur
+  const pkgId = (p) => str(p.shipmentPackageId ?? p.id);
+  const lineIdOf = (l) => str(l.lineId ?? l.id);
+  const lineKind = (p, l) => {
+    const s = String(l.orderLineItemStatusName || '');
+    return /Cancel|UnSupplied/i.test(s) || STATUS[p.status] === 'cancelled' ? 'cancelled' : /Return/i.test(s) || STATUS[p.status] === 'returned' ? 'returned' : '';
+  };
+  const isLive = (p) => !['cancelled', 'returned'].includes(STATUS[p.status]);
+
+  // Trendyol her paketi ayrı kayıt olarak verir; aynı sipariş numarasındaki paketler tek siparişte toplanır.
+  // Bölünen (UnPacked) ya da kısmi iptalle bozulan paket (yeni paketlerin originPackageIds alanında geçer) yerini yeni paketlere
+  // bırakır: yalnız güncel paketler sayılır (aynı ürün iki kez sayılmasın, tutar ikiye katlanmasın).
   function group(pkgs) {
     const byNo = new Map();
     for (const p of pkgs) {
       const no = String(p.orderNumber);
-      if (!byNo.has(no)) byNo.set(no, []);
-      byNo.get(no).push(p);
+      if (!byNo.has(no)) byNo.set(no, new Map());
+      const m = byNo.get(no), id = pkgId(p);
+      if (!m.has(id)) m.set(id, p); // aynı paket iki sayfada / iki dilimde gelebilir: ilki (en güncel) kalır
     }
-    return [...byNo.values()].map((list) => {
+    return [...byNo.values()].map((m) => {
+      let list = [...m.values()];
+      const origins = new Set(list.flatMap((p) => [].concat(p.originPackageIds ?? []).flatMap((x) => String(x).split(','))).map((x) => x.trim()).filter(Boolean));
+      const current = list.filter((p) => p.status !== 'UnPacked' && !origins.has(pkgId(p)));
+      if (current.length) list = current;
       const p0 = list[0], a = p0.shipmentAddress || {};
-      const items = [], seen = new Set();
-      for (const p of list) for (const l of p.lines || []) {
-        const id = String(l.id);
-        if (seen.has(id)) continue;
-        seen.add(id);
-        const unit = num(l.price ?? l.amount);
-        items.push({
-          lineId: id, sku: str(l.merchantSku || l.stockCode), barcode: str(l.barcode), name: str(l.productName), image: '',
-          quantity: num(l.quantity, 1), unitPrice: unit, total: unit * num(l.quantity, 1),
-          status: /Cancel|UnSupplied/i.test(l.orderLineItemStatusName || '') || STATUS[p.status] === 'cancelled' ? 'cancelled' : /Return/i.test(l.orderLineItemStatusName || '') || STATUS[p.status] === 'returned' ? 'returned' : '',
-          remoteKey: str(l.barcode),
-        });
+      const live = list.filter(isLive);
+      // Kalemler satır kimliğine göre: aynı satır birden çok pakete bölündüyse adetler toplanır; aynı satırın iptal / iade edilen
+      // kısmı ayrı kalem olur (canlı paketler önce okunur)
+      const items = [], byKey = new Map();
+      for (const p of [...live, ...list.filter((x) => !isLive(x))]) for (const l of p.lines || []) {
+        const lid = lineIdOf(l), st = lineKind(p, l), qty = num(l.quantity, 1);
+        const first = byKey.get(lid), key = first && first.status !== st ? `${lid}-${st || 'acik'}` : lid;
+        const ex = byKey.get(key);
+        if (ex) { ex.quantity += qty; ex.total = Math.round(ex.unitPrice * ex.quantity * 100) / 100; continue; }
+        const unit = num(l.lineUnitPrice ?? l.price ?? l.amount);
+        const it = {
+          lineId: key, sku: str(l.stockCode || l.merchantSku), barcode: str(l.barcode), name: str(l.productName), image: '',
+          quantity: qty, unitPrice: unit, total: Math.round(unit * qty * 100) / 100, status: st, remoteKey: str(l.barcode),
+        };
+        byKey.set(key, it);
+        items.push(it);
       }
-      const live = list.filter((p) => !['cancelled', 'returned'].includes(STATUS[p.status]));
       let status;
       if (!live.length) status = list.some((p) => STATUS[p.status] === 'returned') ? 'returned' : 'cancelled';
       else status = RANKS[Math.min(...live.map((p) => Math.max(0, RANKS.indexOf(STATUS[p.status] || 'new'))))];
       const tracked = list.find((p) => p.cargoTrackingNumber) || {};
+      const sum = (ps) => ps.reduce((s, p) => s + num(p.packageTotalPrice ?? p.totalPrice ?? p.grossAmount), 0);
       return {
-        remoteId: String(p0.orderNumber), orderNumber: String(p0.orderNumber), orderedAt: num(p0.orderDate) || Date.now(),
+        // orderDate GMT+3 zaman damgasıdır: gerçek zamana çevrilir
+        remoteId: String(p0.orderNumber), orderNumber: String(p0.orderNumber), orderedAt: num(p0.orderDate) ? num(p0.orderDate) - H3 : Date.now(),
         remoteStatus: list.map((p) => p.status).join(', '), status,
         customer: [p0.customerFirstName, p0.customerLastName].filter(Boolean).join(' ') || str(a.fullName), phone: str(a.phone), email: str(p0.customerEmail), customerId: str(p0.customerId),
         address: { name: str(a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' ')), line: str(a.fullAddress || [a.address1, a.address2].filter(Boolean).join(' ')), district: str(a.district), city: str(a.city), phone: str(a.phone) },
-        total: list.reduce((s, p) => s + num(p.totalPrice ?? p.grossAmount), 0), currency: p0.currencyCode || 'TRY',
+        // Tutar: canlı paketlerin toplamı (iptal / iade edilen paketler düşülür); hepsi iptal / iadeyse tüm paketlerin toplamı
+        total: Math.round(sum(live.length ? live : list) * 100) / 100, currency: p0.currencyCode || 'TRY',
         cargoCompany: str(tracked.cargoProviderName || p0.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),
-        awaitingPayment: list.every((p) => p.status === 'Awaiting'),
+        awaitingPayment: list.every((p) => PAYMENT_WAIT.includes(p.status)),
         // Son kargoya teslim tarihi (agreedDeliveryDate): canlı paketlerin en erkeni
         shipBy: Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0)) || null,
         history: list.flatMap((p) => (p.packageHistories || []).map((h) => ({ status: h.status, at: num(h.createdDate) }))),
         items,
         packages: list.map((p) => ({
-          remoteId: String(p.id || p.shipmentPackageId),
-          items: (p.lines || []).map((l) => ({ line_id: String(l.id), qty: num(l.quantity, 1) })),
+          remoteId: pkgId(p),
+          items: (p.lines || []).map((l) => ({ line_id: lineIdOf(l), qty: num(l.quantity, 1) })),
           status: ['shipped', 'delivered'].includes(STATUS[p.status]) ? 'shipped' : STATUS[p.status] === 'cancelled' ? 'cancelled' : 'open',
           cargoCompany: str(p.cargoProviderName), tracking: str(p.cargoTrackingNumber), trackingUrl: str(p.cargoTrackingLink),
           remoteStatus: p.status,
@@ -77,19 +109,35 @@ export function trendyol(env, meta) {
     });
   }
 
+  // Sipariş paketleri: v2/orders (eski /orders 15 Ekim 2026'da kapanıyor; o tarihe kadar günde 3 kez 10 dk 426 dönüyor).
+  // v2 bu hesapta yoksa (404 / 405) bir kez eski adrese düşülür.
+  let ordersPath = `/order/sellers/${seller}/v2/orders`;
+  async function orders(query) {
+    try { return await call(`${ordersPath}?${query}`); } catch (e) {
+      if (!/\b(404|405)\b/.test(e.message) || !ordersPath.includes('/v2/')) throw e;
+      ordersPath = `/order/sellers/${seller}/orders`;
+      return call(`${ordersPath}?${query}`);
+    }
+  }
   async function fetchOrders(since, until) {
-    // Trendyol en fazla 2 haftalık aralık kabul eder; daha eskiyse 2 haftalık dilimlerle çekilir
-    const W = 14 * 864e5 - 60e3, pkgs = [];
+    // Trendyol en fazla 2 haftalık aralık ve son 1 aylık veri verir. Tarihler GMT+3 beklenir: bitiş 3 saat ileri alınır ki son 3 saatte
+    // gelen siparişler de dönsün (başlangıç olduğu gibi kalır; aralık yalnız genişler). Dilim boyu bu 3 saat düşülerek 2 haftayı aşmaz.
+    const out = [], floor = Date.now() - MAX_BACK;
+    if (since < floor) { out.warnings = ['Trendyol sipariş servisi yalnız son 1 ayın siparişlerini veriyor; daha eski siparişler okunamadı']; since = floor; }
+    const W = 14 * D - H3 - 60e3, pkgs = [];
     for (let to = until; to > since; to -= W) {
       const from = Math.max(since, to - W);
       for (let page = 0; page < 50; page++) {
-        const r = await call(`/order/sellers/${seller}/orders?startDate=${from}&endDate=${to}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`);
+        const r = await orders(`startDate=${from}&endDate=${to + H3}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`);
         pkgs.push(...(r.content || []));
         if (page + 1 >= (r.totalPages || 1)) break;
       }
     }
-    return group(pkgs);
+    out.push(...group(pkgs));
+    return out;
   }
+  // Tek sipariş (sipariş numarasıyla; servis tarihsiz sorguda son 1 haftayı tarar, bu yüzden yalnız kargo değişikliği / tanılamada kullanılır)
+  const orderPackages = async (no) => ((await orders(`orderNumber=${encodeURIComponent(no)}`)) || {}).content || [];
 
   // Ürünler: V2 "approved" servisi (V1 /products Trendyol tarafından kapatılıyor). Stok ayrı "inventory-and-price" servisinden gelir.
   // Sayfalama: size ≤ 100, page × size ≤ 10.000; daha fazlası için nextPageToken. V2 hata verirse V1'e düşülür.
@@ -147,7 +195,8 @@ export function trendyol(env, meta) {
   async function pushStock(items) {
     const refs = [];
     for (const part of chunk(items, 1000)) {
-      const r = await call(`/inventory/sellers/${seller}/products/price-and-inventory`, { method: 'POST', body: { items: part.map((x) => ({ barcode: x.remoteId, quantity: x.stock })) } });
+      // Trendyol bir ürüne en fazla 20.000 adet stok kabul eder; fazlası tüm isteği reddettirmesin diye sınıra çekilir
+      const r = await call(`/inventory/sellers/${seller}/products/price-and-inventory`, { method: 'POST', body: { items: part.map((x) => ({ barcode: x.remoteId, quantity: Math.min(MAX_STOCK, Math.max(0, Math.round(num(x.stock)))) })) } });
       if (r && r.batchRequestId) refs.push(String(r.batchRequestId));
     }
     return { refs };
@@ -167,11 +216,16 @@ export function trendyol(env, meta) {
   const openPkgs = (order) => order.packages.filter((p) => p.remote_id && p.status === 'open');
   const linesOf = (pkg) => pkg.items.map((x) => ({ lineId: Number(x.line_id), quantity: x.qty }));
 
+  // Statü bildirimi sırası: önce Picking, sonra Invoiced. Ödeme bekleyen (Awaiting) pakete işlem yapılmaz; kargodaki / teslim edilen
+  // pakete statü gönderilmez (Trendyol reddeder).
+  const noPayment = (p) => { if (PAYMENT_WAIT.includes(p.remote_status)) throw new Error('Trendyol bu paketin ödeme onayını bekliyor (Awaiting); paket "Yeni" olana kadar işlem yapılamaz'); };
+  const putStatus = (p, status, params = {}) => call(`/order/sellers/${seller}/shipment-packages/${p.remote_id}`, { method: 'PUT', body: { lines: linesOf(p), params, status } });
+
   // İşleme al = paketleri "Picking" (hazırlanıyor) yap; müşteri siparişin hazırlandığını görür
   async function accept(order) {
     for (const p of openPkgs(order)) {
       if (p.remote_status && p.remote_status !== 'Created') continue;
-      await call(`/order/sellers/${seller}/shipment-packages/${p.remote_id}`, { method: 'PUT', body: { lines: linesOf(p), params: {}, status: 'Picking' } });
+      await putStatus(p, 'Picking');
     }
   }
 
@@ -179,6 +233,7 @@ export function trendyol(env, meta) {
   async function split(order, groups) {
     const src = openPkgs(order);
     if (src.length !== 1) throw new Error('Trendyol\'da sadece tek paketli, henüz kargolanmamış sipariş bölünebilir');
+    noPayment(src[0]);
     await call(`/order/sellers/${seller}/shipment-packages/${src[0].remote_id}/split-packages`, {
       method: 'POST',
       body: { splitPackages: groups.map((g) => ({ packageDetails: g.items.map((x) => ({ orderLineId: Number(x.line_id), quantities: x.qty })) })) },
@@ -186,10 +241,12 @@ export function trendyol(env, meta) {
     return { async: true, message: 'Bölme isteği Trendyol\'a gönderildi. Yeni paketler birkaç dakika içinde oluşur ve senkronla panele gelir.' };
   }
 
-  async function ship(order, pkg, { invoiceNumber }) {
+  async function ship(order, pkg, { invoiceNumber } = {}) {
     if (!pkg.remote_id) throw new Error('Paket Trendyol\'da henüz oluşmadı; senkronu bekleyin');
-    if (invoiceNumber) {
-      await call(`/order/sellers/${seller}/shipment-packages/${pkg.remote_id}`, { method: 'PUT', body: { lines: linesOf(pkg), params: { invoiceNumber }, status: 'Invoiced' } });
+    noPayment(pkg);
+    if (invoiceNumber && (!pkg.remote_status || ['Created', 'Picking'].includes(pkg.remote_status))) {
+      if (!pkg.remote_status || pkg.remote_status === 'Created') await putStatus(pkg, 'Picking');
+      await putStatus(pkg, 'Invoiced', { invoiceNumber });
     }
     // Takip numarası Trendyol'un anlaşmalı kargosundan gelir. Elle takip no bildirme servisi (update-tracking-number)
     // Trendyol tarafından kullanımdan kaldırıldı; kargo firması değişikliği "Kargo firmasını değiştir" ile yapılır.
@@ -201,9 +258,11 @@ export function trendyol(env, meta) {
     const out = [];
     for (const p of pkgs) {
       if (!p.remote_id) throw new Error('Paket Trendyol\'da henüz oluşmadı; senkronu bekleyin');
-      if (!p.remote_status || p.remote_status === 'Created') await call(`/order/sellers/${seller}/shipment-packages/${p.remote_id}`, { method: 'PUT', body: { lines: linesOf(p), params: {}, status: 'Picking' } });
-      if (invoiceNumber && p.remote_status !== 'Invoiced') await call(`/order/sellers/${seller}/shipment-packages/${p.remote_id}`, { method: 'PUT', body: { lines: linesOf(p), params: { invoiceNumber }, status: 'Invoiced' } });
-      out.push({ remoteId: p.remote_id, remoteStatus: invoiceNumber ? 'Invoiced' : 'Picking' });
+      noPayment(p);
+      if (p.remote_status && !CHANGEABLE.includes(p.remote_status)) { out.push({ remoteId: p.remote_id, remoteStatus: p.remote_status }); continue; } // kargoda / teslim: dokunulmaz
+      if (!p.remote_status || p.remote_status === 'Created') await putStatus(p, 'Picking');
+      if (invoiceNumber && p.remote_status !== 'Invoiced') await putStatus(p, 'Invoiced', { invoiceNumber });
+      out.push({ remoteId: p.remote_id, remoteStatus: invoiceNumber ? 'Invoiced' : p.remote_status === 'Invoiced' ? 'Invoiced' : 'Picking' });
     }
     return { packages: out, message: `Trendyol'a "${invoiceNumber ? 'Faturalandı' : 'Hazırlanıyor'}" bildirildi` };
   }
@@ -217,8 +276,7 @@ export function trendyol(env, meta) {
     if (pkg.remote_status && !CHANGEABLE.includes(pkg.remote_status)) throw new Error(`Trendyol kargo firması yalnızca Yeni / Hazırlanıyor / Faturalandı paketlerde değiştirilebilir (paket: ${pkg.remote_status})`);
     await call(`/order/sellers/${seller}/shipment-packages/${pkg.remote_id}/cargo-providers`, { method: 'PUT', body: { cargoProvider: cargo.id } });
     // Trendyol değişikliği uygular ve yeni takip numarası verir: paket tekrar okunur
-    const r = await call(`/order/sellers/${seller}/orders?orderNumber=${encodeURIComponent(order.remote_id)}`).catch(() => null);
-    const p = r && (r.content || []).find((x) => String(x.id) === String(pkg.remote_id));
+    const p = (await orderPackages(order.remote_id).catch(() => [])).find((x) => pkgId(x) === String(pkg.remote_id));
     return { remoteId: pkg.remote_id, cargoCompany: p ? str(p.cargoProviderName) : cargo.name, tracking: p ? str(p.cargoTrackingNumber) : '', resetLabel: true };
   }
 
@@ -273,7 +331,7 @@ export function trendyol(env, meta) {
   }
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();
-    await diagStep(out, 'Siparişler (son 24 saat)', async () => { const r = await call(`/order/sellers/${seller}/orders?startDate=${now - 864e5}&endDate=${now}&page=0&size=1`); return { detail: `${r.totalElements ?? (r.content || []).length} paket · satıcı ${seller}` }; });
+    await diagStep(out, 'Siparişler (son 24 saat)', async () => { const r = await orders(`startDate=${now - 864e5}&endDate=${now + H3}&page=0&size=1`); return { detail: `${r.totalElements ?? (r.content || []).length} paket · satıcı ${seller}` }; });
     let bc = '';
     await diagStep(out, 'Ürünler (V2 onaylı ürün servisi)', async () => { const r = await call(`/product/sellers/${seller}/products/approved?page=0&size=1`); bc = str((((r.content || [])[0] || {}).variants || [])[0]?.barcode); return { detail: `${r.totalElements ?? '?'} ürün` }; });
     await diagStep(out, 'Stok / fiyat servisi', async () => { const r = await call(`/product/sellers/${seller}/products/approved/inventory-and-price?page=0&size=1`); return { detail: `erişildi · ${r.totalElements ?? (r.content || []).length} ürün` }; });
@@ -285,9 +343,8 @@ export function trendyol(env, meta) {
     });
     await diagStep(out, 'Müşteri soruları', async () => { const r = await questions({ since: now - 7 * 864e5, page: 0, size: 1 }); return { detail: `son 7 günde ${r.total ?? r.items.length} soru` }; });
     if (orderId) await diagStep(out, 'Sipariş paketleri', async () => {
-      const r = await call(`/order/sellers/${seller}/orders?orderNumber=${encodeURIComponent(orderId)}`);
-      const ps = r.content || [];
-      return { ok: ps.length ? true : false, detail: ps.map((p) => `Paket ${p.id}: ${p.status} · ${p.cargoProviderName || '-'} · takip ${p.cargoTrackingNumber || '-'}${p.agreedDeliveryDate ? ` · son teslim ${new Date(p.agreedDeliveryDate).toISOString().slice(0, 16).replace('T', ' ')}` : ''}`).join('\n') || 'Trendyol bu sipariş numarasını bulamadı' };
+      const ps = await orderPackages(orderId);
+      return { ok: ps.length ? true : false, detail: ps.map((p) => `Paket ${pkgId(p)}: ${p.status} · ${p.cargoProviderName || '-'} · takip ${p.cargoTrackingNumber || '-'}${p.agreedDeliveryDate ? ` · son teslim ${new Date(p.agreedDeliveryDate).toISOString().slice(0, 16).replace('T', ' ')}` : ''}`).join('\n') || 'Trendyol bu sipariş numarasını bulamadı' };
     });
     return out;
   }
@@ -394,8 +451,10 @@ export function trendyol(env, meta) {
     let pending = false;
     for (const id of String(ref).split(',').filter(Boolean)) {
       const r = await call(`/product/sellers/${seller}/products/batch-requests/${encodeURIComponent(id)}`);
-      if (!/COMPLETED|DONE|FAILED/i.test(r.status || '')) pending = true;
-      for (const it of r.items || []) {
+      // Stok / fiyat toplu işleminde genel "status" alanı dönmez: kalemlerin hepsi SUCCESS / FAILED olunca tamamlanmış sayılır
+      const its = r.items || [];
+      if (r.status ? !/COMPLETED|DONE|FAILED/i.test(r.status) : !its.length || its.some((it) => !/SUCCESS|FAIL/i.test(str(it.status))) || num(r.itemCount) > its.length) pending = true;
+      for (const it of its) {
         const req = it.requestItem || {}, st = str(it.status);
         items.push({ key: str(req.barcode || (req.product && req.product.barcode)), status: st, ok: /SUCCESS/i.test(st) ? true : /FAIL/i.test(st) ? false : null, error: (it.failureReasons || []).map((x) => (typeof x === 'string' ? x : x.message || JSON.stringify(x))).join(' · ') });
       }
@@ -450,7 +509,7 @@ export function trendyol(env, meta) {
       const lines = [...by.values()];
       const status = lines.some((l) => l.status === 'waiting') ? 'waiting' : lines.length && lines.every((l) => l.status === 'accepted') ? 'accepted' : lines.some((l) => l.status === 'rejected') ? 'rejected' : 'other';
       return {
-        remoteId: String(c.id), orderNumber: str(c.orderNumber), claimedAt: num(c.claimDate) || Date.now(), status, remoteStatus: [...new Set(lines.map((l) => l.remoteStatus))].join(', '),
+        remoteId: str(c.claimId ?? c.id), orderNumber: str(c.orderNumber), claimedAt: num(c.claimDate) || Date.now(), status, remoteStatus: [...new Set(lines.map((l) => l.remoteStatus))].join(', '),
         customer: [c.customerFirstName, c.customerLastName].filter(Boolean).join(' '), reason: [...new Set(lines.map((l) => l.reason).filter(Boolean))].join(', '),
         note: lines.map((l) => l.note).filter(Boolean).join(' · '), lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: str(c.cargoProviderName), tracking: str(c.cargoTrackingNumber),
       };
@@ -461,24 +520,29 @@ export function trendyol(env, meta) {
   async function approveClaim(c, lines) {
     await call(`/order/sellers/${seller}/claims/${encodeURIComponent(c.remote_id)}/items/approve`, { method: 'PUT', body: { claimLineItemIdList: claimIds(lines), params: {} } });
   }
+  // Ret talebi (createClaimIssue): gerekçe, kalemler ve açıklama sorgu parametresi olarak; ek dosya multipart "files" alanında
   async function rejectClaim(c, lines, { reasonId, text, file }) {
+    const q = new URLSearchParams({ claimIssueReasonId: String(reasonId), claimItemIdList: claimIds(lines).join(','), description: String(text).slice(0, 500) });
     const fd = new FormData();
-    fd.append('claimIssueReasonId', String(reasonId)); fd.append('claimItemIdList', claimIds(lines).join(',')); fd.append('description', String(text).slice(0, 500));
     if (file) fd.append('files', file, file.name);
     const h = headers(); delete h['Content-Type'];
-    await http(`${BASE}/order/sellers/${seller}/claims/${encodeURIComponent(c.remote_id)}/issue`, { method: 'POST', headers: h, body: fd });
+    await http(`${BASE}/order/sellers/${seller}/claims/${encodeURIComponent(c.remote_id)}/issue?${q}`, { method: 'POST', headers: h, body: fd });
   }
+  // Ret gerekçeleri Trendyol'da değişebiliyor (ör. 8 Ekim 2026'da bazıları kaldırıldı): 6 saatte bir yeniden okunur
   let reasonCache = null;
   async function claimReasons() {
-    if (!reasonCache) reasonCache = ((await call('/order/claim-issue-reasons')) || []).map((x) => ({ id: String(x.id), name: str(x.name) }));
-    return reasonCache;
+    if (!reasonCache || Date.now() - reasonCache.at > 6 * 3600e3) reasonCache = { at: Date.now(), list: ((await call('/order/claim-issue-reasons')) || []).map((x) => ({ id: String(x.id), name: str(x.name) })) };
+    return reasonCache.list;
   }
 
   // ---------- hakediş (cari hesap ekstresi: settlements) ----------
   // Satış, iade, indirim, kupon ve komisyon düzeltmeleri; her kaydın satıcı hakedişi (sellerRevenue) ve ödeme tarihi.
   // Önce tüm türler tek istekte (transactionTypes) denenir; servis kabul etmezse tür tür okunur. En fazla 15 günlük aralık.
   const ST_TYPES = { Sale: 'Satış', Return: 'İade', Discount: 'İndirim', DiscountCancel: 'İndirim iptali', Coupon: 'Kupon', CouponCancel: 'Kupon iptali', SellerRevenuePositive: 'Hakediş düzeltme (+)', SellerRevenueNegative: 'Hakediş düzeltme (−)',
-    CommissionPositive: 'Komisyon düzeltme (+)', CommissionNegative: 'Komisyon düzeltme (−)', ManualRefund: 'Manuel iade', ProvisionPositive: 'Provizyon (+)', ProvisionNegative: 'Provizyon (−)', DeliveryFee: 'Teslimat bedeli' };
+    CommissionPositive: 'Komisyon düzeltme (+)', CommissionNegative: 'Komisyon düzeltme (−)', ManualRefund: 'Manuel iade', ProvisionPositive: 'Provizyon (+)', ProvisionNegative: 'Provizyon (−)', DeliveryFee: 'Teslimat bedeli',
+    // İptal kayıtları (iade / iptal sonrası ters kayıt): okunmazsa düzeltme ve teslimat bedelleri iki kez sayılır
+    ManualRefundCancel: 'Manuel iade iptali', DeliveryFeeCancel: 'Teslimat bedeli iptali', SellerRevenuePositiveCancel: 'Hakediş düzeltme (+) iptali', SellerRevenueNegativeCancel: 'Hakediş düzeltme (−) iptali',
+    CommissionPositiveCancel: 'Komisyon düzeltme (+) iptali', CommissionNegativeCancel: 'Komisyon düzeltme (−) iptali' };
   async function settlements(since, until) {
     const W = 14 * 864e5, out = [];
     const row = (x) => {
