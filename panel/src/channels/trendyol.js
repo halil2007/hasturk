@@ -142,18 +142,27 @@ export function trendyol(env, meta) {
     return out;
   }
 
+  // Stok / fiyat gönderimi: Trendyol isteği kabul edip toplu işlem kimliği döner; sonuç (satır bazında başarılı / reddedildi)
+  // birkaç dakika sonra pushStatus ile sorgulanır (bkz. sync.js checkPushes)
   async function pushStock(items) {
+    const refs = [];
     for (const part of chunk(items, 1000)) {
-      await call(`/inventory/sellers/${seller}/products/price-and-inventory`, { method: 'POST', body: { items: part.map((x) => ({ barcode: x.remoteId, quantity: x.stock })) } });
+      const r = await call(`/inventory/sellers/${seller}/products/price-and-inventory`, { method: 'POST', body: { items: part.map((x) => ({ barcode: x.remoteId, quantity: x.stock })) } });
+      if (r && r.batchRequestId) refs.push(String(r.batchRequestId));
     }
+    return { refs };
   }
   async function pushPrice(items) {
+    const refs = [];
     for (const part of chunk(items, 1000)) {
-      await call(`/inventory/sellers/${seller}/products/price-and-inventory`, {
+      const r = await call(`/inventory/sellers/${seller}/products/price-and-inventory`, {
         method: 'POST', body: { items: part.map((x) => ({ barcode: x.remoteId, salePrice: x.price, listPrice: Math.max(x.listPrice || 0, x.price) })) },
       });
+      if (r && r.batchRequestId) refs.push(String(r.batchRequestId));
     }
+    return { refs };
   }
+  const pushStatus = (ref) => status(ref);
 
   const openPkgs = (order) => order.packages.filter((p) => p.remote_id && p.status === 'open');
   const linesOf = (pkg) => pkg.items.map((x) => ({ lineId: Number(x.line_id), quantity: x.qty }));
@@ -531,6 +540,6 @@ export function trendyol(env, meta) {
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
   };
 }

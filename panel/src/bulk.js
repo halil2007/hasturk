@@ -98,6 +98,7 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
   for (const p of prods) { if (str(p.sku)) bySku.set(str(p.sku).toUpperCase(), p); if (str(p.barcode)) byBc.set(str(p.barcode), p); }
   const listings = await all(db, 'SELECT product_id, channel, remote_id, price, remote_stock FROM listings WHERE product_id IS NOT NULL');
   const lmap = new Map(listings.map((l) => [`${l.product_id}|${l.channel}`, l]));
+  const rules = new Map((await all(db, 'SELECT channel, remote_id, min_price, max_price FROM price_rules WHERE enabled = 1')).map((r) => [`${r.channel}|${r.remote_id}`, r]));
   const siteStock = new Set(settings.stock_sync ? [] : listings.filter((l) => cats.includes(l.channel) && l.remote_stock != null).map((l) => l.product_id));
 
   // Dosyadan sonraki stok hareketleri (satış, iptal, elle düzeltme; Excel yüklemeleri hariç): değiştirilen stok hücresine eklenir
@@ -132,6 +133,8 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
         if (!l) { skipped.push({ line, reason: `${name}: ${label(k)} — ürünün bu kanalda ilanı yok` }); continue; }
         if (!(n > 0)) { skipped.push({ line, reason: `${name}: ${label(k)} sıfır olamaz` }); continue; }
         if (Math.abs((l.price || 0) - n) < 0.005) continue;
+        const rule = rules.get(`${l.channel}|${l.remote_id}`);
+        if (rule && ((rule.min_price > 0 && n < rule.min_price) || (rule.max_price > 0 && n > rule.max_price))) { skipped.push({ line, reason: `${name}: ${label(k)} ${n} — otomatik fiyat kuralı ${rule.min_price}–${rule.max_price} TL dışında` }); continue; }
         changes.push({ id: p.id, name, field: k, label: label(k), old: l.price, new: n, channel: l.channel, remote_id: l.remote_id });
         continue;
       }
@@ -156,7 +159,11 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
   // Uygula: ürün alanları, stok (hareket kaydıyla) ve kanal fiyatları (gönderilmeyi bekler)
   const t = Date.now(), st = [];
   for (const c of changes) {
-    if (c.field.startsWith('ch:')) st.push(db.prepare('UPDATE listings SET price = ?, price_dirty = 1 WHERE channel = ? AND remote_id = ?').bind(c.new, c.channel, c.remote_id));
+    if (c.field.startsWith('ch:')) {
+      st.push(db.prepare('UPDATE listings SET price = ?, price_dirty = 1 WHERE channel = ? AND remote_id = ?').bind(c.new, c.channel, c.remote_id));
+      // Elle (Excel) değişiklik: otomatik fiyat bu ilanı 14 dakika değiştirmez, fiyat geçmişinde görünür
+      st.push(db.prepare('INSERT INTO price_changes (channel, remote_id, at, old_price, new_price, reason, ok) VALUES (?, ?, ?, ?, ?, ?, 1)').bind(c.channel, c.remote_id, t, c.old, c.new, `Excel ile toplu güncelleme (${user})`));
+    }
     else if (c.field === 'stock') {
       st.push(db.prepare('UPDATE products SET stock = ?, updated_at = ? WHERE id = ?').bind(c.new, t, c.id));
       st.push(db.prepare('INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(c.id, c.new - c.old, c.new, 'Excel ile toplu güncelleme', null, t, user));

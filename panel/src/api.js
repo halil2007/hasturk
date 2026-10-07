@@ -736,6 +736,14 @@ async function saveProduct(env, db, ctx, id, b, user, { push = true } = {}) {
     if (!cur) continue;
     const price = l.price === '' || l.price == null ? cur.price : num(l.price);
     const dirty = price !== cur.price ? 1 : 0;
+    if (dirty) {
+      // Otomatik fiyat kuralı açık ilan: sınır dışı fiyat kabul edilmez; elle değişiklik otomatik fiyatı 14 dakika bekletir
+      const rule = await first(db, 'SELECT min_price, max_price FROM price_rules WHERE channel = ? AND remote_id = ? AND enabled = 1', l.channel, String(l.remote_id));
+      if (rule && ((rule.min_price > 0 && price < rule.min_price) || (rule.max_price > 0 && price > rule.max_price))) {
+        fail(400, `${l.channel} ilanında otomatik fiyat kuralı açık: fiyat ${rule.min_price} – ${rule.max_price} TL arasında olmalı (girilen ${price} TL). Sınırları Buybox sayfasından değiştirin ya da kuralı kapatın.`);
+      }
+      await run(db, "INSERT INTO price_changes (channel, remote_id, at, old_price, new_price, reason, ok) VALUES (?, ?, ?, ?, ?, ?, 1)", l.channel, String(l.remote_id), Date.now(), cur.price, price, `Elle değiştirildi (${user.name})`);
+    }
     // Elle girilen komisyon korunur (API'den gelen gerçek oran bunun üzerine yazmaz); boş bırakılırsa API / kanal oranı kullanılır
     const com = l.commission === '' || l.commission == null ? null : num(l.commission);
     const same = cur.commission != null && com != null && Math.abs(cur.commission - com) < 0.001;
@@ -771,7 +779,8 @@ async function saveProduct(env, db, ctx, id, b, user, { push = true } = {}) {
 async function productDetail(db, id) {
   const p = await first(db, 'SELECT * FROM products WHERE id = ?', id);
   if (!p) fail(404, 'Ürün bulunamadı');
-  p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id = ?`, id);
+  p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired, r.min_price AS rule_min, r.max_price AS rule_max FROM listings l JOIN products p ON p.id = l.product_id
+    LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.product_id = ?`, id);
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
   // Aynı ana ürünün varyantları (tek ekrandan düzenleme için)
   const gk = p.parent_key || p.group_name;

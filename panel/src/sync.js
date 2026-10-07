@@ -303,7 +303,7 @@ export async function pushStocks(env, db, settings, only) {
     const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
     if (!items.length) continue;
     try {
-      await ch.pushStock(items);
+      await trackPush(db, ch, 'stock', await ch.pushStock(items), items.length);
       for (const part of chunk(items, 90)) {
         await db.batch(part.map((x) => db.prepare('UPDATE listings SET pushed_stock = ?, remote_stock = ?, error = NULL WHERE channel = ? AND remote_id = ?').bind(x.stock, x.stock, ch.id, x.remoteId)));
       }
@@ -323,13 +323,28 @@ export async function pushStocks(env, db, settings, only) {
 }
 
 export async function pushPrices(env, db) {
-  const rows = await all(db, 'SELECT channel, remote_id, remote_product_id, sku, barcode, price, list_price FROM listings WHERE price_dirty = 1 AND price > 0 LIMIT 2000');
+  // Otomatik fiyat kuralı açık ilanda fiyat, kaynağı ne olursa olsun (döviz kuru, fiyat önerisi, Excel) kuralın en düşük /
+  // en yüksek sınırı dışına gönderilmez: sınıra çekilir ve kullanıcıya bildirilir (zararına satış olmasın).
+  const rows = await all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.price, l.list_price, r.min_price, r.max_price
+    FROM listings l LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.price_dirty = 1 AND l.price > 0 LIMIT 2000`);
+  const bounded = [];
+  for (const r of rows) {
+    const min = Number(r.min_price) || 0, max = Number(r.max_price) || 0;
+    const p = min > 0 && r.price < min ? min : max >= min && max > 0 && r.price > max ? max : r.price;
+    if (p !== r.price) { bounded.push({ ...r, from: r.price, to: p }); r.price = p; }
+  }
+  if (bounded.length) {
+    for (const part of chunk(bounded, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price = ? WHERE channel = ? AND remote_id = ?').bind(x.to, x.channel, x.remote_id)));
+    await log(db, null, 'warn', `Otomatik fiyat sınırı: ${bounded.length} ilanın fiyatı en düşük / en yüksek sınıra çekildi · ${bounded.slice(0, 5).map((x) => `${x.remote_id} ${x.from} → ${x.to}`).join(', ')}`);
+    await notify(db, 'pricebound', { level: 'warn', title: `${bounded.length} ilanın fiyatı otomatik fiyat sınırına çekildi`,
+      msg: `${bounded.slice(0, 3).map((x) => `${x.remote_id}: ${x.from} → ${x.to} TL`).join(' · ')} · Döviz kuru, fiyat önerisi ya da toplu güncelleme fiyatı kuralın dışına çıkarıyordu. Sınırları Buybox sayfasından değiştirebilirsiniz.` });
+  }
   const result = {};
   for (const ch of await getChannels(env, db)) {
     const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: r.price, listPrice: r.list_price || 0 }));
     if (!items.length || !ch.enabled || !ch.pushPrice) continue;
     try {
-      await ch.pushPrice(items);
+      await trackPush(db, ch, 'price', await ch.pushPrice(items), items.length);
       for (const part of chunk(items, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL WHERE channel = ? AND remote_id = ?').bind(ch.id, x.remoteId)));
       result[ch.id] = items.length;
       await log(db, ch.id, 'info', `${items.length} ilanın fiyatı gönderildi`);
@@ -342,6 +357,46 @@ export async function pushPrices(env, db) {
     }
   }
   return result;
+}
+
+// ---------- gönderim sonucu ----------
+// Trendyol / Hepsiburada stok ve fiyatı hemen "kabul" eder, satır satır sonucu birkaç dakika sonra verir. Sonuç sorgulanır:
+// reddedilen ilan (ör. kampanyadaki ürünün fiyatı) ilana hata olarak yazılır ve Bildirimler'e düşer; panel "gönderildi" sanmaz.
+export async function trackPush(db, ch, kind, res, n) {
+  if (!ch.pushStatus || !res || !Array.isArray(res.refs) || !res.refs.length) return;
+  const t = Date.now();
+  await db.batch(res.refs.map((ref) => db.prepare('INSERT INTO push_checks (channel, kind, ref, at, n) VALUES (?, ?, ?, ?, ?)').bind(ch.id, kind, String(ref), t, n)));
+}
+export async function checkPushes(env, db, { minAge = 60e3, maxAge = 6 * 3600e3, limit = 20 } = {}) {
+  const t = Date.now();
+  const rows = await all(db, "SELECT * FROM push_checks WHERE status = 'pending' AND at < ? ORDER BY at LIMIT ?", t - minAge, limit);
+  if (!rows.length) return null;
+  const chans = await getChannels(env, db), out = { checked: 0, failed: 0 };
+  for (const r of rows) {
+    const ch = chans.find((c) => c.id === r.channel);
+    if (!ch || !ch.enabled || !ch.pushStatus) { await run(db, "UPDATE push_checks SET status = 'skipped', checked_at = ? WHERE id = ?", t, r.id); continue; }
+    let res;
+    try { res = await ch.pushStatus(r.ref); } catch (e) {
+      if (t - r.at > maxAge) await run(db, "UPDATE push_checks SET status = 'expired', checked_at = ? WHERE id = ?", t, r.id);
+      continue;
+    }
+    if (!res.done) { if (t - r.at > maxAge) await run(db, "UPDATE push_checks SET status = 'expired', checked_at = ? WHERE id = ?", t, r.id); continue; }
+    const bad = (res.items || []).filter((x) => x.ok === false && x.key);
+    out.checked++; out.failed += bad.length;
+    const what = r.kind === 'price' ? 'Fiyat' : 'Stok';
+    for (const part of chunk(bad, 40)) {
+      await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND (remote_id = ? OR sku = ?)')
+        .bind(`${what} kanal tarafından reddedildi: ${(x.error || 'nedeni belirtilmedi').slice(0, 300)}`, r.channel, x.key, x.key)));
+    }
+    await run(db, "UPDATE push_checks SET status = 'done', failed = ?, checked_at = ? WHERE id = ?", bad.length, t, r.id);
+    const key = `${r.kind}reject:${r.channel}`;
+    if (bad.length) {
+      await log(db, r.channel, 'warn', `${ch.name}: ${bad.length} ilanın ${what.toLowerCase()} değişikliği reddedildi · ${bad.slice(0, 5).map((x) => `${x.key}: ${x.error || '?'}`).join(' | ')}`);
+      await notify(db, key, { level: 'warn', channel: r.channel, title: `${ch.name}: ${bad.length} ilanın ${what.toLowerCase()} değişikliği kabul edilmedi`,
+        msg: `${bad.slice(0, 3).map((x) => `${x.key}: ${x.error || 'nedeni belirtilmedi'}`).join(' · ')}${bad.length > 3 ? ` · +${bad.length - 3} ilan` : ''} · Ürünler sayfasında ilan hatası olarak görünür. ${r.kind === 'price' ? 'Kanaldaki fiyat değişmedi; panel bir sonraki senkronda kanaldaki fiyatı gösterir.' : 'Bir sonraki senkronda yeniden denenir.'}` });
+    } else await resolve(db, key);
+  }
+  return out;
 }
 
 // ---------- kilit ----------
@@ -429,6 +484,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     // Döviz bazlı fiyatlar: kur yenilenir, zamanı geldiyse ürün ve kanal fiyatları güncellenir (sonra fiyatlar gönderilir)
     if (!only) out.fx = await syncFx(env, db, settings).catch((e) => 'hata: ' + e.message);
     out.price = await pushPrices(env, db);
+    // Önceki gönderimlerin kanal tarafındaki sonucu (reddedilen fiyat / stok)
+    out.pushChecks = await checkPushes(env, db).catch((e) => 'hata: ' + e.message);
     // Buybox kontrolü ve (açıksa) seçili ürünlerde otomatik fiyat
     if (!only) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
@@ -536,6 +593,7 @@ export async function quickSync(env, db) {
     const settings = await getSettings(db);
     const out = {
       uploads: await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message),
+      pushChecks: await checkPushes(env, db).catch((e) => 'hata: ' + e.message),
       autoUpload: await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message),
     };
     // Kanalın kabul ettiği ama ilanı henüz görünmeyen ürünler (son 2 gün): kanal ilanı onaydan sonra açar; ilanlar 10 dakikada bir

@@ -200,6 +200,10 @@ const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS orders_stock_dirty ON orders(stock_dirty) WHERE stock_dirty = 1',
   // Kabul edilmiş iade talebiyle iade edilen adet (bkz. claims.js applyClaimReturns); "iadede stoğa ekle" açıksa stoğa döner
   'ALTER TABLE order_items ADD COLUMN returned_qty INTEGER NOT NULL DEFAULT 0',
+  // Gönderilen stok / fiyatın kanal tarafındaki sonucu (Trendyol toplu işlem, Hepsiburada yükleme): reddedilen satırlar ilana hata olarak yazılır
+  `CREATE TABLE IF NOT EXISTS push_checks (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL, at INTEGER NOT NULL,
+    n INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', failed INTEGER NOT NULL DEFAULT 0, checked_at INTEGER)`,
+  'CREATE INDEX IF NOT EXISTS push_checks_p ON push_checks(status, at)',
   // Firma tahsilatları (ödeme kaydı; aboneliği uzatır)
   `CREATE TABLE IF NOT EXISTS tenant_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL, at INTEGER NOT NULL, amount REAL NOT NULL,
     months INTEGER NOT NULL DEFAULT 0, method TEXT, note TEXT, user TEXT)`,
