@@ -209,6 +209,32 @@
     if (m && !m.value) m.value = { arama: 'Lütfen beni arayın.', kanal: 'Entegrasyonunu istediğim kanal: ', teklif: q.get('paket') ? `${q.get('paket')} paketi için teklif ve deneme hesabı istiyorum.` : '' }[q.get('konu')] || '';
   }
 
+  // Bot doğrulaması (Cloudflare Turnstile): panel anahtar verirse formlara "robot değilim" kutucuğu eklenir; vermezse formlar kutucuksuz
+  // çalışır (doğrulama sunucuda da kapalıdır). Jeton tek kullanımlık: her gönderimden sonra kutucuk yenilenir.
+  let cfKey = null, cfLoad = null;
+  const captcha = () => cfLoad || (cfLoad = !S.panelUrl ? Promise.resolve(null)
+    : fetch(`${S.panelUrl.replace(/\/+$/, '')}/api/public/captcha`).then((r) => (r.ok ? r.json() : {})).then((d) => {
+      cfKey = d && d.siteKey;
+      if (!cfKey) return null;
+      return new Promise((ok) => {
+        window.__cfReady = () => ok(window.turnstile || null);
+        const sc = document.createElement('script');
+        sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=__cfReady'; sc.async = true; sc.onerror = () => ok(null);
+        document.head.append(sc);
+      });
+    }).catch(() => null));
+  const guard = (form, action) => {
+    const btn = $('button[type=submit]', form);
+    if (!btn) return;
+    const box = document.createElement('div'); box.className = 'cf-box';
+    btn.parentNode.insertBefore(box, btn);
+    captcha().then((ts) => { if (!ts) { box.remove(); return; } form._cf = { ts, id: ts.render(box, { sitekey: cfKey, action, language: 'tr' }) }; });
+  };
+  const cfToken = (form) => (form._cf ? form._cf.ts.getResponse(form._cf.id) || '' : null);
+  const cfReset = (form) => { if (form._cf) try { form._cf.ts.reset(form._cf.id); } catch { /* yok */ } };
+  const CF_MSG = 'Lütfen "Ben robot değilim" doğrulamasını tamamlayın.';
+  $$('[data-lead]').forEach((form) => guard(form, 'lead'));
+
   // Formlar → panel (Destek'e "Web sitesi" olarak düşer); demo formu dönen bağlantıyla demo panelini açar
   $$('[data-lead]').forEach((form) => form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -222,6 +248,9 @@
     if (!okPhone(body.phone)) { mark(form, 'phone'); return say('err', 'Geçerli bir telefon numarası yazın (ör. 0532 123 45 67 ya da 0212 123 45 67).'); }
     if (!okEmail(body.email)) { mark(form, 'email'); return say('err', 'Geçerli bir e-posta adresi yazın.'); }
     if (!body.consent) return say('err', 'Lütfen KVKK aydınlatma metnini onaylayın.');
+    const tok = cfToken(form);
+    if (tok === '') return say('err', CF_MSG);
+    if (tok) body.cf = tok;
     btn.disabled = true; say('', 'Gönderiliyor…');
     try {
       const r = await fetch(S.leadUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -239,7 +268,43 @@
       if (raw === 'demo' && j.demo) msg.insertAdjacentHTML('beforeend', ` <a href="${esc(j.demo)}" target="_blank" rel="noopener">Demo panelini şimdi açın →</a>`);
     } catch (x) {
       say('err', `${x.message || 'Gönderilemedi'}.${get('company.phone') ? ` Dilerseniz ${get('company.phone')} numarasından ulaşabilirsiniz.` : ''}`);
-    } finally { btn.disabled = false; }
+    } finally { btn.disabled = false; cfReset(form); }
+  }));
+
+  // 7 günlük deneme: form gönderilince panel hemen açılır, dönen tek kullanımlık bağlantıyla doğrudan girilir
+  $$('[data-trial]').forEach((form) => guard(form, 'trial'));
+  $$('[data-trial]').forEach((form) => form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('[data-msg]', form), btn = $('button[type=submit]', form), f = new FormData(form);
+    const body = Object.fromEntries(['company', 'name', 'phone', 'email', 'username', 'password', 'website'].map((k) => [k, String(f.get(k) || '').trim()]));
+    body.password = String(f.get('password') || ''); body.consent = !!f.get('consent');
+    const say = (cls, t) => { msg.className = 'form-msg ' + cls; msg.textContent = t; };
+    if (body.company.length < 2) { mark(form, 'company'); return say('err', 'Firma / mağaza adını yazın.'); }
+    if (body.name.length < 2) { mark(form, 'name'); return say('err', 'Lütfen adınızı ve soyadınızı yazın.'); }
+    if (!okPhone(body.phone)) { mark(form, 'phone'); return say('err', 'Geçerli bir telefon numarası yazın (ör. 0532 123 45 67).'); }
+    if (!okEmail(body.email)) { mark(form, 'email'); return say('err', 'Geçerli bir e-posta adresi yazın.'); }
+    if (!/^[\p{L}0-9._-]{3,40}$/u.test(body.username)) { mark(form, 'username'); return say('err', 'Kullanıcı adı 3-40 karakter olmalı (harf, rakam, . _ -), boşluk içermemeli.'); }
+    if (body.password.length < 8) { mark(form, 'password'); return say('err', 'Şifre en az 8 karakter olmalı.'); }
+    if (!body.consent) return say('err', 'Lütfen kullanım koşullarını ve KVKK aydınlatma metnini onaylayın.');
+    const tok = cfToken(form);
+    if (tok === '') return say('err', CF_MSG);
+    if (tok) body.cf = tok;
+    if (!S.panelUrl) return say('err', 'Deneme paneli şu an açılamıyor; lütfen bizi arayın.');
+    btn.disabled = true; say('', 'Paneliniz açılıyor…');
+    try {
+      const r = await fetch(`${S.panelUrl.replace(/\/+$/, '')}/api/public/trial`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.error || 'Panel açılamadı');
+      if (!j.url) { say('ok', 'Teşekkürler!'); return; }
+      const ok = $('[data-trial-ok]', form);
+      $('[data-t-slug]', ok).textContent = j.slug; $('[data-t-user]', ok).textContent = j.username;
+      $('[data-t-link]', ok).href = j.url;
+      $$(':scope > :not([data-trial-ok])', form).forEach((x) => { x.hidden = true; });
+      ok.hidden = false; form.classList.add('done');
+      if (window.gtag) try { window.gtag('event', 'sign_up', { method: 'trial' }); } catch { /* yok */ }
+    } catch (x) {
+      say('err', `${x.message || 'Panel açılamadı'}.${get('company.phone') ? ` Dilerseniz ${get('company.phone')} numarasından ulaşabilirsiniz.` : ''}`.replace('..', '.'));
+    } finally { btn.disabled = false; cfReset(form); }
   }));
 
   // ---------- Teşekkür sayfaları (reklam dönüşümü için sabit adresler): /odeme-basarili (kartla ödeme), /siparis-alindi (havale / EFT) ----------
@@ -267,6 +332,7 @@
   // ---------- Satın al (iyzico): 1 Paket → 2 Hesap → 3 Fatura bilgileri → 4 Onay; özet kartı seçime göre güncellenir ----------
   const co = $('[data-checkout]');
   if (co) {
+    guard(co, 'checkout');
     const plans = (S.plans || []).filter((p) => p.key && p.monthly);
     const st = { plan: q.get('plan') || 'profesyonel', period: q.get('donem') === 'aylik' ? 'monthly' : 'yearly', kind: q.get('firma') ? 'renew' : 'new', inv: 'bireysel', pay: 'card' };
     if (!plans.some((p) => p.key === st.plan)) st.plan = (plans[1] || plans[0] || {}).key;
@@ -371,6 +437,9 @@
       const body = { kind: st.kind, plan: st.plan, period: st.period, pay: st.pay, website: val('website'), consent: true, email: val('email'), phone: val('phone'), invoice };
       if (!renew) body.firm = val('firm');
       else body.slug = val('slug_renew');
+      const tok = cfToken(co);
+      if (tok === '') return say('err', CF_MSG);
+      if (tok) body.cf = tok;
       btn.disabled = true; say('', 'Güvenli ödeme sayfası hazırlanıyor…');
       try {
         const r = await fetch(S.checkoutUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -386,7 +455,7 @@
         location.href = j.url;
       } catch (x) {
         say('err', `${x.message || 'Ödeme başlatılamadı'}${get('company.phone') ? ` · Yardım için: ${get('company.phone')}` : ''}`);
-        btn.disabled = false;
+        btn.disabled = false; cfReset(co);
       }
     });
   }

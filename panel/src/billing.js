@@ -20,6 +20,7 @@ import { notify as pushNotify } from './push.js';
 import { siteOrigins, validEmail, validPhone } from './lead.js';
 import { mailOwner } from './ownermail.js';
 import { json, str, fail, HttpError } from './util.js';
+import { turnstileOk, siteHosts, CAPTCHA_ERROR } from './turnstile.js';
 
 const cors = (origin) => ({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', Vary: 'Origin' });
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -162,6 +163,7 @@ export async function publicCheckout(req, env) {
     const eft = str(b.pay) === 'eft';
     if (!eft && !iyzicoReady(env)) fail(503, 'Online ödeme henüz açılmadı. Satın almak için bizi arayın ya da WhatsApp\'tan yazın.');
     if (str(b.website)) return json({ ok: true }, 200, h); // bot tuzağı
+    if (!(await turnstileOk(env, req, b.cf, 'checkout', fetch, siteHosts(siteOrigins(env))))) return json(CAPTCHA_ERROR, 400, h);
     const ip = await rateLimit(env.DB, req, 'checkout_rate', 10);
     const p = priceOf(str(b.plan), str(b.period));
     if (!p) fail(400, 'Paket ya da dönem geçersiz');

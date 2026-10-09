@@ -869,3 +869,12 @@ a.mf:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .cookie-bar p { margin: 0; flex: 1 1 260px; color: var(--text-2); }
 .cookie-bar div { display: flex; gap: 8px; }
 .cookie-bar .btn { padding: 8px 14px; font-size: 14px; }
+
+/* bot doğrulaması (Turnstile) kutucuğu: gönder düğmesinin üstünde */
+.cf-box { min-height: 65px; margin: 4px 0 10px; }
+.cf-box:empty { min-height: 0; margin: 0; }
+.trial-ok { display: grid; gap: 10px; text-align: center; padding: 8px 0; }
+.trial-ok b { font-size: 21px; font-weight: 800; }
+.trial-ok p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.trial-ok code { background: var(--soft, #eef3fc); color: var(--text, #0d1b34); padding: 2px 8px; border-radius: 6px; font-weight: 700; }
+.trial-ok .btn { justify-self: center; margin-top: 6px; }

@@ -5,6 +5,7 @@ import { first, run, init, notify } from './db.js';
 import { demoLogin } from './tenants.js';
 import { notify as pushNotify } from './push.js';
 import { json, str } from './util.js';
+import { turnstileOk, siteHosts, CAPTCHA_ERROR } from './turnstile.js';
 
 const DEFAULT_ORIGINS = 'https://hasturkcrm.com,https://www.hasturkcrm.com';
 export const siteOrigins = (env) => String(env.SITE_ORIGINS || DEFAULT_ORIGINS).split(',').map((x) => x.trim().replace(/\/+$/, '')).filter(Boolean);
@@ -29,6 +30,7 @@ export async function leadRequest(req, env) {
   let b = {};
   try { b = JSON.parse(await req.text()); } catch { return json({ error: 'Geçersiz istek' }, 400, h); }
   if (str(b.website)) return json({ ok: true }, 200, h); // bot tuzağı
+  if (!(await turnstileOk(env, req, b.cf, 'lead', fetch, siteHosts(siteOrigins(env))))) return json(CAPTCHA_ERROR, 400, h);
   const name = str(b.name).trim().slice(0, 100), company = str(b.company).trim().slice(0, 120), phone = str(b.phone).trim().slice(0, 40), email = str(b.email).trim().slice(0, 120);
   const channels = (Array.isArray(b.channels) ? b.channels : []).map((x) => str(x).slice(0, 30)).slice(0, 20), message = str(b.message).trim().slice(0, 2000);
   if (name.length < 2) return json({ error: 'Adınızı yazın' }, 400, h);
