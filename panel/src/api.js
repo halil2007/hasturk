@@ -385,14 +385,16 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
     if (!pkg) fail(400, 'Gönderilecek açık paket yok');
-    // ikas: yalnız ikas Kargo gönderisi kargoya verilebilir; elle takip bilgisi kabul edilmez
+    // ikas: ikas Kargo gönderisi ya da bağlı kargo entegratörüyle açılmış gönderi kargoya verilebilir; elle takip bilgisi kabul edilmez.
+    // Entegratör gönderisi ikas'a bildirilir (paket "Kargoda", takip bilgisi müşteriye ikas'tan gider).
+    const ownPkg = !!(ch && ch.caps && ch.caps.ownCarrier && pkg.agreement === 'own' && pkg.carrier_provider);
     if (ch && ch.caps && ch.caps.manualTracking === false) {
-      if (!pkg.remote_id || !(pkg.barcode || pkg.tracking)) fail(400, `${ch.name}: bu pakette ikas Kargo gönderisi yok. Önce “Paketle ve etiket al” (ya da ikas panelinde ikas Kargo ile Gönder); elle kargo bilgisi girilmez.`);
+      if (!ownPkg && (!pkg.remote_id || !(pkg.barcode || pkg.tracking))) fail(400, `${ch.name}: bu pakette ikas Kargo gönderisi yok. Önce “Paketle ve etiket al” (ya da ikas panelinde ikas Kargo ile Gönder) ya da bağlı kargo entegratörünüzle “Entegratörle gönder”; elle kargo bilgisi girilmez.`);
       b = { ...b, tracking: '', cargo_company: '' };
     }
     const tracking = str(b.tracking) || pkg.tracking || pkg.barcode, cargo = str(b.cargo_company) || pkg.cargo_company || o.cargo_company;
     let res = {};
-    if (ch && ch.enabled && ch.caps.ship === 'remote' && ch.ship) res = (await ch.ship(o, pkg, { cargoCompany: cargo, tracking, invoiceNumber: str(b.invoice_number) })) || {};
+    if (ch && ch.enabled && (ch.caps.ship === 'remote' || ownPkg) && ch.ship) res = (await ch.ship(o, pkg, { cargoCompany: cargo, tracking, invoiceNumber: str(b.invoice_number) })) || {};
     const tn = res.tracking || tracking || '';
     await run(db, "UPDATE packages SET status = 'shipped', tracking = ?, cargo_company = ?, shipped_at = ?, packed_at = COALESCE(packed_at, ?), remote_id = COALESCE(remote_id, ?) WHERE id = ?", tn, cargo || '', Date.now(), Date.now(), res.remoteId || null, pkg.id);
     const left = await first(db, "SELECT COUNT(*) AS n FROM packages WHERE order_id = ? AND status = 'open'", o.id);
@@ -406,7 +408,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   // Takip no, kargo firması ve etiket pakete yazılır; "Kargoya ver" takip numarasını kanala bildirir.
   if (action === 'carrier-label') {
     if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
-    if (ch && ch.caps && ch.caps.manualTracking === false) fail(400, `${ch.name}: gönderi yalnız ${ch.type === 'ikas' ? 'ikas Kargo' : 'kanalın kargosu'} ile yapılır; kargo entegratörü kullanılamaz`);
+    if (ch && ch.caps && ch.caps.manualTracking === false && !ch.caps.ownCarrier) fail(400, `${ch.name}: gönderi yalnız kanalın kargosu ile yapılır; kargo entegratörü kullanılamaz`);
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
     if (!pkg) fail(404, 'Paket bulunamadı');
@@ -428,13 +430,24 @@ async function orderAction(env, db, id, action, b, ctx, user) {
       agreement = 'own', packed_at = COALESCE(packed_at, ?), label_format = ?, label_data = ?, label_at = ?, label_viewed_at = NULL, label_printed_at = NULL, error = NULL WHERE id = ?`,
     c.id, str(r.ref) || null, r.cost == null ? null : num(r.cost), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
     t, r.label ? r.label.format : null, r.label ? r.label.data : null, t, pkg.id);
+    // ikas: entegratör gönderisi ikas'ta takip bilgili paket olarak açılır ("Kargoya Hazır"); yazılamazsa "Kargoya ver"de yeniden denenir
+    let chNote = '';
+    if (ch && ch.enabled && ch.caps && ch.caps.ownCarrier && ch.ownShipment && !pkg.remote_id) {
+      try {
+        const x = await ch.ownShipment(o, pkg, { tracking: tn, barcode: str(r.barcode || r.tracking), cargoCompany: str(r.carrier) || c.name, trackingUrl: str(r.trackingUrl) });
+        if (x && x.remoteId) await run(db, 'UPDATE packages SET remote_id = ? WHERE id = ?', x.remoteId, pkg.id);
+      } catch (e) {
+        chNote = ` · ${ch.name}'a henüz yazılamadı (${e.message}); “Kargoya ver”de yeniden denenir`;
+        await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${ch.name}'a kargo bilgisi yazılamadı: ${e.message}`.slice(0, 500), pkg.id);
+      }
+    }
     // Entegratörün kargo ücreti siparişin kargo giderine yazılır (elle girilen gider korunur)
     if (r.cost != null && o.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", num(r.cost), o.id);
     if (o.status === 'new') await setLocalStatus(db, o, 'processing');
     await event(db, o, 'carrier', user, `Paket ${pkg.no}: ${c.name} · ${str(r.carrier) || ''} ${tn}`.trim());
     const fresh = await loadOrder(db, o.id);
     const lab = r.label ? { ...r.label, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label.format}` } : null;
-    return { ok: true, message: `${c.name} gönderisi oluşturuldu: ${str(r.carrier) || ''} ${tn}`.trim(), order: fresh, package_id: pkg.id, official: lab, panel: !lab, sender: settings.sender };
+    return { ok: true, message: `${c.name} gönderisi oluşturuldu: ${str(r.carrier) || ''} ${tn}`.trim() + chNote, order: fresh, package_id: pkg.id, official: lab, panel: !lab, sender: settings.sender };
   }
   if (action === 'carrier-cancel') {
     const pkg = pkgOf(b.package_id);
@@ -442,6 +455,11 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paketin gönderisi panelden iptal edilemez; entegratör panelinden yapın');
     const c = await carrierFor(env, db, pkg.carrier_provider);
     if (pkg.carrier_ref) await c.api.cancel(pkg.carrier_ref);
+    // ikas'ta açılmış entegratör paketi de geri alınır (ürünler yeniden paketlenebilir)
+    if (ch && ch.enabled && ch.caps && ch.caps.ownCarrier && pkg.remote_id && ch.cancelPackage) {
+      await ch.cancelPackage(o, pkg);
+      await run(db, 'UPDATE packages SET remote_id = NULL, remote_status = NULL WHERE id = ?', pkg.id);
+    }
     if (pkg.carrier_cost && o.shipping_src === 'carrier') await run(db, 'UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) - ?) WHERE id = ?', pkg.carrier_cost, o.id);
     await run(db, "UPDATE packages SET carrier_provider = NULL, carrier_ref = NULL, carrier_cost = NULL, tracking = '', barcode = '', cargo_company = '', tracking_url = NULL, agreement = NULL, error = NULL WHERE id = ?", pkg.id);
     await clearLabel(db, pkg.id);

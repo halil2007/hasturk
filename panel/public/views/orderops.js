@@ -415,7 +415,7 @@ export async function carrierOptions() {
   return carriersCache;
 }
 // Pakete entegratörden gönderi açılabilir mi: kanal elle kargo bilgisi kabul ediyor, paket kanalda kargo barkodu almamış, gönderisi yok
-export const carrierAllowed = (d, pkg) => pkg.status === 'open' && ((d.channel || {}).caps || {}).manualTracking !== false && !pkg.carrier_ref
+export const carrierAllowed = (d, pkg) => pkg.status === 'open' && (((d.channel || {}).caps || {}).manualTracking !== false || ((d.channel || {}).caps || {}).ownCarrier) && !pkg.carrier_ref
   && !(pkg.remote_id && (pkg.barcode || pkg.tracking) && pkg.agreement !== 'own');
 async function carrierDialog(d, pkg, done) {
   const o = d.order, list = await carrierOptions(), usable = list.filter((c) => c.usable), soon = list.filter((c) => !c.usable);
@@ -456,13 +456,13 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
     title: editOnly ? `Paket ${pkg.no} · kendi anlaşmanızla gönderim` : `Paket ${pkg.no} kargoya ver`, size: 'narrow',
     body: html`<div class="stack">
       <div class="small muted">${name} · #${o.order_number} · ${o.customer}</div>
-      ${!editOnly && !code && c.manualTracking === false ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bu pakette henüz ikas Kargo barkodu yok. ikas siparişleri yalnızca <b>ikas Kargo</b> ile gönderilir; elle kargo/takip bilgisi girilmez. Önce “Paketle ve etiket al” ya da ikas panelinde “ikas Kargo ile Gönder”.</div></div>`
+      ${!editOnly && !code && c.manualTracking === false ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bu pakette henüz kargo barkodu yok. ikas siparişi <b>ikas Kargo</b> ile (ikas panelinde “ikas Kargo ile Gönder”; etiket panele kendiliğinden gelir) ya da bağlı <b>kargo entegratörünüzle</b> (paket menüsü → Entegratörle gönder) gönderilir; elle kargo/takip bilgisi girilmez.</div></div>`
         : !editOnly && code ? html`<dl class="kv small"><dt>Kargo</dt><dd>${pkg.cargo_company || '—'}</dd><dt>Barkod / takip</dt><dd class="num">${code}</dd><dt>Etiket</dt><dd>${pkg.label_printed_at ? `yazdırıldı (${shortDT(pkg.label_printed_at)})` : html`<span style="color:var(--amber)">yazdırılmadı</span>`}</dd></dl>`
         : html`${editOnly ? html`<div class="notice small">Kanalın kargo sistemi dışında (kendi kargo anlaşmanızla) gönderdiğiniz paketler içindir.</div>` : ''}
         <label class="field"><span>Kargo firması</span><input class="input" list="cargo-dl" data-f="cargo" value="${pkg.cargo_company || o.cargo_company || ''}"><datalist id="cargo-dl">${((state.settings && state.settings.cargo_companies) || []).map((x) => html`<option value="${x}">`)}</datalist></label>
         <label class="field"><span>Takip no</span><input class="input" data-f="tracking" value="${pkg.tracking || ''}"></label>`}
       ${ch(o.channel).type === 'trendyol' && !editOnly ? html`<label class="field"><span>Fatura no (isteğe bağlı, Trendyol'a "Faturalandı" bildirilir)</span><input class="input" data-f="invoice"></label>` : ''}
-      ${!editOnly ? html`<div class="notice small">${c.ship === 'remote' ? `Gönderim ${name}'a bildirilir.` : `${name}'da paket, kargo firması teslim alıp okutunca “Kargoda” olur; burada panel kaydı güncellenir.`}</div>` : ''}
+      ${!editOnly ? html`<div class="notice small">${c.ship === 'remote' || (c.ownCarrier && pkg.carrier_provider) ? `Gönderim ${name}'a bildirilir${c.ownCarrier && pkg.carrier_provider ? ' (paket “Kargoda” olur, takip bilgisi müşteriye ikas’tan gider)' : ''}.` : `${name}'da paket, kargo firması teslim alıp okutunca “Kargoda” olur; burada panel kaydı güncellenir.`}</div>` : ''}
     </div>`,
     foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>${editOnly ? 'Kaydet' : html`<i class="ico ico-truck"></i>Kargoya ver`}</button>`,
   });

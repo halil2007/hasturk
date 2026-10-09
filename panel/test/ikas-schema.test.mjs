@@ -17,7 +17,7 @@ test('ikas: tüm sorgu ve mutasyonlar resmi şemayla uyumlu (işlem, argüman, d
     const pk = { id: 'pk1', orderLineItemIds: ['l1'], orderPackageFulfillStatus: 'READY_FOR_SHIPMENT', trackingInfo: { barcode: 'B1' } };
     const data = { listOrder: { hasNext: false, data: [{ id: 'o1', orderNumber: 1, orderLineItems: [], orderPackages: [pk] }] }, listProduct: { hasNext: false, data: [] }, listVariantType: [], getMerchant: { id: 'm' },
       getAuthorizedApp: { scope: 'read_orders,write_orders' }, listStockLocation: [{ id: 'loc', name: 'Depo', address: {} }], listCargoCompany: [{ id: 'c', name: 'Yurtiçi' }], listShippingSettings: [],
-      fulfillOrder: { id: 'o1', orderPackages: [pk] }, saveProduct: { id: 'p', variants: [{ id: 'v' }] } };
+      fulfillOrder: { id: 'o1', orderPackages: [pk] }, updateOrderPackageStatus: { id: 'o1' }, saveProduct: { id: 'p', variants: [{ id: 'v' }] } };
     return new Response(JSON.stringify({ data }), { headers: { 'Content-Type': 'application/json' } });
   };
   try {
@@ -28,10 +28,15 @@ test('ikas: tüm sorgu ve mutasyonlar resmi şemayla uyumlu (işlem, argüman, d
     await ch.cargoOptions(); await ch.fetchOne('o1'); await ch.label(order, pkg);
     await ch.ship(order, { ...pkg, barcode: 'B1' }, {}); await assert.rejects(() => ch.ship(order, { ...pkg, remote_id: null }, { tracking: 'T' }), /elle kargo bilgisi girilmez/); await ch.cancelPackage(order, pkg);
     await ch.createProduct({ name: 'x', sale_price: 1, stock: 1 }); await ch.diagnose({ orderId: 'o1' });
+    // ikas Kargo akışında ikas'a kargo / durum bilgisi yazılmaz (ikas Kargo uygulaması gönderir)
+    assert.ok(![...seen].some((q) => /fulfillOrder|updateOrderPackageStatus/.test(q)), 'ikas Kargo akışında ikas\'a yazılmaz');
+    // Kendi kargo entegratörünüzle gönderim: paket ikas'ta takip bilgisiyle açılır, kargoya verilince "Kargoda" yapılır
+    const own = { ...pkg, remote_id: null, agreement: 'own', carrier_provider: 'kargonomi', tracking: 'KG1', cargo_company: 'Yurtiçi' };
+    await ch.ownShipment(order, own, { tracking: 'KG1', cargoCompany: 'Yurtiçi' });
+    await ch.ship(order, { ...own, remote_id: 'pk1' });
   } finally { globalThis.fetch = real; }
-  assert.ok(seen.size >= 11, `${seen.size} işlem`);
-  assert.ok(![...seen].some((q) => /fulfillOrder/.test(q)), 'panel ikas\'ta Kargoya Hazır işaretlemez (ikas Kargo uygulaması gönderir)');
-  assert.ok(![...seen].some((q) => /updateOrderPackageStatus/.test(q)), 'ikas\'a takip / durum bilgisi yazılmaz');
+  assert.ok(seen.size >= 13, `${seen.size} işlem`);
+  assert.ok([...seen].some((q) => /fulfillOrder/.test(q)) && [...seen].some((q) => /updateOrderPackageStatus/.test(q)));
   assert.deepEqual(validate(seen, schema), []);
 });
 

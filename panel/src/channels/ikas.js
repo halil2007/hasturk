@@ -370,15 +370,39 @@ export function ikas(env, p, meta) {
 
   // Kargoya ver: ikas'a HİÇBİR takip / kargo bilgisi yazılmaz. Gönderiyi ikas Kargo yönetir; kargo firması paketi
   // okutunca ikas durumu kendisi "Gönderildi" yapar ve senkronla panele gelir. Panel yalnızca kendi kaydını günceller.
+  // Kendi anlaşmanızla (kargo entegratörü: Kargonomi, Navlungo…) gönderim: ikas Kargo kullanılmaz. Entegratörün takip no / barkodu
+  // ikas'ta paket olarak yazılır ("Kargoya Hazır", müşteriye bildirim gitmez); "Kargoya ver" paketi ikas'ta "Kargoda" yapar ve takip
+  // bilgisi müşteriye ikas'tan gider. ikas'a kargo bilgisi yalnız bu yolda yazılır; ikas Kargo gönderilerine dokunulmaz.
+  const own = (pkg) => pkg.agreement === 'own' && !!pkg.carrier_provider;
+  const tinfo = (t, notify) => ({ trackingNumber: t.tracking || undefined, barcode: t.barcode || undefined, cargoCompany: t.cargoCompany || undefined, trackingLink: t.trackingUrl || undefined, isSendNotification: notify });
+  async function ownShipment(order, pkg, t) {
+    const lines = (pkg.items || []).map((x) => ({ orderLineItemId: String(x.line_id), quantity: Number(x.qty) || 1 }));
+    if (!lines.length) throw new Error('Pakette ürün yok');
+    const d = await gql('mutation ($input: FulFillOrderInput!) { fulfillOrder(input: $input) { id orderPackages { id orderLineItemIds trackingInfo { trackingNumber barcode } } } }', {
+      input: { orderId: order.remote_id, lines, markAsReadyForShipment: true, sendNotificationToCustomer: false, trackingInfoDetail: tinfo(t, false) },
+    });
+    const pks = (d.fulfillOrder && d.fulfillOrder.orderPackages) || [];
+    const hit = pks.find((p) => p.trackingInfo && t.tracking && (p.trackingInfo.trackingNumber === t.tracking || p.trackingInfo.barcode === t.tracking)) || pks[pks.length - 1];
+    if (!hit) throw new Error('ikas paketi oluşturamadı');
+    return { remoteId: String(hit.id) };
+  }
   async function ship(order, pkg) {
-    if (!pkg.remote_id || !(pkg.barcode || pkg.tracking)) throw new Error('Bu paket ikas Kargo ile gönderilmemiş. Önce “ikas Kargo ile Gönder”; elle kargo bilgisi girilmez.');
+    if (own(pkg)) {
+      const t = { tracking: pkg.tracking, barcode: pkg.barcode, cargoCompany: pkg.cargo_company, trackingUrl: pkg.tracking_url };
+      const id = pkg.remote_id || (await ownShipment(order, pkg, t)).remoteId;
+      await gql('mutation ($input: UpdateOrderPackageStatusInput!) { updateOrderPackageStatus(input: $input) { id } }', {
+        input: { orderId: order.remote_id, packages: [{ packageId: id, status: 'FULFILLED', trackingInfo: tinfo(t, true) }] },
+      });
+      return { remoteId: id, tracking: pkg.tracking };
+    }
+    if (!pkg.remote_id || !(pkg.barcode || pkg.tracking)) throw new Error('Bu paket ikas Kargo ile gönderilmemiş. Önce “ikas Kargo ile Gönder” ya da bağlı kargo entegratörünüzle gönderi açın; elle kargo bilgisi girilmez.');
     return { remoteId: pkg.remote_id };
   }
 
   // Paketi iptal et (ikas'ta paketlemeyi geri al) — kargo firmasını değiştirmek veya yeniden bölmek için
   async function cancelPackage(order, pkg) {
     if (!pkg.remote_id) return;
-    if (pkg.barcode || pkg.tracking) throw new Error('Bu pakette ikas Kargo gönderisi (barkod) var; gönderiyi ikas panelindeki ikas Kargo ekranından iptal edin.');
+    if ((pkg.barcode || pkg.tracking) && !own(pkg)) throw new Error('Bu pakette ikas Kargo gönderisi (barkod) var; gönderiyi ikas panelindeki ikas Kargo ekranından iptal edin.');
     await gql('mutation ($input: CancelFulfillmentInput!) { cancelFulfillment(input: $input) { id } }', { input: { orderId: order.remote_id, orderPackageId: pkg.remote_id } });
   }
   async function createProduct(pr) {
@@ -481,7 +505,7 @@ export function ikas(env, p, meta) {
   const missing = [p + 'STORE', p + 'CLIENT_ID', p + 'CLIENT_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'ikas', enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'local', pack: 'external', external: { label: 'ikas Kargo ile Gönder', url: adminUrl }, ship: 'local', manualTracking: false, label: 'remote', cargo: false, repack: false, cancelPackage: true, createProduct: true, price: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, createProduct, cargoOptions, label, cancelPackage, diagnose,
+    caps: { accept: 'local', split: 'local', pack: 'external', external: { label: 'ikas Kargo ile Gönder', url: adminUrl }, ship: 'local', manualTracking: false, ownCarrier: true, label: 'remote', cargo: false, repack: false, cancelPackage: true, createProduct: true, price: true },
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, ownShipment, createProduct, cargoOptions, label, cancelPackage, diagnose,
   };
 }

@@ -111,14 +111,38 @@ test('kargo entegratörü (deneme modu): gönderi → takip no ve etiket pakete 
   assert.equal((await post(`/api/orders/${id}/carrier-cancel`, { package_id: o.packages[0].id })).status, 400, 'kargodaki gönderi panelden iptal edilmez');
 });
 
-test('kargo entegratörü: ikas siparişinde kullanılamaz (gönderi yalnız ikas Kargo)', async () => {
-  // Gerçek ikas kanalı (bilgileri girilmiş; deneme modundaki örnek kanalın kısıtı yoktur)
-  const { env, post } = await panel({ IKAS1_STORE: 'magaza', IKAS1_CLIENT_ID: 'id', IKAS1_CLIENT_SECRET: 'secret' });
-  await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '1', address: 'Adres', city: 'Konya' });
-  await saveOrders(env.DB, 'ikas1', [order('I1')]);
-  const r = await post(`/api/orders/${encodeURIComponent('ikas1:I1')}/carrier-label`, {});
-  assert.equal(r.status, 400);
-  assert.match(r.body.error, /ikas Kargo/);
+test('kargo entegratörü: ikas siparişinde gönderi ikas\'a takip bilgili paket olarak yazılır, kargoya verilince "Kargoda" yapılır', async () => {
+  // Gerçek ikas kanalı (ikas API'si taklit edilir) + deneme modundaki örnek entegratör
+  const real = globalThis.fetch, calls = [];
+  globalThis.fetch = async (url, o = {}) => {
+    if (/oauth\/token/.test(String(url))) return new Response(JSON.stringify({ access_token: 'T', expires_in: 3600 }), { headers: { 'Content-Type': 'application/json' } });
+    const b = JSON.parse(o.body); calls.push(b);
+    const data = /fulfillOrder/.test(b.query) ? { fulfillOrder: { id: 'I1', orderPackages: [{ id: 'ikpk9', orderLineItemIds: ['I1-1'], trackingInfo: { trackingNumber: b.variables.input.trackingInfoDetail.trackingNumber } }] } }
+      : /updateOrderPackageStatus/.test(b.query) ? { updateOrderPackageStatus: { id: 'I1' } } : /cancelFulfillment/.test(b.query) ? { cancelFulfillment: { id: 'I1' } } : {};
+    return new Response(JSON.stringify({ data }), { headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const { env, call, post } = await panel({ DEMO_CARRIER: '1', IKAS1_STORE: 'magaza', IKAS1_CLIENT_ID: 'id', IKAS1_CLIENT_SECRET: 'secret' });
+    await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '1', address: 'Adres', city: 'Konya' });
+    await saveOrders(env.DB, 'ikas1', [order('I1')]);
+    const id = encodeURIComponent('ikas1:I1');
+    let r = await post(`/api/orders/${id}/carrier-label`, { provider: 'demo' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const f = calls.find((c) => /fulfillOrder/.test(c.query)).variables.input;
+    assert.equal(f.orderId, 'I1'); assert.equal(f.markAsReadyForShipment, true); assert.equal(f.sendNotificationToCustomer, false);
+    assert.deepEqual(f.lines, [{ orderLineItemId: 'I1-1', quantity: 2 }]);
+    assert.match(f.trackingInfoDetail.trackingNumber, /^DM\d+$/);
+    let pkg = r.body.order.packages[0];
+    assert.equal(pkg.remote_id, 'ikpk9');
+    // Elle takip no hâlâ girilemez
+    assert.equal((await post(`/api/orders/${id}/tracking`, { package_id: pkg.id, tracking: 'X' })).status, 400);
+    r = await post(`/api/orders/${id}/ship`, { package_id: pkg.id });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const u = calls.find((c) => /updateOrderPackageStatus/.test(c.query)).variables.input;
+    assert.deepEqual(u.packages.map((p) => [p.packageId, p.status, p.trackingInfo.trackingNumber, p.trackingInfo.isSendNotification]), [['ikpk9', 'FULFILLED', pkg.tracking, true]]);
+    pkg = (await call(`/api/orders/${id}`)).body.order.packages[0];
+    assert.equal(pkg.status, 'shipped');
+  } finally { globalThis.fetch = real; }
 });
 
 test('gönderi bilgisi: alıcı, gönderen, içerik ve değer siparişten; eksik adres bildirilir', () => {
