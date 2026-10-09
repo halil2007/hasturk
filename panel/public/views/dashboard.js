@@ -54,7 +54,8 @@ export async function dashboard(el) {
       ['orange', 'truck', sm.cargoWaiting || 0, 'Kargoya hazırlanacak', '#/kargo'],
       ['purple', 'link', sm.unmatched || 0, 'Eşleşme bekleyen ilan', '#/eslestirme'],
       ['red', 'db', sm.stockOut || 0, 'Stokta olmayan ürün', '#/stoklar?durum=out'],
-      ['green', 'bell', (sm.notices && sm.notices.open) || 0, 'Açık sorun', '#/bildirimler'],
+      // Açık sorunlar yalnız bizim yönetim panelimizde; müşteri panellerinde ve demoda gösterilmez
+      ...(!state.tenant && !state.demo ? [['green', 'bell', (sm.notices && sm.notices.open) || 0, 'Açık sorun', '#/bildirimler']] : []),
     ];
     // Kurulum rehberi: kanal bağlanmadıysa boş grafikler yerine adım adım ilk kurulum; ürün yoksa panonun üstünde
     const live = activeChannels().some((x) => x.enabled || x.demo), st = state.settings || {}, co = st.company || {}, admin = u.role === 'admin';

@@ -15,8 +15,8 @@ const FILTERS = [['', 'Tümü', 'all'], ['low', 'Kritik stok', 'low'], ['nocost'
 const SORTS = [['sold', 'En çok satan (30 gün)'], ['name', 'Ada göre (A–Z)'], ['new', 'En yeni eklenen'], ['stock', 'Stok (azdan çoğa)'], ['stock_desc', 'Stok (çoktan aza)'], ['price_desc', 'Fiyat (yüksekten)'], ['price_asc', 'Fiyat (düşükten)'], ['margin_desc', 'Marj (yüksekten)'], ['margin_asc', 'Marj (düşükten)']];
 
 export async function products(el, rest, query = {}) {
-  const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), sort: query.sort || 'sold', page: 1 };
-  let rows = [], total = 0, groupsTotal = 0, counts = {}, stats = {};
+  const f = { q: query.q || '', filter: query.f || (rest[0] === 'kritik' ? 'low' : ''), sort: query.sort || 'sold', cat: query.kat || '', page: 1 };
+  let rows = [], total = 0, groupsTotal = 0, counts = {}, stats = {}, cats = [];
   const sel = new Set();
   render(el, html`<div class="stack">
     <div class="pstats" data-stats></div>
@@ -28,6 +28,7 @@ export async function products(el, rest, query = {}) {
         <button class="btn primary" data-act="new" data-fab><i class="ico ico-plus"></i>Ürün ekle</button>
       </div>
       <div class="fchips" data-filters></div>
+      <div class="cat-bar" data-cats></div>
     </div>
     <div class="card flush" data-box></div>
   </div>`);
@@ -37,6 +38,8 @@ export async function products(el, rest, query = {}) {
   const marginPill = (m) => (m == null ? html`<span class="muted tiny">—</span>` : html`<span class="mpill ${m < 0 ? 'bad' : m < 15 ? 'amber' : 'good'}">%${n(m)}</span>`);
   const title = (p) => html`${p.variant_name && p.group_name ? p.group_name : p.name}${p.variant_name ? html`<span class="var-tag">${p.variant_name}</span>` : ''}`;
   const brand = (b) => (b ? html`<span class="brand-tag" title="Marka">${b}</span>` : '');
+  // Kategori etiketi (son basamak); tıklayınca o kategoriye süzer
+  const catTag = (c) => (c && c.trim() && f.cat !== c.trim() ? html`<button class="cat-tag" data-act="cat" data-k="${c.trim()}" title="${c.trim()} kategorisini göster">${c.trim().split(' › ').pop()}</button>` : '');
   const codes = (p) => html`<span class="codes">${p.sku ? html`<span title="Stok kodu (SKU)">${p.sku}</span>` : html`<span class="miss">SKU yok</span>`}${p.barcode ? html`<span title="Barkod">${p.barcode}</span>` : ''}</span>`;
   // Kanallar: logo yığını + kanal fiyat aralığı; ayrıntı ipucunda. Hata kırmızı, kanalda yoksa uyarı.
   function chans(list) {
@@ -73,6 +76,35 @@ export async function products(el, rest, query = {}) {
     render($('[data-filters]', el), html`${FILTERS.map(([k, t, ck]) => html`<button class="fchip ${f.filter === k ? 'on' : ''}" data-act="filter" data-k="${k}">${t}${cnt[ck] ? html`<span class="n">${n(cnt[ck])}</span>` : ''}</button>`)}`);
   }
 
+  // Kategoriler: "Bahçe › Tohum" gibi yollar ağaç olarak; üst kategori seçilince alt kategorileri açılır
+  const SEP = ' › ';
+  function catTree() {
+    const m = new Map();
+    for (const c of cats) {
+      if (!c.name) continue;
+      const parts = c.name.split(SEP);
+      for (let i = 1; i <= parts.length; i++) { const k = parts.slice(0, i).join(SEP); m.set(k, (m.get(k) || 0) + c.n); }
+    }
+    return m;
+  }
+  function drawCats() {
+    const box = $('[data-cats]', el);
+    if (!cats.some((c) => c.name)) return render(box, '');
+    const m = catTree(), none = (cats.find((c) => !c.name) || {}).n || 0;
+    const depth = f.cat && f.cat !== '-' ? f.cat.split(SEP).length : 0;
+    const kids = (pre, d) => [...m].filter(([k]) => k.split(SEP).length === d + 1 && (!pre || k.startsWith(pre + SEP)));
+    const chip = (k, label, cnt, on) => html`<button class="fchip ${on ? 'on' : ''}" data-act="cat" data-k="${k}" title="${k && k !== '-' ? k : ''}">${label}${cnt ? html`<span class="n">${n(cnt)}</span>` : ''}</button>`;
+    const crumbs = depth ? f.cat.split(SEP).map((x, i, a) => a.slice(0, i + 1).join(SEP)) : [];
+    const sub = depth ? kids(f.cat, depth) : [];
+    render(box, html`<div class="cat-row"><span class="cat-lbl"><i class="ico ico-grid"></i>Kategori</span><div class="fchips">
+        ${chip('', 'Tümü', 0, !f.cat)}
+        ${kids('', 0).map(([k, c]) => chip(k, k, c, crumbs[0] === k))}
+        ${none ? chip('-', 'Kategorisiz', none, f.cat === '-') : ''}
+      </div></div>
+      ${crumbs.slice(1).length || sub.length ? html`<div class="cat-row sub"><span class="cat-lbl">${crumbs.map((k, i) => html`${i ? html`<span class="muted">›</span>` : ''}<a class="link" data-act="cat" data-k="${k}">${k.split(SEP).pop()}</a>`)}</span><div class="fchips">
+        ${sub.map(([k, c]) => chip(k, k.split(SEP).pop(), c, false))}</div></div>` : ''}`);
+  }
+
   function bulkbar() {
     if (!sel.size) return '';
     return html`<div class="bulk"><b>${sel.size} ürün seçildi</b>
@@ -83,11 +115,11 @@ export async function products(el, rest, query = {}) {
       <span class="spacer"></span><button class="btn sm ghost" data-act="clearsel">Seçimi kaldır</button></div>`;
   }
   function draw() {
-    drawStats();
+    drawStats(); drawCats();
     const mob = isMobile(), gl = groupList(), all = !!f.q;
     const prow = (p, variant = false) => { const m = margin(p); return html`<tr class="${variant ? 'var-row' : ''} ${sel.has(p.id) ? 'sel-row' : ''} click" data-pid="${p.id}" data-row-edit="${p.id}">
       <td class="cbcol">${cb(p)}</td>
-      <td><div class="prod-cell">${thumb(p.image, p.name, variant ? 'sm' : '')}<div style="min-width:0"><div class="pname">${variant && p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : title(p)}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="psub">${variant ? '' : brand(p.brand)}${codes(p)}</div></div></div></td>
+      <td><div class="prod-cell">${thumb(p.image, p.name, variant ? 'sm' : '')}<div style="min-width:0"><div class="pname">${variant && p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : title(p)}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="psub">${variant ? '' : html`${brand(p.brand)}${catTag(p.category)}`}${codes(p)}</div></div></div></td>
       <td>${chans([p])}</td>
       <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span class="miss" title="Alış fiyatı girilmedi; kâr hesaplanamaz">girilmedi</span>`}</td>
       <td class="r num"><b>${money(p.sale_price)}</b>${p.currency && p.fx_price ? html`<div class="tiny muted">${p.fx_price} ${p.currency}</div>` : ''}</td>
@@ -97,7 +129,7 @@ export async function products(el, rest, query = {}) {
     const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p)), gname = p0.group_name || p0.name, allSel = list.every((p) => sel.has(p.id));
       return html`<tr class="grp-head click ${on ? 'on' : ''}" data-act="vedit" data-gi="${i}" title="Tüm varyantları birlikte düzenle">
         <td class="cbcol"><input type="checkbox" class="cb" data-gsel="${i}" ${allSel ? 'checked' : ''} aria-label="Varyantları seç"></td>
-        <td><div class="prod-cell"><button class="icon-btn sm grp-tog" data-act="tog" data-gi="${i}" aria-label="${on ? 'Varyantları gizle' : 'Varyantları göster'}" title="${on ? 'Varyantları gizle' : 'Varyantları listede göster'}"><i class="ico ico-down grp-chev"></i></button>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="pname">${gname}</div><div class="psub">${brand(list.find((p) => p.brand)?.brand)}<span class="pill info" style="padding:1px 8px">${list.length} varyant</span>${list.length <= 4 ? html`<span class="muted tiny ellipsis">${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}</span>` : ''}</div></div></div></td>
+        <td><div class="prod-cell"><button class="icon-btn sm grp-tog" data-act="tog" data-gi="${i}" aria-label="${on ? 'Varyantları gizle' : 'Varyantları göster'}" title="${on ? 'Varyantları gizle' : 'Varyantları listede göster'}"><i class="ico ico-down grp-chev"></i></button>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="pname">${gname}</div><div class="psub">${brand(list.find((p) => p.brand)?.brand)}${catTag(list.find((p) => p.category)?.category)}<span class="pill info" style="padding:1px 8px">${list.length} varyant</span>${list.length <= 4 ? html`<span class="muted tiny ellipsis">${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}</span>` : ''}</div></div></div></td>
         <td>${chans(list)}</td>
         <td class="r num muted">${range(list.map((p) => p.purchase_price))}</td>
         <td class="r num"><b>${range(list.map((p) => p.sale_price))}</b></td>
@@ -106,16 +138,16 @@ export async function products(el, rest, query = {}) {
         <td class="r"><button class="btn sm outline" data-act="vedit" data-gi="${i}"><i class="ico ico-gear"></i>Varyantları düzenle</button></td></tr>
         ${on ? list.map((p) => prow(p, true)) : ''}`; };
     const mCard = ([k, list], i) => { if (!isGroup(list)) { const p = list[0]; return html`<div class="m-card" data-pid="${p.id}">
-          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="psub">${brand(p.brand)}${codes(p)}</div></div></div>
+          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="psub">${brand(p.brand)}${catTag(p.category)}${codes(p)}</div></div></div>
           <div class="row">${chans([p])}<span class="spacer"></span>${marginPill(margin(p))}</div>
           <div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCell(p)}</div></div>`; }
       const on = all || opened.has(k), gname = list[0].group_name || list[0].name;
       return html`<div class="m-card grp ${on ? 'on' : ''}">
         <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
         ${on ? html`<div class="m-vars"><button class="btn sm outline block" data-act="vedit" data-gi="${i}"><i class="ico ico-gear"></i>Tüm varyantları birlikte düzenle</button>${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCell(p)}</div>`)}</div>` : ''}</div>`; };
-    const empty = html`<div class="empty-state"><div class="ic"><i class="ico ico-box"></i></div><b>${f.q || f.filter ? 'Bu filtrede ürün yok' : 'Henüz ürün yok'}</b>
-      <span>${f.q || f.filter ? 'Aramayı ya da filtreyi değiştirin.' : 'Kanallarınızdaki ürünleri Kanal Ürünleri sayfasından seçip ekleyebilir ya da yeni ürün açabilirsiniz.'}</span>
-      ${f.q || f.filter ? '' : html`<div class="row" style="justify-content:center"><a class="btn" href="#/kanal-urunleri"><i class="ico ico-grid"></i>Kanal Ürünleri</a><button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün ekle</button></div>`}</div>`;
+    const empty = html`<div class="empty-state"><div class="ic"><i class="ico ico-box"></i></div><b>${f.q || f.filter || f.cat ? 'Bu filtrede ürün yok' : 'Henüz ürün yok'}</b>
+      <span>${f.q || f.filter || f.cat ? 'Aramayı ya da filtreyi değiştirin.' : 'Kanallarınızdaki ürünleri Kanal Ürünleri sayfasından seçip ekleyebilir ya da yeni ürün açabilirsiniz.'}</span>
+      ${f.q || f.filter || f.cat ? '' : html`<div class="row" style="justify-content:center"><a class="btn" href="#/kanal-urunleri"><i class="ico ico-grid"></i>Kanal Ürünleri</a><button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün ekle</button></div>`}</div>`;
     const allSel = rows.length && rows.every((p) => sel.has(p.id));
     const body = !rows.length ? empty
       : mob ? html`<div class="m-list">${gl.map(mCard)}</div>`
@@ -126,14 +158,15 @@ export async function products(el, rest, query = {}) {
     render($('[data-box]', el), html`${bulkbar()}${body}${rows.length ? html`<div class="pager"><span class="muted small" style="margin-right:auto">${n(groupsTotal)} ana ürün · ${n(total)} ürün/varyant${shown < groupsTotal ? ` · ${shown} gösteriliyor` : ''}</span>${gl.some((g) => isGroup(g[1])) && !all ? html`<button class="btn sm ghost" data-act="togall">${opened.size ? 'Varyantları kapat' : 'Tüm varyantları aç'}</button>` : ''}${shown < groupsTotal ? html`<button class="btn sm" data-act="more">Daha fazla göster</button>` : ''}</div>` : ''}`);
   }
   async function load(append = false) {
-    setQuery({ f: f.filter, q: f.q, sort: f.sort === 'sold' ? '' : f.sort });
+    setQuery({ f: f.filter, q: f.q, sort: f.sort === 'sold' ? '' : f.sort, kat: f.cat });
     const p = new URLSearchParams({ page: f.page, limit: 40, group: 1 });
     if (f.q) p.set('q', f.q);
     if (f.filter) p.set('filter', f.filter);
     if (f.sort) p.set('sort', f.sort);
+    if (f.cat) p.set('category', f.cat);
     const r = await api('products?' + p);
     rows = append ? rows.concat(r.products) : r.products;
-    total = r.total; groupsTotal = r.groups ?? r.total; counts = r.counts || {}; stats = r.stats || {};
+    total = r.total; groupsTotal = r.groups ?? r.total; counts = r.counts || {}; stats = r.stats || {}; cats = r.categories || cats;
     draw();
   }
   const refresh = () => { f.page = 1; return load().catch((e) => toast(e.message, true)); };
@@ -141,6 +174,7 @@ export async function products(el, rest, query = {}) {
   const unl = () => (state.summary ? state.summary.unmatched : 0);
   actions(el, {
     filter: (t) => { f.filter = t.dataset.k; sel.clear(); refresh(); },
+    cat: (t) => { f.cat = t.dataset.k; sel.clear(); refresh(); },
     tog: (t) => { const g = groupList()[Number(t.dataset.gi)]; if (!g) return; if (opened.has(g[0])) opened.delete(g[0]); else opened.add(g[0]); draw(); },
     vedit: (t) => { const g = groupList()[Number(t.dataset.gi)]; if (g) variantEditor(g[1].map((p) => p.id), refresh, g[1][0].group_name || g[1][0].name); },
     togall: () => { if (opened.size) opened.clear(); else groupList().forEach(([k]) => opened.add(k)); draw(); },

@@ -539,7 +539,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-09f';
+const ASSETS = '2026-10-09g';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

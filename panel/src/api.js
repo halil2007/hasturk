@@ -631,6 +631,9 @@ async function listProducts(db, q) {
   if (q.filter === 'runout') where.push(`p.stock > 0 AND ${S30} > 0 AND p.stock * 30.0 / ${S30} <= ${RUNOUT_DAYS}`);
   if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.group_name LIKE ? OR p.brand LIKE ?)'); args.push(s, s, s, s, s); }
   if (q.filter === 'out') where.push('p.stock <= 0');
+  // Kategori: alt kategoriler dahil ("Bahçe" seçilince "Bahçe › Tohum" da gelir); "-" kategorisiz ürünler
+  if (q.category === '-') where.push("COALESCE(TRIM(p.category), '') = ''");
+  else if (q.category) { where.push("(TRIM(p.category) = ? OR TRIM(p.category) LIKE ? ESCAPE '\\')"); args.push(q.category, q.category.replace(/[\\%_]/g, '\\$&') + ' › %'); }
   if (q.filter === 'below') where.push(`p.stock > 0 AND p.stock <= ${low}`);
   if (q.filter === 'enough') where.push(`p.stock > ${low}`);
   if (q.filter === 'low') where.push(`p.stock <= ${low}`);
@@ -670,7 +673,7 @@ async function listProducts(db, q) {
     const at = new Map(gks.map((g, i) => [g, i]));
     return list.sort((a, b) => at.get(a.gk) - at.get(b.gk));
   };
-  const [rows, totalRow, groupRow, cnt, ro, st] = await Promise.all([
+  const [rows, totalRow, groupRow, cnt, ro, st, cats] = await Promise.all([
     page1(),
     first(db, `SELECT COUNT(*) AS n FROM products p ${q.filter === 'runout' ? SJ : ''} ${w}`, ...args),
     q.group ? first(db, `SELECT COUNT(DISTINCT ${GK}) AS n FROM products p ${q.filter === 'runout' ? SJ : ''} ${w}`, ...args) : null,
@@ -681,6 +684,8 @@ async function listProducts(db, q) {
       SUM(active = 1 AND COALESCE(TRIM(barcode), '') = '') AS nobarcode, SUM(active = 1 AND NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)) AS nolisting,
       SUM(CASE WHEN active = 1 AND stock > 0 THEN stock * COALESCE(purchase_price, 0) ELSE 0 END) AS stock_value, SUM(CASE WHEN active = 1 AND stock > 0 THEN stock * sale_price ELSE 0 END) AS sale_value,
       AVG(CASE WHEN active = 1 AND sale_price > 0 AND purchase_price > 0 THEN (sale_price - purchase_price) / sale_price END) AS margin FROM products p`),
+    // Kategoriler: her kategoride kaç ana ürün var (aktif ürünler)
+    q.group ? all(db, `SELECT COALESCE(TRIM(p.category), '') AS name, COUNT(DISTINCT ${GK}) AS n FROM products p WHERE p.active = 1 GROUP BY 1 ORDER BY 1 COLLATE NOCASE`) : null,
   ]);
   const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
@@ -694,7 +699,7 @@ async function listProducts(db, q) {
     const sold = new Map(soldRows.map((x) => [x.id, x.n]));
     for (const r of rows) { r.sold30 = sold.get(r.id) || 0; r.days_left = r.sold30 > 0 ? Math.floor((Math.max(0, r.stock) * 30) / r.sold30) : null; }
   }
-  return { products: rows, total, groups, page, limit, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, runout: ro.n || 0, all: cnt.total || 0 },
+  return { products: rows, total, groups, page, limit, categories: cats || undefined, counts: { out: cnt.out_ || 0, below: cnt.below || 0, enough: cnt.enough || 0, runout: ro.n || 0, all: cnt.total || 0 },
     stats: Object.fromEntries(Object.entries(st || {}).map(([k, v]) => [k, k === 'margin' ? (v == null ? null : r2(v * 100)) : Math.round(v || 0)])) };
 }
 
@@ -1487,7 +1492,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true, message: `Günlük özet ${r.sent} alıcıya gönderildi` });
   }
   // Toplama listesi: kargoya çıkacak siparişlerdeki ürünlerin toplamı (kanal ya da seçili siparişler)
-  if (path === 'picklist' && m === 'GET') return json(await pickList(db, { channel: q.channel || '', ids: q.ids || '' }));
+  if (path === 'picklist' && m === 'GET') return json(await pickList(db, { channel: q.channel || '', ids: q.ids || '', day: q.day || '' }));
   // Anlık bildirim: cihaz aboneliği, deneme bildirimi ve servis çalışanının okuduğu son bildirim
   if (path === 'push/key' && m === 'GET') return json({ key: await publicKey(db) });
   if (path === 'push/subscribe' && m === 'POST') { const b = await body(req); return json(await subscribe(db, user, b.subscription, req.headers.get('user-agent'))); }
