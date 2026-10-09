@@ -86,8 +86,21 @@ test('hata kayıtları kendiliğinden çözülür: işlem sonradan başarılı, 
   assert.equal(await syncSucceeded(db, 'acme', { channels: { hepsiburada: 4 } }, false), 1);
   assert.equal((await one(db, 'SELECT status FROM error_reports WHERE id = ?', s)).status, 'resolved');
   assert.equal(await resolveQuiet(db), 0);
-  assert.equal(await resolveQuiet(db, Date.now() + 4 * 864e5), 1);
-  assert.match((await one(db, 'SELECT auto FROM error_reports WHERE id = ?', q)).auto, /3 gün/);
+  // Tek seferlik (anlık) hata 1 saat tekrarlanmazsa kapanır
+  assert.equal(await resolveQuiet(db, Date.now() + 30 * 60e3), 0, 'yarım saat: açık');
+  assert.equal(await resolveQuiet(db, Date.now() + 61 * 60e3), 1);
+  assert.match((await one(db, 'SELECT auto FROM error_reports WHERE id = ?', q)).auto, /anlık.*1 saat/);
+  // Sık görülen hata: 2-3 kez → 6 saat, daha sık → 24 saat sessizlik
+  const few = await recordError(db, { slug: 'beta', firm: 'Beta', source: 'client', message: 'y is undefined' });
+  await recordError(db, { slug: 'beta', firm: 'Beta', source: 'client', message: 'y is undefined' });
+  const many = await recordError(db, { slug: 'beta', firm: 'Beta', source: 'sync', message: 'PttAVM kopuk', action: 'kanal: pttavm' });
+  for (let i = 0; i < 5; i++) await recordError(db, { slug: 'beta', firm: 'Beta', source: 'sync', message: 'PttAVM kopuk', action: 'kanal: pttavm' });
+  assert.equal(await resolveQuiet(db, Date.now() + 2 * 3600e3), 0, '2 saat: ikisi de açık');
+  assert.equal(await resolveQuiet(db, Date.now() + 7 * 3600e3), 1);
+  assert.equal((await one(db, 'SELECT status FROM error_reports WHERE id = ?', few)).status, 'resolved');
+  assert.equal((await one(db, 'SELECT status FROM error_reports WHERE id = ?', many)).status, 'open');
+  assert.equal(await resolveQuiet(db, Date.now() + 25 * 3600e3), 1);
+  assert.match((await one(db, 'SELECT auto FROM error_reports WHERE id = ?', many)).auto, /24 saat/);
   // Tekrar ederse yeniden açılır, neden temizlenir
   await recordError(db, { slug: 'acme', firm: 'Acme', source: 'api', message: 'Etiket alınamadı', action: 'POST orders/13/label' });
   const r = await one(db, 'SELECT status, reopened, auto FROM error_reports WHERE id = ?', a);

@@ -101,13 +101,15 @@ async function aggregate(db, settings, { from, to, channel }) {
         SUM(CASE WHEN ${LIVEI} AND i.commission IS NULL THEN 1 ELSE 0 END) AS estc,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity ELSE 0 END) AS cost,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) = 0 THEN 1 ELSE 0 END) AS miss,
-        SUM(CASE WHEN ${LIVEI} THEN 1 ELSE 0 END) AS live, COUNT(*) AS n
+        SUM(CASE WHEN ${LIVEI} THEN 1 ELSE 0 END) AS live, COUNT(*) AS n,
+        -- Ürüne girilen kargo tutarı (siparişteki en yüksek): ürünler zaten bu geçişte okunur, sipariş başına ayrı alt sorgu gerekmez
+        MAX(CASE WHEN ${LIVEI} AND p.ship_cost > 0 THEN p.ship_cost END) AS pship
       FROM orders o JOIN order_items i ON i.order_id = o.id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw} GROUP BY i.order_id)
     SELECT o.channel, COUNT(*) AS orders, COALESCE(SUM(it.rev), 0) AS revenue, COALESCE(SUM(it.comm), 0) AS commission,
       SUM(CASE WHEN it.n > 0 AND it.estc = 0 THEN 1 ELSE 0 END) AS realCommission, COALESCE(SUM(it.cost), 0) AS cost, COALESCE(SUM(it.miss), 0) AS missingCost,
-      SUM(CASE WHEN it.live > 0 THEN COALESCE(o.shipping_cost, ${PRODUCT_SHIP}, ${rate('shipping')}) ELSE 0 END) AS shipping,
-      SUM(CASE WHEN it.live > 0 AND o.shipping_cost IS NULL AND ${PRODUCT_SHIP} IS NOT NULL THEN 1 ELSE 0 END) AS productShipping,
+      SUM(CASE WHEN it.live > 0 THEN COALESCE(o.shipping_cost, it.pship, ${rate('shipping')}) ELSE 0 END) AS shipping,
+      SUM(CASE WHEN it.live > 0 AND o.shipping_cost IS NULL AND it.pship IS NOT NULL THEN 1 ELSE 0 END) AS productShipping,
       SUM(CASE WHEN o.shipping_cost IS NOT NULL AND o.shipping_src IN ('api', 'carrier') THEN 1 ELSE 0 END) AS realShipping,
       SUM(CASE WHEN it.live > 0 THEN ${rate('service_fee')} ELSE 0 END) AS fee,
       SUM(COALESCE(it.rev, 0) * ${rate('fee_rate')} / 100.0) AS rateFee,

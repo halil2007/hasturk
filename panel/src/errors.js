@@ -7,7 +7,8 @@
 // Aynı firmadaki aynı hata (sayılar ayıklanmış mesaj + işlem) tek kayıtta toplanır: kaç kez, kimde, ilk / son ne zaman.
 // İlk kez görülen ya da çözüldü denip tekrar oluşan hata ana panele bildirim olarak düşer. "Yok say" denen hata sessizce sayılır.
 // Kendiliğinden çözülme (auto = neden): aynı firmada aynı işlem sonradan başarıyla yapıldıysa, kanal hatasında o kanalın senkronu
-// sonradan başarılı olduysa ya da hata 3 gündür hiç tekrarlanmadıysa kayıt "Çözüldü" olur. Hata yeniden oluşursa kayıt yeniden açılır.
+// sonradan başarılı olduysa ya da hata bir süredir hiç tekrarlanmadıysa kayıt "Çözüldü" olur: tek seferlik (anlık) hata 1 saat, 2-3 kez
+// görülen 6 saat, daha sık görülen 24 saat tekrarlanmazsa. Hata yeniden oluşursa kayıt yeniden açılır (ve bildirim gelir).
 import { all, first, run, notify, resolve } from './db.js';
 import { notify as pushNotify } from './push.js';
 import { fail, str } from './util.js';
@@ -51,7 +52,9 @@ export async function recordError(db, e) {
 }
 
 // ---------- kendiliğinden çözülme ----------
-const QUIET_MS = 3 * 864e5; // bu süre boyunca tekrarlanmayan hata çözülmüş sayılır
+// Bu süre boyunca tekrarlanmayan hata çözülmüş sayılır: ne kadar seyrek görüldüyse o kadar çabuk (anlık hata 1 saatte kapanır)
+export const QUIET = [{ max: 1, ms: 3600e3, why: 'Tek seferlik (anlık) hata; 1 saattir tekrarlanmadı' }, { max: 3, ms: 6 * 3600e3, why: '6 saattir tekrarlanmadı' },
+  { max: Infinity, ms: 864e5, why: '24 saattir tekrarlanmadı' }];
 const actKey = (a) => String(a || '').split('?')[0].replace(/\d+/g, '#').replace(/\/+$/, '').trim();
 async function markResolved(db, rows, reason) {
   if (!rows.length) return 0;
@@ -83,10 +86,16 @@ export async function syncSucceeded(db, slug, result, failed) {
   const rows = await all(db, `SELECT id FROM error_reports WHERE status = 'open' AND slug = ? AND source = 'sync' AND action IN (${ok.map(() => '?').join(',')}) AND last_at < ?`, slug || '', ...ok, Date.now() - 1000);
   return markResolved(db, rows, 'Kanal senkronu sonradan başarılı oldu');
 }
-// 3 gündür tekrarlanmayan açık hatalar (yavaş işlem dahil)
+// Bir süredir tekrarlanmayan açık hatalar (yavaş işlem dahil): sayısına göre 1 saat / 6 saat / 24 saat
 export async function resolveQuiet(db, now = Date.now()) {
-  const rows = await all(db, "SELECT id FROM error_reports WHERE status = 'open' AND last_at < ? LIMIT 500", now - QUIET_MS);
-  return markResolved(db, rows, '3 gündür tekrarlanmadı');
+  let n = 0, lo = 0;
+  for (const q of QUIET) {
+    const rows = await all(db, `SELECT id FROM error_reports WHERE status = 'open' AND count > ?${q.max === Infinity ? '' : ' AND count <= ?'} AND last_at < ? LIMIT 500`,
+      lo, ...(q.max === Infinity ? [] : [q.max]), now - q.ms);
+    n += await markResolved(db, rows, q.why);
+    lo = q.max;
+  }
+  return n;
 }
 
 // Ana panel (yönetici): hata listesi, ayrıntı, durum

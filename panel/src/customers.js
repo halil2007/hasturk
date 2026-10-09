@@ -42,52 +42,48 @@ function range(q) {
   return { where, args };
 }
 
-// Özet: müşteri / sipariş / tekrar oranı / ortalama sepet; kanal bazında; sipariş sayısı dağılımı; aylık yeni ve tekrar eden
+// Özet: müşteri / sipariş / tekrar oranı / ortalama sepet; kanal bazında; sipariş sayısı dağılımı; aylık yeni ve tekrar eden.
+// Hız: toplamlar veritabanında yapılır, panele yalnız birkaç satır döner (müşteri başına satır taşınmaz); D1 sorguları sırayla
+// işlediği için aynı taramayı paylaşan hesaplar tek sorguda birleştirilmiştir.
 export async function summary(db, q = {}) {
   await fillKeys(db);
   const { where, args } = range(q);
   const W = 'WHERE ' + where.join(' AND ');
   const since = Date.now() - 365 * 864e5;
-  // Sorgular aynı anda gönderilir (sıralı gidiş-dönüş yerine tek bekleme)
-  const [per, byCh, rep, guests, multiRow, firstRows, monthly, cities] = await Promise.all([
-    all(db, `SELECT o.ckey, COUNT(*) AS n, SUM(o.total) AS spend, MIN(o.ordered_at) AS first_at FROM orders o ${W} GROUP BY o.ckey`, ...args),
-    // Kanal bazında: bir müşteri birden çok kanalda alışveriş yaptıysa her kanalda sayılır
-    all(db, `SELECT o.channel, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue FROM orders o ${W} GROUP BY o.channel ORDER BY orders DESC`, ...args),
-    all(db, `SELECT channel, COUNT(*) AS repeat FROM (SELECT o.channel, o.ckey FROM orders o ${W} GROUP BY o.channel, o.ckey HAVING COUNT(*) > 1) GROUP BY channel`, ...args),
-    all(db, `SELECT o.channel, COUNT(DISTINCT o.ckey) AS n FROM orders o ${W} AND o.extra LIKE '%"guest":true%' GROUP BY o.channel`, ...args),
-    first(db, `SELECT COUNT(*) AS n FROM (SELECT o.ckey FROM orders o ${W} GROUP BY o.ckey HAVING COUNT(DISTINCT o.channel) > 1)`, ...args),
-    // Aylık: o ay ilk siparişini veren (yeni) ve daha önce sipariş vermiş (tekrar eden) müşteri sayısı (son 12 ay).
+  const M = (col) => `strftime('%Y-%m', ${col} / 1000 + 10800, 'unixepoch')`;
+  const [tot, chans, monthly, cities] = await Promise.all([
+    // Müşteri başına (dönem içi): sipariş sayısı, harcama, kaç kanalda alışveriş → genel toplamlar ve dağılım
+    first(db, `SELECT COUNT(*) AS customers, COALESCE(SUM(n), 0) AS orders, COALESCE(SUM(spend), 0) AS revenue, COALESCE(SUM(n > 1), 0) AS repeat,
+        COALESCE(SUM(CASE WHEN n > 1 THEN n ELSE 0 END), 0) AS repeatOrders, COALESCE(SUM(ch > 1), 0) AS multi,
+        COALESCE(SUM(n = 1), 0) AS d1, COALESCE(SUM(n = 2), 0) AS d2, COALESCE(SUM(n = 3), 0) AS d3, COALESCE(SUM(n = 4), 0) AS d4, COALESCE(SUM(n >= 5), 0) AS d5
+      FROM (SELECT o.ckey, COUNT(*) AS n, SUM(o.total) AS spend, COUNT(DISTINCT o.channel) AS ch FROM orders o ${W} GROUP BY o.ckey)`, ...args),
+    // Kanal bazında: bir müşteri birden çok kanalda alışveriş yaptıysa her kanalda sayılır; tekrar eden ve misafir müşteri
+    all(db, `SELECT channel, COUNT(*) AS customers, SUM(n) AS orders, SUM(spend) AS revenue, SUM(n > 1) AS repeat, SUM(g) AS guests
+      FROM (SELECT o.channel, o.ckey, COUNT(*) AS n, SUM(o.total) AS spend, MAX(o.extra LIKE '%"guest":true%') AS g FROM orders o ${W} GROUP BY o.channel, o.ckey)
+      GROUP BY channel ORDER BY orders DESC, channel`, ...args),
+    // Aylık (son 12 ay): o ay ilk siparişini veren (yeni) ve daha önce sipariş vermiş (tekrar eden) müşteri sayısı.
     // İlk sipariş tarihi dönem filtresinden bağımsız: bir müşteri ancak ilk siparişini verdiği ay "yeni" sayılır
-    all(db, `SELECT o.ckey, MIN(o.ordered_at) AS first_at FROM orders o WHERE ${LIVE} AND o.ckey IN (SELECT DISTINCT ckey FROM orders WHERE ordered_at >= ?) GROUP BY o.ckey`, since),
-    all(db, `SELECT o.ckey, strftime('%Y-%m', o.ordered_at / 1000 + 10800, 'unixepoch') AS m FROM orders o WHERE ${LIVE} AND o.ordered_at >= ? GROUP BY o.ckey, m`, since),
+    all(db, `WITH m AS (SELECT DISTINCT o.ckey, ${M('o.ordered_at')} AS m FROM orders o WHERE ${LIVE} AND o.ordered_at >= ?),
+        f AS (SELECT o.ckey, MIN(o.ordered_at) AS fa FROM orders o WHERE ${LIVE} AND o.ckey IN (SELECT ckey FROM m) GROUP BY o.ckey)
+      SELECT m.m, SUM(${M('f.fa')} = m.m) AS new, SUM(${M('f.fa')} != m.m) AS ret FROM m JOIN f ON f.ckey = m.ckey GROUP BY m.m ORDER BY m.m`, since),
     // İller (harita ve liste): müşteri, sipariş, satılan adet ve ciro; tüm iller
-    all(db, `SELECT json_extract(o.address, '$.city') AS city, COUNT(DISTINCT o.ckey) AS customers, COUNT(*) AS orders, SUM(o.total) AS revenue,
-        SUM((SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status NOT IN ('cancelled', 'returned'))) AS units
-      FROM orders o ${W} AND COALESCE(json_extract(o.address, '$.city'), '') != '' GROUP BY 1 ORDER BY orders DESC LIMIT 200`, ...args),
+    all(db, `SELECT x.city, COUNT(DISTINCT x.ckey) AS customers, COUNT(*) AS orders, SUM(x.total) AS revenue, COALESCE(SUM(u.units), 0) AS units
+      FROM (SELECT o.id, o.ckey, o.total, json_extract(o.address, '$.city') AS city FROM orders o ${W}) x
+      LEFT JOIN (SELECT order_id, SUM(quantity) AS units FROM order_items WHERE COALESCE(status, '') NOT IN ('cancelled', 'returned') GROUP BY order_id) u ON u.order_id = x.id
+      WHERE COALESCE(x.city, '') != '' GROUP BY x.city ORDER BY orders DESC LIMIT 200`, ...args),
   ]);
-  const customers = per.length, orders = per.reduce((s, r) => s + r.n, 0), revenue = per.reduce((s, r) => s + (r.spend || 0), 0);
-  const repeat = per.filter((r) => r.n > 1).length;
-  const dist = [1, 2, 3, 4, 5].map((k) => ({ k: k === 5 ? '5+' : String(k), n: per.filter((r) => (k === 5 ? r.n >= 5 : r.n === k)).length }));
-  const multi = multiRow.n;
-  const firsts = new Map(firstRows.map((r) => [r.ckey, r.first_at]));
-  const months = new Map();
-  for (const r of monthly) {
-    const e = months.get(r.m) || { m: r.m, new: 0, returning: 0 };
-    const f = firsts.get(r.ckey);
-    const fm = f ? new Date(f + 10800e3).toISOString().slice(0, 7) : r.m;
-    if (fm === r.m) e.new++; else e.returning++;
-    months.set(r.m, e);
-  }
+  const { customers, orders, revenue, repeat, multi } = tot;
+  const dist = [tot.d1, tot.d2, tot.d3, tot.d4, tot.d5].map((n, i) => ({ k: i === 4 ? '5+' : String(i + 1), n }));
   return {
     customers, orders, revenue, repeat, multi,
     repeatRate: customers ? (repeat / customers) * 100 : 0,
     avgBasket: orders ? revenue / orders : 0,
     ordersPerCustomer: customers ? orders / customers : 0,
     revenuePerCustomer: customers ? revenue / customers : 0,
-    repeatOrderShare: orders ? (per.filter((r) => r.n > 1).reduce((s, r) => s + r.n, 0) / orders) * 100 : 0,
+    repeatOrderShare: orders ? (tot.repeatOrders / orders) * 100 : 0,
     dist, cities,
-    channels: byCh.map((c) => ({ ...c, repeat: (rep.find((x) => x.channel === c.channel) || {}).repeat || 0, guests: (guests.find((x) => x.channel === c.channel) || {}).n || 0, avgBasket: c.orders ? c.revenue / c.orders : 0 })),
-    months: [...months.values()].sort((a, b) => a.m.localeCompare(b.m)),
+    channels: chans.map((c) => ({ channel: c.channel, customers: c.customers, orders: c.orders, revenue: c.revenue, repeat: c.repeat || 0, guests: c.guests || 0, avgBasket: c.orders ? c.revenue / c.orders : 0 })),
+    months: monthly.map((r) => ({ m: r.m, new: r.new, returning: r.ret })),
   };
 }
 

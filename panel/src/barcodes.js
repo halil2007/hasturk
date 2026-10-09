@@ -53,7 +53,7 @@ export async function assignBarcodes(db, ids, { prefix, user = 'Panel' } = {}) {
   ids = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter((x) => x > 0))].slice(0, 5000);
   if (!ids.length) fail(400, 'Ürün seçilmedi');
   const prods = [];
-  for (const part of chunk(ids, 400)) prods.push(...await all(db, `SELECT id, name, variant_name, barcode FROM products WHERE id IN (${part.map(() => '?').join(',')})`, ...part));
+  for (const part of chunk(ids, 90)) prods.push(...await all(db, `SELECT id, name, variant_name, barcode FROM products WHERE id IN (${part.map(() => '?').join(',')})`, ...part));
   const used = await usedCodes(db), t = Date.now(), st = [], assigned = [];
   let skipped = 0;
   for (const p of prods) {
