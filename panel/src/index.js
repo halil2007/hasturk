@@ -8,7 +8,7 @@ import { PerfBuffer } from './perf.js';
 import { extApi } from './extapi.js';
 import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
-import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin } from './billing.js';
+import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin, payLink } from './billing.js';
 import { blogPublic } from './blog.js';
 import { trialRequest, trialLogin } from './trial.js';
 import { turnstileOk, turnstileSiteKey, CAPTCHA_ERROR } from './turnstile.js';
@@ -82,6 +82,8 @@ export default {
     // Kendi kendine 7 günlük deneme: sitedeki form firma panelini açar, tek kullanımlık bağlantıyla doğrudan girilir (bkz. trial.js)
     if (path === 'public/trial') return await trialRequest(req, env);
     if (path === 'public/trial-login' && req.method === 'GET') return await trialLogin(req, env);
+    // Ana panelden gönderilen ödeme bağlantısı (Firmalar → Ödeme al → Kartla tahsil et)
+    if (path === 'public/pay' && req.method === 'GET') return await payLink(req, env);
     // Demo paneline giriş (sitedeki imzalı bağlantı)
     if (path === 'public/demo') return await demoRequest(req, env);
     // Başka sitelerden gelen yazma isteklerini reddet (müşteri paneli girişi ve yönetimi dahil; panel içi istekler handle() içinde de denetlenir)

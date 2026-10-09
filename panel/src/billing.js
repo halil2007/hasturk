@@ -131,8 +131,10 @@ async function lastInvoice(db, t) {
 }
 async function start(env, db, order, origin) {
   const callback = `${origin}/api/public/checkout/callback`;
-  const name = order.kind === 'stores' ? `${order.qty} ek mağaza (${order.period} ay)` : PLANS[order.plan].name;
-  const r = await initCheckout(env, { ...order, buyer: JSON.parse(order.buyer), installments: order.period === 'yearly' ? INSTALLMENTS_YEARLY : [1], name }, callback);
+  const name = order.kind === 'stores' ? `${order.qty} ek mağaza (${order.period} ay)` : order.kind === 'charge' ? 'ödeme' : PLANS[order.plan].name;
+  const itemName = order.kind === 'stores' ? `Hastürk CRM ${order.qty} ek mağaza (${order.period} ay)` : order.kind === 'charge' ? `Hastürk CRM ${order.plan || 'abonelik'} ödemesi${Number(order.period) ? ` (${order.period} ay)` : ''}` : '';
+  const many = order.period === 'yearly' || (order.kind === 'charge' && Number(order.period) >= 12);
+  const r = await initCheckout(env, { ...order, buyer: JSON.parse(order.buyer), installments: many ? INSTALLMENTS_YEARLY : [1], name, ...(itemName ? { itemName } : {}) }, callback);
   await run(db, 'UPDATE sales_orders SET token = ?, updated_at = ? WHERE id = ?', r.token, Date.now(), order.id);
   return { ok: true, url: r.url, order: order.id };
 }
@@ -287,6 +289,7 @@ export async function finalize(env, order, panel, fetchFn) {
 // Ödeme alındı (kart ya da onaylanan havale / EFT): yeni firmada panel açılır, mevcut firmada süre uzar; ödeme kaydı, bildirim, e-posta
 async function complete(env, order, panel, { method, note, res = {} }) {
   if (order.kind === 'stores') return completeStores(env, order, { method, note });
+  if (order.kind === 'charge') return completeCharge(env, order, { method, note });
   const buyer = JSON.parse(order.buyer || '{}'), p = { ...priceOf(order.plan, order.period), amount: order.amount };
   try {
     let slug = order.slug;
@@ -337,6 +340,73 @@ async function completeStores(env, order, { method, note }) {
   } catch (e) {
     await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
     await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Ek mağaza ödemesi alındı, sınır artırılamadı: ${order.slug}`, msg: `${order.id} · ${e.message}` }).catch(() => {});
+    return { paidError: true, reason: e.message };
+  }
+}
+
+// ---------- ana panel → Firmalar → Ödeme al → Kartla tahsil et (sanal POS) ----------
+// Tutar ve uzatılacak süre girilir; 7 gün geçerli imzalı ödeme bağlantısı oluşur. Bağlantı açılınca iyzico ödeme sayfası her seferinde
+// yeniden başlatılır (iyzico sayfası kısa sürede düşer). Yönetici kartı kendisi girebilir ya da bağlantı müşteriye e-postayla gider.
+// Ödeme alınınca tahsilat kaydı düşer ve abonelik uzar.
+const LINK_DAYS = 7;
+const enc = new TextEncoder();
+const linkKey = (env) => crypto.subtle.importKey('raw', enc.encode(`${env.PANEL_SECRET || env.PANEL_PASSWORD}|paylink`), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+const linkSig = async (env, id) => btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign('HMAC', await linkKey(env), enc.encode(id))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '').slice(0, 32);
+export async function chargeLink(env, origin, id) { return `${origin}/api/public/pay?o=${encodeURIComponent(`${id}.${await linkSig(env, id)}`)}`; }
+export async function adminCharge(env, db, t, b, user, origin) {
+  if (!iyzicoReady(env)) fail(503, 'Sanal POS (iyzico) bilgileri girilmemiş: Ayarlar → Online satış');
+  const amount = Math.round(Math.max(0, Number(String(b.amount ?? '').replace(',', '.')) || 0) * 100) / 100, months = Math.max(0, Math.min(36, Math.round(Number(b.months) || 0)));
+  if (amount < 1) fail(400, 'Tutar girin');
+  const email = str(b.email || t.email).trim().toLowerCase();
+  if (!validEmail(email)) fail(400, 'Müşterinin e-posta adresi geçersiz (iyzico ister)');
+  const tax = str(t.tax).replace(/\D/g, '');
+  const buyer = { name: str(t.contact || t.legal || t.name), firm: t.name, email, phone: str(t.phone), city: str(t.city) || 'İstanbul', address: str(t.address) || str(t.city) || 'Türkiye',
+    identity: tax.length === 11 ? tax : '', billName: str(t.legal || t.name), note: str(b.note).slice(0, 200) };
+  const now = Date.now(), id = newId();
+  await run(db, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, username) VALUES (?, 'charge', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?, ?)`,
+    id, t.slug, str(t.plan), String(months), amount, JSON.stringify(buyer), now, now, str(user.name || ''));
+  const link = await chargeLink(env, origin, id);
+  let mailed = false;
+  if (b.send) {
+    const what = `${amount.toLocaleString('tr-TR')} TL${months ? ` · aboneliğiniz ${months} ay uzatılır` : ''}${buyer.note ? ` · ${buyer.note}` : ''}`;
+    const r = await sendMail(env, db, { to: [email], subject: `Hastürk CRM · ödeme bağlantınız (${t.name})`,
+      html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111;max-width:560px"><p>Merhaba,</p><p><b>${esc(t.name)}</b> için Hastürk CRM ödemeniz: <b>${esc(what)}</b>.</p><p><a href="${link}" style="display:inline-block;background:#1d5cff;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700">Kartla öde</a></p><p style="color:#555;font-size:13px">Ödeme iyzico güvencesiyle alınır; kart bilgileriniz bize ulaşmaz. Bağlantı ${LINK_DAYS} gün geçerlidir.</p></div>`,
+      text: `${t.name} için Hastürk CRM ödemeniz: ${what}\nKartla ödemek için: ${link}\nBağlantı ${LINK_DAYS} gün geçerlidir.` }).catch((e) => ({ error: e.message }));
+    mailed = !(r && r.error);
+  }
+  return { ok: true, id, link, amount, months, mailed, expires_at: now + LINK_DAYS * 864e5 };
+}
+// Müşterinin açtığı ödeme bağlantısı: imza ve süre denetlenir, ödenmemişse iyzico ödeme sayfası başlatılır
+export async function payLink(req, env) {
+  const v = str(new URL(req.url).searchParams.get('o')), [id, sig] = v.split('.');
+  if (!id || !sig || !env.DB) return resultPage('Ödeme bağlantısı geçersiz', 'Bağlantı eksik ya da bozuk.', { status: 400 });
+  if (sig !== await linkSig(env, id)) return resultPage('Ödeme bağlantısı geçersiz', 'Bağlantı doğrulanamadı.', { status: 400 });
+  await init(env.DB);
+  const o = await first(env.DB, "SELECT * FROM sales_orders WHERE id = ? AND kind = 'charge'", id);
+  if (!o) return resultPage('Ödeme bulunamadı', 'Bu bağlantıya ait ödeme bulunamadı.', { status: 404 });
+  if (o.status === 'done' || o.status === 'paid') return resultPage('Bu ödeme alınmış', 'Bu bağlantının ödemesi daha önce alındı, teşekkürler.', { ok: true });
+  if (o.status === 'cancelled') return resultPage('Bağlantı iptal edildi', `Bu ödeme bağlantısı iptal edildi. ${esc(await contactLine(env))}`, { status: 410 });
+  if (Date.now() - o.created_at > LINK_DAYS * 864e5) return resultPage('Bağlantının süresi doldu', `Ödeme bağlantısı ${LINK_DAYS} gün geçerlidir. Yeni bağlantı için bizimle iletişime geçin. ${esc(await contactLine(env))}`, { status: 410 });
+  // Önceki denemesi başarısız olan bağlantı yeniden kullanılabilir
+  if (o.status === 'failed') await run(env.DB, "UPDATE sales_orders SET status = 'pending', error = NULL WHERE id = ?", id);
+  try {
+    const r = await start(env, env.DB, { ...o, status: 'pending' }, new URL(req.url).origin);
+    return new Response(null, { status: 303, headers: { Location: r.url, 'Cache-Control': 'no-store' } });
+  } catch (e) { return resultPage('Ödeme başlatılamadı', `${esc(e.message)}. Biraz sonra tekrar deneyin.`, { status: 502 }); }
+}
+async function completeCharge(env, order, { method, note }) {
+  const buyer = JSON.parse(order.buyer || '{}'), months = Number(order.period) || 0;
+  try {
+    const t = await getTenant(env.DB, order.slug, true);
+    const r = await recordPayment(env, env.DB, t, { amount: order.amount, months, method, note: `Ödeme bağlantısı${buyer.note ? ` · ${buyer.note}` : ''} · ${note}`, user: order.username || 'Ödeme bağlantısı' });
+    await run(env.DB, "UPDATE sales_orders SET status = 'done', updated_at = ? WHERE id = ?", Date.now(), order.id);
+    const title = `Kartla tahsilat: ${t.name} · ${order.amount} TL${months ? ` · +${months} ay` : ''}`;
+    await notify(env.DB, `sale:${order.id}`, { level: 'info', title, msg: `${buyer.email || ''}${r.expires_at ? ` · yeni bitiş ${new Date(r.expires_at + 3 * 3600e3).toISOString().slice(0, 10)}` : ''}` }).catch(() => {});
+    await pushNotify(env.DB, { title: '💳 ' + title, body: `${order.amount} TL`, url: '#/firmalar' }).catch(() => {});
+    return { done: true, order: { ...order, status: 'done' }, expires_at: r.expires_at };
+  } catch (e) {
+    await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
+    await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Kartla ödeme alındı, kaydedilemedi: ${order.slug}`, msg: `${order.id} · ${e.message}` }).catch(() => {});
     return { paidError: true, reason: e.message };
   }
 }
@@ -412,6 +482,11 @@ async function pageFor(env, order, r, panel) {
     { actions: btn(order.origin === 'panel' ? `${panel}/#/paketim` : `${site}/satin-al?plan=${order.plan}&donem=${order.period === 'yearly' ? 'yillik' : 'aylik'}`, 'Tekrar dene') });
   if (r.paidError) return resultPage('Ödemeniz alındı', `Ödemeniz başarıyla alındı ancak işleminiz otomatik tamamlanamadı. Ekibimiz en kısa sürede tamamlayıp size dönecek; ek bir ödeme yapmanız gerekmez. ${esc(await contactLine(env))}`, { ok: true });
   if (r.error) return resultPage('Ödeme sonucu doğrulanamadı', `Ödeme sonucunu şu an doğrulayamadık (${esc(r.error)}). Kartınızdan çekim yapıldıysa işleminiz kısa sürede tamamlanır; sayfayı birkaç dakika sonra yenileyebilir ya da bizimle iletişime geçebilirsiniz.`, { status: 502 });
+  if ((r.order || order).kind === 'charge') {
+    const t = await getTenant(env.DB, order.slug, true), m = Number(order.period) || 0;
+    const until = t && t.expires_at ? new Date(t.expires_at + 3 * 3600e3).toISOString().slice(0, 10).split('-').reverse().join('.') : '';
+    return resultPage('Ödemeniz alındı, teşekkürler', `${esc(Number(order.amount).toLocaleString('tr-TR'))} TL ödemeniz alındı.${m && until ? ` Aboneliğiniz <b>${until}</b> tarihine kadar uzatıldı.` : ''}`, { ok: true, actions: btn(`${panel}/?firma=${encodeURIComponent(order.slug)}`, 'Panele git') });
+  }
   if ((r.order || order).kind === 'stores') {
     const t = await getTenant(env.DB, order.slug, true);
     return resultPage('Ödemeniz alındı, teşekkürler', `${esc(String(order.qty))} ek mağaza tanımlandı; mağaza sınırınız artık <b>${esc(String(r.stores || (t && limitsOf(t).stores) || ''))}</b>. Entegrasyonlar'dan yeni mağazanızı bağlayabilirsiniz.`,
