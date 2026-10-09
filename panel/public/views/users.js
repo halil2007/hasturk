@@ -8,7 +8,7 @@ const ROLE = { admin: 'Yönetici', staff: 'Personel' };
 const initials = (s) => String(s || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toLocaleUpperCase('tr');
 const level = (u, k) => (u.role === 'admin' || !Array.isArray(u.perms) ? 'full' : u.perms.includes(k) ? 'full' : u.perms.includes(k + ':view') ? 'view' : '');
 const tplName = (k) => (ROLE_TEMPLATES.find((t) => t[0] === k) || [])[1] || '';
-const EV = { accept: 'İşleme aldı', split: 'Pakete böldü', pack: 'Paketledi', ship: 'Kargoya verdi', label: 'Etiket aldı', cancel: 'Paket iptal', repack: 'Yeniden paketledi', cargo: 'Kargo firması değiştirdi', note: 'Not ekledi' };
+const EV = { carrier: 'Entegratörden etiket aldı', 'carrier-cancel': 'Entegratör gönderisini iptal etti', accept: 'İşleme aldı', split: 'Pakete böldü', pack: 'Paketledi', ship: 'Kargoya verdi', label: 'Etiket aldı', cancel: 'Paket iptal', repack: 'Yeniden paketledi', cargo: 'Kargo firması değiştirdi', note: 'Not ekledi' };
 
 // Okunabilir, karışmayan karakterlerle güçlü şifre (0/O, 1/l yok)
 function genPassword() {

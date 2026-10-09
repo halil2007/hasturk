@@ -1,6 +1,6 @@
 // Entegrasyonlar: pazaryeri ve site API bilgileri panelden girilir/değiştirilir (sunucuda şifreli saklanır),
 // bağlantı test edilir, kanal aktif/pasif yapılır; son başarılı senkron zamanları, hatalar ve geçmiş sipariş aktarımı buradadır.
-import { api, state, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey, isAdmin, popMenu } from '../core.js';
+import { api, state, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey, isAdmin, popMenu, sheet } from '../core.js';
 import { loadSummary } from '../app.js';
 import { importDialog } from './products.js';
 import { diagnoseDialog, systemCheck } from './diagnose.js';
@@ -29,8 +29,10 @@ let BETA = ALL_BETA;
 // Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
 const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama', 'woocommerce', ...ALL_BETA];
 const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', etsy: 'Etsy' };
-// Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi)
-const SOON = () => ['Teknosa', 'Turkcell Pasaj'];
+// Yakında eklenecek satış kanalları ve kargo firmaları (seçilemez, yalnız bilgi)
+const SOON = ['Teknosa', 'Turkcell Pasaj', 'Boyner', 'Trendyol Go', 'Getir', 'Yemeksepeti Market'];
+const SOON_ABROAD = ['eBay', 'Ozon'];
+const CARGO_SOON = ['Yurtiçi Kargo', 'Aras Kargo', 'DHL eCommerce (MNG)', 'Sürat Kargo', 'PTT Kargo', 'UPS', 'HepsiJET', 'Kolay Gelsin', 'Sendeo', 'DHL Express'];
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
@@ -46,10 +48,10 @@ const ok = (on, yes, no) => html`<span class="istat ${on === true ? 'on' : on ==
 
 export async function integrations(el, rest = []) {
   const id = rest[0] ? decodeURIComponent(rest[0]) : '';
-  let data = null, jobs = [], modes = [], f = { show: 'all', q: '' };
+  let data = null, jobs = [], modes = [], carriers = [], f = { show: 'all', q: '' };
   try { f.show = sessionStorage.getItem('integ_show') || 'all'; } catch { /* yok */ }
   async function load() {
-    [data, jobs, modes] = await Promise.all([api('integrations'), api('backfill').catch(() => []), api('channel-products/channels').catch(() => [])]);
+    [data, jobs, modes, carriers] = await Promise.all([api('integrations'), api('backfill').catch(() => []), api('channel-products/channels').catch(() => []), api('integrations/carriers').catch(() => [])]);
     data.channels.sort((a, b) => rank(a) - rank(b));
     if (Array.isArray(data.beta)) BETA = data.beta;
     draw();
@@ -110,9 +112,59 @@ export async function integrations(el, rest = []) {
       ${!conn.length ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Henüz bağlı satış kanalınız yok. Satış yaptığınız kanalın kartında <b>Bağla</b>'ya basın; bilgileri girip <b>Kaydet ve bağlantıyı test et</b> deyince siparişleriniz gelmeye başlar.</div></div>` : ''}
       <div class="icards">${list.map(icard)}</div>
       ${!list.length ? html`<div class="card empty">Bu filtrede kanal yok</div>` : ''}
-      <div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${SOON().map((t) => html`<span class="pill">${t}</span>`)}</div>
+      <div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>
+      <div class="row wrap small" style="gap:6px"><span class="muted">Yurt dışı pazaryerleri (yakında):</span>${SOON_ABROAD.map((t) => html`<span class="pill">${t}</span>`)}</div>
+      ${carrierSection()}
       ${conn.some((c) => !c.demo) || jobs.length ? backfill() : ''}
     </div>`);
+  }
+
+  // ---------- kargo entegratörleri (Kargonomi, Navlungo…): kendi anlaşmanızla gönderimde etiket ve takip no bu firmalardan ----------
+  const carrierState = (c) => (!c.ready ? { k: 'off', t: 'Hazırlanıyor' } : !c.configured ? { k: 'off', t: 'Bağlanmadı' } : !c.active ? { k: 'off', t: 'Pasif' } : { k: '', t: 'Bağlı' });
+  function carrierSection() {
+    if (!carriers.length) return '';
+    return html`<div class="card stack" style="--g:12px">
+      <div><h2>Kargo entegratörleri</h2><div class="muted small">Kendi kargo anlaşmanızla gönderdiğiniz siparişlerin (kendi siteniz, pazaryerleri) etiketini ve takip numarasını entegratör firmadan alın: sipariş → paket menüsü → <b>Kargo entegratöründen etiket al</b>. “Kargoya ver” dediğinizde takip numarası satış kanalına bildirilir.</div></div>
+      <div class="icards">${carriers.map((c) => { const s = carrierState(c); return html`<div class="icard ${c.configured ? 'conf' : ''}" data-act="carrier" data-id="${c.id}" tabindex="0">
+        <div class="ic-top"><span class="logo-b" style="background:${c.id === 'kargonomi' ? '#ff6b00' : c.id === 'navlungo' ? '#1d4ed8' : '#64748b'}">${c.id === 'demo' ? html`<i class="ico ico-truck"></i>` : c.name.slice(0, 1)}</span><div class="ic-name"><b class="ellipsis">${c.name}</b>
+          <div class="ic-st"><span class="led ${s.k}"></span>${s.t}${c.isDefault && c.usable ? html`<span class="pill good tiny">Varsayılan</span>` : ''}</div></div>
+          <button class="btn sm ${c.configured ? 'outline' : 'primary'}" data-act="carrier" data-id="${c.id}">${c.configured ? html`<i class="ico ico-gear"></i>Yönet` : html`<i class="ico ico-plus"></i>Bağla`}</button></div>
+        ${!c.ready ? html`<div class="ic-need small"><span class="pill warn tiny">API dokümanı bekleniyor</span></div>` : ''}
+        <div class="ic-need small muted">${c.about}</div></div>`; })}</div>
+      <div class="row wrap small" style="gap:6px"><span class="muted">Yakında kargo firmaları (doğrudan bağlantı):</span>${CARGO_SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>
+    </div>`;
+  }
+  function carrierSheet(id) {
+    const c = carriers.find((x) => x.id === id);
+    if (!c) return;
+    const admin = isAdmin(), fields = c.fields || [];
+    const s = sheet({ title: `${c.name} · kargo entegratörü`, size: 'narrow', body: html`<div class="stack">
+      <div class="small">${c.about}</div>
+      ${!c.ready ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>Bağlantı hazırlanıyor.</b> ${c.name}'nun API dokümanı geldiğinde gönderi oluşturma açılacak. Bilgilerinizi şimdiden kaydedebilirsiniz; o zamana kadar etiketi ${c.name} panelinden alıp takip numarasını paket menüsünden “Kendi anlaşmamla gönder” ile girebilirsiniz.</div></div>` : ''}
+      <div class="notice small"><i class="ico ico-key"></i><div>${c.howto}${c.site ? html` <a class="link" href="${c.site}" target="_blank" rel="noopener">${c.site.replace(/^https?:\/\/(www\.)?/, '')}</a>` : ''}</div></div>
+      ${c.demo ? '' : html`<div class="form-grid">${fields.map((f2) => html`<label class="field"><span class="row" style="gap:6px">${f2.label}${f2.req ? html`<b style="color:var(--bad)">*</b>` : ''}${f2.source === 'panel' ? html`<span class="src panel">kayıtlı</span>` : ''}</span>
+        ${f2.secret ? html`<input class="input" type="password" autocomplete="new-password" data-k="${f2.k}" placeholder="${f2.masked ? `${f2.masked} (kayıtlı — değiştirmek için yazın)` : 'gizli değer'}" ${admin ? '' : 'disabled'}>`
+          : html`<input class="input" data-k="${f2.k}" value="${f2.value}" autocomplete="off" ${admin ? '' : 'disabled'}>`}
+        ${f2.hint ? html`<small class="muted">${f2.hint}</small>` : ''}</label>`)}</div>`}
+      ${c.configured && !c.demo ? html`<label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" data-active ${c.active ? 'checked' : ''} ${admin ? '' : 'disabled'}><span class="small">Aktif (kapalıysa sipariş ekranında kullanılmaz)</span></label>` : ''}
+      <div data-res></div>
+    </div>`,
+    foot: admin ? html`${c.usable && !c.isDefault ? html`<button class="btn" data-def>Varsayılan yap</button>` : ''}<span class="spacer"></span>${c.demo ? '' : html`<button class="btn" data-save>Kaydet</button>`}<button class="btn primary" data-test><i class="ico ico-key"></i>${c.demo ? 'Bağlantıyı test et' : 'Kaydet ve test et'}</button>` : html`<span class="muted small">Bilgileri yalnız yönetici değiştirebilir.</span>` });
+    const save = async () => {
+      if (c.demo) return;
+      const values = {}; $$('[data-k]', s.el).forEach((i) => { values[i.dataset.k] = i.value; });
+      const act = $('[data-active]', s.el);
+      await api('integrations/carriers/' + c.id, { method: 'PUT', body: { values, ...(act ? { active: act.checked } : {}) } });
+    };
+    const sv = $('[data-save]', s.el), ts = $('[data-test]', s.el), df = $('[data-def]', s.el);
+    if (sv) sv.onclick = (e) => busy(e.currentTarget, async () => { await save(); toast('Kaydedildi'); s.close(); await load(); });
+    if (ts) ts.onclick = (e) => busy(e.currentTarget, async () => {
+      await save();
+      const r = await api(`integrations/carriers/${c.id}/test`, { method: 'POST' });
+      render($('[data-res]', s.el), html`<div class="notice ${r.ok ? 'good' : 'warn'} small"><i class="ico ico-${r.ok ? 'check' : 'warn'}"></i><div>${r.message}</div></div>`);
+      await load();
+    });
+    if (df) df.onclick = (e) => busy(e.currentTarget, async () => { await api('integrations/carriers/default', { method: 'POST', body: { id: c.id } }); toast(`${c.name} varsayılan entegratör`); s.close(); await load(); });
   }
 
   // Kanal ekranının üstünde aynı türün mağazaları ve "Mağaza ekle" (paketteki mağaza sınırı kaydederken uygulanır)
@@ -239,6 +291,7 @@ export async function integrations(el, rest = []) {
   const saveSet = async (patch, msg) => { try { state.settings = await api('settings', { method: 'PUT', body: patch }); toast(msg); await after(); } catch (err) { toast(err.message, true); await after(); } };
   actions(el, {
     open: (t) => { location.hash = '#/entegrasyonlar/' + encodeURIComponent(t.dataset.id); },
+    carrier: (t) => carrierSheet(t.dataset.id),
     show: (t) => { f.show = t.dataset.k; try { sessionStorage.setItem('integ_show', f.show); } catch { /* yok */ } draw(); },
     release: async (t) => {
       const on = !!t.dataset.on, name = TYPE_NAME[t.dataset.type] || t.dataset.type;

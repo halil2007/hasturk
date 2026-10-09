@@ -271,6 +271,10 @@ const MIGRATIONS = [
   'ALTER TABLE users ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0',
   // Online satış: ödeme tamamlanana kadar geçici şifre şifrelenmiş saklanır, firma açılınca silinir
   'ALTER TABLE sales_orders ADD COLUMN pass_tmp TEXT',
+  // Kargo entegratörüyle (Kargonomi, Navlungo…) oluşturulan gönderi: entegratör, onun gönderi numarası ve ücreti (bkz. carriers.js)
+  'ALTER TABLE packages ADD COLUMN carrier_provider TEXT',
+  'ALTER TABLE packages ADD COLUMN carrier_ref TEXT',
+  'ALTER TABLE packages ADD COLUMN carrier_cost REAL',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

@@ -24,6 +24,16 @@ export const FIELDS = {
     { k: 'TRENDYOL_INTEGRATOR', label: 'Entegratör adı', adv: true, hint: 'Boşsa "SelfIntegration" gönderilir. Trendyol\'da entegratör firma olarak kayıtlıysanız firma adınız (yalnız harf ve rakam, en fazla 30 karakter); istekler "SatıcıId - FirmaAdı" kimliğiyle gider' },
   ],
   // Yeni sipariş e-posta bildirimi (kanal değil; Ayarlar → Bildirimler'den girilir)
+  // ---------- kargo entegratörleri (kanal değil; siparişin kargo etiketi bu firmalar üzerinden alınır: src/carriers.js) ----------
+  // Alanlar firmanın verdiği API bilgisine göre kesinleşir (iki firma da bilgiyi anlaşmayla, kendi ekibinden veriyor)
+  kargonomi: [
+    { k: 'KARGONOMI_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Kargonomi ekibinin entegrasyon için verdiği anahtar (destek@kargonomi.com.tr)' },
+    { k: 'KARGONOMI_API_SECRET', label: 'API şifresi', secret: true, hint: 'Kargonomi ayrıca şifre verdiyse' },
+  ],
+  navlungo: [
+    { k: 'NAVLUNGO_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Navlungo ekibinin entegrasyon için verdiği anahtar' },
+    { k: 'NAVLUNGO_API_SECRET', label: 'API şifresi', secret: true, hint: 'Navlungo ayrıca şifre verdiyse' },
+  ],
   mail: [
     { k: 'MAIL_PROVIDER', label: 'E-posta servisi', hint: 'smtp (kendi e-posta sunucunuz), brevo veya resend' },
     { k: 'MAIL_API_KEY', label: 'API anahtarı', secret: true },

@@ -145,11 +145,12 @@ function zplChoice(order, pkg, off) {
  * mode: 'expand' (tablo satırı altı) | 'panel' (Genel Bakış sağ panel) | 'sheet' (tam detay)
  */
 export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
-  let d = null;
+  let d = null, hasCarrier = false;
   const enc = encodeURIComponent(id);
   const changed = async () => { await load(); onChange && onChange(); };
   async function load() {
-    d = await api('orders/' + enc);
+    const [x, cs] = await Promise.all([api('orders/' + enc), carrierOptions()]);
+    d = x; hasCarrier = cs.some((c) => c.usable);
     draw();
   }
   const caps = () => (d.channel && d.channel.caps) || {};
@@ -162,7 +163,11 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     const ls = labelState(o, p);
     if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${chName()}'dan kontrol et</button>`;
     if (ls.key === 'external') return html`<button class="btn sm primary" data-op="ext"><i class="ico ico-truck"></i>${caps().external.label}${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}</button><button class="btn sm" style="flex:0 0 auto" data-op="refresh" title="ikas'tan hemen kontrol et" aria-label="Kontrol et"><i class="ico ico-sync"></i></button>`;
-    if (ls.key === 'unpacked') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-box"></i>${caps().pack ? 'Paketle ve etiket al' : 'Etiket oluştur'}</button>`;
+    // Kanalın kargo etiketi servisi yoksa ve bağlı kargo entegratörü varsa: etiket ve takip no entegratörden
+    if (ls.key === 'unpacked' && !caps().label && !caps().pack && hasCarrier && carrierAllowed(d, p)) return html`<button class="btn sm primary" data-op="carrier" data-id="${p.id}"><i class="ico ico-tag"></i>Entegratörden etiket al</button><button class="btn sm" data-op="label" data-id="${p.id}">Etiket oluştur</button>`;
+    // Kanalın kendi etiketi varken de entegratör seçilebilir (paket henüz oluşmadığında menü görünmez: küçük düğme)
+    const alt = hasCarrier && carrierAllowed(d, p) ? html`<button class="btn sm" style="flex:0 0 auto" data-op="carrier" data-id="${p.id}" title="Kargo entegratöründen etiket al" aria-label="Kargo entegratöründen etiket al"><i class="ico ico-truck"></i></button>` : '';
+    if (ls.key === 'unpacked') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-box"></i>${caps().pack ? 'Paketle ve etiket al' : 'Etiket oluştur'}</button>${alt}`;
     if (ls.key === 'packed' || ls.key === 'created' || ls.key === 'error') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${ls.key === 'error' ? 'Tekrar dene' : ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'ready') return html`<button class="btn sm primary" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi yazdır</button>`;
     return html`<button class="btn sm" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Tekrar yazdır</button><button class="btn sm primary" data-op="ship" data-id="${p.id}"><i class="ico ico-truck"></i>${caps().ship === 'remote' ? 'Kargoya ver' : 'Kargoya verildi'}</button>`;
@@ -177,7 +182,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     const ls = labelState(o, p);
     const qty = p.items.reduce((a, x) => a + x.qty, 0);
     // Kargo firması: paket kanalda oluşmadan önce de seçilebilir (Hepsiburada / Trendyol; seçim paketlerken uygulanır)
-    const canCargo = live() && p.status === 'open' && caps().cargo && (!p.virtual || caps().cargo === 'change');
+    const canCargo = live() && p.status === 'open' && caps().cargo && !p.carrier_provider && (!p.virtual || caps().cargo === 'change');
     let pick = null; try { pick = JSON.parse(o.cargo_pick || 'null'); } catch { /* yok */ }
     return html`<div class="pkg-card" data-pkg="${p.id}">
       <div class="hd"><span class="box"><i class="ico ico-box"></i></span><b>Paket ${p.no}</b><span class="muted small">• ${qty} ürün</span><span class="spacer"></span><span class="pill ${ls.cls}">${ls.text}</span></div>
@@ -327,26 +332,32 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     },
     ship: (b) => shipDialog(d, b.dataset.id ? pkgOf(b.dataset.id) : null, changed),
     cargo: (b) => cargoDialog(d, pkgOf(b.dataset.id), changed),
+    carrier: (b) => carrierDialog(d, pkgOf(b.dataset.id), changed),
     diag: () => diagnoseDialog(d.order.channel, d.order.id, d.order.order_number),
     more: (b) => {
       const pkg = pkgOf(b.dataset.id), c = caps(), open = pkg.status === 'open' && live();
       const items = [];
-      if (open && c.cargo) items.push({ icon: 'truck', label: 'Kargo firmasını değiştir', run: () => cargoDialog(d, pkg, changed) });
+      if (open && c.cargo && !pkg.carrier_provider) items.push({ icon: 'truck', label: 'Kargo firmasını değiştir', run: () => cargoDialog(d, pkg, changed) });
       if (hasLabel(pkg, d.order.channel) || pkg.barcode || pkg.tracking) {
-        items.push({ icon: 'sync', label: 'Etiketi kanaldan yeniden al', run: () => busy(null, async () => { const r = await getLabel(pkg, { refresh: true }); toast(r.official || r.panel ? 'Etiket yenilendi' : r.error || r.pending || 'Etiket alınamadı', !(r.official || r.panel)); await changed(); }) });
+        if (!pkg.carrier_provider) items.push({ icon: 'sync', label: 'Etiketi kanaldan yeniden al', run: () => busy(null, async () => { const r = await getLabel(pkg, { refresh: true }); toast(r.official || r.panel ? 'Etiket yenilendi' : r.error || r.pending || 'Etiket alınamadı', !(r.official || r.panel)); await changed(); }) });
         if (pkg.has_label && pkg.label_format === 'zpl') items.push({ icon: 'print', label: 'Etiketi PDF olarak aç', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official && r.official.format === 'zpl') await zplChoice(d.order, pkg, r.official); else if (r.official) await outputLabel({ ...r, order: r.order || d.order, package_id: pkg.id }, { ask: false }); }) });
         if (pkg.has_label) items.push({ icon: 'download', label: 'Etiket dosyasını indir', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official) { downloadFile(r.official.filename, r.official.data, r.official.format === 'zpl' ? 'text/plain' : r.official.format === 'pdf' ? 'application/pdf' : 'image/' + r.official.format); await mark(d.order.id, [pkg.id], 'viewed'); } }) });
         items.push(pkg.label_printed_at
           ? { icon: 'x', label: 'Yazdırıldı işaretini kaldır', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'unprinted'); await changed(); }) }
           : { icon: 'check', label: 'Yazdırıldı olarak işaretle', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'printed'); toast('İşaretlendi'); await changed(); }) });
-        items.push({ icon: 'print', label: 'Kendi etiketimizi yazdır (kanal barkoduyla)', run: async () => { await printLabels([{ order: d.order, pkg }], state.settings && state.settings.sender); await mark(d.order.id, [pkg.id], 'viewed'); askPrinted([{ orderId: d.order.id, pkgId: pkg.id }], changed); } });
+        items.push({ icon: 'print', label: pkg.carrier_provider ? 'Kendi etiketimizi yazdır (entegratör barkoduyla)' : 'Kendi etiketimizi yazdır (kanal barkoduyla)', run: async () => { await printLabels([{ order: d.order, pkg }], state.settings && state.settings.sender); await mark(d.order.id, [pkg.id], 'viewed'); askPrinted([{ orderId: d.order.id, pkgId: pkg.id }], changed); } });
       }
       if (open && pkg.packed_at && c.repack && !pkg.barcode && !pkg.tracking) items.push({ icon: 'sync', label: 'ikas Kargo ile yeniden hazırla (barkod gelmiyorsa)', run: () => busy(null, () => repackPkg(pkg)) });
       if (open && pkg.packed_at && pkg.remote_id && c.cancelPackage) items.push('-', { icon: 'x', danger: true, label: 'Paketi iptal et (kanalda paketlemeyi geri al)', run: async () => {
         if (!(await confirmBox(`Paket ${pkg.no} ${chName()}'da iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
         busy(null, async () => { const r = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
       } });
-      if (open && c.manualTracking !== false) items.push('-', { icon: 'key', label: 'Kendi anlaşmamla gönder (takip no gir)', run: () => shipDialog(d, pkg, changed, { editOnly: true }) });
+      if (open && carrierAllowed(d, pkg)) items.push('-', { icon: 'truck', label: 'Kargo entegratöründen etiket al', run: () => carrierDialog(d, pkg, changed) });
+      if (open && pkg.carrier_provider) items.push('-', { icon: 'x', danger: true, label: 'Entegratör gönderisini iptal et', run: async () => {
+        if (!(await confirmBox(`Paket ${pkg.no} için entegratörde açılan gönderi (${pkg.cargo_company || ''} ${pkg.tracking || ''}) iptal edilsin mi? Takip numarası ve etiket geçersiz olur.`, 'Gönderiyi iptal et'))) return;
+        busy(null, async () => { const r = await api(`orders/${enc}/carrier-cancel`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
+      } });
+      if (open && c.manualTracking !== false && !pkg.carrier_provider) items.push('-', { icon: 'key', label: 'Kendi anlaşmamla gönder (takip no gir)', run: () => shipDialog(d, pkg, changed, { editOnly: true }) });
       items.push('-', { icon: 'bolt', label: `Kargo / bağlantı tanılaması (${chName()})`, run: () => diagnoseDialog(d.order.channel, d.order.id, d.order.order_number) });
       items.push('-', { icon: 'orders', label: 'Sipariş detayı', run: () => openOrder(id, onChange) });
       popMenu(b, items);
@@ -394,6 +405,42 @@ async function cargoDialog(d, pkg, done, { after } = {}) {
     s.close();
     if (after && pkg && pkg.packed_at) { toast(`Kargo firması ${x.dataset.name} oldu; etiket isteniyor…`); await done(); await after(); return; }
     toast(res.message); await done();
+  });
+}
+
+// ---------- kargo entegratörü (Kargonomi, Navlungo…): gönderi oluştur + etiket al (kendi anlaşmanızla gönderim) ----------
+let carriersCache = null, carriersAt = 0;
+export async function carrierOptions() {
+  if (!carriersCache || Date.now() - carriersAt > 60e3) { carriersCache = await api('carriers').catch(() => []); carriersAt = Date.now(); }
+  return carriersCache;
+}
+// Pakete entegratörden gönderi açılabilir mi: kanal elle kargo bilgisi kabul ediyor, paket kanalda kargo barkodu almamış, gönderisi yok
+export const carrierAllowed = (d, pkg) => pkg.status === 'open' && ((d.channel || {}).caps || {}).manualTracking !== false && !pkg.carrier_ref
+  && !(pkg.remote_id && (pkg.barcode || pkg.tracking) && pkg.agreement !== 'own');
+async function carrierDialog(d, pkg, done) {
+  const o = d.order, list = await carrierOptions(), usable = list.filter((c) => c.usable), soon = list.filter((c) => !c.usable);
+  const def = usable.find((c) => c.isDefault) || usable[0];
+  let a = o.address; try { if (typeof a === 'string') a = JSON.parse(a); } catch { a = {}; }
+  a = a || {};
+  const snd = (state.settings && state.settings.sender) || {};
+  const s = sheet({ title: `Paket ${pkg.no} · kargo entegratöründen etiket`, size: 'narrow', body: html`<div class="stack">
+    <div class="small muted">${ch(o.channel).name} · #${o.order_number} · ${o.customer}</div>
+    ${usable.length ? html`<div class="stack" style="gap:6px">${usable.map((c) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="carrier" value="${c.id}" ${def && def.id === c.id ? 'checked' : ''}><span style="flex:1"><span style="font-weight:600">${c.name}</span><div class="tiny muted">${c.about || ''}</div></span>${c.isDefault ? html`<span class="pill good">varsayılan</span>` : ''}</label>`)}</div>
+      <label class="field"><span>Desi</span><input class="input" type="number" min="0.1" step="0.1" data-desi value="${pkg.desi || 1}" style="max-width:120px"></label>
+      <dl class="kv small"><dt>Alıcı</dt><dd>${a.name || o.customer || '—'} · ${[a.district, a.city].filter(Boolean).join(' / ') || html`<span style="color:var(--bad)">adres yok</span>`}</dd>
+        <dt>Gönderen</dt><dd>${snd.name || html`<span style="color:var(--bad)">tanımlı değil</span>`}${snd.city ? ` · ${snd.city}` : ''} <a class="link tiny" href="#/ayarlar">değiştir</a></dd></dl>
+      <div class="notice small">Gönderi entegratörde açılır; takip numarası ve etiket bu pakete yazılır. Paketi kargoya verdiğinizde takip numarası ${ch(o.channel).name}'a bildirilir. Kargo ücreti siparişin kargo giderine eklenir.</div>`
+      : html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Kullanılabilir kargo entegratörü yok.${soon.length ? ` ${soon.map((c) => `${c.name}${c.ready ? (c.configured ? ' (pasif)' : ' (bilgileri girilmedi)') : ' (bağlantı hazırlanıyor)'}`).join(', ')}.` : ''} ${isAdmin() ? html`<a class="link" href="#/entegrasyonlar">Entegrasyonlar → Kargo entegratörleri</a>` : 'Yöneticiniz Entegrasyonlar sayfasından bağlayabilir.'}</div></div>`}
+  </div>`,
+  foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button>${usable.length ? html`<button class="btn primary" data-go><i class="ico ico-tag"></i>Gönderi oluştur ve etiket al</button>` : ''}` });
+  const go = $('[data-go]', s.el);
+  if (go) go.onclick = (e) => busy(e.currentTarget, async () => {
+    const x = $('input[name=carrier]:checked', s.el);
+    if (!x) return toast('Entegratör seçin', true);
+    const r = await api(`orders/${encodeURIComponent(o.id)}/carrier-label`, { method: 'POST', body: { package_id: pkg.virtual ? undefined : pkg.id, provider: x.value, desi: $('[data-desi]', s.el).value } });
+    s.close(); toast(r.message);
+    await outputLabel(r, { done });
+    await done();
   });
 }
 
@@ -536,7 +583,7 @@ async function watchSplit(o, r, done) {
 }
 
 // ---------- sipariş detayı (tam) ----------
-const EV = { accept: 'İşleme alındı', pack: 'Paketlendi (kargoya hazır)', split: 'Paketlere bölündü', cargo: 'Kargo firması seçildi', 'cancel-package': 'Paket iptal edildi', ship: 'Kargoya verildi', tracking: 'Takip no girildi', label: 'Etiket oluşturuldu', 'label-printed': 'Etiket yazdırıldı', 'label-unprinted': 'Yazdırıldı işareti kaldırıldı', status: 'Durum elle değiştirildi', processed: 'Kanalda işlem yapıldı', auto_close: 'Otomatik tamamlandı', };
+const EV = { carrier: 'Kargo entegratöründe gönderi açıldı', 'carrier-cancel': 'Entegratör gönderisi iptal edildi', accept: 'İşleme alındı', pack: 'Paketlendi (kargoya hazır)', split: 'Paketlere bölündü', cargo: 'Kargo firması seçildi', 'cancel-package': 'Paket iptal edildi', ship: 'Kargoya verildi', tracking: 'Takip no girildi', label: 'Etiket oluşturuldu', 'label-printed': 'Etiket yazdırıldı', 'label-unprinted': 'Yazdırıldı işareti kaldırıldı', status: 'Durum elle değiştirildi', processed: 'Kanalda işlem yapıldı', auto_close: 'Otomatik tamamlandı', };
 // Sipariş silme: önce kanalda var mı sorulur (destekleyen kanallarda), sonuç onay penceresinde gösterilir
 export async function deleteOrder(o) {
   const c = await api(`orders/${encodeURIComponent(o.id)}/check`).catch(() => ({ exists: null, why: '' }));
@@ -548,7 +595,7 @@ export async function deleteOrder(o) {
 }
 
 // Kargo giderinin kaynağı (kârlılık kartı)
-const SHIP_SRC = { api: '(kanal faturası)', manual: '(siparişe girilen)', product: '(ürüne girilen)', default: '(Ayarlar → Giderler)', none: '' };
+const SHIP_SRC = { api: '(kanal faturası)', carrier: '(kargo entegratörü)', manual: '(siparişe girilen)', product: '(ürüne girilen)', default: '(Ayarlar → Giderler)', none: '' };
 
 export async function openOrder(id, onChange) {
   const s = sheet({ title: 'Sipariş', size: 'wide drawer' });
