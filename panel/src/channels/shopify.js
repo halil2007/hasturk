@@ -264,6 +264,29 @@ export function shopify(env, meta = {}) {
     }
   }
 
+  // Panelde açılan ürünü mağazada oluştur: ürün (başlık, açıklama, yayında) + görseller → tek varyantın fiyatı, SKU, barkodu ve
+  // stok takibi → stok (mağazanın lokasyonuna). Shopify ürünü varsayılan tek varyantla açar.
+  async function createProduct(pr) {
+    let imgs = [];
+    try { imgs = JSON.parse(pr.images || '[]'); } catch { /* bozuk liste */ }
+    imgs = [...new Set([pr.image, ...imgs].filter((u) => /^https:\/\//i.test(u || '')))].slice(0, 10);
+    const d = await gql('mutation($p: ProductCreateInput!, $m: [CreateMediaInput!]) { productCreate(product: $p, media: $m) { product { id variants(first: 1) { nodes { id } } } userErrors { field message } } }', {
+      p: { title: pr.name, descriptionHtml: pr.description || '', status: 'ACTIVE', ...(pr.brand ? { vendor: pr.brand } : {}) },
+      m: imgs.map((u) => ({ originalSource: u, mediaContentType: 'IMAGE' })),
+    });
+    ok(d.productCreate, 'ürün');
+    const prod = d.productCreate.product, v = ((prod.variants || {}).nodes || [])[0];
+    if (!v) throw new Error('Shopify ürünü varyantsız döndü');
+    const price = num(pr.sale_price), stock = Math.max(0, Math.round(num(pr.stock)));
+    const u = await gql('mutation($p: ID!, $v: [ProductVariantsBulkInput!]!) { productVariantsBulkUpdate(productId: $p, variants: $v) { userErrors { field message } } }', {
+      p: prod.id, v: [{ id: v.id, price: String(price), ...(pr.barcode ? { barcode: String(pr.barcode) } : {}), inventoryItem: { sku: pr.sku || undefined, tracked: true } }],
+    });
+    ok(u.productVariantsBulkUpdate, 'varyant');
+    const listing = { remoteId: nid(v.id), remoteProductId: nid(prod.id), sku: pr.sku || '', barcode: pr.barcode || '', name: pr.name, price, stock };
+    await pushStock([listing]);
+    return listing;
+  }
+
   // Kargoya ver: açık gönderim emirleri (fulfillment order) takip bilgisiyle kapatılır; paket kalemleri verildiyse yalnız onlar
   async function ship(order, pkg, { cargoCompany, tracking } = {}) {
     const d = await gql(`query($id: ID!) { order(id: $id) { fulfillmentOrders(first: 5) { nodes { id status lineItems(first: 50) { nodes { id remainingQuantity lineItem { id } } } } } } }`, { id: gid('Order', order.remote_id) });
@@ -315,7 +338,7 @@ export function shopify(env, meta = {}) {
   const missing = [!store && 'SHOPIFY_STORE', !token && (cid ? !csec && 'SHOPIFY_CLIENT_SECRET' : 'SHOPIFY_TOKEN')].filter(Boolean);
   return {
     ...meta, type: 'shopify', enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, diagnose,
+    caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: true, price: true, manualTracking: true },
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, createProduct, diagnose,
   };
 }

@@ -341,3 +341,31 @@ test('WooCommerce: tanılama', async () => {
   assert.deepEqual(bad.map((x) => x.ok), [false, null]);
   assert.match(bad[0].detail, /HTTP 404/);
 });
+
+test('panelden ürün oluşturma: WooCommerce basit ürün, Shopify ürün + varyant + stok', async () => {
+  const real = globalThis.fetch;
+  try {
+    const pr = { name: 'Solucan Gübresi 5 Kg', sku: 'SOL-5', barcode: '8690000000011', sale_price: 189, stock: 12, description: '<p>Doğal</p>', image: 'https://cdn.x/1.jpg', images: '["https://cdn.x/1.jpg","https://cdn.x/2.jpg"]', brand: 'HG' };
+    let calls = mockFetch((c) => (c.method === 'POST' && /\/products$/.test(c.url.split('?')[0]) ? { id: 501 } : {}));
+    const w = await woocommerce(WENV, { id: 'woocommerce' }).createProduct(pr);
+    const wb = calls.find((c) => c.method === 'POST').body;
+    assert.deepEqual([wb.name, wb.sku, wb.global_unique_id, wb.regular_price, wb.stock_quantity, wb.manage_stock, wb.images.length], ['Solucan Gübresi 5 Kg', 'SOL-5', '8690000000011', '189', 12, true, 2]);
+    assert.deepEqual([w.remoteId, w.remoteProductId], ['501', '501']);
+    calls = mockFetch((c) => {
+      const q = c.body && c.body.query || '';
+      if (/productCreate/.test(q)) return { data: { productCreate: { product: { id: 'gid://shopify/Product/7', variants: { nodes: [{ id: 'gid://shopify/ProductVariant/70' }] } }, userErrors: [] } } };
+      if (/productVariantsBulkUpdate/.test(q)) return { data: { productVariantsBulkUpdate: { userErrors: [] } } };
+      if (/locations/.test(q)) return { data: { locations: { nodes: [{ id: 'gid://shopify/Location/5', isActive: true }] } } };
+      if (/nodes\(ids/.test(q)) return { data: { nodes: [{ id: 'gid://shopify/ProductVariant/70', product: { id: 'gid://shopify/Product/7' }, inventoryItem: { id: 'gid://shopify/InventoryItem/9', tracked: true, inventoryLevel: { id: 'x' } } }] } };
+      if (/inventorySetQuantities/.test(q)) return { data: { inventorySetQuantities: { userErrors: [] } } };
+      return { data: {} };
+    });
+    const sh = await shopify(SENV, { id: 'shopify' }).createProduct(pr);
+    const create = calls.find((c) => /productCreate/.test(c.body.query)).body.variables;
+    assert.equal(create.p.title, 'Solucan Gübresi 5 Kg'); assert.equal(create.m.length, 2);
+    const v = calls.find((c) => /productVariantsBulkUpdate/.test(c.body.query)).body.variables.v[0];
+    assert.deepEqual([v.price, v.barcode, v.inventoryItem.sku, v.inventoryItem.tracked], ['189', '8690000000011', 'SOL-5', true]);
+    assert.equal(calls.find((c) => /inventorySetQuantities/.test(c.body.query)).body.variables.input.quantities[0].quantity, 12);
+    assert.deepEqual([sh.remoteId, sh.remoteProductId], ['70', '7']);
+  } finally { globalThis.fetch = real; }
+});
