@@ -6,7 +6,7 @@
 // Not: Trendyol "avantajlı ürün" etiket eşikleri ve Hepsiburada "avantajlı teklif" önerileri için pazaryerlerinin açık servisi yok;
 // bu yüzden öneriler yalnız servisle okunabilen rakip (buybox) fiyatlarından üretilir.
 import { all, getSettings, log } from './db.js';
-import { profit, costOf } from '../public/profit.js';
+import { profit, costOf, rateGross } from '../public/profit.js';
 import { chunk, fail, r2 } from './util.js';
 
 const STEP = 0.01, MAX_AGE = 3 * 864e5, RAISE_MIN = 0.02; // ikinci satıcı en az %2 yukarıdaysa yükseltme önerilir
@@ -31,7 +31,7 @@ export function suggestFor(r, settings) {
   const ch = r.channel, cost = (k) => costOf(settings, k, ch);
   const calc = (sale) => {
     if (!(r.purchase_price > 0)) return null;
-    const x = profit({ sale, purchase: r.purchase_price, commissionRate: r.commission ?? cost('commission'), shipping: cost('shipping'), fee: cost('service_fee'),
+    const x = profit({ sale, purchase: r.purchase_price, commissionRate: rateGross(settings, r.commission) ?? cost('commission'), shipping: cost('shipping'), fee: cost('service_fee'),
       feeRate: cost('fee_rate'), withholdingRate: cost('withholding'), vatRate: r.vat ?? 20 });
     return { profit: r2(x.unitProfit), margin: r2(x.margin) };
   };

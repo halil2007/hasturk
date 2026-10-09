@@ -1,5 +1,5 @@
 // Kârlılık hesabı — panel (tarayıcı) ve sunucu (sipariş kârı, istatistik) aynı formülü kullanır.
-// Tüm tutarlar KDV dahil girilir (pazaryerlerinin gösterdiği gibi).
+// Satış ve alış KDV dahil girilir; pazaryeri kesintileri (Ayarlar) KDV hariç girilir ve %20 KDV eklenerek düşülür (bkz. costOf).
 //   Satıştan kalan (hakediş) = satış − komisyon − kargo − hizmet bedeli − ek kesinti (işlem / ödeme bedeli, %) − stopaj
 //   Ürün başı kâr            = hakediş − alış − diğer giderler [− ödenecek KDV, "KDV'yi hesaba kat" açıksa]
 // Komisyon, kargo, hizmet bedeli, ek kesinti ve diğer giderlerin KDV'si %20 kabul edilir (indirilecek KDV).
@@ -10,7 +10,14 @@ export const SERVICE_VAT = 20;
 // Ayarlardaki kanal bazlı gider (komisyon %, kargo ₺, hizmet bedeli ₺, ek kesinti %, stopaj %).
 // Eklenen mağaza (trendyol_2, ikas_3) için değer girilmemişse aynı türün ana mağazasındaki değer kullanılır.
 const baseId = (ch) => String(ch || '').replace(/_\d+$/, '').replace(/^ikas$/, 'ikas1');
-export const costOf = (settings, key, ch) => { const m = (settings && settings[key]) || {}; return Number(m[ch] ?? m[baseId(ch)] ?? 0) || 0; };
+export const costRaw = (settings, key, ch) => { const m = (settings && settings[key]) || {}; return Number(m[ch] ?? m[baseId(ch)] ?? 0) || 0; };
+// Komisyon, kargo, hizmet bedeli ve ek kesinti pazaryerlerinin ilan ettiği gibi KDV hariç girilir; hesaplarda %20 KDV eklenmiş tutar
+// kullanılır (pazaryeri faturası KDV dahil keser). Ayarlar'da "girdiğim tutarlar KDV dahil" seçilmişse eklenmez. Stopaj vergidir, KDV'si yoktur.
+// Ürüne / ilana özel komisyon oranı (pazaryeri API'sinden gelen) da KDV hariçtir: rateGross ile aynı kural uygulanır.
+export const VAT_COST_KEYS = ['commission', 'shipping', 'service_fee', 'fee_rate'];
+export const costVat = (settings) => (settings && settings.costs_vat_incl ? 1 : 1 + SERVICE_VAT / 100);
+export const costOf = (settings, key, ch) => costRaw(settings, key, ch) * (VAT_COST_KEYS.includes(key) ? costVat(settings) : 1);
+export const rateGross = (settings, rate) => (rate == null ? rate : Number(rate) * costVat(settings));
 export const COST_KEYS = ['commission', 'shipping', 'service_fee', 'fee_rate', 'withholding'];
 
 export function profit({ sale = 0, purchase = 0, commissionRate = 0, shipping = 0, fee = 0, extra = 0, vatRate = 20, includeVat = false, qty = 1, feeRate = 0, withholdingRate = 0 } = {}) {

@@ -3,7 +3,7 @@
 import { api, state, locked, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels, sheet, store, themeOf, applyTheme } from '../core.js';
 import { apiGuide } from '../apiguide.js';
 import { loadSummary } from '../app.js';
-import { costOf, COST_KEYS } from '../profit.js';
+import { costRaw, COST_KEYS } from '../profit.js';
 import { pushState, enablePush, disablePush } from '../push-client.js';
 
 // Logoyu en fazla 600×200 px PNG'ye küçült (veritabanında küçük yer kaplasın)
@@ -98,10 +98,12 @@ export async function settingsView(el) {
 
       <div class="card stack" data-fxcard data-stab="${locked('fx') ? 'giderler' : 'doviz'}">${locked('fx') ? html`<h2>Döviz kuruna endeksli fiyat <span class="pill info">Kurumsal paket</span></h2><div class="muted small">Ürüne dolar, euro ya da sterlin fiyatı girin; TL satış fiyatı ve kanal fiyatları anlık / günlük / haftalık / aylık kurla kendiliğinden güncellensin. Kurumsal pakette açılır; <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
 
-      <div class="card flush" data-stab="giderler"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
+      <div class="card flush" data-stab="giderler"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div>
+          <label class="row" style="align-items:flex-start;gap:12px;margin-top:12px"><span class="switch"><input type="checkbox" data-costvat ${st.costs_vat_incl ? '' : 'checked'} ${dis}><span></span></span>
+            <span><b>Kesintilere KDV'yi otomatik ekle</b><br><span class="small muted">Komisyon, kargo, hizmet bedeli ve ek kesintiyi pazaryerinin ilan ettiği gibi KDV hariç girin (ör. komisyon %20 + KDV); panel %20 KDV ekleyerek düşer (%20 → %24). Kapatırsanız girdiğiniz tutarlar KDV dahil sayılır. Stopaj vergidir, KDV eklenmez. Kanalın bildirdiği gerçek komisyon ve kargo faturaları zaten KDV dahildir.</span></span></label></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
         ${live.map((c) => html`<tr><td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td>
-          ${COST_KEYS.map((k) => { const own = (st[k] || {})[c.id], extra = /_\d+$/.test(c.id); return html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${extra ? own ?? '' : costOf(st, k, c.id)}" placeholder="${extra ? costOf(st, k, c.id) : ''}" title="${extra ? 'Boş bırakılırsa aynı türdeki ana mağazanın değeri kullanılır' : ''}" ${dis}></td>`; })}</tr>`)}
+          ${COST_KEYS.map((k) => { const own = (st[k] || {})[c.id], extra = /_\d+$/.test(c.id); return html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${extra ? own ?? '' : costRaw(st, k, c.id)}" placeholder="${extra ? costRaw(st, k, c.id) : ''}" title="${extra ? 'Boş bırakılırsa aynı türdeki ana mağazanın değeri kullanılır' : ''}" ${dis}></td>`; })}</tr>`)}
       </tbody></table></div>
         <div class="card-pad muted tiny" style="padding-top:0">Masraf basamakları: satış − komisyon − kargo − hizmet bedeli − ek kesinti − stopaj = hakediş; hakediş − alış = kâr. Stopaj, pazaryerlerinin 2025'ten beri hakedişten kestiği gelir vergisidir (KDV hariç satış üzerinden, genelde %1); yıllık vergiden mahsup edilir. Kendi siteniz (ikas) için 0 bırakın.</div></div>
 
@@ -311,7 +313,7 @@ export async function settingsView(el) {
       const sender = {}; $$('[data-sender]', el).forEach((i) => { sender[i.dataset.sender] = i.value.trim(); });
       const company = {}; $$('[data-co]', el).forEach((i) => { company[i.dataset.co] = i.value.trim(); });
       const track = {}; ($('[data-track]', el).value || '').split('\n').forEach((l) => { const i = l.indexOf('='); if (i > 0) track[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });
-      await save({ ...cost, sender, company, track_urls: track, label_size: $('[data-labelsize]', el).value, low_stock: numIn($('[data-low]', el).value), cargo_companies: $('[data-cargos]', el).value.split(',').map((x) => x.trim()).filter(Boolean), history_days: numIn($('[data-history]', el).value) });
+      await save({ ...cost, costs_vat_incl: !$('[data-costvat]', el).checked, sender, company, track_urls: track, label_size: $('[data-labelsize]', el).value, low_stock: numIn($('[data-low]', el).value), cargo_companies: $('[data-cargos]', el).value.split(',').map((x) => x.trim()).filter(Boolean), history_days: numIn($('[data-history]', el).value) });
       await loadSummary();
       toast('Ayarlar kaydedildi');
     }),

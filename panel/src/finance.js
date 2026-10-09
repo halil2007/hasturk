@@ -4,7 +4,7 @@
 import { all, first, run, getRaw, setSetting, log } from './db.js';
 import { getChannels } from './channels/index.js';
 import { chunk, fail, PRODUCT_SHIP } from './util.js';
-import { profit, costOf } from '../public/profit.js';
+import { profit, costOf, rateGross, costVat } from '../public/profit.js';
 import { r2 } from './util.js';
 
 export function orderProfit(o, settings) {
@@ -12,7 +12,7 @@ export function orderProfit(o, settings) {
   let revenue = 0, commission = 0, cost = 0, missing = 0, realCommission = true;
   for (const i of o.items) {
     if (i.status === 'cancelled' || i.status === 'returned') continue;
-    const rate = i.listing_commission ?? costOf(settings, 'commission', ch);
+    const rate = rateGross(settings, i.listing_commission) ?? costOf(settings, 'commission', ch);
     revenue += i.total;
     // Kanalın bildirdiği gerçek komisyon varsa o; yoksa ilan / kanal oranıyla tahmin
     if (i.commission != null) commission += i.commission; else { commission += profit({ sale: i.total, commissionRate: rate }).commission; realCommission = false; }
@@ -97,7 +97,7 @@ async function aggregate(db, settings, { from, to, channel }) {
   const LIVEI = "COALESCE(i.status, '') NOT IN ('cancelled', 'returned')";
   return all(db, `WITH it AS (
       SELECT i.order_id, SUM(CASE WHEN ${LIVEI} THEN i.total ELSE 0 END) AS rev,
-        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission, ${rate('commission')}) / 100.0) ELSE 0 END) AS comm,
+        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission * ${costVat(settings)}, ${rate('commission')}) / 100.0) ELSE 0 END) AS comm,
         SUM(CASE WHEN ${LIVEI} AND i.commission IS NULL THEN 1 ELSE 0 END) AS estc,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity ELSE 0 END) AS cost,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) = 0 THEN 1 ELSE 0 END) AS miss,
@@ -228,7 +228,7 @@ export async function productProfit(db, settings, { from, to, channel, sort = 'p
     for (const i of its) {
       if (i.status === 'cancelled' || i.status === 'returned') continue;
       const share = p.revenue ? i.total / p.revenue : 0;
-      const comm = i.commission != null ? i.commission : (i.total * (i.listing_commission ?? costOf(settings, 'commission', o.channel))) / 100;
+      const comm = i.commission != null ? i.commission : (i.total * (rateGross(settings, i.listing_commission) ?? costOf(settings, 'commission', o.channel))) / 100;
       const k = i.product_id != null ? i.product_id : 'x:' + (i.sku || i.name);
       const x = out.get(k) || out.set(k, { key: String(k), product_id: i.product_id, name: i.pname || i.name || i.sku || '—', variant: i.variant_name || '', image: i.image || '', units: 0, orders: 0, revenue: 0, commission: 0, other: 0, cost: 0, missingCost: 0, channels: new Set() }).get(k);
       x.units += i.quantity; x.orders++; x.revenue += i.total; x.commission += comm; x.other += other * share; x.channels.add(o.channel);

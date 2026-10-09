@@ -1,13 +1,13 @@
 // Kârlılık hesapla: alış, satış, komisyon, kargo → satıştan kalan ve ürün başına kazanç. Telefonda tek elle kullanılır;
 // hesap tarayıcıda yapılır (internet gerekmez), son girilen değerler hatırlanır.
 import { api, state, html, render, $, $$, money, n, chLogo, store, debounce, numIn , activeChannels } from '../core.js';
-import { profit, priceFor, costOf } from '../profit.js';
+import { profit, priceFor, costOf, costRaw, costVat } from '../profit.js';
 
 const DEF = { sale: '', purchase: '', commissionRate: '', shipping: '', fee: '', extra: '', feeRate: '', withholdingRate: '', vatRate: 20, includeVat: false, qty: 1, target: 20, channel: '' };
 
 export async function profitView(el) {
   const v = { ...DEF, ...store.get('calc', {}) };
-  const st = state.settings || {};
+  const st = state.settings || {}, exv = costVat(st) > 1 ? ' (KDV hariç)' : '';
   const box = (k, label, suffix = '₺', extra = '') => html`<label class="calc-field"><span>${label}</span><div class="input-group"><input class="input big num" inputmode="decimal" enterkeyhint="next" data-k="${k}" value="${v[k]}" placeholder="0"><span class="suffix">${suffix}</span></div>${extra}</label>`;
   render(el, html`<div class="two-col">
     <div class="stack">
@@ -16,9 +16,9 @@ export async function profitView(el) {
         <div class="search" style="min-width:0"><i class="ico ico-search"></i><input class="input" placeholder="Üründen doldur (ad / SKU)" data-find></div>
         <div class="list" data-found></div>
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('sale', 'Satış fiyatı')}${box('purchase', 'Alış fiyatı')}</div>
-        ${box('commissionRate', 'Komisyon', '%', html`<div class="preset">${activeChannels().map((c) => html`<button class="chip ${v.channel === c.id ? 'on' : ''}" data-ch="${c.id}">${chLogo(c.id, true)}%${n(costOf(st, 'commission', c.id))}</button>`)}</div>`)}
-        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('shipping', 'Kargo gideri')}${box('fee', 'Hizmet / işlem bedeli')}</div>
-        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('feeRate', 'Ek kesinti', '%', html`<small class="muted tiny">işlem / ödeme bedeli</small>`)}${box('withholdingRate', 'Stopaj', '%', html`<small class="muted tiny">KDV hariç satıştan, genelde %1</small>`)}</div>
+        ${box('commissionRate', 'Komisyon' + exv, '%', html`<div class="preset">${activeChannels().map((c) => html`<button class="chip ${v.channel === c.id ? 'on' : ''}" data-ch="${c.id}">${chLogo(c.id, true)}%${n(costRaw(st, 'commission', c.id))}</button>`)}</div>`)}
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('shipping', 'Kargo gideri' + exv)}${box('fee', 'Hizmet bedeli' + exv)}</div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('feeRate', 'Ek kesinti' + exv, '%', html`<small class="muted tiny">işlem / ödeme bedeli</small>`)}${box('withholdingRate', 'Stopaj', '%', html`<small class="muted tiny">KDV hariç satıştan, genelde %1</small>`)}</div>
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('extra', 'Diğer gider', '₺', html`<small class="muted tiny">paketleme, reklam…</small>`)}${box('qty', 'Adet', 'ad')}</div>
         <div class="row wrap">
           <label class="check" style="flex:1"><span class="switch"><input type="checkbox" data-k="includeVat" ${v.includeVat ? 'checked' : ''}><span></span></span> KDV'yi hesaba kat</label>
@@ -34,7 +34,9 @@ export async function profitView(el) {
 
   const calc = () => {
     const inp = { sale: numIn(v.sale), purchase: numIn(v.purchase), commissionRate: numIn(v.commissionRate), shipping: numIn(v.shipping), fee: numIn(v.fee), extra: numIn(v.extra), feeRate: numIn(v.feeRate), withholdingRate: numIn(v.withholdingRate), vatRate: Number(v.vatRate), includeVat: !!v.includeVat, qty: numIn(v.qty) || 1 };
-    const r = profit(inp), target = priceFor(inp, numIn(v.target)), good = r.unitProfit >= 0;
+    // Komisyon, kargo, hizmet bedeli ve ek kesinti KDV hariç girilir (Ayarlar'daki gibi); hesapta KDV eklenir
+    const g = costVat(st), gin = { ...inp, commissionRate: inp.commissionRate * g, shipping: inp.shipping * g, fee: inp.fee * g, feeRate: inp.feeRate * g };
+    const r = profit(gin), target = priceFor(gin, numIn(v.target)), good = r.unitProfit >= 0;
     $('[data-comm]', el).textContent = money(r.commission);
     render($('[data-result]', el), html`<div class="card stack">
       <div class="gain" style="background:${good ? 'var(--good-soft)' : 'var(--bad-soft)'}">
@@ -49,9 +51,9 @@ export async function profitView(el) {
         <div class="res-box"><div class="label">Komisyon tutarı</div><div class="v num">${money(r.commission)}</div></div>
         <div class="res-box"><div class="label">Başabaş satış fiyatı</div><div class="v num">${r.breakEven != null ? money(r.breakEven) : '—'}</div></div>
       </div>
-      <dl class="kv small"><dt>Satış</dt><dd>${money(inp.sale)}</dd><dt>Komisyon</dt><dd>−${money(r.commission)}</dd><dt>Kargo</dt><dd>−${money(inp.shipping)}</dd>
-        ${inp.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(inp.fee)}</dd>` : ''}${r.rateFee ? html`<dt>Ek kesinti</dt><dd>−${money(r.rateFee)}</dd>` : ''}${r.withholding ? html`<dt>Stopaj <span class="tiny muted">(mahsup edilir)</span></dt><dd>−${money(r.withholding)}</dd>` : ''}
-        <div class="total"><dt>Hakediş</dt><dd>${money(r.payout)}</dd></div><dt>Alış</dt><dd>−${money(inp.purchase)}</dd>${inp.extra ? html`<dt>Diğer giderler</dt><dd>−${money(inp.extra)}</dd>` : ''}${inp.includeVat ? html`<dt>Ödenecek KDV</dt><dd>−${money(r.vat.payable)}</dd>` : ''}<div class="total"><dt>Kâr</dt><dd>${money(r.unitProfit)}</dd></div></dl>
+      <dl class="kv small"><dt>Satış</dt><dd>${money(inp.sale)}</dd><dt>Komisyon</dt><dd>−${money(r.commission)}</dd><dt>Kargo</dt><dd>−${money(gin.shipping)}</dd>
+        ${gin.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(gin.fee)}</dd>` : ''}${r.rateFee ? html`<dt>Ek kesinti</dt><dd>−${money(r.rateFee)}</dd>` : ''}${r.withholding ? html`<dt>Stopaj <span class="tiny muted">(mahsup edilir)</span></dt><dd>−${money(r.withholding)}</dd>` : ''}
+        ${g > 1 ? html`<dt class="muted tiny" style="grid-column:1/-1">Kesintilere %20 KDV eklendi (Ayarlar → Komisyon ve giderler)</dt>` : ''}<div class="total"><dt>Hakediş</dt><dd>${money(r.payout)}</dd></div><dt>Alış</dt><dd>−${money(inp.purchase)}</dd>${inp.extra ? html`<dt>Diğer giderler</dt><dd>−${money(inp.extra)}</dd>` : ''}${inp.includeVat ? html`<dt>Ödenecek KDV</dt><dd>−${money(r.vat.payable)}</dd>` : ''}<div class="total"><dt>Kâr</dt><dd>${money(r.unitProfit)}</dd></div></dl>
       ${inp.includeVat ? html`<dl class="kv small"><dt>Satış KDV'si</dt><dd>${money(r.vat.sale)}</dd><dt>İndirilecek KDV (alış)</dt><dd>−${money(r.vat.purchase)}</dd><dt>İndirilecek KDV (hizmetler)</dt><dd>−${money(r.vat.services)}</dd><div class="total"><dt>${r.vat.payable >= 0 ? 'Ödenecek KDV' : 'Devreden KDV'}</dt><dd>${money(Math.abs(r.vat.payable))}</dd></div></dl>` : ''}
       <div class="stack" style="border-top:1px solid var(--line);padding-top:12px">
         <div class="row"><span class="small" style="flex:1;font-weight:650">Hedef kâr oranı</span><b class="num">%${n(numIn(v.target))}</b></div>
@@ -61,8 +63,8 @@ export async function profitView(el) {
     </div>
     <div class="card flush"><div class="card-pad"><h3>Kanallara göre</h3><div class="muted tiny" style="margin-top:4px">Aynı fiyatlarla, her kanalın Ayarlar'daki komisyon, kargo ve hizmet bedeli kullanılır.</div></div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Kom.</th><th class="r">Kalan</th><th class="r">Kâr</th></tr></thead><tbody>
-      ${activeChannels().map((c) => { const x = profit({ ...inp, commissionRate: costOf(st, 'commission', c.id), shipping: costOf(st, 'shipping', c.id), fee: costOf(st, 'service_fee', c.id), feeRate: costOf(st, 'fee_rate', c.id), withholdingRate: costOf(st, 'withholding', c.id) }); return html`<tr>
-        <td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td><td class="r num">%${n(costOf(st, 'commission', c.id))}</td>
+      ${activeChannels().map((c) => { const x = profit({ ...gin, commissionRate: costOf(st, 'commission', c.id), shipping: costOf(st, 'shipping', c.id), fee: costOf(st, 'service_fee', c.id), feeRate: costOf(st, 'fee_rate', c.id), withholdingRate: costOf(st, 'withholding', c.id) }); return html`<tr>
+        <td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td><td class="r num">%${n(costRaw(st, 'commission', c.id))}</td>
         <td class="r num">${money(x.payout)}</td><td class="r num" style="font-weight:750;color:${x.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(x.unitProfit)}</td></tr>`; })}
       </tbody></table></div></div>`);
     store.set('calc', v);
@@ -81,9 +83,9 @@ export async function profitView(el) {
     if (c) {
       const id = c.dataset.ch;
       v.channel = id;
-      v.commissionRate = String(costOf(st, 'commission', id));
-      v.shipping = String(costOf(st, 'shipping', id)); v.fee = String(costOf(st, 'service_fee', id));
-      v.feeRate = String(costOf(st, 'fee_rate', id)); v.withholdingRate = String(costOf(st, 'withholding', id));
+      v.commissionRate = String(costRaw(st, 'commission', id));
+      v.shipping = String(costRaw(st, 'shipping', id)); v.fee = String(costRaw(st, 'service_fee', id));
+      v.feeRate = String(costRaw(st, 'fee_rate', id)); v.withholdingRate = String(costRaw(st, 'withholding', id));
       for (const k of ['commissionRate', 'shipping', 'fee', 'feeRate', 'withholdingRate']) { const i = $(`[data-k=${k}]`, el); if (i) i.value = v[k]; }
       $$('[data-ch]', el).forEach((b) => b.classList.toggle('on', b === c));
       calc();

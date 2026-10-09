@@ -330,6 +330,11 @@ export function init(db) {
           WHERE channel LIKE 'hepsiburada%' AND commission_src = 'api' AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:hb_comm_1')`),
         db.prepare("INSERT INTO settings (k, v) VALUES ('once:hb_comm_1', '1') ON CONFLICT (k) DO NOTHING"),
       ]);
+      // Tek seferlik: kanaldan gelen ilan komisyon oranları KDV dahil kaydediliyordu; artık KDV hariç tutulur (hesapta KDV eklenir)
+      await db.batch([
+        db.prepare("UPDATE listings SET commission = ROUND(commission / 1.2, 2) WHERE commission_src = 'api' AND commission IS NOT NULL AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:comm_net_1')"),
+        db.prepare("INSERT INTO settings (k, v) VALUES ('once:comm_net_1', '1') ON CONFLICT (k) DO NOTHING"),
+      ]);
       await db.batch([
         db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)),
         db.prepare("INSERT INTO settings (k, v) VALUES ('schema_n', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(MIGRATIONS.length)),
@@ -375,6 +380,8 @@ export const DEFAULT_SETTINGS = {
   answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
   commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15, amazon: 15, ciceksepeti: 20, koctas: 15, shopify: 0, woocommerce: 0, opencart: 0, etsy: 6.5 },
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
+  // Komisyon, kargo, hizmet bedeli ve ek kesinti KDV hariç girilir, hesapta %20 KDV eklenir; true: girilen tutarlar zaten KDV dahil
+  costs_vat_incl: false,
   // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Satış tutarının %'si olarak ek kesinti (işlem / ödeme bedeli vb.)

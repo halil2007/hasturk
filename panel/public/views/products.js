@@ -2,7 +2,7 @@
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
 import { api, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
 import { readSheet } from '../sheetread.js';
-import { profit, costOf } from '../profit.js';
+import { profit, costOf, costRaw, rateGross } from '../profit.js';
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
 
@@ -341,7 +341,7 @@ export async function productForm(id, done) {
   const st = state.settings || {};
   const ikasChannels = activeChannels().filter((c) => c.enabled && c.caps.createProduct);
   const lp = (l) => {
-    const rate = l.commission ?? (st.commission || {})[l.channel] ?? 0;
+    const rate = rateGross(st, l.commission) ?? costOf(st, 'commission', l.channel);
     return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
   };
   s.setBody(html`<form class="stack" data-form>
@@ -389,7 +389,7 @@ export async function productForm(id, done) {
         ${p.listings.map((l) => { const r = lp(l); return html`<tr data-l="${l.channel}" data-rid="${l.remote_id}">
           <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span><div class="muted tiny ellipsis" style="max-width:180px">${l.remote_id}</div>${l.error ? html`<div class="tiny" style="color:var(--bad)">${l.error}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" style="width:96px" inputmode="decimal" data-lf="price" value="${l.price ?? ''}">${l.rule_min != null ? html`<div class="tiny muted" title="Bu ilanda otomatik fiyat açık: elle girdiğiniz fiyat bu aralıkta olmalı; değişiklikten sonra otomatik fiyat 14 dakika bekler">Otomatik fiyat: ${money(l.rule_min)} – ${money(l.rule_max)}</div>` : ''}</td>
-          <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${(st.commission || {})[l.channel] ?? 0}">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? 'kanaldan (son sipariş)' : 'elle girildi'}</div>` : ''}</td>
+          <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${costRaw(st, 'commission', l.channel)}" title="KDV hariç oran (hesapta %20 KDV eklenir)">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? 'kanaldan (son sipariş)' : 'elle girildi'}</div>` : ''}</td>
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>
           <td class="r num"><button type="button" class="plain" data-rule style="align-items:flex-end">${l.desired ?? l.remote_stock ?? '—'}<span class="tiny muted">${ruleText(l) || 'ortak stok'}</span></button>${l.price_dirty ? html`<div class="tiny" style="color:var(--warn)">fiyat gönderilecek</div>` : ''}</td></tr>`; })}
       </tbody></table></div></div>` : ''}

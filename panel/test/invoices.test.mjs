@@ -63,9 +63,12 @@ test('Gelir & gider: komisyon, kargo, stopaj basamakları ve hakediş', async ()
   await saveOrders(db, 'trendyol', [o]);
   const settings = { commission: { trendyol: 20 }, shipping: { trendyol: 30 }, service_fee: { trendyol: 10 }, fee_rate: {}, withholding: { trendyol: 1 } };
   const b = await breakdown(db, settings, {});
-  // 240 − 48 komisyon − 30 kargo − 10 hizmet − 2 stopaj (KDV hariç 200'ün %1'i) = 150
-  assert.equal(b.total.revenue, 240); assert.equal(b.total.commission, 48); assert.equal(b.total.withholding, 2); assert.equal(b.total.payout, 150);
-  assert.equal(b.steps.find((x) => x.k === 'payout').v, 150);
+  // Ayarlardaki kesintiler KDV hariçtir, %20 KDV eklenir: 240 − 57,6 komisyon (%20 + KDV) − 36 kargo − 12 hizmet − 2 stopaj (KDV hariç 200'ün %1'i; KDV'si yok) = 132,4
+  assert.equal(b.total.revenue, 240); assert.equal(b.total.commission, 57.6); assert.equal(b.total.shipping, 36); assert.equal(b.total.fee, 12); assert.equal(b.total.withholding, 2); assert.equal(b.total.payout, 132.4);
+  assert.equal(b.steps.find((x) => x.k === 'payout').v, 132.4);
+  // "Girdiğim tutarlar KDV dahil" seçilirse eklenmez: 240 − 48 − 30 − 10 − 2 = 150
+  const inc = await breakdown(db, { ...settings, costs_vat_incl: true }, {});
+  assert.equal(inc.total.commission, 48); assert.equal(inc.total.payout, 150);
   assert.equal(b.channels[0].channel, 'trendyol');
 });
 
@@ -95,7 +98,7 @@ test('Hakediş: Trendyol ekstresi saklanır; ödeme günleri, ödenecek toplam v
   const { syncSettlements, settlementReport } = await import('../src/finance.js');
   assert.equal((await syncSettlements(env, db, { force: true })).trendyol, 3);
   await saveOrders(db, 'trendyol', [{ remoteId: 'X1', orderNumber: 'X1', orderedAt: now - 3 * 864e5, status: 'delivered', customer: 'A', total: 240, items: [{ lineId: '1', sku: 'S', name: 'Ü', quantity: 1, unitPrice: 240, total: 240, remoteKey: 'S' }] }]);
-  const r = await settlementReport(env, db, { commission: { trendyol: 20 } }, { from: now - 30 * 864e5, to: now + 1 });
+  const r = await settlementReport(env, db, { commission: { trendyol: 20 }, costs_vat_incl: true }, { from: now - 30 * 864e5, to: now + 1 });
   assert.equal(r.totals.upcoming, 190); assert.equal(r.totals.paid, 0);
   assert.equal(r.types.find((x) => x.type === 'İade').amount, -80);
   // Panel tahmini: 240 − %20 = 192; pazaryeri 190 → 2 TL fark
@@ -112,7 +115,7 @@ test('Kâr-zarar: reklam, ceza, iade kaybı ve işletme giderleri net kârdan d�
   const ins = (id, type, amount) => db.prepare("INSERT INTO invoices (channel, remote_id, no, date, type, description, amount, order_number, url, synced_at) VALUES ('trendyol', ?, ?, ?, ?, '', ?, '', '', 0)").bind(id, id, now - 2 * 864e5, type, amount).run();
   await ins('AD1', 'Reklam / pazarlama', 40); await ins('C1', 'Ceza', 5); await ins('H1', 'Hizmet bedeli', 12);
   await saveExpense(db, { title: 'Ambalaj', category: 'Paketleme', amount: 30, date: now - 3 * 864e5 });
-  const settings = { commission: { trendyol: 10 }, shipping: { trendyol: 20 }, service_fee: {}, fee_rate: {}, withholding: {} };
+  const settings = { commission: { trendyol: 10 }, shipping: { trendyol: 20 }, service_fee: {}, fee_rate: {}, withholding: {}, costs_vat_incl: true };
   const b = await breakdown(db, settings, { from: now - 10 * 864e5, to: now + 1 });
   const t = b.total;
   assert.equal(t.revenue, 200); assert.equal(t.ads, 40); assert.equal(t.penalty, 5); assert.equal(t.fee, 12); assert.equal(t.returns, 1); assert.equal(t.returnLoss, 20);
