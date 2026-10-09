@@ -21,7 +21,7 @@ const localImg = (s) => String(s || '').replace(IMG_RE, '/blog/img/$1');
 const panelBase = (env) => String((env && env.PANEL_URL) || PANEL_URL).replace(/\/+$/, '');
 const headers = (env, extra = {}) => ({ 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'SAMEORIGIN',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self' ${panelBase(env)}; frame-ancestors 'self'; base-uri 'self'; form-action 'self'`, ...extra });
+  'Content-Security-Policy': `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' https://www.googletagmanager.com; connect-src 'self' ${panelBase(env)} https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://*.doubleclick.net https://www.google.com https://www.google.com.tr; frame-src https://td.doubleclick.net https://www.googletagmanager.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'`, ...extra });
 
 async function panel(env, path) {
   const r = await fetch(`${panelBase(env)}/api/public/blog${path}`, { headers: { Accept: 'application/json' } });

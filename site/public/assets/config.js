@@ -27,6 +27,10 @@ window.SITE = {
   // Paketler: aylık ve yıllık fiyat (TL, KDV DAHİL). Fiyat boşsa "Teklif alın" yazar.
   installments: 3,
   eftDiscount: 5,           // havale / EFT ile ödemede indirim (%), yalnız yıllık alımda; 0 = gösterme (panel/src/plans.js → EFT_DISCOUNT ile aynı tutun)
+  // Google Ads etiketi: id (AW-…). Dönüşüm etiketleri (Google Ads → Dönüşümler → işlem → "Etiketi kendiniz yükleyin" →
+  // send_to: 'AW-…/ETİKET' içindeki ETİKET kısmı) girilirse tutar ve sipariş no ile dönüşüm gönderilir; boşken Google'da
+  // "URL içerir /odeme-basarili" kuralıyla dönüşüm tanımlanabilir. Etiket ve çerez onayı: assets/gtag.js
+  ads: { id: 'AW-18503315802', purchase: '', lead: '' },
   // Havale / EFT: satın alma sayfasında "Havale / EFT" seçilince gösterilir (panel/src/billing.js → bankOf ile aynı tutun)
   bank: { name: 'Ziraat Katılım Bankası', holder: 'Hastürk Gübre Sanayi ve Ticaret Limited Şirketi', iban: 'TR63 0020 9000 0207 5858 0000 01' },          // yıllık alımda kredi kartına peşin fiyatına taksit sayısı (0 = gösterme)
   vat: 'Tüm fiyatlara KDV dahildir. Yıllık alımda 12 ay yerine 10 ay ücret alınır ve kredi kartına peşin fiyatına 3 taksit yapılır. Yıllık alımda havale / EFT ile ödemede %5 indirim uygulanır.',
