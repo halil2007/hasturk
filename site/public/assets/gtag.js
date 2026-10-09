@@ -33,7 +33,7 @@
   const show = () => {
     const b = document.createElement('div');
     b.className = 'cookie-bar'; b.setAttribute('role', 'region'); b.setAttribute('aria-label', 'Çerez tercihi');
-    b.innerHTML = '<p>Reklamlarımızın etkisini ölçmek için çerezler kullanıyoruz. Ayrıntılar: <a href="/gizlilik">Çerez politikası</a></p><div><button type="button" class="btn btn-line" data-c="no">Reddet</button><button type="button" class="btn btn-primary" data-c="yes">Kabul et</button></div>';
+    b.innerHTML = '<p>Alışveriş deneyiminizi iyileştirmek için yasal düzenlemelere uygun çerezler (cookies) kullanıyoruz. Detaylı bilgiye <a href="/gizlilik">Çerez Politikası</a> sayfamızdan erişebilirsiniz.</p><div><button type="button" class="btn btn-line" data-c="no">Reddet</button><button type="button" class="btn btn-primary" data-c="yes">Kabul et</button></div>';
     b.addEventListener('click', (e) => {
       const x = e.target.closest('[data-c]'); if (!x) return;
       const ok = x.dataset.c === 'yes', v = ok ? 'granted' : 'denied';
