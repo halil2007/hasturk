@@ -54,3 +54,22 @@ test('günlük özet: veri, e-posta metni ve günde bir gönderim', async () => 
   await setSetting(db, 'digest_sent', new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10));
   assert.equal(await dailyDigest({}, db, { ...settings, daily_digest: true, mail_to: ['a@b.co'] }), null);
 });
+
+test('hazırlama listesi: bugün gelenler / önceki günlerden, siparişe göre görünüm, stok yetmeyen sayısı', async () => {
+  const db = await seed();
+  const { trDayStart } = await import('../src/picklist.js');
+  // a: bugün gelmiş, b: dün gelmiş sayılsın (gün başlangıcına göre)
+  const start = trDayStart(t);
+  await run(db, "UPDATE orders SET ordered_at = ? WHERE id = 'a'", start + 60e3);
+  await run(db, "UPDATE orders SET ordered_at = ? WHERE id = 'b'", start - 60e3);
+  const today = await pickList(db, { day: 'today', now: t });
+  assert.deepEqual(today.list.map((o) => o.id), ['a']);
+  assert.equal(today.totalQty, 3);
+  const old = await pickList(db, { day: 'old', now: t });
+  assert.deepEqual(old.list.map((o) => o.id), ['b']);
+  const all = await pickList(db, {});
+  assert.equal(all.list.length, 2); assert.deepEqual(all.channels, { trendyol: 2 });
+  const a = all.list.find((o) => o.id === 'a');
+  assert.deepEqual(a.lines.map((l) => [l.name, l.variant, l.qty]), [['Solucan Gübresi', '5 Kg', 2], ['Torf', '', 1]], 'panel ürün adı ve varyant');
+  assert.equal(all.short, 1, 'Solucan Gübresi: 5 adet gerekli, stok 3');
+});

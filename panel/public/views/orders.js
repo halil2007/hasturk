@@ -19,6 +19,7 @@ export async function orders(el, rest, query = {}) {
   render(el, html`<div class="stack">
     <div class="row wrap page-actions" style="justify-content:flex-end;margin-top:-4px">
       <span class="muted small" style="margin-right:auto" data-sub></span>
+      <button class="btn sm primary" data-act="pick" title="Kargoya çıkacak siparişlerin ürün ürün özeti: etiketten önce hazırlığa başlayın"><i class="ico ico-box"></i>Hazırlama listesi</button>
       <button class="btn sm" data-act="reload"><i class="ico ico-sync"></i>Yenile</button>
       <button class="btn sm" data-act="export"><i class="ico ico-download"></i>Dışa aktar <i class="ico ico-down"></i></button>
     </div>
@@ -121,6 +122,7 @@ export async function orders(el, rest, query = {}) {
   function bulkbar() {
     return sel.size ? html`<div class="bulk"><input type="checkbox" class="cb" checked data-clear aria-label="Seçimi kaldır"><b>${sel.size} sipariş seçildi</b>
       <button class="btn sm outline" data-act="bulk-accept"><i class="ico ico-play"></i>İşleme al</button>
+      <button class="btn sm outline" data-act="pick"><i class="ico ico-box"></i>Hazırlama listesi</button>
       <button class="btn sm outline" data-act="bulk-label"><i class="ico ico-tag"></i>Toplu etiket oluştur</button>
       <button class="btn sm outline" data-act="bulk-print"><i class="ico ico-print"></i>Yazdır</button>
       ${isAdmin() ? html`<button class="btn sm danger ghost" data-act="bulk-del"><i class="ico ico-trash"></i>Sil</button>` : ''}
@@ -180,11 +182,12 @@ export async function orders(el, rest, query = {}) {
       loadSummary().catch(() => {});
     }),
     reload: (t) => busy(t, load),
+    pick: () => pickSheet({ ids: [...sel] }),
     filters: () => el.classList.toggle('show-filters'),
     export: (t) => popMenu(t, [
       { icon: 'download', label: 'Bu filtreyi Excel (CSV) olarak indir', run: () => { location.href = '/api/orders.csv?' + params(); } },
       { icon: 'download', label: 'Seçilenleri yazdır (etiket)', run: () => sel.size ? bulkLabels([...sel], { fetch: false }) : toast('Önce sipariş seçin') },
-      { icon: 'box', label: sel.size ? `Toplama listesi (${sel.size} seçili sipariş)` : 'Toplama listesi (kargoya çıkacak tüm siparişler)', run: () => pickSheet({ ids: [...sel] }) },
+      { icon: 'box', label: sel.size ? `Hazırlama listesi (${sel.size} seçili sipariş)` : 'Hazırlama listesi (kargoya çıkacak tüm siparişler)', run: () => pickSheet({ ids: [...sel] }) },
     ]),
     clear: () => { Object.assign(f, { q: '', from: '', to: '', cargo: '', page: 1 }); $('[data-q]', el).value = ''; $('[data-from]', el).value = ''; $('[data-to]', el).value = ''; $('[data-cargo]', el).value = ''; refresh(); },
     clearsel: () => { sel.clear(); draw(); },
