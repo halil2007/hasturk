@@ -24,9 +24,16 @@ function styles() {
 .bl-tools { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border: 1px solid var(--line-2); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--surface-2); }
 .bl-tools button { min-width: 34px; height: 32px; padding: 0 8px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; font-weight: 700; color: var(--text-2); display: inline-flex; align-items: center; gap: 6px; }
 .bl-tools button:hover { background: var(--surface-3); color: var(--text); } .bl-tools .sep { width: 1px; margin: 4px 4px; background: var(--line-2); }
-.bl-body { border-radius: 0 0 10px 10px !important; min-height: 420px; font: 14.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; }
+.bl-body { border-radius: 0 0 12px 12px !important; min-height: 62vh; padding: 22px 26px !important; font: 400 16.5px/1.8 Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important; letter-spacing: -.003em; resize: none; overflow: hidden; color: var(--text); }
+.bl-body:focus { box-shadow: none; border-color: var(--primary); }
+.bl-tools { position: sticky; top: 64px; z-index: 3; }
+.bl-title { font-size: 30px !important; font-weight: 780; letter-spacing: -.02em; border: 0 !important; padding: 6px 2px !important; min-height: 52px; background: transparent !important; box-shadow: none !important; }
+.bl-title::placeholder { color: var(--muted); font-weight: 650; }
+.bl-stat { font-size: 12.5px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+.bl-ed.focus { grid-template-columns: minmax(0, 1fr) !important; } .bl-ed.focus > aside { display: none; }
+.bl-ed.focus > .card { max-width: 920px; width: 100%; margin: 0 auto; box-shadow: none; border-color: transparent; background: transparent; }
 .bl-split { display: grid; gap: 14px; } .bl-split.both { grid-template-columns: 1fr 1fr; } .bl-split > [hidden] { display: none; }
-.bl-prev { border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; min-height: 420px; max-height: 76vh; overflow: auto; background: var(--surface); }
+.bl-prev { border: 1px solid var(--line); border-radius: 12px; padding: 26px 32px; min-height: 62vh; max-height: 82vh; overflow: auto; background: var(--surface); }
 .bl-art { font-size: 16px; line-height: 1.7; color: var(--text); overflow-wrap: break-word; }
 .bl-art h1 { font-size: 28px; margin: 0 0 8px; } .bl-art h2 { font-size: 22px; margin: 28px 0 8px; } .bl-art h3 { font-size: 18px; margin: 22px 0 6px; } .bl-art h4 { font-size: 16px; margin: 18px 0 6px; }
 .bl-art p, .bl-art ul, .bl-art ol, .bl-art blockquote, .bl-art figure, .bl-art pre, .bl-art .tbl { margin: 12px 0; }
@@ -150,10 +157,11 @@ async function editor(root, id) {
     </div>
     <div class="bl-ed">
       <div class="card stack" style="min-width:0">
-        <input class="input big" name="title" maxlength="160" placeholder="Yazının başlığı" value="${p.title}">
+        <input class="input big bl-title" name="title" maxlength="160" placeholder="Yazının başlığı" value="${p.title}">
         <label class="bl-slug" title="Yazının adresi (Türkçe karakterler dönüştürülür). Yayındaki yazının adresini değiştirirseniz eski bağlantılar çalışmaz."><span>${host(site)}/blog/</span><input class="input" name="slug" maxlength="100" placeholder="baslik-otomatik-uretilir" value="${p.slug}"></label>
         <label class="field"><span>Özet <span class="bl-cnt" data-cnt="summary"></span></span><textarea class="input" name="summary" rows="2" maxlength="320" placeholder="Listede ve arama sonucunda görünen 1–2 cümlelik özet (boşsa yazının başından alınır)">${p.summary}</textarea></label>
-        <div class="row wrap" style="gap:8px"><b class="small" style="flex:1">Yazı</b>
+        <div class="row wrap" style="gap:8px"><b class="small">Yazı</b><span class="bl-stat" data-stat style="flex:1"></span>
+          <button type="button" class="btn sm ghost" data-focus title="Yan paneli gizle, yazıya odaklan"><i class="ico ico-eye"></i>Odak modu</button>
           <div class="seg">${[['write', 'Yaz'], ['both', 'Yan yana'], ['preview', 'Önizleme']].map(([k, t]) => html`<button type="button" data-mode="${k}">${t}</button>`)}</div></div>
         <div class="bl-split" data-split>
           <div data-wr><div class="bl-tools">${TOOLS.map((t) => (t === '|' ? raw('<span class="sep"></span>') : html`<button type="button" data-tool="${t[0]}" title="${t[2]}">${t[1]}</button>`))}</div>
@@ -202,7 +210,7 @@ async function editor(root, id) {
     const st = id ? stOf({ status: p.status, published_at: p.published_at }) : 'draft', s = ST[st];
     const pill = $('[data-st]', ed); pill.className = `pill ${s[0]}`; pill.textContent = id ? s[1] + (dirty ? ' · kaydedilmedi' : '') : 'Yeni yazı' + (dirty ? ' · kaydedilmedi' : '');
     $('[data-act="publish"]', ed).innerHTML = p.status === 'published' ? '<i class="ico ico-x"></i>Yayından kaldır' : '<i class="ico ico-send"></i>Yayınla';
-    const v = $('[data-view]', ed); v.hidden = !(id && p.status === 'published'); v.href = `${site}/blog/${p.slug}`;
+    const v = $('[data-view]', ed); v.hidden = !(id && p.status === 'published'); v.style.display = v.hidden ? 'none' : ''; v.href = `${site}/blog/${p.slug}`;
   };
   const coverBox = () => { const b = $('[data-cover]', ed); b.style.backgroundImage = cover ? `url('${IMG(cover)}')` : ''; b.textContent = cover ? '' : 'Kapak görseli yok'; $('[data-act="nocover"]', ed).hidden = !cover; };
   const gallery = () => render($('[data-gal]', ed), images.length ? html`${images.map((m) => html`<div class="bl-gi" style="background-image:url('${IMG(m.id)}')" title="${m.name} · ${m.w}×${m.h} · ${Math.round(m.size / 1024)} KB">
@@ -210,6 +218,12 @@ async function editor(root, id) {
     : html`<div class="tiny muted">Görsel yok. Araç çubuğundaki <b>Görsel</b> düğmesiyle, sürükle-bırak ya da Ctrl+V ile ekleyin.</div>`);
   const setMode = (m) => { mode = m; $$('[data-mode]', ed).forEach((b) => b.classList.toggle('on', b.dataset.mode === m)); $('[data-split]', ed).classList.toggle('both', m === 'both'); $('[data-wr]', ed).hidden = m === 'preview'; $('[data-pv]', ed).hidden = m === 'write'; if (m !== 'write') preview(); };
   const touch = () => { if (!dirty) { dirty = true; status(); } };
+  // Yazı alanı içerik uzadıkça büyür (iç kaydırma yok); kelime sayısı ve okuma süresi
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.max(ta.scrollHeight + 2, Math.round(window.innerHeight * 0.62)) + 'px'; };
+  const stat = () => { const w = (mdText(ta.value).match(/\S+/g) || []).length; $('[data-stat]', ed).textContent = w ? `${w.toLocaleString('tr-TR')} kelime · ~${Math.max(1, Math.round(w / 200))} dk okuma` : ''; };
+  $('[data-focus]', ed).onclick = (e) => { const on = $('.bl-ed', ed).classList.toggle('focus'); e.currentTarget.classList.toggle('on', on); grow(); };
+  ta.addEventListener('input', () => { grow(); stat(); });
+  requestAnimationFrame(() => { grow(); stat(); });
 
   // İmlecin olduğu yere metin ekle / seçimi sar
   const insert = (before, after = '', ph = '') => {
