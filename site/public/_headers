@@ -3,7 +3,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self' https://panel.hasturkcrm.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' https://www.googletagmanager.com; connect-src 'self' https://panel.hasturkcrm.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://*.doubleclick.net https://www.google.com https://www.google.com.tr; frame-src https://td.doubleclick.net https://www.googletagmanager.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'
 /img/*
   Cache-Control: public, max-age=604800
 /fonts/*
@@ -16,6 +16,8 @@
 # config.js elle düzenlenebildiği için kısa tutulur (derlemeden yüklense bile en geç 10 dk'da yenilenir)
 /assets/config.js
   Cache-Control: public, max-age=600
+/assets/gtag.js
+  Cache-Control: public, max-age=3600
 /assets/logo.webp
   Cache-Control: public, max-age=2592000
 /assets/icon.svg
