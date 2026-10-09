@@ -147,6 +147,9 @@ export function demo(meta) {
   };
   // Örnek iade talepleri (Trendyol / Hepsiburada örneği): son teslim edilen siparişlerden birkaçı
   const decided = new Map();
+  // Örnek iade fotoğrafları (müşterinin eklediği; gerçek kanalda talep verisinden gelir)
+  const svg = (bg, t) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="${bg}"/><rect x="50" y="70" width="140" height="110" rx="6" fill="#c8a06a" stroke="#8a6a3a" stroke-width="4"/><path d="M50 70 L95 105 L120 80 L150 112 L190 70" fill="none" stroke="#6b4c22" stroke-width="5"/><text x="120" y="215" font-family="Arial" font-size="18" text-anchor="middle" fill="#333">${t}</text></svg>`);
+  const DEMO_CLAIM_IMAGES = [svg('#eef2f7', 'Ezik kutu'), svg('#f7efe9', 'Akmış şişe')];
   async function claims({ since, until = Date.now(), page = 0 }) {
     if (page) return { items: [], hasNext: false };
     const orders = (await fetchOrders(since, until)).filter((o) => o.status === 'delivered').slice(0, 4);
@@ -154,7 +157,7 @@ export function demo(meta) {
     return { hasNext: false, items: orders.map((o, i) => {
       const id = `CLM-${o.orderNumber}`, st = decided.get(id) || (i === 3 ? 'accepted' : 'waiting');
       const lines = o.items.slice(0, 1).map((it) => ({ id: `${id}-1`, ids: [`${id}-1`], name: it.name, barcode: it.barcode, sku: it.sku, qty: it.quantity, price: it.unitPrice, reason: WHY[i], note: i === 1 ? 'Kutu ezik geldi, içindeki şişe akmış.' : '', status: st, remoteStatus: st === 'waiting' ? 'Aksiyon bekliyor' : st === 'accepted' ? 'Onaylandı' : 'Reddedildi' }));
-      return { remoteId: id, orderNumber: o.orderNumber, claimedAt: o.orderedAt + 3 * 864e5, status: st, remoteStatus: lines[0] ? lines[0].remoteStatus : '', customer: o.customer, reason: WHY[i], note: lines[0] && lines[0].note, lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: 'Aras Kargo', tracking: `5${o.orderNumber.replace(/\D/g, '')}` };
+      return { remoteId: id, orderNumber: o.orderNumber, claimedAt: o.orderedAt + 3 * 864e5, status: st, remoteStatus: lines[0] ? lines[0].remoteStatus : '', customer: o.customer, reason: WHY[i], note: lines[0] && lines[0].note, lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: 'Aras Kargo', tracking: `5${o.orderNumber.replace(/\D/g, '')}`, images: i === 1 ? DEMO_CLAIM_IMAGES : [] };
     }) };
   }
   const claimReasons = async () => [{ id: '1', name: 'Ürün kullanılmış' }, { id: '2', name: 'Ürün hasarlı (müşteri kaynaklı)' }, { id: '3', name: 'Farklı ürün gönderilmiş' }, { id: '4', name: 'Eksik parça' }];

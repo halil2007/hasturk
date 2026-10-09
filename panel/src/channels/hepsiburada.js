@@ -3,7 +3,7 @@
 // Önemli: User-Agent başlığı Merchant Portal'da tanımlı entegratör adıyla BİREBİR aynı olmalı (ör. "hasturk_dev");
 // "merchantId - uygulama" biçimi 401/403 ile reddedilir.
 //   Siparişler/paketler: oms-external · İlan/stok/fiyat/buybox: listing-external · Müşteri soruları: api-asktoseller-merchant
-import { http, basic, num, str, chunk, diagStep, isImageAttr, imageList } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, isImageAttr, imageList, mediaUrls } from '../util.js';
 
 export function hepsiburada(env, meta) {
   const m = env.HB_MERCHANT_ID, user = env.HB_USERNAME || m, pass = env.HB_PASSWORD;
@@ -719,7 +719,7 @@ export function hepsiburada(env, meta) {
         remoteId: no || str(g(c, 'id')), orderNumber: str(g(c, 'orderNumber')), claimedAt: Date.parse(g(c, 'claimDate') || '') || Date.now(), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st,
         customer: str(g(c, 'customerName')), reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')),
         lines: [{ id: no, name: str(g(c, 'productName')) || str(g(c, 'sku')), sku: str(g(c, 'sku')), qty, price, reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st }],
-        amount: money(g(c, 'totalPriceAmount')) || price * qty, cargo: '', tracking: '',
+        amount: money(g(c, 'totalPriceAmount')) || price * qty, cargo: '', tracking: '', images: mediaUrls(c),
       };
     });
     return { items, hasNext: rows.length >= lim };

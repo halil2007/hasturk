@@ -279,6 +279,8 @@ const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS ip_guard (ip TEXT PRIMARY KEY, fails INTEGER NOT NULL DEFAULT 0, window_at INTEGER, strikes INTEGER NOT NULL DEFAULT 0,
     blocked_until INTEGER, blocked_hits INTEGER NOT NULL DEFAULT 0, blocks INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0,
     last_at INTEGER, last_user TEXT, last_kind TEXT)`,
+  // İade talebine müşterinin eklediği görseller (kanal veriyorsa; JSON dizi)
+  'ALTER TABLE claims ADD COLUMN images TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

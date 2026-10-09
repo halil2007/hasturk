@@ -1396,3 +1396,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .cat-opt { display: flex; width: 100%; justify-content: space-between; gap: 10px; align-items: center; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 8px; font: inherit; font-size: 13.5px; color: inherit; cursor: pointer; }
 .cat-opt:hover, .cat-opt.on { background: var(--bg-soft, rgba(0, 0, 0, .05)); }
 .cat-new { padding: 8px 10px; border-top: 1px solid var(--line); }
+/* İade talebi: müşterinin eklediği görseller */
+.claim-media { display: flex; flex-wrap: wrap; gap: 8px; }
+.claim-media img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); display: block; background: var(--bg-soft, #f3f5f9); }
+.claim-doc { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: inherit; text-decoration: none; }

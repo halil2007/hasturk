@@ -36,13 +36,13 @@ export async function syncClaims(env, db, { only } = {}) {
 export async function save(db, channel, items) {
   const t = Date.now();
   for (const part of chunk(items, 40)) {
-    await db.batch(part.map((c) => db.prepare(`INSERT INTO claims (channel, remote_id, order_number, order_id, claimed_at, status, remote_status, customer, reason, note, lines, amount, cargo, tracking, synced_at)
-      VALUES (?, ?, ?, (SELECT id FROM orders WHERE channel = ? AND order_number = ? LIMIT 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    await db.batch(part.map((c) => db.prepare(`INSERT INTO claims (channel, remote_id, order_number, order_id, claimed_at, status, remote_status, customer, reason, note, lines, amount, cargo, tracking, synced_at, images)
+      VALUES (?, ?, ?, (SELECT id FROM orders WHERE channel = ? AND order_number = ? LIMIT 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (channel, remote_id) DO UPDATE SET status = CASE WHEN claims.decided_by IS NOT NULL AND excluded.status = 'waiting' THEN claims.status ELSE excluded.status END,
         remote_status = excluded.remote_status, lines = CASE WHEN claims.decided_by IS NOT NULL AND excluded.status = 'waiting' THEN claims.lines ELSE excluded.lines END, amount = excluded.amount, cargo = excluded.cargo, tracking = excluded.tracking, reason = excluded.reason, note = excluded.note,
-        order_id = COALESCE(claims.order_id, excluded.order_id), synced_at = excluded.synced_at`)
+        order_id = COALESCE(claims.order_id, excluded.order_id), synced_at = excluded.synced_at, images = COALESCE(excluded.images, claims.images)`)
       .bind(channel, String(c.remoteId), str(c.orderNumber), channel, str(c.orderNumber), c.claimedAt || t, CLAIM_STATUS.includes(c.status) ? c.status : 'other', str(c.remoteStatus),
-        str(c.customer), str(c.reason), str(c.note), JSON.stringify(c.lines || []), Number(c.amount) || 0, str(c.cargo), str(c.tracking), t)));
+        str(c.customer), str(c.reason), str(c.note), JSON.stringify(c.lines || []), Number(c.amount) || 0, str(c.cargo), str(c.tracking), t, (c.images || []).length ? JSON.stringify(c.images.slice(0, 12)) : null)));
   }
 }
 
@@ -59,6 +59,7 @@ export async function listClaims(db, q = {}) {
   // Ürün görseli: eşleşmiş panel ürününden
   for (const r of rows) {
     r.lines = parse(r.lines, []);
+    r.images = parse(r.images, []);
     for (const l of r.lines) if (!l.image && (l.barcode || l.sku)) {
       const p = await first(db, `SELECT COALESCE(NULLIF(l.image, ''), p.image) AS image FROM listings l LEFT JOIN products p ON p.id = l.product_id WHERE l.channel = ? AND (l.barcode = ? OR l.sku = ?) LIMIT 1`, r.channel, l.barcode || '-', l.sku || '-');
       if (p) l.image = p.image;
