@@ -364,6 +364,12 @@ async function pageFor(env, order, r, panel) {
   if (r.paidError) return resultPage('Ödemeniz alındı', `Ödemeniz başarıyla alındı ancak işleminiz otomatik tamamlanamadı. Ekibimiz en kısa sürede tamamlayıp size dönecek; ek bir ödeme yapmanız gerekmez. ${esc(await contactLine(env))}`, { ok: true });
   if (r.error) return resultPage('Ödeme sonucu doğrulanamadı', `Ödeme sonucunu şu an doğrulayamadık (${esc(r.error)}). Kartınızdan çekim yapıldıysa işleminiz kısa sürede tamamlanır; sayfayı birkaç dakika sonra yenileyebilir ya da bizimle iletişime geçebilirsiniz.`, { status: 502 });
   const o = r.order || order, p = priceOf(o.plan, o.period);
+  // Siteden satış: tanıtım sitesinin teşekkür sayfasına yönlendirilir (reklam dönüşüm takibi için sabit adres). Adreste yalnız sipariş no,
+  // tutar ve paket bilgisi vardır; firma kodu / kullanıcı adı adrese yazılmaz (giriş bilgileri e-postayla gider)
+  if (order.origin && order.origin !== 'panel' && siteOrigins(env).includes(order.origin)) {
+    const q = new URLSearchParams({ siparis: o.id, tutar: String(o.amount), paket: p.name, donem: p.period === 'yearly' ? 'yillik' : 'aylik', tur: o.kind === 'new' ? 'yeni' : 'yenileme' });
+    return new Response(null, { status: 303, headers: { Location: `${order.origin}/odeme-basarili?${q}`, 'Cache-Control': 'no-store' } });
+  }
   if (o.kind === 'new') {
     return resultPage('Paneliniz hazır!', `${esc(p.name)} paketiniz (${PERIOD[p.period]}) aktif. Giriş bilgileriniz:<br><b>Firma kodu:</b> ${esc(o.slug)}<br><b>Kullanıcı adı:</b> ${esc(o.username)}<br><b>Şifre:</b> e-posta adresinize gönderilen geçici şifre<br><span style="font-size:14px">Giriş bilgileriniz e-postanıza gönderildi (gelmediyse istenmeyen klasörüne bakın). İlk girişte yeni şifrenizi belirlemeniz istenecek.</span>`,
       { ok: true, actions: btn(`${panel}/?firma=${encodeURIComponent(o.slug)}`, 'Panele giriş yap') });

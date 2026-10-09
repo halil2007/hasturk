@@ -68,16 +68,21 @@ test('yeni müşteri: siteden satın alır; firma kodu, kullanıcı adı ve geç
     assert.match(temp, /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/);
     assert.match(o.pass_hash, /^pbkdf2/); assert.ok(!JSON.stringify(o).includes(temp), 'geçici şifre açık yazılmaz');
     ok(s.iyz, '19900.0');
+    // Siteden satış: sitenin teşekkür sayfasına yönlendirilir (reklam dönüşümü); adreste firma kodu / kullanıcı adı yok
     const cb = await s.callback('tok-1');
-    const html = await cb.text();
-    assert.equal(cb.status, 200); assert.match(html, /Paneliniz hazır/); assert.match(html, /yesil-bahce-tarim/); assert.match(html, /yonetici/);
+    assert.equal(cb.status, 303);
+    const loc = new URL(cb.headers.get('location'));
+    assert.equal(loc.origin + loc.pathname, 'https://hasturkcrm.com/odeme-basarili');
+    assert.equal(loc.searchParams.get('siparis'), init.conversationId); assert.equal(loc.searchParams.get('tutar'), '19900');
+    assert.equal(loc.searchParams.get('tur'), 'yeni'); assert.equal(loc.searchParams.get('donem'), 'yillik');
+    assert.doesNotMatch(loc.search, /yesil-bahce|yonetici/);
     const t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce-tarim'");
     assert.equal(t.plan, 'Profesyonel'); assert.equal(t.email, 'ayse@ornek.com');
     assert.ok(t.expires_at > Date.now() + 360 * 864e5, '12 ay');
     const pays = await all(s.env.DB, "SELECT * FROM tenant_payments WHERE slug = 'yesil-bahce-tarim'");
     assert.equal(pays.length, 1); assert.equal(pays[0].amount, 19900); assert.match(pays[0].note, /3 taksit/);
     // Sayfa yenilendi / iyzico ikinci kez gönderdi: tek ödeme kaydı kalır
-    assert.match(await (await s.callback('tok-1')).text(), /Paneliniz hazır/);
+    assert.match((await s.callback('tok-1')).headers.get('location'), /\/odeme-basarili\?/);
     assert.equal((await all(s.env.DB, "SELECT * FROM tenant_payments WHERE slug = 'yesil-bahce-tarim'")).length, 1);
     const done = await first(s.env.DB, 'SELECT pass_hash, pass_tmp FROM sales_orders WHERE id = ?', init.conversationId);
     assert.equal(done.pass_hash, null, 'şifre özeti işlem sonrası silinir'); assert.equal(done.pass_tmp, null, 'geçici şifre işlem sonrası silinir');
@@ -128,7 +133,7 @@ test('mevcut müşteri: siteden (firma kodu + e-posta) ve panelden (Paketim) yen
     const r = await s.site({ kind: 'renew', slug: 'eski-musteri', plan: 'profesyonel', period: 'monthly', ...buyer, email: 'veli@ornek.com' });
     assert.equal(r.status, 200);
     ok(s.iyz, '1990.00');
-    assert.match(await (await s.callback('tok-1')).text(), /Ödemeniz alındı/);
+    assert.match((await s.callback('tok-1')).headers.get('location'), /\/odeme-basarili\?.*tur=yenileme/);
     let t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'eski-musteri'");
     assert.equal(t.plan, 'Profesyonel'); assert.equal(t.trial, 0); assert.ok(t.expires_at > Date.now() + 27 * 864e5);
     // Panelden: Paketim → yıllık Kurumsal
@@ -215,7 +220,7 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     assert.equal(JSON.parse(o.buyer).invoice.taxNo, '1234567890');
     const temp = await openTemp(s.env, (await first(s.env.DB, 'SELECT pass_tmp FROM sales_orders WHERE id = ?', init1.conversationId)).pass_tmp);
     ok(s.iyz, '3990.00');
-    assert.match(await (await s.callback('tok-1')).text(), /Paneliniz hazır/);
+    assert.equal((await s.callback('tok-1')).status, 303);
     // Firma kartı ve ödeme kaydı
     const t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce'");
     assert.equal(t.legal, 'Yeşil Bahçe Tarım Ltd. Şti.'); assert.equal(t.tax, 'Selçuk / 1234567890'); assert.equal(t.city, 'Konya'); assert.match(t.address, /Selçuklu$/);
@@ -235,7 +240,7 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     assert.equal(r2.status, 200, await r2.clone().text());
     const init2 = s.iyz.inits[1];
     assert.equal(init2.buyer.identityNumber, '10000000146', 'bireyselde TC kimlik no'); assert.equal(init2.billingAddress.contactName, 'Ayşe Yılmaz');
-    assert.match(await (await s.callback('tok-2')).text(), /Ödemeniz alındı/);
+    assert.equal((await s.callback('tok-2')).status, 303);
     const t2 = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce'");
     assert.equal(t2.legal, 'Ayşe Yılmaz'); assert.equal(t2.tax, 'TC 10000000146'); assert.equal(t2.email, 'ali@ornek.com', 'e-posta değişmez');
     assert.equal((await first(s.env.DB, "SELECT status FROM sales_orders WHERE id = ?", init2.conversationId)).status, 'done');
