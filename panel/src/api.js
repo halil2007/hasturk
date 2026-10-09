@@ -28,6 +28,7 @@ import { recordError, errorsApi, clientReport } from './errors.js';
 import { perfReport } from './perf.js';
 import { mainKeysApi } from './extapi.js';
 import { supportResponse } from './support.js';
+import { guardConfig, setGuardConfig, guardList, guardUnblock, guardIp } from './guard.js';
 import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS } from './carriers.js';
 import { can, sectionOf } from '../public/perms.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
@@ -1203,6 +1204,23 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!r) fail(404, 'Bulunamadı');
     if (path !== 'me/2fa') await log(db, null, 'info', `${user.name}: iki adımlı doğrulama ${{ 'me/2fa/enable': 'açıldı', 'me/2fa/disable': 'kapatıldı', 'me/2fa/recovery': 'yedek kodları yenilendi', 'me/2fa/setup': 'kurulumu başladı' }[path] || ''}`);
     return json(r);
+  }
+  // Giriş koruması (IP engelleme): yalnız ana panel (koruma ana panelin önünde tüm firmalar için çalışır; bkz. guard.js)
+  if (path === 'users/guard' || path.startsWith('users/guard/')) {
+    if (env.TENANT_SLUG) fail(404, 'Bulunamadı');
+    if (path === 'users/guard' && m === 'GET') return json({ config: await guardConfig(db, true), rows: await guardList(db), you: guardIp(req) });
+    if (path === 'users/guard' && m === 'PUT') {
+      let cfg;
+      try { cfg = await setGuardConfig(db, await body(req)); } catch (e) { fail(400, e.message); }
+      await log(db, null, 'info', `${user.name}: giriş koruması ayarları değiştirildi (${cfg.enabled ? `açık, ${cfg.windowMin} dk'da ${cfg.maxFails} deneme` : 'kapalı'})`);
+      return json(cfg);
+    }
+    if (path === 'users/guard/unblock' && m === 'POST') {
+      const ip = str((await body(req)).ip);
+      await guardUnblock(db, ip);
+      await log(db, null, 'info', `${user.name}: ${ip} adresinin engeli kaldırıldı`);
+      return json({ ok: true });
+    }
   }
   if (path === 'users/security' && m === 'GET') return json(await security(db, true));
   if (path === 'users/security' && m === 'PUT') {

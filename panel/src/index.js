@@ -16,7 +16,8 @@ import { actionSucceeded, resolveQuiet } from './errors.js';
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
 import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired, tenantWatchdog, contactLine, tenantPassword, expiryReminders, expiredMessage, renewUrl } from './tenants.js';
-import { json, body, HttpError } from './util.js';
+import { json, body, HttpError, str } from './util.js';
+import { guardConfig, guardIp, guardAttempt, guardBlocked, guardOk, blockedBody, blockedHeaders, rateLimited } from './guard.js';
 
 export { TenantPanel } from './tenants.js';
 
@@ -45,6 +46,18 @@ function secure(res) {
   return r;
 }
 
+// Giriş / şifre yenileme isteğinin kendisi (giriş koruması bunun önünde çalışır)
+async function guardedAuth(req, env, ctx, path, b) {
+  if (path === 'password/forgot' || path === 'password/reset') {
+    if (path === 'password/forgot' && !(await turnstileOk(env, req, b && b.cf, 'forgot'))) return json(CAPTCHA_ERROR, 400);
+    return json(await tenantPassword(req, env, path.slice(9), b));
+  }
+  // İlk adımda (kullanıcı adı + şifre) bot doğrulaması; firma koduyla giriş → müşteri paneli
+  if (b && b.password !== undefined && !b.ticket && !b.mailticket && !(await turnstileOk(env, req, b.cf, 'login'))) return json(CAPTCHA_ERROR, 400);
+  if (b && String(b.tenant || '').trim()) return await tenantLogin(req, env, b);
+  return await handle(req, env, ctx, env.DB);
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
@@ -68,19 +81,32 @@ export default {
       if (o) { let h = ''; try { h = new URL(o).host; } catch { /* geçersiz */ } if (h !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403); }
     }
     try {
-      // Dış API (stok aktarımı): anahtarla, yalnız ana panelin yetkilendirdiği mağaza (bkz. extapi.js)
-      if (path === 'v1' || path.startsWith('v1/')) return await extApi(req, env, ctx, path, { getTenant, forward, expired });
-      // Şifremi unuttum / şifre yenileme (müşteri panelleri, oturumsuz)
-      if ((path === 'password/forgot' || path === 'password/reset') && req.method === 'POST') {
-        const b = await body(req.clone());
-        if (path === 'password/forgot' && !(await turnstileOk(env, req, b && b.cf, 'forgot'))) return json(CAPTCHA_ERROR, 400);
-        return json(await tenantPassword(req, env, path.slice(9), b));
+      // Genel istek sınırı: IP başına dakikada N istek (bellekte; bkz. guard.js)
+      if (env.DB) {
+        await init(env.DB);
+        const gc = await guardConfig(env.DB);
+        if (gc.enabled && rateLimited(guardIp(req), gc.apiPerMin)) return json({ error: 'Çok fazla istek gönderildi; biraz bekleyip tekrar deneyin.' }, 429, { 'Retry-After': '60' });
       }
-      // Giriş: ilk adımda (kullanıcı adı + şifre) bot doğrulaması; firma koduyla giriş → müşteri paneli
-      if (path === 'login' && req.method === 'POST') {
+      // Dış API (stok aktarımı): anahtarla, yalnız ana panelin yetkilendirdiği mağaza (bkz. extapi.js).
+      // Geçersiz anahtar (401) giriş korumasına sayılır (403: anahtar doğru, IP / durum izni yok — sayılmaz); engelli IP anahtara bakılmadan reddedilir.
+      if (path === 'v1' || path.startsWith('v1/')) {
+        const bl = env.DB ? await guardBlocked(env.DB, req) : null;
+        if (bl) return json(blockedBody(bl), 429, blockedHeaders(bl));
+        const res = await extApi(req, env, ctx, path, { getTenant, forward, expired });
+        if (env.DB && res.status === 401) await guardAttempt(env.DB, req, { kind: 'api' });
+        return res;
+      }
+      // Giriş koruması: giriş (ana panel ve firma koduyla müşteri panelleri, iki adımlı / e-posta kodu dahil) ve şifre yenileme.
+      // Deneme şifre kontrolünden önce sayılır, başarılı yanıtta sıfırlanır; sınır aşılınca IP artan sürelerle engellenir.
+      if ((path === 'login' || path === 'password/forgot' || path === 'password/reset') && req.method === 'POST' && env.DB) {
         const b = await body(req.clone());
-        if (b && b.password !== undefined && !b.ticket && !b.mailticket && !(await turnstileOk(env, req, b.cf, 'login'))) return json(CAPTCHA_ERROR, 400);
-        if (b && String(b.tenant || '').trim()) return await tenantLogin(req, env, b);
+        const who = [str(b && b.tenant), str(b && (b.username || b.user || b.email))].filter(Boolean).join(' / ') || (path === 'login' ? 'ana yönetici' : '');
+        const bl = await guardAttempt(env.DB, req, { kind: path === 'login' ? (b && (b.ticket || b.mailticket) ? 'kod' : 'giriş') : 'şifre yenileme', who });
+        if (bl) return json(blockedBody(bl), 429, blockedHeaders(bl));
+        const res = await guardedAuth(req, env, ctx, path, b);
+        // "Şifremi unuttum" hep aynı yanıtı verir (hesabın varlığı anlaşılmasın): sayaç sıfırlanmaz, istek sayısı sınırlanır
+        if (res.status < 400 && path !== 'password/forgot') await guardOk(env.DB, req);
+        return res;
       }
       // Müşteri panelinin logosu (e-postalar için, oturumsuz): /api/logo?t=firma-kodu
       if (path === 'logo' && url.searchParams.get('t')) {
