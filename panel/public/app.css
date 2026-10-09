@@ -50,6 +50,8 @@ html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--font); -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
 a.link { color: var(--primary); text-decoration: none; font-weight: 600; }
+button.link { background: none; border: 0; padding: 0; font: inherit; color: var(--primary); font-weight: 600; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+button.pill { border: 0; font-family: inherit; cursor: pointer; }
 a.link:hover { text-decoration: underline; }
 button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -.01em; }

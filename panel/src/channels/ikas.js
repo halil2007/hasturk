@@ -261,28 +261,41 @@ export function ikas(env, p, meta) {
     return (locationId = l.id);
   }
 
-  async function pushStock(items) {
-    const loc = await location();
-    for (let i = 0; i < items.length; i += 100) {
-      const part = items.slice(i, i + 100);
-      await gql('mutation ($input: SaveStockLocationsInput!) { saveProductStockLocations(input: $input) }', {
-        input: { productStockLocationInputs: part.map((x) => ({ productId: x.remoteProductId, variantId: x.remoteId, stockLocationId: loc, stockCount: x.stock })) },
-      });
+  // Grup reddedilirse ikiye bölünerek hatalı varyant(lar) bulunur: tek bir hatalı varyant (ikas'ta silinmiş / ürünü değişmiş)
+  // gruptaki diğer 99 ilanın gönderimini engellemez ve onları "hatalı" göstermez. Bağlantı / yetki hatası tüm gönderimi durdurur.
+  const itemError = (e) => e.gql || /HTTP 4(00|22)\b/.test(e.message || '');
+  async function isolate(items, send, out) {
+    try { await send(items); out.done.push(...items.map((x) => x.remoteId)); } catch (e) {
+      if (!itemError(e)) throw e;
+      if (items.length === 1) { out.errors.push({ remoteId: items[0].remoteId, error: String(e.message).replace(/^ikas: /, '') }); return; }
+      const h = Math.ceil(items.length / 2);
+      await isolate(items.slice(0, h), send, out);
+      await isolate(items.slice(h), send, out);
     }
   }
 
+  async function pushStock(items) {
+    const loc = await location(), out = { done: [], errors: [] };
+    const send = (part) => gql('mutation ($input: SaveStockLocationsInput!) { saveProductStockLocations(input: $input) }', {
+      input: { productStockLocationInputs: part.map((x) => ({ productId: x.remoteProductId, variantId: x.remoteId, stockLocationId: loc, stockCount: x.stock })) },
+    });
+    for (let i = 0; i < items.length; i += 100) await isolate(items.slice(i, i + 100), send, out);
+    return out;
+  }
+
   async function pushPrice(items) {
-    for (let i = 0; i < items.length; i += 100) {
-      await gql('mutation ($input: SaveVariantPricesInput!) { saveVariantPrices(input: $input) }', {
-        input: {
-          variantPriceInputs: items.slice(i, i + 100).map((x) => ({
-            productId: x.remoteProductId, variantId: x.remoteId,
-            // İndirim yoksa discountPrice açıkça boşaltılır: eski indirimli fiyat kalırsa müşteri o fiyattan alır
-            price: x.listPrice && x.listPrice > x.price ? { sellPrice: x.listPrice, discountPrice: x.price } : { sellPrice: x.price, discountPrice: null },
-          })),
-        },
-      });
-    }
+    const out = { done: [], errors: [] };
+    const send = (part) => gql('mutation ($input: SaveVariantPricesInput!) { saveVariantPrices(input: $input) }', {
+      input: {
+        variantPriceInputs: part.map((x) => ({
+          productId: x.remoteProductId, variantId: x.remoteId,
+          // İndirim yoksa discountPrice açıkça boşaltılır: eski indirimli fiyat kalırsa müşteri o fiyattan alır
+          price: x.listPrice && x.listPrice > x.price ? { sellPrice: x.listPrice, discountPrice: x.price } : { sellPrice: x.price, discountPrice: null },
+        })),
+      },
+    });
+    for (let i = 0; i < items.length; i += 100) await isolate(items.slice(i, i + 100), send, out);
+    return out;
   }
 
   // ---------- kargo (ikas Kargo) ----------

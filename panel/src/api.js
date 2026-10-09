@@ -23,6 +23,7 @@ import * as chp from './chproducts.js';
 import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity, twofaApi, resetTfa, security, setSecurity, forgetNets } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costRaw, COST_KEYS } from '../public/profit.js';
+import { explainError, errorKey } from '../public/listerr.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
 import { recordError, errorsApi, clientReport } from './errors.js';
 import { perfReport } from './perf.js';
@@ -1062,6 +1063,29 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
   if (path === 'import' && m === 'POST') { const b = await body(req); return json(await importListings(env, db, { only: b.channels })); }
   if (path === 'purge-demo' && m === 'POST') return json(await purgeDemo(db));
+
+  // ---------- ilan hataları: nedenine göre gruplu, açıklamalı; yeniden deneme ----------
+  if (path === 'listings/errors' && m === 'GET') {
+    const w = q.channel ? ' AND l.channel = ?' : '', a = q.channel ? [String(q.channel)] : [];
+    const rows = await all(db, `SELECT l.channel, l.remote_id, l.sku, l.barcode, l.error, l.product_id, p.name, p.variant_name FROM listings l LEFT JOIN products p ON p.id = l.product_id
+      WHERE l.error IS NOT NULL${w} ORDER BY l.channel, l.error LIMIT 2000`, ...a);
+    const groups = new Map();
+    for (const r of rows) {
+      const k = r.channel + '|' + errorKey(r.error);
+      const g = groups.get(k) || groups.set(k, { channel: r.channel, error: r.error, ...explainError(r.error), count: 0, items: [] }).get(k);
+      g.count++;
+      if (g.items.length < 20) g.items.push({ remote_id: r.remote_id, sku: r.sku, barcode: r.barcode, product_id: r.product_id, name: r.name ? `${r.name}${r.variant_name ? ' · ' + r.variant_name : ''}` : '', error: r.error });
+    }
+    return json({ total: rows.length, groups: [...groups.values()].sort((x, y) => y.count - x.count) });
+  }
+  if (path === 'listings/errors/retry' && m === 'POST') {
+    const b = await body(req), w = b.channel ? ' AND channel = ?' : '', a = b.channel ? [str(b.channel)] : [];
+    // Hata silinir; stok yeniden gönderilecek, fiyat hatasında fiyat yeniden gönderilecek olarak işaretlenir (sonraki senkron / şimdi)
+    const r = await run(db, `UPDATE listings SET pushed_stock = CASE WHEN error LIKE 'Fiyat%' THEN pushed_stock ELSE NULL END, price_dirty = CASE WHEN error LIKE 'Fiyat%' THEN 1 ELSE price_dirty END, error = NULL WHERE error IS NOT NULL${w}`, ...a);
+    const n = (r && r.meta && r.meta.changes) || 0;
+    await log(db, b.channel || null, 'info', `${user.name}: ${n} ilan hatası temizlendi, stok / fiyat yeniden gönderilecek`);
+    return json({ ok: true, n });
+  }
 
   // ---------- eşleştirme ----------
   if (path === 'match/repair' && m === 'POST') {
