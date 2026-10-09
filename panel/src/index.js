@@ -73,13 +73,13 @@ export default {
       // Şifremi unuttum / şifre yenileme (müşteri panelleri, oturumsuz)
       if ((path === 'password/forgot' || path === 'password/reset') && req.method === 'POST') {
         const b = await body(req.clone());
-        if (path === 'password/forgot' && !(await turnstileOk(env, req, b && b.cf))) return json(CAPTCHA_ERROR, 400);
+        if (path === 'password/forgot' && !(await turnstileOk(env, req, b && b.cf, 'forgot'))) return json(CAPTCHA_ERROR, 400);
         return json(await tenantPassword(req, env, path.slice(9), b));
       }
       // Giriş: ilk adımda (kullanıcı adı + şifre) bot doğrulaması; firma koduyla giriş → müşteri paneli
       if (path === 'login' && req.method === 'POST') {
         const b = await body(req.clone());
-        if (b && b.password !== undefined && !b.ticket && !b.mailticket && !(await turnstileOk(env, req, b.cf))) return json(CAPTCHA_ERROR, 400);
+        if (b && b.password !== undefined && !b.ticket && !b.mailticket && !(await turnstileOk(env, req, b.cf, 'login'))) return json(CAPTCHA_ERROR, 400);
         if (b && String(b.tenant || '').trim()) return await tenantLogin(req, env, b);
       }
       // Müşteri panelinin logosu (e-postalar için, oturumsuz): /api/logo?t=firma-kodu
