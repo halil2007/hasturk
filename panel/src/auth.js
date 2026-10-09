@@ -142,10 +142,11 @@ function issue(req, env, user, sv) {
 // ---------- yeni ağdan girişte e-posta kodu ----------
 // Kullanıcının daha önce kodla doğruladığı ağlar settings'te (trust:<id>) tutulur. Ağ: IPv4'te ilk 3 bölüm (aynı modem /
 // ofis hattında son hane değişse de tanınır), IPv6'da ilk 4 grup. Tanınmayan ağdan girişte şifre doğruysa e-postaya 10 dakika
-// geçerli 6 haneli kod gider; kod girilince oturum açılır ve ağ 120 gün hatırlanır (her girişte süre uzar).
+// geçerli 6 haneli kod gider; kod girilince oturum açılır ve ağ 48 saat hatırlanır. O ağdan her girişte 48 saat yeniden başlar;
+// 48 saatten uzun süre o ağdan giriş yapılmazsa kod yeniden istenir.
 // İki adımlı doğrulaması (uygulama) açık kullanıcıda bu adım atlanır: uygulama kodu zaten her girişte istenir.
 // E-postası olmayan kullanıcıda ve e-posta gönderilemezse giriş engellenmez (kimse panelin dışında kalmasın); olay günlüğe yazılır.
-const NET_MS = 120 * 864e5, CODE_MS = 10 * 60e3, MAIL_TICKET_MS = 20 * 60e3;
+const NET_MS = 48 * 3600e3, CODE_MS = 10 * 60e3, MAIL_TICKET_MS = 20 * 60e3;
 const clientIp = (req) => String(req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || '').split(',')[0].trim();
 export function netOf(ip) {
   const s = String(ip || '').trim().toLowerCase();

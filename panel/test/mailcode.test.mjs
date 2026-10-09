@@ -155,3 +155,32 @@ test('müşteri paneli: firma yöneticisi yeni ağdan girişte e-posta koduyla g
   // Firma yöneticisi ana yönetici e-postasını değiştiremez
   assert.equal((await T('/api/users/security', J({ adminEmail: 'x@y.test' }, 'PUT'))).status, 403);
 });
+
+test('tanınan ağ 48 saat hatırlanır: her girişte süre yeniden başlar, 48 saatten uzun aradan sonra kod yeniden istenir', async () => {
+  resetChannels(); mails.length = 0;
+  const { env, call, jar } = setup();
+  const A = call('admin', '1.1.1.1');
+  await A('/api/login', J({ password: 'x-123456' }));
+  await A('/api/users', J({ username: 'mehmet', name: 'Mehmet', email: 'mehmet@firma.test', password: 'mehmet-sifre-1', role: 'staff', perms: ['orders'] }));
+  const id = (await (await A('/api/users')).json()).find((u) => u.username === 'mehmet').id;
+  const M = call('mehmet', '85.105.12.34');
+  const login = async () => { jar.mehmet = ''; return (await M('/api/login', J({ username: 'mehmet', password: 'mehmet-sifre-1' }))).json(); };
+  // Ağın son giriş zamanını geriye al (saat)
+  const age = async (h) => {
+    const row = await env.DB.prepare('SELECT v FROM settings WHERE k = ?').bind('trust:' + id).first();
+    const list = JSON.parse(row.v).map((x) => ({ ...x, at: Date.now() - h * 3600e3 }));
+    await env.DB.prepare('UPDATE settings SET v = ? WHERE k = ?').bind(JSON.stringify(list), 'trust:' + id).run();
+  };
+  let r = await login();
+  assert.equal(r.emailcode, true);
+  assert.equal((await M('/api/login', J({ mailticket: r.ticket, code: lastCode() }))).status, 200);
+  // 47 saat sonra: kod yok; giriş süreyi yeniler
+  await age(47);
+  r = await login(); assert.equal(r.ok, true); assert.equal(mails.length, 1);
+  // Yenilendiği için 47 saat daha sonra da kod yok (toplam 94 saat, ama arada giriş var)
+  await age(47);
+  r = await login(); assert.equal(r.ok, true); assert.equal(mails.length, 1);
+  // 49 saat hiç giriş yok: kod yeniden istenir
+  await age(49);
+  r = await login(); assert.equal(r.emailcode, true); assert.equal(mails.length, 2);
+});
