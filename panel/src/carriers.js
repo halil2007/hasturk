@@ -58,7 +58,7 @@ export async function carrierList(env, db, { withFields = false } = {}) {
       ...(withFields ? { fields: d.fields } : {}),
     };
   });
-  if (env.DEMO === '1') list.push({ ...DEMO, active: true, configured: true, missing: [], usable: true, isDefault: def === 'demo' || !list.some((x) => x.usable) });
+  if ((env.DEMO === '1' || env.DEMO_CARRIER === '1')) list.push({ ...DEMO, active: true, configured: true, missing: [], usable: true, isDefault: def === 'demo' || !list.some((x) => x.usable) });
   return list;
 }
 
