@@ -40,3 +40,12 @@ test('turnstile: siteverify yanıtı', async () => {
   assert.equal(await turnstileOk(env, req, '', 'login', async () => { throw new Error('çağrılmamalı'); }), false);
   assert.equal(await turnstileOk(env, req, 'tok', 'login', async () => { throw new Error('ağ'); }), false);
 });
+
+test('CSP: statik dosyaların başlığı (_headers) Worker\'daki CSP ile aynı; Turnstile betiği ve çerçevesi izinli', async () => {
+  const { readFileSync } = await import('node:fs');
+  const hdr = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8').match(/Content-Security-Policy: (.+)/)[1].trim();
+  const env = { ASSETS: { fetch: async () => new Response('<html>', { headers: { 'Content-Type': 'text/html' } }) } };
+  const csp = (await worker.fetch(new Request('https://panel.test/'), env, { waitUntil() {} })).headers.get('content-security-policy');
+  assert.equal(hdr, csp);
+  for (const d of ['script-src', 'frame-src', 'connect-src']) assert.match(csp, new RegExp(`${d} [^;]*https://challenges\\.cloudflare\\.com`));
+});
