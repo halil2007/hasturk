@@ -384,11 +384,11 @@ function debounceEnh() { cancelAnimationFrame(enhTimer); enhTimer = requestAnima
 // Cloudflare Turnstile (insan doğrulaması): sunucuda anahtar tanımlıysa giriş ve şifremi unuttum formlarında gösterilir.
 // Her doğrulama tek kullanımlıktır: başarısız denemeden sonra yenilenir.
 let tsLoad = null;
-function turnstile(el, sitekey) {
+function turnstile(el, sitekey, action) {
   const st = { token: '', id: null, on: !!sitekey, reset() { this.token = ''; if (this.id != null && window.turnstile) window.turnstile.reset(this.id); } };
   if (!sitekey || !el) return st;
   tsLoad = tsLoad || new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; sc.async = true; sc.onload = ok; sc.onerror = no; document.head.append(sc); });
-  tsLoad.then(() => { st.id = window.turnstile.render(el, { sitekey, language: 'tr', theme: 'light', size: 'flexible', callback: (t) => { st.token = t; }, 'expired-callback': () => { st.token = ''; }, 'error-callback': () => { st.token = ''; } }); })
+  tsLoad.then(() => { st.id = window.turnstile.render(el, { sitekey, action, language: 'tr', theme: 'light', size: 'flexible', callback: (t) => { st.token = t; }, 'expired-callback': () => { st.token = ''; }, 'error-callback': () => { st.token = ''; } }); })
     .catch(() => { el.textContent = 'Güvenlik doğrulaması yüklenemedi; sayfayı yenileyin.'; });
   return st;
 }
@@ -403,7 +403,7 @@ function forgotForm(box, tenant, who) {
     <div class="login-err" data-err role="alert"></div><div class="notice hide" data-ok></div>
     <button class="btn primary block lg" type="submit">Bağlantı gönder</button>
     <button type="button" class="link-btn" data-back>Girişe dön</button>`);
-  const f = $('.login-card', box), ts = turnstile($('[data-ts]', f), tsKey);
+  const f = $('.login-card', box), ts = turnstile($('[data-ts]', f), tsKey, 'forgot');
   $('[data-back]', f).onclick = () => { box.remove(); login(); };
   f.onsubmit = async (e) => {
     e.preventDefault();
@@ -476,7 +476,7 @@ async function login(info = {}) {
     <div class="login-foot">Hastürk CRM · güvenli bağlantı</div>`);
   document.body.prepend(box);
   tsKey = brand.turnstile || '';
-  const ts = turnstile($('[data-ts]', box), tsKey);
+  const ts = turnstile($('[data-ts]', box), tsKey, 'login');
   $(owner ? '[name=password]' : firma ? '[name=username]' : '[name=tenant]', box).focus();
   $('[data-eye]', box).onclick = (e) => { const i = $('[name=password]', box); i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.classList.toggle('on', i.type === 'text'); };
   $('[data-forgot]', box).onclick = () => forgotForm(box, $('[name=tenant]', box).value.trim().toLocaleLowerCase('tr'), $('[name=username]', box).value.trim());
@@ -528,7 +528,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-09c';
+const ASSETS = '2026-10-09d';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

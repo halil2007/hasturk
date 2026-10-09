@@ -26,12 +26,17 @@ test('turnstile: anahtar yoksa kapalı; varsa giriş ve şifremi unuttum jeton i
 });
 
 test('turnstile: siteverify yanıtı', async () => {
-  const env = { TURNSTILE_SITE_KEY: 's', TURNSTILE_SECRET: 'k' }, req = new Request('https://x', { headers: { 'CF-Connecting-IP': '1.2.3.4' } });
+  const env = { TURNSTILE_SITE_KEY: 's', TURNSTILE_SECRET: 'k' }, req = new Request('https://panel.test/api/login', { headers: { 'CF-Connecting-IP': '1.2.3.4' } });
+  const res = (o) => async () => new Response(JSON.stringify(o));
   let sent;
-  const ok = await turnstileOk(env, req, 'tok', async (u, o) => { sent = o.body; return new Response(JSON.stringify({ success: true })); });
+  const ok = await turnstileOk(env, req, 'tok', 'login', async (u, o) => { sent = o.body; return new Response(JSON.stringify({ success: true, action: 'login', hostname: 'panel.test' })); });
   assert.equal(ok, true);
   assert.equal(sent.get('secret'), 'k'); assert.equal(sent.get('response'), 'tok'); assert.equal(sent.get('remoteip'), '1.2.3.4');
-  assert.equal(await turnstileOk(env, req, 'tok', async () => new Response(JSON.stringify({ success: false }))), false);
-  assert.equal(await turnstileOk(env, req, '', async () => { throw new Error('çağrılmamalı'); }), false);
-  assert.equal(await turnstileOk(env, req, 'tok', async () => { throw new Error('ağ'); }), false);
+  assert.equal(await turnstileOk(env, req, 'tok', 'login', res({ success: false })), false);
+  assert.equal(await turnstileOk(env, req, 'tok', 'login', res({ success: true, action: 'forgot', hostname: 'panel.test' })), false, 'başka işlemin jetonu');
+  assert.equal(await turnstileOk(env, req, 'tok', 'login', res({ success: true, action: 'login', hostname: 'evil.test' })), false, 'başka sitenin jetonu');
+  assert.equal(await turnstileOk({ ...env, TURNSTILE_HOSTNAMES: 'a.test, panel.test' }, req, 'tok', 'login', res({ success: true, action: 'login', hostname: 'a.test' })), true);
+  assert.equal(await turnstileOk(env, req, 'tok', 'login', async () => new Response('x', { status: 500 })), false);
+  assert.equal(await turnstileOk(env, req, '', 'login', async () => { throw new Error('çağrılmamalı'); }), false);
+  assert.equal(await turnstileOk(env, req, 'tok', 'login', async () => { throw new Error('ağ'); }), false);
 });
