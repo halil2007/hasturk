@@ -1,10 +1,11 @@
-// Google Ads etiketi (gtag.js) ve dönüşüm ölçümü. Kimlik ve dönüşüm etiketleri config.js → ads.
+// Google Ads etiketi (gtag.js), Google Analytics 4 ve dönüşüm ölçümü. Kimlikler config.js → ads, analytics.
 // Çerez onayı (Google Consent Mode v2): ziyaretçi "Kabul et" diyene kadar reklam / analiz çerezleri kapalıdır; Google bu sürede
 // çerezsiz, kimliksiz sinyallerle dönüşümleri modelleyebilir. Tercih bu cihazda saklanır (localStorage → "cerez").
 // Dönüşümler: /odeme-basarili (kartla satın alma) ve /siparis-alindi (havale / EFT siparişi); tutar ve sipariş no adresten okunur.
 (() => {
-  const A = (window.SITE || {}).ads || {};
-  if (!A.id) return;
+  const A = (window.SITE || {}).ads || {}, GA = (window.SITE || {}).analytics || '';
+  const tagId = A.id || GA;
+  if (!tagId) return;
   const ls = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* yok */ } } };
   window.dataLayer = window.dataLayer || [];
   function gtag() { window.dataLayer.push(arguments); }
@@ -13,9 +14,10 @@
   gtag('consent', 'default', { ad_storage: g, ad_user_data: g, ad_personalization: g, analytics_storage: g, wait_for_update: 500 });
   gtag('set', 'url_passthrough', true);
   gtag('js', new Date());
-  gtag('config', A.id);
+  if (A.id) gtag('config', A.id);
+  if (GA) gtag('config', GA);
   const s = document.createElement('script');
-  s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(A.id);
+  s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(tagId);
   document.head.append(s);
 
   // Dönüşüm: aynı sipariş bu tarayıcıda bir kez sayılır (sayfa yenilense de); Google da transaction_id ile tekrarı ayıklar
@@ -23,7 +25,7 @@
   const conv = { '/odeme-basarili': ['purchase', A.purchase], '/siparis-alindi': ['eft_order', A.lead] }[location.pathname.replace(/\.html$/, '').replace(/\/+$/, '')];
   if (conv && order && ls.get('conv:' + order) !== '1') {
     const data = { value, currency: 'TRY', transaction_id: order };
-    if (conv[1]) gtag('event', 'conversion', { send_to: `${A.id}/${conv[1]}`, ...data });
+    if (conv[1] && A.id) gtag('event', 'conversion', { send_to: `${A.id}/${conv[1]}`, ...data });
     gtag('event', conv[0], data);
     ls.set('conv:' + order, '1');
   }
