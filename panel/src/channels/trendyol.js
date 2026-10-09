@@ -1,6 +1,6 @@
 // Trendyol Marketplace API (apigw.trendyol.com/integration).
 // Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key, API Secret.
-import { http, basic, num, str, chunk, diagStep, imageList } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, imageList, mediaUrls } from '../util.js';
 
 const BASE = 'https://apigw.trendyol.com/integration';
 
@@ -518,6 +518,7 @@ export function trendyol(env, meta) {
         remoteId: str(c.claimId ?? c.id), orderNumber: str(c.orderNumber), claimedAt: num(c.claimDate) || Date.now(), status, remoteStatus: [...new Set(lines.map((l) => l.remoteStatus))].join(', '),
         customer: [c.customerFirstName, c.customerLastName].filter(Boolean).join(' '), reason: [...new Set(lines.map((l) => l.reason).filter(Boolean))].join(', '),
         note: lines.map((l) => l.note).filter(Boolean).join(' · '), lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: str(c.cargoProviderName), tracking: str(c.cargoTrackingNumber),
+        images: mediaUrls(c),
       };
     });
     return { items, hasNext: page + 1 < num(r.totalPages) };

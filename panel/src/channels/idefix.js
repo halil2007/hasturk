@@ -3,7 +3,7 @@
 // Kimlik: X-API-KEY = base64(ApiKey:ApiSecret). Canlı ortamda IP izni gerekmez (test ortamında gerekir).
 // Kimlik: X-API-KEY başlığı (biçim otomatik bulunur, aşağıya bakın). Siparişler: /oms/{vendorId}/list · İadeler: /oms/{vendorId}/claim-list · Ürün/stok/fiyat: /pim/...
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, diagStep, sleep, imageList } from '../util.js';
+import { http, num, str, chunk, diagStep, sleep, imageList, mediaUrls } from '../util.js';
 
 const BASE = 'https://merchantapi.idefix.com';
 // idefix durumları "shipment_" önekiyle gelir (shipment_created, shipment_picking, shipment_in_cargo, shipment_delivered…)
@@ -330,7 +330,7 @@ export function idefix(env, meta) {
       return {
         remoteId: String(c.id), orderNumber: str(c.orderNumber), claimedAt: Date.parse(c.createdAt || '') || Date.now(), status, remoteStatus: [...new Set(lines.map((l) => l.remoteStatus))].join(', '),
         customer: str(c.customerName), reason: [...new Set(lines.map((l) => l.reason).filter(Boolean))].join(', '), note: lines.map((l) => l.note).filter(Boolean).join(' · '),
-        lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: str(c.cargoCompanyName), tracking: str(c.cargoTrackingNumber || c.cargoKey),
+        lines, amount: lines.reduce((x, l) => x + l.price * l.qty, 0), cargo: str(c.cargoCompanyName), tracking: str(c.cargoTrackingNumber || c.cargoKey), images: mediaUrls(c),
       };
     });
     // Sayfa parametresi yok sayılırsa aynı sayfa tekrar okunmasın: dönen sayfa no istenenle aynı olmalı

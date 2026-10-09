@@ -164,3 +164,23 @@ export const DEAD_LINE = (s) => s === 'cancelled' || s === 'returned';
 
 // Siparişin ürün kargo tutarı: canlı satırlardaki ürünlerin kargo tutarlarının en yükseği (sipariş tek koli gider varsayımı)
 export const PRODUCT_SHIP = "(SELECT MAX(sp.ship_cost) FROM order_items si JOIN products sp ON sp.id = si.product_id WHERE si.order_id = o.id AND COALESCE(si.status, '') NOT IN ('cancelled', 'returned') AND sp.ship_cost > 0)";
+
+// Kanal verisindeki müşteri görselleri / ekleri (iade talebi fotoğrafı, tutanak …): kanalların alan adları farklı ve belgelenmemiş
+// olabildiğinden veri ağacında görsel / ek alanındaki ya da görsel uzantılı https bağlantıları toplanır. Ürün görseli (katalog) alınmaz.
+const MEDIA_KEY = /image|photo|picture|media|attach|file|resim|gorsel|görsel|evidence|document|belge/i, SKIP_KEY = /product|catalog|thumbnail|logo|brand|merchant|seller|cargo|tracking|invoice|fatura/i;
+const IMG_EXT = /\.(jpe?g|png|webp|gif|heic|bmp|pdf)(\?|#|$)/i;
+export function mediaUrls(obj, max = 12) {
+  const out = new Set();
+  const walk = (v, key, depth) => {
+    if (out.size >= max || depth > 10 || v == null) return;
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (/^https:\/\/[^\s"'<>]+$/i.test(s) && (IMG_EXT.test(s) || MEDIA_KEY.test(key))) out.add(s);
+      return;
+    }
+    if (Array.isArray(v)) { for (const x of v) walk(x, key, depth + 1); return; }
+    if (typeof v === 'object') for (const [k, x] of Object.entries(v)) { if (!SKIP_KEY.test(k)) walk(x, MEDIA_KEY.test(k) ? k : key && MEDIA_KEY.test(key) ? key : k, depth + 1); }
+  };
+  walk(obj, '', 0);
+  return [...out];
+}

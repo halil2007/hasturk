@@ -32,6 +32,9 @@ export async function claimsView(el, rest, query = {}) {
           <div class="tiny muted">${[l.barcode || l.sku, `${n(l.qty)} adet`, money(l.price)].filter(Boolean).join(' · ')}</div>
           <div class="small" style="margin-top:2px"><b>Gerekçe:</b> ${l.reason || '—'}${l.remoteStatus ? html` <span class="muted tiny">(${l.remoteStatus})</span>` : ''}</div>
           ${l.note ? html`<div class="small qtext" style="margin-top:4px">“${l.note}”</div>` : ''}</div></div>`)}</div>
+      ${(r.images || []).length ? html`<div><div class="tiny muted" style="margin-bottom:6px">Müşterinin eklediği görseller (${r.images.length})</div><div class="claim-media">${r.images.map((u) => /\.pdf(\?|$)/i.test(u)
+        ? html`<a class="claim-doc" href="${u}" target="_blank" rel="noopener noreferrer"><i class="ico ico-doc"></i>Belge</a>`
+        : html`<a href="${u}" target="_blank" rel="noopener noreferrer" title="Büyük görmek için tıklayın"><img src="${u}" alt="İade görseli" loading="lazy" referrerpolicy="no-referrer"></a>`)}</div></div>` : ''}
       ${r.decided_by ? html`<div class="tiny muted">${r.decided_by} · ${dateTime(r.decided_at)}${r.decision_note ? ` · ${r.decision_note}` : ''}</div>` : ''}
       ${r.error ? html`<div class="notice bad small">${r.error}</div>` : ''}
       ${open.length ? html`<div class="row wrap" style="justify-content:flex-end;gap:8px"><button class="btn" data-act="reject"><i class="ico ico-x"></i>Reddet</button><button class="btn primary" data-act="approve"><i class="ico ico-check"></i>İadeyi onayla</button></div>` : ''}
