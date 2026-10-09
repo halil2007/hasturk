@@ -58,7 +58,7 @@ test('Başlangıç paketi: mağaza / kullanıcı sınırı ve Profesyonel özell
   assert.equal((await owner('/api/tenants/kucuk', J({ plan: 'Profesyonel' }, 'PUT'))).status, 200);
   assert.equal((await tenant('/api/products.csv')).status, 200);
   assert.equal((await put('idefix', { IDEFIX_VENDOR_ID: '1', IDEFIX_API_KEY: 'k', IDEFIX_API_SECRET: 's' })).status, 200);
-  assert.equal((await (await tenant('/api/me')).json()).tenant.locked.length, 1, 'yalnız Stok API (Kurumsal) kilitli');
+  assert.equal((await (await tenant('/api/me')).json()).tenant.locked.sort().join(','), 'fx,stockapi', 'yalnız Kurumsal özellikleri (Stok API, döviz endeksli fiyat) kilitli');
 });
 
 test('süresi dolan panel: giriş mesajı iletişim bilgisi verir, arka plan senkronu durur, yenilenince devam eder', async () => {

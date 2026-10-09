@@ -32,10 +32,10 @@ window.SITE = {
       items: ['Tüm aktif entegrasyonlar', 'Sipariş, kargo ve etiket yönetimi', 'Stok senkronu ve ürün eşleştirme', 'Çok kanala ürün yükleme', 'Gelir & gider, kâr-zarar raporu', 'Müşteri soruları ve iade talepleri', 'E-posta ve WhatsApp destek'] },
     { key: 'profesyonel', name: 'Profesyonel', tag: 'Çok kanallı büyüyen işletmeler', monthly: 1990, yearly: 19900, featured: true, limits: ['10 mağaza bağlantısı', '5 kullanıcı'],
       items: ['Başlangıç paketindeki her şey', 'Buybox takibi ve otomatik fiyat', 'Otomatik ürün gönderimi', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
-    { key: 'kurumsal', name: 'Kurumsal', tag: 'Yüksek hacim ve bayi ağı', monthly: 3990, yearly: 39900, limits: ['25 mağaza bağlantısı', 'Sınırsız kullanıcı'],
-      items: ['Profesyonel paketteki her şey', 'Stok API (kendi sisteminize / bayilerinize stok aktarımı)', 'Kurulum ve veri aktarımında birebir destek', 'Yeni kanal ve özel geliştirme talepleri önceliği', 'Telefon destek hattı', 'Daha fazla mağaza için özel teklif'],
+    { key: 'kurumsal', name: 'Kurumsal', tag: 'Tüm özellikler ve birebir destek', monthly: 3990, yearly: 39900, limits: ['25 mağaza bağlantısı', 'Sınırsız kullanıcı'],
+      items: ['Profesyonel paketteki her şey', 'Döviz kuruna endeksli otomatik fiyat (USD / EUR / GBP)', 'Stok API (kendi sisteminize / bayilerinize stok aktarımı)', 'Kurulum ve veri aktarımında birebir destek', 'Yeni kanal ve özel geliştirme talepleri önceliği', 'Telefon destek hattı', 'Daha fazla mağaza için özel teklif'],
       // soon: pakete eklenecek ama henüz aktif olmayan özellikler ("Yakında" rozetiyle görünür)
-      soon: ['Yapay zekâ ile ürün yönetimi: "şu ürünü kapat", "şu ürünlerin fiyatını %5 artır" deyin, sistem tek tek uğraştırmadan kendisi yapsın'] },
+      soon: ['e-Fatura / e-Arşiv entegrasyonu', 'Kendi anlaşmalı kargo entegrasyonu', 'Yapay zekâ ile ürün yönetimi: "şu ürünü kapat", "şu ürünlerin fiyatını %5 artır" deyin, sistem tek tek uğraştırmadan kendisi yapsın'] },
   ],
   // Paket karşılaştırma tablosu: [özellik, Başlangıç, Profesyonel, Kurumsal]; true = var, false = yok, metin = değer
   compare: [
@@ -56,7 +56,10 @@ window.SITE = {
     ['Hakediş ve kesilen faturalar', false, true, true],
     ['Excel ile toplu güncelleme', false, true, true],
     ['Personel yetkileri ve rol şablonları', false, true, true],
+    ['Döviz kuruna endeksli otomatik fiyat', false, false, true],
     ['Stok API (bayi / kendi sisteminiz)', false, false, true],
+    ['e-Fatura / e-Arşiv entegrasyonu', false, false, 'Yakında'],
+    ['Kendi anlaşmalı kargo entegrasyonu', false, false, 'Yakında'],
     ['Yapay zekâ ile ürün yönetimi', false, false, 'Yakında'],
     ['Yıllık alımda peşin fiyatına 3 taksit', true, true, true],
     ['Destek', 'E-posta, WhatsApp', 'Öncelikli', 'Telefon + birebir kurulum'],

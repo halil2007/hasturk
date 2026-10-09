@@ -69,3 +69,27 @@ test('müşteri paneli: tarayıcı bildirimi ve iki adımlı girişle birlikte a
   assert.equal((await T('/api/login', J({ tenant: 'yesil', ticket: l.ticket, code: await hotp(sk, step() + 1) }))).status, 200);
   assert.equal((await T('/api/summary')).status, 200);
 });
+
+test('hata kayıtları kendiliğinden çözülür: işlem sonradan başarılı, kanal senkronu başarılı, 3 gün sessiz', async () => {
+  const { d1 } = await import('../dev/d1.mjs');
+  const { init, first: one, run: exec } = await import('../src/db.js');
+  const { recordError, actionSucceeded, syncSucceeded, resolveQuiet } = await import('../src/errors.js');
+  const db = d1(); await init(db);
+  const a = await recordError(db, { slug: 'acme', firm: 'Acme', source: 'api', message: 'Etiket alınamadı', action: 'POST orders/12/label' });
+  const s = await recordError(db, { slug: 'acme', firm: 'Acme', source: 'sync', message: 'HB: zaman aşımı', action: 'kanal: hepsiburada' });
+  const q = await recordError(db, { slug: 'beta', firm: 'Beta', source: 'client', message: 'x is undefined' });
+  await exec(db, 'UPDATE error_reports SET last_at = last_at - 5000');
+  assert.equal(await actionSucceeded(db, 'baska', 'POST orders/99/label'), 0, 'başka firma');
+  assert.equal(await actionSucceeded(db, 'acme', 'POST orders/99/label'), 1, 'farklı sipariş, aynı işlem');
+  assert.equal((await one(db, 'SELECT status, auto FROM error_reports WHERE id = ?', a)).status, 'resolved');
+  assert.equal(await syncSucceeded(db, 'acme', { channels: { hepsiburada: 'hata: x', trendyol: 3 } }, false), 0, 'HB hâlâ hatalı');
+  assert.equal(await syncSucceeded(db, 'acme', { channels: { hepsiburada: 4 } }, false), 1);
+  assert.equal((await one(db, 'SELECT status FROM error_reports WHERE id = ?', s)).status, 'resolved');
+  assert.equal(await resolveQuiet(db), 0);
+  assert.equal(await resolveQuiet(db, Date.now() + 4 * 864e5), 1);
+  assert.match((await one(db, 'SELECT auto FROM error_reports WHERE id = ?', q)).auto, /3 gün/);
+  // Tekrar ederse yeniden açılır, neden temizlenir
+  await recordError(db, { slug: 'acme', firm: 'Acme', source: 'api', message: 'Etiket alınamadı', action: 'POST orders/13/label' });
+  const r = await one(db, 'SELECT status, reopened, auto FROM error_reports WHERE id = ?', a);
+  assert.equal(r.status, 'open'); assert.equal(r.reopened, 1); assert.equal(r.auto, null);
+});

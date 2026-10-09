@@ -5,57 +5,87 @@ description: Hastürk CRM paketini kredi kartıyla hemen satın alın: ödeme iy
 url: /satin-al
 nav: paketler
 -->
-<section class="page-hero" style="padding-bottom:12px">
+<section class="page-hero co-hero">
   <div class="wrap">
-    <div class="kicker">Satın al</div>
+    <div class="kicker">Güvenli satın alma</div>
     <h1>Paketinizi Seçin, <span class="grad">Hemen Başlayın</span></h1>
-    <p>Ödeme iyzico güvencesiyle alınır, kart bilgileriniz bize ulaşmaz. Ödemeden hemen sonra paneliniz açılır ve seçtiğiniz şifreyle giriş yaparsınız.</p>
+    <p>Ödeme iyzico güvencesiyle alınır, kart bilgileriniz bize ulaşmaz. Ödemeden hemen sonra paneliniz açılır ve faturanız e-posta adresinize gönderilir.</p>
+    <ol class="co-steps" data-co-steps aria-label="Satın alma adımları">
+      <li class="on"><span>1</span>Paket</li><li><span>2</span>Hesap</li><li><span>3</span>Fatura bilgileri</li><li><span>4</span>Onay</li>
+    </ol>
   </div>
 </section>
 
-<section class="sec" style="padding-top:12px">
-  <div class="wrap co-wrap">
+<section class="sec co-sec">
+  <div class="wrap">
     <div class="card co-off" data-shop-wait><p class="muted">Yükleniyor…</p></div>
     <div class="card co-off" data-shop-off hidden>
       <h2>Online satış çok yakında</h2>
       <p>Kartla online satın alma şu an kapalı. Paket almak ya da 7 gün ücretsiz denemek için bize ulaşın; aynı gün panelinizi açalım.</p>
       <div class="co-off-actions"><a class="btn btn-primary" data-call href="/iletisim"><svg><use href="#i-phone"/></svg>Hemen arayın</a><a class="btn btn-outline" data-show="company.whatsapp" data-c="company.whatsapp" data-href="wa"><svg><use href="#i-wa"/></svg>WhatsApp</a><a class="btn btn-line" href="/iletisim?konu=teklif">Teklif isteyin</a></div>
     </div>
-    <form class="lead card co" data-checkout data-shop hidden novalidate>
-      <div class="co-tabs"><button type="button" class="co-tab" data-kind="new">Yeni müşteriyim</button><button type="button" class="co-tab" data-kind="renew">Mevcut panelimi yenile</button></div>
 
-      <div class="co-step"><span class="co-n">1</span><b>Paket</b></div>
-      <div class="co-period"><button type="button" data-period="yearly">Yıllık <small>2 ay hediye</small></button><button type="button" data-period="monthly">Aylık</button></div>
-      <div class="co-plans" data-co-plans></div>
+    <form class="co" data-checkout data-shop hidden novalidate>
+      <div class="co-main">
+        <fieldset class="co-card" data-step="1">
+          <legend class="co-h"><span class="co-n">1</span><span><b>Paket</b><small>Paketinizi ve ödeme dönemini seçin</small></span></legend>
+          <div class="co-period" role="group" aria-label="Ödeme dönemi"><button type="button" data-period="yearly">Yıllık <small>2 ay hediye</small></button><button type="button" data-period="monthly">Aylık</button></div>
+          <div class="co-plans" data-co-plans role="radiogroup" aria-label="Paket"></div>
+        </fieldset>
 
-      <div data-for="new">
-        <div class="co-step"><span class="co-n">2</span><b>Firma ve giriş bilgileri</b></div>
-        <div class="row2"><label class="f">Firma / mağaza adı *<input class="in" name="firm" autocomplete="organization" required></label><label class="f">Firma kodu *<input class="in" name="slug" autocapitalize="none" placeholder="ör. yesil-bahce" required><small class="hint">Panele girerken yazacağınız kod (küçük harf, rakam, tire)</small></label></div>
-        <div class="row2"><label class="f">Kullanıcı adı *<input class="in" name="username" autocapitalize="none" autocomplete="username" placeholder="ör. yonetici" required></label><label class="f">E-posta *<input class="in" name="email" type="email" autocomplete="email" required></label></div>
-        <div class="row2"><label class="f">Şifre * <small>(en az 8 karakter)</small><input class="in" name="password" type="password" autocomplete="new-password" required></label><label class="f">Şifre (tekrar) *<input class="in" name="password2" type="password" autocomplete="new-password" required></label></div>
+        <fieldset class="co-card" data-step="2">
+          <legend class="co-h"><span class="co-n">2</span><span><b>Hesap</b><small>Panel girişiniz ve size ulaşacağımız bilgiler</small></span></legend>
+          <div class="co-seg co-kind" role="group" aria-label="Müşteri türü"><button type="button" data-kind="new">Yeni hesap açacağım</button><button type="button" data-kind="renew">Mevcut panelimi yenile</button></div>
+          <div class="co-fields" data-for="new">
+            <div class="row2"><label class="f">Firma / mağaza adı *<input class="in" name="firm" autocomplete="organization" required></label><label class="f">Firma kodu *<input class="in" name="slug" autocapitalize="none" spellcheck="false" placeholder="ör. yesil-bahce" required><small class="hint">Panele girerken yazacağınız kod (küçük harf, rakam, tire)</small></label></div>
+            <div class="row2"><label class="f">Kullanıcı adı *<input class="in" name="username" autocapitalize="none" autocomplete="username" spellcheck="false" placeholder="ör. yonetici" required></label><span class="co-gap"></span></div>
+            <div class="row2"><label class="f">Şifre *<input class="in" name="password" type="password" autocomplete="new-password" minlength="8" required><small class="hint">En az 8 karakter</small></label><label class="f">Şifre (tekrar) *<input class="in" name="password2" type="password" autocomplete="new-password" required></label></div>
+          </div>
+          <div class="co-fields" data-for="renew" hidden>
+            <label class="f">Firma kodu *<input class="in" name="slug_renew" autocapitalize="none" spellcheck="false" required><small class="hint">Panele girişte yazdığınız firma kodu</small></label>
+            <p class="co-note"><svg><use href="#i-calendar"/></svg>Satın aldığınız süre mevcut bitiş tarihinizin üstüne eklenir; paket değiştirdiyseniz yeni paket hemen geçerli olur.</p>
+          </div>
+          <div class="row2"><label class="f">E-posta *<input class="in" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="ornek@firma.com" required><small class="hint" data-for="new">Giriş bilgileriniz ve faturanız bu adrese gönderilir</small><small class="hint" data-for="renew" hidden>Firma kaydınızdaki e-posta adresi</small></label><label class="f">Telefon *<input class="in" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx" required><small class="hint">Cep ya da sabit hat</small></label></div>
+        </fieldset>
+
+        <fieldset class="co-card" data-step="3">
+          <legend class="co-h"><span class="co-n">3</span><span><b>Fatura bilgileri</b><small>Faturanız bu bilgilerle düzenlenir</small></span></legend>
+          <div class="co-seg co-inv" role="group" aria-label="Fatura türü"><button type="button" data-inv="bireysel">Bireysel</button><button type="button" data-inv="kurumsal">Kurumsal</button></div>
+          <div class="co-fields" data-inv-for="bireysel">
+            <div class="row2"><label class="f">Ad soyad *<input class="in" name="inv_name" autocomplete="name"></label><label class="f">TC kimlik no *<input class="in" name="tckn" inputmode="numeric" maxlength="11" autocomplete="off"></label></div>
+          </div>
+          <div class="co-fields" data-inv-for="kurumsal" hidden>
+            <label class="f">Firma unvanı *<input class="in" name="company" autocomplete="organization" placeholder="ör. Yeşil Bahçe Tarım Ltd. Şti."></label>
+            <div class="row2"><label class="f">Vergi dairesi *<input class="in" name="tax_office"></label><label class="f">Vergi numarası *<input class="in" name="tax_no" inputmode="numeric" maxlength="11" autocomplete="off"><small class="hint">10 hane (şahıs şirketinde TC kimlik no)</small></label></div>
+            <div class="row2"><label class="f">Yetkili ad soyad *<input class="in" name="contact" autocomplete="name"></label><label class="co-check"><input type="checkbox" name="efatura"><span>e-Fatura mükellefiyiz</span></label></div>
+          </div>
+          <label class="f">Fatura adresi *<input class="in" name="address" autocomplete="street-address" placeholder="Mahalle, cadde / sokak, bina ve daire no"></label>
+          <div class="row2"><label class="f">İl *<select class="in" name="city" autocomplete="address-level1" data-iller><option value="">Seçin</option></select></label><label class="f">İlçe *<input class="in" name="district" autocomplete="address-level2"></label></div>
+        </fieldset>
+
+        <fieldset class="co-card" data-step="4">
+          <legend class="co-h"><span class="co-n">4</span><span><b>Onay</b><small>Sözleşmeyi onaylayın, güvenli ödeme sayfasına geçin</small></span></legend>
+          <div class="co-total" data-co-total></div>
+          <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <label class="consent"><input type="checkbox" name="consent"><span><a href="/on-bilgilendirme" target="_blank">Ön bilgilendirme formunu</a>, <a href="/mesafeli-satis-sozlesmesi" target="_blank">mesafeli satış sözleşmesini</a> ve <a href="/iptal-iade" target="_blank">iptal / iade koşullarını</a> okudum, onaylıyorum.</span></label>
+          <p class="co-kvkk">Kişisel verileriniz yalnız siparişinizin yürütülmesi ve faturalandırma için, <a href="/kvkk" target="_blank">KVKK aydınlatma metni</a> kapsamında işlenir.</p>
+          <div data-msg role="alert"></div>
+          <button class="btn btn-primary co-pay" type="submit"><svg><use href="#i-lock"/></svg><span data-co-pay>Güvenli ödemeye geç</span></button>
+          <p class="co-secure"><svg><use href="#i-shield"/></svg>iyzico'nun 3D Secure ödeme sayfasına yönlendirilirsiniz. Kart bilgileriniz bize ulaşmaz ve saklanmaz.</p>
+        </fieldset>
       </div>
-      <div data-for="renew" hidden>
-        <div class="co-step"><span class="co-n">2</span><b>Paneliniz</b></div>
-        <div class="row2"><label class="f">Firma kodu *<input class="in" name="slug_renew" autocapitalize="none" required></label><label class="f">Firma e-postası *<input class="in" name="email_renew" type="email" autocomplete="email" required><small class="hint">Firma kaydınızdaki e-posta adresi</small></label></div>
-        <p class="co-note">Satın aldığınız süre mevcut bitiş tarihinizin üstüne eklenir; paket değiştirdiyseniz yeni paket hemen geçerli olur.</p>
-      </div>
 
-      <div class="co-step"><span class="co-n">3</span><b>Fatura bilgileri</b></div>
-      <div class="row2"><label class="f">Yetkili ad soyad *<input class="in" name="contact" autocomplete="name" required></label><label class="f">Cep telefonu *<input class="in" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx" required></label></div>
-      <div class="row2"><label class="f">Şehir *<input class="in" name="city" autocomplete="address-level1" required></label><label class="f">TC kimlik / Vergi no<input class="in" name="identity" inputmode="numeric" maxlength="11"></label></div>
-      <label class="f">Fatura adresi *<input class="in" name="address" autocomplete="street-address" required></label>
-
-      <div class="co-sum" data-co-sum></div>
-      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <label class="consent"><input type="checkbox" name="consent"><span><a href="/on-bilgilendirme" target="_blank">Ön bilgilendirme formunu</a>, <a href="/mesafeli-satis-sozlesmesi" target="_blank">mesafeli satış sözleşmesini</a> ve <a href="/iptal-iade" target="_blank">iptal / iade koşullarını</a> okudum, onaylıyorum. <a href="/kvkk" target="_blank">KVKK aydınlatma metni</a></span></label>
-      <div data-msg></div>
-      <button class="btn btn-primary" type="submit"><svg><use href="#i-lock"/></svg>Güvenli ödemeye geç</button>
-      <p class="co-secure"><svg><use href="#i-shield"/></svg>Ödeme iyzico altyapısıyla 3D Secure olarak alınır. Kart bilgileriniz bize ulaşmaz ve saklanmaz.</p>
+      <aside class="co-aside">
+        <div class="co-sum" data-co-sum aria-live="polite"></div>
+        <div class="co-trust">
+          <div><svg><use href="#i-lock"/></svg><span><b>256-bit SSL</b>Tüm bilgiler şifreli bağlantıyla iletilir</span></div>
+          <div><svg><use href="#i-shield"/></svg><span><b>iyzico ile güvenli ödeme</b>3D Secure; kart bilginiz bize ulaşmaz</span></div>
+          <div><svg><use href="#i-calendar"/></svg><span><b>Taahhüt yok</b>Süre sonunda kendiliğinden yenilenmez</span></div>
+          <div class="co-pays"><img src="/img/pay/iyzico.svg" alt="iyzico ile Öde" width="92" height="30"><img src="/img/pay/visa.svg" alt="Visa" width="52" height="30"><img src="/img/pay/mastercard.svg" alt="Mastercard" width="52" height="30"><img src="/img/pay/troy.svg" alt="Troy" width="52" height="30"></div>
+          <p class="co-links"><a href="/iptal-iade" target="_blank">İptal ve iade koşulları</a><a href="/mesafeli-satis-sozlesmesi" target="_blank">Mesafeli satış sözleşmesi</a><a href="/kvkk" target="_blank">KVKK</a></p>
+        </div>
+        <div class="co-help"><b>Yardıma mı ihtiyacınız var?</b><span>Satın alma ile ilgili sorularınız için <a data-c="company.phone" data-href="tel"></a> · <a data-c="company.email" data-href="mailto"></a></span><span>Önce denemek isterseniz <a data-demo href="https://panel.hasturkcrm.com/api/public/demo">canlı demoyu açın</a>.</span></div>
+      </aside>
     </form>
-    <aside class="co-side">
-      <div class="card"><h3>Neler dahil?</h3><ul class="co-list"><li>Tüm aktif pazaryeri entegrasyonları</li><li>Sipariş, kargo, stok ve kâr-zarar</li><li>Kurulum ücreti yok</li><li>Verileriniz size ait; istediğiniz zaman dışa aktarın</li></ul><p class="small"><a href="/paketler#karsilastir">Paketleri karşılaştırın →</a></p></div>
-      <div class="card"><h3>Önce denemek ister misiniz?</h3><p class="small">7 gün ücretsiz deneme için bize yazın ya da kayıt olmadan canlı demoyu açın.</p><p><a class="btn btn-outline" data-demo href="/demo">Canlı demoyu aç</a></p><p class="small"><a href="/iletisim?konu=demo">Ücretsiz deneme iste →</a></p></div>
-      <div class="card"><h3>Yardım</h3><p class="small">Satın alma ile ilgili sorularınız için: <a data-c="company.phone" data-href="tel"></a> · <a data-c="company.email" data-href="mailto"></a></p></div>
-    </aside>
   </div>
 </section>

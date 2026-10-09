@@ -1,12 +1,16 @@
-// Tanıtım sitesi (hasturkcrm.com): yalnız statik dosyalar, kod çalışmaz. Panelden bağımsız ayrı bir Cloudflare Worker'dır.
+// Tanıtım sitesi (hasturkcrm.com): statik dosyalar + blog sayfaları (src/worker.js; yazılar panelden okunur).
 // Cloudflare: Workers & Pages → Create → Import a repository → hasturk → "Root directory" (Kök dizin): site
 // Alan adı: Worker → Settings → Domains & Routes → Custom domain: hasturkcrm.com (ve www.hasturkcrm.com)
+// Blog yalnız /blog adreslerinde kod çalıştırır; diğer tüm adresler doğrudan statik dosyadır (run_worker_first).
 {
   "name": "hasturk-site",
+  "main": "src/worker.js",
   "compatibility_date": "2025-09-01",
   "assets": {
     "directory": "./public",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/blog", "/blog/*"]
   }
 }

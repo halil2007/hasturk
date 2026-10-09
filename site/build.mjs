@@ -53,6 +53,9 @@ const mnavIntegrations = INTEGRATIONS.map((x) => `<a href="/entegrasyonlar/${x.s
 // ---------- ortak parçalar ----------
 const browser = (img, alt) => `<div class="browser"><div class="bar"><i></i><i></i><i></i><span>panel.hasturkcrm.com</span></div><img src="/img/${img}.jpg" width="1440" height="900" alt="${esc(alt)}"></div>`;
 const MOCKS = {
+  fx: `<div class="mockcard"><div class="mc-h"><b>Döviz kurları</b><span class="pill">TCMB · günlük</span></div>
+    ${[['#1f6feb', '$', 'ABD doları', '34,12 ₺', 'USD 49,90 → 1.702,59 ₺'], ['#0e9f6e', '€', 'Euro', '37,48 ₺', 'EUR 39,00 → 1.461,72 ₺'], ['#7c3aed', '£', 'Sterlin', '44,61 ₺', 'GBP 25,00 → 1.115,25 ₺']].map(([c, b, n, r, ex]) => `<div class="mc-row"><span class="b" style="background:${c}">${b}</span><div><b>${n} · ${r}</b><small>${ex}</small></div><span class="mc-btn">Güncel</span></div>`).join('')}
+    <div class="mc-note">Örnek görünüm · kanal fiyatları kurla kendiliğinden güncellenir</div></div>`,
   questions: `<div class="mockcard"><div class="mc-h"><b>Müşteri soruları</b><span class="pill soon">3 cevap bekliyor</span></div>
     ${[['#f27a1a', 'T', 'Trendyol', 'Bu toprak orkide için uygun mu?', '12 dk'], ['#ff6000', 'hb', 'Hepsiburada', 'Kargo ne zaman çıkar?', '40 dk'], ['#7b3fe4', 'n11', 'N11', 'Paket kaç litre?', '2 sa']].map(([c, b, n, q, t]) => `<div class="mc-row"><span class="b" style="background:${c}">${b}</span><div><b>${q}</b><small>${n} · ${t} önce</small></div><span class="mc-btn">Cevapla</span></div>`).join('')}
     <div class="mc-note">Örnek görünüm</div></div>`,
@@ -254,6 +257,23 @@ for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPa
   await writeFile(join(OUT, g.file), render(g.meta, g.body, g.file.split('/')[0] + '-detay'));
   pages.push({ file: g.file, ...g.meta });
 }
+// Blog sayfa kalıbı (src/worker.js sunucuda doldurur): aynı üst menü / alt bilgi, yer tutucular {{T}} başlık, {{D}} açıklama, {{U}} adres,
+// {{R}} robots, {{O}} og:type, {{I}}/{{IW}}/{{IH}}/{{IA}} paylaşım görseli, {{J}} JSON-LD, {{H}} ek head, {{B}} gövde
+{
+  const SENT = { title: '\u0001T\u0001', description: '\u0001D\u0001', url: '\u0001U\u0001' };
+  let shell = layout.replace('{{sprite}}', sprite).replace('{{head}}', `<link rel="stylesheet" href="/assets/blog.css?v=${createHash('sha1').update(readFileSync(join(OUT, 'assets', 'blog.css'))).digest('hex').slice(0, 10)}">\u0001H\u0001`).replace('{{body}}', '\u0001B\u0001')
+    .replace('{{menuFeatures}}', menuFeatures).replace('{{menuIntegrations}}', menuIntegrations).replace('{{mnavFeatures}}', mnavFeatures).replace('{{mnavIntegrations}}', mnavIntegrations)
+    .replace(/{{v:([a-z.]+)}}/g, (_, f) => ver[f]).replace('{{robots}}', '\u0001R\u0001').replace('{{jsonld}}', '\u0001J\u0001')
+    .replace(/{{title}}/g, SENT.title).replace(/{{description}}/g, SENT.description).replace(/{{url}}/g, SENT.url).replace(/{{page}}/g, 'blog')
+    .replace('<meta property="og:type" content="website">', '<meta property="og:type" content="\u0001O\u0001">')
+    .replace(/https:\/\/hasturkcrm\.com\/img\/genel-bakis\.jpg/g, '\u0001I\u0001').replace('content="1440"', 'content="\u0001IW\u0001"').replace('content="900"', 'content="\u0001IH\u0001"')
+    .replace('content="Hastürk CRM panelinin genel bakış ekranı"', 'content="\u0001IA\u0001"')
+    .replace(/data-nav="blog"/g, 'data-nav="blog" class="on" aria-current="page"');
+  // Sayfadaki (statik) {{…}} benzeri metinler önce kaçışlanır, sonra yer tutucular {{X}} biçimine çevrilir
+  shell = shell.replace(/\{\{/g, '{\u200b{').replace(/\u0001([A-Z]+)\u0001/g, '{{$1}}');
+  await writeFile(join(SRC, 'blog-shell.mjs'), `// node build.mjs üretir; elle düzenlemeyin (kaynak: src/layout.html)\nexport const SHELL = ${JSON.stringify(shell)};\nexport const PANEL_URL = ${JSON.stringify(S.panelUrl || 'https://panel.hasturkcrm.com')};\nexport const SITE_URL = ${JSON.stringify(SITE_URL)};\nexport const ORG = ${JSON.stringify(ORG)};\n`);
+}
+pages.push({ file: 'blog', url: '/blog' });
 const today = new Date().toISOString().slice(0, 10);
 const urls = pages.filter((p) => p.sitemap !== 'no').map((p) => `  <url><loc>https://hasturkcrm.com${p.url}</loc><lastmod>${today}</lastmod></url>`).join('\n');
 await writeFile(join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);

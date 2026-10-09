@@ -3,13 +3,15 @@
 // stok koduyla var olan ürüne bağlar, yoksa yeni ürün kartı açar. Kanal başına mod: otomatik (yeni ilan kendiliğinden ürün olur)
 // ya da "ben seçeyim" (settings.manual_import, bkz. match.js → autoMatch).
 import { all, first, run, getRaw, setSetting, getSettings, log } from './db.js';
-import { autoMatch, relinkItems, normBc, normSku, manualImport, bestCandidates, approveConfident } from './match.js';
+import { autoMatch, relinkItems, normBc, normSku, manualImport, bestCandidates, approveConfident, score, prep } from './match.js';
 import { fillProductInfo, catalogOf, applyDirtyStock } from './sync.js';
 import { chunk, str, fail } from './util.js';
 
 const STATES = {
   all: '1 = 1',
-  unlinked: 'l.product_id IS NULL AND l.ignored = 0',
+  unlinked: "l.product_id IS NULL AND l.ignored = 0 AND COALESCE(l.match, '') NOT LIKE 'dup:%'",
+  // Aynı ürünün bu kanaldaki ikinci ilanı olabilir: kullanıcıya sorulur
+  dup: "l.product_id IS NULL AND l.ignored = 0 AND l.match LIKE 'dup:%'",
   linked: 'l.product_id IS NOT NULL',
   ignored: "l.product_id IS NULL AND l.ignored = 1 AND COALESCE(l.match, '') != 'zero'",
   zero: "l.product_id IS NULL AND l.ignored = 1 AND l.match = 'zero'",
@@ -24,12 +26,13 @@ const filter = (channel, { state = 'all', q = '' } = {}) => {
 export async function channelSummary(db, channels = []) {
   const isManual = await manualImport(db);
   const [rows, settings] = await Promise.all([
-    all(db, `SELECT channel, COUNT(*) AS total, SUM(product_id IS NOT NULL) AS linked, SUM(product_id IS NULL AND ignored = 0) AS unlinked, MAX(synced_at) AS synced_at FROM listings GROUP BY channel`),
+    all(db, `SELECT channel, COUNT(*) AS total, SUM(product_id IS NOT NULL) AS linked, SUM(product_id IS NULL AND ignored = 0) AS unlinked,
+      SUM(product_id IS NULL AND ignored = 0 AND match LIKE 'dup:%') AS dup, MAX(synced_at) AS synced_at FROM listings GROUP BY channel`),
     getSettings(db),
   ]);
   const cats = catalogOf(settings), have = new Set(rows.map((r) => r.channel));
   for (const c of channels) if (!have.has(c)) rows.push({ channel: c, total: 0, linked: 0, unlinked: 0, synced_at: null });
-  return rows.map((r) => ({ ...r, linked: r.linked || 0, unlinked: r.unlinked || 0, manual: isManual(r.channel), catalog: cats.includes(r.channel) }));
+  return rows.map((r) => ({ ...r, linked: r.linked || 0, unlinked: r.unlinked || 0, dup: r.dup || 0, manual: isManual(r.channel), catalog: cats.includes(r.channel) }));
 }
 
 export async function listChannelProducts(db, q) {
@@ -39,14 +42,17 @@ export async function listChannelProducts(db, q) {
   const f = filter(channel, { state: q.state, q: str(q.q).trim() });
   const [rows, total, counts] = await Promise.all([
     all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.name, l.group_name, l.variant_name, l.image, l.price, l.remote_stock, l.product_id, l.ignored, l.match, l.brand, l.category, l.synced_at,
-        p.name AS product_name, p.variant_name AS product_variant, p.sku AS product_sku
-      FROM listings l LEFT JOIN products p ON p.id = l.product_id ${f.w}
+        p.name AS product_name, p.variant_name AS product_variant, p.sku AS product_sku,
+        d.id AS dup_id, d.name AS dup_name, d.variant_name AS dup_variant, d.sku AS dup_sku, d.barcode AS dup_barcode, d.image AS dup_image,
+        (SELECT x.name FROM listings x WHERE x.product_id = d.id AND x.channel = l.channel LIMIT 1) AS dup_listing
+      FROM listings l LEFT JOIN products p ON p.id = l.product_id
+        LEFT JOIN products d ON l.product_id IS NULL AND l.match LIKE 'dup:%' AND d.id = CAST(substr(l.match, 5) AS INTEGER) ${f.w}
       ORDER BY COALESCE(NULLIF(l.group_name, ''), l.name) COLLATE NOCASE, l.variant_name COLLATE NOCASE LIMIT ? OFFSET ?`, ...f.args, limit, (page - 1) * limit),
     first(db, `SELECT COUNT(*) AS n FROM listings l ${f.w}`, ...f.args),
-    first(db, `SELECT COUNT(*) AS total, SUM(${STATES.unlinked}) AS unlinked, SUM(${STATES.linked}) AS linked, SUM(${STATES.ignored}) AS ignored, SUM(${STATES.zero}) AS zero FROM listings l WHERE l.channel = ?`, channel),
+    first(db, `SELECT COUNT(*) AS total, SUM(${STATES.unlinked}) AS unlinked, SUM(${STATES.dup}) AS dup, SUM(${STATES.linked}) AS linked, SUM(${STATES.ignored}) AS ignored, SUM(${STATES.zero}) AS zero FROM listings l WHERE l.channel = ?`, channel),
   ]);
   // Panelde olmayan ilanlar için önerilen eşleşme (var olan ürün; kanalda boş olan)
-  const sug = await bestCandidates(db, rows.filter((l) => !l.product_id));
+  const sug = await bestCandidates(db, rows.filter((l) => !l.product_id && !l.dup_id));
   for (const l of rows) l.suggest = sug.get(l.remote_id) || null;
   return { listings: rows, total: total.n, page, limit, counts: Object.fromEntries(Object.entries(counts || {}).map(([k, v]) => [k, v || 0])) };
 }
@@ -65,17 +71,22 @@ export async function addToPanel(env, db, b, user = {}) {
   const ls = [];
   for (const part of chunk(ids, 300)) ls.push(...await all(db, `SELECT * FROM listings WHERE channel = ? AND product_id IS NULL AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
   // Var olan ürünler (barkod / stok kodu) ve bu kanaldan zaten ilanı olanlar (bir ürüne her kanaldan tek ilan)
-  const prods = await all(db, 'SELECT id, sku, barcode FROM products');
+  const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name FROM products');
+  const pById = new Map(prods.map((p) => [p.id, p]));
   const taken = new Set((await all(db, 'SELECT product_id FROM listings WHERE channel = ? AND product_id IS NOT NULL', channel)).map((r) => r.product_id));
   const byBc = new Map(), bySku = new Map();
   for (const p of prods) { if (normBc(p.barcode)) byBc.set(normBc(p.barcode), p.id); if (normSku(p.sku)) bySku.set(normSku(p.sku), p.id); }
   const t = Date.now();
   let linked = 0, created = 0;
-  const links = [];
+  const links = [], twins = [];
   const toCreate = [];
   for (const l of ls) {
     const hit = (normBc(l.barcode) && byBc.get(normBc(l.barcode))) || (normSku(l.sku) && bySku.get(normSku(l.sku)));
     if (hit && !taken.has(hit)) { links.push([hit, 'manual', l]); taken.add(hit); linked++; continue; }
+    // Aynı barkod / stok kodlu ürünün bu kanalda zaten ilanı var: mükerrer ürün açılmaz, "aynı ürün mü?" diye sorulur
+    const byBarcode = normBc(l.barcode) && byBc.get(normBc(l.barcode)) === hit, hp = pById.get(hit);
+    const alike = byBarcode || (hp && score(prep({ name: l.name, variant: l.variant_name }), prep({ name: hp.name, variant: hp.variant_name })).score >= 70);
+    if (hit && alike && l.match !== 'dup_no') { twins.push([hit, l]); continue; }
     toCreate.push(l);
   }
   // Yeni ürünler: 50'lik gruplar halinde (her grup tek veritabanı gidiş-dönüşü)
@@ -93,6 +104,7 @@ export async function addToPanel(env, db, b, user = {}) {
   for (const part of chunk(links, 90)) {
     await db.batch(part.map(([id, how, l]) => db.prepare('UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, channel, l.remote_id)));
   }
+  for (const part of chunk(twins, 90)) await db.batch(part.map(([id, l]) => db.prepare("UPDATE listings SET match = ? WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind('dup:' + id, channel, l.remote_id)));
   // Sipariş satırları yeni ürünlere bağlanır; diğer kanallardaki aynı ürünün ilanları kesin eşleşmeyle bağlanır
   await relinkItems(db);
   const settings = await getSettings(db);
@@ -100,7 +112,7 @@ export async function addToPanel(env, db, b, user = {}) {
   const m = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] }).catch(() => ({ linked: 0 }));
   await fillProductInfo(db, settings).catch(() => {});
   await log(db, channel, 'info', `${user.name || 'Panel'}: kanal ürünlerinden panele alındı · ${created} yeni ürün, ${linked} var olan ürüne bağlandı${m.linked ? `, diğer kanallardan ${m.linked} ilan eşleşti` : ''}`);
-  return { created, linked, others: m.linked || 0, skipped: ids.length - ls.length };
+  return { created, linked, twins: twins.length, others: m.linked || 0, skipped: ids.length - ls.length };
 }
 
 // Güçlü önerileri onayla: en iyi aday en az 85 puan ve ikinciden 15 puan öndeyse bağlar
@@ -122,6 +134,24 @@ export async function ignoreListings(db, b) {
     n += (r.meta && r.meta.changes) || 0;
   }
   return { changed: n };
+}
+
+// Tekrar olabilir ilanlara karar: same = aynı ürün (ilan o ürüne de bağlanır; ürünün bu kanalda iki ilanı olur, stok ikisine de gider),
+// aksi halde farklı ürün (ilandan yeni ürün kartı açılır ve bir daha sorulmaz)
+export async function resolveTwins(env, db, b, user = {}) {
+  const channel = str(b.channel), ids = (Array.isArray(b.ids) ? b.ids : []).map(String).slice(0, 500);
+  if (!channel || !ids.length) fail(400, 'İlan seçin');
+  const ls = [];
+  for (const part of chunk(ids, 300)) ls.push(...await all(db, `SELECT remote_id, match FROM listings WHERE channel = ? AND product_id IS NULL AND match LIKE 'dup:%' AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
+  if (!ls.length) fail(400, 'Seçilen ilanlar artık beklemiyor; sayfayı yenileyin');
+  if (b.same) {
+    for (const part of chunk(ls, 90)) await db.batch(part.map((l) => db.prepare("UPDATE listings SET product_id = ?, match = 'dup_ok', ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind(Number(l.match.slice(4)), channel, l.remote_id)));
+    await relinkItems(db);
+    await log(db, channel, 'info', `${user.name || 'Panel'}: ${ls.length} ilan aynı ürünün ikinci ilanı olarak bağlandı`);
+    return { linked: ls.length };
+  }
+  for (const part of chunk(ls, 90)) await db.batch(part.map((l) => db.prepare("UPDATE listings SET match = 'dup_no' WHERE channel = ? AND remote_id = ?").bind(channel, l.remote_id)));
+  return addToPanel(env, db, { channel, ids: ls.map((l) => l.remote_id) }, user);
 }
 
 // Kanal modu: manual = true → "ben seçeyim"

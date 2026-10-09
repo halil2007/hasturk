@@ -5,7 +5,7 @@ import { api, html, render, $, n, money, ago, ch, chLogo, thumb, actions, busy, 
 import { loadSummary, setQuery } from '../app.js';
 import { findProduct } from './match.js';
 
-const TABS = [['unlinked', 'Panelde değil'], ['linked', 'Panelde'], ['ignored', 'Yok sayılan'], ['zero', 'Stoğu bitmiş'], ['all', 'Tümü']];
+const TABS = [['unlinked', 'Panelde değil'], ['dup', 'Tekrar olabilir'], ['linked', 'Panelde'], ['ignored', 'Yok sayılan'], ['zero', 'Stoğu bitmiş'], ['all', 'Tümü']];
 const vtag = (v, name) => (v && !String(name || '').includes(v) ? html`<span class="var-tag">${v}</span>` : '');
 
 export async function channelProductsView(el, rest, query = {}) {
@@ -26,7 +26,7 @@ export async function channelProductsView(el, rest, query = {}) {
 
   const cur = () => chans.find((c) => c.channel === f.channel) || {};
   function drawTabs() {
-    render($('[data-chtabs]', el), html`${chans.map((c) => html`<button class="ch-tab ${f.channel === c.channel ? 'on' : ''}" data-act="ch" data-id="${c.channel}">${chLogo(c.channel)}<span>${ch(c.channel).name}</span>${c.unlinked ? html`<span class="badge-n" title="Panelde olmayan ilan">${n(c.unlinked)}</span>` : ''}</button>`)}`);
+    render($('[data-chtabs]', el), html`${chans.map((c) => html`<button class="ch-tab ${f.channel === c.channel ? 'on' : ''}" data-act="ch" data-id="${c.channel}">${chLogo(c.channel)}<span>${ch(c.channel).name}</span>${c.dup ? html`<span class="badge-n warn" title="Aynı ürünün ikinci ilanı olabilir">${n(c.dup)}</span>` : c.unlinked ? html`<span class="badge-n" title="Panelde olmayan ilan">${n(c.unlinked)}</span>` : ''}</button>`)}`);
     const c = cur();
     render($('[data-head]', el), c.channel ? html`<div class="card cp-head">
       <div class="row wrap" style="gap:14px">
@@ -40,7 +40,7 @@ export async function channelProductsView(el, rest, query = {}) {
     : c.catalog ? 'Otomatik: bu kanal ana katalog; buradaki her yeni ilan senkronda kendiliğinden panel ürünü olur.' : 'Otomatik: bu kanaldaki ilanlar panelde var olan ürünlere kendiliğinden bağlanır; karşılığı olmayanlar burada ve Eşleştirme\'de bekler. Ana katalog (yeni ürün açan kanal) Ayarlar\'dan seçilir.'}</div>
     </div>` : '');
     const cn = data.counts || {};
-    render($('[data-tabs]', el), html`${TABS.map(([k, t]) => html`<button class="tab ${f.state === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${n(k === 'all' ? cn.total || 0 : cn[k] || 0)}</span></button>`)}`);
+    render($('[data-tabs]', el), html`${TABS.filter(([k]) => k !== 'dup' || cn.dup || f.state === 'dup').map(([k, t]) => html`<button class="tab ${f.state === k ? 'on' : ''} ${k === 'dup' ? 'warn' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${n(k === 'all' ? cn.total || 0 : cn[k] || 0)}</span></button>`)}`);
   }
 
   const stateCell = (l) => (l.product_id ? html`<a class="pill good" href="#/urunler?q=${encodeURIComponent(l.product_sku || l.product_name || '')}" title="Panel ürünü: ${l.product_name || ''}">Panelde</a>`
@@ -51,10 +51,16 @@ export async function channelProductsView(el, rest, query = {}) {
       <button class="btn sm outline" data-act="linksug" data-pid="${l.suggest.product_id}">Bağla</button></div>` : '');
   const acts = (l) => (l.product_id ? html`<span class="muted tiny ellipsis" style="max-width:180px;display:inline-block">${l.product_name || ''}</span>`
     : html`<button class="btn sm ${l.suggest && l.suggest.score >= 60 ? '' : 'primary'}" data-act="add1" title="Yeni ürün kartı aç (aynı barkod / stok kodlu ürün varsa ona bağlanır)">Yeni ürün olarak ekle</button><button class="icon-btn sm" data-act="more" aria-label="Diğer"><i class="ico ico-dots"></i></button>`);
+  // Aynı ürünün ikinci ilanı olabilir: hangi panel ürünü ve bu kanaldaki hangi ilanla çakıştığı; karar düğmeleri
+  const twinCell = (l) => html`<div class="cp-sug"><span class="score mid" title="Barkod / stok kodu / ad aynı">?</span>
+      <div style="min-width:0;flex:1"><div class="muted tiny">Paneldeki ürün (bu kanalda zaten ilanı var)</div><div class="ellipsis small" style="font-weight:600;max-width:300px" title="${l.dup_name || ''}">${l.dup_name || ''}${l.dup_variant ? ` · ${l.dup_variant}` : ''}</div>
+        <div class="muted tiny ellipsis" style="max-width:300px">${[l.dup_sku, l.dup_barcode].filter(Boolean).join(' · ')}${l.dup_listing ? ` · mevcut ilan: ${l.dup_listing}` : ''}</div></div></div>`;
+  const twinActs = () => html`<button class="btn sm primary" data-act="twinsame" title="Bu ilan da aynı ürün: ürünün stoğu iki ilana da gider">Aynı ürün, bağla</button><button class="btn sm" data-act="twinsep" title="Farklı ürün: ilandan yeni ürün kartı açılır">Farklı ürün</button>`;
   const pick = (l) => (l.product_id ? html`<span style="display:inline-block;width:18px"></span>` : html`<input type="checkbox" class="cb" data-sel="${l.remote_id}" ${sel.has(l.remote_id) ? 'checked' : ''} aria-label="Seç">`);
 
   function bulkbar() {
     if (sel.size) {
+      if (f.state === 'dup') return html`<div class="bulk"><b>${sel.size} ilan seçildi</b><button class="btn sm primary" data-act="twinsame">Aynı ürün, bağla</button><button class="btn sm" data-act="twinsep">Farklı ürün, ayrı ekle</button><span class="spacer"></span><button class="btn sm ghost" data-act="clearsel">Seçimi kaldır</button></div>`;
       return html`<div class="bulk"><b>${sel.size} ilan seçildi</b>
         <button class="btn sm primary" data-act="addsel"><i class="ico ico-plus"></i>Panele ekle</button>
         ${f.state === 'ignored' || f.state === 'zero' ? html`<button class="btn sm" data-act="unignoresel">Yok saymayı kaldır</button>` : html`<button class="btn sm" data-act="ignoresel">Yok say</button>`}
@@ -62,6 +68,7 @@ export async function channelProductsView(el, rest, query = {}) {
     }
     const free = data.listings.filter((l) => !l.product_id);
     if (!free.length) return '';
+    if (f.state === 'dup') return html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bu ilanlar, panelde olan ve <b>bu kanalda zaten ilanı bulunan</b> bir ürünle aynı görünüyor (aynı barkod, stok kodu ya da ad). Yeni ürün açılmadı. <b>Aynı ürün</b> derseniz ilan o ürüne de bağlanır ve ürünün stoğu iki ilana da gider; <b>Farklı ürün</b> derseniz ilandan yeni ürün kartı açılır.</div></div><div class="bulk"><label class="check"><input type="checkbox" class="cb" data-selall> Bu sayfadakileri seç</label></div>`;
     const strong = free.filter((l) => l.suggest && l.suggest.score >= 85).length;
     return html`<div class="bulk"><label class="check"><input type="checkbox" class="cb" data-selall> Bu sayfadakileri seç</label>
       ${strong ? html`<button class="btn sm outline" data-act="accept" title="En iyi aday en az 85 puan ve ikinci adaydan belirgin öndeyse bağlar"><i class="ico ico-check"></i>Güçlü önerileri bağla</button>` : ''}
@@ -88,7 +95,7 @@ export async function channelProductsView(el, rest, query = {}) {
         <div class="row" style="align-items:flex-start">${pick(l)}${thumb(l.image, l.name, 'lg')}<div style="min-width:0;flex:1"><div style="font-weight:650" class="clamp2">${l.name}${vtag(l.variant_name, l.name)}</div>
           <div class="muted tiny ellipsis">${[l.sku, l.barcode].filter(Boolean).join(' · ') || l.remote_id}</div>
           <div class="row" style="margin-top:4px;gap:10px"><b class="num">${money(l.price)}</b><span class="small ${l.remote_stock > 0 ? '' : 'down'}">${l.remote_stock ?? '—'} stok</span></div></div></div>
-        ${sugg(l)}<div class="row">${stateCell(l)}<span class="spacer"></span>${acts(l)}</div></div>`) : empty}</div>${pager()}`);
+        ${l.dup_id ? twinCell(l) : sugg(l)}<div class="row">${l.dup_id ? '' : stateCell(l)}<span class="spacer"></span>${l.dup_id ? twinActs() : acts(l)}</div></div>`) : empty}</div>${pager()}`);
       return;
     }
     render(box, html`${bulkbar()}<div class="table-wrap"><table class="t"><thead><tr><th style="width:40px"></th><th>İlan</th><th>SKU / barkod</th><th class="r">Fiyat</th><th class="r">Stok</th><th>Durum / önerilen eşleşme</th><th class="r"></th></tr></thead><tbody>
@@ -98,8 +105,8 @@ export async function channelProductsView(el, rest, query = {}) {
         <td class="small"><div>${l.sku || '—'}</div><div class="muted tiny num">${l.barcode || ''}</div></td>
         <td class="r num">${money(l.price)}</td>
         <td class="r num ${l.remote_stock > 0 ? '' : 'down'}">${l.remote_stock ?? '—'}</td>
-        <td style="min-width:300px">${l.suggest && !l.product_id ? sugg(l) : stateCell(l)}</td>
-        <td class="r"><div class="row" style="justify-content:flex-end;gap:4px">${acts(l)}</div></td></tr>`)}
+        <td style="min-width:300px">${l.dup_id ? twinCell(l) : l.suggest && !l.product_id ? sugg(l) : stateCell(l)}</td>
+        <td class="r"><div class="row" style="justify-content:flex-end;gap:4px">${l.dup_id ? twinActs() : acts(l)}</div></td></tr>`)}
     </tbody></table></div>${L.length ? '' : empty}${pager()}`);
   }
 
@@ -121,7 +128,7 @@ export async function channelProductsView(el, rest, query = {}) {
     try { if (full || !chans.length) await loadChannels(); await load(); } catch (e) { toast(e.message, true); }
   };
   const after = async (msg) => { sel.clear(); toast(msg); loadSummary().catch(() => {}); await refresh(true); };
-  const added = (r) => `${r.created ? `${n(r.created)} yeni ürün açıldı` : ''}${r.created && r.linked ? ', ' : ''}${r.linked ? `${n(r.linked)} ilan var olan ürüne bağlandı` : ''}${r.others ? ` · diğer kanallardan ${n(r.others)} ilan da eşleşti` : ''}` || 'Değişiklik yok';
+  const added = (r) => `${r.created ? `${n(r.created)} yeni ürün açıldı` : ''}${r.created && r.linked ? ', ' : ''}${r.linked ? `${n(r.linked)} ilan var olan ürüne bağlandı` : ''}${r.twins ? ` · ${n(r.twins)} ilan aynı ürünün ikinci ilanı olabilir: "Tekrar olabilir" sekmesinden onaylayın` : ''}${r.others ? ` · diğer kanallardan ${n(r.others)} ilan da eşleşti` : ''}` || 'Değişiklik yok';
   const keyOf = (t) => t.closest('[data-key]').dataset.key;
   const rowOf = (t) => data.listings.find((l) => l.remote_id === keyOf(t));
 
@@ -144,6 +151,9 @@ export async function channelProductsView(el, rest, query = {}) {
     ignoresel: (t) => busy(t, async () => { const r = await api('channel-products/ignore', { method: 'POST', body: { channel: f.channel, ids: [...sel] } }); await after(`${n(r.changed)} ilan yok sayıldı`); }),
     unignoresel: (t) => busy(t, async () => { const r = await api('channel-products/ignore', { method: 'POST', body: { channel: f.channel, ids: [...sel], ignored: false } }); await after(`${n(r.changed)} ilan bekleyenlere alındı`); }),
     clearsel: () => { sel.clear(); draw(); },
+    // Tekrar olabilir: satırdaki düğme o ilan için, üst çubuktaki seçilenler için
+    twinsame: (t) => busy(t, async () => { const ids = t.closest('[data-key]') ? [keyOf(t)] : [...sel]; const r = await api('channel-products/twins', { method: 'POST', body: { channel: f.channel, ids, same: true } }); await after(`${n(r.linked || 0)} ilan aynı ürüne bağlandı`); }),
+    twinsep: (t) => busy(t, async () => { const ids = t.closest('[data-key]') ? [keyOf(t)] : [...sel]; const r = await api('channel-products/twins', { method: 'POST', body: { channel: f.channel, ids, same: false } }); await after(added(r)); }),
     more: (t) => {
       const l = rowOf(t);
       if (!l) return;

@@ -15,7 +15,7 @@ const call = (env, path, { method = 'GET', body, cookie, origin } = {}) => worke
 test('demo paneli: bağlantı, oturum, örnek veri, kısıtlar, günlük sıfırlama', async () => {
   const env = { PANEL_SECRET: 'gizli-anahtar-123', DB: d1() };
   env.TENANT = doNamespace(TenantPanel, () => env);
-  const lead = await (await call(env, '/api/public/lead', { method: 'POST', origin: 'https://hasturkcrm.com', body: { name: 'Ali Veli', phone: '0555', consent: true } })).json();
+  const lead = await (await call(env, '/api/public/lead', { method: 'POST', origin: 'https://hasturkcrm.com', body: { name: 'Ali Veli', phone: '0555 000 00 00', email: 'ali@ornek.com', consent: true } })).json();
   assert.ok(lead.ok); assert.equal(lead.demo, 'https://panel.test/api/public/demo');
   const path = '/api/public/demo';
 
@@ -86,6 +86,6 @@ test('demo firma kodu başka firmaya verilemez; gizli anahtar yoksa bağlantı �
   const req = new Request('https://panel.test/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'demo', name: 'X', admin_username: 'yonetim', admin_password: '12345678' }) });
   await assert.rejects(tenantApi(req, env, env.DB, 'tenants', { role: 'admin' }), /demo paneline ayrılmış/);
   const env2 = { PANEL_PASSWORD: '', DB: d1() };
-  const lead = await (await call(env2, '/api/public/lead', { method: 'POST', origin: 'https://hasturkcrm.com', body: { name: 'Ali Veli', phone: '0555', consent: true } })).json();
+  const lead = await (await call(env2, '/api/public/lead', { method: 'POST', origin: 'https://hasturkcrm.com', body: { name: 'Ali Veli', phone: '0555 000 00 00', email: 'ali@ornek.com', consent: true } })).json();
   assert.equal(lead.demo, null);
 });

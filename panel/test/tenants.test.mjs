@@ -83,7 +83,7 @@ test('müşteri paneli: yönetici adı "admin" olabilir; başka siteden gelen y�
   assert.equal((await owner('/api/tenants', J({ slug: 'acme', name: 'Acme', admin_username: 'admin', admin_password: 'acme-sifre-1' }))).status, 200);
   assert.equal((await tenant('/api/login', J({ tenant: 'acme', username: 'admin', password: 'acme-sifre-1' }))).status, 200);
   assert.equal((await (await tenant('/api/me')).json()).user.username, 'admin');
-  assert.equal((await tenant('/api/fx')).status, 403, 'döviz bazlı fiyat müşteri panelinde yakında');
+  assert.equal((await tenant('/api/fx')).status, 200, 'paketsiz (özel) firmada döviz bazlı fiyat açık');
   const evil = await owner('/api/tenants/acme/password', { method: 'POST', body: JSON.stringify({ password: 'kotu-sifre-12' }), headers: { Origin: 'https://evil.example' } });
   assert.equal(evil.status, 403);
   resetChannels();

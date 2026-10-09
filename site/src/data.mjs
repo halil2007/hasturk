@@ -211,6 +211,26 @@ export const FEATURES = [
     ],
     related: ['stok-senkronizasyonu', 'ekip-ve-guvenlik', 'urun-yonetimi'],
   },
+  {
+    slug: 'doviz-endeksli-fiyat', name: 'Döviz kuruna endeksli fiyat', icon: 'i-calc', color: 'c-teal', short: 'Dolar / euro fiyatı, kurla otomatik TL fiyat',
+    title: 'Döviz Kuruna Endeksli Otomatik Fiyat — Hastürk CRM', h1: ['Kur Değişsin,', 'Fiyatınız Kendiliğinden Güncellensin'],
+    lead: 'İthal ya da dövizle aldığınız ürünlere dolar, euro veya sterlin fiyatı girin; TL satış fiyatınız ve tüm pazaryeri fiyatlarınız güncel kurla kendiliğinden hesaplanıp kanallara gönderilsin. Kur yükseldiğinde zarar etmezsiniz.',
+    mock: 'fx',
+    points: [
+      ['i-calc', 'Dövizle fiyat', 'Ürüne USD, EUR ya da GBP fiyatı girin; TL fiyatı kurla hesaplanır, kâr payını ürün bazında ekleyin.'],
+      ['i-sync', 'Kanallara otomatik', 'Yeni TL fiyatı Trendyol, Hepsiburada ve diğer kanallara kendiliğinden gider; kanallar arasındaki fiyat farkınız korunur.'],
+      ['i-clock', 'Güncelleme sıklığı', 'Anlık (piyasa kuru, ~15 dakikada bir), günlük, haftalık, aylık ya da yalnız düğmeyle; kur belirlediğiniz eşikten fazla değişince.'],
+      ['i-shield', 'Resmi kur', 'Merkez Bankası (TCMB) günlük kuru ya da anlık piyasa kuru; döviz alış / satış, efektif alış / satış seçenekleri.'],
+      ['i-tag', 'Yuvarlama', 'Fiyatlar kuruşuyla, tam sayıya ya da ,90 / ,99 ile bitecek şekilde yuvarlanır.'],
+      ['i-eye', 'Kontrol sizde', 'Her güncelleme işlem kayıtlarına yazılır; döviz fiyatlı ürünlerin TL fiyatı elle yanlışlıkla değiştirilemez.'],
+    ],
+    faq: [
+      ['Hangi pakette var?', 'Döviz kuruna endeksli otomatik fiyat Kurumsal pakette yer alır.'],
+      ['Kur düşerse fiyatım da düşer mi?', 'Evet; fiyat kurla iki yönde de güncellenir. Küçük dalgalanmalarda fiyat değişmesin diye bir eşik (ör. %0,5) belirleyebilirsiniz.'],
+      ['Pazaryerindeki fiyatım panelden farklıysa ne olur?', 'Kanal fiyatı, ürünün eski TL fiyatına göre oranı korunarak güncellenir; ör. Trendyol\'da %10 farklı satıyorsanız fark korunur.'],
+    ],
+    related: ['urun-yonetimi', 'buybox-takibi', 'kar-zarar'],
+  },
 ];
 
 // Entegrasyonlar. caps: [özellik, true | false | 'metin'] (sayfadaki "Desteklenen işlemler" kartı)
@@ -262,6 +282,18 @@ export const INTEGRATIONS = [
       ['i-sync', 'Stok eşitleme', 'Pazaryerinde satılan ürünün stoğu ikas sitenizde de düşer.'],
     ],
     help: 'ikas paneli → Uygulamalar → Özel uygulama oluştur. İzinler: Ürünler, Siparişler, Stok, Mağaza bilgisi (okuma + yazma).',
+  },
+  {
+    slug: 'woocommerce', name: 'WooCommerce', kind: 'e-ticaret sitesi', color: '#7f54b3', badge: 'W', word: 'WooCommerce',
+    lead: 'WordPress / WooCommerce sitenizin siparişlerini pazaryeri siparişlerinizle aynı listede yönetin; stok ve fiyatlarınızı tüm kanallarla eşit tutun.',
+    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo bildirimi', true], ['Kargo etiketi', 'Panel etiketi'], ['Birden fazla site', true], ['Müşteri soruları', false], ['İade talepleri', false]],
+    points: [
+      ['i-cart', 'Siparişler', 'WooCommerce siparişleri diğer kanallarla aynı listeye gelir; durum değişiklikleri sitenize işlenir.'],
+      ['i-sync', 'Stok ve fiyat', 'Pazaryerinde satılan ürünün stoğu WooCommerce sitenizde de düşer; fiyatlarınız eşit kalır.'],
+      ['i-store', 'Birden fazla site', 'Birden fazla WooCommerce sitenizi ayrı mağazalar olarak bağlayın.'],
+      ['i-tag', 'Etiket', 'Kendi kargo anlaşmanızla gönderimde etiket sipariş ve adres bilgisiyle panelden basılır.'],
+    ],
+    help: 'WordPress yönetimi → WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (izin: Okuma/Yazma). Siteniz HTTPS olmalıdır.',
   },
   {
     slug: 'pttavm', name: 'PttAVM', kind: 'pazaryeri', color: '#e0a800', badge: 'Ptt', word: 'PttAVM',
@@ -348,6 +380,11 @@ const MORE = {
     why: ['Herkesin aynı hesapla girdiği bir panelde kimin ne yaptığı bilinmez; pazaryeri şifresini paylaşmak da ciddi bir güvenlik riskidir.', 'Her personelin kendi hesabı ve yalnız işi olan bölümlere yetkisi olur; iki adımlı doğrulama ve işlem kayıtlarıyla kontrol sizde kalır.'],
     steps: [['Personel ekleyin', 'Kullanıcı adı ve şifreyle hesap açın.'], ['Rolünü seçin', 'Hazır şablonlardan seçin ya da bölüm bölüm yetki verin.'], ['Güvenliği açın', 'İki adımlı doğrulamayı herkes için zorunlu tutun.']],
     benefits: [['i-lock', 'Şifre paylaşımı yok', 'Herkesin kendi hesabı'], ['i-eye', 'Görünürlük', 'Kim ne yaptı kayıtlı'], ['i-shield', 'Güçlü giriş', 'İki adımlı doğrulama'], ['i-users', 'Doğru yetki', 'Herkes yalnız işini görür']],
+  },
+  'doviz-endeksli-fiyat': {
+    why: ['Dövizle aldığınız ürünün fiyatını kur her değiştiğinde onlarca kanalda tek tek güncellemek saatler sürer; geciktiğiniz her gün maliyetinizin altında satabilirsiniz.', 'Ürünün döviz fiyatını bir kez girersiniz; panel kuru takip eder, TL fiyatı hesaplar ve tüm kanallara kendisi gönderir.'],
+    steps: [['Döviz fiyatı girin', 'Ürün kartında para birimini ve döviz fiyatını yazın.'], ['Kuralı seçin', 'Kur kaynağı, güncelleme sıklığı, eşik ve yuvarlama.'], ['Gerisini panel yapsın', 'Kur değişince TL fiyatı ve kanal fiyatları kendiliğinden güncellenir.']],
+    benefits: [['i-up', 'Zarar yok', 'Maliyet kurla birlikte izlenir'], ['i-clock', 'Zaman kazancı', 'Elle fiyat güncelleme biter'], ['i-sync', 'Tüm kanallar', 'Tek seferde her yerde'], ['i-shield', 'Resmi kur', 'TCMB ya da anlık piyasa']],
   },
   'stok-api': {
     why: ['Bayileriniz ya da kendi siteniz güncel stoğunuzu bilmezse olmayan ürünü satar. Stok listesini e-postayla ya da Excel\'le göndermek gecikmeli ve hatalıdır.', 'Bayinizin sistemi panelinizdeki güncel stoğu güvenli bir API ile kendisi okur; siz hiçbir şey göndermezsiniz.'],

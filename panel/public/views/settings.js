@@ -1,6 +1,6 @@
 // Ayarlar: firma bilgileri ve logo, stok senkronu ve stok sınırı, ana katalog, komisyon/kargo, kargo etiketi, kayıtlar.
 // Kanal API bilgileri Entegrasyonlar'da, kullanıcılar Kullanıcılar sayfasındadır.
-import { api, state, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels, sheet, store, themeOf, applyTheme } from '../core.js';
+import { api, state, locked, html, render, $, $$, n, dateTime, ch, chLogo, actions, busy, toast, numIn, confirmBox, isAdmin, activeChannels, sheet, store, themeOf, applyTheme } from '../core.js';
 import { apiGuide } from '../apiguide.js';
 import { loadSummary } from '../app.js';
 import { costOf, COST_KEYS } from '../profit.js';
@@ -40,7 +40,7 @@ export async function settingsView(el) {
   }
   let tab = 'firma';
   try { tab = sessionStorage.getItem('settings_tab') || 'firma'; } catch { /* yok */ }
-  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(state.tenant ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ...(state.tenant || !admin ? [] : [['api', 'Stok API', 'link']]), ['kayit', 'İşlem kayıtları', 'orders'], ['gorunum', 'Görünüm', 'bolt']];
+  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(locked('fx') ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ...(state.tenant || !admin ? [] : [['api', 'Stok API', 'link']]), ['kayit', 'İşlem kayıtları', 'orders'], ['gorunum', 'Görünüm', 'bolt']];
   el.addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) showTab(b.dataset.st); });
   const load = async () => { await load0(); drawPush(); };
   async function load0() {
@@ -96,7 +96,7 @@ export async function settingsView(el) {
           <div class="muted tiny" style="margin-top:4px">Diğer kanallardaki ilanlar barkod / stok kodu kesin tutuyorsa otomatik bağlanır; tutmuyorsa Eşleştirme sayfasında onayınızı bekler.</div></div>
       </div>
 
-      <div class="card stack" data-fxcard data-stab="${state.tenant ? 'giderler' : 'doviz'}">${state.tenant ? html`<h2>Döviz ve fiyat <span class="pill info">Yakında</span></h2><div class="muted small">Dolar, euro ve sterlin bazlı ürün fiyatı; anlık / günlük / haftalık / aylık kur güncellemesi yakında panelinizde.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
+      <div class="card stack" data-fxcard data-stab="${locked('fx') ? 'giderler' : 'doviz'}">${locked('fx') ? html`<h2>Döviz kuruna endeksli fiyat <span class="pill info">Kurumsal paket</span></h2><div class="muted small">Ürüne dolar, euro ya da sterlin fiyatı girin; TL satış fiyatı ve kanal fiyatları anlık / günlük / haftalık / aylık kurla kendiliğinden güncellensin. Kurumsal pakette açılır; <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
 
       <div class="card flush" data-stab="giderler"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
@@ -234,7 +234,7 @@ export async function settingsView(el) {
   const ROUND = [['none', 'Kuruşuyla'], ['int', 'Tam sayıya'], ['90', ',90 ile bitsin'], ['99', ',99 ile bitsin']];
   async function drawFx(refresh) {
     const box = $('[data-fxcard]', el);
-    if (!box || state.tenant) return;
+    if (!box || locked('fx')) return;
     let d;
     try { d = await api('fx' + (refresh ? '?refresh=1' : ''), refresh ? { fresh: true } : {}); } catch (e) { return render(box, html`<h2>Döviz ve fiyat</h2><div class="notice bad small">${e.message}</div>`); }
     const fx = d.settings, R = (d.rates && d.rates.rates) || {}, dis = isAdmin() ? '' : 'disabled';

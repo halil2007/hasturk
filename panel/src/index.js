@@ -6,8 +6,12 @@ import { syncAll, quickSync } from './sync.js';
 import { handle, report5xx } from './handler.js';
 import { PerfBuffer } from './perf.js';
 import { extApi } from './extapi.js';
-import { leadRequest, demoRequest } from './lead.js';
+import { leadRequest, demoRequest, siteOrigins } from './lead.js';
+import { releasedTypes, BETA_TYPES } from './config.js';
 import { publicCheckout, checkoutCallback, checkoutStatus } from './billing.js';
+import { blogPublic } from './blog.js';
+import { turnstileOk, CAPTCHA_ERROR } from './turnstile.js';
+import { actionSucceeded, resolveQuiet } from './errors.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 import { currentUser } from './auth.js';
@@ -16,10 +20,20 @@ import { json, body, HttpError } from './util.js';
 
 export { TenantPanel } from './tenants.js';
 
+async function publicChannels(req, env) {
+  const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');
+  const h = { Vary: 'Origin', 'Cache-Control': 'public, max-age=120, s-maxage=300', ...(siteOrigins(env).includes(origin) ? { 'Access-Control-Allow-Origin': origin } : {}) };
+  let rel = [];
+  try { if (env.DB) { await init(env.DB); rel = await releasedTypes(env, env.DB); } } catch (e) { console.error('kanal listesi', e); }
+  return json({ released: rel, beta: BETA_TYPES.filter((t) => !rel.includes(t)) }, 200, h);
+}
+
 // Tarayıcı güvenlik başlıkları (panel sayfaları): yalnız kendi betiğimiz çalışır, panel başka sitede çerçeve içinde açılamaz,
 // görseller https / data ile sınırlı. Bir açık olsa bile dışarıdan betik yüklenemez ve veri başka sunucuya gönderilemez.
-const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "font-src 'self' data:",
-  "img-src 'self' data: blob: https:", "connect-src 'self'", "worker-src 'self'", "frame-src 'self' blob: data:", "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
+// Turnstile (giriş ekranındaki bot doğrulaması) yalnız challenges.cloudflare.com'dan betik ve çerçeve yükler
+const TS = 'https://challenges.cloudflare.com';
+const CSP = ["default-src 'self'", `script-src 'self' ${TS}`, "style-src 'self' 'unsafe-inline'", "font-src 'self' data:",
+  "img-src 'self' data: blob: https:", `connect-src 'self' ${TS}`, "worker-src 'self'", `frame-src 'self' blob: data: ${TS}`, "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 function secure(res) {
   const r = new Response(res.body, res);
   r.headers.set('Content-Security-Policy', CSP);
@@ -42,6 +56,10 @@ export default {
     if (path === 'public/checkout/status') return checkoutStatus(req, env);
     if (path === 'public/checkout') return await publicCheckout(req, env);
     if (path === 'public/checkout/callback') return await checkoutCallback(req, env);
+    // Blog (tanıtım sitesi için; oturumsuz, yalnız okuma: yazı listesi, yazı, görsel, RSS, site haritası — bkz. blog.js)
+    if (path === 'public/blog' || path.startsWith('public/blog/')) return await blogPublic(req, env, path);
+    // Tanıtım sitesi: müşterilere açık kanal türleri (test modülünden açılanlar; Entegrasyonlar sayfası "Yakında" etiketini buna göre kaldırır)
+    if (path === 'public/channels' && req.method === 'GET') return await publicChannels(req, env);
     // Demo paneline giriş (sitedeki imzalı bağlantı)
     if (path === 'public/demo') return await demoRequest(req, env);
     // Başka sitelerden gelen yazma isteklerini reddet (müşteri paneli girişi ve yönetimi dahil; panel içi istekler handle() içinde de denetlenir)
@@ -53,10 +71,15 @@ export default {
       // Dış API (stok aktarımı): anahtarla, yalnız ana panelin yetkilendirdiği mağaza (bkz. extapi.js)
       if (path === 'v1' || path.startsWith('v1/')) return await extApi(req, env, ctx, path, { getTenant, forward, expired });
       // Şifremi unuttum / şifre yenileme (müşteri panelleri, oturumsuz)
-      if ((path === 'password/forgot' || path === 'password/reset') && req.method === 'POST') return json(await tenantPassword(req, env, path.slice(9), await body(req.clone())));
-      // Firma koduyla giriş → müşteri paneli
+      if ((path === 'password/forgot' || path === 'password/reset') && req.method === 'POST') {
+        const b = await body(req.clone());
+        if (path === 'password/forgot' && !(await turnstileOk(env, req, b && b.cf))) return json(CAPTCHA_ERROR, 400);
+        return json(await tenantPassword(req, env, path.slice(9), b));
+      }
+      // Giriş: ilk adımda (kullanıcı adı + şifre) bot doğrulaması; firma koduyla giriş → müşteri paneli
       if (path === 'login' && req.method === 'POST') {
         const b = await body(req.clone());
+        if (b && b.password !== undefined && !b.ticket && !b.mailticket && !(await turnstileOk(env, req, b.cf))) return json(CAPTCHA_ERROR, 400);
         if (b && String(b.tenant || '').trim()) return await tenantLogin(req, env, b);
       }
       // Müşteri panelinin logosu (e-postalar için, oturumsuz): /api/logo?t=firma-kodu
@@ -88,6 +111,7 @@ export default {
       }
       const t0 = Date.now(), res = await handle(req, env, ctx, env.DB);
       if (res.status >= 500) ctx.waitUntil(report5xx(env.DB, req, res, { slug: '', firm: '' }).catch(() => {}));
+      else if (res.status < 400 && env.DB && path !== 'errors/report') ctx.waitUntil(actionSucceeded(env.DB, '', `${req.method} ${path}`).catch(() => {}));
       perfMain.add(req.method, path, Date.now() - t0);
       if (perfMain.due() && env.DB) ctx.waitUntil(perfMain.flush(env.DB).catch(() => {}));
       return res;
@@ -105,5 +129,7 @@ export default {
     ctx.waitUntil((quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true })).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r))).catch((e) => console.error('senkron hatası', e)));
     if (!quick) ctx.waitUntil(tenantWatchdog(env, env.DB).catch((e) => console.error('bekçi hatası', e)));
     if (!quick) ctx.waitUntil(expiryReminders(env, env.DB).catch((e) => console.error('bitiş hatırlatması hatası', e)));
+    // 3 gündür tekrarlanmayan hata kayıtları kendiliğinden "Çözüldü"
+    if (!quick) ctx.waitUntil(resolveQuiet(env.DB).catch((e) => console.error('hata kayıtları çözülemedi', e)));
   },
 };

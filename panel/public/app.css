@@ -148,6 +148,7 @@ h3 { font-size: 14px; font-weight: 700; }
 .ico-menu { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h16'/%3E%3C/svg%3E"); }
 .ico-bolt { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 4 14h6l-1 8 9-12h-6z'/%3E%3C/svg%3E"); }
 .ico-key { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7.5' cy='15.5' r='4.5'/%3E%3Cpath d='m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2'/%3E%3C/svg%3E"); }
+.ico-doc { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5M9 13h6M9 17h4'/%3E%3C/svg%3E"); }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1230,11 +1231,15 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .ih-field.muted { background: var(--surface-2); }
 .ih-steps { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--text-2); }
 .ic-caps { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 16px 14px; align-self: end; }
+/* Aynı kanalın birden çok mağazası (kartta ve kanal ekranının üstünde) */
+.ic-stores { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 16px 12px; }
+.ic-store { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-2); }
+.store-tabs .tab { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .ic-caps span { font-size: 11.5px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-09b"; }
+:root { --assets: "2026-10-09c"; }
 
 /* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
 .subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }

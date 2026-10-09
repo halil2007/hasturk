@@ -1,35 +1,66 @@
 // Tanıtım sitesi: kanal listeleri, ekran sekmeleri, paketler (aylık / yıllık), karşılaştırma tablosu, iletişim bilgileri (config.js),
-// iletişim ve demo formları (demo formu panelden dönen demo bağlantısını gösterir).
+// iletişim ve demo formları (demo formu panelden dönen demo bağlantısını gösterir), satın alma (iyzico) formu.
+// Tüm formlarda e-posta ve telefon zorunludur; biçimleri burada ve sunucuda (panel/src/lead.js, billing.js) aynı kuralla doğrulanır.
 (() => {
   const S = window.SITE || {}, $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const get = (k) => k.split('.').reduce((o, x) => (o ? o[x] : undefined), S);
   const tl = (n) => Number(n).toLocaleString('tr-TR', { maximumFractionDigits: 0 });
+  // Doğrulama: e-posta; Türkiye telefonu (cep 5xx, sabit 2xx-4xx, 850; başında 0 / +90 olabilir); TC kimlik no (kontrol haneleri)
+  const okEmail = (v) => /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[a-z]{2,}$/i.test(String(v || '').trim());
+  const okPhone = (v) => {
+    let d = String(v || '').replace(/\D/g, '');
+    if (d.length === 12 && d.startsWith('90')) d = d.slice(2); else if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+    return /^[2-58]\d{9}$/.test(d) && !/[^\d\s()+-]/.test(String(v || '').trim());
+  };
+  const okTckn = (v) => {
+    const d = String(v || ''); if (!/^[1-9]\d{10}$/.test(d)) return false;
+    const n = [...d].map(Number), o = n[0] + n[2] + n[4] + n[6] + n[8], e = n[1] + n[3] + n[5] + n[7];
+    return (((o * 7 - e) % 10) + 10) % 10 === n[9] && n.slice(0, 10).reduce((a, x) => a + x, 0) % 10 === n[10];
+  };
+  // Hatalı alanı işaretle ve odakla (yazmaya başlayınca işaret kalkar)
+  const mark = (form, name) => { const el = form.elements[name]; if (!el) return; el.classList.add('bad'); el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+  document.addEventListener('input', (e) => { if (e.target.classList && e.target.classList.contains('bad')) e.target.classList.remove('bad'); });
   const waUrl = (v) => 'https://wa.me/' + String(v).replace(/\D/g, '') + (S.waText ? '?text=' + encodeURIComponent(S.waText) : '');
 
   // Kanallar: aktif olanlar ve yakında gelecekler. [ad, tür, rozet rengi, kısa ad, yazı stili (logo şeridi)]
   const ACTIVE = [
     ['Hepsiburada', 'pazaryeri', '#ff6000', 'hb', 'color:#ff6000;font-size:19px'], ['Trendyol', 'pazaryeri', '#f27a1a', 'T', 'color:#f27a1a'], ['ikas', 'e-ticaret sitesi', '#111827', 'ik', 'color:#111827;font-size:24px'],
     ['N11', 'pazaryeri', '#7b3fe4', 'n11', 'color:#7b3fe4'], ['PttAVM', 'pazaryeri', '#e0a800', 'Ptt', 'color:#e0a800'], ['idefix', 'pazaryeri', '#1d4ed8', 'id', 'color:#1d4ed8;font-style:italic'],
-    ['Pazarama', 'pazaryeri', '#7a2bc9', 'Pz', 'color:#7a2bc9;font-size:19px'],
+    ['Pazarama', 'pazaryeri', '#7a2bc9', 'Pz', 'color:#7a2bc9;font-size:19px'], ['WooCommerce', 'e-ticaret sitesi', '#7f54b3', 'W', 'color:#7f54b3;font-size:19px'],
   ];
+  // 6. alan: paneldeki kanal türü. Ana panelde "Müşterilere aç" ile yayına alınan tür (panel → /api/public/channels) aktif listeye geçer
   const SOON = [
-    ['Amazon', 'pazaryeri', '#232f3e', 'a'], ['Çiçeksepeti', 'pazaryeri', '#1e9e57', 'Çs'], ['Koçtaş', 'pazaryeri', '#e5541b', 'K'], ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S'],
-    ['WooCommerce', 'e-ticaret sitesi', '#7f54b3', 'W'], ['Etsy', 'pazaryeri', '#f1641e', 'E'], ['Ticimax', 'e-ticaret sitesi', '#0b5cff', 'Tx'],
-    ['IdeaSoft', 'e-ticaret sitesi', '#00a3e0', 'iS'], ['T-Soft', 'e-ticaret sitesi', '#e30613', 'TS'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC'],
+    ['Amazon', 'pazaryeri', '#232f3e', 'a', 'color:#232f3e', 'amazon'], ['Çiçeksepeti', 'pazaryeri', '#1e9e57', 'Çs', 'color:#1e9e57;font-size:19px', 'ciceksepeti'], ['Koçtaş', 'pazaryeri', '#e5541b', 'K', 'color:#e5541b', 'koctas'],
+    ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S', 'color:#5e8e3e', 'shopify'], ['Etsy', 'pazaryeri', '#f1641e', 'E', 'color:#f1641e', 'etsy'], ['Ticimax', 'e-ticaret sitesi', '#0b5cff', 'Tx'],
+    ['IdeaSoft', 'e-ticaret sitesi', '#00a3e0', 'iS'], ['T-Soft', 'e-ticaret sitesi', '#e30613', 'TS'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC', 'color:#23a8e0;font-size:19px', 'opencart'],
   ];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
   const wms = (dup, link = true) => ACTIVE.map((x) => `<${link ? 'a href="/entegrasyonlar"' : 'span'} class="wm${dup ? ' dup' : ''}" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</${link ? 'a' : 'span'}>`).join('');
-  const logos = $('[data-logos]');
-  if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
-  const logosStatic = $('[data-logos-static]');
-  if (logosStatic) logosStatic.innerHTML = wms(false, false);
-  $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.length; });
   const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}</small></div></div>`).join('');
-  $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
-  $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
+  const drawChannels = () => {
+    const logos = $('[data-logos]');
+    if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
+    const logosStatic = $('[data-logos-static]');
+    if (logosStatic) logosStatic.innerHTML = wms(false, false);
+    $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.length; });
+    $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
+    $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
+    // Kanal sayfasındaki "yakında" rozeti (ör. /entegrasyonlar/shopify): yayına alınmışsa kalkar
+    $$('[data-soon-type]').forEach((el) => { if (ACTIVE.some((x) => x[5] === el.dataset.soonType)) el.remove(); });
+  };
+  drawChannels();
+  // Panelde müşterilere açılan kanallar: "yakında"dan aktif listeye (panel yanıt vermezse sayfa olduğu gibi kalır)
+  if (S.panelUrl && (document.querySelector('[data-integ], [data-logos], [data-logos-static], [data-count="active"], [data-soon-type]'))) {
+    fetch(`${S.panelUrl.replace(/\/+$/, '')}/api/public/channels`, { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const rel = (d && Array.isArray(d.released)) ? d.released : [];
+      let moved = false;
+      for (const t of rel) { const i = SOON.findIndex((x) => x[5] === t); if (i >= 0) { ACTIVE.push(SOON.splice(i, 1)[0]); moved = true; } }
+      if (moved) drawChannels();
+    }).catch(() => {});
+  }
   $$('[data-chans]').forEach((el) => { el.innerHTML = [...ACTIVE, ...SOON].map((x) => x[0]).concat(['Diğer']).map((n) => `<label><input type="checkbox" name="channels" value="${esc(n)}">${esc(n)}</label>`).join(''); });
 
   // Ekran sekmeleri
@@ -154,8 +185,9 @@
       topic: ['demo', 'teklif'].includes(raw) ? raw : 'iletisim', plan: q.get('paket') || '' };
     if (raw === 'arama' && !/arayın/i.test(body.message)) body.message = 'Lütfen beni arayın. ' + body.message;
     const say = (cls, t) => { msg.className = 'form-msg ' + cls; msg.textContent = t; };
-    if (String(body.name || '').trim().length < 2) return say('err', 'Lütfen adınızı yazın.');
-    if (!String(body.phone || '').trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email || ''))) return say('err', 'Size ulaşabilmemiz için telefon ya da e-posta yazın.');
+    if (String(body.name || '').trim().length < 2) { mark(form, 'name'); return say('err', 'Lütfen adınızı yazın.'); }
+    if (!okPhone(body.phone)) { mark(form, 'phone'); return say('err', 'Geçerli bir telefon numarası yazın (ör. 0532 123 45 67 ya da 0212 123 45 67).'); }
+    if (!okEmail(body.email)) { mark(form, 'email'); return say('err', 'Geçerli bir e-posta adresi yazın.'); }
     if (!body.consent) return say('err', 'Lütfen KVKK aydınlatma metnini onaylayın.');
     btn.disabled = true; say('', 'Gönderiliyor…');
     try {
@@ -177,50 +209,95 @@
     } finally { btn.disabled = false; }
   }));
 
-  // ---------- Satın al (iyzico) ----------
+  // ---------- Satın al (iyzico): 1 Paket → 2 Hesap → 3 Fatura bilgileri → 4 Onay; özet kartı seçime göre güncellenir ----------
   const co = $('[data-checkout]');
   if (co) {
     const plans = (S.plans || []).filter((p) => p.key && p.monthly);
-    const st = { plan: q.get('plan') || 'profesyonel', period: q.get('donem') === 'aylik' ? 'monthly' : 'yearly', kind: q.get('firma') ? 'renew' : 'new' };
+    const st = { plan: q.get('plan') || 'profesyonel', period: q.get('donem') === 'aylik' ? 'monthly' : 'yearly', kind: q.get('firma') ? 'renew' : 'new', inv: 'bireysel' };
     if (!plans.some((p) => p.key === st.plan)) st.plan = (plans[1] || plans[0] || {}).key;
-    if (q.get('firma')) { const s = $('[name=slug_renew]', co); if (s) s.value = q.get('firma'); }
+    if (q.get('firma')) co.elements.slug_renew.value = q.get('firma');
+    const IL = 'Adana Adıyaman Afyonkarahisar Ağrı Aksaray Amasya Ankara Antalya Ardahan Artvin Aydın Balıkesir Bartın Batman Bayburt Bilecik Bingöl Bitlis Bolu Burdur Bursa Çanakkale Çankırı Çorum Denizli Diyarbakır Düzce Edirne Elazığ Erzincan Erzurum Eskişehir Gaziantep Giresun Gümüşhane Hakkari Hatay Iğdır Isparta İstanbul İzmir Kahramanmaraş Karabük Karaman Kars Kastamonu Kayseri Kilis Kırıkkale Kırklareli Kırşehir Kocaeli Konya Kütahya Malatya Manisa Mardin Mersin Muğla Muş Nevşehir Niğde Ordu Osmaniye Rize Sakarya Samsun Şanlıurfa Siirt Sinop Şırnak Sivas Tekirdağ Tokat Trabzon Tunceli Uşak Van Yalova Yozgat Zonguldak'.split(' ');
+    $('[data-iller]', co).insertAdjacentHTML('beforeend', IL.map((x) => `<option>${x}</option>`).join(''));
     const slugOf = (t) => String(t || '').toLocaleLowerCase('tr').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
-    const firm = $('[name=firm]', co), slug = $('[name=slug]', co);
+    const F = co.elements;
     let slugTouched = false;
-    if (slug) slug.addEventListener('input', () => { slugTouched = true; });
-    if (firm && slug) firm.addEventListener('input', () => { if (!slugTouched) slug.value = slugOf(firm.value); });
+    F.slug.addEventListener('input', () => { slugTouched = true; });
+    F.firm.addEventListener('input', () => { if (!slugTouched) F.slug.value = slugOf(F.firm.value); if (!F.company.value || F.company.dataset.auto) { F.company.value = F.firm.value; F.company.dataset.auto = '1'; } });
+    F.company.addEventListener('input', () => { delete F.company.dataset.auto; });
     const draw = () => {
-      $$('[data-co-plans]').forEach((el) => {
-        el.innerHTML = plans.map((p) => `<button type="button" class="co-plan${p.key === st.plan ? ' on' : ''}" data-plan="${p.key}"><b>${esc(p.name)}</b><span>${tl(st.period === 'yearly' ? p.yearly : p.monthly)} ₺ <small>${st.period === 'yearly' ? '/ yıl' : '/ ay'}</small></span><em>${esc((p.limits || []).join(' · '))}</em></button>`).join('');
-      });
+      const p = plans.find((x) => x.key === st.plan) || {}, yearly = st.period === 'yearly', amount = yearly ? p.yearly : p.monthly;
+      $('[data-co-plans]', co).innerHTML = plans.map((x) => `<button type="button" role="radio" aria-checked="${x.key === st.plan}" class="co-plan${x.key === st.plan ? ' on' : ''}" data-plan="${x.key}"><b>${esc(x.name)}</b><span>${tl(yearly ? x.yearly : x.monthly)} ₺ <small>${yearly ? '/ yıl' : '/ ay'}</small></span><em>${esc((x.limits || []).join(' · '))}</em></button>`).join('');
       $$('[data-period]', co).forEach((b) => b.classList.toggle('on', b.dataset.period === st.period));
       $$('[data-kind]', co).forEach((b) => b.classList.toggle('on', b.dataset.kind === st.kind));
+      $$('[data-inv]', co).forEach((b) => b.classList.toggle('on', b.dataset.inv === st.inv));
       $$('[data-for]', co).forEach((x) => { x.hidden = x.dataset.for !== st.kind; $$('input', x).forEach((i) => { i.disabled = x.hidden; }); });
-      const p = plans.find((x) => x.key === st.plan) || {}, amount = st.period === 'yearly' ? p.yearly : p.monthly;
-      const sum = $('[data-co-sum]', co);
-      if (sum) sum.innerHTML = `<div class="co-sum-row"><span>${esc(p.name || '')} paketi · ${st.period === 'yearly' ? 'yıllık (12 ay)' : 'aylık (1 ay)'}</span><b>${tl(amount || 0)} ₺</b></div>
-        <div class="co-sum-note">KDV dahil${st.period === 'yearly' && S.installments ? ` · kredi kartına peşin fiyatına ${S.installments} taksit (${S.installments} × ${tl((amount || 0) / S.installments)} ₺)` : ''}${st.period === 'yearly' && p.monthly ? ` · ${tl(p.monthly * 12 - p.yearly)} ₺ kazanç` : ''}</div>`;
+      $$('[data-inv-for]', co).forEach((x) => { x.hidden = x.dataset.invFor !== st.inv; });
+      const inst = yearly && S.installments ? `${S.installments} × ${tl((amount || 0) / S.installments)} ₺` : '';
+      const save = yearly && p.monthly ? p.monthly * 12 - p.yearly : 0;
+      $('[data-co-sum]', co).innerHTML = `<h3>Sipariş özeti</h3>
+        <div class="co-sum-pkg"><div><b>${esc(p.name || '')} paketi</b><small>${esc((p.limits || []).join(' · '))}</small></div><em>${yearly ? 'Yıllık' : 'Aylık'}</em></div>
+        <dl><dt>Süre</dt><dd>${yearly ? '12 ay' : '1 ay'}</dd>
+          ${yearly ? `<dt>Aylık karşılığı</dt><dd>${tl(p.yearly / 12)} ₺</dd>` : `<dt>Aylık ücret</dt><dd>${tl(p.monthly)} ₺</dd>`}
+          ${save ? `<dt>Yıllık kazanç</dt><dd class="good">${tl(save)} ₺ (2 ay hediye)</dd>` : ''}
+          <dt>Kurulum ücreti</dt><dd class="good">Yok</dd></dl>
+        <div class="co-sum-tot"><span>Toplam</span><b>${tl(amount || 0)} ₺<small>KDV dahil</small></b></div>
+        ${inst ? `<div class="co-sum-inst"><b>Peşin fiyatına ${S.installments} taksit:</b> ${inst} (kredi kartına)</div>` : `<div class="co-sum-inst">Yıllık alımda 2 ay hediye ve peşin fiyatına ${S.installments || 3} taksit.</div>`}`;
+      $('[data-co-total]', co).innerHTML = `<span>${esc(p.name || '')} · ${yearly ? 'yıllık (12 ay)' : 'aylık (1 ay)'}</span><b>${tl(amount || 0)} ₺</b><small>KDV dahil${inst ? ` · ${S.installments} taksit imkânı` : ''}</small>`;
+      $('[data-co-pay]', co).textContent = `${tl(amount || 0)} ₺ öde · güvenli ödemeye geç`;
     };
     co.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-plan],[data-period],[data-kind]');
+      const b = e.target.closest('[data-plan],[data-period],[data-kind],[data-inv]');
       if (!b) return;
       if (b.dataset.plan) st.plan = b.dataset.plan;
       if (b.dataset.period) st.period = b.dataset.period;
       if (b.dataset.kind) st.kind = b.dataset.kind;
+      if (b.dataset.inv) st.inv = b.dataset.inv;
       draw();
+    });
+    // Üstteki adım göstergesi: üzerinde çalışılan adım
+    const steps = $$('[data-co-steps] li');
+    co.addEventListener('focusin', (e) => {
+      const f = e.target.closest('[data-step]'); if (!f) return;
+      const n = Number(f.dataset.step);
+      steps.forEach((li, i) => { li.classList.toggle('on', i + 1 === n); li.classList.toggle('done', i + 1 < n); });
     });
     draw();
     co.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const msg = $('[data-msg]', co), btn = $('button[type=submit]', co), f = new FormData(co);
+      const msg = $('[data-msg]', co), btn = $('button[type=submit]', co);
       const say = (cls, t) => { msg.className = 'form-msg ' + cls; msg.textContent = t; };
-      const val = (k) => String(f.get(k) || '').trim();
-      const body = { kind: st.kind, plan: st.plan, period: st.period, website: val('website'), consent: !!f.get('consent'),
-        contact: val('contact'), email: val(st.kind === 'renew' ? 'email_renew' : 'email'), phone: val('phone'), city: val('city'), address: val('address'), identity: val('identity') };
-      if (st.kind === 'new') Object.assign(body, { firm: val('firm'), slug: val('slug'), username: val('username'), password: String(f.get('password') || '') });
+      const val = (k) => String((F[k] && F[k].value) || '').trim();
+      const bad = (k, t) => { mark(co, k); say('err', t); };
+      const renew = st.kind === 'renew', corp = st.inv === 'kurumsal';
+      // Adım sırasıyla denetim: ilk eksik alan işaretlenir
+      if (!renew) {
+        if (!val('firm')) return bad('firm', 'Firma / mağaza adını yazın.');
+        if (!/^[a-z0-9-]{3,32}$/.test(val('slug'))) return bad('slug', 'Firma kodu 3-32 karakter olmalı: küçük harf, rakam ve tire.');
+        if (val('username').length < 3) return bad('username', 'Kullanıcı adı en az 3 karakter olmalı.');
+        if (String(F.password.value).length < 8) return bad('password', 'Şifre en az 8 karakter olmalı.');
+        if (F.password.value !== F.password2.value) return bad('password2', 'Şifreler aynı değil.');
+      } else if (!val('slug_renew')) return bad('slug_renew', 'Firma kodunuzu yazın.');
+      if (!okEmail(val('email'))) return bad('email', 'Geçerli bir e-posta adresi yazın.');
+      if (!okPhone(val('phone'))) return bad('phone', 'Geçerli bir telefon numarası yazın (ör. 0532 123 45 67 ya da 0212 123 45 67).');
+      if (!corp) {
+        if (val('inv_name').split(/\s+/).length < 2) return bad('inv_name', 'Fatura için adınızı ve soyadınızı yazın.');
+        if (!okTckn(val('tckn'))) return bad('tckn', 'Geçerli bir TC kimlik numarası yazın (11 hane).');
+      } else {
+        if (val('company').length < 3) return bad('company', 'Firma unvanını yazın.');
+        if (val('tax_office').length < 2) return bad('tax_office', 'Vergi dairesini yazın.');
+        if (!/^\d{10}$/.test(val('tax_no')) && !okTckn(val('tax_no'))) return bad('tax_no', 'Vergi numarası 10 hane olmalı (şahıs şirketinde 11 haneli TC kimlik no).');
+        if (val('contact').split(/\s+/).length < 2) return bad('contact', 'Yetkili kişinin adını ve soyadını yazın.');
+      }
+      if (val('address').length < 8) return bad('address', 'Fatura adresini yazın (mahalle, cadde / sokak, no).');
+      if (!val('city')) return bad('city', 'Fatura adresinin ilini seçin.');
+      if (!val('district')) return bad('district', 'Fatura adresinin ilçesini yazın.');
+      if (!F.consent.checked) return bad('consent', 'Lütfen ön bilgilendirme formunu ve mesafeli satış sözleşmesini onaylayın.');
+      const invoice = corp ? { type: 'kurumsal', company: val('company'), taxOffice: val('tax_office'), taxNo: val('tax_no').replace(/\D/g, ''), contact: val('contact'), efatura: F.efatura.checked }
+        : { type: 'bireysel', name: val('inv_name'), tckn: val('tckn').replace(/\D/g, '') };
+      Object.assign(invoice, { address: val('address'), district: val('district'), city: val('city') });
+      const body = { kind: st.kind, plan: st.plan, period: st.period, website: val('website'), consent: true, email: val('email'), phone: val('phone'), invoice };
+      if (!renew) Object.assign(body, { firm: val('firm'), slug: val('slug'), username: val('username'), password: String(F.password.value) });
       else body.slug = val('slug_renew');
-      if (st.kind === 'new' && body.password !== String(f.get('password2') || '')) return say('err', 'Şifreler aynı değil.');
-      if (!body.consent) return say('err', 'Lütfen mesafeli satış sözleşmesini ve ön bilgilendirme formunu onaylayın.');
       btn.disabled = true; say('', 'Güvenli ödeme sayfası hazırlanıyor…');
       try {
         const r = await fetch(S.checkoutUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
