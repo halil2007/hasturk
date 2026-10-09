@@ -370,10 +370,15 @@ export async function pushPrices(env, db) {
     const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: r.price, listPrice: r.list_price || 0, stock: r.stock }));
     if (!items.length || !ch.enabled || !ch.pushPrice) continue;
     try {
-      await trackPush(db, ch, 'price', await ch.pushPrice(items), items.length);
-      for (const part of chunk(items, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL WHERE channel = ? AND remote_id = ?').bind(ch.id, x.remoteId)));
-      result[ch.id] = items.length;
-      await log(db, ch.id, 'info', `${items.length} ilanın fiyatı gönderildi`);
+      const res = await ch.pushPrice(items);
+      await trackPush(db, ch, 'price', res, items.length);
+      // Kanal ilan ilan sonuç verdiyse (ikas) yalnız kabul edilenler işaretlenir; reddedilen ilana neden yazılır, fiyatı sonraki senkronda yeniden denenir
+      const doneIds = res && Array.isArray(res.done) ? new Set(res.done.map(String)) : null;
+      const sent = doneIds ? items.filter((x) => doneIds.has(String(x.remoteId))) : items, errs = (res && res.errors) || [];
+      for (const part of chunk(sent, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL WHERE channel = ? AND remote_id = ?').bind(ch.id, x.remoteId)));
+      for (const part of chunk(errs, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND remote_id = ?').bind('Fiyat: ' + String(x.error).slice(0, 200), ch.id, x.remoteId)));
+      result[ch.id] = errs.length ? `${sent.length} gönderildi, ${errs.length} hata` : sent.length;
+      await log(db, ch.id, errs.length ? 'warn' : 'info', `${sent.length} ilanın fiyatı gönderildi${errs.length ? `, ${errs.length} ilanda hata (${errs[0].error})` : ''}`);
       await resolve(db, `price:${ch.id}`);
     } catch (e) {
       result[ch.id] = 'hata: ' + e.message;

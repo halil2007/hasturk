@@ -3,6 +3,9 @@
 import { api, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
 import { readSheet } from '../sheetread.js';
 import { profit, costOf, costRaw, rateGross } from '../profit.js';
+import { productErrorsSheet } from './listerrs.js';
+import { explainError } from '../listerr.js';
+const errText = (e) => { const x = explainError(e); return `${x.kind ? x.kind + ': ' : ''}${x.title} — ${x.fix}`; };
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
 
@@ -49,7 +52,7 @@ export async function products(el, rest, query = {}) {
     const prices = ls.map((l) => l.price).filter((x) => x > 0), lo = Math.min(...prices), hi = Math.max(...prices);
     const tip = ids.map((c) => { const xs = ls.filter((l) => l.channel === c); return `${ch(c).name}: ${xs.map((l) => money(l.price)).join(', ')}${xs.some((l) => l.error) ? ' (hata)' : ''}`; }).join('\n');
     return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => chLogo(c, true))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>
-      <span class="small num">${prices.length ? (lo === hi ? money0(lo) : `${money0(lo)} – ${money0(hi)}`) : ''}</span>${err.length ? html`<span class="pill bad" title="${err.map((l) => `${ch(l.channel).name}: ${l.error}`).join('\n')}">${err.length} hata</span>` : ''}</div>`;
+      <span class="small num">${prices.length ? (lo === hi ? money0(lo) : `${money0(lo)} – ${money0(hi)}`) : ''}</span>${err.length ? html`<button class="pill bad" data-act="errs" data-ids="${list.map((p) => p.id).join(',')}" title="${err.map((l) => `${ch(l.channel).name}: ${l.error}`).join('\n')} (açıklama için tıklayın)">${err.length} hata</button>` : ''}</div>`;
   }
   const stockCell = (p) => {
     const site = siteStock(p), c = stockCls(p);
@@ -182,6 +185,7 @@ export async function products(el, rest, query = {}) {
     stock: (t) => stockDialog(byId(t.dataset.id), refresh),
     sitestock: () => toast('Stok, ikas sitesinden okunuyor (stok senkronu kapalı). Adedi ikas panelinden değiştirin ya da Ayarlar → Stok\'tan senkronu açın.'),
     edit: (t) => productForm(Number(t.dataset.id), refresh),
+    errs: (t) => { const ps = t.dataset.ids.split(',').map(byId).filter(Boolean); productErrorsSheet(ps[0] ? { name: ps[0].group_name || ps[0].name } : {}, ps.flatMap((p) => p.listings || [])); },
     new: () => productForm(0, refresh),
     clearsel: () => { sel.clear(); draw(); },
     menu: (t) => {
@@ -387,7 +391,7 @@ export async function productForm(id, done) {
     ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p></div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Fiyat</th><th class="r">Komisyon %</th><th class="r">Ürün başı kâr</th><th class="r">Kanala giden stok</th></tr></thead><tbody>
         ${p.listings.map((l) => { const r = lp(l); return html`<tr data-l="${l.channel}" data-rid="${l.remote_id}">
-          <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span><div class="muted tiny ellipsis" style="max-width:180px">${l.remote_id}</div>${l.error ? html`<div class="tiny" style="color:var(--bad)">${l.error}</div>` : ''}</td>
+          <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span><div class="muted tiny ellipsis" style="max-width:180px">${l.remote_id}</div>${l.error ? html`<div class="tiny" style="color:var(--bad)" title="${l.error}">${errText(l.error)}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" style="width:96px" inputmode="decimal" data-lf="price" value="${l.price ?? ''}">${l.rule_min != null ? html`<div class="tiny muted" title="Bu ilanda otomatik fiyat açık: elle girdiğiniz fiyat bu aralıkta olmalı; değişiklikten sonra otomatik fiyat 14 dakika bekler">Otomatik fiyat: ${money(l.rule_min)} – ${money(l.rule_max)}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${costRaw(st, 'commission', l.channel)}" title="KDV hariç oran (hesapta %20 KDV eklenir)">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? 'kanaldan (son sipariş)' : 'elle girildi'}</div>` : ''}</td>
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>

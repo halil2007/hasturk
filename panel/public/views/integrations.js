@@ -4,6 +4,7 @@ import { api, state, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, ch
 import { loadSummary } from '../app.js';
 import { importDialog } from './products.js';
 import { diagnoseDialog, systemCheck } from './diagnose.js';
+import { listingErrorsSheet } from './listerrs.js';
 
 const HELP = {
   ikas: 'ikas paneli → Uygulamalar → Özel uygulama oluştur. İzinler: Ürünler, Siparişler, Stok, Mağaza bilgisi (okuma + yazma). Görseller ve varyantlar ürünlerle birlikte gelir.',
@@ -229,7 +230,7 @@ export async function integrations(el, rest = []) {
           ${live ? html`<dl class="id-kv small">
             <dt>Siparişler</dt><dd>${c.last && c.last.ordersAt ? html`<span title="${dateTime(c.last.ordersAt)}">${ago(c.last.ordersAt)}</span>` : '—'}</dd>
             ${(c.can || {}).listings !== false ? html`<dt>Ürün / stok</dt><dd>${c.last && c.last.listingsAt ? html`<span title="${dateTime(c.last.listingsAt)}">${ago(c.last.listingsAt)}</span>` : '—'}</dd>
-            <dt>İlan</dt><dd class="num">${n(c.listings)}${c.listingErrors ? html` · <span style="color:var(--bad)">${c.listingErrors} hatalı</span>` : ''}</dd>` : ''}</dl>` : ''}
+            <dt>İlan</dt><dd class="num">${n(c.listings)}${c.listingErrors ? html` · <button class="link" style="color:var(--bad)" data-act="lerrs" data-id="${c.id}" title="Ne olduğunu ve nasıl düzeleceğini gösterir">${c.listingErrors} hatalı</button>` : ''}</dd>` : ''}</dl>` : ''}
           <div class="id-acts">
             ${live && (c.can || {}).listings !== false ? html`<button class="btn sm ghost" data-act="import"><i class="ico ico-download"></i>İlanları içe aktar</button>` : ''}
             <button class="btn sm ghost" data-act="diag" data-id="${c.id}"><i class="ico ico-bolt"></i>Tanılama</button>
@@ -347,6 +348,7 @@ export async function integrations(el, rest = []) {
       await api(`integrations/${cid}/remove`, { method: 'POST' }); toast('Mağaza kaldırıldı'); await loadSummary().catch(() => {}); location.hash = '#/entegrasyonlar';
     },
     diag: (t) => diagnoseDialog(t.dataset.id),
+    lerrs: (t) => listingErrorsSheet(t.dataset.id, () => load().catch(() => {})),
     bfstart: (t) => busy(t, async () => {
       const box = $('[data-bf]', el), channels = $$('[data-bfch]', box).filter((x) => x.type === 'hidden' || x.checked).map((x) => x.value);
       const r = await api('backfill', { method: 'POST', body: { channels, from: $('[data-bffrom]', box).value, to: $('[data-bfto]', box).value } });
