@@ -1570,7 +1570,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (maxStores && isChannelId(x[1]) && b.values && Object.values(b.values).some((v) => String(v || '').trim())) {
       const rows = await all(db, 'SELECT id, data FROM channel_config WHERE data IS NOT NULL');
       const has = rows.some((r) => r.id === x[1]), used = rows.filter((r) => r.id !== x[1] && isChannelId(r.id)).length;
-      if (!has && used >= maxStores) fail(403, `Paketinizdeki mağaza sınırına ulaşıldı (${maxStores} mağaza). Yeni mağaza bağlamak için bir mağazanın bağlantısını kaldırın ya da paketinizi yükseltin.`);
+      if (!has && used >= maxStores) fail(403, `Paketinizdeki mağaza sınırına ulaşıldı (${maxStores} mağaza). Yeni mağaza için Paketim → Ek mağaza al, bir mağazanın bağlantısını kaldırın ya da paketinizi yükseltin.`);
     }
     await saveConfig(env, db, x[1], b);
     resetChannels();

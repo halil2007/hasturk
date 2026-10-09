@@ -32,24 +32,35 @@ export async function billingView(el) {
           <button class="btn primary sm" data-buy="${p.key}" data-period="yearly">Yıllık al</button></div>` : ''}
       </div>`)}
     </div>
+    ${d.stores && d.stores.base ? html`<div class="card stack" style="gap:10px" data-stores>
+      <div class="row wrap" style="gap:10px;align-items:center"><div style="flex:1;min-width:220px"><h3>Mağaza sınırı</h3>
+        <div class="small" style="margin-top:4px"><b>${d.stores.used}</b> / ${d.stores.limit} mağaza bağlı${d.stores.extra ? html` <span class="muted">(paketinizde ${d.stores.base} + ${d.stores.extra} ek mağaza)</span>` : ''}</div>
+        <div class="bar" style="margin-top:6px;height:6px;border-radius:6px;background:var(--line);overflow:hidden"><span style="display:block;height:100%;width:${Math.min(100, Math.round((d.stores.used / Math.max(1, d.stores.limit)) * 100))}%;background:${d.stores.used >= d.stores.limit ? 'var(--bad)' : 'var(--primary)'}"></span></div></div>
+        ${admin && d.online && d.stores.buyable ? html`<div class="row" style="gap:8px;align-items:center"><label class="small">Ek mağaza</label><input class="input" type="number" min="1" max="${d.stores.max}" value="1" data-sqty style="width:80px"><button class="btn primary sm" data-sbuy><i class="ico ico-plus"></i>Ek mağaza al</button></div>` : ''}</div>
+      <div class="muted small">Ek mağaza: mağaza başına <b>${money0(d.stores.monthly)}</b> / ay (KDV dahil). Aboneliğinizin bitişine kalan <b>${d.stores.months} ay</b> için tek seferde alınır: <b data-stotal>${money0(d.stores.monthly * d.stores.months)}</b>. Paket yenilemesinde ek mağazalarınız korunur ve ücrete eklenir.${!d.stores.buyable ? ' Deneme süresinde ya da süresi dolmuş abonelikte ek mağaza alınamaz.' : ''}</div>
+    </div>` : ''}
     <div class="muted tiny">Satın aldığınız süre, mevcut bitiş tarihinizin üstüne eklenir; paket değişikliği hemen geçerli olur. Ödeme iyzico güvencesiyle alınır, kart bilgileriniz bize ulaşmaz.</div>
     <div class="card flush"><div class="card-pad"><h3>Ödeme geçmişi</h3></div>
       ${d.payments.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="r">Süre</th><th class="r">Tutar</th></tr></thead><tbody>
         ${d.payments.map((x) => html`<tr><td>${date(x.at)}</td><td class="small">${x.method || ''}${x.note ? html`<div class="muted tiny">${x.note}</div>` : ''}</td><td class="r">${x.months ? `${x.months} ay` : '—'}</td><td class="r num">${money0(x.amount)}</td></tr>`)}
       </tbody></table></div>` : html`<div class="empty">Henüz ödeme yok.</div>`}</div>
   </div>`);
-  $$('[data-buy]', el).forEach((b) => { b.onclick = () => buy(d, d.plans.find((p) => p.key === b.dataset.buy), b.dataset.period); });
+  $$('[data-buy]', el).forEach((b) => { b.onclick = () => { const p = d.plans.find((x) => x.key === b.dataset.buy), per = b.dataset.period; buy(d, { title: `${p.name} · ${PERIOD[per]}`, amount: p[per], what: per === 'yearly' ? `12 ay${d.installments > 1 ? `, kartla peşin fiyatına ${d.installments} taksit` : ''}` : '1 ay', path: 'billing/checkout', body: { plan: p.key, period: per } }); }; });
+  const sq = $('[data-sqty]', el), sb = $('[data-sbuy]', el);
+  const sAmount = () => d.stores.monthly * d.stores.months * Math.max(1, Math.min(d.stores.max, Math.round(Number(sq.value) || 1)));
+  if (sq) sq.oninput = () => { $('[data-stotal]', el).textContent = money0(sAmount()); };
+  if (sb) sb.onclick = () => { const q = Math.max(1, Math.min(d.stores.max, Math.round(Number(sq.value) || 1))); buy(d, { title: `${q} ek mağaza`, amount: sAmount(), what: `${q} mağaza × ${d.stores.months} ay (abonelik bitişine kadar); ödeme alınınca mağaza sınırınız ${d.stores.limit + q} olur`, path: 'billing/stores', body: { qty: q } }); };
   const ci = $('[data-copy-iban]', el); if (ci) ci.onclick = () => navigator.clipboard.writeText(d.bank.iban.replace(/\s/g, '')).then(() => toast('IBAN kopyalandı')).catch(() => {});
 }
 
 const INV = ['name', 'tckn', 'company', 'taxOffice', 'taxNo', 'contact', 'address', 'district', 'city'];
-function buy(d, p, period) {
-  const amount = p[period], inv = d.invoice || {};
+function buy(d, { title, amount, what, path, body }) {
+  const inv = d.invoice || {};
   let type = inv.type === 'kurumsal' ? 'kurumsal' : 'bireysel';
   const s = sheet({
-    title: `${p.name} · ${PERIOD[period]}`,
+    title,
     body: html`<form class="stack" data-f>
-      <div class="notice"><i class="ico ico-info"></i><div><b>${money0(amount)}</b> (KDV dahil) · ${period === 'yearly' ? `12 ay${d.installments > 1 ? `, kartla peşin fiyatına ${d.installments} taksit` : ''}` : '1 ay'}. Faturanız aşağıdaki bilgilerle kesilir.</div></div>
+      <div class="notice"><i class="ico ico-info"></i><div><b>${money0(amount)}</b> (KDV dahil) · ${what}. Faturanız aşağıdaki bilgilerle kesilir.</div></div>
       <div class="form-grid">
         <label class="field"><span>E-posta *</span><input class="input" type="email" name="email" value="${d.current.email || (state.user && state.user.email) || ''}" required></label>
         <label class="field"><span>Telefon *</span><input class="input" name="phone" type="tel" inputmode="tel" placeholder="05xx xxx xx xx" value="${d.current.phone || ''}" required></label>
@@ -82,9 +93,9 @@ function buy(d, p, period) {
   $('[data-pay]', s.el).onclick = async (e) => {
     const f = $('[data-f]', s.el), btn = e.currentTarget, v = (k) => f.elements[k].value.trim(); // f.name formun kendi adı; alanlar elements'ten
     const b = { email: v('email'), phone: v('phone'), invoice: { type, efatura: f.elements.efatura.checked, ...Object.fromEntries(INV.map((k) => [k, v(k)])) } };
-    b.consent = f.elements.consent.checked; b.plan = p.key; b.period = period;
+    b.consent = f.elements.consent.checked; Object.assign(b, body);
     btn.disabled = true; btn.textContent = 'Ödeme sayfası açılıyor…';
-    try { const r = await api('billing/checkout', { method: 'POST', body: b }); location.href = r.url; }
+    try { const r = await api(path, { method: 'POST', body: b }); location.href = r.url; }
     catch (x) { $('[data-err]', f).textContent = x.message; btn.disabled = false; btn.textContent = 'Ödemeye geç'; toast(x.message, true); }
   };
 }

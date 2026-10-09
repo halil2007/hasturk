@@ -17,6 +17,7 @@ import { json, fail, str } from './util.js';
 import { loadConfig, releasedTypes } from './config.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 import { limitsOf } from './plans.js';
+import { CARRIER_IDS } from './carriers.js';
 import { forgot, resetPassword, welcome } from './pwreset.js';
 import { tenantBilling } from './billing.js';
 import { iyzicoReady } from './iyzico.js';
@@ -276,6 +277,12 @@ export async function createTenant(env, db, b, { origin }) {
 
 // Tahsilat kaydı: abonelik belirtilen ay kadar uzar (bitiş geçmişse bugünden, değilse bitişten itibaren). plan verilirse paket de
 // değişir (online satın almada). Panel yeni bilgileri hemen öğrenir (süresi dolmuş panelin senkronu yeniden başlar).
+// Firma kaydı ana panelde değişti (ör. ek mağaza alındı): önbellek silinir, firma paneli yeni sınırları hemen alır
+export async function refreshTenant(env, db, slug) {
+  cache.delete(slug);
+  const t = await getTenant(db, slug, true);
+  if (t) await admin(env, t, 'ping').catch(() => {});
+}
 export async function recordPayment(env, db, t, { at = Date.now(), amount = 0, months = 0, method = '', note = '', user = '', plan = null }) {
   await run(db, 'INSERT INTO tenant_payments (slug, at, amount, months, method, note, user) VALUES (?, ?, ?, ?, ?, ?, ?)', t.slug, at, amount, months, String(method).slice(0, 40), String(note).slice(0, 300), user);
   let expires = t.expires_at;
@@ -434,7 +441,8 @@ export class TenantPanel {
         if (!user) return json({ error: 'Giriş gerekli' }, 401);
         if (req.method !== 'GET' && req.headers.get('Origin') && new URL(req.headers.get('Origin')).host !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403);
         const b = req.method === 'GET' ? {} : await req.json().catch(() => ({}));
-        return json(await tenantBilling(this.env, this.t, user, req.method, sp, b, url.origin));
+        const used = await first(this.db, `SELECT COUNT(*) AS n FROM channel_config WHERE data IS NOT NULL AND id NOT IN (${CARRIER_IDS.map(() => '?').join(',')})`, ...CARRIER_IDS);
+        return json(await tenantBilling(this.env, this.t, user, req.method, sp, b, url.origin, { usedStores: used ? used.n : 0 }));
       } catch (e) { return json({ error: e.message || 'Hata' }, e.status || 500); }
     }
     // Hata bildirimi (tarayıcıdan): ana panelin hata kayıtlarına firma adıyla düşer
@@ -543,7 +551,7 @@ export class TenantPanel {
   async usage() {
     const db = this.db, since = Date.now() - 30 * 864e5;
     const r = await first(db, `SELECT (SELECT COUNT(*) FROM users WHERE active = 1) AS users, (SELECT COUNT(*) FROM orders) AS orders, (SELECT COUNT(*) FROM products) AS products,
-      (SELECT COUNT(*) FROM channel_config WHERE data IS NOT NULL AND id NOT IN ('kargonomi', 'navlungo')) AS channels, (SELECT MAX(last_login) FROM users) AS last_login, (SELECT MAX(ordered_at) FROM orders) AS last_order,
+      (SELECT COUNT(*) FROM channel_config WHERE data IS NOT NULL AND id NOT IN (${CARRIER_IDS.map((c) => `'${c}'`).join(', ')})) AS channels, (SELECT MAX(last_login) FROM users) AS last_login, (SELECT MAX(ordered_at) FROM orders) AS last_order,
       (SELECT COUNT(*) FROM orders WHERE ordered_at >= ? AND status NOT IN ('cancelled')) AS orders30, (SELECT COALESCE(SUM(total), 0) FROM orders WHERE ordered_at >= ? AND status NOT IN ('cancelled', 'returned')) AS revenue30`, since, since);
     return { ...r, revenue30: Math.round(r.revenue30 || 0) };
   }
