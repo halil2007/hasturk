@@ -111,4 +111,4 @@ export const resetChannels = () => { cache = null; };
 export const channel = async (env, db, id) => (await getChannels(env, db)).find((c) => c.id === id);
 export const publicInfo = (c) => ({ id: c.id, type: c.type, beta: !!c.beta, released: !!c.released, sandbox: !!c.sandbox, extra: !!c.extra, claims: !!c.claims, campaigns: !!c.campaigns, name: c.name, short: c.short, enabled: c.enabled, paused: !!c.paused, gated: !!c.gated, demo: !!c.demo, hold: !!c.hold, missing: c.missing, caps: c.caps,
   // Kanalın gerçekten yapabildikleri (arayüzde yalnız bunlar listelenir)
-  can: ((r) => ({ orders: !!r.fetchOrders, listings: !!r.fetchListings, stock: !!r.pushStock, price: !!r.pushPrice, questions: !!r.questions }))(c.real || c) });
+  can: ((r) => ({ orders: !!r.fetchOrders, listings: !!r.fetchListings, stock: !!r.pushStock, price: !!r.pushPrice, questions: !!r.questions, upload: !!r.catalog, create: !!r.createProduct }))(c.real || c) });

@@ -141,6 +141,21 @@ export function woocommerce(env, meta) {
     return { regular_price: String(list), sale_price: price < list ? String(price) : '' };
   });
 
+  // Panelde açılan ürünü sitede oluştur (basit ürün, yayında): ad, açıklama, SKU, barkod (GTIN alanı, WooCommerce 9.2+),
+  // fiyat (indirimliyse liste + indirimli), stok ve görseller (bağlantıdan; WordPress görseli kendi ortam kitaplığına indirir)
+  async function createProduct(pr) {
+    let imgs = [];
+    try { imgs = JSON.parse(pr.images || '[]'); } catch { /* bozuk liste */ }
+    imgs = [...new Set([pr.image, ...imgs].filter((u) => /^https:\/\//i.test(u || '')))].slice(0, 10);
+    const price = num(pr.sale_price), stock = Math.max(0, Math.round(num(pr.stock)));
+    const r = await call('/products', { method: 'POST', body: {
+      name: pr.name, type: 'simple', status: 'publish', sku: pr.sku || undefined, ...(pr.barcode ? { global_unique_id: String(pr.barcode) } : {}),
+      regular_price: String(price), manage_stock: true, stock_quantity: stock, description: pr.description || '', images: imgs.map((src) => ({ src })),
+    } });
+    if (!r || !r.id) throw new Error('WooCommerce ürünü oluşturmadı');
+    return { remoteId: String(r.id), remoteProductId: String(r.id), sku: pr.sku || '', barcode: pr.barcode || '', name: pr.name, price, stock };
+  }
+
   // Kargoya ver: müşteriye görünen kargo notu + (siparişin son açık paketiyse) durum "completed" (Woo müşteriye e-posta gönderir)
   async function ship(order, pkg, { cargoCompany, tracking } = {}) {
     const id = encodeURIComponent(order.remote_id);
@@ -174,7 +189,7 @@ export function woocommerce(env, meta) {
   const missing = [!site && 'WOO_URL', !key && 'WOO_KEY', !secret && 'WOO_SECRET'].filter(Boolean);
   return {
     ...meta, type: 'woocommerce', enabled: !missing.length, missing,
-    caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, diagnose,
+    caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: true, price: true, manualTracking: true },
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, createProduct, diagnose,
   };
 }

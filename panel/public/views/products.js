@@ -345,7 +345,11 @@ export async function productForm(id, done) {
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
   const p = id ? await api('products/' + id) : { name: '', sku: '', barcode: '', purchase_price: 0, sale_price: 0, vat: 20, desi: 1, stock: 0, critical_stock: 0, active: 1, listings: [], moves: [], sales: [] };
   const st = state.settings || {};
-  const ikasChannels = activeChannels().filter((c) => c.enabled && c.caps.createProduct);
+  // Ürünü kanallarda yayınla: siteler (ikas, WooCommerce, Shopify) ürünü doğrudan açar; pazaryerleri (Trendyol, Hepsiburada, idefix,
+  // N11) kategori eşleştirmesiyle gönderilir. Ürünün zaten ilanı olan kanal listelenmez.
+  const hasL = new Set((p.listings || []).map((l) => l.channel));
+  const siteCh = activeChannels().filter((c) => c.enabled && c.caps.createProduct && !hasL.has(c.id));
+  const mpCh = activeChannels().filter((c) => c.enabled && (c.can || {}).upload && !hasL.has(c.id));
   const lp = (l) => {
     const rate = rateGross(st, l.commission) ?? costOf(st, 'commission', l.channel);
     return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
@@ -399,9 +403,12 @@ export async function productForm(id, done) {
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>
           <td class="r num"><button type="button" class="plain" data-rule style="align-items:flex-end">${l.desired ?? l.remote_stock ?? '—'}<span class="tiny muted">${ruleText(l) || 'ortak stok'}</span></button>${l.price_dirty ? html`<div class="tiny" style="color:var(--warn)">fiyat gönderilecek</div>` : ''}</td></tr>`; })}
       </tbody></table></div></div>` : ''}
-    ${!id && ikasChannels.length ? html`<div class="card stack"><h3>Kanallarda oluştur</h3>
-      ${ikasChannels.map((c) => html`<label class="check"><input type="checkbox" name="create_on" value="${c.id}"> ${c.name} (ikas) mağazasında da oluştur</label>`)}
-      <p class="muted small" style="margin:0">Trendyol ve Hepsiburada'da ürün, kanalın kendi panelinden açılır; aynı barkod veya SKU ile açıldığında senkronda otomatik eşleşir.</p></div>` : ''}
+    ${siteCh.length || mpCh.length ? html`<div class="card stack"><h3>Kanallarda yayınla</h3>
+      <div class="muted small">${id ? 'Bu ürünün henüz ilanı olmayan kanallar.' : 'Ürün panelde açılınca seçtiğiniz kanallara da gönderilir.'} Stok ve fiyat sonra panelden otomatik güncellenir.</div>
+      ${siteCh.length ? html`<div><div class="small" style="font-weight:650;margin-bottom:4px">Siteler (ürün hemen açılır)</div><div class="row wrap" style="gap:6px 16px">${siteCh.map((c) => html`<label class="check"><input type="checkbox" name="create_on" value="${c.id}"> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>` : ''}
+      ${mpCh.length ? html`<div><div class="small" style="font-weight:650;margin-bottom:4px">Pazaryerleri (kanal onayından sonra yayına girer)</div><div class="row wrap" style="gap:6px 16px">${mpCh.map((c) => html`<label class="check"><input type="checkbox" name="upload_on" value="${c.id}"> ${chLogo(c.id, true)}${c.name}</label>`)}</div>
+        <div class="muted tiny" style="margin-top:4px">Pazaryerine göndermek için ürünün <b>kategorisi</b>, <b>barkodu</b> ve <b>görseli</b> olmalı; kategori bir kez <a class="link" href="#/urun-yukle">Pazaryerine Yükle</a> ekranında pazaryeri kategorisiyle eşleştirilir. Eksik varsa ne olduğu söylenir.</div></div>` : ''}
+    </div>` : ''}
     ${id ? html`<div class="two-col">
       <div class="card"><h3 style="margin-bottom:8px">Stok hareketleri</h3>${p.moves.length ? html`<table class="t"><tbody>${p.moves.map((m) => html`<tr><td class="small">${dateTime(m.created_at)}<div class="muted tiny">${m.reason}${m.ref ? ` · ${m.ref}` : ''}</div></td><td class="r num" style="font-weight:650;color:${m.delta > 0 ? 'var(--good)' : 'var(--bad)'}">${m.delta > 0 ? '+' : ''}${m.delta}</td><td class="r num muted">${m.stock_after ?? ''}</td></tr>`)}</tbody></table>` : html`<div class="muted small">Henüz hareket yok</div>`}</div>
       <div class="card"><h3 style="margin-bottom:8px">Son 30 gün satış</h3>${p.sales.length ? html`<table class="t"><tbody>${p.sales.map((x) => html`<tr><td>${ch(x.channel).name}</td><td class="r num">${x.qty} adet</td><td class="r num">${money(x.revenue)}</td></tr>`)}</tbody></table>` : html`<div class="muted small">Satış yok</div>`}</div>
@@ -485,7 +492,18 @@ export async function productForm(id, done) {
     b.create_on = fd.getAll('create_on');
     if (galAuto) b.images_auto = 1; else if (galDirty) b.images = gal;
     const r = await api(id ? 'products/' + id : 'products', { method: id ? 'PUT' : 'POST', body: b });
-    if (r.errors && r.errors.length) toast(r.errors.join(' · '), true); else toast(r.created && r.created.length ? `Kaydedildi ve ${r.created.length} mağazada oluşturuldu` : 'Kaydedildi');
+    // Pazaryerlerine gönderim (kategori eşleştirmesi ve zorunlu bilgilerle); sonuç tek mesajda
+    const msgs = [], errs = [...(r.errors || [])];
+    if (r.created && r.created.length) msgs.push(`${r.created.map((c) => ch(c).name).join(', ')}'da oluşturuldu`);
+    for (const cid of fd.getAll('upload_on')) {
+      try {
+        const u = await api('catalog/upload', { method: 'POST', body: { channel: cid, ids: [r.id || id] } });
+        if (u.sent) msgs.push(`${ch(cid).name}'a gönderildi (onay bekleniyor)`);
+        else errs.push(`${ch(cid).name}: gönderilemedi — eksik: ${((u.skipped || [])[0] || {}).missing?.join(', ') || 'bilgi'}`);
+      } catch (x) { errs.push(`${ch(cid).name}: ${x.message}`); }
+    }
+    if (errs.length) toast(`Kaydedildi${msgs.length ? ' · ' + msgs.join(' · ') : ''} · ${errs.join(' · ')}`, true);
+    else toast(`Kaydedildi${msgs.length ? ' · ' + msgs.join(' · ') : ''}`);
     s.close(); done();
   });
   const del = $('[data-del]', s.el);
