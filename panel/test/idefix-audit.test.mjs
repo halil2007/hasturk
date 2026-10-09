@@ -76,3 +76,19 @@ test('idefix: tekil sevkiyat "ids" ile yenilenir; bulunamazsa hata (orderExists 
     await assert.rejects(c.fetchOne('999'), /bulunamadı/);
   }, (c) => J({ totalCount: 1, pageCount: 1, items: /ids=700/.test(c.url) ? [shipment(700)] : [] }));
 });
+
+test('idefix: stok gönderiminde mevcut fiyat da gider (yalnız stok "NO_PRICE" ile reddedilir); fiyat gönderiminde stok da gider', async () => {
+  await withFetch(async (calls) => {
+    const c = idefix(ENV, { id: 'idefix' });
+    await c.pushStock([{ remoteId: 'B1', stock: 7, price: 120, listPrice: 150 }, { remoteId: 'B2', stock: -2, price: 80, listPrice: 0 },
+      // Bekleyen fiyat değişikliği: eski fiyat gönderilmez (fiyat gönderimine bırakılır)
+      { remoteId: 'B3', stock: 4, price: 99, priceDirty: true }]);
+    assert.deepEqual(calls[0].body.items, [
+      { barcode: 'B1', price: 120, comparePrice: 150, inventoryQuantity: 7 },
+      { barcode: 'B2', price: 80, comparePrice: 80, inventoryQuantity: 0 },
+      { barcode: 'B3', inventoryQuantity: 4 },
+    ]);
+    await c.pushPrice([{ remoteId: 'B1', price: 110, listPrice: 0, stock: 5 }, { remoteId: 'B4', price: 50, listPrice: 60, stock: null }]);
+    assert.deepEqual(calls[1].body.items, [{ barcode: 'B1', price: 110, comparePrice: 110, inventoryQuantity: 5 }, { barcode: 'B4', price: 50, comparePrice: 60 }]);
+  }, (c) => J({ items: c.body.items, status: 'CREATED', batchRequestId: '101b-9' }));
+});

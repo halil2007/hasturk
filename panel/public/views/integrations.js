@@ -58,7 +58,8 @@ export async function integrations(el, rest = []) {
   }
   const st = () => state.settings || {};
   const held = (c) => (st().hold_channels || []).includes(c.id);
-  const isCatalog = (c) => (st().catalog_channels || ['ikas1']).includes(c.id);
+  // Stok senkronu kapalıyken ana katalogdan stok okunur (gönderilmez); açıkken ana katalog da diğer kanallar gibi stok alır
+  const isCatalog = (c) => !st().stock_sync && (st().catalog_channels || ['ikas1']).includes(c.id);
   const stockOn = (c) => (st().stock_sync ? (st().stock_channels || {})[c.id] !== false : !!(st().stock_push || {})[c.id]);
   const modeOf = (c) => modes.find((m) => m.channel === c.id);
   const stateOf = (c) => {
@@ -221,7 +222,7 @@ export async function integrations(el, rest = []) {
           <div class="id-sws">
             ${sw('active', c.id, c.active, 'Kanal aktif', 'Kapalıysa senkronlanmaz', !admin)}
             ${sw('write', c.id, !held(c), 'Kanala yazma', 'Kapalıysa yalnız okunur: paketleme, stok, fiyat gönderilmez', !admin || !live)}
-            ${isCatalog(c) ? html`<div class="iswitch dis"><span style="flex:1"><b>Stok gönderimi</b><span class="muted tiny">Ana katalog: stok bu kanaldan okunur</span></span></div>`
+            ${isCatalog(c) ? html`<div class="iswitch dis"><span style="flex:1"><b>Stok gönderimi</b><span class="muted tiny">Stok senkronu kapalı: stok bu kanaldan okunur (Ayarlar → Stok'tan açın)</span></span></div>`
               : sw('stock', c.id, stockOn(c), 'Stok gönderimi', st().stock_sync ? 'Panel stoğu bu kanala otomatik gider' : 'Genel stok senkronu kapalıyken yalnız bu kanala gönderilir', !admin || !live)}
             ${m ? sw('mode', c.id, !m.manual, 'Yeni ilanları otomatik ekle', 'Kapalıysa yeni ilanları Kanal Ürünleri\'nden siz seçersiniz', !admin) : ''}
           </div>
