@@ -69,7 +69,7 @@ export async function addToPanel(env, db, b, user = {}) {
   }
   if (!ids.length) fail(400, 'Panele eklenecek ilan seçin');
   const ls = [];
-  for (const part of chunk(ids, 300)) ls.push(...await all(db, `SELECT * FROM listings WHERE channel = ? AND product_id IS NULL AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
+  for (const part of chunk(ids, 90)) ls.push(...await all(db, `SELECT * FROM listings WHERE channel = ? AND product_id IS NULL AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
   // Var olan ürünler (barkod / stok kodu) ve bu kanaldan zaten ilanı olanlar (bir ürüne her kanaldan tek ilan)
   const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name FROM products');
   const pById = new Map(prods.map((p) => [p.id, p]));
@@ -129,7 +129,7 @@ export async function ignoreListings(db, b) {
   if (!channel || !ids.length) fail(400, 'İlan seçin');
   const on = b.ignored !== false;
   let n = 0;
-  for (const part of chunk(ids, 300)) {
+  for (const part of chunk(ids, 90)) {
     const r = await run(db, `UPDATE listings SET ignored = ?, match = ? WHERE channel = ? AND product_id IS NULL AND remote_id IN (${part.map(() => '?').join(',')})`, on ? 1 : 0, on ? 'ignored' : null, channel, ...part);
     n += (r.meta && r.meta.changes) || 0;
   }
@@ -142,7 +142,7 @@ export async function resolveTwins(env, db, b, user = {}) {
   const channel = str(b.channel), ids = (Array.isArray(b.ids) ? b.ids : []).map(String).slice(0, 500);
   if (!channel || !ids.length) fail(400, 'İlan seçin');
   const ls = [];
-  for (const part of chunk(ids, 300)) ls.push(...await all(db, `SELECT remote_id, match FROM listings WHERE channel = ? AND product_id IS NULL AND match LIKE 'dup:%' AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
+  for (const part of chunk(ids, 90)) ls.push(...await all(db, `SELECT remote_id, match FROM listings WHERE channel = ? AND product_id IS NULL AND match LIKE 'dup:%' AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
   if (!ls.length) fail(400, 'Seçilen ilanlar artık beklemiyor; sayfayı yenileyin');
   if (b.same) {
     for (const part of chunk(ls, 90)) await db.batch(part.map((l) => db.prepare("UPDATE listings SET product_id = ?, match = 'dup_ok', ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind(Number(l.match.slice(4)), channel, l.remote_id)));

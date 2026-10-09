@@ -31,8 +31,9 @@ for (let i = 1; i <= P; i++) {
 for (let i = 1; i <= O; i++) {
   const c = CH[i % 3], at = now - rnd(365) * 864e5 - rnd(864e5), pid = 1 + Math.floor(Math.pow(Math.random(), 3) * P); // satışlar az sayıda üründe yoğun
   const status = ['delivered', 'delivered', 'delivered', 'shipped', 'new', 'processing', 'cancelled', 'returned'][i % 8];
-  st.push(db.prepare('INSERT INTO orders (id, channel, remote_id, order_number, status, ordered_at, updated_at, customer, total, address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(`${c}:${i}`, c, String(i), String(100000 + i), status, at, at, 'Müşteri ' + (i % 5000), 150, JSON.stringify({ city: ['İstanbul', 'Ankara', 'İzmir'][i % 3] })));
+  // Müşteri anahtarı (ckey) canlıda sipariş kaydedilirken yazılır: burada da dolu (yoksa Müşteriler her açılışta eski kayıtları doldurur)
+  st.push(db.prepare('INSERT INTO orders (id, channel, remote_id, order_number, status, ordered_at, updated_at, customer, total, address, ckey) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(`${c}:${i}`, c, String(i), String(100000 + i), status, at, at, 'Müşteri ' + (i % 5000), 150, JSON.stringify({ city: ['İstanbul', 'Ankara', 'İzmir'][i % 3] }), 'n:' + (i % 5000)));
   st.push(db.prepare('INSERT INTO order_items (order_id, line_id, product_id, sku, name, quantity, unit_price, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(`${c}:${i}`, '1', pid, 'SKU-' + pid, 'Ürün ' + pid, 1 + (i % 3), 150, 150, status === 'cancelled' ? 'cancelled' : null));
   if (st.length >= 2000) { await batch(st); st = []; }
@@ -52,7 +53,10 @@ const PAGES = [
   ['Ürünler (en çok satan)', 'products?page=1&limit=40&group=1&sort=sold'], ['Ürünler (A–Z)', 'products?page=1&limit=40&group=1&sort=name'], ['Ürün arama', 'products?page=1&limit=40&group=1&q=Gübre'],
   ['Stoklar', 'products?page=1&limit=50&sort=sold'], ['Stoklar (tükenecek)', 'products?page=1&limit=50&sort=days'],
   ['Satış analizi', 'stats?range=30'], ['Gelir & gider (bu ay)', `finance?from=${month.getTime()}`], ['Ürün kârlılığı (bu ay)', `finance/products?from=${month.getTime()}`],
-  ['Gelir & gider (1 yıl)', `finance?from=${now - 365 * 864e5}`], ['Müşteriler', 'customers'], ['Buybox', 'buybox?page=1&limit=50'], ['Fiyat önerileri', 'suggestions'],
+  ['Gelir & gider (1 yıl)', `finance?from=${now - 365 * 864e5}`], ['Müşteriler', 'customers'], ['Müşteri özeti', 'customers/summary'], ['Buybox', 'buybox?page=1&limit=50'], ['Fiyat önerileri', 'suggestions'],
+  ['Sipariş detayı', 'orders/' + encodeURIComponent('trendyol:100')], ['Ürün detayı', 'products/1'], ['Kanallar', 'channels'], ['Entegrasyonlar', 'integrations'], ['Ayarlar', 'settings'],
+  ['Bildirimler', 'notices'], ['Toplama listesi', 'picklist'], ['Müşteri soruları', 'questions'], ['İadeler', 'claims'], 
+  ['Satış analizi (1 yıl)', 'stats?range=365'], ['Kargo (kargoda)', 'packages?state=shipped'], ['Eşleştirme', 'match'], ['Siparişler (iptal)', 'orders?status=cancelled&page=1&limit=50'],
 ];
 const rows = [];
 for (const [name, path] of PAGES) {
@@ -70,3 +74,5 @@ for (const [name, path] of PAGES) {
 console.table(rows);
 const slow = rows.filter((r) => r.ms > 500);
 console.log(slow.length ? `\n500 ms'yi aşan: ${slow.map((r) => r.sayfa).join(', ')}` : '\nTüm sayfalar 500 ms altında.');
+const bad = rows.filter((r) => r.durum >= 400);
+if (bad.length) console.log(`Hatalı yanıt: ${bad.map((r) => `${r.sayfa} (${r.durum})`).join(', ')}`);

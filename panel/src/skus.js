@@ -74,7 +74,7 @@ export async function previewSkus(db, ids, prefix) {
   const pre = cleanSkuPrefix(prefix ?? await skuPrefix(db));
   ids = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter((x) => x > 0))].slice(0, 2000);
   const prods = [];
-  for (const part of chunk(ids, 400)) prods.push(...await all(db, `SELECT id, name, group_name, variant_name, brand, sku FROM products WHERE id IN (${part.map(() => '?').join(',')})`, ...part));
+  for (const part of chunk(ids, 90)) prods.push(...await all(db, `SELECT id, name, group_name, variant_name, brand, sku FROM products WHERE id IN (${part.map(() => '?').join(',')})`, ...part));
   const used = await usedSkus(db);
   return { prefix: pre, items: prods.filter((p) => !str(p.sku)).map((p) => ({ id: p.id, sku: unique(skuFor(p, pre), used) })) };
 }

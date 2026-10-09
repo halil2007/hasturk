@@ -41,7 +41,7 @@ export async function errorsView(el, query = {}) {
           <td class="small" style="white-space:nowrap" title="${dateTime(e.last_at)}">${ago(e.last_at)}<div class="tiny muted">ilk ${ago(e.first_at)}</div></td>
           <td><span class="pill ${st[0]}">${st[1]}</span>${e.reopened ? html`<div class="tiny" style="color:var(--bad)">tekrarladı</div>` : e.auto && e.status === 'resolved' ? html`<div class="tiny muted" title="${e.auto}">kendiliğinden</div>` : ''}</td></tr>`; })}
       </tbody></table></div></div>` : html`<div class="card empty">${f.status === 'open' ? 'Açık hata yok 🎉 Müşteri panellerinde hata oluşunca burada görünür.' : 'Kayıt yok'}</div>`}
-      <div class="muted tiny">Müşteri panellerinde oluşan ekran hataları, başarısız işlemler (ör. etiket alınamadı), sunucu hataları ve kanal senkron hataları kendiliğinden kaydedilir. Aynı hata tek satırda toplanır; çözüldü denen hata tekrar ederse yeniden açılır ve bildirim gelir.</div>
+      <div class="muted tiny">Müşteri panellerinde oluşan ekran hataları, başarısız işlemler (ör. etiket alınamadı), sunucu hataları ve kanal senkron hataları kendiliğinden kaydedilir. Aynı hata tek satırda toplanır; çözüldü denen hata tekrar ederse yeniden açılır ve bildirim gelir. Kendiliğinden çözülür: aynı işlem sonradan başarılı olunca, kanal senkronu düzelince ya da hata tekrarlanmayınca (tek seferlik / anlık hata 1 saat, 2-3 kez görülen 6 saat, daha sık görülen 24 saat).</div>
     </div>`);
     const q = $('[data-q]', el);
     q.oninput = () => { clearTimeout(q._t); q._t = setTimeout(() => { f.q = q.value.trim(); load(); }, 300); };

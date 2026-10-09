@@ -1666,7 +1666,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!set) fail(400, 'Geçersiz işlem');
     const extra = b.action === 'critical' ? [Math.max(0, Math.round(num(b.value)))] : [];
     let changed = 0;
-    for (const part of chunk(ids, 300)) changed += ((await run(db, `UPDATE products SET ${set[0]}, updated_at = ? WHERE id IN (${part.map(() => '?').join(',')})`, ...extra, Date.now(), ...part)).meta || {}).changes || 0;
+    for (const part of chunk(ids, 90)) changed += ((await run(db, `UPDATE products SET ${set[0]}, updated_at = ? WHERE id IN (${part.map(() => '?').join(',')})`, ...extra, Date.now(), ...part)).meta || {}).changes || 0;
     await log(db, null, 'info', `${user.name}: ${changed} ürün toplu güncellendi (${b.action})`);
     return json({ changed });
   }

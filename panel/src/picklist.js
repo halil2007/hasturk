@@ -1,7 +1,7 @@
 // Toplama listesi: kargoya çıkacak (yeni / hazırlanıyor) siparişlerdeki ürünlerin toplu listesi — depoda tek turda toplanır.
 // Paketi olmayan siparişte tüm satırlar (iptaller hariç), paketlenmiş siparişte yalnız açık (gönderilmemiş) paketlerdeki adetler sayılır.
 import { all } from './db.js';
-import { chunk, str, DEAD_LINE } from './util.js';
+import { str, DEAD_LINE } from './util.js';
 
 const parse = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 const inList = (n) => Array(n).fill('?').join(',');
@@ -12,15 +12,23 @@ export async function pickList(db, { channel, ids, day, now = Date.now() } = {})
   const where = ["o.status IN ('new', 'processing')"], args = [];
   if (channel) { where.push('o.channel = ?'); args.push(channel); }
   if (day === 'today' || day === 'old') { where.push(`o.ordered_at ${day === 'today' ? '>=' : '<'} ?`); args.push(trDayStart(now)); }
+  // Seçili siparişler: D1 bir sorguda en fazla 100 değişken kabul eder; azsa sorguda, çoksa sonuçta süzülür
   const idList = (Array.isArray(ids) ? ids : str(ids).split(',')).map(str).filter(Boolean).slice(0, 2000);
-  if (idList.length) { where.push(`o.id IN (${inList(idList.length)})`); args.push(...idList); }
-  const orders = await all(db, `SELECT o.id, o.channel, o.order_number, o.customer, o.ordered_at FROM orders o WHERE ${where.join(' AND ')} ORDER BY o.ordered_at ASC LIMIT 2000`, ...args);
+  const idSet = idList.length > 90 ? new Set(idList) : null;
+  if (idList.length && !idSet) { where.push(`o.id IN (${inList(idList.length)})`); args.push(...idList); }
+  // Siparişler, paketleri ve satırları aynı anda (tek bekleme); paket / satır sorguları sipariş listesini alt sorguyla alır
+  const sub = `SELECT o.id FROM orders o WHERE ${where.join(' AND ')} ORDER BY o.ordered_at ASC LIMIT 2000`;
+  const [allOrders, pkRows, lineRows, prodRows] = await Promise.all([
+    all(db, `SELECT o.id, o.channel, o.order_number, o.customer, o.ordered_at FROM orders o WHERE ${where.join(' AND ')} ORDER BY o.ordered_at ASC LIMIT 2000`, ...args),
+    all(db, `SELECT order_id, status, items FROM packages WHERE order_id IN (${sub})`, ...args),
+    all(db, `SELECT order_id, line_id, product_id, sku, barcode, name, image, quantity, status FROM order_items WHERE order_id IN (${sub})`, ...args),
+    // Panel ürün bilgisi: ad / varyant / görsel / SKU / barkod / stok (sipariş satırındaki ad yerine)
+    all(db, `SELECT id, name, group_name, variant_name, sku, barcode, image, stock FROM products WHERE id IN (SELECT product_id FROM order_items WHERE order_id IN (${sub}))`, ...args),
+  ]);
+  const orders = idSet ? allOrders.filter((o) => idSet.has(o.id)) : allOrders;
   if (!orders.length) return { orders: 0, totalQty: 0, items: [], list: [], channels: {} };
-  const oids = orders.map((o) => o.id), pkgs = new Map(), lines = [];
-  for (const part of chunk(oids, 400)) {
-    for (const p of await all(db, `SELECT order_id, status, items FROM packages WHERE order_id IN (${inList(part.length)})`, ...part)) (pkgs.get(p.order_id) || pkgs.set(p.order_id, []).get(p.order_id)).push(p);
-    lines.push(...await all(db, `SELECT order_id, line_id, product_id, sku, barcode, name, image, quantity, status FROM order_items WHERE order_id IN (${inList(part.length)})`, ...part));
-  }
+  const pkgs = new Map(), lines = lineRows;
+  for (const p of pkRows) (pkgs.get(p.order_id) || pkgs.set(p.order_id, []).get(p.order_id)).push(p);
   const byOrder = new Map();
   for (const l of lines) (byOrder.get(l.order_id) || byOrder.set(l.order_id, []).get(l.order_id)).push(l);
 
@@ -48,10 +56,7 @@ export async function pickList(db, { channel, ids, day, now = Date.now() } = {})
       g.orders.push({ id: o.id, order_number: o.order_number, channel: o.channel, customer: o.customer, ordered_at: o.ordered_at, qty: q });
     }
   }
-  // Panel ürün bilgisi: ad / varyant / görsel / SKU / barkod / stok (sipariş satırındaki ad yerine)
-  const pids = [...groups.values()].map((g) => g.product_id).filter(Boolean);
-  const prods = new Map();
-  for (const part of chunk(pids, 400)) for (const p of await all(db, `SELECT id, name, group_name, variant_name, sku, barcode, image, stock FROM products WHERE id IN (${inList(part.length)})`, ...part)) prods.set(p.id, p);
+  const prods = new Map(prodRows.map((p) => [p.id, p]));
   const items = [...groups.values()].map((g) => {
     const p = prods.get(g.product_id);
     return p ? { ...g, name: p.variant_name && p.group_name ? p.group_name : p.name, variant: p.variant_name || '', sku: p.sku || g.sku, barcode: p.barcode || g.barcode, image: p.image || g.image, stock: p.stock } : { ...g, variant: '', stock: null };

@@ -1,10 +1,17 @@
 // Sistem hızı: her panelin (ana panel ve müşteri panelleri) istek süreleri işlem türüne göre toplanır ve birkaç dakikada bir
-// ana veritabanına yazılır (günlük: kaç istek, ortalama, en uzun, 1 sn'yi aşan). Ortalaması 3 sn'yi aşan işlem "Yavaş işlem"
-// olarak Müşteri hataları'na düşer. Günlük bakım (housekeeping) eski kayıtları temizler ve veritabanı istatistiklerini tazeler.
+// ana veritabanına yazılır (günlük: kaç istek, ortalama, en uzun, 1 sn'yi aşan). Ortalaması 1 sn'yi aşan panel işlemi "Yavaş işlem"
+// olarak Müşteri hataları'na düşer (pazaryeri bağlantılı işlemde sınır 10 sn). Günlük bakım (housekeeping) eski kayıtları temizler ve veritabanı istatistiklerini tazeler.
 import { all, run } from './db.js';
 import { recordError } from './errors.js';
 
-const SLOW = 1000, ALERT = 3000;
+const SLOW = 1000, ALERT = 1000, ALERT_EXT = 10000;
+// Pazaryeri / site bağlantılı işlemler: süre, kanalın (Trendyol, Hepsiburada, ikas …) yanıtına bağlıdır (senkron, paketleme, etiket,
+// kargo bildirimi, bağlantı testi, soru cevabı …). Raporda ayrı gösterilir; panelin kendi hızı (ortalama yanıt) bunlarsız ölçülür.
+export const EXTERNAL = new RegExp('^(POST (sync|import|push-stock|buybox/check|questions/sync|claims/sync|invoices/sync|settlements/sync|backfill(/run)?|campaigns'
+  + '|channel-products/(accept|add)|mail/test|digest/test|push/test|orders-bulk|labels|fx/apply|suggestions/apply|listings/stock|catalog/.*'
+  + '|orders/:id/(accept|pack|split|ship|label|label-pdf|cargo|refresh|repack|cancel-package|carrier-label|carrier-cancel)'
+  + '|integrations/[a-z0-9_]+/(test|diagnose)|integrations/carriers/[a-z]+/test|claims/[a-z0-9_]+/.+/(approve|reject)|questions/[a-z0-9_]+/.+/answer)'
+  + '|GET (orders/:id/cargo|campaigns/.+|catalog/.*))$');
 const day = (t = Date.now()) => new Date(t + 3 * 3600e3).toISOString().slice(0, 10);
 // İşlem türü: kimlik / numara içeren parçalar :id olur (orders/trendyol:123 → orders/:id)
 export const routeOf = (method, path) => `${method} ${String(path).split('?')[0].split('/').map((s) => (/^\d+$/.test(s) || (/\d/.test(s) && s.length > 3) ? ':id' : s)).join('/')}`.slice(0, 120);
@@ -29,7 +36,8 @@ export class PerfBuffer {
       ON CONFLICT (day, slug, route) DO UPDATE SET n = n + excluded.n, total_ms = total_ms + excluded.total_ms, max_ms = MAX(max_ms, excluded.max_ms), slow_n = slow_n + excluded.slow_n`)
       .bind(d, slug, route, e.n, Math.round(e.total), Math.round(e.max), e.slow)));
     for (const [route, e] of rows) {
-      if (e.n >= 3 && e.total / e.n >= ALERT) await recordError(db, { slug, firm, source: 'perf', message: `Yavaş işlem: ortalama ${Math.round(e.total / e.n / 100) / 10} sn (${e.n} istek, en uzun ${Math.round(e.max / 100) / 10} sn)`, action: route });
+      const ext = EXTERNAL.test(route);
+      if (e.n >= 3 && e.total / e.n >= (ext ? ALERT_EXT : ALERT)) await recordError(db, { slug, firm, source: 'perf', message: `${ext ? 'Pazaryeri yanıtı yavaş' : 'Yavaş işlem'}: ortalama ${Math.round(e.total / e.n / 100) / 10} sn (${e.n} istek, en uzun ${Math.round(e.max / 100) / 10} sn)`, action: route });
     }
     if (Math.random() < 0.05) await run(db, 'DELETE FROM perf_stats WHERE day < ?', day(Date.now() - 45 * 864e5));
   }
@@ -38,15 +46,30 @@ export class PerfBuffer {
 // Ana panel → Destek → Sistem hızı: son N günün en yavaş işlemleri (firma bazında) ve günlük toplam
 export async function perfReport(db, { days = 7, slug } = {}) {
   const from = day(Date.now() - (days - 1) * 864e5), sw = slug != null && slug !== '' ? ' AND slug = ?' : '', sa = sw ? [slug === '-' ? '' : slug] : [];
-  const [routes, daily, firms] = await Promise.all([
+  // Günlük ve firma toplamları panelin kendi işlemleriyle (pazaryeri bağlantılılar hariç) hesaplanır; onlar ayrıca verilir
+  const [routes, byDay, byFirm] = await Promise.all([
     all(db, `SELECT slug, route, SUM(n) AS n, ROUND(SUM(total_ms) * 1.0 / SUM(n)) AS avg_ms, MAX(max_ms) AS max_ms, SUM(slow_n) AS slow_n FROM perf_stats WHERE day >= ?${sw}
-      GROUP BY slug, route HAVING SUM(n) > 0 ORDER BY avg_ms DESC LIMIT 60`, from, ...sa),
-    all(db, `SELECT day, SUM(n) AS n, ROUND(SUM(total_ms) * 1.0 / SUM(n)) AS avg_ms, SUM(slow_n) AS slow_n FROM perf_stats WHERE day >= ?${sw} GROUP BY day ORDER BY day`, from, ...sa),
-    all(db, `SELECT p.slug, COALESCE(t.name, '') AS firm, SUM(p.n) AS n, ROUND(SUM(p.total_ms) * 1.0 / SUM(p.n)) AS avg_ms, SUM(p.slow_n) AS slow_n FROM perf_stats p LEFT JOIN tenants t ON t.slug = p.slug
-      WHERE p.day >= ? GROUP BY p.slug ORDER BY avg_ms DESC`, from).catch(() => []),
+      GROUP BY slug, route HAVING SUM(n) > 0 ORDER BY avg_ms DESC LIMIT 300`, from, ...sa),
+    all(db, `SELECT day, route, SUM(n) AS n, SUM(total_ms) AS t, SUM(slow_n) AS slow_n FROM perf_stats WHERE day >= ?${sw} GROUP BY day, route`, from, ...sa),
+    all(db, `SELECT p.slug, COALESCE(t.name, '') AS firm, p.route, SUM(p.n) AS n, SUM(p.total_ms) AS t, SUM(p.slow_n) AS slow_n FROM perf_stats p LEFT JOIN tenants t ON t.slug = p.slug
+      WHERE p.day >= ? GROUP BY p.slug, p.route`, from).catch(() => []),
   ]);
-  const names = new Map(firms.map((f) => [f.slug, f.firm]));
-  return { days, routes: routes.map((r) => ({ ...r, firm: r.slug ? names.get(r.slug) || r.slug : 'Ana panel' })), daily, firms: firms.map((f) => ({ ...f, firm: f.slug ? f.firm || f.slug : 'Ana panel' })) };
+  const sum = (rows, key) => {
+    const m = new Map();
+    for (const r of rows) {
+      if (EXTERNAL.test(r.route)) continue;
+      const e = m.get(r[key]) || { [key]: r[key], firm: r.firm, n: 0, t: 0, slow_n: 0 };
+      e.n += r.n; e.t += r.t; e.slow_n += r.slow_n; m.set(r[key], e);
+    }
+    return [...m.values()].map(({ t, ...e }) => ({ ...e, avg_ms: e.n ? Math.round(t / e.n) : 0 }));
+  };
+  const daily = sum(byDay, 'day').sort((a, b) => a.day.localeCompare(b.day));
+  const firms = sum(byFirm, 'slug').sort((a, b) => b.avg_ms - a.avg_ms);
+  const names = new Map(byFirm.map((f) => [f.slug, f.firm]));
+  const named = (r) => ({ ...r, firm: r.slug ? names.get(r.slug) || r.slug : 'Ana panel', ext: EXTERNAL.test(r.route) });
+  const all_ = routes.map(named);
+  return { days, routes: all_.filter((r) => !r.ext).slice(0, 60), external: all_.filter((r) => r.ext).slice(0, 40), daily,
+    firms: firms.map((f) => ({ ...f, firm: f.slug ? f.firm || f.slug : 'Ana panel' })) };
 }
 
 // Günlük bakım (her panelin kendi veritabanında): büyüyen geçmiş tabloları budanır, sorgu planlayıcının istatistikleri tazelenir
