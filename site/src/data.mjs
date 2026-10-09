@@ -331,6 +331,80 @@ export const INTEGRATIONS = [
     ],
     help: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri. API Key (Client ID) ve API Secret bilgileriniz gerekir.',
   },
+  // Test aşamasındaki kanallar (beta: paneldeki kanal türü). Sayfada, menüde ve kartlarda "Test aşamasında" etiketiyle görünür; ana panelde
+  // Entegrasyonlar → kanal → "Test yazısını kaldır" denince etiket sitede de kalkar (site.js, panelin /api/public/channels yanıtına göre).
+  {
+    slug: 'amazon', beta: 'amazon', name: 'Amazon', kind: 'pazaryeri', color: '#232f3e', badge: 'a', word: 'amazon',
+    lead: 'Amazon mağazanızın siparişlerini diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını Amazon\'a bildirin.',
+    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Amazon\'un gönderdiği (FBA) siparişler', 'Durum takibi'], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    points: [
+      ['i-cart', 'Siparişler', 'Amazon siparişleri diğer kanallarla aynı listeye gelir; Amazon\'un kendi deposundan gönderdiği siparişlerin durumu da izlenir.'],
+      ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız ilanlarınıza gönderilir; diğer kanallarla eşit kalır.'],
+      ['i-truck', 'Kargo bildirimi', 'Kargo firması ve takip numarası panelden Amazon\'a bildirilir.'],
+      ['i-shield', 'Alıcı bilgisi', 'Amazon alıcının adını ve açık adresini kısıtlı veri olarak verir; siparişte il ve ilçe görünür.'],
+    ],
+    help: 'Amazon Seller Central → Uygulamalar ve Hizmetler → Uygulama geliştirme: kendi mağazanız için özel bir uygulama oluşturup yetkilendirin; LWA Client ID, Client Secret ve refresh token buradan alınır.',
+  },
+  {
+    slug: 'ciceksepeti', beta: 'ciceksepeti', name: 'Çiçeksepeti', kind: 'pazaryeri', color: '#1e9e57', badge: 'Çs', word: 'çiçeksepeti',
+    lead: 'Çiçeksepeti mağazanızın siparişlerini ve ürünlerini diğer kanallarla aynı panelde görün, stok ve fiyatlarınızı eşitleyin.',
+    caps: [['Siparişler', true], ['Ürün ve stok okuma', true], ['Stok ve fiyat gönderimi', true], ['Kargo etiketi', 'Çiçeksepeti panelinden'], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    points: [
+      ['i-cart', 'Siparişler', 'Çiçeksepeti siparişleri diğer kanallarla aynı listeye gelir; durumları kanaldan güncellenir.'],
+      ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız ilanlarınıza gönderilir; diğer kanallarla eşit kalır.'],
+      ['i-box', 'Ürünler', 'İlanlarınız stok koduyla panele gelir ve paneldeki ürünle eşleşir.'],
+      ['i-truck', 'Kargo', 'Gönderi Çiçeksepeti anlaşmalı kargosuyla yapılır; takip numarası kanaldan panele gelir.'],
+    ],
+    help: 'Çiçeksepeti satıcı paneli → Hesap Ayarları → Entegrasyon Bilgileri sayfasından API anahtarınızı alın.',
+  },
+  {
+    slug: 'koctas', beta: 'koctas', name: 'Koçtaş', kind: 'pazaryeri', color: '#e5541b', badge: 'K', word: 'koçtaş',
+    lead: 'Koçtaş pazaryeri siparişlerinizi panelden onaylayın, kargo takip numarasını bildirin, stok ve fiyatlarınızı diğer kanallarla eşitleyin.',
+    caps: [['Siparişler ve onay', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    points: [
+      ['i-cart', 'Sipariş onayı', 'Yeni Koçtaş siparişlerini panelden onaylayın; diğer kanallarla aynı listede yönetin.'],
+      ['i-truck', 'Kargo bildirimi', 'Kendi kargo anlaşmanızla gönderip takip numarasını panelden Koçtaş\'a bildirin.'],
+      ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız tekliflerinize gönderilir; diğer kanallarla eşit kalır.'],
+      ['i-box', 'Ürünler', 'Yeni teklifi Koçtaş panelinden açarsınız; teklif paneldeki ürüne bağlanır.'],
+    ],
+    help: 'Koçtaş satıcı paneli → sağ üstteki kullanıcı menüsü → API Anahtarı sayfasından anahtarınızı alın.',
+  },
+  {
+    slug: 'shopify', beta: 'shopify', name: 'Shopify', kind: 'e-ticaret sitesi', color: '#5e8e3e', badge: 'S', word: 'shopify',
+    lead: 'Shopify sitenizin siparişlerini pazaryeri siparişlerinizle aynı listede yönetin; stok ve fiyatlarınızı tüm kanallarla eşit tutun, kargo bilgisini müşterinize Shopify üzerinden iletin.',
+    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Kargo etiketi', 'Panel etiketi'], ['Birden fazla site', true], ['Ürün oluşturma', false], ['İade talepleri', false]],
+    points: [
+      ['i-cart', 'Siparişler', 'Shopify siparişleri diğer kanallarla aynı listeye gelir.'],
+      ['i-sync', 'Stok ve fiyat', 'Pazaryerinde satılan ürünün stoğu Shopify sitenizde de düşer; fiyatlarınız eşit kalır.'],
+      ['i-truck', 'Kargo bildirimi', 'Kargo firması ve takip numarası Shopify\'a işlenir, müşterinize bildirim gider.'],
+      ['i-tag', 'Etiket', 'Kendi kargo anlaşmanızla gönderimde etiket sipariş ve adres bilgisiyle panelden basılır.'],
+    ],
+    help: 'Shopify Dev Dashboard (dev.shopify.com) → uygulama oluşturun, sipariş, ürün, stok ve gönderim izinlerini verip mağazanıza kurun; Client ID ve Client secret bilgilerinizi panele girin.',
+  },
+  {
+    slug: 'opencart', beta: 'opencart', name: 'OpenCart', kind: 'e-ticaret sitesi', color: '#23a8e0', badge: 'OC', word: 'OpenCart',
+    lead: 'OpenCart sitenizin siparişlerini pazaryeri siparişlerinizle aynı listede yönetin; stok ve fiyatlarınızı tüm kanallarla eşit tutun.',
+    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Kargo etiketi', 'Panel etiketi'], ['Birden fazla site', true], ['Ürün oluşturma', false], ['İade talepleri', false]],
+    points: [
+      ['i-cart', 'Siparişler', 'OpenCart siparişleri diğer kanallarla aynı listeye gelir; seçenekli ürünlerin her seçeneği ayrı varyant olarak eşleşir.'],
+      ['i-sync', 'Stok ve fiyat', 'Pazaryerinde satılan ürünün stoğu OpenCart sitenizde de düşer; fiyatlarınız eşit kalır.'],
+      ['i-truck', 'Kargo bildirimi', 'Kargo firması ve takip numarası sipariş geçmişine müşterinin göreceği not olarak işlenir.'],
+      ['i-link', 'Bağlantı dosyası', 'OpenCart\'ın hazır bir yönetim API\'si olmadığı için bağlantı, panelden indirdiğiniz tek bir dosyayla kurulur.'],
+    ],
+    help: 'Panelde Entegrasyonlar → OpenCart → Bağlantı dosyasını indirin, OpenCart\'ın kurulu olduğu ana klasöre (config.php\'nin yanına) yükleyin ve site adresinizi girin. Siteniz HTTPS olmalıdır.',
+  },
+  {
+    slug: 'etsy', beta: 'etsy', name: 'Etsy', kind: 'pazaryeri', color: '#f1641e', badge: 'E', word: 'Etsy',
+    lead: 'Etsy mağazanızın siparişlerini diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını Etsy\'ye bildirin.',
+    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    points: [
+      ['i-cart', 'Siparişler', 'Etsy siparişleri diğer kanallarla aynı listeye gelir.'],
+      ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız ilanlarınıza ve varyantlarına gönderilir; diğer kanallarla eşit kalır.'],
+      ['i-truck', 'Kargo bildirimi', 'Kargo firması ve takip numarası panelden Etsy\'ye bildirilir.'],
+      ['i-box', 'Ürünler', 'Aktif ilanlarınız ve varyantları panele gelir, paneldeki ürünle eşleşir.'],
+    ],
+    help: 'etsy.com/developers → Your Apps: uygulama oluşturun (keystring ve shared secret), uygulamayı mağazanız için yetkilendirip refresh token alın.',
+  },
 ];
 
 // ---------- özellik sayfalarının ek bölümleri: ne işe yarar (sorun → çözüm), nasıl çalışır (adımlar), artıları ----------

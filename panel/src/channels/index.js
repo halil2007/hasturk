@@ -17,7 +17,7 @@ import { demo } from './demo.js';
 import { loadConfig, effectiveEnv, configVersion, EXTRA_RE, TYPES, TYPE_NAMES, BETA_TYPES, isBeta, typeOf, storeEnv, releasedTypes } from '../config.js';
 import { getRaw, setSetting } from '../db.js';
 
-// Test modülündeki kanallar (BETA_TYPES) ana mağaza olarak da listelenir; müşteri panellerinde hiç oluşturulmaz
+// Test aşamasındaki kanallar (BETA_TYPES) da ana mağaza olarak listelenir (ana ve müşteri panellerinde; beta: "Test aşamasında" etiketi)
 export const BASE_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', 'woocommerce', ...BETA_TYPES];
 // Geçerli kanal kimlikleri: ana mağazalar + eklenen mağazalar (getChannels her çağrıda günceller)
 export const CHANNEL_IDS = [...BASE_IDS];
@@ -77,14 +77,12 @@ export async function getChannels(env, db) {
     return TYPES.indexOf(ta) - TYPES.indexOf(tb) || Number(na) - Number(nb);
   });
   for (const id of extras) {
-    if (env.TENANT_SLUG && beta(id)) continue;
     const type = typeOf(id), v = cfg[id].values || {}, n = EXTRA_RE.exec(id)[2];
     const name = v.STORE_LABEL || (type === 'ikas' ? v.IKAS1_NAME : '') || `${TYPE_NAMES[type]} ${n}`;
     meta[id] = { id, type, name, short: name, extra: true, ...((BETA_TYPES.includes(type) || type === 'woocommerce') ? { kv: kvFor(id), ...(beta(id) ? { beta: true } : {}) } : {}) };
     real[id] = make(type, storeEnv(env, type, v), meta[id]);
   }
-  // Müşteri panelleri: test modülündeki kanallar yok (Entegrasyonlar'da "Yakında" olarak görünür)
-  const ids = [...BASE_IDS, ...extras].filter((id) => !(env.TENANT_SLUG && beta(id)));
+  const ids = [...BASE_IDS, ...extras];
   CHANNEL_IDS.splice(0, CHANNEL_IDS.length, ...ids);
   const verified = {};
   if (db) for (const id of ids) if (GATED.includes(typeOf(id))) verified[id] = await getRaw(db, 'verified:' + id);

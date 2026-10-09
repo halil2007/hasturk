@@ -1,7 +1,7 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
@@ -983,7 +983,6 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (user.role !== 'admin') fail(403, 'Yalnız yönetici');
     const cid = str(q.channel) || 'opencart';
     if (typeOf(cid) !== 'opencart' || !fieldsFor(cid)) fail(400, 'Geçersiz kanal');
-    if (env.TENANT_SLUG) fail(403, 'Bu kanal yakında açılacak');
     if (!env.ASSETS) fail(404, 'Dosya bulunamadı');
     const v = ((await loadConfig(env, db))[cid] || {}).values || {}, cf = (k) => v[k] || (isExtra(cid) ? '' : str(env[k]));
     let key = cf('OPENCART_KEY');
@@ -1390,22 +1389,22 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     await log(db, null, 'info', `${user.name}: deneme e-postası gönderildi (${to.join(', ')})`);
     return json({ ok: true, message: `Deneme e-postası gönderildi: ${to.join(', ')}` });
   }
-  // Test modülündeki kanal türünü müşterilere aç / test modülüne geri al (yalnız ana panel yöneticisi). Müşteri panelleri birkaç dakika içinde,
-  // tanıtım sitesi (Entegrasyonlar) önbelleği dolunca görür. Açılan türün mevcut firma mağazaları geri alınınca çalışmayı bırakır.
+  // Test aşamasındaki kanal türünün "Test aşamasında" etiketini kaldır / geri koy (yalnız ana panel yöneticisi). Müşteri panelleri birkaç
+  // dakika içinde, tanıtım sitesi önbelleği dolunca görür. Kanal her iki durumda da çalışır; yalnız etiket değişir.
   if (path === 'integrations/release' && m === 'POST') {
     if (env.TENANT_SLUG) fail(404, 'Bulunamadı');
     const b = await body(req), type = str(b.type);
-    if (!BETA_TYPES.includes(type)) fail(400, 'Bu kanal test modülünde değil');
+    if (!BETA_TYPES.includes(type)) fail(400, 'Bu kanal test aşamasında değil');
     const set = new Set(await releasedTypes(env, db));
     if (b.on) set.add(type); else set.delete(type);
     await setSetting(db, 'released_channels', BETA_TYPES.filter((t) => set.has(t)));
     resetChannels();
-    await log(db, type, 'info', `${user.name}: ${TYPE_NAMES[type]} ${b.on ? 'müşterilere açıldı (firmalarda ve sitede görünür)' : 'test modülüne geri alındı (firmalarda “Yakında”)'}`);
+    await log(db, type, 'info', `${user.name}: ${TYPE_NAMES[type]} ${b.on ? '“Test aşamasında” etiketi kaldırıldı (firmalarda ve sitede normal kanal)' : 'yeniden “Test aşamasında” etiketiyle gösteriliyor'}`);
     return json({ ok: true, released: [...set] });
   }
   // Mağaza ekle / kaldır (aynı kanal türünden istenen sayıda mağaza)
   if (path === 'integrations/add' && m === 'POST') {
-    const id = await addStore(db, str((await body(req)).type), { tenant: !!env.TENANT_SLUG, released: await releasedTypes(env, db) });
+    const id = await addStore(db, str((await body(req)).type));
     resetChannels();
     await log(db, id, 'info', `${user.name}: yeni mağaza eklendi`);
     return json({ ok: true, id });
@@ -1417,7 +1416,6 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true });
   }
   if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT') {
-    if (env.TENANT_SLUG && isBeta(x[1], await releasedTypes(env, db))) fail(403, 'Bu kanal yakında açılacak');
     const b = await body(req);
     // Paketteki mağaza sınırı: yeni bir mağazanın API bilgisi kaydedilirken bağlı mağazalar sayılır (var olanı güncellemek serbest)
     const maxStores = Number(env.TENANT_MAX_STORES) || 0;

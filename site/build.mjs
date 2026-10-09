@@ -34,9 +34,11 @@ const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js'].m
 
 // ---------- üst menü açılır listeleri ----------
 const menuFeatures = FEATURES.map((f) => `<a class="mi" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><span><b>${esc(f.name)}</b><small>${esc(f.short)}</small></span></a>`).join('');
-const menuIntegrations = INTEGRATIONS.map((x) => `<a class="mi" href="/entegrasyonlar/${x.slug}"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span><b>${esc(x.name)}</b><small>${esc(x.kind)}</small></span></a>`).join('');
+// Test aşamasındaki kanalın etiketi (data-beta): panelde "Test yazısını kaldır" denince site.js kaldırır; data-beta-on olanlar o zaman görünür
+const testTag = (x, cls = 'pill soon') => (x.beta ? `<span class="${cls}" data-beta="${x.beta}">Test aşamasında</span>` : '');
+const menuIntegrations = INTEGRATIONS.map((x) => `<a class="mi" href="/entegrasyonlar/${x.slug}"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span><b>${esc(x.name)}</b><small>${esc(x.kind)}${testTag(x, 'tt')}</small></span></a>`).join('');
 const featureCards = FEATURES.map((f) => `<a class="fcard reveal" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><b>${esc(f.name)}</b><span>${esc(f.short)}</span><ul>${f.points.slice(0, 3).map(([, t]) => `<li>${tick}${esc(t)}</li>`).join('')}</ul><em>İncele ${ico('i-arrow')}</em></a>`).join('');
-const integrationCards = INTEGRATIONS.map((x) => `<a class="icard reveal" href="/entegrasyonlar/${x.slug}"><span class="wm-big" style="color:${x.color}">${esc(x.word)}</span><small>${esc(x.kind)} · ${x.caps.filter(([, v]) => v !== false).length} işlem</small><em>Ayrıntılar ${ico('i-arrow')}</em></a>`).join('');
+const integrationCards = INTEGRATIONS.map((x) => `<a class="icard reveal" href="/entegrasyonlar/${x.slug}"><span class="wm-big" style="color:${x.color}">${esc(x.word)}</span><small>${esc(x.kind)} · ${x.caps.filter(([, v]) => v !== false).length} işlem</small>${testTag(x)}<em>Ayrıntılar ${ico('i-arrow')}</em></a>`).join('');
 const TAB_FEATURES = ['siparis-yonetimi', 'kargo-ve-etiket', 'stok-senkronizasyonu', 'urun-yonetimi', 'buybox-takibi', 'kar-zarar', 'raporlar', 'musteri-sorulari-ve-iadeler', 'mobil-yonetim'];
 const featureTabs = () => { const list = TAB_FEATURES.map((s) => fById[s]); return `<div class="ftabs" data-ftabs>
   <div class="ft-list" role="tablist">${list.map((f, i) => `<button type="button" role="tab" data-i="${i}" class="${i ? '' : 'on'}" aria-selected="${!i}"><span class="ic ${f.color}">${ico(f.icon)}</span><span>${esc(f.name)}</span></button>`).join('')}</div>
@@ -48,7 +50,7 @@ const featureTabs = () => { const list = TAB_FEATURES.map((s) => fById[s]); retu
   </div>`).join('')}</div>
 </div>`; };
 const mnavFeatures = FEATURES.map((f) => `<a href="/ozellikler/${f.slug}">${esc(f.name)}</a>`).join('');
-const mnavIntegrations = INTEGRATIONS.map((x) => `<a href="/entegrasyonlar/${x.slug}">${esc(x.name)}</a>`).join('');
+const mnavIntegrations = INTEGRATIONS.map((x) => `<a href="/entegrasyonlar/${x.slug}">${esc(x.name)}${testTag(x, 'tt')}</a>`).join('');
 
 // ---------- ortak parçalar ----------
 const browser = (img, alt) => `<div class="browser"><div class="bar"><i></i><i></i><i></i><span>panel.hasturkcrm.com</span></div><img src="/img/${img}.jpg" width="1440" height="900" alt="${esc(alt)}"></div>`;
@@ -149,9 +151,10 @@ function integrationPage(x) {
   <div class="wrap fp-grid">
     <div class="txt">
       <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/entegrasyonlar">Entegrasyonlar</a><span>›</span><b>${esc(x.name)}</b></nav>
-      <div class="int-logo"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span class="wm-big" style="color:${x.color}">${esc(x.word)}</span><span class="pill">Aktif entegrasyon</span></div>
+      <div class="int-logo"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span class="wm-big" style="color:${x.color}">${esc(x.word)}</span>${x.beta ? `${testTag(x)}<span class="pill" data-beta-on="${x.beta}" hidden>Aktif entegrasyon</span>` : '<span class="pill">Aktif entegrasyon</span>'}</div>
       <h1>${esc(x.name)} <span class="grad">Entegrasyonu</span></h1>
       <p>${esc(x.lead)}</p>
+      ${x.beta ? `<p class="beta-note" data-beta="${x.beta}"><b>Test aşamasında:</b> ${esc(x.name)} entegrasyonu panelde kullanıma açıktır ve son testleri sürmektedir. Kurulumda yanınızdayız; ilk siparişlerinizi ve stoklarınızı birlikte kontrol ederiz.</p>` : ''}
       <div class="ctas"><a class="btn btn-primary" data-demo href="/demo">Canlı demoyu açın ${ico('i-arrow')}</a><a class="btn btn-line" href="/paketler">Fiyatlar</a></div>
       ${heroChecks}
     </div>
@@ -177,7 +180,7 @@ function integrationPage(x) {
 <section class="sec">
   <div class="wrap">
     <div class="sec-head reveal"><div class="kicker">Diğer entegrasyonlar</div><h2>Tüm Kanallarınız Tek Panelde</h2><p>Aynı panelde birden fazla pazaryeri ve e-ticaret sitesini birlikte yönetin; stok ve fiyat hepsinde eşit kalır.</p></div>
-    <div class="integ">${others.map((o) => `<a class="it reveal" href="/entegrasyonlar/${o.slug}"><span class="b" style="background:${o.color}">${esc(o.badge)}</span><div style="min-width:0"><b>${esc(o.name)}</b><small>${esc(o.kind)}</small></div></a>`).join('')}<a class="it reveal" href="/entegrasyonlar#yakinda"><span class="b" style="background:#94a3b8">+</span><div style="min-width:0"><b>Yakında</b><small>Amazon, Ticimax, IdeaSoft, T-Soft…</small></div></a></div>
+    <div class="integ">${others.map((o) => `<a class="it reveal" href="/entegrasyonlar/${o.slug}"><span class="b" style="background:${o.color}">${esc(o.badge)}</span><div style="min-width:0"><b>${esc(o.name)}</b><small>${esc(o.kind)}${testTag(o, 'tt')}</small></div></a>`).join('')}<a class="it reveal" href="/entegrasyonlar#yakinda"><span class="b" style="background:#94a3b8">+</span><div style="min-width:0"><b>Yakında</b><small>Ticimax, IdeaSoft, T-Soft…</small></div></a></div>
   </div>
 </section>
 ${ctaBand}`;

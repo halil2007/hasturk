@@ -64,7 +64,7 @@ export const FIELDS = {
     { k: 'PAZARAMA_CLIENT_ID', label: 'API Key (Client ID)', req: true },
     { k: 'PAZARAMA_CLIENT_SECRET', label: 'API Secret', secret: true, req: true },
   ],
-  // ---------- test modülündeki kanallar (yalnız ana panelde; müşteri panellerinde "Yakında") ----------
+  // ---------- test aşamasındaki kanallar (ana ve müşteri panellerinde "Test aşamasında" etiketiyle) ----------
   amazon: [
     { k: 'AMAZON_SELLER_ID', label: 'Satıcı kimliği (Merchant Token)', req: true, hint: 'Seller Central → Ayarlar → Hesap Bilgileri → Satıcı Token (ör. A1B2C3D4E5F6G7)', pattern: '^[A-Z0-9]{8,20}$', patternMsg: 'Amazon satıcı kimliği büyük harf ve rakamlardan oluşur (ör. A1B2C3D4E5F6G7)' },
     { k: 'AMAZON_CLIENT_ID', label: 'LWA Client ID', req: true, hint: 'Seller Central → Uygulamalar ve Hizmetler → Uygulama geliştirme → uygulamanız → LWA kimlik bilgileri (amzn1.application-oa2-client…)' },
@@ -115,9 +115,10 @@ export const FIELDS = {
 // ---------- ek mağazalar ----------
 // Her kanal türüne istenen sayıda mağaza eklenebilir: ek mağazanın kimliği "<tür>_<n>" (ör. trendyol_2, ikas_3).
 // Ek mağazanın bilgileri ana mağazayla aynı alan adlarıyla, kendi kaydında saklanır; Cloudflare değişkenleri ek mağazaya karışmaz.
-// Test modülündeki kanallar: ana panelde bağlanıp denenir, müşteri panellerinde "Yakında" görünür (eklenemez, çalışmaz).
-// Ana panel → Entegrasyonlar → kanal → "Müşterilere aç" ile yayına alınan tür (settings: released_channels) normal kanal olur:
-// müşteri panellerine RELEASED_TYPES ortam değişkeniyle gider (birkaç dakika içinde), tanıtım sitesi /api/public/channels'tan okur.
+// Test aşamasındaki kanallar: ana panelde ve müşteri panellerinde eklenip kullanılabilir, "Test aşamasında" etiketiyle görünür
+// (tanıtım sitesinde de). Ana panel → Entegrasyonlar → kanal → "Test yazısını kaldır" ile tamamlanan tür (settings: released_channels)
+// etiketsiz normal kanal olur: müşteri panellerine RELEASED_TYPES ortam değişkeniyle gider (birkaç dakika içinde), tanıtım sitesi
+// /api/public/channels'tan okur.
 export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy'];
 export async function releasedTypes(env, db) {
   if (env && env.TENANT_SLUG) return String(env.RELEASED_TYPES || '').split(',').filter((t) => BETA_TYPES.includes(t));
@@ -145,9 +146,8 @@ export function storeEnv(env, type, values) {
   for (const [k, v] of Object.entries(values || {})) if (v) out[k] = v;
   return out;
 }
-export async function addStore(db, type, { tenant = false, released = [] } = {}) {
+export async function addStore(db, type) {
   if (!TYPES.includes(type)) fail(400, 'Bilinmeyen kanal türü');
-  if (tenant && isBeta(type, released)) fail(403, `${TYPE_NAMES[type]} yakında açılacak`);
   const rows = await all(db, 'SELECT id FROM channel_config');
   const used = new Set(rows.map((r) => r.id));
   let n = type === 'ikas' ? 3 : 2;
