@@ -3,19 +3,21 @@
 // şifre sıfırlama ve dış API'nin (v1) hatalı anahtar denemeleri aynı sayaçtan geçer.
 //
 // Kural (Kullanıcılar → Giriş koruması'ndan değiştirilebilir): bir IP 15 dakikada 5 kez başarısız olursa engellenir.
-// Engel bitince denemeler sürerse her yeni engel bir öncekinden uzundur: 15 dk → 1 saat → 6 saat → 24 saat → 7 gün.
+// Engel bitince denemeler sürerse her yeni engel bir öncekinden uzundur: 1 dk → 5 dk → 15 dk → 1 saat → 6 saat → 24 saat → 7 gün.
 // 24 saat hiç hatalı deneme yapmayan IP'nin geçmişi sıfırlanır. Engelliyken yapılan denemeler şifre kontrol edilmeden reddedilir.
 // Giriş denemesi şifre kontrolünden ÖNCE sayılır (aynı anda gönderilen çok sayıda istek sınırı aşamaz); başarılı girişte sayaç sıfırlanır.
 // Güvenilir IP'ler (ör. ofis) hiç engellenmez. Ayrıca kullanıcı adı + IP başına sayaç da vardır (auth.js → login).
 import { all, first, run, getRaw, setSetting, log } from './db.js';
 
-export const GUARD_DEFAULTS = { enabled: true, maxFails: 5, windowMin: 15, steps: [15, 60, 360, 1440, 10080], allow: [], apiPerMin: 600 };
+export const GUARD_DEFAULTS = { enabled: true, maxFails: 5, windowMin: 15, steps: [1, 5, 15, 60, 360, 1440, 10080], allow: [], apiPerMin: 600 };
 const DAY = 864e5;
 
 let cfgCache = null;
 export async function guardConfig(db, fresh = false) {
   if (!fresh && cfgCache && cfgCache.db === db && Date.now() - cfgCache.at < 30e3) return cfgCache.v;
   const v = { ...GUARD_DEFAULTS, ...((await getRaw(db, 'ip_guard').catch(() => null)) || {}) };
+  // Eski varsayılan aşamalarla kaydedilmiş ayar yeni varsayılana geçer (elle değiştirilmiş aşamalar korunur)
+  if (Array.isArray(v.steps) && v.steps.join(',') === '15,60,360,1440,10080') v.steps = GUARD_DEFAULTS.steps;
   cfgCache = { db, at: Date.now(), v };
   return v;
 }

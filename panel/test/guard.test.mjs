@@ -23,33 +23,30 @@ test('5 hatalı denemeden sonra IP engellenir; doğru şifre de reddedilir; baş
   const b = await login('dogru-sifre-1', '9.9.9.9');
   assert.equal(b.status, 429);
   assert.equal(b.body.blocked, true);
-  assert.match(b.body.error, /15 dakika/);
-  assert.ok(Number(b.headers.get('Retry-After')) > 800);
+  assert.match(b.body.error, /1 dakika/);
+  assert.ok(Number(b.headers.get('Retry-After')) > 50);
   // Farklı kullanıcı adlarıyla denemek de aynı sayaca girer; başka IP serbest
   assert.equal((await login('dogru-sifre-1', '8.8.8.8')).status, 200);
 });
 
-test('engel bitince denemeler sürerse süre artar (15 dk → 1 saat → 6 saat); 24 saat sessizlikten sonra sıfırlanır', async () => {
+test('engel bitince denemeler sürerse süre artar (1 dk → 5 dk → 15 dk → 1 saat); 24 saat sessizlikten sonra sıfırlanır', async () => {
   const { env, login } = setup();
   const ip = '7.7.7.7';
   const expire = () => run(env.DB, 'UPDATE ip_guard SET blocked_until = ? WHERE ip = ?', Date.now() - 1000, ip);
   const block = async () => { for (let i = 0; i < 6; i++) await login('x', ip); return (await first(env.DB, 'SELECT blocked_until, strikes FROM ip_guard WHERE ip = ?', ip)); };
   let r = await block();
-  assert.equal(r.strikes, 1);
-  assert.ok(Math.abs(r.blocked_until - Date.now() - 15 * 60e3) < 5000);
-  await expire(); r = await block();
-  assert.equal(r.strikes, 2);
-  assert.ok(Math.abs(r.blocked_until - Date.now() - 60 * 60e3) < 5000);
-  await expire(); r = await block();
-  assert.equal(r.strikes, 3);
-  assert.ok(Math.abs(r.blocked_until - Date.now() - 360 * 60e3) < 5000);
+  for (const [k, min] of [[1, 1], [2, 5], [3, 15], [4, 60]]) {
+    if (k > 1) { await expire(); r = await block(); }
+    assert.equal(r.strikes, k);
+    assert.ok(Math.abs(r.blocked_until - Date.now() - min * 60e3) < 5000, `${k}. engel ${min} dk`);
+  }
   // Engelliyken gelen denemeler engeli uzatmaz, sayılır
   const before = (await first(env.DB, 'SELECT blocked_until, blocked_hits FROM ip_guard WHERE ip = ?', ip));
   await login('x', ip);
   const after = (await first(env.DB, 'SELECT blocked_until, blocked_hits FROM ip_guard WHERE ip = ?', ip));
   assert.equal(after.blocked_until, before.blocked_until);
   assert.equal(after.blocked_hits, before.blocked_hits + 1);
-  // 24 saat hiç deneme yok: geçmiş sıfırlanır, bir sonraki engel yine 15 dk
+  // 24 saat hiç deneme yok: geçmiş sıfırlanır, bir sonraki engel yine 1 dk
   await run(env.DB, 'UPDATE ip_guard SET blocked_until = ?, last_at = ? WHERE ip = ?', Date.now() - 2 * 864e5, Date.now() - 2 * 864e5, ip);
   r = await block();
   assert.equal(r.strikes, 1);
@@ -80,8 +77,8 @@ test('firma koduyla giriş ve dış API anahtarı denemeleri de sayılır; güve
   const ok = await login('dogru-sifre-1', '2.2.2.2');
   const cookie = ok.headers.get('set-cookie').split(';')[0];
   assert.equal((await call('/api/users/guard', { ip: '2.2.2.2', method: 'PUT', cookie, body: { allow: '10.0.0.*' } })).status, 200);
-  // (kullanıcı adı başına 15 dakikada 8 deneme sınırı güvenilir IP'de de geçerlidir: auth.js → login)
-  for (let i = 0; i < 8; i++) assert.equal((await login('yanlis', '10.0.0.7')).status, 401);
+  // (kullanıcı adı başına 15 dakikada 20 deneme sınırı güvenilir IP'de de geçerlidir: auth.js → login)
+  for (let i = 0; i < 20; i++) assert.equal((await login('yanlis', '10.0.0.7')).status, 401);
   assert.equal(await first(env.DB, "SELECT ip FROM ip_guard WHERE ip = '10.0.0.7'"), null);
 });
 

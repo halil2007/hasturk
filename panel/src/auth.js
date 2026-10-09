@@ -95,7 +95,8 @@ export async function currentUser(req, env, db) {
 export async function login(req, env, db, { username, password: pass }) {
   const users = await first(db, 'SELECT COUNT(*) AS n FROM users WHERE active = 1');
   if (!password(env) && !users.n) return { ok: false, status: 503, error: 'Panel şifresi tanımlı değil (Cloudflare → Settings → Variables and Secrets → PANEL_PASSWORD)' };
-  // Kaba kuvvet koruması: kullanıcı adı + IP başına 15 dakikada 8 deneme. Sayaç denemeden ÖNCE artırılır (eşzamanlı
+  // Kaba kuvvet koruması: kullanıcı adı + IP başına 15 dakikada 20 deneme (asıl koruma kademeli IP engelidir: guard.js; bu sınır
+  // koruma kapalıyken ya da güvenilir IP'de de çalışır). Sayaç denemeden ÖNCE artırılır (eşzamanlı
   // istekler sınırı aşamaz); başarılı girişte yalnız o sayaç silinir. Herkesi kilitleyen tek bir genel sayaç yoktur.
   const ip = req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || '';
   const fk = `login_fail:${String(username || 'yonetici').trim().toLocaleLowerCase('tr').slice(0, 60)}|${ip.split(',')[0].trim()}`;
@@ -104,7 +105,7 @@ export async function login(req, env, db, { username, password: pass }) {
       v = CASE WHEN json_extract(settings.v, '$.at') < ? THEN json_object('n', 1, 'at', ?) ELSE json_set(settings.v, '$.n', json_extract(settings.v, '$.n') + 1) END RETURNING v`,
     fk, now, now - 15 * 60e3, now);
   if (Math.random() < 0.05) await run(db, "DELETE FROM settings WHERE k LIKE 'login_fail:%' AND json_extract(v, '$.at') < ?", now - 864e5);
-  if (((row && JSON.parse(row.v)) || {}).n > 8) return { ok: false, status: 429, error: 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.' };
+  if (((row && JSON.parse(row.v)) || {}).n > 20) return { ok: false, status: 429, error: 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.' };
   let user = null, sv = '0';
   if (!env.TENANT_SLUG && isAdminName(username) && password(env)) {
     const a = await hmac('cmp', String(pass || '')), b = await hmac('cmp', password(env));

@@ -164,7 +164,7 @@ export async function users(el) {
         <div class="form-grid" style="margin-top:10px">
           <label class="field"><span>Hatalı deneme sınırı</span><input class="input" type="number" min="3" max="50" data-g="maxFails" value="${c.maxFails}"></label>
           <label class="field"><span>Süre (dakika)</span><input class="input" type="number" min="5" max="1440" data-g="windowMin" value="${c.windowMin}"></label>
-          <label class="field"><span>Engel süreleri (dakika, sırayla)</span><input class="input" data-g="steps" value="${c.steps.join(', ')}"><small class="muted">her yeni engel bir sonrakine geçer; ör. 15, 60, 360, 1440, 10080 (7 gün)</small></label>
+          <label class="field"><span>Engel süreleri (dakika, sırayla)</span><input class="input" data-g="steps" value="${c.steps.join(', ')}"><small class="muted">her yeni engel bir sonrakine geçer; ör. 1, 5, 15, 60, 360, 1440, 10080 (7 gün)</small></label>
           <label class="field"><span>IP başına dakikada en fazla istek</span><input class="input" type="number" min="60" max="10000" data-g="apiPerMin" value="${c.apiPerMin}"></label>
           <label class="field" style="grid-column:1/-1"><span>Güvenilir IP'ler (hiç engellenmez)</span><textarea class="input" rows="2" data-g="allow" placeholder="ör. 85.105.12.40 ya da 85.105.12.*">${(c.allow || []).join('\n')}</textarea>
             <small class="muted">Sizin şu anki IP'niz: <b>${guard.you.split(' > ')[0]}</b>${mineAllowed ? ' (güvenilir listede)' : html` · <a href="#" class="link" data-gme>listeye ekle</a>`}. Ofis IP'nizi ekleyin; yanlışlıkla kendinizi engellemezsiniz.</small></label>
