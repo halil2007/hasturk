@@ -2,7 +2,7 @@
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES } from './config.js';
-import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
+import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -24,6 +24,7 @@ import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, use
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costRaw, COST_KEYS } from '../public/profit.js';
 import { explainError, errorKey } from '../public/listerr.js';
+import { normCat } from '../public/catpath.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
 import { recordError, errorsApi, clientReport } from './errors.js';
 import { perfReport } from './perf.js';
@@ -666,6 +667,7 @@ const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/
 function cleanProduct(b) {
   const o = {};
   for (const k of PRODUCT_FIELDS) if (k in b) o[k] = NUMERIC.has(k) ? num(b[k]) : str(b[k]) || null;
+  if (o.category) o.category = normCat(o.category) || null;
   if ('name' in o && !o.name) fail(400, 'Ürün adı gerekli');
   // Döviz: yalnız USD / EUR / GBP; ürüne özel kâr payı boşsa genel ayar kullanılır
   if ('currency' in o && !CURRENCIES.includes(o.currency)) o.currency = null;
@@ -1604,6 +1606,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
 
   // Barkod oluşturma: öneri (kaydedilmez), seçilen ürünlere toplu barkod, ön ek ve eksik sayısı
+  // Kayıtlı kategoriler (ürün formunda yazarken öneri): yol ve ürün sayısı; farklı yazılmış aynı kategoriler önce birleştirilir
+  if (path === 'products/categories' && m === 'GET') {
+    await mergeCategories(db).catch(() => 0);
+    return json(await all(db, "SELECT category AS name, COUNT(*) AS n FROM products WHERE COALESCE(category, '') != '' GROUP BY category ORDER BY category COLLATE NOCASE LIMIT 2000"));
+  }
   if (path === 'products/barcodes' && m === 'GET') return json({ prefix: await barcodePrefix(db), missing: await missingBarcodes(db) });
   if (path === 'products/barcodes/new' && m === 'GET') return json(await suggestBarcode(db, q.prefix));
   if (path === 'products/barcodes' && m === 'POST') { const b = await body(req); return json(await assignBarcodes(db, b.ids, { prefix: b.prefix, user: user.name })); }
