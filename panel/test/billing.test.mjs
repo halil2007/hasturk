@@ -251,7 +251,7 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'yesil-bahce', username: 'yonetici', password: temp }) })).status, 200);
     const g = await (await s.tenant('/api/billing')).json();
     assert.equal(g.invoice.type, 'bireysel'); assert.equal(g.invoice.tckn, '10000000146'); assert.equal(g.invoice.district, 'Meram');
-    assert.deepEqual(g.plans.find((p) => p.key === 'kurumsal').soon, ['e-Fatura / e-Arşiv entegrasyonu', 'Kendi anlaşmalı kargo entegrasyonu']);
+    assert.deepEqual(g.plans.find((p) => p.key === 'kurumsal').soon, ['e-Fatura / e-Arşiv entegrasyonu']);
     assert.equal((await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', period: 'monthly', consent: true, invoice: { ...corp, tckn: '' } }) })).status, 200, 'e-posta / telefon firma kartından');
     assert.equal(s.iyz.inits[2].billingAddress.contactName, 'Yeşil Bahçe Tarım Ltd. Şti.');
   } finally { s.restore(); }

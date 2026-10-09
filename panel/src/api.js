@@ -408,6 +408,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   // Takip no, kargo firması ve etiket pakete yazılır; "Kargoya ver" takip numarasını kanala bildirir.
   if (action === 'carrier-label') {
     if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
+    requireFeature(env, 'carrier');
     if (ch && ch.caps && ch.caps.manualTracking === false && !ch.caps.ownCarrier) fail(400, `${ch.name}: gönderi yalnız kanalın kargosu ile yapılır; kargo entegratörü kullanılamaz`);
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
@@ -1479,11 +1480,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // ---------- entegrasyonlar (kanal API bilgileri) ----------
   // ---------- kargo entegratörleri ----------
   // Sipariş ekranı: kullanılabilecek entegratörler (bilgi alanları olmadan)
-  if (path === 'carriers' && m === 'GET') return json(await carrierList(env, db));
+  // Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette: paketinde yoksa liste "kilitli" işaretiyle döner (Entegrasyonlar'da gösterilir)
+  const carrierLock = (list) => (allows(env, 'carrier') ? list : list.map((c) => ({ ...c, usable: false, locked: true })));
+  if (path === 'carriers' && m === 'GET') return json(carrierLock(await carrierList(env, db)));
   // Entegrasyonlar (yalnız yönetici): bilgiler, kaydet, bağlantı testi, varsayılan
-  if (path === 'integrations/carriers' && m === 'GET') return json(await carrierList(env, db, { withFields: true }));
+  if (path === 'integrations/carriers' && m === 'GET') return json(carrierLock(await carrierList(env, db, { withFields: true })));
   if ((x = path.match(/^integrations\/carriers\/([a-z]+)$/)) && m === 'PUT') {
     if (!CARRIERS[x[1]]) fail(404, 'Bilinmeyen kargo entegratörü');
+    requireFeature(env, 'carrier');
     const b = await body(req);
     await saveConfig(env, db, x[1], { values: b.values || {}, clear: b.clear || [], active: b.active });
     await log(db, null, 'info', `${user.name}: ${CARRIERS[x[1]].name} kargo entegratörü bilgileri güncellendi`);
