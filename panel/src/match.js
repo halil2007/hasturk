@@ -3,7 +3,7 @@
 //  Kural 2: ana katalog kanalının (ör. HasTürk ikas) her varyantı kendi panel ürünüdür; tek kanal bağlıyken eşleştirme yapılmaz.
 //  Kesin (otomatik): barkod aynı; ya da stok kodu aynı ve barkod çelişmiyor; ya da ad + varyant/ölçü birebir aynı ve tek aday.
 //  Kesin değil: ad benzerliği + ölçü (5 Kg, 10 Lt…) + varyant özellikleri + stok kodu benzerliğiyle puanlı öneri; kullanıcı onaylar.
-import { all, run, notify } from './db.js';
+import { all, run, notify, getRaw, setSetting } from './db.js';
 import { chunk, str } from './util.js';
 
 const TR = { ı: 'i', İ: 'i', ş: 's', Ş: 's', ğ: 'g', Ğ: 'g', ü: 'u', Ü: 'u', ö: 'o', Ö: 'o', ç: 'c', Ç: 'c', â: 'a', î: 'i', û: 'u' };
@@ -126,9 +126,27 @@ export function certain(l, idx, { anyTaken = false } = {}) {
   return null;
 }
 
-export async function productIndex(db) {
-  const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name, group_name, parent_key, image, stock FROM products');
-  const used = await all(db, 'SELECT product_id, channel, name, remote_product_id FROM listings WHERE product_id IS NOT NULL');
+// Öneri ekranları için dizin önbelleği (çalışan örnek başına): ürün ve bağlı ilanlar değişmediyse dizin yeniden kurulmaz.
+// İmza: ürün sayısı + son ürün güncellemesi + bağlı ilan sayısı ve kimlik toplamı (bağlama / ayırma her seferinde değiştirir).
+const cache = new WeakMap(), CACHE_MS = 10 * 60e3;
+const SIG_SQL = `SELECT (SELECT COUNT(*) FROM products) AS a, (SELECT MAX(updated_at) FROM products) AS b,
+    (SELECT COUNT(*) FROM listings WHERE product_id IS NOT NULL) AS c, (SELECT TOTAL(product_id) FROM listings WHERE product_id IS NOT NULL) AS d`;
+export async function readIndex(db) {
+  const r = await all(db, SIG_SQL);
+  const sig = JSON.stringify(r[0]), hit = cache.get(db);
+  if (hit && hit.sig === sig && Date.now() - hit.at < CACHE_MS) return hit.idx;
+  const idx = await productIndex(db, { names: false });
+  cache.set(db, { sig, idx, at: Date.now() });
+  return idx;
+}
+
+// names: ad anahtarı dizini (kesin eşleşme için; certain). Yalnız öneri puanı (candidates) gereken ekranlar atlar: 20.000 ürün ve
+// 60.000 bağlı ilanda tam ad anahtarı hesaplamak dizin süresinin çoğudur.
+export async function productIndex(db, { names = true } = {}) {
+  const [prods, used] = await Promise.all([
+    all(db, 'SELECT id, sku, barcode, name, variant_name, group_name, parent_key, image, stock FROM products'),
+    all(db, `SELECT product_id, channel, remote_product_id${names ? ', name' : ''} FROM listings WHERE product_id IS NOT NULL`),
+  ]);
   const sku = new Map(), barcode = new Map(), name = new Map(), chans = new Map(), group = new Map(), rgroup = new Map();
   const add = (m, k, p) => m.set(k, [...(m.get(k) || []), p]);
   const byId = new Map(prods.map((p) => [p.id, p]));
@@ -144,10 +162,11 @@ export async function productIndex(db) {
     },
     add: (p) => {
       byId.set(p.id, p);
+      if (idx.tok) for (const w of prepOf(p).t) (idx.tok.get(w) || idx.tok.set(w, []).get(w)).push(p);
       const sk = normSku(p.sku), bc = normBc(p.barcode);
       if (sk) add(sku, sk, p);
       if (bc) add(barcode, bc, p);
-      const k = fullKey(p.name, p.variant_name);
+      const k = names ? fullKey(p.name, p.variant_name) : '';
       if (k) add(name, k, p);
       const g = groupKey(p);
       if (g) add(group, g, p);
@@ -156,7 +175,7 @@ export async function productIndex(db) {
   for (const p of prods) idx.add(p);
   for (const u of used) idx.use(u.product_id, u.channel, u.remote_product_id);
   // Ürünün bağlı ilanlarının adları da ad anahtarına eklenir (aynı ürün farklı sitede farklı adla olabilir)
-  for (const u of used) {
+  if (names) for (const u of used) {
     const p = byId.get(u.product_id), k = fullKey(u.name);
     if (p && k && !(name.get(k) || []).includes(p)) add(name, k, p);
   }
@@ -228,6 +247,22 @@ export async function manualImport(db) {
   try { m = (r && JSON.parse(r.v)) || {}; } catch { /* bozuk */ }
   return (ch) => (ch in m ? !!m[ch] : !!m['*']);
 }
+// Ürünün eksik görsel / grup / varyant bilgisini bağlı ilandan tamamla
+const fillFromListings = (db) => run(db, `UPDATE products SET
+      image = COALESCE(NULLIF(image, ''), (SELECT l.image FROM listings l WHERE l.product_id = products.id AND l.image != '' ORDER BY l.channel LIMIT 1), ''),
+      group_name = COALESCE(NULLIF(group_name, ''), (SELECT l.group_name FROM listings l WHERE l.product_id = products.id AND l.group_name IS NOT NULL AND l.group_name != '' ORDER BY l.channel LIMIT 1)),
+      variant_name = COALESCE(NULLIF(variant_name, ''), (SELECT l.variant_name FROM listings l WHERE l.product_id = products.id AND l.variant_name IS NOT NULL AND l.variant_name != '' ORDER BY l.channel LIMIT 1))
+    WHERE image IS NULL OR image = '' OR group_name IS NULL OR group_name = '' OR variant_name IS NULL OR variant_name = ''`);
+const UNLINKED = "SELECT channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND (ignored = 0 OR match = 'zero') ORDER BY channel, remote_id";
+async function matchSig(db, cats, unlinked) {
+  const r = (await all(db, SIG_SQL))[0];
+  let h = 0;
+  for (const l of unlinked) {
+    const s = `${l.channel}|${l.remote_id}|${l.remote_product_id || ''}|${l.match || ''}|${l.remote_stock == null ? '' : l.remote_stock > 0 ? 1 : 0}|${l.sku || ''}|${l.barcode || ''}|${l.name || ''}|${l.variant_name || ''}`;
+    for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  }
+  return JSON.stringify([r, cats, unlinked.length, h]);
+}
 export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   const isManual = await manualImport(db);
   const cats = (await catalogChannels(db, catalog)).filter((c) => !isManual(c));
@@ -237,8 +272,16 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   // kesin eşleşen bir ürün varsa bağlanır: depoya mal gelince panel o ilanın stoğunu da açar (tükenmiş ilan kapalı kalmaz).
   // (Kullanıcının kaldırdığı eşleşmenin hatırası "x:<ürün>" silinmez; yoksa ilan aynı ürüne yeniden bağlanırdı.)
   await run(db, "UPDATE listings SET ignored = 1, match = 'zero' WHERE product_id IS NULL AND ignored = 0 AND remote_stock IS NOT NULL AND remote_stock <= 0 AND COALESCE(match, '') NOT LIKE 'x:%'");
+  const unlinked = await all(db, UNLINKED);
+  // Son çalışmadan beri ürünler, bağlı ilanlar ve eşleşmemiş ilanlar değişmediyse sonuç da değişmez: ürün dizini (büyük katalogda
+  // saniyeye yakın işlemci) kurulmaz. Müşteri paneli tek iş parçacığında çalıştığından arka plandaki bu iş o anki istekleri bekletiyordu.
+  const before = await matchSig(db, cats, unlinked);
+  if (!unlinked.length || before === (await getRaw(db, 'match_sig'))) {
+    if (!unlinked.length) await setSetting(db, 'match_sig', before);
+    await fillFromListings(db);
+    return { linked: 0, created: 0 };
+  }
   const idx = await productIndex(db);
-  const unlinked = await all(db, "SELECT channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, remote_stock, match FROM listings WHERE product_id IS NULL AND (ignored = 0 OR match = 'zero') ORDER BY channel, remote_id");
   // Ana katalog önce işlenir (sırasıyla), sonra diğer kanallar
   const rank = (c) => (cats.includes(c) ? cats.indexOf(c) : 99);
   unlinked.sort((a, b) => rank(a.channel) - rank(b.channel));
@@ -279,13 +322,9 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   // Diğer kanallarda da: eşleşmeyen ilan, bu kanalda zaten ilanı olan bir ürünün kesin karşılığıysa "tekrar olabilir" diye sorulur
   for (const l of rest) { const tw = twinOf(l, idx); if (tw && l.match !== 'dup:' + tw) { st.push(markTwin(db, tw, l)); twins++; } }
   for (const part of chunk(st, 90)) await db.batch(part);
-  // Ürünün eksik görsel / grup / varyant bilgisini bağlı ilandan tamamla
-  await run(db, `UPDATE products SET
-      image = COALESCE(NULLIF(image, ''), (SELECT l.image FROM listings l WHERE l.product_id = products.id AND l.image != '' ORDER BY l.channel LIMIT 1), ''),
-      group_name = COALESCE(NULLIF(group_name, ''), (SELECT l.group_name FROM listings l WHERE l.product_id = products.id AND l.group_name IS NOT NULL AND l.group_name != '' ORDER BY l.channel LIMIT 1)),
-      variant_name = COALESCE(NULLIF(variant_name, ''), (SELECT l.variant_name FROM listings l WHERE l.product_id = products.id AND l.variant_name IS NOT NULL AND l.variant_name != '' ORDER BY l.channel LIMIT 1))
-    WHERE image IS NULL OR image = '' OR group_name IS NULL OR group_name = '' OR variant_name IS NULL OR variant_name = ''`);
+  await fillFromListings(db);
   if (linked || created) await relinkItems(db);
+  await setSetting(db, 'match_sig', await matchSig(db, cats, await all(db, UNLINKED)));
   if (twins) await notify(db, 'dup_listings', { level: 'warn', title: 'Aynı ürünün ikinci ilanı olabilir', msg: `${twins} ilan panelde olan bir ürünün aynı kanaldaki ikinci ilanı gibi görünüyor; yeni ürün açılmadı. Kanal Ürünleri → Tekrar olabilir'den onaylayın.` }).catch(() => {});
   return { linked, created, ...(twins ? { twins } : {}) };
 }
@@ -294,21 +333,39 @@ const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.va
 // Verilen ilanlar için en iyi aday ürün (Kanal Ürünleri listesinde "önerilen eşleşme"); en az 40 puan
 export async function bestCandidates(db, listings) {
   if (!listings.length) return new Map();
-  const idx = await productIndex(db), out = new Map();
+  const idx = await readIndex(db), out = new Map();
   for (const l of listings) {
     const c = candidates(l, idx, 1)[0];
     if (c && c.s.score >= 40) out.set(l.remote_id, { product_id: c.p.id, name: fullName(c.p), sku: c.p.sku, barcode: c.p.barcode, image: c.p.image, score: c.s.score, why: c.s.why });
   }
   return out;
 }
+// Aday havuzu: ilanla en az bir ortak kelimesi olan ürünler (kelime dizini; nadir kelimeden başlanır), aynı stok kodlu ve aynı ürün
+// grubundaki ürünler. Ortak kelimesi olmayan ürünün puanı en çok stok kodu benzerliğidir; o da stok kodu dizininden gelir.
+// Böylece her ilan binlerce ürünün hepsiyle karşılaştırılmaz (20.000 üründe öneri listesi 2 sn → 0,1 sn).
+const prepOf = (p) => p._prep || (p._prep = prep({ name: fullName(p), variant: p.variant_name, sku: p.sku, barcode: p.barcode }));
+const POOL = 4000;
+function tokenIndex(idx) {
+  if (idx.tok) return idx.tok;
+  idx.tok = new Map();
+  for (const p of idx.prods) for (const w of prepOf(p).t) (idx.tok.get(w) || idx.tok.set(w, []).get(w)).push(p);
+  return idx.tok;
+}
+function pool(l, a, idx, gks) {
+  const tok = tokenIndex(idx), set = new Set();
+  const lists = [...a.t].map((w) => tok.get(w) || []).filter((x) => x.length).sort((x, y) => x.length - y.length);
+  for (const list of lists) { for (const p of list) set.add(p); if (set.size >= POOL) break; }
+  for (const p of (a.sku && idx.sku.get(a.sku)) || []) set.add(p);
+  if (gks) for (const g of gks) for (const p of idx.group.get(g) || []) set.add(p);
+  return set;
+}
 function candidates(l, idx, n = 3) {
   const a = prep({ name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode });
   const gks = l.remote_product_id ? idx.rgroup.get(`${l.channel}|${l.remote_product_id}`) : null;
   const out = [];
-  for (const p of idx.prods) {
+  for (const p of pool(l, a, idx, gks)) {
     if (idx.taken(p.id, l.channel)) continue;
-    if (!p._prep) p._prep = prep({ name: fullName(p), variant: p.variant_name, sku: p.sku, barcode: p.barcode });
-    let s = score(a, p._prep);
+    let s = score(a, prepOf(p));
     if (gks && gks.has(groupKey(p))) s = { score: Math.min(100, s.score + 20), why: [...s.why, 'aynı ürün grubu'] };
     if (s.score >= 25) out.push({ p, s });
   }
@@ -318,18 +375,24 @@ const bestScore = (l, idx) => (candidates(l, idx, 1)[0] || { s: { score: 0 } }).
 
 // Eşleşme önerileri (emin olunamayan ilanlar). Aday ürün, ilanın kanalından ilan almamış ürünlerdir.
 export async function suggestions(db, { channel, q, limit = 100 } = {}) {
-  const idx = await productIndex(db);
   const where = ['product_id IS NULL', 'ignored = 0'], args = [];
   if (channel) { where.push('channel = ?'); args.push(channel); }
   if (q) { where.push('(name LIKE ? OR sku LIKE ? OR barcode LIKE ?)'); const s = '%' + q + '%'; args.push(s, s, s); }
   const rows = await all(db, `SELECT channel, remote_id, remote_product_id, sku, barcode, name, variant_name, image, price, remote_stock FROM listings WHERE ${where.join(' AND ')} ORDER BY channel, name LIMIT ?`, ...args, limit);
   if (!rows.length) return [];
-  const on = await all(db, 'SELECT product_id, channel, name FROM listings WHERE product_id IS NOT NULL');
-  return rows.map((l) => ({
+  const idx = await readIndex(db);
+  const out = rows.map((l) => ({ ...l, cands: candidates(l, idx) }));
+  // Adayların bağlı ilanları: yalnız aday ürünler için (tüm bağlı ilanlar okunmaz)
+  const ids = [...new Set(out.flatMap((l) => l.cands.map((c) => c.p.id)))], on = new Map();
+  for (const part of chunk(ids, 90)) {
+    for (const x of await all(db, `SELECT product_id, channel, name FROM listings WHERE product_id IN (${part.map(() => '?').join(',')})`, ...part)) {
+      (on.get(x.product_id) || on.set(x.product_id, []).get(x.product_id)).push({ channel: x.channel, name: x.name });
+    }
+  }
+  return out.map(({ cands, ...l }) => ({
     ...l,
-    candidates: candidates(l, idx).map(({ p, s }) => ({
-      product_id: p.id, name: fullName(p), sku: p.sku, barcode: p.barcode, image: p.image, stock: p.stock, score: s.score, why: s.why,
-      channels: on.filter((x) => x.product_id === p.id).map((x) => ({ channel: x.channel, name: x.name })),
+    candidates: cands.map(({ p, s }) => ({
+      product_id: p.id, name: fullName(p), sku: p.sku, barcode: p.barcode, image: p.image, stock: p.stock, score: s.score, why: s.why, channels: on.get(p.id) || [],
     })),
   }));
 }

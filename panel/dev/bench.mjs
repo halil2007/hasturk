@@ -59,7 +59,9 @@ const PAGES = [
   ['Satış analizi (1 yıl)', 'stats?range=365'], ['Kargo (kargoda)', 'packages?state=shipped'], ['Eşleştirme', 'match'], ['Siparişler (iptal)', 'orders?status=cancelled&page=1&limit=50'],
 ];
 const rows = [];
-for (const [name, path] of PAGES) {
+// ONLY=Eşleştirme,Müşteri özeti → yalnız bu sayfalar
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
+for (const [name, path] of PAGES.filter(([n]) => !ONLY || ONLY.includes(n))) {
   const times = [];
   let q = 0, status = 0;
   for (let k = 0; k < 3; k++) {
