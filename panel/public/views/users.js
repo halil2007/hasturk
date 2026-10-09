@@ -28,6 +28,7 @@ export async function users(el) {
     </div>
     <div class="card row wrap" data-sec style="gap:12px;align-items:center"></div>
     <div class="card row wrap" data-msec style="gap:12px;align-items:center"></div>
+    ${state.tenant ? '' : html`<div class="card stack" data-guard style="--g:10px"></div>`}
     <div class="tabs" data-tabs></div>
     <div class="card flush" data-box></div>
     <details class="card"><summary><b>Roller ve yetki düzeyleri nasıl çalışır?</b></summary>
@@ -131,7 +132,59 @@ export async function users(el) {
   const refresh = async () => {
     [rows, sec] = await Promise.all([api('users', { fresh: true }).catch((e) => { toast(e.message, true); return []; }), api('users/security', { fresh: true }).catch(() => sec)]);
     draw();
+    if (!state.tenant) loadGuard();
   };
+
+  // ---------- giriş koruması (IP engelleme; yalnız ana panel — tüm firmaların girişlerini kapsar) ----------
+  let guard = null;
+  const mins = (m) => (m < 60 ? `${m} dk` : m < 1440 ? `${Math.round(m / 60)} saat` : `${Math.round(m / 1440)} gün`);
+  const left = (t) => { const m = Math.ceil((t - Date.now()) / 60e3); return m < 60 ? `${m} dk` : m < 1440 ? `${Math.ceil(m / 60)} saat` : `${Math.ceil(m / 1440)} gün`; };
+  async function loadGuard() {
+    guard = await api('users/guard', { fresh: true }).catch(() => null);
+    drawGuard();
+  }
+  function drawGuard() {
+    const box = $('[data-guard]', el);
+    if (!box || !guard) return;
+    const c = guard.config, list = guard.rows || [], blocked = list.filter((r) => r.blocked);
+    const mineAllowed = (c.allow || []).some((a) => (a.endsWith('*') ? guard.you.split(' > ')[0].startsWith(a.slice(0, -1)) : guard.you.split(' > ')[0] === a));
+    render(box, html`<div class="row wrap" style="gap:12px;align-items:center"><i class="ico ico-eye" style="color:var(--primary)"></i>
+        <div style="flex:1;min-width:220px"><b>Giriş koruması (IP engelleme)</b>
+          <div class="muted small">${c.enabled ? html`Açık: bir IP <b>${c.windowMin} dakikada ${c.maxFails}</b> kez hatalı giriş, kod ya da API anahtarı denerse engellenir. Denemeler sürdükçe her engel uzar: <b>${c.steps.map(mins).join(' → ')}</b>. Ana panel ve tüm firma panelleri için geçerlidir; ayrıca IP başına dakikada en fazla ${c.apiPerMin} istek.` : 'Kapalı: yalnız kullanıcı adı başına deneme sınırı uygulanır.'}</div></div>
+        <label class="switch-row" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" data-gon ${c.enabled ? 'checked' : ''}><span class="small" style="font-weight:650">Açık</span></label></div>
+      ${blocked.length ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>${blocked.length} IP şu an engelli.</b></div></div>` : ''}
+      ${list.length ? html`<div class="table-wrap"><table class="t small"><thead><tr><th>IP</th><th>Durum</th><th class="r">Hatalı deneme</th><th class="r">Engel</th><th>Son deneme</th><th></th></tr></thead><tbody>
+        ${list.map((r) => html`<tr><td class="num">${r.ip}${r.ip === guard.you ? html` <span class="pill tiny">siz</span>` : ''}</td>
+          <td>${r.blocked ? html`<span class="pill bad">Engelli · ${left(r.blocked_until)} kaldı</span>${r.blocked_hits ? html`<div class="tiny muted">engelliyken ${r.blocked_hits} deneme</div>` : ''}` : html`<span class="pill">Serbest</span>`}</td>
+          <td class="r num">${r.fails} <span class="muted tiny">/ toplam ${r.total}</span></td><td class="r num">${r.blocks || 0}</td>
+          <td><span title="${dateTime(r.last_at)}">${ago(r.last_at)}</span><div class="tiny muted">${[r.last_kind, r.last_user].filter(Boolean).join(' · ')}</div></td>
+          <td class="r">${r.blocked || r.fails ? html`<button class="btn sm" data-gunblock="${r.ip}">${r.blocked ? 'Engeli kaldır' : 'Sayacı sıfırla'}</button>` : ''}</td></tr>`)}
+      </tbody></table></div>` : html`<div class="muted small">Son 7 günde hatalı deneme yok.</div>`}
+      <details><summary class="small" style="cursor:pointer;font-weight:650">Ayarlar ve güvenilir IP'ler</summary>
+        <div class="form-grid" style="margin-top:10px">
+          <label class="field"><span>Hatalı deneme sınırı</span><input class="input" type="number" min="3" max="50" data-g="maxFails" value="${c.maxFails}"></label>
+          <label class="field"><span>Süre (dakika)</span><input class="input" type="number" min="5" max="1440" data-g="windowMin" value="${c.windowMin}"></label>
+          <label class="field"><span>Engel süreleri (dakika, sırayla)</span><input class="input" data-g="steps" value="${c.steps.join(', ')}"><small class="muted">her yeni engel bir sonrakine geçer; ör. 15, 60, 360, 1440, 10080 (7 gün)</small></label>
+          <label class="field"><span>IP başına dakikada en fazla istek</span><input class="input" type="number" min="60" max="10000" data-g="apiPerMin" value="${c.apiPerMin}"></label>
+          <label class="field" style="grid-column:1/-1"><span>Güvenilir IP'ler (hiç engellenmez)</span><textarea class="input" rows="2" data-g="allow" placeholder="ör. 85.105.12.40 ya da 85.105.12.*">${(c.allow || []).join('\n')}</textarea>
+            <small class="muted">Sizin şu anki IP'niz: <b>${guard.you.split(' > ')[0]}</b>${mineAllowed ? ' (güvenilir listede)' : html` · <a href="#" class="link" data-gme>listeye ekle</a>`}. Ofis IP'nizi ekleyin; yanlışlıkla kendinizi engellemezsiniz.</small></label>
+        </div>
+        <div class="row" style="margin-top:8px"><button class="btn primary sm" data-gsave>Kaydet</button></div></details>`);
+    $('[data-gon]', box).onchange = async (e) => {
+      const on = e.target.checked;
+      if (!on && !(await confirmBox('Giriş koruması kapatılsın mı? Şifre denemeleri IP bazında engellenmez.', 'Kapat'))) { e.target.checked = true; return; }
+      guard.config = await api('users/guard', { method: 'PUT', body: { enabled: on } }).catch((x) => { toast(x.message, true); return guard.config; });
+      toast(guard.config.enabled ? 'Giriş koruması açık' : 'Giriş koruması kapalı'); drawGuard();
+    };
+    $$('[data-gunblock]', box).forEach((b) => { b.onclick = () => busy(b, async () => { await api('users/guard/unblock', { method: 'POST', body: { ip: b.dataset.gunblock } }); toast('Engel kaldırıldı'); await loadGuard(); }); });
+    const me = $('[data-gme]', box);
+    if (me) me.onclick = (e) => { e.preventDefault(); const t = $('[data-g=allow]', box); t.value = [t.value.trim(), guard.you.split(' > ')[0]].filter(Boolean).join('\n'); };
+    $('[data-gsave]', box).onclick = (e) => busy(e.currentTarget, async () => {
+      const v = {}; $$('[data-g]', box).forEach((i) => { v[i.dataset.g] = i.value; });
+      guard.config = await api('users/guard', { method: 'PUT', body: v });
+      toast('Giriş koruması ayarları kaydedildi'); drawGuard();
+    });
+  }
 
   // ---------- form ----------
   function form(u) {
