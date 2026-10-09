@@ -194,8 +194,8 @@ test('Sipariş listesi: tarih / durum filtresi, sayfalama, kâr ve CSV', async (
   await db.prepare("DELETE FROM orders WHERE id = 'trendyol:A4'").run();
   const all = await (await call('/api/orders?status=new&limit=10')).json();
   const a2 = all.orders.find((o) => o.order_number === 'A2');
-  // 200 satış − %20 komisyon (40) − %1 stopaj (KDV hariç 166,67 → 1,67) − 2×40 maliyet = 78,33
-  assert.equal(a2.profit, 78.33);
+  // 200 satış − %20 + KDV komisyon (48) − %1 stopaj (KDV hariç 166,67 → 1,67; KDV'si yok) − 2×40 maliyet = 70,33
+  assert.equal(a2.profit, 70.33);
   const buf = new Uint8Array(await (await call('/api/orders.csv?status=all')).arrayBuffer());
   assert.deepEqual([...buf.slice(0, 3)], [0xef, 0xbb, 0xbf], 'Excel için UTF-8 BOM');
   const csv = new TextDecoder().decode(buf);

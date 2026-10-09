@@ -22,7 +22,7 @@ import * as customers from './customers.js';
 import * as chp from './chproducts.js';
 import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity, twofaApi, resetTfa, security, setSecurity, forgetNets } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
-import { costOf, COST_KEYS } from '../public/profit.js';
+import { costRaw, COST_KEYS } from '../public/profit.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
 import { recordError, errorsApi, clientReport } from './errors.js';
 import { perfReport } from './perf.js';
@@ -883,7 +883,7 @@ async function saveSettings(db, b) {
       for (const [c, x] of Object.entries(v && typeof v === 'object' ? v : {})) {
         if (!isChannelId(c)) continue;
         if (x === '' || x == null) { if (/_\d+$/.test(c)) delete next[c]; continue; }
-        next[c] = num(x, costOf(cur, k, c));
+        next[c] = num(x, costRaw(cur, k, c));
       }
       v = next;
     }
@@ -894,7 +894,7 @@ async function saveSettings(db, b) {
     }
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
-    if (k === 'autoprice') v = !!v;
+    if (k === 'autoprice' || k === 'costs_vat_incl') v = !!v;
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
     if (k === 'track_urls') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).map(([a, b]) => [str(a).slice(0, 40), str(b).slice(0, 300)]).filter(([a, b]) => a && /^https:\/\/[^\s]+$/i.test(b) && b.includes('{no}')).slice(0, 30));
     if (k === 'label_size') v = ['100x150', 'a5', 'a4'].includes(v) ? v : '100x150';
