@@ -453,3 +453,27 @@ test('Hepsiburada aracı sunucu: adres girilince tüm istekler hb-proxy.php üze
     assert.ok(ans.body instanceof ArrayBuffer);
   } finally { globalThis.fetch = real; }
 });
+
+test('Trendyol: bölme isteği ve bölme sonrası sipariş hemen yenilenir (fetchOne); bölünen eski paket sayılmaz', async () => {
+  const pkg = (id, status, lines, tn, origin) => ({ id, orderNumber: '901', orderDate: 1790000000000, status, totalPrice: 100, originPackageIds: origin,
+    shipmentAddress: { fullName: 'Ayşe K', fullAddress: 'Adres 1', city: 'İzmir', district: 'Bornova' }, cargoProviderName: 'Trendyol Express', cargoTrackingNumber: tn, lines });
+  const calls = mockFetch([
+    [/split-packages$/, {}],
+    [/\/orders\?/, { totalPages: 1, content: [
+      pkg(10, 'UnPacked', [{ id: 21, quantity: 2, merchantSku: 'A', barcode: '111', productName: 'A', price: 50 }], 8000),
+      pkg(11, 'Created', [{ id: 21, quantity: 1, merchantSku: 'A', barcode: '111', productName: 'A', price: 50 }], 8001, [10]),
+      pkg(12, 'Created', [{ id: 21, quantity: 1, merchantSku: 'A', barcode: '111', productName: 'A', price: 50 }], 8002, [10]),
+    ] }],
+  ]);
+  const ch = trendyol({ TRENDYOL_SELLER_ID: '42', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' }, { id: 'trendyol' });
+  const r = await ch.split({ packages: [{ remote_id: '10', status: 'open', remote_status: 'Created', items: [{ line_id: '21', qty: 2 }] }] }, [{ items: [{ line_id: '21', qty: 1 }] }, { items: [{ line_id: '21', qty: 1 }] }]);
+  assert.equal(r.async, true);
+  const sp = calls.find((c) => /split-packages$/.test(c.url));
+  assert.match(sp.url, /shipment-packages\/10\/split-packages$/);
+  assert.deepEqual(JSON.parse(sp.body), { splitPackages: [{ packageDetails: [{ orderLineId: 21, quantities: 1 }] }, { packageDetails: [{ orderLineId: 21, quantities: 1 }] }] });
+  const o = await ch.fetchOne('901');
+  assert.match(calls.at(-1).url, /orderNumber=901/);
+  assert.deepEqual(o.packages.map((p) => p.remoteId).sort(), ['11', '12'], 'bölünen eski paket (10) sayılmaz');
+  assert.deepEqual(o.packages.map((p) => p.tracking).sort(), ['8001', '8002']);
+  assert.equal(o.items[0].quantity, 2, 'adet iki kez sayılmaz');
+});

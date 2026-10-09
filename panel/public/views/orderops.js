@@ -443,11 +443,12 @@ function splitEditor(d, extra, done) {
   const grid = new Map(live.map((i) => [String(i.line_id), Array(8).fill(0)]));
   if (o.packages.length) o.packages.forEach((p, k) => p.items.forEach((x) => { const g = grid.get(String(x.line_id)); if (g) g[k] = x.qty; }));
   else live.forEach((i, k) => { grid.get(String(i.line_id))[live.length > 1 && k === live.length - 1 ? 1 : 0] = i.quantity; });
-  const desi = Array(8).fill('');
+  const desi = Array(8).fill(''), qtyAll = live.reduce((a, i) => a + i.quantity, 0);
+  const reset = () => { for (const g of grid.values()) g.fill(0); };
   const s = sheet({ title: `Sipariş #${o.order_number} · paketler`, size: 'wide' });
   const draw = () => {
     s.setBody(html`<div class="stack">
-      <p class="muted small" style="margin:0">Her ürünün adedini paketlere dağıtın. Her paket için ayrı kargo etiketi oluşur.${d.channel && d.channel.caps.split === 'remote' ? ` Paketler ${ch(o.channel).name}'da da oluşturulur.` : d.channel && d.channel.caps.split === 'remote-async' ? ' Bölme Trendyol\'a gönderilir; yeni paketler birkaç dakika sonra senkronla gelir.' : d.channel && d.channel.caps.pack ? ` Paketler “Paketle” adımında ${ch(o.channel).name}'a gönderilir.` : ''}</p>
+      <p class="muted small" style="margin:0">Her ürünün adedini paketlere dağıtın. Her paket için ayrı kargo etiketi oluşur.${d.channel && d.channel.caps.split === 'remote' ? ` Paketler ${ch(o.channel).name}'da da oluşturulur.` : d.channel && d.channel.caps.split === 'remote-async' ? ' Bölme Trendyol\'a gönderilir; panel yeni paketler oluşana kadar izler, ardından tüm etiketleri tek tuşla alırsınız.' : d.channel && d.channel.caps.pack ? ` Paketler “Paketle” adımında ${ch(o.channel).name}'a gönderilir.` : ''}</p>
       <div class="card flush"><div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th>${Array.from({ length: count }, (_, k) => html`<th class="c">Paket ${k + 1}</th>`)}<th class="c">Kalan</th></tr></thead><tbody>
         ${live.map((i) => { const g = grid.get(String(i.line_id)); const left = i.quantity - g.slice(0, count).reduce((a, b) => a + b, 0); return html`<tr>
           <td style="min-width:180px"><div class="row">${thumb(i.product_image || i.image, i.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:260px;font-weight:600">${i.product_name || i.name}</div><div class="muted tiny">${i.quantity} adet</div></div></div></td>
@@ -455,7 +456,11 @@ function splitEditor(d, extra, done) {
           <td class="c num" style="font-weight:800;color:${left ? 'var(--bad)' : 'var(--good)'}" data-left="${i.line_id}">${left}</td></tr>`; })}
         <tr><td class="muted small">Desi (isteğe bağlı)</td>${Array.from({ length: count }, (_, k) => html`<td class="c"><input class="input" style="width:70px;text-align:center" inputmode="decimal" data-desi="${k}" value="${desi[k]}"></td>`)}<td></td></tr>
       </tbody></table></div></div>
-      <div class="row"><button class="btn sm" data-ed="add" ${count >= 8 ? 'disabled' : ''}><i class="ico ico-plus"></i>Paket ekle</button><button class="btn sm" data-ed="del" ${count <= 1 ? 'disabled' : ''}><i class="ico ico-minus"></i>Paket çıkar</button></div>
+      <div class="row wrap"><button class="btn sm" data-ed="add" ${count >= 8 ? 'disabled' : ''}><i class="ico ico-plus"></i>Paket ekle</button><button class="btn sm" data-ed="del" ${count <= 1 ? 'disabled' : ''}><i class="ico ico-minus"></i>Paket çıkar</button>
+        <span class="spacer"></span><span class="muted small">Hızlı:</span>
+        <button class="btn sm ghost" data-ed="by-item" ${live.length < 2 || live.length > 8 ? 'disabled' : ''} title="Her ürün kendi paketinde">Her ürün ayrı</button>
+        <button class="btn sm ghost" data-ed="by-unit" ${qtyAll < 2 || qtyAll > 8 ? 'disabled' : ''} title="Her adet ayrı paket (en fazla 8)">Her adet ayrı</button>
+        <button class="btn sm ghost" data-ed="even" title="Her ürünün adedi paketlere eşit dağıtılır">Eşit böl</button></div>
     </div>`);
   };
   s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-ed="save"><i class="ico ico-split"></i>Paketleri oluştur</button>`);
@@ -476,14 +481,58 @@ function splitEditor(d, extra, done) {
     const b = e.target.closest('[data-ed]');
     if (!b) return;
     if (b.dataset.ed === 'add') { count++; draw(); }
+    // Hızlı dağıtım: her ürün ayrı paket / her adet ayrı paket / her ürünü mevcut paket sayısına eşit dağıt
+    if (b.dataset.ed === 'by-item') { reset(); count = live.length; live.forEach((i, k) => { grid.get(String(i.line_id))[k] = i.quantity; }); draw(); }
+    if (b.dataset.ed === 'by-unit') { reset(); count = qtyAll; let k = 0; for (const i of live) for (let u = 0; u < i.quantity; u++) grid.get(String(i.line_id))[k++] += 1; draw(); }
+    if (b.dataset.ed === 'even') { reset(); let k = 0; for (const i of live) for (let u = 0; u < i.quantity; u++) { grid.get(String(i.line_id))[k % count] += 1; k++; } draw(); }
     if (b.dataset.ed === 'del') { for (const g of grid.values()) { g[count - 2] += g[count - 1]; g[count - 1] = 0; } count--; draw(); }
     if (b.dataset.ed === 'save') {
       const bad = live.find((i) => grid.get(String(i.line_id)).slice(0, count).reduce((a, x) => a + x, 0) !== i.quantity);
       if (bad) return toast(`“${bad.product_name || bad.name}” adetleri tam dağıtılmadı`, true);
       const groups = Array.from({ length: count }, (_, k) => ({ desi: Number(String(desi[k]).replace(',', '.')) || null, items: live.map((i) => ({ line_id: String(i.line_id), qty: grid.get(String(i.line_id))[k] })).filter((x) => x.qty > 0) })).filter((g) => g.items.length);
-      busy(b, async () => { const r = await api(`orders/${encodeURIComponent(o.id)}/split`, { method: 'POST', body: { groups } }); toast(r.message); s.close(); await done(); });
+      busy(b, async () => {
+        const r = await api(`orders/${encodeURIComponent(o.id)}/split`, { method: 'POST', body: { groups } });
+        s.close();
+        if (r.async && r.refresh) return watchSplit(o, r, done);
+        toast(r.message); await done();
+      });
     }
   });
+}
+
+// Kanalda bölme (Trendyol): yeni paketler kanalda oluşana kadar sipariş birkaç saniyede bir kanaldan yenilenir; paketler ve takip
+// numaraları gelince tüm etiketler tek tuşla alınır (senkronu beklemeye gerek kalmaz)
+async function watchSplit(o, r, done) {
+  let stop = false, x = null;
+  const enc = encodeURIComponent(o.id), name = ch(o.channel).name;
+  const s = sheet({ title: `${name} · paketler oluşturuluyor`, size: 'narrow', onClose: () => { stop = true; } });
+  const fresh = (ord) => (ord.packages || []).filter((p) => p.remote_id && p.status !== 'cancelled' && !(r.from || []).includes(String(p.remote_id)));
+  const view = (i, n, pk) => s.setBody(html`<div class="stack"><div class="diag">
+      <div class="diag-row"><span class="diag-ic good">✓</span><div style="flex:1">Bölme isteği ${name}'a gönderildi (${r.expect} paket)</div></div>
+      <div class="diag-row"><span class="diag-ic ${pk.length >= r.expect ? 'good' : 'amber'}">${pk.length >= r.expect ? '✓' : html`<i class="ico ico-sync spin"></i>`}</span><div style="flex:1">${pk.length >= r.expect ? `${pk.length} yeni paket oluştu` : `${name} paketleri oluşturuyor… (${pk.length}/${r.expect})`}</div></div>
+      <div class="diag-row"><span class="diag-ic ${pk.length && pk.every((p) => p.tracking) ? 'good' : 'amber'}">${pk.length && pk.every((p) => p.tracking) ? '✓' : html`<i class="ico ico-sync spin"></i>`}</span><div style="flex:1">${pk.length && pk.every((p) => p.tracking) ? 'Kargo takip numaraları geldi' : 'Kargo takip numaraları bekleniyor…'}</div></div>
+    </div><div class="tiny muted">Kontrol ${i} / ${n} · pencereyi kapatırsanız paketler bir sonraki senkronda gelir.</div></div>`);
+  s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Arka planda bırak</button>`);
+  const waits = [3, 3, 4, 4, 5, 5, 6, 8, 10, 12, 15, 20];
+  let pk = [];
+  for (let i = 0; i < waits.length && !stop; i++) {
+    view(i + 1, waits.length, pk);
+    await new Promise((ok) => setTimeout(ok, waits[i] * 1000));
+    if (stop) break;
+    x = await api(`orders/${enc}/refresh`, { method: 'POST' }).catch(() => null);
+    if (x && x.order) pk = fresh(x.order);
+    if (pk.length >= r.expect && pk.every((p) => p.tracking)) break;
+  }
+  await done();
+  if (stop) return;
+  if (pk.length >= r.expect) {
+    view(waits.length, waits.length, pk);
+    s.setFoot(html`<button class="btn" data-close>Kapat</button><span class="spacer"></span><button class="btn primary" data-all-labels><i class="ico ico-tag"></i>Tüm etiketleri al (${pk.length})</button>`);
+    $('[data-all-labels]', s.el).onclick = (e) => busy(e.currentTarget, async () => { s.close(); await bulkLabels([o.id], { fetch: true }); await done(); });
+  } else {
+    s.setBody(html`<div class="notice warn"><i class="ico ico-warn"></i><div>${name} yeni paketleri henüz oluşturmadı. Birkaç dakika içinde senkronla gelir; ardından siparişte <b>Tüm etiketleri al</b>'a basın.</div></div>`);
+    s.setFoot(html`<span class="spacer"></span><button class="btn primary" data-close>Tamam</button>`);
+  }
 }
 
 // ---------- sipariş detayı (tam) ----------
