@@ -537,7 +537,7 @@ export class TenantPanel {
   async usage() {
     const db = this.db, since = Date.now() - 30 * 864e5;
     const r = await first(db, `SELECT (SELECT COUNT(*) FROM users WHERE active = 1) AS users, (SELECT COUNT(*) FROM orders) AS orders, (SELECT COUNT(*) FROM products) AS products,
-      (SELECT COUNT(*) FROM channel_config WHERE data IS NOT NULL) AS channels, (SELECT MAX(last_login) FROM users) AS last_login, (SELECT MAX(ordered_at) FROM orders) AS last_order,
+      (SELECT COUNT(*) FROM channel_config WHERE data IS NOT NULL AND id NOT IN ('kargonomi', 'navlungo')) AS channels, (SELECT MAX(last_login) FROM users) AS last_login, (SELECT MAX(ordered_at) FROM orders) AS last_order,
       (SELECT COUNT(*) FROM orders WHERE ordered_at >= ? AND status NOT IN ('cancelled')) AS orders30, (SELECT COALESCE(SUM(total), 0) FROM orders WHERE ordered_at >= ? AND status NOT IN ('cancelled', 'returned')) AS revenue30`, since, since);
     return { ...r, revenue30: Math.round(r.revenue30 || 0) };
   }

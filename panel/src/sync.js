@@ -122,7 +122,8 @@ export async function saveOrders(db, ch, orders, maps) {
         if (remoteIds.length) {
           st.push(db.prepare(`DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND remote_id NOT IN (${remoteIds.map(() => '?').join(',')})`).bind(id, ...remoteIds));
           // Kanalda paket oluştuysa (panelden ya da kanalın kendi panelinden) paneldeki taslak paketler kaldırılır
-          st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NULL AND status = 'open'").bind(id));
+          // (kargo entegratöründe gönderisi açılmış taslak korunur: takip no ve etiket kaybolmasın)
+          st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NULL AND status = 'open' AND carrier_provider IS NULL").bind(id));
         } else if (!o.packages.length) {
           // Kanalda paket kalmadı (ör. ikas'ta paket iptal edildi): kanal paketleri kaldırılır, taslaklar korunur
           st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND status = 'open'").bind(id));
@@ -138,8 +139,9 @@ export async function saveOrders(db, ch, orders, maps) {
             ON CONFLICT (order_id, remote_id) DO UPDATE SET items = excluded.items, remote_status = excluded.remote_status,
               status = CASE WHEN packages.status = 'shipped' AND excluded.status = 'open' THEN 'shipped' ELSE excluded.status END,
               shipped_at = CASE WHEN excluded.status = 'shipped' THEN COALESCE(packages.shipped_at, excluded.shipped_at) ELSE packages.shipped_at END,
-              cargo_company = COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company), tracking = COALESCE(NULLIF(excluded.tracking, ''), packages.tracking),
-              barcode = COALESCE(NULLIF(excluded.barcode, ''), packages.barcode), error = excluded.error,
+              cargo_company = CASE WHEN packages.carrier_provider IS NOT NULL THEN packages.cargo_company ELSE COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company) END,
+              tracking = CASE WHEN packages.carrier_provider IS NOT NULL THEN packages.tracking ELSE COALESCE(NULLIF(excluded.tracking, ''), packages.tracking) END,
+              barcode = CASE WHEN packages.carrier_provider IS NOT NULL THEN packages.barcode ELSE COALESCE(NULLIF(excluded.barcode, ''), packages.barcode) END, error = excluded.error,
               agreement = CASE WHEN packages.agreement = 'own' THEN 'own' ELSE COALESCE(excluded.agreement, packages.agreement) END,
               tracking_url = COALESCE(NULLIF(excluded.tracking_url, ''), packages.tracking_url),
               packed_at = CASE WHEN excluded.packed_at IS NULL THEN NULL ELSE COALESCE(packages.packed_at, excluded.packed_at) END`)

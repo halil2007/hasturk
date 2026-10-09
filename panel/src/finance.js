@@ -28,7 +28,7 @@ export function orderProfit(o, settings) {
   // Yüzdelik kesintiler: ek kesinti (işlem / ödeme bedeli) ve stopaj (KDV hariç satış üzerinden; KDV %20 varsayılır)
   const x = profit({ sale: revenue, feeRate: costOf(settings, 'fee_rate', ch), withholdingRate: costOf(settings, 'withholding', ch) });
   const net = revenue - commission - shipping - fee - x.rateFee - x.withholding;
-  const shippingSrc = o.shipping_cost != null ? (o.shipping_src === 'api' ? 'api' : 'manual') : prodShip > 0 ? 'product' : defShip > 0 ? 'default' : 'none';
+  const shippingSrc = o.shipping_cost != null ? (o.shipping_src === 'api' ? 'api' : o.shipping_src === 'carrier' ? 'carrier' : 'manual') : prodShip > 0 ? 'product' : defShip > 0 ? 'default' : 'none';
   return {
     revenue: r2(revenue), commission: r2(commission), commissionSrc: realCommission && o.items.length ? 'api' : 'estimate', shipping: r2(shipping), shippingSrc,
     fee: r2(fee), rateFee: r2(x.rateFee), withholding: r2(x.withholding), payout: r2(net), cost: r2(cost), profit: r2(net - cost), missingCost: missing,
@@ -108,7 +108,7 @@ async function aggregate(db, settings, { from, to, channel }) {
       SUM(CASE WHEN it.n > 0 AND it.estc = 0 THEN 1 ELSE 0 END) AS realCommission, COALESCE(SUM(it.cost), 0) AS cost, COALESCE(SUM(it.miss), 0) AS missingCost,
       SUM(CASE WHEN it.live > 0 THEN COALESCE(o.shipping_cost, ${PRODUCT_SHIP}, ${rate('shipping')}) ELSE 0 END) AS shipping,
       SUM(CASE WHEN it.live > 0 AND o.shipping_cost IS NULL AND ${PRODUCT_SHIP} IS NOT NULL THEN 1 ELSE 0 END) AS productShipping,
-      SUM(CASE WHEN o.shipping_cost IS NOT NULL AND o.shipping_src = 'api' THEN 1 ELSE 0 END) AS realShipping,
+      SUM(CASE WHEN o.shipping_cost IS NOT NULL AND o.shipping_src IN ('api', 'carrier') THEN 1 ELSE 0 END) AS realShipping,
       SUM(CASE WHEN it.live > 0 THEN ${rate('service_fee')} ELSE 0 END) AS fee,
       SUM(COALESCE(it.rev, 0) * ${rate('fee_rate')} / 100.0) AS rateFee,
       SUM(COALESCE(it.rev, 0) * 100.0 / 120.0 * ${rate('withholding')} / 100.0) AS withholding
