@@ -59,6 +59,16 @@ export async function pool(items, n, fn) {
 export const chunk = (arr, n) => { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; };
 
 // Dış API isteği: zaman aşımı, 429/5xx'te kısa tekrar, anlaşılır hata mesajı
+// Hata yanıtı HTML sayfasıysa (bakım sayfası, güvenlik duvarı, sunucu hata sayfası) ham HTML yerine sayfanın başlığı ve
+// anlaşılır açıklama: "Bakımdayız | PTTAVM" → "kanal bakımda (…): bakım bitince panel kendiliğinden devam eder"
+export function htmlReason(text, status) {
+  const t = String(text || '');
+  if (!/^\s*<(!doctype|html|head|body)/i.test(t)) return t;
+  const title = ((/<title[^>]*>([\s\S]*?)<\/title>/i.exec(t) || [])[1] || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (/bak[ıi]m|maintenance|under construction/i.test(title + ' ' + t.slice(0, 4000))) return `kanal bakımda${title ? ` (“${title}”)` : ''}: sorun bizde değil, bakım bitince panel kendiliğinden devam eder`;
+  if (/cloudflare|attention required|access denied|forbidden|captcha/i.test(title)) return `kanalın güvenlik duvarı isteği engelledi${title ? ` (“${title}”)` : ''}`;
+  return `kanal HTML hata sayfası döndürdü${title ? ` (“${title}”)` : ''}${status >= 500 ? ': kanal sunucusunda geçici sorun' : ''}`;
+}
 export async function http(url, { method = 'GET', headers = {}, body: b, timeout = 25000, tries = 2, raw = false } = {}) {
   for (let i = 1; ; i++) {
     const ctl = new AbortController();
@@ -76,14 +86,14 @@ export async function http(url, { method = 'GET', headers = {}, body: b, timeout
     clearTimeout(t);
     if ((res.status === 429 || res.status >= 500) && i < tries) { await sleep(1500 * i); continue; }
     if (raw) {
-      if (!res.ok) throw new Error(`${method} ${shortUrl(url)}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+      if (!res.ok) throw new Error(`${method} ${shortUrl(url)}: HTTP ${res.status} ${htmlReason(await res.text(), res.status).slice(0, 300)}`);
       return res;
     }
     const text = await res.text();
     let data = text;
     if (/json/i.test(res.headers.get('content-type') || '') || /^\s*[[{]/.test(text)) { try { data = JSON.parse(text); } catch { /* düz metin */ } }
     if (!res.ok) {
-      const msg = typeof data === 'object' && data ? (data.message || data.errorMessage || (data.errors && JSON.stringify(data.errors)) || JSON.stringify(data)) : text;
+      const msg = typeof data === 'object' && data ? (data.message || data.errorMessage || (data.errors && JSON.stringify(data.errors)) || JSON.stringify(data)) : htmlReason(text, res.status);
       const err = new Error(`${method} ${shortUrl(url)}: HTTP ${res.status} ${String(msg).slice(0, 400)}`);
       err.status = res.status;
       throw err;
