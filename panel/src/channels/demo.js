@@ -17,8 +17,29 @@ export const DEMO_PRODUCTS = [
   ['HG-SIVI-1', '8690000000127', 'Sıvı Bitki Besini 1 Lt', 159, 62, 1],
   ['HG-MONSTERA', '8690000000134', 'HG Monstera Toprağı 10 Lt', 189, 84, 2],
   ['HG-ZEOLIT-5', '8690000000141', 'Zeolit 5 Kg', 139, 58, 2],
+  ['HG-SOL-25', '8690000000158', 'HG Solucan Gübresi 25 Kg', 649, 340, 8],
+  ['HG-VERMI-1', '8690000000165', 'Sıvı Vermikompost 1 Lt', 129, 48, 1],
+  ['HG-YANMIS-10', '8690000000172', 'Yanmış Koyun Gübresi 10 Kg', 219, 96, 3],
+  ['HG-TAVUK-5', '8690000000189', 'Granül Tavuk Gübresi 5 Kg', 179, 78, 2],
+  ['HG-NPK-1', '8690000000196', 'NPK 20-20-20 Suda Çözünür Gübre 1 Kg', 199, 88, 1],
+  ['HG-HUMIK-1', '8690000000202', 'Humik Asit Sıvı 1 Lt', 169, 66, 1],
+  ['HG-BIBER-T', '8690000000219', 'Biber Tohumu (Paket)', 45, 12, 1],
+  ['HG-MARUL-T', '8690000000226', 'Marul Tohumu (Paket)', 39, 10, 1],
+  ['HG-CICEK-T', '8690000000233', 'Karışık Çiçek Tohumu (Paket)', 59, 16, 1],
+  ['HG-MAKAS', '8690000000240', 'Budama Makası', 249, 115, 1],
+  ['HG-ELDIVEN', '8690000000257', 'Bahçe Eldiveni', 79, 28, 1],
+  ['HG-HORTUM-15', '8690000000264', 'Bahçe Hortumu 15 Mt', 399, 210, 4],
+  ['HG-SAKSI-PL30', '8690000000271', 'Plastik Saksı 30 cm', 89, 32, 2],
+  ['HG-SULAMA-5', '8690000000288', 'Damla Sulama Seti 5 Mt', 299, 140, 2],
+  ['HG-KABUK-5', '8690000000295', 'Çam Kabuğu Malç 5 Lt', 119, 46, 1],
+  ['HG-BITKIBAG', '8690000000301', 'Bitki Bağlama Teli 50 Mt', 49, 15, 1],
 ];
-const WEIGHT = { ikas1: 2.2, ikas2: 0.9, trendyol: 3.1, hepsiburada: 1.6, pttavm: 0.6 };
+// Kanal başına günlük sipariş yoğunluğu (örnek): pazaryerleri önde, siteler ve küçük kanallar daha az
+// Örnek kategori ağacı (ikas'tan gelir gibi): Bahçe › Gübre › Organik …
+const demoCategory = (n) => (/topra|torf|perlit|cocopeat|zeolit|malç/i.test(n) ? 'Bahçe › Toprak ve Harç'
+  : /solucan|vermikompost|koyun|tavuk/i.test(n) ? 'Bahçe › Gübre › Organik Gübre' : /gübre|besin|humik/i.test(n) ? 'Bahçe › Gübre › Sıvı ve Kimyasal Gübre'
+  : /tohum/i.test(n) ? 'Bahçe › Tohum' : /saksı/i.test(n) ? 'Bahçe › Saksı' : /sulama|hortum/i.test(n) ? 'Bahçe › Ekipman › Sulama' : 'Bahçe › Ekipman › El Aletleri');
+const WEIGHT = { ikas1: 2.4, ikas2: 1, trendyol: 3.4, hepsiburada: 1.9, pttavm: 0.7, n11: 0.8, idefix: 0.5, pazarama: 0.4, amazon: 0.6, ciceksepeti: 0.6, koctas: 0.3, shopify: 0.5, woocommerce: 0.6, opencart: 0.3, etsy: 0.2 };
 const NAMES = ['Ayşe Yılmaz', 'Mehmet Kaya', 'Zeynep Demir', 'Ali Çelik', 'Elif Şahin', 'Mustafa Arslan', 'Fatma Doğan', 'Emre Koç', 'Hatice Kurt', 'Burak Öztürk', 'Selin Aydın', 'Can Polat'];
 const CITIES = [['İstanbul', 'Kadıköy'], ['Ankara', 'Çankaya'], ['İzmir', 'Bornova'], ['Bursa', 'Nilüfer'], ['Antalya', 'Muratpaşa'], ['Konya', 'Selçuklu'], ['Kocaeli', 'İzmit']];
 
@@ -28,7 +49,7 @@ function rng(seed) {
   return () => { h += 0x6d2b79f5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-const PRICE = { ikas1: 1, ikas2: 1, trendyol: 1.12, hepsiburada: 1.1, pttavm: 1.05 };
+const PRICE = { ikas1: 1, ikas2: 1, trendyol: 1.12, hepsiburada: 1.1, pttavm: 1.05, n11: 1.08, idefix: 1.08, pazarama: 1.06, amazon: 1.12, ciceksepeti: 1.1, koctas: 1.08, shopify: 1, woocommerce: 1, opencart: 1, etsy: 1.4 };
 export function demo(meta) {
   const ch = meta.id;
   const remoteKey = (p) => (ch === 'trendyol' || ch === 'pttavm' ? p[1] : `${ch}-${p[0]}`);
@@ -85,7 +106,7 @@ export function demo(meta) {
         remoteId: remoteKey(p), remoteProductId: `${ch}-${(m ? m[1] : p[2]).toLowerCase().replace(/\W+/g, '-')}`, sku: p[0], barcode: p[1], name: p[2], image: '',
         groupName: m ? m[1] : p[2], variantName: m ? m[2] : '', brand: /^HG\b/.test(p[2]) ? 'HG' : 'Hastürk',
         description: `<p><b>${p[2]}</b> — örnek ürün açıklaması. Bahçe ve saksı bitkileri için uygundur.</p><ul><li>Doğal içerik</li><li>Kolay kullanım</li></ul>`,
-        category: meta.type === 'ikas' ? (/topra|torf|perlit|cocopeat|zeolit/i.test(p[2]) ? 'Toprak ve Harç' : /gübre|besin/i.test(p[2]) ? 'Gübre' : /pompa/i.test(p[2]) ? 'Bahçe Ekipmanları' : 'Tohum') : '',
+        category: meta.type === 'ikas' ? demoCategory(p[2]) : '',
         purchasePrice: p[4], price: Math.round(p[3] * (PRICE[ch] || 1)), listPrice: Math.round(p[3] * (PRICE[ch] || 1) * 1.15), stock: 20 + ((i * 7) % 30),
       };
     });

@@ -91,6 +91,8 @@ export async function getChannels(env, db) {
   const list = ids.map((id) => {
     // Panelde "pasif" yapılan kanal hiç çalışmaz
     if (cfg[id] && cfg[id].active === false) return { ...real[id], enabled: false, paused: true };
+    // DEMO=1: anahtarı girilmemiş tüm kanallar (pazaryerleri, siteler, test aşamasındakiler) örnek veriyle bağlı görünür
+    if (env.DEMO === '1' && !meta[id].extra && !real[id].enabled && !(cfg[id] && cfg[id].values && Object.keys(cfg[id].values).length)) return demo(meta[id]);
     // Bağlantısı onaylanmamış kanal: son kayıttan sonra başarılı test yoksa listelere girmez; test için gerçek bağlantı ayrıca tutulur
     if (GATED.includes(typeOf(id))) {
       const v = verified[id], ok = v && cfg[id] && v.at >= (cfg[id].updated || 0);
