@@ -307,6 +307,22 @@
     } finally { btn.disabled = false; cfReset(form); }
   }));
 
+  // Blog yazısı: okuma ilerleme çubuğu ve içindekilerde okunan başlığın vurgusu
+  const bar = $('[data-progress]');
+  if (bar) {
+    const art = $('.bl-art'), links = $$('.bl-toc a'), heads = links.map((a) => document.getElementById(decodeURIComponent(a.hash.slice(1)))).filter(Boolean);
+    let tick = false;
+    const upd = () => {
+      tick = false;
+      const r = art.getBoundingClientRect(), total = r.height - innerHeight * 0.6;
+      bar.style.width = `${Math.max(0, Math.min(100, (-r.top / Math.max(1, total)) * 100))}%`;
+      let cur = -1; heads.forEach((h, i) => { if (h.getBoundingClientRect().top < 140) cur = i; });
+      links.forEach((a, i) => a.classList.toggle('on', i === cur));
+    };
+    addEventListener('scroll', () => { if (!tick) { tick = true; requestAnimationFrame(upd); } }, { passive: true });
+    upd();
+  }
+
   // ---------- Teşekkür sayfaları (reklam dönüşümü için sabit adresler): /odeme-basarili (kartla ödeme), /siparis-alindi (havale / EFT) ----------
   const th = $('[data-thanks]');
   if (th) {

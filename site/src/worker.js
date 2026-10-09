@@ -21,7 +21,7 @@ const localImg = (s) => String(s || '').replace(IMG_RE, '/blog/img/$1');
 const panelBase = (env) => String((env && env.PANEL_URL) || PANEL_URL).replace(/\/+$/, '');
 const headers = (env, extra = {}) => ({ 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'SAMEORIGIN',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' https://www.googletagmanager.com; connect-src 'self' ${panelBase(env)} https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://*.doubleclick.net https://www.google.com https://www.google.com.tr; frame-src https://td.doubleclick.net https://www.googletagmanager.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'`, ...extra });
+  'Content-Security-Policy': `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://challenges.cloudflare.com https://static.cloudflareinsights.com; connect-src 'self' ${panelBase(env)} https://challenges.cloudflare.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://*.doubleclick.net https://www.google.com https://www.google.com.tr https://google.com https://www.googleadservices.com https://pagead2.googlesyndication.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com https://td.doubleclick.net https://bid.g.doubleclick.net https://www.googletagmanager.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'`, ...extra });
 
 async function panel(env, path) {
   const r = await fetch(`${panelBase(env)}/api/public/blog${path}`, { headers: { Accept: 'application/json' } });
@@ -63,11 +63,11 @@ async function listPage(env, url) {
   const posts = d.posts || [];
   const title = tag ? `${tagName} Yazıları | ${BRAND} Blog` : `Blog: Pazaryeri, Kargo ve Stok Rehberleri | ${BRAND}${pg > 1 ? ` (Sayfa ${pg})` : ''}`;
   const desc = tag ? `${BRAND} blogunda "${tagName}" etiketli yazılar.` : 'Trendyol, Hepsiburada ve diğer pazaryerlerinde sipariş, kargo, stok, fiyat ve kârlılık yönetimi üzerine pratik rehberler ve ipuçları.';
-  const body = `<section class="page-hero bl-hero"><div class="wrap">
+  const body = `<section class="bl-hero"><div class="wrap">
   <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span>${tag ? `<a href="/blog">Blog</a><span>›</span><b>${esc(tagName)}</b>` : '<b>Blog</b>'}</nav>
-  <div class="kicker">${tag ? 'Etiket' : 'Blog'}</div>
-  <h1>${tag ? `<span class="grad">${esc(tagName)}</span> Yazıları` : 'Pazaryeri Satışında <span class="grad">Pratik Rehberler</span>'}</h1>
-  <p>${tag ? `"${esc(tagName)}" etiketli ${d.total} yazı.` : 'Sipariş, kargo, stok, fiyat ve kârlılık yönetimi üzerine; satıcıların gerçekten işine yarayan, kısa ve uygulanabilir yazılar.'}</p>
+  <div class="bl-hero-row"><div><h1>${tag ? esc(tagName) : `${BRAND} Blog`}</h1>
+  <p>${tag ? `"${esc(tagName)}" etiketli ${d.total} yazı.` : 'E-ticaret operasyonu üzerine rehberler: pazaryeri yönetimi, kargo, stok, fiyatlandırma ve kârlılık. Ekibimizin sahadaki deneyiminden, uygulanabilir ve kısa.'}</p></div>
+  <a class="bl-rss" href="/blog/rss.xml" title="RSS ile takip edin">RSS</a></div>
   ${(d.tags || []).length ? `<div class="bl-tagbar"><a href="/blog"${tag ? '' : ' class="on" aria-current="page"'}>Tümü</a>${d.tags.slice(0, 12).map((t) => `<a href="/blog?etiket=${encodeURIComponent(t.tag)}"${t.tag.toLocaleLowerCase('tr') === tag.toLocaleLowerCase('tr') ? ' class="on" aria-current="page"' : ''}>${esc(t.tag)}</a>`).join('')}</div>` : ''}
 </div></section>
 <section class="sec bl-list"><div class="wrap">
@@ -92,7 +92,10 @@ async function postPage(env, slug) {
   const img = cover ? { src: SITE_URL + cover, w: p.cover_w, h: p.cover_h, alt: p.title } : null;
   const isOrg = !p.author || /hast[uü]rk/i.test(p.author);
   const share = encodeURIComponent(abs), stitle = encodeURIComponent(p.title);
-  const body = `<article class="bl-post">
+  // İçindekiler: yazıdaki ara başlıklar (en az iki tane varsa; geniş ekranda yanda sabit)
+  const toc = [...String(p.html).matchAll(/<h2 id="([^"]+)">([\s\S]*?)<\/h2>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '').trim()]).filter((x) => x[1]).slice(0, 14);
+  const tocHtml = toc.length >= 2 ? `<aside class="bl-toc" aria-label="Bu yazıda"><b>Bu yazıda</b><ol>${toc.map(([id, t]) => `<li><a href="#${esc(id)}">${esc(t)}</a></li>`).join('')}</ol></aside>` : '';
+  const body = `<div class="bl-progress" data-progress aria-hidden="true"></div><article class="bl-post">
   <header class="bl-head"><div class="wrap">
     <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/blog">Blog</a><span>›</span><b>${esc(clip(p.title, 60))}</b></nav>
     ${p.tags.length ? `<div class="bl-ptags">${p.tags.map((t) => `<a href="/blog?etiket=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')}</div>` : ''}
@@ -101,11 +104,12 @@ async function postPage(env, slug) {
     <div class="bl-meta"><span>${esc(p.author || BRAND)}</span><span>${day(p.published_at)}</span><span>${p.minutes} dk okuma</span></div>
   </div></header>
   ${cover ? `<figure class="bl-cover"><img src="${esc(cover)}" alt="${esc(p.title)}"${p.cover_w ? ` width="${p.cover_w}" height="${p.cover_h}"` : ''} fetchpriority="high" decoding="async"></figure>` : ''}
-  <div class="bl-art">${localImg(p.html).replace(/<img /g, '<img decoding="async" ')}</div>
+  <div class="bl-body${tocHtml ? ' has-toc' : ''}"><div class="bl-main"><div class="bl-art">${localImg(p.html).replace(/<img /g, '<img decoding="async" ')}</div>
+  <div class="bl-author"><span class="bl-av">${esc((p.author || BRAND).slice(0, 1))}</span><div><b>${esc(p.author || `${BRAND} Ekibi`)}</b><span>${isOrg ? 'Pazaryeri ve e-ticaret operasyonu üzerine yazıyoruz. Panelimizi kullanan satıcıların sahada karşılaştığı sorunlardan derliyoruz.' : `${BRAND} blog yazarı`}</span></div></div>
   <footer class="bl-foot">
     <div class="bl-share"><b>Paylaşın:</b><a href="https://wa.me/?text=${stitle}%20${share}" target="_blank" rel="noopener">WhatsApp</a><a href="https://www.linkedin.com/sharing/share-offsite/?url=${share}" target="_blank" rel="noopener">LinkedIn</a><a href="https://x.com/intent/post?url=${share}&amp;text=${stitle}" target="_blank" rel="noopener">X</a><a href="https://www.facebook.com/sharer/sharer.php?u=${share}" target="_blank" rel="noopener">Facebook</a></div>
     <a class="bl-back" href="/blog">‹ Tüm yazılar</a>
-  </footer>
+  </footer></div>${tocHtml}</div>
 </article>
 ${d.more && d.more.length ? `<section class="sec bl-list"><div class="wrap"><div class="sec-head"><div class="kicker">Blog</div><h2>Diğer Yazılar</h2></div><div class="bl-grid three">${d.more.map((x) => card(x)).join('')}</div></div></section>` : ''}
 ${ctaBand}`;
