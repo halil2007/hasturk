@@ -281,6 +281,8 @@ const MIGRATIONS = [
     last_at INTEGER, last_user TEXT, last_kind TEXT)`,
   // İade talebine müşterinin eklediği görseller (kanal veriyorsa; JSON dizi)
   'ALTER TABLE claims ADD COLUMN images TEXT',
+  // Ek mağaza satın alma (sales_orders.kind = 'stores'): adet
+  'ALTER TABLE sales_orders ADD COLUMN qty INTEGER',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

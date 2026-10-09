@@ -183,7 +183,7 @@ export async function integrations(el, rest = []) {
     return html`<div class="row wrap store-tabs" style="gap:8px;align-items:center">
       <div class="tabs" style="min-width:0">${list.map((x) => { const k = stateOf(x).k; return html`<a class="tab ${x.id === c.id ? 'on' : ''}" href="#/entegrasyonlar/${encodeURIComponent(x.id)}"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${x.name}</a>`; })}</div>
       ${admin ? html`<button class="btn sm outline" data-act="addstore" data-type="${c.type}"><i class="ico ico-plus"></i>${typeName(c.type)} mağazası ekle</button>` : ''}
-      ${lim ? html`<span class="tiny muted">Paketiniz: ${used} / ${lim} mağaza</span>` : ''}
+      ${lim ? html`<span class="tiny ${used >= lim ? '' : 'muted'}" style="${used >= lim ? 'color:var(--bad)' : ''}">Paketiniz: ${used} / ${lim} mağaza${used >= lim && admin ? html` · <a class="link" href="#/paketim">Ek mağaza al</a>` : ''}</span>` : ''}
     </div>`;
   }
 
