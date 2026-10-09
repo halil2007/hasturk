@@ -30,7 +30,7 @@ const SITE_URL = 'https://hasturkcrm.com';
 // Şirket bilgileri ve paket fiyatları tek yerden: public/assets/config.js (arama motoru verisi de buradan üretilir)
 const S = (() => { const ctx = { window: {}, document: { documentElement: { classList: { add() {} } } } }; vm.runInNewContext(readFileSync(join(OUT, 'assets', 'config.js'), 'utf8'), ctx); return ctx.window.SITE; })();
 // Önbellek kırıcı: CSS / JS içeriği değişince adresi de değişir (?v=…); tarayıcı eski dosyayı kullanmaz, değişmeyeni uzun süre saklar
-const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js'].map((f) => [f, createHash('sha1').update(readFileSync(join(OUT, 'assets', f))).digest('hex').slice(0, 10)]));
+const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js', 'logo.webp'].map((f) => [f, createHash('sha1').update(readFileSync(join(OUT, 'assets', f))).digest('hex').slice(0, 10)]));
 
 // ---------- üst menü açılır listeleri ----------
 const menuFeatures = FEATURES.map((f) => `<a class="mi" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><span><b>${esc(f.name)}</b><small>${esc(f.short)}</small></span></a>`).join('');

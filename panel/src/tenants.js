@@ -11,7 +11,7 @@ import { PerfBuffer } from './perf.js';
 import { extApiInner, apiOf, apiPublic, newKey, parseIps } from './extapi.js';
 import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
-import { hashPassword, supportCookie, currentUser, demoCookie } from './auth.js';
+import { hashPassword, supportCookie, currentUser, demoCookie, userCookie } from './auth.js';
 import { supportResponse } from './support.js';
 import { json, fail, str } from './util.js';
 import { loadConfig, releasedTypes } from './config.js';
@@ -126,6 +126,8 @@ async function admin(env, t, op, data = {}) {
   return j;
 }
 
+// Firma yöneticisi olarak oturum çerezi (kendi kendine açılan deneme panelinin ilk girişi; bkz. trial.js)
+export const ownerCookie = async (env, t, secure) => (await admin(env, t, 'login', { username: t.admin_username, secure })).cookie;
 // Müşteri paneline giriş: firma kodu doğrulanır, giriş isteği o panelin veritabanında denetlenir
 // Şifremi unuttum / şifre yenileme (oturumsuz): firma kodu doğrulanır, istek firmanın paneline gider. IP başına saatte 10 istek.
 export async function tenantPassword(req, env, kind, b) {
@@ -496,6 +498,10 @@ export class TenantPanel {
         return json({ ok: true, username: b.username });
       }
       if (b.op === 'support') return json({ ok: true, cookie: await supportCookie(env, !!b.secure) });
+      if (b.op === 'login') {
+        const cookie = await userCookie(env, db, b.username, !!b.secure);
+        return cookie ? json({ ok: true, cookie }) : json({ error: 'Kullanıcı bulunamadı' }, 404);
+      }
       if (b.op === 'demo') {
         if (env.DEMO !== '1') return json({ error: 'Bu panel demo paneli değil' }, 400);
         await this.ctx.storage.delete('suspended'); await this.ctx.storage.delete('destroyed');

@@ -70,6 +70,15 @@ export async function demoCookie(env, db, secure) {
   const v = encodeURIComponent(`${pre(env)}${u.id}.${exp}.${await hmac(secret(env), `${u.id}.${exp}.${ver(u)}`)}`);
   return `${COOKIE}=${v}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${secure ? '; Secure' : ''}`;
 }
+// Kendi kendine açılan deneme paneli: kayıt formundan hemen sonra firma yöneticisi olarak oturum (ana panelin imzalı bağlantısıyla)
+export async function userCookie(env, db, username, secure) {
+  const u = await first(db, 'SELECT id, pass, sess FROM users WHERE LOWER(username) = LOWER(?) AND active = 1', String(username || ''));
+  if (!u) return null;
+  const exp = String(Date.now() + DAYS * 864e5);
+  const v = encodeURIComponent(`${pre(env)}${u.id}.${exp}.${await hmac(secret(env), `${u.id}.${exp}.${ver(u)}`)}`);
+  await run(db, 'UPDATE users SET last_login = ? WHERE id = ?', Date.now(), u.id);
+  return `${COOKIE}=${v}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DAYS * 86400}${secure ? '; Secure' : ''}`;
+}
 // Çerezden oturumdaki kullanıcıyı bul (yoksa null)
 export async function currentUser(req, env, db) {
   const m = (req.headers.get('Cookie') || '').match(new RegExp(COOKIE + '=([^;]+)'));

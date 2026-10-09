@@ -10,7 +10,8 @@ import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
 import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin } from './billing.js';
 import { blogPublic } from './blog.js';
-import { turnstileOk, CAPTCHA_ERROR } from './turnstile.js';
+import { trialRequest, trialLogin } from './trial.js';
+import { turnstileOk, turnstileSiteKey, CAPTCHA_ERROR } from './turnstile.js';
 import { actionSucceeded, resolveQuiet } from './errors.js';
 // Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
@@ -73,6 +74,14 @@ export default {
     if (path === 'public/blog' || path.startsWith('public/blog/')) return await blogPublic(req, env, path);
     // Tanıtım sitesi: "Test aşamasında" etiketi kaldırılan kanal türleri (released) ve hâlâ test aşamasında olanlar (beta)
     if (path === 'public/channels' && req.method === 'GET') return await publicChannels(req, env);
+    // Tanıtım sitesi: bot doğrulaması (Turnstile) açıksa site anahtarı; formlar kutucuğu buna göre gösterir
+    if (path === 'public/captcha' && req.method === 'GET') {
+      const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');
+      return json({ siteKey: turnstileSiteKey(env) }, 200, { Vary: 'Origin', 'Cache-Control': 'public, max-age=300', ...(siteOrigins(env).includes(origin) ? { 'Access-Control-Allow-Origin': origin } : {}) });
+    }
+    // Kendi kendine 7 günlük deneme: sitedeki form firma panelini açar, tek kullanımlık bağlantıyla doğrudan girilir (bkz. trial.js)
+    if (path === 'public/trial') return await trialRequest(req, env);
+    if (path === 'public/trial-login' && req.method === 'GET') return await trialLogin(req, env);
     // Demo paneline giriş (sitedeki imzalı bağlantı)
     if (path === 'public/demo') return await demoRequest(req, env);
     // Başka sitelerden gelen yazma isteklerini reddet (müşteri paneli girişi ve yönetimi dahil; panel içi istekler handle() içinde de denetlenir)

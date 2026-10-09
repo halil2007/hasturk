@@ -18,16 +18,17 @@ url: /demo
         <li><i class="tick"><svg><use href="#i-check"/></svg></i>Satış analizi, gelir & gider ve gerçek kâr raporları</li>
       </ul>
     </div>
-    <form class="lead card demo-form" data-lead novalidate>
-      <input type="hidden" name="topic" value="demo">
-      <div class="demo-form-h"><b>Kendi mağazanızla deneyin</b><span>7 gün ücretsiz deneme hesabı için bilgilerinizi bırakın, sizi arayalım.</span></div>
+    <form class="lead card demo-form" data-trial novalidate>
+      <div class="demo-form-h"><b>Kendi mağazanızla deneyin</b><span>7 gün ücretsiz deneme paneliniz formu gönderdiğiniz anda açılır; beklemeden girip mağazalarınızı bağlayabilirsiniz.</span></div>
+      <label class="f">Firma / mağaza adı *<input class="in" name="company" autocomplete="organization" required></label>
       <label class="f">Ad soyad *<input class="in" name="name" autocomplete="name" required></label>
-      <label class="f">Firma / mağaza adı<input class="in" name="company" autocomplete="organization"></label>
       <div class="row2"><label class="f">Telefon *<input class="in" name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="0532 123 45 67"></label><label class="f">E-posta *<input class="in" name="email" type="email" autocomplete="email" required></label></div>
+      <div class="row2"><label class="f">Kullanıcı adı *<input class="in" name="username" autocomplete="username" required minlength="3" maxlength="40" placeholder="ör. ayse"></label><label class="f">Şifre *<input class="in" name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="en az 8 karakter"></label></div>
       <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <label class="consent"><input type="checkbox" name="consent"><span><a href="/kvkk" target="_blank">KVKK aydınlatma metnini</a> okudum; deneme hesabı için benimle iletişime geçilmesini kabul ediyorum.</span></label>
+      <label class="consent"><input type="checkbox" name="consent"><span><a href="/kullanim-kosullari" target="_blank">Kullanım koşullarını</a> ve <a href="/kvkk" target="_blank">KVKK aydınlatma metnini</a> okudum, kabul ediyorum.</span></label>
       <div data-msg></div>
-      <button class="btn btn-primary" type="submit">Deneme hesabı isteyin <svg><use href="#i-arrow"/></svg></button>
+      <button class="btn btn-primary" type="submit">Deneme panelimi aç <svg><use href="#i-arrow"/></svg></button>
+      <div class="trial-ok" data-trial-ok hidden><b>Paneliniz hazır 🎉</b><p>Firma kodunuz: <code data-t-slug></code> · Kullanıcı adınız: <code data-t-user></code></p><p>Bu bilgileri not edin; panele her girişte firma kodu, kullanıcı adı ve şifrenizle girersiniz.</p><a class="btn btn-primary" data-t-link href="#">Panelime git <svg><use href="#i-arrow"/></svg></a></div>
     </form>
   </div>
 </section>
@@ -43,7 +44,7 @@ url: /demo
     <div class="demo-notes reveal">
       <p><svg><use href="#i-sync"/></svg>Demo paneli kendini düzeltir: ziyaretçilerin yaptığı değişiklikler kısa süre sonra geri alınır, panel hep ilk günkü gibi kalır.</p>
       <p><svg><use href="#i-lock"/></svg>Ayarlar, entegrasyon bilgileri ve kullanıcı yönetimi demoda kapalıdır.</p>
-      <p><svg><use href="#i-store"/></svg>Kendi mağazalarınızla denemek için 7 gün ücretsiz deneme hesabı açıyoruz.</p>
+      <p><svg><use href="#i-store"/></svg>Kendi mağazalarınızla denemek için yukarıdaki formla 7 günlük deneme panelinizi hemen açabilirsiniz.</p>
     </div>
   </div>
 </section>
