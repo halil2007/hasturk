@@ -8,8 +8,10 @@ import { fail } from './util.js';
 export const PLANS = {
   baslangic: { name: 'Başlangıç', stores: 3, users: 2, monthly: 990, yearly: 9900, features: [] },
   profesyonel: { name: 'Profesyonel', stores: 10, users: 5, monthly: 1990, yearly: 19900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles'] },
-  kurumsal: { name: 'Kurumsal', stores: 25, users: 0, monthly: 3990, yearly: 39900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles', 'stockapi'] },
+  kurumsal: { name: 'Kurumsal', stores: 25, users: 0, monthly: 3990, yearly: 39900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles', 'stockapi', 'fx'],
+    soon: ['e-Fatura / e-Arşiv entegrasyonu', 'Kendi anlaşmalı kargo entegrasyonu'] },
 };
+// soon: pakete eklenecek, henüz aktif olmayan özellikler (Paketim'de "Yakında" olarak görünür; hiçbir özelliği açmaz)
 export const INSTALLMENTS_YEARLY = [1, 2, 3];
 // Satın alınabilir paket ve dönem → tutar, süre (ay)
 export function priceOf(plan, period) {
@@ -19,7 +21,7 @@ export function priceOf(plan, period) {
 }
 export const FEATURES = {
   buybox: 'Buybox takibi ve otomatik fiyat', autoupload: 'Otomatik ürün gönderimi', finance: 'Hakediş ve kesilen faturalar',
-  bulk: 'Excel ile toplu güncelleme', roles: 'Personel yetkileri ve rol şablonları', stockapi: 'Stok API',
+  bulk: 'Excel ile toplu güncelleme', roles: 'Personel yetkileri ve rol şablonları', stockapi: 'Stok API', fx: 'Döviz kuruna endeksli otomatik fiyat',
 };
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/[^a-z]/g, '');
 // Firma kartındaki paket adı → paket anahtarı ("Başlangıç", "baslangic", "Profesyonel paket" …); tanınmazsa '' (özel)

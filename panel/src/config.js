@@ -115,12 +115,20 @@ export const FIELDS = {
 // ---------- ek mağazalar ----------
 // Her kanal türüne istenen sayıda mağaza eklenebilir: ek mağazanın kimliği "<tür>_<n>" (ör. trendyol_2, ikas_3).
 // Ek mağazanın bilgileri ana mağazayla aynı alan adlarıyla, kendi kaydında saklanır; Cloudflare değişkenleri ek mağazaya karışmaz.
-// Test modülündeki kanallar: ana panelde bağlanıp denenir, müşteri panellerinde "Yakında" görünür (eklenemez, çalışmaz)
-export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'opencart', 'etsy'];
-export const TYPES = ['ikas', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', ...BETA_TYPES];
+// Test modülündeki kanallar: ana panelde bağlanıp denenir, müşteri panellerinde "Yakında" görünür (eklenemez, çalışmaz).
+// Ana panel → Entegrasyonlar → kanal → "Müşterilere aç" ile yayına alınan tür (settings: released_channels) normal kanal olur:
+// müşteri panellerine RELEASED_TYPES ortam değişkeniyle gider (birkaç dakika içinde), tanıtım sitesi /api/public/channels'tan okur.
+export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy'];
+export async function releasedTypes(env, db) {
+  if (env && env.TENANT_SLUG) return String(env.RELEASED_TYPES || '').split(',').filter((t) => BETA_TYPES.includes(t));
+  if (!db) return [];
+  const r = await first(db, "SELECT v FROM settings WHERE k = 'released_channels'").catch(() => null);
+  try { const a = r ? JSON.parse(r.v) : []; return Array.isArray(a) ? a.filter((t) => BETA_TYPES.includes(t)) : []; } catch { return []; }
+}
+export const TYPES = ['ikas', 'trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', 'woocommerce', ...BETA_TYPES];
 export const TYPE_NAMES = { ikas: 'ikas', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', etsy: 'Etsy' };
 export const EXTRA_RE = new RegExp(`^(${TYPES.join('|')})_(\\d{1,3})$`);
-export const isBeta = (id) => BETA_TYPES.includes(typeOf(id));
+export const isBeta = (id, released = []) => BETA_TYPES.includes(typeOf(id)) && !released.includes(typeOf(id));
 export const isExtra = (id) => EXTRA_RE.test(String(id || ''));
 export const typeOf = (id) => { const m = EXTRA_RE.exec(String(id || '')); return m ? m[1] : /^ikas\d$/.test(id) ? 'ikas' : id; };
 const baseFields = (type) => FIELDS[type === 'ikas' ? 'ikas1' : type] || [];
@@ -137,9 +145,9 @@ export function storeEnv(env, type, values) {
   for (const [k, v] of Object.entries(values || {})) if (v) out[k] = v;
   return out;
 }
-export async function addStore(db, type, { tenant = false } = {}) {
+export async function addStore(db, type, { tenant = false, released = [] } = {}) {
   if (!TYPES.includes(type)) fail(400, 'Bilinmeyen kanal türü');
-  if (tenant && BETA_TYPES.includes(type)) fail(403, `${TYPE_NAMES[type]} yakında açılacak`);
+  if (tenant && isBeta(type, released)) fail(403, `${TYPE_NAMES[type]} yakında açılacak`);
   const rows = await all(db, 'SELECT id FROM channel_config');
   const used = new Set(rows.map((r) => r.id));
   let n = type === 'ikas' ? 3 : 2;
@@ -236,6 +244,6 @@ export function describe(env, cfg, id) {
 
 // Kanal nesneleri önbelleğinin anahtarı: API bilgisi kaydı ya da bekleyen kanal onayı değişince yenilenir
 export async function configVersion(db) {
-  const r = await first(db, "SELECT (SELECT MAX(updated_at) FROM channel_config) AS v, (SELECT GROUP_CONCAT(v) FROM settings WHERE k LIKE 'verified:%') AS w, (SELECT v FROM settings WHERE k = 'hold_channels') AS h");
-  return `${(r && r.v) || 0}|${(r && r.w) || ''}|${(r && r.h) || ''}`;
+  const r = await first(db, "SELECT (SELECT MAX(updated_at) FROM channel_config) AS v, (SELECT GROUP_CONCAT(v) FROM settings WHERE k LIKE 'verified:%') AS w, (SELECT v FROM settings WHERE k = 'hold_channels') AS h, (SELECT v FROM settings WHERE k = 'released_channels') AS rl");
+  return `${(r && r.v) || 0}|${(r && r.w) || ''}|${(r && r.h) || ''}|${(r && r.rl) || ''}`;
 }

@@ -39,7 +39,7 @@ export async function errorsView(el, query = {}) {
           <td class="small"><b>${e.firm || 'Ana panel'}</b>${e.slug ? html`<div class="tiny muted">${e.slug}</div>` : ''}</td>
           <td class="r num" style="font-weight:700">${n(e.count)}</td>
           <td class="small" style="white-space:nowrap" title="${dateTime(e.last_at)}">${ago(e.last_at)}<div class="tiny muted">ilk ${ago(e.first_at)}</div></td>
-          <td><span class="pill ${st[0]}">${st[1]}</span>${e.reopened ? html`<div class="tiny" style="color:var(--bad)">tekrarladı</div>` : ''}</td></tr>`; })}
+          <td><span class="pill ${st[0]}">${st[1]}</span>${e.reopened ? html`<div class="tiny" style="color:var(--bad)">tekrarladı</div>` : e.auto && e.status === 'resolved' ? html`<div class="tiny muted" title="${e.auto}">kendiliğinden</div>` : ''}</td></tr>`; })}
       </tbody></table></div></div>` : html`<div class="card empty">${f.status === 'open' ? 'Açık hata yok 🎉 Müşteri panellerinde hata oluşunca burada görünür.' : 'Kayıt yok'}</div>`}
       <div class="muted tiny">Müşteri panellerinde oluşan ekran hataları, başarısız işlemler (ör. etiket alınamadı), sunucu hataları ve kanal senkron hataları kendiliğinden kaydedilir. Aynı hata tek satırda toplanır; çözüldü denen hata tekrar ederse yeniden açılır ve bildirim gelir.</div>
     </div>`);
@@ -63,7 +63,7 @@ export async function errorsView(el, query = {}) {
     s.setBody(html`<div class="stack">
       <div class="notice ${e.status === 'open' ? 'bad' : ''}"><i class="ico ico-${src[1]}"></i><div style="min-width:0"><b>${src[0]}</b><div style="word-break:break-word">${e.message}</div></div></div>
       <dl class="id-kv"><dt>Firma</dt><dd>${e.firm || 'Ana panel'}${e.slug ? ` (${e.slug})` : ''}</dd><dt>Durum</dt><dd><span class="pill ${st[0]}">${st[1]}</span></dd>
-        <dt>İşlem</dt><dd>${e.action || '—'}${e.status_code ? ` · HTTP ${e.status_code}` : ''}</dd><dt>Sayfa</dt><dd>${e.page || '—'}</dd><dt>Son kullanıcı</dt><dd>${e.user_name || '—'}</dd>
+        ${e.auto && e.status === 'resolved' ? html`<dt>Çözülme</dt><dd>Kendiliğinden: ${e.auto}</dd>` : ''}<dt>İşlem</dt><dd>${e.action || '—'}${e.status_code ? ` · HTTP ${e.status_code}` : ''}</dd><dt>Sayfa</dt><dd>${e.page || '—'}</dd><dt>Son kullanıcı</dt><dd>${e.user_name || '—'}</dd>
         <dt>Kaç kez</dt><dd>${n(e.count)}</dd><dt>İlk / son</dt><dd>${dateTime(e.first_at)} / ${dateTime(e.last_at)}</dd>
         ${dt.screen ? html`<dt>Ekran</dt><dd>${dt.screen}${dt.version ? ` · sürüm ${dt.version}` : ''}</dd>` : ''}</dl>
       ${dt.browser ? html`<div class="tiny muted" style="word-break:break-word">${dt.browser}</div>` : ''}

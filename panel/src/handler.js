@@ -1,5 +1,6 @@
 // /api/* isteklerinin işlenmesi. Ana panel (env.DB) ve müşteri panelleri (her biri kendi Durable Object veritabanında,
 // bkz. tenants.js) aynı kodu kullanır; böylece her güncelleme tüm panellere aynı anda gelir.
+import { turnstileSiteKey } from './turnstile.js';
 import { planInfo } from './plans.js';
 import { init, getSettings, getLogo } from './db.js';
 import { logoPath } from './mail.js';
@@ -21,7 +22,7 @@ export async function handle(req, env, ctx, db) {
     // Giriş ekranı için firma adı ve logo (giriş gerektirmez)
     if (path === 'brand') {
       const s = await getSettings(db);
-      return json({ title: s.company.title, legal: s.company.legal, logo: logoPath(env, s) || null, demo: env.DEMO === '1' });
+      return json({ title: s.company.title, legal: s.company.legal, logo: logoPath(env, s) || null, demo: env.DEMO === '1', turnstile: turnstileSiteKey(env) });
     }
     // Firma logosu (giriş gerektirmez): e-postalarda görünsün diye görsel olarak sunulur (ayarlardaki data: adresinden)
     if (path === 'logo' && req.method === 'GET') {

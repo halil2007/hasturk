@@ -252,6 +252,21 @@ const MIGRATIONS = [
   'ALTER TABLE products ADD COLUMN ship_cost REAL',
   // Trendyol sipariş saati düzeltmesi (aşağıdaki tek seferlik adım) için şema sürümü değişsin: mevcut veritabanlarında da çalışır
   'CREATE INDEX IF NOT EXISTS orders_channel ON orders(channel, ordered_at)',
+  // Online satışta alınan fatura bilgisi (JSON: bireysel / kurumsal, TC / vergi no, adres, e-posta, telefon; bkz. billing.js)
+  'ALTER TABLE tenant_payments ADD COLUMN invoice TEXT',
+  // Blog (bkz. blog.js): yalnız ana panelde kullanılır. Yazı gövdesi Markdown; tags JSON dizi; durum draft | published
+  `CREATE TABLE IF NOT EXISTS blog_posts (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE, title TEXT NOT NULL, summary TEXT, body TEXT,
+    cover_id TEXT, tags TEXT, status TEXT NOT NULL DEFAULT 'draft', published_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+    author TEXT, seo_title TEXT, seo_desc TEXT)`,
+  'CREATE INDEX IF NOT EXISTS blog_posts_pub ON blog_posts(status, published_at)',
+  // Blog görselleri: rastgele kimlik (sırayla tahmin edilemez), base64 içerik (WEBP / JPG / PNG, en fazla ~500 KB)
+  `CREATE TABLE IF NOT EXISTS blog_images (id TEXT PRIMARY KEY, post_id INTEGER, name TEXT, type TEXT NOT NULL, size INTEGER, w INTEGER, h INTEGER,
+    data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  'CREATE INDEX IF NOT EXISTS blog_images_post ON blog_images(post_id)',
+  // Hepsiburada komisyon düzeltmesi (yukarıdaki tek seferlik adım) mevcut veritabanlarında da çalışsın diye şema sürümü değişir
+  'CREATE INDEX IF NOT EXISTS order_items_remote ON order_items(remote_key)',
+  // Kendiliğinden çözülen hata kaydının nedeni (bkz. errors.js → autoResolve); elle çözülende boş
+  'ALTER TABLE error_reports ADD COLUMN auto TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -294,6 +309,14 @@ export function init(db) {
       await db.batch([
         db.prepare("UPDATE orders SET ordered_at = ordered_at - 10800000 WHERE channel LIKE 'trendyol%' AND ordered_at > 10800000 AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:ty_gmt3_1')"),
         db.prepare("INSERT INTO settings (k, v) VALUES ('once:ty_gmt3_1', '1') ON CONFLICT (k) DO NOTHING"),
+      ]);
+      // Tek seferlik: Hepsiburada komisyonu adet başı ve KDV hariç kaydediliyordu (2 adetlik 3.000 TL siparişte 612 TL yerine 255 TL);
+      // kayıtlı satırlar satır toplamına ve KDV dahil tutara çevrilir, ilanların komisyon oranı son siparişten yeniden hesaplanır.
+      await db.batch([
+        db.prepare("UPDATE order_items SET commission = ROUND(commission * MAX(quantity, 1) * 1.2, 2) WHERE commission IS NOT NULL AND order_id IN (SELECT id FROM orders WHERE channel LIKE 'hepsiburada%') AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:hb_comm_1')"),
+        db.prepare(`UPDATE listings SET commission = (SELECT ROUND(i.commission / i.total * 100, 2) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.channel = listings.channel AND i.remote_key = listings.remote_id AND i.commission IS NOT NULL AND i.total > 0 ORDER BY o.ordered_at DESC LIMIT 1)
+          WHERE channel LIKE 'hepsiburada%' AND commission_src = 'api' AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:hb_comm_1')`),
+        db.prepare("INSERT INTO settings (k, v) VALUES ('once:hb_comm_1', '1') ON CONFLICT (k) DO NOTHING"),
       ]);
       await db.batch([
         db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)),

@@ -219,7 +219,7 @@ export async function insights(db, q) {
     cm.set(k, x);
   }
   const cities = [...cm.values()].map((x) => ({ ...x, revenue: r2(x.revenue) })).sort((a, b) => b.orders - a.orders);
-  const trows = await all(db, `SELECT i.product_id, COALESCE(p.name, i.name) AS name, COALESCE(p.sku, i.sku) AS sku, COALESCE(p.image, i.image) AS image, p.stock, o.channel,
+  const trows = await all(db, `SELECT i.product_id, COALESCE(p.name, i.name) AS name, COALESCE(p.sku, i.sku) AS sku, COALESCE(p.image, i.image) AS image, p.stock, p.purchase_price AS cost, o.channel,
       SUM(i.quantity) AS qty, SUM(i.total) AS revenue, COUNT(DISTINCT o.id) AS orders, MIN(i.unit_price) AS min, MAX(i.unit_price) AS max
     FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
     WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status NOT IN ('cancelled', 'returned')${cw}
@@ -227,13 +227,33 @@ export async function insights(db, q) {
   const tm = new Map();
   for (const r of trows) {
     const k = r.product_id ? 'p' + r.product_id : 'n' + (r.sku || r.name);
-    const x = tm.get(k) || { product_id: r.product_id, name: r.name, sku: r.sku, image: r.image, stock: r.stock, qty: 0, revenue: 0, orders: 0, min: Infinity, max: 0, channels: {} };
+    const x = tm.get(k) || { product_id: r.product_id, name: r.name, sku: r.sku, image: r.image, stock: r.stock, cost: r.cost, qty: 0, revenue: 0, orders: 0, min: Infinity, max: 0, channels: {} };
     x.qty += r.qty; x.revenue += r.revenue; x.orders += r.orders; x.min = Math.min(x.min, r.min || Infinity); x.max = Math.max(x.max, r.max || 0);
     x.channels[r.channel] = (x.channels[r.channel] || 0) + r.qty;
     tm.set(k, x);
   }
+  // Önceki aynı uzunluktaki dönemin adetleri (artış / düşüş) ve bu dönemde iptal / iade edilen adetler
+  const key = (r) => (r.product_id ? 'p' + r.product_id : 'n' + (r.sku || r.name));
+  const kexpr = "COALESCE(CAST(i.product_id AS TEXT), 'n:' || COALESCE(NULLIF(i.sku, ''), i.name))";
+  const [prow, lrow] = await Promise.all([
+    all(db, `SELECT i.product_id, COALESCE(p.sku, i.sku) AS sku, COALESCE(p.name, i.name) AS name, SUM(i.quantity) AS qty FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
+      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE} AND i.status NOT IN ('cancelled', 'returned')${cw} GROUP BY ${kexpr}`, from - (to - from), from, ...ca),
+    all(db, `SELECT i.product_id, COALESCE(p.sku, i.sku) AS sku, COALESCE(p.name, i.name) AS name, SUM(i.quantity) AS qty FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
+      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND (i.status IN ('cancelled', 'returned') OR o.status IN ('cancelled', 'returned'))${cw} GROUP BY ${kexpr}`, from, to, ...ca),
+  ]);
+  const prev = new Map(prow.map((r) => [key(r), r.qty])), lost = new Map(lrow.map((r) => [key(r), r.qty]));
+  const days = Math.max(1, (Math.min(to, now) - from) / 864e5), all$ = [...tm.values()], totQ = all$.reduce((a, x) => a + x.qty, 0), totR = all$.reduce((a, x) => a + x.revenue, 0);
   const sort = q.sort === 'revenue' ? (a, b) => b.revenue - a.revenue : (a, b) => b.qty - a.qty || b.revenue - a.revenue;
-  const top = [...tm.values()].sort(sort).slice(0, Math.min(Number(q.limit) || 50, 200))
-    .map((x) => ({ ...x, revenue: r2(x.revenue), avg: x.qty ? r2(x.revenue / x.qty) : 0, min: Number.isFinite(x.min) ? r2(x.min) : 0, max: r2(x.max) }));
-  return { unit, channel: chan, cards, weeks, range: { from, to }, cities, top, totals: { orders: crows.length, revenue: r2(crows.reduce((s, r) => s + r.total, 0)) } };
+  const top = all$.sort(sort).slice(0, Math.min(Number(q.limit) || 50, 500))
+    .map((x) => {
+      const k = key(x), pq = prev.get(k) || 0, perDay = x.qty / days;
+      return { ...x, cost: undefined, revenue: r2(x.revenue), avg: x.qty ? r2(x.revenue / x.qty) : 0, min: Number.isFinite(x.min) ? r2(x.min) : 0, max: r2(x.max),
+        prevQty: pq, trend: pq ? Math.round(((x.qty - pq) / pq) * 100) : null,
+        share: totR ? Math.round((x.revenue / totR) * 1000) / 10 : 0, qtyShare: totQ ? Math.round((x.qty / totQ) * 1000) / 10 : 0,
+        lost: lost.get(k) || 0, lostRate: x.qty + (lost.get(k) || 0) ? Math.round(((lost.get(k) || 0) / (x.qty + (lost.get(k) || 0))) * 100) : 0,
+        // Alış fiyatı girilmişse brüt kâr (satış - alış; komisyon / kargo hariç)
+        profit: x.cost > 0 ? r2(x.revenue - x.cost * x.qty) : null,
+        cover: x.stock != null && perDay > 0 ? Math.floor(x.stock / perDay) : null };
+    });
+  return { unit, channel: chan, cards, weeks, range: { from, to }, cities, top, products: tm.size, totals: { orders: crows.length, revenue: r2(crows.reduce((s, r) => s + r.total, 0)), units: totQ } };
 }

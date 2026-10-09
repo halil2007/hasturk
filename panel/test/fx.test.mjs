@@ -35,7 +35,7 @@ test('dolar fiyatlı ürün: TL fiyatı kurla hesaplanır, kanal fiyatı farkı 
   assert.equal((await applyFx(db, settings, rates)).changed, 0);
 });
 
-test('güncelleme sıklığı: elle modunda senkron fiyat değiştirmez; müşteri panelinde çalışmaz', async () => {
+test('güncelleme sıklığı: elle modunda senkron fiyat değiştirmez; müşteri panelinde yalnız Kurumsal pakette çalışır', async () => {
   const db = d1(); await init(db);
   const t = Date.now();
   await run(db, "INSERT INTO products (id, name, sale_price, currency, fx_price, created_at, updated_at) VALUES (1, 'P', 1, 'EUR', 2, ?, ?)", t, t);
@@ -44,5 +44,6 @@ test('güncelleme sıklığı: elle modunda senkron fiyat değiştirmez; müşte
   const r = await syncFx({}, db, await getSettings(db));
   assert.equal(r.skipped, true);
   assert.equal((await first(db, 'SELECT sale_price FROM products WHERE id = 1')).sale_price, 1);
-  assert.equal(await syncFx({ TENANT_SLUG: 'x' }, db, await getSettings(db)), null);
+  assert.equal(await syncFx({ TENANT_SLUG: 'x', TENANT_PLAN: 'profesyonel' }, db, await getSettings(db)), null, 'Profesyonel pakette yok');
+  assert.equal((await syncFx({ TENANT_SLUG: 'x', TENANT_PLAN: 'kurumsal' }, db, await getSettings(db))).skipped, true, 'Kurumsal pakette çalışır');
 });

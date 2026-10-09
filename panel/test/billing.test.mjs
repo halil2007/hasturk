@@ -1,4 +1,5 @@
-// Online paket satışı (iyzico): imza, yeni müşteri satın alması → panel açılır, yenileme, tek sefer işleme, tutar doğrulaması.
+// Online paket satışı (iyzico): imza, yeni müşteri satın alması → panel açılır, yenileme, tek sefer işleme, tutar doğrulaması,
+// fatura bilgisi (bireysel / kurumsal) doğrulaması ve saklanması, panel sahibine satış e-postası.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -7,7 +8,9 @@ import { doNamespace } from '../dev/do.mjs';
 import worker, { TenantPanel } from '../src/index.js';
 import { resetChannels } from '../src/channels/index.js';
 import { authHeader } from '../src/iyzico.js';
-import { all, first, run } from '../src/db.js';
+import { all, first, run, init, setSetting } from '../src/db.js';
+import { validTckn, invoiceOf } from '../src/billing.js';
+import { validPhone } from '../src/lead.js';
 
 test('iyzico IYZWSv2 imzası', async () => {
   const h = await authHeader('api-k', 'sec-k', '/payment/x', '{"a":1}', '123');
@@ -40,7 +43,8 @@ function setup() {
   const callback = (token) => worker.fetch(new Request('https://panel.test/api/public/checkout/callback', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'https://sandbox-cpp.iyzipay.com' }, body: 'token=' + token }), env, { waitUntil() {} });
   return { env, jar, owner: call('owner'), tenant: call('tenant'), iyz, site, callback, restore: () => { globalThis.fetch = real; } };
 }
-const buyer = { contact: 'Ayşe Yılmaz', email: 'ayse@ornek.com', phone: '0532 111 22 33', city: 'Konya', address: 'Selçuklu Mah. 1. Sok. No:2', consent: true };
+const invoice = { type: 'bireysel', name: 'Ayşe Yılmaz', tckn: '10000000146', address: 'Selçuklu Mah. 1. Sok. No:2', district: 'Selçuklu', city: 'Konya' };
+const buyer = { email: 'ayse@ornek.com', phone: '0532 111 22 33', invoice, consent: true };
 const ok = (iyz, price) => iyz.result = (b) => ({ status: 'success', paymentStatus: 'SUCCESS', fraudStatus: 1, basketId: b.conversationId, conversationId: b.conversationId, price, paidPrice: price, paymentId: 'P' + b.conversationId, installment: 3 });
 
 test('yeni müşteri: siteden satın alır, ödeme onaylanınca panel seçtiği şifreyle açılır; ikinci dönüş tekrar işlemez', async () => {
@@ -135,4 +139,100 @@ test('site için online satış durumu: API bilgisi yokken kapalı', async () =>
   assert.deepEqual(await off.json(), { online: false });
   assert.equal(off.headers.get('access-control-allow-origin'), 'https://hasturkcrm.com');
   assert.deepEqual(await (await call({ DB: d1(), IYZICO_API_KEY: 'k', IYZICO_SECRET_KEY: 's' })).json(), { online: true });
+});
+
+test('fatura bilgisi doğrulaması: TC kimlik no, vergi no, telefon', () => {
+  assert.equal(validTckn('10000000146'), true);
+  assert.equal(validTckn('10000000145'), false, 'kontrol hanesi');
+  assert.equal(validTckn('00000000146'), false, 'ilk hane 0 olamaz');
+  assert.equal(validTckn('1000000014'), false);
+  for (const ok of ['0532 111 22 33', '+90 (532) 111-22-33', '5321112233', '0212 555 00 00', '0850 123 45 67']) assert.equal(validPhone(ok), true, ok);
+  for (const bad of ['0555', '0155 000 00 00', '0532 111 22 3x', '', '00532 111 22 33 4']) assert.equal(validPhone(bad), false, bad);
+  const err = (v) => { try { invoiceOf(v); return ''; } catch (e) { return e.message; } };
+  const adr = { address: 'Atatürk Cad. No:5', district: 'Kadıköy', city: 'İstanbul' };
+  assert.equal(err({ type: 'bireysel', name: 'Ayşe Yılmaz', tckn: '10000000146', ...adr }), '');
+  assert.match(err({ type: 'bireysel', name: 'Ayşe Yılmaz', tckn: '12345678901', ...adr }), /TC kimlik/);
+  assert.match(err({ type: 'bireysel', name: 'Ayşe', tckn: '10000000146', ...adr }), /soyad/);
+  assert.match(err({ type: 'bireysel', name: 'Ayşe Yılmaz', tckn: '10000000146', ...adr, district: '' }), /ilçe/);
+  const corp = { type: 'kurumsal', company: 'Yeşil Bahçe Ltd. Şti.', taxOffice: 'Kadıköy', taxNo: '1234567890', contact: 'Ali Veli', efatura: true, ...adr };
+  assert.equal(err(corp), '');
+  assert.equal(err({ ...corp, taxNo: '10000000146' }), '', 'şahıs şirketi: TC kimlik no');
+  assert.match(err({ ...corp, taxNo: '123456789' }), /Vergi numarası/);
+  assert.match(err({ ...corp, taxOffice: '' }), /Vergi dairesi/);
+  assert.match(err({ ...corp, company: '' }), /unvan/);
+  assert.deepEqual(Object.keys(invoiceOf(corp)).sort(), ['address', 'city', 'company', 'contact', 'district', 'efatura', 'taxNo', 'taxOffice', 'type'].sort(), 'yalnız bilinen alanlar saklanır');
+});
+
+test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, firma kartı, ödeme kaydı ve panel sahibine e-posta', async () => {
+  resetChannels();
+  const s = setup();
+  // Panel sahibinin e-postası ve e-posta servisi (Brevo); gönderilen e-postalar yakalanır
+  Object.assign(s.env, { MAIL_PROVIDER: 'brevo', MAIL_API_KEY: 'k-1', MAIL_FROM: 'bildirim@hasturkcrm.com' });
+  await init(s.env.DB);
+  await setSetting(s.env.DB, 'company', { email: 'sahip@hasturkcrm.com' });
+  const mails = [], mock = globalThis.fetch;
+  let mailDown = false;
+  globalThis.fetch = async (url, o) => {
+    if (String(url).startsWith('https://api.brevo.com')) {
+      if (mailDown) return new Response('{"message":"servis kapalı"}', { status: 500 });
+      const m = JSON.parse(o.body); if (m.to && m.to[0].email === 'sahip@hasturkcrm.com') mails.push(m); // müşterinin hoş geldiniz e-postası sayılmaz
+      return new Response('{"messageId":"m1"}', { status: 201, headers: { 'Content-Type': 'application/json' } });
+    }
+    return mock(url, o);
+  };
+  try {
+    const base = { kind: 'new', plan: 'kurumsal', period: 'monthly', firm: 'Yeşil Bahçe', slug: 'yesil-bahce', username: 'ali', password: 'gizli-sifre-9', consent: true };
+    const corp = { type: 'kurumsal', company: 'Yeşil Bahçe Tarım Ltd. Şti.', taxOffice: 'Selçuk', taxNo: '1234567890', contact: 'Ali Veli', efatura: true, address: 'Bosna Hersek Mah. 12. Sok. No:3', district: 'Selçuklu', city: 'Konya' };
+    // E-posta, telefon ve fatura bilgisi zorunlu
+    const no = async (b, re) => { const r = await s.site(b); assert.equal(r.status, 400); assert.match((await r.json()).error, re); };
+    await no({ ...base, phone: '0532 111 22 33', invoice: corp }, /e-posta/);
+    await no({ ...base, email: 'ali@ornek.com', invoice: corp }, /telefon/);
+    await no({ ...base, email: 'ali@ornek.com', phone: '0532 111', invoice: corp }, /telefon/);
+    await no({ ...base, email: 'ali@ornek.com', phone: '0532 111 22 33' }, /soyad|TC/);
+    await no({ ...base, email: 'ali@ornek.com', phone: '0532 111 22 33', invoice: { ...corp, taxNo: '12' } }, /Vergi numarası/);
+    assert.equal(s.iyz.inits.length, 0);
+    const r = await s.site({ ...base, email: 'ali@ornek.com', phone: '0532 111 22 33', invoice: corp });
+    assert.equal(r.status, 200, await r.clone().text());
+    const init1 = s.iyz.inits[0];
+    assert.equal(init1.billingAddress.contactName, 'Yeşil Bahçe Tarım Ltd. Şti.', 'kurumsalda fatura adı firma unvanı');
+    assert.equal(init1.billingAddress.city, 'Konya'); assert.match(init1.billingAddress.address, /Bosna Hersek.*Selçuklu \/ Konya/);
+    assert.equal(init1.buyer.name, 'Ali'); assert.equal(init1.buyer.surname, 'Veli'); assert.equal(init1.buyer.identityNumber, '11111111111', 'VKN kimlik no olarak gönderilmez');
+    const o = await first(s.env.DB, 'SELECT buyer FROM sales_orders WHERE id = ?', init1.conversationId);
+    assert.equal(JSON.parse(o.buyer).invoice.taxNo, '1234567890');
+    ok(s.iyz, '3990.00');
+    assert.match(await (await s.callback('tok-1')).text(), /Paneliniz hazır/);
+    // Firma kartı ve ödeme kaydı
+    const t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce'");
+    assert.equal(t.legal, 'Yeşil Bahçe Tarım Ltd. Şti.'); assert.equal(t.tax, 'Selçuk / 1234567890'); assert.equal(t.city, 'Konya'); assert.match(t.address, /Selçuklu$/);
+    const pay = await first(s.env.DB, "SELECT invoice FROM tenant_payments WHERE slug = 'yesil-bahce'");
+    const pinv = JSON.parse(pay.invoice);
+    assert.equal(pinv.type, 'kurumsal'); assert.equal(pinv.efatura, true); assert.equal(pinv.email, 'ali@ornek.com'); assert.equal(pinv.phone, '0532 111 22 33');
+    // Panel sahibine e-posta: firma, paket, tutar, alıcı ve fatura bilgileri
+    assert.equal(mails.length, 1);
+    assert.deepEqual(mails[0].to, [{ email: 'sahip@hasturkcrm.com' }]);
+    assert.match(mails[0].subject, /Yeni satış: Yeşil Bahçe · Kurumsal \(aylık\)/);
+    for (const x of ['yesil-bahce', '3.990 TL', 'Ali Veli', 'ali@ornek.com', '0532 111 22 33', 'Kurumsal', 'Selçuk', '1234567890', 'e-Fatura mükellefi', 'Bosna Hersek', '/#/firmalar']) assert.ok(mails[0].htmlContent.includes(x), x);
+
+    // Yenileme (siteden, bireysel): e-posta servisi çalışmasa da ödeme tamamlanır; firma kartı yeni fatura bilgisiyle güncellenir
+    mailDown = true;
+    const ind = { type: 'bireysel', name: 'Ayşe Yılmaz', tckn: '10000000146', address: 'Mevlana Cad. No:7 D:2', district: 'Meram', city: 'Konya' };
+    const r2 = await s.site({ kind: 'renew', slug: 'yesil-bahce', plan: 'kurumsal', period: 'monthly', email: 'ali@ornek.com', phone: '0332 222 33 44', invoice: ind, consent: true });
+    assert.equal(r2.status, 200, await r2.clone().text());
+    const init2 = s.iyz.inits[1];
+    assert.equal(init2.buyer.identityNumber, '10000000146', 'bireyselde TC kimlik no'); assert.equal(init2.billingAddress.contactName, 'Ayşe Yılmaz');
+    assert.match(await (await s.callback('tok-2')).text(), /Ödemeniz alındı/);
+    const t2 = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce'");
+    assert.equal(t2.legal, 'Ayşe Yılmaz'); assert.equal(t2.tax, 'TC 10000000146'); assert.equal(t2.email, 'ali@ornek.com', 'e-posta değişmez');
+    assert.equal((await first(s.env.DB, "SELECT status FROM sales_orders WHERE id = ?", init2.conversationId)).status, 'done');
+    assert.equal(mails.length, 1);
+    assert.ok(await first(s.env.DB, "SELECT 1 AS x FROM logs WHERE msg LIKE 'Bilgilendirme e-postası gönderilemedi%'"), 'gönderilemeyen e-posta günlüğe yazılır');
+
+    // Paketim: fatura formu son satın almanın bilgileriyle dolu gelir; panelden kurumsal yenileme
+    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'yesil-bahce', username: 'ali', password: 'gizli-sifre-9' }) })).status, 200);
+    const g = await (await s.tenant('/api/billing')).json();
+    assert.equal(g.invoice.type, 'bireysel'); assert.equal(g.invoice.tckn, '10000000146'); assert.equal(g.invoice.district, 'Meram');
+    assert.deepEqual(g.plans.find((p) => p.key === 'kurumsal').soon, ['e-Fatura / e-Arşiv entegrasyonu', 'Kendi anlaşmalı kargo entegrasyonu']);
+    assert.equal((await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', period: 'monthly', consent: true, invoice: { ...corp, tckn: '' } }) })).status, 200, 'e-posta / telefon firma kartından');
+    assert.equal(s.iyz.inits[2].billingAddress.contactName, 'Yeşil Bahçe Tarım Ltd. Şti.');
+  } finally { s.restore(); }
 });

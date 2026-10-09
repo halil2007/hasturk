@@ -54,3 +54,16 @@ test('Hepsiburada: kargo gideri gelir kayıtlarını (CargoCompensationIncome, S
   const r = await hb().cargoCosts(Date.parse('2026-10-01'), Date.parse('2026-10-02'));
   assert.deepEqual(r.items, [{ orderNumber: '1', amount: 40 }]);
 });
+
+test('Hepsiburada: komisyon satır toplamı ve KDV dahil (2 × 1.500 TL, %17 → 612 TL; HB panelindeki tutar)', async () => {
+  const line = (x) => ({ id: 'L1', orderNumber: 'S1', orderDate: new Date().toISOString(), merchantSku: 'A', productName: 'Toprak 40 Lt', quantity: 2, totalPrice: { amount: 3000, currency: 'TRY' }, unitPrice: { amount: 1500 }, ...x });
+  const run = async (x) => {
+    mockFetch([[/\/orders\/merchantId\/M(\?|$)/, 'GET', (u) => (!/offset=[1-9]/.test(u) ? { items: [line(x)] } : { items: [] })]]);
+    const r = await hb().fetchOrders(Date.now() - 864e5, Date.now());
+    return r.find((o) => o.orderNumber === 'S1').items[0].commission;
+  };
+  assert.equal(await run({ commission: { amount: 255, currency: 'TRY' }, commissionRate: 17 }), 612, 'adet başı tutar → satır × KDV');
+  assert.equal(await run({ commission: { amount: 510, currency: 'TRY' }, commissionRate: 17 }), 612, 'satır toplamı geldiyse yeniden çarpılmaz');
+  assert.equal(await run({ commissionRate: 17 }), 612, 'yalnız oran');
+  assert.equal(await run({ quantity: 1, totalPrice: { amount: 1500 }, commission: { amount: 255 } }), 306);
+});

@@ -3,7 +3,7 @@
 //  Kural 2: ana katalog kanalının (ör. HasTürk ikas) her varyantı kendi panel ürünüdür; tek kanal bağlıyken eşleştirme yapılmaz.
 //  Kesin (otomatik): barkod aynı; ya da stok kodu aynı ve barkod çelişmiyor; ya da ad + varyant/ölçü birebir aynı ve tek aday.
 //  Kesin değil: ad benzerliği + ölçü (5 Kg, 10 Lt…) + varyant özellikleri + stok kodu benzerliğiyle puanlı öneri; kullanıcı onaylar.
-import { all, run } from './db.js';
+import { all, run, notify } from './db.js';
 import { chunk, str } from './util.js';
 
 const TR = { ı: 'i', İ: 'i', ş: 's', Ş: 's', ğ: 'g', Ğ: 'g', ü: 'u', Ü: 'u', ö: 'o', Ö: 'o', ç: 'c', Ç: 'c', â: 'a', î: 'i', û: 'u' };
@@ -82,9 +82,9 @@ export function fullKey(name, variant) {
 }
 
 // Kesin eşleşme: aday ürün, ilanın kanalından henüz ilan almamış olmalı. Bulunursa { id, how }; yoksa null
-export function certain(l, idx) {
+export function certain(l, idx, { anyTaken = false } = {}) {
   const no = /^x:\d+$/.test(l.match || '') ? Number(l.match.slice(2)) : 0; // kullanıcının kaldırdığı eşleşme
-  const free = (list) => (list || []).filter((p) => p.id !== no && !idx.taken(p.id, l.channel));
+  const free = (list) => (list || []).filter((p) => p.id !== no && (anyTaken || !idx.taken(p.id, l.channel)));
   const bc = normBc(l.barcode), sku = normSku(l.sku);
   const byBc = bc.length >= 6 ? free(idx.barcode.get(bc)) : [];
   const bySku = sku ? free(idx.sku.get(sku)) : [];
@@ -163,6 +163,22 @@ export async function productIndex(db) {
   return idx;
 }
 
+// Aynı ürünün aynı kanaldaki ikinci ilanı: barkod / stok kodu / tam ad kesin eşleşiyor ama ürünün bu kanalda zaten ilanı var.
+// Yeni ürün açılmaz; ilan "dup:<ürün>" olarak işaretlenir ve kullanıcıya sorulur (Kanal Ürünleri → Tekrar olabilir).
+// Kullanıcı "farklı ürün" dediyse (dup_no) bir daha sorulmaz.
+export function twinOf(l, idx) {
+  if (l.match === 'dup_no') return null;
+  const c = certain(l, idx, { anyTaken: true });
+  if (!c || !idx.taken(c.id, l.channel) || !['barcode', 'sku', 'name'].includes(c.how)) return null;
+  // Yalnız stok kodu tutuyorsa adlar da benzemeli (aynı kodu yanlışlıkla taşıyan farklı ürünler sorulmasın)
+  if (c.how === 'sku') {
+    const p = idx.prods.find((x) => x.id === c.id);
+    if (!p || score(prep({ name: l.name, variant: l.variant_name }), prep({ name: fullName(p), variant: p.variant_name })).score < 70) return null;
+  }
+  return c.id;
+}
+export const markTwin = (db, pid, l) => db.prepare("UPDATE listings SET match = ? WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind('dup:' + pid, l.channel, l.remote_id);
+
 // Ana katalog: ayarda seçilen ve ilanı olan kanallar; hiçbiri yoksa öncelik sırasındaki ilk bağlı kanal
 const PRIORITY = ['ikas1', 'ikas2', 'shopify', 'woocommerce', 'opencart', 'hepsiburada', 'trendyol', 'n11', 'idefix', 'pazarama', 'pttavm', 'amazon', 'ciceksepeti', 'koctas', 'etsy'];
 async function catalogChannels(db, wanted) {
@@ -178,11 +194,11 @@ const link = (db, id, how, l) => db.prepare('UPDATE listings SET product_id = ?,
 // Aynı kanaldan birden fazla ilanı aynı ürüne bağlanmış (eski sürümden kalma) eşleşmeleri onarır: ürüne en uygun
 // ilan (barkod > stok kodu > ad benzerliği) kalır, diğerleri ayrılıp yeniden eşleştirmeye döner.
 export async function repairDuplicates(db) {
-  const dups = await all(db, 'SELECT product_id, channel FROM listings WHERE product_id IS NOT NULL GROUP BY product_id, channel HAVING COUNT(*) > 1');
+  const dups = await all(db, "SELECT product_id, channel FROM listings WHERE product_id IS NOT NULL AND COALESCE(match, '') != 'dup_ok' GROUP BY product_id, channel HAVING COUNT(*) > 1");
   let freed = 0;
   for (const d of dups) {
     const p = await all(db, 'SELECT id, sku, barcode, name, variant_name FROM products WHERE id = ?', d.product_id);
-    const ls = await all(db, 'SELECT remote_id, sku, barcode, name, variant_name, match FROM listings WHERE product_id = ? AND channel = ?', d.product_id, d.channel);
+    const ls = await all(db, "SELECT remote_id, sku, barcode, name, variant_name, match FROM listings WHERE product_id = ? AND channel = ? AND COALESCE(match, '') != 'dup_ok'", d.product_id, d.channel);
     if (!p[0] || ls.length < 2) continue;
     const pp = prep({ name: fullName(p[0]), variant: p[0].variant_name, sku: p[0].sku, barcode: p[0].barcode });
     const rank = (l) => (l.barcode && normBc(l.barcode) === normBc(p[0].barcode) ? 1000 : 0) + (normSku(l.sku) && normSku(l.sku) === normSku(p[0].sku) ? 500 : 0) + (l.match === 'manual' ? 50 : 0)
@@ -227,7 +243,7 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   const rank = (c) => (cats.includes(c) ? cats.indexOf(c) : 99);
   unlinked.sort((a, b) => rank(a.channel) - rank(b.channel));
   const st = [], rest = [];
-  let linked = 0, created = 0;
+  let linked = 0, created = 0, twins = 0;
   for (const l of unlinked) {
     const zero = l.match === 'zero' || (l.remote_stock != null && l.remote_stock <= 0);
     const c = certain(l, idx);
@@ -239,6 +255,8 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
     const isCat = cats.includes(l.channel);
     if (!isCat) { rest.push(l); continue; }
     if (cats.indexOf(l.channel) > 0 && bestScore(l, idx) >= 40) continue;
+    const tw = twinOf(l, idx);
+    if (tw) { if (l.match !== 'dup:' + tw) { st.push(markTwin(db, tw, l)); twins++; } continue; }
     if (st.length) { for (const part of chunk(st.splice(0), 90)) await db.batch(part); }
     const skuFree = str(l.sku) && !idx.sku.has(normSku(l.sku));
     const t = Date.now();
@@ -258,6 +276,8 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
     }
     if (rest.length === left.length) break;
   }
+  // Diğer kanallarda da: eşleşmeyen ilan, bu kanalda zaten ilanı olan bir ürünün kesin karşılığıysa "tekrar olabilir" diye sorulur
+  for (const l of rest) { const tw = twinOf(l, idx); if (tw && l.match !== 'dup:' + tw) { st.push(markTwin(db, tw, l)); twins++; } }
   for (const part of chunk(st, 90)) await db.batch(part);
   // Ürünün eksik görsel / grup / varyant bilgisini bağlı ilandan tamamla
   await run(db, `UPDATE products SET
@@ -266,7 +286,8 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
       variant_name = COALESCE(NULLIF(variant_name, ''), (SELECT l.variant_name FROM listings l WHERE l.product_id = products.id AND l.variant_name IS NOT NULL AND l.variant_name != '' ORDER BY l.channel LIMIT 1))
     WHERE image IS NULL OR image = '' OR group_name IS NULL OR group_name = '' OR variant_name IS NULL OR variant_name = ''`);
   if (linked || created) await relinkItems(db);
-  return { linked, created };
+  if (twins) await notify(db, 'dup_listings', { level: 'warn', title: 'Aynı ürünün ikinci ilanı olabilir', msg: `${twins} ilan panelde olan bir ürünün aynı kanaldaki ikinci ilanı gibi görünüyor; yeni ürün açılmadı. Kanal Ürünleri → Tekrar olabilir'den onaylayın.` }).catch(() => {});
+  return { linked, created, ...(twins ? { twins } : {}) };
 }
 
 const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ');

@@ -6,6 +6,7 @@
 // Kanal fiyatları ürünün eski TL fiyatına göre oranı korunarak güncellenir (ör. Trendyol'daki fiyat %10 farklıysa fark korunur).
 import { all, first, getRaw, setSetting, log } from './db.js';
 import { http, chunk } from './util.js';
+import { allows } from './plans.js';
 
 export const CURRENCIES = ['USD', 'EUR', 'GBP'];
 export const FX_DEFAULTS = { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 };
@@ -113,7 +114,7 @@ export async function applyFx(db, settings, rates, { user = 'Otomatik', ids = nu
 
 // Senkronda: kurları yenile, zamanı geldiyse fiyatları güncelle
 export async function syncFx(env, db, settings) {
-  if (env.TENANT_SLUG) return null; // müşteri panellerinde yakında
+  if (!allows(env, 'fx')) return null; // müşteri panellerinde yalnız Kurumsal pakette
   const n = (await first(db, "SELECT COUNT(*) AS n FROM products WHERE currency IN ('USD', 'EUR', 'GBP') AND fx_price > 0")).n;
   if (!n) return null; // döviz fiyatlı ürün yoksa kur servisine gidilmez (kurlar Ayarlar açılınca okunur)
   const fx = { ...FX_DEFAULTS, ...(settings.fx || {}) };

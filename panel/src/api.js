@@ -1,7 +1,7 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, isExtra, fieldsFor } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isBeta, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
@@ -768,7 +768,7 @@ async function saveProduct(env, db, ctx, id, b, user, { push = true } = {}) {
   }
   if (b.sku || b.barcode) await autoLink(db);
   // Döviz fiyatlı ürün: TL fiyatı ve kanal fiyatları hemen güncel kurla hesaplanır
-  if (!env.TENANT_SLUG && ('fx_price' in b || 'currency' in b)) {
+  if (allows(env, 'fx') && ('fx_price' in b || 'currency' in b)) {
     const pr = await first(db, 'SELECT currency, fx_price FROM products WHERE id = ?', id);
     if (pr && pr.currency && pr.fx_price > 0) {
       const settings = await getSettings(db);
@@ -1271,9 +1271,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json(d);
   }
   // Gelir & gider: dönem masraf basamakları (satış → komisyon → kargo → hizmet bedeli → ek kesinti → stopaj → hakediş → alış → kâr)
-  // Döviz kurları ve döviz bazlı fiyat (müşteri panellerinde yakında)
+  // Döviz kurları ve döviz bazlı fiyat (müşteri panellerinde Kurumsal paket)
   if (path === 'fx' || path.startsWith('fx/')) {
-    if (env.TENANT_SLUG) fail(403, 'Döviz bazlı fiyat yakında müşteri panellerinde de açılacak');
+    requireFeature(env, 'fx');
     const settings = await getSettings(db);
     if (path === 'fx' && m === 'GET') {
       let rates = await getRaw(db, 'fx_rates'), error = null;
@@ -1313,8 +1313,10 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // Destek talepleri: ana panelde gelen kutusu (müşteri panellerinin istekleri Durable Object'te karşılanır, bkz. tenants.js)
   if (path === 'support' || path.startsWith('support/')) {
     if (env.TENANT_SLUG) fail(404, 'Bulunamadı');
-    return supportResponse(req, db, path, { slug: '', firm: '', user, staff: true });
+    return supportResponse(req, db, path, { slug: '', firm: '', user, staff: true, env });
   }
+  // Blog yazıları (yalnız ana panel yöneticisi; müşteri panelinde ve personelde 404 — bkz. blog.js)
+  if (path === 'blog' || path.startsWith('blog/')) return await (await import('./blog.js')).blogAdmin(req, env, db, path, user);
   if (path === 'campaigns' || path.startsWith('campaigns/')) return json(await campaignApi(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
   // Fiyat önerileri (buybox servisinden okunan rakip fiyatlarına göre; bkz. suggest.js)
   if (path === 'suggestions' && m === 'GET') { const bb = bbIds(); return json(await listSuggestions(db, bb.includes(q.channel) ? { channel: q.channel } : { channels: bb })); }
@@ -1356,7 +1358,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       const plat = new Set(fieldsFor(c.id).filter((f) => f.platform).map((f) => f.k));
       return { ...i, ...d, fields: d.fields.filter((f) => !plat.has(f.k)), missing: (i.missing || []).map((k) => (plat.has(k) ? 'entegratör bilgisi (hizmet sağlayıcınız tanımlar)' : k)) };
     };
-    return json({ secretSet: !!env.PANEL_SECRET, tenant, channels: chs.map(view) });
+    const rel = await releasedTypes(env, db);
+    return json({ secretSet: !!env.PANEL_SECRET, tenant, channels: chs.map(view), beta: BETA_TYPES.filter((t) => !rel.includes(t)), released: rel });
   }
   // E-posta servisi bilgileri (gizli anahtar istemciye dönmez) ve deneme e-postası
   if (path === 'integrations/mail' && m === 'GET') {
@@ -1376,9 +1379,22 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     await log(db, null, 'info', `${user.name}: deneme e-postası gönderildi (${to.join(', ')})`);
     return json({ ok: true, message: `Deneme e-postası gönderildi: ${to.join(', ')}` });
   }
+  // Test modülündeki kanal türünü müşterilere aç / test modülüne geri al (yalnız ana panel yöneticisi). Müşteri panelleri birkaç dakika içinde,
+  // tanıtım sitesi (Entegrasyonlar) önbelleği dolunca görür. Açılan türün mevcut firma mağazaları geri alınınca çalışmayı bırakır.
+  if (path === 'integrations/release' && m === 'POST') {
+    if (env.TENANT_SLUG) fail(404, 'Bulunamadı');
+    const b = await body(req), type = str(b.type);
+    if (!BETA_TYPES.includes(type)) fail(400, 'Bu kanal test modülünde değil');
+    const set = new Set(await releasedTypes(env, db));
+    if (b.on) set.add(type); else set.delete(type);
+    await setSetting(db, 'released_channels', BETA_TYPES.filter((t) => set.has(t)));
+    resetChannels();
+    await log(db, type, 'info', `${user.name}: ${TYPE_NAMES[type]} ${b.on ? 'müşterilere açıldı (firmalarda ve sitede görünür)' : 'test modülüne geri alındı (firmalarda “Yakında”)'}`);
+    return json({ ok: true, released: [...set] });
+  }
   // Mağaza ekle / kaldır (aynı kanal türünden istenen sayıda mağaza)
   if (path === 'integrations/add' && m === 'POST') {
-    const id = await addStore(db, str((await body(req)).type), { tenant: !!env.TENANT_SLUG });
+    const id = await addStore(db, str((await body(req)).type), { tenant: !!env.TENANT_SLUG, released: await releasedTypes(env, db) });
     resetChannels();
     await log(db, id, 'info', `${user.name}: yeni mağaza eklendi`);
     return json({ ok: true, id });
@@ -1390,7 +1406,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true });
   }
   if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT') {
-    if (env.TENANT_SLUG && isBeta(x[1])) fail(403, 'Bu kanal yakında açılacak');
+    if (env.TENANT_SLUG && isBeta(x[1], await releasedTypes(env, db))) fail(403, 'Bu kanal yakında açılacak');
     const b = await body(req);
     // Paketteki mağaza sınırı: yeni bir mağazanın API bilgisi kaydedilirken bağlı mağazalar sayılır (var olanı güncellemek serbest)
     const maxStores = Number(env.TENANT_MAX_STORES) || 0;
@@ -1572,6 +1588,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'channel-products' && m === 'GET') return json(await chp.listChannelProducts(db, q));
   if (path === 'channel-products/add' && m === 'POST') { const r = await chp.addToPanel(env, db, await body(req), user); ctx.waitUntil(pushStocks(env, db).catch(() => {})); return json(r); }
   if (path === 'channel-products/ignore' && m === 'POST') return json(await chp.ignoreListings(db, await body(req)));
+  if (path === 'channel-products/twins' && m === 'POST') { const r = await chp.resolveTwins(env, db, await body(req), user); ctx.waitUntil(pushStocks(env, db).catch(() => {})); return json(r); }
   if (path === 'channel-products/accept' && m === 'POST') { const r = await chp.acceptStrong(db, await body(req), user); ctx.waitUntil(pushStocks(env, db).catch(() => {})); return json(r); }
   if (path === 'channel-products/mode' && m === 'POST') { const r = await chp.setMode(db, await body(req)); await log(db, null, 'info', `${user.name}: kanal ürünleri modu değişti`); return json(r); }
   if ((path === 'listings/link' || path === 'channel-products/link') && m === 'POST') {

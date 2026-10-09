@@ -27,6 +27,9 @@ import { campaignsView, campaignChannels } from './views/campaigns.js';
 import { codeStep, mailStep, forcedSetup, twofaSettings } from './twofa.js';
 import { can, viewOnly } from './perms.js';
 import { billingView } from './views/billing.js';
+import { blogView } from './views/blog.js';
+// Panelde gösterilen ürün adı (firma unvanı yerine)
+const BRAND = 'Hastürk CRM Sistemleri';
 
 const ROUTES = [
   { path: '', title: 'Genel Bakış', icon: 'home', view: dashboard },
@@ -53,6 +56,7 @@ const ROUTES = [
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
   { path: 'kullanicilar', title: 'Personel', icon: 'team', view: users, admin: true },
   { path: 'firmalar', title: 'Firmalar', icon: 'grid', view: firmsView, admin: true, when: () => !!state.owner },
+  { path: 'blog', title: 'Blog', icon: 'doc', view: blogView, admin: true, when: () => !!state.owner },
   { path: 'paketim', title: 'Paketim', icon: 'tag', view: billingView, admin: true, when: () => !!state.tenant && !state.demo },
   { path: 'ayarlar', title: 'Ayarlar', icon: 'gear', view: settingsView },
   { path: 'destek', title: 'Destek', icon: 'help', view: supportView, count: 'support' },
@@ -113,9 +117,10 @@ export function refreshChrome(s = state.summary) {
   box.classList.toggle('warn', !!err.length || !on.length);
   render(box, html`<span class="led"></span><div><b>${on.length} kanal bağlı</b><span>${err.length ? `${err.length} kanalda hata` : on.some((c) => c.demo) ? 'Örnek veriyle çalışıyor' : on.length ? `Son senkron ${ago(Math.max(...on.map((c) => (c.last && c.last.at) || 0))) || '—'}` : 'Entegrasyonları tamamlayın'}</span></div>`);
   $('[data-bell-dot]').classList.toggle('hide', !((s.notices && s.notices.unread) || n));
-  const co = (s.settings && s.settings.company) || {};
-  $('[data-company]').textContent = co.legal || co.title || '';
+  // Menüde firma unvanı yerine ürün adı (unvan kurumsal görünmüyordu)
   const logo = (s.settings && s.settings.logo) || 'logo.webp';
+  // Varsayılan logoda ürün adı zaten yazılı: tekrar edilmez; firmanın kendi logosu varsa altında ürün adı görünür
+  $('[data-company]').textContent = logo === 'logo.webp' ? '' : BRAND;
   $$('[data-logo]').forEach((i) => { if (i.getAttribute('src') !== logo) i.src = logo; });
   const u = state.user || {};
   $('[data-act=me]').textContent = (u.name || 'Y').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toLocaleUpperCase('tr');
@@ -152,6 +157,18 @@ export function prefetchRoute(path) {
   if (!r || !canSee(r) || !state.summary) return;
   (PREFETCH[path] || []).forEach(prefetch);
 }
+// Boşta ön yükleme: ilk sayfa açıldıktan sonra tarayıcı boşaldıkça en sık açılan sayfaların verisi sırayla (aralıklı) önbelleğe alınır;
+// menüden ilk geçişte sayfa sunucuyu beklemeden önbellekten açılır (arka planda tazelenir). Veri tasarrufu modunda yapılmaz.
+let warmed = false;
+function warmIdle() {
+  if (warmed || !state.summary || (navigator.connection && navigator.connection.saveData)) return;
+  warmed = true;
+  const list = ['siparisler', 'kargo', 'urunler', 'stoklar', '', 'kanal-urunleri', 'sorular', 'iadeler', 'analiz', 'gelir-gider'].filter((p) => p !== currentPath);
+  const idle = window.requestIdleCallback ? (f) => window.requestIdleCallback(f, { timeout: 2000 }) : (f) => setTimeout(f, 200);
+  let i = 0;
+  const next = () => { if (i >= list.length || document.hidden) return; prefetchRoute(list[i++]); setTimeout(() => idle(next), 400); };
+  setTimeout(() => idle(next), 1200);
+}
 // Sayfa iskeleti: veri gelene kadar sayfa boş kalmaz (görünüm ilk çizimde bunu değiştirir)
 const SKELETON = html`<div class="skel-page" aria-busy="true" aria-label="Yükleniyor"><div class="skel-row"><span class="skel w40"></span><span class="skel w20"></span></div><div class="skel-card"><span class="skel w30"></span><span class="skel"></span><span class="skel w80"></span><span class="skel w60"></span></div><div class="skel-card"><span class="skel"></span><span class="skel w70"></span><span class="skel w90"></span><span class="skel w50"></span><span class="skel w80"></span></div></div>`;
 async function route() {
@@ -166,8 +183,8 @@ async function route() {
   render(tabsBox, sibs.length < 2 ? '' : html`${sibs.map((x) => html`<a href="#/${x.path}" class="${x.path === r.path ? 'on' : ''}"><i class="ico ico-${x.icon}"></i>${x.tab}${x.count ? html`<span class="n hide" data-count="${x.count}"></span>` : ''}</a>`)}`);
   $('[data-title]').textContent = r.group ? GROUPS[r.group].title : r.title;
   document.body.dataset.route = r.path;
-  $('[data-sub]').textContent = state.demo ? 'Örnek veriler' : (state.settings && state.settings.company && state.settings.company.title) || '';
-  document.title = `${r.title} · ${(state.settings && state.settings.company && state.settings.company.title) || 'Hastürk'} CRM`;
+  $('[data-sub]').textContent = state.demo ? 'Örnek veriler' : '';
+  document.title = `${r.title} · Hastürk CRM`;
   if (current && current.destroy) current.destroy();
   // Her sayfa temiz bir kapsayıcıyla başlar (önceki sayfanın olay dinleyicileri taşınmaz)
   const old = $('#view'), el = old.cloneNode(false);
@@ -188,6 +205,7 @@ async function route() {
     // Yalnız görüntüleme yetkisi: sayfanın üstünde bilgi (değişiklik düğmeleri sunucuda reddedilir)
     if (r.perm && viewOnly(state.user, r.perm)) el.insertAdjacentHTML('afterbegin', '<div class="notice" style="margin-bottom:12px"><i class="ico ico-eye"></i><div>Bu bölümde <b>yalnız görüntüleme</b> yetkiniz var; değişiklik yapamazsınız.</div></div>');
     performance.mark('route:' + r.path); // hız ölçümü (geliştirici araçları → Performance)
+    warmIdle();
   } catch (e) {
     if (my !== routeSeq) return;
     render(el, html`<div class="card"><div class="notice bad"><i class="ico ico-warn"></i><div style="flex:1">Sayfa yüklenemedi: ${e.message}</div><button class="btn sm" data-retry>Tekrar dene</button></div></div>`);
@@ -277,11 +295,11 @@ function moreMenu() {
   if (cur.items.length) groups.push(cur);
   // Genel Bakış tek başına bölüm olmasın: Satış bölümünün başına
   if (groups.length > 1 && !groups[0].sec) { groups[1].items.unshift(...groups[0].items); groups.shift(); }
-  const u = state.user || {}, co = (state.settings && state.settings.company) || {};
+  const u = state.user || {};
   const logo = (state.settings && state.settings.logo) || 'logo.webp';
   const s = sheet({
     title: 'Menü', size: 'menu-sheet',
-    body: html`<div class="mm-head"><img src="${logo}" alt=""><div style="min-width:0"><b class="ellipsis">${co.title || 'Hastürk'}</b><span class="ellipsis">${[u.name && u.name !== 'Yönetici' ? u.name : '', u.role === 'admin' ? 'Yönetici' : 'Personel', state.tenant ? state.tenant.name : ''].filter(Boolean).join(' · ')}</span></div></div>
+    body: html`<div class="mm-head"><img src="${logo}" alt=""><div style="min-width:0"><b class="ellipsis">${BRAND}</b><span class="ellipsis">${[u.name && u.name !== 'Yönetici' ? u.name : '', u.role === 'admin' ? 'Yönetici' : 'Personel', state.tenant ? state.tenant.name : ''].filter(Boolean).join(' · ')}</span></div></div>
       <label class="search mm-search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Menüde ara (ör. kargo, iade, stok)" data-mm-q></label>
       ${groups.map((g) => html`<section class="mm-sec" data-mm-sec><h4>${g.sec || 'Genel'}</h4><div class="mm-grid">${g.items.map((r) => html`<a class="mm-tile ${SEC_TONE[g.sec] || 'blue'} ${currentPath === r.path ? 'on' : ''}" href="#/${r.path}" data-mm="${r.title.toLocaleLowerCase('tr')} ${r.path}"><span class="mm-ic"><i class="ico ico-${r.icon}"></i>${r.count ? html`<span class="mm-n hide" data-count="${r.count}"></span>` : ''}</span><span class="mm-t">${r.title}</span></a>`)}</div></section>`)}
       <div class="mm-list">
@@ -363,23 +381,39 @@ new MutationObserver(() => { cancelAnimationFrame(enhTimer); enhTimer = requestA
 window.addEventListener('resize', debounceEnh);
 function debounceEnh() { cancelAnimationFrame(enhTimer); enhTimer = requestAnimationFrame(mobileEnhance); }
 
+// Cloudflare Turnstile (insan doğrulaması): sunucuda anahtar tanımlıysa giriş ve şifremi unuttum formlarında gösterilir.
+// Her doğrulama tek kullanımlıktır: başarısız denemeden sonra yenilenir.
+let tsLoad = null;
+function turnstile(el, sitekey) {
+  const st = { token: '', id: null, on: !!sitekey, reset() { this.token = ''; if (this.id != null && window.turnstile) window.turnstile.reset(this.id); } };
+  if (!sitekey || !el) return st;
+  tsLoad = tsLoad || new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; sc.async = true; sc.onload = ok; sc.onerror = no; document.head.append(sc); });
+  tsLoad.then(() => { st.id = window.turnstile.render(el, { sitekey, language: 'tr', theme: 'light', size: 'flexible', callback: (t) => { st.token = t; }, 'expired-callback': () => { st.token = ''; }, 'error-callback': () => { st.token = ''; } }); })
+    .catch(() => { el.textContent = 'Güvenlik doğrulaması yüklenemedi; sayfayı yenileyin.'; });
+  return st;
+}
+let tsKey = '';
+
 // Şifremi unuttum: firma kodu + kullanıcı adı / e-posta → e-postaya yenileme bağlantısı (müşteri panelleri)
 function forgotForm(box, tenant, who) {
   render($('.login-card', box), html`<div><h2>Şifremi unuttum</h2><div class="muted small">Kullanıcınıza kayıtlı e-posta adresine şifre yenileme bağlantısı gönderilir.</div></div>
     <label class="field"><span>Firma kodu</span><input class="input" name="ft" autocapitalize="none" value="${tenant}" placeholder="ör. ornek-firma"></label>
     <label class="field"><span>Kullanıcı adı ya da e-posta</span><input class="input" name="fw" autocapitalize="none" value="${who}"></label>
+    <div class="ts-box" data-ts></div>
     <div class="login-err" data-err role="alert"></div><div class="notice hide" data-ok></div>
     <button class="btn primary block lg" type="submit">Bağlantı gönder</button>
     <button type="button" class="link-btn" data-back>Girişe dön</button>`);
-  const f = $('.login-card', box);
+  const f = $('.login-card', box), ts = turnstile($('[data-ts]', f), tsKey);
   $('[data-back]', f).onclick = () => { box.remove(); login(); };
   f.onsubmit = async (e) => {
     e.preventDefault();
     const t = f.ft.value.trim().toLocaleLowerCase('tr'), w = f.fw.value.trim();
     if (!t || !w) { $('[data-err]', f).textContent = 'Firma kodunu ve kullanıcı adınızı (ya da e-postanızı) girin'; return; }
+    if (ts.on && !ts.token) { $('[data-err]', f).textContent = 'Güvenlik doğrulamasının tamamlanmasını bekleyin'; return; }
     const btn = f.querySelector('[type=submit]'); btn.disabled = true;
-    try { const r = await api('password/forgot', { method: 'POST', body: { tenant: t, who: w } }); $('[data-err]', f).textContent = ''; const ok = $('[data-ok]', f); ok.textContent = r.message; ok.classList.remove('hide'); }
+    try { const r = await api('password/forgot', { method: 'POST', body: { tenant: t, who: w, cf: ts.token } }); $('[data-err]', f).textContent = ''; const ok = $('[data-ok]', f); ok.textContent = r.message; ok.classList.remove('hide'); }
     catch (x) { $('[data-err]', f).textContent = x.message; }
+    ts.reset();
     btn.disabled = false;
   };
 }
@@ -418,44 +452,50 @@ async function login(info = {}) {
   if (rk) return resetForm(rk[1]);
   const brand = await fetch('/api/brand').then((r) => r.json()).catch(() => ({}));
   // Müşteri paneli: firma kodu adresle (?firma=kod) gelebilir; son kullanılan hatırlanır
-  const firma = new URLSearchParams(location.search).get('firma') || store.get('firma', '');
+  const qs = new URLSearchParams(location.search), firma = qs.get('firma') || store.get('firma', '');
+  // Ana panel (yönetim) girişi giriş ekranında görünmez: yalnız ?yonetim adresiyle ya da bu cihazda daha önce yönetim girişi yapıldıysa açılır
+  const owner = qs.has('yonetim') || brand.demo || info.demo || info.setup || (!firma && store.get('yonetim', false));
   const box = document.createElement('div');
   box.className = 'login';
   // Firma kodu yalnız müşteri panelleri için: hatırlanan kod yoksa "Firma koduyla giriş" bağlantısının arkasında durur
   render(box, html`<div class="login-hero"><div class="login-logo"><img src="${brand.logo || 'logo.webp'}" alt="${brand.title || 'Logo'}"></div>
-      <div class="login-sub">${brand.legal || brand.title || 'Hastürk'} · Satış yönetim paneli</div></div>
+      <div class="login-sub">${BRAND} · Satış yönetim paneli</div></div>
     <form class="login-card stack" novalidate>
       <div><h2>Hoş geldiniz</h2><div class="muted small">Devam etmek için giriş yapın</div></div>
       ${info.setup ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Panel şifresi henüz tanımlanmamış. Cloudflare → Worker → Settings → Variables and Secrets bölümüne <b>PANEL_PASSWORD</b> ekleyin.</div></div>` : ''}
       ${info.demo || brand.demo ? html`<div class="notice"><i class="ico ico-bolt"></i><div>Deneme modu: kullanıcı adı boş, şifre <b>demo</b></div></div>` : ''}
-      <label class="field ${firma ? '' : 'hide'}" data-firma><span>Firma kodu</span><input class="input" name="tenant" autocomplete="organization" autocapitalize="none" placeholder="ör. ornek-firma" value="${firma}"></label>
-      <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" autocapitalize="none" placeholder="Yönetici için boş bırakın"></label>
+      <label class="field ${owner ? 'hide' : ''}" data-firma><span>Firma kodu</span><input class="input" name="tenant" autocomplete="organization" autocapitalize="none" placeholder="ör. ornek-firma" value="${owner ? '' : firma}"></label>
+      <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" autocapitalize="none" placeholder="${owner ? 'Yönetici için boş bırakın' : 'Kullanıcı adınız'}"></label>
       <label class="field"><span>Şifre</span><span class="pw"><input class="input" type="password" name="password" autocomplete="current-password" required><button type="button" class="icon-btn sm" data-eye aria-label="Şifreyi göster"><i class="ico ico-eye"></i></button></span></label>
+      <div class="ts-box" data-ts></div>
       <div class="login-err" data-err role="alert"></div>
       <button class="btn primary block lg" type="submit">Giriş yap</button>
-      <button type="button" class="link-btn" data-firma-toggle>${firma ? 'Ana panele giriş (firma kodu olmadan)' : 'Müşteri paneli girişi (firma kodu ile)'}</button>
-      <button type="button" class="link-btn ${firma ? '' : 'hide'}" data-forgot>Şifremi unuttum</button>
+      ${owner ? html`<button type="button" class="link-btn" data-firma-toggle>Firma koduyla giriş</button>` : ''}
+      <button type="button" class="link-btn ${owner ? 'hide' : ''}" data-forgot>Şifremi unuttum</button>
     </form>
     <div class="login-foot">Hastürk CRM · güvenli bağlantı</div>`);
   document.body.prepend(box);
-  $(firma ? '[name=username]' : '[name=password]', box).focus();
+  tsKey = brand.turnstile || '';
+  const ts = turnstile($('[data-ts]', box), tsKey);
+  $(owner ? '[name=password]' : firma ? '[name=username]' : '[name=tenant]', box).focus();
   $('[data-eye]', box).onclick = (e) => { const i = $('[name=password]', box); i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.classList.toggle('on', i.type === 'text'); };
   $('[data-forgot]', box).onclick = () => forgotForm(box, $('[name=tenant]', box).value.trim().toLocaleLowerCase('tr'), $('[name=username]', box).value.trim());
-  $('[data-firma-toggle]', box).onclick = (e) => {
-    const f = $('[data-firma]', box), show = f.classList.contains('hide');
-    f.classList.toggle('hide', !show);
-    $('[data-forgot]', box).classList.toggle('hide', !show);
-    if (show) $('[name=tenant]', box).focus(); else $('[name=tenant]', box).value = '';
-    e.currentTarget.textContent = show ? 'Ana panele giriş (firma kodu olmadan)' : 'Müşteri paneli girişi (firma kodu ile)';
+  const tg = $('[data-firma-toggle]', box);
+  if (tg) tg.onclick = (e) => {
+    $('[data-firma]', box).classList.remove('hide'); $('[data-forgot]', box).classList.remove('hide');
+    $('[name=username]', box).placeholder = 'Kullanıcı adınız'; $('[name=tenant]', box).focus(); e.currentTarget.remove();
   };
   $('form', box).onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('[type=submit]');
     if (!e.target.password.value) { $('[data-err]', box).textContent = 'Şifrenizi girin'; return e.target.password.focus(); }
+    if (!$('[data-firma]', box).classList.contains('hide') && !e.target.tenant.value.trim()) { $('[data-err]', box).textContent = 'Firma kodunuzu girin'; return e.target.tenant.focus(); }
+    if (ts.on && !ts.token) { $('[data-err]', box).textContent = 'Güvenlik doğrulamasının tamamlanmasını bekleyin'; return; }
     btn.disabled = true; btn.innerHTML = '<i class="ico ico-sync spin"></i>Giriş yapılıyor';
     try {
       const tenant = e.target.tenant.value.trim().toLocaleLowerCase('tr');
-      let r = await api('login', { method: 'POST', body: { tenant, username: e.target.username.value.trim(), password: e.target.password.value } });
+      let r = await api('login', { method: 'POST', body: { tenant, username: e.target.username.value.trim(), password: e.target.password.value, cf: ts.token } });
+      ts.reset();
       // İki adımlı doğrulama: form kod adımına dönüşür (bilet 5 dakika geçerli)
       if (r.twofa) {
         try { r = await codeStep(e.target, { ticket: r.ticket, tenant }); } catch (x) { box.remove(); toast(x.message, true); return login(); }
@@ -465,11 +505,11 @@ async function login(info = {}) {
       if (r.emailcode) {
         try { r = await mailStep(e.target, { ticket: r.ticket, tenant, to: r.to }); } catch (x) { box.remove(); toast(x.message, true); return login(); }
       }
-      store.set('firma', tenant);
+      store.set('firma', tenant); store.set('yonetim', !tenant);
       box.remove();
       $$('.side, .main, .tabbar').forEach((x) => x.classList.remove('hide'));
       start();
-    } catch (err) { $('[data-err]', box).textContent = err.message; btn.disabled = false; btn.textContent = 'Giriş yap'; }
+    } catch (err) { ts.reset(); $('[data-err]', box).textContent = err.message; btn.disabled = false; btn.textContent = 'Giriş yap'; }
   };
 }
 state.onLogin = (info) => login(info);
@@ -488,7 +528,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-09b';
+const ASSETS = '2026-10-09c';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

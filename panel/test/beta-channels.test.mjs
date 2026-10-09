@@ -26,3 +26,29 @@ test('müşteri paneli: test modülü kanalları yok, eklenemez', async () => {
   resetChannels();
   assert.ok(!(await getChannels({ PANEL_PASSWORD: 'x', TENANT_SLUG: 'firma' }, db)).some((c) => c.id === 'amazon_2'));
 });
+
+test('müşterilere açılan kanal: firmalarda görünür, eklenebilir; ana panelde "beta" kalkar; site listesi', async () => {
+  const db = d1(); await init(db); resetChannels();
+  const { setSetting } = await import('../src/db.js');
+  const { platformValues } = await import('../src/tenants.js');
+  const worker = (await import('../src/index.js')).default;
+  await setSetting(db, 'released_channels', ['shopify']);
+  resetChannels();
+  const main = await getChannels({ PANEL_PASSWORD: 'x' }, db);
+  assert.equal(publicInfo(main.find((c) => c.id === 'shopify')).beta, false);
+  assert.equal(publicInfo(main.find((c) => c.id === 'amazon')).beta, true);
+  // Müşteri paneline ana panelin listesi ortam değişkeniyle gider
+  const pv = await platformValues({}, db);
+  assert.equal(pv.RELEASED_TYPES, 'shopify');
+  const tdb = d1(); await init(tdb); resetChannels();
+  const tenv = { PANEL_PASSWORD: 'x', TENANT_SLUG: 'firma', RELEASED_TYPES: pv.RELEASED_TYPES };
+  const tch = await getChannels(tenv, tdb);
+  assert.ok(tch.some((c) => c.id === 'shopify'));
+  assert.ok(!tch.some((c) => c.id === 'amazon'));
+  assert.equal(await addStore(tdb, 'shopify', { tenant: true, released: ['shopify'] }), 'shopify_2');
+  await assert.rejects(() => addStore(tdb, 'etsy', { tenant: true, released: ['shopify'] }), /yakında/);
+  const r = await worker.fetch(new Request('https://panel.test/api/public/channels', { headers: { Origin: 'https://hasturkcrm.com' } }), { DB: db }, { waitUntil() {} });
+  const d = await r.json();
+  assert.deepEqual(d.released, ['shopify']);
+  assert.equal(r.headers.get('access-control-allow-origin'), 'https://hasturkcrm.com');
+});

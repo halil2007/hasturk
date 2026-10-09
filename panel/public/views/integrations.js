@@ -21,11 +21,13 @@ const HELP = {
   opencart: 'OpenCart\'ın hazır bir yönetim API\'si olmadığından bağlantı küçük bir PHP dosyasıyla kurulur: Bağlantı dosyasını indirin, OpenCart\'ın kurulu olduğu ana klasöre (config.php\'nin yanına) yükleyin, site adresini girip bağlantıyı test edin. Dosya veritabanına OpenCart\'ın kendi bilgileriyle bağlanır, yalnız panelin anahtarıyla çalışır. Siparişler, ürünler (seçenekler ayrı varyant), stok, fiyat ve kargo bildirimi desteklenir. Site HTTPS olmalı.',
   etsy: 'etsy.com/developers → Create a New App (keystring + shared secret); uygulamayı mağazanız için OAuth ile yetkilendirip refresh token alın. Siparişler, stok, fiyat ve kargo bildirimi desteklenir; panel yenilenen belirteci kendisi saklar.',
 };
-// Test modülü: bu kanallar ana panelde bağlanıp denenir; müşteri panellerinde "Yakında" görünür
-const BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'opencart', 'etsy'];
+// Test modülü: bu kanallar ana panelde bağlanıp denenir; müşteri panellerinde "Yakında" görünür. Ana panelde kanal sayfasındaki
+// "Müşterilere aç" düğmesiyle yayına alınan tür listeden çıkar (liste sunucudan gelir: integrations → beta)
+const ALL_BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy'];
+let BETA = ALL_BETA;
 
 // Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
-const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama', ...BETA];
+const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama', 'woocommerce', ...ALL_BETA];
 const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', etsy: 'Etsy' };
 // Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi): müşteri panellerinde test modülündekiler de burada
 const SOON = () => [...(state.tenant ? BETA.map((t) => TYPE_NAME[t]) : []), 'Teknosa', 'Turkcell Pasaj'];
@@ -38,7 +40,8 @@ const SITES = ['ikas', 'shopify', 'woocommerce', 'opencart'];
 // Satıcı panelleri (bilgilerin alındığı yer)
 const PANEL_URL = { trendyol: 'https://partner.trendyol.com', hepsiburada: 'https://merchant.hepsiburada.com', n11: 'https://so.n11.com', amazon: 'https://sellercentral.amazon.com.tr', etsy: 'https://www.etsy.com/developers/your-apps', pazarama: 'https://isortagim.pazarama.com' };
 const panelUrl = (c) => (c.type === 'ikas' ? ((c.fields.find((f) => /STORE$/.test(f.k)) || {}).value ? `https://${c.fields.find((f) => /STORE$/.test(f.k)).value}.myikas.com/admin` : 'https://ikas.com') : PANEL_URL[c.type] || '');
-const CAPS = (c) => [c.caps.accept === 'remote' && 'Siparişi kanalda işleme alma', c.caps.ship === 'remote' && 'Kargo / takip bildirimi', c.caps.label && 'Kargo etiketi', 'Stok gönderimi', c.caps.price && 'Fiyat gönderimi', c.caps.createProduct && 'Ürün oluşturma', c.claims && 'İade talepleri', c.campaigns && 'Kampanyalar'].filter(Boolean);
+// Kanalın gerçekten yapabildikleri (servisi izin vermeyen işler yazılmaz)
+const CAPS = (c) => { const can = c.can || {}; return [can.orders !== false && 'Sipariş alma', can.listings && 'Ürün / stok okuma', c.caps.accept === 'remote' && 'Siparişi kanalda işleme alma', c.caps.ship === 'remote' && 'Kargo / takip bildirimi', c.caps.label && 'Kargo etiketi', can.stock !== false && 'Stok gönderimi', c.caps.price && can.price !== false && 'Fiyat gönderimi', c.caps.createProduct && 'Ürün oluşturma', can.questions && 'Müşteri soruları', c.claims && 'İade talepleri', c.campaigns && 'Kampanyalar'].filter(Boolean); };
 const ok = (on, yes, no) => html`<span class="istat ${on === true ? 'on' : on === false ? 'off' : 'na'}"><i class="ico ico-${on === true ? 'check' : on === false ? 'x' : 'dots'}"></i>${on === true ? yes : on === false ? no : '—'}</span>`;
 
 export async function integrations(el, rest = []) {
@@ -48,6 +51,7 @@ export async function integrations(el, rest = []) {
   async function load() {
     [data, jobs, modes] = await Promise.all([api('integrations'), api('backfill').catch(() => []), api('channel-products/channels').catch(() => [])]);
     data.channels.sort((a, b) => rank(a) - rank(b));
+    if (Array.isArray(data.beta)) BETA = data.beta;
     draw();
   }
   const st = () => state.settings || {};
@@ -60,36 +64,46 @@ export async function integrations(el, rest = []) {
     return { k: !configured(c) && !c.paused ? 'off' : k, t: !configured(c) ? 'Bağlı değil' : t };
   };
 
-  // ---------- genel bakış: kanal kartları ----------
-  function icard(c) {
-    const s = stateOf(c), conf = configured(c), linkP = c.listings ? Math.round((c.linked / c.listings) * 100) : 0;
-    return html`<div class="icard ${conf ? 'conf' : ''} ${s.k}" data-act="open" data-id="${c.id}" tabindex="0">
-      <div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</b>
-          <div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${s.t}${c.beta ? html`<span class="pill info tiny">Test modülü</span>` : ''}${c.sandbox ? html`<span class="pill warn tiny">Test ortamı</span>` : ''}</div></div>
-        <button class="btn sm ${conf ? 'outline' : 'primary'}" data-act="open" data-id="${c.id}">${conf ? html`<i class="ico ico-gear"></i>Yönet` : html`<i class="ico ico-plus"></i>Bağla`}</button></div>
-      ${conf && (c.enabled || c.demo) ? html`<div class="ic-prog"><div class="row small"><span class="muted">Eşleşen ilan</span><span class="spacer"></span><b class="num">${n(c.linked)} / ${n(c.listings)}</b></div><div class="prog"><span style="width:${linkP}%"></span></div></div>`
-        : html`<div class="ic-need small muted">${conf ? 'Bilgiler girildi; bağlantı testi bekleniyor.' : `Gerekenler: ${c.fields.filter((x) => x.req).map((x) => x.label).join(', ') || 'API bilgileri'}`}</div>`}
-      ${!conf ? html`<div class="ic-caps">${CAPS(c).slice(0, 4).map((x) => html`<span>${x}</span>`)}</div>` : html`<div class="ic-stats">
+  // ---------- genel bakış: kanal türü başına tek kart (aynı türün mağazaları kanalın kendi ekranında) ----------
+  // Bir türün görünen mağazaları: kurulmuş olanlar + ilk (ana) mağaza. Kurulmamış ek ana mağazalar (ör. ikas2) gizli kalır.
+  const storesOf = (type) => { const all = data.channels.filter((c) => c.type === type); return all.filter((c, i) => i === 0 || configured(c)); };
+  const groupsOf = () => TYPES.map((t) => ({ type: t, stores: storesOf(t) })).filter((g) => g.stores.length);
+  const typeName = (t) => (t === 'ikas' ? 'ikas' : TYPE_NAME[t] || t);
+  function icard(g) {
+    const conf = g.stores.filter(configured), c = conf[0] || g.stores[0], live = conf.filter((x) => x.enabled || x.demo);
+    const err = conf.find((x) => x.last && x.last.ok === false);
+    const s = err ? { k: 'err', t: 'Hata' } : stateOf(c);
+    const multi = conf.length > 1;
+    return html`<div class="icard ${conf.length ? 'conf' : ''} ${s.k}" data-act="open" data-id="${c.id}" tabindex="0">
+      <div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${typeName(g.type)}</b>
+          <div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${multi ? `${live.length}/${conf.length} mağaza bağlı` : s.t}${c.beta ? html`<span class="pill info tiny">Test modülü</span>` : ''}${c.sandbox ? html`<span class="pill warn tiny">Test ortamı</span>` : ''}</div></div>
+        <button class="btn sm ${conf.length ? 'outline' : 'primary'}" data-act="open" data-id="${c.id}">${conf.length ? html`<i class="ico ico-gear"></i>Yönet` : html`<i class="ico ico-plus"></i>Bağla`}</button></div>
+      ${multi ? html`<div class="ic-stores small">${conf.map((x) => { const k = stateOf(x).k; return html`<span class="ic-store"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${x.name}</span>`; })}</div>` : ''}
+      ${!conf.length ? html`<div class="ic-need small muted">Gerekenler: ${c.fields.filter((x) => x.req).map((x) => x.label).join(', ') || 'API bilgileri'}</div>`
+        : !live.length ? html`<div class="ic-need small muted">Bilgiler girildi; bağlantı testi bekleniyor.</div>` : ''}
+      ${!conf.length ? html`<div class="ic-caps">${CAPS(c).slice(0, 4).map((x) => html`<span>${x}</span>`)}</div>` : !multi ? html`<div class="ic-stats">
         <div><span>Siparişler</span>${c.enabled || c.demo ? (c.last && c.last.ok === false ? html`<span class="istat off"><i class="ico ico-x"></i>Hata</span>` : ok(true, c.last && c.last.ordersAt ? ago(c.last.ordersAt) : 'Açık')) : ok(null)}</div>
         <div><span>Stok gönderimi</span>${c.enabled || c.demo ? (isCatalog(c) ? html`<span class="istat na"><i class="ico ico-db"></i>Ana katalog</span>` : ok(stockOn(c), 'Açık', 'Kapalı')) : ok(null)}</div>
         <div><span>Kanala yazma</span>${c.enabled || c.demo ? ok(!held(c), 'Açık', 'Beklemede') : ok(null)}</div>
-      </div>`}
-      ${c.last && c.last.ok === false ? html`<div class="ic-err small"><i class="ico ico-warn"></i><span class="ellipsis">${c.last.error || 'Senkron başarısız'}</span></div>` : ''}
+      </div>` : ''}
+      ${err ? html`<div class="ic-err small"><i class="ico ico-warn"></i><span class="ellipsis">${multi ? `${err.name}: ` : ''}${err.last.error || 'Senkron başarısız'}</span></div>` : ''}
     </div>`;
   }
   function overview() {
     const all = data.channels, conn = all.filter((c) => c.enabled || c.demo), errs = all.filter((c) => c.last && c.last.ok === false), wait = all.filter((c) => configured(c) && !c.enabled && !c.demo && c.gated);
-    const groups = [['all', 'Tümü', all.length], ['on', 'Bağlı', conn.length], ['off', 'Bağlanmamış', all.filter((c) => !configured(c)).length], ['market', 'Pazaryerleri', all.filter((c) => !SITES.includes(c.type)).length], ['site', 'E-ticaret siteleri', all.filter((c) => SITES.includes(c.type)).length]];
+    const gs = groupsOf(), on = (g) => g.stores.some((c) => c.enabled || c.demo), conf = (g) => g.stores.some(configured);
+    const groups = [['all', 'Tümü', gs.length], ['on', 'Bağlı', gs.filter(on).length], ['off', 'Bağlanmamış', gs.filter((g) => !conf(g)).length], ['market', 'Pazaryerleri', gs.filter((g) => !SITES.includes(g.type)).length], ['site', 'E-ticaret siteleri', gs.filter((g) => SITES.includes(g.type)).length]];
     const q = f.q.toLocaleLowerCase('tr');
-    const list = all.filter((c) => (f.show === 'all' || (f.show === 'on' ? c.enabled || c.demo : f.show === 'off' ? !configured(c) : f.show === 'site' ? SITES.includes(c.type) : !SITES.includes(c.type))) && (!q || `${c.name} ${TYPE_NAME[c.type] || ''}`.toLocaleLowerCase('tr').includes(q)))
-      .sort((a, b) => Number(configured(b)) - Number(configured(a)));
+    const list = gs.filter((g) => (f.show === 'all' || (f.show === 'on' ? on(g) : f.show === 'off' ? !conf(g) : f.show === 'site' ? SITES.includes(g.type) : !SITES.includes(g.type)))
+      && (!q || `${typeName(g.type)} ${g.stores.map((c) => c.name).join(' ')}`.toLocaleLowerCase('tr').includes(q)))
+      .sort((a, b) => Number(conf(b)) - Number(conf(a)));
     render(el, html`<div class="stack">
       <div class="ihead card">
-        <div class="ih-kpi"><b class="num">${n(conn.length)}</b><span>bağlı kanal</span></div>
+        <div class="ih-kpi"><b class="num">${n(conn.length)}</b><span>bağlı mağaza</span></div>
         <div class="ih-kpi ${errs.length ? 'bad' : ''}"><b class="num">${n(errs.length)}</b><span>hatalı</span></div>
         <div class="ih-kpi ${wait.length ? 'warn' : ''}"><b class="num">${n(wait.length)}</b><span>test bekliyor</span></div>
-        <div class="ih-txt muted small">Bağlı kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: siparişler, ürünler, stoklar güncellenir. Sorun olursa <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer.</div>
-        <div class="row" style="gap:8px"><button class="btn" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü</button>${isAdmin() ? html`<button class="btn primary" data-act="addmenu"><i class="ico ico-plus"></i>Mağaza ekle</button>` : ''}</div>
+        <div class="ih-txt muted small">Bağlı kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: siparişler, ürünler, stoklar güncellenir. Sorun olursa <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer. Aynı kanalda ikinci mağaza için kanalı açıp <b>Mağaza ekle</b>'ye basın.</div>
+        <div class="row" style="gap:8px"><button class="btn" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü</button></div>
       </div>
       <div class="row wrap"><div class="tabs" style="flex:1;min-width:0">${groups.map(([k, t, cnt]) => html`<button class="tab ${f.show === k ? 'on' : ''}" data-act="show" data-k="${k}">${t} <span class="n">${cnt}</span></button>`)}</div>
         <label class="search" style="max-width:260px"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Kanal ara" data-q value="${f.q}"></label></div>
@@ -99,6 +113,17 @@ export async function integrations(el, rest = []) {
       <div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${SOON().map((t) => html`<span class="pill">${t}</span>`)}</div>
       ${conn.some((c) => !c.demo) || jobs.length ? backfill() : ''}
     </div>`);
+  }
+
+  // Kanal ekranının üstünde aynı türün mağazaları ve "Mağaza ekle" (paketteki mağaza sınırı kaydederken uygulanır)
+  function storeTabs(c, admin) {
+    const list = storesOf(c.type), lim = state.tenant && state.tenant.stores;
+    const used = data.channels.filter(configured).length;
+    return html`<div class="row wrap store-tabs" style="gap:8px;align-items:center">
+      <div class="tabs" style="min-width:0">${list.map((x) => { const k = stateOf(x).k; return html`<a class="tab ${x.id === c.id ? 'on' : ''}" href="#/entegrasyonlar/${encodeURIComponent(x.id)}"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${x.name}</a>`; })}</div>
+      ${admin ? html`<button class="btn sm outline" data-act="addstore" data-type="${c.type}"><i class="ico ico-plus"></i>${typeName(c.type)} mağazası ekle</button>` : ''}
+      ${lim ? html`<span class="tiny muted">Paketiniz: ${used} / ${lim} mağaza</span>` : ''}
+    </div>`;
   }
 
   // ---------- kanal ekranı: anahtarlar · bağlantı bilgileri · yardım ----------
@@ -132,11 +157,14 @@ export async function integrations(el, rest = []) {
     const s = stateOf(c), live = c.enabled || c.demo, m = modeOf(c), basic = c.fields.filter((x) => !x.adv), adv = c.fields.filter((x) => x.adv), url = panelUrl(c), admin = isAdmin();
     render(el, html`<div class="stack">
       <div class="row wrap" style="gap:10px"><a class="btn ghost sm" href="#/entegrasyonlar"><i class="ico ico-back"></i>Entegrasyonlar</a><span class="spacer"></span>
-        ${live ? html`<button class="btn sm" data-act="sync" data-id="${c.id}"><i class="ico ico-sync"></i>Siparişleri ve ürünleri çek</button>` : ''}</div>
+        ${live ? html`<button class="btn sm" data-act="sync" data-id="${c.id}"><i class="ico ico-sync"></i>${(c.can || {}).listings === false ? 'Siparişleri çek' : 'Siparişleri ve ürünleri çek'}</button>` : ''}</div>
+      ${storeTabs(c, admin)}
       <div class="idetail" data-ch="${c.id}">
         <aside class="card id-side">
           <div class="id-brand">${chLogo(c.id)}<div style="min-width:0"><h2>${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2><div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${s.t}</div></div></div>
-          ${c.beta ? html`<div class="notice small"><div><b>Test modülü:</b> yalnız bu panelde açık; firmalarda “Yakında” görünür.</div></div>` : ''}
+          ${!state.tenant && ALL_BETA.includes(c.type) ? (c.beta
+            ? html`<div class="notice small"><div><b>Test modülü:</b> yalnız bu panelde açık; firmalarda ve sitede “Yakında” görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm primary" data-act="release" data-type="${c.type}" data-on="1">Müşterilere aç</button></div>` : ''}</div></div>`
+            : html`<div class="notice small good"><div><b>Müşterilere açık:</b> firmalar bu kanalı ekleyebilir; tanıtım sitesinde de aktif görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm" data-act="release" data-type="${c.type}" data-on="">Test modülüne geri al</button></div>` : ''}</div></div>`) : ''}
           <div class="id-sws">
             ${sw('active', c.id, c.active, 'Kanal aktif', 'Kapalıysa senkronlanmaz', !admin)}
             ${sw('write', c.id, !held(c), 'Kanala yazma', 'Kapalıysa yalnız okunur: paketleme, stok, fiyat gönderilmez', !admin || !live)}
@@ -146,10 +174,10 @@ export async function integrations(el, rest = []) {
           </div>
           ${live ? html`<dl class="id-kv small">
             <dt>Siparişler</dt><dd>${c.last && c.last.ordersAt ? html`<span title="${dateTime(c.last.ordersAt)}">${ago(c.last.ordersAt)}</span>` : '—'}</dd>
-            <dt>Ürün / stok</dt><dd>${c.last && c.last.listingsAt ? html`<span title="${dateTime(c.last.listingsAt)}">${ago(c.last.listingsAt)}</span>` : '—'}</dd>
-            <dt>İlan</dt><dd class="num">${n(c.listings)}</dd><dt>Eşleşmiş</dt><dd class="num">${n(c.linked)}${c.listingErrors ? html` · <span style="color:var(--bad)">${c.listingErrors} hatalı</span>` : ''}</dd></dl>` : ''}
+            ${(c.can || {}).listings !== false ? html`<dt>Ürün / stok</dt><dd>${c.last && c.last.listingsAt ? html`<span title="${dateTime(c.last.listingsAt)}">${ago(c.last.listingsAt)}</span>` : '—'}</dd>
+            <dt>İlan</dt><dd class="num">${n(c.listings)}${c.listingErrors ? html` · <span style="color:var(--bad)">${c.listingErrors} hatalı</span>` : ''}</dd>` : ''}</dl>` : ''}
           <div class="id-acts">
-            ${live ? html`<button class="btn sm ghost" data-act="import"><i class="ico ico-download"></i>İlanları içe aktar</button>` : ''}
+            ${live && (c.can || {}).listings !== false ? html`<button class="btn sm ghost" data-act="import"><i class="ico ico-download"></i>İlanları içe aktar</button>` : ''}
             <button class="btn sm ghost" data-act="diag" data-id="${c.id}"><i class="ico ico-bolt"></i>Tanılama</button>
             ${c.type === 'hepsiburada' && c.id === 'hepsiburada' && !state.tenant ? html`<a class="btn sm ghost" href="#/hb-test"><i class="ico ico-check"></i>Test adımları</a>` : ''}
             ${c.extra && admin ? html`<button class="btn sm ghost danger" data-act="remove" data-id="${c.id}"><i class="ico ico-x"></i>Mağazayı kaldır</button>` : ''}
@@ -211,6 +239,13 @@ export async function integrations(el, rest = []) {
   actions(el, {
     open: (t) => { location.hash = '#/entegrasyonlar/' + encodeURIComponent(t.dataset.id); },
     show: (t) => { f.show = t.dataset.k; try { sessionStorage.setItem('integ_show', f.show); } catch { /* yok */ } draw(); },
+    release: async (t) => {
+      const on = !!t.dataset.on, name = TYPE_NAME[t.dataset.type] || t.dataset.type;
+      const ok = await confirmBox(on ? `${name} müşterilere açılsın mı? Firmalar kanalı Entegrasyonlar'dan ekleyebilir; sitede “Yakında” etiketi kalkar. Müşteri panellerine birkaç dakika içinde yansır.`
+        : `${name} test modülüne geri alınsın mı? Firmalarda yeniden “Yakında” görünür ve firmaların bu kanaldaki mağazaları çalışmayı bırakır (bilgileri silinmez).`, on ? 'Müşterilere aç' : 'Geri al');
+      if (!ok) return;
+      await busy(t, async () => { await api('integrations/release', { method: 'POST', body: { type: t.dataset.type, on } }); toast(on ? `${name} müşterilere açıldı` : `${name} test modülüne alındı`); await load(); });
+    },
     syscheck: () => systemCheck(data.channels.filter((c) => (c.enabled && !c.paused) || (c.gated && !(c.missing || []).length)).map((c) => ({ id: c.id, name: c.name }))),
     addmenu: (t) => {
       const types = TYPES.filter((x) => !(state.tenant && BETA.includes(x)));
@@ -220,6 +255,15 @@ export async function integrations(el, rest = []) {
         location.hash = '#/entegrasyonlar/' + encodeURIComponent(r.id);
       }) })), { title: 'Hangi kanala mağaza eklensin?' });
     },
+    // Aynı kanala yeni mağaza: kurulmamış hazır mağaza (ör. ikas2) varsa o açılır, yoksa yeni kayıt oluşturulur
+    addstore: (t) => busy(t, async () => {
+      const type = t.dataset.type, lim = state.tenant && state.tenant.stores;
+      if (lim && data.channels.filter(configured).length >= lim) return toast(`Paketinizdeki mağaza sınırına ulaşıldı (${lim} mağaza). Paketim sayfasından yükseltebilirsiniz.`, true);
+      const spare = data.channels.find((c) => c.type === type && !configured(c) && !storesOf(type).includes(c));
+      const cid = spare ? spare.id : (await api('integrations/add', { method: 'POST', body: { type } })).id;
+      if (!spare) { toast(`${typeName(type)}: yeni mağaza eklendi — bilgilerini girin`); await loadSummary().catch(() => {}); }
+      location.hash = '#/entegrasyonlar/' + encodeURIComponent(cid);
+    }),
     save: (t) => busy(t, async () => { await api('integrations/' + t.dataset.id, { method: 'PUT', body: { values: values(t.dataset.id) } }); toast('Kaydedildi'); await after(); }),
     test: (t) => busy(t, async () => {
       const cid = t.dataset.id;

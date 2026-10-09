@@ -50,6 +50,8 @@ export function prefetch(path) {
 }
 // Sayfa açılırken yapılan okumalar kaydedilir (bir sonraki ziyarette menüye dokununca bu adresler önceden istenir)
 export const recorder = { list: null };
+// Paketinizde olmayan özellik (müşteri paneli; ana panel ve paketsiz firmada hiçbir şey kilitli değil)
+export const locked = (f) => !!(state.tenant && (state.tenant.locked || []).includes(f));
 export async function api(path, { method = 'GET', body, fresh = false } = {}) {
   if (method === 'GET') {
     if (recorder.list && !recorder.list.includes(path)) recorder.list.push(path);

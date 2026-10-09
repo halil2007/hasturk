@@ -9,6 +9,15 @@ const PLANS = ['Başlangıç', 'Profesyonel', 'Kurumsal', 'Özel'];
 // Paket sınırları (sunucudaki plans.js ile aynı; web sitesindeki paketler)
 const LIMITS = { 'Başlangıç': '3 mağaza, 2 kullanıcı', Profesyonel: '10 mağaza, 5 kullanıcı', Kurumsal: '25 mağaza, sınırsız kullanıcı' };
 const METHODS = ['Havale / EFT', 'Kredi kartı', 'Nakit', 'Diğer'];
+// Online satışta alınan fatura bilgisi (ödeme kaydında JSON): fatura kesmek için satırlar
+function invLines(raw) {
+  let i; try { i = JSON.parse(raw || 'null'); } catch { i = null; }
+  if (!i) return null;
+  const adr = [i.address, [i.district, i.city].filter(Boolean).join(' / ')].filter(Boolean).join(', ');
+  return i.type === 'kurumsal'
+    ? [`Kurumsal: ${i.company}`, `${i.taxOffice} VD · VKN ${i.taxNo}${i.efatura ? ' · e-Fatura mükellefi' : ' · e-Arşiv'}`, adr, [i.contact, i.email, i.phone].filter(Boolean).join(' · ')]
+    : [`Bireysel: ${i.name}`, `TCKN ${i.tckn}`, adr, [i.email, i.phone].filter(Boolean).join(' · ')];
+}
 const iso = (ms) => (ms ? new Date(ms + 3 * 3600e3).toISOString().slice(0, 10) : '');
 const daysLeft = (t) => (t.expires_at ? Math.ceil((t.expires_at - Date.now()) / DAY) : null);
 // Durum: askıda > süresi doldu > deneme > yaklaşıyor > aktif
@@ -205,6 +214,7 @@ export async function firmsView(el) {
     const draw2 = async () => {
       const t2 = bySlug(slug) || t, [c, st] = stateOf(t2), d = daysLeft(t2), link = location.origin + '/?firma=' + t2.slug;
       const pays = await api(`tenants/${slug}/payments`, { fresh: true }).catch(() => ({ payments: [] }));
+      s.pays = pays.payments;
       const u = t2.usage || {};
       s.setBody(html`<div class="row wrap" style="margin-bottom:12px"><span class="pill ${c}">${st}</span>${t2.plan ? html`<span class="pill">${t2.plan}</span>` : ''}<span class="muted small">kod: <b class="num">${t2.slug}</b></span><span class="spacer"></span>
           <button class="btn sm primary" data-x="pay"><i class="ico ico-calc"></i>Ödeme al</button><button class="btn sm" data-x="support" ${t2.active ? '' : 'disabled'}><i class="ico ico-key"></i>Panele gir</button><button class="btn sm" data-x="edit"><i class="ico ico-gear"></i>Düzenle</button></div>
@@ -219,7 +229,8 @@ export async function firmsView(el) {
               <dt>Toplam tahsilat</dt><dd>${money(t2.paid_total || 0)}</dd></dl></div>
             <div class="card"><div class="card-head"><h3>Tahsilatlar</h3><button class="btn sm ghost" data-x="pay"><i class="ico ico-plus"></i>Ekle</button></div>
               ${pays.payments.length ? html`<div class="list">${pays.payments.map((p) => html`<div class="li"><div style="flex:1;min-width:0"><b class="num">${money(p.amount)}</b>${p.months ? html` <span class="pill good" style="margin-left:4px">+${p.months >= 12 && p.months % 12 === 0 ? `${p.months / 12} yıl` : `${p.months} ay`}</span>` : ''}
-                <div class="muted tiny">${date(p.at)}${p.method ? ` · ${p.method}` : ''}${p.note ? ` · ${p.note}` : ''}${p.user ? ` · ${p.user}` : ''}</div></div><button class="icon-btn sm" data-x="delpay" data-id="${p.id}" aria-label="Kaydı sil" title="Kaydı sil (bitiş tarihi değişmez)"><i class="ico ico-x"></i></button></div>`)}</div>` : html`<div class="muted small">Henüz ödeme kaydı yok</div>`}</div>
+                <div class="muted tiny">${date(p.at)}${p.method ? ` · ${p.method}` : ''}${p.note ? ` · ${p.note}` : ''}${p.user ? ` · ${p.user}` : ''}</div>
+                ${invLines(p.invoice) ? html`<div class="tiny" style="margin-top:6px;padding:7px 9px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;line-height:1.5"><div class="row" style="gap:6px"><b style="flex:1">Fatura bilgisi</b><button class="btn sm ghost" data-x="copyinv" data-id="${p.id}" style="min-height:0;padding:2px 8px"><i class="ico ico-copy"></i>Kopyala</button></div>${invLines(p.invoice).map((l) => html`<div>${l}</div>`)}</div>` : ''}</div><button class="icon-btn sm" data-x="delpay" data-id="${p.id}" aria-label="Kaydı sil" title="Kaydı sil (bitiş tarihi değişmez)"><i class="ico ico-x"></i></button></div>`)}</div>` : html`<div class="muted small">Henüz ödeme kaydı yok</div>`}</div>
           </div>
           <div class="stack">
             <div class="card"><div class="card-head"><h3>Kullanım</h3><button class="btn sm ghost" data-x="usage"><i class="ico ico-sync"></i>Yenile</button></div>
@@ -255,6 +266,10 @@ export async function firmsView(el) {
         return;
       }
       if (k === 'edit') { s.close(); form(t2); }
+      if (k === 'copyinv') {
+        const p = (s.pays || []).find((y) => String(y.id) === x.dataset.id);
+        if (p) navigator.clipboard.writeText(invLines(p.invoice).join('\n')).then(() => toast('Fatura bilgisi kopyalandı')).catch(() => {});
+      }
       if (k === 'copy') { navigator.clipboard.writeText(location.origin + '/?firma=' + slug).then(() => toast('Giriş adresi kopyalandı')).catch(() => {}); }
       if (k === 'usage') busy(x, async () => { await api(`tenants/${slug}/stats`, { fresh: true }); await refresh(); await draw2(); });
       if (k === 'delpay') { if (await confirmBox('Bu ödeme kaydı silinsin mi? Abonelik bitiş tarihi değişmez.', 'Sil')) busy(x, async () => { await api(`tenants/${slug}/payments/${x.dataset.id}`, { method: 'DELETE' }); await refresh(); await draw2(); }); }

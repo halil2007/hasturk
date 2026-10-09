@@ -1,5 +1,6 @@
 // Paketim (müşteri panelleri): mevcut paket ve bitiş tarihi, paketler, kartla satın alma / yenileme / yükseltme (iyzico)
 // ve ödeme geçmişi. Ödeme iyzico'nun güvenli sayfasında yapılır; kart bilgisi panele gelmez. Tutar sunucuda belirlenir.
+// Fatura bilgisi (bireysel / kurumsal) son satın almadan ya da firma kartından dolu gelir; e-posta ve telefon zorunludur.
 import { api, html, render, $, $$, money0, date, toast, sheet, state } from '../core.js';
 
 const PERIOD = { monthly: 'Aylık', yearly: 'Yıllık' };
@@ -19,6 +20,8 @@ export async function billingView(el) {
       ${d.plans.map((p) => html`<div class="card" style="display:flex;flex-direction:column;gap:8px;${cur.plan === p.name ? 'outline:2px solid var(--primary)' : ''}">
         <div class="row"><b style="font-size:18px;flex:1">${p.name}</b>${cur.plan === p.name ? html`<span class="pill info">Mevcut</span>` : ''}</div>
         <div class="muted small">${p.stores} mağaza · ${p.users ? `${p.users} kullanıcı` : 'sınırsız kullanıcı'}</div>
+        ${(p.features || []).length ? html`<ul class="small" style="margin:0;padding-left:18px">${p.features.map((x) => html`<li>${x}</li>`)}</ul>` : html`<div class="small muted">Tüm temel özellikler</div>`}
+        ${(p.soon || []).map((x) => html`<div class="small">${x} <span class="pill amber" style="padding:1px 8px;font-size:11px">Yakında</span></div>`)}
         <div><b style="font-size:20px">${money0(p.monthly)}</b> <span class="muted small">/ ay · KDV dahil</span></div>
         <div class="small">Yıllık <b>${money0(p.yearly)}</b> <span class="muted">(2 ay hediye${d.installments > 1 ? ` · peşin fiyatına ${d.installments} taksit` : ''})</span></div>
         ${admin && d.online ? html`<div class="row wrap" style="gap:8px;margin-top:auto">
@@ -35,29 +38,47 @@ export async function billingView(el) {
   $$('[data-buy]', el).forEach((b) => { b.onclick = () => buy(d, d.plans.find((p) => p.key === b.dataset.buy), b.dataset.period); });
 }
 
+const INV = ['name', 'tckn', 'company', 'taxOffice', 'taxNo', 'contact', 'address', 'district', 'city'];
 function buy(d, p, period) {
-  const amount = p[period];
+  const amount = p[period], inv = d.invoice || {};
+  let type = inv.type === 'kurumsal' ? 'kurumsal' : 'bireysel';
   const s = sheet({
     title: `${p.name} · ${PERIOD[period]}`,
     body: html`<form class="stack" data-f>
-      <div class="notice"><i class="ico ico-info"></i><div><b>${money0(amount)}</b> (KDV dahil) · ${period === 'yearly' ? `12 ay${d.installments > 1 ? `, kartla peşin fiyatına ${d.installments} taksit` : ''}` : '1 ay'}. Fatura bilgileri:</div></div>
+      <div class="notice"><i class="ico ico-info"></i><div><b>${money0(amount)}</b> (KDV dahil) · ${period === 'yearly' ? `12 ay${d.installments > 1 ? `, kartla peşin fiyatına ${d.installments} taksit` : ''}` : '1 ay'}. Faturanız aşağıdaki bilgilerle kesilir.</div></div>
       <div class="form-grid">
-        <label class="field"><span>Yetkili ad soyad *</span><input class="input" name="contact" required></label>
         <label class="field"><span>E-posta *</span><input class="input" type="email" name="email" value="${d.current.email || (state.user && state.user.email) || ''}" required></label>
-        <label class="field"><span>Cep telefonu *</span><input class="input" name="phone" inputmode="tel" placeholder="05xx xxx xx xx" required></label>
-        <label class="field"><span>Şehir *</span><input class="input" name="city" required></label>
-        <label class="field"><span>TC kimlik / Vergi no</span><input class="input" name="identity" inputmode="numeric"></label>
+        <label class="field"><span>Telefon *</span><input class="input" name="phone" type="tel" inputmode="tel" placeholder="05xx xxx xx xx" value="${d.current.phone || ''}" required></label>
       </div>
-      <label class="field"><span>Fatura adresi *</span><input class="input" name="address" required></label>
+      <div class="row wrap" style="gap:10px;align-items:center"><b class="small">Fatura türü</b><div class="seg" data-type><button type="button" data-v="bireysel">Bireysel</button><button type="button" data-v="kurumsal">Kurumsal</button></div></div>
+      <div class="form-grid" data-for="bireysel">
+        <label class="field"><span>Ad soyad *</span><input class="input" name="name" value="${inv.name || ''}" autocomplete="name"></label>
+        <label class="field"><span>TC kimlik no *</span><input class="input" name="tckn" value="${inv.tckn || ''}" inputmode="numeric" maxlength="11"></label>
+      </div>
+      <div class="form-grid" data-for="kurumsal">
+        <label class="field" style="grid-column:1/-1"><span>Firma unvanı *</span><input class="input" name="company" value="${inv.company || ''}" placeholder="ör. Yeşil Bahçe Tarım Ltd. Şti."></label>
+        <label class="field"><span>Vergi dairesi *</span><input class="input" name="taxOffice" value="${inv.taxOffice || ''}"></label>
+        <label class="field"><span>Vergi no *</span><input class="input" name="taxNo" value="${inv.taxNo || ''}" inputmode="numeric" maxlength="11"><small>10 hane (şahıs şirketinde TC kimlik no)</small></label>
+        <label class="field"><span>Yetkili ad soyad *</span><input class="input" name="contact" value="${inv.contact || ''}"></label>
+        <label class="check" style="align-self:end"><input type="checkbox" name="efatura" ${inv.efatura ? 'checked' : ''}> <span>e-Fatura mükellefiyiz</span></label>
+      </div>
+      <label class="field"><span>Fatura adresi *</span><input class="input" name="address" value="${inv.address || ''}" placeholder="Mahalle, cadde / sokak, no"></label>
+      <div class="form-grid">
+        <label class="field"><span>İlçe *</span><input class="input" name="district" value="${inv.district || ''}"></label>
+        <label class="field"><span>İl *</span><input class="input" name="city" value="${inv.city || ''}"></label>
+      </div>
       <label class="check"><input type="checkbox" name="consent"> <span><a href="https://hasturkcrm.com/mesafeli-satis-sozlesmesi" target="_blank" rel="noopener">Mesafeli satış sözleşmesini</a> ve <a href="https://hasturkcrm.com/iptal-iade" target="_blank" rel="noopener">iptal / iade koşullarını</a> okudum, onaylıyorum.</span></label>
       <div class="login-err" data-err role="alert"></div>
     </form>`,
     foot: html`<button class="btn" data-close>Vazgeç</button><button class="btn primary" data-pay>Ödemeye geç</button>`,
   });
+  const setType = (v) => { type = v; $$('[data-type] button', s.el).forEach((b) => b.classList.toggle('on', b.dataset.v === v)); $$('[data-for]', s.el).forEach((x) => { x.style.display = x.dataset.for === v ? '' : 'none'; }); };
+  $('[data-type]', s.el).onclick = (e) => { const b = e.target.closest('button'); if (b) setType(b.dataset.v); };
+  setType(type);
   $('[data-pay]', s.el).onclick = async (e) => {
-    const f = $('[data-f]', s.el), btn = e.currentTarget;
-    const b = Object.fromEntries(['contact', 'email', 'phone', 'city', 'identity', 'address'].map((k) => [k, f[k].value.trim()]));
-    b.consent = f.consent.checked; b.plan = p.key; b.period = period;
+    const f = $('[data-f]', s.el), btn = e.currentTarget, v = (k) => f.elements[k].value.trim(); // f.name formun kendi adı; alanlar elements'ten
+    const b = { email: v('email'), phone: v('phone'), invoice: { type, efatura: f.elements.efatura.checked, ...Object.fromEntries(INV.map((k) => [k, v(k)])) } };
+    b.consent = f.elements.consent.checked; b.plan = p.key; b.period = period;
     btn.disabled = true; btn.textContent = 'Ödeme sayfası açılıyor…';
     try { const r = await api('billing/checkout', { method: 'POST', body: b }); location.href = r.url; }
     catch (x) { $('[data-err]', f).textContent = x.message; btn.disabled = false; btn.textContent = 'Ödemeye geç'; toast(x.message, true); }

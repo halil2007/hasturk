@@ -27,7 +27,7 @@ async function tabbed(el, cur, fn) {
 
 async function summary(el, query) {
   // En çok satanlar her açılışta adede göre sıralanır (ciro sıralaması isteğe bağlı, kaydedilmez)
-  const f = { channel: query.channel || '', ...store.get('insights', { unit: 'day', range: 'week' }), sort: 'qty', allCities: false };
+  const f = { channel: query.channel || '', ...store.get('insights', { unit: 'day', range: 'week' }), sort: 'qty', allCities: false, tq: '', more: false };
   let d = null;
   render(el, html`<div class="stack">
     <div class="ch-tabs" data-chs></div>
@@ -37,7 +37,9 @@ async function summary(el, query) {
       <div class="card flush"><div class="card-pad card-head"><h2>Haftalık rapor</h2><span class="muted small">son 8 hafta</span></div><div data-weeks></div></div>
       <div class="card flush"><div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><h2 style="flex:none;white-space:nowrap">İllere göre satış</h2><span class="muted small" data-ctotal></span><span class="spacer"></span><div class="seg" data-cview></div></div><div data-cities></div></div>
     </div>
-    <div class="card flush"><div class="card-pad card-head"><h2>En çok satanlar</h2><div class="seg" data-sort></div></div><div data-top></div></div>
+    <div class="card flush"><div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:200px"><h2>En çok satanlar</h2><div class="muted small" data-tsum></div></div>
+      <label class="search" style="max-width:220px"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün ara" data-tq></label>
+      <div class="seg" data-sort></div><button class="btn sm" data-act="csv" title="Listeyi Excel'de açılabilen dosya olarak indir"><i class="ico ico-download"></i>İndir</button></div><div data-top></div></div>
   </div>`);
 
   function draw() {
@@ -71,22 +73,46 @@ async function summary(el, query) {
         <div class="hbar"><span style="width:${(c.orders / maxC) * 100}%;background:var(--primary);opacity:${0.35 + 0.65 * (c.orders / maxC)}"></span></div>
         <span class="num" title="${c.shipped} kargoya verildi / teslim">${n(c.units || c.orders)} adet · ${n(c.orders)} sipariş</span><span class="num muted small">${money0(c.revenue)}</span></div>`)}</div>
       ${d.cities.length > 12 ? html`<div class="pager"><button class="btn sm" data-act="allcities">${f.allCities ? 'Daha az göster' : `Tüm iller (${d.cities.length})`}</button></div>` : ''}` : html`<div class="empty">Bu dönemde sipariş yok</div>`); }
-    // 4) en çok satanlar
-    if (isMobile() && d.top.length) return render($('[data-top]', el), html`<div class="m-list" style="padding:0 12px 12px">${d.top.map((p, i) => html`<div class="m-card"><div class="top"><b class="muted" style="width:22px">${i + 1}</b>${thumb(p.image, p.name, 'sm')}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="muted tiny">ort. ${money(p.avg)} · ${money(p.min)}–${money(p.max)}</div></div></div>
-      <div class="row small"><b>${n(p.qty)} adet</b><span class="muted">${n(p.orders)} sipariş</span><span class="spacer"></span><b>${money(p.revenue)}</b></div>
-      <div class="hbar">${Object.entries(p.channels).map(([c, v]) => html`<span style="width:${(v / p.qty) * 100}%;background:${chColor(c)}" title="${ch(c).name}: ${v} adet"></span>`)}</div></div>`)}</div>`);
-    render($('[data-top]', el), d.top.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th style="width:44px">Sıra</th><th>Ürün</th><th class="r">Satış adedi</th><th class="r">Satış cirosu</th><th class="r">Birim fiyat</th><th>Kanallar</th></tr></thead><tbody>
-      ${d.top.map((p, i) => html`<tr><td class="c">${i < 3 ? ['🥇', '🥈', '🥉'][i] : html`<span class="muted">${i + 1}</span>`}</td>
-        <td><div class="row">${thumb(p.image, p.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:340px;font-weight:650">${p.name}</div><div class="muted tiny">${p.sku || ''}${p.stock != null ? ` · stok ${p.stock}` : ''}</div></div></div></td>
-        <td class="r num" style="font-weight:800;font-size:15px">${n(p.qty)} <span class="muted tiny" style="font-weight:500">adet</span><div class="muted tiny">${n(p.orders)} sipariş</div></td><td class="r num" style="font-weight:${f.sort === 'revenue' ? 800 : 500}">${money(p.revenue)}</td>
-        <td class="r small" style="white-space:nowrap">Ort: <b>${money(p.avg)}</b><div class="muted tiny">en yüksek ${money(p.max)} · en düşük ${money(p.min)}</div></td>
-        <td><div class="hbar" style="min-width:90px">${Object.entries(p.channels).map(([c, v]) => html`<span style="width:${(v / p.qty) * 100}%;background:${chColor(c)}" title="${ch(c).name}: ${v} adet"></span>`)}</div></td></tr>`)}
-    </tbody></table></div>` : html`<div class="empty">Bu dönemde satış yok</div>`);
+    // 4) en çok satanlar: adet / ciro, önceki döneme göre değişim, satıştaki pay, brüt kâr, iptal-iade, stok kaç gün yeter
+    drawTop();
+  }
+  const trendTag = (p) => (p.trend == null ? html`<span class="pill info tiny" title="Önceki dönemde satışı yoktu">yeni</span>` : html`<span class="tiny ${p.trend > 0 ? 'up' : p.trend < 0 ? 'down' : 'muted'}" title="Önceki dönem ${n(p.prevQty)} adet">${p.trend > 0 ? '▲' : p.trend < 0 ? '▼' : '='} %${n(Math.abs(p.trend))}</span>`);
+  const coverTag = (p) => (p.cover == null ? '' : html`<span class="pill tiny ${p.cover <= 7 ? 'bad' : p.cover <= 21 ? 'warn' : ''}" title="Bu satış hızıyla stok yaklaşık ${p.cover} gün yeter">${p.cover > 365 ? '1 yıl+' : `${p.cover} gün`}</span>`);
+  const topRows = () => { const q = f.tq.toLocaleLowerCase('tr'); const L = q ? d.top.filter((p) => `${p.name} ${p.sku || ''}`.toLocaleLowerCase('tr').includes(q)) : d.top; return f.more || q ? L : L.slice(0, 20); };
+  function drawTop() {
+    const L = topRows(), box = $('[data-top]', el);
+    $('[data-tsum]', el).textContent = d.top.length ? `${n(d.products || d.top.length)} farklı ürün · ${n(d.totals.units || 0)} adet · ${money0(d.totals.revenue)}` : '';
+    const more = !f.tq && d.top.length > 20 ? html`<div class="pager"><button class="btn sm" data-act="topmore">${f.more ? 'İlk 20' : `Tümünü göster (${n(d.top.length)})`}</button></div>` : '';
+    if (!L.length) return render(box, html`<div class="empty">${f.tq ? 'Aramaya uyan ürün yok' : 'Bu dönemde satış yok'}</div>`);
+    if (isMobile()) return render(box, html`<div class="m-list" style="padding:0 12px 12px">${L.map((p) => { const i = d.top.indexOf(p); return html`<div class="m-card"><div class="top"><b class="muted" style="width:22px">${i + 1}</b>${thumb(p.image, p.name, 'sm')}<div style="min-width:0;flex:1"><div class="clamp2" style="font-weight:650">${p.name}</div><div class="muted tiny">ort. ${money(p.avg)}${p.stock != null ? ` · stok ${n(p.stock)}` : ''}</div></div></div>
+      <div class="row small" style="gap:8px;flex-wrap:wrap"><b>${n(p.qty)} adet</b>${trendTag(p)}<span class="muted">${n(p.orders)} sipariş</span><span class="spacer"></span><b>${money(p.revenue)}</b><span class="muted tiny">%${p.share}</span></div>
+      <div class="row tiny" style="gap:8px;flex-wrap:wrap">${p.profit != null ? html`<span>Kâr <b class="${p.profit < 0 ? 'down' : ''}">${money(p.profit)}</b></span>` : ''}${p.lost ? html`<span class="down">${n(p.lost)} iptal/iade</span>` : ''}${coverTag(p)}</div>
+      <div class="hbar">${Object.entries(p.channels).map(([c, v]) => html`<span style="width:${(v / p.qty) * 100}%;background:${chColor(c)}" title="${ch(c).name}: ${v} adet"></span>`)}</div></div>`; })}</div>${more}`);
+    render(box, html`<div class="table-wrap"><table class="t"><thead><tr><th style="width:44px">Sıra</th><th>Ürün</th><th class="r">Satış adedi</th><th class="r">Ciro</th><th class="r" title="Alış fiyatı girilen ürünlerde: ciro − alış × adet (komisyon ve kargo hariç)">Brüt kâr</th><th class="r">Birim fiyat</th><th class="r" title="Bu dönemde iptal / iade edilen adet">İptal / iade</th><th>Kanallar</th></tr></thead><tbody>
+      ${L.map((p) => { const i = d.top.indexOf(p); return html`<tr><td class="c">${i < 3 ? ['🥇', '🥈', '🥉'][i] : html`<span class="muted">${i + 1}</span>`}</td>
+        <td><div class="row">${thumb(p.image, p.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:650" title="${p.name}">${p.name}</div><div class="muted tiny row" style="gap:6px">${p.sku || ''}${p.stock != null ? html`<span>stok ${n(p.stock)}</span>` : ''}${coverTag(p)}</div></div></div></td>
+        <td class="r num" style="white-space:nowrap"><b style="font-size:15px">${n(p.qty)}</b> <span class="muted tiny">adet</span><div>${trendTag(p)} <span class="muted tiny">${n(p.orders)} sipariş</span></div></td>
+        <td class="r num" style="white-space:nowrap"><b style="font-weight:${f.sort === 'revenue' ? 800 : 600}">${money(p.revenue)}</b><div class="muted tiny" title="Toplam cirodaki payı">%${p.share} pay</div></td>
+        <td class="r num">${p.profit != null ? html`<span class="${p.profit < 0 ? 'down' : ''}">${money(p.profit)}</span>` : html`<span class="muted tiny" title="Ürüne alış fiyatı girilmemiş">—</span>`}</td>
+        <td class="r small" style="white-space:nowrap">Ort: <b>${money(p.avg)}</b><div class="muted tiny">${money(p.min)} – ${money(p.max)}</div></td>
+        <td class="r num">${p.lost ? html`<span class="down">${n(p.lost)}</span><div class="muted tiny">%${p.lostRate}</div>` : html`<span class="muted">0</span>`}</td>
+        <td><div class="hbar" style="min-width:90px">${Object.entries(p.channels).map(([c, v]) => html`<span style="width:${(v / p.qty) * 100}%;background:${chColor(c)}" title="${ch(c).name}: ${v} adet"></span>`)}</div></td></tr>`; })}
+    </tbody></table></div>${more}`);
+  }
+  // CSV (Excel): tüm liste, Türkçe karakterler için BOM, ayraç ;
+  function csv() {
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`, num = (v) => (v == null ? '' : String(v).replace('.', ','));
+    const rows = [['Sıra', 'Ürün', 'Stok kodu', 'Satış adedi', 'Önceki dönem adet', 'Değişim %', 'Sipariş', 'Ciro', 'Ciro payı %', 'Brüt kâr', 'Ortalama fiyat', 'İptal / iade adet', 'Stok', 'Stok kaç gün yeter', 'Kanallar'],
+      ...d.top.map((p, i) => [i + 1, p.name, p.sku || '', p.qty, p.prevQty, p.trend ?? '', p.orders, num(p.revenue), num(p.share), num(p.profit), num(p.avg), p.lost, p.stock ?? '', p.cover ?? '',
+        Object.entries(p.channels).map(([c, v]) => `${ch(c).name}: ${v}`).join(', ')])];
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.map((r) => r.map(cell).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    a.download = `en-cok-satanlar-${new Date(d.range.from).toISOString().slice(0, 10)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
   async function load() {
     store.set('insights', { unit: f.unit, range: f.range, cityView: f.cityView });
     setQuery({ channel: f.channel });
-    const p = new URLSearchParams({ unit: f.unit, range: f.range, sort: f.sort });
+    const p = new URLSearchParams({ unit: f.unit, range: f.range, sort: f.sort, limit: 500 });
     if (f.channel) p.set('channel', f.channel);
     d = await api('insights?' + p);
     draw();
@@ -98,8 +124,11 @@ async function summary(el, query) {
     range: (t) => { f.range = t.dataset.k; refresh(); },
     sort: (t) => { f.sort = t.dataset.k; refresh(); },
     allcities: () => { f.allCities = !f.allCities; draw(); },
+    topmore: () => { f.more = !f.more; drawTop(); },
+    csv: () => (d && d.top.length ? csv() : toast('Bu dönemde satış yok', true)),
     cview: (t) => { f.cityView = t.dataset.k; store.set('insights', { unit: f.unit, range: f.range, cityView: f.cityView }); draw(); },
   });
+  $('[data-tq]', el).addEventListener('input', (e) => { f.tq = e.target.value.trim(); if (d) drawTop(); });
   await refresh();
   return { refresh };
 }

@@ -1,6 +1,6 @@
 // Ürünler: varyantlar ana ürün altında gruplanır; merkezi stok (her kanala kendi kuralıyla gönderilir), hızlı stok girişi,
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
-import { api, state, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
+import { api, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
 import { readSheet } from '../sheetread.js';
 import { profit, costOf } from '../profit.js';
 import { ruleDialog, ruleText } from './stocks.js';
@@ -340,7 +340,7 @@ export async function productForm(id, done) {
         ${siteStock(p) ? html`<label class="field"><span>Stok</span><input class="input" type="number" value="${p.stock}" readonly><small>ikas sitesinden okunur (stok senkronu kapalı)</small></label>` : html`<label class="field"><span>Stok</span><input class="input" name="stock" type="number" inputmode="numeric" value="${p.stock}"></label>`}
         <label class="field"><span>Kritik stok uyarısı</span><input class="input" name="critical_stock" type="number" inputmode="numeric" value="${p.critical_stock || 0}"></label>
       </div>
-      ${state.tenant ? html`<div class="notice small"><i class="ico ico-tag"></i><div><b>Döviz bazlı fiyat</b> (dolar / euro / sterlin fiyatı, kurla otomatik güncelleme) <span class="pill info">Yakında</span></div></div>` : html`<div class="stack" style="gap:8px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px">
+      ${locked('fx') ? html`<div class="notice small"><i class="ico ico-tag"></i><div><b>Döviz kuruna endeksli otomatik fiyat</b> (dolar / euro / sterlin fiyatı, kurla otomatik güncelleme) <span class="pill info">Kurumsal paket</span></div></div>` : html`<div class="stack" style="gap:8px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px">
         <div class="row wrap" style="gap:8px"><b class="small">Döviz bazlı fiyat</b><span class="muted tiny">Döviz seçilirse TL satış fiyatı ve kanal fiyatları kurla otomatik güncellenir (Ayarlar → Döviz ve fiyat).</span></div>
         <div class="form-grid">
           <label class="field"><span>Fiyat para birimi</span><select class="input" name="currency" data-fx>${[['', 'TL (döviz yok)'], ['USD', 'Dolar ($)'], ['EUR', 'Euro (€)'], ['GBP', 'Sterlin (£)']].map(([v, t]) => html`<option value="${v}" ${(p.currency || '') === v ? 'selected' : ''}>${t}</option>`)}</select></label>

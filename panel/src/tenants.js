@@ -6,7 +6,7 @@
 // Durable Object'ine iletilir. Ana panelin API bilgileri, şifresi ve deneme modu müşteri paneline geçmez.
 import { all, first, run, init } from './db.js';
 import { handle, report5xx } from './handler.js';
-import { recordError, clientReport } from './errors.js';
+import { recordError, clientReport, actionSucceeded, syncSucceeded } from './errors.js';
 import { PerfBuffer } from './perf.js';
 import { extApiInner, apiOf, apiPublic, newKey, parseIps } from './extapi.js';
 import { syncAll } from './sync.js';
@@ -14,7 +14,7 @@ import { doD1 } from './dosql.js';
 import { hashPassword, supportCookie, currentUser, demoCookie } from './auth.js';
 import { supportResponse } from './support.js';
 import { json, fail, str } from './util.js';
-import { loadConfig } from './config.js';
+import { loadConfig, releasedTypes } from './config.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 import { limitsOf } from './plans.js';
 import { forgot, resetPassword, welcome } from './pwreset.js';
@@ -55,6 +55,9 @@ const PLATFORM = { hepsiburada: ['HB_USER_AGENT', 'HB_PROXY_URL', 'HB_PROXY_KEY'
 export async function platformValues(env, db) {
   const cfg = db ? await loadConfig(env, db) : {}, out = {};
   for (const [id, keys] of Object.entries(PLATFORM)) for (const k of keys) { const v = (cfg[id] && cfg[id].values && cfg[id].values[k]) || env[k]; if (v) out[k] = String(v); }
+  // Test modülünden müşterilere açılan kanal türleri (ana panel → Entegrasyonlar → "Müşterilere aç")
+  const rel = db ? await releasedTypes({}, db) : [];
+  if (rel.length) out.RELEASED_TYPES = rel.join(',');
   return out;
 }
 export function tenantEnv(env, t, platform = {}) {
@@ -418,7 +421,7 @@ export class TenantPanel {
         if (!user) return json({ error: 'Giriş gerekli' }, 401);
         if (req.method !== 'GET' && req.headers.get('Origin') && new URL(req.headers.get('Origin')).host !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403);
         await init(this.env.DB);
-        return await supportResponse(req, this.env.DB, sp, { slug: this.t.slug, firm: this.t.name, user, staff: false });
+        return await supportResponse(req, this.env.DB, sp, { slug: this.t.slug, firm: this.t.name, user, staff: false, env: this.env });
       } catch (e) { return json({ error: e.message || 'Hata' }, e.status || 500); }
     }
     // Paketim (online satın alma / yenileme): ödeme ve abonelik ana panelin kaydında; yalnız bu firmanın kaydı
@@ -447,14 +450,18 @@ export class TenantPanel {
     if (env.DEMO === '1' && Date.now() - (this.seen || 0) > 60e3) { this.seen = Date.now(); await this.ctx.storage.put('demo_seen', this.seen); }
     const t0 = Date.now(), res = await handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
     if (res.status >= 500) this.ctx.waitUntil(report5xx(this.env.DB, req, res, { slug: this.t.slug, firm: this.t.name }).catch(() => {}));
+    // Başarılı işlem: bu firmanın aynı işlemdeki açık hata kayıtları kendiliğinden çözülür
+    else if (res.status < 400 && this.env.DB) this.ctx.waitUntil(actionSucceeded(this.env.DB, this.t.slug, `${req.method} ${sp}`).catch(() => {}));
     // İstek süresi: firma adıyla ana panelin "Sistem hızı" bölümüne
     this.perf.add(req.method, sp, Date.now() - t0);
     if (this.perf.due() && this.env.DB) this.ctx.waitUntil(init(this.env.DB).then(() => this.perf.flush(this.env.DB, { slug: this.t.slug, firm: this.t.name })).catch(() => {}));
     return res;
   }
   // Arka plan (senkron) hataları: son kontrolden beri yazılan hata günlükleri ana panelin hata kayıtlarına aktarılır
-  async reportSyncErrors(err) {
+  async reportSyncErrors(err, result) {
     if (!this.env.DB || !this.t) return;
+    // Başarılı senkron: o kanalların açık hata kayıtları çözülür (yeni hatalar aşağıda yeniden açar)
+    await syncSucceeded(this.env.DB, this.t.slug, result, !!err).catch((e) => console.error('hata kayıtları çözülemedi', e));
     const since = (await this.ctx.storage.get('errlog_at')) || Date.now() - 3600e3, now = Date.now();
     const rows = await all(this.db, "SELECT at, channel, msg FROM logs WHERE level = 'error' AND at > ? ORDER BY at LIMIT 50", since);
     if (err) rows.push({ channel: '', msg: 'Senkron durdu: ' + (err.message || err), stack: err.stack });
@@ -544,13 +551,13 @@ export class TenantPanel {
     // Abonelik süresi doldu: kanallara stok / fiyat gönderimi ve senkron durur (müşteri panele giremezken arka planda iş yapılmaz).
     // Yenilenince ana panel bitiş tarihini iletir, senkron kendiliğinden devam eder.
     if (this.t && this.t.expires && Date.now() > this.t.expires && env.DEMO !== '1') return;
-    let syncErr = null;
+    let syncErr = null, syncRes = null;
     if (env.DEMO === '1' && (await this.demoDue())) {
       try { await this.demoReset(env); } catch (e) { console.error('demo paneli sıfırlanamadı', e); }
       return void (await this.ctx.storage.setAlarm(Date.now() + SYNC_MS));
     }
-    try { await init(this.db); await syncAll(env, this.db); } catch (e) { syncErr = e; console.error('müşteri paneli senkron hatası', this.t && this.t.slug, e); }
-    try { await this.reportSyncErrors(syncErr); } catch (e) { console.error('hata kayıtları aktarılamadı', e); }
+    try { await init(this.db); syncRes = await syncAll(env, this.db); } catch (e) { syncErr = e; console.error('müşteri paneli senkron hatası', this.t && this.t.slug, e); }
+    try { await this.reportSyncErrors(syncErr, syncRes); } catch (e) { console.error('hata kayıtları aktarılamadı', e); }
     // Saatte bir yeter (ana veritabanına yazma maliyeti)
     try {
       const last = (await this.ctx.storage.get('usage_at')) || 0;

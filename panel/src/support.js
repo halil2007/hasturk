@@ -2,6 +2,7 @@
 // veritabanında tutulur ve ana panelin "Destek" sayfasına düşer. Ana panel yanıtlar, durum değiştirir; firma yanıtı kendi panelinde görür.
 // staff = ana panel (talepleri yanıtlayan taraf); değilse yalnız kendi firmasının (slug) talepleri görülür.
 import { all, first, run, notify } from './db.js';
+import { mailOwner } from './ownermail.js';
 import { notify as pushNotify } from './push.js';
 import { fail, str, json } from './util.js';
 
@@ -35,7 +36,7 @@ async function tellStaff(db, t, text) {
   await pushNotify(db, { title: `Destek talebi · ${t.firm || 'Panel'}`, body: t.subject, url: `#/destek/${t.id}` }).catch(() => {});
 }
 
-// c: { slug, firm, user, staff }
+// c: { slug, firm, user, staff, env } (env varsa yeni talepte panel sahibine e-posta gider)
 export async function supportApi(req, db, path, c) {
   const m = req.method, url = new URL(req.url), q = Object.fromEntries(url.searchParams);
   const b = m === 'GET' ? {} : await req.json().catch(() => ({}));
@@ -68,6 +69,10 @@ export async function supportApi(req, db, path, c) {
     const mid = (await first(db, 'INSERT INTO support_messages (ticket_id, author, admin, body, created_at) VALUES (?, ?, 0, ?, ?) RETURNING id', r.id, who, body, t)).id;
     await saveFiles(db, r.id, mid, fl);
     await tellStaff(db, { id: r.id, firm: c.firm, subject }, `${CATEGORIES[cat]} · ${who}: ${body}`);
+    // Panel sahibine e-posta (yeni destek talebi)
+    if (c.env) await mailOwner(c.env, db, { subject: `Yeni destek talebi · ${c.firm || 'Ana panel'} — ${subject}`, intro: 'Panelden yeni bir destek talebi açıldı.',
+      rows: [['Firma', c.firm ? `${c.firm} (${c.slug})` : 'Ana panel'], ['Kişi', who], ['Konu', subject], ['Tür', CATEGORIES[cat]], ['Mesaj', body.slice(0, 1500)], ['Ek', fl.length ? `${fl.length} dosya` : '']],
+      link: `${new URL(req.url).origin}/#/destek/${r.id}`, button: 'Talebi aç' });
     return { ok: true, id: r.id };
   }
   if ((x = path.match(/^support\/file\/(\d+)$/)) && m === 'GET') {

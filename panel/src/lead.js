@@ -1,6 +1,6 @@
 // Tanıtım sitesinden demo / teklif talebi: oturumsuz, yalnız izin verilen site adreslerinden (SITE_ORIGINS) kabul edilir.
 // Talep ana panelin Destek sayfasına "Web sitesi" firmasıyla düşer ve ana panele bildirim gider. IP başına saatte 5 talep;
-// gizli "website" alanı (bot tuzağı) doluysa sessizce yok sayılır. Yanıtta demo paneline giriş bağlantısı döner.
+// gizli "website" alanı (bot tuzağı) doluysa sessizce yok sayılır. Ad, e-posta ve telefon zorunludur. Yanıtta demo paneline giriş bağlantısı döner.
 import { first, run, init, notify } from './db.js';
 import { demoLogin } from './tenants.js';
 import { notify as pushNotify } from './push.js';
@@ -8,6 +8,14 @@ import { json, str } from './util.js';
 
 const DEFAULT_ORIGINS = 'https://hasturkcrm.com,https://www.hasturkcrm.com';
 export const siteOrigins = (env) => String(env.SITE_ORIGINS || DEFAULT_ORIGINS).split(',').map((x) => x.trim().replace(/\/+$/, '')).filter(Boolean);
+// İletişim bilgisi doğrulaması (site formları ve online satış): e-posta biçimi; Türkiye telefonu (cep 5xx, sabit 2xx-4xx, 850)
+export const validEmail = (s) => /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[a-z]{2,}$/i.test(String(s || '').trim());
+export function phoneDigits(s) {
+  let d = String(s || '').replace(/\D/g, '');
+  if (d.length === 12 && d.startsWith('90')) d = d.slice(2); else if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+  return d;
+}
+export const validPhone = (s) => /^[2-58]\d{9}$/.test(phoneDigits(s)) && !/[^\d\s()+-]/.test(String(s || '').trim());
 const cors = (origin) => ({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', Vary: 'Origin' });
 
 export async function leadRequest(req, env) {
@@ -24,7 +32,8 @@ export async function leadRequest(req, env) {
   const name = str(b.name).trim().slice(0, 100), company = str(b.company).trim().slice(0, 120), phone = str(b.phone).trim().slice(0, 40), email = str(b.email).trim().slice(0, 120);
   const channels = (Array.isArray(b.channels) ? b.channels : []).map((x) => str(x).slice(0, 30)).slice(0, 20), message = str(b.message).trim().slice(0, 2000);
   if (name.length < 2) return json({ error: 'Adınızı yazın' }, 400, h);
-  if (!phone && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Telefon ya da geçerli bir e-posta yazın' }, 400, h);
+  if (!validEmail(email)) return json({ error: 'Geçerli bir e-posta adresi yazın' }, 400, h);
+  if (!validPhone(phone)) return json({ error: 'Geçerli bir telefon numarası yazın (ör. 0532 123 45 67 ya da 0212 123 45 67)' }, 400, h);
   if (!b.consent) return json({ error: 'Aydınlatma metnini onaylayın' }, 400, h);
   await init(db);
   // IP başına saatte 5 talep

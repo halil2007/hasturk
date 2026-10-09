@@ -536,7 +536,6 @@ export async function openOrder(id, onChange) {
           <div class="card">
             <div class="card-head"><h3>Alıcı</h3><button class="btn sm ghost" data-copy><i class="ico ico-copy"></i>Kopyala</button></div>
             <div style="font-weight:700">${a.name || o.customer}</div><div class="small">${a.line}</div><div class="small">${[a.district, a.city].filter(Boolean).join(' / ')}</div><div class="small muted">${a.phone || o.phone}${o.email ? ` · ${o.email}` : ''}</div>
-            ${!(a.phone || o.phone) ? html`<div class="notice warn small" style="margin-top:8px">Telefon yok: bazı kargo firmaları barkod oluşturmaz.</div>` : ''}
           </div>
           <div class="card">
             <div class="card-head"><h3>Kârlılık (tahmini)</h3></div>

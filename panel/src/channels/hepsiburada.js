@@ -48,6 +48,7 @@ export function hepsiburada(env, meta) {
   const g = (o, ...keys) => { if (!o) return undefined; for (const k of keys) { if (o[k] != null) return o[k]; const K = k[0].toUpperCase() + k.slice(1); if (o[K] != null) return o[K]; } return undefined; };
   const page = (r) => (Array.isArray(r) ? r : (r && (g(r, 'items', 'data', 'listings') || [])) || []);
   const D = 864e5;
+  const HB_VAT = 1.2; // komisyon faturası KDV'si
 
   // Sipariş satırı (açık satır: LineRepresentation · paket satırı: PackageLine)
   function lineOf(it) {
@@ -60,8 +61,22 @@ export function hepsiburada(env, meta) {
       status: /cancel|iptal/i.test(g(it, 'status') || '') ? 'cancelled' : '', remoteKey: str(g(it, 'hbSku', 'sku', 'hepsiburadaSku')),
       orderNumber: str(g(it, 'orderNumber', 'orderId')), orderDate: g(it, 'orderDate'), dueDate: Date.parse(g(it, 'dueDate') || '') || null,
       // Hepsiburada'nın satırda bildirdiği komisyon (TL) ya da oran (%); ikisi de yoksa boş (tahmin kullanılır)
-      commission: g(it, 'commission') != null ? money(g(it, 'commission')) : g(it, 'commissionRate') != null ? Math.round(total * num(g(it, 'commissionRate'))) / 100 : null,
+      commission: commissionOf(it, total, qty),
     };
+  }
+  // Komisyon: Hepsiburada satırdaki tutarı tek adet için ve KDV hariç bildirir (ör. 2 × 1.500 TL, %17 → 255 TL); Hepsiburada panelindeki
+  // "Hepsiburada komisyonu" ise satırın tamamı ve KDV dahildir (3.000 × %17 × 1,20 = 612 TL). Panelde de kesilecek tutar tutulur.
+  // Oran da geldiyse tutarın adet başı mı satır toplamı mı olduğu orandan doğrulanır.
+  function commissionOf(it, total, qty) {
+    const amt = g(it, 'commission') != null ? money(g(it, 'commission')) : null, rate = g(it, 'commissionRate') != null ? num(g(it, 'commissionRate')) : null;
+    let net = null;
+    if (amt > 0) {
+      let perUnit = qty > 1;
+      if (perUnit && rate > 0) perUnit = Math.abs(amt - (total / qty) * rate / 100) <= Math.abs(amt - total * rate / 100);
+      net = perUnit ? amt * qty : amt;
+    } else if (rate != null) net = (total * rate) / 100;
+    else if (amt != null) net = amt;
+    return net == null ? null : Math.round(net * HB_VAT * 100) / 100;
   }
   // Adres: açık satırdaki shippingAddress / sipariş ayrıntısındaki deliveryAddress (il = city, ilçe = town, mahalle = district)
   const addrOf = (a = {}, fallbackName = '') => ({ name: str(g(a, 'name') || fallbackName), line: str(g(a, 'address')), district: str(g(a, 'town') || g(a, 'district')), city: str(g(a, 'city')), phone: str(g(a, 'phoneNumber', 'phone')), email: str(g(a, 'email')) });
