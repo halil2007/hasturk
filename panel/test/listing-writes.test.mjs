@@ -47,3 +47,25 @@ test('günlük bakım: eski gönderilmiş paketlerin etiket dosyası silinir, ye
   assert.equal(rows.b.label_data, 'YENI'); assert.equal(rows.c.label_data, 'ACIK');
   assert.equal(await housekeeping(db), null, 'günde bir kez');
 });
+
+test('günlük bakım: teslim edilen / iptal / iade siparişin etiketi 3 gün sonra silinir; kargodaki ve yeni teslim edilen kalır', async () => {
+  const { housekeeping } = await import('../src/sync.js');
+  const db = d1();
+  await init(db);
+  const t = Date.now(), D = 864e5;
+  const order = (id, status, upd) => run(db, "INSERT INTO orders (id, channel, remote_id, order_number, status, ordered_at, updated_at, total) VALUES (?, 'trendyol', ?, ?, ?, ?, ?, 0)", id, id, id, status, t - 20 * D, upd);
+  await order('teslim', 'delivered', t - 4 * D);
+  await order('yeni-teslim', 'delivered', t - 1 * D);
+  await order('iptal', 'cancelled', t - 5 * D);
+  await order('kargoda', 'shipped', t - 10 * D);
+  for (const id of ['teslim', 'yeni-teslim', 'iptal', 'kargoda']) {
+    await run(db, "INSERT INTO packages (order_id, no, items, status, created_at, shipped_at, label_format, label_data, tracking) VALUES (?, 1, '[]', ?, ?, ?, 'pdf', 'ETIKET', 'TR')",
+      id, id === 'iptal' ? 'open' : 'shipped', t - 10 * D, id === 'iptal' ? null : t - 8 * D);
+  }
+  assert.equal((await housekeeping(db)).labels, 2);
+  const rows = Object.fromEntries((await all(db, 'SELECT order_id, label_data, tracking FROM packages')).map((r) => [r.order_id, r]));
+  assert.equal(rows.teslim.label_data, null); assert.equal(rows.teslim.tracking, 'TR', 'takip no kalır');
+  assert.equal(rows.iptal.label_data, null);
+  assert.equal(rows['yeni-teslim'].label_data, 'ETIKET', 'teslimden 3 gün geçmedi');
+  assert.equal(rows.kargoda.label_data, 'ETIKET', 'kargodaki paket 45 güne kadar');
+});

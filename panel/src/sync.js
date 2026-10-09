@@ -668,12 +668,18 @@ export async function quickSync(env, db) {
     return out;
   } finally { await releaseLock(db, 'quick_lock', t); }
 }
-// Günde bir: eski etiket dosyaları (paket kaydı, takip no ve geçmiş kalır; yalnız artık gerekmeyen etiket içeriği silinir)
-export async function housekeeping(db, { days = 45 } = {}) {
+// Günde bir: artık gerekmeyen etiket dosyaları silinir (paket kaydı, takip no, barkod ve geçmiş kalır; gerekirse panel aynı barkodla
+// etiket basar ya da etiket kanaldan yeniden istenir). Sipariş teslim edildi / iptal / iade olduktan 3 gün sonra; teslim bilgisi
+// gelmeyen kargodaki paketlerde 45 gün sonra.
+export async function housekeeping(db, { days = 45, doneDays = 3 } = {}) {
   const t = Date.now(), last = await getRaw(db, 'housekeeping_at');
   if (last && t - last < 864e5) return null;
   await setSetting(db, 'housekeeping_at', t);
-  const r = await run(db, "UPDATE packages SET label_data = NULL WHERE label_data IS NOT NULL AND status = 'shipped' AND COALESCE(shipped_at, created_at) < ?", t - days * 864e5);
+  const done = t - doneDays * 864e5;
+  const r = await run(db, `UPDATE packages SET label_data = NULL WHERE label_data IS NOT NULL AND (
+      (status = 'shipped' AND COALESCE(shipped_at, created_at) < ?)
+      OR (COALESCE(shipped_at, created_at) < ? AND order_id IN (SELECT id FROM orders WHERE status IN ('delivered', 'cancelled', 'returned') AND COALESCE(updated_at, 0) < ?)))`,
+  t - days * 864e5, done, done);
   // Hız bakımı: eski günlük / geçmiş kayıtları budanır, sorgu planlayıcı istatistikleri tazelenir (bkz. perf.js)
   const m = await maintain(db).catch((e) => ({ error: e.message }));
   await setSetting(db, 'maint', { at: t, labels: (r && r.meta && r.meta.changes) || 0, ...m });
