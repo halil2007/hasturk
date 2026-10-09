@@ -1390,3 +1390,9 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .cat-tag { display: inline-flex; align-items: center; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 7px; margin-right: 6px; height: 19px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2); font-size: 11px; font-weight: 600; cursor: pointer; vertical-align: middle; }
 .cat-tag:hover { border-color: var(--accent, var(--line-2)); color: var(--text); }
 @media (max-width: 640px) { .cat-row { flex-direction: column; align-items: stretch; gap: 4px; } }
+/* Kategori seçici (ürün formu): yazarken öneri */
+.cat-pick { position: relative; }
+.cat-pop { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; background: var(--card, #fff); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 30, 60, .14); max-height: 300px; overflow: auto; padding: 4px; }
+.cat-opt { display: flex; width: 100%; justify-content: space-between; gap: 10px; align-items: center; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 8px; font: inherit; font-size: 13.5px; color: inherit; cursor: pointer; }
+.cat-opt:hover, .cat-opt.on { background: var(--bg-soft, rgba(0, 0, 0, .05)); }
+.cat-new { padding: 8px 10px; border-top: 1px solid var(--line); }

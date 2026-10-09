@@ -14,6 +14,7 @@ import { syncFx } from './fx.js';
 import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
 import { autoMatch, relinkItems, repairDuplicates } from './match.js';
 import { runJobs, createJob } from './backfill.js';
+import { normCat, catKey } from '../public/catpath.js';
 import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
 import { syncClaims, applyClaimReturns } from './claims.js';
@@ -233,8 +234,23 @@ export async function applyDirtyStock(db, settings, limit = 3000) {
 // Panel ürününde marka / açıklama / kategori / SKU / barkod boşsa bağlı ilanlardan doldurulur (önce ana katalog sitesi, sonra diğer kanallar).
 // Panelde elle girilen değer korunur. SKU ve barkod başka bir üründe kullanılıyorsa yazılmaz (çakışma ve yanlış eşleşme olmasın);
 // o ilanda yoksa sıradaki platformun değeri denenir.
+// Kategorileri birleştir: farklı ayırıcıyla ("Bahçe > Tohum") ya da farklı harfle ("bahçe › tohum") yazılmış aynı yol tek biçime
+// çekilir (en çok kullanılan yazım). Kategori çeşidi az olduğundan her senkronda çalışması ucuzdur.
+export async function mergeCategories(db) {
+  const rows = await all(db, "SELECT category AS c, COUNT(*) AS n FROM products WHERE COALESCE(category, '') != '' GROUP BY category");
+  const best = new Map();
+  for (const r of rows) {
+    const k = catKey(r.c), x = best.get(k), norm = normCat(r.c), n = r.n + (norm === r.c ? 0.5 : 0); // eşitlikte zaten düzgün yazılmış olan
+    if (!x || n > x.n || (n === x.n && norm < x.c)) best.set(k, { c: norm, n });
+  }
+  const st = rows.filter((r) => r.c !== best.get(catKey(r.c)).c).map((r) => db.prepare('UPDATE products SET category = ? WHERE category = ?').bind(best.get(catKey(r.c)).c, r.c));
+  for (const part of chunk(st, 90)) await db.batch(part);
+  return st.length;
+}
+
 export async function fillProductInfo(db, settings) {
   settings = settings || await getSettings(db);
+  await mergeCategories(db).catch(() => 0);
   const cats = catalogOf(settings);
   const rank = `CASE l.channel ${cats.map((c, i) => `WHEN '${String(c).replace(/'/g, '')}' THEN ${i}`).join(' ')} ELSE 99 END`;
   let n = 0;
@@ -616,7 +632,7 @@ export async function refreshListings(db, ch) {
         OR (excluded.category != '' AND listings.category IS NOT excluded.category) OR (listings.price_dirty = 0 AND listings.price IS NOT excluded.price)
         OR listings.list_price IS NOT excluded.list_price OR listings.remote_stock IS NOT excluded.remote_stock OR listings.pushed_stock IS NOT excluded.remote_stock`)
       .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t,
-        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), str(l.category).slice(0, 300), (l.images || []).length ? JSON.stringify(l.images.slice(0, 12)) : '')));
+        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), normCat(l.category), (l.images || []).length ? JSON.stringify(l.images.slice(0, 12)) : '')));
   }
   // Deneme modu: örnek alış fiyatları (gerçek kanallar alış fiyatı vermez)
   for (const l of rows) if (l.purchasePrice) await run(db, 'UPDATE products SET purchase_price = ? WHERE sku = ? AND purchase_price = 0', l.purchasePrice, l.sku);

@@ -4,6 +4,8 @@ import { api, state, locked, html, raw, render, $, $$, money, money0, n, ago, da
 import { readSheet } from '../sheetread.js';
 import { profit, costOf, costRaw, rateGross } from '../profit.js';
 import { productErrorsSheet } from './listerrs.js';
+import { attachCatPicker } from './catpick.js';
+import { normCat } from '../catpath.js';
 import { explainError } from '../listerr.js';
 const errText = (e) => { const x = explainError(e); return `${x.kind ? x.kind + ': ' : ''}${x.title} — ${x.fix}`; };
 import { ruleDialog, ruleText } from './stocks.js';
@@ -85,7 +87,7 @@ export async function products(el, rest, query = {}) {
     const m = new Map();
     for (const c of cats) {
       if (!c.name) continue;
-      const parts = c.name.split(SEP);
+      const parts = normCat(c.name).split(SEP);
       for (let i = 1; i <= parts.length; i++) { const k = parts.slice(0, i).join(SEP); m.set(k, (m.get(k) || 0) + c.n); }
     }
     return m;
@@ -357,7 +359,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Stok kodu (SKU)</span><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" name="sku" value="${p.sku || ''}" placeholder="kanallarla aynı olmalı" style="flex:1;min-width:0"><button type="button" class="btn sm" data-gensku title="Ürün adından SKU oluştur">Oluştur</button></div></label>
         <label class="field"><span>Barkod</span><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" name="barcode" value="${p.barcode || ''}" style="flex:1;min-width:0"><button type="button" class="btn sm" data-genbc title="Benzersiz EAN-13 barkod oluştur">Oluştur</button></div></label>
         <label class="field"><span>Marka</span><input class="input" name="brand" value="${p.brand || ''}"></label>
-        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ikas'tan gelir"><small>Pazaryerine yüklemede kategori eşleştirmesi buna göre yapılır</small></label>
+        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="Yazın: kayıtlı kategoriler önerilir (ör. Bahçe › Tohum)"><small>Alt kategori için › ya da > yazın. Pazaryerine yüklemede kategori eşleştirmesi buna göre yapılır</small></label>
         <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="varyantlar bu adla gruplanır"></label>
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
       </div>
@@ -405,6 +407,7 @@ export async function productForm(id, done) {
       <div class="card"><h3 style="margin-bottom:8px">Son 30 gün satış</h3>${p.sales.length ? html`<table class="t"><tbody>${p.sales.map((x) => html`<tr><td>${ch(x.channel).name}</td><td class="r num">${x.qty} adet</td><td class="r num">${money(x.revenue)}</td></tr>`)}</tbody></table>` : html`<div class="muted small">Satış yok</div>`}</div>
     </div>` : ''}
   </form>`);
+  attachCatPicker($("[name=category]", s.body));
   const allv = $("[data-allvar]", s.body);
   if (allv) allv.onclick = () => { s.close(); variantEditor(p.siblings, done, p.group_name || p.name); };
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
