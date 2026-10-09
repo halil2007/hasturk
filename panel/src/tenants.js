@@ -55,7 +55,7 @@ const PLATFORM = { hepsiburada: ['HB_USER_AGENT', 'HB_PROXY_URL', 'HB_PROXY_KEY'
 export async function platformValues(env, db) {
   const cfg = db ? await loadConfig(env, db) : {}, out = {};
   for (const [id, keys] of Object.entries(PLATFORM)) for (const k of keys) { const v = (cfg[id] && cfg[id].values && cfg[id].values[k]) || env[k]; if (v) out[k] = String(v); }
-  // Test modülünden müşterilere açılan kanal türleri (ana panel → Entegrasyonlar → "Müşterilere aç")
+  // "Test aşamasında" etiketi kaldırılan kanal türleri (ana panel → Entegrasyonlar → "Test yazısını kaldır")
   const rel = db ? await releasedTypes({}, db) : [];
   if (rel.length) out.RELEASED_TYPES = rel.join(',');
   return out;

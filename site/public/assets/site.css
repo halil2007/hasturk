@@ -52,7 +52,9 @@ p { margin: 0; }
 .menu-btn { margin-left: auto; background: none; border: 0; color: var(--text); padding: 8px; cursor: pointer; }
 .menu-btn svg { width: 26px; height: 26px; }
 .mnav { display: none; background: #fff; border-bottom: 1px solid var(--line); padding: 8px 16px 18px; }
-.mnav.open { display: grid; gap: 2px; }
+.mnav.open { display: grid; gap: 2px; max-height: calc(100vh - 72px); max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* menü ekrandan uzunsa kendi içinde kayar; sona gelince kaydırma arkadaki sayfaya geçmez (yükseklik site.js'te ekrana göre ayarlanır).
+   Sayfa overflow ile kilitlenmez: html / body'de overflow değişince yapışkan üst çubuk sayfayla birlikte kayıp gidiyor */
 .mnav a { color: var(--text); padding: 12px 6px; font-weight: 600; border-bottom: 1px solid var(--line); }
 .mnav .btn { margin-top: 10px; border-bottom-width: 1.5px; }
 @media (min-width: 1040px) { .nav, .top-cta { display: flex; } .menu-btn, .mnav { display: none !important; } }
@@ -230,6 +232,11 @@ section { scroll-margin-top: 76px; }
 .it.soon .b { opacity: .55; }
 .pill { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 99px; background: var(--good-soft); color: var(--good); vertical-align: 1px; }
 .pill.soon { background: var(--amber-soft); color: var(--amber); }
+.pill[hidden] { display: none; }
+/* test aşamasındaki kanalın küçük etiketi (menü, listeler) */
+.tt { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 99px; background: var(--amber-soft); color: var(--amber); font-size: 10.5px; font-weight: 700; line-height: 17px; vertical-align: 1px; white-space: nowrap; }
+.icard .pill { margin-top: 4px; }
+.beta-note { background: var(--amber-soft); border-radius: 12px; padding: 10px 14px; font-size: 14.5px; color: var(--text); }
 .integ-h { display: flex; align-items: center; gap: 10px; margin: 28px 0 12px; font-weight: 750; font-size: 17px; }
 .note { color: var(--muted); font-size: 13px; text-align: center; margin-top: 18px; }
 

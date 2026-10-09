@@ -23,42 +23,44 @@
   document.addEventListener('input', (e) => { if (e.target.classList && e.target.classList.contains('bad')) e.target.classList.remove('bad'); });
   const waUrl = (v) => 'https://wa.me/' + String(v).replace(/\D/g, '') + (S.waText ? '?text=' + encodeURIComponent(S.waText) : '');
 
-  // Kanallar: aktif olanlar ve yakında gelecekler. [ad, tür, rozet rengi, kısa ad, yazı stili (logo şeridi)]
+  // Kanallar: aktif olanlar ve yakında gelecekler. [ad, tür, rozet rengi, kısa ad, yazı stili (logo şeridi), paneldeki kanal türü]
   const ACTIVE = [
     ['Hepsiburada', 'pazaryeri', '#ff6000', 'hb', 'color:#ff6000;font-size:19px'], ['Trendyol', 'pazaryeri', '#f27a1a', 'T', 'color:#f27a1a'], ['ikas', 'e-ticaret sitesi', '#111827', 'ik', 'color:#111827;font-size:24px'],
     ['N11', 'pazaryeri', '#7b3fe4', 'n11', 'color:#7b3fe4'], ['PttAVM', 'pazaryeri', '#e0a800', 'Ptt', 'color:#e0a800'], ['idefix', 'pazaryeri', '#1d4ed8', 'id', 'color:#1d4ed8;font-style:italic'],
     ['Pazarama', 'pazaryeri', '#7a2bc9', 'Pz', 'color:#7a2bc9;font-size:19px'], ['WooCommerce', 'e-ticaret sitesi', '#7f54b3', 'W', 'color:#7f54b3;font-size:19px'],
-  ];
-  // 6. alan: paneldeki kanal türü. Ana panelde "Müşterilere aç" ile yayına alınan tür (panel → /api/public/channels) aktif listeye geçer
-  const SOON = [
+    // Test aşamasındakiler (6. alan: paneldeki kanal türü): kullanıma açık, "test aşamasında" etiketiyle görünür
     ['Amazon', 'pazaryeri', '#232f3e', 'a', 'color:#232f3e', 'amazon'], ['Çiçeksepeti', 'pazaryeri', '#1e9e57', 'Çs', 'color:#1e9e57;font-size:19px', 'ciceksepeti'], ['Koçtaş', 'pazaryeri', '#e5541b', 'K', 'color:#e5541b', 'koctas'],
-    ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S', 'color:#5e8e3e', 'shopify'], ['Etsy', 'pazaryeri', '#f1641e', 'E', 'color:#f1641e', 'etsy'], ['Ticimax', 'e-ticaret sitesi', '#0b5cff', 'Tx'],
-    ['IdeaSoft', 'e-ticaret sitesi', '#00a3e0', 'iS'], ['T-Soft', 'e-ticaret sitesi', '#e30613', 'TS'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC', 'color:#23a8e0;font-size:19px', 'opencart'],
+    ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S', 'color:#5e8e3e', 'shopify'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC', 'color:#23a8e0;font-size:19px', 'opencart'], ['Etsy', 'pazaryeri', '#f1641e', 'E', 'color:#f1641e', 'etsy'],
+  ];
+  // Ana panelde "Test yazısını kaldır" denince tür bu listeden çıkar (panel → /api/public/channels → beta); panel yanıt vermezse etiketler kalır
+  let TEST = new Set(['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy']);
+  const SOON = [
+    ['Ticimax', 'e-ticaret sitesi', '#0b5cff', 'Tx'], ['IdeaSoft', 'e-ticaret sitesi', '#00a3e0', 'iS'], ['T-Soft', 'e-ticaret sitesi', '#e30613', 'TS'],
   ];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
   const wms = (dup, link = true) => ACTIVE.map((x) => `<${link ? 'a href="/entegrasyonlar"' : 'span'} class="wm${dup ? ' dup' : ''}" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</${link ? 'a' : 'span'}>`).join('');
-  const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}</small></div></div>`).join('');
+  const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}${TEST.has(x[5]) ? '<span class="tt">Test aşamasında</span>' : ''}</small></div></div>`).join('');
   const drawChannels = () => {
     const logos = $('[data-logos]');
     if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
     const logosStatic = $('[data-logos-static]');
     if (logosStatic) logosStatic.innerHTML = wms(false, false);
-    $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.length; });
+    $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.filter((x) => !TEST.has(x[5])).length; });
     $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
     $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
-    // Kanal sayfasındaki "yakında" rozeti (ör. /entegrasyonlar/shopify): yayına alınmışsa kalkar
-    $$('[data-soon-type]').forEach((el) => { if (ACTIVE.some((x) => x[5] === el.dataset.soonType)) el.remove(); });
+    // Derlenmiş sayfalardaki "Test aşamasında" etiketleri (menü, kartlar, kanal sayfası): testi biten türde kalkar, yerine "Aktif entegrasyon"
+    $$('[data-beta]').forEach((el) => { if (!TEST.has(el.dataset.beta)) el.remove(); });
+    $$('[data-beta-on]').forEach((el) => { el.hidden = TEST.has(el.dataset.betaOn); });
   };
   drawChannels();
-  // Panelde müşterilere açılan kanallar: "yakında"dan aktif listeye (panel yanıt vermezse sayfa olduğu gibi kalır)
-  if (S.panelUrl && (document.querySelector('[data-integ], [data-logos], [data-logos-static], [data-count="active"], [data-soon-type]'))) {
+  // Panelde testi biten kanallar: "Test aşamasında" etiketi kalkar (panel yanıt vermezse sayfa olduğu gibi kalır)
+  if (S.panelUrl && (document.querySelector('[data-integ], [data-beta]'))) {
     fetch(`${S.panelUrl.replace(/\/+$/, '')}/api/public/channels`, { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)).then((d) => {
-      const rel = (d && Array.isArray(d.released)) ? d.released : [];
-      let moved = false;
-      for (const t of rel) { const i = SOON.findIndex((x) => x[5] === t); if (i >= 0) { ACTIVE.push(SOON.splice(i, 1)[0]); moved = true; } }
-      if (moved) drawChannels();
+      if (!d || !Array.isArray(d.beta)) return;
+      const next = new Set([...TEST].filter((t) => d.beta.includes(t)));
+      if (next.size !== TEST.size) { TEST = next; drawChannels(); }
     }).catch(() => {});
   }
   $$('[data-chans]').forEach((el) => { el.innerHTML = [...ACTIVE, ...SOON].map((x) => x[0]).concat(['Diğer']).map((n) => `<label><input type="checkbox" name="channels" value="${esc(n)}">${esc(n)}</label>`).join(''); });
@@ -167,10 +169,21 @@
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
 
   // Mobil menü
+  // Menü ekrandan uzun olabilir (açılır listeler): kendi içinde kayar. Yükseklik menünün ekrandaki yerine göre ayarlanır
+  // (üstteki iletişim şeridi görünürken de alttaki bağlantılara ulaşılır; sayfa kayınca yeniden hesaplanır).
   const mb = $('[data-menu]'), mn = $('[data-mnav]');
   if (mb && mn) {
-    mb.addEventListener('click', () => { const o = mn.classList.toggle('open'); mb.setAttribute('aria-expanded', o); });
-    mn.addEventListener('click', (e) => { if (e.target.closest('a')) { mn.classList.remove('open'); mb.setAttribute('aria-expanded', 'false'); } });
+    const fit = () => { if (mn.classList.contains('open')) mn.style.maxHeight = Math.max(200, window.innerHeight - mn.getBoundingClientRect().top) + 'px'; };
+    const set = (o) => {
+      mn.classList.toggle('open', o); mb.setAttribute('aria-expanded', o);
+      if (o) { mn.scrollTop = 0; fit(); } else mn.style.maxHeight = '';
+    };
+    mb.addEventListener('click', () => set(!mn.classList.contains('open')));
+    mn.addEventListener('click', (e) => { if (e.target.closest('a')) set(false); });
+    window.addEventListener('resize', () => { if (window.innerWidth >= 1040) set(false); else fit(); });
+    window.addEventListener('scroll', fit, { passive: true });
+    mn.addEventListener('toggle', fit, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mn.classList.contains('open')) set(false); });
   }
 
   // Görünürken beliren bölümler

@@ -21,16 +21,16 @@ const HELP = {
   opencart: 'OpenCart\'ın hazır bir yönetim API\'si olmadığından bağlantı küçük bir PHP dosyasıyla kurulur: Bağlantı dosyasını indirin, OpenCart\'ın kurulu olduğu ana klasöre (config.php\'nin yanına) yükleyin, site adresini girip bağlantıyı test edin. Dosya veritabanına OpenCart\'ın kendi bilgileriyle bağlanır, yalnız panelin anahtarıyla çalışır. Siparişler, ürünler (seçenekler ayrı varyant), stok, fiyat ve kargo bildirimi desteklenir. Site HTTPS olmalı.',
   etsy: 'etsy.com/developers → Create a New App (keystring + shared secret); uygulamayı mağazanız için OAuth ile yetkilendirip refresh token alın. Siparişler, stok, fiyat ve kargo bildirimi desteklenir; panel yenilenen belirteci kendisi saklar.',
 };
-// Test modülü: bu kanallar ana panelde bağlanıp denenir; müşteri panellerinde "Yakında" görünür. Ana panelde kanal sayfasındaki
-// "Müşterilere aç" düğmesiyle yayına alınan tür listeden çıkar (liste sunucudan gelir: integrations → beta)
+// Test aşamasındaki kanallar: ana ve müşteri panellerinde eklenip kullanılır, "Test aşamasında" etiketiyle görünür. Ana panelde kanal
+// sayfasındaki "Test yazısını kaldır" düğmesiyle etiketi kalkan tür listeden çıkar (liste sunucudan gelir: integrations → beta)
 const ALL_BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy'];
 let BETA = ALL_BETA;
 
 // Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
 const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama', 'woocommerce', ...ALL_BETA];
 const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', etsy: 'Etsy' };
-// Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi): müşteri panellerinde test modülündekiler de burada
-const SOON = () => [...(state.tenant ? BETA.map((t) => TYPE_NAME[t]) : []), 'Teknosa', 'Turkcell Pasaj'];
+// Yakında eklenecek satış kanalları (seçilemez, yalnız bilgi)
+const SOON = () => ['Teknosa', 'Turkcell Pasaj'];
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
@@ -76,7 +76,7 @@ export async function integrations(el, rest = []) {
     const multi = conf.length > 1;
     return html`<div class="icard ${conf.length ? 'conf' : ''} ${s.k}" data-act="open" data-id="${c.id}" tabindex="0">
       <div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${typeName(g.type)}</b>
-          <div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${multi ? `${live.length}/${conf.length} mağaza bağlı` : s.t}${c.beta ? html`<span class="pill info tiny">Test modülü</span>` : ''}${c.sandbox ? html`<span class="pill warn tiny">Test ortamı</span>` : ''}</div></div>
+          <div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${multi ? `${live.length}/${conf.length} mağaza bağlı` : s.t}${c.beta ? html`<span class="pill warn tiny">Test aşamasında</span>` : ''}${c.sandbox ? html`<span class="pill warn tiny">Test ortamı</span>` : ''}</div></div>
         <button class="btn sm ${conf.length ? 'outline' : 'primary'}" data-act="open" data-id="${c.id}">${conf.length ? html`<i class="ico ico-gear"></i>Yönet` : html`<i class="ico ico-plus"></i>Bağla`}</button></div>
       ${multi ? html`<div class="ic-stores small">${conf.map((x) => { const k = stateOf(x).k; return html`<span class="ic-store"><span class="led ${k === 'off' ? 'off' : k === 'err' ? 'err' : k === 'demo' ? 'demo' : ''}"></span>${x.name}</span>`; })}</div>` : ''}
       ${!conf.length ? html`<div class="ic-need small muted">Gerekenler: ${c.fields.filter((x) => x.req).map((x) => x.label).join(', ') || 'API bilgileri'}</div>`
@@ -162,9 +162,10 @@ export async function integrations(el, rest = []) {
       <div class="idetail" data-ch="${c.id}">
         <aside class="card id-side">
           <div class="id-brand">${chLogo(c.id)}<div style="min-width:0"><h2>${c.type === 'ikas' ? `ikas · ${c.name}` : c.name}</h2><div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${s.t}</div></div></div>
-          ${!state.tenant && ALL_BETA.includes(c.type) ? (c.beta
-            ? html`<div class="notice small"><div><b>Test modülü:</b> yalnız bu panelde açık; firmalarda ve sitede “Yakında” görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm primary" data-act="release" data-type="${c.type}" data-on="1">Müşterilere aç</button></div>` : ''}</div></div>`
-            : html`<div class="notice small good"><div><b>Müşterilere açık:</b> firmalar bu kanalı ekleyebilir; tanıtım sitesinde de aktif görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm" data-act="release" data-type="${c.type}" data-on="">Test modülüne geri al</button></div>` : ''}</div></div>`) : ''}
+          ${state.tenant ? (c.beta ? html`<div class="notice small warn"><div><b>Test aşamasında:</b> bu entegrasyon kullanıma açık ancak henüz test aşamasındadır. Bağladıktan sonra ilk siparişlerinizi ve stoklarınızı kanalın kendi panelinden de kontrol edin; bir sorun görürseniz bize bildirin.</div></div>` : '')
+            : ALL_BETA.includes(c.type) ? (c.beta
+            ? html`<div class="notice small warn"><div><b>Test aşamasında:</b> firmalar bu kanalı ekleyip kullanabilir; panellerinde ve tanıtım sitesinde “Test aşamasında” etiketiyle görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm primary" data-act="release" data-type="${c.type}" data-on="1">Test yazısını kaldır</button></div>` : ''}</div></div>`
+            : html`<div class="notice small good"><div><b>Test tamamlandı:</b> firmalarda ve tanıtım sitesinde etiketsiz, normal kanal olarak görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm" data-act="release" data-type="${c.type}" data-on="">“Test aşamasında” etiketini geri koy</button></div>` : ''}</div></div>`) : ''}
           <div class="id-sws">
             ${sw('active', c.id, c.active, 'Kanal aktif', 'Kapalıysa senkronlanmaz', !admin)}
             ${sw('write', c.id, !held(c), 'Kanala yazma', 'Kapalıysa yalnız okunur: paketleme, stok, fiyat gönderilmez', !admin || !live)}
@@ -241,15 +242,14 @@ export async function integrations(el, rest = []) {
     show: (t) => { f.show = t.dataset.k; try { sessionStorage.setItem('integ_show', f.show); } catch { /* yok */ } draw(); },
     release: async (t) => {
       const on = !!t.dataset.on, name = TYPE_NAME[t.dataset.type] || t.dataset.type;
-      const ok = await confirmBox(on ? `${name} müşterilere açılsın mı? Firmalar kanalı Entegrasyonlar'dan ekleyebilir; sitede “Yakında” etiketi kalkar. Müşteri panellerine birkaç dakika içinde yansır.`
-        : `${name} test modülüne geri alınsın mı? Firmalarda yeniden “Yakında” görünür ve firmaların bu kanaldaki mağazaları çalışmayı bırakır (bilgileri silinmez).`, on ? 'Müşterilere aç' : 'Geri al');
+      const ok = await confirmBox(on ? `${name} için “Test aşamasında” yazısı kaldırılsın mı? Firmaların panellerinde ve tanıtım sitesinde normal kanal olarak görünür (birkaç dakika içinde yansır).`
+        : `${name} yeniden “Test aşamasında” etiketiyle gösterilsin mi? Kanal çalışmaya devam eder; yalnız firmaların panellerinde ve sitede etiket görünür.`, on ? 'Test yazısını kaldır' : 'Etiketi geri koy');
       if (!ok) return;
-      await busy(t, async () => { await api('integrations/release', { method: 'POST', body: { type: t.dataset.type, on } }); toast(on ? `${name} müşterilere açıldı` : `${name} test modülüne alındı`); await load(); });
+      await busy(t, async () => { await api('integrations/release', { method: 'POST', body: { type: t.dataset.type, on } }); toast(on ? `${name}: “Test aşamasında” yazısı kaldırıldı` : `${name}: “Test aşamasında” etiketi geri kondu`); await load(); });
     },
     syscheck: () => systemCheck(data.channels.filter((c) => (c.enabled && !c.paused) || (c.gated && !(c.missing || []).length)).map((c) => ({ id: c.id, name: c.name }))),
     addmenu: (t) => {
-      const types = TYPES.filter((x) => !(state.tenant && BETA.includes(x)));
-      popMenu(t, types.map((x) => ({ label: `${TYPE_NAME[x]}${BETA.includes(x) ? ' (test modülü)' : ''}`, run: () => busy(null, async () => {
+      popMenu(t, TYPES.map((x) => ({ label: `${TYPE_NAME[x]}${BETA.includes(x) ? ' (test aşamasında)' : ''}`, run: () => busy(null, async () => {
         const r = await api('integrations/add', { method: 'POST', body: { type: x } });
         toast(`${TYPE_NAME[x]}: yeni mağaza eklendi — bilgilerini girin`); await loadSummary().catch(() => {});
         location.hash = '#/entegrasyonlar/' + encodeURIComponent(r.id);

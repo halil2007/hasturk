@@ -47,7 +47,9 @@ Ayarlar (değiştirdikten sonra `node build.mjs` çalıştırın; arama motoru v
 - **Şirket bilgileri, telefon, WhatsApp, e-posta, paket fiyatları (KDV dahil) ve karşılaştırma tablosu:** `public/assets/config.js`
   (boş alanlar sitede gösterilmez; yasal sayfalarda sarı `[yer tutucu]` olarak kalır — yayından önce doldurun).
   Bir pakete henüz aktif olmayan özellik eklemek için `soon: [...]` kullanın; kartta "Yakında" rozetiyle görünür.
-- **Kanal listesi (aktif / yakında):** `public/assets/site.js` → `ACTIVE`, `SOON`. Kanal yetenek tablosu `src/pages/entegrasyonlar.html` içindedir.
+- **Kanal listesi (aktif / test aşamasında / yakında):** `public/assets/site.js` → `ACTIVE`, `TEST`, `SOON`; kanal sayfaları `src/data.mjs` → `INTEGRATIONS`. Kanal yetenek tablosu `src/pages/entegrasyonlar.html` içindedir.
+  Test aşamasındaki kanallar (Amazon, Çiçeksepeti, Koçtaş, Shopify, OpenCart, Etsy; `data.mjs`'te `beta`) menüde, kartlarda ve kendi sayfalarında **“Test aşamasında”** etiketiyle görünür.
+  Ana panelde Entegrasyonlar → kanal → **“Test yazısını kaldır”** denince etiket sitede de kalkar (sayfalar `/api/public/channels`'tan okur; derleme gerekmez).
 - **Rakamlar şeridi** (ana sayfa, `class="stats"`): yalnız doğrulanabilir bilgiler yazın (müşteri sayısı, memnuniyet oranı gibi değerleri gerçek veri olmadan eklemeyin).
 - **Ekran görüntüleri:** `public/img/*.jpg` (panelin deneme modundan, 1440×900).
 - **Yasal metinler:** `src/pages/kvkk.html`, `gizlilik.html`, `kullanim-kosullari.html` — yayından önce bir hukukçuya kontrol ettirin.

@@ -58,7 +58,7 @@ export default {
     if (path === 'public/checkout/callback') return await checkoutCallback(req, env);
     // Blog (tanıtım sitesi için; oturumsuz, yalnız okuma: yazı listesi, yazı, görsel, RSS, site haritası — bkz. blog.js)
     if (path === 'public/blog' || path.startsWith('public/blog/')) return await blogPublic(req, env, path);
-    // Tanıtım sitesi: müşterilere açık kanal türleri (test modülünden açılanlar; Entegrasyonlar sayfası "Yakında" etiketini buna göre kaldırır)
+    // Tanıtım sitesi: "Test aşamasında" etiketi kaldırılan kanal türleri (released) ve hâlâ test aşamasında olanlar (beta)
     if (path === 'public/channels' && req.method === 'GET') return await publicChannels(req, env);
     // Demo paneline giriş (sitedeki imzalı bağlantı)
     if (path === 'public/demo') return await demoRequest(req, env);
