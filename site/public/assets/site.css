@@ -847,3 +847,13 @@ a.mf:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .co-copy { margin-left: 6px; font: inherit; font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 7px; border: 1px solid #b7d3f7; background: #fff; color: var(--primary); cursor: pointer; font-family: inherit; }
 .co-done { display: grid; gap: 10px; } .co-done h2 { margin: 0; }
 .y-eft { margin-top: 8px; font-size: 13px; color: #0f5132; } .y-eft small { color: #3f7a5d; }
+/* Teşekkür sayfaları (/odeme-basarili, /siparis-alindi) */
+.thanks { padding-top: 72px; min-height: 60vh; }
+.thanks-card { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid var(--line, #e6ecf6); border-radius: 20px; padding: 36px 28px; text-align: center; box-shadow: 0 20px 50px rgb(13 27 52 / .07); display: grid; gap: 14px; justify-items: center; }
+.thanks-card h1 { margin: 0; font-size: clamp(26px, 4vw, 34px); }
+.thanks-card p { margin: 0; color: var(--text-2); line-height: 1.6; }
+.thanks-ic { width: 64px; height: 64px; border-radius: 50%; background: #e7f8ef; color: #16a34a; display: grid; place-items: center; }
+.thanks-ic svg { width: 32px; height: 32px; }
+.thanks-dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; text-align: left; width: 100%; background: #f6f9fe; border: 1px solid #e6ecf6; border-radius: 14px; padding: 16px 18px; margin: 4px 0; }
+.thanks-dl dt { color: var(--text-2); } .thanks-dl dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
+.thanks-note { font-size: 14px; }

@@ -218,6 +218,28 @@
     } finally { btn.disabled = false; }
   }));
 
+  // ---------- Teşekkür sayfaları (reklam dönüşümü için sabit adresler): /odeme-basarili (kartla ödeme), /siparis-alindi (havale / EFT) ----------
+  const th = $('[data-thanks]');
+  if (th) {
+    const g = (k) => q.get(k) || '', renew = g('tur') === 'yenileme', amount = Number(g('tutar')) || 0;
+    const row = (k, v, copy) => `<dt>${esc(k)}</dt><dd>${v}${copy ? ` <button type="button" class="co-copy" data-copy="${esc(copy)}">Kopyala</button>` : ''}</dd>`;
+    const rows = [];
+    if (g('siparis')) rows.push(row('Sipariş no', esc(g('siparis')), th.dataset.thanks === 'eft' ? g('siparis') : ''));
+    if (g('paket')) rows.push(row('Paket', `${esc(g('paket'))}${g('donem') ? ` · ${g('donem') === 'yillik' ? 'yıllık' : 'aylık'}` : ''}`));
+    if (amount) rows.push(row('Tutar', `<b>${tl(amount)} ₺</b> <small>KDV dahil${Number(g('indirim')) ? ` · %${Number(g('indirim'))} havale indirimi` : ''}</small>`));
+    if (th.dataset.thanks === 'eft') {
+      const k = S.bank || {};
+      rows.push(row('Banka', esc(k.name || '')), row('Hesap sahibi', esc(k.holder || '')), row('IBAN', `<span class="iban">${esc(k.iban || '')}</span>`, String(k.iban || '').replace(/\s/g, '')));
+      if (renew) $('[data-t-lead]', th).textContent = 'Aşağıdaki hesaba havale / EFT yapın; açıklamaya sipariş numaranızı yazın. Ödemeniz hesabımıza geçince aboneliğiniz uzatılır.';
+    } else if (renew) {
+      $('[data-t-title]', th).textContent = 'Teşekkürler, aboneliğiniz uzatıldı';
+      $('[data-t-lead]', th).textContent = 'Ödemeniz alındı ve paketiniz güncellendi. Panelinizi kullanmaya kaldığınız yerden devam edebilirsiniz.';
+    }
+    const dl = $('[data-t-dl]', th);
+    dl.innerHTML = rows.join(''); dl.hidden = !rows.length;
+    th.addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (b) navigator.clipboard.writeText(b.dataset.copy).then(() => { b.textContent = 'Kopyalandı'; }).catch(() => {}); });
+  }
+
   // ---------- Satın al (iyzico): 1 Paket → 2 Hesap → 3 Fatura bilgileri → 4 Onay; özet kartı seçime göre güncellenir ----------
   const co = $('[data-checkout]');
   if (co) {
@@ -330,13 +352,9 @@
         const r = await fetch(S.checkoutUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const j = await r.json().catch(() => ({}));
         if (r.ok && j.eft) {
-          // Havale / EFT: sipariş kaydedildi; banka bilgileri ve sipariş numarası gösterilir (e-postayla da gönderilir)
-          const k = j.bank || S.bank || {};
-          co.innerHTML = `<div class="co-card co-done"><h2>Siparişiniz alındı 🎉</h2><p>Sipariş numaranız: <b>${esc(j.order)}</b>. Aşağıdaki hesaba havale / EFT yapın; açıklamaya sipariş numaranızı yazın. Ödemeniz hesabımıza geçince ${body.kind === 'renew' ? 'aboneliğiniz uzatılır' : 'paneliniz açılır ve giriş bilgileriniz e-postanıza gönderilir'}.</p>
-            <dl><dt>Banka</dt><dd>${esc(k.bank || k.name || '')}</dd><dt>Hesap sahibi</dt><dd>${esc(k.holder || '')}</dd><dt>IBAN</dt><dd class="iban">${esc(k.iban || '')} <button type="button" class="co-copy" data-copy="${esc(String(k.iban || '').replace(/\s/g, ''))}">Kopyala</button></dd>
-            <dt>Tutar</dt><dd><b>${tl(j.amount)} ₺</b> <small>KDV dahil${j.discount ? ` · %${j.discount} havale indirimi` : ''}</small></dd><dt>Açıklama</dt><dd>${esc(j.order)} <button type="button" class="co-copy" data-copy="${esc(j.order)}">Kopyala</button></dd></dl>
-            <p class="muted">Bu bilgiler e-posta adresinize de gönderildi. Sorunuz olursa: ${esc(get('company.phone') || '')}</p></div>`;
-          co.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Havale / EFT: sipariş kaydedildi → teşekkür sayfası (reklam dönüşümü için sabit adres; banka bilgileri orada)
+          const tq = new URLSearchParams({ siparis: j.order, tutar: String(j.amount), paket: (plans.find((x) => x.key === st.plan) || {}).name || '', donem: st.period === 'yearly' ? 'yillik' : 'aylik', tur: body.kind === 'renew' ? 'yenileme' : 'yeni', ...(j.discount ? { indirim: String(j.discount) } : {}) });
+          location.href = `/siparis-alindi?${tq}`;
           return;
         }
         if (!r.ok || !j.url) throw new Error(j.error || 'Ödeme başlatılamadı');
