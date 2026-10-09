@@ -325,3 +325,29 @@ test('ek mağaza: Paketim\'den abonelik bitişine kalan ay için alınır; sın�
     assert.equal(s.iyz.inits.at(-1).price, '1388.00');
   } finally { s.restore(); }
 });
+
+test('Firmalar → kartla tahsil et: imzalı ödeme bağlantısı, iyzico ödemesi, tahsilat kaydı ve uzatma; sahte / ödenmiş bağlantı', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await s.owner('/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'kartli', name: 'Kartlı Firma', admin_username: 'can', admin_password: 'gizli-sifre-4', plan: 'Profesyonel', email: 'can@ornek.com', phone: '0532 111 22 33', welcome: false }) });
+    const before = (await first(s.env.DB, "SELECT expires_at FROM tenants WHERE slug = 'kartli'")).expires_at || Date.now();
+    assert.equal((await s.owner('/api/tenants/kartli/charge', { method: 'POST', body: JSON.stringify({ amount: '0' }) })).status, 400);
+    const c = await (await s.owner('/api/tenants/kartli/charge', { method: 'POST', body: JSON.stringify({ amount: '1990', months: 1, note: 'Ekim' }) })).json();
+    assert.match(c.link, /^https:\/\/panel\.test\/api\/public\/pay\?o=/);
+    const pay = (u) => worker.fetch(new Request(u), s.env, { waitUntil() {} });
+    assert.equal((await pay(c.link.replace(/.{3}$/, 'xyz'))).status, 400, 'imza bozuk');
+    const r = await pay(c.link);
+    assert.equal(r.status, 303); assert.match(r.headers.get('location'), /sandbox-cpp\.iyzipay\.com/);
+    const init = s.iyz.inits.at(-1);
+    assert.equal(init.price, '1990.00'); assert.equal(init.buyer.email, 'can@ornek.com'); assert.match(init.basketItems[0].name, /ödemesi \(1 ay\)/);
+    ok(s.iyz, '1990.00');
+    assert.match(await (await s.callback('tok-1')).text(), /1\.990 TL ödemeniz alındı/);
+    const t = await first(s.env.DB, "SELECT expires_at FROM tenants WHERE slug = 'kartli'");
+    assert.ok(t.expires_at > before + 27 * 864e5, 'abonelik uzadı');
+    const p = await first(s.env.DB, "SELECT * FROM tenant_payments WHERE slug = 'kartli'");
+    assert.equal(p.amount, 1990); assert.equal(p.months, 1); assert.match(p.note, /Ödeme bağlantısı · Ekim/);
+    assert.match(await (await pay(c.link)).text(), /ödemesi daha önce alındı/);
+  } finally { s.restore(); }
+});

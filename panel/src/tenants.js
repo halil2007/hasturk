@@ -19,7 +19,7 @@ import { DEMO_PRODUCTS } from './channels/demo.js';
 import { limitsOf } from './plans.js';
 import { CARRIER_IDS } from './carriers.js';
 import { forgot, resetPassword, welcome } from './pwreset.js';
-import { tenantBilling } from './billing.js';
+import { tenantBilling, adminCharge } from './billing.js';
 import { iyzicoReady } from './iyzico.js';
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
@@ -307,7 +307,7 @@ export async function tenantApi(req, env, db, path, user) {
     return { tenants: rows.map((t) => ({ ...pub(t), paid_total: (p.get(t.slug) || {}).total || 0, last_payment: (p.get(t.slug) || {}).last_at || null })), ready: !!env.TENANT };
   }
   if (path === 'tenants' && m === 'POST') return createTenant(env, db, b, { origin: new URL(req.url).origin });
-  if ((x = path.match(/^tenants\/([a-z0-9-]+)(?:\/(stats|password|support|delete|payments|api))?(?:\/(\d+))?$/))) {
+  if ((x = path.match(/^tenants\/([a-z0-9-]+)(?:\/(stats|password|support|delete|payments|charge|api))?(?:\/(\d+))?$/))) {
     const t = await getTenant(db, x[1], true);
     if (!t) fail(404, 'Müşteri paneli bulunamadı');
     const op = x[2];
@@ -334,6 +334,8 @@ export async function tenantApi(req, env, db, path, user) {
       if (!amount && !months) fail(400, 'Tutar ya da uzatılacak süre girin');
       return recordPayment(env, db, t, { at: dateMs(b.date) || Date.now(), amount, months, method: str(b.method), note: str(b.note), user: user.name || '' });
     }
+    // Kartla tahsil et (sanal POS): ödeme bağlantısı; ödeme alınınca tahsilat kaydı ve uzatma kendiliğinden (bkz. billing.js)
+    if (op === 'charge' && m === 'POST') return adminCharge(env, db, t, b, user, new URL(req.url).origin);
     if (op === 'payments' && m === 'DELETE' && x[3]) { await run(db, 'DELETE FROM tenant_payments WHERE id = ? AND slug = ?', Number(x[3]), t.slug); return { ok: true }; }
     // Dış API (stok aktarımı): yalnız ana panel açar / kapatır / anahtar üretir; firma yöneticisi göremez ve değiştiremez
     if (op === 'api' && m === 'GET') return apiPublic(t);

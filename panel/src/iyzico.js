@@ -40,7 +40,7 @@ export async function initCheckout(env, order, callbackUrl, fetchFn) {
     buyer: { id: String(order.buyerId || b.email).slice(0, 60), name, surname, gsmNumber: gsm.startsWith('+') ? gsm : gsm ? '+90' + gsm.replace(/^0+/, '').replace(/^90/, '') : undefined,
       email: b.email, identityNumber: /^\d{11}$/.test(String(b.identity || '')) ? String(b.identity) : '11111111111', registrationAddress: address, ip: b.ip || '127.0.0.1', city: b.city || 'İstanbul', country: 'Turkey' },
     billingAddress: { contactName: String(b.billName || b.name).slice(0, 200), city: b.city || 'İstanbul', country: 'Turkey', address },
-    basketItems: [{ id: `${order.plan}-${order.period}`, name: `Hastürk CRM ${order.name} paketi (${order.period === 'yearly' ? 'yıllık' : 'aylık'})`, category1: 'Yazılım', category2: 'Abonelik', itemType: 'VIRTUAL', price: money(order.amount) }],
+    basketItems: [{ id: `${order.plan}-${order.period}`, name: order.itemName || `Hastürk CRM ${order.name} paketi (${order.period === 'yearly' ? 'yıllık' : 'aylık'})`, category1: 'Yazılım', category2: 'Abonelik', itemType: 'VIRTUAL', price: money(order.amount) }],
   }, fetchFn);
   if (r.status !== 'success' || !r.paymentPageUrl) throw new Error('Ödeme başlatılamadı: ' + (r.errorMessage || r.errorCode || 'bilinmeyen hata'));
   return { token: r.token, url: r.paymentPageUrl };

@@ -169,20 +169,41 @@ export async function firmsView(el) {
 
   // ---------- ödeme ----------
   function payment(t, done) {
+    let mode = 'record';
     const s = sheet({
       title: `${t.name} · ödeme al`, size: 'narrow',
-      body: html`<form class="stack" data-f>
+      body: html`<div class="seg" data-mode style="margin-bottom:12px"><button type="button" class="on" data-v="record">Ödeme kaydet</button><button type="button" data-v="card">Kartla tahsil et (sanal POS)</button></div>
+      <form class="stack" data-f>
         <label class="field"><span>Tutar (₺)</span><input class="input" name="amount" inputmode="decimal" value="${t.fee || ''}"></label>
         <label class="field"><span>Aboneliği uzat</span><select class="input" name="months">${[[0, 'Uzatma'], [1, '1 ay'], [3, '3 ay'], [6, '6 ay'], [12, '1 yıl'], [24, '2 yıl']].map(([v, l]) => html`<option value="${v}" ${v === (t.period === 'yearly' ? 12 : 1) ? 'selected' : ''}>${l}</option>`)}</select>
           <small>${t.expires_at ? `Şu anki bitiş: ${date(t.expires_at)}${daysLeft(t) < 0 ? ' (geçti; uzatma bugünden başlar)' : ''}` : 'Şu an süresiz; uzatma bugünden başlar'}</small></label>
-        <label class="field"><span>Ödeme yöntemi</span><select class="input" name="method">${METHODS.map((m) => html`<option>${m}</option>`)}</select></label>
-        <label class="field"><span>Ödeme tarihi</span><input class="input" type="date" name="date" value="${iso(Date.now())}"></label>
+        <div class="stack" data-only="record" style="gap:12px">
+          <label class="field"><span>Ödeme yöntemi</span><select class="input" name="method">${METHODS.map((m) => html`<option>${m}</option>`)}</select></label>
+          <label class="field"><span>Ödeme tarihi</span><input class="input" type="date" name="date" value="${iso(Date.now())}"></label></div>
+        <label class="field" data-only="card" hidden><span>Müşterinin e-postası</span><input class="input" type="email" name="email" value="${t.email || ''}"><small>iyzico ödeme sayfası ve bağlantı e-postası için</small></label>
         <label class="field"><span>Not</span><input class="input" name="note" placeholder="ör. Ekim faturası, dekont no"></label>
+        <div class="notice small" data-only="card" hidden><i class="ico ico-info"></i><div>7 gün geçerli ödeme bağlantısı oluşur. <b>Kartı siz girin</b> (ödeme sayfası açılır) ya da bağlantıyı <b>müşteriye gönderin</b>. Ödeme alınınca tahsilat kaydedilir ve abonelik seçilen süre kadar uzar; size bildirim gelir.</div></div>
+        <div data-link></div>
       </form>`,
-      foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`,
+      foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn" data-send hidden><i class="ico ico-send"></i>Müşteriye gönder</button><button class="btn primary" data-save>Kaydet</button>`,
     });
-    const fm = $('[data-f]', s.el);
-    $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
+    const fm = $('[data-f]', s.el), saveBtn = $('[data-save]', s.el), sendBtn = $('[data-send]', s.el);
+    $('[data-mode]', s.el).onclick = (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      mode = b.dataset.v;
+      $$('[data-mode] button', s.el).forEach((x) => x.classList.toggle('on', x === b));
+      $$('[data-only]', s.el).forEach((x) => { x.hidden = x.dataset.only !== mode; });
+      sendBtn.hidden = mode !== 'card';
+      saveBtn.innerHTML = mode === 'card' ? '<i class="ico ico-calc"></i>Kartı ben gireyim' : 'Kaydet';
+    };
+    const charge = (send) => api(`tenants/${t.slug}/charge`, { method: 'POST', body: { amount: fm.amount.value, months: Number(fm.months.value), email: fm.email.value, note: fm.note.value, send } });
+    sendBtn.onclick = (e) => busy(e.currentTarget, async () => {
+      const r = await charge(true);
+      render($('[data-link]', s.el), html`<div class="notice ${r.mailed ? 'good' : 'warn'} small"><i class="ico ico-${r.mailed ? 'check' : 'warn'}"></i><div>${r.mailed ? `Ödeme bağlantısı ${fm.email.value} adresine gönderildi.` : 'E-posta gönderilemedi (Ayarlar → E-posta); bağlantıyı kopyalayıp WhatsApp vb. ile iletin:'}<div class="row" style="gap:6px;margin-top:6px"><input class="input" readonly value="${r.link}" style="flex:1;min-width:0"><button type="button" class="btn sm" data-copy>Kopyala</button></div></div></div>`);
+      $('[data-copy]', s.el).onclick = () => navigator.clipboard.writeText(r.link).then(() => toast('Bağlantı kopyalandı')).catch(() => {});
+    });
+    saveBtn.onclick = (e) => busy(e.currentTarget, async () => {
+      if (mode === 'card') { const w = window.open('about:blank', '_blank'); let r; try { r = await charge(false); } catch (x) { if (w) w.close(); throw x; } if (w) w.location.href = r.link; else location.href = r.link; toast('Ödeme sayfası açıldı; ödeme alınınca tahsilat kendiliğinden kaydedilir'); s.close(); return; }
       const r = await api(`tenants/${t.slug}/payments`, { method: 'POST', body: { amount: fm.amount.value, months: Number(fm.months.value), method: fm.method.value, date: fm.date.value, note: fm.note.value } });
       s.close(); toast(r.expires_at ? `Ödeme kaydedildi · yeni bitiş: ${date(r.expires_at)}` : 'Ödeme kaydedildi'); await refresh(); done && done();
     });
