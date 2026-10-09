@@ -308,9 +308,11 @@ export async function pushStocks(env, db, settings, only) {
     if (!ch.enabled || !ch.pushStock) continue;
     if ((settings.stock_channels || {})[ch.id] === false) continue;
     // Kanal başına ayrı sorgu: gönderimi kapalı bir kanaldaki bekleyen ilanlar diğer kanalların sırasını tıkamaz
-    const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, ${DESIRED} AS stock
+    // Fiyat da verilir: stok ve fiyatı tek kayıtta isteyen kanal (idefix) stokla birlikte mevcut fiyatı yeniden gönderir (fiyat değişmez)
+    const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, l.price, l.list_price, l.price_dirty, ${DESIRED} AS stock
       FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ?) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`, ch.id);
-    const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock }));
+    const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock,
+      price: Number(r.price) || 0, listPrice: Number(r.list_price) || 0, priceDirty: !!r.price_dirty }));
     if (!items.length) continue;
     try {
       const res = await ch.pushStock(items);
@@ -345,8 +347,11 @@ export async function pushStocks(env, db, settings, only) {
 export async function pushPrices(env, db) {
   // Otomatik fiyat kuralı açık ilanda fiyat, kaynağı ne olursa olsun (döviz kuru, fiyat önerisi, Excel) kuralın en düşük /
   // en yüksek sınırı dışına gönderilmez: sınıra çekilir ve kullanıcıya bildirilir (zararına satış olmasın).
-  const rows = await all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.price, l.list_price, r.min_price, r.max_price
-    FROM listings l LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.price_dirty = 1 AND l.price > 0 LIMIT 2000`);
+  // Stok da verilir (panelin bu ilan için istediği adet): stok ve fiyatı tek kayıtta isteyen kanal (idefix) fiyatla birlikte stoğu da gönderir
+  const rows = await all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.price, l.list_price, r.min_price, r.max_price,
+      CASE WHEN p.id IS NULL THEN NULL ELSE ${DESIRED} END AS stock
+    FROM listings l LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 LEFT JOIN products p ON p.id = l.product_id
+    WHERE l.price_dirty = 1 AND l.price > 0 LIMIT 2000`);
   const bounded = [];
   for (const r of rows) {
     const min = Number(r.min_price) || 0, max = Number(r.max_price) || 0;
@@ -361,7 +366,7 @@ export async function pushPrices(env, db) {
   }
   const result = {};
   for (const ch of await getChannels(env, db)) {
-    const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: r.price, listPrice: r.list_price || 0 }));
+    const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: r.price, listPrice: r.list_price || 0, stock: r.stock }));
     if (!items.length || !ch.enabled || !ch.pushPrice) continue;
     try {
       await trackPush(db, ch, 'price', await ch.pushPrice(items), items.length);
@@ -405,7 +410,8 @@ export async function checkPushes(env, db, { minAge = 60e3, maxAge = 6 * 3600e3,
     out.checked++; out.failed += bad.length;
     const what = r.kind === 'price' ? 'Fiyat' : 'Stok';
     for (const part of chunk(bad, 40)) {
-      await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND (remote_id = ? OR sku = ?)')
+      // Reddedilen stok "gönderildi" sayılmaz: sonraki senkronda yeniden gönderilir
+      await db.batch(part.map((x) => db.prepare(`UPDATE listings SET error = ?${r.kind === 'stock' ? ', pushed_stock = NULL' : ''} WHERE channel = ? AND (remote_id = ? OR sku = ?)`)
         .bind(`${what} kanal tarafından reddedildi: ${(x.error || 'nedeni belirtilmedi').slice(0, 300)}`, r.channel, x.key, x.key)));
     }
     await run(db, "UPDATE push_checks SET status = 'done', failed = ?, checked_at = ? WHERE id = ?", bad.length, t, r.id);
@@ -434,6 +440,23 @@ async function attempt(fn) {
   try { return await fn(); } catch (e) { await sleep(1500); return fn(); }
 }
 
+// Tek seferlik (ana panel): stok panelde tutulur ve ana katalog (HasTürk ikas) dahil tüm kanallara gönderilir. Kurulumda stok senkronu
+// kapalı başlatılmıştı (stok ikas sitesinden okunuyordu); ilk referans alındıktan sonra stok tek yerden, panelden yönetilir.
+// Açıldığı andan önceki siparişler stoğu değiştirmez (stock_since). Ana katalog kanalının stok gönderimi kapalı bırakılmışsa açılır.
+async function stockOnce(env, db, settings) {
+  if (env.TENANT_SLUG || await getRaw(db, 'once:stock_on_2')) return;
+  if (!settings.stock_sync) {
+    const t = Date.now();
+    await setSetting(db, 'stock_sync', true); await setSetting(db, 'stock_since', t);
+    settings.stock_sync = true; settings.stock_since = t;
+    await log(db, null, 'info', 'Stok senkronu açıldı: stoklar panelde tutulur ve ana katalog dahil tüm kanallara gönderilir');
+  }
+  const sc = { ...(settings.stock_channels || {}) };
+  const off = catalogOf(settings).filter((c) => sc[c] === false);
+  if (off.length) { for (const c of off) delete sc[c]; await setSetting(db, 'stock_channels', sc); settings.stock_channels = sc; }
+  await setSetting(db, 'once:stock_on_2', 1);
+}
+
 export async function syncAll(env, db, { only, force, listings, cron } = {}) {
   const t = Date.now();
   // Kilit tek sorguda alınır (aynı anda iki senkron başlayamaz); "Senkronla" da kilide uyar, yalnız kanal beklemesini atlar
@@ -442,6 +465,7 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
   try {
     await maybePurgeDemo(env, db);
     const settings = await getSettings(db);
+    await stockOnce(env, db, settings);
     const maps = await productMaps(db);
     const changed = [];
     const chans = (await getChannels(env, db)).filter((c) => c.enabled && (!only || only.includes(c.id)));

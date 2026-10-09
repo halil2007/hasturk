@@ -136,10 +136,14 @@ export function idefix(env, meta) {
     }
     return { refs };
   }
-  const pushStock = (items) => upload(items.map((x) => ({ barcode: x.remoteId, inventoryQuantity: Math.max(0, Math.round(num(x.stock))) })));
-  const pushPrice = (items) => upload(items.map((x) => ({ barcode: x.remoteId, price: x.price, comparePrice: Math.max(x.listPrice || 0, x.price) })));
+  // idefix stok ve fiyatı aynı kayıtta ister: yalnız stok gönderilen satır "NO_PRICE" (fiyat yok) ile reddedilir. Stok gönderiminde ilanın
+  // mevcut fiyatı (bekleyen fiyat değişikliği varsa o fiyat gönderimine bırakılır), fiyat gönderiminde panelin istediği stok da gönderilir.
+  const priced = (x) => (num(x.price) > 0 && !x.priceDirty ? { price: num(x.price), comparePrice: Math.max(num(x.listPrice), num(x.price)) } : {});
+  const qty = (x) => (x.stock == null ? {} : { inventoryQuantity: Math.max(0, Math.round(num(x.stock))) });
+  const pushStock = (items) => upload(items.map((x) => ({ barcode: x.remoteId, ...priced(x), inventoryQuantity: Math.max(0, Math.round(num(x.stock))) })));
+  const pushPrice = (items) => upload(items.map((x) => ({ barcode: x.remoteId, price: x.price, comparePrice: Math.max(x.listPrice || 0, x.price), ...qty(x) })));
   const INV_FAIL = { DATA_PARSE_ERROR: 'veri okunamadı', BATCH_NOT_EXIST: 'gönderim bulunamadı', BATCH_ALREADY_PROCESSED: 'gönderim zaten işleniyor',
-    PRODUCT_NOT_FOUND: 'barkod idefix ürün havuzunda yok', CATALOG_PRICE_LOCKED: 'fiyat kilitli (idefix destek ile görüşün)', NO_PRICE: 'fiyat yok' };
+    PRODUCT_NOT_FOUND: 'barkod idefix ürün havuzunda yok', CATALOG_PRICE_LOCKED: 'fiyat kilitli (idefix destek ile görüşün)', NO_PRICE: 'fiyat yok (ilanın idefix fiyatı bilinmiyor; ürünün idefix fiyatını girin)' };
   // Satır durumu: created (işleniyor) · completed · decline (failureReasons ile)
   async function pushStatus(ref) {
     const r = (await call(`/pim/catalog/${vendor}/inventory-result/${encodeURIComponent(ref)}`)) || {};
