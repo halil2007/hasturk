@@ -138,6 +138,12 @@ export function trendyol(env, meta) {
   }
   // Tek sipariş (sipariş numarasıyla; servis tarihsiz sorguda son 1 haftayı tarar, bu yüzden yalnız kargo değişikliği / tanılamada kullanılır)
   const orderPackages = async (no) => ((await orders(`orderNumber=${encodeURIComponent(no)}`)) || {}).content || [];
+  // Siparişi hemen yenile (paket bölme sonrası yeni paketler, takip numaraları): senkronu beklemeden
+  async function fetchOne(no) {
+    const [o] = group(await orderPackages(no));
+    if (!o) throw new Error(`Trendyol ${no} numaralı siparişi bulamadı`);
+    return o;
+  }
 
   // Ürünler: V2 "approved" servisi (V1 /products Trendyol tarafından kapatılıyor). Stok ayrı "inventory-and-price" servisinden gelir.
   // Sayfalama: size ≤ 100, page × size ≤ 10.000; daha fazlası için nextPageToken. V2 hata verirse V1'e düşülür.
@@ -604,6 +610,6 @@ export function trendyol(env, meta) {
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, pushStatus, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
   };
 }

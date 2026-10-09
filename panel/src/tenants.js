@@ -260,14 +260,14 @@ export async function createTenant(env, db, b, { origin }) {
   if (f.trial && !f.expires_at) f.expires_at = Date.now() + 7 * DAY;
   if (!f.starts_at) f.starts_at = Date.now();
   const t = { slug, ...f, name, active: 1, admin_username: username, created_at: Date.now(), updated_at: Date.now() };
-  await admin(env, t, 'setup', { username, password: pw, passHash: b.passHash || null, name });
+  await admin(env, t, 'setup', { username, password: pw, passHash: b.passHash || null, name, mustChange: !!b.mustChange });
   await run(db, `INSERT INTO tenants (slug, ${COLS.join(', ')}, active, admin_username, created_at, updated_at) VALUES (?, ${COLS.map(() => '?').join(', ')}, 1, ?, ?, ?)`,
     slug, ...COLS.map((k) => t[k] ?? null), username, t.created_at, t.updated_at);
   cache.delete(slug);
   // Hoş geldiniz e-postası (firma kartında e-posta varsa): giriş bilgileri ve şifre belirleme bağlantısı
   let mail = null;
   if (f.email && b.welcome !== false) {
-    mail = await admin(env, t, 'welcome', { email: f.email, firm: name, slug, username, origin, link: `${origin}/#/sifre/${slug}.`, trialDays: f.trial ? Math.max(1, Math.round((f.expires_at - Date.now()) / DAY)) : 0 }).catch((e) => ({ error: e.message }));
+    mail = await admin(env, t, 'welcome', { email: f.email, firm: name, slug, username, origin, link: `${origin}/#/sifre/${slug}.`, trialDays: f.trial ? Math.max(1, Math.round((f.expires_at - Date.now()) / DAY)) : 0, password: b.tempPassword || '' }).catch((e) => ({ error: e.message }));
   }
   return { ok: true, tenant: pub(t), mail };
 }
@@ -477,7 +477,7 @@ export class TenantPanel {
       await init(db);
       if (b.op === 'setup') {
         const n = await first(db, 'SELECT COUNT(*) AS n FROM users');
-        if (!n.n) await run(db, "INSERT INTO users (username, name, email, pass, role, active, created_at) VALUES (?, ?, '', ?, 'admin', 1, ?)", b.username, b.username, b.passHash && /^pbkdf2/.test(b.passHash) ? b.passHash : await hashPassword(String(b.password)), Date.now());
+        if (!n.n) await run(db, "INSERT INTO users (username, name, email, pass, role, active, created_at, must_change) VALUES (?, ?, '', ?, 'admin', 1, ?, ?)", b.username, b.username, b.passHash && /^pbkdf2/.test(b.passHash) ? b.passHash : await hashPassword(String(b.password)), Date.now(), b.mustChange ? 1 : 0);
         // Firma adı (giriş ekranı, etiket, e-posta) müşterinin adıyla başlar; Ayarlar'dan değiştirilebilir
         await run(db, "INSERT INTO settings (k, v) VALUES ('company', ?) ON CONFLICT (k) DO NOTHING", JSON.stringify({ title: b.name, legal: b.name }));
         // Yeni firma: kanallardaki ürünler kendiliğinden ürün kartına dönüşmez; firma Kanal Ürünleri'nden istediğini seçer

@@ -8,7 +8,7 @@ import { PerfBuffer } from './perf.js';
 import { extApi } from './extapi.js';
 import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
-import { publicCheckout, checkoutCallback, checkoutStatus } from './billing.js';
+import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin } from './billing.js';
 import { blogPublic } from './blog.js';
 import { turnstileOk, CAPTCHA_ERROR } from './turnstile.js';
 import { actionSucceeded, resolveQuiet } from './errors.js';
@@ -105,6 +105,8 @@ export default {
         await init(env.DB);
         const user = await currentUser(req, env, env.DB);
         if (!user) return json({ error: 'Giriş gerekli' }, 401);
+        // Havale / EFT ile gelen siparişler (onay → panel açılır / süre uzar)
+        if (path === 'tenants/eft' || path.startsWith('tenants/eft/')) return json(await eftAdmin(req, env, path, user));
         const r = await tenantApi(req, env, env.DB, path, user);
         // Destek girişi: çerez ana panelin yanıtıyla verilir, tarayıcı müşteri paneline geçer
         return r && r.cookie ? json({ ok: true }, 200, { 'Set-Cookie': r.cookie }) : json(r);

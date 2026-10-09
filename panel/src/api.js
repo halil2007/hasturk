@@ -285,10 +285,12 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     for (const [lid, q] of need) if ((got.get(lid) || 0) !== q) fail(400, 'Her ürünün tüm adedi bir pakete dağıtılmalı');
     if (o.packages.some((p) => p.status === 'shipped')) fail(400, 'Kargoya verilmiş paketi olan sipariş yeniden bölünemez');
     if (ch && ch.enabled && ch.caps.split === 'remote-async') {
+      const from = o.packages.filter((p) => p.remote_id && p.status !== 'cancelled').map((p) => String(p.remote_id));
       const r = await ch.split(o, groups);
       await setLocalStatus(db, o, 'processing');
       await event(db, o, 'split', user);
-      return { ok: true, message: r.message };
+      // Kanal paketleri birkaç saniye / dakika içinde oluşturur: panel "refresh" ile izler (eski paket kimlikleri ve beklenen sayı)
+      return { ok: true, message: r.message, async: true, expect: groups.length, from, refresh: !!ch.fetchOne };
     }
     if (o.packages.some((p) => p.remote_id && ch && ch.caps.split !== 'remote-async')) fail(400, `Bu sipariş ${ch ? ch.name : 'kanal'}da paketlenmiş. Yeniden bölmek için önce paket menüsünden "Paketi iptal et" yapın.`);
     if (ch && ch.enabled && ch.caps.split === 'remote') {
@@ -412,6 +414,10 @@ async function orderAction(env, db, id, action, b, ctx, user) {
       await packOrder(db, ch, o, { only: pkg.id });
       await event(db, o, 'pack', user);
       o = await loadOrder(db, o.id); pkg = o.packages.find((p) => p.id === pkg.id); packed = true;
+    }
+    // Trendyol: bölünen / yeni paketin takip numarası henüz panele gelmediyse sipariş önce Trendyol'dan yenilenir (senkronu beklemeden)
+    if (live && ch && ch.enabled && ch.fetchOne && ch.type === 'trendyol' && !(pkg.tracking || o.tracking)) {
+      try { await saveOrders(db, ch.id, [await ch.fetchOne(o.remote_id)]); o = await loadOrder(db, o.id); pkg = o.packages.find((p) => p.id === pkg.id) || pkg; } catch (e) { console.error('trendyol yenileme', e); }
     }
     const r = await makeLabel(db, ch, o, pkg, settings, { refresh: !!b.refresh });
     if (r.official || r.panel) await event(db, o, 'label', user, `Paket ${pkg.no}`);

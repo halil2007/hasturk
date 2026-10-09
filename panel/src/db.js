@@ -267,6 +267,10 @@ const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS order_items_remote ON order_items(remote_key)',
   // Kendiliğinden çözülen hata kaydının nedeni (bkz. errors.js → autoResolve); elle çözülende boş
   'ALTER TABLE error_reports ADD COLUMN auto TEXT',
+  // İlk girişte şifre değiştirme zorunlu (online satışla açılan panelin geçici şifresi; bkz. billing.js)
+  'ALTER TABLE users ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0',
+  // Online satış: ödeme tamamlanana kadar geçici şifre şifrelenmiş saklanır, firma açılınca silinir
+  'ALTER TABLE sales_orders ADD COLUMN pass_tmp TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

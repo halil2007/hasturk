@@ -16,6 +16,9 @@ export async function billingView(el) {
         <div class="small" style="margin-top:4px">${cur.expires_at ? html`Bitiş: <b>${date(cur.expires_at)}</b>${left != null ? html` · <span style="color:${left <= 7 ? 'var(--bad)' : 'inherit'}">${left <= 0 ? 'süresi doldu' : `${left} gün kaldı`}</span>` : ''}` : 'Süresiz'}</div></div>
       ${!d.online ? html`<div class="notice" style="flex-basis:100%"><i class="ico ico-info"></i><div>Online ödeme henüz açılmadı. Paket almak / yenilemek için Destek sayfasından bize yazın.</div></div>` : ''}
     </div></div>
+    ${d.bank ? html`<div class="card small" style="display:grid;gap:4px"><b>🏦 Havale / EFT ile ödeme${d.eftDiscount ? html` <span class="pill good">Yıllıkta %${d.eftDiscount} indirim</span>` : ''}</b>
+      <div>${d.bank.bank} · ${d.bank.holder}</div><div class="num" style="font-weight:700;letter-spacing:.3px">${d.bank.iban} <button class="btn sm ghost" data-copy-iban style="min-height:0;padding:2px 8px"><i class="ico ico-copy"></i>Kopyala</button></div>
+      <div class="muted">Açıklamaya firma kodunuzu (<b>${(state.tenant && state.tenant.slug) || ''}</b>) ve paketi yazın, ardından Destek'ten bize bildirin; ödemeniz hesabımıza geçince aboneliğiniz uzatılır.</div></div>` : ''}
     <div class="plans-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
       ${d.plans.map((p) => html`<div class="card" style="display:flex;flex-direction:column;gap:8px;${cur.plan === p.name ? 'outline:2px solid var(--primary)' : ''}">
         <div class="row"><b style="font-size:18px;flex:1">${p.name}</b>${cur.plan === p.name ? html`<span class="pill info">Mevcut</span>` : ''}</div>
@@ -36,6 +39,7 @@ export async function billingView(el) {
       </tbody></table></div>` : html`<div class="empty">Henüz ödeme yok.</div>`}</div>
   </div>`);
   $$('[data-buy]', el).forEach((b) => { b.onclick = () => buy(d, d.plans.find((p) => p.key === b.dataset.buy), b.dataset.period); });
+  const ci = $('[data-copy-iban]', el); if (ci) ci.onclick = () => navigator.clipboard.writeText(d.bank.iban.replace(/\s/g, '')).then(() => toast('IBAN kopyalandı')).catch(() => {});
 }
 
 const INV = ['name', 'tckn', 'company', 'taxOffice', 'taxNo', 'contact', 'address', 'district', 'city'];

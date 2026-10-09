@@ -84,6 +84,9 @@
     show(0);
   }
 
+  // Havale / EFT indirimi yalnız yıllık alımda (config.js → eftDiscount); aylıkta havale / EFT tam fiyat
+  const eftPct = () => Number(S.eftDiscount) || 0;
+  const eftPrice = (amount, period) => (period === 'yearly' ? Math.round((amount || 0) * (100 - eftPct()) / 100) : amount || 0);
   // Paketler: fiyatlar KDV dahil; büyük fiyat aylık, altında yıllık alım kutusu (2 ay hediye, peşin fiyatına taksit)
   const priceHtml = (p) => {
     if (!p.monthly && !p.yearly) return '<div class="price">Teklif alın</div>';
@@ -93,7 +96,8 @@
       <div class="vatline">KDV dahil · aylık ödeme</div>
       ${p.yearly ? `<div class="yearly"><div class="y-top"><b>Yıllık ${tl(p.yearly)} ₺</b><small>KDV dahil</small>${save ? `<span class="save">${tl(save)} ₺ kazanç</span>` : ''}</div>
         <div class="y-sub">2 ay hediye · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
-        ${inst ? `<div class="y-inst"><b>Peşin fiyatına ${S.installments} taksit</b><span>${inst}</span></div>` : ''}</div>` : ''}`;
+        ${inst ? `<div class="y-inst"><b>Peşin fiyatına ${S.installments} taksit</b><span>${inst}</span></div>` : ''}
+        ${eftPct() ? `<div class="y-eft">Havale / EFT ile <b>${tl(eftPrice(p.yearly, 'yearly'))} ₺</b> <small>(%${eftPct()} indirim)</small></div>` : ''}</div>` : ''}`;
   };
   // "Hemen satın al" yalnız online satış açıkken (panelde iyzico API bilgileri girilmişse) görünür; kapalıyken eski hali
   const renderPlans = (shop) => $$('[data-plans]').forEach((el) => {
@@ -111,11 +115,16 @@
     renderPlans(true);
     $$('[data-plans] [data-demo]').forEach((a) => { if (S.demoUrl) { a.href = S.demoUrl; a.target = '_blank'; a.rel = 'noopener'; } });
   };
-  const shopState = (on) => {
+  // Satın alma: kartla ödeme yalnız iyzico açıkken; havale / EFT (banka bilgisi tanımlıysa) her zaman
+  let cardOn = false;
+  const shopState = (card) => {
+    cardOn = card;
+    const on = card || !!(S.bank && S.bank.iban);
     $$('[data-shop-wait]').forEach((x) => { x.hidden = true; });
     $$('[data-shop-off]').forEach((x) => { x.hidden = on; });
     $$('[data-shop]').forEach((x) => { x.hidden = !on; });
     if (on) shopOn();
+    document.dispatchEvent(new Event('shop:state'));
   };
   if (S.checkoutUrl) fetch(S.checkoutUrl + '/status').then((r) => r.json()).then((j) => shopState(!!j.online)).catch(() => shopState(false));
   else shopState(false);
@@ -213,23 +222,25 @@
   const co = $('[data-checkout]');
   if (co) {
     const plans = (S.plans || []).filter((p) => p.key && p.monthly);
-    const st = { plan: q.get('plan') || 'profesyonel', period: q.get('donem') === 'aylik' ? 'monthly' : 'yearly', kind: q.get('firma') ? 'renew' : 'new', inv: 'bireysel' };
+    const st = { plan: q.get('plan') || 'profesyonel', period: q.get('donem') === 'aylik' ? 'monthly' : 'yearly', kind: q.get('firma') ? 'renew' : 'new', inv: 'bireysel', pay: 'card' };
     if (!plans.some((p) => p.key === st.plan)) st.plan = (plans[1] || plans[0] || {}).key;
     if (q.get('firma')) co.elements.slug_renew.value = q.get('firma');
     const IL = 'Adana Adıyaman Afyonkarahisar Ağrı Aksaray Amasya Ankara Antalya Ardahan Artvin Aydın Balıkesir Bartın Batman Bayburt Bilecik Bingöl Bitlis Bolu Burdur Bursa Çanakkale Çankırı Çorum Denizli Diyarbakır Düzce Edirne Elazığ Erzincan Erzurum Eskişehir Gaziantep Giresun Gümüşhane Hakkari Hatay Iğdır Isparta İstanbul İzmir Kahramanmaraş Karabük Karaman Kars Kastamonu Kayseri Kilis Kırıkkale Kırklareli Kırşehir Kocaeli Konya Kütahya Malatya Manisa Mardin Mersin Muğla Muş Nevşehir Niğde Ordu Osmaniye Rize Sakarya Samsun Şanlıurfa Siirt Sinop Şırnak Sivas Tekirdağ Tokat Trabzon Tunceli Uşak Van Yalova Yozgat Zonguldak'.split(' ');
     $('[data-iller]', co).insertAdjacentHTML('beforeend', IL.map((x) => `<option>${x}</option>`).join(''));
-    const slugOf = (t) => String(t || '').toLocaleLowerCase('tr').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
     const F = co.elements;
-    let slugTouched = false;
-    F.slug.addEventListener('input', () => { slugTouched = true; });
-    F.firm.addEventListener('input', () => { if (!slugTouched) F.slug.value = slugOf(F.firm.value); if (!F.company.value || F.company.dataset.auto) { F.company.value = F.firm.value; F.company.dataset.auto = '1'; } });
+    // Firma kodu, kullanıcı adı ve geçici şifreyi sunucu üretir (e-postayla gönderilir); fatura unvanı firma adından önerilir
+    F.firm.addEventListener('input', () => { if (!F.company.value || F.company.dataset.auto) { F.company.value = F.firm.value; F.company.dataset.auto = '1'; } });
+    F.corp.addEventListener('change', () => { st.inv = F.corp.checked ? 'kurumsal' : 'bireysel'; draw(); });
+    $$('[name=pay]', co).forEach((r) => r.addEventListener('change', () => { st.pay = r.value; draw(); }));
+    document.addEventListener('shop:state', () => { if (!cardOn) st.pay = 'eft'; draw(); });
+    const copy = (t, b) => navigator.clipboard.writeText(t).then(() => { const o = b.textContent; b.textContent = 'Kopyalandı'; setTimeout(() => { b.textContent = o; }, 1500); }).catch(() => {});
+    co.addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (b) { e.preventDefault(); copy(b.dataset.copy, b); } });
     F.company.addEventListener('input', () => { delete F.company.dataset.auto; });
     const draw = () => {
       const p = plans.find((x) => x.key === st.plan) || {}, yearly = st.period === 'yearly', amount = yearly ? p.yearly : p.monthly;
       $('[data-co-plans]', co).innerHTML = plans.map((x) => `<button type="button" role="radio" aria-checked="${x.key === st.plan}" class="co-plan${x.key === st.plan ? ' on' : ''}" data-plan="${x.key}"><b>${esc(x.name)}</b><span>${tl(yearly ? x.yearly : x.monthly)} ₺ <small>${yearly ? '/ yıl' : '/ ay'}</small></span><em>${esc((x.limits || []).join(' · '))}</em></button>`).join('');
       $$('[data-period]', co).forEach((b) => b.classList.toggle('on', b.dataset.period === st.period));
       $$('[data-kind]', co).forEach((b) => b.classList.toggle('on', b.dataset.kind === st.kind));
-      $$('[data-inv]', co).forEach((b) => b.classList.toggle('on', b.dataset.inv === st.inv));
       $$('[data-for]', co).forEach((x) => { x.hidden = x.dataset.for !== st.kind; $$('input', x).forEach((i) => { i.disabled = x.hidden; }); });
       $$('[data-inv-for]', co).forEach((x) => { x.hidden = x.dataset.invFor !== st.inv; });
       const inst = yearly && S.installments ? `${S.installments} × ${tl((amount || 0) / S.installments)} ₺` : '';
@@ -241,17 +252,37 @@
           ${save ? `<dt>Yıllık kazanç</dt><dd class="good">${tl(save)} ₺ (2 ay hediye)</dd>` : ''}
           <dt>Kurulum ücreti</dt><dd class="good">Yok</dd></dl>
         <div class="co-sum-tot"><span>Toplam</span><b>${tl(amount || 0)} ₺<small>KDV dahil</small></b></div>
-        ${inst ? `<div class="co-sum-inst"><b>Peşin fiyatına ${S.installments} taksit:</b> ${inst} (kredi kartına)</div>` : `<div class="co-sum-inst">Yıllık alımda 2 ay hediye ve peşin fiyatına ${S.installments || 3} taksit.</div>`}`;
+        ${inst ? `<div class="co-sum-inst"><b>Peşin fiyatına ${S.installments} taksit:</b> ${inst} (kredi kartına)</div>` : `<div class="co-sum-inst">Yıllık alımda 2 ay hediye ve peşin fiyatına ${S.installments || 3} taksit.</div>`}
+        ${yearly && eftPct() ? `<div class="co-sum-eft"><b>Havale / EFT ile:</b> ${tl(eftPrice(amount, 'yearly'))} ₺ <small>(%${eftPct()} indirim)</small></div>` : ''}`;
       $('[data-co-total]', co).innerHTML = `<span>${esc(p.name || '')} · ${yearly ? 'yıllık (12 ay)' : 'aylık (1 ay)'}</span><b>${tl(amount || 0)} ₺</b><small>KDV dahil${inst ? ` · ${S.installments} taksit imkânı` : ''}</small>`;
       $('[data-co-pay]', co).textContent = `${tl(amount || 0)} ₺ öde · güvenli ödemeye geç`;
+      // Ödeme yöntemi: kart (iyzico) ya da havale / EFT (yıllıkta indirimli); havalede banka bilgileri ve tutar gösterilir
+      const eftAmt = eftPrice(amount, st.period), pct = yearly ? eftPct() : 0, bank = S.bank || {};
+      const card = $('[name=pay][value=card]', co);
+      card.disabled = !cardOn; card.closest('label').classList.toggle('off', !cardOn);
+      if (!cardOn) st.pay = 'eft';
+      $$('[name=pay]', co).forEach((r) => { r.checked = r.value === st.pay; r.closest('label').classList.toggle('on', r.checked); });
+      $('[data-pm-card]', co).textContent = cardOn ? `iyzico 3D Secure${yearly && S.installments ? ` · peşin fiyatına ${S.installments} taksit` : ''}` : 'Şu an kapalı; havale / EFT ile ödeyebilirsiniz';
+      $('[data-pm-eft]', co).textContent = pct ? `%${pct} indirimli: ${tl(eftAmt)} ₺` : 'Aylık pakette indirim yok';
+      const eftBox = $('[data-co-eft]', co);
+      eftBox.hidden = st.pay !== 'eft';
+      eftBox.innerHTML = `<b>Havale / EFT bilgileri</b>
+        <dl><dt>Banka</dt><dd>${esc(bank.name || '')}</dd><dt>Hesap sahibi</dt><dd>${esc(bank.holder || '')}</dd>
+        <dt>IBAN</dt><dd class="iban">${esc(bank.iban || '')} <button type="button" class="co-copy" data-copy="${esc(String(bank.iban || '').replace(/\s/g, ''))}">Kopyala</button></dd>
+        <dt>Tutar</dt><dd><b>${tl(eftAmt)} ₺</b> <small>KDV dahil${pct ? ` · %${pct} havale indirimi` : ''}</small></dd></dl>
+        <span>Siparişi verince size sipariş numarası verilir; açıklamaya bu numarayı yazın. Ödemeniz hesabımıza geçince ${st.kind === 'renew' ? 'aboneliğiniz uzatılır' : 'paneliniz açılır ve giriş bilgileriniz e-postanıza gönderilir'}.</span>`;
+      $('.co-secure', co).hidden = st.pay === 'eft';
+      if (st.pay === 'eft') {
+        $('[data-co-total]', co).innerHTML = `<span>${esc(p.name || '')} · ${yearly ? 'yıllık (12 ay)' : 'aylık (1 ay)'} · havale / EFT</span><b>${tl(eftAmt)} ₺</b><small>KDV dahil${pct ? ` · %${pct} indirim uygulandı` : ''}</small>`;
+        $('[data-co-pay]', co).textContent = `Siparişi ver · ${tl(eftAmt)} ₺ havale / EFT`;
+      }
     };
     co.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-plan],[data-period],[data-kind],[data-inv]');
+      const b = e.target.closest('[data-plan],[data-period],[data-kind]');
       if (!b) return;
       if (b.dataset.plan) st.plan = b.dataset.plan;
       if (b.dataset.period) st.period = b.dataset.period;
       if (b.dataset.kind) st.kind = b.dataset.kind;
-      if (b.dataset.inv) st.inv = b.dataset.inv;
       draw();
     });
     // Üstteki adım göstergesi: üzerinde çalışılan adım
@@ -271,11 +302,7 @@
       const renew = st.kind === 'renew', corp = st.inv === 'kurumsal';
       // Adım sırasıyla denetim: ilk eksik alan işaretlenir
       if (!renew) {
-        if (!val('firm')) return bad('firm', 'Firma / mağaza adını yazın.');
-        if (!/^[a-z0-9-]{3,32}$/.test(val('slug'))) return bad('slug', 'Firma kodu 3-32 karakter olmalı: küçük harf, rakam ve tire.');
-        if (val('username').length < 3) return bad('username', 'Kullanıcı adı en az 3 karakter olmalı.');
-        if (String(F.password.value).length < 8) return bad('password', 'Şifre en az 8 karakter olmalı.');
-        if (F.password.value !== F.password2.value) return bad('password2', 'Şifreler aynı değil.');
+        if (val('firm').length < 2) return bad('firm', 'Firma / mağaza adını yazın.');
       } else if (!val('slug_renew')) return bad('slug_renew', 'Firma kodunuzu yazın.');
       if (!okEmail(val('email'))) return bad('email', 'Geçerli bir e-posta adresi yazın.');
       if (!okPhone(val('phone'))) return bad('phone', 'Geçerli bir telefon numarası yazın (ör. 0532 123 45 67 ya da 0212 123 45 67).');
@@ -295,13 +322,23 @@
       const invoice = corp ? { type: 'kurumsal', company: val('company'), taxOffice: val('tax_office'), taxNo: val('tax_no').replace(/\D/g, ''), contact: val('contact'), efatura: F.efatura.checked }
         : { type: 'bireysel', name: val('inv_name'), tckn: val('tckn').replace(/\D/g, '') };
       Object.assign(invoice, { address: val('address'), district: val('district'), city: val('city') });
-      const body = { kind: st.kind, plan: st.plan, period: st.period, website: val('website'), consent: true, email: val('email'), phone: val('phone'), invoice };
-      if (!renew) Object.assign(body, { firm: val('firm'), slug: val('slug'), username: val('username'), password: String(F.password.value) });
+      const body = { kind: st.kind, plan: st.plan, period: st.period, pay: st.pay, website: val('website'), consent: true, email: val('email'), phone: val('phone'), invoice };
+      if (!renew) body.firm = val('firm');
       else body.slug = val('slug_renew');
       btn.disabled = true; say('', 'Güvenli ödeme sayfası hazırlanıyor…');
       try {
         const r = await fetch(S.checkoutUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const j = await r.json().catch(() => ({}));
+        if (r.ok && j.eft) {
+          // Havale / EFT: sipariş kaydedildi; banka bilgileri ve sipariş numarası gösterilir (e-postayla da gönderilir)
+          const k = j.bank || S.bank || {};
+          co.innerHTML = `<div class="co-card co-done"><h2>Siparişiniz alındı 🎉</h2><p>Sipariş numaranız: <b>${esc(j.order)}</b>. Aşağıdaki hesaba havale / EFT yapın; açıklamaya sipariş numaranızı yazın. Ödemeniz hesabımıza geçince ${body.kind === 'renew' ? 'aboneliğiniz uzatılır' : 'paneliniz açılır ve giriş bilgileriniz e-postanıza gönderilir'}.</p>
+            <dl><dt>Banka</dt><dd>${esc(k.bank || k.name || '')}</dd><dt>Hesap sahibi</dt><dd>${esc(k.holder || '')}</dd><dt>IBAN</dt><dd class="iban">${esc(k.iban || '')} <button type="button" class="co-copy" data-copy="${esc(String(k.iban || '').replace(/\s/g, ''))}">Kopyala</button></dd>
+            <dt>Tutar</dt><dd><b>${tl(j.amount)} ₺</b> <small>KDV dahil${j.discount ? ` · %${j.discount} havale indirimi` : ''}</small></dd><dt>Açıklama</dt><dd>${esc(j.order)} <button type="button" class="co-copy" data-copy="${esc(j.order)}">Kopyala</button></dd></dl>
+            <p class="muted">Bu bilgiler e-posta adresinize de gönderildi. Sorunuz olursa: ${esc(get('company.phone') || '')}</p></div>`;
+          co.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
         if (!r.ok || !j.url) throw new Error(j.error || 'Ödeme başlatılamadı');
         say('ok', 'iyzico ödeme sayfasına yönlendiriliyorsunuz…');
         location.href = j.url;

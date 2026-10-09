@@ -41,6 +41,7 @@ export async function firmsView(el) {
       <span class="spacer"></span>
       <button class="btn primary" data-act="add" data-fab><i class="ico ico-plus"></i>Firma ekle</button>
     </div>
+    <div data-eft></div>
     <div class="tabs" data-tabs></div>
     <div data-warn></div>
     <div class="card flush" data-box></div>
@@ -97,7 +98,21 @@ export async function firmsView(el) {
         <td class="r"><button class="btn sm" data-act="open">Aç</button></td></tr>`; })}
     </tbody></table></div>${list.length ? '' : html`<div class="empty">${all.length ? 'Bu filtrede firma yok' : 'Henüz firma eklenmedi — “Firma ekle” ile ilk müşteri panelini oluşturun'}</div>`}`);
   }
-  const refresh = async () => { T = await api('tenants', { fresh: true }).catch((e) => ({ tenants: [], error: e.message })); draw(); };
+  const refresh = async () => { T = await api('tenants', { fresh: true }).catch((e) => ({ tenants: [], error: e.message })); draw(); drawEft(); };
+  // Havale / EFT ile gelen siparişler: ödeme hesaba geçince "Ödeme geldi" → yeni firmada panel açılır (giriş bilgileri e-postayla), yenilemede süre uzar
+  let E = { orders: [] };
+  async function drawEft() {
+    E = await api('tenants/eft', { fresh: true }).catch(() => ({ orders: [] }));
+    const box = $('[data-eft]', el);
+    if (!box) return;
+    render(box, E.orders.length ? html`<div class="card flush"><div class="card-pad row wrap" style="gap:8px"><h3 style="margin:0">🏦 Havale / EFT bekleyen siparişler</h3><span class="pill amber">${E.orders.length}</span>
+      <span class="muted small" style="flex-basis:100%">Ödeme hesabınıza geçince <b>Ödeme geldi</b>'ye basın: yeni firmada panel açılır ve giriş bilgileri müşteriye e-postayla gider; yenilemede abonelik uzar.</span></div>
+      <div class="list">${E.orders.map((o) => html`<div class="li" style="align-items:flex-start;gap:12px"><div style="flex:1;min-width:0">
+        <b>${o.firm}</b> <span class="pill">${o.kind === 'new' ? 'Yeni firma' : `Yenileme · ${o.slug}`}</span>
+        <div class="small">${o.plan} · ${o.period === 'yearly' ? 'yıllık' : 'aylık'} · <b class="num">${money(o.amount)}</b> · sipariş no <span class="num">${o.id}</span></div>
+        <div class="muted tiny">${dateTime(o.created_at)} · ${[o.name, o.email, o.phone].filter(Boolean).join(' · ')}</div></div>
+        <div class="row" style="gap:6px"><button class="btn sm primary" data-act="eftok" data-id="${o.id}"><i class="ico ico-check"></i>Ödeme geldi</button><button class="btn sm ghost" data-act="eftno" data-id="${o.id}">İptal</button></div></div>`)}</div></div>` : '');
+  }
   const bySlug = (s) => T.tenants.find((t) => t.slug === s);
 
   // ---------- firma formu ----------
@@ -293,6 +308,15 @@ export async function firmsView(el) {
     add: () => form(null),
     open: (t) => detail(t.closest('[data-slug]').dataset.slug),
     st: (t) => { f.st = t.dataset.k; draw(); },
+    eftok: async (t) => {
+      const o = E.orders.find((x) => x.id === t.dataset.id);
+      if (!o || !(await confirmBox(`${o.firm} · ${money(o.amount)} havale / EFT ödemesi hesabınıza geçti mi? Onaylayınca ${o.kind === 'new' ? 'panel açılır ve giriş bilgileri müşteriye e-postayla gider' : 'abonelik uzatılır'}.`, 'Ödeme geldi'))) return;
+      await busy(t, async () => { const r = await api(`tenants/eft/${o.id}/confirm`, { method: 'POST' }); toast(o.kind === 'new' ? `Panel açıldı: ${r.slug}` : 'Abonelik uzatıldı'); await refresh(); });
+    },
+    eftno: async (t) => {
+      if (!(await confirmBox('Bu havale siparişi iptal edilsin mi? (Ödeme gelmediyse)', 'İptal et'))) return;
+      await busy(t, async () => { await api(`tenants/eft/${t.dataset.id}/cancel`, { method: 'POST' }); toast('Sipariş iptal edildi'); await refresh(); });
+    },
   });
   el.addEventListener('click', (e) => {
     const r = e.target.closest('[data-slug]');

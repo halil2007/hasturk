@@ -86,10 +86,10 @@ export async function currentUser(req, env, db) {
     if (!password(env)) return null;
     return same(sig, await hmac(secret(env), `0.${exp}.0`)) ? { ...ADMIN, twofa: !!(await getTfa(db, 0)).on } : null;
   }
-  const u = await first(db, 'SELECT id, username, name, email, role, active, pass, perms, sess, totp FROM users WHERE id = ?', Number(uid));
+  const u = await first(db, 'SELECT id, username, name, email, role, active, pass, perms, sess, totp, must_change FROM users WHERE id = ?', Number(uid));
   if (!u || !u.active) return null;
   if (!same(sig, await hmac(secret(env), `${uid}.${exp}.${ver(u)}`))) return null;
-  return { id: u.id, username: u.username, name: u.name || u.username, email: u.email, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms), twofa: !!tfaOf(u.totp).on };
+  return { id: u.id, username: u.username, name: u.name || u.username, email: u.email, role: u.role, perms: u.role === 'admin' ? null : permsOf(u.perms), twofa: !!tfaOf(u.totp).on, ...(u.must_change ? { mustChange: true } : {}) };
 }
 
 export async function login(req, env, db, { username, password: pass }) {
@@ -422,5 +422,6 @@ export async function changeOwnPassword(db, user, oldPw, newPw) {
   const u = await first(db, 'SELECT pass FROM users WHERE id = ?', user.id);
   if (!u || !(await checkPassword(String(oldPw || ''), u.pass))) throw new Error('Mevcut şifre hatalı');
   if (String(newPw || '').length < 8) throw new Error('Yeni şifre en az 8 karakter olmalı');
-  await run(db, 'UPDATE users SET pass = ? WHERE id = ?', await hashPassword(String(newPw)), user.id);
+  if (String(newPw) === String(oldPw)) throw new Error('Yeni şifre eskisiyle aynı olamaz');
+  await run(db, 'UPDATE users SET pass = ?, must_change = 0 WHERE id = ?', await hashPassword(String(newPw)), user.id);
 }
