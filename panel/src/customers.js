@@ -45,8 +45,20 @@ function range(q) {
 // Özet: müşteri / sipariş / tekrar oranı / ortalama sepet; kanal bazında; sipariş sayısı dağılımı; aylık yeni ve tekrar eden.
 // Hız: toplamlar veritabanında yapılır, panele yalnız birkaç satır döner (müşteri başına satır taşınmaz); D1 sorguları sırayla
 // işlediği için aynı taramayı paylaşan hesaplar tek sorguda birleştirilmiştir.
+// Özet önbelleği (çalışan örnek başına): siparişler değişmediyse (sayı, son güncelleme, toplam tutar) aynı dönem yeniden hesaplanmaz.
+// Büyük katalogda özet birkaç ağır toplama sorgusudur (~0,6 sn); sayfa her açıldığında tekrar çalışmasın.
+const memo = new WeakMap(), MEMO_MS = 15 * 60e3;
 export async function summary(db, q = {}) {
   await fillKeys(db);
+  const sig = JSON.stringify(await first(db, 'SELECT COUNT(*) AS n, MAX(updated_at) AS u, TOTAL(total) AS t FROM orders'));
+  const key = JSON.stringify([q.from || '', q.to || '', q.channel || '']), m = memo.get(db) || memo.set(db, new Map()).get(db), hit = m.get(key);
+  if (hit && hit.sig === sig && Date.now() - hit.at < MEMO_MS) return hit.val;
+  const val = await summaryNow(db, q);
+  if (m.size > 20) m.clear();
+  m.set(key, { sig, at: Date.now(), val });
+  return val;
+}
+async function summaryNow(db, q) {
   const { where, args } = range(q);
   const W = 'WHERE ' + where.join(' AND ');
   const since = Date.now() - 365 * 864e5;
