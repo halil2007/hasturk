@@ -164,13 +164,25 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${chName()}'dan kontrol et</button>`;
     if (ls.key === 'external') return html`<button class="btn sm primary" data-op="ext"><i class="ico ico-truck"></i>${caps().external.label}${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}</button><button class="btn sm" style="flex:0 0 auto" data-op="refresh" title="ikas'tan hemen kontrol et" aria-label="Kontrol et"><i class="ico ico-sync"></i></button>`;
     // Kanalın kargo etiketi servisi yoksa ve bağlı kargo entegratörü varsa: etiket ve takip no entegratörden
-    if (ls.key === 'unpacked' && !caps().label && !caps().pack && hasCarrier && carrierAllowed(d, p)) return html`<button class="btn sm primary" data-op="carrier" data-id="${p.id}"><i class="ico ico-tag"></i>Entegratörden etiket al</button><button class="btn sm" data-op="label" data-id="${p.id}">Etiket oluştur</button>`;
+    if (ls.key === 'unpacked' && !caps().label && !caps().pack && hasCarrier && carrierAllowed(d, p)) return html`<button class="btn sm primary" data-op="carrier" data-id="${p.id}"><i class="ico ico-tag"></i>Kargo firmasından etiket al</button><button class="btn sm" data-op="label" data-id="${p.id}">Etiket oluştur</button>`;
     // Kanalın kendi etiketi varken de entegratör seçilebilir (paket henüz oluşmadığında menü görünmez: küçük düğme)
-    const alt = hasCarrier && carrierAllowed(d, p) ? html`<button class="btn sm" style="flex:0 0 auto" data-op="carrier" data-id="${p.id}" title="Kargo entegratöründen etiket al" aria-label="Kargo entegratöründen etiket al"><i class="ico ico-truck"></i></button>` : '';
+    const alt = hasCarrier && carrierAllowed(d, p) ? html`<button class="btn sm" style="flex:0 0 auto" data-op="carrier" data-id="${p.id}" title="Bağlı kargo firmasından etiket al" aria-label="Bağlı kargo firmasından etiket al"><i class="ico ico-truck"></i></button>` : '';
     if (ls.key === 'unpacked') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-box"></i>${caps().pack ? 'Paketle ve etiket al' : 'Etiket oluştur'}</button>${alt}`;
     if (ls.key === 'packed' || ls.key === 'created' || ls.key === 'error') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${ls.key === 'error' ? 'Tekrar dene' : ls.key === 'created' ? 'Etiketi al' : 'Etiket oluştur'}</button>`;
     if (ls.key === 'ready') return html`<button class="btn sm primary" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi yazdır</button>`;
     return html`<button class="btn sm" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Tekrar yazdır</button><button class="btn sm primary" data-op="ship" data-id="${p.id}"><i class="ico ico-truck"></i>${caps().ship === 'remote' ? 'Kargoya ver' : 'Kargoya verildi'}</button>`;
+  }
+  // Önerilen etiket kaynağı (paket henüz etiketlenmediyse): pazaryeri ortak barkodu → sitenin etiketi → bağlı kargo firması
+  function labelAdvice(o, p) {
+    if (p.status !== 'open' || p.carrier_provider || p.barcode || p.tracking || !live()) return '';
+    const c = caps(), nm = chName();
+    const t = c.external ? `${c.external.label.replace(/ ile Gönder$/, '')} etiketi (${nm}'ta açılır, barkod ve etiket panele kendiliğinden gelir)${hasCarrier ? ' · ya da bağlı kargo firmanız' : ''}`
+      : c.label && c.cargo !== false ? `${nm} ortak barkodu (anlaşmalı kargo; etiketi panelden basarsınız)${hasCarrier ? ' · kendi anlaşmanızla gönderecekseniz bağlı kargo firması' : ''}`
+      : c.label ? `${nm} etiketi${hasCarrier ? ' · ya da bağlı kargo firmanız' : ''}`
+      : hasCarrier ? 'bağlı kargo firmanız (etiket ve takip no firmadan gelir)'
+      : '';
+    if (!t) return mode === 'panel' ? '' : html`<div class="tiny muted" style="margin:2px 0 6px">${nm} kargo etiketi vermiyor: takip no girin ya da ${isAdmin() ? html`<a class="link" href="#/entegrasyonlar">kargo firması bağlayın</a>` : 'yöneticiniz kargo firması bağlayabilir'}.</div>`;
+    return html`<div class="tiny muted" style="margin:2px 0 6px"><b>Önerilen etiket:</b> ${t}</div>`;
   }
   function labelSteps(p) {
     const st = [['packed_at', 'Paketlendi'], ['label_at', 'Etiket oluşturuldu'], ['label_viewed_at', 'Görüntülendi'], ['label_printed_at', 'Yazdırıldı']];
@@ -192,7 +204,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company || (pick && pick.name) ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
       ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
-      <div class="acts">${mainBtn(o, p)}${mode !== 'panel' && !p.virtual ? html`<button class="btn sm" style="flex:0 0 auto" data-op="more" data-id="${p.id}" aria-label="Diğer işlemler"><i class="ico ico-dots"></i></button>` : ''}</div>
+      ${labelAdvice(o, p)}<div class="acts">${mainBtn(o, p)}${mode !== 'panel' && !p.virtual ? html`<button class="btn sm" style="flex:0 0 auto" data-op="more" data-id="${p.id}" aria-label="Diğer işlemler"><i class="ico ico-dots"></i></button>` : ''}</div>
     </div>`;
   }
 
@@ -352,7 +364,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         if (!(await confirmBox(`Paket ${pkg.no} ${chName()}'da iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
         busy(null, async () => { const r = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
       } });
-      if (open && carrierAllowed(d, pkg)) items.push('-', { icon: 'truck', label: 'Kargo entegratöründen etiket al', run: () => carrierDialog(d, pkg, changed) });
+      if (open && carrierAllowed(d, pkg)) items.push('-', { icon: 'truck', label: 'Kargo firmasından etiket al (kendi anlaşmam)', run: () => carrierDialog(d, pkg, changed) });
       if (open && pkg.carrier_provider) items.push('-', { icon: 'x', danger: true, label: 'Entegratör gönderisini iptal et', run: async () => {
         if (!(await confirmBox(`Paket ${pkg.no} için entegratörde açılan gönderi (${pkg.cargo_company || ''} ${pkg.tracking || ''}) iptal edilsin mi? Takip numarası ve etiket geçersiz olur.`, 'Gönderiyi iptal et'))) return;
         busy(null, async () => { const r = await api(`orders/${enc}/carrier-cancel`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
@@ -418,19 +430,19 @@ export async function carrierOptions() {
 export const carrierAllowed = (d, pkg) => pkg.status === 'open' && (((d.channel || {}).caps || {}).manualTracking !== false || ((d.channel || {}).caps || {}).ownCarrier) && !pkg.carrier_ref
   && !(pkg.remote_id && (pkg.barcode || pkg.tracking) && pkg.agreement !== 'own');
 async function carrierDialog(d, pkg, done) {
-  const o = d.order, list = await carrierOptions(), usable = list.filter((c) => c.usable), soon = list.filter((c) => !c.usable);
+  const o = d.order, list = await carrierOptions(), usable = list.filter((c) => c.usable), soon = list.filter((c) => !c.usable && c.configured), locked = list.some((c) => c.locked);
   const def = usable.find((c) => c.isDefault) || usable[0];
   let a = o.address; try { if (typeof a === 'string') a = JSON.parse(a); } catch { a = {}; }
   a = a || {};
   const snd = (state.settings && state.settings.sender) || {};
-  const s = sheet({ title: `Paket ${pkg.no} · kargo entegratöründen etiket`, size: 'narrow', body: html`<div class="stack">
+  const s = sheet({ title: `Paket ${pkg.no} · kargo firmasından etiket`, size: 'narrow', body: html`<div class="stack">
     <div class="small muted">${ch(o.channel).name} · #${o.order_number} · ${o.customer}</div>
     ${usable.length ? html`<div class="stack" style="gap:6px">${usable.map((c) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="carrier" value="${c.id}" ${def && def.id === c.id ? 'checked' : ''}><span style="flex:1"><span style="font-weight:600">${c.name}</span><div class="tiny muted">${c.about || ''}</div></span>${c.isDefault ? html`<span class="pill good">varsayılan</span>` : ''}</label>`)}</div>
       <label class="field"><span>Desi</span><input class="input" type="number" min="0.1" step="0.1" data-desi value="${pkg.desi || 1}" style="max-width:120px"></label>
       <dl class="kv small"><dt>Alıcı</dt><dd>${a.name || o.customer || '—'} · ${[a.district, a.city].filter(Boolean).join(' / ') || html`<span style="color:var(--bad)">adres yok</span>`}</dd>
         <dt>Gönderen</dt><dd>${snd.name || html`<span style="color:var(--bad)">tanımlı değil</span>`}${snd.city ? ` · ${snd.city}` : ''} <a class="link tiny" href="#/ayarlar">değiştir</a></dd></dl>
       <div class="notice small">Gönderi entegratörde açılır; takip numarası ve etiket bu pakete yazılır. Paketi kargoya verdiğinizde takip numarası ${ch(o.channel).name}'a bildirilir. Kargo ücreti siparişin kargo giderine eklenir.</div>`
-      : html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Kullanılabilir kargo entegratörü yok.${soon.length ? ` ${soon.map((c) => `${c.name}${c.ready ? (c.configured ? ' (pasif)' : ' (bilgileri girilmedi)') : ' (bağlantı hazırlanıyor)'}`).join(', ')}.` : ''} ${isAdmin() ? html`<a class="link" href="#/entegrasyonlar">Entegrasyonlar → Kargo entegratörleri</a>` : 'Yöneticiniz Entegrasyonlar sayfasından bağlayabilir.'}</div></div>`}
+      : locked ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Kendi anlaşmalı kargo entegrasyonu <b>Kurumsal</b> pakette.</div></div>` : html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bağlı kargo firması yok.${soon.length ? ` ${soon.map((c) => `${c.name}${c.ready ? (c.configured ? ' (pasif)' : ' (bilgileri girilmedi)') : ' (bağlantı hazırlanıyor)'}`).join(', ')}.` : ''} ${isAdmin() ? html`<a class="link" href="#/entegrasyonlar">Entegrasyonlar → Kargo entegratörleri</a>` : 'Yöneticiniz Entegrasyonlar sayfasından bağlayabilir.'}</div></div>`}
   </div>`,
   foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button>${usable.length ? html`<button class="btn primary" data-go><i class="ico ico-tag"></i>Gönderi oluştur ve etiket al</button>` : ''}` });
   const go = $('[data-go]', s.el);

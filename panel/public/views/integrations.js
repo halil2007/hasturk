@@ -33,7 +33,7 @@ const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trend
 // Yakında eklenecek satış kanalları ve kargo firmaları (seçilemez, yalnız bilgi)
 const SOON = ['Teknosa', 'Turkcell Pasaj', 'Boyner', 'Trendyol Go', 'Getir', 'Yemeksepeti Market'];
 const SOON_ABROAD = ['eBay', 'Ozon'];
-const CARGO_SOON = ['Yurtiçi Kargo', 'Aras Kargo', 'DHL eCommerce (MNG)', 'Sürat Kargo', 'PTT Kargo', 'UPS', 'HepsiJET', 'Kolay Gelsin', 'Sendeo', 'DHL Express'];
+const CARGO_SOON = ['Kolay Gelsin', 'Sendeo', 'DHL Express'];
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
@@ -125,24 +125,31 @@ export async function integrations(el, rest = []) {
   const carrierState = (c) => (!c.ready ? { k: 'off', t: 'Hazırlanıyor' } : !c.configured ? { k: 'off', t: 'Bağlanmadı' } : !c.active ? { k: 'off', t: 'Pasif' } : { k: '', t: 'Bağlı' });
   function carrierSection() {
     if (!carriers.length) return '';
-    return html`<div class="card stack" style="--g:12px">
-      <div><h2>Kargo entegratörleri</h2><div class="muted small">Kendi kargo anlaşmanızla gönderdiğiniz siparişlerin (kendi siteniz, pazaryerleri) etiketini ve takip numarasını entegratör firmadan alın: sipariş → paket menüsü → <b>Kargo entegratöründen etiket al</b>. “Kargoya ver” dediğinizde takip numarası satış kanalına bildirilir.</div></div>
-      <div class="icards">${carriers.map((c) => { const s = carrierState(c); return html`<div class="icard ${c.configured ? 'conf' : ''}" data-act="carrier" data-id="${c.id}" tabindex="0">
-        <div class="ic-top"><span class="logo-b" style="background:${c.id === 'kargonomi' ? '#ff6b00' : c.id === 'navlungo' ? '#1d4ed8' : '#64748b'}">${c.id === 'demo' ? html`<i class="ico ico-truck"></i>` : c.name.slice(0, 1)}</span><div class="ic-name"><b class="ellipsis">${c.name}</b>
+    const locked = carriers.some((c) => c.locked), direct = carriers.filter((c) => c.kind === 'direct'), rest = carriers.filter((c) => c.kind !== 'direct');
+    const card = (c) => { const s = carrierState(c); return html`<div class="icard ${c.configured ? 'conf' : ''}" data-act="carrier" data-id="${c.id}" tabindex="0">
+        <div class="ic-top"><span class="logo-b" style="background:${c.color || (c.id === 'kargonomi' ? '#ff6b00' : c.id === 'navlungo' ? '#1d4ed8' : '#64748b')}">${c.id === 'demo' ? html`<i class="ico ico-truck"></i>` : c.name.slice(0, 1)}</span><div class="ic-name"><b class="ellipsis">${c.name}</b>
           <div class="ic-st"><span class="led ${s.k}"></span>${s.t}${c.isDefault && c.usable ? html`<span class="pill good tiny">Varsayılan</span>` : ''}</div></div>
           <button class="btn sm ${c.configured ? 'outline' : 'primary'}" data-act="carrier" data-id="${c.id}">${c.configured ? html`<i class="ico ico-gear"></i>Yönet` : html`<i class="ico ico-plus"></i>Bağla`}</button></div>
-        ${!c.ready ? html`<div class="ic-need small"><span class="pill warn tiny">API dokümanı bekleniyor</span></div>` : ''}
-        <div class="ic-need small muted">${c.about}</div></div>`; })}</div>
-      <div class="row wrap small" style="gap:6px"><span class="muted">Yakında kargo firmaları (doğrudan bağlantı):</span>${CARGO_SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>
+        ${!c.ready ? html`<div class="ic-need small"><span class="pill warn tiny">${c.configured ? 'Bilgiler kayıtlı · bağlantı hazırlanıyor' : 'API bilgisi gelince açılır'}</span></div>` : ''}
+        <div class="ic-need small muted">${c.about}</div></div>`; };
+    return html`<div class="card stack" style="--g:12px">
+      <div><h2 class="row" style="gap:8px">Kargo entegrasyonları <span class="pill info tiny">Kurumsal paket</span></h2><div class="muted small">Kendi kargo anlaşmanızla gönderdiğiniz siparişlerin (kendi siteniz, pazaryerleri, ikas) etiketini ve takip numarasını kargo firmasından alın: sipariş → paket menüsü → <b>Kargo firmasından etiket al</b>. “Kargoya ver” dediğinizde takip numarası satış kanalına bildirilir. Bir firma, API bilgileri girilip bağlantısı doğrulandıktan sonra sipariş ekranında görünür.</div>
+        <div class="tiny muted" style="margin-top:6px"><b>Hangi etiket?</b> Trendyol / Hepsiburada gibi pazaryeri anlaşmalı kargosunda pazaryerinin <b>ortak barkodu</b>; siteniz kargo etiketi veriyorsa (ikas Kargo) <b>sitenin etiketi</b>; ikisi de yoksa ya da kendi anlaşmanızla gönderiyorsanız <b>bağlı kargo firması</b>. Sipariş ekranı her paket için önerilen yolu gösterir.</div></div>
+      ${locked ? html`<div class="notice warn small"><i class="ico ico-key"></i><div>Kendi anlaşmalı kargo entegrasyonu <b>Kurumsal</b> pakette. Pazaryeri ortak barkodu ve ikas Kargo etiketleri tüm paketlerde çalışır. ${isAdmin() ? html`<a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.` : ''}</div></div>` : ''}
+      <div class="small" style="font-weight:650">Kargo firmaları (doğrudan bağlantı)</div>
+      <div class="icards">${direct.map(card)}</div>
+      ${rest.length ? html`<div class="small" style="font-weight:650">Kargo entegratörleri (tek hesaptan birçok firma)</div><div class="icards">${rest.map(card)}</div>` : ''}
+      <div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${CARGO_SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>
     </div>`;
   }
   function carrierSheet(id) {
     const c = carriers.find((x) => x.id === id);
     if (!c) return;
+    if (c.locked) return toast('Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette; Paketim\'den yükseltebilirsiniz', true);
     const admin = isAdmin(), fields = c.fields || [];
     const s = sheet({ title: `${c.name} · kargo entegratörü`, size: 'narrow', body: html`<div class="stack">
       <div class="small">${c.about}</div>
-      ${!c.ready ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>Bağlantı hazırlanıyor.</b> ${c.name}'nun API dokümanı geldiğinde gönderi oluşturma açılacak. Bilgilerinizi şimdiden kaydedebilirsiniz; o zamana kadar etiketi ${c.name} panelinden alıp takip numarasını paket menüsünden “Kendi anlaşmamla gönder” ile girebilirsiniz.</div></div>` : ''}
+      ${!c.ready ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>Bağlantı hazırlanıyor.</b> ${c.name} API dokümanı ve test hesabı geldiğinde gönderi oluşturma açılacak. Bilgilerinizi şimdiden kaydedebilirsiniz; o zamana kadar etiketi ${c.name} panelinden alıp takip numarasını paket menüsünden “Kendi anlaşmamla gönder” ile girebilirsiniz.</div></div>` : ''}
       <div class="notice small"><i class="ico ico-key"></i><div>${c.howto}${c.site ? html` <a class="link" href="${c.site}" target="_blank" rel="noopener">${c.site.replace(/^https?:\/\/(www\.)?/, '')}</a>` : ''}</div></div>
       ${c.demo ? '' : html`<div class="form-grid">${fields.map((f2) => html`<label class="field"><span class="row" style="gap:6px">${f2.label}${f2.req ? html`<b style="color:var(--bad)">*</b>` : ''}${f2.source === 'panel' ? html`<span class="src panel">kayıtlı</span>` : ''}</span>
         ${f2.secret ? html`<input class="input" type="password" autocomplete="new-password" data-k="${f2.k}" placeholder="${f2.masked ? `${f2.masked} (kayıtlı — değiştirmek için yazın)` : 'gizli değer'}" ${admin ? '' : 'disabled'}>`

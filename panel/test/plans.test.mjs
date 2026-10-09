@@ -58,7 +58,7 @@ test('Başlangıç paketi: mağaza / kullanıcı sınırı ve Profesyonel özell
   assert.equal((await owner('/api/tenants/kucuk', J({ plan: 'Profesyonel' }, 'PUT'))).status, 200);
   assert.equal((await tenant('/api/products.csv')).status, 200);
   assert.equal((await put('idefix', { IDEFIX_VENDOR_ID: '1', IDEFIX_API_KEY: 'k', IDEFIX_API_SECRET: 's' })).status, 200);
-  assert.equal((await (await tenant('/api/me')).json()).tenant.locked.sort().join(','), 'fx,stockapi', 'yalnız Kurumsal özellikleri (Stok API, döviz endeksli fiyat) kilitli');
+  assert.equal((await (await tenant('/api/me')).json()).tenant.locked.sort().join(','), 'carrier,fx,stockapi', 'yalnız Kurumsal özellikleri (kargo entegrasyonu, Stok API, döviz endeksli fiyat) kilitli');
 });
 
 test('süresi dolan panel: giriş mesajı iletişim bilgisi verir, arka plan senkronu durur, yenilenince devam eder', async () => {
@@ -106,4 +106,11 @@ test('şifremi unuttum: hesap varlığı belli edilmez; e-postadaki bağlantıyl
   assert.equal((await tenant('/api/password/reset', J({ key: `unutkan.${tok}`, password: 'baska-sifre-1' }))).status, 400, 'bağlantı tek kullanımlık');
   assert.equal((await tenant('/api/login', J({ tenant: 'unutkan', username: 'ali', password: 'gizli-sifre-1' }))).status, 401, 'eski şifre geçmez');
   assert.equal((await tenant('/api/login', J({ tenant: 'unutkan', username: 'ali', password: 'yeni-sifre-99' }))).status, 200);
+});
+
+test('kendi anlaşmalı kargo entegrasyonu yalnız Kurumsal pakette', async () => {
+  const { requireFeature, allows } = await import('../src/plans.js');
+  assert.equal(allows({ TENANT_SLUG: 'a', TENANT_PLAN: 'profesyonel' }, 'carrier'), false);
+  assert.equal(allows({ TENANT_SLUG: 'a', TENANT_PLAN: 'kurumsal' }, 'carrier'), true);
+  assert.throws(() => requireFeature({ TENANT_SLUG: 'a', TENANT_PLAN: 'baslangic' }, 'carrier'), /Kurumsal paketinde var/);
 });

@@ -34,6 +34,23 @@ export const FIELDS = {
     { k: 'NAVLUNGO_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Navlungo ekibinin entegrasyon için verdiği anahtar' },
     { k: 'NAVLUNGO_API_SECRET', label: 'API şifresi', secret: true, hint: 'Navlungo ayrıca şifre verdiyse' },
   ],
+  // Doğrudan kargo firmaları (kendi anlaşmanız): alanlar firmaların web servislerinin istediği bilgiler
+  hepsijet: [
+    { k: 'HEPSIJET_USER', label: 'Kullanıcı adı', req: true }, { k: 'HEPSIJET_PASSWORD', label: 'Şifre', secret: true, req: true },
+    { k: 'HEPSIJET_COMPANY', label: 'Firma kodu', req: true }, { k: 'HEPSIJET_WAREHOUSE', label: 'Depo kodu', hint: 'Gönderilerin çıkış deposu' },
+  ],
+  dhl: [
+    { k: 'DHL_CLIENT_ID', label: 'API istemci kimliği (Client ID)', req: true }, { k: 'DHL_CLIENT_SECRET', label: 'API gizli anahtarı (Client Secret)', secret: true, req: true },
+    { k: 'DHL_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'DHL_PASSWORD', label: 'Müşteri şifresi', secret: true, req: true },
+  ],
+  ptt: [{ k: 'PTT_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'PTT_USER', label: 'Web servis kullanıcı adı', req: true }, { k: 'PTT_PASSWORD', label: 'Web servis şifresi', secret: true, req: true }],
+  surat: [{ k: 'SURAT_USER', label: 'Kullanıcı adı', req: true }, { k: 'SURAT_PASSWORD', label: 'Şifre', secret: true, req: true }, { k: 'SURAT_ACCOUNT', label: 'Cari kod' }],
+  yurtici: [
+    { k: 'YURTICI_USER', label: 'Web servis kullanıcı adı (wsUserName)', req: true }, { k: 'YURTICI_PASSWORD', label: 'Web servis şifresi (wsPassword)', secret: true, req: true },
+    { k: 'YURTICI_USER_COD', label: 'Alıcı ödemeli kullanıcı adı', adv: true, hint: 'Yurtiçi alıcı ödemeli gönderi için ayrı kullanıcı verdiyse' }, { k: 'YURTICI_PASSWORD_COD', label: 'Alıcı ödemeli şifre', secret: true, adv: true },
+  ],
+  aras: [{ k: 'ARAS_USER', label: 'Kullanıcı adı', req: true }, { k: 'ARAS_PASSWORD', label: 'Şifre', secret: true, req: true }, { k: 'ARAS_CUSTOMER_CODE', label: 'Müşteri kodu', req: true }],
+  ups: [{ k: 'UPS_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'UPS_USER', label: 'Kullanıcı adı', req: true }, { k: 'UPS_PASSWORD', label: 'Şifre', secret: true, req: true }],
   mail: [
     { k: 'MAIL_PROVIDER', label: 'E-posta servisi', hint: 'smtp (kendi e-posta sunucunuz), brevo veya resend' },
     { k: 'MAIL_API_KEY', label: 'API anahtarı', secret: true },

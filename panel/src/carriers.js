@@ -24,6 +24,22 @@ export const CARRIERS = {
     about: 'Yurt içi ve yurt dışı gönderi platformu: tek entegrasyonla 20\'den fazla yerel ve global kargo firması, 230 ülkeye gönderim.',
     howto: 'Navlungo\'da hesap açın ve Navlungo ekibinden API erişimi isteyin; verilen bilgileri buraya girin.',
   },
+  // ---------- doğrudan kargo firmaları (kendi anlaşmanız; sıra: bağlantı önceliği) ----------
+  // Her firma API erişimini kurumsal müşteri sözleşmesiyle, kendi bölge / şube ekibinden verir; test hesabı ve doküman gelince açılır.
+  hepsijet: { id: 'hepsijet', kind: 'direct', name: 'HepsiJET', site: 'https://www.hepsijet.com', ready: false, color: '#ff6000',
+    about: 'Hepsiburada\'nın kargo firması: kendi anlaşmanızla gönderi, barkod ve takip.', howto: 'HepsiJET kurumsal satış ekibinden entegrasyon kullanıcı adı, şifre, firma kodu ve depo kodu isteyin.' },
+  dhl: { id: 'dhl', kind: 'direct', name: 'DHL eCommerce (MNG Kargo)', site: 'https://www.dhlecommerce.com.tr', ready: false, color: '#d40511',
+    about: 'Eski MNG Kargo: API ile gönderi, barkod ve takip.', howto: 'DHL eCommerce (MNG) şubenizden müşteri numaranız ve API (apizone) erişimi için istemci kimliği / gizli anahtar isteyin.' },
+  ptt: { id: 'ptt', kind: 'direct', name: 'PTT Kargo', site: 'https://www.ptt.gov.tr', ready: false, color: '#f6c400',
+    about: 'PTT Kargo kurumsal gönderi: barkod ve takip.', howto: 'PTT Kargo kurumsal sözleşmenizle müşteri numarası ve web servis kullanıcı adı / şifresi isteyin.' },
+  surat: { id: 'surat', kind: 'direct', name: 'Sürat Kargo', site: 'https://www.suratkargo.com.tr', ready: false, color: '#e30613',
+    about: 'Sürat Kargo web servisiyle gönderi ve takip.', howto: 'Sürat Kargo şubenizden web servis kullanıcı adı, şifre ve cari kodunuzu isteyin.' },
+  yurtici: { id: 'yurtici', kind: 'direct', name: 'Yurtiçi Kargo', site: 'https://www.yurticikargo.com', ready: false, color: '#1d3e8c',
+    about: 'Yurtiçi Kargo web servisiyle gönderi, barkod ve takip.', howto: 'Yurtiçi Kargo şubenizden web servis (wsUserName / wsPassword) bilgilerinizi isteyin; gönderici ve alıcı ödemeli için ayrı kullanıcı verilebilir.' },
+  aras: { id: 'aras', kind: 'direct', name: 'Aras Kargo', site: 'https://www.araskargo.com.tr', ready: false, color: '#c8102e',
+    about: 'Aras Kargo web servisiyle gönderi, barkod ve takip.', howto: 'Aras Kargo şubenizden entegrasyon kullanıcı adı, şifre ve müşteri kodunuzu isteyin.' },
+  ups: { id: 'ups', kind: 'direct', name: 'UPS Kargo', site: 'https://www.ups.com.tr', ready: false, color: '#351c15',
+    about: 'UPS Türkiye web servisiyle yurt içi / yurt dışı gönderi ve takip.', howto: 'UPS Türkiye satış temsilcinizden müşteri numarası ve web servis kullanıcı adı / şifresi isteyin.' },
 };
 export const CARRIER_IDS = Object.keys(CARRIERS);
 export const isCarrierId = (id) => CARRIER_IDS.includes(id) || id === 'demo';
@@ -53,7 +69,7 @@ export async function carrierList(env, db, { withFields = false } = {}) {
     const missing = d.fields.filter((f) => f.req && !f.source).map((f) => f.label);
     const configured = !missing.length;
     return {
-      id: c.id, name: c.name, site: c.site, about: c.about, howto: c.howto, ready: c.ready,
+      id: c.id, kind: c.kind || 'integrator', color: c.color || '', name: c.name, site: c.site, about: c.about, howto: c.howto, ready: c.ready,
       active: d.active, configured, missing, usable: c.ready && configured && d.active, isDefault: def === c.id, updated: d.updated,
       ...(withFields ? { fields: d.fields } : {}),
     };
