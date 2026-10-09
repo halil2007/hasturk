@@ -16,9 +16,12 @@
   gtag('js', new Date());
   if (A.id) gtag('config', A.id);
   if (GA) gtag('config', GA);
-  const s = document.createElement('script');
-  s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(tagId);
-  document.head.append(s);
+  // Etiket betiği sayfada (layout.html) doğrudan yüklenir; kimlik farklıysa (yalnız Analytics) burada eklenir
+  if (!document.querySelector('script[src*="googletagmanager.com/gtag/js?id=' + tagId + '"]')) {
+    const s = document.createElement('script');
+    s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(tagId);
+    document.head.append(s);
+  }
 
   // Dönüşüm: aynı sipariş bu tarayıcıda bir kez sayılır (sayfa yenilense de); Google da transaction_id ile tekrarı ayıklar
   const q = new URLSearchParams(location.search), order = q.get('siparis') || '', value = Number(q.get('tutar')) || 0;
