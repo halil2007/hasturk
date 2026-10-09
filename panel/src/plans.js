@@ -13,6 +13,9 @@ export const PLANS = {
 };
 // soon: pakete eklenecek, henüz aktif olmayan özellikler (Paketim'de "Yakında" olarak görünür; hiçbir özelliği açmaz)
 export const INSTALLMENTS_YEARLY = [1, 2, 3];
+// Havale / EFT ile ödemede indirim (%): yalnız yıllık alımda (aylıkta havale / EFT tam fiyatla)
+export const EFT_DISCOUNT = 5;
+export const eftAmount = (p) => (p.period === 'yearly' ? Math.round((p.amount * (100 - EFT_DISCOUNT)) / 100) : p.amount);
 // Satın alınabilir paket ve dönem → tutar, süre (ay)
 export function priceOf(plan, period) {
   const p = PLANS[plan];

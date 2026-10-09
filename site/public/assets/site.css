@@ -825,3 +825,25 @@ a.mf:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 @media (max-width: 599px) { .co-seg button { white-space: normal; padding: 9px 8px; font-size: 13.5px; line-height: 1.25; } .co-seg { grid-auto-columns: minmax(0, 1fr); } }
 .co fieldset { min-width: 0; min-inline-size: 0; }
 .co-card { grid-template-columns: minmax(0, 1fr); } .co-pay { white-space: normal; text-align: center; }
+/* Fatura: "Kurumsal fatura istiyorum" kutucuğu ve havale / EFT indirimi */
+.co-check.co-corp { border: 0; padding: 4px 0; align-self: start; font-size: 15px; color: var(--text-2); }
+.co-check.co-corp input { width: 20px; height: 20px; }
+.co-eft { margin-top: 4px; padding: 12px 14px; border: 1px solid #cdeedd; background: #f1fbf6; border-radius: 12px; font-size: 14px; line-height: 1.55; color: #0f5132; display: grid; gap: 4px; }
+.co-eft small { color: #3f7a5d; font-weight: 500; }
+.co-eft span { color: #335; font-size: 13.5px; }
+.co-eft a { font-weight: 650; }
+.co-sum-eft { margin-top: 8px; padding: 9px 12px; border-radius: 10px; background: #f1fbf6; border: 1px dashed #b7e4cc; font-size: 13.5px; color: #0f5132; } .co-sum-eft small { color: #3f7a5d; }
+/* Ödeme yöntemi seçimi ve havale / EFT bilgileri */
+.co-pm-list { display: grid; gap: 10px; }
+@media (min-width: 600px) { .co-pm-list { grid-template-columns: 1fr 1fr; } }
+.co-pm { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid #dbe3f0; border-radius: 12px; cursor: pointer; background: #fff; }
+.co-pm.on { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(37 99 235 / .12); background: #f7faff; }
+.co-pm.off { opacity: .55; cursor: not-allowed; }
+.co-pm input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); }
+.co-pm span { display: grid; gap: 2px; } .co-pm small { color: var(--text-2); font-size: 13px; }
+.co-eft dl, .co-done dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 6px 0; }
+.co-eft dt, .co-done dt { color: #4b6b5b; font-weight: 500; } .co-eft dd, .co-done dd { margin: 0; font-weight: 650; color: #0d1b34; overflow-wrap: anywhere; }
+.iban { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .3px; }
+.co-copy { margin-left: 6px; font: inherit; font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 7px; border: 1px solid #b7d3f7; background: #fff; color: var(--primary); cursor: pointer; font-family: inherit; }
+.co-done { display: grid; gap: 10px; } .co-done h2 { margin: 0; }
+.y-eft { margin-top: 8px; font-size: 13px; color: #0f5132; } .y-eft small { color: #3f7a5d; }

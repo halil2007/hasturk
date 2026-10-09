@@ -5,10 +5,14 @@
 //  - Panelde: firma yöneticisi Paketim sayfasından satın alır / yeniler / yükseltir.
 // Tutar her zaman sunucudaki paket fiyatından (plans.js) alınır. Ödeme sonucu iyzico'dan sunucu tarafında doğrulanır; aynı
 // ödeme iki kez işlenmez. Kart bilgisi panele hiç gelmez.
+// Yeni firma: firma kodu firma adından üretilir (boşsa / doluysa sonuna sayı eklenir), yönetici kullanıcı adı "yonetici",
+// şifre rastgele geçici şifredir. Geçici şifre ödeme tamamlanana kadar şifrelenmiş saklanır (pass_tmp), firma açılınca e-postayla
+// gönderilir ve silinir; müşteri ilk girişte yeni şifre belirler (users.must_change).
 // Fatura bilgisi (bireysel: ad soyad + TC kimlik no; kurumsal: unvan + vergi dairesi / no) siparişte saklanır, ödeme kaydına ve firma
 // kartına (ünvan, vergi, adres, şehir) yazılır; ödeme tamamlanınca panel sahibine e-posta gider (fatura kesmek için).
-import { all, first, run, init, notify } from './db.js';
-import { priceOf, PLANS, INSTALLMENTS_YEARLY, FEATURES } from './plans.js';
+import { all, first, run, init, notify, resolve as resolveNotice } from './db.js';
+import { priceOf, PLANS, INSTALLMENTS_YEARLY, FEATURES, EFT_DISCOUNT, eftAmount } from './plans.js';
+import { sendMail } from './mail.js';
 import { initCheckout, retrieveCheckout, iyzicoReady } from './iyzico.js';
 import { createTenant, recordPayment, checkNewTenant, getTenant, expired, contactLine } from './tenants.js';
 import { hashPassword } from './auth.js';
@@ -68,6 +72,45 @@ export const invoiceRows = (inv) => (!inv ? [] : inv.type === 'kurumsal'
   : [['Fatura türü', 'Bireysel'], ['Ad soyad', inv.name], ['TC kimlik no', inv.tckn], ['Fatura adresi', fullAddress(inv)]]);
 // Firma kartı alanları (Ticari ünvan, Vergi dairesi / no, adres, şehir)
 const tenantFields = (inv) => ({ legal: inv.type === 'kurumsal' ? inv.company : inv.name, tax: inv.type === 'kurumsal' ? `${inv.taxOffice} / ${inv.taxNo}` : `TC ${inv.tckn}`, address: `${inv.address}, ${inv.district}`, city: inv.city });
+const TR = { ç: 'c', ğ: 'g', ı: 'i', i: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i', û: 'u' };
+export function slugFrom(name) {
+  const s = String(name || '').toLocaleLowerCase('tr').replace(/[çğıiöşüâîû]/g, (c) => TR[c] || c).normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(ltd|limited|sti|şti|san|sanayi|tic|ticaret|as|a\.s|anonim|sirketi|şirketi|ve)\b\.?/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  let out = s.slice(0, 24).replace(/-+$/, '');
+  if (out.length < 3) out = 'firma';
+  return out;
+}
+async function freeSlug(db, firm, now) {
+  const base = slugFrom(firm);
+  for (let i = 0; i < 50; i++) {
+    const s = i === 0 ? base : i < 20 ? `${base}-${i + 1}` : `${base}-${crypto.getRandomValues(new Uint16Array(1))[0] % 9000 + 1000}`;
+    if (s === 'demo') continue;
+    const taken = await first(db, 'SELECT 1 AS x FROM tenants WHERE slug = ?', s)
+      || await first(db, "SELECT 1 AS x FROM sales_orders WHERE kind = 'new' AND slug = ? AND ((status = 'pending' AND created_at > ?) OR status = 'eft')", s, now - 3600e3);
+    if (!taken) return s;
+  }
+  fail(500, 'Firma kodu oluşturulamadı; lütfen tekrar deneyin');
+}
+// Okunaklı geçici şifre (karışan harfler yok): ör. "Kp7m-Rt4x-Wq9z"
+export function tempPassword() {
+  const A = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(12));
+  const c = [...r].map((x) => A[x % A.length]);
+  return `${c.slice(0, 4).join('')}-${c.slice(4, 8).join('')}-${c.slice(8, 12).join('')}`;
+}
+// Geçici şifrenin saklanması (AES-GCM; anahtar panelin gizli anahtarından türetilir)
+async function tmpKey(env) {
+  const raw = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${env.PANEL_SECRET || env.PANEL_PASSWORD || ''}|checkout-temp-pass`));
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+const b64 = (u8) => btoa(String.fromCharCode(...u8)), unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+export async function sealTemp(env, pw) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await tmpKey(env), new TextEncoder().encode(pw)));
+  return `${b64(iv)}.${b64(ct)}`;
+}
+export async function openTemp(env, v) {
+  try { const [iv, ct] = String(v || '').split('.'); return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(iv) }, await tmpKey(env), unb64(ct))); } catch { return ''; }
+}
 function buyerOf(b, ip) {
   const email = str(b.email).trim().toLowerCase().slice(0, 120), phone = str(b.phone).trim().slice(0, 30);
   if (!validEmail(email)) fail(400, 'Geçerli bir e-posta adresi yazın');
@@ -100,6 +143,10 @@ export function checkoutStatus(req, env) {
 }
 
 // Siteden: POST /api/public/checkout  { kind: 'new' | 'renew', plan, period, ...alanlar, consent }
+// Havale / EFT ile ödeme: banka hesabı (sitede ödeme adımında ve müşteriye giden e-postada gösterilir; Worker değişkenleriyle değiştirilebilir)
+export const bankOf = (env = {}) => ({ bank: env.BANK_NAME || 'Ziraat Katılım Bankası', holder: env.BANK_HOLDER || 'Hastürk Gübre Sanayi ve Ticaret Limited Şirketi', iban: env.BANK_IBAN || 'TR63 0020 9000 0207 5858 0000 01' });
+const tl = (n) => `${Number(n).toLocaleString('tr-TR')} TL`;
+
 export async function publicCheckout(req, env) {
   const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');
   const allowed = siteOrigins(env).includes(origin);
@@ -109,10 +156,11 @@ export async function publicCheckout(req, env) {
   const h = cors(origin);
   try {
     if (!env.DB) fail(503, 'Şu an satış yapılamıyor');
-    if (!iyzicoReady(env)) fail(503, 'Online ödeme henüz açılmadı. Satın almak için bizi arayın ya da WhatsApp\'tan yazın.');
     await init(env.DB);
     let b = {};
     try { b = JSON.parse(await req.text()); } catch { fail(400, 'Geçersiz istek'); }
+    const eft = str(b.pay) === 'eft';
+    if (!eft && !iyzicoReady(env)) fail(503, 'Online ödeme henüz açılmadı. Satın almak için bizi arayın ya da WhatsApp\'tan yazın.');
     if (str(b.website)) return json({ ok: true }, 200, h); // bot tuzağı
     const ip = await rateLimit(env.DB, req, 'checkout_rate', 10);
     const p = priceOf(str(b.plan), str(b.period));
@@ -128,16 +176,19 @@ export async function publicCheckout(req, env) {
       const buyer = buyerOf({ ...b, firm: t.name }, ip);
       order = { id: newId(), kind: 'renew', slug: t.slug, plan: p.plan, period: p.period, amount: p.amount, buyer: JSON.stringify(buyer) };
     } else {
-      const firm = str(b.firm).trim();
-      const { slug, username } = await checkNewTenant(env.DB, { slug: b.slug, name: firm, admin_username: b.username });
-      if (String(b.password || '').length < 8) fail(400, 'Şifre en az 8 karakter olmalı');
-      // Aynı firma kodu için bekleyen başka bir ödeme (son 1 saat) varsa kod ayrılmış sayılır
-      if (await first(env.DB, "SELECT 1 AS x FROM sales_orders WHERE kind = 'new' AND slug = ? AND status = 'pending' AND created_at > ?", slug, now - 3600e3)) fail(400, 'Bu firma kodu için devam eden bir ödeme var; birkaç dakika sonra tekrar deneyin ya da başka kod seçin');
+      const firm = str(b.firm).trim().slice(0, 120);
+      if (firm.length < 2) fail(400, 'Firma / mağaza adını yazın');
       const buyer = buyerOf(b, ip);
-      order = { id: newId(), kind: 'new', slug, plan: p.plan, period: p.period, amount: p.amount, buyer: JSON.stringify(buyer), username, pass_hash: await hashPassword(String(b.password)) };
+      // Firma kodu, kullanıcı adı ve geçici şifre sunucuda üretilir (bekleyen ödemelerin kodları da dolu sayılır)
+      const { slug, username } = await checkNewTenant(env.DB, { slug: await freeSlug(env.DB, firm, now), name: firm, admin_username: 'yonetici' });
+      const pw = tempPassword();
+      order = { id: newId(), kind: 'new', slug, plan: p.plan, period: p.period, amount: p.amount, buyer: JSON.stringify(buyer), username, pass_hash: await hashPassword(pw), pass_tmp: await sealTemp(env, pw) };
     }
-    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, username, pass_hash, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
-      order.id, order.kind, order.slug, order.plan, order.period, order.amount, order.buyer, order.username || null, order.pass_hash || null, origin, now, now);
+    // Havale / EFT: sipariş "havale bekleniyor" olarak kaydedilir (yıllıkta indirimli tutar); ödeme gelince ana panel → Firmalar'dan onaylanır
+    if (eft) order.amount = eftAmount(p);
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, username, pass_hash, pass_tmp, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      order.id, order.kind, order.slug, order.plan, order.period, order.amount, eft ? 'eft' : 'pending', order.buyer, order.username || null, order.pass_hash || null, order.pass_tmp || null, origin, now, now);
+    if (eft) return json(await eftOrder(env, order, p, panel), 200, h);
     return json(await start(env, env.DB, order, panel), 200, h);
   } catch (e) {
     if (e instanceof HttpError) return json({ error: e.message }, e.status, h);
@@ -154,7 +205,7 @@ export async function tenantBilling(env, t, user, method, path, b, origin) {
   if (method === 'GET' && path === 'billing') {
     const pays = await all(env.DB, 'SELECT at, amount, months, method, note FROM tenant_payments WHERE slug = ? ORDER BY at DESC LIMIT 50', t.slug);
     return { plans: catalog(), current: { plan: rec.plan || '', expires_at: rec.expires_at || null, trial: !!rec.trial, expired: expired(rec), email: rec.email || '', phone: rec.phone || '' },
-      invoice: await lastInvoice(env.DB, rec), payments: pays, online: iyzicoReady(env), installments: INSTALLMENTS_YEARLY.length };
+      invoice: await lastInvoice(env.DB, rec), payments: pays, online: iyzicoReady(env), installments: INSTALLMENTS_YEARLY.length, bank: bankOf(env), eftDiscount: EFT_DISCOUNT };
   }
   if (method === 'POST' && path === 'billing/checkout') {
     if (user.role !== 'admin') fail(403, 'Paket işlemleri yalnız yöneticiye açıktır');
@@ -202,12 +253,20 @@ export async function finalize(env, order, panel, fetchFn) {
   // Tek sefer: pending → paid geçişini yapan istek uygular (sayfa yenilense / iyzico iki kez gönderse de)
   const claim = await first(env.DB, "UPDATE sales_orders SET status = 'paid', payment_id = ?, installment = ?, updated_at = ? WHERE id = ? AND status = 'pending' RETURNING id", String(res.paymentId || ''), Number(res.installment) || 1, Date.now(), order.id);
   if (!claim) return { done: true, order: await first(env.DB, 'SELECT * FROM sales_orders WHERE id = ?', order.id), again: true };
-  const buyer = JSON.parse(order.buyer || '{}'), p = priceOf(order.plan, order.period), note = `iyzico · ${order.id} · ödeme ${res.paymentId || ''}${Number(res.installment) > 1 ? ` · ${res.installment} taksit` : ''}`;
+  const note = `iyzico · ${order.id} · ödeme ${res.paymentId || ''}${Number(res.installment) > 1 ? ` · ${res.installment} taksit` : ''}`;
+  return complete(env, order, panel, { method: 'Kart (iyzico)', note, res });
+}
+
+// Ödeme alındı (kart ya da onaylanan havale / EFT): yeni firmada panel açılır, mevcut firmada süre uzar; ödeme kaydı, bildirim, e-posta
+async function complete(env, order, panel, { method, note, res = {} }) {
+  const buyer = JSON.parse(order.buyer || '{}'), p = { ...priceOf(order.plan, order.period), amount: order.amount };
   try {
     let slug = order.slug;
     const inv = buyer.invoice ? tenantFields(buyer.invoice) : { city: buyer.city, address: buyer.address, tax: buyer.identity || '' };
     if (order.kind === 'new') {
+      const tempPw = order.pass_tmp ? await openTemp(env, order.pass_tmp) : '';
       await createTenant(env, env.DB, { slug: order.slug, name: buyer.firm, admin_username: order.username, passHash: order.pass_hash, email: buyer.email, phone: buyer.phone, contact: buyer.name,
+        ...(tempPw ? { tempPassword: tempPw, mustChange: true } : {}),
         ...inv, plan: p.name, fee: p.amount, period: p.period, welcome: true }, { origin: panel });
     } else if (buyer.invoice) {
       // Yenilemede firma kartının fatura alanları güncellenir (yetkili / telefon boşsa doldurulur; e-posta değişmez)
@@ -215,10 +274,10 @@ export async function finalize(env, order, panel, fetchFn) {
         inv.legal, inv.tax, inv.address, inv.city, buyer.name, buyer.phone, Date.now(), slug).catch((e) => console.error('firma fatura bilgisi yazılamadı', e));
     }
     const t = await getTenant(env.DB, slug, true);
-    await recordPayment(env, env.DB, t, { amount: p.amount, months: p.months, method: 'Kart (iyzico)', note, user: 'Online satış', plan: p.name });
+    await recordPayment(env, env.DB, t, { amount: p.amount, months: p.months, method, note, user: method === 'Kart (iyzico)' ? 'Online satış' : 'Havale / EFT onayı', plan: p.name });
     // Fatura bilgisi ödeme kaydında (ana panel → Firmalar → Tahsilatlar)
     if (buyer.invoice) await run(env.DB, 'UPDATE tenant_payments SET invoice = ? WHERE slug = ? AND instr(note, ?) > 0', JSON.stringify({ ...buyer.invoice, email: buyer.email, phone: buyer.phone }), slug, order.id).catch(() => {});
-    await run(env.DB, "UPDATE sales_orders SET status = 'done', pass_hash = NULL, updated_at = ? WHERE id = ?", Date.now(), order.id);
+    await run(env.DB, "UPDATE sales_orders SET status = 'done', pass_hash = NULL, pass_tmp = NULL, updated_at = ? WHERE id = ?", Date.now(), order.id);
     const title = order.kind === 'new' ? `Yeni satış: ${buyer.firm} · ${p.name} (${PERIOD[p.period]})` : `Yenileme: ${t.name} · ${p.name} (${PERIOD[p.period]})`;
     await notify(env.DB, `sale:${order.id}`, { level: 'info', title, msg: `${p.amount} TL · ${buyer.name} · ${buyer.email} · ${buyer.phone}` }).catch(() => {});
     await pushNotify(env.DB, { title: '💳 ' + title, body: `${p.amount} TL`, url: '#/firmalar' }).catch(() => {});
@@ -231,6 +290,51 @@ export async function finalize(env, order, panel, fetchFn) {
     await pushNotify(env.DB, { title: '⚠️ Ödeme alındı, panel açılamadı', body: `${buyer.firm || order.slug}: ${e.message}`, url: '#/bildirimler' }).catch(() => {});
     return { paidError: true, reason: e.message };
   }
+}
+
+// ---------- havale / EFT ----------
+const eftLines = (env, order, p) => { const k = bankOf(env); return [['Banka', k.bank], ['Hesap sahibi', k.holder], ['IBAN', k.iban], ['Tutar', `${tl(order.amount)} (KDV dahil)${p.period === 'yearly' ? ` · %${EFT_DISCOUNT} havale indirimi` : ''}`], ['Açıklama', `Sipariş no ${order.id}`]]; };
+async function eftOrder(env, order, p, panel) {
+  const buyer = JSON.parse(order.buyer || '{}'), lines = eftLines(env, order, p), firm = buyer.firm || order.slug;
+  const what = `${p.name} paketi (${PERIOD[p.period]})`;
+  await notify(env.DB, `eft:${order.id}`, { level: 'info', title: `Havale bekleniyor: ${firm} · ${what}`, msg: `${tl(order.amount)} · ${order.id} · ${buyer.email} · ${buyer.phone}` }).catch(() => {});
+  await pushNotify(env.DB, { title: '🏦 Havale / EFT siparişi', body: `${firm} · ${tl(order.amount)}`, url: '#/firmalar' }).catch(() => {});
+  await mailOwner(env, env.DB, { subject: `Havale / EFT siparişi: ${firm} · ${what}`, intro: 'Siteden havale / EFT ile sipariş verildi. Ödeme hesabınıza geçince ana panel → Firmalar → Havale bekleyenler\'den onaylayın; panel açılır / süre uzar.',
+    rows: [['Sipariş no', order.id], ['Tür', order.kind === 'new' ? 'Yeni firma' : `Yenileme (${order.slug})`], ['Paket', what], ['Beklenen tutar', `${tl(order.amount)} (KDV dahil)`], ['Alıcı', buyer.name], ['E-posta', buyer.email], ['Telefon', buyer.phone], ...invoiceRows(buyer.invoice)],
+    link: `${panel}/#/firmalar`, button: 'Firmalar' });
+  // Müşteriye banka bilgileri (e-posta servisi yoksa sayfada gösterilenler yeterli)
+  try {
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111;max-width:560px"><h2 style="font-size:18px">Siparişiniz alındı</h2><p>${esc(what)} siparişiniz havale / EFT ödemesi bekliyor. Ödemeniz hesabımıza geçince ${order.kind === 'new' ? 'paneliniz açılır ve giriş bilgileriniz e-postayla gönderilir' : 'aboneliğiniz uzatılır'}.</p>
+      <table style="border-collapse:collapse">${lines.map(([k, v]) => `<tr><td style="padding:5px 12px 5px 0;color:#667">${esc(k)}</td><td style="padding:5px 0;font-weight:600">${esc(v)}</td></tr>`).join('')}</table>
+      <p style="color:#556">Açıklamaya sipariş numaranızı yazmanız işleminizi hızlandırır.</p></div>`;
+    await sendMail(env, env.DB, { to: [buyer.email], subject: `Hastürk CRM · Havale / EFT bilgileri (${order.id})`, html, text: `Siparişiniz alındı (${what}).\n\n${lines.map(([k, v]) => `${k}: ${v}`).join('\n')}` });
+  } catch (e) { console.error('havale e-postası', e); }
+  return { eft: true, order: order.id, amount: order.amount, bank: bankOf(env), discount: p.period === 'yearly' ? EFT_DISCOUNT : 0 };
+}
+// Ana panel (yönetici): havale bekleyen siparişler, onay (ödeme geldi) ve iptal
+export async function eftAdmin(req, env, path, user) {
+  if (!user || user.role !== 'admin' || env.TENANT_SLUG) fail(403, 'Yönetici yetkisi gerekir');
+  await init(env.DB);
+  let x;
+  if (path === 'tenants/eft' && req.method === 'GET') {
+    const rows = await all(env.DB, "SELECT id, kind, slug, plan, period, amount, buyer, created_at FROM sales_orders WHERE status = 'eft' ORDER BY created_at DESC LIMIT 100");
+    return { orders: rows.map((o) => { const b = JSON.parse(o.buyer || '{}'), p = priceOf(o.plan, o.period) || {}; return { id: o.id, kind: o.kind, slug: o.slug, firm: b.firm || o.slug, plan: p.name, period: o.period, amount: o.amount, name: b.name, email: b.email, phone: b.phone, invoice: b.invoice || null, created_at: o.created_at }; }), bank: bankOf(env) };
+  }
+  if ((x = path.match(/^tenants\/eft\/([A-Z0-9]+)\/(confirm|cancel)$/)) && req.method === 'POST') {
+    if (x[2] === 'cancel') {
+      const r = await first(env.DB, "UPDATE sales_orders SET status = 'cancelled', pass_hash = NULL, pass_tmp = NULL, updated_at = ? WHERE id = ? AND status = 'eft' RETURNING id", Date.now(), x[1]);
+      if (!r) fail(404, 'Sipariş bulunamadı ya da işlenmiş');
+      await resolveNotice(env.DB, `eft:${x[1]}`);
+      return { ok: true };
+    }
+    const claim = await first(env.DB, "UPDATE sales_orders SET status = 'paid', updated_at = ? WHERE id = ? AND status = 'eft' RETURNING *", Date.now(), x[1]);
+    if (!claim) fail(404, 'Sipariş bulunamadı ya da işlenmiş');
+    await resolveNotice(env.DB, `eft:${x[1]}`);
+    const r = await complete(env, claim, new URL(req.url).origin, { method: 'Havale / EFT', note: `Havale / EFT · ${claim.id} · onaylayan ${user.name}` });
+    if (r.paidError) fail(500, 'Ödeme kaydedildi ama işlem tamamlanamadı: ' + r.reason);
+    return { ok: true, slug: claim.slug };
+  }
+  fail(404, 'Bulunamadı');
 }
 
 // Panel sahibine yeni abonelik / yenileme e-postası (fatura kesmek için tüm bilgiler). Gönderilemezse ödeme akışı etkilenmez.
@@ -261,7 +365,7 @@ async function pageFor(env, order, r, panel) {
   if (r.error) return resultPage('Ödeme sonucu doğrulanamadı', `Ödeme sonucunu şu an doğrulayamadık (${esc(r.error)}). Kartınızdan çekim yapıldıysa işleminiz kısa sürede tamamlanır; sayfayı birkaç dakika sonra yenileyebilir ya da bizimle iletişime geçebilirsiniz.`, { status: 502 });
   const o = r.order || order, p = priceOf(o.plan, o.period);
   if (o.kind === 'new') {
-    return resultPage('Paneliniz hazır!', `${esc(p.name)} paketiniz (${PERIOD[p.period]}) aktif. Giriş bilgileriniz:<br><b>Firma kodu:</b> ${esc(o.slug)}<br><b>Kullanıcı adı:</b> ${esc(o.username)}<br><b>Şifre:</b> satın alırken belirlediğiniz şifre<br><span style="font-size:14px">Bilgiler e-posta adresinize de gönderildi.</span>`,
+    return resultPage('Paneliniz hazır!', `${esc(p.name)} paketiniz (${PERIOD[p.period]}) aktif. Giriş bilgileriniz:<br><b>Firma kodu:</b> ${esc(o.slug)}<br><b>Kullanıcı adı:</b> ${esc(o.username)}<br><b>Şifre:</b> e-posta adresinize gönderilen geçici şifre<br><span style="font-size:14px">Giriş bilgileriniz e-postanıza gönderildi (gelmediyse istenmeyen klasörüne bakın). İlk girişte yeni şifrenizi belirlemeniz istenecek.</span>`,
       { ok: true, actions: btn(`${panel}/?firma=${encodeURIComponent(o.slug)}`, 'Panele giriş yap') });
   }
   const t = await getTenant(env.DB, o.slug, true);

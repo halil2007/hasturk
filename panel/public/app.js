@@ -273,14 +273,25 @@ function meMenu(btn) {
     { icon: 'x', label: 'Çıkış yap', danger: true, run: async () => { await api('logout', { method: 'POST' }).catch(() => {}); location.reload(); } },
   ]);
 }
-function changePassword() {
+// forced: ilk giriş (online satışla açılan panelin geçici şifresi) — yeni şifre belirlenmeden panel kullanılamaz; vazgeçilirse çıkış yapılır
+function changePassword(forced = false) {
+  let saved = false;
   const s = sheet({
-    title: 'Şifremi değiştir', size: 'narrow',
-    body: html`<div class="stack"><label class="field"><span>Mevcut şifre</span><input class="input" type="password" data-old autocomplete="current-password"></label>
-      <label class="field"><span>Yeni şifre (en az 8 karakter)</span><input class="input" type="password" data-new autocomplete="new-password"></label></div>`,
-    foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`,
+    title: forced ? 'Yeni şifrenizi belirleyin' : 'Şifremi değiştir', size: 'narrow',
+    body: html`<div class="stack">${forced ? html`<div class="notice small"><i class="ico ico-key"></i><div>Güvenliğiniz için e-postanıza gönderilen <b>geçici şifreyi</b> değiştirin. Yeni şifrenizle tekrar giriş yapacaksınız.</div></div>` : ''}
+      <label class="field"><span>${forced ? 'Geçici şifre' : 'Mevcut şifre'}</span><input class="input" type="password" data-old autocomplete="current-password"></label>
+      <label class="field"><span>Yeni şifre (en az 8 karakter)</span><input class="input" type="password" data-new autocomplete="new-password"></label>
+      <label class="field"><span>Yeni şifre (tekrar)</span><input class="input" type="password" data-new2 autocomplete="new-password"></label></div>`,
+    foot: html`<span class="spacer"></span><button class="btn" data-close>${forced ? 'Çıkış yap' : 'Vazgeç'}</button><button class="btn primary" data-save>Kaydet</button>`,
+    onClose: forced ? () => { if (!saved) api('logout', { method: 'POST' }).catch(() => {}).finally(() => location.reload()); } : undefined,
   });
-  $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => { await api('me/password', { method: 'POST', body: { old: $('[data-old]', s.el).value, new: $('[data-new]', s.el).value } }); toast('Şifre değişti, tekrar giriş yapın'); setTimeout(() => location.reload(), 1200); });
+  $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
+    if ($('[data-new]', s.el).value !== $('[data-new2]', s.el).value) throw new Error('Yeni şifreler aynı değil');
+    await api('me/password', { method: 'POST', body: { old: $('[data-old]', s.el).value, new: $('[data-new]', s.el).value } });
+    saved = true;
+    toast('Şifre değişti, yeni şifrenizle giriş yapın'); setTimeout(() => location.reload(), 1200);
+  });
+  setTimeout(() => { const i = $('[data-old]', s.el); if (i) i.focus(); }, 50);
 }
 
 // Telefon menüsü: firma / kullanıcı başlığı, menüde arama, bölümlere ayrılmış simge ızgarası, hesap işlemleri
@@ -528,7 +539,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-09d';
+const ASSETS = '2026-10-09e';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');
@@ -559,6 +570,8 @@ async function start(attempt = 0) {
   shellCache(state.summary.build);
   nav();
   refreshChrome();
+  // İlk giriş: geçici şifre değiştirilmeden panel kullanılamaz (sunucu da diğer istekleri reddeder)
+  if (state.user && state.user.mustChange) return changePassword(true);
   await route();
   // Boşta: alt menüdeki sayfaların verisi önceden alınır (ilk dokunuşta da beklemeden açılsın)
   setTimeout(() => ['siparisler', 'kargo', 'stoklar', 'urunler'].forEach(prefetchRoute), 1200);

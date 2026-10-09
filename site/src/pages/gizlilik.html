@@ -21,7 +21,8 @@ url: /gizlilik
 <h2>3. Güvenlik</h2>
 <ul>
 <li>Tüm bağlantılar şifrelidir (HTTPS).</li>
-<li>Şifreler tek yönlü özetlenerek saklanır; düz metin olarak tutulmaz.</li>
+<li>Şifreler tek yönlü özetlenerek saklanır; düz metin olarak tutulmaz. Online satın almada oluşturulan geçici şifre, ödeme tamamlanana kadar şifrelenmiş tutulur, e-postayla gönderildikten sonra silinir ve ilk girişte değiştirilmesi istenir.</li>
+<li>Panel girişinde otomatik saldırılara karşı Cloudflare Turnstile doğrulaması kullanılır (reklam ya da izleme amaçlı değildir).</li>
 <li>Pazaryeri ve e-ticaret API bilgileri şifrelenerek saklanır.</li>
 <li>Her müşteri firmanın verisi ayrı veritabanında tutulur.</li>
 <li>Hatalı girişlere karşı deneme sınırı uygulanır; iki adımlı doğrulama (Google Authenticator vb.) açılabilir.</li>
@@ -29,7 +30,7 @@ url: /gizlilik
 </ul>
 
 <h2>4. Üçüncü taraf hizmetler</h2>
-<p>Panel; satıcının bağladığı pazaryerlerinin ve e-ticaret altyapılarının resmi API servisleriyle haberleşir. Kargo etiketinin PDF'e çevrilmesi seçeneği satıcı tarafından açılırsa etiket içeriği bu dönüşüm için bir dış servise gönderilir; seçenek kapalıyken gönderilmez.</p>
+<p>Online ödemeler iyzico'nun ödeme sayfasında alınır; kart bilgileri bize ulaşmaz. Panel; satıcının bağladığı pazaryerlerinin ve e-ticaret altyapılarının resmi API servisleriyle haberleşir. Kargo etiketinin PDF'e çevrilmesi seçeneği satıcı tarafından açılırsa etiket içeriği bu dönüşüm için bir dış servise gönderilir; seçenek kapalıyken gönderilmez.</p>
 
 <h2>5. İletişim</h2>
 <p>Sorularınız için: <span data-c="company.email" data-ph="E-posta adresi"></span></p>

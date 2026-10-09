@@ -49,22 +49,26 @@ export async function resetPassword(db, { token, password }) {
   const u = await first(db, 'SELECT id, username FROM users WHERE id = ? AND active = 1', r.uid);
   if (!u) return { error: 'Kullanıcı bulunamadı' };
   // Yeni şifre: eski oturumlar şifre özetine bağlı olduğundan kendiliğinden kapanır
-  await run(db, 'UPDATE users SET pass = ? WHERE id = ?', await hashPassword(String(password)), u.id);
+  await run(db, 'UPDATE users SET pass = ?, must_change = 0 WHERE id = ?', await hashPassword(String(password)), u.id);
   await run(db, "DELETE FROM settings WHERE k = ? OR k LIKE 'login_fail:%'", k);
   await log(db, null, 'info', `${u.username}: şifre e-postadaki bağlantıyla yenilendi`);
   return { ok: true, username: u.username };
 }
 
 // Yeni firma: yönetici e-postasına giriş bilgileri ve 7 gün geçerli "şifrenizi belirleyin" bağlantısı
-export async function welcome(env, db, { email, firm, slug, username, origin, link, trialDays }) {
+export async function welcome(env, db, { email, firm, slug, username, origin, link, trialDays, password }) {
   if (!validEmail(email)) return { skipped: 'e-posta yok' };
   const u = await first(db, 'SELECT id FROM users WHERE LOWER(username) = LOWER(?)', username);
   if (!u) return { skipped: 'kullanıcı yok' };
   if (!(await first(db, 'SELECT email FROM users WHERE id = ?', u.id)).email) await run(db, 'UPDATE users SET email = ? WHERE id = ?', email, u.id);
   const url = link + await createToken(db, u.id, 7 * 24 * HOUR);
+  // Geçici şifre (online satış): e-postada yazılır, ilk girişte yenisi istenir; ya da bağlantıdan şifre belirlenir
+  const pw = password ? String(password) : '', site = String(env.SITE_URL || 'https://hasturkcrm.com').replace(/\/+$/, '');
   await sendMail(env, db, { to: [email], subject: `${firm} · Hastürk CRM paneliniz hazır`,
-    text: `Paneliniz hazır.\n\nGiriş adresi: ${origin}\nFirma kodu: ${slug}\nKullanıcı adı: ${username}\n\nŞifrenizi belirlemek için (7 gün geçerli): ${url}\n${trialDays ? `\nÜcretsiz deneme süreniz ${trialDays} gündür.` : ''}`,
-    html: mailHtml('Paneliniz hazır', [`<b>${esc(firm)}</b> için Hastürk CRM paneli açıldı.`, `Giriş adresi: <a href="${esc(origin)}">${esc(origin)}</a><br>Firma kodu: <b>${esc(slug)}</b><br>Kullanıcı adı: <b>${esc(username)}</b>`,
-      'Güvenliğiniz için şifrenizi aşağıdaki bağlantıdan kendiniz belirleyin (bağlantı 7 gün geçerli). Size iletilen geçici şifreyle de giriş yapabilirsiniz.', trialDays ? `Ücretsiz deneme süreniz <b>${trialDays} gün</b>. İlk adım olarak Entegrasyonlar sayfasından mağazanızı bağlayın.` : 'İlk adım olarak Entegrasyonlar sayfasından mağazanızı bağlayın.'].filter(Boolean), url, 'Şifremi belirle') });
+    text: `Paneliniz hazır.\n\nGiriş adresi: ${origin}\nFirma kodu: ${slug}\nKullanıcı adı: ${username}${pw ? `\nGeçici şifre: ${pw}\n\nİlk girişte yeni şifrenizi belirlemeniz istenecek.` : ''}\n\nŞifrenizi bağlantıdan belirlemek için (7 gün geçerli): ${url}\n${trialDays ? `\nÜcretsiz deneme süreniz ${trialDays} gündür.` : ''}`,
+    html: mailHtml('Paneliniz hazır', [`<b>${esc(firm)}</b> için Hastürk CRM paneli açıldı.`, `Giriş adresi: <a href="${esc(origin)}">${esc(origin)}</a><br>Firma kodu: <b>${esc(slug)}</b><br>Kullanıcı adı: <b>${esc(username)}</b>${pw ? `<br>Geçici şifre: <b style="font-family:monospace;font-size:15px">${esc(pw)}</b>` : ''}`,
+      pw ? 'Güvenliğiniz için ilk girişte geçici şifrenizi değiştirmeniz istenecek. Dilerseniz şifrenizi doğrudan aşağıdaki bağlantıdan da belirleyebilirsiniz (7 gün geçerli).' : 'Güvenliğiniz için şifrenizi aşağıdaki bağlantıdan kendiniz belirleyin (bağlantı 7 gün geçerli). Size iletilen geçici şifreyle de giriş yapabilirsiniz.', trialDays ? `Ücretsiz deneme süreniz <b>${trialDays} gün</b>. İlk adım olarak Entegrasyonlar sayfasından mağazanızı bağlayın.` : 'İlk adım olarak Entegrasyonlar sayfasından mağazanızı bağlayın.',
+      // Online satış: onaylanan sözleşmelerin bağlantısı (mesafeli satış sözleşmesi gereği)
+      pw ? `Onayladığınız <a href="${esc(site)}/mesafeli-satis-sozlesmesi">mesafeli satış sözleşmesi</a> ve <a href="${esc(site)}/on-bilgilendirme">ön bilgilendirme formu</a>.` : ''].filter(Boolean), url, 'Şifremi belirle') });
   return { ok: true };
 }

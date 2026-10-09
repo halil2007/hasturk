@@ -45,6 +45,8 @@ export async function handle(req, env, ctx, db) {
     // İki adımlı doğrulama zorunluysa ve kullanıcı henüz açmadıysa yalnız kurulum ekranı çalışır
     const need2fa = !user.support && !user.twofa && (await security(db)).require2fa;
     if (path === 'me') return json({ ok: true, user, need2fa, demo: env.DEMO === '1', tenant: env.TENANT_SLUG ? { slug: env.TENANT_SLUG, name: env.TENANT_NAME || env.TENANT_SLUG, ...planInfo(env) } : null });
+    // İlk girişte şifre değiştirme zorunlu (online satışla açılan panelin geçici şifresi): yalnız şifre değiştirme ve özet çalışır
+    if (user.mustChange && !/^(me\/password|summary|me|brand|logo|errors\/report)$/.test(path)) return json({ error: 'Devam etmek için önce geçici şifrenizi değiştirin', mustChange: true }, 403);
     if (need2fa && !path.startsWith('me/2fa') && !/^(brand|logo)$/.test(path)) return json({ error: 'Yöneticiniz iki adımlı doğrulamayı zorunlu tuttu; devam etmek için açın', need2fa: true }, 403);
     return await api(req, env, ctx, db, path, user);
   } catch (e) {

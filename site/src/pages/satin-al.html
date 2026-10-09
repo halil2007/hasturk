@@ -37,9 +37,8 @@ nav: paketler
           <legend class="co-h"><span class="co-n">2</span><span><b>Hesap</b><small>Panel girişiniz ve size ulaşacağımız bilgiler</small></span></legend>
           <div class="co-seg co-kind" role="group" aria-label="Müşteri türü"><button type="button" data-kind="new">Yeni hesap açacağım</button><button type="button" data-kind="renew">Mevcut panelimi yenile</button></div>
           <div class="co-fields" data-for="new">
-            <div class="row2"><label class="f">Firma / mağaza adı *<input class="in" name="firm" autocomplete="organization" required></label><label class="f">Firma kodu *<input class="in" name="slug" autocapitalize="none" spellcheck="false" placeholder="ör. yesil-bahce" required><small class="hint">Panele girerken yazacağınız kod (küçük harf, rakam, tire)</small></label></div>
-            <div class="row2"><label class="f">Kullanıcı adı *<input class="in" name="username" autocapitalize="none" autocomplete="username" spellcheck="false" placeholder="ör. yonetici" required></label><span class="co-gap"></span></div>
-            <div class="row2"><label class="f">Şifre *<input class="in" name="password" type="password" autocomplete="new-password" minlength="8" required><small class="hint">En az 8 karakter</small></label><label class="f">Şifre (tekrar) *<input class="in" name="password2" type="password" autocomplete="new-password" required></label></div>
+            <label class="f">Firma / mağaza adı *<input class="in" name="firm" autocomplete="organization" placeholder="ör. Yeşil Bahçe" required></label>
+            <p class="co-note"><svg><use href="#i-key"/></svg>Firma kodunuz, kullanıcı adınız ve geçici şifreniz ödemeden hemen sonra e-posta adresinize gönderilir. İlk girişte kendi şifrenizi belirlersiniz.</p>
           </div>
           <div class="co-fields" data-for="renew" hidden>
             <label class="f">Firma kodu *<input class="in" name="slug_renew" autocapitalize="none" spellcheck="false" required><small class="hint">Panele girişte yazdığınız firma kodu</small></label>
@@ -50,13 +49,13 @@ nav: paketler
 
         <fieldset class="co-card" data-step="3">
           <legend class="co-h"><span class="co-n">3</span><span><b>Fatura bilgileri</b><small>Faturanız bu bilgilerle düzenlenir</small></span></legend>
-          <div class="co-seg co-inv" role="group" aria-label="Fatura türü"><button type="button" data-inv="bireysel">Bireysel</button><button type="button" data-inv="kurumsal">Kurumsal</button></div>
+          <label class="co-check co-corp"><input type="checkbox" name="corp" data-corp><span>Kurumsal fatura istiyorum</span></label>
           <div class="co-fields" data-inv-for="bireysel">
-            <div class="row2"><label class="f">Ad soyad *<input class="in" name="inv_name" autocomplete="name"></label><label class="f">TC kimlik no *<input class="in" name="tckn" inputmode="numeric" maxlength="11" autocomplete="off"></label></div>
+            <div class="row2"><label class="f">Ad soyad *<input class="in" name="inv_name" autocomplete="name" placeholder="Ad Soyad"></label><label class="f">TC kimlik no *<input class="in" name="tckn" inputmode="numeric" maxlength="11" autocomplete="off" placeholder="11 hane"></label></div>
           </div>
           <div class="co-fields" data-inv-for="kurumsal" hidden>
-            <label class="f">Firma unvanı *<input class="in" name="company" autocomplete="organization" placeholder="ör. Yeşil Bahçe Tarım Ltd. Şti."></label>
-            <div class="row2"><label class="f">Vergi dairesi *<input class="in" name="tax_office"></label><label class="f">Vergi numarası *<input class="in" name="tax_no" inputmode="numeric" maxlength="11" autocomplete="off"><small class="hint">10 hane (şahıs şirketinde TC kimlik no)</small></label></div>
+            <label class="f">Firma adı (unvan) *<input class="in" name="company" autocomplete="organization" placeholder="ör. Yeşil Bahçe Tarım Ltd. Şti."></label>
+            <div class="row2"><label class="f">Vergi numarası *<input class="in" name="tax_no" inputmode="numeric" maxlength="11" autocomplete="off" placeholder="10 hane"><small class="hint">Şahıs şirketinde 11 haneli TC kimlik no</small></label><label class="f">Vergi dairesi *<input class="in" name="tax_office" placeholder="ör. Selçuk"></label></div>
             <div class="row2"><label class="f">Yetkili ad soyad *<input class="in" name="contact" autocomplete="name"></label><label class="co-check"><input type="checkbox" name="efatura"><span>e-Fatura mükellefiyiz</span></label></div>
           </div>
           <label class="f">Fatura adresi *<input class="in" name="address" autocomplete="street-address" placeholder="Mahalle, cadde / sokak, bina ve daire no"></label>
@@ -65,6 +64,11 @@ nav: paketler
 
         <fieldset class="co-card" data-step="4">
           <legend class="co-h"><span class="co-n">4</span><span><b>Onay</b><small>Sözleşmeyi onaylayın, güvenli ödeme sayfasına geçin</small></span></legend>
+          <div class="co-pm-list" role="radiogroup" aria-label="Ödeme yöntemi">
+            <label class="co-pm"><input type="radio" name="pay" value="card" checked><span><b>Kredi / banka kartı</b><small data-pm-card></small></span></label>
+            <label class="co-pm"><input type="radio" name="pay" value="eft"><span><b>Havale / EFT</b><small data-pm-eft></small></span></label>
+          </div>
+          <div class="co-eft" data-co-eft hidden></div>
           <div class="co-total" data-co-total></div>
           <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
           <label class="consent"><input type="checkbox" name="consent"><span><a href="/on-bilgilendirme" target="_blank">Ön bilgilendirme formunu</a>, <a href="/mesafeli-satis-sozlesmesi" target="_blank">mesafeli satış sözleşmesini</a> ve <a href="/iptal-iade" target="_blank">iptal / iade koşullarını</a> okudum, onaylıyorum.</span></label>

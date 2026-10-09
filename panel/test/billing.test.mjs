@@ -9,7 +9,7 @@ import worker, { TenantPanel } from '../src/index.js';
 import { resetChannels } from '../src/channels/index.js';
 import { authHeader } from '../src/iyzico.js';
 import { all, first, run, init, setSetting } from '../src/db.js';
-import { validTckn, invoiceOf } from '../src/billing.js';
+import { validTckn, invoiceOf, openTemp, slugFrom, tempPassword } from '../src/billing.js';
 import { validPhone } from '../src/lead.js';
 
 test('iyzico IYZWSv2 imzası', async () => {
@@ -47,11 +47,12 @@ const invoice = { type: 'bireysel', name: 'Ayşe Yılmaz', tckn: '10000000146', 
 const buyer = { email: 'ayse@ornek.com', phone: '0532 111 22 33', invoice, consent: true };
 const ok = (iyz, price) => iyz.result = (b) => ({ status: 'success', paymentStatus: 'SUCCESS', fraudStatus: 1, basketId: b.conversationId, conversationId: b.conversationId, price, paidPrice: price, paymentId: 'P' + b.conversationId, installment: 3 });
 
-test('yeni müşteri: siteden satın alır, ödeme onaylanınca panel seçtiği şifreyle açılır; ikinci dönüş tekrar işlemez', async () => {
+test('yeni müşteri: siteden satın alır; firma kodu, kullanıcı adı ve geçici şifre otomatik; ilk girişte şifre değiştirilir; ikinci dönüş tekrar işlemez', async () => {
   resetChannels();
   const s = setup();
   try {
-    const r = await s.site({ kind: 'new', plan: 'profesyonel', period: 'yearly', firm: 'Yeşil Bahçe', slug: 'yesil-bahce', username: 'ayse', password: 'gizli-sifre-9', ...buyer });
+    // Formdan gelen firma kodu / kullanıcı adı / şifre dikkate alınmaz: sunucu üretir
+    const r = await s.site({ kind: 'new', plan: 'profesyonel', period: 'yearly', firm: 'Yeşil Bahçe Tarım Ltd. Şti.', slug: 'baska-kod', username: 'ayse', password: 'gizli-sifre-9', ...buyer });
     const j = await r.json();
     assert.equal(r.status, 200, JSON.stringify(j));
     assert.match(j.url, /sandbox-cpp/);
@@ -62,24 +63,37 @@ test('yeni müşteri: siteden satın alır, ödeme onaylanınca panel seçtiği 
     assert.equal(init.basketItems[0].itemType, 'VIRTUAL');
     // Ödeme sayfasında tarayıcıdan gelen tutar dikkate alınmaz; şifre siparişte yalnız özetiyle durur
     const o = await first(s.env.DB, 'SELECT * FROM sales_orders WHERE id = ?', init.conversationId);
-    assert.match(o.pass_hash, /^pbkdf2/); assert.ok(!JSON.stringify(o).includes('gizli-sifre-9'));
+    assert.equal(o.slug, 'yesil-bahce-tarim', 'firma kodu firma adından'); assert.equal(o.username, 'yonetici');
+    const temp = await openTemp(s.env, o.pass_tmp);
+    assert.match(temp, /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/);
+    assert.match(o.pass_hash, /^pbkdf2/); assert.ok(!JSON.stringify(o).includes(temp), 'geçici şifre açık yazılmaz');
     ok(s.iyz, '19900.0');
     const cb = await s.callback('tok-1');
     const html = await cb.text();
-    assert.equal(cb.status, 200); assert.match(html, /Paneliniz hazır/); assert.match(html, /yesil-bahce/);
-    const t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce'");
+    assert.equal(cb.status, 200); assert.match(html, /Paneliniz hazır/); assert.match(html, /yesil-bahce-tarim/); assert.match(html, /yonetici/);
+    const t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce-tarim'");
     assert.equal(t.plan, 'Profesyonel'); assert.equal(t.email, 'ayse@ornek.com');
     assert.ok(t.expires_at > Date.now() + 360 * 864e5, '12 ay');
-    const pays = await all(s.env.DB, "SELECT * FROM tenant_payments WHERE slug = 'yesil-bahce'");
+    const pays = await all(s.env.DB, "SELECT * FROM tenant_payments WHERE slug = 'yesil-bahce-tarim'");
     assert.equal(pays.length, 1); assert.equal(pays[0].amount, 19900); assert.match(pays[0].note, /3 taksit/);
     // Sayfa yenilendi / iyzico ikinci kez gönderdi: tek ödeme kaydı kalır
     assert.match(await (await s.callback('tok-1')).text(), /Paneliniz hazır/);
-    assert.equal((await all(s.env.DB, "SELECT * FROM tenant_payments WHERE slug = 'yesil-bahce'")).length, 1);
-    assert.equal((await first(s.env.DB, 'SELECT pass_hash FROM sales_orders WHERE id = ?', init.conversationId)).pass_hash, null, 'şifre özeti işlem sonrası silinir');
-    // Seçtiği şifreyle giriş
-    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'yesil-bahce', username: 'ayse', password: 'gizli-sifre-9' }) })).status, 200);
+    assert.equal((await all(s.env.DB, "SELECT * FROM tenant_payments WHERE slug = 'yesil-bahce-tarim'")).length, 1);
+    const done = await first(s.env.DB, 'SELECT pass_hash, pass_tmp FROM sales_orders WHERE id = ?', init.conversationId);
+    assert.equal(done.pass_hash, null, 'şifre özeti işlem sonrası silinir'); assert.equal(done.pass_tmp, null, 'geçici şifre işlem sonrası silinir');
+    // Geçici şifreyle giriş: yalnız şifre değiştirme çalışır
+    const login = (pw) => s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'yesil-bahce-tarim', username: 'yonetici', password: pw }) });
+    assert.equal((await login(temp)).status, 200);
     const me = await (await s.tenant('/api/me')).json();
-    assert.equal(me.tenant.planName, 'Profesyonel');
+    assert.equal(me.tenant.planName, 'Profesyonel'); assert.equal(me.user.mustChange, true);
+    const blocked = await s.tenant('/api/orders');
+    assert.equal(blocked.status, 403); assert.equal((await blocked.json()).mustChange, true);
+    assert.equal((await s.tenant('/api/me/password', { method: 'POST', body: JSON.stringify({ old: temp, new: temp }) })).status, 400, 'aynı şifre olmaz');
+    assert.equal((await s.tenant('/api/me/password', { method: 'POST', body: JSON.stringify({ old: temp, new: 'yeni-sifre-77' }) })).status, 200);
+    assert.equal((await login(temp)).status, 401, 'geçici şifre artık geçmez');
+    assert.equal((await login('yeni-sifre-77')).status, 200);
+    assert.equal((await (await s.tenant('/api/me')).json()).user.mustChange, undefined);
+    assert.equal((await s.tenant('/api/orders')).status, 200);
   } finally { s.restore(); }
 });
 
@@ -181,7 +195,7 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     return mock(url, o);
   };
   try {
-    const base = { kind: 'new', plan: 'kurumsal', period: 'monthly', firm: 'Yeşil Bahçe', slug: 'yesil-bahce', username: 'ali', password: 'gizli-sifre-9', consent: true };
+    const base = { kind: 'new', plan: 'kurumsal', period: 'monthly', firm: 'Yeşil Bahçe', consent: true };
     const corp = { type: 'kurumsal', company: 'Yeşil Bahçe Tarım Ltd. Şti.', taxOffice: 'Selçuk', taxNo: '1234567890', contact: 'Ali Veli', efatura: true, address: 'Bosna Hersek Mah. 12. Sok. No:3', district: 'Selçuklu', city: 'Konya' };
     // E-posta, telefon ve fatura bilgisi zorunlu
     const no = async (b, re) => { const r = await s.site(b); assert.equal(r.status, 400); assert.match((await r.json()).error, re); };
@@ -199,6 +213,7 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     assert.equal(init1.buyer.name, 'Ali'); assert.equal(init1.buyer.surname, 'Veli'); assert.equal(init1.buyer.identityNumber, '11111111111', 'VKN kimlik no olarak gönderilmez');
     const o = await first(s.env.DB, 'SELECT buyer FROM sales_orders WHERE id = ?', init1.conversationId);
     assert.equal(JSON.parse(o.buyer).invoice.taxNo, '1234567890');
+    const temp = await openTemp(s.env, (await first(s.env.DB, 'SELECT pass_tmp FROM sales_orders WHERE id = ?', init1.conversationId)).pass_tmp);
     ok(s.iyz, '3990.00');
     assert.match(await (await s.callback('tok-1')).text(), /Paneliniz hazır/);
     // Firma kartı ve ödeme kaydı
@@ -228,11 +243,54 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     assert.ok(await first(s.env.DB, "SELECT 1 AS x FROM logs WHERE msg LIKE 'Bilgilendirme e-postası gönderilemedi%'"), 'gönderilemeyen e-posta günlüğe yazılır');
 
     // Paketim: fatura formu son satın almanın bilgileriyle dolu gelir; panelden kurumsal yenileme
-    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'yesil-bahce', username: 'ali', password: 'gizli-sifre-9' }) })).status, 200);
+    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'yesil-bahce', username: 'yonetici', password: temp }) })).status, 200);
     const g = await (await s.tenant('/api/billing')).json();
     assert.equal(g.invoice.type, 'bireysel'); assert.equal(g.invoice.tckn, '10000000146'); assert.equal(g.invoice.district, 'Meram');
     assert.deepEqual(g.plans.find((p) => p.key === 'kurumsal').soon, ['e-Fatura / e-Arşiv entegrasyonu', 'Kendi anlaşmalı kargo entegrasyonu']);
     assert.equal((await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', period: 'monthly', consent: true, invoice: { ...corp, tckn: '' } }) })).status, 200, 'e-posta / telefon firma kartından');
     assert.equal(s.iyz.inits[2].billingAddress.contactName, 'Yeşil Bahçe Tarım Ltd. Şti.');
+  } finally { s.restore(); }
+});
+
+test('firma kodu firma adından; geçici şifre biçimi', () => {
+  assert.equal(slugFrom('Yeşil Bahçe Tarım Ltd. Şti.'), 'yesil-bahce-tarim');
+  assert.equal(slugFrom('ÇİÇEK DÜNYASI A.Ş.'), 'cicek-dunyasi');
+  assert.equal(slugFrom('Öz'), 'firma');
+  assert.match(slugFrom('Çok Uzun Bir Firma Adı Ve Mağaza Sanayi Ticaret'), /^[a-z0-9-]{3,24}$/);
+  const a = tempPassword(), b = tempPassword();
+  assert.match(a, /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/); assert.notEqual(a, b);
+  assert.doesNotMatch(a, /[0O1lI]/, 'karışan karakter yok');
+});
+
+test('havale / EFT: sipariş "havale bekleniyor" kaydedilir (yalnız yıllıkta %5 indirim); yönetici onaylayınca panel açılır', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    const r = await s.site({ kind: 'new', plan: 'profesyonel', period: 'yearly', pay: 'eft', firm: 'Havale Firma', ...buyer });
+    const j = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(j));
+    assert.equal(j.eft, true); assert.equal(j.amount, 18905, '19.900 × %95'); assert.equal(j.discount, 5);
+    assert.match(j.bank.iban, /^TR63 0020 9000 0207 5858 0000 01$/);
+    assert.equal(s.iyz.inits.length, 0, 'iyzico başlatılmaz');
+    const m = await (await s.site({ kind: 'new', plan: 'baslangic', period: 'monthly', pay: 'eft', firm: 'Aylık Firma', ...buyer })).json();
+    assert.equal(m.amount, 990, 'aylıkta indirim yok'); assert.equal(m.discount, 0);
+    const list = await (await s.owner('/api/tenants/eft')).json();
+    assert.equal(list.orders.length, 2);
+    const o = list.orders.find((x) => x.id === j.order);
+    assert.equal(o.firm, 'Havale Firma'); assert.equal(o.amount, 18905);
+    // Henüz panel yok; onay → panel açılır, ödeme kaydı indirimli tutarla
+    assert.equal(await first(s.env.DB, "SELECT 1 AS x FROM tenants WHERE slug = 'havale-firma'"), null);
+    const temp = await openTemp(s.env, (await first(s.env.DB, 'SELECT pass_tmp FROM sales_orders WHERE id = ?', j.order)).pass_tmp);
+    const c = await s.owner(`/api/tenants/eft/${j.order}/confirm`, { method: 'POST' });
+    assert.equal(c.status, 200, await c.clone().text());
+    assert.equal((await c.json()).slug, 'havale-firma');
+    const pay = await first(s.env.DB, "SELECT amount, method FROM tenant_payments WHERE slug = 'havale-firma'");
+    assert.equal(pay.amount, 18905); assert.equal(pay.method, 'Havale / EFT');
+    assert.equal((await s.owner(`/api/tenants/eft/${j.order}/confirm`, { method: 'POST' })).status, 404, 'ikinci onay işlemez');
+    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'havale-firma', username: 'yonetici', password: temp }) })).status, 200);
+    // İptal
+    assert.equal((await s.owner(`/api/tenants/eft/${m.order}/cancel`, { method: 'POST' })).status, 200);
+    assert.equal((await (await s.owner('/api/tenants/eft')).json()).orders.length, 0);
   } finally { s.restore(); }
 });
