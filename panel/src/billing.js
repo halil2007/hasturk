@@ -11,7 +11,7 @@
 // Fatura bilgisi (bireysel: ad soyad + TC kimlik no; kurumsal: unvan + vergi dairesi / no) siparişte saklanır, ödeme kaydına ve firma
 // kartına (ünvan, vergi, adres, şehir) yazılır; ödeme tamamlanınca panel sahibine e-posta gider (fatura kesmek için).
 import { all, first, run, init, notify, resolve as resolveNotice } from './db.js';
-import { priceOf, PLANS, INSTALLMENTS_YEARLY, FEATURES, EFT_DISCOUNT, eftAmount, EXTRA_STORE, monthsLeft, extraStoreAmount, limitsOf, planKey } from './plans.js';
+import { priceOf, PLANS, INSTALLMENTS_YEARLY, FEATURES, EFT_DISCOUNT, eftAmount, EXTRA_STORE, daysLeft, extraStoreAmount, extraRenewAmount, limitsOf, planKey } from './plans.js';
 import { sendMail } from './mail.js';
 import { initCheckout, retrieveCheckout, iyzicoReady } from './iyzico.js';
 import { createTenant, recordPayment, checkNewTenant, getTenant, expired, contactLine, refreshTenant } from './tenants.js';
@@ -131,8 +131,8 @@ async function lastInvoice(db, t) {
 }
 async function start(env, db, order, origin) {
   const callback = `${origin}/api/public/checkout/callback`;
-  const name = order.kind === 'stores' ? `${order.qty} ek mağaza (${order.period} ay)` : order.kind === 'charge' ? 'ödeme' : PLANS[order.plan].name;
-  const itemName = order.kind === 'stores' ? `Hastürk CRM ${order.qty} ek mağaza (${order.period} ay)` : order.kind === 'charge' ? `Hastürk CRM ${order.plan || 'abonelik'} ödemesi${Number(order.period) ? ` (${order.period} ay)` : ''}` : '';
+  const name = order.kind === 'stores' ? `${order.qty} ek mağaza (${order.period} gün)` : order.kind === 'charge' ? 'ödeme' : PLANS[order.plan].name;
+  const itemName = order.kind === 'stores' ? `Hastürk CRM ${order.qty} ek mağaza (${order.period} gün)` : order.kind === 'charge' ? `Hastürk CRM ${order.plan || 'abonelik'} ödemesi${Number(order.period) ? ` (${order.period} ay)` : ''}` : '';
   const many = order.period === 'yearly' || (order.kind === 'charge' && Number(order.period) >= 12);
   const r = await initCheckout(env, { ...order, buyer: JSON.parse(order.buyer), installments: many ? INSTALLMENTS_YEARLY : [1], name, ...(itemName ? { itemName } : {}) }, callback);
   await run(db, 'UPDATE sales_orders SET token = ?, updated_at = ? WHERE id = ?', r.token, Date.now(), order.id);
@@ -203,10 +203,10 @@ export async function publicCheckout(req, env) {
 }
 
 // Panelden (firma yöneticisi, oturumlu): Paketim sayfası. t = firma kaydı, user = panel kullanıcısı
-// Ek mağaza: mevcut sınır, paketin mağaza sayısı, kullanılan, aylık ücret ve bitişe kalan ay (tutar sunucuda hesaplanır)
+// Ek mağaza: mevcut sınır, paketin mağaza sayısı, kullanılan, yıllık ücret, lisans bitişine kalan gün ve mağaza başı tutar (sunucuda hesaplanır)
 function storeInfo(rec, used) {
   const lim = limitsOf(rec), base = (PLANS[planKey(rec.plan)] || {}).stores || 0;
-  return { limit: lim.stores || 0, base, extra: Math.max(0, (lim.stores || 0) - base), used: Number(used) || 0, monthly: EXTRA_STORE.monthly, months: monthsLeft(rec.expires_at), max: EXTRA_STORE.max,
+  return { limit: lim.stores || 0, base, extra: Math.max(0, (lim.stores || 0) - base), used: Number(used) || 0, yearly: EXTRA_STORE.yearly, days: daysLeft(rec.expires_at), perStore: extraStoreAmount(1, daysLeft(rec.expires_at)), max: EXTRA_STORE.max,
     buyable: !!base && !rec.trial && !expired(rec) };
 }
 export async function tenantBilling(env, t, user, method, path, b, origin, { usedStores = 0 } = {}) {
@@ -218,7 +218,7 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     return { plans: catalog(), stores: storeInfo(rec, usedStores), current: { plan: rec.plan || '', expires_at: rec.expires_at || null, trial: !!rec.trial, expired: expired(rec), email: rec.email || '', phone: rec.phone || '' },
       invoice: await lastInvoice(env.DB, rec), payments: pays, online: iyzicoReady(env), installments: INSTALLMENTS_YEARLY.length, bank: bankOf(env), eftDiscount: EFT_DISCOUNT };
   }
-  // Ek mağaza satın alma: adet × aylık ücret × abonelik bitişine kalan ay; ödeme alınınca firmanın mağaza sınırı artar
+  // Ek mağaza satın alma: adet × yıllık ücret × lisans bitişine kalan gün / 365; ödeme alınınca firmanın mağaza sınırı artar
   if (method === 'POST' && path === 'billing/stores') {
     if (user.role !== 'admin') fail(403, 'Paket işlemleri yalnız yöneticiye açıktır');
     if (!iyzicoReady(env)) fail(503, 'Online ödeme henüz açılmadı. ' + await contactLine(env));
@@ -227,8 +227,8 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     if (qty < 1 || qty > si.max) fail(400, `Ek mağaza adedi 1-${si.max} arasında olmalı`);
     if (!b.consent) fail(400, 'Mesafeli satış sözleşmesini onaylayın');
     const buyer = buyerOf({ ...b, firm: rec.name, email: b.email || rec.email || user.email, phone: b.phone || rec.phone }, '');
-    const now = Date.now(), months = si.months, amount = extraStoreAmount(qty, months);
-    const order = { id: newId(), kind: 'stores', slug: rec.slug, plan: 'stores', period: String(months), amount, qty, buyer: JSON.stringify(buyer) };
+    const now = Date.now(), days = si.days, amount = extraStoreAmount(qty, days);
+    const order = { id: newId(), kind: 'stores', slug: rec.slug, plan: 'stores', period: String(days), amount, qty, buyer: JSON.stringify(buyer) };
     await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, qty) VALUES (?, 'stores', ?, 'stores', ?, ?, 'pending', ?, 'panel', ?, ?, ?)`,
       order.id, order.slug, order.period, amount, order.buyer, now, now, qty);
     return start(env, env.DB, order, origin);
@@ -242,7 +242,7 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     const buyer = buyerOf({ ...b, firm: rec.name, email: b.email || rec.email || user.email, phone: b.phone || rec.phone }, '');
     // Aldığı ek mağazalar yenilemede korunur ve ücrete eklenir (yeni paket daha çok mağaza içeriyorsa fazlası düşer)
     const extra = Math.max(0, (Number(rec.max_stores) || 0) - (PLANS[p.plan].stores || 0));
-    if (extra) p.amount = Math.round((p.amount + extraStoreAmount(extra, p.months) * (p.period === 'yearly' ? 10 / 12 : 1)) * 100) / 100;
+    if (extra) p.amount = Math.round((p.amount + extraRenewAmount(extra, p.months)) * 100) / 100;
     const now = Date.now(), order = { id: newId(), kind: 'renew', slug: rec.slug, plan: p.plan, period: p.period, amount: p.amount, buyer: JSON.stringify(buyer) };
     await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at) VALUES (?, 'renew', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?)`,
       order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now);
@@ -330,7 +330,7 @@ async function completeStores(env, order, { method, note }) {
     const t = await getTenant(env.DB, order.slug, true);
     const cur = limitsOf(t).stores || 0, next = cur + qty;
     await run(env.DB, 'UPDATE tenants SET max_stores = ?, updated_at = ? WHERE slug = ?', next, Date.now(), t.slug);
-    await recordPayment(env, env.DB, t, { amount: order.amount, months: 0, method, note: `${qty} ek mağaza (${order.period} ay) · ${note}`, user: 'Online satış' });
+    await recordPayment(env, env.DB, t, { amount: order.amount, months: 0, method, note: `${qty} ek mağaza (${order.period} gün, lisans bitişine kadar) · ${note}`, user: 'Online satış' });
     await refreshTenant(env, env.DB, t.slug);
     await run(env.DB, "UPDATE sales_orders SET status = 'done', updated_at = ? WHERE id = ?", Date.now(), order.id);
     const title = `Ek mağaza: ${t.name} · +${qty} (sınır ${cur} → ${next})`;

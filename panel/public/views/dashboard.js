@@ -61,18 +61,33 @@ export async function dashboard(el) {
     const live = activeChannels().some((x) => x.enabled || x.demo), st = state.settings || {}, co = st.company || {}, admin = u.role === 'admin';
     // Web sitesindeki demo paneli (firma kodu "demo"): kurulum rehberi yerine deneme hesabı çağrısı
     const demoPanel = !!(state.tenant && state.tenant.slug === 'demo');
+    // [tamam mı, başlık, açıklama, bağlantı, düğme, nasıl yapılır adımları, isteğe bağlı adım anahtarı (Tamamladım ile işaretlenir)]
+    const setup = st.setup || {}, sender = st.sender || {};
     const steps = [
-      [live, 'Satış kanalınızı bağlayın', 'Sitenizi ve pazaryerlerinizi (Trendyol, Hepsiburada, ikas …) API bilgileriyle bağlayın; siparişleriniz kendiliğinden gelir.', '#/entegrasyonlar', 'Kanal bağla'],
-      [!!d.stock.products, 'Ürünlerinizi panele alın', 'Kanallardaki ilanlarınızı seçip panele ekleyin; aynı ürün farklı kanallarda barkod / stok koduyla eşleşir.', '#/kanal-urunleri', 'Ürünleri al'],
-      [!!(st.stock_sync || Object.values(st.stock_push || {}).some(Boolean) || (st.setup || {}).stock), 'Stok gönderimine karar verin', st.stock_sync ? 'Stoklar tüm kanallara otomatik gidiyor.' : 'Açarsanız bir kanalda satılan ürünün stoğu diğer kanallarda da düşer (fazla satış olmaz). Kapalıyken stoklar yalnız okunur.', '#stock-decide', 'Karar ver'],
-      [!!(co.phone || co.address || co.tax), 'Firma bilgilerinizi girin', 'Logo, ünvan ve adres kargo etiketinde ve e-postalarda kullanılır.', '#/ayarlar', 'Ayarlara git'],
-      [false, 'Komisyon ve kargo giderlerini kontrol edin', 'Kâr hesapları için kanal komisyon oranlarınızı ve kargo giderinizi girin (isteğe bağlı).', '#/ayarlar', 'Giderler'],
-      [false, 'Ekibinizi ekleyin', 'Personel ekleyip her kişiye yalnız ihtiyaç duyduğu bölümleri açın (isteğe bağlı).', '#/kullanicilar', 'Personel'],
+      [live, 'Satış kanalınızı bağlayın', 'Sitenizi ve pazaryerlerinizi bağlayın; siparişleriniz kendiliğinden gelmeye başlar.', '#/entegrasyonlar', 'Kanal bağla',
+        ['Entegrasyonlar sayfasında satış yaptığınız kanalın kartında “Bağla”ya basın.', 'Kanalın satıcı panelinden aldığınız API bilgilerini girin (her kanalın penceresinde bilgilerin nereden alınacağı yazar; ör. Trendyol: Hesap Bilgilerim → Entegrasyon Bilgileri).', '“Kaydet ve test et” ile bağlantıyı doğrulayın. Siparişler birkaç dakika içinde gelir.']],
+      [!!d.stock.products, 'Ürünlerinizi panele alın', 'Kanallardaki ilanlarınız tek ürün kartında toplanır; stok ve fiyat buradan yönetilir.', '#/kanal-urunleri', 'Ürünleri al',
+        ['Kanal ürünleri sayfasında ilanlarınızı seçip “Panele ekle”ye basın.', 'Aynı barkod ya da stok koduna sahip ilanlar farklı kanallarda olsa da tek ürün kartında birleşir.', 'Alış fiyatı ve desi girerseniz kâr ve kargo hesapları doğru çıkar.']],
+      [!!d.stock.products && !(sm.unmatched > 0), 'Eşleşmeleri kontrol edin', sm.unmatched > 0 ? `${sm.unmatched} ilan henüz bir ürüne bağlı değil; bağlanmayan ilanın stoğu güncellenmez.` : d.stock.products ? 'Tüm ilanlarınız bir ürüne bağlı.' : 'Ürünler panele alınınca hiçbir ürüne bağlanmamış ilanlar burada görünür.', '#/eslestirme', 'Eşleştir',
+        ['Eşleştirme sayfasında ürüne bağlanmamış ilanlar listelenir.', 'Her ilanı doğru ürünle eşleştirin ya da “Yeni ürün olarak ekle” deyin.', 'Eşleşmeler bitince stok gönderimini güvenle açabilirsiniz.']],
+      [!!(st.stock_sync || Object.values(st.stock_push || {}).some(Boolean) || setup.stock), 'Stok gönderimine karar verin', st.stock_sync ? 'Stoklar tüm kanallara otomatik gidiyor.' : 'Açarsanız bir kanalda satılan ürünün stoğu diğer kanallarda da düşer (fazla satış olmaz). Kapalıyken stoklar yalnız okunur.', '#stock-decide', 'Karar ver',
+        ['Önce eşleşmeleri kontrol edin: yanlış eşleşen ilanın stoğu yanlış güncellenir.', '“Karar ver”e basıp stok gönderimini açın; değişen stoklar birkaç dakika içinde tüm kanallara gider.', 'İsterseniz Ürünler sayfasından bir kanala gösterilecek en fazla adedi sınırlayabilirsiniz.']],
+      [!!((co.phone || co.address || co.tax) && sender.name && sender.address), 'Firma ve gönderen bilgilerinizi girin', 'Ünvan, adres ve gönderen bilgisi kargo etiketinde ve e-postalarda kullanılır.', '#/ayarlar', 'Ayarlara git',
+        ['Ayarlar → Firma bölümüne ünvan, telefon ve adresinizi girin, logonuzu yükleyin.', 'Ayarlar → Kargo etiketi bölümünde gönderen adını, adresini ve “İlçe / il” alanını (ör. Selçuklu / Konya) doldurun.', 'Kaydet’e basın.']],
+      [!!setup.costs, 'Komisyon ve kargo giderlerini kontrol edin', 'Kâr raporlarının doğru çıkması için kanal komisyonlarınızı ve kargo giderinizi girin.', '#/ayarlar', 'Giderler',
+        ['Ayarlar → Giderler bölümünde her kanalın komisyon oranını kendi sözleşmenize göre düzeltin.', 'Sipariş başı kargo ve hizmet bedelini girin.', 'Bitince bu adımda “Tamamladım”a basın.'], 'costs'],
+      [!!(setup.notify || (st.mail_to || []).length), 'Bildirimleri açın', 'Yeni sipariş e-postası ve günlük özet ile hiçbir siparişi kaçırmayın.', '#/ayarlar', 'Bildirimler',
+        ['Ayarlar → Bildirimler bölümüne bildirim alacak e-posta adreslerini girin.', 'Telefonunuzda anlık bildirim için tarayıcının bildirim iznini açın.', 'Bitince “Tamamladım”a basın.'], 'notify'],
+      [!!setup.team, 'Ekibinizi ekleyin', 'Personel ekleyip her kişiye yalnız ihtiyaç duyduğu bölümleri açın.', '#/kullanicilar', 'Personel',
+        ['Personel sayfasında “Personel ekle”ye basın.', 'Kullanıcı adı ve şifre verin, hangi bölümleri göreceğini seçin.', 'Bitince “Tamamladım”a basın (tek başınıza çalışıyorsanız da işaretleyebilirsiniz).'], 'team'],
     ];
-    const done = steps.filter((x) => x[0]).length, need = steps.slice(0, 4).some((x) => !x[0]);
-    const guide = html`<div class="card guide"><div class="row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Kurulum adımları</h2><div class="muted small">${admin ? 'Paneli birkaç adımda kullanıma hazırlayın.' : 'Kurulumu firmanızın yöneticisi tamamlar.'}</div></div>
+    const REQUIRED = 5;
+    const done = steps.filter((x) => x[0]).length, need = steps.slice(0, REQUIRED).some((x) => !x[0]), next = steps.findIndex((s2) => !s2[0]);
+    const guide = html`<div class="card guide"><div class="row wrap" style="gap:10px"><div style="flex:1;min-width:220px"><h2>Kurulum rehberi</h2><div class="muted small">${admin ? 'Paneli yaklaşık 15 dakikada kullanıma hazırlayın. İlk 5 adım zorunlu, diğerleri önerilir; takıldığınız yerde Destek sayfasından bize yazın.' : 'Kurulumu firmanızın yöneticisi tamamlar.'}</div></div>
       <div class="guide-prog"><b>${done}/${steps.length}</b><div class="prog"><span style="width:${(done / steps.length) * 100}%"></span></div></div>${live && admin ? html`<button class="btn sm ghost" data-act="guide-hide" title="Rehberi gizle">Gizle</button>` : ''}</div>
-      <ol class="steps">${steps.map(([ok, t, dsc, href, btn], i) => html`<li class="${ok ? 'ok' : ''}"><span class="no">${ok ? html`<i class="ico ico-check"></i>` : i + 1}</span><div style="flex:1;min-width:0"><b>${t}</b><div class="muted small">${dsc}</div></div>${!ok && admin ? (href === '#stock-decide' ? html`<button class="btn sm ${i === steps.findIndex((s2) => !s2[0]) ? 'primary' : ''}" data-act="stock-decide">${btn}</button>` : html`<a class="btn sm ${i === steps.findIndex((s2) => !s2[0]) ? 'primary' : ''}" href="${href}">${btn}</a>`) : ''}</li>`)}</ol></div>`;
+      <ol class="steps">${steps.map(([ok, t, dsc, href, btn, how, key], i) => html`<li class="${ok ? 'ok' : ''}"><span class="no">${ok ? html`<i class="ico ico-check"></i>` : i + 1}</span><div style="flex:1;min-width:0"><b>${t}</b>${i >= REQUIRED ? html` <span class="pill tiny">isteğe bağlı</span>` : ''}<div class="muted small">${dsc}</div>
+        ${!ok && how ? html`<details class="adv" ${i === next ? 'open' : ''} style="margin-top:6px"><summary class="small">Nasıl yapılır?</summary><ol class="small how">${how.map((h) => html`<li>${h}</li>`)}</ol></details>` : ''}</div>
+        ${!ok && admin ? html`<div class="acts">${href === '#stock-decide' ? html`<button class="btn sm ${i === next ? 'primary' : ''}" data-act="stock-decide">${btn}</button>` : html`<a class="btn sm ${i === next ? 'primary' : ''}" href="${href}">${btn}</a>`}${key ? html`<button class="btn sm ghost" data-act="guide-done" data-key="${key}">Tamamladım</button>` : ''}</div>` : ''}</li>`)}</ol></div>`;
     if (!live) {
       render(el, html`<div class="hello"><div><h2>Hoş geldiniz${u.name && u.id ? `, ${u.name.split(' ')[0]}` : ''}</h2><div class="muted small">Siparişleriniz, stoklarınız ve kârınız bu ekranda toplanacak. Başlamak için ilk satış kanalınızı bağlayın.</div></div></div>${guide}`);
       return;
@@ -187,6 +202,7 @@ export async function dashboard(el) {
   };
   actions(el, {
     'guide-hide': () => setupSave({ setup: { hidden: true } }, 'Kurulum rehberi gizlendi (Ayarlar\'dan devam edebilirsiniz)'),
+    'guide-done': (b) => setupSave({ setup: { [b.dataset.key]: true } }, 'Adım tamamlandı'),
     'stock-decide': () => {
       const unmatched = (state.summary && state.summary.unmatched) || 0;
       const s = sheet({ title: 'Stoklar pazaryerlerine gönderilsin mi?', size: 'narrow', body: html`<div class="stack">

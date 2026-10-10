@@ -300,29 +300,33 @@ test('havale / EFT: sipariş "havale bekleniyor" kaydedilir (yalnız yıllıkta 
   } finally { s.restore(); }
 });
 
-test('ek mağaza: Paketim\'den abonelik bitişine kalan ay için alınır; sınır artar; yenilemede korunup ücrete eklenir', async () => {
+test('ek mağaza: Paketim\'den lisans bitişine kalan gün için (yıllık 3000 TL) alınır; sınır artar; yenilemede korunup ücrete eklenir', async () => {
   resetChannels();
   const s = setup();
   try {
     await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
     await s.owner('/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'magazaci', name: 'Mağazacı', admin_username: 'ali', admin_password: 'gizli-sifre-3', plan: 'Başlangıç', email: 'ali@ornek.com', welcome: false }) });
-    await run(s.env.DB, "UPDATE tenants SET expires_at = ?, trial = 0 WHERE slug = 'magazaci'", Date.now() + 75 * 864e5); // 3 ay kaldı
+    await run(s.env.DB, "UPDATE tenants SET expires_at = ?, trial = 0 WHERE slug = 'magazaci'", Date.now() + 73 * 864e5 - 3600e3); // 73 gün kaldı
     assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'magazaci', username: 'ali', password: 'gizli-sifre-3' }) })).status, 200);
     const g = await (await s.tenant('/api/billing')).json();
-    assert.deepEqual([g.stores.limit, g.stores.base, g.stores.extra, g.stores.used, g.stores.months, g.stores.buyable], [3, 3, 0, 0, 3, true]);
+    assert.deepEqual([g.stores.limit, g.stores.base, g.stores.extra, g.stores.used, g.stores.days, g.stores.buyable], [3, 3, 0, 0, 73, true]);
+    assert.equal(g.stores.perStore, 600, '3000 × 73 / 365');
     assert.equal((await s.tenant('/api/billing/stores', { method: 'POST', body: JSON.stringify({ qty: 0, ...buyer }) })).status, 400);
     const c = await s.tenant('/api/billing/stores', { method: 'POST', body: JSON.stringify({ qty: 2, ...buyer }) });
     assert.equal(c.status, 200, await c.clone().text());
-    assert.equal(s.iyz.inits.at(-1).price, '1194.00', '2 mağaza × 199 TL × 3 ay');
-    ok(s.iyz, '1194.00');
+    assert.equal(s.iyz.inits.at(-1).price, '1200.00', '2 mağaza × 3000 TL × 73 / 365 gün');
+    ok(s.iyz, '1200.00');
     assert.match(await (await s.callback('tok-1')).text(), /2 ek mağaza tanımlandı/);
     let t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'magazaci'");
     assert.equal(t.max_stores, 5);
     const me = await (await s.tenant('/api/billing')).json();
     assert.deepEqual([me.stores.limit, me.stores.extra], [5, 2], 'sınır firma paneline hemen iletildi');
-    // Aylık Başlangıç yenilemesi: 990 + 2 × 199
+    // Aylık Başlangıç yenilemesi: 990 + 2 × 3000 / 12
     await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', period: 'monthly', ...buyer }) });
-    assert.equal(s.iyz.inits.at(-1).price, '1388.00');
+    assert.equal(s.iyz.inits.at(-1).price, '1490.00');
+    // Yıllık yenileme: 9900 + 2 × 3000
+    await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', period: 'yearly', ...buyer }) });
+    assert.equal(s.iyz.inits.at(-1).price, '15900.00');
   } finally { s.restore(); }
 });
 

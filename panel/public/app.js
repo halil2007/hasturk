@@ -97,15 +97,21 @@ export function refreshChrome(s = state.summary) {
     document.body.prepend(sb);
     sb.querySelector('[data-support-exit]').onclick = async () => { await api('logout', { method: 'POST' }).catch(() => {}); store.set('firma', ''); location.reload(); };
   }
-  // Abonelik / deneme bitişine 7 gün ve daha az kaldı: üstte uyarı (yalnız müşteri panelinde; demo hariç)
+  // Lisans bitişine 15 gün ve daha az kaldı / deneme süresince: üstte uyarı (yalnız müşteri panelinde; demo ve destek oturumu hariç).
+  // 15–8 gün: bilgi (gün içinde kapatılabilir) · 7–4 gün: uyarı · 3 gün ve altı: acil (kapatılamaz)
   const tn = s.tenant, left = tn && tn.days_left;
   let eb = $('[data-expiry-bar]');
-  if (tn && !s.demo && left != null && left <= 7 && !(s.user && s.user.support)) {
+  const level = left == null ? null : left <= 3 ? 'urgent' : left <= 7 ? 'warn' : left <= 15 || tn.trial ? 'info' : null;
+  const hideKey = `expbar:${tn && tn.expires_at}:${new Date().toISOString().slice(0, 10)}`;
+  if (tn && !s.demo && level && !(s.user && s.user.support) && !(level === 'info' && store.get(hideKey))) {
     if (!eb) { eb = document.createElement('div'); eb.dataset.expiryBar = '1'; document.body.prepend(eb); }
-    const urgent = left <= 2;
-    eb.style.cssText = `position:sticky;top:0;z-index:50;background:${urgent ? '#fee2e2' : '#fef3c7'};color:${urgent ? '#7f1d1d' : '#713f12'};padding:7px 14px;font-weight:600;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap`;
+    const C = { urgent: ['#fee2e2', '#7f1d1d'], warn: ['#fef3c7', '#713f12'], info: ['#e0ecff', '#1e3a8a'] }[level];
+    eb.style.cssText = `position:sticky;top:0;z-index:50;background:${C[0]};color:${C[1]};padding:7px 14px;font-weight:600;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap`;
     const when = left <= 0 ? 'bugün sona eriyor' : left === 1 ? 'yarın sona eriyor' : `bitmesine ${left} gün kaldı`;
-    render(eb, html`<span style="flex:1;min-width:200px">${tn.trial ? 'Ücretsiz deneme sürenizin' : 'Aboneliğinizin'} ${when}. Süre bitince panele giriş ve kanallarla senkron durur; verileriniz silinmez.</span><a class="btn sm" href="#/paketim">Paket seçin / yenileyin</a>`);
+    const date = tn.expires_at ? new Date(tn.expires_at).toLocaleDateString('tr-TR') : '';
+    render(eb, html`<span style="flex:1;min-width:200px">${tn.trial ? 'Ücretsiz deneme sürenizin' : 'Lisansınızın'} ${when}${date ? ` (${date})` : ''}. ${level === 'info' && tn.trial ? 'Süre sonunda paket seçerek kaldığınız yerden devam edersiniz.' : 'Süre bitince panele giriş ve kanallarla senkron durur; verileriniz silinmez.'}</span><a class="btn sm" href="#/paketim">${tn.trial ? 'Paket seçin' : 'Lisansı yenileyin'}</a>${level === 'info' ? html`<button class="btn sm ghost" data-exp-hide title="Bugün gizle" aria-label="Bugün gizle">✕</button>` : ''}`);
+    const hb = eb.querySelector('[data-exp-hide]');
+    if (hb) hb.onclick = () => { store.set(hideKey, '1'); eb.remove(); };
   } else if (eb) eb.remove();
   const n = s.pending.filter((p) => p.status === 'new').reduce((a, p) => a + p.n, 0);
   const counts = { orders: n, questions: s.questions || 0, claims: s.claims || 0, match: s.unmatched || 0, notices: (s.notices && s.notices.open) || 0, stock: s.stockOut || 0, cargo: s.cargoWaiting || 0 };

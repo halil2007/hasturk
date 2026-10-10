@@ -1,7 +1,7 @@
 // Paketim (müşteri panelleri): mevcut paket ve bitiş tarihi, paketler, kartla satın alma / yenileme / yükseltme (iyzico)
 // ve ödeme geçmişi. Ödeme iyzico'nun güvenli sayfasında yapılır; kart bilgisi panele gelmez. Tutar sunucuda belirlenir.
 // Fatura bilgisi (bireysel / kurumsal) son satın almadan ya da firma kartından dolu gelir; e-posta ve telefon zorunludur.
-import { api, html, render, $, $$, money0, date, toast, sheet, state } from '../core.js';
+import { api, html, render, $, $$, money0, money, date, toast, sheet, state } from '../core.js';
 
 const PERIOD = { monthly: 'Aylık', yearly: 'Yıllık' };
 export async function billingView(el) {
@@ -37,7 +37,7 @@ export async function billingView(el) {
         <div class="small" style="margin-top:4px"><b>${d.stores.used}</b> / ${d.stores.limit} mağaza bağlı${d.stores.extra ? html` <span class="muted">(paketinizde ${d.stores.base} + ${d.stores.extra} ek mağaza)</span>` : ''}</div>
         <div class="bar" style="margin-top:6px;height:6px;border-radius:6px;background:var(--line);overflow:hidden"><span style="display:block;height:100%;width:${Math.min(100, Math.round((d.stores.used / Math.max(1, d.stores.limit)) * 100))}%;background:${d.stores.used >= d.stores.limit ? 'var(--bad)' : 'var(--primary)'}"></span></div></div>
         ${admin && d.online && d.stores.buyable ? html`<div class="row" style="gap:8px;align-items:center"><label class="small">Ek mağaza</label><input class="input" type="number" min="1" max="${d.stores.max}" value="1" data-sqty style="width:80px"><button class="btn primary sm" data-sbuy><i class="ico ico-plus"></i>Ek mağaza al</button></div>` : ''}</div>
-      <div class="muted small">Ek mağaza: mağaza başına <b>${money0(d.stores.monthly)}</b> / ay (KDV dahil). Aboneliğinizin bitişine kalan <b>${d.stores.months} ay</b> için tek seferde alınır: <b data-stotal>${money0(d.stores.monthly * d.stores.months)}</b>. Paket yenilemesinde ek mağazalarınız korunur ve ücrete eklenir.${!d.stores.buyable ? ' Deneme süresinde ya da süresi dolmuş abonelikte ek mağaza alınamaz.' : ''}</div>
+      <div class="muted small">Ek mağaza: mağaza başına yıllık <b>${money0(d.stores.yearly)}</b> (KDV dahil). Lisansınızın bitişine kalan <b>${d.stores.days} gün</b> için gün hesabıyla tek seferde alınır: mağaza başına <b data-stotal>${money(d.stores.perStore)}</b>. Paket yenilemesinde ek mağazalarınız korunur ve yenilenen süre kadar ücrete eklenir.${!d.stores.buyable ? ' Deneme süresinde ya da süresi dolmuş abonelikte ek mağaza alınamaz.' : ''}</div>
     </div>` : ''}
     <div class="muted tiny">Satın aldığınız süre, mevcut bitiş tarihinizin üstüne eklenir; paket değişikliği hemen geçerli olur. Ödeme iyzico güvencesiyle alınır, kart bilgileriniz bize ulaşmaz.</div>
     <div class="card flush"><div class="card-pad"><h3>Ödeme geçmişi</h3></div>
@@ -47,9 +47,9 @@ export async function billingView(el) {
   </div>`);
   $$('[data-buy]', el).forEach((b) => { b.onclick = () => { const p = d.plans.find((x) => x.key === b.dataset.buy), per = b.dataset.period; buy(d, { title: `${p.name} · ${PERIOD[per]}`, amount: p[per], what: per === 'yearly' ? `12 ay${d.installments > 1 ? `, kartla peşin fiyatına ${d.installments} taksit` : ''}` : '1 ay', path: 'billing/checkout', body: { plan: p.key, period: per } }); }; });
   const sq = $('[data-sqty]', el), sb = $('[data-sbuy]', el);
-  const sAmount = () => d.stores.monthly * d.stores.months * Math.max(1, Math.min(d.stores.max, Math.round(Number(sq.value) || 1)));
-  if (sq) sq.oninput = () => { $('[data-stotal]', el).textContent = money0(sAmount()); };
-  if (sb) sb.onclick = () => { const q = Math.max(1, Math.min(d.stores.max, Math.round(Number(sq.value) || 1))); buy(d, { title: `${q} ek mağaza`, amount: sAmount(), what: `${q} mağaza × ${d.stores.months} ay (abonelik bitişine kadar); ödeme alınınca mağaza sınırınız ${d.stores.limit + q} olur`, path: 'billing/stores', body: { qty: q } }); };
+  const sAmount = () => Math.round(d.stores.perStore * Math.max(1, Math.min(d.stores.max, Math.round(Number(sq.value) || 1))) * 100) / 100;
+  if (sq) sq.oninput = () => { $('[data-stotal]', el).textContent = money(sAmount()); };
+  if (sb) sb.onclick = () => { const q = Math.max(1, Math.min(d.stores.max, Math.round(Number(sq.value) || 1))); buy(d, { title: `${q} ek mağaza`, amount: sAmount(), what: `${q} mağaza × ${d.stores.days} gün (lisans bitişine kadar, yıllık ${money0(d.stores.yearly)} üzerinden); ödeme alınınca mağaza sınırınız ${d.stores.limit + q} olur`, path: 'billing/stores', body: { qty: q } }); };
   const ci = $('[data-copy-iban]', el); if (ci) ci.onclick = () => navigator.clipboard.writeText(d.bank.iban.replace(/\s/g, '')).then(() => toast('IBAN kopyalandı')).catch(() => {});
 }
 
