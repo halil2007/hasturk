@@ -36,7 +36,7 @@ export async function initCheckout(env, order, callbackUrl, fetchFn) {
   const address = String(b.address || b.city || 'Türkiye').slice(0, 250);
   const r = await call(env, '/payment/iyzipos/checkoutform/initialize/auth/ecom', {
     locale: 'tr', conversationId: order.id, price: money(order.amount), paidPrice: money(order.amount), currency: 'TRY', basketId: order.id,
-    paymentGroup: 'SUBSCRIPTION', callbackUrl, enabledInstallments: order.installments || [1],
+    paymentGroup: 'SUBSCRIPTION', callbackUrl, ...(order.installments ? { enabledInstallments: order.installments } : {}),
     buyer: { id: String(order.buyerId || b.email).slice(0, 60), name, surname, gsmNumber: gsm.startsWith('+') ? gsm : gsm ? '+90' + gsm.replace(/^0+/, '').replace(/^90/, '') : undefined,
       email: b.email, identityNumber: /^\d{11}$/.test(String(b.identity || '')) ? String(b.identity) : '11111111111', registrationAddress: address, ip: b.ip || '127.0.0.1', city: b.city || 'İstanbul', country: 'Turkey' },
     billingAddress: { contactName: String(b.billName || b.name).slice(0, 200), city: b.city || 'İstanbul', country: 'Turkey', address },

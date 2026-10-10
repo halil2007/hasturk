@@ -110,6 +110,7 @@
       ${p.yearly ? `<div class="yearly"><div class="y-top"><b>Yıllık ${tl(p.yearly)} ₺</b><small>KDV dahil</small>${save ? `<span class="save">${tl(save)} ₺ kazanç</span>` : ''}</div>
         <div class="y-sub">2 ay hediye · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
         ${inst ? `<div class="y-inst"><b>Peşin fiyatına ${S.installments} taksit</b><span>${inst}</span></div>` : ''}
+        ${S.maxInstallments ? `<div class="y-sub">Kredi kartına ${S.maxInstallments} taksite kadar</div>` : ''}
         ${eftPct() ? `<div class="y-eft">Havale / EFT ile <b>${tl(eftPrice(p.yearly, 'yearly'))} ₺</b> <small>(%${eftPct()} indirim)</small></div>` : ''}</div>` : ''}`;
   };
   // "Hemen satın al" yalnız online satış açıkken (panelde iyzico API bilgileri girilmişse) görünür; kapalıyken eski hali
@@ -382,8 +383,9 @@
           <dt>Kurulum ücreti</dt><dd class="good">Yok</dd></dl>
         <div class="co-sum-tot"><span>Toplam</span><b>${tl(amount || 0)} ₺<small>KDV dahil</small></b></div>
         ${inst ? `<div class="co-sum-inst"><b>Peşin fiyatına ${S.installments} taksit:</b> ${inst} (kredi kartına)</div>` : `<div class="co-sum-inst">Yıllık alımda 2 ay hediye ve peşin fiyatına ${S.installments || 3} taksit.</div>`}
+        ${S.maxInstallments ? `<div class="co-sum-inst">${(S.installmentCards || []).length ? `${esc(S.installmentCards.join(', '))} kartlarına` : 'Kredi kartına'} <b>${S.maxInstallments} taksite kadar</b>; seçenekler ödeme sayfasında görünür.</div>` : ''}
         ${yearly && eftPct() ? `<div class="co-sum-eft"><b>Havale / EFT ile:</b> ${tl(eftPrice(amount, 'yearly'))} ₺ <small>(%${eftPct()} indirim)</small></div>` : ''}`;
-      $('[data-co-total]', co).innerHTML = `<span>${esc(p.name || '')} · ${yearly ? 'yıllık (12 ay)' : 'aylık (1 ay)'}</span><b>${tl(amount || 0)} ₺</b><small>KDV dahil${inst ? ` · ${S.installments} taksit imkânı` : ''}</small>`;
+      $('[data-co-total]', co).innerHTML = `<span>${esc(p.name || '')} · ${yearly ? 'yıllık (12 ay)' : 'aylık (1 ay)'}</span><b>${tl(amount || 0)} ₺</b><small>KDV dahil${S.maxInstallments ? ` · ${S.maxInstallments} taksite kadar` : inst ? ` · ${S.installments} taksit imkânı` : ''}</small>`;
       $('[data-co-pay]', co).textContent = `${tl(amount || 0)} ₺ öde · güvenli ödemeye geç`;
       // Ödeme yöntemi: kart (iyzico) ya da havale / EFT (yıllıkta indirimli); havalede banka bilgileri ve tutar gösterilir
       const eftAmt = eftPrice(amount, st.period), pct = yearly ? eftPct() : 0, bank = S.bank || {};
@@ -391,7 +393,7 @@
       card.disabled = !cardOn; card.closest('label').classList.toggle('off', !cardOn);
       if (!cardOn) st.pay = 'eft';
       $$('[name=pay]', co).forEach((r) => { r.checked = r.value === st.pay; r.closest('label').classList.toggle('on', r.checked); });
-      $('[data-pm-card]', co).textContent = cardOn ? `iyzico 3D Secure${yearly && S.installments ? ` · peşin fiyatına ${S.installments} taksit` : ''}` : 'Şu an kapalı; havale / EFT ile ödeyebilirsiniz';
+      $('[data-pm-card]', co).textContent = cardOn ? `iyzico 3D Secure${yearly && S.installments ? ` · peşin fiyatına ${S.installments} taksit` : ''}${S.maxInstallments ? ` · ${S.maxInstallments} taksite kadar` : ''}` : 'Şu an kapalı; havale / EFT ile ödeyebilirsiniz';
       $('[data-pm-eft]', co).textContent = pct ? `%${pct} indirimli: ${tl(eftAmt)} ₺` : 'Aylık pakette indirim yok';
       const eftBox = $('[data-co-eft]', co);
       eftBox.hidden = st.pay !== 'eft';

@@ -11,7 +11,7 @@
 // Fatura bilgisi (bireysel: ad soyad + TC kimlik no; kurumsal: unvan + vergi dairesi / no) siparişte saklanır, ödeme kaydına ve firma
 // kartına (ünvan, vergi, adres, şehir) yazılır; ödeme tamamlanınca panel sahibine e-posta gider (fatura kesmek için).
 import { all, first, run, init, notify, resolve as resolveNotice } from './db.js';
-import { priceOf, PLANS, INSTALLMENTS_YEARLY, FEATURES, EFT_DISCOUNT, eftAmount, EXTRA_STORE, daysLeft, extraStoreAmount, extraRenewAmount, limitsOf, planKey } from './plans.js';
+import { priceOf, PLANS, INSTALLMENTS, upgradeQuote, FEATURES, EFT_DISCOUNT, eftAmount, EXTRA_STORE, daysLeft, extraStoreAmount, extraRenewAmount, limitsOf, planKey } from './plans.js';
 import { sendMail } from './mail.js';
 import { initCheckout, retrieveCheckout, iyzicoReady } from './iyzico.js';
 import { createTenant, recordPayment, checkNewTenant, getTenant, expired, contactLine, refreshTenant } from './tenants.js';
@@ -131,10 +131,12 @@ async function lastInvoice(db, t) {
 }
 async function start(env, db, order, origin) {
   const callback = `${origin}/api/public/checkout/callback`;
+  const up = order.kind === 'upgrade' ? upgradeOf(order) : null;
   const name = order.kind === 'stores' ? `${order.qty} ek mağaza (${order.period} gün)` : order.kind === 'charge' ? 'ödeme' : PLANS[order.plan].name;
-  const itemName = order.kind === 'stores' ? `Hastürk CRM ${order.qty} ek mağaza (${order.period} gün)` : order.kind === 'charge' ? `Hastürk CRM ${order.plan || 'abonelik'} ödemesi${Number(order.period) ? ` (${order.period} ay)` : ''}` : '';
-  const many = order.period === 'yearly' || (order.kind === 'charge' && Number(order.period) >= 12);
-  const r = await initCheckout(env, { ...order, buyer: JSON.parse(order.buyer), installments: many ? INSTALLMENTS_YEARLY : [1], name, ...(itemName ? { itemName } : {}) }, callback);
+  const itemName = order.kind === 'stores' ? `Hastürk CRM ${order.qty} ek mağaza (${order.period} gün)` : order.kind === 'charge' ? `Hastürk CRM ${order.plan || 'abonelik'} ödemesi${Number(order.period) ? ` (${order.period} ay)` : ''}`
+    : up ? `Hastürk CRM ${PLANS[up.from].name} → ${PLANS[order.plan].name} paket yükseltme (${up.days} gün)` : '';
+  // Taksit kısıtlanmaz: bankanın sunduğu tüm taksit seçenekleri ödeme sayfasında görünür (bkz. plans.js → INSTALLMENTS)
+  const r = await initCheckout(env, { ...order, buyer: JSON.parse(order.buyer), name, ...(itemName ? { itemName } : {}) }, callback);
   await run(db, 'UPDATE sales_orders SET token = ?, updated_at = ? WHERE id = ?', r.token, Date.now(), order.id);
   return { ok: true, url: r.url, order: order.id };
 }
@@ -204,6 +206,22 @@ export async function publicCheckout(req, env) {
 
 // Panelden (firma yöneticisi, oturumlu): Paketim sayfası. t = firma kaydı, user = panel kullanıcısı
 // Ek mağaza: mevcut sınır, paketin mağaza sayısı, kullanılan, yıllık ücret, lisans bitişine kalan gün ve mağaza başı tutar (sunucuda hesaplanır)
+// Paket yükseltme siparişi: period = 'yearly:profesyonel:123' (dönem, eski paket, kalan gün)
+const upgradeOf = (o) => { const [period, from, days] = String(o.period || '').split(':'); return { period, from, days: Number(days) || 0 }; };
+// Firmanın geçerli dönemi: son tamamlanan paket satın alımının dönemi (yoksa firma kartındaki)
+async function currentPeriod(db, rec) {
+  const o = await first(db, "SELECT kind, period FROM sales_orders WHERE slug = ? AND status = 'done' AND kind IN ('new', 'renew', 'upgrade') ORDER BY updated_at DESC LIMIT 1", rec.slug).catch(() => null);
+  const p = o ? (o.kind === 'upgrade' ? upgradeOf(o).period : o.period) : rec.period;
+  return p === 'yearly' ? 'yearly' : 'monthly';
+}
+// Yükseltilebilir paketler (ödenmiş, süresi dolmamış abonelikte; dönem aynı kalır, fark gün hesabıyla)
+async function upgradeInfo(db, rec) {
+  const from = planKey(rec.plan);
+  if (!from || rec.trial || expired(rec) || !rec.expires_at) return null;
+  const period = await currentPeriod(db, rec);
+  const options = Object.keys(PLANS).map((k) => upgradeQuote(from, k, period, rec.expires_at)).filter(Boolean).map((q) => ({ ...q, name: PLANS[q.to].name }));
+  return { from, period, days: daysLeft(rec.expires_at), options };
+}
 function storeInfo(rec, used) {
   const lim = limitsOf(rec), base = (PLANS[planKey(rec.plan)] || {}).stores || 0;
   return { limit: lim.stores || 0, base, extra: Math.max(0, (lim.stores || 0) - base), used: Number(used) || 0, yearly: EXTRA_STORE.yearly, days: daysLeft(rec.expires_at), perStore: extraStoreAmount(1, daysLeft(rec.expires_at)), max: EXTRA_STORE.max,
@@ -216,7 +234,7 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
   if (method === 'GET' && path === 'billing') {
     const pays = await all(env.DB, 'SELECT at, amount, months, method, note FROM tenant_payments WHERE slug = ? ORDER BY at DESC LIMIT 50', t.slug);
     return { plans: catalog(), stores: storeInfo(rec, usedStores), current: { plan: rec.plan || '', expires_at: rec.expires_at || null, trial: !!rec.trial, expired: expired(rec), email: rec.email || '', phone: rec.phone || '' },
-      invoice: await lastInvoice(env.DB, rec), payments: pays, online: iyzicoReady(env), installments: INSTALLMENTS_YEARLY.length, bank: bankOf(env), eftDiscount: EFT_DISCOUNT };
+      invoice: await lastInvoice(env.DB, rec), payments: pays, online: iyzicoReady(env), installments: INSTALLMENTS, upgrade: await upgradeInfo(env.DB, rec), bank: bankOf(env), eftDiscount: EFT_DISCOUNT };
   }
   // Ek mağaza satın alma: adet × yıllık ücret × lisans bitişine kalan gün / 365; ödeme alınınca firmanın mağaza sınırı artar
   if (method === 'POST' && path === 'billing/stores') {
@@ -231,6 +249,21 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     const order = { id: newId(), kind: 'stores', slug: rec.slug, plan: 'stores', period: String(days), amount, qty, buyer: JSON.stringify(buyer) };
     await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, qty) VALUES (?, 'stores', ?, 'stores', ?, ?, 'pending', ?, 'panel', ?, ?, ?)`,
       order.id, order.slug, order.period, amount, order.buyer, now, now, qty);
+    return start(env, env.DB, order, origin);
+  }
+  // Üst pakete geçiş: fark = (yeni paket − mevcut paket, aynı dönem fiyatıyla) × kalan gün / dönem günü; bitiş tarihi değişmez
+  if (method === 'POST' && path === 'billing/upgrade') {
+    if (user.role !== 'admin') fail(403, 'Paket işlemleri yalnız yöneticiye açıktır');
+    if (!iyzicoReady(env)) fail(503, 'Online ödeme henüz açılmadı. ' + await contactLine(env));
+    const u = await upgradeInfo(env.DB, rec);
+    if (!u) fail(400, rec.trial ? 'Deneme süresinde paket yükseltilmez; paket satın alın' : expired(rec) ? 'Aboneliğinizin süresi dolmuş; paketinizi yenilerken yeni paketi seçin' : 'Paketiniz özel tanımlı: paket değişikliği için bizimle iletişime geçin');
+    const q = u.options.find((x) => x.to === str(b.plan));
+    if (!q) fail(400, 'Bu pakete yükseltme yapılamaz (yalnız üst pakete geçilebilir)');
+    if (!b.consent) fail(400, 'Mesafeli satış sözleşmesini onaylayın');
+    const buyer = buyerOf({ ...b, firm: rec.name, email: b.email || rec.email || user.email, phone: b.phone || rec.phone }, '');
+    const now = Date.now(), order = { id: newId(), kind: 'upgrade', slug: rec.slug, plan: q.to, period: `${q.period}:${q.from}:${q.days}`, amount: q.amount, buyer: JSON.stringify(buyer) };
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at) VALUES (?, 'upgrade', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?)`,
+      order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now);
     return start(env, env.DB, order, origin);
   }
   if (method === 'POST' && path === 'billing/checkout') {
@@ -290,6 +323,7 @@ export async function finalize(env, order, panel, fetchFn) {
 async function complete(env, order, panel, { method, note, res = {} }) {
   if (order.kind === 'stores') return completeStores(env, order, { method, note });
   if (order.kind === 'charge') return completeCharge(env, order, { method, note });
+  if (order.kind === 'upgrade') return completeUpgrade(env, order, { method, note });
   const buyer = JSON.parse(order.buyer || '{}'), p = { ...priceOf(order.plan, order.period), amount: order.amount };
   try {
     let slug = order.slug;
@@ -304,6 +338,7 @@ async function complete(env, order, panel, { method, note, res = {} }) {
       await run(env.DB, "UPDATE tenants SET legal = ?, tax = ?, address = ?, city = ?, contact = COALESCE(NULLIF(contact, ''), ?), phone = COALESCE(NULLIF(phone, ''), ?), updated_at = ? WHERE slug = ?",
         inv.legal, inv.tax, inv.address, inv.city, buyer.name, buyer.phone, Date.now(), slug).catch((e) => console.error('firma fatura bilgisi yazılamadı', e));
     }
+    if (order.kind !== 'new') await run(env.DB, 'UPDATE tenants SET period = ?, fee = ?, updated_at = ? WHERE slug = ?', p.period, PLANS[order.plan][p.period], Date.now(), slug).catch(() => {});
     const t = await getTenant(env.DB, slug, true);
     await recordPayment(env, env.DB, t, { amount: p.amount, months: p.months, method, note, user: method === 'Kart (iyzico)' ? 'Online satış' : 'Havale / EFT onayı', plan: p.name });
     // Fatura bilgisi ödeme kaydında (ana panel → Firmalar → Tahsilatlar)
@@ -340,6 +375,29 @@ async function completeStores(env, order, { method, note }) {
   } catch (e) {
     await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
     await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Ek mağaza ödemesi alındı, sınır artırılamadı: ${order.slug}`, msg: `${order.id} · ${e.message}` }).catch(() => {});
+    return { paidError: true, reason: e.message };
+  }
+}
+
+// Paket yükseltme ödemesi alındı: paket hemen yükselir, bitiş tarihi aynı kalır. Ek mağaza alındıysa toplam sınır korunur
+// (yeni paketin sınırı daha büyükse paketin sınırı geçerli olur).
+async function completeUpgrade(env, order, { method, note }) {
+  const buyer = JSON.parse(order.buyer || '{}'), u = upgradeOf(order), to = PLANS[order.plan];
+  try {
+    const t = await getTenant(env.DB, order.slug, true);
+    const cur = Number(t.max_stores) || 0;
+    await run(env.DB, 'UPDATE tenants SET max_stores = ?, fee = ?, period = ?, updated_at = ? WHERE slug = ?', cur > to.stores ? cur : null, to[u.period] || null, u.period, Date.now(), t.slug);
+    await recordPayment(env, env.DB, { ...t, max_stores: cur > to.stores ? cur : null }, { amount: order.amount, months: 0, method, plan: to.name, user: 'Online satış',
+      note: `Paket yükseltme ${(PLANS[u.from] || {}).name || u.from} → ${to.name} (${u.days} gün, gün hesabıyla) · ${note}` });
+    await refreshTenant(env, env.DB, t.slug);
+    await run(env.DB, "UPDATE sales_orders SET status = 'done', updated_at = ? WHERE id = ?", Date.now(), order.id);
+    const title = `Paket yükseltme: ${t.name} · ${(PLANS[u.from] || {}).name || u.from} → ${to.name}`;
+    await notify(env.DB, `sale:${order.id}`, { level: 'info', title, msg: `${order.amount} TL · ${u.days} gün · ${buyer.name || ''} · ${buyer.email || ''}` }).catch(() => {});
+    await pushNotify(env.DB, { title: '💳 ' + title, body: `${order.amount} TL`, url: '#/firmalar' }).catch(() => {});
+    return { done: true, order: { ...order, status: 'done' } };
+  } catch (e) {
+    await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
+    await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Yükseltme ödemesi alındı, paket değiştirilemedi: ${order.slug}`, msg: `${order.id} · ${e.message}` }).catch(() => {});
     return { paidError: true, reason: e.message };
   }
 }
@@ -486,6 +544,12 @@ async function pageFor(env, order, r, panel) {
     const t = await getTenant(env.DB, order.slug, true), m = Number(order.period) || 0;
     const until = t && t.expires_at ? new Date(t.expires_at + 3 * 3600e3).toISOString().slice(0, 10).split('-').reverse().join('.') : '';
     return resultPage('Ödemeniz alındı, teşekkürler', `${esc(Number(order.amount).toLocaleString('tr-TR'))} TL ödemeniz alındı.${m && until ? ` Aboneliğiniz <b>${until}</b> tarihine kadar uzatıldı.` : ''}`, { ok: true, actions: btn(`${panel}/?firma=${encodeURIComponent(order.slug)}`, 'Panele git') });
+  }
+  if ((r.order || order).kind === 'upgrade') {
+    const t = await getTenant(env.DB, order.slug, true);
+    const until = t && t.expires_at ? new Date(t.expires_at + 3 * 3600e3).toISOString().slice(0, 10).split('-').reverse().join('.') : '';
+    return resultPage('Paketiniz yükseltildi', `${esc(PLANS[order.plan].name)} paketiniz aktif${until ? `; bitiş tarihiniz değişmedi (<b>${until}</b>)` : ''}. Yeni özellikler panelinizde hemen açıldı.`,
+      { ok: true, actions: btn(`${panel}/?firma=${encodeURIComponent(order.slug)}`, 'Panele dön') });
   }
   if ((r.order || order).kind === 'stores') {
     const t = await getTenant(env.DB, order.slug, true);

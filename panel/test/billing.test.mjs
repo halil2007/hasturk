@@ -58,7 +58,7 @@ test('yeni müşteri: siteden satın alır; firma kodu, kullanıcı adı ve geç
     assert.match(j.url, /sandbox-cpp/);
     const init = s.iyz.inits[0];
     assert.equal(init.price, '19900.00', 'tutar sunucudaki fiyattan');
-    assert.deepEqual(init.enabledInstallments, [1, 2, 3], 'yıllıkta 3 taksit');
+    assert.equal(init.enabledInstallments, undefined, 'taksit kısıtlanmaz: bankanın sunduğu tüm seçenekler (12 taksite kadar)');
     assert.equal(init.buyer.gsmNumber, '+905321112233');
     assert.equal(init.basketItems[0].itemType, 'VIRTUAL');
     // Ödeme sayfasında tarayıcıdan gelen tutar dikkate alınmaz; şifre siparişte yalnız özetiyle durur
@@ -327,6 +327,56 @@ test('ek mağaza: Paketim\'den lisans bitişine kalan gün için (yıllık 3000 
     // Yıllık yenileme: 9900 + 2 × 3000
     await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', period: 'yearly', ...buyer }) });
     assert.equal(s.iyz.inits.at(-1).price, '15900.00');
+  } finally { s.restore(); }
+});
+
+test('üst pakete geçiş: aynı dönem fiyat farkı × kalan gün; bitiş tarihi değişmez, paket hemen yükselir, ek mağaza korunur', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await s.owner('/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'yukselen', name: 'Yükselen', admin_username: 'efe', admin_password: 'gizli-sifre-5', plan: 'Profesyonel', period: 'yearly', email: 'efe@ornek.com', welcome: false }) });
+    const exp = Date.now() + 146 * 864e5 - 3600e3; // 146 gün kaldı
+    await run(s.env.DB, "UPDATE tenants SET expires_at = ?, trial = 0, max_stores = 12 WHERE slug = 'yukselen'", exp);
+    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'yukselen', username: 'efe', password: 'gizli-sifre-5' }) })).status, 200);
+    const g = await (await s.tenant('/api/billing')).json();
+    assert.equal(g.installments.max, 12);
+    assert.equal(g.upgrade.period, 'yearly');
+    assert.deepEqual(g.upgrade.options.map((x) => [x.to, x.days, x.amount]), [['kurumsal', 146, 8000]], '(39900 − 19900) × 146 / 365; alt paket listelenmez');
+    assert.equal((await s.tenant('/api/billing/upgrade', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', ...buyer }) })).status, 400, 'alt pakete geçiş yok');
+    const r = await s.tenant('/api/billing/upgrade', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', ...buyer }) });
+    assert.equal(r.status, 200, await r.clone().text());
+    const init = s.iyz.inits.at(-1);
+    assert.equal(init.price, '8000.00');
+    assert.equal(init.enabledInstallments, undefined);
+    assert.match(init.basketItems[0].name, /Profesyonel → Kurumsal paket yükseltme \(146 gün\)/);
+    ok(s.iyz, '8000.00');
+    assert.match(await (await s.callback('tok-1')).text(), /Paketiniz yükseltildi/);
+    const t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yukselen'");
+    assert.equal(t.plan, 'Kurumsal');
+    assert.equal(t.expires_at, exp, 'bitiş tarihi değişmedi');
+    assert.equal(t.max_stores, null, '12 mağaza < Kurumsal 25: paketin sınırı geçerli');
+    const pay = await first(s.env.DB, "SELECT amount, months, note FROM tenant_payments WHERE slug = 'yukselen' ORDER BY at DESC LIMIT 1");
+    assert.deepEqual([pay.amount, pay.months], [8000, 0]);
+    assert.match(pay.note, /Profesyonel → Kurumsal/);
+    const me = await (await s.tenant('/api/billing')).json();
+    assert.equal(me.current.plan, 'Kurumsal');
+    assert.deepEqual(me.upgrade.options, [], 'en üst pakette yükseltme yok');
+  } finally { s.restore(); }
+});
+
+test('üst pakete geçiş: aylık abonelikte aylık fark (30 gün üzerinden); denemede kapalı', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await s.owner('/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'aylikci', name: 'Aylıkçı', admin_username: 'naz', admin_password: 'gizli-sifre-6', plan: 'Başlangıç', period: 'monthly', email: 'naz@ornek.com', welcome: false }) });
+    await run(s.env.DB, "UPDATE tenants SET expires_at = ?, trial = 1 WHERE slug = 'aylikci'", Date.now() + 15 * 864e5 - 3600e3);
+    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'aylikci', username: 'naz', password: 'gizli-sifre-6' }) })).status, 200);
+    assert.equal((await (await s.tenant('/api/billing')).json()).upgrade, null, 'denemede yükseltme yok');
+    await run(s.env.DB, "UPDATE tenants SET trial = 0 WHERE slug = 'aylikci'");
+    const g = await (await s.tenant('/api/billing')).json();
+    assert.deepEqual(g.upgrade.options.map((x) => [x.to, x.amount]), [['profesyonel', 500], ['kurumsal', 1500]], '(1990 − 990) × 15 / 30; (3990 − 990) × 15 / 30');
   } finally { s.restore(); }
 });
 
