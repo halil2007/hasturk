@@ -4,7 +4,7 @@
 import { api, html, render, $, $$, money0, money, date, toast, sheet, state } from '../core.js';
 
 const PERIOD = { monthly: 'Aylık', yearly: 'Yıllık' };
-// Taksit bilgisi: panelde yalnız yıllıkta "peşin fiyatına N taksit" yazar (diğer taksit seçenekleri ödeme sayfasında görünür)
+// Taksit bilgisi: yıllıkta "peşin fiyatına N taksit"; ayrı satırda "Kredi kartına 12 taksite kadar" (seçenekler ödeme sayfasında)
 const instText = (d, yearly) => { const i = d.installments || {}; return yearly && i.free > 1 ? `peşin fiyatına ${i.free} taksit` : ''; };
 // Alt paket: abonelik sürerken alınamaz (iade yok); süre dolunca ya da denemede seçilebilir
 const lower = (d, p) => { const c = d.plans.find((x) => x.key === d.current.key); return !d.current.downgrade && !!c && p.monthly < c.monthly; };
@@ -32,6 +32,7 @@ export async function billingView(el) {
         ${(p.soon || []).map((x) => html`<div class="small">${x} <span class="pill amber" style="padding:1px 8px;font-size:11px">Yakında</span></div>`)}
         <div><b style="font-size:20px">${money0(p.monthly)}</b> <span class="muted small">/ ay · KDV dahil</span></div>
         <div class="small">Yıllık <b>${money0(p.yearly)}</b> <span class="muted">(2 ay hediye${instText(d, true) ? ` · ${instText(d, true)}` : ''})</span></div>
+        ${(d.installments || {}).max ? html`<div class="small muted">Kredi kartına ${d.installments.max} taksite kadar</div>` : ''}
         ${up(d, p) ? html`<div class="small" style="color:var(--primary)">Şimdi geçiş: <b>${money(up(d, p).amount)}</b> <span class="muted">(kalan ${up(d, p).days} gün için fark)</span></div>` : ''}
         ${admin && d.online && lower(d, p) ? html`<div class="small muted" style="margin-top:auto">Bu pakete aboneliğinizin süresi dolunca geçebilirsiniz.</div>` : ''}
         ${admin && d.online && !lower(d, p) ? html`<div class="row wrap" style="gap:8px;margin-top:auto">
