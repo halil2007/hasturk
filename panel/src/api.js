@@ -1481,7 +1481,12 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // ---------- kargo entegratörleri ----------
   // Sipariş ekranı: kullanılabilecek entegratörler (bilgi alanları olmadan)
   // Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette: paketinde yoksa liste "kilitli" işaretiyle döner (Entegrasyonlar'da gösterilir)
-  const carrierLock = (list) => (allows(env, 'carrier') ? list : list.map((c) => ({ ...c, usable: false, locked: true })));
+  // Müşteri ve demo panellerinde yalnız bağlantısı hazır (gönderi açabilen) firmalar listelenir: "hazırlanıyor / API dokümanı bekleniyor"
+  // bizim geliştirme durumumuzdur, müşteriyi ilgilendirmez
+  const carrierLock = (list0) => {
+    const list = env.TENANT_SLUG || env.DEMO === '1' ? list0.filter((c) => c.ready) : list0;
+    return allows(env, 'carrier') ? list : list.map((c) => ({ ...c, usable: false, locked: true }));
+  };
   if (path === 'carriers' && m === 'GET') return json(carrierLock(await carrierList(env, db)));
   // Entegrasyonlar (yalnız yönetici): bilgiler, kaydet, bağlantı testi, varsayılan
   if (path === 'integrations/carriers' && m === 'GET') return json(carrierLock(await carrierList(env, db, { withFields: true })));

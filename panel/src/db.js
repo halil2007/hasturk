@@ -423,7 +423,7 @@ export const DEFAULT_SETTINGS = {
     'Sendeo': 'https://www.sendeo.com.tr/gonderi-takip?code={no}',
     'Trendyol Express': 'https://kargotakip.trendyolexpress.com/?trackingNumber={no}',
   },
-  cargo_companies: ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'PTT Kargo', 'Sürat Kargo', 'Trendyol Express', 'HepsiJet', 'Kolay Gelsin'],
+  cargo_companies: ['Yurtiçi Kargo', 'Aras Kargo', 'DHL eCommerce', 'PTT Kargo', 'Sürat Kargo', 'Trendyol Express', 'HepsiJet', 'Kolay Gelsin'],
 };
 
 // Logo (base64, yüzlerce KB olabilir) her ayar okumasında taşınmaz: yerine kısa bir sürüm işareti gelir ("logo:uzunluk:son-karakterler").

@@ -181,7 +181,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       : c.label ? `${nm} etiketi${hasCarrier ? ' · ya da bağlı kargo firmanız' : ''}`
       : hasCarrier ? 'bağlı kargo firmanız (etiket ve takip no firmadan gelir)'
       : '';
-    if (!t) return mode === 'panel' ? '' : html`<div class="tiny muted" style="margin:2px 0 6px">${nm} kargo etiketi vermiyor: takip no girin ya da ${isAdmin() ? html`<a class="link" href="#/entegrasyonlar">kargo firması bağlayın</a>` : 'yöneticiniz kargo firması bağlayabilir'}.</div>`;
+    if (!t) return mode === 'panel' ? '' : html`<div class="tiny muted" style="margin:2px 0 6px">${nm} kargo etiketi vermiyor: paketi kendi kargonuzla gönderip takip numarasını girin.</div>`;
     return html`<div class="tiny muted" style="margin:2px 0 6px"><b>Önerilen etiket:</b> ${t}</div>`;
   }
   function labelSteps(p) {

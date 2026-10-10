@@ -32,3 +32,19 @@ test('30 günden eski açık sipariş tamamlandı sayılır; yenisi kalır; kana
   await saveOrders(db, 'trendyol', [ord('ESKI', 140, 'cancelled')]);
   assert.equal((await first(db, "SELECT status FROM orders WHERE order_number = 'ESKI'")).status, 'cancelled');
 });
+
+test('kargodaki sipariş: son 90 günde kanaldan yeniden okunur (teslim gelirse işlenir); 15 günü aşan ve teslim bilgisi gelmeyen teslim edildi sayılır', async () => {
+  const db = d1(); await init(db);
+  await saveOrders(db, 'trendyol', [ord('K40', 40, 'shipped'), ord('K60', 60, 'shipped'), ord('K5', 5, 'shipped'), ord('K20', 20, 'shipped')]);
+  // Kanal 60 günlük siparişin teslim edildiğini bildiriyor (eskiden 30 günden eskiler hiç okunmuyordu)
+  const calls = [];
+  const ch = { id: 'trendyol', byOrderDate: true, fetchOrders: async (since, until, o) => { calls.push([since, until, o]); return [ord('K60', 60, 'delivered')]; } };
+  const r = await staleOrders({}, db, [ch]);
+  assert.equal(calls.length, 1); assert.ok(calls[0][0] <= Date.now() - 60 * D, 'en eski kargodaki siparişten itibaren okunur');
+  assert.equal(r.delivered, 2, 'K40 ve K20 (15 günü aştı) teslim edildi sayılır');
+  const st = Object.fromEntries((await all(db, 'SELECT order_number, status FROM orders')).map((x) => [x.order_number, x.status]));
+  assert.deepEqual(st, { K40: 'delivered', K60: 'delivered', K5: 'shipped', K20: 'delivered' });
+  // Kanal yine "kargoda" gösterse de teslim edildi kalır
+  await saveOrders(db, 'trendyol', [ord('K40', 40, 'shipped')]);
+  assert.equal((await first(db, "SELECT status FROM orders WHERE order_number = 'K40'")).status, 'delivered');
+});
