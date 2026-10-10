@@ -283,7 +283,8 @@ const PLATFORM_GROUPS = [/^MAIL_/, /^HB_PROXY_/];
 export function effectiveEnv(env, cfg) {
   const out = { ...env };
   const own = [];
-  for (const [id, c] of Object.entries(cfg)) if (!isExtra(id)) for (const [k, v] of Object.entries(c.values || {})) if (v) own.push([k, v]);
+  // Müşteri panelinde kayıtlı e-posta servisi (eskiden girilmiş olsa da) kullanılmaz: e-postalar yalnız platformun adresinden gider
+  for (const [id, c] of Object.entries(cfg)) if (!isExtra(id) && !(env.TENANT_SLUG && id === 'mail')) for (const [k, v] of Object.entries(c.values || {})) if (v) own.push([k, v]);
   if (env.TENANT_SLUG && env.PLATFORM_KEYS) {
     const plat = String(env.PLATFORM_KEYS).split(',').filter(Boolean);
     for (const g of PLATFORM_GROUPS) if (own.some(([k]) => g.test(k))) for (const k of plat) if (g.test(k)) delete out[k];

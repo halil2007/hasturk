@@ -121,8 +121,8 @@ export async function settingsView(el) {
         </div>
         ${state.tenant ? '' : html`<div class="notice small"><i class="ico ico-link"></i><div><b>Paneli kendi alt alan adınızdan açmak</b> (ör. crm.alanadiniz.com.tr, DNS'i taşımadan): cPanel'de alt alan adı oluşturun, <a class="link" href="/api/panel-proxy" download="index.php">index.php</a> dosyasını indirip o alt alan adının klasörüne yükleyin, AutoSSL ile sertifika alın. Panel adresi ilk girişte kendiliğinden güncellenir.</div></div>`}
         <div><div class="small" style="font-weight:650;margin-bottom:6px">E-posta alınacak mağazalar / pazaryerleri</div><div class="row wrap">${live.map((c) => html`<label class="check"><input type="checkbox" data-mailch="${c.id}" ${(st.mail_channels || {})[c.id] === false ? '' : 'checked'}> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>
-        ${platformMail ? html`<div class="notice good small"><i class="ico ico-check"></i><div>E-posta bildirimleri <b>hazır</b>: kurulum gerekmez, e-postalar firma adınızla gönderilir. Kendi e-posta adresinizden göndermek isterseniz aşağıdan kendi sunucunuzu girebilirsiniz.</div></div>` : ''}
-        <details ${mailReady ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">${platformMail ? 'Kendi e-posta sunucumu kullan (isteğe bağlı)' : html`E-posta servisi ${mailReady ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || mf('MAIL_SMTP_USER').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}`}</summary>
+        ${state.tenant ? html`<div class="notice good small"><i class="ico ico-check"></i><div>E-posta bildirimleri <b>hazır</b>: kurulum gerekmez, e-postalar Hastürk CRM bildirim adresinden firma adınızla gönderilir.</div></div>` : ''}
+        ${state.tenant ? '' : html`<details ${mailReady ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">${platformMail ? 'Kendi e-posta sunucumu kullan (isteğe bağlı)' : html`E-posta servisi ${mailReady ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || mf('MAIL_SMTP_USER').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}`}</summary>
           <div class="stack" style="margin-top:10px">
             <div class="form-grid">
               <label class="field"><span>Servis</span><select class="input" data-mailf="MAIL_PROVIDER" data-prov>${[['smtp', 'Kendi e-posta sunucum (SMTP)'], ['brevo', 'Brevo'], ['resend', 'Resend']].map(([v, t]) => html`<option value="${v}" ${prov === v ? 'selected' : ''}>${t}</option>`)}</select></label>
@@ -142,7 +142,7 @@ export async function settingsView(el) {
               <div class="notice small"><div><b>Brevo (ücretsiz, alan adı gerekmez):</b> brevo.com'da hesap açın → <i>Senders</i> bölümünde gönderen adresinizi doğrulayın → <i>SMTP & API → API Keys</i> bölümünden anahtar oluşturup yapıştırın. <b>Resend</b> için alan adınızı Resend'de doğrulamanız gerekir.</div></div>
               <label class="field"><span>API anahtarı</span><input class="input" type="password" autocomplete="off" data-mailf="MAIL_API_KEY" placeholder="${mf('MAIL_API_KEY').masked || 'yapıştırın'}"><small>${mf('MAIL_API_KEY').masked ? 'Kayıtlı (şifreli). Değiştirmek için yenisini yapıştırın.' : 'Şifreli saklanır, ekranda tekrar gösterilmez.'}</small></label>
             </div>
-          </div></details>
+          </div></details>`}
         <div class="row wrap"><button class="btn" data-act="mail-test"><i class="ico ico-chat"></i>Deneme e-postası gönder</button><button class="btn" data-act="digest-test"><i class="ico ico-bars"></i>Örnek günlük özet gönder</button><span class="spacer"></span><button class="btn primary" data-act="mail-save">Bildirim ayarlarını kaydet</button></div>
       </div>` : ''}
 
@@ -296,7 +296,8 @@ export async function settingsView(el) {
     const m = {}; $$('[data-mailch]', box).forEach((x) => { m[x.dataset.mailch] = x.checked; });
     await save({ mail_to: $('[data-mailto]', box).value, mail_channels: m, ...($('[data-panelurl]', box) ? { panel_url: $('[data-panelurl]', box).value.trim() } : {}) });
     const values = {}; $$('[data-mailf]', box).forEach((i) => { values[i.dataset.mailf] = i.value.trim(); });
-    await api('integrations/mail', { method: 'PUT', body: { values } });
+    // Müşteri panelinde e-posta servisi ayarlanamaz (e-postalar yalnız platformun adresinden gider)
+    if (!state.tenant) await api('integrations/mail', { method: 'PUT', body: { values } });
   };
   actions(el, {
     'push-on': (t) => busy(t, async () => { await enablePush(); toast('Bildirimler bu cihazda açıldı'); await drawPush(); }),

@@ -1599,6 +1599,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true });
   }
   if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT') {
+    // Müşteri panelinde e-posta servisi ayarlanamaz: otomatik e-postalar yalnız ana panelde girilen adresten gider
+    if (env.TENANT_SLUG && x[1] === 'mail') fail(403, 'E-posta gönderimi Hastürk CRM tarafından yapılır; e-posta servisi ayarlanamaz');
     const b = await body(req);
     // Paketteki mağaza sınırı: yeni bir mağazanın API bilgisi kaydedilirken bağlı mağazalar sayılır (var olanı güncellemek serbest)
     const maxStores = Number(env.TENANT_MAX_STORES) || 0;
