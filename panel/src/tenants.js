@@ -221,11 +221,19 @@ export async function tenantWatchdog(env, db) {
   const now = Date.now(), last = (await first(db, "SELECT v FROM settings WHERE k = 'watchdog_at'")) || null;
   if (last && now - JSON.parse(last.v) < 3600e3) return null;
   await run(db, "INSERT INTO settings (k, v) VALUES ('watchdog_at', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", JSON.stringify(now));
-  const rows = await all(db, 'SELECT * FROM tenants WHERE active = 1 AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(usage_at, 0) < ? ORDER BY COALESCE(usage_at, 0) LIMIT 50', now, now - 2 * 3600e3);
-  let n = 0;
-  for (const t of rows) { try { await admin(env, t, 'ping'); n++; } catch (e) { console.error('bekçi: firma paneline ulaşılamadı', t.slug, e); } }
+  const rows = await all(db, 'SELECT * FROM tenants WHERE active = 1 AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(usage_at, 0) < ? ORDER BY COALESCE(usage_at, 0) LIMIT 150', now, now - 2 * 3600e3);
+  let n = 0, stale = 0;
+  for (const t of rows) {
+    try { await admin(env, t, 'ping'); n++; } catch (e) { console.error('bekçi: firma paneline ulaşılamadı', t.slug, e); }
+    // Zamanlayıcı yenilendiği hâlde 6 saattir iz yoksa (ya da panele hiç ulaşılamıyorsa) senkron gerçekten durmuştur: acil uyarı
+    if (now - Math.max(Number(t.usage_at) || 0, Number(t.created_at) || 0) > 6 * 3600e3) {
+      stale++;
+      await import('./alerts.js').then((m) => m.urgentAlert(env, db, 'stale:' + t.slug, { title: `Senkron durdu: ${t.name || t.slug}`,
+        body: `${t.slug} müşteri panelinin arka plan senkronu 6 saattir çalışmıyor (siparişler / stoklar işlenmiyor olabilir). Firmalar sayfasından kontrol edin.`, url: '#/firmalar' })).catch(() => {});
+    }
+  }
   if (n) console.log('bekçi: zamanlayıcısı yenilenen firma', n);
-  return { checked: n };
+  return { checked: n, stale };
 }
 
 export async function tenantLogin(req, env, b) {
@@ -488,7 +496,12 @@ export class TenantPanel {
       try {
         await init(this.db);
         const user = await currentUser(req, env, this.db);
-        if (!user || !this.env.DB) return json({ ok: false });
+        if (!user || !this.env.DB || env.DEMO === '1') return json({ ok: false });
+        // Sunucu tarafı sınır: panel başına saatte en fazla 30 bildirim (tarayıcıdaki sınır atlanabilir)
+        const hr = Math.floor(Date.now() / 3600e3), rate = (await this.ctx.storage.get('errrep')) || { h: hr, n: 0 };
+        if (rate.h !== hr) { rate.h = hr; rate.n = 0; }
+        if (++rate.n > 30) return json({ ok: false, limited: true });
+        await this.ctx.storage.put('errrep', rate);
         await init(this.env.DB);
         await recordError(this.env.DB, clientReport(await req.json().catch(() => ({})), { slug: this.t.slug, firm: this.t.name, user }));
         return json({ ok: true });

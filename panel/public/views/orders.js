@@ -192,7 +192,13 @@ export async function orders(el, rest, query = {}) {
     clear: () => { Object.assign(f, { q: '', from: '', to: '', cargo: '', page: 1 }); $('[data-q]', el).value = ''; $('[data-from]', el).value = ''; $('[data-to]', el).value = ''; $('[data-cargo]', el).value = ''; refresh(); },
     clearsel: () => { sel.clear(); draw(); },
     'bulk-accept': (t) => busy(t, async () => {
-      const r = await api('orders-bulk', { method: 'POST', body: { ids: [...sel], action: 'accept' } });
+      // Sunucu tek istekte en fazla 100 sipariş işler: çok seçimde 100'erli parçalarla gönderilir
+      const ids = [...sel], r = { done: [], errors: [] };
+      for (let i = 0; i < ids.length; i += 100) {
+        if (ids.length > 100) toast(`İşleme alınıyor: ${Math.min(i + 100, ids.length)} / ${ids.length}`);
+        const part = await api('orders-bulk', { method: 'POST', body: { ids: ids.slice(i, i + 100), action: 'accept' } });
+        r.done.push(...part.done); r.errors.push(...part.errors);
+      }
       toast(`${r.done.length} sipariş işleme alındı${r.errors.length ? `, ${r.errors.length} atlandı` : ''}`, !!r.errors.length && !r.done.length);
       sel.clear(); await load(); loadSummary().catch(() => {});
     }),

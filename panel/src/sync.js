@@ -44,7 +44,7 @@ const OVERLAP = 2 * 3600e3; // son senkrondan 2 saat öncesinden itibaren tekrar
 const LOOKBACK = 3 * D;
 
 // ---------- ürün eşleştirme haritası ----------
-async function productMaps(db) {
+export async function productMaps(db) {
   const [prods, lst] = await Promise.all([
     all(db, 'SELECT id, sku, barcode FROM products'),
     all(db, 'SELECT channel, remote_id, product_id FROM listings WHERE product_id IS NOT NULL'),
@@ -313,6 +313,18 @@ export async function mirrorStock(db, settings) {
 }
 
 // ---------- stok / fiyat gönderimi ----------
+// Bir senkronda kanal başına gönderilecek en fazla ilan. Toplu uç noktası olan kanallar (Trendyol 1000, ikas 100 … ilan / istek)
+// için 3000 stok / 2000 fiyat. İlan başına ayrı istek atan kanallar (Amazon, eBay, IdeaSoft; fiyatta Shopify ürün başına, Ticimax,
+// Etsy ilan başına 2 istek) daha az alır: Workers'ın istek başına alt istek sınırı (1000) ve süre aşılmasın; aşılırsa gönderim yarıda
+// hata verir, hiçbir ilan "gönderildi" işaretlenmez ve her senkron aynı ilanları baştan dener (kalanlar hiç gönderilmezdi).
+// Kalan ilanlar sonraki senkronlarda gönderilir.
+export const PUSH_LIMIT = { stock: 3000, price: 2000 };
+const PUSH_CAP = {
+  stock: { amazon: 200, ebay: 150, ideasoft: 150, etsy: 60 },
+  price: { amazon: 120, ebay: 150, ideasoft: 75, etsy: 60, shopify: 150, ticimax: 150 },
+};
+export const pushCap = (kind, chId) => PUSH_CAP[kind][typeOf(chId)] || PUSH_LIMIT[kind];
+
 export async function pushStocks(env, db, settings, only) {
   settings = settings || await getSettings(db);
   // Genel senkron kapalıyken yalnız "stok gönder" anahtarı açık kanallara (ana katalog hariç) ikas stoğu gönderilir
@@ -327,8 +339,9 @@ export async function pushStocks(env, db, settings, only) {
     if ((settings.stock_channels || {})[ch.id] === false) continue;
     // Kanal başına ayrı sorgu: gönderimi kapalı bir kanaldaki bekleyen ilanlar diğer kanalların sırasını tıkamaz
     // Fiyat da verilir: stok ve fiyatı tek kayıtta isteyen kanal (idefix) stokla birlikte mevcut fiyatı yeniden gönderir (fiyat değişmez)
-    const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, l.price, l.list_price, l.price_dirty, ${DESIRED} AS stock
-      FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ? AND COALESCE(l.error_at, 0) < ?) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`, ch.id, Date.now() - ERROR_RETRY_MS);
+    const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, l.price, l.list_price, l.price_dirty, l.error IS NOT NULL AS err, ${DESIRED} AS stock
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ? AND COALESCE(l.error_at, 0) < ?) WHERE pushed_stock IS NULL OR pushed_stock != stock
+      ORDER BY err LIMIT ?`, ch.id, Date.now() - ERROR_RETRY_MS, pushCap('stock', ch.id));
     const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock,
       price: Number(r.price) || 0, listPrice: Number(r.list_price) || 0, priceDirty: !!r.price_dirty }));
     if (!items.length) continue;
@@ -369,15 +382,23 @@ export async function pushPrices(env, db) {
   // Otomatik fiyat kuralı açık ilanda fiyat, kaynağı ne olursa olsun (döviz kuru, fiyat önerisi, Excel) kuralın en düşük /
   // en yüksek sınırı dışına gönderilmez: sınıra çekilir ve kullanıcıya bildirilir (zararına satış olmasın).
   // Stok da verilir (panelin bu ilan için istediği adet): stok ve fiyatı tek kayıtta isteyen kanal (idefix) fiyatla birlikte stoğu da gönderir
-  const rows = await all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.price, l.list_price, r.min_price, r.max_price,
+  // Kanal başına ayrı sorgu: önceden tüm kanallar için tek "LIMIT 2000" vardı; gönderimi kapalı / bekletilen / kaldırılmış bir kanalın
+  // bekleyen 2000+ fiyatı listenin başını tutunca diğer kanalların fiyatı hiç gönderilmiyordu.
+  const result = {}, bounded = [];
+  const sel = (where, ...args) => all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.price, l.list_price, r.min_price, r.max_price,
       CASE WHEN p.id IS NULL THEN NULL ELSE ${DESIRED} END AS stock
     FROM listings l LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 LEFT JOIN products p ON p.id = l.product_id
-    WHERE l.price_dirty = 1 AND l.price > 0 AND COALESCE(l.error_at, 0) < ? LIMIT 2000`, Date.now() - ERROR_RETRY_MS);
-  const bounded = [];
-  for (const r of rows) {
-    const min = Number(r.min_price) || 0, max = Number(r.max_price) || 0;
-    const p = min > 0 && r.price < min ? min : max >= min && max > 0 && r.price > max ? max : r.price;
-    if (p !== r.price) { bounded.push({ ...r, from: r.price, to: p }); r.price = p; }
+    WHERE l.price_dirty = 1 AND l.price > 0 AND COALESCE(l.error_at, 0) < ? ${where}`, Date.now() - ERROR_RETRY_MS, ...args);
+  const chans = (await getChannels(env, db)).filter((ch) => ch.enabled && ch.pushPrice);
+  const work = [];
+  for (const ch of chans) {
+    const rows = await sel('AND l.channel = ? ORDER BY l.error IS NOT NULL LIMIT ?', ch.id, pushCap('price', ch.id));
+    for (const r of rows) {
+      const min = Number(r.min_price) || 0, max = Number(r.max_price) || 0;
+      const p = min > 0 && r.price < min ? min : max >= min && max > 0 && r.price > max ? max : r.price;
+      if (p !== r.price) { bounded.push({ ...r, from: r.price, to: p }); r.price = p; }
+    }
+    if (rows.length) work.push([ch, rows]);
   }
   if (bounded.length) {
     for (const part of chunk(bounded, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price = ? WHERE channel = ? AND remote_id = ?').bind(x.to, x.channel, x.remote_id)));
@@ -385,17 +406,17 @@ export async function pushPrices(env, db) {
     await notify(db, 'pricebound', { level: 'warn', title: `${bounded.length} ilanın fiyatı otomatik fiyat sınırına çekildi`,
       msg: `${bounded.slice(0, 3).map((x) => `${x.remote_id}: ${x.from} → ${x.to} TL`).join(' · ')} · Döviz kuru, fiyat önerisi ya da toplu güncelleme fiyatı kuralın dışına çıkarıyordu. Sınırları Buybox sayfasından değiştirebilirsiniz.` });
   }
-  const result = {};
-  for (const ch of await getChannels(env, db)) {
-    const items = rows.filter((r) => r.channel === ch.id).map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: r.price, listPrice: r.list_price || 0, stock: r.stock }));
-    if (!items.length || !ch.enabled || !ch.pushPrice) continue;
+  for (const [ch, rows] of work) {
+    const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, price: r.price, listPrice: r.list_price || 0, stock: r.stock }));
     try {
       const res = await ch.pushPrice(items);
       await trackPush(db, ch, 'price', res, items.length);
       // Kanal ilan ilan sonuç verdiyse (ikas) yalnız kabul edilenler işaretlenir; reddedilen ilana neden yazılır, fiyatı sonraki senkronda yeniden denenir
       const doneIds = res && Array.isArray(res.done) ? new Set(res.done.map(String)) : null;
       const sent = doneIds ? items.filter((x) => doneIds.has(String(x.remoteId))) : items, errs = (res && res.errors) || [];
-      for (const part of chunk(sent, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL, error_at = NULL WHERE channel = ? AND remote_id = ?').bind(ch.id, x.remoteId)));
+      // "Gönderildi" yalnız fiyat gönderilen değerde kaldıysa: gönderim sürerken (kanal isteği beklenirken) fiyat yeniden değiştiyse
+      // ilan bekleyen kalır ve yeni fiyat sonraki senkronda gönderilir (önceden işaret silinip yeni fiyat hiç gönderilmiyordu)
+      for (const part of chunk(sent, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL, error_at = NULL WHERE channel = ? AND remote_id = ? AND price = ?').bind(ch.id, x.remoteId, x.price)));
       for (const part of chunk(errs, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ?, error_at = ? WHERE channel = ? AND remote_id = ?').bind('Fiyat: ' + String(x.error).slice(0, 200), Date.now(), ch.id, x.remoteId)));
       result[ch.id] = errs.length ? `${sent.length} gönderildi, ${errs.length} hata` : sent.length;
       await log(db, ch.id, errs.length ? 'warn' : 'info', `${sent.length} ilanın fiyatı gönderildi${errs.length ? `, ${errs.length} ilanda hata (${errs[0].error})` : ''}`);
@@ -405,6 +426,9 @@ export async function pushPrices(env, db) {
       await log(db, ch.id, 'error', 'Fiyat gönderilemedi: ' + e.message);
       // Bekleyen fiyatlar silinmez; bir sonraki senkronda yeniden denenir
       await notify(db, `price:${ch.id}`, { channel: ch.id, title: `${ch.name}: fiyat gönderilemedi (${items.length} ilan bekliyor)`, msg: explainHttp(e.message) + ' · Bir sonraki senkronda yeniden denenir.' });
+      // Hata ilana yazılır (stoktaki gibi, error_at boş: hemen yeniden denenir): sonraki senkronda önce hatasız bekleyen ilanlar alınır,
+      // gönderim sınırlı kanalda hep aynı parçanın hata verip kalanların hiç gönderilmemesi önlenir
+      for (const part of chunk(items, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ?, error_at = NULL WHERE channel = ? AND remote_id = ?').bind('Fiyat: ' + e.message.slice(0, 200), ch.id, x.remoteId)));
     }
   }
   return result;
@@ -613,7 +637,9 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
       await log(db, ch.id, 'info', 'Son 1 yılın siparişleri için geçmiş aktarımı otomatik başlatıldı');
     }
     // 5) geçmiş sipariş aktarımı varsa bir parça daha ilerlet
-    if (!only) out.backfill = await runJobs(env, db, { budgetMs: 20000 }).catch((e) => 'hata: ' + e.message);
+    // Süre senkronun başından sayılır: senkronun kendisi uzun sürdüyse geçmiş aktarımı daha kısa çalışır (istek başına işlemci süresi
+    // sınırı aşılmasın; Durable Object'te veritabanı işlemi de işlemci süresidir). En az 2 sn: her senkronda biraz ilerler.
+    if (!only) out.backfill = await runJobs(env, db, { budgetMs: Math.max(2000, 20000 - (Date.now() - t)) }).catch((e) => 'hata: ' + e.message);
     await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });
   } finally {
     await releaseLock(db, 'sync_lock', t);

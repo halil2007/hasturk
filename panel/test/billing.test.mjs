@@ -488,3 +488,32 @@ test('Firmalar → kartla tahsil et: imzalı ödeme bağlantısı, iyzico ödeme
     assert.match(await (await pay(c.link)).text(), /ödemesi daha önce alındı/);
   } finally { s.restore(); }
 });
+
+test('ödeme bekçisi: dönüşü gelmeyen ödeme iyzico\'dan sorulup tamamlanır; yenisi beklenir; yarıda kalan ödeme acil uyarı olur', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    const { paymentWatch } = await import('../src/billing.js');
+    const r = await s.site({ kind: 'new', plan: 'profesyonel', period: 'yearly', firm: 'Kapanan Sekme Ltd', ...buyer });
+    assert.equal(r.status, 200);
+    const id = s.iyz.inits[0].conversationId;
+    ok(s.iyz, '19900.0');
+    // Ödeme sayfası yeni açıldı: müşteri hâlâ ödüyor olabilir, dokunulmaz
+    let w = await paymentWatch(s.env, s.env.DB, 'https://panel.test');
+    assert.equal(w.checked, 0);
+    assert.equal((await first(s.env.DB, 'SELECT status FROM sales_orders WHERE id = ?', id)).status, 'pending');
+    // 1 saat önce açılmış, dönüş hiç gelmemiş: iyzico'dan sorulur, panel açılır
+    await run(s.env.DB, 'UPDATE sales_orders SET updated_at = ? WHERE id = ?', Date.now() - 3600e3, id);
+    w = await paymentWatch(s.env, s.env.DB, 'https://panel.test');
+    assert.equal(w.checked, 1);
+    assert.equal((await first(s.env.DB, 'SELECT status FROM sales_orders WHERE id = ?', id)).status, 'done');
+    assert.ok(await first(s.env.DB, "SELECT 1 FROM tenants WHERE slug = 'kapanan-sekme'"));
+    // Ödeme alındı (paid) ama işlem yarıda kaldı: acil uyarı (6 saatte bir)
+    await run(s.env.DB, "INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, created_at, updated_at) VALUES ('yarida', 'renew', 'x', 'profesyonel', 'yearly', 100, 'paid', ?, ?)", Date.now() - 3600e3, Date.now() - 3600e3);
+    w = await paymentWatch(s.env, s.env.DB);
+    assert.equal(w.alerted, 1);
+    assert.ok(await first(s.env.DB, "SELECT 1 FROM settings WHERE k = 'alert:pay:yarida'"));
+    w = await paymentWatch(s.env, s.env.DB);
+    assert.equal(w.alerted, 0, 'aynı sipariş için tekrar tekrar uyarı gitmez');
+  } finally { s.restore(); }
+});

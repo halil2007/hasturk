@@ -85,6 +85,9 @@ export async function maintain(db) {
   await del('pwreset', "DELETE FROM settings WHERE (k LIKE 'pwreset:%' AND json_extract(v, '$.exp') < ?) OR (k LIKE 'pwreset_rate:%' AND json_extract(v, '$.at') < ?) OR (k LIKE 'pw_rate:%' AND json_extract(v, '$.at') < ?)", t, t - 864e5, t - 864e5);
   await del('push_checks', "DELETE FROM push_checks WHERE at < ?", t - 7 * 864e5);
   await del('perf_stats', 'DELETE FROM perf_stats WHERE day < ?', day(t - 45 * 864e5));
+  await del('mail_queue', 'DELETE FROM mail_queue WHERE sent_at IS NOT NULL AND sent_at < ?', t - 30 * 864e5);
+  await del('product_uploads', "DELETE FROM product_uploads WHERE status IN ('done', 'error', 'failed', 'success') AND created_at < ?", t - 90 * 864e5);
+  await del('jobs', "DELETE FROM jobs WHERE status IN ('done', 'error', 'cancelled') AND COALESCE(updated_at, created_at) < ?", t - 90 * 864e5);
   // Sorgu planlayıcı istatistikleri (indeks seçimi): SQLite'ın önerdiği bakım komutu
   try { await run(db, 'PRAGMA optimize'); out.optimize = true; } catch { out.optimize = false; }
   return out;

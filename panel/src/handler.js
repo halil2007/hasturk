@@ -17,9 +17,9 @@ const caches = new WeakMap();
 const cacheOf = (db) => { let c = caches.get(db); if (!c) caches.set(db, (c = new Map())); return c; };
 export const bumpCache = (db, uid) => {
   const c = caches.get(db); if (!c) return;
-  if (uid == null) return c.clear();
+  if (uid == null) { c.bytes = 0; return c.clear(); }
   // Yazan kişinin önbelleği hemen boşalır (değişikliğini görsün); diğer kullanıcılarda en geç 8 sn sonra yenilenir
-  for (const k of c.keys()) if (k.startsWith(uid + '|')) c.delete(k);
+  for (const [k, v] of c) if (k.startsWith(uid + '|')) { c.bytes -= v.body.length; c.delete(k); }
 };
 
 export async function handle(req, env, ctx, db) {
@@ -69,8 +69,11 @@ export async function handle(req, env, ctx, db) {
     const r = await api(req, env, ctx, db, path, user);
     if (r.status === 200 && /json/.test(r.headers.get('Content-Type') || '')) {
       const text = await r.text(), headers = [...r.headers];
-      if (c.size > 300) for (const [k, v] of c) if (now - v.at >= CACHE_TTL) c.delete(k);
-      if (c.size < 500) c.set(key, { at: now, body: text, headers });
+      // Bellek sınırı: büyük yanıt (256 KB üstü) saklanmaz, toplam ~16 MB'ı aşınca eskiler atılır
+      if (text.length <= 256e3) {
+        if (c.size > 300 || (c.bytes || 0) > 16e6) for (const [k, v] of c) if (now - v.at >= CACHE_TTL || (c.bytes || 0) > 16e6) { c.bytes -= v.body.length; c.delete(k); }
+        if (c.size < 500) { const old = c.get(key); if (old) c.bytes -= old.body.length; c.set(key, { at: now, body: text, headers }); c.bytes = (c.bytes || 0) + text.length; }
+      }
       return new Response(text, { status: 200, headers });
     }
     return r;

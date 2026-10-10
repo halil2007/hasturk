@@ -4,7 +4,7 @@
 import { all, getSettings, log } from './db.js';
 import { getChannels } from './channels/index.js';
 import { catalogOf } from './sync.js';
-import { chunk, str, fail } from './util.js';
+import { str, fail } from './util.js';
 import { norm } from './match.js';
 
 const FIELDS = [
@@ -157,8 +157,12 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
   if (dry) return { ...summary, preview: changes.slice(0, 500) };
 
   // Uygula: ürün alanları, stok (hareket kaydıyla) ve kanal fiyatları (gönderilmeyi bekler)
-  const t = Date.now(), st = [];
+  // Bir değişikliğin yazımları (fiyat + fiyat geçmişi, stok + stok hareketi) aynı işlemde kalır: parça sınırında bölünüp biri yazılıp
+  // diğeri yazılmadan (ör. stok değişip hareket kaydı olmadan) kesilmesin. Yarıda kesilirse yazılan parçalar kalır; dosya yeniden
+  // yüklendiğinde yalnız kalan değişiklikler görünür (değerler mutlak yazılır, aynı değişiklik iki kez uygulanmaz).
+  const t = Date.now(), groups = [];
   for (const c of changes) {
+    const st = [];
     if (c.field.startsWith('ch:')) {
       st.push(db.prepare('UPDATE listings SET price = ?, price_dirty = 1 WHERE channel = ? AND remote_id = ?').bind(c.new, c.channel, c.remote_id));
       // Elle (Excel) değişiklik: otomatik fiyat bu ilanı 14 dakika değiştirmez, fiyat geçmişinde görünür
@@ -168,8 +172,11 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel' } =
       st.push(db.prepare('UPDATE products SET stock = ?, updated_at = ? WHERE id = ?').bind(c.new, t, c.id));
       st.push(db.prepare('INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(c.id, c.new - c.old, c.new, 'Excel ile toplu güncelleme', null, t, user));
     } else st.push(db.prepare(`UPDATE products SET ${c.field} = ?, updated_at = ? WHERE id = ?`).bind(c.new, t, c.id));
+    groups.push(st);
   }
-  for (const part of chunk(st, 90)) await db.batch(part);
+  let batch = [];
+  for (const g of groups) { if (batch.length && batch.length + g.length > 90) { await db.batch(batch); batch = []; } batch.push(...g); }
+  if (batch.length) await db.batch(batch);
   await log(db, null, 'info', `${user}: Excel ile toplu güncelleme · ${changes.length} değişiklik (${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')})`);
   return { ...summary, applied: true, stock: changes.some((c) => c.field === 'stock'), prices: changes.some((c) => c.field.startsWith('ch:')) };
 }

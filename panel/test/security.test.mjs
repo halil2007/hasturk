@@ -41,3 +41,14 @@ test('oturum çerezine fazladan bölüm eklenemez (süresi dolmuş firmada deste
   const req = new Request('https://p.test/api/me', { headers: { Cookie: 'hp_session=' + encodeURIComponent('firma~5.' + (Date.now() + 864e5) + '.abc.~-1.x') } });
   assert.equal(await currentUser(req, env, null), null);
 });
+
+test('salt-okur personel: döviz fiyatını uygulayamaz, tüm ilanları çeken ağır senkronu başlatamaz', async () => {
+  const { d1 } = await import('../dev/d1.mjs');
+  const { init } = await import('../src/db.js');
+  const { api } = await import('../src/api.js');
+  const db = d1(); await init(db);
+  const viewer = { id: 7, name: 'İzleyici', role: 'staff', perms: ['products:view', 'orders:view'] };
+  const post = (path, b) => api(new Request('https://panel.test/api/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }), {}, { waitUntil() {} }, db, path, viewer);
+  await assert.rejects(() => post('fx/apply', {}), (e) => e.status === 403);
+  await assert.rejects(() => post('sync', { listings: true }), (e) => e.status === 403);
+});

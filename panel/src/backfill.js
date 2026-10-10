@@ -3,7 +3,7 @@
 // Geçmiş siparişler stoğu değiştirmez (stok takibi başladığı andan önceki siparişler sadece kaydedilir).
 import { all, first, run, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
-import { saveOrders, applyStock } from './sync.js';
+import { saveOrders, applyStock, productMaps } from './sync.js';
 
 const D = 864e5, STEP = 7 * D;
 
@@ -21,6 +21,9 @@ export async function runJobs(env, db, { budgetMs = 20000 } = {}) {
   const jobs = await all(db, "SELECT * FROM jobs WHERE status = 'running' ORDER BY created_at");
   if (!jobs.length) return null;
   const chans = await getChannels(env, db), out = {};
+  // Ürün eşleştirme haritası (tüm ürünler + ilanlar) çalıştırma başına bir kez: haftalık her dilimde yeniden okunması 20k ürün /
+  // 60k ilanlı mağazada sürenin yarısını alıyordu
+  let maps = null;
   for (const j of jobs) {
     const ch = chans.find((c) => c.id === j.channel);
     if (!ch || !ch.enabled) { out[j.channel] = 'kanal bağlı değil'; continue; }
@@ -29,7 +32,7 @@ export async function runJobs(env, db, { budgetMs = 20000 } = {}) {
       const from = Math.max(j.from_ms, cursor - STEP);
       try {
         const orders = await ch.fetchOrders(from, cursor, { byOrdered: true });
-        const ids = await saveOrders(db, ch.id, orders.filter((o) => o.orderedAt >= j.from_ms - D));
+        const ids = await saveOrders(db, ch.id, orders.filter((o) => o.orderedAt >= j.from_ms - D), maps || (maps = await productMaps(db)));
         await applyStock(db, ids);
         done += orders.length;
         cursor = from;

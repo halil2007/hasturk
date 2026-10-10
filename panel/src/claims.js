@@ -1,7 +1,7 @@
 // İade talepleri: pazaryerlerindeki iade taleplerini (müşterinin iade isteği, kargoyla gelen ürün) her senkronda çeker,
 // panelde listeler; satıcı panelden onaylar ya da gerekçesiyle reddeder. Kanalda verilen kararlar da senkronla görünür.
 // Kanal arayüzü: claims({ since, until, page, size }) → { items, hasNext }, claimReasons(), approveClaim(c, lines), rejectClaim(c, lines, { reasonId, text, file })
-import { all, first, run, log, notify, resolve } from './db.js';
+import { all, first, run, log, notify, resolve, getRaw, setSetting } from './db.js';
 import { getChannels } from './channels/index.js';
 import { chunk, str, DEAD_LINE } from './util.js';
 
@@ -15,13 +15,19 @@ export async function syncClaims(env, db, { only } = {}) {
     try {
       const last = (await first(db, 'SELECT MAX(synced_at) AS t FROM claims WHERE channel = ?', ch.id)).t;
       // İlk senkronda son 30 gün, sonra son 10 gün (kararı kanalda verilen / otomatik onaylanan talepleri güncellemek için)
-      const since = Date.now() - (last ? 10 : 30) * 864e5, items = [];
-      for (let page = 0; page < 20; page++) {
-        const r = await ch.claims({ since, until: Date.now(), page, size: 50 });
+      // Tek senkronda en fazla 20 sayfa (1000 talep: alt istek sınırı); daha fazlası varsa aynı zaman aralığında kalan sayfalar
+      // sonraki senkronlarda okunur (önceden her senkron ilk 20 sayfayı yeniden okuyor, sonrakiler hiç alınmıyordu)
+      const key = 'claims_page:' + ch.id, cont = await getRaw(db, key), t = Date.now();
+      const w = cont && t - cont.until < 864e5 ? cont : { page: 0, since: t - (last ? 10 : 30) * 864e5, until: t }, items = [];
+      let page = w.page, more = false;
+      for (const end = page + 20; page < end; page++) {
+        const r = await ch.claims({ since: w.since, until: w.until, page, size: 50 });
         items.push(...r.items);
-        if (!r.hasNext || !r.items.length) break;
+        more = !!(r.hasNext && r.items.length);
+        if (!more) break;
       }
       await save(db, ch.id, items);
+      if (more || cont) await setSetting(db, key, more ? { ...w, page: page } : null);
       out[ch.id] = items.length;
       await resolve(db, `claims:${ch.id}`);
     } catch (e) {

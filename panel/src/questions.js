@@ -1,6 +1,6 @@
 // Müşteri soruları: pazaryerlerindeki (Trendyol, Hepsiburada …) ürün sorularını çeker, panelde listeler ve
 // panelden cevaplanmasını sağlar. Kanalın kendi panelinden verilen cevaplar da senkronla algılanır (answered_by = kanal).
-import { all, first, run, log, notify, resolve } from './db.js';
+import { all, first, run, log, notify, resolve, getRaw, setSetting } from './db.js';
 import { getChannels } from './channels/index.js';
 import { chunk } from './util.js';
 
@@ -13,14 +13,19 @@ export async function syncQuestions(env, db, { only } = {}) {
     try {
       const last = (await first(db, 'SELECT MAX(synced_at) AS t FROM questions WHERE channel = ?', ch.id)).t;
       // İlk senkronda son 14 gün, sonra son 3 gün (cevaplanan / reddedilen durum değişikliklerini yakalamak için)
-      const since = Date.now() - (last ? 3 : 14) * 864e5;
-      const items = [];
-      for (let page = 0; page < 30; page++) {
-        const r = await ch.questions({ since, until: Date.now(), page, size: 50 });
+      // Tek senkronda en fazla 30 sayfa (1500 soru: alt istek sınırı); daha fazlası varsa aynı zaman aralığında kalan sayfalar
+      // sonraki senkronlarda okunur (önceden her senkron ilk 30 sayfayı yeniden okuyor, sonrakiler hiç alınmıyordu)
+      const key = 'questions_page:' + ch.id, cont = await getRaw(db, key), t = Date.now();
+      const w = cont && t - cont.until < 864e5 ? cont : { page: 0, since: t - (last ? 3 : 14) * 864e5, until: t }, items = [];
+      let page = w.page, more = false;
+      for (const end = page + 30; page < end; page++) {
+        const r = await ch.questions({ since: w.since, until: w.until, page, size: 50 });
         items.push(...r.items);
-        if (!r.hasNext || !r.items.length) break;
+        more = !!(r.hasNext && r.items.length);
+        if (!more) break;
       }
       await save(db, ch.id, items);
+      if (more || cont) await setSetting(db, key, more ? { ...w, page: page } : null);
       out[ch.id] = items.length;
       await resolve(db, `questions:${ch.id}`);
     } catch (e) {
@@ -32,12 +37,15 @@ export async function syncQuestions(env, db, { only } = {}) {
   return out;
 }
 
+// Panelden cevaplanan soru, kanal cevabı henüz yansıtmadan gelen senkronla "bekliyor"a dönmez (2 gün; sonra kanalın durumu geçerli):
+// yoksa soru yeniden cevaplanabilir ve müşteri iki cevap görür
 export async function save(db, channel, items) {
   const t = Date.now();
   for (const part of chunk(items, 40)) {
     await db.batch(part.map((q) => db.prepare(`INSERT INTO questions (channel, remote_id, text, asked_at, status, remote_status, product_name, product_image, product_url, barcode, sku, customer, answer, answered_at, answered_by, due_at, synced_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (channel, remote_id) DO UPDATE SET text = excluded.text, status = excluded.status, remote_status = excluded.remote_status,
+      ON CONFLICT (channel, remote_id) DO UPDATE SET text = excluded.text,
+        status = CASE WHEN questions.status = 'answered' AND questions.answered_by = 'panel' AND excluded.status = 'waiting' AND questions.answered_at > ${t - 2 * 864e5} THEN 'answered' ELSE excluded.status END, remote_status = excluded.remote_status,
         product_name = COALESCE(NULLIF(excluded.product_name, ''), questions.product_name), product_image = COALESCE(NULLIF(excluded.product_image, ''), questions.product_image),
         product_url = COALESCE(NULLIF(excluded.product_url, ''), questions.product_url), answer = COALESCE(excluded.answer, questions.answer),
         answered_at = COALESCE(excluded.answered_at, questions.answered_at),

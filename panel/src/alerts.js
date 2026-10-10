@@ -26,6 +26,8 @@ export async function urgentAlert(env, db, key, { title, body, url = '#/bildirim
     }).then(() => to.length).catch((e) => 'hata: ' + e.message);
   }
   await log(db, null, 'warn', `Acil uyarı gönderildi: ${title}`);
+  // E-posta servisi bozuksa uyarının kendisi sessizce kaybolmasın
+  if (typeof out.mail === 'string') await log(db, null, 'error', `Acil uyarı e-postası gönderilemedi (${title}): ${out.mail.slice(0, 200)}`).catch(() => {});
   return out;
 }
 // Sorun düzeldi: daha önce uyarı gittiyse tek bir bilgi bildirimi
