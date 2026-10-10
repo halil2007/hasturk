@@ -491,3 +491,60 @@ FEATURES.push({
   ],
   related: ['siparis-yonetimi', 'kargo-ve-etiket', 'raporlar'],
 });
+
+// ---------- Kendi anlaşmalı kargo entegrasyonu (Kurumsal paket) ----------
+FEATURES.push({
+  slug: 'kargo-entegrasyonu', name: 'Kargo firması entegrasyonu', icon: 'i-truck', color: 'c-orange', short: 'Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL, Sürat',
+  title: 'Kargo Entegrasyonu — Hastürk CRM', h1: ['Kendi Kargo Anlaşmanızla', 'Etiket ve Takip Tek Tıkla'],
+  lead: 'Yurtiçi Kargo, Aras Kargo, PTT Kargo, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo ile kendi anlaşmanızdan gönderi açın: takip numarası ve kargo etiketi panele gelir, takip numarası satış kanalına bildirilir, kargo teslim edilince sipariş kendiliğinden kapanır.',
+  img: 'kargo',
+  points: [
+    ['i-truck', '7 kargo firması', 'Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo web servisleriyle doğrudan bağlantı.'],
+    ['i-tag', 'Etiket ve takip numarası', 'Gönderi panelden açılır; firmanın etiketi (PDF, ZPL ya da görsel) ve takip numarası pakete yazılır.'],
+    ['i-sync', 'Kanala bildirim', '“Kargoya ver” dediğinizde takip numarası siparişin geldiği kanala (ikas, WooCommerce, pazaryeri) bildirilir.'],
+    ['i-eye', 'Otomatik kargo takibi', 'Kargo firmasından durum sorgulanır; teslim edilen sipariş kendiliğinden “Teslim edildi” olur.'],
+    ['i-calc', 'Gerçek kargo maliyeti', 'Firmanın bildirdiği kargo ücreti siparişin giderine yazılır, kâr hesabınız doğru çıkar.'],
+    ['i-orders', 'Toplu ve termal yazdırma', 'Etiketleri termal ya da normal yazıcıdan tek tek veya toplu basın.'],
+  ],
+  steps: [
+    ['Kargo firmanızı bağlayın', 'Firmanın verdiği web servis bilgilerini Entegrasyonlar → Kargo firmaları bölümüne girin; panel bağlantıyı test eder.'],
+    ['Gönderiyi açın', 'Siparişte “Kargo firmasından etiket al” deyin; takip numarası ve etiket saniyeler içinde gelir.'],
+    ['Kargoya verin', 'Etiketi yazdırın; takip numarası kanala bildirilir, teslimat kendiliğinden takip edilir.'],
+  ],
+  note: { title: 'Bilmeniz gerekenler', items: ['Kargo firması entegrasyonu Kurumsal pakette yer alır.', 'Web servis bilgileri kargo firmasıyla yaptığınız kurumsal anlaşmayla, firmanın şube ya da satış ekibinden alınır.', 'Trendyol ve Hepsiburada gibi pazaryerlerinin anlaşmalı kargosuyla gönderimde barkod pazaryerinden gelir; bu entegrasyona gerek yoktur.'] },
+  faq: [
+    ['Hangi kargo firmalarıyla entegrasyon var?', 'Yurtiçi Kargo, Aras Kargo, PTT Kargo, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo ile doğrudan entegrasyon vardır. Kargonomi ve Navlungo entegratörleri yakında eklenecek.'],
+    ['Kargo entegrasyonu için ne gerekir?', 'Kargo firmasıyla kurumsal anlaşmanız ve firmanın verdiği web servis kullanıcı adı / şifresi gerekir. Bilgileri panele girdiğinizde bağlantı hemen test edilir.'],
+    ['Takip numarası satış kanalına gider mi?', 'Evet. Paketi “Kargoya ver” ile kapattığınızda takip numarası ve kargo firması siparişin geldiği kanala bildirilir; müşteriniz kargosunu takip edebilir.'],
+    ['Kargo teslim edilince ne olur?', 'Panel kargo firmasından durumu düzenli sorgular; teslim edilen sipariş kendiliğinden “Teslim edildi” olur, iade dönen gönderi işaretlenir.'],
+    ['Hangi pakette var?', 'Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette yer alır. Pazaryerlerinin anlaşmalı kargosu ve ikas Kargo tüm paketlerde çalışır.'],
+  ],
+  related: ['kargo-ve-etiket', 'siparis-yonetimi', 'kar-zarar'],
+});
+
+// ---------- arama motoru başlık ve açıklamaları ----------
+// title: sekme / arama sonucu başlığı (en çok ~60 karakter), desc: arama sonucu açıklaması (en çok ~155 karakter).
+// İnsanların Google'da yazdığı ifadelerle (ör. "pazaryeri stok takibi", "trendyol entegrasyonu") yazılır.
+const FEATURE_SEO = {
+  'siparis-yonetimi': ['Pazaryeri Sipariş Yönetimi Programı | Hastürk CRM', 'Trendyol, Hepsiburada, N11 ve ikas siparişlerini tek listede yönetin: gecikme uyarısı, toplu işlem, sipariş başı kâr. 7 gün ücretsiz deneyin.'],
+  'kargo-ve-etiket': ['Pazaryeri Kargo Etiketi ve Toplu Yazdırma | Hastürk CRM', 'Trendyol ve Hepsiburada ortak barkodlu kargo etiketi, ikas Kargo, termal yazıcı (ZPL) ve toplu etiket yazdırma tek panelde. 7 gün ücretsiz deneyin.'],
+  'kargo-entegrasyonu': ['Kargo Entegrasyonu: Yurtiçi, Aras, PTT, UPS | Hastürk CRM', 'Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo entegrasyonu: kendi anlaşmanızla etiket, takip numarası ve otomatik teslimat takibi.'],
+  'stok-senkronizasyonu': ['Pazaryeri Stok Senkronizasyonu ve Stok Takibi | Hastürk CRM', 'Bir kanalda satılan ürünün stoğu Trendyol, Hepsiburada, N11 ve sitenizde otomatik düşer. Fazla satışa son; çoklu mağaza stok takibi tek panelde.'],
+  'urun-yonetimi': ['Toplu Ürün Yükleme ve Pazaryeri Ürün Yönetimi | Hastürk CRM', 'Ürünü bir kez tanımlayın; Trendyol, Hepsiburada, N11 ve idefix\'e toplu ürün yükleyin. Kategori eşleştirme, varyant ve görseller otomatik gider.'],
+  'buybox-takibi': ['Buybox Takibi ve Otomatik Fiyatlandırma | Hastürk CRM', 'Trendyol ve Hepsiburada buybox takibi: rakip fiyatlarını izleyin, belirlediğiniz alt-üst sınırlarla fiyatınız otomatik ayarlansın. Zararına satış yok.'],
+  'kar-zarar': ['Pazaryeri Kâr Hesaplama ve Kâr-Zarar Raporu | Hastürk CRM', 'Komisyon, kargo, hizmet bedeli, stopaj ve reklam kesintileriyle sipariş başı gerçek kârınızı görün. Trendyol ve Hepsiburada hakedişleri otomatik.'],
+  'raporlar': ['E-Ticaret Satış Raporları ve Analiz | Hastürk CRM', 'Günlük, haftalık ve aylık satış raporları; en çok satan ürünler, kanal dağılımı, il bazında satış haritası ve sadık müşteriler. Tüm pazaryerleri tek raporda.'],
+  'musteri-sorulari-ve-iadeler': ['Pazaryeri Müşteri Soruları ve İade Yönetimi | Hastürk CRM', 'Trendyol, Hepsiburada ve N11 müşteri sorularını hazır cevaplarla yanıtlayın, iade taleplerini panelden onaylayın ya da reddedin.'],
+  'ekip-ve-guvenlik': ['Personel Yetkilendirme ve Güvenlik | Hastürk CRM', 'Ekibinize yalnız ihtiyaç duyduğu bölümleri açın; hazır roller, iki adımlı doğrulama ve şifreli saklanan API bilgileriyle mağazanız güvende.'],
+  'stok-api': ['Stok API: Bayilere ve ERP\'ye Stok Aktarımı | Hastürk CRM', 'Güncel stoklarınızı kendi sitenize, ERP\'nize ya da bayilerinizin sistemine API ile aktarın. Her bayiye ayrı anahtar, IP kısıtı ve kurulum kılavuzu.'],
+  'doviz-endeksli-fiyat': ['Döviz Kuruna Endeksli Otomatik Fiyat Güncelleme | Hastürk CRM', 'Ürün fiyatını dolar veya euro ile girin; kur değişince TL fiyatınız Trendyol, Hepsiburada ve sitenizde otomatik güncellensin.'],
+  'mobil-yonetim': ['Pazaryeri Mağazanızı Telefondan Yönetin | Hastürk CRM', 'Siparişleri işleme alın, stok güncelleyin, soruları yanıtlayın: panel telefonda uygulama gibi çalışır, yeni siparişte anlık bildirim gelir.'],
+};
+for (const f of FEATURES) { const s = FEATURE_SEO[f.slug]; if (s) [f.seoTitle, f.desc] = s; }
+
+// Entegrasyon sayfası arama sonucu açıklamaları (özellik listesi uzun olan kanallarda kesik görünmesin)
+const INTEGRATION_SEO = {
+  trendyol: 'Trendyol entegrasyonu: siparişler, ortak barkodlu kargo etiketi, stok ve fiyat, ürün yükleme, buybox ve gerçek kâr tek panelde. 7 gün ücretsiz deneyin.',
+  hepsiburada: 'Hepsiburada entegrasyonu: siparişler ve paketleme, kargo etiketi, stok ve fiyat, ürün yükleme, buybox ve hakediş tek panelde. 7 gün ücretsiz deneyin.',
+};
+for (const x of INTEGRATIONS) if (INTEGRATION_SEO[x.slug]) x.desc = INTEGRATION_SEO[x.slug];

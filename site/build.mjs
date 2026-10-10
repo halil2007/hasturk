@@ -141,7 +141,48 @@ ${alt([
     <div class="grid g3">${rel.map((r) => `<a class="card rel reveal" href="/ozellikler/${r.slug}"><span class="ic ${r.color}">${ico(r.icon)}</span><b>${esc(r.name)}</b><span>${esc(r.short)}</span><em>İncele ${ico('i-arrow')}</em></a>`).join('')}</div>`,
 ], !!f.why)}
 ${ctaBand}`;
-  return { meta: { title: f.title, description: clip(f.lead), url: `/ozellikler/${f.slug}`, nav: 'ozellikler' }, body, file: `ozellikler/${f.slug}.html` };
+  return { meta: { title: f.seoTitle || f.title, crumb: f.name, description: f.desc || clip(f.lead), url: `/ozellikler/${f.slug}`, nav: 'ozellikler' }, body, file: `ozellikler/${f.slug}.html` };
+}
+
+// ---------- entegrasyon sayfası arama metinleri (kanalın gerçek özelliklerinden üretilir; söz verdiğimiz kadar) ----------
+// Türkçe ekler (ilgi / yönelme / ayrılma): okunuşa göre (N11 → "en on bir", PttAVM → "pe te te a ve me")
+const SUF = { trendyol: ['un', 'a', 'dan'], hepsiburada: ['nın', 'ya', 'dan'], n11: ['in', 'e', 'den'], ikas: ['ın', 'a', 'tan'], woocommerce: ['ın', 'a', 'tan'], pttavm: ['nin', 'ye', 'den'],
+  idefix: ['in', 'e', 'ten'], pazarama: ['nın', 'ya', 'dan'], amazon: ['un', 'a', 'dan'], ciceksepeti: ['nin', 'ye', 'den'], koctas: ['ın', 'a', 'tan'], shopify: ['ın', 'a', 'dan'], opencart: ['ın', 'a', 'tan'], etsy: ['nin', 'ye', 'den'] };
+const sx = (x, i) => `${x.name}'${(SUF[x.slug] || ['in', 'e', 'den'])[i]}`;
+const capOn = (x, re) => x.caps.some(([k, v]) => re.test(k) && v !== false);
+const capVal = (x, re) => (x.caps.find(([k]) => re.test(k)) || [])[1];
+const minPrice = Math.min(...S.plans.filter((p) => p.monthly).map((p) => p.monthly));
+function intDesc(x) {
+  const parts = ['siparişlerinizi', capOn(x, /^Stok/) && 'stok ve fiyatlarınızı', capOn(x, /^Kargo etiketi/) && 'kargo etiketlerini', capOn(x, /soru/i) && 'müşteri sorularını'].filter(Boolean);
+  const and = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a[0]);
+  const t = `${x.name} entegrasyonu: ${and(parts)} tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.`;
+  return t.length <= 158 ? t : clip(x.lead);
+}
+function intIntro(x) {
+  const on = x.caps.filter(([, v]) => v !== false).map(([k]) => k.toLocaleLowerCase('tr'));
+  const off = x.caps.filter(([, v]) => v === false).map(([k]) => k.toLocaleLowerCase('tr'));
+  const list = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a.join(''));
+  const where = x.kind === 'pazaryeri' ? `${x.name} pazaryerindeki mağazanızı` : `${x.name} sitenizi`;
+  return [
+    `Hastürk CRM, ${where} resmi entegrasyon servisi üzerinden bağlar. ${x.name} siparişleriniz 15 dakikada bir kendiliğinden panele gelir; diğer pazaryerleri ve e-ticaret sitelerinizin siparişleriyle aynı listede, tek ekranda yönetilir.`,
+    `${x.name} entegrasyonunda desteklenen işlemler: ${list(on)}.${off.length ? ` Şu an ${x.name} için panelde yer almayanlar: ${list(off)}.` : ''}`,
+    `Ürünleriniz barkod ve stok koduyla eşleşir; bir kanalda satılan ürünün stoğu ${capOn(x, /^Stok/) ? `${x.name} dahil ` : ''}stok gönderimi açık tüm kanallarda düşer, böylece fazla satış yaşamazsınız. Komisyon, kargo ve diğer kesintilerle her siparişin gerçek kârını da aynı panelde görürsünüz.`,
+  ];
+}
+function intFaq(x) {
+  const lbl = capVal(x, /^Kargo etiketi/);
+  const ship = lbl === 'Ortak barkod' ? `${sx(x, 0)} anlaşmalı kargosuyla gönderimde barkod doğrudan ${sx(x, 2)} alınır; etiketi panelden termal ya da normal yazıcıya tek tek veya toplu basarsınız.`
+    : lbl === 'ikas Kargo' ? 'Gönderi ikas Kargo ile oluşturulur ve etiket ikas\'tan alınır. Kendi kargo anlaşmanızla gönderiyorsanız Kurumsal pakette Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ya da Sürat Kargo\'dan etiketi doğrudan panelden alabilirsiniz.'
+    : lbl === 'Panel etiketi' ? 'Kargo etiketi sipariş ve adres bilgisiyle panelden basılır. Kendi kargo anlaşmanızla gönderiyorsanız Kurumsal pakette Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ya da Sürat Kargo\'dan etiket ve takip numarasını doğrudan panelden alabilirsiniz.'
+    : lbl ? `Kargo etiketi: ${lbl}.` : '';
+  return [
+    [`${x.name} entegrasyonu nasıl yapılır?`, `${x.help} Ardından Hastürk CRM panelinde Entegrasyonlar sayfasındaki ${x.name} kartına bilgileri girip “Kaydet ve test et”e basın. Bağlantı hemen test edilir; siparişleriniz ve ürünleriniz birkaç dakika içinde gelmeye başlar.`],
+    capOn(x, /^Stok/) && [`${x.name} stok ve fiyatlarım otomatik güncellenir mi?`, `Evet. Stok gönderimini açtığınızda bir kanalda satılan ürünün stoğu ${x.name} mağazanızda da kendiliğinden düşer; panelde değiştirdiğiniz fiyat ve stoklar en geç 15 dakika içinde ${sx(x, 1)} gönderilir.`],
+    ship && [`${x.name} siparişlerinin kargo etiketi nasıl alınır?`, ship],
+    capOn(x, /^Ürün (yükleme|oluşturma)/) && [`Ürünlerimi panelden ${x.name} mağazama yükleyebilir miyim?`, `Evet. Ürünü panelde bir kez tanımlayın; kategori ve özellik eşleştirmesiyle ${sx(x, 1)} gönderin. Görseller, varyantlar ve fiyat da birlikte gider.`],
+    [`Birden fazla ${x.name} mağazası bağlayabilir miyim?`, `Evet. Birden fazla ${x.name} mağazanızı aynı panelde ayrı mağazalar olarak bağlayabilirsiniz. Bağlanabilecek mağaza sayısı paketinize göre değişir; gerekirse ek mağaza alabilirsiniz.`],
+    [`${x.name} entegrasyonu ücretli mi?`, `${x.name} entegrasyonu tüm paketlerde yer alır. Paketler aylık ${minPrice.toLocaleString('tr-TR')} ₺'den (KDV dahil) başlar; kurulum ücreti yoktur ve 7 gün ücretsiz deneyebilirsiniz.`],
+  ].filter(Boolean);
 }
 
 function integrationPage(x) {
@@ -178,13 +219,24 @@ function integrationPage(x) {
   </div>
 </section>
 <section class="sec">
+  <div class="wrap narrow-text">
+    <div class="sec-head reveal"><div class="kicker">${esc(x.name)} entegrasyonu nedir?</div><h2>${esc(x.name)} Mağazanızı Tek Panelden Yönetin</h2></div>
+    ${intIntro(x).map((t) => `<p class="reveal seo-p">${esc(t)}</p>`).join('')}
+  </div>
+</section>
+<section class="sec alt">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(x.name)} Entegrasyonu Hakkında</h2></div>${faqHtml(intFaq(x))}
+  </div>
+</section>
+<section class="sec">
   <div class="wrap">
     <div class="sec-head reveal"><div class="kicker">Diğer entegrasyonlar</div><h2>Tüm Kanallarınız Tek Panelde</h2><p>Aynı panelde birden fazla pazaryeri ve e-ticaret sitesini birlikte yönetin; stok ve fiyat hepsinde eşit kalır.</p></div>
     <div class="integ">${others.map((o) => `<a class="it reveal" href="/entegrasyonlar/${o.slug}"><span class="b" style="background:${o.color}">${esc(o.badge)}</span><div style="min-width:0"><b>${esc(o.name)}</b><small>${esc(o.kind)}${testTag(o, 'tt')}</small></div></a>`).join('')}<a class="it reveal" href="/entegrasyonlar#yakinda"><span class="b" style="background:#94a3b8">+</span><div style="min-width:0"><b>Yakında</b><small>Teknosa, Boyner, eBay, Ozon, kargo…</small></div></a></div>
   </div>
 </section>
 ${ctaBand}`;
-  return { meta: { title: `${x.name} Entegrasyonu: Sipariş, Stok ve Fiyat | Hastürk CRM`, crumb: `${x.name} Entegrasyonu`, description: clip(x.lead), url: `/entegrasyonlar/${x.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${x.slug}.html` };
+  return { meta: { title: x.seoTitle || `${x.name} Entegrasyonu: Sipariş, Stok ve Fiyat | Hastürk CRM`, crumb: `${x.name} Entegrasyonu`, description: x.desc || intDesc(x), url: `/entegrasyonlar/${x.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${x.slug}.html` };
 }
 
 // ---------- arama motoru verisi (JSON-LD) ----------
