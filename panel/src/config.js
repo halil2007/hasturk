@@ -25,32 +25,61 @@ export const FIELDS = {
   ],
   // Yeni sipariş e-posta bildirimi (kanal değil; Ayarlar → Bildirimler'den girilir)
   // ---------- kargo entegratörleri (kanal değil; siparişin kargo etiketi bu firmalar üzerinden alınır: src/carriers.js) ----------
-  // Alanlar firmanın verdiği API bilgisine göre kesinleşir (iki firma da bilgiyi anlaşmayla, kendi ekibinden veriyor)
+  // Alanlar firmaların API'lerinin istediği bilgiler (src/carriers/<firma>.js)
   kargonomi: [
-    { k: 'KARGONOMI_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Kargonomi ekibinin entegrasyon için verdiği anahtar (destek@kargonomi.com.tr)' },
-    { k: 'KARGONOMI_API_SECRET', label: 'API şifresi', secret: true, hint: 'Kargonomi ayrıca şifre verdiyse' },
+    { k: 'KARGONOMI_API_KEY', label: 'API anahtarı (token)', secret: true, req: true, hint: 'Kargonomi destek ekibinin verdiği API anahtarı (destek@kargonomi.com.tr)' },
+    { k: 'KARGONOMI_WAREHOUSE', label: 'Depo numarası', adv: true, hint: 'Boşsa Kargonomi\'deki ana depo (gönderen adresi) kullanılır' },
+    { k: 'KARGONOMI_PROVIDER', label: 'Kargo firması', adv: true, choices: [['', 'Otomatik (en ucuz)'], ['3', 'Kolay Gelsin'], ['4', 'Aras Kargo'], ['5', 'Sürat Kargo'], ['6', 'HepsiJET'], ['7', 'PTT Kargo']] },
   ],
   navlungo: [
-    { k: 'NAVLUNGO_API_KEY', label: 'API anahtarı', secret: true, req: true, hint: 'Navlungo ekibinin entegrasyon için verdiği anahtar' },
-    { k: 'NAVLUNGO_API_SECRET', label: 'API şifresi', secret: true, hint: 'Navlungo ayrıca şifre verdiyse' },
+    { k: 'NAVLUNGO_USER', label: 'API kullanıcı adı', req: true, hint: 'Navlungo → Entegrasyonlar\'da açılan API kullanıcısı (panel giriş bilgisi değil)' },
+    { k: 'NAVLUNGO_PASSWORD', label: 'API şifresi', secret: true, req: true },
+    { k: 'NAVLUNGO_ADDRESS_ID', label: 'Gönderici adres numarası', req: true, pattern: '^\\d+$', patternMsg: 'Navlungo adres defterindeki numara (yalnız rakam)', hint: 'Navlungo → Adres Defteri\'ndeki gönderici adresinin numarası' },
+    { k: 'NAVLUNGO_CARRIER_ID', label: 'Kargo firması', adv: true, choices: [['', 'Otomatik'], ['9', 'Sürat Kargo'], ['10', 'HepsiJET'], ['11', 'Kolay Gelsin'], ['13', 'Aras Kargo'], ['14', 'PTT Kargo'], ['18', 'Yurtiçi Kargo']] },
+    { k: 'NAVLUNGO_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test (QA)']] },
   ],
-  // Doğrudan kargo firmaları (kendi anlaşmanız): alanlar firmaların web servislerinin istediği bilgiler
+  // Doğrudan kargo firmaları (kendi anlaşmanız)
   hepsijet: [
     { k: 'HEPSIJET_USER', label: 'Kullanıcı adı', req: true }, { k: 'HEPSIJET_PASSWORD', label: 'Şifre', secret: true, req: true },
-    { k: 'HEPSIJET_COMPANY', label: 'Firma kodu', req: true }, { k: 'HEPSIJET_WAREHOUSE', label: 'Depo kodu', hint: 'Gönderilerin çıkış deposu' },
+    { k: 'HEPSIJET_COMPANY', label: 'Firma kodu', req: true, hint: 'HepsiJET\'in verdiği kısa kod (ör. ETF)' }, { k: 'HEPSIJET_WAREHOUSE', label: 'Depo (XDock) kodu', req: true, hint: 'Gönderilerin çıkış deposu (ör. MRHP_SANCAKTEPE)' },
+    { k: 'HEPSIJET_SENDER_ID', label: 'Gönderen adres kodu', adv: true, hint: 'HepsiJET\'te kayıtlı gönderen adresinizin kodu (verildiyse)' },
+    { k: 'HEPSIJET_COMPANY_NAME', label: 'Firma adı', adv: true, hint: 'Boşsa Ayarlar → Kargo etiketi → Gönderen' },
+    { k: 'HEPSIJET_APIKEY', label: 'API key', secret: true, adv: true, hint: 'HepsiJET ayrıca apikey verdiyse' },
+    { k: 'HEPSIJET_PRODUCT', label: 'Teslimat türü', adv: true, choices: [['', 'Standart (HX_STD)'], ['HX_ND', 'Ertesi gün (HX_ND)'], ['HX_SD', 'Aynı gün (HX_SD)']] },
+    { k: 'HEPSIJET_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test']] },
   ],
   dhl: [
-    { k: 'DHL_CLIENT_ID', label: 'API istemci kimliği (Client ID)', req: true }, { k: 'DHL_CLIENT_SECRET', label: 'API gizli anahtarı (Client Secret)', secret: true, req: true },
+    { k: 'DHL_CLIENT_ID', label: 'API istemci kimliği (Client ID)', req: true, hint: 'apizone.mngkargo.com.tr geliştirici portalındaki uygulamanızın anahtarı' }, { k: 'DHL_CLIENT_SECRET', label: 'API gizli anahtarı (Client Secret)', secret: true, req: true },
     { k: 'DHL_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'DHL_PASSWORD', label: 'Müşteri şifresi', secret: true, req: true },
+    { k: 'DHL_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test (sandbox)']] },
   ],
-  ptt: [{ k: 'PTT_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'PTT_USER', label: 'Web servis kullanıcı adı', req: true }, { k: 'PTT_PASSWORD', label: 'Web servis şifresi', secret: true, req: true }],
-  surat: [{ k: 'SURAT_USER', label: 'Kullanıcı adı', req: true }, { k: 'SURAT_PASSWORD', label: 'Şifre', secret: true, req: true }, { k: 'SURAT_ACCOUNT', label: 'Cari kod' }],
+  ptt: [
+    { k: 'PTT_CUSTOMER_NO', label: 'Müşteri numarası', req: true, pattern: '^\\d+$', patternMsg: 'PTT müşteri numarası yalnız rakamlardan oluşur' }, { k: 'PTT_PASSWORD', label: 'Web servis şifresi', secret: true, req: true },
+    { k: 'PTT_BARCODE_START', label: 'Barkod aralığı başlangıcı', req: true, pattern: '^\\d{12,13}$', patternMsg: 'PTT\'nin verdiği 12 haneli başlangıç numarası', hint: 'PTT\'nin verdiği aralığın ilk numarası (12 hane, kontrol hanesi olmadan)' },
+    { k: 'PTT_BARCODE_END', label: 'Barkod aralığı sonu', pattern: '^\\d{12,13}$', patternMsg: 'PTT\'nin verdiği 12 haneli bitiş numarası' },
+    { k: 'PTT_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test']] },
+  ],
+  surat: [
+    { k: 'SURAT_USER', label: 'Cari kod', req: true, hint: 'Sürat Kargo müşteri (cari) numaranız' }, { k: 'SURAT_PASSWORD', label: 'Web servis şifresi', secret: true, req: true },
+    { k: 'SURAT_WEB_PASSWORD', label: 'e-Sürat web servis şifresi', secret: true, hint: 'Panelden iptal ve Sürat etiketi için: e-Sürat → profil → Web Servis Şifre' },
+    { k: 'SURAT_TRACK_PASSWORD', label: 'Takip şifresi', secret: true, adv: true, hint: 'Takip sorgusu farklı şifreyle çalışıyorsa' },
+    { k: 'SURAT_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test (prova)']] },
+  ],
   yurtici: [
-    { k: 'YURTICI_USER', label: 'Web servis kullanıcı adı (wsUserName)', req: true }, { k: 'YURTICI_PASSWORD', label: 'Web servis şifresi (wsPassword)', secret: true, req: true },
-    { k: 'YURTICI_USER_COD', label: 'Alıcı ödemeli kullanıcı adı', adv: true, hint: 'Yurtiçi alıcı ödemeli gönderi için ayrı kullanıcı verdiyse' }, { k: 'YURTICI_PASSWORD_COD', label: 'Alıcı ödemeli şifre', secret: true, adv: true },
+    { k: 'YURTICI_USER', label: 'Web servis kullanıcı adı (wsUserName)', req: true, hint: 'Gönderici ödemeli kullanıcı' }, { k: 'YURTICI_PASSWORD', label: 'Web servis şifresi (wsPassword)', secret: true, req: true },
+    { k: 'YURTICI_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test']] },
   ],
-  aras: [{ k: 'ARAS_USER', label: 'Kullanıcı adı', req: true }, { k: 'ARAS_PASSWORD', label: 'Şifre', secret: true, req: true }, { k: 'ARAS_CUSTOMER_CODE', label: 'Müşteri kodu', req: true }],
-  ups: [{ k: 'UPS_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'UPS_USER', label: 'Kullanıcı adı', req: true }, { k: 'UPS_PASSWORD', label: 'Şifre', secret: true, req: true }],
+  aras: [
+    { k: 'ARAS_USER', label: 'Kullanıcı adı', req: true, hint: 'Sevkiyat entegrasyonu (SetOrder) kullanıcısı' }, { k: 'ARAS_PASSWORD', label: 'Şifre', secret: true, req: true },
+    { k: 'ARAS_QUERY_USER', label: 'Takip servisi kullanıcı adı', hint: 'Kargo durumu için: esasweb → Entegrasyon → XML Servisleri' }, { k: 'ARAS_QUERY_PASSWORD', label: 'Takip servisi şifresi', secret: true },
+    { k: 'ARAS_CUSTOMER_CODE', label: 'Müşteri kodu', hint: 'Takip servisi için' },
+    { k: 'ARAS_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test']] },
+  ],
+  ups: [
+    { k: 'UPS_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'UPS_USER', label: 'Kullanıcı adı', req: true }, { k: 'UPS_PASSWORD', label: 'Şifre', secret: true, req: true },
+    { k: 'UPS_QUERY_USER', label: 'Takip kullanıcı adı', adv: true, hint: 'UPS takip servisi için ayrı kullanıcı verdiyse' }, { k: 'UPS_QUERY_PASSWORD', label: 'Takip şifresi', secret: true, adv: true },
+    { k: 'UPS_SERVICE', label: 'Servis', adv: true, choices: [['', 'Standart'], ['6', 'Express Saver'], ['4', 'Express 10:30']] },
+  ],
   mail: [
     { k: 'MAIL_PROVIDER', label: 'E-posta servisi', hint: 'smtp (kendi e-posta sunucunuz), brevo veya resend' },
     { k: 'MAIL_API_KEY', label: 'API anahtarı', secret: true },

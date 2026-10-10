@@ -146,15 +146,18 @@ export async function integrations(el, rest = []) {
     const c = carriers.find((x) => x.id === id);
     if (!c) return;
     if (c.locked) return toast('Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette; Paketim\'den yükseltebilirsiniz', true);
-    const admin = isAdmin(), fields = c.fields || [];
-    const s = sheet({ title: `${c.name} · kargo entegratörü`, size: 'narrow', body: html`<div class="stack">
+    const admin = isAdmin(), fields = c.fields || [], dis = admin ? '' : 'disabled';
+    const cfield = (f2) => html`<label class="field"><span class="row" style="gap:6px">${f2.label}${f2.req ? html`<b style="color:var(--bad)">*</b>` : ''}${f2.source === 'panel' ? html`<span class="src panel">kayıtlı</span>` : ''}</span>
+        ${f2.choices ? html`<select class="input" data-k="${f2.k}" ${dis}>${f2.choices.map(([v, t]) => html`<option value="${v}" ${(f2.value || '') === v ? 'selected' : ''}>${t}</option>`)}</select>`
+          : f2.secret ? html`<input class="input" type="password" autocomplete="new-password" data-k="${f2.k}" placeholder="${f2.masked ? `${f2.masked} (kayıtlı — değiştirmek için yazın)` : 'gizli değer'}" ${dis}>`
+          : html`<input class="input" data-k="${f2.k}" value="${f2.value}" autocomplete="off" ${dis}>`}
+        ${f2.hint ? html`<small class="muted">${f2.hint}</small>` : ''}</label>`;
+    const s = sheet({ title: `${c.name} · ${c.kind === 'direct' ? 'kargo firması' : 'kargo entegratörü'}`, size: 'narrow', body: html`<div class="stack">
       <div class="small">${c.about}</div>
       ${!c.ready ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>Bağlantı hazırlanıyor.</b> ${c.name} API dokümanı ve test hesabı geldiğinde gönderi oluşturma açılacak. Bilgilerinizi şimdiden kaydedebilirsiniz; o zamana kadar etiketi ${c.name} panelinden alıp takip numarasını paket menüsünden “Kendi anlaşmamla gönder” ile girebilirsiniz.</div></div>` : ''}
       <div class="notice small"><i class="ico ico-key"></i><div>${c.howto}${c.site ? html` <a class="link" href="${c.site}" target="_blank" rel="noopener">${c.site.replace(/^https?:\/\/(www\.)?/, '')}</a>` : ''}</div></div>
-      ${c.demo ? '' : html`<div class="form-grid">${fields.map((f2) => html`<label class="field"><span class="row" style="gap:6px">${f2.label}${f2.req ? html`<b style="color:var(--bad)">*</b>` : ''}${f2.source === 'panel' ? html`<span class="src panel">kayıtlı</span>` : ''}</span>
-        ${f2.secret ? html`<input class="input" type="password" autocomplete="new-password" data-k="${f2.k}" placeholder="${f2.masked ? `${f2.masked} (kayıtlı — değiştirmek için yazın)` : 'gizli değer'}" ${admin ? '' : 'disabled'}>`
-          : html`<input class="input" data-k="${f2.k}" value="${f2.value}" autocomplete="off" ${admin ? '' : 'disabled'}>`}
-        ${f2.hint ? html`<small class="muted">${f2.hint}</small>` : ''}</label>`)}</div>`}
+      ${c.demo ? '' : html`<div class="form-grid">${fields.filter((f2) => !f2.adv).map(cfield)}</div>
+        ${fields.some((f2) => f2.adv) ? html`<details class="adv"><summary class="small">Gelişmiş ayarlar (isteğe bağlı)</summary><div class="form-grid" style="margin-top:10px">${fields.filter((f2) => f2.adv).map(cfield)}</div></details>` : ''}`}
       ${c.configured && !c.demo ? html`<label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" data-active ${c.active ? 'checked' : ''} ${admin ? '' : 'disabled'}><span class="small">Aktif (kapalıysa sipariş ekranında kullanılmaz)</span></label>` : ''}
       <div data-res></div>
     </div>`,

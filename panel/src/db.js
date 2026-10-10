@@ -275,6 +275,10 @@ const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN carrier_provider TEXT',
   'ALTER TABLE packages ADD COLUMN carrier_ref TEXT',
   'ALTER TABLE packages ADD COLUMN carrier_cost REAL',
+  // Kargo firmasından son takip sorgusu: zaman ve durum (created / transit / delivered / returned / cancelled) + firmanın durum metni
+  'ALTER TABLE packages ADD COLUMN carrier_checked_at INTEGER',
+  'ALTER TABLE packages ADD COLUMN carrier_state TEXT',
+  'ALTER TABLE packages ADD COLUMN carrier_status TEXT',
   // Giriş koruması: IP başına hatalı deneme, engel sayısı (her engel bir öncekinden uzun) ve engel bitişi (bkz. guard.js)
   `CREATE TABLE IF NOT EXISTS ip_guard (ip TEXT PRIMARY KEY, fails INTEGER NOT NULL DEFAULT 0, window_at INTEGER, strikes INTEGER NOT NULL DEFAULT 0,
     blocked_until INTEGER, blocked_hits INTEGER NOT NULL DEFAULT 0, blocks INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0,
