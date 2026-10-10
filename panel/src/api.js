@@ -742,6 +742,8 @@ export const RUNOUT_DAYS = 14;
 const SOLD_JOIN = () => 'LEFT JOIN sold30 s30 ON s30.pid = p.id';
 // sold30 tablosu (son 30 gün satış adedi) en fazla 5 dakikada bir yeniden hesaplanır (veritabanı / örnek başına)
 const soldAt = new WeakMap();
+// Senkron yeni sipariş getirdiyse bir sonraki ürün listesi satış adetlerini hemen yeniler ("en çok satan" sırası beklemesin)
+export const soldStale = (db) => soldAt.delete(db);
 async function refreshSold30(db) {
   if (Date.now() - (soldAt.get(db) || 0) < 5 * 60e3) return;
   soldAt.set(db, Date.now());

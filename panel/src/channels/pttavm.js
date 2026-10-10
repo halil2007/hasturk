@@ -122,6 +122,7 @@ function pttavmSoap(env, meta) {
     let streak = 0;
     for (const x of items.slice(0, 200)) {
       try { await soap(STOCK_METHOD, `<tem:item><Barkod>${esc(x.remoteId)}</Barkod><Miktar>${x.stock}</Miktar></tem:item>`); done.push(x.remoteId); streak = 0; } catch (e) {
+        if (e.budget) throw e; // senkron istek bütçesi bitti: ilan hatası değil
         errors.push({ remoteId: x.remoteId, error: e.message });
         if (++streak >= 5 && !done.length) throw e; // servis / kimlik hatası: hepsi aynı hatayı verir
         if (streak >= 5) break;

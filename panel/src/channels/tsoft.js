@@ -98,6 +98,8 @@ export function tsoft(env, meta = {}) {
     return {
       remoteId: str(o.OrderId), orderNumber: str(o.OrderCode || o.OrderId), orderedAt: tsDate(o.OrderDateTimeStamp) || tsDate(o.OrderDate) || Date.now(),
       remoteStatus: status || str(o.OrderStatusId), status: tsoftStatus(status), awaitingPayment: isPending(status),
+      // Kapıda ödeme: ödeme tipi adı (DOĞRULA: alan adı PaymentType / PaymentTypeName; değer "Kapıda Ödeme", "Kapıda Kredi Kartı")
+      cod: /kap[ıi]da/i.test(str(o.PaymentTypeName || o.PaymentType || o.PaymentName)) || undefined,
       customer: str(o.CustomerName) || name, phone: str(o.DeliveryMobile || o.Mobile || o.CustomerPhone || o.DeliveryTelephone), email: str(o.CustomerUsername || o.CustomerEmail || o.Email),
       customerId: num(o.CustomerId) > 0 ? str(o.CustomerId) : '',
       address: { name, line: str(o.DeliveryAddress), district: str(o.DeliveryTown || o.DeliveryDistrict), city: str(o.DeliveryCity), phone: str(o.DeliveryMobile || o.DeliveryTelephone || o.Mobile || o.CustomerPhone) },
@@ -180,24 +182,33 @@ export function tsoft(env, meta = {}) {
 
   // Varyant mı (SubProductCode) ana ürün mü (ProductCode): ilan listesinde varyantın remoteProductId'si ana ürün kodudur
   const isSub = (x) => !!(x.remoteProductId && str(x.remoteProductId) !== str(x.remoteId));
-  async function send(path, data) {
-    const errs = [];
-    for (const part of chunk(data, 100)) {
-      const r = await call(path, { data: part });
-      // Kalem hataları message[] içinde (type 2 = hata kabul edildi)
-      for (const m of (r && r.message) || []) if (String(m.type) === '2') errs.push(Array.isArray(m.text) ? m.text.join(' ') : str(m.text || m.code));
+  // Sonuç ilan ilan: { done, errors }. Kalem hataları message[] içinde (type 2 = hata kabul edildi); hata metninde ilan kodu geçiyorsa
+  // yalnız o ilana, geçmiyorsa (hangi ilan olduğu anlaşılamıyor) o parçanın tüm ilanlarına yazılır. Hiçbiri gönderilemeden bağlantı hatası: atılır.
+  async function send(path, list, row, out) {
+    for (const part of chunk(list, 100)) {
+      let r;
+      try { r = await call(path, { data: part.map(row) }); } catch (e) {
+        if (!out.done.length || e.budget) throw e;
+        out.errors.push(...part.map((x) => ({ remoteId: x.remoteId, error: e.message })));
+        continue;
+      }
+      const msgs = ((r && r.message) || []).filter((m) => String(m.type) === '2').map((m) => (Array.isArray(m.text) ? m.text.join(' ') : str(m.text || m.code)));
+      const has = (t, x) => { const c = str(x.remoteId); return !!c && new RegExp(`(^|[^\\w])${c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w])`).test(t); };
+      const hit = (x) => msgs.find((t) => has(t, x)), loose = msgs.filter((t) => !part.some((x) => has(t, x)));
+      for (const x of part) {
+        const err = hit(x) || loose[0];
+        if (err) out.errors.push({ remoteId: x.remoteId, error: 'T-Soft: ' + err }); else out.done.push(x.remoteId);
+      }
     }
-    return errs;
+    return out;
   }
   async function pushStock(items) {
-    const st = (x) => Math.max(0, Math.round(num(x.stock)));
+    const st = (x) => Math.max(0, Math.round(num(x.stock))), out = { done: [], errors: [] };
     const subs = items.filter(isSub), mains = items.filter((x) => !isSub(x) && str(x.remoteId));
-    const errs = [
-      ...(subs.length ? await send('subProduct/updateStock', subs.map((x) => ({ SubProductCode: str(x.remoteId), Stock: st(x) }))) : []),
-      // DOĞRULA: varyantsız ürün stoğu için product/updateStock (ProductCode + Stock)
-      ...(mains.length ? await send('product/updateStock', mains.map((x) => ({ ProductCode: str(x.remoteId), Stock: st(x) }))) : []),
-    ];
-    if (errs.length) throw new Error(`T-Soft: ${errs.length} stok güncellenemedi (${errs.slice(0, 3).join('; ')})`);
+    if (subs.length) await send('subProduct/updateStock', subs, (x) => ({ SubProductCode: str(x.remoteId), Stock: st(x) }), out);
+    // DOĞRULA: varyantsız ürün stoğu için product/updateStock (ProductCode + Stock)
+    if (mains.length) await send('product/updateStock', mains, (x) => ({ ProductCode: str(x.remoteId), Stock: st(x) }), out);
+    return out;
   }
   // KDV oranı bilinmiyorsa ilan okunarak öğrenilir
   async function vat(x) {
@@ -210,15 +221,17 @@ export function tsoft(env, meta = {}) {
   }
   // Fiyat: liste fiyatı SellingPrice, satış fiyatı düşükse DiscountedSellingPrice (değilse 0 = indirim yok); ikisi de KDV hariç yazılır
   async function pushPrice(items) {
-    const subs = [], mains = [];
+    const subs = [], mains = [], out = { done: [], errors: [] };
     await pool(items.filter((x) => str(x.remoteId)), 4, async (x) => {
-      const v = 1 + (await vat(x)) / 100, price = num(x.price), list = Math.max(num(x.listPrice), price), ex = (n) => Math.round((n / v) * 10000) / 10000;
-      const row = { SellingPrice: ex(list), DiscountedSellingPrice: price < list ? ex(price) : 0 };
-      if (isSub(x)) subs.push({ SubProductCode: str(x.remoteId), ...row }); else mains.push({ ProductCode: str(x.remoteId), ...row });
+      let v;
+      try { v = 1 + (await vat(x)) / 100; } catch (e) { if (e.budget || !/bulunamadı/.test(e.message)) throw e; out.errors.push({ remoteId: x.remoteId, error: e.message }); return; }
+      const price = num(x.price), list = Math.max(num(x.listPrice), price), ex = (n) => Math.round((n / v) * 10000) / 10000;
+      (isSub(x) ? subs : mains).push({ ...x, row: { SellingPrice: ex(list), DiscountedSellingPrice: price < list ? ex(price) : 0 } });
     });
     // DOĞRULA: fiyat güncelleme metot adları (subProduct/updateSubProducts, product/updateProducts) ve alanları
-    const errs = [...(subs.length ? await send('subProduct/updateSubProducts', subs) : []), ...(mains.length ? await send('product/updateProducts', mains) : [])];
-    if (errs.length) throw new Error(`T-Soft: ${errs.length} fiyat güncellenemedi (${errs.slice(0, 3).join('; ')})`);
+    if (subs.length) await send('subProduct/updateSubProducts', subs, (x) => ({ SubProductCode: str(x.remoteId), ...x.row }), out);
+    if (mains.length) await send('product/updateProducts', mains, (x) => ({ ProductCode: str(x.remoteId), ...x.row }), out);
+    return out;
   }
 
   // Kargoya ver: siparişin son açık paketiyse "Kargoya Verildi" + takip no. Kargo kodu: ayarlardaki kod, yoksa siparişteki kargo kodu.

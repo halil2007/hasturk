@@ -53,7 +53,9 @@ test('Boyner: kök adres, Basic kimlik, User-Agent, sipariş normalleştirme', a
 test('Boyner: durum eşlemesi, paket birleştirme, iptal satırı, sayfalama ve 14 günlük dilim', async () => {
   const pages = [];
   mockFetch([['GET', /orders\?/, (url) => {
-    const q = new URL(url).searchParams; pages.push([q.get('page'), q.get('startDate')]);
+    const q = new URL(url).searchParams;
+    if (q.get('orderNumber')) return { content: [] }; // sipariş numarasıyla paket okuma (bkz. fix-marketplaces testi)
+    pages.push([q.get('page'), q.get('startDate')]);
     if (q.get('page') === '0') return { totalPages: 2, content: [
       pkg({ orderNumber: 'A', status: 'Picking' }), pkg({ orderNumber: 'B', status: 'Shipped', cargoTrackingNumber: 'TR1' }), pkg({ orderNumber: 'C', status: 'Delivered' }),
       pkg({ orderNumber: 'D', status: 'Cancelled' }), pkg({ orderNumber: 'E', status: 'Returned' }),

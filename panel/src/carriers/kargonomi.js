@@ -50,7 +50,8 @@ export function make(values) {
     const tracking = str(s.shipping_webservice_tracking_code), carrier = str(s.shipping_provider_name);
     return {
       ref: str(s.id), tracking, barcode: str(s.shipping_webservice_barcode) || tracking, carrier: carrier || 'Kargonomi',
-      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price),
+      // DOĞRULA: real_price / estimated_price KDV hariç kabul edildi (Kargonomi fiyat listeleri KDV hariç)
+      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costVatIncluded: false,
       state: STATES[s.status] || null, text: str(s.status_label),
     };
   };
@@ -85,11 +86,17 @@ export function make(values) {
         await req('DELETE', `/shipments/${draft.id}`).catch(() => null); // seçilemeyen taslak kalmasın
         throw e;
       }
-      const s2 = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => draft));
-      if (s2.status === 'webservice_order_failed') throw new Error(`Kargonomi: kargo firması gönderiyi oluşturamadı (${str(s2.status_label)})`);
-      const out = result(s2);
-      out.label = out.tracking ? await getLabel(draft.id).catch(() => null) : null;
-      return out;
+      // Fiyat onayından sonraki hata: gönderi panele yazılmaz (takipsiz taslak / gönderi kalmasın) → iptal edilir, olmazsa silinir (en iyi çaba)
+      try {
+        const s2 = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => draft));
+        if (s2.status === 'webservice_order_failed') throw new Error(`Kargonomi: kargo firması gönderiyi oluşturamadı (${str(s2.status_label)})`);
+        const out = result(s2);
+        out.label = out.tracking ? await getLabel(draft.id).catch(() => null) : null;
+        return out;
+      } catch (e) {
+        await req('POST', '/shipments/cancel', { shipment_id: draft.id }).catch(() => req('DELETE', `/shipments/${draft.id}`)).catch(() => null);
+        throw e;
+      }
     },
     async cancel(ref) {
       try { await req('POST', '/shipments/cancel', { shipment_id: Number(ref) || ref }); } catch (e) {

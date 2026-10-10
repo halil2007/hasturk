@@ -12,7 +12,7 @@
 //   label(pkg)                      → etiketi sonradan veren firmalarda (Kargonomi, Navlungo, DHL, Sürat) etiket
 // Firma bağlantıları src/carriers/<firma>.js'te. "ready: false": bağlantı henüz yok; bilgiler kaydedilebilir, gönderi açıklamayla reddedilir.
 import { loadConfig, describe } from './config.js';
-import { getRaw, setSetting, all, run } from './db.js';
+import { getRaw, setSetting, all, run, first } from './db.js';
 import { HttpError, str, pool } from './util.js';
 import * as kargonomi from './carriers/kargonomi.js';
 import * as navlungo from './carriers/navlungo.js';
@@ -113,7 +113,31 @@ export async function carrierFor(env, db, id) {
   const values = ((await loadConfig(env, db))[c.id] || {}).values || {};
   const make = ADAPTERS[c.id];
   if (!make) throw notReady(c);
-  return { ...c, api: make(env, values, { db }) };
+  const api = make(env, values, { db });
+  // İptalden sonra yeniden açılan gönderide referans eki: firma aynı referansı "zaten var" sayıp iptal edilmiş gönderiyi döndürmesin
+  if (api.create && db) { const create = api.create.bind(api); api.create = async (s) => create(await withAttempt(db, s)); }
+  return { ...c, api };
+}
+
+// Paketin daha önce iptal edilmiş entegratör gönderisi sayısı (order_events 'carrier-cancel', not "Paket N: …") → referans "-R<n>" eki.
+// İlk gönderide referans değişmez (yanıtı kaybolan isteğin yeniden denemesi aynı referansla firmadaki gönderiyi bulur).
+export async function withAttempt(db, s) {
+  if (!s || !s.orderId || s.packageNo == null) return s;
+  try {
+    const r = await first(db, "SELECT COUNT(*) AS n FROM order_events WHERE order_id = ? AND action = 'carrier-cancel' AND note LIKE ?", s.orderId, `Paket ${s.packageNo}:%`);
+    const n = Number(r && r.n) || 0;
+    return n ? { ...s, reference: `${s.reference}-R${n}`, attempt: n } : s;
+  } catch { return s; }
+}
+
+// Kapıda ödemeli sipariş: hiçbir kargo bağlantısı tahsilatlı (kapıda ödeme) gönderi açmıyor; gönderi tahsilatsız açılırsa
+// ürün parası tahsil edilmeden teslim edilir. Kanal bağdaştırıcıları siparişe extra.cod = true yazar (WooCommerce payment_method 'cod',
+// ikas paymentMethods.type *_ON_DELIVERY, OpenCart payment_code 'cod', T-Soft / Ticimax ödeme tipi adı "Kapıda …").
+export const COD_MSG = 'Kapıda ödemeli sipariş: anlaşmalı kargo entegrasyonuyla gönderilemez; tahsilatlı gönderi için kargo firmasının panelini kullanın';
+export function codBlocked(o) {
+  let x = o && o.extra;
+  if (typeof x === 'string') { try { x = JSON.parse(x); } catch { x = null; } }
+  return x && x.cod ? COD_MSG : '';
 }
 
 export async function setDefaultCarrier(db, id) {
@@ -134,13 +158,15 @@ export function senderPlace(sender = {}) {
 }
 
 export function shipmentOf(o, pkg, sender = {}, { desi } = {}) {
+  const cod = codBlocked(o);
+  if (cod) throw new HttpError(400, cod);
   const a = (o.address && typeof o.address === 'object') ? o.address : (() => { try { return JSON.parse(o.address || '{}') || {}; } catch { return {}; } })();
   const lines = (pkg.items || []).map((x) => {
     const it = (o.items || []).find((i) => String(i.line_id) === String(x.line_id)) || {};
     return { name: it.product_name || it.name || '', sku: it.sku || '', barcode: it.barcode || '', qty: x.qty, unitPrice: Number(it.unit_price) || 0 };
   });
   const s = {
-    reference: `${o.order_number || o.id}-${pkg.no}`, orderNumber: o.order_number || '', channel: o.channel,
+    reference: `${o.order_number || o.id}-${pkg.no}`, orderNumber: o.order_number || '', channel: o.channel, orderId: o.id, packageNo: pkg.no,
     receiver: { name: str(a.name || o.customer), phone: str(a.phone || o.phone), email: str(o.email), address: str(a.line), district: str(a.district), city: str(a.city), postalCode: str(a.zip || a.postalCode), country: str(a.country || 'TR') },
     sender: { name: str(sender.name), phone: str(sender.phone), address: str(sender.address), ...senderPlace(sender) },
     desi: Number(desi) > 0 ? Number(desi) : Number(pkg.desi) > 0 ? Number(pkg.desi) : 1,

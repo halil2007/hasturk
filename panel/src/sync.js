@@ -542,7 +542,7 @@ async function stockOnce(env, db, settings) {
 
 export async function syncAll(env, db, opts = {}) {
   // Dış istek bütçesi (bkz. util.js withBudget): ~150 istek veritabanı / bildirim / kullanım özeti için ayrılır
-  try { return await withBudget(Number(env.SUBREQ_BUDGET) || 850, () => syncAllInner(env, db, opts)); } finally { (await import('./handler.js')).bumpCache(db); }
+  try { return await withBudget(Number(env.SUBREQ_BUDGET) || 850, () => syncAllInner(env, db, opts)); } finally { (await import('./handler.js')).bumpCache(db); (await import('./api.js')).soldStale(db); }
 }
 async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
   const t = Date.now();

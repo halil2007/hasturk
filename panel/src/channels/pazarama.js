@@ -81,6 +81,7 @@ export function pazarama(env, meta) {
   // bu yüzden tarih saat:dakika ile gönderilir ve bitiş bir dakika ileri yuvarlanır.
   async function fetchOrders(since, until) {
     const out = new Map(), W = 28 * 864e5, end = Math.ceil(until / 60e3) * 60e3 + 60e3;
+    let cut = null;
     for (let to = end; to > since; to -= W) {
       const from = Math.max(since, to - W);
       for (let page = 1; page <= 50; page++) {
@@ -88,9 +89,12 @@ export function pazarama(env, meta) {
         const rows = (r && r.data) || [];
         for (const o of rows) { const n = norm(o); out.set(n.remoteId, n); }
         if (rows.length < 100) break;
+        if (page === 50) cut = from; // sayfa sınırı (5.000 sipariş): dilimin kalanı okunmadı
       }
     }
-    return [...out.values()];
+    const res = [...out.values()];
+    if (cut != null) { res.partialUntil = cut; res.warnings = ['Pazarama: bir tarih aralığında 5.000 siparişten fazlası var; kalanlar sonraki senkronda okunur']; }
+    return res;
   }
 
   // Onaylı ürünler: product/products/approved (imleç tabanlı, istek başına en fazla 100; nextCursor null olunca biter).

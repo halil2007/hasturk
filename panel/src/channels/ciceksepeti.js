@@ -84,8 +84,12 @@ export function ciceksepeti(env, meta) {
 
   const W = 14 * 864e5 - 60e3;
   const page = (from, to, p, size = 100) => call('/Order/GetOrders', { method: 'POST', body: { startDate: new Date(from).toISOString(), endDate: new Date(to).toISOString(), pageSize: size, page: p } });
+  // İptal edilen siparişler GetOrders'ta gelmiyor; iptal servisi bu ortamdan doğrulanamadı (uç nokta bilinmiyor): iptaller okunamaz.
+  // Kullanıcı bunu bilsin diye bağlantı başına bir kez uyarı düşer (iptaller Çiçeksepeti panelinden kontrol edilmeli).
+  let cancelWarned = false;
   async function fetchOrders(since, until) {
-    const rows = [];
+    const rows = [], warnings = [];
+    let cut = null;
     for (let to = until; to > since; to -= W) {
       const from = Math.max(since, to - W);
       for (let p = 0; p < 50; p++) {
@@ -93,9 +97,14 @@ export function ciceksepeti(env, meta) {
         const list = r.supplierOrderListWithBranch || r.supplierOrderList || r.orders || [];
         rows.push(...list);
         if (list.length < 100 || (r.orderListCount != null && (p + 1) * 100 >= num(r.orderListCount))) break;
+        if (p === 49) cut = from; // sayfa sınırı (5.000 satır): dilimin kalanı okunmadı
       }
     }
-    return group(rows);
+    const out = group(rows);
+    if (cut != null) { out.partialUntil = cut; warnings.push('Çiçeksepeti: bir tarih aralığında 5.000 sipariş satırından fazlası var; kalanlar sonraki senkronda okunur'); }
+    if (!cancelWarned) { cancelWarned = true; warnings.push('Çiçeksepeti: iptal edilen siparişler API\'den okunamıyor; iptalleri Çiçeksepeti satıcı panelinden kontrol edin'); }
+    if (warnings.length) out.warnings = warnings;
+    return out;
   }
 
   // Aynı ana ürün kodundaki (mainProductCode) ürünlerin ortak ad başı grup adı, kalan kısmı varyant adı olur
@@ -122,7 +131,12 @@ export function ciceksepeti(env, meta) {
     });
   }
 
-  const update = async (rows) => { for (const part of chunk(rows, 200)) await call('/Products/price-and-stock', { method: 'PUT', body: { items: part } }); };
+  // Toplu işlem kimlikleri (batchId) refs olarak döner. Sonuç sorgu servisi (pushStatus) doğrulanamadığından yok: refs şimdilik izlenmez.
+  const update = async (rows) => {
+    const refs = [];
+    for (const part of chunk(rows, 200)) { const r = await call('/Products/price-and-stock', { method: 'PUT', body: { items: part } }); if (r && r.batchId) refs.push(String(r.batchId)); }
+    return { refs };
+  };
   const pushStock = (items) => update(items.map((x) => ({ stockCode: x.remoteId || x.sku, stockQuantity: Math.max(0, Math.round(num(x.stock))) })));
   const pushPrice = (items) => update(items.map((x) => ({ stockCode: x.remoteId || x.sku, listPrice: Math.max(num(x.listPrice), num(x.price)), salesPrice: num(x.price) })));
 

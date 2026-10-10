@@ -247,7 +247,7 @@ export function hepsiburada(env, meta) {
     // İlan servisi ürün adı / barkod / görsel vermez: kataloğa alınmış ürünlerin bilgisi merchantSku ile katalog servisinden eklenir
     // (eşleştirme barkodla da yapılabilsin, Eşleştirme sayfasında ürün adı görünsün). Servis cevap vermezse ilanlar olduğu gibi kalır.
     if (out.some((l) => !l.barcode || l.name === l.sku)) {
-      const info = await catalogInfo().catch(() => new Map());
+      const info = await catalogInfo().catch((e) => { if (e.budget) throw e; return new Map(); });
       for (const l of out) {
         const x = info.get(l.sku.toLowerCase());
         if (!x) continue;
@@ -273,7 +273,7 @@ export function hepsiburada(env, meta) {
       for (let pg = 0; pg < 30; pg++) {
         let r;
         try { r = await call(`${CAT}/api/products/products-by-merchant-and-status?page=${pg}&size=100&version=1&merchantId=${encodeURIComponent(m)}&productStatus=${st}`, { tries: 1 }); }
-        catch { if (!pg && st === 'MATCHED') return out; break; }
+        catch (e) { if (e.budget) throw e; if (!pg && st === 'MATCHED') return out; break; }
         const d = g(r, 'data');
         const rows = Array.isArray(d) ? d : page(d && typeof d === 'object' ? (g(d, 'content') ? { items: g(d, 'content') } : d) : r);
         for (const it of rows) {

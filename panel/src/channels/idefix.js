@@ -75,6 +75,8 @@ export function idefix(env, meta) {
       out.push(...rows);
       const pages = r && !Array.isArray(r) && r.pageCount != null ? num(r.pageCount) : null;
       if (!rows.length || (pages != null ? page >= pages : rows.length < pageSize)) break;
+      // Sayfa sınırına ulaşıldı ama devamı var: çağıran eksik okumayı bilsin
+      if (page === maxPages) { out.capped = true; break; }
       await sleep(250);
     }
     return out;
@@ -83,12 +85,15 @@ export function idefix(env, meta) {
   // Tarih biçimi: yyyy/MM/dd HH:mm:ss (Türkiye saati)
   const fmt = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 19).replace('T', ' ').replace(/-/g, '/');
 
+  // Komisyon (commissionAmount): satırın KDV dahil komisyon tutarı sayılır (adet başı / KDV hariç olduğuna dair bir alan ya da örnek yok).
+  // 0 ya da boş → bilinmiyor (null; ilan / kanal oranıyla tahmin edilir); satır tutarının %0,5–%60'ı dışındaysa güvenilmez → null.
+  const commissionOf = (it, total) => { const c = num(it.commissionAmount); return c > 0 && total > 0 && c / total >= 0.005 && c / total <= 0.6 ? Math.round(c * 100) / 100 : null; };
   function norm(s) {
     const a = s.shippingAddress || {}, st = idefixStatus(s.status);
     const items = (s.items || []).map((it) => {
       const qty = num(it.quantity, 1), total = num(it.discountedTotalPrice) || num(it.price ?? it.productPrice) * qty;
       return { lineId: str(it.id || it.orderLineId), sku: str(it.merchantSku || it.erpId), barcode: str(it.barcode), name: str(it.productName || it.title), image: str(it.image || it.productImage).replace('{size}', '300/'), quantity: qty, variantName: (it.productAttributes || []).map((a) => a.attributeValueName).filter(Boolean).join(' / '), unitPrice: qty ? total / qty : total, total,
-        status: st === 'cancelled' || st === 'returned' ? st : '', remoteKey: str(it.barcode), commission: it.commissionAmount != null ? num(it.commissionAmount) : null };
+        status: st === 'cancelled' || st === 'returned' ? st : '', remoteKey: str(it.barcode), commission: commissionOf(it, total) };
     });
     return {
       remoteId: str(s.id), orderNumber: str(s.orderNumber || s.id), orderedAt: Date.parse(s.orderDate || s.createdAt) || Date.now(), remoteStatus: str(s.status), status: st,
@@ -103,7 +108,10 @@ export function idefix(env, meta) {
 
   async function fetchOrders(since, until) {
     const rows = await paged((page, n) => `/oms/${vendor}/list?page=${page}&limit=${n}&startDate=${encodeURIComponent(fmt(since))}&endDate=${encodeURIComponent(fmt(until))}&sortByField=createAt&sortDirection=desc`, 100);
-    return rows.map(norm);
+    const out = rows.map(norm);
+    // Sayfa sınırına takıldı (yeniden eskiye sıralı: okunmayanlar aralığın en eskileri): imleç ilerlemez, uyarı düşer
+    if (rows.capped) { out.partialUntil = since; out.warnings = [`idefix: aralıktaki siparişlerin yalnız en yeni ${rows.length} tanesi okundu; daha eskiler sonraki senkronda yeniden denenir`]; }
+    return out;
   }
 
   // Tekil sevkiyat: list servisi "ids" (sevkiyat numarası) ile süzülür

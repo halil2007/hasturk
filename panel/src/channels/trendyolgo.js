@@ -91,6 +91,7 @@ export function trendyolgo(env, meta) {
       const list = r.content || [];
       out.push(...list);
       if (list.length < SIZE || page + 1 >= num(r.totalPages, Infinity)) break;
+      if (page === max - 1) out.capped = true; // sayfa sınırı: devamı okunmadı
     }
     return out;
   }
@@ -98,7 +99,10 @@ export function trendyolgo(env, meta) {
   // DOĞRULA: tarih süzgeci adları packageModificationStartDate / packageModificationEndDate (Yemek modelinde belgeli; Market'te önerilen örnek yalnız storeId + status)
   async function fetchOrders(since, until) {
     const pkgs = await pages({ storeId: store, status: ALL, packageModificationStartDate: Math.floor(since), packageModificationEndDate: Math.floor(until || Date.now()), sortDirection: 'DESC' });
-    return group(pkgs);
+    const out = group(pkgs);
+    // Sayfa sınırına takıldı (yeniden eskiye sıralı: okunmayanlar aralığın en eskileri): imleç ilerlemez, uyarı düşer
+    if (pkgs.capped) { out.partialUntil = since; out.warnings = [`Trendyol Go: aralıktaki paketlerin yalnız en yeni ${pkgs.length} tanesi okundu; eskiler sonraki senkronda yeniden denenir`]; }
+    return out;
   }
   // Güncel paket: sipariş numarasıyla (tedarik edememe sonrası yeni packageId)
   async function currentPackage(order) {

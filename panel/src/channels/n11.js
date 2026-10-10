@@ -50,7 +50,7 @@ export function n11(env, meta) {
         address: { name: str(a.fullName || p0.customerfullName), line: str(a.address), district: str(a.district), city: str(a.city), phone: str(a.gsm) },
         total: Math.round((live.length ? sumOf(live) : sumOf(list)) * 100) / 100, currency: 'TRY',
         cargoCompany: str(tracked.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),
-        shipBy: Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0)) || null,
+        shipBy: ((n) => (Number.isFinite(n) ? n : null))(Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0))),
         items,
         // Paket numarası (id) olmayan paket (konuma özel teslimat; kargosu satıcıda) panelde kanal paketi olarak tutulmaz
         packages: list.filter((p) => pst(p) !== 'cancelled' && p.id != null && p.id !== '').map((p) => ({
@@ -66,15 +66,19 @@ export function n11(env, meta) {
   // tarihine göre sorguda yalnız değişen paket gelir ve diğer paketlerin satırları siparişten düşerdi. Aralık en fazla 15 gün, sayfa en çok 100.
   async function fetchOrders(since, until) {
     const W = 15 * 864e5 - 60e3, pkgs = [];
+    let cut = null;
     for (let to = until; to > since; to -= W) {
       const from = Math.max(since, to - W);
       for (let page = 0; page < 50; page++) {
         const r = await call(`/rest/delivery/v1/shipmentPackages?startDate=${from}&endDate=${to}&page=${page}&size=100`);
         pkgs.push(...(r.content || []));
         if (page + 1 >= (r.totalPages || 1)) break;
+        if (page === 49) cut = from; // sayfa sınırı (5.000 paket): dilimin kalanı okunmadı
       }
     }
-    return group(pkgs);
+    const out = group(pkgs);
+    if (cut != null) { out.partialUntil = cut; out.warnings = ['N11: bir tarih aralığında 5.000 paketten fazlası var; kalan paketler sonraki senkronda okunur']; }
+    return out;
   }
 
   async function fetchListings() {
@@ -116,24 +120,35 @@ export function n11(env, meta) {
   }
 
   // ---------- müşteri soruları (ürün soru-cevap, SOAP: api.n11.com/ws/productService) ----------
-  // Liste servisi dakikada bir kez çağrılabilir: her senkronda açık (cevap bekleyen) sorular tek sayfada (100) alınır.
+  // Liste servisi dakikada bir kez çağrılabilir: her senkronda aralıktaki sorular tek sayfada (100) alınır. Durum süzgeci boş gönderilir
+  // (tüm sorular): yalnız açık (OPEN) sorular istenince n11 panelinden cevaplanan soru panelde hep "cevap bekliyor" kalıyordu.
+  // Boş süzgeç reddedilirse (SOAP hatası) bu bağlantıda yalnız açık sorulara dönülür.
   const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const tag = (x, t) => { const m = new RegExp(`<(?:\\w+:)?${t}>([\\s\\S]*?)</(?:\\w+:)?${t}>`).exec(x); return m ? m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim() : ''; };
   const tags = (x, t) => [...x.matchAll(new RegExp(`<(?:\\w+:)?${t}>([\\s\\S]*?)</(?:\\w+:)?${t}>`, 'g'))].map((m) => m[1]);
   async function soap(op, inner, svc = 'productService') {
     const body = `<?xml version="1.0" encoding="utf-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sch="http://www.n11.com/ws/schemas"><soapenv:Header/><soapenv:Body>`
       + `<sch:${op}Request><auth><appKey>${esc(key)}</appKey><appSecret>${esc(secret)}</appSecret></auth>${inner}</sch:${op}Request></soapenv:Body></soapenv:Envelope>`;
-    const res = await fetch(`${BASE}/ws/${svc}/`, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: op }, body });
-    const x = await res.text();
+    // util http(): zaman aşımı ve senkron istek bütçesi; SOAP hatası (HTTP 500 + faultstring) okunur. Yeniden denenmez
+    // (soru listesi dakikada bir çağrılabilir; cevap gönderimi iki kez gitmesin).
+    let x;
+    try { x = String(await http(`${BASE}/ws/${svc}/`, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: op }, body, tries: 1 })); } catch (e) {
+      if (e.budget || !e.status) throw e;
+      throw new Error(`N11 ${op}: HTTP ${e.status} ${tag(e.message, 'faultstring') || e.message.replace(/^.*?HTTP \d+\s*/, '').slice(0, 200)}`);
+    }
     const fault = tag(x, 'faultstring');
-    if (!res.ok || fault) throw new Error(`N11 ${op}: HTTP ${res.status} ${fault || x.slice(0, 200)}`);
+    if (fault) throw new Error(`N11 ${op}: ${fault}`);
     if (/^failure$/i.test(tag(tag(x, 'result') || x, 'status'))) throw new Error(`N11 ${op}: ${tag(x, 'errorMessage') || 'başarısız'}`);
     return x;
   }
   const dmy = (ms) => { const d = new Date(ms + 3 * 3600e3); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
+  let qOpenOnly = false;
   async function questions({ since, until = Date.now(), page = 0 }) {
     if (page > 0) return { items: [], hasNext: false };
-    const x = await soap('GetProductQuestionList', `<productQuestionSearch><productId></productId><buyerEmail></buyerEmail><subject></subject><status>OPEN</status><startDate>${dmy(since)}</startDate><endDate>${dmy(until)}</endDate></productQuestionSearch><pagingData><currentPage>0</currentPage><pageSize>100</pageSize></pagingData>`);
+    const ask = (st) => soap('GetProductQuestionList', `<productQuestionSearch><productId></productId><buyerEmail></buyerEmail><subject></subject><status>${st}</status><startDate>${dmy(since)}</startDate><endDate>${dmy(until)}</endDate></productQuestionSearch><pagingData><currentPage>0</currentPage><pageSize>100</pageSize></pagingData>`);
+    let x;
+    if (qOpenOnly) x = await ask('OPEN');
+    else try { x = await ask(''); } catch (e) { if (e.budget || /bağlantı hatası|HTTP 429/.test(e.message)) throw e; qOpenOnly = true; x = await ask('OPEN'); }
     const items = tags(x, 'productQuestion').map((q) => ({
       remoteId: tag(q, 'id'), text: [tag(q, 'questionSubject'), tag(q, 'question')].filter(Boolean).join(' — '), status: tag(q, 'answer') ? 'answered' : 'waiting', remoteStatus: tag(q, 'answer') ? 'CLOSED' : 'OPEN',
       productName: tag(q, 'productTitle'), sku: tag(q, 'productId'), answer: tag(q, 'answer') || null,

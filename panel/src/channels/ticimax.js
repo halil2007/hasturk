@@ -104,6 +104,8 @@ export function ticimax(env, meta = {}) {
     return {
       remoteId: txt(o, 'ID'), orderNumber: txt(o, 'SiparisNo') || txt(o, 'ID'), orderedAt: tmxParse(txt(o, 'SiparisTarihi')) || Date.now(),
       remoteStatus: TICIMAX_STATES[d] || String(d), status: ticimaxStatus(d), awaitingPayment: d === 3,
+      // Kapıda ödeme: ödeme satırının tip adı (DOĞRULA: WebSiparis.Odemeler / WebSiparisOdeme.OdemeTipi(Tanim) alan adları ve "Kapıda Ödeme" metni)
+      cod: kids(kid(o, 'Odemeler'), 'WebSiparisOdeme').some((p) => /kap[ıi]da/i.test(txt(p, 'OdemeTipiTanim') || txt(p, 'OdemeTipAdi') || txt(p, 'OdemeTipi'))) || /kap[ıi]da/i.test(txt(o, 'OdemeTipi')) || undefined,
       customer, phone: txt(adr, 'AliciTelefon'), email: txt(o, 'Mail'), customerId: num(txt(o, 'UyeID')) > 0 ? txt(o, 'UyeID') : '',
       address: { name: name || customer, line: [txt(adr, 'Mahalle'), txt(adr, 'Adres')].filter(Boolean).join(' '), district: txt(adr, 'Ilce'), city: txt(adr, 'Il'), phone: txt(adr, 'AliciTelefon') },
       // DOĞRULA: SiparisToplamTutari ödenecek genel toplam (kargo ve indirimler dahil) kabul edildi
@@ -113,20 +115,20 @@ export function ticimax(env, meta = {}) {
     };
   }
 
-  // Siparişler 100'er; 50 sayfa (5000 sipariş) sınırına gelinirse kalanlar son okunan siparişin düzenlenme zamanından itibaren sonraki senkronda
+  // Siparişler 100'er; 50 sayfa (5000 sipariş) sınırına gelinirse kalanlar sonraki senkronda. Sıra sipariş numarasına (ID) göredir, düzenlenme
+  // zamanına göre değil: okunmayan siparişlerin düzenlenme zamanı aralığın herhangi bir yerinde olabilir → imleç aralığın başında kalır
+  // (önceden son okunan satırın düzenlenme zamanından devam ediliyor, arada kalan siparişler atlanabiliyordu)
   const PAGE = 100, MAXP = 50;
   async function fetchOrders(since, until, { byOrdered = false } = {}) {
     const out = [], range = byOrdered ? { sipBas: tmxDate(since), sipSon: tmxDate(until) } : { duzBas: tmxDate(since), duzSon: tmxDate(until) };
-    let last = null;
     for (let page = 0; page < MAXP; page++) {
       const tree = await call('SiparisServis', 'SelectSiparis', filtre(range) + sayfa(page * PAGE, PAGE));
       const list = kids(find(tree, 'SelectSiparisResult'), 'WebSiparis');
       for (const o of list) if (!SKIP.has(num(txt(o, 'Durum'), 1))) out.push(norm(o));
       if (list.length < PAGE) return out;
-      last = list[list.length - 1];
     }
     out.warnings = [`Ticimax: bu aralıkta ${MAXP * PAGE}+ sipariş var; kalanlar bir sonraki senkronda alınacak`];
-    if (!byOrdered) { const t = last && tmxParse(txt(last, 'DuzenlemeTarihi')); out.partialUntil = t ? Math.max(since, t) : since; }
+    if (!byOrdered) out.partialUntil = since;
     return out;
   }
   async function getOrder(id) {
@@ -169,26 +171,65 @@ export function ticimax(env, meta = {}) {
     return out;
   }
 
-  // Stok: StokAdediGuncelle (varyasyon ID + StokAdedi yeterli), 100'erli
+  // Yanıttaki hata: IsError / ErrorMessage (ya da hata metni). Satır satır sonuç (ID + IsError) varsa ilana, yoksa tüm parçaya yazılır.
+  // Dönüş: { all: mesaj } | Map(ID → mesaj) | null
+  function resultErrors(res) {
+    if (!res || res.nil) return null;
+    const rowErr = (n) => (txt(n, 'IsError') === 'true' ? txt(n, 'ErrorMessage') || txt(n, 'Message') || `hata kodu ${txt(n, 'ErrorCode') || '?'}` : '');
+    const rows = new Map();
+    const walk = (n) => { for (const x of n.c) { const id = txt(x, 'VaryasyonID') || txt(x, 'ID'), e = rowErr(x); if (id && e) rows.set(id, e); walk(x); } };
+    walk(res);
+    if (rows.size) return rows;
+    const top = rowErr(res);
+    if (top) return { all: top };
+    const t = res.c.length ? '' : res.t.trim();
+    return /hata|error|başarısız|basarisiz|yetki/i.test(t) ? { all: t } : null;
+  }
+  // Ağ / yetki hatası (SOAP hata metni değil): hiçbir ilan gönderilemediyse atılır
+  const netErr = (e) => e.budget || /bağlantı hatası|HTTP (40[13]|404|5\d\d)\b/.test(e.message || '');
+  const bad = (out, part) => out.errors.push(...part.filter((x) => !(num(x.remoteId) > 0)).map((x) => ({ remoteId: x.remoteId, error: 'Ticimax: geçersiz varyasyon numarası' })));
+  // Stok: StokAdediGuncelle (varyasyon ID + StokAdedi yeterli), 100'erli. Sonuç ilan ilan: { done, errors } (yanıt da denetlenir)
   async function pushStock(items) {
+    const out = { done: [], errors: [] };
+    bad(out, items);
     for (const part of chunk(items.filter((x) => num(x.remoteId) > 0), 100)) {
       const list = part.map((x) => `<dc:Varyasyon>${dc([['ID', num(x.remoteId)], ['StokAdedi', Math.max(0, Math.round(num(x.stock)))]])}</dc:Varyasyon>`).join('');
-      await call('UrunServis', 'StokAdediGuncelle', param('urunler', list));
+      let errs;
+      try { errs = resultErrors(find(await call('UrunServis', 'StokAdediGuncelle', param('urunler', list)), 'StokAdediGuncelleResult')); } catch (e) {
+        if (e.budget || (netErr(e) && !out.done.length)) throw e;
+        errs = { all: e.message };
+      }
+      for (const x of part) {
+        const m = errs && (errs.all || (errs instanceof Map && errs.get(String(num(x.remoteId)))));
+        if (m) out.errors.push({ remoteId: x.remoteId, error: 'Ticimax: ' + String(m).replace(/^Ticimax: /, '') }); else out.done.push(x.remoteId);
+      }
     }
+    return out;
   }
   // Fiyat: liste fiyatı SatisFiyati, satış fiyatı düşükse IndirimliFiyati (değilse 0 → indirim kalkar); fiyatlar KDV dahil yazılır.
   // VaryasyonAyar'da yalnız işaretlenen alanlar yazılır (işaretsiz = false = dokunulmaz).
+  // Sonuç ilan ilan: { done, errors }; hiçbiri gönderilemeden ağ / yetki hatası olduysa atılır
   async function pushPrice(items) {
-    const errs = [];
+    const out = { done: [], errors: [] };
+    let global = null;
+    bad(out, items);
     await pool(items.filter((x) => num(x.remoteId) > 0), 4, async (x) => {
       const price = r2(num(x.price)), list = r2(Math.max(num(x.listPrice), price));
       try {
-        await call('UrunServis', 'VaryasyonGuncelle',
+        const tree = await call('UrunServis', 'VaryasyonGuncelle',
           param('urun', dc([['ID', num(x.remoteId)], ['IndirimliFiyati', price < list ? price : 0], ['KdvDahil', true], ['SatisFiyati', list]]))
           + param('ayar', dc([['IndirimliFiyatiGuncelle', true], ['KdvDahilGuncelle', true], ['SatisFiyatiGuncelle', true]])));
-      } catch (e) { errs.push(`${x.remoteId}: ${e.message}`); }
+        const errs = resultErrors(find(tree, 'VaryasyonGuncelleResult'));
+        const m = errs && (errs.all || [...errs.values()][0]);
+        if (m) out.errors.push({ remoteId: x.remoteId, error: 'Ticimax: ' + m }); else out.done.push(x.remoteId);
+      } catch (e) {
+        if (e.budget) throw e;
+        if (netErr(e)) global = global || e;
+        out.errors.push({ remoteId: x.remoteId, error: 'Ticimax: ' + String(e.message).replace(/^Ticimax: /, '') });
+      }
     });
-    if (errs.length) throw new Error(`Ticimax: ${errs.length} fiyat güncellenemedi (${errs.slice(0, 3).join('; ')})`);
+    if (global && !out.done.length) throw global;
+    return out;
   }
 
   // Kargoya ver: siparişin son açık paketiyse durum KargoyaVerildi + takip no / bağlantısı (müşteriye e-posta)
