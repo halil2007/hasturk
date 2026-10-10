@@ -1,6 +1,6 @@
 // Genel Bakış: dönem seçimi, kanal bağlantıları, KPI'lar (eğilim çizgili), satış performansı (önceki dönemle),
 // kanal dağılımı, son siparişler + seçili siparişin işlemleri, en çok satanlar, ortak stok, hızlı kâr hesabı.
-import { api, state, html, raw, render, $, $$, money, money0, compact, n, pct, delta, ago, ch, chLogo, chBadge, chColor, chState, statusPill, thumb, actions, toast, dayKey, store, numIn, rangeLabel, activeChannels, sheet, busy } from '../core.js';
+import { api, state, html, raw, render, $, $$, money, money0, compact, n, delta, ago, ch, chLogo, chBadge, chColor, chState, statusPill, thumb, actions, toast, dayKey, store, numIn, rangeLabel, activeChannels, sheet, busy } from '../core.js';
 import { lineChart, sparkline } from '../chart.js';
 import { profit } from '../profit.js';
 import { mountOps } from './orderops.js';
@@ -37,7 +37,7 @@ export async function dashboard(el) {
   function kpi(lab, cur, prev, fmt, spark, opts = {}) {
     const dl = delta(cur, prev), cls = dl == null || dl === 0 ? 'flat' : dl > 0 ? 'up' : 'down';
     return html`<div class="kpi"><div class="label">${lab}</div><div class="value num">${fmt(cur)}</div>
-      <div class="delta ${cls}">${dl == null ? '' : dl > 0 ? '▲' : dl < 0 ? '▼' : ''} ${pct(dl)} <span class="muted" style="font-weight:500">önceki ${fmt(prev)}</span></div>
+      <div class="delta ${cls}">${dl == null ? '' : dl > 0 ? '▲' : dl < 0 ? '▼' : ''} ${dl == null ? '—' : `%${n(Math.abs(dl))}`} <span class="muted" style="font-weight:500">önceki ${fmt(prev)}</span></div>
       ${opts.warn ? html`<a class="kpi-warn" href="#/urunler?f=nocost" title="Alış fiyatı girilmemiş ürünlerde kâr maliyetsiz hesaplanır; gerçek kâr daha düşüktür">⚠ ${opts.warn} satırda alış fiyatı yok · kâr olduğundan yüksek görünür</a>` : raw(sparkline(spark, opts.color))}</div>`;
   }
 

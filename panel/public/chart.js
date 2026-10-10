@@ -4,10 +4,12 @@ import { esc } from './core.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
-function niceMax(v) {
-  if (v <= 0) return 1;
-  const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p;
-  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+// Eksen üst sınırı: 4 eşit aralık, aralık 1, 2, 3, 5 × 10ⁿ (en az 1). Küçük değerlerde aynı eksen yazısı tekrarlanmaz.
+function axisMax(v) {
+  const raw = Math.max(v, 0) / 4;
+  if (raw <= 1) return 4;
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 3 ? 3 : m <= 5 ? 5 : 10) * p * 4;
 }
 const topRounded = (x, y, w, h, r) => {
   r = Math.min(r, w / 2, h);
@@ -32,7 +34,7 @@ export function columnChart(el, opts) {
     const padL = 44, padR = 8, padT = 10, padB = 26;
     const n = labels.length, cw = (W - padL - padR) / Math.max(1, n);
     const totals = labels.map((_, i) => series.reduce((s, x) => s + Math.max(0, x.values[i] || 0), 0));
-    const max = niceMax(Math.max(...totals, ...(compare ? compare.values : [0]), 0));
+    const max = axisMax(Math.max(...totals, ...(compare ? compare.values : [0]), 0));
     const y = (v) => padT + (H - padT - padB) * (1 - v / max);
     const bw = Math.max(3, Math.min(24, cw * 0.62));
     let s = `<svg xmlns="${NS}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(opts.title || 'Grafik')}">`;
@@ -112,7 +114,7 @@ export function lineChart(el, { labels, titles = labels, current, previous = nul
     const W = Math.max(280, el.clientWidth || 600), H = height || (W < 560 ? 200 : 250);
     const padL = 50, padR = 12, padT = 12, padB = 26;
     const n = labels.length;
-    const max = niceMax(Math.max(0, ...current, ...(previous || [])));
+    const max = axisMax(Math.max(0, ...current, ...(previous || [])));
     const x = (i) => padL + (n <= 1 ? (W - padL - padR) / 2 : ((W - padL - padR) * i) / (n - 1));
     const y = (v) => padT + (H - padT - padB) * (1 - (v || 0) / max);
     const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');

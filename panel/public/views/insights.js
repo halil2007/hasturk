@@ -1,7 +1,7 @@
 // Analizler: özet rapor (son 4 gün / hafta / ay kartları, haftalık rapor, illere göre gönderim, en çok satanlar)
 // ve ayrıntılı grafik sekmesi. Tüm bölümler toplam ya da tek bir satış kanalı için görülebilir.
 import { turkeyMap } from './trmap.js';
-import { api, html, render, $, money, money0, n, pct, delta, ch, chLogo, chColor, thumb, store, toast, actions, date, isMobile, activeChannels } from '../core.js';
+import { api, html, render, $, money, money0, n, delta, ch, chLogo, chColor, thumb, store, toast, actions, date, isMobile, activeChannels } from '../core.js';
 import { setQuery } from '../app.js';
 import { statsView } from './stats.js';
 
@@ -14,7 +14,7 @@ const cardTitle = (u, i) => ({
   year: ['Bu yıl', 'Geçen yıl', '2 yıl önce', '3 yıl önce'],
 }[u][i]);
 const dlabel = (ms, u) => (u === 'month' ? new Date(ms + 3 * 3600e3 + 864e5).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) : u === 'year' ? String(new Date(ms + 3 * 3600e3 + 864e5).getUTCFullYear()) : date(ms));
-const chg = (cur, prev) => { const d = delta(cur, prev); return d == null || d === 0 ? html`<span class="delta flat">—</span>` : html`<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${pct(d)}</span>`; };
+const chg = (cur, prev) => { const d = delta(cur, prev); return d == null || d === 0 ? html`<span class="delta flat">—</span>` : html`<span class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} %${n(Math.abs(d))}</span>`; };
 
 export async function insightsView(el, rest, query = {}) {
   if (query.tab === 'grafik') return tabbed(el, 'grafik', async (box) => statsView(box));

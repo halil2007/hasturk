@@ -50,8 +50,20 @@ export function trendyol(env, meta) {
   // Satıcı geliri: brüt fiyat − satıcı indirimi. Trendyol'un karşıladığı indirim (lineTyDiscount / packageTyDiscount) satıcıya ödenir;
   // lineUnitPrice / packageTotalPrice müşterinin ödediği net tutardır (TY indirimi de düşülmüş). Alanlar yoksa eskisi gibi net tutar.
   // Dokümandaki örneklerde lineGrossAmount ve lineSellerDiscount adet başıdır (2 adet: 350 brüt, 35 indirim → birim 315).
-  const unitOf = (l) => (l.lineGrossAmount != null ? r2(num(l.lineGrossAmount) - num(l.lineSellerDiscount) + num(l.lineSgrFee)) : num(l.lineUnitPrice ?? l.price ?? l.amount));
-  const pkgTotalOf = (p) => (p.packageGrossAmount != null ? num(p.packageGrossAmount) - num(p.packageSellerDiscount) + num(p.totalSgrFee) : num(p.packageTotalPrice ?? p.totalPrice ?? p.grossAmount));
+  // Güvenlik: brüt − satıcı indirimi, müşterinin ödediği net + Trendyol indirimini aşamaz (alanlar adet başı değil satır toplamıysa
+  // ciro adet kadar katlanırdı): aşıyorsa net tutar kullanılır
+  const unitOf = (l) => {
+    const net = num(l.lineUnitPrice ?? l.price ?? l.amount);
+    if (l.lineGrossAmount == null) return net;
+    const u = r2(num(l.lineGrossAmount) - num(l.lineSellerDiscount) + num(l.lineSgrFee));
+    return net > 0 && (u > net + num(l.lineTyDiscount) + num(l.lineSgrFee) + 0.05 || u < net - 0.05) ? net : u;
+  };
+  const pkgTotalOf = (p) => {
+    const net = num(p.packageTotalPrice ?? p.totalPrice ?? p.grossAmount);
+    if (p.packageGrossAmount == null) return net;
+    const v = num(p.packageGrossAmount) - num(p.packageSellerDiscount) + num(p.totalSgrFee);
+    return net > 0 && (v > net + num(p.packageTyDiscount) + num(p.totalSgrFee) + 0.05 || v < net - 0.05) ? net : v;
+  };
   const comm = (total, rate) => r2(total * rate / 100 * 1.2);
 
   // Trendyol her paketi ayrı kayıt olarak verir; aynı sipariş numarasındaki paketler tek siparişte toplanır.

@@ -152,8 +152,8 @@ export const n = (v) => nf.format(Number(v) || 0);
 export function compact(v) {
   v = Number(v) || 0;
   const a = Math.abs(v);
-  if (a >= 1e6) return nf.format(v / 1e6) + ' Mn';
-  if (a >= 1e4) return nf.format(v / 1e3) + ' B';
+  if (a >= 1e6) return nf.format(v / 1e6) + ' mn';
+  if (a >= 1e4) return nf.format(v / 1e3) + ' bin';
   return nf.format(Math.round(v));
 }
 export const pct = (v) => (v == null || !Number.isFinite(v) ? '—' : `${v > 0 ? '+' : ''}%${nf.format(v)}`);
