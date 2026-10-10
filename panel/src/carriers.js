@@ -23,6 +23,9 @@ import * as surat from './carriers/surat.js';
 import * as ups from './carriers/ups.js';
 import * as yurtici from './carriers/yurtici.js';
 import * as aras from './carriers/aras.js';
+import * as kolaygelsin from './carriers/kolaygelsin.js';
+import * as sendeo from './carriers/sendeo.js';
+import * as dhlexpress from './carriers/dhlexpress.js';
 
 export const CARRIERS = {
   kargonomi: {
@@ -51,9 +54,15 @@ export const CARRIERS = {
     about: 'Aras Kargo web servisiyle gönderi, Aras etiketi (barkod yetkili hesaplarda) ve takip.', howto: 'Aras Kargo şubenizden ya da entegrasyon ekibinden (entegrasyonekibi@araskargo.com.tr) sevkiyat entegrasyonu kullanıcı adı ve şifresi isteyin. Kargo durumu takibi için esasweb.araskargo.com.tr → Tanımlamalar → Entegrasyon → XML Servisleri bölümünden kullanıcı oluşturup müşteri kodunuzla girin.' },
   ups: { id: 'ups', kind: 'direct', name: 'UPS Kargo', site: 'https://www.ups.com.tr', ready: true, color: '#351c15',
     about: 'UPS Türkiye web servisiyle yurt içi gönderi, etiket ve takip.', howto: 'UPS Türkiye satış temsilcinizden müşteri numarası ve web servis kullanıcı adı / şifresi isteyin (takip için ayrı kullanıcı verildiyse onu da girin).' },
+  kolaygelsin: { id: 'kolaygelsin', kind: 'direct', beta: true, name: "Kolay Gelsin", site: "https://www.kolaygelsin.com", ready: true, color: "#00a651",
+    about: "Kolay Gelsin entegrasyon servisiyle kendi anlaşmanızla gönderi ve takip: etiketi panel basar (Kolay Gelsin müşteri barkoduyla taşır), takip numarası Kolay Gelsin gönderi numarasıdır. (Test aşamasında)", howto: "Kolay Gelsin kurumsal satış ekibinden entegrasyon token'ı, müşteri numaranız (CustomerId) ve gönderen adres numaranızı (AddressId) isteyin. Takip durumlarının dönmesi için Kolay Gelsin panelinde \"Webhook Ayarlar\" sekmesinden izlemek istediğiniz gönderi durumlarını seçin." },
+  sendeo: { id: 'sendeo', kind: 'direct', beta: true, name: "Sendeo", site: "https://www.sendeo.com.tr", ready: true, color: "#00b140",
+    about: "Sendeo web servisiyle kendi anlaşmanızla gönderi (iş emri), Sendeo etiketi (ZPL) ve takip. (Test aşamasında)", howto: "Sendeo Kurumsal Satış ekibinden canlı ortam web servis müşteri adı ve şifresini isteyin (entegrasyon testleri ortak test hesabıyla yapılır). Gönderen il / ilçesi Ayarlar → Kargo etiketi → Gönderen'deki “İlçe / il” alanından okunur." },
+  dhlexpress: { id: 'dhlexpress', kind: 'direct', beta: true, name: "DHL Express", site: "https://www.dhl.com/tr-tr/home/express.html", ready: true, color: "#ffcc00",
+    about: "DHL Express Türkiye (MyDHL API) ile yurt içi ekspres gönderi, PDF etiket ve takip; gönderiler DHL Express hesabınıza faturalanır. (Test aşamasında)", howto: "developer.dhl.com'da hesap açıp \"MyDHL API (DHL Express)\" için uygulama oluşturun; API Key / Secret test için hemen, canlı erişim DHL Express Türkiye satış temsilcinizin onayıyla verilir. DHL Express gönderen (shipper) hesap numaranızı girin. Kurye çağırma bu bağlantıda yok: gönderiyi şubeye verin ya da düzenli alım anlaşmanızı kullanın." },
 };
 // Firma bağlantıları (make(values, { db }) → { test, create, cancel, track, label })
-const MODULES = { kargonomi, navlungo, hepsijet, dhl, ptt, surat, ups, yurtici, aras };
+const MODULES = { kargonomi, navlungo, hepsijet, dhl, ptt, surat, ups, yurtici, aras, kolaygelsin, sendeo, dhlexpress };
 export const CARRIER_IDS = Object.keys(CARRIERS);
 export const isCarrierId = (id) => CARRIER_IDS.includes(id) || id === 'demo';
 

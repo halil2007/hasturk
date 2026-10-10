@@ -20,20 +20,31 @@ const HELP = {
   shopify: 'Shopify yönetimde yeni özel uygulama oluşturmayı kapattı; uygulama Dev Dashboard\'dan açılır: dev.shopify.com → Dev Dashboard → Uygulama oluştur → kapsamlar: read_orders, read_all_orders, write_products, write_inventory, read_locations, write_merchant_managed_fulfillment_orders, write_fulfillments → uygulamayı mağazanıza kurun → Ayarlar\'daki Client ID ve Client secret\'ı girin (panel 24 saatlik erişim belirtecini kendisi yeniler). Eski shpat_… belirteciniz varsa Gelişmiş ayarlar\'a girebilirsiniz.',
   woocommerce: 'WordPress yönetimi → WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (İzin: Okuma/Yazma). Site HTTPS olmalı; kalıcı bağlantılar "Yazı adı" gibi açık olmalı.',
   opencart: 'OpenCart\'ın hazır bir yönetim API\'si olmadığından bağlantı küçük bir PHP dosyasıyla kurulur: Bağlantı dosyasını indirin, OpenCart\'ın kurulu olduğu ana klasöre (config.php\'nin yanına) yükleyin, site adresini girip bağlantıyı test edin. Dosya veritabanına OpenCart\'ın kendi bilgileriyle bağlanır, yalnız panelin anahtarıyla çalışır. Siparişler, ürünler (seçenekler ayrı varyant), stok, fiyat ve kargo bildirimi desteklenir. Site HTTPS olmalı.',
+  teknosa: "Teknosa satıcı paneline (Mirakl, https://teknosatr-prod.mirakl.net) girin → sağ üst kullanıcı menüsü → API Anahtarı (API Key sekmesi) → anahtarı oluşturup kopyalayın. Birden çok mağazanız varsa Mağaza ID'yi de girin.",
+  boyner: "Boyner satıcı paneline (merchant.boyner.com.tr) girin → sağ üstte mağaza adı → Hesabım → Entegrasyon Bilgileri. Ekrandaki Satıcı ID, API Key ve API Secret değerlerini kopyalayın. Ekran yoksa Boyner satıcı destek / entegrasyon ekibinden isteyin.",
+  pasaj: "API özelliği varsayılan kapalıdır: önce Pasaj danışmanınızdan API erişimini ve entegrasyon belgesini (servis adresi) isteyin. Sonra https://pasaj.turkcell.com.tr/seller-admin adresine girin → sağ üstte kullanıcı adınız → Entegrasyon Bilgileri → \"Yeni Oluştur\". Ekranda Satıcı ID, API Key ve API Secret oluşur.",
+  trendyolgo: "Trendyol Go by Uber Eats satıcı paneline (partner.tgomarket.com) girin → sağ üstte mağaza adınız → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key ve API Secret. Anahtarlar tüm şubelerde aynıdır; şube ID'lerini (storeId) kategori sorumlunuzdan alın (bağlantı testi şube listesini de gösterir). Test ortamı için 0850 258 58 00'dan IP yetkilendirmesi istenir.",
+  getir: "GetirÇarşı API anahtarları satıcı panelinden alınmaz: getircarsiapi@getir.com adresine (ya da Getir temsilcinize) mağaza adı ve mağaza ID'si ile API erişimi talep edin; Getir uygulama anahtarı (appSecretKey) ve mağaza anahtarını (shopSecretKey), gerekirse API adresiyle birlikte iletir. Test ortamı anahtarları da Getir'den gelir.",
+  yemeksepeti: "Yemeksepeti Partner Portal'a girin → Mağaza Entegrasyonları (Shop Integrations) eklentisi → Partner API için client_id ve client_secret oluşturun; zincir (chain) ve mağaza (vendor) kimliği aynı ekranda ya da hesap yöneticinizden alınır. Tek anahtar zincirdeki tüm mağazalarda geçer.",
+  ebay: "developer.ebay.com'da ücretsiz geliştirici hesabı açın → Application Keys sayfasında Production anahtar seti oluşturun (App ID + Cert ID). Aynı sayfadaki User Tokens bölümünde \"Get a Token from eBay via Your Application\" ile bir RuName (yönlendirme adı) tanımlayıp eBay satıcı hesabınızla oturum açın ve izin verin; OAuth bölümünde görünen refresh token'ı (v^1.1#…) kopyalayın. Kapsamlarda sell.fulfillment ve sell.inventory seçili olmalı. Ürünlerin panelde görünmesi için ilanların Inventory API ile oluşturulmuş ya da Seller Hub'dan Inventory API'ye taşınmış (bulk_migrate_listing) olması gerekir.",
+  ozon: "seller.ozon.ru satıcı panelinde Ayarlar (Настройки) → Seller API sayfasında Client ID görünür; \"Anahtar oluştur\" ile Admin rolünde bir API anahtarı oluşturup kopyalayın (anahtar yalnız bir kez gösterilir). Birden fazla FBS deposunuz varsa stokların yazılacağı deponun numarasını (Logistics → Depolar) gelişmiş alana girin.",
+  ticimax: "Ticimax yönetim paneline girin → Ayarlar → WS Yetki Kodu Yönetimi → Yeni kod oluşturun. Yetki tablosunda Sipariş Servisi (SelectSiparis, SetSiparisDurum) ve Ürün Servisi (SelectUrun, StokAdediGuncelle, VaryasyonGuncelle) metotlarını işaretleyip kaydedin. Kodu ve mağazanın alan adını panele girin. Not: Ticimax yetkisiz / yanlış kodda hata vermez, boş liste döner; tanılama bunu ayrıca uyarır.",
+  ideasoft: "IdeaSoft yönetim paneli → Entegrasyonlar → API → Ekle: uygulamaya ad ve yönlendirme adresi (Redirect URI, ör. https://www.getpostman.com/oauth2/callback) verin, sipariş okuma/güncelleme ve ürün güncelleme izinlerini seçin; Client ID ve Client Secret üretilir. Ardından https://MAGAZA/panel/auth?client_id=…&response_type=code&state=…&redirect_uri=… adresinde izin verin, dönen code'u 30 saniye içinde POST https://MAGAZA/oauth/v2/token (grant_type=authorization_code, client_id, client_secret, code, redirect_uri) ile token'a çevirin (Postman'in OAuth 2.0 ekranı bunu otomatik yapar). Yanıttaki refresh_token'ı panele girin.",
+  tsoft: "T-Soft yönetim paneline girin → Ayarlar → Kullanıcı Yönetimi → Web Servis Kullanıcıları → Yeni kullanıcı. Sipariş (order2), ürün (product) ve alt ürün (subProduct) metotlarına yetki verin; isterseniz IP kısıtı ekleyin ve 'Sınırlı Hesap' işaretleyin (panel girişi kapanır, yalnız API). Kullanıcı adı ve şifreyi panele girin. Bilgileri https://MAGAZA/rest1/console adresinde (ya da kullanıcı listesindeki Console Giriş butonuyla) deneyebilirsiniz.",
   etsy: 'etsy.com/developers → Create a New App (keystring + shared secret); uygulamayı mağazanız için OAuth ile yetkilendirip refresh token alın. Siparişler, stok, fiyat ve kargo bildirimi desteklenir; panel yenilenen belirteci kendisi saklar.',
 };
 // Test aşamasındaki kanallar: ana ve müşteri panellerinde eklenip kullanılır, "Test aşamasında" etiketiyle görünür. Ana panelde kanal
 // sayfasındaki "Test yazısını kaldır" düğmesiyle etiketi kalkan tür listeden çıkar (liste sunucudan gelir: integrations → beta)
-const ALL_BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy'];
+const ALL_BETA = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon', 'ticimax', 'ideasoft', 'tsoft'];
 let BETA = ALL_BETA;
 
 // Sıra: kanal türü (ikas, Hepsiburada, Trendyol, ...), aynı türde önce ana mağaza sonra eklenenler
 const TYPES = ['ikas', 'hepsiburada', 'trendyol', 'pttavm', 'n11', 'idefix', 'pazarama', 'woocommerce', ...ALL_BETA];
-const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', etsy: 'Etsy' };
+const TYPE_NAME = { ikas: 'ikas (web sitesi)', hepsiburada: 'Hepsiburada', trendyol: 'Trendyol', pttavm: 'PttAVM', n11: 'N11', idefix: 'idefix', pazarama: 'Pazarama', amazon: 'Amazon', ciceksepeti: 'Çiçeksepeti', koctas: 'Koçtaş', shopify: 'Shopify', woocommerce: 'WooCommerce', opencart: 'OpenCart', teknosa: 'Teknosa', boyner: 'Boyner', pasaj: 'Turkcell Pasaj', trendyolgo: 'Trendyol Go', getir: 'Getir Çarşı', yemeksepeti: 'Yemeksepeti Market', ebay: 'eBay', ozon: 'Ozon', ticimax: 'Ticimax', ideasoft: 'IdeaSoft', tsoft: 'T-Soft', etsy: 'Etsy' };
 // Yakında eklenecek satış kanalları ve kargo firmaları (seçilemez, yalnız bilgi)
-const SOON = ['Teknosa', 'Turkcell Pasaj', 'Boyner', 'Trendyol Go', 'Getir', 'Yemeksepeti Market'];
-const SOON_ABROAD = ['eBay', 'Ozon'];
-const CARGO_SOON = ['Kolay Gelsin', 'Sendeo', 'DHL Express'];
+const SOON = [];
+const SOON_ABROAD = [];
+const CARGO_SOON = [];
 const rank = (c) => TYPES.indexOf(c.type) * 1000 + (c.extra ? Number(c.id.split('_')[1]) || 99 : c.id === 'ikas2' ? 2 : 1);
 const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>` : html`<span class="muted">henüz yok</span>`);
 
@@ -114,8 +125,8 @@ export async function integrations(el, rest = []) {
       ${!conn.length ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Henüz bağlı satış kanalınız yok. Satış yaptığınız kanalın kartında <b>Bağla</b>'ya basın; bilgileri girip <b>Kaydet ve bağlantıyı test et</b> deyince siparişleriniz gelmeye başlar.</div></div>` : ''}
       <div class="icards">${list.map(icard)}</div>
       ${!list.length ? html`<div class="card empty">Bu filtrede kanal yok</div>` : ''}
-      <div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>
-      <div class="row wrap small" style="gap:6px"><span class="muted">Yurt dışı pazaryerleri (yakında):</span>${SOON_ABROAD.map((t) => html`<span class="pill">${t}</span>`)}</div>
+      ${SOON.length ? html`<div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>` : ''}
+      ${SOON_ABROAD.length ? html`<div class="row wrap small" style="gap:6px"><span class="muted">Yurt dışı pazaryerleri (yakında):</span>${SOON_ABROAD.map((t) => html`<span class="pill">${t}</span>`)}</div>` : ''}
       ${carrierSection()}
       ${conn.some((c) => !c.demo) || jobs.length ? backfill() : ''}
     </div>`);
@@ -139,7 +150,7 @@ export async function integrations(el, rest = []) {
       <div class="small" style="font-weight:650">Kargo firmaları (doğrudan bağlantı)</div>
       <div class="icards">${direct.map(card)}</div>
       ${rest.length ? html`<div class="small" style="font-weight:650">Kargo entegratörleri (tek hesaptan birçok firma)</div><div class="icards">${rest.map(card)}</div>` : ''}
-      <div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${CARGO_SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>
+      ${CARGO_SOON.length ? html`<div class="row wrap small" style="gap:6px"><span class="muted">Yakında:</span>${CARGO_SOON.map((t) => html`<span class="pill">${t}</span>`)}</div>` : ''}
     </div>`;
   }
   function carrierSheet(id) {

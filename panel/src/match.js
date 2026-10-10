@@ -199,7 +199,7 @@ export function twinOf(l, idx) {
 export const markTwin = (db, pid, l) => db.prepare("UPDATE listings SET match = ? WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind('dup:' + pid, l.channel, l.remote_id);
 
 // Ana katalog: ayarda seçilen ve ilanı olan kanallar; hiçbiri yoksa öncelik sırasındaki ilk bağlı kanal
-const PRIORITY = ['ikas1', 'ikas2', 'shopify', 'woocommerce', 'opencart', 'hepsiburada', 'trendyol', 'n11', 'idefix', 'pazarama', 'pttavm', 'amazon', 'ciceksepeti', 'koctas', 'etsy'];
+const PRIORITY = ['ikas1', 'ikas2', 'shopify', 'woocommerce', 'opencart', 'ticimax', 'ideasoft', 'tsoft', 'hepsiburada', 'trendyol', 'n11', 'idefix', 'pazarama', 'pttavm', 'amazon', 'ciceksepeti', 'koctas', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon'];
 async function catalogChannels(db, wanted) {
   const have = new Set((await all(db, 'SELECT DISTINCT channel FROM listings')).map((r) => r.channel));
   const list = (wanted || []).filter((c) => have.has(c));

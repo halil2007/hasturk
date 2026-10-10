@@ -389,7 +389,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     // Entegratör gönderisi ikas'a bildirilir (paket "Kargoda", takip bilgisi müşteriye ikas'tan gider).
     const ownPkg = !!(ch && ch.caps && ch.caps.ownCarrier && pkg.agreement === 'own' && pkg.carrier_provider);
     if (ch && ch.caps && ch.caps.manualTracking === false) {
-      if (!ownPkg && (!pkg.remote_id || !(pkg.barcode || pkg.tracking))) fail(400, `${ch.name}: bu pakette ikas Kargo gönderisi yok. Önce “Paketle ve etiket al” (ya da ikas panelinde ikas Kargo ile Gönder) ya da bağlı kargo entegratörünüzle “Entegratörle gönder”; elle kargo bilgisi girilmez.`);
+      if (!ownPkg && ch.caps.courier !== 'platform' && (!pkg.remote_id || !(pkg.barcode || pkg.tracking))) fail(400, `${ch.name}: bu pakette ikas Kargo gönderisi yok. Önce “Paketle ve etiket al” (ya da ikas panelinde ikas Kargo ile Gönder) ya da bağlı kargo entegratörünüzle “Entegratörle gönder”; elle kargo bilgisi girilmez.`);
       b = { ...b, tracking: '', cargo_company: '' };
     }
     const tracking = str(b.tracking) || pkg.tracking || pkg.barcode, cargo = str(b.cargo_company) || pkg.cargo_company || o.cargo_company;

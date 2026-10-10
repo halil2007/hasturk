@@ -33,7 +33,7 @@ const DEMO_IDLE = 20 * 60e3, DEMO_STALE = 3600e3, DEMO_MAX = 24 * 3600e3;
 export const demoDue = (now, resetAt, seenAt) => now - resetAt > DEMO_MAX || (now - resetAt > DEMO_STALE && now - seenAt > DEMO_IDLE);
 // Müşteri paneline geçmeyen ortam değişkenleri: ana panelin kanal / e-posta bilgileri, şifresi, deneme modu, bağlantılar
 // (yeni kanal / kargo firması / servis eklenince buraya da ekleyin: aksi halde ana panelin bilgisi müşteri paneline geçer)
-const PRIVATE = /^(IKAS\d?_|TRENDYOL_|HB_|PTTAVM_|N11_|IDEFIX_|PAZARAMA_|MAIL_|AMAZON_|CICEKSEPETI_|KOCTAS_|SHOPIFY_|WOO_|OPENCART_|ETSY_|ARAS_|YURTICI_|PTT_|SURAT_|UPS_|DHL_|HEPSIJET_|KARGONOMI_|NAVLUNGO_|ANTHROPIC_)/;
+const PRIVATE = /^(IKAS\d?_|TRENDYOL_|HB_|PTTAVM_|N11_|IDEFIX_|PAZARAMA_|MAIL_|AMAZON_|CICEKSEPETI_|KOCTAS_|SHOPIFY_|WOO_|OPENCART_|ETSY_|ARAS_|YURTICI_|PTT_|SURAT_|UPS_|DHL_|HEPSIJET_|KARGONOMI_|NAVLUNGO_|ANTHROPIC_|TEKNOSA_|BOYNER_|PASAJ_|TRENDYOLGO_|GETIR_|YEMEKSEPETI_|EBAY_|OZON_|TICIMAX_|IDEASOFT_|TSOFT_|KOLAYGELSIN_|SENDEO_|DHLEXPRESS_)/;
 const DROP = new Set(['PANEL_PASSWORD', 'DEMO', 'DB', 'TENANT']);
 
 // Süresi dolan / askıdaki firmaya gösterilen iletişim: ana panelin firma bilgilerindeki telefon ve e-posta (Ayarlar → Firma)

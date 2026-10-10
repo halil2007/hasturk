@@ -31,22 +31,19 @@
     // Test aşamasındakiler (6. alan: paneldeki kanal türü): kullanıma açık, "test aşamasında" etiketiyle görünür
     ['Amazon', 'pazaryeri', '#232f3e', 'a', 'color:#232f3e', 'amazon'], ['Çiçeksepeti', 'pazaryeri', '#1e9e57', 'Çs', 'color:#1e9e57;font-size:19px', 'ciceksepeti'], ['Koçtaş', 'pazaryeri', '#e5541b', 'K', 'color:#e5541b', 'koctas'],
     ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S', 'color:#5e8e3e', 'shopify'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC', 'color:#23a8e0;font-size:19px', 'opencart'], ['Etsy', 'pazaryeri', '#f1641e', 'E', 'color:#f1641e', 'etsy'],
+    ["Teknosa", "pazaryeri", "#005bab", "T", "color:#005bab", "teknosa"], ["Boyner", "pazaryeri", "#000000", "B", "color:#000000", "boyner"], ["Turkcell Pasaj", "pazaryeri", "#ffc900", "P", "color:#ffc900", "pasaj"], ["Trendyol Go", "hızlı market", "#ff6000", "TG", "color:#ff6000", "trendyolgo"], ["Getir Çarşı", "hızlı market", "#5d3ebc", "G", "color:#5d3ebc", "getir"], ["Yemeksepeti Market", "hızlı market", "#fa0050", "YS", "color:#fa0050", "yemeksepeti"], ["eBay", "yurt dışı pazaryeri", "#E53238", "e", "color:#E53238", "ebay"], ["Ozon", "yurt dışı pazaryeri", "#005BFF", "O", "color:#005BFF", "ozon"], ["Ticimax", "e-ticaret sitesi", "#00A8E8", "Tx", "color:#00A8E8", "ticimax"], ["IdeaSoft", "e-ticaret sitesi", "#F26B21", "iS", "color:#F26B21", "ideasoft"], ["T-Soft", "e-ticaret sitesi", "#E30613", "T", "color:#E30613", "tsoft"],
   ];
   // Ana panelde "Test yazısını kaldır" denince tür bu listeden çıkar (panel → /api/public/channels → beta); panel yanıt vermezse etiketler kalır
-  let TEST = new Set(['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy']);
-  const SOON = [
-    ['Teknosa', 'pazaryeri', '#0057a8', 'Tk'], ['Turkcell Pasaj', 'pazaryeri', '#ffc900', 'P'], ['Boyner', 'pazaryeri', '#111827', 'B'],
-    ['Trendyol Go', 'hızlı market', '#f27a1a', 'Go'], ['Getir', 'hızlı market', '#5d3ebc', 'G'], ['Yemeksepeti Market', 'hızlı market', '#ea004b', 'Ys'],
-    ['eBay', 'yurt dışı pazaryeri', '#0064d2', 'eb'], ['Ozon', 'yurt dışı pazaryeri', '#005bff', 'Oz'],
-    ['Ticimax', 'e-ticaret sitesi', '#0b5cff', 'Tx'], ['IdeaSoft', 'e-ticaret sitesi', '#00a3e0', 'iS'], ['T-Soft', 'e-ticaret sitesi', '#e30613', 'TS'],
-  ];
+  let TEST = new Set(['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon', 'ticimax', 'ideasoft', 'tsoft']);
+  const SOON = [];
   // Kargo: entegratörler (altyapı hazır, firmaların API'si bağlanınca açılır) ve doğrudan bağlanacak kargo firmaları
   // Kargo: bağlı firmalar (Kurumsal pakette) ve yakında gelecekler
   const CARGO = [
     ['Yurtiçi Kargo', 'kargo firması', '#004a99', 'Y'], ['Aras Kargo', 'kargo firması', '#e30613', 'A'], ['DHL eCommerce', 'kargo firması', '#d40511', 'D'],
-    ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'], ['HepsiJET', 'kargo firması', '#ff6000', 'hj']
+    ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'], ['HepsiJET', 'kargo firması', '#ff6000', 'hj'],
+    ['Kolay Gelsin', 'kargo firması · test aşamasında', '#00a651', 'KG'], ['Sendeo', 'kargo firması · test aşamasında', '#00b140', 'Sd'], ['DHL Express', 'kargo firması · test aşamasında', '#ffcc00', 'DHL'],
   ];
-  const CARGO_SOON = [['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N'], ['Kolay Gelsin', 'kargo firması', '#00a651', 'KG'], ['Sendeo', 'kargo firması', '#6c2bd9', 'Sd'], ['DHL Express', 'kargo firması', '#ffcc00', 'DHL']];
+  const CARGO_SOON = [['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N']];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)

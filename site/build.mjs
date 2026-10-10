@@ -147,13 +147,13 @@ ${ctaBand}`;
 // ---------- entegrasyon sayfası arama metinleri (kanalın gerçek özelliklerinden üretilir; söz verdiğimiz kadar) ----------
 // Türkçe ekler (ilgi / yönelme / ayrılma): okunuşa göre (N11 → "en on bir", PttAVM → "pe te te a ve me")
 const SUF = { trendyol: ['un', 'a', 'dan'], hepsiburada: ['nın', 'ya', 'dan'], n11: ['in', 'e', 'den'], ikas: ['ın', 'a', 'tan'], woocommerce: ['ın', 'a', 'tan'], pttavm: ['nin', 'ye', 'den'],
-  idefix: ['in', 'e', 'ten'], pazarama: ['nın', 'ya', 'dan'], amazon: ['un', 'a', 'dan'], ciceksepeti: ['nin', 'ye', 'den'], koctas: ['ın', 'a', 'tan'], shopify: ['ın', 'a', 'dan'], opencart: ['ın', 'a', 'tan'], etsy: ['nin', 'ye', 'den'] };
+  idefix: ['in', 'e', 'ten'], pazarama: ['nın', 'ya', 'dan'], amazon: ['un', 'a', 'dan'], ciceksepeti: ['nin', 'ye', 'den'], koctas: ['ın', 'a', 'tan'], shopify: ['ın', 'a', 'dan'], opencart: ['ın', 'a', 'tan'], etsy: ['nin', 'ye', 'den'], teknosa: ["nın", "ya", "dan"], boyner: ["in", "e", "den"], pasaj: ["ın", "a", "dan"], trendyolgo: ["nun", "ya", "dan"], getir: ["nın", "ya", "dan"], yemeksepeti: ["in", "e", "ten"], ebay: ["in", "e", "den"], ozon: ["un", "a", "dan"], ticimax: ["in", "e", "ten"], ideasoft: ["un", "a", "tan"], tsoft: ["un", "a", "tan"] };
 const sx = (x, i) => `${x.name}'${(SUF[x.slug] || ['in', 'e', 'den'])[i]}`;
 const capOn = (x, re) => x.caps.some(([k, v]) => re.test(k) && v !== false);
 const capVal = (x, re) => (x.caps.find(([k]) => re.test(k)) || [])[1];
 const minPrice = Math.min(...S.plans.filter((p) => p.monthly).map((p) => p.monthly));
 function intDesc(x) {
-  const parts = ['siparişlerinizi', capOn(x, /^Stok/) && 'stok ve fiyatlarınızı', capOn(x, /^Kargo etiketi/) && 'kargo etiketlerini', capOn(x, /soru/i) && 'müşteri sorularını'].filter(Boolean);
+  const parts = ['siparişlerinizi', capOn(x, /^Stok/) && 'stoklarınızı', capOn(x, /^Stok/) && 'fiyatlarınızı', capOn(x, /^Kargo etiketi/) && 'kargo etiketlerini', capOn(x, /soru/i) && 'müşteri sorularını'].filter(Boolean);
   const and = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a[0]);
   const t = `${x.name} entegrasyonu: ${and(parts)} tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.`;
   return t.length <= 158 ? t : clip(x.lead);
@@ -162,7 +162,7 @@ function intIntro(x) {
   const on = x.caps.filter(([, v]) => v !== false).map(([k]) => k.toLocaleLowerCase('tr'));
   const off = x.caps.filter(([, v]) => v === false).map(([k]) => k.toLocaleLowerCase('tr'));
   const list = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a.join(''));
-  const where = x.kind === 'pazaryeri' ? `${x.name} pazaryerindeki mağazanızı` : `${x.name} sitenizi`;
+  const where = /pazaryeri/.test(x.kind) ? `${x.name} pazaryerindeki mağazanızı` : /market/.test(x.kind) ? `${x.name} mağazanızı` : `${x.name} sitenizi`;
   return [
     `Hastürk CRM, ${where} resmi entegrasyon servisi üzerinden bağlar. ${x.name} siparişleriniz 15 dakikada bir kendiliğinden panele gelir; diğer pazaryerleri ve e-ticaret sitelerinizin siparişleriyle aynı listede, tek ekranda yönetilir.`,
     `${x.name} entegrasyonunda desteklenen işlemler: ${list(on)}.${off.length ? ` Şu an ${x.name} için panelde yer almayanlar: ${list(off)}.` : ''}`,
@@ -232,7 +232,7 @@ function integrationPage(x) {
 <section class="sec">
   <div class="wrap">
     <div class="sec-head reveal"><div class="kicker">Diğer entegrasyonlar</div><h2>Tüm Kanallarınız Tek Panelde</h2><p>Aynı panelde birden fazla pazaryeri ve e-ticaret sitesini birlikte yönetin; stok ve fiyat hepsinde eşit kalır.</p></div>
-    <div class="integ">${others.map((o) => `<a class="it reveal" href="/entegrasyonlar/${o.slug}"><span class="b" style="background:${o.color}">${esc(o.badge)}</span><div style="min-width:0"><b>${esc(o.name)}</b><small>${esc(o.kind)}${testTag(o, 'tt')}</small></div></a>`).join('')}<a class="it reveal" href="/entegrasyonlar#yakinda"><span class="b" style="background:#94a3b8">+</span><div style="min-width:0"><b>Yakında</b><small>Teknosa, Boyner, eBay, Ozon, kargo…</small></div></a></div>
+    <div class="integ">${others.map((o) => `<a class="it reveal" href="/entegrasyonlar/${o.slug}"><span class="b" style="background:${o.color}">${esc(o.badge)}</span><div style="min-width:0"><b>${esc(o.name)}</b><small>${esc(o.kind)}${testTag(o, 'tt')}</small></div></a>`).join('')}<a class="it reveal" href="/entegrasyonlar#yakinda"><span class="b" style="background:#94a3b8">+</span><div style="min-width:0"><b>Tümü</b><small>Tüm entegrasyonlar ve kargo</small></div></a></div>
   </div>
 </section>
 ${ctaBand}`;
