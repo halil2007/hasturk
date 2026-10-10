@@ -19,6 +19,7 @@ import { hashPassword } from './auth.js';
 import { notify as pushNotify } from './push.js';
 import { siteOrigins, validEmail, validPhone } from './lead.js';
 import { mailOwner } from './ownermail.js';
+import { urgentAlert } from './alerts.js';
 import { json, str, fail, HttpError } from './util.js';
 import { turnstileOk, siteHosts, CAPTCHA_ERROR } from './turnstile.js';
 
@@ -338,6 +339,11 @@ export async function finalize(env, order, panel, fetchFn) {
   return complete(env, order, panel, { method: 'Kart (iyzico)', note, res });
 }
 
+// Ödeme alındı ama işlem tamamlanamadı: anlık bildirim + e-posta (panel sahibi paneli açmasa da haberi olur)
+const paidAlert = (env, order, what, msg) => urgentAlert(env, env.DB, 'pay:' + order.id, { title: `Ödeme alındı, ${what}: ${order.slug || ''}`, body: `${order.id} · ${msg}`, url: '#/bildirimler' })
+  .then(() => mailOwner(env, env.DB, { subject: `Ödeme alındı, ${what}`, intro: 'Ödeme alındı ancak işlem kendiliğinden tamamlanamadı; elle kontrol edilmeli.', rows: [['Sipariş', order.id], ['Firma', order.slug], ['Tutar', order.amount + ' TL'], ['Hata', msg]] }))
+  .catch(() => {});
+
 // Ödeme alındı (kart ya da onaylanan havale / EFT): yeni firmada panel açılır, mevcut firmada süre uzar; ödeme kaydı, bildirim, e-posta
 async function complete(env, order, panel, { method, note, res = {} }) {
   if (order.kind === 'stores') return completeStores(env, order, { method, note });
@@ -379,7 +385,7 @@ async function complete(env, order, panel, { method, note, res = {} }) {
     // Ödeme alındı ama firma açılamadı / uzatılamadı: elle tamamlanmak üzere işaretlenir, ana panele acil bildirim
     await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
     await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Ödeme alındı, işlem tamamlanamadı: ${buyer.firm || order.slug}`, msg: `${order.id} · ${e.message} · ${buyer.email} ${buyer.phone}` }).catch(() => {});
-    await pushNotify(env.DB, { title: '⚠️ Ödeme alındı, panel açılamadı', body: `${buyer.firm || order.slug}: ${e.message}`, url: '#/bildirimler' }).catch(() => {});
+    await paidAlert(env, order, 'panel açılamadı / süre uzatılamadı', `${buyer.firm || ''} ${e.message}`);
     return { paidError: true, reason: e.message };
   }
 }
@@ -402,6 +408,7 @@ async function completeStores(env, order, { method, note }) {
   } catch (e) {
     await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
     await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Ek mağaza ödemesi alındı, sınır artırılamadı: ${order.slug}`, msg: `${order.id} · ${e.message}` }).catch(() => {});
+    await paidAlert(env, order, 'mağaza sınırı artırılamadı', e.message);
     return { paidError: true, reason: e.message };
   }
 }
@@ -426,6 +433,7 @@ async function completeUpgrade(env, order, { method, note }) {
   } catch (e) {
     await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
     await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Yükseltme ödemesi alındı, paket değiştirilemedi: ${order.slug}`, msg: `${order.id} · ${e.message}` }).catch(() => {});
+    await paidAlert(env, order, 'paket yükseltilemedi', e.message);
     return { paidError: true, reason: e.message };
   }
 }
@@ -495,6 +503,7 @@ async function completeCharge(env, order, { method, note }) {
   } catch (e) {
     await run(env.DB, "UPDATE sales_orders SET status = 'error', error = ?, updated_at = ? WHERE id = ?", String(e.message).slice(0, 300), Date.now(), order.id);
     await notify(env.DB, `sale:${order.id}`, { level: 'error', title: `Kartla ödeme alındı, kaydedilemedi: ${order.slug}`, msg: `${order.id} · ${e.message}` }).catch(() => {});
+    await paidAlert(env, order, 'tahsilat kaydedilemedi', e.message);
     return { paidError: true, reason: e.message };
   }
 }
@@ -601,4 +610,22 @@ async function pageFor(env, order, r, panel) {
   const until = t && t.expires_at ? new Date(t.expires_at + 3 * 3600e3).toISOString().slice(0, 10).split('-').reverse().join('.') : '';
   return resultPage('Ödemeniz alındı, teşekkürler', `${esc(p.name)} paketiniz (${PERIOD[p.period]}) ${until ? `<b>${until}</b> tarihine kadar` : ''} aktif.`,
     { ok: true, actions: btn(`${panel}/?firma=${encodeURIComponent(o.slug)}`, 'Panele dön') });
+}
+
+// Ödeme bekçisi (ana panelin 15 dakikalık senkronunda): ödemesi alınıp tamamlanamayan siparişler acil uyarı olarak gider;
+// müşteri iyzico sayfasını ödeme sonrası kapattıysa (dönüş gelmedi) sonuç iyzico'dan yeniden sorulur. iyzico ödeme sayfası
+// 30 dakikada düştüğünden ödeme sayfası 45 dakikadan önce açılmış siparişler sorulur (ödeme sırasında "başarısız" yazılmaz).
+export async function paymentWatch(env, db, panel = '', fetchFn) {
+  const now = Date.now(), out = { alerted: 0, checked: 0 };
+  const stuck = await all(db, "SELECT * FROM sales_orders WHERE status IN ('paid', 'error') AND updated_at < ? AND updated_at > ? ORDER BY updated_at LIMIT 20", now - 10 * 60e3, now - 7 * 864e5);
+  for (const o of stuck) {
+    const r = await urgentAlert(env, db, 'pay:' + o.id, { title: `Ödeme alındı, işlem tamamlanmadı: ${o.slug || o.id}`, body: `${o.id} · ${o.amount} TL · ${o.error || 'işlem yarıda kaldı'} · ana panel → Firmalar'dan elle tamamlayın`, url: '#/firmalar' }).catch(() => null);
+    if (r) out.alerted++;
+  }
+  if (!iyzicoReady(env)) return out;
+  const open = await all(db, "SELECT * FROM sales_orders WHERE status = 'pending' AND token IS NOT NULL AND token != '' AND updated_at < ? AND updated_at > ? ORDER BY updated_at LIMIT 10", now - 45 * 60e3, now - 864e5);
+  for (const o of open) {
+    try { await finalize(env, o, panel, fetchFn); out.checked++; } catch (e) { console.error('ödeme yeniden sorulamadı', o.id, e.message); }
+  }
+  return out;
 }

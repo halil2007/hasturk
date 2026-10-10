@@ -8,7 +8,7 @@ import { PerfBuffer } from './perf.js';
 import { extApi } from './extapi.js';
 import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
-import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin, payLink } from './billing.js';
+import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin, payLink, paymentWatch } from './billing.js';
 import { blogPublic } from './blog.js';
 import { trialRequest, trialLogin } from './trial.js';
 import { turnstileOk, turnstileSiteKey, CAPTCHA_ERROR } from './turnstile.js';
@@ -172,7 +172,10 @@ const handler = {
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message }, e.status);
       console.error(e);
-      return json({ error: e.message || 'Sunucu hatası' }, 500);
+      const res = json({ error: e.message || 'Sunucu hatası' }, 500);
+      // Müşteri paneline iletilemeyen / veritabanı açılamayan istekler de hata kayıtlarına düşer (yalnız günlüğe değil)
+      if (env.DB) ctx.waitUntil(report5xx(env.DB, req, res, { slug: '', firm: '' }).catch(() => {}));
+      return res;
     }
   },
 
@@ -180,7 +183,12 @@ const handler = {
     if (!env.DB) return;
     await init(env.DB);
     const quick = event && event.cron === '*/2 * * * *';
-    ctx.waitUntil((quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true })).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r))).catch((e) => console.error('senkron hatası', e)));
+    ctx.waitUntil((quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true })).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r)))
+      // Dış nabız (isteğe bağlı, HEARTBEAT_URL: healthchecks.io vb.): zamanlanmış iş hiç çalışmazsa / düşerse servis e-postayla haber verir
+      .then(() => !quick && env.HEARTBEAT_URL && fetch(env.HEARTBEAT_URL).catch(() => {}))
+      .catch((e) => { console.error('senkron hatası', e); if (!quick && env.HEARTBEAT_URL) return fetch(String(env.HEARTBEAT_URL).replace(/\/+$/, '') + '/fail').catch(() => {}); }));
+    // Ödemesi alınıp tamamlanamayan / dönüşü gelmeyen satışlar (bkz. billing.js paymentWatch)
+    if (!quick) ctx.waitUntil(getSettings(env.DB).then((st) => paymentWatch(env, env.DB, st.panel_url || '')).then((r) => (r.alerted || r.checked) && console.log('ödeme bekçisi', JSON.stringify(r))).catch((e) => console.error('ödeme bekçisi hatası', e)));
     if (!quick) ctx.waitUntil(tenantWatchdog(env, env.DB).catch((e) => console.error('bekçi hatası', e)));
     if (!quick) ctx.waitUntil(expiryReminders(env, env.DB).catch((e) => console.error('bitiş hatırlatması hatası', e)));
     // Bir süredir tekrarlanmayan hata kayıtları kendiliğinden "Çözüldü" (anlık hata 1 saat, 2-3 kez görülen 6 saat, diğerleri 24 saat)

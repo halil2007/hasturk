@@ -52,8 +52,9 @@ export function guardIp(req) {
   if (!cf) return (xf || 'yerel').slice(0, 64);
   return (via && xf && xf !== cf ? `${xf} > ${cf}` : cf).slice(0, 100);
 }
-const realIp = (key) => String(key).split(' > ')[0];
-const allowed = (cfg, key) => (cfg.allow || []).some((a) => { const ip = realIp(key); return a.endsWith('*') ? ip.startsWith(a.slice(0, -1)) : ip === a; });
+// İzin listesi yalnız bağlantının gerçek adresine (CF-Connecting-IP) bakar: X-Forwarded-For taklit edilebilir
+const connIp = (key) => { const k = String(key); return k.includes(' > ') ? k.split(' > ')[1] : k; };
+const allowed = (cfg, key) => (cfg.allow || []).some((a) => { const ip = connIp(key); return a.endsWith('*') ? ip.startsWith(a.slice(0, -1)) : ip === a; });
 const stepMs = (cfg, strikes) => { const s = cfg.steps && cfg.steps.length ? cfg.steps : GUARD_DEFAULTS.steps; return s[Math.min(strikes, s.length) - 1] * 60e3; };
 export const waitText = (ms) => { const m = Math.ceil(ms / 60e3); return m < 60 ? `${m} dakika` : m < 1440 ? `${Math.ceil(m / 60)} saat` : `${Math.ceil(m / 1440)} gün`; };
 

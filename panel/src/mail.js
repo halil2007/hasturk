@@ -170,7 +170,8 @@ export async function sendQueued(env, db, channels, settings) {
       sent++;
     } catch (e) {
       await run(db, 'UPDATE mail_queue SET tries = tries + 1, error = ? WHERE order_id = ?', e.message.slice(0, 400), q.order_id);
-      await log(db, q.channel, 'warn', `#${o.order_number} yeni sipariş e-postası gönderilemedi: ${e.message}`);
+      // 3. denemeden sonra hata düzeyinde: panel sahibinin hata kayıtlarına da düşer
+      await log(db, q.channel, (Number(q.tries) || 0) + 1 >= 3 ? 'error' : 'warn', `#${o.order_number} yeni sipariş e-postası gönderilemedi: ${e.message}`);
       await notify(db, 'mail', { level: 'warn', title: 'Yeni sipariş e-postası gönderilemedi', msg: e.message });
       return sent; // servis hatası: kalanlar sonraki senkronda denenir
     }

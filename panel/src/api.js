@@ -553,6 +553,8 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   fail(404, 'Bilinmeyen işlem');
 }
 
+// Elle tetiklenen ağır işler (veritabanı / panel başına): üst üste basılınca pazaryerine yük bindirmesin
+const manualSync = new WeakMap(), buyboxCheck = new WeakMap();
 // ZPL (termal yazıcı) etiketini PDF'e çevir (Labelary). Etiket boyutu ZPL'deki genişlik / uzunluktan (203 dpi), yoksa 4×6 inç (10×15 cm).
 export async function zplToPdf(lab) {
   const z = String(lab.data || ''), dots = (re, d) => { const m = re.exec(z); return m ? Number(m[1]) : d; };
@@ -1129,7 +1131,17 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return new Response(src.replace(PH, () => `define('HASTURK_KEY', '${key}');`), { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' } });
   }
   if (path === 'channels' && m === 'GET') return json(await channelsInfo(env, db));
-  if (path === 'sync' && m === 'POST') { const b = await body(req); return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings })); }
+  if (path === 'sync' && m === 'POST') {
+    const b = await body(req);
+    // Tüm ilanları çeken senkron pazaryerine ağır yük: yalnız ürün düzenleme yetkisi olan, aynı kanal(lar) için 20 sn'de bir
+    if (b.listings) {
+      if (!can(user, 'products', true)) fail(403, 'Yetki yok');
+      const key = JSON.stringify(b.channels || null), seen = manualSync.get(db) || new Map(), last = seen.get(key) || 0;
+      if (Date.now() - last < 20e3) fail(429, 'Senkron az önce çalıştı; birkaç saniye sonra yeniden deneyin');
+      seen.set(key, Date.now()); manualSync.set(db, seen);
+    }
+    return json(await syncAll(env, db, { only: b.channels, force: !!b.force, listings: !!b.listings }));
+  }
   if (path === 'import' && m === 'POST') { const b = await body(req); return json(await importListings(env, db, { only: b.channels })); }
   if (path === 'purge-demo' && m === 'POST') return json(await purgeDemo(db));
 
@@ -1237,7 +1249,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!l) fail(404, 'İlan bulunamadı');
     return json({ listing: l, buybox: b, rule: r, history, changes, preview: r && b ? decide({ ...r, enabled: 1 }, { rank: b.rank, buyboxPrice: b.buybox_price, second: b.second_price, multi: !!b.multi }, l.price) : null });
   }
-  if (path === 'buybox/check' && m === 'POST') { requireFeature(env, 'buybox'); const b = await body(req); return json(await checkBuybox(env, db, { channel: b.channel, ids: b.ids, limit: Math.min(Number(b.limit) || 100, 300) })); }
+  if (path === 'buybox/check' && m === 'POST') {
+    requireFeature(env, 'buybox');
+    if (Date.now() - (buyboxCheck.get(db) || 0) < 60e3) fail(429, 'Buybox kontrolü az önce yapıldı; bir dakika sonra yeniden deneyin');
+    buyboxCheck.set(db, Date.now());
+    const b = await body(req); return json(await checkBuybox(env, db, { channel: b.channel, ids: b.ids, limit: Math.min(Number(b.limit) || 100, 300) })); }
   if (path === 'price-rules' && m === 'PUT') {
     const b = await body(req);
     if (b.enabled) requireFeature(env, 'buybox');
@@ -1462,7 +1478,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       return json({ settings: { ...FX_DEFAULTS, ...(settings.fx || {}) }, rates, applied: await getRaw(db, 'fx_applied'), products, items, error });
     }
     if (path === 'fx/apply' && m === 'POST') {
-      if (!can(user, 'products')) fail(403, 'Yetki yok');
+      if (!can(user, 'products', true)) fail(403, 'Yetki yok');
       const rates = await refreshRates(db, settings, { force: true });
       const r = await applyFx(db, settings, rates, { user: user.name });
       ctx.waitUntil(pushPrices(env, db).catch(() => {}));

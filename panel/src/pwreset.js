@@ -51,6 +51,8 @@ export async function resetPassword(db, { token, password }) {
   // Yeni şifre: eski oturumlar şifre özetine bağlı olduğundan kendiliğinden kapanır
   await run(db, 'UPDATE users SET pass = ?, must_change = 0 WHERE id = ?', await hashPassword(String(password)), u.id);
   await run(db, "DELETE FROM settings WHERE k = ? OR k LIKE 'login_fail:%'", k);
+  // Aynı kullanıcının diğer bekleyen bağlantıları (7 günlük hoş geldin bağlantısı dahil) da geçersiz
+  await run(db, "DELETE FROM settings WHERE k LIKE 'pwreset:%' AND json_extract(v, '$.uid') = ?", u.id);
   await log(db, null, 'info', `${u.username}: şifre e-postadaki bağlantıyla yenilendi`);
   return { ok: true, username: u.username };
 }

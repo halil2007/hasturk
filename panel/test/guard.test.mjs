@@ -133,3 +133,14 @@ test('IP anahtarı: aracı dosya (panel-proxy.php) üzerinden gelen ziyaretçi a
   for (let i = 0; i < 100; i++) assert.equal(rateLimited('rl-test', 100), false);
   assert.equal(rateLimited('rl-test', 100), true);
 });
+
+test('güvenilir IP X-Forwarded-For ile taklit edilemez: izin listesi yalnız bağlantının gerçek adresine bakar', async () => {
+  const { env, call, login } = setup();
+  const ok = await login('dogru-sifre-1', '2.2.2.2');
+  const cookie = ok.headers.get('set-cookie').split(';')[0];
+  assert.equal((await call('/api/users/guard', { ip: '2.2.2.2', method: 'PUT', cookie, body: { allow: '10.0.0.*' } })).status, 200);
+  const spoof = (pw) => worker.fetch(new Request('https://panel.test/api/login', { method: 'POST', body: JSON.stringify({ password: pw }),
+    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '66.6.6.6', 'X-Forwarded-Host': 'a.b', 'X-Forwarded-For': '10.0.0.7' } }), env, { waitUntil() {} });
+  for (let i = 0; i < 5; i++) assert.equal((await spoof('yanlis' + i)).status, 401);
+  assert.equal((await spoof('dogru-sifre-1')).status, 429, 'sahte güvenilir adres engeli atlatamaz');
+});
