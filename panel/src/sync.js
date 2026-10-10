@@ -747,17 +747,18 @@ export async function maybePurgeDemo(env, db) {
 // kalabilir. (1) 6 saatte bir: 2 günden eski, hâlâ açık siparişler kanaldan sipariş tarihine göre yeniden okunur (son 90 gün).
 // (2) 30 günden eski ve hâlâ açık görünen sipariş tamamlandı (teslim edildi) sayılır: listelerden ve kargo ekranından çıkar,
 // sipariş geçmişine not düşülür; kanal sonradan iptal / iade bildirirse o durum geçerli olur.
-export const STALE_CLOSE_DAYS = 30;
+export const STALE_CLOSE_DAYS = 30, SHIPPED_CLOSE_DAYS = 15;
 export async function staleOrders(env, db, chans, maps) {
   const t = Date.now(), out = {};
   for (const ch of chans || []) {
     if (ch.demo || !ch.fetchOrders) continue;
     const key = 'stale:' + ch.id, last = await getRaw(db, key);
     if (last && t - last.at < 6 * 3600e3) continue;
-    // Sipariş tarihine göre listeleyen kanallarda (PttAVM, N11) senkron yalnız son günleri okur: kargodaki siparişin sonradan teslim /
-    // iptal / iade olması da kaçmasın diye son 30 günün kargodaki siparişleri de yeniden okunur
+    // Sipariş tarihine göre listeleyen kanallarda (Trendyol, PttAVM, N11, idefix …) senkron yalnız son günleri okur: kargodaki siparişin
+    // sonradan teslim / iptal / iade olması kaçmasın diye kargodaki siparişler de (son 90 gün) yeniden okunur. Önceden yalnız son 30 gün
+    // okunuyordu; 30 günden eski kargodaki sipariş teslim edilse de panelde "Kargoda" kalıyordu.
     const old = await first(db, `SELECT MIN(ordered_at) AS m, COUNT(*) AS n FROM orders WHERE channel = ? AND ordered_at < ? AND ordered_at >= ?
-      AND (status IN ('new', 'processing')${ch.byOrderDate ? " OR (status = 'shipped' AND ordered_at >= ?)" : ''})`, ch.id, t - 2 * D, t - 90 * D, ...(ch.byOrderDate ? [t - 30 * D] : []));
+      AND (status IN ('new', 'processing')${ch.byOrderDate ? " OR status = 'shipped'" : ''})`, ch.id, t - 2 * D, t - 90 * D);
     if (!old.n) { await setSetting(db, key, { at: t, open: 0 }); continue; }
     try {
       const orders = await ch.fetchOrders(old.m - 3600e3, t, { byOrdered: true });
@@ -771,6 +772,19 @@ export async function staleOrders(env, db, chans, maps) {
       out[ch.id] = 'hata: ' + e.message;
     }
   }
+  // Kargoda: kargoya verilişinden SHIPPED_CLOSE_DAYS gün geçmiş ve kanaldan teslim bilgisi gelmemiş sipariş teslim edilmiş sayılır
+  // (yurt içi teslimat birkaç gün sürer; kanal teslimi bildirmediyse ya da bildirim kaçtıysa sipariş sonsuza kadar "Kargoda" kalmasın)
+  const ship = await all(db, `SELECT o.id FROM orders o WHERE o.status = 'shipped' AND o.ordered_at < ?
+      AND COALESCE((SELECT MAX(p.shipped_at) FROM packages p WHERE p.order_id = o.id), o.ordered_at) < ? LIMIT 1000`, t - SHIPPED_CLOSE_DAYS * D, t - SHIPPED_CLOSE_DAYS * D);
+  for (const part of chunk(ship, 30)) {
+    await db.batch(part.flatMap((o) => [
+      db.prepare("UPDATE orders SET status = 'delivered', local_status = 'delivered', updated_at = ? WHERE id = ? AND status = 'shipped'").bind(t, o.id),
+      db.prepare("INSERT INTO order_events (order_id, at, source, action, status, note, user) VALUES (?, ?, 'panel', 'auto_close', 'delivered', ?, 'Sistem')")
+        .bind(o.id, t, `Kargoya verileli ${SHIPPED_CLOSE_DAYS} günden fazla oldu ve kanaldan teslim bilgisi gelmedi; teslim edildi sayıldı`),
+    ]));
+  }
+  if (ship.length) await log(db, null, 'info', `${ship.length} sipariş kargoya verileli ${SHIPPED_CLOSE_DAYS} günden fazla olduğu için teslim edildi sayıldı`);
+  out.delivered = ship.length;
   const rows = await all(db, "SELECT id, ordered_at FROM orders WHERE status IN ('new', 'processing') AND ordered_at < ? LIMIT 500", t - STALE_CLOSE_DAYS * D);
   for (const part of chunk(rows, 30)) {
     await db.batch(part.flatMap((o) => [

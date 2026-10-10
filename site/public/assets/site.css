@@ -878,3 +878,19 @@ a.mf:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .trial-ok p { margin: 0; color: var(--muted); font-size: 14.5px; }
 .trial-ok code { background: var(--soft, #eef3fc); color: var(--text, #0d1b34); padding: 2px 8px; border-radius: 6px; font-weight: 700; }
 .trial-ok .btn { justify-self: center; margin-top: 6px; }
+
+/* ---------- Duyarlı düzen düzeltmeleri (telefon / tablet / bilgisayar) ---------- */
+/* Uzun tek kelimeli başlıklar ("Senkronizasyonu", "WooCommerce") kutusundan taşmaz */
+h1, h2, h3, h4 { overflow-wrap: break-word; }
+.marquee { overflow: hidden; max-width: 100%; }
+/* "Test aşamasında" etiketi dar hücrede alta iner, sayfayı yana taşırmaz */
+.tt { max-width: 100%; white-space: normal; text-align: center; }
+/* Kanal kartları: tür ve işlem sayısı ayrı satırda, logo yazısı karta göre ölçeklenir, kartlar eşit yükseklikte */
+.icard { min-width: 0; justify-content: flex-start; }
+.icard .wm-big { font-size: clamp(17px, 4.4vw, 21px); max-width: 100%; white-space: nowrap; line-height: 1.2; min-height: 26px; display: flex; align-items: center; justify-content: center; }
+.icard .wm-big.long { font-size: clamp(15px, 3.9vw, 19px); letter-spacing: -.01em; }
+.icard small { line-height: 1.35; }
+.icard .ic-n { color: var(--text-2); font-weight: 600; }
+@media (min-width: 1100px) { .icard .wm-big { font-size: 19px; } .icard .wm-big.long { font-size: 16px; } .icard { padding: 20px 8px 16px; } }
+/* Sayfa hiçbir genişlikte yana kaymaz (kenara taşan süsleme / kayan logo şeridi dahil) */
+html { overflow-x: clip; }

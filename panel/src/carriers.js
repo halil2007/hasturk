@@ -28,8 +28,8 @@ export const CARRIERS = {
   // Her firma API erişimini kurumsal müşteri sözleşmesiyle, kendi bölge / şube ekibinden verir; test hesabı ve doküman gelince açılır.
   hepsijet: { id: 'hepsijet', kind: 'direct', name: 'HepsiJET', site: 'https://www.hepsijet.com', ready: false, color: '#ff6000',
     about: 'Hepsiburada\'nın kargo firması: kendi anlaşmanızla gönderi, barkod ve takip.', howto: 'HepsiJET kurumsal satış ekibinden entegrasyon kullanıcı adı, şifre, firma kodu ve depo kodu isteyin.' },
-  dhl: { id: 'dhl', kind: 'direct', name: 'DHL eCommerce (MNG Kargo)', site: 'https://www.dhlecommerce.com.tr', ready: false, color: '#d40511',
-    about: 'Eski MNG Kargo: API ile gönderi, barkod ve takip.', howto: 'DHL eCommerce (MNG) şubenizden müşteri numaranız ve API (apizone) erişimi için istemci kimliği / gizli anahtar isteyin.' },
+  dhl: { id: 'dhl', kind: 'direct', name: 'DHL eCommerce', site: 'https://www.dhlecommerce.com.tr', ready: false, color: '#d40511',
+    about: 'DHL eCommerce ile gönderi, barkod ve takip.', howto: 'DHL eCommerce şubenizden müşteri numaranız ve API (apizone) erişimi için istemci kimliği / gizli anahtar isteyin.' },
   ptt: { id: 'ptt', kind: 'direct', name: 'PTT Kargo', site: 'https://www.ptt.gov.tr', ready: false, color: '#f6c400',
     about: 'PTT Kargo kurumsal gönderi: barkod ve takip.', howto: 'PTT Kargo kurumsal sözleşmenizle müşteri numarası ve web servis kullanıcı adı / şifresi isteyin.' },
   surat: { id: 'surat', kind: 'direct', name: 'Sürat Kargo', site: 'https://www.suratkargo.com.tr', ready: false, color: '#e30613',
@@ -45,7 +45,7 @@ export const CARRIER_IDS = Object.keys(CARRIERS);
 export const isCarrierId = (id) => CARRIER_IDS.includes(id) || id === 'demo';
 
 // Deneme modu (DEMO=1): gerçek firmaya gitmeden örnek gönderi oluşturan entegratör (akışı göstermek ve test için)
-const DEMO = { id: 'demo', name: 'Örnek entegratör', ready: true, demo: true, about: 'Deneme modu: gerçek kargo firmasına gönderi açmaz, örnek takip numarası verir.' };
+const DEMO = { id: 'demo', name: 'Anlaşmalı kargo', ready: true, demo: true, about: 'Kendi anlaşmalı kargo firmanızla etiket ve takip numarası (demo).' };
 
 // Bağlantılar. Firmanın API dokümanı gelince buraya eklenir (ready: true yapılır); o zamana kadar gönderi oluşturma açıkça reddedilir.
 const ADAPTERS = {

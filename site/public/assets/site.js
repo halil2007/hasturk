@@ -43,7 +43,7 @@
   // Kargo: entegratörler (altyapı hazır, firmaların API'si bağlanınca açılır) ve doğrudan bağlanacak kargo firmaları
   const CARGO = [
     ['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü · yurt içi ve yurt dışı', '#1d4ed8', 'N'],
-    ['Yurtiçi Kargo', 'kargo firması', '#004a99', 'Y'], ['Aras Kargo', 'kargo firması', '#e30613', 'A'], ['DHL eCommerce (MNG)', 'kargo firması', '#d40511', 'D'],
+    ['Yurtiçi Kargo', 'kargo firması', '#004a99', 'Y'], ['Aras Kargo', 'kargo firması', '#e30613', 'A'], ['DHL eCommerce', 'kargo firması', '#d40511', 'D'],
     ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'],
     ['HepsiJET', 'kargo firması', '#ff6000', 'hj'], ['Kolay Gelsin', 'kargo firması', '#00a651', 'KG'], ['Sendeo', 'kargo firması', '#6c2bd9', 'Sd'], ['DHL Express', 'kargo firması', '#ffcc00', 'DHL'],
   ];
