@@ -11,7 +11,6 @@ import { phone10, nameKey, fullAddress, money } from './common.js';
 import { plateOf, barcodeOf } from './kolaygelsin.js';
 
 const BASE = (test) => (test ? 'https://api-dev.sendeo.com.tr' : 'https://api.sendeo.com.tr'); // DOĞRULA: test ortamı adresi (dokümanda yalnız canlı adres var)
-const tokens = new Map();
 // Statü listesi (dokümandaki "Sendeo Statü Listesi")
 const DELIVERED = [111, 120], RETURNED = [131, 135, 151], CANCELLED = [133, 139], CREATED = [101];
 const stateOf = (n) => (DELIVERED.includes(n) ? 'delivered' : RETURNED.includes(n) ? 'returned' : CANCELLED.includes(n) ? 'cancelled' : CREATED.includes(n) ? 'created' : n ? 'transit' : null);
@@ -37,6 +36,8 @@ export function districtId(city, district) {
 
 export function make(values) {
   const test = values.SENDEO_ENV === 'test', base = BASE(test), user = str(values.SENDEO_USER), pass = str(values.SENDEO_PASSWORD), key = `${test}:${user}:${pass.length}`;
+  // Oturum belirteci yalnız bu bağlantı nesnesinde tutulur (modül düzeyinde paylaşılan önbellek firmalar arasında karışabilirdi)
+  const tokens = new Map();
   async function call(method, path, body, jwt) {
     let text, status = 0;
     try {

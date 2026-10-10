@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { d1 } from '../dev/d1.mjs';
 import { init } from '../src/db.js';
 import { getChannels, resetChannels, publicInfo } from '../src/channels/index.js';
-import { addStore, BETA_TYPES } from '../src/config.js';
+import { addStore, BETA_TYPES, DEV_TYPES } from '../src/config.js';
 
 test('ana panel: test modülü kanalları bekleyen ve "beta" işaretli', async () => {
   const db = d1(); await init(db); resetChannels();
@@ -13,7 +13,8 @@ test('ana panel: test modülü kanalları bekleyen ve "beta" işaretli', async (
     const c = chs.find((x) => x.id === t);
     assert.ok(c, t + ' listede');
     assert.equal(c.gated, true, t + ' bağlantı testi bekliyor');
-    assert.equal(publicInfo(c).beta, true);
+    // Geliştirme aşamasındakiler "dev" (bağlanamaz), diğerleri "beta"
+    if (DEV_TYPES.includes(t)) assert.equal(publicInfo(c).dev, true); else assert.equal(publicInfo(c).beta, true);
   }
 });
 
@@ -24,7 +25,8 @@ test('müşteri paneli: test aşamasındaki kanallar listede ("beta"), eklenebil
     const c = chs.find((x) => x.id === t);
     assert.ok(c, t + ' listede');
     assert.equal(c.gated, true, t + ' bağlantı testi bekliyor');
-    assert.equal(publicInfo(c).beta, true);
+    // Geliştirme aşamasındakiler "dev" (bağlanamaz), diğerleri "beta"
+    if (DEV_TYPES.includes(t)) assert.equal(publicInfo(c).dev, true); else assert.equal(publicInfo(c).beta, true);
   }
   assert.equal(await addStore(db, 'amazon'), 'amazon_2');
   resetChannels();
@@ -55,4 +57,16 @@ test('"Test aşamasında" yazısı kaldırılan kanal: ana ve müşteri panelind
   const d = await r.json();
   assert.deepEqual(d.released, ['shopify']);
   assert.equal(r.headers.get('access-control-allow-origin'), 'https://hasturkcrm.com');
+});
+
+test('geliştirme aşamasındaki kanallar bağlanamaz / eklenemez', async () => {
+  const { api } = await import('../src/api.js');
+  const db = d1(); await init(db); resetChannels();
+  const env = { PANEL_PASSWORD: 'x', TENANT_SLUG: 'firma' }, ctx = { waitUntil() {} }, user = { id: 1, name: 'Y', role: 'admin', perms: null };
+  for (const t of DEV_TYPES) {
+    const r = await api(new Request('https://p.test/api/integrations/' + t, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: { X: '1' } }) }), env, ctx, db, 'integrations/' + t, user).catch((e) => e);
+    assert.equal(r.status, 403, t);
+    const a = await api(new Request('https://p.test/api/integrations/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: t }) }), env, ctx, db, 'integrations/add', user).catch((e) => e);
+    assert.equal(a.status, 403, t + ' ek mağaza');
+  }
 });

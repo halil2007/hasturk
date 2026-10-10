@@ -194,6 +194,8 @@ Object.assign(FIELDS, {
 // (tanıtım sitesinde de). Ana panel → Entegrasyonlar → kanal → "Test yazısını kaldır" ile tamamlanan tür (settings: released_channels)
 // etiketsiz normal kanal olur: müşteri panellerine RELEASED_TYPES ortam değişkeniyle gider (birkaç dakika içinde), tanıtım sitesi
 // /api/public/channels'tan okur.
+// Geliştirme aşamasındaki kanallar: listede görünür, bağlanamaz (API belgesi doğrulanana kadar)
+export const DEV_TYPES = ['boyner', 'pasaj', 'getir'];
 export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon', 'ticimax', 'ideasoft', 'tsoft'];
 export async function releasedTypes(env, db) {
   if (env && env.TENANT_SLUG) return String(env.RELEASED_TYPES || '').split(',').filter((t) => BETA_TYPES.includes(t));

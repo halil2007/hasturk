@@ -34,7 +34,9 @@
     ["Teknosa", "pazaryeri", "#005bab", "T", "color:#005bab", "teknosa"], ["Boyner", "pazaryeri", "#000000", "B", "color:#000000", "boyner"], ["Turkcell Pasaj", "pazaryeri", "#ffc900", "P", "color:#ffc900", "pasaj"], ["Trendyol Go", "hızlı market", "#ff6000", "TG", "color:#ff6000", "trendyolgo"], ["Getir Çarşı", "hızlı market", "#5d3ebc", "G", "color:#5d3ebc", "getir"], ["Yemeksepeti Market", "hızlı market", "#fa0050", "YS", "color:#fa0050", "yemeksepeti"], ["eBay", "yurt dışı pazaryeri", "#E53238", "e", "color:#E53238", "ebay"], ["Ozon", "yurt dışı pazaryeri", "#005BFF", "O", "color:#005BFF", "ozon"], ["Ticimax", "e-ticaret sitesi", "#00A8E8", "Tx", "color:#00A8E8", "ticimax"], ["IdeaSoft", "e-ticaret sitesi", "#F26B21", "iS", "color:#F26B21", "ideasoft"], ["T-Soft", "e-ticaret sitesi", "#E30613", "T", "color:#E30613", "tsoft"],
   ];
   // Ana panelde "Test yazısını kaldır" denince tür bu listeden çıkar (panel → /api/public/channels → beta); panel yanıt vermezse etiketler kalır
-  let TEST = new Set(['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon', 'ticimax', 'ideasoft', 'tsoft']);
+  let TEST = new Set(['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy', 'teknosa', 'trendyolgo', 'yemeksepeti', 'ebay', 'ozon', 'ticimax', 'ideasoft', 'tsoft']);
+  // Geliştirme aşamasındakiler: listede görünür, panelde henüz bağlanamaz
+  const DEV = new Set(['boyner', 'pasaj', 'getir']);
   const SOON = [];
   // Kargo: entegratörler (altyapı hazır, firmaların API'si bağlanınca açılır) ve doğrudan bağlanacak kargo firmaları
   // Kargo: bağlı firmalar (Kurumsal pakette) ve yakında gelecekler
@@ -48,13 +50,13 @@
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
   const wms = (dup, link = true) => ACTIVE.map((x) => `<${link ? 'a href="/entegrasyonlar"' : 'span'} class="wm${dup ? ' dup' : ''}" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</${link ? 'a' : 'span'}>`).join('');
-  const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}${TEST.has(x[5]) ? '<span class="tt">Test aşamasında</span>' : ''}</small></div></div>`).join('');
+  const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}${TEST.has(x[5]) ? '<span class="tt">Test aşamasında</span>' : DEV.has(x[5]) ? '<span class="tt">Geliştirme aşamasında</span>' : ''}</small></div></div>`).join('');
   const drawChannels = () => {
     const logos = $('[data-logos]');
     if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
     const logosStatic = $('[data-logos-static]');
     if (logosStatic) logosStatic.innerHTML = wms(false, false);
-    $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.filter((x) => !TEST.has(x[5])).length; });
+    $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.filter((x) => !TEST.has(x[5]) && !DEV.has(x[5])).length; });
     $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
     $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
     $$('[data-integ="cargo"]').forEach((el) => { el.innerHTML = integ(CARGO, false) + integ(CARGO_SOON, true); });

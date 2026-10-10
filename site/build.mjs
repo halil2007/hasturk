@@ -35,7 +35,7 @@ const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js', '
 // ---------- üst menü açılır listeleri ----------
 const menuFeatures = FEATURES.map((f) => `<a class="mi" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><span><b>${esc(f.name)}</b><small>${esc(f.short)}</small></span></a>`).join('');
 // Test aşamasındaki kanalın etiketi (data-beta): panelde "Test yazısını kaldır" denince site.js kaldırır; data-beta-on olanlar o zaman görünür
-const testTag = (x, cls = 'pill soon') => (x.beta ? `<span class="${cls}" data-beta="${x.beta}">Test aşamasında</span>` : '');
+const testTag = (x, cls = 'pill soon') => (x.dev ? `<span class="${cls}">Geliştirme aşamasında</span>` : x.beta ? `<span class="${cls}" data-beta="${x.beta}">Test aşamasında</span>` : '');
 const menuIntegrations = INTEGRATIONS.map((x) => `<a class="mi" href="/entegrasyonlar/${x.slug}"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span><b>${esc(x.name)}</b><small>${esc(x.kind)}${testTag(x, 'tt')}</small></span></a>`).join('');
 const featureCards = FEATURES.map((f) => `<a class="fcard reveal" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><b>${esc(f.name)}</b><span>${esc(f.short)}</span><ul>${f.points.slice(0, 3).map(([, t]) => `<li>${tick}${esc(t)}</li>`).join('')}</ul><em>İncele ${ico('i-arrow')}</em></a>`).join('');
 const integrationCards = INTEGRATIONS.map((x) => `<a class="icard reveal" href="/entegrasyonlar/${x.slug}"><span class="wm-big${x.word.length > 9 ? ' long' : ''}" style="color:${x.color}">${esc(x.word)}</span><small>${esc(x.kind)}</small><small class="ic-n">${x.caps.filter(([, v]) => v !== false).length} işlem</small>${testTag(x)}<em>Ayrıntılar ${ico('i-arrow')}</em></a>`).join('');
@@ -192,9 +192,10 @@ function integrationPage(x) {
   <div class="wrap fp-grid">
     <div class="txt">
       <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/entegrasyonlar">Entegrasyonlar</a><span>›</span><b>${esc(x.name)}</b></nav>
-      <div class="int-logo"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span class="wm-big" style="color:${x.color}">${esc(x.word)}</span>${x.beta ? `${testTag(x)}<span class="pill" data-beta-on="${x.beta}" hidden>Aktif entegrasyon</span>` : '<span class="pill">Aktif entegrasyon</span>'}</div>
+      <div class="int-logo"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span class="wm-big" style="color:${x.color}">${esc(x.word)}</span>${x.dev ? testTag(x) : x.beta ? `${testTag(x)}<span class="pill" data-beta-on="${x.beta}" hidden>Aktif entegrasyon</span>` : '<span class="pill">Aktif entegrasyon</span>'}</div>
       <h1>${esc(x.name)} <span class="grad">Entegrasyonu</span></h1>
       <p>${esc(x.lead)}</p>
+      ${x.dev ? `<p class="beta-note"><b>Geliştirme aşamasında:</b> ${esc(x.name)} entegrasyonu hazırlanıyor; kullanıma açıldığında panelinizdeki Entegrasyonlar sayfasından bağlayabilirsiniz.</p>` : ''}
       ${x.beta ? `<p class="beta-note" data-beta="${x.beta}"><b>Test aşamasında:</b> ${esc(x.name)} entegrasyonu panelde kullanıma açıktır ve son testleri sürmektedir. Kurulumda yanınızdayız; ilk siparişlerinizi ve stoklarınızı birlikte kontrol ederiz.</p>` : ''}
       <div class="ctas"><a class="btn btn-primary" data-demo href="/demo">Canlı demoyu açın ${ico('i-arrow')}</a><a class="btn btn-line" href="/paketler">Fiyatlar</a></div>
       ${heroChecks}
