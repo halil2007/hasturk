@@ -57,7 +57,7 @@ async function loadOrder(db, id) {
   // Kalemler, paketler ve müşteri geçmişi aynı anda okunur (her sorgu ayrı gidiş-dönüş)
   const [cust, items, packages] = await Promise.all([
     o.ckey ? first(db, "SELECT COUNT(*) AS total, SUM(ordered_at <= ?) AS nth FROM orders WHERE ckey = ? AND status != 'cancelled'", o.ordered_at, o.ckey) : null,
-    all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.ship_cost, p.desi, p.image AS product_image, l.commission AS listing_commission
+    all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.ship_cost, p.desi, p.image AS product_image, l.commission AS listing_commission, l.commission_src AS listing_commission_src
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = ? AND l.remote_id = i.remote_key
     WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id),
@@ -130,8 +130,8 @@ async function listOrders(db, q) {
   const items = {}, full = {};
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    for (const it of await allIn(db, ids, (ph, part) => [`SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
-        p.purchase_price, p.ship_cost, l.commission AS listing_commission
+    for (const it of await allIn(db, ids, (ph, part) => [`SELECT i.order_id, i.name, i.quantity, i.returned_qty, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
+        p.purchase_price, p.ship_cost, l.commission AS listing_commission, l.commission_src AS listing_commission_src
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE i.order_id IN (${ph}) ORDER BY i.rowid`, part])) {

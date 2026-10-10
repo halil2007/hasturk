@@ -21,7 +21,10 @@ export async function syncClaims(env, db, { only } = {}) {
       const w = cont && t - cont.until < 864e5 ? cont : { page: 0, since: t - (last ? 10 : 30) * 864e5, until: t }, items = [];
       let page = w.page, more = false;
       for (const end = page + 20; page < end; page++) {
-        const r = await ch.claims({ since: w.since, until: w.until, page, size: 50 });
+        let r;
+        // Sayfa okunamazsa o ana kadar okunanlar kaydedilir ve kalınan sayfadan devam edilir (hepsi kaybolmasın, hep aynı yerde takılmasın)
+        try { r = await ch.claims({ since: w.since, until: w.until, page, size: 50 }); }
+        catch (e) { if (items.length) { await save(db, ch.id, items); await setSetting(db, key, { ...w, page }); } throw e; }
         items.push(...r.items);
         more = !!(r.hasNext && r.items.length);
         if (!more) break;

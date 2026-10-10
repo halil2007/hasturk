@@ -352,7 +352,7 @@ export async function productForm(id, done) {
   const siteCh = activeChannels().filter((c) => c.enabled && c.caps.createProduct && !hasL.has(c.id));
   const mpCh = activeChannels().filter((c) => c.enabled && (c.can || {}).upload && !hasL.has(c.id));
   const lp = (l) => {
-    const rate = rateGross(st, l.commission) ?? costOf(st, 'commission', l.channel);
+    const rate = rateGross(st, l.commission, l.commission_src) ?? costOf(st, 'commission', l.channel);
     return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
   };
   s.setBody(html`<form class="stack" data-form>

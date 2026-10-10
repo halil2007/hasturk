@@ -7,21 +7,24 @@ import { chunk, fail, PRODUCT_SHIP } from './util.js';
 import { profit, costOf, rateGross, costVat } from '../public/profit.js';
 import { r2 } from './util.js';
 
+// Satırın iade edilmeyen payı: kısmi iadede (3 adetten 1'i iade) ciro, komisyon ve maliyet kalan adede göre sayılır
+export const keptShare = (i) => { const q = Number(i.quantity) || 0, r = Math.min(q, Math.max(0, Number(i.returned_qty) || 0)); return q > 0 ? (q - r) / q : 1; };
+const liveLine = (i) => i.status !== 'cancelled' && i.status !== 'returned' && keptShare(i) > 0;
 export function orderProfit(o, settings) {
   const ch = o.channel;
   let revenue = 0, commission = 0, cost = 0, missing = 0, realCommission = true;
   for (const i of o.items) {
-    if (i.status === 'cancelled' || i.status === 'returned') continue;
-    const rate = rateGross(settings, i.listing_commission) ?? costOf(settings, 'commission', ch);
-    revenue += i.total;
-    // Kanalın bildirdiği gerçek komisyon varsa o; yoksa ilan / kanal oranıyla tahmin
-    if (i.commission != null) commission += i.commission; else { commission += profit({ sale: i.total, commissionRate: rate }).commission; realCommission = false; }
-    if (i.purchase_price) cost += i.purchase_price * i.quantity; else missing++;
+    if (!liveLine(i)) continue;
+    const rate = rateGross(settings, i.listing_commission, i.listing_commission_src) ?? costOf(settings, 'commission', ch), k = keptShare(i);
+    revenue += i.total * k;
+    // Kanalın bildirdiği gerçek komisyon varsa o; yoksa ilan / kanal oranıyla tahmin (iade edilen adedin komisyonu kanal tarafından geri verilir)
+    if (i.commission != null) commission += i.commission * k; else { commission += profit({ sale: i.total * k, commissionRate: rate }).commission; realCommission = false; }
+    if (i.purchase_price) cost += i.purchase_price * i.quantity * k; else missing++;
   }
   // Kargo ve hizmet bedeli sipariş başınadır; tüm satırları iptal edilmiş siparişte sayılmaz (istatistiklerle aynı kural)
-  const live = o.items.some((i) => i.status !== 'cancelled' && i.status !== 'returned');
+  const live = o.items.some(liveLine);
   // Kargo: kanal faturası / siparişe elle girilen → ürünün kargo tutarı (en yükseği; tek koli) → Ayarlar'daki sipariş başı tutar
-  const prodShip = Math.max(0, ...o.items.filter((i) => i.status !== 'cancelled' && i.status !== 'returned').map((i) => Number(i.ship_cost) || 0));
+  const prodShip = Math.max(0, ...o.items.filter(liveLine).map((i) => Number(i.ship_cost) || 0));
   const defShip = costOf(settings, 'shipping', ch);
   const shipping = live ? o.shipping_cost ?? (prodShip > 0 ? prodShip : defShip) : 0;
   const fee = live ? costOf(settings, 'service_fee', ch) : 0;
@@ -95,6 +98,8 @@ async function aggregate(db, settings, { from, to, channel }) {
   if (!chans.length) return [];
   const rate = (key, col = 'o.channel') => `(CASE ${col} ${chans.map((c) => `WHEN '${c}' THEN ${Number(costOf(settings, key, c)) || 0}`).join(' ')} ELSE 0 END)`;
   const LIVEI = "i.order_id IS NOT NULL AND COALESCE(i.status, '') NOT IN ('cancelled', 'returned')";
+  // Kısmi iade: satırın iade edilmeyen payı (bkz. keptShare)
+  const K = "(CASE WHEN i.quantity > 0 THEN (i.quantity - MIN(i.quantity, MAX(0, COALESCE(i.returned_qty, 0)))) * 1.0 / i.quantity ELSE 1 END)";
   // Tek geçiş: siparişler tarih dizininden bir kez okunur, satırlarıyla sipariş başına toplanır, sonra kanal başına toplanır
   // (önceki iki aşamalı sorgu siparişleri iki kez tarıyor ve ara sonuç için geçici dizin kuruyordu; 1 yıllık dönem ~%40 daha hızlı)
   return all(db, `SELECT channel, COUNT(*) AS orders, COALESCE(SUM(rev), 0) AS revenue, COALESCE(SUM(comm), 0) AS commission,
@@ -106,10 +111,10 @@ async function aggregate(db, settings, { from, to, channel }) {
       SUM(rev * ${rate('fee_rate', 'channel')} / 100.0) AS rateFee,
       SUM(rev * 100.0 / 120.0 * ${rate('withholding', 'channel')} / 100.0) AS withholding
     FROM (SELECT o.channel, o.shipping_cost AS sc, o.shipping_src AS ss,
-        SUM(CASE WHEN ${LIVEI} THEN i.total ELSE 0 END) AS rev,
-        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission * ${costVat(settings)}, ${rate('commission')}) / 100.0) ELSE 0 END) AS comm,
+        SUM(CASE WHEN ${LIVEI} THEN i.total * ${K} ELSE 0 END) AS rev,
+        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission * (CASE WHEN l.commission_src = 'api' THEN 1.2 ELSE ${costVat(settings)} END), ${rate('commission')}) / 100.0) * ${K} ELSE 0 END) AS comm,
         SUM(CASE WHEN ${LIVEI} AND i.commission IS NULL THEN 1 ELSE 0 END) AS estc,
-        SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity ELSE 0 END) AS cost,
+        SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity * ${K} ELSE 0 END) AS cost,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) = 0 THEN 1 ELSE 0 END) AS miss,
         SUM(CASE WHEN ${LIVEI} THEN 1 ELSE 0 END) AS live, COUNT(i.order_id) AS n,
         -- Ürüne girilen kargo tutarı (siparişteki en yüksek): ürünler zaten bu geçişte okunur, sipariş başına ayrı alt sorgu gerekmez
@@ -214,11 +219,12 @@ export async function productProfit(db, settings, { from, to, channel, sort = 'p
   const cw = channel ? ' AND o.channel = ?' : '', ca = channel ? [channel] : [];
   const [orders, items, ret] = await Promise.all([
     all(db, `SELECT o.id, o.channel, o.shipping_cost, o.shipping_src FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
-    all(db, `SELECT i.order_id, i.product_id, i.name, i.sku, i.total, i.quantity, i.status, i.commission, p.purchase_price, p.ship_cost, p.name AS pname, p.variant_name, p.image, l.commission AS listing_commission
+    all(db, `SELECT i.order_id, i.product_id, i.name, i.sku, i.total, i.quantity, i.returned_qty, i.status, i.commission, p.purchase_price, p.ship_cost, p.name AS pname, p.variant_name, p.image, l.commission AS listing_commission, l.commission_src AS listing_commission_src
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca),
-    all(db, `SELECT COALESCE(i.product_id, 'x:' || COALESCE(i.sku, i.name)) AS k, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id
-      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND o.status = 'returned'${cw} GROUP BY k`, from, to, ...ca),
+    all(db, `SELECT COALESCE(i.product_id, 'x:' || COALESCE(i.sku, i.name)) AS k, SUM(CASE WHEN o.status = 'returned' THEN i.quantity ELSE MIN(i.quantity, COALESCE(i.returned_qty, 0)) END) AS n
+      FROM order_items i JOIN orders o ON o.id = i.order_id
+      WHERE o.ordered_at >= ? AND o.ordered_at < ? AND (o.status = 'returned' OR i.returned_qty > 0)${cw} GROUP BY k`, from, to, ...ca),
   ]);
   const byOrder = new Map();
   for (const i of items) (byOrder.get(i.order_id) || byOrder.set(i.order_id, []).get(i.order_id)).push(i);
@@ -228,13 +234,14 @@ export async function productProfit(db, settings, { from, to, channel, sort = 'p
     const p = orderProfit({ ...o, items: its }, settings);
     const other = p.shipping + p.fee + p.rateFee + p.withholding;
     for (const i of its) {
-      if (i.status === 'cancelled' || i.status === 'returned') continue;
-      const share = p.revenue ? i.total / p.revenue : 0;
-      const comm = i.commission != null ? i.commission : (i.total * (rateGross(settings, i.listing_commission) ?? costOf(settings, 'commission', o.channel))) / 100;
+      if (!liveLine(i)) continue;
+      const kk = keptShare(i), tot = i.total * kk, qty = i.quantity * kk;
+      const share = p.revenue ? tot / p.revenue : 0;
+      const comm = (i.commission != null ? i.commission : (i.total * (rateGross(settings, i.listing_commission, i.listing_commission_src) ?? costOf(settings, 'commission', o.channel))) / 100) * kk;
       const k = i.product_id != null ? i.product_id : 'x:' + (i.sku || i.name);
       const x = out.get(k) || out.set(k, { key: String(k), product_id: i.product_id, name: i.pname || i.name || i.sku || '—', variant: i.variant_name || '', image: i.image || '', units: 0, orders: 0, revenue: 0, commission: 0, other: 0, cost: 0, missingCost: 0, channels: new Set() }).get(k);
-      x.units += i.quantity; x.orders++; x.revenue += i.total; x.commission += comm; x.other += other * share; x.channels.add(o.channel);
-      if (i.purchase_price) x.cost += i.purchase_price * i.quantity; else x.missingCost += i.quantity;
+      x.units += qty; x.orders++; x.revenue += tot; x.commission += comm; x.other += other * share; x.channels.add(o.channel);
+      if (i.purchase_price) x.cost += i.purchase_price * qty; else x.missingCost += qty;
     }
   }
   const retBy = new Map(ret.map((r) => [String(r.k), r.n]));
@@ -257,10 +264,12 @@ export async function syncInvoices(env, db, { force = false, only } = {}) {
   for (const ch of await getChannels(env, db)) {
     if (!ch.enabled || ch.demo || !ch.invoices || (only && !only.includes(ch.id))) continue;
     const key = 'invsync:' + ch.id, last = await getRaw(db, key);
-    if (!force && last && Date.now() - last.at < 6 * 3600e3) continue;
+    // Hata sonrası kademeli bekleme (30 dk, 1 sa, … en çok 6 sa): uzun okumada sürekli hata alan kanal her senkronda baştan denenmez
+    if (!force && last && Date.now() - last.at < (last.error ? Math.min(last.fails || 1, 12) * 30 * 60e3 : 6 * 3600e3)) continue;
     const t = Date.now();
     try {
-      const rows = await ch.invoices(last ? t - 20 * 864e5 : t - 90 * 864e5, t);
+      // İlk başarılı okumaya kadar 90 gün, sonra son 20 gün (hata kaydı ilk okumayı "yapıldı" saydırmaz)
+      const rows = await ch.invoices(last && last.n != null ? t - 20 * 864e5 : t - 90 * 864e5, t);
       for (const part of chunk(rows, 60)) {
         await db.batch(part.map((x) => db.prepare(`INSERT INTO invoices (channel, remote_id, no, date, type, description, amount, order_number, url, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT (channel, remote_id) DO UPDATE SET no = excluded.no, date = excluded.date, type = excluded.type, description = excluded.description, amount = excluded.amount,
@@ -271,6 +280,8 @@ export async function syncInvoices(env, db, { force = false, only } = {}) {
       out[ch.id] = rows.length;
     } catch (e) {
       out[ch.id] = 'hata: ' + e.message;
+      // İlk okuma (90 gün) henüz başarılmadıysa kayıt "ilk okuma" olarak kalır (last yok → yine 90 gün); istek sınırı doluysa sayılmaz
+      if (!e.budget) await setSetting(db, key, { ...(last || {}), at: t, error: e.message.slice(0, 300), fails: ((last && last.fails) || 0) + 1 }).catch(() => {});
       await log(db, ch.id, 'error', 'Faturalar alınamadı: ' + e.message);
     }
   }
@@ -284,10 +295,11 @@ export async function syncSettlements(env, db, { force = false, only } = {}) {
   for (const ch of await getChannels(env, db)) {
     if (!ch.enabled || ch.demo || !ch.settlements || (only && !only.includes(ch.id))) continue;
     const key = 'stlsync:' + ch.id, last = await getRaw(db, key);
-    if (!force && last && Date.now() - last.at < 6 * 3600e3) continue;
+    // Hata sonrası kademeli bekleme (30 dk, 1 sa, … en çok 6 sa): uzun okumada sürekli hata alan kanal her senkronda baştan denenmez
+    if (!force && last && Date.now() - last.at < (last.error ? Math.min(last.fails || 1, 12) * 30 * 60e3 : 6 * 3600e3)) continue;
     const t = Date.now();
     try {
-      const rows = await ch.settlements(last ? t - 20 * 864e5 : t - 60 * 864e5, t);
+      const rows = await ch.settlements(last && last.n != null ? t - 20 * 864e5 : t - 60 * 864e5, t);
       for (const part of chunk(rows, 60)) {
         await db.batch(part.map((x) => db.prepare(`INSERT INTO settlements (channel, remote_id, date, type, order_number, amount, commission, payment_date, due_date, paid, payment_id, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT (channel, remote_id) DO UPDATE SET date = excluded.date, type = excluded.type, order_number = excluded.order_number, amount = excluded.amount, commission = excluded.commission,
@@ -298,6 +310,7 @@ export async function syncSettlements(env, db, { force = false, only } = {}) {
       out[ch.id] = rows.length;
     } catch (e) {
       out[ch.id] = 'hata: ' + e.message;
+      if (!e.budget) await setSetting(db, key, { ...(last || {}), at: t, error: e.message.slice(0, 300), fails: ((last && last.fails) || 0) + 1 }).catch(() => {});
       await log(db, ch.id, 'error', 'Hakediş kayıtları alınamadı: ' + e.message);
     }
   }
@@ -323,7 +336,7 @@ export async function settlementReport(env, db, settings, q = {}) {
   const diffs = [];
   if (orders.length) {
     const ids = orders.map((o) => o.id), items = [];
-    for (const part of chunk(ids, 80)) items.push(...await all(db, `SELECT i.order_id, i.total, i.quantity, i.status, i.commission, p.purchase_price, l.commission AS listing_commission FROM order_items i JOIN orders o ON o.id = i.order_id
+    for (const part of chunk(ids, 80)) items.push(...await all(db, `SELECT i.order_id, i.total, i.quantity, i.status, i.commission, p.purchase_price, l.commission AS listing_commission, l.commission_src AS listing_commission_src FROM order_items i JOIN orders o ON o.id = i.order_id
       LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key WHERE i.order_id IN (${part.map(() => '?').join(',')})`, ...part));
     const by = new Map();
     for (const i of items) (by.get(i.order_id) || by.set(i.order_id, []).get(i.order_id)).push(i);

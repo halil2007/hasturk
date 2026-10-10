@@ -4,6 +4,7 @@ import { dayKey, weekKey, monthKey, TR, r2, LATE, PRODUCT_SHIP } from './util.js
 import { CHANNEL_IDS, isChannelId } from './channels/index.js';
 import { profit, costOf, rateGross } from '../public/profit.js';
 import { DESIRED } from './sync.js';
+import { keptShare } from './finance.js';
 const LOW = (n) => `(CASE WHEN critical_stock > 0 THEN critical_stock ELSE ${Math.max(0, Math.round(Number(n) || 0))} END)`;
 
 const D = 864e5;
@@ -36,7 +37,7 @@ async function period(db, fromMs, toMs, group, settings) {
     if (b) { b.revenue[r.channel] = (b.revenue[r.channel] || 0) + r.total; b.orders[r.channel] = (b.orders[r.channel] || 0) + 1; }
   }
   // Tahmini kâr: satır tutarı − komisyon − alış maliyeti; sipariş başına kargo + hizmet bedeli
-  const lines = await all(db, `SELECT o.id, o.channel, o.ordered_at, o.shipping_cost, ${PRODUCT_SHIP} AS pship, i.total, i.quantity, i.commission AS actual_commission, p.purchase_price, l.commission
+  const lines = await all(db, `SELECT o.id, o.channel, o.ordered_at, o.shipping_cost, ${PRODUCT_SHIP} AS pship, i.total, i.quantity, i.returned_qty, i.commission AS actual_commission, p.purchase_price, l.commission, l.commission_src
     FROM order_items i JOIN orders o ON o.id = i.order_id
     LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
@@ -44,8 +45,12 @@ async function period(db, fromMs, toMs, group, settings) {
   const seen = new Set();
   let missingCost = 0;
   for (const l of lines) {
+    // Kısmi iade: iade edilmeyen pay (ciro, maliyet; komisyon oranı aynı kalır)
+    const kq = keptShare(l);
+    if (kq <= 0) continue;
+    l.total *= kq; l.quantity *= kq; if (l.actual_commission != null) l.actual_commission *= kq;
     const ch = l.channel, tt = T(ch);
-    const rate = rateGross(settings, l.commission) ?? costOf(settings, 'commission', ch);
+    const rate = rateGross(settings, l.commission, l.commission_src) ?? costOf(settings, 'commission', ch);
     // Kanalın bildirdiği gerçek komisyon varsa o kullanılır
     const effRate = l.actual_commission != null && l.total > 0 ? (l.actual_commission / l.total) * 100 : rate;
     let v = profit({ sale: l.total, purchase: (l.purchase_price || 0) * l.quantity, commissionRate: effRate, feeRate: costOf(settings, 'fee_rate', ch), withholdingRate: costOf(settings, 'withholding', ch) }).unitProfit;

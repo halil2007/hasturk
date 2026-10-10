@@ -295,21 +295,28 @@ test('WooCommerce: ürünler; değişken ürünün varyasyonları ayrı okunur',
 });
 
 test('WooCommerce: stok ve fiyat toplu (batch) gönderilir; varyasyonlar ana ürün altında', async () => {
-  const calls = mockFetch((c) => ({ update: c.body.update.map((u) => ({ id: u.id })) }));
+  // Stok takibi modu (manage_stock) ürün sorgusundan okunur (bkz. fix-stores-woo.test.mjs: 'parent' ve kapalı stok takibi)
+  const managed = (c) => new URL(c.url).searchParams.get('include').split(',').map((id) => ({ id: Number(id), manage_stock: true }));
+  const all = [];
+  mockFetch((c) => { all.push(c); return c.method === 'GET' ? managed(c) : { update: c.body.update.map((u) => ({ id: u.id })) }; });
   const ch = woocommerce(WENV, {});
   await ch.pushStock([{ remoteId: '10', remoteProductId: '10', stock: 4 }, { remoteId: '21', remoteProductId: '20', stock: -2 }, { remoteId: '22', remoteProductId: '20', stock: 3 }, { remoteId: '30', stock: 1 }]);
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].method, 'POST');
-  assert.match(calls[0].url, /\/wp-json\/wc\/v3\/products\/batch$/);
-  assert.deepEqual(calls[0].body, { update: [{ id: 10, manage_stock: true, stock_quantity: 4 }, { id: 30, manage_stock: true, stock_quantity: 1 }] });
-  assert.match(calls[1].url, /\/products\/20\/variations\/batch$/);
-  assert.deepEqual(calls[1].body, { update: [{ id: 21, manage_stock: true, stock_quantity: 0 }, { id: 22, manage_stock: true, stock_quantity: 3 }] });
+  const posts = all.filter((c) => c.method === 'POST');
+  assert.equal(posts.length, 2);
+  assert.match(posts[0].url, /\/wp-json\/wc\/v3\/products\/batch$/);
+  assert.deepEqual(posts[0].body, { update: [{ id: 10, manage_stock: true, stock_quantity: 4 }, { id: 30, manage_stock: true, stock_quantity: 1 }] });
+  assert.match(posts[1].url, /\/products\/20\/variations\/batch$/);
+  assert.deepEqual(posts[1].body, { update: [{ id: 21, manage_stock: true, stock_quantity: 0 }, { id: 22, manage_stock: true, stock_quantity: 3 }] });
+  all.length = 0;
   await ch.pushPrice([{ remoteId: '10', remoteProductId: '10', price: 90, listPrice: 120 }, { remoteId: '11', remoteProductId: '11', price: 75.5, listPrice: 0 }]);
-  assert.deepEqual(calls[2].body, { update: [{ id: 10, regular_price: '120', sale_price: '90' }, { id: 11, regular_price: '75.5', sale_price: '' }] });
-  // 100'den fazlası parçalanır; kalem hatası bildirilir
+  assert.deepEqual(all[0].body, { update: [{ id: 10, regular_price: '120', sale_price: '90' }, { id: 11, regular_price: '75.5', sale_price: '' }] });
+  // 100'den fazlası parçalanır; kalem hatası yalnız o ilana yazılır (diğerleri gönderildi)
   const many = Array.from({ length: 150 }, (_, i) => ({ remoteId: String(i + 1), remoteProductId: String(i + 1), stock: 1 }));
-  const calls2 = mockFetch((c) => ({ update: c.body.update.map((u) => (u.id === 120 ? { id: 120, error: { code: 'woocommerce_rest_product_invalid_id', message: 'Geçersiz kimlik.' } } : { id: u.id })) }));
-  await assert.rejects(ch.pushStock(many), /WooCommerce: 1 ürün güncellenemedi \(120: Geçersiz kimlik\.\)/);
+  const calls2 = [];
+  mockFetch((c) => { if (c.method === 'GET') return managed(c); calls2.push(c); return { update: c.body.update.map((u) => (u.id === 120 ? { id: 120, error: { code: 'woocommerce_rest_product_invalid_id', message: 'Geçersiz kimlik.' } } : { id: u.id })) }; });
+  const r = await ch.pushStock(many);
+  assert.deepEqual(r.errors, [{ remoteId: '120', error: 'WooCommerce: Geçersiz kimlik.' }]);
+  assert.equal(r.done.length, 149);
   assert.deepEqual(calls2.map((c) => c.body.update.length), [100, 50]);
 });
 

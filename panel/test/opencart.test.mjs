@@ -123,7 +123,10 @@ test('OpenCart: stok ve fiyat gönderimi; seçenek kalemleri ürün + seçenek d
   // 200'den fazlası parçalanır; kalem hataları bildirilir
   const many = Array.from({ length: 250 }, (_, i) => ({ remoteId: String(i + 1), remoteProductId: String(i + 1), stock: 1 }));
   const calls2 = mockFetch((c) => ({ ok: true, updated: c.body.items.length - 1, errors: c.body.items.length === 50 ? [{ product_id: 220, message: 'ürün bulunamadı' }] : [{ product_id: 5, option_value_id: 9, message: 'seçenek bulunamadı' }] }));
-  await assert.rejects(ch.pushStock(many), /OpenCart: 2 ürün güncellenemedi \(5:9: seçenek bulunamadı; 220: ürün bulunamadı\)/);
+  // Sonuç ilan ilan: hatalı kalemler errors'a, diğerleri done'a (yalnız hatalılar yeniden denenir)
+  const r = await ch.pushStock(many);
+  assert.deepEqual(r.errors, [{ remoteId: '5', error: 'OpenCart: seçenek bulunamadı' }, { remoteId: '220', error: 'OpenCart: ürün bulunamadı' }]);
+  assert.equal(r.done.length, 248);
   assert.deepEqual(calls2.map((c) => c.body.items.length), [200, 50]);
 });
 

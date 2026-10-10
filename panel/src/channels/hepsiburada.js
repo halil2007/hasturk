@@ -5,6 +5,15 @@
 //   Siparişler/paketler: oms-external · İlan/stok/fiyat/buybox: listing-external · Müşteri soruları: api-asktoseller-merchant
 import { http, basic, num, str, chunk, diagStep, isImageAttr, imageList, mediaUrls } from '../util.js';
 
+// Tarih: saat dilimi yazılmamışsa (ör. "2021-02-02T11:09:39", "2026-10-01 10:00") Türkiye saati (+03:00); geçersizse 0
+export function hbTime(v) {
+  const s = str(v);
+  if (!s) return 0;
+  const m = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?))?$/.exec(s);
+  const t = Date.parse(m ? `${m[1]}T${m[2] || '00:00:00'}+03:00` : s);
+  return Number.isFinite(t) ? t : 0;
+}
+
 export function hepsiburada(env, meta) {
   const m = env.HB_MERCHANT_ID, user = env.HB_USERNAME || m, pass = env.HB_PASSWORD;
   // Test ortamı (SIT): Hepsiburada canlı API bilgilerini test adımları tamamlanınca verir; o zamana kadar tüm istekler -sit sunucularına gider
@@ -59,23 +68,24 @@ export function hepsiburada(env, meta) {
       image: str(g(it, 'productImageUrlFormat')).replace('{size}', '300'),
       quantity: qty, unitPrice: qty ? total / qty : total, total,
       status: /cancel|iptal/i.test(g(it, 'status') || '') ? 'cancelled' : '', remoteKey: str(g(it, 'hbSku', 'sku', 'hepsiburadaSku')),
-      orderNumber: str(g(it, 'orderNumber', 'orderId')), orderDate: g(it, 'orderDate'), dueDate: Date.parse(g(it, 'dueDate') || '') || null,
+      orderNumber: str(g(it, 'orderNumber', 'orderId')), orderDate: g(it, 'orderDate'), dueDate: hbTime(g(it, 'dueDate')) || null,
       // Hepsiburada'nın satırda bildirdiği komisyon (TL) ya da oran (%); ikisi de yoksa boş (tahmin kullanılır)
       commission: commissionOf(it, total, qty),
     };
   }
   // Komisyon: Hepsiburada satırdaki tutarı tek adet için ve KDV hariç bildirir (ör. 2 × 1.500 TL, %17 → 255 TL); Hepsiburada panelindeki
   // "Hepsiburada komisyonu" ise satırın tamamı ve KDV dahildir (3.000 × %17 × 1,20 = 612 TL). Panelde de kesilecek tutar tutulur.
-  // Oran da geldiyse tutarın adet başı mı satır toplamı mı olduğu orandan doğrulanır.
+  // Oran da geldiyse tutarın adet başı mı satır toplamı mı olduğu orandan doğrulanır; oran yoksa adet başı sayıldığında oran %35'i
+  // aşıyorsa (komisyon için olanaksız) tutar satır toplamıdır. Oransız 0 tutar "bilinmiyor"dur (tahmin kullanılır), 0 TL komisyon değil.
   function commissionOf(it, total, qty) {
     const amt = g(it, 'commission') != null ? money(g(it, 'commission')) : null, rate = g(it, 'commissionRate') != null ? num(g(it, 'commissionRate')) : null;
     let net = null;
     if (amt > 0) {
       let perUnit = qty > 1;
       if (perUnit && rate > 0) perUnit = Math.abs(amt - (total / qty) * rate / 100) <= Math.abs(amt - total * rate / 100);
+      else if (perUnit && total > 0) perUnit = (amt * qty) / total <= 0.35;
       net = perUnit ? amt * qty : amt;
     } else if (rate != null) net = (total * rate) / 100;
-    else if (amt != null) net = amt;
     return net == null ? null : Math.round(net * HB_VAT * 100) / 100;
   }
   // Adres: açık satırdaki shippingAddress / sipariş ayrıntısındaki deliveryAddress (il = city, ilçe = town, mahalle = district)
@@ -90,7 +100,7 @@ export function hepsiburada(env, meta) {
       touch(orderNumber, { date, customer, address, customerId } = {}) {
         let o = map.get(orderNumber);
         if (!o) {
-          o = { remoteId: orderNumber, orderNumber, orderedAt: Date.parse(date) || Date.now(), remoteStatus: 'new', status: 'new', customer: '', phone: '', email: '', address: {}, total: 0, currency: 'TRY', cargoCompany: '', tracking: '', items: [], packages: [] };
+          o = { remoteId: orderNumber, orderNumber, orderedAt: hbTime(date) || Date.now(), remoteStatus: 'new', status: 'new', customer: '', phone: '', email: '', address: {}, total: 0, currency: 'TRY', cargoCompany: '', tracking: '', items: [], packages: [] };
           map.set(orderNumber, o);
         }
         if (customer && !o.customer) o.customer = customer;
@@ -137,20 +147,24 @@ export function hepsiburada(env, meta) {
         if (!no) continue;
         const address = { name: str(g(pk, 'recipientName', 'customerName')), line: str(g(pk, 'shippingAddressDetail')), district: str(g(pk, 'shippingTown') || g(pk, 'shippingDistrict')), city: str(g(pk, 'shippingCity')), phone: str(g(pk, 'phoneNumber')), email: str(g(pk, 'email')) };
         const o = O.touch(no, { date: g(pk, 'orderDate'), customerId: g(pk, 'customerId'), customer: str(g(pk, 'customerName')), address });
-        for (const l of lines) O.addLine(o, { ...l, dueDate: l.dueDate || Date.parse(g(pk, 'dueDate') || '') || null });
+        for (const l of lines) O.addLine(o, { ...l, dueDate: l.dueDate || hbTime(g(pk, 'dueDate')) || null });
         O.bump(o, 'processing');
         const pn = str(g(pk, 'packageNumber'));
         if (pn && !o.packages.some((x) => x.remoteId === pn)) o.packages.push({ remoteId: pn, items: lines.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: 'open', remoteStatus: 'Packaged', cargoCompany: str(g(pk, 'cargoCompany')), tracking: '', barcode: str(g(pk, 'barcode')), packed: true });
         if (!o.cargoCompany) o.cargoCompany = str(g(pk, 'cargoCompany'));
       }
-    } catch (e) { errors.push('paketler: ' + e.message); }
+    } catch (e) { if (e.budget) throw e; errors.push('paketler: ' + e.message); }
     // 3) Kargodaki / teslim edilen paketler ve iptal edilen satırlar (tarih filtresi yok; yeniden eskiye, since'e kadar)
+    // Üç liste önce toplanır, kayıtlar eskiden yeniye işlenir: ayrıntı okuma sınırına (200 sipariş) takılınca imleç ilk okunamayan
+    // kaydın zamanında kalır (partialUntil), sonraki senkron oradan devam eder. Önceden en yeniler okunup imleç hep "since"te kalıyordu:
+    // çok siparişli mağazada her senkron aynı 200 siparişi yeniden okuyup hiç ilerlemiyordu. Siparişi bu senkronda zaten okunmuş
+    // (açık satır / paket listesinde gelen ya da başka listede okunan) kayıt sınırdan sayılmaz.
     const detail = new Map();
-    let detailCapped = false;
+    let detailCapped = false, cut = Infinity, at = 0;
     const need = async (no) => {
       if (O.map.has(no)) return O.map.get(no);
       if (!detail.has(no)) {
-        if (detail.size >= 200) { detailCapped = true; return null; }
+        if (detail.size >= 200) { detailCapped = true; if (at && at < cut) cut = at; return null; }
         detail.set(no, null);
         try {
           const r = await call(`${OMS}/orders/merchantId/${m}/ordernumber/${encodeURIComponent(no)}`);
@@ -158,40 +172,46 @@ export function hepsiburada(env, meta) {
           const o = O.touch(no, { date: g(r, 'orderDate'), customer: str(g(g(r, 'customer') || {}, 'name')) || a.name, address: a });
           for (const it of g(r, 'items') || []) O.addLine(o, lineOf(it));
           detail.set(no, o);
-        } catch (e) { errors.push(`sipariş ${no}: ${e.message}`); }
+        } catch (e) { if (e.budget) throw e; errors.push(`sipariş ${no}: ${e.message}`); }
       }
       return detail.get(no);
     };
+    const feed = [];
     const feeds = [['shipped', 'ShippedDate', 'shipped'], ['delivered', 'DeliveredDate', 'delivered']];
     for (const [path, dateKey, status] of feeds) {
       try {
-        const old = (r) => r.length && r.every((x) => (Date.parse(g(x, dateKey) || '') || Infinity) < since);
+        const old = (r) => r.length && r.every((x) => (hbTime(g(x, dateKey)) || Infinity) < since);
         for (const x of await pages(`${OMS}/packages/merchantId/${m}/${path}`, { limit: 50, max: 40, stop: old })) {
-          const at = Date.parse(g(x, dateKey) || '') || 0;
-          if (at && at < since) continue;
-          const no = str(g(x, 'OrderNumber') || (g(x, 'OrderNumbers') || [])[0]);
-          const o = no && await need(no);
-          if (!o) continue;
-          O.bump(o, status);
-          const pn = str(g(x, 'PackageNumber'));
-          const live = o.items.filter((i) => !i.status);
-          const pk = o.packages.find((p) => p.remoteId === pn);
-          if (pk) { pk.status = 'shipped'; pk.remoteStatus = path; pk.barcode = pk.barcode || str(g(x, 'Barcode')); }
-          else if (pn) o.packages.push({ remoteId: pn, items: live.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: 'shipped', remoteStatus: path, cargoCompany: o.cargoCompany, tracking: str(g(x, 'Barcode')), barcode: str(g(x, 'Barcode')), packed: true });
+          const t = hbTime(g(x, dateKey)) || 0;
+          if (!(t && t < since)) feed.push({ t, x, path, status, no: str(g(x, 'OrderNumber') || (g(x, 'OrderNumbers') || [])[0]) });
         }
-      } catch (e) { errors.push(`${path}: ${e.message}`); }
+      } catch (e) { if (e.budget) throw e; errors.push(`${path}: ${e.message}`); }
     }
     try {
-      const old = (r) => r.length && r.every((x) => (Date.parse(g(x, 'cancelDate') || '') || Infinity) < since);
+      const old = (r) => r.length && r.every((x) => (hbTime(g(x, 'cancelDate')) || Infinity) < since);
       for (const x of await pages(`${OMS}/orders/merchantId/${m}/cancelled`, { limit: 50, max: 40, stop: old })) {
-        const at = Date.parse(g(x, 'cancelDate') || '') || 0;
-        if (at && at < since) continue;
-        const o = await need(str(g(x, 'orderNumber')));
-        if (!o) continue;
+        const t = hbTime(g(x, 'cancelDate')) || 0;
+        if (!(t && t < since)) feed.push({ t, x, path: 'cancelled', no: str(g(x, 'orderNumber')) });
+      }
+    } catch (e) { if (e.budget) throw e; errors.push('iptaller: ' + e.message); }
+    // Eskiden yeniye (tarihsiz kayıt en başta); aynı anda kargo ve teslim kaydı varsa teslim sonra (durum geriye gitmesin)
+    feed.sort((a, b) => a.t - b.t);
+    for (const { t, x, path, status, no } of feed) {
+      at = t;
+      const o = no && await need(no);
+      if (!o) continue;
+      if (path === 'cancelled') {
         const it = o.items.find((i) => i.lineId === str(g(x, 'lineItemId')));
         if (it && !it.status) { it.status = 'cancelled'; o.total -= it.total; }
+        continue;
       }
-    } catch (e) { errors.push('iptaller: ' + e.message); }
+      O.bump(o, status);
+      const pn = str(g(x, 'PackageNumber'));
+      const live = o.items.filter((i) => !i.status);
+      const pk = o.packages.find((p) => p.remoteId === pn);
+      if (pk) { pk.status = 'shipped'; pk.remoteStatus = path; pk.barcode = pk.barcode || str(g(x, 'Barcode')); }
+      else if (pn) o.packages.push({ remoteId: pn, items: live.map((l) => ({ line_id: l.lineId, qty: l.quantity })), status: 'shipped', remoteStatus: path, cargoCompany: o.cargoCompany, tracking: str(g(x, 'Barcode')), barcode: str(g(x, 'Barcode')), packed: true });
+    }
     const out = [];
     for (const o of O.map.values()) {
       if (o.items.length && o.items.every((i) => i.status === 'cancelled')) o.status = 'cancelled';
@@ -205,7 +225,8 @@ export function hepsiburada(env, meta) {
     if (detailCapped) errors.push('bu senkronda en fazla 200 eski siparişin ayrıntısı okunabildi; kalan kargo / teslim / iptal bilgileri bir sonraki senkronda alınacak');
     if (errors.length) out.warnings = errors;
     // Kargo / teslim / iptal akışlarından biri okunamadıysa imleç ilerlemez: o aralıktaki iptaller bir sonraki senkronda yeniden okunur
-    if (detailCapped || errors.some((x) => /^(shipped|delivered|iptaller|paketler):/.test(x))) out.partialUntil = since;
+    if (errors.some((x) => /^(shipped|delivered|iptaller|paketler):/.test(x))) out.partialUntil = since;
+    else if (detailCapped) out.partialUntil = Number.isFinite(cut) && cut > since ? cut - 1000 : since;
     return out;
   }
 
@@ -467,11 +488,11 @@ export function hepsiburada(env, meta) {
       const prod = g(x, 'product') || {}, subj = g(x, 'subject') || {};
       const st = g(x, 'status');
       return {
-        remoteId: str(g(x, 'issueNumber') || g(x, 'id')), text: str(g(first, 'content') || g(x, 'lastContent')), askedAt: Date.parse(g(x, 'createdAt') || '') || Date.now(),
+        remoteId: str(g(x, 'issueNumber') || g(x, 'id')), text: str(g(first, 'content') || g(x, 'lastContent')), askedAt: hbTime(g(x, 'createdAt')) || Date.now(),
         status: QST[st] || 'other', remoteStatus: str(st), productName: [str(g(subj, 'description')), str(g(prod, 'name'))].filter(Boolean).join(' · '),
         productImage: str(g(prod, 'imageUrl')).replace('{size}', '300'), barcode: str(g(prod, 'sku')), sku: str(g(prod, 'stockCode')),
-        customer: g(x, 'orderNumber') ? `Sipariş #${g(x, 'orderNumber')}` : '', answer: ans ? str(g(ans, 'content')) : null, answeredAt: ans ? Date.parse(g(ans, 'createdAt') || '') || null : null,
-        dueAt: Date.parse(g(x, 'expireDate') || '') || null,
+        customer: g(x, 'orderNumber') ? `Sipariş #${g(x, 'orderNumber')}` : '', answer: ans ? str(g(ans, 'content')) : null, answeredAt: ans ? hbTime(g(ans, 'createdAt')) || null : null,
+        dueAt: hbTime(g(x, 'expireDate')) || null,
       };
     });
     return { items, total: num(g(r, 'totalItemCount')), hasNext: num(g(r, 'currentPage')) < num(g(r, 'totalPageCount')) };
@@ -716,7 +737,7 @@ export function hepsiburada(env, meta) {
       const st = str(g(c, 'status')), qty = num(g(c, 'quantity'), 1), price = money(g(c, 'priceAmount'));
       const no = str(g(c, 'number', 'claimNumber'));
       return {
-        remoteId: no || str(g(c, 'id')), orderNumber: str(g(c, 'orderNumber')), claimedAt: Date.parse(g(c, 'claimDate') || '') || Date.now(), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st,
+        remoteId: no || str(g(c, 'id')), orderNumber: str(g(c, 'orderNumber')), claimedAt: hbTime(g(c, 'claimDate')) || Date.now(), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st,
         customer: str(g(c, 'customerName')), reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')),
         lines: [{ id: no, name: str(g(c, 'productName')) || str(g(c, 'sku')), sku: str(g(c, 'sku')), qty, price, reason: str(g(c, 'claimType')), note: str(g(c, 'explanation')), status: HCS[st] || 'other', remoteStatus: HCS_TR[st] || st }],
         amount: money(g(c, 'totalPriceAmount')) || price * qty, cargo: '', tracking: '', images: mediaUrls(c),
@@ -755,8 +776,8 @@ export function hepsiburada(env, meta) {
           if (/^TotalPayment$/.test(tt)) continue; // toplam ödeme satırı ayrı kalemleri tekrar eder
           const v = Math.abs(money(g(x, 'netAmount')) || money(g(x, 'amount'))), inc = g(x, 'isIncome');
           const amount = (inc === true || (inc == null && money(g(x, 'amount')) > 0) ? 1 : -1) * v;
-          const due = Date.parse(g(x, 'dueDate') || '') || null, paidAt = Date.parse(g(x, 'paymentDate') || '') || null;
-          out.set(str(g(x, 'id')), { remoteId: str(g(x, 'id')), date: Date.parse(g(x, 'orderDate') || g(x, 'invoiceDate') || '') || from, type: HB_TR[tt] || hbType[tt] || tt, orderNumber: str(g(x, 'orderNumber')),
+          const due = hbTime(g(x, 'dueDate')) || null, paidAt = hbTime(g(x, 'paymentDate')) || null;
+          out.set(str(g(x, 'id')), { remoteId: str(g(x, 'id')), date: hbTime(g(x, 'orderDate') || g(x, 'invoiceDate')) || from, type: HB_TR[tt] || hbType[tt] || tt, orderNumber: str(g(x, 'orderNumber')),
             amount: Math.round(amount * 100) / 100, commission: /^Commission/.test(tt) ? Math.round(amount * 100) / 100 : 0, paymentDate: paidAt, dueDate: due || paidAt, paid: /^Paid$/i.test(str(g(x, 'status'))), paymentId: '' });
         }
         if (rows.length < 100) break;
@@ -806,7 +827,7 @@ export function hepsiburada(env, meta) {
           const tt = str(g(x, 'transactionType')), type = hbType[tt] || 'Diğer kesinti';
           const inv = str(g(x, 'invoiceNumber')), key = inv ? `${type}:${inv}` : `${tt}:${str(g(x, 'id'))}`;
           const amt = Math.abs(money(g(x, 'amount'))) * (/Refund/.test(tt) ? -1 : 1);
-          const date = Date.parse(g(x, 'invoiceDate') || g(x, 'orderDate') || '') || from;
+          const date = hbTime(g(x, 'invoiceDate') || g(x, 'orderDate')) || from;
           const e = by.get(key) || { remoteId: key, no: inv, date, type, description: str(g(x, 'invoiceExplanation')) || tt, amount: 0, orderNumber: inv ? '' : str(g(x, 'orderNumber')), url: '' };
           e.amount = Math.round((e.amount + amt) * 100) / 100;
           by.set(key, e);

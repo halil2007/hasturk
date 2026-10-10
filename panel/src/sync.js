@@ -10,8 +10,8 @@ import { getChannels } from './channels/index.js';
 import { typeOf } from './config.js';
 import { syncInvoices, syncSettlements } from './finance.js';
 import { maintain } from './perf.js';
-import { syncFx } from './fx.js';
-import { mergeStatus, chunk, str, sleep, explainHttp } from './util.js';
+import { syncFx, orderRate } from './fx.js';
+import { mergeStatus, chunk, str, sleep, explainHttp, withBudget, budgetLeft, budgetUsed, budgetElapsed } from './util.js';
 import { autoMatch, relinkItems, repairDuplicates } from './match.js';
 import { runJobs, createJob } from './backfill.js';
 import { normCat, catKey } from '../public/catpath.js';
@@ -34,7 +34,9 @@ export { relinkItems };
 //   depodaki toplam stoktan fazlası gönderilmez)
 export const DESIRED = `CASE l.stock_mode WHEN 'own' THEN MAX(MIN(COALESCE(l.stock_value, 0), p.stock), 0)
   WHEN 'limit' THEN MAX(MIN(p.stock, COALESCE(l.stock_value, p.stock)), 0) ELSE MAX(p.stock, 0) END`;
-const LISTING_EVERY = 14 * 60e3;
+// İlanlar (tüm katalog) saatte bir yenilenir: her senkronda okumak isteklerin çoğunu tüketiyordu (stok / fiyat gönderimi
+// panelin kaydıyla yapılır; kanalda elle yapılan değişiklik en geç bir saatte görülür)
+const LISTING_EVERY = 55 * 60e3;
 export const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', 'amazon', 'ciceksepeti', 'koctas', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon']; // ilanlar en geç bu aralıkla yenilenir
 
 const D = 864e5;
@@ -85,12 +87,25 @@ export async function saveOrders(db, ch, orders, maps) {
     o._hash = h;
     changed.push(o);
   }
+  // Yurt dışı kanal (eBay, Etsy, Ozon, Amazon …) ya da TL dışı mağaza: tutarlar sipariş kaydedilirken TCMB kuruyla TL'ye çevrilir
+  // (ciro, kâr, istatistik TL üzerinden). Asıl tutar ve kur siparişin ek bilgisinde saklanır. Kur alınamazsa sipariş asıl
+  // para biriminde kalır ve bildirim düşer (TL toplamlara yanlış tutar karışmaz: currency alanı korunur).
+  for (const o of changed) {
+    const c = String(o.currency || 'TRY').toUpperCase();
+    if (c === 'TRY' || c === 'TL') continue;
+    const rate = await orderRate(db, c).catch(() => null);
+    if (!(rate > 0)) { await notify(db, `fx-order:${ch}`, { level: 'warn', channel: ch, title: `${c} siparişler TL'ye çevrilemedi`, msg: 'Kur alınamadı; bir sonraki senkronda yeniden denenir.' }).catch(() => {}); continue; }
+    const x = (v) => (v == null || !Number.isFinite(Number(v)) ? v : Math.round(Number(v) * rate * 100) / 100);
+    o.fx = { currency: c, rate, total: o.total };
+    o.total = x(o.total); o.currency = 'TRY';
+    for (const it of o.items || []) { it.unitPrice = x(it.unitPrice); it.total = x(it.total); it.commission = x(it.commission); }
+  }
   for (const part of chunk(changed, 25)) {
     const st = [];
     for (const o of part) {
       const id = `${ch}:${o.remoteId}`, ex = existing.get(id);
       const status = mergeStatus(o.status, ex && ex.local_status);
-      const extra = JSON.stringify({ awaitingPayment: !!o.awaitingPayment, ...(o.demo ? { demo: true } : {}), ...(o.cargoChoice ? { cargoChoice: o.cargoChoice } : {}), ...(o.customerId ? { customerId: o.customerId } : {}), ...(o.guest ? { guest: true } : {}) });
+      const extra = JSON.stringify({ awaitingPayment: !!o.awaitingPayment, ...(o.demo ? { demo: true } : {}), ...(o.cargoChoice ? { cargoChoice: o.cargoChoice } : {}), ...(o.customerId ? { customerId: o.customerId } : {}), ...(o.guest ? { guest: true } : {}), ...(o.fx ? { fx: o.fx } : {}) });
       // Kanalda durum değişti ve panelden yapılmadı → kanal tarafında işlem (satıcı paneli, kargo, müşteri…)
       let ext = null;
       if (ex && ex.remote_status && o.remoteStatus && ex.remote_status !== o.remoteStatus && !recent.has(id)) {
@@ -111,13 +126,17 @@ export async function saveOrders(db, ch, orders, maps) {
           customerKey({ channel: ch, id, phone: o.phone, email: o.email, customer: o.customer, address: o.address, extra })));
       st.push(db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id));
       for (const it of o.items) {
-        const com = it.commission == null || !Number.isFinite(Number(it.commission)) ? null : Math.max(0, Number(it.commission));
+        // Kanalın bildirdiği komisyon: satır tutarının %0,5–%60'ı dışındaysa (birim / KDV hatası, iptal satırında 0, hesaplanmamış) güvenilmez:
+        // saklanmaz, ilan / kanal oranıyla tahmin edilir (yanlış tutar "gerçek komisyon" olarak kâra işlemesin)
+        let com = it.commission == null || !Number.isFinite(Number(it.commission)) ? null : Math.max(0, Number(it.commission));
+        if (com != null && !(it.total > 0 && com / it.total >= 0.005 && com / it.total <= 0.6)) com = null;
         st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key, commission)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || '', com));
         // Kanalın bildirdiği gerçek komisyon oranı ilana yazılır (elle girilmiş oran korunur). Satır komisyonu KDV dahildir; ilandaki oran
         // pazaryerinin ilan ettiği gibi KDV hariç tutulur (hesapta KDV yeniden eklenir: profit.js → rateGross)
-        if (com != null && it.total > 0 && it.remoteKey) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src = 'api')").bind(Math.round((com / it.total / 1.2) * 10000) / 100, ch, it.remoteKey));
+        // Yalnız canlı satır ve son 30 günün siparişi (geçmiş aktarımındaki eski oran güncel oranı ezmesin)
+        if (com != null && it.total > 0 && it.remoteKey && !it.status && o.orderedAt > t - 30 * 864e5) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src = 'api')").bind(Math.round((com / it.total / 1.2) * 10000) / 100, ch, it.remoteKey));
       }
       // Kanalın kendi paketleri (Trendyol/Hepsiburada/ikas) panele aynen yansır; paneldeki taslak paketler korunur
       if (Array.isArray(o.packages)) {
@@ -361,6 +380,8 @@ export async function pushStocks(env, db, settings, only) {
       await resolve(db, `stock:${ch.id}`);
       await alertResolved(env, db, `stock:${ch.id}`, { title: `${ch.name}: stok gönderimi düzeldi` });
     } catch (e) {
+      // Bütçe doldu: ilanlar bekleyen kalır (hata yazılmaz), bir sonraki senkronda gönderilir
+      if (e.budget) { result[ch.id] = 'ertelendi'; continue; }
       result[ch.id] = 'hata: ' + e.message;
       await log(db, ch.id, 'error', 'Stok gönderilemedi: ' + e.message);
       await notify(db, `stock:${ch.id}`, { channel: ch.id, title: `${ch.name}: stok gönderilemedi (${items.length} ilan bekliyor)`, msg: explainHttp(e.message) + ' · Bir sonraki senkronda yeniden denenir.' });
@@ -422,6 +443,7 @@ export async function pushPrices(env, db) {
       await log(db, ch.id, errs.length ? 'warn' : 'info', `${sent.length} ilanın fiyatı gönderildi${errs.length ? `, ${errs.length} ilanda hata (${errs[0].error})` : ''}`);
       await resolve(db, `price:${ch.id}`);
     } catch (e) {
+      if (e.budget) { result[ch.id] = 'ertelendi'; continue; }
       result[ch.id] = 'hata: ' + e.message;
       await log(db, ch.id, 'error', 'Fiyat gönderilemedi: ' + e.message);
       // Bekleyen fiyatlar silinmez; bir sonraki senkronda yeniden denenir
@@ -444,18 +466,26 @@ export async function trackPush(db, ch, kind, res, n) {
 }
 export async function checkPushes(env, db, { minAge = 60e3, maxAge = 6 * 3600e3, limit = 20 } = {}) {
   const t = Date.now();
-  const rows = await all(db, "SELECT * FROM push_checks WHERE status = 'pending' AND at < ? ORDER BY at LIMIT ?", t - minAge, limit);
+  // Sırayla: en uzun süredir sorgulanmayan önce (sonucu gelmeyen birkaç kayıt yenilerin sorgulanmasını tıkamasın)
+  const rows = await all(db, "SELECT * FROM push_checks WHERE status = 'pending' AND at < ? ORDER BY COALESCE(checked_at, 0), at LIMIT ?", t - minAge, limit);
   if (!rows.length) return null;
   const chans = await getChannels(env, db), out = { checked: 0, failed: 0 };
   for (const r of rows) {
     const ch = chans.find((c) => c.id === r.channel);
     if (!ch || !ch.enabled || !ch.pushStatus) { await run(db, "UPDATE push_checks SET status = 'skipped', checked_at = ? WHERE id = ?", t, r.id); continue; }
     let res;
+    // Sonuç 6 saatte alınamadı: gönderimin tuttuğu bilinmiyor; stokta ilanlar yeniden gönderilmek üzere işaretlenir, bildirim düşer
+    const expire = async (why) => {
+      await run(db, "UPDATE push_checks SET status = 'expired', checked_at = ? WHERE id = ?", t, r.id);
+      await notify(db, `pushcheck:${ch.id}`, { level: 'warn', channel: ch.id, title: `${ch.name}: ${r.kind === 'price' ? 'fiyat' : 'stok'} gönderiminin sonucu alınamadı`, msg: `${why} · Bir sonraki gönderimde kontrol edilir.` }).catch(() => {});
+    };
     try { res = await ch.pushStatus(r.ref); } catch (e) {
-      if (t - r.at > maxAge) await run(db, "UPDATE push_checks SET status = 'expired', checked_at = ? WHERE id = ?", t, r.id);
+      if (e.budget) break;
+      await run(db, 'UPDATE push_checks SET checked_at = ? WHERE id = ?', t, r.id);
+      if (t - r.at > maxAge) await expire(e.message.slice(0, 200));
       continue;
     }
-    if (!res.done) { if (t - r.at > maxAge) await run(db, "UPDATE push_checks SET status = 'expired', checked_at = ? WHERE id = ?", t, r.id); continue; }
+    if (!res.done) { await run(db, 'UPDATE push_checks SET checked_at = ? WHERE id = ?', t, r.id); if (t - r.at > maxAge) await expire('kanal işlemi tamamlamadı'); continue; }
     const bad = (res.items || []).filter((x) => x.ok === false && x.key);
     out.checked++; out.failed += bad.length;
     const what = r.kind === 'price' ? 'Fiyat' : 'Stok';
@@ -486,8 +516,11 @@ export const releaseLock = (db, k, t) => run(db, "UPDATE settings SET v = '0' WH
 
 // ---------- tam senkron ----------
 // Adımı çalıştır; hata olursa kısa bir bekleme sonrası bir kez daha dene
+// İsteğe bağlı adım: kalan bütçe yetmiyorsa bu senkronda atlanır (bir sonraki senkronda yapılır)
+// Süre: senkron 8 dakikayı geçtiyse isteğe bağlı adımlar atlanır (kilit süresi dolmadan ve platformun süre sınırına takılmadan biter)
+const opt = (reserve, fn) => (budgetLeft() > reserve + 50 && budgetElapsed() < 8 * 60e3 ? fn() : Promise.resolve('ertelendi (istek / süre sınırı)'));
 async function attempt(fn) {
-  try { return await fn(); } catch (e) { await sleep(1500); return fn(); }
+  try { return await fn(); } catch (e) { if (e.budget) throw e; await sleep(1500); return fn(); }
 }
 
 // Tek seferlik (ana panel): stok panelde tutulur ve ana katalog (HasTürk ikas) dahil tüm kanallara gönderilir. Kurulumda stok senkronu
@@ -508,12 +541,13 @@ async function stockOnce(env, db, settings) {
 }
 
 export async function syncAll(env, db, opts = {}) {
-  try { return await syncAllInner(env, db, opts); } finally { (await import('./handler.js')).bumpCache(db); }
+  // Dış istek bütçesi (bkz. util.js withBudget): ~150 istek veritabanı / bildirim / kullanım özeti için ayrılır
+  try { return await withBudget(Number(env.SUBREQ_BUDGET) || 850, () => syncAllInner(env, db, opts)); } finally { (await import('./handler.js')).bumpCache(db); }
 }
 async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
   const t = Date.now();
   // Kilit tek sorguda alınır (aynı anda iki senkron başlayamaz); "Senkronla" da kilide uyar, yalnız kanal beklemesini atlar
-  if (!(await takeLock(db, 'sync_lock', t, 10 * 60e3))) return { skipped: 'Otomatik senkron şu an çalışıyor; birkaç dakika içinde biter, siparişler ve stoklar kendiliğinden güncellenir.' };
+  if (!(await takeLock(db, 'sync_lock', t, 15 * 60e3))) return { skipped: 'Otomatik senkron şu an çalışıyor; birkaç dakika içinde biter, siparişler ve stoklar kendiliğinden güncellenir.' };
   const out = { channels: {}, listings: {}, stockMoves: 0 };
   try {
     await maybePurgeDemo(env, db);
@@ -522,8 +556,12 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     const maps = await productMaps(db);
     const changed = [];
     const chans = (await getChannels(env, db)).filter((c) => c.enabled && (!only || only.includes(c.id)));
-    for (const ch of chans) {
-      const st = (await getRaw(db, 'last:' + ch.id)) || {};
+    // Siparişleri en uzun süredir alınamayan kanal önce: bütçe dolduğunda hep aynı kanallar geride kalmasın
+    const lastOf = new Map();
+    for (const ch of chans) lastOf.set(ch.id, (await getRaw(db, 'last:' + ch.id)) || {});
+    const order = [...chans].sort((a, b) => (lastOf.get(a.id).ordersAt || 0) - (lastOf.get(b.id).ordersAt || 0));
+    for (const ch of order) {
+      const st = lastOf.get(ch.id);
       // Art arda hata veren kanal kademeli beklenir (3. hatadan sonra 15, 30, 45 … en çok 2 saat); "Senkronla" düğmesi beklemeyi atlar
       if (!force && st.fails >= 3 && st.at && t - st.at < Math.min(st.fails - 2, 8) * 15 * 60e3) {
         out.channels[ch.id] = `beklemede: art arda ${st.fails} hata, sonraki deneme ${new Date(st.at + Math.min(st.fails - 2, 8) * 15 * 60e3).toISOString().slice(11, 16)} UTC`;
@@ -550,6 +588,8 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
         await resolve(db, `orders:${ch.id}`);
         await alertResolved(env, db, `orders:${ch.id}`, { title: `${ch.name}: siparişler yeniden alınıyor`, body: 'Bağlantı sorunu düzeldi; kaçan siparişler bu senkronda alındı.', url: '#/siparisler' });
       } catch (e) {
+        // Bütçe doldu: kanalın hatası değil — imleç ilerlemez, hata sayılmaz, bir sonraki senkronda önce bu kanal
+        if (e.budget) { out.channels[ch.id] = 'ertelendi'; out.deferred = true; await setSetting(db, 'last:' + ch.id, st); continue; }
         out.channels[ch.id] = 'hata: ' + e.message;
         Object.assign(st, { at: t, ok: false, error: explainHttp(e.message).slice(0, 600), fails: (st.fails || 0) + 1 });
         if (st.fails >= 3) st.nextTry = t + Math.min(st.fails - 2, 8) * 15 * 60e3;
@@ -560,13 +600,16 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
         if (st.fails >= 3) await urgentAlert(env, db, `orders:${ch.id}`, { title: `${ch.name}: siparişler alınamıyor`, body: `${explainHttp(e.message).slice(0, 300)} · Yeni siparişler panele düşmüyor ve bu kanaldaki satışlar diğer kanalların stoğundan düşülmüyor. API bilgilerini Entegrasyonlar sayfasından kontrol edin.`, url: '#/entegrasyonlar' }).catch(() => null);
       }
       // 2) ilanlar (ürün, görsel, varyant, kanaldaki stok) — en geç 14 dakikada bir
-      if (ch.fetchListings && (listings || force || !st.listingsAt || t - st.listingsAt >= LISTING_EVERY)) {
+      // Bütçe azaldıysa ilan yenileme sonraki senkrona kalır (önce tüm kanalların siparişleri)
+      if (ch.fetchListings && (listings || force || !st.listingsAt || t - st.listingsAt >= LISTING_EVERY) && budgetLeft() > (st.listingsReq || 300) + 150) {
+        const u0 = budgetUsed();
         try {
           const n = await attempt(() => refreshListings(db, ch));
-          Object.assign(st, { listingsAt: t, listings: n, listingsError: null });
+          Object.assign(st, { listingsAt: t, listings: n, listingsError: null, listingsReq: Math.max(20, budgetUsed() - u0) });
           out.listings[ch.id] = n;
           await resolve(db, `listings:${ch.id}`);
         } catch (e) {
+          if (e.budget) { out.listings[ch.id] = 'ertelendi'; out.deferred = true; await setSetting(db, 'last:' + ch.id, st); continue; }
           out.listings[ch.id] = 'hata: ' + e.message;
           Object.assign(st, { listingsError: e.message.slice(0, 500), listingsFails: (st.listingsFails || 0) + 1 });
           await log(db, ch.id, 'error', 'Ürünler alınamadı: ' + e.message);
@@ -596,24 +639,24 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     out.pushChecks = await checkPushes(env, db).catch((e) => 'hata: ' + e.message);
     // Buybox kontrolü ve (açıksa) seçili ürünlerde otomatik fiyat
     // Pakete bağlı işler (müşteri panellerinde paket izin veriyorsa; bkz. plans.js)
-    if (!only && allows(env, 'buybox')) out.buybox = await runBuybox(env, db, settings).catch((e) => 'hata: ' + e.message);
+    if (!only && allows(env, 'buybox')) out.buybox = await opt(40, () => runBuybox(env, db, settings)).catch((e) => 'hata: ' + e.message);
     // Müşteri soruları (yeni sorular ve kanaldan verilen cevaplar)
-    out.questions = await syncQuestions(env, db, { only }).catch((e) => 'hata: ' + e.message);
-    out.claims = await syncClaims(env, db, { only }).catch((e) => 'hata: ' + e.message);
+    out.questions = await opt(60, () => syncQuestions(env, db, { only })).catch((e) => 'hata: ' + e.message);
+    out.claims = await opt(40, () => syncClaims(env, db, { only })).catch((e) => 'hata: ' + e.message);
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
     // Eski açık siparişler: kanaldan yeniden sorgulanır; 30 günü geçip hâlâ açık görünen tamamlandı sayılır
-    if (!only) out.stale = await staleOrders(env, db, chans, maps).catch((e) => 'hata: ' + e.message);
+    if (!only) out.stale = await opt(100, () => staleOrders(env, db, chans, maps)).catch((e) => 'hata: ' + e.message);
     // Kendi anlaşmalı kargo gönderileri: firmadan takip no, ücret ve teslim durumu
-    if (!only) out.carriers = await trackCarriers(env, db).catch((e) => 'hata: ' + e.message);
+    if (!only) out.carriers = await opt(40, () => trackCarriers(env, db)).catch((e) => 'hata: ' + e.message);
     // Kanalda bulunamayan açık siparişler (silinmiş / deneme siparişi, kaldırılmış mağaza)
-    if (!only) out.missing = await checkMissing(env, db).catch((e) => 'hata: ' + e.message);
+    if (!only) out.missing = await opt(20, () => checkMissing(env, db)).catch((e) => 'hata: ' + e.message);
     // Eski siparişlerde bulunan iptal / iade ve bu senkronda kabul edilen iade talepleri: stok hemen düzeltilir
     await applyClaimReturns(db).catch(() => 0);
     out.stockMoves += await applyDirtyStock(db, settings).catch(() => 0);
     // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
-    if (!only) out.costs = await syncCosts(env, db, chans).catch((e) => 'hata: ' + e.message);
-    if (!only && allows(env, 'finance')) out.invoices = await syncInvoices(env, db).catch((e) => 'hata: ' + e.message);
-    if (!only && allows(env, 'finance')) out.settlements = await syncSettlements(env, db).catch((e) => 'hata: ' + e.message);
+    if (!only) out.costs = await opt(150, () => syncCosts(env, db, chans)).catch((e) => 'hata: ' + e.message);
+    if (!only && allows(env, 'finance')) out.invoices = await opt(150, () => syncInvoices(env, db)).catch((e) => 'hata: ' + e.message);
+    if (!only && allows(env, 'finance')) out.settlements = await opt(150, () => syncSettlements(env, db)).catch((e) => 'hata: ' + e.message);
     // Anlık bildirim: yeni sipariş / iade talebi / müşteri sorusu özeti abonelere
     if (!only) out.push = await pushDigest(env, db, { newOrders: out.newOrders || 0 }).catch((e) => 'hata: ' + e.message);
     // Günlük özet e-postası (açıksa, sabah 08:00'den sonraki ilk senkronda, günde bir kez)
@@ -640,7 +683,7 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     // Süre senkronun başından sayılır: senkronun kendisi uzun sürdüyse geçmiş aktarımı daha kısa çalışır (istek başına işlemci süresi
     // sınırı aşılmasın; Durable Object'te veritabanı işlemi de işlemci süresidir). En az 2 sn: her senkronda biraz ilerler.
     if (!only) out.backfill = await runJobs(env, db, { budgetMs: Math.max(2000, 20000 - (Date.now() - t)) }).catch((e) => 'hata: ' + e.message);
-    await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t });
+    await setSetting(db, 'last_sync', { at: t, ms: Date.now() - t, requests: budgetUsed(), deferred: !!out.deferred });
   } finally {
     await releaseLock(db, 'sync_lock', t);
   }
@@ -799,8 +842,10 @@ export async function staleOrders(env, db, chans, maps) {
     // Sipariş tarihine göre listeleyen kanallarda (Trendyol, PttAVM, N11, idefix …) senkron yalnız son günleri okur: kargodaki siparişin
     // sonradan teslim / iptal / iade olması kaçmasın diye kargodaki siparişler de (son 90 gün) yeniden okunur. Önceden yalnız son 30 gün
     // okunuyordu; 30 günden eski kargodaki sipariş teslim edilse de panelde "Kargoda" kalıyordu.
+    // İade talebi servisi olmayan kanallarda teslim edilen siparişin sonradan iadesi / iptali de yakalansın: son 30 günün teslim edilenleri de okunur
+    const late = ch.byOrderDate && !ch.claims ? ` OR (status = 'delivered' AND ordered_at >= ${t - 30 * D})` : '';
     const old = await first(db, `SELECT MIN(ordered_at) AS m, COUNT(*) AS n FROM orders WHERE channel = ? AND ordered_at < ? AND ordered_at >= ?
-      AND (status IN ('new', 'processing')${ch.byOrderDate ? " OR status = 'shipped'" : ''})`, ch.id, t - 2 * D, t - 90 * D);
+      AND (status IN ('new', 'processing')${ch.byOrderDate ? " OR status = 'shipped'" : ''}${late})`, ch.id, t - 2 * D, t - 90 * D);
     if (!old.n) { await setSetting(db, key, { at: t, open: 0 }); continue; }
     try {
       const orders = await ch.fetchOrders(old.m - 3600e3, t, { byOrdered: true });
@@ -810,6 +855,7 @@ export async function staleOrders(env, db, chans, maps) {
       await setSetting(db, key, { at: t, open: old.n, fetched: orders.length, changed: ids.length, ...(gone ? { missing: gone } : {}) });
       out[ch.id] = ids.length;
     } catch (e) {
+      if (e.budget) { out[ch.id] = 'ertelendi'; continue; }
       await setSetting(db, key, { at: t, open: old.n, error: e.message.slice(0, 300) });
       out[ch.id] = 'hata: ' + e.message;
     }

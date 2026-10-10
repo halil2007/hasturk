@@ -94,7 +94,8 @@ test('ikas çok lokasyonlu mağaza: silinmiş lokasyon seçilmez; stok yalnız a
       return { data: { saveProductStockLocations: true } };
     }],
   ]);
-  const ch = ikas({ IKAS2_STORE: 's2', IKAS2_CLIENT_ID: 'i', IKAS2_CLIENT_SECRET: 'c' }, 'IKAS2_', { id: 'ikas2' });
+  // Birden çok lokasyonda lokasyon seçilmiş olmalı (seçilmezse stok işlemleri hata verir, bkz. fix-stores-ikas.test.mjs)
+  const ch = ikas({ IKAS2_STORE: 's2', IKAS2_CLIENT_ID: 'i', IKAS2_CLIENT_SECRET: 'c', IKAS2_STOCK_LOCATION_ID: 'A' }, 'IKAS2_', { id: 'ikas2' });
   const r = await ch.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 7 }]);
   assert.deepEqual(r.done, ['v1']);
   const save = gqlBodies.find((b) => /saveProductStockLocations/.test(b.query));

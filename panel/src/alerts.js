@@ -11,7 +11,8 @@ const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
 export async function urgentAlert(env, db, key, { title, body, url = '#/bildirimler' }) {
   if (env.DEMO === '1') return null;
   const k = 'alert:' + key, last = await getRaw(db, k), t = Date.now();
-  if (last && t - last.at < EVERY) return null;
+  // Gönderilemeyen uyarı (servis hatası, istek sınırı) 15 dakika sonra yeniden denenir; gönderilen en fazla 6 saatte bir
+  if (last && t - last.at < (last.failed ? 15 * 60e3 : EVERY)) return null;
   await setSetting(db, k, { at: t, title });
   const out = {};
   out.push = await push(db, { title: '⚠️ ' + title, body, url }).catch((e) => 'hata: ' + e.message);
@@ -25,6 +26,9 @@ export async function urgentAlert(env, db, key, { title, body, url = '#/bildirim
       html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111"><h2 style="font-size:18px;margin:0 0 10px">${esc(title)}</h2><p style="margin:0 0 14px">${esc(body)}</p>${link ? `<p><a href="${esc(link)}">Panelde görüntüle</a></p>` : ''}<p style="color:#667;font-size:12px">${esc(company)} · otomatik uyarı (aynı sorun için en fazla 6 saatte bir gönderilir)</p></div>`,
     }).then(() => to.length).catch((e) => 'hata: ' + e.message);
   }
+  // Hiç alıcı yoksa (bildirim aboneliği ve e-posta tanımlı değil) yeniden denemenin anlamı yok
+  const pushOk = !!(out.push && out.push.sent > 0), mailOk = typeof out.mail === 'number', anyTarget = !!(out.push && out.push.sent !== 0) || to.length > 0 || typeof out.push === 'string';
+  if (anyTarget && !pushOk && !mailOk) { await setSetting(db, k, { at: t, title, failed: true }); await log(db, null, 'error', `Acil uyarı gönderilemedi (${title}): telefon bildirimi ve e-posta ulaşmadı`).catch(() => {}); return out; }
   await log(db, null, 'warn', `Acil uyarı gönderildi: ${title}`);
   // E-posta servisi bozuksa uyarının kendisi sessizce kaybolmasın
   if (typeof out.mail === 'string') await log(db, null, 'error', `Acil uyarı e-postası gönderilemedi (${title}): ${out.mail.slice(0, 200)}`).catch(() => {});

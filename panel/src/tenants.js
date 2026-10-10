@@ -209,7 +209,11 @@ export async function expiryReminders(env, db) {
     try {
       await sendMail(env, db, { to: [t.email], subject, text, html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111;max-width:560px"><h2 style="font-size:18px">${head}</h2>${body.map((x) => `<p>${x}</p>`).join('')}${cta}</div>` });
       sent++;
-    } catch (err) { console.error('hatırlatma gönderilemedi', t.slug, err.message); }
+    } catch (err) {
+      // Gönderilemedi: işaret kaldırılır, bir sonraki turda yeniden denenir (yoksa hatırlatma hiç gitmezdi)
+      console.error('hatırlatma gönderilemedi', t.slug, err.message);
+      await run(db, 'DELETE FROM settings WHERE k = ?', k).catch(() => {});
+    }
   }
   return { sent };
 }

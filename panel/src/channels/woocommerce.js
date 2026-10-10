@@ -52,6 +52,7 @@ export function woocommerce(env, meta) {
     return {
       remoteId: str(o.id), orderNumber: str(o.number || o.id), orderedAt: Date.parse(o.date_created_gmt ? o.date_created_gmt + 'Z' : o.date_created) || Date.now(),
       remoteStatus: str(o.status), status: wooStatus(str(o.status)), awaitingPayment: o.status === 'on-hold',
+      cod: o.payment_method === 'cod' || undefined, // kapıda ödeme (Woo "Kapıda ödeme" ödeme yöntemi)
       customer: [b.first_name, b.last_name].map(str).filter(Boolean).join(' ') || name, phone: str(b.phone || s.phone), email: str(b.email), customerId: num(o.customer_id) ? str(o.customer_id) : '',
       address: { name: name || [b.first_name, b.last_name].map(str).filter(Boolean).join(' '), line: [s.address_1, s.address_2].map(str).filter(Boolean).join(' '),
         district: il ? str(s.city) : '', city: il || str(s.city || s.state), phone: str(s.phone || b.phone) },
@@ -98,6 +99,7 @@ export function woocommerce(env, meta) {
     const x = v || p, img = str((v && v.image && v.image.src) || ((p.images || [])[0] || {}).src);
     const vname = v ? (v.attributes || []).map((a) => str(a.option)).filter(Boolean).join(' / ') : '';
     const managed = x.manage_stock === true ? x : x.manage_stock === 'parent' ? p : null; // 'parent': stok ana üründe
+    stockMode.set(str(x.id), x.manage_stock);
     const price = num(x.price || x.regular_price);
     return { remoteId: str(x.id), remoteProductId: str(p.id), sku: str(x.sku), barcode: str(x.global_unique_id), name: vname ? `${str(p.name)} - ${vname}` : str(p.name), groupName: str(p.name), variantName: vname,
       image: img, images: imageList([img, ...(p.images || [])]), price, listPrice: Math.max(num(x.regular_price), price),
@@ -120,22 +122,72 @@ export function woocommerce(env, meta) {
     return out;
   }
 
-  // Basit ürün: /products/batch; varyasyon: /products/{ana}/variations/batch (en çok 100'er). Kalem hataları toplanıp bildirilir.
+  // Basit ürün: /products/batch; varyasyon: /products/{ana}/variations/batch (en çok 100'er). Sonuç ilan ilan: { done, errors }
+  // (kalem hatası yalnız o ilana yazılır, diğerleri gönderildi sayılır). Hiçbiri gönderilemeden bağlantı / yetki hatası: atılır.
   async function batch(items, fields) {
-    const groups = new Map(), errs = [];
+    const groups = new Map(), out = { done: [], errors: [] };
     for (const x of items) {
       const parent = x.remoteProductId && String(x.remoteProductId) !== String(x.remoteId) ? String(x.remoteProductId) : '';
-      groups.set(parent, [...(groups.get(parent) || []), { id: Number(x.remoteId) || x.remoteId, ...fields(x) }]);
+      groups.set(parent, [...(groups.get(parent) || []), x]);
     }
     for (const [parent, list] of groups) {
       for (const part of chunk(list, 100)) {
-        const r = await call(parent ? `/products/${parent}/variations/batch` : '/products/batch', { method: 'POST', body: { update: part } });
-        for (const u of (r && r.update) || []) if (u && u.error) errs.push(`${u.id}: ${u.error.message || u.error.code}`);
+        let r;
+        try { r = await call(parent ? `/products/${parent}/variations/batch` : '/products/batch', { method: 'POST', body: { update: part.map((x) => ({ id: Number(x.remoteId) || x.remoteId, ...fields(x) })) } }); } catch (e) {
+          if (!out.done.length || e.budget) throw e;
+          out.errors.push(...part.map((x) => ({ remoteId: x.remoteId, error: e.message })));
+          continue;
+        }
+        const bad = new Map(((r && r.update) || []).filter((u) => u && u.error).map((u) => [String(u.id), u.error.message || u.error.code || 'güncellenemedi']));
+        for (const x of part) {
+          if (bad.has(String(x.remoteId))) out.errors.push({ remoteId: x.remoteId, error: 'WooCommerce: ' + bad.get(String(x.remoteId)) });
+          else out.done.push(x.remoteId);
+        }
       }
     }
-    if (errs.length) throw new Error(`WooCommerce: ${errs.length} ürün güncellenemedi (${errs.slice(0, 3).join('; ')})`);
+    return out;
   }
-  const pushStock = (items) => batch(items, (x) => ({ manage_stock: true, stock_quantity: Math.max(0, Math.round(num(x.stock))) }));
+  // Stok takibi: manage_stock true → ilanın kendisine; 'parent' (varyasyon stoğu ana üründe) → ana ürüne bir kez;
+  // false → gönderilmez (stok takibi zorla açılmaz), ilana hata yazılır. Mod ilan okumasından bilinir, bilinmiyorsa sorulur.
+  const stockMode = new Map();
+  async function modes(parent, list) {
+    const miss = list.filter((x) => !stockMode.has(String(x.remoteId)));
+    for (const part of chunk(miss, 100)) {
+      const rows = await call(parent ? `/products/${parent}/variations` : '/products', { query: { include: part.map((x) => x.remoteId).join(','), per_page: 100 } });
+      for (const v of Array.isArray(rows) ? rows : []) stockMode.set(String(v.id), v.manage_stock);
+    }
+  }
+  async function pushStock(items) {
+    const qty = (x) => Math.max(0, Math.round(num(x.stock)));
+    const groups = new Map(), own = [], parents = new Map(), skip = [];
+    for (const x of items) {
+      const parent = x.remoteProductId && String(x.remoteProductId) !== String(x.remoteId) ? String(x.remoteProductId) : '';
+      groups.set(parent, [...(groups.get(parent) || []), x]);
+    }
+    for (const [parent, list] of groups) {
+      await modes(parent, list);
+      for (const x of list) {
+        const m = stockMode.get(String(x.remoteId));
+        if (m === true) own.push(x);
+        else if (m === 'parent' && parent) parents.set(parent, [...(parents.get(parent) || []), x]);
+        else skip.push({ remoteId: x.remoteId, error: m === undefined ? 'WooCommerce\'da ürün bulunamadı' : 'WooCommerce\'da stok takibi kapalı' });
+      }
+    }
+    const out = await batch(own, (x) => ({ manage_stock: true, stock_quantity: qty(x) }));
+    // Ana üründe tutulan stok: varyasyonlar aynı stoğu paylaşır, ana ürüne bir kez (en düşük istenen adet) yazılır
+    const pp = [...parents].map(([parent, list]) => ({ remoteId: parent, remoteProductId: parent, stock: Math.min(...list.map(qty)), list }));
+    const r2 = pp.length ? await batch(pp, (x) => ({ stock_quantity: x.stock })).catch((e) => { if (!out.done.length || e.budget) throw e; return { done: [], errors: pp.map((x) => ({ remoteId: x.remoteId, error: e.message })) }; }) : { done: [], errors: [] };
+    for (const x of pp) {
+      const err = r2.errors.find((e) => String(e.remoteId) === String(x.remoteId));
+      for (const v of x.list) {
+        if (err) out.errors.push({ remoteId: v.remoteId, error: err.error });
+        else if (qty(v) === x.stock) out.done.push(v.remoteId);
+        else out.errors.push({ remoteId: v.remoteId, error: `WooCommerce: stok ana üründe tutuluyor; bu ürünün varyasyonları aynı stoğu paylaşır (${x.stock} gönderildi)` });
+      }
+    }
+    out.errors.push(...skip);
+    return out;
+  }
   const pushPrice = (items) => batch(items, (x) => {
     const price = num(x.price), list = Math.max(num(x.listPrice), price);
     return { regular_price: String(list), sale_price: price < list ? String(price) : '' };

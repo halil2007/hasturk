@@ -14,12 +14,15 @@ const KINDS = { buy: 'ForexBuying', sell: 'ForexSelling', bbuy: 'BanknoteBuying'
 const trDay = (t = Date.now()) => new Date(t + 3 * 3600e3).toISOString().slice(0, 10);
 
 // TCMB today.xml → { USD: { buy, sell, bbuy, bsell }, ... }, date
+// Yurt dışı kanal siparişlerinin TL'ye çevrilmesi için ek para birimleri (Ozon RUB, Amazon CA/AU …); kur 1 birim içindir (TCMB Unit)
+export const ORDER_CURRENCIES = [...CURRENCIES, 'RUB', 'CAD', 'AUD', 'CHF', 'SEK', 'DKK', 'NOK', 'SAR', 'JPY', 'CNY', 'AZN', 'AED'];
 export function parseTcmb(xml) {
   const out = {};
-  for (const c of CURRENCIES) {
+  for (const c of ORDER_CURRENCIES) {
     const m = new RegExp(`<Currency[^>]*Kod="${c}"[^>]*>([\\s\\S]*?)</Currency>`).exec(xml);
     if (!m) continue;
-    const v = (t) => { const x = new RegExp(`<${t}>([\\d.,]+)</${t}>`).exec(m[1]); return x ? Number(x[1].replace(',', '.')) : null; };
+    const u = Number((/<Unit>(\d+)<\/Unit>/.exec(m[1]) || [])[1]) || 1;
+    const v = (t) => { const x = new RegExp(`<${t}>([\\d.,]+)</${t}>`).exec(m[1]); return x ? Number(x[1].replace(',', '.')) / u : null; };
     out[c] = { buy: v('ForexBuying'), sell: v('ForexSelling'), bbuy: v('BanknoteBuying'), bsell: v('BanknoteSelling') };
   }
   const d = /Tarih="(\d{2})\.(\d{2})\.(\d{4})"/.exec(xml);
@@ -62,6 +65,18 @@ export async function refreshRates(db, settings, { force = false } = {}) {
   await setSetting(db, 'fx_rates', out);
   return out;
 }
+// Sipariş tutarlarını TL'ye çevirmek için kur (TCMB döviz alış): ayarlardaki kur kaydında yoksa TCMB'den okunur, günde bir yenilenir
+export async function orderRate(db, currency) {
+  const c = String(currency || '').toUpperCase();
+  if (!c || c === 'TRY' || c === 'TL') return 1;
+  for (const k of ['fx_rates', 'fx_orders']) {
+    const r = await getRaw(db, k);
+    if (r && Date.now() - r.at < 864e5 && rateOf(r, c, 'buy')) return rateOf(r, c, 'buy');
+  }
+  const r = { ...(await fetchTcmb()), at: Date.now() };
+  await setSetting(db, 'fx_orders', r);
+  return rateOf(r, c, 'buy');
+}
 export const rateOf = (rates, c, kind = 'sell') => { const x = rates && rates.rates && rates.rates[c]; return x ? x[kind] || x.sell || null : null; };
 
 function round(v, mode) {
@@ -101,7 +116,9 @@ export async function applyFx(db, settings, rates, { user = 'Otomatik', ids = nu
       st.push(db.prepare('UPDATE products SET sale_price = ?, updated_at = ? WHERE id = ?').bind(price, Date.now(), p.id));
       // Kanal fiyatları: eski TL fiyatına göre oran korunur; eski fiyat yoksa yeni fiyat yazılır
       const k = p.sale_price > 0 ? price / p.sale_price : null;
-      st.push(db.prepare(`UPDATE listings SET price = ROUND(CASE WHEN ? IS NOT NULL AND price > 0 THEN price * ? ELSE ? END, 2), price_dirty = 1 WHERE product_id = ?`).bind(k, k, price, p.id));
+      // Yurt dışı kanallardaki (eBay, Etsy, Ozon) ilan fiyatı kanalın para birimindedir: TL kuruyla çarpılmaz (dolar fiyatı kur arttıkça şişmesin)
+      st.push(db.prepare(`UPDATE listings SET price = ROUND(CASE WHEN ? IS NOT NULL AND price > 0 THEN price * ? ELSE ? END, 2), price_dirty = 1 WHERE product_id = ?
+        AND channel NOT LIKE 'ebay%' AND channel NOT LIKE 'etsy%' AND channel NOT LIKE 'ozon%'`).bind(k, k, price, p.id));
     }
     if (st.length) await db.batch(st);
   }

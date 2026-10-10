@@ -99,10 +99,12 @@ export function ikas(env, p, meta) {
     cancelledAt: 'cancelledAt',
     updatedAt: 'updatedAt',
     orderPackages: `orderPackages { ${PKG_FIELDS} }`,
+    paymentMethods: 'paymentMethods { type }',
   };
-  const orderQuery = (o, filter) => `query ($p: PaginationInput, $d: ${filter === 'id' ? 'StringFilterInput' : 'DateFilterInput'}) {
-    listOrder(pagination: $p, ${filter}: $d) { hasNext data {
-      id orderNumber orderedAt status totalFinalPrice currencyCode ${o.salesChannelId} ${o.orderPackageStatus} ${o.orderPaymentStatus} ${o.cancelledAt} ${o.updatedAt} ${o.shippingLines}
+  // sort: "updatedAt" (eskiden yeniye): aralık tek senkronda bitmezse imleç okunan son güncellemeden devam eder
+  const orderQuery = (o, filter, sort) => `query ($p: PaginationInput, $d: ${filter === 'id' ? 'StringFilterInput' : 'DateFilterInput'}) {
+    listOrder(pagination: $p, ${filter}: $d${sort ? `, sort: "${sort}"` : ''}) { hasNext data {
+      id orderNumber orderedAt status totalFinalPrice currencyCode ${o.salesChannelId} ${o.orderPackageStatus} ${o.orderPaymentStatus} ${o.cancelledAt} ${o.updatedAt} ${o.shippingLines} ${o.paymentMethods}
       ${o.customer} ${o.shippingAddress} ${o.billingAddress}
       orderLineItems { id quantity price finalPrice status variant { id productId sku name ${o.barcodeList} ${o.mainImageId} } }
       ${o.orderPackages}
@@ -173,7 +175,9 @@ export function ikas(env, p, meta) {
       address: { name: [a.firstName, a.lastName].filter(Boolean).join(' '), line: [a.addressLine1, a.addressLine2].filter(Boolean).join(' '), district: str(a.district && a.district.name), city: str(a.city && a.city.name), phone: str(a.phone) },
       total: num(o.totalFinalPrice), currency: o.currencyCode || 'TRY',
       cargoCompany: first.cargoCompany || '', tracking: first.tracking || '',
-      awaitingPayment: /WAITING/i.test(o.orderPaymentStatus || ''), customerId: str(c.id), guest: !!c.isGuestCheckout,
+      awaitingPayment: /WAITING/i.test(o.orderPaymentStatus || ''),
+      // Kapıda ödeme (nakit / kartla): anlaşmalı kargo entegrasyonuyla tahsilatlı gönderi açılamaz (bkz. carriers.js codBlocked)
+      cod: (o.paymentMethods || []).some((m) => /ON_DELIVERY/i.test(String(m && m.type))) || undefined, customerId: str(c.id), guest: !!c.isGuestCheckout,
       cargoChoice: str(((o.shippingLines || [])[0] || {}).title), cargoChoiceId: str(((o.shippingLines || [])[0] || {}).cargoCompanyId),
       items, packages,
     };
@@ -192,13 +196,15 @@ export function ikas(env, p, meta) {
   async function fetchOrders(since, until, { byOrdered = false } = {}) {
     await ensureMerchant();
     const out = [];
-    let filter = byOrdered ? 'orderedAt' : 'updatedAt', optional = ORDER_OPT, more = false;
+    let filter = byOrdered ? 'orderedAt' : 'updatedAt', optional = ORDER_OPT, more = false, sort = byOrdered ? '' : 'updatedAt', last = null, noChannel = 0;
     const maxPage = byOrdered ? 60 : 100;
     for (let page = 1; page <= maxPage; page++) {
       let data;
       try {
-        data = await flex((o) => orderQuery(o, filter), optional, { p: { page, limit: 50 }, d: { gte: since, lte: until } });
+        data = await flex((o) => orderQuery(o, filter, sort), optional, { p: { page, limit: 50 }, d: { gte: since, lte: until } });
       } catch (e) {
+        // Sıralama desteklenmiyorsa sırasız (imleç aralığın başında kalır)
+        if (sort && e.gql && /sort/i.test(e.message)) { sort = ''; page--; continue; }
         // Eski şemada updatedAt filtresi yoksa sipariş tarihine göre çek
         if (filter === 'updatedAt' && e.gql) { filter = 'orderedAt'; page--; continue; }
         throw e;
@@ -206,15 +212,21 @@ export function ikas(env, p, meta) {
       const r = data.listOrder;
       for (const o of r.data || []) {
         // Taslak ve satış sonrası teklif (upsell) ekranında bekleyen sipariş henüz kesinleşmedi: CREATED olunca (updatedAt değişir) gelir
+        if (o.updatedAt != null) last = o.updatedAt;
         if (/^(DRAFT|WAITING_UPSELL_ACTION)$/i.test(o.status || '')) continue;
-        if (salesChannel && o.salesChannelId && o.salesChannelId !== salesChannel) continue;
+        // Satış kanalı seçiliyken siparişin kanalı okunamadıysa (şemada alan yok) sipariş alınmaz: diğer kanalların siparişi karışmasın
+        if (salesChannel && o.salesChannelId == null) { noChannel++; continue; }
+        if (salesChannel && o.salesChannelId !== salesChannel) continue;
         out.push(normOrder(o));
       }
       more = !!r.hasNext;
       if (!r.hasNext) break;
     }
     // Aralıktaki siparişlerin hepsi okunamadı (ör. uzun kesintiden sonra binlerce güncelleme): imleç ilerlemez, kalanı sonraki senkronda
-    if (more && !byOrdered) { out.warnings = [`ikas: bu aralıkta ${out.length}+ sipariş güncellemesi var; kalanlar bir sonraki senkronda alınacak`]; out.partialUntil = since; }
+    // Sıralı okumada imleç okunan son güncellemeden devam eder (sırasızda aralığın başında kalır)
+    const lastAt = sort && last != null ? (typeof last === 'number' ? last : Date.parse(last)) : NaN;
+    if (more && !byOrdered) { out.warnings = [`ikas: bu aralıkta ${out.length}+ sipariş güncellemesi var; kalanlar bir sonraki senkronda alınacak`]; out.partialUntil = Number.isFinite(lastAt) && lastAt > since ? lastAt : since; }
+    if (noChannel) (out.warnings = out.warnings || []).push(`ikas: ${noChannel} siparişin satış kanalı okunamadı; seçili satış kanalı (${salesChannel}) doğrulanamadığı için alınmadı`);
     return out;
   }
 
@@ -243,8 +255,9 @@ export function ikas(env, p, meta) {
     // Stok, gönderimin yazdığı lokasyondan okunur (pushStock ile aynı): çok lokasyonlu mağazada toplam okunursa diğer depodaki adet
     // yüzünden okunan değer gönderilenle hiç eşleşmez ve ilan her senkronda yeniden gönderilir. Diğer depolara dokunulmaz.
     // Lokasyon bilinmiyorsa ya da varyantın o lokasyonda kaydı yoksa toplam alınır.
+    // Lokasyon seçilmeden (çok lokasyonlu mağaza) ya da seçilen silinmişken stok okunmaz: toplam okunup ana katalog stoğu yanlış olmasın
     let loc = '';
-    try { loc = await location(); } catch { /* toplam stok */ }
+    try { loc = await location(true); } catch (e) { if (e.loc || e.budget) throw e; /* lokasyon listesi okunamadı: toplam stok */ }
     const stockOf = (v) => {
       const list = v.stocks || [], at = loc ? list.filter((x) => x.stockLocationId === loc) : [];
       return (at.length ? at : list).reduce((s, x) => s + num(x.stockCount), 0);
@@ -281,38 +294,84 @@ export function ikas(env, p, meta) {
     return out;
   }
 
-  async function location() {
-    if (locationId) return locationId;
-    const d = await gql('{ listStockLocation { id name deleted } }');
-    const l = (d.listStockLocation || []).find((x) => !x.deleted);
-    if (!l) throw new Error('ikas stok lokasyonu bulunamadı (' + p + 'STOCK_LOCATION_ID tanımlayın)');
-    return (locationId = l.id);
+  // Stok lokasyonu: seçilmediyse yalnız tek (silinmemiş) lokasyonlu mağazada o kullanılır. Birden çok lokasyonda hangi depoya
+  // yazılacağı tahmin edilmez (ilki seçilince stok yanlış depoya yazılıyordu): seçilmesi istenir. Seçilen lokasyon silinmişse de hata.
+  // Yalnız stok işlemleri durur; siparişler alınmaya devam eder.
+  // Seçilen lokasyon her gönderimde sorgulanmaz: stok okunurken (fetchListings, verify) doğrulanır, sonuç gönderimde kullanılır.
+  const cfgLoc = locationId;
+  let locErr = null;
+  const locError = (msg) => Object.assign(new Error(msg), { loc: true });
+  async function location(verify = false) {
+    if (locErr && !verify) throw locErr;
+    if (locationId && !verify) return locationId;
+    let d = null;
+    try { d = await gql('{ listStockLocation { id name deleted } }'); } catch (e) { if (!cfgLoc || e.budget) throw e; }
+    const arr = d && d.listStockLocation, live = (arr || []).filter((x) => !x.deleted);
+    locErr = null;
+    if (cfgLoc) {
+      // Liste okunamadıysa (yanıtta yok) seçilen lokasyon kullanılır; yalnız listede olmadığı kesinse hata
+      if (Array.isArray(arr) && !live.some((x) => String(x.id) === String(cfgLoc))) throw (locErr = locError(`ikas'ta seçili stok lokasyonu (${cfgLoc}) bulunamadı ya da silinmiş; Entegrasyonlar → ikas'tan stok lokasyonunu seçin`));
+      return cfgLoc;
+    }
+    locationId = '';
+    if (live.length > 1) throw (locErr = locError("ikas'ta birden fazla stok lokasyonu var; Entegrasyonlar → ikas'tan stok lokasyonunu seçin"));
+    if (!live.length) throw new Error('ikas stok lokasyonu bulunamadı (' + p + 'STOCK_LOCATION_ID tanımlayın)');
+    return (locationId = live[0].id);
   }
 
   // Grup reddedilirse ikiye bölünerek hatalı varyant(lar) bulunur: tek bir hatalı varyant (ikas'ta silinmiş / ürünü değişmiş)
   // gruptaki diğer 99 ilanın gönderimini engellemez ve onları "hatalı" göstermez. Bağlantı / yetki hatası tüm gönderimi durdurur.
-  const itemError = (e) => e.gql || /HTTP 4(00|22)\b/.test(e.message || '');
-  async function isolate(items, send, out) {
-    try { await send(items); out.done.push(...items.map((x) => x.remoteId)); } catch (e) {
-      if (!itemError(e)) throw e;
-      if (items.length === 1) { out.errors.push({ remoteId: items[0].remoteId, error: String(e.message).replace(/^ikas: /, '') }); return; }
-      const h = Math.ceil(items.length / 2);
-      await isolate(items.slice(0, h), send, out);
-      await isolate(items.slice(h), send, out);
-    }
+  // Bölme sınırlıdır: iki yarı da üst grupla aynı hatayı verir ve iki tek ilanlık deneme de aynı hatayı verirse hata ilanlara değil
+  // tüm isteğe aittir (şema / yetki): atılır (önceden 100 ilanlık grup tek tek bölünüp ~200 istek atıyordu). Bir gönderimde en çok
+  // SPLIT_CAP bölme isteği atılır; kalan ilanlar hatalı yazılır (sonra yeniden denenir). İstek bütçesi hatası (e.budget) hep atılır.
+  const itemError = (e) => !e.budget && (e.gql || /HTTP 4(00|22)\b/.test(e.message || ''));
+  const SPLIT_CAP = 60;
+  const msgOf = (e) => String(e.message).replace(/^ikas: /, '');
+  async function isolate(items, send, out, ctx = { calls: 0 }) {
+    const attempt = async (part) => {
+      try { await send(part); out.done.push(...part.map((x) => x.remoteId)); return null; } catch (e) { if (!itemError(e)) throw e; return e; }
+    };
+    const fail = (part, e) => out.errors.push(...part.map((x) => ({ remoteId: x.remoteId, error: msgOf(e) })));
+    const split = async (part, e) => {
+      if (part.length === 1) return fail(part, e);
+      if (ctx.calls >= SPLIT_CAP) return fail(part, e);
+      const h = Math.ceil(part.length / 2), a = part.slice(0, h), b = part.slice(h);
+      ctx.calls += 2;
+      const ea = await attempt(a), eb = await attempt(b);
+      if (ea && eb && msgOf(ea) === msgOf(e) && msgOf(eb) === msgOf(e) && a.length > 1) {
+        // Tüm isteğe ait hata mı: her yarıdan bir ilan tek başına denenir
+        ctx.calls += 2;
+        const pa = await attempt(a.slice(0, 1)), pb = await attempt(b.slice(0, 1));
+        if (pa && pb && msgOf(pa) === msgOf(e) && msgOf(pb) === msgOf(e)) throw pa;
+        if (pa) fail(a.slice(0, 1), pa);
+        if (pb) fail(b.slice(0, 1), pb);
+        for (const rest of [a.slice(1), b.slice(1)].filter((x) => x.length)) {
+          if (ctx.calls >= SPLIT_CAP) { fail(rest, e); continue; }
+          ctx.calls++;
+          const er = await attempt(rest);
+          if (er) await split(rest, er);
+        }
+        return;
+      }
+      if (ea) await split(a, ea);
+      if (eb) await split(b, eb);
+    };
+    ctx.calls++;
+    const e = await attempt(items);
+    if (e) await split(items, e);
   }
 
   async function pushStock(items) {
-    const loc = await location(), out = { done: [], errors: [] };
+    const loc = await location(), out = { done: [], errors: [] }, ctx = { calls: 0 };
     const send = (part) => gql('mutation ($input: SaveStockLocationsInput!) { saveProductStockLocations(input: $input) }', {
       input: { productStockLocationInputs: part.map((x) => ({ productId: x.remoteProductId, variantId: x.remoteId, stockLocationId: loc, stockCount: x.stock })) },
     });
-    for (let i = 0; i < items.length; i += 100) await isolate(items.slice(i, i + 100), send, out);
+    for (let i = 0; i < items.length; i += 100) await isolate(items.slice(i, i + 100), send, out, ctx);
     return out;
   }
 
   async function pushPrice(items) {
-    const out = { done: [], errors: [] };
+    const out = { done: [], errors: [] }, ctx = { calls: 0 };
     const send = (part) => gql('mutation ($input: SaveVariantPricesInput!) { saveVariantPrices(input: $input) }', {
       input: {
         variantPriceInputs: part.map((x) => ({
@@ -322,7 +381,7 @@ export function ikas(env, p, meta) {
         })),
       },
     });
-    for (let i = 0; i < items.length; i += 100) await isolate(items.slice(i, i + 100), send, out);
+    for (let i = 0; i < items.length; i += 100) await isolate(items.slice(i, i + 100), send, out, ctx);
     return out;
   }
 
