@@ -365,6 +365,36 @@ test('üst pakete geçiş: aynı dönem fiyat farkı × kalan gün; bitiş tarih
   } finally { s.restore(); }
 });
 
+test('alt pakete geçiş yalnız süre dolunca; ek mağazalar yeni paketin üstüne korunur, özellikler pakete göre', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await s.owner('/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'dusen', name: 'Düşen', admin_username: 'ece', admin_password: 'gizli-sifre-7', plan: 'Profesyonel', period: 'yearly', email: 'ece@ornek.com', welcome: false }) });
+    await run(s.env.DB, "UPDATE tenants SET expires_at = ?, trial = 0, max_stores = 12 WHERE slug = 'dusen'", Date.now() + 40 * 864e5);
+    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'dusen', username: 'ece', password: 'gizli-sifre-7' }) })).status, 200);
+    assert.equal((await (await s.tenant('/api/billing')).json()).current.downgrade, false);
+    const no = await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', period: 'yearly', ...buyer }) });
+    assert.equal(no.status, 400);
+    assert.match((await no.json()).error, /süresi dolunca/);
+    // Siteden yenilemede de aynı kural
+    const sr = await s.site({ kind: 'renew', slug: 'dusen', plan: 'baslangic', period: 'monthly', ...buyer, email: 'ece@ornek.com' });
+    assert.equal(sr.status, 400);
+    // Aynı paket yenilemesi serbest (12 − 10 = 2 ek mağaza ücrete eklenir)
+    await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'profesyonel', period: 'yearly', ...buyer }) });
+    assert.equal(s.iyz.inits.at(-1).price, '25900.00', '19900 + 2 × 3000');
+    // Süre doldu: alt paket alınabilir; ek mağazalar (2) Başlangıç'ın 3 mağazasının üstüne
+    await run(s.env.DB, "UPDATE tenants SET expires_at = ? WHERE slug = 'dusen'", Date.now() - 864e5);
+    const r = await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', period: 'yearly', ...buyer }) });
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.equal(s.iyz.inits.at(-1).price, '15900.00', '9900 + 2 × 3000 (Profesyonel sınırına göre ek mağaza)');
+    ok(s.iyz, '15900.00');
+    await s.callback('tok-' + s.iyz.inits.length);
+    const t = await first(s.env.DB, "SELECT plan, max_stores, period FROM tenants WHERE slug = 'dusen'");
+    assert.deepEqual([t.plan, t.max_stores, t.period], ['Başlangıç', 5, 'yearly']);
+  } finally { s.restore(); }
+});
+
 test('üst pakete geçiş: aylık abonelikte aylık fark (30 gün üzerinden); denemede kapalı', async () => {
   resetChannels();
   const s = setup();

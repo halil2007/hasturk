@@ -7,6 +7,8 @@ const PERIOD = { monthly: 'Aylık', yearly: 'Yıllık' };
 // Taksit bilgisi: yıllıkta peşin fiyatına N taksit; tüm alımlarda anlaşmalı kartlara 12 taksite kadar
 const instText = (d, yearly) => { const i = d.installments || {}; if (!i.max) return ''; return `${yearly && i.free > 1 ? `peşin fiyatına ${i.free} taksit · ` : ''}${i.max} taksite kadar`; };
 const cardsText = (d) => ((d.installments || {}).cards || []).join(', ');
+// Alt paket: abonelik sürerken alınamaz (iade yok); süre dolunca ya da denemede seçilebilir
+const lower = (d, p) => { const c = d.plans.find((x) => x.key === d.current.key); return !d.current.downgrade && !!c && p.monthly < c.monthly; };
 const up = (d, p) => (d.upgrade ? d.upgrade.options.find((x) => x.to === p.key) : null);
 export async function billingView(el) {
   render(el, html`<div class="card"><div class="empty">Yükleniyor…</div></div>`);
@@ -32,7 +34,8 @@ export async function billingView(el) {
         <div><b style="font-size:20px">${money0(p.monthly)}</b> <span class="muted small">/ ay · KDV dahil</span></div>
         <div class="small">Yıllık <b>${money0(p.yearly)}</b> <span class="muted">(2 ay hediye${instText(d, true) ? ` · ${instText(d, true)}` : ''})</span></div>
         ${up(d, p) ? html`<div class="small" style="color:var(--primary)">Şimdi geçiş: <b>${money(up(d, p).amount)}</b> <span class="muted">(kalan ${up(d, p).days} gün için fark)</span></div>` : ''}
-        ${admin && d.online ? html`<div class="row wrap" style="gap:8px;margin-top:auto">
+        ${admin && d.online && lower(d, p) ? html`<div class="small muted" style="margin-top:auto">Bu pakete aboneliğinizin süresi dolunca geçebilirsiniz.</div>` : ''}
+        ${admin && d.online && !lower(d, p) ? html`<div class="row wrap" style="gap:8px;margin-top:auto">
           ${up(d, p) ? html`<button class="btn primary sm" data-up="${p.key}"><i class="ico ico-up"></i>Bu pakete geç</button>` : ''}
           <button class="btn sm" data-buy="${p.key}" data-period="monthly">Aylık al</button>
           <button class="btn ${up(d, p) ? '' : 'primary '}sm" data-buy="${p.key}" data-period="yearly">Yıllık al</button></div>` : ''}
