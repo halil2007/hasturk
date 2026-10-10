@@ -100,7 +100,7 @@ async function list(root, query) {
     render($('[data-list]', root), d.posts.length ? html`<div class="card flush">${d.posts.map((p) => { const st = ST[stOf(p, now)];
       return html`<a class="bl-row" href="#/blog/${p.id}">
         <span class="bl-cv" style="${p.cover_id ? `background-image:url('${IMG(p.cover_id)}')` : ''}">${p.cover_id ? '' : raw('<i class="ico ico-image"></i>')}</span>
-        <div style="flex:1;min-width:0"><div class="row" style="gap:8px"><b class="ellipsis">${p.title}</b></div>
+        <div style="flex:1;min-width:0"><div class="row" style="gap:8px"><b class="ellipsis">${p.title}</b>${p.ai ? html`<span class="pill info tiny" title="Otomatik blog (yapay zekâ) taslağı">Yapay zekâ</span>` : ''}</div>
           <div class="tiny muted ellipsis">/blog/${p.slug} · ${p.author || ''} · ~${Math.max(1, Math.round((p.chars || 0) / 1300))} dk okuma</div>
           ${p.tags.length ? html`<div class="bl-tags" style="margin-top:4px">${p.tags.map((t) => html`<span class="bl-tag">${t}</span>`)}</div>` : ''}</div>
         <div style="display:grid;gap:4px;justify-items:end"><span class="pill ${st[0]}">${st[1]}</span>
@@ -118,6 +118,7 @@ async function list(root, query) {
       <div style="flex:1;min-width:240px"><h2>Blog yazıları</h2><div class="muted small">Yayındaki yazılar <a class="link" href="${d.site}/blog" target="_blank" rel="noopener">${host(d.site)}/blog</a> adresinde görünür (site birkaç dakika içinde güncellenir). Taslaklar yalnız burada görünür.</div></div>
       <button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Yeni yazı</button>
     </div>
+    <div class="card stack" data-auto><div class="muted small"><i class="ico ico-sync spin"></i> Otomatik yazı ayarları yükleniyor…</div></div>
     <div class="row wrap" style="gap:10px">
       <div class="tabs" style="flex:1 1 420px">${[['', 'Tümü'], ['published', 'Yayında'], ['scheduled', 'Zamanlanmış'], ['draft', 'Taslak']].map(([k, t]) => html`<button class="tab" data-act="st" data-k="${k}">${t} <span class="n">0</span></button>`)}</div>
       <input class="input" type="search" placeholder="Başlık, adres ya da etiket ara" data-q style="flex:1 1 220px;max-width:320px">
@@ -125,12 +126,56 @@ async function list(root, query) {
     <div data-list></div>
   </div>`);
   if (f.status) await load(); else draw();
+  autoCard($('[data-auto]', root), load).catch((e) => render($('[data-auto]', root), html`<div class="muted small">Otomatik yazı ayarları alınamadı: ${e.message}</div>`));
   $('[data-q]', root).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); load().catch((er) => toast(er.message, true)); }, 300));
   actions(root, {
     new: () => { location.hash = '#/blog/yeni'; },
     st: (b) => { f.status = b.dataset.k; load().catch((e) => toast(e.message, true)); },
   });
   return { refresh: load };
+}
+
+// ---------- otomatik yazı (Claude) ----------
+// Her gün belirlenen saatten sonra kuyruktaki sıradaki konuyla (kuyruk boşsa yapay zekânın seçtiği konuyla) bir TASLAK yazı üretilir;
+// yazı okunup yayınlanır. Okunmamış taslak birikirse üretim durur.
+async function autoCard(box, reload) {
+  const draw = (a) => {
+    const st = a.state || {}, last = st.last, err = st.error && (!last || st.error.at > last.at) ? st.error : null;
+    const month = (st.history || []).filter((x) => x.at > Date.now() - 30 * 864e5).reduce((t, x) => t + (x.cost || 0), 0);
+    render(box, html`<div class="row wrap" style="gap:10px;align-items:flex-start">
+        <div style="flex:1;min-width:240px"><h2 class="row" style="gap:8px">Otomatik yazı <span class="pill ${a.enabled && a.key.set ? 'good' : ''} tiny">${a.enabled && a.key.set ? 'Açık' : 'Kapalı'}</span></h2>
+          <div class="muted small">Yapay zekâ (Claude) her gün <b>${String(a.hour).padStart(2, '0')}:00</b>'dan sonra pazaryeri satıcılarına yönelik, Google'da aranan bir konuda yazı yazar ve <b>taslak</b> olarak kaydeder. Okuyup düzenledikten sonra siz yayınlarsınız. Güncel bilgiler (komisyon oranı, kural) için internette arama yapar. ${a.pending ? html`Onay bekleyen <b>${a.pending}</b> taslak var${a.pending >= a.max_pending ? ' — üretim durdu, önce bunları yayınlayın ya da silin' : ''}.` : ''}</div></div>
+        <label class="row" style="gap:8px;cursor:pointer"><span class="switch"><input type="checkbox" data-auto-on ${a.enabled ? 'checked' : ''}><span></span></span><span class="small">Her gün üret</span></label>
+      </div>
+      ${last ? html`<div class="small">Son yazı: <a class="link" href="#/blog/${last.id}">${last.title}</a> <span class="muted">· ${ago(last.at)}${last.cost ? ` · ~${last.cost.toFixed(2)} $` : ''}</span>${month ? html` <span class="muted">· son 30 gün ~${month.toFixed(2)} $</span>` : ''}</div>` : ''}
+      ${err ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Son deneme başarısız (${ago(err.at)}): ${err.msg}</div></div>` : ''}
+      <details class="adv" ${!a.key.set ? 'open' : ''}><summary class="small">Ayarlar ve konu kuyruğu</summary>
+        <div class="form-grid" style="margin-top:10px">
+          <label class="field"><span>Anthropic API anahtarı ${a.key.set ? html`<span class="src panel">kayıtlı</span>` : html`<b style="color:var(--bad)">*</b>`}</span><input class="input" type="password" autocomplete="new-password" data-auto-key placeholder="${a.key.masked ? `${a.key.masked} (değiştirmek için yazın)` : 'sk-ant-…'}"><small class="muted">console.anthropic.com → API Keys. Şifreli saklanır. Yazı başına tahmini maliyet ~0,20–0,40 $.</small></label>
+          <label class="field"><span>Üretim saati</span><select class="input" data-auto-hour>${Array.from({ length: 24 }, (_, h) => html`<option value="${h}" ${Number(a.hour) === h ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`)}</select><small class="muted">Bu saatten sonraki ilk kontrolde (15 dakikada bir) üretilir.</small></label>
+        </div>
+        <label class="field" style="margin-top:10px"><span>Konu kuyruğu (her satıra bir konu; sırayla yazılır)</span><textarea class="input" data-auto-topics rows="6" placeholder="Trendyol komisyon oranları ve kâr hesabı
+Pazaryerinde fazla satış nasıl önlenir?
+Hepsiburada buybox nasıl kazanılır?">${(a.topics || []).join('\n')}</textarea>
+          <small class="muted">Kuyruk boşsa konuyu yapay zekâ seçer (mevcut yazılarla çakışmayan bir konu).</small></label>
+        <div class="row wrap" style="gap:8px;margin-top:10px"><span class="spacer"></span><button class="btn" data-auto-now><i class="ico ico-bolt"></i>Şimdi bir yazı üret</button><button class="btn primary" data-auto-save>Kaydet</button></div>
+      </details>`);
+    const save = (extra = {}) => api('blog/auto', { method: 'PUT', body: { enabled: $('[data-auto-on]', box).checked, hour: Number($('[data-auto-hour]', box).value), topics: $('[data-auto-topics]', box).value, key: $('[data-auto-key]', box).value, ...extra } });
+    $('[data-auto-on]', box).onchange = (e) => busy(null, async () => {
+      if (e.target.checked && !a.key.set && !$('[data-auto-key]', box).value.trim()) { e.target.checked = false; $('details', box).open = true; return toast('Önce Anthropic API anahtarını girin', true); }
+      draw(await save()); toast(e.target.checked ? 'Otomatik yazı açıldı' : 'Otomatik yazı kapatıldı');
+    });
+    $('[data-auto-save]', box).onclick = (e) => busy(e.currentTarget, async () => { draw(await save()); toast('Otomatik yazı ayarları kaydedildi'); });
+    $('[data-auto-now]', box).onclick = (e) => busy(e.currentTarget, async () => {
+      const cur = await save();
+      if (!cur.key.set) { draw(cur); return toast('Önce Anthropic API anahtarını girin', true); }
+      toast('Yazı üretiliyor; 1–3 dakika sürebilir…');
+      const r = await api('blog/auto/run', { method: 'POST', body: {} });
+      toast(`Taslak hazır: ${r.title}`);
+      draw(await api('blog/auto', { fresh: true })); await reload();
+    });
+  };
+  draw(await api('blog/auto', { fresh: true }));
 }
 
 // ---------- düzenleyici ----------

@@ -8,5 +8,10 @@
     "test": "node --test",
     "deploy": "npx wrangler deploy"
   },
-  "engines": { "node": ">=22.5" }
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0"
+  }
 }

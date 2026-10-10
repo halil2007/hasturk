@@ -277,6 +277,8 @@ const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN carrier_cost REAL',
   // Kargo firmasından son takip sorgusu: zaman ve durum (created / transit / delivered / returned / cancelled) + firmanın durum metni
   'ALTER TABLE packages ADD COLUMN carrier_checked_at INTEGER',
+  // Otomatik blog (Claude) ile üretilen yazı: onay bekleyen taslak sayısı için
+  'ALTER TABLE blog_posts ADD COLUMN ai INTEGER',
   'ALTER TABLE packages ADD COLUMN carrier_state TEXT',
   'ALTER TABLE packages ADD COLUMN carrier_status TEXT',
   // Giriş koruması: IP başına hatalı deneme, engel sayısı (her engel bir öncekinden uzun) ve engel bitişi (bkz. guard.js)
