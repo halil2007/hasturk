@@ -278,27 +278,24 @@ export async function settingsView(el) {
           <td class="r num"><b>${nw != null ? money(nw) : '—'}</b>${diff != null && Math.abs(diff) >= 0.05 ? html` <span class="tiny" style="color:${diff > 0 ? 'var(--good)' : 'var(--bad)'}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}%</span>` : ''}</td></tr>`; })}`);
     };
     render(box, html`<div class="row wrap" style="gap:8px;align-items:flex-start"><div style="flex:1;min-width:220px"><h2>Döviz ile fiyatlandırma</h2>
-        <div class="muted small">Ürünün fiyatını dolar, euro ya da sterlin olarak girersiniz; panel bunu güncel kurla TL'ye çevirip satış fiyatını ve tüm kanallardaki fiyatı kendiliğinden günceller.</div></div>
+        <div class="muted small">Dövizle fiyatlanan ürünlerin TL fiyatı kurla kendiliğinden güncellenir.</div></div>
         <button class="btn sm" data-act="fx-refresh"><i class="ico ico-sync"></i>Kurları yenile</button></div>
-      <div class="row wrap" style="gap:10px">
-        ${[['1', 'Ürüne döviz fiyatı girin', 'Ürünler → ürünü açın → “Fiyat para birimi” ve “Döviz fiyatı”.'], ['2', 'Kuru ve sıklığı seçin', 'Aşağıdan hangi kurun, ne sıklıkla kullanılacağını belirleyin.'], ['3', 'Gerisini panel yapar', 'TL fiyat hesaplanır, kanal fiyatları aradaki farkı koruyarak güncellenir.']].map(([no, t, s2]) => html`<div style="flex:1;min-width:180px;display:flex;gap:10px;align-items:flex-start"><span class="pill info" style="min-width:26px;justify-content:center">${no}</span><div><b class="small">${t}</b><div class="tiny muted">${s2}</div></div></div>`)}
-      </div>
       ${d.error ? html`<div class="notice bad small">Kur alınamadı: ${d.error}. Biraz sonra “Kurları yenile”yi deneyin; fiyatlarınız son kurla kalır.</div>` : ''}
       <div class="row wrap" style="gap:10px" data-fxrates></div>
       <div class="muted tiny">${d.rates ? `${d.rates.source === 'live' ? `Anlık piyasa kuru (${d.rates.provider || ''})` : `Merkez Bankası ${d.rates.date ? d.rates.date.split('-').reverse().join('.') : ''} kuru`} · okunma ${dateTime(d.rates.at)}` : 'Kur henüz okunmadı'}${d.applied ? ` · son fiyat güncellemesi ${dateTime(d.applied.at)} (${d.applied.changed} ürün değişti)` : ''}</div>
       <div class="form-grid">
-        <label class="field"><span>Kur nereden alınsın?</span><select class="input" data-fx="source" ${dis}><option value="tcmb" ${d.settings.source === 'tcmb' ? 'selected' : ''}>Merkez Bankası (resmi kur, önerilen)</option><option value="live" ${d.settings.source === 'live' ? 'selected' : ''}>Anlık piyasa kuru</option></select><small>Merkez Bankası kuru gün içinde değişmez; anlık kur sürekli değişir.</small></label>
-        <label class="field" data-fxtcmb><span>Hangi kur kullanılsın?</span><select class="input" data-fx="kind" ${dis}>${KIND.map(([v, t]) => html`<option value="${v}" ${d.settings.kind === v ? 'selected' : ''}>${t}</option>`)}</select><small>Emin değilseniz “Döviz satış kuru” kalsın.</small></label>
+        <label class="field"><span>Kur nereden alınsın?</span><select class="input" data-fx="source" ${dis}><option value="tcmb" ${d.settings.source === 'tcmb' ? 'selected' : ''}>Merkez Bankası (resmi kur, önerilen)</option><option value="live" ${d.settings.source === 'live' ? 'selected' : ''}>Anlık piyasa kuru</option></select></label>
+        <label class="field" data-fxtcmb><span>Hangi kur kullanılsın?</span><select class="input" data-fx="kind" ${dis}>${KIND.map(([v, t]) => html`<option value="${v}" ${d.settings.kind === v ? 'selected' : ''}>${t}</option>`)}</select></label>
         <label class="field"><span>Fiyatlar ne sıklıkla güncellensin?</span><select class="input" data-fx="mode" ${dis}>${MODE.map(([v, t]) => html`<option value="${v}" ${d.settings.mode === v ? 'selected' : ''}>${t}</option>`)}</select></label>
-        <label class="field" data-fxlive><span>En az ne kadar değişince? (%)</span><input class="input" data-fx="threshold" inputmode="decimal" value="${d.settings.threshold}" ${dis}><small>Kur bu orandan az değiştiyse fiyatlar boşuna değişmez (ör. 0,5).</small></label>
-        <label class="field"><span>Kâr payı (%)</span><input class="input" data-fx="margin" inputmode="decimal" value="${d.settings.margin}" ${dis}><small>Kurla bulunan fiyatın üstüne eklenir. Ürüne ayrıca girdiyseniz o geçerlidir.</small></label>
+        <label class="field" data-fxlive><span>En az ne kadar değişince? (%)</span><input class="input" data-fx="threshold" inputmode="decimal" value="${d.settings.threshold}" ${dis}></label>
+        <label class="field"><span>Kâr payı (%)</span><input class="input" data-fx="margin" inputmode="decimal" value="${d.settings.margin}" ${dis}></label>
         <label class="field"><span>Fiyat nasıl yuvarlansın?</span><select class="input" data-fx="rounding" ${dis}>${ROUND.map(([v, t]) => html`<option value="${v}" ${d.settings.rounding === v ? 'selected' : ''}>${t}</option>`)}</select></label>
       </div>
       <div class="notice small"><i class="ico ico-calc"></i><div data-fxexample></div></div>
       <div class="notice small"><i class="ico ico-cal"></i><div data-fxnext></div></div>
       ${d.products ? html`<div><div class="small" style="font-weight:650;margin-bottom:6px">Döviz fiyatlı ürünleriniz (${n(d.products)})${d.products > d.items.length ? html` <span class="muted">· son değişen ${d.items.length} ürün gösteriliyor</span>` : ''}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th class="r">Döviz fiyatı</th><th class="r">Şu anki fiyat</th><th class="r">Bu ayarla yeni fiyat</th></tr></thead><tbody data-fxitems></tbody></table></div>
-        <div class="tiny muted" style="margin-top:4px">Kanal fiyatları (Trendyol, Hepsiburada…) ürünün eski fiyatına göre aradaki oran korunarak değişir: Trendyol'da %10 pahalı satıyorsanız yine %10 pahalı kalır.</div></div>`
+</div>`
         : html`<div class="notice small"><i class="ico ico-help"></i><div>Henüz döviz fiyatlı ürününüz yok. <a class="link" href="#/urunler">Ürünler</a> sayfasında bir ürünü açın, “Fiyat para birimi”ni Dolar / Euro / Sterlin seçip döviz fiyatını girin.</div></div>`}
       ${isAdmin() ? html`<div class="row wrap"><button class="btn primary" data-act="fx-save">Ayarları kaydet</button><button class="btn" data-act="fx-apply"><i class="ico ico-bolt"></i>Fiyatları şimdi güncelle</button></div>` : ''}`);
     box.oninput = box.onchange = (e) => { if (e.target.dataset.fx !== undefined) paint(); };

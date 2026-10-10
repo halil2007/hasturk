@@ -51,7 +51,7 @@ export async function dashboard(el) {
     const tasks = [
       ['blue', 'orders', newN, 'Yeni sipariş', '#/siparisler?status=new'],
       ['red', 'warn', sm.late || 0, 'Gecikme riski olan sipariş', '#/siparisler?status=new'],
-      ['orange', 'truck', sm.cargoWaiting || 0, 'Kargoya hazırlanacak', '#/kargo'],
+      ['orange', 'truck', sm.cargoWaiting || 0, 'Kargoya hazırlanacak', '#/siparisler'],
       ['purple', 'link', sm.unmatched || 0, 'Eşleşme bekleyen ilan', '#/eslestirme'],
       ['red', 'db', sm.stockOut || 0, 'Stokta olmayan ürün', '#/stoklar?durum=out'],
       // Açık sorunlar yalnız bizim yönetim panelimizde; müşteri panellerinde ve demoda gösterilmez
@@ -112,7 +112,7 @@ export async function dashboard(el) {
         ${kpi('Toplam ciro', c.total.revenue, p.total.revenue, money0, c.revenue)}
         ${kpi('Sipariş adedi', c.total.orders, p.total.orders, (v) => n(v), c.orders, { color: 'var(--good)' })}
         ${kpi(d.missingCost ? 'Tahmini kâr (eksik veri)' : 'Tahmini kâr', c.total.profit, p.total.profit, money0, c.profit, { color: 'var(--good)', warn: d.missingCost })}
-        <a class="kpi" href="#/kargo"><div class="label">Bekleyen kargo</div><div class="value num">${toShip}</div>
+        <a class="kpi" href="#/siparisler"><div class="label">Bekleyen kargo</div><div class="value num">${toShip}</div>
           <span class="kpi-ico"><i class="ico ico-box"></i></span>
           <span class="kpi-link"><i class="ico ico-tag"></i>Etiket oluştur <i class="ico ico-chev"></i></span></a>
       </div>

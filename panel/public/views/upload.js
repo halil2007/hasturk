@@ -27,8 +27,7 @@ export async function uploadView(el) {
   function draw() {
     const c = C();
     render(el, html`<div class="stack">
-      <div class="notice"><i class="ico ico-upload"></i><div style="flex:1"><b>Ürünlerinizi pazaryerlerine yükleyin:</b> 1) Kategorinizi pazaryeri kategorisiyle bir kez eşleştirin · 2) Kanalda olmayan ürünleri gönderin · 3) Onay sonucunu “Gönderimler”de takip edin. Onaylanan ürün kendiliğinden eşleşir.
-        ${!st.stockSync && c && !c.stockPush ? html`<div class="small" style="margin-top:4px">Stok senkronu kapalı: ürün ilk stokla gönderilir, sonraki stok değişiklikleri bu kanala gitmez (aşağıdan “Stokları gönder”i açabilirsiniz).</div>` : ''}</div></div>
+      ${!st.stockSync && c && !c.stockPush ? html`<div class="notice small"><i class="ico ico-warn"></i><div>Stok senkronu kapalı: ürün ilk stokla gönderilir, sonraki stok değişiklikleri bu kanala gitmez.</div></div>` : ''}
       <div class="ch-tabs">${st.channels.map((x) => html`<button class="ch-tab ${x.id === chId ? 'on' : ''}" data-act="ch" data-id="${x.id}" ${x.ready ? '' : 'disabled'} title="${x.reason}">${chLogo(x.id)}${x.name}${!x.ready ? html`<span class="tiny muted">${x.reason}</span>` : ''}</button>`)}</div>
       ${c && c.test ? html`<div class="notice warn"><i class="ico ico-warn"></i><div><b>${c.name} TEST ortamına (SIT) bağlı.</b> Buradan gönderilen ürünler gerçek ${c.name}'ya gitmez, satışa çıkmaz; yalnız test adımları içindir. Kanaldan gelen ilanlar da test ilanlarıdır (sizin ürünlerinizle eşleşmez). Canlı bilgiler gelince Entegrasyonlar → ${c.name} → <b>Ortam = Canlı</b> seçin.</div></div>` : ''}
       ${!c || !c.ready ? html`<div class="empty">Ürün yüklenebilecek bağlı pazaryeri yok. Trendyol / Hepsiburada API bilgilerini Entegrasyonlar'dan girin.</div>` : html`

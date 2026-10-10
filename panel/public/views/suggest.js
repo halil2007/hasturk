@@ -16,8 +16,7 @@ export async function suggestView(el) {
   function draw() {
     const rows = list(), c = data ? data.counts : {};
     render(el, html`<div class="stack">
-      <div class="notice small"><i class="ico ico-tag"></i><div><b>Fiyat önerileri</b> pazaryerinin rakip fiyatlarından (buybox) kendiliğinden hazırlanır: birinci sıra rakipteyse rakibin 1 kuruş altı, sizdeyse ve ikinci satıcı yukarıdaysa kârınızı artıracak fiyat önerilir.
-        Önerilen fiyattaki kârınızı görür, uygun olanı tek tıkla kanala gönderirsiniz. Fiyat kuralı tanımlı ürünlerde en düşük / en yüksek sınır aşılmaz.</div></div>
+      
       ${!chs.length ? html`<div class="card empty">Rakip fiyatı veren bağlı pazaryeri yok. Trendyol ya da Hepsiburada bağlanınca öneriler burada görünür (Entegrasyonlar).</div>` : html`
       <div class="row wrap" style="gap:10px">${chs.length > 1 ? html`<div class="ch-tabs" style="flex:1;min-width:0"><button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tümü</button>${chs.map((x) => html`<button class="ch-tab ${f.channel === x.id ? 'on' : ''}" data-act="ch" data-id="${x.id}">${chLogo(x.id)}${x.name}</button>`)}</div>` : html`<span style="flex:1"></span>`}
         <button class="btn" data-act="check"><i class="ico ico-sync"></i>Rakip fiyatlarını yenile</button></div>

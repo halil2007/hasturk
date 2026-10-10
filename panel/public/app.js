@@ -4,7 +4,6 @@ import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
 import { products } from './views/products.js';
 import { stocks } from './views/stocks.js';
-import { cargo } from './views/cargo.js';
 import { matching } from './views/match.js';
 import { buyboxView, bbChannels } from './views/buybox.js';
 import { questionsView, qChannels } from './views/questions.js';
@@ -35,7 +34,8 @@ const ROUTES = [
   { path: '', title: 'Genel Bakış', icon: 'home', view: dashboard },
   { sec: 'Satış' },
   { path: 'siparisler', title: 'Siparişler', icon: 'orders', view: orders, count: 'orders', perm: 'orders' },
-  { path: 'kargo', title: 'Kargo', icon: 'truck', view: cargo, count: 'cargo', perm: 'cargo' },
+  // Kargo sayfası menüde yok: paketleme, etiket, toplu etiket ve hazırlama listesi Siparişler'de (eski bağlantılar Siparişler'e gider)
+  { path: 'kargo', title: 'Siparişler', icon: 'truck', view: () => { location.replace('#/siparisler'); }, perm: 'orders', hidden: true },
   { path: 'iadeler', title: 'İadeler', icon: 'return', view: claimsView, count: 'claims', perm: 'returns' },
   { path: 'sorular', title: 'Müşteri Soruları', icon: 'chat', view: questionsView, count: 'questions', perm: 'questions' },
   { sec: 'Ürünler' },
@@ -67,7 +67,7 @@ const PAGES = ROUTES.filter((r) => r.view);
 // Menü grupları: menüde tek satır (ilk görülebilen sayfaya gider), rozet = grubun sayfalarının rozet toplamı
 const GROUPS = { katalog: { title: 'Ürünler', icon: 'box' }, fiyat: { title: 'Fiyat & Kampanya', icon: 'tag' }, rapor: { title: 'Raporlar', icon: 'pie' } };
 const groupPages = (g) => PAGES.filter((r) => r.group === g && canSee(r) && !r.hidden);
-const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['kargo', 'Kargo', 'truck'], ['stoklar', 'Stok', 'db']];
+const TABS = [['', 'Panel', 'home'], ['siparisler', 'Sipariş', 'orders'], ['urunler', 'Ürün', 'box'], ['stoklar', 'Stok', 'db']];
 const canSee = (r) => (!r.admin || !state.user || state.user.role === 'admin') && can(state.user, r.perm) && (!r.when || r.when());
 
 function nav() {
@@ -169,7 +169,7 @@ let warmed = false;
 function warmIdle() {
   if (warmed || !state.summary || (navigator.connection && navigator.connection.saveData)) return;
   warmed = true;
-  const list = ['siparisler', 'kargo', 'urunler', 'stoklar', '', 'kanal-urunleri', 'sorular', 'iadeler', 'analiz', 'gelir-gider'].filter((p) => p !== currentPath);
+  const list = ['siparisler', 'urunler', 'stoklar', '', 'kanal-urunleri', 'sorular', 'iadeler', 'analiz', 'gelir-gider'].filter((p) => p !== currentPath);
   const idle = window.requestIdleCallback ? (f) => window.requestIdleCallback(f, { timeout: 2000 }) : (f) => setTimeout(f, 200);
   let i = 0;
   const next = () => { if (i >= list.length || document.hidden) return; prefetchRoute(list[i++]); setTimeout(() => idle(next), 400); };
@@ -580,7 +580,7 @@ async function start(attempt = 0) {
   if (state.user && state.user.mustChange) return changePassword(true);
   await route();
   // Boşta: alt menüdeki sayfaların verisi önceden alınır (ilk dokunuşta da beklemeden açılsın)
-  setTimeout(() => ['siparisler', 'kargo', 'stoklar', 'urunler'].forEach(prefetchRoute), 1200);
+  setTimeout(() => ['siparisler', 'stoklar', 'urunler'].forEach(prefetchRoute), 1200);
 }
 
 // Yan menü: geniş ↔ dar (yalnız simgeler). Tercih bu cihazda hatırlanır.

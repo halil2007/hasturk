@@ -25,7 +25,7 @@ async function basketView(el) {
   const state = (c) => { const t = Date.now(), s = Date.parse(c.startDate), e = Date.parse(c.endDate); return c.status === 3 || c.status === 'Cancelled' ? ['', 'İptal'] : e < t ? ['', 'Bitti'] : s > t ? ['info', 'Başlayacak'] : ['good', 'Aktif']; };
   function draw() {
     render(el, html`<div class="stack">
-      <div class="notice small"><i class="ico ico-tag"></i><div><b>Hepsiburada sepet indirimleri</b> buradan oluşturulup iptal edilir. Rakiplere göre fiyat önerileri için <b>Fiyat önerileri</b> sekmesine bakın.</div></div>
+      
       ${!chs.length ? html`<div class="card empty">Kampanya servisi olan bağlı kanal yok. Hepsiburada bağlanıp bağlantı testi geçince sepet indirimleri buradan yönetilir (Entegrasyonlar).</div>` : html`
       <div class="row wrap">${chs.length > 1 ? html`<div class="ch-tabs" style="flex:1">${chs.map((c) => html`<button class="ch-tab ${chId === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}${c.name}</button>`)}</div>` : html`<span style="flex:1"></span>`}
         <button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Yeni sepet indirimi</button></div>
