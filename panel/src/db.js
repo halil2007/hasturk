@@ -304,6 +304,9 @@ export const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS packages_status_shipped ON packages(status, shipped_at)',
   // Son 30 gün satış adedi (ürün başına): ürün / stok listeleri her istekte sipariş geçmişini toplamasın (birkaç dakikada bir yenilenir)
   'CREATE TABLE IF NOT EXISTS sold30 (pid INTEGER PRIMARY KEY, s REAL NOT NULL)',
+  // Sipariş numarasıyla arama (iade talebi → sipariş, kargo faturası → sipariş): yoksa her iade talebi kanalın tüm siparişlerini
+  // tarıyordu (60 bin siparişte 1000 iade talebi ≈ 16 sn işlemci süresi, her senkronda)
+  'CREATE INDEX IF NOT EXISTS orders_number ON orders(channel, order_number)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
