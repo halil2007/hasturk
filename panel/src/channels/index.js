@@ -13,7 +13,7 @@ import { shopify } from './shopify.js';
 import { woocommerce } from './woocommerce.js';
 import { opencart } from './opencart.js';
 import { etsy } from './etsy.js';
-import { demo } from './demo.js';
+import { demo, DEMO_CHANNELS } from './demo.js';
 import { loadConfig, effectiveEnv, configVersion, EXTRA_RE, TYPES, TYPE_NAMES, BETA_TYPES, isBeta, typeOf, storeEnv, releasedTypes } from '../config.js';
 import { getRaw, setSetting } from '../db.js';
 
@@ -91,8 +91,9 @@ export async function getChannels(env, db) {
   const list = ids.map((id) => {
     // Panelde "pasif" yapılan kanal hiç çalışmaz
     if (cfg[id] && cfg[id].active === false) return { ...real[id], enabled: false, paused: true };
-    // DEMO=1: anahtarı girilmemiş tüm kanallar (pazaryerleri, siteler, test aşamasındakiler) örnek veriyle bağlı görünür
-    if (env.DEMO === '1' && !meta[id].extra && !real[id].enabled && !(cfg[id] && cfg[id].values && Object.keys(cfg[id].values).length)) return demo(meta[id]);
+    // DEMO=1: en çok kullanılan 10 kanal (pazaryerleri + tek site) bağlı görünür; diğerleri bağlanmamış olarak listelenir
+    const demoOn = env.DEMO === '1' && DEMO_CHANNELS.includes(id) && !real[id].enabled && !(cfg[id] && cfg[id].values && Object.keys(cfg[id].values).length);
+    if (demoOn) return demo(meta[id]);
     // Bağlantısı onaylanmamış kanal: son kayıttan sonra başarılı test yoksa listelere girmez; test için gerçek bağlantı ayrıca tutulur
     if (GATED.includes(typeOf(id))) {
       const v = verified[id], ok = v && cfg[id] && v.at >= (cfg[id].updated || 0);
@@ -101,7 +102,7 @@ export async function getChannels(env, db) {
     }
     if (meta[id].extra) return hold.has(id) ? held(real[id]) : real[id];
     // DEMO=1: anahtarı olmayan kanallar örnek veriyle çalışır (anahtarı girilmiş kanal gerçek kalır)
-    const c = env.DEMO === '1' && !real[id].enabled ? demo(meta[id]) : real[id];
+    const c = real[id];
     return hold.has(id) && !c.demo ? held(c) : c;
   });
   cache = { env, ver, list };
