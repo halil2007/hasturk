@@ -283,6 +283,8 @@ const MIGRATIONS = [
   'ALTER TABLE claims ADD COLUMN images TEXT',
   // Ek mağaza satın alma (sales_orders.kind = 'stores'): adet
   'ALTER TABLE sales_orders ADD COLUMN qty INTEGER',
+  // İlanın kalem hatası zamanı: kalıcı hatalı ilan bir süre yeniden gönderilmez (bkz. sync.js → ERROR_RETRY_MS)
+  'ALTER TABLE listings ADD COLUMN error_at INTEGER',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

@@ -327,7 +327,7 @@ export async function pushStocks(env, db, settings, only) {
     // Kanal başına ayrı sorgu: gönderimi kapalı bir kanaldaki bekleyen ilanlar diğer kanalların sırasını tıkamaz
     // Fiyat da verilir: stok ve fiyatı tek kayıtta isteyen kanal (idefix) stokla birlikte mevcut fiyatı yeniden gönderir (fiyat değişmez)
     const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, l.price, l.list_price, l.price_dirty, ${DESIRED} AS stock
-      FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ?) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`, ch.id);
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ? AND COALESCE(l.error_at, 0) < ?) WHERE pushed_stock IS NULL OR pushed_stock != stock LIMIT 3000`, ch.id, Date.now() - ERROR_RETRY_MS);
     const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock,
       price: Number(r.price) || 0, listPrice: Number(r.list_price) || 0, priceDirty: !!r.price_dirty }));
     if (!items.length) continue;
@@ -338,10 +338,10 @@ export async function pushStocks(env, db, settings, only) {
       const doneIds = res && Array.isArray(res.done) ? new Set(res.done.map(String)) : null;
       const sent = doneIds ? items.filter((x) => doneIds.has(String(x.remoteId))) : items;
       for (const part of chunk(sent, 90)) {
-        await db.batch(part.map((x) => db.prepare('UPDATE listings SET pushed_stock = ?, remote_stock = ?, error = NULL WHERE channel = ? AND remote_id = ?').bind(x.stock, x.stock, ch.id, x.remoteId)));
+        await db.batch(part.map((x) => db.prepare('UPDATE listings SET pushed_stock = ?, remote_stock = ?, error = NULL, error_at = NULL WHERE channel = ? AND remote_id = ?').bind(x.stock, x.stock, ch.id, x.remoteId)));
       }
       const errs = (res && res.errors) || [];
-      for (const part of chunk(errs, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND remote_id = ?').bind('Stok: ' + String(x.error).slice(0, 200), ch.id, x.remoteId)));
+      for (const part of chunk(errs, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ?, error_at = ? WHERE channel = ? AND remote_id = ?').bind('Stok: ' + String(x.error).slice(0, 200), Date.now(), ch.id, x.remoteId)));
       result[ch.id] = errs.length ? `${sent.length} gönderildi, ${errs.length} hata` : sent.length;
       await log(db, ch.id, errs.length ? 'warn' : 'info', `${sent.length} ürünün stoğu gönderildi${errs.length ? `, ${errs.length} ilanda hata (${errs[0].error})` : ''}${sent.length + errs.length < items.length ? ` · ${items.length - sent.length - errs.length} ilan sonraki senkronda` : ''}`);
       await resolve(db, `stock:${ch.id}`);
@@ -354,13 +354,16 @@ export async function pushStocks(env, db, settings, only) {
       const nc = await first(db, 'SELECT count FROM notices WHERE key = ? AND resolved_at IS NULL', `stock:${ch.id}`);
       if (nc && nc.count >= 3) await urgentAlert(env, db, `stock:${ch.id}`, { title: `${ch.name}: stok gönderilemiyor`, body: `${items.length} ilanın stoğu kanala gönderilemiyor (${explainHttp(e.message).slice(0, 200)}). Satılan ürünler bu kanalda açık kalabilir.`, url: '#/bildirimler' }).catch(() => null);
       for (const part of chunk(items, 90)) {
-        await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND remote_id = ?').bind('Stok: ' + e.message.slice(0, 200), ch.id, x.remoteId)));
+        await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ?, error_at = NULL WHERE channel = ? AND remote_id = ?').bind('Stok: ' + e.message.slice(0, 200), ch.id, x.remoteId)));
       }
     }
   }
   return result;
 }
 
+// Kanalın kalem kalem reddettiği ilan (silinmiş varyant, kampanya …) her senkronda değil, bu süre sonra yeniden denenir:
+// kalıcı hatalı ilanlar her 15 dakikada yüzlerce istek üretip kanalın istek sınırını (ikas 429) doldurmasın
+export const ERROR_RETRY_MS = 2 * 3600e3;
 export async function pushPrices(env, db) {
   // Otomatik fiyat kuralı açık ilanda fiyat, kaynağı ne olursa olsun (döviz kuru, fiyat önerisi, Excel) kuralın en düşük /
   // en yüksek sınırı dışına gönderilmez: sınıra çekilir ve kullanıcıya bildirilir (zararına satış olmasın).
@@ -368,7 +371,7 @@ export async function pushPrices(env, db) {
   const rows = await all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.price, l.list_price, r.min_price, r.max_price,
       CASE WHEN p.id IS NULL THEN NULL ELSE ${DESIRED} END AS stock
     FROM listings l LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 LEFT JOIN products p ON p.id = l.product_id
-    WHERE l.price_dirty = 1 AND l.price > 0 LIMIT 2000`);
+    WHERE l.price_dirty = 1 AND l.price > 0 AND COALESCE(l.error_at, 0) < ? LIMIT 2000`, Date.now() - ERROR_RETRY_MS);
   const bounded = [];
   for (const r of rows) {
     const min = Number(r.min_price) || 0, max = Number(r.max_price) || 0;
@@ -391,8 +394,8 @@ export async function pushPrices(env, db) {
       // Kanal ilan ilan sonuç verdiyse (ikas) yalnız kabul edilenler işaretlenir; reddedilen ilana neden yazılır, fiyatı sonraki senkronda yeniden denenir
       const doneIds = res && Array.isArray(res.done) ? new Set(res.done.map(String)) : null;
       const sent = doneIds ? items.filter((x) => doneIds.has(String(x.remoteId))) : items, errs = (res && res.errors) || [];
-      for (const part of chunk(sent, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL WHERE channel = ? AND remote_id = ?').bind(ch.id, x.remoteId)));
-      for (const part of chunk(errs, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ? WHERE channel = ? AND remote_id = ?').bind('Fiyat: ' + String(x.error).slice(0, 200), ch.id, x.remoteId)));
+      for (const part of chunk(sent, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET price_dirty = 0, error = NULL, error_at = NULL WHERE channel = ? AND remote_id = ?').bind(ch.id, x.remoteId)));
+      for (const part of chunk(errs, 90)) await db.batch(part.map((x) => db.prepare('UPDATE listings SET error = ?, error_at = ? WHERE channel = ? AND remote_id = ?').bind('Fiyat: ' + String(x.error).slice(0, 200), Date.now(), ch.id, x.remoteId)));
       result[ch.id] = errs.length ? `${sent.length} gönderildi, ${errs.length} hata` : sent.length;
       await log(db, ch.id, errs.length ? 'warn' : 'info', `${sent.length} ilanın fiyatı gönderildi${errs.length ? `, ${errs.length} ilanda hata (${errs[0].error})` : ''}`);
       await resolve(db, `price:${ch.id}`);
@@ -433,8 +436,8 @@ export async function checkPushes(env, db, { minAge = 60e3, maxAge = 6 * 3600e3,
     const what = r.kind === 'price' ? 'Fiyat' : 'Stok';
     for (const part of chunk(bad, 40)) {
       // Reddedilen stok "gönderildi" sayılmaz: sonraki senkronda yeniden gönderilir
-      await db.batch(part.map((x) => db.prepare(`UPDATE listings SET error = ?${r.kind === 'stock' ? ', pushed_stock = NULL' : ''} WHERE channel = ? AND (remote_id = ? OR sku = ?)`)
-        .bind(`${what} kanal tarafından reddedildi: ${(x.error || 'nedeni belirtilmedi').slice(0, 300)}`, r.channel, x.key, x.key)));
+      await db.batch(part.map((x) => db.prepare(`UPDATE listings SET error = ?, error_at = ?${r.kind === 'stock' ? ', pushed_stock = NULL' : ''} WHERE channel = ? AND (remote_id = ? OR sku = ?)`)
+        .bind(`${what} kanal tarafından reddedildi: ${(x.error || 'nedeni belirtilmedi').slice(0, 300)}`, t, r.channel, x.key, x.key)));
     }
     await run(db, "UPDATE push_checks SET status = 'done', failed = ?, checked_at = ? WHERE id = ?", bad.length, t, r.id);
     const key = `${r.kind}reject:${r.channel}`;
