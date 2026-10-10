@@ -73,6 +73,8 @@ const handler = {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? secure(await env.ASSETS.fetch(req)) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
+    // Herkese açık uçlar: IP başına dakikada 120 istek (veritabanı yükü / kötüye kullanım)
+    if (path.startsWith('public/') && rateLimited('pub:' + (req.headers.get('CF-Connecting-IP') || guardIp(req)), 120)) return json({ error: 'Çok fazla istek; biraz bekleyip tekrar deneyin.' }, 429, { 'Retry-After': '60' });
     // Tanıtım sitesinden demo talebi (oturumsuz; yalnız izin verilen site adreslerinden, bkz. lead.js)
     if (path === 'public/lead') return await leadRequest(req, env);
     // Online paket satışı: siteden başlatma (CORS) ve iyzico'nun ödeme sonrası dönüşü (iyzico sayfasından gelen POST)
@@ -106,7 +108,7 @@ const handler = {
       if (env.DB) {
         await init(env.DB);
         const gc = await guardConfig(env.DB);
-        if (gc.enabled && rateLimited(guardIp(req), gc.apiPerMin)) return json({ error: 'Çok fazla istek gönderildi; biraz bekleyip tekrar deneyin.' }, 429, { 'Retry-After': '60' });
+        if (gc.enabled && rateLimited(req.headers.get('CF-Connecting-IP') || guardIp(req), gc.apiPerMin)) return json({ error: 'Çok fazla istek gönderildi; biraz bekleyip tekrar deneyin.' }, 429, { 'Retry-After': '60' });
       }
       // Dış API (stok aktarımı): anahtarla, yalnız ana panelin yetkilendirdiği mağaza (bkz. extapi.js).
       // Geçersiz anahtar (401) giriş korumasına sayılır (403: anahtar doğru, IP / durum izni yok — sayılmaz); engelli IP anahtara bakılmadan reddedilir.
@@ -141,8 +143,11 @@ const handler = {
         const t = env.DB ? await getTenant(env.DB, slug) : null;
         if (!t || !t.active) return json({ error: t ? 'Bu müşteri paneli askıya alınmış' : 'Oturum geçersiz', tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
         // Abonelik süresi doldu: müşteri giremez (ana panelin destek oturumu girebilir; yenileme / veri kontrolü için)
-        const raw = ((req.headers.get('Cookie') || '').match(/hp_session=([^;]+)/) || [])[1] || '';
-        if (expired(t) && !/~-1\./.test(raw.replace(/%7E/gi, '~')))
+        // Destek oturumu: çerez "firma~-1.bitiş.imza" (tam olarak; imzayı Durable Object denetler)
+        let raw = ((req.headers.get('Cookie') || '').match(/hp_session=([^;]+)/) || [])[1] || '';
+        try { raw = decodeURIComponent(raw); } catch { raw = ''; }
+        const parts = raw.slice(raw.indexOf('~') + 1).split('.'), support = raw.includes('~') && parts.length === 3 && parts[0] === '-1';
+        if (expired(t) && !support)
           return json({ error: await expiredMessage(env, t), renew: renewUrl(env, t), tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
         return await forward(req, env, t);
       }

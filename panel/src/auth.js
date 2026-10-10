@@ -87,7 +87,9 @@ export async function currentUser(req, env, db) {
   const i = v.indexOf('~');
   if (env.TENANT_SLUG ? v.slice(0, i + 1) !== pre(env) : i >= 0) return null; // başka panelin çerezi
   if (i >= 0) v = v.slice(i + 1);
-  const [uid, exp, sig] = v.split('.');
+  const seg = v.split('.');
+  if (seg.length !== 3) return null; // fazladan bölüm eklenmiş çerez kabul edilmez
+  const [uid, exp, sig] = seg;
   if (!sig || Number(exp) < Date.now()) return null;
   // Destek oturumu en fazla 2 saat: imzalı olsa bile daha uzak bitiş tarihi kabul edilmez
   if (uid === '-1') return env.TENANT_SLUG && Number(exp) <= Date.now() + 2 * 3600e3 + 60e3 && same(sig, await hmac(secret(env), `-1.${exp}.support`)) ? { ...SUPPORT, name: 'Destek (ana panel)' } : null;

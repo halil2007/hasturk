@@ -961,6 +961,7 @@ async function saveSettings(db, b) {
       if (bad.length) fail(400, 'Geçersiz e-posta adresi: ' + bad.join(', '));
     }
     if (k === 'mail_channels') v = { ...(cur.mail_channels || {}), ...Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, x !== false])) };
+    if (k === 'panel_url' && env.TENANT_SLUG) continue; // müşteri panelinde e-postalardaki panel adresi değiştirilemez (platformun adresi)
     if (k === 'panel_url') { v = str(v).replace(/\/+$/, ''); if (v && !/^https?:\/\/[^\s]+$/i.test(v)) fail(400, 'Panel adresi https:// ile başlamalı'); }
     if (k === 'catalog_channels') v = (Array.isArray(v) ? v : []).filter((c) => isChannelId(c));
     if (k === 'company') v = Object.fromEntries(['title', 'legal', 'phone', 'email', 'address', 'tax'].map((f) => [f, str((v || {})[f]).slice(0, 300)]));
@@ -1475,6 +1476,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json(await errorsApi(req, db, path, q, m === 'GET' ? {} : await body(req)));
   }
   // Destek talepleri: ana panelde gelen kutusu (müşteri panellerinin istekleri Durable Object'te karşılanır, bkz. tenants.js)
+  if (!env.TENANT_SLUG && user.role !== 'admin' && (path === 'support' || path.startsWith('support/') || path === 'notices' || path.startsWith('notices/') || path === 'push/latest')) fail(403, 'Bu bölüm yalnız yöneticiye açıktır');
   if (path === 'support' || path.startsWith('support/')) {
     if (env.TENANT_SLUG) fail(404, 'Bulunamadı');
     return supportResponse(req, db, path, { slug: '', firm: '', user, staff: true, env });
@@ -1564,6 +1566,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!env.TENANT_SLUG) return json(d);
     const plat = /MAIL_/.test(env.PLATFORM_KEYS || '');
     return json({ ...d, platform: plat, fields: d.fields.map((f) => (f.source === 'cloudflare' ? { ...f, value: '', masked: '', source: '' } : f)) });
+  }
+  if ((path === 'mail/test' || path === 'digest/test') && m === 'POST' && env.TENANT_SLUG) {
+    // Müşteri panelinden deneme e-postası günde en fazla 5 (platformun gönderici adresi toplu gönderimde kullanılamasın)
+    const day = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10), k = 'mailtest:' + day;
+    const n = (Number(await getRaw(db, k)) || 0) + 1;
+    if (n > 5) fail(429, 'Bugün deneme e-postası sınırına ulaşıldı (günde 5); yarın tekrar deneyebilirsiniz.');
+    await setSetting(db, k, n);
   }
   if (path === 'mail/test' && m === 'POST') {
     const settings = await getSettings(db), to = (settings.mail_to || []).filter(validEmail);
