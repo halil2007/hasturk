@@ -81,6 +81,29 @@ test('ikas: token alınır, sipariş okunur, stok saveProductStockLocations ile 
   assert.deepEqual(save.variables.input.productStockLocationInputs, [{ productId: 'p1', variantId: 'v1', stockLocationId: 'loc1', stockCount: 7 }]);
 });
 
+test('ikas çok lokasyonlu mağaza: silinmiş lokasyon seçilmez; stok yalnız ana depoya yazılır ve oradan okunur (diğer depolara dokunulmaz)', async () => {
+  const gqlBodies = [];
+  mockFetch([
+    [/oauth\/token/, { access_token: 'T', expires_in: 3600 }],
+    [/graphql/, (url, opts) => {
+      const b = JSON.parse(opts.body); gqlBodies.push(b);
+      if (/listStockLocation/.test(b.query)) return { data: { listStockLocation: [{ id: 'old', name: 'Eski', deleted: true }, { id: 'A', name: 'Depo' }, { id: 'B', name: 'Mağaza' }] } };
+      if (/listProduct\b|listProduct\(/.test(b.query)) return { data: { listProduct: { hasNext: false, data: [{ id: 'p1', name: 'Toprak', variants: [
+        { id: 'v1', sku: 'T1', isActive: true, prices: [{ sellPrice: 100 }], stocks: [{ stockCount: 7, stockLocationId: 'A' }, { stockCount: 5, stockLocationId: 'B' }] },
+        { id: 'v2', sku: 'T2', isActive: true, prices: [{ sellPrice: 100 }], stocks: [{ stockCount: 4, stockLocationId: 'B' }] }] }] } } };
+      return { data: { saveProductStockLocations: true } };
+    }],
+  ]);
+  const ch = ikas({ IKAS2_STORE: 's2', IKAS2_CLIENT_ID: 'i', IKAS2_CLIENT_SECRET: 'c' }, 'IKAS2_', { id: 'ikas2' });
+  const r = await ch.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 7 }]);
+  assert.deepEqual(r.done, ['v1']);
+  const save = gqlBodies.find((b) => /saveProductStockLocations/.test(b.query));
+  assert.deepEqual(save.variables.input.productStockLocationInputs, [{ productId: 'p1', variantId: 'v1', stockLocationId: 'A', stockCount: 7 }], 'yalnız ana depo; B değişmez');
+  const ls = await ch.fetchListings();
+  assert.equal(ls.find((x) => x.remoteId === 'v1').stock, 7, 'ana deponun stoğu okunur (gönderilenle eşleşir, tekrar gönderilmez)');
+  assert.equal(ls.find((x) => x.remoteId === 'v2').stock, 4, 'ana depoda kaydı olmayan varyantta toplam');
+});
+
 test('ikas Kargo: panel "Kargoya Hazır" işaretlemez; ikas Kargo gönderisi (barkod / etiket görseli / hata) okunur', async () => {
   const bodies = [];
   let pkgState = null;

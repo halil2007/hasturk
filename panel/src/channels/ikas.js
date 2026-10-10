@@ -239,7 +239,16 @@ export function ikas(env, p, meta) {
       return names.join(' › ');
     };
     const q = (o) => `query ($page: Int!) { listProduct(pagination: { page: $page, limit: 100 }) { hasNext data {
-      id name ${o.salesChannelIds} ${o.brand} ${o.description} ${o.categoryIds} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice priceListId } stocks { stockCount } ${o.images} } } } }`;
+      id name ${o.salesChannelIds} ${o.brand} ${o.description} ${o.categoryIds} variants { id sku ${o.barcodeList} isActive ${o.variantValueIds} prices { sellPrice discountPrice priceListId } stocks { stockCount stockLocationId } ${o.images} } } } }`;
+    // Stok, gönderimin yazdığı lokasyondan okunur (pushStock ile aynı): çok lokasyonlu mağazada toplam okunursa diğer depodaki adet
+    // yüzünden okunan değer gönderilenle hiç eşleşmez ve ilan her senkronda yeniden gönderilir. Diğer depolara dokunulmaz.
+    // Lokasyon bilinmiyorsa ya da varyantın o lokasyonda kaydı yoksa toplam alınır.
+    let loc = '';
+    try { loc = await location(); } catch { /* toplam stok */ }
+    const stockOf = (v) => {
+      const list = v.stocks || [], at = loc ? list.filter((x) => x.stockLocationId === loc) : [];
+      return (at.length ? at : list).reduce((s, x) => s + num(x.stockCount), 0);
+    };
     let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }', brand: 'brand { name }', description: 'description', categoryIds: 'categoryIds' };
     for (let page = 1; page <= 200; page++) {
       const d = await flex(q, optional, { page });
@@ -262,7 +271,7 @@ export function ikas(env, p, meta) {
             remoteId: String(v.id), remoteProductId: String(p.id), sku: str(v.sku), barcode: str((v.barcodeList || [])[0]),
             name: vname ? `${p.name} - ${vname}` : p.name, groupName: p.name, variantName: vname,
             image: imgUrl(img, 360), images: gallery, price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
-            stock: (v.stocks || []).reduce((s, x) => s + num(x.stockCount), 0), active: v.isActive !== false,
+            stock: stockOf(v), active: v.isActive !== false,
             brand: str(p.brand && p.brand.name), description: str(p.description), category: catPath(p.categoryIds),
           });
         }
@@ -274,8 +283,8 @@ export function ikas(env, p, meta) {
 
   async function location() {
     if (locationId) return locationId;
-    const d = await gql('{ listStockLocation { id name } }');
-    const l = (d.listStockLocation || [])[0];
+    const d = await gql('{ listStockLocation { id name deleted } }');
+    const l = (d.listStockLocation || []).find((x) => !x.deleted);
     if (!l) throw new Error('ikas stok lokasyonu bulunamadı (' + p + 'STOCK_LOCATION_ID tanımlayın)');
     return (locationId = l.id);
   }
