@@ -475,6 +475,8 @@ export class TenantPanel {
         await init(this.db);
         const user = await currentUser(req, env, this.db);
         if (!user) return json({ error: 'Giriş gerekli' }, 401);
+        // Paketim (ödemeler, fatura bilgileri) yalnız yöneticiye
+        if (user.role !== 'admin') return json({ error: 'Paketim sayfası yalnız yöneticiye açıktır; paket ve ödeme işlemleri için yöneticinize başvurun.' }, 403);
         if (req.method !== 'GET' && req.headers.get('Origin') && new URL(req.headers.get('Origin')).host !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403);
         const b = req.method === 'GET' ? {} : await req.json().catch(() => ({}));
         const used = await first(this.db, `SELECT COUNT(*) AS n FROM channel_config WHERE data IS NOT NULL AND id NOT IN (${CARRIER_IDS.map(() => '?').join(',')})`, ...CARRIER_IDS);
@@ -549,7 +551,13 @@ export class TenantPanel {
       if (b.op === 'demo') {
         if (env.DEMO !== '1') return json({ error: 'Bu panel demo paneli değil' }, 400);
         await this.ctx.storage.delete('suspended'); await this.ctx.storage.delete('destroyed');
-        if (await this.demoDue()) await this.demoReset(env);
+        // Sıfırlama (tam senkron, ~7 sn) arka planda: ziyaretçi beklemeden girer, veriler birkaç saniyede yenilenir
+        if (await this.demoDue()) {
+          // İlk kurulumda (demo kullanıcısı yok) beklenir; sonraki sıfırlamalar arka planda (ziyaretçi ~7 sn beklemesin)
+          const ready = await first(this.db, "SELECT 1 AS x FROM users LIMIT 1").catch(() => null);
+          if (ready) this.ctx.waitUntil(this.demoReset(env).catch((e) => console.error('demo sıfırlama', e)));
+          else await this.demoReset(env);
+        }
         await this.schedule();
         return json({ ok: true, cookie: await demoCookie(env, this.db, !!b.secure) });
       }

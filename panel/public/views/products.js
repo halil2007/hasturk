@@ -223,8 +223,9 @@ export async function products(el, rest, query = {}) {
       { icon: 'link', label: `Eşleştirme${unl() ? ` (${unl()} bekliyor)` : ''}`, run: () => { location.hash = '#/eslestirme'; } },
       '-',
       { icon: 'tag', label: 'Barkod / SKU oluştur', run: () => barcodeDialog(refresh, f.filter === 'nosku' ? 'sku' : 'barcode') },
-      { icon: 'download', label: 'Excel\'e aktar (tüm ürünler)', run: () => { location.href = '/api/products.csv'; } },
-      { icon: 'upload', label: 'Excel\'den toplu güncelle', run: () => excelDialog(refresh) },
+      ...(locked('bulk') ? [{ icon: 'download', label: 'Excel ile toplu işlem (Profesyonel paket)', run: () => { toast('Excel ile toplu güncelleme Profesyonel ve Kurumsal pakette; Paketim\'den yükseltebilirsiniz'); location.hash = '#/paketim'; } }] : [
+        { icon: 'download', label: 'Excel\'e aktar (tüm ürünler)', run: () => { location.href = '/api/products.csv'; } },
+        { icon: 'upload', label: 'Excel\'den toplu güncelle', run: () => excelDialog(refresh) }]),
       { icon: 'sync', label: 'Kanallardan içe aktar', run: () => importDialog(refresh) },
     ], { title: 'Araçlar' }),
   });

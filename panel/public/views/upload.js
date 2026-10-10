@@ -1,5 +1,5 @@
 // Ürün yükle: ikas kategorilerini pazaryeri kategorileriyle eşleştir, kanalda olmayan ürünleri seçip gönder, sonucu takip et.
-import { api, html, render, $, $$, money, n, dateTime, actions, busy, toast, sheet, debounce, chLogo, ch, thumb, isAdmin, store, state } from '../core.js';
+import { api, locked, html, render, $, $$, money, n, dateTime, actions, busy, toast, sheet, debounce, chLogo, ch, thumb, isAdmin, store, state } from '../core.js';
 
 const ST = { sent: ['warn', 'Kanal işliyor'], done: ['good', 'Tamamlandı'], error: ['bad', 'Gönderilemedi'] };
 const catName = (l) => l || 'Kategorisiz';
@@ -34,8 +34,8 @@ export async function uploadView(el) {
       ${!c || !c.ready ? html`<div class="empty">Ürün yüklenebilecek bağlı pazaryeri yok. Trendyol / Hepsiburada API bilgilerini Entegrasyonlar'dan girin.</div>` : html`
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
         <h2 style="margin:0">2 · Otomatik işlemler · ${c.name}</h2>
-        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="auto_upload" ${c.auto ? 'checked' : ''}><span></span></span>
-          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Onayladığınız kategori eşleşmelerindeki, ${c.name}'da olmayan ve stoğu olan yeni ürünler kendiliğinden gönderilir; eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir.</span></span></label>
+        ${locked('autoupload') ? html`<div class="notice small"><i class="ico ico-up"></i><div><b>Yeni ürünleri otomatik gönderme</b> Profesyonel ve Kurumsal pakette. Paketinizde ürünleri aşağıdan seçip gönderebilirsiniz. <a class="link" href="#/paketim">Paketim</a></div></div>` : html`<label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="auto_upload" ${c.auto ? 'checked' : ''}><span></span></span>
+          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Onayladığınız kategori eşleşmelerindeki, ${c.name}'da olmayan ve stoğu olan yeni ürünler kendiliğinden gönderilir; eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir.</span></span></label>`}
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="stock_push" ${c.stockPush ? 'checked' : ''}><span></span></span>
           <span><b>Stokları ${c.name}'a gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${c.name}'a gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
       </div>` : ''}
