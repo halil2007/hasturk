@@ -89,6 +89,9 @@ export async function integrations(el, rest = []) {
     const err = conf.find((x) => x.last && x.last.ok === false);
     const s = err ? { k: 'err', t: 'Hata' } : stateOf(c);
     const multi = conf.length > 1;
+    // Geliştirme aşamasındaki kanal: yalnız bilgi (bağlanamaz)
+    if (c.dev) return html`<div class="icard off" style="opacity:.75"><div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${typeName(g.type)}</b>
+      <div class="ic-st"><span class="pill tiny">Geliştirme aşamasında</span></div></div></div><div class="ic-need small muted">Yakında bağlanabilecek.</div></div>`;
     return html`<div class="icard ${conf.length ? 'conf' : ''} ${s.k}" data-act="open" data-id="${c.id}" tabindex="0">
       <div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${typeName(g.type)}</b>
           <div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${multi ? `${live.length}/${conf.length} mağaza bağlı` : s.t}${c.beta ? html`<span class="pill warn tiny">Test aşamasında</span>` : ''}${c.sandbox ? html`<span class="pill warn tiny">Test ortamı</span>` : ''}</div></div>

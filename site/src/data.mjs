@@ -413,14 +413,14 @@ export const INTEGRATIONS = [
     help: "Teknosa satıcı paneline (Mirakl, https://teknosatr-prod.mirakl.net) girin → sağ üst kullanıcı menüsü → API Anahtarı (API Key sekmesi) → anahtarı oluşturup kopyalayın. Birden çok mağazanız varsa Mağaza ID'yi de girin.",
   },
   {
-    slug: 'boyner', beta: 'boyner', name: "Boyner", kind: 'pazaryeri', color: '#000000', badge: "B", word: "Boyner",
+    slug: 'boyner', dev: true, name: "Boyner", kind: 'pazaryeri', color: '#000000', badge: "B", word: "Boyner",
     lead: "Boyner siparişlerinizi diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını panelden bildirin.",
     caps: [["Siparişler ve onay", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Ürün yükleme", false], ["Müşteri soruları", false], ["İade talepleri", false]],
     points: [["i-cart", "Siparişler", "Boyner siparişleri diğer kanallarla aynı listeye gelir, panelden onaylanır."], ["i-sync", "Stok ve fiyat", "Stok ve fiyatlarınız diğer kanallarla eşit kalır."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası panelden bildirilir."], ["i-box", "Ürünler", "İlanlarınız panele gelir, paneldeki ürünle eşleşir."]],
     help: "Boyner satıcı paneline (merchant.boyner.com.tr) girin → sağ üstte mağaza adı → Hesabım → Entegrasyon Bilgileri. Ekrandaki Satıcı ID, API Key ve API Secret değerlerini kopyalayın. Ekran yoksa Boyner satıcı destek / entegrasyon ekibinden isteyin.",
   },
   {
-    slug: 'pasaj', beta: 'pasaj', name: "Turkcell Pasaj", kind: 'pazaryeri', color: '#ffc900', badge: "P", word: "Pasaj",
+    slug: 'pasaj', dev: true, name: "Turkcell Pasaj", kind: 'pazaryeri', color: '#ffc900', badge: "P", word: "Pasaj",
     lead: "Turkcell Pasaj siparişlerinizi diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını panelden bildirin.",
     caps: [["Siparişler ve onay", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Ürün yükleme", false], ["Müşteri soruları", false], ["İade talepleri", false]],
     points: [["i-cart", "Siparişler", "Turkcell Pasaj siparişleri diğer kanallarla aynı listeye gelir, panelden onaylanır."], ["i-sync", "Stok ve fiyat", "Stok ve fiyatlarınız diğer kanallarla eşit kalır."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası panelden bildirilir."], ["i-box", "Ürünler", "İlanlarınız panele gelir, paneldeki ürünle eşleşir."]],
@@ -434,7 +434,7 @@ export const INTEGRATIONS = [
     help: "Trendyol Go by Uber Eats satıcı paneline (partner.tgomarket.com) girin → sağ üstte mağaza adınız → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key ve API Secret. Anahtarlar tüm şubelerde aynıdır; şube ID'lerini (storeId) kategori sorumlunuzdan alın (bağlantı testi şube listesini de gösterir). Test ortamı için 0850 258 58 00'dan IP yetkilendirmesi istenir.",
   },
   {
-    slug: 'getir', beta: 'getir', name: "Getir Çarşı", kind: 'hızlı market', color: '#5d3ebc', badge: "G", word: "getir",
+    slug: 'getir', dev: true, name: "Getir Çarşı", kind: 'hızlı market', color: '#5d3ebc', badge: "G", word: "getir",
     lead: "Getir Çarşı siparişlerini pazaryeri siparişlerinizle aynı ekranda görün, hazırlayıp kuryeye teslim edin; stok ve fiyatlarınız tüm kanallarla eşit kalsın.",
     caps: [["Siparişler", true], ["Hazırlandı / kuryeye teslim bildirimi", true], ["Stok ve fiyat gönderimi", true], ["Kurye", "Platformun kuryesi"], ["Ürün yükleme", false]],
     points: [["i-cart", "Siparişler", "Getir Çarşı siparişleri diğer kanallarla aynı listeye gelir."], ["i-truck", "Hazırlama ve teslim", "Sipariş hazırlanınca panelden bildirirsiniz; kurye platformdan gelir."], ["i-sync", "Stok ve fiyat", "Tükenen ürün bu kanalda da tükenir, fiyatlarınız eşit kalır."], ["i-box", "Ürünler", "Mağaza ürünleriniz panele gelir, paneldeki ürünle eşleşir."]],

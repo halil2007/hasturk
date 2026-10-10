@@ -1,7 +1,7 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES, DEV_TYPES } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
@@ -1591,7 +1591,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   // Mağaza ekle / kaldır (aynı kanal türünden istenen sayıda mağaza)
   if (path === 'integrations/add' && m === 'POST') {
-    const id = await addStore(db, str((await body(req)).type));
+    const at = str((await body(req)).type);
+    if (DEV_TYPES.includes(at)) fail(403, 'Bu entegrasyon geliştirme aşamasında; henüz bağlanamaz.');
+    const id = await addStore(db, at);
     resetChannels();
     await log(db, id, 'info', `${user.name}: yeni mağaza eklendi`);
     return json({ ok: true, id });
@@ -1602,6 +1604,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     await log(db, null, 'info', `${user.name}: ${x[1]} mağazası kaldırıldı (siparişleri ve ilanları silinmedi)`);
     return json({ ok: true });
   }
+  if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT' && DEV_TYPES.includes(typeOf(x[1]))) fail(403, 'Bu entegrasyon geliştirme aşamasında; henüz bağlanamaz.');
   if ((x = path.match(/^integrations\/([a-z0-9_]+)$/)) && m === 'PUT') {
     // Müşteri panelinde e-posta servisi ayarlanamaz: otomatik e-postalar yalnız ana panelde girilen adresten gider
     if (env.TENANT_SLUG && x[1] === 'mail') fail(403, 'E-posta gönderimi Hastürk CRM tarafından yapılır; e-posta servisi ayarlanamaz');
