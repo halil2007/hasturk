@@ -180,8 +180,10 @@ export async function publicCheckout(req, env) {
       const t = await getTenant(env.DB, str(b.slug).toLocaleLowerCase('tr').trim(), true);
       if (!t || !t.email || t.email.trim().toLowerCase() !== str(b.email).trim().toLowerCase()) fail(400, 'Firma kodu ve e-posta eşleşmedi. Firma kartınızdaki e-posta adresini yazın ya da bizimle iletişime geçin.');
       if (!t.active) fail(400, 'Bu firma paneli askıya alınmış. ' + await contactLine(env));
-      const buyer = buyerOf({ ...b, firm: t.name }, ip);
-      order = { id: newId(), kind: 'renew', slug: t.slug, plan: p.plan, period: p.period, amount: p.amount, buyer: JSON.stringify(buyer) };
+      checkDowngrade(t, p.plan);
+      const buyer = buyerOf({ ...b, firm: t.name }, ip), extra = renewExtras(t, p.plan);
+      if (extra) p.amount = Math.round((p.amount + extraRenewAmount(extra, p.months)) * 100) / 100;
+      order = { id: newId(), kind: 'renew', slug: t.slug, plan: p.plan, period: p.period, amount: p.amount, qty: extra, buyer: JSON.stringify(buyer) };
     } else {
       const firm = str(b.firm).trim().slice(0, 120);
       if (firm.length < 2) fail(400, 'Firma / mağaza adını yazın');
@@ -193,8 +195,8 @@ export async function publicCheckout(req, env) {
     }
     // Havale / EFT: sipariş "havale bekleniyor" olarak kaydedilir (yıllıkta indirimli tutar); ödeme gelince ana panel → Firmalar'dan onaylanır
     if (eft) order.amount = eftAmount(p);
-    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, username, pass_hash, pass_tmp, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      order.id, order.kind, order.slug, order.plan, order.period, order.amount, eft ? 'eft' : 'pending', order.buyer, order.username || null, order.pass_hash || null, order.pass_tmp || null, origin, now, now);
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, username, pass_hash, pass_tmp, origin, created_at, updated_at, qty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      order.id, order.kind, order.slug, order.plan, order.period, order.amount, eft ? 'eft' : 'pending', order.buyer, order.username || null, order.pass_hash || null, order.pass_tmp || null, origin, now, now, order.qty || null);
     if (eft) return json(await eftOrder(env, order, p, panel), 200, h);
     return json(await start(env, env.DB, order, panel), 200, h);
   } catch (e) {
@@ -206,6 +208,14 @@ export async function publicCheckout(req, env) {
 
 // Panelden (firma yöneticisi, oturumlu): Paketim sayfası. t = firma kaydı, user = panel kullanıcısı
 // Ek mağaza: mevcut sınır, paketin mağaza sayısı, kullanılan, yıllık ücret, lisans bitişine kalan gün ve mağaza başı tutar (sunucuda hesaplanır)
+// Alt pakete geçiş yalnız abonelik bitince (ya da denemede): iade olmadığı için dönem ortasında paket düşürülmez
+const isDowngrade = (rec, plan) => { const a = PLANS[planKey(rec.plan)], b = PLANS[plan]; return !!(a && b && b.monthly < a.monthly); };
+function checkDowngrade(rec, plan) {
+  if (isDowngrade(rec, plan) && !rec.trial && !expired(rec)) fail(400, `${PLANS[plan].name} paketine aboneliğinizin süresi dolunca geçebilirsiniz (iade olmadığı için dönem ortasında alt pakete geçilmez). Şimdi mevcut ya da üst paketi alabilirsiniz.`);
+}
+// Yenilemede korunan ek mağaza adedi: firmanın toplam sınırı, eski ve yeni paketin büyük olanının üstündeki kısım
+// (üst pakete geçince paketin sınırı ek mağazaları karşılıyorsa düşer; alt pakete geçince ek mağazalar yeni paketin üstüne eklenir)
+const renewExtras = (rec, plan) => Math.max(0, (Number(rec.max_stores) || 0) - Math.max((PLANS[plan] || {}).stores || 0, (PLANS[planKey(rec.plan)] || {}).stores || 0));
 // Paket yükseltme siparişi: period = 'yearly:profesyonel:123' (dönem, eski paket, kalan gün)
 const upgradeOf = (o) => { const [period, from, days] = String(o.period || '').split(':'); return { period, from, days: Number(days) || 0 }; };
 // Firmanın geçerli dönemi: son tamamlanan paket satın alımının dönemi (yoksa firma kartındaki)
@@ -233,7 +243,8 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
   const rec = await getTenant(env.DB, t.slug, true);
   if (method === 'GET' && path === 'billing') {
     const pays = await all(env.DB, 'SELECT at, amount, months, method, note FROM tenant_payments WHERE slug = ? ORDER BY at DESC LIMIT 50', t.slug);
-    return { plans: catalog(), stores: storeInfo(rec, usedStores), current: { plan: rec.plan || '', expires_at: rec.expires_at || null, trial: !!rec.trial, expired: expired(rec), email: rec.email || '', phone: rec.phone || '' },
+    return { plans: catalog(), stores: storeInfo(rec, usedStores), current: { plan: rec.plan || '', key: planKey(rec.plan), expires_at: rec.expires_at || null, trial: !!rec.trial, expired: expired(rec), email: rec.email || '', phone: rec.phone || '',
+      downgrade: !!rec.trial || expired(rec) },
       invoice: await lastInvoice(env.DB, rec), payments: pays, online: iyzicoReady(env), installments: INSTALLMENTS, upgrade: await upgradeInfo(env.DB, rec), bank: bankOf(env), eftDiscount: EFT_DISCOUNT };
   }
   // Ek mağaza satın alma: adet × yıllık ücret × lisans bitişine kalan gün / 365; ödeme alınınca firmanın mağaza sınırı artar
@@ -273,12 +284,13 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     if (!p) fail(400, 'Paket ya da dönem geçersiz');
     if (!b.consent) fail(400, 'Mesafeli satış sözleşmesini onaylayın');
     const buyer = buyerOf({ ...b, firm: rec.name, email: b.email || rec.email || user.email, phone: b.phone || rec.phone }, '');
-    // Aldığı ek mağazalar yenilemede korunur ve ücrete eklenir (yeni paket daha çok mağaza içeriyorsa fazlası düşer)
-    const extra = Math.max(0, (Number(rec.max_stores) || 0) - (PLANS[p.plan].stores || 0));
+    checkDowngrade(rec, p.plan);
+    // Aldığı ek mağazalar yenilemede korunur ve ücrete eklenir (bkz. renewExtras)
+    const extra = renewExtras(rec, p.plan);
     if (extra) p.amount = Math.round((p.amount + extraRenewAmount(extra, p.months)) * 100) / 100;
-    const now = Date.now(), order = { id: newId(), kind: 'renew', slug: rec.slug, plan: p.plan, period: p.period, amount: p.amount, buyer: JSON.stringify(buyer) };
-    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at) VALUES (?, 'renew', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?)`,
-      order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now);
+    const now = Date.now(), order = { id: newId(), kind: 'renew', slug: rec.slug, plan: p.plan, period: p.period, amount: p.amount, qty: extra, buyer: JSON.stringify(buyer) };
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, qty) VALUES (?, 'renew', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?, ?)`,
+      order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now, extra || null);
     return start(env, env.DB, order, origin);
   }
   fail(404, 'Bulunamadı');
@@ -338,10 +350,15 @@ async function complete(env, order, panel, { method, note, res = {} }) {
       await run(env.DB, "UPDATE tenants SET legal = ?, tax = ?, address = ?, city = ?, contact = COALESCE(NULLIF(contact, ''), ?), phone = COALESCE(NULLIF(phone, ''), ?), updated_at = ? WHERE slug = ?",
         inv.legal, inv.tax, inv.address, inv.city, buyer.name, buyer.phone, Date.now(), slug).catch((e) => console.error('firma fatura bilgisi yazılamadı', e));
     }
-    if (order.kind !== 'new') await run(env.DB, 'UPDATE tenants SET period = ?, fee = ?, updated_at = ? WHERE slug = ?', p.period, PLANS[order.plan][p.period], Date.now(), slug).catch(() => {});
+    // Yenileme: dönem / ücret ve mağaza sınırı yeni pakete göre (ödenen ek mağazalar paketin sınırının üstüne); özellikler pakete göre açılır / kapanır
+    if (order.kind !== 'new') {
+      const cur = await getTenant(env.DB, slug, true), extra = order.qty != null ? Number(order.qty) || 0 : renewExtras(cur, order.plan);
+      await run(env.DB, 'UPDATE tenants SET period = ?, fee = ?, max_stores = ?, updated_at = ? WHERE slug = ?', p.period, PLANS[order.plan][p.period], extra ? PLANS[order.plan].stores + extra : null, Date.now(), slug).catch(() => {});
+    }
     const t = await getTenant(env.DB, slug, true);
     await recordPayment(env, env.DB, t, { amount: p.amount, months: p.months, method, note, user: method === 'Kart (iyzico)' ? 'Online satış' : 'Havale / EFT onayı', plan: p.name });
     // Fatura bilgisi ödeme kaydında (ana panel → Firmalar → Tahsilatlar)
+    if (order.kind !== 'new') await refreshTenant(env, env.DB, slug).catch(() => {});
     if (buyer.invoice) await run(env.DB, 'UPDATE tenant_payments SET invoice = ? WHERE slug = ? AND instr(note, ?) > 0', JSON.stringify({ ...buyer.invoice, email: buyer.email, phone: buyer.phone }), slug, order.id).catch(() => {});
     await run(env.DB, "UPDATE sales_orders SET status = 'done', pass_hash = NULL, pass_tmp = NULL, updated_at = ? WHERE id = ?", Date.now(), order.id);
     const title = order.kind === 'new' ? `Yeni satış: ${buyer.firm} · ${p.name} (${PERIOD[p.period]})` : `Yenileme: ${t.name} · ${p.name} (${PERIOD[p.period]})`;
