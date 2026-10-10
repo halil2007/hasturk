@@ -80,6 +80,8 @@ export const FIELDS = {
     { k: 'UPS_QUERY_USER', label: 'Takip kullanıcı adı', adv: true, hint: 'UPS takip servisi için ayrı kullanıcı verdiyse' }, { k: 'UPS_QUERY_PASSWORD', label: 'Takip şifresi', secret: true, adv: true },
     { k: 'UPS_SERVICE', label: 'Servis', adv: true, choices: [['', 'Standart'], ['6', 'Express Saver'], ['4', 'Express 10:30']] },
   ],
+  // Otomatik blog: Anthropic (Claude) API anahtarı (yalnız ana panel; bkz. blogai.js)
+  ai: [{ k: 'ANTHROPIC_API_KEY', label: 'Anthropic API anahtarı', secret: true, req: true, hint: 'console.anthropic.com → API Keys' }],
   mail: [
     { k: 'MAIL_PROVIDER', label: 'E-posta servisi', hint: 'smtp (kendi e-posta sunucunuz), brevo veya resend' },
     { k: 'MAIL_API_KEY', label: 'API anahtarı', secret: true },

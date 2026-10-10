@@ -56,6 +56,14 @@ async function claimImages(db, id, p) {
   if (ids.length) await run(db, `UPDATE blog_images SET post_id = ? WHERE post_id IS NULL AND id IN (${ids.map(() => '?').join(',')})`, id, ...ids);
 }
 const postOut = (p) => p && { ...p, tags: tagsOf(p.tags) };
+// Yeni yazı kaydı (panelden ya da otomatik blogdan, bkz. blogai.js)
+export async function insertPost(db, b, user) {
+  const p = await clean(db, b, null, user), now = Date.now();
+  const r = await first(db, `INSERT INTO blog_posts (slug, title, summary, body, cover_id, tags, status, published_at, created_at, updated_at, author, seo_title, seo_desc)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`, p.slug, p.title, p.summary, p.body, p.cover_id, p.tags, p.status, p.published_at, now, now, p.author, p.seo_title, p.seo_desc);
+  await claimImages(db, r.id, p);
+  return { id: r.id, slug: p.slug };
+}
 
 export async function blogAdmin(req, env, db, path, user) {
   if (env.TENANT_SLUG || !user || user.role !== 'admin' || user.support) fail(404, 'Bulunamadı');
@@ -69,18 +77,38 @@ export async function blogAdmin(req, env, db, path, user) {
     else if (STATUS.includes(q.status)) { where.push('status = ?'); args.push(q.status); }
     if (str(q.q)) { where.push('(title LIKE ? OR slug LIKE ? OR tags LIKE ?)'); const s = `%${str(q.q).slice(0, 60)}%`; args.push(s, s, s); }
     const [posts, counts] = await Promise.all([
-      all(db, `SELECT id, slug, title, summary, cover_id, tags, status, published_at, created_at, updated_at, author, length(body) AS chars
+      all(db, `SELECT id, slug, title, summary, cover_id, tags, status, published_at, created_at, updated_at, author, ai, length(body) AS chars
         FROM blog_posts WHERE ${where.join(' AND ')} ORDER BY (status = 'draft') DESC, COALESCE(published_at, updated_at) DESC LIMIT 500`, ...args),
       first(db, "SELECT COUNT(*) AS total, SUM(status = 'draft') AS draft, SUM(status = 'published') AS published, SUM(status = 'published' AND published_at > ?) AS scheduled FROM blog_posts", now),
     ]);
     return json({ posts: posts.map(postOut), counts: { total: counts.total || 0, draft: counts.draft || 0, published: counts.published || 0, scheduled: counts.scheduled || 0 }, site: siteUrl(env), now });
   }
   if (path === 'blog' && m === 'POST') {
-    const p = await clean(db, b, null, user);
-    const r = await first(db, `INSERT INTO blog_posts (slug, title, summary, body, cover_id, tags, status, published_at, created_at, updated_at, author, seo_title, seo_desc)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`, p.slug, p.title, p.summary, p.body, p.cover_id, p.tags, p.status, p.published_at, now, now, p.author, p.seo_title, p.seo_desc);
-    await claimImages(db, r.id, p);
-    return json({ ok: true, id: r.id, slug: p.slug });
+    const r = await insertPost(db, b, user);
+    return json({ ok: true, id: r.id, slug: r.slug });
+  }
+  // Otomatik blog (Claude): ayarlar, konu kuyruğu, API anahtarı ve "şimdi üret"
+  if (path === 'blog/auto') {
+    const ai = await import('./blogai.js'), { saveConfig, loadConfig, describe } = await import('./config.js');
+    if (m === 'PUT') {
+      const cur = await ai.autoConfig(db);
+      const topics = (Array.isArray(b.topics) ? b.topics : String(b.topics || '').split('\n')).map((t) => str(t).slice(0, 200)).filter(Boolean).slice(0, 100);
+      await run(db, "INSERT INTO settings (k, v) VALUES ('blog_auto', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v",
+        JSON.stringify({ ...cur, enabled: b.enabled === undefined ? cur.enabled : !!b.enabled, hour: b.hour === undefined ? cur.hour : Math.max(0, Math.min(23, Math.round(Number(b.hour) || 0))), topics: b.topics === undefined ? cur.topics : topics }));
+      if (str(b.key)) await saveConfig(env, db, 'ai', { values: { ANTHROPIC_API_KEY: str(b.key) } });
+    }
+    if (m === 'GET' || m === 'PUT') {
+      const [cfg, st, pend] = await Promise.all([ai.autoConfig(db), first(db, "SELECT v FROM settings WHERE k = 'blog_auto_state'"), first(db, "SELECT COUNT(*) AS n FROM blog_posts WHERE ai = 1 AND status = 'draft'")]);
+      const key = describe(env, await loadConfig(env, db), 'ai').fields[0];
+      return json({ ...cfg, key: { set: !!(key.source), masked: key.masked, source: key.source }, state: st ? JSON.parse(st.v) : {}, pending: pend.n || 0, max_pending: ai.MAX_PENDING, model: ai.MODEL });
+    }
+    if (m === 'POST' && path === 'blog/auto') fail(405, 'Bilinmeyen işlem');
+  }
+  if (path === 'blog/auto/run' && m === 'POST') {
+    const ai = await import('./blogai.js');
+    const cfg = await ai.autoConfig(db);
+    const r = await ai.runOnce(env, db, cfg, b.topic != null && str(b.topic) ? { topic: str(b.topic).slice(0, 200) } : {});
+    return json({ ok: true, ...r });
   }
   // Görsel yükleme: { data: 'data:image/webp;base64,…', name, w, h, post_id? }
   if (path === 'blog/images' && m === 'POST') {
