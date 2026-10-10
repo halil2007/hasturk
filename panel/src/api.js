@@ -1405,28 +1405,37 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const b = await body(req), done = [], errors = [];
     if (b.action === 'delete') {
       if (user.role !== 'admin') fail(403, 'Sipariş silmek için yönetici yetkisi gerekir');
-      const r = await deleteOrders(db, b.ids || [], user.name);
+      // deleteOrders tek çağrıda en fazla 500 sipariş siler: çok seçimde 500'erli parçalar (önceden 500'ün üstü sessizce kalıyordu)
+      let deleted = 0;
+      for (const part of chunk([...new Set((Array.isArray(b.ids) ? b.ids : []).map(String))].slice(0, 5000), 500)) deleted += (await deleteOrders(db, part, user.name)).deleted;
       ctx.waitUntil(pushStocks(env, db).catch(() => {}));
-      return json({ ok: true, deleted: r.deleted, done: [], errors: [] });
+      return json({ ok: true, deleted, done: [], errors: [] });
     }
-    await pool((b.ids || []).slice(0, 100), 4, async (id) => {
+    // Tek istekte en fazla 100 sipariş (her biri kanala istek: alt istek sınırı / süre). Fazlası önceden sessizce atlanıyor, yanıt
+    // "tamamı işlendi" gibi görünüyordu; artık işlenmeyenler "rest" ile döner (arayüz 100'erli parçalarla gönderir)
+    const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(String))], rest = ids.slice(100);
+    await pool(ids.slice(0, 100), 4, async (id) => {
       try { await orderAction(env, db, id, b.action, b, ctx, user); done.push(id); } catch (e) { errors.push(`${id}: ${e.message}`); }
     });
-    return json({ ok: !errors.length, done, errors });
+    if (rest.length) errors.push(`${rest.length} sipariş işlenmedi: tek seferde en fazla 100 sipariş`);
+    return json({ ok: !errors.length, done, errors, rest });
   }
   // Toplu etiket işareti (görüntülendi / yazdırıldı): tek istekte
   if (path === 'labels/mark' && m === 'POST') {
     const b = await body(req), t = Date.now();
     if (!['viewed', 'printed'].includes(b.kind)) fail(400, 'Geçersiz işlem');
-    const items = (b.items || []).slice(0, 300).map((x) => Number(x.pkgId)).filter(Boolean);
+    // Toplu etiket ekranı 1000+ etiketi tek seferde işaretleyebilir (önceden ilk 300'ü işaretleniyor, kalanı sessizce atlanıyordu)
+    const list = (Array.isArray(b.items) ? b.items : []).slice(0, 5000), items = list.map((x) => Number(x.pkgId)).filter(Boolean);
     for (let i = 0; i < items.length; i += 80) {
       const part = items.slice(i, i + 80), ph = part.map(() => '?').join(',');
       if (b.kind === 'viewed') await run(db, `UPDATE packages SET label_viewed_at = ? WHERE id IN (${ph})`, t, ...part);
       else await run(db, `UPDATE packages SET label_printed_at = ?, label_prints = label_prints + 1, label_viewed_at = COALESCE(label_viewed_at, ?) WHERE id IN (${ph})`, t, t, ...part);
     }
     if (b.kind === 'printed') {
-      const orders = [...new Set((b.items || []).map((x) => String(x.orderId)))].slice(0, 300);
-      for (const id of orders) { const o = await first(db, 'SELECT id, status, remote_status FROM orders WHERE id = ?', id); if (o) await event(db, o, 'label-printed', user, 'Toplu yazdırma'); }
+      const orders = [...new Set(list.map((x) => String(x.orderId)))];
+      const rows = await allIn(db, orders, (ph, part) => [`SELECT id, status, remote_status FROM orders WHERE id IN (${ph})`, part]);
+      for (const part of chunk(rows, 90)) await db.batch(part.map((o) => db.prepare("INSERT INTO order_events (order_id, at, source, action, status, remote_status, note, user) VALUES (?, ?, 'panel', 'label-printed', ?, ?, 'Toplu yazdırma', ?)")
+        .bind(o.id, t, o.status, o.remote_status || '', user ? user.name : null)));
     }
     return json({ ok: true, count: items.length });
   }

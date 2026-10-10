@@ -320,8 +320,8 @@ export async function mirrorStock(db, settings) {
 // Kalan ilanlar sonraki senkronlarda gönderilir.
 export const PUSH_LIMIT = { stock: 3000, price: 2000 };
 const PUSH_CAP = {
-  stock: { amazon: 80, ebay: 150, ideasoft: 150, etsy: 60 },
-  price: { amazon: 80, ebay: 150, ideasoft: 75, etsy: 60, shopify: 150, ticimax: 150 },
+  stock: { amazon: 200, ebay: 150, ideasoft: 150, etsy: 60 },
+  price: { amazon: 120, ebay: 150, ideasoft: 75, etsy: 60, shopify: 150, ticimax: 150 },
 };
 export const pushCap = (kind, chId) => PUSH_CAP[kind][typeOf(chId)] || PUSH_LIMIT[kind];
 
