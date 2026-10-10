@@ -30,9 +30,13 @@ const TRENDS_URL = env.TRENDS_URL || 'https://hasturk-arama.halilc2007.workers.d
 
 // ---------- yardımcılar ----------
 const die = (msg) => { console.error('HATA: ' + msg); process.exit(1); };
+const dieHard = die;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function getToken(store = env.IKAS_STORE, id = env.IKAS_CLIENT_ID, secret = env.IKAS_CLIENT_SECRET) {
+// soft: hata olursa işlemi bitirmek yerine hata fırlatır (diğer mağaza için: o mağaza hata verse de bu mağazanın
+// senkronu sürer)
+async function getToken(store = env.IKAS_STORE, id = env.IKAS_CLIENT_ID, secret = env.IKAS_CLIENT_SECRET, soft = false) {
+  const die = soft ? (msg) => { throw new Error(msg); } : dieHard;
   if (!store || !id || !secret) die('IKAS_STORE / IKAS_CLIENT_ID / IKAS_CLIENT_SECRET tanımlı değil');
   const res = await fetch(`https://${store}.myikas.com/api/admin/oauth/token`, {
     method: 'POST',
@@ -425,13 +429,14 @@ async function fetchOrders() {
 // OTHER_CLIENT_SECRET, OTHER_PRODUCTS = diğer sitenin son products.json'u). Diğer mağazanın ürünü bu mağazada aynı
 // adresle → config.tarim.json > sameProduct (HasTürk'teki çok seçenekli ürün ↔ Tarım Dünyası'ndaki ayrı ürünler,
 // seçenek adına göre) → aynı adla bulunur; bulunamayan satır atlanır.
+let OTHER_ERR = null;
 async function fetchOtherOrders(out) {
   if (env.MOCK || !env.OTHER_STORE || !env.OTHER_CLIENT_ID || !env.OTHER_CLIENT_SECRET || !env.OTHER_PRODUCTS) return null;
   let other, token;
   try { other = JSON.parse(await readFile(env.OTHER_PRODUCTS, 'utf8')); } catch { console.warn('UYARI: diğer mağazanın ürün dosyası yok: ' + env.OTHER_PRODUCTS); return null; }
   const save = [TOKEN, ORDER_Q];
   try {
-    TOKEN = await getToken(env.OTHER_STORE, env.OTHER_CLIENT_ID, env.OTHER_CLIENT_SECRET);
+    TOKEN = await getToken(env.OTHER_STORE, env.OTHER_CLIENT_ID, env.OTHER_CLIENT_SECRET, true);
     ORDER_Q = null;
     const o = await fetchOrders();
     if (!o) return null;
@@ -442,7 +447,8 @@ async function fetchOtherOrders(out) {
     console.log(`Diğer mağaza (${env.OTHER_STORE}): ${o.orders} sipariş; ${ok} satır eşleşti, ${miss} satır bu mağazada karşılığı olmadığı için atlandı`);
     return res;
   } catch (e) {
-    console.warn('UYARI: diğer mağazanın siparişleri alınamadı: ' + String(e && e.message).slice(0, 200));
+    OTHER_ERR = String(e && e.message).slice(0, 200);
+    console.warn('UYARI: diğer mağazanın siparişleri alınamadı: ' + OTHER_ERR);
     return null;
   } finally { [TOKEN, ORDER_Q] = save; }
 }
@@ -675,6 +681,8 @@ async function writeReport(out, trends, orders, an, config) {
       trends ? `site içi olaylar son ${trends.days} gün (${trends.rows} kayıt)` : 'site içi olay verisi henüz yok',
       ...yearTxt,
     ].join('; ') + '.', '',
+    ...(OTHER_ERR ? [`> **Uyarı:** ${env.OTHER_STORE} mağazasının siparişleri alınamadı (${OTHER_ERR.replace(/[|\n]/g, ' ')}). ` +
+      'Algoritma şu an yalnız bu mağazanın siparişleriyle çalışıyor. ikas\'ta o mağazanın API uygulamasını ve GitHub Secrets\'taki anahtarları kontrol edin.', ''] : []),
     'Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. ' +
     'Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.', '');
 
