@@ -94,7 +94,7 @@ function orderFilter(q, { withStatus = true } = {}) {
 
 async function listOrders(db, q) {
   const { w, args, st } = orderFilter(q);
-  const limit = Math.min(Number(q.limit) || 25, 200), page = Math.max(1, Number(q.page) || 1);
+  const limit = Math.max(1, Math.min(Number(q.limit) || 25, 200)), page = Math.max(1, Number(q.page) || 1);
   // Liste, toplam, durum sayıları ve ayarlar aynı anda okunur (sıralı gidiş-dönüş yerine tek bekleme)
   const f2 = orderFilter(q, { withStatus: false });
   const [rows, totalRow, counts, lateRow, byChannel, settings, missRow] = await Promise.all([all(db, `SELECT o.id, o.channel, o.order_number, o.status, o.remote_status, o.ordered_at, o.customer, o.address, o.total, o.tracking, o.cargo_company, o.extra, o.shipping_cost, o.shipping_src, o.missing_n, o.missing_why,
@@ -690,7 +690,7 @@ async function listBuybox(db, q) {
   if (F[q.status]) where.push(F[q.status]);
   const base = `FROM listings l LEFT JOIN buybox b ON b.channel = l.channel AND b.remote_id = l.remote_id LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id LEFT JOIN products p ON p.id = l.product_id`;
   const w = 'WHERE ' + where.join(' AND ');
-  const limit = Math.min(Number(q.limit) || 50, 200), page = Math.max(1, Number(q.page) || 1);
+  const limit = Math.max(1, Math.min(Number(q.limit) || 50, 200)), page = Math.max(1, Number(q.page) || 1);
   const rows = await all(db, `SELECT l.channel, l.remote_id, l.name, l.barcode, l.sku, l.price, COALESCE(NULLIF(l.image, ''), p.image) AS image, p.name AS product_name,
       b.rank, b.prev_rank, b.buybox_price, b.second_price, b.third_price, b.multi, b.checked_at, b.error,
       r.enabled AS rule_on, r.min_price, r.max_price, r.target_price, r.step,
@@ -750,7 +750,7 @@ async function listProducts(db, q) {
   if (q.filter === 'nolisting') where.push('NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)');
   if (q.filter === 'passive') where.push('p.active = 0'); else if (q.filter !== 'all') where.push('p.active = 1');
   const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
-  const limit = Math.min(Number(q.limit) || 50, 500), page = Math.max(1, Number(q.page) || 1);
+  const limit = Math.max(1, Math.min(Number(q.limit) || 50, 500)), page = Math.max(1, Number(q.page) || 1);
   // Ana ürün (varyant grubu) anahtarı: grup adı yoksa ürün adı
   const GK = "COALESCE(NULLIF(p.parent_key, ''), NULLIF(p.group_name, ''), p.name)";
   // Sıralama: ürün (varyant) satırları için ve ana ürün (grup) için toplu karşılığı
@@ -792,6 +792,8 @@ async function listProducts(db, q) {
     // Kategoriler: her kategoride kaç ana ürün var (aktif ürünler)
     q.group ? all(db, `SELECT COALESCE(TRIM(p.category), '') AS name, COUNT(DISTINCT ${GK}) AS n FROM products p WHERE p.active = 1 GROUP BY 1 ORDER BY 1 COLLATE NOCASE`) : null,
   ]);
+  // Liste satırında açıklama (ikas HTML) gönderilmez: düzenleme penceresi ürünü ayrıca okur (sayfa yükü küçülür)
+  for (const r of rows) delete r.description;
   const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
     const ids = rows.map((r) => r.id);

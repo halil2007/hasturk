@@ -64,7 +64,7 @@ const lowestFor = (f) => Object.values(PLANS).find((p) => p.features.includes(f)
 export function requireFeature(env, f) {
   if (allows(env, f)) return;
   const p = tenantPlan(env), up = lowestFor(f);
-  fail(403, `${FEATURES[f]} ${up ? up.name : 'üst'} paketinde var; ${p.name} paketinizde kullanılamıyor. Paketinizi yükseltmek için bizimle iletişime geçin.`);
+  fail(403, `${FEATURES[f]} ${up ? up.name : 'üst'} paketinde var; ${p.name} paketinizde kullanılamıyor. Paketim sayfasından paketinizi yükseltebilirsiniz.`);
 }
 // Müşteri paneline giden özet (arayüz: kilitli özellikler, kalan gün)
 export function planInfo(env) {

@@ -1,7 +1,7 @@
 // Personel ve yetkiler: panele giriş yapacak kişiler, rolleri, bölüm bazlı yetkileri (yok / görür / tam), oturum ve etkinlik takibi.
 // Yönetici tüm bölümleri (entegrasyon, personel, ayarlar) yönetir; personel yalnız yetkili olduğu bölümleri görür.
 // "Görür" yetkisinde sunucu değişiklik isteklerini reddeder. Ana yönetici Cloudflare'deki PANEL_PASSWORD ile girer.
-import { api, state, html, render, $, $$, n, dateTime, ago, actions, busy, toast, sheet, confirmBox, popMenu, debounce, isMobile, ch } from '../core.js';
+import { api, state, locked, html, render, $, $$, n, dateTime, ago, actions, busy, toast, sheet, confirmBox, popMenu, debounce, isMobile, ch } from '../core.js';
 import { PERMS, ROLE_TEMPLATES } from '../perms.js';
 
 const ROLE = { admin: 'Yönetici', staff: 'Personel' };
@@ -212,6 +212,7 @@ export async function users(el) {
             <label><input type="radio" name="role" value="staff" ${u && u.role === 'admin' ? '' : 'checked'}><span><b>Personel</b><small>Yalnız aşağıda seçilen bölümler</small></span></label>
             <label><input type="radio" name="role" value="admin" ${u && u.role === 'admin' ? 'checked' : ''} ${state.user && u && state.user.id === u.id ? 'disabled' : ''}><span><b>Yönetici</b><small>Her şey: API bilgileri, personel, ayarlar</small></span></label>
           </div>
+          ${locked('roles') ? html`<div class="notice small" style="margin-top:12px" data-perms ${u && u.role === 'admin' ? 'hidden' : ''}><i class="ico ico-key"></i><div><b>Bölüm bazlı personel yetkisi Profesyonel pakette.</b> Paketinizde personel tüm bölümleri görür ve kullanır (entegrasyon, personel ve ayarlar hariç). <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div></div>` : html`
           <div data-perms ${u && u.role === 'admin' ? 'hidden' : ''}>
             <div class="small" style="font-weight:650;margin:14px 0 6px">Rol şablonu</div>
             <div class="chips wrap-chips">${ROLE_TEMPLATES.map(([k, t]) => html`<button type="button" class="chip ${u && u.template === k ? 'on' : ''}" data-tpl="${k}">${t}</button>`)}<button type="button" class="chip ${u && !u.template ? 'on' : ''}" data-tpl="">Özel</button></div>
@@ -219,7 +220,7 @@ export async function users(el) {
             <div class="perm-grid">${PERMS.map(([k, t, d]) => html`<div class="perm-row"><div style="min-width:0"><b>${t}</b><div class="muted tiny">${d}</div></div>
               <div class="seg" data-perm="${k}">${[['', 'Yok'], ['view', 'Görür'], ['full', 'Tam']].map(([v, l]) => html`<button type="button" data-v="${v}" class="${(u ? level(u, k) : '') === v ? 'on' : ''}">${l}</button>`)}</div></div>`)}</div>
             <div class="muted tiny" style="margin-top:8px">Genel Bakış, bildirimler ve kendi şifresi her zaman açıktır. Entegrasyon, personel ve ayarlar yalnız yöneticidedir.</div>
-          </div>
+          </div>`}
         </div>
         <div class="card"><label class="field"><span>Not (yalnız yöneticiler görür)</span><textarea class="input" name="note" rows="2" placeholder="ör. vardiya, izin, sorumlu olduğu mağaza">${u ? u.note || '' : ''}</textarea></label></div>
       </form>`,
@@ -247,7 +248,7 @@ export async function users(el) {
     $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
       if (!fm.reportValidity()) return;
       const b = { name: fm.name.value.trim(), title: fm.title.value.trim(), username: fm.username.value.trim(), email: fm.email.value.trim(), phone: fm.phone.value.trim(), role: fm.role.value, password: fm.password.value, note: fm.note.value.trim(), template: tpl };
-      if (b.role !== 'admin') {
+      if (b.role !== 'admin' && !locked('roles')) {
         b.perms = $$('[data-perm]', s.el).map((g) => { const v = ($('button.on', g) || {}).dataset; const lv = v ? v.v : ''; return lv === 'full' ? g.dataset.perm : lv === 'view' ? g.dataset.perm + ':view' : null; }).filter(Boolean);
         if (!b.perms.length && !(await confirmBox('Hiçbir bölüm seçilmedi; bu kişi yalnız Genel Bakış\'ı görür. Devam edilsin mi?', 'Devam et'))) return;
       }

@@ -242,7 +242,7 @@ async function upgradeInfo(db, rec) {
 function storeInfo(rec, used) {
   const lim = limitsOf(rec), base = (PLANS[planKey(rec.plan)] || {}).stores || 0;
   return { limit: lim.stores || 0, base, extra: Math.max(0, (lim.stores || 0) - base), used: Number(used) || 0, yearly: EXTRA_STORE.yearly, days: daysLeft(rec.expires_at), perStore: extraStoreAmount(1, daysLeft(rec.expires_at)), max: EXTRA_STORE.max,
-    buyable: !!base && !rec.trial && !expired(rec) };
+    buyable: !!base && !rec.trial && !expired(rec) && !!rec.expires_at };
 }
 export async function tenantBilling(env, t, user, method, path, b, origin, { usedStores = 0 } = {}) {
   if (!env.DB) fail(503, 'Şu an kullanılamıyor');

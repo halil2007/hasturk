@@ -300,6 +300,8 @@ const MIGRATIONS = [
   'ALTER TABLE blog_posts ADD COLUMN ai INTEGER',
   // Ek mağaza / paket yükseltme siparişinin hesaplandığı andaki abonelik (bitiş, paket, sınır): ödeme gelince değişmişse elle incelenir
   'ALTER TABLE sales_orders ADD COLUMN snap TEXT',
+  // Kargo sayfası: durum + kargoya verilme tarihine göre süzme / sıralama (büyük sipariş geçmişinde tam tarama olmasın)
+  'CREATE INDEX IF NOT EXISTS packages_status_shipped ON packages(status, shipped_at)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

@@ -1,6 +1,6 @@
 // Buybox (Trendyol ve Hepsiburada): ürünlerin buybox sırası, buybox fiyatı ve rakip fiyatları, durum bildirimleri,
 // geçmiş ve otomatik fiyat kuralları. Otomatik fiyat yalnızca kural açılan ürün/kanalda ve Ayarlar'daki genel anahtar açıkken çalışır.
-import { api, state, html, render, $, n, money, ch, chLogo, chBadge, thumb, actions, busy, toast, debounce, sheet, numIn, ago, dateTime, isAdmin, isMobile, activeChannels } from '../core.js';
+import { api, state, locked, html, render, $, n, money, ch, chLogo, chBadge, thumb, actions, busy, toast, debounce, sheet, numIn, ago, dateTime, isAdmin, isMobile, activeChannels } from '../core.js';
 import { setQuery, loadSummary } from '../app.js';
 
 const STATUS = [['', 'Tümü'], ['won', 'Buybox sizde'], ['lost', 'Kaybedilen'], ['multi', 'Rakipli'], ['rules', 'Otomatik fiyat açık'], ['unchecked', 'Kontrol edilmedi']];
@@ -18,6 +18,7 @@ export async function buyboxView(el, rest, query = {}) {
   const f = { channel: query.channel || '', status: query.durum || '', q: query.q || '', page: 1 };
   let data = { rows: [], kpi: {}, total: 0 };
   const st = state.settings || {};
+  if (locked('buybox')) return render(el, html`<div class="card stack"><h2>Buybox takibi ve otomatik fiyat <span class="pill info">Profesyonel paket</span></h2><div class="muted">Trendyol ve Hepsiburada'da buybox'ı kimin aldığını izleyin, kaybettiğinizde fiyatınız belirlediğiniz sınırlar içinde kendiliğinden ayarlansın. Bu özellik Profesyonel ve Kurumsal pakette.</div><div><a class="btn primary" href="#/paketim"><i class="ico ico-up"></i>Paketimi yükselt</a></div></div>`);
   render(el, html`<div class="stack">
     ${!bbChannels().length ? html`<div class="notice"><i class="ico ico-warn"></i><div>Buybox takibi Trendyol ve Hepsiburada ilanları için çalışır; bu kanallardan biri bağlanınca ilanlar burada görünür (Entegrasyonlar).</div></div>` : ''}
     <div data-auto></div>

@@ -99,8 +99,9 @@ export function make(values) {
       const p = (await call('SaveIntegrationShipmentV2', body)) || {};
       const id = str(p.ShipmentId);
       if (!id) throw new Error('Kolay Gelsin gönderi numarası vermedi');
+      // Takip bağlantısı gönderiye özelse o, genel sayfaysa (ör. …/shipment) herkese açık takip adresi
       const link = str(p.ShipmentTrackingLink);
-      return { ref: id, tracking: id, barcode: code, carrier: 'Kolay Gelsin', trackingUrl: /^https?:\/\/[^/]+\/.+/.test(link) ? link : trackUrl('kolaygelsin', id), cost: null, label: null };
+      return { ref: id, tracking: id, barcode: code, carrier: 'Kolay Gelsin', trackingUrl: /^https?:\/\//.test(link) && link.includes(id) ? link : trackUrl('kolaygelsin', id), cost: null, label: null };
     },
     // Toplanmamış gönderi iptal edilir; toplanmış (henüz teslim edilmemiş) gönderide teslimat durdurulup iade süreci başlar
     async cancel(ref) {

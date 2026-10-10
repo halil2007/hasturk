@@ -87,6 +87,8 @@ h3 { font-size: 14px; font-weight: 700; }
 
 @media (min-width: 1024px) {
   body { display: grid; grid-template-columns: var(--side) 1fr; }
+  /* Lisans / deneme ve destek oturumu şeritleri tam genişlik (yan menü sütununa düşüp düzeni bozmasın) */
+  body > [data-expiry-bar], body > [data-support-bar] { grid-column: 1 / -1; }
   .side { display: flex; flex-direction: column; position: sticky; top: 0; height: 100dvh; padding: 18px 14px; background: var(--nav-bg); color: var(--nav-text); }
   .brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 800; font-size: 17px; padding: 6px 10px 22px; letter-spacing: -.01em; }
   .brand .logo { width: 30px; height: 30px; flex: none; }

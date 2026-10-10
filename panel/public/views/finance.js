@@ -1,6 +1,6 @@
 // Gelir & Gider: seçilen dönemde satıştan kâra masraf basamakları (komisyon, kargo, hizmet bedeli, ek kesinti, stopaj, alış),
 // kanal bazında tablo, hakediş (ödeme günleri, ödenen / ödenecek, mutabakat) ve pazaryerlerinin kestiği faturalar.
-import { api, html, render, $, $$, money, money0, n, ch, chLogo, chBadge, date, dateTime, store, toast, actions, busy, activeChannels, isAdmin, sheet, confirmBox, thumb, state } from '../core.js';
+import { api, locked, html, render, $, $$, money, money0, n, ch, chLogo, chBadge, date, dateTime, store, toast, actions, busy, activeChannels, isAdmin, sheet, confirmBox, thumb, state } from '../core.js';
 import { viewOnly } from '../perms.js';
 import { setQuery } from '../app.js';
 
@@ -62,6 +62,7 @@ export async function financeView(el, rest, query = {}) {
   function drawInvoices() {
     const box = $('[data-inv]', el);
     if (!inv) return render(box, html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
+    if (inv.locked) return render(box, html`<div class="notice small" style="margin:12px"><i class="ico ico-key"></i><div><b>${'Kesilen faturalar'} Profesyonel ve Kurumsal pakette.</b> Pazaryerinin kestiği faturalar ve hakediş ödemeleri burada görünür. <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div></div>`);
     $('[data-invsub]', el).textContent = inv.items.length ? `${n(inv.total)} fatura · ${money0(inv.sum)}` : '';
     if (!inv.supported.length) return render(box, html`<div class="empty">Fatura bilgisi veren bağlı kanal yok.</div>`);
     render(box, html`
@@ -140,6 +141,7 @@ export async function financeView(el, rest, query = {}) {
   function drawSettlements() {
     const box = $('[data-stl]', el);
     if (!stl) return render(box, html`<div class="card-pad"><h2>Hakediş</h2></div><div class="empty"><i class="ico ico-sync spin"></i></div>`);
+    if (stl.locked) return render(box, html`<div class="card-pad"><h2>Hakediş</h2></div>${html`<div class="notice small" style="margin:12px"><i class="ico ico-key"></i><div><b>${'Hakediş takibi'} Profesyonel ve Kurumsal pakette.</b> Pazaryerinin kestiği faturalar ve hakediş ödemeleri burada görünür. <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div></div>`}`);
     const t = stl.totals, today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
     render(box, html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:220px"><h2>Hakediş</h2><div class="muted small">Pazaryerinin hesap ekstresinden: ödeme günleri, ödenen ve ödenecek tutarlar</div></div>
         ${isAdmin() ? html`<button class="btn sm" data-act="stlsync"><i class="ico ico-sync"></i>Hakedişi çek</button>` : ''}</div>
@@ -174,7 +176,7 @@ export async function financeView(el, rest, query = {}) {
     api('finance/products?' + new URLSearchParams([...p, ['sort', f.psort]])).then((r) => { prod = r; drawProducts(); }).catch(() => { prod = { rows: [], total: 0 }; drawProducts(); });
     if (f.itype) p.set('type', f.itype);
     stl = null; drawSettlements();
-    [inv, stl] = await Promise.all([
+    [inv, stl] = locked('finance') ? [{ locked: true }, { locked: true }] : await Promise.all([
       api('invoices?' + p).catch((e) => ({ items: [], types: [], supported: [], total: 0, sum: 0, error: e.message })),
       api('settlements?' + new URLSearchParams([...p].filter(([k]) => k !== 'type'))).catch(() => ({ totals: { paid: 0, upcoming: 0, overdue: 0, checked: 0, mismatched: 0 }, days: [], types: [], diffs: [], supported: [] })),
     ]);
