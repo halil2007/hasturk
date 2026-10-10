@@ -30,7 +30,7 @@ const SITE_URL = 'https://hasturkcrm.com';
 // Şirket bilgileri ve paket fiyatları tek yerden: public/assets/config.js (arama motoru verisi de buradan üretilir)
 const S = (() => { const ctx = { window: {}, document: { documentElement: { classList: { add() {} } } } }; vm.runInNewContext(readFileSync(join(OUT, 'assets', 'config.js'), 'utf8'), ctx); return ctx.window.SITE; })();
 // Önbellek kırıcı: CSS / JS içeriği değişince adresi de değişir (?v=…); tarayıcı eski dosyayı kullanmaz, değişmeyeni uzun süre saklar
-const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js', 'logo.webp'].map((f) => [f, createHash('sha1').update(readFileSync(join(OUT, 'assets', f))).digest('hex').slice(0, 10)]));
+const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js', 'logo.webp', 'icon.svg', 'icon-48.png', 'apple-touch-icon.png'].map((f) => [f, createHash('sha1').update(readFileSync(join(OUT, 'assets', f))).digest('hex').slice(0, 10)]));
 
 // ---------- üst menü açılır listeleri ----------
 const menuFeatures = FEATURES.map((f) => `<a class="mi" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><span><b>${esc(f.name)}</b><small>${esc(f.short)}</small></span></a>`).join('');
@@ -288,7 +288,7 @@ function render(meta, body, page) {
   body = body.replace(/<!-- head -->([\s\S]*?)<!-- \/head -->\s*/, (_, h) => { head = h.trim(); return ''; });
   let html = layout.replace('{{sprite}}', sprite).replace('{{body}}', body.trim()).replace('{{head}}', head)
     .replace('{{featureCards}}', featureCards).replace('{{phoneMock}}', MOCKS.phone).replace('{{featureTabs}}', body.includes('{{featureTabs}}') ? featureTabs() : '').replace('{{integrationCards}}', integrationCards).replace('{{menuFeatures}}', menuFeatures).replace('{{menuIntegrations}}', menuIntegrations).replace('{{mnavFeatures}}', mnavFeatures).replace('{{mnavIntegrations}}', mnavIntegrations)
-    .replace(/{{v:([a-z.]+)}}/g, (_, f) => ver[f]).replace('{{robots}}', meta.sitemap === 'no' ? 'noindex, follow' : ROBOTS)
+    .replace(/{{v:([a-z0-9.-]+)}}/g, (_, f) => ver[f]).replace('{{robots}}', meta.sitemap === 'no' ? 'noindex, follow' : ROBOTS)
     .replace(/{{title}}/g, esc(meta.title)).replace(/{{description}}/g, esc(meta.description)).replace(/{{url}}/g, meta.url).replace(/{{page}}/g, page);
   html = html.replace('{{jsonld}}', () => jsonLd(meta, html.slice(html.indexOf('<main>'))));
   if (meta.nav) html = html.replace(new RegExp(`data-nav="${meta.nav}"`, 'g'), `data-nav="${meta.nav}" class="on" aria-current="page"`);
@@ -318,7 +318,7 @@ for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPa
   const SENT = { title: '\u0001T\u0001', description: '\u0001D\u0001', url: '\u0001U\u0001' };
   let shell = layout.replace('{{sprite}}', sprite).replace('{{head}}', `<link rel="stylesheet" href="/assets/blog.css?v=${createHash('sha1').update(readFileSync(join(OUT, 'assets', 'blog.css'))).digest('hex').slice(0, 10)}">\u0001H\u0001`).replace('{{body}}', '\u0001B\u0001')
     .replace('{{menuFeatures}}', menuFeatures).replace('{{menuIntegrations}}', menuIntegrations).replace('{{mnavFeatures}}', mnavFeatures).replace('{{mnavIntegrations}}', mnavIntegrations)
-    .replace(/{{v:([a-z.]+)}}/g, (_, f) => ver[f]).replace('{{robots}}', '\u0001R\u0001').replace('{{jsonld}}', '\u0001J\u0001')
+    .replace(/{{v:([a-z0-9.-]+)}}/g, (_, f) => ver[f]).replace('{{robots}}', '\u0001R\u0001').replace('{{jsonld}}', '\u0001J\u0001')
     .replace(/{{title}}/g, SENT.title).replace(/{{description}}/g, SENT.description).replace(/{{url}}/g, SENT.url).replace(/{{page}}/g, 'blog')
     .replace('<meta property="og:type" content="website">', '<meta property="og:type" content="\u0001O\u0001">')
     .replace(/https:\/\/hasturkcrm\.com\/img\/genel-bakis\.jpg/g, '\u0001I\u0001').replace('content="1440"', 'content="\u0001IW\u0001"').replace('content="900"', 'content="\u0001IH\u0001"')

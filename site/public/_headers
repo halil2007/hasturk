@@ -22,3 +22,9 @@
   Cache-Control: public, max-age=2592000
 /assets/icon.svg
   Cache-Control: public, max-age=2592000
+/assets/icon-48.png
+  Cache-Control: public, max-age=2592000
+/assets/apple-touch-icon.png
+  Cache-Control: public, max-age=2592000
+/favicon.ico
+  Cache-Control: public, max-age=86400

@@ -43,7 +43,7 @@ self.addEventListener('message', (e) => {
 self.addEventListener('push', (e) => e.waitUntil((async () => {
   let m = { title: 'Hastürk Panel', body: 'Yeni bildirim', url: '#/' };
   try { const r = await fetch('/api/push/latest', { credentials: 'include', cache: 'no-store' }); if (r.ok) m = { ...m, ...(await r.json()) }; } catch { /* varsayılan metin */ }
-  await self.registration.showNotification(m.title, { body: m.body, icon: '/icon.svg', badge: '/icon.svg', tag: 'hasturk', renotify: true, data: { url: m.url || '#/' } });
+  await self.registration.showNotification(m.title, { body: m.body, icon: '/icon-192.png', badge: '/icon-192.png', tag: 'hasturk', renotify: true, data: { url: m.url || '#/' } });
 })()));
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
