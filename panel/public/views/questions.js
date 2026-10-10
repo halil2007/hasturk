@@ -1,6 +1,6 @@
 // Müşteri soruları: pazaryerlerinden (Trendyol, Hepsiburada …) gelen ürün soruları her senkronda çekilir;
 // burada listelenir ve panelden cevaplanır. Kanalın kendi panelinden verilen cevaplar da görünür.
-import { api, state, html, render, $, n, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, ago, dateTime, isAdmin, activeChannels } from '../core.js';
+import { api, ek, state, html, render, $, n, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, ago, dateTime, isAdmin, activeChannels } from '../core.js';
 import { setQuery, loadSummary } from '../app.js';
 
 const TABS = [['waiting', 'Cevap bekleyen'], ['answered', 'Cevaplanan'], ['rejected', 'Reddedilen'], ['', 'Tümü']];
@@ -31,7 +31,7 @@ export async function questionsView(el, rest, query = {}) {
       ${r.status === 'waiting' ? html`
         ${r.error ? html`<div class="notice bad small">${r.error}</div>` : ''}
         ${tpls().length ? html`<div class="row wrap" style="gap:6px">${tpls().map((t, i) => html`<button class="chip" data-act="usetpl" data-i="${i}" title="${t}">${t.length > 34 ? t.slice(0, 34) + '…' : t}</button>`)}</div>` : ''}
-        <textarea class="input" data-ans maxlength="${L.max}" placeholder="Cevabınız (${L.min}–${L.max} karakter). Gönderilen cevap ${ch(r.channel).name}'da müşteriye görünür."></textarea>
+        <textarea class="input" data-ans maxlength="${L.max}" placeholder="Cevabınız (${L.min}–${L.max} karakter). Gönderilen cevap ${ek(ch(r.channel).name, 'da')} müşteriye görünür."></textarea>
         <div class="row"><span class="cnt" data-cnt>0 / ${L.max}</span><span class="spacer"></span>${r.due_at ? html`<span class="muted tiny">son cevap: ${dateTime(r.due_at)}</span>` : ''}<button class="btn primary" data-act="answer"><i class="ico ico-check"></i>Cevapla</button></div>` : ''}
     </div>`;
   }
@@ -77,7 +77,7 @@ export async function questionsView(el, rest, query = {}) {
     answer: (t) => busy(t, async () => {
       const k = keyOf(t), text = $('[data-ans]', t.closest('[data-key]')).value.trim();
       await api(`questions/${k.channel}/${encodeURIComponent(k.remote_id)}/answer`, { method: 'POST', body: { text } });
-      toast(`Cevap ${ch(k.channel).name}'a gönderildi`); await loadSummary().catch(() => {}); refresh();
+      toast(`Cevap ${ek(ch(k.channel).name, 'a')} gönderildi`); await loadSummary().catch(() => {}); refresh();
     }),
     tpl: () => templates(refresh),
   });

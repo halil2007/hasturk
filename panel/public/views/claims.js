@@ -1,6 +1,6 @@
 // İadeler: pazaryerlerinden (Trendyol, Hepsiburada) gelen iade talepleri her senkronda çekilir; burada listelenir,
 // karar bekleyenler panelden onaylanır ya da gerekçe (ve isteğe bağlı fotoğraf / PDF) ile reddedilir.
-import { api, html, render, $, n, money, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, ago, dateTime, activeChannels } from '../core.js';
+import { api, ek, html, render, $, n, money, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, ago, dateTime, activeChannels } from '../core.js';
 import { setQuery, loadSummary } from '../app.js';
 import { openOrder } from './orderops.js';
 
@@ -15,8 +15,8 @@ export async function claimsView(el, rest, query = {}) {
     <div class="ch-tabs" data-chs></div>
     <div class="row wrap"><div class="tabs" style="flex:1;min-width:0" data-tabs></div>
       <div class="search" style="min-width:min(100%,220px)"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Sipariş no, müşteri, ürün" data-q value="${f.q}"></div>
-      <button class="btn" data-act="sync"><i class="ico ico-sync"></i>İadeleri yenile</button></div>
-    <div class="notice small"><i class="ico ico-warn"></i><div>Onay ve ret kararları doğrudan pazaryerine gönderilir ve geri alınamaz. Ürün size ulaşıp kontrol edilmeden karar vermeyin; ret için gerekçe seçin, mümkünse fotoğraf ekleyin.</div></div>
+      <button class="btn" data-act="sync"><i class="ico ico-sync"></i>Yenile</button></div>
+    <div class="notice small"><i class="ico ico-warn"></i><div>Karar geri alınamaz. Ürünü kontrol ettikten sonra karar verin.</div></div>
     <div data-box></div>
   </div>`);
 
@@ -30,7 +30,7 @@ export async function claimsView(el, rest, query = {}) {
       <div class="stack" style="gap:8px">${r.lines.map((l) => html`<div class="row" style="align-items:flex-start;gap:10px">${thumb(l.image, l.name, 'sm')}
         <div style="flex:1;min-width:0"><div style="font-weight:600" class="clamp2">${l.name || l.sku}</div>
           <div class="tiny muted">${[l.barcode || l.sku, `${n(l.qty)} adet`, money(l.price)].filter(Boolean).join(' · ')}</div>
-          <div class="small" style="margin-top:2px"><b>Gerekçe:</b> ${l.reason || '—'}${l.remoteStatus ? html` <span class="muted tiny">(${l.remoteStatus})</span>` : ''}</div>
+          <div class="small" style="margin-top:2px"><b>Gerekçe:</b> ${l.reason || '—'}</div>
           ${l.note ? html`<div class="small qtext" style="margin-top:4px">“${l.note}”</div>` : ''}</div></div>`)}</div>
       ${(r.images || []).length ? html`<div><div class="tiny muted" style="margin-bottom:6px">Müşterinin eklediği görseller (${r.images.length})</div><div class="claim-media">${r.images.map((u) => /\.pdf(\?|$)/i.test(u)
         ? html`<a class="claim-doc" href="${u}" target="_blank" rel="noopener noreferrer"><i class="ico ico-doc"></i>Belge</a>`
@@ -96,7 +96,7 @@ export async function claimsView(el, rest, query = {}) {
     sync: (t) => busy(t, async () => { const r = await api('claims/sync', { method: 'POST' }); toast(Object.entries(r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} talep`}`).join(' · ') || 'İade servisi olan bağlı kanal yok'); await load(); }),
     approve: (t) => busy(t, async () => {
       const r = rowOf(t);
-      if (!confirm(`#${r.order_number} siparişinin iadesi ${ch(r.channel).name}'da onaylansın mı? Müşteriye ödeme iadesi yapılır; bu işlem geri alınamaz.`)) return;
+      if (!confirm(`#${r.order_number} siparişinin iadesi ${ek(ch(r.channel).name, 'da')} onaylansın mı? Müşteriye ödeme iadesi yapılır; bu işlem geri alınamaz.`)) return;
       await api(`claims/${r.channel}/${encodeURIComponent(r.remote_id)}/approve`, { method: 'POST', body: {} });
       await done('İade onaylandı');
     }),

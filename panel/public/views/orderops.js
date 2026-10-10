@@ -1,6 +1,6 @@
 // Sipariş işlemleri (ortak bileşen): işleme al → paketle (kanalda kargoya hazırla) → kargo firması seç/değiştir →
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
-import { api, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly, isAdmin } from '../core.js';
+import { api, ek, store, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly, isAdmin } from '../core.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
@@ -86,14 +86,21 @@ async function mark(orderId, pkgIds, kind) {
 export function askPrinted(items, done) {
   // items: [{ orderId, pkgId }]
   if (!items.length) return;
+  // "Bir daha sorma" seçildiyse (bu cihazda) etiket sormadan yazdırıldı sayılır
+  if (store.get('print-noask', false)) {
+    api('labels/mark', { method: 'POST', body: { kind: 'printed', items } }).then(() => done && done()).catch((e) => toast(e.message, true));
+    return;
+  }
   const s = sheet({
     title: 'Etiket yazdırıldı mı?', size: 'narrow',
-    body: html`<p style="margin:0">${items.length > 1 ? `${items.length} etiket` : 'Etiket'} yazdırıcıya gönderildi. Yazdırma başarılıysa onaylayın; sipariş listesinde “Etiket yazdırıldı” olarak görünür.</p>`,
+    body: html`<div class="stack"><p style="margin:0">${items.length > 1 ? `${items.length} etiket` : 'Etiket'} yazıcıya gönderildi. Yazdırıldıysa onaylayın.</p>
+      <label class="row" style="gap:8px;cursor:pointer;min-height:32px"><input type="checkbox" data-noask><span class="small">Bir daha sorma</span></label></div>`,
     foot: html`<button class="btn" data-no>Yazdırılmadı</button><span class="spacer"></span><button class="btn primary" data-yes><i class="ico ico-check"></i>Evet, yazdırıldı</button>`,
   });
   $('[data-no]', s.el).onclick = () => s.close();
   $('[data-yes]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     await api('labels/mark', { method: 'POST', body: { kind: 'printed', items } });
+    if ($('[data-noask]', s.el).checked) store.set('print-noask', true);
     s.close(); toast('Etiket yazdırıldı olarak işaretlendi'); done && done();
   });
 }
@@ -161,7 +168,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   function mainBtn(o, p) {
     if (p.status === 'shipped' || !live()) return hasLabel(p, o.channel) ? html`<button class="btn sm outline" data-op="print" data-id="${p.id}"><i class="ico ico-print"></i>Etiketi göster</button>` : '';
     const ls = labelState(o, p);
-    if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${chName()}'dan kontrol et</button>`;
+    if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${ek(chName(), 'dan')} kontrol et</button>`;
     if (ls.key === 'external') return html`<button class="btn sm primary" data-op="ext"><i class="ico ico-truck"></i>${caps().external.label}${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}</button><button class="btn sm" style="flex:0 0 auto" data-op="refresh" title="ikas'tan hemen kontrol et" aria-label="Kontrol et"><i class="ico ico-sync"></i></button>`;
     // Kanalın kargo etiketi servisi yoksa ve bağlı kargo entegratörü varsa: etiket ve takip no entegratörden
     if (ls.key === 'unpacked' && !caps().label && !caps().pack && hasCarrier && carrierAllowed(d, p)) return html`<button class="btn sm primary" data-op="carrier" data-id="${p.id}"><i class="ico ico-tag"></i>Kargo firmasından etiket al</button><button class="btn sm" data-op="label" data-id="${p.id}">Etiket oluştur</button>`;
@@ -176,13 +183,13 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   function labelAdvice(o, p) {
     if (p.status !== 'open' || p.carrier_provider || p.barcode || p.tracking || !live()) return '';
     const c = caps(), nm = chName();
-    const t = c.external ? `${c.external.label.replace(/ ile Gönder$/, '')} etiketi (${nm}'ta açılır, barkod ve etiket panele kendiliğinden gelir)${hasCarrier ? ' · ya da bağlı kargo firmanız' : ''}`
-      : c.label && c.cargo !== false ? `${nm} ortak barkodu (anlaşmalı kargo; etiketi panelden basarsınız)${hasCarrier ? ' · kendi anlaşmanızla gönderecekseniz bağlı kargo firması' : ''}`
-      : c.label ? `${nm} etiketi${hasCarrier ? ' · ya da bağlı kargo firmanız' : ''}`
-      : hasCarrier ? 'bağlı kargo firmanız (etiket ve takip no firmadan gelir)'
+    const t = c.external ? c.external.label.replace(/ ile Gönder$/, '')
+      : c.label && c.cargo !== false ? `${nm} barkodu`
+      : c.label ? `${nm} etiketi`
+      : hasCarrier ? 'kendi kargo firmanız'
       : '';
-    if (!t) return mode === 'panel' ? '' : html`<div class="tiny muted" style="margin:2px 0 6px">${nm} kargo etiketi vermiyor: paketi kendi kargonuzla gönderip takip numarasını girin.</div>`;
-    return html`<div class="tiny muted" style="margin:2px 0 6px"><b>Önerilen etiket:</b> ${t}</div>`;
+    if (!t) return mode === 'panel' ? '' : html`<div class="tiny muted" style="margin:2px 0 6px">Kendi kargonuzla gönderin, takip numarasını girin.</div>`;
+    return html`<div class="tiny muted" style="margin:2px 0 6px">Etiket: ${t}</div>`;
   }
   function labelSteps(p) {
     const st = [['packed_at', 'Paketlendi'], ['label_at', 'Etiket oluşturuldu'], ['label_viewed_at', 'Görüntülendi'], ['label_printed_at', 'Yazdırıldı']];
@@ -201,7 +208,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
         : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="pname" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
       <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || (pick && pick.name ? `${pick.name} (seçildi, paketlerken uygulanır)` : '') || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}${p.carrier_status ? html` · <span class="pill tiny ${p.carrier_state === 'delivered' ? 'good' : p.carrier_state === 'returned' ? 'warn' : ''}">${p.carrier_status}</span>` : ''}</span>
-        ${canCargo ? html`<button class="btn sm ghost" data-op="cargo" data-id="${p.id}">${p.cargo_company || (pick && pick.name) ? 'Değiştir' : 'Seç'}</button>` : ''}${trackBtn(p, o)}</div>
+        ${canCargo ? html`<button class="btn sm outline" style="flex:0 0 auto" data-op="cargo" data-id="${p.id}">${p.cargo_company || (pick && pick.name) ? 'Değiştir' : 'Kargo firması seç'}</button>` : ''}${trackBtn(p, o)}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
       ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
       ${labelAdvice(o, p)}<div class="acts">${mainBtn(o, p)}${mode !== 'panel' && !p.virtual ? html`<button class="btn sm" style="flex:0 0 auto" data-op="more" data-id="${p.id}" aria-label="Diğer işlemler"><i class="ico ico-dots"></i></button>` : ''}</div>
@@ -217,7 +224,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     const ext = extNote(o);
     const notes = html`${late ? html`<div class="notice ${late.cls === 'bad' ? 'bad' : 'warn'} small"><i class="ico ico-warn"></i><div><b>${late.text}</b> · ${late.title}</div></div>` : ''}
       ${ext ? html`<div class="notice small" style="background:var(--purple-soft)"><i class="ico ico-bell"></i><div><b>${ext.text}</b> · ${shortDT(ext.at)} <span class="muted">(${ext.detail})</span></div></div>` : ''}
-      ${c.hold && live() ? html`<div class="notice small"><i class="ico ico-warn"></i><div><b>${chName()} işlemleri beklemede.</b> Paketleme ve kargo ${chName()} panelinden yapılır; orada oluşan barkod ve etiket senkronla buraya gelir, buradan yazdırılabilir.</div></div>` : ''}`;
+      ${c.hold && live() ? html`<div class="notice small"><i class="ico ico-warn"></i><div>Paketleme ve kargo ${ek(chName(), 'da')} yapılır; etiket buraya gelir.</div></div>` : ''}`;
     const stockNote = unmatched
       ? html`<div class="row small" style="color:var(--amber)"><i class="ico ico-warn"></i>${unmatched} ürün panelde eşleşmemiş; stoktan düşülmez</div>`
       : state.settings && state.settings.stock_sync ? html`<div class="row small" style="color:var(--good)"><i class="ico ico-check"></i>Stok tüm kanallarda güncellendi</div>`
@@ -240,14 +247,13 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         <h3>Sipariş işlemleri</h3>
         ${stepper(o.status)}${notes}
         ${live() ? html`<div class="row wrap" style="margin-top:8px">
-          ${o.status === 'new' ? html`<button class="btn primary" style="flex:1" data-op="accept"><i class="ico ico-play"></i>İşleme al</button>` : ''}
+          ${o.status === 'new' && mode !== 'expand' ? html`<button class="btn primary" style="flex:1" data-op="accept"><i class="ico ico-play"></i>İşleme al</button>` : ''}
           ${open.length > 1 && open.some((p) => !hasLabel(p, d.order.channel)) ? html`<button class="btn primary" style="flex:1" data-op="labels"><i class="ico ico-tag"></i>Tüm etiketleri al</button>` : ''}
           <button class="btn outline" style="flex:1" data-op="split" ${splittable ? '' : 'disabled'}><i class="ico ico-split"></i>Pakete böl</button>
           <button class="btn outline" style="flex:1" data-op="addpkg" ${splittable ? '' : 'disabled'}><i class="ico ico-plus"></i>Paket ekle</button>
         </div>` : ''}
         <div style="margin-top:12px">${stockNote}</div>
-        ${c.split === 'remote-async' && live() ? html`<div class="tiny muted" style="margin-top:8px">Trendyol'da bölünen paketler birkaç dakika sonra senkronla gelir.</div>` : ''}
-        ${c.pack && live() ? html`<div class="tiny muted" style="margin-top:8px">${packHelp(o.channel, c)}</div>` : ''}
+        ${c.split === 'remote-async' && live() ? html`<div class="tiny muted" style="margin-top:8px">Bölünen paketler birkaç dakika sonra gelir.</div>` : ''}
         ${mode === 'sheet' ? '' : html`<button class="btn ghost sm" style="margin-top:8px" data-op="detail">Tüm detaylar →</button>`}
       </div>
       ${pk.map((p) => pkgCard(o, p))}
@@ -266,7 +272,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     const s = sheet({ title: `${chName()} · gönderi hazırlanıyor`, size: 'narrow', onClose: () => { stop = true; } });
     const row = (ok, text) => html`<div class="diag-row"><span class="diag-ic ${ok ? 'good' : 'amber'}">${ok ? '✓' : html`<i class="ico ico-sync spin"></i>`}</span><div style="flex:1">${text}</div></div>`;
     const draw = (x, i, n) => s.setBody(html`<div class="stack"><div class="diag">
-      ${row(true, html`Paket ${chName()}'da oluşturuldu`)}
+      ${row(true, html`Paket ${ek(chName(), 'da')} oluşturuldu`)}
       ${row(x.step === 'created' || !!x.official, x.step === 'created' || x.official ? 'ikas Kargo gönderiyi oluşturdu (gerçek kargo barkodu alındı)' : 'ikas Kargo anlaşmalı firmada gönderiyi oluşturuyor…')}
       ${row(!!x.official, x.official ? 'Kargo etiketi alındı' : 'Kargo etiketi bekleniyor…')}
     </div><div class="small muted">${x.pending || ''}</div><div class="tiny muted">Kontrol ${i} / ${n} · pencereyi kapatırsanız izleme durur, işlem ikas'ta sürer.</div></div>`);
@@ -361,7 +367,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       }
       if (open && pkg.packed_at && c.repack && !pkg.barcode && !pkg.tracking) items.push({ icon: 'sync', label: 'ikas Kargo ile yeniden hazırla (barkod gelmiyorsa)', run: () => busy(null, () => repackPkg(pkg)) });
       if (open && pkg.packed_at && pkg.remote_id && c.cancelPackage) items.push('-', { icon: 'x', danger: true, label: 'Paketi iptal et (kanalda paketlemeyi geri al)', run: async () => {
-        if (!(await confirmBox(`Paket ${pkg.no} ${chName()}'da iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
+        if (!(await confirmBox(`Paket ${pkg.no} ${ek(chName(), 'da')} iptal edilsin mi? Barkod/etiket geçersiz olur; paket yeniden paketlenebilir veya bölünebilir.`, 'Paketi iptal et'))) return;
         busy(null, async () => { const r = await api(`orders/${enc}/cancel-package`, { method: 'POST', body: { package_id: pkg.id } }); toast(r.message); await changed(); });
       } });
       if (open && carrierAllowed(d, pkg)) items.push('-', { icon: 'truck', label: 'Kargo firmasından etiket al (kendi anlaşmam)', run: () => carrierDialog(d, pkg, changed) });
@@ -384,14 +390,6 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
   render(el, html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
   load().catch((e) => render(el, html`<div class="notice bad">${e.message}</div>`));
   return { reload: load };
-}
-
-function packHelp(channel, c) {
-  const name = ch(channel).name, t = ch(channel).type;
-  if (t === 'ikas') return `“ikas Kargo ile Gönder” ${name} siparişini ikas'ta açar: ⋮ → ikas Kargo ile Paketle ve Gönder → firma seçip Devam Et. Gönderi oluşunca barkod ve etiket buraya kendiliğinden gelir, buradan yazdırılır.`;
-  if (t === 'trendyol') return `“Paketle” Trendyol'a “Hazırlanıyor” bildirir. Kargo firması Trendyol'un anlaşmalı firmalarından seçilir/değiştirilir; Trendyol Express ve Aras'ta ortak etiket alınır.`;
-  if (t === 'hepsiburada') return `“Paketle” paketi Hepsiburada'da oluşturur; kargo firması Hepsiburada'nın izin verdiği firmalar arasından değiştirilebilir ve etiket Hepsiburada'dan alınır.`;
-  return c.pack ? `Paket ${name}'da hazırlanır ve etiket kanaldan alınır.` : '';
 }
 
 // ---------- kargo firması seç / değiştir (seçenekler kanaldan gelir) ----------
@@ -441,7 +439,7 @@ async function carrierDialog(d, pkg, done) {
       <label class="field"><span>Desi</span><input class="input" type="number" min="0.1" step="0.1" data-desi value="${pkg.desi || 1}" style="max-width:120px"></label>
       <dl class="kv small"><dt>Alıcı</dt><dd>${a.name || o.customer || '—'} · ${[a.district, a.city].filter(Boolean).join(' / ') || html`<span style="color:var(--bad)">adres yok</span>`}</dd>
         <dt>Gönderen</dt><dd>${snd.name || html`<span style="color:var(--bad)">tanımlı değil</span>`}${snd.city ? ` · ${snd.city}` : ''} <a class="link tiny" href="#/ayarlar">değiştir</a></dd></dl>
-      <div class="notice small">Gönderi entegratörde açılır; takip numarası ve etiket bu pakete yazılır. Paketi kargoya verdiğinizde takip numarası ${ch(o.channel).name}'a bildirilir. Kargo ücreti siparişin kargo giderine eklenir.</div>`
+      <div class="notice small">Gönderi entegratörde açılır; takip numarası ve etiket bu pakete yazılır. Paketi kargoya verdiğinizde takip numarası ${ek(ch(o.channel).name, 'a')} bildirilir. Kargo ücreti siparişin kargo giderine eklenir.</div>`
       : locked ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Kendi anlaşmalı kargo entegrasyonu <b>Kurumsal</b> pakette.</div></div>` : html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bağlı kargo firması yok.${soon.length ? ` ${soon.map((c) => `${c.name}${c.ready ? (c.configured ? ' (pasif)' : ' (bilgileri girilmedi)') : ' (bağlantı hazırlanıyor)'}`).join(', ')}.` : ''} ${isAdmin() ? html`<a class="link" href="#/entegrasyonlar">Entegrasyonlar → Kargo entegratörleri</a>` : 'Yöneticiniz Entegrasyonlar sayfasından bağlayabilir.'}</div></div>`}
   </div>`,
   foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button>${usable.length ? html`<button class="btn primary" data-go><i class="ico ico-tag"></i>Gönderi oluştur ve etiket al</button>` : ''}` });
@@ -474,7 +472,7 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
         <label class="field"><span>Kargo firması</span><input class="input" list="cargo-dl" data-f="cargo" value="${pkg.cargo_company || o.cargo_company || ''}"><datalist id="cargo-dl">${((state.settings && state.settings.cargo_companies) || []).map((x) => html`<option value="${x}">`)}</datalist></label>
         <label class="field"><span>Takip no</span><input class="input" data-f="tracking" value="${pkg.tracking || ''}"></label>`}
       ${ch(o.channel).type === 'trendyol' && !editOnly ? html`<label class="field"><span>Fatura no (isteğe bağlı, Trendyol'a "Faturalandı" bildirilir)</span><input class="input" data-f="invoice"></label>` : ''}
-      ${!editOnly ? html`<div class="notice small">${c.ship === 'remote' || (c.ownCarrier && pkg.carrier_provider) ? `Gönderim ${name}'a bildirilir${c.ownCarrier && pkg.carrier_provider ? ' (paket “Kargoda” olur, takip bilgisi müşteriye ikas’tan gider)' : ''}.` : `${name}'da paket, kargo firması teslim alıp okutunca “Kargoda” olur; burada panel kaydı güncellenir.`}</div>` : ''}
+      ${!editOnly ? html`<div class="notice small">${c.ship === 'remote' || (c.ownCarrier && pkg.carrier_provider) ? `Gönderim ${ek(name, 'a')} bildirilir${c.ownCarrier && pkg.carrier_provider ? ' (paket “Kargoda” olur, takip bilgisi müşteriye ikas’tan gider)' : ''}.` : `${ek(name, 'da')} paket, kargo firması teslim alıp okutunca “Kargoda” olur; burada panel kaydı güncellenir.`}</div>` : ''}
     </div>`,
     foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>${editOnly ? 'Kaydet' : html`<i class="ico ico-truck"></i>Kargoya ver`}</button>`,
   });
@@ -497,7 +495,7 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
 function splitEditor(d, extra, done) {
   const o = d.order, live = o.items.filter((i) => !DEAD_LINE(i.status));
   if (o.packages.some((p) => p.status === 'shipped')) return toast('Kargoya verilmiş paketi olan sipariş yeniden bölünemez', true);
-  if (o.packages.some((p) => p.remote_id) && d.channel && d.channel.caps.split !== 'remote-async') return toast(`Paketler ${ch(o.channel).name}'da oluşturulmuş. Yeniden bölmek için önce paket menüsünden “Paketi iptal et”.`, true);
+  if (o.packages.some((p) => p.remote_id) && d.channel && d.channel.caps.split !== 'remote-async') return toast(`Paketler ${ek(ch(o.channel).name, 'da')} oluşturulmuş. Yeniden bölmek için önce paket menüsünden “Paketi iptal et”.`, true);
   let count = Math.min(8, Math.max(2, o.packages.length + extra));
   const grid = new Map(live.map((i) => [String(i.line_id), Array(8).fill(0)]));
   if (o.packages.length) o.packages.forEach((p, k) => p.items.forEach((x) => { const g = grid.get(String(x.line_id)); if (g) g[k] = x.qty; }));
@@ -507,7 +505,7 @@ function splitEditor(d, extra, done) {
   const s = sheet({ title: `Sipariş #${o.order_number} · paketler`, size: 'wide' });
   const draw = () => {
     s.setBody(html`<div class="stack">
-      <p class="muted small" style="margin:0">Her ürünün adedini paketlere dağıtın. Her paket için ayrı kargo etiketi oluşur.${d.channel && d.channel.caps.split === 'remote' ? ` Paketler ${ch(o.channel).name}'da da oluşturulur.` : d.channel && d.channel.caps.split === 'remote-async' ? ' Bölme Trendyol\'a gönderilir; panel yeni paketler oluşana kadar izler, ardından tüm etiketleri tek tuşla alırsınız.' : d.channel && d.channel.caps.pack ? ` Paketler “Paketle” adımında ${ch(o.channel).name}'a gönderilir.` : ''}</p>
+      <p class="muted small" style="margin:0">Her ürünün adedini paketlere dağıtın. Her paket için ayrı kargo etiketi oluşur.${d.channel && d.channel.caps.split === 'remote' ? ` Paketler ${ek(ch(o.channel).name, 'da')} da oluşturulur.` : d.channel && d.channel.caps.split === 'remote-async' ? ' Bölme Trendyol\'a gönderilir; panel yeni paketler oluşana kadar izler, ardından tüm etiketleri tek tuşla alırsınız.' : d.channel && d.channel.caps.pack ? ` Paketler “Paketle” adımında ${ek(ch(o.channel).name, 'a')} gönderilir.` : ''}</p>
       <div class="card flush"><div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th>${Array.from({ length: count }, (_, k) => html`<th class="c">Paket ${k + 1}</th>`)}<th class="c">Kalan</th></tr></thead><tbody>
         ${live.map((i) => { const g = grid.get(String(i.line_id)); const left = i.quantity - g.slice(0, count).reduce((a, b) => a + b, 0); return html`<tr>
           <td style="min-width:180px"><div class="row">${thumb(i.product_image || i.image, i.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:260px;font-weight:600">${i.product_name || i.name}</div><div class="muted tiny">${i.quantity} adet</div></div></div></td>
@@ -567,7 +565,7 @@ async function watchSplit(o, r, done) {
   const s = sheet({ title: `${name} · paketler oluşturuluyor`, size: 'narrow', onClose: () => { stop = true; } });
   const fresh = (ord) => (ord.packages || []).filter((p) => p.remote_id && p.status !== 'cancelled' && !(r.from || []).includes(String(p.remote_id)));
   const view = (i, n, pk) => s.setBody(html`<div class="stack"><div class="diag">
-      <div class="diag-row"><span class="diag-ic good">✓</span><div style="flex:1">Bölme isteği ${name}'a gönderildi (${r.expect} paket)</div></div>
+      <div class="diag-row"><span class="diag-ic good">✓</span><div style="flex:1">Bölme isteği ${ek(name, 'a')} gönderildi (${r.expect} paket)</div></div>
       <div class="diag-row"><span class="diag-ic ${pk.length >= r.expect ? 'good' : 'amber'}">${pk.length >= r.expect ? '✓' : html`<i class="ico ico-sync spin"></i>`}</span><div style="flex:1">${pk.length >= r.expect ? `${pk.length} yeni paket oluştu` : `${name} paketleri oluşturuyor… (${pk.length}/${r.expect})`}</div></div>
       <div class="diag-row"><span class="diag-ic ${pk.length && pk.every((p) => p.tracking) ? 'good' : 'amber'}">${pk.length && pk.every((p) => p.tracking) ? '✓' : html`<i class="ico ico-sync spin"></i>`}</span><div style="flex:1">${pk.length && pk.every((p) => p.tracking) ? 'Kargo takip numaraları geldi' : 'Kargo takip numaraları bekleniyor…'}</div></div>
     </div><div class="tiny muted">Kontrol ${i} / ${n} · pencereyi kapatırsanız paketler bir sonraki senkronda gelir.</div></div>`);
@@ -618,9 +616,9 @@ export async function openOrder(id, onChange) {
     const o = d.order, p = d.profit, a = o.address || {};
     s.title.textContent = `#${o.order_number} · ${ch(o.channel).name}`;
     s.setBody(html`
-      <div class="row wrap" style="margin-bottom:12px">${chLogo(o.channel)}${statusPill(o.status)}<span class="muted small">${dateTime(o.ordered_at)}</span>
-        ${o.remote_status ? html`<span class="muted tiny" title="Kanaldaki durum">(${o.remote_status})</span>` : ''}${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">Kanalda bulunamadı</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}
-        ${o.ship_by ? html`<span class="muted small">· Son kargoya teslim: <b>${dateTime(o.ship_by)}</b></span>` : ''}${o.extra && o.extra.cargoChoice ? html`<span class="muted small">· Müşterinin seçtiği: ${o.extra.cargoChoice}</span>` : ''}
+      <div class="row wrap" style="margin-bottom:12px">${chLogo(o.channel)}<span title="${o.remote_status ? `Kanaldaki durum: ${o.remote_status}` : ''}">${statusPill(o.status)}</span><span class="muted small">${dateTime(o.ordered_at)}</span>
+${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">Kanalda bulunamadı</span>` : ''}${o.extra && o.extra.awaitingPayment ? html`<span class="pill warn">Ödeme bekleniyor</span>` : ''}
+        ${o.ship_by ? html`<span class="muted small">Son kargoya teslim: <b>${dateTime(o.ship_by)}</b></span>` : ''}${o.extra && o.extra.cargoChoice ? html`<span class="muted small">Müşterinin seçtiği: ${o.extra.cargoChoice}</span>` : ''}
         ${o.cust && o.cust.total > 1 ? html`<a class="pill info" href="#/musteriler?key=${encodeURIComponent(o.ckey)}" title="Müşterinin tüm siparişleri">Müşterinin ${o.cust.nth}. siparişi · toplam ${o.cust.total}</a>` : ''}</div>
       <div data-ops></div>
       <div class="two-col" style="margin-top:16px">
@@ -636,8 +634,8 @@ export async function openOrder(id, onChange) {
           <div class="card">
             <div class="card-head"><h3>İşlem geçmişi</h3><span class="muted tiny">panel ve kanal</span></div>
             ${(o.events || []).length ? html`<div class="timeline">${o.events.map((e) => html`<div class="ev ${e.source}"><span class="dot"></span><div style="flex:1;min-width:0">
-              <div><b>${e.source === 'panel' ? EV[e.action] || e.action : e.action === 'processed' ? `${ch(o.channel).name} üzerinden işlem yapıldı` : `${ch(o.channel).name}'da durum değişti`}</b>${e.note && e.source === 'panel' ? html` <span class="muted">· ${e.note}</span>` : ''}</div>
-              <div class="muted tiny">${dateTime(e.at)} · ${e.source === 'panel' ? `Panel${e.user ? ` (${e.user})` : ''}` : `${e.note || '?'} → ${e.remote_status || '?'}`}</div></div></div>`)}</div>` : html`<div class="muted small">Henüz kayıt yok</div>`}
+              <div><b>${e.source === 'panel' ? EV[e.action] || e.action : e.action === 'processed' ? `${ch(o.channel).name} üzerinden işlem yapıldı` : `${ek(ch(o.channel).name, 'da')} durum değişti`}</b>${e.note && e.source === 'panel' ? html` <span class="muted">· ${e.note}</span>` : ''}</div>
+              <div class="muted tiny" title="${e.source === 'panel' ? '' : `${e.note || '?'} → ${e.remote_status || '?'}`}">${dateTime(e.at)} · ${e.source === 'panel' ? `Panel${e.user ? ` (${e.user})` : ''}` : ch(o.channel).name}</div></div></div>`)}</div>` : html`<div class="muted small">Henüz kayıt yok</div>`}
           </div>
         </div>
         <div class="stack">

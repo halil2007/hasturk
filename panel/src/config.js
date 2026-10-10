@@ -11,7 +11,7 @@ const ikasFields = (p) => [
   { k: `${p}CLIENT_SECRET`, label: 'Client Secret', secret: true, req: true },
   { k: `${p}MERCHANT_ID`, label: 'Merchant ID', hint: 'ürün görselleri için (isteğe bağlı)', adv: true },
   { k: `${p}SALES_CHANNEL_ID`, label: 'Satış kanalı ID', hint: 'sadece bu kanalın siparişleri (isteğe bağlı)', adv: true },
-  { k: `${p}STOCK_LOCATION_ID`, label: 'Stok lokasyonu ID', hint: 'boşsa ilk lokasyon', adv: true },
+  { k: `${p}STOCK_LOCATION_ID`, label: 'Stok lokasyonu ID', hint: 'tek lokasyon varsa boş bırakılabilir; birden çok lokasyonda zorunlu', adv: true },
 ];
 
 export const FIELDS = {

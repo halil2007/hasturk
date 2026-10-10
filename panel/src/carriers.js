@@ -180,6 +180,9 @@ export function shipmentOf(o, pkg, sender = {}, { desi } = {}) {
   return { shipment: s, missing: miss };
 }
 
+// Kargo ücreti KDV dahil saklanır (sipariş kârı kargo giderini KDV dahil kabul eder): firma KDV hariç bildiriyorsa %20 eklenir
+export const grossCost = (r) => (r.cost == null ? null : Math.round(Number(r.cost) * (r.costVatIncluded === false ? 1.2 : 1) * 100) / 100);
+
 // ---------- kargo durumu takibi (her senkronda, paket başına en sık 2 saatte bir) ----------
 // Firma gönderisi açılmış paketler son 30 gün içinde sorgulanır: gerçek takip numarası (şube kabulünden sonra veren firmalar),
 // takip adresi ve kargo ücreti pakete yazılır; kargoya verilmiş paketlerin hepsi teslim edildiyse sipariş "Teslim edildi" olur.
@@ -206,8 +209,9 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
       if (tn && tn !== p.tracking) { out.updated++; await run(db, 'UPDATE packages SET tracking = ?, tracking_url = COALESCE(NULLIF(?, \'\'), tracking_url) WHERE id = ?', tn, str(r.trackingUrl), p.id); }
       else if (r.trackingUrl && !p.tracking_url) await run(db, 'UPDATE packages SET tracking_url = ? WHERE id = ?', str(r.trackingUrl), p.id);
       if (r.cost != null && p.carrier_cost == null) {
-        await run(db, 'UPDATE packages SET carrier_cost = ? WHERE id = ?', r.cost, p.id);
-        if (p.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", r.cost, p.order_id);
+        const cost = grossCost(r);
+        await run(db, 'UPDATE packages SET carrier_cost = ? WHERE id = ?', cost, p.id);
+        if (p.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", cost, p.order_id);
       }
       await run(db, 'UPDATE packages SET carrier_checked_at = ?, carrier_state = COALESCE(?, carrier_state), carrier_status = COALESCE(NULLIF(?, \'\'), carrier_status) WHERE id = ?', t, r.state || null, str(r.text).slice(0, 200), p.id);
       if (r.state && r.state !== p.carrier_state && ['delivered', 'returned'].includes(r.state)) {

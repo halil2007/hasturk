@@ -9,9 +9,9 @@ import { pickSheet } from './picklist.js';
 const STATUS_TABS = [['new', 'Yeni'], ['processing', 'Hazırlanıyor'], ['shipped', 'Kargoda'], ['delivered', 'Teslim edildi'], ['cancelled', 'İptal'], ['returned', 'İade'], ['all', 'Tümü']];
 
 export async function orders(el, rest, query = {}) {
-  const f = { channel: query.channel || '', status: (query.status === 'late' ? '' : query.status) || (query.q || query.missing ? 'all' : 'new'), q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', missing: query.missing ? '1' : '', page: 1, limit: 25 };
+  const f = { channel: query.channel || '', status: query.status || (query.q || query.missing ? 'all' : 'new'), q: query.q || '', from: query.from || '', to: query.to || '', cargo: query.cargo || '', missing: query.missing ? '1' : '', page: 1, limit: 25 };
   if (rest[0] === 'kanal') f.channel = rest[1] || '';
-  if (rest[0] === 'durum') f.status = (rest[1] !== 'late' && rest[1]) || 'new';
+  if (rest[0] === 'durum') f.status = rest[1] || 'new';
   if (rest[0] && !['kanal', 'durum'].includes(rest[0])) setTimeout(() => openOrder(rest[0], refresh), 0);
   const sel = new Set();
   let data = { orders: [], counts: {}, total: 0 }, expanded = null, mobile = isMobile();
@@ -51,7 +51,9 @@ export async function orders(el, rest, query = {}) {
   function statusTabs() {
     const c = data.counts, total = Object.entries(c).filter(([k]) => k !== 'late').reduce((a, [, x]) => a + x, 0);
     const cnt = (k) => (k === 'all' ? total : c[k] || 0);
-    render($('[data-stabs]', el), html`${STATUS_TABS.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${cnt(k)}</span></button>`)}`);
+    // Gecikme riski sekmesi yalnız Genel Bakış'tan gelinince (status=late) görünür
+    const tabs = f.status === 'late' ? [['late', 'Gecikme riski'], ...STATUS_TABS] : STATUS_TABS;
+    render($('[data-stabs]', el), html`${tabs.map(([k, t]) => html`<button class="tab ${f.status === k ? 'on' : ''}" data-act="st" data-k="${k}" title="${cnt(k)} sipariş" aria-label="${t}: ${cnt(k)} sipariş">${t}<span class="n">${cnt(k)}</span></button>`)}`);
   }
 
   function actionBtn(o) {
@@ -120,13 +122,13 @@ export async function orders(el, rest, query = {}) {
       <button class="pg" data-act="page" data-p="${Math.min(pages, p + 1)}" aria-label="Sonraki"><i class="ico ico-chev"></i></button></div>`;
   }
   function bulkbar() {
-    return sel.size ? html`<div class="bulk"><input type="checkbox" class="cb" checked data-clear aria-label="Seçimi kaldır"><b>${sel.size} sipariş seçildi</b>
+    return sel.size ? html`<div class="bulk"><b>${sel.size} sipariş seçildi</b>
       <button class="btn sm outline" data-act="bulk-accept"><i class="ico ico-play"></i>İşleme al</button>
       <button class="btn sm outline" data-act="pick"><i class="ico ico-box"></i>Hazırlama listesi</button>
-      <button class="btn sm outline" data-act="bulk-label"><i class="ico ico-tag"></i>Toplu etiket oluştur</button>
+      <button class="btn sm outline" data-act="bulk-label"><i class="ico ico-tag"></i>Etiket al</button>
       <button class="btn sm outline" data-act="bulk-print"><i class="ico ico-print"></i>Yazdır</button>
       ${isAdmin() ? html`<button class="btn sm danger ghost" data-act="bulk-del"><i class="ico ico-trash"></i>Sil</button>` : ''}
-      <button class="icon-btn" data-act="clearsel" aria-label="Seçimi temizle"><i class="ico ico-x"></i></button></div>` : '';
+      <button class="icon-btn" data-act="clearsel" title="Seçimi kaldır" aria-label="Seçimi kaldır"><i class="ico ico-x"></i></button></div>` : '';
   }
   function draw() {
     mobile = isMobile();

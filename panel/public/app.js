@@ -230,20 +230,28 @@ export async function loadSummary(fresh = true) {
   return s;
 }
 
-async function sync() {
+// Bağlı kanalların hiçbiri henüz senkronlanmadı mı (yeni / demo panel)
+let firstDone = false;
+function firstSync() {
+  if (firstDone) return false;
+  firstDone = true;
+  const on = state.channels.filter((c) => !c.paused && (c.enabled || c.demo));
+  return on.length > 0 && !on.some((c) => c.last && (c.last.at || c.last.ordersAt));
+}
+async function sync({ auto = false } = {}) {
   const icons = $$('[data-act=sync] .ico');
   icons.forEach((i) => i.classList.add('spin'));
   try {
     const r = await api('sync', { method: 'POST', body: { force: true } });
-    if (r.skipped) toast(r.skipped);
+    if (r.skipped) { if (!auto) toast(r.skipped); }
     else {
       const errs = [...Object.values(r.channels || {}), ...Object.values(r.listings || {})].filter((v) => typeof v === 'string');
-      const count = Object.values(r.channels || {}).filter((v) => typeof v === 'number').reduce((a, b) => a + b, 0);
-      toast(errs.length ? `${errs.length} adımda hata var (Bildirimler)` : `Senkron tamam: ${count} sipariş kontrol edildi${r.match && (r.match.linked || r.match.created) ? `, ${r.match.linked + r.match.created} ürün eşleşti` : ''}`, !!errs.length);
+      toast(errs.length ? 'Bazı kanallarda hata var (Bildirimler)' : `Güncellendi${r.newOrders ? ` · ${r.newOrders} yeni sipariş` : ''}`, !!errs.length);
     }
+    state.syncing = false;
     await loadSummary();
     if (current && current.refresh) current.refresh();
-  } catch (e) { toast(e.message, true); } finally { icons.forEach((i) => i.classList.remove('spin')); }
+  } catch (e) { if (!auto) toast(e.message, true); } finally { state.syncing = false; icons.forEach((i) => i.classList.remove('spin')); }
 }
 
 async function bell(btn) {
@@ -270,7 +278,7 @@ function meMenu(btn) {
     { icon: 'user', label: `${u.name || ''} · ${u.role === 'admin' ? 'Yönetici' : 'Personel'}${state.tenant ? ` · ${state.tenant.name}` : ''}`, run: () => {} },
     ...(u.id > 0 ? [{ icon: 'key', label: 'Şifremi değiştir', run: changePassword }] : []),
     ...(u.id >= 0 && !u.support ? [{ icon: 'check', label: `İki adımlı doğrulama${u.twofa ? ' (açık)' : ''}`, run: twofaSettings }] : []),
-    { icon: 'sync', label: 'Şimdi senkronla', run: sync },
+    { icon: 'sync', label: 'Yenile', run: () => sync() },
     '-',
     { label: `${theme === 'light' ? '✓ ' : ''}Açık tema`, run: () => setTheme('light') },
     { label: `${theme === 'dark' ? '✓ ' : ''}Koyu tema`, run: () => setTheme('dark') },
@@ -321,7 +329,7 @@ function moreMenu() {
       ${groups.map((g) => html`<section class="mm-sec" data-mm-sec><h4>${g.sec || 'Genel'}</h4><div class="mm-grid">${g.items.map((r) => html`<a class="mm-tile ${SEC_TONE[g.sec] || 'blue'} ${currentPath === r.path ? 'on' : ''}" href="#/${r.path}" data-mm="${r.title.toLocaleLowerCase('tr')} ${r.path}"><span class="mm-ic"><i class="ico ico-${r.icon}"></i>${r.count ? html`<span class="mm-n hide" data-count="${r.count}"></span>` : ''}</span><span class="mm-t">${r.title}</span></a>`)}</div></section>`)}
       <div class="mm-list">
         <button data-mm-act="help"><i class="ico ico-help"></i>Bu sayfa nasıl kullanılır?</button>
-        <button data-mm-act="sync"><i class="ico ico-sync"></i>Şimdi senkronla<span class="muted tiny" style="margin-left:auto">${ago(Math.max(0, ...state.channels.map((c) => (c.last && c.last.at) || 0)))}</span></button>
+        <button data-mm-act="sync"><i class="ico ico-sync"></i>Yenile<span class="muted tiny" style="margin-left:auto">${ago(Math.max(0, ...state.channels.map((c) => (c.last && c.last.at) || 0)))}</span></button>
         <button data-mm-act="theme"><i class="ico ico-bolt"></i>Görünüm: ${{ light: 'Açık', dark: 'Koyu', auto: 'Cihaza uy' }[themeOf()]}</button>
         ${u.id > 0 ? html`<button data-mm-act="pass"><i class="ico ico-key"></i>Şifremi değiştir</button>` : ''}
         <button data-mm-act="logout" class="danger"><i class="ico ico-x"></i>Çıkış yap</button>
@@ -578,7 +586,11 @@ async function start(attempt = 0) {
   refreshChrome();
   // İlk giriş: geçici şifre değiştirilmeden panel kullanılamaz (sunucu da diğer istekleri reddeder)
   if (state.user && state.user.mustChange) return changePassword(true);
+  // Yeni panel: hiç senkron yapılmadıysa veriler bir kez kendiliğinden alınır (sayfalar "Veriler alınıyor…" gösterir)
+  const first = firstSync();
+  if (first) state.syncing = true;
   await route();
+  if (first) sync({ auto: true });
   // Boşta: alt menüdeki sayfaların verisi önceden alınır (ilk dokunuşta da beklemeden açılsın)
   setTimeout(() => ['siparisler', 'stoklar', 'urunler'].forEach(prefetchRoute), 1200);
 }

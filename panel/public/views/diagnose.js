@@ -1,6 +1,6 @@
 // Bağlantı tanılaması: kanalın her adımını (kimlik, izinler, servisler, depo adresi, kargo ayarları ve isteğe bağlı
 // bir siparişin paket / barkod / etiket durumu) ayrı ayrı dener ve sonucu açıklar. Rapor kopyalanıp destek için iletilebilir.
-import { api, html, $, ch, sheet, toast, busy, dateTime } from '../core.js';
+import { api, ek, html, $, ch, sheet, toast, busy, dateTime } from '../core.js';
 
 const ICON = (ok) => (ok === true ? ['good', '✓'] : ok === false ? ['bad', '✗'] : ['amber', '!']);
 
@@ -8,7 +8,7 @@ export function diagnoseDialog(channelId, orderId, orderNo) {
   const s = sheet({ title: `${ch(channelId).name} · bağlantı tanılaması${orderNo ? ` · #${orderNo}` : ''}`, size: 'wide drawer' });
   let report = '';
   const run = async () => {
-    s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i> ${ch(channelId).name}'a adım adım soruluyor…</div>`);
+    s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i> ${ek(ch(channelId).name, 'a')} adım adım soruluyor…</div>`);
     try {
       const r = await api(`integrations/${channelId}/diagnose`, { method: 'POST', body: { order_id: orderId || undefined } });
       const bad = r.checks.filter((c) => c.ok === false).length, warn = r.checks.filter((c) => c.ok == null).length;

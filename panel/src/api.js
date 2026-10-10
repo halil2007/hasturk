@@ -31,7 +31,7 @@ import { perfReport } from './perf.js';
 import { mainKeysApi } from './extapi.js';
 import { supportResponse } from './support.js';
 import { guardConfig, setGuardConfig, guardList, guardUnblock, guardIp } from './guard.js';
-import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS } from './carriers.js';
+import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS, grossCost } from './carriers.js';
 import { can, sectionOf } from '../public/perms.js';
 import { exclusive } from './locks.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
@@ -440,7 +440,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (!tn && !r.ref) fail(502, `${c.name} gönderi numarası vermedi`);
     await run(db, `UPDATE packages SET carrier_provider = ?, carrier_ref = ?, carrier_cost = ?, tracking = ?, barcode = ?, cargo_company = ?, tracking_url = ?, desi = ?,
       agreement = 'own', packed_at = COALESCE(packed_at, ?), label_format = ?, label_data = ?, label_at = ?, label_viewed_at = NULL, label_printed_at = NULL, error = NULL WHERE id = ?`,
-    c.id, str(r.ref) || null, r.cost == null ? null : num(r.cost), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
+    c.id, str(r.ref) || null, grossCost(r), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
     t, r.label ? r.label.format : null, r.label ? r.label.data : null, t, pkg.id);
     // ikas: entegratör gönderisi ikas'ta takip bilgili paket olarak açılır ("Kargoya Hazır"); yazılamazsa "Kargoya ver"de yeniden denenir
     let chNote = '';
@@ -454,7 +454,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
       }
     }
     // Entegratörün kargo ücreti siparişin kargo giderine yazılır (elle girilen gider korunur)
-    if (r.cost != null && o.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", num(r.cost), o.id);
+    if (r.cost != null && o.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", grossCost(r), o.id);
     if (o.status === 'new') await setLocalStatus(db, o, 'processing');
     await event(db, o, 'carrier', user, `Paket ${pkg.no}: ${c.name} · ${str(r.carrier) || ''} ${tn}`.trim());
     const fresh = await loadOrder(db, o.id);

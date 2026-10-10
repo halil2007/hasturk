@@ -140,7 +140,7 @@ export function koctas(env, meta) {
     if (!(num(r.lines_in_error) > 0) && r.has_error_report !== true) return { done: true, items: [] };
     const text = String((await call(`/offers/imports/${encodeURIComponent(ref)}/error_report`).catch((e) => { if (e.budget) throw e; return ''; })) || '');
     const lines = text.split(/\r?\n/).filter((x) => x.trim()), sep = (lines[0] || '').includes(';') ? ';' : ',';
-    const head = csvRow(lines[0] || '', sep).map((h) => h.trim().toLowerCase()), ks = head.findIndex((h) => h === 'shop_sku' || h === 'sku' || h === 'offer-sku'), ke = head.findIndex((h) => /error/.test(h));
+    const head = csvRow(lines[0] || '', sep).map((h) => h.trim().toLowerCase()), ks = head.findIndex((h) => h === 'shop_sku' || h === 'sku' || h === 'offer-sku'), ke = ((i) => (i >= 0 ? i : head.findIndex((h) => /error/.test(h) && !/line/.test(h))))(head.findIndex((h) => /error.?message/.test(h)));
     const items = ks < 0 ? [] : lines.slice(1).map((l) => csvRow(l, sep)).map((c) => ({ key: str(c[ks]), ok: false, error: str(ke >= 0 ? c[ke] : '') || 'reddedildi' })).filter((x) => x.key);
     return { done: true, items };
   }

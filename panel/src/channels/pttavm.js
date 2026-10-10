@@ -252,7 +252,7 @@ function pttavmRest(env, meta) {
       const [a, b] = parts.shift();
       const q = new URLSearchParams({ startDate: new Date(a).toISOString(), endDate: new Date(b).toISOString(), isActiveOrders: 'false' });
       const rows = list(await call(`${API}/orders/search?${q}`));
-      if (capped(rows.length) && b - a > 3600e3 && extra > 0) { extra--; const m = a + Math.floor((b - a) / 2); parts.unshift([a, m], [m, b]); continue; }
+      if (capped(rows.length) && b - a > 3600e3 && extra >= 2) { extra -= 2; const m = a + Math.floor((b - a) / 2); parts.unshift([a, m], [m, b]); continue; }
       if (capped(rows.length) && (cut == null || a < cut)) cut = a;
       for (const o of rows) if (o && o.siparisNo) out.set(String(o.siparisNo), normPttOrder(o));
     }

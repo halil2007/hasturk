@@ -1,6 +1,6 @@
 // Ürünler: varyantlar ana ürün altında gruplanır; merkezi stok (her kanala kendi kuralıyla gönderilir), hızlı stok girişi,
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
-import { api, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
+import { api, ek, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
 import { readSheet } from '../sheetread.js';
 import { profit, costOf, costRaw, rateGross } from '../profit.js';
 import { productErrorsSheet } from './listerrs.js';
@@ -501,11 +501,11 @@ export async function productForm(id, done) {
     const r = await api(id ? 'products/' + id : 'products', { method: id ? 'PUT' : 'POST', body: b });
     // Pazaryerlerine gönderim (kategori eşleştirmesi ve zorunlu bilgilerle); sonuç tek mesajda
     const msgs = [], errs = [...(r.errors || [])];
-    if (r.created && r.created.length) msgs.push(`${r.created.map((c) => ch(c).name).join(', ')}'da oluşturuldu`);
+    if (r.created && r.created.length) msgs.push(`${ek(r.created.map((c) => ch(c).name).join(', '), 'da')} oluşturuldu`);
     for (const cid of fd.getAll('upload_on')) {
       try {
         const u = await api('catalog/upload', { method: 'POST', body: { channel: cid, ids: [r.id || id] } });
-        if (u.sent) msgs.push(`${ch(cid).name}'a gönderildi (onay bekleniyor)`);
+        if (u.sent) msgs.push(`${ek(ch(cid).name, 'a')} gönderildi (onay bekleniyor)`);
         else errs.push(`${ch(cid).name}: gönderilemedi — eksik: ${((u.skipped || [])[0] || {}).missing?.join(', ') || 'bilgi'}`);
       } catch (x) { errs.push(`${ch(cid).name}: ${x.message}`); }
     }
