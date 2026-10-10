@@ -13,6 +13,17 @@ import { shopify } from './shopify.js';
 import { woocommerce } from './woocommerce.js';
 import { opencart } from './opencart.js';
 import { etsy } from './etsy.js';
+import { teknosa } from './teknosa.js';
+import { boyner } from './boyner.js';
+import { pasaj } from './pasaj.js';
+import { trendyolgo } from './trendyolgo.js';
+import { getir } from './getir.js';
+import { yemeksepeti } from './yemeksepeti.js';
+import { ebay } from './ebay.js';
+import { ozon } from './ozon.js';
+import { ticimax } from './ticimax.js';
+import { ideasoft } from './ideasoft.js';
+import { tsoft } from './tsoft.js';
 import { demo, DEMO_CHANNELS } from './demo.js';
 import { loadConfig, effectiveEnv, configVersion, EXTRA_RE, TYPES, TYPE_NAMES, BETA_TYPES, isBeta, typeOf, storeEnv, releasedTypes } from '../config.js';
 import { getRaw, setSetting } from '../db.js';
@@ -22,7 +33,7 @@ export const BASE_IDS = ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm', 
 // Geçerli kanal kimlikleri: ana mağazalar + eklenen mağazalar (getChannels her çağrıda günceller)
 export const CHANNEL_IDS = [...BASE_IDS];
 export const isChannelId = (id) => CHANNEL_IDS.includes(id) || EXTRA_RE.test(String(id || ''));
-const FACTORY = { trendyol, hepsiburada, pttavm, n11, idefix, pazarama, amazon, ciceksepeti, koctas, shopify, woocommerce, opencart, etsy };
+const FACTORY = { trendyol, hepsiburada, pttavm, n11, idefix, pazarama, amazon, ciceksepeti, koctas, shopify, woocommerce, opencart, etsy, teknosa, boyner, pasaj, trendyolgo, getir, yemeksepeti, ebay, ozon, ticimax, ideasoft, tsoft };
 const make = (type, e, meta) => (type === 'ikas' ? ikas(e, 'IKAS1_', meta) : FACTORY[type](e, meta));
 // Bekleyen kanallar: bilgileri girilip "Bağlantıyı test et" başarılı olana kadar yalnızca Entegrasyonlar'da görünür;
 // sipariş, ürün, stok ve analiz ekranlarına ve senkrona girmez. Bilgiler değişirse yeniden onay gerekir.

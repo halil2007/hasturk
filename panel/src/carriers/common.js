@@ -69,6 +69,7 @@ const TRACK = {
   ptt: 'https://gonderitakip.ptt.gov.tr/Track/Verify?q={n}',
   kolaygelsin: 'https://esube.kolaygelsin.com/shipments?trackingId={n}&lang=TR',
   ups: 'https://www.ups.com/track?loc=tr_TR&tracknum={n}',
+  dhlexpress: 'https://www.dhl.com/tr-tr/home/tracking.html?tracking-id={n}&submit=1',
   dhl: 'https://kargotakip.dhlecommerce.com.tr/?takipNo={n}',
 };
 const TRACK_ALIAS = { araskargo: 'aras', yurticikargo: 'yurtici', suratkargo: 'surat', hepsijetxl: 'hepsijet', pttkargo: 'ptt', mng: 'dhl', mngkargo: 'dhl', dhlecommerce: 'dhl' };

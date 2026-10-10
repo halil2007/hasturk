@@ -403,16 +403,16 @@ export const DEFAULT_SETTINGS = {
   fx: { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 },
   // Müşteri sorularına hazır cevaplar
   answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
-  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15, amazon: 15, ciceksepeti: 20, koctas: 15, shopify: 0, woocommerce: 0, opencart: 0, etsy: 6.5 },
+  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15, amazon: 15, ciceksepeti: 20, koctas: 15, shopify: 0, woocommerce: 0, opencart: 0, etsy: 6.5, teknosa: 15, boyner: 20, pasaj: 12, trendyolgo: 15, getir: 20, yemeksepeti: 20, ebay: 13, ozon: 15, ticimax: 0, ideasoft: 0, tsoft: 0 },
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Komisyon, kargo, hizmet bedeli ve ek kesinti KDV hariç girilir, hesapta %20 KDV eklenir; true: girilen tutarlar zaten KDV dahil
   costs_vat_incl: false,
   // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Satış tutarının %'si olarak ek kesinti (işlem / ödeme bedeli vb.)
-  fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0, amazon: 0, ciceksepeti: 0, koctas: 0, shopify: 0, woocommerce: 0, opencart: 0, etsy: 3 },
+  fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0, amazon: 0, ciceksepeti: 0, koctas: 0, shopify: 0, woocommerce: 0, opencart: 0, etsy: 3, teknosa: 0, boyner: 0, pasaj: 0, trendyolgo: 0, getir: 0, yemeksepeti: 0, ebay: 0, ozon: 0, ticimax: 0, ideasoft: 0, tsoft: 0 },
   // E-ticaret stopajı %: pazaryeri hakedişten keser (KDV hariç satış üzerinden); kendi siteniz (ikas) için 0
-  withholding: { ikas1: 0, ikas2: 0, trendyol: 1, hepsiburada: 1, pttavm: 1, n11: 1, idefix: 1, pazarama: 1, amazon: 1, ciceksepeti: 1, koctas: 1, shopify: 0, woocommerce: 0, opencart: 0, etsy: 0 },
+  withholding: { ikas1: 0, ikas2: 0, trendyol: 1, hepsiburada: 1, pttavm: 1, n11: 1, idefix: 1, pazarama: 1, amazon: 1, ciceksepeti: 1, koctas: 1, shopify: 0, woocommerce: 0, opencart: 0, etsy: 0, teknosa: 1, boyner: 1, pasaj: 1, trendyolgo: 1, getir: 1, yemeksepeti: 1, ebay: 0, ozon: 0, ticimax: 0, ideasoft: 0, tsoft: 0 },
   // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
   stock_sync: false,
   // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar
