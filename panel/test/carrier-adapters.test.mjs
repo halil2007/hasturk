@@ -8,6 +8,8 @@ import * as dhl from '../src/carriers/dhl.js';
 import * as ptt from '../src/carriers/ptt.js';
 import * as surat from '../src/carriers/surat.js';
 import * as ups from '../src/carriers/ups.js';
+import * as yurtici from '../src/carriers/yurtici.js';
+import * as aras from '../src/carriers/aras.js';
 import { senderPlace } from '../src/carriers.js';
 import { trackUrl } from '../src/carriers/common.js';
 
@@ -264,5 +266,72 @@ test('UPS: oturum → gönderi (il plaka + UPS bölge kodu) → 1Z takip no + PN
     assert.equal(t.state, 'delivered');
     assert.ok(t.deliveredAt > 0);
     await assert.rejects(a.create(ship({ receiver: { ...ship().receiver, district: 'Yokilçe' } })), /UPS bölge listesinde bulunamadı/);
+  } finally { restore(); }
+});
+
+// Yanıtlar Yurtiçi / Aras test sunucularından alınan gerçek yanıtlardır
+const YK = (inner) => soapOk(`<ns1:x xmlns:ns1='http://yurticikargo.com.tr/ShippingOrderDispatcherServices'>${inner}</ns1:x>`);
+test('Yurtiçi: kargo anahtarı (en çok 20) barkod olur; zaten var (60020) kabul edilir; şube kabulünden sonra gönderi kodu ve teslim; iptal', async () => {
+  let created = 0, accepted = false;
+  const calls = mock([[/POST .*ShippingOrderDispatcherServices/, (q) => {
+    if (/createShipment/.test(q.body)) return YK(created++ === 0 ? '<ShippingOrderResultVO><outFlag>0</outFlag><outResult>Başarılı</outResult><count>1</count><jobId>2198836</jobId><shippingOrderDetailVO><cargoKey>K</cargoKey><invoiceKey>K</invoiceKey></shippingOrderDetailVO></ShippingOrderResultVO>'
+      : created === 2 ? '<ShippingOrderResultVO><outFlag>1</outFlag><outResult>Hata Oluştu!!!</outResult><shippingOrderDetailVO><errCode>60020</errCode><errMessage>gönderi sistemde mevcuttur.</errMessage></shippingOrderDetailVO></ShippingOrderResultVO>'
+        : '<ShippingOrderResultVO><outFlag>1</outFlag><outResult>Hata Oluştu!!!</outResult><shippingOrderDetailVO><errCode>82503</errCode><errMessage>RECEIVER_CUST_NAME parametresi min :  5 max : 200 uzunluğunda olmalıdır.</errMessage></shippingOrderDetailVO></ShippingOrderResultVO>');
+    if (/queryShipment/.test(q.body)) return YK(accepted
+      ? '<ShippingDeliveryVO><outFlag>0</outFlag><shippingDeliveryDetailVO><cargoKey>K</cargoKey><operationCode>5</operationCode><operationMessage>Kargo teslim edilmiştir.</operationMessage><operationStatus>DLV</operationStatus><shippingDeliveryItemDetailVO><docId>113456789012</docId><trackingUrl>https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code=113456789012</trackingUrl><deliveryDate>20261012</deliveryDate><deliveryTime>143000</deliveryTime><totalAmount>58.40</totalAmount><returnStatus>1</returnStatus></shippingDeliveryItemDetailVO></shippingDeliveryDetailVO></ShippingDeliveryVO>'
+      : '<ShippingDeliveryVO><outFlag>0</outFlag><shippingDeliveryDetailVO><cargoKey>K</cargoKey><operationCode>0</operationCode><operationMessage>Kargo İşlem Görmemiş.</operationMessage><operationStatus>NOP</operationStatus></shippingDeliveryDetailVO></ShippingDeliveryVO>');
+    if (/cancelShipment/.test(q.body)) return YK('<ShippingOrderResultVO><outFlag>0</outFlag><shippingCancelDetailVO><cargoKey>K</cargoKey><operationStatus>CNL</operationStatus></shippingCancelDetailVO></ShippingOrderResultVO>');
+  }]]);
+  try {
+    assert.equal(yurtici.cargoKey({ channel: 'trendyol', reference: '10839471234567890123-2' }).length, 20);
+    const a = yurtici.make({ YURTICI_USER: 'YKTEST', YURTICI_PASSWORD: 'YK' });
+    const r = await a.create(ship());
+    assert.equal(r.ref, 'TRTRENDYOL10011');
+    assert.equal(r.barcode, r.ref);
+    const b = calls[0].body;
+    assert.match(b, /<ship:createShipment><wsUserName>YKTEST<\/wsUserName><wsPassword>YK<\/wsPassword><userLanguage>TR<\/userLanguage><ShippingOrderVO><cargoKey>TRTRENDYOL10011<\/cargoKey>/);
+    assert.match(b, /<cityName>İstanbul<\/cityName><townName>Kadıköy<\/townName><receiverPhone1>5321234567<\/receiverPhone1>/);
+    assert.equal(calls[0].headers.SOAPAction, '""');
+    assert.equal((await a.create(ship())).ref, 'TRTRENDYOL10011', '60020: aynı gönderi');
+    await assert.rejects(a.create(ship()), /RECEIVER_CUST_NAME/);
+    let t = await a.track({ carrier_ref: r.ref });
+    assert.equal(t.state, 'created');
+    assert.match(calls.at(-1).body, /<wsLanguage>TR<\/wsLanguage><keys>TRTRENDYOL10011<\/keys><keyType>0<\/keyType>/);
+    accepted = true;
+    t = await a.track({ carrier_ref: r.ref });
+    assert.equal(t.state, 'delivered');
+    assert.equal(t.tracking, '113456789012');
+    assert.equal(t.cost, 58.4);
+    assert.equal(t.deliveredAt, Date.parse('2026-10-12T14:30:00+03:00'));
+    await a.cancel(r.ref);
+  } finally { restore(); }
+});
+
+test('Aras: SetOrder (büyük harf entegrasyon kodu + parça barkodu) → Aras etiketi (ZPL) ve takip no; "hazır değil" tekrar denenir; iptal; takip servisi', async () => {
+  let tries = 0;
+  const calls = mock([
+    [/SOAP:tempuri.org\/SetOrder/, () => soapOk('<SetOrderResponse xmlns="http://tempuri.org/"><SetOrderResult><OrderResultInfo><ResultCode>0</ResultCode><ResultMessage>Başarılı</ResultMessage></OrderResultInfo></SetOrderResult></SetOrderResponse>')],
+    [/SOAP:tempuri.org\/GetBarcode/, () => soapOk(tries++ === 0 ? '<GetBarcodeResponse xmlns="http://tempuri.org/"><GetBarcodeResult><Message>barkod basımı için hazır değildir.</Message><ResultCode>1004</ResultCode></GetBarcodeResult></GetBarcodeResponse>'
+      : '<GetBarcodeResponse xmlns="http://tempuri.org/"><GetBarcodeResult><Images><base64Binary>/9j/4AA</base64Binary></Images><ZebraZpl><string>^XA^FD&gt;;1108^FS^XZ</string></ZebraZpl><BarcodeModelLst><BarcodeModel><TrackingNumber>6843848468457</TrackingNumber><Barcode>1108</Barcode></BarcodeModel></BarcodeModelLst><ResultCode>0</ResultCode></GetBarcodeResult></GetBarcodeResponse>')],
+    [/SOAP:tempuri.org\/CancelDispatch/, () => soapOk('<CancelDispatchResponse xmlns="http://tempuri.org/"><CancelDispatchResult><ResultCode>405</ResultCode><ResultMessage>Daha önce iptal işlemi yapılmıştır.</ResultMessage></CancelDispatchResult></CancelDispatchResponse>')],
+    [/SOAP:IArasCargoIntegrationService\/GetQueryJSON/, () => soapOk(`<GetQueryJSONResponse xmlns="http://tempuri.org/"><GetQueryJSONResult>${JSON.stringify({ QueryResult: { Cargo: [{ KARGO_TAKIP_NO: '6843848468457', DURUM_KODU: '6', TIP_KODU: '1', DURUMU: 'TESLİM EDİLDİ', TESLIM_TARIHI: '12.10.2026', TESLIM_SAATI: '10:15' }] } }).replace(/"/g, '&quot;')}</GetQueryJSONResult></GetQueryJSONResponse>`)],
+  ]);
+  try {
+    const a = aras.make({ ARAS_USER: 'neodyum', ARAS_PASSWORD: 'nd2580', ARAS_QUERY_USER: 'q', ARAS_QUERY_PASSWORD: 'qp', ARAS_CUSTOMER_CODE: '1932448851342' });
+    const r = await a.create(ship({ reference: 'abc-1001-1' }));
+    assert.equal(r.ref, 'ABC-1001-1', 'küçük harf kabul edilmez');
+    assert.equal(r.tracking, '6843848468457');
+    assert.equal(r.label.format, 'zpl');
+    assert.equal(r.label.data, '^XA^FD>;1108^FS^XZ');
+    const b = calls[0].body;
+    assert.match(b, /<ReceiverCityName>İSTANBUL<\/ReceiverCityName><ReceiverTownName>KADIKÖY<\/ReceiverTownName>/);
+    assert.match(b, /<PieceCount>1<\/PieceCount>/);
+    assert.match(b, /<BarcodeNumber>ABC1001101<\/BarcodeNumber>/);
+    assert.match(b, /<\/orderInfo><userName>neodyum<\/userName><password>nd2580<\/password>/);
+    await a.cancel(r.ref);
+    const t = await a.track({ carrier_ref: r.ref });
+    assert.equal(t.state, 'delivered');
+    assert.equal(t.tracking, '6843848468457');
+    assert.match(calls.at(-1).body, /&lt;QueryType&gt;39&lt;\/QueryType&gt;/);
   } finally { restore(); }
 });

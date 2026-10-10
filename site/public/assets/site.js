@@ -41,12 +41,13 @@
     ['Ticimax', 'e-ticaret sitesi', '#0b5cff', 'Tx'], ['IdeaSoft', 'e-ticaret sitesi', '#00a3e0', 'iS'], ['T-Soft', 'e-ticaret sitesi', '#e30613', 'TS'],
   ];
   // Kargo: entegratörler (altyapı hazır, firmaların API'si bağlanınca açılır) ve doğrudan bağlanacak kargo firmaları
+  // Kargo: bağlı firmalar (Kurumsal pakette) ve yakında gelecekler
   const CARGO = [
-    ['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü · yurt içi ve yurt dışı', '#1d4ed8', 'N'],
     ['Yurtiçi Kargo', 'kargo firması', '#004a99', 'Y'], ['Aras Kargo', 'kargo firması', '#e30613', 'A'], ['DHL eCommerce', 'kargo firması', '#d40511', 'D'],
-    ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'],
-    ['HepsiJET', 'kargo firması', '#ff6000', 'hj'], ['Kolay Gelsin', 'kargo firması', '#00a651', 'KG'], ['Sendeo', 'kargo firması', '#6c2bd9', 'Sd'], ['DHL Express', 'kargo firması', '#ffcc00', 'DHL'],
+    ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'], ['HepsiJET', 'kargo firması', '#ff6000', 'hj'],
+    ['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N'],
   ];
+  const CARGO_SOON = [['Kolay Gelsin', 'kargo firması', '#00a651', 'KG'], ['Sendeo', 'kargo firması', '#6c2bd9', 'Sd'], ['DHL Express', 'kargo firması', '#ffcc00', 'DHL']];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
@@ -60,7 +61,7 @@
     $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.filter((x) => !TEST.has(x[5])).length; });
     $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
     $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
-    $$('[data-integ="cargo"]').forEach((el) => { el.innerHTML = integ(CARGO, true); });
+    $$('[data-integ="cargo"]').forEach((el) => { el.innerHTML = integ(CARGO, false) + integ(CARGO_SOON, true); });
     // Derlenmiş sayfalardaki "Test aşamasında" etiketleri (menü, kartlar, kanal sayfası): testi biten türde kalkar, yerine "Aktif entegrasyon"
     $$('[data-beta]').forEach((el) => { if (!TEST.has(el.dataset.beta)) el.remove(); });
     $$('[data-beta-on]').forEach((el) => { el.hidden = TEST.has(el.dataset.betaOn); });

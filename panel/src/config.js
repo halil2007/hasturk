@@ -66,10 +66,15 @@ export const FIELDS = {
     { k: 'SURAT_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test (prova)']] },
   ],
   yurtici: [
-    { k: 'YURTICI_USER', label: 'Web servis kullanıcı adı (wsUserName)', req: true }, { k: 'YURTICI_PASSWORD', label: 'Web servis şifresi (wsPassword)', secret: true, req: true },
-    { k: 'YURTICI_USER_COD', label: 'Alıcı ödemeli kullanıcı adı', adv: true, hint: 'Yurtiçi alıcı ödemeli gönderi için ayrı kullanıcı verdiyse' }, { k: 'YURTICI_PASSWORD_COD', label: 'Alıcı ödemeli şifre', secret: true, adv: true },
+    { k: 'YURTICI_USER', label: 'Web servis kullanıcı adı (wsUserName)', req: true, hint: 'Gönderici ödemeli kullanıcı' }, { k: 'YURTICI_PASSWORD', label: 'Web servis şifresi (wsPassword)', secret: true, req: true },
+    { k: 'YURTICI_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test']] },
   ],
-  aras: [{ k: 'ARAS_USER', label: 'Kullanıcı adı', req: true }, { k: 'ARAS_PASSWORD', label: 'Şifre', secret: true, req: true }, { k: 'ARAS_CUSTOMER_CODE', label: 'Müşteri kodu', req: true }],
+  aras: [
+    { k: 'ARAS_USER', label: 'Kullanıcı adı', req: true, hint: 'Sevkiyat entegrasyonu (SetOrder) kullanıcısı' }, { k: 'ARAS_PASSWORD', label: 'Şifre', secret: true, req: true },
+    { k: 'ARAS_QUERY_USER', label: 'Takip servisi kullanıcı adı', hint: 'Kargo durumu için: esasweb → Entegrasyon → XML Servisleri' }, { k: 'ARAS_QUERY_PASSWORD', label: 'Takip servisi şifresi', secret: true },
+    { k: 'ARAS_CUSTOMER_CODE', label: 'Müşteri kodu', hint: 'Takip servisi için' },
+    { k: 'ARAS_ENV', label: 'Ortam', adv: true, choices: [['', 'Canlı'], ['test', 'Test']] },
+  ],
   ups: [
     { k: 'UPS_CUSTOMER_NO', label: 'Müşteri numarası', req: true }, { k: 'UPS_USER', label: 'Kullanıcı adı', req: true }, { k: 'UPS_PASSWORD', label: 'Şifre', secret: true, req: true },
     { k: 'UPS_QUERY_USER', label: 'Takip kullanıcı adı', adv: true, hint: 'UPS takip servisi için ayrı kullanıcı verdiyse' }, { k: 'UPS_QUERY_PASSWORD', label: 'Takip şifresi', secret: true, adv: true },

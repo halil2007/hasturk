@@ -21,6 +21,8 @@ import * as dhl from './carriers/dhl.js';
 import * as ptt from './carriers/ptt.js';
 import * as surat from './carriers/surat.js';
 import * as ups from './carriers/ups.js';
+import * as yurtici from './carriers/yurtici.js';
+import * as aras from './carriers/aras.js';
 
 export const CARRIERS = {
   kargonomi: {
@@ -43,15 +45,15 @@ export const CARRIERS = {
     about: 'PTT Kargo kurumsal gönderi: barkod, veri yükleme ve takip.', howto: 'PTT Kargo bölge müdürlüğünüzden müşteri numarası, web servis şifresi ve barkod aralığı (12 haneli başlangıç / bitiş) isteyin. Etikete basılan barkod şubede okutulunca gönderi kabul edilir.' },
   surat: { id: 'surat', kind: 'direct', name: 'Sürat Kargo', site: 'https://www.suratkargo.com.tr', ready: true, color: '#e30613',
     about: 'Sürat Kargo web servisiyle gönderi (ön kabul) ve takip.', howto: 'Sürat Kargo şubenizden cari kodunuzu ve web servis şifresini isteyin. Gönderiyi panelden iptal etmek ve Sürat etiketi almak için e-Sürat → profil → Web Servis Şifre bölümünde belirlediğiniz şifreyi de girin.' },
-  yurtici: { id: 'yurtici', kind: 'direct', name: 'Yurtiçi Kargo', site: 'https://www.yurticikargo.com', ready: false, color: '#1d3e8c',
-    about: 'Yurtiçi Kargo web servisiyle gönderi, barkod ve takip.', howto: 'Yurtiçi Kargo şubenizden web servis (wsUserName / wsPassword) bilgilerinizi isteyin; gönderici ve alıcı ödemeli için ayrı kullanıcı verilebilir.' },
-  aras: { id: 'aras', kind: 'direct', name: 'Aras Kargo', site: 'https://www.araskargo.com.tr', ready: false, color: '#c8102e',
-    about: 'Aras Kargo web servisiyle gönderi, barkod ve takip.', howto: 'Aras Kargo şubenizden entegrasyon kullanıcı adı, şifre ve müşteri kodunuzu isteyin.' },
+  yurtici: { id: 'yurtici', kind: 'direct', name: 'Yurtiçi Kargo', site: 'https://www.yurticikargo.com', ready: true, color: '#1d3e8c',
+    about: 'Yurtiçi Kargo web servisiyle gönderi ve takip: etikete basılan barkod şubede okutulunca Yurtiçi gönderi kodu verilir.', howto: 'Yurtiçi Kargo şubenizden gönderici ödemeli web servis kullanıcı adı ve şifresi (wsUserName / wsPassword) isteyin.' },
+  aras: { id: 'aras', kind: 'direct', name: 'Aras Kargo', site: 'https://www.araskargo.com.tr', ready: true, color: '#c8102e',
+    about: 'Aras Kargo web servisiyle gönderi, Aras etiketi (barkod yetkili hesaplarda) ve takip.', howto: 'Aras Kargo şubenizden ya da entegrasyon ekibinden (entegrasyonekibi@araskargo.com.tr) sevkiyat entegrasyonu kullanıcı adı ve şifresi isteyin. Kargo durumu takibi için esasweb.araskargo.com.tr → Tanımlamalar → Entegrasyon → XML Servisleri bölümünden kullanıcı oluşturup müşteri kodunuzla girin.' },
   ups: { id: 'ups', kind: 'direct', name: 'UPS Kargo', site: 'https://www.ups.com.tr', ready: true, color: '#351c15',
     about: 'UPS Türkiye web servisiyle yurt içi gönderi, etiket ve takip.', howto: 'UPS Türkiye satış temsilcinizden müşteri numarası ve web servis kullanıcı adı / şifresi isteyin (takip için ayrı kullanıcı verildiyse onu da girin).' },
 };
 // Firma bağlantıları (make(values, { db }) → { test, create, cancel, track, label })
-const MODULES = { kargonomi, navlungo, hepsijet, dhl, ptt, surat, ups };
+const MODULES = { kargonomi, navlungo, hepsijet, dhl, ptt, surat, ups, yurtici, aras };
 export const CARRIER_IDS = Object.keys(CARRIERS);
 export const isCarrierId = (id) => CARRIER_IDS.includes(id) || id === 'demo';
 
