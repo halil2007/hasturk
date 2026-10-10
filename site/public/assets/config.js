@@ -30,7 +30,7 @@ window.SITE = {
   // Google Ads etiketi: id (AW-…). Dönüşüm etiketleri (Google Ads → Dönüşümler → işlem → "Etiketi kendiniz yükleyin" →
   // send_to: 'AW-…/ETİKET' içindeki ETİKET kısmı) girilirse tutar ve sipariş no ile dönüşüm gönderilir; boşken Google'da
   // "URL içerir /odeme-basarili" kuralıyla dönüşüm tanımlanabilir. Etiket ve çerez onayı: assets/gtag.js
-  ads: { id: 'AW-18503315802', purchase: '', lead: '' },
+  ads: { id: 'AW-18503315802', trial: '', contact: '', purchase: '', lead: '' },  // etiketler asıl olarak panelden (Ayarlar → Google Ads) okunur
   // Google Analytics 4 ölçüm kimliği (G-…): aynı Google etiketi ve aynı çerez onayıyla çalışır
   analytics: 'G-TL715957RJ',
   // Havale / EFT: satın alma sayfasında "Havale / EFT" seçilince gösterilir (panel/src/billing.js → bankOf ile aynı tutun)

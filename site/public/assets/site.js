@@ -265,6 +265,7 @@
       }
       form.reset(); if (topicSel) topicSel.value = raw;
       say('ok', 'Teşekkürler! Mesajınız bize ulaştı, en kısa sürede dönüş yapacağız.');
+      if (window.hcConversion) window.hcConversion('lead', 'generate_lead', { form: raw });
       if (raw === 'demo' && j.demo) msg.insertAdjacentHTML('beforeend', ` <a href="${esc(j.demo)}" target="_blank" rel="noopener">Demo panelini şimdi açın →</a>`);
     } catch (x) {
       say('err', `${x.message || 'Gönderilemedi'}.${get('company.phone') ? ` Dilerseniz ${get('company.phone')} numarasından ulaşabilirsiniz.` : ''}`);
@@ -301,7 +302,7 @@
       $('[data-t-link]', ok).href = j.url;
       $$(':scope > :not([data-trial-ok])', form).forEach((x) => { x.hidden = true; });
       ok.hidden = false; form.classList.add('done');
-      if (window.gtag) try { window.gtag('event', 'sign_up', { method: 'trial' }); } catch { /* yok */ }
+      if (window.hcConversion) window.hcConversion('trial', 'sign_up', { method: 'trial' });
     } catch (x) {
       say('err', `${x.message || 'Panel açılamadı'}.${get('company.phone') ? ` Dilerseniz ${get('company.phone')} numarasından ulaşabilirsiniz.` : ''}`.replace('..', '.'));
     } finally { btn.disabled = false; cfReset(form); }

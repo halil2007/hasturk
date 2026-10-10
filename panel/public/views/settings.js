@@ -40,7 +40,7 @@ export async function settingsView(el) {
   }
   let tab = 'firma';
   try { tab = sessionStorage.getItem('settings_tab') || 'firma'; } catch { /* yok */ }
-  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(locked('fx') ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ...(state.tenant || !admin ? [] : [['api', 'Stok API', 'link']]), ['kayit', 'İşlem kayıtları', 'orders'], ['gorunum', 'Görünüm', 'bolt']];
+  const STABS = [['firma', 'Firma', 'user'], ['stok', 'Stok', 'db'], ['giderler', 'Komisyon ve giderler', 'calc'], ...(locked('fx') ? [] : [['doviz', 'Döviz', 'tag']]), ['bildirim', 'Bildirimler', 'bell'], ['etiket', 'Kargo etiketi', 'print'], ...(state.tenant || !admin ? [] : [['api', 'Stok API', 'link'], ['reklam', 'Google Ads', 'bolt']]), ['kayit', 'İşlem kayıtları', 'orders'], ['gorunum', 'Görünüm', 'bolt']];
   el.addEventListener('click', (e) => { const b = e.target.closest('[data-st]'); if (b) showTab(b.dataset.st); });
   const load = async () => { await load0(); drawPush(); };
   async function load0() {
@@ -166,6 +166,16 @@ export async function settingsView(el) {
       </div>
       ${admin ? html`<div class="savebar" data-savebar><span class="muted small" data-savehint>Değişiklikleri kaydetmeyi unutmayın.</span><span class="spacer"></span><button class="btn primary lg" data-act="save">Kaydet</button></div>` : ''}
 
+      ${!state.tenant && admin ? html`<div class="card stack" data-stab="reklam">
+        <h2>Google Ads dönüşümleri</h2>
+        <div class="muted small">Tanıtım sitesinde (hasturkcrm.com) şu işlemler Google Ads'e dönüşüm olarak bildirilir; böylece hangi reklamın, hangi anahtar kelimenin müşteri getirdiğini Google Ads'te görürsünüz ve otomatik teklif doğru çalışır. Girdiğiniz etiket birkaç dakika içinde sitede kullanılmaya başlar.</div>
+        <div class="notice small"><i class="ico ico-key"></i><div><b>Etiket nereden alınır?</b> Google Ads → <b>Hedefler → Dönüşümler → Özet → + Yeni dönüşüm işlemi → Web sitesi</b> → alan adı: hasturkcrm.com → <b>“Dönüşüm işlemlerini manuel olarak oluşturun”</b>. İşlem adını (ör. “Deneme kaydı”) ve kategoriyi (Kaydol / Potansiyel müşteri / Satın alma) seçip kaydedin. Ardından <b>“Etiketi kendiniz yükleyin”</b> → olay snippet'inde <code>send_to: 'AW-18503315802/<b>XXXXXXXX</b>'</code> yazar: eğik çizgiden sonraki <b>XXXXXXXX</b> kısmını aşağıya yapıştırın (tamamını yapıştırsanız da olur). Google etiketi sitede zaten yüklü; başka bir şey eklemenize gerek yok.</div></div>
+        <div class="form-grid">
+          ${[['trial', 'Deneme kaydı (7 gün ücretsiz deneme formu)', 'Kategori: Kaydol · en önemli dönüşüm'], ['lead', 'İletişim formu gönderimi', 'Kategori: Potansiyel müşteri formu gönderimi'], ['purchase', 'Kartla satın alma', 'Kategori: Satın alma · tutar ve sipariş no ile'], ['eft', 'Havale / EFT siparişi', 'Kategori: Satın alma (ödeme onayı sonra gelir)']]
+            .map(([k, t, h]) => html`<label class="field"><span>${t}</span><input class="input" data-adsconv="${k}" value="${(st.ads_conv || {})[k] || ''}" placeholder="ör. AbC1dEfGhIjK" autocomplete="off"><small class="muted">${h}</small></label>`)}
+        </div>
+        <div class="row wrap"><span class="muted small" style="flex:1">Boş bırakılan işlem yalnız Google Analytics'e olay olarak gider.</span><button class="btn primary" data-act="ads-save">Kaydet</button></div>
+      </div>` : ''}
       ${!state.tenant && admin ? html`<div class="card stack" data-stab="api" data-apibox><div class="empty"><i class="ico ico-sync spin"></i></div></div>` : ''}
       <div class="card flush" data-stab="kayit"><div class="card-pad row"><h2 style="flex:1">İşlem kayıtları</h2>${admin && state.demo ? html`<button class="btn sm ghost danger" data-act="purge">Örnek (demo) verileri temizle</button>` : ''}<a class="btn sm ghost" href="#/bildirimler">Bildirimler</a></div>
         <div class="table-wrap" style="max-height:380px;overflow:auto"><table class="t"><tbody>
@@ -292,6 +302,7 @@ export async function settingsView(el) {
     'push-on': (t) => busy(t, async () => { await enablePush(); toast('Bildirimler bu cihazda açıldı'); await drawPush(); }),
     'push-off': (t) => busy(t, async () => { await disablePush(); toast('Bildirimler bu cihazda kapatıldı'); await drawPush(); }),
     'push-test': (t) => busy(t, async () => { const r = await api('push/test', { method: 'POST' }); toast(r.sent ? `Deneme bildirimi gönderildi (${r.sent} cihaz)` : 'Bildirim açık cihaz yok'); }),
+    'ads-save': (t) => busy(t, async () => { const ads_conv = {}; $$('[data-adsconv]', el).forEach((i) => { ads_conv[i.dataset.adsconv] = i.value.trim(); }); state.settings = await api('settings', { method: 'PUT', body: { ads_conv } }); toast('Google Ads dönüşüm etiketleri kaydedildi'); }),
     'mail-save': (t) => busy(t, async () => { await saveMail(); toast('Bildirim ayarları kaydedildi'); await load(); }),
     'digest-test': (t) => busy(t, async () => { await saveMail(); const r = await api('digest/test', { method: 'POST' }); toast(r.message); }),
     'mail-test': (t) => busy(t, async () => { await saveMail(); const r = await api('mail/test', { method: 'POST' }); toast(r.message); }),

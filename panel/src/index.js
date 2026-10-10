@@ -1,7 +1,7 @@
 // Satış paneli Worker'ı: /api/* → panel API'si, diğer adresler → public/ (panel arayüzü).
 // Zamanlanmış görev (wrangler.jsonc → triggers): 15 dakikada bir tüm kanalları senkronlar.
 // Müşteri panelleri (tenants.js): firma koduyla giriş yapan müşterinin istekleri kendi Durable Object'ine iletilir.
-import { init } from './db.js';
+import { init, getSettings } from './db.js';
 import { syncAll, quickSync } from './sync.js';
 import { handle, report5xx } from './handler.js';
 import { PerfBuffer } from './perf.js';
@@ -28,6 +28,15 @@ async function publicChannels(req, env) {
   let rel = [];
   try { if (env.DB) { await init(env.DB); rel = await releasedTypes(env, env.DB); } } catch (e) { console.error('kanal listesi', e); }
   return json({ released: rel, beta: BETA_TYPES.filter((t) => !rel.includes(t)) }, 200, h);
+}
+
+// Tanıtım sitesi için Google Ads dönüşüm etiketleri (Ayarlar → Google Ads'ten girilir; gizli bilgi değildir, sayfada da görünür)
+async function publicAds(req, env) {
+  const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');
+  const h = { Vary: 'Origin', 'Cache-Control': 'public, max-age=300, s-maxage=300', ...(siteOrigins(env).includes(origin) ? { 'Access-Control-Allow-Origin': origin } : {}) };
+  let a = {};
+  try { if (env.DB) { await init(env.DB); a = (await getSettings(env.DB)).ads_conv || {}; } } catch (e) { console.error('ads etiketleri', e); }
+  return json({ trial: a.trial || '', lead: a.lead || '', purchase: a.purchase || '', eft: a.eft || '' }, 200, h);
 }
 
 // Tarayıcı güvenlik başlıkları (panel sayfaları): yalnız kendi betiğimiz çalışır, panel başka sitede çerçeve içinde açılamaz,
@@ -74,6 +83,7 @@ export default {
     if (path === 'public/blog' || path.startsWith('public/blog/')) return await blogPublic(req, env, path);
     // Tanıtım sitesi: "Test aşamasında" etiketi kaldırılan kanal türleri (released) ve hâlâ test aşamasında olanlar (beta)
     if (path === 'public/channels' && req.method === 'GET') return await publicChannels(req, env);
+    if (path === 'public/ads' && req.method === 'GET') return await publicAds(req, env);
     // Tanıtım sitesi: bot doğrulaması (Turnstile) açıksa site anahtarı; formlar kutucuğu buna göre gösterir
     if (path === 'public/captcha' && req.method === 'GET') {
       const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');
