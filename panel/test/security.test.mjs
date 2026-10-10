@@ -8,17 +8,12 @@ import { tenantEnv } from '../src/tenants.js';
 const PLATFORM = { MAIL_PROVIDER: 'smtp', MAIL_SMTP_HOST: 'smtp.platform.com', MAIL_SMTP_USER: 'bildirim@platform.com', MAIL_SMTP_PASS: 'platform-sifre', HB_PROXY_URL: 'https://proxy.platform.com', HB_PROXY_KEY: 'platform-anahtar', HB_USER_AGENT: 'hasturk' };
 const tenant = (extra = {}) => ({ TENANT_SLUG: 'firma', PLATFORM_KEYS: Object.keys(PLATFORM).join(','), ...PLATFORM, ...extra });
 
-test('müşteri tek bir e-posta alanını değiştirirse platformun e-posta şifresi kullanılmaz', () => {
-  const e = effectiveEnv(tenant(), { mail: { values: { MAIL_SMTP_HOST: 'evil.example' } } });
-  assert.equal(e.MAIL_SMTP_HOST, 'evil.example');
-  assert.equal(e.MAIL_SMTP_PASS, undefined, 'platform şifresi saldırganın sunucusuna gitmez');
-  assert.equal(e.MAIL_SMTP_USER, undefined);
-  assert.equal(e.HB_PROXY_KEY, 'platform-anahtar', 'diğer grup etkilenmez');
-  // Müşteri hiçbir şey girmediyse platform servisi kullanılır
+test('müşteri panelinde e-posta servisi ayarı yok sayılır: e-postalar yalnız platformun adresinden', () => {
+  const e = effectiveEnv(tenant(), { mail: { values: { MAIL_SMTP_HOST: 'evil.example', MAIL_FROM: 'kendi@firma.com' } } });
+  assert.equal(e.MAIL_SMTP_HOST, 'smtp.platform.com', 'saldırganın sunucusuna gitmez');
+  assert.equal(e.MAIL_FROM, undefined, 'müşterinin kendi adresi kullanılmaz');
+  assert.equal(e.MAIL_SMTP_PASS, 'platform-sifre');
   assert.equal(effectiveEnv(tenant(), {}).MAIL_SMTP_PASS, 'platform-sifre');
-  // Kendi servisini tam girerse kendi bilgileri
-  const own = effectiveEnv(tenant(), { mail: { values: { MAIL_PROVIDER: 'brevo', MAIL_API_KEY: 'kendi', MAIL_FROM: 'a@b.co' } } });
-  assert.deepEqual([own.MAIL_PROVIDER, own.MAIL_API_KEY, own.MAIL_SMTP_PASS], ['brevo', 'kendi', undefined]);
 });
 
 test('Hepsiburada aracı adresi değiştirilirse platform anahtarı gönderilmez', () => {
