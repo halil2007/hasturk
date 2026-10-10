@@ -94,10 +94,10 @@ export function ticimax(env, meta = {}) {
       const qty = num(txt(u, 'Adet'), 1) || 1;
       // DOĞRULA: Tutar birim fiyat (KDV hariç), KdvTutari birim KDV kabul edildi (SaveSiparis örneklerindeki kullanım); toplam = (Tutar + KdvTutari) × Adet
       const unit = r2(num(txt(u, 'Tutar')) + num(txt(u, 'KdvTutari')));
-      const durum = txt(u, 'DurumAd');
+      const durum = txt(u, 'DurumAd').toLocaleLowerCase('tr'); // "İptal" küçük harfe Türkçe kuralla (İ → i)
       const imgs = imageList([txt(u, 'ResimYolu')]);
       return { lineId: txt(u, 'ID'), sku: txt(u, 'StokKodu'), barcode: txt(u, 'Barkod'), name: txt(u, 'UrunAdi'), image: imgs[0] || '', quantity: qty,
-        unitPrice: unit, total: r2(unit * qty), status: /iptal/i.test(durum) ? 'cancelled' : /iade/i.test(durum) && !/talep/i.test(durum) ? 'returned' : '', remoteKey: txt(u, 'UrunID') };
+        unitPrice: unit, total: r2(unit * qty), status: /iptal/.test(durum) ? 'cancelled' : /iade/.test(durum) && !/talep/.test(durum) ? 'returned' : '', remoteKey: txt(u, 'UrunID') };
     });
     const d = num(txt(o, 'Durum'), 1), name = txt(adr, 'AliciAdi');
     const customer = txt(o, 'AdiSoyadi') || [txt(o, 'UyeAdi'), txt(o, 'UyeSoyadi')].filter(Boolean).join(' ') || name;
