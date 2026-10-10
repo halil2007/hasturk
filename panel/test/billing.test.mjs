@@ -429,6 +429,25 @@ test('bekleyen ek mağaza / yükseltme siparişi, araya yenileme girerse uygulan
   } finally { s.restore(); }
 });
 
+test('araya ödeme girerse bekleyen yenileme siparişi uygulanmaz (ucuz paketle aktif olup eski Kurumsal siparişi ödeme)', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await s.owner('/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'sirali', name: 'Sıralı', admin_username: 'ozan', admin_password: 'gizli-sifre-9', plan: 'Başlangıç', email: 'ozan@ornek.com', trial: true, welcome: false }) });
+    await run(s.env.DB, "UPDATE tenants SET expires_at = ?, trial = 1 WHERE slug = 'sirali'", Date.now() + 3 * 864e5); // denemede: her paket alınabilir
+    const lg = await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'sirali', username: 'ozan', password: 'gizli-sifre-9' }) }); assert.equal(lg.status, 200, await lg.clone().text());
+    assert.equal((await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', period: 'yearly', ...buyer }) })).status, 200); // tok-1 bekletilir
+    assert.equal((await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', period: 'yearly', ...buyer }) })).status, 200);
+    ok(s.iyz, '9900.00'); await s.callback('tok-2');
+    ok(s.iyz, '39900.00');
+    assert.match(await (await s.callback('tok-1')).text(), /otomatik tamamlanamadı/);
+    const t = await first(s.env.DB, "SELECT plan FROM tenants WHERE slug = 'sirali'");
+    assert.equal(t.plan, 'Başlangıç');
+    assert.equal((await first(s.env.DB, "SELECT status FROM sales_orders WHERE token = 'tok-1'")).status, 'error');
+  } finally { s.restore(); }
+});
+
 test('üst pakete geçiş: aylık abonelikte aylık fark (30 gün üzerinden); denemede kapalı', async () => {
   resetChannels();
   const s = setup();

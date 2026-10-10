@@ -34,3 +34,10 @@ test('ana panelin kanal / kargo / servis bilgileri müşteri paneline geçmez', 
   for (const k of ['AMAZON_REFRESH_TOKEN', 'ARAS_PASSWORD', 'YURTICI_PASSWORD', 'WOO_SECRET', 'ANTHROPIC_API_KEY', 'SHOPIFY_TOKEN', 'KOCTAS_API_KEY']) assert.equal(out[k], undefined, k);
   assert.equal(out.TURNSTILE_SITE_KEY, 't');
 });
+
+test('oturum çerezine fazladan bölüm eklenemez (süresi dolmuş firmada destek oturumu taklidi)', async () => {
+  const { currentUser } = await import('../src/auth.js');
+  const env = { PANEL_SECRET: 's'.repeat(32), TENANT_SLUG: 'firma' };
+  const req = new Request('https://p.test/api/me', { headers: { Cookie: 'hp_session=' + encodeURIComponent('firma~5.' + (Date.now() + 864e5) + '.abc.~-1.x') } });
+  assert.equal(await currentUser(req, env, null), null);
+});

@@ -87,7 +87,7 @@ async function freeSlug(db, firm, now) {
     const s = i === 0 ? base : i < 20 ? `${base}-${i + 1}` : `${base}-${crypto.getRandomValues(new Uint16Array(1))[0] % 9000 + 1000}`;
     if (s === 'demo') continue;
     const taken = await first(db, 'SELECT 1 AS x FROM tenants WHERE slug = ?', s)
-      || await first(db, "SELECT 1 AS x FROM sales_orders WHERE kind = 'new' AND slug = ? AND ((status = 'pending' AND created_at > ?) OR status = 'eft')", s, now - 3600e3);
+      || await first(db, "SELECT 1 AS x FROM sales_orders WHERE kind = 'new' AND slug = ? AND ((status = 'pending' AND created_at > ?) OR (status = 'eft' AND created_at > ?))", s, now - 3600e3, now - 14 * 864e5);
     if (!taken) return s;
   }
   fail(500, 'Firma kodu oluşturulamadı; lütfen tekrar deneyin');
@@ -183,7 +183,7 @@ export async function publicCheckout(req, env) {
       checkDowngrade(t, p.plan);
       const buyer = buyerOf({ ...b, firm: t.name }, ip), extra = renewExtras(t, p.plan);
       if (extra) p.amount = Math.round((p.amount + extraRenewAmount(extra, p.months)) * 100) / 100;
-      order = { id: newId(), kind: 'renew', slug: t.slug, plan: p.plan, period: p.period, amount: p.amount, qty: extra, buyer: JSON.stringify(buyer) };
+      order = { id: newId(), kind: 'renew', slug: t.slug, plan: p.plan, period: p.period, amount: p.amount, qty: extra, snap: snapOf(t), buyer: JSON.stringify(buyer) };
     } else {
       const firm = str(b.firm).trim().slice(0, 120);
       if (firm.length < 2) fail(400, 'Firma / mağaza adını yazın');
@@ -195,8 +195,8 @@ export async function publicCheckout(req, env) {
     }
     // Havale / EFT: sipariş "havale bekleniyor" olarak kaydedilir (yıllıkta indirimli tutar); ödeme gelince ana panel → Firmalar'dan onaylanır
     if (eft) order.amount = eftAmount(p);
-    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, username, pass_hash, pass_tmp, origin, created_at, updated_at, qty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      order.id, order.kind, order.slug, order.plan, order.period, order.amount, eft ? 'eft' : 'pending', order.buyer, order.username || null, order.pass_hash || null, order.pass_tmp || null, origin, now, now, order.qty || null);
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, username, pass_hash, pass_tmp, origin, created_at, updated_at, qty, snap) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      order.id, order.kind, order.slug, order.plan, order.period, order.amount, eft ? 'eft' : 'pending', order.buyer, order.username || null, order.pass_hash || null, order.pass_tmp || null, origin, now, now, order.kind === 'renew' ? order.qty || 0 : order.qty || null, order.snap || null);
     if (eft) return json(await eftOrder(env, order, p, panel), 200, h);
     return json(await start(env, env.DB, order, panel), 200, h);
   } catch (e) {
@@ -296,8 +296,8 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     const extra = renewExtras(rec, p.plan);
     if (extra) p.amount = Math.round((p.amount + extraRenewAmount(extra, p.months)) * 100) / 100;
     const now = Date.now(), order = { id: newId(), kind: 'renew', slug: rec.slug, plan: p.plan, period: p.period, amount: p.amount, qty: extra, buyer: JSON.stringify(buyer) };
-    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, qty) VALUES (?, 'renew', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?, ?)`,
-      order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now, extra || null);
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, qty, snap) VALUES (?, 'renew', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?, ?, ?)`,
+      order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now, extra, snapOf(rec));
     return start(env, env.DB, order, origin);
   }
   fail(404, 'Bulunamadı');
@@ -359,6 +359,8 @@ async function complete(env, order, panel, { method, note, res = {} }) {
     }
     // Yenileme: dönem / ücret ve mağaza sınırı yeni pakete göre (ödenen ek mağazalar paketin sınırının üstüne); özellikler pakete göre açılır / kapanır
     if (order.kind !== 'new') {
+      // Sipariş verildikten sonra abonelik değiştiyse (araya başka yenileme / yükseltme girdi) paket kuralları ve ek mağaza tutarı geçersizdir: elle incelenir
+      if (snapStale(order, await getTenant(env.DB, slug, true))) throw new Error('sipariş verildikten sonra abonelik değişti (araya başka yenileme / yükseltme girdi); paket ve tutar elle kontrol edilmeli');
       const cur = await getTenant(env.DB, slug, true), extra = order.qty != null ? Number(order.qty) || 0 : renewExtras(cur, order.plan);
       await run(env.DB, 'UPDATE tenants SET period = ?, fee = ?, max_stores = ?, updated_at = ? WHERE slug = ?', p.period, PLANS[order.plan][p.period], extra ? PLANS[order.plan].stores + extra : null, Date.now(), slug).catch(() => {});
     }
