@@ -11,11 +11,13 @@ export const PLANS = {
   kurumsal: { name: 'Kurumsal', stores: 25, users: 0, monthly: 3990, yearly: 39900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles', 'stockapi', 'fx', 'carrier'],
     soon: ['e-Fatura / e-Arşiv entegrasyonu'] },
 };
-// Ek mağaza: paketteki mağaza sınırının üstüne, mağaza başına aylık ücret (TL, KDV dahil). Abonelik bitişine kadar kalan ay için
-// tek seferde alınır (en az 1 ay); yenilemede paket ücretine eklenir. Fiyatı buradan değiştirin.
-export const EXTRA_STORE = { monthly: 199, max: 50 };
-export const monthsLeft = (expiresAt, now = Date.now()) => Math.max(1, Math.ceil(((Number(expiresAt) || now) - now) / (30 * 864e5)));
-export const extraStoreAmount = (qty, months) => Math.round(EXTRA_STORE.monthly * qty * months * 100) / 100;
+// Ek mağaza: paketteki mağaza sınırının üstüne, mağaza başına YILLIK ücret (TL, KDV dahil). Lisansın bitişine kalan gün kadar
+// tek seferde alınır (gün hesabı: yıllık ücret × kalan gün / 365, en az 1 gün); paket yenilemesinde yenilenen süre kadar (ay / 12)
+// paket ücretine eklenir. Fiyatı buradan değiştirin.
+export const EXTRA_STORE = { yearly: 3000, max: 50 };
+export const daysLeft = (expiresAt, now = Date.now()) => Math.max(1, Math.ceil(((Number(expiresAt) || now) - now) / 864e5));
+export const extraStoreAmount = (qty, days) => Math.round((EXTRA_STORE.yearly * qty * days / 365) * 100) / 100;
+export const extraRenewAmount = (qty, months) => Math.round((EXTRA_STORE.yearly * qty * months / 12) * 100) / 100;
 // soon: pakete eklenecek, henüz aktif olmayan özellikler (Paketim'de "Yakında" olarak görünür; hiçbir özelliği açmaz)
 export const INSTALLMENTS_YEARLY = [1, 2, 3];
 // Havale / EFT ile ödemede indirim (%): yalnız yıllık alımda (aylıkta havale / EFT tam fiyatla)

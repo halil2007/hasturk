@@ -51,7 +51,7 @@ function card(p, feat = false) {
 </article>`;
 }
 const ctaBand = `<section class="sec alt"><div class="wrap"><div class="ask big"><div><b>Pazaryeri satışlarınızı tek panelden yönetin</b><span>Siparişler, kargo etiketleri, stok ve kârlılık tek ekranda. Kayıt olmadan demo panelini açın; beğenirseniz 7 gün ücretsiz kullanın.</span></div>
-  <div class="ctas"><a class="btn btn-primary" data-demo href="/demo">Canlı demoyu açın ${ico('i-arrow')}</a><a class="btn btn-outline" data-call href="/iletisim">${ico('i-phone')}Hemen arayın</a></div></div></div></section>`;
+  <div class="ctas"><a class="btn btn-primary" data-demo href="/demo">Canlı demoyu açın ${ico('i-arrow')}</a><a class="btn btn-outline" href="/demo#deneme">7 gün ücretsiz deneyin</a></div></div></div></section>`;
 const RSS_LINK = `<link rel="alternate" type="application/rss+xml" title="${BRAND} Blog" href="/blog/rss.xml">`;
 
 async function listPage(env, url) {

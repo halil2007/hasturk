@@ -153,31 +153,62 @@ export async function tenantPassword(req, env, kind, b) {
   return { ok: true, tenant: t.slug, username: r.username };
 }
 
-// Abonelik / deneme bitiş hatırlatması: bitişe 7, 3 ve 1 gün kala firma kartındaki e-postaya (ana panelin e-posta servisiyle).
-// Her eşik için bir kez; bitiş tarihi uzatılırsa yeni tarih için yeniden hatırlatılır.
+// Abonelik / deneme hatırlatmaları (firma kartındaki e-postaya, ana panelin e-posta servisiyle; saatte bir kontrol):
+//   lisans: bitişe 15, 7, 3 ve 1 gün kala + süre dolunca · deneme: kurulum (2. gün, henüz mağaza bağlanmadıysa), bitişe 3 ve 1 gün
+//   kala + süre dolunca. Her olay bir kez gönderilir; bitiş tarihi uzatılırsa yeni tarih için yeniden hatırlatılır.
+export const LICENSE_DAYS = [15, 7, 3, 1], TRIAL_DAYS = [3, 1];
+export function reminderOf(t, now = Date.now()) {
+  const left = Math.ceil((t.expires_at - now) / DAY);
+  if (left <= 0) return now - t.expires_at <= 3 * DAY ? { k: 'expired', left } : null;
+  const th = (t.trial ? TRIAL_DAYS : LICENSE_DAYS).filter((d) => left <= d).pop();
+  if (th) return { k: 'd' + th, left };
+  // Denemenin 2. günü ve henüz mağaza bağlanmadı: kurulum hatırlatması
+  let usage = {}; try { usage = JSON.parse(t.usage || '{}') || {}; } catch { /* boş */ }
+  if (t.trial && t.created_at && now - t.created_at >= DAY && now - t.created_at <= 4 * DAY && !Number(usage.channels)) return { k: 'setup', left };
+  return null;
+}
 export async function expiryReminders(env, db) {
   const now = Date.now(), last = await first(db, "SELECT v FROM settings WHERE k = 'expmail_at'");
   if (last && now - JSON.parse(last.v) < 3600e3) return null;
   await run(db, "INSERT INTO settings (k, v) VALUES ('expmail_at', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", JSON.stringify(now));
-  const rows = await all(db, "SELECT * FROM tenants WHERE active = 1 AND slug != ? AND expires_at > ? AND expires_at <= ? AND COALESCE(email, '') != ''", DEMO_SLUG, now, now + 7 * DAY);
+  const rows = await all(db, "SELECT * FROM tenants WHERE active = 1 AND slug != ? AND expires_at > ? AND expires_at <= ? AND COALESCE(email, '') != ''", DEMO_SLUG, now - 3 * DAY, now + 15 * DAY);
   if (!rows.length) return { sent: 0 };
   const { sendMail, validEmail } = await import('./mail.js');
   const contact = await contactLine(env, true);
+  const e = (x) => String(x || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
   let sent = 0;
   for (const t of rows) {
-    const left = Math.ceil((t.expires_at - now) / DAY), th = [1, 3, 7].find((d) => left <= d);
-    const k = `expmail:${t.slug}:${th}:${t.expires_at}`;
-    if (!th || !validEmail(t.email) || await first(db, 'SELECT 1 AS x FROM settings WHERE k = ?', k)) continue;
+    const r = reminderOf(t, now);
+    if (!r || !validEmail(t.email)) continue;
+    const k = `expmail:${t.slug}:${r.k}:${t.expires_at}`;
+    if (await first(db, 'SELECT 1 AS x FROM settings WHERE k = ?', k)) continue;
     await run(db, "INSERT INTO settings (k, v) VALUES (?, '1') ON CONFLICT (k) DO NOTHING", k);
-    const what = t.trial ? 'ücretsiz deneme süreniz' : 'aboneliğiniz';
-    const when = left <= 1 ? 'yarın' : `${left} gün sonra`;
+    const what = t.trial ? 'ücretsiz deneme süreniz' : 'lisansınız';
+    const when = r.left <= 1 ? 'yarın' : `${r.left} gün sonra`;
     const date = new Date(t.expires_at + 3 * 3600e3).toISOString().slice(0, 10).split('-').reverse().join('.');
+    const renew = renewUrl(env, t), act = t.trial ? 'Paket seçmek' : 'Lisansınızı yenilemek';
+    const cta = renew ? `<p><a href="${e(renew)}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${t.trial ? 'Paket seçin' : 'Lisansı yenileyin'}</a></p>` : '';
+    let subject, head, body;
+    if (r.k === 'setup') {
+      subject = `${t.name}: ilk mağazanızı bağlayın, denemeden en iyi şekilde yararlanın`;
+      head = 'Kuruluma 5 dakikada başlayın';
+      body = ['Deneme paneliniz hazır ama henüz bir mağaza bağlanmadı. Panele girdiğinizde ana sayfadaki <b>Kurulum rehberi</b> sizi adım adım götürür:',
+        '1) Entegrasyonlar\'dan ilk mağazanızı (Trendyol, Hepsiburada, ikas…) bağlayın · 2) Ürünler senkronlanınca eşleştirmeleri kontrol edin · 3) Stok ve fiyat gönderimini açın.',
+        `Takıldığınız yerde bize yazın, birlikte kuralım: ${e(contact)}`];
+    } else if (r.k === 'expired') {
+      subject = `${t.name}: ${t.trial ? 'ücretsiz deneme süreniz' : 'lisansınızın süresi'} doldu`;
+      head = t.trial ? 'Deneme süreniz doldu' : 'Lisansınızın süresi doldu';
+      body = [`<b>${e(t.name)}</b> için Hastürk CRM ${what} ${date} tarihinde sona erdi. Panele giriş ve pazaryerleriyle senkron durdu; <b>verileriniz silinmedi</b>.`, `${act} ve kaldığınız yerden devam etmek için ${e(contact)}`];
+    } else {
+      subject = `${t.name}: ${what} ${when} sona eriyor`;
+      head = t.trial ? 'Deneme süreniz bitiyor' : `Lisansınızın bitmesine ${r.left} gün kaldı`;
+      body = [`<b>${e(t.name)}</b> için Hastürk CRM ${what} <b>${date}</b> tarihinde (${when}) sona eriyor.`, 'Süre bitince panele giriş ve pazaryerleriyle senkron durur; verileriniz silinmez.', `${act} için ${e(contact)}`];
+    }
+    const text = `Merhaba,\n\n${body.map((x) => x.replace(/<[^>]+>/g, '')).join('\n\n')}${renew ? `\n\n${renew}` : ''}`;
     try {
-      await sendMail(env, db, { to: [t.email], subject: `${t.name}: ${what} ${when} sona eriyor`,
-        text: `Merhaba,\n\n${t.name} için Hastürk CRM ${what} ${date} tarihinde (${when}) sona eriyor. Süre bitince panele giriş ve pazaryerleriyle senkron durur; verileriniz silinmez.\n\n${t.trial ? 'Paket seçmek' : 'Yenilemek'} için ${contact}`,
-        html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111;max-width:560px"><h2 style="font-size:18px">${t.trial ? 'Deneme süreniz bitiyor' : 'Aboneliğiniz bitiyor'}</h2><p><b>${String(t.name).replace(/</g, '&lt;')}</b> için Hastürk CRM ${what} <b>${date}</b> tarihinde (${when}) sona eriyor.</p><p>Süre bitince panele giriş ve pazaryerleriyle senkron durur; verileriniz silinmez.</p><p>${t.trial ? 'Paket seçmek' : 'Yenilemek'} için ${contact.replace(/</g, '&lt;')}</p></div>` });
+      await sendMail(env, db, { to: [t.email], subject, text, html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111;max-width:560px"><h2 style="font-size:18px">${head}</h2>${body.map((x) => `<p>${x}</p>`).join('')}${cta}</div>` });
       sent++;
-    } catch (e) { console.error('bitiş hatırlatması gönderilemedi', t.slug, e.message); }
+    } catch (err) { console.error('hatırlatma gönderilemedi', t.slug, err.message); }
   }
   return { sent };
 }

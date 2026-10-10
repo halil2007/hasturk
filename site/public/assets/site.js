@@ -119,7 +119,7 @@
       <div class="limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
       <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-bolt"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul>
       ${shop && p.key ? `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/satin-al?plan=${p.key}&amp;donem=yillik">Hemen satın al</a>
-      <a class="btn btn-line plan-trial" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>` : `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/iletisim?konu=teklif&amp;paket=${encodeURIComponent(p.name)}">7 gün ücretsiz deneyin</a>`}
+      <a class="btn btn-line plan-trial" href="/demo#deneme">7 gün ücretsiz deneyin</a>` : `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/demo#deneme">7 gün ücretsiz deneyin</a>`}
       <a class="plan-demo" data-demo href="/demo">ya da önce demo panelini açın →</a></div>`).join('');
   });
   renderPlans(false);
@@ -206,7 +206,7 @@
   if (topicSel && q.get('konu') && [...topicSel.options].some((o) => o.value === q.get('konu'))) {
     topicSel.value = q.get('konu');
     const m = $('[name=message]');
-    if (m && !m.value) m.value = { arama: 'Lütfen beni arayın.', kanal: 'Entegrasyonunu istediğim kanal: ', teklif: q.get('paket') ? `${q.get('paket')} paketi için teklif ve deneme hesabı istiyorum.` : '' }[q.get('konu')] || '';
+    if (m && !m.value) m.value = { arama: 'Lütfen beni arayın.', kanal: 'Entegrasyonunu istediğim kanal: ', teklif: q.get('paket') ? `${q.get('paket')} paketi için teklif istiyorum.` : '' }[q.get('konu')] || '';
   }
 
   // Bot doğrulaması (Cloudflare Turnstile): panel anahtar verirse formlara "robot değilim" kutucuğu eklenir; vermezse formlar kutucuksuz

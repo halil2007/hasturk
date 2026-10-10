@@ -18,8 +18,8 @@ window.SITE = {
     whatsapp: '905539422961',       // yalnız rakam, ülke koduyla
     email: 'info@hasturkcrm.com',
     kvkkEmail: 'info@hasturkcrm.com',                  // KVKK başvuruları için e-posta (boşsa yukarıdaki e-posta)
-    taxOffice: '',                  // Vergi dairesi
-    taxNo: '',                      // Vergi numarası
+    taxOffice: 'Büyükçekmece',                  // Vergi dairesi
+    taxNo: '4590601809',                      // Vergi numarası
     mersis: '0459060180900001',                     // MERSİS no (varsa)
   },
   // WhatsApp düğmesine basınca hazır gelen mesaj

@@ -71,7 +71,8 @@ p { margin: 0; }
 .hero .lead { font-size: clamp(16.5px, 2vw, 18.5px); color: var(--text-2); margin-top: 20px; max-width: 560px; }
 .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 .checks { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 26px; color: var(--text-2); font-size: 14.5px; font-weight: 550; }
-.checks span { display: inline-flex; align-items: center; gap: 8px; }
+.checks span, .checks a { display: inline-flex; align-items: center; gap: 8px; }
+.checks a, .perks a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 3px; }
 .tick { flex: 0 0 20px; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: #fff; display: inline-grid; place-items: center; }
 .tick svg { width: 12px; height: 12px; }
 .tick.g { background: var(--good); }
@@ -129,7 +130,7 @@ p { margin: 0; }
 .c-orange { background: #fff1e3; color: #f08a1c; } .c-purple { background: #f1ebff; color: #7c4dff; } .c-teal { background: #e3f7f6; color: #0f9f98; }
 
 /* bölümler */
-section { scroll-margin-top: 76px; }
+section, #deneme { scroll-margin-top: 76px; }
 .sec { padding: 72px 0; }
 .sec.alt { background: linear-gradient(180deg, #f5f8fe 0%, #f9fbff 100%); }
 .kicker { color: var(--primary); font-weight: 700; font-size: 13.5px; text-transform: uppercase; letter-spacing: .1em; }
@@ -374,7 +375,7 @@ textarea.in { min-height: 110px; resize: vertical; }
 .jump a { padding: 7px 14px; border-radius: 99px; background: #fff; border: 1px solid var(--line); color: var(--text-2); font-weight: 600; font-size: 14px; box-shadow: var(--shadow-sm); }
 .jump a:hover { color: var(--primary); border-color: #c9d8f5; text-decoration: none; }
 .perks { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; margin-top: 24px; font-weight: 600; color: var(--text-2); font-size: 15px; }
-.perks span { display: inline-flex; align-items: center; gap: 8px; }
+.perks span, .perks a { display: inline-flex; align-items: center; gap: 8px; }
 .logo-row.static { animation: none; width: auto; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 30px; }
 .logo-row.static .wm { margin: 0; min-width: 0; height: 54px; padding: 0 16px; font-size: 18px; }
 .center-cta { text-align: center; margin-top: 30px; }
@@ -651,7 +652,7 @@ a.mf:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .plan.featured .badge { box-shadow: 0 8px 18px rgb(31 107 255 / .35); }
 .plan.featured { transform: translateY(-6px); }
 @media (max-width: 899px) { .plan.featured { transform: none; } }
-.perks span { white-space: nowrap; }
+.perks span, .perks a { white-space: nowrap; }
 
 /* ---------- sekmeli özellik gezgini ---------- */
 .ftabs { display: grid; gap: 22px; }
