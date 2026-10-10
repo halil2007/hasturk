@@ -44,10 +44,9 @@
   // Kargo: bağlı firmalar (Kurumsal pakette) ve yakında gelecekler
   const CARGO = [
     ['Yurtiçi Kargo', 'kargo firması', '#004a99', 'Y'], ['Aras Kargo', 'kargo firması', '#e30613', 'A'], ['DHL eCommerce', 'kargo firması', '#d40511', 'D'],
-    ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'], ['HepsiJET', 'kargo firması', '#ff6000', 'hj'],
-    ['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N'],
+    ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'], ['HepsiJET', 'kargo firması', '#ff6000', 'hj']
   ];
-  const CARGO_SOON = [['Kolay Gelsin', 'kargo firması', '#00a651', 'KG'], ['Sendeo', 'kargo firması', '#6c2bd9', 'Sd'], ['DHL Express', 'kargo firması', '#ffcc00', 'DHL']];
+  const CARGO_SOON = [['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N'], ['Kolay Gelsin', 'kargo firması', '#00a651', 'KG'], ['Sendeo', 'kargo firması', '#6c2bd9', 'Sd'], ['DHL Express', 'kargo firması', '#ffcc00', 'DHL']];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
