@@ -277,7 +277,7 @@ test('İadeler: senkron, liste (görseller), onay → sipariş satırı ve stok;
   } finally { n.restore(); }
 });
 
-test('İadeler: kullanıcı hataları (gerekçesiz / kısa açıklama, karar verilmiş talep, kanalın reddi) 400 döner, sunucu hatası (500) sayılmaz', { skip: 'BUG: src/api.js:1513-1516 claims approve/reject rotası claims.js\'in düz Error\'larını yakalamıyor → HTTP 500 ve ana panelin hata kayıtlarına "sunucu hatası" olarak düşer' }, async () => {
+test('İadeler: kullanıcı hataları (gerekçesiz / kısa açıklama, karar verilmiş talep, kanalın reddi) 400 döner, sunucu hatası (500) sayılmaz', { skip: 'BUG: src/api.js claims/:kanal/:id/(approve|reject) rotası claims.js\'in düz Error\'larını yakalamıyor → HTTP 500 ve ana panelin hata kayıtlarına "sunucu hatası" olarak düşer' }, async () => {
   const n = net();
   try {
     const { admin, ty } = await setup(n);
@@ -344,7 +344,7 @@ test('Müşteri soruları: senkron, liste, cevap (kanal sınırları), tekrar ce
   } finally { n.restore(); }
 });
 
-test('Müşteri soruları: panelden cevaplanan soru, kanal cevabı henüz yansıtmadan gelen senkronla tekrar "bekliyor"a dönmez (çift cevap riski)', { skip: 'BUG: src/questions.js:41 senkron status = excluded.status ile paneldeki "answered" durumunu ezer (iadelerdeki decided_by koruması yok) → soru yeniden cevaplanabilir, müşteriye iki cevap gider' }, async () => {
+test('Müşteri soruları: panelden cevaplanan soru, kanal cevabı henüz yansıtmadan gelen senkronla tekrar "bekliyor"a dönmez (çift cevap riski)', { skip: 'BUG: src/questions.js save() senkronda status = excluded.status ile paneldeki "answered" durumunu ezer (iadelerdeki decided_by koruması yok) → soru yeniden cevaplanabilir, müşteriye iki cevap gider' }, async () => {
   const n = net();
   try {
     const { admin, ty } = await setup(n);
