@@ -20,12 +20,12 @@ function mockFetch(handler) {
   return calls;
 }
 const urun = (id, durum = 'Onaylandı') => `<a:WebSiparisUrun><a:Adet>2</a:Adet><a:Barkod>8690001${id}</a:Barkod><a:DurumAd>${durum}</a:DurumAd><a:ID>${id}</a:ID><a:KdvTutari>20</a:KdvTutari><a:ResimYolu>https://static.magaza.com/u${id}.jpg</a:ResimYolu><a:StokKodu>TS-${id}</a:StokKodu><a:Tutar>100</a:Tutar><a:UrunAdi>Tişört M</a:UrunAdi><a:UrunID>5${id}</a:UrunID></a:WebSiparisUrun>`;
-const siparis = (id, durum, extra = '', urunler = urun(1)) => `<a:WebSiparis><a:AdiSoyadi>Ali Veli</a:AdiSoyadi><a:Durum>${durum}</a:Durum><a:DuzenlemeTarihi>2026-10-02T10:00:00</a:DuzenlemeTarihi>
+const siparis = (id, durum, takip = '', urunler = urun(1)) => `<a:WebSiparis><a:AdiSoyadi>Ali Veli</a:AdiSoyadi><a:Durum>${durum}</a:Durum><a:DuzenlemeTarihi>2026-10-02T10:00:00</a:DuzenlemeTarihi>
   <a:FaturaAdresi><a:Adres>Fatura adr</a:Adres><a:AliciTelefon>05320000000</a:AliciTelefon><a:Il>İstanbul</a:Il><a:Ilce>Kadıköy</a:Ilce></a:FaturaAdresi>
-  <a:ID>${id}</a:ID><a:KargoFirmaTanim>Aras Kargo</a:KargoFirmaTanim><a:KargoTakipNo i:nil="true"/><a:KargoyaSonVerilmeTarihi>2026-10-03T18:00:00</a:KargoyaSonVerilmeTarihi><a:Mail>ali@x.com</a:Mail><a:ParaBirimi>TL</a:ParaBirimi>
+  <a:ID>${id}</a:ID><a:KargoFirmaTanim>Aras Kargo</a:KargoFirmaTanim>${takip ? `<a:KargoTakipNo>${takip}</a:KargoTakipNo>` : '<a:KargoTakipNo i:nil="true"/>'}<a:KargoyaSonVerilmeTarihi>2026-10-03T18:00:00</a:KargoyaSonVerilmeTarihi><a:Mail>ali@x.com</a:Mail><a:ParaBirimi>TL</a:ParaBirimi>
   <a:SiparisNo>TM${id}</a:SiparisNo><a:SiparisTarihi>2026-10-01T12:30:00</a:SiparisTarihi><a:SiparisToplamTutari>269.9</a:SiparisToplamTutari>
   <a:TeslimatAdresi><a:Adres>Cumhuriyet Cd. No 5</a:Adres><a:AliciAdi>Ayşe Veli</a:AliciAdi><a:AliciTelefon>05321112233</a:AliciTelefon><a:Il>Bursa</a:Il><a:Ilce>Nilüfer</a:Ilce><a:Mahalle>Fethiye Mah.</a:Mahalle></a:TeslimatAdresi>
-  <a:Urunler>${urunler}</a:Urunler><a:UyeID>7</a:UyeID>${extra}</a:WebSiparis>`;
+  <a:Urunler>${urunler}</a:Urunler><a:UyeID>7</a:UyeID></a:WebSiparis>`;
 
 test('Ticimax: adres, eksik bilgiler, durum eşlemesi, tarih biçimi', () => {
   assert.deepEqual(ticimax({}, {}).missing, ['TICIMAX_URL', 'TICIMAX_KEY']);
@@ -51,7 +51,7 @@ test('Ticimax: adres, eksik bilgiler, durum eşlemesi, tarih biçimi', () => {
 test('Ticimax: siparişler SOAP zarfı (yetki kodu, alan sırası, -1 filtreleri), sayfalama ve normalleştirme', async () => {
   const calls = mockFetch((c) => {
     if (c.body.includes('<dc:BaslangicIndex>0</dc:BaslangicIndex>')) return env(siparis(1, 4, '', urun(1) + urun(2, 'İptal Edildi')) + Array.from({ length: 99 }, (_, i) => siparis(2000 + i, 2)).join(''), 'SelectSiparis');
-    return env(siparis(3, 0) + siparis(4, 6, '<a:KargoTakipNo>AR123</a:KargoTakipNo>') + siparis(5, 3), 'SelectSiparis');
+    return env(siparis(3, 0) + siparis(4, 6, 'AR123') + siparis(5, 3), 'SelectSiparis');
   });
   const since = Date.parse('2026-10-01T00:00:00Z'), until = Date.parse('2026-10-02T00:00:00Z');
   const list = await ticimax(ENV, {}).fetchOrders(since, until);

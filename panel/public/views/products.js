@@ -386,7 +386,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Kritik stok uyarısı</span><input class="input" name="critical_stock" type="number" inputmode="numeric" value="${p.critical_stock || 0}"></label>
       </div>
       ${locked('fx') ? html`<div class="notice small"><i class="ico ico-tag"></i><div><b>Döviz kuruna endeksli otomatik fiyat</b> (dolar / euro / sterlin fiyatı, kurla otomatik güncelleme) <span class="pill info">Kurumsal paket</span></div></div>` : html`<div class="stack" style="gap:8px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px">
-        <div class="row wrap" style="gap:8px"><b class="small">Fiyatı dövizle belirle</b><span class="muted tiny">Dolar / euro / sterlin seçerseniz bu ürünün TL satış fiyatını kur belirler; yukarıdaki satış fiyatı kurla kendiliğinden değişir. Kur ve sıklık: <a class="link" href="#/ayarlar">Ayarlar → Döviz</a>.</span></div>
+        <div class="row wrap" style="gap:8px"><b class="small">Fiyatı dövizle belirle</b></div>
         <div class="form-grid">
           <label class="field"><span>Fiyat para birimi</span><select class="input" name="currency" data-fx>${[['', 'TL (döviz yok)'], ['USD', 'Dolar ($)'], ['EUR', 'Euro (€)'], ['GBP', 'Sterlin (£)']].map(([v, t]) => html`<option value="${v}" ${(p.currency || '') === v ? 'selected' : ''}>${t}</option>`)}</select></label>
           <label class="field" data-fxon><span>Döviz fiyatı</span><input class="input" name="fx_price" inputmode="decimal" value="${p.fx_price || ''}" data-fx placeholder="ör. 12,50"></label>
@@ -483,7 +483,7 @@ export async function productForm(id, done) {
     const rate = r[fx.kind] || r.sell, mg = form.fx_margin.value.trim() === '' ? (fx.margin || 0) : numIn(form.fx_margin.value), base = fp * rate, withM = base * (1 + mg / 100);
     const rd = fx.rounding, fin = rd === 'int' ? Math.round(withM) : rd === '90' ? Math.max(0.9, Math.ceil(withM) - 0.1) : rd === '99' ? Math.max(0.99, Math.ceil(withM) - 0.01) : Math.round(withM * 100) / 100;
     const sym = { USD: '$', EUR: '€', GBP: '£' }[c] || c;
-    render(box, html`<div class="notice small" style="margin:0"><i class="ico ico-calc"></i><div>${fp} ${sym} × ${money(rate)} (${fxInfo.rates.source === 'live' ? 'anlık kur' : 'Merkez Bankası kuru'})${mg ? ` + %${mg} kâr payı` : ''} = <b style="color:var(--primary)">${money(fin)}</b> satış fiyatı<div class="tiny muted">Kaydedince satış fiyatı ve kanal fiyatları bu tutarla güncellenir; kur değiştikçe kendiliğinden yeniden hesaplanır.</div></div></div>`);
+    render(box, html`<div class="notice small" style="margin:0"><i class="ico ico-calc"></i><div>${fp} ${sym} × ${money(rate)} (${fxInfo.rates.source === 'live' ? 'anlık kur' : 'Merkez Bankası kuru'})${mg ? ` + %${mg} kâr payı` : ''} = <b style="color:var(--primary)">${money(fin)}</b> satış fiyatı</div></div>`);
   };
   if ($('[data-fxprev]', form)) { api('fx').then((r) => { fxInfo = r; fxPrev(); }).catch(() => fxPrev()); form.addEventListener('input', (e) => { if (e.target.dataset.fx !== undefined) fxPrev(); }); form.addEventListener('change', (e) => { if (e.target.dataset.fx !== undefined) fxPrev(); }); fxPrev(); }
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
