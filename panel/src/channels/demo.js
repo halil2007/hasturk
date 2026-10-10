@@ -2,46 +2,39 @@
 // Aynı tohum her seferinde aynı siparişleri üretir; zaman ilerledikçe yeni siparişler "gelir".
 import { dayKey, DEAD_LINE } from '../util.js';
 
+// Örnek ürünler (çok satandan aza): [stok kodu, barkod, ad, satış fiyatı, alış fiyatı, desi, görsel türü, renk, görsel etiketi, kategori]
+// Görseller public/demo/<stok kodu>.svg (dev/demo-img.mjs üretir)
 export const DEMO_PRODUCTS = [
-  ['HG-SOL-5', '8690000000011', 'HG Solucan Gübresi 5 Kg', 189, 95, 1.5],
-  ['HG-SOL-10', '8690000000028', 'HG Solucan Gübresi 10 Kg', 319, 170, 3],
-  ['HG-TORF-20', '8690000000035', 'HG Torf 20 Lt', 149, 72, 2],
-  ['HG-PERLIT-10', '8690000000042', 'HG Perlit 10 Lt', 129, 55, 2],
-  ['HG-COCO-5', '8690000000059', 'HG Cocopeat Blok 5 Kg', 239, 120, 2],
-  ['HG-SAKSI-20', '8690000000066', 'HG Saksı Toprağı 20 Lt', 169, 80, 2],
-  ['HG-ORKIDE-3', '8690000000073', 'HG Orkide Toprağı 3 Lt', 99, 38, 1],
-  ['HG-KAKTUS-5', '8690000000080', 'HG Kaktüs Toprağı 5 Lt', 109, 45, 1],
-  ['HG-POMPA-2', '8690000000097', 'Basınçlı İlaçlama Pompası 2 Lt', 279, 150, 2],
-  ['HG-POMPA-16', '8690000000103', 'Sırt Tipi İlaçlama Pompası 16 Lt', 1149, 690, 6],
-  ['HG-DOMATES-T', '8690000000110', 'Domates Tohumu (Paket)', 49, 14, 1],
-  ['HG-SIVI-1', '8690000000127', 'Sıvı Bitki Besini 1 Lt', 159, 62, 1],
-  ['HG-MONSTERA', '8690000000134', 'HG Monstera Toprağı 10 Lt', 189, 84, 2],
-  ['HG-ZEOLIT-5', '8690000000141', 'Zeolit 5 Kg', 139, 58, 2],
-  ['HG-SOL-25', '8690000000158', 'HG Solucan Gübresi 25 Kg', 649, 340, 8],
-  ['HG-VERMI-1', '8690000000165', 'Sıvı Vermikompost 1 Lt', 129, 48, 1],
-  ['HG-YANMIS-10', '8690000000172', 'Yanmış Koyun Gübresi 10 Kg', 219, 96, 3],
-  ['HG-TAVUK-5', '8690000000189', 'Granül Tavuk Gübresi 5 Kg', 179, 78, 2],
-  ['HG-NPK-1', '8690000000196', 'NPK 20-20-20 Suda Çözünür Gübre 1 Kg', 199, 88, 1],
-  ['HG-HUMIK-1', '8690000000202', 'Humik Asit Sıvı 1 Lt', 169, 66, 1],
-  ['HG-BIBER-T', '8690000000219', 'Biber Tohumu (Paket)', 45, 12, 1],
-  ['HG-MARUL-T', '8690000000226', 'Marul Tohumu (Paket)', 39, 10, 1],
-  ['HG-CICEK-T', '8690000000233', 'Karışık Çiçek Tohumu (Paket)', 59, 16, 1],
-  ['HG-MAKAS', '8690000000240', 'Budama Makası', 249, 115, 1],
-  ['HG-ELDIVEN', '8690000000257', 'Bahçe Eldiveni', 79, 28, 1],
-  ['HG-HORTUM-15', '8690000000264', 'Bahçe Hortumu 15 Mt', 399, 210, 4],
-  ['HG-SAKSI-PL30', '8690000000271', 'Plastik Saksı 30 cm', 89, 32, 2],
-  ['HG-SULAMA-5', '8690000000288', 'Damla Sulama Seti 5 Mt', 299, 140, 2],
-  ['HG-KABUK-5', '8690000000295', 'Çam Kabuğu Malç 5 Lt', 119, 46, 1],
-  ['HG-BITKIBAG', '8690000000301', 'Bitki Bağlama Teli 50 Mt', 49, 15, 1],
+  ['KB-PRO', '8690000000011', 'Kablosuz Kulaklık Pro ANC', 1299, 640, 1, 'headphones', '#1e293b', '', 'Elektronik › Kulaklık'],
+  ['AF-55', '8690000000028', 'Airfryer XL 5,5 Lt', 3299, 1950, 6, 'airfryer', '#111827', '', 'Ev & Mutfak › Elektrikli Mutfak'],
+  ['AS-S9', '8690000000035', 'Akıllı Saat S9 Sport', 1899, 980, 1, 'watch', '#334155', '', 'Elektronik › Giyilebilir Teknoloji'],
+  ['TR-750', '8690000000042', 'Çelik Termos 750 ml', 449, 180, 1, 'bottle', '#0d9488', '', 'Ev & Mutfak › Termos ve Matara'],
+  ['PF-EDP', '8690000000059', 'Kadın Parfüm EDP 100 ml', 1099, 420, 1, 'perfume', '#db2777', '', 'Kozmetik › Parfüm'],
+  ['SN-RUN', '8690000000066', 'Koşu Ayakkabısı Air Run', 1799, 850, 2, 'sneaker', '#2563eb', '', 'Spor › Ayakkabı'],
+  ['PB-20K', '8690000000073', 'Powerbank 20.000 mAh Hızlı Şarj', 599, 290, 1, 'powerbank', '#0f172a', '', 'Elektronik › Telefon Aksesuarı'],
+  ['SR-C', '8690000000080', 'Vitamin C Serum 30 ml', 399, 120, 1, 'serum', '#f59e0b', '', 'Kozmetik › Cilt Bakımı'],
+  ['KM-ESP', '8690000000097', 'Espresso Kahve Makinesi', 4499, 2700, 7, 'coffee', '#7c2d12', '', 'Ev & Mutfak › Elektrikli Mutfak'],
+  ['YM-6', '8690000000103', 'Kaymaz Yoga Matı 6 mm', 399, 160, 2, 'mat', '#7c3aed', '', 'Spor › Fitness'],
+  ['BT-SP', '8690000000110', 'Bluetooth Hoparlör Bass 20W', 899, 430, 1, 'speaker', '#0891b2', '', 'Elektronik › Ses Sistemleri'],
+  ['SC-BAG', '8690000000127', 'Su Geçirmez Laptop Sırt Çantası', 849, 380, 2, 'backpack', '#374151', '', 'Moda › Çanta'],
+  ['HG-SOL-10', '8690000000134', 'Solucan Gübresi 10 Kg', 319, 170, 3, 'bag', '#65a30d', '10 Kg', 'Bahçe › Gübre'],
+  ['KL-15', '8690000000141', 'iPhone 15 Silikon Kılıf', 249, 60, 1, 'phonecase', '#e11d48', '', 'Elektronik › Telefon Aksesuarı'],
+  ['DM-SET', '8690000000158', 'Ayarlanabilir Dambıl Seti 20 Kg', 2199, 1200, 8, 'dumbbell', '#dc2626', '', 'Spor › Fitness'],
+  ['NV-SET', '8690000000165', 'Pamuk Saten Nevresim Takımı', 1149, 560, 3, 'bedding', '#6366f1', '', 'Ev & Mutfak › Ev Tekstili'],
+  ['KT-17', '8690000000172', 'Cam Kettle 1,7 Lt', 899, 450, 2, 'kettle', '#475569', '', 'Ev & Mutfak › Elektrikli Mutfak'],
+  ['GZ-POL', '8690000000189', 'Polarize Güneş Gözlüğü', 699, 250, 1, 'sunglasses', '#0f172a', '', 'Moda › Aksesuar'],
+  ['SC-65W', '8690000000196', '65W GaN Hızlı Şarj Aleti', 549, 230, 1, 'charger', '#e5e7eb', '', 'Elektronik › Telefon Aksesuarı'],
+  ['TK-LED', '8690000000202', 'Akıllı LED Masa Lambası', 749, 350, 2, 'lamp', '#0ea5e9', '', 'Ev & Mutfak › Aydınlatma'],
+  ['GK-SPF', '8690000000219', 'Güneş Kremi SPF 50+', 349, 130, 1, 'tube', '#f97316', '', 'Kozmetik › Güneş Koruma'],
+  ['HG-SAKSI-20', '8690000000226', 'Organik Saksı Toprağı 20 Lt', 169, 80, 2, 'bag', '#92400e', '20 Lt', 'Bahçe › Toprak'],
+  ['DS-SET', '8690000000233', 'Damla Sulama Seti 25 Mt', 299, 140, 2, 'hose', '#16a34a', '', 'Bahçe › Sulama'],
+  ['BM-PRO', '8690000000240', 'Profesyonel Budama Makası', 249, 115, 1, 'shears', '#ea580c', '', 'Bahçe › El Aletleri'],
 ];
-// Kanal başına günlük sipariş yoğunluğu (örnek): pazaryerleri önde, siteler ve küçük kanallar daha az
-// Örnek kategori ağacı (ikas'tan gelir gibi): Bahçe › Gübre › Organik …
-const demoCategory = (n) => (/topra|torf|perlit|cocopeat|zeolit|malç/i.test(n) ? 'Bahçe › Toprak ve Harç'
-  : /solucan|vermikompost|koyun|tavuk/i.test(n) ? 'Bahçe › Gübre › Organik Gübre' : /gübre|besin|humik/i.test(n) ? 'Bahçe › Gübre › Sıvı ve Kimyasal Gübre'
-  : /tohum/i.test(n) ? 'Bahçe › Tohum' : /saksı/i.test(n) ? 'Bahçe › Saksı' : /sulama|hortum/i.test(n) ? 'Bahçe › Ekipman › Sulama' : 'Bahçe › Ekipman › El Aletleri');
-const WEIGHT = { ikas1: 2.4, ikas2: 1, trendyol: 3.4, hepsiburada: 1.9, pttavm: 0.7, n11: 0.8, idefix: 0.5, pazarama: 0.4, amazon: 0.6, ciceksepeti: 0.6, koctas: 0.3, shopify: 0.5, woocommerce: 0.6, opencart: 0.3, etsy: 0.2 };
-const NAMES = ['Ayşe Yılmaz', 'Mehmet Kaya', 'Zeynep Demir', 'Ali Çelik', 'Elif Şahin', 'Mustafa Arslan', 'Fatma Doğan', 'Emre Koç', 'Hatice Kurt', 'Burak Öztürk', 'Selin Aydın', 'Can Polat'];
-const CITIES = [['İstanbul', 'Kadıköy'], ['Ankara', 'Çankaya'], ['İzmir', 'Bornova'], ['Bursa', 'Nilüfer'], ['Antalya', 'Muratpaşa'], ['Konya', 'Selçuklu'], ['Kocaeli', 'İzmit']];
+// Demo kanalları (en çok kullanılan pazaryerleri + tek site) ve günlük sipariş yoğunluğu
+export const DEMO_CHANNELS = ['ikas1', 'trendyol', 'hepsiburada', 'amazon', 'n11', 'ciceksepeti', 'pttavm', 'idefix', 'pazarama', 'koctas'];
+const WEIGHT = { ikas1: 3.2, trendyol: 6, hepsiburada: 4, amazon: 2.6, n11: 2.2, ciceksepeti: 1.8, pttavm: 1.5, idefix: 1.4, pazarama: 1.2, koctas: 1 };
+const NAMES = ['Ayşe Yılmaz', 'Mehmet Kaya', 'Zeynep Demir', 'Ali Çelik', 'Elif Şahin', 'Mustafa Arslan', 'Fatma Doğan', 'Emre Koç', 'Hatice Kurt', 'Burak Öztürk', 'Selin Aydın', 'Can Polat', 'Deniz Aksoy', 'Gizem Yıldız', 'Oğuz Kılıç', 'Merve Çetin', 'Kerem Aslan', 'Ebru Tekin', 'Serkan Güneş', 'Buse Erdem'];
+const CITIES = [['İstanbul', 'Kadıköy'], ['İstanbul', 'Beşiktaş'], ['İstanbul', 'Ataşehir'], ['Ankara', 'Çankaya'], ['İzmir', 'Bornova'], ['Bursa', 'Nilüfer'], ['Antalya', 'Muratpaşa'], ['Konya', 'Selçuklu'], ['Kocaeli', 'İzmit'], ['Adana', 'Seyhan'], ['Gaziantep', 'Şahinbey'], ['Eskişehir', 'Tepebaşı']];
 
 function rng(seed) {
   let h = 2166136261;
@@ -49,7 +42,10 @@ function rng(seed) {
   return () => { h += 0x6d2b79f5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-const PRICE = { ikas1: 1, ikas2: 1, trendyol: 1.12, hepsiburada: 1.1, pttavm: 1.05, n11: 1.08, idefix: 1.08, pazarama: 1.06, amazon: 1.12, ciceksepeti: 1.1, koctas: 1.08, shopify: 1, woocommerce: 1, opencart: 1, etsy: 1.4 };
+const PRICE = { ikas1: 1, trendyol: 1.06, hepsiburada: 1.05, amazon: 1.08, n11: 1.04, ciceksepeti: 1.07, pttavm: 1.03, idefix: 1.05, pazarama: 1.03, koctas: 1.06 };
+const BRAND = { Elektronik: 'Volta', 'Ev & Mutfak': 'Casa', Kozmetik: 'Lumière', Spor: 'Atlas', Moda: 'Urban', Bahçe: 'HG' };
+const STREETS = ['Atatürk Cad.', 'Cumhuriyet Mah. Gül Sok.', 'İstiklal Cad.', 'Bağdat Cad.', 'Fevzi Çakmak Mah. Lale Sok.', 'Yıldız Mah. Çınar Sok.', 'Barbaros Bulv.', 'Kazım Karabekir Cad.'];
+const CARRIER = { trendyol: 'Trendyol Express', hepsiburada: 'HepsiJet', amazon: 'Yurtiçi Kargo', n11: 'Aras Kargo', ciceksepeti: 'Aras Kargo', pttavm: 'PTT Kargo', idefix: 'Sürat Kargo', pazarama: 'Yurtiçi Kargo', koctas: 'Yurtiçi Kargo', ikas1: 'HepsiJet' };
 export function demo(meta) {
   const ch = meta.id;
   const remoteKey = (p) => (ch === 'trendyol' || ch === 'pttavm' ? p[1] : `${ch}-${p[0]}`);
@@ -63,8 +59,10 @@ export function demo(meta) {
       const dt = new Date(d), month = dt.getUTCMonth(), wd = dt.getUTCDay();
       const season = [0.6, 0.7, 1.2, 1.6, 1.5, 1.1, 0.9, 0.8, 1.0, 1.1, 0.8, 0.6][month];
       const n = Math.round(w * season * (wd === 0 || wd === 6 ? 1.3 : 1) * (0.5 + r() * 1.2));
+      // Bugün: günün tamamının siparişi şu ana kadar geçen sürede gelmiş gibi dağıtılır (panel her saatte dolu ve canlı görünür)
+      const today = until - d < D, span = today ? Math.max(3600e3, until - (d - 3 * 3600e3)) : D;
       for (let i = 0; i < n; i++) {
-        const at = d + Math.floor(r() * D) - 3 * 3600e3;
+        const at = d + Math.floor(r() * span) - 3 * 3600e3;
         if (at > until || at < since) continue;
         const age = (until - at) / D;
         const lines = [], count = r() < 0.7 ? 1 : r() < 0.7 ? 2 : 3;
@@ -72,10 +70,10 @@ export function demo(meta) {
           const p = DEMO_PRODUCTS[Math.floor(Math.pow(r(), 1.6) * DEMO_PRODUCTS.length)];
           if (lines.some((l) => l.sku === p[0])) continue;
           const q = r() < 0.8 ? 1 : 2, unit = Math.round(p[3] * (PRICE[ch] || 1));
-          lines.push({ lineId: `${key}-${i}-${j}`, sku: p[0], barcode: p[1], name: p[2], image: '', quantity: q, unitPrice: unit, total: unit * q, status: '', remoteKey: remoteKey(p) });
+          lines.push({ lineId: `${key}-${i}-${j}`, sku: p[0], barcode: p[1], name: p[2], image: `/demo/${p[0]}.svg`, quantity: q, unitPrice: unit, total: unit * q, status: '', remoteKey: remoteKey(p) });
         }
         const x = r();
-        let status = age < 0.5 ? 'new' : age < 1.5 ? 'processing' : age < 4 ? 'shipped' : 'delivered';
+        let status = age < 0.3 ? 'new' : age < 1.2 ? 'processing' : age < 4 ? 'shipped' : 'delivered';
         if (x < 0.04) status = 'cancelled'; else if (x < 0.06 && age > 6) status = 'returned';
         if (status === 'cancelled') lines.forEach((l) => (l.status = 'cancelled'));
         const [city, district] = CITIES[Math.floor(r() * CITIES.length)], name = NAMES[Math.floor(r() * NAMES.length)];
@@ -85,9 +83,9 @@ export function demo(meta) {
         out.push({
           remoteId: no, orderNumber: no, orderedAt: at, remoteStatus: status, status, demo: true,
           customer: name, phone, email: '',
-          address: { name, line: 'Örnek Mah. Deneme Sok. No:1 D:2', district, city, phone },
+          address: { name, line: `${STREETS[Math.floor(r() * STREETS.length)]} No:${1 + Math.floor(r() * 80)} D:${1 + Math.floor(r() * 12)}`, district, city, phone },
           total: lines.reduce((s, l) => s + l.total, 0), currency: 'TRY',
-          cargoCompany: status === 'shipped' || status === 'delivered' ? 'Yurtiçi Kargo' : '', tracking: status === 'shipped' || status === 'delivered' ? `DEMO${no}` : '',
+          cargoCompany: status === 'shipped' || status === 'delivered' ? CARRIER[ch] || 'Yurtiçi Kargo' : '', tracking: status === 'shipped' || status === 'delivered' ? `DEMO${no}` : '',
           shipBy: ['new', 'processing'].includes(status) ? at + (ch === 'trendyol' ? 1 : 2) * D : null,
           items: lines, packages: null,
           ...(meta.type === 'ikas' ? { cargoChoice: r() < 0.6 ? 'HepsiJet Ücretsiz Kargo' : 'Aras Kargo (Ücretli)' } : {}),
@@ -103,18 +101,18 @@ export function demo(meta) {
       // Örnek varyant: adın sonundaki ölçü (5 Kg, 20 Lt…) varyant, öncesi ana ürün
       const m = /^(.*?)\s+(\d+(?:[.,]\d+)?\s*(?:Kg|Lt|gr|ml))$/i.exec(p[2]);
       return {
-        remoteId: remoteKey(p), remoteProductId: `${ch}-${(m ? m[1] : p[2]).toLowerCase().replace(/\W+/g, '-')}`, sku: p[0], barcode: p[1], name: p[2], image: '',
-        groupName: m ? m[1] : p[2], variantName: m ? m[2] : '', brand: /^HG\b/.test(p[2]) ? 'HG' : 'Hastürk',
-        description: `<p><b>${p[2]}</b> — örnek ürün açıklaması. Bahçe ve saksı bitkileri için uygundur.</p><ul><li>Doğal içerik</li><li>Kolay kullanım</li></ul>`,
-        category: meta.type === 'ikas' ? demoCategory(p[2]) : '',
-        purchasePrice: p[4], price: Math.round(p[3] * (PRICE[ch] || 1)), listPrice: Math.round(p[3] * (PRICE[ch] || 1) * 1.15), stock: 20 + ((i * 7) % 30),
+        remoteId: remoteKey(p), remoteProductId: `${ch}-${(m ? m[1] : p[2]).toLowerCase().replace(/\W+/g, '-')}`, sku: p[0], barcode: p[1], name: p[2], image: `/demo/${p[0]}.svg`, images: [`/demo/${p[0]}.svg`],
+        groupName: m ? m[1] : p[2], variantName: m ? m[2] : '', brand: BRAND[p[9].split(' › ')[0]] || 'Demo',
+        description: `<p><b>${p[2]}</b> — ${p[9].split(' › ').pop()} kategorisinin en çok satan ürünlerinden.</p><ul><li>Aynı gün kargo</li><li>2 yıl garanti</li><li>Kolay iade</li></ul>`,
+        category: meta.type === 'ikas' ? p[9] : '',
+        purchasePrice: p[4], price: Math.round(p[3] * (PRICE[ch] || 1)), listPrice: Math.round(p[3] * (PRICE[ch] || 1) * 1.15), stock: 140 + ((i * 37) % 260),
       };
     });
   }
   const ok = async () => ({});
   // Kargo akışı taklidi: paketle → kanal paketi, etiket → örnek barkod, kargo firması seç / değiştir
-  const CARGO = ['Yurtiçi Kargo', 'Aras Kargo', 'MNG Kargo', 'Sürat Kargo', 'PTT Kargo', 'HepsiJet'];
-  const pack = async (order, pkgs, { cargo } = {}) => ({ packages: pkgs.map((p) => ({ remoteId: `D${order.order_number}-${p.no}-${Date.now() % 100000}`, remoteStatus: 'READY_FOR_SHIPMENT', cargoCompany: (cargo && cargo.name) || p.cargo_company || 'Yurtiçi Kargo' })), message: 'Paket kargoya hazırlandı (örnek)' });
+  const CARGO = ['Yurtiçi Kargo', 'Aras Kargo', 'DHL eCommerce', 'Sürat Kargo', 'PTT Kargo', 'HepsiJet'];
+  const pack = async (order, pkgs, { cargo } = {}) => ({ packages: pkgs.map((p) => ({ remoteId: `D${order.order_number}-${p.no}-${Date.now() % 100000}`, remoteStatus: 'READY_FOR_SHIPMENT', cargoCompany: (cargo && cargo.name) || p.cargo_company || 'Yurtiçi Kargo' })), message: 'Paket kargoya hazırlandı' });
   const label = async (order, pkg) => (meta.type === 'ikas' && !pkg.remote_id
     ? { pending: 'Bu sipariş henüz ikas Kargo ile gönderilmedi. “ikas Kargo ile Gönder”e basın (örnek).', external: true, step: 'external' }
     : { barcode: `DEMO${order.order_number}${pkg.no}`.replace(/[^A-Z0-9]/gi, ''), cargoCompany: pkg.cargo_company || 'Yurtiçi Kargo', panel: true, agreement: /^ikas/.test(ch) ? 'ikas' : ch });

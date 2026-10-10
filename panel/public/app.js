@@ -115,7 +115,7 @@ export function refreshChrome(s = state.summary) {
   const on = chs.filter((c) => c.enabled), err = chs.filter((c) => c.enabled && !c.demo && c.last && (!c.last.ok || c.last.listingsError));
   const box = $('[data-status]');
   box.classList.toggle('warn', !!err.length || !on.length);
-  render(box, html`<span class="led"></span><div><b>${on.length} kanal bağlı</b><span>${err.length ? `${err.length} kanalda hata` : on.some((c) => c.demo) ? 'Örnek veriyle çalışıyor' : on.length ? `Son senkron ${ago(Math.max(...on.map((c) => (c.last && c.last.at) || 0))) || '—'}` : 'Entegrasyonları tamamlayın'}</span></div>`);
+  render(box, html`<span class="led"></span><div><b>${on.length} kanal bağlı</b><span>${err.length ? `${err.length} kanalda hata` : on.some((c) => c.demo) ? 'Tüm kanallar canlı' : on.length ? `Son senkron ${ago(Math.max(...on.map((c) => (c.last && c.last.at) || 0))) || '—'}` : 'Entegrasyonları tamamlayın'}</span></div>`);
   $('[data-bell-dot]').classList.toggle('hide', !((s.notices && s.notices.unread) || n));
   // Menüde firma unvanı yerine ürün adı (unvan kurumsal görünmüyordu)
   const logo = (s.settings && s.settings.logo) || 'logo.webp';
@@ -183,7 +183,7 @@ async function route() {
   render(tabsBox, sibs.length < 2 ? '' : html`${sibs.map((x) => html`<a href="#/${x.path}" class="${x.path === r.path ? 'on' : ''}"><i class="ico ico-${x.icon}"></i>${x.tab}${x.count ? html`<span class="n hide" data-count="${x.count}"></span>` : ''}</a>`)}`);
   $('[data-title]').textContent = r.group ? GROUPS[r.group].title : r.title;
   document.body.dataset.route = r.path;
-  $('[data-sub]').textContent = state.demo ? 'Örnek veriler' : '';
+  $('[data-sub]').textContent = '';
   document.title = `${r.title} · Hastürk CRM`;
   if (current && current.destroy) current.destroy();
   // Her sayfa temiz bir kapsayıcıyla başlar (önceki sayfanın olay dinleyicileri taşınmaz)

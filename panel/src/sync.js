@@ -19,7 +19,7 @@ import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
 import { syncClaims, applyClaimReturns } from './claims.js';
 import { queueNew, sendQueued } from './mail.js';
-import { DEMO_PRODUCTS } from './channels/demo.js';
+import { DEMO_PRODUCTS, DEMO_CHANNELS } from './channels/demo.js';
 import { checkPendingUploads, autoUpload } from './catalog.js';
 import { customerKey, fillKeys } from './customers.js';
 import { pushDigest } from './push.js';
@@ -548,6 +548,10 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     // Tek seferlik: eski sürümden kalma, aynı kanaldan birden fazla ilanı tek ürüne bağlamış eşleşmeleri onar
     if (!(await getRaw(db, 'once:repair_dups_1'))) { out.repaired = await repairDuplicates(db).catch(() => 0); await setSetting(db, 'once:repair_dups_1', Date.now()); }
     out.match = await autoMatch(db, { catalog: settings.catalog_channels || ['ikas1'] });
+    // Demo: ürünlerin alış fiyatı ve desisi (kâr raporları eksiksiz görünsün; kullanıcının girdiği değer korunur)
+    if (env.DEMO === '1') {
+      await db.batch(DEMO_PRODUCTS.map(([sku, , , , cost, desi]) => db.prepare('UPDATE products SET purchase_price = ?, desi = ? WHERE sku = ? AND COALESCE(purchase_price, 0) = 0').bind(cost, desi, sku)));
+    }
     out.mirrored = await mirrorStock(db, settings);
     out.info = await fillProductInfo(db, settings).catch((e) => 'hata: ' + e.message);
     // 4) stok düşümü ve gönderim
@@ -723,7 +727,7 @@ export async function purgeDemo(db) {
     ]);
   }
   const keys = [];
-  for (const p of DEMO_PRODUCTS) for (const ch of ['ikas1', 'ikas2', 'trendyol', 'hepsiburada', 'pttavm']) keys.push([ch, ch === 'trendyol' || ch === 'pttavm' ? p[1] : `${ch}-${p[0]}`]);
+  for (const p of DEMO_PRODUCTS) for (const ch of ['ikas2', ...DEMO_CHANNELS]) keys.push([ch, ch === 'trendyol' || ch === 'pttavm' ? p[1] : `${ch}-${p[0]}`]);
   for (const part of chunk(keys, 40)) await db.batch(part.map(([c, r]) => db.prepare('DELETE FROM listings WHERE channel = ? AND remote_id = ?').bind(c, r)));
   const skus = DEMO_PRODUCTS.map((p) => p[0]);
   const prods = (await all(db, `SELECT id FROM products WHERE sku IN (${skus.map(() => '?').join(',')}) AND id NOT IN (SELECT product_id FROM listings WHERE product_id IS NOT NULL)`, ...skus)).map((r) => r.id);
