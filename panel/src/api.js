@@ -1102,7 +1102,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'listings/errors/retry' && m === 'POST') {
     const b = await body(req), w = b.channel ? ' AND channel = ?' : '', a = b.channel ? [str(b.channel)] : [];
     // Hata silinir; stok yeniden gönderilecek, fiyat hatasında fiyat yeniden gönderilecek olarak işaretlenir (sonraki senkron / şimdi)
-    const r = await run(db, `UPDATE listings SET pushed_stock = CASE WHEN error LIKE 'Fiyat%' THEN pushed_stock ELSE NULL END, price_dirty = CASE WHEN error LIKE 'Fiyat%' THEN 1 ELSE price_dirty END, error = NULL WHERE error IS NOT NULL${w}`, ...a);
+    const r = await run(db, `UPDATE listings SET pushed_stock = CASE WHEN error LIKE 'Fiyat%' THEN pushed_stock ELSE NULL END, price_dirty = CASE WHEN error LIKE 'Fiyat%' THEN 1 ELSE price_dirty END, error = NULL, error_at = NULL WHERE error IS NOT NULL${w}`, ...a);
     const n = (r && r.meta && r.meta.changes) || 0;
     await log(db, b.channel || null, 'info', `${user.name}: ${n} ilan hatası temizlendi, stok / fiyat yeniden gönderilecek`);
     return json({ ok: true, n });

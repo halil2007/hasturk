@@ -3,7 +3,7 @@
 // Kargo (ikas Kargo): gönderi ikas'taki "ikas Kargo ile Paketle ve Gönder" uygulamasıyla açılır (genel API'de yok);
 // ikas Kargo paketi oluşturup barkod ve etiket görselini paketin trackingInfo alanına yazar, panel oradan okur ve yazdırır.
 // Şema kaynağı: ikas'ın resmi @ikas/admin-api-client paketi (FulFillOrderInput, UpdateOrderPackageStatusInput, TrackingInfo…).
-import { http, num, str, labelFrom } from '../util.js';
+import { http, num, str, labelFrom, sleep } from '../util.js';
 
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
 // Müşterinin ödeme sayfasında seçtiği kargo SEÇENEĞİNİN adı → ikas Kargo ekranında seçilecek firma (seçenek bir bağlantı değildir)
@@ -35,14 +35,33 @@ export function ikas(env, p, meta) {
     return token;
   }
 
+  // ikas istek sınırı (ör. 50 istek / pencere; aşılırsa HTTP 429 + retryAfter): istekler arka arkaya en az GAP ms aralıkla gider,
+  // 429 gelirse ikas'ın bildirdiği süre kadar beklenip aynı istek yeniden denenir (en çok 6 kez). Önceden 429 tüm stok gönderimini düşürüyordu.
+  const GAP = 220;
+  let nextAt = 0;
   async function gql(query, variables = {}) {
-    const r = await http(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await auth()}` },
-      body: JSON.stringify({ query, variables }),
-    });
-    if (r.errors) { const e = new Error('ikas: ' + r.errors.map((x) => x.message).join(' | ')); e.gql = true; throw e; }
-    return r.data;
+    for (let i = 0; ; i++) {
+      const wait = nextAt - Date.now();
+      if (wait > 0) await sleep(wait);
+      nextAt = Date.now() + GAP;
+      let r;
+      try {
+        r = await http(API, {
+          method: 'POST', tries: 1,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await auth()}` },
+          body: JSON.stringify({ query, variables }),
+        });
+      } catch (e) {
+        if (e.status === 429 && i < 6) {
+          const m = /"retryAfter"\s*:\s*([\d.]+)/.exec(e.message || '');
+          nextAt = Date.now() + Math.min(30e3, Math.max(1000, (m ? Number(m[1]) : 2) * 1000 + 300));
+          continue;
+        }
+        throw e;
+      }
+      if (r.errors) { const e = new Error('ikas: ' + r.errors.map((x) => x.message).join(' | ')); e.gql = true; throw e; }
+      return r.data;
+    }
   }
 
   // Şemada olmayan isteğe bağlı alan hata verirse o alanı çıkarıp tekrar dener (ikas sürüm farklarına dayanıklı)
