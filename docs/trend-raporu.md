@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2043 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2045 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 > **Uyarı:** hasturktarimdunyasi mağazasının siparişleri alınamadı (Token alınamadı (401): ). Algoritma şu an yalnız bu mağazanın siparişleriyle çalışıyor. ikas'ta o mağazanın API uygulamasını ve GitHub Secrets'taki anahtarları kontrol edin.
 
