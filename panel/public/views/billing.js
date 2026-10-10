@@ -4,9 +4,8 @@
 import { api, html, render, $, $$, money0, money, date, toast, sheet, state } from '../core.js';
 
 const PERIOD = { monthly: 'Aylık', yearly: 'Yıllık' };
-// Taksit bilgisi: yıllıkta peşin fiyatına N taksit; tüm alımlarda anlaşmalı kartlara 12 taksite kadar
-const instText = (d, yearly) => { const i = d.installments || {}; if (!i.max) return ''; return `${yearly && i.free > 1 ? `peşin fiyatına ${i.free} taksit · ` : ''}${i.max} taksite kadar`; };
-const cardsText = (d) => ((d.installments || {}).cards || []).join(', ');
+// Taksit bilgisi: panelde yalnız yıllıkta "peşin fiyatına N taksit" yazar (diğer taksit seçenekleri ödeme sayfasında görünür)
+const instText = (d, yearly) => { const i = d.installments || {}; return yearly && i.free > 1 ? `peşin fiyatına ${i.free} taksit` : ''; };
 // Alt paket: abonelik sürerken alınamaz (iade yok); süre dolunca ya da denemede seçilebilir
 const lower = (d, p) => { const c = d.plans.find((x) => x.key === d.current.key); return !d.current.downgrade && !!c && p.monthly < c.monthly; };
 const up = (d, p) => (d.upgrade ? d.upgrade.options.find((x) => x.to === p.key) : null);
@@ -49,7 +48,6 @@ export async function billingView(el) {
       <div class="muted small">Ek mağaza: mağaza başına yıllık <b>${money0(d.stores.yearly)}</b> (KDV dahil). Lisansınızın bitişine kalan <b>${d.stores.days} gün</b> için gün hesabıyla tek seferde alınır: mağaza başına <b data-stotal>${money(d.stores.perStore)}</b>. Paket yenilemesinde ek mağazalarınız korunur ve yenilenen süre kadar ücrete eklenir.${!d.stores.buyable ? ' Deneme süresinde ya da süresi dolmuş abonelikte ek mağaza alınamaz.' : ''}</div>
     </div>` : ''}
     ${d.upgrade && d.upgrade.options.length ? html`<div class="muted tiny"><b>Üst pakete geçiş:</b> bitiş tarihiniz değişmez; yalnız iki paketin ${PERIOD[d.upgrade.period].toLowerCase()} fiyat farkının kalan ${d.upgrade.days} güne düşen kısmı alınır. Yeni paketin özellikleri ödemeden hemen sonra açılır.</div>` : ''}
-    ${cardsText(d) ? html`<div class="muted tiny">Kartla ödemede ${cardsText(d)} kartlarına ${d.installments.max} taksite kadar; taksit seçenekleri ödeme sayfasında görünür.</div>` : ''}
     <div class="muted tiny">Satın aldığınız süre, mevcut bitiş tarihinizin üstüne eklenir; paket değişikliği hemen geçerli olur. Ödeme iyzico güvencesiyle alınır, kart bilgileriniz bize ulaşmaz.</div>
     <div class="card flush"><div class="card-pad"><h3>Ödeme geçmişi</h3></div>
       ${d.payments.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="r">Süre</th><th class="r">Tutar</th></tr></thead><tbody>
