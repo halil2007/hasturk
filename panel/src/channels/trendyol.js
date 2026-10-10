@@ -228,11 +228,15 @@ export function trendyol(env, meta) {
   const putStatus = (p, status, params = {}) => call(`/order/sellers/${seller}/shipment-packages/${p.remote_id}`, { method: 'PUT', body: { lines: linesOf(p), params, status } });
 
   // İşleme al = paketleri "Picking" (hazırlanıyor) yap; müşteri siparişin hazırlandığını görür
+  // Dönüş: "Picking" yapılan paketler (panel paketin kanal durumunu günceller; etiket alırken Picking ikinci kez gönderilmez)
   async function accept(order) {
+    const packages = [];
     for (const p of openPkgs(order)) {
       if (p.remote_status && p.remote_status !== 'Created') continue;
       await putStatus(p, 'Picking');
+      packages.push({ remoteId: p.remote_id, remoteStatus: 'Picking' });
     }
+    return { packages };
   }
 
   // Paket bölme: Trendyol yeni paketleri birkaç dakika içinde oluşturur (bir sonraki senkronda panelde görünür)

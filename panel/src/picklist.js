@@ -41,7 +41,7 @@ export async function pickList(db, { channel, ids, day, now = Date.now() } = {})
     else {
       const open = new Map();
       for (const p of ps) if (p.status === 'open') for (const x of parse(p.items, [])) open.set(String(x.line_id), (open.get(String(x.line_id)) || 0) + Number(x.qty || 0));
-      need = ls.filter((l) => open.has(String(l.line_id))).map((l) => [l, open.get(String(l.line_id))]);
+      need = ls.filter((l) => open.has(String(l.line_id)) && !DEAD_LINE(l.status)).map((l) => [l, open.get(String(l.line_id))]);
     }
     need = need.filter(([, q]) => q > 0);
     if (!need.length) continue;

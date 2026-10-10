@@ -257,17 +257,18 @@ test('Personel yetkileri: müşteri hizmetleri (sipariş görüntüleme, sorular
   } finally { n.restore(); }
 });
 
-test('Personel yetkileri: stok yalnız görüntüleme yetkisi olan katalog personeli ürün formundan / varyant düzenleyiciden stok değiştiremez', { skip: 'BUG: public/perms.js MAP yalnız products/:id/stock yolunu "stock" bölümüne bağlar; PUT /api/products/:id ve POST /api/products-variants gövdesindeki stock alanı src/api.js saveProduct → stockChange ile "products" yetkisiyle uygulanır (stok:view personel stoğu değiştirir ve kanallara gönderilir)' }, async () => {
+test('Personel yetkileri: stok yalnız görüntüleme yetkisi olan katalog personeli ürün formundan / varyant düzenleyiciden stok değiştiremez', async () => {
   const n = net();
   try {
     const p = await panel({ plan: 'Profesyonel' });
     const { pid } = await seed(p.admin, n);
     const S = await p.staff('katalog', ['products', 'stock:view', 'orders:view']);
+    const before = (await ok(await p.admin(`/api/products/${pid}`))).stock;
     assert.equal((await S(`/api/products/${pid}/stock`, J({ mode: 'set', qty: 99 }))).status, 403, 'doğrudan stok uç noktası kapalı');
     const put = await S(`/api/products/${pid}`, J({ sale_price: 175, stock: 99 }, 'PUT'));
     const vr = await S('/api/products-variants', J({ items: [{ id: pid, stock: 77 }] }));
     const st = (await ok(await p.admin(`/api/products/${pid}`))).stock;
-    assert.equal(st, 9, `stok değişmemeli (PUT ${put.status}, varyant ${vr.status}, stok ${st})`);
+    assert.equal(st, before, `stok değişmemeli (PUT ${put.status}, varyant ${vr.status}, stok ${st})`);
   } finally { n.restore(); }
 });
 

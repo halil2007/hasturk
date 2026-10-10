@@ -37,12 +37,15 @@ export async function syncQuestions(env, db, { only } = {}) {
   return out;
 }
 
+// Panelden cevaplanan soru, kanal cevabı henüz yansıtmadan gelen senkronla "bekliyor"a dönmez (2 gün; sonra kanalın durumu geçerli):
+// yoksa soru yeniden cevaplanabilir ve müşteri iki cevap görür
 export async function save(db, channel, items) {
   const t = Date.now();
   for (const part of chunk(items, 40)) {
     await db.batch(part.map((q) => db.prepare(`INSERT INTO questions (channel, remote_id, text, asked_at, status, remote_status, product_name, product_image, product_url, barcode, sku, customer, answer, answered_at, answered_by, due_at, synced_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (channel, remote_id) DO UPDATE SET text = excluded.text, status = excluded.status, remote_status = excluded.remote_status,
+      ON CONFLICT (channel, remote_id) DO UPDATE SET text = excluded.text,
+        status = CASE WHEN questions.status = 'answered' AND questions.answered_by = 'panel' AND excluded.status = 'waiting' AND questions.answered_at > ${t - 2 * 864e5} THEN 'answered' ELSE excluded.status END, remote_status = excluded.remote_status,
         product_name = COALESCE(NULLIF(excluded.product_name, ''), questions.product_name), product_image = COALESCE(NULLIF(excluded.product_image, ''), questions.product_image),
         product_url = COALESCE(NULLIF(excluded.product_url, ''), questions.product_url), answer = COALESCE(excluded.answer, questions.answer),
         answered_at = COALESCE(excluded.answered_at, questions.answered_at),

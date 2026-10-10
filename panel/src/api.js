@@ -33,10 +33,11 @@ import { supportResponse } from './support.js';
 import { guardConfig, setGuardConfig, guardList, guardUnblock, guardIp } from './guard.js';
 import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS } from './carriers.js';
 import { can, sectionOf } from '../public/perms.js';
+import { exclusive } from './locks.js';
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
-import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE } from './util.js';
+import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE, HttpError } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 // Etiketi kanalın servisinden alınan kanallar
@@ -274,7 +275,10 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   const pkgOf = (pid) => { const p = o.packages.find((x) => x.id === Number(pid)); if (!p) fail(404, 'Paket bulunamadı'); return p; };
   if (action === 'accept') {
     if (o.status !== 'new') fail(400, 'Sadece yeni siparişler işleme alınabilir');
-    if (ch && ch.enabled && ch.caps.accept === 'remote' && ch.accept) await ch.accept(o);
+    if (ch && ch.enabled && ch.caps.accept === 'remote' && ch.accept) {
+      const r = (await ch.accept(o)) || {};
+      for (const p of r.packages || []) await run(db, 'UPDATE packages SET remote_status = ? WHERE order_id = ? AND remote_id = ?', p.remoteStatus, o.id, String(p.remoteId));
+    }
     await setLocalStatus(db, o, 'processing');
     await event(db, o, 'accept', user);
     return { ok: true, message: ch && ch.caps.accept === 'remote' ? `Sipariş işleme alındı (${ch.name}'a bildirildi)` : 'Sipariş işleme alındı' };
@@ -840,18 +844,42 @@ async function stockChange(env, db, ctx, id, b, user) {
     const src = await first(db, `SELECT channel FROM listings WHERE product_id = ? AND remote_stock IS NOT NULL AND channel IN (${cats.map(() => '?').join(',')}) LIMIT 1`, id, ...cats);
     if (src) fail(409, 'Stok senkronu kapalıyken stoklar ikas sitesinden okunur. Adedi ikas panelinden değiştirin (birkaç dakika içinde buraya yansır) ya da Ayarlar → Stok\'tan senkronu açın.');
   }
-  const t = Date.now();
+  const t = Date.now(), who = user ? user.name : null;
+  if (b.mode === 'set') {
+    // Sayım: stok doğrudan girilen adet olur; fark aynı işlemde o anki stoktan hesaplanır (aynı anda iki sayım ya da sayım sırasında
+    // gelen sipariş düşümü kaybolmaz / üst üste eklenmez)
+    await db.batch([
+      db.prepare("INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at, user) SELECT id, ? - stock, ?, 'Sayım / düzeltme', ?, ?, ? FROM products WHERE id = ? AND stock != ?")
+        .bind(qty, qty, str(b.note) || null, t, who, id, qty),
+      db.prepare('UPDATE products SET stock = ?, updated_at = ? WHERE id = ?').bind(qty, t, id),
+    ]);
+    ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    return { ok: true, stock: qty };
+  }
   await db.batch([
     db.prepare('UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?').bind(delta, t, id),
     db.prepare('INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at, user) VALUES (?, ?, (SELECT stock FROM products WHERE id = ?), ?, ?, ?, ?)')
-      .bind(id, delta, id, b.mode === 'set' ? 'Sayım / düzeltme' : delta > 0 ? 'Stok girişi' : 'Stok çıkışı', str(b.note) || null, t, user ? user.name : null),
+      .bind(id, delta, id, delta > 0 ? 'Stok girişi' : 'Stok çıkışı', str(b.note) || null, t, who),
   ]);
   ctx.waitUntil(pushStocks(env, db).catch(() => {}));
-  return { ok: true, stock: p.stock + delta };
+  const now = await first(db, 'SELECT stock FROM products WHERE id = ?', id);
+  return { ok: true, stock: now ? now.stock : p.stock + delta };
 }
 
-async function saveProduct(env, db, ctx, id, b, user, { push = true } = {}) {
+// Aynı SKU ile aynı anda iki kayıt (iki kullanıcı / çift tık): SKU başına sıra; ikinci istek ilkinin kaydını görüp reddedilir
+async function saveProduct(env, db, ctx, id, b, user, opts = {}) {
+  const sku = cleanProduct(b).sku;
+  if (!sku) return saveProductInner(env, db, ctx, id, b, user, opts);
+  return exclusive(db, 'sku:' + String(sku).toLocaleLowerCase('tr'), () => saveProductInner(env, db, ctx, id, b, user, opts), { ttl: 30e3, wait: 8e3 });
+}
+async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {}) {
   const f = cleanProduct(b), t = Date.now();
+  // Stok yalnız görüntüleme yetkisi olan personel ürün formundan / varyant düzenleyiciden stok değiştiremez
+  const stockGiven = b.stock !== undefined && b.stock !== '' && b.stock !== null;
+  if (stockGiven && user && !can(user, 'stock', true)) {
+    const cur = id ? await first(db, 'SELECT stock FROM products WHERE id = ?', id) : { stock: 0 };
+    if (!cur || Math.round(num(b.stock)) !== Number(cur.stock)) fail(403, 'Stok değiştirme yetkiniz yok (yalnız görüntüleme)');
+  }
   if (f.sku) {
     const dup = await first(db, 'SELECT id FROM products WHERE LOWER(sku) = LOWER(?) AND id != ?', f.sku, id || 0);
     if (dup) fail(400, 'Bu stok kodu (SKU) başka bir üründe kullanılıyor');
@@ -1233,7 +1261,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'questions/sync' && m === 'POST') return json(await syncQuestions(env, db));
   if ((x = path.match(/^questions\/([a-z0-9_]+)\/(.+)\/answer$/)) && m === 'POST') {
     const b = await body(req);
-    try { return json(await answerQuestion(env, db, x[1], decodeURIComponent(x[2]), b.text, user)); } catch (e) { fail(400, e.message); }
+    const qid = decodeURIComponent(x[2]);
+    try { return json(await exclusive(db, `question:${x[1]}:${qid}`, () => answerQuestion(env, db, x[1], qid, b.text, user))); } catch (e) { if (e instanceof HttpError) throw e; fail(400, e.message); }
   }
 
   // ---------- buybox ----------
@@ -1386,7 +1415,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if ((x = path.match(/^orders\/([^/]+)\/([a-z-]+)$/)) && m === 'POST') {
     const b = await body(req);
-    return json(await orderAction(env, db, decodeURIComponent(x[1]), x[2], b, ctx, user));
+    const oid = decodeURIComponent(x[1]);
+    // Aynı siparişte aynı anda tek işlem (çift tıklama: iki kargo gönderisi, kanala iki "kargoda" bildirimi, paketlerin çoğalması).
+    // Not, takip / etiket görüntüleme gibi kanala bir şey göndermeyen işlemler kilitsiz
+    if (/^(note|tracking|label-pdf|label-mark)$/.test(x[2])) return json(await orderAction(env, db, oid, x[2], b, ctx, user));
+    return json(await exclusive(db, 'order:' + oid, () => orderAction(env, db, oid, x[2], b, ctx, user)));
   }
   // Sipariş silme (yalnız yönetici): stok geri eklenir, sipariş kanaldan yeniden alınmaz. Önce kanalda var mı bakılabilir (check).
   if ((x = path.match(/^orders\/([^/]+)\/check$/)) && m === 'GET') {
@@ -1415,7 +1448,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     // "tamamı işlendi" gibi görünüyordu; artık işlenmeyenler "rest" ile döner (arayüz 100'erli parçalarla gönderir)
     const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(String))], rest = ids.slice(100);
     await pool(ids.slice(0, 100), 4, async (id) => {
-      try { await orderAction(env, db, id, b.action, b, ctx, user); done.push(id); } catch (e) { errors.push(`${id}: ${e.message}`); }
+      try { await exclusive(db, 'order:' + id, () => orderAction(env, db, id, b.action, b, ctx, user)); done.push(id); } catch (e) { errors.push(`${id}: ${e.message}`); }
     });
     if (rest.length) errors.push(`${rest.length} sipariş işlenmedi: tek seferde en fazla 100 sipariş`);
     return json({ ok: !errors.length, done, errors, rest });
@@ -1444,7 +1477,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const b = await body(req), errors = [], settings = await getSettings(db);
     // Siparişler 4'erli paralel işlenir (her biri kanalda paketleme + etiket isteği); sonuç sırası korunur
     const out = (await pool((b.ids || []).slice(0, 60), 4, async (id) => {
-      try {
+      try { return await exclusive(db, 'order:' + id, async () => {
         let o = await loadOrder(db, id);
         const ch = await channel(env, db, o.channel);
         o = await ensurePackages(db, ch, o);
@@ -1459,7 +1492,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
           labels.push({ package_id: pkg.id, official: r.official || null, panel: !!r.panel });
         }
         return { order: await loadOrder(db, id), labels };
-      } catch (e) { errors.push(`${id}: ${e.message}`); return null; }
+      }); } catch (e) { errors.push(`${id}: ${e.message}`); return null; }
     })).filter(Boolean);
     return json({ orders: out, errors, sender: settings.sender });
   }
@@ -1537,7 +1570,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'claims/reasons' && m === 'GET') return json({ reasons: await claimReasons(env, db, str(q.channel)) });
   if ((x = path.match(/^claims\/([a-z0-9_]+)\/(.+)\/(approve|reject)$/)) && m === 'POST') {
     const b = await body(req), id = decodeURIComponent(x[2]);
-    return json(x[3] === 'approve' ? await approveClaim(env, db, x[1], id, b.lines, user) : await rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user));
+    // Aynı talebe aynı anda tek karar (kanala iki onay gitmesin); gerekçe eksik / karar verilmiş / kanalın reddi kullanıcı hatasıdır (400)
+    try {
+      return json(await exclusive(db, `claim:${x[1]}:${id}`, () => x[3] === 'approve' ? approveClaim(env, db, x[1], id, b.lines, user)
+        : rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user)));
+    } catch (e) { if (e instanceof HttpError) throw e; fail(400, e.message); }
   }
   if ((path === 'settlements' || path === 'invoices' || path.startsWith('settlements/') || path.startsWith('invoices/')) && env.TENANT_SLUG) requireFeature(env, 'finance');
   if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));

@@ -247,7 +247,7 @@ test('Eşzamanlı: iki kullanıcı aynı anda stok girişi yapar (+) — ikisi d
   assert.equal(d.moves[0].stock_after, 12, 'hareket kaydı son stokla tutarlı');
 });
 
-test('Eşzamanlı: iki kullanıcı aynı ürüne aynı anda sayım yapar (stok = N) — sonuç girilen değerlerden biri olmalı', { skip: 'BUG: src/api.js stockChange "set" modunda farkı (qty - okunan stok) önce okuyup sonra stock = stock + fark yazar; aynı anda iki sayım (10 → 5 ve 10 → 7) stoğu 2 yapar (kayıp güncelleme, kanallara yanlış stok gider). Ana panelde (D1) gerçek' }, async () => {
+test('Eşzamanlı: iki kullanıcı aynı ürüne aynı anda sayım yapar (stok = N) — sonuç girilen değerlerden biri olmalı', async () => {
   const { A, B } = await mainPanel();
   const p = await ok(await A('/api/products', J({ name: 'Ürün', sku: 'U-1', stock: 10 })));
   const [r1, r2] = await both(A(`/api/products/${p.id}/stock`, J({ mode: 'set', qty: 5 })), B(`/api/products/${p.id}/stock`, J({ mode: 'set', qty: 7 })));
@@ -256,7 +256,7 @@ test('Eşzamanlı: iki kullanıcı aynı ürüne aynı anda sayım yapar (stok =
   assert.ok([5, 7].includes(d.stock), 'stok ' + d.stock);
 });
 
-test('Eşzamanlı: aynı SKU ile aynı anda iki ürün açılır — biri 400 ile reddedilir, 500 ve mükerrer kart yok', { skip: 'BUG: src/api.js saveProduct SKU tekilliğini önce SELECT LOWER(sku) ile denetler, sonra INSERT eder; aynı anda gelen iki istekte ikisi de denetimi geçer: aynı yazımda UNIQUE hatası → HTTP 500, farklı harf büyüklüğünde ("abc-1" / "ABC-1") iki ayrı kart (sku sütunu harf duyarlı UNIQUE)' }, async () => {
+test('Eşzamanlı: aynı SKU ile aynı anda iki ürün açılır — biri 400 ile reddedilir, 500 ve mükerrer kart yok', async () => {
   const { A, B } = await mainPanel();
   const [r1, r2] = await both(A('/api/products', J({ name: 'X', sku: 'AYNI-1' })), B('/api/products', J({ name: 'Y', sku: 'AYNI-1' })));
   const [r3, r4] = await both(A('/api/products', J({ name: 'X', sku: 'abc-1' })), B('/api/products', J({ name: 'Y', sku: 'ABC-1' })));
@@ -264,7 +264,7 @@ test('Eşzamanlı: aynı SKU ile aynı anda iki ürün açılır — biri 400 il
   assert.deepEqual({ same: [r1.status, r2.status].sort(), cased: [r3.status, r4.status].sort(), cards }, { same: [200, 400], cased: [200, 400], cards: 1 });
 });
 
-test('Eşzamanlı: aynı siparişi iki kullanıcı aynı anda böler / etiket alır — paketler çoğalmaz, ürün adedi korunur', { skip: 'BUG: src/api.js orderAction split (yerel) ve ensurePackages kilitsiz: DELETE + insertPackages iki istekte iç içe geçince sipariş 2 adet yerine 4 adetlik paket taşır (toplama listesi / etiket / kargo iki kat). Ana panelde (D1) gerçek' }, async () => {
+test('Eşzamanlı: aynı siparişi iki kullanıcı aynı anda böler / etiket alır — paketler çoğalmaz, ürün adedi korunur', async () => {
   const n = net();
   try {
     const { A, B } = await mainPanel();
@@ -300,13 +300,13 @@ test('Eşzamanlı: işleme al + not aynı anda (müşteri paneli, gecikmeli kana
     const id = oid('trendyol:900');
     const [r1, r2, r3] = await Promise.all([admin(`/api/orders/${id}/accept`, J({})), S(`/api/orders/${id}/note`, J({ note: 'Acil' })), S(`/api/orders/${id}/accept`, J({}))]);
     no500(r1, r2, r3);
-    assert.ok([r1.status, r3.status].includes(200) && [r1.status, r3.status].every((s) => s === 200 || s === 400), `${r1.status} / ${r3.status}`);
+    assert.ok([r1.status, r3.status].includes(200) && [r1.status, r3.status].every((s) => s === 200 || s === 400 || s === 409), `${r1.status} / ${r3.status}`);
     const d = await ok(await admin('/api/orders/' + id));
     assert.equal(d.order.status, 'processing'); assert.equal(d.order.note, 'Acil');
   } finally { n.restore(); }
 });
 
-test('Eşzamanlı: "Entegratörle gönder"e iki kez basılır (çift tık / iki kullanıcı) — kargo firmasında tek gönderi açılmalı', { skip: 'BUG: src/api.js orderAction carrier-label pkg.carrier_ref denetimini entegratör çağrısından önce okur; iki istek de geçer, Kargonomi\'de iki ücretli gönderi açılır, ilkinin takip no / etiketi ikincisiyle ezilir (iptal edilemeyen yetim gönderi, çift kargo gideri)' }, async () => {
+test('Eşzamanlı: "Entegratörle gönder"e iki kez basılır (çift tık / iki kullanıcı) — kargo firmasında tek gönderi açılmalı', async () => {
   const n = net();
   try {
     const { admin, staff } = await panel({ plan: 'Kurumsal' });
@@ -327,7 +327,7 @@ test('Eşzamanlı: "Entegratörle gönder"e iki kez basılır (çift tık / iki 
   } finally { n.restore(); }
 });
 
-test('Eşzamanlı: iki kullanıcı aynı soruyu aynı anda cevaplar — müşteriye tek cevap gitmeli', { skip: 'BUG: src/questions.js answerQuestion durum denetimi (status === answered) kanal çağrısından önce; iki istek de geçer ve kanala iki cevap gönderilir (Trendyol\'da müşteri iki cevap görür)' }, async () => {
+test('Eşzamanlı: iki kullanıcı aynı soruyu aynı anda cevaplar — müşteriye tek cevap gitmeli', async () => {
   const n = net();
   try {
     const { admin, staff } = await panel();
@@ -343,7 +343,7 @@ test('Eşzamanlı: iki kullanıcı aynı soruyu aynı anda cevaplar — müşter
   } finally { n.restore(); }
 });
 
-test('Eşzamanlı: iki kullanıcı aynı iade talebini aynı anda onaylar — kanala tek onay, stok bir kez', { skip: 'BUG: src/claims.js claimOf / approveClaim "waiting" denetimini kanal çağrısından önce yapar, kilit yok; iki onay da Trendyol\'a gider (ikincisi kanalda hata verirse kullanıcı 500 görür). Stok yine bir kez eklenir' }, async () => {
+test('Eşzamanlı: iki kullanıcı aynı iade talebini aynı anda onaylar — kanala tek onay, stok bir kez', async () => {
   const n = net();
   try {
     const { admin, staff } = await panel();
@@ -368,7 +368,7 @@ test('Eşzamanlı: iki kullanıcı aynı iade talebini aynı anda onaylar — ka
   } finally { n.restore(); }
 });
 
-test('Eşzamanlı: hızlı market siparişinde "Hazırlandı"ya iki kez basılır — Trendyol Go\'ya tek "invoiced"', { skip: 'BUG: src/api.js orderAction ship paket durumunu (shipped) kanal çağrısından önce okur, işlem sırasında kilit yok; channels/trendyolgo.js ship ikisinde de paketi Picking görüp iki kez invoiced gönderir (ikinci çağrı kanalda hata / çift provizyon)' }, async () => {
+test('Eşzamanlı: hızlı market siparişinde "Hazırlandı"ya iki kez basılır — Trendyol Go\'ya tek "invoiced"', async () => {
   const n = net();
   try {
     const { admin, staff } = await panel();
