@@ -895,3 +895,6 @@ h1, h2, h3, h4 { overflow-wrap: break-word; }
 @media (min-width: 1100px) { .icard .wm-big { font-size: 19px; } .icard .wm-big.long { font-size: 16px; } .icard { padding: 20px 8px 16px; } }
 /* Sayfa hiçbir genişlikte yana kaymaz (kenara taşan süsleme / kayan logo şeridi dahil) */
 html { overflow-x: clip; }
+/* Entegrasyon sayfası açıklama metni (arama motoru için düz yazı) */
+.narrow-text { max-width: 840px; }
+.seo-p { color: var(--text-2); font-size: 16.5px; line-height: 1.75; margin: 0 0 14px; }
