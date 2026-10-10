@@ -152,8 +152,8 @@ export const FIELDS = {
   ],
   woocommerce: [
     { k: 'WOO_URL', label: 'Site adresi', req: true, hint: 'ör. https://magazaniz.com', pattern: '^https://[^\\s]+$', patternMsg: 'https:// ile başlayan site adresini girin' },
-    { k: 'WOO_KEY', label: 'Consumer key', req: true, hint: 'WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (Okuma/Yazma) → ck_…' },
-    { k: 'WOO_SECRET', label: 'Consumer secret', secret: true, req: true, hint: 'cs_…' },
+    { k: 'WOO_KEY', label: 'Tüketici anahtarı', req: true, hint: 'WooCommerce → Ayarlar → Gelişmiş → REST API → Anahtar ekle (Okuma/Yazma) → ck_…' },
+    { k: 'WOO_SECRET', label: 'Tüketici gizli anahtarı', secret: true, req: true, hint: 'cs_…' },
   ],
   // OpenCart: yönetim API'si yok; panelden indirilen bağlantı dosyası (public/opencart-bridge.php) sitenin ana klasörüne yüklenir
   opencart: [
