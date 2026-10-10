@@ -337,6 +337,8 @@ export async function twofaApi(db, user, path, b, { issuer = 'Hastürk' } = {}) 
   const id = user.id, tf = await getTfa(db, id), sec = await security(db);
   if (path === 'me/2fa') return { on: !!tf.on, required: !!sec.require2fa, recoveryLeft: (tf.rec || []).length };
   if (path === 'me/2fa/setup') {
+    // Açıkken yeni anahtar kurulmaz (çalınan oturumla doğrulama ele geçirilmesin): önce kodla kapatılır
+    if (tf.on) throw new Error('İki adımlı doğrulama zaten açık; yeniden kurmak için önce kodunuzla kapatın');
     const sk = newSecret(), uri = otpauth({ issuer, account: user.username || user.name, secret: sk });
     await setTfa(db, id, { ...tf, pending: sk, pendingAt: Date.now() });
     return { secret: sk.replace(/(.{4})/g, '$1 ').trim(), uri, qr: qrSvg(uri) };

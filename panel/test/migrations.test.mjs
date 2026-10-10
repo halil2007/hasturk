@@ -15,11 +15,11 @@ test('araya eklenip atlanmış sütunlar sonraki açılışta eklenir', async ()
   const a = d1(file);
   await init(a);
   const n = JSON.parse((await a.prepare("SELECT v FROM settings WHERE k = 'schema_n'").first()).v);
-  // Bozuk yayının bıraktığı durum: sütunlar yok, sayaç 4 geçiş geride (eski liste uzunluğu), sürüm eski
+  // Bozuk yayının bıraktığı durum: sütunlar yok, sayaç 5 geçiş geride (eski liste uzunluğu), sürüm eski
   for (const [t, c] of [['packages', 'carrier_checked_at'], ['packages', 'carrier_state'], ['packages', 'carrier_status'], ['blog_posts', 'ai']]) {
     await a.prepare(`ALTER TABLE ${t} DROP COLUMN ${c}`).run();
   }
-  await a.prepare("UPDATE settings SET v = ? WHERE k = 'schema_n'").bind(JSON.stringify(n - 4)).run();
+  await a.prepare("UPDATE settings SET v = ? WHERE k = 'schema_n'").bind(JSON.stringify(n - 5)).run();
   await a.prepare("UPDATE settings SET v = '\"eski\"' WHERE k = 'schema_v'").run();
   const b = d1(file); // yeni Worker örneği
   await init(b);

@@ -298,6 +298,8 @@ const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN carrier_state TEXT',
   'ALTER TABLE packages ADD COLUMN carrier_status TEXT',
   'ALTER TABLE blog_posts ADD COLUMN ai INTEGER',
+  // Ek mağaza / paket yükseltme siparişinin hesaplandığı andaki abonelik (bitiş, paket, sınır): ödeme gelince değişmişse elle incelenir
+  'ALTER TABLE sales_orders ADD COLUMN snap TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

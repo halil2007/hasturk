@@ -68,8 +68,8 @@ async function guardedAuth(req, env, ctx, path, b) {
   return await handle(req, env, ctx, env.DB);
 }
 
-export default {
-  async fetch(req, env, ctx) {
+const handler = {
+  async route(req, env, ctx) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? secure(await env.ASSETS.fetch(req)) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
@@ -184,3 +184,18 @@ export default {
     if (!quick) ctx.waitUntil(import('./blogai.js').then((m) => m.blogAutoTick(env, env.DB)).then((r) => r && console.log('otomatik blog', JSON.stringify(r))).catch((e) => console.error('otomatik blog hatası', e)));
   },
 };
+// /api yanıtları: HTML sayfalar (ödeme sonucu, deneme girişi, demo talebi…) betiksiz CSP ile; hiçbiri çerçeveye alınamaz, tür koklanmaz
+const API_HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+function hardenApi(res) {
+  if (!res || res.status === 101 || res.webSocket) return res;
+  const r = new Response(res.body, res);
+  if (!r.headers.has('X-Content-Type-Options')) r.headers.set('X-Content-Type-Options', 'nosniff');
+  if (!r.headers.has('X-Frame-Options')) r.headers.set('X-Frame-Options', 'DENY');
+  if (/text\/html/i.test(r.headers.get('Content-Type') || '') && !r.headers.has('Content-Security-Policy')) r.headers.set('Content-Security-Policy', API_HTML_CSP);
+  return r;
+}
+handler.fetch = async (req, env, ctx) => {
+  const res = await handler.route(req, env, ctx);
+  return new URL(req.url).pathname.startsWith('/api/') ? hardenApi(res) : res;
+};
+export default handler;

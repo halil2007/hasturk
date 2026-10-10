@@ -764,7 +764,7 @@ async function listProducts(db, q) {
     // Kaç gün yeter (satış hızına göre); satışı olmayan en sona
     days: [`CASE WHEN ${S30} > 0 THEN p.stock * 30.0 / ${S30} ELSE 1e9 END ASC`, `MIN(CASE WHEN ${S30} > 0 THEN p.stock * 30.0 / ${S30} ELSE 1e9 END) ASC`],
   };
-  const so = SORTS[q.sort];
+  const so = Object.hasOwn(SORTS, q.sort || '') ? SORTS[q.sort] : null;
   // Satış toplamı yalnız gereken sorgulara eklenir (satışa göre sıralama / tükenecekler süzgeci)
   const SJ = so && ['sold', 'days'].includes(q.sort) || q.filter === 'runout' ? SOLD_JOIN() : '';
   // Sayfa satırları, toplamlar ve stok sekmesi sayıları aynı anda okunur
