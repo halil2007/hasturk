@@ -106,7 +106,8 @@ export async function list(db, q = {}) {
   if (q.channel) { where.push('o.channel = ?'); args.push(q.channel); }
   if (q.q) { const s = '%' + q.q.trim() + '%'; where.push('(o.customer LIKE ? OR o.phone LIKE ? OR o.email LIKE ? OR o.order_number LIKE ?)'); args.push(s, s, s, s); }
   const having = q.repeat === '1' ? 'HAVING COUNT(*) > 1' : '';
-  const sort = { spend: 'spend DESC', orders: 'orders DESC, spend DESC', last: 'last_at DESC', first: 'first_at DESC' }[q.sort] || 'last_at DESC';
+  const SORTS = { spend: 'spend DESC', orders: 'orders DESC, spend DESC', last: 'last_at DESC', first: 'first_at DESC' };
+  const sort = Object.hasOwn(SORTS, q.sort) ? SORTS[q.sort] : SORTS.last;
   const W = 'WHERE ' + where.join(' AND ');
   const limit = Math.min(Number(q.limit) || 50, 200), page = Math.max(1, Number(q.page) || 1);
   const total = (await first(db, `SELECT COUNT(*) AS n FROM (SELECT o.ckey FROM orders o ${W} GROUP BY o.ckey ${having})`, ...args)).n;

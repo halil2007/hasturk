@@ -32,7 +32,8 @@ export const DEMO_SLUG = 'demo';
 const DEMO_IDLE = 20 * 60e3, DEMO_STALE = 3600e3, DEMO_MAX = 24 * 3600e3;
 export const demoDue = (now, resetAt, seenAt) => now - resetAt > DEMO_MAX || (now - resetAt > DEMO_STALE && now - seenAt > DEMO_IDLE);
 // Müşteri paneline geçmeyen ortam değişkenleri: ana panelin kanal / e-posta bilgileri, şifresi, deneme modu, bağlantılar
-const PRIVATE = /^(IKAS\d?_|TRENDYOL_|HB_|PTTAVM_|N11_|IDEFIX_|PAZARAMA_|MAIL_)/;
+// (yeni kanal / kargo firması / servis eklenince buraya da ekleyin: aksi halde ana panelin bilgisi müşteri paneline geçer)
+const PRIVATE = /^(IKAS\d?_|TRENDYOL_|HB_|PTTAVM_|N11_|IDEFIX_|PAZARAMA_|MAIL_|AMAZON_|CICEKSEPETI_|KOCTAS_|SHOPIFY_|WOO_|OPENCART_|ETSY_|ARAS_|YURTICI_|PTT_|SURAT_|UPS_|DHL_|HEPSIJET_|KARGONOMI_|NAVLUNGO_|ANTHROPIC_)/;
 const DROP = new Set(['PANEL_PASSWORD', 'DEMO', 'DB', 'TENANT']);
 
 // Süresi dolan / askıdaki firmaya gösterilen iletişim: ana panelin firma bilgilerindeki telefon ve e-posta (Ayarlar → Firma)
@@ -462,6 +463,8 @@ export class TenantPanel {
         const user = await currentUser(req, env, this.db);
         if (!user) return json({ error: 'Giriş gerekli' }, 401);
         if (req.method !== 'GET' && req.headers.get('Origin') && new URL(req.headers.get('Origin')).host !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403);
+        // Demo paneli ortak: ziyaretçiler destek talebi açamaz (birbirinin talebini görür, panel sahibine bildirim yağar)
+        if (this.t.slug === DEMO_SLUG && req.method !== 'GET') return json({ error: 'Demo panelinde destek talebi açılamaz; sorularınız için iletişim sayfasından bize yazın.' }, 403);
         await init(this.env.DB);
         return await supportResponse(req, this.env.DB, sp, { slug: this.t.slug, firm: this.t.name, user, staff: false, env: this.env });
       } catch (e) { return json({ error: e.message || 'Hata' }, e.status || 500); }

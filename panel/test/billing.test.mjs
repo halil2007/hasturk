@@ -136,19 +136,22 @@ test('mevcut müşteri: siteden (firma kodu + e-posta) ve panelden (Paketim) yen
     assert.match((await s.callback('tok-1')).headers.get('location'), /\/odeme-basarili\?.*tur=yenileme/);
     let t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'eski-musteri'");
     assert.equal(t.plan, 'Profesyonel'); assert.equal(t.trial, 0); assert.ok(t.expires_at > Date.now() + 27 * 864e5);
-    // Panelden: Paketim → yıllık Kurumsal
+    // Panelden: abonelik sürerken üst paket yenilemeyle alınamaz (kalan günler eski fiyatla ödenmiş); Paketim → yıllık Profesyonel yenileme
     assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'eski-musteri', username: 'veli', password: 'gizli-sifre-2' }) })).status, 200);
     const g = await (await s.tenant('/api/billing')).json();
     assert.equal(g.current.plan, 'Profesyonel'); assert.equal(g.plans.length, 3); assert.equal(g.payments.length, 1);
     const before = t.expires_at;
-    const c = await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', period: 'yearly', ...buyer }) });
+    const up = await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', period: 'yearly', ...buyer }) });
+    assert.equal(up.status, 400); assert.match((await up.json()).error, /Bu pakete geç/);
+    assert.equal((await s.site({ kind: 'renew', slug: 'eski-musteri', plan: 'kurumsal', period: 'monthly', ...buyer, email: 'veli@ornek.com' })).status, 400, 'siteden de');
+    const c = await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'profesyonel', period: 'yearly', ...buyer }) });
     assert.equal(c.status, 200, await c.clone().text());
-    ok(s.iyz, '39900.00');
+    ok(s.iyz, '19900.00');
     assert.match(await (await s.callback('tok-2')).text(), /Ödemeniz alındı/);
     t = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'eski-musteri'");
-    assert.equal(t.plan, 'Kurumsal'); assert.ok(t.expires_at > before + 360 * 864e5, 'süre mevcut bitişin üstüne eklenir');
+    assert.equal(t.plan, 'Profesyonel'); assert.ok(t.expires_at > before + 360 * 864e5, 'süre mevcut bitişin üstüne eklenir');
     const me = await (await s.tenant('/api/me')).json();
-    assert.equal(me.tenant.planName, 'Kurumsal', 'paket panele hemen iletildi');
+    assert.equal(me.tenant.planName, 'Profesyonel', 'paket panele iletildi');
   } finally { s.restore(); }
 });
 
@@ -233,7 +236,8 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     assert.match(mails[0].subject, /Yeni satış: Yeşil Bahçe · Kurumsal \(aylık\)/);
     for (const x of ['yesil-bahce', '3.990 TL', 'Ali Veli', 'ali@ornek.com', '0532 111 22 33', 'Kurumsal', 'Selçuk', '1234567890', 'e-Fatura mükellefi', 'Bosna Hersek', '/#/firmalar']) assert.ok(mails[0].htmlContent.includes(x), x);
 
-    // Yenileme (siteden, bireysel): e-posta servisi çalışmasa da ödeme tamamlanır; firma kartı yeni fatura bilgisiyle güncellenir
+    // Yenileme (siteden, bireysel): e-posta servisi çalışmasa da ödeme tamamlanır; firma kartı DEĞİŞMEZ (firma kodu + e-postayı bilen
+    // başkası ödeyip unvan / vergi bilgisini değiştiremesin), fatura bilgisi ödeme kaydında
     mailDown = true;
     const ind = { type: 'bireysel', name: 'Ayşe Yılmaz', tckn: '10000000146', address: 'Mevlana Cad. No:7 D:2', district: 'Meram', city: 'Konya' };
     const r2 = await s.site({ kind: 'renew', slug: 'yesil-bahce', plan: 'kurumsal', period: 'monthly', email: 'ali@ornek.com', phone: '0332 222 33 44', invoice: ind, consent: true });
@@ -242,7 +246,8 @@ test('fatura bilgisi: siteden zorunlu alanlar, iyzico alıcı / fatura adresi, f
     assert.equal(init2.buyer.identityNumber, '10000000146', 'bireyselde TC kimlik no'); assert.equal(init2.billingAddress.contactName, 'Ayşe Yılmaz');
     assert.equal((await s.callback('tok-2')).status, 303);
     const t2 = await first(s.env.DB, "SELECT * FROM tenants WHERE slug = 'yesil-bahce'");
-    assert.equal(t2.legal, 'Ayşe Yılmaz'); assert.equal(t2.tax, 'TC 10000000146'); assert.equal(t2.email, 'ali@ornek.com', 'e-posta değişmez');
+    assert.equal(t2.legal, 'Yeşil Bahçe Tarım Ltd. Şti.'); assert.equal(t2.tax, 'Selçuk / 1234567890'); assert.equal(t2.email, 'ali@ornek.com', 'e-posta değişmez');
+    assert.equal(JSON.parse((await first(s.env.DB, "SELECT invoice FROM tenant_payments WHERE slug = 'yesil-bahce' AND instr(note, ?) > 0", init2.conversationId)).invoice).name, 'Ayşe Yılmaz');
     assert.equal((await first(s.env.DB, "SELECT status FROM sales_orders WHERE id = ?", init2.conversationId)).status, 'done');
     assert.equal(mails.length, 1);
     assert.ok(await first(s.env.DB, "SELECT 1 AS x FROM logs WHERE msg LIKE 'Bilgilendirme e-postası gönderilemedi%'"), 'gönderilemeyen e-posta günlüğe yazılır');
@@ -392,6 +397,35 @@ test('alt pakete geçiş yalnız süre dolunca; ek mağazalar yeni paketin üst�
     await s.callback('tok-' + s.iyz.inits.length);
     const t = await first(s.env.DB, "SELECT plan, max_stores, period FROM tenants WHERE slug = 'dusen'");
     assert.deepEqual([t.plan, t.max_stores, t.period], ['Başlangıç', 5, 'yearly']);
+  } finally { s.restore(); }
+});
+
+test('bekleyen ek mağaza / yükseltme siparişi, araya yenileme girerse uygulanmaz (eski kalan güne göre hesaplanmıştı)', async () => {
+  resetChannels();
+  const s = setup();
+  try {
+    await s.owner('/api/login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await s.owner('/api/tenants', { method: 'POST', body: JSON.stringify({ slug: 'kurnaz', name: 'Kurnaz', admin_username: 'can', admin_password: 'gizli-sifre-8', plan: 'Başlangıç', period: 'yearly', email: 'can@ornek.com', welcome: false }) });
+    await run(s.env.DB, "UPDATE tenants SET expires_at = ?, trial = 0 WHERE slug = 'kurnaz'", Date.now() + 864e5 - 3600e3); // 1 gün kaldı
+    assert.equal((await s.tenant('/api/login', { method: 'POST', body: JSON.stringify({ tenant: 'kurnaz', username: 'can', password: 'gizli-sifre-8' }) })).status, 200);
+    assert.equal((await s.tenant('/api/billing/stores', { method: 'POST', body: JSON.stringify({ qty: 50, ...buyer }) })).status, 200);
+    const cheap = s.iyz.inits.at(-1).price; // 50 mağaza × 1 gün
+    assert.equal(cheap, '410.96');
+    assert.equal((await s.tenant('/api/billing/upgrade', { method: 'POST', body: JSON.stringify({ plan: 'kurumsal', ...buyer }) })).status, 200);
+    const upPrice = s.iyz.inits.at(-1).price;
+    // Araya yıllık yenileme girer
+    await s.tenant('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan: 'baslangic', period: 'yearly', ...buyer }) });
+    ok(s.iyz, '9900.00');
+    await s.callback('tok-3');
+    // Eski ucuz siparişler ödenirse uygulanmaz, elle incelemeye düşer
+    ok(s.iyz, cheap);
+    assert.match(await (await s.callback('tok-1')).text(), /otomatik tamamlanamadı/);
+    ok(s.iyz, upPrice);
+    assert.match(await (await s.callback('tok-2')).text(), /otomatik tamamlanamadı/);
+    const t = await first(s.env.DB, "SELECT plan, max_stores FROM tenants WHERE slug = 'kurnaz'");
+    assert.deepEqual([t.plan, t.max_stores], ['Başlangıç', null]);
+    const errs = await all(s.env.DB, "SELECT kind, status, error FROM sales_orders WHERE slug = 'kurnaz' AND status = 'error'");
+    assert.equal(errs.length, 2); assert.match(errs[0].error, /abonelik değişti/);
   } finally { s.restore(); }
 });
 

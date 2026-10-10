@@ -9,6 +9,13 @@ import { turnstileOk, siteHosts, CAPTCHA_ERROR } from './turnstile.js';
 import { notify as pushNotify } from './push.js';
 import { json, str, HttpError } from './util.js';
 
+// Sabit süreli karşılaştırma (imza tahmini zamanlamadan çıkarılamasın)
+async function sameStr(a, b) {
+  const e = new TextEncoder(), x = new Uint8Array(await crypto.subtle.digest('SHA-256', e.encode(String(a)))), y = new Uint8Array(await crypto.subtle.digest('SHA-256', e.encode(String(b))));
+  let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i];
+  return d === 0;
+}
+
 const TRIAL_DAYS = 7, LINK_MS = 30 * 60e3;
 const cors = (origin) => ({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', Vary: 'Origin' });
 const TR = { ı: 'i', İ: 'i', ş: 's', Ş: 's', ğ: 'g', Ğ: 'g', ü: 'u', Ü: 'u', ö: 'o', Ö: 'o', ç: 'c', Ç: 'c' };
@@ -61,7 +68,8 @@ export async function trialRequest(req, env) {
   let base = slugOf(company);
   if (base.length < 3) base = 'firma';
   let slug = base;
-  for (let i = 2; i < 200 && (!SLUG_RE.test(slug) || slug === 'demo' || await getTenant(db, slug, true)); i++) slug = `${base}-${i}`.slice(0, 32);
+  const reserved = async (s) => !!(await first(db, "SELECT 1 AS x FROM sales_orders WHERE kind = 'new' AND slug = ? AND ((status = 'pending' AND created_at > ?) OR status IN ('eft', 'paid'))", s, now - 3600e3).catch(() => null));
+  for (let i = 2; i < 200 && (!SLUG_RE.test(slug) || slug === 'demo' || await getTenant(db, slug, true) || await reserved(slug)); i++) slug = `${base}-${i}`.slice(0, 32);
   if (!SLUG_RE.test(slug) || await getTenant(db, slug, true)) slug = `firma-${now.toString(36).slice(-6)}`;
   const panel = new URL(req.url).origin;
   try {
@@ -86,7 +94,7 @@ export async function trialLogin(req, env) {
   if (!m || !env.DB || !(env.PANEL_SECRET || env.PANEL_PASSWORD)) return fail('Bağlantı eksik ya da bozuk.');
   const [, slug, exp, sig] = m;
   if (Number(exp) < Date.now()) return fail('Bağlantının süresi doldu. Giriş ekranından firma kodunuz, kullanıcı adınız ve şifrenizle girin.');
-  if (sig !== await sign(env, slug, exp)) return fail('Bağlantı doğrulanamadı.');
+  if (!(await sameStr(sig, await sign(env, slug, exp)))) return fail('Bağlantı doğrulanamadı.');
   await init(env.DB);
   // Tek kullanımlık
   const used = await first(env.DB, "INSERT INTO settings (k, v) VALUES (?, '1') ON CONFLICT (k) DO NOTHING RETURNING k", `trial_link:${slug}.${exp}`);

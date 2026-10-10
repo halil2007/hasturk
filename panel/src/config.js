@@ -276,9 +276,19 @@ export async function saveConfig(env, db, id, { values = {}, clear = [], active 
 }
 
 // Kanal için geçerli değişkenler: Cloudflare ortamı + panelde girilenler (panel önceliklidir)
+// Müşteri panelinde platformdan gelen gizli bilgiler (ana panelin e-posta servisi, Hepsiburada aracı sunucusu) gruptur: müşteri gruptan
+// tek bir değeri bile kendisi girerse platformun o gruptaki değerleri hiç kullanılmaz (aksi halde ör. yalnız SMTP sunucusunu kendi
+// adresine çevirip platformun SMTP şifresini oraya gönderebilirdi).
+const PLATFORM_GROUPS = [/^MAIL_/, /^HB_PROXY_/];
 export function effectiveEnv(env, cfg) {
   const out = { ...env };
-  for (const [id, c] of Object.entries(cfg)) if (!isExtra(id)) for (const [k, v] of Object.entries(c.values || {})) if (v) out[k] = v;
+  const own = [];
+  for (const [id, c] of Object.entries(cfg)) if (!isExtra(id)) for (const [k, v] of Object.entries(c.values || {})) if (v) own.push([k, v]);
+  if (env.TENANT_SLUG && env.PLATFORM_KEYS) {
+    const plat = String(env.PLATFORM_KEYS).split(',').filter(Boolean);
+    for (const g of PLATFORM_GROUPS) if (own.some(([k]) => g.test(k))) for (const k of plat) if (g.test(k)) delete out[k];
+  }
+  for (const [k, v] of own) out[k] = v;
   return out;
 }
 

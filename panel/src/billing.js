@@ -212,7 +212,14 @@ export async function publicCheckout(req, env) {
 const isDowngrade = (rec, plan) => { const a = PLANS[planKey(rec.plan)], b = PLANS[plan]; return !!(a && b && b.monthly < a.monthly); };
 function checkDowngrade(rec, plan) {
   if (isDowngrade(rec, plan) && !rec.trial && !expired(rec)) fail(400, `${PLANS[plan].name} paketine aboneliğinizin süresi dolunca geçebilirsiniz (iade olmadığı için dönem ortasında alt pakete geçilmez). Şimdi mevcut ya da üst paketi alabilirsiniz.`);
+  // Abonelik sürerken üst paket "yenileme" ile alınamaz: kalan günler eski paket fiyatıyla ödenmişken yeni pakete geçerdi.
+  // Önce Paketim → "Bu pakete geç" (kalan günlerin farkı), sonra yenileme.
+  const a = PLANS[planKey(rec.plan)], b = PLANS[plan];
+  if (a && b && b.monthly > a.monthly && !rec.trial && !expired(rec) && rec.expires_at) fail(400, `Aboneliğiniz sürerken ${b.name} paketine Paketim → “Bu pakete geç” ile geçebilirsiniz (yalnız kalan günlerin farkı alınır). Yükseltmeden sonra yenileyebilirsiniz.`);
 }
+// Siparişin hesaplandığı andaki abonelik: ödeme geldiğinde değişmişse (araya yenileme / yükseltme girdiyse) tutar geçersizdir
+const snapOf = (t) => JSON.stringify({ exp: t.expires_at || null, plan: t.plan || '', max: Number(t.max_stores) || null });
+const snapStale = (order, t) => !!order.snap && order.snap !== snapOf(t);
 // Yenilemede korunan ek mağaza adedi: firmanın toplam sınırı, eski ve yeni paketin büyük olanının üstündeki kısım
 // (üst pakete geçince paketin sınırı ek mağazaları karşılıyorsa düşer; alt pakete geçince ek mağazalar yeni paketin üstüne eklenir)
 const renewExtras = (rec, plan) => Math.max(0, (Number(rec.max_stores) || 0) - Math.max((PLANS[plan] || {}).stores || 0, (PLANS[planKey(rec.plan)] || {}).stores || 0));
@@ -258,8 +265,8 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     const buyer = buyerOf({ ...b, firm: rec.name, email: b.email || rec.email || user.email, phone: b.phone || rec.phone }, '');
     const now = Date.now(), days = si.days, amount = extraStoreAmount(qty, days);
     const order = { id: newId(), kind: 'stores', slug: rec.slug, plan: 'stores', period: String(days), amount, qty, buyer: JSON.stringify(buyer) };
-    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, qty) VALUES (?, 'stores', ?, 'stores', ?, ?, 'pending', ?, 'panel', ?, ?, ?)`,
-      order.id, order.slug, order.period, amount, order.buyer, now, now, qty);
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, qty, snap) VALUES (?, 'stores', ?, 'stores', ?, ?, 'pending', ?, 'panel', ?, ?, ?, ?)`,
+      order.id, order.slug, order.period, amount, order.buyer, now, now, qty, snapOf(rec));
     return start(env, env.DB, order, origin);
   }
   // Üst pakete geçiş: fark = (yeni paket − mevcut paket, aynı dönem fiyatıyla) × kalan gün / dönem günü; bitiş tarihi değişmez
@@ -273,8 +280,8 @@ export async function tenantBilling(env, t, user, method, path, b, origin, { use
     if (!b.consent) fail(400, 'Mesafeli satış sözleşmesini onaylayın');
     const buyer = buyerOf({ ...b, firm: rec.name, email: b.email || rec.email || user.email, phone: b.phone || rec.phone }, '');
     const now = Date.now(), order = { id: newId(), kind: 'upgrade', slug: rec.slug, plan: q.to, period: `${q.period}:${q.from}:${q.days}`, amount: q.amount, buyer: JSON.stringify(buyer) };
-    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at) VALUES (?, 'upgrade', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?)`,
-      order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now);
+    await run(env.DB, `INSERT INTO sales_orders (id, kind, slug, plan, period, amount, status, buyer, origin, created_at, updated_at, snap) VALUES (?, 'upgrade', ?, ?, ?, ?, 'pending', ?, 'panel', ?, ?, ?)`,
+      order.id, order.slug, order.plan, order.period, order.amount, order.buyer, now, now, snapOf(rec));
     return start(env, env.DB, order, origin);
   }
   if (method === 'POST' && path === 'billing/checkout') {
@@ -345,7 +352,7 @@ async function complete(env, order, panel, { method, note, res = {} }) {
       await createTenant(env, env.DB, { slug: order.slug, name: buyer.firm, admin_username: order.username, passHash: order.pass_hash, email: buyer.email, phone: buyer.phone, contact: buyer.name,
         ...(tempPw ? { tempPassword: tempPw, mustChange: true } : {}),
         ...inv, plan: p.name, fee: p.amount, period: p.period, welcome: true }, { origin: panel });
-    } else if (buyer.invoice) {
+    } else if (buyer.invoice && order.origin === 'panel') {
       // Yenilemede firma kartının fatura alanları güncellenir (yetkili / telefon boşsa doldurulur; e-posta değişmez)
       await run(env.DB, "UPDATE tenants SET legal = ?, tax = ?, address = ?, city = ?, contact = COALESCE(NULLIF(contact, ''), ?), phone = COALESCE(NULLIF(phone, ''), ?), updated_at = ? WHERE slug = ?",
         inv.legal, inv.tax, inv.address, inv.city, buyer.name, buyer.phone, Date.now(), slug).catch((e) => console.error('firma fatura bilgisi yazılamadı', e));
@@ -380,6 +387,7 @@ async function completeStores(env, order, { method, note }) {
   const buyer = JSON.parse(order.buyer || '{}'), qty = Number(order.qty) || 0;
   try {
     const t = await getTenant(env.DB, order.slug, true);
+    if (snapStale(order, t)) throw new Error('sipariş oluşturulduktan sonra abonelik değişti (yenileme / yükseltme); tutar yeniden hesaplanmalı');
     const cur = limitsOf(t).stores || 0, next = cur + qty;
     await run(env.DB, 'UPDATE tenants SET max_stores = ?, updated_at = ? WHERE slug = ?', next, Date.now(), t.slug);
     await recordPayment(env, env.DB, t, { amount: order.amount, months: 0, method, note: `${qty} ek mağaza (${order.period} gün, lisans bitişine kadar) · ${note}`, user: 'Online satış' });
@@ -402,6 +410,7 @@ async function completeUpgrade(env, order, { method, note }) {
   const buyer = JSON.parse(order.buyer || '{}'), u = upgradeOf(order), to = PLANS[order.plan];
   try {
     const t = await getTenant(env.DB, order.slug, true);
+    if (snapStale(order, t)) throw new Error('sipariş oluşturulduktan sonra abonelik değişti (yenileme / yükseltme); tutar yeniden hesaplanmalı');
     const cur = Number(t.max_stores) || 0;
     await run(env.DB, 'UPDATE tenants SET max_stores = ?, fee = ?, period = ?, updated_at = ? WHERE slug = ?', cur > to.stores ? cur : null, to[u.period] || null, u.period, Date.now(), t.slug);
     await recordPayment(env, env.DB, { ...t, max_stores: cur > to.stores ? cur : null }, { amount: order.amount, months: 0, method, plan: to.name, user: 'Online satış',
@@ -453,6 +462,7 @@ export async function adminCharge(env, db, t, b, user, origin) {
 }
 // Müşterinin açtığı ödeme bağlantısı: imza ve süre denetlenir, ödenmemişse iyzico ödeme sayfası başlatılır
 export async function payLink(req, env) {
+  if (!env.PANEL_SECRET && !env.PANEL_PASSWORD) return resultPage('Ödeme bağlantısı geçersiz', 'Ödeme bağlantıları şu an kullanılamıyor.', { status: 503 });
   const v = str(new URL(req.url).searchParams.get('o')), [id, sig] = v.split('.');
   if (!id || !sig || !env.DB) return resultPage('Ödeme bağlantısı geçersiz', 'Bağlantı eksik ya da bozuk.', { status: 400 });
   if (sig !== await linkSig(env, id)) return resultPage('Ödeme bağlantısı geçersiz', 'Bağlantı doğrulanamadı.', { status: 400 });
@@ -460,6 +470,7 @@ export async function payLink(req, env) {
   const o = await first(env.DB, "SELECT * FROM sales_orders WHERE id = ? AND kind = 'charge'", id);
   if (!o) return resultPage('Ödeme bulunamadı', 'Bu bağlantıya ait ödeme bulunamadı.', { status: 404 });
   if (o.status === 'done' || o.status === 'paid') return resultPage('Bu ödeme alınmış', 'Bu bağlantının ödemesi daha önce alındı, teşekkürler.', { ok: true });
+  if (o.status === 'error') return resultPage('Bu ödeme alınmış', `Bu bağlantının ödemesi alındı; işlem ekibimizce tamamlanıyor. ${esc(await contactLine(env))}`, { ok: true });
   if (o.status === 'cancelled') return resultPage('Bağlantı iptal edildi', `Bu ödeme bağlantısı iptal edildi. ${esc(await contactLine(env))}`, { status: 410 });
   if (Date.now() - o.created_at > LINK_DAYS * 864e5) return resultPage('Bağlantının süresi doldu', `Ödeme bağlantısı ${LINK_DAYS} gün geçerlidir. Yeni bağlantı için bizimle iletişime geçin. ${esc(await contactLine(env))}`, { status: 410 });
   // Önceki denemesi başarısız olan bağlantı yeniden kullanılabilir

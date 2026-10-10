@@ -36,9 +36,9 @@ export async function billingView(el) {
         ${up(d, p) ? html`<div class="small" style="color:var(--primary)">Şimdi geçiş: <b>${money(up(d, p).amount)}</b> <span class="muted">(kalan ${up(d, p).days} gün için fark)</span></div>` : ''}
         ${admin && d.online && lower(d, p) ? html`<div class="small muted" style="margin-top:auto">Bu pakete aboneliğinizin süresi dolunca geçebilirsiniz.</div>` : ''}
         ${admin && d.online && !lower(d, p) ? html`<div class="row wrap" style="gap:8px;margin-top:auto">
-          ${up(d, p) ? html`<button class="btn primary sm" data-up="${p.key}"><i class="ico ico-up"></i>Bu pakete geç</button>` : ''}
+          ${up(d, p) ? html`<button class="btn primary sm" data-up="${p.key}"><i class="ico ico-up"></i>Bu pakete geç</button>` : html`
           <button class="btn sm" data-buy="${p.key}" data-period="monthly">Aylık al</button>
-          <button class="btn ${up(d, p) ? '' : 'primary '}sm" data-buy="${p.key}" data-period="yearly">Yıllık al</button></div>` : ''}
+          <button class="btn primary sm" data-buy="${p.key}" data-period="yearly">Yıllık al</button>`}</div>` : ''}
       </div>`)}
     </div>
     ${d.stores && d.stores.base ? html`<div class="card stack" style="gap:10px" data-stores>
