@@ -182,7 +182,7 @@ export async function firmsView(el) {
           <label class="field"><span>Ödeme tarihi</span><input class="input" type="date" name="date" value="${iso(Date.now())}"></label></div>
         <label class="field" data-only="card" hidden><span>Müşterinin e-postası</span><input class="input" type="email" name="email" value="${t.email || ''}"><small>iyzico ödeme sayfası ve bağlantı e-postası için</small></label>
         <label class="field"><span>Not</span><input class="input" name="note" placeholder="ör. Ekim faturası, dekont no"></label>
-        <div class="notice small" data-only="card" hidden><i class="ico ico-info"></i><div>7 gün geçerli ödeme bağlantısı oluşur. <b>Kartı siz girin</b> (ödeme sayfası açılır) ya da bağlantıyı <b>müşteriye gönderin</b>. Ödeme alınınca tahsilat kaydedilir ve abonelik seçilen süre kadar uzar; size bildirim gelir.</div></div>
+        <div class="notice small" data-only="card" hidden><i class="ico ico-help"></i><div>7 gün geçerli ödeme bağlantısı oluşur. <b>Kartı siz girin</b> (ödeme sayfası açılır) ya da bağlantıyı <b>müşteriye gönderin</b>. Ödeme alınınca tahsilat kaydedilir ve abonelik seçilen süre kadar uzar; size bildirim gelir.</div></div>
         <div data-link></div>
       </form>`,
       foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn" data-send hidden><i class="ico ico-send"></i>Müşteriye gönder</button><button class="btn primary" data-save>Kaydet</button>`,

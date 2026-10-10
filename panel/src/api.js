@@ -1439,7 +1439,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       let rates = await getRaw(db, 'fx_rates'), error = null;
       if (!rates || q.refresh) { try { rates = await refreshRates(db, settings, { force: !!q.refresh }); } catch (e) { error = e.message; } }
       const products = (await first(db, "SELECT COUNT(*) AS n FROM products WHERE currency IN ('USD', 'EUR', 'GBP') AND fx_price > 0")).n;
-      return json({ settings: { ...FX_DEFAULTS, ...(settings.fx || {}) }, rates, applied: await getRaw(db, 'fx_applied'), products, error });
+      // Ekranda örnek tablo: döviz fiyatlı ilk 30 ürün (yeni TL fiyatı tarayıcıda seçili ayarla hesaplanır)
+      const items = products ? await all(db, "SELECT id, name, sku, currency, fx_price, fx_margin, sale_price FROM products WHERE currency IN ('USD', 'EUR', 'GBP') AND fx_price > 0 ORDER BY updated_at DESC LIMIT 30") : [];
+      return json({ settings: { ...FX_DEFAULTS, ...(settings.fx || {}) }, rates, applied: await getRaw(db, 'fx_applied'), products, items, error });
     }
     if (path === 'fx/apply' && m === 'POST') {
       if (!can(user, 'products')) fail(403, 'Yetki yok');

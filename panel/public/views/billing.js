@@ -19,7 +19,7 @@ export async function billingView(el) {
     <div class="card"><div class="row wrap" style="gap:16px;align-items:center">
       <div style="flex:1;min-width:220px"><div class="muted small">Mevcut paketiniz</div><div style="font-size:22px;font-weight:750">${cur.plan || 'Paket seçilmedi'}${cur.trial ? html` <span class="pill amber">Deneme</span>` : ''}</div>
         <div class="small" style="margin-top:4px">${cur.expires_at ? html`Bitiş: <b>${date(cur.expires_at)}</b>${left != null ? html` · <span style="color:${left <= 7 ? 'var(--bad)' : 'inherit'}">${left <= 0 ? 'süresi doldu' : `${left} gün kaldı`}</span>` : ''}` : 'Süresiz'}</div></div>
-      ${!d.online ? html`<div class="notice" style="flex-basis:100%"><i class="ico ico-info"></i><div>Online ödeme henüz açılmadı. Paket almak / yenilemek için Destek sayfasından bize yazın.</div></div>` : ''}
+      ${!d.online ? html`<div class="notice" style="flex-basis:100%"><i class="ico ico-help"></i><div>Online ödeme henüz açılmadı. Paket almak / yenilemek için Destek sayfasından bize yazın.</div></div>` : ''}
     </div></div>
     ${d.bank ? html`<div class="card small" style="display:grid;gap:4px"><b>🏦 Havale / EFT ile ödeme${d.eftDiscount ? html` <span class="pill good">Yıllıkta %${d.eftDiscount} indirim</span>` : ''}</b>
       <div>${d.bank.bank} · ${d.bank.holder}</div><div class="num" style="font-weight:700;letter-spacing:.3px">${d.bank.iban} <button class="btn sm ghost" data-copy-iban style="min-height:0;padding:2px 8px"><i class="ico ico-copy"></i>Kopyala</button></div>
@@ -72,7 +72,7 @@ function buy(d, { title, amount, what, path, body }) {
   const s = sheet({
     title,
     body: html`<form class="stack" data-f>
-      <div class="notice"><i class="ico ico-info"></i><div><b>${money0(amount)}</b> (KDV dahil) · ${what}. Faturanız aşağıdaki bilgilerle kesilir.</div></div>
+      <div class="notice"><i class="ico ico-help"></i><div><b>${money0(amount)}</b> (KDV dahil) · ${what}. Faturanız aşağıdaki bilgilerle kesilir.</div></div>
       <div class="form-grid">
         <label class="field"><span>E-posta *</span><input class="input" type="email" name="email" value="${d.current.email || (state.user && state.user.email) || ''}" required></label>
         <label class="field"><span>Telefon *</span><input class="input" name="phone" type="tel" inputmode="tel" placeholder="05xx xxx xx xx" value="${d.current.phone || ''}" required></label>
