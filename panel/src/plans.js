@@ -4,7 +4,7 @@
 import { fail } from './util.js';
 
 // Fiyatlar (TL, KDV dahil): online satışta tutar buradan alınır (tarayıcıdan gelen tutara güvenilmez). Sitedeki fiyatlarla
-// (site/public/assets/config.js) aynı tutun. Yıllık = 10 aylık ücret (2 ay hediye); yıllıkta kartla en fazla 3 taksit.
+// (site/public/assets/config.js) aynı tutun. Yıllık = 10 aylık ücret (2 ay hediye).
 export const PLANS = {
   baslangic: { name: 'Başlangıç', stores: 3, users: 2, monthly: 990, yearly: 9900, features: [] },
   profesyonel: { name: 'Profesyonel', stores: 10, users: 5, monthly: 1990, yearly: 19900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles'] },
@@ -19,7 +19,18 @@ export const daysLeft = (expiresAt, now = Date.now()) => Math.max(1, Math.ceil((
 export const extraStoreAmount = (qty, days) => Math.round((EXTRA_STORE.yearly * qty * days / 365) * 100) / 100;
 export const extraRenewAmount = (qty, months) => Math.round((EXTRA_STORE.yearly * qty * months / 12) * 100) / 100;
 // soon: pakete eklenecek, henüz aktif olmayan özellikler (Paketim'de "Yakında" olarak görünür; hiçbir özelliği açmaz)
-export const INSTALLMENTS_YEARLY = [1, 2, 3];
+// Kartla taksit: ödeme sayfasında taksit kısıtlanmaz; bankanın / iyzico hesabının sunduğu tüm seçenekler görünür (peşin fiyatına
+// taksit sayısı ve vade farkı iyzico'da ayarlanır). Burada yalnız sitede / panelde gösterilen bilgi tutulur.
+export const INSTALLMENTS = { free: 3, max: 12, cards: ['Axess', 'Bonus', 'Maximum', 'World', 'Paraf', 'QNB'] };
+// Üst pakete geçiş (dönem ortasında): mevcut dönem fiyatıyla yeni paketin farkı × lisans bitişine kalan gün / dönem günü.
+// Bitiş tarihi değişmez, paket hemen yükselir. Alt pakete geçiş yenilemede yapılır (iade yok).
+const PERIOD_DAYS = { yearly: 365, monthly: 30 };
+export function upgradeQuote(from, to, period, expiresAt, now = Date.now()) {
+  const a = PLANS[from], b = PLANS[to];
+  if (!a || !b || !PERIOD_DAYS[period] || !(b[period] > a[period])) return null;
+  const days = daysLeft(expiresAt, now), diff = b[period] - a[period];
+  return { from, to, period, days, diff, amount: Math.max(1, Math.round((diff * days / PERIOD_DAYS[period]) * 100) / 100) };
+}
 // Havale / EFT ile ödemede indirim (%): yalnız yıllık alımda (aylıkta havale / EFT tam fiyatla)
 export const EFT_DISCOUNT = 5;
 export const eftAmount = (p) => (p.period === 'yearly' ? Math.round((p.amount * (100 - EFT_DISCOUNT)) / 100) : p.amount);

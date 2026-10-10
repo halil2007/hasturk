@@ -4,6 +4,10 @@
 import { api, html, render, $, $$, money0, money, date, toast, sheet, state } from '../core.js';
 
 const PERIOD = { monthly: 'Aylık', yearly: 'Yıllık' };
+// Taksit bilgisi: yıllıkta peşin fiyatına N taksit; tüm alımlarda anlaşmalı kartlara 12 taksite kadar
+const instText = (d, yearly) => { const i = d.installments || {}; if (!i.max) return ''; return `${yearly && i.free > 1 ? `peşin fiyatına ${i.free} taksit · ` : ''}${i.max} taksite kadar`; };
+const cardsText = (d) => ((d.installments || {}).cards || []).join(', ');
+const up = (d, p) => (d.upgrade ? d.upgrade.options.find((x) => x.to === p.key) : null);
 export async function billingView(el) {
   render(el, html`<div class="card"><div class="empty">Yükleniyor…</div></div>`);
   let d;
@@ -26,10 +30,12 @@ export async function billingView(el) {
         ${(p.features || []).length ? html`<ul class="small" style="margin:0;padding-left:18px">${p.features.map((x) => html`<li>${x}</li>`)}</ul>` : html`<div class="small muted">Tüm temel özellikler</div>`}
         ${(p.soon || []).map((x) => html`<div class="small">${x} <span class="pill amber" style="padding:1px 8px;font-size:11px">Yakında</span></div>`)}
         <div><b style="font-size:20px">${money0(p.monthly)}</b> <span class="muted small">/ ay · KDV dahil</span></div>
-        <div class="small">Yıllık <b>${money0(p.yearly)}</b> <span class="muted">(2 ay hediye${d.installments > 1 ? ` · peşin fiyatına ${d.installments} taksit` : ''})</span></div>
+        <div class="small">Yıllık <b>${money0(p.yearly)}</b> <span class="muted">(2 ay hediye${instText(d, true) ? ` · ${instText(d, true)}` : ''})</span></div>
+        ${up(d, p) ? html`<div class="small" style="color:var(--primary)">Şimdi geçiş: <b>${money(up(d, p).amount)}</b> <span class="muted">(kalan ${up(d, p).days} gün için fark)</span></div>` : ''}
         ${admin && d.online ? html`<div class="row wrap" style="gap:8px;margin-top:auto">
+          ${up(d, p) ? html`<button class="btn primary sm" data-up="${p.key}"><i class="ico ico-up"></i>Bu pakete geç</button>` : ''}
           <button class="btn sm" data-buy="${p.key}" data-period="monthly">Aylık al</button>
-          <button class="btn primary sm" data-buy="${p.key}" data-period="yearly">Yıllık al</button></div>` : ''}
+          <button class="btn ${up(d, p) ? '' : 'primary '}sm" data-buy="${p.key}" data-period="yearly">Yıllık al</button></div>` : ''}
       </div>`)}
     </div>
     ${d.stores && d.stores.base ? html`<div class="card stack" style="gap:10px" data-stores>
@@ -39,13 +45,17 @@ export async function billingView(el) {
         ${admin && d.online && d.stores.buyable ? html`<div class="row" style="gap:8px;align-items:center"><label class="small">Ek mağaza</label><input class="input" type="number" min="1" max="${d.stores.max}" value="1" data-sqty style="width:80px"><button class="btn primary sm" data-sbuy><i class="ico ico-plus"></i>Ek mağaza al</button></div>` : ''}</div>
       <div class="muted small">Ek mağaza: mağaza başına yıllık <b>${money0(d.stores.yearly)}</b> (KDV dahil). Lisansınızın bitişine kalan <b>${d.stores.days} gün</b> için gün hesabıyla tek seferde alınır: mağaza başına <b data-stotal>${money(d.stores.perStore)}</b>. Paket yenilemesinde ek mağazalarınız korunur ve yenilenen süre kadar ücrete eklenir.${!d.stores.buyable ? ' Deneme süresinde ya da süresi dolmuş abonelikte ek mağaza alınamaz.' : ''}</div>
     </div>` : ''}
+    ${d.upgrade && d.upgrade.options.length ? html`<div class="muted tiny"><b>Üst pakete geçiş:</b> bitiş tarihiniz değişmez; yalnız iki paketin ${PERIOD[d.upgrade.period].toLowerCase()} fiyat farkının kalan ${d.upgrade.days} güne düşen kısmı alınır. Yeni paketin özellikleri ödemeden hemen sonra açılır.</div>` : ''}
+    ${cardsText(d) ? html`<div class="muted tiny">Kartla ödemede ${cardsText(d)} kartlarına ${d.installments.max} taksite kadar; taksit seçenekleri ödeme sayfasında görünür.</div>` : ''}
     <div class="muted tiny">Satın aldığınız süre, mevcut bitiş tarihinizin üstüne eklenir; paket değişikliği hemen geçerli olur. Ödeme iyzico güvencesiyle alınır, kart bilgileriniz bize ulaşmaz.</div>
     <div class="card flush"><div class="card-pad"><h3>Ödeme geçmişi</h3></div>
       ${d.payments.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Tarih</th><th>Açıklama</th><th class="r">Süre</th><th class="r">Tutar</th></tr></thead><tbody>
         ${d.payments.map((x) => html`<tr><td>${date(x.at)}</td><td class="small">${x.method || ''}${x.note ? html`<div class="muted tiny">${x.note}</div>` : ''}</td><td class="r">${x.months ? `${x.months} ay` : '—'}</td><td class="r num">${money0(x.amount)}</td></tr>`)}
       </tbody></table></div>` : html`<div class="empty">Henüz ödeme yok.</div>`}</div>
   </div>`);
-  $$('[data-buy]', el).forEach((b) => { b.onclick = () => { const p = d.plans.find((x) => x.key === b.dataset.buy), per = b.dataset.period; buy(d, { title: `${p.name} · ${PERIOD[per]}`, amount: p[per], what: per === 'yearly' ? `12 ay${d.installments > 1 ? `, kartla peşin fiyatına ${d.installments} taksit` : ''}` : '1 ay', path: 'billing/checkout', body: { plan: p.key, period: per } }); }; });
+  $$('[data-buy]', el).forEach((b) => { b.onclick = () => { const p = d.plans.find((x) => x.key === b.dataset.buy), per = b.dataset.period; buy(d, { title: `${p.name} · ${PERIOD[per]}`, amount: p[per], what: `${per === 'yearly' ? '12 ay' : '1 ay'}${instText(d, per === 'yearly') ? `, kartla ${instText(d, per === 'yearly')}` : ''}`, path: 'billing/checkout', body: { plan: p.key, period: per } }); }; });
+  $$('[data-up]', el).forEach((b) => { b.onclick = () => { const q = up(d, { key: b.dataset.up }), p = d.plans.find((x) => x.key === q.to);
+    buy(d, { title: `${p.name} paketine geçiş`, amount: q.amount, what: `${cur.plan} → ${p.name}: ${PERIOD[q.period].toLowerCase()} fiyat farkı ${money0(q.diff)} × kalan ${q.days} gün; bitiş tarihiniz (${date(cur.expires_at)}) değişmez${instText(d, q.period === 'yearly') ? `, kartla ${instText(d, q.period === 'yearly')}` : ''}`, path: 'billing/upgrade', body: { plan: q.to } }); }; });
   const sq = $('[data-sqty]', el), sb = $('[data-sbuy]', el);
   const sAmount = () => Math.round(d.stores.perStore * Math.max(1, Math.min(d.stores.max, Math.round(Number(sq.value) || 1))) * 100) / 100;
   if (sq) sq.oninput = () => { $('[data-stotal]', el).textContent = money(sAmount()); };

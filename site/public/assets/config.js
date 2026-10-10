@@ -25,7 +25,9 @@ window.SITE = {
   // WhatsApp düğmesine basınca hazır gelen mesaj
   waText: 'Merhaba, Hastürk CRM hakkında bilgi almak istiyorum.',
   // Paketler: aylık ve yıllık fiyat (TL, KDV DAHİL). Fiyat boşsa "Teklif alın" yazar.
-  installments: 3,
+  installments: 3,          // yıllık alımda kredi kartına peşin fiyatına taksit sayısı (0 = gösterme)
+  maxInstallments: 12,      // anlaşmalı kartlara en fazla taksit (ödeme sayfasında bankanın sunduğu seçenekler görünür)
+  installmentCards: ['Axess', 'Bonus', 'Maximum', 'World', 'Paraf', 'QNB'],
   eftDiscount: 5,           // havale / EFT ile ödemede indirim (%), yalnız yıllık alımda; 0 = gösterme (panel/src/plans.js → EFT_DISCOUNT ile aynı tutun)
   // Google Ads etiketi: id (AW-…). Dönüşüm etiketleri (Google Ads → Dönüşümler → işlem → "Etiketi kendiniz yükleyin" →
   // send_to: 'AW-…/ETİKET' içindeki ETİKET kısmı) girilirse tutar ve sipariş no ile dönüşüm gönderilir; boşken Google'da
@@ -34,8 +36,8 @@ window.SITE = {
   // Google Analytics 4 ölçüm kimliği (G-…): aynı Google etiketi ve aynı çerez onayıyla çalışır
   analytics: 'G-TL715957RJ',
   // Havale / EFT: satın alma sayfasında "Havale / EFT" seçilince gösterilir (panel/src/billing.js → bankOf ile aynı tutun)
-  bank: { name: 'Ziraat Katılım Bankası', holder: 'Hastürk Gübre Sanayi ve Ticaret Limited Şirketi', iban: 'TR63 0020 9000 0207 5858 0000 01' },          // yıllık alımda kredi kartına peşin fiyatına taksit sayısı (0 = gösterme)
-  vat: 'Tüm fiyatlara KDV dahildir. Yıllık alımda 12 ay yerine 10 ay ücret alınır ve kredi kartına peşin fiyatına 3 taksit yapılır. Yıllık alımda havale / EFT ile ödemede %5 indirim uygulanır.',
+  bank: { name: 'Ziraat Katılım Bankası', holder: 'Hastürk Gübre Sanayi ve Ticaret Limited Şirketi', iban: 'TR63 0020 9000 0207 5858 0000 01' },
+  vat: 'Tüm fiyatlara KDV dahildir. Yıllık alımda 12 ay yerine 10 ay ücret alınır ve kredi kartına peşin fiyatına 3 taksit yapılır; Axess, Bonus, Maximum, World, Paraf ve QNB kartlarına 12 taksite kadar ödenebilir. Yıllık alımda havale / EFT ile ödemede %5 indirim uygulanır.',
   plans: [
     { key: 'baslangic', name: 'Başlangıç', tag: 'Tek mağaza, küçük ekip', monthly: 990, yearly: 9900, limits: ['3 mağaza bağlantısı', '2 kullanıcı'],
       items: ['Tüm aktif entegrasyonlar', 'Sipariş, kargo ve etiket yönetimi', 'Stok senkronu ve ürün eşleştirme', 'Çok kanala ürün yükleme', 'Gelir & gider, kâr-zarar raporu', 'Müşteri soruları ve iade talepleri', 'E-posta ve WhatsApp destek'] },
@@ -71,6 +73,7 @@ window.SITE = {
     ['Kendi anlaşmalı kargo entegrasyonu', false, false, 'Yakında'],
     ['Yapay zekâ ile ürün yönetimi', false, false, 'Yakında'],
     ['Yıllık alımda peşin fiyatına 3 taksit', true, true, true],
+    ['Kredi kartına 12 taksite kadar', true, true, true],
     ['Destek', 'E-posta, WhatsApp', 'Öncelikli', 'Telefon + birebir kurulum'],
   ],
 };
