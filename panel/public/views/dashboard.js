@@ -47,7 +47,7 @@ export async function dashboard(el) {
     const totalRev = c.total.revenue || 1;
     const chs = activeChannels().filter((x) => x.enabled || x.demo).length ? activeChannels().filter((x) => x.enabled || x.demo) : activeChannels();
     const sm = state.summary || {}, newN = (sm.pending || []).filter((x) => x.status === 'new').reduce((a, x) => a + x.n, 0);
-    const hour = new Date().getHours(), u = state.user || {};
+    const hour = Number(new Intl.DateTimeFormat('tr-TR', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Istanbul' }).format(new Date())), u = state.user || {};
     const tasks = [
       ['blue', 'orders', newN, 'Yeni sipariş', '#/siparisler?status=new'],
       ['red', 'warn', sm.late || 0, 'Gecikme riski', '#/siparisler?status=late'],
@@ -96,7 +96,7 @@ export async function dashboard(el) {
     render(el, html`
       ${demoPanel ? html`<div class="card demo-strip"><div style="flex:1;min-width:220px"><b>Demo paneli</b><div class="muted small">Tüm özellikleri serbestçe deneyin: siparişleri işleme alın, kargo etiketi basın, raporları inceleyin. Yaptığınız değişiklikler kısa süre sonra kendiliğinden geri alınır. Kendi mağazalarınızla denemek için 7 günlük ücretsiz paneliniz formu doldurduğunuz anda açılır.</div></div><a class="btn primary" href="https://hasturkcrm.com/demo#deneme" target="_blank" rel="noopener">7 gün ücretsiz deneyin</a></div>` : need && !(st.setup || {}).hidden ? guide : ''}
       <div class="hello"><div><h2>${hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar'}${u.name && u.id ? `, ${u.name.split(' ')[0]}` : ''}</h2>
-        <div class="muted small">${new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · bugün ${n(Object.values(sm.today || {}).reduce((a, x) => a + x.orders, 0))} sipariş, ${money0(Object.values(sm.today || {}).reduce((a, x) => a + x.revenue, 0))}</div></div></div>
+        <div class="muted small">${new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Istanbul' })} · bugün ${n(Object.values(sm.today || {}).reduce((a, x) => a + x.orders, 0))} sipariş, ${money0(Object.values(sm.today || {}).reduce((a, x) => a + x.revenue, 0))}</div></div></div>
       <div class="tasks">${tasks.map(([c, i, v, t, href]) => html`<a class="task ${c} ${v ? '' : 'zero'}" href="${href}"><span class="ic"><i class="ico ico-${i}"></i></span><div style="min-width:0"><b class="num">${n(v)}</b><span>${t}</span></div></a>`)}</div>
       <div class="date-bar">
         ${[['today', 'Bugün'], ['7', '7 gün'], ['month', 'Bu ay'], ['30', '30 gün']].map(([k, t]) => html`<button class="chip ${f.preset === k ? 'on' : ''}" data-act="preset" data-k="${k}">${t}</button>`)}
@@ -157,7 +157,7 @@ export async function dashboard(el) {
         </div>
         <div class="card">
           <div class="card-head"><h2 style="white-space:nowrap">Stoklar</h2>
-            <span class="row small" style="color:${d.stockSync ? 'var(--good)' : 'var(--amber)'}"><span class="led ${d.stockSync ? '' : 'demo'}"></span>${d.stockSync ? `${chs.filter((x) => x.enabled).length} kanalda güncel` : 'senkron kapalı'}</span>
+            <span class="row small" style="color:${d.stockSync ? 'var(--good)' : 'var(--amber)'}"><span class="led ${d.stockSync ? '' : 'demo'}"></span>${d.stockSync ? `${chs.filter((x) => x.enabled).length} kanalda güncel` : 'stok gönderimi kapalı'}</span>
             <a class="link small" href="#/stoklar?durum=below">Tümü ›</a></div>
           <div class="row small muted" style="margin-bottom:6px">${d.stock.products} ürün · ${n(d.stock.units)} adet${d.stock.waiting ? ` · ${d.stock.waiting} ilan gönderim bekliyor` : ''}</div>
           ${d.lowStock.length ? d.lowStock.slice(0, 4).map((x) => html`<div class="li">${thumb(x.image, x.name, 'sm')}<span class="ellipsis" style="flex:1">${x.name}</span><b class="num">${x.stock} adet</b><button class="pill warn" style="border:0;cursor:pointer" data-act="stock" data-id="${x.id}"><i class="ico ico-warn"></i>Düşük stok</button></div>`)

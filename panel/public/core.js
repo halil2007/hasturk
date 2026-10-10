@@ -186,28 +186,8 @@ export const rangeLabel = (from, to) => {
   return `${f.toLocaleDateString('tr-TR', o)} – ${t.toLocaleDateString('tr-TR', { ...o, year: 'numeric' })}`;
 };
 
-// Ad + ek (Türkçe ses uyumu): ek('Trendyol', 'a') → Trendyol'a, ek('Hepsiburada', 'a') → Hepsiburada'ya, ek('N11', 'da') → N11'de.
-// kind: 'a' (yönelme) | 'da' (bulunma) | 'dan' (ayrılma). Okunuşu yazılışından farklı adlar tablodan.
-const EK = { hepsiburada: ["'ya", "'da", "'dan"], pazarama: ["'ya", "'da", "'dan"], teknosa: ["'ya", "'da", "'dan"], n11: ["'e", "'de", "'den"], idefix: ["'e", "'te", "'ten"],
-  hastürk: ["'e", "'te", "'ten"], pttavm: ["'ye", "'de", "'den"], çiçeksepeti: ["'ne", "'nde", "'nden"], trendyol: ["'a", "'da", "'dan"], amazon: ["'a", "'da", "'dan"],
-  ikas: ["'a", "'ta", "'tan"], koçtaş: ["'a", "'ta", "'tan"], ebay: ["'e", "'de", "'den"], shopify: ["'a", "'da", "'dan"], woocommerce: ["'a", "'da", "'dan"], etsy: ["'ye", "'de", "'den"] };
-const DIGIT = ['sıfır', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz'], TENS = ['', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan'];
-const LETTER = { a: 'a', b: 'be', c: 'ce', ç: 'çe', d: 'de', e: 'e', f: 'fe', g: 'ge', ğ: 'ğe', h: 'he', ı: 'ı', i: 'i', j: 'je', k: 'ke', l: 'le', m: 'me', n: 'ne', o: 'o', ö: 'ö', p: 'pe', r: 're', s: 'se', ş: 'şe', t: 'te', u: 'u', ü: 'ü', v: 've', w: 've', x: 'iks', y: 'ye', z: 'ze', q: 'ku' };
-export function ek(name, kind = 'a') {
-  const s = String(name ?? '').trim(), i = kind === 'dan' || kind === 'den' ? 2 : kind === 'da' || kind === 'de' ? 1 : 0;
-  if (!s) return s;
-  const key = s.toLocaleLowerCase('tr'), hit = EK[key] || EK[key.split(/\s+/).pop()];
-  if (hit) return s + hit[i];
-  // Okunuş: sondaki sayı yazıyla, sondaki kısaltma (2+ büyük harf) harf harf okunur
-  let w = (s.match(/[\p{L}\d]+$/u) || [s])[0];
-  const num = /(\d+)$/.exec(w);
-  if (num) { const v = Number(num[1].slice(-2)); w = v % 10 ? DIGIT[v % 10] : v ? TENS[Math.floor(v / 10)] : num[1].length > 2 ? 'yüz' : 'sıfır'; }
-  else if (/[A-ZÇĞİÖŞÜ]{2,}$/.test(w)) w = LETTER[w.slice(-1).toLocaleLowerCase('tr')] || w;
-  w = w.toLocaleLowerCase('tr');
-  const vs = w.match(/[aeıioöuü]/g), back = !vs || /[aıou]/.test(vs[vs.length - 1]), V = back ? 'a' : 'e';
-  const end = w.slice(-1), vowelEnd = /[aeıioöuü]/.test(end), hard = /[fstkçşhpx]/.test(end);
-  return s + "'" + [vowelEnd ? 'y' + V : V, (hard ? 't' : 'd') + V, (hard ? 't' : 'd') + V + 'n'][i];
-}
+export { ek } from './ek.js';
+import { ek } from './ek.js';
 
 // Kargo gecikme uyarısı: kanalın son kargoya teslim tarihi (varsa) ve sipariş yaşı (1 günü aşan) dikkate alınır
 export function lateInfo(o, now = Date.now()) {
@@ -326,7 +306,7 @@ export function sheet({ title, body, foot, size = '', onClose } = {}) {
   bg.innerHTML = `<div class="sheet ${size}" role="dialog" aria-modal="true"><div class="sheet-head"><h2 class="ellipsis"></h2><button class="icon-btn" data-close aria-label="Kapat"><i class="ico ico-x"></i></button></div><div class="sheet-body"></div><div class="sheet-foot hide"></div></div>`;
   const s = { el: bg, body: $('.sheet-body', bg), foot: $('.sheet-foot', bg), title: $('h2', bg) };
   s.title.textContent = title || '';
-  s.close = () => { if (!bg.isConnected) return; bg.remove(); sheets.splice(sheets.indexOf(s), 1); document.body.style.overflow = sheets.length ? 'hidden' : ''; onClose && onClose(); };
+  s.close = () => { if (!bg.isConnected) return; bg.remove(); sheets.splice(sheets.indexOf(s), 1); document.body.style.overflow = sheets.length ? 'hidden' : ''; document.body.classList.toggle('has-sheet', !!sheets.length); onClose && onClose(); };
   s.setBody = (tpl) => render(s.body, tpl);
   s.setFoot = (tpl) => { s.foot.classList.toggle('hide', !tpl); if (tpl) render(s.foot, tpl); };
   bg.addEventListener('click', (e) => { if (e.target === bg || e.target.closest('[data-close]')) s.close(); });
@@ -335,6 +315,7 @@ export function sheet({ title, body, foot, size = '', onClose } = {}) {
   $('#sheet-root').append(bg);
   sheets.push(s);
   document.body.style.overflow = 'hidden';
+  document.body.classList.add('has-sheet');
   return s;
 }
 if (typeof document !== 'undefined') document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openMenu) closeMenu(); else if (sheets.length) sheets[sheets.length - 1].close(); } });

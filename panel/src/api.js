@@ -34,6 +34,9 @@ import { guardConfig, setGuardConfig, guardList, guardUnblock, guardIp } from '.
 import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS, grossCost } from './carriers.js';
 import { can, sectionOf } from '../public/perms.js';
 import { exclusive } from './locks.js';
+import { ek } from '../public/ek.js';
+// Eksik alan kodları (WOO_URL …) kullanıcıya alan adıyla gösterilir
+const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).find((f) => f.k === k) || {}).label || k).join(', ');
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
@@ -281,7 +284,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     }
     await setLocalStatus(db, o, 'processing');
     await event(db, o, 'accept', user);
-    return { ok: true, message: ch && ch.caps.accept === 'remote' ? `Sipariş işleme alındı (${ch.name}'a bildirildi)` : 'Sipariş işleme alındı' };
+    return { ok: true, message: ch && ch.caps.accept === 'remote' ? `Sipariş işleme alındı (${ek(ch.name, 'a')} bildirildi)` : 'Sipariş işleme alındı' };
   }
   if (action === 'pack') {
     if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
@@ -449,8 +452,8 @@ async function orderAction(env, db, id, action, b, ctx, user) {
         const x = await ch.ownShipment(o, pkg, { tracking: tn, barcode: str(r.barcode || r.tracking), cargoCompany: str(r.carrier) || c.name, trackingUrl: str(r.trackingUrl) });
         if (x && x.remoteId) await run(db, 'UPDATE packages SET remote_id = ? WHERE id = ?', x.remoteId, pkg.id);
       } catch (e) {
-        chNote = ` · ${ch.name}'a henüz yazılamadı (${e.message}); “Kargoya ver”de yeniden denenir`;
-        await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${ch.name}'a kargo bilgisi yazılamadı: ${e.message}`.slice(0, 500), pkg.id);
+        chNote = ` · ${ek(ch.name, 'a')} henüz yazılamadı (${e.message}); “Kargoya ver”de yeniden denenir`;
+        await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${ek(ch.name, 'a')} kargo bilgisi yazılamadı: ${e.message}`.slice(0, 500), pkg.id);
       }
     }
     // Entegratörün kargo ücreti siparişin kargo giderine yazılır (elle girilen gider korunur)
@@ -1723,7 +1726,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     let ch = await channel(env, db, x[1]);
     if (!ch) fail(404, 'Kanal bulunamadı');
     if (ch.gated) ch = ch.real;
-    const checks = [{ name: 'API bilgileri', ok: ch.demo ? null : ch.enabled ? true : false, detail: ch.demo ? 'Girilmemiş' : ch.enabled ? 'Gerekli alanlar dolu' : 'Eksik: ' + (ch.missing || []).join(', ') }];
+    const checks = [{ name: 'API bilgileri', ok: ch.demo ? null : ch.enabled ? true : false, detail: ch.demo ? 'Girilmemiş' : ch.enabled ? 'Gerekli alanlar dolu' : 'Eksik: ' + fieldNames(ch.id, ch.missing) }];
     if (ch.demo) checks.push({ name: 'Deneme modu', ok: null, detail: 'Bu kanal örnek veriyle çalışıyor (API bilgisi girilmemiş)' });
     let order = null;
     if (b.order_id) order = await first(db, 'SELECT remote_id, order_number FROM orders WHERE id = ?', String(b.order_id));
@@ -1744,7 +1747,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const gated = !!ch.gated;
     if (gated) ch = ch.real; // bekleyen kanal: gerçek bağlantı denenir, başarılıysa onaylanır
     else if (ch.paused) return json({ ok: false, message: 'Kanal pasif' });
-    if (!ch.enabled) return json({ ok: false, message: 'Eksik bilgi: ' + ch.missing.join(', ') });
+    if (!ch.enabled) return json({ ok: false, message: 'Eksik bilgi: ' + fieldNames(ch.id, ch.missing) });
     if (ch.demo) return json({ ok: true, message: 'Deneme modu: örnek veriyle çalışıyor' });
     const t = Date.now();
     try {

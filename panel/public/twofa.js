@@ -83,7 +83,7 @@ export function showRecovery(codes, onDone) {
   $('[data-copy]', s.el).onclick = () => navigator.clipboard.writeText(text).then(() => toast('Kodlar kopyalandı'), () => toast('Kopyalanamadı; elle seçip kopyalayın', true));
   $('[data-dl]', s.el).onclick = () => {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([`Hastürk panel — iki adımlı doğrulama yedek kodları\n${new Date().toLocaleString('tr-TR')}\n\n${text}\n`], { type: 'text/plain' }));
+    a.href = URL.createObjectURL(new Blob([`Hastürk panel — iki adımlı doğrulama yedek kodları\n${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}\n\n${text}\n`], { type: 'text/plain' }));
     a.download = 'yedek-kodlar.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
   return s;

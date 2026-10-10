@@ -42,15 +42,15 @@ const ROUTES = [
   // Gruplu sayfalar: menüde grup tek satır; grubun sayfaları sayfanın üstünde sekme olarak (tab: sekme adı)
   { path: 'urunler', title: 'Ürünler', tab: 'Ürün listesi', icon: 'box', view: products, perm: 'products', group: 'katalog' },
   { path: 'stoklar', title: 'Stoklar', tab: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock', group: 'katalog' },
-  { path: 'kanal-urunleri', title: 'Kanal Ürünleri', tab: 'Kanaldaki ürünler', icon: 'grid', view: channelProductsView, perm: 'products', group: 'katalog' },
+  { path: 'kanal-urunleri', title: 'Kanal ürünleri', tab: 'Kanal ürünleri', icon: 'grid', view: channelProductsView, perm: 'products', group: 'katalog' },
   { path: 'eslestirme', title: 'Eşleştirme', tab: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match', group: 'katalog' },
   { path: 'urun-yukle', title: 'Pazaryerine Yükle', tab: 'Pazaryerine yükle', icon: 'upload', view: uploadView, perm: 'products', group: 'katalog' },
   { path: 'kampanyalar', title: 'Kampanyalar', tab: 'Kampanyalar', icon: 'tag', view: campaignsView, perm: 'products', group: 'fiyat' },
-  { path: 'buybox', title: 'Buybox', tab: 'Buybox (fiyat rekabeti)', icon: 'bolt', view: buyboxView, perm: 'products', group: 'fiyat' },
+  { path: 'buybox', title: 'Fiyat rekabeti', tab: 'Fiyat rekabeti', icon: 'bolt', view: buyboxView, perm: 'products', group: 'fiyat' },
   { sec: 'Raporlar' },
-  { path: 'analiz', title: 'Analizler', tab: 'Satış analizi', icon: 'pie', view: insightsView, perm: 'reports', group: 'rapor' },
+  { path: 'analiz', title: 'Satış analizi', tab: 'Satış analizi', icon: 'pie', view: insightsView, perm: 'reports', group: 'rapor' },
   { path: 'gelir-gider', title: 'Gelir & Gider', tab: 'Gelir & gider', icon: 'calc', view: financeView, perm: 'finance', group: 'rapor' },
-  { path: 'kar', title: 'Kârlılık', tab: 'Kâr hesapla', icon: 'bars', view: profitView, perm: 'finance', group: 'rapor' },
+  { path: 'kar', title: 'Kâr hesapla', tab: 'Kâr hesapla', icon: 'bars', view: profitView, perm: 'finance', group: 'rapor' },
   { path: 'musteriler', title: 'Müşteriler', tab: 'Müşteriler', icon: 'user', view: customersView, perm: 'reports', group: 'rapor' },
   { sec: 'Sistem' },
   { path: 'entegrasyonlar', title: 'Entegrasyonlar', icon: 'key', view: integrations, admin: true },
@@ -108,7 +108,7 @@ export function refreshChrome(s = state.summary) {
     const C = { urgent: ['#fee2e2', '#7f1d1d'], warn: ['#fef3c7', '#713f12'], info: ['#e0ecff', '#1e3a8a'] }[level];
     eb.style.cssText = `position:sticky;top:0;z-index:50;background:${C[0]};color:${C[1]};padding:7px 14px;font-weight:600;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap`;
     const when = left <= 0 ? 'bugün sona eriyor' : left === 1 ? 'yarın sona eriyor' : `bitmesine ${left} gün kaldı`;
-    const date = tn.expires_at ? new Date(tn.expires_at).toLocaleDateString('tr-TR') : '';
+    const date = tn.expires_at ? new Date(tn.expires_at).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' }) : '';
     render(eb, html`<span style="flex:1;min-width:200px">${tn.trial ? 'Ücretsiz deneme sürenizin' : 'Lisansınızın'} ${when}${date ? ` (${date})` : ''}. ${level === 'info' && tn.trial ? 'Süre sonunda paket seçerek kaldığınız yerden devam edersiniz.' : 'Süre bitince panele giriş ve kanallarla senkron durur; verileriniz silinmez.'}</span><a class="btn sm" href="#/paketim">${tn.trial ? 'Paket seçin' : 'Lisansı yenileyin'}</a>${level === 'info' ? html`<button class="btn sm ghost" data-exp-hide title="Bugün gizle" aria-label="Bugün gizle">✕</button>` : ''}`);
     const hb = eb.querySelector('[data-exp-hide]');
     if (hb) hb.onclick = () => { store.set(hideKey, '1'); eb.remove(); };
@@ -422,7 +422,7 @@ let tsKey = '';
 // Şifremi unuttum: firma kodu + kullanıcı adı / e-posta → e-postaya yenileme bağlantısı (müşteri panelleri)
 function forgotForm(box, tenant, who) {
   render($('.login-card', box), html`<div><h2>Şifremi unuttum</h2><div class="muted small">Kullanıcınıza kayıtlı e-posta adresine şifre yenileme bağlantısı gönderilir.</div></div>
-    <label class="field"><span>Firma kodu</span><input class="input" name="ft" autocapitalize="none" value="${tenant}" placeholder="ör. ornek-firma"></label>
+    <label class="field"><span>Firma kodu</span><input class="input" name="ft" autocapitalize="none" value="${tenant}" placeholder="E-postanızdaki firma kodu"></label>
     <label class="field"><span>Kullanıcı adı ya da e-posta</span><input class="input" name="fw" autocapitalize="none" value="${who}"></label>
     <div class="ts-box" data-ts></div>
     <div class="login-err" data-err role="alert"></div><div class="notice hide" data-ok></div>
@@ -489,7 +489,7 @@ async function login(info = {}) {
       <div><h2>Hoş geldiniz</h2><div class="muted small">Devam etmek için giriş yapın</div></div>
       ${info.setup ? html`<div class="notice warn"><i class="ico ico-warn"></i><div>Panel şifresi henüz tanımlanmamış. Cloudflare → Worker → Settings → Variables and Secrets bölümüne <b>PANEL_PASSWORD</b> ekleyin.</div></div>` : ''}
       ${info.demo || brand.demo ? html`<div class="notice"><i class="ico ico-bolt"></i><div>Deneme modu: kullanıcı adı boş, şifre <b>demo</b></div></div>` : ''}
-      <label class="field ${owner ? 'hide' : ''}" data-firma><span>Firma kodu</span><input class="input" name="tenant" autocomplete="organization" autocapitalize="none" placeholder="ör. ornek-firma" value="${owner ? '' : firma}"></label>
+      <label class="field ${owner ? 'hide' : ''}" data-firma><span>Firma kodu</span><input class="input" name="tenant" autocomplete="organization" autocapitalize="none" placeholder="E-postanızdaki firma kodu" value="${owner ? '' : firma}"></label>
       <label class="field"><span>Kullanıcı adı</span><input class="input" name="username" autocomplete="username" autocapitalize="none" placeholder="${owner ? 'Yönetici için boş bırakın' : 'Kullanıcı adınız'}"></label>
       <label class="field"><span>Şifre</span><span class="pw"><input class="input" type="password" name="password" autocomplete="current-password" required><button type="button" class="icon-btn sm" data-eye aria-label="Şifreyi göster"><i class="ico ico-eye"></i></button></span></label>
       <div class="ts-box" data-ts></div>
@@ -553,7 +553,7 @@ function shellCache(build) {
 }
 
 // Dosya sürümü (app.css → --assets ile aynı). Eski CSS ile yeni JS (ya da tersi) açıldıysa saklananlar silinip bir kez yenilenir.
-const ASSETS = '2026-10-09g';
+const ASSETS = '2026-10-10a';
 state.assets = ASSETS;
 function assetsMatch() {
   const css = getComputedStyle(document.documentElement).getPropertyValue('--assets').trim().replace(/"/g, '');

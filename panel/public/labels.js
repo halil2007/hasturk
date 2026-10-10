@@ -96,7 +96,7 @@ export function labelHtml(order, pkg, total, sender = {}) {
           <dt>Sipariş No</dt><dd><b>${esc(order.order_number)}</b></dd>
           <dt>Platform</dt><dd>${esc(c.name)}</dd>
           ${track ? `<dt>Takip No</dt><dd>${esc(track)}</dd>` : ''}
-          <dt>Tarih</dt><dd>${esc(new Date(order.ordered_at).toLocaleDateString('tr-TR'))}</dd>
+          <dt>Tarih</dt><dd>${esc(new Date(order.ordered_at).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' }))}</dd>
           <dt>Gönderen</dt><dd>${esc(sender.name || '')}${sender.phone ? ` · ${esc(sender.phone)}` : ''}</dd>
         </dl>
         <div class="lb-to">

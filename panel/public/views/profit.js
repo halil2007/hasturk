@@ -12,7 +12,7 @@ export async function profitView(el) {
   render(el, html`<div class="two-col">
     <div class="stack">
       <div class="card stack">
-        <div class="row"><div style="flex:1"><h2>Kârlılık hesapla</h2><div class="muted small">Ürün başına kazancını gör</div></div><button class="btn sm ghost" data-act="clear">Temizle</button></div>
+        <div class="row"><div style="flex:1"><h2>Kâr hesapla</h2><div class="muted small">Ürün başına kazancını gör</div></div><button class="btn sm ghost" data-act="clear">Temizle</button></div>
         <div class="search" style="min-width:0"><i class="ico ico-search"></i><input class="input" placeholder="Üründen doldur (ad / SKU)" data-find></div>
         <div class="list" data-found></div>
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('sale', 'Satış fiyatı')}${box('purchase', 'Alış fiyatı')}</div>

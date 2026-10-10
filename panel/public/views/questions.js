@@ -13,9 +13,9 @@ export async function questionsView(el, rest, query = {}) {
     <div class="row wrap"><div class="ch-tabs" style="flex:1" data-chs></div></div>
     <div class="row wrap"><div class="tabs" style="flex:1" data-tabs></div>
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Soru, ürün veya müşteri" data-q value="${f.q}"></div>
-      <button class="btn" data-act="sync"><i class="ico ico-sync"></i>Soruları yenile</button>${isAdmin() ? html`<button class="btn ghost" data-act="tpl">Hazır cevaplar</button>` : ''}</div>
-    <div data-stats></div>
+      <button class="btn" data-act="sync"><i class="ico ico-sync"></i>Yenile</button>${isAdmin() ? html`<button class="btn" data-act="tpl"><i class="ico ico-chat"></i>Hazır cevaplar</button>` : ''}</div>
     <div data-box></div>
+    <div data-stats></div>
   </div>`);
   const tpls = () => (state.settings && state.settings.answer_templates) || [];
   const lim = (c) => (ch(c).caps && ch(c).caps.answer) || { min: 1, max: 2000 };
@@ -25,14 +25,14 @@ export async function questionsView(el, rest, query = {}) {
       <div class="row" style="align-items:flex-start">${thumb(r.image, r.product_name, 'sm')}
         <div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${/^https?:\/\//i.test(r.product_url || '') ? html`<a class="link" href="${r.product_url}" target="_blank" rel="noopener">${r.product_name || 'Ürün'}</a>` : r.product_name || 'Ürün'}</div>
           <div class="row small muted wrap" style="gap:10px">${chBadge(r.channel)}<span>${r.customer || 'Müşteri'}</span><span title="${dateTime(r.asked_at)}">${ago(r.asked_at)}</span>${r.barcode ? html`<span>${r.barcode}</span>` : ''}</div></div>
-        ${r.status === 'waiting' ? html`<span class="pill ${late ? 'bad' : 'warn'}">${late ? 'Süre doluyor' : 'Cevap bekliyor'}</span>` : r.status === 'answered' ? html`<span class="pill good">Cevaplandı</span>` : html`<span class="pill">${r.remote_status || r.status}</span>`}</div>
+        ${r.status === 'waiting' ? html`<span class="pill ${late ? 'bad' : 'warn'}">${late ? 'Süre doluyor' : 'Cevap bekliyor'}</span>` : r.status === 'answered' ? html`<span class="pill good">Cevaplandı</span>` : html`<span class="pill">${r.status === 'rejected' ? 'Reddedildi' : 'Kapandı'}</span>`}</div>
       <div class="qtext">${r.text}</div>
-      ${r.answer ? html`<div class="qans"><div class="tiny muted" style="margin-bottom:4px">${r.answered_by === 'panel' ? `Panelden cevaplandı${r.user ? ` (${r.user})` : ''}` : `${ch(r.channel).name} panelinden cevaplandı`}${r.answered_at ? ` · ${dateTime(r.answered_at)}` : ''}</div>${r.answer}</div>` : ''}
+      ${r.answer ? html`<div class="qans"><div class="tiny muted" style="margin-bottom:4px">${r.answered_by === 'panel' ? `Buradan cevaplandı${r.user ? ` (${r.user})` : ''}` : `${ch(r.channel).name} panelinden cevaplandı`}${r.answered_at ? ` · ${dateTime(r.answered_at)}` : ''}</div>${r.answer}</div>` : ''}
       ${r.status === 'waiting' ? html`
         ${r.error ? html`<div class="notice bad small">${r.error}</div>` : ''}
         ${tpls().length ? html`<div class="row wrap" style="gap:6px">${tpls().map((t, i) => html`<button class="chip" data-act="usetpl" data-i="${i}" title="${t}">${t.length > 34 ? t.slice(0, 34) + '…' : t}</button>`)}</div>` : ''}
         <textarea class="input" data-ans maxlength="${L.max}" placeholder="Cevabınız (${L.min}–${L.max} karakter). Gönderilen cevap ${ek(ch(r.channel).name, 'da')} müşteriye görünür."></textarea>
-        <div class="row"><span class="cnt" data-cnt>0 / ${L.max}</span><span class="spacer"></span>${r.due_at ? html`<span class="muted tiny">son cevap: ${dateTime(r.due_at)}</span>` : ''}<button class="btn primary" data-act="answer"><i class="ico ico-check"></i>Cevapla</button></div>` : ''}
+        <div class="row"><span class="cnt" data-cnt>0 / ${L.max}</span><span class="spacer"></span>${r.due_at ? html`<span class="muted tiny">Son cevap tarihi: ${dateTime(r.due_at)}</span>` : ''}<button class="btn primary" data-act="answer"><i class="ico ico-check"></i>Cevapla</button></div>` : ''}
     </div>`;
   }
   // Son 30 gün kanal bazında soru analizi
@@ -40,7 +40,7 @@ export async function questionsView(el, rest, query = {}) {
   function drawStats() {
     const st = (data.stats || []).filter((x) => !f.channel || x.channel === f.channel);
     render($('[data-stats]', el), st.length ? html`<div class="card flush"><div class="card-pad card-head"><h2>Soru analizi</h2><span class="muted small">son 30 gün</span></div>
-      <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Soru</th><th class="r">Bekleyen</th><th class="r">Cevaplanma</th><th class="r">Ort. cevap süresi</th><th class="r">Panelden</th></tr></thead><tbody>
+      <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Soru</th><th class="r">Bekleyen</th><th class="r">Cevaplanma</th><th class="r">Ort. cevap süresi</th><th class="r">Buradan cevaplanan</th></tr></thead><tbody>
       ${st.map((x) => html`<tr><td>${chBadge(x.channel)}</td><td class="r num">${n(x.total)}</td><td class="r num" style="color:${x.waiting ? 'var(--bad)' : 'inherit'};font-weight:650">${n(x.waiting)}</td>
         <td class="r num">%${n(x.total ? (x.answered / x.total) * 100 : 0)}</td><td class="r num">${dur(x.avg_ms)}</td><td class="r num">${n(x.by_panel)}</td></tr>`)}
       </tbody></table></div></div>` : '');

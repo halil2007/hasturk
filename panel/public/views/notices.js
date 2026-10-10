@@ -12,7 +12,7 @@ export async function notices(el, rest, query = {}) {
   const internal = !state.tenant && !state.demo;
   if (!internal) f.all = true;
   render(el, html`<div class="stack">
-    <div class="row wrap page-actions"><div class="tabs" data-tabs></div><span class="spacer"></span><button class="btn" data-act="sync"><i class="ico ico-sync"></i>Şimdi senkronla</button></div>
+    <div class="row wrap page-actions"><div class="tabs" data-tabs></div><span class="spacer"></span><button class="btn" data-act="sync"><i class="ico ico-sync"></i>Yenile</button></div>
     <div data-box></div>
     ${internal ? html`<div class="card flush" data-errs-card><div class="card-pad row"><h3 style="flex:1">Hata özeti · son 30 gün</h3><button class="btn sm" data-act="copyerr"><i class="ico ico-copy"></i>Raporu kopyala</button></div><div data-errs></div></div>` : ''}
     <div class="card flush"><div class="card-pad row"><h3 style="flex:1">Son işlemler</h3><span class="muted tiny">senkron, stok ve kullanıcı işlemleri</span></div><div data-logs></div></div>
