@@ -384,6 +384,8 @@ export const DEFAULT_SETTINGS = {
   panel_url: '',
   // Kurulum rehberi kararları (stok gönderimi soruldu mu, rehber gizlendi mi)
   setup: {},
+  // Google Ads dönüşüm etiketleri (yalnız ana panel; tanıtım sitesi /api/public/ads ile okur): send_to 'AW-…/ETİKET' içindeki ETİKET
+  ads_conv: { trial: '', lead: '', purchase: '', eft: '' },
   // Döviz bazlı fiyat ayarları (kaynak, kur türü, güncelleme sıklığı, eşik %, yuvarlama, genel kâr payı %)
   fx: { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 },
   // Müşteri sorularına hazır cevaplar

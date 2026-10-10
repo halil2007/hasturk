@@ -1,7 +1,7 @@
 // Google Ads etiketi (gtag.js), Google Analytics 4 ve dönüşüm ölçümü. Kimlikler config.js → ads, analytics.
 // Çerez onayı (Google Consent Mode v2): ziyaretçi "Kabul et" diyene kadar reklam / analiz çerezleri kapalıdır; Google bu sürede
 // çerezsiz, kimliksiz sinyallerle dönüşümleri modelleyebilir. Tercih bu cihazda saklanır (localStorage → "cerez").
-// Dönüşümler: /odeme-basarili (kartla satın alma) ve /siparis-alindi (havale / EFT siparişi); tutar ve sipariş no adresten okunur.
+// Dönüşümler: deneme kaydı, iletişim formu, /odeme-basarili (kartla satın alma), /siparis-alindi (havale / EFT); etiketler panelden.
 (() => {
   const A = (window.SITE || {}).ads || {}, GA = (window.SITE || {}).analytics || '';
   const tagId = A.id || GA;
@@ -23,13 +23,22 @@
     document.head.append(s);
   }
 
-  // Dönüşüm: aynı sipariş bu tarayıcıda bir kez sayılır (sayfa yenilense de); Google da transaction_id ile tekrarı ayıklar
+  // Google Ads dönüşüm etiketleri panelden okunur (ana panel → Ayarlar → Google Ads); panel yanıt vermezse config.js → ads
+  const S = window.SITE || {};
+  let labels = null;
+  const labelsOf = () => labels || (labels = (S.panelUrl ? fetch(`${S.panelUrl.replace(/\/+$/, '')}/api/public/ads`, { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({}))
+    .then((p) => ({ trial: p.trial || A.trial, lead: p.lead || A.contact, purchase: p.purchase || A.purchase, eft: p.eft || A.lead })));
+  // Dönüşüm bildir: kind = trial | lead | purchase | eft; ga = Google Analytics olay adı. Etiket yoksa yalnız GA olayı gider.
+  window.hcConversion = (kind, ga, data = {}) => {
+    try { gtag('event', ga, data); } catch { /* yok */ }
+    return labelsOf().then((l) => { if (l[kind] && A.id) gtag('event', 'conversion', { send_to: `${A.id}/${l[kind]}`, ...data }); }).catch(() => {});
+  };
+
+  // Satın alma dönüşümü: aynı sipariş bu tarayıcıda bir kez sayılır (sayfa yenilense de); Google da transaction_id ile tekrarı ayıklar
   const q = new URLSearchParams(location.search), order = q.get('siparis') || '', value = Number(q.get('tutar')) || 0;
-  const conv = { '/odeme-basarili': ['purchase', A.purchase], '/siparis-alindi': ['eft_order', A.lead] }[location.pathname.replace(/\.html$/, '').replace(/\/+$/, '')];
+  const conv = { '/odeme-basarili': ['purchase', 'purchase'], '/siparis-alindi': ['eft', 'eft_order'] }[location.pathname.replace(/\.html$/, '').replace(/\/+$/, '')];
   if (conv && order && ls.get('conv:' + order) !== '1') {
-    const data = { value, currency: 'TRY', transaction_id: order };
-    if (conv[1] && A.id) gtag('event', 'conversion', { send_to: `${A.id}/${conv[1]}`, ...data });
-    gtag('event', conv[0], data);
+    window.hcConversion(conv[0], conv[1], { value, currency: 'TRY', transaction_id: order });
     ls.set('conv:' + order, '1');
   }
 

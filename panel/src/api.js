@@ -944,6 +944,11 @@ async function saveSettings(db, b) {
     if (k === 'autoprice' || k === 'costs_vat_incl') v = !!v;
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
     if (k === 'track_urls') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).map(([a, b]) => [str(a).slice(0, 40), str(b).slice(0, 300)]).filter(([a, b]) => a && /^https:\/\/[^\s]+$/i.test(b) && b.includes('{no}')).slice(0, 30));
+    if (k === 'ads_conv') {
+      const o = v && typeof v === 'object' ? v : {};
+      v = Object.fromEntries(['trial', 'lead', 'purchase', 'eft'].map((f) => [f, str(o[f]).replace(/^AW-\d+\//, '')]));
+      for (const [f, x] of Object.entries(v)) if (x && !/^[A-Za-z0-9_-]{4,64}$/.test(x)) fail(400, `Google Ads dönüşüm etiketi geçersiz (${f}): yalnız harf, rakam, - ve _ (ör. AbC1dEfGhIjK)`);
+    }
     if (k === 'label_size') v = ['100x150', 'a5', 'a4'].includes(v) ? v : '100x150';
     if (k === 'stock_push' || k === 'auto_upload') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, !!x]));
     if (k === 'hold_channels') v = [...new Set((Array.isArray(v) ? v : []).filter((c) => isChannelId(c)))];
