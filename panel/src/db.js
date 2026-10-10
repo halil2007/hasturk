@@ -84,7 +84,7 @@ const SCHEMA = [
 ];
 // Sonradan eklenen sütunlar (mevcut veritabanlarına eklenir; zaten varsa hata yok sayılır)
 // YALNIZ SONA EKLEYİN: araya eklenen geçiş mevcut veritabanlarında hiç çalışmaz (bkz. init → schema_n; test/migrations.test.mjs)
-const MIGRATIONS = [
+export const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN barcode TEXT',
   'ALTER TABLE packages ADD COLUMN label_format TEXT',
   'ALTER TABLE packages ADD COLUMN label_data TEXT',
@@ -302,6 +302,8 @@ const MIGRATIONS = [
   'ALTER TABLE sales_orders ADD COLUMN snap TEXT',
   // Kargo sayfası: durum + kargoya verilme tarihine göre süzme / sıralama (büyük sipariş geçmişinde tam tarama olmasın)
   'CREATE INDEX IF NOT EXISTS packages_status_shipped ON packages(status, shipped_at)',
+  // Son 30 gün satış adedi (ürün başına): ürün / stok listeleri her istekte sipariş geçmişini toplamasın (birkaç dakikada bir yenilenir)
+  'CREATE TABLE IF NOT EXISTS sold30 (pid INTEGER PRIMARY KEY, s REAL NOT NULL)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

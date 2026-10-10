@@ -59,13 +59,13 @@ export async function api(path, { method = 'GET', body, fresh = false } = {}) {
     if (c && !c.dirty && age < TTL) return structuredClone(c.data);
     if (c && swr && age < STALE) { revalidate(path, c.data); return structuredClone(c.data); }
     if (!fresh && pending.has(path)) return structuredClone(await pending.get(path));
-    return structuredClone(await (fresh ? request(path, 'GET').then((d) => { remember(path, d); return d; }) : fetchGet(path)));
+    return structuredClone(await (fresh ? request(path, 'GET', undefined, true).then((d) => { remember(path, d); return d; }) : fetchGet(path)));
   }
   const dirty = () => { for (const c of cache.values()) c.dirty = true; };
   dirty();
   try { return await request(path, method, body); } finally { dirty(); }
 }
-async function request(path, method, body) {
+async function request(path, method, body, fresh = false) {
   busyBar(1);
   let res;
   // Okuma istekleri en fazla 20 sn beklenir: takılan bir bağlantı (ör. yeni yayın anında) sayfayı sonsuza kadar bekletmesin
@@ -73,7 +73,7 @@ async function request(path, method, body) {
   const timer = ctl ? setTimeout(() => ctl.abort(), 20e3) : null;
   try {
     res = await fetch('/api/' + path, {
-      method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
+      method, headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(fresh ? { 'X-Fresh': '1' } : {}) }, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
     });
   } catch (e) {
     throw new Error(ctl && ctl.signal.aborted ? 'Sunucu yanıt vermedi; birazdan tekrar deneyin' : 'Sunucuya ulaşılamadı; internet bağlantınızı kontrol edin');

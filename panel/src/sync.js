@@ -483,7 +483,10 @@ async function stockOnce(env, db, settings) {
   await setSetting(db, 'once:stock_on_2', 1);
 }
 
-export async function syncAll(env, db, { only, force, listings, cron } = {}) {
+export async function syncAll(env, db, opts = {}) {
+  try { return await syncAllInner(env, db, opts); } finally { (await import('./handler.js')).bumpCache(db); }
+}
+async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
   const t = Date.now();
   // Kilit tek sorguda alınır (aynı anda iki senkron başlayamaz); "Senkronla" da kilide uyar, yalnız kanal beklemesini atlar
   if (!(await takeLock(db, 'sync_lock', t, 10 * 60e3))) return { skipped: 'Otomatik senkron şu an çalışıyor; birkaç dakika içinde biter, siparişler ve stoklar kendiliğinden güncellenir.' };
@@ -673,6 +676,9 @@ export async function importListings(env, db, { only } = {}) {
 }
 // Hızlı iş (2 dakikada bir): gönderim sonuçlarını sorgula ve otomatik gönderimi çalıştır (siparişler / stoklar 15 dakikalık senkronda)
 export async function quickSync(env, db) {
+  try { return await quickSyncInner(env, db); } finally { (await import('./handler.js')).bumpCache(db); }
+}
+async function quickSyncInner(env, db) {
   const t = Date.now();
   if (!(await takeLock(db, 'quick_lock', t, 5 * 60e3))) return { skipped: 'Önceki hızlı iş sürüyor' };
   try {
