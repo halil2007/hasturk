@@ -83,6 +83,7 @@ const SCHEMA = [
     status TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, error TEXT, created_at INTEGER, updated_at INTEGER)`,
 ];
 // Sonradan eklenen sütunlar (mevcut veritabanlarına eklenir; zaten varsa hata yok sayılır)
+// YALNIZ SONA EKLEYİN: araya eklenen geçiş mevcut veritabanlarında hiç çalışmaz (bkz. init → schema_n; test/migrations.test.mjs)
 const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN barcode TEXT',
   'ALTER TABLE packages ADD COLUMN label_format TEXT',
@@ -291,6 +292,12 @@ const MIGRATIONS = [
   'ALTER TABLE sales_orders ADD COLUMN qty INTEGER',
   // İlanın kalem hatası zamanı: kalıcı hatalı ilan bir süre yeniden gönderilmez (bkz. sync.js → ERROR_RETRY_MS)
   'ALTER TABLE listings ADD COLUMN error_at INTEGER',
+  // Onarım: aşağıdaki sütunlar listenin ortasına eklendiği için mevcut veritabanlarında atlanmıştı (yalnız sona eklenen geçişler
+  // çalışır). Yeniden sona eklendi; sütunu olan veritabanında "duplicate column" hatası yok sayılır.
+  'ALTER TABLE packages ADD COLUMN carrier_checked_at INTEGER',
+  'ALTER TABLE packages ADD COLUMN carrier_state TEXT',
+  'ALTER TABLE packages ADD COLUMN carrier_status TEXT',
+  'ALTER TABLE blog_posts ADD COLUMN ai INTEGER',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
