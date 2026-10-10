@@ -8,6 +8,20 @@ import { api } from './api.js';
 import { currentUser, login, loginSecond, loginMail, logoutCookie, password, security } from './auth.js';
 import { json, body, HttpError } from './util.js';
 
+// Kısa süreli yanıt önbelleği (Durable Object / Worker örneği başına): çok kişinin aynı anda açtığı ağır okuma ekranları
+// (özet, genel bakış, sipariş / ürün listeleri, raporlar) aynı kullanıcı ve aynı sorgu için 8 sn içinde yeniden hesaplanmaz.
+// Herhangi bir yazma isteği ya da senkron önbelleği hemen boşaltır; "Yenile" (X-Fresh) önbelleği atlar.
+const CACHEABLE = /^(summary|dashboard|orders|products|stats|customers|customers\/summary|buybox|channels|finance|finance\/products|packages|suggestions|picklist)$/;
+const CACHE_TTL = 8e3;
+const caches = new WeakMap();
+const cacheOf = (db) => { let c = caches.get(db); if (!c) caches.set(db, (c = new Map())); return c; };
+export const bumpCache = (db, uid) => {
+  const c = caches.get(db); if (!c) return;
+  if (uid == null) return c.clear();
+  // Yazan kişinin önbelleği hemen boşalır (değişikliğini görsün); diğer kullanıcılarda en geç 8 sn sonra yenilenir
+  for (const k of c.keys()) if (k.startsWith(uid + '|')) c.delete(k);
+};
+
 export async function handle(req, env, ctx, db) {
   const url = new URL(req.url);
   if (!db) return json({ error: 'Veritabanı bağlı değil (wrangler.jsonc → d1_databases)' }, 503);
@@ -48,7 +62,18 @@ export async function handle(req, env, ctx, db) {
     // İlk girişte şifre değiştirme zorunlu (online satışla açılan panelin geçici şifresi): yalnız şifre değiştirme ve özet çalışır
     if (user.mustChange && !/^(me\/password|summary|me|brand|logo|errors\/report)$/.test(path)) return json({ error: 'Devam etmek için önce geçici şifrenizi değiştirin', mustChange: true }, 403);
     if (need2fa && !path.startsWith('me/2fa') && !/^(brand|logo)$/.test(path)) return json({ error: 'Yöneticiniz iki adımlı doğrulamayı zorunlu tuttu; devam etmek için açın', need2fa: true }, 403);
-    return await api(req, env, ctx, db, path, user);
+    if (req.method !== 'GET') { const r = await api(req, env, ctx, db, path, user); bumpCache(db, user.id); return r; }
+    if (!CACHEABLE.test(path)) return await api(req, env, ctx, db, path, user);
+    const c = cacheOf(db), key = `${user.id}|${user.role}|${user.support ? 1 : 0}|${JSON.stringify(user.perms || null)}|${path}${url.search}`, now = Date.now(), hit = c.get(key);
+    if (hit && now - hit.at < CACHE_TTL && !req.headers.get('X-Fresh')) return new Response(hit.body, { status: 200, headers: hit.headers });
+    const r = await api(req, env, ctx, db, path, user);
+    if (r.status === 200 && /json/.test(r.headers.get('Content-Type') || '')) {
+      const text = await r.text(), headers = [...r.headers];
+      if (c.size > 300) for (const [k, v] of c) if (now - v.at >= CACHE_TTL) c.delete(k);
+      if (c.size < 500) c.set(key, { at: now, body: text, headers });
+      return new Response(text, { status: 200, headers });
+    }
+    return r;
   } catch (e) {
     if (e instanceof HttpError) return json({ error: e.message }, e.status);
     console.error(e);

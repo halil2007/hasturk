@@ -6,7 +6,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { d1 } from '../dev/d1.mjs';
-import { init } from '../src/db.js';
+import { init, MIGRATIONS } from '../src/db.js';
 
 const cols = async (db, t) => (await db.prepare(`PRAGMA table_info(${t})`).all()).results.map((c) => c.name);
 
@@ -19,7 +19,7 @@ test('araya eklenip atlanmış sütunlar sonraki açılışta eklenir', async ()
   for (const [t, c] of [['packages', 'carrier_checked_at'], ['packages', 'carrier_state'], ['packages', 'carrier_status'], ['blog_posts', 'ai']]) {
     await a.prepare(`ALTER TABLE ${t} DROP COLUMN ${c}`).run();
   }
-  await a.prepare("UPDATE settings SET v = ? WHERE k = 'schema_n'").bind(JSON.stringify(n - 6)).run();
+  await a.prepare("UPDATE settings SET v = ? WHERE k = 'schema_n'").bind(JSON.stringify(MIGRATIONS.lastIndexOf('ALTER TABLE packages ADD COLUMN carrier_checked_at INTEGER'))).run();
   await a.prepare("UPDATE settings SET v = '\"eski\"' WHERE k = 'schema_v'").run();
   const b = d1(file); // yeni Worker örneği
   await init(b);

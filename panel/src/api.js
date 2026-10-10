@@ -83,7 +83,8 @@ function orderFilter(q, { withStatus = true } = {}) {
   if (day(q.from) != null) { where.push('o.ordered_at >= ?'); args.push(day(q.from)); }
   if (day(q.to) != null) { where.push('o.ordered_at < ?'); args.push(day(q.to) + 864e5); }
   if (q.cargo) { where.push('(o.cargo_company = ? OR EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id AND k.cargo_company = ?))'); args.push(q.cargo, q.cargo); }
-  if (q.q) {
+  if (q._ids) { where.push('o.id IN (SELECT value FROM json_each(?))'); args.push(q._ids); }
+  else if (q.q) {
     const s = '%' + q.q.trim() + '%';
     // Eşleşen siparişler bir kez bulunur (sipariş başına alt sorgu yerine; büyük sipariş geçmişinde hızlı)
     where.push('o.id IN (SELECT id FROM orders WHERE order_number LIKE ? OR customer LIKE ? OR tracking LIKE ? UNION SELECT order_id FROM order_items WHERE name LIKE ? OR sku LIKE ? OR barcode LIKE ?)');
@@ -93,6 +94,12 @@ function orderFilter(q, { withStatus = true } = {}) {
 }
 
 async function listOrders(db, q) {
+  // Arama: eşleşen sipariş kimlikleri bir kez bulunur, liste / toplam / durum sayıları / geciken sorguları bu listeyi kullanır
+  if (q.q && q.q.trim()) {
+    const s = '%' + q.q.trim() + '%';
+    const ids = await all(db, 'SELECT id FROM orders WHERE order_number LIKE ? OR customer LIKE ? OR tracking LIKE ? UNION SELECT order_id FROM order_items WHERE name LIKE ? OR sku LIKE ? OR barcode LIKE ? LIMIT 5000', s, s, s, s, s, s);
+    q = { ...q, _ids: JSON.stringify(ids.map((r) => r.id)) };
+  }
   const { w, args, st } = orderFilter(q);
   const limit = Math.max(1, Math.min(Number(q.limit) || 25, 200)), page = Math.max(1, Number(q.page) || 1);
   // Liste, toplam, durum sayıları ve ayarlar aynı anda okunur (sıralı gidiş-dönüş yerine tek bekleme)
@@ -726,10 +733,18 @@ function cleanProduct(b) {
 const LIMIT = (low) => `(CASE WHEN p.critical_stock > 0 THEN p.critical_stock ELSE ${Math.max(0, Math.round(Number(low) || 0))} END)`;
 export const RUNOUT_DAYS = 14;
 // Hız: son 30 gün satışları ürün başına tek seferde toplanır (ürün başına alt sorgu yerine; büyük katalogda 10 kat hızlı)
-const SOLD_JOIN = () => `LEFT JOIN (SELECT i.product_id AS pid, SUM(i.quantity) AS s FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.ordered_at >= ${Date.now() - 30 * 864e5}
-  AND o.status NOT IN ('cancelled', 'returned') AND COALESCE(i.status, '') != 'cancelled' AND i.product_id IS NOT NULL GROUP BY i.product_id) s30 ON s30.pid = p.id`;
+const SOLD_JOIN = () => 'LEFT JOIN sold30 s30 ON s30.pid = p.id';
+// sold30 tablosu (son 30 gün satış adedi) en fazla 5 dakikada bir yeniden hesaplanır (veritabanı / örnek başına)
+const soldAt = new WeakMap();
+async function refreshSold30(db) {
+  if (Date.now() - (soldAt.get(db) || 0) < 5 * 60e3) return;
+  soldAt.set(db, Date.now());
+  await db.batch([db.prepare('DELETE FROM sold30'), db.prepare(`INSERT INTO sold30 (pid, s) SELECT i.product_id, SUM(i.quantity) FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.ordered_at >= ?
+    AND o.status NOT IN ('cancelled', 'returned') AND COALESCE(i.status, '') != 'cancelled' AND i.product_id IS NOT NULL GROUP BY i.product_id`).bind(Date.now() - 30 * 864e5)]);
+}
 const S30 = 'COALESCE(s30.s, 0)';
 async function listProducts(db, q) {
+  await refreshSold30(db);
   const where = [], args = [];
   const low = LIMIT((await getSettings(db)).low_stock);
   // Tükenmek üzere: mevcut satış hızıyla 14 gün içinde bitecek ürünler
