@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2045 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2059 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 > **Uyarı:** hasturktarimdunyasi mağazasının siparişleri alınamadı (Token alınamadı (401): ). Algoritma şu an yalnız bu mağazanın siparişleriyle çalışıyor. ikas'ta o mağazanın API uygulamasını ve GitHub Secrets'taki anahtarları kontrol edin.
 
@@ -16,8 +16,8 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 2 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×3,9 | 1 | evet |
 | 3 | HG 5’li Bitki Yetiştirme Seti | ×4,8 | 3 | evet |
 | 4 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×5,3 | 2 | evet |
-| 5 | HG Kaktüs ve Sukulent Toprağı | ×5,2 | 1 | evet |
-| 6 | HasTürk Solucan Gübresi  | ×2,1 | 2 | evet |
+| 5 | HasTürk Solucan Gübresi  | ×2,2 | 2 | evet |
+| 6 | HG Kaktüs ve Sukulent Toprağı | ×5,2 | 1 | evet |
 | 7 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | ×4,2 | 0 | evet |
 | 8 | HasTürk Sıvı Solucan Gübresi  | ×1,9 | 3 | evet |
 | 9 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×2,6 | 1 | evet |
@@ -45,8 +45,8 @@ _Henüz veri yok._
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
 | 1 | HasTürk Sıvı Solucan Gübresi  | 10,6 | 12 |
-| 2 | HasTürk Solucan Gübresi  | 8,7 | 11 |
-| 3 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 7,2 | 10 |
+| 2 | HasTürk Solucan Gübresi  | 8,6 | 11 |
+| 3 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 7,1 | 10 |
 | 4 | Kullanıma Hazır Cocopeat Torfu | 6,4 | 16 |
 | 5 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 5,8 | 3 |
 | 6 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 5,6 | 5 |
@@ -55,7 +55,7 @@ _Henüz veri yok._
 | 9 | Premium Fide Toprağı | 5 | 11 |
 | 10 | HG Mezar Toprağı | 4,7 | 8 |
 | 11 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,9 | 5 |
-| 12 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,6 | 4 |
+| 12 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,5 | 4 |
 | 13 | Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı | 3,5 | 2 |
 | 14 | HG Tarım Perliti | 3,3 | 6 |
 | 15 | HG 5’li Bitki Yetiştirme Seti | 3,2 | 4 |
@@ -70,7 +70,7 @@ _Henüz veri yok._
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | saksı | 12 | 10 | ↑ ×4,4 |  |
-| 2 | sıvı solucan gübresi | 26 | 6 |  |  |
+| 2 | sıvı solucan gübresi | 27 | 7 |  |  |
 | 3 | solucan gübresi | 11 | 6 | ↑ ×2,2 |  |
 | 4 | solucan | 14 | 6 | ↑ ×1,7 |  |
 | 5 | kil | 4 | 4 | ↑ ×2,9 |  |
@@ -85,15 +85,15 @@ _Henüz veri yok._
 | 14 | kil bil | 2 | 2 |  |  |
 | 15 | star | 2 | 2 |  |  |
 | 16 | starliçe | 2 | 2 |  |  |
-| 17 | pompa | 2 | 2 |  |  |
-| 18 | cicek tohumu | 2 | 2 |  |  |
-| 19 | mod | 2 | 2 |  |  |
-| 20 | solu | 2 | 2 |  |  |
-| 21 | leonardit | 2 | 2 |  |  |
-| 22 | uzman akü | 2 | 2 |  |  |
-| 23 | ilaçlama pompası | 2 | 1 |  |  |
-| 24 | cocopeat | 2 | 1 |  |  |
-| 25 | leonar | 2 | 1 |  |  |
+| 17 | toprak | 2 | 2 |  |  |
+| 18 | pompa | 2 | 2 |  |  |
+| 19 | cicek tohumu | 2 | 2 |  |  |
+| 20 | mod | 2 | 2 |  |  |
+| 21 | solu | 2 | 2 |  |  |
+| 22 | leonardit | 2 | 2 |  |  |
+| 23 | uzman akü | 2 | 2 |  |  |
+| 24 | ilaçlama pompası | 2 | 1 |  |  |
+| 25 | cocopeat | 2 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
@@ -135,7 +135,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 2 | HG Tarım Perliti | 4,4 | 19 |
 | 3 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 3,8 | 13,3 |
 | 4 | HasTürk Hümix Sıvı Hümik Asit | 3,6 | 20,3 |
-| 5 | HasTürk Solucan Gübresi  | 3,1 | 27 |
+| 5 | HasTürk Solucan Gübresi  | 3,1 | 28 |
 | 6 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,6 | 36,5 |
 | 7 | SGS Bahçe Seti 3 Parça | 2,5 | 0 |
 | 8 | HG Kaktüs ve Sukulent Toprağı | 2,5 | 19,8 |
@@ -170,9 +170,9 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 19,4 | 0 | %0 |
 | Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 16,4 | 0 | %0 |
 | Bahçe Toprağı Canlandırma Seti | 15,3 | 0 | %0 |
+| Envaplas Esnek Yeşil Çim Ayırıcı ve Sınırlayıcı (25 Metre) | 14,9 | 0 | %0 |
 | Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 14,5 | 0 | %0 |
 | Gold Valley Fare Kulağı Tohumu 500 Gr | 14,5 | 0 | %0 |
-| Trendline Gourmet Tavuklu Yetişkin Kedi Maması 15 Kg | 14,5 | 0 | %0 |
 
 ## Masaüstü menü önerileri (kategori başına ilk 3)
 
