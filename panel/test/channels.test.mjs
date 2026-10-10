@@ -81,6 +81,28 @@ test('ikas: token alınır, sipariş okunur, stok saveProductStockLocations ile 
   assert.deepEqual(save.variables.input.productStockLocationInputs, [{ productId: 'p1', variantId: 'v1', stockLocationId: 'loc1', stockCount: 7 }]);
 });
 
+test('ikas çok lokasyonlu mağaza: silinmiş lokasyon seçilmez, diğer lokasyonlardaki stok 0lanır (site toplamı = panel stoğu)', async () => {
+  const gqlBodies = [];
+  mockFetch([
+    [/oauth\/token/, { access_token: 'T', expires_in: 3600 }],
+    [/graphql/, (url, opts) => {
+      const b = JSON.parse(opts.body); gqlBodies.push(b);
+      if (/listStockLocation/.test(b.query)) return { data: { listStockLocation: [{ id: 'old', name: 'Eski', deleted: true }, { id: 'A', name: 'Depo' }, { id: 'B', name: 'Mağaza' }] } };
+      if (/listProductStockLocation/.test(b.query)) return { data: { listProductStockLocation: { hasNext: false, data: [
+        { productId: 'p1', variantId: 'v1', stockLocationId: 'A', stockCount: 2 }, { productId: 'p1', variantId: 'v1', stockLocationId: 'B', stockCount: 5 },
+        { productId: 'p2', variantId: 'v2', stockLocationId: 'B', stockCount: 0 }] } } };
+      return { data: { saveProductStockLocations: true } };
+    }],
+  ]);
+  const ch = ikas({ IKAS2_STORE: 's2', IKAS2_CLIENT_ID: 'i', IKAS2_CLIENT_SECRET: 'c' }, 'IKAS2_', { id: 'ikas2' });
+  const r = await ch.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 7 }, { remoteId: 'v2', remoteProductId: 'p2', stock: 3 }]);
+  assert.deepEqual(r.done, ['v1', 'v2']);
+  const save = gqlBodies.find((b) => /saveProductStockLocations/.test(b.query));
+  assert.deepEqual(save.variables.input.productStockLocationInputs, [
+    { productId: 'p1', variantId: 'v1', stockLocationId: 'A', stockCount: 7 }, { productId: 'p1', variantId: 'v1', stockLocationId: 'B', stockCount: 0 },
+    { productId: 'p2', variantId: 'v2', stockLocationId: 'A', stockCount: 3 }]);
+});
+
 test('ikas Kargo: panel "Kargoya Hazır" işaretlemez; ikas Kargo gönderisi (barkod / etiket görseli / hata) okunur', async () => {
   const bodies = [];
   let pkgState = null;
