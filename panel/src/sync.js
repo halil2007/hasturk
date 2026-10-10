@@ -26,6 +26,7 @@ import { pushDigest } from './push.js';
 import { dailyDigest } from './digest.js';
 import { urgentAlert, alertResolved } from './alerts.js';
 import { allows } from './plans.js';
+import { trackCarriers } from './carriers.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -575,6 +576,8 @@ export async function syncAll(env, db, { only, force, listings, cron } = {}) {
     out.mail = await sendQueued(env, db, chans, settings).catch((e) => 'hata: ' + e.message);
     // Eski açık siparişler: kanaldan yeniden sorgulanır; 30 günü geçip hâlâ açık görünen tamamlandı sayılır
     if (!only) out.stale = await staleOrders(env, db, chans, maps).catch((e) => 'hata: ' + e.message);
+    // Kendi anlaşmalı kargo gönderileri: firmadan takip no, ücret ve teslim durumu
+    if (!only) out.carriers = await trackCarriers(env, db).catch((e) => 'hata: ' + e.message);
     // Kanalda bulunamayan açık siparişler (silinmiş / deneme siparişi, kaldırılmış mağaza)
     if (!only) out.missing = await checkMissing(env, db).catch((e) => 'hata: ' + e.message);
     // Eski siparişlerde bulunan iptal / iade ve bu senkronda kabul edilen iade talepleri: stok hemen düzeltilir

@@ -152,7 +152,7 @@ export async function settingsView(el) {
           <label class="field"><span>Gönderen</span><input class="input" data-sender="name" value="${st.sender.name || co.title || ''}" ${dis}></label>
           <label class="field"><span>Telefon</span><input class="input" data-sender="phone" value="${st.sender.phone || ''}" ${dis}></label>
           <label class="field"><span>Adres</span><input class="input" data-sender="address" value="${st.sender.address || ''}" ${dis}></label>
-          <label class="field"><span>İlçe / il</span><input class="input" data-sender="city" value="${st.sender.city || ''}" ${dis}></label>
+          <label class="field"><span>İlçe / il</span><input class="input" data-sender="city" placeholder="ör. Selçuklu / Konya" value="${st.sender.city || ''}" ${dis}></label>
           <label class="field"><span>Kargo firmaları (virgülle)</span><input class="input" data-cargos value="${(st.cargo_companies || []).join(', ')}" ${dis}></label>
           <label class="field"><span>Kendi etiketimizin boyutu</span><select class="input" data-labelsize ${dis}>${[['100x150', '10 × 15 cm (termal yazıcı)'], ['a5', 'A5 (normal yazıcı)'], ['a4', 'A4 (normal yazıcı)']].map(([v, t]) => html`<option value="${v}" ${(st.label_size || '100x150') === v ? 'selected' : ''}>${t}</option>`)}</select></label>
           <label class="field"><span>İlk senkronda geçmiş (gün)</span><input class="input" inputmode="numeric" data-history value="${st.history_days}" ${dis}></label>

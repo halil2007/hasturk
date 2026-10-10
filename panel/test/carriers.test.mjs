@@ -27,12 +27,12 @@ async function panel(extraEnv = {}) {
   return { env, call, post: (path, b) => call(path, { method: 'POST', body: JSON.stringify(b || {}) }) };
 }
 
-test('kargo entegratörü: bilgiler şifreli saklanır; API dokümanı gelmemiş firma gönderi açmaz, açıklama döner', async () => {
+test('kargo entegratörü: bilgiler şifreli saklanır; bağlantısı olmayan firma gönderi açmaz, açıklama döner', async () => {
   const { env, call, post } = await panel();
   let r = await call('/api/integrations/carriers');
   const k0 = r.body.find((c) => c.id === 'kargonomi');
   assert.equal(k0.configured, false);
-  assert.equal(k0.ready, false);
+  assert.equal(k0.ready, true);
   assert.ok(r.body.some((c) => c.id === 'navlungo'));
   await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'kg-cok-gizli-9876' } }) });
   const row = await env.DB.prepare("SELECT data FROM channel_config WHERE id = 'kargonomi'").first();
@@ -40,19 +40,21 @@ test('kargo entegratörü: bilgiler şifreli saklanır; API dokümanı gelmemiş
   r = await call('/api/integrations/carriers');
   const k = r.body.find((c) => c.id === 'kargonomi');
   assert.equal(k.configured, true);
-  assert.equal(k.usable, false, 'bağlantısı hazır olmayan firma kullanılamaz');
+  assert.equal(k.usable, true);
   assert.equal(k.fields.find((f) => f.k === 'KARGONOMI_API_KEY').masked, '••••••9876');
   assert.ok(!JSON.stringify(r.body).includes('cok-gizli'));
   // Kargo entegratörü satış kanalı değildir: kanal listesine girmez
   assert.ok(!(await call('/api/integrations')).body.channels.some((c) => c.id === 'kargonomi'));
-  r = await post('/api/integrations/carriers/kargonomi/test');
-  assert.equal(r.body.ok, false);
-  assert.match(r.body.message, /API dokümanı/);
+  // Bağlantısı henüz olmayan firma (varsa): bilgiler kaydedilir, gönderi açıklamayla reddedilir
+  const pending = r.body.find((c) => !c.ready && c.id !== 'demo');
   await saveOrders(env.DB, 'trendyol', [order('K1')]);
-  r = await post('/api/orders/trendyol%3AK1/carrier-label', { provider: 'kargonomi' });
-  assert.equal(r.status, 501);
-  assert.match(r.body.error, /Kargonomi bağlantısı hazırlanıyor/);
+  if (pending) {
+    r = await post('/api/orders/trendyol%3AK1/carrier-label', { provider: pending.id });
+    assert.equal(r.status, 501);
+    assert.match(r.body.error, /bağlantısı hazırlanıyor/);
+  }
   // Hiç kullanılabilir entegratör yoksa yönlendirme
+  await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: {}, active: false }) });
   r = await post('/api/orders/trendyol%3AK1/carrier-label', {});
   assert.equal(r.status, 400);
   assert.match(r.body.error, /Bağlı kargo entegratörü yok/);
@@ -158,4 +160,68 @@ test('gönderi bilgisi: alıcı, gönderen, içerik ve değer siparişten; eksik
   const bad = shipmentOf({ ...o, address: '{}', customer: '' }, { no: 1, items: [] }, {});
   assert.ok(bad.missing.includes('alıcı adresi'));
   assert.ok(bad.missing.some((m) => /gönderen/.test(m)));
+});
+
+test('kargo firması (HepsiJET, sahte sunucu): etiket → kargoya ver → firma "teslim edildi" deyince sipariş teslim edildi; Kargonomi etiketi sonradan alınır', async () => {
+  const real = globalThis.fetch;
+  let delivered = false, kgReady = false;
+  globalThis.fetch = async (url, o = {}) => {
+    const u = String(url), J = (x) => new Response(JSON.stringify(x), { headers: { 'Content-Type': 'application/json' } });
+    if (/getToken/.test(u)) return J({ status: 'OK', data: { token: 't' } });
+    if (/sendDeliveryOrderEnhanced/.test(u)) return J({ status: 'OK', data: { customerDeliveryNo: JSON.parse(o.body).delivery.customerDeliveryNo, zplBarcodeDTOList: [{ zplBarcode: '^XA^FDx^FS^XZ' }] } });
+    if (/integration\/track/.test(u)) return J({ status: 'OK', data: [{ details: [{ integrationStatus: delivered ? 'DELIVERED' : 'ACCEPTED', transactionDate: '2026-10-02T12:00:00+03:00' }] }] });
+    // Kargonomi
+    if (/\/states$/.test(u)) return J({ data: [{ id: 42, name: 'KONYA' }] });
+    if (/\/cities\/42$/.test(u)) return J({ data: [{ id: 600, name: 'SELÇUKLU' }] });
+    if (/\/warehouses$/.test(u)) return J({ data: [{ id: 1, is_main: 1 }] });
+    if (/\/shipments$/.test(u)) return J({ id: 9 });
+    if (/confirm-shipping-price/.test(u)) return J({});
+    if (/\/shipments\/9\/barcode/.test(u)) return J({ data: { barcode: 'JVBERi0' + 'C'.repeat(150) } });
+    if (/\/shipments\/9$/.test(u)) return J({ id: 9, status: kgReady ? 'webservice_order_created' : 'webservice_order_creating', shipping_webservice_tracking_code: kgReady ? 'AR123' : null, shipping_provider_name: kgReady ? 'Aras Kargo' : null, shipping_provider_slug: 'aras' });
+    return new Response('?', { status: 404 });
+  };
+  try {
+    const { env, call, post } = await panel();
+    await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '03320000000', address: 'Sanayi Cd. 1', city: 'Selçuklu / Konya' });
+    await call('/api/integrations/carriers/hepsijet', { method: 'PUT', body: JSON.stringify({ values: { HEPSIJET_USER: 'u', HEPSIJET_PASSWORD: 'p', HEPSIJET_COMPANY: 'ETF', HEPSIJET_WAREHOUSE: 'X1' } }) });
+    assert.equal((await post('/api/integrations/carriers/hepsijet/test')).body.ok, true);
+    await saveOrders(env.DB, 'trendyol', [order('H1')]);
+    const id = encodeURIComponent('trendyol:H1');
+    let r = await post(`/api/orders/${id}/carrier-label`, { provider: 'hepsijet' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const pkg = r.body.order.packages[0];
+    assert.match(pkg.tracking, /^ETF\d+$/);
+    assert.equal(pkg.cargo_company, 'HepsiJET');
+    assert.equal(r.body.official.format, 'zpl');
+    r = await post(`/api/orders/${id}/ship`, { package_id: pkg.id });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const { trackCarriers } = await import('../src/carriers.js');
+    let t = await trackCarriers(env, env.DB, { force: true });
+    assert.equal(t.checked, 1);
+    assert.equal((await call(`/api/orders/${id}`)).body.order.status, 'shipped');
+    delivered = true;
+    t = await trackCarriers(env, env.DB, { force: true });
+    assert.equal(t.closed, 1);
+    const o = (await call(`/api/orders/${id}`)).body.order;
+    assert.equal(o.status, 'delivered');
+    assert.ok(o.events.some((e) => e.source === 'carrier' && /teslim/i.test(e.note || '')));
+    // Teslim edilmiş paket yeniden sorgulanmaz
+    assert.equal((await trackCarriers(env, env.DB, { force: true })).checked, 0);
+
+    // Kargonomi: firma gönderisi birkaç saniye sonra oluşur → etiket istenince takip no ve PDF alınır
+    await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'k' } }) });
+    await saveOrders(env.DB, 'trendyol', [order('K9')]);
+    const kid = encodeURIComponent('trendyol:K9');
+    r = await post(`/api/orders/${kid}/carrier-label`, { provider: 'kargonomi' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const kp = r.body.order.packages[0];
+    assert.equal(kp.carrier_ref, '9');
+    r = await post(`/api/orders/${kid}/label`, { package_id: kp.id });
+    assert.match(r.body.pending || '', /henüz hazır değil/);
+    kgReady = true;
+    r = await post(`/api/orders/${kid}/label`, { package_id: kp.id });
+    assert.equal(r.body.official.format, 'pdf');
+    assert.equal(r.body.order.packages[0].tracking, 'AR123');
+    assert.equal(r.body.order.packages[0].cargo_company, 'Aras Kargo');
+  } finally { globalThis.fetch = real; }
 });

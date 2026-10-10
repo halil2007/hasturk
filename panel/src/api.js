@@ -44,7 +44,7 @@ const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d
 const LABEL_REMOTE = ['ikas', 'trendyol', 'hepsiburada', 'pttavm'];
 const bbIds = () => CHANNEL_IDS.filter((c) => BUYBOX_CHANNELS.includes(typeOf(c)));
 const remoteLabel = (col) => `(${col} IN ('ikas1', 'ikas2', ${LABEL_REMOTE.slice(1).map((x) => `'${x}'`).join(', ')}) OR ${LABEL_REMOTE.map((x) => `${col} LIKE '${x}\\_%' ESCAPE '\\'`).join(' OR ')})`;
-const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, cargo_applied, tracking, barcode, agreement, tracking_url, carrier_provider, carrier_ref, carrier_cost, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
+const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, cargo_applied, tracking, barcode, agreement, tracking_url, carrier_provider, carrier_ref, carrier_cost, carrier_state, carrier_status, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
 
 // ---------- siparişler ----------
 async function loadOrder(db, id) {
@@ -462,7 +462,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
       await run(db, 'UPDATE packages SET remote_id = NULL, remote_status = NULL WHERE id = ?', pkg.id);
     }
     if (pkg.carrier_cost && o.shipping_src === 'carrier') await run(db, 'UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) - ?) WHERE id = ?', pkg.carrier_cost, o.id);
-    await run(db, "UPDATE packages SET carrier_provider = NULL, carrier_ref = NULL, carrier_cost = NULL, tracking = '', barcode = '', cargo_company = '', tracking_url = NULL, agreement = NULL, error = NULL WHERE id = ?", pkg.id);
+    await run(db, "UPDATE packages SET carrier_provider = NULL, carrier_ref = NULL, carrier_cost = NULL, carrier_state = NULL, carrier_status = NULL, carrier_checked_at = NULL, tracking = '', barcode = '', cargo_company = '', tracking_url = NULL, agreement = NULL, error = NULL WHERE id = ?", pkg.id);
     await clearLabel(db, pkg.id);
     await event(db, o, 'carrier-cancel', user, `Paket ${pkg.no}: ${c.name}`);
     return { ok: true, message: `Paket ${pkg.no}: ${c.name} gönderisi iptal edildi` };
@@ -490,7 +490,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (live && ch && ch.enabled && ch.fetchOne && ch.type === 'trendyol' && !(pkg.tracking || o.tracking)) {
       try { await saveOrders(db, ch.id, [await ch.fetchOne(o.remote_id)]); o = await loadOrder(db, o.id); pkg = o.packages.find((p) => p.id === pkg.id) || pkg; } catch (e) { console.error('trendyol yenileme', e); }
     }
-    const r = await makeLabel(db, ch, o, pkg, settings, { refresh: !!b.refresh });
+    const r = await makeLabel(db, ch, o, pkg, settings, { refresh: !!b.refresh, env });
     if (r.official || r.panel) await event(db, o, 'label', user, `Paket ${pkg.no}`);
     return { ok: true, order: await loadOrder(db, o.id), package_id: pkg.id, packed, ...r, sender: settings.sender };
   }
@@ -562,10 +562,16 @@ const ownDesign = (settings, ch) => !!ch && ch.type === 'hepsiburada' && setting
 // ---------- kargo etiketi (kanalın kendi sisteminden) ----------
 // ikas: ikas Kargo etiket görseli / barkodu · Trendyol: ortak etiket (ZPL) ya da takip barkodu · Hepsiburada: paket etiketi (ZPL/PDF).
 // Alınan etiket pakete kaydedilir; tekrar istenince kanala gidilmez. Oluşturma, görüntüleme ve yazdırma ayrı tutulur.
-async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
-  // Kargo entegratörü gönderisi: etiket entegratörden geldi (ya da barkodla panel etiketi); kanala gidilmez
+async function makeLabel(db, ch, o, pkg, settings, { refresh = false, env = null } = {}) {
+  // Kargo firması gönderisi: etiket firmadan geldi (ya da barkodla panel etiketi); kanala gidilmez
   if (pkg.carrier_provider) {
-    const r = await first(db, 'SELECT label_format, label_data FROM packages WHERE id = ?', pkg.id);
+    let r = await first(db, 'SELECT label_format, label_data FROM packages WHERE id = ?', pkg.id);
+    // Etiketi sonradan veren firmalar (Kargonomi, Navlungo, DHL şube bekleyen, Sürat): etiket ve takip no şimdi istenir
+    if (!(r && r.label_data) && env) {
+      const got = await carrierLabel(env, db, pkg).catch((e) => ({ error: e.message }));
+      if (got && got.error) return { official: null, pending: got.error };
+      if (got && got.label) r = { label_format: got.label.format, label_data: got.label.data };
+    }
     await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?) WHERE id = ?', Date.now(), pkg.id);
     if (r && r.label_data) return { official: { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` } };
     return { official: null, panel: true };
@@ -617,6 +623,25 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false } = {}) {
   if (lab.format === 'zpl' && settings.zpl_pdf) { try { lab = await zplToPdf(lab); } catch { /* ZPL olarak kalır */ } }
   await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ?, error = NULL WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);
   return { official: lab };
+}
+
+// Firmadan etiket (ve henüz yoksa takip numarası): etiketi gönderiden sonra hazırlayan firmalar için.
+// Firma etiketi hiç vermiyorsa (PTT, Sürat ön kabul) null döner: panel etiketi firmanın barkoduyla basılır.
+async function carrierLabel(env, db, pkg) {
+  if (!pkg.carrier_ref) return null;
+  const c = await carrierFor(env, db, pkg.carrier_provider);
+  let t = null;
+  if (!pkg.tracking && c.api.track) t = await c.api.track(pkg).catch(() => null);
+  const lab = c.api.label ? await c.api.label({ ...pkg, tracking: pkg.tracking || (t && t.tracking) || '' }) : null;
+  const tn = str((lab && lab.tracking) || (t && t.tracking));
+  if (tn && tn !== pkg.tracking) await run(db, 'UPDATE packages SET tracking = ?, barcode = ?, tracking_url = COALESCE(?, tracking_url), cargo_company = COALESCE(NULLIF(?, \'\'), cargo_company) WHERE id = ?', tn, str((t && t.barcode) || tn), str((lab && lab.trackingUrl) || (t && t.trackingUrl)) || null, str(t && t.carrier), pkg.id);
+  if (lab && lab.data) {
+    await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ?, error = NULL WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);
+    return { label: { format: lab.format, data: lab.data } };
+  }
+  // Etiket henüz hazır değil ama firma sonradan veriyor: kullanıcıya bekleme mesajı
+  if (c.api.label && !tn && ['kargonomi', 'navlungo', 'dhl'].includes(c.id)) return { error: `${c.name} etiketi henüz hazır değil (gönderi firmaya iletiliyor); birkaç dakika sonra tekrar deneyin.` };
+  return null;
 }
 
 // Kargo ekranı: paketler (etiket bekleyen / kargoya verilecek / kargoda) + henüz paketlenmemiş siparişler
@@ -1381,7 +1406,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
           try { o = (await packOrder(db, ch, o)).o; await event(db, o, 'pack', user); } catch (e) { errors.push(`${o.order_number}: ${e.message}`); o = await loadOrder(db, id); }
         }
         for (const pkg of o.packages.filter((p) => p.status === 'open' || b.all)) {
-          const r = b.fetch || pkg.has_label ? await makeLabel(db, ch, o, pkg, settings) : {};
+          const r = b.fetch || pkg.has_label ? await makeLabel(db, ch, o, pkg, settings, { env }) : {};
           if (r.error || r.pending) errors.push(`${o.order_number}/${pkg.no}: ${r.error || r.pending}`);
           labels.push({ package_id: pkg.id, official: r.official || null, panel: !!r.panel });
         }
