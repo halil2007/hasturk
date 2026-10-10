@@ -1246,7 +1246,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 
 /* Dosya sürümü: app.js içindeki ASSETS ile aynı olmalı (CSS değişince ikisi birlikte artırılır). Farklıysa sayfa eski CSS ile
    açılmış demektir; app.js saklanan dosyaları silip bir kez yeniler. */
-:root { --assets: "2026-10-09g"; }
+:root { --assets: "2026-10-10a"; }
 
 /* Gruplu sayfaların üst sekmeleri (Ürünler · Fiyat & Kampanya · Raporlar) */
 .subtabs { display: flex; gap: 4px; max-width: 1440px; margin: 0 auto; padding: 4px 14px 0; overflow-x: auto; scrollbar-width: none; }
@@ -1405,3 +1405,21 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .claim-media { display: flex; flex-wrap: wrap; gap: 8px; }
 .claim-media img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); display: block; background: var(--bg-soft, #f3f5f9); }
 .claim-doc { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: inherit; text-decoration: none; }
+/* Kurulum rehberi: tamamlanan adımlar tek satırda */
+.guide .guide-done { margin: 10px 0 0; }
+.guide .guide-done .steps { margin-top: 8px; }
+/* Ürün formu: zorunlu alan uyarısı */
+.input.err, .field.err .input { border-color: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent); }
+.field .err-msg { color: var(--bad); font-size: 12.5px; font-weight: 600; }
+@media (max-width: 899px) {
+  /* Kaydet çubuğu yalnız değişiklik yapılınca */
+  .savebar.pristine { display: none; }
+  /* Alt pencere açıkken bildirimler üstte: pencerenin ana düğmesini kapatmasın */
+  body.has-sheet #toast { top: calc(10px + env(safe-area-inset-top)); bottom: auto; }
+  /* Parmakla rahat dokunma: en az 32 px */
+  .cb, .check input { width: 22px; height: 22px; }
+  label.check { min-height: 32px; }
+  .pager .pg { min-width: 36px; height: 36px; }
+  .card-head a.link, .card-head .link.small, a.link.small, button.link.small { display: inline-block; padding: 7px 4px; margin: -7px -4px; }
+  .tab { min-height: 36px; }
+}

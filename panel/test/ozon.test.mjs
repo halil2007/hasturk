@@ -105,7 +105,7 @@ test('Ozon: ürün listesi (product/list + info/list) ve dönüşüm', async () 
   assert.equal(calls.length, 2, '1000\'den az ürün gelince sonraki sayfa istenmez');
   assert.deepEqual(calls[1].body, { product_id: [11, 12] });
   assert.deepEqual(ls[0], { remoteId: 'SKU-A', remoteProductId: '11', sku: 'SKU-A', barcode: '4600000000011', name: 'Кружка', groupName: 'Кружка', variantName: '',
-    image: 'https://cdn1.ozone.ru/a.jpg', images: ['https://cdn1.ozone.ru/a.jpg', 'https://cdn1.ozone.ru/b.jpg'], price: 450, listPrice: 600, stock: 9, active: true });
+    image: 'https://cdn1.ozone.ru/a.jpg', images: ['https://cdn1.ozone.ru/a.jpg', 'https://cdn1.ozone.ru/b.jpg'], price: 450, listPrice: 600, stock: 11, active: true }); // present (rezerve dahil): gönderilen "stock" ile aynı temel
   assert.equal(ls[1].active, false); assert.equal(ls[1].listPrice, 300); assert.equal(ls[1].stock, 0); assert.equal(ls[1].image, '');
 });
 
@@ -119,7 +119,7 @@ test('Ozon: stok gönderimi (depo no, 100\'erli parça, tek depo otomatik, satı
   // depo girilmedi: tek etkin depo kullanılır
   calls = mockFetch([[/v1\/warehouse\/list/, { result: [{ warehouse_id: 9, name: 'Ana', status: 'created' }, { warehouse_id: 8, name: 'Eski', status: 'disabled' }] }],
     [/v2\/products\/stocks/, { result: [{ offer_id: 'SKU-A', updated: false, errors: [{ code: 'TOO_MANY_REQUESTS', message: 'too many requests' }] }] }]]);
-  await assert.rejects(ozon(ENV, { id: 'ozon' }).pushStock([{ remoteId: 'SKU-A', stock: 1 }]), /SKU-A: too many requests/);
+  assert.deepEqual(await ozon(ENV, { id: 'ozon' }).pushStock([{ remoteId: 'SKU-A', stock: 1 }]), { done: [], errors: [{ remoteId: 'SKU-A', error: 'Ozon: too many requests' }] });
   assert.equal(calls[1].body.stocks[0].warehouse_id, 9);
   // birden çok depo: açık hata
   mockFetch([[/v1\/warehouse\/list/, { result: [{ warehouse_id: 1, name: 'A' }, { warehouse_id: 2, name: 'B' }] }]]);
@@ -139,7 +139,7 @@ test('Ozon: fiyat gönderimi (old_price, para birimi önbellekten, satır hatas�
   assert.deepEqual(c.body, { prices: [
     { offer_id: 'SKU-A', product_id: 11, price: '450', old_price: '600', currency_code: 'CNY', auto_action_enabled: 'UNKNOWN' },
     { offer_id: 'SKU-Z', price: '100.5', old_price: '0', auto_action_enabled: 'UNKNOWN' }] });
-  await assert.rejects(ch.pushPrice([{ remoteId: 'BAD', price: 1 }]), /BAD: price diff too small/);
+  assert.deepEqual((await ch.pushPrice([{ remoteId: 'BAD', price: 1 }])).errors, [{ remoteId: 'BAD', error: 'Ozon: price diff too small' }]);
 });
 
 test('Ozon: işleme al (topla), kargoya ver (rFBS takip no) ve etiket', async () => {

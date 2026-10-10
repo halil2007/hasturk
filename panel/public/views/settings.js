@@ -31,10 +31,10 @@ export async function settingsView(el) {
     const box = $('[data-pushbox]', el); if (!box) return;
     const st = await pushState().catch(() => 'unsupported');
     render(box, html`<h2>Anlık bildirim (bu cihaz)</h2>
-      <div class="muted small">Yeni sipariş, iade talebi ve müşteri sorusu bu telefona / bilgisayara bildirim olarak gelir (15 dakikalık senkronda, tek özet bildirim). Her cihazda ayrı açılır.</div>
+      <div class="muted small">Yeni sipariş, iade ve soru bu cihaza bildirim olarak gelir.</div>
       ${st === 'on' ? html`<div class="row wrap"><span class="pill good">Bu cihazda açık</span><span class="spacer"></span><button class="btn" data-act="push-test">Deneme bildirimi gönder</button><button class="btn ghost" data-act="push-off">Kapat</button></div>`
         : st === 'off' ? html`<div class="row wrap"><button class="btn primary" data-act="push-on"><i class="ico ico-bell"></i>Bu cihazda bildirimleri aç</button></div>`
-        : st === 'denied' ? html`<div class="notice warn small">Bildirim izni bu tarayıcıda reddedilmiş. Adres çubuğundaki kilit simgesi → Bildirimler → İzin ver, sonra sayfayı yenileyin.</div>`
+        : st === 'denied' ? html`<div class="notice warn small">Bildirim izni kapalı: adres çubuğundaki kilit simgesinden izin verin.</div>`
         : st === 'ios-install' ? html`<div class="notice small">iPhone'da bildirim için paneli ana ekrana ekleyin: Safari → <b>Paylaş</b> → <b>Ana Ekrana Ekle</b>; sonra ana ekrandaki simgeden açıp buradan bildirimleri açın (iOS 16.4 ve üzeri).</div>`
         : html`<div class="notice warn small">Bu tarayıcı anlık bildirimi desteklemiyor. Chrome, Edge, Firefox ya da Safari'nin güncel sürümünü kullanın.</div>`}`);
   }
@@ -92,36 +92,36 @@ export async function settingsView(el) {
           <label class="field"><span>Stok sınırı (bu adet ve altı “sınırın altında”)</span><input class="input" inputmode="numeric" data-low value="${st.low_stock}" ${dis}><small>Ürüne özel kritik stok girilmişse o kullanılır.</small></label>
         </div>
         <div><div class="small" style="font-weight:650;margin-bottom:6px">Stok gönderilecek kanallar</div><div class="row wrap">${live.map((c) => html`<label class="check"><input type="checkbox" data-stockch="${c.id}" ${(st.stock_channels || {})[c.id] === false ? '' : 'checked'} ${dis}> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>
-        <div><div class="small" style="font-weight:650;margin-bottom:6px">Ana katalog (eşleşmeyen ürünleri otomatik oluşturan kanallar)</div><div class="row wrap">${live.filter((c) => c.type === 'ikas').map((c) => html`<label class="check"><input type="checkbox" data-catalog="${c.id}" ${(st.catalog_channels || []).includes(c.id) ? 'checked' : ''} ${dis}> ${chLogo(c.id, true)}${c.name}</label>`)}</div>
-          <div class="muted tiny" style="margin-top:4px">Diğer kanallardaki ilanlar barkod / stok kodu kesin tutuyorsa otomatik bağlanır; tutmuyorsa Eşleştirme sayfasında onayınızı bekler.</div></div>
+        <div><div class="small" style="font-weight:650;margin-bottom:6px">Ana katalog</div><div class="row wrap">${live.filter((c) => c.type === 'ikas').map((c) => html`<label class="check"><input type="checkbox" data-catalog="${c.id}" ${(st.catalog_channels || []).includes(c.id) ? 'checked' : ''} ${dis}> ${chLogo(c.id, true)}${c.name}</label>`)}</div>
+          <div class="muted tiny" style="margin-top:4px">Yeni ürünler bu kanaldan oluşturulur.</div></div>
       </div>
 
       <div class="card stack" data-fxcard data-stab="${locked('fx') ? 'giderler' : 'doviz'}">${locked('fx') ? html`<h2>Döviz kuruna endeksli fiyat <span class="pill info">Kurumsal paket</span></h2><div class="muted small">Ürüne dolar, euro ya da sterlin fiyatı girin; TL satış fiyatı ve kanal fiyatları anlık / günlük / haftalık / aylık kurla kendiliğinden güncellensin. Kurumsal pakette açılır; <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div>` : html`<div class="empty"><i class="ico ico-sync spin"></i></div>`}</div>
 
       <div class="card flush" data-stab="giderler"><div class="card-pad"><h2>Komisyon ve giderler</h2><div class="muted small" style="margin-top:4px">Sipariş ve istatistiklerdeki tahmini kâr bu değerlerle hesaplanır. Ürüne özel komisyon ürün formundan girilir.</div>
           <label class="row" style="align-items:flex-start;gap:12px;margin-top:12px"><span class="switch"><input type="checkbox" data-costvat ${st.costs_vat_incl ? '' : 'checked'} ${dis}><span></span></span>
-            <span><b>Kesintilere KDV'yi otomatik ekle</b><br><span class="small muted">Komisyon, kargo, hizmet bedeli ve ek kesintiyi pazaryerinin ilan ettiği gibi KDV hariç girin (ör. komisyon %20 + KDV); panel %20 KDV ekleyerek düşer (%20 → %24). Kapatırsanız girdiğiniz tutarlar KDV dahil sayılır. Stopaj vergidir, KDV eklenmez. Kanalın bildirdiği gerçek komisyon ve kargo faturaları zaten KDV dahildir.</span></span></label></div>
+            <span><b>Kesintilere KDV'yi otomatik ekle</b><br><span class="small muted">Tutarları KDV hariç girin; panel KDV'yi ekler.</span></span></label></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Komisyon %</th><th class="r">Sipariş başı kargo ₺</th><th class="r" title="Sipariş başına sabit platform / hizmet bedeli">Hizmet bedeli ₺</th><th class="r" title="Satış tutarının yüzdesi: işlem, ödeme veya altyapı bedeli">Ek kesinti %</th><th class="r" title="E-ticaret stopajı: KDV hariç satış tutarı üzerinden pazaryerinin kestiği gelir vergisi">Stopaj %</th></tr></thead><tbody>
         ${live.map((c) => html`<tr><td><span class="ch-name">${chLogo(c.id, true)}${c.name}</span></td>
           ${COST_KEYS.map((k) => { const own = (st[k] || {})[c.id], extra = /_\d+$/.test(c.id); return html`<td class="r"><input class="input" style="width:92px;text-align:right" inputmode="decimal" data-cost="${k}:${c.id}" value="${extra ? own ?? '' : costRaw(st, k, c.id)}" placeholder="${extra ? costRaw(st, k, c.id) : ''}" title="${extra ? 'Boş bırakılırsa aynı türdeki ana mağazanın değeri kullanılır' : ''}" ${dis}></td>`; })}</tr>`)}
       </tbody></table></div>
-        <div class="card-pad muted tiny" style="padding-top:0">Masraf basamakları: satış − komisyon − kargo − hizmet bedeli − ek kesinti − stopaj = hakediş; hakediş − alış = kâr. Stopaj, pazaryerlerinin 2025'ten beri hakedişten kestiği gelir vergisidir (KDV hariç satış üzerinden, genelde %1); yıllık vergiden mahsup edilir. Kendi siteniz (ikas) için 0 bırakın.</div></div>
+        <div class="card-pad muted tiny" style="padding-top:0">Stopaj: pazaryerinin kestiği vergi (genelde %1). Kendi siteniz için 0 bırakın.</div></div>
 
       <div class="card stack" data-pushbox data-stab="bildirim"><h2>Anlık bildirim (bu cihaz)</h2><div class="muted small">Yükleniyor…</div></div>
 
       ${admin ? html`<div class="card stack" data-mailbox data-stab="bildirim">
         <h2>Yeni sipariş e-posta bildirimi</h2>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="mail_enabled" ${st.mail_enabled ? 'checked' : ''}><span></span></span>
-          <span><b>Yeni sipariş gelince e-posta gönder</b><br><span class="small muted">Her sipariş için bir kez gönderilir; 15 dakikalık senkronda aynı sipariş için tekrar gönderilmez. Kanalların ilk aktarımı ve geçmiş sipariş aktarımı e-posta oluşturmaz.</span></span></label>
+          <span><b>Yeni sipariş e-postası</b><br><span class="small muted">Her yeni sipariş için e-posta.</span></span></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="daily_digest" ${st.daily_digest ? 'checked' : ''}><span></span></span>
-          <span><b>Her sabah günlük özet e-postası gönder</b><br><span class="small muted">Saat 08:00'den sonra: dünün cirosu, sipariş sayısı ve tahmini kârı (önceki günle karşılaştırmalı, kanal kanal), bugün kargoya hazırlanacak / geciken siparişler, bekleyen iade ve sorular, stokta olmayan ve tükenmek üzere olan ürünler. Aşağıdaki alıcılara gider.</span></span></label>
+          <span><b>Günlük özet</b><br><span class="small muted">Her sabah 08:00'de özet.</span></span></label>
         <div class="form-grid">
           <label class="field"><span>Bildirim alacak e-postalar</span><input class="input" data-mailto value="${(st.mail_to || []).join(', ')}" placeholder="ornek@firma.com, ikinci@firma.com"><small>Virgülle ayırın (en fazla 10)</small></label>
-          ${state.tenant ? '' : html`<label class="field"><span>Panel adresi</span><input class="input" data-panelurl value="${st.panel_url || ''}" placeholder="https://hasturk-panel.xxx.workers.dev"><small>E-postadaki “Siparişi panelde aç” bağlantısı</small></label>`}
         </div>
+        <details class="adv"><summary class="small">Gelişmiş${state.tenant || mailReady ? '' : html` <span class="pill warn tiny">e-posta servisi kurulmadı</span>`}</summary><div class="stack" style="margin-top:10px">
+        ${state.tenant ? '' : html`<label class="field"><span>Panel adresi</span><input class="input" data-panelurl value="${st.panel_url || ''}" placeholder="https://hasturk-panel.xxx.workers.dev"><small>E-postadaki “Siparişi panelde aç” bağlantısı</small></label>`}
         ${state.tenant ? '' : html`<div class="notice small"><i class="ico ico-link"></i><div><b>Paneli kendi alt alan adınızdan açmak</b> (ör. crm.alanadiniz.com.tr, DNS'i taşımadan): cPanel'de alt alan adı oluşturun, <a class="link" href="/api/panel-proxy" download="index.php">index.php</a> dosyasını indirip o alt alan adının klasörüne yükleyin, AutoSSL ile sertifika alın. Panel adresi ilk girişte kendiliğinden güncellenir.</div></div>`}
         <div><div class="small" style="font-weight:650;margin-bottom:6px">E-posta alınacak mağazalar / pazaryerleri</div><div class="row wrap">${live.map((c) => html`<label class="check"><input type="checkbox" data-mailch="${c.id}" ${(st.mail_channels || {})[c.id] === false ? '' : 'checked'}> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>
-        ${state.tenant ? html`<div class="notice good small"><i class="ico ico-check"></i><div>E-posta bildirimleri <b>hazır</b>: kurulum gerekmez, e-postalar Hastürk CRM bildirim adresinden firma adınızla gönderilir.</div></div>` : ''}
         ${state.tenant ? '' : html`<details ${mailReady ? '' : 'open'}><summary style="cursor:pointer;font-weight:650">${platformMail ? 'Kendi e-posta sunucumu kullan (isteğe bağlı)' : html`E-posta servisi ${mailReady ? html`<span class="pill good" style="margin-left:6px">bağlı · ${mf('MAIL_FROM').value || mf('MAIL_SMTP_USER').value || ''}</span>` : html`<span class="pill warn" style="margin-left:6px">kurulmadı</span>`}`}</summary>
           <div class="stack" style="margin-top:10px">
             <div class="form-grid">
@@ -143,6 +143,7 @@ export async function settingsView(el) {
               <label class="field"><span>API anahtarı</span><input class="input" type="password" autocomplete="off" data-mailf="MAIL_API_KEY" placeholder="${mf('MAIL_API_KEY').masked || 'yapıştırın'}"><small>${mf('MAIL_API_KEY').masked ? 'Kayıtlı (şifreli). Değiştirmek için yenisini yapıştırın.' : 'Şifreli saklanır, ekranda tekrar gösterilmez.'}</small></label>
             </div>
           </div></details>`}
+        </div></details>
         <div class="row wrap"><button class="btn" data-act="mail-test"><i class="ico ico-chat"></i>Deneme e-postası gönder</button><button class="btn" data-act="digest-test"><i class="ico ico-bars"></i>Örnek günlük özet gönder</button><span class="spacer"></span><button class="btn primary" data-act="mail-save">Bildirim ayarlarını kaydet</button></div>
       </div>` : ''}
 
@@ -160,11 +161,11 @@ export async function settingsView(el) {
         <label class="field"><span>Kargo takip adresleri (“Kargoyu takip et” düğmesi)</span><textarea class="input" data-track style="min-height:120px;font-family:ui-monospace,monospace;font-size:12.5px" ${dis}>${Object.entries(st.track_urls || {}).map(([k, v]) => `${k} = ${v}`).join('\n')}</textarea>
           <small>Her satır: <b>Firma = adres</b>; adreste takip numarasının geleceği yere <b>{no}</b> yazın. Kanal resmi takip bağlantısı verdiyse (ikas, Trendyol) önce o kullanılır.</small></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="label_own" ${st.label_own !== false ? 'checked' : ''} ${dis}><span></span></span>
-          <span><b>Hepsiburada etiketini bizim tasarımla bas</b><br><span class="small muted">Kargo barkodu (takip numarası) Hepsiburada'dan alınır ve panelin etiket tasarımına basılır; Hepsiburada'nın kendi etiketi saklanır, paket menüsünden indirilebilir. Kapalıyken Hepsiburada'nın etiketi basılır.</span></span></label>
+          <span><b>Hepsiburada etiketini bizim tasarımla bas</b><br><span class="small muted">Kapalıysa Hepsiburada'nın etiketi basılır.</span></span></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="zpl_pdf" ${st.zpl_pdf ? 'checked' : ''} ${dis}><span></span></span>
-          <span><b>Etiketleri PDF olarak ver (normal yazıcı)</b><br><span class="small muted">Trendyol ve Hepsiburada etiketi termal yazıcı biçiminde (ZPL) gelir. Açıkken Hepsiburada'dan doğrudan PDF istenir; kanal PDF vermezse ZPL, Labelary servisiyle PDF'e çevrilir (etiket içeriği — alıcı adı / adresi — bu servise gönderilir). Kapalıyken etiket alınınca “PDF olarak aç / ZPL indir” sorulur.</span></span></label>
+          <span><b>Etiketleri PDF olarak ver (normal yazıcı)</b><br><span class="small muted">Etiket PDF olarak açılır.</span></span></label>
       </div>
-      ${admin ? html`<div class="savebar" data-savebar><span class="muted small" data-savehint>Değişiklikleri kaydetmeyi unutmayın.</span><span class="spacer"></span><button class="btn primary lg" data-act="save">Kaydet</button></div>` : ''}
+      ${admin ? html`<div class="savebar pristine" data-savebar><span class="muted small" data-savehint>Değişiklikleri kaydetmeyi unutmayın.</span><span class="spacer"></span><button class="btn primary lg" data-act="save">Kaydet</button></div>` : ''}
 
       ${!state.tenant && admin ? html`<div class="card stack" data-stab="reklam">
         <h2>Google Ads dönüşümleri</h2>
@@ -301,6 +302,8 @@ export async function settingsView(el) {
     box.oninput = box.onchange = (e) => { if (e.target.dataset.fx !== undefined) paint(); };
     paint();
   }
+  // Telefonda "Kaydet" çubuğu ilk değişiklikten sonra görünür
+  el.addEventListener('input', (e) => { if (e.target.closest('[data-stab]')) { const b = $('[data-savebar]', el); if (b) b.classList.remove('pristine'); } });
   el.addEventListener('change', async (e) => {
     if (e.target.matches('[name=theme]')) { store.set('theme', e.target.value); applyTheme(); toast('Görünüm değişti'); return; }
     if (e.target.dataset && e.target.dataset.prov !== undefined) {

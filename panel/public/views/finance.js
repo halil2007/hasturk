@@ -144,8 +144,8 @@ export async function financeView(el, rest, query = {}) {
     if (stl.locked) return render(box, html`<div class="card-pad"><h2>Hakediş</h2></div>${html`<div class="notice small" style="margin:12px"><i class="ico ico-key"></i><div><b>${'Hakediş takibi'} Profesyonel ve Kurumsal pakette.</b> Pazaryerinin kestiği faturalar ve hakediş ödemeleri burada görünür. <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div></div>`}`);
     const t = stl.totals, today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
     render(box, html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:220px"><h2>Hakediş</h2><div class="muted small">Pazaryerinin hesap ekstresinden: ödeme günleri, ödenen ve ödenecek tutarlar</div></div>
-        ${isAdmin() ? html`<button class="btn sm" data-act="stlsync"><i class="ico ico-sync"></i>Hakedişi çek</button>` : ''}</div>
-      ${!stl.supported.length && !stl.days.length ? html`<div class="empty">Hakediş bilgisi veren bağlı kanal yok (Trendyol, Hepsiburada).</div>` : html`
+        ${isAdmin() ? html`<button class="btn sm" data-act="stlsync"><i class="ico ico-sync"></i>Yenile</button>` : ''}</div>
+      ${!stl.supported.length && !stl.days.length ? html`<div class="empty">${activeChannels().some((c) => (c.enabled || c.demo) && ['trendyol', 'hepsiburada'].includes(c.type)) ? 'Hakediş bilgisi Trendyol ve Hepsiburada\'dan gelir; henüz veri yok.' : 'Hakediş bilgisi Trendyol ve Hepsiburada\'dan gelir; bu kanalları bağlayınca burada görünür.'}</div>` : html`
       <div class="kpis" style="padding:0 16px 12px">
         <div class="kpi"><div class="label">Ödenecek (vadesi gelmemiş)</div><div class="value num">${money0(t.upcoming - t.overdue)}</div></div>
         <div class="kpi"><div class="label">Vadesi geçmiş, ödenmemiş</div><div class="value num" style="color:${t.overdue ? 'var(--bad)' : 'inherit'}">${money0(t.overdue)}</div></div>

@@ -20,6 +20,8 @@ const RANKS = ['new', 'processing', 'shipped', 'delivered'];
 const D = 864e5;
 // DOĞRULA: tarih aralığı sınırı (Trendyol düzeninde en fazla 2 hafta): uzun aralık 14 günlük dilimlerle okunur
 const W = 14 * D;
+// Değişen sipariş başına bir numarayla sorgu (tüm paketler): bir senkronda en fazla bu kadar
+const MAX_LOOKUP = 100;
 
 export function pasaj(env, meta) {
   // DOĞRULA: kök adres Pasaj'dan alınır (varsayılan yok)
@@ -41,6 +43,10 @@ export function pasaj(env, meta) {
     return /Cancel|UnSupplied/i.test(s) || STATUS[p.status] === 'cancelled' ? 'cancelled' : /Return/i.test(s) || STATUS[p.status] === 'returned' ? 'returned' : '';
   };
 
+  const noOf = (p) => str(p.orderNumber ?? p.orderId);
+  // Paketin son değişiklik zamanı (DOĞRULA: alan adı Trendyol düzeninde lastModifiedDate); yoksa sipariş tarihi
+  const dateOf = (v) => (typeof v === 'string' && !/^\d+$/.test(v) ? Date.parse(v) || 0 : num(v));
+  const modOf = (p) => dateOf(p.lastModifiedDate ?? p.packageLastModifiedDate ?? p.orderDate);
   function group(pkgs) {
     const byNo = new Map();
     for (const p of pkgs) {
@@ -63,7 +69,7 @@ export function pasaj(env, meta) {
       const tracked = list.find((p) => p.cargoTrackingNumber) || {};
       const sum = (ps) => ps.reduce((s, p) => s + num(p.totalPrice ?? p.grossAmount), 0);
       const name = str(a.fullName || [a.firstName, a.lastName].filter(Boolean).join(' '));
-      const orderedAt = typeof p0.orderDate === 'string' && !/^\d+$/.test(p0.orderDate) ? Date.parse(p0.orderDate) : num(p0.orderDate);
+      const orderedAt = dateOf(p0.orderDate);
       return {
         remoteId: str(p0.orderNumber ?? p0.orderId), orderNumber: str(p0.orderNumber ?? p0.orderId), orderedAt: orderedAt || Date.now(),
         remoteStatus: [...new Set(list.map((p) => p.status))].join(', '), status,
@@ -71,7 +77,7 @@ export function pasaj(env, meta) {
         address: { name, line: str(a.fullAddress || [a.address1, a.address2].filter(Boolean).join(' ')), district: str(a.district), city: str(a.city), phone: str(a.phone) },
         total: Math.round(sum(live.length ? live : list) * 100) / 100, currency: str(p0.currencyCode) || 'TRY',
         cargoCompany: str(tracked.cargoProviderName || p0.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),
-        shipBy: Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0)) || null,
+        shipBy: ((n) => (Number.isFinite(n) ? n : null))(Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0))),
         items, packages: null,
       };
     });
@@ -90,7 +96,23 @@ export function pasaj(env, meta) {
         if (page + 1 >= num(r.totalPages, 1)) break;
       }
     }
-    return group(pkgs);
+    if (byOrdered) return group(pkgs);
+    // Güncellenme tarihine göre sorguda yalnız değişen paket gelir: siparişin diğer paketleri (satırları) kaydedilen siparişten düşer,
+    // stokları geri eklenirdi. Görülen her sipariş numarasının tüm paketleri numarayla okunur (en eski değişen önce, en fazla MAX_LOOKUP);
+    // fazlası sonraki senkrona kalır (imleç son okunan siparişin değişiklik zamanında: partialUntil). Sorgu aralığında oluşturulan
+    // siparişin bütün paketleri zaten listededir (oluşturulma da değişikliktir): o siparişler numarayla okunmaz.
+    const last = new Map(), fresh = new Set();
+    for (const p of pkgs) { const no = noOf(p), t = modOf(p); if (no && (!last.has(no) || t > last.get(no))) last.set(no, t); if (no && dateOf(p.orderDate) >= since) fresh.add(no); }
+    for (const no of fresh) last.delete(no);
+    const nos = [...last.keys()].sort((a, b) => last.get(a) - last.get(b)), keep = new Set(nos.slice(0, MAX_LOOKUP)), full = [];
+    for (const no of keep) full.push(...(await orderPackages(no)).filter((p) => noOf(p) === no));
+    const out = group([...full, ...pkgs.filter((p) => keep.has(noOf(p)) || fresh.has(noOf(p)))]);
+    if (nos.length > keep.size) {
+      const t = last.get(nos[keep.size - 1]);
+      out.partialUntil = t > since ? t - 1000 : since;
+      out.warnings = [`Pasaj: ${nos.length} değişen siparişin ${keep.size} tanesi okundu; kalanlar sonraki senkronda`];
+    }
+    return out;
   }
   const orderPackages = async (no) => (((await call(`${sup}/orders?orderNumber=${encodeURIComponent(no)}`)) || {}).content || []);
 

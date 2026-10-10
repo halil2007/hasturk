@@ -121,34 +121,44 @@ export function etsy(env, meta) {
 
   // Envanter yazımı: ilanın tüm ürünleri (salt okunur alanlar çıkarılarak) geri gönderilir. Değer özelliğe göre değişmiyorsa
   // (ör. quantity_on_property boş) Etsy tüm varyantlarda aynı değeri ister: o zaman değer ilanın tüm satırlarına yazılır.
+  // Sonuç ilan ilan: { done, errors }. İlana özgü ret (400 / 404 / 409) yalnız o ilanın satırlarına yazılır; hiçbiri gönderilemeden
+  // bağlantı / yetki hatası atılır (sonradan gelirse kalan ilanlara hata yazılır, yalnız onlar yeniden denenir).
   async function writeInventory(items, prop, apply) {
-    const by = new Map(), errs = [];
+    const by = new Map(), out = { done: [], errors: [] }, fail = (x, error) => out.errors.push({ remoteId: x.remoteId, error: 'Etsy: ' + error });
     for (const x of items) {
       const lid = str(x.remoteProductId) || (/^\d+:\d+$/.test(str(x.remoteId)) ? str(x.remoteId).split(':')[0] : '');
-      if (!lid) { errs.push(`${x.remoteId}: ilan numarası yok`); continue; }
+      if (!lid) { fail(x, 'ilan numarası yok'); continue; }
       by.set(lid, [...(by.get(lid) || []), x]);
     }
     let n = 0;
     for (const [lid, list] of by) {
       if (n++) await sleep(150);
-      const inv = await call(`/listings/${lid}/inventory`);
-      const products = (inv.products || []).filter((p) => !p.is_deleted).map((p) => ({
-        _id: p.product_id, sku: str(p.sku),
-        property_values: (p.property_values || []).map((v) => ({ property_id: v.property_id, value_ids: v.value_ids || [], scale_id: v.scale_id ?? null, property_name: v.property_name, values: v.values || [] })),
-        offerings: (p.offerings || []).filter((o) => !o.is_deleted).map((o) => ({ price: money(o.price), quantity: num(o.quantity), is_enabled: o.is_enabled !== false,
-          ...(o.readiness_state_id != null ? { readiness_state_id: o.readiness_state_id } : {}) })),
-      }));
-      const shared = !(inv[prop] || []).length && products.length > 1;
-      for (const x of list) {
-        const hit = products.filter((p) => (p.sku && p.sku === str(x.remoteId)) || `${lid}:${p._id}` === str(x.remoteId));
-        if (!hit.length) { errs.push(`${x.remoteId}: ilanda bulunamadı`); continue; }
-        for (const p of shared ? products : hit) for (const o of p.offerings) apply(o, x);
+      try {
+        const inv = await call(`/listings/${lid}/inventory`);
+        const products = (inv.products || []).filter((p) => !p.is_deleted).map((p) => ({
+          _id: p.product_id, sku: str(p.sku),
+          property_values: (p.property_values || []).map((v) => ({ property_id: v.property_id, value_ids: v.value_ids || [], scale_id: v.scale_id ?? null, property_name: v.property_name, values: v.values || [] })),
+          offerings: (p.offerings || []).filter((o) => !o.is_deleted).map((o) => ({ price: money(o.price), quantity: num(o.quantity), is_enabled: o.is_enabled !== false,
+            ...(o.readiness_state_id != null ? { readiness_state_id: o.readiness_state_id } : {}) })),
+        }));
+        const shared = !(inv[prop] || []).length && products.length > 1, sent = [];
+        for (const x of list) {
+          const hit = products.filter((p) => (p.sku && p.sku === str(x.remoteId)) || `${lid}:${p._id}` === str(x.remoteId));
+          if (!hit.length) { fail(x, 'ilanda bulunamadı'); continue; }
+          for (const p of shared ? products : hit) for (const o of p.offerings) apply(o, x);
+          sent.push(x);
+        }
+        if (!sent.length) continue;
+        const body = { products: products.map(({ _id, ...p }) => p) };
+        for (const k of ON_PROP) if (Array.isArray(inv[k])) body[k] = inv[k];
+        await call(`/listings/${lid}/inventory`, { method: 'PUT', body });
+        out.done.push(...sent.map((x) => x.remoteId));
+      } catch (e) {
+        if (e.budget || (![400, 404, 409].includes(e.status) && !out.done.length)) throw e;
+        for (const x of list) if (!out.errors.some((y) => y.remoteId === x.remoteId)) fail(x, String(e.message).replace(/^Etsy: /, ''));
       }
-      const body = { products: products.map(({ _id, ...p }) => p) };
-      for (const k of ON_PROP) if (Array.isArray(inv[k])) body[k] = inv[k];
-      await call(`/listings/${lid}/inventory`, { method: 'PUT', body });
     }
-    if (errs.length) throw new Error('Etsy: ' + errs.slice(0, 5).join(' | '));
+    return out;
   }
   const pushStock = (items) => writeInventory(items, 'quantity_on_property', (o, x) => { o.quantity = Math.min(999, Math.max(0, Math.round(num(x.stock)))); });
   const pushPrice = (items) => writeInventory(items, 'price_on_property', (o, x) => { o.price = Math.round(num(x.price) * 100) / 100; });

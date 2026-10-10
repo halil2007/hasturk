@@ -122,6 +122,7 @@ function pttavmSoap(env, meta) {
     let streak = 0;
     for (const x of items.slice(0, 200)) {
       try { await soap(STOCK_METHOD, `<tem:item><Barkod>${esc(x.remoteId)}</Barkod><Miktar>${x.stock}</Miktar></tem:item>`); done.push(x.remoteId); streak = 0; } catch (e) {
+        if (e.budget) throw e; // senkron istek bütçesi bitti: ilan hatası değil
         errors.push({ remoteId: x.remoteId, error: e.message });
         if (++streak >= 5 && !done.length) throw e; // servis / kimlik hatası: hepsi aynı hatayı verir
         if (streak >= 5) break;
@@ -215,10 +216,11 @@ export function normPttOrder(o) {
       remoteKey: str(l.urunBarkod), remoteStatus: st,
     };
   });
-  // Sipariş durumu: satırlardan (hepsi iptal → iptal; biri iade → iade; en ileri gönderim durumu)
+  // Sipariş durumu canlı (iptal / iade olmayan) satırlardan; hepsi iptal / iadeyse biri iade → iade, değilse iptal
+  // (tek satırın iadesi bütün siparişi iade saymasın: diğer satırların stoğu geri eklenmesin)
   const sts = lines.map((l) => pttStatus(l.remoteStatus));
-  const live = sts.filter((x) => x !== 'cancelled');
-  const status = !live.length ? (sts.length ? 'cancelled' : 'new') : live.includes('returned') ? 'returned' : live.every((x) => x === 'delivered') ? 'delivered'
+  const live = sts.filter((x) => x !== 'cancelled' && x !== 'returned');
+  const status = !live.length ? (sts.length ? (sts.includes('returned') ? 'returned' : 'cancelled') : 'new') : live.every((x) => x === 'delivered') ? 'delivered'
     : live.some((x) => x === 'shipped' || x === 'delivered') ? 'shipped' : 'new';
   const raw = (lines[0] && lines[0].remoteStatus) || '';
   const tr = (o.barcodes || []).find((b) => b && b.barcode);
@@ -239,14 +241,24 @@ function pttavmRest(env, meta) {
   const call = (url, { method = 'GET', body } = {}) => http(url, { method, headers: headers(), body: body && JSON.stringify(body) });
   const list = (r) => (Array.isArray(r) ? r : r && Array.isArray(r.data) ? r.data : r && Array.isArray(r.items) ? r.items : []);
 
+  // orders/search sayfalama almaz: cevap yuvarlak bir sınırda (≥100, 50'nin katı) kesilmiş görünüyorsa aralık ikiye bölünüp yeniden sorulur
+  // (en fazla 16 ek istek, en kısa 1 saat). Yine sınırdaysa okunanlar alınır, imleç o aralığın başında kalır (partialUntil) ve uyarı düşer.
+  const capped = (n) => n >= 100 && n % 50 === 0;
   async function fetchOrders(since, until) {
-    const out = new Map();
-    for (let a = since; a < until; a += WINDOW) {
-      const b = Math.min(until, a + WINDOW);
+    const out = new Map(), parts = [];
+    for (let a = since; a < until; a += WINDOW) parts.push([a, Math.min(until, a + WINDOW)]);
+    let extra = 16, cut = null;
+    while (parts.length) {
+      const [a, b] = parts.shift();
       const q = new URLSearchParams({ startDate: new Date(a).toISOString(), endDate: new Date(b).toISOString(), isActiveOrders: 'false' });
-      for (const o of list(await call(`${API}/orders/search?${q}`))) if (o && o.siparisNo) out.set(String(o.siparisNo), normPttOrder(o));
+      const rows = list(await call(`${API}/orders/search?${q}`));
+      if (capped(rows.length) && b - a > 3600e3 && extra >= 2) { extra -= 2; const m = a + Math.floor((b - a) / 2); parts.unshift([a, m], [m, b]); continue; }
+      if (capped(rows.length) && (cut == null || a < cut)) cut = a;
+      for (const o of rows) if (o && o.siparisNo) out.set(String(o.siparisNo), normPttOrder(o));
     }
-    return [...out.values()];
+    const res = [...out.values()];
+    if (cut != null) { res.partialUntil = cut; res.warnings = [`PttAVM sipariş araması ${new Date(cut).toISOString().slice(0, 16)} sonrasında sınıra takılmış olabilir; eksik siparişler sonraki senkronda yeniden okunur`]; }
+    return res;
   }
   async function getOrder(id) {
     const r = await call(`${API}/orders/${encodeURIComponent(id)}`).catch((e) => { if (/HTTP 404/.test(e.message)) return null; throw e; });
@@ -324,7 +336,8 @@ function pttavmRest(env, meta) {
     const r = await call(`${API}/products/tracking-result/${encodeURIComponent(ref)}`, { method: 'POST' });
     const st = String((r && r.status) || '').toLowerCase(), sub = (r && r.productsSubTrackingResult) || {};
     const done = /completed|cancelled/.test(st) || num(r && r.progress) >= 100;
-    const items = (sub.productBasedInfos || []).map((x) => ({ key: str(x.barcode), ok: !/cancel/i.test(String(x.status || '')), error: [str(x.message), ...(x.failureReasons || []).map(str)].filter(Boolean).join(' · ') }));
+    // Satır sonucu: yalnız tamamlanan / başarılı satır kabul; hata / iptal reddedildi; diğerleri (işleniyor) belirsiz
+    const items = (sub.productBasedInfos || []).map((x) => { const s = String(x.status || ''); return { key: str(x.barcode), ok: /complet|success/i.test(s) ? true : /fail|error|cancel/i.test(s) ? false : null, error: [str(x.message), ...(x.failureReasons || []).map(str)].filter(Boolean).join(' · ') }; });
     return { done, items };
   }
 

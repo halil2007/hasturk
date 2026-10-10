@@ -148,7 +148,10 @@ export function orderMail(o, items, ch, panelUrl, logo = '', company = '') {
 // Kuyruktaki e-postaları gönder (her senkron sonunda)
 export async function sendQueued(env, db, channels, settings) {
   settings = settings || await getSettings(db);
-  const pending = await all(db, 'SELECT * FROM mail_queue WHERE sent_at IS NULL AND tries < 5 ORDER BY created_at LIMIT 20');
+  // 6 saati geçen "yeni sipariş" e-postası artık haber değeri taşımaz: gönderilmeden kapatılır. Hata veren kayıt sıranın sonuna geçer
+  // (tek bozuk e-posta diğerlerini bekletmez)
+  await run(db, "UPDATE mail_queue SET sent_at = ?, error = COALESCE(error, 'zaman aşımı (6 saat)') WHERE sent_at IS NULL AND created_at < ?", Date.now(), Date.now() - 6 * 3600e3);
+  const pending = await all(db, 'SELECT * FROM mail_queue WHERE sent_at IS NULL AND tries < 5 ORDER BY tries, created_at LIMIT 40');
   if (!pending.length) return 0;
   const to = (settings.mail_to || []).filter(validEmail);
   if (!settings.mail_enabled || !to.length) {

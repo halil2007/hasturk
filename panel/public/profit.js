@@ -17,7 +17,8 @@ export const costRaw = (settings, key, ch) => { const m = (settings && settings[
 export const VAT_COST_KEYS = ['commission', 'shipping', 'service_fee', 'fee_rate'];
 export const costVat = (settings) => (settings && settings.costs_vat_incl ? 1 : 1 + SERVICE_VAT / 100);
 export const costOf = (settings, key, ch) => costRaw(settings, key, ch) * (VAT_COST_KEYS.includes(key) ? costVat(settings) : 1);
-export const rateGross = (settings, rate) => (rate == null ? rate : Number(rate) * costVat(settings));
+// API'den gelen oran (commission_src = 'api') satır komisyonundan KDV ayrılarak yazılır: her zaman %20 KDV eklenir ("tutarlar KDV dahil" ayarından bağımsız)
+export const rateGross = (settings, rate, src) => (rate == null ? rate : Number(rate) * (src === 'api' ? 1 + SERVICE_VAT / 100 : costVat(settings)));
 export const COST_KEYS = ['commission', 'shipping', 'service_fee', 'fee_rate', 'withholding'];
 
 export function profit({ sale = 0, purchase = 0, commissionRate = 0, shipping = 0, fee = 0, extra = 0, vatRate = 20, includeVat = false, qty = 1, feeRate = 0, withholdingRate = 0 } = {}) {

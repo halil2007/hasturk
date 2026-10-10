@@ -2,8 +2,8 @@
 // mağazanız için yetkilendirin → LWA Client ID / Client Secret + refresh token (Atzr|…). Satıcı Token: Ayarlar → Hesap Bilgileri.
 // Kimlik: LWA (api.amazon.com/auth/o2/token, refresh_token) → x-amz-access-token başlığı (SigV4 imzası gerekmez). Belirteç süresince saklanır.
 // Siparişler: /orders/v0 (senkronda LastUpdatedAfter, geçmiş aktarımında CreatedAfter). Alıcı adı / açık adres / telefon kısıtlı veridir (RDT):
-// yalnız il / ilçe gelir, ad boş kalır. Satır servisi (orderItems) yavaş kotalıdır (0,5 istek/sn): çağrı başına en yeni 100 sipariş işlenir,
-// fazlası uyarıyla bildirilir. FBA (AFN) siparişlerini Amazon gönderir: durum OrderStatus'tan okunur, panelden kargoya verilmez.
+// yalnız il / ilçe gelir, ad boş kalır. Satır servisi (orderItems) yavaş kotalıdır (0,5 istek/sn): çağrı başına en eski 100 sipariş işlenir,
+// fazlası varsa imleç son işlenenin güncellenme zamanında kalır (partialUntil), kalanlar sonraki senkronda. FBA (AFN) siparişlerini Amazon gönderir: durum OrderStatus'tan okunur, panelden kargoya verilmez.
 // Ürün / stok / fiyat: Listings Items 2021-08-01 (searchListingsItems; patchListingsItem SKU başına bir istek, 5 istek/sn).
 // Kargoya verme: shipmentConfirmation (takip no + kargo firması). Ürün oluşturma, etiket, iade yok.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
@@ -24,6 +24,21 @@ export function amazon(env, meta) {
   const API = `https://${str(env.AMAZON_SANDBOX) === '1' ? 'sandbox.' : ''}sellingpartnerapi-${region}.amazon.com`;
   const currency = CURRENCY[market] || 'TRY', mq = `marketplaceIds=${encodeURIComponent(market)}`;
   const types = new Map(); // SKU → productType (ürün listesinden; yoksa PRODUCT)
+  const fba = new Set(), seen = new Set(); // Amazon deposundaki (FBA) SKU'lar: stok gönderilmez (DEFAULT kanalı yazılırsa ilan satıcı gönderimine dönerdi)
+  // DEFAULT (satıcı gönderimi) kanalı olmayan SKU Amazon deposunda (FBA): stoğu Amazon tutar
+  const known = (it) => {
+    const sku = str(it.sku), fa = it.fulfillmentAvailability || [];
+    seen.add(sku);
+    if (fa.length && !fa.some((x) => x.fulfillmentChannelCode === 'DEFAULT')) fba.add(sku); else fba.delete(sku);
+  };
+  // Ürün listesi bu bağlantıda okunmadıysa SKU'nun gönderim kanalı tek tek sorulur (okunamazsa eskisi gibi gönderilir)
+  async function isFba(sku) {
+    if (!seen.has(sku)) {
+      const r = await call(`/listings/2021-08-01/items/${encodeURIComponent(seller)}/${encodeURIComponent(sku)}?${mq}&includedData=summaries,fulfillmentAvailability`, { tries: 4 }).catch((e) => { if (e.budget) throw e; return null; });
+      if (r) { const s = (r.summaries || []).find((x) => x.marketplaceId === market) || (r.summaries || [])[0]; if (s && s.productType) types.set(sku, s.productType); known({ ...r, sku }); }
+    }
+    return fba.has(sku);
+  }
 
   let token = null, exp = 0;
   async function auth() {
@@ -54,7 +69,8 @@ export function amazon(env, meta) {
   function norm(o, lines) {
     const status = STATUS[o.OrderStatus] || 'new', a = o.ShippingAddress || {}, b = o.BuyerInfo || {};
     const items = lines.map((it) => {
-      const qty = num(it.QuantityOrdered) || 1, total = money(it.ItemPrice);
+      // Satır tutarı: ItemPrice − satıcının verdiği promosyon indirimi (PromotionDiscount)
+      const qty = num(it.QuantityOrdered) || 1, total = Math.round((money(it.ItemPrice) - money(it.PromotionDiscount)) * 100) / 100;
       return { lineId: str(it.OrderItemId), sku: str(it.SellerSKU), barcode: '', name: str(it.Title), image: '', quantity: qty, unitPrice: total / qty, total,
         status: status === 'cancelled' ? 'cancelled' : '', remoteKey: str(it.SellerSKU) };
     });
@@ -85,13 +101,17 @@ export function amazon(env, meta) {
       if (!next) break;
     }
     const key = (o) => Date.parse(byOrdered ? o.PurchaseDate : o.LastUpdateDate || o.PurchaseDate) || 0;
-    heads.sort((x, y) => key(y) - key(x));
-    const out = [];
-    for (const [i, o] of heads.slice(0, MAX_ORDERS).entries()) {
+    // Eskiden yeniye: en eski 100 işlenir, imleç son işlenenin zamanında kalır (en yeniler işlenip imleç ilerleyince eskiler kaybolurdu)
+    heads.sort((x, y) => key(x) - key(y));
+    const out = [], done = heads.slice(0, MAX_ORDERS);
+    for (const [i, o] of done.entries()) {
       if (i) await sleep(500);
       out.push(norm(o, await orderItems(o.AmazonOrderId)));
     }
-    if (heads.length > MAX_ORDERS) out.warnings = [`Amazon: ${heads.length} siparişin en yeni ${MAX_ORDERS} tanesi işlendi (satır servisi kotası); eskiler için geçmiş sipariş aktarımını kullanın`];
+    if (heads.length > MAX_ORDERS) {
+      out.partialUntil = key(done[done.length - 1]) - 1000;
+      out.warnings = [`Amazon: ${heads.length} siparişin en eski ${MAX_ORDERS} tanesi işlendi (satır servisi kotası); kalanlar sonraki senkronda alınır`];
+    }
     return out;
   }
 
@@ -106,6 +126,7 @@ export function amazon(env, meta) {
         const fa = it.fulfillmentAvailability || [], f = fa.find((x) => x.fulfillmentChannelCode === 'DEFAULT');
         const img = str(s.mainImage && s.mainImage.link);
         if (s.productType) types.set(str(it.sku), s.productType);
+        known(it);
         out.push({ remoteId: str(it.sku), remoteProductId: str(s.asin), sku: str(it.sku), barcode: '', name: str(s.itemName), groupName: str(s.itemName), variantName: '',
           image: img, images: imageList([img]), price: num(o.price && o.price.amount), listPrice: num(o.price && o.price.amount),
           stock: f ? num(f.quantity) : fa.reduce((t, x) => t + num(x.quantity), 0), active: (s.status || []).includes('BUYABLE') });
@@ -128,7 +149,11 @@ export function amazon(env, meta) {
     }
     if (errs.length) throw new Error('Amazon güncellemeyi reddetti: ' + errs.slice(0, 5).join(' | '));
   }
-  const pushStock = (items) => patch(items, (x) => ({ op: 'replace', path: '/attributes/fulfillment_availability', value: [{ fulfillment_channel_code: 'DEFAULT', quantity: Math.max(0, Math.round(num(x.stock))) }] }));
+  async function pushStock(items) {
+    const own = [];
+    for (const x of items) if (!(await isFba(str(x.remoteId || x.sku)))) own.push(x);
+    return patch(own, (x) => ({ op: 'replace', path: '/attributes/fulfillment_availability', value: [{ fulfillment_channel_code: 'DEFAULT', quantity: Math.max(0, Math.round(num(x.stock))) }] }));
+  }
   const pushPrice = (items) => patch(items, (x) => ({ op: 'replace', path: '/attributes/purchasable_offer', value: [{ marketplace_id: market, currency, our_price: [{ schedule: [{ value_with_tax: num(x.price) }] }] }] }));
 
   // Kargoya ver: shipmentConfirmation (paket satırları + takip no). FBA siparişini Amazon gönderir.

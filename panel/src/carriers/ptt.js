@@ -83,8 +83,9 @@ export function make(values, { db } = {}) {
       const events = tags(x, 'dongu').map((e) => ({ text: tag(e, 'ISLEM'), at: tag(e, 'ITARIH'), no: Number(tag(e, 'siraNo')) || 0 })).sort((a, b) => a.no - b.no);
       if (!tag(x, 'BARNO') && !events.length) return { state: 'created', text: 'Şube kabulü bekleniyor', tracking: barkod };
       const last = events[events.length - 1] || {}, got = str(tag(x, 'TESALAN'));
-      const delivered = !!got || /teslim edildi/i.test(last.text || '');
-      const state = delivered && !/iade/i.test(last.text || '') ? 'delivered' : /iade/i.test(last.text || '') ? 'returned' : 'transit';
+      // PTT metinleri büyük harf ("TESLİM EDİLDİ", "İADE"): Türkçe kuralla küçültülür (/i bayrağı İ'yi i saymaz); iade önce denetlenir
+      const tx = String(last.text || '').toLocaleLowerCase('tr');
+      const state = /iade/.test(tx) ? 'returned' : got || /teslim edildi/.test(tx) ? 'delivered' : 'transit';
       const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(last.at || '');
       return { state, text: last.text || '', tracking: barkod, deliveredAt: state === 'delivered' && m ? Date.parse(`${m[3]}-${m[2]}-${m[1]}T12:00:00+03:00`) : null,
         trackingUrl: /^https?:\/\//.test(tag(x, 'sonucAciklama')) ? tag(x, 'sonucAciklama') : '' };

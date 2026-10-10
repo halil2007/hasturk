@@ -4,6 +4,8 @@
 {
   "name": "hasturk-panel",
   "compatibility_date": "2025-09-01",
+  // AsyncLocalStorage: senkronun dış istek bütçesi istek bağlamında tutulur (bkz. src/util.js withBudget)
+  "compatibility_flags": ["nodejs_als"],
   "main": "src/index.js",
   "assets": {
     "directory": "./public",

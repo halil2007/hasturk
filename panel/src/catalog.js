@@ -401,10 +401,18 @@ export async function checkPendingUploads(env, db) {
   const rows = await all(db, `SELECT * FROM product_uploads WHERE status = 'sent' AND ref IS NOT NULL AND created_at BETWEEN ? AND ?
     AND (created_at > ? OR COALESCE(checked_at, 0) < ?) ORDER BY COALESCE(checked_at, 0) LIMIT 5`, now - 3 * 864e5, now - 60e3, now - 4 * 3600e3, now - 3600e3);
   let n = 0;
+  // 3 günde sonuçlanmayan gönderim kapanır (kanal sonucu artık vermiyor; sonsuza kadar "gönderildi" kalmasın)
+  await run(db, "UPDATE product_uploads SET status = 'error', error = COALESCE(error, 'Kanal 3 gün içinde sonuç vermedi; ürünü kanal panelinden kontrol edin') WHERE status = 'sent' AND created_at < ?", now - 3 * 864e5);
+  const chans = rows.length ? await getChannels(env, db) : [];
   for (const u of rows) {
-    const c = (await getChannels(env, db)).find((x) => x.id === u.channel && x.enabled && x.catalog && !x.hold);
-    if (!c) continue;
-    try { if ((await checkUpload(env, db, null, u, c)).done) n++; } catch (e) { await log(db, u.channel, 'error', `Ürün gönderimi #${u.id} sorgulanamadı: ${e.message}`); }
+    const c = chans.find((x) => x.id === u.channel && x.enabled && x.catalog && !x.hold);
+    // Sorgulanamayan / kanalı kapalı kayıt da "denendi" işaretlenir: sıradakilerin önünü tıkamasın
+    if (!c) { await run(db, 'UPDATE product_uploads SET checked_at = ? WHERE id = ?', now, u.id); continue; }
+    try { if ((await checkUpload(env, db, null, u, c)).done) n++; } catch (e) {
+      if (e.budget) break;
+      await run(db, 'UPDATE product_uploads SET checked_at = ? WHERE id = ?', now, u.id);
+      await log(db, u.channel, 'error', `Ürün gönderimi #${u.id} sorgulanamadı: ${e.message}`);
+    }
   }
   return n;
 }

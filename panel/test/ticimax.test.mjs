@@ -97,7 +97,7 @@ test('Ticimax: 5000+ siparişte uyarı ve kısmi imleç; tek sipariş; teslimat 
   const big = await ticimax(ENV, {}).fetchOrders(since, since + 864e5);
   assert.equal(big.length, 5000);
   assert.match(big.warnings[0], /5000\+ sipariş/);
-  assert.equal(big.partialUntil, Date.parse('2026-10-02T07:00:00Z'));
+  assert.equal(big.partialUntil, since, 'sıra ID\'ye göre: imleç aralığın başında kalır (okunmayanların düzenlenme zamanı bilinmez)');
   const noAddr = siparis(9, 7).replace(/<a:TeslimatAdresi>[\s\S]*?<\/a:TeslimatAdresi>/, '<a:TeslimatAdresi i:nil="true"/>');
   const calls = mockFetch(() => env(noAddr, 'SelectSiparis'));
   const one = await ticimax(ENV, {}).fetchOne('9');
@@ -154,7 +154,7 @@ test('Ticimax: stok toplu (ID + StokAdedi), fiyat varyasyon başına bayraklarla
   assert.match(calls.find((c) => c.body.includes('<dc:ID>12<')).body, /<dc:IndirimliFiyati>0<\/dc:IndirimliFiyati><dc:KdvDahil>true<\/dc:KdvDahil><dc:SatisFiyati>99.9</);
   // SOAP hatası (HTTP 500 + faultstring) kalem bazında toplanır
   mockFetch((c) => (c.body.includes('<dc:ID>12<') ? { status: 500, body: '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>s:Client</faultcode><faultstring>Yetkisiz işlem</faultstring></s:Fault></s:Body></s:Envelope>' } : env('', 'VaryasyonGuncelle')));
-  await assert.rejects(ch.pushPrice([{ remoteId: '11', price: 1, listPrice: 1 }, { remoteId: '12', price: 1, listPrice: 1 }]), /Ticimax: 1 fiyat güncellenemedi \(12: Yetkisiz işlem\)/);
+  assert.deepEqual(await ch.pushPrice([{ remoteId: '11', price: 1, listPrice: 1 }, { remoteId: '12', price: 1, listPrice: 1 }]), { done: ['11'], errors: [{ remoteId: '12', error: 'Ticimax: Yetkisiz işlem' }] });
 });
 
 test('Ticimax: kargoya verme SetSiparisDurum (takip no + bağlantı, e-posta); başka açık paket varsa beklenir; hata yanıtı', async () => {

@@ -60,7 +60,7 @@ const ok = (on, yes, no) => html`<span class="istat ${on === true ? 'on' : on ==
 
 export async function integrations(el, rest = []) {
   const id = rest[0] ? decodeURIComponent(rest[0]) : '';
-  let data = null, jobs = [], modes = [], carriers = [], f = { show: 'all', q: '' };
+  let data = null, jobs = [], modes = [], carriers = [], f = { show: 'all', q: '' }, res = null;
   try { f.show = sessionStorage.getItem('integ_show') || 'all'; } catch { /* yok */ }
   async function load() {
     [data, jobs, modes, carriers] = await Promise.all([api('integrations'), api('backfill').catch(() => []), api('channel-products/channels').catch(() => []), api('integrations/carriers').catch(() => [])]);
@@ -82,7 +82,8 @@ export async function integrations(el, rest = []) {
   // ---------- genel bakış: kanal türü başına tek kart (aynı türün mağazaları kanalın kendi ekranında) ----------
   // Bir türün görünen mağazaları: kurulmuş olanlar + ilk (ana) mağaza. Kurulmamış ek ana mağazalar (ör. ikas2) gizli kalır.
   const storesOf = (type) => { const all = data.channels.filter((c) => c.type === type); return all.filter((c, i) => i === 0 || configured(c)); };
-  const groupsOf = () => TYPES.map((t) => ({ type: t, stores: storesOf(t) })).filter((g) => g.stores.length);
+  // Geliştirme aşamasındaki kanallar listede gösterilmez
+  const groupsOf = () => TYPES.map((t) => ({ type: t, stores: storesOf(t) })).filter((g) => g.stores.length && !g.stores[0].dev);
   const typeName = (t) => (t === 'ikas' ? 'ikas' : TYPE_NAME[t] || t);
   function icard(g) {
     const conf = g.stores.filter(configured), c = conf[0] || g.stores[0], live = conf.filter((x) => x.enabled || x.demo);
@@ -102,7 +103,7 @@ export async function integrations(el, rest = []) {
       ${!conf.length ? html`<div class="ic-caps">${CAPS(c).slice(0, 4).map((x) => html`<span>${x}</span>`)}</div>` : !multi ? html`<div class="ic-stats">
         <div><span>Siparişler</span>${c.enabled || c.demo ? (c.last && c.last.ok === false ? html`<span class="istat off"><i class="ico ico-x"></i>Hata</span>` : ok(true, c.last && c.last.ordersAt ? ago(c.last.ordersAt) : 'Açık')) : ok(null)}</div>
         <div><span>Stok gönderimi</span>${c.enabled || c.demo ? (isCatalog(c) ? html`<span class="istat na"><i class="ico ico-db"></i>Ana katalog</span>` : ok(stockOn(c), 'Açık', 'Kapalı')) : ok(null)}</div>
-        <div><span>Kanala yazma</span>${c.enabled || c.demo ? ok(!held(c), 'Açık', 'Beklemede') : ok(null)}</div>
+        <div><span>Kanala gönder</span>${c.enabled || c.demo ? ok(!held(c), 'Açık', 'Beklemede') : ok(null)}</div>
       </div>` : ''}
       ${err ? html`<div class="ic-err small"><i class="ico ico-warn"></i><span class="ellipsis">${multi ? `${err.name}: ` : ''}${err.last.error || 'Senkron başarısız'}</span></div>` : ''}
     </div>`;
@@ -147,8 +148,7 @@ export async function integrations(el, rest = []) {
         ${!c.ready ? html`<div class="ic-need small"><span class="pill warn tiny">${c.configured ? 'Bilgiler kayıtlı · bağlantı hazırlanıyor' : 'API bilgisi gelince açılır'}</span></div>` : ''}
         <div class="ic-need small muted">${c.about}</div></div>`; };
     return html`<div class="card stack" style="--g:12px">
-      <div><h2 class="row" style="gap:8px">Kargo entegrasyonları <span class="pill info tiny">Kurumsal paket</span></h2><div class="muted small">Kendi kargo anlaşmanızla gönderdiğiniz siparişlerin (kendi siteniz, pazaryerleri, ikas) etiketini ve takip numarasını kargo firmasından alın: sipariş → paket menüsü → <b>Kargo firmasından etiket al</b>. “Kargoya ver” dediğinizde takip numarası satış kanalına bildirilir. Bir firma, API bilgileri girilip bağlantısı doğrulandıktan sonra sipariş ekranında görünür.</div>
-        <div class="tiny muted" style="margin-top:6px"><b>Hangi etiket?</b> Trendyol / Hepsiburada gibi pazaryeri anlaşmalı kargosunda pazaryerinin <b>ortak barkodu</b>; siteniz kargo etiketi veriyorsa (ikas Kargo) <b>sitenin etiketi</b>; ikisi de yoksa ya da kendi anlaşmanızla gönderiyorsanız <b>bağlı kargo firması</b>. Sipariş ekranı her paket için önerilen yolu gösterir.</div></div>
+      <div><h2 class="row" style="gap:8px">Kargo entegrasyonları <span class="pill info tiny">Kurumsal paket</span></h2><div class="muted small">Kendi kargo anlaşmanızla etiket alın.</div></div>
       ${locked ? html`<div class="notice warn small"><i class="ico ico-key"></i><div>Kendi anlaşmalı kargo entegrasyonu <b>Kurumsal</b> pakette. Pazaryeri ortak barkodu ve ikas Kargo etiketleri tüm paketlerde çalışır. ${isAdmin() ? html`<a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.` : ''}</div></div>` : ''}
       <div class="small" style="font-weight:650">Kargo firmaları (doğrudan bağlantı)</div>
       <div class="icards">${direct.map(card)}</div>
@@ -232,6 +232,7 @@ export async function integrations(el, rest = []) {
   function detail() {
     const c = data.channels.find((x) => x.id === id);
     if (!c) { render(el, html`<div class="stack"><a class="link" href="#/entegrasyonlar">← Entegrasyonlar</a><div class="card empty">Kanal bulunamadı</div></div>`); return; }
+    const shown = res && res.id === c.id;
     const s = stateOf(c), live = c.enabled || c.demo, m = modeOf(c), basic = c.fields.filter((x) => !x.adv), adv = c.fields.filter((x) => x.adv), url = panelUrl(c), admin = isAdmin();
     render(el, html`<div class="stack">
       <div class="row wrap" style="gap:10px"><a class="btn ghost sm" href="#/entegrasyonlar"><i class="ico ico-back"></i>Entegrasyonlar</a><span class="spacer"></span>
@@ -244,13 +245,13 @@ export async function integrations(el, rest = []) {
             : ALL_BETA.includes(c.type) ? (c.beta
             ? html`<div class="notice small warn"><div><b>Test aşamasında:</b> firmalar bu kanalı ekleyip kullanabilir; panellerinde ve tanıtım sitesinde “Test aşamasında” etiketiyle görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm primary" data-act="release" data-type="${c.type}" data-on="1">Test yazısını kaldır</button></div>` : ''}</div></div>`
             : html`<div class="notice small good"><div><b>Test tamamlandı:</b> firmalarda ve tanıtım sitesinde etiketsiz, normal kanal olarak görünür.${admin ? html`<div style="margin-top:8px"><button class="btn sm" data-act="release" data-type="${c.type}" data-on="">“Test aşamasında” etiketini geri koy</button></div>` : ''}</div></div>`) : ''}
-          <div class="id-sws">
+          ${live || (configured(c) && !c.active) ? html`<div class="id-sws">
             ${sw('active', c.id, c.active, 'Kanal aktif', 'Kapalıysa senkronlanmaz', !admin)}
-            ${sw('write', c.id, !held(c), 'Kanala yazma', 'Kapalıysa yalnız okunur: paketleme, stok, fiyat gönderilmez', !admin || !live)}
+            ${sw('write', c.id, !held(c), 'Kanala gönder', 'Kapalıysa kanala hiçbir şey gönderilmez', !admin || !live)}
             ${isCatalog(c) ? html`<div class="iswitch dis"><span style="flex:1"><b>Stok gönderimi</b><span class="muted tiny">Stok senkronu kapalı: stok bu kanaldan okunur (Ayarlar → Stok'tan açın)</span></span></div>`
               : sw('stock', c.id, stockOn(c), 'Stok gönderimi', st().stock_sync ? 'Panel stoğu bu kanala otomatik gider' : 'Genel stok senkronu kapalıyken yalnız bu kanala gönderilir', !admin || !live)}
-            ${m ? sw('mode', c.id, !m.manual, 'Yeni ilanları otomatik ekle', 'Kapalıysa yeni ilanları Kanal Ürünleri\'nden siz seçersiniz', !admin) : ''}
-          </div>
+            ${m ? sw('mode', c.id, !m.manual, 'Yeni ilanları otomatik ekle', 'Kapalıysa yeni ilanları Kanal ürünleri\'nden siz seçersiniz', !admin) : ''}
+          </div>` : ''}
           ${live ? html`<dl class="id-kv small">
             <dt>Siparişler</dt><dd>${c.last && c.last.ordersAt ? html`<span title="${dateTime(c.last.ordersAt)}">${ago(c.last.ordersAt)}</span>` : '—'}</dd>
             ${(c.can || {}).listings !== false ? html`<dt>Ürün / stok</dt><dd>${c.last && c.last.listingsAt ? html`<span title="${dateTime(c.last.listingsAt)}">${ago(c.last.listingsAt)}</span>` : '—'}</dd>
@@ -266,14 +267,14 @@ export async function integrations(el, rest = []) {
           <div class="card stack">
             <div class="row wrap" style="gap:10px"><div style="flex:1;min-width:0"><h2>Bağlantı bilgileri</h2><div class="muted small">Bilgiler sunucuda şifreli saklanır, ekranda tekrar açık gösterilmez.</div></div></div>
             ${c.locked ? html`<div class="notice bad small"><i class="ico ico-warn"></i>Kayıtlı bilgiler okunamadı${state.tenant ? '' : ' (panel şifresi / PANEL_SECRET değişmiş olabilir)'}. Bilgileri yeniden girin.</div>` : ''}
-            ${c.last && c.last.ok === false ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error || 'ayrıntı yok — Tanılama ile kontrol edin'}<div class="tiny muted">${c.last.nextTry ? `Sonraki otomatik deneme ${dateTime(c.last.nextTry)}.` : '15 dakikada bir otomatik yeniden denenir.'}</div></div></div>` : ''}
+            ${!shown && c.last && c.last.ok === false ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Sipariş senkronu başarısız${c.last.fails > 1 ? ` (${c.last.fails}. deneme)` : ''}:</b> ${c.last.error || 'ayrıntı yok — Tanılama ile kontrol edin'}<div class="tiny muted">${c.last.nextTry ? `Sonraki otomatik deneme ${dateTime(c.last.nextTry)}.` : '15 dakikada bir otomatik yeniden denenir.'}</div></div></div>` : ''}
             ${c.last && c.last.listingsError ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div><b>Ürün / stok alınamadı:</b> ${c.last.listingsError}</div></div>` : ''}
-            ${c.last && c.last.note && !c.last.error ? html`<div class="notice small"><i class="ico ico-check"></i><div>${c.last.note}</div></div>` : ''}
+            ${!shown && c.last && c.last.note && !c.last.error && !/API bilgileri güncellendi/.test(c.last.note) ? html`<div class="notice small"><i class="ico ico-check"></i><div>${c.last.note}</div></div>` : ''}
             ${c.type === 'opencart' ? ocBridge(c, admin) : ''}
             <div class="form-grid">${basic.map((x) => field(c, x))}</div>
             ${adv.length ? html`<details class="adv"><summary>Gelişmiş ayarlar (${adv.length})</summary><div class="form-grid" style="margin-top:10px">${adv.map((x) => field(c, x))}</div></details>` : ''}
             ${admin ? html`<div class="row wrap" style="gap:8px"><button class="btn primary" data-act="test" data-id="${c.id}"><i class="ico ico-key"></i>Kaydet ve bağlantıyı test et</button><button class="btn" data-act="save" data-id="${c.id}">Yalnız kaydet</button></div>` : html`<div class="muted small">Bağlantı bilgilerini yalnız yönetici değiştirebilir.</div>`}
-            <div data-res></div>
+            <div data-res>${shown ? html`<div class="notice ${res.ok ? 'good' : 'bad'}"><i class="ico ico-${res.ok ? 'check' : 'warn'}"></i><div>${res.message}</div></div>` : ''}</div>
           </div>
           ${live ? backfill(c) : ''}
         </main>
@@ -291,7 +292,7 @@ export async function integrations(el, rest = []) {
   }
   function backfill(only) {
     const on = only ? [only] : data.channels.filter((c) => c.enabled && !c.demo);
-    const from = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+    const from = dayKey(Date.now() - 90 * 864e5);
     const js = only ? jobs.filter((j) => j.channel === only.id) : jobs;
     return html`<div class="card stack" data-bf>
       <div><h2>Geçmiş siparişleri aktar</h2><div class="muted small">Seçilen tarih aralığındaki siparişler haftalık parçalar halinde çekilir. Aynı sipariş iki kez kaydedilmez; stok takibi başlamadan önceki siparişler stoğu düşmez.</div></div>
@@ -312,7 +313,10 @@ export async function integrations(el, rest = []) {
   }
   const draw = () => (id ? detail() : overview());
 
-  const values = (cid) => { const o = {}; $$(`[data-ch="${cid}"] [data-k]`, el).forEach((i) => { o[i.dataset.k] = i.value; }); return o; };
+  // Adres alanlarında https:// yazılmadıysa eklenir
+  const values = (cid) => { const o = {}; $$(`[data-ch="${cid}"] [data-k]`, el).forEach((i) => { let v = i.value.trim(); if (v && /_(URL|BASE)$/.test(i.dataset.k) && !/^https?:\/\//i.test(v)) { v = 'https://' + v; i.value = v; } o[i.dataset.k] = v; }); return o; };
+  // Sunucu mesajındaki alan kodları (WOO_URL …) alan adlarıyla gösterilir
+  const labelize = (cid, msg) => { const c = data && data.channels.find((x) => x.id === cid); let t = String(msg || ''); if (c) for (const f2 of [...c.fields].sort((a, b) => b.k.length - a.k.length)) t = t.split(f2.k).join(f2.label); return t; };
   const after = async () => { await loadSummary().catch(() => {}); await load(); };
   const saveSet = async (patch, msg) => { try { state.settings = await api('settings', { method: 'PUT', body: patch }); toast(msg); await after(); } catch (err) { toast(err.message, true); await after(); } };
   actions(el, {
@@ -343,14 +347,16 @@ export async function integrations(el, rest = []) {
       if (!spare) { toast(`${typeName(type)}: yeni mağaza eklendi — bilgilerini girin`); await loadSummary().catch(() => {}); }
       location.hash = '#/entegrasyonlar/' + encodeURIComponent(cid);
     }),
-    save: (t) => busy(t, async () => { await api('integrations/' + t.dataset.id, { method: 'PUT', body: { values: values(t.dataset.id) } }); toast('Kaydedildi'); await after(); }),
+    save: (t) => busy(t, async () => { res = null; try { await api('integrations/' + t.dataset.id, { method: 'PUT', body: { values: values(t.dataset.id) } }); } catch (e) { throw new Error(labelize(t.dataset.id, e.message)); } toast('Kaydedildi'); await after(); }),
+    // Tek sonuç: başarılıysa yalnız başarı, hata varsa yalnız hata (bildirim penceresi açılmaz)
     test: (t) => busy(t, async () => {
       const cid = t.dataset.id;
-      await api('integrations/' + cid, { method: 'PUT', body: { values: values(cid) } });
-      const r = await api(`integrations/${cid}/test`, { method: 'POST' });
+      try {
+        await api('integrations/' + cid, { method: 'PUT', body: { values: values(cid) } });
+        const r = await api(`integrations/${cid}/test`, { method: 'POST' });
+        res = { id: cid, ok: !!r.ok, message: labelize(cid, r.message) };
+      } catch (e) { res = { id: cid, ok: false, message: labelize(cid, e.message) }; }
       await after();
-      const box = $('[data-res]', el);
-      if (box) render(box, html`<div class="notice ${r.ok ? 'good' : 'bad'}"><i class="ico ico-${r.ok ? 'check' : 'warn'}"></i><div>${r.message}${r.ok ? '' : html`<div class="tiny muted" style="margin-top:4px">Bilgileri kontrol edin ya da adım adım denemek için <b>Tanılama</b>'ya basın.</div>`}</div></div>`);
     }),
     sync: (t) => busy(t, async () => { const r = await api('sync', { method: 'POST', body: { channels: [t.dataset.id], force: true, listings: true } }); const v = (r.channels || {})[t.dataset.id]; toast(typeof v === 'string' ? v : `${v ?? 0} sipariş kontrol edildi`, typeof v === 'string'); await after(); }),
     // Önce formdaki bilgiler kaydedilir (yazılan site adresi kaybolmasın), sonra anahtarlı dosya indirilir
@@ -392,7 +398,7 @@ export async function integrations(el, rest = []) {
     if (d.write) {
       const cur = new Set(st().hold_channels || []);
       if (t.checked) cur.delete(d.write); else cur.add(d.write);
-      return saveSet({ hold_channels: [...cur] }, t.checked ? `${ch(d.write).name}: kanala yazma açık` : `${ch(d.write).name}: kanala yazma beklemede (yalnız okunuyor)`);
+      return saveSet({ hold_channels: [...cur] }, t.checked ? `${ch(d.write).name}: kanala gönder açık` : `${ch(d.write).name}: kanala gönder kapalı`);
     }
     if (d.stock) {
       const key = st().stock_sync ? 'stock_channels' : 'stock_push';

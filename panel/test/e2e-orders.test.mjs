@@ -426,7 +426,7 @@ test('Kendi anlaşmalı kargo: ikas siparişi Kargonomi ile gönderilir (etiket,
     let d = await ok(await admin('/api/orders/' + id));
     const pk = d.order.packages[0];
     assert.equal(pk.carrier_provider, 'kargonomi'); assert.equal(pk.tracking, 'KG901'); assert.equal(pk.agreement, 'own'); assert.equal(pk.remote_id, 'pk-1');
-    assert.equal(d.order.shipping_cost, 54.9, 'entegratör ücreti kargo giderine');
+    assert.equal(d.order.shipping_cost, 65.88, 'entegratör ücreti (KDV hariç 54,90) KDV dahil kargo giderine');
     const ful = ik.gql.find((b) => /fulfillOrder/.test(b.query));
     assert.equal(ful.variables.input.trackingInfoDetail.trackingNumber, 'KG901');
     assert.equal(ful.variables.input.sendNotificationToCustomer, false);

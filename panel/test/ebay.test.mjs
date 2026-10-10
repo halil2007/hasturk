@@ -183,8 +183,9 @@ test('eBay: stok ve fiyat bulk_update_price_quantity gövdeleri; 25\'erli parça
   bodies.length = 0;
   await ch.pushPrice([{ remoteId: 'S1', price: 12.5 }]);
   assert.deepEqual(bodies[0], { requests: [{ offers: [{ offerId: 'O-S1', price: { value: '12.50', currency: 'EUR' } }] }] });
-  await assert.rejects(ch.pushPrice([{ remoteId: 'NO', price: 3 }]), /NO: teklif \(offer\) bulunamadı/);
-  await assert.rejects(ch.pushStock([{ remoteId: 'BAD1', stock: 1 }]), /BAD1: Invalid quantity/);
+  // Sonuç ilan ilan: reddedilen ilan errors'a, diğerleri done'a
+  assert.deepEqual(await ch.pushPrice([{ remoteId: 'NO', price: 3 }]), { done: [], errors: [{ remoteId: 'NO', error: 'eBay: teklif (offer) bulunamadı' }] });
+  assert.deepEqual(await ch.pushStock([{ remoteId: 'BAD1', stock: 1 }, { remoteId: 'S1', stock: 2 }]), { done: ['S1'], errors: [{ remoteId: 'BAD1', error: 'eBay: Invalid quantity' }] });
 });
 
 test('eBay: kargoya verme (shipping_fulfillment) gövdesi', async () => {

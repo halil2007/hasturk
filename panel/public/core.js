@@ -152,8 +152,8 @@ export const n = (v) => nf.format(Number(v) || 0);
 export function compact(v) {
   v = Number(v) || 0;
   const a = Math.abs(v);
-  if (a >= 1e6) return nf.format(v / 1e6) + ' Mn';
-  if (a >= 1e4) return nf.format(v / 1e3) + ' B';
+  if (a >= 1e6) return nf.format(v / 1e6) + ' mn';
+  if (a >= 1e4) return nf.format(v / 1e3) + ' bin';
   return nf.format(Math.round(v));
 }
 export const pct = (v) => (v == null || !Number.isFinite(v) ? '—' : `${v > 0 ? '+' : ''}%${nf.format(v)}`);
@@ -186,6 +186,9 @@ export const rangeLabel = (from, to) => {
   return `${f.toLocaleDateString('tr-TR', o)} – ${t.toLocaleDateString('tr-TR', { ...o, year: 'numeric' })}`;
 };
 
+export { ek } from './ek.js';
+import { ek } from './ek.js';
+
 // Kargo gecikme uyarısı: kanalın son kargoya teslim tarihi (varsa) ve sipariş yaşı (1 günü aşan) dikkate alınır
 export function lateInfo(o, now = Date.now()) {
   if (!['new', 'processing'].includes(o.status) || (o.open_packages === 0 && o.packages > 0)) return null;
@@ -204,7 +207,7 @@ export function extNote(o) {
   try { x = typeof x === 'string' ? JSON.parse(x) : x; } catch { x = null; }
   if (!x || x.status !== o.status) return null;
   const name = ch(o.channel).name;
-  return { seller: x.seller, at: x.at, text: x.seller ? `${name} üzerinden işlem yapıldı` : `${name}'da durum güncellendi`, detail: `${x.from || '?'} → ${x.to || '?'}` };
+  return { seller: x.seller, at: x.at, text: x.seller ? `${name} üzerinden işlem yapıldı` : `${ek(name, 'da')} durum güncellendi`, detail: `${x.from || '?'} → ${x.to || '?'}` };
 }
 
 export const STATUS_LABEL = { new: 'Yeni', processing: 'Hazırlanıyor', shipped: 'Kargoda', delivered: 'Teslim edildi', cancelled: 'İptal', returned: 'İade' };
@@ -303,7 +306,7 @@ export function sheet({ title, body, foot, size = '', onClose } = {}) {
   bg.innerHTML = `<div class="sheet ${size}" role="dialog" aria-modal="true"><div class="sheet-head"><h2 class="ellipsis"></h2><button class="icon-btn" data-close aria-label="Kapat"><i class="ico ico-x"></i></button></div><div class="sheet-body"></div><div class="sheet-foot hide"></div></div>`;
   const s = { el: bg, body: $('.sheet-body', bg), foot: $('.sheet-foot', bg), title: $('h2', bg) };
   s.title.textContent = title || '';
-  s.close = () => { if (!bg.isConnected) return; bg.remove(); sheets.splice(sheets.indexOf(s), 1); document.body.style.overflow = sheets.length ? 'hidden' : ''; onClose && onClose(); };
+  s.close = () => { if (!bg.isConnected) return; bg.remove(); sheets.splice(sheets.indexOf(s), 1); document.body.style.overflow = sheets.length ? 'hidden' : ''; document.body.classList.toggle('has-sheet', !!sheets.length); onClose && onClose(); };
   s.setBody = (tpl) => render(s.body, tpl);
   s.setFoot = (tpl) => { s.foot.classList.toggle('hide', !tpl); if (tpl) render(s.foot, tpl); };
   bg.addEventListener('click', (e) => { if (e.target === bg || e.target.closest('[data-close]')) s.close(); });
@@ -312,6 +315,7 @@ export function sheet({ title, body, foot, size = '', onClose } = {}) {
   $('#sheet-root').append(bg);
   sheets.push(s);
   document.body.style.overflow = 'hidden';
+  document.body.classList.add('has-sheet');
   return s;
 }
 if (typeof document !== 'undefined') document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (openMenu) closeMenu(); else if (sheets.length) sheets[sheets.length - 1].close(); } });

@@ -137,7 +137,7 @@ export function make(values) {
       const state = stateOf(st), tn = str(pick(d, 'TrackingNo', 'TrackingNumber'));
       return {
         state, text: str(pick(d, 'StateText')) || (lastH ? str(pick(lastH, 'Status')) : ''), tracking: tn, barcode: tn || pkg.carrier_ref,
-        trackingUrl: str(pick(d, 'TrackingUrl')) || pubUrl(tn), cost: money(pick(d, 'CargoAmount')) ?? money(pick(d, 'TotalPrice')),
+        trackingUrl: str(pick(d, 'TrackingUrl')) || pubUrl(tn), cost: money(pick(d, 'CargoAmount')) ?? money(pick(d, 'TotalPrice')), costVatIncluded: false, // DOĞRULA: CargoAmount KDV hariç kabul edildi
         deliveredAt: state === 'delivered' ? when(pick(d, 'UpdateDate')) || (lastH ? when(pick(lastH, 'StatusDate')) : null) : null,
       };
     },

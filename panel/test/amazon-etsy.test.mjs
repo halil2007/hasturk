@@ -67,9 +67,9 @@ test('Amazon: LWA belirteci alınır ve saklanır; siparişler sayfalanır, sat�
   assert.deepEqual(qs(list[0].url), { MarketplaceIds: 'A33AVAJ2PDY3EV', LastUpdatedAfter: '2026-10-01T00:00:00Z', MaxResultsPerPage: '100' });
   assert.deepEqual(qs(list[1].url), { MarketplaceIds: 'A33AVAJ2PDY3EV', NextToken: 'P2' });
   for (const c of calls.slice(1)) { assert.equal(c.headers['x-amz-access-token'], 'AT1'); assert.ok(!c.headers.Authorization); }
-  // en yeni güncellenen önce
-  assert.deepEqual(orders.map((o) => o.remoteId), ['222-2', '111-1', '333-3']);
-  const [c, u, p] = orders;
+  // en eski güncellenen önce
+  assert.deepEqual(orders.map((o) => o.remoteId), ['333-3', '111-1', '222-2']);
+  const [p, u, c] = orders;
   assert.equal(u.status, 'new'); assert.equal(u.remoteStatus, 'Unshipped');
   assert.equal(u.total, 250); assert.equal(u.currency, 'TRY');
   assert.equal(u.orderedAt, Date.parse('2026-10-01T10:00:00Z')); assert.equal(u.shipBy, Date.parse('2026-10-03T21:00:00Z'));
@@ -106,7 +106,7 @@ test('Amazon: durum eşlemesi; geçmiş aktarımında CreatedAfter / CreatedBefo
   assert.equal(calls.length, n, 'son 2 dakika için istek atılmaz');
 });
 
-test('Amazon: çok siparişte en yeni 100 işlenir, uyarı döner', async () => {
+test('Amazon: çok siparişte en eski 100 işlenir, imleç son işlenende kalır (partialUntil), uyarı döner', async () => {
   const many = Array.from({ length: 105 }, (_, i) => order('X' + i, 'Shipped', { LastUpdateDate: new Date(Date.parse('2026-10-01T00:00:00Z') + i * 60e3).toISOString() }));
   const calls = mockFetch([
     [/auth\/o2\/token/, { access_token: 'AT', expires_in: 3600 }],
@@ -115,10 +115,11 @@ test('Amazon: çok siparişte en yeni 100 işlenir, uyarı döner', async () => 
   ]);
   const orders = await amazon(AENV, { id: 'amazon' }).fetchOrders(Date.now() - 864e5, Date.now());
   assert.equal(orders.length, 100);
-  assert.equal(orders[0].remoteId, 'X104');
-  assert.ok(!orders.some((o) => o.remoteId === 'X4'));
+  assert.equal(orders[0].remoteId, 'X0');
+  assert.ok(!orders.some((o) => o.remoteId === 'X100'));
   assert.equal(calls.filter((c) => /orderItems/.test(c.url)).length, 100);
-  assert.match(orders.warnings[0], /105 siparişin en yeni 100/);
+  assert.equal(orders.partialUntil, Date.parse('2026-10-01T00:00:00Z') + 99 * 60e3 - 1000);
+  assert.match(orders.warnings[0], /105 siparişin en eski 100/);
 });
 
 test('Amazon: ürün listesi (searchListingsItems) sayfalanır ve dönüşür', async () => {
@@ -380,7 +381,8 @@ test('Etsy: stok / fiyat envanter PUT ile yazılır (salt okunur alanlar çıkar
   assert.deepEqual(puts[2].body.products.map((p) => p.offerings[0].price), [10, 15.56]);
   assert.deepEqual(puts[2].body.quantity_on_property, []);
   // ilanda olmayan satır hata olarak bildirilir (diğerleri yine yazılır)
-  await assert.rejects(() => ch.pushStock([{ remoteId: 'YOK', remoteProductId: '5', stock: 1 }, { remoteId: 'x', stock: 1 }]), /x: ilan numarası yok \| YOK: ilanda bulunamadı/);
+  // Sonuç ilan ilan: hatalı satırlar errors'a (yalnız onlar yeniden denenir)
+  assert.deepEqual((await ch.pushStock([{ remoteId: 'YOK', remoteProductId: '5', stock: 1 }, { remoteId: 'x', stock: 1 }])).errors, [{ remoteId: 'x', error: 'Etsy: ilan numarası yok' }, { remoteId: 'YOK', error: 'Etsy: ilanda bulunamadı' }]);
 
   await assert.rejects(() => ch.ship({ remote_id: '1000' }, {}, { cargoCompany: 'PTT', tracking: '' }), /takip numarası/);
   assert.deepEqual(await ch.ship({ remote_id: '1000' }, { items: [] }, { cargoCompany: 'Yurtiçi Kargo', tracking: 'YK1' }), { tracking: 'YK1' });

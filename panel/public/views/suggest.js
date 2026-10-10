@@ -1,7 +1,7 @@
 // Fiyat önerileri: pazaryerinin buybox servisinden okunan rakip fiyatlarına göre ilan bazında öneri (bkz. src/suggest.js).
 // "Birinciliği al": rakibin 1 kuruş altı; "Kâr artır": birinci sıra sizde, ikinci satıcının 1 kuruş altına kadar yükseltme.
 // Her öneride önerilen fiyattaki kâr görünür; tek tıkla ya da toplu uygulanır, fiyat kanala gönderilir.
-import { api, html, render, $, $$, n, money, ago, ch, chLogo, thumb, actions, busy, toast, confirmBox } from '../core.js';
+import { api, ek, html, render, $, $$, n, money, ago, ch, chLogo, thumb, actions, busy, toast, confirmBox } from '../core.js';
 import { bbChannels } from './buybox.js';
 
 const marg = (x) => (x && x.margin != null ? html`<span class="tiny ${x.margin < 0 ? 'neg' : x.margin < 8 ? 'warn-t' : 'pos'}">%${n(Math.round(x.margin))} · ${money(x.profit)}</span>` : html`<span class="tiny muted" title="Ürünün alış fiyatı girilmemiş">kâr ?</span>`);
@@ -19,7 +19,7 @@ export async function suggestView(el) {
       
       ${!chs.length ? html`<div class="card empty">Rakip fiyatı veren bağlı pazaryeri yok. Trendyol ya da Hepsiburada bağlanınca öneriler burada görünür (Entegrasyonlar).</div>` : html`
       <div class="row wrap" style="gap:10px">${chs.length > 1 ? html`<div class="ch-tabs" style="flex:1;min-width:0"><button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tümü</button>${chs.map((x) => html`<button class="ch-tab ${f.channel === x.id ? 'on' : ''}" data-act="ch" data-id="${x.id}">${chLogo(x.id)}${x.name}</button>`)}</div>` : html`<span style="flex:1"></span>`}
-        <button class="btn" data-act="check"><i class="ico ico-sync"></i>Rakip fiyatlarını yenile</button></div>
+        <button class="btn" data-act="check"><i class="ico ico-sync"></i>Yenile</button></div>
       <div class="row wrap"><div class="tabs" style="flex:1;min-width:0">${[['win', 'Birinciliği al', c.win], ['raise', 'Kâr artır', c.raise], ['loss', 'Zararına olanlar', c.loss]]
         .map(([k, t, cnt]) => html`<button class="tab ${f.kind === k ? 'on' : ''}" data-act="kind" data-k="${k}">${t} <span class="muted">${data ? n(cnt || 0) : ''}</span></button>`)}</div>
         <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün, barkod, stok kodu" data-q value="${f.q}"></div></div>
@@ -70,7 +70,7 @@ export async function suggestView(el) {
     }),
     one: async (b) => {
       const k = b.closest('tr').dataset.key, s = data.items.find((x) => key(x) === k);
-      if (!s || !(await confirmBox(`${s.name}: fiyat ${money(s.price)} → ${money(s.suggested)} olsun ve ${ch(s.channel).name}'a gönderilsin mi?`, 'Uygula'))) return;
+      if (!s || !(await confirmBox(`${s.name}: fiyat ${money(s.price)} → ${money(s.suggested)} olsun ve ${ek(ch(s.channel).name, 'a')} gönderilsin mi?`, 'Uygula'))) return;
       await apply([{ channel: s.channel, remote_id: s.remote_id }], b);
     },
     apply: async (b) => {

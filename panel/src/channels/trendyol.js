@@ -11,6 +11,9 @@ const STATUS = {
 };
 const RANKS = ['new', 'processing', 'shipped', 'delivered'];
 const H3 = 3 * 3600e3, D = 864e5;
+const r2 = (n) => Math.round(n * 100) / 100;
+// Math.min() boş listede Infinity döner: sonlu değilse boş
+const finite = (n) => (Number.isFinite(n) ? n : null);
 // Sipariş servisi: orderDate ve startDate/endDate "GMT+3" zaman damgasıdır (Türkiye saati UTC gibi yazılır; gerçek zamandan 3 saat ileride).
 // Servis en fazla 2 haftalık aralık ve son 1 aylık veri verir (5 Mart 2026'dan beri). 15 Ekim 2026'dan itibaren yalnız v2/orders çalışır.
 const MAX_BACK = 30 * D - 3600e3;
@@ -44,6 +47,24 @@ export function trendyol(env, meta) {
     return /Cancel|UnSupplied/i.test(s) || STATUS[p.status] === 'cancelled' ? 'cancelled' : /Return/i.test(s) || STATUS[p.status] === 'returned' ? 'returned' : '';
   };
   const isLive = (p) => !['cancelled', 'returned'].includes(STATUS[p.status]);
+  // Satıcı geliri: brüt fiyat − satıcı indirimi. Trendyol'un karşıladığı indirim (lineTyDiscount / packageTyDiscount) satıcıya ödenir;
+  // lineUnitPrice / packageTotalPrice müşterinin ödediği net tutardır (TY indirimi de düşülmüş). Alanlar yoksa eskisi gibi net tutar.
+  // Dokümandaki örneklerde lineGrossAmount ve lineSellerDiscount adet başıdır (2 adet: 350 brüt, 35 indirim → birim 315).
+  // Güvenlik: brüt − satıcı indirimi, müşterinin ödediği net + Trendyol indirimini aşamaz (alanlar adet başı değil satır toplamıysa
+  // ciro adet kadar katlanırdı): aşıyorsa net tutar kullanılır
+  const unitOf = (l) => {
+    const net = num(l.lineUnitPrice ?? l.price ?? l.amount);
+    if (l.lineGrossAmount == null) return net;
+    const u = r2(num(l.lineGrossAmount) - num(l.lineSellerDiscount) + num(l.lineSgrFee));
+    return net > 0 && (u > net + num(l.lineTyDiscount) + num(l.lineSgrFee) + 0.05 || u < net - 0.05) ? net : u;
+  };
+  const pkgTotalOf = (p) => {
+    const net = num(p.packageTotalPrice ?? p.totalPrice ?? p.grossAmount);
+    if (p.packageGrossAmount == null) return net;
+    const v = num(p.packageGrossAmount) - num(p.packageSellerDiscount) + num(p.totalSgrFee);
+    return net > 0 && (v > net + num(p.packageTyDiscount) + num(p.totalSgrFee) + 0.05 || v < net - 0.05) ? net : v;
+  };
+  const comm = (total, rate) => r2(total * rate / 100 * 1.2);
 
   // Trendyol her paketi ayrı kayıt olarak verir; aynı sipariş numarasındaki paketler tek siparişte toplanır.
   // Bölünen (UnPacked) ya da kısmi iptalle bozulan paket (yeni paketlerin originPackageIds alanında geçer) yerini yeni paketlere
@@ -65,16 +86,19 @@ export function trendyol(env, meta) {
       const live = list.filter(isLive);
       // Kalemler satır kimliğine göre: aynı satır birden çok pakete bölündüyse adetler toplanır; aynı satırın iptal / iade edilen
       // kısmı ayrı kalem olur (canlı paketler önce okunur)
-      const items = [], byKey = new Map();
+      const items = [], byKey = new Map(), rates = new Map();
       for (const p of [...live, ...list.filter((x) => !isLive(x))]) for (const l of p.lines || []) {
         const lid = lineIdOf(l), st = lineKind(p, l), qty = num(l.quantity, 1);
         const first = byKey.get(lid), key = first && first.status !== st ? `${lid}-${st || 'acik'}` : lid;
         const ex = byKey.get(key);
-        if (ex) { ex.quantity += qty; ex.total = Math.round(ex.unitPrice * ex.quantity * 100) / 100; continue; }
-        const unit = num(l.lineUnitPrice ?? l.price ?? l.amount);
+        if (ex) { ex.quantity += qty; ex.total = r2(ex.unitPrice * ex.quantity); if (rates.has(key)) ex.commission = comm(ex.total, rates.get(key)); continue; }
+        const unit = unitOf(l), total = r2(unit * qty);
+        // commission: satırdaki komisyon ORANI (%); panelde satırın KDV dahil komisyon tutarı tutulur
+        const rate = l.commission != null && l.commission !== '' ? num(l.commission, null) : null;
+        if (rate != null) rates.set(key, rate);
         const it = {
           lineId: key, sku: str(l.stockCode || l.merchantSku), barcode: str(l.barcode), name: str(l.productName), image: '',
-          quantity: qty, unitPrice: unit, total: Math.round(unit * qty * 100) / 100, status: st, remoteKey: str(l.barcode),
+          quantity: qty, unitPrice: unit, total, status: st, remoteKey: str(l.barcode), ...(rate != null ? { commission: comm(total, rate) } : {}),
         };
         byKey.set(key, it);
         items.push(it);
@@ -83,7 +107,7 @@ export function trendyol(env, meta) {
       if (!live.length) status = list.some((p) => STATUS[p.status] === 'returned') ? 'returned' : 'cancelled';
       else status = RANKS[Math.min(...live.map((p) => Math.max(0, RANKS.indexOf(STATUS[p.status] || 'new'))))];
       const tracked = list.find((p) => p.cargoTrackingNumber) || {};
-      const sum = (ps) => ps.reduce((s, p) => s + num(p.packageTotalPrice ?? p.totalPrice ?? p.grossAmount), 0);
+      const sum = (ps) => ps.reduce((s, p) => s + pkgTotalOf(p), 0);
       return {
         // orderDate GMT+3 zaman damgasıdır: gerçek zamana çevrilir
         remoteId: String(p0.orderNumber), orderNumber: String(p0.orderNumber), orderedAt: num(p0.orderDate) ? num(p0.orderDate) - H3 : Date.now(),
@@ -95,7 +119,7 @@ export function trendyol(env, meta) {
         cargoCompany: str(tracked.cargoProviderName || p0.cargoProviderName), tracking: str(tracked.cargoTrackingNumber),
         awaitingPayment: list.every((p) => PAYMENT_WAIT.includes(p.status)),
         // Son kargoya teslim tarihi (agreedDeliveryDate): canlı paketlerin en erkeni
-        shipBy: Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0)) || null,
+        shipBy: finite(Math.min(...live.map((p) => num(p.agreedDeliveryDate)).filter((x) => x > 0))),
         history: list.flatMap((p) => (p.packageHistories || []).map((h) => ({ status: h.status, at: num(h.createdDate) }))),
         items,
         packages: list.map((p) => ({
@@ -110,13 +134,16 @@ export function trendyol(env, meta) {
   }
 
   // Sipariş paketleri: v2/orders (eski /orders 15 Ekim 2026'da kapanıyor; o tarihe kadar günde 3 kez 10 dk 426 dönüyor).
-  // v2 bu hesapta yoksa (404 / 405) bir kez eski adrese düşülür.
-  let ordersPath = `/order/sellers/${seller}/v2/orders`;
-  async function orders(query) {
-    try { return await call(`${ordersPath}?${query}`); } catch (e) {
-      if (!/\b(404|405)\b/.test(e.message) || !ordersPath.includes('/v2/')) throw e;
-      ordersPath = `/order/sellers/${seller}/orders`;
-      return call(`${ordersPath}?${query}`);
+  // v2 404 / 405 verirse yalnız o okumada (aynı listenin kalan sayfaları dahil: state) eski adrese düşülür; kalıcı geçilmez,
+  // sonraki okuma yine v2 dener (geçici bir 404 bağlantıyı kapanacak eski adrese kilitlemesin). Eski adres de hata verirse v2 hatası bildirilir.
+  const V2 = `/order/sellers/${seller}/v2/orders`, LEGACY = `/order/sellers/${seller}/orders`;
+  async function orders(query, state = {}) {
+    if (state.legacy) return call(`${LEGACY}?${query}`);
+    try { return await call(`${V2}?${query}`); } catch (e) {
+      if (!/\b(404|405)\b/.test(e.message)) throw e;
+      const r = await call(`${LEGACY}?${query}`).catch((e2) => { if (e2.budget) throw e2; throw e; });
+      state.legacy = true;
+      return r;
     }
   }
   async function fetchOrders(since, until) {
@@ -124,16 +151,20 @@ export function trendyol(env, meta) {
     // gelen siparişler de dönsün (başlangıç olduğu gibi kalır; aralık yalnız genişler). Dilim boyu bu 3 saat düşülerek 2 haftayı aşmaz.
     const out = [], floor = Date.now() - MAX_BACK;
     if (since < floor) { out.warnings = ['Trendyol sipariş servisi yalnız son 1 ayın siparişlerini veriyor; daha eski siparişler okunamadı']; since = floor; }
-    const W = 14 * D - H3 - 60e3, pkgs = [];
+    const W = 14 * D - H3 - 60e3, pkgs = [], state = {};
+    let cut = null;
     for (let to = until; to > since; to -= W) {
       const from = Math.max(since, to - W);
       for (let page = 0; page < 50; page++) {
-        const r = await orders(`startDate=${from}&endDate=${to + H3}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`);
+        const r = await orders(`startDate=${from}&endDate=${to + H3}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`, state);
         pkgs.push(...(r.content || []));
         if (page + 1 >= (r.totalPages || 1)) break;
+        // Sayfa sınırı (50 × 200): dilimin kalanı okunmadı, imleç bu dilimin başında kalır
+        if (page === 49) cut = from;
       }
     }
     out.push(...group(pkgs));
+    if (cut != null) { out.partialUntil = cut; (out.warnings = out.warnings || []).push('Trendyol: bir tarih aralığında 10.000 paketten fazlası var; kalan paketler sonraki senkronda okunur'); }
     return out;
   }
   // Tek sipariş (sipariş numarasıyla; servis tarihsiz sorguda son 1 haftayı tarar, bu yüzden yalnız kargo değişikliği / tanılamada kullanılır)

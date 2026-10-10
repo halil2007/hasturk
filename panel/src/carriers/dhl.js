@@ -4,7 +4,7 @@
 // kodlarıyla gönderilir (cbsinfoapi; JWT gerekmez). Varış şubesi henüz belirlenemediyse (hata 20001) etiket sonradan alınır.
 // carrier_ref = referenceId (bizim sipariş-paket numaramız, büyük harf); takip numarası = shipmentId.
 import { http, str, sleep } from '../util.js';
-import { phone10, nameKey, fullAddress, money, trackUrl } from './common.js';
+import { phone10, nameKey, fullAddress, money, trackUrl, freshRef } from './common.js';
 
 const BASE = (test) => (test ? 'https://testapi.mngkargo.com.tr/mngapi/api' : 'https://api.mngkargo.com.tr/mngapi/api');
 const tokens = new Map(), places = new Map();
@@ -73,16 +73,28 @@ export function make(values) {
       const r = s.receiver, phone = phone10(r.phone);
       if (phone.length !== 10) throw new Error('DHL eCommerce alıcı cep telefonunu zorunlu istiyor (10 hane); siparişte geçerli telefon yok');
       const place = await codes(r.city, r.district);
-      // Referans: büyük harf, yalnız ASCII harf / rakam (DHL küçük harfi ve Türkçe karakteri kabul etmiyor)
-      const ref = s.reference.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40);
+      // Referans: büyük harf, yalnız ASCII harf / rakam (DHL küçük harfi ve Türkçe karakteri kabul etmiyor); uzunsa sondaki deneme eki (-R…) korunur
+      const refOf = (x) => { const v = x.reference.toUpperCase().replace(/[^A-Z0-9_-]/g, ''); return v.length > 40 ? v.slice(0, 20) + v.slice(-20) : v; };
+      let ref = refOf(s);
       const content = (s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ').slice(0, 200) || 'Paket';
-      try {
-        await req('POST', '/standardcmdapi/createOrder', {
-          order: { referenceId: ref, barcode: ref, billOfLandingId: '', isCOD: 0, codAmount: 0, shipmentServiceType: 1, packagingType: 3, content, smsPreference1: 1, smsPreference2: 0, smsPreference3: 0, paymentType: 1, deliveryType: 1, description: s.orderNumber ? `Sipariş ${s.orderNumber}` : ref, marketPlaceShortCode: '', marketPlaceSaleCode: '' },
-          orderPieceList: pieces(ref, s.desi, content),
-          recipient: { refCustomerId: '', ...place, address: fullAddress(r).slice(0, 250), bussinessPhoneNumber: '', email: r.email || 'musteri@hasturkcrm.com', taxOffice: 'SAHIS', taxNumber: '11111111110', fullName: r.name, homePhoneNumber: '', mobilePhoneNumber: phone },
-        });
-      } catch (e) { if (e.code !== '3002') throw e; } // aynı referansla sipariş zaten kayıtlı: etiket adımına geçilir
+      for (let i = 0; ; i++) {
+        try {
+          await req('POST', '/standardcmdapi/createOrder', {
+            order: { referenceId: ref, barcode: ref, billOfLandingId: '', isCOD: 0, codAmount: 0, shipmentServiceType: 1, packagingType: 3, content, smsPreference1: 1, smsPreference2: 0, smsPreference3: 0, paymentType: 1, deliveryType: 1, description: s.orderNumber ? `Sipariş ${s.orderNumber}` : ref, marketPlaceShortCode: '', marketPlaceSaleCode: '' },
+            orderPieceList: pieces(ref, s.desi, content),
+            recipient: { refCustomerId: '', ...place, address: fullAddress(r).slice(0, 250), bussinessPhoneNumber: '', email: r.email || 'musteri@hasturkcrm.com', taxOffice: 'SAHIS', taxNumber: '11111111110', fullName: r.name, homePhoneNumber: '', mobilePhoneNumber: phone },
+          });
+          break;
+        } catch (e) {
+          if (e.code !== '3002') throw e;
+          // Aynı referansla sipariş zaten kayıtlı (yanıtı kaybolan önceki istek): etiket adımına geçilir. Ama kayıt iptal edilmişse
+          // iptal edilen gönderiye barkod alınmaz: yeni referansla bir kez yeniden açılır, yine çakışırsa hata verilir.
+          const st = one(await req('GET', `/standardqueryapi/getshipmentstatus/${encodeURIComponent(ref)}`).catch(() => null));
+          if (!(st && (/iptal|cancel/i.test(`${str(st.shipmentStatus)} ${str(st.orderStatus)}`) || Number(st.isCancelled ?? st.isCanceled) === 1))) break;
+          if (i) throw new Error(`DHL eCommerce: ${ref} referanslı gönderi iptal edilmiş; yeni gönderi açılamadı`);
+          ref = refOf(freshRef(s));
+        }
+      }
       // Varış şubesi birkaç saniye içinde belirlenir (20001): bir kez beklenip yeniden denenir; olmazsa etiket sonra alınır
       let b = null;
       for (let i = 0; i < 2 && !b; i++) {
@@ -102,7 +114,8 @@ export function make(values) {
       return {
         state: Number(st.isDelivered) === 1 ? 'delivered' : STATES[st.shipmentStatusCode] || null, text: str(st.shipmentStatus).replace(/_/g, ' '),
         tracking: id, barcode: id, trackingUrl: id ? trackUrl('dhl', id) : '', deliveredAt: trDate(st.deliveryDateTime),
-        cost: sh && sh.shipment ? money(sh.shipment.finalTotal) : null,
+        // DOĞRULA: finalTotal = tutar + KDV (getshipment'te total / kdv / finalTotal) kabul edildi
+        cost: sh && sh.shipment ? money(sh.shipment.finalTotal) : null, costVatIncluded: true,
       };
     },
     // Gönderi açılırken şube belirlenemediyse etiket (ve gönderi no) burada alınır

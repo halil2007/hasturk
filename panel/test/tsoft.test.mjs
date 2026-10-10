@@ -171,7 +171,10 @@ test('T-Soft: stok varyant / ana ürün ayrı metotla, fiyat KDV düşülerek; k
   // 100'lük parçalar; message type 2 = kalem hatası
   const many = Array.from({ length: 150 }, (_, i) => ({ remoteId: `TA${i}`, remoteProductId: 'T1', stock: 1 }));
   const calls3 = mockFetch((c) => ok([], c.data.length === 50 ? { message: [{ type: 2, code: 'SP404', text: ['TA140 bulunamadı'] }] } : {}));
-  await assert.rejects(ch.pushStock(many), /T-Soft: 1 stok güncellenemedi \(TA140 bulunamadı\)/);
+  // Sonuç ilan ilan: hata metnindeki koda göre yalnız o ilana yazılır
+  const r = await ch.pushStock(many);
+  assert.deepEqual(r.errors, [{ remoteId: 'TA140', error: 'T-Soft: TA140 bulunamadı' }]);
+  assert.equal(r.done.length, 149);
   assert.deepEqual(api(calls3).map((c) => c.data.length), [100, 50]);
 });
 

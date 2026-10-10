@@ -18,7 +18,7 @@ export async function channelProductsView(el, rest, query = {}) {
     <div class="row wrap page-actions">
       <div class="search"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU, barkod" data-q value="${f.q}"></div>
       <span class="spacer"></span>
-      <button class="btn" data-act="pull" title="Bu kanaldaki ilanları şimdi yeniden çek"><i class="ico ico-sync"></i>Kanaldan yenile</button>
+      <button class="btn" data-act="pull" title="Bu kanaldaki ilanları şimdi yeniden çek"><i class="ico ico-sync"></i>Yenile</button>
     </div>
     <div class="tabs" data-tabs></div>
     <div class="card flush" data-box></div>

@@ -31,9 +31,12 @@ import { perfReport } from './perf.js';
 import { mainKeysApi } from './extapi.js';
 import { supportResponse } from './support.js';
 import { guardConfig, setGuardConfig, guardList, guardUnblock, guardIp } from './guard.js';
-import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS } from './carriers.js';
+import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS, grossCost } from './carriers.js';
 import { can, sectionOf } from '../public/perms.js';
 import { exclusive } from './locks.js';
+import { ek } from '../public/ek.js';
+// Eksik alan kodları (WOO_URL …) kullanıcıya alan adıyla gösterilir
+const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).find((f) => f.k === k) || {}).label || k).join(', ');
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
@@ -57,7 +60,7 @@ async function loadOrder(db, id) {
   // Kalemler, paketler ve müşteri geçmişi aynı anda okunur (her sorgu ayrı gidiş-dönüş)
   const [cust, items, packages] = await Promise.all([
     o.ckey ? first(db, "SELECT COUNT(*) AS total, SUM(ordered_at <= ?) AS nth FROM orders WHERE ckey = ? AND status != 'cancelled'", o.ordered_at, o.ckey) : null,
-    all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.ship_cost, p.desi, p.image AS product_image, l.commission AS listing_commission
+    all(db, `SELECT i.*, p.name AS product_name, p.group_name AS product_group, p.variant_name AS product_variant, p.stock AS product_stock, p.purchase_price, p.ship_cost, p.desi, p.image AS product_image, l.commission AS listing_commission, l.commission_src AS listing_commission_src
     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
     LEFT JOIN listings l ON l.channel = ? AND l.remote_id = i.remote_key
     WHERE i.order_id = ? ORDER BY i.rowid`, o.channel, id),
@@ -130,8 +133,8 @@ async function listOrders(db, q) {
   const items = {}, full = {};
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    for (const it of await allIn(db, ids, (ph, part) => [`SELECT i.order_id, i.name, i.quantity, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
-        p.purchase_price, p.ship_cost, l.commission AS listing_commission
+    for (const it of await allIn(db, ids, (ph, part) => [`SELECT i.order_id, i.name, i.quantity, i.returned_qty, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
+        p.purchase_price, p.ship_cost, l.commission AS listing_commission, l.commission_src AS listing_commission_src
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE i.order_id IN (${ph}) ORDER BY i.rowid`, part])) {
@@ -281,7 +284,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     }
     await setLocalStatus(db, o, 'processing');
     await event(db, o, 'accept', user);
-    return { ok: true, message: ch && ch.caps.accept === 'remote' ? `Sipariş işleme alındı (${ch.name}'a bildirildi)` : 'Sipariş işleme alındı' };
+    return { ok: true, message: ch && ch.caps.accept === 'remote' ? `Sipariş işleme alındı (${ek(ch.name, 'a')} bildirildi)` : 'Sipariş işleme alındı' };
   }
   if (action === 'pack') {
     if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
@@ -440,7 +443,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (!tn && !r.ref) fail(502, `${c.name} gönderi numarası vermedi`);
     await run(db, `UPDATE packages SET carrier_provider = ?, carrier_ref = ?, carrier_cost = ?, tracking = ?, barcode = ?, cargo_company = ?, tracking_url = ?, desi = ?,
       agreement = 'own', packed_at = COALESCE(packed_at, ?), label_format = ?, label_data = ?, label_at = ?, label_viewed_at = NULL, label_printed_at = NULL, error = NULL WHERE id = ?`,
-    c.id, str(r.ref) || null, r.cost == null ? null : num(r.cost), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
+    c.id, str(r.ref) || null, grossCost(r), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
     t, r.label ? r.label.format : null, r.label ? r.label.data : null, t, pkg.id);
     // ikas: entegratör gönderisi ikas'ta takip bilgili paket olarak açılır ("Kargoya Hazır"); yazılamazsa "Kargoya ver"de yeniden denenir
     let chNote = '';
@@ -449,12 +452,12 @@ async function orderAction(env, db, id, action, b, ctx, user) {
         const x = await ch.ownShipment(o, pkg, { tracking: tn, barcode: str(r.barcode || r.tracking), cargoCompany: str(r.carrier) || c.name, trackingUrl: str(r.trackingUrl) });
         if (x && x.remoteId) await run(db, 'UPDATE packages SET remote_id = ? WHERE id = ?', x.remoteId, pkg.id);
       } catch (e) {
-        chNote = ` · ${ch.name}'a henüz yazılamadı (${e.message}); “Kargoya ver”de yeniden denenir`;
-        await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${ch.name}'a kargo bilgisi yazılamadı: ${e.message}`.slice(0, 500), pkg.id);
+        chNote = ` · ${ek(ch.name, 'a')} henüz yazılamadı (${e.message}); “Kargoya ver”de yeniden denenir`;
+        await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${ek(ch.name, 'a')} kargo bilgisi yazılamadı: ${e.message}`.slice(0, 500), pkg.id);
       }
     }
     // Entegratörün kargo ücreti siparişin kargo giderine yazılır (elle girilen gider korunur)
-    if (r.cost != null && o.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", num(r.cost), o.id);
+    if (r.cost != null && o.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", grossCost(r), o.id);
     if (o.status === 'new') await setLocalStatus(db, o, 'processing');
     await event(db, o, 'carrier', user, `Paket ${pkg.no}: ${c.name} · ${str(r.carrier) || ''} ${tn}`.trim());
     const fresh = await loadOrder(db, o.id);
@@ -742,6 +745,8 @@ export const RUNOUT_DAYS = 14;
 const SOLD_JOIN = () => 'LEFT JOIN sold30 s30 ON s30.pid = p.id';
 // sold30 tablosu (son 30 gün satış adedi) en fazla 5 dakikada bir yeniden hesaplanır (veritabanı / örnek başına)
 const soldAt = new WeakMap();
+// Senkron yeni sipariş getirdiyse bir sonraki ürün listesi satış adetlerini hemen yeniler ("en çok satan" sırası beklemesin)
+export const soldStale = (db) => soldAt.delete(db);
 async function refreshSold30(db) {
   if (Date.now() - (soldAt.get(db) || 0) < 5 * 60e3) return;
   soldAt.set(db, Date.now());
@@ -1721,7 +1726,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     let ch = await channel(env, db, x[1]);
     if (!ch) fail(404, 'Kanal bulunamadı');
     if (ch.gated) ch = ch.real;
-    const checks = [{ name: 'API bilgileri', ok: ch.demo ? null : ch.enabled ? true : false, detail: ch.demo ? 'Girilmemiş' : ch.enabled ? 'Gerekli alanlar dolu' : 'Eksik: ' + (ch.missing || []).join(', ') }];
+    const checks = [{ name: 'API bilgileri', ok: ch.demo ? null : ch.enabled ? true : false, detail: ch.demo ? 'Girilmemiş' : ch.enabled ? 'Gerekli alanlar dolu' : 'Eksik: ' + fieldNames(ch.id, ch.missing) }];
     if (ch.demo) checks.push({ name: 'Deneme modu', ok: null, detail: 'Bu kanal örnek veriyle çalışıyor (API bilgisi girilmemiş)' });
     let order = null;
     if (b.order_id) order = await first(db, 'SELECT remote_id, order_number FROM orders WHERE id = ?', String(b.order_id));
@@ -1742,7 +1747,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const gated = !!ch.gated;
     if (gated) ch = ch.real; // bekleyen kanal: gerçek bağlantı denenir, başarılıysa onaylanır
     else if (ch.paused) return json({ ok: false, message: 'Kanal pasif' });
-    if (!ch.enabled) return json({ ok: false, message: 'Eksik bilgi: ' + ch.missing.join(', ') });
+    if (!ch.enabled) return json({ ok: false, message: 'Eksik bilgi: ' + fieldNames(ch.id, ch.missing) });
     if (ch.demo) return json({ ok: true, message: 'Deneme modu: örnek veriyle çalışıyor' });
     const t = Date.now();
     try {

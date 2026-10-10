@@ -9,9 +9,20 @@
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
 import { http, num, str, chunk, imageList, diagStep, pool, DEAD_LINE } from '../util.js';
 
+// INCIDENT_OPEN / INCIDENT_CLOSED: kargodan sonra açılan / kapanan müşteri sorunu (sipariş gönderilmiş durumda kalır)
 const STATUS = { WAITING_ACCEPTANCE: 'new', WAITING_DEBIT: 'new', WAITING_DEBIT_PAYMENT: 'new', STAGING: 'new', SHIPPING: 'processing', SHIPPED: 'shipped', TO_COLLECT: 'shipped',
-  RECEIVED: 'delivered', CLOSED: 'delivered', REFUSED: 'cancelled', CANCELED: 'cancelled', CANCELLED: 'cancelled', REFUNDED: 'returned' };
+  INCIDENT_OPEN: 'shipped', INCIDENT_CLOSED: 'shipped', RECEIVED: 'delivered', CLOSED: 'delivered', REFUSED: 'cancelled', CANCELED: 'cancelled', CANCELLED: 'cancelled', REFUNDED: 'returned' };
+// Bilinmeyen (yeni eklenen) durum "yeni" sayılmaz (kargolanmış sipariş yeniden işleme alınacak gibi görünmesin): stok ayrılı kalan ara durum
+const stOf = (s) => STATUS[s] || 'processing';
 const DEAD = ['REFUSED', 'CANCELED', 'CANCELLED'];
+// Satır komisyonu (KDV dahil): total_commission; yoksa commission_fee + commission_vat (ya da commission_taxes toplamı)
+function commissionOf(l) {
+  if (l.total_commission != null) return num(l.total_commission) > 0 ? num(l.total_commission) : null;
+  if (l.commission_fee == null) return null;
+  const vat = l.commission_vat != null ? num(l.commission_vat) : (l.commission_taxes || []).reduce((s, t) => s + num(t && t.amount), 0);
+  const c = Math.round((num(l.commission_fee) + vat) * 100) / 100;
+  return c > 0 ? c : null;
+}
 const iso = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const EAN = /^(EAN|EAN13|GTIN|BARCODE|BARKOD)$/i;
 // DOĞRULA: kök adres entegratör ayarlarından (teknosatr-prod.mirakl.net); Teknosa farklı bir adres verdiyse alana girilir
@@ -37,10 +48,11 @@ export function teknosa(env, meta) {
       const qty = num(l.quantity, 1) || 1, total = num(l.price) || num(l.price_unit) * qty;
       const media = (l.product_medias || []).find((m) => /small|medium/i.test(m.type || '')) || (l.product_medias || [])[0] || {};
       return { lineId: str(l.order_line_id), sku: str(l.offer_sku), barcode: '', name: str(l.product_title), image: str(media.media_url), quantity: qty,
-        unitPrice: num(l.price_unit) || total / qty, total, status: DEAD.includes(l.order_line_state) ? 'cancelled' : '', remoteKey: str(l.offer_sku) };
+        unitPrice: num(l.price_unit) || total / qty, total, status: DEAD.includes(l.order_line_state) ? 'cancelled' : l.order_line_state === 'REFUNDED' ? 'returned' : '', remoteKey: str(l.offer_sku),
+        ...(commissionOf(l) != null ? { commission: commissionOf(l) } : {}) };
     });
     return {
-      remoteId: str(o.order_id), orderNumber: str(o.commercial_id || o.order_id), orderedAt: Date.parse(o.created_date) || Date.now(), remoteStatus: str(o.order_state), status: STATUS[o.order_state] || 'new',
+      remoteId: str(o.order_id), orderNumber: str(o.commercial_id || o.order_id), orderedAt: Date.parse(o.created_date) || Date.now(), remoteStatus: str(o.order_state), status: stOf(o.order_state),
       customer: [c.firstname, c.lastname].filter(Boolean).join(' ') || name, phone: str(a.phone || a.phone_secondary), email: str(o.customer_notification_email), customerId: str(c.customer_id),
       address: { name: name || [c.firstname, c.lastname].filter(Boolean).join(' '), line: [a.street_1, a.street_2, a.zip_code].map(str).filter(Boolean).join(' '),
         district: a.state && a.state !== a.city ? str(a.state) : '', city: str(a.city), phone: str(a.phone || a.phone_secondary) },
@@ -109,13 +121,32 @@ export function teknosa(env, meta) {
   }
   const oldDiscount = (o) => { const d = (o && o.discount) || {}; return num(d.discount_price) > 0 ? { price: num(d.discount_price), start_date: d.start_date || undefined, end_date: d.end_date || undefined } : null; };
   const basePrice = (o) => { const d = (o && o.discount) || {}; return num(d.origin_price) || num(o && o.origin_price) || num(o && o.price); };
-  // Bulunamayan teklifler atlanır, diğerleri gönderilir ve sonra hata verilir. Gönderilen değerler önbelleğe yazılır (sonraki gönderim güncel değeri kullanır).
+  // Bulunamayan teklifler atlanır, diğerleri gönderilir; sonuç ilan ilan döner (done / errors). Hiçbiri gönderilemediyse hata verilir.
+  // Gönderilen değerler önbelleğe yazılır (sonraki gönderim güncel değeri kullanır). OF24 import_id'leri sonuç sorgusu için döner (refs → pushStatus).
   async function send(items, build, patch) {
-    const offers = await offersFor(items.map((x) => str(x.remoteId || x.sku))), rows = [], bad = [];
-    items.forEach((x, i) => { const o = offers[i]; if (o && basePrice(o) > 0) rows.push(build(o, x)); else bad.push(str(x.remoteId || x.sku)); });
-    for (const part of chunk(rows, 100)) await call('/offers', {}, { method: 'POST', body: { offers: part } });
+    const offers = await offersFor(items.map((x) => str(x.remoteId || x.sku))), rows = [], done = [], bad = [], refs = [];
+    items.forEach((x, i) => {
+      const o = offers[i];
+      if (!(o && basePrice(o) > 0)) { bad.push(x); return; }
+      try { rows.push(build(o, x)); done.push(x.remoteId); } catch (e) { bad.push({ ...x, why: e.message }); }
+    });
+    if (!rows.length && bad.length) throw new Error(`Teknosa: ${bad.length} teklif bulunamadı ya da fiyatı yok (${bad.slice(0, 5).map((x) => str(x.remoteId || x.sku)).join(', ')}${bad.length > 5 ? '…' : ''})`);
+    for (const part of chunk(rows, 100)) { const r = await call('/offers', {}, { method: 'POST', body: { offers: part } }); if (r && r.import_id != null) refs.push(String(r.import_id)); }
     for (const r of rows) { const o = cache.get(r.shop_sku); if (o) Object.assign(o, patch(r)); }
-    if (bad.length) throw new Error(`Teknosa: ${bad.length} teklif bulunamadı ya da fiyatı yok (${bad.slice(0, 5).join(', ')}${bad.length > 5 ? '…' : ''})`);
+    return { done, errors: bad.map((x) => ({ remoteId: x.remoteId, error: x.why || `Teknosa: teklif bulunamadı ya da fiyatı yok` })), refs };
+  }
+  // OF02 (içe aktarma durumu) + OF03 (hata raporu, CSV): reddedilen teklif satırları ilana hata olarak yazılır
+  const csvRow = (line, sep) => { const out = []; let cur = '', q = false; for (let i = 0; i < line.length; i++) { const c = line[i]; if (q) { if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; } else if (c === '"') q = true; else if (c === sep) { out.push(cur); cur = ''; } else cur += c; } out.push(cur); return out; };
+  async function pushStatus(ref) {
+    const r = (await call(`/offers/imports/${encodeURIComponent(ref)}`)) || {};
+    const st = str(r.import_status || r.status).toUpperCase();
+    if (!/^(COMPLETE|FAILED|CANCELLED|REJECTED)$/.test(st)) return { done: false, items: [] };
+    if (!(num(r.lines_in_error) > 0) && r.has_error_report !== true) return { done: true, items: [] };
+    const text = String((await call(`/offers/imports/${encodeURIComponent(ref)}/error_report`).catch((e) => { if (e.budget) throw e; return ''; })) || '');
+    const lines = text.split(/\r?\n/).filter((x) => x.trim()), sep = (lines[0] || '').includes(';') ? ';' : ',';
+    const head = csvRow(lines[0] || '', sep).map((h) => h.trim().toLowerCase()), ks = head.findIndex((h) => h === 'shop_sku' || h === 'sku' || h === 'offer-sku'), ke = ((i) => (i >= 0 ? i : head.findIndex((h) => /error/.test(h) && !/line/.test(h))))(head.findIndex((h) => /error.?message/.test(h)));
+    const items = ks < 0 ? [] : lines.slice(1).map((l) => csvRow(l, sep)).map((c) => ({ key: str(c[ks]), ok: false, error: str(ke >= 0 ? c[ke] : '') || 'reddedildi' })).filter((x) => x.key);
+    return { done: true, items };
   }
   // Stok: teklifin güncel fiyatı ve indirimi korunur
   const pushStock = (items) => send(items, (o, x) => row(o, x, { price: basePrice(o), discount: oldDiscount(o), quantity: Math.max(0, Math.round(num(x.stock))) }), (r) => ({ quantity: r.quantity }));
@@ -159,7 +190,7 @@ export function teknosa(env, meta) {
     await diagStep(out, 'Hesap (A01)', async () => { const r = (await call('/account')) || {}; return { detail: `${str(r.shop_name) || 'mağaza'} · mağaza ID ${r.shop_id ?? '?'}${r.shop_state ? ' · durum ' + r.shop_state : ''} · adres ${base}` }; });
     await diagStep(out, 'Siparişler (son 24 saat, OR11)', async () => {
       const r = (await call('/orders', { start_update_date: iso(now - 864e5), end_update_date: iso(now), paginate: 'true', max: 1 })) || {}, o = (r.orders || [])[0];
-      return { detail: `${r.total_count ?? (r.orders || []).length} sipariş${o ? ` · örnek durum: ${o.order_state} → ${STATUS[o.order_state] || 'new'}` : ''}` };
+      return { detail: `${r.total_count ?? (r.orders || []).length} sipariş${o ? ` · örnek durum: ${o.order_state} → ${stOf(o.order_state)}` : ''}` };
     });
     if (orderId) await diagStep(out, `Sipariş ${orderId}`, async () => { const o = (((await call('/orders', { order_ids: orderId })) || {}).orders || [])[0]; if (!o) throw new Error('Sipariş bulunamadı'); return { detail: `durum ${o.order_state} · kargo ${o.shipping_company || '-'} ${o.shipping_tracking || ''}`.trim() }; });
     await diagStep(out, 'Teklifler (OF21)', async () => { const r = (await call('/offers', { max: 1 })) || {}; return { detail: `${r.total_count ?? (r.offers || []).length} teklif` }; });
@@ -170,6 +201,6 @@ export function teknosa(env, meta) {
   return {
     ...meta, type: 'teknosa', enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, accept, ship, diagnose,
+    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, accept, ship, diagnose,
   };
 }

@@ -1,4 +1,18 @@
 // Ortak yardımcılar: JSON cevapları, tarih anahtarları (Türkiye saati), dış istekler.
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+// Dış istek bütçesi: Cloudflare bir çalıştırmada ~1000 alt istekten fazlasına izin vermez. Sınır aşılınca sonraki tüm istekler
+// hata verir ve hep aynı (sıradaki) kanallar / adımlar hiç çalışmaz. Senkron kendi bütçesiyle çalışır (withBudget); bütçe bitince
+// kalan işler "ertelendi" sayılır (hata / uyarı değil) ve bir sonraki senkronda önce onlar yapılır. Bağlam isteğe özeldir
+// (aynı Worker örneğindeki farklı müşteri panelleri birbirinin sayacını etkilemez).
+const budgetCtx = new AsyncLocalStorage();
+export class BudgetError extends Error { constructor() { super('Bu senkronun dış istek sınırı doldu; kalan işler bir sonraki senkronda yapılır'); this.budget = true; } }
+export const withBudget = (max, fn) => budgetCtx.run({ used: 0, max, start: Date.now() }, fn);
+// Bütçenin başlangıcından beri geçen süre (senkronun süre sınırı için)
+export const budgetElapsed = () => { const b = budgetCtx.getStore(); return b ? Date.now() - b.start : 0; };
+export const budgetLeft = () => { const b = budgetCtx.getStore(); return b ? b.max - b.used : Infinity; };
+export const budgetUsed = () => { const b = budgetCtx.getStore(); return b ? b.used : 0; };
+export function spendBudget() { const b = budgetCtx.getStore(); if (b && ++b.used > b.max) throw new BudgetError(); }
 
 export const json = (data, status = 200, headers = {}) =>
   new Response(JSON.stringify(data), {
@@ -74,12 +88,15 @@ export async function http(url, { method = 'GET', headers = {}, body: b, timeout
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeout);
     let res;
+    spendBudget();
     try {
       // Kimliksiz (User-Agent'sız) istekleri bazı pazaryeri güvenlik duvarları 403 ile reddeder: verilmediyse panel kimliği eklenir
       const h = headers && !Object.keys(headers).some((k) => k.toLowerCase() === 'user-agent') ? { ...headers, 'User-Agent': 'HasturkPanel/1.0 (+https://workers.cloudflare.com)' } : headers;
       res = await fetch(url, { method, headers: h, body: b, signal: ctl.signal });
     } catch (e) {
       clearTimeout(t);
+      // Platformun alt istek sınırı: tekrar denemek boşuna, bütçe bitti sayılır
+      if (/too many subrequests/i.test(e.message)) { const b = budgetCtx.getStore(); if (b) b.used = b.max; throw new BudgetError(); }
       if (i < tries) { await sleep(800 * i); continue; }
       throw new Error(`${method} ${shortUrl(url)}: bağlantı hatası (${e.name === 'AbortError' ? 'zaman aşımı' : e.message})`);
     }

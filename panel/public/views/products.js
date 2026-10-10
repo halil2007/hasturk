@@ -1,6 +1,6 @@
 // Ürünler: varyantlar ana ürün altında gruplanır; merkezi stok (her kanala kendi kuralıyla gönderilir), hızlı stok girişi,
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
-import { api, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
+import { api, ek, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
 import { readSheet } from '../sheetread.js';
 import { profit, costOf, costRaw, rateGross } from '../profit.js';
 import { productErrorsSheet } from './listerrs.js';
@@ -151,8 +151,8 @@ export async function products(el, rest, query = {}) {
         <div class="top" data-act="tog" data-gi="${i}" style="cursor:pointer">${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:700">${gname}</div><div class="muted tiny">${brand(list.find((p) => p.brand)?.brand)}${list.length} varyant · ${range(list.map((p) => p.sale_price))} · stok ${gStock(list)}</div></div><i class="ico ico-down grp-chev"></i></div>
         ${on ? html`<div class="m-vars"><button class="btn sm outline block" data-act="vedit" data-gi="${i}"><i class="ico ico-gear"></i>Tüm varyantları birlikte düzenle</button>${list.map((p) => html`<div class="m-var" data-pid="${p.id}"><div style="min-width:0;flex:1" data-act="edit" data-id="${p.id}"><span class="var-tag" style="margin-left:0">${p.variant_name || p.name}</span><div class="muted tiny">${p.sku || ''} · ${money(p.sale_price)}</div></div>${stockCell(p)}</div>`)}</div>` : ''}</div>`; };
     const empty = html`<div class="empty-state"><div class="ic"><i class="ico ico-box"></i></div><b>${f.q || f.filter || f.cat ? 'Bu filtrede ürün yok' : 'Henüz ürün yok'}</b>
-      <span>${f.q || f.filter || f.cat ? 'Aramayı ya da filtreyi değiştirin.' : 'Kanallarınızdaki ürünleri Kanal Ürünleri sayfasından seçip ekleyebilir ya da yeni ürün açabilirsiniz.'}</span>
-      ${f.q || f.filter || f.cat ? '' : html`<div class="row" style="justify-content:center"><a class="btn" href="#/kanal-urunleri"><i class="ico ico-grid"></i>Kanal Ürünleri</a><button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün ekle</button></div>`}</div>`;
+      <span>${f.q || f.filter || f.cat ? 'Aramayı ya da filtreyi değiştirin.' : 'Kanallarınızdaki ürünleri Kanal ürünleri sayfasından seçip ekleyebilir ya da yeni ürün açabilirsiniz.'}</span>
+      ${f.q || f.filter || f.cat ? '' : html`<div class="row" style="justify-content:center"><a class="btn" href="#/kanal-urunleri"><i class="ico ico-grid"></i>Kanal ürünleri</a><button class="btn primary" data-act="new"><i class="ico ico-plus"></i>Ürün ekle</button></div>`}</div>`;
     const allSel = rows.length && rows.every((p) => sel.has(p.id));
     const body = !rows.length ? empty
       : mob ? html`<div class="m-list">${gl.map(mCard)}</div>`
@@ -160,7 +160,7 @@ export async function products(el, rest, query = {}) {
           ${gl.map((g, i) => (isGroup(g[1]) ? head(g, i) : prow(g[1][0])))}
         </tbody></table></div>`;
     const shown = gl.length;
-    render($('[data-box]', el), html`${bulkbar()}${body}${rows.length ? html`<div class="pager"><span class="muted small" style="margin-right:auto">${n(groupsTotal)} ana ürün · ${n(total)} ürün/varyant${shown < groupsTotal ? ` · ${shown} gösteriliyor` : ''}</span>${gl.some((g) => isGroup(g[1])) && !all ? html`<button class="btn sm ghost" data-act="togall">${opened.size ? 'Varyantları kapat' : 'Tüm varyantları aç'}</button>` : ''}${shown < groupsTotal ? html`<button class="btn sm" data-act="more">Daha fazla göster</button>` : ''}</div>` : ''}`);
+    render($('[data-box]', el), html`${bulkbar()}${body}${rows.length ? html`<div class="pager"><span class="muted small" style="margin-right:auto">${n(groupsTotal)} ürün${total !== groupsTotal ? ` · ${n(total)} varyant` : ''}${shown < groupsTotal ? ` · ${shown} gösteriliyor` : ''}</span>${gl.some((g) => isGroup(g[1])) && !all ? html`<button class="btn sm ghost" data-act="togall">${opened.size ? 'Varyantları kapat' : 'Tüm varyantları aç'}</button>` : ''}${shown < groupsTotal ? html`<button class="btn sm" data-act="more">Daha fazla göster</button>` : ''}</div>` : ''}`);
   }
   async function load(append = false) {
     setQuery({ f: f.filter, q: f.q, sort: f.sort === 'sold' ? '' : f.sort, kat: f.cat });
@@ -352,7 +352,7 @@ export async function productForm(id, done) {
   const siteCh = activeChannels().filter((c) => c.enabled && c.caps.createProduct && !hasL.has(c.id));
   const mpCh = activeChannels().filter((c) => c.enabled && (c.can || {}).upload && !hasL.has(c.id));
   const lp = (l) => {
-    const rate = rateGross(st, l.commission) ?? costOf(st, 'commission', l.channel);
+    const rate = rateGross(st, l.commission, l.commission_src) ?? costOf(st, 'commission', l.channel);
     return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
   };
   s.setBody(html`<form class="stack" data-form>
@@ -364,14 +364,14 @@ export async function productForm(id, done) {
         <label class="field"><span>Stok kodu (SKU)</span><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" name="sku" value="${p.sku || ''}" placeholder="kanallarla aynı olmalı" style="flex:1;min-width:0"><button type="button" class="btn sm" data-gensku title="Ürün adından SKU oluştur">Oluştur</button></div></label>
         <label class="field"><span>Barkod</span><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" name="barcode" value="${p.barcode || ''}" style="flex:1;min-width:0"><button type="button" class="btn sm" data-genbc title="Benzersiz EAN-13 barkod oluştur">Oluştur</button></div></label>
         <label class="field"><span>Marka</span><input class="input" name="brand" value="${p.brand || ''}"></label>
-        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="Yazın: kayıtlı kategoriler önerilir (ör. Bahçe › Tohum)"><small>Alt kategori için › ya da > yazın. Pazaryerine yüklemede kategori eşleştirmesi buna göre yapılır</small></label>
-        <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="varyantlar bu adla gruplanır"></label>
+        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ör. Bahçe › Tohum"><small>Alt kategori için › yazın.</small></label>
+        <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="ör. Domates tohumu"></label>
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
       </div>
       <label class="field"><span>Görsel adresi</span><input class="input" name="image" value="${p.image || ''}" placeholder="https://…"></label>
       <div class="field" data-gal><span>Tüm görseller</span><div data-galbox></div></div>
       ${p.description && /<[a-z][\s\S]*>/i.test(p.description) ? html`<div class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><div class="desc-view">${raw(safeHtml(p.description))}</div>
-        <details style="margin-top:6px"><summary class="small muted" style="cursor:pointer">Açıklamayı düzenle (HTML)</summary><textarea class="input" name="description" style="min-height:160px;margin-top:6px">${p.description}</textarea></details></div>`
+        <details style="margin-top:6px"><summary class="small muted" style="cursor:pointer">Açıklama</summary><textarea class="input" name="description" style="min-height:160px;margin-top:6px">${p.description}</textarea></details></div>`
         : html`<label class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><textarea class="input" name="description" style="min-height:110px">${p.description || ''}</textarea></label>`}
     </div>
     <div class="card stack">
@@ -425,7 +425,7 @@ export async function productForm(id, done) {
   const drawGal = () => render($('[data-galbox]', form), html`<div class="stack" style="gap:8px">
     ${gal.length ? html`<div class="row wrap" style="gap:6px">${gal.map((u, i) => html`<a href="${u}" target="_blank" rel="noopener" title="${i === 0 ? 'Ana görsel · ' : ''}${u}" style="position:relative"><span class="thumb lg" style="background-image:url('${cssUrl(u)}')"></span>${i === 0 ? html`<span class="pill" style="position:absolute;left:2px;bottom:2px;font-size:9px;padding:0 4px">ana</span>` : ''}</a>`)}</div>`
       : html`<div class="muted small">${id ? 'Henüz görsel bağlantısı yok; bağlı kanallardan bir sonraki senkronda gelir.' : 'Kaydettikten sonra bağlı kanallardan gelir ya da aşağıdan ekleyin.'}</div>`}
-    <div class="row wrap" style="gap:8px"><span class="muted tiny" style="flex:1">${gal.length ? `${gal.length} görsel · ` : ''}${galAuto ? 'kaydedince kanaldan otomatik alınacak' : galManual ? 'panelde düzenlendi (senkron değiştirmez)' : 'kanaldan otomatik (ana katalog önce)'} · yalnız bağlantı saklanır, yer kaplamaz</span>
+    <div class="row wrap" style="gap:8px"><span class="muted tiny" style="flex:1">${gal.length ? `${gal.length} görsel · ` : ''}${galAuto ? 'Kaydedince kanaldan alınır.' : galManual ? 'Panelde düzenlendi.' : 'Görseller kanaldan gelir.'}</span>
       <button type="button" class="btn sm" data-galedit>${galEdit ? 'Düzenlemeyi kapat' : 'Bağlantıları düzenle'}</button>${galManual && !galAuto ? html`<button type="button" class="btn sm ghost" data-galauto>Kanaldan otomatik al</button>` : ''}</div>
     ${galEdit ? html`<textarea class="input" data-galtext rows="5" placeholder="Her satıra bir görsel bağlantısı (https://…). İlk satır ana görsel.">${gal.join('\n')}</textarea>` : ''}
   </div>`);
@@ -492,7 +492,7 @@ export async function productForm(id, done) {
     for (const k of ['purchase_price', 'sale_price', 'desi', 'ship_cost']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
     if (form.currency) { b.currency = fd.get('currency') || ''; b.fx_price = numIn(fd.get('fx_price')); b.fx_margin = String(fd.get('fx_margin') || '').trim() === '' ? '' : numIn(fd.get('fx_margin')); }
-    if (!b.name.trim()) return toast('Ürün adı gerekli', true);
+    if (!b.name.trim()) { const i = form.name; i.classList.add('err'); i.focus(); i.addEventListener('input', () => i.classList.remove('err'), { once: true }); return toast('Ürün adı gerekli', true); }
     // Stok alanı yalnız panelde tutulan stokta vardır (ikas'tan okunan stok salt okunur, gönderilmez)
     if (fd.has('stock') && (!id || Number(fd.get('stock')) !== p.stock)) b.stock = Number(fd.get('stock')) || 0;
     b.listings = $$('tr[data-l]', form).map((tr) => ({ channel: tr.dataset.l, remote_id: tr.dataset.rid, price: numIn($('[data-lf=price]', tr).value), commission: $('[data-lf=commission]', tr).value }));
@@ -501,11 +501,11 @@ export async function productForm(id, done) {
     const r = await api(id ? 'products/' + id : 'products', { method: id ? 'PUT' : 'POST', body: b });
     // Pazaryerlerine gönderim (kategori eşleştirmesi ve zorunlu bilgilerle); sonuç tek mesajda
     const msgs = [], errs = [...(r.errors || [])];
-    if (r.created && r.created.length) msgs.push(`${r.created.map((c) => ch(c).name).join(', ')}'da oluşturuldu`);
+    if (r.created && r.created.length) msgs.push(`${ek(r.created.map((c) => ch(c).name).join(', '), 'da')} oluşturuldu`);
     for (const cid of fd.getAll('upload_on')) {
       try {
         const u = await api('catalog/upload', { method: 'POST', body: { channel: cid, ids: [r.id || id] } });
-        if (u.sent) msgs.push(`${ch(cid).name}'a gönderildi (onay bekleniyor)`);
+        if (u.sent) msgs.push(`${ek(ch(cid).name, 'a')} gönderildi (onay bekleniyor)`);
         else errs.push(`${ch(cid).name}: gönderilemedi — eksik: ${((u.skipped || [])[0] || {}).missing?.join(', ') || 'bilgi'}`);
       } catch (x) { errs.push(`${ch(cid).name}: ${x.message}`); }
     }
@@ -626,13 +626,13 @@ function excelDialog(done) {
   const s = sheet({ title: 'Excel\'den toplu güncelle', size: 'wide' });
   const intro = () => {
     s.setBody(html`<div class="stack">
+      <div class="notice small"><i class="ico ico-warn"></i><div>Yalnız var olan ürünler güncellenir; yeni ürün eklenmez.</div></div>
       <ol class="small" style="margin:0;padding-left:20px;line-height:1.8">
-        <li><a class="link" href="/api/products.csv">Ürün listesini Excel'e aktarın</a> (her ürün bir satır, ID / SKU / barkod ile).</li>
-        <li>Excel'de <b>Alış fiyatı, Satış fiyatı, Stok, Kritik stok, Desi, KDV</b> ya da <b>“Fiyat: Kanal adı”</b> sütunlarını değiştirin. Ürün adı gibi diğer sütunlar değiştirilse de dikkate alınmaz; boş hücre değişiklik sayılmaz.</li>
-        <li>Dosyayı (.xlsx ya da .csv) aşağıdan seçin; önce <b>önizleme</b> gösterilir, onaylayınca kaydedilir.</li>
+        <li><a class="link" href="/api/products.csv">Ürün listesini indirin.</a></li>
+        <li>Fiyat ve stok sütunlarını Excel'de değiştirin.</li>
+        <li>Dosyayı seçin, önizlemeyi onaylayın.</li>
       </ol>
       <label class="btn" style="align-self:flex-start"><i class="ico ico-upload"></i>Dosya seç (.xlsx / .csv)<input type="file" accept=".xlsx,.csv,.txt" data-file hidden></label>
-      <div class="muted tiny">Stok senkronu kapalıyken stoğu ikas'tan okunan ürünlerin stoğu değiştirilmez. Kanal fiyatları kaydedilince kanala gönderilir.</div>
     </div>`);
     s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>`);
   };

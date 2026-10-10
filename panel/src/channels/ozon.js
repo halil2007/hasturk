@@ -80,11 +80,12 @@ export function ozon(env, meta) {
       const r = (await call('/v3/product/info/list', { product_id: part })) || {};
       for (const p of r.items || []) {
         const price = num(p.price), old = num(p.old_price), images = imageList([...(p.primary_image || []), ...(p.images || [])]);
-        // FBS / rFBS stoku: depodaki miktar − rezerve (DOĞRULA: present rezerveyi de içerir kabul edildi)
+        // FBS / rFBS stoku: depodaki miktar (present). Gönderim de bu miktarı yazar (/v2/products/stocks "stock"; rezerveyi Ozon düşer):
+        // okunan ile gönderilen aynı temelde karşılaştırılır (önceden present − reserved okunuyordu, rezerve olan her ilan her senkronda yeniden gönderiliyordu)
         const fbs = ((p.stocks && p.stocks.stocks) || []).filter((s) => /fbs/i.test(str(s.source)));
         cache.set(str(p.offer_id), { product_id: p.id, currency: str(p.currency_code) });
         out.push({ remoteId: str(p.offer_id), remoteProductId: str(p.id), sku: str(p.offer_id), barcode: str((p.barcodes || [])[0] || p.barcode), name: str(p.name), groupName: str(p.name), variantName: '',
-          image: images[0] || '', images, price, listPrice: Math.max(old, price), stock: fbs.reduce((t, s) => t + Math.max(0, num(s.present) - num(s.reserved)), 0),
+          image: images[0] || '', images, price, listPrice: Math.max(old, price), stock: fbs.reduce((t, s) => t + Math.max(0, num(s.present)), 0),
           active: !p.is_archived && !p.is_autoarchived && p.visible !== false && !(p.visibility_details && p.visibility_details.active_product === false) });
       }
     }
@@ -100,32 +101,42 @@ export function ozon(env, meta) {
     if (list.length === 1) return (wh = str(list[0].warehouse_id));
     throw new Error(list.length ? `Ozon: ${list.length} FBS deposu var (${list.slice(0, 5).map((w) => `${w.name} ${w.warehouse_id}`).join(', ')}); Entegrasyonlar'da stok deposu numarasını girin` : 'Ozon: hesapta FBS deposu bulunamadı');
   }
-  const rowErrs = (r) => ((r && r.result) || []).filter((x) => x.updated === false || (x.errors || []).length).map((x) => `${x.offer_id || x.product_id}: ${(x.errors || []).map((e) => e.message || e.code).join(' · ') || 'güncellenmedi'}`);
+  // Satır sonuçları ilan ilan: { done, errors } (yalnız reddedilen ilan yeniden denenir). Hiçbiri gönderilemeden bağlantı / yetki hatası: atılır.
+  const rowErr = (x) => (x.errors || []).map((e) => e.message || e.code).join(' · ') || 'güncellenmedi';
+  async function send(items, size, gap, request) {
+    const out = { done: [], errors: [] };
+    for (const [i, part] of chunk(items, size).entries()) {
+      if (i && gap) await sleep(gap);
+      let r;
+      try { r = await request(part); } catch (e) {
+        if (!out.done.length || e.budget) throw e;
+        out.errors.push(...part.map((x) => ({ remoteId: x.remoteId, error: e.message })));
+        continue;
+      }
+      const bad = new Map(((r && r.result) || []).filter((x) => x.updated === false || (x.errors || []).length).flatMap((x) => [[str(x.offer_id), rowErr(x)], [str(x.product_id), rowErr(x)]]));
+      for (const x of part) {
+        const err = bad.get(str(x.remoteId || x.sku)) || (x.remoteProductId && bad.get(str(x.remoteProductId)));
+        if (err) out.errors.push({ remoteId: x.remoteId, error: 'Ozon: ' + err }); else out.done.push(x.remoteId);
+      }
+    }
+    return out;
+  }
 
   // Stok: 100'erli; aynı ürün-depo için 2 dakikada bir güncellenebilir (Ozon TOO_MANY_REQUESTS satır hatası döner)
   async function pushStock(items) {
-    const w = Number(await warehouse()), errs = [];
-    for (const [i, part] of chunk(items, 100).entries()) {
-      if (i) await sleep(800); // dakikada 80 istek sınırı
-      const r = await call('/v2/products/stocks', { stocks: part.map((x) => {
-        const id = str(x.remoteId || x.sku), c = cache.get(id), pid = num((c && c.product_id) || x.remoteProductId);
-        return { offer_id: id, ...(pid ? { product_id: pid } : {}), stock: Math.max(0, Math.round(num(x.stock))), warehouse_id: w };
-      }) });
-      errs.push(...rowErrs(r));
-    }
-    if (errs.length) throw new Error('Ozon stok güncellemesini reddetti: ' + errs.slice(0, 5).join(' | '));
+    const w = Number(await warehouse());
+    // dakikada 80 istek sınırı: parçalar arası 800 ms
+    return send(items, 100, 800, (part) => call('/v2/products/stocks', { stocks: part.map((x) => {
+      const id = str(x.remoteId || x.sku), c = cache.get(id), pid = num((c && c.product_id) || x.remoteProductId);
+      return { offer_id: id, ...(pid ? { product_id: pid } : {}), stock: Math.max(0, Math.round(num(x.stock))), warehouse_id: w };
+    }) }));
   }
   // Fiyat: liste fiyatı satış fiyatından büyükse old_price (üstü çizili), değilse old_price "0" (sıfırlanır). Fiyat saatte en çok 10 kez değişebilir.
   async function pushPrice(items) {
-    const errs = [];
-    for (const part of chunk(items, 1000)) {
-      const r = await call('/v1/product/import/prices', { prices: part.map((x) => {
-        const id = str(x.remoteId || x.sku), c = cache.get(id), pid = num((c && c.product_id) || x.remoteProductId), sale = Math.round(num(x.price) * 100) / 100, list = Math.round(num(x.listPrice) * 100) / 100;
-        return { offer_id: id, ...(pid ? { product_id: pid } : {}), price: String(sale), old_price: list > sale ? String(list) : '0', ...(c && c.currency ? { currency_code: c.currency } : {}), auto_action_enabled: 'UNKNOWN' };
-      }) });
-      errs.push(...rowErrs(r));
-    }
-    if (errs.length) throw new Error('Ozon fiyat güncellemesini reddetti: ' + errs.slice(0, 5).join(' | '));
+    return send(items, 1000, 0, (part) => call('/v1/product/import/prices', { prices: part.map((x) => {
+      const id = str(x.remoteId || x.sku), c = cache.get(id), pid = num((c && c.product_id) || x.remoteProductId), sale = Math.round(num(x.price) * 100) / 100, list = Math.round(num(x.listPrice) * 100) / 100;
+      return { offer_id: id, ...(pid ? { product_id: pid } : {}), price: String(sale), old_price: list > sale ? String(list) : '0', ...(c && c.currency ? { currency_code: c.currency } : {}), auto_action_enabled: 'UNKNOWN' };
+    }) }));
   }
 
   // ---------- gönderi işlemleri ----------

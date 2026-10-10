@@ -54,7 +54,8 @@ export function make(values) {
     return {
       ref: str(d.post_number), tracking: str(d.carrier_tracking_code), barcode: str(d.carrier_tracking_code) || str(d.post_number),
       carrier: str(p.carrier_name) || 'Navlungo', trackingUrl: str(d.carrier_tracking_url) || str(d.tracking_url),
-      cost: money(p.post && (p.post.post_price ?? p.post.calculated_price)), state: STATES[st.status_code] || stateOf(st.status_name), text: str(st.status_name),
+      // DOĞRULA: post_price KDV hariç kabul edildi
+      cost: money(p.post && (p.post.post_price ?? p.post.calculated_price)), costVatIncluded: false, state: STATES[st.status_code] || stateOf(st.status_name), text: str(st.status_name),
       deliveredAt: st.delivered_date ? Date.parse(String(st.delivered_date).replace(' ', 'T') + '+03:00') || null : null, labelReady: d.barcode_status === 1,
     };
   };

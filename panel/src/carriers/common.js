@@ -51,9 +51,13 @@ export function stateOf(text) {
   if (/iptal|cancel/.test(t)) return 'cancelled';
   if (/iade edil|göndericiye teslim|geri döndü|returned/.test(t)) return 'returned';
   if (/teslim edildi|teslim edilmiştir|delivered/.test(t) && !/edilemedi|edilmedi|not/.test(t)) return 'delivered';
+  // "Teslim alınmayı bekliyor" / "teslim alınması bekleniyor": gönderi yolda / şubede, alıcının alması bekleniyor (oluşturuldu değil)
+  if (/teslim alınmayı bekl|teslim alınması bekl/.test(t)) return 'transit';
   if (/hazırlan|oluşturuldu|kayıt|bekleniyor|teslim alınacak|created/.test(t)) return 'created';
   return 'transit';
 }
+// Firmada aynı referansla iptal edilmiş gönderi varsa yeni referans (zaman eki): iptal edilen gönderi yeniden kullanılmasın
+export const freshRef = (s) => ({ ...s, reference: `${s.reference}-R${Date.now().toString(36).slice(-4).toUpperCase()}` });
 // Alıcı adresi tek satırda (bazı firmalar ilçe / ili adres metninde de ister)
 export function fullAddress(r) {
   const a = str(r.address), k = nameKey(a);

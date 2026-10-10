@@ -139,35 +139,47 @@ export function ebay(env, meta) {
     });
   }
 
-  // bulk_update_price_quantity: 25'erli istek; yanıttaki her satırın statusCode'u denetlenir, hatalılar toplanıp bildirilir
-  async function bulk(requests, errs) {
-    for (const [i, part] of chunk(requests, 25).entries()) {
+  // bulk_update_price_quantity: 25'erli istek; yanıttaki her satırın statusCode'u denetlenir. Sonuç ilan ilan: { done, errors }
+  // (yalnız reddedilen ilan yeniden denenir). Hiçbiri gönderilemeden bağlantı / yetki hatası: atılır.
+  // entries: [{ remoteId, req, keys: [yanıt satırını ilana bağlayan sku / offerId] }]
+  async function bulk(entries, out) {
+    for (const [i, part] of chunk(entries, 25).entries()) {
       if (i) await sleep(200);
-      const r = (await call('/sell/inventory/v1/bulk_update_price_quantity', { method: 'POST', body: { requests: part } })) || {};
+      let r;
+      try { r = (await call('/sell/inventory/v1/bulk_update_price_quantity', { method: 'POST', body: { requests: part.map((x) => x.req) } })) || {}; } catch (e) {
+        if (!out.done.length || e.budget) throw e;
+        out.errors.push(...part.map((x) => ({ remoteId: x.remoteId, error: e.message })));
+        continue;
+      }
+      const bad = new Map();
       for (const x of r.responses || []) {
-        if (num(x.statusCode, 200) >= 300 || (x.errors || []).length) errs.push(`${x.sku || x.offerId || '?'}: ${(x.errors || []).map((e) => e.longMessage || e.message).join(' · ') || 'HTTP ' + x.statusCode}`);
+        if (num(x.statusCode, 200) >= 300 || (x.errors || []).length) bad.set(str(x.sku || x.offerId), (x.errors || []).map((e) => e.longMessage || e.message).join(' · ') || 'HTTP ' + x.statusCode);
+      }
+      for (const x of part) {
+        const k = x.keys.find((y) => bad.has(y));
+        if (k) out.errors.push({ remoteId: x.remoteId, error: 'eBay: ' + bad.get(k) }); else out.done.push(x.remoteId);
       }
     }
+    return out;
   }
   // Stok: stok kaydının toplam "ship-to-home" miktarı; SKU'nun tek yayındaki teklifi varsa teklifin satılabilir miktarı da aynı değere çekilir
   async function pushStock(items) {
-    const errs = [], reqs = await pool(items, 4, async (x) => {
+    const entries = await pool(items, 4, async (x) => {
       const sku = str(x.remoteId || x.sku), qty = Math.max(0, Math.round(num(x.stock))), pub = (await offersOf(sku)).filter(live);
-      return { sku, shipToLocationAvailability: { quantity: qty }, ...(pub.length === 1 ? { offers: [{ offerId: str(pub[0].offerId), availableQuantity: qty }] } : {}) };
+      const offer = pub.length === 1 ? str(pub[0].offerId) : '';
+      return { remoteId: x.remoteId, keys: [sku, offer].filter(Boolean), req: { sku, shipToLocationAvailability: { quantity: qty }, ...(offer ? { offers: [{ offerId: offer, availableQuantity: qty }] } : {}) } };
     });
-    await bulk(reqs, errs);
-    if (errs.length) throw new Error('eBay stok güncellemesini reddetti: ' + errs.slice(0, 5).join(' | '));
+    return bulk(entries, { done: [], errors: [] });
   }
   // Fiyat: SKU'nun sabit fiyatlı (açık artırma olmayan) tüm teklifleri; para birimi teklifin kendi para birimi
   async function pushPrice(items) {
-    const errs = [], reqs = [];
+    const out = { done: [], errors: [] }, entries = [];
     await pool(items, 4, async (x) => {
       const sku = str(x.remoteId || x.sku), list = (await offersOf(sku)).filter((o) => o.format !== 'AUCTION' && o.offerId);
-      if (!list.length) { errs.push(`${sku}: teklif (offer) bulunamadı`); return; }
-      reqs.push({ offers: list.map((o) => ({ offerId: str(o.offerId), price: { value: (Math.round(num(x.price) * 100) / 100).toFixed(2), currency: str(o.pricingSummary && o.pricingSummary.price && o.pricingSummary.price.currency) || 'USD' } })) });
+      if (!list.length) { out.errors.push({ remoteId: x.remoteId, error: 'eBay: teklif (offer) bulunamadı' }); return; }
+      entries.push({ remoteId: x.remoteId, keys: [sku, ...list.map((o) => str(o.offerId))], req: { offers: list.map((o) => ({ offerId: str(o.offerId), price: { value: (Math.round(num(x.price) * 100) / 100).toFixed(2), currency: str(o.pricingSummary && o.pricingSummary.price && o.pricingSummary.price.currency) || 'USD' } })) } });
     });
-    await bulk(reqs, errs);
-    if (errs.length) throw new Error('eBay fiyat güncellemesini reddetti: ' + errs.slice(0, 5).join(' | '));
+    return bulk(entries, out);
   }
 
   // ---------- kargoya verme ----------

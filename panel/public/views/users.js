@@ -51,7 +51,7 @@ export async function users(el) {
   });
   const permChips = (u) => {
     if (u.role === 'admin') return html`<span class="muted tiny">Tüm bölümler ve yönetim</span>`;
-    if (!Array.isArray(u.perms)) return html`<span class="pill amber" title="Eski hesap: yetki seçilmemiş, tüm bölümleri görür. Düzenleyip yetki seçin.">Tüm bölümler (sınırsız)</span>`;
+    if (!Array.isArray(u.perms)) return html`<span class="pill amber" title="Yetki seçilmemiş: tüm bölümleri görür. Düzenleyip yetki seçin.">Yetkisi seçilmemiş</span>`;
     const list = PERMS.map(([k, t]) => [t, level(u, k)]).filter(([, l]) => l);
     return list.length ? html`<div class="perm-chips">${list.map(([t, l]) => html`<span class="pc ${l}" title="${l === 'view' ? 'Yalnız görür' : 'Tam yetki'}">${l === 'view' ? html`<i class="ico ico-eye"></i>` : ''}${t}</span>`)}</div>` : html`<span class="muted tiny">Yalnız genel bakış</span>`;
   };
@@ -65,7 +65,7 @@ export async function users(el) {
     const me = state.user || {}, mainAdmin = !state.tenant && me.id === 0;
     const noMail = rows.filter((u) => u.active && !u.twofa && !String(u.email || '').trim());
     render($('[data-msec]', el), html`<i class="ico ico-send" style="color:var(--primary)"></i><div style="flex:1;min-width:220px"><b>Yeni ağdan girişte e-posta kodu</b>
-        <div class="muted small">${sec.emailVerify ? 'Açık: bir kullanıcı daha önce doğrulamadığı bir ağdan (IP) girince e-postasına 6 haneli kod gider; kod girildikten sonra o ağdan 48 saat sorulmaz (her girişte süre yeniden başlar; 48 saatten uzun ara verilirse kod yeniden istenir). İki adımlı doğrulaması açık olanlara uygulama kodu sorulur.' : 'Kapalı: girişte yalnız şifre (ve açıksa iki adımlı doğrulama) istenir.'}</div>
+        <div class="muted small">${sec.emailVerify ? 'Açık: yeni bir ağdan girişte e-postaya kod gider.' : 'Kapalı: girişte yalnız şifre istenir.'}</div>
         ${sec.emailVerify && noMail.length ? html`<div class="small" style="color:var(--warn,#b54708);margin-top:4px">E-postası girilmemiş ${noMail.length} kullanıcıya kod gönderilemez: ${noMail.slice(0, 5).map((u) => u.name).join(', ')}${noMail.length > 5 ? '…' : ''}. Kullanıcıyı düzenleyip e-posta ekleyin.</div>` : ''}
         ${mainAdmin ? html`<div class="row wrap" style="gap:8px;margin-top:8px;align-items:center"><span class="small" style="font-weight:650">Ana yönetici e-postası</span>
           <input class="input" type="email" data-admmail value="${sec.adminEmail || ''}" placeholder="ornek@firma.com" style="max-width:260px"><button class="btn sm" data-admsave>Kaydet</button>
@@ -85,7 +85,7 @@ export async function users(el) {
   function drawSec() {
     const on2 = rows.filter((u) => u.active && u.twofa).length, act = rows.filter((u) => u.active).length;
     render($('[data-sec]', el), html`<i class="ico ico-key" style="color:var(--primary)"></i><div style="flex:1;min-width:220px"><b>İki adımlı doğrulama (Google Authenticator)</b>
-        <div class="muted small">${sec.require2fa ? 'Tüm kullanıcılar için zorunlu: açmayan kişi bir sonraki işleminde kurulum ekranını görür.' : 'İsteğe bağlı: her kullanıcı sağ üstteki hesap menüsünden açabilir.'} ${act ? `${on2}/${act} aktif kullanıcıda açık.` : ''}</div></div>
+        <div class="muted small">${sec.require2fa ? 'Herkes için zorunlu.' : 'İsteğe bağlı.'} ${act ? `${on2}/${act} kişide açık.` : ''}</div></div>
       <label class="switch-row" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" data-req2 ${sec.require2fa ? 'checked' : ''}><span class="small" style="font-weight:650">Herkes için zorunlu</span></label>`);
     $('[data-req2]', el).onchange = async (e) => {
       const want = e.target.checked;
@@ -104,7 +104,7 @@ export async function users(el) {
       <div class="kpi"><div class="label">Toplam personel</div><div class="value num">${n(rows.length)}</div><div class="delta flat">${act.length} aktif · ${rows.length - act.length} pasif</div></div>
       <div class="kpi"><div class="label">Yönetici</div><div class="value num">${n(rows.filter((u) => u.role === 'admin').length + (state.tenant ? 0 : 1))}</div><div class="delta flat">${state.tenant ? 'panel yöneticileri' : 'ana yönetici dahil'}</div></div>
       <div class="kpi"><div class="label">Son 7 günde giriş</div><div class="value num">${n(week.length)}</div><div class="delta flat">kişi</div></div>
-      <div class="kpi"><div class="label">Sınırsız eski hesap</div><div class="value num ${rows.some((u) => u.role !== 'admin' && !Array.isArray(u.perms)) ? 'low' : ''}">${n(rows.filter((u) => u.role !== 'admin' && !Array.isArray(u.perms)).length)}</div><div class="delta flat">yetki seçilmemiş</div></div>`);
+      <div class="kpi"><div class="label">Yetkisi seçilmemiş personel</div><div class="value num ${rows.some((u) => u.role !== 'admin' && !Array.isArray(u.perms)) ? 'low' : ''}">${n(rows.filter((u) => u.role !== 'admin' && !Array.isArray(u.perms)).length)}</div><div class="delta flat">her bölümü görür</div></div>`);
     const cnt = { all: rows.length, active: act.length, passive: rows.length - act.length, admin: rows.filter((u) => u.role === 'admin').length, staff: rows.filter((u) => u.role !== 'admin').length };
     render($('[data-tabs]', el), html`${[['all', 'Tümü'], ['active', 'Aktif'], ['passive', 'Pasif'], ['admin', 'Yönetici'], ['staff', 'Personel']].map(([k, t]) => html`<button class="tab ${f.st === k ? 'on' : ''}" data-act="st" data-k="${k}">${t}<span class="n">${cnt[k]}</span></button>`)}`);
     const main = state.tenant || f.q || !['all', 'active', 'admin'].includes(f.st) ? null : { id: 0, name: 'Ana yönetici', username: 'kullanıcı adı boş', role: 'admin', active: 1, main: true, twofa: me.id === 0 && !!me.twofa };
@@ -150,7 +150,7 @@ export async function users(el) {
     const mineAllowed = (c.allow || []).some((a) => (a.endsWith('*') ? guard.you.split(' > ')[0].startsWith(a.slice(0, -1)) : guard.you.split(' > ')[0] === a));
     render(box, html`<div class="row wrap" style="gap:12px;align-items:center"><i class="ico ico-eye" style="color:var(--primary)"></i>
         <div style="flex:1;min-width:220px"><b>Giriş koruması (IP engelleme)</b>
-          <div class="muted small">${c.enabled ? html`Açık: bir IP <b>${c.windowMin} dakikada ${c.maxFails}</b> kez hatalı giriş, kod ya da API anahtarı denerse engellenir. Denemeler sürdükçe her engel uzar: <b>${c.steps.map(mins).join(' → ')}</b>. Ana panel ve tüm firma panelleri için geçerlidir; ayrıca IP başına dakikada en fazla ${c.apiPerMin} istek.` : 'Kapalı: yalnız kullanıcı adı başına deneme sınırı uygulanır.'}</div></div>
+          <div class="muted small">${c.enabled ? html`<span title="Engel süreleri: ${c.steps.map(mins).join(' → ')} · IP başına dakikada en fazla ${c.apiPerMin} istek">Açık: ${c.windowMin} dakikada ${c.maxFails} hatalı denemede IP engellenir.</span>` : 'Kapalı: yalnız kullanıcı adı başına deneme sınırı uygulanır.'}</div></div>
         <label class="switch-row" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" data-gon ${c.enabled ? 'checked' : ''}><span class="small" style="font-weight:650">Açık</span></label></div>
       ${blocked.length ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>${blocked.length} IP şu an engelli.</b></div></div>` : ''}
       ${list.length ? html`<div class="table-wrap"><table class="t small"><thead><tr><th>IP</th><th>Durum</th><th class="r">Hatalı deneme</th><th class="r">Engel</th><th>Son deneme</th><th></th></tr></thead><tbody>

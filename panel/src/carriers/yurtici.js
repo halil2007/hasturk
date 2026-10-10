@@ -4,7 +4,7 @@
 // Ödeme tipi kullanıcıya bağlıdır (gönderici ödemeli için ayrı kullanıcı verilir). Hatalar HTTP 200 içinde: outFlag + satır errCode.
 // Alt öğeler ön eksizdir (yalnız işlem öğesi ship: önekli); dil öğesi işleme göre değişir (userLanguage / wsLanguage).
 import { str } from '../util.js';
-import { soap, esc, tag, tags, phone10, cut, money, trackUrl } from './common.js';
+import { soap, esc, tag, tags, phone10, cut, money, trackUrl, freshRef } from './common.js';
 
 const URL = (test) => `https://${test ? 'testws' : 'ws'}.yurticikargo.com/KOPSWebServices/ShippingOrderDispatcherServices`;
 const NS = 'http://yurticikargo.com.tr/ShippingOrderDispatcherServices';
@@ -31,20 +31,29 @@ export function make(values) {
       return { ok: true, message: `Yurtiçi Kargo bağlantısı tamam${test ? ' (test ortamı)' : ''}` };
     },
     async create(s) {
-      const r = s.receiver, phone = phone10(r.phone), key = cargoKey(s);
+      const r = s.receiver, phone = phone10(r.phone);
+      let key = cargoKey(s);
       if (!r.district) throw new Error('Yurtiçi alıcı ilçesini istiyor; sipariş adresinde ilçe yok');
       if (phone.length !== 10) throw new Error('Yurtiçi alıcı telefonunu istiyor (10 hane); siparişte geçerli telefon yok');
       const name = r.name.length >= 5 ? r.name : (r.name + ' ' + r.name).slice(0, 5).padEnd(5, '.');
       const addr = r.address.length >= 10 ? r.address : `${r.address} ${r.district} ${r.city}`.padEnd(10, '.');
-      const vo = [['cargoKey', key], ['invoiceKey', key], ['receiverCustName', cut(name, 200)], ['receiverAddress', cut(addr, 500)], ['cityName', cut(r.city, 40)], ['townName', cut(r.district, 40)],
-        ['receiverPhone1', phone], ['emailAddress', r.email], ['desi', Number(s.desi) || 1], ['kg', Number(s.desi) || 1], ['cargoCount', 1],
-        ['description', cut((s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ') || s.reference, 255)]]
-        .filter(([, v]) => v !== '' && v != null).map(([k, v]) => `<${k}>${esc(v)}</${k}>`).join('');
-      const x = await call('createShipment', `<ShippingOrderVO>${vo}</ShippingOrderVO>`);
-      const row = tags(x, 'shippingOrderDetailVO')[0] || '', code = tag(row, 'errCode') || tag(x, 'errCode');
-      if (authErr(x) || AUTH.test(code)) throw new Error('Yurtiçi web servis kullanıcı adı veya şifresi hatalı');
-      // 60020: aynı anahtarla gönderi zaten var (yanıtı kaybolmuş önceki istek) → o gönderi kullanılır
-      if ((tag(x, 'outFlag') !== '0' || (code && code !== '0')) && code !== '60020') throw new Error('Yurtiçi: ' + (tag(row, 'errMessage') || tag(x, 'outResult') || 'gönderi oluşturulamadı'));
+      for (let i = 0; ; i++) {
+        const vo = [['cargoKey', key], ['invoiceKey', key], ['receiverCustName', cut(name, 200)], ['receiverAddress', cut(addr, 500)], ['cityName', cut(r.city, 40)], ['townName', cut(r.district, 40)],
+          ['receiverPhone1', phone], ['emailAddress', r.email], ['desi', Number(s.desi) || 1], ['kg', Number(s.desi) || 1], ['cargoCount', 1],
+          ['description', cut((s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ') || s.reference, 255)]]
+          .filter(([, v]) => v !== '' && v != null).map(([k, v]) => `<${k}>${esc(v)}</${k}>`).join('');
+        const x = await call('createShipment', `<ShippingOrderVO>${vo}</ShippingOrderVO>`);
+        const row = tags(x, 'shippingOrderDetailVO')[0] || '', code = tag(row, 'errCode') || tag(x, 'errCode');
+        if (authErr(x) || AUTH.test(code)) throw new Error('Yurtiçi web servis kullanıcı adı veya şifresi hatalı');
+        // 60020: aynı anahtarla gönderi zaten var (yanıtı kaybolmuş önceki istek) → o gönderi kullanılır
+        if ((tag(x, 'outFlag') !== '0' || (code && code !== '0')) && code !== '60020') throw new Error('Yurtiçi: ' + (tag(row, 'errMessage') || tag(x, 'outResult') || 'gönderi oluşturulamadı'));
+        if (code !== '60020') break;
+        // Var olan gönderi iptal edilmişse kullanılmaz: yeni anahtarla bir kez yeniden açılır
+        const st = tag(tags(await query(key).catch(() => ''), 'shippingDeliveryDetailVO')[0] || '', 'operationStatus');
+        if (!['CNL', 'ISC', 'BI'].includes(st)) break;
+        if (i) throw new Error(`Yurtiçi: ${key} anahtarlı gönderi iptal edilmiş; yeni gönderi açılamadı`);
+        key = cargoKey(freshRef(s));
+      }
       return { ref: key, tracking: '', barcode: key, carrier: 'Yurtiçi Kargo', trackingUrl: '', cost: null, label: null };
     },
     async cancel(ref) {
@@ -68,7 +77,7 @@ export function make(values) {
       const state = returned ? 'returned' : STATES[st] || null;
       return {
         state, text: tag(row, 'operationMessage') || st, tracking: doc, barcode: doc || pkg.carrier_ref,
-        trackingUrl: tag(item, 'trackingUrl') || (doc ? trackUrl('yurtici', doc) : ''), cost: money(tag(item, 'totalAmount')),
+        trackingUrl: tag(item, 'trackingUrl') || (doc ? trackUrl('yurtici', doc) : ''), cost: money(tag(item, 'totalAmount')), costVatIncluded: true, // totalAmount: KDV dahil toplam ücret
         deliveredAt: state === 'delivered' && d ? Date.parse(`${d[1]}-${d[2]}-${d[3]}T${tm ? tm[1] : '12'}:${tm ? tm[2] : '00'}:00+03:00`) : null,
       };
     },

@@ -117,7 +117,8 @@ test('Teknosa: OF24 stok/fiyat güncel teklif korunarak; önbellekte yoksa sku i
 
   // bilinmeyen teklif: anlaşılır hata
   const before = calls.filter((x) => x.method === 'POST').length;
-  await assert.rejects(ch.pushStock([{ remoteId: 'YOK', stock: 1 }, { remoteId: 'MAT-1', stock: 4 }]), /1 teklif bulunamadı.*YOK/);
+  const res = await ch.pushStock([{ remoteId: 'YOK', stock: 1 }, { remoteId: 'MAT-1', stock: 4 }]);
+  assert.deepEqual(res.done, ['MAT-1']); assert.deepEqual(res.errors.map((x) => x.remoteId), ['YOK'], 'bulunamayan teklif ilan hatası olur');
   assert.equal(calls.filter((x) => x.method === 'POST').length, before + 1, 'bulunan teklif yine gönderilir');
   assert.deepEqual(JSON.parse(calls.at(-1).body).offers.map((x) => x.shop_sku), ['MAT-1']);
 });

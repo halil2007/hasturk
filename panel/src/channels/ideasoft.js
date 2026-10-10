@@ -177,27 +177,32 @@ export function ideasoft(env, meta = {}) {
     return [...out.values()];
   }
 
-  // Ürün güncelleme kalem kalem (toplu uç yok); hatalar toplanır
+  // Ürün güncelleme kalem kalem (toplu uç yok). Sonuç ilan ilan: { done, errors } (yalnız hatalı ilan yeniden denenir).
+  // Hiçbiri gönderilemeden bağlantı / yetki hatası (4xx ilan hatası değil) olduysa atılır; istek bütçesi hatası hep atılır.
+  const itemErr = (e) => [400, 404, 409, 422].includes(e.status);
   async function each(items, fn) {
-    const errs = [];
-    await pool(items.filter((x) => num(x.remoteId) > 0), 4, async (x) => { try { await fn(x); } catch (e) { errs.push(`${x.remoteId}: ${e.message}`); } });
-    return errs;
+    const out = { done: [], errors: [] };
+    let global = null;
+    for (const x of items) if (!(num(x.remoteId) > 0)) out.errors.push({ remoteId: x.remoteId, error: 'IdeaSoft: geçersiz ürün numarası' });
+    await pool(items.filter((x) => num(x.remoteId) > 0), 4, async (x) => {
+      try { await fn(x); out.done.push(x.remoteId); } catch (e) {
+        if (e.budget) throw e;
+        if (!itemErr(e)) global = global || e;
+        out.errors.push({ remoteId: x.remoteId, error: e.message });
+      }
+    });
+    if (global && !out.done.length) throw global;
+    return out;
   }
-  async function pushStock(items) {
-    // DOĞRULA: PUT gövdesinde yalnız değişen alan (IdeaSoft'un kendi araçları kısmi PUT kullanıyor; şema tüm nesneyi tanımlıyor)
-    const errs = await each(items, (x) => call(`/products/${num(x.remoteId)}`, { method: 'PUT', body: { id: num(x.remoteId), stockAmount: Math.max(0, Math.round(num(x.stock))) } }));
-    if (errs.length) throw new Error(`IdeaSoft: ${errs.length} ürünün stoğu güncellenemedi (${errs.slice(0, 3).join('; ')})`);
-  }
+  // DOĞRULA: PUT gövdesinde yalnız değişen alan (IdeaSoft'un kendi araçları kısmi PUT kullanıyor; şema tüm nesneyi tanımlıyor)
+  const pushStock = (items) => each(items, (x) => call(`/products/${num(x.remoteId)}`, { method: 'PUT', body: { id: num(x.remoteId), stockAmount: Math.max(0, Math.round(num(x.stock))) } }));
   // Fiyat: satış fiyatı price1'e yazılır, ürün indirimi sıfırlanır (indirim tipinin anlamı belgede net değil: üstü çizili fiyat yazılmaz).
   // Ürün fiyatları KDV hariç tutuyorsa (taxIncluded=0) KDV düşülerek yazılır → önce ürün okunur.
-  async function pushPrice(items) {
-    const errs = await each(items, async (x) => {
-      const p = await call(`/products/${num(x.remoteId)}`);
-      const price = num(x.price), v = num(p && p.taxIncluded, 1) === 0 ? price / (1 + num(p.tax) / 100) : price;
-      await call(`/products/${num(x.remoteId)}`, { method: 'PUT', body: { id: num(x.remoteId), price1: Math.round(v * 10000) / 10000, discount: 0 } });
-    });
-    if (errs.length) throw new Error(`IdeaSoft: ${errs.length} ürünün fiyatı güncellenemedi (${errs.slice(0, 3).join('; ')})`);
-  }
+  const pushPrice = (items) => each(items, async (x) => {
+    const p = await call(`/products/${num(x.remoteId)}`);
+    const price = num(x.price), v = num(p && p.taxIncluded, 1) === 0 ? price / (1 + num(p.tax) / 100) : price;
+    await call(`/products/${num(x.remoteId)}`, { method: 'PUT', body: { id: num(x.remoteId), price1: Math.round(v * 10000) / 10000, discount: 0 } });
+  });
 
   // Kargoya ver: siparişin son açık paketiyse durum "fulfilled" + kargo takip kodu (müşteri bildirimi IdeaSoft ayarlarına göre)
   async function ship(order, pkg, { tracking } = {}) {

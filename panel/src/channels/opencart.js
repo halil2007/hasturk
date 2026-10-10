@@ -20,6 +20,12 @@ export const ocStatus = (s) => {
   return 'new'; // pending, processing, hazırlanıyor, bilinmeyen
 };
 const name2 = (...a) => a.map(str).filter(Boolean).join(' ');
+// Kapıda ödeme: OpenCart 3 payment_code "cod"; OpenCart 4 payment_method JSON'unda code "cod.cod"
+const isCod = (o) => {
+  let c = str(o.payment_code);
+  if (!c && o.payment_method) { try { const m = typeof o.payment_method === 'string' ? JSON.parse(o.payment_method) : o.payment_method; c = str(m && m.code); } catch { /* OpenCart 3: düz ad */ } }
+  return /^cod(\.|$)/i.test(c);
+};
 
 export function opencart(env, meta) {
   const base0 = str(env.OPENCART_URL).replace(/[?#].*$/, '').replace(/\/+$/, '').replace(/\/(admin(\/.*)?|index\.php(\/.*)?|[^/]+\.php)$/i, '').replace(/\/+$/, '');
@@ -50,6 +56,7 @@ export function opencart(env, meta) {
     return {
       remoteId: str(o.order_id), orderNumber: str(o.order_id), orderedAt: num(o.added) ? num(o.added) * 1000 : Date.now(),
       remoteStatus: str(o.status) || str(o.order_status_id), status: ocStatus(o.status),
+      cod: isCod(o) || undefined,
       customer, phone: str(o.telephone), email: str(o.email), customerId: num(o.customer_id) ? str(o.customer_id) : '',
       address: { name: name2(a('firstname'), a('lastname')) || customer, line: name2(a('address_1'), a('address_2')),
         district: il && city && il.toLocaleLowerCase('tr') !== city.toLocaleLowerCase('tr') ? city : '', city: il || city, phone: str(o.telephone) },
@@ -103,13 +110,26 @@ export function opencart(env, meta) {
 
   // remoteId "<ürün>:<seçenek değeri>" → { product_id, option_value_id }
   const ids = (x) => { const [pid, ov] = String(x.remoteId).split(':'); return { product_id: Number(x.remoteProductId || pid) || Number(pid) || 0, ...(ov ? { option_value_id: Number(ov) || 0 } : {}) }; };
+  // Sonuç ilan ilan: { done, errors } (dosyanın bildirdiği kalem hatası yalnız o ilana yazılır). Hiçbiri gönderilemeden bağlantı hatası: atılır.
+  const keyOf = (pid, ov) => `${pid}${ov ? ':' + ov : ''}`;
   async function send(action, items, fields) {
-    const errs = [];
+    const out = { done: [], errors: [] };
     for (const part of chunk(items, 200)) {
-      const r = await call(action, { items: part.map((x) => ({ ...ids(x), ...fields(x) })) });
-      for (const e of r.errors || []) errs.push(`${e.product_id}${e.option_value_id ? ':' + e.option_value_id : ''}: ${e.message}`);
+      let r;
+      try { r = await call(action, { items: part.map((x) => ({ ...ids(x), ...fields(x) })) }); } catch (e) {
+        if (!out.done.length || e.budget) throw e;
+        out.errors.push(...part.map((x) => ({ remoteId: x.remoteId, error: e.message })));
+        continue;
+      }
+      const bad = new Map((r.errors || []).map((e) => [keyOf(e.product_id, e.option_value_id), str(e.message) || 'güncellenemedi']));
+      for (const x of part) {
+        // Hata ürün + seçenekle eşleşmezse yalnız ürün numarasıyla eşleştirilir (bildirilen hata kaybolmasın)
+        const k = ids(x), err = bad.get(keyOf(k.product_id, k.option_value_id)) || (!k.option_value_id && [...bad].find(([b]) => b.split(':')[0] === String(k.product_id)) || [])[1];
+        if (err) out.errors.push({ remoteId: x.remoteId, error: 'OpenCart: ' + err });
+        else out.done.push(x.remoteId);
+      }
     }
-    if (errs.length) throw new Error(`OpenCart: ${errs.length} ürün güncellenemedi (${errs.slice(0, 3).join('; ')})`);
+    return out;
   }
   const pushStock = (items) => send('stock', items, (x) => ({ quantity: Math.max(0, Math.round(num(x.stock))) }));
   // Ana fiyat = liste fiyatı; satış fiyatı düşükse indirimli fiyat (product_special) olarak yazılır, değilse panelin yazdığı indirim silinir

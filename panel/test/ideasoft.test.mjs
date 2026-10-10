@@ -176,7 +176,10 @@ test('IdeaSoft: stok ve fiyat PUT gövdeleri; KDV hariç ürün fiyatı; hatalar
   const pp = api(calls).filter((c) => c.method === 'PUT').map((c) => [c.path, c.body]).sort();
   assert.deepEqual(pp, [['/admin-api/products/11', { id: 11, price1: 90, discount: 0 }], ['/admin-api/products/12', { id: 12, price1: 100, discount: 0 }]]);
   mockFetch((c) => (c.path.endsWith('/12') ? { status: 422, body: { errors: { stockAmount: 'geçersiz' } } } : {}));
-  await assert.rejects(ch.pushStock([{ remoteId: '11', stock: 1 }, { remoteId: '12', stock: 1 }]), /IdeaSoft: 1 ürünün stoğu güncellenemedi \(12: PUT .*HTTP 422/);
+  // Sonuç ilan ilan: reddedilen ilan errors'a (yalnız o yeniden denenir), diğerleri done'a
+  const r = await ch.pushStock([{ remoteId: '11', stock: 1 }, { remoteId: '12', stock: 1 }]);
+  assert.deepEqual(r.done, ['11']);
+  assert.equal(r.errors.length, 1); assert.equal(r.errors[0].remoteId, '12'); assert.match(r.errors[0].error, /PUT .*HTTP 422/);
 });
 
 test('IdeaSoft: kargoya verme durum + takip kodu; başka açık paket varken beklenir; tanılama', async () => {
