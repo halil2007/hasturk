@@ -95,8 +95,10 @@ export const weakSku = (s) => { const k = normSku(s); return k.length < 4 || (/^
 const variantSig = (variant, name) => { if (!str(variant)) { const q = [...quantities(name)].sort().join(','); return q ? q + '|' : ''; } return [...quantities(variant)].sort().join(',') + '|' + [...vtok(variant)].sort().join(' '); };
 const groupKey = (p) => str(p.parent_key) || norm(p.group_name) || norm(p.name);
 
+// Ad + varyant birlikte okunurken araya ayraç: "Seri 113" + "L / Kırmızı" → "113 L" (113 litre) diye okunmaz
+const both = (a, b) => [a, b].filter((x) => str(x)).join(' | ');
 export const prep = (x) => ({
-  t: tokens(x.name), q: quantities(`${x.name || ''} ${x.variant || ''}`), v: tokens(x.variant),
+  t: tokens(x.name), q: quantities(both(x.name, x.variant)), v: tokens(x.variant),
   sku: norm(x.sku).replace(/[^a-z0-9]/g, ''), barcode: normBc(x.barcode),
 });
 
@@ -121,7 +123,7 @@ export function score(a, b) {
 export const similarity = (a, b) => score(prep(a), prep(b));
 
 export function nameKey(name, variant) {
-  const full = [name, variant && !norm(name).includes(norm(variant)) ? variant : ''].filter(Boolean).join(' ');
+  const full = [name, variant && !norm(name).includes(norm(variant)) ? variant : ''].filter(Boolean).join(' | ');
   const t = [...tokens(full)].sort();
   if (t.length < 2) return '';
   return t.join(' ') + '|' + [...quantities(full)].sort().join(',');
@@ -131,7 +133,7 @@ function keyText(s) {
   return t.split(/[^a-z0-9.]+/).filter((w) => w && !KSTOP.has(w));
 }
 export function fullKey(name, variant) {
-  const full = [name, variant && !norm(name).includes(norm(variant)) ? variant : ''].filter(Boolean).join(' ');
+  const full = [name, variant && !norm(name).includes(norm(variant)) ? variant : ''].filter(Boolean).join(' | ');
   const t = keyText(full);
   return t.length >= 2 ? t.join(' ') : '';
 }
@@ -144,20 +146,20 @@ export function variantKey(base, variant) {
 
 // Is product p contradicted by listing l? (pack size / unit value, variant axis, brand)
 export function conflict(l, p, idx) {
-  const ql = quantities(`${l.name || ''} ${l.variant_name || ''}`), qp = quantities(`${fullName(p)} ${p.variant_name || ''}`);
+  const ql = quantities(both(l.name, l.variant_name)), qp = quantities(both(p.name, p.variant_name));
   if (qtyConflict(ql, qp)) return 'ölçü';
   if (str(l.variant_name) && str(p.variant_name) && !setEq(vtok(l.variant_name), vtok(p.variant_name))) return 'varyant';
   if (str(l.brand) && str(p.brand)) { const a = normSku(l.brand), b = normSku(p.brand); if (a && b && !a.includes(b) && !b.includes(a)) return 'marka'; }
   // Variant evidence in the listing title (HB / N11 put the variant in the title): words beyond the product's base name must
   // include the product's own variant values ("Kolye 16 Rose" is not "Kolye - 17 / Gümüş")
   if (str(p.variant_name)) {
-    const own = vtok(p.variant_name), base = vtok(p.group_name || String(p.name || '').split(' - ')[0]), lt = vtok(`${l.name || ''} ${l.variant_name || ''}`);
+    const own = vtok(p.variant_name), base = vtok(p.group_name || String(p.name || '').split(' - ')[0]), lt = vtok(both(l.name, l.variant_name));
     const extra = [...lt].filter((w) => !base.has(w));
     if (extra.length && ![...own].every((w) => lt.has(w))) return 'varyant';
   }
   return '';
 }
-export const nameSane = (l, p) => { const a = tokens(`${l.name} ${l.variant_name || ''}`), b = tokens(`${fullName(p)} ${p.variant_name || ''}`); return [...a].some((w) => w.length >= 3 && !/^\d+$/.test(w) && [...b].some((x) => x.length >= 3 && (x.startsWith(w.slice(0, 4)) || w.startsWith(x.slice(0, 4))))); };
+export const nameSane = (l, p) => { const a = tokens(both(l.name, l.variant_name)), b = tokens(both(p.name, p.variant_name)); return [...a].some((w) => w.length >= 3 && !/^\d+$/.test(w) && [...b].some((x) => x.length >= 3 && (x.startsWith(w.slice(0, 4)) || w.startsWith(x.slice(0, 4))))); };
 
 export function certain(l, idx, { anyTaken = false } = {}) {
   const no = /^x:\d+$/.test(l.match || '') ? Number(l.match.slice(2)) : 0;
@@ -195,9 +197,14 @@ export function certain(l, idx, { anyTaken = false } = {}) {
   }
   const gks = l.remote_product_id ? idx.rgroup.get(`${l.channel}|${l.remote_product_id}`) : null;
   if (gks && gks.size === 1) {
-    const sig = variantSig(l.variant_name, l.name);
-    if (!sig) return null;
-    const sib = ok(free(idx.group.get([...gks][0])).filter((p) => variantSig(p.variant_name) === sig));
+    const sig = variantSig(l.variant_name, l.name), all0 = ok(free(idx.group.get([...gks][0])));
+    let sib = sig ? all0.filter((p) => variantSig(p.variant_name) === sig) : [];
+    // Varyant alanı olmayan ilan (HB / N11 başlıkta yazar, sırası farklı olabilir: "Elbise M Kırmızı"): başlığın ana ürün adı dışındaki
+    // kelimeleri kardeşin varyant değerleriyle birebir aynı olmalı
+    if (!str(l.variant_name) && sib.length !== 1) {
+      const lt = vtok(l.name), lq = quantities(l.name);
+      sib = all0.filter((p) => setEq(lq, quantities(both(p.name, p.variant_name)))).filter((p) => { const base = vtok(p.group_name || String(p.name || '').split(' - ')[0]), own = vtok(p.variant_name); const extra = new Set([...lt].filter((w) => !base.has(w))); return own.size && setEq(extra, own); });
+    }
     if (sib.length === 1) {
       const p = sib[0];
       if (bcs.length && barcodes(p.barcode).length && !barcodes(p.barcode).some((b) => bcs.includes(b))) return null;
@@ -420,7 +427,7 @@ export async function autoMatch(db, { catalog = ['ikas1'], noCreate = false } = 
   return { linked, created, ...(twins ? { twins } : {}) };
 }
 
-export const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ');
+export const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' - ');
 // Verilen ilanlar için en iyi aday ürün (Kanal Ürünleri listesinde "önerilen eşleşme"); en az 40 puan
 export async function bestCandidates(db, listings) {
   if (!listings.length) return new Map();

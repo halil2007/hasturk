@@ -37,8 +37,19 @@ export function stem(w) {
 // "bot" ≠ "body": yumuşama yalnız 4+ harfte; kısa kök ancak birebir ya da çoğul ekiyle eşleşir
 const same0 = (a, b) => a === b || pm(a, b) || (a.length > 3 && pm(soft(a), b)) || (b.length > 3 && pm(a, soft(b))) || (a.length > 4 || b.length > 4) && stem(a) === stem(b) || (a.length > 4 && b.length > 4 && pm(stem(a), stem(b)));
 // Kelime çifti sonucu önbellekte (binlerce kategori × yerel kelime: aynı çiftler tekrar tekrar karşılaştırılır)
+// Eşleşen iki kelimenin ilk iki harfi her zaman aynıdır (önek, yumuşama ve ek yalnız sonu değiştirir): farklıysa hemen hayır.
 const SAME = new Map();
-export const same = (a, b) => { if (a === b) return true; const k = a < b ? a + '|' + b : b + '|' + a; let r = SAME.get(k); if (r === undefined) { if (SAME.size > 200000) SAME.clear(); SAME.set(k, (r = same0(a, b))); } return r; };
+let sameN = 0;
+export const same = (a, b) => {
+  if (a === b) return true;
+  if (a[0] !== b[0] || a[1] !== b[1]) return false;
+  if (a > b) [a, b] = [b, a];
+  let m = SAME.get(a);
+  if (!m) { if (sameN > 200000) { SAME.clear(); sameN = 0; } SAME.set(a, (m = new Map())); }
+  let r = m.get(b);
+  if (r === undefined) { m.set(b, (r = same0(a, b))); sameN++; }
+  return r;
+};
 const has = (list, w) => list.some((x) => same(x, w));
 
 // ---------- genel eş anlamlılar (tüm sektörler) ----------
