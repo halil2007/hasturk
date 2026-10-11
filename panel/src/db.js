@@ -362,6 +362,14 @@ export const MIGRATIONS = [
   'ALTER TABLE orders ADD COLUMN return_ship_cost REAL',
   'ALTER TABLE orders ADD COLUMN return_ship_src TEXT',
   "UPDATE orders SET return_ship_src = 'lumped' WHERE shipping_src = 'api' AND return_ship_src IS NULL",
+  // İlanın kanaldaki yayın durumu (ilan yenilemede kanaldan okunur): NULL = yayında (ya da kanal bildirmiyor), 'pending' = kanal onayı
+  // bekliyor, 'rejected' = kanal onaylamadı (eksik bilgi, red), 'passive' = kanalda satışa kapalı. remote_state_note: kanalın nedeni (Türkçe).
+  // pending / rejected ilana stok ve fiyat gönderilmez (kanal kabul etmez); kanal yayına alınca otomatik gönderilir.
+  'ALTER TABLE listings ADD COLUMN remote_state TEXT',
+  'ALTER TABLE listings ADD COLUMN remote_state_note TEXT',
+  // İlan hatasının kaynağı: 'channel' = kanal kaynaklı (ör. idefix PRODUCT_NOT_FOUND: ürün idefix'te onaylanmamış); hata sayılarına girmez
+  'ALTER TABLE listings ADD COLUMN error_side TEXT',
+  "UPDATE listings SET error_side = 'channel' WHERE error IS NOT NULL AND channel LIKE 'idefix%' AND (error LIKE '%PRODUCT_NOT_FOUND%' OR error LIKE '%idefix bu barkodu%')",
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
