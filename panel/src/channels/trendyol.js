@@ -200,7 +200,7 @@ export function trendyol(env, meta) {
       if (!(r.content || []).length) break;
       if (r.nextPageToken) token = r.nextPageToken;
       else if ((page + 1) * 100 < 10000 && page + 1 < (r.totalPages || 1)) page++;
-      else break;
+      else { if (page + 1 < (r.totalPages || 1)) rows.partial = true; break; }
     }
     return rows;
   }
@@ -209,7 +209,9 @@ export function trendyol(env, meta) {
       const stock = new Map();
       for (const p of await pagedV2(`/product/sellers/${seller}/products/approved/inventory-and-price`)) for (const v of p.variants || [p]) stock.set(str(v.barcode), num(v.quantity));
       const out = [];
-      for (const p of await pagedV2(`/product/sellers/${seller}/products/approved`)) for (const v of p.variants || []) if (v.barcode) out.push(listingOf(p, v, stock.get(str(v.barcode))));
+      const prods = await pagedV2(`/product/sellers/${seller}/products/approved`);
+      for (const p of prods) for (const v of p.variants || []) if (v.barcode) out.push(listingOf(p, v, stock.get(str(v.barcode))));
+      if (prods.partial) out.partial = true;
       return out;
     } catch (e) {
       if (!/404|405|410|not\s*found/i.test(e.message)) throw e;
@@ -222,8 +224,9 @@ export function trendyol(env, meta) {
         l.active = p.approved !== false && !p.archived;
         out.push(l);
       }
-      if (page + 1 >= (r.totalPages || 1)) break;
+      if (page + 1 >= (r.totalPages || 1)) return out;
     }
+    out.partial = true;
     return out;
   }
 

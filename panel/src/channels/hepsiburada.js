@@ -243,6 +243,7 @@ export function hepsiburada(env, meta) {
         });
       }
       if (rows.length < 1000) break;
+      if (offset + 1000 >= 100000) out.partial = true;
     }
     // İlan servisi ürün adı / barkod / görsel vermez: kataloğa alınmış ürünlerin bilgisi merchantSku ile katalog servisinden eklenir
     // (eşleştirme barkodla da yapılabilsin, Eşleştirme sayfasında ürün adı görünsün). Servis cevap vermezse ilanlar olduğu gibi kalır.

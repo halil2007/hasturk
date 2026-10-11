@@ -75,7 +75,9 @@ test('değişen stok tüm kanal ilanlarına gönderilir', async () => {
 
 test('eşleşmeyen ilan SKU/barkodla otomatik bağlanır ve eski satırları da bağlar', async () => {
   const db = await setup();
-  await db.prepare("INSERT INTO listings (channel, remote_id, sku, barcode) VALUES ('hepsiburada', 'HBV1', 'a', '')").run();
+  // Kısa stok kodu ("A") zayıf sayılır (başka kanalın kendi numarası olabilir); ayırt edici kod ayraç / harf farkıyla eşleşir
+  await db.prepare("UPDATE products SET sku = 'URN-A100' WHERE id = 1").run();
+  await db.prepare("INSERT INTO listings (channel, remote_id, sku, barcode) VALUES ('hepsiburada', 'HBV1', 'urn a100', '')").run();
   assert.equal(await autoLink(db), 1);
   assert.equal((await first(db, "SELECT product_id FROM listings WHERE remote_id = 'HBV1'")).product_id, 1);
 });

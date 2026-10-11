@@ -3,7 +3,7 @@
 // stok koduyla var olan ürüne bağlar, yoksa yeni ürün kartı açar. Kanal başına mod: otomatik (yeni ilan kendiliğinden ürün olur)
 // ya da "ben seçeyim" (settings.manual_import, bkz. match.js → autoMatch).
 import { all, first, run, getRaw, setSetting, getSettings, log } from './db.js';
-import { autoMatch, relinkItems, normBc, normSku, manualImport, bestCandidates, approveConfident, score, prep } from './match.js';
+import { autoMatch, relinkItems, normSku, firstBarcode, manualImport, bestCandidates, approveConfident, productIndex, certain, twinOf } from './match.js';
 import { fillProductInfo, catalogOf, applyDirtyStock } from './sync.js';
 import { chunk, str, fail } from './util.js';
 
@@ -13,7 +13,7 @@ const STATES = {
   // Aynı ürünün bu kanaldaki ikinci ilanı olabilir: kullanıcıya sorulur
   dup: "l.product_id IS NULL AND l.ignored = 0 AND l.match LIKE 'dup:%'",
   linked: 'l.product_id IS NOT NULL',
-  ignored: "l.product_id IS NULL AND l.ignored = 1 AND COALESCE(l.match, '') != 'zero'",
+  ignored: "l.product_id IS NULL AND l.ignored = 1 AND COALESCE(l.match, '') NOT IN ('zero', 'gone')",
   zero: "l.product_id IS NULL AND l.ignored = 1 AND l.match = 'zero'",
 };
 const filter = (channel, { state = 'all', q = '' } = {}) => {
@@ -70,33 +70,29 @@ export async function addToPanel(env, db, b, user = {}) {
   if (!ids.length) fail(400, 'Panele eklenecek ilan seçin');
   const ls = [];
   for (const part of chunk(ids, 90)) ls.push(...await all(db, `SELECT * FROM listings WHERE channel = ? AND product_id IS NULL AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
-  // Var olan ürünler (barkod / stok kodu) ve bu kanaldan zaten ilanı olanlar (bir ürüne her kanaldan tek ilan)
-  const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name FROM products');
-  const pById = new Map(prods.map((p) => [p.id, p]));
-  const taken = new Set((await all(db, 'SELECT product_id FROM listings WHERE channel = ? AND product_id IS NOT NULL', channel)).map((r) => r.product_id));
-  const byBc = new Map(), bySku = new Map();
-  for (const p of prods) { if (normBc(p.barcode)) byBc.set(normBc(p.barcode), p.id); if (normSku(p.sku)) bySku.set(normSku(p.sku), p.id); }
-  const t = Date.now();
+  // Var olan ürünler: otomatik eşleştirmeyle aynı kesin kurallar (barkod listesi, stok kodu, ad + varyant; ölçü / paket / varyant /
+  // marka çelişkisi veto eder). Bir ürüne bu kanaldan tek ilan; aynı ürünün bu kanalda ilanı varsa "aynı ürün mü?" diye sorulur.
+  const idx = await productIndex(db);
   let linked = 0, created = 0;
   const links = [], twins = [];
   const toCreate = [];
   for (const l of ls) {
-    const hit = (normBc(l.barcode) && byBc.get(normBc(l.barcode))) || (normSku(l.sku) && bySku.get(normSku(l.sku)));
-    if (hit && !taken.has(hit)) { links.push([hit, 'manual', l]); taken.add(hit); linked++; continue; }
-    // Aynı barkod / stok kodlu ürünün bu kanalda zaten ilanı var: mükerrer ürün açılmaz, "aynı ürün mü?" diye sorulur
-    const byBarcode = normBc(l.barcode) && byBc.get(normBc(l.barcode)) === hit, hp = pById.get(hit);
-    const alike = byBarcode || (hp && score(prep({ name: l.name, variant: l.variant_name }), prep({ name: hp.name, variant: hp.variant_name })).score >= 70);
-    if (hit && alike && l.match !== 'dup_no') { twins.push([hit, l]); continue; }
+    const c = certain(l, idx);
+    if (c) { links.push([c.id, 'manual', l]); idx.use(c.id, l.channel, l.remote_product_id); linked++; continue; }
+    const tw = twinOf(l, idx);
+    if (tw) { twins.push([tw, l]); continue; }
     toCreate.push(l);
   }
+  const t = Date.now();
+  const bySku = new Set(idx.sku.keys());
   // Yeni ürünler: 50'lik gruplar halinde (her grup tek veritabanı gidiş-dönüşü)
   for (const part of chunk(toCreate, 50)) {
     const res = await db.batch(part.map((l) => {
       // Stok kodu başka üründe varsa (ör. aynı kod iki ilanda) yeni ürün kodsuz açılır; çakışma olmaz
       const sku = normSku(l.sku) && !bySku.has(normSku(l.sku)) ? str(l.sku) : null;
-      if (sku) bySku.set(normSku(sku), -1);
+      if (sku) bySku.add(normSku(sku));
       return db.prepare(`INSERT INTO products (sku, barcode, name, group_name, variant_name, brand, category, image, images, sale_price, stock, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`).bind(sku, str(l.barcode) || null, l.name || l.sku || l.remote_id, l.group_name || null, l.variant_name || null,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`).bind(sku, firstBarcode(l.barcode) || null, l.name || l.sku || l.remote_id, l.group_name || null, l.variant_name || null,
         l.brand || null, l.category || null, l.image || '', l.images || null, l.price || 0, Math.max(0, l.remote_stock || 0), t, t);
     }));
     res.forEach((r, i) => { const id = r.results && r.results[0] && r.results[0].id; if (id) { links.push([id, 'new', part[i]]); created++; } });

@@ -9,6 +9,7 @@ import { getChannels } from './channels/index.js';
 import { importListings, catalogOf } from './sync.js';
 import { fail, str, num, r2, isImageAttr } from './util.js';
 import { rank, localProfile, prepare, score } from './catmatch.js';
+import { quantities } from './match.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
@@ -71,14 +72,22 @@ export function shape(p, opts, zeroStock) {
 // Varyant adından (ör. "5 Kg") kanalın değer listesindeki karşılığını bul
 export function picker(c, catId) {
   const cache = new Map();
+  // One axis value against the list: exact, else same canonical quantity ("500 ml" = "0,5 Lt", "5000 gr" = "5 Kg"; "15 Kg" never "5 Kg")
+  const one = (list, text) => {
+    const t = norm(text), q = [...quantities(text)].sort().join(',');
+    return list.find((v) => norm(v.value) === t) || (q && list.find((v) => [...quantities(v.value)].sort().join(',') === q)) || null;
+  };
   return async (attr, text) => {
     if (!text) return null;
     if (!cache.has(attr.id)) cache.set(attr.id, await c.catalog.values(catId, attr.id).catch(() => []));
-    const list = cache.get(attr.id), t = norm(text);
-    // Tam eşleşme; yoksa sayı + birim aynı olan değer ("5 Kg" ↔ "5 kg", "2,5 Lt" ↔ "2.5 Lt"). "15 Kg" asla "5 Kg" ile eşleşmez.
-    const qty = (x) => { const m = /(\d+(?:\.\d+)?)([a-zğüşıöç]*)/.exec(norm(x)); return m ? `${Number(m[1])}|${m[2]}` : null; };
-    const q = qty(text);
-    return list.find((v) => norm(v.value) === t) || (q && list.find((v) => qty(v.value) === q && /\d/.test(t))) || null;
+    const list = cache.get(attr.id);
+    const whole = one(list, text);
+    if (whole) return whole;
+    // Multi-axis variant ("Kırmızı / XL", "1 Lt / 6 Adet"): each axis is tried on its own; exactly one axis may match this attribute
+    const parts = String(text).split(/\s*[/|]\s*|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    const hits = [...new Map(parts.map((x) => one(list, x)).filter(Boolean).map((h) => [String(h.id), h])).values()];
+    return hits.length === 1 ? hits[0] : null;
   };
 }
 async function buildAll(c, map, prods, opts, zeroStock) {
@@ -101,8 +110,8 @@ async function suggest(db, c, local, n = 5) {
   return rank(await c.catalog.allCategories(), local, await namesOf(db, local), n);
 }
 // "Güçlü öneri": açık farkla en iyi aday; iki aday birbirine çok yakınsa "zayıf öneri" (her iki durumda da onay gerekir)
-const AUTO_MIN = 5, AUTO_LEAD = 0.5;
-export const confident = (r) => r[0] && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
+const AUTO_MIN = 6, AUTO_LEAD = 2;
+export const confident = (r) => !!r[0] && !r[0].generic && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
 // Kategori özelliklerini mümkün olduğunca otomatik doldur: varyant özellikleri ürünün varyant adından, Menşei = Türkiye
 export async function autoAttrs(c, catId) {
   const out = {}, missing = [];

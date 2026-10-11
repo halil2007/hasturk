@@ -89,8 +89,9 @@ export function n11(env, meta) {
         out.push({ remoteId: str(p.stockCode), remoteProductId: str(p.n11ProductId || p.productMainId), sku: str(p.stockCode), barcode: str(p.barcode), name: str(p.title), groupName: str(p.title), variantName: '',
           image: str((p.imageUrls || [])[0] || ((p.images || [])[0] || {}).url), images: imageList(p.imageUrls || p.images), price: num(p.salePrice), listPrice: num(p.listPrice), stock: num(p.quantity), active: p.status !== 'Suspended' });
       }
-      if (r.last || page + 1 >= (r.totalPages || 1)) break;
+      if (r.last || page + 1 >= (r.totalPages || 1)) return out;
     }
+    out.partial = true;
     return out;
   }
 

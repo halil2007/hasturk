@@ -6,7 +6,7 @@
 //  - Bağlandıktan sonra: ürün stoğu her iki ilana da gider (pushStocks, ilan başına stok kuralı geçerli), iki ilandan gelen sipariş
 //    ürün stoğundan bir kez düşer (sipariş satırı başına), fiyat ilan başınadır.
 import { all, first, run, allIn, log } from './db.js';
-import { normBc, normSku, prep, score, fullName, relinkItems } from './match.js';
+import { barcodes, normSku, skuEq, weakSku, nameSane, conflict, prep, score, fullName, relinkItems } from './match.js';
 import { str, fail } from './util.js';
 
 export const NAME_MIN = 75;            // ad benzerliği (0–100) en az bu kadar olmalı
@@ -19,18 +19,24 @@ export const WHY = { twin: 'barkod / stok kodu / ad aynı', barcode: 'barkod ayn
 
 const priceClose = (a, b) => !(a > 0 && b > 0) || Math.max(a, b) / Math.min(a, b) <= PRICE_RATIO;
 const add = (m, k, v) => { if (!k) return; const s = m.get(k) || m.set(k, new Set()).get(k); s.add(v); };
+// Barkod / stok kodu dizini (eşleştirmeyle aynı kurallar: barkod listesi, normalleştirme; stok kodunda ayraç konumu önemli)
+const addCodes = (x, pid, bc, sku) => {
+  for (const b of barcodes(bc)) if (b.length >= 6) add(x.bc, b, pid);
+  const k = normSku(sku);
+  if (k.length >= 3) { add(x.sku, k, pid); (x.skus.get(pid) || x.skus.set(pid, []).get(pid)).push(sku); }
+};
 
 // Öneriler: { items: [{ channel, remote_id, name, …, how, score, why, product: {…}, existing: [ilanlar] }], total }
 export async function secondSuggestions(db, { channel, q, limit = 50, page = 1 } = {}) {
   const where = ['product_id IS NULL', 'ignored = 0'], args = [];
   if (channel) { where.push('channel = ?'); args.push(String(channel)); }
-  const cands = await all(db, `SELECT channel, remote_id, remote_product_id, sku, barcode, name, variant_name, image, price, remote_stock, match FROM listings
+  const cands = await all(db, `SELECT channel, remote_id, remote_product_id, sku, barcode, name, variant_name, brand, image, price, remote_stock, match FROM listings
     WHERE ${where.join(' AND ')} ORDER BY channel, remote_id LIMIT ?`, ...args, MAX_SCAN);
   if (!cands.length) return { items: [], total: 0 };
   const chans = [...new Set(cands.map((c) => c.channel))];
   const [linked, rejects] = await Promise.all([
     allIn(db, chans, (ph, part) => [`SELECT l.channel, l.remote_id, l.product_id, l.sku, l.barcode, l.name, l.variant_name, l.price, l.image, l.extra_link,
-        p.sku AS p_sku, p.barcode AS p_barcode, p.name AS p_name, p.variant_name AS p_variant, p.image AS p_image, p.stock AS p_stock
+        p.sku AS p_sku, p.barcode AS p_barcode, p.name AS p_name, p.variant_name AS p_variant, p.group_name AS p_group, p.brand AS p_brand, p.image AS p_image, p.stock AS p_stock
       FROM listings l JOIN products p ON p.id = l.product_id WHERE l.channel IN (${ph})`, part]),
     allIn(db, chans, (ph, part) => [`SELECT channel, remote_id, product_id FROM listing_twin_no WHERE channel IN (${ph})`, part]),
   ]);
@@ -39,19 +45,17 @@ export async function secondSuggestions(db, { channel, q, limit = 50, page = 1 }
   const idx = new Map(), prods = new Map();
   for (const l of linked) {
     let x = idx.get(l.channel);
-    if (!x) idx.set(l.channel, (x = { bc: new Map(), sku: new Map(), tok: new Map(), byPid: new Map(), seen: new Set() }));
-    if (!prods.has(l.product_id)) prods.set(l.product_id, { id: l.product_id, sku: l.p_sku, barcode: l.p_barcode, name: l.p_name, variant_name: l.p_variant, image: l.p_image, stock: l.p_stock });
+    if (!x) idx.set(l.channel, (x = { bc: new Map(), sku: new Map(), skus: new Map(), tok: new Map(), byPid: new Map(), seen: new Set() }));
+    if (!prods.has(l.product_id)) prods.set(l.product_id, { id: l.product_id, sku: l.p_sku, barcode: l.p_barcode, name: l.p_name, variant_name: l.p_variant, group_name: l.p_group, brand: l.p_brand, image: l.p_image, stock: l.p_stock });
     (x.byPid.get(l.product_id) || x.byPid.set(l.product_id, []).get(l.product_id)).push(l);
     const ents = [{ pid: l.product_id, price: l.price, pr: prep({ name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode }) }];
     if (!x.seen.has(l.product_id)) {
       x.seen.add(l.product_id);
       const p = prods.get(l.product_id);
-      add(x.bc, normBc(p.barcode).length >= 6 ? normBc(p.barcode) : '', l.product_id);
-      add(x.sku, normSku(p.sku).length >= 3 ? normSku(p.sku) : '', l.product_id);
+      addCodes(x, l.product_id, p.barcode, p.sku);
       ents.push({ pid: l.product_id, price: l.price, pr: prep({ name: fullName(p), variant: p.variant_name, sku: p.sku, barcode: p.barcode }) });
     }
-    add(x.bc, normBc(l.barcode).length >= 6 ? normBc(l.barcode) : '', l.product_id);
-    add(x.sku, normSku(l.sku).length >= 3 ? normSku(l.sku) : '', l.product_id);
+    addCodes(x, l.product_id, l.barcode, l.sku);
     for (const e of ents) for (const w of e.pr.t) (x.tok.get(w) || x.tok.set(w, []).get(w)).push(e);
   }
   const qq = str(q).toLocaleLowerCase('tr');
@@ -80,10 +84,15 @@ export async function secondSuggestions(db, { channel, q, limit = 50, page = 1 }
     const simOf = (pid) => (sim.get(pid) || { score: 0 }).score;
     const tw = /^dup:\d+$/.test(l.match || '') ? Number(l.match.slice(4)) : 0;
     if (tw) put(tw, 'twin', Math.max(90, simOf(tw)));
-    for (const pid of x.bc.get(normBc(l.barcode)) || []) put(pid, 'barcode', Math.max(90, simOf(pid)));
-    for (const pid of x.sku.get(normSku(l.sku)) || []) if (simOf(pid) >= SKU_NAME_MIN) put(pid, 'sku', Math.max(80, simOf(pid)));
+    // Ölçü / paket / varyant / marka çelişkisi olan ürün önerilmez (aynı barkod kardeş varyanttan kopyalanmış olabilir)
+    const vetoed = (pid) => !!conflict(l, prods.get(pid));
+    for (const b of barcodes(l.barcode)) for (const pid of x.bc.get(b) || []) if (!vetoed(pid)) put(pid, 'barcode', Math.max(90, simOf(pid)));
+    for (const pid of x.sku.get(normSku(l.sku)) || []) {
+      if (!(x.skus.get(pid) || []).some((v) => skuEq(v, l.sku)) || (weakSku(l.sku) && !nameSane(l, prods.get(pid)))) continue;
+      if (simOf(pid) >= SKU_NAME_MIN && !vetoed(pid)) put(pid, 'sku', Math.max(80, simOf(pid)));
+    }
     for (const [pid, s] of sim) {
-      if (s.score < NAME_MIN) continue;
+      if (s.score < NAME_MIN || vetoed(pid)) continue;
       // Fiyat: ürünün bu kanaldaki herhangi bir ilanına yakın olmalı
       if (!(x.byPid.get(pid) || []).some((e) => priceClose(Number(l.price) || 0, Number(e.price) || 0))) continue;
       put(pid, 'name', s.score);
