@@ -102,7 +102,7 @@ export async function addToPanel(env, db, b, user = {}) {
     res.forEach((r, i) => { const id = r.results && r.results[0] && r.results[0].id; if (id) { links.push([id, 'new', part[i]]); created++; } });
   }
   for (const part of chunk(links, 90)) {
-    await db.batch(part.map(([id, how, l]) => db.prepare('UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, channel, l.remote_id)));
+    await db.batch(part.map(([id, how, l]) => db.prepare('UPDATE listings SET product_id = ?, match = ?, ignored = 0, extra_link = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, channel, l.remote_id)));
   }
   for (const part of chunk(twins, 90)) await db.batch(part.map(([id, l]) => db.prepare("UPDATE listings SET match = ? WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind('dup:' + id, channel, l.remote_id)));
   // Sipariş satırları yeni ürünlere bağlanır; diğer kanallardaki aynı ürünün ilanları kesin eşleşmeyle bağlanır
@@ -145,12 +145,19 @@ export async function resolveTwins(env, db, b, user = {}) {
   for (const part of chunk(ids, 90)) ls.push(...await all(db, `SELECT remote_id, match FROM listings WHERE channel = ? AND product_id IS NULL AND match LIKE 'dup:%' AND remote_id IN (${part.map(() => '?').join(',')})`, channel, ...part));
   if (!ls.length) fail(400, 'Seçilen ilanlar artık beklemiyor; sayfayı yenileyin');
   if (b.same) {
-    for (const part of chunk(ls, 90)) await db.batch(part.map((l) => db.prepare("UPDATE listings SET product_id = ?, match = 'dup_ok', ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind(Number(l.match.slice(4)), channel, l.remote_id)));
+    for (const part of chunk(ls, 90)) await db.batch(part.map((l) => db.prepare("UPDATE listings SET product_id = ?, match = 'dup_ok', ignored = 0, extra_link = 1, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind(Number(l.match.slice(4)), channel, l.remote_id)));
     await relinkItems(db);
     await log(db, channel, 'info', `${user.name || 'Panel'}: ${ls.length} ilan aynı ürünün ikinci ilanı olarak bağlandı`);
     return { linked: ls.length };
   }
-  for (const part of chunk(ls, 90)) await db.batch(part.map((l) => db.prepare("UPDATE listings SET match = 'dup_no' WHERE channel = ? AND remote_id = ?").bind(channel, l.remote_id)));
+  // "Farklı ürün": ikinci eşleşme önerilerinde de bu ilan + ürün bir daha sorulmaz
+  const t = Date.now();
+  for (const part of chunk(ls, 45)) {
+    await db.batch(part.flatMap((l) => [
+      db.prepare("UPDATE listings SET match = 'dup_no' WHERE channel = ? AND remote_id = ?").bind(channel, l.remote_id),
+      db.prepare('INSERT INTO listing_twin_no (channel, remote_id, product_id, at, user) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(channel, l.remote_id, Number(l.match.slice(4)), t, user.name || null),
+    ]));
+  }
   return addToPanel(env, db, { channel, ids: ls.map((l) => l.remote_id) }, user);
 }
 

@@ -1,5 +1,6 @@
 // Ürün eşleştirme: FARKLI kanallardaki aynı ürünü / varyantı tek panel ürününe bağlar.
-//  Kural 1: bir panel ürününe her kanaldan en fazla BİR ilan bağlanır (aynı sitenin iki ürünü asla birleşmez).
+//  Kural 1: otomatik eşleştirme bir panel ürününe her kanaldan en fazla BİR ilan bağlar (aynı sitenin iki ürünü asla birleşmez).
+//           Aynı kanaldaki ikinci ilan yalnız kullanıcı onayıyla bağlanır (ikinci eşleşme, bkz. second.js; listings.extra_link = 1).
 //  Kural 2: ana katalog kanalının (ör. HasTürk ikas) her varyantı kendi panel ürünüdür; tek kanal bağlıyken eşleştirme yapılmaz.
 //  Kesin (otomatik): barkod aynı; ya da stok kodu aynı ve barkod çelişmiyor; ya da ad + varyant/ölçü birebir aynı ve tek aday.
 //  Kesin değil: ad benzerliği + ölçü (5 Kg, 10 Lt…) + varyant özellikleri + stok kodu benzerliğiyle puanlı öneri; kullanıcı onaylar.
@@ -208,16 +209,18 @@ async function catalogChannels(db, wanted) {
   return first ? [first] : [];
 }
 
-const link = (db, id, how, l) => db.prepare('UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, l.channel, l.remote_id);
+const link = (db, id, how, l) => db.prepare('UPDATE listings SET product_id = ?, match = ?, ignored = 0, extra_link = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL').bind(id, how, l.channel, l.remote_id);
 
 // Aynı kanaldan birden fazla ilanı aynı ürüne bağlanmış (eski sürümden kalma) eşleşmeleri onarır: ürüne en uygun
 // ilan (barkod > stok kodu > ad benzerliği) kalır, diğerleri ayrılıp yeniden eşleştirmeye döner.
+// Kullanıcının onayladığı ikinci ilan bağları (extra_link = 1, bkz. second.js) hiç sayılmaz ve ayrılmaz.
+const KEEP = "COALESCE(match, '') != 'dup_ok' AND COALESCE(extra_link, 0) = 0";
 export async function repairDuplicates(db) {
-  const dups = await all(db, "SELECT product_id, channel FROM listings WHERE product_id IS NOT NULL AND COALESCE(match, '') != 'dup_ok' GROUP BY product_id, channel HAVING COUNT(*) > 1");
+  const dups = await all(db, `SELECT product_id, channel FROM listings WHERE product_id IS NOT NULL AND ${KEEP} GROUP BY product_id, channel HAVING COUNT(*) > 1`);
   let freed = 0;
   for (const d of dups) {
     const p = await all(db, 'SELECT id, sku, barcode, name, variant_name FROM products WHERE id = ?', d.product_id);
-    const ls = await all(db, "SELECT remote_id, sku, barcode, name, variant_name, match FROM listings WHERE product_id = ? AND channel = ? AND COALESCE(match, '') != 'dup_ok'", d.product_id, d.channel);
+    const ls = await all(db, `SELECT remote_id, sku, barcode, name, variant_name, match FROM listings WHERE product_id = ? AND channel = ? AND ${KEEP}`, d.product_id, d.channel);
     if (!p[0] || ls.length < 2) continue;
     const pp = prep({ name: fullName(p[0]), variant: p[0].variant_name, sku: p[0].sku, barcode: p[0].barcode });
     const rank = (l) => (l.barcode && normBc(l.barcode) === normBc(p[0].barcode) ? 1000 : 0) + (normSku(l.sku) && normSku(l.sku) === normSku(p[0].sku) ? 500 : 0) + (l.match === 'manual' ? 50 : 0)
@@ -329,7 +332,7 @@ export async function autoMatch(db, { catalog = ['ikas1'] } = {}) {
   return { linked, created, ...(twins ? { twins } : {}) };
 }
 
-const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ');
+export const fullName = (p) => [p.name, p.variant_name && !String(p.name).includes(p.variant_name) ? p.variant_name : ''].filter(Boolean).join(' ');
 // Verilen ilanlar için en iyi aday ürün (Kanal Ürünleri listesinde "önerilen eşleşme"); en az 40 puan
 export async function bestCandidates(db, listings) {
   if (!listings.length) return new Map();
@@ -445,7 +448,7 @@ export async function approveConfident(db, { channel, min = 85, gap = 15 } = {})
     const k = `${a.product_id}|${l.channel}`;
     if (taken.has(k)) continue;
     taken.add(k);
-    st.push(db.prepare("UPDATE listings SET product_id = ?, match = 'approved', pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind(a.product_id, l.channel, l.remote_id));
+    st.push(db.prepare("UPDATE listings SET product_id = ?, match = 'approved', extra_link = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ? AND product_id IS NULL").bind(a.product_id, l.channel, l.remote_id));
   }
   for (const part of chunk(st, 90)) await db.batch(part);
   if (st.length) await relinkItems(db);
