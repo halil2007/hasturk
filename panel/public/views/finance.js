@@ -17,6 +17,11 @@ const RANGES = [
 
 export async function financeView(el, rest, query = {}) {
   const f = { range: 'month', psort: 'profit', channel: query.channel || '', ...store.get('finance', {}), ...(query.channel ? { channel: query.channel } : {}) };
+  // Genel bakıştaki "Zarar ettiren ürünler" kartından: ?urun=zarar&donem=30 → ürün tablosu "Zarar ettiren", son 30 gün, tabloya kaydırılır
+  const PS_Q = { zarar: 'loss', iade: 'retcost' };
+  let jump = PS_Q[query.urun];
+  if (jump) f.psort = jump;
+  if (['month', 'last', '30', '90', 'year'].includes(query.donem)) f.range = query.donem;
   let d = null, inv = null;
   render(el, html`<div class="stack">
     <div class="ch-tabs" data-chs></div>
@@ -56,7 +61,7 @@ export async function financeView(el, rest, query = {}) {
       : html`<div class="empty">Bu dönemde sipariş yok</div>`);
     render($('[data-chtable]', el), d.channels.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Satış</th><th class="r">Komisyon</th><th class="r">Kargo</th><th class="r">Hizmet + ek</th><th class="r">Stopaj</th><th class="r" title="Reklam, ceza ve iade kaybı">Reklam / ceza / iade</th><th class="r">Hakediş</th><th class="r">Kâr</th></tr></thead><tbody>
       ${d.channels.map((c) => html`<tr><td>${chBadge(c.channel)}<div class="tiny muted">${n(c.orders)} sipariş</div></td><td class="r num">${money0(c.revenue)}</td><td class="r num">${money0(c.commission)}</td><td class="r num">${money0(c.shipping)}<div class="tiny muted" title="${c.shippingError ? 'Kargo gideri okunamadı: ' + c.shippingError : ''}">${c.shippingError && !['api', 'invoice'].includes(c.shippingSrc) ? html`<span style="color:var(--warn)">fatura okunamadı</span>` : { api: 'fatura', mixed: 'fatura + ürün / ayar', invoice: 'fatura toplamı', product: 'ürüne girilen', default: 'Ayarlar → Giderler', none: 'girilmedi' }[c.shippingSrc] || ''}</div></td>
-        <td class="r num">${money0(c.fee + c.rateFee)}</td><td class="r num">${money0(c.withholding)}</td><td class="r num">${money0(c.ads + c.penalty + c.returnLoss)}${c.returns ? html`<div class="tiny muted">${n(c.returns)} iade</div>` : ''}</td><td class="r num" style="font-weight:650">${money0(c.payout)}</td>
+        <td class="r num">${money0(c.fee + c.rateFee)}</td><td class="r num">${money0(c.withholding)}</td><td class="r num">${money0(c.ads + c.penalty + c.returnLoss + (c.returnDamaged || 0))}${c.returns ? html`<div class="tiny muted">${n(c.returns)} iade · ${money0(c.returnLoss + (c.returnDamaged || 0))}</div>` : ''}</td><td class="r num" style="font-weight:650">${money0(c.payout)}</td>
         <td class="r num" style="font-weight:750;color:${c.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(c.profit)}<div class="tiny muted">%${n(c.margin)}</div></td></tr>`)}
     </tbody></table></div>` : html`<div class="empty">Veri yok</div>`);
     drawInvoices();
@@ -109,21 +114,22 @@ export async function financeView(el, rest, query = {}) {
   }
   // Ürünlere göre kârlılık (en çok kazandıran / zarar ettiren / en çok iade edilen)
   let prod = null, exp = null;
-  const PSORT = [['profit', 'En çok kazandıran'], ['loss', 'Zarar ettiren'], ['revenue', 'En çok ciro'], ['margin', 'Marj'], ['returns', 'En çok iade']];
+  const PSORT = [['profit', 'En çok kazandıran'], ['loss', 'Zarar ettiren'], ['revenue', 'En çok ciro'], ['margin', 'Marj'], ['returns', 'En çok iade'], ['retcost', 'En çok iade maliyeti']];
   function drawProducts() {
     const box = $('[data-prod]', el);
-    const head = html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:220px"><h2>Ürünlere göre kârlılık</h2><div class="muted small">${prod ? `${n(prod.total)} ürün satıldı${prod.losing ? ` · ${n(prod.losing)} ürün zararına` : ''}${prod.noCost ? ` · ${n(prod.noCost)} ürünün alış fiyatı yok` : ''}` : ''}</div></div>
+    const head = html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:220px"><h2>Ürünlere göre kârlılık</h2><div class="muted small">${prod ? html`${n(prod.total)} ürün satıldı${prod.losing ? html` · <b class="neg">${n(prod.losing)} ürün zararına (${money0(prod.lossTotal)})</b>` : ''}${prod.returnCost ? ` · iade maliyeti ${money0(prod.returnCost)}${prod.returnEst ? ` (${money0(prod.returnEst)} tahmini)` : ''}` : ''}${prod.noCost ? ` · ${n(prod.noCost)} ürünün alış fiyatı yok` : ''}` : ''}</div></div>
       <div class="chips">${PSORT.map(([k, t]) => html`<button class="chip ${f.psort === k ? 'on' : ''}" data-act="psort" data-k="${k}">${t}</button>`)}</div></div>`;
     if (!prod) return render(box, html`${head}<div class="empty"><i class="ico ico-sync spin"></i></div>`);
     const rows = prod.rows.slice(0, f.pall ? 300 : 15);
-    render(box, html`${head}${rows.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th class="r">Adet</th><th class="r">Ciro</th><th class="r">Komisyon</th><th class="r" title="Kargo, hizmet bedeli, ek kesinti ve stopajın satır payı">Diğer kesinti</th><th class="r">Alış</th><th class="r">Kâr</th><th class="r">İade</th></tr></thead><tbody>
+    render(box, html`${head}${rows.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th class="r">Adet</th><th class="r">Ciro</th><th class="r">Komisyon</th><th class="r" title="Kargo, hizmet bedeli, ek kesinti ve stopajın satır payı">Diğer kesinti</th><th class="r">Alış</th><th class="r" title="Geri gelmeyen gönderim kargosu, iade kargosu, geri verilmeyen komisyon / hizmet bedeli (ve açıksa hasarlı iadenin alış maliyeti)">İade maliyeti</th><th class="r" title="İade maliyeti düşüldükten sonraki gerçek kâr">Kâr (iade dahil)</th><th class="r">İade</th></tr></thead><tbody>
       ${rows.map((x) => html`<tr><td><div class="row" style="gap:10px;min-width:220px">${thumb(x.image, x.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:650;max-width:320px">${x.name}${x.variant ? html` <span class="muted">· ${x.variant}</span>` : ''}</div>
           <div class="tiny muted">${x.channels.map((c) => chLogo(c, true))} ${x.missingCost ? costBtn(x.product_id, x.name) : `birim kâr ${money(x.unitProfit)}`}</div></div></div></td>
         <td class="r num">${n(x.units)}</td><td class="r num">${money0(x.revenue)}</td><td class="r num">${money0(x.commission)}</td><td class="r num">${money0(x.other)}</td><td class="r num">${x.missingCost ? '—' : money0(x.cost)}</td>
-        <td class="r num" style="font-weight:750;color:${x.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(x.profit)}<div class="tiny muted">%${n(x.margin)}</div></td>
+        <td class="r num">${x.returnCost ? html`<span class="${x.returnShare == null || x.returnShare > 30 ? 'neg' : ''}">${money0(x.returnCost)}</span><div class="tiny muted" title="${x.estReturn ? `${money(x.estReturn)} tahmini (Ayarlar'daki kargo / hizmet bedeli tutarlarından)` : 'kargo faturasından'}">${money(x.perReturn)} / iade${x.estReturn ? ' · tahmini' : ''}</div>` : html`<span class="muted">—</span>`}</td>
+        <td class="r num" style="font-weight:750;color:${x.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(x.profit)}<div class="tiny muted">%${n(x.margin)}${x.returnCost ? html` · iade hariç ${money0(x.profitExRet)}` : ''}</div></td>
         <td class="r num">${x.returns ? html`${n(x.returns)}<div class="tiny ${x.returnRate >= 10 ? 'neg' : 'muted'}">%${n(x.returnRate)}</div>` : html`<span class="muted">—</span>`}</td></tr>`)}
       </tbody></table></div>${prod.rows.length > rows.length ? html`<div class="pager"><button class="btn sm" data-act="pall">Tümünü göster (${n(prod.rows.length)})</button></div>` : ''}
-      <div class="muted tiny" style="padding:0 16px 14px">Sipariş başı giderler (kargo, hizmet bedeli, ek kesinti, stopaj) siparişteki ürünlere ciro payına göre dağıtılır. Reklam, ceza ve işletme giderleri ürünlere dağıtılmaz.</div>`
+      <div class="muted tiny" style="padding:0 16px 14px">Sipariş başı giderler (kargo, hizmet bedeli, ek kesinti, stopaj) siparişteki ürünlere ciro payına göre dağıtılır. İade maliyeti: iade edilen siparişte geri gelmeyen gönderim kargosu, iade kargosu (kargo faturasından; yoksa Ayarlar → Giderler'deki tahmini iade kargo bedeli), geri verilmeyen komisyon ve hizmet bedeli; iade edilen ürünlere iade tutarı payına göre dağıtılır. Reklam, ceza ve işletme giderleri ürünlere dağıtılmaz.</div>`
       : html`<div class="empty">Bu dönemde satış yok</div>`}`);
   }
   // İşletme giderleri: kira, personel, paketleme … (tek seferlik ya da her ay)
@@ -228,7 +234,7 @@ export async function financeView(el, rest, query = {}) {
     [d, exp] = await Promise.all([api('finance?' + p), api('expenses').catch(() => ({ items: [], categories: [] }))]);
     draw(); drawProducts(); drawExpenses(); drawCommission();
     api('finance/commission?' + p).then((r) => { comm = r; drawCommission(); }).catch((e) => { comm = { error: e.message }; drawCommission(); });
-    api('finance/products?' + new URLSearchParams([...p, ['sort', f.psort]])).then((r) => { prod = r; drawProducts(); }).catch(() => { prod = { rows: [], total: 0 }; drawProducts(); });
+    api('finance/products?' + new URLSearchParams([...p, ['sort', f.psort]])).then((r) => { prod = r; drawProducts(); if (jump) { jump = null; $('[data-prod]', el).scrollIntoView({ block: 'start', behavior: 'smooth' }); } }).catch(() => { prod = { rows: [], total: 0 }; drawProducts(); });
     if (f.itype) p.set('type', f.itype);
     stl = null; drawSettlements();
     [inv, stl] = locked('finance') ? [{ locked: true }, { locked: true }] : await Promise.all([

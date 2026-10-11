@@ -557,7 +557,7 @@ export function trendyol(env, meta) {
         const r = await call(`/finance/che/sellers/${seller}/cargo-invoice/${encodeURIComponent(id)}/items?page=${page}&size=500`);
         for (const it of r.content || []) {
           if (!it.orderNumber || !num(it.amount)) continue;
-          const no = String(it.orderNumber), m = /iade|return/i.test(`${it.shipmentPackageType || ''} ${it.type || ''} ${it.description || ''}`) ? retOf : byOrder;
+          const no = String(it.orderNumber), m = /[iİ]ade|return/i.test(`${it.shipmentPackageType || ''} ${it.type || ''} ${it.description || ''}`) ? retOf : byOrder;
           m.set(no, (m.get(no) || 0) + num(it.amount));
         }
         if (page + 1 >= (r.totalPages || 1)) break;

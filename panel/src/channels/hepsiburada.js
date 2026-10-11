@@ -721,7 +721,7 @@ export function hepsiburada(env, meta) {
           // Gelir kayıtları (ör. CargoCompensationIncome, ShipmentCostSharingIncome: Hepsiburada'nın satıcıya ödediği) gider sayılmaz
           if (g(x, 'isIncome') === true || /Income/.test(str(g(x, 'transactionType', 'type')))) continue;
           if (!no || !/kargo|cargo|shipping|shipment|transport|delivery|teslimat/i.test(t) || /refund/i.test(t)) continue;
-          const mp = /iade|return/i.test(t) ? retOf : byOrder;
+          const mp = /[iİ]ade|return/i.test(t) ? retOf : byOrder;
           mp.set(no, (mp.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
         }
         if (rows.length < 100) break;
