@@ -112,7 +112,7 @@ async function aggregate(db, settings, { from, to, channel }) {
       SUM(rev * 100.0 / 120.0 * ${rate('withholding', 'channel')} / 100.0) AS withholding
     FROM (SELECT o.channel, o.shipping_cost AS sc, o.shipping_src AS ss,
         SUM(CASE WHEN ${LIVEI} THEN i.total * ${K} ELSE 0 END) AS rev,
-        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission * (CASE WHEN l.commission_src = 'api' THEN 1.2 ELSE ${costVat(settings)} END), ${rate('commission')}) / 100.0) * ${K} ELSE 0 END) AS comm,
+        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission * ${costVat(settings)}, ${rate('commission')}) / 100.0) * ${K} ELSE 0 END) AS comm,
         SUM(CASE WHEN ${LIVEI} AND i.commission IS NULL THEN 1 ELSE 0 END) AS estc,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity * ${K} ELSE 0 END) AS cost,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) = 0 THEN 1 ELSE 0 END) AS miss,
