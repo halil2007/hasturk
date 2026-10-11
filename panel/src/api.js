@@ -1632,7 +1632,16 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   if (path === 'perf' && m === 'GET') {
     if (env.TENANT_SLUG || user.role !== 'admin') fail(404, 'Bulunamadı');
-    return json({ ...(await perfReport(db, { days: Math.min(30, Number(q.days) || 7), slug: q.slug })), maint: await getRaw(db, 'maint') });
+    // Taşıma doğrulaması (ana panel kendi yerel veritabanındaysa): tablo başına eski (ana) veritabanındaki ve yereldeki kayıt sayısı
+    let migration = null;
+    if (db.routed && q.mig === '1') {
+      const { LOCAL_TABLES } = await import('./router.js');
+      const cnt = async (d, t) => { try { const r = await d.prepare(`SELECT COUNT(*) AS n FROM ${t}`).first(); return r ? r.n : 0; } catch { return null; } };
+      const flag = await db.remote.prepare("SELECT v FROM settings WHERE k = 'main_local'").first().catch(() => null);
+      const tables = await Promise.all(LOCAL_TABLES.map(async (t) => ({ table: t, old: await cnt(db.remote, t), now: await cnt(db.local, t) })));
+      migration = { ...(flag ? JSON.parse(flag.v) : {}), tables };
+    }
+    return json({ ...(await perfReport(db, { days: Math.min(30, Number(q.days) || 7), slug: q.slug })), maint: await getRaw(db, 'maint'), migration, local: !!db.routed });
   }
   if (path === 'errors' || path.startsWith('errors/')) {
     if (env.TENANT_SLUG || user.role !== 'admin') fail(404, 'Bulunamadı');

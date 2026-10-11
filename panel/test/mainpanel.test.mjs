@@ -57,6 +57,10 @@ test('ana panel: veri yerel veritabanına taşınır; mağaza tabloları yerelde
   assert.equal(r.status, 200);
   assert.deepEqual((await r.json()).products.map((p) => p.sku), ['ESKI-1']);
   assert.match(r.headers.get('server-timing') || '', /do;desc="yerel"/);
+  // Taşıma doğrulaması: tablo başına eski / yeni kayıt sayısı eşit
+  const mig = (await (await call('perf?days=1&mig=1')).json()).migration;
+  assert.ok(mig && mig.rows > 0 && mig.tables.length > 30);
+  for (const t of mig.tables) if (t.table !== 'settings') assert.equal(t.now, t.old, t.table);
   // Yeni ürün yalnız yerelde (ana veritabanındaki eski kopya değişmez)
   assert.equal((await call('products', J({ name: 'Yeni ürün', sku: 'YENI-1', sale_price: 50, stock: 2 }))).status, 200);
   const loc = obj().ctx.storage.sql;
