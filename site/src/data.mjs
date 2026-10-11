@@ -8,7 +8,7 @@ export const FEATURES = [
   {
     slug: 'siparis-yonetimi', name: 'Sipariş yönetimi', icon: 'i-cart', color: 'c-pink', short: 'Tüm kanalların siparişleri tek listede',
     title: 'Sipariş Yönetimi — Hastürk CRM', h1: ['Tüm Kanalların Siparişleri', 'Tek Listede'],
-    lead: 'Trendyol, Hepsiburada, N11, ikas ve diğer kanallardan gelen siparişler 15 dakikada bir kendiliğinden panele gelir. Hangi siparişin bugün kargoya verilmesi gerektiğini ilk bakışta görürsünüz.',
+    lead: 'Trendyol, Hepsiburada, N11, ikas ve diğer kanallardan gelen siparişler otomatik olarak panele gelir. Hangi siparişin bugün kargoya verilmesi gerektiğini ilk bakışta görürsünüz.',
     img: 'siparisler',
     points: [
       ['i-list', 'Durum sekmeleri', 'Yeni, hazırlanan, geciken, kargodaki, teslim edilen, iptal ve iade siparişler ayrı sekmelerde; her sekmede kaç sipariş olduğu görünür.'],
@@ -19,7 +19,7 @@ export const FEATURES = [
       ['i-mail', 'Bildirim ve özet', 'Yeni siparişte e-posta ve telefon bildirimi; her sabah önceki günün özeti e-postanızda.'],
     ],
     faq: [
-      ['Siparişler ne sıklıkla gelir?', 'Panel her kanalı 15 dakikada bir kontrol eder; isterseniz "Yenile" ile hemen çekebilirsiniz.'],
+      ['Siparişler ne sıklıkla gelir?', 'Panel kanallarınızı gün boyu otomatik olarak kontrol eder; isterseniz "Yenile" ile hemen çekebilirsiniz.'],
       ['Eski siparişlerim de gelir mi?', 'Evet. Mağazanızı bağladığınızda son bir yılın siparişleri arka planda panele aktarılır; raporlarınız ilk günden dolu olur.'],
       ['Pazaryeri panelinde yaptığım işlem panele yansır mı?', 'Evet. Siparişi pazaryerinin kendi panelinden iptal eder ya da kargolarsanız, panel bir sonraki kontrolde durumu günceller.'],
     ],
@@ -63,7 +63,7 @@ export const FEATURES = [
       ['i-orders', 'Excel ile toplu güncelleme', 'Stok, fiyat ve maliyeti Excel dosyasıyla toplu güncelleyin.'],
       ['i-eye', 'Stoksuz ilan takibi', 'Stokta olmayan ürünler ve eşleşme bekleyen ilanlar ana ekranda ayrıca gösterilir.'],
     ],
-    note: { title: 'Bilmeniz gerekenler', items: ['Stok gönderimi siz bir kanal için açana kadar kapalıdır; kapalıyken stoklar kanaldan yalnız okunur, hiçbir şey değiştirilmez.', 'Satıştan sonraki ilk kontrolde (en geç 15 dakika içinde) yeni stok, gönderimi açık olan diğer kanallara gider.'] },
+    note: { title: 'Bilmeniz gerekenler', items: ['Stok gönderimi siz bir kanal için açana kadar kapalıdır; kapalıyken stoklar kanaldan yalnız okunur, hiçbir şey değiştirilmez.', 'Satıştan sonraki ilk kontrolde yeni stok, gönderimi açık olan diğer kanallara gider.'] },
     faq: [
       ['Aynı ürün farklı kanallarda farklı barkodla satılıyorsa?', 'Eşleştirme ekranından ilanları elle aynı ürüne bağlayabilirsiniz; bir kez bağladıktan sonra stok birlikte yönetilir.'],
       ['Bir kanala stoğumun tamamını göstermek istemiyorum.', 'Kanala özel en fazla adet tanımlayabilirsiniz; panel o kanala bu sınırı aşmayan adedi gönderir.'],
@@ -106,7 +106,7 @@ export const FEATURES = [
     steps: [
       ['Kural tanımlayın', 'İlan için en düşük ve en yüksek fiyatı, adım tutarını ve isterseniz hedef fiyatı girin.'],
       ['Otomatik fiyatı açın', 'Buybox sayfasındaki genel anahtarı açın; kapalıyken kurallar kaydedilir ama fiyat değişmez.'],
-      ['Sonucu izleyin', 'Panel her 15 dakikada buybox durumunu kontrol eder, gerekirse fiyatı günceller ve kaydını tutar.'],
+      ['Sonucu izleyin', 'Panel buybox durumunu gün boyu düzenli olarak kontrol eder, gerekirse fiyatı günceller ve kaydını tutar.'],
     ],
     note: { title: 'Bilmeniz gerekenler', items: ['Buybox yalnız fiyata bağlı değildir; pazaryerleri teslim süresi ve mağaza puanı gibi ölçütleri de kullanır. Fiyatınız en düşük olsa bile buybox başka nedenle rakipte kalabilir; bu durumda panel fiyatı boşuna düşürmez.', 'Rakibin fiyatı sizin en düşük fiyatınızın altındaysa panel sınırın altına inmez; buybox\'ı geri almak için zararına satış yapmaz.', 'Otomatik fiyat yalnız kural tanımlayıp açtığınız ilanlarda çalışır. Hepsiburada\'da sıranızın bulunması için Entegrasyonlar sayfasına mağaza adınızı girmeniz gerekir.'] },
     faq: [
@@ -300,7 +300,7 @@ export const INTEGRATIONS = [
     lead: 'PttAVM mağazanızın siparişlerini diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı panelden eşitleyin.',
     caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo etiketi', 'Panel etiketi'], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
     points: [
-      ['i-cart', 'Siparişler', 'PttAVM siparişleri 15 dakikada bir panele gelir.'],
+      ['i-cart', 'Siparişler', 'PttAVM siparişleri otomatik olarak panele gelir.'],
       ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız diğer kanallarla eşit kalır.'],
       ['i-tag', 'Etiket', 'Sipariş ve adres bilgisiyle etiket panelden basılır; kargo barkodu için depo numaranız girilir.'],
       ['i-box', 'Ürünler', 'Yeni ilanı PttAVM panelinden açarsınız; ilan barkoduyla paneldeki ürüne kendiliğinden bağlanır.'],
@@ -489,7 +489,7 @@ export const INTEGRATIONS = [
 const MORE = {
   'siparis-yonetimi': {
     why: ['Her pazaryerinin paneline ayrı ayrı girip siparişleri tek tek kontrol etmek zaman alır. Bir kanalda gözden kaçan sipariş gecikmeye, gecikme de pazaryeri cezasına ve düşük mağaza puanına dönüşür.', 'Tüm kanalların siparişleri tek listede, kargoya verilme son saatine göre. Geciken ya da gecikme riski taşıyan sipariş kırmızıyla işaretlenir; hiçbir sipariş gözden kaçmaz.'],
-    steps: [['Kanallarınızı bağlayın', 'Pazaryeri ve site API bilgilerini bir kez girin.'], ['Siparişler gelsin', 'Yeni siparişler 15 dakikada bir kendiliğinden panele düşer, size bildirim gelir.'], ['İşleme alın, paketleyin', 'Tek tek ya da toplu işleme alın; etiket ve kargo adımına geçin.']],
+    steps: [['Kanallarınızı bağlayın', 'Pazaryeri ve site API bilgilerini bir kez girin.'], ['Siparişler gelsin', 'Yeni siparişler otomatik olarak panele düşer, size bildirim gelir.'], ['İşleme alın, paketleyin', 'Tek tek ya da toplu işleme alın; etiket ve kargo adımına geçin.']],
     benefits: [['i-clock', 'Zaman kazanırsınız', 'Panel panel gezmek yerine tek ekran'], ['i-shield', 'Gecikme cezası riski azalır', 'Son saat yaklaşınca uyarı'], ['i-users', 'Ekip aynı listeyi görür', 'Kim neyi hazırladı belli'], ['i-calc', 'Kârı satırda görürsünüz', 'Zarar eden sipariş fark edilir']],
   },
   'kargo-ve-etiket': {
@@ -507,7 +507,7 @@ const MORE = {
     benefits: [['i-clock', 'Saatler değil dakikalar', 'Bir kez tanımla, her yere gönder'], ['i-bolt', 'Otomatik gönderim', 'Yeni ürün kendiliğinden yüklenir'], ['i-list', 'Doğru kategori', 'Panel önerir, siz onaylarsınız'], ['i-eye', 'Şeffaf takip', 'Ret nedeni açıkça görünür']],
   },
   'buybox-takibi': {
-    why: ['Buybox\'ı kaybeden ilan satış yapamaz. Rakip fiyatını gün boyu kontrol edip elle güncellemek imkânsızdır; aceleyle indirilen fiyat da çoğu zaman gereğinden düşük kalır ve kârınız erir.', 'Panel buybox durumunu 15 dakikada bir kontrol eder. Kaybettiğinizde fiyatı alt sınırınızı aşmadan rakibin hemen altına çeker; buybox sizdeyken fiyatı yeniden yükseltir.'],
+    why: ['Buybox\'ı kaybeden ilan satış yapamaz. Rakip fiyatını gün boyu kontrol edip elle güncellemek imkânsızdır; aceleyle indirilen fiyat da çoğu zaman gereğinden düşük kalır ve kârınız erir.', 'Panel buybox durumunu gün boyu düzenli olarak kontrol eder. Kaybettiğinizde fiyatı alt sınırınızı aşmadan rakibin hemen altına çeker; buybox sizdeyken fiyatı yeniden yükseltir.'],
     example: 'buybox',
     benefits: [['i-up', 'Daha çok satış', 'Buybox\'ı kaybettiğiniz an tepki'], ['i-shield', 'Zararına satış yok', 'Alt sınırın altına inmez'], ['i-calc', 'Kâr korunur', 'Buybox sizdeyken fiyat yükselir'], ['i-list', 'Her adım kayıtlı', 'Neden değiştiği görünür']],
   },
