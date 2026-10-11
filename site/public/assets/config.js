@@ -46,8 +46,8 @@ window.SITE = {
       items: ['Buybox takibi ve otomatik fiyat', 'Otomatik ürün gönderimi', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
     { key: 'kurumsal', name: 'Kurumsal', tag: 'Yüksek hacimli ve yurt dışına satan firmalar', monthly: 3990, yearly: 39900, limits: ['25 mağaza', 'Sınırsız kullanıcı'], base: 'Profesyonel',
       items: ['Yurt dışı pazaryerleri (eBay, Etsy, Ozon, yurt dışı Amazon)', 'Kendi kargo anlaşmanızla 7 kargo firması', 'Döviz kuruna endeksli otomatik fiyat', 'Kurulum ve veri aktarımında birebir destek', 'Telefon destek hattı', 'Yeni kanal ve özel geliştirme önceliği'],
-      // soon: pakete eklenecek ama henüz aktif olmayan özellikler ("Yakında" rozetiyle görünür; panel/src/plans.js → soon ile aynı tutun)
-      soon: ['e-Fatura / e-Arşiv entegrasyonu'] },
+      // soon: pakete eklenecek ama henüz aktif olmayan özellikler ("Yakında" rozetiyle görünür). Yapay zekâ planlanan bir özelliktir; kaldırmayın
+      soon: ['e-Fatura / e-Arşiv entegrasyonu', 'Yapay zekâ ile ürün yönetimi'] },
   ],
   // Ek mağaza: paketteki mağaza sınırının üstüne, mağaza başına yıllık ücret (TL, KDV dahil; panel/src/plans.js → EXTRA_STORE ile aynı tutun)
   extraStore: 3000,
@@ -81,6 +81,9 @@ window.SITE = {
       ['Satış analizi ve raporlar', true, true, true],
       ['Hakediş ve kesilen faturalar', false, true, true],
       ['e-Fatura / e-Arşiv entegrasyonu', false, false, 'Yakında'],
+    ] },
+    { group: 'Yapay zekâ', rows: [
+      ['Yapay zekâ ile ürün yönetimi ("şu ürünü kapat", "şu ürünlerin fiyatını %5 artır" deyin, sistem kendisi yapsın)', false, false, 'Yakında'],
     ] },
     { group: 'Ekip ve güvenlik', rows: [
       ['Kullanıcı', '2', '5', 'Sınırsız'],
