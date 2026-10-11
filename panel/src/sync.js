@@ -8,7 +8,7 @@ import { compareFetched, checkMissing } from './orderclean.js';
 import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { typeOf, INTL_TYPES } from './config.js';
-import { syncInvoices, syncSettlements } from './finance.js';
+import { syncInvoices, syncSettlements, lossNotify } from './finance.js';
 import { applyListRates } from './commcheck.js';
 import { maintain } from './perf.js';
 import { syncFx, orderRate } from './fx.js';
@@ -20,7 +20,7 @@ import { runBuybox } from './buybox.js';
 import { syncQuestions } from './questions.js';
 import { syncClaims, applyClaimReturns } from './claims.js';
 import { queueNew, sendQueued } from './mail.js';
-import { DEMO_PRODUCTS, DEMO_CHANNELS } from './channels/demo.js';
+import { DEMO_PRODUCTS, DEMO_CHANNELS, demoCargoFee } from './channels/demo.js';
 import { checkPendingUploads, autoUpload } from './catalog.js';
 import { autoSuggest } from './catmap.js';
 import { customerKey, fillKeys } from './customers.js';
@@ -83,7 +83,9 @@ export async function saveOrders(db, ch, orders, maps) {
     const c = String(o.currency || 'TRY').toUpperCase();
     if (c === 'TRY' || c === 'TL') continue;
     const rate = await orderRate(db, c).catch(() => null);
-    if (!(rate > 0)) { await notify(db, `fx-order:${ch}`, { level: 'warn', channel: ch, title: `${c} siparişler TL'ye çevrilemedi`, msg: 'Kur alınamadı; bir sonraki senkronda yeniden denenir.' }).catch(() => {}); continue; }
+    // Kur alınamadı: sipariş asıl para biriminde kaydedilir ama özeti boş bırakılır; yoksa sonraki senkronda "değişmedi" sayılıp
+    // hiç TL'ye çevrilmezdi (bildirimdeki "yeniden denenir" gerçekleşmezdi)
+    if (!(rate > 0)) { o._hash = null; await notify(db, `fx-order:${ch}`, { level: 'warn', channel: ch, title: `${c} siparişler TL'ye çevrilemedi`, msg: 'Kur alınamadı; bir sonraki senkronda yeniden denenir.' }).catch(() => {}); continue; }
     const x = (v) => (v == null || !Number.isFinite(Number(v)) ? v : Math.round(Number(v) * rate * 100) / 100);
     o.fx = { currency: c, rate, total: o.total };
     o.total = x(o.total); o.currency = 'TRY';
@@ -620,6 +622,8 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     // Demo: ürünlerin alış fiyatı ve desisi (kâr raporları eksiksiz görünsün; kullanıcının girdiği değer korunur)
     if (env.DEMO === '1') {
       await db.batch(DEMO_PRODUCTS.map(([sku, , , , cost, desi]) => db.prepare('UPDATE products SET purchase_price = ?, desi = ? WHERE sku = ? AND COALESCE(purchase_price, 0) = 0').bind(cost, desi, sku)));
+      // Ürünün kargo tutarı (örnek tarife, desiye göre): kargo faturası gelmeyen kanallarda da kâr ve iade maliyeti gerçekçi çıksın
+      await db.batch(DEMO_PRODUCTS.map(([sku, , , , , desi]) => db.prepare('UPDATE products SET ship_cost = ? WHERE sku = ? AND ship_cost IS NULL').bind(demoCargoFee(desi), sku)));
     }
     out.mirrored = await mirrorStock(db, settings);
     out.info = await fillProductInfo(db, settings).catch((e) => 'hata: ' + e.message);
@@ -652,6 +656,8 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     if (!only) out.costs = await opt(150, () => syncCosts(env, db, chans)).catch((e) => 'hata: ' + e.message);
     if (!only && allows(env, 'finance')) out.invoices = await opt(150, () => syncInvoices(env, db)).catch((e) => 'hata: ' + e.message);
     if (!only && allows(env, 'finance')) out.settlements = await opt(150, () => syncSettlements(env, db)).catch((e) => 'hata: ' + e.message);
+    // Zarar ettiren ürünler (iade dahil, son 30 gün): yeni ürün çıktıysa haftada en fazla bir bildirim
+    if (!only) out.losses = await lossNotify(db, settings).catch((e) => 'hata: ' + e.message);
     // Anlık bildirim: yeni sipariş / iade talebi / müşteri sorusu özeti abonelere
     if (!only) out.push = await pushDigest(env, db, { newOrders: out.newOrders || 0 }).catch((e) => 'hata: ' + e.message);
     // Günlük özet e-postası (açıksa, sabah 08:00'den sonraki ilk senkronda, günde bir kez)
@@ -917,18 +923,28 @@ export async function staleOrders(env, db, chans, maps) {
 export async function syncCosts(env, db, chans, { force = false } = {}) {
   const out = {};
   for (const ch of chans || await getChannels(env, db)) {
-    if (!ch.enabled || ch.demo || !ch.cargoCosts) continue;
+    // Deneme modunda örnek kanallar da örnek kargo faturası verir (iade maliyeti ekranları boş kalmasın)
+    if (!ch.enabled || !ch.cargoCosts) continue;
     const key = 'costs:' + ch.id, last = await getRaw(db, key);
     if (!force && last && Date.now() - last.at < 6 * 3600e3) continue;
     const t = Date.now();
     try {
-      const r = await ch.cargoCosts(last ? t - 20 * 864e5 : t - 60 * 864e5, t);
+      // İade kargosu ayrı okunmaya başlamadan önceki kayıt (split yok): son 60 gün yeniden okunur, gönderim / iade ayrışsın
+      const r = await ch.cargoCosts(last && last.split ? t - 20 * 864e5 : t - 60 * 864e5, t);
       let n = 0;
       for (const part of chunk(r.items, 80)) {
-        await db.batch(part.map((x) => db.prepare("UPDATE orders SET shipping_cost = ?, shipping_src = 'api' WHERE channel = ? AND order_number = ? AND COALESCE(shipping_src, '') != 'manual'").bind(x.amount, ch.id, x.orderNumber)));
+        // Gönderim kargosu (amount) yalnız faturada varsa yazılır: iade faturası sonraki bir okumada tek başına gelirse gönderim tutarını
+        // silmesin. İade kargosu (returnAmount) elle girilen gönderim tutarı olan siparişe de yazılır. Gönderimi yeniden okunan eski kayıtta
+        // "gönderimle birlikte" işareti ('lumped') kalkar: iade kargosu artık ayrı gelir.
+        await db.batch(part.map((x) => db.prepare(`UPDATE orders SET
+            shipping_cost = CASE WHEN ? > 0 AND COALESCE(shipping_src, '') != 'manual' THEN ? ELSE shipping_cost END,
+            shipping_src = CASE WHEN ? > 0 AND COALESCE(shipping_src, '') != 'manual' THEN 'api' ELSE shipping_src END,
+            return_ship_cost = CASE WHEN ? > 0 THEN ? ELSE return_ship_cost END,
+            return_ship_src = CASE WHEN ? > 0 THEN 'api' WHEN ? > 0 AND return_ship_src = 'lumped' THEN NULL ELSE return_ship_src END
+          WHERE channel = ? AND order_number = ?`).bind(x.amount, x.amount, x.amount, x.returnAmount || 0, x.returnAmount || 0, x.returnAmount || 0, x.amount, ch.id, x.orderNumber)));
         n += (await first(db, `SELECT COUNT(*) AS n FROM orders WHERE channel = ? AND shipping_src = 'api' AND order_number IN (${part.map(() => '?').join(',')})`, ch.id, ...part.map((x) => x.orderNumber))).n;
       }
-      await setSetting(db, key, { at: t, orders: n, found: r.items.length });
+      await setSetting(db, key, { at: t, orders: n, found: r.items.length, split: 1 });
       if (n) await log(db, ch.id, 'info', `Gerçek kargo gideri ${n} siparişe yazıldı (kanalın kargo faturalarından)`);
       out[ch.id] = n;
     } catch (e) {

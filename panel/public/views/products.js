@@ -3,6 +3,7 @@
 import { api, ek, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
 import { readSheet } from '../sheetread.js';
 import { profit, costOf, costRaw, rateGross } from '../profit.js';
+import { can } from '../perms.js';
 import { productErrorsSheet } from './listerrs.js';
 import { attachCatPicker } from './catpick.js';
 import { normCat } from '../catpath.js';
@@ -18,7 +19,7 @@ export const siteStock = (p) => !(state.settings && state.settings.stock_sync)
   && (p.listings || []).some((l) => ((state.settings && state.settings.catalog_channels) || ['ikas1']).includes(l.channel) && l.remote_stock != null);
 export const siteStockVal = (p, cls = '') => html`<span class="val num ${cls}" style="cursor:help" title="ikas sitesinden okunur (stok senkronu kapalı). Adedi ikas panelinden değiştirin.">${p.stock}<span class="tiny muted" style="margin-left:4px;font-weight:500">ikas</span></span>`;
 
-const FILTERS = [['', 'Tümü', 'all'], ['low', 'Kritik stok', 'low'], ['nocost', 'Alış fiyatı eksik', 'nocost'], ['nosku', 'SKU eksik', 'nosku'], ['nobarcode', 'Barkod eksik', 'nobarcode'], ['nolisting', 'Kanalda olmayan', 'nolisting'], ['passive', 'Pasif', 'passive']];
+const FILTERS = [['', 'Tümü', 'all'], ['low', 'Kritik stok', 'low'], ['nocost', 'Alış fiyatı eksik', 'nocost'], ['nosku', 'SKU eksik', 'nosku'], ['nobarcode', 'Barkod eksik', 'nobarcode'], ['nolisting', 'Kanalda olmayan', 'nolisting'], ['passive', 'Pasif', 'passive'], ['loss', 'Zarar ettiren', 'loss']];
 const SORTS = [['sold', 'En çok satan (30 gün)'], ['name', 'Ada göre (A–Z)'], ['new', 'En yeni eklenen'], ['stock', 'Stok (azdan çoğa)'], ['stock_desc', 'Stok (çoktan aza)'], ['price_desc', 'Fiyat (yüksekten)'], ['price_asc', 'Fiyat (düşükten)'], ['margin_desc', 'Marj (yüksekten)'], ['margin_asc', 'Marj (düşükten)']];
 
 export async function products(el, rest, query = {}) {
@@ -47,6 +48,9 @@ export async function products(el, rest, query = {}) {
   const brand = (b) => (b ? html`<span class="brand-tag" title="Marka">${b}</span>` : '');
   // Kategori etiketi (son basamak); tıklayınca o kategoriye süzer
   const catTag = (c) => (c && c.trim() && f.cat !== c.trim() ? html`<button class="cat-tag" data-act="cat" data-k="${c.trim()}" title="${c.trim()} kategorisini göster">${c.trim().split(' › ').pop()}</button>` : '');
+  // Zarar rozeti: son 30 günde iade dahil zarar ettiren ürün (sunucu önbelleğinden; yalnız kâr bilgisini görebilen kullanıcıya gelir)
+  const lossTag = (list) => { const ls = list.filter((p) => p.loss30); if (!ls.length) return ''; const sum = ls.reduce((a, p) => a + p.loss30.profit, 0), rc = ls.reduce((a, p) => a + (p.loss30.returnCost || 0), 0);
+    return html` <span class="pill bad loss-tag" style="padding:1px 8px;font-size:11px" title="Son 30 günde ${money(-sum)} zarar (iade dahil${rc ? `; iade maliyeti ${money(rc)}` : ''}). Ayrıntı ve kârlı fiyat için ürünü açın.">zarar</span>`; };
   const codes = (p) => html`<span class="codes">${p.sku ? html`<span title="Stok kodu (SKU)">${p.sku}</span>` : html`<span class="miss">SKU yok</span>`}${p.barcode ? html`<span title="Barkod">${p.barcode}</span>` : ''}</span>`;
   // Kanallar: logo yığını + kanal fiyat aralığı; ayrıntı ipucunda. Hata kırmızı, kanalda yoksa uyarı.
   function chans(list) {
@@ -81,8 +85,8 @@ export async function products(el, rest, query = {}) {
       <div class="pstat"><span class="ic purple"><i class="ico ico-pie"></i></span><div><b class="num">${s.margin == null ? '—' : `%${n(s.margin)}`}</b><span>ortalama marj</span></div></div>
       <button class="pstat ${c.out || c.below ? 'warn' : ''}" data-act="filter" data-k="low"><span class="ic red"><i class="ico ico-db"></i></span><div><b class="num">${n((c.out || 0) + (c.below || 0))}</b><span>kritik stok · ${n(c.out || 0)} tükendi</span></div></button>
       <button class="pstat ${missing ? 'warn' : ''}" data-act="filter" data-k="${s.nocost ? 'nocost' : s.nosku ? 'nosku' : 'nobarcode'}"><span class="ic amber"><i class="ico ico-warn"></i></span><div><b class="num">${n(missing)}</b><span>eksik bilgi (alış ${n(s.nocost || 0)} · SKU ${n(s.nosku || 0)} · barkod ${n(s.nobarcode || 0)})</span></div></button>`);
-    const cnt = { all: c.all, low: (c.out || 0) + (c.below || 0), nocost: s.nocost, nosku: s.nosku, nobarcode: s.nobarcode, nolisting: s.nolisting, passive: s.passive };
-    render($('[data-filters]', el), html`${FILTERS.map(([k, t, ck]) => html`<button class="fchip ${f.filter === k ? 'on' : ''}" data-act="filter" data-k="${k}">${t}${cnt[ck] ? html`<span class="n">${n(cnt[ck])}</span>` : ''}</button>`)}`);
+    const cnt = { all: c.all, low: (c.out || 0) + (c.below || 0), nocost: s.nocost, nosku: s.nosku, nobarcode: s.nobarcode, nolisting: s.nolisting, passive: s.passive, loss: s.loss };
+    render($('[data-filters]', el), html`${FILTERS.filter(([k]) => k !== 'loss' || s.loss != null).map(([k, t, ck]) => html`<button class="fchip ${f.filter === k ? 'on' : ''}" data-act="filter" data-k="${k}">${t}${cnt[ck] ? html`<span class="n">${n(cnt[ck])}</span>` : ''}</button>`)}`);
   }
 
   // Kategoriler: "Bahçe › Tohum" gibi yollar ağaç olarak; üst kategori seçilince alt kategorileri açılır
@@ -129,7 +133,7 @@ export async function products(el, rest, query = {}) {
     const mob = isMobile(), gl = groupList(), all = !!f.q;
     const prow = (p, variant = false) => { const m = margin(p); return html`<tr class="${variant ? 'var-row' : ''} ${sel.has(p.id) ? 'sel-row' : ''} click" data-pid="${p.id}" data-row-edit="${p.id}">
       <td class="cbcol">${cb(p)}</td>
-      <td><div class="prod-cell">${thumb(p.image, p.name, variant ? 'sm' : '')}<div style="min-width:0"><div class="pname">${variant && p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : title(p)}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="psub">${variant ? '' : html`${brand(p.brand)}${catTag(p.category)}`}${codes(p)}</div></div></div></td>
+      <td><div class="prod-cell">${thumb(p.image, p.name, variant ? 'sm' : '')}<div style="min-width:0"><div class="pname">${variant && p.variant_name ? html`<span class="var-tag" style="margin-left:0">${p.variant_name}</span>` : title(p)}${lossTag([p])}${p.active ? '' : html` <span class="pill">Pasif</span>`}</div><div class="psub">${variant ? '' : html`${brand(p.brand)}${catTag(p.category)}`}${codes(p)}</div></div></div></td>
       <td>${chans([p])}</td>
       <td class="r num">${p.purchase_price ? money(p.purchase_price) : html`<span class="miss" title="Alış fiyatı girilmedi; kâr hesaplanamaz">girilmedi</span>`}</td>
       <td class="r num"><b>${money(p.sale_price)}</b>${p.currency && p.fx_price ? html`<div class="tiny muted">${p.fx_price} ${p.currency}</div>` : ''}</td>
@@ -139,7 +143,7 @@ export async function products(el, rest, query = {}) {
     const head = ([k, list], i) => { const p0 = list[0], on = all || opened.has(k), low = list.some((p) => stockCls(p)), gname = p0.group_name || p0.name, allSel = list.every((p) => sel.has(p.id));
       return html`<tr class="grp-head click ${on ? 'on' : ''}" data-act="vedit" data-gi="${i}" title="Tüm varyantları birlikte düzenle">
         <td class="cbcol"><input type="checkbox" class="cb" data-gsel="${i}" ${allSel ? 'checked' : ''} aria-label="Varyantları seç"></td>
-        <td><div class="prod-cell"><button class="icon-btn sm grp-tog" data-act="tog" data-gi="${i}" aria-label="${on ? 'Varyantları gizle' : 'Varyantları göster'}" title="${on ? 'Varyantları gizle' : 'Varyantları listede göster'}"><i class="ico ico-down grp-chev"></i></button>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="pname">${gname}</div><div class="psub">${brand(list.find((p) => p.brand)?.brand)}${catTag(list.find((p) => p.category)?.category)}<span class="pill info" style="padding:1px 8px">${list.length} varyant</span>${list.length <= 4 ? html`<span class="muted tiny ellipsis">${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}</span>` : ''}</div></div></div></td>
+        <td><div class="prod-cell"><button class="icon-btn sm grp-tog" data-act="tog" data-gi="${i}" aria-label="${on ? 'Varyantları gizle' : 'Varyantları göster'}" title="${on ? 'Varyantları gizle' : 'Varyantları listede göster'}"><i class="ico ico-down grp-chev"></i></button>${thumb(list.find((p) => p.image)?.image || '', gname)}<div style="min-width:0"><div class="pname">${gname}${lossTag(list)}</div><div class="psub">${brand(list.find((p) => p.brand)?.brand)}${catTag(list.find((p) => p.category)?.category)}<span class="pill info" style="padding:1px 8px">${list.length} varyant</span>${list.length <= 4 ? html`<span class="muted tiny ellipsis">${list.map((p) => p.variant_name || p.sku || '').filter(Boolean).join(', ')}</span>` : ''}</div></div></div></td>
         <td>${chans(list)}</td>
         <td class="r num muted">${range(list.map((p) => p.purchase_price))}</td>
         <td class="r num"><b>${range(list.map((p) => p.sale_price))}</b></td>
@@ -148,7 +152,7 @@ export async function products(el, rest, query = {}) {
         <td class="r"><button class="btn sm outline" data-act="vedit" data-gi="${i}"><i class="ico ico-gear"></i>Varyantları düzenle</button></td></tr>
         ${on ? list.map((p) => prow(p, true)) : ''}`; };
     const mCard = ([k, list], i) => { if (!isGroup(list)) { const p = list[0]; return html`<div class="m-card" data-pid="${p.id}">
-          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}</div><div class="psub">${brand(p.brand)}${catTag(p.category)}${codes(p)}</div></div></div>
+          <div class="top" data-act="edit" data-id="${p.id}" style="cursor:pointer">${thumb(p.image, p.name)}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${p.name}${lossTag([p])}</div><div class="psub">${brand(p.brand)}${catTag(p.category)}${codes(p)}</div></div></div>
           <div class="row">${chans([p])}<span class="spacer"></span>${marginPill(margin(p))}</div>
           <div class="row"><span class="small muted">Satış <b style="color:var(--text)">${money(p.sale_price)}</b>${p.purchase_price ? html` · alış ${money(p.purchase_price)}` : ''}</span><span class="spacer"></span>${stockCell(p)}</div></div>`; }
       const on = all || opened.has(k), gname = list[0].group_name || list[0].name;
@@ -390,6 +394,35 @@ function safeHtml(src) {
 const descSource = (p) => { const l = (p.listings || []).find((x) => x.description && x.description === p.description); return l ? ch(l.channel).name : ''; };
 
 // ---------- ürün formu ----------
+// Ürün kartındaki kâr uyarısı: zarar ediyorsa ne kadar, iade maliyeti ve kanal başına kârlı olmak için gereken en düşük fiyat;
+// kârlıysa ama iade maliyeti kârın büyük kısmını götürüyorsa daha yumuşak bir not. Hesap: finance.js productLoss / breakEven.
+export function lossCard(box, r) {
+  if (!box || !r) return;
+  const d90 = r.d90, d30 = r.d30, v90 = d90 && d90.verdict, v30 = d30 && d30.verdict;
+  // 90 gün esas; son 30 günde zarar başladıysa o gösterilir
+  const [d, v, days] = v30 && v30.level === 'loss' && (!v90 || v90.level !== 'loss') ? [d30, v30, 30] : [d90, v90, 90];
+  const chs = (r.channels || []).filter((c) => c.units > 0 || c.returns > 0);
+  const main = chs.filter((c) => c.price != null).sort((a, b) => b.units - a.units)[0];
+  const table = chs.length ? html`<div class="table-wrap" style="margin-top:8px"><table class="t"><thead><tr><th>Kanal (son 90 gün)</th><th class="r">Satış</th><th class="r">Ort. fiyat</th><th class="r">İade</th><th class="r" title="İade başına maliyet: geri gelmeyen gönderim kargosu, iade kargosu, geri verilmeyen kesintiler">İade başı</th><th class="r">Kâr (iade dahil)</th><th class="r" title="Kâr = 0 olan fiyat: komisyon, kargo, kesintiler ve beklenen iade maliyeti (iade oranı × iade başı maliyet) dahil">Kârlı olmak için en az</th></tr></thead><tbody>
+    ${chs.map((c) => html`<tr data-lossch="${c.channel}"><td>${chLogo(c.channel, true)} ${ch(c.channel).name}</td><td class="r num">${n(c.units)}</td><td class="r num">${c.avgPrice == null ? '—' : money(c.avgPrice)}</td>
+      <td class="r num">${c.returns ? html`${n(c.returns)} <span class="tiny muted">%${n(c.returnRate)}</span>` : '—'}</td><td class="r num">${c.returns ? money(c.perReturn) : '—'}</td>
+      <td class="r num" style="font-weight:650;color:${c.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(c.profit)}</td>
+      <td class="r num" style="font-weight:700;${c.price != null && c.avgPrice != null && c.price > c.avgPrice ? 'color:var(--bad)' : ''}">${c.price == null ? html`<span class="muted" title="Kesintiler satışın tamamını götürüyor">—</span>` : money(Math.ceil(c.price))}</td></tr>`)}
+    </tbody></table></div><div class="tiny muted" style="margin-top:6px">Başa baş fiyat kanalın son 90 gündeki gerçek komisyon ve kargo tutarlarıyla, ürünün iade oranı × kanalın iade başı maliyetiyle hesaplanır. ${d && d.estReturn ? `İade maliyetinin ${money0(d.estReturn)}'si tahmini (Ayarlar → Giderler tutarlarından).` : ''}</div>` : '';
+  let body;
+  if (v && v.level === 'loss') {
+    body = html`<div class="notice bad"><i class="ico ico-warn"></i><div style="flex:1;min-width:0"><b>Bu üründen son ${days} günde ${money(v.loss)} zarar ettiniz</b> (${n(d.units)} satış${d.returns ? `, ${n(d.returns)} iade` : ''}${d.returnCost ? `, iade maliyeti ${money(d.returnCost)}` : ''}).
+      ${main ? html`Kârlı olması için en az <b>${money(Math.ceil(main.price))}</b> fiyat gerekir (${ch(main.channel).name}${main.avgPrice ? `; şu an ortalama ${money(main.avgPrice)}` : ''}).` : ''}
+      ${d.returnCost && d.profitExRet > 0 ? html`<div class="small" style="margin-top:4px">İade olmasa ${money(d.profitExRet)} kâr ederdiniz: zararın nedeni iade maliyeti.</div>` : ''}${table}</div></div>`;
+  } else if (v && v.level === 'returns') {
+    body = html`<div class="notice warn"><i class="ico ico-warn"></i><div style="flex:1;min-width:0"><b>İade maliyeti kârınızın %${n(v.share)} kadarını götürüyor</b> (son ${days} gün: iade öncesi kâr ${money(d.profitExRet)}, iade maliyeti ${money(d.returnCost)}, iade oranı %${n(d.returnRate)}). İade nedenlerini kontrol edin ya da fiyatı gözden geçirin.
+      <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Kanallara göre kâr ve başa baş fiyat</summary>${table}</details></div></div>`;
+  } else if (d) {
+    body = html`<div class="muted small" style="padding:0 2px">Son 90 gün: ${n(d.units)} satış · kâr ${money0(d.profit)} (iade dahil${d.returns ? `; ${n(d.returns)} iade, ${money0(d.returnCost)}` : ''}).${chs.length ? html` <details style="display:inline"><summary class="link" style="display:inline;cursor:pointer">Başa baş fiyatlar</summary>${table}</details>` : ''}</div>`;
+  } else return;
+  render(box, body);
+  box.hidden = false;
+}
 export async function productForm(id, done) {
   const s = sheet({ title: id ? 'Ürünü düzenle' : 'Yeni ürün', size: 'wide' });
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
@@ -402,6 +435,7 @@ export async function productForm(id, done) {
     return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
   };
   s.setBody(html`<form class="stack" data-form>
+    <div data-losscard hidden></div>
     ${(p.siblings || []).length > 1 ? html`<div class="notice"><i class="ico ico-grid"></i><div><b>${p.group_name || p.name}</b> ana ürününün ${p.siblings.length} varyantından biri. Fiyat, stok ve kanal fiyatlarını tüm varyantlarda tek ekrandan değiştirebilirsiniz.</div><button class="btn sm primary" type="button" data-allvar>Tüm varyantları düzenle</button></div>` : ''}
     <div class="card stack">
       <h3>Ürün bilgileri</h3>
@@ -474,6 +508,8 @@ export async function productForm(id, done) {
   if (allv) allv.onclick = () => { s.close(); variantEditor(p.siblings, done, p.group_name || p.name); };
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
   const form = $('[data-form]', s.body);
+  // Zarar / iade uyarısı (son 30 / 90 gün, iade dahil gerçek kâr): yalnız kâr bilgisini görebilen kullanıcıya; form beklemeden sonradan dolar
+  if (id && can(state.user, 'finance')) api('finance/product/' + id).then((r) => lossCard($('[data-losscard]', form), r)).catch(() => {});
   // Fotoğraflar: bilgisayardan / telefondan yüklenir (tarayıcıda küçültülür, panelde saklanır, herkese açık adresten pazaryerlerine gider)
   // ya da bağlantıyla eklenir. İlk fotoğraf ana fotoğraftır; sıralama oklarla değişir. Kaydet'e basınca ürüne yazılır.
   photoStyles();

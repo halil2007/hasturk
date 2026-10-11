@@ -47,3 +47,19 @@ test('güncelleme sıklığı: elle modunda senkron fiyat değiştirmez; müşte
   assert.equal(await syncFx({ TENANT_SLUG: 'x', TENANT_PLAN: 'profesyonel' }, db, await getSettings(db)), null, 'Profesyonel pakette yok');
   assert.equal((await syncFx({ TENANT_SLUG: 'x', TENANT_PLAN: 'kurumsal' }, db, await getSettings(db))).skipped, true, 'Kurumsal pakette çalışır');
 });
+
+test('döviz siparişi: kur alınamazsa bir sonraki senkronda (sipariş değişmese de) TL\'ye çevrilir', async () => {
+  const { saveOrders } = await import('../src/sync.js');
+  const db = d1(); await init(db);
+  const at = Date.now(), o = () => ({ remoteId: 'E1', orderNumber: 'E1', orderedAt: at, status: 'new', customer: 'A', total: 10, currency: 'USD', items: [{ lineId: '1', sku: 'S', name: 'Ü', quantity: 1, unitPrice: 10, total: 10, remoteKey: 'S' }] });
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => new Response('hata', { status: 503 });
+  try {
+    await saveOrders(db, 'ebay', [o()]);
+    assert.deepEqual({ ...(await first(db, "SELECT total, currency FROM orders WHERE id = 'ebay:E1'")) }, { total: 10, currency: 'USD' });
+    globalThis.fetch = async () => new Response(XML, { status: 200 });
+    await saveOrders(db, 'ebay', [o()]);
+    const r = await first(db, "SELECT total, currency, extra FROM orders WHERE id = 'ebay:E1'");
+    assert.deepEqual([r.total, r.currency, JSON.parse(r.extra).fx.rate], [415, 'TRY', 41.5]);
+  } finally { globalThis.fetch = real; }
+});

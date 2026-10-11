@@ -263,3 +263,33 @@ test('Senkron: tanınmayan tür "Diğer" olarak saklanır ve günlüğe yazılı
   assert.ok(lg.results.some((x) => x.level === 'warn' && /Yepyeni Tür \(1\)/.test(x.msg)));
   resetChannels();
 });
+
+test('Hakediş raporu: ödeme günleri tablosu kartlarla tutar (dönemden önce geciken ödenmemiş kayıt, aynı gün kısmen ödenen)', async () => {
+  const db = d1(); await init(db);
+  const now = Date.now();
+  const ins = (id, due, amount, paid) => db.prepare(`INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, payment_date, due_date, paid, payment_id, synced_at)
+    VALUES ('trendyol', ?, ?, 'Satış', '', '', ?, 0, ?, ?, ?, '', 0)`).bind(id, due - 20 * D, amount, due, due, paid ? 1 : 0).run();
+  const mixed = now - 2 * D;
+  await ins('old', now - 40 * D, 70, false); // dönem (son 7 gün) başlamadan gecikmiş
+  await ins('m1', mixed, 100, true); await ins('m2', mixed, 25, false); // aynı gün: 100 ödendi, 25 bekliyor
+  await ins('far', now + 80 * D, 40, false); // 60 günden sonraki vade
+  await ins('outside', now - 20 * D, 999, true); // dönem dışında ödenen: sayılmaz
+  const r = await settlementReport({ DB: db }, db, {}, { from: now - 7 * D, to: now + 1 });
+  const sum = (k) => Math.round(r.days.reduce((a, x) => a + (x[k] || 0), 0) * 100) / 100;
+  assert.equal(r.totals.upcoming, 135); assert.equal(sum('due'), 135);
+  assert.equal(r.totals.overdue, 70);
+  assert.equal(r.totals.paid, 100); assert.equal(sum('paid'), 100);
+  const day = r.days.find((x) => x.paid);
+  assert.deepEqual([day.paid, day.due], [100, 25]);
+});
+
+test('Senkron: tutarı 0 olan ödenmemiş kayıt (komisyon düzeltmesi) okuma penceresini geriye açmaz', async () => {
+  const now = Date.now();
+  const calls = mock(() => page([]));
+  const db = d1(); await init(db); resetChannels();
+  await setSetting(db, 'stlsync:trendyol', { at: now - 7 * 3600e3, n: 5 });
+  await db.prepare(`INSERT INTO settlements (channel, remote_id, date, type, order_number, amount, commission, due_date, paid, synced_at) VALUES ('trendyol', 'z', ?, 'Komisyon düzeltme (−)', 'X', 0, -5, ?, 0, 0)`).bind(now - 60 * D, now - 50 * D).run();
+  await syncSettlements({ DB: db, ...TY_ENV }, db, { force: true });
+  assert.ok(Math.min(...calls.map((u) => Number(/startDate=(\d+)/.exec(u)[1]))) >= now - 21 * D);
+  resetChannels();
+});

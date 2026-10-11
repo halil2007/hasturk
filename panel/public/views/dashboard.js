@@ -6,6 +6,7 @@ import { profit } from '../profit.js';
 import { mountOps } from './orderops.js';
 import { loadSummary } from '../app.js';
 import { stockDialog } from './products.js';
+import { can } from '../perms.js';
 
 const D = 864e5;
 function presetRange(k) {
@@ -30,6 +31,7 @@ export async function dashboard(el) {
       api(`dashboard?from=${f.from}&to=${f.to}`), loadSummary(false), api(`orders?status=${ord.status}&limit=6`),
     ]);
     d = dash; ord.rows = o.orders; ord.counts = o.counts;
+    if (can(state.user, 'finance')) api('finance/losses').then((r) => { losses = r; drawLosses(); }).catch(() => {});
     if (!selected || !ord.rows.some((x) => x.id === selected)) selected = (ord.rows.find((x) => x.status === 'processing' || x.status === 'new') || ord.rows[0] || {}).id || null;
     draw(s);
   }
@@ -116,7 +118,7 @@ export async function dashboard(el) {
           <span class="kpi-ico"><i class="ico ico-box"></i></span>
           <span class="kpi-link"><i class="ico ico-tag"></i>Etiket al <i class="ico ico-chev"></i></span></a>
       </div>
-
+      <div data-losses hidden style="margin-top:16px"></div>
 
       <div class="dash-grid perf">
         <div class="card">
@@ -175,10 +177,26 @@ export async function dashboard(el) {
       </div>`);
     drawChart();
     drawGain();
+    drawLosses();
     const panel = $('[data-sel-panel]', el);
     if (selected) mountOps(panel, selected, { mode: 'panel', onChange: load });
   }
 
+  // Zarar ettiren ürünler (son 30 gün, iade dahil) ve bu ayın iade maliyeti: yalnız kâr bilgisini görebilen kullanıcıya, pano beklemeden
+  let losses = null;
+  function drawLosses() {
+    const box = $('[data-losses]', el);
+    if (!box || !losses || (!losses.count && !losses.month.cost)) return;
+    const m = losses.month, bad = losses.count > 0;
+    render(box, html`<div class="card loss-card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;${bad ? 'border-left:4px solid var(--bad)' : ''}">
+      <span class="ic" style="font-size:22px;color:${bad ? 'var(--bad)' : 'var(--amber)'}"><i class="ico ico-warn"></i></span>
+      <div style="flex:1;min-width:220px">${bad ? html`<b>Zarar ettiren ürünler: ${n(losses.count)} ürün, toplam ${money0(-losses.total)}</b> <span class="muted small">(son ${losses.days} gün, iade dahil)</span>
+          <div class="small muted ellipsis">${losses.top.map((x, i) => html`${i ? ' · ' : ''}<a class="link" href="#/urunler/${x.id}">${x.name}${x.variant && !x.name.includes(x.variant) ? ` ${x.variant}` : ''}</a> ${money0(-x.profit)}`)}</div>`
+        : html`<b>Zarar ettiren ürün yok</b> <span class="muted small">(son ${losses.days} gün, iade dahil)</span>`}
+        <div class="small" style="margin-top:2px">İade maliyeti bu ay: <b class="num">${money0(m.cost)}</b> <span class="muted">(${n(m.orders)} iade${m.estimated ? `, ${money0(m.estimated)} tahmini` : ''})</span></div></div>
+      <a class="btn sm ${bad ? 'primary' : ''}" href="#/gelir-gider?urun=zarar&donem=30">${bad ? 'Zarar ettirenleri gör' : 'Ürün kârlılığı'} <i class="ico ico-chev"></i></a></div>`);
+    box.hidden = false;
+  }
   function drawChart() {
     if (chart) chart.destroy();
     const fmt = f.metric === 'orders' ? (v) => `${n(v)} sipariş` : money0;

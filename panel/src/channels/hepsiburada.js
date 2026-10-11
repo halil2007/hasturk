@@ -707,7 +707,8 @@ export function hepsiburada(env, meta) {
   // kargo olan kayıtlar sipariş numarasına göre toplanır.
   const FIN = `https://mpfinance-external${test}.hepsiburada.com`;
   async function cargoCosts(since, until) {
-    const W = 28 * 864e5, byOrder = new Map();
+    // İade kargosu (türü / açıklaması iade diyen kargo kaydı) returnAmount'a ayrı yazılır; gönderim kargosu amount'ta kalır
+    const W = 28 * 864e5, byOrder = new Map(), retOf = new Map();
     const d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10);
     for (let from = since; from < until; from += W) {
       const to = Math.min(until, from + W);
@@ -719,12 +720,15 @@ export function hepsiburada(env, meta) {
           const no = str(g(x, 'orderNumber'));
           // Gelir kayıtları (ör. CargoCompensationIncome, ShipmentCostSharingIncome: Hepsiburada'nın satıcıya ödediği) gider sayılmaz
           if (g(x, 'isIncome') === true || /Income/.test(str(g(x, 'transactionType', 'type')))) continue;
-          if (no && /kargo|cargo|shipping|shipment|transport|delivery|teslimat/i.test(t) && !/refund/i.test(t)) byOrder.set(no, (byOrder.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
+          if (!no || !/kargo|cargo|shipping|shipment|transport|delivery|teslimat/i.test(t) || /refund/i.test(t)) continue;
+          const mp = /[iİ]ade|return/i.test(t) ? retOf : byOrder;
+          mp.set(no, (mp.get(no) || 0) + Math.abs(money(g(x, 'amount'))));
         }
         if (rows.length < 100) break;
       }
     }
-    return { items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
+    const r2c = (v) => Math.round(v * 100) / 100;
+    return { items: [...new Set([...byOrder.keys(), ...retOf.keys()])].map((orderNumber) => ({ orderNumber, amount: r2c(byOrder.get(orderNumber) || 0), ...(retOf.get(orderNumber) ? { returnAmount: r2c(retOf.get(orderNumber)) } : {}) })) };
   }
 
   // ---------- iade talepleri (claims): oms-external /claims ----------
