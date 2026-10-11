@@ -416,8 +416,8 @@ const toolCard = (t) => `<a class="fcard tcard reveal" href="/araclar/${t.slug}"
 const toolCta = `<section class="sec"><div class="wrap"><div class="ask big reveal"><div><b>Bu hesabı her sipariş için otomatik yapın</b><span>Hastürk CRM, pazaryerinin kestiği komisyon, kargo ve hizmet bedeli faturalarıyla her siparişin net kârını kendiliğinden hesaplar. Kurulum ücreti yok.</span></div>
   <div class="ctas"><a class="btn btn-primary" href="/demo#deneme">7 gün ücretsiz deneyin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a></div></div></div></section>`;
 function toolPage(t) {
-  const rel = t.related.map((s) => tById[s]).filter(Boolean);
-  if (rel.length !== t.related.length) throw new Error(`${t.slug}: ilgili araç bulunamadı`);
+  const rel = t.related.map((s) => tById[s]).filter(Boolean).slice(0, 3);
+  if (t.related.some((s) => !tById[s])) throw new Error(`${t.slug}: ilgili araç bulunamadı`);
   const body = `${TOOLS_JS}<section class="page-hero fp-hero tool-hero">
   <div class="wrap">
     <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/araclar">Araçlar</a><span>›</span><b>${esc(t.name)}</b></nav>
@@ -438,7 +438,7 @@ function toolPage(t) {
   </div>
 </section>
 <section class="sec">
-  <div class="wrap"><div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(t.name.replace(/^./, (c) => c.toLocaleUpperCase('tr')))} Hakkında</h2></div>${faqHtml(t.faq)}</div>
+  <div class="wrap"><div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(t.h1.join(' '))} Hakkında</h2></div>${faqHtml(t.faq)}</div>
 </section>
 <section class="sec alt">
   <div class="wrap"><div class="sec-head reveal"><div class="kicker">Diğer araçlar</div><h2>Bunlar da İşinize Yarar</h2></div>
