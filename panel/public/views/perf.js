@@ -9,6 +9,19 @@ const table = (title, sub, rows, empty, warnAt = 1000) => html`<div class="card 
     ${rows.map((r) => html`<tr><td class="small"><code>${r.route}</code></td><td class="small">${r.firm}</td><td class="r num">${n(r.n)}</td><td class="r num" style="font-weight:700;color:${tone(r.avg_ms * (1000 / warnAt))}">${ms(r.avg_ms)}</td><td class="r num">${ms(r.max_ms)}</td><td class="r num">${r.slow_n ? n(r.slow_n) : '—'}</td></tr>`)}
   </tbody></table></div>` : html`<div class="empty">${empty}</div>`}</div>`;
 
+// Veritabanı altyapısı: sunucu nerede çalışıyor, veritabanı hangi bölgede, sorgu başına gidiş-dönüş ne kadar
+const PLACE = { DO: 'Veritabanının yanındaki ana panel nesnesi', '?': 'bilinmiyor' };
+function infraBox(d) {
+  const rows = (d.infra || []).filter((x) => !x.slug).sort((a, b) => b.queries - a.queries);
+  if (!rows.length) return '';
+  const best = rows[0], far = rows.some((x) => x.rtt_ms >= 20);
+  return html`<div class="card"><div class="card-head"><h2>Veritabanı bağlantısı (ana panel)</h2><span class="muted small">sorgu başına ortalama bekleme · ${n(best.queries)} sorgu</span></div>
+    <div class="table-wrap"><table class="t"><thead><tr><th>Sunucu → veritabanı bölgesi</th><th class="r">Sorgu</th><th class="r">Sorgu başı</th></tr></thead><tbody>
+    ${rows.map((x) => { const [w, reg] = x.where.split(' → '); const place = w.startsWith('DO') ? PLACE.DO : `Kullanıcıya yakın sunucu (${w})`; return html`<tr><td class="small">${place} → <b>${reg}</b></td><td class="r num">${n(x.queries)}</td><td class="r num" style="font-weight:700;color:${x.rtt_ms >= 40 ? 'var(--bad)' : x.rtt_ms >= 15 ? 'var(--amber)' : 'var(--good)'}">${ms(x.rtt_ms)}</td></tr>`; })}
+    </tbody></table></div>
+    <div class="muted tiny" style="margin-top:8px">${far ? 'Sorgu başına 20 ms üstü bekleme, sunucunun veritabanından uzakta çalıştığını gösterir; ana panel istekleri veritabanının yanındaki nesneye yönlendirildikçe bu satır azalır.' : 'Sorgular veritabanının yanında çalışıyor (sorgu başına birkaç ms).'}</div></div>`;
+}
+
 export async function perfView(el) {
   const f = { days: 7, slug: '' };
   let d = null;
@@ -26,7 +39,16 @@ export async function perfView(el) {
       <div class="row wrap" style="gap:10px"><div class="chips">${[7, 30].map((k) => html`<button class="chip ${f.days === k ? 'on' : ''}" data-act="days" data-k="${k}">Son ${k} gün</button>`)}</div>
         <select class="input" style="width:auto" data-slug><option value="">Tüm paneller</option>${d.firms.map((x) => html`<option value="${x.slug || '-'}" ${f.slug === (x.slug || '-') ? 'selected' : ''}>${x.firm} · ${ms(x.avg_ms)}</option>`)}</select></div>
       ${d.daily.length ? html`<div class="card"><div class="card-head"><h2>Günlük ortalama yanıt</h2></div><div class="perf-bars">${d.daily.map((x) => html`<div class="pb" title="${x.day}: ${ms(x.avg_ms)} · ${n(x.n)} istek · ${n(x.slow_n)} yavaş"><span style="height:${Math.max(4, (x.avg_ms / mx) * 100)}%;background:${tone(x.avg_ms)}"></span><small>${x.day.slice(8)}</small></div>`)}</div></div>` : ''}
-      ${table('En yavaş işlemler (panel)', 'ortalamaya göre', d.routes, 'Henüz ölçüm yok. Paneller kullanıldıkça birkaç dakikada bir yazılır.')}
+      ${infraBox(d)}
+      ${(d.pages || []).length ? html`<div class="card flush"><div class="card-pad card-head"><h2>Sayfa açılışları (kullanıcının beklediği süre)</h2><span class="muted small">menüye basıştan sayfa ekrana gelene kadar · tarayıcıda ölçülür</span></div>
+        <div class="table-wrap"><table class="t"><thead><tr><th>Sayfa</th><th>Panel</th><th class="r">Açılış</th><th class="r">Ortalama</th><th class="r">En uzun</th><th class="r">1 sn+</th></tr></thead><tbody>
+        ${d.pages.map((r) => html`<tr><td class="small"><code>#/${r.route}</code></td><td class="small">${r.firm}</td><td class="r num">${n(r.n)}</td><td class="r num" style="font-weight:700;color:${tone(r.avg_ms)}">${ms(r.avg_ms)}</td><td class="r num">${ms(r.max_ms)}</td><td class="r num">${r.slow_n ? n(r.slow_n) : '—'}</td></tr>`)}
+        </tbody></table></div></div>` : ''}
+      ${(d.client || []).length ? html`<div class="card flush"><div class="card-pad card-head"><h2>Bekleme nereden geliyor?</h2><span class="muted small">aynı işlem için tarayıcının beklediği süre ile sunucunun çalışma süresi · aradaki fark ağ / mesafe</span></div>
+        <div class="table-wrap"><table class="t"><thead><tr><th>İşlem</th><th>Panel</th><th class="r">Tarayıcı</th><th class="r">Sunucu</th><th class="r">Ağ + bekleme</th><th class="r">Sorgu</th></tr></thead><tbody>
+        ${d.client.map((r) => html`<tr><td class="small"><code>${r.route}</code></td><td class="small">${r.firm}</td><td class="r num" style="font-weight:700;color:${tone(r.avg_ms)}">${ms(r.avg_ms)}</td><td class="r num">${r.server_ms != null ? ms(r.server_ms) : '—'}</td><td class="r num">${r.server_ms != null ? ms(Math.max(0, r.avg_ms - r.server_ms)) : '—'}</td><td class="r num">${r.db_q != null ? n(r.db_q) : '—'}</td></tr>`)}
+        </tbody></table></div></div>` : ''}
+      ${table('En yavaş işlemler (panel)', 'ortalamaya göre · sunucuda', d.routes, 'Henüz ölçüm yok. Paneller kullanıldıkça birkaç dakikada bir yazılır.')}
       ${(d.external || []).length ? table('Pazaryeri / site bağlantılı işlemler', 'süre kanalın yanıtına bağlı: senkron, paketleme, etiket, kargo bildirimi, bağlantı testi, soru cevabı …', d.external, '', 10000) : ''}
       <div class="muted tiny">Her panelin istek süreleri işlem türüne göre toplanır. Ortalaması 1 saniyeyi aşan panel işlemi (pazaryeri bağlantılı işlemde 10 saniye) "Müşteri hataları"na <b>Yavaş işlem</b> olarak düşer; sonra hızlanırsa kendiliğinden çözülür. Her gün otomatik bakım: eski günlük / buybox geçmişi / bildirimler temizlenir, veritabanı sorgu istatistikleri tazelenir (PRAGMA optimize).</div>
     </div>`);

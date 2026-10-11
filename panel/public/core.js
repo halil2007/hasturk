@@ -65,9 +65,28 @@ export async function api(path, { method = 'GET', body, fresh = false } = {}) {
   dirty();
   try { return await request(path, method, body); } finally { dirty(); }
 }
+// ---------- hız ölçümü (kullanıcının gerçekten beklediği süre) ----------
+// Her istek: tarayıcıdaki toplam süre ve sunucunun bildirdiği süre (Server-Timing). Sayfa açılışları: menüye basıştan sayfa çizilene kadar.
+// Dakikada en fazla bir kez toplu olarak sunucuya gönderilir (Destek → Sistem hızı: "Sayfa açılışları", ağ / sunucu ayrımı).
+const perfAgg = { pages: {}, api: {} };
+let perfN = 0, perfTimer = null;
+const perfAdd = (bag, k, ms) => { const e = bag[k] || (bag[k] = [0, 0, 0, 0]); e[0]++; e[1] += ms; e[2] = Math.max(e[2], ms); if (ms >= 1000) e[3]++; perfN++; };
+export const perfRoute = (method, path) => `${method} ${String(path).split('?')[0].split('/').map((s) => (/^\d+$/.test(s) || (/\d/.test(s) && s.length > 3) ? ':id' : s)).join('/')}`.slice(0, 120);
+export function perfPage(name, ms) { if (state.user) { perfAdd(perfAgg.pages, String(name || '').slice(0, 40), Math.round(ms)); perfSoon(); } }
+function perfSoon() { if (!perfTimer) perfTimer = setTimeout(perfBeacon, 60e3); }
+export function perfBeacon() {
+  clearTimeout(perfTimer); perfTimer = null;
+  if (!perfN || !state.user || state.demo) return;
+  const body = JSON.stringify(perfAgg);
+  perfAgg.pages = {}; perfAgg.api = {}; perfN = 0;
+  try { fetch('/api/perf/client', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, credentials: 'same-origin', keepalive: true }).catch(() => {}); } catch { /* gönderilemezse önemli değil */ }
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.hidden) perfBeacon(); });
+
 async function request(path, method, body, fresh = false) {
   busyBar(1);
   let res;
+  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   // Okuma istekleri en fazla 20 sn beklenir: takılan bir bağlantı (ör. yeni yayın anında) sayfayı sonsuza kadar bekletmesin
   const ctl = method === 'GET' && typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), 20e3) : null;
@@ -80,6 +99,7 @@ async function request(path, method, body, fresh = false) {
   } finally { clearTimeout(timer); busyBar(-1); }
   let data = {};
   try { data = await res.json(); } catch { /* boş */ }
+  if (res.ok && state.user && path !== 'perf/client' && !path.startsWith('errors/')) { perfAdd(perfAgg.api, perfRoute(method, path), Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0)); perfSoon(); }
   if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw Object.assign(new Error(data.error || 'Giriş gerekli'), { auth: true }); }
   if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw Object.assign(new Error(data.error), { auth: true }); }
   if (!res.ok) {

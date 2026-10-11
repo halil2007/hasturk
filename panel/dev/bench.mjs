@@ -66,7 +66,8 @@ for (const [name, path] of PAGES.filter(([n]) => !ONLY || ONLY.includes(n))) {
   let q = 0, status = 0;
   for (let k = 0; k < 3; k++) {
     const q0 = d1Stats.q, s = performance.now();
-    const r = await handle(new Request('https://b.test/api/' + path, { headers: { Cookie: cookie } }), env, { waitUntil() {} }, db);
+    // X-Fresh: 8 sn yanıt önbelleği atlanır (yoksa 2. ve 3. ölçüm önbellekten gelir, sayfa olduğundan hızlı görünür)
+    const r = await handle(new Request('https://b.test/api/' + path, { headers: { Cookie: cookie, 'X-Fresh': '1' } }), env, { waitUntil() {} }, db);
     status = r.status; await r.text();
     times.push(performance.now() - s); q = d1Stats.q - q0;
   }
