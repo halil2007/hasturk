@@ -3,7 +3,7 @@
 // Kargo (ikas Kargo): gönderi ikas'taki "ikas Kargo ile Paketle ve Gönder" uygulamasıyla açılır (genel API'de yok);
 // ikas Kargo paketi oluşturup barkod ve etiket görselini paketin trackingInfo alanına yazar, panel oradan okur ve yazdırır.
 // Şema kaynağı: ikas'ın resmi @ikas/admin-api-client paketi (FulFillOrderInput, UpdateOrderPackageStatusInput, TrackingInfo…).
-import { http, num, str, labelFrom, sleep } from '../util.js';
+import { http, num, str, labelFrom, sleep, brandKey } from '../util.js';
 
 const API = 'https://api.myikas.com/api/v1/admin/graphql';
 // Müşterinin ödeme sayfasında seçtiği kargo SEÇENEĞİNİN adı → ikas Kargo ekranında seçilecek firma (seçenek bir bağlantı değildir)
@@ -492,18 +492,94 @@ export function ikas(env, p, meta) {
     if ((pkg.barcode || pkg.tracking) && !own(pkg)) throw new Error('Bu pakette ikas Kargo gönderisi (barkod) var; gönderiyi ikas panelindeki ikas Kargo ekranından iptal edin.');
     await gql('mutation ($input: CancelFulfillmentInput!) { cancelFulfillment(input: $input) { id } }', { input: { orderId: order.remote_id, orderPackageId: pkg.remote_id } });
   }
-  async function createProduct(pr) {
-    const d = await gql('mutation ($input: ProductInput!) { saveProduct(input: $input) { id variants { id } } }', {
+  // Panelde açılan ürünü ikas'ta oluştur. Tek ürün ya da (opts.variants: aynı ana ürünün varyantları) varyantlı tek ürün.
+  // Marka adla bulunur (yoksa açılır), kategori ürünün kategori adına göre eşlenir (bulunamazsa boş), varyant türü varyant adlarından
+  // (ör. "5 Kg" → Ağırlık), liste fiyatı satış fiyatından yüksekse sellPrice = liste, discountPrice = satış. Görseller bağlantıdan
+  // (ikas görsel yükleme servisi) eklenir; yüklenemeyen görsel ürünü engellemez. Stok yalnız seçili stok lokasyonuna yazılır (pushStock).
+  const lcName = (v) => str(v).toLocaleLowerCase('tr');
+  const imagesOf = (r) => { let l = []; try { l = JSON.parse(r.images || '[]'); } catch { /* bozuk liste */ } return [...new Set([r.image, ...l].filter((u) => /^https:\/\//i.test(u || '')))].slice(0, 10); };
+  const priceOf = (r) => { const sale = num(r.sale_price), list = num(r.list_price); return list > sale && sale > 0 ? { sellPrice: list, discountPrice: sale } : { sellPrice: sale }; };
+  async function brandFor(name) {
+    if (!str(name)) return undefined;
+    try {
+      const d = await gql('query ($s: String) { listProductBrand(search: $s) { id name } }', { s: str(name) });
+      const hit = (d.listProductBrand || []).find((b) => brandKey(b.name) === brandKey(name));
+      if (hit) return hit.id;
+      const c = await gql('mutation ($input: ProductBrandInput!) { saveProductBrand(input: $input) { id } }', { input: { name: str(name) } });
+      return (c.saveProductBrand && c.saveProductBrand.id) || undefined;
+    } catch (e) { if (e.budget) throw e; return undefined; }
+  }
+  async function categoryFor(path) {
+    const leaf = lcName(str(path).split('›').pop());
+    if (!leaf) return undefined;
+    try {
+      const list = (await gql('{ listCategory { id name parentId } }')).listCategory || [];
+      const hit = list.find((c) => lcName(c.name) === leaf);
+      return hit ? [hit.id] : undefined;
+    } catch (e) { if (e.budget) throw e; return undefined; }
+  }
+  const typeName = (vals) => (vals.every((v) => /\d\s*(kg|kilo|gr|g|gram)\b/i.test(v)) ? 'Ağırlık' : vals.every((v) => /\d\s*(lt|l|litre|ml|cc)\b/i.test(v)) ? 'Hacim' : 'Seçenek');
+  async function variantType(vals) {
+    const name = typeName(vals);
+    const d = await gql('query ($n: StringFilterInput) { listVariantType(name: $n) { id name values { id name } } }', { n: { eq: name } });
+    const cur = (d.listVariantType || [])[0];
+    const have = cur ? cur.values || [] : [], add = vals.filter((v) => !have.some((x) => lcName(x.name) === lcName(v)));
+    let t = cur;
+    if (!cur || add.length) {
+      const r = await gql('mutation ($input: VariantTypeInput!) { saveVariantType(input: $input) { id name values { id name } } }', {
+        input: { ...(cur ? { id: cur.id } : {}), name, values: [...have.map((x) => ({ id: x.id, name: x.name })), ...add.map((v) => ({ name: v }))] },
+      });
+      t = r.saveVariantType;
+    }
+    const idOf = (v) => ((t.values || []).find((x) => lcName(x.name) === lcName(v)) || {}).id;
+    return { id: t.id, idOf };
+  }
+  async function uploadImages(prodRows) {
+    // Aynı görsel birden çok varyantta: tek yükleme, tüm varyantlara
+    const by = new Map();
+    for (const { vid, row } of prodRows) imagesOf(row).forEach((u, i) => { const x = by.get(u) || { order: i, ids: [] }; x.ids.push(vid); x.order = Math.min(x.order, i); by.set(u, x); });
+    let n = 0;
+    for (const [url, x] of by) {
+      if (n++ >= 20) break;
+      try {
+        await http('https://api.myikas.com/api/v1/admin/product/upload/image', { method: 'POST', tries: 1, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await auth()}` },
+          body: JSON.stringify({ productImage: { variantIds: x.ids, url, order: x.order, isMain: x.order === 0 } }) });
+      } catch (e) { if (e.budget) throw e; /* görsel yüklenemedi: ürün yine açılır */ }
+    }
+  }
+  // Kategori eşleştirme ekranı için ikas kategorileri (yalnız okuma): ad + üst kategori yolu
+  async function storeCategories() {
+    const list = (await gql('{ listCategory { id name parentId } }')).listCategory || [], by = new Map(list.map((c) => [c.id, c]));
+    const pathOf = (c) => { const n = []; for (let x = by.get(c.parentId), i = 0; x && i < 8; x = by.get(x.parentId), i++) n.unshift(x.name); return n.join(' › '); };
+    return list.map((c) => ({ id: String(c.id), name: str(c.name), path: pathOf(c) }));
+  }
+  async function createProduct(pr, opts = {}) {
+    const rows = (opts.variants || []).length > 1 ? opts.variants : [pr];
+    const group = rows.length > 1;
+    const vals = group ? rows.map((r) => str(r.variant_name) || str(r.name)) : [];
+    if (group && new Set(vals.map(lcName)).size !== vals.length) throw new Error('Varyant adları farklı olmalı (ör. 5 Kg, 10 Kg)');
+    const vt = group ? await variantType(vals) : null;
+    const [brandId, categoryIds] = await Promise.all([brandFor(pr.brand), opts.categoryId ? [String(opts.categoryId)] : categoryFor(pr.category)]);
+    const weight = num(pr.weight) > 0 ? num(pr.weight) : undefined;
+    const d = await gql('mutation ($input: ProductInput!) { saveProduct(input: $input) { id variants { id sku } } }', {
       input: {
-        name: pr.name, type: 'PHYSICAL', description: pr.description || '',
-        salesChannelIds: salesChannel ? [salesChannel] : undefined,
-        variants: [{ sku: pr.sku || undefined, barcodeList: pr.barcode ? [pr.barcode] : [], isActive: true, prices: [{ sellPrice: pr.sale_price }] }],
+        name: group ? str(pr.group_name) || pr.name : pr.name, type: 'PHYSICAL', description: pr.description || '',
+        salesChannelIds: salesChannel ? [salesChannel] : undefined, brandId, categoryIds, weight,
+        ...(vt ? { productVariantTypes: [{ order: 0, variantTypeId: vt.id, variantValueIds: vals.map(vt.idOf) }] } : {}),
+        variants: rows.map((r, i) => ({ sku: r.sku || undefined, barcodeList: r.barcode ? [r.barcode] : [], isActive: true, prices: [priceOf(r)],
+          ...(num(r.weight) > 0 ? { weight: num(r.weight) } : {}), ...(vt ? { variantValueIds: [{ variantTypeId: vt.id, variantValueId: vt.idOf(vals[i]) }] } : {}) })),
       },
     });
-    const prod = d.saveProduct, v = (prod.variants || [])[0];
-    const listing = { remoteId: String(v.id), remoteProductId: String(prod.id), sku: pr.sku, barcode: pr.barcode, name: pr.name, price: pr.sale_price, stock: 0 };
-    await pushStock([{ ...listing, stock: Math.max(0, pr.stock) }]);
-    return { ...listing, stock: Math.max(0, pr.stock) };
+    const prod = d.saveProduct, vs = prod.variants || [];
+    const out = rows.map((r, i) => {
+      const v = (r.sku && vs.find((x) => str(x.sku) === str(r.sku))) || vs[i];
+      if (!v) throw new Error('ikas varyantı oluşturmadı');
+      const p0 = priceOf(r);
+      return { pid: r.id, remoteId: String(v.id), remoteProductId: String(prod.id), sku: r.sku, barcode: r.barcode, name: r.name, price: p0.discountPrice || p0.sellPrice, stock: Math.max(0, num(r.stock)) };
+    });
+    await uploadImages(out.map((l, i) => ({ vid: l.remoteId, row: rows[i] })));
+    await pushStock(out.map((l) => ({ ...l })));
+    return group ? out : out[0];
   }
 
   // ---------- tanılama ----------
@@ -593,6 +669,6 @@ export function ikas(env, p, meta) {
   return {
     ...meta, type: 'ikas', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', pack: 'external', external: { label: 'ikas Kargo ile Gönder', url: adminUrl }, ship: 'local', manualTracking: false, ownCarrier: true, label: 'remote', cargo: false, repack: false, cancelPackage: true, createProduct: true, price: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, ownShipment, createProduct, cargoOptions, label, cancelPackage, diagnose,
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, ownShipment, createProduct, storeCategories, cargoOptions, label, cancelPackage, diagnose,
   };
 }

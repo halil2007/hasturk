@@ -266,25 +266,45 @@ export function shopify(env, meta = {}) {
 
   // Panelde açılan ürünü mağazada oluştur: ürün (başlık, açıklama, yayında) + görseller → tek varyantın fiyatı, SKU, barkodu ve
   // stok takibi → stok (mağazanın lokasyonuna). Shopify ürünü varsayılan tek varyantla açar.
-  async function createProduct(pr) {
-    let imgs = [];
-    try { imgs = JSON.parse(pr.images || '[]'); } catch { /* bozuk liste */ }
-    imgs = [...new Set([pr.image, ...imgs].filter((u) => /^https:\/\//i.test(u || '')))].slice(0, 10);
+  // Panelde açılan ürünü Shopify'da oluştur: tek ürün ya da (opts.variants) aynı ana ürünün varyantlarıyla tek ürün (seçenek = varyant adı).
+  // Marka → vendor, kategorinin son basamağı → productType, liste fiyatı satıştan yüksekse compareAtPrice, ağırlık kg.
+  async function createProduct(pr, opts = {}) {
+    const rows = (opts.variants || []).length > 1 ? opts.variants : [pr], group = rows.length > 1;
+    const imgsOf = (r) => { let l = []; try { l = JSON.parse(r.images || '[]'); } catch { /* bozuk liste */ } return l; };
+    const imgs = [...new Set(rows.flatMap((r) => [r.image, ...imgsOf(r)]).filter((u) => /^https:\/\//i.test(u || '')))].slice(0, 10);
+    const type = str(pr.category).split('›').pop().trim();
+    const optName = 'Seçenek', vals = rows.map((r) => str(r.variant_name) || str(r.name));
+    if (group && new Set(vals.map((v) => v.toLocaleLowerCase('tr'))).size !== vals.length) throw new Error('Varyant adları farklı olmalı (ör. 5 Kg, 10 Kg)');
     const d = await gql('mutation($p: ProductCreateInput!, $m: [CreateMediaInput!]) { productCreate(product: $p, media: $m) { product { id variants(first: 1) { nodes { id } } } userErrors { field message } } }', {
-      p: { title: pr.name, descriptionHtml: pr.description || '', status: 'ACTIVE', ...(pr.brand ? { vendor: pr.brand } : {}) },
+      p: { title: group ? str(pr.group_name) || pr.name : pr.name, descriptionHtml: pr.description || '', status: 'ACTIVE', ...(pr.brand ? { vendor: pr.brand } : {}), ...(type ? { productType: type } : {}),
+        ...(group ? { productOptions: [{ name: optName, values: vals.map((name) => ({ name })) }] } : {}) },
       m: imgs.map((u) => ({ originalSource: u, mediaContentType: 'IMAGE' })),
     });
     ok(d.productCreate, 'ürün');
     const prod = d.productCreate.product, v = ((prod.variants || {}).nodes || [])[0];
     if (!v) throw new Error('Shopify ürünü varyantsız döndü');
-    const price = num(pr.sale_price), stock = Math.max(0, Math.round(num(pr.stock)));
-    const u = await gql('mutation($p: ID!, $v: [ProductVariantsBulkInput!]!) { productVariantsBulkUpdate(productId: $p, variants: $v) { userErrors { field message } } }', {
-      p: prod.id, v: [{ id: v.id, price: String(price), ...(pr.barcode ? { barcode: String(pr.barcode) } : {}), inventoryItem: { sku: pr.sku || undefined, tracked: true } }],
-    });
-    ok(u.productVariantsBulkUpdate, 'varyant');
-    const listing = { remoteId: nid(v.id), remoteProductId: nid(prod.id), sku: pr.sku || '', barcode: pr.barcode || '', name: pr.name, price, stock };
-    await pushStock([listing]);
-    return listing;
+    const input = (r) => {
+      const price = num(r.sale_price), list = num(r.list_price), w = num(r.weight);
+      return { price: String(price), ...(list > price ? { compareAtPrice: String(list) } : {}), ...(r.barcode ? { barcode: String(r.barcode) } : {}),
+        inventoryItem: { sku: r.sku || undefined, tracked: true, ...(w > 0 ? { measurement: { weight: { value: w, unit: 'KILOGRAMS' } } } : {}) } };
+    };
+    let ids = [v.id];
+    if (group) {
+      // Seçenekli ürün: tüm varyantlar bir kerede açılır; Shopify'ın açtığı ilk (varsayılan) varyant kaldırılır
+      const u = await gql('mutation($p: ID!, $v: [ProductVariantsBulkInput!]!) { productVariantsBulkCreate(productId: $p, variants: $v, strategy: REMOVE_STANDALONE_VARIANT) { productVariants { id sku } userErrors { field message } } }', {
+        p: prod.id, v: rows.map((r, i) => ({ ...input(r), optionValues: [{ optionName: optName, name: vals[i] }] })),
+      });
+      ok(u.productVariantsBulkCreate, 'varyant');
+      const made = u.productVariantsBulkCreate.productVariants || [];
+      ids = rows.map((r, i) => ((r.sku && made.find((x) => str(x.sku) === str(r.sku))) || made[i] || {}).id);
+      if (ids.some((x) => !x)) throw new Error('Shopify varyantları oluşturmadı');
+    } else {
+      const u = await gql('mutation($p: ID!, $v: [ProductVariantsBulkInput!]!) { productVariantsBulkUpdate(productId: $p, variants: $v) { userErrors { field message } } }', { p: prod.id, v: [{ id: v.id, ...input(pr) }] });
+      ok(u.productVariantsBulkUpdate, 'varyant');
+    }
+    const out = rows.map((r, i) => ({ pid: r.id, remoteId: nid(ids[i]), remoteProductId: nid(prod.id), sku: r.sku || '', barcode: r.barcode || '', name: r.name, price: num(r.sale_price), stock: Math.max(0, Math.round(num(r.stock))) }));
+    await pushStock(out);
+    return group ? out : out[0];
   }
 
   // Kargoya ver: açık gönderim emirleri (fulfillment order) takip bilgisiyle kapatılır; paket kalemleri verildiyse yalnız onlar

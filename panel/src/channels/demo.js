@@ -145,12 +145,20 @@ export function demo(meta) {
   const ATTRS = [{ id: '10', name: 'Ağırlık / Hacim', mandatory: true, kind: 'variant', type: 'enum', custom: true }, { id: '11', name: 'Menşei', mandatory: true, kind: 'category', type: 'enum' }, { id: '12', name: 'Kullanım Alanı', mandatory: false, kind: 'category', type: 'text', custom: true }];
   const VALS = { 10: ['1 Lt', '3 Lt', '5 Kg', '10 Kg', '10 Lt', '20 Lt', '2 Lt', '16 Lt'], 11: ['TR', 'CN', 'DE'] };
   const uploads = new Map();
+  // Kanalın zorunlu seçenekleri (gerçek bağdaştırıcılarla aynı adlar): N11 kargo şablonu + hazırlık süresi, Trendyol / idefix kargo firması, HB garanti
+  const OPTS = {
+    trendyol: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }], idefix: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }, { k: 'deliveryDuration', label: 'Kargoya veriliş süresi, gün (isteğe bağlı)' }],
+    n11: [{ k: 'shipmentTemplate', label: 'Kargo şablonu adı (N11 → Hesabım → Teslimat Bilgilerim)' }, { k: 'preparingDay', label: 'Kargoya veriliş süresi (gün)' }], hepsiburada: [{ k: 'warranty', label: 'Garanti süresi (ay)' }],
+  };
+  const BRANDS = [['1001', 'Volta'], ['1002', 'Casa'], ['1003', 'Lumière'], ['1004', 'Atlas'], ['1005', 'Urban'], ['1006', 'HG'], ['1007', 'HG Tarım'], ['1008', 'Demo']];
+  const bkey = (v) => String(v || '').toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]+/gu, '');
   const catalog = {
     categories: async (q) => { const k = String(q || '').toLocaleLowerCase('tr'); const items = CATS.map(([id, name, path]) => ({ id, name, path })).filter((c) => !k || `${c.name} ${c.path}`.toLocaleLowerCase('tr').includes(k)); return { total: CATS.length, items }; },
     allCategories: async () => CATS.map(([id, name, path]) => ({ id, name, path })),
     attributes: async () => ATTRS,
     values: async (c, a) => (VALS[a] || []).map((v, i) => ({ id: String(a * 100 + i), value: v })),
-    async build(pr, map, { pick }) {
+    brands: async (q) => { const k = bkey(q); return BRANDS.filter(([, n]) => !k || bkey(n).includes(k) || k.includes(bkey(n))).map(([id, name]) => ({ id, name })); },
+    async build(pr, map, { pick, opts = {} }) {
       const missing = [];
       for (const a of ATTRS) {
         const v = (map.attrs || {})[a.id]; let val = v && v.value;
@@ -158,11 +166,20 @@ export function demo(meta) {
         if (!val && a.mandatory) missing.push(a.name);
       }
       if (!pr.barcode) missing.push('barkod'); if (!(pr.price > 0)) missing.push('fiyat');
-      return { key: pr.barcode || pr.sku, missing, payload: { barcode: pr.barcode, title: pr.name, price: pr.price, stock: pr.stock } };
+      if (meta.type !== 'hepsiburada' && !pr.brandId && !BRANDS.some(([, n]) => bkey(n) === bkey(pr.brand))) missing.push(pr.brand ? `marka “${pr.brand}” bulunamadı` : 'marka');
+      if (meta.type === 'n11' && !String(opts.shipmentTemplate || '').trim()) missing.push('kargo şablonu (Ürün yükle → N11 seçenekleri)');
+      if (meta.type === 'n11' && !(Number(opts.preparingDay) > 0)) missing.push('kargoya veriliş süresi (Ürün yükle → N11 seçenekleri)');
+      return { key: pr.barcode || pr.sku, missing, payload: { barcode: pr.barcode, sku: pr.sku, title: pr.name, price: pr.price, stock: pr.stock, productMainId: pr.group, name: pr.name } };
     },
-    async send(items) { const ref = 'DEMO-' + Date.now().toString(36); uploads.set(ref, items.map((x) => x.barcode)); return { ref }; },
-    async status(ref) { return { done: true, items: (uploads.get(ref) || []).map((k) => ({ key: k, status: 'SUCCESS', ok: true, error: '' })) }; },
-    options: ch === 'trendyol' ? [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] : [{ k: 'warranty', label: 'Garanti süresi (ay)' }],
+    // Örnek sonuç: gönderimden ~12 sn sonra tamamlanır; adında "RED" geçen ürün reddedilir (Reddedildi durumunu denemek için)
+    async send(items) { const ref = 'DEMO-' + Date.now().toString(36); uploads.set(ref, { at: Date.now(), items }); return { ref }; },
+    async status(ref) {
+      const u = uploads.get(ref);
+      if (!u) return { done: true, items: [] };
+      if (Date.now() - u.at < 12e3) return { done: false, items: [] };
+      return { done: true, items: u.items.map((x) => (/\bRED\b/.test(x.name || '') ? { key: x.barcode || x.sku, status: 'REJECTED', ok: false, error: 'Görsel beyaz arka planlı olmalı' } : { key: x.barcode || x.sku, status: 'SUCCESS', ok: true, error: '' })) };
+    },
+    options: OPTS[meta.type] || [{ k: 'warranty', label: 'Garanti süresi (ay)' }],
   };
   // Örnek iade talepleri (Trendyol / Hepsiburada örneği): son teslim edilen siparişlerden birkaçı
   const decided = new Map();
@@ -206,6 +223,11 @@ export function demo(meta) {
     caps: { accept: 'remote', split: 'local', pack: isIkas ? 'external' : 'remote', ...(isIkas ? { external: { label: 'ikas Kargo ile Gönder', url: 'https://demo.myikas.com/admin/order/view/' } } : {}), ship: isIkas ? 'local' : 'remote', label: 'remote', cargo: isIkas ? false : 'change', cancelPackage: true, createProduct: ['ikas', 'woocommerce', 'shopify'].includes(meta.type), price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
     fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, ...(isIkas ? { fetchOne } : { pack }), label, cargoOptions, changeCargo, cancelPackage: ok,
     ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim, ...(ch === 'hepsiburada' ? { campaigns } : {}) } : {}),
-    createProduct: async (pr) => ({ remoteId: `${ch}-${pr.sku || Date.now()}`, remoteProductId: '', sku: pr.sku, barcode: pr.barcode, name: pr.name, price: pr.sale_price, stock: pr.stock }),
+    ...(['n11', 'idefix'].includes(ch) ? { catalog } : {}),
+    ...(isIkas ? { storeCategories: async () => [...new Set(DEMO_PRODUCTS.map((p) => p[9]))].map((c, i) => ({ id: 'K' + (i + 1), name: c.split(' › ').pop(), path: c.split(' › ').slice(0, -1).join(' › ') })) } : {}),
+    createProduct: async (pr, opts = {}) => {
+      const one = (r, pid) => ({ pid: r.id, remoteId: `${ch}-${r.sku || r.id || Date.now()}`, remoteProductId: pid || '', sku: r.sku, barcode: r.barcode, name: r.name, price: r.sale_price, stock: r.stock });
+      return (opts.variants || []).length > 1 ? opts.variants.map((r) => one(r, `${ch}-P${pr.id}`)) : one(pr);
+    },
   };
 }

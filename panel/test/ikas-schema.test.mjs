@@ -13,11 +13,12 @@ test('ikas: tüm sorgu ve mutasyonlar resmi şemayla uyumlu (işlem, argüman, d
   globalThis.fetch = async (url, opts = {}) => {
     if (/oauth\/token/.test(url)) return new Response(JSON.stringify({ access_token: 'T', expires_in: 3600 }), { headers: { 'Content-Type': 'application/json' } });
     const b = JSON.parse(opts.body);
-    seen.add(b.query);
+    if (b.query) seen.add(b.query); // görsel yükleme REST servisi (GraphQL değil)
     const pk = { id: 'pk1', orderLineItemIds: ['l1'], orderPackageFulfillStatus: 'READY_FOR_SHIPMENT', trackingInfo: { barcode: 'B1' } };
     const data = { listOrder: { hasNext: false, data: [{ id: 'o1', orderNumber: 1, orderLineItems: [], orderPackages: [pk] }] }, listProduct: { hasNext: false, data: [] }, listVariantType: [], getMerchant: { id: 'm' },
       getAuthorizedApp: { scope: 'read_orders,write_orders' }, listStockLocation: [{ id: 'loc', name: 'Depo', address: {} }], listCargoCompany: [{ id: 'c', name: 'Yurtiçi' }], listShippingSettings: [],
-      fulfillOrder: { id: 'o1', orderPackages: [pk] }, updateOrderPackageStatus: { id: 'o1' }, saveProduct: { id: 'p', variants: [{ id: 'v' }] } };
+      fulfillOrder: { id: 'o1', orderPackages: [pk] }, updateOrderPackageStatus: { id: 'o1' }, saveProduct: { id: 'p', variants: [{ id: 'v', sku: 'A' }, { id: 'v2', sku: 'B' }] },
+      listProductBrand: [], saveProductBrand: { id: 'b' }, listCategory: [{ id: 'c', name: 'Gübre', parentId: null }], saveVariantType: { id: 't', name: 'Ağırlık', values: [{ id: 'x1', name: '5 Kg' }, { id: 'x2', name: '10 Kg' }] } };
     return new Response(JSON.stringify({ data }), { headers: { 'Content-Type': 'application/json' } });
   };
   try {
@@ -27,7 +28,12 @@ test('ikas: tüm sorgu ve mutasyonlar resmi şemayla uyumlu (işlem, argüman, d
     await ch.pushStock([{ remoteId: 'v', remoteProductId: 'p', stock: 1 }]); await ch.pushPrice([{ remoteId: 'v', remoteProductId: 'p', price: 1 }]);
     await ch.cargoOptions(); await ch.fetchOne('o1'); await ch.label(order, pkg);
     await ch.ship(order, { ...pkg, barcode: 'B1' }, {}); await assert.rejects(() => ch.ship(order, { ...pkg, remote_id: null }, { tracking: 'T' }), /elle kargo bilgisi girilmez/); await ch.cancelPackage(order, pkg);
-    await ch.createProduct({ name: 'x', sale_price: 1, stock: 1 }); await ch.diagnose({ orderId: 'o1' });
+    await ch.createProduct({ name: 'x', sale_price: 1, stock: 1 });
+    // Varyantlı ürün (Kanallarda yayınla): marka, kategori, varyant türü, liste fiyatı, görsel
+    const vs = [{ id: 1, sku: 'A', name: 'G 5 Kg', group_name: 'G', variant_name: '5 Kg', sale_price: 10, list_price: 12, stock: 1, brand: 'HG', category: 'Bahçe › Gübre', image: 'https://x/a.jpg', weight: 5 }, { id: 2, sku: 'B', name: 'G 10 Kg', group_name: 'G', variant_name: '10 Kg', sale_price: 18, stock: 2 }];
+    const made = await ch.createProduct(vs[0], { variants: vs });
+    assert.deepEqual(made.map((x) => [x.pid, x.remoteId]), [[1, 'v'], [2, 'v2']]);
+    assert.equal((await ch.storeCategories())[0].name, 'Gübre'); await ch.diagnose({ orderId: 'o1' });
     // ikas Kargo akışında ikas'a kargo / durum bilgisi yazılmaz (ikas Kargo uygulaması gönderir)
     assert.ok(![...seen].some((q) => /fulfillOrder|updateOrderPackageStatus/.test(q)), 'ikas Kargo akışında ikas\'a yazılmaz');
     // Kendi kargo entegratörünüzle gönderim: paket ikas'ta takip bilgisiyle açılır, kargoya verilince "Kargoda" yapılır

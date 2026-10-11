@@ -1423,3 +1423,25 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
   .card-head a.link, .card-head .link.small, a.link.small, button.link.small { display: inline-block; padding: 7px 4px; margin: -7px -4px; }
   .tab { min-height: 36px; }
 }
+
+/* Kanallarda yayınla paneli (views/publish.js) */
+.pub { display: flex; flex-direction: column; gap: 8px; }
+.pub-row { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); }
+.pub-row.open { border-color: var(--primary); }
+.pub-head { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.pub-head .check { display: flex; align-items: center; gap: 6px; }
+.pub-head .pub-badge { display: inline-block; max-width: min(420px, 62%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pub-why { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; display: inline-block; vertical-align: bottom; }
+.pub-body { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: 1px dashed var(--line); margin-top: 4px; }
+.pub-fix { display: flex; flex-direction: column; gap: 6px; }
+.chip-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; color: var(--text); }
+.chip-btn.on, .chip-btn:hover { border-color: var(--primary); color: var(--primary); }
+@media (max-width: 899px) { .pub-why { max-width: 150px; } }
+/* Kategori eşleştirme (views/catmap.js) */
+.cm-t td, .cm-t th { vertical-align: top; }
+.cm-cell { display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%; min-width: 120px; max-width: 220px; background: none; border: 1px solid transparent; border-radius: 8px; padding: 4px 6px; cursor: pointer; color: var(--text); font: inherit; }
+.cm-cell:hover { border-color: var(--line); background: var(--surface-3); }
+.cm-cell .nm { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-sum { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.cm-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.cm-card .cm-cell { max-width: none; flex-direction: row; justify-content: space-between; align-items: center; gap: 8px; }

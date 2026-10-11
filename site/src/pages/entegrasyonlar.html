@@ -5,22 +5,48 @@ crumb: Entegrasyonlar
 url: /entegrasyonlar
 nav: entegrasyonlar
 -->
-<section class="page-hero">
+<section class="page-hero int-list-hero">
   <div class="wrap">
-    <div class="kicker">Entegrasyonlar</div>
+    <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><b>Entegrasyonlar</b></nav>
     <h1>Satış Yaptığınız <span class="grad">Her Kanal</span>, Tek Panelde</h1>
-    <p>Her kanala o kanalın resmi entegrasyon servisiyle bağlanırız. Aynı pazaryerinde birden fazla mağazanız varsa hepsini ayrı ayrı bağlayabilirsiniz.</p>
-    <div class="logo-row static" data-logos-static></div>
+    <p>Pazaryerlerinizi, e-ticaret sitenizi ve kargo firmanızı resmi entegrasyon servisleriyle bağlayın. Siparişler, stok ve fiyat tek ekranda.</p>
+    <div class="checks"><span><i class="tick"><svg><use href="#i-check"/></svg></i>Resmi API ile bağlantı</span><span><i class="tick"><svg><use href="#i-check"/></svg></i>Birden fazla mağaza</span><span><i class="tick"><svg><use href="#i-check"/></svg></i>Kurulum ücreti yok</span></div>
   </div>
 </section>
 
-<section class="sec" style="padding-top:28px">
+<section id="yakinda" class="sec int-list" data-chfilter>
   <div class="wrap">
-    <div class="icards">{{integrationCards}}</div>
+    <div class="ch-tools">
+      <label class="ch-search"><svg><use href="#i-search"/></svg><span class="sr">Kanal arayın</span><input type="search" data-chsearch placeholder="Kanal arayın (ör. Trendyol)" autocomplete="off" enterkeyhint="search"></label>
+      <div class="ftabs-row" role="group" aria-label="Kategori">{{integrationTabs}}</div>
+    </div>
+    <div class="chs" data-chgrid>
+{{integrationCards}}
+      <div class="ch-cargo" data-cargo-cards></div>
+    </div>
+    <div class="ch-empty" data-chempty hidden><b>Bu aramayla eşleşen kanal yok.</b><span>Kullandığınız kanalı yazın; öncelik sırasını müşterilerimizin taleplerine göre belirliyoruz.</span><a class="btn btn-outline" href="/iletisim?konu=kanal">Kanal talep edin</a></div>
+    <ul class="st-legend">
+      <li><span class="st ok">Aktif</span>Panelde kullanıma açık.</li>
+      <li><span class="st test">Test aşamasında</span>Kullanıma açık, son testler sürüyor; kurulumda birlikte kontrol ederiz.</li>
+      <li><span class="st dev">Geliştirme aşamasında</span>Hazırlanıyor, henüz bağlanamaz.</li>
+    </ul>
+    <p class="ch-note">Kargo firması entegrasyonu Kurumsal pakettedir: kendi anlaşmanızla gönderdiğiniz siparişlerin etiketi ve takip numarası doğrudan kargo firmasından alınır. <a href="/ozellikler/kargo-entegrasyonu">Kargo entegrasyonunu inceleyin →</a></p>
   </div>
 </section>
 
 <section class="sec alt">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">Kurulum</div><h2>Nasıl Çalışır?</h2></div>
+    <div class="how three">
+      <div class="hs reveal"><div class="ic"><svg><use href="#i-key"/></svg></div><h3>API bilgilerini girin</h3><p>Satış kanalınızın panelinden aldığınız bilgileri Entegrasyonlar sayfasına yapıştırın; bağlantı hemen test edilir.</p></div>
+      <div class="hs reveal"><div class="ic"><svg><use href="#i-link"/></svg></div><h3>Ürünler eşleşir</h3><p>İlanlarınız barkod ve stok koduyla paneldeki ürünlere kendiliğinden bağlanır.</p></div>
+      <div class="hs reveal"><div class="ic"><svg><use href="#i-sync"/></svg></div><h3>Siparişler ve stok otomatik</h3><p>Siparişler panele gelir; stok ve fiyat değişiklikleri tüm kanallara kendiliğinden gönderilir.</p></div>
+    </div>
+    <p class="how-note reveal">Son bir yılın siparişleri ve ilanlarınız aktarılır. Kurulumda yanınızdayız.</p>
+  </div>
+</section>
+
+<section id="karsilastirma" class="sec">
   <div class="wrap">
     <div class="sec-head reveal"><div class="kicker">Kanal kanal</div><h2>Hangi Kanalda Neler Yapabilirsiniz?</h2><p>Tablo bugün panelde çalışan özellikleri gösterir. Bir kanal özelliği sunmuyorsa (ör. ikas'ta müşteri sorusu) panel de sunamaz.</p></div>
     <p class="swipe">Tabloyu yana kaydırın →</p>
@@ -53,24 +79,15 @@ nav: entegrasyonlar
   </div>
 </section>
 
-<section class="sec">
+<section class="sec alt">
   <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Bağlantı</div><h2>Mağazanızı Bağlamak 3 Adım</h2></div>
-    <div class="how three">
-      <div class="hs reveal"><div class="ic"><svg><use href="#i-key"/></svg></div><h3>API bilgilerini alın</h3><p>Pazaryeri satıcı panelinizdeki "Entegrasyon / API bilgileri" sayfasından anahtarlarınızı kopyalayın.</p></div>
-      <div class="hs reveal"><div class="ic"><svg><use href="#i-plug"/></svg></div><h3>Panele girin</h3><p>Entegrasyonlar sayfasında kanalı seçip bilgileri yapıştırın; panel bağlantıyı hemen test eder.</p></div>
-      <div class="hs reveal"><div class="ic"><svg><use href="#i-sync"/></svg></div><h3>Veriler gelsin</h3><p>Son bir yılın siparişleri ve ilanlarınız gelir, ürünler barkoda göre eşleşir. Kurulumda yanınızdayız.</p></div>
+    <div class="ask big reveal">
+      <div><b>Kanallarınızı bugün bağlayın</b><span>7 gün ücretsiz deneyin; kurulum ücreti yok. Önce görmek isterseniz demo panelini kayıt olmadan açın.</span></div>
+      <div class="ctas"><a class="btn btn-primary" href="/demo#deneme">Ücretsiz deneyin <svg><use href="#i-arrow"/></svg></a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a></div>
     </div>
-  </div>
-</section>
-
-<section id="yakinda" class="sec alt">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Kargo</div><h2>Kargo Entegrasyonları</h2><p>Hangi kanaldan gelirse gelsin, kendi kargo anlaşmanızla gönderdiğiniz siparişlerin etiketini ve takip numarasını doğrudan kargo firmasından alın; takip numarası satış kanalına bildirilir, kargo teslim edilince sipariş kendiliğinden “Teslim edildi” olur. Kurumsal pakette. <a href="/ozellikler/kargo-entegrasyonu">Kargo entegrasyonunu inceleyin →</a></p></div>
-    <div class="integ reveal" data-integ="cargo"></div>
     <div class="ask reveal">
       <div><b>Kullandığınız kanal listede yok mu?</b><span>Hangi kanalda satış yaptığınızı yazın; öncelik sırasını müşterilerimizin taleplerine göre belirliyoruz.</span></div>
-      <a class="btn btn-primary" href="/iletisim?konu=kanal">Kanal talep edin <svg><use href="#i-arrow"/></svg></a>
+      <a class="btn btn-outline" href="/iletisim?konu=kanal">Kanal talep edin <svg><use href="#i-arrow"/></svg></a>
     </div>
   </div>
 </section>

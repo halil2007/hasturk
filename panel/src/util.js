@@ -46,6 +46,15 @@ export function imageList(list, max = 12) {
   }
   return out;
 }
+// Marka karşılaştırması: Türkçe küçük harf, boşluk ve noktalama yok ("HG Tarım A.Ş." = "hg tarım aş")
+export const brandKey = (v) => str(v).toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]+/gu, '');
+// Kanalın marka aramasından gelen sonuçlar: tam eşleşen önce, sonra adı aranan metni içerenler
+export function rankBrands(list, q) {
+  const k = brandKey(q), seen = new Map();
+  for (const b of list) if (b && b.id != null && !seen.has(String(b.id))) seen.set(String(b.id), { id: String(b.id), name: str(b.name) });
+  const all = [...seen.values()], hit = all.filter((b) => { const n = brandKey(b.name); return n.includes(k) || k.includes(n); });
+  return (hit.length ? hit : all).sort((a, b) => (brandKey(b.name) === k) - (brandKey(a.name) === k) || a.name.length - b.name.length).slice(0, 20);
+}
 export const isImageAttr = (a) => !!a && /g[öo]rsel|resim|foto[gğ]raf|image|photo/i.test(String(a.name || '')) && !/enum|list|select/i.test(String(a.type || ''));
 
 // Türkiye UTC+3 (yaz saati yok): gün/hafta/ay anahtarları bu saate göre

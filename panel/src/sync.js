@@ -21,6 +21,7 @@ import { syncClaims, applyClaimReturns } from './claims.js';
 import { queueNew, sendQueued } from './mail.js';
 import { DEMO_PRODUCTS, DEMO_CHANNELS } from './channels/demo.js';
 import { checkPendingUploads, autoUpload } from './catalog.js';
+import { autoSuggest } from './catmap.js';
 import { customerKey, fillKeys } from './customers.js';
 import { pushDigest } from './push.js';
 import { dailyDigest } from './digest.js';
@@ -668,6 +669,8 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     // (zamanlanmış senkronda bu ikisi 2 dakikalık hızlı işte yapılır: aynı ürün iki kez gönderilmesin)
     if (!only && !cron) out.uploads = await checkPendingUploads(env, db).catch((e) => 'hata: ' + e.message);
     // Otomatik ürün gönderimi açık kanallar (ör. yalnız Hepsiburada): yeni ürünler kendiliğinden gönderilir
+    // Kategori önerileri (günde bir, kanal başına; otomatik gönderim kapalı olsa da): yeni kanal / yeni kategori için öneri hazır olur
+    if (!only && !cron) out.autoSuggest = await autoSuggest(env, db, settings).catch((e) => 'hata: ' + e.message);
     if (!only && !cron && allows(env, 'autoupload')) out.autoUpload = await autoUpload(env, db, settings).catch((e) => 'hata: ' + e.message);
     // Son 1 yılın siparişleri: her bağlı (gerçek) kanal için bir kez otomatik geçmiş aktarımı başlatılır.
     // Parça parça (haftalık) ilerler; stoğu değiştirmez, yeni sipariş e-postası oluşturmaz.

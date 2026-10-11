@@ -18,6 +18,8 @@ import { dailyDigest } from './digest.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail, logoPath, logoUrl } from './mail.js';
 import { catalogApi } from './catalog.js';
+import { publishApi } from './publish.js';
+import { catmapApi } from './catmap.js';
 import * as customers from './customers.js';
 import * as chp from './chproducts.js';
 import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity, twofaApi, resetTfa, security, setSecurity, forgetNets } from './auth.js';
@@ -721,8 +723,8 @@ async function listBuybox(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin'];
-const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price']);
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months'];
+const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price', 'list_price', 'weight', 'preparing_days', 'warranty_months']);
 // Görsel bağlantıları: dizi ya da satır satır metin → tekrarsız https adresleri
 const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/[\s,]+/));
 export function cleanProduct(b) {
@@ -1001,7 +1003,7 @@ async function saveSettings(db, b) {
     }
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
-    if (k === 'autoprice' || k === 'costs_vat_incl') v = !!v;
+    if (k === 'autoprice' || k === 'costs_vat_incl' || k === 'auto_approve_sure') v = !!v;
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
     if (k === 'track_urls') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).map(([a, b]) => [str(a).slice(0, 40), str(b).slice(0, 300)]).filter(([a, b]) => a && /^https:\/\/[^\s]+$/i.test(b) && b.includes('{no}')).slice(0, 30));
     if (k === 'ads_conv') {
@@ -1098,7 +1100,7 @@ function claimFile(f) {
 
 // ---------- yönlendirme ----------
 // Sadece yöneticinin yapabileceği işlemler (kanal API bilgileri, kullanıcılar, ayarlar, toplu aktarım)
-const ADMIN_ONLY = [/^mail\//, /^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/, /^catalog\//];
+const ADMIN_ONLY = [/^mail\//, /^integrations/, /^users/, /^purge-demo$/, /^backfill$/, /^backfill\//, /^import$/, /^price-rules$/, /^catalog\/(?!(publish|preflight)$)/];
 export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönetici', role: 'admin' }) {
   const url = new URL(req.url), q = Object.fromEntries(url.searchParams), m = req.method;
   let x;
@@ -1118,6 +1120,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json(await hbTest(env, db, path, m, q, m === 'GET' ? {} : await body(req), user));
   }
   // Kategori eşleştirme ve pazaryerine ürün yükleme
+  // Kanallarda yayınla (ürün yazma yetkisi yeterli; yukarıdaki bölüm kontrolü)
+  if (/^catalog\/(preflight|publish|publish\/status|brands)$/.test(path)) return json(await publishApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
+  if (/^catalog\/(matrix|automap-all|approve-sure|cell|store-categories)$/.test(path)) return json(await catmapApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
   if (path.startsWith('catalog/')) return json(await catalogApi(env, db, ctx, path, m, q, m === 'GET' ? {} : await body(req), user));
   if (path === 'summary' && m === 'GET') {
     const [qs, s, notices, match, st, chInfo, cl] = await Promise.all([
