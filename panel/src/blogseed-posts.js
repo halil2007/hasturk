@@ -608,7 +608,7 @@ Hepsiburada'da her satıştan şu kalemler düşülür:
 - **E-ticaret stopajı:** 1 Ocak 2025'ten beri satışın KDV hariç tutarının %1'i.
 - **Reklam ve diğer:** Kullandığınız reklam ya da oluşan diğer kesintiler.
 
-Komisyon oranları kategoriye göre ciddi farklılık gösterir: elektronik gibi düşük marjlı kategorilerde oranlar genellikle daha düşük, moda ve aksesuar gibi kategorilerde daha yüksektir. Oranlar zaman zaman güncellendiği için kesin rakam vermiyoruz; güncel oranları satıcı panelinizdeki komisyon tablosundan kontrol edin. Kategori bazında genel bir fikir için [Hepsiburada komisyon oranları sayfamıza](/araclar/hepsiburada-komisyon-oranlari) bakabilir, kendi oranınızla net kârınızı [Hepsiburada komisyon hesaplama aracımızla](/araclar/hepsiburada-komisyon-hesaplama) bulabilirsiniz.
+Komisyon oranları kategoriye göre ciddi farklılık gösterir: elektronik gibi düşük marjlı kategorilerde oranlar genellikle daha düşük, moda ve aksesuar gibi kategorilerde daha yüksektir. Oranlar zaman zaman güncellendiği için kesin rakam vermiyoruz; güncel oranları satıcı panelinizdeki komisyon tablosundan kontrol edin. Kategori bazında genel bir fikir için [Hepsiburada komisyon oranları sayfamıza](/araclar/hepsiburada-komisyon-hesaplama) bakabilir, kendi oranınızla net kârınızı [Hepsiburada komisyon hesaplama aracımızla](/araclar/hepsiburada-komisyon-hesaplama) bulabilirsiniz.
 
 ### Örnek kesinti hesabı
 
@@ -735,7 +735,7 @@ Hesapta dikkat edilmesi gereken üç nokta var:
 
 ### Komisyon oranımı nereden öğrenirim?
 
-Güncel oranlar satıcı panelinizdeki komisyon bölümünde ve ürün bazında listelenir. Oranlar zaman zaman güncellendiği ve bazı dönemlerde kampanyaya bağlı özel tarifeler uygulandığı için internetteki tablolara değil, kendi panelinizdeki orana güvenin. Kategori bazında genel bir fikir edinmek için [Trendyol komisyon oranları sayfamıza](/araclar/trendyol-komisyon-oranlari) da bakabilirsiniz; ama hesap yaparken her zaman panelinizdeki oranı kullanın.
+Güncel oranlar satıcı panelinizdeki komisyon bölümünde ve ürün bazında listelenir. Oranlar zaman zaman güncellendiği ve bazı dönemlerde kampanyaya bağlı özel tarifeler uygulandığı için internetteki tablolara değil, kendi panelinizdeki orana güvenin. Kategori bazında genel bir fikir edinmek için [Trendyol komisyon oranları sayfamıza](/araclar/trendyol-komisyon-hesaplama) da bakabilirsiniz; ama hesap yaparken her zaman panelinizdeki oranı kullanın.
 
 ## Trendyol’da satıştan düşülen tüm kesintiler
 
