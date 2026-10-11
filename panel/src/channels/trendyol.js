@@ -726,10 +726,43 @@ export function trendyol(env, meta) {
     return out;
   }
 
+  // ---------- veri sağlık kontrolü: salt okuma örnek (bkz. health.js) ----------
+  // En çok 5 kısa istek (tek deneme, 8 sn): son kargo faturasının kalemlerindeki türler (shipmentPackageType; belge örneği
+  // "Gönderi Kargo Bedeli" / "İade Kargo Bedeli") ve Satış kayıtlarında komisyon tutarı ↔ satış × komisyon oranı.
+  async function financeProbe(now = Date.now()) {
+    const o = { timeout: 8000, tries: 1 }, out = { cargo: null, sale: null };
+    let inv = null;
+    for (let k = 0; k < 2 && !inv; k++) {
+      const to = now - k * 14 * 864e5, from = to - 14 * 864e5;
+      const r = await call(`/finance/che/sellers/${seller}/otherfinancials?transactionType=DeductionInvoices&startDate=${from}&endDate=${to}&page=0&size=200`, o);
+      inv = (r.content || []).find((x) => /kargo|cargo/i.test(`${x.transactionType || ''} ${x.description || ''}`) && x.id) || null;
+    }
+    if (inv) {
+      const r = await call(`/finance/che/sellers/${seller}/cargo-invoice/${encodeURIComponent(inv.id)}/items?page=0&size=500`, o), types = {}, keys = new Set();
+      let ret = 0;
+      for (const it of r.content || []) {
+        Object.keys(it || {}).forEach((x) => keys.add(x));
+        const t = str(it.shipmentPackageType) || '(boş)';
+        types[t] = (types[t] || 0) + 1;
+        if (/[iİ]ade|return/i.test(`${it.shipmentPackageType || ''} ${it.type || ''} ${it.description || ''}`)) ret++;
+      }
+      out.cargo = { invoice: str(inv.id), date: num(inv.transactionDate) || null, items: (r.content || []).length, types, returnItems: ret, keys: [...keys].sort() };
+    } else out.cargo = { invoice: null, items: 0 };
+    const r = await call(`/finance/che/sellers/${seller}/settlements?transactionType=Sale&startDate=${now - 14 * 864e5}&endDate=${now}&page=0&size=100`, o);
+    const ratios = [], keys = new Set();
+    for (const x of r.content || []) {
+      Object.keys(x || {}).forEach((k) => keys.add(k));
+      const sale = num(x.credit) || num(x.debt), rate = num(x.commissionRate), com = Math.abs(num(x.commissionAmount));
+      if (sale > 0 && rate > 0 && com > 0) ratios.push(com / ((sale * rate) / 100));
+    }
+    out.sale = { records: (r.content || []).length, ratios, keys: [...keys].sort() };
+    return out;
+  }
+
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, pushStatus, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, pushStatus, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, financeProbe,
   };
 }

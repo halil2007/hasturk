@@ -819,7 +819,8 @@ export function hepsiburada(env, meta) {
     Komisyon: ['Commission', 'CommissionCorrection', 'CommissionRefund', 'CommissionInvoiceRefund'],
     Stopaj: ['Stoppage', 'StoppageRefund'],
     'Reklam / pazarlama': ['MarketingExpense', 'AdSharingExpense', 'FacebookAdExpense', 'SponsorshipFee', 'StudioExpense'],
-    Kargo: ['ShipmentCostSharingExpense', 'ReturnShipmentCostSharingExpense', 'TransportExpense', 'CargoMargin', 'DeliveryProcessingFee'],
+    // OneClickReturn… (tek tıkla iade kargosu) ve DropShipment… : belgedeki TransactionTypes listesinde var, filtreye girmezse faturalarda görünmezdi
+    Kargo: ['ShipmentCostSharingExpense', 'ReturnShipmentCostSharingExpense', 'OneClickReturnShipmentCostSharingExpense', 'DropShipmentCostSharingExpense', 'TransportExpense', 'CargoMargin', 'DeliveryProcessingFee'],
     'Hizmet bedeli': ['ProcessingFeeExpense', 'PaymentServiceCostReflection', 'InternationalOperationFee'],
     Ceza: ['LateInterestExpense', 'PriceDifferenceExpense', 'RefusedInvoiceExpense'],
   };
@@ -846,10 +847,29 @@ export function hepsiburada(env, meta) {
     return [...by.values()].filter((x) => x.amount);
   }
 
+  // ---------- veri sağlık kontrolü: salt okuma örnek (bkz. health.js) ----------
+  // 2 kısa istek (tek deneme, 8 sn). Belgedeki (Kayıt Bazlı Muhasebe Servisi) kayıtta amount, taxAmount ve netAmount ayrı gelir:
+  // Commission kayıtlarında amount / netAmount ≈ 1,20 ise kesilen tutar KDV dahildir (panel sipariş satırı komisyonunu × 1,20 sayar).
+  // Son 28 günün kayıt türleri: kargo / iade kargosu türleri (ReturnShipmentCostSharingExpense …) gerçekten geliyor mu.
+  async function financeProbe(now = Date.now()) {
+    const o = { timeout: 8000, tries: 1 }, d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10), from = d(now - 28 * 864e5), to = d(now);
+    const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=0&Limit=100&TransactionTypes=Commission&RecordDateStart=${from}&RecordDateEnd=${to}`, o));
+    const gross = [], tax = [], keys = new Set();
+    for (const x of rows) {
+      Object.keys(x || {}).forEach((k) => keys.add(k));
+      const a = Math.abs(money(g(x, 'amount'))), n = Math.abs(money(g(x, 'netAmount'))), t = Math.abs(money(g(x, 'taxAmount')));
+      if (a > 0 && n > 0) gross.push(a / n);
+      if (t > 0 && n > 0) tax.push(t / n);
+    }
+    const all = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=0&Limit=100&RecordDateStart=${from}&RecordDateEnd=${to}`, o)), types = {};
+    for (const x of all) { const t = str(g(x, 'transactionType')) || '(boş)'; types[t] = (types[t] || 0) + 1; }
+    return { commission: { records: rows.length, grossToNet: gross, taxToNet: tax, keys: [...keys].sort() }, types: { records: all.length, types } };
+  }
+
   const missing = ['HB_MERCHANT_ID', 'HB_PASSWORD', 'HB_USER_AGENT'].filter((k) => !env[k]);
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns,
+    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns, financeProbe,
   };
 }
