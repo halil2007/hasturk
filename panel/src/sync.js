@@ -9,6 +9,7 @@ import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, r
 import { getChannels } from './channels/index.js';
 import { typeOf, INTL_TYPES } from './config.js';
 import { syncInvoices, syncSettlements } from './finance.js';
+import { applyListRates } from './commcheck.js';
 import { maintain } from './perf.js';
 import { syncFx, orderRate } from './fx.js';
 import { mergeStatus, chunk, str, sleep, explainHttp, withBudget, budgetLeft, budgetUsed, budgetElapsed } from './util.js';
@@ -123,7 +124,7 @@ export async function saveOrders(db, ch, orders, maps) {
           .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || '', com));
         // Kanalın bildirdiği gerçek komisyon oranı ilana yazılır (elle girilmiş oran korunur). Satır komisyonu KDV dahildir, oran da KDV dahil saklanır
         // Yalnız canlı satır ve son 30 günün siparişi (geçmiş aktarımındaki eski oran güncel oranı ezmesin)
-        if (com != null && it.total > 0 && it.remoteKey && !it.status && o.orderedAt > t - 30 * 864e5) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src = 'api')").bind(Math.round((com / it.total) * 10000) / 100, ch, it.remoteKey));
+        if (com != null && it.total > 0 && it.remoteKey && !it.status && o.orderedAt > t - 30 * 864e5) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src IN ('api', 'list'))").bind(Math.round((com / it.total) * 10000) / 100, ch, it.remoteKey));
       }
       // Kanalın kendi paketleri (Trendyol/Hepsiburada/ikas) panele aynen yansır; paneldeki taslak paketler korunur
       if (Array.isArray(o.packages)) {
@@ -695,14 +696,14 @@ export async function refreshListings(db, ch) {
   const rows = await ch.fetchListings();
   const t = Date.now();
   for (const part of chunk(rows, 40)) {
-    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description, category, images, url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description, category, images, url, mp_category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (channel, remote_id) DO UPDATE SET remote_product_id = excluded.remote_product_id, sku = excluded.sku, barcode = excluded.barcode,
         name = excluded.name, group_name = excluded.group_name, variant_name = excluded.variant_name,
         image = COALESCE(NULLIF(excluded.image, ''), listings.image), images = COALESCE(NULLIF(excluded.images, ''), listings.images),
         brand = COALESCE(NULLIF(excluded.brand, ''), listings.brand), description = COALESCE(NULLIF(excluded.description, ''), listings.description),
         category = COALESCE(NULLIF(excluded.category, ''), listings.category),
-        url = COALESCE(NULLIF(excluded.url, ''), listings.url),
+        url = COALESCE(NULLIF(excluded.url, ''), listings.url), mp_category = COALESCE(NULLIF(excluded.mp_category, ''), listings.mp_category),
         -- Kanal fiyatı boş / 0 verirse (kampanya, arşiv) bilinen fiyat korunur
         -- Panelde 0 / boş kalmış ve gönderilemeyen (bekleyen) fiyat, kanalın gerçek fiyatıyla düzelir
         price = CASE WHEN listings.price_dirty = 1 AND listings.price > 0 THEN listings.price WHEN COALESCE(excluded.price, 0) <= 0 AND listings.price > 0 THEN listings.price ELSE excluded.price END,
@@ -714,10 +715,13 @@ export async function refreshListings(db, ch) {
         OR (excluded.image != '' AND listings.image IS NOT excluded.image) OR (excluded.images != '' AND listings.images IS NOT excluded.images)
         OR (excluded.brand != '' AND listings.brand IS NOT excluded.brand) OR (excluded.description != '' AND listings.description IS NOT excluded.description)
         OR (excluded.category != '' AND listings.category IS NOT excluded.category) OR (listings.price_dirty = 0 AND excluded.price > 0 AND listings.price IS NOT excluded.price) OR (COALESCE(listings.price, 0) <= 0 AND excluded.price > 0) OR (excluded.url != '' AND listings.url IS NOT excluded.url)
+        OR (excluded.mp_category != '' AND listings.mp_category IS NOT excluded.mp_category)
         OR listings.list_price IS NOT excluded.list_price OR listings.remote_stock IS NOT excluded.remote_stock OR listings.pushed_stock IS NOT excluded.remote_stock`)
       .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t,
-        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), normCat(l.category), (l.images || []).length ? JSON.stringify(l.images.slice(0, 12)) : '', /^https:\/\//.test(str(l.url)) ? str(l.url).slice(0, 500) : '')));
+        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), normCat(l.category), (l.images || []).length ? JSON.stringify(l.images.slice(0, 12)) : '', /^https:\/\//.test(str(l.url)) ? str(l.url).slice(0, 500) : '', str(l.mpCategory).slice(0, 200))));
   }
+  // Oranı bilinmeyen Trendyol / Hepsiburada ilanına resmî listeden oran (kategori tek anlamlı eşleşirse)
+  await applyListRates(db, ch.id).catch((e) => log(db, ch.id, 'warn', 'Komisyon listesi oranı yazılamadı: ' + e.message));
   // Deneme modu: örnek alış fiyatları (gerçek kanallar alış fiyatı vermez)
   for (const l of rows) if (l.purchasePrice) await run(db, 'UPDATE products SET purchase_price = ? WHERE sku = ? AND purchase_price = 0', l.purchasePrice, l.sku);
   await markGone(db, ch, rows, before);

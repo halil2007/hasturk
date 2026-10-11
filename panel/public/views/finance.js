@@ -25,6 +25,7 @@ export async function financeView(el, rest, query = {}) {
       <div class="card"><div class="card-head"><h2>Masraf basamakları</h2><span class="muted small">satıştan kâra</span></div><div data-steps></div></div>
       <div class="card flush"><div class="card-pad card-head"><h2>Kanallara göre</h2></div><div data-chtable></div></div>
     </div>
+    <div class="card flush" data-comm></div>
     <div class="card flush" data-prod></div>
     <div class="card flush" data-exp></div>
     <div class="card flush" data-stl></div>
@@ -38,7 +39,7 @@ export async function financeView(el, rest, query = {}) {
     render($('[data-chs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>${chs.map((c) => html`<button class="ch-tab ${f.channel === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}${c.name}</button>`)}`);
     render($('[data-ranges]', el), html`${RANGES.map(([k, t]) => html`<button class="chip ${f.range === k ? 'on' : ''}" data-act="range" data-k="${k}">${t}</button>`)}`);
     $('[data-rlabel]', el).textContent = `${date(d.from)} – ${date(Math.min(d.to, Date.now()) - 1)}`;
-    const t = d.total, ded = t.commission + t.shipping + t.fee + t.rateFee + t.withholding + t.ads + t.penalty + t.returnLoss, net = f.channel ? t.profit : t.net;
+    const t = d.total, ded = t.commission - (t.commCredit || 0) + t.shipping + t.fee + t.rateFee + t.withholding + t.ads + t.penalty + t.returnLoss, net = f.channel ? t.profit : t.net;
     render($('[data-kpis]', el), html`
       <div class="kpi"><div class="label">Satış (ciro)</div><div class="value num">${money0(t.revenue)}</div><div class="delta flat">${n(t.orders)} sipariş</div></div>
       <div class="kpi"><div class="label">Pazaryeri kesintileri</div><div class="value num">${money0(ded)}</div><div class="delta flat">satışın %${n(t.revenue ? (ded / t.revenue) * 100 : 0)}'i</div></div>
@@ -48,7 +49,7 @@ export async function financeView(el, rest, query = {}) {
     render($('[data-steps]', el), t.orders ? html`<div class="stack" style="gap:8px">${d.steps.map((s) => html`<div class="fin-step" style="${s.sum ? 'border-top:1px solid var(--line);padding-top:8px' : ''}">
         <div style="min-width:0"><div class="small" style="font-weight:${s.sum || s.k === 'revenue' ? 750 : 550}">${s.label}</div>${s.note ? html`<div class="tiny muted">${s.note}</div>` : ''}</div>
         <div class="bar" style="background:var(--surface-3);border-radius:6px;height:14px;overflow:hidden"><div style="height:100%;width:${(Math.abs(s.v) / max) * 100}%;border-radius:6px;background:${s.v < 0 ? 'var(--bad)' : s.k === 'profit' || s.k === 'net' ? 'var(--good)' : 'var(--primary)'};opacity:${s.sum || s.k === 'revenue' ? 1 : 0.7}"></div></div>
-        <span class="amt num" style="color:${s.v < 0 ? 'var(--bad)' : s.k === 'net' ? 'var(--good)' : 'inherit'};${s.k === 'net' ? 'font-weight:800' : ''}">${s.v < 0 ? '−' : ''}${money(Math.abs(s.v))}</span>
+        <span class="amt num" style="color:${s.v < 0 ? 'var(--bad)' : s.k === 'net' ? 'var(--good)' : 'inherit'};${s.k === 'net' ? 'font-weight:800' : ''}">${s.v < 0 ? '−' : s.k === 'commCredit' ? '+' : ''}${money(Math.abs(s.v))}</span>
         <span class="pct muted tiny" style="text-align:right">%${n(t.revenue ? (Math.abs(s.v) / t.revenue) * 100 : 0)}</span></div>`)}</div>
       <div class="muted tiny" style="margin-top:10px">Kesinti oranları Ayarlar → Giderler'den gelir; kanal gerçek komisyon, kargo ve hizmet bedelini bildirdiyse o kullanılır. Reklam, ceza ve kesinti faturaları pazaryerinin kestiği faturalardan (fatura tarihine göre) alınır.</div>`
       : html`<div class="empty">Bu dönemde sipariş yok</div>`);
@@ -75,6 +76,35 @@ export async function financeView(el, rest, query = {}) {
       </tbody></table></div>${inv.total > inv.items.length ? html`<div class="pager"><span class="muted small">İlk ${n(inv.items.length)} fatura gösteriliyor</span></div>` : ''}`
       : html`<div class="empty">Bu dönemde fatura yok${isAdmin() ? ' — “Faturaları çek” ile kanallardan alın' : ''}</div>`}
       <div class="muted tiny" style="padding:0 16px 14px">Faturalar ${inv.supported.map((c) => ch(c).name).join(', ')} finans servisinden alınır ve panelde saklanır (6 saatte bir güncellenir). PDF bağlantısı kanal veriyorsa gösterilir.</div>`);
+  }
+  // Komisyon kontrolü (Trendyol / Hepsiburada): pazaryerinin komisyon indirimi, sonradan geri verdiği komisyon ve resmî listeyle sağlama
+  let comm = null;
+  function drawCommission() {
+    const box = $('[data-comm]', el);
+    const head = html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:220px"><h2>Komisyon kontrolü</h2><div class="muted small">Trendyol ve Hepsiburada · tutarlar KDV dahil (cebinizden çıkan)</div></div></div>`;
+    if (!comm) return render(box, html`${head}<div class="empty"><i class="ico ico-sync spin"></i></div>`);
+    if (comm.error || !comm.supported) return render(box, html`${head}<div class="empty">${comm.error || 'Komisyon kontrolü Trendyol ve Hepsiburada için yapılır.'}</div>`);
+    const dsc = comm.discounts, cr = comm.credits, L = comm.list, src = (x) => (x.ref === 'list' ? 'resmî liste' : 'olağan');
+    const srcs = Object.entries(L.sources || {}).map(([k, v]) => `${ch(k).name}: ${v.title || 'resmî liste'} (${v.published.split('-').reverse().join('.')}${v.basis === 'kdv-haric' ? ', oran KDV hariç → ×1,20' : ', oran KDV dahil'})`).join(' · ');
+    render(box, html`${head}
+      <div class="kpis" style="padding:0 16px 12px">
+        <div class="kpi"><div class="label">Pazaryeri komisyon indirimi</div><div class="value num" style="color:${dsc.amount ? 'var(--good)' : 'inherit'}">${money0(dsc.amount)}</div><div class="delta flat">${dsc.orders ? `${n(dsc.orders)} sipariş, ${n(dsc.lines)} satır` : 'bu dönemde yok'}</div></div>
+        <div class="kpi"><div class="label">Komisyon iadesi (pazaryeri karşıladı)</div><div class="value num" style="color:${cr.amount > 0 ? 'var(--good)' : 'inherit'}">${money0(cr.amount)}</div><div class="delta flat">${cr.orders ? `${n(cr.orders)} sipariş · kâra eklendi` : 'hakediş kayıtlarında yok'}</div></div>
+        <div class="kpi"><div class="label">Listeden yüksek oran</div><div class="value num" style="color:${L.aboveCount ? 'var(--bad)' : 'var(--good)'}">${n(L.aboveCount)}</div><div class="delta flat">${n(L.matched)}/${n(L.total)} ilan resmî listeyle eşleşti</div></div>
+      </div>
+      ${dsc.top.length ? html`<details style="padding:4px 16px"><summary style="cursor:pointer;font-weight:650">İndirimli komisyonlu satırlar (${n(dsc.lines)})</summary>
+        <div class="muted tiny" style="margin:6px 0">Satırın gerçek komisyon oranı, ürünün olağan oranından (son 90 günün ortancası) ya da resmî listedeki orandan en az 1 puan düşük: farkı pazaryeri karşıladı. Bu indirim komisyon satırında zaten düşük kesildi; kâra ayrıca eklenmez.</div>
+        <div class="table-wrap"><table class="t"><thead><tr><th>Sipariş</th><th class="r">Normal</th><th class="r">Kesilen</th><th class="r">Kazancınız</th></tr></thead><tbody>
+        ${dsc.top.map((x) => html`<tr><td><div>${chLogo(x.channel, true)} <a class="link" href="#/siparisler/${encodeURIComponent(x.id)}"><b>#${x.order_number}</b></a> <span class="muted tiny">${date(x.ordered_at)}</span></div><div class="tiny muted ellipsis" style="max-width:340px">${x.name || ''}</div></td>
+          <td class="r num">%${n(x.normal)}<div class="tiny muted">${src(x)}</div></td><td class="r num">%${n(x.rate)}</td><td class="r num" style="font-weight:650;color:var(--good)">${money(x.saved)}</td></tr>`)}
+        </tbody></table></div></details>` : ''}
+      ${L.above.length ? html`<details style="padding:4px 16px"><summary style="cursor:pointer;font-weight:650;color:var(--bad)">Resmî listeden yüksek komisyon (${n(L.aboveCount)} ilan)</summary>
+        <div class="muted tiny" style="margin:6px 0">Pazaryerinin siparişte bildirdiği oran, kategorinin resmî liste oranından 0,5 puandan fazla yüksek. Kategori eşleşmesi, KDV farkı ya da hatalı oran olabilir; pazaryeri panelinden kontrol edin.</div>
+        <div class="table-wrap"><table class="t"><thead><tr><th>İlan</th><th class="r">Kanal oranı</th><th class="r">Liste</th><th class="r">Fark</th></tr></thead><tbody>
+        ${L.above.map((x) => html`<tr><td><div>${chLogo(x.channel, true)} ${x.product_id ? html`<a class="link" href="#/urunler/${x.product_id}">${x.name || x.remote_id}</a>` : x.name || x.remote_id}</div><div class="tiny muted ellipsis" style="max-width:360px" title="${x.path}">${x.category} → ${x.path}</div></td>
+          <td class="r num">%${n(x.rate)}</td><td class="r num">%${n(x.list)}</td><td class="r num" style="font-weight:650;color:var(--bad)">+${n(x.gap)} puan</td></tr>`)}
+        </tbody></table></div></details>` : ''}
+      <div class="muted tiny" style="padding:8px 16px 14px">Komisyon iadesi: pazaryerinin hakediş ekstresindeki komisyon düzeltmeleri (Trendyol "Komisyon düzeltme", Hepsiburada komisyon iadesi); panelin saydığı komisyona zaten yansımış kısmı (ör. kısmi iade) ikinci kez eklenmez. Resmî liste: ${srcs}. Kategori adı listede tek anlamlı eşleşen ilanlar karşılaştırılır (${n(L.withCategory)} ilanın pazaryeri kategorisi biliniyor); oranı bilinmeyen ${n(L.fallback)} ilanda tahmin için liste oranı kullanılıyor.</div>`);
   }
   // Ürünlere göre kârlılık (en çok kazandıran / zarar ettiren / en çok iade edilen)
   let prod = null, exp = null;
@@ -167,6 +197,7 @@ export async function financeView(el, rest, query = {}) {
         <div class="kpi"><div class="label">Bu dönemde ödenen</div><div class="value num">${money0(t.paid)}</div><div class="delta flat">ödeme gününe göre</div></div>
         <div class="kpi"><div class="label">Mutabakat</div><div class="value num" style="color:${t.mismatched ? 'var(--warn, #b45309)' : 'var(--good)'}">${!t.checked ? '—' : t.mismatched ? `${n(t.mismatched)} fark` : 'Uyumlu'}</div><div class="delta flat">${n(t.checked)} sipariş kontrol edildi</div></div>
       </div>
+      ${t.commissionCredit && t.commissionCredit.orders ? html`<div class="notice small" style="margin:0 16px 12px"><i class="ico ico-check"></i><div><b>Komisyon iadesi / indirimi (pazaryeri karşıladı):</b> ${n(t.commissionCredit.orders)} siparişte ${money(t.commissionCredit.amount)}. Panel hesabına eklendi; fark sayılmadı.</div></div>` : ''}
       <div class="card-pad" style="padding-top:0;padding-bottom:6px"><b class="small">Yaklaşan ödemeler</b></div>
       ${dayTable(upc, 'due', 'stlup', 'Bekleyen ödeme yok', true)}
       <div class="card-pad" style="padding-bottom:6px"><b class="small">Bu dönemde ödenenler</b></div>
@@ -192,9 +223,10 @@ export async function financeView(el, rest, query = {}) {
     const [from, to] = span();
     const p = new URLSearchParams({ from, to });
     if (f.channel) p.set('channel', f.channel);
-    inv = null; prod = null;
+    inv = null; prod = null; comm = null;
     [d, exp] = await Promise.all([api('finance?' + p), api('expenses').catch(() => ({ items: [], categories: [] }))]);
-    draw(); drawProducts(); drawExpenses();
+    draw(); drawProducts(); drawExpenses(); drawCommission();
+    api('finance/commission?' + p).then((r) => { comm = r; drawCommission(); }).catch((e) => { comm = { error: e.message }; drawCommission(); });
     api('finance/products?' + new URLSearchParams([...p, ['sort', f.psort]])).then((r) => { prod = r; drawProducts(); }).catch(() => { prod = { rows: [], total: 0 }; drawProducts(); });
     if (f.itype) p.set('type', f.itype);
     stl = null; drawSettlements();

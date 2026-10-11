@@ -189,6 +189,8 @@ export function trendyol(env, meta) {
       stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
       brand: str((p.brand && typeof p.brand === 'object' ? p.brand.name : p.brand) || p.brandName), description: str(p.description),
       url: str(v.productUrl || p.productUrl),
+      // Trendyol kategori adı (onaylı ürün v2: category { id, name }; eski filterProducts: categoryName): resmî komisyon listesiyle sağlama için
+      mpCategory: str((p.category && typeof p.category === 'object' ? p.category.name : p.category) || p.categoryName),
     };
   };
   async function pagedV2(path) {
