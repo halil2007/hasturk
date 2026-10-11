@@ -343,6 +343,8 @@ export const MIGRATIONS = [
   'UPDATE settlements SET due_date = COALESCE(payment_date, date) WHERE due_date IS NULL',
   'CREATE INDEX IF NOT EXISTS settlements_date ON settlements(date)',
   'CREATE INDEX IF NOT EXISTS settlements_open ON settlements(channel, date) WHERE paid = 0',
+  // Trendyol komisyonu KDV dahil (tek seferlik çevrimi tetikler; bkz. once:ty_comm_incl_1)
+  'CREATE INDEX IF NOT EXISTS listings_comm_src ON listings(channel, commission_src)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -398,6 +400,14 @@ export function init(db) {
       await db.batch([
         db.prepare("UPDATE listings SET commission = ROUND(commission / 1.2, 2) WHERE commission_src = 'api' AND commission IS NOT NULL AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:comm_net_1')"),
         db.prepare("INSERT INTO settings (k, v) VALUES ('once:comm_net_1', '1') ON CONFLICT (k) DO NOTHING"),
+      ]);
+      // Tek seferlik: Trendyol sipariş satırındaki komisyon oranı KDV dahildir (resmî komisyon tablosu "KDV Dahil"); önceden üzerine
+      // %20 eklenerek kaydedilmişti. Trendyol (Trendyol Go hariç) satır tutarları 1,2'ye bölünür, ilanların oranı son siparişten yeniden hesaplanır.
+      await db.batch([
+        db.prepare("UPDATE order_items SET commission = ROUND(commission / 1.2, 2) WHERE commission IS NOT NULL AND order_id IN (SELECT id FROM orders WHERE channel LIKE 'trendyol%' AND channel NOT LIKE 'trendyolgo%') AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:ty_comm_incl_1')"),
+        db.prepare(`UPDATE listings SET commission = (SELECT ROUND(i.commission / i.total * 100, 2) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.channel = listings.channel AND i.remote_key = listings.remote_id AND i.commission IS NOT NULL AND i.total > 0 ORDER BY o.ordered_at DESC LIMIT 1)
+          WHERE channel LIKE 'trendyol%' AND channel NOT LIKE 'trendyolgo%' AND commission_src = 'api' AND NOT EXISTS (SELECT 1 FROM settings WHERE k = 'once:ty_comm_incl_1')`),
+        db.prepare("INSERT INTO settings (k, v) VALUES ('once:ty_comm_incl_1', '1') ON CONFLICT (k) DO NOTHING"),
       ]);
       await db.batch([
         db.prepare("INSERT INTO settings (k, v) VALUES ('schema_v', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(SCHEMA_V)),

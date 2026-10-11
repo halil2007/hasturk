@@ -64,7 +64,8 @@ export function trendyol(env, meta) {
     const v = num(p.packageGrossAmount) - num(p.packageSellerDiscount) + num(p.totalSgrFee);
     return net > 0 && (v > net + num(p.packageTyDiscount) + num(p.totalSgrFee) + 0.05 || v < net - 0.05) ? net : v;
   };
-  const comm = (total, rate) => r2(total * rate / 100 * 1.2);
+  // Trendyol'un satırdaki komisyon oranı KDV dahildir (resmî komisyon tablosu "KDV Dahil"): üzerine KDV eklenmez
+  const comm = (total, rate) => r2(total * rate / 100);
 
   // Trendyol her paketi ayrı kayıt olarak verir; aynı sipariş numarasındaki paketler tek siparişte toplanır.
   // Bölünen (UnPacked) ya da kısmi iptalle bozulan paket (yeni paketlerin originPackageIds alanında geçer) yerini yeni paketlere
