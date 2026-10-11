@@ -15,6 +15,9 @@
   Cache-Control: public, max-age=31536000, immutable
 /assets/tools.js
   Cache-Control: public, max-age=31536000, immutable
+# Resmî komisyon listeleri (komisyon-<pazaryeri>.json; adres içerikle değişir, ?v=…)
+/assets/komisyon-*
+  Cache-Control: public, max-age=31536000, immutable
 # config.js elle düzenlenebildiği için kısa tutulur (derlemeden yüklense bile en geç 10 dk'da yenilenir)
 /assets/config.js
   Cache-Control: public, max-age=600

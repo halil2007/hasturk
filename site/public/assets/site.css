@@ -1316,7 +1316,7 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 .cp-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
 .cp-x svg { width: 15px; height: 15px; }
 .cp-x:hover { background: #eef2f8; color: var(--text); }
-.cp-list { position: absolute; z-index: 30; left: 12px; right: 12px; top: calc(100% - 44px); margin: 0; padding: 6px; list-style: none; max-height: min(360px, 60vh); overflow-y: auto; overscroll-behavior: contain; background: #fff; border: 1px solid #cfdaee; border-radius: 12px; box-shadow: 0 18px 44px rgb(20 45 100 / .18); }
+.cp-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 6px; list-style: none; max-height: min(360px, 60vh); overflow-y: auto; overscroll-behavior: contain; background: #fff; border: 1px solid #cfdaee; border-radius: 12px; box-shadow: 0 18px 44px rgb(20 45 100 / .18); }
 .cp-list li[role="option"] { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border-radius: 9px; cursor: pointer; }
 .cp-list li[aria-selected="true"], .cp-list li[role="option"]:hover { background: var(--primary-soft); }
 .cp-n { display: grid; min-width: 0; }
@@ -1331,7 +1331,8 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 .cp-rate { color: #138a4b; font-weight: 650; }
 /* araç sayfası alt bilgi satırı */
 .tool-hero p.tool-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin: 14px 0 0; font-size: 13px; color: var(--muted); }
-.tool-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.tool-meta > span { display: inline-flex; align-items: flex-start; gap: 6px; text-align: left; }
+.tool-meta svg { margin-top: 3px; }
 .tool-meta svg { width: 14px; height: 14px; color: var(--primary); flex: 0 0 14px; }
 /* rehber: içindekiler + metin */
 .tg { display: grid; gap: 28px; }
@@ -1403,3 +1404,17 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 }
 @media (max-width: 999px) { .tg-side { display: contents; } .tg-body { order: 2; } .tg-links { order: 3; } .tg-toc { order: 0; } .tg-rates { order: 1; } }
 @media (max-width: 479px) { .cg .cf-grid > .cf:has(.seg) { grid-column: 1 / -1; } }
+.rt thead th small { display: block; font-size: 10.5px; letter-spacing: .03em; font-weight: 600; color: #9aa4b5; }
+@media (min-width: 600px) { .rt { table-layout: fixed; } .rt thead th:first-child { width: 52%; } .rt thead th:last-child { width: 96px; } }
+.rate-sec { padding-top: 36px; }
+.calc fieldset.cmp-c { padding: 14px; border: 1px solid var(--line); border-radius: 16px; }
+.calc fieldset.cmp-c.best { border-color: #8fd4b0; }
+.calc fieldset.parcel { padding: 12px 14px 14px; border: 1px dashed #cfd9ea; border-radius: 14px; position: relative; }
+.calc fieldset.parcel > legend { float: left; width: 100%; padding: 0; }
+.calc fieldset.parcel > legend + * { clear: both; }
+.calc fieldset.parcel .parcel-x { position: absolute; top: 8px; right: 10px; }
+.calc fieldset.pbox { padding: 18px; border: 1px solid var(--line); border-radius: 16px; }
+.calc fieldset.pbox > legend { float: left; width: 100%; padding: 0; margin-bottom: 2px; }
+.calc fieldset.pbox > legend + * { clear: both; }
+.cmp .cf-grid { align-items: end; }
+.calc fieldset.parcel > :not(legend) { clear: both; }

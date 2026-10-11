@@ -50,7 +50,7 @@ export function makeToolPages({ esc, ico, tick, faqHtml, toolIc, channels, comm,
       <p>${esc(R(t.lead, c))}</p>
       <div class="checks"><span>${tick}Ücretsiz, kayıt gerekmez</span><span>${tick}Tutarlar KDV dahil</span><span>${tick}Veriler tarayıcınızda kalır</span></div></div>
     ${calcForm(t, channels, t.mp ? (srcs[t.mp] ? { [t.mp]: srcs[t.mp] } : {}) : srcs)}
-    <p class="tool-meta">${mp && srcs[mp] ? `<span>${ico('i-shield')}Kaynak: ${srcLine(mp)}</span>` : mp ? `<span>${ico('i-eye')}${esc(MARKETPLACES[mp])} kategori oranını satıcı panelinizden girin; oran KDV hariçse araç KDV'yi ekler.</span>` : ''}<span>${ico('i-calendar')}Son güncelleme: ${updated}</span></p>
+    <p class="tool-meta">${mp && srcs[mp] ? `<span>${ico('i-shield')}<span>Kaynak: ${srcLine(mp)}</span></span>` : mp ? `<span>${ico('i-eye')}<span>${esc(MARKETPLACES[mp])} kategori oranını satıcı panelinizden girin; oran KDV hariçse araç KDV'yi ekler.</span></span>` : ''}<span>${ico('i-calendar')}<span>Son güncelleme: ${updated}</span></span></p>
     <p class="tool-cta"><a href="/demo#deneme">Bu hesabı her sipariş için otomatik yapın ${ico('i-arrow')} <b>7 gün ücretsiz deneyin</b></a></p>
   </div>
 </section>
@@ -112,7 +112,7 @@ ${toolCta}`;
 <section class="sec rate-sec">
   <div class="wrap" data-rt>
     ${groups.map((g) => `<section class="rt-g" id="${g.id}" data-rt-g><h2>${esc(g.top)} <small>${g.rows.length} kategori · ${g.min === g.max ? pct(g.min) : `${pct(g.min)}–${pct(g.max)}`}</small></h2>
-    <div class="tw"><table class="gt num rt"><thead><tr><th scope="col">Kategori</th><th scope="col">Resmî oran${ex ? ' (KDV hariç)' : ''}</th>${ex ? '<th scope="col">Kesilen (KDV dahil)</th>' : ''}<th scope="col"><span class="vh">Hesapla</span></th></tr></thead><tbody>${g.rows.map(([sub, r, path]) => `<tr data-q="${esc(path)}"><th scope="row">${esc(sub)}</th><td>${pct(r)}</td>${ex ? `<td>${pct(charged(r, d.basis))}</td>` : ''}<td>${calc ? `<a href="/araclar/${calc.slug}?kat=${encodeURIComponent(path)}" aria-label="${esc(sub)} için hesapla">Hesapla</a>` : ''}</td></tr>`).join('')}</tbody></table></div>
+    <div class="tw"><table class="gt num rt"><thead><tr><th scope="col">Kategori</th><th scope="col">Resmî oran<small>${ex ? 'KDV hariç' : 'KDV dahil'}</small></th>${ex ? '<th scope="col">Kesilen<small>KDV dahil</small></th>' : ''}<th scope="col"><span class="vh">Hesapla</span></th></tr></thead><tbody>${g.rows.map(([sub, r, path]) => `<tr data-q="${esc(path)}"><th scope="row">${esc(sub.split(' > ').join(' › '))}</th><td>${pct(r)}</td>${ex ? `<td>${pct(charged(r, d.basis))}</td>` : ''}<td>${calc ? `<a href="/araclar/${calc.slug}?kat=${encodeURIComponent(path)}" aria-label="${esc(sub)} için hesapla">Hesapla</a>` : ''}</td></tr>`).join('')}</tbody></table></div>
     <p class="rt-top"><a href="#rt-q">Başa dön ↑</a></p></section>`).join('\n    ')}
     <p class="tg-upd">${ico('i-calendar')}Oranlar ${esc(ng)} ${esc(date)} tarihli resmî listesinden alınmıştır. Mağazanıza özel anlaşma, kampanya ya da dönemsel indirimler oranı değiştirebilir; kesin oran için satıcı panelinize bakın.</p>
   </div>

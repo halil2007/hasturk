@@ -519,8 +519,7 @@ const fees = () => `<div class="cf-grid g3">${fld('ship', 'Kargo', 65, '₺', 'S
 // Kategori seçici (resmî liste varsa). srcs: { pazaryeri: { src, name, date, basis, count, page } }
 const picker = (srcs) => `<div class="cp" data-cp data-srcs="${esc(JSON.stringify(srcs))}">
   <label class="cf-l" for="cp-q">Kategori <small data-cp-cap></small></label>
-  <div class="cp-box">${ico('i-search')}<input id="cp-q" class="in" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cp-list" autocomplete="off" spellcheck="false" placeholder="Kategori arayın: ör. tencere, kılıf, mont"><button type="button" class="cp-x" data-cp-clear aria-label="Kategori seçimini temizle" hidden>${ico('i-x')}</button></div>
-  <ul id="cp-list" class="cp-list" role="listbox" aria-label="Kategoriler" hidden></ul>
+  <div class="cp-box">${ico('i-search')}<input id="cp-q" class="in" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cp-list" autocomplete="off" spellcheck="false" placeholder="Kategori arayın: ör. tencere, kılıf, mont"><button type="button" class="cp-x" data-cp-clear aria-label="Kategori seçimini temizle" hidden>${ico('i-x')}</button><ul id="cp-list" class="cp-list" role="listbox" aria-label="Kategoriler" hidden></ul></div>
   <p class="cp-st" data-cp-st aria-live="polite"></p>
 </div>`;
 

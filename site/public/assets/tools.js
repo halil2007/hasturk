@@ -255,12 +255,12 @@
       if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) open(); else hl(cp.i + 1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); hl(cp.i - 1); }
       else if (e.key === 'Enter') { e.preventDefault(); if (!list.hidden && cp.items.length) pick(cp.items[Math.max(0, cp.i)]); }
-      else if (e.key === 'Escape') { if (!list.hidden) { e.preventDefault(); close(); } }
+      else if (e.key === 'Escape') { if (!list.hidden) { e.preventDefault(); e.stopPropagation(); close(); } }
       else if (e.key === 'Tab') close();
     });
     list.addEventListener('mousedown', (e) => e.preventDefault());
     list.addEventListener('click', (e) => { const li = e.target.closest('[role="option"]'); if (li) pick(cp.items[+li.dataset.i]); });
-    q.addEventListener('blur', () => setTimeout(close, 120));
+    q.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== q) close(); }, 120));
     clr.addEventListener('click', () => { cp.sel = null; cp.manual = false; q.value = ''; clr.hidden = true; status(); run(); q.focus(); });
     // Oran elle değiştirilirse seçili kategori korunur ama "elle girilen" olarak işaretlenir
     f.addEventListener('input', (e) => { if (cp.sel && (e.target.name === 'com' || e.target.name === 'basis')) { cp.manual = true; status(); run(); } });
