@@ -222,6 +222,31 @@
   }));
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
 
+  // Entegrasyonlar mega menüsü (masaüstü): fareyle kısa gecikmeyle açılır / kapanır; klavyede odakla açılır, Escape kapatır;
+  // dokunmatik ekranda ilk dokunuş açar, ikinci dokunuş /entegrasyonlar'a gider. JS yoksa CSS hover / focus çalışır.
+  $$('[data-mm]').forEach((dd) => {
+    const trg = dd.querySelector(':scope > a'), panel = $('[data-mm-panel]', dd);
+    if (!trg || !panel) return;
+    let tm = null, touch = false, hush = false; // hush: Escape ile kapatıldı; odak tetikleyicide kalınca yeniden açılmaz
+    const set = (o) => { clearTimeout(tm); dd.classList.toggle('open', o); trg.setAttribute('aria-expanded', o); };
+    const later = (o, ms) => { clearTimeout(tm); tm = setTimeout(() => set(o), ms); };
+    dd.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') { hush = false; later(true, 120); } });
+    dd.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') later(false, 220); });
+    trg.addEventListener('pointerdown', (e) => { touch = e.pointerType === 'touch' || e.pointerType === 'pen'; });
+    trg.addEventListener('click', (e) => { if (touch && !dd.classList.contains('open')) { e.preventDefault(); hush = false; set(true); } touch = false; });
+    dd.addEventListener('focusin', () => { if (!hush && !touch) set(true); });
+    dd.addEventListener('focusout', (e) => { if (!dd.contains(e.relatedTarget)) { hush = false; later(false, 60); } });
+    dd.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dd.classList.contains('open')) { e.stopPropagation(); hush = true; set(false); trg.focus({ preventScroll: true }); }
+      else if (e.key === 'ArrowDown' && e.target === trg) {
+        e.preventDefault(); hush = false; set(true); const f = $('a', panel); if (f) f.focus();
+      }
+    });
+    document.addEventListener('pointerdown', (e) => { if (dd.classList.contains('open') && !dd.contains(e.target)) set(false); });
+    // Başka bir menü öğesine geçilince hemen kapan (Özellikler açılırken üst üste binmesin)
+    $$('.nav > a, .nav > .dd:not([data-mm])').forEach((o) => o.addEventListener('pointerenter', () => { if (dd.classList.contains('open')) set(false); }));
+  });
+
   // Mobil menü
   // Menü ekrandan uzun olabilir (açılır listeler): kendi içinde kayar. Yükseklik menünün ekrandaki yerine göre ayarlanır
   // (üstteki iletişim şeridi görünürken de alttaki bağlantılara ulaşılır; sayfa kayınca yeniden hesaplanır).
@@ -234,7 +259,7 @@
     };
     mb.addEventListener('click', () => set(!mn.classList.contains('open')));
     mn.addEventListener('click', (e) => { if (e.target.closest('a')) set(false); });
-    window.addEventListener('resize', () => { if (window.innerWidth >= 1040) set(false); else fit(); });
+    window.addEventListener('resize', () => { if (window.innerWidth >= 1000) set(false); else fit(); });
     window.addEventListener('scroll', fit, { passive: true });
     mn.addEventListener('toggle', fit, true);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mn.classList.contains('open')) set(false); });

@@ -138,11 +138,11 @@ async function listOrders(db, q) {
   if (rows.length) {
     const ids = rows.map((r) => r.id);
     for (const it of await allIn(db, ids, (ph, part) => [`SELECT i.order_id, i.name, i.quantity, i.returned_qty, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
-        p.purchase_price, p.ship_cost, l.commission AS listing_commission, l.commission_src AS listing_commission_src
+        p.purchase_price, p.ship_cost, l.commission AS listing_commission, l.commission_src AS listing_commission_src, l.url AS l_url, l.remote_id AS l_rid, l.remote_product_id AS l_pid, i.barcode AS l_bc
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE i.order_id IN (${ph}) ORDER BY i.rowid`, part])) {
-      (items[it.order_id] = items[it.order_id] || []).push({ name: it.pname || it.name, qty: it.quantity, sku: it.sku, image: it.image || '' });
+      (items[it.order_id] = items[it.order_id] || []).push({ name: it.pname || it.name, qty: it.quantity, sku: it.sku, image: it.image || '', url: it.l_url || '', remote_id: it.l_rid || '', remote_product_id: it.l_pid || '', barcode: it.l_bc || '', lname: it.name || '' });
       (full[it.order_id] = full[it.order_id] || []).push(it);
     }
   }
@@ -719,7 +719,7 @@ async function listBuybox(db, q) {
   const base = `FROM listings l LEFT JOIN buybox b ON b.channel = l.channel AND b.remote_id = l.remote_id LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id LEFT JOIN products p ON p.id = l.product_id`;
   const w = 'WHERE ' + where.join(' AND ');
   const limit = Math.max(1, Math.min(Number(q.limit) || 50, 200)), page = Math.max(1, Number(q.page) || 1);
-  const rows = await all(db, `SELECT l.channel, l.remote_id, l.name, l.barcode, l.sku, l.price, COALESCE(NULLIF(l.image, ''), p.image) AS image, p.name AS product_name,
+  const rows = await all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.url, l.name, l.barcode, l.sku, l.price, COALESCE(NULLIF(l.image, ''), p.image) AS image, p.name AS product_name,
       b.rank, b.prev_rank, b.buybox_price, b.second_price, b.third_price, b.multi, b.checked_at, b.error,
       r.enabled AS rule_on, r.min_price, r.max_price, r.target_price, r.step,
       (SELECT MAX(at) FROM price_changes c WHERE c.channel = l.channel AND c.remote_id = l.remote_id AND c.ok = 1) AS last_change

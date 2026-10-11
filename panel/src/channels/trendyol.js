@@ -187,6 +187,7 @@ export function trendyol(env, meta) {
       image: str(((p.images || v.images || [])[0] || {}).url), images: imageList((v.images || []).length ? v.images : p.images), price: num(price.salePrice ?? v.salePrice), listPrice: num(price.listPrice ?? v.listPrice),
       stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
       brand: str((p.brand && typeof p.brand === 'object' ? p.brand.name : p.brand) || p.brandName), description: str(p.description),
+      url: str(v.productUrl || p.productUrl),
     };
   };
   async function pagedV2(path) {

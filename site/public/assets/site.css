@@ -57,7 +57,9 @@ p { margin: 0; }
    Sayfa overflow ile kilitlenmez: html / body'de overflow değişince yapışkan üst çubuk sayfayla birlikte kayıp gidiyor */
 .mnav a { color: var(--text); padding: 12px 6px; font-weight: 600; border-bottom: 1px solid var(--line); }
 .mnav .btn { margin-top: 10px; border-bottom-width: 1.5px; }
-@media (min-width: 1040px) { .nav, .top-cta { display: flex; } .menu-btn, .mnav { display: none !important; } }
+@media (min-width: 1000px) { .nav, .top-cta { display: flex; } .menu-btn, .mnav { display: none !important; } }
+/* 1000–1099 px: masaüstü menü sığsın diye boşluklar biraz daralır */
+@media (min-width: 1000px) and (max-width: 1099px) { .top .wrap { gap: 12px; } .nav a { padding: 8px 9px; } .top-cta .btn { padding: 0 14px; } }
 
 /* giriş (hero) */
 .hero { position: relative; overflow: hidden; background: radial-gradient(900px 480px at 85% 10%, #dfeaff 0%, transparent 65%), radial-gradient(700px 420px at 0% 0%, #eef4ff 0%, transparent 70%), linear-gradient(180deg, #f6f9ff 0%, #fff 100%); }
@@ -621,7 +623,7 @@ a.mf:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .call-float { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px 12px 14px; border-radius: 99px; background: var(--primary); color: #fff; font-weight: 700; font-size: 15px; box-shadow: 0 14px 30px rgb(31 107 255 / .36); text-decoration: none !important; transition: transform .15s; }
 .call-float:hover { transform: translateY(-2px); }
 .call-float svg { width: 22px; height: 22px; }
-@media (min-width: 1040px) { .call-float { display: none; } }
+@media (min-width: 1000px) { .call-float { display: none; } }
 @media (max-width: 640px) { .call-float { padding: 14px; } .call-float span { display: none; } }
 .btn-xl { min-height: 56px; padding: 0 26px; font-size: 17px; border-radius: 12px; }
 .hero-note { margin-top: 12px; font-size: 14px; color: var(--muted); }
@@ -975,3 +977,48 @@ html { overflow-x: clip; }
 .rl b { display: block; font-size: 15px; line-height: 1.3; }
 .rl small { display: block; color: var(--muted); font-size: 12.5px; }
 @media (max-width: 639px) { .ask.big { padding: 24px 20px; } .ask .ctas, .ask .ctas .btn, .int-hero .ctas .btn { width: 100%; } }
+
+/* ---------- Entegrasyonlar mega menüsü: üst çubuk genişliğinde panel (gruplar · popüler kanallar · öne çıkan kart · alt bağlantılar) ---------- */
+.top .wrap { position: relative; }
+.dd-mm { position: static; }
+.dd-p.mm { left: 28px; right: 28px; top: calc(100% - 6px); padding-top: 6px; transform: translateY(8px); }
+.dd-mm:hover .dd-p.mm, .dd-mm:focus-within .dd-p.mm, .dd-mm.open .dd-p.mm { transform: translateY(0); }
+/* JS varken açma / kapama site.js'te (gecikmeli hover, dokunma, klavye); yoksa CSS hover / focus çalışır */
+.js .dd-mm:not(.open) .dd-p.mm { opacity: 0; visibility: hidden; transform: translateY(8px); pointer-events: none; }
+.js .dd-mm:not(.open) .dd-c { transform: none; }
+.mm-box { background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 24px 60px rgb(20 45 100 / .16); overflow: hidden; }
+.mm-body { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, .82fr); gap: 22px; padding: 20px 22px 22px; }
+.mm-h { font-size: 11.5px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 2px 0 10px 12px; }
+.mm-groups { display: grid; align-content: start; gap: 2px; }
+.nav .mm-groups .mi { align-items: center; }
+.nav .mm-groups .mi:hover b { color: var(--primary); }
+.mm-pop { border-left: 1px solid var(--line); padding-left: 22px; }
+.mm-pop .mm-h { margin-left: 2px; }
+.mm-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; }
+.nav .dd-p .mm-tile { display: flex; flex-direction: column; gap: 7px; padding: 7px !important; border: 1px solid transparent; border-radius: 13px !important; transition: background .15s, border-color .15s; min-width: 0; }
+.nav .mm-tile:hover { background: #f6f9ff; border-color: #dbe6fb; text-decoration: none; }
+.nav .mm-tile:hover .lt { border-color: #c9d8f5; }
+.mm-tile .lt { height: 46px; border-radius: 10px; font-size: 17px; transition: border-color .15s; }
+.mm-tile > span:last-child { min-width: 0; padding: 0 3px; }
+.mm-tile b { display: block; font-size: 13.5px; font-weight: 650; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm-tile small { display: block; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.nav .dd-p .mm-feat { display: flex; flex-direction: column; gap: 6px; padding: 16px !important; border-radius: 14px !important; background: linear-gradient(160deg, #f1f6ff 0%, #e8f0ff 100%); border: 1px solid #d9e5fd; color: var(--text); transition: border-color .15s, box-shadow .15s; }
+.nav .mm-feat:hover { text-decoration: none; border-color: #b8cdfa; box-shadow: 0 10px 26px rgb(31 107 255 / .12); }
+.mm-kick { align-self: flex-start; font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--primary); background: #fff; border-radius: 99px; padding: 2px 9px; }
+.mm-vis { display: block; margin: 4px 0 2px; }
+.mm-art { display: block; width: 100%; height: auto; max-height: 112px; font-family: "Inter", system-ui, sans-serif; }
+.mm-feat b { font-size: 16px; font-weight: 750; letter-spacing: -.01em; }
+.mm-d { font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.mm-feat em { font-style: normal; margin-top: auto; padding-top: 4px; color: var(--primary); font-weight: 650; font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
+.mm-feat em svg { width: 15px; height: 15px; transition: transform .15s; }
+.mm-feat:hover em svg { transform: translateX(3px); }
+.mm-foot.mega-foot { border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; justify-content: flex-start; gap: 28px; padding: 13px 34px; }
+.nav .mm-foot a span { color: var(--text-2); font-weight: 500; margin-right: 2px; }
+.nav .mm-foot a:last-child { margin-left: auto; }
+.nav .mm-foot a:hover { text-decoration: none; color: var(--primary-2); }
+@media (max-width: 1180px) { .mm-body { gap: 16px; padding: 16px 16px 18px; } .mm-pop { padding-left: 16px; } .mm-foot.mega-foot { padding: 12px 28px; gap: 20px; } }
+@media (prefers-reduced-motion: reduce) { .dd-p.mm { transition: none; } }
+/* mobil menü: aynı gruplar sade liste olarak */
+.mnav .m-int a.m-gi { display: block; padding: 9px 6px; color: var(--text); font-weight: 600; font-size: 15px; }
+.m-gi small { display: block; font-weight: 450; font-size: 12.5px; color: var(--muted); line-height: 1.35; margin-top: 1px; }
+.mnav .m-int a.m-req { color: var(--primary); font-size: 14.5px; }

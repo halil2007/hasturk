@@ -2,6 +2,7 @@
 // geçmiş ve otomatik fiyat kuralları. Otomatik fiyat yalnızca kural açılan ürün/kanalda ve Ayarlar'daki genel anahtar açıkken çalışır.
 import { api, state, locked, html, render, $, n, money, ch, chLogo, chBadge, thumb, actions, busy, toast, debounce, sheet, numIn, ago, dateTime, isAdmin, isMobile, activeChannels } from '../core.js';
 import { setQuery, loadSummary } from '../app.js';
+import { listingUrl } from '../listingurl.js';
 
 const STATUS = [['', 'Tümü'], ['won', 'Buybox sizde'], ['lost', 'Kaybedilen'], ['multi', 'Rakipli'], ['rules', 'Otomatik fiyat açık'], ['unchecked', 'Kontrol edilmedi']];
 export const bbChannels = () => activeChannels().filter((c) => ['trendyol', 'hepsiburada'].includes(c.type) && (c.enabled || c.demo));
@@ -49,15 +50,17 @@ export async function buyboxView(el, rest, query = {}) {
   function draw() {
     head();
     const rows = data.rows;
+    // Ürün adına basınca ilanın kanaldaki satış sayfası yeni sekmede açılır
+    const nm = (r, st = '') => { const u = listingUrl(ch(r.channel).type || r.channel, r); return u ? html`<a class="ellipsis link-plain" style="display:block;font-weight:650;${st}" href="${u}" target="_blank" rel="noopener" title="Kanalda aç">${r.product_name || r.name} <i class="ico ico-link" style="width:12px;height:12px;opacity:.6"></i></a>` : html`<div class="ellipsis" style="font-weight:650;${st}">${r.product_name || r.name}</div>`; };
     const body = !rows.length ? html`<div class="empty">${data.kpi.total ? 'Bu filtrede ürün yok' : 'Trendyol / Hepsiburada ilanı yok. Önce Entegrasyonlar\'dan ilanları çekin.'}</div>`
       : isMobile() ? html`<div class="m-list" style="padding:12px">${rows.map((r) => { const [c, t] = bbState(r); return html`<div class="m-card" data-key="${r.channel}|${r.remote_id}">
-          <div class="top">${thumb(r.image, r.name, 'sm')}<div style="min-width:0;flex:1"><div class="ellipsis" style="font-weight:650">${r.product_name || r.name}</div><div class="muted tiny">${chBadge(r.channel)} ${r.barcode || ''}</div></div>${r.rank ? html`<span class="rank ${r.rank === 1 ? 'one' : ''}">#${r.rank}</span>` : ''}</div>
+          <div class="top">${thumb(r.image, r.name, 'sm')}<div style="min-width:0;flex:1">${nm(r)}<div class="muted tiny">${chBadge(r.channel)} ${r.barcode || ''}</div></div>${r.rank ? html`<span class="rank ${r.rank === 1 ? 'one' : ''}">#${r.rank}</span>` : ''}</div>
           <div class="row wrap"><span class="pill ${c}">${t}</span>${r.rule_on ? html`<span class="pill info">Otomatik fiyat</span>` : ''}</div>
-          <div class="row small"><span>Fiyatımız <b>${money(r.price)}</b></span><span class="spacer"></span><span>Buybox <b>${r.buybox_price ? money(r.buybox_price) : '—'}</b></span></div>
+          <div class="row small"><span>Fiyatımız <b>${r.price > 0 ? money(r.price) : '—'}</b></span><span class="spacer"></span><span>Buybox <b>${r.buybox_price ? money(r.buybox_price) : '—'}</b></span></div>
           <div class="row"><span class="muted tiny" style="flex:1">${r.checked_at ? `kontrol ${ago(r.checked_at)}` : ''}</span><button class="btn sm" data-act="detail">Geçmiş</button><button class="btn sm ${r.rule_on ? 'primary' : ''}" data-act="rule">Otomatik fiyat: ${r.rule_on ? 'Açık' : 'Kapalı'}</button></div></div>`; })}</div>`
         : html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th>Kanal</th><th class="c">Sıra</th><th class="r">Fiyatımız</th><th class="r">Buybox fiyatı</th><th class="r col-cust">3. fiyat</th><th>Durum</th><th class="col-cust">Son kontrol</th><th class="c"></th><th></th></tr></thead><tbody>
           ${rows.map((r) => { const [c, t] = bbState(r); return html`<tr data-key="${r.channel}|${r.remote_id}">
-            <td><div class="row">${thumb(r.image, r.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:300px;font-weight:650">${r.product_name || r.name}</div><div class="muted tiny">${r.barcode || r.remote_id}</div></div></div></td>
+            <td><div class="row">${thumb(r.image, r.name, 'sm')}<div style="min-width:0">${nm(r, 'max-width:300px')}<div class="muted tiny">${r.barcode || r.remote_id}</div></div></div></td>
             <td>${chBadge(r.channel)}</td><td class="c">${r.rank ? html`<span class="rank ${r.rank === 1 ? 'one' : ''}">#${r.rank}</span>` : html`<span class="muted">—</span>`}</td>
             <td class="r">${priceCell(r)}</td><td class="r">${bbCell(r)}</td><td class="r num muted col-cust">${r.third_price ? money(r.third_price) : '—'}</td>
             <td><span class="pill ${c}">${t}</span>${r.multi === 0 && r.rank === 1 && !r.second_price ? html`<div class="tiny muted">rakip yok</div>` : ''}</td>

@@ -335,6 +335,8 @@ export const MIGRATIONS = [
     PRIMARY KEY (channel, remote_id, product_id))`,
   // Ürüne özel menşei (boşsa mağaza ayarı "Ürünlerin menşei" geçerli; pazaryerine yüklemede Menşei özelliği)
   'ALTER TABLE products ADD COLUMN origin TEXT',
+  // İlanın kanaldaki satış sayfası (kanal veriyorsa; ör. Trendyol productUrl): panelde ürüne basınca açılır
+  'ALTER TABLE listings ADD COLUMN url TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
