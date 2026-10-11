@@ -37,13 +37,29 @@ test('ikas: seçilen lokasyon silinmişse stok okunmaz ve gönderilmez; tek loka
   try {
     mock(data([{ id: 'A', name: 'Depo', deleted: true }, { id: 'B', name: 'Mağaza' }]));
     const ch = ikas(env({ IKAS1_STOCK_LOCATION_ID: 'A' }), 'IKAS1_', { id: 'ikas1' });
-    await assert.rejects(() => ch.fetchListings(), /seçili stok lokasyonu \(A\) bulunamadı ya da silinmiş/);
-    await assert.rejects(() => ch.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 5 }]), /silinmiş/);
+    await assert.rejects(() => ch.fetchListings(), /"A" adlı ya da ID'li stok lokasyonu bulunamadı\. ikas'taki lokasyonlar: Mağaza\./);
+    await assert.rejects(() => ch.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 5 }]), /bulunamadı/);
     const bodies = mock(data([{ id: 'B', name: 'Mağaza' }, { id: 'A', deleted: true }]));
     const one = ikas(env(), 'IKAS1_', { id: 'ikas1' });
     assert.deepEqual((await one.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 5 }])).done, ['v1']);
     assert.equal(bodies.find((b) => /saveProductStockLocations/.test(b.query)).variables.input.productStockLocationInputs[0].stockLocationId, 'B');
     assert.equal((await one.fetchListings())[0].stock, 4, 'tek lokasyonun stoğu okunur');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('ikas: stok lokasyonu alanına ID yerine depo ADI yazılabilir (harf/boşluk farkı yok sayılır); bulunamazsa mevcut adlar söylenir', async () => {
+  try {
+    const locs = [{ id: '11111111-aaaa-4bbb-8ccc-000000000001', name: 'HasTürk Gübre Bağcılar Depo' }, { id: '11111111-aaaa-4bbb-8ccc-000000000002', name: 'Mağaza' }];
+    let bodies = mock(data(locs));
+    const ch = ikas(env({ IKAS1_STOCK_LOCATION_ID: '  hastürk gübre  bağcılar depo ' }), 'IKAS1_', { id: 'ikas1' });
+    assert.deepEqual((await ch.pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 5 }])).done, ['v1'], 'doğrulama yapılmadan da ad ID\'ye çevrilir');
+    assert.equal(bodies.find((b) => /saveProductStockLocations/.test(b.query)).variables.input.productStockLocationInputs[0].stockLocationId, locs[0].id);
+    // Adın bir kısmı (tek eşleşme) da yeter
+    bodies = mock(data(locs));
+    await ikas(env({ IKAS1_STOCK_LOCATION_ID: 'Bağcılar Depo' }), 'IKAS1_', { id: 'ikas1' }).pushStock([{ remoteId: 'v1', remoteProductId: 'p1', stock: 5 }]);
+    assert.equal(bodies.find((b) => /saveProductStockLocations/.test(b.query)).variables.input.productStockLocationInputs[0].stockLocationId, locs[0].id);
+    mock(data(locs));
+    await assert.rejects(() => ikas(env({ IKAS1_STOCK_LOCATION_ID: 'Kadıköy Depo' }), 'IKAS1_', { id: 'ikas1' }).fetchListings(), /ikas'taki lokasyonlar: HasTürk Gübre Bağcılar Depo, Mağaza/);
   } finally { globalThis.fetch = realFetch; }
 });
 
