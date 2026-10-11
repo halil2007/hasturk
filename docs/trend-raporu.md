@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2067 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2077 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 > **Uyarı:** hasturktarimdunyasi mağazasının siparişleri alınamadı (Token alınamadı (401): ). Algoritma şu an yalnız bu mağazanın siparişleriyle çalışıyor. ikas'ta o mağazanın API uygulamasını ve GitHub Secrets'taki anahtarları kontrol edin.
 
@@ -47,11 +47,11 @@ _Henüz veri yok._
 | 1 | HasTürk Sıvı Solucan Gübresi  | 10,5 | 12 |
 | 2 | HasTürk Solucan Gübresi  | 8,6 | 11 |
 | 3 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 7,1 | 10 |
-| 4 | Kullanıma Hazır Cocopeat Torfu | 6,4 | 16 |
+| 4 | Kullanıma Hazır Cocopeat Torfu | 6,3 | 16 |
 | 5 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 5,8 | 3 |
 | 6 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 5,6 | 5 |
-| 7 | Leonardit - Organik Toprak Düzenleyici | 5,2 | 10 |
-| 8 | HG Akıllı Bitki ve Saksı Toprağı | 5,2 | 7 |
+| 7 | Leonardit - Organik Toprak Düzenleyici | 5,1 | 10 |
+| 8 | HG Akıllı Bitki ve Saksı Toprağı | 5,1 | 7 |
 | 9 | Premium Fide Toprağı | 5 | 11 |
 | 10 | HG Mezar Toprağı | 4,7 | 8 |
 | 11 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,9 | 5 |
@@ -135,7 +135,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 2 | HG Tarım Perliti | 4,1 | 17,7 |
 | 3 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 3,5 | 12,4 |
 | 4 | HasTürk Hümix Sıvı Hümik Asit | 3,3 | 19 |
-| 5 | HasTürk Solucan Gübresi  | 2,9 | 26,2 |
+| 5 | HasTürk Solucan Gübresi  | 2,9 | 27,2 |
 | 6 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,4 | 34 |
 | 7 | SGS Bahçe Seti 3 Parça | 2,4 | 0 |
 | 8 | HG Kaktüs ve Sukulent Toprağı | 2,3 | 18,5 |
