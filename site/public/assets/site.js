@@ -66,7 +66,11 @@
     if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
     const logosStatic = $('[data-logos-static]');
     if (logosStatic) logosStatic.innerHTML = wms(false, false);
-    $$('[data-count="active"]').forEach((el) => { el.textContent = ACTIVE.filter((x) => !TEST.has(x[5]) && !DEV.has(x[5])).length; });
+    // Kullanıma açık = aktif + test aşamasındakiler (test aşamasındakiler çalışır, yalnız testleri sürer); geliştirmedekiler sayılmaz
+    const live = ACTIVE.filter((x) => !DEV.has(x[5])), nTest = live.filter((x) => TEST.has(x[5])).length;
+    $$('[data-count="active"]').forEach((el) => { el.textContent = live.length - nTest; });
+    $$('[data-count="usable"]').forEach((el) => { el.textContent = live.length; });
+    $$('[data-count-note]').forEach((el) => { el.textContent = nTest ? `Entegrasyon: ${live.length - nTest} aktif, ${nTest} testte` : 'Aktif entegrasyon'; });
     $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
     $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
     $$('[data-integ="cargo"]').forEach((el) => { el.innerHTML = integ(CARGO, false) + integ(CARGO_SOON, true); });
@@ -150,12 +154,11 @@
     const yearly = planPeriod === 'yearly' && p.yearly, save = p.monthly && p.yearly ? p.monthly * 12 - p.yearly : 0;
     if (!yearly) return `<div class="pr-price"><b>${tl(p.monthly)}</b><span class="cur">₺</span><small>/ ay</small></div>
       <div class="pr-sub">KDV dahil · her ay ödenir</div>
-      ${p.yearly ? `<div class="pr-sub2">Yıllık alımda ${tl(p.yearly)} ₺ · 2 ay hediye</div>` : ''}`;
-    const inst = S.installments ? `<span>Peşin fiyatına ${S.installments} × ${tl(p.yearly / S.installments)} ₺</span>` : '';
-    const eft = eftPct() ? `<span>Havale / EFT ile ${tl(eftPrice(p.yearly, 'yearly'))} ₺</span>` : '';
+      ${p.yearly ? `<div class="pr-sub2">Yıllık alımda ${tl(p.yearly)} ₺ · 2 ay hediye${S.installments ? ` · <b>peşin fiyatına ${S.installments} taksit</b>` : ''}</div>` : ''}`;
+    const eft = eftPct() ? `<div class="pr-sub2">Havale / EFT ile ${tl(eftPrice(p.yearly, 'yearly'))} ₺</div>` : '';
     return `<div class="pr-price"><b>${tl(p.yearly)}</b><span class="cur">₺</span><small>/ yıl</small>${save ? `<span class="pr-save">${tl(save)} ₺ kazanç</span>` : ''}</div>
       <div class="pr-sub">KDV dahil · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
-      ${inst || eft ? `<div class="pr-sub2">${[inst, eft].filter(Boolean).join(' · ')}</div>` : ''}`;
+      ${S.installments ? `<div class="pr-inst"><svg><use href="#i-card"/></svg><span><b>Peşin fiyatına ${S.installments} taksit</b>${S.installments} × ${tl(p.yearly / S.installments)} ₺ · kredi kartına</span></div>` : ''}${eft}`;
   };
   // "Satın al" yalnız online satış açıkken görünür; kapalıyken kartta yalnız ücretsiz deneme düğmesi olur
   const renderPlans = (shop = planShop) => {
@@ -168,7 +171,8 @@
         <div class="pr-ctas">${shop && p.key ? `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/satin-al?plan=${p.key}&amp;donem=${donem}">Satın al</a>
           <a class="btn btn-line" href="/demo#deneme">7 gün ücretsiz deneyin</a>` : `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/demo#deneme">7 gün ücretsiz deneyin</a>`}</div>
         <div class="pr-feats"><p>${p.base ? `${esc(p.base)} paketindeki her şey, ek olarak:` : 'Pakette neler var:'}</p>
-          <ul>${(p.items || []).map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-clock"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul></div>
+          <ul>${(p.items || []).map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-clock"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul>
+          <a class="pr-all" href="/paketler#karsilastir">Tüm özellikleri karşılaştırın <svg><use href="#i-arrow"/></svg></a></div>
         </div>`).join('');
     });
   };
