@@ -350,6 +350,12 @@ export const MIGRATIONS = [
   'ALTER TABLE listings ADD COLUMN mp_category TEXT',
   // idefix red nedeni nesne geliyordu, "[object Object]" kaydedildi: bu ilanlar hemen yeniden denensin (yeni gönderimde okunur neden yazılır)
   "UPDATE listings SET error_at = 0 WHERE error LIKE '%[object Object]%'",
+  // Avantajlı etiketler (Excel'le yüklenen Trendyol yıldız eşikleri / Hepsiburada flaş indirim davetleri, bkz. promos.js). Eski
+  // promo_offers tablosu yukarıdaki bir geçişte silindiği için (yeniden çalışırsa veri gitmesin) yeni adlarla: satırlar + yüklenen dosya.
+  `CREATE TABLE IF NOT EXISTS offer_rows (channel TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, row_no INTEGER, remote_id TEXT, product_id INTEGER, barcode TEXT, sku TEXT, name TEXT,
+    current_price REAL, tiers TEXT, file_comm REAL, cur_comm REAL, starts_at INTEGER, ends_at INTEGER, raw TEXT, choice TEXT, chosen_price REAL, applied_price REAL, applied_at INTEGER,
+    updated_at INTEGER, PRIMARY KEY (channel, kind, key))`,
+  'CREATE TABLE IF NOT EXISTS offer_files (channel TEXT NOT NULL, kind TEXT NOT NULL, part INTEGER NOT NULL, meta TEXT, data TEXT, PRIMARY KEY (channel, kind, part))',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
