@@ -4,6 +4,10 @@
 import { first, run } from './db.js';
 import { insertPost, siteUrl, MAX_IMAGE } from './blog.js';
 import { POSTS } from './blogseed-posts.js';
+import { POSTS_2A } from './blogseed-posts-2a.js';
+import { POSTS_2B } from './blogseed-posts-2b.js';
+// İkinci parti (10 yazı): yüklemeden sonra 2 günde bir yayına girer
+const ALL = [...POSTS, ...[...POSTS_2A, ...POSTS_2B].map((p, i) => ({ ...p, day: p.day ?? i * 2 }))];
 
 const KEY = 'blog_seed';
 const TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -23,7 +27,7 @@ async function coverImage(env, db, file, fetcher) {
   return id;
 }
 
-export async function blogSeed(env, db, { posts = POSTS, fetcher = fetch, now = Date.now() } = {}) {
+export async function blogSeed(env, db, { posts = ALL, fetcher = fetch, now = Date.now() } = {}) {
   if (env.TENANT_SLUG || env.DEMO) return null;
   const row = await first(db, 'SELECT v FROM settings WHERE k = ?', KEY);
   const done = row ? JSON.parse(row.v) : [];
@@ -35,7 +39,8 @@ export async function blogSeed(env, db, { posts = POSTS, fetcher = fetch, now = 
       if (await first(db, 'SELECT id FROM blog_posts WHERE slug = ?', p.slug)) { out.skipped.push(p.slug); done.push(p.slug); continue; }
       const cover_id = p.cover ? await coverImage(env, db, p.cover, fetcher) : null;
       // Yayın tarihleri birkaç gün arayla geriye dağıtılır (hepsi aynı dakikada görünmesin); sıra listedeki sıradır
-      const published_at = now - (posts.length - 1 - posts.indexOf(p)) * 2 * 864e5 - i * 60e3;
+      // p.day verilmişse yayın tarihi yüklemeden bu kadar gün sonradır (ileri tarihli yazı sitede o gün görünür: düzenli yayın)
+      const published_at = p.day != null ? now + p.day * 864e5 + i * 60e3 : now - (posts.length - 1 - posts.indexOf(p)) * 2 * 864e5 - i * 60e3;
       await insertPost(db, { ...p, cover_id, status: 'published', published_at, author: p.author || 'Hastürk CRM' }, { name: 'Hastürk CRM' });
       out.added.push(p.slug); done.push(p.slug);
     } catch (e) { out.errors.push(`${p.slug}: ${e.message}`); }

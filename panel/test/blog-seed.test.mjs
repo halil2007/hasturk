@@ -29,3 +29,11 @@ test('hazır yazılar bir kez yayımlanır; kapak alınamazsa o yazı sonra yeni
   assert.equal(await blogSeed(env, db, { posts, fetcher }), null);
   assert.equal((await all(db, 'SELECT id FROM blog_posts')).length, 1);
 });
+
+test('day verilen yazı ileri tarihli yayımlanır (sitede o gün görünür)', async () => {
+  const db = d1(); await init(db);
+  const now = Date.UTC(2026, 9, 11);
+  const fetcher = async () => new Response(JPG, { status: 200 });
+  await blogSeed({ SITE_URL: 'https://site.test' }, db, { posts: [{ slug: 'ileri', title: 'İleri yazı', body: 'x', cover: 'a.jpg', day: 4 }], fetcher, now });
+  assert.equal((await first(db, 'SELECT published_at FROM blog_posts WHERE slug = ?', 'ileri')).published_at, now + 4 * 864e5);
+});
