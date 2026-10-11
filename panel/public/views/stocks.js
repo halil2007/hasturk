@@ -35,10 +35,12 @@ export async function stocks(el, rest, query = {}) {
   const cls = (p) => (p.stock <= 0 ? 'neg' : p.stock <= (p.low_limit ?? low()) ? 'low' : '');
   // Kanal hücresi: kanaldaki adet. Panel stoğuyla aynıysa sade, gönderim bekliyorsa turuncu (eski → yeni), hata kırmızı
   function cell(p, c) {
-    const l = (p.listings || []).find((x) => x.channel === c.id);
+    const xs = (p.listings || []).filter((x) => x.channel === c.id);
+    // Aynı kanalda birden fazla ilan (ikinci eşleşme): hatalı / bekleyen ilan öne alınır, "2 ilan" notu eklenir
+    const l = xs.find((x) => x.error) || xs.find((x) => (x.pushed_stock ?? x.remote_stock) !== (x.desired ?? Math.max(0, p.stock))) || xs[0];
     if (!l) return html`<span class="chc none" title="Bu kanalda ilanı yok">—</span>`;
     const want = l.desired ?? Math.max(0, p.stock), shown = l.pushed_stock ?? l.remote_stock;
-    const rule = l.stock_mode && l.stock_mode !== 'shared' ? html`<span class="rule" title="Kanal stok kuralı">${ruleText(l)}</span>` : '';
+    const rule = html`${l.stock_mode && l.stock_mode !== 'shared' ? html`<span class="rule" title="Kanal stok kuralı">${ruleText(l)}</span>` : ''}${xs.length > 1 ? html`<span class="rule" title="Bu ürün bu kanalda ${xs.length} ilanla satılıyor; stok hepsine gider">${xs.length} ilan</span>` : ''}`;
     if (l.error) return html`<button class="chc err" data-act="rule" data-id="${p.id}" title="${l.error}"><i class="ico ico-warn"></i>${shown ?? '?'}${rule}</button>`;
     if (pushOn(c.id) && shown !== want) return html`<button class="chc wait" data-act="rule" data-id="${p.id}" title="Kanala gönderim bekliyor">${shown ?? '?'} → ${want}${rule}</button>`;
     const v = pushOn(c.id) ? want : shown;
@@ -130,7 +132,7 @@ export function ruleDialog(p, done) {
     body: html`<div class="stack">
       <div class="row"><span class="muted">Ortak stok</span><span class="spacer"></span><b class="num" style="font-size:22px">${p.stock}</b></div>
       ${p.listings.map((l, i) => html`<div class="cand" style="flex-wrap:wrap" data-i="${i}">
-        <span class="ch-name" style="min-width:140px">${chLogo(l.channel, true)}${ch(l.channel).name}</span>
+        <span class="ch-name" style="min-width:140px">${chLogo(l.channel, true)}${ch(l.channel).name}${p.listings.filter((x) => x.channel === l.channel).length > 1 ? ` · İlan ${p.listings.filter((x) => x.channel === l.channel).indexOf(l) + 1}` : ''}</span>
         <select class="input rule-sel" data-mode>${Object.entries(RULE).map(([k, t]) => html`<option value="${k}" ${(l.stock_mode || 'shared') === k ? 'selected' : ''}>${t}</option>`)}</select>
         <input class="input rule-sel num" style="width:80px" type="number" min="0" inputmode="numeric" data-val value="${l.stock_value ?? ''}" placeholder="adet" ${(l.stock_mode || 'shared') === 'shared' ? 'hidden' : ''}>
         <span class="spacer"></span><span class="small">Kanala gidecek: <b class="num" data-out>${l.desired ?? calc(l.stock_mode, l.stock_value || 0)}</b></span>

@@ -10,6 +10,7 @@ import { explainError } from '../listerr.js';
 const errText = (e) => { const x = explainError(e); return `${x.kind ? x.kind + ': ' : ''}${x.title} — ${x.fix}`; };
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
+import { addListing, ilanNo } from './match.js';
 import { mountPublish, publishSheet } from './publish.js';
 
 // Stok senkronu kapalıyken ana katalog (ikas) sitesindeki ilanı olan ürünün stoğu siteden okunur; panelde değiştirilmez
@@ -54,7 +55,9 @@ export async function products(el, rest, query = {}) {
     const ids = [...new Set(ls.map((l) => l.channel))], err = ls.filter((l) => l.error);
     const prices = ls.map((l) => l.price).filter((x) => x > 0), lo = Math.min(...prices), hi = Math.max(...prices);
     const tip = ids.map((c) => { const xs = ls.filter((l) => l.channel === c); return `${ch(c).name}: ${xs.map((l) => money(l.price)).join(', ')}${xs.some((l) => l.error) ? ' (hata)' : ''}`; }).join('\n');
-    return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => chLogo(c, true))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>
+    // Aynı kanalda birden fazla ilan (ikinci eşleşme): "2 ilan" etiketi
+    const multi = ids.map((c) => [c, Math.max(...list.map((p) => (p.listings || []).filter((l) => l.channel === c).length))]).filter(([, k]) => k > 1);
+    return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => chLogo(c, true))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>${multi.map(([c, k]) => html`<span class="pill info" style="padding:2px 8px;font-size:11px" title="${ch(c).name}: bu ürün ${k} ilanla satılıyor">${ch(c).short || ch(c).name} ${k} ilan</span>`)}
       <span class="small num">${prices.length ? (lo === hi ? money0(lo) : `${money0(lo)} – ${money0(hi)}`) : ''}</span>${err.length ? html`<button class="pill bad" data-act="errs" data-ids="${list.map((p) => p.id).join(',')}" title="${err.map((l) => `${ch(l.channel).name}: ${l.error}`).join('\n')} (açıklama için tıklayın)">${err.length} hata</button>` : ''}</div>`;
   }
   const stockCell = (p) => {
@@ -407,8 +410,8 @@ export async function productForm(id, done) {
         <label class="field"><span>Stok kodu (SKU)</span><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" name="sku" value="${p.sku || ''}" placeholder="kanallarla aynı olmalı" style="flex:1;min-width:0"><button type="button" class="btn sm" data-gensku title="Ürün adından SKU oluştur">Oluştur</button></div></label>
         <label class="field"><span>Barkod</span><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" name="barcode" value="${p.barcode || ''}" style="flex:1;min-width:0"><button type="button" class="btn sm" data-genbc title="Benzersiz EAN-13 barkod oluştur">Oluştur</button></div></label>
         <label class="field"><span>Marka</span><input class="input" name="brand" value="${p.brand || ''}"></label>
-        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ör. Bahçe › Tohum"><small>Alt kategori için › yazın.</small></label>
-        <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="ör. Domates tohumu"></label>
+        <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ör. Giyim › Kadın › Elbise"><small>Alt kategori için › yazın.</small></label>
+        <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="ör. Pamuklu Tişört"></label>
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
         <label class="field"><span>Model kodu</span><input class="input" name="model_code" value="${p.model_code || ''}" placeholder="varyantlarda aynı"><small>Boşsa ana ürün adından.</small></label>
       </div>
@@ -445,12 +448,12 @@ export async function productForm(id, done) {
     ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p></div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Fiyat</th><th class="r">Komisyon %</th><th class="r">Ürün başı kâr</th><th class="r">Kanala giden stok</th></tr></thead><tbody>
         ${p.listings.map((l) => { const r = lp(l); return html`<tr data-l="${l.channel}" data-rid="${l.remote_id}">
-          <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span><div class="muted tiny ellipsis" style="max-width:180px">${l.remote_id}</div>${l.error ? html`<div class="tiny" style="color:var(--bad)" title="${l.error}">${errText(l.error)}</div>` : ''}</td>
+          <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span>${ilanNo(p.listings, l) ? html` <span class="pill info" style="padding:2px 8px;font-size:11px">${ilanNo(p.listings, l)}</span> <button type="button" class="btn sm ghost danger" data-unl="${l.channel}|${l.remote_id}" title="Bu ilanın ürünle bağını kaldır">Ayır</button>` : ''}<div class="muted tiny ellipsis" style="max-width:180px">${l.name && ilanNo(p.listings, l) ? `${l.name} · ` : ''}${l.remote_id}</div>${l.error ? html`<div class="tiny" style="color:var(--bad)" title="${l.error}">${errText(l.error)}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" style="width:96px" inputmode="decimal" data-lf="price" value="${l.price ?? ''}">${l.rule_min != null ? html`<div class="tiny muted" title="Bu ilanda otomatik fiyat açık: elle girdiğiniz fiyat bu aralıkta olmalı; değişiklikten sonra otomatik fiyat 14 dakika bekler">Otomatik fiyat: ${money(l.rule_min)} – ${money(l.rule_max)}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${costRaw(st, 'commission', l.channel)}" title="KDV dahil komisyon oranı">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? 'kanaldan (son sipariş)' : 'elle girildi'}</div>` : ''}</td>
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>
           <td class="r num"><button type="button" class="plain" data-rule style="align-items:flex-end">${l.desired ?? l.remote_stock ?? '—'}<span class="tiny muted">${ruleText(l) || 'ortak stok'}</span></button>${l.price_dirty ? html`<div class="tiny" style="color:var(--warn)">fiyat gönderilecek</div>` : ''}</td></tr>`; })}
-      </tbody></table></div></div>` : ''}
+      </tbody></table></div><div class="row wrap" style="padding:10px 16px"><button type="button" class="btn sm" data-addl><i class="ico ico-plus"></i>İlan ekle</button><span class="muted tiny">Aynı ürün bir kanalda iki kez listelendiyse ikinci ilanı buradan bağlayın.</span></div></div>` : ''}
     ${pubCh.length ? html`<div class="card stack"><h3>Kanallarda yayınla</h3>
       ${id ? html`<div data-pub></div>` : html`<div class="muted small">Kaydedince seçtiğiniz kanallar için yayın paneli açılır.</div>
         <div class="row wrap" style="gap:6px 16px">${pubCh.map((c) => html`<label class="check"><input type="checkbox" data-pubon value="${c.id}" checked> ${chLogo(c.id, true)}${c.name}</label>`)}</div>`}
@@ -561,6 +564,17 @@ export async function productForm(id, done) {
     toast('Barkod oluşturuldu — kaydetmeyi unutmayın');
   });
   form.addEventListener('click', (e) => { if (e.target.closest('[data-rule]')) ruleDialog(p, () => { s.close(); productForm(id, done); }); });
+  // Aynı kanaldan ek ilan bağla / ayır (ikinci eşleşme)
+  form.addEventListener('click', (e) => {
+    if (e.target.closest('[data-addl]')) addListing(p, () => { toast('İlan bağlandı'); s.close(); productForm(id, done); });
+    const u = e.target.closest('[data-unl]');
+    if (u) busy(u, async () => {
+      const [channel, ...r] = u.dataset.unl.split('|');
+      if (!(await confirmBox(`Bu ilanın ürünle bağı kaldırılsın mı? İlan Eşleştirme'de bekleyenlere düşer.`, 'Ayır'))) return;
+      await api('products/second-match/unlink', { method: 'POST', body: { channel, remote_id: r.join('|') } });
+      toast('İlan ayrıldı'); s.close(); productForm(id, done);
+    });
+  });
   form.addEventListener('input', () => {
     $$('tr[data-l]', form).forEach((tr) => {
       const l = { channel: tr.dataset.l, price: numIn($('[data-lf=price]', tr).value), commission: $('[data-lf=commission]', tr).value === '' ? null : numIn($('[data-lf=commission]', tr).value) };
@@ -663,7 +677,7 @@ async function barcodeDialog(done, kind = 'barcode') {
     s.setBody(html`<div class="stack">
       <div class="tabs"><button class="tab ${!isSku ? 'on' : ''}" data-kind="barcode">Barkod (EAN-13)</button><button class="tab ${isSku ? 'on' : ''}" data-kind="sku">SKU (stok kodu)</button></div>
       <div class="notice small"><i class="ico ico-tag"></i><div>${isSku
-        ? html`SKU <b>ürün adından</b> oluşur: <b>ön ek – kısaltma – miktar/varyant</b> (ör. “HasTürk Solucan Gübresi - 15 Kg” → <b>HG-SOGU-15KG</b>; marka adı ve parantez içi kısaltmaya girmez). Öneriler panel ürünleri ve tüm kanal ilanlarıyla çakışmaz; kaydetmeden önce kutudan değiştirebilirsiniz. SKU'su dolu ürünler değişmez.`
+        ? html`SKU <b>ürün adından</b> oluşur: <b>ön ek – kısaltma – miktar/varyant</b> (ör. “Nemlendirici Krem 250 ml” → <b>OM-NEKR-250ML</b>; marka adı ve parantez içi kısaltmaya girmez). Öneriler panel ürünleri ve tüm kanal ilanlarıyla çakışmaz; kaydetmeden önce kutudan değiştirebilirsiniz. SKU'su dolu ürünler değişmez.`
         : html`Seçtiğiniz ürünlere <b>benzersiz, geçerli EAN-13</b> barkod verilir (son hane kontrol hanesi). Panel ürünleri ve tüm kanal ilanlarıyla çakışmaz. Ön ek <b>200</b>, mağaza içi kullanıma ayrılmış aralıktır; gerçek bir firmanın barkoduyla çakışmaz. GS1 firma önekiniz varsa onu yazın. Barkodu dolu ürünler değişmez.`}</div></div>
       ${!list.length ? html`<div class="empty">${isSku ? 'SKU\'su eksik ürün yok 🎉' : 'Barkodu eksik ürün yok 🎉'}</div>` : html`
       <div class="row wrap"><div class="search" style="flex:1"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-bq value="${q}"></div>
@@ -783,11 +797,14 @@ export async function variantEditor(ids, done, title = '') {
   let list;
   try { list = (await api('products-variants?ids=' + ids.join(','), { fresh: true })).products; } catch (e) { return s.setBody(html`<div class="notice bad">${e.message}</div>`); }
   if (!list.length) return s.setBody(html`<div class="empty">Ürün bulunamadı</div>`);
-  const chans = [...new Set(list.flatMap((p) => p.listings.map((l) => l.channel)))].sort((a, b) => activeChannels().findIndex((c) => c.id === a) - activeChannels().findIndex((c) => c.id === b));
+  // Fiyat sütunları: kanal başına; bir varyantın aynı kanalda birden fazla ilanı varsa (ikinci eşleşme) "İlan 2" sütunu da açılır
+  const chIds = [...new Set(list.flatMap((p) => p.listings.map((l) => l.channel)))].sort((a, b) => activeChannels().findIndex((c) => c.id === a) - activeChannels().findIndex((c) => c.id === b));
+  const chans = chIds.flatMap((c) => { const k = Math.max(...list.map((p) => p.listings.filter((l) => l.channel === c).length)); return Array.from({ length: k }, (_, i) => (i ? `${c}#${i}` : c)); });
   const p0 = list[0], group0 = p0.group_name || p0.name, brand0 = list.find((p) => p.brand)?.brand || '';
-  const lst = (p, c) => p.listings.find((l) => l.channel === c);
+  const lst = (p, col) => { const [c, i] = col.split('#'); return p.listings.filter((l) => l.channel === c)[Number(i) || 0]; };
+  const colName = (col) => { const [c, i] = col.split('#'); return `${ch(c).short || ch(c).name}${i ? ` İlan ${Number(i) + 1}` : ''}`; };
   const num = (v) => (v == null || v === '' ? '' : String(Math.round(Number(v) * 100) / 100).replace('.', ','));
-  const TARGETS = [['sale_price', 'Satış fiyatı'], ['purchase_price', 'Alış fiyatı'], ...chans.map((c) => ['ch:' + c, `Fiyat: ${ch(c).name}`]), ['stock', 'Stok'], ['critical_stock', 'Kritik stok']];
+  const TARGETS = [['sale_price', 'Satış fiyatı'], ['purchase_price', 'Alış fiyatı'], ...chans.map((c) => ['ch:' + c, `Fiyat: ${colName(c)}`]), ['stock', 'Stok'], ['critical_stock', 'Kritik stok']];
   const inp = (i, k, v, extra = '') => html`<input class="input vin num" inputmode="decimal" data-r="${i}" data-k="${k}" value="${v}" data-o="${v}" ${raw(extra)}>`;
   s.setBody(html`<div class="stack">
     <div class="card"><div class="form-grid">
@@ -806,7 +823,7 @@ export async function variantEditor(ids, done, title = '') {
     </div>
     <div class="card flush"><div class="table-wrap"><table class="t vt"><thead><tr>
       <th class="cbcol"><input type="checkbox" class="cb" data-all aria-label="Tümünü seç"></th><th class="stick">Varyant</th><th class="r">Alış ₺</th><th class="r">Satış ₺</th>
-      ${chans.map((c) => html`<th class="r"><span class="row" style="justify-content:flex-end;gap:5px" title="${ch(c).name} fiyatı">${chLogo(c, true)}${ch(c).short || ch(c).name} ₺</span></th>`)}<th class="r">Stok</th><th class="r">Kritik</th><th>SKU</th><th>Barkod</th><th class="c">Aktif</th></tr></thead><tbody>
+      ${chans.map((c) => html`<th class="r"><span class="row" style="justify-content:flex-end;gap:5px" title="${colName(c)} fiyatı">${chLogo(c.split('#')[0], true)}${colName(c)} ₺</span></th>`)}<th class="r">Stok</th><th class="r">Kritik</th><th>SKU</th><th>Barkod</th><th class="c">Aktif</th></tr></thead><tbody>
       ${list.map((p, i) => html`<tr data-i="${i}">
         <td class="cbcol"><input type="checkbox" class="cb" data-sel="${i}"></td>
         <td class="stick"><div class="row" style="gap:8px;min-width:200px">${thumb(p.image, p.variant_name || p.name, 'sm')}<input class="input vin" data-r="${i}" data-k="variant_name" value="${p.variant_name || ''}" data-o="${p.variant_name || ''}" placeholder="${p.name}"></div></td>

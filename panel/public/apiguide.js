@@ -17,7 +17,7 @@ Parametreler (isteğe bağlı):
 
 Yanıt:
 { "store": {...}, "page": 1, "limit": 500, "total": 1250, "has_more": true, "generated_at": "...",
-  "items": [ { "id": 12, "sku": "HG-SOL-5", "barcode": "869...", "name": "...", "variant": "5 Kg", "brand": "...",
+  "items": [ { "id": 12, "sku": "OM-TS-XL", "barcode": "869...", "name": "...", "variant": "XL", "brand": "...",
                "stock": 20, "price": 189.9, "vat": 20, "active": true, "updated_at": "2026-10-06T09:12:00.000Z" } ] }
 
 Önerilen kullanım: ilk seferde tüm sayfaları çekin (has_more false olana kadar), sonra 10-15 dakikada bir

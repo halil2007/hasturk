@@ -107,7 +107,13 @@ export function demo(meta) {
         category: meta.type === 'ikas' ? p[9] : '',
         purchasePrice: p[4], price: Math.round(p[3] * (PRICE[ch] || 1)), listPrice: Math.round(p[3] * (PRICE[ch] || 1) * 1.15), stock: 140 + ((i * 37) % 260),
       };
-    });
+    }).concat(ch === 'hepsiburada' ? [twinListing()] : []);
+  }
+  // İkinci eşleşmeyi denemek için: aynı termos Hepsiburada'da ikinci kez, biraz farklı adla listelenmiş (barkodsuz)
+  function twinListing() {
+    const p = DEMO_PRODUCTS.find((x) => x[0] === 'TR-750'), price = Math.round(p[3] * (PRICE[ch] || 1)) - 10;
+    return { remoteId: `${ch}-TR-750-B`, remoteProductId: `${ch}-celik-termos-matara`, sku: 'TR-750-B', barcode: '', name: 'Çelik Termos Matara 750 ml', image: `/demo/${p[0]}.svg`, images: [`/demo/${p[0]}.svg`],
+      groupName: 'Çelik Termos Matara 750 ml', variantName: '', brand: 'Casa', description: '', category: '', price, listPrice: Math.round(price * 1.15), stock: 25 };
   }
   const ok = async () => ({});
   // Kargo akışı taklidi: paketle → kanal paketi, etiket → örnek barkod, kargo firması seç / değiştir
