@@ -307,6 +307,10 @@ export const MIGRATIONS = [
   // Sipariş numarasıyla arama (iade talebi → sipariş, kargo faturası → sipariş): yoksa her iade talebi kanalın tüm siparişlerini
   // tarıyordu (60 bin siparişte 1000 iade talebi ≈ 16 sn işlemci süresi, her senkronda)
   'CREATE INDEX IF NOT EXISTS orders_number ON orders(channel, order_number)',
+  // Ürün fotoğrafları (bilgisayardan / telefondan yüklenen): rastgele 32 haneli kimlik (tahmin edilemez), base64 içerik (JPG / PNG / WEBP).
+  // Herkese açık adresten sunulur (/img/<firma kodu>/<kimlik>.jpg) ki pazaryerleri indirebilsin (bkz. prodimg.js)
+  `CREATE TABLE IF NOT EXISTS product_images (id TEXT PRIMARY KEY, type TEXT NOT NULL, size INTEGER NOT NULL, w INTEGER, h INTEGER,
+    data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

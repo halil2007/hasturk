@@ -18,7 +18,7 @@ self.addEventListener('activate', (e) => e.waitUntil((async () => {
 
 self.addEventListener('fetch', (e) => {
   const req = e.request, url = new URL(req.url);
-  if (DEV || req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.search) return;
+  if (DEV || req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/img/') || url.search) return;
   // Sayfa adresi (/, /?firma=…) tek kayıt: index.html
   const key = req.mode === 'navigate' ? '/' : url.pathname;
   e.respondWith((async () => {

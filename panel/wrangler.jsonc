@@ -9,8 +9,8 @@
   "main": "src/index.js",
   "assets": {
     "directory": "./public",
-    // /api/* her zaman koda gider; diğer adresler panel dosyalarıdır
-    "run_worker_first": ["/api/*"]
+    // /api/* ve /img/* (ürün fotoğrafları, bkz. src/prodimg.js) her zaman koda gider; diğer adresler panel dosyalarıdır
+    "run_worker_first": ["/api/*", "/img/*"]
   },
   // Panel veritabanı (sipariş, ürün, stok). Kimliği yazılmadığı için ilk yayında Cloudflare otomatik oluşturur.
   "d1_databases": [
