@@ -394,8 +394,8 @@ export const INTEGRATIONS = [
     help: 'Panelde Entegrasyonlar → OpenCart → Bağlantı dosyasını indirin, OpenCart\'ın kurulu olduğu ana klasöre (config.php\'nin yanına) yükleyin ve site adresinizi girin. Siteniz HTTPS olmalıdır.',
   },
   {
-    slug: 'etsy', beta: 'etsy', name: 'Etsy', kind: 'pazaryeri', color: '#f1641e', badge: 'E', word: 'Etsy',
-    lead: 'Etsy mağazanızın siparişlerini diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını Etsy\'ye bildirin.',
+    slug: 'etsy', beta: 'etsy', name: 'Etsy', kind: 'yurt dışı pazaryeri', color: '#f1641e', badge: 'E', word: 'Etsy',
+    lead: 'Etsy mağazanızın siparişlerini diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını Etsy\'ye bildirin. Yurt dışı pazaryerleri Kurumsal pakette yer alır.',
     caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
     points: [
       ['i-cart', 'Siparişler', 'Etsy siparişleri diğer kanallarla aynı listeye gelir.'],
@@ -449,16 +449,16 @@ export const INTEGRATIONS = [
   },
   {
     slug: 'ebay', beta: 'ebay', name: "eBay", kind: 'yurt dışı pazaryeri', color: '#E53238', badge: "e", word: "ebay",
-    lead: "eBay siparişlerinizi Türkiye'deki kanallarınızla aynı panelde yönetin; stok ve fiyatlarınızı eşitleyin, takip numarasını panelden bildirin.",
+    lead: "eBay siparişlerinizi Türkiye'deki kanallarınızla aynı panelde yönetin; stok ve fiyatlarınızı eşitleyin, takip numarasını panelden bildirin. Yurt dışı pazaryerleri Kurumsal pakette yer alır.",
     caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Döviz ile fiyat (Kurumsal)", true], ["Ürün yükleme", false]],
-    points: [["i-cart", "Siparişler", "eBay siparişleri kendi para birimiyle diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Yurt içinde satılan ürünün stoğu bu kanalda da düşer."], ["i-truck", "Kargo bildirimi", "Takip numarası panelden bildirilir."], ["i-calc", "Döviz", "Döviz kuruna endeksli fiyatla birlikte kullanılabilir."]],
+    points: [["i-cart", "Siparişler", "eBay siparişleri TCMB kuruyla TL'ye çevrilerek diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Yurt içinde satılan ürünün stoğu bu kanalda da düşer."], ["i-truck", "Kargo bildirimi", "Takip numarası panelden bildirilir."], ["i-calc", "Döviz", "Döviz kuruna endeksli fiyatla birlikte kullanılabilir."]],
     help: "developer.ebay.com'da ücretsiz geliştirici hesabı açın → Application Keys sayfasında Production anahtar seti oluşturun (App ID + Cert ID). Aynı sayfadaki User Tokens bölümünde \"Get a Token from eBay via Your Application\" ile bir RuName (yönlendirme adı) tanımlayıp eBay satıcı hesabınızla oturum açın ve izin verin; OAuth bölümünde görünen refresh token'ı (v^1.1#…) kopyalayın. Kapsamlarda sell.fulfillment ve sell.inventory seçili olmalı. Ürünlerin panelde görünmesi için ilanların Inventory API ile oluşturulmuş ya da Seller Hub'dan Inventory API'ye taşınmış (bulk_migrate_listing) olması gerekir.",
   },
   {
     slug: 'ozon', beta: 'ozon', name: "Ozon", kind: 'yurt dışı pazaryeri', color: '#005BFF', badge: "O", word: "OZON",
-    lead: "Ozon siparişlerinizi Türkiye'deki kanallarınızla aynı panelde yönetin; stok ve fiyatlarınızı eşitleyin, takip numarasını panelden bildirin.",
+    lead: "Ozon siparişlerinizi Türkiye'deki kanallarınızla aynı panelde yönetin; stok ve fiyatlarınızı eşitleyin, takip numarasını panelden bildirin. Yurt dışı pazaryerleri Kurumsal pakette yer alır.",
     caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Döviz ile fiyat (Kurumsal)", true], ["Ürün yükleme", false]],
-    points: [["i-cart", "Siparişler", "Ozon siparişleri kendi para birimiyle diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Yurt içinde satılan ürünün stoğu bu kanalda da düşer."], ["i-truck", "Kargo bildirimi", "Takip numarası panelden bildirilir."], ["i-calc", "Döviz", "Döviz kuruna endeksli fiyatla birlikte kullanılabilir."]],
+    points: [["i-cart", "Siparişler", "Ozon siparişleri TCMB kuruyla TL'ye çevrilerek diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Yurt içinde satılan ürünün stoğu bu kanalda da düşer."], ["i-truck", "Kargo bildirimi", "Takip numarası panelden bildirilir."], ["i-calc", "Döviz", "Döviz kuruna endeksli fiyatla birlikte kullanılabilir."]],
     help: "seller.ozon.ru satıcı panelinde Ayarlar (Настройки) → Seller API sayfasında Client ID görünür; \"Anahtar oluştur\" ile Admin rolünde bir API anahtarı oluşturup kopyalayın (anahtar yalnız bir kez gösterilir). Birden fazla FBS deposunuz varsa stokların yazılacağı deponun numarasını (Logistics → Depolar) gelişmiş alana girin.",
   },
   {

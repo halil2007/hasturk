@@ -1,6 +1,6 @@
 // Trendyol Marketplace API (apigw.trendyol.com/integration).
 // Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key, API Secret.
-import { http, basic, num, str, chunk, diagStep, imageList, mediaUrls, rankBrands } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, imageList, mediaUrls, rankBrands, oneAxis } from '../util.js';
 
 const BASE = 'https://apigw.trendyol.com/integration';
 
@@ -464,7 +464,7 @@ export function trendyol(env, meta) {
     for (const a of await rawAttrs(map.remote_id)) {
       const id = attrId(a), v = (map.attrs || {})[id];
       let valueId = v && v.id, text = v && v.value;
-      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
+      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : oneAxis(pr.variant); }
       if (text === '@image') text = pr.image;
       // V2 biçimi: listeden değer → attributeValueIds, serbest metin (izin varsa) → attributeValue
       if (valueId) attrs.push({ attributeId: Number(id), attributeValueIds: [Number(valueId)] });

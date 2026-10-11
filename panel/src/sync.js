@@ -7,7 +7,7 @@
 import { compareFetched, checkMissing } from './orderclean.js';
 import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
-import { typeOf } from './config.js';
+import { typeOf, INTL_TYPES } from './config.js';
 import { syncInvoices, syncSettlements } from './finance.js';
 import { maintain } from './perf.js';
 import { syncFx, orderRate } from './fx.js';
@@ -548,7 +548,8 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     await stockOnce(env, db, settings);
     const maps = await productMaps(db);
     const changed = [];
-    const chans = (await getChannels(env, db)).filter((c) => c.enabled && (!only || only.includes(c.id)));
+    // Yurt dışı pazaryeri (eBay, Etsy, Ozon) paket dışı kaldıysa senkron yapılmaz (Kurumsal pakette)
+    const chans = (await getChannels(env, db)).filter((c) => c.enabled && (!only || only.includes(c.id)) && (allows(env, 'intl') || !INTL_TYPES.includes(c.type)));
     // Siparişleri en uzun süredir alınamayan kanal önce: bütçe dolduğunda hep aynı kanallar geride kalmasın
     const lastOf = new Map();
     for (const ch of chans) lastOf.set(ch.id, (await getRaw(db, 'last:' + ch.id)) || {});

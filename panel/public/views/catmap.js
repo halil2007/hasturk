@@ -12,6 +12,7 @@ export async function catmapView(el) {
     const x = cellOf(local, cid);
     const miss = x.missing && x.missing.length;
     const inner = x.state === 'mapped' ? html`<span class="nm" title="${x.name}"><i class="ico ico-check" style="color:var(--good)"></i> ${short(x.name)}</span>${miss ? html`<span class="pill amber" title="${x.missing.join(', ')}">${x.missing.length} zorunlu özellik eksik</span>` : ''}`
+      : x.state === 'stale' ? html`<span class="nm" title="${x.note || ''}"><i class="ico ico-warn" style="color:var(--bad)"></i> ${short(x.name)}</span><span class="pill bad" title="${x.note || ''}">kanalda kaldırılmış</span>`
       : x.state === 'suggested' ? html`<span class="nm" title="${x.path ? x.path + ' › ' : ''}${x.name}">${short(x.name)}</span><span class="pill ${x.sure ? 'good' : 'amber'}">${x.sure ? 'kesin' : 'öneri'}</span>`
         : html`<span class="nm muted">${x.state === 'none' ? 'Öneri yok · seç' : '—'}</span>`;
     return html`<button type="button" class="cm-cell" data-act="cell" data-l="${local}" data-c="${cid}">${mob ? html`<span class="row" style="gap:6px">${chLogo(cid, true)}<b>${ch(cid).name}</b></span><span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">${inner}</span>` : inner}</button>`;
@@ -54,12 +55,13 @@ export async function catmapView(el) {
     const save = async (id, name) => { await api('catalog/cell', { method: 'POST', body: { local, channel: cid, remote_id: id, remote_name: name } }); toast('Eşleşti'); s.close(); await load(); };
     function draw() {
       s.setBody(html`<div class="stack">
+        ${x.state === 'stale' ? html`<div class="notice"><div><span class="pill bad">kanalda kaldırılmış</span> <b>${x.name}</b><div class="tiny muted">${x.note || ''}</div></div></div>` : ''}
         ${x.state === 'mapped' ? html`<div><span class="muted small">Eşleşen</span><div><i class="ico ico-check" style="color:var(--good)"></i> <b>${x.name}</b></div></div>`
           : x.state === 'suggested' ? html`<div class="notice"><div><span class="pill ${x.sure ? 'good' : 'amber'}">${x.sure ? 'kesin' : 'öneri'}</span> <b>${x.name}</b><div class="tiny muted">${x.path || ''}</div>
             <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm primary" data-x="ok">Onayla</button><button class="btn sm ghost" data-x="rej">Uygun değil</button></div></div></div>` : ''}
         <label class="field"><span>${x.state === 'mapped' ? 'Değiştir' : 'Kategori ara'}</span><input class="input" data-cq placeholder="ör. elbise, kılıf"><div data-res class="stack" style="gap:4px;margin-top:4px"></div></label>
         ${x.state === 'mapped' && c.kind === 'market' ? html`<div data-attrs><div class="muted small"><i class="ico ico-sync spin"></i> Zorunlu özellikler…</div></div>` : ''}
-        ${x.state === 'mapped' ? html`<button class="btn sm ghost danger" data-x="unmap" style="align-self:flex-start">Eşleşmeyi kaldır</button>` : ''}
+        ${x.state === 'mapped' || x.state === 'stale' ? html`<button class="btn sm ghost danger" data-x="unmap" style="align-self:flex-start">Eşleşmeyi kaldır</button>` : ''}
       </div>`);
       const cq = $('[data-cq]', s.body);
       cq.addEventListener('input', debounce(async () => {

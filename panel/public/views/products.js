@@ -431,6 +431,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Ağırlık (kg)</span><input class="input" name="weight" inputmode="decimal" placeholder="isteğe bağlı" value="${p.weight || ''}"></label>
         <label class="field"><span>Kargoya hazırlık (gün)</span><input class="input" name="preparing_days" inputmode="numeric" placeholder="kanal ayarı" value="${p.preparing_days || ''}"></label>
         <label class="field"><span>Garanti (ay)</span><input class="input" name="warranty_months" inputmode="numeric" placeholder="kanal ayarı" value="${p.warranty_months || ''}"></label>
+        <label class="field"><span>Menşei</span><input class="input" name="origin" maxlength="40" placeholder="${(state.settings && state.settings.origin) || 'Türkiye'}" value="${p.origin || ''}"></label>
         <label class="field"><span>Kargo tutarı (sipariş başı)</span><div class="input-group"><input class="input" name="ship_cost" inputmode="decimal" placeholder="girilmedi" value="${p.ship_cost || ''}"><span class="suffix">₺</span></div><small>Kâr hesabında kargo gideri; kanal kargo faturası gelirse o kullanılır</small></label>
         ${siteStock(p) ? html`<label class="field"><span>Stok</span><input class="input" type="number" value="${p.stock}" readonly><small>ikas sitesinden okunur (stok senkronu kapalı)</small></label>` : html`<label class="field"><span>Stok</span><input class="input" name="stock" type="number" inputmode="numeric" value="${p.stock}"></label>`}
         <label class="field"><span>Kritik stok uyarısı</span><input class="input" name="critical_stock" type="number" inputmode="numeric" value="${p.critical_stock || 0}"></label>
@@ -604,7 +605,7 @@ export async function productForm(id, done) {
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const fd = new FormData(form), b = {};
     if (uploading) return toast('Fotoğraflar yükleniyor; bitince kaydedin', true);
-    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months']) b[k] = fd.get(k);
+    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months', 'origin']) b[k] = fd.get(k);
     for (const k of ['purchase_price', 'sale_price', 'desi', 'ship_cost', 'list_price', 'weight', 'preparing_days', 'warranty_months']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
     if (form.currency) { b.currency = fd.get('currency') || ''; b.fx_price = numIn(fd.get('fx_price')); b.fx_margin = String(fd.get('fx_margin') || '').trim() === '' ? '' : numIn(fd.get('fx_margin')); }

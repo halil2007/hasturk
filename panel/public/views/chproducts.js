@@ -44,7 +44,7 @@ export async function channelProductsView(el, rest, query = {}) {
   }
 
   const stateCell = (l) => (l.product_id ? html`<a class="pill good" href="#/urunler?q=${encodeURIComponent(l.product_sku || l.product_name || '')}" title="Panel ürünü: ${l.product_name || ''}">Panelde</a>`
-    : l.ignored && l.match === 'zero' ? html`<span class="pill">Stoğu yok</span>` : l.ignored ? html`<span class="pill">Yok sayıldı</span>` : html`<span class="pill amber">Panelde değil</span>`);
+    : l.match === 'gone' ? html`<span class="pill" title="Kanalın ilan listesinde artık yok">Kanalda yok</span>` : l.ignored && l.match === 'zero' ? html`<span class="pill">Stoğu yok</span>` : l.ignored ? html`<span class="pill">Yok sayıldı</span>` : html`<span class="pill amber">Panelde değil</span>`);
   // Önerilen eşleşme: panelde var olan en benzer ürün (puan ve neden); "Bağla" ilanı o ürüne bağlar
   const sugg = (l) => (!l.product_id && l.suggest ? html`<div class="cp-sug"><span class="score ${l.suggest.score >= 85 ? 'hi' : l.suggest.score >= 60 ? 'mid' : 'lo'}" title="${l.suggest.why || ''}">${l.suggest.score}</span>
       <div style="min-width:0;flex:1"><div class="muted tiny">Önerilen eşleşme</div><div class="ellipsis small" style="font-weight:600;max-width:260px" title="${l.suggest.name}">${l.suggest.name}</div><div class="muted tiny ellipsis" style="max-width:260px">${[l.suggest.sku, l.suggest.barcode].filter(Boolean).join(' · ')}</div></div>

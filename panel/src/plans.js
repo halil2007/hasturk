@@ -8,7 +8,7 @@ import { fail } from './util.js';
 export const PLANS = {
   baslangic: { name: 'Başlangıç', stores: 3, users: 2, monthly: 990, yearly: 9900, features: [] },
   profesyonel: { name: 'Profesyonel', stores: 10, users: 5, monthly: 1990, yearly: 19900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles'] },
-  kurumsal: { name: 'Kurumsal', stores: 25, users: 0, monthly: 3990, yearly: 39900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles', 'stockapi', 'fx', 'carrier'],
+  kurumsal: { name: 'Kurumsal', stores: 25, users: 0, monthly: 3990, yearly: 39900, features: ['buybox', 'autoupload', 'finance', 'bulk', 'roles', 'stockapi', 'fx', 'carrier', 'intl'],
     soon: ['e-Fatura / e-Arşiv entegrasyonu'] },
 };
 // Ek mağaza: paketteki mağaza sınırının üstüne, mağaza başına YILLIK ücret (TL, KDV dahil). Lisansın bitişine kalan gün kadar
@@ -43,7 +43,7 @@ export function priceOf(plan, period) {
 export const FEATURES = {
   buybox: 'Buybox takibi ve otomatik fiyat', autoupload: 'Otomatik ürün gönderimi', finance: 'Hakediş ve kesilen faturalar',
   bulk: 'Excel ile toplu güncelleme', roles: 'Personel yetkileri ve rol şablonları', stockapi: 'Stok API', fx: 'Döviz kuruna endeksli otomatik fiyat',
-  carrier: 'Kendi anlaşmalı kargo entegrasyonu (etiket ve takip)',
+  carrier: 'Kendi anlaşmalı kargo entegrasyonu (etiket ve takip)', intl: 'Yurt dışı pazaryerleri (eBay, Etsy, Ozon, yurt dışı Amazon)',
 };
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/[^a-z]/g, '');
 // Firma kartındaki paket adı → paket anahtarı ("Başlangıç", "baslangic", "Profesyonel paket" …); tanınmazsa '' (özel)

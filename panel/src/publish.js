@@ -13,7 +13,7 @@ import { getChannels } from './channels/index.js';
 import { fail, str, num, brandKey } from './util.js';
 import { exclusive } from './locks.js';
 import { rank } from './catmatch.js';
-import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor } from './catalog.js';
+import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes } from './catalog.js';
 
 // Kanalın bir kez sorulan zorunlu seçenekleri (Ürün yükle → kanal seçenekleri ile aynı yer: upload_opts). Üçüncü değer: ürünün kendi alanı varsa o kullanılır.
 const NEED = {
@@ -130,7 +130,8 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
       }
       return schema.get(catId);
     };
-    const autoOf = async (catId) => { if (!autoA.has(catId)) autoA.set(catId, (await autoAttrs(c, catId).catch(() => ({ attrs: {} }))).attrs); return autoA.get(catId); };
+    const autoOf = async (catId) => { if (!autoA.has(catId)) autoA.set(catId, (await autoAttrs(c, catId, { origin: originOf(settings) }).catch(() => ({ attrs: {} }))).attrs); return autoA.get(catId); };
+    let staleOf = null;
     const pickOf = (catId) => { if (!picks.has(catId)) picks.set(catId, picker(c, catId)); return picks.get(catId); };
     // Ürünün kategorisi: ürüne özel seçim → taslak onay → kategori eşleştirmesi → öneri
     async function catFor(p) {
@@ -140,7 +141,10 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
       if (d && str(d.id)) return { key, local, remote_id: str(d.id), name: str(d.name), state: 'mapped', draft: true, product: !local || !!own || maps.has(local) };
       if (own && own.id) return { key, local, remote_id: own.id, name: own.value, state: 'mapped', product: true };
       const m = local && maps.get(local);
-      if (m) return { key, local, remote_id: m.remote_id, name: m.remote_name, state: 'mapped', attrs: m.attrs };
+      if (m) {
+        if (!staleOf) staleOf = await staleCheck(c);
+        return { key, local, remote_id: m.remote_id, name: m.remote_name, state: 'mapped', attrs: m.attrs, ...(staleOf(m.remote_id) ? { stale: true } : {}) };
+      }
       if (catBox.has(key)) return catBox.get(key);
       const sg = local && sugs.get(local);
       const text = local || str(p.group_name) || str(p.name);
@@ -182,6 +186,7 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
       if (cat.state === 'none') missing.push('Kategori');
       else {
         if (cat.state === 'suggested') missing.push('Kategori onayı');
+        if (cat.stale) missing.push(STALE_MSG);
         const sch = await schemaOf(cat.remote_id);
         if (!catRows.has(cat.key)) catRows.set(cat.key, { key: cat.key, local: cat.local, remote_id: cat.remote_id, name: cat.name, path: cat.path || '', state: cat.state, sure: !!cat.sure, alts: cat.alts || [], attrs: sch, products: [] });
         catRows.get(cat.key).products.push(p.id);
@@ -190,7 +195,7 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
         const own = { ...((saved[p.id] || {})[c.id] || {}) };
         delete own['@category'];
         const dA = { ...((draft.attrs || {})[c.id] || {}), ...(((draft.pattrs || {})[p.id] || {})[c.id] || {}) };
-        const map = { local: cat.local, channel: c.id, remote_id: cat.remote_id, remote_name: cat.name, attrs: { ...base, ...own } };
+        const map = { local: cat.local, channel: c.id, remote_id: cat.remote_id, remote_name: cat.name, attrs: { ...(await withOrigin(c, cat.remote_id, base, p)), ...own } };
         for (const [aid, v] of Object.entries(dA)) {
           const a = sch.find((x) => String(x.id) === String(aid));
           if (!a) continue;
@@ -201,7 +206,7 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
         for (const a of sch) {
           const v = map.attrs[a.id];
           if (!v) continue;
-          if (v.value === '@variant') { const hit = p.variant_name ? await pick(a, p.variant_name) : null; vals[a.id] = hit ? { id: hit.id, value: hit.value, from: 'variant' } : { value: str(p.variant_name), from: 'variant', bad: !a.custom }; }
+          if (v.value === '@variant') { const hit = p.variant_name ? await pick(a, p.variant_name) : null; vals[a.id] = hit ? { id: hit.id, value: hit.value, from: 'variant' } : { value: str(p.variant_name), from: 'variant', bad: !a.custom || variantAxes(p.variant_name).length > 1 }; }
           else if (v.value !== '@image') vals[a.id] = { id: v.id, value: v.value, from: own[a.id] || dA[a.id] ? 'product' : 'category' };
         }
         brand = await brandFor(p, cat.remote_id);
@@ -285,11 +290,11 @@ async function saveDraft(env, db, ids, b, user) {
         if (local && !own && !maps.has(local)) {
           if (doneLocal.has(local)) continue;
           doneLocal.add(local);
-          const { attrs } = await autoAttrs(c, str(d.id)).catch(() => ({ attrs: {} }));
+          const { attrs } = await autoAttrs(c, str(d.id), { origin: originOf(await getSettings(db)) }).catch(() => ({ attrs: {} }));
           await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,
           local, c.id, str(d.id), str(d.name), JSON.stringify(attrs), t, user.name);
-          await run(db, 'DELETE FROM category_suggest WHERE local = ? AND channel = ?', local, c.id);
+          await clearSuggest(db, local, c.id);
           await log(db, c.id, 'info', `${user.name}: kategori onaylandı (${local} → ${str(d.name)})`);
         } else {
           st.push(db.prepare(`INSERT INTO product_attrs (product_id, channel, attr_id, value_id, value) VALUES (?, ?, '@category', ?, ?)

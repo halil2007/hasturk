@@ -333,6 +333,8 @@ export const MIGRATIONS = [
   // "Hayır, farklı ürün" denen ikinci eşleşme önerileri (ilan + ürün): bir daha önerilmez
   `CREATE TABLE IF NOT EXISTS listing_twin_no (channel TEXT NOT NULL, remote_id TEXT NOT NULL, product_id INTEGER NOT NULL, at INTEGER, user TEXT,
     PRIMARY KEY (channel, remote_id, product_id))`,
+  // Ürüne özel menşei (boşsa mağaza ayarı "Ürünlerin menşei" geçerli; pazaryerine yüklemede Menşei özelliği)
+  'ALTER TABLE products ADD COLUMN origin TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -450,6 +452,7 @@ export const DEFAULT_SETTINGS = {
   stock_push: {},
   auto_upload: {},
   auto_approve_sure: false, // Kategori eşleştirme: kesin önerileri arka planda otomatik onayla (varsayılan kapalı)
+  origin: 'Türkiye',        // Ürünlerin menşei: pazaryerine yüklemede Menşei özelliği (ürün kartında ayrıca girilebilir)
   stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)
   restock_returns: false,   // iade gelen ürün stoğa geri eklensin mi
   history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (daha eskisi: Entegrasyonlar → Geçmiş siparişler)

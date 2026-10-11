@@ -3,7 +3,7 @@
 // Kimlik: X-API-KEY = base64(ApiKey:ApiSecret). Canlı ortamda IP izni gerekmez (test ortamında gerekir).
 // Kimlik: X-API-KEY başlığı (biçim otomatik bulunur, aşağıya bakın). Siparişler: /oms/{vendorId}/list · İadeler: /oms/{vendorId}/claim-list · Ürün/stok/fiyat: /pim/...
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, diagStep, sleep, imageList, mediaUrls, rankBrands } from '../util.js';
+import { http, num, str, chunk, diagStep, sleep, imageList, mediaUrls, rankBrands, oneAxis } from '../util.js';
 
 const BASE = 'https://merchantapi.idefix.com';
 // idefix durumları "shipment_" önekiyle gelir (shipment_created, shipment_picking, shipment_in_cargo, shipment_delivered…)
@@ -266,7 +266,7 @@ export function idefix(env, meta) {
     for (const a of await rawAttrs(map.remote_id)) {
       const id = String(a.attributeId), v = (map.attrs || {})[id];
       let valueId = v && v.id, text = v && v.value;
-      if (text === '@variant') { const hit = pr.variant && !a.allowCustom ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? hit.value : pr.variant; }
+      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : oneAxis(pr.variant); }
       if (text === '@image') text = pr.image;
       if (a.allowCustom && text) attrs.push({ attributeId: Number(id), attributeValueId: null, customAttributeValue: String(text) });
       else if (valueId) attrs.push({ attributeId: Number(id), attributeValueId: Number(valueId), customAttributeValue: null });

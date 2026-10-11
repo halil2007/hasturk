@@ -74,7 +74,10 @@ function oneBc(x) {
   }
   const i13 = isbn13(t);
   if (i13) t = i13;
-  return /^\d+$/.test(t) ? t.replace(/^0+/, '') : t;
+  if (!/^\d+$/.test(t)) return t;
+  // GTIN baştaki sıfırlar (UPC-12 "0…" = EAN-13 = GTIN-14); kısa iç kodlarda ("000123456") sıfırlar koddur, atılmaz
+  const z = t.replace(/^0+/, '');
+  return z.length >= 8 ? z : t;
 }
 // First code of a barcode list field (what a product card / channel upload should carry): "869…;869…" → "869…"
 export const firstBarcode = (b) => str(str(b).split(/[,;|/\n]+/)[0]);
@@ -545,7 +548,7 @@ export async function itemResolver(db) {
       let s = normSku(it.sku) ? sku.get(normSku(it.sku)) : undefined;
       if (s > 0 && !skuEq(skuOf.get(s), it.sku)) s = undefined; // "TSH-1-12" ≠ "TSH-11-2"
       if (b === -1 || s === -1) return null;
-      if (b && s && b !== s) return null;
+      if (b && s && b !== s) { if (weakSku(it.sku)) s = undefined; else return null; } // kısa / sayısal stok kodu barkoda karşı oy kullanmaz
       const id = b || s || null;
       return id && id !== no ? id : null;
     },
