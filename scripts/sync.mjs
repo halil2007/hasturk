@@ -370,7 +370,7 @@ async function fetchOrdersRange(from, to, maxPages) {
   let lastErr;
   for (const build of ORDER_Q ? [ORDER_Q] : variants) {
     try {
-      const out = { orders: 0, lines: [] };
+      const out = { orders: 0, lines: [], ts: [] };
       for (let page = 1; page <= maxPages; page++) {
         const [q, vars] = build({ page, limit: 50 });
         const r = (await gql(q, vars)).listOrder;
@@ -381,9 +381,11 @@ async function fetchOrdersRange(from, to, maxPages) {
           if (t && t > to) continue;
           if (/CANCEL|REFUND|DRAFT/i.test(o.status || '')) continue;
           out.orders++;
+          out.ts.push(t || 0);
+          const oi = out.orders; // sipariş sırası: aynı siparişteki satırlar "birlikte alındı" sayılır
           for (const li of o.orderLineItems || []) {
             if (/CANCEL|REFUND/i.test(li.status || '')) continue;
-            if (li.variant) out.lines.push({ pid: li.variant.productId, vid: li.variant.id, q: +li.quantity || 1, t });
+            if (li.variant) out.lines.push({ pid: li.variant.productId, vid: li.variant.id, q: +li.quantity || 1, t, o: oi });
           }
         }
         if (!r.hasNext || !(r.data || []).length || (old && old === r.data.length)) break;
@@ -400,9 +402,12 @@ async function fetchOrdersRange(from, to, maxPages) {
 async function fetchOrders() {
   if (env.MOCK) return env.ORDERS_FILE ? JSON.parse(await readFile(env.ORDERS_FILE, 'utf8')) : null;
   const days = +env.ORDER_DAYS || 60, now = Date.now(), Y = 365 * 864e5, D = 864e5;
+  // "Birlikte alınanlar" için daha uzun pencere (varsayılan 180 gün) tek seferde çekilir; eğilim son `days` günü kullanır
+  const coDays = Math.max(days, +env.CO_DAYS || 180);
   try {
-    const cur = await fetchOrdersRange(now - days * D, now, 60);
-    console.log(`Siparişler: son ${days} günde ${cur.orders} sipariş, ${cur.lines.length} satır`);
+    const long = await fetchOrdersRange(now - coDays * D, now, 80), from = now - days * D;
+    const cur = { orders: long.ts.filter((t) => !t || t >= from).length, lines: long.lines.filter((l) => !l.t || l.t >= from) };
+    console.log(`Siparişler: son ${days} günde ${cur.orders} sipariş, ${cur.lines.length} satır; birlikte alınanlar için son ${coDays} günde ${long.orders} sipariş`);
     // Tarih filtresi gerçekten uygulanıyor mu? (geçmiş yıllar 0 gelirse sebebini ayırt etmek için)
     try {
       const half = await fetchOrdersRange(now - days * D, now - 30 * D, 60);
@@ -418,7 +423,7 @@ async function fetchOrders() {
         past.push({ y, ...r });
       } catch (e) { console.warn(`UYARI: ${y} yıl önceki siparişler alınamadı: ` + String(e.message).slice(0, 160)); }
     }
-    return { days, now, orders: cur.orders, lines: cur.lines, past };
+    return { days, now, orders: cur.orders, lines: cur.lines, past, co: long.lines, coDays, coOrders: long.orders };
   } catch (e) {
     console.warn('UYARI: sipariş verisi alınamadı (ikas uygulamasına "Siparişler (okuma)" izni gerekebilir): ' + String(e && e.message).slice(0, 200));
     return null;
@@ -442,8 +447,9 @@ async function fetchOtherOrders(out) {
     if (!o) return null;
     const map = await crossMapper(other, out);
     let ok = 0, miss = 0;
-    const conv = (lines) => lines.map((l) => { const p = map(l); if (p) ok++; else miss++; return p ? { pid: p.id, vid: null, q: l.q, t: l.t } : null; }).filter(Boolean);
-    const res = { ...o, lines: conv(o.lines), past: o.past.map((py) => ({ ...py, lines: conv(py.lines) })) };
+    const one = (l) => { const p = map(l); return p ? { pid: p.id, vid: null, q: l.q, t: l.t, o: l.o == null ? null : 'b' + l.o } : null; };
+    const conv = (lines) => lines.map((l) => { const r = one(l); if (r) ok++; else miss++; return r; }).filter(Boolean);
+    const res = { ...o, lines: conv(o.lines), past: o.past.map((py) => ({ ...py, lines: conv(py.lines) })), co: (o.co || []).map(one).filter(Boolean) };
     console.log(`Diğer mağaza (${env.OTHER_STORE}): ${o.orders} sipariş; ${ok} satır eşleşti, ${miss} satır bu mağazada karşılığı olmadığı için atlandı`);
     return res;
   } catch (e) {
@@ -476,7 +482,8 @@ async function crossMapper(other, out) {
 function mergeOrders(a, b) {
   if (!a || !b) return a || b;
   const past = a.past.map((py) => { const q = b.past.find((x) => x.y === py.y); return q ? { ...py, orders: py.orders + q.orders, lines: py.lines.concat(q.lines) } : py; });
-  return { ...a, orders: a.orders + b.orders, lines: a.lines.concat(b.lines), past, stores: 2 };
+  return { ...a, orders: a.orders + b.orders, lines: a.lines.concat(b.lines), past, stores: 2,
+    co: (a.co || []).concat(b.co || []), coOrders: (a.coOrders || 0) + (b.coOrders || 0) };
 }
 
 const fold = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[ışğüöçâîû]/g, (c) => ({ ı: 'i', ş: 's', ğ: 'g', ü: 'u', ö: 'o', ç: 'c', â: 'a', î: 'i', û: 'u' })[c]).replace(/̇/g, '');
@@ -601,12 +608,7 @@ function applyTrends(out, trends, orders, config) {
   // Öne çıkarılmayacak kategoriler (config.json > demoteCategories; yoksa categoryLast, ör. kedi/köpek ürünleri):
   // bu ürünler aranınca yine bulunur ama "Çok satan / Yükselen / Sezon" listelerine ve öne çıkanlara girmez,
   // genel sıralamadaki eğilim katkıları da 1/5'e iner
-  const catOf = new Map(out.cats.map((c) => [c.id, c]));
-  const demoteSet = new Set((config.demoteCategories || config.categoryLast || []).map(fold));
-  const demoted = (slug) => {
-    const p = bySlug.get(slug);
-    return !!p && (p.c || []).some((id) => { for (let c = catOf.get(id); c; c = catOf.get(c.p)) if (demoteSet.has(fold(c.n))) return true; return false; });
-  };
+  const demoted = makeDemoted(out, config);
   const max = Math.max(0, ...rows.filter((r) => !demoted(r.slug)).map((r) => r.score));
   for (const r of rows) {
     r.lo = demoted(r.slug);
@@ -660,10 +662,79 @@ function applyTrends(out, trends, orders, config) {
   return { rows, terms, best, rising, season, years };
 }
 
+// Öne çıkarılmayan kategoride mi (config.json > demoteCategories; yoksa categoryLast): ürünün herhangi bir
+// kategorisi ya da üst kategorisi listedeyse
+function makeDemoted(out, config) {
+  const bySlug = new Map(out.items.map((p) => [p.s, p]));
+  const catOf = new Map(out.cats.map((c) => [c.id, c]));
+  const demoteSet = new Set((config.demoteCategories || config.categoryLast || []).map(fold));
+  return (slug) => {
+    const p = bySlug.get(slug);
+    return !!p && (p.c || []).some((id) => { for (let c = catOf.get(id); c; c = catOf.get(c.p)) if (demoteSet.has(fold(c.n))) return true; return false; });
+  };
+}
+
+// ---------- birlikte satın alınanlar (çapraz satış) ----------
+// Aynı siparişte birlikte alınan ürün çiftleri (iki mağazanın son CO_DAYS günü). Her ürüne en fazla 4 öneri (p.x):
+//  - çift en az 2 farklı siparişte birlikte geçmeli
+//  - "kaldıraç" (lift) = birlikte alınma ÷ tesadüfen beklenen; 1'in altındaysa (sadece ikisi de çok sattığı için
+//    yan yana düşüyorsa) öneri sayılmaz. Puan = birlikte sipariş × √kaldıraç (en fazla 6)
+//  - öne çıkarılmayan kategorideki ürün (kedi/köpek) sadece yine öyle bir ürünün yanında önerilir
+// Widget sepete ekleme sonrası önce bu listeyi, yetmezse config.json > crossSell kurallarını kullanır.
+const CO_MIN = 2, CO_MAX = 4, CO_BASKET = 15;
+function coPurchase(out, orders, config) {
+  const byId = new Map(out.items.map((p) => [p.id, p]));
+  const byVar = new Map();
+  for (const p of out.items) { if (p.v1) byVar.set(p.v1, p); for (const v of p.v || []) byVar.set(v.id, p); }
+  const baskets = new Map();
+  for (const l of (orders && orders.co) || []) {
+    if (l.o == null) continue;
+    const p = byId.get(l.pid) || byVar.get(l.vid);
+    if (!p) continue;
+    if (!baskets.has(l.o)) baskets.set(l.o, new Set());
+    baskets.get(l.o).add(p.s);
+  }
+  const n = new Map(), c = new Map();
+  let N = 0;
+  for (const b of baskets.values()) {
+    N++;
+    for (const s of b) n.set(s, (n.get(s) || 0) + 1);
+    if (b.size < 2 || b.size > CO_BASKET) continue; // tek ürünlü ve toptan (çok kalemli) siparişler çift üretmez
+    const arr = [...b].sort();
+    for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) { const k = arr[i] + '|' + arr[j]; c.set(k, (c.get(k) || 0) + 1); }
+  }
+  const demoted = makeDemoted(out, config);
+  const pairs = [], per = new Map();
+  for (const [k, cnt] of c) {
+    if (cnt < CO_MIN) continue;
+    const [a, b] = k.split('|');
+    const lift = (cnt * N) / (n.get(a) * n.get(b));
+    if (lift < 1) continue;
+    const score = cnt * Math.sqrt(Math.min(lift, 6));
+    pairs.push({ a, b, cnt, lift, score });
+    for (const [x, y] of [[a, b], [b, a]]) {
+      if (demoted(y) && !demoted(x)) continue;
+      if (!per.has(x)) per.set(x, []);
+      per.get(x).push({ s: y, score });
+    }
+  }
+  let withX = 0;
+  for (const p of out.items) {
+    const l = per.get(p.s);
+    if (!l) continue;
+    p.x = l.sort((a, b) => b.score - a.score || (a.s < b.s ? -1 : 1)).slice(0, CO_MAX).map((o) => o.s);
+    withX++;
+  }
+  pairs.sort((a, b) => b.score - a.score || (a.a + a.b < b.a + b.b ? -1 : 1));
+  const multi = [...baskets.values()].filter((b) => b.size >= 2).length;
+  console.log(`Birlikte alınanlar: ${N} sipariş (${multi} tanesi çok ürünlü), ${pairs.length} çift, ${withX} ürüne öneri`);
+  return { pairs, baskets: N, multi, withX, days: orders && orders.coDays };
+}
+
 // İnsan için rapor: docs/trend-raporu.md (sadece içerik değişince yazılır)
 async function writeReport(out, trends, orders, an, config) {
   const bySlug = new Map(out.items.map((p) => [p.s, p]));
-  const name = (s) => (bySlug.get(s) || {}).n || s;
+  const name = (s) => String((bySlug.get(s) || {}).n || s).replace(/\|/g, '/'); // tablo ayırıcısı adı bölmesin
   const stock = (s) => ((bySlug.get(s) || {}).st ? 'evet' : '**HAYIR**');
   const catOf = new Map(out.cats.map((c) => [c.id, c]));
   const topCat = (p) => { let c = catOf.get(p.c[0]); while (c && c.p && catOf.get(c.p)) c = catOf.get(c.p); return c ? c.n : ''; };
@@ -701,7 +772,9 @@ async function writeReport(out, trends, orders, an, config) {
     .map((r) => [name(r.slug), f1(r.lastRecent), f1(r.thisRecent), pct(r.conf)]));
 
   L.push('## En çok satanlar (son 60 gün, gerçek siparişler)', '');
-  tbl(['#', 'Ürün', 'Satış puanı', 'Son 28 gün adet'], an.rows.filter((r) => r.g.o > 0).sort((a, b) => b.g.o - a.g.o).slice(0, 20).map((r, i) => [i + 1, name(r.slug), f1(r.g.o), r.g.o28]));
+  tbl(['#', 'Ürün', 'Satış puanı', 'Son 28 gün adet'], an.rows.filter((r) => r.g.o > 0 && !r.lo).sort((a, b) => b.g.o - a.g.o).slice(0, 20).map((r, i) => [i + 1, name(r.slug), f1(r.g.o), r.g.o28]));
+  const loSold = an.rows.filter((r) => r.lo && r.g.o28 > 0);
+  if (loSold.length) L.push(`_Öne çıkarılmayan kategoriler (${(config.demoteCategories || config.categoryLast || []).join(', ')}): son 28 günde ${loSold.reduce((a, r) => a + r.g.o28, 0)} adet, ${loSold.length} ürün. Listelere alınmadı._`, '');
 
   L.push('## En çok aranan kelimeler', '');
   tbl(['#', 'Kelime', 'Son 30 gün', 'Son 7 gün', 'Yükseliyor', 'Geçen yıl bu dönem'], [...an.terms.values()].sort((a, b) => b.score - a.score).slice(0, 25)
@@ -711,11 +784,29 @@ async function writeReport(out, trends, orders, an, config) {
   tbl(['#', 'Kelime', 'Arama'], ((trends && trends.q0) || []).slice(0, 25).map(([x, n], i) => [i + 1, x, n]));
 
   L.push('## En çok sepete eklenenler', '');
-  tbl(['#', 'Ürün', 'Sepete ekleme', 'Görüntüleme'], an.rows.filter((r) => r.g.a > 0).sort((a, b) => b.g.a - a.g.a).slice(0, 20).map((r, i) => [i + 1, name(r.slug), f1(r.g.a), f1(r.g.v)]));
+  tbl(['#', 'Ürün', 'Sepete ekleme', 'Görüntüleme'], an.rows.filter((r) => r.g.a > 0 && !r.lo).sort((a, b) => b.g.a - a.g.a).slice(0, 20).map((r, i) => [i + 1, name(r.slug), f1(r.g.a), f1(r.g.v)]));
 
   L.push('## Çok bakılıp az sepete eklenenler', '', 'Fiyat, görsel veya açıklama gözden geçirilebilir.', '');
   tbl(['Ürün', 'Görüntüleme', 'Sepete ekleme', 'Oran'], an.rows.filter((r) => r.g.v >= 8 && r.g.a / r.g.v < 0.05).sort((a, b) => b.g.v - a.g.v).slice(0, 15)
     .map((r) => [name(r.slug), f1(r.g.v), f1(r.g.a), pct(r.g.a / r.g.v)]));
+
+  const co = an.co;
+  if (co) {
+    L.push(`## Birlikte satın alınanlar (son ${co.days || 180} gün)`, '',
+      `${co.baskets} siparişin ${co.multi} tanesinde birden fazla ürün var. En az ${CO_MIN} siparişte birlikte alınan çiftler; ` +
+      `kaldıraç = tesadüfe göre kaç kat sık birlikte alındığı. Sepete ekleme sonrası "Bunu alanlar bunları da aldı" önerisi bu listeden gelir ` +
+      `(${co.withX} ürün); listede olmayan ürünlerde \`config.json > crossSell\` kuralları kullanılır.`, '');
+    tbl(['#', 'Ürün', 'Birlikte alınan', 'Sipariş', 'Kaldıraç'], co.pairs.slice(0, 25).map((x, i) => [i + 1, name(x.a), name(x.b), x.cnt, '×' + f1(x.lift)]));
+  }
+  const xs = new Map(((trends && trends.xs) || []).map(([x, n]) => [x, n])), xa = new Map(((trends && trends.xa) || []).map(([x, n]) => [x, n]));
+  if (xs.size || xa.size) {
+    const sum = (m) => [...m.values()].reduce((a, b) => a + b, 0), shown = sum(xs), added = sum(xa);
+    L.push(`## Çapraz satış önerilerinin sonucu (son ${trends.days} gün)`, '',
+      `Öneri ${shown} kez gösterildi, ${added} kez sepete eklendi (${shown ? pct(added / shown) : '—'}).`, '');
+    tbl(['#', 'Önerilen ürün', 'Gösterildi', 'Eklendi', 'Oran'], [...new Set([...xs.keys(), ...xa.keys()])]
+      .map((x) => [x, xs.get(x) || 0, xa.get(x) || 0]).sort((a, b) => b[2] - a[2] || b[1] - a[1]).slice(0, 15)
+      .map(([x, a, b], i) => [i + 1, name(x), a, b, a ? pct(b / a) : '—']));
+  }
 
   L.push('## Masaüstü menü önerileri (kategori başına ilk 3)', '', 'Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazsanız menü bu sıraya göre kendini günceller.', '');
   const groups = new Map();
@@ -886,6 +977,7 @@ async function main() {
     const [trends, own] = await Promise.all([fetchTrends(), fetchOrders()]);
     const orders = mergeOrders(own, await fetchOtherOrders(out));
     const an = applyTrends(out, trends, orders, config);
+    try { an.co = coPurchase(out, orders, config); } catch (e) { console.warn('UYARI: birlikte alınanlar hesaplanamadı: ' + String(e && e.message).slice(0, 200)); }
     await writeReport(out, trends, orders, an, config);
   } catch (e) {
     console.warn('UYARI: eğilim hesaplanamadı: ' + (e.stack || e.message).slice(0, 300));

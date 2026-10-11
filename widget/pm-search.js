@@ -1053,7 +1053,7 @@
     else if (act === 'guide') { GID = v; renderGuide(); }
     else if (act === 'goguide') { GID = v; $q.value = ''; render(); setTab('guide'); }
     else if (act === 'goguideq') { GQ = v; $q.value = ''; render(); setTab('guide'); }
-    else if (act === 'add') { var xs = !!b.getAttribute('data-xs'); if (xs) track('cross_sell_add', v); openAdd(v, xs); }
+    else if (act === 'add') { var xs = !!b.getAttribute('data-xs'); if (xs) { track('cross_sell_add', v); if (BY_ID[v]) ev('xa', BY_ID[v].s); } openAdd(v, xs); }
     else if (act === 'xsx') hideCross();
     else if (act === 'vo') pickVariant(v);
     else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
@@ -1238,9 +1238,11 @@
     p.c.forEach(function (id) { for (var c = CATS_BY_ID[id]; c; c = c.p && CATS_BY_ID[c.p]) if (out.indexOf(c.f) === -1) out.push(c.f); });
     return out;
   }
+  // Önce gerçek siparişlerde birlikte alınanlar (sync: p.x), yetmezse config.json > crossSell kuralları
   function crossFor(p) {
-    var chain = catChain(p), picked = [], bySlug = {};
-    DATA.items.forEach(function (x) { bySlug[x.s] = x; });
+    var chain = catChain(p), picked = [], bySlug = BY_SLUG, ok = function (x) { return x && x.st && x.id !== p.id && !ADDED[x.id] && picked.indexOf(x) === -1; };
+    (p.x || []).forEach(function (s) { if (picked.length < 2 && ok(bySlug[s])) picked.push(bySlug[s]); });
+    picked.fromData = picked.length;
     (CFG.crossSell || []).forEach(function (r) {
       if (!(r.when || []).some(function (n) { return chain.indexOf(fold(n)) !== -1; })) return;
       (r.offer || []).forEach(function (o) {
@@ -1252,11 +1254,13 @@
         } else if (bySlug[o]) cands = [bySlug[o]];
         for (var i = 0; i < cands.length; i++) {
           var x = cands[i];
-          if (x.st && x.id !== p.id && !ADDED[x.id] && picked.indexOf(x) === -1) { picked.push(x); break; }
+          if (ok(x)) { picked.push(x); break; }
         }
       });
     });
-    return picked.slice(0, 2);
+    var out = picked.slice(0, 2);
+    out.fromData = picked.fromData;
+    return out;
   }
   function xsCount(inc) {
     var n = 0;
@@ -1276,7 +1280,7 @@
     var el = root.querySelector('.xsell');
     el.innerHTML = '<div class="xs-ok">' + I.check + '<span>' + esc(msg) + '</span><a href="' + esc(pageHref(CFG.cartUrl || '/cart')) + '">Sepete git</a>' +
       '<button type="button" data-act="xsx" aria-label="Kapat">' + I.x + '</button></div>' +
-      '<div class="xs-h">Yanına iyi gider</div><div class="xs-l">' + list.map(function (x) {
+      '<div class="xs-h">' + (list.fromData ? 'Bunu alanlar bunları da aldı' : 'Yanına iyi gider') + '</div><div class="xs-l">' + list.map(function (x) {
         var href = esc(url(x.s));
         return '<div class="xs-i">' + thumb(x.img, 180) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
           (price(x) != null ? '<b>' + (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) + '</b>' : '') + '</div>' +
@@ -1284,6 +1288,7 @@
       }).join('') + '</div>';
     el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
     track('cross_sell_show', p.n);
+    list.forEach(function (x) { ev('xs', x.s); });
     var arm = function (ms) { clearTimeout(xsTimer); xsTimer = setTimeout(hideCross, ms); };
     arm(12000);
     el.onpointerenter = function () { clearTimeout(xsTimer); };

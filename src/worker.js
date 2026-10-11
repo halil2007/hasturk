@@ -12,6 +12,8 @@ const KINDS = {
   v: 'slug',      // ürün sayfası görüntüleme
   a: 'slug',      // sepete ekleme (sitenin tamamı)
   m: 'name',      // masaüstü menü tıklaması
+  xs: 'slug',     // sepete ekleme sonrası çapraz satış önerisi gösterildi (önerilen ürün)
+  xa: 'slug',     // çapraz satış önerisinden sepete eklendi
 };
 const DAYS = 30;          // özet penceresi
 const HALF_LIFE = 10;     // gün: yeni olaylar daha ağır basar
@@ -123,7 +125,7 @@ async function trends(env, ctx) {
   }
   const [ly, ly2] = [await year(1), await year(2)];
   if (Math.random() < 0.1) ctx.waitUntil(env.DB.prepare('DELETE FROM ev WHERE d < ?').bind(day(-KEEP_DAYS)).run().catch(() => {}));
-  return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', 80), q0: top('q0', 50), m: top('m', 40), p, ly, ly2 });
+  return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', 80), q0: top('q0', 50), m: top('m', 40), xs: top('xs', 60), xa: top('xa', 60), p, ly, ly2 });
 }
 
 export default {
