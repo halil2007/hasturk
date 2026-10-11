@@ -1394,9 +1394,10 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 .rt td:last-child { width: 1%; }
 .rt td a { font-weight: 650; font-size: 13.5px; }
 .rate-sec .tw { position: relative; }
-.rt .rt-v { font-size: 13px; color: var(--text-2); font-variant-numeric: normal; }
-@media (min-width: 600px) { .rt .rt-v { min-width: 7.5em; } }
-@media (max-width: 599px) { .rt .rt-v { font-size: 12px; } .rt td a { font-size: 12.5px; } }
+.gt.num.rt thead th.rt-v { text-align: left; }
+.gt.num.rt td.rt-v { text-align: left; font-size: 13px; color: var(--text-2); font-variant-numeric: normal; }
+@media (min-width: 600px) { .gt.num.rt .rt-v { min-width: 8.5em; } }
+@media (max-width: 599px) { .rt tbody th { min-width: 10.5em; } .gt.num.rt td.rt-v { font-size: 12px; white-space: normal; min-width: 5.5em; } .rt td a { font-size: 12.5px; } }
 .rate-src small.rate-note { color: var(--text-2); }
 .cp-vade { color: var(--text-2); }
 .rt-top { text-align: right; font-size: 13px; margin: -8px 0 0; }

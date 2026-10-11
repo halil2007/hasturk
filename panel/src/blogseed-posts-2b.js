@@ -67,7 +67,7 @@ Hedef kârınızı KDV hariç satış tutarına oranla, yani **kâr marjı** ola
 
 ![Satış fiyatı formülü: sabit giderler bölü komisyon ve hedef marjdan kalan pay](https://hasturkcrm.com/img/blog/satis-fiyati-formulu.jpg "Örnek: 493 TL sabit gider, %20 komisyon + KDV ve %20 hedef marjla satış fiyatı")
 
-Formüldeki tüm tutarlar KDV dahildir; komisyon oranı panelde gördüğünüz KDV hariç orandır. Paydadaki 1,2 × komisyon, KDV'siyle birlikte komisyonun fiyat içindeki payıdır. Hedef marj ise kârınızın KDV hariç satış tutarına oranıdır.
+Formüldeki tüm tutarlar KDV dahildir; komisyon oranı KDV hariç bir orana göre yazılmıştır (Hepsiburada listesi gibi). Oranınız zaten KDV dahilse (Trendyol listesi gibi) 1,2 ile çarpmayın, oranı olduğu gibi kullanın. Paydadaki 1,2 × komisyon, KDV'siyle birlikte komisyonun fiyat içindeki payıdır. Hedef marj ise kârınızın KDV hariç satış tutarına oranıdır.
 
 ### Adım adım örnek
 
