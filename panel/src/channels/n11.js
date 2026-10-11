@@ -3,7 +3,7 @@
 // Kargo: N11 anlaşmalı kargo; durum kargo okutunca kendiliğinden "Shipped" olur (API'de kargoya verme / etiket servisi yok).
 // Ürün yükleme REST (cdn/categories, ms/product/tasks); iade talepleri SOAP (ws/returnService). Hakediş / fatura (finans) servisi yok.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, imageList, DEAD_LINE } from '../util.js';
+import { http, num, str, chunk, imageList, DEAD_LINE, rankBrands } from '../util.js';
 
 const BASE = 'https://api.n11.com';
 const STATUS = { created: 'new', picking: 'processing', unpacked: 'processing', shipped: 'shipped', delivered: 'delivered', cancelled: 'cancelled', unsupplied: 'cancelled', returned: 'returned' };
@@ -192,7 +192,7 @@ export function n11(env, meta) {
     for (const a of await rawAttrs(map.remote_id)) {
       const id = String(a.attributeId), v = (map.attrs || {})[id];
       let valueId = v && v.id, text = v && v.value;
-      if (!v && isBrand(a)) text = pr.brand;
+      if (!v && isBrand(a)) { text = pr.brand; if (pr.brandId) valueId = pr.brandId; }
       if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
       if (text === '@image') text = pr.image;
       // Listede olan değer valueId ile; listede yoksa yalnız serbest değere izin veren (isCustomValue) özellikte customValue ile
@@ -244,7 +244,13 @@ export function n11(env, meta) {
     return { done: !pending, items };
   }
   const allCategories = async () => { await categories(''); return catCache.all; };
-  const catalog = { categories, allCategories, attributes, values, build, send, status, chunk: 1000,
+  // Marka N11'de kategori özelliğidir ("Marka"): kategorinin marka değerleri içinde aranır
+  async function searchBrands(q, cat) {
+    if (!cat || !str(q)) return [];
+    const a = (await rawAttrs(cat)).find(isBrand);
+    return rankBrands(((a && a.attributeValues) || []).map((v) => ({ id: v.id, name: v.value })), q);
+  }
+  const catalog = { categories, allCategories, attributes, values, build, send, status, brands: searchBrands, brandByCategory: true, chunk: 1000,
     options: [{ k: 'shipmentTemplate', label: 'Kargo şablonu adı (N11 → Hesabım → Teslimat Bilgilerim)' }, { k: 'preparingDay', label: 'Kargoya veriliş süresi (gün)' }] };
 
   // ---------- iade talepleri (SOAP: api.n11.com/ws/returnService, ReturnService.wsdl) ----------

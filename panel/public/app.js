@@ -8,6 +8,7 @@ import { matching } from './views/match.js';
 import { buyboxView, bbChannels } from './views/buybox.js';
 import { questionsView, qChannels } from './views/questions.js';
 import { uploadView } from './views/upload.js';
+import { catmapView } from './views/catmap.js';
 import { customersView } from './views/customers.js';
 import { profitView } from './views/profit.js';
 import { insightsView } from './views/insights.js';
@@ -44,6 +45,7 @@ const ROUTES = [
   { path: 'stoklar', title: 'Stoklar', tab: 'Stoklar', icon: 'db', view: stocks, count: 'stock', perm: 'stock', group: 'katalog' },
   { path: 'kanal-urunleri', title: 'Kanal ürünleri', tab: 'Kanal ürünleri', icon: 'grid', view: channelProductsView, perm: 'products', group: 'katalog' },
   { path: 'eslestirme', title: 'Eşleştirme', tab: 'Eşleştirme', icon: 'link', view: matching, count: 'match', perm: 'match', group: 'katalog' },
+  { path: 'kategori-eslestirme', title: 'Kategori eşleştirme', tab: 'Kategoriler', icon: 'grid', view: catmapView, perm: 'products', group: 'katalog' },
   { path: 'urun-yukle', title: 'Pazaryerine Yükle', tab: 'Pazaryerine yükle', icon: 'upload', view: uploadView, perm: 'products', group: 'katalog' },
   { path: 'kampanyalar', title: 'Kampanyalar', tab: 'Kampanyalar', icon: 'tag', view: campaignsView, perm: 'products', group: 'fiyat' },
   { path: 'buybox', title: 'Fiyat rekabeti', tab: 'Fiyat rekabeti', icon: 'bolt', view: buyboxView, perm: 'products', group: 'fiyat' },

@@ -10,6 +10,7 @@ import { explainError } from '../listerr.js';
 const errText = (e) => { const x = explainError(e); return `${x.kind ? x.kind + ': ' : ''}${x.title} — ${x.fix}`; };
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
+import { mountPublish, publishSheet } from './publish.js';
 
 // Stok senkronu kapalıyken ana katalog (ikas) sitesindeki ilanı olan ürünün stoğu siteden okunur; panelde değiştirilmez
 export const siteStock = (p) => !(state.settings && state.settings.stock_sync)
@@ -116,6 +117,7 @@ export async function products(el, rest, query = {}) {
       <button class="btn sm" data-act="bulk" data-a="activate"><i class="ico ico-check"></i>Aktif yap</button>
       <button class="btn sm" data-act="bulk" data-a="deactivate"><i class="ico ico-minus"></i>Pasife al</button>
       <button class="btn sm" data-act="bulk" data-a="critical"><i class="ico ico-db"></i>Kritik stok sınırı</button>
+      <button class="btn sm primary" data-act="publish"><i class="ico ico-send"></i>Kanallarda yayınla</button>
       <button class="btn sm danger ghost" data-act="bulk" data-a="delete"><i class="ico ico-trash"></i>Sil</button>
       <span class="spacer"></span><button class="btn sm ghost" data-act="clearsel">Seçimi kaldır</button></div>`;
   }
@@ -190,6 +192,7 @@ export async function products(el, rest, query = {}) {
     errs: (t) => { const ps = t.dataset.ids.split(',').map(byId).filter(Boolean); productErrorsSheet(ps[0] ? { name: ps[0].group_name || ps[0].name } : {}, ps.flatMap((p) => p.listings || [])); },
     new: () => productForm(0, refresh),
     clearsel: () => { sel.clear(); draw(); },
+    publish: () => publishSheet([...sel]),
     menu: (t) => {
       const p = byId(t.dataset.id);
       if (!p) return;
@@ -389,11 +392,8 @@ export async function productForm(id, done) {
   s.setBody(html`<div class="empty"><i class="ico ico-sync spin"></i></div>`);
   const p = id ? await api('products/' + id) : { name: '', sku: '', barcode: '', purchase_price: 0, sale_price: 0, vat: 20, desi: 1, stock: 0, critical_stock: 0, active: 1, listings: [], moves: [], sales: [] };
   const st = state.settings || {};
-  // Ürünü kanallarda yayınla: siteler (ikas, WooCommerce, Shopify) ürünü doğrudan açar; pazaryerleri (Trendyol, Hepsiburada, idefix,
-  // N11) kategori eşleştirmesiyle gönderilir. Ürünün zaten ilanı olan kanal listelenmez.
-  const hasL = new Set((p.listings || []).map((l) => l.channel));
-  const siteCh = activeChannels().filter((c) => c.enabled && c.caps.createProduct && !hasL.has(c.id));
-  const mpCh = activeChannels().filter((c) => c.enabled && (c.can || {}).upload && !hasL.has(c.id));
+  // Kanallarda yayınla: yeni üründe kaydedince seçili kanallar için panel açılır; kayıtlı üründe panel formun içinde (views/publish.js)
+  const pubCh = activeChannels().filter((c) => c.enabled && !c.hold && ((c.can || {}).upload || (c.caps || {}).createProduct));
   const lp = (l) => {
     const rate = rateGross(st, l.commission, l.commission_src) ?? costOf(st, 'commission', l.channel);
     return profit({ sale: l.price, purchase: numIn($('[name=purchase_price]', s.body)?.value ?? p.purchase_price), commissionRate: rate, shipping: costOf(st, 'shipping', l.channel), fee: costOf(st, 'service_fee', l.channel), feeRate: costOf(st, 'fee_rate', l.channel), withholdingRate: costOf(st, 'withholding', l.channel) });
@@ -410,6 +410,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Kategori</span><input class="input" name="category" value="${p.category || ''}" placeholder="ör. Bahçe › Tohum"><small>Alt kategori için › yazın.</small></label>
         <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="ör. Domates tohumu"></label>
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
+        <label class="field"><span>Model kodu</span><input class="input" name="model_code" value="${p.model_code || ''}" placeholder="varyantlarda aynı"><small>Boşsa ana ürün adından.</small></label>
       </div>
       <div class="field" data-gal><span>Fotoğraflar <span class="muted tiny">· ilk fotoğraf ana fotoğraftır · en fazla ${MAX_PHOTOS}</span></span><div data-galbox></div></div>
       ${p.description && /<[a-z][\s\S]*>/i.test(p.description) ? html`<div class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><div class="desc-view">${raw(safeHtml(p.description))}</div>
@@ -421,8 +422,12 @@ export async function productForm(id, done) {
       <div class="form-grid">
         <label class="field"><span>Alış fiyatı (KDV dahil)</span><div class="input-group"><input class="input" name="purchase_price" inputmode="decimal" value="${p.purchase_price || ''}"><span class="suffix">₺</span></div></label>
         <label class="field"><span>Satış fiyatı</span><div class="input-group"><input class="input" name="sale_price" inputmode="decimal" value="${p.sale_price || ''}"><span class="suffix">₺</span></div></label>
+        <label class="field"><span>Liste fiyatı (üstü çizili)</span><div class="input-group"><input class="input" name="list_price" inputmode="decimal" placeholder="isteğe bağlı" value="${p.list_price || ''}"><span class="suffix">₺</span></div></label>
         <label class="field"><span>KDV oranı</span><select class="input" name="vat">${[0, 1, 10, 20].map((v) => html`<option value="${v}" ${Number(p.vat) === v ? 'selected' : ''}>%${v}</option>`)}</select></label>
         <label class="field"><span>Desi</span><input class="input" name="desi" inputmode="decimal" value="${p.desi || ''}"></label>
+        <label class="field"><span>Ağırlık (kg)</span><input class="input" name="weight" inputmode="decimal" placeholder="isteğe bağlı" value="${p.weight || ''}"></label>
+        <label class="field"><span>Kargoya hazırlık (gün)</span><input class="input" name="preparing_days" inputmode="numeric" placeholder="kanal ayarı" value="${p.preparing_days || ''}"></label>
+        <label class="field"><span>Garanti (ay)</span><input class="input" name="warranty_months" inputmode="numeric" placeholder="kanal ayarı" value="${p.warranty_months || ''}"></label>
         <label class="field"><span>Kargo tutarı (sipariş başı)</span><div class="input-group"><input class="input" name="ship_cost" inputmode="decimal" placeholder="girilmedi" value="${p.ship_cost || ''}"><span class="suffix">₺</span></div><small>Kâr hesabında kargo gideri; kanal kargo faturası gelirse o kullanılır</small></label>
         ${siteStock(p) ? html`<label class="field"><span>Stok</span><input class="input" type="number" value="${p.stock}" readonly><small>ikas sitesinden okunur (stok senkronu kapalı)</small></label>` : html`<label class="field"><span>Stok</span><input class="input" name="stock" type="number" inputmode="numeric" value="${p.stock}"></label>`}
         <label class="field"><span>Kritik stok uyarısı</span><input class="input" name="critical_stock" type="number" inputmode="numeric" value="${p.critical_stock || 0}"></label>
@@ -446,11 +451,9 @@ export async function productForm(id, done) {
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>
           <td class="r num"><button type="button" class="plain" data-rule style="align-items:flex-end">${l.desired ?? l.remote_stock ?? '—'}<span class="tiny muted">${ruleText(l) || 'ortak stok'}</span></button>${l.price_dirty ? html`<div class="tiny" style="color:var(--warn)">fiyat gönderilecek</div>` : ''}</td></tr>`; })}
       </tbody></table></div></div>` : ''}
-    ${siteCh.length || mpCh.length ? html`<div class="card stack"><h3>Kanallarda yayınla</h3>
-      <div class="muted small">${id ? 'Bu ürünün henüz ilanı olmayan kanallar.' : 'Ürün panelde açılınca seçtiğiniz kanallara da gönderilir.'} Stok ve fiyat sonra panelden otomatik güncellenir.</div>
-      ${siteCh.length ? html`<div><div class="small" style="font-weight:650;margin-bottom:4px">Siteler (ürün hemen açılır)</div><div class="row wrap" style="gap:6px 16px">${siteCh.map((c) => html`<label class="check"><input type="checkbox" name="create_on" value="${c.id}"> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>` : ''}
-      ${mpCh.length ? html`<div><div class="small" style="font-weight:650;margin-bottom:4px">Pazaryerleri (kanal onayından sonra yayına girer)</div><div class="row wrap" style="gap:6px 16px">${mpCh.map((c) => html`<label class="check"><input type="checkbox" name="upload_on" value="${c.id}"> ${chLogo(c.id, true)}${c.name}</label>`)}</div>
-        <div class="muted tiny" style="margin-top:4px">Pazaryerine göndermek için ürünün <b>kategorisi</b>, <b>barkodu</b> ve <b>görseli</b> olmalı; kategori bir kez <a class="link" href="#/urun-yukle">Pazaryerine Yükle</a> ekranında pazaryeri kategorisiyle eşleştirilir. Eksik varsa ne olduğu söylenir.</div></div>` : ''}
+    ${pubCh.length ? html`<div class="card stack"><h3>Kanallarda yayınla</h3>
+      ${id ? html`<div data-pub></div>` : html`<div class="muted small">Kaydedince seçtiğiniz kanallar için yayın paneli açılır.</div>
+        <div class="row wrap" style="gap:6px 16px">${pubCh.map((c) => html`<label class="check"><input type="checkbox" data-pubon value="${c.id}" checked> ${chLogo(c.id, true)}${c.name}</label>`)}</div>`}
     </div>` : ''}
     ${id ? html`<div class="two-col">
       <div class="card"><h3 style="margin-bottom:8px">Stok hareketleri</h3>${p.moves.length ? html`<table class="t"><tbody>${p.moves.map((m) => html`<tr><td class="small">${dateTime(m.created_at)}<div class="muted tiny">${m.reason}${m.ref ? ` · ${m.ref}` : ''}</div></td><td class="r num" style="font-weight:650;color:${m.delta > 0 ? 'var(--good)' : 'var(--bad)'}">${m.delta > 0 ? '+' : ''}${m.delta}</td><td class="r num muted">${m.stock_after ?? ''}</td></tr>`)}</tbody></table>` : html`<div class="muted small">Henüz hareket yok</div>`}</div>
@@ -458,6 +461,11 @@ export async function productForm(id, done) {
     </div>` : ''}
   </form>`);
   attachCatPicker($("[name=category]", s.body));
+  // Kayıtlı ürün: yayın paneli formda. Form değiştiyse önce kaydedilir, sonra panel güncel bilgiyle açılır.
+  let formDirty = false, pubAfter = null;
+  const pubBox = $('[data-pub]', s.body);
+  if (pubBox) mountPublish(pubBox, { ids: [id], beforePublish: (chans) => { if (!formDirty) return true; pubAfter = chans; $('[data-save]', s.el).click(); return false; } });
+  $('[data-form]', s.body).addEventListener('input', (e) => { if (!e.target.closest('[data-pub]')) formDirty = true; });
   const allv = $("[data-allvar]", s.body);
   if (allv) allv.onclick = () => { s.close(); variantEditor(p.siblings, done, p.group_name || p.name); };
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
@@ -582,30 +590,24 @@ export async function productForm(id, done) {
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const fd = new FormData(form), b = {};
     if (uploading) return toast('Fotoğraflar yükleniyor; bitince kaydedin', true);
-    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock']) b[k] = fd.get(k);
-    for (const k of ['purchase_price', 'sale_price', 'desi', 'ship_cost']) b[k] = numIn(b[k]);
+    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months']) b[k] = fd.get(k);
+    for (const k of ['purchase_price', 'sale_price', 'desi', 'ship_cost', 'list_price', 'weight', 'preparing_days', 'warranty_months']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
     if (form.currency) { b.currency = fd.get('currency') || ''; b.fx_price = numIn(fd.get('fx_price')); b.fx_margin = String(fd.get('fx_margin') || '').trim() === '' ? '' : numIn(fd.get('fx_margin')); }
     if (!b.name.trim()) { const i = form.name; i.classList.add('err'); i.focus(); i.addEventListener('input', () => i.classList.remove('err'), { once: true }); return toast('Ürün adı gerekli', true); }
     // Stok alanı yalnız panelde tutulan stokta vardır (ikas'tan okunan stok salt okunur, gönderilmez)
     if (fd.has('stock') && (!id || Number(fd.get('stock')) !== p.stock)) b.stock = Number(fd.get('stock')) || 0;
     b.listings = $$('tr[data-l]', form).map((tr) => ({ channel: tr.dataset.l, remote_id: tr.dataset.rid, price: numIn($('[data-lf=price]', tr).value), commission: $('[data-lf=commission]', tr).value }));
-    b.create_on = fd.getAll('create_on');
     if (galAuto) b.images_auto = 1; else if (galDirty) { b.images = gal; b.image = gal[0] || ''; }
     const r = await api(id ? 'products/' + id : 'products', { method: id ? 'PUT' : 'POST', body: b });
-    // Pazaryerlerine gönderim (kategori eşleştirmesi ve zorunlu bilgilerle); sonuç tek mesajda
     const msgs = [], errs = [...(r.errors || [])];
     if (r.created && r.created.length) msgs.push(`${ek(r.created.map((c) => ch(c).name).join(', '), 'da')} oluşturuldu`);
-    for (const cid of fd.getAll('upload_on')) {
-      try {
-        const u = await api('catalog/upload', { method: 'POST', body: { channel: cid, ids: [r.id || id] } });
-        if (u.sent) msgs.push(`${ek(ch(cid).name, 'a')} gönderildi (onay bekleniyor)`);
-        else errs.push(`${ch(cid).name}: gönderilemedi — eksik: ${((u.skipped || [])[0] || {}).missing?.join(', ') || 'bilgi'}`);
-      } catch (x) { errs.push(`${ch(cid).name}: ${x.message}`); }
-    }
     if (errs.length) toast(`Kaydedildi${msgs.length ? ' · ' + msgs.join(' · ') : ''} · ${errs.join(' · ')}`, true);
     else toast(`Kaydedildi${msgs.length ? ' · ' + msgs.join(' · ') : ''}`);
+    // Yeni ürün ya da yayınla öncesi kayıt: yayın paneli açılır
+    const pubOn = id ? pubAfter : $$('[data-pubon]', form).filter((x) => x.checked).map((x) => x.value);
     s.close(); done();
+    if (pubOn && pubOn.length) publishSheet([r.id || id], pubOn);
   });
   const del = $('[data-del]', s.el);
   if (del) del.onclick = async () => {

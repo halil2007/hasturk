@@ -3,7 +3,7 @@
 // Kimlik: X-API-KEY = base64(ApiKey:ApiSecret). Canlı ortamda IP izni gerekmez (test ortamında gerekir).
 // Kimlik: X-API-KEY başlığı (biçim otomatik bulunur, aşağıya bakın). Siparişler: /oms/{vendorId}/list · İadeler: /oms/{vendorId}/claim-list · Ürün/stok/fiyat: /pim/...
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, diagStep, sleep, imageList, mediaUrls } from '../util.js';
+import { http, num, str, chunk, diagStep, sleep, imageList, mediaUrls, rankBrands } from '../util.js';
 
 const BASE = 'https://merchantapi.idefix.com';
 // idefix durumları "shipment_" önekiyle gelir (shipment_created, shipment_picking, shipment_in_cargo, shipment_delivered…)
@@ -251,6 +251,16 @@ export function idefix(env, meta) {
     }
     return brands.get(k);
   }
+  async function searchBrands(q) {
+    const k = str(q), out = [];
+    if (!k) return [];
+    for (const term of [...new Set([k, k.split(/\s+/)[0]])]) {
+      let r = null;
+      try { r = await call(`/pim/brand/by-name?title=${encodeURIComponent(term)}`); } catch (e) { if (!/HTTP (400|404)/.test(e.message)) throw e; }
+      out.push(...(Array.isArray(r) ? r : r ? [r] : []).map((b) => ({ id: b.id, name: b.title })));
+    }
+    return rankBrands(out, k);
+  }
   async function build(pr, map, { opts = {}, pick } = {}) {
     const missing = [], attrs = [];
     for (const a of await rawAttrs(map.remote_id)) {
@@ -262,8 +272,8 @@ export function idefix(env, meta) {
       else if (valueId) attrs.push({ attributeId: Number(id), attributeValueId: Number(valueId), customAttributeValue: null });
       else if (a.required) missing.push(str(a.attributeTitle) + (text ? ` (“${text}” listede yok)` : ''));
     }
-    const bid = pr.brand ? await brandId(pr.brand) : null;
-    if (!pr.brand) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” idefix'te bulunamadı`);
+    const bid = pr.brandId ? Number(pr.brandId) || pr.brandId : pr.brand ? await brandId(pr.brand) : null;
+    if (!pr.brand && !bid) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” idefix'te bulunamadı`);
     if (!pr.barcode) missing.push('barkod');
     if (!pr.sku) missing.push('SKU');
     if (!pr.image) missing.push('görsel');
@@ -313,7 +323,7 @@ export function idefix(env, meta) {
     return { done: !pending, items };
   }
   const allCategories = async () => { await categories(''); return catCache.all; };
-  const catalog = { categories, allCategories, attributes, values, build, send, status, chunk: 200,
+  const catalog = { categories, allCategories, attributes, values, build, send, status, brands: searchBrands, chunk: 200,
     options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }, { k: 'deliveryDuration', label: 'Kargoya veriliş süresi, gün (isteğe bağlı)' }] };
 
   // ---------- iade talepleri (claims): /oms/{vendor}/claim-list ----------

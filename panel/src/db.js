@@ -311,6 +311,21 @@ export const MIGRATIONS = [
   // Herkese açık adresten sunulur (/img/<firma kodu>/<kimlik>.jpg) ki pazaryerleri indirebilsin (bkz. prodimg.js)
   `CREATE TABLE IF NOT EXISTS product_images (id TEXT PRIMARY KEY, type TEXT NOT NULL, size INTEGER NOT NULL, w INTEGER, h INTEGER,
     data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  // Kanallarda yayınla (bkz. publish.js): model kodu (varyant grubu kodu), liste (üstü çizili) fiyat, ağırlık (kg), kargoya veriliş süresi, garanti
+  'ALTER TABLE products ADD COLUMN model_code TEXT',
+  'ALTER TABLE products ADD COLUMN list_price REAL',
+  'ALTER TABLE products ADD COLUMN weight REAL',
+  'ALTER TABLE products ADD COLUMN preparing_days INTEGER',
+  'ALTER TABLE products ADD COLUMN warranty_months INTEGER',
+  // Ürüne özel kanal özelliği (kategori eşleştirmesindeki değerin üstüne yazar); attr_id '@category' = ürüne özel kanal kategorisi
+  `CREATE TABLE IF NOT EXISTS product_attrs (product_id INTEGER NOT NULL, channel TEXT NOT NULL, attr_id TEXT NOT NULL, value_id TEXT, value TEXT,
+    PRIMARY KEY (product_id, channel, attr_id))`,
+  // Marka eşleştirmesi: panel markası → kanalın marka kimliği / adı (bir kez bulunur, sonra hep kullanılır)
+  'CREATE TABLE IF NOT EXISTS brand_map (brand TEXT NOT NULL, channel TEXT NOT NULL, remote_id TEXT, remote_name TEXT, PRIMARY KEY (brand, channel))',
+  // Ürünün kanaldaki yayın durumu: ready | sent | live | rejected | error (+ takip kimliği, hata, gönderim kaydı)
+  `CREATE TABLE IF NOT EXISTS product_channel (product_id INTEGER NOT NULL, channel TEXT NOT NULL, state TEXT NOT NULL, ref TEXT, error TEXT, upload_id INTEGER,
+    updated_at INTEGER, PRIMARY KEY (product_id, channel))`,
+  'CREATE INDEX IF NOT EXISTS product_channel_upload ON product_channel(upload_id)',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -427,6 +442,7 @@ export const DEFAULT_SETTINGS = {
   // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar
   stock_push: {},
   auto_upload: {},
+  auto_approve_sure: false, // Kategori eşleştirme: kesin önerileri arka planda otomatik onayla (varsayılan kapalı)
   stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)
   restock_returns: false,   // iade gelen ürün stoğa geri eklensin mi
   history_days: 30,         // ilk senkronda geriye kaç gün sipariş çekilsin (daha eskisi: Entegrasyonlar → Geçmiş siparişler)

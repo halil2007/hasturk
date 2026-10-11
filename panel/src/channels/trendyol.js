@@ -1,6 +1,6 @@
 // Trendyol Marketplace API (apigw.trendyol.com/integration).
 // Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key, API Secret.
-import { http, basic, num, str, chunk, diagStep, imageList, mediaUrls } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, imageList, mediaUrls, rankBrands } from '../util.js';
 
 const BASE = 'https://apigw.trendyol.com/integration';
 
@@ -445,6 +445,17 @@ export function trendyol(env, meta) {
     }
     return brands.get(k);
   }
+  // Marka arama (Kanallarda yayınla → marka seçimi): by-name aranan metinle ve ilk kelimesiyle; sonuçlar içerene göre süzülür
+  async function searchBrands(q) {
+    const k = str(q), out = [];
+    if (!k) return [];
+    for (const term of [...new Set([k, k.split(/\s+/)[0]])]) {
+      let r = [];
+      try { r = await call(`/product/brands/by-name?name=${encodeURIComponent(term)}`); } catch (e) { if (!/\b(400|404)\b/.test(e.message)) throw e; }
+      out.push(...(Array.isArray(r) ? r : r.brands || []));
+    }
+    return rankBrands(out, k);
+  }
   async function build(pr, map, { opts = {}, pick } = {}) {
     const missing = [], attrs = [];
     for (const a of await rawAttrs(map.remote_id)) {
@@ -457,8 +468,8 @@ export function trendyol(env, meta) {
       else if (text && a.allowCustom) attrs.push({ attributeId: Number(id), attributeValue: String(text) });
       else if (a.required) missing.push(attrName(a) + (text ? ` (“${text}” listede yok)` : ''));
     }
-    const bid = pr.brand ? await brandId(pr.brand) : null;
-    if (!pr.brand) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” Trendyol'da bulunamadı`);
+    const bid = pr.brandId ? Number(pr.brandId) || pr.brandId : pr.brand ? await brandId(pr.brand) : null;
+    if (!pr.brand && !bid) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” Trendyol'da bulunamadı`);
     if (!pr.barcode) missing.push('barkod');
     if (!pr.image) missing.push('görsel');
     if (!(pr.price > 0)) missing.push('fiyat');
@@ -503,7 +514,7 @@ export function trendyol(env, meta) {
     return { done: !pending, items };
   }
   const allCategories = async () => { await categories(''); return catCache.all; };
-  const catalog = { categories, allCategories, attributes, values, build, send, status, chunk: 1000, options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] };
+  const catalog = { categories, allCategories, attributes, values, build, send, status, brands: searchBrands, chunk: 1000, options: [{ k: 'cargoCompanyId', label: 'Kargo firması ID (isteğe bağlı)' }] };
 
   // ---------- kargo gideri (gerçek) ----------
   // Cari hesap ekstresindeki kesinti faturalarından (DeductionInvoices) kargo faturaları bulunur; her kargo faturasının kalemleri

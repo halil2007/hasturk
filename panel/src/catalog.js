@@ -18,7 +18,7 @@ const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').r
 async function targets(env, db) {
   return (await getChannels(env, db)).filter((c) => c.type !== 'ikas' && !NO_UPLOAD.includes(c.type) && (c.enabled || NO_API[c.type] && !c.paused));
 }
-async function target(env, db, id) {
+export async function target(env, db, id) {
   const c = (await getChannels(env, db)).find((x) => x.id === id);
   if (!c) fail(404, 'Kanal yok');
   if (c.hold) fail(400, `${c.name} beklemede: yazma işlemleri kapalı`);
@@ -31,7 +31,7 @@ async function mapOf(db, local, ch) {
 }
 
 // Panel ürünü → kanala gidecek ortak ürün bilgisi
-async function productsFor(db, settings, { local, ch, ids }) {
+export async function productsFor(db, settings, { local, ch, ids }) {
   const cats = catalogOf(settings);
   const ph = cats.map(() => '?').join(',');
   const q = (where) => `SELECT p.*, (SELECT MAX(l.price) FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) AS cat_price,
@@ -43,11 +43,19 @@ async function productsFor(db, settings, { local, ch, ids }) {
   const key = (p) => `${p.group_name || p.name}\u0000${p.variant_name || ''}`;
   return (await allIn(db, ids, (ph2, part) => [q(`p.id IN (${ph2})`), [...cats, ...cats, ch, ...part]], 60)).sort((a, b) => key(a).localeCompare(key(b))).slice(0, 500);
 }
-function shape(p, opts, zeroStock) {
+// Varyant grubu kodu (Trendyol / idefix / N11 productMainId, Hepsiburada VaryantGroupID): aynı ana ürünün varyantları aynı kodla gider.
+// Sıra: ürünün model kodu → ikas ana ürün kimliği (parent_key) → ana ürün adından sabit kod → SKU
+const TR_ASCII = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' };
+export const slug = (s) => String(s || '').toLocaleLowerCase('tr').replace(/[çğıöşü]/g, (c) => TR_ASCII[c]).normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').toUpperCase().slice(0, 40);
+export const groupCode = (p) => str(p.model_code).trim() || str(p.parent_key).split(':').pop() || slug(p.group_name) || str(p.sku);
+export function shape(p, opts, zeroStock) {
   const base = p.cat_price > 0 ? p.cat_price : p.sale_price;
   const k = 1 + num(opts.markup) / 100;
   // Kanal görselinin küçük boyutu büyüğüyle değiştirilir (panelde barındırılan fotoğrafın adresine dokunulmaz: /img/<firma>/<kimlik>.jpg)
   const big = (u) => (/\/img\/[^/]+\/[a-f0-9]{32}\.\w+$/.test(str(u)) ? str(u) : str(u).replace(/\/(180|360)\//, '/1080/'));
+  // Ürünün liste (üstü çizili) fiyatı: satış fiyatından düşükse kullanılmaz
+  const own = num(p.list_price) > 0 && num(p.list_price) >= base ? num(p.list_price) : 0;
   const img = big(p.image);
   // Tüm görsel bağlantıları (ana görsel önce, tekrarsız): pazaryerine ek görsel olarak gider
   let extra = [];
@@ -56,12 +64,12 @@ function shape(p, opts, zeroStock) {
   return {
     id: p.id, sku: str(p.sku), barcode: str(p.barcode), name: str(p.name), brand: str(p.brand), description: str(p.description) || str(p.name),
     image: img || images[0] || '', images, vat: p.vat ?? 20, desi: p.desi || 1, stock: zeroStock ? 0 : Math.max(0, Math.round(p.stock || 0)),
-    price: r2(base * k), listPrice: r2(Math.max(p.cat_list || 0, base) * k),
-    group: str(p.parent_key).split(':').pop() || str(p.sku), variant: str(p.variant_name),
+    price: r2(base * k), listPrice: r2((own || Math.max(p.cat_list || 0, base)) * k), weight: num(p.weight) > 0 ? num(p.weight) : null,
+    group: groupCode(p), variant: str(p.variant_name),
   };
 }
 // Varyant adından (ör. "5 Kg") kanalın değer listesindeki karşılığını bul
-function picker(c, catId) {
+export function picker(c, catId) {
   const cache = new Map();
   return async (attr, text) => {
     if (!text) return null;
@@ -87,16 +95,16 @@ async function buildAll(c, map, prods, opts, zeroStock) {
 // Puanlama src/catmatch.js'te: ikas kategori yolu + o kategorideki ürün adları, pazaryeri kategorisinin adı ve yoluyla;
 // Türkçe ekler, eş anlamlılar ve tarım/bahçe kavramları (ilaçlama pompası ≠ su pompası, organik ≠ kimyevi gübre) dikkate alınır.
 export function scoreCategory(local, c, names = []) { return score(localProfile(local, names), prepare([c])[0]).score; }
-const namesOf = async (db, local) => (await all(db, "SELECT name FROM products WHERE active = 1 AND COALESCE(category, '') = ? ORDER BY updated_at DESC LIMIT 60", local)).map((r) => r.name);
+export const namesOf = async (db, local) => (await all(db, "SELECT name FROM products WHERE active = 1 AND COALESCE(category, '') = ? ORDER BY updated_at DESC LIMIT 60", local)).map((r) => r.name);
 async function suggest(db, c, local, n = 5) {
   if (!local || !c.catalog.allCategories) return [];
   return rank(await c.catalog.allCategories(), local, await namesOf(db, local), n);
 }
 // "Güçlü öneri": açık farkla en iyi aday; iki aday birbirine çok yakınsa "zayıf öneri" (her iki durumda da onay gerekir)
 const AUTO_MIN = 5, AUTO_LEAD = 0.5;
-const confident = (r) => r[0] && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
+export const confident = (r) => r[0] && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
 // Kategori özelliklerini mümkün olduğunca otomatik doldur: varyant özellikleri ürünün varyant adından, Menşei = Türkiye
-async function autoAttrs(c, catId) {
+export async function autoAttrs(c, catId) {
   const out = {}, missing = [];
   for (const a of await c.catalog.attributes(catId)) {
     if (a.kind === 'variant') { out[a.id] = { value: '@variant' }; continue; }
@@ -232,7 +240,8 @@ export async function autoUpload(env, db, settings) {
       if (!ready.length) { out[c.id] = 0; continue; }
       items = ready.map((x) => ({ id: x.p.id, key: x.key, name: x.p.name }));
       const r = await c.catalog.send(ready.map((x) => x.payload));
-      await run(db, "INSERT INTO product_uploads (channel, ref, status, items, user, created_at) VALUES (?, ?, 'sent', ?, 'Otomatik', ?)", c.id, r.ref, JSON.stringify(items), Date.now());
+      const row = await first(db, "INSERT INTO product_uploads (channel, ref, status, items, user, created_at) VALUES (?, ?, 'sent', ?, 'Otomatik', ?) RETURNING id", c.id, r.ref, JSON.stringify(items), Date.now());
+      await markSent(db, c.id, items.map((x) => x.id), row && row.id, r.ref);
       await log(db, c.id, 'info', `Otomatik gönderim: ${ready.length} yeni ürün ${c.name}'a gönderildi · takip ${r.ref}`);
       out[c.id] = ready.length;
     } catch (e) {
@@ -350,6 +359,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     try {
       const r = await c.catalog.send(ready.map((x) => x.payload));
       const row = await first(db, "INSERT INTO product_uploads (channel, ref, status, items, user, created_at) VALUES (?, ?, 'sent', ?, ?, ?) RETURNING id", c.id, r.ref, JSON.stringify(items), user.name, t);
+      await markSent(db, c.id, items.map((x) => x.id), row && row.id, r.ref);
       await log(db, c.id, 'info', `${user.name}: ${ready.length} ürün ${c.name}'a gönderildi · takip ${r.ref}`);
       return { id: row && row.id, ref: r.ref, sent: ready.length, skipped };
     } catch (e) {
@@ -377,12 +387,13 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
 }
 
 // Gönderimin sonucunu kanaldan sorgula; tamamlandıysa ilanlar çekilip onaylanan ürünler panel ürününe bağlanır
-async function checkUpload(env, db, ctx, u, c) {
+export async function checkUpload(env, db, ctx, u, c) {
   const st = await c.catalog.status(u.ref);
   const res = new Map(st.items.map((x) => [x.key, x]));
   const items = JSON.parse(u.items || '[]').map((x) => { const r = res.get(x.key); return r ? { ...x, ok: r.ok, status: r.status, error: r.error } : x; });
   const status = st.done ? 'done' : 'sent';
   await run(db, 'UPDATE product_uploads SET status = ?, items = ?, result = ?, checked_at = ? WHERE id = ?', status, JSON.stringify(items), JSON.stringify(st.items.slice(0, 500)), Date.now(), u.id);
+  await channelStates(db, u, items, st.done);
   if (st.done) {
     const ok = items.filter((x) => x.ok).length, bad = items.filter((x) => x.ok === false).length;
     await log(db, c.id, bad ? 'error' : 'info', `Ürün gönderimi #${u.id} tamamlandı: ${ok} onay${bad ? `, ${bad} hata (${items.filter((x) => x.ok === false).slice(0, 2).map((x) => `${x.name}: ${x.error || x.status}`).join(' · ')})` : ''}`);
@@ -395,6 +406,26 @@ async function checkUpload(env, db, ctx, u, c) {
   }
   return { status, items, done: st.done };
 }
+// Ürünün kanal durumu (Kanallarda yayınla): kabul → yayında, red → reddedildi (kanalın nedeniyle). Yalnız bu gönderime bağlı kayıtlar
+// güncellenir (ürün sonradan yeniden gönderildiyse eski sonuç yenisinin üstüne yazılmaz).
+export async function channelStates(db, u, items, done) {
+  const t = Date.now(), st = [];
+  for (const x of items) {
+    if (!x.id) continue;
+    const state = x.ok === true ? 'live' : x.ok === false ? 'rejected' : done ? 'error' : null;
+    if (!state) continue;
+    const err = x.ok === true ? null : str(x.error || x.status || (state === 'error' ? 'Kanal bu ürün için sonuç vermedi' : 'Kanal kabul etmedi')).slice(0, 500);
+    st.push(db.prepare('UPDATE product_channel SET state = ?, error = ?, updated_at = ? WHERE product_id = ? AND channel = ? AND upload_id = ?').bind(state, err, t, x.id, u.channel, u.id));
+  }
+  for (let i = 0; i < st.length; i += 50) await db.batch(st.slice(i, i + 50));
+}
+// Gönderilen ürünlerin kanal durumu "gönderildi" olarak kaydedilir (gönderim kaydı ve takip kimliğiyle)
+export async function markSent(db, ch, ids, uploadId, ref, state = 'sent', error = null) {
+  const t = Date.now(), st = ids.map((id) => db.prepare(`INSERT INTO product_channel (product_id, channel, state, ref, error, upload_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (product_id, channel) DO UPDATE SET state = excluded.state, ref = excluded.ref, error = excluded.error, upload_id = excluded.upload_id, updated_at = excluded.updated_at`)
+    .bind(id, ch, state, ref == null ? null : String(ref), error, uploadId ?? null, t));
+  for (let i = 0; i < st.length; i += 50) await db.batch(st.slice(i, i + 50));
+}
 // Senkron sırasında: son 4 saatte gönderilip sonucu henüz alınmamış gönderimler sorgulanır (Trendyol sonucu 4 saat saklar)
 export async function checkPendingUploads(env, db) {
   // Kanal onayı saatler / birkaç gün sürebilir: ilk 4 saatte her senkronda, sonra saatte bir, 3 güne kadar sorgulanır
@@ -404,6 +435,7 @@ export async function checkPendingUploads(env, db) {
   let n = 0;
   // 3 günde sonuçlanmayan gönderim kapanır (kanal sonucu artık vermiyor; sonsuza kadar "gönderildi" kalmasın)
   await run(db, "UPDATE product_uploads SET status = 'error', error = COALESCE(error, 'Kanal 3 gün içinde sonuç vermedi; ürünü kanal panelinden kontrol edin') WHERE status = 'sent' AND created_at < ?", now - 3 * 864e5);
+  await run(db, "UPDATE product_channel SET state = 'error', error = 'Kanal 3 gün içinde sonuç vermedi', updated_at = ? WHERE state = 'sent' AND upload_id IN (SELECT id FROM product_uploads WHERE status = 'error')", now);
   const chans = rows.length ? await getChannels(env, db) : [];
   for (const u of rows) {
     const c = chans.find((x) => x.id === u.channel && x.enabled && x.catalog && !x.hold);

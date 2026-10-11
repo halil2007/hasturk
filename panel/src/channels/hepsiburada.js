@@ -622,7 +622,7 @@ export function hepsiburada(env, meta) {
   async function build(pr, map, { opts = {}, pick } = {}) {
     const a = {
       merchantSku: pr.sku, VaryantGroupID: pr.group, Barcode: pr.barcode, UrunAdi: pr.name, UrunAciklamasi: pr.description || pr.name, Marka: pr.brand,
-      GarantiSuresi: String(opts.warranty ?? 0), kg: String(pr.desi || 1), tax_vat_rate: String(pr.vat ?? 20),
+      GarantiSuresi: String(opts.warranty ?? 0), kg: String(pr.weight || pr.desi || 1), tax_vat_rate: String(pr.vat ?? 20),
       price: String(pr.price).replace('.', ','), stock: String(pr.stock), Image1: pr.image,
     };
     (pr.images || []).slice(1, 5).forEach((u, i) => { a['Image' + (i + 2)] = u; });
