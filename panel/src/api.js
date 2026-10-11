@@ -925,6 +925,8 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
     const cur = await first(db, 'SELECT price, list_price, commission, commission_src FROM listings WHERE channel = ? AND remote_id = ? AND product_id = ?', l.channel, String(l.remote_id), id);
     if (!cur) continue;
     const price = l.price === '' || l.price == null ? cur.price : num(l.price);
+    // 0 ₺ fiyat kanala gönderilemez ve ilanın gerçek fiyatını panelde 0 gösterir: kabul edilmez
+    if (price !== cur.price && !(price > 0)) fail(400, `${l.channel} ilanının fiyatı 0 olamaz; fiyatı boş bırakırsanız kanaldaki fiyat korunur`);
     const dirty = price !== cur.price ? 1 : 0;
     if (dirty) {
       // Otomatik fiyat kuralı açık ilan: sınır dışı fiyat kabul edilmez; elle değişiklik otomatik fiyatı 14 dakika bekletir
