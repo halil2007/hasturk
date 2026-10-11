@@ -1,5 +1,5 @@
 // Panel uygulaması: gruplu yan menü, üst çubuk, alt menü (telefon), yönlendirme (#/sayfa/...?filtre=...), giriş, senkron, bildirimler.
-import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder, themeOf, applyTheme } from './core.js';
+import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder, themeOf, applyTheme, perfPage } from './core.js';
 import './costedit.js';
 import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
@@ -214,6 +214,8 @@ async function route() {
     // Yalnız görüntüleme yetkisi: sayfanın üstünde bilgi (değişiklik düğmeleri sunucuda reddedilir)
     if (r.perm && viewOnly(state.user, r.perm)) el.insertAdjacentHTML('afterbegin', '<div class="notice" style="margin-bottom:12px"><i class="ico ico-eye"></i><div>Bu bölümde <b>yalnız görüntüleme</b> yetkiniz var; değişiklik yapamazsınız.</div></div>');
     performance.mark('route:' + r.path); // hız ölçümü (geliştirici araçları → Performance)
+    // Kullanıcının beklediği süre (menüye basıştan sayfa çizilene kadar): Destek → Sistem hızı → Sayfa açılışları
+    if (!rest.length) perfPage(r.path, Date.now() - routeAt);
     warmIdle();
   } catch (e) {
     if (my !== routeSeq) return;

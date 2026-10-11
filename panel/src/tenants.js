@@ -14,6 +14,8 @@ import { doD1 } from './dosql.js';
 import { hashPassword, supportCookie, currentUser, demoCookie, userCookie } from './auth.js';
 import { supportResponse } from './support.js';
 import { json, fail, str } from './util.js';
+import { edgeCached, edgeDrop } from './edgecache.js';
+import { serverTiming } from './meter.js';
 import { loadConfig, releasedTypes } from './config.js';
 import { DEMO_PRODUCTS } from './channels/demo.js';
 import { limitsOf } from './plans.js';
@@ -97,11 +99,17 @@ export function cookieTenant(req) {
 
 // Kayıt (ana veritabanında); sık istek için 30 sn bellekte
 const cache = new Map();
+// Firma kaydı değişti: bellekteki ve kenar önbelleğindeki kopya silinir
+let lastDb = null;
+const forgetTenant = (slug) => { cache.delete(slug); edgeDrop('tenant:' + slug, lastDb).catch(() => {}); };
 export async function getTenant(db, slug, fresh = false) {
   const c = cache.get(slug);
   if (!fresh && c && Date.now() - c.at < 30e3) return c.t;
-  await init(db);
-  const t = await first(db, 'SELECT * FROM tenants WHERE slug = ?', slug);
+  // Sık istek yolu (her müşteri paneli isteği): soğuk başlayan Worker örneğinde de veritabanına gitmeden (bkz. edgecache.js)
+  const load = async () => { await init(db); return first(db, 'SELECT * FROM tenants WHERE slug = ?', slug); };
+  lastDb = db;
+  const t = fresh ? await load() : await edgeCached('tenant:' + slug, 30e3, load, db);
+  if (fresh) edgeDrop('tenant:' + slug, db).catch(() => {});
   cache.set(slug, { at: Date.now(), t });
   return t;
 }
@@ -311,7 +319,7 @@ export async function createTenant(env, db, b, { origin }) {
   await admin(env, t, 'setup', { username, password: pw, passHash: b.passHash || null, name, mustChange: !!b.mustChange });
   await run(db, `INSERT INTO tenants (slug, ${COLS.join(', ')}, active, admin_username, created_at, updated_at) VALUES (?, ${COLS.map(() => '?').join(', ')}, 1, ?, ?, ?)`,
     slug, ...COLS.map((k) => t[k] ?? null), username, t.created_at, t.updated_at);
-  cache.delete(slug);
+  forgetTenant(slug);
   // Hoş geldiniz e-postası (firma kartında e-posta varsa): giriş bilgileri ve şifre belirleme bağlantısı
   let mail = null;
   if (f.email && b.welcome !== false) {
@@ -324,7 +332,7 @@ export async function createTenant(env, db, b, { origin }) {
 // değişir (online satın almada). Panel yeni bilgileri hemen öğrenir (süresi dolmuş panelin senkronu yeniden başlar).
 // Firma kaydı ana panelde değişti (ör. ek mağaza alındı): önbellek silinir, firma paneli yeni sınırları hemen alır
 export async function refreshTenant(env, db, slug) {
-  cache.delete(slug);
+  forgetTenant(slug);
   const t = await getTenant(db, slug, true);
   if (t) await admin(env, t, 'ping').catch(() => {});
 }
@@ -336,7 +344,7 @@ export async function recordPayment(env, db, t, { at = Date.now(), amount = 0, m
   if (plan) next.plan = plan;
   if (months || plan) {
     await run(db, 'UPDATE tenants SET expires_at = ?, trial = ?, plan = ?, updated_at = ? WHERE slug = ?', next.expires_at ?? null, next.trial ? 1 : 0, next.plan || null, Date.now(), t.slug);
-    cache.delete(t.slug);
+    forgetTenant(t.slug);
     await admin(env, next, 'ping').catch(() => {});
   }
   return { ok: true, expires_at: expires };
@@ -361,7 +369,7 @@ export async function tenantApi(req, env, db, path, user) {
       const f = fields(b, t);
       await run(db, `UPDATE tenants SET ${COLS.map((k) => k + ' = ?').join(', ')}, active = ?, updated_at = ? WHERE slug = ?`, ...COLS.map((k) => f[k] ?? null), active, Date.now(), t.slug);
       if (active !== t.active) await admin(env, t, active ? 'resume' : 'suspend');
-      cache.delete(t.slug);
+      forgetTenant(t.slug);
       // Paket, sınırlar ve bitiş tarihi panele hemen iletilir
       if (active) await admin(env, { ...t, ...f, active }, 'ping').catch(() => {});
       return { ok: true };
@@ -396,7 +404,7 @@ export async function tenantApi(req, env, db, path, user) {
       else if (act === 'ips') { try { a.ips = parseIps(b.ips); } catch (e) { fail(400, e.message); } }
       else fail(400, 'Geçersiz işlem');
       await run(db, 'UPDATE tenants SET api = ?, updated_at = ? WHERE slug = ?', JSON.stringify(a), Date.now(), t.slug);
-      cache.delete(t.slug);
+      forgetTenant(t.slug);
       return { ok: true, key, api: apiPublic({ api: JSON.stringify(a) }) };
     }
     if (op === 'password' && m === 'POST') {
@@ -414,7 +422,7 @@ export async function tenantApi(req, env, db, path, user) {
       await admin(env, t, 'destroy');
       await run(db, 'DELETE FROM tenants WHERE slug = ?', t.slug);
       await run(db, 'DELETE FROM tenant_payments WHERE slug = ?', t.slug);
-      cache.delete(t.slug);
+      forgetTenant(t.slug);
       return { ok: true };
     }
   }
@@ -520,14 +528,14 @@ export class TenantPanel {
     }
     await this.schedule();
     if (env.DEMO === '1' && Date.now() - (this.seen || 0) > 60e3) { this.seen = Date.now(); await this.ctx.storage.put('demo_seen', this.seen); }
-    const t0 = Date.now(), res = await handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, this.db);
+    const t0 = Date.now(), res = await handle(req, env, { waitUntil: (p) => this.ctx.waitUntil(p), perf: this.perf }, this.db);
     if (res.status >= 500) this.ctx.waitUntil(report5xx(this.env.DB, req, res, { slug: this.t.slug, firm: this.t.name }).catch(() => {}));
     // Başarılı işlem: bu firmanın aynı işlemdeki açık hata kayıtları kendiliğinden çözülür
     else if (res.status < 400 && this.env.DB) this.ctx.waitUntil(actionSucceeded(this.env.DB, this.t.slug, `${req.method} ${sp}`).catch(() => {}));
     // İstek süresi: firma adıyla ana panelin "Sistem hızı" bölümüne
     this.perf.add(req.method, sp, Date.now() - t0);
     if (this.perf.due() && this.env.DB) this.ctx.waitUntil(init(this.env.DB).then(() => this.perf.flush(this.env.DB, { slug: this.t.slug, firm: this.t.name })).catch(() => {}));
-    return res;
+    return serverTiming(res, Date.now() - t0);
   }
   // Arka plan (senkron) hataları: son kontrolden beri yazılan hata günlükleri ana panelin hata kayıtlarına aktarılır
   async reportSyncErrors(err, result) {

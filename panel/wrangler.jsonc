@@ -17,8 +17,9 @@
     { "binding": "DB", "database_name": "hasturk-panel" }
   ],
   // Müşteri panelleri (Kullanıcılar → Müşteri panelleri): her firma kendi SQLite veritabanlı Durable Object'inde çalışır
-  "durable_objects": { "bindings": [{ "name": "TENANT", "class_name": "TenantPanel" }] },
-  "migrations": [{ "tag": "tenants-v1", "new_sqlite_classes": ["TenantPanel"] }],
+  // Ana panel (MAIN): ana panelin API'si veritabanıyla aynı bölgede çalışan tek nesnede işlenir; sorgular uzak bölgeye gidip gelmez (bkz. src/mainpanel.js)
+  "durable_objects": { "bindings": [{ "name": "TENANT", "class_name": "TenantPanel" }, { "name": "MAIN", "class_name": "MainPanel" }] },
+  "migrations": [{ "tag": "tenants-v1", "new_sqlite_classes": ["TenantPanel"] }, { "tag": "main-v1", "new_sqlite_classes": ["MainPanel"] }],
   // 15 dakikada bir: siparişler, ürünler (görsel/varyant), stoklar kontrol edilir ve kanallara gönderilir.
   // 2 dakikada bir (hızlı iş): pazaryerine ürün gönderimi (otomatik gönderim açık kanallar) ve gönderim sonuçlarının sorgulanması
   "triggers": { "crons": ["*/15 * * * *", "*/2 * * * *"] },

@@ -62,6 +62,8 @@ export async function handle(req, env, ctx, db) {
     // İlk girişte şifre değiştirme zorunlu (online satışla açılan panelin geçici şifresi): yalnız şifre değiştirme ve özet çalışır
     if (user.mustChange && !/^(me\/password|summary|me|brand|logo|errors\/report)$/.test(path)) return json({ error: 'Devam etmek için önce geçici şifrenizi değiştirin', mustChange: true }, 403);
     if (need2fa && !path.startsWith('me/2fa') && !/^(brand|logo)$/.test(path)) return json({ error: 'Yöneticiniz iki adımlı doğrulamayı zorunlu tuttu; devam etmek için açın', need2fa: true }, 403);
+    // Tarayıcının ölçtüğü sayfa açılış / istek süreleri (dakikada en fazla bir kez gönderilir; bkz. public/core.js perfBeacon)
+    if (path === 'perf/client' && req.method === 'POST') { if (ctx.perf && !user.support) ctx.perf.client(await body(req)); return json({ ok: true }); }
     if (req.method !== 'GET') { const r = await api(req, env, ctx, db, path, user); bumpCache(db, user.id); return r; }
     if (!CACHEABLE.test(path)) return await api(req, env, ctx, db, path, user);
     const c = cacheOf(db), key = `${user.id}|${user.role}|${user.support ? 1 : 0}|${JSON.stringify(user.perms || null)}|${path}${url.search}`, now = Date.now(), hit = c.get(key);

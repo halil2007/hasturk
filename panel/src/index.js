@@ -3,25 +3,25 @@
 // Müşteri panelleri (tenants.js): firma koduyla giriş yapan müşterinin istekleri kendi Durable Object'ine iletilir.
 import { init, getSettings } from './db.js';
 import { syncAll, quickSync } from './sync.js';
-import { handle, report5xx } from './handler.js';
-import { PerfBuffer } from './perf.js';
+import { report5xx } from './handler.js';
 import { extApi } from './extapi.js';
 import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
-import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin, payLink, paymentWatch } from './billing.js';
+import { publicCheckout, checkoutCallback, checkoutStatus, payLink, paymentWatch } from './billing.js';
 import { blogPublic } from './blog.js';
 import { serveImage } from './prodimg.js';
 import { trialRequest, trialLogin } from './trial.js';
 import { turnstileOk, turnstileSiteKey, CAPTCHA_ERROR } from './turnstile.js';
-import { actionSucceeded, resolveQuiet } from './errors.js';
-// Ana panelin istek süreleri (bu Worker örneğinde toplanır, birkaç dakikada bir yazılır)
-const perfMain = new PerfBuffer();
-import { currentUser } from './auth.js';
-import { cookieTenant, getTenant, forward, tenantLogin, tenantApi, SLUG_RE, expired, tenantWatchdog, contactLine, tenantPassword, expiryReminders, expiredMessage, renewUrl } from './tenants.js';
+import { resolveQuiet } from './errors.js';
+import { mainRoute } from './mainpanel.js';
+import { serverTiming, meter } from './meter.js';
+import { edgeCached } from './edgecache.js';
+import { cookieTenant, getTenant, forward, tenantLogin, SLUG_RE, expired, tenantWatchdog, contactLine, tenantPassword, expiryReminders, expiredMessage, renewUrl } from './tenants.js';
 import { json, body, HttpError, str } from './util.js';
 import { guardConfig, guardIp, guardAttempt, guardBlocked, guardOk, blockedBody, blockedHeaders, rateLimited } from './guard.js';
 
 export { TenantPanel } from './tenants.js';
+export { MainPanel } from './mainpanel.js';
 
 async function publicChannels(req, env) {
   const origin = (req.headers.get('Origin') || '').replace(/\/+$/, '');
@@ -66,7 +66,7 @@ async function guardedAuth(req, env, ctx, path, b) {
   // İlk adımda (kullanıcı adı + şifre) bot doğrulaması; firma koduyla giriş → müşteri paneli
   if (b && b.password !== undefined && !b.ticket && !b.mailticket && !(await turnstileOk(env, req, b.cf, 'login'))) return json(CAPTCHA_ERROR, 400);
   if (b && String(b.tenant || '').trim()) return await tenantLogin(req, env, b);
-  return await handle(req, env, ctx, env.DB);
+  return await mainRoute(req, env, ctx, path);
 }
 
 // Ürün fotoğrafları (herkese açık, oturumsuz): /img/<firma kodu>/<kimlik>.jpg → o firmanın paneli; /img/_/<kimlik>.jpg → ana panel.
@@ -132,16 +132,17 @@ const handler = {
       const o = req.headers.get('Origin');
       if (o) { let h = ''; try { h = new URL(o).host; } catch { /* geçersiz */ } if (h !== url.host) return json({ error: 'İzin verilmeyen kaynak' }, 403); }
     }
+    const t0 = Date.now();
     try {
       // Genel istek sınırı: IP başına dakikada N istek (bellekte; bkz. guard.js)
       if (env.DB) {
-        await init(env.DB);
-        const gc = await guardConfig(env.DB);
+        const gc = await edgeCached('ip_guard', 30e3, async () => { await init(env.DB); return guardConfig(env.DB); }, env.DB);
         if (gc.enabled && rateLimited(req.headers.get('CF-Connecting-IP') || guardIp(req), gc.apiPerMin)) return json({ error: 'Çok fazla istek gönderildi; biraz bekleyip tekrar deneyin.' }, 429, { 'Retry-After': '60' });
       }
       // Dış API (stok aktarımı): anahtarla, yalnız ana panelin yetkilendirdiği mağaza (bkz. extapi.js).
       // Geçersiz anahtar (401) giriş korumasına sayılır (403: anahtar doğru, IP / durum izni yok — sayılmaz); engelli IP anahtara bakılmadan reddedilir.
       if (path === 'v1' || path.startsWith('v1/')) {
+        if (env.DB) await init(env.DB);
         const bl = env.DB ? await guardBlocked(env.DB, req) : null;
         if (bl) return json(blockedBody(bl), 429, blockedHeaders(bl));
         const res = await extApi(req, env, ctx, path, { getTenant, forward, expired });
@@ -151,6 +152,7 @@ const handler = {
       // Giriş koruması: giriş (ana panel ve firma koduyla müşteri panelleri, iki adımlı / e-posta kodu dahil) ve şifre yenileme.
       // Deneme şifre kontrolünden önce sayılır, başarılı yanıtta sıfırlanır; sınır aşılınca IP artan sürelerle engellenir.
       if ((path === 'login' || path === 'password/forgot' || path === 'password/reset') && req.method === 'POST' && env.DB) {
+        await init(env.DB);
         const b = await body(req.clone());
         const who = [str(b && b.tenant), str(b && (b.username || b.user || b.email))].filter(Boolean).join(' / ') || (path === 'login' ? 'ana yönetici' : '');
         const bl = await guardAttempt(env.DB, req, { kind: path === 'login' ? (b && (b.ticket || b.mailticket) ? 'kod' : 'giriş') : 'şifre yenileme', who });
@@ -178,26 +180,10 @@ const handler = {
         const parts = raw.slice(raw.indexOf('~') + 1).split('.'), support = raw.includes('~') && parts.length === 3 && parts[0] === '-1';
         if (expired(t) && !support)
           return json({ error: await expiredMessage(env, t), renew: renewUrl(env, t), tenantOff: true }, 401, { 'Set-Cookie': 'hp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' });
-        return await forward(req, env, t);
+        return serverTiming(await forward(req, env, t), Date.now() - t0, null, '', `edge;desc="${(req.cf && req.cf.colo) || ''}"`);
       }
-      // Ana panel: müşteri panellerinin yönetimi (Kullanıcılar → Müşteri panelleri)
-      if (path === 'tenants' || path.startsWith('tenants/')) {
-        if (!env.DB) return json({ error: 'Veritabanı bağlı değil' }, 503);
-        await init(env.DB);
-        const user = await currentUser(req, env, env.DB);
-        if (!user) return json({ error: 'Giriş gerekli' }, 401);
-        // Havale / EFT ile gelen siparişler (onay → panel açılır / süre uzar)
-        if (path === 'tenants/eft' || path.startsWith('tenants/eft/')) return json(await eftAdmin(req, env, path, user));
-        const r = await tenantApi(req, env, env.DB, path, user);
-        // Destek girişi: çerez ana panelin yanıtıyla verilir, tarayıcı müşteri paneline geçer
-        return r && r.cookie ? json({ ok: true }, 200, { 'Set-Cookie': r.cookie }) : json(r);
-      }
-      const t0 = Date.now(), res = await handle(req, env, ctx, env.DB);
-      if (res.status >= 500) ctx.waitUntil(report5xx(env.DB, req, res, { slug: '', firm: '' }).catch(() => {}));
-      else if (res.status < 400 && env.DB && path !== 'errors/report') ctx.waitUntil(actionSucceeded(env.DB, '', `${req.method} ${path}`).catch(() => {}));
-      perfMain.add(req.method, path, Date.now() - t0);
-      if (perfMain.due() && env.DB) ctx.waitUntil(perfMain.flush(env.DB).catch(() => {}));
-      return res;
+      // Ana panel (müşteri panellerinin yönetimi dahil): veritabanının yanındaki nesnede işlenir (bkz. mainpanel.js)
+      return await mainRoute(req, env, ctx, path);
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message }, e.status);
       console.error(e);
@@ -239,6 +225,8 @@ function hardenApi(res) {
   return r;
 }
 handler.fetch = async (req, env, ctx) => {
+  // Veritabanı ölçümü (sorgu sayısı / süresi, bölge): tüm istek yolu aynı sarmalanmış bağlantıyı kullanır (önbellekler buna bağlı)
+  if (env.DB && !env.DB.metered) env = { ...env, DB: meter(env.DB) };
   const res = await handler.route(req, env, ctx);
   return new URL(req.url).pathname.startsWith('/api/') ? hardenApi(res) : res;
 };
