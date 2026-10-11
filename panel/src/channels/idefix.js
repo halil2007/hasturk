@@ -151,14 +151,15 @@ export function idefix(env, meta) {
   const pushStock = (items) => upload(items.map((x) => ({ barcode: x.remoteId, ...priced(x), inventoryQuantity: Math.max(0, Math.round(num(x.stock))) })));
   const pushPrice = (items) => upload(items.map((x) => ({ barcode: x.remoteId, price: x.price, comparePrice: Math.max(x.listPrice || 0, x.price), ...qty(x) })));
   const INV_FAIL = { DATA_PARSE_ERROR: 'veri okunamadı', BATCH_NOT_EXIST: 'gönderim bulunamadı', BATCH_ALREADY_PROCESSED: 'gönderim zaten işleniyor',
-    PRODUCT_NOT_FOUND: 'barkod idefix ürün havuzunda yok', CATALOG_PRICE_LOCKED: 'fiyat kilitli (idefix destek ile görüşün)', NO_PRICE: 'fiyat yok (ilanın idefix fiyatı bilinmiyor; ürünün idefix fiyatını girin)' };
+    PRODUCT_NOT_FOUND: 'idefix bu barkodu satıştaki ürünleri arasında bulamadı: ürün idefix\'te henüz onaylanmamış / eşleşme onayı bekliyor, pasif ya da silinmiş olabilir; idefix satıcı panelinde ürünün durumunu ve barkodunu kontrol edin', CATALOG_PRICE_LOCKED: 'fiyat kilitli (idefix destek ile görüşün)', NO_PRICE: 'fiyat yok (ilanın idefix fiyatı bilinmiyor; ürünün idefix fiyatını girin)' };
   // Red nedeni metin ("NO_PRICE") ya da nesne ({ code, message } / { failureReason, description } …) gelebilir: bilinen kod Türkçeye
   // çevrilir, yoksa idefix'in kendi açıklaması yazılır ("[object Object]" görünmesin)
   const reasonText = (c) => {
     if (c == null || c === '') return '';
-    if (typeof c !== 'object') return INV_FAIL[String(c)] || String(c);
+    if (typeof c !== 'object') return INV_FAIL[String(c).trim()] || String(c);
     const code = str(c.code || c.failureReason || c.reason || c.key || c.type), msg = str(c.message || c.description || c.detail || c.text || c.reasonText);
     if (code && INV_FAIL[code]) return INV_FAIL[code] + (msg && msg !== code ? ` (${msg})` : '');
+    if (msg && INV_FAIL[msg]) return INV_FAIL[msg]; // kod "message" alanında gelebilir
     return msg || code || JSON.stringify(c).slice(0, 200);
   };
   // Satır durumu: created (işleniyor) · completed · decline (failureReasons ile)
