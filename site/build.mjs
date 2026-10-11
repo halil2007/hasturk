@@ -277,12 +277,11 @@ function intDesc(x) {
 }
 function intIntro(x) {
   const on = x.caps.filter(([, v]) => v !== false).map(([k]) => k.toLocaleLowerCase('tr'));
-  const off = x.caps.filter(([, v]) => v === false).map(([k]) => k.toLocaleLowerCase('tr'));
   const list = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a.join(''));
   const where = /pazaryeri/.test(x.kind) ? `${x.name} pazaryerindeki mağazanızı` : /market/.test(x.kind) ? `${x.name} mağazanızı` : `${x.name} sitenizi`;
   return [
     `Hastürk CRM, ${where} resmi entegrasyon servisi üzerinden bağlar. ${x.name} siparişleriniz 15 dakikada bir kendiliğinden panele gelir; diğer pazaryerleri ve e-ticaret sitelerinizin siparişleriyle aynı listede, tek ekranda yönetilir.`,
-    `${x.name} entegrasyonunda desteklenen işlemler: ${list(on)}.${off.length ? ` Şu an ${x.name} için panelde yer almayanlar: ${list(off)}.` : ''}`,
+    `${x.name} entegrasyonunda desteklenen işlemler: ${list(on)}.`,
     `Ürünleriniz barkod ve stok koduyla eşleşir; bir kanalda satılan ürünün stoğu ${capOn(x, /^Stok/) ? `${x.name} dahil ` : ''}stok gönderimi açık tüm kanallarda düşer, böylece fazla satış yaşamazsınız. Komisyon, kargo ve diğer kesintilerle her siparişin gerçek kârını da aynı panelde görürsünüz.`,
   ];
 }
@@ -368,7 +367,7 @@ function integrationPage(x) {
       <div class="ctas">${ctas}</div>
       ${heroChecks}
     </div>
-    <div class="vis"><div class="capcard"><div class="cc-h"><b>${x.dev ? 'Planlanan işlemler' : 'Desteklenen işlemler'}</b><small>${esc(x.name)} resmi entegrasyon servisi</small></div><ul>${x.caps.map(cap).join('')}</ul></div></div>
+    <div class="vis"><div class="capcard"><div class="cc-h"><b>${x.dev ? 'Planlanan işlemler' : 'Desteklenen işlemler'}</b><small>${esc(x.name)} resmi entegrasyon servisi</small></div><ul>${x.caps.filter(([, v]) => v !== false).map(cap).join('')}</ul></div></div>
   </div>
 </section>
 <section class="sec">
