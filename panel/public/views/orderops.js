@@ -236,7 +236,6 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         <div class="small muted" style="margin:6px 0 10px">${qty} ürün • ${pk.length} paket · ${o.customer}</div>
         <div class="stack" style="--g:8px">${pk.map((p) => pkgCard(o, p))}</div>
         <div class="row" style="margin-top:14px">
-          ${o.status === 'new' ? html`<button class="btn outline" style="flex:1" data-op="accept"><i class="ico ico-play"></i>İşleme al</button>` : ''}
           <button class="btn outline" style="flex:1" data-op="split" ${splittable ? '' : 'disabled'}><i class="ico ico-split"></i>Pakete böl</button>
         </div>
         <button class="btn ghost sm block" style="margin-top:6px" data-op="detail">Sipariş detayı</button>`);
@@ -247,7 +246,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         <h3>Sipariş işlemleri</h3>
         ${stepper(o.status)}${notes}
         ${live() ? html`<div class="row wrap" style="margin-top:8px">
-          ${o.status === 'new' && mode !== 'expand' ? html`<button class="btn primary" style="flex:1" data-op="accept"><i class="ico ico-play"></i>İşleme al</button>` : ''}
+          ${o.status === 'new' ? html`<button class="btn ghost" style="flex:1" data-op="accept" title="Etiket almadan yalnız onayla"><i class="ico ico-play"></i>Yalnız işleme al</button>` : ''}
           ${open.length > 1 && open.some((p) => !hasLabel(p, d.order.channel)) ? html`<button class="btn primary" style="flex:1" data-op="labels"><i class="ico ico-tag"></i>Tüm etiketleri al</button>` : ''}
           <button class="btn outline" style="flex:1" data-op="split" ${splittable ? '' : 'disabled'}><i class="ico ico-split"></i>Pakete böl</button>
           <button class="btn outline" style="flex:1" data-op="addpkg" ${splittable ? '' : 'disabled'}><i class="ico ico-plus"></i>Paket ekle</button>

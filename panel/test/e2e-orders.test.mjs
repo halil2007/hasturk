@@ -327,6 +327,24 @@ test('Trendyol: işleme alınmış (Picking) pakete etiket alırken Trendyol\'a 
   } finally { n.restore(); }
 });
 
+test('Trendyol: yeni siparişte doğrudan "Paketle ve etiket al": sipariş kendiliğinden işleme alınır, Picking bir kez gönderilir', async () => {
+  const n = net();
+  try {
+    const { admin } = await panel();
+    await withProducts(admin);
+    await ok(await admin('/api/integrations/trendyol', J({ values: TY }, 'PUT')));
+    const ty = trendyolMock(n);
+    ty.pkgs.push(tyPkg(1, 901, 'Created', [[11, 'SOL-5', '8690001', 1, 150]]));
+    n.on('PUT', /\/shipment-packages\/\d+$/, (c) => { const p = ty.pkgs[0]; if (p.status === c.body.status) return { __status: 400, body: { errors: [{ message: 'Paket statüsü zaten ' + p.status }] } }; p.status = c.body.status; return {}; });
+    await ok(await admin('/api/sync', J({ channels: ['trendyol'] })));
+    const r = await admin(`/api/orders/${oid('trendyol:901')}/label`, J({}));
+    const b = await js(r);
+    assert.equal(r.status, 200, JSON.stringify(b));
+    assert.equal(b.order.status, 'processing', 'sipariş işleme alındı');
+    assert.equal(n.find('PUT', /shipment-packages\/1$/).length, 1, 'Picking yalnız bir kez');
+  } finally { n.restore(); }
+});
+
 test('Trendyol: paket bölme kanalda (asenkron) yapılır; yeni paketler yenile ile gelir', async () => {
   const n = net();
   try {
