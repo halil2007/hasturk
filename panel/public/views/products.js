@@ -71,12 +71,13 @@ export async function products(el, rest, query = {}) {
     const heldTip = heldCh.map((c) => `${ch(c).name}: ${channelStateText(all.find((l) => l.channel === c && isHeld(l)), ch(c).name).short}`).join('\n');
     if (!ls.length) return html`<span class="pill" title="${heldTip}">Yayında değil</span>`;
     const ids = [...new Set(ls.map((l) => l.channel))], err = ls.filter(realError);
+    // Satışa kapalı (ör. stok 0) ilanın logosu normal görünür; yalnız kanalın onaylamadığı / beklettiği ilanların logosu gösterilmez
     const off = (c) => ls.filter((l) => l.channel === c).every((l) => l.remote_state === 'passive');
     const prices = ls.map((l) => l.price).filter((x) => x > 0), lo = Math.min(...prices), hi = Math.max(...prices);
     const tip = ids.map((c) => { const xs = ls.filter((l) => l.channel === c); return `${ch(c).name}: ${xs.map((l) => money(l.price)).join(', ')}${off(c) ? ` (${channelStateText(xs[0], ch(c).name).short})` : ''}${xs.some(realError) ? ' (hata)' : ''}`; }).concat(heldTip ? [heldTip] : []).join('\n');
     // Aynı kanalda birden fazla ilan (ikinci eşleşme): "2 ilan" etiketi
     const multi = ids.map((c) => [c, Math.max(...list.map((p) => (p.listings || []).filter((l) => l.channel === c && !isHeld(l)).length))]).filter(([, k]) => k > 1);
-    return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => (off(c) ? html`<span class="lg-off">${chLogo(c, true)}</span>` : chLogo(c, true)))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>${multi.map(([c, k]) => html`<span class="pill info" style="padding:2px 8px;font-size:11px" title="${ch(c).name}: bu ürün ${k} ilanla satılıyor">${ch(c).short || ch(c).name} ${k} ilan</span>`)}
+    return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => chLogo(c, true))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>${multi.map(([c, k]) => html`<span class="pill info" style="padding:2px 8px;font-size:11px" title="${ch(c).name}: bu ürün ${k} ilanla satılıyor">${ch(c).short || ch(c).name} ${k} ilan</span>`)}
       <span class="small num">${prices.length ? (lo === hi ? money0(lo) : `${money0(lo)} – ${money0(hi)}`) : ''}</span>${err.length ? html`<button class="pill bad" data-act="errs" data-ids="${list.map((p) => p.id).join(',')}" title="${err.map((l) => `${ch(l.channel).name}: ${l.error}`).join('\n')} (açıklama için tıklayın)">${err.length} hata</button>` : ''}</div>`;
   }
   const stockCell = (p) => {

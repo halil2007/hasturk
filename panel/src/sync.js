@@ -9,7 +9,7 @@ import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, r
 import { getChannels } from './channels/index.js';
 import { typeOf, INTL_TYPES } from './config.js';
 import { syncInvoices, syncSettlements, lossNotify } from './finance.js';
-import { applyListRates } from './commcheck.js';
+import { applyListRates, refreshBaseRates, rebaseOnce, BASE_DAYS } from './commcheck.js';
 import { maintain } from './perf.js';
 import { syncFx, orderRate } from './fx.js';
 import { mergeStatus, chunk, str, sleep, explainHttp, withBudget, budgetLeft, budgetUsed, budgetElapsed } from './util.js';
@@ -29,6 +29,7 @@ import { dailyDigest } from './digest.js';
 import { urgentAlert, alertResolved } from './alerts.js';
 import { allows } from './plans.js';
 import { trackCarriers } from './carriers.js';
+import { shipCheck } from './shipcost.js';
 export { relinkItems };
 
 // İlanın kanalda görünmesi gereken stok (l = listings, p = products):
@@ -105,6 +106,7 @@ export async function saveOrders(db, ch, orders, maps) {
     o.total = x(o.total); o.currency = 'TRY';
     for (const it of o.items || []) { it.unitPrice = x(it.unitPrice); it.total = x(it.total); it.commission = x(it.commission); }
   }
+  const baseKeys = new Set();
   for (const part of chunk(changed, 25)) {
     const st = [];
     for (const o of part) {
@@ -135,12 +137,14 @@ export async function saveOrders(db, ch, orders, maps) {
         // saklanmaz, ilan / kanal oranıyla tahmin edilir (yanlış tutar "gerçek komisyon" olarak kâra işlemesin)
         let com = it.commission == null || !Number.isFinite(Number(it.commission)) ? null : Math.max(0, Number(it.commission));
         if (com != null && !(it.total > 0 && com / it.total >= 0.005 && com / it.total <= 0.6)) com = null;
-        st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key, commission)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || '', com));
-        // Kanalın bildirdiği gerçek komisyon oranı ilana yazılır (elle girilmiş oran korunur). Satır komisyonu KDV dahildir, oran da KDV dahil saklanır
-        // Yalnız canlı satır ve son 30 günün siparişi (geçmiş aktarımındaki eski oran güncel oranı ezmesin)
-        if (com != null && it.total > 0 && it.remoteKey && !it.status && o.orderedAt > t - 30 * 864e5) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src IN ('api', 'list'))").bind(Math.round((com / it.total) * 10000) / 100, ch, it.remoteKey));
+        // seller_discount: satıcının karşıladığı indirim (Trendyol sepet / kupon; bilgi amaçlı, total zaten indirim düşülmüş tutar)
+        const sd = Number(it.sellerDiscount) > 0 ? Math.round(Number(it.sellerDiscount) * 100) / 100 : null;
+        st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key, commission, seller_discount)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || '', com, sd));
+        // İlanın ana komisyon oranı yeniden hesaplanacak (kayıttan sonra; bkz. commcheck.js refreshBaseRates): son siparişin oranı
+        // doğrudan yazılmaz, tek indirimli satır ana oranı düşürmesin. Elle girilmiş oran korunur.
+        if (com != null && it.total > 0 && it.remoteKey && !it.status && o.orderedAt > t - BASE_DAYS * 864e5) baseKeys.add(it.remoteKey);
       }
       // Kanalın kendi paketleri (Trendyol/Hepsiburada/ikas) panele aynen yansır; paneldeki taslak paketler korunur
       if (Array.isArray(o.packages)) {
@@ -177,6 +181,7 @@ export async function saveOrders(db, ch, orders, maps) {
     }
     await db.batch(st);
   }
+  if (baseKeys.size) await refreshBaseRates(db, ch, [...baseKeys]).catch((e) => log(db, ch, 'warn', 'İlan komisyon oranı güncellenemedi: ' + e.message));
   const out = changed.map((o) => `${ch}:${o.remoteId}`);
   out.created = created; // veritabanında ilk kez görülen siparişler (yeni sipariş bildirimi için)
   return out;
@@ -672,6 +677,10 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     out.stockMoves += await applyDirtyStock(db, settings).catch(() => 0);
     // Kanalların kargo faturalarından gerçek kargo gideri (kanal başına 6 saatte bir)
     if (!only) out.costs = await opt(150, () => syncCosts(env, db, chans)).catch((e) => 'hata: ' + e.message);
+    // Ürün kargo tutarı ↔ kargo faturaları (düşükse ürün tutarı güncellenir, yüksekse en fazla iki kez uyarı; 6 saatte bir)
+    if (!only) out.shipCheck = await shipCheck(db).catch((e) => 'hata: ' + e.message);
+    // Tek seferlik: ilanların komisyon oranı ana oran kuralıyla yeniden hesaplanır (bkz. commcheck.js rebaseOnce)
+    if (!only) out.commBase = await rebaseOnce(db).catch((e) => 'hata: ' + e.message);
     if (!only && allows(env, 'finance')) out.invoices = await opt(150, () => syncInvoices(env, db)).catch((e) => 'hata: ' + e.message);
     if (!only && allows(env, 'finance')) out.settlements = await opt(150, () => syncSettlements(env, db)).catch((e) => 'hata: ' + e.message);
     // Zarar ettiren ürünler (iade dahil, son 30 gün): yeni ürün çıktıysa haftada en fazla bir bildirim
