@@ -21,6 +21,7 @@ import { CARRIER_IDS } from './carriers.js';
 import { forgot, resetPassword, welcome } from './pwreset.js';
 import { tenantBilling, adminCharge } from './billing.js';
 import { iyzicoReady } from './iyzico.js';
+import { serveImage } from './prodimg.js';
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
 const SYNC_MS = 15 * 60e3;
@@ -459,6 +460,12 @@ export class TenantPanel {
     this.unlockStale();
     const url = new URL(req.url);
     if (url.pathname === '/__admin') return this.adminOp(env, await req.json().catch(() => ({})));
+    // Ürün fotoğrafı (herkese açık; Worker'dan /img/<firma kodu>/<kimlik>.jpg isteğiyle gelir, bkz. index.js → productImage)
+    if (url.pathname.startsWith('/__img/')) {
+      if (await this.ctx.storage.get('suspended')) return new Response('Fotoğraf yok', { status: 404 });
+      await init(this.db);
+      return serveImage(this.db, req, url.pathname.slice(7));
+    }
     // Dış API: anahtar Worker'da doğrulandı (bu yol yalnız Worker içinden gelir; tarayıcı istekleri /api/ ile başlar)
     if (url.pathname.startsWith('/__api/')) {
       if (await this.ctx.storage.get('suspended')) return json({ error: 'Mağaza paneli askıda' }, 403);

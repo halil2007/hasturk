@@ -3,6 +3,7 @@
 // olarak Müşteri hataları'na düşer (pazaryeri bağlantılı işlemde sınır 10 sn). Günlük bakım (housekeeping) eski kayıtları temizler ve veritabanı istatistiklerini tazeler.
 import { all, run } from './db.js';
 import { recordError } from './errors.js';
+import { cleanupImages } from './prodimg.js';
 
 const SLOW = 1000, ALERT = 1000, ALERT_EXT = 10000;
 // Pazaryeri / site bağlantılı işlemler: süre, kanalın (Trendyol, Hepsiburada, ikas …) yanıtına bağlıdır (senkron, paketleme, etiket,
@@ -88,6 +89,8 @@ export async function maintain(db) {
   await del('mail_queue', 'DELETE FROM mail_queue WHERE sent_at IS NOT NULL AND sent_at < ?', t - 30 * 864e5);
   await del('product_uploads', "DELETE FROM product_uploads WHERE status IN ('done', 'error', 'failed', 'success') AND created_at < ?", t - 90 * 864e5);
   await del('jobs', "DELETE FROM jobs WHERE status IN ('done', 'error', 'cancelled') AND COALESCE(updated_at, created_at) < ?", t - 90 * 864e5);
+  // Ürün fotoğrafları: hiçbir üründe kullanılmayan, 1 günden eski fotoğraflar (bkz. prodimg.js)
+  try { out.product_images = await cleanupImages(db, t); } catch { /* tablo yoksa geç */ }
   // Sorgu planlayıcı istatistikleri (indeks seçimi): SQLite'ın önerdiği bakım komutu
   try { await run(db, 'PRAGMA optimize'); out.optimize = true; } catch { out.optimize = false; }
   return out;

@@ -11,7 +11,7 @@ import { hbTest } from './hbtest.js';
 import { deleteOrders, orderOnChannel } from './orderclean.js';
 import { suggestBarcode, assignBarcodes, barcodePrefix, missingBarcodes } from './barcodes.js';
 import { previewSkus, suggestSku, assignSkus, skuPrefix } from './skus.js';
-import { exportProducts, bulkUpdate } from './bulk.js';
+import { exportProducts, bulkUpdate, templateCsv } from './bulk.js';
 import { publicKey, subscribe, unsubscribe, latest, notify } from './push.js';
 import { pickList } from './picklist.js';
 import { dailyDigest } from './digest.js';
@@ -34,6 +34,7 @@ import { guardConfig, setGuardConfig, guardList, guardUnblock, guardIp } from '.
 import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS, grossCost } from './carriers.js';
 import { can, sectionOf } from '../public/perms.js';
 import { exclusive } from './locks.js';
+import { uploadImage, checkProductImages, dropUnused, hostedIds } from './prodimg.js';
 import { ek } from '../public/ek.js';
 // Eksik alan kodları (WOO_URL …) kullanıcıya alan adıyla gösterilir
 const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).find((f) => f.k === k) || {}).label || k).join(', ');
@@ -724,7 +725,7 @@ const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 
 const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price']);
 // Görsel bağlantıları: dizi ya da satır satır metin → tekrarsız https adresleri
 const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/[\s,]+/));
-function cleanProduct(b) {
+export function cleanProduct(b) {
   const o = {};
   for (const k of PRODUCT_FIELDS) if (k in b) o[k] = NUMERIC.has(k) ? num(b[k]) : str(b[k]) || null;
   if (o.category) o.category = normCat(o.category) || null;
@@ -734,7 +735,7 @@ function cleanProduct(b) {
   if ('fx_margin' in o) o.fx_margin = b.fx_margin === '' || b.fx_margin == null ? null : num(b.fx_margin);
   // Görseller: elle düzenlenen liste (images_manual = 1) ya da "kanaldan otomatik al" (images_auto: senkron doldurur)
   if (b.images_auto) { o.images = null; o.images_manual = 0; }
-  else if ('images' in b) { const l = imagesIn(b.images); o.images = l.length ? JSON.stringify(l) : null; o.images_manual = 1; if (!o.image && !b.image && l[0]) o.image = l[0]; }
+  else if ('images' in b) { const l = imagesIn(b.images); checkProductImages(l); o.images = l.length ? JSON.stringify(l) : null; o.images_manual = 1; if (!o.image && !b.image && l[0]) o.image = l[0]; }
   return o;
 }
 
@@ -889,6 +890,8 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
     const dup = await first(db, 'SELECT id FROM products WHERE LOWER(sku) = LOWER(?) AND id != ?', f.sku, id || 0);
     if (dup) fail(400, 'Bu stok kodu (SKU) başka bir üründe kullanılıyor');
   }
+  // Panelde barındırılan fotoğraflar: üründen çıkarılanlar (başka ürün kullanmıyorsa) kayıttan sonra silinir
+  const oldImg = id && ('image' in f || 'images' in f) ? await first(db, 'SELECT image, images FROM products WHERE id = ?', id) : null;
   if (!id) {
     const keys = Object.keys(f);
     const r = await first(db, `INSERT INTO products (${keys.join(', ')}, stock, created_at, updated_at) VALUES (${keys.map(() => '?').join(', ')}, ?, ?, ?) RETURNING id`,
@@ -899,6 +902,11 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
     const keys = Object.keys(f);
     if (keys.length) await run(db, `UPDATE products SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => f[k]), t, id);
     if (b.stock !== undefined && b.stock !== '') await stockChange(env, db, ctx, id, { mode: 'set', qty: b.stock, note: 'Ürün formu' }, user);
+  }
+  if (oldImg) {
+    const now = await first(db, 'SELECT image, images FROM products WHERE id = ?', id), keep = hostedIds(now && now.image, now && now.images);
+    const gone = [...hostedIds(oldImg.image, oldImg.images)].filter((x) => !keep.has(x));
+    if (gone.length) await dropUnused(db, gone);
   }
   if (b.images_auto) await fillProductInfo(db).catch(() => {});
   // Kanal ilanları: fiyat / komisyon
@@ -1788,10 +1796,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // Excel ile toplu güncelleme: dışa aktar (CSV) ve geri yükle (önizleme / uygula)
   if (path === 'products.csv' && m === 'GET') requireFeature(env, 'bulk');
   if (path === 'products.csv' && m === 'GET') return new Response(await exportProducts(env, db), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="urunler-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
+  // Örnek dosya (yeni ürün eklemek için): başlıklar ve bir örnek satır
+  if (path === 'products/template.csv' && m === 'GET') { requireFeature(env, 'bulk'); return new Response(templateCsv(), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="urun-ornek.csv"', 'Cache-Control': 'no-store' } }); }
   if (path === 'products/bulk' && m === 'POST') {
     requireFeature(env, 'bulk');
     const b = await body(req);
-    const r = await bulkUpdate(env, db, b.rows, { dry: b.dry !== false, user: user.name });
+    // Yeni ürün: Ürünler düzenleme yetkisi; stok hücresi: Stok düzenleme yetkisi (ürün formundaki gibi)
+    const r = await bulkUpdate(env, db, b.rows, { dry: b.dry !== false, user: user.name, canCreate: can(user, 'products', true), canStock: can(user, 'stock', true) });
     if (r.applied && r.stock) ctx.waitUntil(pushStocks(env, db).catch(() => {}));
     if (r.applied && r.prices) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
     return json(r);
@@ -1858,6 +1869,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     await log(db, null, 'info', `${user.name}: ${changed} ürün toplu güncellendi (${b.action})`);
     return json({ changed });
   }
+  // Ürün fotoğrafı yükleme (bilgisayardan / telefondan; tarayıcıda küçültülmüş JPEG). Herkese açık adresi döner (bkz. prodimg.js)
+  if (path === 'products/images' && m === 'POST') return json(await uploadImage(req, env, db, await body(req)));
   if (path === 'products' && m === 'POST') return json(await saveProduct(env, db, ctx, 0, await body(req), user));
   if ((x = path.match(/^products\/(\d+)$/))) {
     const id = Number(x[1]);

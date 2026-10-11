@@ -225,7 +225,7 @@ export async function products(el, rest, query = {}) {
       { icon: 'tag', label: 'Barkod / SKU oluştur', run: () => barcodeDialog(refresh, f.filter === 'nosku' ? 'sku' : 'barcode') },
       ...(locked('bulk') ? [{ icon: 'download', label: 'Excel ile toplu işlem (Profesyonel paket)', run: () => { toast('Excel ile toplu güncelleme Profesyonel ve Kurumsal pakette; Paketim\'den yükseltebilirsiniz'); location.hash = '#/paketim'; } }] : [
         { icon: 'download', label: 'Excel\'e aktar (tüm ürünler)', run: () => { location.href = '/api/products.csv'; } },
-        { icon: 'upload', label: 'Excel\'den toplu güncelle', run: () => excelDialog(refresh) }]),
+        { icon: 'upload', label: 'Excel\'den ekle / güncelle', run: () => excelDialog(refresh) }]),
       { icon: 'sync', label: 'Kanallardan içe aktar', run: () => importDialog(refresh) },
     ], { title: 'Araçlar' }),
   });
@@ -306,6 +306,49 @@ export function stockDialog(p, done) {
   });
 }
 
+// Ürün fotoğrafı: en fazla 8 (Trendyol / idefix sınırı). Tarayıcıda küçültülür: en uzun kenar 1600 px, JPEG (kalite 0,85; büyükse
+// kalite / boyut düşürülür, ~400 KB altı). Pazaryerlerinin hepsi JPEG kabul eder; şeffaf alan beyaz olur.
+const MAX_PHOTOS = 8;
+async function shrinkPhoto(file, max = 1600, limit = 400 * 1024) {
+  if (!/^image\//.test(file.type || '') && !/\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i.test(file.name || '')) throw new Error('Yalnız fotoğraf yüklenebilir');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('Fotoğraf açılamadı (JPG ya da PNG olarak kaydedip tekrar deneyin)')); i.src = url; });
+    const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+    if (!W || !H) throw new Error('Fotoğraf açılamadı');
+    const bytes = (d) => Math.floor(((d.length - d.indexOf(',') - 1) * 3) / 4);
+    let k = Math.min(1, max / Math.max(W, H)), best = null;
+    for (let round = 0; round < 4; round++, k *= 0.8) {
+      const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      for (const q of [0.85, 0.75, 0.65]) {
+        const d = c.toDataURL('image/jpeg', q);
+        if (!d.startsWith('data:image/jpeg')) throw new Error('Tarayıcınız fotoğrafı dönüştüremedi');
+        best = { data: d, w: c.width, h: c.height, size: bytes(d) };
+        if (best.size <= limit) return best;
+      }
+    }
+    if (best && best.size <= 1100 * 1024) return best;
+    throw new Error('Fotoğraf küçültülemedi; daha küçük bir fotoğraf seçin');
+  } finally { URL.revokeObjectURL(url); }
+}
+function photoStyles() {
+  if (document.getElementById('ph-css')) return;
+  const st = document.createElement('style'); st.id = 'ph-css';
+  st.textContent = `.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.ph-item { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-3); }
+.ph-item.main { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.ph-item a { display: block; }
+.ph-img { display: grid; place-items: center; width: 100%; aspect-ratio: 1; background: var(--surface-3) center/contain no-repeat; }
+.ph-main { position: absolute; left: 4px; top: 4px; background: var(--primary); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; }
+.ph-tools { display: flex; border-top: 1px solid var(--line); background: var(--surface); }
+.ph-btn { flex: 1; border: 0; background: none; color: var(--text); font-size: 18px; line-height: 1; padding: 6px 0; cursor: pointer; min-height: 32px; }
+.ph-btn:disabled { opacity: .3; cursor: default; }
+.ph-btn.del { color: var(--bad); }
+.ph-btn + .ph-btn { border-left: 1px solid var(--line); }
+.ph-drop { outline: 2px dashed var(--primary); outline-offset: 4px; border-radius: 10px; }`;
+  document.head.append(st);
+}
 // CSS url() içine giden adres: tırnak / parantez / ters bölü atılır (stil enjeksiyonu olmasın)
 const cssUrl = (u) => String(u || '').replace(/['"()\\\s]/g, '');
 // Kanaldan gelen HTML açıklama: izin verilen biçim etiketleriyle YENİ bir belge kurulur (yorum, betik, noscript gibi her şey atılır;
@@ -368,8 +411,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Ana ürün (varyant grubu)</span><input class="input" name="group_name" value="${p.group_name || ''}" placeholder="ör. Domates tohumu"></label>
         <label class="field"><span>Varyant</span><input class="input" name="variant_name" value="${p.variant_name || ''}" placeholder="ör. 5 kg / Kırmızı"></label>
       </div>
-      <label class="field"><span>Görsel adresi</span><input class="input" name="image" value="${p.image || ''}" placeholder="https://…"></label>
-      <div class="field" data-gal><span>Tüm görseller</span><div data-galbox></div></div>
+      <div class="field" data-gal><span>Fotoğraflar <span class="muted tiny">· ilk fotoğraf ana fotoğraftır · en fazla ${MAX_PHOTOS}</span></span><div data-galbox></div></div>
       ${p.description && /<[a-z][\s\S]*>/i.test(p.description) ? html`<div class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><div class="desc-view">${raw(safeHtml(p.description))}</div>
         <details style="margin-top:6px"><summary class="small muted" style="cursor:pointer">Açıklama</summary><textarea class="input" name="description" style="min-height:160px;margin-top:6px">${p.description}</textarea></details></div>`
         : html`<label class="field"><span>Açıklama${descSource(p) ? html` <span class="muted tiny">· kaynak: ${descSource(p)}</span>` : ''}</span><textarea class="input" name="description" style="min-height:110px">${p.description || ''}</textarea></label>`}
@@ -420,27 +462,78 @@ export async function productForm(id, done) {
   if (allv) allv.onclick = () => { s.close(); variantEditor(p.siblings, done, p.group_name || p.name); };
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);
   const form = $('[data-form]', s.body);
-  // Görsel galerisi: yalnız bağlantılar saklanır (görseller kanalın sunucusundan açılır, panelde yer kaplamaz)
-  let gal = (() => { try { return JSON.parse(p.images || '[]'); } catch { return []; } })(), galManual = !!p.images_manual, galEdit = false, galDirty = false, galAuto = false;
-  const drawGal = () => render($('[data-galbox]', form), html`<div class="stack" style="gap:8px">
-    ${gal.length ? html`<div class="row wrap" style="gap:6px">${gal.map((u, i) => html`<a href="${u}" target="_blank" rel="noopener" title="${i === 0 ? 'Ana görsel · ' : ''}${u}" style="position:relative"><span class="thumb lg" style="background-image:url('${cssUrl(u)}')"></span>${i === 0 ? html`<span class="pill" style="position:absolute;left:2px;bottom:2px;font-size:9px;padding:0 4px">ana</span>` : ''}</a>`)}</div>`
-      : html`<div class="muted small">${id ? 'Henüz görsel bağlantısı yok; bağlı kanallardan bir sonraki senkronda gelir.' : 'Kaydettikten sonra bağlı kanallardan gelir ya da aşağıdan ekleyin.'}</div>`}
-    <div class="row wrap" style="gap:8px"><span class="muted tiny" style="flex:1">${gal.length ? `${gal.length} görsel · ` : ''}${galAuto ? 'Kaydedince kanaldan alınır.' : galManual ? 'Panelde düzenlendi.' : 'Görseller kanaldan gelir.'}</span>
-      <button type="button" class="btn sm" data-galedit>${galEdit ? 'Düzenlemeyi kapat' : 'Bağlantıları düzenle'}</button>${galManual && !galAuto ? html`<button type="button" class="btn sm ghost" data-galauto>Kanaldan otomatik al</button>` : ''}</div>
-    ${galEdit ? html`<textarea class="input" data-galtext rows="5" placeholder="Her satıra bir görsel bağlantısı (https://…). İlk satır ana görsel.">${gal.join('\n')}</textarea>` : ''}
+  // Fotoğraflar: bilgisayardan / telefondan yüklenir (tarayıcıda küçültülür, panelde saklanır, herkese açık adresten pazaryerlerine gider)
+  // ya da bağlantıyla eklenir. İlk fotoğraf ana fotoğraftır; sıralama oklarla değişir. Kaydet'e basınca ürüne yazılır.
+  photoStyles();
+  let gal = (() => { try { return JSON.parse(p.images || '[]'); } catch { return []; } })(), galManual = !!p.images_manual, galDirty = false, galAuto = false, galLink = false, uploading = 0;
+  if (!Array.isArray(gal)) gal = [];
+  if (!gal.length && p.image) gal = [p.image];
+  const drawGal = () => render($('[data-galbox]', form), html`<div class="stack" style="gap:10px">
+    ${gal.length || uploading ? html`<div class="ph-grid">${gal.map((u, i) => html`<div class="ph-item${i === 0 ? ' main' : ''}">
+        <a href="${u}" target="_blank" rel="noopener" title="${u}"><span class="ph-img" style="background-image:url('${cssUrl(u)}')"></span></a>
+        ${i === 0 ? html`<span class="ph-main">Ana</span>` : ''}
+        <div class="ph-tools">
+          <button type="button" class="ph-btn" data-phmove="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Öne al" title="Öne al">‹</button>
+          <button type="button" class="ph-btn" data-phmove="${i}" data-d="1" ${i === gal.length - 1 ? 'disabled' : ''} aria-label="Arkaya al" title="Arkaya al">›</button>
+          <button type="button" class="ph-btn del" data-phdel="${i}" aria-label="Fotoğrafı kaldır" title="Kaldır">×</button>
+        </div></div>`)}
+      ${Array.from({ length: uploading }, () => html`<div class="ph-item"><span class="ph-img"><i class="ico ico-sync spin"></i></span></div>`)}</div>`
+      : html`<div class="muted small">Henüz fotoğraf yok. ${isMobile() ? 'Telefonunuzdan fotoğraf seçin ya da çekin.' : 'Bilgisayarınızdan seçin ya da fotoğrafları buraya sürükleyip bırakın.'}</div>`}
+    <div class="row wrap" style="gap:8px">
+      <button type="button" class="btn sm primary" data-phadd ${gal.length >= MAX_PHOTOS ? 'disabled' : ''}><i class="ico ico-upload"></i>Fotoğraf ekle</button>
+      ${isMobile() ? html`<button type="button" class="btn sm" data-phcam ${gal.length >= MAX_PHOTOS ? 'disabled' : ''}><i class="ico ico-image"></i>Fotoğraf çek</button>` : ''}
+      <button type="button" class="btn sm ghost" data-phlink><i class="ico ico-link"></i>Bağlantı ile ekle</button>
+      ${galManual && !galAuto ? html`<button type="button" class="btn sm ghost" data-galauto>Kanaldan otomatik al</button>` : ''}
+    </div>
+    ${galLink ? html`<div class="row" style="gap:6px;flex-wrap:nowrap"><input class="input" data-phurl placeholder="https://… (fotoğraf bağlantısı)" style="flex:1;min-width:0"><button type="button" class="btn sm" data-phurladd>Ekle</button></div>` : ''}
+    <span class="muted tiny">${gal.length ? `${gal.length} fotoğraf · ` : ''}${galAuto ? 'Kaydedince kanaldan alınır.' : galDirty ? 'Kaydetmeyi unutmayın.' : galManual ? 'Panelde düzenlendi.' : gal.length ? 'Fotoğraflar kanaldan geldi.' : ''}</span>
   </div>`);
+  const changed = () => { galDirty = true; galAuto = false; galManual = true; drawGal(); };
+  const addPhotos = async (files) => {
+    files = [...files];
+    if (!files.length) return;
+    const room = MAX_PHOTOS - gal.length - uploading;
+    if (room <= 0) return toast(`Bir ürüne en fazla ${MAX_PHOTOS} fotoğraf eklenebilir`, true);
+    if (files.length > room) toast(`En fazla ${MAX_PHOTOS} fotoğraf: ilk ${room} fotoğraf ekleniyor`, true);
+    const errs = [];
+    await Promise.all(files.slice(0, room).map(async (file) => {
+      uploading++; drawGal();
+      try {
+        const sh = await shrinkPhoto(file);
+        const r = await api('products/images', { method: 'POST', body: { data: sh.data, w: sh.w, h: sh.h } });
+        uploading--;
+        if (gal.length < MAX_PHOTOS) gal.push(r.url);
+        changed();
+      } catch (e) { uploading--; errs.push(`${file.name || 'Fotoğraf'}: ${e.message}`); drawGal(); }
+    }));
+    if (errs.length) toast(errs.join(' · '), true);
+  };
+  const pick = (camera) => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.multiple = !camera; if (camera) i.setAttribute('capture', 'environment'); i.onchange = () => addPhotos(i.files); i.click(); };
   drawGal();
   form.addEventListener('click', (e) => {
-    if (e.target.closest('[data-galedit]')) { galEdit = !galEdit; drawGal(); }
-    if (e.target.closest('[data-galauto]')) { galAuto = true; galDirty = false; galManual = false; galEdit = false; drawGal(); }
+    const t = e.target;
+    if (t.closest('[data-phadd]')) pick(false);
+    if (t.closest('[data-phcam]')) pick(true);
+    if (t.closest('[data-phlink]')) { galLink = !galLink; drawGal(); if (galLink) $('[data-phurl]', form).focus(); }
+    if (t.closest('[data-phurladd]')) {
+      const inp = $('[data-phurl]', form), urls = inp.value.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+      if (!urls.length) return;
+      if (urls.some((u) => !/^https?:\/\/\S+$/i.test(u))) return toast('Bağlantı https:// ile başlamalı', true);
+      for (const u of urls) if (!gal.includes(u) && gal.length < MAX_PHOTOS) gal.push(u);
+      galLink = false; changed();
+    }
+    const mv = t.closest('[data-phmove]');
+    if (mv) { const i = Number(mv.dataset.phmove), j = i + Number(mv.dataset.d); if (j >= 0 && j < gal.length) { [gal[i], gal[j]] = [gal[j], gal[i]]; changed(); } }
+    const dl = t.closest('[data-phdel]');
+    if (dl) { gal.splice(Number(dl.dataset.phdel), 1); changed(); }
+    if (t.closest('[data-galauto]')) { galAuto = true; galDirty = false; galManual = false; galLink = false; drawGal(); }
   });
-  form.addEventListener('input', (e) => {
-    if (!e.target.matches('[data-galtext]')) return;
-    gal = [...new Set(e.target.value.split(/[\s,]+/).map((x) => x.trim()).filter((x) => /^https?:\/\//i.test(x)))].slice(0, 12);
-    galDirty = true; galAuto = false; galManual = true;
-    const box = $('[data-galbox] .row', form); // önizlemeyi yazarken yeniden çizme (imleç kaybolmasın)
-    if (box && box.firstElementChild && box.firstElementChild.tagName === 'A') render(box, html`${gal.map((u) => html`<a href="${u}" target="_blank" rel="noopener"><span class="thumb lg" style="background-image:url('${cssUrl(u)}')"></span></a>`)}`);
-  });
+  form.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-phurl]')) { e.preventDefault(); $('[data-phurladd]', form).click(); } });
+  // Masaüstü: fotoğrafları sürükleyip bırakma
+  const galEl = $('[data-gal]', form);
+  galEl.addEventListener('dragover', (e) => { if ([...((e.dataTransfer || {}).types || [])].includes('Files')) { e.preventDefault(); galEl.classList.add('ph-drop'); } });
+  galEl.addEventListener('dragleave', (e) => { if (!galEl.contains(e.relatedTarget)) galEl.classList.remove('ph-drop'); });
+  galEl.addEventListener('drop', (e) => { const fs = [...((e.dataTransfer || {}).files || [])]; galEl.classList.remove('ph-drop'); if (fs.length) { e.preventDefault(); addPhotos(fs); } });
   // SKU oluştur: formdaki ad / varyant / markadan benzersiz öneri; kaydedilince geçerli olur
   $('[data-gensku]', form).onclick = (e) => busy(e.currentTarget, async () => {
     if (form.sku.value.trim() && !(await confirmBox((p.listings || []).length
@@ -488,7 +581,8 @@ export async function productForm(id, done) {
   if ($('[data-fxprev]', form)) { api('fx').then((r) => { fxInfo = r; fxPrev(); }).catch(() => fxPrev()); form.addEventListener('input', (e) => { if (e.target.dataset.fx !== undefined) fxPrev(); }); form.addEventListener('change', (e) => { if (e.target.dataset.fx !== undefined) fxPrev(); }); fxPrev(); }
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const fd = new FormData(form), b = {};
-    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'image', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock']) b[k] = fd.get(k);
+    if (uploading) return toast('Fotoğraflar yükleniyor; bitince kaydedin', true);
+    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock']) b[k] = fd.get(k);
     for (const k of ['purchase_price', 'sale_price', 'desi', 'ship_cost']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
     if (form.currency) { b.currency = fd.get('currency') || ''; b.fx_price = numIn(fd.get('fx_price')); b.fx_margin = String(fd.get('fx_margin') || '').trim() === '' ? '' : numIn(fd.get('fx_margin')); }
@@ -497,7 +591,7 @@ export async function productForm(id, done) {
     if (fd.has('stock') && (!id || Number(fd.get('stock')) !== p.stock)) b.stock = Number(fd.get('stock')) || 0;
     b.listings = $$('tr[data-l]', form).map((tr) => ({ channel: tr.dataset.l, remote_id: tr.dataset.rid, price: numIn($('[data-lf=price]', tr).value), commission: $('[data-lf=commission]', tr).value }));
     b.create_on = fd.getAll('create_on');
-    if (galAuto) b.images_auto = 1; else if (galDirty) b.images = gal;
+    if (galAuto) b.images_auto = 1; else if (galDirty) { b.images = gal; b.image = gal[0] || ''; }
     const r = await api(id ? 'products/' + id : 'products', { method: id ? 'PUT' : 'POST', body: b });
     // Pazaryerlerine gönderim (kategori eşleştirmesi ve zorunlu bilgilerle); sonuç tek mesajda
     const msgs = [], errs = [...(r.errors || [])];
@@ -620,32 +714,38 @@ async function barcodeDialog(done, kind = 'barcode') {
   await load().catch((e) => { s.close(); fail(e); });
 }
 
-// Excel ile toplu güncelleme: dosya tarayıcıda okunur, sunucu önizleme döner; onaylanınca uygulanır
+// Excel ile toplu güncelleme ve yeni ürün ekleme: dosya tarayıcıda okunur, sunucu önizleme döner; onaylanınca uygulanır
 function excelDialog(done) {
   let rows = null, file = '';
-  const s = sheet({ title: 'Excel\'den toplu güncelle', size: 'wide' });
+  const s = sheet({ title: 'Excel\'den ekle / güncelle', size: 'wide' });
   const intro = () => {
     s.setBody(html`<div class="stack">
-      <div class="notice small"><i class="ico ico-warn"></i><div>Yalnız var olan ürünler güncellenir; yeni ürün eklenmez.</div></div>
       <ol class="small" style="margin:0;padding-left:20px;line-height:1.8">
-        <li><a class="link" href="/api/products.csv">Ürün listesini indirin.</a></li>
-        <li>Fiyat ve stok sütunlarını Excel'de değiştirin.</li>
+        <li><a class="link" href="/api/products.csv">Ürün listesini</a> ya da <a class="link" href="/api/products/template.csv">örnek dosyayı</a> indirin.</li>
+        <li>Excel'de fiyat ve stokları değiştirin, yeni ürünleri alta ekleyin.</li>
         <li>Dosyayı seçin, önizlemeyi onaylayın.</li>
       </ol>
+      <div class="muted tiny">Listede olmayan satır yeni ürün olarak eklenir; Ürün adı yeterli.</div>
       <label class="btn" style="align-self:flex-start"><i class="ico ico-upload"></i>Dosya seç (.xlsx / .csv)<input type="file" accept=".xlsx,.csv,.txt" data-file hidden></label>
     </div>`);
-    s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>`);
+    s.setFoot(html`<a class="btn ghost" href="/api/products/template.csv"><i class="ico ico-download"></i>Örnek dosyayı indir</a><span class="spacer"></span><button class="btn" data-close>Kapat</button>`);
   };
   const fmt = (v) => (v == null ? '—' : String(Math.round(v * 100) / 100).replace('.', ','));
   function preview(r) {
+    const any = r.changes || r.created;
     s.setBody(html`<div class="stack">
-      <div class="notice ${r.changes ? '' : 'warn'} small"><i class="ico ico-${r.changes ? 'check' : 'warn'}"></i><div><b>${file}</b> · ${n(r.rows)} satır, ${n(r.matched)} ürün eşleşti · <b>${n(r.changes)} değişiklik</b>${Object.keys(r.counts).length ? ` (${Object.entries(r.counts).map(([k, x]) => `${k} ${x}`).join(', ')})` : ''}<div class="tiny muted">Okunan sütunlar: ${r.columns.join(', ')}</div></div></div>
-      ${r.preview.length ? html`<div class="table-wrap" style="max-height:42vh;overflow:auto"><table class="t"><thead><tr><th>Ürün</th><th>Alan</th><th class="r">Eski</th><th class="r">Yeni</th></tr></thead><tbody>
+      <div class="notice ${any ? '' : 'warn'} small"><i class="ico ico-${any ? 'check' : 'warn'}"></i><div><b>${file}</b> · ${n(r.rows)} satır
+        <div><b>${n(r.updated)} ürün güncellenecek</b>, <b>${n(r.created)} yeni ürün eklenecek</b>${r.errorRows ? html`, <b style="color:var(--warn)">${n(r.errorRows)} satır hatalı</b>` : ''}</div>
+        ${r.columns.length ? html`<div class="tiny muted">Okunan sütunlar: ${r.columns.join(', ')}</div>` : ''}</div></div>
+      ${r.preview.length ? html`<div class="table-wrap" style="max-height:36vh;overflow:auto"><table class="t"><thead><tr><th>Ürün</th><th>Alan</th><th class="r">Eski</th><th class="r">Yeni</th></tr></thead><tbody>
         ${r.preview.map((c) => html`<tr><td class="ellipsis" style="max-width:320px">${c.name}</td><td class="small">${c.label}${c.note ? html`<div class="tiny muted">${c.note}</div>` : ''}</td><td class="r num muted">${fmt(c.old)}</td><td class="r num" style="font-weight:650">${fmt(c.new)}</td></tr>`)}
       </tbody></table></div>${r.changes > r.preview.length ? html`<div class="muted tiny">İlk ${r.preview.length} değişiklik gösteriliyor; tümü uygulanır.</div>` : ''}` : ''}
-      ${r.skippedTotal ? html`<details${r.changes ? '' : ' open'}><summary class="small" style="cursor:pointer;color:var(--warn)">${n(r.skippedTotal)} satır / hücre atlandı</summary><ul class="small" style="margin:6px 0 0;padding-left:20px">${r.skipped.map((x) => html`<li>${x.line}. satır: ${x.reason}</li>`)}</ul></details>` : ''}
+      ${r.created ? html`<details${r.changes ? '' : ' open'}><summary class="small" style="cursor:pointer">${n(r.created)} yeni ürün</summary><div class="table-wrap" style="max-height:30vh;overflow:auto;margin-top:6px"><table class="t"><thead><tr><th>Ürün</th><th>SKU</th><th class="r">Satış</th><th class="r">Stok</th></tr></thead><tbody>
+        ${r.newPreview.map((c) => html`<tr><td class="ellipsis" style="max-width:320px">${c.name}</td><td class="small">${c.sku || '—'}</td><td class="r num">${fmt(c.sale_price)}</td><td class="r num">${c.stock}</td></tr>`)}
+      </tbody></table></div>${r.created > r.newPreview.length ? html`<div class="muted tiny">İlk ${r.newPreview.length} ürün gösteriliyor; tümü eklenir.</div>` : ''}${r.noSku ? html`<div class="muted tiny">${n(r.noSku)} yeni ürünün SKU'su yok: dosyayı tekrar yüklerseniz yeniden eklenir.</div>` : ''}</details>` : ''}
+      ${r.skippedTotal ? html`<details${any ? '' : ' open'}><summary class="small" style="cursor:pointer;color:var(--warn)">${n(r.skippedTotal)} hata / atlanan hücre</summary><ul class="small" style="margin:6px 0 0;padding-left:20px">${r.skipped.map((x) => html`<li>${x.line ? `${x.line}. satır: ` : ''}${x.reason}</li>`)}</ul></details>` : ''}
     </div>`);
-    s.setFoot(html`<button class="btn" data-again>Başka dosya</button><span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-apply ${r.changes ? '' : 'disabled'}><i class="ico ico-check"></i>${n(r.changes)} değişikliği kaydet</button>`);
+    s.setFoot(html`<button class="btn" data-again>Başka dosya</button><span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-apply ${any ? '' : 'disabled'}><i class="ico ico-check"></i>Kaydet</button>`);
   }
   intro();
   s.el.addEventListener('change', async (e) => {
@@ -665,7 +765,7 @@ function excelDialog(done) {
     if (!b || !rows) return;
     busy(b, async () => {
       const r = await api('products/bulk', { method: 'POST', body: { rows, dry: false } });
-      toast(`${n(r.changes)} değişiklik kaydedildi${r.prices ? ' · kanal fiyatları gönderiliyor' : ''}${r.stock ? ' · stoklar kanallara gönderiliyor' : ''}`);
+      toast(`${[r.changes ? `${n(r.changes)} değişiklik` : '', r.created ? `${n(r.created)} yeni ürün` : ''].filter(Boolean).join(', ') || 'Değişiklik yok'} kaydedildi${r.prices ? ' · kanal fiyatları gönderiliyor' : ''}${r.stock ? ' · stoklar kanallara gönderiliyor' : ''}`);
       s.close(); done();
     });
   });

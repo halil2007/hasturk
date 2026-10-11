@@ -10,6 +10,7 @@ import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
 import { publicCheckout, checkoutCallback, checkoutStatus, eftAdmin, payLink, paymentWatch } from './billing.js';
 import { blogPublic } from './blog.js';
+import { serveImage } from './prodimg.js';
 import { trialRequest, trialLogin } from './trial.js';
 import { turnstileOk, turnstileSiteKey, CAPTCHA_ERROR } from './turnstile.js';
 import { actionSucceeded, resolveQuiet } from './errors.js';
@@ -68,9 +69,37 @@ async function guardedAuth(req, env, ctx, path, b) {
   return await handle(req, env, ctx, env.DB);
 }
 
+// Ürün fotoğrafları (herkese açık, oturumsuz): /img/<firma kodu>/<kimlik>.jpg → o firmanın paneli; /img/_/<kimlik>.jpg → ana panel.
+// Pazaryerleri (Trendyol, Hepsiburada, ikas…) bir üründe onlarca fotoğrafı art arda indirir: genel istek sınırına (dakikada 120) girmez,
+// yalnız IP başına dakikada 3.000 istekle sınırlanır. Süresi dolan firmanın fotoğrafları da sunulur (pazaryerinde zaten yayında);
+// askıya alınmış / silinmiş firmanınkiler sunulmaz. Değişmeyen içerik Cloudflare'in önbelleğinde de tutulur.
+const IMG_RE = /^\/img\/(_|[a-z0-9][a-z0-9-]{1,30}[a-z0-9])\/([a-f0-9]{32})\.(?:jpg|png|webp)$/;
+async function productImage(req, env, ctx, url) {
+  const m = IMG_RE.exec(url.pathname);
+  const none = (s = 404, msg = 'Fotoğraf yok') => new Response(msg, { status: s, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=300', 'X-Content-Type-Options': 'nosniff' } });
+  if (!m) return none();
+  if (req.method !== 'GET' && req.method !== 'HEAD') return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } });
+  if (rateLimited('img:' + (req.headers.get('CF-Connecting-IP') || guardIp(req)), 3000)) return new Response('Çok fazla istek', { status: 429, headers: { 'Retry-After': '60' } });
+  const edge = typeof caches !== 'undefined' && caches.default && req.method === 'GET' ? caches.default : null;
+  const key = new Request(url.origin + url.pathname);
+  if (edge) { try { const hit = await edge.match(key); if (hit) return hit; } catch { /* önbellek yok */ } }
+  if (!env.DB) return none();
+  const inner = new Request(req.url, { method: req.method, headers: req.headers.get('If-None-Match') ? { 'If-None-Match': req.headers.get('If-None-Match') } : {} });
+  let res;
+  if (m[1] === '_') { await init(env.DB); res = await serveImage(env.DB, inner, m[2]); }
+  else {
+    const t = SLUG_RE.test(m[1]) ? await getTenant(env.DB, m[1]) : null;
+    if (!t || !t.active) return none();
+    res = await forward(inner, env, t, `https://tenant.internal/__img/${m[2]}`);
+  }
+  if (edge && res.status === 200 && /^image\//.test(res.headers.get('Content-Type') || '')) ctx.waitUntil(edge.put(key, res.clone()).catch(() => {}));
+  return res;
+}
+
 const handler = {
   async route(req, env, ctx) {
     const url = new URL(req.url);
+    if (url.pathname.startsWith('/img/')) return await productImage(req, env, ctx, url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? secure(await env.ASSETS.fetch(req)) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
     // Herkese açık uçlar: IP başına dakikada 120 istek (veritabanı yükü / kötüye kullanım)

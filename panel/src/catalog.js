@@ -46,7 +46,8 @@ async function productsFor(db, settings, { local, ch, ids }) {
 function shape(p, opts, zeroStock) {
   const base = p.cat_price > 0 ? p.cat_price : p.sale_price;
   const k = 1 + num(opts.markup) / 100;
-  const big = (u) => str(u).replace(/\/(180|360)\//, '/1080/');
+  // Kanal görselinin küçük boyutu büyüğüyle değiştirilir (panelde barındırılan fotoğrafın adresine dokunulmaz: /img/<firma>/<kimlik>.jpg)
+  const big = (u) => (/\/img\/[^/]+\/[a-f0-9]{32}\.\w+$/.test(str(u)) ? str(u) : str(u).replace(/\/(180|360)\//, '/1080/'));
   const img = big(p.image);
   // Tüm görsel bağlantıları (ana görsel önce, tekrarsız): pazaryerine ek görsel olarak gider
   let extra = [];
