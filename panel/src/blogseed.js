@@ -21,6 +21,23 @@ export const THIRD = [0, 1, 2, 3, 4, 5, 6].flatMap((i) => [POSTS_3A[i], POSTS_3B
 const EXTRA = POSTS_3X.map((p, i) => ({ ...p, at: Date.UTC(2026, 10, 2 + i * 3, 7 + ((i * 3) % 7), (i * 29 + 7) % 60) }));
 const ALL = [...POSTS, ...SECOND, ...THIRD, ...EXTRA];
 const REDATE = 'once:blog_redate_1';
+// Yayımlanmış hazır yazıların düzeltmeleri: veritabanındaki gövde hâlâ ilk yüklenen gövdeyse (SHA-256'sı from listesinde) bir kez
+// kaynaktaki güncel yazıyla değiştirilir; sahibi yazıyı elle düzenlediyse dokunulmaz. fields: gövdeyle birlikte güncellenecek diğer
+// alanlar. cover: kapaktaki rakamlar da değişti; yeni kapak siteden alınıp yeni kimlikle kaydedilir (görseller kimlikle 1 yıl
+// önbelleklenir); site henüz eski görseli veriyorsa sonraki çalışmalarda (en fazla 14 gün) yeniden denenir.
+// 1: Trendyol resmî komisyon oranları KDV dahildir (üzerine %20 KDV eklenmez); örnek hesaplar buna göre düzeltildi.
+export const REVISIONS = {
+  'trendyol-komisyon-orani-net-kar-hesaplama': { cover: true, from: [
+    'cba80f5491dcd00d3f60b44064ee37da8754b54fe78541cc6864fc7cff6073b6', // #191 (ilk yükleme)
+    '28e1de0887eed0f6c6c91336406bafa9019c659d4112021aa0bf9050f2b1f856', // #194 (komisyon oranları bağlantısı)
+  ] },
+  'pazaryeri-satis-fiyati-nasil-belirlenir': { cover: true, from: ['602080eadbb9de2bcf8b153c121f18093b6f21c6dcd421c5f1927effae1a8ce0'] },
+  'trendyol-buybox-nedir-nasil-kazanilir': { from: ['82469bb500c9a3855e0e6f7d3921d13c4854ec3f0301d4deb8bba85c6a4be9a4'] },
+  'pazaryeri-hakedis-nedir-ne-zaman-yatar': { cover: true, from: ['9f0f2b7253b0bb4e7b2eb3ffcf1820da01daefa679bfd26b9c8157a79adb9d53'] },
+};
+const REV = 'once:blog_rev_1';
+const FIELDS = ['title', 'summary', 'seo_title', 'seo_desc'];
+const sha256 = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((x) => x.toString(16).padStart(2, '0')).join('');
 
 const KEY = 'blog_seed';
 const TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -40,7 +57,45 @@ async function coverImage(env, db, file, fetcher) {
   return id;
 }
 
-export async function blogSeed(env, db, { posts = ALL, fetcher = fetch, now = Date.now() } = {}) {
+// Düzeltmeler (bkz. REVISIONS): gövdeler bir kez, kapaklar site yeni görseli verene kadar. Sonuç: düzeltilen yazılar ve yenilenen kapaklar
+async function revise(env, db, posts, revisions, fetcher, now) {
+  const row = await first(db, 'SELECT v FROM settings WHERE k = ?', REV);
+  let st = null;
+  try { st = row ? JSON.parse(row.v) : null; } catch { st = { covers: [] }; }
+  const out = { revised: [], covers: [] };
+  if (!st) {
+    st = { covers: [], until: now + 14 * 864e5 };
+    for (const [slug, r] of Object.entries(revisions)) {
+      const p = posts.find((x) => x.slug === slug), cur = p && await first(db, 'SELECT id, body FROM blog_posts WHERE slug = ?', slug);
+      if (!cur || !r.from.includes(await sha256(String(cur.body ?? '')))) continue;
+      const f = FIELDS.filter((k) => r.fields?.includes(k) && p[k] != null);
+      await run(db, `UPDATE blog_posts SET body = ?${f.map((k) => `, ${k} = ?`).join('')}, updated_at = ? WHERE id = ? AND body = ?`, p.body, ...f.map((k) => p[k]), now, cur.id, cur.body);
+      out.revised.push(slug);
+      if (r.cover && p.cover) st.covers.push(slug);
+    }
+  }
+  const left = [];
+  for (const slug of st.covers || []) {
+    const p = posts.find((x) => x.slug === slug);
+    const old = p && await first(db, 'SELECT p.id, p.cover_id, i.name, i.data FROM blog_posts p JOIN blog_images i ON i.id = p.cover_id WHERE p.slug = ?', slug);
+    if (!old || old.name !== p.cover) continue; // kapak elle değiştirilmiş / kaldırılmış
+    try {
+      const id = await coverImage(env, db, p.cover, fetcher);
+      if ((await first(db, 'SELECT data FROM blog_images WHERE id = ?', id)).data === old.data) { await run(db, 'DELETE FROM blog_images WHERE id = ?', id); throw new Error('site henüz eski kapağı veriyor'); }
+      await db.batch([
+        db.prepare('UPDATE blog_posts SET cover_id = ? WHERE id = ? AND cover_id = ?').bind(id, old.id, old.cover_id),
+        db.prepare('UPDATE blog_images SET post_id = ? WHERE id = ?').bind(old.id, id),
+        db.prepare('DELETE FROM blog_images WHERE id = ? AND NOT EXISTS (SELECT 1 FROM blog_posts WHERE cover_id = ? OR body LIKE ?)').bind(old.cover_id, old.cover_id, `%img:${old.cover_id}%`),
+      ]);
+      out.covers.push(slug);
+    } catch { if (now < (st.until || 0)) left.push(slug); }
+  }
+  const v = JSON.stringify({ covers: left, until: st.until || 0 });
+  if (!row || row.v !== v) await run(db, 'INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v', REV, v);
+  return out;
+}
+
+export async function blogSeed(env, db, { posts = ALL, fetcher = fetch, now = Date.now(), revisions = posts === ALL ? REVISIONS : {} } = {}) {
   if (env.TENANT_SLUG || env.DEMO) return null;
   // İkinci parti önceden ileri tarihli (2 günde bir) yüklendiyse tarihleri bir kez Ekim başına çekilir; elle tarihi değiştirilmiş
   // (artık ileri tarihli olmayan) yazıya dokunulmaz
@@ -50,11 +105,12 @@ export async function blogSeed(env, db, { posts = ALL, fetcher = fetch, now = Da
       db.prepare("INSERT INTO settings (k, v) VALUES (?, '1') ON CONFLICT (k) DO NOTHING").bind(REDATE),
     ]);
   }
+  const rev = Object.keys(revisions).length ? await revise(env, db, posts, revisions, fetcher, now) : { revised: [], covers: [] };
   const row = await first(db, 'SELECT v FROM settings WHERE k = ?', KEY);
   const done = row ? JSON.parse(row.v) : [];
   const todo = posts.filter((p) => !done.includes(p.slug));
-  if (!todo.length) return null;
-  const out = { added: [], skipped: [], errors: [] };
+  if (!todo.length) return rev.revised.length || rev.covers.length ? { added: [], skipped: [], errors: [], ...rev } : null;
+  const out = { added: [], skipped: [], errors: [], ...rev };
   for (const [i, p] of todo.entries()) {
     try {
       if (await first(db, 'SELECT id FROM blog_posts WHERE slug = ?', p.slug)) { out.skipped.push(p.slug); done.push(p.slug); continue; }

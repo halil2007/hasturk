@@ -63,3 +63,73 @@ test('üçüncü parti: 11–31 Ekim her gün bir yazı, farklı saatler', async
   if (THIRD.length) { assert.equal(days[0], '2026-10-11'); assert.ok(days.at(-1) <= '2026-10-31'); }
   for (const p of THIRD) { const h = new Date(p.at + 3 * 3600e3).getUTCHours(); assert.ok(h >= 9 && h <= 17); }
 });
+
+// Yayımlanmış hazır yazı düzeltmesi: gövde hâlâ ilk yüklenen gövdeyse bir kez güncellenir; elle düzenlenmiş yazıya dokunulmaz
+const sha = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((x) => x.toString(16).padStart(2, '0')).join('');
+const PNG2 = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 9, 9, 9]);
+test('düzeltme: değişmemiş gövde bir kez güncellenir, elle düzenlenen atlanır, yeni yüklenen etkilenmez; kapak yenilenir', async () => {
+  const db = d1(); await init(db);
+  const env = { SITE_URL: 'https://site.test' };
+  let img = JPG;
+  const fetcher = async () => new Response(img, { status: 200 });
+  const v1 = [
+    { slug: 'r-a', title: 'A yazısı', body: 'eski A', cover: 'a.jpg' },
+    { slug: 'r-b', title: 'B yazısı', body: 'eski B', cover: 'b.jpg' },
+  ];
+  await blogSeed(env, db, { posts: v1, fetcher });
+  await run(db, "UPDATE blog_posts SET body = 'sahibin metni' WHERE slug = 'r-b'");
+  const oldCover = (await first(db, "SELECT cover_id FROM blog_posts WHERE slug = 'r-a'")).cover_id;
+  const v2 = [
+    { slug: 'r-a', title: 'A yazısı', body: 'yeni A', cover: 'a.jpg', seo_desc: 'yeni açıklama' },
+    { slug: 'r-b', title: 'B yazısı', body: 'yeni B', cover: 'b.jpg' },
+    { slug: 'r-c', title: 'C yazısı', body: 'yeni C', cover: 'c.jpg' },
+  ];
+  const revisions = {
+    'r-a': { from: ['0'.repeat(64), await sha('eski A')], cover: true, fields: ['seo_desc'] },
+    'r-b': { from: [await sha('eski B')], cover: true },
+    'r-c': { from: [await sha('eski C')] },
+  };
+  // Site henüz eski kapağı veriyor: gövde düzelir, kapak bekler
+  const r = await blogSeed(env, db, { posts: v2, fetcher, revisions, now: 1000 });
+  assert.deepEqual(r.revised, ['r-a']); assert.deepEqual(r.covers, []); assert.deepEqual(r.added, ['r-c']);
+  const a = await first(db, "SELECT body, seo_desc, updated_at, cover_id FROM blog_posts WHERE slug = 'r-a'");
+  assert.equal(a.body, 'yeni A'); assert.equal(a.seo_desc, 'yeni açıklama'); assert.equal(a.updated_at, 1000); assert.equal(a.cover_id, oldCover);
+  assert.equal((await first(db, "SELECT body FROM blog_posts WHERE slug = 'r-b'")).body, 'sahibin metni', 'elle düzenlenen korunur');
+  assert.equal((await first(db, "SELECT body FROM blog_posts WHERE slug = 'r-c'")).body, 'yeni C', 'yeni yazı güncel gövdeyle yüklenir');
+  assert.equal((await first(db, 'SELECT COUNT(*) AS n FROM blog_images')).n, 3, 'aynı kapak tekrar kaydedilmez');
+  // Bir kez çalışır: gövde eskiye dönse bile yeniden uygulanmaz; site yeni kapağı verince kapak yeni kimlikle değişir
+  await run(db, "UPDATE blog_posts SET body = 'eski A' WHERE slug = 'r-a'");
+  img = PNG2;
+  const r2 = await blogSeed(env, db, { posts: v2, fetcher, revisions, now: 2000 });
+  assert.deepEqual(r2.revised, []); assert.deepEqual(r2.covers, ['r-a']);
+  const a2 = await first(db, "SELECT id, body, cover_id FROM blog_posts WHERE slug = 'r-a'");
+  assert.equal(a2.body, 'eski A'); assert.notEqual(a2.cover_id, oldCover);
+  assert.equal((await first(db, 'SELECT post_id FROM blog_images WHERE id = ?', a2.cover_id)).post_id, a2.id);
+  assert.equal(await first(db, 'SELECT id FROM blog_images WHERE id = ?', oldCover), null, 'eski kapak silinir');
+  assert.equal(await blogSeed(env, db, { posts: v2, fetcher, revisions, now: 3000 }), null, 'yapılacak iş kalmadı');
+});
+
+test('düzeltme: kapak 14 gün içinde yenilenemezse vazgeçilir', async () => {
+  const db = d1(); await init(db);
+  const env = { SITE_URL: 'https://site.test' };
+  const fetcher = async () => new Response(JPG, { status: 200 });
+  await blogSeed(env, db, { posts: [{ slug: 'k', title: 'K yazısı', body: 'eski', cover: 'k.jpg' }], fetcher });
+  const posts = [{ slug: 'k', title: 'K yazısı', body: 'yeni', cover: 'k.jpg' }], revisions = { k: { from: [await sha('eski')], cover: true } };
+  assert.deepEqual((await blogSeed(env, db, { posts, fetcher, revisions, now: 0 })).revised, ['k']);
+  assert.deepEqual(JSON.parse((await first(db, "SELECT v FROM settings WHERE k = 'once:blog_rev_1'")).v).covers, ['k']);
+  await blogSeed(env, db, { posts, fetcher: async () => new Response('', { status: 500 }), revisions, now: 15 * 864e5 });
+  assert.deepEqual(JSON.parse((await first(db, "SELECT v FROM settings WHERE k = 'once:blog_rev_1'")).v).covers, []);
+});
+
+test('gerçek düzeltme listesi: eski gövdelerin özetleri güncel gövdeyle aynı değil, her yazı kaynakta var', async () => {
+  const { REVISIONS } = await import('../src/blogseed.js');
+  const { POSTS } = await import('../src/blogseed-posts.js');
+  const { POSTS_2B } = await import('../src/blogseed-posts-2b.js');
+  for (const [slug, r] of Object.entries(REVISIONS)) {
+    const p = [...POSTS, ...POSTS_2B].find((x) => x.slug === slug);
+    assert.ok(p, slug);
+    assert.ok(r.from.length && r.from.every((h) => /^[0-9a-f]{64}$/.test(h)));
+    assert.ok(!r.from.includes(await sha(p.body)), `${slug} güncel gövde eski özetle aynı`);
+    assert.ok(!/[Kk]omisyon %20 \+ KDV|1,2 × Komisyon|%24\)/.test(p.body), `${slug} Trendyol örneğinde KDV eklenmiş oran kalmış`);
+  }
+});

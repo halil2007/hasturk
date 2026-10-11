@@ -730,7 +730,7 @@ Trendyol'un kendi örneğinde %20 komisyonlu bir kategoride 100 TL'lik ürünün
 Hesapta dikkat edilmesi gereken üç nokta var:
 
 - **Oran kategoriye göre değişir.** Aynı mağazada bir ürün düşük, diğeri yüksek komisyonlu olabilir. Doğru oran, ürünün yüklü olduğu kategorinin oranıdır.
-- **Komisyon faturası KDV'lidir.** Komisyon bir hizmet bedelidir ve Trendyol size komisyon faturasını KDV ekleyerek keser. Panelde gördüğünüz oran KDV hariçse, cebinizden çıkan tutar bunun KDV eklenmiş halidir. Ödediğiniz bu KDV'yi, KDV beyannamenizde indirim konusu yapabilirsiniz.
+- **Oran KDV dahildir.** Trendyol'un resmî komisyon tablosundaki oranlar KDV dahil yayımlanır: tabloda %20 yazıyorsa cebinizden çıkan tutar satış fiyatının %20'sidir, üzerine ayrıca KDV eklenmez. Komisyon bir hizmet bedeli olduğu için bu tutarın içinde KDV vardır (%20 KDV'de tutarın altıda biri); bu KDV'yi KDV beyannamenizde indirim konusu yapabilirsiniz. Hepsiburada'nın resmî listesindeki oranlar ise KDV hariçtir; orada komisyona %20 KDV eklenir.
 - **İadede komisyon geri döner.** İadesi onaylanan siparişin daha önce faturalanan komisyonu, bir sonraki komisyon faturasında mahsup edilir.
 
 ### Komisyon oranımı nereden öğrenirim?
@@ -743,7 +743,7 @@ Güncel oranlar satıcı panelinizdeki komisyon bölümünde ve ürün bazında 
 
 | Kalem | Ne zaman uygulanır? | Nasıl hesaplanır? |
 | --- | --- | --- |
-| Satış komisyonu | Her satışta | Satış fiyatı × kategori oranı (+ KDV) |
+| Satış komisyonu | Her satışta | Satış fiyatı × kategori oranı (oran KDV dahil) |
 | Kargo ücreti | Anlaşmalı kargoyla gönderimde | Paketin desisine göre; barem altı siparişte daha düşük |
 | Platform hizmet bedeli | Sipariş başına | Sabit tutar; dönemsel güncellenir |
 | E-ticaret stopajı | Her satışta | KDV hariç satış tutarı × %1 |
@@ -768,20 +768,20 @@ Kesilen stopaj kaybolan bir para değildir: yıllık gelir ya da kurumlar vergis
 
 Aşağıdaki örnekte tüm oranlar ve tutarlar **varsayımsaldır**; yalnızca hesabın mantığını göstermek için seçilmiştir. Kendi kategorinizin oranını ve kendi kargo tutarınızı kullanın.
 
-**Varsayımlar:** Ürün %20 KDV'li. Satış fiyatı 1.000 TL (KDV dahil). Komisyon %20 + KDV. Kargo 80 TL (KDV dahil). Platform hizmet bedeli 13 TL (KDV dahil). Ürünün alış maliyeti 400 TL (KDV dahil, %20 KDV'li).
+**Varsayımlar:** Ürün %20 KDV'li. Satış fiyatı 1.000 TL (KDV dahil). Komisyon %20 (KDV dahil). Kargo 80 TL (KDV dahil). Platform hizmet bedeli 13 TL (KDV dahil). Ürünün alış maliyeti 400 TL (KDV dahil, %20 KDV'li).
 
 ### 1. Adım: Hakediş (elinize geçen tutar)
 
 | Kalem | Tutar |
 | --- | --- |
 | Satış fiyatı (KDV dahil) | 1.000,00 TL |
-| Komisyon (%20 + KDV = %24) | −240,00 TL |
+| Komisyon (%20, KDV dahil) | −200,00 TL |
 | Kargo | −80,00 TL |
 | Platform hizmet bedeli | −13,00 TL |
 | Stopaj (1.000 ÷ 1,20 × %1) | −8,33 TL |
-| **Hakediş** | **658,67 TL** |
+| **Hakediş** | **698,67 TL** |
 
-Toplam kesinti 341,33 TL, yani satış fiyatının yaklaşık üçte biri. Hakedişten alış maliyetini (400 TL) düştüğünüzde **258,67 TL** kalır. Pek çok satıcı hesabı burada bitirir; ama bu rakam henüz kâr değildir, çünkü KDV farkı ödenmemiştir.
+Toplam kesinti 301,33 TL, yani satış fiyatının yaklaşık %30'u. Hakedişten alış maliyetini (400 TL) düştüğünüzde **298,67 TL** kalır. Pek çok satıcı hesabı burada bitirir; ama bu rakam henüz kâr değildir, çünkü KDV farkı ödenmemiştir.
 
 ### 2. Adım: KDV farkı
 
@@ -790,30 +790,30 @@ Müşteriye 1.000 TL'lik fatura kestiğinizde bunun 166,67 TL'si devlete ödeyec
 | KDV kalemi | Tutar |
 | --- | --- |
 | Satıştaki KDV (hesaplanan) | 166,67 TL |
-| Komisyon faturasındaki KDV | −40,00 TL |
+| Komisyondaki KDV (200 TL'nin içinde) | −33,33 TL |
 | Kargo faturasındaki KDV | −13,33 TL |
 | Hizmet bedelindeki KDV | −2,17 TL |
 | Alış faturasındaki KDV | −66,67 TL |
-| **Ödenecek KDV** | **44,50 TL** |
+| **Ödenecek KDV** | **51,17 TL** |
 
 ### 3. Adım: Gerçek kâr
 
-258,67 TL − 44,50 TL = **214,17 TL**. Bu tutara, peşin ödenmiş vergi niteliğindeki 8,33 TL stopajı eklediğinizde KDV hariç kârınız **222,50 TL** olur; yani KDV hariç satış tutarının (833,33 TL) yaklaşık %26,7'si. Gelir ya da kurumlar vergisi bu kâr üzerinden ayrıca hesaplanır.
+298,67 TL − 51,17 TL = **247,50 TL**. Bu tutara, peşin ödenmiş vergi niteliğindeki 8,33 TL stopajı eklediğinizde KDV hariç kârınız **255,83 TL** olur; yani KDV hariç satış tutarının (833,33 TL) yaklaşık %30,7'si. Gelir ya da kurumlar vergisi bu kâr üzerinden ayrıca hesaplanır.
 
-Aynı hesabı KDV hariç tutarlarla yaparak sağlamasını alabilirsiniz: 833,33 (satış) − 200,00 (komisyon) − 66,67 (kargo) − 10,83 (hizmet bedeli) − 333,33 (alış) = 222,50 TL.
+Aynı hesabı KDV hariç tutarlarla yaparak sağlamasını alabilirsiniz: 833,33 (satış) − 166,67 (komisyon) − 66,67 (kargo) − 10,83 (hizmet bedeli) − 333,33 (alış) = 255,83 TL.
 
 > **Önemli:** Bu örnekte reklam, iade, kampanya indirimi, paketleme malzemesi, personel ve kira gibi giderler yoktur. Gerçek hayatta bunlar da kârdan düşer. Özellikle iade oranı yüksek kategorilerde, iade edilen siparişlerin gidiş-dönüş kargo maliyeti hesaba katılmadan bulunan kâr yanıltıcıdır.
 
 ## Sabit kesintiler düşük fiyatlı ürünlerde neden daha ağır?
 
-Komisyon ve stopaj fiyatla birlikte artıp azalır; ama kargo ve platform hizmet bedeli sipariş başına neredeyse sabittir. Bu yüzden aynı kategoride, aynı komisyon oranıyla satılan iki ürünün kesinti oranı fiyatlarına göre çok farklı çıkar. Aşağıdaki tabloda yine **varsayımsal** değerler kullanıyoruz: komisyon %20 + KDV, kargo 80 TL, hizmet bedeli 13 TL, KDV %20.
+Komisyon ve stopaj fiyatla birlikte artıp azalır; ama kargo ve platform hizmet bedeli sipariş başına neredeyse sabittir. Bu yüzden aynı kategoride, aynı komisyon oranıyla satılan iki ürünün kesinti oranı fiyatlarına göre çok farklı çıkar. Aşağıdaki tabloda yine **varsayımsal** değerler kullanıyoruz: komisyon %20 (KDV dahil), kargo 80 TL, hizmet bedeli 13 TL, KDV %20.
 
 | Satış fiyatı | Komisyon | Kargo + hizmet bedeli | Stopaj | Toplam kesinti | Satışa oranı |
 | --- | --- | --- | --- | --- | --- |
-| 150 TL | 36,00 TL | 93,00 TL | 1,25 TL | 130,25 TL | %86,8 |
-| 300 TL | 72,00 TL | 93,00 TL | 2,50 TL | 167,50 TL | %55,8 |
-| 1.000 TL | 240,00 TL | 93,00 TL | 8,33 TL | 341,33 TL | %34,1 |
-| 2.500 TL | 600,00 TL | 93,00 TL | 20,83 TL | 713,83 TL | %28,6 |
+| 150 TL | 30,00 TL | 93,00 TL | 1,25 TL | 124,25 TL | %82,8 |
+| 300 TL | 60,00 TL | 93,00 TL | 2,50 TL | 155,50 TL | %51,8 |
+| 1.000 TL | 200,00 TL | 93,00 TL | 8,33 TL | 301,33 TL | %30,1 |
+| 2.500 TL | 500,00 TL | 93,00 TL | 20,83 TL | 613,83 TL | %24,6 |
 
 Tablo bir gerçeği açıkça gösteriyor: düşük fiyatlı ürünlerde asıl yük komisyon değil, sabit kesintilerdir. Gerçek hayatta düşük tutarlı siparişlerde kargo baremi devreye girdiği için kargo tutarı daha düşük olabilir; yine de sipariş başı sabit maliyetler düşük fiyatlı ürünlerin marjını hızla eritir. Bu tür ürünlerde set yapmak, sepet tutarını artıracak tamamlayıcı ürünler sunmak ya da desiyi küçültmek kârlılığın anahtarıdır.
 
@@ -830,9 +830,9 @@ Bu kontrolü yüzlerce siparişte elle yapmak zordur; ama hatalı kesintiler far
 
 ## Kampanya ve indirimin kâra etkisi
 
-Yukarıdaki ürünü %10 indirimle 900 TL'ye sattığınızı düşünün. Komisyon 216 TL'ye, stopaj 7,50 TL'ye düşer; kargo ve hizmet bedeli değişmez. Hakediş 900 − 216 − 80 − 13 − 7,50 = 583,50 TL olur. Alış maliyetini düştüğünüzde 183,50 TL kalır; ödenecek KDV de 150 − 36 − 13,33 − 2,17 − 66,67 = 31,83 TL'ye iner. Gerçek kâr 151,67 TL'dir.
+Yukarıdaki ürünü %10 indirimle 900 TL'ye sattığınızı düşünün. Komisyon 180 TL'ye, stopaj 7,50 TL'ye düşer; kargo ve hizmet bedeli değişmez. Hakediş 900 − 180 − 80 − 13 − 7,50 = 619,50 TL olur. Alış maliyetini düştüğünüzde 219,50 TL kalır; ödenecek KDV de 150 − 30 − 13,33 − 2,17 − 66,67 = 37,83 TL'ye iner. Gerçek kâr 181,67 TL'dir.
 
-Yani **%10'luk indirim, kârı yaklaşık %29 azalttı** (214,17 TL'den 151,67 TL'ye). Sabit kesintiler (kargo, hizmet bedeli) ve alış maliyeti indirimle birlikte azalmadığı için indirimin kâra etkisi her zaman indirim oranından büyüktür. Kampanyaya katılmadan önce [indirim sonrası kâr hesaplama aracımızla](/araclar/indirim-kar-hesaplama) başabaş indirim oranınızı görün.
+Yani **%10'luk indirim, kârı yaklaşık %27 azalttı** (247,50 TL'den 181,67 TL'ye). Sabit kesintiler (kargo, hizmet bedeli) ve alış maliyeti indirimle birlikte azalmadığı için indirimin kâra etkisi her zaman indirim oranından büyüktür. Kampanyaya katılmadan önce [indirim sonrası kâr hesaplama aracımızla](/araclar/indirim-kar-hesaplama) başabaş indirim oranınızı görün.
 
 ## Trendyol’da kârı korumanın 7 yolu
 
@@ -856,7 +856,7 @@ Panelin nasıl çalıştığını kayıt olmadan [canlı demoda](/demo) görebil
 
 ### Trendyol komisyonu KDV dahil fiyattan mı hesaplanır?
 
-Komisyon, ürünün müşteriye satıldığı fiyat üzerinden hesaplanır. Komisyon bir hizmet bedeli olduğu için Trendyol bunun faturasını KDV ekleyerek keser. Panelde gördüğünüz oranın KDV hariç mi dahil mi olduğuna dikkat edin; KDV hariç orana KDV eklendiğinde cebinizden çıkan tutarı bulursunuz.
+Komisyon, ürünün müşteriye satıldığı KDV dahil fiyat üzerinden hesaplanır. Trendyol'un resmî komisyon tablosundaki oranlar da KDV dahildir: %20'lik oranda 1.000 TL'lik satışın komisyonu 200 TL'dir ve üzerine ayrıca KDV eklenmez; bu tutarın içindeki KDV'yi (33,33 TL) beyannamenizde indirebilirsiniz. Hepsiburada'nın resmî listesindeki oranlar ise KDV hariçtir; orada komisyona %20 KDV eklenir.
 
 ### Trendyol komisyon oranları neden ürünlere göre farklı?
 
