@@ -273,6 +273,16 @@ async function packOrder(db, ch, o, { only, invoice } = {}) {
   return { o: await loadOrder(db, o.id), message: ch && ch.pack ? `${todo.length} paket ${ch.name}'da kargoya hazırlandı` : `${todo.length} paket hazırlandı` };
 }
 
+// İşleme al: kanala bildirilir (Trendyol "Picking" …), sipariş "Hazırlanıyor" olur
+async function acceptOrder(db, ch, o, user) {
+  if (ch && ch.enabled && ch.caps.accept === 'remote' && ch.accept) {
+    const r = (await ch.accept(o)) || {};
+    for (const p of r.packages || []) await run(db, 'UPDATE packages SET remote_status = ? WHERE order_id = ? AND remote_id = ?', p.remoteStatus, o.id, String(p.remoteId));
+  }
+  await setLocalStatus(db, o, 'processing');
+  await event(db, o, 'accept', user);
+}
+
 async function orderAction(env, db, id, action, b, ctx, user) {
   let o = await loadOrder(db, id);
   const ch = await channel(env, db, o.channel);
@@ -281,14 +291,11 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   const pkgOf = (pid) => { const p = o.packages.find((x) => x.id === Number(pid)); if (!p) fail(404, 'Paket bulunamadı'); return p; };
   if (action === 'accept') {
     if (o.status !== 'new') fail(400, 'Sadece yeni siparişler işleme alınabilir');
-    if (ch && ch.enabled && ch.caps.accept === 'remote' && ch.accept) {
-      const r = (await ch.accept(o)) || {};
-      for (const p of r.packages || []) await run(db, 'UPDATE packages SET remote_status = ? WHERE order_id = ? AND remote_id = ?', p.remoteStatus, o.id, String(p.remoteId));
-    }
-    await setLocalStatus(db, o, 'processing');
-    await event(db, o, 'accept', user);
+    await acceptOrder(db, ch, o, user);
     return { ok: true, message: ch && ch.caps.accept === 'remote' ? `Sipariş işleme alındı (${ek(ch.name, 'a')} bildirildi)` : 'Sipariş işleme alındı' };
   }
+  // Yeni siparişte paketleme / etiket: sipariş önce kendiliğinden işleme alınır (ayrıca "İşleme al" gerekmez)
+  if ((action === 'pack' || action === 'label') && o.status === 'new' && live) { await acceptOrder(db, ch, o, user); o = await loadOrder(db, o.id); }
   if (action === 'pack') {
     if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
     const r = await packOrder(db, ch, o, { only: b.package_id ? Number(b.package_id) : null, invoice: str(b.invoice_number) });
@@ -427,6 +434,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
     requireFeature(env, 'carrier');
     if (ch && ch.caps && ch.caps.manualTracking === false && !ch.caps.ownCarrier) fail(400, `${ch.name}: gönderi yalnız kanalın kargosu ile yapılır; kargo entegratörü kullanılamaz`);
+    if (o.status === 'new') { await acceptOrder(db, ch, o, user); o = await loadOrder(db, o.id); }
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
     if (!pkg) fail(404, 'Paket bulunamadı');
@@ -1498,6 +1506,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       try { return await exclusive(db, 'order:' + id, async () => {
         let o = await loadOrder(db, id);
         const ch = await channel(env, db, o.channel);
+        if (b.fetch && o.status === 'new') { await acceptOrder(db, ch, o, user); o = await loadOrder(db, id); }
         o = await ensurePackages(db, ch, o);
         const labels = [];
         // Etiket alınırken paketlenmemiş paketler önce kanalda kargoya hazırlanır

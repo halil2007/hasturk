@@ -57,7 +57,8 @@ export async function orders(el, rest, query = {}) {
   }
 
   function actionBtn(o) {
-    if (o.status === 'new') return html`<button class="btn sm outline" data-act="accept" data-id="${o.id}"><i class="ico ico-play"></i>İşleme al</button><button class="btn sm ghost" data-act="toggle" data-id="${o.id}" aria-label="Yönet"><i class="ico ico-${expanded === o.id ? 'up' : 'down'}"></i></button>`;
+    // Yeni sipariş: "Paketle ve etiket al" siparişi kendiliğinden işleme alır; ayrı "İşleme al" adımı yok (toplu işleme alma seçim çubuğunda)
+    if (o.status === 'new') return html`<button class="btn sm primary" data-act="toggle" data-id="${o.id}"><i class="ico ico-truck"></i>Kargola<i class="ico ico-${expanded === o.id ? 'up' : 'down'}"></i></button>`;
     if (o.status === 'processing') return html`<button class="btn sm outline" data-act="toggle" data-id="${o.id}">Yönet<i class="ico ico-${expanded === o.id ? 'up' : 'down'}"></i></button>`;
     if (o.status === 'shipped') return html`<button class="btn sm outline" data-act="track" data-id="${o.id}"><i class="ico ico-truck"></i>Takip et</button>`;
     return html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-orders"></i>Detay</button>`;
@@ -103,7 +104,7 @@ export async function orders(el, rest, query = {}) {
     const item = (o) => o.items.length ? html`<div class="oc-items">${o.items.map((it) => html`<div class="oc-item">${thumb(it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="oc-name">${it.name}</div>
       <div class="muted tiny">${it.qty || 0} adet${it.sku ? ` · ${it.sku}` : ''}</div></div></div>`)}
       ${o.lines > o.items.length || o.unmatched ? html`<div class="muted tiny" style="padding:0 4px">${o.lines > o.items.length ? `+${o.lines - o.items.length} ürün daha · toplam ${o.qty || 0} adet` : ''}${o.lines > o.items.length && o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş ürün var</span>` : ''}</div>` : ''}</div>` : '';
-    const mainBtn = (o) => (o.status === 'new' ? html`<button class="btn sm primary" data-act="accept" data-id="${o.id}"><i class="ico ico-play"></i>İşleme al</button>`
+    const mainBtn = (o) => (o.status === 'new' ? html`<button class="btn sm primary" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Kargola</button>`
       : o.status === 'processing' ? html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Kargola</button>`
         : o.status === 'shipped' ? html`<button class="btn sm ghost" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Takip</button>` : '');
     return html`<div class="m-list oc-list">${data.orders.length ? data.orders.map((o) => html`<div class="m-card oc ${sel.has(o.id) ? 'sel-row' : ''}" data-row="${o.id}">
