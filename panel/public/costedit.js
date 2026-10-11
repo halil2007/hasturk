@@ -2,7 +2,7 @@
 // Kullanım: costBtn(ürünId, ad) düğmesi; tıklama tüm sayfalarda burada yakalanır (app.js içe aktarır). Kayıttan sonra sayfa yenilenir.
 import { api, html, raw, $, sheet, toast, busy } from './core.js';
 
-export const costBtn = (pid, name, label = 'alış fiyatı yok · gir') => (pid ? html`<button type="button" class="pill warn tiny cost-btn" data-cost="${pid}" data-cost-name="${name || ''}" title="Alış fiyatını girmek için tıklayın">${label}</button>` : html`<span class="pill warn tiny">alış fiyatı yok</span>`);
+export const costBtn = (pid, name, label = 'alış fiyatı yok · gir') => (pid ? html`<button type="button" class="pill warn tiny cost-btn" data-cost-pid="${pid}" data-cost-name="${name || ''}" title="Alış fiyatını girmek için tıklayın">${label}</button>` : html`<span class="pill warn tiny">alış fiyatı yok</span>`);
 
 export function editCost(pid, name, onDone) {
   const s = sheet({
@@ -26,10 +26,10 @@ export function editCost(pid, name, onDone) {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('click', (e) => {
-    const b = e.target.closest && e.target.closest('[data-cost]');
+    const b = e.target.closest && e.target.closest('[data-cost-pid]');
     if (!b) return;
     e.preventDefault(); e.stopPropagation();
-    editCost(Number(b.dataset.cost), b.dataset.costName, () => window.dispatchEvent(new HashChangeEvent('hashchange')));
+    editCost(Number(b.dataset.costPid), b.dataset.costName, () => window.dispatchEvent(new HashChangeEvent('hashchange')));
   }, true);
 }
 void raw;
