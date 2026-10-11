@@ -22,10 +22,29 @@ function infraBox(d) {
     <div class="muted tiny" style="margin-top:8px">${far ? 'Ana veritabanı (yalnız firmalar, destek, hata kayıtları, blog gibi ortak tablolar) uzak bölgede; mağaza verisi (sipariş, ürün, stok, ayarlar) ana panelin kendi yerel veritabanında olduğundan bu sayılar sayfa hızını etkilemez.' : 'Sorgular veritabanının yanında çalışıyor (sorgu başına birkaç ms).'}</div></div>`;
 }
 
+// Veri taşıma doğrulaması: ana panelin verisi eski (ana) veritabanından kendi yerel veritabanına kopyalandı; tablo başına kayıt sayıları.
+// Taşımadan sonra yeni kayıtlar yalnız yerele yazıldığından yerel sayı eskiye eşit ya da fazla olmalı (eski günlük / geçmiş kayıtları
+// günlük bakımda temizlendiği için bu tablolarda azalma olağandır).
+const PRUNED = ['logs', 'buybox_history', 'price_changes', 'notices', 'push_checks', 'mail_queue', 'jobs', 'product_uploads'];
+// Ayarlar ana veritabanında da tutulur ve oraya site / Worker da yazar (giriş denemesi, deneme bağlantısı …): sayıları karşılaştırılmaz
+const SHARED = ['settings'];
+function migBox(m) {
+  if (!m) return html`<div class="card"><div class="card-head"><h2>Veri taşıma doğrulaması</h2><button class="btn sm" data-act="mig">Doğrula</button></div><div class="muted small">Ana panelin verisi yeni, hızlı altyapıya (kendi yerel veritabanına) taşındı. "Doğrula" tablo tablo eski ve yeni kayıt sayılarını karşılaştırır.</div></div>`;
+  const rows = m.tables || [], bad = rows.filter((r) => r.old != null && r.now != null && r.now < r.old && !PRUNED.includes(r.table) && !SHARED.includes(r.table));
+  const tot = rows.reduce((a, r) => ({ old: a.old + (r.old || 0), now: a.now + (r.now || 0) }), { old: 0, now: 0 });
+  return html`<div class="card flush"><div class="card-pad card-head"><h2>Veri taşıma doğrulaması</h2><span class="muted small">${m.at ? `taşındı: ${dateTime(m.at)} · ` : ''}${n(m.rows || 0)} kayıt kopyalandı</span></div>
+    <div class="card-pad"><div class="notice ${bad.length || (m.skipped || []).length ? 'bad' : 'good'}"><i class="ico ico-${bad.length ? 'warn' : 'check'}"></i><div>${bad.length || (m.skipped || []).length
+      ? html`<b>Kontrol gerekli:</b> ${bad.map((r) => r.table).concat(m.skipped || []).join(', ')}`
+      : html`<b>Veri kaybı yok.</b> Tüm tablolarda yeni veritabanındaki kayıt sayısı eskisine eşit ya da fazla (taşımadan sonra gelen yeni kayıtlar). Toplam: eski ${n(tot.old)} · şimdi ${n(tot.now)}.`}</div></div></div>
+    <div class="table-wrap"><table class="t"><thead><tr><th>Tablo</th><th class="r">Eski veritabanı</th><th class="r">Yeni (yerel)</th><th class="r">Fark</th></tr></thead><tbody>
+    ${rows.filter((r) => r.old || r.now).map((r) => html`<tr><td class="small"><code>${r.table}</code></td><td class="r num">${r.old == null ? '—' : n(r.old)}</td><td class="r num">${r.now == null ? '—' : n(r.now)}</td><td class="r num" style="color:${r.now < r.old ? (PRUNED.includes(r.table) || SHARED.includes(r.table) ? 'var(--muted)' : 'var(--bad)') : 'var(--good)'}">${r.old == null || r.now == null ? '—' : (r.now - r.old > 0 ? '+' : '') + n(r.now - r.old)}${SHARED.includes(r.table) ? ' (ortak)' : r.now < r.old && PRUNED.includes(r.table) ? ' (bakım)' : ''}</td></tr>`)}
+    </tbody></table></div></div>`;
+}
+
 export async function perfView(el) {
-  const f = { days: 7, slug: '' };
+  const f = { days: 7, slug: '', mig: false };
   let d = null;
-  async function load() { d = await api(`perf?days=${f.days}${f.slug ? `&slug=${encodeURIComponent(f.slug)}` : ''}`, { fresh: true }); draw(); }
+  async function load() { d = await api(`perf?days=${f.days}${f.slug ? `&slug=${encodeURIComponent(f.slug)}` : ''}${f.mig ? '&mig=1' : ''}`, { fresh: true }); draw(); }
   function draw() {
     const tot = d.daily.reduce((a, x) => ({ n: a.n + x.n, slow: a.slow + x.slow_n, t: a.t + x.avg_ms * x.n }), { n: 0, slow: 0, t: 0 });
     const avg = tot.n ? tot.t / tot.n : 0, mx = Math.max(1, ...d.daily.map((x) => x.avg_ms)), m = d.maint || {};
@@ -36,10 +55,11 @@ export async function perfView(el) {
         <div class="kpi"><div class="label">1 sn'yi aşan</div><div class="value num" style="color:${tot.slow ? 'var(--amber)' : 'var(--good)'}">${n(tot.slow)}</div><div class="delta flat">%${n(tot.n ? (tot.slow / tot.n) * 100 : 0)}</div></div>
         <div class="kpi"><div class="label">Son otomatik bakım</div><div class="value" style="font-size:18px">${m.at ? ago(m.at) : '—'}</div><div class="delta flat" title="${m.at ? dateTime(m.at) : ''}">${m.at ? `${n((m.logs || 0) + (m.buybox_history || 0) + (m.notices || 0) + (m.price_changes || 0))} eski kayıt temizlendi` : 'ilk senkronda çalışır'}</div></div>
       </div>
-      <div class="row wrap" style="gap:10px"><div class="chips">${[7, 30].map((k) => html`<button class="chip ${f.days === k ? 'on' : ''}" data-act="days" data-k="${k}">Son ${k} gün</button>`)}</div>
+      <div class="row wrap" style="gap:10px"><div class="chips">${[1, 7, 30].map((k) => html`<button class="chip ${f.days === k ? 'on' : ''}" data-act="days" data-k="${k}">${k === 1 ? 'Bugün' : `Son ${k} gün`}</button>`)}</div>
         <select class="input" style="width:auto" data-slug><option value="">Tüm paneller</option>${d.firms.map((x) => html`<option value="${x.slug || '-'}" ${f.slug === (x.slug || '-') ? 'selected' : ''}>${x.firm} · ${ms(x.avg_ms)}</option>`)}</select></div>
       ${d.daily.length ? html`<div class="card"><div class="card-head"><h2>Günlük ortalama yanıt</h2></div><div class="perf-bars">${d.daily.map((x) => html`<div class="pb" title="${x.day}: ${ms(x.avg_ms)} · ${n(x.n)} istek · ${n(x.slow_n)} yavaş"><span style="height:${Math.max(4, (x.avg_ms / mx) * 100)}%;background:${tone(x.avg_ms)}"></span><small>${x.day.slice(8)}</small></div>`)}</div></div>` : ''}
       ${infraBox(d)}
+      ${d.local ? migBox(d.migration) : ''}
       ${(d.pages || []).length ? html`<div class="card flush"><div class="card-pad card-head"><h2>Sayfa açılışları (kullanıcının beklediği süre)</h2><span class="muted small">menüye basıştan sayfa ekrana gelene kadar · tarayıcıda ölçülür</span></div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Sayfa</th><th>Panel</th><th class="r">Açılış</th><th class="r">Ortalama</th><th class="r">En uzun</th><th class="r">1 sn+</th></tr></thead><tbody>
         ${d.pages.map((r) => html`<tr><td class="small"><code>#/${r.route}</code></td><td class="small">${r.firm}</td><td class="r num">${n(r.n)}</td><td class="r num" style="font-weight:700;color:${tone(r.avg_ms)}">${ms(r.avg_ms)}</td><td class="r num">${ms(r.max_ms)}</td><td class="r num">${r.slow_n ? n(r.slow_n) : '—'}</td></tr>`)}
@@ -54,7 +74,7 @@ export async function perfView(el) {
     </div>`);
     $('[data-slug]', el).onchange = (e) => { f.slug = e.target.value; load(); };
   }
-  actions(el, { days: (b) => { f.days = Number(b.dataset.k); load(); } });
+  actions(el, { days: (b) => { f.days = Number(b.dataset.k); load(); }, mig: () => { f.mig = true; load(); } });
   await load();
   return { refresh: load };
 }
