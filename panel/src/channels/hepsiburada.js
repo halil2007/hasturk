@@ -769,27 +769,79 @@ export function hepsiburada(env, meta) {
   }
 
   // ---------- hakediş (mpfinance işlemleri): ödenecek (WillBePaid) ve ödenen (Paid) kayıtlar ----------
-  // Gelir kayıtları (+), gider kayıtları (−); vade tarihi (dueDate) ödeme günüdür. Kayıt tarihine göre en fazla 1 aylık aralıklarla.
-  // Tutar: kesilen / ödenen tutar (amount; fatura ve kargo okumasıyla aynı alan), yoksa netAmount. Tanınmayan tür "Diğer" yazılır.
-  const HB_TR = { Payment: 'Satış', Return: 'İade', CampaignDiscount: 'Kampanya indirimi', Commission: 'Komisyon', Stoppage: 'Stopaj' };
+  // Gelir kayıtları (+), gider kayıtları (−); işaret isIncome'dan (yoksa tutarın işaretinden). Vade tarihi (dueDate) ödeme günüdür.
+  // Kayıt tarihine göre en fazla 1 aylık aralıklarla. Tutar: amount (KDV dahil kesilen / ödenen tutar); netAmount KDV hariçtir
+  // (belge ve canlı yanıt yapısı: amount = netAmount + taxAmount; Commission 12,50 = 10,42 + 2,08), yalnız amount yoksa kullanılır.
+  // Satış (Payment) ve komisyon (Commission) AYRI kayıtlardır (Trendyol'da satış kaydı komisyonu da taşır): komisyon kaydı
+  // satıştan sonra gelebilir; mutabakat bunu "bekleniyor" sayar (bkz. finance.js settlementReport).
+  // Tür listesi: Kayıt Bazlı Muhasebe Servisi TransactionTypes değerleri. Tanınmayan tür "Diğer" yazılır (günlüğe düşer).
+  const HB_TR = {
+    Payment: 'Satış', BnplOrder: 'Satış', Return: 'İade', BnplRefund: 'İade',
+    // Hepsiburada'nın karşıladığı kampanya indirimi (Kampanya geliri) ve iadede geri alınması
+    CampaignDiscount: 'Kampanya indirimi', CampaignDiscountRefund: 'Kampanya indirimi iadesi', HepsiGlobalCampaignDiscount: 'Kampanya indirimi',
+    Commission: 'Komisyon', OverseasCommissionRefund: 'Komisyon', Stoppage: 'Stopaj', GoldLaborStoppage: 'Stopaj', GoldLaborStoppageRefund: 'Stopaj',
+  };
+  // Siparişin hakedişine girmeyen, ayrı kesilen / ödenen türler (faturalar listesinde olmayan iadeleri ve gelirleri de: "Diğer"e düşmesin)
+  const HB_STL_OTHER = {
+    Kargo: ['ShipmentCostSharingIncome', 'DropShipmentCostSharingIncome', 'CargoCostRefund', 'TransportExpenseRefund', 'DeliveryProcessingFeeRefund', 'ReturnDeliveryProcessingFee', 'RoadAssistanceExpense', 'RoadAssistanceExpenseRefund'],
+    'Hizmet bedeli': ['ProcessingFeeExpenseRefund', 'ReturnProcessingFeeExpense', 'PaymentServiceCostReflectionRefund', 'InternationalOperationFeeRefund', 'BnplProcessingFee', 'BnplProcessingFeeRefund', 'FaturaLab'],
+    'Reklam / pazarlama': ['MarketingExpenseRefund', 'AdSharingExpenseRefund', 'MarketingSupportParticipation', 'MarketingSupportParticipationRefund', 'AdBalanceTopUpFromAllowance', 'AdBalanceTopUpFromAllowanceRefund'],
+    Ceza: ['PriceDifferenceRefund', 'RefusedInvoiceExpenseRefund', 'Chargeout'],
+    'Tazmin / müşteri memnuniyeti': ['CustomerSatisfaction', 'CustomerSatisfactionRefund', 'InboundCustomerSatisfaction', 'InboundCustomerSatisfactionRefund', 'OutboundCustomerSatisfaction', 'OutboundCustomerSatisfactionRefund',
+      'CargoCompensationIncome', 'CargoCompensationIncomeRefund', 'CargoCompensationExpenseRefund', 'CargoCompensationSellerSatisfactionIncome', 'CargoLimitExcessCompensationIncome', 'MpCompensationIncome',
+      'MpScrapIncome', 'MpScrapExpense', 'ProductsReportedByService', 'MpOutletProductExpense', 'LineItemTransferExpense', 'LineItemTransferIncome'],
+    'Diğer gelir / gider': ['RevenueIncome', 'RevenueExpense', 'BalanceCorrection', 'SfsInterest', 'Deposit', 'EInvoiceSales', 'EInvoiceSalesRefund', 'VAT', 'HepsiGlobalTransferIncome', 'HepsiGlobalTransferExpense', 'FigoPara'],
+  };
+  const hbStlOther = Object.fromEntries(Object.entries(HB_STL_OTHER).flatMap(([k, l]) => l.map((t) => [t, k])));
+  // Hakediş kaydının ham alanları (tanı için saklanır: Mutabakat → sipariş ayrıntısı). Ürün adı ve satıcı kimliği alınmaz.
+  const HB_RAW = ['status', 'isIncome', 'isInvoice', 'amount', 'netAmount', 'taxAmount', 'transactionTypeCategory', 'packageNumber', 'orderItemNumber', 'invoiceNumber', 'sku', 'quantity', 'orderDate', 'invoiceDate', 'dueDate', 'paymentDate', 'invoiceExplanation'];
+  const rawOf = (x) => {
+    const o = {};
+    for (const k of HB_RAW) { const v = g(x, k); if (v != null && v !== '') o[k] = v && typeof v === 'object' ? (v.value ?? v.amount ?? null) : v; }
+    o.keys = Object.keys(x || {}).sort().join(',');
+    return JSON.stringify(o).slice(0, 1500);
+  };
+  function stlRow(x, from) {
+    const tt = str(g(x, 'transactionType')), id = str(g(x, 'id'));
+    if (/^TotalPayment$/.test(tt) || !id) return null; // toplam ödeme satırı ayrı kalemleri tekrar eder
+    const a = money(g(x, 'amount')), v = Math.abs(a || money(g(x, 'netAmount'))), inc = g(x, 'isIncome');
+    const amount = Math.round((inc === true || (inc == null && a > 0) ? 1 : -1) * v * 100) / 100;
+    const due = hbTime(g(x, 'dueDate')) || null, paidAt = hbTime(g(x, 'paymentDate')) || null, type = HB_TR[tt] || hbType[tt] || hbStlOther[tt] || null;
+    const status = str(g(x, 'status'));
+    return { remoteId: id, date: hbTime(g(x, 'orderDate') || g(x, 'invoiceDate') || g(x, 'transactionDate')) || from, type: type || 'Diğer', rawType: tt, unknown: !type, orderNumber: str(g(x, 'orderNumber')).trim(),
+      // Komisyon: kesilen tutar artı (iade / düzeltme ile geri verilen eksi)
+      amount, commission: type === 'Komisyon' ? -amount : 0, paymentDate: paidAt, dueDate: due || paidAt, paid: /^Paid$/i.test(status), paymentId: '', status, raw: rawOf(x) };
+  }
+  // Satış kaydı gelmiş ama komisyon kaydı gelmemiş siparişler: kayıtları sipariş numarasıyla durum filtresi OLMADAN yeniden okunur
+  // (en çok 25 sipariş / senkron). Paid / WillBePaid dışında durumdaki (ör. henüz ödemeye bağlanmamış) kayıt böylece görünür;
+  // iptal / ret durumundakiler alınmaz. Bulunanlar outOfFilter ile işaretlenir (senkron günlüğe yazar: filtre gözden geçirilsin).
+  const STL_LOOKUP = 25;
   async function settlements(since, until) {
     const W = 28 * 864e5, d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10), out = new Map();
     for (let from = since; from < until; from += W) {
       const to = Math.min(until, from + W);
       for (let off = 0; off < 100000; off += 100) {
         const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=${off}&Limit=100&Status=Paid,WillBePaid&RecordDateStart=${d(from)}&RecordDateEnd=${d(to)}`));
-        for (const x of rows) {
-          const tt = str(g(x, 'transactionType')), id = str(g(x, 'id'));
-          if (/^TotalPayment$/.test(tt) || !id) continue; // toplam ödeme satırı ayrı kalemleri tekrar eder
-          const a = money(g(x, 'amount')), v = Math.abs(a || money(g(x, 'netAmount'))), inc = g(x, 'isIncome');
-          const amount = Math.round((inc === true || (inc == null && a > 0) ? 1 : -1) * v * 100) / 100;
-          const due = hbTime(g(x, 'dueDate')) || null, paidAt = hbTime(g(x, 'paymentDate')) || null, type = HB_TR[tt] || hbType[tt] || null;
-          out.set(id, { remoteId: id, date: hbTime(g(x, 'orderDate') || g(x, 'invoiceDate') || g(x, 'transactionDate')) || from, type: type || 'Diğer', rawType: tt, unknown: !type, orderNumber: str(g(x, 'orderNumber')).trim(),
-            // Komisyon: kesilen tutar artı (iade / düzeltme ile geri verilen eksi)
-            amount, commission: type === 'Komisyon' ? -amount : 0, paymentDate: paidAt, dueDate: due || paidAt, paid: /^Paid$/i.test(str(g(x, 'status'))), paymentId: '' });
-        }
+        for (const x of rows) { const r = stlRow(x, from); if (r) out.set(r.remoteId, r); }
         if (rows.length < 100) break;
       }
+    }
+    const sale = new Map(), comm = new Set();
+    for (const r of out.values()) {
+      if (!r.orderNumber) continue;
+      if (r.type === 'Satış' && r.amount > 0) sale.set(r.orderNumber, Math.min(sale.get(r.orderNumber) ?? Infinity, r.date || Infinity));
+      if (r.type === 'Komisyon') comm.add(r.orderNumber);
+    }
+    const look = [...sale].filter(([no]) => !comm.has(no)).sort((a, b) => a[1] - b[1]).slice(0, STL_LOOKUP);
+    for (const [no] of look) {
+      try {
+        const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=0&Limit=100&OrderNumber=${encodeURIComponent(no)}`));
+        for (const x of rows) {
+          const r = stlRow(x, since);
+          if (!r || out.has(r.remoteId) || /cancel|iptal|reject|void|delete/i.test(r.status)) continue;
+          out.set(r.remoteId, { ...r, outOfFilter: r.status || '(boş)' });
+        }
+      } catch (e) { if (e.budget) throw e; /* tanı okuması: hata asıl okumayı bozmaz */ }
     }
     return [...out.values()];
   }

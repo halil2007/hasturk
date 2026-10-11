@@ -114,9 +114,16 @@ test('Hepsiburada: tür eşlemesi ve işaretler, toplam ödeme satırı atlanır
   assert.equal(by.t1, undefined);
   assert.deepEqual([by.last.type, by.last.amount], ['İade', -80]);
   // 40 gün → iki aralık (her biri en çok 28 gün); her aralıkta 100'lük sayfa dolu olduğu için ikinci sayfa okunur
-  const wins = [...new Set(calls.map((u) => /RecordDateStart=([\d-]+)&RecordDateEnd=([\d-]+)/.exec(u).slice(1).join('/')))];
+  const main = calls.filter((u) => /RecordDateStart=/.test(u));
+  const wins = [...new Set(main.map((u) => /RecordDateStart=([\d-]+)&RecordDateEnd=([\d-]+)/.exec(u).slice(1).join('/')))];
   assert.equal(wins.length, 2);
-  assert.equal(calls.filter((u) => /Offset=100&/.test(u)).length, 2);
+  assert.ok(main.every((u) => /Status=Paid,WillBePaid&/.test(u)));
+  assert.equal(main.filter((u) => /Offset=100&/.test(u)).length, 2);
+  // Komisyon kaydı gelmemiş satışlar (F0 … F92) sipariş numarasıyla, durum filtresi olmadan yeniden okunur: en çok 25 sipariş
+  const look = calls.filter((u) => /OrderNumber=/.test(u));
+  assert.equal(look.length, 25);
+  assert.ok(look.every((u) => !/Status=|RecordDate/.test(u)));
+  assert.ok(!look.some((u) => /OrderNumber=777\b/.test(u)), 'komisyon kaydı olan sipariş yeniden okunmaz');
 });
 
 // Mutabakat senaryoları: birebir, rakam yuvarlama, komisyon farkı, kısmi iade, iptal, pazaryerinin kuponu, satıcı kuponu, panelde olmayan sipariş

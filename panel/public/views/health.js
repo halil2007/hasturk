@@ -11,11 +11,11 @@ function card(c) {
   const [cls, ic, label] = MARK[c.status] || MARK.none;
   return html`<details class="card" ${c.status === 'warn' ? 'open' : ''} style="padding:0">
     <summary class="row" style="cursor:pointer;gap:12px;padding:12px 14px;align-items:center">
-      <span class="diag-ic ${cls}" style="${cls === 'none' ? 'background:var(--surface-3);color:var(--muted, #888)' : ''}" aria-label="${label}">${ic}</span>
+      <span class="diag-ic ${cls}" style="${cls === 'none' ? 'background:var(--surface-3);color:var(--muted)' : ''}" aria-label="${label}">${ic}</span>
       <div style="min-width:0;flex:1"><b>${c.title}</b><div class="small ${c.status === 'warn' ? '' : 'muted'}" style="word-break:break-word">${c.summary}</div></div>
       <span class="pill ${c.status === 'warn' ? 'warn' : c.status === 'ok' ? 'good' : ''} tiny">${label}</span>
     </summary>
-    <div class="stack" style="gap:8px;padding:0 14px 14px 52px">
+    <div class="stack" style="gap:8px;padding:0 14px 14px clamp(14px, 7vw, 52px)">
       ${c.numbers && c.numbers.length ? html`<table class="small" style="border-collapse:collapse;width:100%">${c.numbers.map(([k, v]) => html`<tr><td class="muted" style="padding:2px 12px 2px 0;vertical-align:top;width:45%">${k}</td><td class="num" style="padding:2px 0;word-break:break-word">${v}</td></tr>`)}</table>` : ''}
       ${c.explain ? html`<div class="tiny muted">${c.explain}</div>` : ''}
       ${c.action ? html`<div class="small"><b>Ne yapmalı:</b> ${c.action}</div>` : ''}
@@ -37,8 +37,9 @@ export function healthSheet() {
       </div></div>
       ${GROUPS.map(([g, t]) => { const list = checks.filter((c) => (c.group || 'money') === g); return list.length ? html`<h3 style="margin:6px 0 0">${t}</h3><div class="stack" style="gap:8px">${list.map(card)}</div>` : ''; })}
     </div>`);
-    s.setFoot(html`<button class="btn" data-again><i class="ico ico-sync"></i>Yeniden kontrol et</button><button class="btn" data-copy><i class="ico ico-copy"></i>Raporu kopyala</button><span class="spacer"></span>
+    s.setFoot(html`<button class="btn" data-again><i class="ico ico-sync"></i>Yenile</button><button class="btn" data-copy><i class="ico ico-copy"></i>Kopyala</button><span class="spacer"></span>
       <button class="btn ${sm.warn ? 'primary' : ''}" data-ticket><i class="ico ico-send"></i>Destek'e gönder</button>`);
+    s.foot.style.flexWrap = 'wrap';
     $('[data-again]', s.el).onclick = (e) => busy(e.currentTarget, () => load(true));
     $('[data-copy]', s.el).onclick = () => navigator.clipboard.writeText(rep.ticket.body).then(() => toast('Rapor kopyalandı'), () => toast('Kopyalanamadı', true));
     $('[data-ticket]', s.el).onclick = () => { s.close(); openTicketForm({ category: 'bug', subject: rep.ticket.subject, body: rep.ticket.body }); };

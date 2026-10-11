@@ -45,8 +45,8 @@ export function judgeRatio(ratios, { min = MIN_ORDERS } = {}) {
 // Oran sonucunun Türkçe yorumu (what: "komisyon", "satış tutarı" …)
 export function ratioText(j, what = 'komisyon') {
   if (j.kind === 'few') return `Karşılaştırılabilir sipariş yok ya da çok az (${j.n}).`;
-  if (j.kind === 'equal' && j.status === OK) return `Pazaryerinin kaydındaki ${what} ile panelin hesabı birbirini tutuyor (ortanca oran ${trn(j.median, 3)}, siparişlerin %${trn(j.share, 1)}'i ±%5 içinde).`;
-  if (j.kind === 'equal') return `Ortanca oran 1'e yakın (${trn(j.median, 3)}) ama siparişlerin yalnız %${trn(j.share, 1)}'i ±%5 içinde: bazı siparişlerde ${what} farklı (kampanya, kategori değişikliği ya da eşleşme hatası).`;
+  if (j.kind === 'equal' && j.status === OK) return `Pazaryerinin kaydındaki ${what} ile panelin hesabı birbirini tutuyor (ortanca oran ${trn(j.median, 3)}, ±%5 içinde kalan sipariş: %${trn(j.share, 1)}).`;
+  if (j.kind === 'equal') return `Ortanca oran 1'e yakın (${trn(j.median, 3)}) ama ±%5 içinde kalan sipariş yalnız %${trn(j.share, 1)}: bazı siparişlerde ${what} farklı (kampanya, kategori değişikliği ya da eşleşme hatası).`;
   if (j.kind === 'x1.2') return `Pazaryerinin kaydındaki ${what} panelin hesabından ~%20 YÜKSEK (ortanca oran ${trn(j.median, 3)}): panel KDV'yi eklemiyor olabilir — kâr olduğundan yüksek görünür.`;
   if (j.kind === 'x0.83') return `Pazaryerinin kaydındaki ${what} panelin hesabından ~%17 DÜŞÜK (ortanca oran ${trn(j.median, 3)}): kayıt KDV hariç ya da panel KDV'yi iki kez ekliyor — kâr olduğundan düşük görünür.`;
   return `Oranlar KDV kalıbına (1,20 / 0,83) uymuyor: ortanca ${trn(j.median, 3)}. Komisyon oranı / tutarı farklı hesaplanıyor olabilir.`;
@@ -146,14 +146,19 @@ export function salesCheck(ch, rows) {
   const gross = bad.filter((r) => Math.abs(fin(r.disc)) >= 0.01 && Math.abs(fin(r.sale) - fin(r.total)) < tol(r));
   const low = bad.filter((r) => fin(r.sale) + fin(r.disc) > fin(r.total)), high = bad.filter((r) => fin(r.sale) + fin(r.disc) < fin(r.total));
   const share = pct(matched.length, use.length);
-  let status = use.length < MIN_ORDERS ? NONE : share >= 90 ? OK : WARN, text;
+  // İndirimli siparişler ayrıca: genel oran yüksek olsa da indirim / kupon kaydı olanların çoğu tutmuyorsa indirim varsayımı şüphelidir
+  const discOk = withDisc.filter(ok).length, discBad = withDisc.length >= MIN_ORDERS && discOk / withDisc.length < 0.5;
+  let status = use.length < MIN_ORDERS ? NONE : share >= 90 && !discBad ? OK : WARN, text;
+  const discNote = withDisc.length ? ` İndirim / kupon kaydı olan ${withDisc.length} siparişten ${discOk} tanesi tutuyor.` : '';
   if (status === NONE) text = `Karşılaştırılabilir sipariş yok ya da çok az (${use.length}).`;
-  else if (status === OK) text = `Siparişlerin %${trn(share, 1)}'inde hakediş satış tutarı (indirim / kupon düşülerek) panelin sipariş tutarıyla aynı.${withDisc.length ? ` İndirimli ${withDisc.length} siparişin ${withDisc.filter(ok).length}'i tutuyor.` : ''}`;
-  else if (gross.length >= bad.length / 2) text = `${bad.length} siparişte fark var; bunların ${gross.length}'inde panel tutarı satıcı indiriminden ÖNCEKİ tutar: satıcı indirimi / kuponu panelde düşülmüyor (ciro ve kâr yüksek görünür).`;
+  else if (status === OK) text = `Hakediş satış tutarı (indirim / kupon düşülerek) panelin sipariş tutarıyla aynı olan sipariş oranı: %${trn(share, 1)}.${discNote}`;
+  else if (share >= 90 && discBad) text = `Siparişlerin çoğu tutuyor (%${trn(share, 1)}) ama indirim / kupon kaydı olan ${withDisc.length} siparişten yalnız ${discOk} tanesi tutuyor: `
+    + (gross.length >= (withDisc.length - discOk) / 2 ? 'panel tutarı satıcı indiriminden ÖNCEKİ tutar, indirim / kupon panelde düşülmüyor (ciro ve kâr yüksek görünür).' : 'satıcı indirimi / kuponu panelde farklı hesaplanıyor.');
+  else if (gross.length >= bad.length / 2) text = `${bad.length} siparişte fark var; bunlardan ${gross.length} tanesinde panel tutarı satıcı indiriminden ÖNCEKİ tutar: satıcı indirimi / kuponu panelde düşülmüyor (ciro ve kâr yüksek görünür).`;
   else if (high.length > low.length) text = `${bad.length} siparişte (%${trn(100 - share, 1)}) panelin sipariş tutarı hakediş satışından YÜKSEK (en çok ${tl(Math.max(...high.map((r) => fin(r.total) - fin(r.sale) - fin(r.disc))))}): panelde görünmeyen indirim / kupon olabilir.`;
   else text = `${bad.length} siparişte (%${trn(100 - share, 1)}) panelin sipariş tutarı hakediş satışından DÜŞÜK: indirim iki kez düşülmüş ya da pazaryeri ek tutar (kargo payı, hizmet) eklemiş olabilir.`;
   return { id: 'sales_vs_settlement', group: 'money', channel: ch.id, title: `${ch.name}: hakediş satış tutarı ↔ sipariş tutarı`, status, summary: text,
-    numbers: [['Karşılaştırılan sipariş', trn(use.length)], ['Tutan', `${trn(matched.length)} (%${trn(share, 1)})`], ['İndirim / kupon kaydı olan', trn(withDisc.length)], ['Panel yüksek / düşük', `${high.length} / ${low.length}`]],
+    numbers: [['Karşılaştırılan sipariş', trn(use.length)], ['Tutan', `${trn(matched.length)} (%${trn(share, 1)})`], ['İndirim / kupon kaydı olan', `${trn(withDisc.length)} (tutan ${discOk})`], ['Panel yüksek / düşük', `${high.length} / ${low.length}`]],
     explain: 'Panelin sipariş tutarı satıcının karşıladığı indirim düşülmüş tutardır. Hakedişte "Satış" kaydı ile satıcı indirimi / kupon kayıtlarının toplamı buna eşit olmalı (pazaryerinin karşıladığı indirim hariç).',
     action: status === WARN ? 'Destek\'e gönder ile bize iletin; örnek siparişler raporda. Tek tek bakmak için Gelir & Gider → Hakediş → Mutabakat.' : status === OK ? 'Bir şey yapmanız gerekmez.' : 'Hakediş kayıtları geldikçe kontrol anlamlı olur.',
     tech: { matched: matched.length, n: use.length, gross: gross.length, high: high.length, low: low.length, sample: sample(bad, (r) => ({ order: r.order_number, panel: r2(r.total), satis: r2(r.sale), indirim: r2(r.disc) })) } };
@@ -174,8 +179,8 @@ export async function cargoChecks(db, ch, now, probe) {
   if (state && state.error) { status = WARN; text = `Kargo faturaları okunamıyor: ${state.error}`; }
   else if (!state) { status = NONE; text = 'Kargo faturaları henüz okunmadı (6 saatte bir okunur).'; }
   else if (!ret) { status = NONE; text = 'Dönemde iade edilen sipariş yok.'; }
-  else if (retApi) { status = OK; text = `İade edilen ${ret} siparişin ${retApi}'inde iade kargosu faturada ayrı bulundu (%${trn(pct(retApi, ret), 1)}).`; }
-  else if (ret >= MIN_ORDERS && outApi) { status = WARN; text = `İade kargosu faturada ayırt edilemiyor: iade edilen ${ret} siparişin ${outApi}'inde gönderim kargosu faturadan geldi ama hiçbirinde iade kargosu kalemi bulunamadı. İade maliyeti Ayarlar'daki tahmini "İade kargo bedeli" ile hesaplanıyor.`; }
+  else if (retApi) { status = OK; text = `İade edilen ${ret} siparişten ${retApi} tanesinde iade kargosu faturada ayrı bulundu (%${trn(pct(retApi, ret), 1)}).`; }
+  else if (ret >= MIN_ORDERS && outApi) { status = WARN; text = `İade kargosu faturada ayırt edilemiyor: iade edilen ${ret} siparişten ${outApi} tanesinde gönderim kargosu faturadan geldi ama hiçbirinde iade kargosu kalemi bulunamadı. İade maliyeti Ayarlar'daki tahmini "İade kargo bedeli" ile hesaplanıyor.`; }
   else { status = NONE; text = `İade edilen ${ret} sipariş var ama faturayla eşleşen yok ya da veri az; karar verilemedi.`; }
   // API örneği: son kargo faturasının kalem türleri (Trendyol) / son 28 günün kayıt türleri (Hepsiburada)
   if (probe && !probe.error) {
@@ -200,8 +205,8 @@ export async function cargoChecks(db, ch, now, probe) {
   const n = fin(m && m.n), api = fin(m && m.api), share = pct(api, n);
   const ms = !state || state.error ? NONE : n < MIN_ORDERS ? NONE : share >= 70 ? OK : WARN;
   out.push({ id: 'cargo_match', group: 'money', channel: ch.id, title: `${ch.name}: kargo faturası siparişlerle eşleşiyor mu?`, status: ms,
-    summary: ms === NONE ? (n < MIN_ORDERS ? 'Dönemde yeterli kargolanmış sipariş yok.' : 'Kargo faturaları henüz okunmadı.') : ms === OK ? `Kargolanan siparişlerin %${trn(share, 1)}'inde kargo gideri faturadan geldi.`
-      : `Kargolanan ${n} siparişin yalnız ${api}'inde (%${trn(share, 1)}) kargo gideri faturadan geldi. Kendi kargo anlaşmanızla gönderiyorsanız bu normaldir; yoksa sipariş numarası eşleşmiyor olabilir.`,
+    summary: ms === NONE ? (n < MIN_ORDERS ? 'Dönemde yeterli kargolanmış sipariş yok.' : 'Kargo faturaları henüz okunmadı.') : ms === OK ? `Kargo gideri faturadan gelen sipariş oranı: %${trn(share, 1)}.`
+      : `Kargolanan ${n} siparişten yalnız ${api} tanesinde (%${trn(share, 1)}) kargo gideri faturadan geldi. Kendi kargo anlaşmanızla gönderiyorsanız bu normaldir; yoksa sipariş numarası eşleşmiyor olabilir.`,
     numbers: [['Kargolanan sipariş (15–60 gün önce)', trn(n)], ['Faturadan kargo gideri gelen', `${trn(api)} (%${trn(share, 1)})`]],
     explain: 'Gerçek kargo gideri pazaryerinin kargo faturasından sipariş numarasıyla eşleştirilir; eşleşmeyen sipariş için ürün / Ayarlar kargo tutarı (tahmin) kullanılır.',
     action: ms === WARN ? 'Kargo pazaryeri anlaşmasıyla gidiyorsa Destek\'e gönderin.' : 'Bir şey yapmanız gerekmez.', tech: { n, api } });
@@ -221,7 +226,7 @@ export async function settlementChecks(db, ch, now) {
   else if (late && !paid) text = `Hiçbir kayıt "ödendi" olarak işaretlenmemiş; vadesi 7 günden fazla geçmiş ${late} kayıt (${tl(r.late_amt)}) var: ödeme bilgisi okunmuyor olabilir.`;
   else if (late) text = `Vadesi 7 günden fazla geçtiği hâlde "ödenmedi" görünen ${late} kayıt (${tl(r.late_amt)}; en eskisinin vadesi ${new Date(r.oldest + 3 * H).toISOString().slice(0, 10)}). Gerçekten ödenmediyse pazaryerine sorun; ödendiyse bilgi güncellenmiyor.`;
   else if (stale) text = `90 günden eski ${stale} kayıt hâlâ "ödenmedi": bu kayıtlar artık yeniden okunmuyor, durumları güncellenmez.`;
-  else text = `${trn(n)} kayıttan ${trn(paid)}'i ödendi; vadesi geçip ödenmemiş görünen kayıt yok.`;
+  else text = `Hakediş kaydı ${trn(n)}, ödenen ${trn(paid)}; vadesi geçip ödenmemiş görünen kayıt yok.`;
   if (n && st && st.error) text += ` Son okuma hatası: ${st.error}`;
   const out = [{ id: 'settlement_paid', group: 'money', channel: ch.id, title: `${ch.name}: hakediş "ödendi" bilgisi güncelleniyor mu?`, status, summary: text,
     numbers: [['Hakediş kaydı', trn(n)], ['Ödendi', trn(paid)], ['Vadesi 7+ gün geçmiş, ödenmemiş', late ? `${trn(late)} (${tl(r.late_amt)})` : '0'], ['90 günden eski, ödenmemiş', trn(stale)], ['Son okuma', st && st.at ? new Date(st.at).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '—']],
@@ -316,7 +321,7 @@ export async function pushCheck(db, now, names) {
   });
   const bad = det.filter((d) => d.status === WARN);
   return [{ id: 'push_errors', group: 'sync', title: 'Stok / fiyat gönderim hataları', status: worst(det.map((d) => d.status)),
-    summary: bad.length ? `Hata oranı yüksek: ${bad.map((d) => `${d.name} (${d.sent ? `gönderimin %${trn(pct(d.failed, d.sent), 1)}'i reddedildi` : ''}${d.stuck ? `${d.sent ? ', ' : ''}${d.stuck} sonuç bekleniyor` : ''}${d.errors ? `${d.sent || d.stuck ? ', ' : ''}${d.errors} ilanda hata` : ''})`).join('; ')}.` : 'Son 7 günde gönderim hataları düşük.',
+    summary: bad.length ? `Hata oranı yüksek: ${bad.map((d) => `${d.name} (${d.sent ? `reddedilen gönderim %${trn(pct(d.failed, d.sent), 1)}` : ''}${d.stuck ? `${d.sent ? ', ' : ''}${d.stuck} sonuç bekleniyor` : ''}${d.errors ? `${d.sent || d.stuck ? ', ' : ''}${d.errors} ilanda hata` : ''})`).join('; ')}.` : 'Son 7 günde gönderim hataları düşük.',
     numbers: det.map((d) => [d.name, `${d.sent} gönderim · ${d.failed} red · ${d.errors}/${d.listings} ilanda hata${d.stuck ? ` · ${d.stuck} takılı` : ''}`]),
     explain: 'Kanala gönderilen stok / fiyatın kanal tarafındaki sonucu okunur; reddedilen satırlar ilana hata olarak yazılır ve sonraki senkronda yeniden gönderilir. Kanal kaynaklı hatalar (ürün kanalda onaylanmamış) sayılmaz.',
     action: bad.length ? 'Ürünler → Kanal hataları\'ndan nedenlere bakın; anlaşılmayan hata için Destek\'e gönderin.' : 'Bir şey yapmanız gerekmez.', tech: { channels: det } }];

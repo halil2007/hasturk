@@ -109,6 +109,10 @@ test('Satış tutarı: panel indirim öncesi (brüt) tutarı tutuyorsa ⚠ "sat�
   }
   const c = byId(await runChecks(db, SET, { chans: [TY], now: NOW }), 'sales_vs_settlement');
   assert.equal(c.status, WARN); assert.match(c.summary, /indiriminden ÖNCEKİ/); assert.equal(c.tech.gross, 4);
+  // İndirimsiz siparişler tutuyor (genel oran %90 üstü) ama indirimlilerin hiçbiri tutmuyor: yine ⚠
+  for (let i = 1; i <= 40; i++) { await order(db, 'trendyol', 'N' + i, { lines: [{ total: 500, commission: 100 }] }); await stl(db, 'trendyol', 'N' + i, 'Satış', 400, 100); }
+  const d = byId(await runChecks(db, SET, { chans: [TY], now: NOW }), 'sales_vs_settlement');
+  assert.equal(d.status, WARN, d.summary); assert.match(d.summary, /4 siparişten yalnız 0 tanesi tutuyor/);
 });
 
 test('İade kargosu: faturada bulunan → ✓; iade var, gönderim faturası var ama iade kalemi yok → ⚠; iade yok → —', async () => {

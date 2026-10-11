@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { d1 } from '../dev/d1.mjs';
 import { init, all, run, first } from '../src/db.js';
 import { saveOrders } from '../src/sync.js';
-import { refreshBaseRates, rebaseOnce, baseRate } from '../src/commcheck.js';
+import { refreshBaseRates, rebaseOnce, baseRate, orderCommission } from '../src/commcheck.js';
 import { orderProfit, breakdown, breakEven, productLoss } from '../src/finance.js';
 import { costInputs } from '../src/promos.js';
 import { shipCheck, evaluateShip, shipSamples } from '../src/shipcost.js';
@@ -47,6 +47,17 @@ test('Ana oran: tek indirimli satır (idefix %4,6) ilanın oranını düşürmez
   await run(db, "UPDATE orders SET ordered_at = ? WHERE id IN ('idefix:A1', 'idefix:A2', 'idefix:A4')", now - 100 * D);
   assert.equal(await refreshBaseRates(db, 'idefix', ['IX1']), 1);
   assert.deepEqual(await lst(db, 'IX1'), { commission: 4.6, commission_src: 'api' });
+});
+
+test('idefix siparişinde komisyon indirimi sipariş ayrıntısında gösterilir (olağan %18 yerine %4,6); ilan oranı %18 kalır', async () => {
+  const db = d1(); await init(db);
+  const now = Date.now();
+  await listing(db, 'idefix', 'IX1');
+  await saveOrders(db, 'idefix', [order('A1', now - 9 * D, 18), order('A2', now - 7 * D, 18), order('A3', now - 5 * D, 18), order('A4', now - D, 4.6)]);
+  const o = { ...(await first(db, "SELECT * FROM orders WHERE id = 'idefix:A4'")), items: await all(db, "SELECT * FROM order_items WHERE order_id = 'idefix:A4'") };
+  const c = await orderCommission(db, SET, o);
+  assert.deepEqual([c.lines.length, c.lines[0].rate, c.lines[0].normal, c.saved], [1, 4.6, 18, 134]);
+  assert.deepEqual(await lst(db, 'IX1'), { commission: 18, commission_src: 'api' });
 });
 
 test('Ana oran: resmî liste tabanı (Trendyol olduğu gibi, Hepsiburada × 1,20); yardımcı', async () => {

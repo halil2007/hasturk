@@ -3,7 +3,8 @@
 //     oran (KDV dahil: Trendyol oranı olduğu gibi, Hepsiburada oranı × 1,20) bulunur. Kanalın bildirdiği oran listeden 0,5 puandan fazla
 //     yüksekse "veri sorunu olabilir" diye gösterilir; ilanın oranı hiç bilinmiyorsa liste oranı tahmin olarak yazılır (commission_src 'list').
 //     Eşleşme yalnız birebir ad eşitliğiyle yapılır (Türkçe harf / büyük-küçük farkı yok sayılır); tahmin yapılmaz, eşleşmeyen ilan atlanır.
-//  2) Komisyon indirimi: sipariş satırındaki gerçek oran, ilanın olağan oranından (son 90 günün ortancası, en az 3 satır) ya da liste
+//  2) Komisyon indirimi (sipariş ayrıntısında satır komisyonu bildiren her kanal, dönem özetinde Trendyol / Hepsiburada): sipariş
+//     satırındaki gerçek oran, ilanın olağan oranından (son 90 günün ortancası, en az 3 satır) ya da liste
 //     oranından en az 1 puan düşükse satır "indirimli" sayılır; kazanç = (normal oran − gerçek oran) × satır tutarı. Saklanmaz, her
 //     seferinde hesaplanır.
 //  3) Sonradan gelen komisyon iadesi / düzeltmesi: hakediş kayıtlarından (bkz. finance.js commissionCredits).
@@ -137,8 +138,8 @@ const LIVE_LINE = "COALESCE(i.status, '') NOT IN ('cancelled', 'returned')";
 
 // Sipariş ayrıntısı: satır satır komisyon indirimi ve hakedişteki komisyon iadesi
 export async function orderCommission(db, settings, o) {
+  // Satır komisyonu bildiren her kanalda (idefix, Hepsiburada, Trendyol …): olağan orana göre; resmî liste yalnız Trendyol / Hepsiburada
   const out = { lines: [], saved: 0, credit: 0, counted: 0 };
-  if (!mpOf(o.channel)) return out;
   const items = (o.items || []).filter((i) => i.commission != null && i.total > 0 && i.status !== 'cancelled' && i.status !== 'returned' && keptShare(i) > 0);
   const keys = [...new Set(items.map((i) => i.remote_key).filter(Boolean))];
   const [hist, cats, cr] = await Promise.all([

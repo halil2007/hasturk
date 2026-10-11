@@ -379,6 +379,8 @@ export const MIGRATIONS = [
   'ALTER TABLE products ADD COLUMN ship_set_at INTEGER',
   'ALTER TABLE products ADD COLUMN ship_auto TEXT',
   'ALTER TABLE products ADD COLUMN ship_warn TEXT',
+  // Hakediş kaydının ham alanları (JSON: durum, amount / netAmount / taxAmount, paket no …): Mutabakat'ta sipariş ayrıntısında gösterilir
+  'ALTER TABLE settlements ADD COLUMN raw TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
