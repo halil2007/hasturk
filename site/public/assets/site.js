@@ -151,11 +151,11 @@
     if (!yearly) return `<div class="pr-price"><b>${tl(p.monthly)}</b><span class="cur">₺</span><small>/ ay</small></div>
       <div class="pr-sub">KDV dahil · her ay ödenir</div>
       ${p.yearly ? `<div class="pr-sub2">Yıllık alımda ${tl(p.yearly)} ₺ · 2 ay hediye</div>` : ''}`;
-    const inst = S.installments ? `peşin fiyatına ${S.installments} × ${tl(p.yearly / S.installments)} ₺` : '';
-    const eft = eftPct() ? `havale / EFT ile ${tl(eftPrice(p.yearly, 'yearly'))} ₺` : '';
+    const inst = S.installments ? `<span>Peşin fiyatına ${S.installments} × ${tl(p.yearly / S.installments)} ₺</span>` : '';
+    const eft = eftPct() ? `<span>Havale / EFT ile ${tl(eftPrice(p.yearly, 'yearly'))} ₺</span>` : '';
     return `<div class="pr-price"><b>${tl(p.yearly)}</b><span class="cur">₺</span><small>/ yıl</small>${save ? `<span class="pr-save">${tl(save)} ₺ kazanç</span>` : ''}</div>
       <div class="pr-sub">KDV dahil · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
-      ${inst || eft ? `<div class="pr-sub2">${[inst, eft].filter(Boolean).join(' · ').replace(/^./, (c) => c.toLocaleUpperCase('tr'))}</div>` : ''}`;
+      ${inst || eft ? `<div class="pr-sub2">${[inst, eft].filter(Boolean).join(' · ')}</div>` : ''}`;
   };
   // "Satın al" yalnız online satış açıkken görünür; kapalıyken kartta yalnız ücretsiz deneme düğmesi olur
   const renderPlans = (shop = planShop) => {

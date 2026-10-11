@@ -45,7 +45,7 @@ window.SITE = {
     { key: 'profesyonel', name: 'Profesyonel', tag: 'Çok kanalda büyüyen işletmeler', monthly: 1990, yearly: 19900, featured: true, limits: ['10 mağaza', '5 kullanıcı'], base: 'Başlangıç',
       items: ['Buybox takibi ve otomatik fiyat', 'Otomatik ürün gönderimi', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
     { key: 'kurumsal', name: 'Kurumsal', tag: 'Yüksek hacimli ve yurt dışına satan firmalar', monthly: 3990, yearly: 39900, limits: ['25 mağaza', 'Sınırsız kullanıcı'], base: 'Profesyonel',
-      items: ['Yurt dışı pazaryerleri (eBay, Etsy, Ozon, yurt dışı Amazon)', 'Kendi anlaşmalı kargo entegrasyonu (7 kargo firması)', 'Döviz kuruna endeksli otomatik fiyat', 'Kurulum ve veri aktarımında birebir destek', 'Telefon destek hattı', 'Yeni kanal ve özel geliştirme önceliği'],
+      items: ['Yurt dışı pazaryerleri (eBay, Etsy, Ozon, yurt dışı Amazon)', 'Kendi kargo anlaşmanızla 7 kargo firması', 'Döviz kuruna endeksli otomatik fiyat', 'Kurulum ve veri aktarımında birebir destek', 'Telefon destek hattı', 'Yeni kanal ve özel geliştirme önceliği'],
       // soon: pakete eklenecek ama henüz aktif olmayan özellikler ("Yakında" rozetiyle görünür; panel/src/plans.js → soon ile aynı tutun)
       soon: ['e-Fatura / e-Arşiv entegrasyonu'] },
   ],
