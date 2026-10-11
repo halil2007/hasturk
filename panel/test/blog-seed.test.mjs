@@ -38,30 +38,48 @@ test('day verilen yazı ileri tarihli yayımlanır (sitede o gün görünür)', 
   assert.equal((await first(db, 'SELECT published_at FROM blog_posts WHERE slug = ?', 'ileri')).published_at, now + 4 * 864e5);
 });
 
-test('ikinci parti: 1 Ekim\'den itibaren günde bir (farklı saatlerde) yayımlanmış sayılır; önceden ileri tarihli yüklenenler bir kez geri çekilir', async () => {
-  const { SECOND } = await import('../src/blogseed.js');
-  assert.equal(SECOND.length, 10);
-  const days = SECOND.map((p) => new Date(p.at + 3 * 3600e3).toISOString().slice(0, 10));
-  assert.equal(days[0], '2026-10-01'); assert.equal(new Set(days).size, 10);
-  for (const p of SECOND) { const h = new Date(p.at + 3 * 3600e3).getUTCHours(); assert.ok(h >= 9 && h <= 17, `${p.slug} saat ${h}`); }
-  const db = d1(); await init(db);
-  const now = Date.UTC(2026, 9, 11, 12);
-  const fetcher = async () => new Response(JPG, { status: 200 });
-  // Eski sürüm: ilk yazı ileri tarihli yüklenmiş, ikincisinin tarihi elle geçmişe alınmış
-  await run(db, "INSERT INTO blog_posts (slug, title, body, status, published_at, created_at, updated_at) VALUES (?, 'a', 'x', 'published', ?, 0, 0), (?, 'b', 'x', 'published', 5, 0, 0)", SECOND[0].slug, now + 864e5, SECOND[1].slug);
-  await blogSeed({ SITE_URL: 'https://site.test' }, db, { fetcher, now });
-  const at = async (s) => (await first(db, 'SELECT published_at FROM blog_posts WHERE slug = ?', s)).published_at;
-  assert.equal(await at(SECOND[0].slug), SECOND[0].at);
-  assert.equal(await at(SECOND[1].slug), 5, 'elle değiştirilen tarih korunur');
-  assert.equal(await at(SECOND[9].slug), SECOND[9].at, 'yeni yüklenen de Ekim tarihinde');
+// Gerçek kaynak (public/_seed): manifest + yazı dosyaları
+import { readFileSync } from 'node:fs';
+const SEED = new URL('../public/_seed/', import.meta.url).pathname;
+const source = async (path) => JSON.parse(readFileSync(SEED + path, 'utf8'));
+const MAN = JSON.parse(readFileSync(SEED + 'manifest.json', 'utf8'));
+const trDay = (t) => new Date(t + 3 * 3600e3).toISOString().slice(0, 10);
+
+test('kaynak: her yazının dosyası var, adresler tekil, saatler TR 08–20 arası, yayın sırası tarihe göre', async () => {
+  assert.ok(MAN.length >= 37);
+  assert.equal(new Set(MAN.map((p) => p.slug)).size, MAN.length);
+  for (const [i, m] of MAN.entries()) {
+    const p = await source(`posts/${m.slug}.json`);
+    assert.equal(p.slug, m.slug); assert.ok(p.title && p.body && p.cover, m.slug);
+    const h = new Date(m.at + 3 * 3600e3).getUTCHours(); assert.ok(h >= 8 && h <= 20, `${m.slug} saat ${h}`);
+    if (i) assert.ok(m.at >= MAN[i - 1].at, 'sıralı');
+  }
+  // İkinci parti 1–10 Ekim, üçüncü parti 11–31 Ekim: her gün bir yazı
+  const b2 = MAN.filter((p) => p.batch === 2).map((p) => trDay(p.at)), b3 = MAN.filter((p) => p.batch === 3).map((p) => trDay(p.at));
+  assert.equal(b2.length, 10); assert.equal(b2[0], '2026-10-01'); assert.equal(new Set(b2).size, 10);
+  assert.equal(b3[0], '2026-10-11'); assert.equal(new Set(b3).size, b3.length); assert.ok(b3.at(-1) <= '2026-10-31');
 });
 
-test('üçüncü parti: 11–31 Ekim her gün bir yazı, farklı saatler', async () => {
-  const { THIRD } = await import('../src/blogseed.js');
-  const days = THIRD.map((p) => new Date(p.at + 3 * 3600e3).toISOString().slice(0, 10));
-  assert.equal(new Set(days).size, THIRD.length, 'aynı güne iki yazı düşmez');
-  if (THIRD.length) { assert.equal(days[0], '2026-10-11'); assert.ok(days.at(-1) <= '2026-10-31'); }
-  for (const p of THIRD) { const h = new Date(p.at + 3 * 3600e3).getUTCHours(); assert.ok(h >= 9 && h <= 17); }
+test('kademeli ekleme: yayın saatine 3 gün kalan yazılar panele girer (ileri tarihli), en fazla 15 yazı; ikinci parti tarihleri bir kez geri çekilir', async () => {
+  const db = d1(); await init(db);
+  const fetcher = async () => new Response(JPG, { status: 200 });
+  const now = Date.UTC(2026, 9, 11, 12), env = { SITE_URL: 'https://site.test' };
+  const b2 = MAN.filter((p) => p.batch === 2);
+  // Eski sürüm: ilk yazı ileri tarihli yüklenmiş, ikincisinin tarihi elle geçmişe alınmış
+  await run(db, "INSERT INTO blog_posts (slug, title, body, status, published_at, created_at, updated_at) VALUES (?, 'a', 'x', 'published', ?, 0, 0), (?, 'b', 'x', 'published', 5, 0, 0)", b2[0].slug, now + 864e5, b2[1].slug);
+  const due = MAN.filter((p) => p.at <= now + 3 * 864e5);
+  let added = [], r;
+  for (let k = 0; k < 10 && (r = await blogSeed(env, db, { source, fetcher, now, revisions: {} })); k++) { assert.ok(r.added.length + r.skipped.length <= 15); added.push(...r.added, ...r.skipped); }
+  assert.deepEqual(added.sort(), due.map((p) => p.slug).sort(), 'yalnız 3 gün içindekiler');
+  const at = async (s) => (await first(db, 'SELECT published_at FROM blog_posts WHERE slug = ?', s)).published_at;
+  assert.equal(await at(b2[0].slug), b2[0].at);
+  assert.equal(await at(b2[1].slug), 5, 'elle değiştirilen tarih korunur');
+  const last = due.at(-1);
+  assert.equal(await at(last.slug), last.at, 'ileri tarihli yazı kendi saatinde');
+  // Ertesi gün: bir günlük yeni yazılar eklenir
+  const later = now + 864e5, next = MAN.filter((p) => p.at > now + 3 * 864e5 && p.at <= later + 3 * 864e5);
+  r = await blogSeed(env, db, { source, fetcher, now: later, revisions: {} });
+  assert.deepEqual(next.length ? r.added : r, next.length ? next.map((p) => p.slug) : null);
 });
 
 // Yayımlanmış hazır yazı düzeltmesi: gövde hâlâ ilk yüklenen gövdeyse bir kez güncellenir; elle düzenlenmiş yazıya dokunulmaz
@@ -123,10 +141,8 @@ test('düzeltme: kapak 14 gün içinde yenilenemezse vazgeçilir', async () => {
 
 test('gerçek düzeltme listesi: eski gövdelerin özetleri güncel gövdeyle aynı değil, her yazı kaynakta var', async () => {
   const { REVISIONS } = await import('../src/blogseed.js');
-  const { POSTS } = await import('../src/blogseed-posts.js');
-  const { POSTS_2B } = await import('../src/blogseed-posts-2b.js');
   for (const [slug, r] of Object.entries(REVISIONS)) {
-    const p = [...POSTS, ...POSTS_2B].find((x) => x.slug === slug);
+    const p = await source(`posts/${slug}.json`);
     assert.ok(p, slug);
     assert.ok(r.from.length && r.from.every((h) => /^[0-9a-f]{64}$/.test(h)));
     assert.ok(!r.from.includes(await sha(p.body)), `${slug} güncel gövde eski özetle aynı`);
