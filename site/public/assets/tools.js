@@ -27,7 +27,9 @@
   const plain = (n, max = 2) => (Number.isFinite(n) ? `${sign(n)}${nf(n, 0, max)}` : '–');
   const fold = (s) => String(s).toLocaleLowerCase('tr').replace(/[çğıöşüâîû]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i', û: 'u' })[c]).replace(/\s+/g, ' ').trim();
   const params = new URLSearchParams(location.search);
-  window.HT_TOOLS = { num, tl, pct, fold }; // testler için
+  // Arama terimi eşleşmesi: tam geçiş ya da basit Türkçe ek atılmış kök ("cep telefonu" → "telefon", "kiliflari" → "kilif")
+  const has = (f, w) => f.includes(w) || (w.length >= 5 && ((r) => r.length >= 4 && f.includes(r))(w.replace(/(lari|leri|lar|ler|si|su|u|i|a|e)$/, '')));
+  window.HT_TOOLS = { num, tl, pct, fold, has }; // testler için
 
   // Komisyon oranının KDV dahil karşılığı ve açıklama satırı
   const rateOf = (v) => { const c = v('com'), b = v.form.elements.basis; const ex = b ? b.value === 'ex' : false; return Number.isFinite(c) ? { raw: c, eff: ex ? c * 1.2 : c, ex } : null; };
@@ -227,7 +229,7 @@
       if (!cp.list) return;
       const t = fold(q.value).split(' ').filter(Boolean);
       let rows = cp.list.rows;
-      if (t.length) rows = rows.filter((x) => t.every((w) => x.f.includes(w))).sort((a, b) => (t.every((w) => b.leaf.includes(w)) - t.every((w) => a.leaf.includes(w))) || a.p.length - b.p.length);
+      if (t.length) rows = rows.filter((x) => t.every((w) => has(x.f, w))).sort((a, b) => (t.every((w) => has(b.leaf, w)) - t.every((w) => has(a.leaf, w))) || a.p.length - b.p.length);
       cp.items = rows.slice(0, 60);
       list.textContent = '';
       if (!cp.items.length) { const li = document.createElement('li'); li.className = 'cp-none'; li.textContent = 'Eşleşen kategori yok. Başka bir kelime deneyin ya da oranı elle girin.'; list.append(li); }
@@ -368,7 +370,7 @@
     const rows = $$('tr[data-q]').map((tr) => ({ tr, f: fold(tr.dataset.q) })), groups = $$('[data-rt-g]'), st = $('[data-rt-st]');
     const go = () => {
       const t = fold(rq.value).split(' ').filter(Boolean); let n = 0;
-      rows.forEach((r) => { const on = t.every((w) => r.f.includes(w)); r.tr.hidden = !on; if (on) n++; });
+      rows.forEach((r) => { const on = t.every((w) => has(r.f, w)); r.tr.hidden = !on; if (on) n++; });
       groups.forEach((g) => { g.hidden = !$$('tr[data-q]', g).some((tr) => !tr.hidden); });
       st.textContent = t.length ? (n ? `${n.toLocaleString('tr-TR')} kategori bulundu` : 'Eşleşen kategori yok') : '';
     };
