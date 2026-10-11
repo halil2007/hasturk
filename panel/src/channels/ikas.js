@@ -300,20 +300,30 @@ export function ikas(env, p, meta) {
   // yazılacağı tahmin edilmez (ilki seçilince stok yanlış depoya yazılıyordu): seçilmesi istenir. Seçilen lokasyon silinmişse de hata.
   // Yalnız stok işlemleri durur; siparişler alınmaya devam eder.
   // Seçilen lokasyon her gönderimde sorgulanmaz: stok okunurken (fetchListings, verify) doğrulanır, sonuç gönderimde kullanılır.
-  const cfgLoc = locationId;
+  const cfgLoc = String(locationId || '').trim();
+  // ikas lokasyon ID'si boşluksuz harf/rakam/tiredir (UUID); boşluk ya da Türkçe harf içeren değer addır ve lokasyon
+  // listesinden ID'ye çevrilmeden kullanılmaz
+  const locIdLike = (v) => /^[A-Za-z0-9_-]+$/.test(String(v || '').trim());
+  const locKey = (v) => String(v || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
+  if (!locIdLike(cfgLoc)) locationId = '';
   let locErr = null;
   const locError = (msg) => Object.assign(new Error(msg), { loc: true });
   async function location(verify = false) {
     if (locErr && !verify) throw locErr;
     if (locationId && !verify) return locationId;
     let d = null;
-    try { d = await gql('{ listStockLocation { id name deleted } }'); } catch (e) { if (!cfgLoc || e.budget) throw e; }
+    try { d = await gql('{ listStockLocation { id name deleted } }'); } catch (e) { if (!cfgLoc || !locIdLike(cfgLoc) || e.budget) throw e; }
     const arr = d && d.listStockLocation, live = (arr || []).filter((x) => !x.deleted);
     locErr = null;
     if (cfgLoc) {
-      // Liste okunamadıysa (yanıtta yok) seçilen lokasyon kullanılır; yalnız listede olmadığı kesinse hata
-      if (Array.isArray(arr) && !live.some((x) => String(x.id) === String(cfgLoc))) throw (locErr = locError(`ikas'ta seçili stok lokasyonu (${cfgLoc}) bulunamadı ya da silinmiş; Entegrasyonlar → ikas'tan stok lokasyonunu seçin`));
-      return cfgLoc;
+      // Alana ID ya da lokasyon ADI yazılabilir: önce ID, sonra ad (büyük/küçük harf ve boşluk farkı yok sayılır),
+      // sonra adı içeren tek lokasyon. Liste okunamadıysa (yanıtta yok) ID biçimindeki değer olduğu gibi kullanılır.
+      if (!Array.isArray(arr)) { if (!locIdLike(cfgLoc)) throw new Error('ikas stok lokasyonları okunamadı; biraz sonra tekrar denenecek'); return (locationId = cfgLoc); }
+      const want = locKey(cfgLoc);
+      const hit = live.find((x) => String(x.id) === String(cfgLoc)) || live.find((x) => locKey(x.name) === want)
+        || (() => { if (locIdLike(cfgLoc) || want.length < 4) return null; const c = live.filter((x) => locKey(x.name).length >= 4 && (locKey(x.name).includes(want) || want.includes(locKey(x.name)))); return c.length === 1 ? c[0] : null; })();
+      if (!hit) throw (locErr = locError(`ikas'ta "${cfgLoc}" adlı ya da ID'li stok lokasyonu bulunamadı. ikas'taki lokasyonlar: ${live.map((x) => x.name).join(', ') || 'yok'}. Entegrasyonlar → ikas → Stok lokasyonu alanına bunlardan birinin adını yazın.`));
+      return (locationId = hit.id);
     }
     locationId = '';
     if (live.length > 1) throw (locErr = locError("ikas'ta birden fazla stok lokasyonu var; Entegrasyonlar → ikas'tan stok lokasyonunu seçin"));
