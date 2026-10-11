@@ -189,16 +189,16 @@ export async function financeView(el, rest, query = {}) {
     return html`<div class="row wrap" style="gap:16px;align-items:flex-start">
       <div style="flex:1 1 320px;min-width:0"><div class="small" style="font-weight:650;margin-bottom:4px">Pazaryeri kayıtları · toplam ${money(x.actual)}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Tür</th><th class="r">Tutar</th><th class="r">Komisyon</th><th>Tarih / vade</th></tr></thead><tbody>
-        ${d.records.map((r) => html`<tr style="${r.counted ? '' : 'opacity:.6'}"><td class="small"><b>${r.type}</b> <span class="muted tiny">${r.rawType}</span>${r.counted ? '' : html` <span class="pill tiny" style="padding:1px 6px">hesaba girmez</span>`}
-            ${rawText(r.raw) ? html`<div class="tiny muted" style="white-space:normal;font-family:ui-monospace,Menlo,Consolas,monospace">${rawText(r.raw)}</div>` : ''}</td>
+        ${d.records.map((r) => html`<tr style="${r.counted ? '' : 'opacity:.6'}"><td class="small"><b>${r.type}</b> <span class="muted tiny">${r.rawType}</span>${r.counted ? '' : html` <span class="pill tiny" style="padding:1px 6px">hesaba girmez</span>`}</td>
           <td class="r num" style="color:${r.amount < 0 ? 'var(--bad)' : 'inherit'}">${money(r.amount)}</td><td class="r num">${r.commission ? money(r.commission) : '—'}</td>
-          <td class="tiny" style="white-space:nowrap">${r.date ? date(r.date) : '—'}<br><span class="muted">vade ${r.due ? date(r.due) : '—'} · ${r.paid ? 'ödendi' : 'ödenecek'}</span></td></tr>`)}
+          <td class="tiny" style="white-space:nowrap">${r.date ? date(r.date) : '—'}<br><span class="muted">vade ${r.due ? date(r.due) : '—'} · ${r.paid ? 'ödendi' : 'ödenecek'}</span></td></tr>
+          ${rawText(r.raw) ? html`<tr style="${r.counted ? '' : 'opacity:.6'}"><td colspan="4" class="tiny muted" style="white-space:normal;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,Consolas,monospace;padding-top:0">${rawText(r.raw)}</td></tr>` : ''}`)}
         ${!d.records.length ? html`<tr><td colspan="4" class="empty">Kayıt yok</td></tr>` : ''}
         </tbody></table></div>
-        ${keys && keys.keys ? html`<div class="tiny muted" style="margin-top:4px;white-space:normal">Kayıttaki alanlar: ${keys.keys}</div>` : ''}</div>
+        ${keys && keys.keys ? html`<div class="tiny muted" style="margin-top:4px;white-space:normal;overflow-wrap:anywhere">Kayıttaki alanlar: ${String(keys.keys).split(',').join(', ')}</div>` : ''}</div>
       <div style="flex:1 1 280px;min-width:0"><div class="small" style="font-weight:650;margin-bottom:4px">Panelin beklediği · ${money(e.payout)}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th class="r">Tutar</th><th class="r">Komisyon</th></tr></thead><tbody>
-        ${d.lines.map((l) => html`<tr style="${l.counted ? '' : 'opacity:.6'}"><td class="small" style="white-space:normal">${l.name} <span class="muted tiny">× ${n(l.qty)}${l.returned ? ` · ${n(l.returned)} iade` : ''}${l.status ? ` · ${l.status === 'cancelled' ? 'iptal' : l.status === 'returned' ? 'iade' : l.status}` : ''}</span>${l.counted ? '' : html` <span class="pill tiny" style="padding:1px 6px">sayılmadı</span>`}</td>
+        ${d.lines.map((l) => html`<tr style="${l.counted ? '' : 'opacity:.6'}"><td class="small" style="white-space:normal">${l.name} <span class="muted tiny">× ${n(l.qty)}${l.returned ? ` · ${n(l.returned)} iade` : ''}${l.status && !(l.status === 'returned' && l.returned) ? ` · ${l.status === 'cancelled' ? 'iptal' : l.status === 'returned' ? 'iade' : l.status}` : ''}</span>${l.counted ? '' : html` <span class="pill tiny" style="padding:1px 6px">sayılmadı</span>`}</td>
           <td class="r num">${money(l.total)}</td><td class="r num">${l.commission == null ? html`<span class="muted tiny">tahmin</span>` : money(l.commission)}</td></tr>`)}
         </tbody></table></div>
         <div class="small" style="margin-top:6px;line-height:1.7">${e.dead ? html`<div>Sipariş iptal / tamamı iade: beklenen hakediş <b>0</b></div>` : html`
@@ -215,7 +215,7 @@ export async function financeView(el, rest, query = {}) {
         <button class="btn sm ghost" style="margin-top:4px" data-act="stlx" data-id="${x.id}">${stlOpen.has(x.id) ? 'Ayrıntıyı gizle' : 'Ayrıntı'}</button></td>
       <td class="r num m-hide">${money(x.expected)}</td><td class="r num m-hide">${money(x.actual)}</td>
       <td class="r num" style="font-weight:700;color:${/^wait_/.test(x.code) ? 'var(--text-2)' : x.diff < 0 ? 'var(--bad)' : 'var(--good)'}">${x.diff > 0 ? '+' : ''}${money(x.diff)}</td></tr>
-      ${stlOpen.has(x.id) ? html`<tr><td colspan="4" style="background:var(--surface-2, transparent)">${detailBox(x)}</td></tr>` : ''}`)}
+      ${stlOpen.has(x.id) ? html`<tr><td colspan="4" style="background:var(--surface-2, transparent);white-space:normal;max-width:0">${detailBox(x)}</td></tr>` : ''}`)}
     </tbody></table></div>`;
   const stlOpen = new Set();
   function drawSettlements() {

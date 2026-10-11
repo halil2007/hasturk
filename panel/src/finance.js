@@ -686,7 +686,7 @@ export const STL_SIDES = {
   extra: 'Pazaryeri fazla ödemiş görünüyor (tüm kayıtlar geldi, tutar yüksek)',
 };
 export const STL_CODES = {
-  wait_commission: 'Bekleniyor: komisyon kaydı henüz gelmedi', wait_sale: 'Bekleniyor: satış kaydı henüz gelmedi',
+  wait_commission: 'Komisyon kaydı henüz gelmedi', wait_sale: 'Satış kaydı henüz gelmedi',
   cancelled_paid: 'İptal edilen siparişe ödeme kaydı', return_pending: 'İade kaydı pazaryerine henüz düşmedi', return_unknown: 'Pazaryerinde iade var, panelde yok',
   no_commission: 'Komisyon kaydı yok / eşleşmedi', no_sale: 'Satış kaydı yok / eşleşmedi', campaign: 'Pazaryerinin karşıladığı kampanya indirimi',
   commission_diff: 'Komisyon farklı', sale_low: 'Satış tutarı düşük', sale_high: 'Satış tutarı yüksek', mixed: 'Satış ve komisyon farklı',
@@ -805,7 +805,7 @@ export async function settlementReport(env, db, settings, q = {}) {
         reason = paidAny ? 'Satış ödendi ama siparişe bağlı komisyon kaydı yok (komisyon toplu / ayrı faturayla kesilmiş ya da kayıt sipariş numarasıyla eşleşmemiş olabilir)'
           : `Komisyon kaydı ${Math.round(STL_WAIT / DAY)} günde gelmedi (kayıt sipariş numarasıyla eşleşmemiş olabilir)`;
       } else if (missing === 'sale') { code = 'no_sale'; reason = 'Komisyon kaydı var ama satış (ödeme) kaydı yok (kayıt eşleşmemiş ya da okuma aralığı dışında kalmış olabilir)'; }
-      else if (camp && Math.abs(diff - camp) < tol) { code = 'campaign'; side = 'extra'; reason = `Pazaryerinin karşıladığı kampanya indirimi (${tl(camp)}) ödendi; panelin satış tutarında yok`; }
+      else if (camp > 0 && Math.abs(diff - camp) < tol) { code = 'campaign'; side = 'extra'; reason = `Pazaryerinin karşıladığı kampanya indirimi (${tl(camp)}) ödendi; panelin satış tutarında yok`; }
       else {
         // Tüm kayıtlar geldi: fark tutardadır. Komisyon oranı aynıysa fark satış tutarındadır (indirim / kupon); satış aynıysa komisyondadır
         side = diff < 0 ? 'short' : 'extra';
