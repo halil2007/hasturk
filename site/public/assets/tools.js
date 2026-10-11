@@ -27,7 +27,9 @@
   const plain = (n, max = 2) => (Number.isFinite(n) ? `${sign(n)}${nf(n, 0, max)}` : '–');
   const fold = (s) => String(s).toLocaleLowerCase('tr').replace(/[çğıöşüâîû]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i', û: 'u' })[c]).replace(/\s+/g, ' ').trim();
   const params = new URLSearchParams(location.search);
-  window.HT_TOOLS = { num, tl, pct, fold }; // testler için
+  // Arama terimi eşleşmesi: tam geçiş ya da basit Türkçe ek atılmış kök ("cep telefonu" → "telefon", "kiliflari" → "kilif")
+  const has = (f, w) => f.includes(w) || (w.length >= 5 && ((r) => r.length >= 4 && f.includes(r))(w.replace(/(lari|leri|lar|ler|si|su|u|i|a|e)$/, '')));
+  window.HT_TOOLS = { num, tl, pct, fold, has }; // testler için
 
   // Komisyon oranının KDV dahil karşılığı ve açıklama satırı
   const rateOf = (v) => { const c = v('com'), b = v.form.elements.basis; const ex = b ? b.value === 'ex' : false; return Number.isFinite(c) ? { raw: c, eff: ex ? c * 1.2 : c, ex } : null; };
@@ -190,7 +192,7 @@
   // ---------- kategori seçici (resmî liste; yalnız kullanılınca yüklenir) ----------
   const cache = {};
   const loadList = (src) => (cache[src] ||= fetch(src, { credentials: 'same-origin' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then((d) => ({ d, rows: d.cats.map(([p, r]) => ({ p, r, f: fold(p), leaf: fold(p.split(' > ').pop()) })) })));
+    .then((d) => ({ d, rows: d.cats.map(([p, r, v]) => ({ p, r, v: v || '', f: fold(p), leaf: fold(p.split(' > ').pop()) })) })));
   function setupPicker(f, run) {
     const box = $('[data-cp]', f); if (!box) return;
     const srcs = JSON.parse(box.dataset.srcs || '{}'), q = $('#cp-q', box), list = $('#cp-list', box), st = $('[data-cp-st]', box), clr = $('[data-cp-clear]', box), cap = $('[data-cp-cap]', box);
@@ -201,11 +203,12 @@
     const status = () => {
       const s = info(); if (!s) { st.textContent = ''; return; }
       if (cp.sel) st.innerHTML = '';
-      const pc = (n) => `%${nf(n, 0, 2)}`;
+      const pc = (n) => `%${nf(n, 2, 2)}`;
       if (cp.sel) {
         const ex = cp.list.d.basis === 'kdv-haric', parts = cp.sel.p.split(' > ');
         st.append(Object.assign(document.createElement('span'), { className: 'cp-path', textContent: parts.join(' › ') }));
-        st.append(Object.assign(document.createElement('span'), { className: 'cp-rate', textContent: cp.manual ? `Elle girilen oran kullanılıyor (resmî oran ${pc(cp.sel.r)}${ex ? ' + KDV' : ''})` : `Resmî oran ${pc(cp.sel.r)}${ex ? ` (KDV hariç) → kesilen ${pc(cp.sel.r * 1.2)} (KDV dahil)` : ' (KDV dahil)'}` }));
+        st.append(Object.assign(document.createElement('span'), { className: 'cp-rate', textContent: cp.manual ? `Elle girilen oran kullanılıyor (resmî oran ${pc(cp.sel.r)}${ex ? ' + KDV' : ' KDV dahil'})` : `Resmî oran ${pc(cp.sel.r)}${ex ? ` (KDV hariç) → kesilen ${pc(cp.sel.r * 1.2)} (KDV dahil)` : ' (KDV dahil)'}` }));
+        if (cp.sel.v) st.append(Object.assign(document.createElement('span'), { className: 'cp-vade', textContent: `Vade: ${cp.sel.v}` }));
       } else st.textContent = `${s.name} resmî listesindeki ${s.count.toLocaleString('tr-TR')} kategoriden seçin ya da oranı elle girin. Liste tarihi: ${s.date}.`;
     };
     const sync = () => {
@@ -226,7 +229,7 @@
       if (!cp.list) return;
       const t = fold(q.value).split(' ').filter(Boolean);
       let rows = cp.list.rows;
-      if (t.length) rows = rows.filter((x) => t.every((w) => x.f.includes(w))).sort((a, b) => (t.every((w) => b.leaf.includes(w)) - t.every((w) => a.leaf.includes(w))) || a.p.length - b.p.length);
+      if (t.length) rows = rows.filter((x) => t.every((w) => has(x.f, w))).sort((a, b) => (t.every((w) => has(b.leaf, w)) - t.every((w) => has(a.leaf, w))) || a.p.length - b.p.length);
       cp.items = rows.slice(0, 60);
       list.textContent = '';
       if (!cp.items.length) { const li = document.createElement('li'); li.className = 'cp-none'; li.textContent = 'Eşleşen kategori yok. Başka bir kelime deneyin ya da oranı elle girin.'; list.append(li); }
@@ -236,7 +239,7 @@
         const n = document.createElement('span'); n.className = 'cp-n';
         const b = document.createElement('b'); b.textContent = parts.pop(); n.append(b);
         if (parts.length) { const s = document.createElement('small'); s.textContent = parts.join(' › '); n.append(s); }
-        const r = document.createElement('em'); r.textContent = `%${nf(x.r, 0, 2)}${cp.list.d.basis === 'kdv-haric' ? ' + KDV' : ''}`;
+        const r = document.createElement('em'); r.textContent = `%${nf(x.r, 2, 2)}${cp.list.d.basis === 'kdv-haric' ? ' + KDV' : ' KDV dahil'}`;
         li.append(n, r); list.append(li);
       });
       if (rows.length > cp.items.length) { const li = document.createElement('li'); li.className = 'cp-none'; li.textContent = `${rows.length - cp.items.length} kategori daha var; aramayı daraltın.`; list.append(li); }
@@ -367,7 +370,7 @@
     const rows = $$('tr[data-q]').map((tr) => ({ tr, f: fold(tr.dataset.q) })), groups = $$('[data-rt-g]'), st = $('[data-rt-st]');
     const go = () => {
       const t = fold(rq.value).split(' ').filter(Boolean); let n = 0;
-      rows.forEach((r) => { const on = t.every((w) => r.f.includes(w)); r.tr.hidden = !on; if (on) n++; });
+      rows.forEach((r) => { const on = t.every((w) => has(r.f, w)); r.tr.hidden = !on; if (on) n++; });
       groups.forEach((g) => { g.hidden = !$$('tr[data-q]', g).some((tr) => !tr.hidden); });
       st.textContent = t.length ? (n ? `${n.toLocaleString('tr-TR')} kategori bulundu` : 'Eşleşen kategori yok') : '';
     };
