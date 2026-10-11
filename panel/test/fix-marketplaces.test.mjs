@@ -109,14 +109,14 @@ test('PttAVM: sınıra takılmış görünen sipariş araması aralık bölüner
 // ---------------------------------------------------------------- 3) Trendyol
 const TENV = { TRENDYOL_SELLER_ID: '42', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' };
 const tpkg = (id, lines, extra = {}) => ({ shipmentPackageId: id, orderNumber: '900', orderDate: 1790000000000 + H3, status: 'Created', lines, ...extra });
-test('Trendyol: satıcı geliri brüt − satıcı indirimi (TY indirimi satıcıya ödenir), komisyon oranı → KDV dahil tutar, boş shipBy null', async () => {
+test('Trendyol: satıcı geliri brüt − satıcı indirimi (TY indirimi satıcıya ödenir), komisyon oranı zaten KDV dahil (üzerine eklenmez), boş shipBy null', async () => {
   mock([[/\/v2\/orders\?/, { totalPages: 1, content: [tpkg(1, [
     // 2 adet: brüt 350, satıcı indirimi 35, TY indirimi 50 (adet başı) → müşteri 265, satıcı geliri 315; komisyon %13
     { lineId: 11, quantity: 2, barcode: 'B1', lineGrossAmount: 350, lineSellerDiscount: 35, lineTyDiscount: 50, lineUnitPrice: 265, commission: 13 },
     { lineId: 12, quantity: 1, barcode: 'B2', lineUnitPrice: 40 }], { packageGrossAmount: 740, packageSellerDiscount: 70, packageTyDiscount: 100, packageTotalPrice: 570 })] }]]);
   const [o] = await trendyol(TENV, { id: 'trendyol' }).fetchOrders(Date.now() - D, Date.now());
   assert.deepEqual([o.items[0].unitPrice, o.items[0].total], [315, 630]);
-  assert.equal(o.items[0].commission, Math.round(630 * 0.13 * 1.2 * 100) / 100);
+  assert.equal(o.items[0].commission, Math.round(630 * 0.13 * 100) / 100, 'Trendyol oranı KDV dahildir: üzerine KDV eklenmez');
   assert.deepEqual([o.items[1].unitPrice, o.items[1].commission], [40, undefined], 'alan yoksa net birim fiyat, komisyon yok');
   assert.equal(o.total, 670);
   assert.equal(o.shipBy, null, 'agreedDeliveryDate yoksa Infinity değil');
@@ -330,4 +330,26 @@ test('Sayfa sınırına takılan sipariş okuması imleci ilerletmez (partialUnt
   // Son sayfa kısa geldiyse sınır sayılmaz
   mock([[/shipmentPackages/, { totalPages: 1, content: [] }]]);
   assert.equal((await n11({ N11_APP_KEY: 'k', N11_APP_SECRET: 's' }, { id: 'n' }).fetchOrders(since, until)).partialUntil, undefined);
+});
+
+test('tek seferlik çevrim: kayıtlı Trendyol komisyonları 1,2\'ye bölünür (Trendyol Go ve Hepsiburada değişmez), ilan oranı yeniden hesaplanır; bir kez çalışır', async () => {
+  const { d1 } = await import('../dev/d1.mjs');
+  const { init, run: r, first: f } = await import('../src/db.js');
+  const db = d1(); await init(db);
+  await r(db, "DELETE FROM settings WHERE k IN ('once:ty_comm_incl_1', 'schema_n', 'schema_v')");
+  for (const [id, ch] of [['t1', 'trendyol'], ['g1', 'trendyolgo'], ['h1', 'hepsiburada']]) {
+    await r(db, "INSERT INTO orders (id, channel, remote_id, order_number, status, ordered_at, total) VALUES (?, ?, ?, ?, 'new', 1000, 1000)", id, ch, id, id);
+    await r(db, "INSERT INTO order_items (order_id, line_id, name, quantity, unit_price, total, remote_key, commission) VALUES (?, '1', 'x', 1, 1000, 1000, ?, 258)", id, 'k-' + id);
+    await r(db, "INSERT INTO listings (channel, remote_id, name, price, synced_at, commission, commission_src) VALUES (?, ?, 'x', 1000, 1, 25.8, 'api')", ch, 'k-' + id);
+  }
+  // init aynı nesne için bir kez çalışır: aynı veritabanına yeni bir sarmalayıcıyla yeniden açılır
+  const again = () => init({ prepare: (q) => db.prepare(q), batch: (x) => db.batch(x), exec: (q) => db.exec(q) });
+  await again();
+  const c = async (id) => (await f(db, 'SELECT commission FROM order_items WHERE order_id = ?', id)).commission;
+  const l = async (ch) => (await f(db, 'SELECT commission FROM listings WHERE channel = ?', ch)).commission;
+  assert.deepEqual([await c('t1'), await c('g1'), await c('h1')], [215, 258, 258]);
+  assert.deepEqual([await l('trendyol'), await l('trendyolgo'), await l('hepsiburada')], [21.5, 25.8, 25.8]);
+  await r(db, "DELETE FROM settings WHERE k IN ('schema_n', 'schema_v')");
+  await again();
+  assert.equal(await c('t1'), 215, 'ikinci kez bölünmez');
 });
