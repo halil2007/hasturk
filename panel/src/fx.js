@@ -111,6 +111,7 @@ export async function applyFx(db, settings, rates, { user = 'Otomatik', ids = nu
       const rate = rateOf(rates, p.currency, fx.kind);
       if (!rate) continue;
       const price = fxPrice(p, rate, fx);
+      if (!(price > 0)) continue;
       if (Math.abs(price - (p.sale_price || 0)) < 0.005) continue;
       changed++;
       st.push(db.prepare('UPDATE products SET sale_price = ?, updated_at = ? WHERE id = ?').bind(price, Date.now(), p.id));

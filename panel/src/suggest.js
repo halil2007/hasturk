@@ -27,6 +27,7 @@ export function suggestFor(r, settings) {
   let limited = '';
   if (r.min_price > 0 && price < r.min_price) { price = r2(r.min_price); limited = 'min'; }
   if (r.max_price > 0 && price > r.max_price) { price = r2(r.max_price); limited = 'max'; }
+  if (!(price > 0)) return null; // rakip fiyatı hatalı / 0 geldiyse 0 ₺ öneri üretilmez
   if (Math.abs(price - P) < 0.01) return null;
   const ch = r.channel, cost = (k) => costOf(settings, k, ch);
   const calc = (sale) => {

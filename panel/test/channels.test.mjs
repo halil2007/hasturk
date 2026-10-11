@@ -501,3 +501,19 @@ test('Trendyol: bölme isteği ve bölme sonrası sipariş hemen yenilenir (fetc
   assert.deepEqual(o.packages.map((p) => p.tracking).sort(), ['8001', '8002']);
   assert.equal(o.items[0].quantity, 2, 'adet iki kez sayılmaz');
 });
+
+test('Trendyol ilanları: ürün servisi fiyatı 0 / boş verirse stok-fiyat servisindeki fiyat kullanılır', async () => {
+  const { trendyol } = await import('../src/channels/trendyol.js');
+  const real = globalThis.fetch;
+  globalThis.fetch = async (u) => {
+    const url = String(u), j = (b) => new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (/approved\/inventory-and-price/.test(url)) return j({ totalPages: 1, content: [{ variants: [{ barcode: 'A1', quantity: 3, salePrice: 149.9, listPrice: 199 }, { barcode: 'A2', quantity: 1, price: { salePrice: 50 } }] }] });
+    if (/products\/approved/.test(url)) return j({ totalPages: 1, content: [{ productMainId: 'M', title: 'Ürün', variants: [{ barcode: 'A1', onSale: true }, { barcode: 'A2', price: { salePrice: 0 }, onSale: true }, { barcode: 'A3', price: { salePrice: 75 }, onSale: true }] }] });
+    return j({});
+  };
+  try {
+    const ch = trendyol({ TRENDYOL_SELLER_ID: '1', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' }, 'TRENDYOL_', { id: 'trendyol' });
+    const by = Object.fromEntries((await ch.fetchListings()).map((l) => [l.remoteId, [l.price, l.listPrice, l.stock]]));
+    assert.deepEqual(by, { A1: [149.9, 199, 3], A2: [50, 50, 1], A3: [75, 0, 0] });
+  } finally { globalThis.fetch = real; }
+});
