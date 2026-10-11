@@ -48,6 +48,8 @@ Ayarlar (değiştirdikten sonra `node build.mjs` çalıştırın; arama motoru v
   (boş alanlar sitede gösterilmez; yasal sayfalarda sarı `[yer tutucu]` olarak kalır — yayından önce doldurun).
   Bir pakete henüz aktif olmayan özellik eklemek için `soon: [...]` kullanın; kartta "Yakında" rozetiyle görünür.
 - **Kanal listesi (aktif / test aşamasında / yakında):** `public/assets/site.js` → `ACTIVE`, `TEST`, `SOON`; kanal sayfaları `src/data.mjs` → `INTEGRATIONS`. Kanal yetenek tablosu `src/pages/entegrasyonlar.html` içindedir.
+  Liste sayfasındaki kartlar (arama + kategori sekmeleri: Pazaryerleri, E-ticaret siteleri, Yurt dışı, Hızlı teslimat, Kargo) `data.mjs`'teki `kind`'dan derlenir; kargo kartları `site.js` → `CARGO` / `CARGO_SOON`'dan gelir. Sekme adresle de açılır: `/entegrasyonlar#kargo`.
+  Kanal sayfasındaki "Neler yapabilirsiniz" kutuları ve kart özetleri yalnız `caps`'te açık olan işlemlerden üretilir (`build.mjs` → `capTiles`, `capShort`).
   Test aşamasındaki kanallar (Amazon, Çiçeksepeti, Koçtaş, Shopify, OpenCart, Etsy; `data.mjs`'te `beta`) menüde, kartlarda ve kendi sayfalarında **“Test aşamasında”** etiketiyle görünür.
   Ana panelde Entegrasyonlar → kanal → **“Test yazısını kaldır”** denince etiket sitede de kalkar (sayfalar `/api/public/channels`'tan okur; derleme gerekmez).
 - **Rakamlar şeridi** (ana sayfa, `class="stats"`): yalnız doğrulanabilir bilgiler yazın (müşteri sayısı, memnuniyet oranı gibi değerleri gerçek veri olmadan eklemeyin).

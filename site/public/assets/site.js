@@ -51,7 +51,17 @@
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
   const wms = (dup, link = true) => ACTIVE.map((x) => `<${link ? 'a href="/entegrasyonlar"' : 'span'} class="wm${dup ? ' dup' : ''}" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</${link ? 'a' : 'span'}>`).join('');
   const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}${TEST.has(x[5]) ? '<span class="tt">Test aşamasında</span>' : DEV.has(x[5]) ? '<span class="tt">Geliştirme aşamasında</span>' : ''}</small></div></div>`).join('');
+  // Entegrasyonlar sayfası: kargo kartları (kanal kartlarıyla aynı tasarım; build.mjs → chCard / logoTile ile eş)
+  const lum = (h) => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+  const logoTile = (w, c) => `<span class="lt${lum(c) > 0.62 ? ' fill' : ''}" style="--c:${c};--k:${w.length <= 6 ? 1 : w.length <= 9 ? 0.86 : w.length <= 11 ? 0.76 : 0.68};--n:${w.length}" aria-hidden="true"><span>${esc(w)}</span></span>`;
+  const cargoCard = (x, soon) => {
+    const test = / test aşamasında/.test(x[1]), kind = x[1].replace(/ · test aşamasında/, '');
+    const st = soon ? '<span class="st dev">Geliştirme aşamasında</span>' : test ? '<span class="st test">Test aşamasında</span>' : '<span class="st ok">Aktif</span>';
+    return `<a class="ch${soon ? ' is-dev' : ''}" href="/ozellikler/kargo-entegrasyonu" data-cat="kargo" data-q="${esc(x[0] + ' ' + kind)}">${logoTile(x[0], x[2])}<span class="ch-n"><b>${esc(x[0])}</b><small>${esc(kind)}</small></span><span class="ch-d">${soon ? 'Etiket ve takip numarası · hazırlanıyor' : 'Etiket · Takip numarası · Teslimat takibi'}</span><span class="ch-f">${st}<em>${soon ? 'İncele' : 'Ayrıntılar'} <svg><use href="#i-arrow"/></svg></em></span></a>`;
+  };
+  let refilter = () => {};
   const drawChannels = () => {
+    $$('[data-cargo-cards]').forEach((el) => { el.innerHTML = CARGO.map((x) => cargoCard(x)).join('') + CARGO_SOON.map((x) => cargoCard(x, true)).join(''); });
     const logos = $('[data-logos]');
     if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
     const logosStatic = $('[data-logos-static]');
@@ -63,7 +73,40 @@
     // Derlenmiş sayfalardaki "Test aşamasında" etiketleri (menü, kartlar, kanal sayfası): testi biten türde kalkar, yerine "Aktif entegrasyon"
     $$('[data-beta]').forEach((el) => { if (!TEST.has(el.dataset.beta)) el.remove(); });
     $$('[data-beta-on]').forEach((el) => { el.hidden = TEST.has(el.dataset.betaOn); });
+    refilter();
   };
+  // Entegrasyonlar sayfası: arama kutusu + kategori sekmeleri (adres #pazaryerleri, #kargo… ile açılabilir)
+  const chBox = $('[data-chfilter]');
+  if (chBox) {
+    const norm = (s) => String(s).toLocaleLowerCase('tr').replace(/[çğıöşüâî]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i' }[c])).replace(/[^a-z0-9]+/g, '');
+    const input = $('[data-chsearch]', chBox), tabs = $$('[data-f]', chBox);
+    let cat = 'all', reveal = null;
+    const fromHash = () => {
+      const t = tabs.find((b) => b.dataset.h && '#' + b.dataset.h === location.hash);
+      if (t) { cat = t.dataset.f; reveal = t; } // telefonda seçili sekme görünsün
+    };
+    refilter = () => {
+      const q = norm(input.value), cards = $$('.ch', chBox), counts = { all: 0 };
+      let shown = 0;
+      cards.forEach((c) => {
+        const hit = !q || norm(c.dataset.q).includes(q);
+        if (hit) { counts.all++; counts[c.dataset.cat] = (counts[c.dataset.cat] || 0) + 1; }
+        c.hidden = !(hit && (cat === 'all' || c.dataset.cat === cat));
+        if (!c.hidden) shown++;
+      });
+      tabs.forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.f === cat)); const n = $('[data-n]', b); if (n) n.textContent = counts[b.dataset.f] || 0; });
+      $('[data-chempty]', chBox).hidden = shown > 0;
+      if (reveal) { const row = reveal.parentElement, d = reveal.getBoundingClientRect().right - row.getBoundingClientRect().right; if (d > 0) row.scrollLeft += d + 16; reveal = null; }
+    };
+    tabs.forEach((b) => b.addEventListener('click', () => {
+      cat = b.dataset.f;
+      try { history.replaceState(null, '', b.dataset.h ? '#' + b.dataset.h : location.pathname + location.search); } catch (e) { /* adres değişmese de filtre çalışır */ }
+      refilter();
+    }));
+    input.addEventListener('input', refilter);
+    window.addEventListener('hashchange', () => { fromHash(); refilter(); });
+    fromHash();
+  }
   drawChannels();
   // Panelde testi biten kanallar: "Test aşamasında" etiketi kalkar (panel yanıt vermezse sayfa olduğu gibi kalır)
   if (S.panelUrl && (document.querySelector('[data-integ], [data-beta]'))) {
