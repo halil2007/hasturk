@@ -56,7 +56,8 @@ test('idefix: stok/fiyat gönderimi batchRequestId döndürür; inventory-result
     const st = await c.pushStatus('101b-1');
     assert.match(calls[2].url, /\/pim\/catalog\/16705\/inventory-result\/101b-1$/);
     assert.equal(st.done, true);
-    assert.deepEqual(st.items, [{ key: 'B1', ok: true, error: '' }, { key: 'B2', ok: false, error: 'barkod idefix ürün havuzunda yok' }]);
+    assert.deepEqual(st.items, [{ key: 'B1', ok: true, error: '' }, { key: 'B2', ok: false, error: st.items[1].error }]);
+    assert.match(st.items[1].error, /idefix bu barkodu satıştaki ürünleri arasında bulamadı/);
     const pend = await c.pushStatus('101b-2');
     assert.equal(pend.done, false);
   }, (c) => {
@@ -101,10 +102,13 @@ test('idefix: nesne olarak gelen red nedeni okunur yazıya çevrilir ("[object O
       'fiyat yok (ilanın idefix fiyatı bilinmiyor; ürünün idefix fiyatını girin) (Fiyat bilgisi bulunamadı)',
       'Stok miktarı geçersiz',
       '{"foo":1}',
+      st.items[3].error,
     ]);
+    assert.match(st.items[3].error, /^idefix bu barkodu/);
   }, () => J({ status: 'COMPLETED', items: [
     { barcode: 'B1', status: 'decline', failureReasons: [{ code: 'NO_PRICE', message: 'Fiyat bilgisi bulunamadı' }] },
     { barcode: 'B2', status: 'decline', failureReasons: [{ failureReason: 'X_UNKNOWN', description: 'Stok miktarı geçersiz' }] },
     { barcode: 'B3', status: 'decline', failureReasons: [{ foo: 1 }] },
+    { barcode: 'B4', status: 'decline', failureReasons: [{ message: 'PRODUCT_NOT_FOUND' }] },
   ] }));
 });
