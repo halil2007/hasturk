@@ -142,34 +142,45 @@
   // Havale / EFT indirimi yalnız yıllık alımda (config.js → eftDiscount); aylıkta havale / EFT tam fiyat
   const eftPct = () => Number(S.eftDiscount) || 0;
   const eftPrice = (amount, period) => (period === 'yearly' ? Math.round((amount || 0) * (100 - eftPct()) / 100) : amount || 0);
-  // Paketler: fiyatlar KDV dahil; büyük fiyat aylık, altında yıllık alım kutusu (2 ay hediye, peşin fiyatına taksit)
+  // Paketler (.pr-plan): fiyatlar KDV dahil; dönem düğmesi ([data-plan-period]) kartları aylık / yıllık gösterir.
+  // Yıllıkta 12 ay yerine 10 ay ücret, peşin fiyatına taksit ve havale / EFT indirimi kartta kısaca yazar.
+  let planPeriod = 'monthly', planShop = false;
   const priceHtml = (p) => {
-    if (!p.monthly && !p.yearly) return '<div class="price">Teklif alın</div>';
-    const save = p.monthly && p.yearly ? p.monthly * 12 - p.yearly : 0;
-    const inst = S.installments && p.yearly ? `${S.installments} × ${tl(p.yearly / S.installments)} ₺` : '';
-    return `<div class="price">${tl(p.monthly)} <span class="cur">₺</span><small>/ ay</small></div>
-      <div class="vatline">KDV dahil · aylık ödeme</div>
-      ${p.yearly ? `<div class="yearly"><div class="y-top"><b>Yıllık ${tl(p.yearly)} ₺</b><small>KDV dahil</small>${save ? `<span class="save">${tl(save)} ₺ kazanç</span>` : ''}</div>
-        <div class="y-sub">2 ay hediye · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
-        ${inst ? `<div class="y-inst"><b>Peşin fiyatına ${S.installments} taksit</b><span>${inst}</span></div>` : ''}
-        ${S.maxInstallments ? `<div class="y-sub">Kredi kartına ${S.maxInstallments} taksite kadar</div>` : ''}
-        ${eftPct() ? `<div class="y-eft">Havale / EFT ile <b>${tl(eftPrice(p.yearly, 'yearly'))} ₺</b> <small>(%${eftPct()} indirim)</small></div>` : ''}</div>` : ''}`;
+    if (!p.monthly && !p.yearly) return '<div class="pr-price"><b>Teklif alın</b></div>';
+    const yearly = planPeriod === 'yearly' && p.yearly, save = p.monthly && p.yearly ? p.monthly * 12 - p.yearly : 0;
+    if (!yearly) return `<div class="pr-price"><b>${tl(p.monthly)}</b><span class="cur">₺</span><small>/ ay</small></div>
+      <div class="pr-sub">KDV dahil · her ay ödenir</div>
+      ${p.yearly ? `<div class="pr-sub2">Yıllık alımda ${tl(p.yearly)} ₺ · 2 ay hediye</div>` : ''}`;
+    const inst = S.installments ? `peşin fiyatına ${S.installments} × ${tl(p.yearly / S.installments)} ₺` : '';
+    const eft = eftPct() ? `havale / EFT ile ${tl(eftPrice(p.yearly, 'yearly'))} ₺` : '';
+    return `<div class="pr-price"><b>${tl(p.yearly)}</b><span class="cur">₺</span><small>/ yıl</small>${save ? `<span class="pr-save">${tl(save)} ₺ kazanç</span>` : ''}</div>
+      <div class="pr-sub">KDV dahil · aylık ${tl(p.yearly / 12)} ₺'ye gelir</div>
+      ${inst || eft ? `<div class="pr-sub2">${[inst, eft].filter(Boolean).join(' · ').replace(/^./, (c) => c.toLocaleUpperCase('tr'))}</div>` : ''}`;
   };
-  // "Hemen satın al" yalnız online satış açıkken (panelde iyzico API bilgileri girilmişse) görünür; kapalıyken eski hali
-  const renderPlans = (shop) => $$('[data-plans]').forEach((el) => {
-    el.innerHTML = (S.plans || []).map((p) => `<div class="plan${p.featured ? ' featured' : ''}">${p.featured ? '<span class="badge">En çok tercih edilen</span>' : ''}
-      <h3>${esc(p.name)}</h3><div class="tag">${esc(p.tag)}</div>${priceHtml(p)}
-      <div class="limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
-      <ul>${p.items.map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-bolt"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul>
-      ${shop && p.key ? `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/satin-al?plan=${p.key}&amp;donem=yillik">Hemen satın al</a>
-      <a class="btn btn-line plan-trial" href="/demo#deneme">7 gün ücretsiz deneyin</a>` : `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/demo#deneme">7 gün ücretsiz deneyin</a>`}
-      <a class="plan-demo" data-demo href="/demo">ya da önce demo panelini açın →</a></div>`).join('');
+  // "Satın al" yalnız online satış açıkken görünür; kapalıyken kartta yalnız ücretsiz deneme düğmesi olur
+  const renderPlans = (shop = planShop) => {
+    planShop = shop;
+    const donem = planPeriod === 'yearly' ? 'yillik' : 'aylik';
+    $$('[data-plans]').forEach((el) => {
+      el.innerHTML = (S.plans || []).map((p) => `<div class="pr-plan${p.featured ? ' is-featured' : ''}">${p.featured ? '<span class="pr-badge">Önerilen</span>' : ''}
+        <h3>${esc(p.name)}</h3><p class="pr-tag">${esc(p.tag)}</p>${priceHtml(p)}
+        <div class="pr-limits">${(p.limits || []).map((x) => `<span>${esc(x)}</span>`).join('')}</div>
+        <div class="pr-ctas">${shop && p.key ? `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/satin-al?plan=${p.key}&amp;donem=${donem}">Satın al</a>
+          <a class="btn btn-line" href="/demo#deneme">7 gün ücretsiz deneyin</a>` : `<a class="btn ${p.featured ? 'btn-primary' : 'btn-outline'}" href="/demo#deneme">7 gün ücretsiz deneyin</a>`}</div>
+        <div class="pr-feats"><p>${p.base ? `${esc(p.base)} paketindeki her şey, ek olarak:` : 'Pakette neler var:'}</p>
+          <ul>${(p.items || []).map((x) => `<li><svg><use href="#i-check"/></svg><span>${esc(x)}</span></li>`).join('')}${(p.soon || []).map((x) => `<li class="soon"><svg><use href="#i-clock"/></svg><span>${esc(x)} <em>Yakında</em></span></li>`).join('')}</ul></div>
+        </div>`).join('');
+    });
+  };
+  $$('[data-plan-period]').forEach((g) => {
+    const sync = () => $$('button', g).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.p === planPeriod)));
+    g.addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (!b || b.dataset.p === planPeriod) return; planPeriod = b.dataset.p; sync(); renderPlans(); });
+    sync();
   });
   renderPlans(false);
   const shopOn = () => {
     document.documentElement.classList.add('shop-on');
     renderPlans(true);
-    $$('[data-plans] [data-demo]').forEach((a) => { if (S.demoUrl) { a.href = S.demoUrl; a.target = '_blank'; a.rel = 'noopener'; } });
   };
   // Satın alma: kartla ödeme yalnız iyzico açıkken; havale / EFT (banka bilgisi tanımlıysa) her zaman
   let cardOn = false;
@@ -185,11 +196,26 @@
   if (S.checkoutUrl) fetch(S.checkoutUrl + '/status').then((r) => r.json()).then((j) => shopState(!!j.online)).catch(() => shopState(false));
   else shopState(false);
   $$('[data-vat]').forEach((el) => { el.textContent = S.vat || ''; });
+  // Paket karşılaştırma tablosu (config.js → compare: gruplar ve satırlar). Telefonda [data-cmp-tabs] ile tek paket sütunu gösterilir.
   const cmp = $('[data-compare]');
   if (cmp && S.compare) {
-    const cell = (v) => (v === true ? '<td class="y"><svg><use href="#i-check"/></svg><span class="sr">Var</span></td>' : v === false ? '<td class="n"><svg><use href="#i-minus"/></svg><span class="sr">Yok</span></td>' : `<td class="t${v === 'Yakında' ? ' soon-cell' : ''}">${esc(v)}</td>`);
-    cmp.innerHTML = `<thead><tr><th scope="col">Özellik</th>${(S.plans || []).map((p) => `<th scope="col"${p.featured ? ' class="feat"' : ''}>${esc(p.name)}</th>`).join('')}</tr></thead>
-      <tbody>${S.compare.map(([k, ...v]) => `<tr><th scope="row">${esc(k)}</th>${v.map(cell).join('')}</tr>`).join('')}</tbody>`;
+    const plans = S.plans || [], fi = plans.findIndex((p) => p.featured);
+    const cell = (v, i) => {
+      const a = ` data-c="${i}"${i === fi ? ' class="f"' : ''}`;
+      if (v === true) return `<td${a}><span class="pr-yes" aria-label="Var"><svg aria-hidden="true"><use href="#i-check"/></svg></span></td>`;
+      if (v === false) return `<td${a}><span class="pr-no" aria-label="Yok">—</span></td>`;
+      return `<td${a}><span class="${v === 'Yakında' ? 'pr-soon' : 'pr-val'}">${esc(v)}</span></td>`;
+    };
+    cmp.innerHTML = `<thead><tr><th scope="col" class="pr-k">Özellikler</th>${plans.map((p, i) => `<th scope="col" data-c="${i}"${i === fi ? ' class="f"' : ''}><b>${esc(p.name)}</b>${p.monthly ? `<small>${tl(p.monthly)} ₺ / ay</small>` : ''}</th>`).join('')}</tr></thead>
+      ${S.compare.map((g) => `<tbody><tr class="pr-grp"><th scope="colgroup" colspan="${plans.length + 1}">${esc(g.group)}</th></tr>
+        ${g.rows.map(([k, ...v]) => `<tr><th scope="row">${esc(k)}</th>${v.map(cell).join('')}</tr>`).join('')}</tbody>`).join('')}`;
+    const tabs = $('[data-cmp-tabs]');
+    if (tabs) {
+      const show = (i) => { cmp.dataset.col = String(i); $$('button', tabs).forEach((b, j) => b.setAttribute('aria-selected', String(i === j))); };
+      tabs.innerHTML = plans.map((p, i) => `<button type="button" role="tab" data-i="${i}">${esc(p.name)}</button>`).join('');
+      tabs.addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) show(Number(b.dataset.i)); });
+      show(fi < 0 ? 0 : fi);
+    }
   }
 
   // Şirket / iletişim bilgileri (config.js): boşsa ilgili satır gizlenir; yasal sayfalarda [köşeli] yer tutucu kalır
