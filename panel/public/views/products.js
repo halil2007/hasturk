@@ -7,8 +7,17 @@ import { can } from '../perms.js';
 import { productErrorsSheet } from './listerrs.js';
 import { attachCatPicker } from './catpick.js';
 import { normCat } from '../catpath.js';
-import { explainError } from '../listerr.js';
+import { explainError, isHeld, realError, isChannelSide, channelStateText, SELLER_PANEL } from '../listerr.js';
 const errText = (e) => { const x = explainError(e); return `${x.kind ? x.kind + ': ' : ''}${x.title} — ${x.fix}`; };
+// Ürün formu: kanal kaynaklı durumlar (kanalın onaylamadığı / onay beklediği ilan, kanal kaynaklı hata) sakin bir bilgi kutusunda,
+// kanal adı ve nedeniyle. Ürünler listesinde hata olarak görünmez.
+function chSideNotice(ls) {
+  const xs = ls.filter((l) => isChannelSide(l) || l.remote_state === 'passive');
+  if (!xs.length) return '';
+  return html`<div class="notice" style="margin:0 0 10px"><i class="ico ico-help"></i><div class="stack" style="gap:6px"><b>Kanal kaynaklı durumlar</b>
+    ${xs.map((l) => { const name = ch(l.channel).name, t = channelStateText(l, name), url = SELLER_PANEL[ch(l.channel).type || l.channel];
+      return html`<div class="small"><span class="ch-name">${chLogo(l.channel, true)}<b>${name}</b></span>: ${t.short}. <span class="muted">${t.fix}</span>${url ? html` <a href="${url}" target="_blank" rel="noopener">${name} satıcı paneli</a>` : ''}</div>`; })}</div></div>`;
+}
 import { ruleDialog, ruleText } from './stocks.js';
 import { setQuery } from '../app.js';
 import { addListing, ilanNo } from './match.js';
@@ -53,15 +62,21 @@ export async function products(el, rest, query = {}) {
     return html` <span class="pill bad loss-tag" style="padding:1px 8px;font-size:11px" title="Son 30 günde ${money(-sum)} zarar (iade dahil${rc ? `; iade maliyeti ${money(rc)}` : ''}). Ayrıntı ve kârlı fiyat için ürünü açın.">zarar</span>`; };
   const codes = (p) => html`<span class="codes">${p.sku ? html`<span title="Stok kodu (SKU)">${p.sku}</span>` : html`<span class="miss">SKU yok</span>`}${p.barcode ? html`<span title="Barkod">${p.barcode}</span>` : ''}</span>`;
   // Kanallar: logo yığını + kanal fiyat aralığı; ayrıntı ipucunda. Hata kırmızı, kanalda yoksa uyarı.
+  // Logo yalnız ürünün yayında olduğu kanallarda: kanalın henüz onaylamadığı ilan (ör. idefix "eksik bilgi") logo göstermez ve hata
+  // sayılmaz (kanal kaynaklı; ayrıntı ürünün içinde). Kanalda satışa kapalı ilanın logosu soluk.
   function chans(list) {
-    const ls = list.flatMap((p) => p.listings || []);
-    if (!ls.length) return html`<span class="pill amber">Kanalda yok</span>`;
-    const ids = [...new Set(ls.map((l) => l.channel))], err = ls.filter((l) => l.error);
+    const all = list.flatMap((p) => p.listings || []);
+    if (!all.length) return html`<span class="pill amber">Kanalda yok</span>`;
+    const ls = all.filter((l) => !isHeld(l)), heldCh = [...new Set(all.filter(isHeld).map((l) => l.channel))].filter((c) => !ls.some((l) => l.channel === c));
+    const heldTip = heldCh.map((c) => `${ch(c).name}: ${channelStateText(all.find((l) => l.channel === c && isHeld(l)), ch(c).name).short}`).join('\n');
+    if (!ls.length) return html`<span class="pill" title="${heldTip}">Yayında değil</span>`;
+    const ids = [...new Set(ls.map((l) => l.channel))], err = ls.filter(realError);
+    const off = (c) => ls.filter((l) => l.channel === c).every((l) => l.remote_state === 'passive');
     const prices = ls.map((l) => l.price).filter((x) => x > 0), lo = Math.min(...prices), hi = Math.max(...prices);
-    const tip = ids.map((c) => { const xs = ls.filter((l) => l.channel === c); return `${ch(c).name}: ${xs.map((l) => money(l.price)).join(', ')}${xs.some((l) => l.error) ? ' (hata)' : ''}`; }).join('\n');
+    const tip = ids.map((c) => { const xs = ls.filter((l) => l.channel === c); return `${ch(c).name}: ${xs.map((l) => money(l.price)).join(', ')}${off(c) ? ` (${channelStateText(xs[0], ch(c).name).short})` : ''}${xs.some(realError) ? ' (hata)' : ''}`; }).concat(heldTip ? [heldTip] : []).join('\n');
     // Aynı kanalda birden fazla ilan (ikinci eşleşme): "2 ilan" etiketi
-    const multi = ids.map((c) => [c, Math.max(...list.map((p) => (p.listings || []).filter((l) => l.channel === c).length))]).filter(([, k]) => k > 1);
-    return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => chLogo(c, true))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>${multi.map(([c, k]) => html`<span class="pill info" style="padding:2px 8px;font-size:11px" title="${ch(c).name}: bu ürün ${k} ilanla satılıyor">${ch(c).short || ch(c).name} ${k} ilan</span>`)}
+    const multi = ids.map((c) => [c, Math.max(...list.map((p) => (p.listings || []).filter((l) => l.channel === c && !isHeld(l)).length))]).filter(([, k]) => k > 1);
+    return html`<div class="chstack" title="${tip}"><span class="logos">${ids.slice(0, 6).map((c) => (off(c) ? html`<span class="lg-off">${chLogo(c, true)}</span>` : chLogo(c, true)))}${ids.length > 6 ? html`<span class="more">+${ids.length - 6}</span>` : ''}</span>${multi.map(([c, k]) => html`<span class="pill info" style="padding:2px 8px;font-size:11px" title="${ch(c).name}: bu ürün ${k} ilanla satılıyor">${ch(c).short || ch(c).name} ${k} ilan</span>`)}
       <span class="small num">${prices.length ? (lo === hi ? money0(lo) : `${money0(lo)} – ${money0(hi)}`) : ''}</span>${err.length ? html`<button class="pill bad" data-act="errs" data-ids="${list.map((p) => p.id).join(',')}" title="${err.map((l) => `${ch(l.channel).name}: ${l.error}`).join('\n')} (açıklama için tıklayın)">${err.length} hata</button>` : ''}</div>`;
   }
   const stockCell = (p) => {
@@ -480,10 +495,10 @@ export async function productForm(id, done) {
         <div class="small" data-fxprev></div></div>`}
       <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Aktif (pasif ürünün stoğu kanallara gönderilmez)</label>
     </div>
-    ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p></div>
+    ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p>${chSideNotice(p.listings)}</div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Fiyat</th><th class="r">Komisyon %</th><th class="r">Ürün başı kâr</th><th class="r">Kanala giden stok</th></tr></thead><tbody>
         ${p.listings.map((l) => { const r = lp(l); return html`<tr data-l="${l.channel}" data-rid="${l.remote_id}">
-          <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span>${ilanNo(p.listings, l) ? html` <span class="pill info" style="padding:2px 8px;font-size:11px">${ilanNo(p.listings, l)}</span> <button type="button" class="btn sm ghost danger" data-unl="${l.channel}|${l.remote_id}" title="Bu ilanın ürünle bağını kaldır">Ayır</button>` : ''}<div class="muted tiny ellipsis" style="max-width:180px">${l.name && ilanNo(p.listings, l) ? `${l.name} · ` : ''}${l.remote_id}</div>${l.error ? html`<div class="tiny" style="color:var(--bad)" title="${l.error}">${errText(l.error)}</div>` : ''}</td>
+          <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span>${ilanNo(p.listings, l) ? html` <span class="pill info" style="padding:2px 8px;font-size:11px">${ilanNo(p.listings, l)}</span> <button type="button" class="btn sm ghost danger" data-unl="${l.channel}|${l.remote_id}" title="Bu ilanın ürünle bağını kaldır">Ayır</button>` : ''}<div class="muted tiny ellipsis" style="max-width:180px">${l.name && ilanNo(p.listings, l) ? `${l.name} · ` : ''}${l.remote_id}</div>${isChannelSide(l) || l.remote_state === 'passive' ? html`<div class="tiny muted" title="${l.error || ''}"><i class="ico ico-help" style="width:12px;height:12px"></i> ${channelStateText(l, ch(l.channel).name).short}</div>` : realError(l) ? html`<div class="tiny" style="color:var(--bad)" title="${l.error}">${errText(l.error)}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" style="width:96px" inputmode="decimal" data-lf="price" value="${l.price ?? ''}">${l.rule_min != null ? html`<div class="tiny muted" title="Bu ilanda otomatik fiyat açık: elle girdiğiniz fiyat bu aralıkta olmalı; değişiklikten sonra otomatik fiyat 14 dakika bekler">Otomatik fiyat: ${money(l.rule_min)} – ${money(l.rule_max)}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${costRaw(st, 'commission', l.channel)}" title="KDV dahil komisyon oranı">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? 'kanaldan (son sipariş)' : l.commission_src === 'list' ? 'resmî listeden (tahmin)' : 'elle girildi'}</div>` : ''}</td>
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>

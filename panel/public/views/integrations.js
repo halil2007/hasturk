@@ -261,7 +261,7 @@ export async function integrations(el, rest = []) {
           ${live ? html`<dl class="id-kv small">
             <dt>Siparişler</dt><dd>${c.last && c.last.ordersAt ? html`<span title="${dateTime(c.last.ordersAt)}">${ago(c.last.ordersAt)}</span>` : '—'}</dd>
             ${(c.can || {}).listings !== false ? html`<dt>Ürün / stok</dt><dd>${c.last && c.last.listingsAt ? html`<span title="${dateTime(c.last.listingsAt)}">${ago(c.last.listingsAt)}</span>` : '—'}</dd>
-            <dt>İlan</dt><dd class="num">${n(c.listings)}${c.listingErrors ? html` · <button class="link" style="color:var(--bad)" data-act="lerrs" data-id="${c.id}" title="Ne olduğunu ve nasıl düzeleceğini gösterir">${c.listingErrors} hatalı</button>` : ''}</dd>` : ''}</dl>` : ''}
+            <dt>İlan</dt><dd class="num">${n(c.listings)}${c.listingErrors ? html` · <button class="link" style="color:var(--bad)" data-act="lerrs" data-id="${c.id}" title="Ne olduğunu ve nasıl düzeleceğini gösterir">${c.listingErrors} hatalı</button>` : ''}${c.channelSide ? html` · <button class="link muted" data-act="lerrs" data-id="${c.id}" title="Kanalın henüz yayına almadığı (onay bekleyen / eksik bilgili) ilanlar: panelden kaynaklanmaz">${c.channelSide} kanal kaynaklı</button>` : ''}</dd>` : ''}</dl>` : ''}
           <div class="id-acts">
             ${live && (c.can || {}).listings !== false ? html`<button class="btn sm ghost" data-act="import"><i class="ico ico-download"></i>İlanları içe aktar</button>` : ''}
             <button class="btn sm ghost" data-act="diag" data-id="${c.id}"><i class="ico ico-bolt"></i>Tanılama</button>

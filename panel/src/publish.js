@@ -14,6 +14,7 @@ import { fail, str, num, brandKey } from './util.js';
 import { exclusive } from './locks.js';
 import { rank } from './catmatch.js';
 import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes } from './catalog.js';
+import { HELD_SQL } from './sync.js';
 
 // Kanalın bir kez sorulan zorunlu seçenekleri (Ürün yükle → kanal seçenekleri ile aynı yer: upload_opts). Üçüncü değer: ürünün kendi alanı varsa o kullanılır.
 const NEED = {
@@ -250,7 +251,9 @@ function resolveVal(a, v) {
 function itemState(p, c, states, missing) {
   const s = states.get(`${p.id}|${c.id}`);
   let state = missing.length ? 'missing' : 'ready', error = null;
-  if (p.listed) state = 'live';
+  // Kanal ilanı var ama kanal henüz yayına almadı (idefix: eksik bilgi / inceleme): kanal kaynaklı durum, nedeniyle
+  if (p.listed && p.held) { const [hs, note] = String(p.held).split('|'); state = hs === 'rejected' ? 'rejected' : 'sent'; error = `${c.name} ${hs === 'rejected' ? 'onaylamadı' : 'onayı bekliyor'}${note ? `: ${note}` : ''} (kanal kaynaklı)`; }
+  else if (p.listed) state = 'live';
   else if (s && ['sent', 'live'].includes(s.state)) state = s.state;
   else if (s && ['rejected', 'error'].includes(s.state)) { state = s.state; error = s.error; }
   return { id: p.id, state, missing, error, ref: s ? s.ref : null, at: s ? s.updated_at : null, listed: !!p.listed };
@@ -422,7 +425,7 @@ async function sendStore(db, c, go, res, user) {
 async function statusOf(env, db, ctx, ids) {
   if (!ids.length) return { items: [] };
   const rows = () => allIn(db, ids, (ph, part) => [`SELECT pc.product_id AS id, pc.channel, pc.state, pc.error, pc.ref, pc.updated_at AS at,
-      EXISTS (SELECT 1 FROM listings l WHERE l.product_id = pc.product_id AND l.channel = pc.channel) AS listed FROM product_channel pc WHERE pc.product_id IN (${ph})`, part]);
+      EXISTS (SELECT 1 FROM listings l WHERE l.product_id = pc.product_id AND l.channel = pc.channel AND NOT ${HELD_SQL()}) AS listed FROM product_channel pc WHERE pc.product_id IN (${ph})`, part]);
   const now = Date.now();
   const ups = [...new Set((await allIn(db, ids, (ph, part) => [`SELECT DISTINCT upload_id FROM product_channel WHERE state = 'sent' AND upload_id IS NOT NULL AND product_id IN (${ph})`, part])).map((r) => r.upload_id))];
   if (ups.length) {

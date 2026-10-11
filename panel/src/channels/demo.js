@@ -101,6 +101,7 @@ export function demo(meta) {
     return out;
   }
 
+  const HELD_DEMO = { 'YM-6': { remoteState: 'rejected', stateNote: 'eksik bilgi: zorunlu kategori özelliği eksik' }, 'GK-SPF': { remoteState: 'pending', stateNote: 'idefix inceliyor' } };
   async function fetchListings() {
     // Ürün yükle ekranını denemek için son iki ürün pazaryerlerinde henüz yok
     return DEMO_PRODUCTS.filter((p, i) => meta.type === 'ikas' || i < DEMO_PRODUCTS.length - 2).map((p, i) => {
@@ -112,6 +113,8 @@ export function demo(meta) {
         description: `<p><b>${p[2]}</b> — ${p[9].split(' › ').pop()} kategorisinin en çok satan ürünlerinden.</p><ul><li>Aynı gün kargo</li><li>2 yıl garanti</li><li>Kolay iade</li></ul>`,
         category: meta.type === 'ikas' ? p[9] : '',
         purchasePrice: p[4], price: Math.round(p[3] * (PRICE[ch] || 1)), listPrice: Math.round(p[3] * (PRICE[ch] || 1) * 1.15), stock: 140 + ((i * 37) % 260),
+        // Kanal kaynaklı durumları denemek için: idefix bu iki ürünü henüz yayına almadı (havuzda eksik bilgi / inceleme)
+        ...(ch === 'idefix' && HELD_DEMO[p[0]] ? HELD_DEMO[p[0]] : {}),
       };
     }).concat(ch === 'hepsiburada' ? [twinListing()] : []);
   }

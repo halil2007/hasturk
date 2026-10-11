@@ -4,6 +4,7 @@
 import { api, state, html, render, $, $$, n, ch, chLogo, thumb, isMobile, actions, busy, toast, debounce, sheet, numIn, activeChannels, popMenu } from '../core.js';
 import { stockDialog, quickStock, siteStock, productForm } from './products.js';
 import { setQuery } from '../app.js';
+import { isHeld, realError, isChannelSide, channelStateText } from '../listerr.js';
 
 const STATUS = [['', 'Tüm ürünler', 'all', 'box', 'blue'], ['out', 'Stokta yok', 'out', 'x', 'red'], ['runout', 'Tükenmek üzere', 'runout', 'warn', 'red'], ['below', 'Kritik seviyede', 'below', 'db', 'amber'], ['enough', 'Yeterli', 'enough', 'check', 'green']];
 const EXTRA = [['', 'Tüm kanal durumları'], ['waiting', 'Kanala gönderim bekleyen'], ['error', 'Kanal hatası olan'], ['nolisting', 'Hiçbir kanalda olmayan']];
@@ -35,13 +36,16 @@ export async function stocks(el, rest, query = {}) {
   const cls = (p) => (p.stock <= 0 ? 'neg' : p.stock <= (p.low_limit ?? low()) ? 'low' : '');
   // Kanal hücresi: kanaldaki adet. Panel stoğuyla aynıysa sade, gönderim bekliyorsa turuncu (eski → yeni), hata kırmızı
   function cell(p, c) {
-    const xs = (p.listings || []).filter((x) => x.channel === c.id);
+    const all = (p.listings || []).filter((x) => x.channel === c.id), xs = all.filter((x) => !isHeld(x));
+    // Kanalın henüz yayına almadığı ilan (onay bekliyor / eksik bilgi): stok gönderilmez, hata değil; nedeni ipucunda
+    if (!xs.length && all.length) return html`<span class="chc none" title="${c.name}: ${channelStateText(all[0], c.name).short}">—</span>`;
     // Aynı kanalda birden fazla ilan (ikinci eşleşme): hatalı / bekleyen ilan öne alınır, "2 ilan" notu eklenir
-    const l = xs.find((x) => x.error) || xs.find((x) => (x.pushed_stock ?? x.remote_stock) !== (x.desired ?? Math.max(0, p.stock))) || xs[0];
+    const l = xs.find(realError) || xs.find((x) => (x.pushed_stock ?? x.remote_stock) !== (x.desired ?? Math.max(0, p.stock))) || xs[0];
     if (!l) return html`<span class="chc none" title="Bu kanalda ilanı yok">—</span>`;
     const want = l.desired ?? Math.max(0, p.stock), shown = l.pushed_stock ?? l.remote_stock;
     const rule = html`${l.stock_mode && l.stock_mode !== 'shared' ? html`<span class="rule" title="Kanal stok kuralı">${ruleText(l)}</span>` : ''}${xs.length > 1 ? html`<span class="rule" title="Bu ürün bu kanalda ${xs.length} ilanla satılıyor; stok hepsine gider">${xs.length} ilan</span>` : ''}`;
-    if (l.error) return html`<button class="chc err" data-act="rule" data-id="${p.id}" title="${l.error}"><i class="ico ico-warn"></i>${shown ?? '?'}${rule}</button>`;
+    if (realError(l)) return html`<button class="chc err" data-act="rule" data-id="${p.id}" title="${l.error}"><i class="ico ico-warn"></i>${shown ?? '?'}${rule}</button>`;
+    if (isChannelSide(l)) return html`<button class="chc" data-act="rule" data-id="${p.id}" title="${c.name}: ${channelStateText(l, c.name).short}">${shown ?? '?'}${rule}</button>`;
     if (pushOn(c.id) && shown !== want) return html`<button class="chc wait" data-act="rule" data-id="${p.id}" title="Kanala gönderim bekliyor">${shown ?? '?'} → ${want}${rule}</button>`;
     const v = pushOn(c.id) ? want : shown;
     return html`<button class="chc ${(v ?? 0) <= 0 ? 'zero' : ''}" data-act="rule" data-id="${p.id}" title="${pushOn(c.id) ? 'Kanaldaki stok' : `Kanaldaki stok (gönderim kapalı)${shown !== want ? ` · senkron açılınca ${want} olur` : ''}`}">${v ?? '?'}${rule}</button>`;

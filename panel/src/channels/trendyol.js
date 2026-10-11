@@ -187,6 +187,8 @@ export function trendyol(env, meta) {
       groupName: str(p.title), variantName: [...new Set(attrs)].join(' / '),
       image: str(((p.images || v.images || [])[0] || {}).url), images: imageList((v.images || []).length ? v.images : p.images), price: num(price.salePrice ?? v.salePrice), listPrice: num(price.listPrice ?? v.listPrice),
       stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
+      // Satışa kapalı ilanın nedeni (Trendyol'un verdiği bayraklardan)
+      stateNote: [v.archived && 'arşivde', v.blacklisted && 'kara listede', v.locked && 'kilitli', v.onSale === false && 'satışa kapalı'].filter(Boolean).join(', '),
       brand: str((p.brand && typeof p.brand === 'object' ? p.brand.name : p.brand) || p.brandName), description: str(p.description),
       url: str(v.productUrl || p.productUrl),
       // Trendyol kategori adı (onaylı ürün v2: category { id, name }; eski filterProducts: categoryName): resmî komisyon listesiyle sağlama için

@@ -2,7 +2,7 @@
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES, DEV_TYPES, isIntl } from './config.js';
-import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
+import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, HELD_SQL, REAL_ERR_SQL, CH_SIDE_SQL, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -783,8 +783,9 @@ async function listProducts(db, q) {
   if (q.filter === 'enough') where.push(`p.stock > ${low}`);
   if (q.filter === 'low') where.push(`p.stock <= ${low}`);
   if (q.filter === 'nocost') where.push('(p.purchase_price IS NULL OR p.purchase_price = 0)');
-  if (q.filter === 'waiting') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED})`);
-  if (q.filter === 'error') where.push('EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.error IS NOT NULL)');
+  // Kanal onayı bekleyen ilan gönderim beklemez (kanal kabul etmez); kanal kaynaklı hata hata sayılmaz
+  if (q.filter === 'waiting') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED} AND NOT ${HELD_SQL()})`);
+  if (q.filter === 'error') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND ${REAL_ERR_SQL()})`);
   if (q.filter === 'nosku') where.push("COALESCE(TRIM(p.sku), '') = ''");
   if (q.filter === 'nobarcode') where.push("COALESCE(TRIM(p.barcode), '') = ''");
   if (q.filter === 'nolisting') where.push('NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)');
@@ -839,7 +840,7 @@ async function listProducts(db, q) {
   const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    const [ls, soldRows] = await Promise.all([allIn(db, ids, (ph, part) => [`SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.extra_link, l.image, ${DESIRED} AS desired
+    const [ls, soldRows] = await Promise.all([allIn(db, ids, (ph, part) => [`SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.error_side, l.remote_state, l.remote_state_note, l.stock_mode, l.stock_value, l.match, l.extra_link, l.image, ${DESIRED} AS desired
       FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ph}) ORDER BY l.extra_link, l.remote_id`, part]),
     // Satış hızı: son 30 günde satılan adet ve mevcut stokla kaç gün yeteceği
     allIn(db, ids, (ph, part) => [`SELECT i.product_id AS id, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id IN (${ph}) AND o.ordered_at >= ?
@@ -1056,14 +1057,16 @@ async function clearFailures(db, id, note) {
 async function channelsInfo(env, db) {
   // Tek seferde: ilan sayıları + tüm kanalların son senkron durumu (kanal başına ayrı sorgu yapılmaz)
   const [counts, lasts, chs] = await Promise.all([
-    all(db, 'SELECT channel, COUNT(*) AS n, SUM(product_id IS NOT NULL) AS linked, SUM(error IS NOT NULL) AS errors FROM listings GROUP BY channel'),
+    // Hatalı: panelin düzeltebileceği hatalar. Kanal kaynaklı (onay bekleyen / onaylanmayan ilan, kanal kaynaklı hata) ayrı sayılır
+    all(db, `SELECT channel, COUNT(*) AS n, SUM(product_id IS NOT NULL) AS linked, SUM(${REAL_ERR_SQL('listings')}) AS errors,
+      SUM(COALESCE(match, '') != 'gone' AND ${CH_SIDE_SQL('listings')}) AS chside FROM listings GROUP BY channel`),
     all(db, "SELECT k, v FROM settings WHERE k LIKE 'last:%'"),
     getChannels(env, db),
   ]);
   const last = new Map(lasts.map((r) => { try { return [r.k.slice(5), JSON.parse(r.v)]; } catch { return [r.k.slice(5), null]; } }));
   return chs.map((c) => {
     const x = counts.find((r) => r.channel === c.id) || {};
-    return { ...publicInfo(c), last: last.get(c.id) || null, listings: x.n || 0, linked: x.linked || 0, listingErrors: x.errors || 0 };
+    return { ...publicInfo(c), last: last.get(c.id) || null, listings: x.n || 0, linked: x.linked || 0, listingErrors: x.errors || 0, channelSide: x.chside || 0 };
   });
 }
 
@@ -1210,21 +1213,33 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // ---------- ilan hataları: nedenine göre gruplu, açıklamalı; yeniden deneme ----------
   if (path === 'listings/errors' && m === 'GET') {
     const w = q.channel ? ' AND l.channel = ?' : '', a = q.channel ? [String(q.channel)] : [];
-    const rows = await all(db, `SELECT l.channel, l.remote_id, l.sku, l.barcode, l.error, l.product_id, p.name, p.variant_name FROM listings l LEFT JOIN products p ON p.id = l.product_id
-      WHERE l.error IS NOT NULL${w} ORDER BY l.channel, l.error LIMIT 2000`, ...a);
-    const groups = new Map();
-    for (const r of rows) {
-      const k = r.channel + '|' + errorKey(r.error);
-      const g = groups.get(k) || groups.set(k, { channel: r.channel, error: r.error, ...explainError(r.error), count: 0, items: [] }).get(k);
-      g.count++;
-      if (g.items.length < 20) g.items.push({ remote_id: r.remote_id, sku: r.sku, barcode: r.barcode, product_id: r.product_id, name: r.name ? `${r.name}${r.variant_name ? ' · ' + r.variant_name : ''}` : '', error: r.error });
-    }
-    return json({ total: rows.length, groups: [...groups.values()].sort((x, y) => y.count - x.count) });
+    const COLS = 'l.channel, l.remote_id, l.sku, l.barcode, l.error, l.error_side, l.remote_state, l.remote_state_note, l.product_id, p.name, p.variant_name';
+    const [rows, side] = await Promise.all([
+      all(db, `SELECT ${COLS} FROM listings l LEFT JOIN products p ON p.id = l.product_id WHERE ${REAL_ERR_SQL()}${w} ORDER BY l.channel, l.error LIMIT 2000`, ...a),
+      // Kanal kaynaklı: kanalın onaylamadığı / onay bekleyen ilanlar ve kanal kaynaklı hatalar (panel hatası değil; ayrı grupta)
+      all(db, `SELECT ${COLS} FROM listings l LEFT JOIN products p ON p.id = l.product_id WHERE COALESCE(l.match, '') != 'gone' AND ${CH_SIDE_SQL()}${w}
+        ORDER BY l.channel, l.product_id IS NULL, l.remote_state, l.remote_state_note LIMIT 2000`, ...a),
+    ]);
+    const item = (r) => ({ remote_id: r.remote_id, sku: r.sku, barcode: r.barcode, product_id: r.product_id, name: r.name ? `${r.name}${r.variant_name ? ' · ' + r.variant_name : ''}` : '', error: r.error });
+    const group = (list, keyOf, make) => {
+      const groups = new Map();
+      for (const r of list) {
+        const k = r.channel + '|' + keyOf(r);
+        const g = groups.get(k) || groups.set(k, { channel: r.channel, ...make(r), count: 0, linked: 0, items: [] }).get(k);
+        g.count++; if (r.product_id) g.linked++;
+        if (g.items.length < 20) g.items.push(item(r));
+      }
+      return [...groups.values()].sort((x, y) => y.count - x.count);
+    };
+    const held = (r) => r.remote_state === 'pending' || r.remote_state === 'rejected';
+    return json({ total: rows.length, groups: group(rows, (r) => errorKey(r.error), (r) => ({ error: r.error, ...explainError(r.error) })),
+      channelSide: { total: side.length, groups: group(side, (r) => (held(r) ? `s:${r.remote_state}|${r.remote_state_note || ''}` : 'e:' + errorKey(r.error)),
+        (r) => (held(r) ? { state: r.remote_state, note: r.remote_state_note || '' } : { error: r.error, ...explainError(r.error) })) } });
   }
   if (path === 'listings/errors/retry' && m === 'POST') {
     const b = await body(req), w = b.channel ? ' AND channel = ?' : '', a = b.channel ? [str(b.channel)] : [];
     // Hata silinir; stok yeniden gönderilecek, fiyat hatasında fiyat yeniden gönderilecek olarak işaretlenir (sonraki senkron / şimdi)
-    const r = await run(db, `UPDATE listings SET pushed_stock = CASE WHEN error LIKE 'Fiyat%' THEN pushed_stock ELSE NULL END, price_dirty = CASE WHEN error LIKE 'Fiyat%' THEN 1 ELSE price_dirty END, error = NULL, error_at = NULL WHERE error IS NOT NULL${w}`, ...a);
+    const r = await run(db, `UPDATE listings SET pushed_stock = CASE WHEN error LIKE 'Fiyat%' THEN pushed_stock ELSE NULL END, price_dirty = CASE WHEN error LIKE 'Fiyat%' THEN 1 ELSE price_dirty END, error = NULL, error_at = NULL, error_side = NULL WHERE error IS NOT NULL AND NOT ${HELD_SQL('listings')}${w}`, ...a);
     const n = (r && r.meta && r.meta.changes) || 0;
     await log(db, b.channel || null, 'info', `${user.name}: ${n} ilan hatası temizlendi, stok / fiyat yeniden gönderilecek`);
     return json({ ok: true, n });

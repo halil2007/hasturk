@@ -34,3 +34,35 @@ export function explainError(msg) {
 }
 // Aynı nedenli hataları tek grupta toplamak için: sayılar, kodlar ve tırnak içindeki değerler atılır
 export const errorKey = (msg) => String(msg || '').replace(/["'“”][^"'“”]{0,80}["'“”]/g, '…').replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, '#').replace(/\d+([.,]\d+)?/g, '#').slice(0, 160);
+
+// ---------- kanaldaki yayın durumu (listings.remote_state) ----------
+// pending: kanal onayı bekliyor · rejected: kanal onaylamadı (eksik bilgi, red) · passive: kanalda satışa kapalı · boş: yayında.
+// Onay bekleyen / onaylanmayan ilan kanal kaynaklıdır: hata sayılmaz, stok / fiyat gönderilmez, ürün listesinde kanal logosu gösterilmez.
+export const isHeld = (l) => !!l && (l.remote_state === 'pending' || l.remote_state === 'rejected');
+export const isLive = (l) => !!l && !isHeld(l) && l.remote_state !== 'passive';
+// Kanal kaynaklı hata (ör. idefix PRODUCT_NOT_FOUND) ya da yayında olmayan ilan
+export const isChannelSide = (l) => isHeld(l) || (!!l && !!l.error && l.error_side === 'channel');
+// Panelin düzeltebileceği gerçek ilan hatası
+export const realError = (l) => !!l && !!l.error && !isChannelSide(l);
+const STATE_LABEL = { pending: 'kanal onayı bekliyor', rejected: 'kanal onaylamadı', passive: 'kanalda satışa kapalı' };
+// Kanal adıyla açıklama: { short: "yayında değil — idefix onaylamadı (eksik bilgi)", fix: ne yapmalı }
+export function channelStateText(l, name = 'Kanal') {
+  if (isHeld(l) || (l && l.remote_state === 'passive')) {
+    const lbl = l.remote_state === 'pending' ? `${name} onayı bekliyor` : l.remote_state === 'rejected' ? `${name} onaylamadı` : STATE_LABEL.passive;
+    const note = l.remote_state_note ? ` (${l.remote_state_note})` : '';
+    const fix = l.remote_state === 'passive' ? `İlan ${name} tarafında satışa kapalı; ${name} satıcı panelinden açabilirsiniz.`
+      : l.remote_state === 'rejected' ? `Bu durum ${name} kaynaklı, panelden kaynaklanmıyor. Ürün bilgilerini ${name} satıcı panelinden tamamlayın; ${name} onaylayınca stok ve fiyat otomatik gönderilir.`
+        : `Bu durum ${name} kaynaklı, panelden kaynaklanmıyor. ${name} onaylayınca stok ve fiyat otomatik gönderilir.`;
+    return { short: `${l.remote_state === 'passive' ? 'satışa kapalı' : 'yayında değil'} — ${lbl}${note}`, fix };
+  }
+  if (l && l.error && l.error_side === 'channel') {
+    const x = explainError(l.error);
+    // Kanal ilanı satıştaki ürünleri arasında bulamadı (idefix PRODUCT_NOT_FOUND): ürün kanalda henüz onaylanmamış / pasif
+    if (/PRODUCT_NOT_FOUND|bulamad|not ?found/i.test(l.error)) return { short: `${name} kaynaklı — ürün kanalda henüz satışta değil`, text: x.text,
+      fix: `Bu durum ${name} kaynaklı, panelden kaynaklanmıyor: ${name} bu barkodu satıştaki ürünleri arasında bulamadı (ürün henüz onaylanmamış, eksik bilgili ya da pasif olabilir). ${name} satıcı panelinden ürünün durumunu kontrol edin; yayına alınınca stok ve fiyat otomatik gönderilir.` };
+    return { short: `${name} kaynaklı — ${x.title}`, fix: `Bu durum ${name} kaynaklı, panelden kaynaklanmıyor. ${x.fix}`, text: x.text };
+  }
+  return null;
+}
+// Kanalların satıcı panelleri (adresi bilinenler; idefix satıcı panelinin adresi doğrulanmadığı için yok)
+export const SELLER_PANEL = { trendyol: 'https://partner.trendyol.com', hepsiburada: 'https://merchant.hepsiburada.com', n11: 'https://so.n11.com', amazon: 'https://sellercentral.amazon.com.tr', pazarama: 'https://isortagim.pazarama.com' };
