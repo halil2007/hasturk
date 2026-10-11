@@ -222,7 +222,7 @@
   }));
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
 
-  // Özellikler ve Entegrasyonlar mega menüleri (masaüstü): fareyle kısa gecikmeyle açılır / kapanır; klavyede odakla açılır, Escape kapatır;
+  // Özellikler, Entegrasyonlar ve Araçlar mega menüleri (masaüstü): fareyle kısa gecikmeyle açılır / kapanır; klavyede odakla açılır, Escape kapatır;
   // dokunmatik ekranda ilk dokunuş açar, ikinci dokunuş menünün sayfasına gider. Aynı anda tek panel açık kalır. JS yoksa CSS hover / focus çalışır.
   const mms = [];
   $$('[data-mm]').forEach((dd) => {
@@ -247,6 +247,29 @@
     document.addEventListener('pointerdown', (e) => { if (dd.classList.contains('open') && !dd.contains(e.target)) set(false); });
     // Başka bir menü öğesine geçilince hemen kapan (iki panel üst üste binmesin)
     $$('.nav > a, .nav > .dd').forEach((o) => o !== dd && o.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch' && dd.classList.contains('open')) set(false); }));
+  });
+
+  // Araçlar menüsündeki hızlı KDV kartı (tam araçlar: assets/tools.js). "1.234,56" ve "1234.56" ikisi de okunur.
+  $$('[data-mini-kdv]').forEach((box) => {
+    const inp = $('.mk-in', box), out = $('[data-mk-o]', box), lbl = $('[data-mk-l]', box), vat = $('[data-mk-v]', box);
+    const num = (v) => { let s = String(v || '').replace(/[\s₺]/g, ''); const c = s.lastIndexOf(','), d = s.lastIndexOf('.');
+      if (c > -1 && d > -1) s = c > d ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, ''); else if (c > -1) s = s.replace(',', '.'); else if (/^[1-9]\d{0,2}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+      return parseFloat(s); };
+    const f2 = (n) => n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+    const pick = (sel) => $(`${sel}[aria-pressed="true"]`, box);
+    const calc = () => {
+      const a = num(inp.value), r = Number(pick('[data-r]').dataset.r), add = pick('[data-d]').dataset.d === 'add';
+      lbl.textContent = add ? 'KDV dahil' : 'KDV hariç';
+      if (!Number.isFinite(a)) { out.textContent = '–'; vat.textContent = ''; return; }
+      const net = add ? a : a / (1 + r / 100), gross = add ? a * (1 + r / 100) : a;
+      out.textContent = f2(add ? gross : net); vat.textContent = `KDV: ${f2(gross - net)}`;
+    };
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-r], button[data-d]'); if (!b) return;
+      $$(b.dataset.r ? '[data-r]' : '[data-d]', box).forEach((x) => x.setAttribute('aria-pressed', x === b)); calc();
+    });
+    inp.addEventListener('input', calc);
+    calc();
   });
 
   // Mobil menü
