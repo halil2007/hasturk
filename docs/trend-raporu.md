@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2077 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 194 sipariş; site içi olaylar son 30 gün (2099 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 > **Uyarı:** hasturktarimdunyasi mağazasının siparişleri alınamadı (Token alınamadı (401): ). Algoritma şu an yalnız bu mağazanın siparişleriyle çalışıyor. ikas'ta o mağazanın API uygulamasını ve GitHub Secrets'taki anahtarları kontrol edin.
 
@@ -13,7 +13,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | # | Ürün | Hızlanma | Son 7 gün satış | Stokta |
 |---|---|---|---|---|
 | 1 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | ×5,1 | 3 | evet |
-| 2 | HG 5’li Bitki Yetiştirme Seti | ×4,1 | 3 | evet |
+| 2 | HG 5’li Bitki Yetiştirme Seti | ×4,3 | 3 | evet |
 | 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×3,4 | 1 | evet |
 | 4 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×3,8 | 2 | evet |
 | 5 | HG Kaktüs ve Sukulent Toprağı | ×4,6 | 1 | evet |
@@ -70,7 +70,7 @@ _Henüz veri yok._
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | saksı | 12 | 9 | ↑ ×3,6 |  |
-| 2 | sıvı solucan gübresi | 27 | 6 |  |  |
+| 2 | sıvı solucan gübresi | 28 | 7 |  |  |
 | 3 | solucan gübresi | 11 | 6 | ↑ ×2,2 |  |
 | 4 | solucan | 14 | 4 |  |  |
 | 5 | kil | 4 | 4 | ↑ ×2,9 |  |
@@ -103,29 +103,29 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 |---|---|---|
 | 1 | nnh. cccccx x , z , vb. nb | 2 |
 | 2 | kompost | 2 |
-| 3 | güvercin | 1 |
-| 4 | mandalinam için | 1 |
-| 5 | mandalinam için besin | 1 |
-| 6 | mandalinam için meyveleri üstünde | 1 |
-| 7 | baltık | 1 |
-| 8 | salyangoz | 1 |
-| 9 | taban gübre | 1 |
-| 10 | yabanmersi tordu | 1 |
-| 11 | yabanmersi torfu | 1 |
-| 12 | zeytin | 1 |
-| 13 | çak | 1 |
-| 14 | akçaağaç için toprak | 1 |
-| 15 | açelya | 1 |
-| 16 | açelya toprağı | 1 |
-| 17 | beyaz topuklu ayakkabı | 1 |
-| 18 | biobi | 1 |
-| 19 | cicek tohumumenekse | 1 |
-| 20 | eyaz topuklu ayakkabı | 1 |
-| 21 | fr | 1 |
-| 22 | fr5 | 1 |
-| 23 | fr5wa | 1 |
-| 24 | fr5waz | 1 |
-| 25 | kabuklu bi | 1 |
+| 3 | nar gidesi | 1 |
+| 4 | güvercin | 1 |
+| 5 | mandalinam için | 1 |
+| 6 | mandalinam için besin | 1 |
+| 7 | mandalinam için meyveleri üstünde | 1 |
+| 8 | baltık | 1 |
+| 9 | salyangoz | 1 |
+| 10 | taban gübre | 1 |
+| 11 | yabanmersi tordu | 1 |
+| 12 | yabanmersi torfu | 1 |
+| 13 | zeytin | 1 |
+| 14 | çak | 1 |
+| 15 | akçaağaç için toprak | 1 |
+| 16 | açelya | 1 |
+| 17 | açelya toprağı | 1 |
+| 18 | beyaz topuklu ayakkabı | 1 |
+| 19 | biobi | 1 |
+| 20 | cicek tohumumenekse | 1 |
+| 21 | eyaz topuklu ayakkabı | 1 |
+| 22 | fr | 1 |
+| 23 | fr5 | 1 |
+| 24 | fr5wa | 1 |
+| 25 | fr5waz | 1 |
 
 ## En çok sepete eklenenler
 
@@ -136,18 +136,18 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 3 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 3,5 | 12,4 |
 | 4 | HasTürk Hümix Sıvı Hümik Asit | 3,3 | 19 |
 | 5 | HasTürk Solucan Gübresi  | 2,9 | 27,2 |
-| 6 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,4 | 34 |
-| 7 | SGS Bahçe Seti 3 Parça | 2,4 | 0 |
-| 8 | HG Kaktüs ve Sukulent Toprağı | 2,3 | 18,5 |
-| 9 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 2,3 | 18,8 |
-| 10 | Doğal Orman Toprağı | %100 Organik ve Humuslu | 2,2 | 17,6 |
-| 11 | HG 5’li Bitki Yetiştirme Seti | 2,2 | 14,3 |
-| 12 | Bitki Toprağı Özel Karışım - 40 LT | 2,2 | 15,4 |
-| 13 | HG Paşa Kılıcı (Sansevieria) Toprağı | 2,1 | 9,4 |
-| 14 | Modüler Balkon ve Teras Sebze Yatağı No:4 - Tekerlekli 110x60 cm | 1,9 | 4,7 |
-| 15 | Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 85 Litre | 1,6 | 3,1 |
-| 16 | HG Vermikülit | 1,5 | 6,5 |
-| 17 | Arom Dere Otu Ata Tohumu (50 Adet) | 1,5 | 0,5 |
+| 6 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,5 | 0,5 |
+| 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,4 | 34 |
+| 8 | SGS Bahçe Seti 3 Parça | 2,4 | 0 |
+| 9 | HG Kaktüs ve Sukulent Toprağı | 2,3 | 18,5 |
+| 10 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 2,3 | 18,8 |
+| 11 | Doğal Orman Toprağı | %100 Organik ve Humuslu | 2,2 | 17,6 |
+| 12 | HG 5’li Bitki Yetiştirme Seti | 2,2 | 15,3 |
+| 13 | Bitki Toprağı Özel Karışım - 40 LT | 2,2 | 16,4 |
+| 14 | HG Paşa Kılıcı (Sansevieria) Toprağı | 2,1 | 9,4 |
+| 15 | Modüler Balkon ve Teras Sebze Yatağı No:4 - Tekerlekli 110x60 cm | 1,9 | 4,7 |
+| 16 | Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 85 Litre | 1,6 | 3,1 |
+| 17 | HG Vermikülit | 1,5 | 6,5 |
 | 18 | HG Kil Bilyesi | 1,5 | 10,3 |
 | 19 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 1,4 | 28,8 |
 | 20 | Reflex Plus Loaf Biftekli Yetişkin Kedi Konservesi 400 Gr | 1,4 | 2,2 |
@@ -169,8 +169,8 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 18,5 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 18,1 | 0 | %0 |
 | Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 15,3 | 0 | %0 |
+| Envaplas Esnek Yeşil Çim Ayırıcı ve Sınırlayıcı (25 Metre) | 14,9 | 0 | %0 |
 | Bahçe Toprağı Canlandırma Seti | 14,3 | 0 | %0 |
-| Envaplas Esnek Yeşil Çim Ayırıcı ve Sınırlayıcı (25 Metre) | 13,9 | 0 | %0 |
 | Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 13,5 | 0 | %0 |
 | Gold Valley Fare Kulağı Tohumu 500 Gr | 13,5 | 0 | %0 |
 
