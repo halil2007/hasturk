@@ -83,6 +83,19 @@ export function perfBeacon() {
 }
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.hidden) perfBeacon(); });
 
+let migBox = null;
+function migrating(d) {
+  if (typeof document === 'undefined') return;
+  if (!migBox) {
+    migBox = document.createElement('div');
+    migBox.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgb(15 28 53/.55);backdrop-filter:blur(2px)';
+    document.body.append(migBox);
+  }
+  migBox.innerHTML = `<div style="background:var(--card,#fff);color:var(--text,#0d1b34);border-radius:16px;padding:28px 32px;max-width:440px;box-shadow:0 20px 60px rgb(0 0 0/.3);font:15px/1.5 Inter,system-ui,sans-serif">
+    <b style="font-size:18px">Panel hızlı altyapısına taşınıyor</b>
+    <div style="margin:14px 0 8px;height:10px;border-radius:6px;background:#e3e9f3;overflow:hidden"><div style="height:100%;width:${Math.max(3, Number(d.pct) || 0)}%;background:#1f6bff;transition:width .6s"></div></div>
+    <div>%${Number(d.pct) || 0} · Tek seferlik işlem, birkaç dakika sürer. Bu sırada pazaryeri senkronu bekler; bittiğinde panel kendiliğinden açılır.</div></div>`;
+}
 async function request(path, method, body, fresh = false) {
   busyBar(1);
   let res;
@@ -100,6 +113,11 @@ async function request(path, method, body, fresh = false) {
   let data = {};
   try { data = await res.json(); } catch { /* boş */ }
   if (res.ok && state.user && path !== 'perf/client' && !path.startsWith('errors/')) { perfAdd(perfAgg.api, perfRoute(method, path), Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0)); perfSoon(); }
+  // Panel yeni altyapısına taşınıyor (tek seferlik, birkaç dakika): ekranda ilerleme gösterilir, okuma istekleri kendiliğinden yinelenir
+  if (res.status === 503 && data.migrating) {
+    migrating(data);
+    if (method === 'GET') { await new Promise((ok) => setTimeout(ok, 5000)); return request(path, method, body, fresh); }
+  } else if (migBox) { migBox.remove(); migBox = null; }
   if (res.status === 401 && path !== 'login') { state.onLogin && state.onLogin(data); throw Object.assign(new Error(data.error || 'Giriş gerekli'), { auth: true }); }
   if (res.status === 403 && data.need2fa) { state.onNeed2fa && state.onNeed2fa(); throw Object.assign(new Error(data.error), { auth: true }); }
   if (!res.ok) {

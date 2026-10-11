@@ -1,12 +1,13 @@
-// Ana panelin API'si veritabanının (D1) yanında çalışır.
-// Sorun: bir sayfa açılırken 10–40 veritabanı sorgusu yapılır. Worker kullanıcıya en yakın yerde (ör. İstanbul) çalışıp
-// veritabanı başka bir bölgedeyse her sorgu o mesafeyi gidip gelir; sorgu başına 40–150 ms, sayfa başına saniyeler eder.
-// Çözüm: ana panelin istekleri, veritabanıyla aynı bölgeye yerleştirilen tek bir Durable Object'e (MainPanel) iletilir.
-// Kullanıcı ile sunucu arasında tek gidiş-dönüş kalır, sorgular aynı bölgede milisaniyede biter. Tek ve sürekli sıcak örnek
-// olduğundan bellekteki önbellekler (oturum, ayarlar, 8 sn yanıt önbelleği) de her istekte işe yarar.
-// Veritabanının bölgesi ilk sorgunun yanıtından öğrenilir (meta.served_by_region); öğrenilemezse ya da nesne yanıt vermezse
-// istek eskisi gibi doğrudan Worker'da işlenir (okuma istekleri). MAIN_DO=0 ortam değişkeniyle tamamen kapatılabilir.
-import { init } from './db.js';
+// Ana panel kullanıcıya yakın bölgede, kendi yerel veritabanıyla çalışır.
+// Ölçüm (Destek → Sistem hızı): ana veritabanı (D1) Asya-Pasifik'te; Türkiye'den her sorgu ~80–250 ms, bir sayfa 10–40 sorgu
+// yaptığından saniyeler ediyordu. Çözüm: ana panelin mağaza verisi (sipariş, ürün, stok, ilan, ayarlar …) Avrupa'ya yerleştirilen
+// tek bir Durable Object'in (MainPanel) yerel SQLite veritabanına taşınır; sorgular mikro saniyede biter (müşteri panelleri de
+// böyle çalışır). Müşteri panelleriyle / siteyle ortak tablolar ana veritabanında kalır (bkz. router.js).
+// Taşıma: nesne ilk istekte ana veritabanındaki mağaza tablolarını parça parça kopyalar (birkaç dakika; bu sırada panel
+// "taşınıyor" der, senkron bekler). Bitince ana veritabanına "main_local" işareti yazılır; o andan sonra mağaza verisi yalnız
+// nesnededir: Worker eski veritabanındaki kopyayla asla çalışmaz (yazma da senkron da). Senkron Worker'ın zamanlayıcısından
+// nesneye iletilir.
+import { init, TABLES } from './db.js';
 import { handle, report5xx } from './handler.js';
 import { PerfBuffer } from './perf.js';
 import { eftAdmin } from './billing.js';
@@ -15,58 +16,79 @@ import { tenantApi } from './tenants.js';
 import { actionSucceeded } from './errors.js';
 import { json, HttpError } from './util.js';
 import { measure, dbStats, meter, region, serverTiming } from './meter.js';
+import { doD1 } from './dosql.js';
+import { routeDb, LOCAL_TABLES } from './router.js';
+import { edgeCached, edgeDrop } from './edgecache.js';
+import { syncAll, quickSync } from './sync.js';
+import { serveImage } from './prodimg.js';
+import { extApiInner } from './extapi.js';
 
 // Ana panelin istek süreleri (bu örnekte toplanır, birkaç dakikada bir yazılır)
 const perfMain = new PerfBuffer();
 export const mainPerf = perfMain;
 
-// Durable Object yer ipuçları (Cloudflare): D1 bölge kodlarıyla aynı adlar
+// Nesnenin bölgesi (Cloudflare yer ipucu): kullanıcılar Türkiye'de → Doğu Avrupa. MAIN_HINT ile değiştirilebilir
+// (değişirse yeni bir nesne kurulur ve taşıma baştan yapılır; eski nesnedeki yeni veriler taşınmaz — değiştirmeyin).
 const HINTS = ['wnam', 'enam', 'sam', 'weur', 'eeur', 'apac', 'oc', 'afr', 'me'];
-let probeAt = 0;
-// Veritabanının bölgesi: önce bellekte, sonra Cloudflare önbelleğinde (bölge değişmez), yoksa tek bir hafif sorguyla öğrenilir
-async function d1Region(env) {
-  if (region.d1) return region.d1.toLowerCase();
-  const edge = typeof caches !== 'undefined' && caches.default ? caches.default : null, key = 'https://cache.internal/d1-region';
-  if (edge) {
-    try { const hit = await edge.match(key); if (hit) { region.d1 = (await hit.text()).toUpperCase(); return region.d1.toLowerCase(); } } catch { /* önbellek yok */ }
-  }
-  if (Date.now() - probeAt < 600e3) return '';
-  probeAt = Date.now();
-  try { await meter(env.DB).prepare('SELECT 1 AS x').all(); } catch { return ''; }
-  if (region.d1 && edge) await edge.put(key, new Response(region.d1, { headers: { 'Cache-Control': 'max-age=86400' } })).catch(() => {});
-  return region.d1.toLowerCase();
+const hintOf = (env) => (HINTS.includes(String(env.MAIN_HINT || '').toLowerCase()) ? String(env.MAIN_HINT).toLowerCase() : 'eeur');
+export const MAIN_FLAG = 'main_local';
+const stubOf = (env) => { const h = hintOf(env); return env.MAIN.get(env.MAIN.idFromName('main-local:' + h), { locationHint: h }); };
+// Taşıma tamamlandı mı (ana veritabanındaki işaret; kenar önbelleğinde 1 dk)
+export const migratedFlag = (env) => edgeCached(MAIN_FLAG, 60e3, async () => {
+  await init(env.DB);
+  const r = await env.DB.prepare('SELECT v FROM settings WHERE k = ?').bind(MAIN_FLAG).first();
+  return r ? JSON.parse(r.v) : null;
+}, env.DB).catch(() => null);
+// Ana panel nesnede mi? MAIN_DO=0 acil durum anahtarıdır: yalnız taşıma bitmeden işe yarar (bittiyse mağaza verisi yalnız nesnede)
+export async function mainOn(env) {
+  if (!env.MAIN || !env.DB) return false;
+  return env.MAIN_DO === '0' ? !!(await migratedFlag(env)) : true;
 }
 
-async function mainStub(env) {
-  if (!env.MAIN || env.MAIN_DO === '0' || !env.DB) return null;
-  const hint = await d1Region(env);
-  if (!HINTS.includes(hint)) return null;
-  return env.MAIN.get(env.MAIN.idFromName('main:' + hint), { locationHint: hint });
+// Worker → nesne (gövde bir kez okunur)
+async function toMain(env, req, url = req.url, extra = {}) {
+  const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await req.arrayBuffer();
+  const h = new Headers(req.headers);
+  for (const [k, v] of Object.entries(extra)) h.set(k, v);
+  return stubOf(env).fetch(new Request(url, { method: req.method, headers: h, body }));
 }
 
-// Worker tarafı: isteği veritabanının yanındaki nesneye ilet (olmazsa burada işle)
+// Worker tarafı: ana panel isteği nesneye gider. Nesne yanıt vermezse: taşıma bitmemişse okuma istekleri eskisi gibi burada
+// (ana veritabanından) yanıtlanır; taşıma bittiyse ya da istek yazmaysa yanıt verilmez (eski kopyaya yazılmasın).
 export async function mainRoute(req, env, ctx, path) {
   const colo = (req.cf && req.cf.colo) || '';
-  let stub = null;
-  try { stub = await mainStub(env); } catch (e) { console.error('ana panel nesnesi', e); }
-  if (!stub) return mainApi(req, env, ctx, path, colo);
-  const t0 = Date.now(), body = ['GET', 'HEAD'].includes(req.method) ? undefined : await req.arrayBuffer();
-  const h = new Headers(req.headers);
-  h.set('X-Edge-Colo', colo);
+  if (!(await mainOn(env))) return mainApi(req, env, ctx, path, colo);
+  const t0 = Date.now(), read = req.method === 'GET' || req.method === 'HEAD';
+  const backup = read ? new Request(req.url, { method: req.method, headers: req.headers }) : null;
   try {
-    const res = await stub.fetch(new Request(req.url, { method: req.method, headers: h, body }));
+    const res = await toMain(env, req, req.url, { 'X-Edge-Colo': colo });
     return serverTiming(res, Date.now() - t0, null, '', `edge;desc="${colo}"`);
   } catch (e) {
     console.error('ana panel nesnesi yanıt vermedi', e);
-    if (!body) return mainApi(new Request(req.url, { method: req.method, headers: req.headers }), env, ctx, path, colo);
-    // Yazma isteği nesnede yarıda kalmış olabilir: tekrar burada çalıştırılmaz (iki kez kaydedilmesin)
-    return json({ error: 'Sunucu şu an yanıt vermedi; lütfen tekrar deneyin' }, 503);
+    if (backup && !(await migratedFlag(env))) return mainApi(backup, env, ctx, path, colo);
+    return json({ error: 'Sunucu şu an yanıt vermedi; lütfen birkaç saniye sonra tekrar deneyin' }, 503);
   }
 }
+// Ana panelin ürün fotoğrafı (/img/_/…) ve dış API (stok aktarımı): nesneden
+export async function mainImage(env, req, id) {
+  if (!(await mainOn(env))) { await init(env.DB); return serveImage(env.DB, req, id); }
+  return toMain(env, new Request(req.url, { method: req.method, headers: req.headers.get('If-None-Match') ? { 'If-None-Match': req.headers.get('If-None-Match') } : {} }), `https://main.internal/__img/${id}`);
+}
+export async function mainExtApi(env, url, store, rkey) {
+  if (!(await mainOn(env))) return extApiInner(env.DB, url, store, rkey);
+  return toMain(env, new Request(url.href), url.href, { 'X-Ext-Store': encodeURIComponent(JSON.stringify(store)), 'X-Ext-Key': rkey });
+}
+// Zamanlanmış senkron (Worker'ın zamanlayıcısından): ana panelin senkronu nesnede çalışır
+export async function mainCron(env, quick) {
+  if (!(await mainOn(env))) return quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true });
+  const r = await stubOf(env).fetch(new Request(`https://main.internal/__cron${quick ? '?quick=1' : ''}`, { method: 'POST' }));
+  return r.json().catch(() => ({ status: r.status }));
+}
 
-// Ana panel isteğinin kendisi (nesnede ya da yedek olarak Worker'da)
-export async function mainApi(req, env, ctx0, path, where = '', inDo = false) {
-  env = env.DB ? { ...env, DB: meter(env.DB) } : env;
+// Ana panel isteğinin kendisi (nesnede; nesne yoksa Worker'da)
+export async function mainApi(req, env, ctx0, path, where = '', inDo = '') {
+  // Nesnede env.DB yönlendiricidir (yerel + ortak); ölçüm ortak veritabanı sorgularını sayar (bkz. MainPanel)
+  env = env.DB && !env.DB.routed ? { ...env, DB: meter(env.DB) } : env;
   const ctx = { waitUntil: (p) => ctx0.waitUntil(p), perf: perfMain };
   return measure(async () => {
     const t0 = Date.now();
@@ -95,23 +117,106 @@ export async function mainApi(req, env, ctx0, path, where = '', inDo = false) {
       else {
         console.error(e);
         res = json({ error: e.message || 'Sunucu hatası' }, 500);
-        // Veritabanı açılamayan istekler de hata kayıtlarına düşer (yalnız günlüğe değil)
         if (env.DB) ctx.waitUntil(report5xx(env.DB, req, res, { slug: '', firm: '' }).catch(() => {}));
       }
     }
     const ms = Date.now() - t0, s = dbStats();
     perfMain.add(req.method, path, ms, s);
-    perfMain.infra(inDo ? `DO ${region.d1 || '?'}` : where || '?', region.d1, s);
+    perfMain.infra(inDo ? `DO ${inDo}` : where || '?', region.d1, s);
     if (perfMain.due() && env.DB) ctx.waitUntil(perfMain.flush(env.DB).catch(() => {}));
-    return serverTiming(res, ms, s, inDo ? `do;desc="${region.d1}"` : '');
+    return serverTiming(res, ms, s, inDo ? `do;desc="${inDo}"` : '');
   });
 }
 
-// Veritabanının yanında çalışan tek nesne (wrangler.jsonc → durable_objects MAIN)
+// ---------- taşıma (ana veritabanı → nesnenin yerel veritabanı) ----------
+// Büyük satırlı tablolar küçük parçalarla (ürün fotoğrafları base64 olarak saklanır)
+const CHUNK = { product_images: 20 };
+const STEP_MS = 20e3;
+export async function migrateStep(ctx, env, local, now = Date.now) {
+  const st = (await ctx.storage.get('mig')) || { ti: 0, after: 0, rows: 0, started: now() };
+  if (st.done) return st;
+  const remote = meter(env.DB), sql = ctx.storage.sql, t0 = now();
+  if (!st.ti && !st.after) await init(local);
+  const tables = LOCAL_TABLES;
+  while (st.ti < tables.length && now() - t0 < STEP_MS) {
+    const t = tables[st.ti];
+    let rows;
+    try {
+      try { rows = (await remote.prepare(`SELECT rowid AS __r, * FROM ${t} WHERE rowid > ? ORDER BY rowid LIMIT ?`).bind(st.after, CHUNK[t] || 400).all()).results || []; }
+      catch (e) { if (/no such table/i.test(e.message)) rows = []; else throw e; }
+      if (!rows.length) { st.ti++; st.after = 0; st.fails = 0; await ctx.storage.put('mig', st); continue; }
+      const cols = new Set(sql.exec(`PRAGMA table_info(${t})`).toArray().map((c) => c.name));
+      ctx.storage.transactionSync(() => {
+        for (const r of rows) {
+          const keys = Object.keys(r).filter((k) => k !== '__r' && cols.has(k));
+          sql.exec(`INSERT OR REPLACE INTO ${t} (${keys.map((k) => `"${k}"`).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`, ...keys.map((k) => (r[k] === undefined ? null : r[k])));
+        }
+      });
+      st.after = rows[rows.length - 1].__r; st.rows += rows.length; st.fails = 0;
+    } catch (e) {
+      // Aynı parça üst üste 3 kez kopyalanamazsa o tablonun kalanı atlanır (panel kilitli kalmasın); hata kaydına yazılır
+      st.fails = (st.fails || 0) + 1; st.err = `${t}: ${String(e.message || e).slice(0, 200)}`;
+      if (st.fails < 3) { await ctx.storage.put('mig', st); throw e; }
+      (st.skipped = st.skipped || []).push(st.err); st.ti++; st.after = 0; st.fails = 0;
+    }
+    await ctx.storage.put('mig', st);
+  }
+  if (st.ti >= tables.length) {
+    st.done = true; st.at = now();
+    await ctx.storage.put('mig', st);
+    await env.DB.prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v').bind(MAIN_FLAG, JSON.stringify({ at: st.at, rows: st.rows, hint: hintOf(env), skipped: st.skipped || [] })).run();
+    if (st.skipped && st.skipped.length) {
+      const { recordError } = await import('./errors.js');
+      await recordError(env.DB, { slug: '', firm: '', source: 'server', message: `Ana panel taşıma: ${st.skipped.length} tablonun bir kısmı kopyalanamadı`, action: 'taşıma', detail: { skipped: st.skipped } }).catch(() => {});
+    }
+    await edgeDrop(MAIN_FLAG, env.DB).catch(() => {});
+  }
+  return st;
+}
+const pct = (st) => (st.done ? 100 : Math.min(99, Math.round(((st.ti || 0) / Math.max(1, LOCAL_TABLES.length)) * 100)));
+
+// Kullanıcıya yakın, kendi veritabanıyla çalışan tek nesne (wrangler.jsonc → durable_objects MAIN)
 export class MainPanel {
-  constructor(ctx, env) { this.ctx = ctx; this.env = env; }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.local = doD1(ctx.storage); this.db = routeDb(this.local, meter(env.DB)); this.ok = false; }
+  async ready() {
+    if (this.ok) return true;
+    const st = await this.ctx.storage.get('mig');
+    if (st && st.done) { this.ok = true; this.fresh(); return true; }
+    // Taşıma sürüyor / başlamadı: zamanlayıcı kurulu değilse hemen başlat
+    if (!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now());
+    return false;
+  }
+  // Nesne yeni başladıysa önceki örneğin yarıda kalan senkron kilidi geçersizdir (müşteri panellerindeki gibi)
+  fresh() { if (this.unlocked) return; this.unlocked = true; try { this.ctx.storage.sql.exec("DELETE FROM settings WHERE k IN ('sync_lock', 'quick_lock')"); } catch { /* tablo yok */ } }
+  async alarm() {
+    const st = await migrateStep(this.ctx, this.env, this.local).catch((e) => { console.error('ana panel taşıma hatası', e); return null; });
+    if (!st) return void (await this.ctx.storage.setAlarm(Date.now() + 30e3));
+    if (!st.done) await this.ctx.storage.setAlarm(Date.now() + 50);
+    else { this.ok = true; this.fresh(); console.log('ana panel taşındı', JSON.stringify(st)); }
+  }
   async fetch(req) {
-    const url = new URL(req.url), path = url.pathname.slice(5).replace(/\/+$/, '');
-    return mainApi(req, this.env, { waitUntil: (p) => this.ctx.waitUntil(p) }, path, req.headers.get('X-Edge-Colo') || '', true);
+    const url = new URL(req.url), env = { ...this.env, DB: this.db };
+    const ok = await this.ready();
+    if (url.pathname === '/__cron') {
+      if (!ok) return json({ migrating: true, pct: pct((await this.ctx.storage.get('mig')) || {}) });
+      await init(this.db);
+      const quick = url.searchParams.get('quick') === '1';
+      return json(await (quick ? quickSync(env, this.db) : syncAll(env, this.db, { cron: true })));
+    }
+    // Taşıma bitmeden fotoğraf ve dış API ana veritabanından (yalnız okuma)
+    const rdb = ok ? this.db : meter(this.env.DB);
+    if (url.pathname.startsWith('/__img/')) { await init(rdb); return serveImage(rdb, req, url.pathname.slice(7)); }
+    if (url.pathname.startsWith('/__api/')) {
+      await init(rdb);
+      let store = { slug: 'ana-panel', name: 'Ana mağaza' };
+      try { store = JSON.parse(decodeURIComponent(req.headers.get('X-Ext-Store') || '')) || store; } catch { /* varsayılan */ }
+      return extApiInner(rdb, url, store, req.headers.get('X-Ext-Key') || 'main');
+    }
+    if (!ok) {
+      const st = (await this.ctx.storage.get('mig')) || {};
+      return json({ error: `Panel yeni, hızlı altyapısına taşınıyor (%${pct(st)}). Birkaç dakika sürer; sayfa kendiliğinden açılacak.`, migrating: true, pct: pct(st) }, 503, { 'Retry-After': '5' });
+    }
+    const path = url.pathname.slice(5).replace(/\/+$/, '');
+    return mainApi(req, env, { waitUntil: (p) => this.ctx.waitUntil(p) }, path, req.headers.get('X-Edge-Colo') || '', 'yerel');
   }
 }

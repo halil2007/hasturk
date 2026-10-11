@@ -5,13 +5,15 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { d1, d1Stats } from './d1.mjs';
-import worker, { TenantPanel } from '../src/index.js';
+import worker, { TenantPanel, MainPanel } from '../src/index.js';
 import { doNamespace } from './do.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const env = { DEMO: '1', ...process.env, DB: d1(process.env.DB_FILE || join(ROOT, 'dev', 'panel.db')) };
 // Müşteri panelleri (Durable Object taklidi): dev/tenant-<kod>.db
 env.TENANT = doNamespace(TenantPanel, () => env, process.env.TENANT_DIR || join(ROOT, 'dev'));
+// MAIN=1: ana panel kendi nesnesinde, yerel veritabanıyla (canlıdaki gibi; dev/tenant-main-local:eeur.db)
+if (process.env.MAIN === '1') { const ns = doNamespace(MainPanel, () => env, process.env.TENANT_DIR || join(ROOT, 'dev')); env.MAIN = { idFromName: ns.idFromName, get: (id) => ns.get(id) }; setInterval(() => { for (const o of ns.objects.values()) o.alarm && o.ctx.storage.getAlarm().then((a) => a && a <= Date.now() && (o.ctx.storage.setAlarm(null), o.alarm())); }, 200); }
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.woff2': 'font/woff2', '.webp': 'image/webp' };
 env.ASSETS = {
   async fetch(req) {
