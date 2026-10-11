@@ -1475,3 +1475,9 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 .tb-r .tb-login:hover { border-color: #93b4f0; }
 .tb-r a[data-href="tel"] { display: none; }
 @media (min-width: 760px) { .tb-r a[data-href="tel"] { display: inline-flex; } }
+
+/* Üst şerit renk: beyaz zemin, üstte ince marka renk çizgisi */
+.topbar { background: #fff; color: #334155; border-bottom: 1px solid #e8edf5; box-shadow: inset 0 2px 0 0 #2563eb; position: relative; }
+.topbar::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, #2563eb, #06b6d4 50%, #8b5cf6); }
+.tb-it b { color: #1e3a8a; }
+.tb-r .tb-login { background: #f5f8ff; border-color: #dbe5f7; }
