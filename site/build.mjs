@@ -17,7 +17,9 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import { FEATURES, INTEGRATIONS } from './src/data.mjs';
-import { TOOLS, TOOL_GROUPS, CHANNEL_RATES, calcForm, miniProfit } from './src/tools.mjs';
+import { TOOLS, TOOL_GROUPS, CHANNEL_RATES, miniProfit } from './src/tools.mjs';
+import { makeToolPages } from './src/tools-pages.mjs';
+import { MARKETPLACES, loadCommission, file as commFile } from './src/commission.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const SRC = join(ROOT, 'src'), OUT = join(ROOT, 'public');
@@ -126,12 +128,11 @@ const menuFeatures = `<div class="dd-p mm" id="mm-feat" data-mm-panel><div class
 const mnavFeatures = FM_GROUPS.map(([href, , , t, sub]) => `<a class="m-gi" href="${href}">${esc(t)}<small>${esc(sub)}</small></a>`).join('')
   + `<div class="m-tools">${FM_TOOLS.map(([href, , , t]) => `<a href="${href}">${esc(t)}</a>`).join('')}</div>`;
 // ---------- Araçlar mega menüsü (aynı kalıp: iki araç grubu · canlı mini KDV kartı · alt bağlantılar) ----------
-// Araç sayfaları src/tools.mjs'ten; kanal oranları yalnız sitede aktif görünen pazaryerleri için (panelin başlangıç ayarları, örnek)
+// Araç sayfaları src/tools.mjs + src/tools-pages.mjs'ten; kanal oranları yalnız sitede aktif görünen pazaryerleri için (panelin başlangıç ayarları, örnek, KDV hariç)
 const TOOL_CH = Object.keys(CHANNEL_RATES).map((s) => activeCh.find((x) => x.slug === s)).filter(Boolean).map((x) => [x.slug, x.name, CHANNEL_RATES[x.slug]]);
 const tById = Object.fromEntries(TOOLS.map((t) => [t.slug, t]));
 const toolIc = (t, cls = 'ic') => (t.brand ? `<span class="${cls} tb" style="background:${t.brand[1]}">${esc(t.brand[0])}</span>` : `<span class="${cls} ${t.color}">${ico(t.icon)}</span>`);
-const MENU_TOOLS = { genel: ['kdv-hesaplama', 'desi-hesaplama', 'yuzde-hesaplama', 'satis-fiyati-hesaplama', 'e-ticaret-stopaj-hesaplama'], pazaryeri: ['pazaryeri-komisyon-hesaplama', 'kar-karsilastirma', 'trendyol-komisyon-hesaplama', 'hepsiburada-komisyon-hesaplama', 'indirim-kar-hesaplama'] };
-const newPill = (t) => (t.isNew ? ' <span class="pill">Yeni</span>' : '');
+const MENU_TOOLS = { genel: ['kdv-hesaplama', 'desi-hesaplama', 'yuzde-hesaplama', 'satis-fiyati-hesaplama', 'e-ticaret-stopaj-hesaplama', 'indirim-kar-hesaplama'], pazaryeri: ['trendyol-komisyon-hesaplama', 'hepsiburada-komisyon-hesaplama', 'n11-komisyon-hesaplama', 'pazaryeri-komisyon-hesaplama', 'kar-karsilastirma'] };
 const miniKdv = `<div class="mm-feat mm-feat-calc" data-mini-kdv><span class="mm-kick">Hızlı KDV</span><b>Hemen hesaplayın</b>
   <div class="mk"><label class="mk-row"><span class="vh">Tutar</span><input class="mk-in" type="text" inputmode="decimal" autocomplete="off" value="1.000" aria-label="Tutar (₺)"><i>₺</i></label>
     <div class="mk-seg" role="group" aria-label="KDV oranı">${['1', '10', '20'].map((r) => `<button type="button" data-r="${r}" aria-pressed="${r === '20'}">%${r}</button>`).join('')}</div>
@@ -140,7 +141,7 @@ const miniKdv = `<div class="mm-feat mm-feat-calc" data-mini-kdv><span class="mm
   <a class="mm-more" href="/araclar">${TOOLS.length} ücretsiz araç ${ico('i-arrow')}</a></div>`;
 const menuTools = `<div class="dd-p mm" id="mm-tools" data-mm-panel><div class="mm-box">
   <div class="mm-body mm-body-tools">
-    ${TOOL_GROUPS.map(([g, h], i) => `<div class="mm-col mm-groups${i ? ' mm-sep' : ''}"><div class="mm-h">${esc(h)}</div>${MENU_TOOLS[g].map((s) => tById[s]).map((t) => `<a class="mi" href="/araclar/${t.slug}">${toolIc(t)}<span><b>${esc(t.name)}${newPill(t)}</b><small>${esc(t.short)}</small></span></a>`).join('')}</div>`).join('')}
+    ${TOOL_GROUPS.map(([g, h], i) => `<div class="mm-col mm-groups${i ? ' mm-sep' : ''}"><div class="mm-h">${esc(h)}</div>${MENU_TOOLS[g].map((s) => tById[s]).map((t) => `<a class="mi" href="/araclar/${t.slug}">${toolIc(t)}<span><b>${esc(t.name)}</b><small>${esc(t.short)}</small></span></a>`).join('')}</div>`).join('')}
     ${miniKdv}
   </div>
   <div class="mega-foot mm-foot"><a href="/araclar">Tüm araçlar ${ico('i-arrow')}</a><a href="/ozellikler/kar-zarar">Panelde otomatik kâr ${ico('i-arrow')}</a><a href="/demo#deneme"><span>Her sipariş için otomatik:</span> 7 gün ücretsiz deneyin ${ico('i-arrow')}</a></div>
@@ -410,79 +411,15 @@ ${x.dev ? '' : `<section class="sec">
 const n2 = (x) => `${x.name} ${isSite(x) ? 'yönetim' : 'satıcı'} panelinizden`;
 
 // ---------- ücretsiz hesaplama araçları: /araclar ve /araclar/<slug> ----------
-const TOOLS_JS = '<!-- head --><script src="/assets/tools.js?v={{v:tools.js}}" defer></script><!-- /head -->';
-const toolCard = (t) => `<a class="fcard tcard reveal" href="/araclar/${t.slug}">${toolIc(t)}<b>${esc(t.name)}${newPill(t)}</b><span>${esc(t.card)}</span><em>Hesapla ${ico('i-arrow')}</em></a>`;
-const toolCta = `<section class="sec"><div class="wrap"><div class="ask big reveal"><div><b>Bu hesabı her sipariş için otomatik yapın</b><span>Hastürk CRM, pazaryerinin kestiği komisyon, kargo ve hizmet bedeli faturalarıyla her siparişin net kârını kendiliğinden hesaplar. Kurulum ücreti yok.</span></div>
-  <div class="ctas"><a class="btn btn-primary" href="/demo#deneme">7 gün ücretsiz deneyin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a></div></div></div></section>`;
-function toolPage(t) {
-  const rel = t.related.map((s) => tById[s]).filter(Boolean).slice(0, 3);
-  if (t.related.some((s) => !tById[s])) throw new Error(`${t.slug}: ilgili araç bulunamadı`);
-  const body = `${TOOLS_JS}<section class="page-hero fp-hero tool-hero">
-  <div class="wrap">
-    <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/araclar">Araçlar</a><span>›</span><b>${esc(t.name)}</b></nav>
-    <div class="tool-head"><div class="fp-k">${toolIc(t)}Ücretsiz araç</div>
-      <h1>${esc(t.h1[0])} <span class="grad">${esc(t.h1[1])}</span></h1>
-      <p>${esc(t.lead)}</p>
-      <div class="checks"><span>${tick}Ücretsiz</span><span>${tick}Kayıt gerekmez</span><span>${tick}Telefonda da çalışır</span></div></div>
-    ${calcForm(t, TOOL_CH)}
-    <p class="tool-cta"><a href="/demo#deneme">Bu hesabı her sipariş için otomatik yapın ${ico('i-arrow')} <b>7 gün ücretsiz dene</b></a></p>
-  </div>
-</section>
-<section class="sec alt">
-  <div class="wrap narrow-text">
-    <div class="sec-head reveal"><div class="kicker">Formül</div><h2>Nasıl Hesaplanır?</h2></div>
-    <div class="formula reveal">${t.formula.map((f) => `<code>${esc(f)}</code>`).join('')}</div>
-    ${t.how.map((x) => `<p class="reveal seo-p">${esc(x)}</p>`).join('')}
-    <div class="ex-box reveal"><b>Örnek</b><span>${esc(t.example)}</span></div>
-  </div>
-</section>
-<section class="sec">
-  <div class="wrap"><div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(t.h1.join(' '))} Hakkında</h2></div>${faqHtml(t.faq)}</div>
-</section>
-<section class="sec alt">
-  <div class="wrap"><div class="sec-head reveal"><div class="kicker">Diğer araçlar</div><h2>Bunlar da İşinize Yarar</h2></div>
-    <div class="fcards tcards">${rel.map(toolCard).join('')}</div>
-    <div class="center-cta"><a class="btn btn-line" href="/araclar">Tüm araçlar ${ico('i-arrow')}</a></div></div>
-</section>
-${toolCta}`;
-  return { meta: { title: t.title, crumb: t.name.replace(/^./, (c) => c.toLocaleUpperCase('tr')), description: t.desc, url: `/araclar/${t.slug}`, nav: 'araclar', tool: t }, body, file: `araclar/${t.slug}.html` };
-}
-function toolsIndex() {
-  const body = `${TOOLS_JS}<section class="page-hero">
-  <div class="wrap">
-    <nav class="crumbs center" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><b>Araçlar</b></nav>
-    <div class="kicker">${TOOLS.length} ücretsiz araç</div>
-    <h1>Ücretsiz E-Ticaret <span class="grad">Hesaplama Araçları</span></h1>
-    <p>KDV, desi, yüzde, satış fiyatı, pazaryeri komisyonu, stopaj ve kâr hesapları. Kayıt gerekmez, tarayıcınızda çalışır; girdiğiniz rakamlar hiçbir yere gönderilmez.</p>
-    <div class="jump">${TOOL_GROUPS.map(([g, h]) => `<a href="#${g}">${esc(h)}</a>`).join('')}<a href="#hizli">Hızlı net kâr</a></div>
-  </div>
-</section>
-${TOOL_GROUPS.map(([g, h], i) => `<section id="${g}" class="sec${i ? ' alt' : ''}"><div class="wrap">
-  <div class="sec-head reveal"><div class="kicker">${esc(h)}</div><h2>${g === 'genel' ? 'Günlük Hesaplar' : 'Pazaryeri Komisyonu ve Kâr'}</h2>${g === 'pazaryeri' ? '<p>Kanal oranları örnek / varsayılan değerlerdir; oranlar kategoriye göre değişir, kendi oranınızı girin.</p>' : ''}</div>
-  <div class="fcards tcards">${TOOLS.filter((t) => t.group === g).map(toolCard).join('')}</div>
-</div></section>`).join('\n')}
-<section id="hizli" class="sec">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Hemen deneyin</div><h2>Hızlı Net Kâr Hesabı</h2><p>Satış fiyatı, alış maliyeti, komisyon ve kargoyu girin; ürün başı kârınızı görün. Tüm tutarlar KDV dahildir.</p></div>
-    <div class="mini-wrap reveal">${miniProfit()}</div>
-  </div>
-</section>
-<section class="sec alt">
-  <div class="wrap"><div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>Araçlar Hakkında</h2></div>${faqHtml([
-    ['Araçlar ücretsiz mi?', 'Evet. Tüm hesaplama araçları ücretsizdir; kayıt ya da giriş gerekmez.'],
-    ['Girdiğim rakamlar kaydediliyor mu?', 'Hayır. Hesaplar tamamen tarayıcınızda yapılır; girdiğiniz tutarlar sunucuya gönderilmez ve saklanmaz.'],
-    ['Tutarları KDV dahil mi girmeliyim?', 'Evet. Satış fiyatı, komisyon, kargo ve hizmet bedelini faturada yazan, cebinizden çıkan KDV dahil haliyle girin. KDV hesaplama aracı ise iki yönde de çevirir.'],
-    ['Komisyon oranları güncel mi?', 'Kanal oranları resmî liste değil, örnek başlangıç değerleridir. Pazaryerleri oranı kategoriye, kampanyaya ve mağazaya göre belirler; satıcı panelinizdeki oranı girin.'],
-  ])}</div>
-</section>
-${toolCta}`;
-  return { meta: { title: 'Ücretsiz E-Ticaret Hesaplama Araçları: KDV, Desi, Komisyon | Hastürk CRM', crumb: 'Araçlar', description: 'Ücretsiz e-ticaret hesaplama araçları: KDV, desi, yüzde, satış fiyatı, Trendyol ve Hepsiburada komisyonu, stopaj ve kâr karşılaştırma. Kayıt gerekmez.', url: '/araclar', nav: 'araclar' }, body, file: 'araclar.html' };
-}
+// Kategori komisyon listeleri (yalnız resmî listeden üretilmiş public/assets/komisyon-<pazaryeri>.json varsa; yoksa elle oran)
+const COMM = Object.fromEntries(Object.keys(MARKETPLACES).map((mp) => [mp, loadCommission(join(OUT, 'assets'), mp)]).filter(([, d]) => d)
+  .map(([mp, d]) => [mp, { ...d, src: `/assets/${commFile(mp)}?v=${createHash('sha1').update(readFileSync(join(OUT, 'assets', commFile(mp)))).digest('hex').slice(0, 10)}` }]));
+const TP = makeToolPages({ esc, ico, tick, faqHtml, toolIc, channels: TOOL_CH, comm: COMM, siteUrl: SITE_URL });
 // Ana sayfa bölümü: canlı mini net kâr hesabı + araç kartları
-const HOME_TOOLS = ['kdv-hesaplama', 'desi-hesaplama', 'pazaryeri-komisyon-hesaplama', 'kar-karsilastirma', 'satis-fiyati-hesaplama', 'indirim-kar-hesaplama'];
+const HOME_TOOLS = ['trendyol-komisyon-hesaplama', 'hepsiburada-komisyon-hesaplama', 'kar-karsilastirma', 'satis-fiyati-hesaplama', 'kdv-hesaplama', 'desi-hesaplama'];
 const toolsHome = `<div class="tools-home">
   <div class="th-calc reveal"><div class="th-h">${ico('i-calc')}<b>Hızlı net kâr</b><span class="pill">Canlı</span></div>${miniProfit()}<a class="th-more" href="/araclar/pazaryeri-komisyon-hesaplama">Ayrıntılı komisyon hesabı ${ico('i-arrow')}</a></div>
-  <div class="th-list">${HOME_TOOLS.map((s) => tById[s]).map((t) => `<a class="th-i reveal" href="/araclar/${t.slug}">${toolIc(t)}<span><b>${esc(t.name)}${newPill(t)}</b><small>${esc(t.short)}</small></span>${ico('i-arrow')}</a>`).join('')}</div>
+  <div class="th-list">${HOME_TOOLS.map((s) => tById[s]).map((t) => `<a class="th-i reveal" href="/araclar/${t.slug}">${toolIc(t)}<span><b>${esc(t.name)}</b><small>${esc(t.short)}</small></span>${ico('i-arrow')}</a>`).join('')}</div>
 </div>`;
 
 // ---------- arama motoru verisi (JSON-LD) ----------
@@ -510,9 +447,9 @@ function jsonLd(meta, body) {
   }
   graph.push(page);
   if (['/', '/paketler', '/ozellikler', '/demo'].includes(meta.url)) graph.push(APP);
-  // Hesaplama aracı: ücretsiz web uygulaması
-  if (meta.tool) graph.push({ '@type': 'WebApplication', '@id': `${url}#app`, name: pageName(meta), url, description: meta.description, applicationCategory: 'FinanceApplication', operatingSystem: 'Web', browserRequirements: 'JavaScript', inLanguage: 'tr-TR',
-    isAccessibleForFree: true, offers: { '@type': 'Offer', price: 0, priceCurrency: 'TRY' }, publisher: { '@id': `${SITE_URL}/#org` } });
+  // Sayfaya özel ek veri (araçlar: WebApplication, HowTo, Dataset …) ve son güncelleme tarihi
+  if (meta.ld) graph.push(...meta.ld);
+  if (meta.modified) page.dateModified = meta.modified;
   // Sayfadaki "Sık sorulan sorular" (details/summary) aynen arama motoruna da verilir
   const faq = [...body.matchAll(/<details[^>]*>\s*<summary>([\s\S]*?)<\/summary>\s*<p>([\s\S]*?)<\/p>\s*<\/details>/g)].map(([, q, a]) => [strip(q), strip(a)]).filter(([q, a]) => q && a);
   if (faq.length) graph.push({ '@type': 'FAQPage', '@id': `${url}#faq`, mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) });
@@ -558,7 +495,7 @@ for (const file of (await readdir(join(SRC, 'pages'))).filter((f) => f.endsWith(
   pages.push({ file, ...meta });
 }
 for (const dir of ['ozellikler', 'entegrasyonlar', 'araclar']) await mkdir(join(OUT, dir), { recursive: true });
-for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPage), toolsIndex(), ...TOOLS.map(toolPage)]) {
+for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPage), ...TP.pages()]) {
   await writeFile(join(OUT, g.file), render(g.meta, g.body, g.file.includes('/') ? g.file.split('/')[0] + '-detay' : g.file.replace(/\.html$/, '')));
   pages.push({ file: g.file, ...g.meta });
 }
@@ -581,6 +518,6 @@ for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPa
 }
 pages.push({ file: 'blog', url: '/blog' });
 const today = new Date().toISOString().slice(0, 10);
-const urls = pages.filter((p) => p.sitemap !== 'no').map((p) => `  <url><loc>https://hasturkcrm.com${p.url}</loc><lastmod>${today}</lastmod></url>`).join('\n');
+const urls = pages.filter((p) => p.sitemap !== 'no').map((p) => `  <url><loc>https://hasturkcrm.com${p.url}</loc><lastmod>${p.modified || today}</lastmod></url>`).join('\n');
 await writeFile(join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
 console.log(`${pages.length} sayfa derlendi`);

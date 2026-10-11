@@ -12,6 +12,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const MARKETPLACES = { trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', n11: 'N11', pazarama: 'Pazarama', pttavm: 'PttAVM', idefix: 'idefix', ciceksepeti: 'Çiçeksepeti' };
+// İlgi eki: "Trendyol'un", "Hepsiburada'nın"
+export const GEN = { trendyol: "'un", hepsiburada: "'nın", n11: "'in", pazarama: "'nın", pttavm: "'nin", idefix: "'in", ciceksepeti: "'nin" };
 export const SEP = ' > ';
 export const file = (mp) => `komisyon-${mp}.json`;
 
