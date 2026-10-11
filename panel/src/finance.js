@@ -418,7 +418,7 @@ export async function settlementReport(env, db, settings, q = {}) {
   const supported = (await getChannels(env, db)).filter((c) => c.enabled && c.settlements).map((c) => c.id);
   const um = unmatched.reduce((a, r) => a + (Number(r.amount) || 0), 0), period = types.reduce((a, r) => a + (Number(r.amount) || 0), 0);
   return {
-    from, to, lateBefore: late, supported, days: days.slice(0, 120), types, diffs: diffs.slice(0, 100), unmatched: unmatched.slice(0, 50),
+    from, to, lateBefore: late, supported, days, types, diffs: diffs.slice(0, 100), unmatched: unmatched.slice(0, 50),
     totals: { ...tot, period: r2(period), checked, matched: checked - diffs.length, mismatched: diffs.length, limited: orders.length >= 3000, unmatched: unmatched.length, unmatchedAmount: r2(um) },
   };
 }
