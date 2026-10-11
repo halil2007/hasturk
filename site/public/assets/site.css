@@ -1442,25 +1442,6 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 .stats .st b { color: var(--navy); font-size: clamp(24px, 3vw, 30px); font-weight: 850; }
 .stats .st span { color: var(--text-2); font-size: 14px; font-weight: 500; }
 
-/* Üst şerit: koyu lacivert, ince ve sade; ayraçlı bağlantılar */
-.topbar { background: #0b1a36; background: linear-gradient(90deg, #0b1a36 0%, #10275a 55%, #0b1a36 100%); color: #c9d6f2; font-size: 12.5px; border-bottom: 1px solid rgba(255,255,255,.06); }
-.topbar .wrap { min-height: 38px; }
-.topbar a { color: #e9f0ff; font-weight: 500; transition: color .15s; }
-.topbar a:hover { color: #fff; }
-.topbar svg { opacity: .85; }
-.tb-l { gap: 10px; letter-spacing: .01em; }
-.tb-badge { display: inline-flex; align-items: center; padding: 3px 9px 3px 7px; border-radius: 99px; background: rgba(76, 140, 255, .18); color: #cfe0ff; font-weight: 650; font-size: 11.5px; border: 1px solid rgba(120, 170, 255, .25); }
-.tb-badge svg { width: 13px; height: 13px; margin-right: 5px; color: #7fb0ff; opacity: 1; }
-.tb-sep { width: 1px; height: 14px; background: rgba(255,255,255,.18); display: inline-block; }
-.tb-trial { color: #9dd1ff !important; font-weight: 650 !important; }
-.tb-trial:hover { text-decoration: underline; }
-.tb-r { gap: 0; }
-.tb-r > a { display: inline-flex; align-items: center; padding: 0 14px; border-left: 1px solid rgba(255,255,255,.12); line-height: 1; }
-.tb-r > a:first-child { border-left: 0; }
-.tb-r .tb-login { margin-left: 6px; padding: 5px 12px; border: 1px solid rgba(255,255,255,.22) !important; border-radius: 99px; }
-.tb-r .tb-login:hover { background: rgba(255,255,255,.08); }
-@media (max-width: 759px) { .tb-r > a { padding: 0 10px; } }
-
 /* Canlı Demo: yumuşak dönen mavi ışık çerçevesi ve yanıp sönen "canlı" noktası */
 .btn-live { position: relative; isolation: isolate; overflow: visible; }
 .btn-live::before { content: ""; position: absolute; inset: -3px; border-radius: inherit; padding: 2px; z-index: -1;
@@ -1474,3 +1455,23 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 @keyframes live-glow { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, .40); } 70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
 @keyframes live-dot { 0% { box-shadow: 0 0 0 0 rgba(125, 255, 178, .7); } 70% { box-shadow: 0 0 0 7px rgba(125, 255, 178, 0); } 100% { box-shadow: 0 0 0 0 rgba(125, 255, 178, 0); } }
 @media (prefers-reduced-motion: reduce) { .btn-live::before, .btn-live::after, .live-dot { animation: none; } }
+
+/* Üst şerit: açık zemin, kayan güven bilgileri (üzerine gelince durur), sağda telefon ve müşteri girişi */
+.topbar { background: linear-gradient(90deg, #eef4ff, #f7faff 40%, #eefaf4); color: #24406e; font-size: 12.5px; border-bottom: 1px solid #e1e9f7; }
+.topbar .wrap { min-height: 36px; gap: 14px; }
+.topbar a { color: #1d4ed8; font-weight: 650; }
+.tb-ticker { flex: 1; min-width: 0; overflow: hidden; position: relative; -webkit-mask: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.tb-track { display: inline-flex; gap: 34px; white-space: nowrap; padding-left: 12px; animation: tb-scroll 38s linear infinite; will-change: transform; }
+.tb-ticker:hover .tb-track { animation-play-state: paused; }
+.tb-it { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+.tb-it i { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 20px; }
+.tb-it svg { width: 12px; height: 12px; margin: 0; vertical-align: 0; }
+.tb-it .g { background: #dcfce7; color: #15803d; } .tb-it .b { background: #dbeafe; color: #1d4ed8; } .tb-it .o { background: #ffedd5; color: #c2410c; } .tb-it .p { background: #ede9fe; color: #6d28d9; }
+.tb-it b { color: #0f2a5c; font-weight: 750; }
+@keyframes tb-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .tb-track { animation: none; } }
+.tb-r { gap: 14px; flex: 0 0 auto; }
+.tb-r .tb-login { display: inline-flex; align-items: center; padding: 4px 11px; border-radius: 8px; background: #fff; border: 1px solid #d6e2f7; color: #1d4ed8; }
+.tb-r .tb-login:hover { border-color: #93b4f0; }
+.tb-r a[data-href="tel"] { display: none; }
+@media (min-width: 760px) { .tb-r a[data-href="tel"] { display: inline-flex; } }
