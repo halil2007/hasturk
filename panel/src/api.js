@@ -42,6 +42,7 @@ import { ek } from '../public/ek.js';
 // Eksik alan kodları (WOO_URL …) kullanıcıya alan adıyla gösterilir
 const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).find((f) => f.k === k) || {}).label || k).join(', ');
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
+import { orderCommission, commissionCheck } from './commcheck.js';
 import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE, HttpError } from './util.js';
@@ -925,6 +926,8 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
     const cur = await first(db, 'SELECT price, list_price, commission, commission_src FROM listings WHERE channel = ? AND remote_id = ? AND product_id = ?', l.channel, String(l.remote_id), id);
     if (!cur) continue;
     const price = l.price === '' || l.price == null ? cur.price : num(l.price);
+    // 0 ₺ fiyat kanala gönderilemez ve ilanın gerçek fiyatını panelde 0 gösterir: kabul edilmez
+    if (price !== cur.price && !(price > 0)) fail(400, `${l.channel} ilanının fiyatı 0 olamaz; fiyatı boş bırakırsanız kanaldaki fiyat korunur`);
     const dirty = price !== cur.price ? 1 : 0;
     if (dirty) {
       // Otomatik fiyat kuralı açık ilan: sınır dışı fiyat kabul edilmez; elle değişiklik otomatik fiyatı 14 dakika bekletir
@@ -1414,9 +1417,12 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const id = decodeURIComponent(x[1]);
     const [o, events, st] = await Promise.all([loadOrder(db, id),
       all(db, 'SELECT at, source, action, status, remote_status, note, user FROM order_events WHERE order_id = ? ORDER BY at DESC LIMIT 30', id), getSettings(db)]);
-    const ch = await channel(env, db, o.channel);
+    const [ch, cc] = await Promise.all([channel(env, db, o.channel), orderCommission(db, st, o).catch(() => null)]);
     o.events = events;
-    return json({ order: o, profit: orderProfit(o, st), channel: ch ? publicInfo(ch) : null });
+    // Komisyon indirimi (satır oranı olağan / liste oranından düşük) ve hakedişteki komisyon iadesi (kâra eklenir)
+    const profit = orderProfit({ ...o, comm_credit: cc ? cc.counted : 0 }, st);
+    if (cc) profit.commDiscount = { lines: cc.lines, saved: cc.saved, credit: cc.credit };
+    return json({ order: o, profit, channel: ch ? publicInfo(ch) : null });
   }
   // Kargo firması seçenekleri: kanalın kendi listesinden (ikas Kargo firmaları, Trendyol sağlayıcıları, HB değiştirilebilir firmalar)
   if ((x = path.match(/^orders\/([^/]+)\/cargo-options$/)) && m === 'GET') {
@@ -1637,6 +1643,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); const [invoices, costs] = await Promise.all([syncInvoices(env, db, { force: true }), syncCosts(env, db, null, { force: true }).catch((e) => ({ error: e.message }))]); return json({ invoices, costs }); }
+  if (path === 'finance/commission' && m === 'GET') return json(await commissionCheck(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'finance/products' && m === 'GET') return json(await productProfit(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', sort: str(q.sort) }));
   if (path === 'expenses' && m === 'GET') return json(await listExpenses(db));
   if (path === 'expenses' && m === 'POST') return json(await saveExpense(db, await body(req)));

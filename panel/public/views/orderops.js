@@ -604,6 +604,15 @@ export async function deleteOrder(o) {
 }
 
 // Kargo giderinin kaynağı (kârlılık kartı)
+// Komisyon indirimi (pazaryeri satırdaki oranı düşürdü): "indirimli: normal %24 yerine %18, kazancınız 60 ₺" (KDV dahil)
+const commNote = (p) => {
+  const d = p.commDiscount;
+  if (!d || !d.lines || !d.lines.length) return '';
+  const l = d.lines[0], src = (x) => (x.ref === 'list' ? 'resmî listedeki' : 'olağan');
+  return d.lines.length === 1
+    ? html`<div class="tiny" style="color:var(--good)" title="Pazaryeri bu satırda daha düşük komisyon kesti (komisyon indirimi). Normal oran: ${src(l)} oran.">indirimli: ${src(l)} %${n(l.normal)} yerine %${n(l.rate)}, kazancınız ${money(d.saved)}</div>`
+    : html`<div class="tiny" style="color:var(--good)" title="${d.lines.map((x) => `${x.name}: ${src(x)} %${n(x.normal)} yerine %${n(x.rate)} (${money(x.saved)})`).join('\n')}">${d.lines.length} satırda indirimli komisyon, kazancınız ${money(d.saved)}</div>`;
+};
 const SHIP_SRC = { api: '(kanal faturası)', carrier: '(kargo entegratörü)', manual: '(siparişe girilen)', product: '(ürüne girilen)', default: '(Ayarlar → Giderler)', none: '' };
 
 export async function openOrder(id, onChange) {
@@ -644,7 +653,7 @@ ${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">
           </div>
           <div class="card">
             <div class="card-head"><h3>Kârlılık (tahmini)</h3></div>
-            <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon</dt><dd>−${money(p.commission)}</dd><dt>Kargo <span class="tiny muted">${SHIP_SRC[p.shippingSrc] || ''}</span></dt><dd>${p.shippingSrc === 'none' ? html`<span class="tiny" style="color:var(--amber)">ürüne girilmedi</span>` : html`−${money(p.shipping)}`}</dd>
+            <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon${commNote(p)}</dt><dd>−${money(p.commission)}</dd>${p.commCredit ? html`<dt>Komisyon iadesi <span class="tiny muted">(pazaryeri karşıladı)</span></dt><dd class="up">${p.commCredit > 0 ? '+' : '−'}${money(Math.abs(p.commCredit))}</dd>` : ''}<dt>Kargo <span class="tiny muted">${SHIP_SRC[p.shippingSrc] || ''}</span></dt><dd>${p.shippingSrc === 'none' ? html`<span class="tiny" style="color:var(--amber)">ürüne girilmedi</span>` : html`−${money(p.shipping)}`}</dd>
               ${p.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(p.fee)}</dd>` : ''}${p.rateFee ? html`<dt>Ek kesinti <span class="tiny muted">(işlem / ödeme bedeli)</span></dt><dd>−${money(p.rateFee)}</dd>` : ''}${p.withholding ? html`<dt>Stopaj <span class="tiny muted">(vergiden mahsup edilir)</span></dt><dd>−${money(p.withholding)}</dd>` : ''}<dt style="color:var(--text);font-weight:650">Satıştan kalan</dt><dd style="font-weight:650">${money(p.payout)}</dd>
               <dt>Ürün maliyeti</dt><dd>−${money(p.cost)}</dd><div class="total"><dt>Kâr</dt><dd class="${p.profit >= 0 ? 'up' : 'down'}">${money(p.profit)}</dd></div></dl>
             ${p.missingCost ? html`<div class="notice warn small" style="margin-top:10px">${p.missingCost} ürünün alış fiyatı girilmemiş; kâr olduğundan yüksek görünür.</div>` : ''}

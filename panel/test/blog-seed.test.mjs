@@ -37,3 +37,21 @@ test('day verilen yazı ileri tarihli yayımlanır (sitede o gün görünür)', 
   await blogSeed({ SITE_URL: 'https://site.test' }, db, { posts: [{ slug: 'ileri', title: 'İleri yazı', body: 'x', cover: 'a.jpg', day: 4 }], fetcher, now });
   assert.equal((await first(db, 'SELECT published_at FROM blog_posts WHERE slug = ?', 'ileri')).published_at, now + 4 * 864e5);
 });
+
+test('ikinci parti: 1 Ekim\'den itibaren günde bir (farklı saatlerde) yayımlanmış sayılır; önceden ileri tarihli yüklenenler bir kez geri çekilir', async () => {
+  const { SECOND } = await import('../src/blogseed.js');
+  assert.equal(SECOND.length, 10);
+  const days = SECOND.map((p) => new Date(p.at + 3 * 3600e3).toISOString().slice(0, 10));
+  assert.equal(days[0], '2026-10-01'); assert.equal(new Set(days).size, 10);
+  for (const p of SECOND) { const h = new Date(p.at + 3 * 3600e3).getUTCHours(); assert.ok(h >= 9 && h <= 17, `${p.slug} saat ${h}`); }
+  const db = d1(); await init(db);
+  const now = Date.UTC(2026, 9, 11, 12);
+  const fetcher = async () => new Response(JPG, { status: 200 });
+  // Eski sürüm: ilk yazı ileri tarihli yüklenmiş, ikincisinin tarihi elle geçmişe alınmış
+  await run(db, "INSERT INTO blog_posts (slug, title, body, status, published_at, created_at, updated_at) VALUES (?, 'a', 'x', 'published', ?, 0, 0), (?, 'b', 'x', 'published', 5, 0, 0)", SECOND[0].slug, now + 864e5, SECOND[1].slug);
+  await blogSeed({ SITE_URL: 'https://site.test' }, db, { fetcher, now });
+  const at = async (s) => (await first(db, 'SELECT published_at FROM blog_posts WHERE slug = ?', s)).published_at;
+  assert.equal(await at(SECOND[0].slug), SECOND[0].at);
+  assert.equal(await at(SECOND[1].slug), 5, 'elle değiştirilen tarih korunur');
+  assert.equal(await at(SECOND[9].slug), SECOND[9].at, 'yeni yüklenen de Ekim tarihinde');
+});

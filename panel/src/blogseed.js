@@ -6,8 +6,11 @@ import { insertPost, siteUrl, MAX_IMAGE } from './blog.js';
 import { POSTS } from './blogseed-posts.js';
 import { POSTS_2A } from './blogseed-posts-2a.js';
 import { POSTS_2B } from './blogseed-posts-2b.js';
-// İkinci parti (10 yazı): yüklemeden sonra 2 günde bir yayına girer
-const ALL = [...POSTS, ...[...POSTS_2A, ...POSTS_2B].map((p, i) => ({ ...p, day: p.day ?? i * 2 }))];
+// İkinci parti (10 yazı): 1 Ekim 2026'dan başlayarak her gün bir yazı, gün içinde farklı saatlerde (TR 09:00–17:00) yayımlanmış sayılır
+const AT = (i) => Date.UTC(2026, 9, 1 + i, 6 + ((i * 5) % 9), (i * 23) % 60);
+export const SECOND = [...POSTS_2A, ...POSTS_2B].map((p, i) => ({ ...p, at: AT(i) }));
+const ALL = [...POSTS, ...SECOND];
+const REDATE = 'once:blog_redate_1';
 
 const KEY = 'blog_seed';
 const TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -29,6 +32,14 @@ async function coverImage(env, db, file, fetcher) {
 
 export async function blogSeed(env, db, { posts = ALL, fetcher = fetch, now = Date.now() } = {}) {
   if (env.TENANT_SLUG || env.DEMO) return null;
+  // İkinci parti önceden ileri tarihli (2 günde bir) yüklendiyse tarihleri bir kez Ekim başına çekilir; elle tarihi değiştirilmiş
+  // (artık ileri tarihli olmayan) yazıya dokunulmaz
+  if (posts === ALL && !(await first(db, 'SELECT 1 AS x FROM settings WHERE k = ?', REDATE))) {
+    await db.batch([
+      ...SECOND.map((p) => db.prepare('UPDATE blog_posts SET published_at = ? WHERE slug = ? AND published_at > ?').bind(p.at, p.slug, now)),
+      db.prepare("INSERT INTO settings (k, v) VALUES (?, '1') ON CONFLICT (k) DO NOTHING").bind(REDATE),
+    ]);
+  }
   const row = await first(db, 'SELECT v FROM settings WHERE k = ?', KEY);
   const done = row ? JSON.parse(row.v) : [];
   const todo = posts.filter((p) => !done.includes(p.slug));
@@ -40,7 +51,7 @@ export async function blogSeed(env, db, { posts = ALL, fetcher = fetch, now = Da
       const cover_id = p.cover ? await coverImage(env, db, p.cover, fetcher) : null;
       // Yayın tarihleri birkaç gün arayla geriye dağıtılır (hepsi aynı dakikada görünmesin); sıra listedeki sıradır
       // p.day verilmişse yayın tarihi yüklemeden bu kadar gün sonradır (ileri tarihli yazı sitede o gün görünür: düzenli yayın)
-      const published_at = p.day != null ? now + p.day * 864e5 + i * 60e3 : now - (posts.length - 1 - posts.indexOf(p)) * 2 * 864e5 - i * 60e3;
+      const published_at = p.at != null ? p.at : p.day != null ? now + p.day * 864e5 + i * 60e3 : now - (posts.length - 1 - posts.indexOf(p)) * 2 * 864e5 - i * 60e3;
       await insertPost(db, { ...p, cover_id, status: 'published', published_at, author: p.author || 'Hastürk CRM' }, { name: 'Hastürk CRM' });
       out.added.push(p.slug); done.push(p.slug);
     } catch (e) { out.errors.push(`${p.slug}: ${e.message}`); }

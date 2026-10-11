@@ -345,6 +345,9 @@ export const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS settlements_open ON settlements(channel, date) WHERE paid = 0',
   // Trendyol komisyonu KDV dahil (tek seferlik çevrimi tetikler; bkz. once:ty_comm_incl_1)
   'CREATE INDEX IF NOT EXISTS listings_comm_src ON listings(channel, commission_src)',
+  // Pazaryerinin kendi kategori adı (Trendyol ürün kategorisi; Hepsiburada katalog veriyorsa): resmî komisyon listesiyle sağlama ve
+  // ilanın oranı bilinmiyorsa listeden oran (commission_src = 'list'). listings.category'den ayrı: o, ürün kategorisine aktarılır.
+  'ALTER TABLE listings ADD COLUMN mp_category TEXT',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

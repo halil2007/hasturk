@@ -189,6 +189,8 @@ export function trendyol(env, meta) {
       stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
       brand: str((p.brand && typeof p.brand === 'object' ? p.brand.name : p.brand) || p.brandName), description: str(p.description),
       url: str(v.productUrl || p.productUrl),
+      // Trendyol kategori adı (onaylı ürün v2: category { id, name }; eski filterProducts: categoryName): resmî komisyon listesiyle sağlama için
+      mpCategory: str((p.category && typeof p.category === 'object' ? p.category.name : p.category) || p.categoryName),
     };
   };
   async function pagedV2(path) {
@@ -208,11 +210,25 @@ export function trendyol(env, meta) {
   }
   async function fetchListings() {
     try {
-      const stock = new Map();
-      for (const p of await pagedV2(`/product/sellers/${seller}/products/approved/inventory-and-price`)) for (const v of p.variants || [p]) stock.set(str(v.barcode), num(v.quantity));
+      // Stok ve fiyat "inventory-and-price" servisinden: ürün servisi bazı varyantlarda fiyatı boş / 0 verir (panelde 0 ₺ görünüyordu);
+      // o zaman bu servisteki satış / liste fiyatı kullanılır
+      const inv = new Map();
+      for (const p of await pagedV2(`/product/sellers/${seller}/products/approved/inventory-and-price`)) {
+        for (const v of p.variants || [p]) {
+          const pr = v.price || {};
+          inv.set(str(v.barcode), { q: num(v.quantity), sale: num(pr.salePrice ?? v.salePrice), list: num(pr.listPrice ?? v.listPrice) });
+        }
+      }
       const out = [];
       const prods = await pagedV2(`/product/sellers/${seller}/products/approved`);
-      for (const p of prods) for (const v of p.variants || []) if (v.barcode) out.push(listingOf(p, v, stock.get(str(v.barcode))));
+      for (const p of prods) {
+        for (const v of p.variants || []) {
+          if (!v.barcode) continue;
+          const x = inv.get(str(v.barcode)), l = listingOf(p, v, x && x.q);
+          if (x && !(l.price > 0) && x.sale > 0) { l.price = x.sale; l.listPrice = Math.max(x.list, x.sale); }
+          out.push(l);
+        }
+      }
       if (prods.partial) out.partial = true;
       return out;
     } catch (e) {

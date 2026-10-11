@@ -255,6 +255,7 @@ export function hepsiburada(env, meta) {
         if (x.name && (!l.name || l.name === l.sku)) { l.name = x.name; l.groupName = l.groupName || x.name; }
         if (x.barcode && !l.barcode) l.barcode = x.barcode;
         if (x.brand) l.brand = x.brand;
+        if (x.category) l.mpCategory = x.category; // komisyon listesiyle sağlama (katalog servisi kategori adını verirse)
         if (x.images.length) { l.images = x.images; if (!l.image) l.image = x.images[0]; }
       }
     }
@@ -281,7 +282,7 @@ export function hepsiburada(env, meta) {
           const a = attrsOf(it), sku = str(g(it, 'merchantSku') || a.merchantSku);
           if (!sku) continue;
           out.set(sku.toLowerCase(), {
-            name: str(g(it, 'productName', 'name') || a.UrunAdi), barcode: str(g(it, 'barcode') || a.Barcode), brand: str(g(it, 'brand') || a.Marka),
+            name: str(g(it, 'productName', 'name') || a.UrunAdi), barcode: str(g(it, 'barcode') || a.Barcode), brand: str(g(it, 'brand') || a.Marka), category: typeof g(it, 'categoryName') === 'string' ? str(g(it, 'categoryName')) : '',
             images: imageList([].concat(g(it, 'images') || [], [a.Image1, a.Image2, a.Image3, a.Image4, a.Image5].filter(Boolean))),
           });
         }
