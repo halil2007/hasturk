@@ -133,10 +133,9 @@ export async function saveOrders(db, ch, orders, maps) {
         st.push(db.prepare(`INSERT OR REPLACE INTO order_items (order_id, line_id, product_id, sku, barcode, name, image, quantity, unit_price, total, status, remote_key, commission)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .bind(id, it.lineId, maps.resolve(ch, it), it.sku || '', it.barcode || '', it.name || '', it.image || '', it.quantity, it.unitPrice || 0, it.total || 0, it.status || '', it.remoteKey || '', com));
-        // Kanalın bildirdiği gerçek komisyon oranı ilana yazılır (elle girilmiş oran korunur). Satır komisyonu KDV dahildir; ilandaki oran
-        // pazaryerinin ilan ettiği gibi KDV hariç tutulur (hesapta KDV yeniden eklenir: profit.js → rateGross)
+        // Kanalın bildirdiği gerçek komisyon oranı ilana yazılır (elle girilmiş oran korunur). Satır komisyonu KDV dahildir, oran da KDV dahil saklanır
         // Yalnız canlı satır ve son 30 günün siparişi (geçmiş aktarımındaki eski oran güncel oranı ezmesin)
-        if (com != null && it.total > 0 && it.remoteKey && !it.status && o.orderedAt > t - 30 * 864e5) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src = 'api')").bind(Math.round((com / it.total / 1.2) * 10000) / 100, ch, it.remoteKey));
+        if (com != null && it.total > 0 && it.remoteKey && !it.status && o.orderedAt > t - 30 * 864e5) st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src = 'api')").bind(Math.round((com / it.total) * 10000) / 100, ch, it.remoteKey));
       }
       // Kanalın kendi paketleri (Trendyol/Hepsiburada/ikas) panele aynen yansır; paneldeki taslak paketler korunur
       if (Array.isArray(o.packages)) {

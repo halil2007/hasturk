@@ -408,14 +408,14 @@ export const DEFAULT_SETTINGS = {
   fx: { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 },
   // Müşteri sorularına hazır cevaplar
   answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
-  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 18, pttavm: 12, n11: 15, idefix: 15, pazarama: 15, amazon: 15, ciceksepeti: 20, koctas: 15, shopify: 0, woocommerce: 0, opencart: 0, etsy: 6.5, teknosa: 15, boyner: 20, pasaj: 12, trendyolgo: 15, getir: 20, yemeksepeti: 20, ebay: 13, ozon: 15, ticimax: 0, ideasoft: 0, tsoft: 0 },
+  commission: { ikas1: 0, ikas2: 0, trendyol: 24, hepsiburada: 21.6, pttavm: 14.4, n11: 18, idefix: 18, pazarama: 18, amazon: 18, ciceksepeti: 24, koctas: 18, shopify: 0, woocommerce: 0, opencart: 0, etsy: 7.8, teknosa: 18, boyner: 24, pasaj: 14.4, trendyolgo: 18, getir: 24, yemeksepeti: 24, ebay: 15.6, ozon: 18, ticimax: 0, ideasoft: 0, tsoft: 0 },
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
-  // Komisyon, kargo, hizmet bedeli ve ek kesinti KDV hariç girilir, hesapta %20 KDV eklenir; true: girilen tutarlar zaten KDV dahil
-  costs_vat_incl: false,
+  // Tüm gider tutarları KDV dahil girilir (cepten çıkan tutar); üstüne KDV eklenmez. false: eski kurulum (KDV hariç girilmiş, hesapta %20 eklenir)
+  costs_vat_incl: true,
   // Ödeme/hizmet bedeli gibi sabit kesintiler (sipariş başı TL)
   service_fee: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Satış tutarının %'si olarak ek kesinti (işlem / ödeme bedeli vb.)
-  fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0, amazon: 0, ciceksepeti: 0, koctas: 0, shopify: 0, woocommerce: 0, opencart: 0, etsy: 3, teknosa: 0, boyner: 0, pasaj: 0, trendyolgo: 0, getir: 0, yemeksepeti: 0, ebay: 0, ozon: 0, ticimax: 0, ideasoft: 0, tsoft: 0 },
+  fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0, amazon: 0, ciceksepeti: 0, koctas: 0, shopify: 0, woocommerce: 0, opencart: 0, etsy: 3.6, teknosa: 0, boyner: 0, pasaj: 0, trendyolgo: 0, getir: 0, yemeksepeti: 0, ebay: 0, ozon: 0, ticimax: 0, ideasoft: 0, tsoft: 0 },
   // E-ticaret stopajı %: pazaryeri hakedişten keser (KDV hariç satış üzerinden); kendi siteniz (ikas) için 0
   withholding: { ikas1: 0, ikas2: 0, trendyol: 1, hepsiburada: 1, pttavm: 1, n11: 1, idefix: 1, pazarama: 1, amazon: 1, ciceksepeti: 1, koctas: 1, shopify: 0, woocommerce: 0, opencart: 0, etsy: 0, teknosa: 1, boyner: 1, pasaj: 1, trendyolgo: 1, getir: 1, yemeksepeti: 1, ebay: 0, ozon: 0, ticimax: 0, ideasoft: 0, tsoft: 0 },
   // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
@@ -455,7 +455,41 @@ export const DEFAULT_SETTINGS = {
 // Logo (base64, yüzlerce KB olabilir) her ayar okumasında taşınmaz: yerine kısa bir sürüm işareti gelir ("logo:uzunluk:son-karakterler").
 // Görselin kendisi /api/logo adresinden (tarayıcı önbellekli) sunulur; içeriği gereken yer getLogo() kullanır.
 // Giriş deneme sayaçları da ayar değildir, okunmaz.
+// Tek seferlik: eski kurulumda gider tutarları KDV hariç girilmişti (hesapta %20 ekleniyordu). Artık her şey KDV dahil saklanır:
+// kayıtlı komisyon / kargo / hizmet bedeli / ek kesinti ve ürüne elle girilen komisyon 1,2 ile çarpılır (kâr değişmez); kanaldan
+// gelen ilan komisyonu (önceden KDV'si ayrılarak saklanıyordu) de KDV dahile çevrilir. Aynı anda iki istek çevirmesin diye işaret önce alınır.
+const VAT_ONCE = 'once:vat_incl_1', vatDone = new WeakSet();
+async function vatInclOnce(db, rows) {
+  if (vatDone.has(db)) return false;
+  if (rows.some((r) => r.k === VAT_ONCE)) { vatDone.add(db); return false; }
+  const claim = await first(db, "INSERT INTO settings (k, v) VALUES (?, '1') ON CONFLICT (k) DO NOTHING RETURNING k", VAT_ONCE).catch(() => null);
+  vatDone.add(db);
+  if (!claim) return false;
+  try {
+    const get = (k) => { const r = rows.find((x) => x.k === k); try { return r ? JSON.parse(r.v) : undefined; } catch { return undefined; } };
+    const wasIncl = get('costs_vat_incl') === true, st = [];
+    if (!wasIncl) {
+      for (const k of ['commission', 'shipping', 'service_fee', 'fee_rate']) {
+        const v = get(k);
+        if (!v || typeof v !== 'object') continue;
+        const g = Object.fromEntries(Object.entries(v).map(([c, x]) => [c, x === '' || x == null || !Number.isFinite(Number(x)) ? x : Math.round(Number(x) * 120) / 100]));
+        st.push(db.prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v').bind(k, JSON.stringify(g)));
+      }
+      st.push(db.prepare("UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND COALESCE(commission_src, 'manual') != 'api'"));
+    }
+    st.push(db.prepare("UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND commission_src = 'api'"));
+    st.push(db.prepare("INSERT INTO settings (k, v) VALUES ('costs_vat_incl', 'true') ON CONFLICT (k) DO UPDATE SET v = excluded.v"));
+    await db.batch(st);
+    return true;
+  } catch (e) {
+    await run(db, 'DELETE FROM settings WHERE k = ?', VAT_ONCE).catch(() => {});
+    vatDone.delete(db);
+    console.error('KDV dahil çevrimi yapılamadı', e);
+    return false;
+  }
+}
 export async function getSettings(db) {
+  if (!vatDone.has(db)) await vatInclOnce(db, await all(db, "SELECT k, v FROM settings WHERE k IN ('once:vat_incl_1', 'costs_vat_incl', 'commission', 'shipping', 'service_fee', 'fee_rate')").catch(() => []));
   const rows = await all(db, `SELECT k, CASE WHEN k = 'logo' AND length(v) > 2 THEN json_quote('logo:' || length(v) || ':' || substr(v, -24, 20)) ELSE v END AS v
     FROM settings WHERE k NOT LIKE 'login_fail:%'`);
   const out = structuredClone(DEFAULT_SETTINGS);
