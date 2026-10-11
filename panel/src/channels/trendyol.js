@@ -58,6 +58,14 @@ export function trendyol(env, meta) {
     const u = r2(num(l.lineGrossAmount) - num(l.lineSellerDiscount) + num(l.lineSgrFee));
     return net > 0 && (u > net + num(l.lineTyDiscount) + num(l.lineSgrFee) + 0.05 || u < net - 0.05) ? net : u;
   };
+  // Satıcının karşıladığı indirim (sepet / kupon kampanyası; lineSellerDiscount, adet başı): satır tutarından zaten düşülür (unitOf),
+  // panelde bilgi olarak saklanır. Yalnız brüt − satıcı indirimi yolu kullanıldıysa (alanların adet başı olduğu doğrulandıysa) yazılır.
+  // Trendyol'un karşıladığı indirim (lineTyDiscount) satıcıya ödenir, burada sayılmaz.
+  const sellerDiscOf = (l, qty) => {
+    const d = num(l.lineSellerDiscount);
+    if (l.lineGrossAmount == null || !(d > 0)) return 0;
+    return unitOf(l) === r2(num(l.lineGrossAmount) - d + num(l.lineSgrFee)) ? r2(d * qty) : 0;
+  };
   const pkgTotalOf = (p) => {
     const net = num(p.packageTotalPrice ?? p.totalPrice ?? p.grossAmount);
     if (p.packageGrossAmount == null) return net;
@@ -92,7 +100,7 @@ export function trendyol(env, meta) {
         const lid = lineIdOf(l), st = lineKind(p, l), qty = num(l.quantity, 1);
         const first = byKey.get(lid), key = first && first.status !== st ? `${lid}-${st || 'acik'}` : lid;
         const ex = byKey.get(key);
-        if (ex) { ex.quantity += qty; ex.total = r2(ex.unitPrice * ex.quantity); if (rates.has(key)) ex.commission = comm(ex.total, rates.get(key)); continue; }
+        if (ex) { ex.quantity += qty; ex.total = r2(ex.unitPrice * ex.quantity); if (rates.has(key)) ex.commission = comm(ex.total, rates.get(key)); if (ex.sellerDiscount) ex.sellerDiscount = r2(ex.sellerDiscount + sellerDiscOf(l, qty)); continue; }
         const unit = unitOf(l), total = r2(unit * qty);
         // commission: satırdaki komisyon ORANI (%); panelde satırın KDV dahil komisyon tutarı tutulur
         const rate = l.commission != null && l.commission !== '' ? num(l.commission, null) : null;
@@ -100,6 +108,7 @@ export function trendyol(env, meta) {
         const it = {
           lineId: key, sku: str(l.stockCode || l.merchantSku), barcode: str(l.barcode), name: str(l.productName), image: '',
           quantity: qty, unitPrice: unit, total, status: st, remoteKey: str(l.barcode), ...(rate != null ? { commission: comm(total, rate) } : {}),
+          ...(sellerDiscOf(l, qty) > 0 ? { sellerDiscount: sellerDiscOf(l, qty) } : {}),
         };
         byKey.set(key, it);
         items.push(it);

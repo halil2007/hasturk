@@ -55,9 +55,12 @@ test('Trendyol ilanı kategori adını okur; oranı bilinmeyen ilana liste oran�
   assert.deepEqual(await get('B4'), { commission: null, commission_src: null });
   assert.deepEqual(await get('B5'), { commission: null, commission_src: null });
   assert.equal(await applyListRates(db, 'trendyol'), 0, 'değişiklik yoksa yazılmaz');
-  // Liste oranı tahmindir: siparişin bildirdiği oran gelince yerini alır
+  // Siparişin bildirdiği oran ilanın ana oranına işlenir (kaynak 'api') ama resmî liste oranının altına inmez: %18'lik satır (indirimli)
+  // ana oranı %21,5'ten düşürmez; listeden yüksek gerçek oran (%22,5) ana oran olur
   await saveOrders(db, 'trendyol', [{ remoteId: 'O1', orderNumber: 'O1', orderedAt: Date.now() - D, status: 'delivered', total: 200, items: [{ lineId: '1', sku: 'S1', barcode: 'B1', name: 'Kordon', quantity: 1, unitPrice: 200, total: 200, remoteKey: 'B1', commission: 36 }] }]);
-  assert.deepEqual(await get('B1'), { commission: 18, commission_src: 'api' });
+  assert.deepEqual(await get('B1'), { commission: 21.5, commission_src: 'api' });
+  await saveOrders(db, 'trendyol', [{ remoteId: 'O1b', orderNumber: 'O1b', orderedAt: Date.now() - D, status: 'delivered', total: 200, items: [{ lineId: '1', sku: 'S1', barcode: 'B1', name: 'Kordon', quantity: 1, unitPrice: 200, total: 200, remoteKey: 'B1', commission: 45 }] }]);
+  assert.deepEqual(await get('B1'), { commission: 22.5, commission_src: 'api' });
   // İlan senkronu kategori adını saklar ve liste oranını yazar
   await refreshListings(db, { id: 'trendyol', fetchListings: async () => [{ remoteId: 'B9', remoteProductId: 'P9', sku: 'S9', barcode: 'B9', name: 'Kordon 2', price: 50, stock: 1, mpCategory: 'Saat Kordonu' }] });
   assert.deepEqual({ ...(await db.prepare("SELECT mp_category, commission, commission_src FROM listings WHERE remote_id = 'B9'").first()) }, { mp_category: 'Saat Kordonu', commission: 21.5, commission_src: 'list' });

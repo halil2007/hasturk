@@ -44,6 +44,7 @@ import { ek } from '../public/ek.js';
 const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).find((f) => f.k === k) || {}).label || k).join(', ');
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderCommission, commissionCheck } from './commcheck.js';
+import { shipInfo, shipFromInvoice } from './shipcost.js';
 import { orderProfit, breakdown, productProfit, productLoss, lossSummary, markLosses, lossCache, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE, HttpError } from './util.js';
@@ -916,6 +917,9 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
     if (num(b.stock)) await run(db, 'INSERT INTO stock_moves (product_id, delta, stock_after, reason, created_at) VALUES (?, ?, ?, ?, ?)', id, Math.round(num(b.stock)), Math.round(num(b.stock)), 'İlk stok', t);
   } else {
     const keys = Object.keys(f);
+    // Kargo tutarı elle değişti: faturalarla karşılaştırma bu andan sonraki gönderilerle yeniden başlar (bkz. shipcost.js)
+    const shipWas = 'ship_cost' in f ? await first(db, 'SELECT ship_cost FROM products WHERE id = ?', id) : null;
+    if (shipWas && Number(shipWas.ship_cost || 0) !== Number(f.ship_cost || 0)) { f.ship_set_at = t; f.ship_warn = null; keys.push('ship_set_at', 'ship_warn'); }
     if (keys.length) await run(db, `UPDATE products SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => f[k]), t, id);
     if (b.stock !== undefined && b.stock !== '') await stockChange(env, db, ctx, id, { mode: 'set', qty: b.stock, note: 'Ürün formu' }, user);
   }
@@ -979,6 +983,12 @@ async function productDetail(db, id) {
   p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired, r.min_price AS rule_min, r.max_price AS rule_max FROM listings l JOIN products p ON p.id = l.product_id
     LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.product_id = ? ORDER BY l.channel, l.extra_link, l.remote_id`, id);
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
+  // Kargo tutarı: faturaya göre son güncelleme / faturalar daha yüksek notu (bkz. shipcost.js)
+  p.ship_info = shipInfo(p);
+  // İlanın son siparişteki gerçek komisyon oranı (ilandaki oran ana orandır; indirimli sipariş ayrıca gösterilir)
+  const lastRates = p.listings.length ? await all(db, `SELECT o.channel, i.remote_key AS k, ROUND(i.commission * 100.0 / i.total, 2) AS r, o.ordered_at AS at FROM order_items i JOIN orders o ON o.id = i.order_id
+    WHERE i.product_id = ? AND o.ordered_at >= ? AND i.commission IS NOT NULL AND i.total > 0 AND COALESCE(i.status, '') NOT IN ('cancelled', 'returned') ORDER BY o.ordered_at DESC LIMIT 200`, id, Date.now() - 90 * 864e5) : [];
+  for (const l of p.listings) { const x = lastRates.find((r) => r.channel === l.channel && r.k === l.remote_id); if (x) l.last_rate = x.r; }
   // Aynı ana ürünün varyantları (tek ekrandan düzenleme için)
   const gk = p.parent_key || p.group_name;
   p.siblings = gk ? (await all(db, "SELECT id FROM products WHERE COALESCE(NULLIF(parent_key, ''), NULLIF(group_name, ''), name) = ? LIMIT 300", gk)).map((r) => r.id) : [id];
@@ -1675,6 +1685,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if ((path === 'settlements' || path === 'invoices' || path.startsWith('settlements/') || path.startsWith('invoices/')) && env.TENANT_SLUG) requireFeature(env, 'finance');
   if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
+  // Veri sağlık kontrolü (bkz. health.js): yönetici ya da Gelir, gider ve hakediş yetkisi; 1 saat önbellek, force=1 hemen yeniler
+  if (path === 'health/data' && m === 'GET') {
+    if (user.role !== 'admin' && !can(user, 'finance')) fail(403, 'Bu kontrol için Gelir, gider ve hakediş yetkisi gerekir');
+    return json(await (await import('./health.js')).healthReport(env, db, await getSettings(db), { force: q.force === '1' }));
+  }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); const [invoices, costs] = await Promise.all([syncInvoices(env, db, { force: true }), syncCosts(env, db, null, { force: true }).catch((e) => ({ error: e.message }))]); return json({ invoices, costs }); }
   if (path === 'finance/commission' && m === 'GET') return json(await commissionCheck(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
@@ -1997,6 +2012,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     }
   }
   // Hızlı alış fiyatı (raporlardaki "alış fiyatı yok" uyarısından): yalnız alış fiyatı değişir
+  // Ürün formundaki "Faturadaki tutarı kullan": kargo tutarı faturalı gönderilerin ortancası olur (Ürünler yazma yetkisi; bölüm denetimi yukarıda)
+  if ((x = path.match(/^products\/(\d+)\/ship-from-invoice$/)) && m === 'POST') {
+    if (!can(user, 'products', true)) fail(403, 'Kargo tutarını değiştirmek için Ürünler yetkisi gerekir');
+    return json(await shipFromInvoice(db, Number(x[1]), user));
+  }
   if ((x = path.match(/^products\/(\d+)\/cost$/)) && m === 'POST') {
     if (!can(user, 'products', true)) fail(403, 'Alış fiyatı girmek için Ürünler yetkisi gerekir');
     const b = await body(req), v = num(b.purchase_price), id = Number(x[1]);

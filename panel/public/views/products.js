@@ -424,7 +424,7 @@ export function lossCard(box, r) {
       <td class="r num">${c.returns ? html`${n(c.returns)} <span class="tiny muted">%${n(c.returnRate)}</span>` : '—'}</td><td class="r num">${c.returns ? money(c.perReturn) : '—'}</td>
       <td class="r num" style="font-weight:650;color:${c.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(c.profit)}</td>
       <td class="r num" style="font-weight:700;${c.price != null && c.avgPrice != null && c.price > c.avgPrice ? 'color:var(--bad)' : ''}">${c.price == null ? html`<span class="muted" title="Kesintiler satışın tamamını götürüyor">—</span>` : money(Math.ceil(c.price))}</td></tr>`)}
-    </tbody></table></div><div class="tiny muted" style="margin-top:6px">Başa baş fiyat kanalın son 90 gündeki gerçek komisyon ve kargo tutarlarıyla, ürünün iade oranı × kanalın iade başı maliyetiyle hesaplanır. ${d && d.estReturn ? `İade maliyetinin ${money0(d.estReturn)}'si tahmini (Ayarlar → Giderler tutarlarından).` : ''}</div>` : '';
+    </tbody></table></div><div class="tiny muted" style="margin-top:6px">Başa baş fiyat ilanın ana komisyon oranıyla (pazaryerinin geçici komisyon indirimleri hariç), kanalın son 90 gündeki kargo tutarlarıyla, ürünün iade oranı × kanalın iade başı maliyetiyle hesaplanır. ${d && d.estReturn ? `İade maliyetinin ${money0(d.estReturn)}'si tahmini (ürün kargo tutarından ya da Ayarlar → Giderler tutarlarından).` : ''}</div>` : '';
   let body;
   if (v && v.level === 'loss') {
     body = html`<div class="notice bad"><i class="ico ico-warn"></i><div style="flex:1;min-width:0"><b>Bu üründen son ${days} günde ${money(v.loss)} zarar ettiniz</b> (${n(d.units)} satış${d.returns ? `, ${n(d.returns)} iade` : ''}${d.returnCost ? `, iade maliyeti ${money(d.returnCost)}` : ''}).
@@ -438,6 +438,15 @@ export function lossCard(box, r) {
   } else return;
   render(box, body);
   box.hidden = false;
+}
+// Kargo tutarı alanının altındaki not (bkz. src/shipcost.js): faturaya göre otomatik güncellendiyse eski → yeni tutar; faturalar
+// girilen tutardan yüksekse sakin bir not ve "Faturadaki tutarı kullan" düğmesi
+function shipNote(p) {
+  const x = p.ship_info || {};
+  if (x.warn && x.warn.median) return html`<div data-shipnote class="tiny" style="margin-top:4px;color:var(--amber)">Faturalara göre kargo ortalama ${money(x.warn.median)}; ürüne girilen ${money(x.warn.entered)} <span class="muted">(son ${n(x.warn.n)} gönderi)</span>
+    ${can(state.user, 'products', true) ? html`<button type="button" class="btn sm" style="margin-left:6px" data-shipfix>Faturadaki tutarı kullan</button>` : ''}</div>`;
+  if (x.auto) return html`<div data-shipnote class="tiny muted" style="margin-top:4px">Kargo tutarı faturaya göre güncellendi: ${money(x.auto.from)} → ${money(x.auto.to)} <span title="${x.auto.n} gönderinin ortancası${x.auto.by ? ' · ' + x.auto.by : ''}">(${dateTime(x.auto.at)})</span></div>`;
+  return '';
 }
 export async function productForm(id, done) {
   const s = sheet({ title: id ? 'Ürünü düzenle' : 'Yeni ürün', size: 'wide' });
@@ -482,7 +491,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Kargoya hazırlık (gün)</span><input class="input" name="preparing_days" inputmode="numeric" placeholder="kanal ayarı" value="${p.preparing_days || ''}"></label>
         <label class="field"><span>Garanti (ay)</span><input class="input" name="warranty_months" inputmode="numeric" placeholder="kanal ayarı" value="${p.warranty_months || ''}"></label>
         <label class="field"><span>Menşei</span><input class="input" name="origin" maxlength="40" placeholder="${(state.settings && state.settings.origin) || 'Türkiye'}" value="${p.origin || ''}"></label>
-        <label class="field"><span>Kargo tutarı (sipariş başı)</span><div class="input-group"><input class="input" name="ship_cost" inputmode="decimal" placeholder="girilmedi" value="${p.ship_cost || ''}"><span class="suffix">₺</span></div><small>Kâr hesabında kargo gideri; kanal kargo faturası gelirse o kullanılır</small></label>
+        <label class="field"><span>Kargo tutarı (sipariş başı)</span><div class="input-group"><input class="input" name="ship_cost" inputmode="decimal" placeholder="girilmedi" value="${p.ship_cost || ''}"><span class="suffix">₺</span></div><small>Kâr hesabında kargo gideri; kanal kargo faturası gelirse o kullanılır</small>${shipNote(p)}</label>
         ${siteStock(p) ? html`<label class="field"><span>Stok</span><input class="input" type="number" value="${p.stock}" readonly><small>ikas sitesinden okunur (stok senkronu kapalı)</small></label>` : html`<label class="field"><span>Stok</span><input class="input" name="stock" type="number" inputmode="numeric" value="${p.stock}"></label>`}
         <label class="field"><span>Kritik stok uyarısı</span><input class="input" name="critical_stock" type="number" inputmode="numeric" value="${p.critical_stock || 0}"></label>
       </div>
@@ -496,12 +505,12 @@ export async function productForm(id, done) {
         <div class="small" data-fxprev></div></div>`}
       <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Aktif (pasif ürünün stoğu kanallara gönderilmez)</label>
     </div>
-    ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p>${chSideNotice(p.listings)}</div>
+    ${p.listings.length ? html`<div class="card flush"><div style="padding:16px 16px 0"><h3>Kanal ilanları</h3><p class="muted small" style="margin:4px 0 8px">Fiyat değişikliği kaydedilince ilgili kanala gönderilir. Komisyon boşsa kanal varsayılanı kullanılır; kanal siparişte gerçek komisyonu bildiriyorsa ana oran (son 90 günün en yüksek oranı; pazaryerinin siparişe özel indirimi düşürmez) otomatik yazılır (elle girdiğiniz oran korunur). Kanala özel stok (ör. bir kanalda 10, diğerinde 5) için stok sütununa dokunun.</p>${chSideNotice(p.listings)}</div>
       <div class="table-wrap"><table class="t"><thead><tr><th>Kanal</th><th class="r">Fiyat</th><th class="r">Komisyon %</th><th class="r">Ürün başı kâr</th><th class="r">Kanala giden stok</th></tr></thead><tbody>
         ${p.listings.map((l) => { const r = lp(l); return html`<tr data-l="${l.channel}" data-rid="${l.remote_id}">
           <td><span class="ch-name">${chLogo(l.channel, true)}${ch(l.channel).name}</span>${ilanNo(p.listings, l) ? html` <span class="pill info" style="padding:2px 8px;font-size:11px">${ilanNo(p.listings, l)}</span> <button type="button" class="btn sm ghost danger" data-unl="${l.channel}|${l.remote_id}" title="Bu ilanın ürünle bağını kaldır">Ayır</button>` : ''}<div class="muted tiny ellipsis" style="max-width:180px">${l.name && ilanNo(p.listings, l) ? `${l.name} · ` : ''}${l.remote_id}</div>${isChannelSide(l) || l.remote_state === 'passive' ? html`<div class="tiny muted" title="${l.error || ''}"><i class="ico ico-help" style="width:12px;height:12px"></i> ${channelStateText(l, ch(l.channel).name).short}</div>` : realError(l) ? html`<div class="tiny" style="color:var(--bad)" title="${l.error}">${errText(l.error)}</div>` : ''}</td>
           <td class="r"><input class="input qty-in" style="width:96px" inputmode="decimal" data-lf="price" value="${l.price ?? ''}">${l.rule_min != null ? html`<div class="tiny muted" title="Bu ilanda otomatik fiyat açık: elle girdiğiniz fiyat bu aralıkta olmalı; değişiklikten sonra otomatik fiyat 14 dakika bekler">Otomatik fiyat: ${money(l.rule_min)} – ${money(l.rule_max)}</div>` : ''}</td>
-          <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${costRaw(st, 'commission', l.channel)}" title="KDV dahil komisyon oranı">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? 'kanaldan (son sipariş)' : l.commission_src === 'list' ? 'resmî listeden (tahmin)' : 'elle girildi'}</div>` : ''}</td>
+          <td class="r"><input class="input qty-in" inputmode="decimal" data-lf="commission" value="${l.commission ?? ''}" placeholder="${costRaw(st, 'commission', l.channel)}" title="KDV dahil komisyon oranı">${l.commission != null ? html`<div class="tiny muted">${l.commission_src === 'api' ? html`<span title="Son 90 gündeki siparişlerin en yüksek oranı (resmî liste oranının altına inmez). Pazaryerinin tek tek siparişlerde yaptığı komisyon indirimi bu oranı düşürmez.">kanaldan (ana oran)</span>` : l.commission_src === 'list' ? 'resmî listeden (tahmin)' : 'elle girildi'}</div>` : ''}${l.last_rate != null && l.commission != null && l.commission - l.last_rate >= 1 ? html`<div class="tiny muted" title="Pazaryerinin bu siparişe özel komisyon indirimi: kârda gerçek tutar kullanılır, ileriye dönük hesaplar ana oranla yapılır">son siparişte %${n(l.last_rate)} (indirimli)</div>` : ''}</td>
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>
           <td class="r num"><button type="button" class="plain" data-rule style="align-items:flex-end">${l.desired ?? l.remote_stock ?? '—'}<span class="tiny muted">${isHeld(l) ? 'kanal yayına alınca gönderilir' : ruleText(l) || 'ortak stok'}</span></button>${l.price_dirty ? html`<div class="tiny" style="color:var(--warn)">fiyat gönderilecek</div>` : ''}</td></tr>`; })}
       </tbody></table></div><div class="row wrap" style="padding:10px 16px"><button type="button" class="btn sm" data-addl><i class="ico ico-plus"></i>İlan ekle</button><span class="muted tiny">Aynı ürün bir kanalda iki kez listelendiyse ikinci ilanı buradan bağlayın.</span></div></div>` : ''}
@@ -606,6 +615,15 @@ export async function productForm(id, done) {
     const q = new URLSearchParams({ name: form.name.value, group_name: form.group_name.value, variant_name: form.variant_name.value, brand: form.brand.value, id: id || '' });
     form.sku.value = (await api('products/skus/new?' + q)).sku;
     toast('SKU oluşturuldu — kaydetmeyi unutmayın');
+  });
+  // Kargo faturaları girilen tutardan yüksek: "Faturadaki tutarı kullan" (sunucu son gönderilerin ortancasını yazar)
+  const shipFix = $('[data-shipfix]', form);
+  if (shipFix) shipFix.onclick = (e) => busy(e.currentTarget, async () => {
+    const r = await api(`products/${id}/ship-from-invoice`, { method: 'POST', body: {} });
+    form.ship_cost.value = r.ship_cost;
+    const box = $('[data-shipnote]', form);
+    if (box) render(box, html`<span class="tiny" style="color:var(--good)">Kargo tutarı faturadaki tutara göre ${money(r.ship_cost)} yapıldı</span>`);
+    toast('Kargo tutarı güncellendi');
   });
   // Barkod oluştur: benzersiz EAN-13 önerisi alanına yazılır, ürün kaydedilince geçerli olur
   $('[data-genbc]', form).onclick = (e) => busy(e.currentTarget, async () => {

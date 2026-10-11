@@ -49,6 +49,7 @@ const STREETS = ['Atatürk Cad.', 'Cumhuriyet Mah. Gül Sok.', 'İstiklal Cad.',
 // iade ve kargoyla zarar ettirir, budama makası kârlı ama iade kârının büyük kısmını götürür
 const RETURNY = { 'HG-SAKSI-20': 0.34, 'BM-PRO': 0.4, 'SN-RUN': 0.18 };
 // Örnek kargo tarifesi (KDV dahil, desiye göre): ürün kargo tutarı ve örnek kargo faturası için
+export const DEMO_SHIP_ACTUAL = { 'TR-750': 36.9, 'AF-55': 96.4 };
 export const demoCargoFee = (desi) => (desi <= 1 ? 42.9 : desi <= 3 ? 59.9 : desi <= 6 ? 84.9 : 119.9);
 const CARRIER = { trendyol: 'Trendyol Express', hepsiburada: 'HepsiJet', amazon: 'Yurtiçi Kargo', n11: 'Aras Kargo', ciceksepeti: 'Aras Kargo', pttavm: 'PTT Kargo', idefix: 'Sürat Kargo', pazarama: 'Yurtiçi Kargo', koctas: 'Yurtiçi Kargo', ikas1: 'HepsiJet' };
 export function demo(meta) {
@@ -75,7 +76,14 @@ export function demo(meta) {
           const p = DEMO_PRODUCTS[Math.floor(Math.pow(r(), 1.6) * DEMO_PRODUCTS.length)];
           if (lines.some((l) => l.sku === p[0])) continue;
           const q = r() < 0.8 ? 1 : 2, unit = Math.round(p[3] * (PRICE[ch] || 1));
-          lines.push({ lineId: `${key}-${i}-${j}`, sku: p[0], barcode: p[1], name: p[2], image: `/demo/${p[0]}.svg`, quantity: q, unitPrice: unit, total: unit * q, status: '', remoteKey: remoteKey(p) });
+          const line = { lineId: `${key}-${i}-${j}`, sku: p[0], barcode: p[1], name: p[2], image: `/demo/${p[0]}.svg`, quantity: q, unitPrice: unit, total: unit * q, status: '', remoteKey: remoteKey(p) };
+          // Ana komisyon / satıcı indirimi örnekleri (ayrı tohum: siparişlerin geri kalanı değişmesin). idefix satırı komisyonu bildirir
+          // (%18); bazı siparişlerde idefix kendi indirimini yapar (%4,6): ilanın ana oranı %18 kalır (bkz. commcheck.js refreshBaseRates).
+          // Trendyol'da bazı satırlarda satıcının karşıladığı sepet indirimi (%10; satır tutarı indirim düşülmüş tutar sayılır).
+          const xr = rng(line.lineId + 'x')();
+          if (ch === 'idefix') line.commission = Math.round(line.total * (xr < 0.2 ? 4.6 : 18)) / 100;
+          if (ch === 'trendyol' && xr < 0.12) line.sellerDiscount = Math.round(line.total * 10) / 100;
+          lines.push(line);
         }
         const x = r();
         let status = age < 0.3 ? 'new' : age < 1.2 ? 'processing' : age < 4 ? 'shipped' : 'delivered';
@@ -274,7 +282,10 @@ export function demo(meta) {
     const items = [];
     for (const o of await fetchOrders(since - 10 * 864e5, Math.min(until, Date.now()))) {
       if (!['shipped', 'delivered', 'returned'].includes(o.status)) continue;
-      const fee = demoCargoFee(Math.max(1, ...o.items.map((l) => (DEMO_PRODUCTS.find((p) => p[0] === l.sku) || [])[5] || 1)));
+      // Tek ürünlü, tek adetlik gönderide bazı ürünlerin faturası ürüne girilen tutardan farklı (bkz. shipcost.js): termos daha ucuza,
+      // airfryer daha pahalıya gidiyor
+      const one = o.items.length === 1 && o.items[0].quantity === 1 ? DEMO_SHIP_ACTUAL[o.items[0].sku] : null;
+      const fee = one || demoCargoFee(Math.max(1, ...o.items.map((l) => (DEMO_PRODUCTS.find((p) => p[0] === l.sku) || [])[5] || 1)));
       items.push({ orderNumber: o.orderNumber, amount: fee, ...(o.status === 'returned' ? { returnAmount: fee } : {}) });
     }
     return { items };

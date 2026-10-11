@@ -38,14 +38,27 @@ test('İade maliyeti: kısmi iade yalnız iade kargosu (gönderim kargosu ve kom
     items: [line({ quantity: 3, total: 300, returned_qty: 1 }), line({ product_id: 2, sku: 'S2', barcode: 'B2', total: 100 })] };
   const none = returnCost(o, S);
   assert.equal(none.full, false); assert.equal(none.units, 1);
-  // İade kargo bedeli girilmemiş: uydurma tutar yok (0, "none"); geri verilmeyen komisyon kısmi iadede eklenmez
-  assert.deepEqual([none.outbound, none.returnShip, none.returnShipSrc, none.commission, none.fee, none.total], [0, 0, 'none', 0, 0, 0]);
+  // İade kargo bedeli girilmemiş: kullanıcının girdiği kargo tutarı kullanılır — ürünün kargo tutarı yoksa Ayarlar'daki sipariş başı
+  // kargo (30), "tahmini (ürün kargo tutarından)"; geri verilmeyen komisyon kısmi iadede eklenmez
+  assert.deepEqual([none.outbound, none.returnShip, none.returnShipSrc, none.commission, none.fee, none.total, none.estimated], [0, 30, 'default', 0, 0, 30, true]);
+  // Ürünün kargo tutarı (iade edilen satırın) Ayarlar'daki tutardan önce gelir
+  const prod = returnCost({ ...o, items: [line({ quantity: 3, total: 300, returned_qty: 1, ship_cost: 54.9 }), line({ product_id: 2, sku: 'S2', barcode: 'B2', total: 100, ship_cost: 99 })] }, S);
+  assert.deepEqual([prod.returnShip, prod.returnShipSrc, prod.total], [54.9, 'product', 54.9]);
+  // Hiçbir kargo tutarı girilmemiş: uydurma tutar yok (0, "none")
+  const bare = returnCost(o, { ...S, shipping: {} });
+  assert.deepEqual([bare.returnShip, bare.returnShipSrc, bare.total], [0, 'none', 0]);
   assert.match(returnNote({ orders: 1, full: 0, partial: 1, units: 1 }), /İade kargo bedeli/);
+  assert.match(returnNote({ orders: 1, full: 0, partial: 1, units: 1, returnShip: 54.9, returnShipEst: 54.9, estOrders: 1, returnShipProd: 54.9 }), /tahmini \(ürün kargo tutarından\)/);
   const est = returnCost(o, { ...S, return_shipping: { trendyol: 25 } });
   assert.deepEqual([est.returnShip, est.returnShipSrc, est.total, est.lines.length, est.lines[0].key, est.lines[0].units], [25, 'estimate', 25, 1, 1, 1]);
-  // Eski kayıt: iade kargosu gönderim faturasıyla birlikte shipping_cost'ta → tahmin eklenmez
+  // Eski kayıt: iade kargosu gönderim faturasıyla birlikte shipping_cost'ta → tahmin eklenmez (ürün / Ayarlar kargo tutarı da eklenmez)
   const lump = returnCost({ ...o, return_ship_src: 'lumped' }, { ...S, return_shipping: { trendyol: 25 } });
   assert.deepEqual([lump.returnShip, lump.returnShipSrc, lump.total], [0, 'lumped', 0]);
+  const lump2 = returnCost({ ...o, return_ship_src: 'lumped', items: [line({ quantity: 3, total: 300, returned_qty: 1, ship_cost: 54.9 })] }, S);
+  assert.deepEqual([lump2.returnShip, lump2.returnShipSrc, lump2.total], [0, 'lumped', 0]);
+  // Faturadaki iade kalemi her zaman önce gelir
+  const invr = returnCost({ ...o, return_ship_src: 'api', return_ship_cost: 33, items: [line({ quantity: 3, total: 300, returned_qty: 1, ship_cost: 54.9 })] }, { ...S, return_shipping: { trendyol: 25 } });
+  assert.deepEqual([invr.returnShip, invr.returnShipSrc], [33, 'invoice']);
   // İade yok: maliyet yok
   assert.equal(returnCost({ ...o, items: [line()] }, S), null);
 });
@@ -54,7 +67,8 @@ test('İade maliyeti: hasarlı iade (ayar açıksa) iade edilen adedin alış ma
   const o = { id: 'D', channel: 'trendyol', status: 'returned', shipping_cost: 0, shipping_src: 'api', items: [line({ quantity: 2, total: 400 })], damaged: [{ barcode: 'B1', qty: 1 }] };
   assert.equal(returnCost(o, S).damaged, 0);
   const r = returnCost(o, { ...S, return_damaged_loss: true });
-  assert.deepEqual([r.damaged, r.total - 5], [80, 80]);
+  // toplam = hasarlı alış 80 + hizmet bedeli 5 + tahmini iade kargosu (Ayarlar'daki kargo 30)
+  assert.deepEqual([r.damaged, r.returnShipSrc, r.total - 5 - r.returnShip], [80, 'default', 80]);
 });
 
 // Ortak örnek: P1 (alış 50) Trendyol'da; O1 teslim, O2 tamamı iade (kargo faturası: gönderim 30, iade 28), O3 kısmi iade (2'den 1)
