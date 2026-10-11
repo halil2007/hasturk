@@ -99,8 +99,8 @@ const FM_TOOLS = [
   ['kar-zarar', 'i-calc', 'c-purple', 'Kâr hesaplama', 'Sipariş başı net kâr'],
   ['doviz-endeksli-fiyat', 'i-coin', 'c-teal', 'Döviz ile fiyat', 'Kurla otomatik TL'],
   ['raporlar', 'i-chart', 'c-blue', 'Raporlar', 'Satış ve kanal analizi'],
-  ['mobil-yonetim', 'i-phone', 'c-green', 'Telefondan yönetim', 'Kurulumsuz, uygulama gibi'],
-  ['kargo-entegrasyonu', 'i-truck', 'c-orange', 'Kargo firmaları', '7 firma, kendi anlaşmanız'],
+  ['mobil-yonetim', 'i-phone', 'c-green', 'Telefondan yönetim', 'Uygulama gibi çalışır'],
+  ['kargo-entegrasyonu', 'i-truck', 'c-orange', 'Kargo firmaları', 'Kendi anlaşmanızla'],
   ['ekip-ve-guvenlik', 'i-users', 'c-pink', 'Personel ve yetkiler', 'Roller, iki adımlı giriş'],
 ].map(([slug, ...r]) => [fLink(slug), ...r]);
 // Öne çıkan kart görseli: üç kanalın siparişleri tek panel listesinde toplanıyor (sipariş satırında kâr: siparis-yonetimi "Satırda kâr")

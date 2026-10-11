@@ -1021,6 +1021,7 @@ html { overflow-x: clip; }
 /* Özellikler mega menüsü: aynı kalıp; araçlar logolar yerine renkli simge kutusu, öne çıkan kart yeşil tonda */
 .mm-tool .ic { display: grid; place-items: center; height: 46px; border-radius: 10px; transition: filter .15s; }
 .mm-tool .ic svg { width: 22px; height: 22px; }
+.mm-tool b { white-space: normal; overflow-wrap: anywhere; }
 .nav .mm-tool:hover .ic { filter: saturate(1.25) brightness(.97); }
 .nav .dd-p .mm-feat-alt { background: linear-gradient(160deg, #f0faf4 0%, #e2f5ea 100%); border-color: #cdebdc; }
 .nav .mm-feat-alt:hover { border-color: #a6dcc0; box-shadow: 0 10px 26px rgb(24 160 88 / .12); }

@@ -3,7 +3,7 @@
 // istemediğini yok sayar. Kanal başına mod: "Otomatik" (yeni ilanlar kendiliğinden ürün olur) ya da "Ben seçeyim".
 import { api, html, render, $, n, money, ago, ch, chLogo, thumb, actions, busy, toast, debounce, popMenu, confirmBox, isMobile, activeChannels } from '../core.js';
 import { loadSummary, setQuery } from '../app.js';
-import { findProduct } from './match.js';
+import { findProduct, guessQ } from './match.js';
 
 const TABS = [['unlinked', 'Panelde değil'], ['dup', 'Tekrar olabilir'], ['linked', 'Panelde'], ['ignored', 'Yok sayılan'], ['zero', 'Stoğu bitmiş'], ['all', 'Tümü']];
 const vtag = (v, name) => (v && !String(name || '').includes(v) ? html`<span class="var-tag">${v}</span>` : '');
@@ -159,7 +159,7 @@ export async function channelProductsView(el, rest, query = {}) {
       if (!l) return;
       popMenu(t, [
         { icon: 'plus', label: 'Yeni ürün olarak ekle', run: () => api('channel-products/add', { method: 'POST', body: { channel: f.channel, ids: [l.remote_id] } }).then((r) => after(added(r))).catch((e) => toast(e.message, true)) },
-        { icon: 'link', label: 'Var olan bir ürüne bağla (ara)', run: () => findProduct({ channel: f.channel, remote_id: l.remote_id }, () => after('İlan ürüne bağlandı'), 'channel-products/link') },
+        { icon: 'link', label: 'Var olan bir ürüne bağla (ara)', run: () => findProduct({ channel: f.channel, remote_id: l.remote_id }, () => after('İlan ürüne bağlandı'), 'channel-products/link', { q: guessQ(l) }) },
         l.ignored ? { icon: 'check', label: 'Yok saymayı kaldır', run: () => api('channel-products/ignore', { method: 'POST', body: { channel: f.channel, ids: [l.remote_id], ignored: false } }).then(() => after('Bekleyenlere alındı')).catch((e) => toast(e.message, true)) }
           : { icon: 'x', label: 'Yok say (panele alma)', run: () => api('channel-products/ignore', { method: 'POST', body: { channel: f.channel, ids: [l.remote_id] } }).then(() => after('Yok sayıldı')).catch((e) => toast(e.message, true)) },
       ], { title: l.name });

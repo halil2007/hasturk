@@ -1438,6 +1438,36 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       return json({ ...extra, options });
     } catch (e) { return json({ ...extra, options: [], note: e.message }); }
   }
+  // Sipariş → Ürünle eşleştir: satırın ilanı (panelde yoksa satırdan açılır) seçilen ürüne bağlanır; ürünün bu kanalda ilanı varsa 2. ilan olur
+  if ((x = path.match(/^orders\/([^/]+)\/link-item$/)) && m === 'POST') {
+    if (!can(user, 'products', true)) fail(403, 'Ürün eşleştirmek için Ürünler yetkisi gerekir');
+    const b = await body(req), oid = decodeURIComponent(x[1]), pid = Number(b.product_id) || 0;
+    const o = await first(db, 'SELECT id, channel FROM orders WHERE id = ?', oid);
+    if (!o) fail(404, 'Sipariş bulunamadı');
+    const it = await first(db, 'SELECT * FROM order_items WHERE order_id = ? AND line_id = ?', oid, str(b.line_id));
+    if (!it) fail(404, 'Sipariş satırı bulunamadı');
+    if (!pid || !(await first(db, 'SELECT id FROM products WHERE id = ?', pid))) fail(404, 'Ürün bulunamadı');
+    // Satırın ilanı: önce remote_key, yoksa kanaldaki aynı barkod/SKU'lu ilan (bağlı olmayan önce); hiç yoksa satırdan oluşturulur
+    let rid = str(it.remote_key);
+    if (!rid && (str(it.barcode) || str(it.sku))) {
+      const hit = await first(db, `SELECT remote_id FROM listings WHERE channel = ? AND ((? != '' AND barcode = ?) OR (? != '' AND sku = ?)) ORDER BY (product_id IS NULL) DESC LIMIT 1`, o.channel, str(it.barcode), str(it.barcode), str(it.sku), str(it.sku));
+      rid = hit ? hit.remote_id : '';
+    }
+    rid = rid || str(it.sku) || str(it.barcode);
+    let r = { linked: 0 };
+    if (rid) {
+      await run(db, `INSERT INTO listings (channel, remote_id, sku, barcode, name, price, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (channel, remote_id) DO NOTHING`,
+        o.channel, rid, it.sku || '', it.barcode || '', it.name || rid, Number(it.unit_price) || 0, Date.now());
+      if (!str(it.remote_key)) await run(db, 'UPDATE order_items SET remote_key = ? WHERE order_id = ? AND line_id = ?', rid, oid, it.line_id);
+      r = await second.linkExtra(db, { channel: o.channel, remote_id: rid, product_id: pid }, user);
+    }
+    // Satır her durumda seçilen ürüne bağlanır (ilan kimliği olmayan satır dahil); stok bir sonraki adımda düşülür
+    await run(db, 'UPDATE order_items SET product_id = ? WHERE order_id = ? AND line_id = ? AND product_id IS NULL', pid, oid, it.line_id);
+    await run(db, 'UPDATE orders SET stock_dirty = 1 WHERE id = ?', oid);
+    await applyDirtyStock(db);
+    ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    return json({ ok: true, ...r });
+  }
   if ((x = path.match(/^orders\/([^/]+)\/([a-z-]+)$/)) && m === 'POST') {
     const b = await body(req);
     const oid = decodeURIComponent(x[1]);
@@ -1889,6 +1919,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/images' && m === 'POST') return json(await uploadImage(req, env, db, await body(req)));
   // İkinci eşleşme (aynı kanaldan ek ilan): onayla / farklı ürün / elle bağla / ayır / ilan ara. Ürünler yazma yetkisi gerekir (bkz. perms.js)
   if (path === 'products/second-match/listings' && m === 'GET') return json(await second.searchListings(db, q));
+  // Siparişteki eşleşmemiş satırı panel ürününe bağla (sipariş ekranından): satırın ilanı panelde yoksa satırdan oluşturulur, ürünün
+  // bu kanalda başka ilanı varsa ikinci ilan olarak bağlanır; satır ürüne bağlanır ve stok hemen düşülür
   if (path === 'products/second-match/approve' && m === 'POST') {
     const r = await second.linkExtra(db, await body(req), user);
     if (r.linked) { await applyDirtyStock(db); ctx.waitUntil(pushStocks(env, db).catch(() => {})); }

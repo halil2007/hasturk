@@ -391,9 +391,10 @@ export async function settlementReport(env, db, settings, q = {}) {
       const its = by.get(o.id) || [];
       const p = orderProfit({ ...o, shipping_cost: 0, items: its }, est);
       const actual = r2(recs.reduce((a, r) => a + (Number(r.amount) || 0), 0)), comm = r2(recs.reduce((a, r) => a + (Number(r.commission) || 0), 0)), sales = r2(actual + comm);
-      const expected = o.status === 'cancelled' ? 0 : p.payout, diff = r2(actual - expected);
+      // İptal / tamamı iade edilen siparişin hakedişi 0 olmalı (satırları ayrıca işaretlenmemiş olsa da)
+      const dead = o.status === 'cancelled' || o.status === 'returned', expected = dead ? 0 : p.payout, diff = r2(actual - expected);
       // Yuvarlama payı: 1 ₺ ya da satışın binde 5'i (satır satır yuvarlanan komisyon, kuruş farkları)
-      const tol = Math.max(1, 0.005 * Math.max(Math.abs(p.revenue), Math.abs(sales)));
+      const tol = Math.max(1, 0.005 * Math.max(dead ? 0 : Math.abs(p.revenue), Math.abs(sales)));
       if (Math.abs(diff) < tol) continue;
       const panelRet = o.status === 'returned' || its.some((i) => i.status === 'returned' || Number(i.returned_qty) > 0);
       const mpRet = recs.some((r) => STL_RETURN.test(r.type) && Math.abs(Number(r.amount) || 0) >= 0.01);
@@ -404,12 +405,13 @@ export async function settlementReport(env, db, settings, q = {}) {
       else if (mpRet && !panelRet && diff < 0) reason = 'Pazaryeri iade kaydetti, panelde iade yok';
       else if (!comm && p.commission >= tol) reason = 'Komisyon kaydı pazaryerinde henüz yok';
       else {
-        const dr = sales - p.revenue, dc = comm - p.commission;
-        reason = Math.abs(dr) >= tol && Math.abs(dc) >= tol ? `Satış ve komisyon farklı (pazaryeri komisyonu ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)})`
-          : Math.abs(dr) >= tol ? (dr < 0 ? 'Satış tutarı düşük: indirim, kupon ya da kısmi iade' : 'Satış tutarı panelden yüksek')
-          : `Komisyon farklı: pazaryeri ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)}`;
+        // Komisyon oranı aynıysa fark satış tutarındadır (indirim / kupon); satış aynıysa komisyondadır
+        const dr = sales - p.revenue, sameRate = Math.abs((sales ? comm / sales : 0) - (p.revenue ? p.commission / p.revenue : 0)) < 0.003;
+        reason = Math.abs(dr) < tol ? `Komisyon farklı: pazaryeri ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)}`
+          : sameRate ? (dr < 0 ? 'Satış tutarı düşük: indirim, kupon ya da kısmi iade' : 'Satış tutarı panelden yüksek')
+          : `Satış ve komisyon farklı (pazaryeri komisyonu ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)})`;
       }
-      diffs.push({ id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, reason, sales, commission: comm, estRevenue: p.revenue, estCommission: p.commission });
+      diffs.push({ id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, reason, sales, commission: comm, estRevenue: dead ? 0 : p.revenue, estCommission: dead ? 0 : p.commission });
     }
   }
   diffs.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
