@@ -152,13 +152,22 @@ export function idefix(env, meta) {
   const pushPrice = (items) => upload(items.map((x) => ({ barcode: x.remoteId, price: x.price, comparePrice: Math.max(x.listPrice || 0, x.price), ...qty(x) })));
   const INV_FAIL = { DATA_PARSE_ERROR: 'veri okunamadı', BATCH_NOT_EXIST: 'gönderim bulunamadı', BATCH_ALREADY_PROCESSED: 'gönderim zaten işleniyor',
     PRODUCT_NOT_FOUND: 'barkod idefix ürün havuzunda yok', CATALOG_PRICE_LOCKED: 'fiyat kilitli (idefix destek ile görüşün)', NO_PRICE: 'fiyat yok (ilanın idefix fiyatı bilinmiyor; ürünün idefix fiyatını girin)' };
+  // Red nedeni metin ("NO_PRICE") ya da nesne ({ code, message } / { failureReason, description } …) gelebilir: bilinen kod Türkçeye
+  // çevrilir, yoksa idefix'in kendi açıklaması yazılır ("[object Object]" görünmesin)
+  const reasonText = (c) => {
+    if (c == null || c === '') return '';
+    if (typeof c !== 'object') return INV_FAIL[String(c)] || String(c);
+    const code = str(c.code || c.failureReason || c.reason || c.key || c.type), msg = str(c.message || c.description || c.detail || c.text || c.reasonText);
+    if (code && INV_FAIL[code]) return INV_FAIL[code] + (msg && msg !== code ? ` (${msg})` : '');
+    return msg || code || JSON.stringify(c).slice(0, 200);
+  };
   // Satır durumu: created (işleniyor) · completed · decline (failureReasons ile)
   async function pushStatus(ref) {
     const r = (await call(`/pim/catalog/${vendor}/inventory-result/${encodeURIComponent(ref)}`)) || {};
     const rows = r.items || [];
     const done = /^(completed|failed|cancelled)$/i.test(str(r.status)) && !rows.some((x) => /^created$/i.test(str(x.status)));
     return { done, items: rows.map((x) => {
-      const bad = /^decline/i.test(str(x.status)), why = [].concat(x.failureReasons || []).map((c) => INV_FAIL[c] || c).filter(Boolean).join(' · ');
+      const bad = /^decline/i.test(str(x.status)), why = [].concat(x.failureReasons || x.failureReason || []).map(reasonText).filter(Boolean).join(' · ');
       return { key: str(x.barcode), ok: bad ? false : /^completed$/i.test(str(x.status)) ? true : null, error: bad ? why || 'idefix reddetti' : '' };
     }) };
   }

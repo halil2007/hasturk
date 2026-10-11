@@ -92,3 +92,19 @@ test('idefix: stok gönderiminde mevcut fiyat da gider (yalnız stok "NO_PRICE" 
     assert.deepEqual(calls[1].body.items, [{ barcode: 'B1', price: 110, comparePrice: 110, inventoryQuantity: 5 }, { barcode: 'B4', price: 50, comparePrice: 60 }]);
   }, (c) => J({ items: c.body.items, status: 'CREATED', batchRequestId: '101b-9' }));
 });
+
+test('idefix: nesne olarak gelen red nedeni okunur yazıya çevrilir ("[object Object]" görünmez)', async () => {
+  await withFetch(async () => {
+    const c = idefix(ENV, { id: 'idefix' });
+    const st = await c.pushStatus('101b-1');
+    assert.deepEqual(st.items.map((x) => x.error), [
+      'fiyat yok (ilanın idefix fiyatı bilinmiyor; ürünün idefix fiyatını girin) (Fiyat bilgisi bulunamadı)',
+      'Stok miktarı geçersiz',
+      '{"foo":1}',
+    ]);
+  }, () => J({ status: 'COMPLETED', items: [
+    { barcode: 'B1', status: 'decline', failureReasons: [{ code: 'NO_PRICE', message: 'Fiyat bilgisi bulunamadı' }] },
+    { barcode: 'B2', status: 'decline', failureReasons: [{ failureReason: 'X_UNKNOWN', description: 'Stok miktarı geçersiz' }] },
+    { barcode: 'B3', status: 'decline', failureReasons: [{ foo: 1 }] },
+  ] }));
+});
