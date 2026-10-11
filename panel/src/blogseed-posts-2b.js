@@ -31,9 +31,9 @@ Bir pazaryeri satışında müşterinin ödediği tutar sizin cebinize olduğu g
 - **Orantılı ve sabit giderler ayrı ele alınır.** Komisyon fiyat yükseldikçe artar; kargo ve hizmet bedeli ise sipariş başına neredeyse sabittir. Bu yüzden düşük fiyatlı ürünlerde sabit giderler kârın büyük kısmını alır. Ayrıntılı örneği [Trendyol komisyon ve net kâr rehberimizde](/blog/trendyol-komisyon-orani-net-kar-hesaplama) bulabilirsiniz.
 - **Stopaj gider değildir, peşin ödenen vergidir.** Pazaryerleri 1 Ocak 2025'ten beri satıcıya yaptıkları ödemelerden KDV hariç satış tutarının %1'i oranında gelir / kurumlar vergisi kesintisi yapar. Bu tutar hakedişinizi azaltır ama yıllık beyanınızda ödenecek vergiden mahsup edilir. Fiyat hesabında kâr kalemi olarak değil, nakit akışı kalemi olarak düşünün. Tek başına hesaplamak için [stopaj hesaplama aracını](/araclar/e-ticaret-stopaj-hesaplama) kullanabilirsiniz.
 
-### Komisyon neden 1,2 ile çarpılır?
+### Komisyon oranı KDV dahil mi, hariç mi?
 
-Komisyon bir hizmet bedelidir ve pazaryeri komisyon faturasını KDV ekleyerek keser. Panelde %20 olarak gördüğünüz komisyon KDV hariç bir oransa, cebinizden çıkan tutar satış fiyatının %24'üdür (%20 × 1,20). Bu KDV'yi beyannamenizde indirebildiğiniz için kârınızı KDV hariç hesaplarken komisyon yine %20 olarak düşer. Aşağıdaki formüller ürünün ve hizmetlerin %20 KDV'li olduğu durum için kurulmuştur; farklı KDV oranlı ürünlerde hesap aracı oranı kendisi ayarlar.
+Komisyon bir hizmet bedelidir ve KDV'ye tabidir; hesaba başlamadan önce oranın KDV dahil mi hariç mi yayımlandığına bakın. Trendyol'un resmî komisyon tablosundaki oranlar **KDV dahildir**: %20 yazıyorsa cebinizden çıkan tutar satış fiyatının %20'sidir, üzerine ayrıca KDV eklenmez. Hepsiburada'nın resmî listesindeki oranlar ise **KDV hariçtir** (+KDV): %20 yazan bir oranda cebinizden çıkan tutar satış fiyatının %24'üdür (%20 × 1,20). Komisyondaki KDV'yi beyannamenizde indirebildiğiniz için kârınızı KDV hariç hesaplarken komisyonun KDV hariç tutarı düşülür. Aşağıdaki örneklerde komisyon oranı KDV dahildir; formüller ürünün ve hizmetlerin %20 KDV'li olduğu durum için kurulmuştur; farklı KDV oranlı ürünlerde hesap aracı oranı kendisi ayarlar.
 
 ## Kâr marjı ve kâr oranı (markup) aynı şey değildir
 
@@ -46,50 +46,50 @@ Pazaryerinde ikisi arasındaki fark çok daha büyüktür, çünkü satış fiya
 
 ### "Maliyetin üstüne %50 koydum" hatası
 
-Aşağıdaki örnekte tüm oranlar ve tutarlar **varsayımsaldır**. Ürün %20 KDV'li, alış maliyeti 400 TL (KDV dahil), komisyon %20 + KDV, kargo 80 TL (KDV dahil), platform hizmet bedeli 13 TL (KDV dahil). Satıcı maliyetin üstüne %50 ekleyip ürünü 600 TL'ye satıyor:
+Aşağıdaki örnekte tüm oranlar ve tutarlar **varsayımsaldır**. Ürün %20 KDV'li, alış maliyeti 400 TL (KDV dahil), komisyon %20 (KDV dahil oran), kargo 80 TL (KDV dahil), platform hizmet bedeli 13 TL (KDV dahil). Satıcı maliyetin üstüne %50 ekleyip ürünü 600 TL'ye satıyor:
 
 | Kalem (KDV hariç) | Tutar |
 | --- | --- |
 | Satış (600 ÷ 1,20) | 500,00 TL |
-| Komisyon (%20) | −120,00 TL |
+| Komisyon (%20) | −100,00 TL |
 | Kargo (80 ÷ 1,20) | −66,67 TL |
 | Hizmet bedeli (13 ÷ 1,20) | −10,83 TL |
 | Alış maliyeti (400 ÷ 1,20) | −333,33 TL |
-| **Kâr** | **−30,83 TL** |
+| **Kâr** | **−10,83 TL** |
 
-Satıcı "her satıştan 200 TL kazanıyorum" diye düşünürken aslında her satışta yaklaşık 31 TL zarar ediyor. Ciro arttıkça zarar da büyüyor. Bu tablo, fiyatı neden maliyetten ileriye değil hedef kârdan geriye doğru hesaplamanız gerektiğini özetliyor.
+Satıcı "her satıştan 200 TL kazanıyorum" diye düşünürken aslında her satışta yaklaşık 11 TL zarar ediyor. Ciro arttıkça zarar da büyüyor. Bu tablo, fiyatı neden maliyetten ileriye değil hedef kârdan geriye doğru hesaplamanız gerektiğini özetliyor.
 
 ## Satış fiyatı formülü
 
 Hedef kârınızı KDV hariç satış tutarına oranla, yani **kâr marjı** olarak belirlediğinizde satış fiyatı (KDV dahil) şöyle bulunur:
 
-**Satış fiyatı = (Alış maliyeti + Kargo + Hizmet bedeli) ÷ (1 − 1,2 × Komisyon oranı − Hedef marj)**
+**Satış fiyatı = (Alış maliyeti + Kargo + Hizmet bedeli) ÷ (1 − Komisyon oranı − Hedef marj)**
 
-![Satış fiyatı formülü: sabit giderler bölü komisyon ve hedef marjdan kalan pay](https://hasturkcrm.com/img/blog/satis-fiyati-formulu.jpg "Örnek: 493 TL sabit gider, %20 komisyon + KDV ve %20 hedef marjla satış fiyatı")
+![Satış fiyatı formülü: sabit giderler bölü komisyon ve hedef marjdan kalan pay](https://hasturkcrm.com/img/blog/satis-fiyati-formulu.jpg "Örnek: 493 TL sabit gider, %20 komisyon (KDV dahil) ve %20 hedef marjla satış fiyatı")
 
-Formüldeki tüm tutarlar KDV dahildir; komisyon oranı KDV hariç bir orana göre yazılmıştır (Hepsiburada listesi gibi). Oranınız zaten KDV dahilse (Trendyol listesi gibi) 1,2 ile çarpmayın, oranı olduğu gibi kullanın. Paydadaki 1,2 × komisyon, KDV'siyle birlikte komisyonun fiyat içindeki payıdır. Hedef marj ise kârınızın KDV hariç satış tutarına oranıdır.
+Formüldeki tüm tutarlar KDV dahildir; komisyon oranı KDV dahil orandır (Trendyol'un resmî tablosundaki gibi), yani KDV'siyle birlikte komisyonun fiyat içindeki payıdır. Oranınız KDV hariç yayımlanıyorsa (Hepsiburada'nın resmî listesi gibi) formülde oranı 1,2 ile çarparak kullanın: %20 + KDV için 0,24. Hedef marj ise kârınızın KDV hariç satış tutarına oranıdır.
 
 ### Adım adım örnek
 
 Aynı ürün için hedefimiz, KDV hariç satış tutarının %20'si kadar kâr bırakmak olsun.
 
 1. **Sabit giderleri toplayın:** 400 (alış) + 80 (kargo) + 13 (hizmet bedeli) = 493 TL.
-2. **Paydayı bulun:** 1 − (1,2 × 0,20) − 0,20 = 1 − 0,24 − 0,20 = 0,56.
-3. **Bölün:** 493 ÷ 0,56 = 880,36 TL.
-4. **Yuvarlayın:** Fiyatı 879,90 TL olarak belirleyelim.
+2. **Paydayı bulun:** 1 − 0,20 − 0,20 = 0,60.
+3. **Bölün:** 493 ÷ 0,60 = 821,67 TL.
+4. **Yuvarlayın:** Fiyatı 819,90 TL olarak belirleyelim.
 
 Sağlamasını KDV hariç tutarlarla yapalım:
 
 | Kalem (KDV hariç) | Tutar |
 | --- | --- |
-| Satış (879,90 ÷ 1,20) | 733,25 TL |
-| Komisyon (%20) | −175,98 TL |
+| Satış (819,90 ÷ 1,20) | 683,25 TL |
+| Komisyon (%20) | −136,65 TL |
 | Kargo | −66,67 TL |
 | Hizmet bedeli | −10,83 TL |
 | Alış maliyeti | −333,33 TL |
-| **Kâr** | **146,44 TL** |
+| **Kâr** | **135,77 TL** |
 
-146,44 ÷ 733,25 = **%20,0**. Hedeflenen marj tutuyor. Bu siparişte hakedişiniz 879,90 − 211,18 (KDV'li komisyon) − 80 − 13 − 7,33 (stopaj) = **568,39 TL** olur; kârın bir kısmı KDV farkı olarak devlete, stopaj kadarı da yıl sonunda vergiden mahsup edilmek üzere vergi dairesine gider.
+135,77 ÷ 683,25 = **%19,9**. Fiyatı aşağı yuvarladığımız küçük payla hedeflenen marj tutuyor. Bu siparişte hakedişiniz 819,90 − 163,98 (KDV dahil komisyon) − 80 − 13 − 6,83 (stopaj) = **556,09 TL** olur; kârın bir kısmı KDV farkı olarak devlete, stopaj kadarı da yıl sonunda vergiden mahsup edilmek üzere vergi dairesine gider.
 
 ### Hedef marja göre gereken fiyat
 
@@ -97,12 +97,12 @@ Aynı varsayımlarla farklı hedef marjlar için gereken fiyat:
 
 | Hedef marj | Gereken satış fiyatı (KDV dahil) | Sipariş başına kâr (KDV hariç) |
 | --- | --- | --- |
-| %0 (başabaş) | 648,68 TL | 0,00 TL |
-| %10 | 746,97 TL | 62,25 TL |
-| %20 | 880,36 TL | 146,73 TL |
-| %30 | 1.071,74 TL | 267,93 TL |
+| %0 (başabaş) | 616,25 TL | 0,00 TL |
+| %10 | 704,29 TL | 58,69 TL |
+| %20 | 821,67 TL | 136,94 TL |
+| %30 | 986,00 TL | 246,50 TL |
 
-Tablodaki ilk satır özellikle önemlidir: **648,68 TL bu ürünün başabaş fiyatıdır.** Bunun altındaki her satış, kesintiler ve maliyet düşüldükten sonra zarar demektir. Kampanyaya katılırken, buybox için fiyat kırarken ya da otomatik fiyat kuralı tanımlarken alt sınırınız bu fiyatın üstünde olmalıdır.
+Tablodaki ilk satır özellikle önemlidir: **616,25 TL bu ürünün başabaş fiyatıdır.** Bunun altındaki her satış, kesintiler ve maliyet düşüldükten sonra zarar demektir. Kampanyaya katılırken, buybox için fiyat kırarken ya da otomatik fiyat kuralı tanımlarken alt sınırınız bu fiyatın üstünde olmalıdır.
 
 ## Reklam, iade ve diğer giderleri fiyata katmak
 
@@ -120,12 +120,12 @@ Aynı ürün farklı kanallarda farklı kesintilerle satılır. Komisyon oranı,
 
 | | Kanal A | Kanal B |
 | --- | --- | --- |
-| Komisyon (KDV hariç) | %20 | %15 |
+| Komisyon (KDV dahil) | %20 | %15 |
 | Kargo (KDV dahil) | 80 TL | 70 TL |
 | Hizmet bedeli (KDV dahil) | 13 TL | Yok |
-| %20 marj için gereken fiyat | 880,36 TL | 758,06 TL |
+| %20 marj için gereken fiyat | 821,67 TL | 723,08 TL |
 
-Fark %16'yı aşıyor. Bu noktada iki yaklaşım vardır:
+Fark %13'ü aşıyor. Bu noktada iki yaklaşım vardır:
 
 - **Her kanalda kendi hesabına göre fiyat:** Her kanalda aynı marjı korursunuz. Dezavantajı, müşterinin fiyat farkını görmesi ve kanallar arasında fiyat takibinin zorlaşmasıdır.
 - **Tek fiyat:** Yönetimi kolaydır ama düşük kesintili kanalda fazla, yüksek kesintili kanalda az kâr edersiniz. Yüksek kesintili kanalda başabaş fiyatın altına düşmediğinizi mutlaka kontrol edin.
@@ -134,7 +134,7 @@ Pratikte birçok satıcı, kanallar arasında sabit bir oran farkı belirleyip (
 
 ## İndirim ve kampanya fiyatı
 
-Kampanyaya katılmadan önce indirimli fiyatla kârınızı yeniden hesaplayın. Yukarıdaki 879,90 TL'lik ürünü %10 indirimle 791,91 TL'ye sattığınızda komisyon da düşer, ama kargo, hizmet bedeli ve alış maliyeti değişmez. Aynı hesapla kârınız 146,44 TL'den **90,71 TL'ye** iner. Yani %10'luk indirim kârı yaklaşık **%38 azaltır**. Bu kaybı telafi etmek için satış adedinin belirgin biçimde artması gerekir. Kampanya öncesi hesap için [indirim sonrası kâr hesaplama aracı](/araclar/indirim-kar-hesaplama) zarar etmeden yapabileceğiniz en yüksek indirimi gösterir.
+Kampanyaya katılmadan önce indirimli fiyatla kârınızı yeniden hesaplayın. Yukarıdaki 819,90 TL'lik ürünü %10 indirimle 737,91 TL'ye sattığınızda komisyon da düşer, ama kargo, hizmet bedeli ve alış maliyeti değişmez. Aynı hesapla kârınız 135,77 TL'den **81,11 TL'ye** iner. Yani %10'luk indirim kârı yaklaşık **%40 azaltır**. Bu kaybı telafi etmek için satış adedinin belirgin biçimde artması gerekir. Kampanya öncesi hesap için [indirim sonrası kâr hesaplama aracı](/araclar/indirim-kar-hesaplama) zarar etmeden yapabileceğiniz en yüksek indirimi gösterir.
 
 İndirim yaparken yasal bir kuralı da unutmayın: Fiyat Etiketi Yönetmeliği'nde 2022'de yapılan değişiklikle, indirimli satışta indirimden önceki fiyat olarak **indirimden önceki 30 gün içinde uygulanan en düşük fiyat** esas alınır. Fiyatı önce yükseltip ardından "indirim" göstermek bu kurala aykırıdır ve ispat yükü satıcıdadır. Kampanya fiyatlarınızı planlarken fiyat geçmişinizi kayıt altında tutun.
 
@@ -145,7 +145,7 @@ Formül size alt sınırı ve hedef fiyatı verir; ama son fiyatı belirlerken p
 - **Maliyet bazlı fiyat:** Yukarıdaki formülle hedef marjdan fiyat bulunur. Rekabetin az olduğu, kendi markanızla sattığınız ürünlerde ana yöntemdir.
 - **Rekabet bazlı fiyat:** Aynı ürünü başka satıcılar da satıyorsa fiyat büyük ölçüde pazarda belirlenir. Burada formül size "bu fiyata inebilir miyim?" sorusunun cevabını verir: piyasa fiyatı başabaş fiyatınızın altındaysa, o üründe rekabet etmek yerine maliyetinizi düşürmeyi ya da ürünü bırakmayı düşünmelisiniz.
 - **Değer bazlı fiyat:** Müşterinin ürüne biçtiği değere göre fiyat koymaktır. Güçlü marka, özgün ürün, iyi yorumlar ve hızlı teslimat daha yüksek fiyatı taşıyabilir.
-- **Psikolojik fiyat:** 880 TL yerine 879,90 TL gibi küsuratlı fiyatlar yaygındır. Etkisi kategoriye göre değişir; yuvarlamanın marjınızı başabaşın altına itmediğinden emin olun.
+- **Psikolojik fiyat:** 820 TL yerine 819,90 TL gibi küsuratlı fiyatlar yaygındır. Etkisi kategoriye göre değişir; yuvarlamanın marjınızı başabaşın altına itmediğinden emin olun.
 - **Set ve paket fiyatı:** Sabit kesintiler düşük fiyatlı ürünlerde kârı eritiyorsa, ikili ya da üçlü set yaparak kargo ve hizmet bedelini birden fazla ürüne bölebilirsiniz.
 
 Aynı ürünü birden fazla satıcının sattığı ilanlarda fiyat, buybox için de belirleyici etkenlerden biridir. Ama buybox için fiyat kırarken bile başabaş fiyatın altına inmemek gerekir.
@@ -167,7 +167,7 @@ Dövizle aldığınız ürünlerde kur değişikliklerini elle takip etmek zordu
 
 - **Maliyete yüzde ekleyip kesintileri unutmak:** Yukarıdaki örnekte olduğu gibi %50 kâr oranı zarara dönüşebilir.
 - **KDV dahil ve hariç tutarları karıştırmak:** Satış fiyatı KDV dahil, kâr ise KDV hariç hesaplanmalıdır. İkisini karıştırmak kârı olduğundan yüksek gösterir.
-- **Komisyonun KDV'sini atlamak:** Panelde %20 görünen komisyon nakit olarak fiyatın %24'ünü alır.
+- **Komisyon oranının KDV esasını karıştırmak:** Hepsiburada'nın resmî listesindeki gibi KDV hariç %20'lik bir komisyon nakit olarak fiyatın %24'ünü alır. Trendyol'un resmî tablosundaki oranlar ise KDV dahildir; bunlara ayrıca KDV eklemek kârı olduğundan düşük gösterir.
 - **Stopajı kâr kaybı sanmak ya da tamamen unutmak:** Stopaj nakit akışını etkiler ama yıl sonunda mahsup edilir.
 - **Tek bir ürün için hesap yapıp tüm kataloğa genellemek:** Desi, komisyon ve maliyet ürün bazında değişir; hesap da ürün bazında yapılmalıdır.
 - **Fiyatı bir kez belirleyip unutmak:** Maliyetler ve kesintiler değiştiğinde dünün doğru fiyatı bugün zarar ettirebilir.
@@ -184,7 +184,7 @@ Panelin nasıl çalıştığını kayıt olmadan [canlı demoda](/demo) inceleye
 
 ### Satış fiyatı nasıl hesaplanır?
 
-Alış maliyeti, kargo ve hizmet bedeli gibi sipariş başına sabit giderleri toplayın; bu toplamı 1'den komisyonun KDV'li payını ve hedef kâr marjınızı çıkardığınızda kalan orana bölün. %20 komisyon ve %20 hedef marjla 493 TL'lik sabit gider için fiyat 493 ÷ 0,56 = 880,36 TL olur.
+Alış maliyeti, kargo ve hizmet bedeli gibi sipariş başına sabit giderleri toplayın; bu toplamı 1'den komisyonun KDV dahil payını ve hedef kâr marjınızı çıkardığınızda kalan orana bölün. %20 (KDV dahil) komisyon ve %20 hedef marjla 493 TL'lik sabit gider için fiyat 493 ÷ 0,60 = 821,67 TL olur. Oranınız KDV hariç yayımlanıyorsa (Hepsiburada'nın resmî listesi gibi) önce 1,2 ile çarpın.
 
 ### Kâr marjı ile kâr oranı arasındaki fark nedir?
 
@@ -276,16 +276,16 @@ Buybox rekabetine katılabilmek için bazı temel koşulları sağlamanız gerek
 
 Buybox rekabetinin en tehlikeli yanı fiyat savaşıdır. İki satıcı birbirinin altına inmeye devam ettiğinde fiyat kısa sürede başabaşın altına düşebilir. Bunu önlemenin yolu, her ürün için bir **en düşük fiyat** belirlemektir.
 
-Aşağıdaki örnekte tüm tutarlar **varsayımsaldır**. Ürün %20 KDV'li, alış maliyeti 400 TL, kargo 80 TL, platform hizmet bedeli 13 TL (tümü KDV dahil), komisyon %20 + KDV:
+Aşağıdaki örnekte tüm tutarlar **varsayımsaldır**. Ürün %20 KDV'li, alış maliyeti 400 TL, kargo 80 TL, platform hizmet bedeli 13 TL (tümü KDV dahil), komisyon %20 (Trendyol'un resmî tablosundaki gibi KDV dahil oran):
 
 | Fiyat (KDV dahil) | Sipariş başına kâr (KDV hariç) | Durum |
 | --- | --- | --- |
-| 879,90 TL | 146,44 TL | Hedef fiyat (%20 marj) |
-| 749,90 TL | 64,10 TL | Kâr düşük ama pozitif |
-| 649,90 TL | 0,77 TL | Başabaşın hemen üstü |
-| 629,90 TL | −11,90 TL | Zarar |
+| 819,90 TL | 135,77 TL | Hedef fiyat (%20 marj) |
+| 749,90 TL | 89,10 TL | Kâr düşük ama pozitif |
+| 619,90 TL | 2,43 TL | Başabaşın hemen üstü |
+| 599,90 TL | −10,90 TL | Zarar |
 
-Bu üründe başabaş fiyatı yaklaşık 648,68 TL'dir. Rakip 629,90 TL'ye indiğinde onu takip etmek, her satışta zarar etmek demektir. Bu durumda yapılacak şey fiyat kırmak değil; rakibin bu fiyatı ne kadar sürdürebileceğini izlemek, diğer etkenlerde (teslimat süresi, mağaza performansı) güçlü kalmak ya da maliyetinizi düşürmenin yolunu aramaktır.
+Bu üründe başabaş fiyatı yaklaşık 616,25 TL'dir. Rakip 599,90 TL'ye indiğinde onu takip etmek, her satışta zarar etmek demektir. Bu durumda yapılacak şey fiyat kırmak değil; rakibin bu fiyatı ne kadar sürdürebileceğini izlemek, diğer etkenlerde (teslimat süresi, mağaza performansı) güçlü kalmak ya da maliyetinizi düşürmenin yolunu aramaktır.
 
 Alt sınırı belirlerken yalnız başabaşa değil, kabul edebileceğiniz en düşük kâra göre karar verin. Örneğin "sipariş başına en az 30 TL kâr" gibi bir kural, reklam ve iade gibi öngörülemeyen giderler için güvenlik payı bırakır. Kampanya döneminde fiyatınızı düşürecekseniz [indirim sonrası kâr hesaplama aracıyla](/araclar/indirim-kar-hesaplama) kârınızı önceden kontrol edin.
 
@@ -317,7 +317,7 @@ Fiyatınız en düşük olduğu halde buybox rakipteyse sorun büyük ihtimalle 
 
 Buybox'ı kaybettiğinizde elinizde iki kaldıraç vardır: fiyat ve hizmet. Fiyat kaldıracı hızlıdır ama her kullanımda kârınızdan bir parça götürür ve rakip de aynı kaldıracı kullanabilir. Hizmet kaldıracı (daha kısa kargolama süresi, zamanında teslim, düşük iptal) daha yavaş sonuç verir ama kalıcıdır ve rakibin kopyalaması zordur.
 
-Aşağıdaki örnek (varsayımsal) farkı gösteriyor: yukarıdaki üründe ayda 300 adet satıyorsunuz. Buybox'ı geri almak için fiyatı 879,90 TL'den 849,90 TL'ye indirdiğinizde sipariş başına kârınız KDV hariç yaklaşık 19 TL azalır; bu da ayda yaklaşık 5.700 TL demektir. Aynı tutarı depo düzenine, paketleme hızına ya da kargo teslim saatinin öne alınmasına harcamak, yalnız bu üründe değil tüm ürünlerinizde buybox şansınızı ve mağaza puanınızı iyileştirebilir. Doğru cevap çoğu zaman ikisinin dengesidir: fiyatı alt sınırla korunan küçük adımlarla yönetirken hizmet tarafını sürekli iyileştirmek.
+Aşağıdaki örnek (varsayımsal) farkı gösteriyor: yukarıdaki üründe ayda 300 adet satıyorsunuz. Buybox'ı geri almak için fiyatı 819,90 TL'den 789,90 TL'ye indirdiğinizde sipariş başına kârınız KDV hariç 20 TL azalır; bu da ayda 6.000 TL demektir. Aynı tutarı depo düzenine, paketleme hızına ya da kargo teslim saatinin öne alınmasına harcamak, yalnız bu üründe değil tüm ürünlerinizde buybox şansınızı ve mağaza puanınızı iyileştirebilir. Doğru cevap çoğu zaman ikisinin dengesidir: fiyatı alt sınırla korunan küçük adımlarla yönetirken hizmet tarafını sürekli iyileştirmek.
 
 ### Buybox için haftalık kontrol rutini
 
@@ -559,7 +559,7 @@ Hakediş, en basit haliyle şöyle hesaplanır:
 
 **Hakediş = Satış tutarı − Komisyon − Kargo − Hizmet bedeli − Stopaj − Diğer kesintiler ± Düzeltmeler**
 
-Örneğin (varsayımsal) %20 KDV'li 1.000 TL'lik bir satışta komisyon %20 + KDV (240 TL), kargo 80 TL, platform hizmet bedeli 13 TL ve %1 stopaj (1.000 ÷ 1,20 × %1 = 8,33 TL) düşüldüğünde hakediş **658,67 TL** olur. Bu hesabın ayrıntılarını [Trendyol komisyon ve net kâr rehberimizde](/blog/trendyol-komisyon-orani-net-kar-hesaplama) adım adım anlattık.
+Örneğin (varsayımsal) %20 KDV'li 1.000 TL'lik bir satışta komisyon %20 (Trendyol'un resmî tablosundaki gibi KDV dahil oran; 200 TL), kargo 80 TL, platform hizmet bedeli 13 TL ve %1 stopaj (1.000 ÷ 1,20 × %1 = 8,33 TL) düşüldüğünde hakediş **698,67 TL** olur. Bu hesabın ayrıntılarını [Trendyol komisyon ve net kâr rehberimizde](/blog/trendyol-komisyon-orani-net-kar-hesaplama) adım adım anlattık.
 
 ### Hakediş kâr değildir
 
@@ -608,18 +608,18 @@ Burada dikkat edilmesi gereken nokta, kesinti faturalarının siparişle aynı a
 
 ## Örnek: bir haftalık hakediş kontrolü
 
-Aşağıdaki örnekte tüm tutarlar **varsayımsaldır**. Bu hafta vadesi dolan iki sipariş var; ikisi de %20 KDV'li, komisyon %20 + KDV, hizmet bedeli 13 TL.
+Aşağıdaki örnekte tüm tutarlar **varsayımsaldır**. Bu hafta vadesi dolan iki sipariş var; ikisi de %20 KDV'li, komisyon %20 (KDV dahil oran), hizmet bedeli 13 TL.
 
 | | Sipariş A | Sipariş B |
 | --- | --- | --- |
 | Satış tutarı | 1.000,00 TL | 500,00 TL |
-| Komisyon (%24) | −240,00 TL | −120,00 TL |
+| Komisyon (%20) | −200,00 TL | −100,00 TL |
 | Beklenen kargo | −80,00 TL | −60,00 TL |
 | Hizmet bedeli | −13,00 TL | −13,00 TL |
 | Stopaj | −8,33 TL | −4,17 TL |
-| **Beklenen hakediş** | **658,67 TL** | **302,83 TL** |
+| **Beklenen hakediş** | **698,67 TL** | **322,83 TL** |
 
-Beklenen toplam 961,50 TL. Hesabınıza ise 946,50 TL yatmış: 15 TL fark var. Ekstreyi sipariş bazında açtığınızda A siparişinin kargo faturasının 80 TL yerine 95 TL kesildiğini görüyorsunuz. Paketin desisi faturada bir üst kademeden okunmuş. Bu durumda paket ölçüleri ve ürün kartınızdaki desi bilgisiyle itiraz edebilirsiniz.
+Beklenen toplam 1.021,50 TL. Hesabınıza ise 1.006,50 TL yatmış: 15 TL fark var. Ekstreyi sipariş bazında açtığınızda A siparişinin kargo faturasının 80 TL yerine 95 TL kesildiğini görüyorsunuz. Paketin desisi faturada bir üst kademeden okunmuş. Bu durumda paket ölçüleri ve ürün kartınızdaki desi bilgisiyle itiraz edebilirsiniz.
 
 15 TL tek başına küçük görünür. Ama aynı hata haftada 200 siparişte tekrarlanıyorsa, ayda 12.000 TL'yi aşan bir kayıp demektir. Mutabakatın amacı tam olarak bu küçük ama sürekli farkları yakalamaktır. Kargo farklarını azaltmanın yollarını [kargo maliyetini düşürme rehberimizde](/blog/e-ticarette-kargo-maliyeti-dusurme) ayrıca anlattık.
 
