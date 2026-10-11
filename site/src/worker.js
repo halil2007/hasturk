@@ -94,7 +94,7 @@ async function postPage(env, slug) {
   const share = encodeURIComponent(abs), stitle = encodeURIComponent(p.title);
   // İçindekiler: yazıdaki ara başlıklar (en az iki tane varsa; geniş ekranda yanda sabit)
   const toc = [...String(p.html).matchAll(/<h2 id="([^"]+)">([\s\S]*?)<\/h2>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '').trim()]).filter((x) => x[1]).slice(0, 14);
-  const tocHtml = toc.length >= 2 ? `<aside class="bl-toc" aria-label="Bu yazıda"><b>Bu yazıda</b><ol>${toc.map(([id, t]) => `<li><a href="#${esc(id)}">${esc(t)}</a></li>`).join('')}</ol></aside>` : '';
+  const tocHtml = toc.length >= 2 ? `<aside class="bl-toc" aria-label="Bu yazıda"><b>Bu yazıda</b><ol>${toc.map(([id, t]) => `<li><a href="#${esc(id)}">${t}</a></li>`).join('')}</ol></aside>` : '';
   const body = `<div class="bl-progress" data-progress aria-hidden="true"></div><article class="bl-post">
   <header class="bl-head"><div class="wrap">
     <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/blog">Blog</a><span>›</span><b>${esc(clip(p.title, 60))}</b></nav>

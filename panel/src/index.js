@@ -223,6 +223,8 @@ const handler = {
     // Bir süredir tekrarlanmayan hata kayıtları kendiliğinden "Çözüldü" (anlık hata 1 saat, 2-3 kez görülen 6 saat, diğerleri 24 saat)
     if (!quick) ctx.waitUntil(resolveQuiet(env.DB).catch((e) => console.error('hata kayıtları çözülemedi', e)));
     // Otomatik blog (açıksa): her gün belirlenen saatten sonra bir taslak yazı (bkz. blogai.js)
+    // Hazır blog yazıları (bkz. blogseed.js): bir kez yayımlanır
+    if (!quick) ctx.waitUntil(import('./blogseed.js').then((m) => m.blogSeed(env, env.DB)).then((r) => r && console.log('hazır blog yazıları', JSON.stringify(r))).catch((e) => console.error('hazır blog hatası', e)));
     if (!quick) ctx.waitUntil(import('./blogai.js').then((m) => m.blogAutoTick(env, env.DB)).then((r) => r && console.log('otomatik blog', JSON.stringify(r))).catch((e) => console.error('otomatik blog hatası', e)));
   },
 };

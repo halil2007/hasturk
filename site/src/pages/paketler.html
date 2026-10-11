@@ -10,21 +10,29 @@ nav: paketler
     <div class="kicker">Paketler</div>
     <h1>Şeffaf Fiyat, <span class="grad">Sürpriz Yok</span></h1>
     <p>Tüm paketlerde aktif entegrasyonların hepsi, sipariş, kargo ve stok yönetimi bulunur. Paketler mağaza ve kullanıcı sayısına, ek araçlara göre ayrılır.</p>
-    <div class="perks"><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Fiyatlara KDV dahil</span><a href="/demo#deneme"><i class="tick g"><svg><use href="#i-check"/></svg></i>7 gün ücretsiz deneme</a><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Kurulum ücreti yok</span><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Yıllıkta 2 ay hediye</span><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Peşin fiyatına 3 taksit</span><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Kredi kartına 12 taksite kadar</span><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Yıllıkta havale / EFT'de %5 indirim</span></div>
+    <div class="perks"><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Fiyatlara KDV dahil</span><a href="/demo#deneme"><i class="tick g"><svg><use href="#i-check"/></svg></i>7 gün ücretsiz deneme</a><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Kurulum ücreti yok</span><span><i class="tick g"><svg><use href="#i-check"/></svg></i>Yıllıkta 2 ay hediye</span></div>
   </div>
 </section>
 
-<section class="sec" style="padding-top:24px">
+<section class="sec pr-sec">
   <div class="wrap">
-        <div class="plans" data-plans></div>
+    <div class="pr-period" role="group" aria-label="Ödeme dönemi" data-plan-period><button type="button" data-p="monthly">Aylık</button><button type="button" data-p="yearly">Yıllık <em>2 ay hediye</em></button></div>
+    <div class="plans pr-plans" data-plans></div>
+    <div class="pr-custom reveal">
+      <span class="pr-custom-ic"><svg><use href="#i-store"/></svg></span>
+      <div><b>Özel paket</b><span>Daha fazla mağaza, birden fazla firma ya da size özel bir ihtiyaç mı var? İşinize göre paket ve fiyat hazırlayalım.</span></div>
+      <a class="btn btn-outline" href="/iletisim?konu=teklif">Teklif isteyin <svg><use href="#i-arrow"/></svg></a>
+    </div>
     <p class="note" data-vat></p>
+    <p class="note">Önce bakmak ister misiniz? <a data-demo href="/demo">Canlı demo panelini açın</a>, örnek verilerle hemen gezin.</p>
   </div>
 </section>
 
 <section id="karsilastir" class="sec alt">
   <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Karşılaştırma</div><h2>Paketlerde Neler Var?</h2></div>
-    <div class="cap-wrap reveal"><table class="cap cmp" data-compare></table></div>
+    <div class="sec-head reveal"><div class="kicker">Pakette neler var?</div><h2>Paketlerin Karşılaştırması</h2><p>Sipariş, ürün ve ilan sayısı hiçbir pakette sınırlı değildir. Paketler mağaza ve kullanıcı sayısıyla ek araçlarda ayrılır.</p></div>
+    <div class="pr-cmp-tabs" role="tablist" aria-label="Paket seçin" data-cmp-tabs></div>
+    <div class="pr-cmp-wrap reveal"><table class="pr-cmp" data-compare></table></div>
   </div>
 </section>
 
@@ -34,7 +42,8 @@ nav: paketler
     <div class="faq">
       <details class="reveal"><summary>Deneme süresinde ücret ödüyor muyum?</summary><p>Hayır. 7 gün boyunca kendi mağazalarınızı bağlayıp paneli gerçek siparişlerinizle kullanırsınız. Süre sonunda devam etmek isterseniz paketinizi seçersiniz; kart bilgisi istemeyiz.</p></details>
       <details class="reveal"><summary>Paketimi sonradan değiştirebilir miyim?</summary><p>Evet. Mağaza ya da ekip sayınız arttığında üst pakete geçebilirsiniz; geçişte verileriniz ve ayarlarınız olduğu gibi kalır.</p></details>
-      <details class="reveal"><summary>"Mağaza bağlantısı" ne demek?</summary><p>Bağladığınız her pazaryeri hesabı ya da e-ticaret sitesi bir mağazadır. Örneğin bir Trendyol, bir Hepsiburada ve bir ikas sitesi 3 mağazadır; aynı pazaryerinde iki ayrı hesabınız varsa 2 sayılır. Kurumsal paketin üstünde mağazaya ihtiyacınız varsa size özel teklif hazırlarız.</p></details>
+      <details class="reveal"><summary>"Mağaza bağlantısı" ne demek?</summary><p>Bağladığınız her pazaryeri hesabı ya da e-ticaret sitesi bir mağazadır. Örneğin bir Trendyol, bir Hepsiburada ve bir ikas sitesi 3 mağazadır; aynı pazaryerinde iki ayrı hesabınız varsa 2 sayılır.</p></details>
+      <details class="reveal"><summary>Paketimdeki mağaza sayısı yetmezse ne olur?</summary><p>Üst pakete geçebilir ya da paketinizi değiştirmeden ek mağaza alabilirsiniz. Ek mağaza, mağaza başına yıllık 3.000 ₺'dir (KDV dahil); ücret lisansınızın bitişine kalan gün kadar hesaplanır. Daha büyük ihtiyaçlar için size özel teklif hazırlarız.</p></details>
       <details class="reveal"><summary>Sipariş ya da ürün sayısı sınırı var mı?</summary><p>Hayır. Hiçbir pakette sipariş, ürün ya da ilan sayısı sınırı yoktur.</p></details>
       <details class="reveal"><summary>Nasıl ödeme yapabilirim?</summary><p>Havale / EFT ya da kredi kartıyla ödeyebilirsiniz. Yıllık alımlarda kredi kartına peşin fiyatına 3 taksit yapılır. Axess, Bonus, Maximum, World, Paraf ve QNB kartlarına 12 taksite kadar ödeyebilirsiniz; taksit seçenekleri ödeme sayfasında görünür. Dönem ortasında üst pakete geçerseniz yalnız kalan günlerin farkını ödersiniz; alt pakete aboneliğinizin süresi dolunca geçebilirsiniz.</p></details>
       <details class="reveal"><summary>Fiyatlara KDV dahil mi?</summary><p>Evet. Kartlarda yazan tüm aylık ve yıllık fiyatlara KDV dahildir; ödeyeceğiniz tutar tam olarak yazan tutardır, üstüne ayrıca vergi eklenmez.</p></details>
