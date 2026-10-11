@@ -1445,3 +1445,7 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 .cm-sum { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
 .cm-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .cm-card .cm-cell { max-width: none; flex-direction: row; justify-content: space-between; align-items: center; gap: 8px; }
+
+/* Kanalda aç bağlantısı (ürün adı): yazı rengi korunur */
+.link-plain { color: inherit; text-decoration: none; }
+.link-plain:hover, .link-plain:focus-visible { color: var(--primary); text-decoration: underline; }

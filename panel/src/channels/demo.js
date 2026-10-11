@@ -1,6 +1,6 @@
 // Deneme modu (DEMO=1): API anahtarı girmeden paneli gerçekçi örnek verilerle denemek için.
 // Aynı tohum her seferinde aynı siparişleri üretir; zaman ilerledikçe yeni siparişler "gelir".
-import { dayKey, DEAD_LINE } from '../util.js';
+import { dayKey, DEAD_LINE, oneAxis } from '../util.js';
 
 // Örnek ürünler (çok satandan aza): [stok kodu, barkod, ad, satış fiyatı, alış fiyatı, desi, görsel türü, renk, görsel etiketi, kategori]
 // Görseller public/demo/<stok kodu>.svg (dev/demo-img.mjs üretir)
@@ -168,7 +168,7 @@ export function demo(meta) {
       const missing = [];
       for (const a of ATTRS) {
         const v = (map.attrs || {})[a.id]; let val = v && v.value;
-        if (val === '@variant') { const hit = await pick(a, pr.variant); val = hit ? hit.value : pr.variant; }
+        if (val === '@variant') { const hit = await pick(a, pr.variant); val = hit ? hit.value : oneAxis(pr.variant); }
         if (!val && a.mandatory) missing.push(a.name);
       }
       if (!pr.barcode) missing.push('barkod'); if (!(pr.price > 0)) missing.push('fiyat');

@@ -7,12 +7,12 @@
 import { compareFetched, checkMissing } from './orderclean.js';
 import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
-import { typeOf } from './config.js';
+import { typeOf, INTL_TYPES } from './config.js';
 import { syncInvoices, syncSettlements } from './finance.js';
 import { maintain } from './perf.js';
 import { syncFx, orderRate } from './fx.js';
 import { mergeStatus, chunk, str, sleep, explainHttp, withBudget, budgetLeft, budgetUsed, budgetElapsed } from './util.js';
-import { autoMatch, relinkItems, repairDuplicates } from './match.js';
+import { autoMatch, relinkItems, repairDuplicates, itemResolver, firstBarcode } from './match.js';
 import { runJobs, createJob } from './backfill.js';
 import { normCat, catKey } from '../public/catpath.js';
 import { runBuybox } from './buybox.js';
@@ -47,20 +47,7 @@ const OVERLAP = 2 * 3600e3; // son senkrondan 2 saat öncesinden itibaren tekrar
 const LOOKBACK = 3 * D;
 
 // ---------- ürün eşleştirme haritası ----------
-export async function productMaps(db) {
-  const [prods, lst] = await Promise.all([
-    all(db, 'SELECT id, sku, barcode FROM products'),
-    all(db, 'SELECT channel, remote_id, product_id FROM listings WHERE product_id IS NOT NULL'),
-  ]);
-  const sku = new Map(), barcode = new Map(), listing = new Map();
-  for (const p of prods) { if (p.sku) sku.set(p.sku.toLowerCase(), p.id); if (p.barcode) barcode.set(p.barcode, p.id); }
-  for (const l of lst) listing.set(l.channel + '\u0000' + l.remote_id, l.product_id);
-  return {
-    resolve(ch, it) {
-      return (it.remoteKey && listing.get(ch + '\u0000' + it.remoteKey)) || (it.sku && sku.get(it.sku.toLowerCase())) || (it.barcode && barcode.get(it.barcode)) || null;
-    },
-  };
-}
+export const productMaps = (db) => itemResolver(db);
 
 // ---------- siparişleri kaydet ----------
 export async function saveOrders(db, ch, orders, maps) {
@@ -300,6 +287,7 @@ export async function fillProductInfo(db, settings) {
     const used = new Set((await all(db, `SELECT LOWER(TRIM(${col})) AS v FROM products WHERE COALESCE(TRIM(${col}), '') != ''`)).map((r) => r.v));
     const done = new Set(), st = [], t = Date.now();
     for (const r of rows) {
+      if (col === 'barcode') r.v = firstBarcode(r.v); // ikas barkod listesi ("a;b"): ürüne ilk kod yazılır
       const k = r.v.toLowerCase();
       if (done.has(r.id) || used.has(k)) continue;
       used.add(k); done.add(r.id);
@@ -364,7 +352,7 @@ export async function pushStocks(env, db, settings, only) {
     // Kanal başına ayrı sorgu: gönderimi kapalı bir kanaldaki bekleyen ilanlar diğer kanalların sırasını tıkamaz
     // Fiyat da verilir: stok ve fiyatı tek kayıtta isteyen kanal (idefix) stokla birlikte mevcut fiyatı yeniden gönderir (fiyat değişmez)
     const rows = await all(db, `SELECT * FROM (SELECT l.channel, l.remote_id, l.remote_product_id, l.sku, l.barcode, l.pushed_stock, l.price, l.list_price, l.price_dirty, l.error IS NOT NULL AS err, ${DESIRED} AS stock
-      FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ? AND COALESCE(l.error_at, 0) < ?) WHERE pushed_stock IS NULL OR pushed_stock != stock
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.channel = ? AND COALESCE(l.match, '') != 'gone' AND COALESCE(l.error_at, 0) < ?) WHERE pushed_stock IS NULL OR pushed_stock != stock
       ORDER BY err LIMIT ?`, ch.id, Date.now() - ERROR_RETRY_MS, pushCap('stock', ch.id));
     const items = rows.map((r) => ({ remoteId: r.remote_id, remoteProductId: r.remote_product_id, sku: r.sku, barcode: r.barcode, stock: r.stock,
       price: Number(r.price) || 0, listPrice: Number(r.list_price) || 0, priceDirty: !!r.price_dirty }));
@@ -560,7 +548,8 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     await stockOnce(env, db, settings);
     const maps = await productMaps(db);
     const changed = [];
-    const chans = (await getChannels(env, db)).filter((c) => c.enabled && (!only || only.includes(c.id)));
+    // Yurt dışı pazaryeri (eBay, Etsy, Ozon) paket dışı kaldıysa senkron yapılmaz (Kurumsal pakette)
+    const chans = (await getChannels(env, db)).filter((c) => c.enabled && (!only || only.includes(c.id)) && (allows(env, 'intl') || !INTL_TYPES.includes(c.type)));
     // Siparişleri en uzun süredir alınamayan kanal önce: bütçe dolduğunda hep aynı kanallar geride kalmasın
     const lastOf = new Map();
     for (const ch of chans) lastOf.set(ch.id, (await getRaw(db, 'last:' + ch.id)) || {});
@@ -702,30 +691,52 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
 // Yalnız değişen ilan yazılır (WHERE): değişmeyen ilan her senkronda yeniden yazılmaz — çok müşterili kullanımda yazma maliyeti düşük kalır.
 // Kanaldaki gerçek stok "pushed_stock" olarak kaydedilir: olması gerekenden farklıysa bir sonraki adımda düzeltilir.
 export async function refreshListings(db, ch) {
+  const before = ((await first(db, "SELECT COUNT(*) AS n FROM listings WHERE channel = ? AND COALESCE(match, '') != 'gone'", ch.id)) || {}).n || 0;
   const rows = await ch.fetchListings();
   const t = Date.now();
   for (const part of chunk(rows, 40)) {
-    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description, category, images)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    await db.batch(part.map((l) => db.prepare(`INSERT INTO listings (channel, remote_id, remote_product_id, sku, barcode, name, group_name, variant_name, image, price, list_price, remote_stock, pushed_stock, synced_at, brand, description, category, images, url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (channel, remote_id) DO UPDATE SET remote_product_id = excluded.remote_product_id, sku = excluded.sku, barcode = excluded.barcode,
         name = excluded.name, group_name = excluded.group_name, variant_name = excluded.variant_name,
         image = COALESCE(NULLIF(excluded.image, ''), listings.image), images = COALESCE(NULLIF(excluded.images, ''), listings.images),
         brand = COALESCE(NULLIF(excluded.brand, ''), listings.brand), description = COALESCE(NULLIF(excluded.description, ''), listings.description),
         category = COALESCE(NULLIF(excluded.category, ''), listings.category),
-        price = CASE WHEN listings.price_dirty = 1 THEN listings.price ELSE excluded.price END,
-        list_price = excluded.list_price, remote_stock = excluded.remote_stock, pushed_stock = excluded.remote_stock, synced_at = excluded.synced_at
-      WHERE listings.remote_product_id IS NOT excluded.remote_product_id OR listings.sku IS NOT excluded.sku OR listings.barcode IS NOT excluded.barcode
+        url = COALESCE(NULLIF(excluded.url, ''), listings.url),
+        -- Kanal fiyatı boş / 0 verirse (kampanya, arşiv) bilinen fiyat korunur
+        price = CASE WHEN listings.price_dirty = 1 THEN listings.price WHEN COALESCE(excluded.price, 0) <= 0 AND listings.price > 0 THEN listings.price ELSE excluded.price END,
+        list_price = excluded.list_price, remote_stock = excluded.remote_stock, pushed_stock = excluded.remote_stock, synced_at = excluded.synced_at,
+        ignored = CASE WHEN listings.match = 'gone' THEN 0 ELSE listings.ignored END, match = CASE WHEN listings.match = 'gone' THEN NULL ELSE listings.match END
+      WHERE listings.match = 'gone' OR listings.remote_product_id IS NOT excluded.remote_product_id OR listings.sku IS NOT excluded.sku OR listings.barcode IS NOT excluded.barcode
         OR listings.name IS NOT excluded.name OR listings.group_name IS NOT excluded.group_name OR listings.variant_name IS NOT excluded.variant_name
         OR (excluded.image != '' AND listings.image IS NOT excluded.image) OR (excluded.images != '' AND listings.images IS NOT excluded.images)
         OR (excluded.brand != '' AND listings.brand IS NOT excluded.brand) OR (excluded.description != '' AND listings.description IS NOT excluded.description)
-        OR (excluded.category != '' AND listings.category IS NOT excluded.category) OR (listings.price_dirty = 0 AND listings.price IS NOT excluded.price)
+        OR (excluded.category != '' AND listings.category IS NOT excluded.category) OR (listings.price_dirty = 0 AND excluded.price > 0 AND listings.price IS NOT excluded.price) OR (excluded.url != '' AND listings.url IS NOT excluded.url)
         OR listings.list_price IS NOT excluded.list_price OR listings.remote_stock IS NOT excluded.remote_stock OR listings.pushed_stock IS NOT excluded.remote_stock`)
       .bind(ch.id, l.remoteId, l.remoteProductId || '', l.sku || '', l.barcode || '', l.name || '', l.groupName || '', l.variantName || '', l.image || '', l.price || 0, l.listPrice || 0, l.stock ?? null, l.stock ?? null, t,
-        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), normCat(l.category), (l.images || []).length ? JSON.stringify(l.images.slice(0, 12)) : '')));
+        str(l.brand).slice(0, 120), str(l.description).slice(0, 20000), normCat(l.category), (l.images || []).length ? JSON.stringify(l.images.slice(0, 12)) : '', /^https:\/\//.test(str(l.url)) ? str(l.url).slice(0, 500) : '')));
   }
   // Deneme modu: örnek alış fiyatları (gerçek kanallar alış fiyatı vermez)
   for (const l of rows) if (l.purchasePrice) await run(db, 'UPDATE products SET purchase_price = ? WHERE sku = ? AND purchase_price = 0', l.purchasePrice, l.sku);
+  await markGone(db, ch, rows, before);
   return rows.length;
+}
+// Kanalda artık olmayan ilanlar: TAM liste okunduysa (kanal "eksik okundu" demediyse ve gelen sayı öncekinin en az yarısıysa) listede
+// görünmeyen ilanın ürün bağı kalkar, "gone" olur (stok / fiyat gönderilmez). Kanal ilanı silip yeni kimlikle açtıysa yeni ilan
+// otomatik eşleştirmeyle aynı ürüne bağlanır. İlan tekrar görünürse eski haline döner (yukarıdaki ON CONFLICT).
+// Kullanıcının kaldırdığı eşleşme hatırası ("x:<ürün>") olan bağsız ilanlara dokunulmaz.
+export async function markGone(db, ch, rows, before) {
+  if (!rows || rows.partial || !rows.length || rows.length < before * 0.5) return 0;
+  const seen = new Set(rows.map((l) => String(l.remoteId)));
+  const cur = await all(db, "SELECT remote_id, product_id, name FROM listings WHERE channel = ? AND COALESCE(match, '') != 'gone' AND NOT (product_id IS NULL AND COALESCE(match, '') LIKE 'x:%')", ch.id);
+  const gone = cur.filter((l) => !seen.has(String(l.remote_id)));
+  if (!gone.length) return 0;
+  for (const part of chunk(gone, 90)) {
+    await db.batch(part.map((l) => db.prepare("UPDATE listings SET product_id = NULL, match = 'gone', ignored = 1, extra_link = 0 WHERE channel = ? AND remote_id = ?").bind(ch.id, l.remote_id)));
+  }
+  const linked = gone.filter((l) => l.product_id).length;
+  if (linked) await log(db, ch.id, 'info', `${linked} ilan kanalda artık yok; ürün bağı kaldırıldı (yeni kimlikle açıldıysa yeniden eşleşir)`);
+  return gone.length;
 }
 
 // Elle "ürünleri içe aktar": seçilen kanalların ilanlarını hemen yenile ve eşleştir
@@ -799,7 +810,7 @@ export async function housekeeping(db, { days = 45, doneDays = 3 } = {}) {
   await setSetting(db, 'maint', { at: t, labels: (r && r.meta && r.meta.changes) || 0, ...m });
   return { labels: (r && r.meta && r.meta.changes) || 0, ...m };
 }
-export const autoLink = async (db) => (await autoMatch(db, { catalog: [] })).linked;
+export const autoLink = async (db) => (await autoMatch(db, { catalog: [], noCreate: true })).linked;
 
 // ---------- deneme verilerini temizle ----------
 // DEMO kapatıldığında örnek siparişler, ilanlar ve ürünler bir kez silinir; gerçek veriye dokunulmaz.

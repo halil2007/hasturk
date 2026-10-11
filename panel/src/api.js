@@ -1,7 +1,7 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
-import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES, DEV_TYPES } from './config.js';
+import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES, DEV_TYPES, isIntl } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
@@ -138,11 +138,11 @@ async function listOrders(db, q) {
   if (rows.length) {
     const ids = rows.map((r) => r.id);
     for (const it of await allIn(db, ids, (ph, part) => [`SELECT i.order_id, i.name, i.quantity, i.returned_qty, i.sku, i.total, i.status, i.commission, COALESCE(p.image, i.image) AS image, COALESCE(p.name, i.name) AS pname,
-        p.purchase_price, p.ship_cost, l.commission AS listing_commission, l.commission_src AS listing_commission_src
+        p.purchase_price, p.ship_cost, l.commission AS listing_commission, l.commission_src AS listing_commission_src, l.url AS l_url, l.remote_id AS l_rid, l.remote_product_id AS l_pid, i.barcode AS l_bc
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
       LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key
       WHERE i.order_id IN (${ph}) ORDER BY i.rowid`, part])) {
-      (items[it.order_id] = items[it.order_id] || []).push({ name: it.pname || it.name, qty: it.quantity, sku: it.sku, image: it.image || '' });
+      (items[it.order_id] = items[it.order_id] || []).push({ name: it.pname || it.name, qty: it.quantity, sku: it.sku, image: it.image || '', url: it.l_url || '', remote_id: it.l_rid || '', remote_product_id: it.l_pid || '', barcode: it.l_bc || '', lname: it.name || '' });
       (full[it.order_id] = full[it.order_id] || []).push(it);
     }
   }
@@ -719,7 +719,7 @@ async function listBuybox(db, q) {
   const base = `FROM listings l LEFT JOIN buybox b ON b.channel = l.channel AND b.remote_id = l.remote_id LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id LEFT JOIN products p ON p.id = l.product_id`;
   const w = 'WHERE ' + where.join(' AND ');
   const limit = Math.max(1, Math.min(Number(q.limit) || 50, 200)), page = Math.max(1, Number(q.page) || 1);
-  const rows = await all(db, `SELECT l.channel, l.remote_id, l.name, l.barcode, l.sku, l.price, COALESCE(NULLIF(l.image, ''), p.image) AS image, p.name AS product_name,
+  const rows = await all(db, `SELECT l.channel, l.remote_id, l.remote_product_id, l.url, l.name, l.barcode, l.sku, l.price, COALESCE(NULLIF(l.image, ''), p.image) AS image, p.name AS product_name,
       b.rank, b.prev_rank, b.buybox_price, b.second_price, b.third_price, b.multi, b.checked_at, b.error,
       r.enabled AS rule_on, r.min_price, r.max_price, r.target_price, r.step,
       (SELECT MAX(at) FROM price_changes c WHERE c.channel = l.channel AND c.remote_id = l.remote_id AND c.ok = 1) AS last_change
@@ -732,7 +732,7 @@ async function listBuybox(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months'];
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months', 'origin'];
 const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price', 'list_price', 'weight', 'preparing_days', 'warranty_months']);
 // Görsel bağlantıları: dizi ya da satır satır metin → tekrarsız https adresleri
 const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/[\s,]+/));
@@ -1011,6 +1011,7 @@ async function saveSettings(db, b) {
         threshold: Math.max(0, Math.min(20, num(o.threshold, 0.5))), rounding: ['none', 'int', '90', '99'].includes(o.rounding) ? o.rounding : 'none', margin: Math.max(-50, Math.min(500, num(o.margin, 0))) };
     }
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
+    if (k === 'origin') v = str(v).replace(/\s+/g, ' ').trim().slice(0, 40) || 'Türkiye';
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
     if (k === 'autoprice' || k === 'costs_vat_incl' || k === 'auto_approve_sure') v = !!v;
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
@@ -1704,6 +1705,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'integrations/add' && m === 'POST') {
     const at = str((await body(req)).type);
     if (DEV_TYPES.includes(at)) fail(403, 'Bu entegrasyon geliştirme aşamasında; henüz bağlanamaz.');
+    if (isIntl(at)) requireFeature(env, 'intl');
     const id = await addStore(db, at);
     resetChannels();
     await log(db, id, 'info', `${user.name}: yeni mağaza eklendi`);
@@ -1720,6 +1722,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     // Müşteri panelinde e-posta servisi ayarlanamaz: otomatik e-postalar yalnız ana panelde girilen adresten gider
     if (env.TENANT_SLUG && x[1] === 'mail') fail(403, 'E-posta gönderimi Hastürk CRM tarafından yapılır; e-posta servisi ayarlanamaz');
     const b = await body(req);
+    // Yurt dışı pazaryerleri Kurumsal pakette (Amazon: Türkiye dışı pazar yeri seçilince)
+    if (b.values && Object.values(b.values).some((v) => String(v || '').trim()) && isIntl(typeOf(x[1]), b.values)) requireFeature(env, 'intl');
     // Paketteki mağaza sınırı: yeni bir mağazanın API bilgisi kaydedilirken bağlı mağazalar sayılır (var olanı güncellemek serbest)
     const maxStores = Number(env.TENANT_MAX_STORES) || 0;
     if (maxStores && isChannelId(x[1]) && b.values && Object.values(b.values).some((v) => String(v || '').trim())) {

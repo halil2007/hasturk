@@ -4,11 +4,13 @@
 // Yükleme: henüz o kanalda ilanı olmayan ürünler, eşleştirmedeki değerlerle kanalın ürün servisine gönderilir; kanalın
 // verdiği takip kimliğiyle (HB trackingId / Trendyol batchRequestId) sonuç sorgulanır. Onaylanan ürün, ilanlar
 // çekilince barkod / SKU ile otomatik eşleşir.
-import { all, first, run, allIn, getRaw, setSetting, getSettings, log, notify } from './db.js';
+import { all, first, run, allIn, getRaw, setSetting, getSettings, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { importListings, catalogOf } from './sync.js';
-import { fail, str, num, r2, isImageAttr } from './util.js';
+import { fail, str, num, r2, isImageAttr, variantAxes } from './util.js';
+export { variantAxes };
 import { rank, localProfile, prepare, score } from './catmatch.js';
+import { quantities } from './match.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır', pazarama: 'Ürün yükleme Pazarama panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
@@ -71,21 +73,30 @@ export function shape(p, opts, zeroStock) {
 // Varyant adından (ör. "5 Kg") kanalın değer listesindeki karşılığını bul
 export function picker(c, catId) {
   const cache = new Map();
+  // One axis value against the list: exact, else same canonical quantity ("500 ml" = "0,5 Lt", "5000 gr" = "5 Kg"; "15 Kg" never "5 Kg")
+  const one = (list, text) => {
+    const t = norm(text), q = [...quantities(text)].sort().join(',');
+    return list.find((v) => norm(v.value) === t) || (q && list.find((v) => [...quantities(v.value)].sort().join(',') === q)) || null;
+  };
   return async (attr, text) => {
     if (!text) return null;
     if (!cache.has(attr.id)) cache.set(attr.id, await c.catalog.values(catId, attr.id).catch(() => []));
-    const list = cache.get(attr.id), t = norm(text);
-    // Tam eşleşme; yoksa sayı + birim aynı olan değer ("5 Kg" ↔ "5 kg", "2,5 Lt" ↔ "2.5 Lt"). "15 Kg" asla "5 Kg" ile eşleşmez.
-    const qty = (x) => { const m = /(\d+(?:\.\d+)?)([a-zğüşıöç]*)/.exec(norm(x)); return m ? `${Number(m[1])}|${m[2]}` : null; };
-    const q = qty(text);
-    return list.find((v) => norm(v.value) === t) || (q && list.find((v) => qty(v.value) === q && /\d/.test(t))) || null;
+    const list = cache.get(attr.id);
+    const whole = one(list, text);
+    if (whole) return whole;
+    // Multi-axis variant ("Kırmızı / XL", "1 Lt / 6 Adet"): each axis is tried on its own; exactly one axis may match this attribute
+    const parts = variantAxes(text);
+    if (parts.length < 2) return null;
+    const hits = [...new Map(parts.map((x) => one(list, x)).filter(Boolean).map((h) => [String(h.id), h])).values()];
+    return hits.length === 1 ? hits[0] : null;
   };
 }
 async function buildAll(c, map, prods, opts, zeroStock) {
   const pick = picker(c, map.remote_id), out = [];
   for (const p of prods) {
     const pr = shape(p, opts, zeroStock);
-    try { out.push({ p: pr, ...(await c.catalog.build(pr, map, { opts, pick })) }); }
+    const m = str(p.origin) ? { ...map, attrs: await withOrigin(c, map.remote_id, map.attrs || {}, p) } : map;
+    try { out.push({ p: pr, ...(await c.catalog.build(pr, m, { opts, pick })) }); }
     catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: ['hata: ' + e.message] }); }
   }
   return out;
@@ -101,23 +112,82 @@ async function suggest(db, c, local, n = 5) {
   return rank(await c.catalog.allCategories(), local, await namesOf(db, local), n);
 }
 // "Güçlü öneri": açık farkla en iyi aday; iki aday birbirine çok yakınsa "zayıf öneri" (her iki durumda da onay gerekir)
-const AUTO_MIN = 5, AUTO_LEAD = 0.5;
-export const confident = (r) => r[0] && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
-// Kategori özelliklerini mümkün olduğunca otomatik doldur: varyant özellikleri ürünün varyant adından, Menşei = Türkiye
-export async function autoAttrs(c, catId) {
+const AUTO_MIN = 6, AUTO_LEAD = 2;
+export const confident = (r) => !!r[0] && !r[0].generic && r[0].score >= AUTO_MIN && (!r[1] || r[0].score - r[1].score >= AUTO_LEAD);
+// Menşei: mağaza ayarı "Ürünlerin menşei" (varsayılan Türkiye); ürün kartında ayrıca girilmişse o ürün için o geçerli.
+// Kanal listesindeki değer ülke adı ya da ISO koduyla bulunur ("Türkiye" = "TR", "Çin" = "CN" …).
+export const DEFAULT_ORIGIN = 'Türkiye';
+export const isOriginAttr = (a) => /men[sş]e|origin|[üu]retim yeri/i.test(String((a && a.name) || ''));
+const COUNTRY = [['türkiye', 'turkiye', 'turkey', 'tr'], ['çin', 'cin', 'china', 'cn', 'çin halk cumhuriyeti'], ['almanya', 'germany', 'de'], ['italya', 'italy', 'it'], ['fransa', 'france', 'fr'],
+  ['ispanya', 'spain', 'es'], ['abd', 'amerika', 'amerika birleşik devletleri', 'usa', 'us'], ['ingiltere', 'birleşik krallık', 'uk', 'gb'], ['japonya', 'japan', 'jp'], ['güney kore', 'kore', 'korea', 'kr'],
+  ['hindistan', 'india', 'in'], ['vietnam', 'vn'], ['tayvan', 'taiwan', 'tw'], ['polonya', 'poland', 'pl'], ['bangladeş', 'bangladesh', 'bd'], ['pakistan', 'pk'], ['yunanistan', 'greece', 'gr']];
+const ckey = (s) => String(s || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
+const countryOf = (s) => { const k = ckey(s); return COUNTRY.find((g) => g.includes(k)) || [k]; };
+export const originOf = (settings, p) => str(p && p.origin) || str(settings && settings.origin) || DEFAULT_ORIGIN;
+// Değer listesinde ülkenin karşılığı; liste yoksa (serbest metin) ülke adı, listede yoksa null (eksik olarak sorulur)
+export function originValue(list, origin, free) {
+  const g = countryOf(origin), hit = (list || []).find((x) => g.includes(ckey(x.value)));
+  if (hit) return { id: hit.id, value: hit.value };
+  return free || !(list || []).length ? { value: str(origin) } : null;
+}
+// Kategori özelliklerini mümkün olduğunca otomatik doldur: varyant özellikleri ürünün varyant adından, Menşei = mağaza ayarı
+export async function autoAttrs(c, catId, { origin = DEFAULT_ORIGIN } = {}) {
   const out = {}, missing = [];
   for (const a of await c.catalog.attributes(catId)) {
     if (a.kind === 'variant') { out[a.id] = { value: '@variant' }; continue; }
     if (!a.mandatory) continue;
     if (isImageAttr(a)) { out[a.id] = { value: '@image' }; continue; }
-    if (/men[sş]e|origin|[üu]retim yeri/i.test(a.name)) {
-      const v = (await c.catalog.values(catId, a.id).catch(() => [])).find((x) => /^(tr|t[üu]rkiye)$/i.test(String(x.value).trim()));
-      if (v) { out[a.id] = { id: v.id, value: v.value }; continue; }
-      if (a.custom || !/enum/i.test(a.type)) { out[a.id] = { value: 'Türkiye' }; continue; }
+    if (isOriginAttr(a)) {
+      const v = originValue(await c.catalog.values(catId, a.id).catch(() => []), origin, a.custom || !/enum/i.test(a.type || ''));
+      if (v) { out[a.id] = v; continue; }
     }
     missing.push(a.name);
   }
   return { attrs: out, missing };
+}
+// Ürüne özel menşei (ürün kartı): kategorinin Menşei değeri bu ürün için değiştirilir; kanal listesinde yoksa değer kalkar (eksik sorulur)
+export async function withOrigin(c, catId, attrs, p) {
+  if (!str(p && p.origin)) return attrs;
+  const out = { ...attrs };
+  for (const a of await c.catalog.attributes(catId).catch(() => [])) {
+    if (!isOriginAttr(a)) continue;
+    const v = originValue(await c.catalog.values(catId, a.id).catch(() => []), p.origin, a.custom || !/enum/i.test(a.type || ''));
+    if (v) out[a.id] = v; else delete out[a.id];
+  }
+  return out;
+}
+// Kanal kategori ağacından kaldırılmış eşleşmeler: ağaç okunamazsa ya da boşsa hiçbir eşleşme "kaldırılmış" sayılmaz
+export const STALE_MSG = 'Kategori kanalda kaldırılmış; yeniden eşleştirin';
+export async function staleCheck(c) {
+  let list = [];
+  try { list = c.catalog && c.catalog.allCategories ? await c.catalog.allCategories() : []; } catch (e) { if (e.budget) throw e; }
+  if (!list || !list.length) return () => false;
+  const ids = new Set(list.map((x) => String(x.id)));
+  return (id) => !ids.has(String(id));
+}
+// Kanalda kaldırılmış kategoriler için uyarı (aynı uyarı açıkken tekrar yazılmaz; kalmadıysa kapanır)
+export async function staleNotice(db, c, locals) {
+  const key = `catstale:${c.id}`;
+  if (!locals.length) return resolve(db, key);
+  const msg = `${locals.slice(0, 5).join(', ')}${locals.length > 5 ? ` ve ${locals.length - 5} kategori daha` : ''} · Kategori eşleştirme sayfasından yeni kategoriyi seçin.`;
+  const cur = await first(db, 'SELECT msg, resolved_at FROM notices WHERE key = ?', key).catch(() => null);
+  if (cur && !cur.resolved_at && cur.msg === msg) return;
+  await notify(db, key, { level: 'warn', channel: c.id, title: `${c.name}: ${STALE_MSG}`, msg });
+}
+// Öneri kaydı: eşleşme yapılınca öneri temizlenir ama reddedilenler kalır (kaldırılan / reddedilen kategori bir daha önerilmez)
+export async function clearSuggest(db, local, ch) {
+  await run(db, "DELETE FROM category_suggest WHERE local = ? AND channel = ? AND COALESCE(rejected, '') IN ('', '[]')", local, ch);
+  await run(db, 'UPDATE category_suggest SET remote_id = NULL, remote_name = NULL, path = NULL, score = NULL, sure = 0 WHERE local = ? AND channel = ?', local, ch);
+}
+// Eşleşme kaldırıldı / değiştirildi: eski kategori reddedilenlere eklenir; yeni öneri hazırlanır (created_at = 0) ama "kesin" sayılmaz
+export async function rejectMapped(db, local, ch, remoteId, { fresh = true } = {}) {
+  if (!str(remoteId)) return;
+  const sg = await first(db, 'SELECT rejected FROM category_suggest WHERE local = ? AND channel = ?', local, ch);
+  let rej = [];
+  try { rej = JSON.parse((sg && sg.rejected) || '[]'); } catch { /* bozuk */ }
+  rej = [...new Set([...rej.map(String), String(remoteId)])];
+  await run(db, `INSERT INTO category_suggest (local, channel, remote_id, remote_name, path, score, sure, rejected, created_at) VALUES (?, ?, NULL, NULL, NULL, NULL, 0, ?, ?)
+    ON CONFLICT (local, channel) DO UPDATE SET rejected = excluded.rejected${fresh ? ', remote_id = NULL, remote_name = NULL, path = NULL, score = NULL, sure = 0, created_at = 0' : ''}`, local, ch, JSON.stringify(rej), fresh ? 0 : Date.now());
 }
 // Önerilen eşleşme: eşleştirilmemiş ikas kategorileri için en uygun pazaryeri kategorisi ÖNERİLİR (category_suggest), eşleştirilmez.
 // Kullanıcı "Onayla" derse eşleşir; beğenmezse kendisi başka kategori seçer (reddedilen kategori o ikas kategorisine tekrar önerilmez).
@@ -139,8 +209,8 @@ async function suggestAll(db, settings, c, { redo = false } = {}) {
     await run(db, `INSERT INTO category_suggest (local, channel, remote_id, remote_name, path, score, sure, rejected, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, path = excluded.path, score = excluded.score, sure = excluded.sure, created_at = excluded.created_at`,
     local, c.id, best && best.score >= 2 ? String(best.id) : null, best && best.score >= 2 ? best.name : null, best && best.score >= 2 ? best.path || '' : null,
-    best ? best.score : null, confident(r) ? 1 : 0, JSON.stringify([...rej]), t);
-    if (best && best.score >= 2) suggested.push({ local, remote: best.name, path: best.path, sure: confident(r) });
+    best ? best.score : null, confident(r) && !rej.size ? 1 : 0, JSON.stringify([...rej]), t);
+    if (best && best.score >= 2) suggested.push({ local, remote: best.name, path: best.path, sure: confident(r) && !rej.size });
   }
   return { suggested, none };
 }
@@ -162,11 +232,11 @@ async function migrateAuto(db) {
 async function acceptSuggestion(db, c, local, user) {
   const sg = await first(db, 'SELECT * FROM category_suggest WHERE local = ? AND channel = ?', local, c.id);
   if (!sg || !sg.remote_id) fail(404, 'Bu kategori için öneri yok; “Eşleştir” ile kendiniz seçin');
-  const { attrs, missing } = await autoAttrs(c, sg.remote_id);
+  const { attrs, missing } = await autoAttrs(c, sg.remote_id, { origin: originOf(await getSettings(db)) });
   await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,
   local, c.id, sg.remote_id, sg.remote_name, JSON.stringify(attrs), Date.now(), user.name);
-  await run(db, 'DELETE FROM category_suggest WHERE local = ? AND channel = ?', local, c.id);
+  await clearSuggest(db, local, c.id);
   await log(db, c.id, 'info', `${user.name}: önerilen kategori onaylandı (${local} → ${sg.remote_name})`);
   return { ok: true, remote: sg.remote_name, missing };
 }
@@ -229,14 +299,16 @@ export async function autoUpload(env, db, settings) {
       // Eşleştirilmemiş kategoriler için yalnız öneri hazırlanır (günde bir); gönderim yalnız kullanıcının onayladığı eşleşmelerle
       const last = await getRaw(db, 'automap:' + c.id);
       if (!last || Date.now() - last > 864e5) { await suggestAll(db, settings, c); await setSetting(db, 'automap:' + c.id, Date.now()); }
-      const skip = await sentFilter(db, c.id);
+      const skip = await sentFilter(db, c.id), stale = await staleCheck(c), gone = [];
       const ready = [];
       for (const map of (await all(db, 'SELECT * FROM category_map WHERE channel = ?', c.id)).map((m) => ({ ...m, attrs: JSON.parse(m.attrs || '{}') }))) {
         if (ready.length >= 100) break;
+        if (stale(map.remote_id)) { gone.push(map.local); continue; }
         const prods = (await productsFor(db, settings, { local: map.local, ch: c.id })).filter((p) => !p.listed && !skip(p) && (p.stock || 0) > 0).slice(0, 100 - ready.length);
         if (!prods.length) continue;
         for (const x of await buildAll(c, map, prods, allOpts[c.id] || {}, false)) if (!x.missing.length) ready.push(x);
       }
+      if (gone.length) await staleNotice(db, c, gone).catch(() => {});
       if (!ready.length) { out[c.id] = 0; continue; }
       items = ready.map((x) => ({ id: x.p.id, key: x.key, name: x.p.name }));
       const r = await c.catalog.send(ready.map((x) => x.payload));
@@ -296,7 +368,9 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const c = await target(env, db, str(b.channel)), done = [];
     for (const x of (b.items || []).slice(0, 200)) {
       if (!str(x.local) || !str(x.id)) continue;
-      const { attrs } = await autoAttrs(c, str(x.id));
+      const cur = await first(db, 'SELECT remote_id FROM category_map WHERE local = ? AND channel = ?', str(x.local), c.id);
+      if (cur && String(cur.remote_id) !== str(x.id)) await rejectMapped(db, str(x.local), c.id, cur.remote_id, { fresh: false });
+      const { attrs } = await autoAttrs(c, str(x.id), { origin: originOf(settings) });
       await run(db, 'UPDATE category_map SET remote_id = ?, remote_name = ?, attrs = ?, updated_at = ?, user = ? WHERE local = ? AND channel = ?', str(x.id), str(x.name), JSON.stringify(attrs), Date.now(), user.name, str(x.local), c.id);
       done.push(x.local);
     }
@@ -314,10 +388,16 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,
     str(b.local), c.id, str(b.remote_id), str(b.remote_name), JSON.stringify(attrs), Date.now(), user.name);
-    await run(db, 'DELETE FROM category_suggest WHERE local = ? AND channel = ?', str(b.local), c.id);
+    await clearSuggest(db, str(b.local), c.id);
     return { ok: true };
   }
-  if (path === 'catalog/unmap' && m === 'POST') { await run(db, 'DELETE FROM category_map WHERE local = ? AND channel = ?', str(b.local), str(b.channel)); return { ok: true }; }
+  // Eşleştirmeyi kaldır: kaldırılan kategori reddedilenlere eklenir (günlük öneri / "kesinleri otomatik onayla" aynı kategoriyi geri getirmez)
+  if (path === 'catalog/unmap' && m === 'POST') {
+    const cur = await first(db, 'SELECT remote_id FROM category_map WHERE local = ? AND channel = ?', str(b.local), str(b.channel));
+    await run(db, 'DELETE FROM category_map WHERE local = ? AND channel = ?', str(b.local), str(b.channel));
+    if (cur) await rejectMapped(db, str(b.local), str(b.channel), cur.remote_id);
+    return { ok: true };
+  }
   if (path === 'catalog/options' && m === 'POST') {
     const c = await target(env, db, str(b.channel));
     const o = {};
@@ -332,12 +412,14 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const sent = new Set((await all(db, "SELECT items FROM product_uploads WHERE channel = ? AND status IN ('sent', 'done') AND created_at > ?", c.id, Date.now() - 14 * 864e5))
       .flatMap((u) => JSON.parse(u.items || '[]').filter((x) => x.ok !== false).map((x) => x.id)));
     const open = prods.filter((p) => !p.listed);
-    const built = map ? await buildAll(c, map, open, allOpts[c.id] || {}, !!Number(q.zero)) : [];
+    const gone = map && (await staleCheck(c))(map.remote_id);
+    const built = map && !gone ? await buildAll(c, map, open, allOpts[c.id] || {}, !!Number(q.zero)) : [];
     const byId = new Map(built.map((x) => [x.p.id, x]));
     return {
       map, listed: prods.length - open.length,
       items: open.map((p) => { const x = byId.get(p.id); const s = x ? x.p : shape(p, allOpts[c.id] || {}, !!Number(q.zero));
-        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, stock: s.stock, variant: s.variant, missing: x ? x.missing : ['kategori eşleştirilmemiş'], sent: sent.has(p.id) }; }),
+        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, stock: s.stock, variant: s.variant, missing: x ? x.missing : [gone ? STALE_MSG : 'kategori eşleştirilmemiş'], sent: sent.has(p.id) }; }),
+      ...(gone ? { stale: STALE_MSG } : {}),
     };
   }
   if (path === 'catalog/upload' && m === 'POST') {
@@ -347,10 +429,11 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const prods = (await productsFor(db, settings, { ch: c.id, ids })).filter((p) => !p.listed);
     const groups = new Map();
     for (const p of prods) { const k = str(p.category); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
-    const ready = [], skipped = [];
+    const ready = [], skipped = [], stale = await staleCheck(c);
     for (const [local, list] of groups) {
       const map = await mapOf(db, local, c.id);
       if (!map) { skipped.push(...list.map((p) => ({ id: p.id, name: p.name, missing: ['kategori eşleştirilmemiş'] }))); continue; }
+      if (stale(map.remote_id)) { skipped.push(...list.map((p) => ({ id: p.id, name: p.name, missing: [STALE_MSG] }))); continue; }
       for (const x of await buildAll(c, map, list, allOpts[c.id] || {}, !!b.zeroStock)) (x.missing.length ? skipped.push({ id: x.p.id, name: x.p.name, missing: x.missing }) : ready.push(x));
     }
     if (!ready.length) return { sent: 0, skipped };

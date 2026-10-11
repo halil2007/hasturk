@@ -263,6 +263,7 @@ export function ikas(env, p, meta) {
       return (at.length ? at : list).reduce((s, x) => s + num(x.stockCount), 0);
     };
     let optional = { barcodeList: 'barcodeList', images: 'images { imageId fileName isMain order isVideo }', salesChannelIds: 'salesChannelIds', variantValueIds: 'variantValueIds { variantTypeId variantValueId }', brand: 'brand { name }', description: 'description', categoryIds: 'categoryIds' };
+    let done = false;
     for (let page = 1; page <= 200; page++) {
       const d = await flex(q, optional, { page });
       for (const p of d.listProduct.data || []) {
@@ -281,7 +282,7 @@ export function ikas(env, p, meta) {
           const gallery = [...new Map(ord(vi.length ? vi : allImgs).map((i) => [i.imageId, imgUrl(i, 1080)])).values()].filter(Boolean).slice(0, 12);
           const vname = (v.variantValueIds || []).map((x) => values.get(x.variantValueId)).filter(Boolean).join(' / ');
           out.push({
-            remoteId: String(v.id), remoteProductId: String(p.id), sku: str(v.sku), barcode: str((v.barcodeList || [])[0]),
+            remoteId: String(v.id), remoteProductId: String(p.id), sku: str(v.sku), barcode: (v.barcodeList || []).map(str).filter(Boolean).join(';'),
             name: vname ? `${p.name} - ${vname}` : p.name, groupName: p.name, variantName: vname,
             image: imgUrl(img, 360), images: gallery, price: num(pr.discountPrice || pr.sellPrice), listPrice: num(pr.sellPrice),
             stock: stockOf(v), active: v.isActive !== false,
@@ -289,8 +290,9 @@ export function ikas(env, p, meta) {
           });
         }
       }
-      if (!d.listProduct.hasNext) break;
+      if (!d.listProduct.hasNext) { done = true; break; }
     }
+    if (!done) out.partial = true; // sayfa sınırı: liste eksik olabilir (kanalda görünmeyen ilan "kaldırıldı" sayılmaz)
     return out;
   }
 

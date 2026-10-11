@@ -30,7 +30,7 @@
     ['Pazarama', 'pazaryeri', '#7a2bc9', 'Pz', 'color:#7a2bc9;font-size:19px'], ['WooCommerce', 'e-ticaret sitesi', '#7f54b3', 'W', 'color:#7f54b3;font-size:19px'],
     // Test aşamasındakiler (6. alan: paneldeki kanal türü): kullanıma açık, "test aşamasında" etiketiyle görünür
     ['Amazon', 'pazaryeri', '#232f3e', 'a', 'color:#232f3e', 'amazon'], ['Çiçeksepeti', 'pazaryeri', '#1e9e57', 'Çs', 'color:#1e9e57;font-size:19px', 'ciceksepeti'], ['Koçtaş', 'pazaryeri', '#e5541b', 'K', 'color:#e5541b', 'koctas'],
-    ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S', 'color:#5e8e3e', 'shopify'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC', 'color:#23a8e0;font-size:19px', 'opencart'], ['Etsy', 'pazaryeri', '#f1641e', 'E', 'color:#f1641e', 'etsy'],
+    ['Shopify', 'e-ticaret sitesi', '#5e8e3e', 'S', 'color:#5e8e3e', 'shopify'], ['OpenCart', 'e-ticaret sitesi', '#23a8e0', 'OC', 'color:#23a8e0;font-size:19px', 'opencart'], ['Etsy', 'yurt dışı pazaryeri', '#f1641e', 'E', 'color:#f1641e', 'etsy'],
     ["Teknosa", "pazaryeri", "#005bab", "T", "color:#005bab", "teknosa"], ["Boyner", "pazaryeri", "#000000", "B", "color:#000000", "boyner"], ["Turkcell Pasaj", "pazaryeri", "#ffc900", "P", "color:#ffc900", "pasaj"], ["Trendyol Go", "hızlı market", "#ff6000", "TG", "color:#ff6000", "trendyolgo"], ["Getir Çarşı", "hızlı market", "#5d3ebc", "G", "color:#5d3ebc", "getir"], ["Yemeksepeti Market", "hızlı market", "#fa0050", "YS", "color:#fa0050", "yemeksepeti"], ["eBay", "yurt dışı pazaryeri", "#E53238", "e", "color:#E53238", "ebay"], ["Ozon", "yurt dışı pazaryeri", "#005BFF", "O", "color:#005BFF", "ozon"], ["Ticimax", "e-ticaret sitesi", "#00A8E8", "Tx", "color:#00A8E8", "ticimax"], ["IdeaSoft", "e-ticaret sitesi", "#F26B21", "iS", "color:#F26B21", "ideasoft"], ["T-Soft", "e-ticaret sitesi", "#E30613", "T", "color:#E30613", "tsoft"],
   ];
   // Ana panelde "Test yazısını kaldır" denince tür bu listeden çıkar (panel → /api/public/channels → beta); panel yanıt vermezse etiketler kalır
@@ -222,6 +222,31 @@
   }));
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
 
+  // Entegrasyonlar mega menüsü (masaüstü): fareyle kısa gecikmeyle açılır / kapanır; klavyede odakla açılır, Escape kapatır;
+  // dokunmatik ekranda ilk dokunuş açar, ikinci dokunuş /entegrasyonlar'a gider. JS yoksa CSS hover / focus çalışır.
+  $$('[data-mm]').forEach((dd) => {
+    const trg = dd.querySelector(':scope > a'), panel = $('[data-mm-panel]', dd);
+    if (!trg || !panel) return;
+    let tm = null, touch = false, hush = false; // hush: Escape ile kapatıldı; odak tetikleyicide kalınca yeniden açılmaz
+    const set = (o) => { clearTimeout(tm); dd.classList.toggle('open', o); trg.setAttribute('aria-expanded', o); };
+    const later = (o, ms) => { clearTimeout(tm); tm = setTimeout(() => set(o), ms); };
+    dd.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') { hush = false; later(true, 120); } });
+    dd.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') later(false, 220); });
+    trg.addEventListener('pointerdown', (e) => { touch = e.pointerType === 'touch' || e.pointerType === 'pen'; });
+    trg.addEventListener('click', (e) => { if (touch && !dd.classList.contains('open')) { e.preventDefault(); hush = false; set(true); } touch = false; });
+    dd.addEventListener('focusin', () => { if (!hush && !touch) set(true); });
+    dd.addEventListener('focusout', (e) => { if (!dd.contains(e.relatedTarget)) { hush = false; later(false, 60); } });
+    dd.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dd.classList.contains('open')) { e.stopPropagation(); hush = true; set(false); trg.focus({ preventScroll: true }); }
+      else if (e.key === 'ArrowDown' && e.target === trg) {
+        e.preventDefault(); hush = false; set(true); const f = $('a', panel); if (f) f.focus();
+      }
+    });
+    document.addEventListener('pointerdown', (e) => { if (dd.classList.contains('open') && !dd.contains(e.target)) set(false); });
+    // Başka bir menü öğesine geçilince hemen kapan (Özellikler açılırken üst üste binmesin)
+    $$('.nav > a, .nav > .dd:not([data-mm])').forEach((o) => o.addEventListener('pointerenter', () => { if (dd.classList.contains('open')) set(false); }));
+  });
+
   // Mobil menü
   // Menü ekrandan uzun olabilir (açılır listeler): kendi içinde kayar. Yükseklik menünün ekrandaki yerine göre ayarlanır
   // (üstteki iletişim şeridi görünürken de alttaki bağlantılara ulaşılır; sayfa kayınca yeniden hesaplanır).
@@ -234,7 +259,7 @@
     };
     mb.addEventListener('click', () => set(!mn.classList.contains('open')));
     mn.addEventListener('click', (e) => { if (e.target.closest('a')) set(false); });
-    window.addEventListener('resize', () => { if (window.innerWidth >= 1040) set(false); else fit(); });
+    window.addEventListener('resize', () => { if (window.innerWidth >= 1000) set(false); else fit(); });
     window.addEventListener('scroll', fit, { passive: true });
     mn.addEventListener('toggle', fit, true);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mn.classList.contains('open')) set(false); });

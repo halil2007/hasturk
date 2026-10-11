@@ -1,6 +1,6 @@
 // Entegrasyonlar: pazaryeri ve site API bilgileri panelden girilir/değiştirilir (sunucuda şifreli saklanır),
 // bağlantı test edilir, kanal aktif/pasif yapılır; son başarılı senkron zamanları, hatalar ve geçmiş sipariş aktarımı buradadır.
-import { api, state, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey, isAdmin, popMenu, sheet } from '../core.js';
+import { api, state, html, render, $, $$, n, ago, date, dateTime, ch, chLogo, chState, actions, busy, toast, confirmBox, dayKey, isAdmin, popMenu, sheet, locked } from '../core.js';
 import { loadSummary } from '../app.js';
 import { importDialog } from './products.js';
 import { diagnoseDialog, systemCheck } from './diagnose.js';
@@ -50,7 +50,10 @@ const when = (ms) => (ms ? html`<span title="${dateTime(ms)}">${ago(ms)}</span>`
 
 // Kanal kurulmuş mu: bağlı, örnek veriyle çalışıyor ya da panelde bilgi girilmiş (test bekliyor)
 const configured = (c) => c.enabled || c.demo || c.fields.some((f) => f.source) || c.extra;
-const SITES = ['ikas', 'shopify', 'woocommerce', 'opencart'];
+const SITES = ['ikas', 'shopify', 'woocommerce', 'opencart', 'ticimax', 'ideasoft', 'tsoft'];
+// Yurt dışı pazaryerleri (Kurumsal pakette) ve hızlı teslimat kanalları ayrı sekmede
+const ABROAD = ['ebay', 'etsy', 'ozon'], QUICK = ['trendyolgo', 'getir', 'yemeksepeti'];
+const kindOf = (t) => (SITES.includes(t) ? 'site' : ABROAD.includes(t) ? 'abroad' : QUICK.includes(t) ? 'quick' : 'market');
 // Satıcı panelleri (bilgilerin alındığı yer)
 const PANEL_URL = { trendyol: 'https://partner.trendyol.com', hepsiburada: 'https://merchant.hepsiburada.com', n11: 'https://so.n11.com', amazon: 'https://sellercentral.amazon.com.tr', etsy: 'https://www.etsy.com/developers/your-apps', pazarama: 'https://isortagim.pazarama.com' };
 const panelUrl = (c) => (c.type === 'ikas' ? ((c.fields.find((f) => /STORE$/.test(f.k)) || {}).value ? `https://${c.fields.find((f) => /STORE$/.test(f.k)).value}.myikas.com/admin` : 'https://ikas.com') : PANEL_URL[c.type] || '');
@@ -93,6 +96,9 @@ export async function integrations(el, rest = []) {
     // Geliştirme aşamasındaki kanal: yalnız bilgi (bağlanamaz)
     if (c.dev) return html`<div class="icard off" style="opacity:.75"><div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${typeName(g.type)}</b>
       <div class="ic-st"><span class="pill tiny">Geliştirme aşamasında</span></div></div></div><div class="ic-need small muted">Yakında bağlanabilecek.</div></div>`;
+    // Yurt dışı pazaryeri Kurumsal pakette: paketi olmayan bağlayamaz (bilgi kartı)
+    if (ABROAD.includes(g.type) && locked('intl') && !conf.length) return html`<div class="icard off" style="opacity:.8"><div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${typeName(g.type)}</b>
+      <div class="ic-st"><span class="pill info tiny">Kurumsal paket</span></div></div></div><div class="ic-need small muted">Yurt dışı pazaryerleri Kurumsal pakette.${isAdmin() ? html` <a class="link" href="#/paketim">Paketim</a>` : ''}</div></div>`;
     return html`<div class="icard ${conf.length ? 'conf' : ''} ${s.k}" data-act="open" data-id="${c.id}" tabindex="0">
       <div class="ic-top">${chLogo(c.id)}<div class="ic-name"><b class="ellipsis">${typeName(g.type)}</b>
           <div class="ic-st"><span class="led ${s.k === 'off' ? 'off' : s.k === 'err' ? 'err' : s.k === 'demo' ? 'demo' : ''}"></span>${multi ? `${live.length}/${conf.length} mağaza bağlı` : s.t}${c.beta ? html`<span class="pill warn tiny">Test aşamasında</span>` : ''}${c.sandbox ? html`<span class="pill warn tiny">Test ortamı</span>` : ''}</div></div>
@@ -111,9 +117,9 @@ export async function integrations(el, rest = []) {
   function overview() {
     const all = data.channels, conn = all.filter((c) => c.enabled || c.demo), errs = all.filter((c) => c.last && c.last.ok === false), wait = all.filter((c) => configured(c) && !c.enabled && !c.demo && c.gated);
     const gs = groupsOf(), on = (g) => g.stores.some((c) => c.enabled || c.demo), conf = (g) => g.stores.some(configured);
-    const groups = [['all', 'Tümü', gs.length], ['on', 'Bağlı', gs.filter(on).length], ['off', 'Bağlanmamış', gs.filter((g) => !conf(g)).length], ['market', 'Pazaryerleri', gs.filter((g) => !SITES.includes(g.type)).length], ['site', 'E-ticaret siteleri', gs.filter((g) => SITES.includes(g.type)).length]];
+    const groups = [['all', 'Tümü', gs.length], ['on', 'Bağlı', gs.filter(on).length], ['off', 'Bağlanmamış', gs.filter((g) => !conf(g)).length], ...[['market', 'Pazaryerleri'], ['site', 'E-ticaret siteleri'], ['quick', 'Hızlı teslimat'], ['abroad', 'Yurt dışı']].map(([k, t]) => [k, t, gs.filter((g) => kindOf(g.type) === k).length]).filter((x) => x[2])];
     const q = f.q.toLocaleLowerCase('tr');
-    const list = gs.filter((g) => (f.show === 'all' || (f.show === 'on' ? on(g) : f.show === 'off' ? !conf(g) : f.show === 'site' ? SITES.includes(g.type) : !SITES.includes(g.type)))
+    const list = gs.filter((g) => (f.show === 'all' || (f.show === 'on' ? on(g) : f.show === 'off' ? !conf(g) : kindOf(g.type) === f.show))
       && (!q || `${typeName(g.type)} ${g.stores.map((c) => c.name).join(' ')}`.toLocaleLowerCase('tr').includes(q)))
       .sort((a, b) => Number(conf(b)) - Number(conf(a)));
     render(el, html`<div class="stack">

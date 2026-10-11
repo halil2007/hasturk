@@ -55,6 +55,10 @@ export function rankBrands(list, q) {
   const all = [...seen.values()], hit = all.filter((b) => { const n = brandKey(b.name); return n.includes(k) || k.includes(n); });
   return (hit.length ? hit : all).sort((a, b) => (brandKey(b.name) === k) - (brandKey(a.name) === k) || a.name.length - b.name.length).slice(0, 20);
 }
+// Çok eksenli varyant adı ("Kırmızı / XL", "1 Lt | 6 Adet", "M - Siyah"): eksenler. Tek bir özelliğe (Renk, Beden) hiçbir zaman
+// bütün metin serbest değer olarak gitmez; listede eşleşen eksen yoksa özellik eksik sayılır.
+export const variantAxes = (t) => String(t || '').split(/\s*[/|]\s*|\s+-\s+/).map((x) => x.trim()).filter(Boolean);
+export const oneAxis = (t) => (variantAxes(t).length > 1 ? '' : String(t || '').trim());
 export const isImageAttr = (a) => !!a && /g[öo]rsel|resim|foto[gğ]raf|image|photo/i.test(String(a.name || '')) && !/enum|list|select/i.test(String(a.type || ''));
 
 // Türkiye UTC+3 (yaz saati yok): gün/hafta/ay anahtarları bu saate göre

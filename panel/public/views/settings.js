@@ -90,6 +90,7 @@ export async function settingsView(el) {
           <span><b>İade gelen ürünü stoğa geri ekle</b><br><span class="small muted">İptal edilen siparişler her zaman stoğa geri eklenir.</span></span></label>
         <div class="form-grid">
           <label class="field"><span>Stok sınırı (bu adet ve altı “sınırın altında”)</span><input class="input" inputmode="numeric" data-low value="${st.low_stock}" ${dis}><small>Ürüne özel kritik stok girilmişse o kullanılır.</small></label>
+          <label class="field"><span>Ürünlerin menşei</span><input class="input" data-origin maxlength="40" value="${st.origin || 'Türkiye'}" ${dis}><small>Pazaryerine yüklemede Menşei; ürün kartında ayrıca girilebilir.</small></label>
         </div>
         <div><div class="small" style="font-weight:650;margin-bottom:6px">Stok gönderilecek kanallar</div><div class="row wrap">${live.map((c) => html`<label class="check"><input type="checkbox" data-stockch="${c.id}" ${(st.stock_channels || {})[c.id] === false ? '' : 'checked'} ${dis}> ${chLogo(c.id, true)}${c.name}</label>`)}</div></div>
         <div><div class="small" style="font-weight:650;margin-bottom:6px">Ana katalog</div><div class="row wrap">${live.filter((c) => c.type === 'ikas').map((c) => html`<label class="check"><input type="checkbox" data-catalog="${c.id}" ${(st.catalog_channels || []).includes(c.id) ? 'checked' : ''} ${dis}> ${chLogo(c.id, true)}${c.name}</label>`)}</div>
@@ -363,7 +364,7 @@ export async function settingsView(el) {
       const sender = {}; $$('[data-sender]', el).forEach((i) => { sender[i.dataset.sender] = i.value.trim(); });
       const company = {}; $$('[data-co]', el).forEach((i) => { company[i.dataset.co] = i.value.trim(); });
       const track = {}; ($('[data-track]', el).value || '').split('\n').forEach((l) => { const i = l.indexOf('='); if (i > 0) track[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });
-      await save({ ...cost, sender, company, track_urls: track, label_size: $('[data-labelsize]', el).value, low_stock: numIn($('[data-low]', el).value), cargo_companies: $('[data-cargos]', el).value.split(',').map((x) => x.trim()).filter(Boolean), history_days: numIn($('[data-history]', el).value) });
+      await save({ ...cost, sender, company, track_urls: track, label_size: $('[data-labelsize]', el).value, low_stock: numIn($('[data-low]', el).value), origin: $('[data-origin]', el).value.trim() || 'Türkiye', cargo_companies: $('[data-cargos]', el).value.split(',').map((x) => x.trim()).filter(Boolean), history_days: numIn($('[data-history]', el).value) });
       await loadSummary();
       toast('Ayarlar kaydedildi');
     }),

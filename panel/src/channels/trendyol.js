@@ -1,6 +1,6 @@
 // Trendyol Marketplace API (apigw.trendyol.com/integration).
 // Satıcı paneli → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key, API Secret.
-import { http, basic, num, str, chunk, diagStep, imageList, mediaUrls, rankBrands } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, imageList, mediaUrls, rankBrands, oneAxis } from '../util.js';
 
 const BASE = 'https://apigw.trendyol.com/integration';
 
@@ -187,6 +187,7 @@ export function trendyol(env, meta) {
       image: str(((p.images || v.images || [])[0] || {}).url), images: imageList((v.images || []).length ? v.images : p.images), price: num(price.salePrice ?? v.salePrice), listPrice: num(price.listPrice ?? v.listPrice),
       stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
       brand: str((p.brand && typeof p.brand === 'object' ? p.brand.name : p.brand) || p.brandName), description: str(p.description),
+      url: str(v.productUrl || p.productUrl),
     };
   };
   async function pagedV2(path) {
@@ -200,7 +201,7 @@ export function trendyol(env, meta) {
       if (!(r.content || []).length) break;
       if (r.nextPageToken) token = r.nextPageToken;
       else if ((page + 1) * 100 < 10000 && page + 1 < (r.totalPages || 1)) page++;
-      else break;
+      else { if (page + 1 < (r.totalPages || 1)) rows.partial = true; break; }
     }
     return rows;
   }
@@ -209,7 +210,9 @@ export function trendyol(env, meta) {
       const stock = new Map();
       for (const p of await pagedV2(`/product/sellers/${seller}/products/approved/inventory-and-price`)) for (const v of p.variants || [p]) stock.set(str(v.barcode), num(v.quantity));
       const out = [];
-      for (const p of await pagedV2(`/product/sellers/${seller}/products/approved`)) for (const v of p.variants || []) if (v.barcode) out.push(listingOf(p, v, stock.get(str(v.barcode))));
+      const prods = await pagedV2(`/product/sellers/${seller}/products/approved`);
+      for (const p of prods) for (const v of p.variants || []) if (v.barcode) out.push(listingOf(p, v, stock.get(str(v.barcode))));
+      if (prods.partial) out.partial = true;
       return out;
     } catch (e) {
       if (!/404|405|410|not\s*found/i.test(e.message)) throw e;
@@ -222,8 +225,9 @@ export function trendyol(env, meta) {
         l.active = p.approved !== false && !p.archived;
         out.push(l);
       }
-      if (page + 1 >= (r.totalPages || 1)) break;
+      if (page + 1 >= (r.totalPages || 1)) return out;
     }
+    out.partial = true;
     return out;
   }
 
@@ -461,7 +465,7 @@ export function trendyol(env, meta) {
     for (const a of await rawAttrs(map.remote_id)) {
       const id = attrId(a), v = (map.attrs || {})[id];
       let valueId = v && v.id, text = v && v.value;
-      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
+      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : oneAxis(pr.variant); }
       if (text === '@image') text = pr.image;
       // V2 biçimi: listeden değer → attributeValueIds, serbest metin (izin varsa) → attributeValue
       if (valueId) attrs.push({ attributeId: Number(id), attributeValueIds: [Number(valueId)] });

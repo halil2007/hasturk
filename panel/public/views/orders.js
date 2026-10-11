@@ -2,6 +2,7 @@
 import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel, activeChannels, lateBadge, extNote, isAdmin, confirmBox } from '../core.js';
 import { mountOps, openOrder, bulkLabels } from './orderops.js';
 import { loadSummary, setQuery } from '../app.js';
+import { listingUrl } from '../listingurl.js';
 import { pickSheet } from './picklist.js';
 
 // İlk sekme Yeni (açılışta seçili), Tümü en sonda
@@ -63,8 +64,11 @@ export async function orders(el, rest, query = {}) {
     if (o.status === 'shipped') return html`<button class="btn sm outline" data-act="track" data-id="${o.id}"><i class="ico ico-truck"></i>Takip et</button>`;
     return html`<button class="btn sm outline" data-act="open" data-id="${o.id}"><i class="ico ico-orders"></i>Detay</button>`;
   }
+  // Ürün adına basınca ilanın kanaldaki satış sayfası yeni sekmede açılır (satır açılmaz)
+  const pname = (o, it, cls, st = '') => { const u = it && listingUrl(ch(o.channel).type || o.channel, { ...it, name: it.lname || it.name }); const t = it ? it.name : '—';
+    return u ? html`<a class="${cls} link-plain" style="${st}" href="${u}" target="_blank" rel="noopener" title="Kanalda aç">${t}</a>` : html`<div class="${cls}" style="${st}" title="${t}">${t}</div>`; };
   const products = (o) => html`<div class="row" style="min-width:180px">${thumb(o.items[0] && o.items[0].image, o.items[0] && o.items[0].name, 'sm')}
-    <div style="min-width:0"><div class="ellipsis" style="max-width:200px;font-weight:600" title="${o.items[0] ? o.items[0].name : ''}">${o.items[0] ? o.items[0].name : '—'}</div>
+    <div style="min-width:0">${pname(o, o.items[0], 'ellipsis', 'display:block;max-width:200px;font-weight:600')}
     <div class="muted tiny">${o.lines > 1 ? `+ ${o.lines - 1} ürün daha · ` : ''}${o.qty || 0} adet${o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş</span>` : ''}</div></div></div>`;
   // Durum + uyarılar: gecikme, kanalda yapılan işlem, etiket yazdırma durumu (paket başına)
   const stateCell = (o) => {
@@ -101,7 +105,7 @@ export async function orders(el, rest, query = {}) {
     const from = (data.page - 1) * data.limit;
     // Telefon: kompakt kart; dokununca sipariş tam ekran açılır (işlemler, paketler, etiket orada)
     // Ürün adları tam görünür (satıra sığmazsa alt satıra geçer); en fazla 2 ürün, kalanı "+N ürün daha"
-    const item = (o) => o.items.length ? html`<div class="oc-items">${o.items.map((it) => html`<div class="oc-item">${thumb(it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="oc-name">${it.name}</div>
+    const item = (o) => o.items.length ? html`<div class="oc-items">${o.items.map((it) => html`<div class="oc-item">${thumb(it.image, it.name, 'sm')}<div style="min-width:0;flex:1">${pname(o, it, 'oc-name', 'display:block')}
       <div class="muted tiny">${it.qty || 0} adet${it.sku ? ` · ${it.sku}` : ''}</div></div></div>`)}
       ${o.lines > o.items.length || o.unmatched ? html`<div class="muted tiny" style="padding:0 4px">${o.lines > o.items.length ? `+${o.lines - o.items.length} ürün daha · toplam ${o.qty || 0} adet` : ''}${o.lines > o.items.length && o.unmatched ? ' · ' : ''}${o.unmatched ? html`<span style="color:var(--amber)">eşleşmemiş ürün var</span>` : ''}</div>` : ''}</div>` : '';
     const mainBtn = (o) => (o.status === 'new' ? html`<button class="btn sm primary" data-act="open" data-id="${o.id}"><i class="ico ico-truck"></i>Kargola</button>`

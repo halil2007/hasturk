@@ -3,7 +3,7 @@
 // Kargo: N11 anlaşmalı kargo; durum kargo okutunca kendiliğinden "Shipped" olur (API'de kargoya verme / etiket servisi yok).
 // Ürün yükleme REST (cdn/categories, ms/product/tasks); iade talepleri SOAP (ws/returnService). Hakediş / fatura (finans) servisi yok.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, imageList, DEAD_LINE, rankBrands } from '../util.js';
+import { http, num, str, chunk, imageList, DEAD_LINE, rankBrands, oneAxis } from '../util.js';
 
 const BASE = 'https://api.n11.com';
 const STATUS = { created: 'new', picking: 'processing', unpacked: 'processing', shipped: 'shipped', delivered: 'delivered', cancelled: 'cancelled', unsupplied: 'cancelled', returned: 'returned' };
@@ -89,8 +89,9 @@ export function n11(env, meta) {
         out.push({ remoteId: str(p.stockCode), remoteProductId: str(p.n11ProductId || p.productMainId), sku: str(p.stockCode), barcode: str(p.barcode), name: str(p.title), groupName: str(p.title), variantName: '',
           image: str((p.imageUrls || [])[0] || ((p.images || [])[0] || {}).url), images: imageList(p.imageUrls || p.images), price: num(p.salePrice), listPrice: num(p.listPrice), stock: num(p.quantity), active: p.status !== 'Suspended' });
       }
-      if (r.last || page + 1 >= (r.totalPages || 1)) break;
+      if (r.last || page + 1 >= (r.totalPages || 1)) return out;
     }
+    out.partial = true;
     return out;
   }
 
@@ -193,7 +194,7 @@ export function n11(env, meta) {
       const id = String(a.attributeId), v = (map.attrs || {})[id];
       let valueId = v && v.id, text = v && v.value;
       if (!v && isBrand(a)) { text = pr.brand; if (pr.brandId) valueId = pr.brandId; }
-      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
+      if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : oneAxis(pr.variant); }
       if (text === '@image') text = pr.image;
       // Listede olan değer valueId ile; listede yoksa yalnız serbest değere izin veren (isCustomValue) özellikte customValue ile
       if (!valueId && text) valueId = ((a.attributeValues || []).find((x) => lc(x.value) === lc(text)) || {}).id;

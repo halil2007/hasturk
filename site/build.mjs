@@ -36,7 +36,6 @@ const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js', '
 const menuFeatures = FEATURES.map((f) => `<a class="mi" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><span><b>${esc(f.name)}</b><small>${esc(f.short)}</small></span></a>`).join('');
 // Test aşamasındaki kanalın etiketi (data-beta): panelde "Test yazısını kaldır" denince site.js kaldırır; data-beta-on olanlar o zaman görünür
 const testTag = (x, cls = 'pill soon') => (x.dev ? `<span class="${cls}">Geliştirme aşamasında</span>` : x.beta ? `<span class="${cls}" data-beta="${x.beta}">Test aşamasında</span>` : '');
-const menuIntegrations = INTEGRATIONS.map((x) => `<a class="mi" href="/entegrasyonlar/${x.slug}"><span class="b" style="background:${x.color}">${esc(x.badge)}</span><span><b>${esc(x.name)}</b><small>${esc(x.kind)}${testTag(x, 'tt')}</small></span></a>`).join('');
 const featureCards = FEATURES.map((f) => `<a class="fcard reveal" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><b>${esc(f.name)}</b><span>${esc(f.short)}</span><ul>${f.points.slice(0, 3).map(([, t]) => `<li>${tick}${esc(t)}</li>`).join('')}</ul><em>İncele ${ico('i-arrow')}</em></a>`).join('');
 // ---------- kanal kartları (entegrasyonlar listesi) ----------
 // Kategori: liste sayfasındaki sekmeler (kargo kartları site.js'teki CARGO listesinden gelir)
@@ -46,6 +45,46 @@ const catOf = (x) => (/yurt dışı/.test(x.kind) ? 'yurtdisi' : /market/.test(x
 const lum = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
 const logoTile = (word, color, size = '') => { const k = word.length <= 6 ? 1 : word.length <= 9 ? 0.86 : word.length <= 11 ? 0.76 : 0.68;
   return `<span class="lt${size ? ` lt-${size}` : ''}${lum(color) > 0.62 ? ' fill' : ''}" style="--c:${color};--k:${k};--n:${word.length}" aria-hidden="true"><span>${esc(word)}</span></span>`; };
+// ---------- Entegrasyonlar mega menüsü (masaüstü panel + mobil menüdeki akordeon) ----------
+// Gruplar data.mjs'teki kanallardan sayılır; bağlantılar liste sayfasının sekmelerine (/entegrasyonlar#<CATS[2]>) ya da özellik sayfasına gider.
+const live = (k) => INTEGRATIONS.filter((x) => k(x) && !x.dev);
+const nameList = (list, n) => (list.length > n ? `${list.slice(0, n).map((x) => x.name).join(', ')} ve ${list.length - n} ${list === domestic ? 'pazaryeri daha' : 'kanal daha'}` : list.map((x) => x.name).join(', '));
+const domestic = live((x) => catOf(x) === 'pazaryeri');
+const MM_GROUPS = [
+  ['/entegrasyonlar#pazaryerleri', 'i-store', 'c-blue', 'Pazaryeri entegrasyonu', nameList(domestic, 3)],
+  ['/entegrasyonlar#e-ticaret', 'i-monitor', 'c-purple', 'E-ticaret sitesi entegrasyonu', `${['ikas', 'woocommerce', 'shopify', 'ticimax'].map((s) => live((x) => x.slug === s)[0]).filter(Boolean).map((x) => x.name).join(', ')} ve diğerleri`],
+  ['/entegrasyonlar#hizli-teslimat', 'i-bolt', 'c-pink', 'Hızlı teslimat', live((x) => catOf(x) === 'hizli').map((x) => x.name).join(', ')],
+  ['/entegrasyonlar#yurt-disi', 'i-globe', 'c-teal', 'Yurt dışı pazaryerleri', `${live((x) => catOf(x) === 'yurtdisi').map((x) => x.name).sort((a, b) => a.localeCompare(b, 'tr')).join(', ')}`],
+  ['/ozellikler/kargo-entegrasyonu', 'i-truck', 'c-orange', 'Kargo entegrasyonu', 'Yurtiçi, Aras, PTT ve 4 kargo firması daha'],
+];
+// Popüler: yalnız aktif kanallar (site.js'teki TEST / DEV listelerinde olmayanlar ve data.mjs'te beta / dev işaretsizler); önce tercih sırası, sonra diğer aktifler
+const SITE_JS = readFileSync(join(OUT, 'assets', 'site.js'), 'utf8');
+const jsSet = (name) => new Set(((SITE_JS.match(new RegExp(`\\b${name} = new Set\\(\\[([^\\]]*)\\]`)) || [])[1] || '').match(/[a-z0-9]+/g) || []);
+const NOT_LIVE = new Set([...jsSet('TEST'), ...jsSet('DEV')]);
+const activeCh = INTEGRATIONS.filter((x) => !x.beta && !x.dev && !NOT_LIVE.has(x.slug));
+const MM_POPULAR = [...new Set([...['trendyol', 'hepsiburada', 'n11', 'ikas', 'idefix', 'pazarama'].map((s) => activeCh.find((x) => x.slug === s)).filter(Boolean), ...activeCh])].slice(0, 6);
+// Öne çıkan kart görseli: ortadaki "Yeni ürün" kartından panelden ürün yüklenebilen kanallara giden çizgiler (urun-yonetimi notuyla aynı 4 kanal)
+const MM_ART = `<svg class="mm-art" viewBox="0 0 280 132" role="img" aria-label="Yeni ürün Trendyol, Hepsiburada, N11 ve idefix'e gönderiliyor">
+  <g fill="none" stroke="#9db8ff" stroke-width="1.6" stroke-dasharray="3 4" stroke-linecap="round"><path d="M94 66C72 66 70 26 58 26"/><path d="M94 66C72 66 70 106 58 106"/><path d="M186 66c22 0 24-40 36-40"/><path d="M186 66c22 0 24 40 36 40"/></g>
+  <g font-family="inherit" font-weight="800" font-size="12.5" text-anchor="middle" letter-spacing="-.3">
+    <rect x="4" y="12" width="70" height="28" rx="14" fill="#fff" stroke="#e3e9f3"/><text x="39" y="30.5" fill="#f27a1a">trendyol</text>
+    <rect x="4" y="92" width="70" height="28" rx="14" fill="#fff" stroke="#e3e9f3"/><text x="39" y="110.5" fill="#7b3fe4">n11</text>
+    <rect x="206" y="12" width="70" height="28" rx="14" fill="#fff" stroke="#e3e9f3"/><text x="241" y="30.5" fill="#ff6000" font-size="10.5">hepsiburada</text>
+    <rect x="206" y="92" width="70" height="28" rx="14" fill="#fff" stroke="#e3e9f3"/><text x="241" y="110.5" fill="#1d4ed8" font-style="italic">idefix</text>
+  </g>
+  <rect x="94" y="48" width="92" height="36" rx="18" fill="#1f6bff"/><circle cx="113" cy="66" r="10" fill="#fff" fill-opacity=".22"/>
+  <path d="M109 63.5 113 61l4 2.5v5l-4 2.5-4-2.5zM109 63.5l4 2.5 4-2.5M113 66v5" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>
+  <text x="128" y="70.5" fill="#fff" font-family="inherit" font-weight="700" font-size="12">Yeni ürün</text>
+</svg>`;
+const menuIntegrations = `<div class="dd-p mm" id="mm-int" data-mm-panel><div class="mm-box">
+  <div class="mm-body">
+    <div class="mm-col mm-groups"><div class="mm-h">Entegrasyon çözümleri</div>${MM_GROUPS.map(([href, icon, color, t, sub]) => `<a class="mi" href="${href}"><span class="ic ${color}">${ico(icon)}</span><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></a>`).join('')}</div>
+    <div class="mm-col mm-pop"><div class="mm-h">Popüler</div><div class="mm-tiles">${MM_POPULAR.map((x) => `<a class="mm-tile" href="/entegrasyonlar/${x.slug}">${logoTile(x.word, x.color, 'sm')}<span><b>${esc(x.name)}</b><small>Entegrasyonu</small></span></a>`).join('')}</div></div>
+    <a class="mm-feat" href="/ozellikler/urun-yonetimi"><span class="mm-kick">Öne çıkan</span><span class="mm-vis">${MM_ART}</span><b>Tek tuşla yayınla</b><span class="mm-d">Ürünü bir kez girin; Trendyol, Hepsiburada, N11 ve idefix'e tek tuşla gönderin.</span><em>Ürün yönetimini inceleyin ${ico('i-arrow')}</em></a>
+  </div>
+  <div class="mega-foot mm-foot"><a href="/entegrasyonlar">Tüm entegrasyonlar ${ico('i-arrow')}</a><a href="/iletisim?konu=kanal"><span>Aradığınız yok mu?</span> Kanal talep edin ${ico('i-arrow')}</a><a href="/ozellikler/kargo-entegrasyonu">Kargo firmaları ${ico('i-arrow')}</a></div>
+</div></div>`;
+const mnavIntegrations = MM_GROUPS.map(([href, , , t, sub]) => `<a class="m-gi" href="${href}">${esc(t)}<small>${esc(sub)}</small></a>`).join('') + '<a class="m-gi m-req" href="/iletisim?konu=kanal">Aradığınız yok mu? Kanal talep edin</a>';
 // Durum etiketi: Aktif / Test aşamasında (panelde test bitince site.js "Aktif"e çevirir) / Geliştirme aşamasında (henüz bağlanamaz)
 const statusTag = (x) => (x.dev ? '<span class="st dev">Geliştirme aşamasında</span>'
   : x.beta ? `<span class="st test" data-beta="${x.beta}">Test aşamasında</span><span class="st ok" data-beta-on="${x.beta}" hidden>Aktif</span>` : '<span class="st ok">Aktif</span>');
@@ -69,7 +108,6 @@ const featureTabs = () => { const list = TAB_FEATURES.map((s) => fById[s]); retu
   </div>`).join('')}</div>
 </div>`; };
 const mnavFeatures = FEATURES.map((f) => `<a href="/ozellikler/${f.slug}">${esc(f.name)}</a>`).join('');
-const mnavIntegrations = INTEGRATIONS.map((x) => `<a href="/entegrasyonlar/${x.slug}">${esc(x.name)}${testTag(x, 'tt')}</a>`).join('');
 
 // ---------- ortak parçalar ----------
 const browser = (img, alt) => `<div class="browser"><div class="bar"><i></i><i></i><i></i><span>panel.hasturkcrm.com</span></div><img src="/img/${img}.jpg" width="1440" height="900" alt="${esc(alt)}"></div>`;

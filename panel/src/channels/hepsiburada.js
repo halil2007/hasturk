@@ -3,7 +3,7 @@
 // Önemli: User-Agent başlığı Merchant Portal'da tanımlı entegratör adıyla BİREBİR aynı olmalı (ör. "hasturk_dev");
 // "merchantId - uygulama" biçimi 401/403 ile reddedilir.
 //   Siparişler/paketler: oms-external · İlan/stok/fiyat/buybox: listing-external · Müşteri soruları: api-asktoseller-merchant
-import { http, basic, num, str, chunk, diagStep, isImageAttr, imageList, mediaUrls } from '../util.js';
+import { http, basic, num, str, chunk, diagStep, isImageAttr, imageList, mediaUrls, oneAxis } from '../util.js';
 
 // Tarih: saat dilimi yazılmamışsa (ör. "2021-02-02T11:09:39", "2026-10-01 10:00") Türkiye saati (+03:00); geçersizse 0
 export function hbTime(v) {
@@ -243,6 +243,7 @@ export function hepsiburada(env, meta) {
         });
       }
       if (rows.length < 1000) break;
+      if (offset + 1000 >= 100000) out.partial = true;
     }
     // İlan servisi ürün adı / barkod / görsel vermez: kataloğa alınmış ürünlerin bilgisi merchantSku ile katalog servisinden eklenir
     // (eşleştirme barkodla da yapılabilsin, Eşleştirme sayfasında ürün adı görünsün). Servis cevap vermezse ilanlar olduğu gibi kalır.
@@ -631,7 +632,7 @@ export function hepsiburada(env, meta) {
       if (AUTO.includes(at.id)) continue;
       const v = (map.attrs || {})[at.id];
       let val = v && (v.value ?? '');
-      if (val === '@variant') { const hit = /enum|list|select/i.test(at.type) ? await pick(at, pr.variant) : null; val = hit ? hit.value : pr.variant; }
+      if (val === '@variant') { const hit = /enum|list|select/i.test(at.type) ? await pick(at, pr.variant) : null; val = hit ? hit.value : oneAxis(pr.variant); }
       // Görsel özellikleri (ör. "Paket Görseli (ön)"): ürün görselinden; "arka" için varsa ikinci görsel
       if (val === '@image' || (!val && isImageAttr(at))) val = imageFor(at, pr);
       if (val) a[at.id] = String(val);

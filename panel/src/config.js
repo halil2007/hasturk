@@ -196,6 +196,17 @@ Object.assign(FIELDS, {
 // /api/public/channels'tan okur.
 // Geliştirme aşamasındaki kanallar: listede görünür, bağlanamaz (API belgesi doğrulanana kadar)
 export const DEV_TYPES = ['boyner', 'pasaj', 'getir'];
+// Yurt dışı pazaryerleri (Kurumsal pakette): eBay, Etsy, Ozon; Amazon yalnız Türkiye dışı pazar yeri seçildiyse (Amazon.com.tr yurt içidir)
+export const INTL_TYPES = ['ebay', 'etsy', 'ozon'];
+const AMAZON_TR = 'A33AVAJ2PDY3EV';
+export const isIntl = (type, values = {}) => {
+  if (INTL_TYPES.includes(type)) return true;
+  if (type !== 'amazon') return false;
+  // Ek mağazada alan adları önekli olabilir (AMAZON2_MARKETPLACE_ID …): sonu eşleşen alan okunur
+  const pick = (suffix) => { const k = Object.keys(values || {}).find((x) => x.endsWith(suffix)); return k ? String(values[k] || '').trim() : ''; };
+  const mp = pick('_MARKETPLACE_ID'), rg = pick('_REGION');
+  return (!!mp && mp !== AMAZON_TR) || (!!rg && rg !== 'eu');
+};
 export const BETA_TYPES = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'opencart', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon', 'ticimax', 'ideasoft', 'tsoft'];
 export async function releasedTypes(env, db) {
   if (env && env.TENANT_SLUG) return String(env.RELEASED_TYPES || '').split(',').filter((t) => BETA_TYPES.includes(t));
