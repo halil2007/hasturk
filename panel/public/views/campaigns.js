@@ -1,19 +1,22 @@
-// Kampanyalar: (1) Fiyat önerileri — pazaryerinin rakip (buybox) fiyatlarından birinciliği alma / kâr artırma önerileri (bkz. suggest.js);
+// Kampanyalar: (0) Avantajlı etiketler — Trendyol yıldız / avantajlı ürün etiketi, Hepsiburada flaş indirim Excel'i: yükle, kârı gör,
+// seç, Excel'i pazaryerinin düzeninde geri indir (bkz. promos.js); (1) Fiyat önerileri — pazaryerinin rakip (buybox) fiyatlarından birinciliği alma / kâr artırma önerileri (bkz. suggest.js);
 // (2) Hepsiburada satıcı sepet indirimleri (yüzde, TL, X al Y öde) panelden listelenir, oluşturulur ve iptal edilir.
 import { api, html, render, $, $$, n, money0, date, ch, chLogo, actions, busy, toast, sheet, confirmBox, activeChannels } from '../core.js';
 import { suggestView } from './suggest.js';
+import { promosView } from './promos.js';
 
 export const campaignChannels = () => activeChannels().filter((c) => (c.enabled || c.demo) && c.campaigns);
 const KIND = [['percent', 'Sepette % indirim'], ['tl', 'Sepette TL indirim'], ['xy', 'X al Y öde']];
 const dayIn = (d) => { const x = new Date(Date.now() + 3 * 3600e3 + d * 864e5); return x.toISOString().slice(0, 16); };
 
 export async function campaignsView(el) {
-  let tab = 'suggest', cur = null;
-  try { tab = sessionStorage.getItem('camp_tab') === 'basket' ? 'basket' : 'suggest'; } catch { /* yok */ }
+  const VIEWS = { promos: promosView, suggest: suggestView, basket: basketView };
+  let tab = 'promos', cur = null;
+  try { const t = sessionStorage.getItem('camp_tab'); if (VIEWS[t]) tab = t; } catch { /* yok */ }
   async function show() {
-    render(el, html`<div class="stack"><div class="tabs" data-ctabs>${[['suggest', 'Fiyat önerileri'], ['basket', 'Sepet indirimleri']].map(([k, t]) => html`<button class="tab ${tab === k ? 'on' : ''}" data-t="${k}">${t}</button>`)}</div><div data-pane></div></div>`);
+    render(el, html`<div class="stack"><div class="tabs" data-ctabs>${[['promos', 'Avantajlı etiketler (Excel)'], ['suggest', 'Fiyat önerileri'], ['basket', 'Sepet indirimleri']].map(([k, t]) => html`<button class="tab ${tab === k ? 'on' : ''}" data-t="${k}">${t}</button>`)}</div><div data-pane></div></div>`);
     $$('[data-t]', el).forEach((b) => { b.onclick = () => { tab = b.dataset.t; try { sessionStorage.setItem('camp_tab', tab); } catch { /* yok */ } show(); }; });
-    cur = await (tab === 'basket' ? basketView : suggestView)($('[data-pane]', el));
+    cur = await VIEWS[tab]($('[data-pane]', el));
   }
   await show();
   return { refresh: () => cur && cur.refresh && cur.refresh() };

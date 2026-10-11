@@ -29,6 +29,7 @@ import { costRaw, COST_KEYS } from '../public/profit.js';
 import { explainError, errorKey } from '../public/listerr.js';
 import { normCat } from '../public/catpath.js';
 import { listSuggestions, applySuggestions } from './suggest.js';
+import { listOffers, importOffers, chooseOffers, applyOffers, clearOffers, offerFile, demoSample, seedDemoOffers } from './promos.js';
 import { recordError, errorsApi, clientReport } from './errors.js';
 import { perfReport } from './perf.js';
 import { mainKeysApi } from './extapi.js';
@@ -1626,6 +1627,22 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (r.applied) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
     return json(r);
   }
+  // Avantajlı etiketler: Excel'den yüklenen Trendyol yıldız eşikleri / Hepsiburada flaş indirim davetleri; seçilen fiyatlarla Excel geri
+  // indirilir (tarayıcıda yazılır) ya da isteğe bağlı kanala gönderilir (bkz. promos.js). Demo panelinde örnek listeler hazır gelir.
+  if (path === 'promos' && m === 'GET') {
+    if (env.DEMO === '1') await seedDemoOffers(db).catch(() => 0);
+    return json(await listOffers(db, { channel: str(q.channel), kind: str(q.kind) }));
+  }
+  if (path === 'promos/file' && m === 'GET') return json(await offerFile(db, { channel: q.channel, kind: q.kind }));
+  if (path === 'promos/sample' && m === 'GET') { if (env.DEMO !== '1') fail(404, 'Bulunamadı'); return json(await demoSample(db, str(q.channel))); }
+  if (path === 'promos/import' && m === 'POST') { const b = await body(req); return json(await importOffers(db, { ...b, demo: false, user: user.name })); }
+  if (path === 'promos/choose' && m === 'POST') return json(await chooseOffers(db, await body(req)));
+  if (path === 'promos/apply' && m === 'POST') {
+    const b = await body(req), r = await applyOffers(db, { ...b, user: user.name });
+    if (r.applied) ctx.waitUntil(pushPrices(env, db).catch(() => {}));
+    return json(r);
+  }
+  if (path === 'promos/clear' && m === 'POST') return json(await clearOffers(db, await body(req)));
   // İade talepleri
   if (path === 'claims' && m === 'GET') return json(await listClaims(db, { ...q, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'claims/sync' && m === 'POST') return json(await syncClaims(env, db));
