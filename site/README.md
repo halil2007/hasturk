@@ -40,6 +40,13 @@ Derleme ayrıca:
 - `site.css`, `site.js`, `config.js` adreslerine içerik özeti ekler (`?v=…`). Bu dosyalar tarayıcıda uzun süre saklanır (`public/_headers`);
   değiştirdikten sonra **mutlaka derleyin**, yoksa ziyaretçiler eski sürümü görmeye devam eder (`config.js` en geç 10 dakikada yenilenir).
 - Sayfanın ilk büyük görselini öncelikli, diğerlerini ekrana yaklaşınca yükler.
+- `public/llms.txt`'in ve `src/blog-shell.mjs` → `LLMS`'in sabit kısmını (ürün, özellikler, entegrasyonlar, araçlar, fiyatlar) üretir.
+
+Blog (`src/worker.js`): `/blog`, `/blog/<adres>`, `/blog/rss.xml`, `/blog/sitemap.xml`, `/llms.txt`, `/llms-full.txt` panelden tek istekle çizilir ve
+Cloudflare önbelleğinde tutulur (liste 2 dk, yazı 10 dk, 404 1 dk; süresi geçen sayfa beklemeden sunulup arka planda yenilenir, panel açılmazsa eski kopya sunulur).
+İleri tarihli yazı yayın saatine kadar 404'tür ve site haritasında / RSS'te / llms.txt'de yer almaz. Deneme: `cd site && node --test` (~250 yazılı sahte panel).
+IndexNow (Bing / Yandex'e anında bildirim): Worker → Settings → Variables and Secrets → `INDEXNOW_KEY` (8–128 harf / rakam) girilince 15 dakikada bir
+yeni yayına giren yazılar bildirilir; girilmezse kapalıdır.
 
 Online satış: `/satin-al` sayfası (paket kartlarındaki "Hemen satın al") formu panele (`checkoutUrl`) gönderir, ödeme iyzico sayfasında alınır, sonuç sayfası panelde gösterilir. Fiyatı değiştirirseniz `public/assets/config.js` ile birlikte `panel/src/plans.js`'i de güncelleyin (tahsil edilen tutar panelden alınır). iyzico başvurusu için gereken yasal sayfalar hazır: `/mesafeli-satis-sozlesmesi`, `/on-bilgilendirme`, `/iptal-iade` (şirket bilgileri config.js'den dolar; yayından önce bir hukukçuya kontrol ettirin).
 

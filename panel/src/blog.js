@@ -207,22 +207,35 @@ export async function blogPublic(req, env, path) {
       const ids = imageIds(p.body);
       const dims = new Map((ids.length ? await all(db, `SELECT id, w, h FROM blog_images WHERE id IN (${ids.map(() => '?').join(',')})`, ...ids) : []).map((r) => [r.id, r]));
       const html = mdToHtml(p.body, { site, image: (id) => { const d = dims.get(id); return d ? { src: `${base}/api/public/blog/img/${id}`, w: d.w, h: d.h } : null; } });
-      const more = await all(db, `SELECT ${SHORT} ${FROM} WHERE ${live('p.')} AND p.id != ? ORDER BY p.published_at DESC LIMIT 3`, now, p.id);
-      return json({ post: { ...card(p, base), html, text: mdText(p.body).slice(0, 300), minutes: readMinutes(p.body), seo_title: p.seo_title || '', seo_desc: p.seo_desc || '', created_at: p.created_at },
+      // İlgili yazılar: ortak etiketi çok olan, yayın tarihi bu yazıya yakın olanlar önce (eski yazılar da yenilerden bağlantı alır; tek sorgu)
+      const tg = tagsOf(p.tags).slice(0, 8), score = tg.length ? `(SELECT COUNT(*) FROM json_each(p.tags) j WHERE lower(j.value) IN (${tg.map(() => 'lower(?)').join(',')}))` : '0';
+      const more = await all(db, `SELECT ${SHORT}, ${score} AS sc ${FROM} WHERE ${live('p.')} AND p.id != ? ORDER BY sc DESC, abs(p.published_at - ?) LIMIT 3`, ...tg, now, p.id, p.published_at);
+      const text = mdText(p.body);
+      return json({ post: { ...card(p, base), html, text: text.slice(0, 300), minutes: readMinutes(p.body), words: text.split(' ').filter(Boolean).length, seo_title: p.seo_title || '', seo_desc: p.seo_desc || '', created_at: p.created_at },
         more: more.map((r) => card(r, base)), site }, 200, { ...h, 'Cache-Control': CACHE });
     }
     // RSS akışı ve site haritası parçası (bağlantılar tanıtım sitesine gider)
     if (path === 'public/blog/rss') {
-      const rows = await all(db, `SELECT ${SHORT} ${FROM} WHERE ${live('p.')} ORDER BY p.published_at DESC LIMIT 20`, now);
+      const rows = await all(db, `SELECT ${SHORT} ${FROM} WHERE ${live('p.')} ORDER BY p.published_at DESC LIMIT 30`, now);
       const items = rows.map((p) => { const c = card(p, base), link = `${site}/blog/${p.slug}`; return `<item><title>${xml(p.title)}</title><link>${link}</link><guid isPermaLink="true">${link}</guid><pubDate>${new Date(p.published_at).toUTCString()}</pubDate>${c.tags.map((t) => `<category>${xml(t)}</category>`).join('')}<description>${xml(c.summary)}</description>${c.cover ? `<enclosure url="${xml(`${site}/blog/img/${p.cover_id}`)}" type="${xml(p.ct)}" length="${p.cs || 0}"/>` : ''}</item>`; });
       return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Hastürk CRM Blog</title><link>${site}/blog</link><atom:link href="${site}/blog/rss.xml" rel="self" type="application/rss+xml"/><description>Pazaryeri satışı, kargo, stok ve kârlılık üzerine rehberler</description><language>tr-TR</language>${rows[0] ? `<lastBuildDate>${new Date(Math.max(...rows.map((r) => r.updated_at || r.published_at))).toUTCString()}</lastBuildDate>` : ''}\n${items.join('\n')}\n</channel></rss>\n`,
         { headers: { ...h, 'Content-Type': 'application/rss+xml; charset=utf-8', 'Cache-Control': CACHE } });
     }
+    // Site haritası: yalnız yayındaki yazılar (ileri tarihliler o güne kadar yok); son değişiklik tarihi ve kapak görseli (Google Görseller)
     if (path === 'public/blog/sitemap') {
-      const rows = await all(db, `SELECT slug, published_at, updated_at FROM blog_posts WHERE ${live()} ORDER BY published_at DESC LIMIT 5000`, now);
-      const day = (ms) => new Date(ms).toISOString().slice(0, 10), last = rows.reduce((a, r) => Math.max(a, r.updated_at || 0, r.published_at || 0), 0);
-      const urls = [`  <url><loc>${site}/blog</loc>${last ? `<lastmod>${day(last)}</lastmod>` : ''}</url>`, ...rows.map((r) => `  <url><loc>${site}/blog/${r.slug}</loc><lastmod>${day(Math.max(r.updated_at || 0, r.published_at || 0))}</lastmod></url>`)];
-      return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`, { headers: { ...h, 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': CACHE } });
+      const rows = await all(db, `SELECT slug, title, published_at, updated_at, cover_id FROM blog_posts WHERE ${live()} ORDER BY published_at DESC LIMIT 5000`, now);
+      const iso = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z'), mod = (r) => Math.max(r.updated_at || 0, r.published_at || 0), last = rows.reduce((a, r) => Math.max(a, mod(r)), 0);
+      const urls = [`  <url><loc>${site}/blog</loc>${last ? `<lastmod>${iso(last)}</lastmod>` : ''}</url>`, ...rows.map((r) => `  <url><loc>${site}/blog/${r.slug}</loc><lastmod>${iso(mod(r))}</lastmod>${r.cover_id ? `<image:image><image:loc>${site}/blog/img/${r.cover_id}</image:loc></image:image>` : ''}</url>`)];
+      return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urls.join('\n')}\n</urlset>\n`, { headers: { ...h, 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': CACHE } });
+    }
+    // Kısa dizin (gövdesiz): tanıtım sitesinin llms.txt / llms-full.txt dosyaları ve IndexNow bildirimi için tüm yayındaki yazılar tek istekte.
+    // ?since=<ms>: yalnız bu andan sonra yayımlanan ya da değiştirilen yazılar (IndexNow)
+    if (path === 'public/blog/index') {
+      const since = Math.max(0, Number(q.since) || 0);
+      const rows = await all(db, `SELECT slug, title, summary, tags, published_at, updated_at, CASE WHEN summary IS NULL OR summary = '' THEN substr(body, 1, 600) END AS body FROM blog_posts
+        WHERE ${live()}${since ? ' AND max(published_at, COALESCE(updated_at, 0)) > ?' : ''} ORDER BY published_at DESC LIMIT 5000`, now, ...(since ? [since] : []));
+      return json({ posts: rows.map((p) => ({ slug: p.slug, title: p.title, summary: (p.summary || mdText(p.body || '')).slice(0, 220), tags: tagsOf(p.tags), published_at: p.published_at, updated_at: p.updated_at })), total: rows.length, site },
+        200, { ...h, 'Cache-Control': CACHE });
     }
     return json({ error: 'Bulunamadı' }, 404, h);
   } catch (e) {

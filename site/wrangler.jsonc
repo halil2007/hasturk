@@ -1,7 +1,9 @@
 // Tanıtım sitesi (hasturkcrm.com): statik dosyalar + blog sayfaları (src/worker.js; yazılar panelden okunur).
 // Cloudflare: Workers & Pages → Create → Import a repository → hasturk → "Root directory" (Kök dizin): site
 // Alan adı: Worker → Settings → Domains & Routes → Custom domain: hasturkcrm.com (ve www.hasturkcrm.com)
-// Blog yalnız /blog adreslerinde kod çalıştırır; diğer tüm adresler doğrudan statik dosyadır (run_worker_first).
+// Kod yalnız /blog adreslerinde ve /llms.txt, /llms-full.txt'de çalışır; diğer tüm adresler doğrudan statik dosyadır (run_worker_first).
+// Zamanlayıcı (triggers.crons): 15 dakikada bir yeni yayına giren blog yazılarını IndexNow ile Bing / Yandex'e bildirir. Worker değişkeni
+// INDEXNOW_KEY girilmediyse hiçbir şey yapmaz (panel de sorgulanmaz); kurulum için src/worker.js → IndexNow açıklamasına bakın.
 {
   "name": "hasturk-site",
   "main": "src/worker.js",
@@ -11,6 +13,7 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/blog", "/blog/*"]
-  }
+    "run_worker_first": ["/blog", "/blog/*", "/llms.txt", "/llms-full.txt"]
+  },
+  "triggers": { "crons": ["*/15 * * * *"] }
 }
