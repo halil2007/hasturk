@@ -593,34 +593,77 @@ export function trendyol(env, meta) {
   }
 
   // ---------- hakediş (cari hesap ekstresi: settlements) ----------
-  // Satış, iade, indirim, kupon ve komisyon düzeltmeleri; her kaydın satıcı hakedişi (sellerRevenue) ve ödeme tarihi.
-  // Önce tüm türler tek istekte (transactionTypes) denenir; servis kabul etmezse tür tür okunur. En fazla 15 günlük aralık.
-  const ST_TYPES = { Sale: 'Satış', Return: 'İade', Discount: 'İndirim', DiscountCancel: 'İndirim iptali', Coupon: 'Kupon', CouponCancel: 'Kupon iptali', SellerRevenuePositive: 'Hakediş düzeltme (+)', SellerRevenueNegative: 'Hakediş düzeltme (−)',
-    CommissionPositive: 'Komisyon düzeltme (+)', CommissionNegative: 'Komisyon düzeltme (−)', ManualRefund: 'Manuel iade', ProvisionPositive: 'Provizyon (+)', ProvisionNegative: 'Provizyon (−)', DeliveryFee: 'Teslimat bedeli',
-    // İptal kayıtları (iade / iptal sonrası ters kayıt): okunmazsa düzeltme ve teslimat bedelleri iki kez sayılır
-    ManualRefundCancel: 'Manuel iade iptali', DeliveryFeeCancel: 'Teslimat bedeli iptali', SellerRevenuePositiveCancel: 'Hakediş düzeltme (+) iptali', SellerRevenueNegativeCancel: 'Hakediş düzeltme (−) iptali',
-    CommissionPositiveCancel: 'Komisyon düzeltme (+) iptali', CommissionNegativeCancel: 'Komisyon düzeltme (−) iptali' };
+  // Satış, iade, indirim, kupon, provizyon ve hakediş / komisyon düzeltmeleri; her kaydın satıcı hakedişi (sellerRevenue) ve ödeme tarihi.
+  // Belge (Cari Hesap Ekstresi v2): en fazla 15 günlük aralık; transactionTypes ile birden çok tür tek istekte okunur; yanıttaki
+  // transactionType Türkçedir ("Satış"), bu yüzden tür hem İngilizce anahtardan hem Türkçe addan tanınır.
+  // İşaret belgedeki tabloya göre türden gelir (tutar alanları işaretsiz gelebilir). Komisyon düzeltme kayıtlarının hakedişe etkisi
+  // eşi olan "Hakediş düzeltme" kaydındadır (CommissionPositive ↔ SellerRevenueNegative): komisyon düzeltmesinin tutarı 0 sayılır,
+  // yoksa aynı düzeltme iki kez düşer. TY indirim / kupon: Trendyol'un karşıladığı tutar (ay sonu faturayla satıcıya ödenir).
+  // [etiket, hakediş işareti (+1 / −1 / 0), komisyon işareti (kesilen komisyon +)]
+  const ST = {
+    Sale: ['Satış', 1, 1], Return: ['İade', -1, -1], Discount: ['İndirim', -1, -1], DiscountCancel: ['İndirim iptali', 1, 1], Coupon: ['Kupon', -1, -1], CouponCancel: ['Kupon iptali', 1, 1],
+    ProvisionPositive: ['Provizyon (+)', 1, 1], ProvisionNegative: ['Provizyon (−)', -1, -1], ManualRefund: ['Manuel iade', -1, -1], ManualRefundCancel: ['Manuel iade iptali', 1, 1],
+    TYDiscount: ['Trendyol indirimi', -1, -1], TYDiscountCancel: ['Trendyol indirimi iptali', 1, 1], TYCoupon: ['Trendyol kuponu', -1, -1], TYCouponCancel: ['Trendyol kuponu iptali', 1, 1],
+    SellerRevenuePositive: ['Hakediş düzeltme (+)', 1, 0], SellerRevenueNegative: ['Hakediş düzeltme (−)', -1, 0], SellerRevenuePositiveCancel: ['Hakediş düzeltme (+) iptali', -1, 0], SellerRevenueNegativeCancel: ['Hakediş düzeltme (−) iptali', 1, 0],
+    CommissionPositive: ['Komisyon düzeltme (+)', 0, 1], CommissionNegative: ['Komisyon düzeltme (−)', 0, -1], CommissionPositiveCancel: ['Komisyon düzeltme (+) iptali', 0, -1], CommissionNegativeCancel: ['Komisyon düzeltme (−) iptali', 0, 1],
+    // Belgede yok, eski sürümden: gelirse tanınsın (kargo ile ilgili; mutabakata girmez)
+    DeliveryFee: ['Teslimat bedeli', -1, 0], DeliveryFeeCancel: ['Teslimat bedeli iptali', 1, 0],
+  };
+  // Tek istekte okunan türler (belgedeki liste). Manuel iadenin adı belgede iki türlü yazılmış (ManuelRefund / ManualRefund): ayrı okunur.
+  const ST_JOINT = Object.keys(ST).filter((k) => !/^(ManualRefund$|DeliveryFee)/.test(k)), ST_SOLO = ['ManualRefund', 'ManuelRefund'];
+  // Yanıttaki Türkçe / İngilizce tür adı → anahtar (tanınmazsa null: "Diğer" yazılır, günlüğe düşer)
+  const trKey = (v) => String(v || '').toLocaleLowerCase('tr').replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c');
+  function stKind(raw) {
+    const s0 = str(raw).trim();
+    if (ST[s0]) return s0;
+    if (/^manuelrefund$/i.test(s0)) return 'ManualRefund';
+    const t = trKey(s0), k = t.replace(/[^a-z0-9+\-−]/g, ''), cancel = /iptal|cancel/.test(k) ? 'Cancel' : '';
+    const pos = /\+|pozitif|positive|arti/.test(k), neg = /−|-|negatif|negative|eksi/.test(k);
+    const pn = pos && !neg ? 'Positive' : neg && !pos ? 'Negative' : '';
+    if (/^satis$|^sale$/.test(k)) return 'Sale';
+    if (/^iade$|^return$/.test(k)) return 'Return';
+    if (/manuel|manual|kismiiade/.test(k)) return 'ManualRefund' + cancel;
+    if (/^ty|trendyol/.test(k) && /indirim|discount/.test(k)) return 'TYDiscount' + cancel;
+    if (/^ty|trendyol/.test(k) && /kupon|coupon/.test(k)) return 'TYCoupon' + cancel;
+    if (/indirim|discount/.test(k)) return 'Discount' + cancel;
+    if (/kupon|coupon/.test(k)) return 'Coupon' + cancel;
+    if (/provizyon|provision/.test(k) && pn) return 'Provision' + pn;
+    if (/hakedis|sellerrevenue/.test(k) && pn) return 'SellerRevenue' + pn + cancel;
+    if (/komisyon|commission/.test(k) && pn) return 'Commission' + pn + cancel;
+    if (/teslimat|delivery/.test(k)) return 'DeliveryFee' + cancel;
+    return null;
+  }
   async function settlements(since, until) {
-    const W = 14 * 864e5, out = [];
-    const row = (x) => {
-      const sign = num(x.debt) > 0 && !num(x.credit) ? -1 : 1, rev = Math.abs(num(x.sellerRevenue ?? (num(x.credit) - num(x.debt))));
-      return { remoteId: String(x.id), date: num(x.transactionDate), type: ST_TYPES[x.transactionType] || str(x.transactionType), orderNumber: str(x.orderNumber), amount: Math.round(sign * rev * 100) / 100,
-        commission: Math.round(sign * Math.abs(num(x.commissionAmount)) * 100) / 100, paymentDate: num(x.paymentDate) || null, dueDate: num(x.paymentDate) || null, paid: !!x.paymentOrderId, paymentId: str(x.paymentOrderId) };
+    const W = 14 * 864e5, out = new Map();
+    const row = (x, asked) => {
+      const kind = asked || stKind(x.transactionType) || stKind(x.description), def = kind && ST[kind];
+      const credit = num(x.credit), debt = num(x.debt), com = Math.abs(num(x.commissionAmount));
+      // Hakediş tutarı: sellerRevenue; yoksa |alacak − borç| − komisyon
+      const rev = x.sellerRevenue != null && x.sellerRevenue !== '' ? Math.abs(num(x.sellerRevenue)) : Math.max(0, Math.abs(credit - debt) - com);
+      // Tanınmayan tür: borç kaydı eksi, alacak kaydı artı
+      const sign = def ? def[1] : debt > 0 && !credit ? -1 : 1, csign = def ? def[2] : sign;
+      return { remoteId: String(x.id), date: num(x.transactionDate) || null, type: def ? def[0] : 'Diğer', rawType: str(x.transactionType || x.description), unknown: !def, orderNumber: str(x.orderNumber).trim(),
+        amount: Math.round(sign * rev * 100) / 100, commission: Math.round(csign * com * 100) / 100, paymentDate: num(x.paymentDate) || null, dueDate: num(x.paymentDate) || null, paid: !!x.paymentOrderId, paymentId: str(x.paymentOrderId) };
     };
-    const read = async (q, from, to) => {
-      for (let page = 0; page < 40; page++) {
+    const read = async (q, from, to, asked) => {
+      for (let page = 0; page < 100; page++) {
         const r = await call(`/finance/che/sellers/${seller}/settlements?${q}&startDate=${from}&endDate=${to}&page=${page}&size=1000`);
-        out.push(...(r.content || []).map(row));
-        if (page + 1 >= (r.totalPages || 1)) break;
+        for (const x of (r && r.content) || []) if (x && x.id != null) out.set(String(x.id), row(x, asked));
+        if (page + 1 >= (num(r && r.totalPages) || 1)) break;
       }
     };
+    // Tek tür okuması: servis türü tanımıyorsa (400 / 422) atlanır, diğer türler okunmaya devam eder
+    const solo = async (t, from, to) => { try { await read(`transactionType=${t}`, from, to, t === 'ManuelRefund' ? 'ManualRefund' : t); } catch (e) { if (e.budget || !/HTTP (400|422)\b/.test(e.message)) throw e; } };
     let joint = true;
     for (let from = since; from < until; from += W) {
       const to = Math.min(until, from + W);
-      if (joint) { try { await read(`transactionTypes=${Object.keys(ST_TYPES).join(',')}`, from, to); continue; } catch (e) { if (!/HTTP (400|422|500)/.test(e.message)) throw e; joint = false; } }
-      for (const t of Object.keys(ST_TYPES)) await read(`transactionType=${t}`, from, to);
+      if (joint) {
+        try { await read(`transactionTypes=${ST_JOINT.join(',')}`, from, to); } catch (e) { if (e.budget || !/HTTP (400|422|500)\b/.test(e.message)) throw e; joint = false; }
+      }
+      if (!joint) for (const t of ST_JOINT) await solo(t, from, to);
+      for (const t of ST_SOLO) await solo(t, from, to);
     }
-    return [...new Map(out.map((x) => [x.remoteId, x])).values()];
+    return [...out.values()];
   }
 
   // ---------- kesilen faturalar / kesintiler (cari hesap ekstresi: otherfinancials) ----------

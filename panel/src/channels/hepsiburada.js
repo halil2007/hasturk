@@ -765,6 +765,7 @@ export function hepsiburada(env, meta) {
 
   // ---------- hakediş (mpfinance işlemleri): ödenecek (WillBePaid) ve ödenen (Paid) kayıtlar ----------
   // Gelir kayıtları (+), gider kayıtları (−); vade tarihi (dueDate) ödeme günüdür. Kayıt tarihine göre en fazla 1 aylık aralıklarla.
+  // Tutar: kesilen / ödenen tutar (amount; fatura ve kargo okumasıyla aynı alan), yoksa netAmount. Tanınmayan tür "Diğer" yazılır.
   const HB_TR = { Payment: 'Satış', Return: 'İade', CampaignDiscount: 'Kampanya indirimi', Commission: 'Komisyon', Stoppage: 'Stopaj' };
   async function settlements(since, until) {
     const W = 28 * 864e5, d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10), out = new Map();
@@ -773,13 +774,14 @@ export function hepsiburada(env, meta) {
       for (let off = 0; off < 100000; off += 100) {
         const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=${off}&Limit=100&Status=Paid,WillBePaid&RecordDateStart=${d(from)}&RecordDateEnd=${d(to)}`));
         for (const x of rows) {
-          const tt = str(g(x, 'transactionType'));
-          if (/^TotalPayment$/.test(tt)) continue; // toplam ödeme satırı ayrı kalemleri tekrar eder
-          const v = Math.abs(money(g(x, 'netAmount')) || money(g(x, 'amount'))), inc = g(x, 'isIncome');
-          const amount = (inc === true || (inc == null && money(g(x, 'amount')) > 0) ? 1 : -1) * v;
-          const due = hbTime(g(x, 'dueDate')) || null, paidAt = hbTime(g(x, 'paymentDate')) || null;
-          out.set(str(g(x, 'id')), { remoteId: str(g(x, 'id')), date: hbTime(g(x, 'orderDate') || g(x, 'invoiceDate')) || from, type: HB_TR[tt] || hbType[tt] || tt, orderNumber: str(g(x, 'orderNumber')),
-            amount: Math.round(amount * 100) / 100, commission: /^Commission/.test(tt) ? Math.round(amount * 100) / 100 : 0, paymentDate: paidAt, dueDate: due || paidAt, paid: /^Paid$/i.test(str(g(x, 'status'))), paymentId: '' });
+          const tt = str(g(x, 'transactionType')), id = str(g(x, 'id'));
+          if (/^TotalPayment$/.test(tt) || !id) continue; // toplam ödeme satırı ayrı kalemleri tekrar eder
+          const a = money(g(x, 'amount')), v = Math.abs(a || money(g(x, 'netAmount'))), inc = g(x, 'isIncome');
+          const amount = Math.round((inc === true || (inc == null && a > 0) ? 1 : -1) * v * 100) / 100;
+          const due = hbTime(g(x, 'dueDate')) || null, paidAt = hbTime(g(x, 'paymentDate')) || null, type = HB_TR[tt] || hbType[tt] || null;
+          out.set(id, { remoteId: id, date: hbTime(g(x, 'orderDate') || g(x, 'invoiceDate') || g(x, 'transactionDate')) || from, type: type || 'Diğer', rawType: tt, unknown: !type, orderNumber: str(g(x, 'orderNumber')).trim(),
+            // Komisyon: kesilen tutar artı (iade / düzeltme ile geri verilen eksi)
+            amount, commission: type === 'Komisyon' ? -amount : 0, paymentDate: paidAt, dueDate: due || paidAt, paid: /^Paid$/i.test(str(g(x, 'status'))), paymentId: '' });
         }
         if (rows.length < 100) break;
       }
