@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2205 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 247 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2217 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -15,7 +15,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 3 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | ×5,2 | 3 | evet |
 | 4 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×4,8 | 2 | evet |
 | 5 | HG 5’li Bitki Yetiştirme Seti | ×4,4 | 3 | evet |
-| 6 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×2,8 | 1 | evet |
+| 6 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×2,9 | 1 | evet |
 | 7 | Kaktüs ve Sukulent Toprağı | ×4,2 | 1 | evet |
 | 8 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | ×4,2 | 0 | evet |
 | 9 | HG Asidik Torf | ×2,3 | 2 | evet |
@@ -24,7 +24,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 12 | Sıvı Solucan Gübresi 250 ml | ×3 | 2 | evet |
 | 13 | HG Vermikülit | ×3,4 | 1 | evet |
 | 14 | Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 545 Litre | ×6 | 1 | evet |
-| 15 | HG Avokado Toprağı Özel Karışım | ×3,2 | 2 | evet |
+| 15 | Katı Solucan Gübresi 1 KG | ×3,3 | 1 | evet |
 
 ## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)
 
@@ -44,11 +44,11 @@ _Henüz veri yok._
 |---|---|---|---|
 | 1 | Katı Solucan Gübresi 20 KG Çuval | 16 | 4 |
 | 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 10,8 | 16 |
-| 3 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 7,2 | 10 |
+| 3 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 7,1 | 10 |
 | 4 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 6,9 | 5 |
-| 5 | Kullanıma Hazır Cocopeat Torfu | 6,3 | 16 |
+| 5 | Kullanıma Hazır Cocopeat Torfu | 6,2 | 16 |
 | 6 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 5,5 | 5 |
-| 7 | Leonardit - Organik Toprak Düzenleyici | 5,3 | 10 |
+| 7 | Leonardit - Organik Toprak Düzenleyici | 5,2 | 10 |
 | 8 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 5,1 | 3 |
 | 9 | HG Akıllı Bitki ve Saksı Toprağı | 5,1 | 7 |
 | 10 | Premium Fide Toprağı | 4,9 | 11 |
@@ -103,29 +103,29 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 |---|---|---|
 | 1 | nnh. cccccx x , z , vb. nb | 2 |
 | 2 | kompost | 2 |
-| 3 | nar gidesi | 1 |
-| 4 | sprayer pompa | 1 |
-| 5 | güvercin | 1 |
-| 6 | mandalinam için | 1 |
-| 7 | mandalinam için besin | 1 |
-| 8 | mandalinam için meyveleri üstünde | 1 |
-| 9 | baltık | 1 |
-| 10 | salyangoz | 1 |
-| 11 | taban gübre | 1 |
-| 12 | yabanmersi tordu | 1 |
-| 13 | yabanmersi torfu | 1 |
-| 14 | zeytin | 1 |
-| 15 | çak | 1 |
-| 16 | akçaağaç için toprak | 1 |
-| 17 | açelya | 1 |
-| 18 | açelya toprağı | 1 |
-| 19 | beyaz topuklu ayakkabı | 1 |
-| 20 | biobi | 1 |
-| 21 | cicek tohumumenekse | 1 |
-| 22 | eyaz topuklu ayakkabı | 1 |
-| 23 | fr | 1 |
-| 24 | fr5 | 1 |
-| 25 | fr5wa | 1 |
+| 3 | azot | 1 |
+| 4 | nar gidesi | 1 |
+| 5 | sprayer pompa | 1 |
+| 6 | vy54 | 1 |
+| 7 | güvercin | 1 |
+| 8 | mandalinam için | 1 |
+| 9 | mandalinam için besin | 1 |
+| 10 | mandalinam için meyveleri üstünde | 1 |
+| 11 | baltık | 1 |
+| 12 | salyangoz | 1 |
+| 13 | taban gübre | 1 |
+| 14 | yabanmersi tordu | 1 |
+| 15 | yabanmersi torfu | 1 |
+| 16 | zeytin | 1 |
+| 17 | çak | 1 |
+| 18 | akçaağaç için toprak | 1 |
+| 19 | açelya | 1 |
+| 20 | açelya toprağı | 1 |
+| 21 | beyaz topuklu ayakkabı | 1 |
+| 22 | biobi | 1 |
+| 23 | cicek tohumumenekse | 1 |
+| 24 | eyaz topuklu ayakkabı | 1 |
+| 25 | fr | 1 |
 
 ## En çok sepete eklenenler
 
@@ -134,7 +134,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 1 | Sıvı Solucan Gübresi 1 Lt | 13,5 | 2,3 |
 | 2 | HG Tarım Perliti | 4,6 | 17,7 |
 | 3 | HasTürk Hümix Sıvı Hümik Asit | 3,3 | 25 |
-| 4 | Leonardit - Organik Toprak Düzenleyici | 3,2 | 46,3 |
+| 4 | Leonardit - Organik Toprak Düzenleyici | 3,2 | 47,3 |
 | 5 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,5 | 0,5 |
 | 6 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 2,4 | 33,8 |
 | 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,4 | 35 |
@@ -158,13 +158,13 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 | Ürün | Görüntüleme | Sepete ekleme | Oran |
 |---|---|---|---|
-| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 34,1 | 0,9 | %3 |
+| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 38,1 | 0,9 | %2 |
 | İnsektisit MAX 5 Lt Kampanya Paketi | 31,1 | 0 | %0 |
 | HG Asidik Torf | 30,8 | 0,7 | %2 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 26,3 | 0 | %0 |
-| HG Mezar Toprağı | 24,3 | 0 | %0 |
+| HG Mezar Toprağı | 25,3 | 0 | %0 |
 | Yuka (Yucca) Toprağı Özel Karışım | 22 | 0 | %0 |
-| Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 19,1 | 0 | %0 |
+| Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 20,1 | 0 | %0 |
 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 18,5 | 0 | %0 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 17,3 | 0 | %0 |
 | Chrysamed Subon Hijyen Sprey | 15,8 | 0 | %0 |
