@@ -2,13 +2,13 @@
 // bağlanır; ana katalog sitesinin her varyantı kendi ürünüdür (aynı sitenin ürünleri birbiriyle eşleştirilmez).
 // Kesin olanlar (barkod, stok kodu, ad + varyant birebir) senkronda otomatik bağlanır; tereddütlüler burada onaya düşer.
 // İkinci eşleşme: aynı ürünün aynı kanaldaki ikinci ilanı yalnız kullanıcı onayıyla bağlanır (öneri ya da elle; bkz. src/second.js).
-import { api, html, render, $, n, money, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, activeChannels, confirmBox } from '../core.js';
+import { api, html, render, $, n, money, ch, chBadge, chLogo, thumb, actions, busy, toast, debounce, sheet, activeChannels, confirmBox, ek } from '../core.js';
 import { setQuery, loadSummary } from '../app.js';
 
 const TABS = [['', 'Onay bekleyen'], ['second', 'İkinci eşleşme önerileri'], ['linked', 'Eşleşmiş ürünler'], ['ignored', 'Yok sayılan']];
 export const HOW = { barcode: ['good', 'Barkod'], sku: ['good', 'Stok kodu'], name: ['good', 'Ad + varyant'], group: ['good', 'Aynı ürün grubu'], approved: ['amber', 'Toplu onay'], new: ['info', 'Katalogdan'], manual: ['amber', 'Elle'], extra: ['info', 'İkinci ilan'], dup_ok: ['info', 'İkinci ilan'] };
 // Aynı kanalda birden fazla ilan: "Bu ürün Hepsiburada'da 2 ilanla satılacak…" (onay penceresi)
-export const twoText = (chId, count) => `Bu ürün ${ch(chId).name}'da ${count} ilanla satılacak. Stok ${count === 2 ? 'iki' : 'tüm'} ilanda da aynı gösterilir.`;
+export const twoText = (chId, count) => `Bu ürün ${ek(ch(chId).name, 'da')} ${count} ilanla satılacak. Stok ${count === 2 ? 'iki' : 'tüm'} ilanda da aynı gösterilir.`;
 // Ürünün bu kanaldaki kaçıncı ilanı (aynı kanalda birden fazlaysa "İlan 1 / İlan 2"; tek ilansa boş)
 export const ilanNo = (list, l) => { const xs = (list || []).filter((x) => x.channel === l.channel); return xs.length > 1 ? `İlan ${xs.indexOf(l) + 1}` : ''; };
 const howPill = (m) => { const [c, t] = HOW[m] || ['', m || '—']; return html`<span class="pill ${c}" title="Eşleşme yöntemi">${t}</span>`; };
