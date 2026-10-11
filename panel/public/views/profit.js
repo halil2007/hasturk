@@ -18,22 +18,21 @@ export async function profitView(el) {
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('sale', 'Satış fiyatı')}${box('purchase', 'Alış fiyatı')}</div>
         ${box('commissionRate', 'Komisyon' + exv, '%', html`<div class="preset">${activeChannels().map((c) => html`<button class="chip ${v.channel === c.id ? 'on' : ''}" data-ch="${c.id}">${chLogo(c.id, true)}%${n(costRaw(st, 'commission', c.id))}</button>`)}</div>`)}
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('shipping', 'Kargo gideri' + exv)}${box('fee', 'Hizmet bedeli' + exv)}</div>
-        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('feeRate', 'Ek kesinti' + exv, '%', html`<small class="muted tiny">işlem / ödeme bedeli</small>`)}${box('withholdingRate', 'Stopaj', '%', html`<small class="muted tiny">KDV hariç satıştan, genelde %1</small>`)}</div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('feeRate', 'Ek kesinti' + exv, '%', html`<small class="muted tiny">işlem / ödeme bedeli</small>`)}${box('withholdingRate', 'Stopaj', '%', html`<small class="muted tiny">genelde %1</small>`)}</div>
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">${box('extra', 'Diğer gider', '₺', html`<small class="muted tiny">paketleme, reklam…</small>`)}${box('qty', 'Adet', 'ad')}</div>
         <div class="row wrap">
-          <label class="check" style="flex:1"><span class="switch"><input type="checkbox" data-k="includeVat" ${v.includeVat ? 'checked' : ''}><span></span></span> KDV'yi hesaba kat</label>
           <label class="row small">Ürün KDV <select class="input" style="width:auto;min-height:38px" data-k="vatRate">${[0, 1, 10, 20].map((x) => html`<option value="${x}" ${Number(v.vatRate) === x ? 'selected' : ''}>%${x}</option>`)}</select></label>
         </div>
         <div class="row" style="padding:4px 2px"><span class="muted">Komisyon tutarı</span><span class="spacer"></span><b class="num" style="font-size:18px" data-comm></b></div>
         <button class="btn primary lg block" data-act="go">Hesapla</button>
-        <p class="muted tiny" style="margin:0">Tutarlar KDV dahil girilir. “KDV'yi hesaba kat” açıkken satış KDV'sinden alış, komisyon, kargo ve giderlerin KDV'si (%20) düşülür; kalan ödenecek KDV kârdan çıkarılır.</p>
+        <p class="muted tiny" style="margin:0">Tüm tutarlar KDV dahildir.</p>
       </div>
     </div>
     <div class="stack sticky" data-result></div>
   </div>`);
 
   const calc = () => {
-    const inp = { sale: numIn(v.sale), purchase: numIn(v.purchase), commissionRate: numIn(v.commissionRate), shipping: numIn(v.shipping), fee: numIn(v.fee), extra: numIn(v.extra), feeRate: numIn(v.feeRate), withholdingRate: numIn(v.withholdingRate), vatRate: Number(v.vatRate), includeVat: !!v.includeVat, qty: numIn(v.qty) || 1 };
+    const inp = { sale: numIn(v.sale), purchase: numIn(v.purchase), commissionRate: numIn(v.commissionRate), shipping: numIn(v.shipping), fee: numIn(v.fee), extra: numIn(v.extra), feeRate: numIn(v.feeRate), withholdingRate: numIn(v.withholdingRate), vatRate: Number(v.vatRate), includeVat: false, qty: numIn(v.qty) || 1 };
     // Komisyon, kargo, hizmet bedeli ve ek kesinti KDV hariç girilir (Ayarlar'daki gibi); hesapta KDV eklenir
     const g = costVat(st), gin = { ...inp, commissionRate: inp.commissionRate * g, shipping: inp.shipping * g, fee: inp.fee * g, feeRate: inp.feeRate * g };
     const r = profit(gin), target = priceFor(gin, numIn(v.target)), good = r.unitProfit >= 0;
