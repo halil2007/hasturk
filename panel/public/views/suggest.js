@@ -2,6 +2,7 @@
 // "Birinciliği al": rakibin 1 kuruş altı; "Kâr artır": birinci sıra sizde, ikinci satıcının 1 kuruş altına kadar yükseltme.
 // Her öneride önerilen fiyattaki kâr görünür; tek tıkla ya da toplu uygulanır, fiyat kanala gönderilir.
 import { api, ek, html, render, $, $$, n, money, ago, ch, chLogo, thumb, actions, busy, toast, confirmBox } from '../core.js';
+import { costBtn } from '../costedit.js';
 import { bbChannels } from './buybox.js';
 
 const marg = (x) => (x && x.margin != null ? html`<span class="tiny ${x.margin < 0 ? 'neg' : x.margin < 8 ? 'warn-t' : 'pos'}">%${n(Math.round(x.margin))} · ${money(x.profit)}</span>` : html`<span class="tiny muted" title="Ürünün alış fiyatı girilmemiş">kâr ?</span>`);
@@ -34,7 +35,7 @@ export async function suggestView(el) {
           <td><input type="checkbox" data-sel ${sel.has(key(s)) ? 'checked' : ''} ${s.loss ? 'disabled' : ''}></td>
           <td><div class="row" style="gap:10px;min-width:220px">${thumb(s.image, s.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:650;max-width:340px">${chLogo(s.channel, true)} ${s.name}${s.variant ? html` <span class="muted">· ${s.variant}</span>` : ''}</div>
             <div class="tiny muted">${[s.sku, s.barcode].filter(Boolean).join(' · ')}${s.stock != null ? ` · stok ${n(s.stock)}` : ''} · ${s.rank}. sıra · ${ago(s.checked_at)}</div>
-            ${s.pending ? html`<span class="pill info tiny">fiyat gönderiliyor</span>` : ''}${s.limited ? html`<span class="pill tiny" title="Fiyat kuralının sınırı">${s.limited === 'min' ? 'en düşük fiyat sınırında' : 'en yüksek fiyat sınırında'}</span>` : ''}</div></div></td>
+            ${s.noCost && s.product_id ? costBtn(s.product_id, s.name) : ''}${s.pending ? html`<span class="pill info tiny">fiyat gönderiliyor</span>` : ''}${s.limited ? html`<span class="pill tiny" title="Fiyat kuralının sınırı">${s.limited === 'min' ? 'en düşük fiyat sınırında' : 'en yüksek fiyat sınırında'}</span>` : ''}</div></div></td>
           <td class="r"><div class="num" style="font-weight:700">${money(s.price)}</div>${marg(s.now)}</td>
           <td class="r num">${money(s.competitor)}</td>
           <td class="r"><button class="tierbtn ${s.loss ? '' : 'ok'}" data-act="one" ${s.loss ? 'disabled' : ''} title="${s.loss ? 'Bu fiyatta zarar edersiniz' : 'Bu fiyatı uygula'}"><span class="num">${money(s.suggested)}</span> <span class="tiny ${s.diff < 0 ? 'neg' : 'pos'}">${s.diff > 0 ? '+' : ''}${money(s.diff)}</span><br>${marg(s.next)}</button></td>

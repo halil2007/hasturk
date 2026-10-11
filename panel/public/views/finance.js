@@ -1,6 +1,7 @@
 // Gelir & Gider: seçilen dönemde satıştan kâra masraf basamakları (komisyon, kargo, hizmet bedeli, ek kesinti, stopaj, alış),
 // kanal bazında tablo, hakediş (ödeme günleri, ödenen / ödenecek, mutabakat) ve pazaryerlerinin kestiği faturalar.
 import { api, locked, html, render, $, $$, money, money0, n, ch, chLogo, chBadge, date, dateTime, store, toast, actions, busy, activeChannels, isAdmin, sheet, confirmBox, thumb, state } from '../core.js';
+import { costBtn } from '../costedit.js';
 import { viewOnly } from '../perms.js';
 import { setQuery } from '../app.js';
 
@@ -117,7 +118,7 @@ export async function financeView(el, rest, query = {}) {
     const rows = prod.rows.slice(0, f.pall ? 300 : 15);
     render(box, html`${head}${rows.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Ürün</th><th class="r">Adet</th><th class="r">Ciro</th><th class="r">Komisyon</th><th class="r" title="Kargo, hizmet bedeli, ek kesinti ve stopajın satır payı">Diğer kesinti</th><th class="r">Alış</th><th class="r">Kâr</th><th class="r">İade</th></tr></thead><tbody>
       ${rows.map((x) => html`<tr><td><div class="row" style="gap:10px;min-width:220px">${thumb(x.image, x.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:650;max-width:320px">${x.name}${x.variant ? html` <span class="muted">· ${x.variant}</span>` : ''}</div>
-          <div class="tiny muted">${x.channels.map((c) => chLogo(c, true))} ${x.missingCost ? html`<span class="pill warn tiny">alış fiyatı yok</span>` : `birim kâr ${money(x.unitProfit)}`}</div></div></div></td>
+          <div class="tiny muted">${x.channels.map((c) => chLogo(c, true))} ${x.missingCost ? costBtn(x.product_id, x.name) : `birim kâr ${money(x.unitProfit)}`}</div></div></div></td>
         <td class="r num">${n(x.units)}</td><td class="r num">${money0(x.revenue)}</td><td class="r num">${money0(x.commission)}</td><td class="r num">${money0(x.other)}</td><td class="r num">${x.missingCost ? '—' : money0(x.cost)}</td>
         <td class="r num" style="font-weight:750;color:${x.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(x.profit)}<div class="tiny muted">%${n(x.margin)}</div></td>
         <td class="r num">${x.returns ? html`${n(x.returns)}<div class="tiny ${x.returnRate >= 10 ? 'neg' : 'muted'}">%${n(x.returnRate)}</div>` : html`<span class="muted">—</span>`}</td></tr>`)}

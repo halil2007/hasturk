@@ -1,6 +1,7 @@
 // Sipariş işlemleri (ortak bileşen): işleme al → paketle (kanalda kargoya hazırla) → kargo firması seç/değiştir →
 // etiket oluştur → yazdır (onaylı) → kargoya ver. Her paket ayrı izlenir. Siparişler tablosu, Genel Bakış, Kargo sayfası kullanır.
 import { api, ek, store, state, html, render, $, $$, money, n, ch, carrierOf, chLogo, chBadge, trackBtn, statusPill, STATUS_LABEL, thumb, toast, busy, sheet, confirmBox, popMenu, dateTime, shortDT, lateInfo, extNote, friendly, isAdmin } from '../core.js';
+import { costBtn } from '../costedit.js';
 import { printLabels, printImages, downloadFile } from '../labels.js';
 import { diagnoseDialog } from './diagnose.js';
 
@@ -656,7 +657,8 @@ ${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">
             <dl class="kv"><dt>Satış</dt><dd>${money(p.revenue)}</dd><dt>Komisyon${commNote(p)}</dt><dd>−${money(p.commission)}</dd>${p.commCredit ? html`<dt>Komisyon iadesi <span class="tiny muted">(pazaryeri karşıladı)</span></dt><dd class="up">${p.commCredit > 0 ? '+' : '−'}${money(Math.abs(p.commCredit))}</dd>` : ''}<dt>Kargo <span class="tiny muted">${SHIP_SRC[p.shippingSrc] || ''}</span></dt><dd>${p.shippingSrc === 'none' ? html`<span class="tiny" style="color:var(--amber)">ürüne girilmedi</span>` : html`−${money(p.shipping)}`}</dd>
               ${p.fee ? html`<dt>Hizmet bedeli</dt><dd>−${money(p.fee)}</dd>` : ''}${p.rateFee ? html`<dt>Ek kesinti <span class="tiny muted">(işlem / ödeme bedeli)</span></dt><dd>−${money(p.rateFee)}</dd>` : ''}${p.withholding ? html`<dt>Stopaj <span class="tiny muted">(vergiden mahsup edilir)</span></dt><dd>−${money(p.withholding)}</dd>` : ''}<dt style="color:var(--text);font-weight:650">Satıştan kalan</dt><dd style="font-weight:650">${money(p.payout)}</dd>
               <dt>Ürün maliyeti</dt><dd>−${money(p.cost)}</dd><div class="total"><dt>Kâr</dt><dd class="${p.profit >= 0 ? 'up' : 'down'}">${money(p.profit)}</dd></div></dl>
-            ${p.missingCost ? html`<div class="notice warn small" style="margin-top:10px">${p.missingCost} ürünün alış fiyatı girilmemiş; kâr olduğundan yüksek görünür.</div>` : ''}
+            ${p.missingCost ? html`<div class="notice warn small" style="margin-top:10px"><div>${p.missingCost} ürünün alış fiyatı girilmemiş; kâr olduğundan yüksek görünür.
+              <div class="row wrap" style="gap:6px;margin-top:6px">${o.items.filter((i) => i.product_id && !(i.purchase_price > 0)).map((i) => costBtn(i.product_id, i.product_name || i.name, `${(i.product_name || i.name || '').slice(0, 28)} · alış fiyatı gir`))}</div></div></div>` : ''}
           </div>
           <div class="card stack">
             <h3>Not ve ayarlar</h3>

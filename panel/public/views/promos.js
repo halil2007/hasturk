@@ -2,6 +2,7 @@
 // Akış: Excel yükle → her eşikte kârı gör, satır başına fiyat seç → Excel'i indir (pazaryerinin dosyası aynı düzende, seçilen fiyatlar
 // pazaryerinin beklediği sütunda) → pazaryerine yükle. İsteğe bağlı: seçilen fiyatları doğrudan kanala gönder (bkz. src/promos.js).
 import { api, state, html, raw, render, $, n, money, date, ago, ch, chLogo, thumb, actions, busy, toast, confirmBox } from '../core.js';
+import { costBtn } from '../costedit.js';
 import { readGrid, csvRows } from '../sheetread.js';
 import { patchXlsx, buildXlsx, buildCsv, saveFile, XLSX_TYPE } from '../sheetwrite.js';
 import { profit } from '../profit.js';
@@ -86,7 +87,7 @@ export async function promosView(el) {
         ${rows.slice(0, 500).map((o) => html`<tr data-key="${o.key}" class="${isChosen(o) ? 'sel-row' : ''}">
           <td><div class="row" style="gap:10px;min-width:220px">${thumb(o.image, o.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="font-weight:650;max-width:340px">${o.name}${o.variant ? html` <span class="muted">· ${o.variant}</span>` : ''}</div>
             <div class="tiny muted">${[o.sku, o.barcode].filter(Boolean).join(' · ')}${o.stock != null ? ` · stok ${n(o.stock)}` : ''}${o.ends_at ? ` · bitiş ${date(o.ends_at)}` : ''}</div>
-            ${!o.remote_id ? html`<span class="pill warn tiny" title="Panelde bu kanalda eşleşen ilan yok; kâr hesaplanamaz ama Excel'e yine yazılabilir">İlan bulunamadı</span>` : ''}${o.applied_at ? html`<span class="pill info tiny" title="${ago(o.applied_at)}">${money(o.applied_price)} kanala gönderildi${o.pending ? ' · sırada' : ''}</span>` : ''}</div></div></td>
+            ${o.product_id && o.calc && !(o.calc.purchase > 0) ? costBtn(o.product_id, o.name) : ''}${!o.remote_id ? html`<span class="pill warn tiny" title="Panelde bu kanalda eşleşen ilan yok; kâr hesaplanamaz ama Excel'e yine yazılabilir">İlan bulunamadı</span>` : ''}${o.applied_at ? html`<span class="pill info tiny" title="${ago(o.applied_at)}">${money(o.applied_price)} kanala gönderildi${o.pending ? ' · sırada' : ''}</span>` : ''}</div></div></td>
           <td class="r"><button class="tierbtn ${!o.choice ? 'cur' : ''}" data-act="pick" data-c="" title="Fiyatı değiştirme"><span class="num">${o.price ? money(o.price) : '—'}</span><br>${marg(o.now)}</button></td>
           ${tierNames.map((_, i) => { const t = o.tiers[i]; return html`<td class="r">${t ? html`<button class="tierbtn ${o.choice === `t${i}` ? 'sel' : ''} ${t.loss ? 'loss' : ''} ${t.ok ? 'ok' : ''}" data-act="pick" data-c="t${i}" title="${t.loss ? 'Bu fiyatta zarar edersiniz' : t.ok ? 'Şu anki fiyatınız bu eşiği zaten sağlıyor' : 'Bu fiyatı seç'}">
             <span class="num">${money(t.price)}</span>${t.ok ? html`<i class="ico ico-check"></i>` : ''}<br>${marg(t)}</button>` : html`<span class="muted">—</span>`}</td>`; })}

@@ -1969,6 +1969,17 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       return json({ ok: true });
     }
   }
+  // Hızlı alış fiyatı (raporlardaki "alış fiyatı yok" uyarısından): yalnız alış fiyatı değişir
+  if ((x = path.match(/^products\/(\d+)\/cost$/)) && m === 'POST') {
+    if (!can(user, 'products', true)) fail(403, 'Alış fiyatı girmek için Ürünler yetkisi gerekir');
+    const b = await body(req), v = num(b.purchase_price), id = Number(x[1]);
+    if (!(v > 0) || v > 1e8) fail(400, 'Geçerli bir alış fiyatı girin');
+    const p = await first(db, 'SELECT id, name, purchase_price FROM products WHERE id = ?', id);
+    if (!p) fail(404, 'Ürün bulunamadı');
+    await run(db, 'UPDATE products SET purchase_price = ?, updated_at = ? WHERE id = ?', Math.round(v * 100) / 100, Date.now(), id);
+    await log(db, null, 'info', `${user.name}: ${p.name} alış fiyatı ${p.purchase_price || 0} → ${Math.round(v * 100) / 100}`);
+    return json({ ok: true, purchase_price: Math.round(v * 100) / 100 });
+  }
   if ((x = path.match(/^products\/(\d+)\/stock$/)) && m === 'POST') return json(await stockChange(env, db, ctx, Number(x[1]), await body(req), user));
 
   if (path === 'listings' && m === 'GET') {
