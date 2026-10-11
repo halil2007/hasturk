@@ -198,7 +198,7 @@ const ctaBand = `<section class="sec"><div class="wrap"><div class="ask big reve
 // Bölümler sırayla açık mavi / beyaz zemin alır (ilk = alt)
 const alt = (parts, first = true) => parts.filter(Boolean).map((c, i) => `<section class="sec${(i % 2 === 0) === first ? ' alt' : ''}"><div class="wrap">${c}</div></section>`).join('\n');
 const faqHtml = (faq) => `<div class="faq">${faq.map(([q, a]) => `<details class="reveal"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>`;
-const heroChecks = `<div class="checks"><span>${tick}7 gün ücretsiz deneme</span><span>${tick}Kurulum ücreti yok</span><span>${tick}Türkçe destek</span></div>`;
+const heroChecks = `<div class="checks"><span>${tick}7 gün ücretsiz deneme</span><span>${tick}Kurulum ücreti yok</span><span>${tick}Telefondan da yönetin</span></div>`;
 
 // Örnek hesap / senaryo blokları (tutarlar örnektir; basamaklar panelin kâr hesabıyla aynı sıradadır)
 const tl = (n) => Math.abs(n).toLocaleString('tr-TR');
