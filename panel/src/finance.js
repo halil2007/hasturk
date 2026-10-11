@@ -290,22 +290,40 @@ export async function syncInvoices(env, db, { force = false, only } = {}) {
 
 // ---------- hakediş ----------
 // Pazaryerinin hesap ekstresi (satış / iade / indirim / komisyon kayıtları ve ödeme tarihleri) 6 saatte bir okunur ve saklanır.
+// İlk okumada son 60 gün; sonra son 20 gün — ödenmemiş kayıt varsa en eskisinin tarihinden (en çok 90 gün geriye): ödeme
+// kayda sonradan işlenir (Trendyol paymentOrderId, Hepsiburada WillBePaid → Paid), okunmazsa kayıt "ödenmedi / gecikti" kalırdı.
+const STL_SQL = `INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, payment_date, due_date, paid, payment_id, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT (channel, remote_id) DO UPDATE SET date = excluded.date, type = excluded.type, raw_type = excluded.raw_type, order_number = excluded.order_number, amount = excluded.amount, commission = excluded.commission,
+    payment_date = excluded.payment_date, due_date = excluded.due_date, paid = excluded.paid, payment_id = excluded.payment_id, synced_at = excluded.synced_at`;
+const fin = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : 0);
+const ms = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);
 export async function syncSettlements(env, db, { force = false, only } = {}) {
   const out = {};
   for (const ch of await getChannels(env, db)) {
-    if (!ch.enabled || ch.demo || !ch.settlements || (only && !only.includes(ch.id))) continue;
+    // Deneme modunda örnek kanallar da örnek hakediş kayıtları verir (sayfa boş kalmasın)
+    if (!ch.enabled || !ch.settlements || (only && !only.includes(ch.id))) continue;
     const key = 'stlsync:' + ch.id, last = await getRaw(db, key);
     // Hata sonrası kademeli bekleme (30 dk, 1 sa, … en çok 6 sa): uzun okumada sürekli hata alan kanal her senkronda baştan denenmez
     if (!force && last && Date.now() - last.at < (last.error ? Math.min(last.fails || 1, 12) * 30 * 60e3 : 6 * 3600e3)) continue;
     const t = Date.now();
     try {
-      const rows = await ch.settlements(last && last.n != null ? t - 20 * 864e5 : t - 60 * 864e5, t);
-      for (const part of chunk(rows, 60)) {
-        await db.batch(part.map((x) => db.prepare(`INSERT INTO settlements (channel, remote_id, date, type, order_number, amount, commission, payment_date, due_date, paid, payment_id, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT (channel, remote_id) DO UPDATE SET date = excluded.date, type = excluded.type, order_number = excluded.order_number, amount = excluded.amount, commission = excluded.commission,
-            payment_date = excluded.payment_date, due_date = excluded.due_date, paid = excluded.paid, payment_id = excluded.payment_id, synced_at = excluded.synced_at`)
-          .bind(ch.id, String(x.remoteId), x.date || null, x.type || '', x.orderNumber || '', x.amount || 0, x.commission || 0, x.paymentDate || null, x.dueDate || null, x.paid ? 1 : 0, x.paymentId || '', t)));
+      let since = t - 60 * DAY;
+      if (last && last.n != null) {
+        const open = await first(db, 'SELECT MIN(date) AS d FROM settlements WHERE channel = ? AND paid = 0 AND date >= ?', ch.id, t - 90 * DAY);
+        since = Math.min(t - 20 * DAY, ms(open && open.d) || Infinity);
       }
+      const rows = (await ch.settlements(since, t)).filter((x) => x && x.remoteId != null && String(x.remoteId) !== '');
+      for (const part of chunk(rows, 60)) {
+        await db.batch(part.map((x) => {
+          const date = ms(x.date), pay = ms(x.paymentDate);
+          // Ödeme günü: vade → ödeme tarihi → kayıt tarihi (rapor vade dizininden okur; boş kalan kayıt hiçbir güne düşmezdi)
+          return db.prepare(STL_SQL).bind(ch.id, String(x.remoteId), date, x.type || 'Diğer', x.rawType || '', String(x.orderNumber || '').trim(), fin(x.amount), fin(x.commission), pay, ms(x.dueDate) || pay || date, x.paid ? 1 : 0, String(x.paymentId || ''), t);
+        }));
+      }
+      // Tanınmayan kayıt türleri kaybolmaz: "Diğer" olarak saklanır, günlüğe yazılır (bağdaştırıcıya eklenmesi için)
+      const unk = new Map();
+      for (const x of rows) if (x.unknown) unk.set(x.rawType || '?', (unk.get(x.rawType || '?') || 0) + 1);
+      if (unk.size && !ch.demo) await log(db, ch.id, 'warn', 'Tanınmayan hakediş kayıt türü "Diğer" olarak eklendi: ' + [...unk].map(([k, n]) => `${k} (${n})`).join(', '));
       await setSetting(db, key, { at: t, n: rows.length });
       out[ch.id] = rows.length;
     } catch (e) {
@@ -317,38 +335,92 @@ export async function syncSettlements(env, db, { force = false, only } = {}) {
   return out;
 }
 
+// Siparişin hakedişine giren kayıt türleri: mutabakatta panelin tahminiyle (satış − komisyon) karşılaştırılır.
+// Kargo / teslimat, hizmet bedeli, stopaj, reklam, ceza ayrı kesilir (tahminde de yok). Trendyol'un karşıladığı indirim / kupon
+// ("Trendyol indirimi / kuponu") ay sonu faturayla satıcıya geri ödenir: siparişin kazancını düşürmez, mutabakata girmez.
+export const STL_ORDER = /^(Satış|İade|İndirim|Kupon|Kampanya indirimi|Komisyon|Hakediş düzeltme|Manuel iade|Provizyon)/;
+const STL_RETURN = /^(İade|Manuel iade)$/;
+// Ödeme günü bu kadar geçtiyse "gecikti": Trendyol haftanın vadesi gelenleri çarşamba öder, kayıt ertesi gün güncellenir
+export const STL_GRACE = 3 * DAY;
+
 // Hakediş raporu: ödeme günlerine göre (ödenen / ödenecek), dönem toplamları ve mutabakat (pazaryerinin hakedişi ile panelin tahmini farklı olan siparişler)
 export async function settlementReport(env, db, settings, q = {}) {
-  const now = Date.now(), from = Number(q.from) || now - 30 * 864e5, to = Number(q.to) || now + 1;
+  const now = Date.now(), from = Number(q.from) || now - 30 * DAY, to = Number(q.to) || now + 1;
   const cw = q.channel ? ' AND channel = ?' : '', ca = q.channel ? [q.channel] : [];
-  const day = "strftime('%Y-%m-%d', COALESCE(due_date, payment_date, date) / 1000 + 10800, 'unixepoch')";
-  // Ödeme günleri: seçilen aralık + önümüzdeki 60 gün (ödenecekler)
-  const days = await all(db, `SELECT channel, ${day} AS d, ROUND(SUM(CASE WHEN paid = 1 THEN amount ELSE 0 END), 2) AS paid, ROUND(SUM(CASE WHEN paid = 0 THEN amount ELSE 0 END), 2) AS due, COUNT(*) AS n
-    FROM settlements WHERE COALESCE(due_date, payment_date, date) >= ? AND COALESCE(due_date, payment_date, date) < ?${cw} GROUP BY channel, d ORDER BY d DESC, channel`, from, Math.max(to, now + 60 * 864e5), ...ca);
-  const tot = await first(db, `SELECT ROUND(COALESCE(SUM(CASE WHEN paid = 1 AND COALESCE(payment_date, due_date) >= ? AND COALESCE(payment_date, due_date) < ? THEN amount END), 0), 2) AS paid,
-      ROUND(COALESCE(SUM(CASE WHEN paid = 0 THEN amount END), 0), 2) AS upcoming, ROUND(COALESCE(SUM(CASE WHEN paid = 0 AND due_date < ? THEN amount END), 0), 2) AS overdue
-    FROM settlements WHERE 1 = 1${cw}`, from, to, now - 864e5, ...ca);
-  const types = await all(db, `SELECT type, ROUND(SUM(amount), 2) AS amount, COUNT(*) AS n FROM settlements WHERE date >= ? AND date < ?${cw} GROUP BY type ORDER BY ABS(SUM(amount)) DESC`, from, to, ...ca);
-  // Mutabakat: dönemde satılan, pazaryerinin hakediş kaydı olan siparişlerde gerçek hakediş − panel tahmini (komisyon, kargo hariç kesintiler)
-  const orders = await all(db, `SELECT o.id, o.channel, o.order_number, o.ordered_at, o.shipping_cost, o.shipping_src, s.amount AS actual
-    FROM orders o JOIN (SELECT channel, order_number, SUM(amount) AS amount FROM settlements WHERE order_number != '' AND (type IN ('Satış', 'İade', 'İndirim', 'İndirim iptali', 'Kupon', 'Kupon iptali', 'Kampanya indirimi', 'Komisyon') OR type LIKE 'Komisyon düzeltme%') GROUP BY channel, order_number) s ON s.channel = o.channel AND s.order_number = o.order_number
-    WHERE o.ordered_at >= ? AND o.ordered_at < ? AND o.status NOT IN ('cancelled')${q.channel ? ' AND o.channel = ?' : ''} ORDER BY o.ordered_at DESC LIMIT 2000`, from, to, ...ca);
+  // Ödeme günü Türkiye saatiyle (UTC+3; yaz saati yok)
+  const day = "strftime('%Y-%m-%d', due_date / 1000 + 10800, 'unixepoch')";
+  const todayStart = Date.parse(new Date(now + 3 * 3600e3).toISOString().slice(0, 10) + 'T00:00:00Z') - 3 * 3600e3, late = todayStart - STL_GRACE;
+  const [days, tot, types, orders, unmatched] = await Promise.all([
+    // Ödeme günleri: seçilen aralık + önümüzdeki 60 gün (ödenecekler)
+    all(db, `SELECT channel, ${day} AS d, ROUND(SUM(CASE WHEN paid = 1 THEN amount ELSE 0 END), 2) AS paid, ROUND(SUM(CASE WHEN paid = 0 THEN amount ELSE 0 END), 2) AS due, COUNT(*) AS n
+      FROM settlements WHERE due_date >= ? AND due_date < ?${cw} GROUP BY channel, d ORDER BY d DESC, channel LIMIT 400`, from, Math.max(to, now + 60 * DAY), ...ca),
+    first(db, `SELECT ROUND(COALESCE(SUM(CASE WHEN paid = 1 AND due_date >= ? AND due_date < ? THEN amount END), 0), 2) AS paid,
+        ROUND(COALESCE(SUM(CASE WHEN paid = 0 THEN amount END), 0), 2) AS upcoming, ROUND(COALESCE(SUM(CASE WHEN paid = 0 AND due_date < ? THEN amount END), 0), 2) AS overdue
+      FROM settlements WHERE (paid = 0 OR (due_date >= ? AND due_date < ?))${cw}`, from, to, late, from, to, ...ca),
+    // Kayıt türleri (kayıt tarihine göre dönemde); "Diğer" için kanalın gönderdiği ham tür adları
+    all(db, `SELECT type, ROUND(SUM(amount), 2) AS amount, COUNT(*) AS n, GROUP_CONCAT(DISTINCT CASE WHEN type = 'Diğer' THEN raw_type END) AS raw
+      FROM settlements WHERE date >= ? AND date < ?${cw} GROUP BY type ORDER BY ABS(SUM(amount)) DESC`, from, to, ...ca),
+    // Mutabakat: dönemde verilen, pazaryerinde hakediş kaydı olan siparişler (iptal edilenler de: iptalde ödeme kaydı olmamalı)
+    all(db, `SELECT o.id, o.channel, o.order_number, o.ordered_at, o.status FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ?${q.channel ? ' AND o.channel = ?' : ''}
+      AND COALESCE(o.order_number, '') != '' AND EXISTS (SELECT 1 FROM settlements s WHERE s.channel = o.channel AND s.order_number = o.order_number) ORDER BY o.ordered_at DESC LIMIT 3000`, from, to, ...ca),
+    // Panelde olmayan siparişlerin kayıtları (panel kurulmadan / geçmiş aktarılmadan önceki siparişler)
+    all(db, `SELECT channel, order_number, ROUND(SUM(amount), 2) AS amount, MIN(date) AS date, COUNT(*) AS n FROM settlements s WHERE date >= ? AND date < ? AND order_number != ''${cw}
+      AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.channel = s.channel AND o.order_number = s.order_number) GROUP BY channel, order_number ORDER BY date DESC LIMIT 1000`, from, to, ...ca),
+  ]);
   const diffs = [];
+  let checked = 0;
   if (orders.length) {
-    const ids = orders.map((o) => o.id), items = [];
-    for (const part of chunk(ids, 80)) items.push(...await all(db, `SELECT i.order_id, i.total, i.quantity, i.status, i.commission, p.purchase_price, l.commission AS listing_commission, l.commission_src AS listing_commission_src FROM order_items i JOIN orders o ON o.id = i.order_id
-      LEFT JOIN products p ON p.id = i.product_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key WHERE i.order_id IN (${part.map(() => '?').join(',')})`, ...part));
-    const by = new Map();
+    const ids = orders.map((o) => o.id), items = [], rows = [];
+    for (const part of chunk(ids, 80)) items.push(...await all(db, `SELECT i.order_id, i.total, i.quantity, i.returned_qty, i.status, i.commission, l.commission AS listing_commission, l.commission_src AS listing_commission_src
+      FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key WHERE i.order_id IN (${part.map(() => '?').join(',')})`, ...part));
+    const byCh = new Map();
+    for (const o of orders) (byCh.get(o.channel) || byCh.set(o.channel, []).get(o.channel)).push(o.order_number);
+    for (const [c, nos] of byCh) {
+      for (const part of chunk([...new Set(nos)], 80)) rows.push(...(await all(db, `SELECT order_number, type, SUM(amount) AS amount, SUM(COALESCE(commission, 0)) AS commission, COUNT(*) AS n FROM settlements
+        WHERE channel = ? AND order_number IN (${part.map(() => '?').join(',')}) GROUP BY order_number, type`, c, ...part)).map((r) => ({ ...r, channel: c })));
+    }
+    const by = new Map(), st = new Map();
     for (const i of items) (by.get(i.order_id) || by.set(i.order_id, []).get(i.order_id)).push(i);
+    for (const r of rows) { const k = r.channel + '|' + r.order_number; (st.get(k) || st.set(k, []).get(k)).push(r); }
+    // Tahmin: satış − komisyon (kargo, hizmet bedeli, ek kesinti, stopaj pazaryerinde ayrı kayıt; tahmine de katılmaz)
+    const est = { ...settings, shipping: {}, service_fee: {}, fee_rate: {}, withholding: {} };
     for (const o of orders) {
-      const p = orderProfit({ ...o, shipping_cost: 0, items: by.get(o.id) || [] }, { ...settings, shipping: {}, service_fee: {}, fee_rate: {}, withholding: {} });
-      const diff = Math.round((o.actual - p.payout) * 100) / 100;
-      if (Math.abs(diff) >= 1) diffs.push({ id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, expected: p.payout, actual: Math.round(o.actual * 100) / 100, diff });
+      const recs = (st.get(o.channel + '|' + o.order_number) || []).filter((r) => STL_ORDER.test(r.type || ''));
+      if (!recs.length) continue; // yalnız kargo / stopaj gibi ayrı kesintiler: karşılaştırılacak hakediş yok
+      checked++;
+      const its = by.get(o.id) || [];
+      const p = orderProfit({ ...o, shipping_cost: 0, items: its }, est);
+      const actual = r2(recs.reduce((a, r) => a + (Number(r.amount) || 0), 0)), comm = r2(recs.reduce((a, r) => a + (Number(r.commission) || 0), 0)), sales = r2(actual + comm);
+      // İptal / tamamı iade edilen siparişin hakedişi 0 olmalı (satırları ayrıca işaretlenmemiş olsa da)
+      const dead = o.status === 'cancelled' || o.status === 'returned', expected = dead ? 0 : p.payout, diff = r2(actual - expected);
+      // Yuvarlama payı: 1 ₺ ya da satışın binde 5'i (satır satır yuvarlanan komisyon, kuruş farkları)
+      const tol = Math.max(1, 0.005 * Math.max(dead ? 0 : Math.abs(p.revenue), Math.abs(sales)));
+      if (Math.abs(diff) < tol) continue;
+      const panelRet = o.status === 'returned' || its.some((i) => i.status === 'returned' || Number(i.returned_qty) > 0);
+      const mpRet = recs.some((r) => STL_RETURN.test(r.type) && Math.abs(Number(r.amount) || 0) >= 0.01);
+      const pct = (a, b) => (b ? `%${(Math.round((a / b) * 1000) / 10).toLocaleString('tr-TR')}` : '—');
+      let reason;
+      if (o.status === 'cancelled') reason = 'Sipariş iptal ama pazaryerinde ödeme kaydı var';
+      else if (panelRet && !mpRet && diff > 0) reason = 'İade pazaryerinin kayıtlarına henüz düşmedi';
+      else if (mpRet && !panelRet && diff < 0) reason = 'Pazaryeri iade kaydetti, panelde iade yok';
+      else if (!comm && p.commission >= tol) reason = 'Komisyon kaydı pazaryerinde henüz yok';
+      else {
+        // Komisyon oranı aynıysa fark satış tutarındadır (indirim / kupon); satış aynıysa komisyondadır
+        const dr = sales - p.revenue, sameRate = Math.abs((sales ? comm / sales : 0) - (p.revenue ? p.commission / p.revenue : 0)) < 0.003;
+        reason = Math.abs(dr) < tol ? `Komisyon farklı: pazaryeri ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)}`
+          : sameRate ? (dr < 0 ? 'Satış tutarı düşük: indirim, kupon ya da kısmi iade' : 'Satış tutarı panelden yüksek')
+          : `Satış ve komisyon farklı (pazaryeri komisyonu ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)})`;
+      }
+      diffs.push({ id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, reason, sales, commission: comm, estRevenue: dead ? 0 : p.revenue, estCommission: dead ? 0 : p.commission });
     }
   }
   diffs.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-  const supported = (await getChannels(env, db)).filter((c) => c.enabled && !c.demo && c.settlements).map((c) => c.id);
-  return { from, to, totals: { ...tot, checked: orders.length, mismatched: diffs.length }, days: days.slice(0, 120), types, diffs: diffs.slice(0, 100), supported };
+  const supported = (await getChannels(env, db)).filter((c) => c.enabled && c.settlements).map((c) => c.id);
+  const um = unmatched.reduce((a, r) => a + (Number(r.amount) || 0), 0), period = types.reduce((a, r) => a + (Number(r.amount) || 0), 0);
+  return {
+    from, to, lateBefore: late, supported, days, types, diffs: diffs.slice(0, 100), unmatched: unmatched.slice(0, 50),
+    totals: { ...tot, period: r2(period), checked, matched: checked - diffs.length, mismatched: diffs.length, limited: orders.length >= 3000, unmatched: unmatched.length, unmatchedAmount: r2(um) },
+  };
 }
 
 export async function listInvoices(env, db, q = {}) {

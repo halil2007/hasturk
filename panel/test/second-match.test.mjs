@@ -172,3 +172,36 @@ test('eski "aynı ürün, bağla" (dup_ok) bağları geçişte işaretlenir; Kan
   const s = await secondSuggestions(db);
   assert.deepEqual(s.items.map((x) => x.remote_id), ['hb2']);
 });
+
+test('Sipariş → Ürünle eşleştir: ilanı panelde olmayan satır doğrudan bağlanır (2. ilan), stok bir kez düşer; barkodlu satır kanaldaki ilanı bulur; yetki ister', async () => {
+  resetChannels();
+  const db = await setup();
+  await setSetting(db, 'stock_sync', true);
+  await setSetting(db, 'stock_since', 1000);
+  const env = { PANEL_PASSWORD: 'x', DB: db, DEMO: '1' };
+  const ctx = { waitUntil() {} };
+  const call = (path, user, b) => api(new Request('https://panel.test/api/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }), env, ctx, db, path, user);
+  const staff = (perms) => ({ id: 9, name: 'Personel', role: 'staff', perms });
+  // İlanı henüz panele gelmemiş satır (remote_key 'hb-yeni', listings'te yok)
+  const [oid] = await saveOrders(db, HB, [order('O9', 'hb-yeni', 2)]);
+  await applyStock(db, [oid]);
+  assert.equal(await stock(db), 7);
+  const path = `orders/${encodeURIComponent(oid)}/link-item`, b = { line_id: 'O9-1', product_id: 1 };
+  await assert.rejects(() => call(path, staff(['orders']), b), (e) => e.status === 403);
+  const r = await (await call(path, staff(['orders', 'products']), b)).json();
+  assert.equal(r.linked, 1); assert.equal(r.extra, true, 'ürünün kanalda ilanı vardı: 2. ilan');
+  assert.deepEqual({ ...(await first(db, 'SELECT product_id, extra_link FROM listings WHERE channel = ? AND remote_id = ?', HB, 'hb-yeni')) }, { product_id: 1, extra_link: 1 });
+  assert.equal((await first(db, 'SELECT product_id FROM order_items WHERE order_id = ?', oid)).product_id, 1);
+  assert.equal(await stock(db), 5, 'stok bir kez düştü');
+  await call(path, staff(['orders', 'products']), b);
+  await applyStock(db, [oid]);
+  assert.equal(await stock(db), 5, 'tekrar bağlama çift düşmez');
+  // remote_key'siz, barkodlu satır: kanaldaki aynı barkodlu bağlanmamış ilan (hb3) kullanılır, yeni ilan açılmaz
+  const o2 = order('O10', '', 1); o2.items[0].barcode = '8690000000042';
+  const [oid2] = await saveOrders(db, HB, [o2]);
+  await run(db, "UPDATE order_items SET product_id = NULL, remote_key = NULL WHERE order_id = ?", oid2);
+  await call(`orders/${encodeURIComponent(oid2)}/link-item`, staff(['orders', 'products']), { line_id: 'O10-1', product_id: 1 });
+  assert.equal((await L(db, 'hb3')).product_id, 1);
+  assert.equal((await first(db, 'SELECT remote_key, product_id FROM order_items WHERE order_id = ?', oid2)).remote_key, 'hb3');
+  assert.equal((await first(db, 'SELECT COUNT(*) AS n FROM listings WHERE channel = ? AND remote_id = ?', HB, '8690000000042')).n, 0);
+});

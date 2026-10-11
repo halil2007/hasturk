@@ -216,6 +216,49 @@ export function demo(meta) {
     create: async (kind, b) => { const id = 9000 + camps.length + 1; camps.push({ campaignId: id, name: b.name, description: b.description, startDate: b.startDate, endDate: b.endDate, status: 1, limit: b.maxCartCount || 0 }); return { campaignId: id }; },
     cancel: async (id) => { const c = camps.find((x) => String(x.campaignId) === String(id)); if (c) c.status = 3; },
   };
+  // Örnek hakediş (Trendyol cari ekstresi / Hepsiburada muhasebe işlemleri gibi): teslim edilen siparişlerin satış, komisyon,
+  // indirim, stopaj ve iade kayıtları; ödeme günü (Trendyol: vadenin ardından gelen çarşamba, Hepsiburada: vade günü).
+  // Birkaç örnek fark: satıcı kuponu (panelde görünmeyen indirim) ve bir üründe farklı komisyon — mutabakat ekranını denemek için.
+  const STL_RATE = { trendyol: 24, hepsiburada: 21.6 };
+  async function settlements(since, until) {
+    const D = 864e5, now = Date.now(), rate = STL_RATE[ch] || 20, out = [];
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const payDay = (t) => {
+      // Türkiye saatiyle gün başı + 12 saat; Trendyol vadenin ardından gelen ilk çarşamba öder
+      let d = Date.parse(dayKey(t) + 'T09:00:00Z');
+      if (ch === 'trendyol') while (new Date(d).getUTCDay() !== 3) d += D;
+      return d;
+    };
+    for (const o of await fetchOrders(since - 20 * D, Math.min(until, now))) {
+      if (!['delivered', 'returned'].includes(o.status)) continue;
+      const r = rng(o.orderNumber + 'stl'), at = o.orderedAt + 4 * D + Math.floor(r() * D);
+      if (at < since || at > until || at > now) continue;
+      const due = payDay(at + (ch === 'trendyol' ? 21 : 14) * D);
+      const rec = (id, type, amount, commission = 0, t = at, dd = due) => out.push({ remoteId: `${o.orderNumber}-${id}`, date: t, type, rawType: '', orderNumber: o.orderNumber,
+        amount: r2(amount), commission: r2(commission), paymentDate: dd, dueDate: dd, paid: dd < now - D / 2, paymentId: dd < now - D / 2 ? `DEMO-${dayKey(dd)}` : '' });
+      const coupon = r() < 0.06, ty = r() < 0.05;
+      for (const l of o.items) {
+        if (l.status === 'cancelled') continue;
+        const cr = l.sku === 'KL-15' && ch === 'trendyol' ? 26.4 : rate, com = (l.total * cr) / 100;
+        if (ch === 'trendyol') rec(`${l.lineId}-S`, 'Satış', l.total - com, com);
+        else { rec(`${l.lineId}-P`, 'Satış', l.total); rec(`${l.lineId}-C`, 'Komisyon', -com, com); }
+        if (o.status === 'returned') {
+          const rt = at + 6 * D, rd = payDay(rt + (ch === 'trendyol' ? 21 : 14) * D);
+          if (rt <= now) {
+            if (ch === 'trendyol') rec(`${l.lineId}-R`, 'İade', -(l.total - com), -com, rt, rd);
+            else { rec(`${l.lineId}-R`, 'İade', -l.total, 0, rt, rd); rec(`${l.lineId}-CR`, 'Komisyon', com, -com, rt, rd); }
+          }
+        }
+      }
+      // Satıcının karşıladığı kupon (%5) ve Trendyol'un karşıladığı indirim (ay sonu faturayla geri ödenir)
+      if (coupon && o.status === 'delivered') { const v = o.total * 0.05; rec('K', ch === 'trendyol' ? 'Kupon' : 'Kampanya indirimi', -(v - (v * rate) / 100), -(v * rate) / 100); }
+      if (ty && ch === 'trendyol' && o.status === 'delivered') rec('TY', 'Trendyol kuponu', -50, 0);
+      // Stopaj (KDV hariç satışın %1'i) ve Hepsiburada kargo payı: ayrı kesinti, mutabakata girmez
+      rec('ST', 'Stopaj', -(o.total / 1.2) * 0.01);
+      if (ch === 'hepsiburada') rec('KG', 'Kargo', -(49.9 + Math.floor(r() * 4) * 10));
+    }
+    return out;
+  }
   // ikas örneği: gerçek ikas gibi gönderi "ikas Kargo ile Gönder" ile açılır; siparişi yenileyince ikas Kargo gönderisi gelmiş olur
   const isIkas = meta.type === 'ikas';
   async function fetchOne(remoteId) {
@@ -228,7 +271,7 @@ export function demo(meta) {
     ...meta, enabled: true, missing: [], demo: true,
     caps: { accept: 'remote', split: 'local', pack: isIkas ? 'external' : 'remote', ...(isIkas ? { external: { label: 'ikas Kargo ile Gönder', url: 'https://demo.myikas.com/admin/order/view/' } } : {}), ship: isIkas ? 'local' : 'remote', label: 'remote', cargo: isIkas ? false : 'change', cancelPackage: true, createProduct: ['ikas', 'woocommerce', 'shopify'].includes(meta.type), price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
     fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, ...(isIkas ? { fetchOne } : { pack }), label, cargoOptions, changeCargo, cancelPackage: ok,
-    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim, ...(ch === 'hepsiburada' ? { campaigns } : {}) } : {}),
+    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim, settlements, ...(ch === 'hepsiburada' ? { campaigns } : {}) } : {}),
     ...(['n11', 'idefix'].includes(ch) ? { catalog } : {}),
     ...(isIkas ? { storeCategories: async () => [...new Set(DEMO_PRODUCTS.map((p) => p[9]))].map((c, i) => ({ id: 'K' + (i + 1), name: c.split(' › ').pop(), path: c.split(' › ').slice(0, -1).join(' › ') })) } : {}),
     createProduct: async (pr, opts = {}) => {

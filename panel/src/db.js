@@ -337,6 +337,12 @@ export const MIGRATIONS = [
   'ALTER TABLE products ADD COLUMN origin TEXT',
   // İlanın kanaldaki satış sayfası (kanal veriyorsa; ör. Trendyol productUrl): panelde ürüne basınca açılır
   'ALTER TABLE listings ADD COLUMN url TEXT',
+  // Hakediş: kanalın gönderdiği ham kayıt türü ("Diğer" yazılan tanınmayan türler için) ve rapor dizinleri.
+  // Ödeme günü her kayıtta dolu olsun (vade yoksa ödeme, o da yoksa kayıt tarihi): rapor vade dizininden okur.
+  'ALTER TABLE settlements ADD COLUMN raw_type TEXT',
+  'UPDATE settlements SET due_date = COALESCE(payment_date, date) WHERE due_date IS NULL',
+  'CREATE INDEX IF NOT EXISTS settlements_date ON settlements(date)',
+  'CREATE INDEX IF NOT EXISTS settlements_open ON settlements(channel, date) WHERE paid = 0',
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

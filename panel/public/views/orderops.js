@@ -627,7 +627,7 @@ ${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">
             ${o.items.map((i) => html`<div class="li" style="${DEAD_LINE(i.status) ? 'opacity:.5' : ''}">${thumb(i.product_image || i.image, i.name)}
               <div style="min-width:0;flex:1"><div class="pname" style="font-weight:650">${i.product_name || i.name}</div>
                 <div class="muted small">${[i.sku, i.barcode].filter(Boolean).join(' · ')}${i.status === 'cancelled' ? ' · İptal' : i.status === 'returned' ? ' · İade' : ''}</div>
-                ${i.product_id ? html`<div class="tiny muted">Stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--amber)">Panelde eşleşmemiş — <a class="link" href="#/eslestirme">eşleştir</a></div>`}</div>
+                ${i.product_id ? html`<div class="tiny muted">Stok: <b>${i.product_stock}</b></div>` : html`<div class="tiny" style="color:var(--amber)">Panelde eşleşmemiş · stok düşmedi <button class="btn sm" style="margin-left:6px" data-linkitem="${i.line_id}"><i class="ico ico-link"></i>Ürünle eşleştir</button></div>`}</div>
               <div style="text-align:right" class="num"><div><b>${i.quantity}</b> × ${money(i.unit_price)}</div><div class="muted small">${money(i.total)}</div></div></div>`)}
           </div>
           <div class="card">
@@ -661,6 +661,17 @@ ${o.missing_n >= 2 ? html`<span class="pill bad" title="${o.missing_why || ''}">
     mountOps($('[data-ops]', s.body), id, { mode: 'sheet', onChange: async () => { onChange && onChange(); } });
   };
   s.body.addEventListener('click', (e) => {
+    const li = e.target.closest('[data-linkitem]');
+    if (li) busy(li, async () => {
+      const o = d.order, it = o.items.find((x) => String(x.line_id) === li.dataset.linkitem);
+      if (!it) return;
+      // Ürün aranıp doğrudan bağlanır; ürünün bu kanalda zaten ilanı varsa "2. ilan olarak bağla" sorulur
+      const { findProduct, guessQ } = await import('./match.js');
+      findProduct({ channel: o.channel, remote_id: it.remote_key || '' }, async () => { toast('Eşleştirildi, stok güncellendi'); await load(); onChange && onChange(); }, null, {
+        title: 'Hangi ürünle eşleşsin?', q: guessQ(it),
+        link: (pid) => api(`orders/${encodeURIComponent(id)}/link-item`, { method: 'POST', body: { line_id: it.line_id, product_id: pid } }),
+      });
+    });
     if (e.target.closest('[data-copy]')) {
       const o = d.order, a = o.address || {};
       navigator.clipboard.writeText([a.name || o.customer, a.line, [a.district, a.city].filter(Boolean).join(' / '), a.phone || o.phone].filter(Boolean).join('\n')).then(() => toast('Adres kopyalandı'), () => toast('Kopyalanamadı', true));

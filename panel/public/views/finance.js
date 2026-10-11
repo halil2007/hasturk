@@ -138,31 +138,53 @@ export async function financeView(el, rest, query = {}) {
   }
   // Hakediş: pazaryerinin ödeme günleri (ödenen / ödenecek), kayıt türleri ve mutabakat (pazaryeri hakedişi ≠ panel tahmini)
   let stl = null;
+  const dmy = (d) => String(d || '').split('-').reverse().join('.');
   function drawSettlements() {
     const box = $('[data-stl]', el);
-    if (!stl) return render(box, html`<div class="card-pad"><h2>Hakediş</h2></div><div class="empty"><i class="ico ico-sync spin"></i></div>`);
-    if (stl.locked) return render(box, html`<div class="card-pad"><h2>Hakediş</h2></div>${html`<div class="notice small" style="margin:12px"><i class="ico ico-key"></i><div><b>${'Hakediş takibi'} Profesyonel ve Kurumsal pakette.</b> Pazaryerinin kestiği faturalar ve hakediş ödemeleri burada görünür. <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div></div>`}`);
-    const t = stl.totals, today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
-    render(box, html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:220px"><h2>Hakediş</h2><div class="muted small">Pazaryerinin hesap ekstresinden: ödeme günleri, ödenen ve ödenecek tutarlar</div></div>
-        ${isAdmin() ? html`<button class="btn sm" data-act="stlsync"><i class="ico ico-sync"></i>Yenile</button>` : ''}</div>
-      ${!stl.supported.length && !stl.days.length ? html`<div class="empty">${activeChannels().some((c) => (c.enabled || c.demo) && ['trendyol', 'hepsiburada'].includes(c.type)) ? 'Hakediş bilgisi Trendyol ve Hepsiburada\'dan gelir; henüz veri yok.' : 'Hakediş bilgisi Trendyol ve Hepsiburada\'dan gelir; bu kanalları bağlayınca burada görünür.'}</div>` : html`
+    const head = (sub = '') => html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:200px"><h2>Hakediş</h2><div class="muted small">${sub || 'Pazaryerinin size ödediği ve ödeyeceği tutarlar'}</div></div>
+      ${isAdmin() && stl && !stl.locked ? html`<button class="btn sm" data-act="stlsync"><i class="ico ico-sync"></i>Yenile</button>` : ''}</div>`;
+    if (!stl) return render(box, html`${head()}<div class="empty"><i class="ico ico-sync spin"></i></div>`);
+    if (stl.locked) return render(box, html`${head()}<div class="notice small" style="margin:12px"><i class="ico ico-key"></i><div><b>Hakediş takibi Profesyonel ve Kurumsal pakette.</b> Pazaryerinin ödemeleri ve kestiği faturalar burada görünür. <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div></div>`);
+    if (stl.error) return render(box, html`${head()}<div class="notice small bad" style="margin:12px"><i class="ico ico-warn"></i><div><b>Hakediş bilgisi açılamadı.</b> ${stl.error} <button class="btn sm" data-act="stlretry">Tekrar dene</button></div></div>`);
+    const t = stl.totals, today = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10), late = new Date((stl.lateBefore || 0) + 3 * 3600e3).toISOString().slice(0, 10);
+    if (!stl.supported.length && !stl.days.length) return render(box, html`${head()}<div class="empty">Hakediş bilgisi Trendyol ve Hepsiburada'dan gelir. Bu kanalları bağlayınca burada görünür.</div>`);
+    if (f.channel && !stl.supported.includes(f.channel) && !stl.days.length) return render(box, html`${head()}<div class="empty">${ch(f.channel).name} hakediş bilgisi vermiyor. Hakediş Trendyol ve Hepsiburada'dan gelir.</div>`);
+    if (!stl.days.length && !stl.types.length && !t.upcoming) return render(box, html`${head()}<div class="empty">Henüz hakediş kaydı yok.${isAdmin() ? ' “Yenile” ile pazaryerinden alın.' : ' Kayıtlar 6 saatte bir alınır.'}</div>`);
+    // Yaklaşan (ödenmemiş: en yakın gün üstte, gecikenler en üstte) ve dönemde ödenen günler (en yeni üstte)
+    const last = new Date(Math.min(stl.to, Date.now()) - 1 + 3 * 3600e3).toISOString().slice(0, 10);
+    const upc = stl.days.filter((x) => x.due).sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)), paid = stl.days.filter((x) => !x.due && x.paid && x.d <= last);
+    const tag = (x) => x.d > today ? html`<span class="pill info tiny">bekleniyor</span>` : x.d === today ? html`<span class="pill info tiny">bugün</span>`
+      : x.d < late ? html`<span class="pill bad tiny">gecikti</span>` : html`<span class="pill tiny">işleniyor</span>`;
+    const dayTable = (rows, k, more, empty, withTag) => html`<div class="table-wrap"><table class="t stl-t"><thead><tr><th>Ödeme günü</th><th>Kanal</th><th class="r">Tutar</th><th class="r m-hide">Kayıt</th></tr></thead><tbody>
+        ${rows.slice(0, f[more] ? 200 : 8).map((x) => html`<tr><td class="small" style="white-space:nowrap">${dmy(x.d)} ${withTag ? tag(x) : ''}</td><td>${chLogo(x.channel, true)}</td>
+          <td class="r num" style="font-weight:650;color:${x[k] < 0 ? 'var(--bad)' : 'inherit'}">${money(x[k])}</td><td class="r num muted m-hide">${n(x.n)}</td></tr>`)}
+        ${!rows.length ? html`<tr><td colspan="4" class="empty">${empty}</td></tr>` : ''}
+      </tbody></table></div>${rows.length > 8 && !f[more] ? html`<div class="pager"><button class="btn sm" data-act="stlmore" data-k="${more}">Tümünü göster (${n(rows.length)})</button></div>` : ''}`;
+    render(box, html`${head()}
       <div class="kpis" style="padding:0 16px 12px">
-        <div class="kpi"><div class="label">Ödenecek (vadesi gelmemiş)</div><div class="value num">${money0(t.upcoming - t.overdue)}</div></div>
-        <div class="kpi"><div class="label">Vadesi geçmiş, ödenmemiş</div><div class="value num" style="color:${t.overdue ? 'var(--bad)' : 'inherit'}">${money0(t.overdue)}</div></div>
-        <div class="kpi"><div class="label">Dönemde ödenen</div><div class="value num">${money0(t.paid)}</div></div>
-        <div class="kpi"><div class="label">Mutabakat</div><div class="value num" style="color:${t.mismatched ? 'var(--amber, #b45309)' : 'var(--good)'}">${t.mismatched ? `${n(t.mismatched)} fark` : 'uyumlu'}</div><div class="delta flat">${n(t.checked)} sipariş karşılaştırıldı</div></div>
+        <div class="kpi"><div class="label">Ödenecek</div><div class="value num">${money0(t.upcoming - t.overdue)}</div><div class="delta flat">henüz ödenmedi</div></div>
+        <div class="kpi"><div class="label">Geciken</div><div class="value num" style="color:${t.overdue ? 'var(--bad)' : 'inherit'}">${money0(t.overdue)}</div><div class="delta flat">ödeme günü 3 günden fazla geçti</div></div>
+        <div class="kpi"><div class="label">Bu dönemde ödenen</div><div class="value num">${money0(t.paid)}</div><div class="delta flat">ödeme gününe göre</div></div>
+        <div class="kpi"><div class="label">Mutabakat</div><div class="value num" style="color:${t.mismatched ? 'var(--warn, #b45309)' : 'var(--good)'}">${!t.checked ? '—' : t.mismatched ? `${n(t.mismatched)} fark` : 'Uyumlu'}</div><div class="delta flat">${n(t.checked)} sipariş kontrol edildi</div></div>
       </div>
-      <div class="table-wrap"><table class="t"><thead><tr><th>Ödeme günü</th><th>Kanal</th><th class="r">Ödenen</th><th class="r">Ödenecek</th><th class="r">Kayıt</th></tr></thead><tbody>
-        ${stl.days.slice(0, 40).map((x) => html`<tr><td class="small" style="white-space:nowrap">${x.d.split('-').reverse().join('.')}${x.d > today ? html` <span class="pill info" style="font-size:11px">ileri</span>` : x.due && x.d < today ? html` <span class="pill bad" style="font-size:11px">gecikti</span>` : ''}</td>
-          <td>${chLogo(x.channel, true)}</td><td class="r num">${x.paid ? money(x.paid) : '—'}</td><td class="r num" style="font-weight:650">${x.due ? money(x.due) : '—'}</td><td class="r num muted">${n(x.n)}</td></tr>`)}
-        ${!stl.days.length ? html`<tr><td colspan="5" class="empty">Kayıt yok${isAdmin() ? ' — “Hakedişi çek” ile alın' : ''}</td></tr>` : ''}
-      </tbody></table></div>
-      ${stl.types.length ? html`<div class="row wrap" style="gap:8px;padding:12px 16px">${stl.types.map((x) => html`<span class="chip">${x.type} <b class="num" style="margin-left:4px;color:${x.amount < 0 ? 'var(--bad)' : 'inherit'}">${money0(x.amount)}</b></span>`)}</div>` : ''}
-      ${stl.diffs.length ? html`<details style="padding:0 16px 14px"><summary style="cursor:pointer;font-weight:650">Mutabakat farkları (${n(stl.diffs.length)}) — pazaryerinin hakedişi panelin tahmininden farklı olan siparişler</summary>
-        <div class="table-wrap" style="margin-top:8px"><table class="t"><thead><tr><th>Sipariş</th><th class="r">Panel tahmini</th><th class="r">Pazaryeri hakedişi</th><th class="r">Fark</th></tr></thead><tbody>
-        ${stl.diffs.map((x) => html`<tr><td>${chLogo(x.channel, true)} <b>#${x.order_number}</b> <span class="muted tiny">${date(x.ordered_at)}</span></td><td class="r num">${money(x.expected)}</td><td class="r num">${money(x.actual)}</td>
+      <div class="card-pad" style="padding-top:0;padding-bottom:6px"><b class="small">Yaklaşan ödemeler</b></div>
+      ${dayTable(upc, 'due', 'stlup', 'Bekleyen ödeme yok', true)}
+      <div class="card-pad" style="padding-bottom:6px"><b class="small">Bu dönemde ödenenler</b></div>
+      ${dayTable(paid, 'paid', 'stlpaid', 'Bu dönemde ödeme yok', false)}
+      ${stl.types.length ? html`<div style="padding:12px 16px 4px"><div class="small" style="font-weight:650;margin-bottom:6px">Dönemin kayıtları <span class="muted">· toplam ${money0(t.period)}</span></div><div class="row wrap" style="gap:8px">${stl.types.map((x) => html`<span class="chip" title="${x.raw ? 'Kanalın gönderdiği tür: ' + x.raw : `${n(x.n)} kayıt`}">${x.type} <b class="num" style="margin-left:4px;color:${x.amount < 0 ? 'var(--bad)' : 'inherit'}">${money0(x.amount)}</b></span>`)}</div></div>` : ''}
+      ${stl.diffs.length ? html`<details style="padding:8px 16px 4px"><summary style="cursor:pointer;font-weight:650">Farklı çıkan siparişler (${n(stl.diffs.length)})</summary>
+        <div class="muted tiny" style="margin:6px 0">Pazaryerinin ödediği tutar, panelin hesabından farklı. Fark nedeni her satırda yazıyor.</div>
+        <div class="table-wrap"><table class="t stl-t"><thead><tr><th>Sipariş</th><th class="r m-hide">Panel hesabı</th><th class="r m-hide">Pazaryeri</th><th class="r">Fark</th></tr></thead><tbody>
+        ${stl.diffs.map((x) => html`<tr><td><div>${chLogo(x.channel, true)} <a class="link" href="#/siparisler/${encodeURIComponent(x.id)}"><b>#${x.order_number}</b></a> <span class="muted tiny">${date(x.ordered_at)}</span></div><div class="tiny muted" style="white-space:normal;max-width:340px">${x.reason}</div><div class="tiny muted m-only">Panel ${money(x.expected)} · Pazaryeri ${money(x.actual)}</div></td>
+          <td class="r num m-hide">${money(x.expected)}</td><td class="r num m-hide">${money(x.actual)}</td>
           <td class="r num" style="font-weight:700;color:${x.diff < 0 ? 'var(--bad)' : 'var(--good)'}">${x.diff > 0 ? '+' : ''}${money(x.diff)}</td></tr>`)}
-        </tbody></table></div><div class="muted tiny" style="margin-top:6px">Tahmin: satış − komisyon (kargo ve diğer kesintiler pazaryerinde ayrı faturalanır). Farklar genelde kampanya indirimi, farklı komisyon oranı ya da kısmi iadeden kaynaklanır.</div></details>` : ''}`}`);
+        </tbody></table></div></details>` : ''}
+      ${t.unmatched ? html`<details style="padding:8px 16px 4px"><summary style="cursor:pointer;font-weight:650">Panelde olmayan siparişler (${n(t.unmatched)}${t.unmatched >= 1000 ? '+' : ''}) · ${money0(t.unmatchedAmount)}</summary>
+        <div class="muted tiny" style="margin:6px 0">Pazaryeri bu siparişler için ödeme kaydı gönderdi ama sipariş panelde yok (genelde panel kurulmadan önceki siparişler). Entegrasyonlar → Geçmiş siparişler ile aktarabilirsiniz.</div>
+        <div class="table-wrap"><table class="t"><thead><tr><th>Sipariş</th><th>Tarih</th><th class="r">Tutar</th></tr></thead><tbody>
+        ${stl.unmatched.map((x) => html`<tr><td>${chLogo(x.channel, true)} <b>#${x.order_number}</b></td><td class="small">${x.date ? date(x.date) : '—'}</td><td class="r num">${money(x.amount)}</td></tr>`)}
+        </tbody></table></div></details>` : ''}
+      <div class="muted tiny" style="padding:8px 16px 14px">Mutabakat: pazaryerinin ödediği tutar, panelin “satış − komisyon” hesabıyla karşılaştırılır. Kargo, stopaj ve hizmet bedeli ayrı kesildiği için hesaba girmez. Trendyol'un karşıladığı indirim ve kuponlar ay sonunda ayrıca ödenir. ${t.limited ? 'Dönemin en yeni 3.000 siparişi kontrol edildi.' : ''}</div>`);
   }
   async function load() {
     store.set('finance', { range: f.range });
@@ -178,7 +200,7 @@ export async function financeView(el, rest, query = {}) {
     stl = null; drawSettlements();
     [inv, stl] = locked('finance') ? [{ locked: true }, { locked: true }] : await Promise.all([
       api('invoices?' + p).catch((e) => ({ items: [], types: [], supported: [], total: 0, sum: 0, error: e.message })),
-      api('settlements?' + new URLSearchParams([...p].filter(([k]) => k !== 'type'))).catch(() => ({ totals: { paid: 0, upcoming: 0, overdue: 0, checked: 0, mismatched: 0 }, days: [], types: [], diffs: [], supported: [] })),
+      api('settlements?' + new URLSearchParams([...p].filter(([k]) => k !== 'type'))).catch((e) => ({ error: e.message })),
     ]);
     drawInvoices(); drawSettlements();
   }
@@ -189,6 +211,8 @@ export async function financeView(el, rest, query = {}) {
     itype: (t) => { f.itype = t.dataset.k; refresh(); },
     psort: async (t) => { f.psort = t.dataset.k; prod = null; drawProducts(); const [from, to] = span(); prod = await api('finance/products?' + new URLSearchParams({ from, to, sort: f.psort, ...(f.channel ? { channel: f.channel } : {}) })); drawProducts(); },
     pall: () => { f.pall = true; drawProducts(); },
+    stlmore: (t) => { f[t.dataset.k] = true; drawSettlements(); },
+    stlretry: (t) => busy(t, async () => { const [from, to] = span(); stl = await api('settlements?' + new URLSearchParams({ from, to, ...(f.channel ? { channel: f.channel } : {}) })).catch((e) => ({ error: e.message })); drawSettlements(); }),
     expadd: () => expenseForm(),
     expedit: (t) => expenseForm(exp.items.find((x) => x.id === Number(t.closest('tr').dataset.id))),
     expdel: async (t) => { const x = exp.items.find((y) => y.id === Number(t.closest('tr').dataset.id)); if (x && (await confirmBox(`"${x.title}" gideri silinsin mi?`, 'Sil'))) { await api(`expenses/${x.id}`, { method: 'DELETE' }); await load(); } },

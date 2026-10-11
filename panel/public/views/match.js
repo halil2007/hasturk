@@ -50,7 +50,7 @@ export async function matching(el, rest, query = {}) {
     $('[data-multi]', el).hidden = f.tab !== 'linked';
   }
 
-  const pendingCard = (l) => html`<div class="card stack" data-key="${l.channel}|${l.remote_id}">
+  const pendingCard = (l) => html`<div class="card stack" data-key="${l.channel}|${l.remote_id}" data-q="${[l.sku, l.barcode, l.name].map((v) => v || '').join('\u001f')}">
     <div class="row" style="align-items:flex-start">${thumb(l.image, l.name)}
       <div style="flex:1;min-width:0"><div style="font-weight:650">${l.name || l.remote_id}${vtag(l.variant_name, l.name)}</div>${ids(l)}
         <div class="row small wrap" style="margin-top:4px;gap:12px">${chBadge(l.channel)}<span class="muted">${money(l.price)}</span><span class="muted">Stok ${l.remote_stock ?? '—'}</span></div></div></div>
@@ -70,7 +70,7 @@ export async function matching(el, rest, query = {}) {
       <div style="flex:1;min-width:0"><a class="link" style="font-weight:700" href="#/urunler/${p.id}">${p.group_name && p.variant_name ? p.group_name : p.name}</a>${vtag(p.variant_name, p.group_name && p.variant_name ? p.group_name : p.name)}${ids(p)}</div>
       <span class="pill ${new Set(p.listings.map((l) => l.channel)).size > 1 ? 'good' : ''}">${new Set(p.listings.map((l) => l.channel)).size} kanal</span>
       <button class="btn sm ghost" data-act="addl" title="Aynı kanaldan bir ilan daha bağla">İlan ekle</button></div>
-    ${p.listings.map((l) => html`<div class="link-row" data-key="${l.channel}|${l.remote_id}">
+    ${p.listings.map((l) => html`<div class="link-row" data-key="${l.channel}|${l.remote_id}" data-q="${[l.sku, l.barcode, l.name].map((v) => v || '').join('\u001f')}">
       <span class="ch-name" style="min-width:120px">${chLogo(l.channel, true)}<span class="ellipsis">${ch(l.channel).short || ch(l.channel).name}</span>${ilanNo(p.listings, l) ? html`<span class="pill info" style="padding:2px 8px;font-size:11px">${ilanNo(p.listings, l)}</span>` : ''}</span>
       ${thumb(l.image, l.name, 'sm')}
       <div style="flex:1;min-width:0"><div class="ellipsis" style="font-weight:600">${l.name}${vtag(l.variant_name, l.name)}</div><div class="muted tiny ellipsis">${[l.sku && `SKU ${l.sku}`, l.barcode && `Barkod ${l.barcode}`, money(l.price), `stok ${l.remote_stock ?? '—'}`].filter(Boolean).join(' · ')}</div></div>
@@ -161,7 +161,7 @@ export async function matching(el, rest, query = {}) {
       const r = await api('match/approve', { method: 'POST', body: { channel: f.channel || undefined } }); toast(`${r.linked} öneri onaylandı`); loadSummary().catch(() => {}); refresh();
     }),
     auto: (t) => busy(t, async () => { const r = await api('sync', { method: 'POST', body: { force: true, listings: true } }); toast(r.skipped || `${(r.match && r.match.linked) || 0} ilan otomatik eşleşti, ${(r.match && r.match.created) || 0} yeni ürün`); loadSummary().catch(() => {}); refresh(); }),
-    find: (t) => findProduct(keyOf(t), () => done(t, 'Eşleştirildi')),
+    find: (t) => { const [sku, barcode, name] = (t.closest('[data-q]')?.dataset.q || '').split('\u001f'); findProduct(keyOf(t), () => done(t, 'Eşleştirildi'), undefined, { q: guessQ({ sku, barcode, name }) }); },
     sapprove: (t) => busy(t, async () => { const pid = Number(t.closest('[data-pid]').dataset.pid); const r = await api('products/second-match/approve', { method: 'POST', body: { ...keyOf(t), product_id: pid } }); done(t, r.extra ? `Bağlandı: ürün bu kanalda ${r.count} ilanla satılacak` : 'Bağlandı'); }),
     sreject: (t) => busy(t, async () => { const pid = Number(t.closest('[data-pid]').dataset.pid); await api('products/second-match/reject', { method: 'POST', body: { ...keyOf(t), product_id: pid } }); done(t, 'Tamam, bu öneri bir daha gösterilmez'); }),
     addl: (t) => { const p = (data.products || []).find((x) => x.id === Number(t.closest('[data-pid]').dataset.pid)); if (p) addListing(p, () => { toast('İlan bağlandı'); refresh(); }); },
@@ -173,14 +173,23 @@ export async function matching(el, rest, query = {}) {
 }
 
 // Ürün arayıp seçilen ürüne bağla. Aynı kanaldan zaten ilanı olan ürün seçilemez. (Kanal Ürünleri sayfası da kullanır)
-export function findProduct(key, onDone, endpoint = 'listings/link') {
+// opts.q: arama kutusuna hazır yazılacak metin (dizi verilirse sonuç veren ilk aday); opts.link(productId): bağlama isteğini kendisi yapar (Sipariş → Ürünle eşleştir)
+// İlanın SKU / barkod / adından arama adayları (sonuç veren ilki kutuya yazılır)
+export const guessQ = (x) => { const w = String(x.name || '').split(/\s+/).filter(Boolean); return [x.sku, x.barcode, x.name, w.slice(0, 3).join(' '), w.slice(0, 2).join(' ')]; };
+export function findProduct(key, onDone, endpoint = 'listings/link', opts = {}) {
   const s = sheet({
-    title: `${ch(key.channel).name} ilanını bağla`, size: 'narrow',
+    title: opts.title || `${ch(key.channel).name} ilanını bağla`, size: 'narrow',
     body: html`<div class="stack"><div class="search" style="min-width:0"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Ürün adı, SKU veya barkod" data-pq></div><div data-res class="stack" style="gap:6px"></div></div>`,
   });
-  const res = $('[data-res]', s.el);
-  const search = async (q) => {
-    const r = await api('products?limit=15&filter=all&q=' + encodeURIComponent(q)).catch(() => ({ products: [] }));
+  const res = $('[data-res]', s.el), inp = $('[data-pq]', s.el);
+  const search = async (q, tries) => {
+    let r = await api('products?limit=15&filter=all&q=' + encodeURIComponent(q)).catch(() => ({ products: [] }));
+    // İlk açılışta sonuç yoksa sıradaki aday denenir (SKU → barkod → ad → adın ilk kelimeleri); kutuya bulunan yazılır
+    for (const t of tries || []) {
+      if (r.products.length) break;
+      r = await api('products?limit=15&filter=all&q=' + encodeURIComponent(t)).catch(() => ({ products: [] }));
+      if (r.products.length) inp.value = t;
+    }
     render(res, r.products.length ? html`${r.products.map((p) => {
       const mine = (p.listings || []).find((l) => l.channel === key.channel);
       const same = mine && mine.remote_id === key.remote_id;
@@ -192,15 +201,18 @@ export function findProduct(key, onDone, endpoint = 'listings/link') {
   $('[data-pq]', s.el).addEventListener('input', debounce((e) => search(e.target.value.trim()), 250));
   res.addEventListener('click', (e) => {
     const b = e.target.closest('[data-pick]');
-    if (b) busy(b, async () => { await api(endpoint, { method: 'POST', body: { ...key, product_id: Number(b.dataset.pick) } }); s.close(); onDone(); });
+    if (b) busy(b, async () => { const pid = Number(b.dataset.pick); await (opts.link ? opts.link(pid) : api(endpoint, { method: 'POST', body: { ...key, product_id: pid } })); s.close(); onDone(); });
     const b2 = e.target.closest('[data-pick2]');
     if (b2) busy(b2, async () => {
       if (!(await confirmBox(twoText(key.channel, Number(b2.dataset.n)), 'Bağla'))) return;
-      await api('products/second-match/approve', { method: 'POST', body: { ...key, product_id: Number(b2.dataset.pick2) } }); s.close(); onDone();
+      const pid = Number(b2.dataset.pick2);
+      await (opts.link ? opts.link(pid) : api('products/second-match/approve', { method: 'POST', body: { ...key, product_id: pid } })); s.close(); onDone();
     });
   });
-  search('');
-  setTimeout(() => $('[data-pq]', s.el).focus(), 50);
+  const tries = [...new Set((Array.isArray(opts.q) ? opts.q : [opts.q]).map((x) => String(x || '').trim()).filter(Boolean))];
+  inp.value = tries[0] || '';
+  search(inp.value, tries.slice(1));
+  setTimeout(() => { inp.focus(); inp.select(); }, 50);
 }
 
 // Ürüne aynı (ya da başka) kanaldan bir ilan daha bağla: ilan ara, onay penceresi ("Bu ürün … 2 ilanla satılacak"). Eşleştirme ve ürün formu kullanır.

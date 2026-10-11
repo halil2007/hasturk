@@ -222,13 +222,15 @@
   }));
   $$('[data-year]').forEach((y) => { y.textContent = new Date().getFullYear(); });
 
-  // Entegrasyonlar mega menüsü (masaüstü): fareyle kısa gecikmeyle açılır / kapanır; klavyede odakla açılır, Escape kapatır;
-  // dokunmatik ekranda ilk dokunuş açar, ikinci dokunuş /entegrasyonlar'a gider. JS yoksa CSS hover / focus çalışır.
+  // Özellikler ve Entegrasyonlar mega menüleri (masaüstü): fareyle kısa gecikmeyle açılır / kapanır; klavyede odakla açılır, Escape kapatır;
+  // dokunmatik ekranda ilk dokunuş açar, ikinci dokunuş menünün sayfasına gider. Aynı anda tek panel açık kalır. JS yoksa CSS hover / focus çalışır.
+  const mms = [];
   $$('[data-mm]').forEach((dd) => {
     const trg = dd.querySelector(':scope > a'), panel = $('[data-mm-panel]', dd);
     if (!trg || !panel) return;
     let tm = null, touch = false, hush = false; // hush: Escape ile kapatıldı; odak tetikleyicide kalınca yeniden açılmaz
-    const set = (o) => { clearTimeout(tm); dd.classList.toggle('open', o); trg.setAttribute('aria-expanded', o); };
+    const set = (o) => { clearTimeout(tm); if (o) mms.forEach((m) => m.dd !== dd && m.close()); dd.classList.toggle('open', o); trg.setAttribute('aria-expanded', o); };
+    mms.push({ dd, close: () => { if (dd.classList.contains('open') || tm) set(false); } });
     const later = (o, ms) => { clearTimeout(tm); tm = setTimeout(() => set(o), ms); };
     dd.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') { hush = false; later(true, 120); } });
     dd.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') later(false, 220); });
@@ -243,8 +245,8 @@
       }
     });
     document.addEventListener('pointerdown', (e) => { if (dd.classList.contains('open') && !dd.contains(e.target)) set(false); });
-    // Başka bir menü öğesine geçilince hemen kapan (Özellikler açılırken üst üste binmesin)
-    $$('.nav > a, .nav > .dd:not([data-mm])').forEach((o) => o.addEventListener('pointerenter', () => { if (dd.classList.contains('open')) set(false); }));
+    // Başka bir menü öğesine geçilince hemen kapan (iki panel üst üste binmesin)
+    $$('.nav > a, .nav > .dd').forEach((o) => o !== dd && o.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch' && dd.classList.contains('open')) set(false); }));
   });
 
   // Mobil menü

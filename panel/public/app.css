@@ -1449,3 +1449,6 @@ body:not([data-route=""]) .topbar .top-add { display: none; }
 /* Kanalda aç bağlantısı (ürün adı): yazı rengi korunur */
 .link-plain { color: inherit; text-decoration: none; }
 .link-plain:hover, .link-plain:focus-visible { color: var(--primary); text-decoration: underline; }
+/* Hakediş tabloları: telefonda kayıt sayısı ve tutar sütunları gizlenir (tutarlar satır altında) */
+.stl-t .m-only { display: none; }
+@media (max-width: 640px) { .stl-t .m-hide { display: none; } .stl-t .m-only { display: block; } }

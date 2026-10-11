@@ -33,7 +33,6 @@ const S = (() => { const ctx = { window: {}, document: { documentElement: { clas
 const ver = Object.fromEntries(['site.css', 'site.js', 'config.js', 'gtag.js', 'logo.webp', 'icon.svg', 'icon-48.png', 'apple-touch-icon.png'].map((f) => [f, createHash('sha1').update(readFileSync(join(OUT, 'assets', f))).digest('hex').slice(0, 10)]));
 
 // ---------- üst menü açılır listeleri ----------
-const menuFeatures = FEATURES.map((f) => `<a class="mi" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><span><b>${esc(f.name)}</b><small>${esc(f.short)}</small></span></a>`).join('');
 // Test aşamasındaki kanalın etiketi (data-beta): panelde "Test yazısını kaldır" denince site.js kaldırır; data-beta-on olanlar o zaman görünür
 const testTag = (x, cls = 'pill soon') => (x.dev ? `<span class="${cls}">Geliştirme aşamasında</span>` : x.beta ? `<span class="${cls}" data-beta="${x.beta}">Test aşamasında</span>` : '');
 const featureCards = FEATURES.map((f) => `<a class="fcard reveal" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><b>${esc(f.name)}</b><span>${esc(f.short)}</span><ul>${f.points.slice(0, 3).map(([, t]) => `<li>${tick}${esc(t)}</li>`).join('')}</ul><em>İncele ${ico('i-arrow')}</em></a>`).join('');
@@ -85,6 +84,46 @@ const menuIntegrations = `<div class="dd-p mm" id="mm-int" data-mm-panel><div cl
   <div class="mega-foot mm-foot"><a href="/entegrasyonlar">Tüm entegrasyonlar ${ico('i-arrow')}</a><a href="/iletisim?konu=kanal"><span>Aradığınız yok mu?</span> Kanal talep edin ${ico('i-arrow')}</a><a href="/ozellikler/kargo-entegrasyonu">Kargo firmaları ${ico('i-arrow')}</a></div>
 </div></div>`;
 const mnavIntegrations = MM_GROUPS.map(([href, , , t, sub]) => `<a class="m-gi" href="${href}">${esc(t)}<small>${esc(sub)}</small></a>`).join('') + '<a class="m-gi m-req" href="/iletisim?konu=kanal">Aradığınız yok mu? Kanal talep edin</a>';
+// ---------- Özellikler mega menüsü (Entegrasyonlar ile aynı kalıp: gruplar · araçlar · öne çıkan kart · alt bağlantılar) ----------
+// Bağlantılar data.mjs'teki özellik sayfalarına gider (sayfası olmayan slug derlemeyi durdurur). Stok API menüde yer almaz.
+const fLink = (slug) => { if (!fById[slug]) throw new Error(`Özellikler menüsü: "${slug}" özellik sayfası yok`); return `/ozellikler/${slug}`; };
+const FM_GROUPS = [
+  ['siparis-yonetimi', 'Sipariş yönetimi', 'Tüm kanalların siparişleri tek listede'],
+  ['stok-senkronizasyonu', 'Stok senkronizasyonu', 'Bir kanalda satılan her yerde düşer'],
+  ['urun-yonetimi', 'Ürün yönetimi ve tek tuşla yayınla', 'Kategori eşleştirme, çok kanala yükleme'],
+  ['buybox-takibi', 'Buybox ve otomatik fiyat', 'Alt ve üst sınırla rakibe göre fiyat'],
+  ['kargo-ve-etiket', 'Kargo ve etiket', 'Ortak barkod, toplu ve termal etiket'],
+  ['musteri-sorulari-ve-iadeler', 'Müşteri soruları ve iadeler', 'Hazır cevaplar, iade onayı tek ekranda'],
+].map(([slug, t, sub]) => [fLink(slug), fById[slug].icon, fById[slug].color, t, sub]);
+const FM_TOOLS = [
+  ['kar-zarar', 'i-calc', 'c-purple', 'Kâr hesaplama', 'Sipariş başı net kâr'],
+  ['doviz-endeksli-fiyat', 'i-coin', 'c-teal', 'Döviz ile fiyat', 'Kurla otomatik TL'],
+  ['raporlar', 'i-chart', 'c-blue', 'Raporlar', 'Satış ve kanal analizi'],
+  ['mobil-yonetim', 'i-phone', 'c-green', 'Telefondan yönetim', 'Uygulama gibi çalışır'],
+  ['kargo-entegrasyonu', 'i-truck', 'c-orange', 'Kargo firmaları', 'Kendi anlaşmanızla'],
+  ['ekip-ve-guvenlik', 'i-users', 'c-pink', 'Personel ve yetkiler', 'Roller, iki adımlı giriş'],
+].map(([slug, ...r]) => [fLink(slug), ...r]);
+// Öne çıkan kart görseli: üç kanalın siparişleri tek panel listesinde toplanıyor (sipariş satırında kâr: siparis-yonetimi "Satırda kâr")
+const FM_ART = `<svg class="mm-art" viewBox="0 0 280 132" role="img" aria-label="Trendyol, Hepsiburada ve N11 siparişleri tek panel listesinde">
+  <g fill="none" stroke="#8fd4b0" stroke-width="1.6" stroke-dasharray="3 4" stroke-linecap="round"><path d="M104 27c22 0 22 39 44 39"/><path d="M104 66h44"/><path d="M104 105c22 0 22-39 44-39"/></g>
+  <g font-family="inherit" font-weight="800" font-size="9" text-anchor="middle" fill="#fff">
+    ${[[13, '#f27a1a', 'T'], [52, '#ff6000', 'hb'], [91, '#7b3fe4', 'n11']].map(([y, c, l]) => `<rect x="4" y="${y}" width="100" height="28" rx="9" fill="#fff" stroke="#dcefe5"/><rect x="10" y="${y + 6}" width="16" height="16" rx="5" fill="${c}"/><text x="18" y="${y + 17}">${l}</text><rect x="32" y="${y + 8}" width="46" height="5" rx="2.5" fill="#cfd8e6"/><rect x="32" y="${y + 16}" width="30" height="4" rx="2" fill="#e5ebf3"/>`).join('')}
+  </g>
+  <rect x="148" y="8" width="128" height="116" rx="12" fill="#fff" stroke="#c5e6d4"/>
+  <path d="M148 20a12 12 0 0 1 12-12h104a12 12 0 0 1 12 12v8H148z" fill="#18a058"/>
+  <text x="160" y="22" fill="#fff" font-family="inherit" font-weight="700" font-size="10">Siparişler</text><circle cx="262" cy="18" r="6" fill="#fff" fill-opacity=".25"/><text x="262" y="21" fill="#fff" font-family="inherit" font-weight="800" font-size="8" text-anchor="middle">3</text>
+  ${[[38, '#f27a1a'], [64, '#ff6000'], [90, '#7b3fe4']].map(([y, c]) => `<circle cx="162" cy="${y + 8}" r="4" fill="${c}"/><rect x="172" y="${y + 3}" width="44" height="5" rx="2.5" fill="#cfd8e6"/><rect x="172" y="${y + 11}" width="28" height="4" rx="2" fill="#e5ebf3"/><rect x="232" y="${y + 1}" width="34" height="14" rx="7" fill="#e5f7ec"/><text x="249" y="${y + 11}" fill="#138a4b" font-family="inherit" font-weight="750" font-size="8" text-anchor="middle">kâr</text>`).join('')}
+</svg>`;
+const menuFeatures = `<div class="dd-p mm" id="mm-feat" data-mm-panel><div class="mm-box">
+  <div class="mm-body">
+    <div class="mm-col mm-groups"><div class="mm-h">Satış yönetimi</div>${FM_GROUPS.map(([href, icon, color, t, sub]) => `<a class="mi" href="${href}"><span class="ic ${color}">${ico(icon)}</span><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></a>`).join('')}</div>
+    <div class="mm-col mm-pop"><div class="mm-h">Araçlar</div><div class="mm-tiles">${FM_TOOLS.map(([href, icon, color, t, sub]) => `<a class="mm-tile mm-tool" href="${href}"><span class="ic ${color}">${ico(icon)}</span><span><b>${esc(t)}</b><small>${esc(sub)}</small></span></a>`).join('')}</div></div>
+    <a class="mm-feat mm-feat-alt" href="/ozellikler/siparis-yonetimi"><span class="mm-kick">Tek ekran</span><span class="mm-vis">${FM_ART}</span><b>Tüm kanallar tek panelde</b><span class="mm-d">Trendyol, Hepsiburada, N11 ve ikas siparişleri tek listede; her satırda kârınız.</span><em>Sipariş yönetimini inceleyin ${ico('i-arrow')}</em></a>
+  </div>
+  <div class="mega-foot mm-foot"><a href="/ozellikler">Tüm özellikler ${ico('i-arrow')}</a><a href="/paketler">Fiyatlar ${ico('i-arrow')}</a><a data-demo href="/demo">Canlı demo ${ico('i-arrow')}</a></div>
+</div></div>`;
+const mnavFeatures = FM_GROUPS.map(([href, , , t, sub]) => `<a class="m-gi" href="${href}">${esc(t)}<small>${esc(sub)}</small></a>`).join('')
+  + `<div class="m-tools">${FM_TOOLS.map(([href, , , t]) => `<a href="${href}">${esc(t)}</a>`).join('')}</div>`;
 // Durum etiketi: Aktif / Test aşamasında (panelde test bitince site.js "Aktif"e çevirir) / Geliştirme aşamasında (henüz bağlanamaz)
 const statusTag = (x) => (x.dev ? '<span class="st dev">Geliştirme aşamasında</span>'
   : x.beta ? `<span class="st test" data-beta="${x.beta}">Test aşamasında</span><span class="st ok" data-beta-on="${x.beta}" hidden>Aktif</span>` : '<span class="st ok">Aktif</span>');
@@ -104,13 +143,12 @@ const featureTabs = () => { const list = TAB_FEATURES.map((s) => fById[s]); retu
     <div class="ft-txt"><div class="kicker">${esc(f.name)}</div><h3>${esc(f.h1[0])} <span class="grad">${esc(f.h1[1])}</span></h3><p>${esc(f.lead)}</p>
       <ul>${f.points.slice(0, 4).map(([, t, d]) => `<li>${tick}<span><b>${esc(t)}</b> ${esc(d)}</span></li>`).join('')}</ul>
       <a class="btn btn-primary" href="/ozellikler/${f.slug}">Nasıl çalışır, ne kazandırır? ${ico('i-arrow')}</a></div>
-    <div class="ft-vis">${f.img ? `<div class="browser"><div class="bar"><i></i><i></i><i></i><span>panel.hasturkcrm.com</span></div><img src="/img/${f.img}.jpg" width="1440" height="900" alt="${esc(f.name)} ekranı" loading="lazy"></div>` : MOCKS[f.mock]}</div>
+    <div class="ft-vis">${f.img ? `<div class="browser"><div class="bar"><i></i><i></i><i></i><span>panel.hasturkcrm.com</span></div><img src="/img/${f.img}.jpg?v=2610" width="1440" height="900" alt="${esc(f.name)} ekranı" loading="lazy"></div>` : MOCKS[f.mock]}</div>
   </div>`).join('')}</div>
 </div>`; };
-const mnavFeatures = FEATURES.map((f) => `<a href="/ozellikler/${f.slug}">${esc(f.name)}</a>`).join('');
 
 // ---------- ortak parçalar ----------
-const browser = (img, alt) => `<div class="browser"><div class="bar"><i></i><i></i><i></i><span>panel.hasturkcrm.com</span></div><img src="/img/${img}.jpg" width="1440" height="900" alt="${esc(alt)}"></div>`;
+const browser = (img, alt) => `<div class="browser"><div class="bar"><i></i><i></i><i></i><span>panel.hasturkcrm.com</span></div><img src="/img/${img}.jpg?v=2610" width="1440" height="900" alt="${esc(alt)}"></div>`;
 const MOCKS = {
   fx: `<div class="mockcard"><div class="mc-h"><b>Döviz kurları</b><span class="pill">TCMB · günlük</span></div>
     ${[['#1f6feb', '$', 'ABD doları', '34,12 ₺', 'USD 49,90 → 1.702,59 ₺'], ['#0e9f6e', '€', 'Euro', '37,48 ₺', 'EUR 39,00 → 1.461,72 ₺'], ['#7c3aed', '£', 'Sterlin', '44,61 ₺', 'GBP 25,00 → 1.115,25 ₺']].map(([c, b, n, r, ex]) => `<div class="mc-row"><span class="b" style="background:${c}">${b}</span><div><b>${n} · ${r}</b><small>${ex}</small></div><span class="mc-btn">Güncel</span></div>`).join('')}
