@@ -1,25 +1,15 @@
-// Hazır blog yazıları (bkz. blogseed-posts.js): ana panelde zamanlanmış görevde bir kez yayımlanır. Aynı adresli yazı varsa
-// dokunulmaz (elle düzenlenmiş / silinmiş yazı geri gelmez: yüklenenler "blog_seed" ayarında tutulur). Kapak görseli tanıtım
-// sitesinden (SITE_URL/img/blog/…) alınıp blog görseli olarak kaydedilir; site henüz yayımlanmadıysa sonraki çalışmada tekrar denenir.
+// Hazır blog yazıları: ana panelde zamanlanmış görevde yayın sırasına göre kademeli eklenir. Aynı adresli yazı varsa dokunulmaz
+// (elle düzenlenmiş / silinmiş yazı geri gelmez: eklenenler "blog_seed" ayarında tutulur). Kapak görseli tanıtım sitesinden
+// (SITE_URL/img/blog/…) alınıp blog görseli olarak kaydedilir; site henüz yayımlanmadıysa sonraki çalışmada tekrar denenir.
+//
+// Kaynak: public/_seed/ (Worker paketine girmez; paket küçük kalır, panel hızlı açılır). manifest.json: [{ slug, at, batch? }]
+// yayın sırası ve saati; posts/<slug>.json: yazının kendisi. Dışarıdan /_seed/ adresi açılmaz (index.js), yalnız Worker okur.
+// Yazı, yayın saatine 3 gün kala panele "ileri tarihli" olarak girer (Blog → zamanlanmış); sitede saati gelince görünür.
+// Bir çalışmada en fazla 15 yazı (kapak indirme isteği sınırı); gecikenler sonraki çalışmalarda tamamlanır.
 import { first, run } from './db.js';
 import { insertPost, siteUrl, MAX_IMAGE } from './blog.js';
-import { POSTS } from './blogseed-posts.js';
-import { POSTS_2A } from './blogseed-posts-2a.js';
-import { POSTS_2B } from './blogseed-posts-2b.js';
-import { POSTS_3A } from './blogseed-posts-3a.js';
-import { POSTS_3B } from './blogseed-posts-3b.js';
-import { POSTS_3C } from './blogseed-posts-3c.js';
-import { POSTS_3X } from './blogseed-posts-3x.js';
-// İkinci parti (10 yazı): 1 Ekim 2026'dan başlayarak her gün bir yazı, gün içinde farklı saatlerde (TR 09:00–17:00) yayımlanmış sayılır
-const AT = (i) => Date.UTC(2026, 9, 1 + i, 6 + ((i * 5) % 9), (i * 23) % 60);
-export const SECOND = [...POSTS_2A, ...POSTS_2B].map((p, i) => ({ ...p, at: AT(i) }));
-// Üçüncü parti (21 yazı, Ekim 2026): 11–31 Ekim her gün bir yazı (TR 09:00–17:00 arası farklı saat); üç dosyanın yazıları sırayla
-// karıştırılır (konu çeşitliliği). İleri tarihli yazı sitede tarihi gelince görünür.
-const AT3 = (i) => Date.UTC(2026, 9, 11 + i, 6 + ((i * 4 + 5) % 9), (i * 37 + 11) % 60);
-export const THIRD = [0, 1, 2, 3, 4, 5, 6].flatMap((i) => [POSTS_3A[i], POSTS_3B[i], POSTS_3C[i]]).filter(Boolean).map((p, i) => ({ ...p, at: AT3(i) }));
-// Ek yazılar (ana konumuz dışı): 2 Kasım'dan itibaren 3 günde bir
-const EXTRA = POSTS_3X.map((p, i) => ({ ...p, at: Date.UTC(2026, 10, 2 + i * 3, 7 + ((i * 3) % 7), (i * 29 + 7) % 60) }));
-const ALL = [...POSTS, ...SECOND, ...THIRD, ...EXTRA];
+
+export const AHEAD = 3 * 864e5, PER_RUN = 15;
 const REDATE = 'once:blog_redate_1';
 // Yayımlanmış hazır yazıların düzeltmeleri: veritabanındaki gövde hâlâ ilk yüklenen gövdeyse (SHA-256'sı from listesinde) bir kez
 // kaynaktaki güncel yazıyla değiştirilir; sahibi yazıyı elle düzenlediyse dokunulmaz. fields: gövdeyle birlikte güncellenecek diğer
@@ -43,6 +33,14 @@ const KEY = 'blog_seed';
 const TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 const newId = () => [...crypto.getRandomValues(new Uint8Array(10))].map((x) => x.toString(16).padStart(2, '0')).join('');
 
+// public/_seed/ dosyası (Worker'ın statik dosyalarından)
+export const assetSource = (env) => async (path) => {
+  if (!env.ASSETS) throw new Error('Statik dosya bağlantısı yok (wrangler.jsonc → assets.binding)');
+  const r = await env.ASSETS.fetch(new Request('https://assets.local/_seed/' + path));
+  if (!r.ok) throw new Error(`Hazır yazı dosyası okunamadı (${r.status}): ${path}`);
+  return r.json();
+};
+
 async function coverImage(env, db, file, fetcher) {
   const type = TYPES[String(file).split('.').pop().toLowerCase()];
   if (!type) throw new Error(`Desteklenmeyen kapak türü: ${file}`);
@@ -58,7 +56,7 @@ async function coverImage(env, db, file, fetcher) {
 }
 
 // Düzeltmeler (bkz. REVISIONS): gövdeler bir kez, kapaklar site yeni görseli verene kadar. Sonuç: düzeltilen yazılar ve yenilenen kapaklar
-async function revise(env, db, posts, revisions, fetcher, now) {
+async function revise(env, db, getPost, revisions, fetcher, now) {
   const row = await first(db, 'SELECT v FROM settings WHERE k = ?', REV);
   let st = null;
   try { st = row ? JSON.parse(row.v) : null; } catch { st = { covers: [] }; }
@@ -66,8 +64,10 @@ async function revise(env, db, posts, revisions, fetcher, now) {
   if (!st) {
     st = { covers: [], until: now + 14 * 864e5 };
     for (const [slug, r] of Object.entries(revisions)) {
-      const p = posts.find((x) => x.slug === slug), cur = p && await first(db, 'SELECT id, body FROM blog_posts WHERE slug = ?', slug);
+      const cur = await first(db, 'SELECT id, body FROM blog_posts WHERE slug = ?', slug);
       if (!cur || !r.from.includes(await sha256(String(cur.body ?? '')))) continue;
+      const p = await getPost(slug).catch(() => null);
+      if (!p) continue;
       const f = FIELDS.filter((k) => r.fields?.includes(k) && p[k] != null);
       await run(db, `UPDATE blog_posts SET body = ?${f.map((k) => `, ${k} = ?`).join('')}, updated_at = ? WHERE id = ? AND body = ?`, p.body, ...f.map((k) => p[k]), now, cur.id, cur.body);
       out.revised.push(slug);
@@ -76,7 +76,7 @@ async function revise(env, db, posts, revisions, fetcher, now) {
   }
   const left = [];
   for (const slug of st.covers || []) {
-    const p = posts.find((x) => x.slug === slug);
+    const p = await getPost(slug).catch(() => null);
     const old = p && await first(db, 'SELECT p.id, p.cover_id, i.name, i.data FROM blog_posts p JOIN blog_images i ON i.id = p.cover_id WHERE p.slug = ?', slug);
     if (!old || old.name !== p.cover) continue; // kapak elle değiştirilmiş / kaldırılmış
     try {
@@ -95,32 +95,45 @@ async function revise(env, db, posts, revisions, fetcher, now) {
   return out;
 }
 
-export async function blogSeed(env, db, { posts = ALL, fetcher = fetch, now = Date.now(), revisions = posts === ALL ? REVISIONS : {} } = {}) {
+// posts: (testler) yazıların kendisi; verilmezse kaynak (public/_seed) manifest'i okunur, yazılar gerektikçe tek tek alınır
+export async function blogSeed(env, db, { posts, source, fetcher = fetch, now = Date.now(), revisions } = {}) {
   if (env.TENANT_SLUG || env.DEMO) return null;
-  // İkinci parti önceden ileri tarihli (2 günde bir) yüklendiyse tarihleri bir kez Ekim başına çekilir; elle tarihi değiştirilmiş
-  // (artık ileri tarihli olmayan) yazıya dokunulmaz
-  if (posts === ALL && !(await first(db, 'SELECT 1 AS x FROM settings WHERE k = ?', REDATE))) {
-    await db.batch([
-      ...SECOND.map((p) => db.prepare('UPDATE blog_posts SET published_at = ? WHERE slug = ? AND published_at > ?').bind(p.at, p.slug, now)),
-      db.prepare("INSERT INTO settings (k, v) VALUES (?, '1') ON CONFLICT (k) DO NOTHING").bind(REDATE),
-    ]);
+  let list, getPost;
+  if (posts) { list = posts.map((p, i) => ({ ...p, i })); getPost = async (slug) => posts.find((p) => p.slug === slug) || null; }
+  else {
+    const src = source || assetSource(env);
+    list = (await src('manifest.json')).map((p, i) => ({ ...p, i }));
+    getPost = async (slug) => ({ ...(await src(`posts/${slug}.json`)), slug });
+    revisions = revisions || REVISIONS;
+    // İkinci parti önceden ileri tarihli (2 günde bir) yüklendiyse tarihleri bir kez Ekim başına çekilir; elle tarihi değiştirilmiş
+    // (artık ileri tarihli olmayan) yazıya dokunulmaz
+    if (!(await first(db, 'SELECT 1 AS x FROM settings WHERE k = ?', REDATE))) {
+      await db.batch([
+        ...list.filter((p) => p.batch === 2).map((p) => db.prepare('UPDATE blog_posts SET published_at = ? WHERE slug = ? AND published_at > ?').bind(p.at, p.slug, now)),
+        db.prepare("INSERT INTO settings (k, v) VALUES (?, '1') ON CONFLICT (k) DO NOTHING").bind(REDATE),
+      ]);
+    }
   }
-  const rev = Object.keys(revisions).length ? await revise(env, db, posts, revisions, fetcher, now) : { revised: [], covers: [] };
+  revisions = revisions || {};
+  const rev = Object.keys(revisions).length ? await revise(env, db, getPost, revisions, fetcher, now) : { revised: [], covers: [] };
   const row = await first(db, 'SELECT v FROM settings WHERE k = ?', KEY);
   const done = row ? JSON.parse(row.v) : [];
-  const todo = posts.filter((p) => !done.includes(p.slug));
+  // Sırası gelenler: yayın saatine 3 gün kalmış (ya da saati geçmiş) ve henüz eklenmemiş yazılar, en fazla PER_RUN
+  const due = list.filter((p) => !done.includes(p.slug) && (p.at == null || p.at <= now + AHEAD));
+  const todo = due.slice(0, PER_RUN);
   if (!todo.length) return rev.revised.length || rev.covers.length ? { added: [], skipped: [], errors: [], ...rev } : null;
-  const out = { added: [], skipped: [], errors: [], ...rev };
-  for (const [i, p] of todo.entries()) {
+  const out = { added: [], skipped: [], errors: [], ...rev, left: due.length - todo.length };
+  for (const [k, m] of todo.entries()) {
     try {
-      if (await first(db, 'SELECT id FROM blog_posts WHERE slug = ?', p.slug)) { out.skipped.push(p.slug); done.push(p.slug); continue; }
+      if (await first(db, 'SELECT id FROM blog_posts WHERE slug = ?', m.slug)) { out.skipped.push(m.slug); done.push(m.slug); continue; }
+      const p = posts ? m : { ...(await getPost(m.slug)), at: m.at };
       const cover_id = p.cover ? await coverImage(env, db, p.cover, fetcher) : null;
-      // Yayın tarihleri birkaç gün arayla geriye dağıtılır (hepsi aynı dakikada görünmesin); sıra listedeki sıradır
-      // p.day verilmişse yayın tarihi yüklemeden bu kadar gün sonradır (ileri tarihli yazı sitede o gün görünür: düzenli yayın)
-      const published_at = p.at != null ? p.at : p.day != null ? now + p.day * 864e5 + i * 60e3 : now - (posts.length - 1 - posts.indexOf(p)) * 2 * 864e5 - i * 60e3;
+      // at: yayın saati (ileri tarihli yazı sitede o saatte görünür); day: yüklemeden bu kadar gün sonra;
+      // ikisi de yoksa yayın tarihleri birkaç gün arayla geriye dağıtılır (hepsi aynı dakikada görünmesin)
+      const published_at = p.at != null ? p.at : p.day != null ? now + p.day * 864e5 + k * 60e3 : now - (list.length - 1 - m.i) * 2 * 864e5 - k * 60e3;
       await insertPost(db, { ...p, cover_id, status: 'published', published_at, author: p.author || 'Hastürk CRM' }, { name: 'Hastürk CRM' });
-      out.added.push(p.slug); done.push(p.slug);
-    } catch (e) { out.errors.push(`${p.slug}: ${e.message}`); }
+      out.added.push(m.slug); done.push(m.slug);
+    } catch (e) { out.errors.push(`${m.slug}: ${e.message}`); }
   }
   await run(db, "INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", KEY, JSON.stringify(done));
   return out;

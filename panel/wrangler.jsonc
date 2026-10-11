@@ -9,8 +9,11 @@
   "main": "src/index.js",
   "assets": {
     "directory": "./public",
-    // /api/* ve /img/* (ürün fotoğrafları, bkz. src/prodimg.js) her zaman koda gider; diğer adresler panel dosyalarıdır
-    "run_worker_first": ["/api/*", "/img/*"]
+    // Kod içinden okunur (env.ASSETS): hazır blog yazıları public/_seed/ altında, Worker paketine girmez (bkz. src/blogseed.js)
+    "binding": "ASSETS",
+    // /api/* ve /img/* (ürün fotoğrafları, bkz. src/prodimg.js) her zaman koda gider; /_seed/* dışarıya kapalıdır (yayın tarihi
+    // gelmemiş yazılar okunamasın); diğer adresler panel dosyalarıdır
+    "run_worker_first": ["/api/*", "/img/*", "/_seed/*"]
   },
   // Panel veritabanı (sipariş, ürün, stok). Kimliği yazılmadığı için ilk yayında Cloudflare otomatik oluşturur.
   "d1_databases": [

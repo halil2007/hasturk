@@ -100,6 +100,8 @@ const handler = {
   async route(req, env, ctx) {
     const url = new URL(req.url);
     if (url.pathname.startsWith('/img/')) return await productImage(req, env, ctx, url);
+    // Hazır blog yazıları (public/_seed): yalnız Worker okur; yayın tarihi gelmemiş yazılar dışarıdan görülmesin
+    if (url.pathname.startsWith('/_seed/')) return new Response('Bulunamadı', { status: 404 });
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? secure(await env.ASSETS.fetch(req)) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
     // Herkese açık uçlar: IP başına dakikada 120 istek (veritabanı yükü / kötüye kullanım)
