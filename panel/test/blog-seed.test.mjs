@@ -55,3 +55,11 @@ test('ikinci parti: 1 Ekim\'den itibaren günde bir (farklı saatlerde) yayımla
   assert.equal(await at(SECOND[1].slug), 5, 'elle değiştirilen tarih korunur');
   assert.equal(await at(SECOND[9].slug), SECOND[9].at, 'yeni yüklenen de Ekim tarihinde');
 });
+
+test('üçüncü parti: 11–31 Ekim her gün bir yazı, farklı saatler', async () => {
+  const { THIRD } = await import('../src/blogseed.js');
+  const days = THIRD.map((p) => new Date(p.at + 3 * 3600e3).toISOString().slice(0, 10));
+  assert.equal(new Set(days).size, THIRD.length, 'aynı güne iki yazı düşmez');
+  if (THIRD.length) { assert.equal(days[0], '2026-10-11'); assert.ok(days.at(-1) <= '2026-10-31'); }
+  for (const p of THIRD) { const h = new Date(p.at + 3 * 3600e3).getUTCHours(); assert.ok(h >= 9 && h <= 17); }
+});

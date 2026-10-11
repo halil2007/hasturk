@@ -6,10 +6,17 @@ import { insertPost, siteUrl, MAX_IMAGE } from './blog.js';
 import { POSTS } from './blogseed-posts.js';
 import { POSTS_2A } from './blogseed-posts-2a.js';
 import { POSTS_2B } from './blogseed-posts-2b.js';
+import { POSTS_3A } from './blogseed-posts-3a.js';
+import { POSTS_3B } from './blogseed-posts-3b.js';
+import { POSTS_3C } from './blogseed-posts-3c.js';
 // İkinci parti (10 yazı): 1 Ekim 2026'dan başlayarak her gün bir yazı, gün içinde farklı saatlerde (TR 09:00–17:00) yayımlanmış sayılır
 const AT = (i) => Date.UTC(2026, 9, 1 + i, 6 + ((i * 5) % 9), (i * 23) % 60);
 export const SECOND = [...POSTS_2A, ...POSTS_2B].map((p, i) => ({ ...p, at: AT(i) }));
-const ALL = [...POSTS, ...SECOND];
+// Üçüncü parti (21 yazı, Ekim 2026): 11–31 Ekim her gün bir yazı (TR 09:00–17:00 arası farklı saat); üç dosyanın yazıları sırayla
+// karıştırılır (konu çeşitliliği). İleri tarihli yazı sitede tarihi gelince görünür.
+const AT3 = (i) => Date.UTC(2026, 9, 11 + i, 6 + ((i * 4 + 5) % 9), (i * 37 + 11) % 60);
+export const THIRD = [0, 1, 2, 3, 4, 5, 6].flatMap((i) => [POSTS_3A[i], POSTS_3B[i], POSTS_3C[i]]).filter(Boolean).map((p, i) => ({ ...p, at: AT3(i) }));
+const ALL = [...POSTS, ...SECOND, ...THIRD];
 const REDATE = 'once:blog_redate_1';
 
 const KEY = 'blog_seed';
