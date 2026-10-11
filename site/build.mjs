@@ -212,7 +212,7 @@ const EXAMPLES = {
   </div>`,
   buybox: `<div class="ex">
     <div class="ex-txt reveal"><div class="kicker">Örnek senaryo</div><h2>Bir Günde Buybox Nasıl Yönetilir?</h2>
-      <p>Kural: en düşük fiyat <b>180 ₺</b>, en yüksek fiyat <b>230 ₺</b>, adım <b>1 ₺</b>. Panel 15 dakikada bir kontrol eder ve yalnız gerektiğinde fiyatı değiştirir.</p>
+      <p>Kural: en düşük fiyat <b>180 ₺</b>, en yüksek fiyat <b>230 ₺</b>, adım <b>1 ₺</b>. Panel gün boyu düzenli olarak kontrol eder ve yalnız gerektiğinde fiyatı değiştirir.</p>
       <p class="muted-s">Saatler ve fiyatlar örnektir.</p></div>
     <ol class="tline card reveal">${[
       ['09:00', 'Fiyatınız 205 ₺, buybox sizde.', 'Değişiklik gerekmez.', ''],
@@ -281,7 +281,7 @@ function intIntro(x) {
   const list = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a.join(''));
   const where = /pazaryeri/.test(x.kind) ? `${x.name} pazaryerindeki mağazanızı` : /market/.test(x.kind) ? `${x.name} mağazanızı` : `${x.name} sitenizi`;
   return [
-    `Hastürk CRM, ${where} resmi entegrasyon servisi üzerinden bağlar. ${x.name} siparişleriniz 15 dakikada bir kendiliğinden panele gelir; diğer pazaryerleri ve e-ticaret sitelerinizin siparişleriyle aynı listede, tek ekranda yönetilir.`,
+    `Hastürk CRM, ${where} resmi entegrasyon servisi üzerinden bağlar. ${x.name} siparişleriniz otomatik olarak panele gelir; diğer pazaryerleri ve e-ticaret sitelerinizin siparişleriyle aynı listede, tek ekranda yönetilir.`,
     `${x.name} entegrasyonunda desteklenen işlemler: ${list(on)}.`,
     `Ürünleriniz barkod ve stok koduyla eşleşir; bir kanalda satılan ürünün stoğu ${capOn(x, /^Stok/) ? `${x.name} dahil ` : ''}stok gönderimi açık tüm kanallarda düşer, böylece fazla satış yaşamazsınız. Komisyon, kargo ve diğer kesintilerle her siparişin gerçek kârını da aynı panelde görürsünüz.`,
   ];
@@ -307,7 +307,7 @@ function intFaq(x) {
   const track = !ship && capOn(x, /takip bildirimi|^Kargo bildirimi/) && [`Kargo takip numarası ${sx(x, 1)} nasıl iletilir?`, `Siparişi kendi kargo anlaşmanızla gönderin; kargo firması ve takip numarası panelden ${sx(x, 1)} bildirilir.`];
   return [
     [`${x.name} entegrasyonu nasıl yapılır?`, `${x.help} Ardından Hastürk CRM panelinde Entegrasyonlar sayfasındaki ${x.name} kartına bilgileri girip “Kaydet ve test et”e basın. Bağlantı hemen test edilir; siparişleriniz ve ürünleriniz birkaç dakika içinde gelmeye başlar.`],
-    capOn(x, /^Stok/) && [`${x.name} stok ve fiyatlarım otomatik güncellenir mi?`, `Evet. Stok gönderimini açtığınızda bir kanalda satılan ürünün stoğu ${where(x)} da kendiliğinden düşer; panelde değiştirdiğiniz fiyat ve stoklar en geç 15 dakika içinde ${sx(x, 1)} gönderilir.`],
+    capOn(x, /^Stok/) && [`${x.name} stok ve fiyatlarım otomatik güncellenir mi?`, `Evet. Stok gönderimini açtığınızda bir kanalda satılan ürünün stoğu ${where(x)} da kendiliğinden düşer; panelde değiştirdiğiniz fiyat ve stoklar otomatik olarak ${sx(x, 1)} gönderilir.`],
     courier || (ship && [`${x.name} siparişlerinin kargo etiketi nasıl alınır?`, ship]) || track,
     capOn(x, /^Ürün (yükleme|oluşturma)/) && [`Ürünlerimi panelden ${x.name} ${isSite(x) ? 'siteme' : 'mağazama'} yükleyebilir miyim?`, `Evet. Ürünü panelde bir kez tanımlayın; kategori ve özellik eşleştirmesiyle ${sx(x, 1)} gönderin. Görseller, varyantlar ve fiyat da birlikte gider.`],
     [`Birden fazla ${x.name} ${isSite(x) ? 'sitesi' : 'mağazası'} bağlayabilir miyim?`, `Evet. Birden fazla ${x.name} ${isSite(x) ? 'sitenizi' : 'mağazanızı'} aynı panelde ayrı mağazalar olarak bağlayabilirsiniz. Bağlanabilecek mağaza sayısı paketinize göre değişir; gerekirse ek mağaza alabilirsiniz.`],
