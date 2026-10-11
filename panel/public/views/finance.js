@@ -25,7 +25,7 @@ export async function financeView(el, rest, query = {}) {
   let d = null, inv = null;
   render(el, html`<div class="stack">
     <div class="ch-tabs" data-chs></div>
-    <div class="row wrap" style="align-items:center"><b style="margin-right:6px">Dönem:</b><div class="chips" data-ranges></div><span class="muted small" data-rlabel></span></div>
+    <div class="row wrap" style="align-items:center"><b style="margin-right:6px">Dönem:</b><div class="chips" data-ranges></div><span class="muted small" data-rlabel></span><span class="spacer"></span><button class="btn sm" data-health title="Komisyon, hakediş ve kargo verilerinin tutarlılığı"><i class="ico ico-check"></i>Veri sağlık kontrolü</button></div>
     <div class="kpis" data-kpis></div>
     <div class="stack">
       <div class="card"><div class="card-head"><h2>Masraf basamakları</h2><span class="muted small">satıştan kâra</span></div><div data-steps></div></div>
@@ -39,6 +39,7 @@ export async function financeView(el, rest, query = {}) {
       ${isAdmin() ? html`<button class="btn sm" data-act="invsync"><i class="ico ico-sync"></i>Faturaları ve kargo giderini çek</button>` : ''}</div><div data-inv></div></div>
   </div>`);
 
+  $('[data-health]', el).onclick = async () => (await import('./health.js')).healthSheet();
   const span = () => (RANGES.find((r) => r[0] === f.range) || RANGES[0])[2]();
   function draw() {
     const chs = activeChannels().filter((c) => c.enabled || c.demo);
@@ -129,7 +130,7 @@ export async function financeView(el, rest, query = {}) {
         <td class="r num" style="font-weight:750;color:${x.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(x.profit)}<div class="tiny muted">%${n(x.margin)}${x.returnCost ? html` · iade hariç ${money0(x.profitExRet)}` : ''}</div></td>
         <td class="r num">${x.returns ? html`${n(x.returns)}<div class="tiny ${x.returnRate >= 10 ? 'neg' : 'muted'}">%${n(x.returnRate)}</div>` : html`<span class="muted">—</span>`}</td></tr>`)}
       </tbody></table></div>${prod.rows.length > rows.length ? html`<div class="pager"><button class="btn sm" data-act="pall">Tümünü göster (${n(prod.rows.length)})</button></div>` : ''}
-      <div class="muted tiny" style="padding:0 16px 14px">Sipariş başı giderler (kargo, hizmet bedeli, ek kesinti, stopaj) siparişteki ürünlere ciro payına göre dağıtılır. İade maliyeti: iade edilen siparişte geri gelmeyen gönderim kargosu, iade kargosu (kargo faturasından; yoksa Ayarlar → Giderler'deki tahmini iade kargo bedeli), geri verilmeyen komisyon ve hizmet bedeli; iade edilen ürünlere iade tutarı payına göre dağıtılır. Reklam, ceza ve işletme giderleri ürünlere dağıtılmaz.</div>`
+      <div class="muted tiny" style="padding:0 16px 14px">Sipariş başı giderler (kargo, hizmet bedeli, ek kesinti, stopaj) siparişteki ürünlere ciro payına göre dağıtılır. İade maliyeti: iade edilen siparişte geri gelmeyen gönderim kargosu, iade kargosu (kargo faturasından; yoksa Ayarlar → Giderler'deki tahmini iade kargo bedeli, o da boşsa tahmini (ürün kargo tutarından)), geri verilmeyen komisyon ve hizmet bedeli; iade edilen ürünlere iade tutarı payına göre dağıtılır. Reklam, ceza ve işletme giderleri ürünlere dağıtılmaz.</div>`
       : html`<div class="empty">Bu dönemde satış yok</div>`}`);
   }
   // İşletme giderleri: kira, personel, paketleme … (tek seferlik ya da her ay)

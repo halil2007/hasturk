@@ -128,7 +128,7 @@ export async function integrations(el, rest = []) {
         <div class="ih-kpi ${errs.length ? 'bad' : ''}"><b class="num">${n(errs.length)}</b><span>hatalı</span></div>
         <div class="ih-kpi ${wait.length ? 'warn' : ''}"><b class="num">${n(wait.length)}</b><span>test bekliyor</span></div>
         <div class="ih-txt muted small">Bağlı kanallar <b>15 dakikada bir</b> otomatik kontrol edilir: siparişler, ürünler, stoklar güncellenir. Sorun olursa <a class="link" href="#/bildirimler">Bildirimler</a>'e düşer. Aynı kanalda ikinci mağaza için kanalı açıp <b>Mağaza ekle</b>'ye basın.</div>
-        <div class="row" style="gap:8px"><button class="btn" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü</button></div>
+        <div class="row wrap" style="gap:8px"><button class="btn" data-act="syscheck"><i class="ico ico-bolt"></i>Sistem kontrolü</button><button class="btn" data-act="health" title="Komisyon, hakediş, kargo ve senkron verilerinin tutarlılığı"><i class="ico ico-check"></i>Veri sağlık kontrolü</button></div>
       </div>
       <div class="row wrap"><div class="tabs" style="flex:1;min-width:0">${groups.map(([k, t, cnt]) => html`<button class="tab ${f.show === k ? 'on' : ''}" data-act="show" data-k="${k}">${t} <span class="n">${cnt}</span></button>`)}</div>
         <label class="search" style="max-width:260px"><i class="ico ico-search"></i><input class="input" type="search" placeholder="Kanal ara" data-q value="${f.q}"></label></div>
@@ -336,6 +336,7 @@ export async function integrations(el, rest = []) {
       if (!ok) return;
       await busy(t, async () => { await api('integrations/release', { method: 'POST', body: { type: t.dataset.type, on } }); toast(on ? `${name}: “Test aşamasında” yazısı kaldırıldı` : `${name}: “Test aşamasında” etiketi geri kondu`); await load(); });
     },
+    health: async () => (await import('./health.js')).healthSheet(),
     syscheck: () => systemCheck(data.channels.filter((c) => (c.enabled && !c.paused) || (c.gated && !(c.missing || []).length)).map((c) => ({ id: c.id, name: c.name }))),
     addmenu: (t) => {
       popMenu(t, TYPES.map((x) => ({ label: `${TYPE_NAME[x]}${BETA.includes(x) ? ' (test aşamasında)' : ''}`, run: () => busy(null, async () => {

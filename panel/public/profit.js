@@ -19,7 +19,8 @@ export const costVat = (settings) => (settings && settings.costs_vat_incl ? 1 : 
 export const costOf = (settings, key, ch) => costRaw(settings, key, ch) * (VAT_COST_KEYS.includes(key) ? costVat(settings) : 1);
 // İlan komisyonu (elle girilen ya da kanaldan gelen) KDV dahil saklanır; yalnız eski kurulumda (costs_vat_incl false) KDV eklenir
 export const rateGross = (settings, rate) => (rate == null ? rate : Number(rate) * costVat(settings));
-// return_shipping: iade kargo bedeli (tahmini, iade başı ₺) — kanal iade gönderisinin kargo faturasını vermiyorsa kullanılır; boş / 0 = sayılmaz
+// return_shipping: iade kargo bedeli (tahmini, iade başı ₺) — kanal iade gönderisinin kargo faturasını vermiyorsa kullanılır; boş / 0 ise
+// ürünün kargo tutarı, o da yoksa sipariş başı kargo tahmini kullanılır (bkz. finance.js returnCost)
 export const COST_KEYS = ['commission', 'shipping', 'service_fee', 'fee_rate', 'withholding', 'return_shipping'];
 
 export function profit({ sale = 0, purchase = 0, commissionRate = 0, shipping = 0, fee = 0, extra = 0, vatRate = 20, includeVat = false, qty = 1, feeRate = 0, withholdingRate = 0 } = {}) {

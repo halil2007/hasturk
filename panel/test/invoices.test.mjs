@@ -118,9 +118,11 @@ test('Kâr-zarar: reklam, ceza, iade kaybı ve işletme giderleri net kârdan d�
   const settings = { commission: { trendyol: 10 }, shipping: { trendyol: 20 }, service_fee: {}, fee_rate: {}, withholding: {}, costs_vat_incl: true };
   const b = await breakdown(db, settings, { from: now - 10 * 864e5, to: now + 1 });
   const t = b.total;
-  assert.equal(t.revenue, 200); assert.equal(t.ads, 40); assert.equal(t.penalty, 5); assert.equal(t.fee, 12); assert.equal(t.returns, 1); assert.equal(t.returnLoss, 20);
-  // 200 − 20 komisyon − 40 kargo − 12 hizmet − 40 reklam − 5 ceza − 20 iade = 63
-  assert.equal(t.payout, 63); assert.equal(t.expenses, 30); assert.equal(t.net, 33);
+  assert.equal(t.revenue, 200); assert.equal(t.ads, 40); assert.equal(t.penalty, 5); assert.equal(t.fee, 12); assert.equal(t.returns, 1);
+  // İade: geri gelmeyen gönderim kargosu 20 + iade kargosu (Ayarlar'da iade kargo bedeli yok → kullanıcının girdiği kargo tutarı, tahmini) 20
+  assert.equal(t.returnLoss, 40);
+  // 200 − 20 komisyon − 40 kargo − 12 hizmet − 40 reklam − 5 ceza − 40 iade = 43
+  assert.equal(t.payout, 43); assert.equal(t.expenses, 30); assert.equal(t.net, 13);
   assert.equal(b.steps.at(-1).k, 'net');
   // Tek kanal seçiliyken işletme gideri yok
   assert.equal((await breakdown(db, settings, { from: now - 10 * 864e5, to: now + 1, channel: 'trendyol' })).steps.some((s) => s.k === 'expenses'), false);
