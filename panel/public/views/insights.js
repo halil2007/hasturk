@@ -1,6 +1,7 @@
 // Analizler: özet rapor (son 4 gün / hafta / ay kartları, haftalık rapor, illere göre gönderim, en çok satanlar)
 // ve ayrıntılı grafik sekmesi. Tüm bölümler toplam ya da tek bir satış kanalı için görülebilir.
 import { turkeyMap } from './trmap.js';
+import { costBtn } from '../costedit.js';
 import { api, html, render, $, money, money0, n, delta, ch, chLogo, chColor, thumb, store, toast, actions, date, isMobile, activeChannels } from '../core.js';
 import { setQuery } from '../app.js';
 import { statsView } from './stats.js';
@@ -93,7 +94,7 @@ async function summary(el, query) {
         <td><div class="row">${thumb(p.image, p.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:320px;font-weight:650" title="${p.name}">${p.name}</div><div class="muted tiny row" style="gap:6px">${p.sku || ''}${p.stock != null ? html`<span>stok ${n(p.stock)}</span>` : ''}${coverTag(p)}</div></div></div></td>
         <td class="r num" style="white-space:nowrap"><b style="font-size:15px">${n(p.qty)}</b> <span class="muted tiny">adet</span><div>${trendTag(p)} <span class="muted tiny">${n(p.orders)} sipariş</span></div></td>
         <td class="r num" style="white-space:nowrap"><b style="font-weight:${f.sort === 'revenue' ? 800 : 600}">${money(p.revenue)}</b><div class="muted tiny" title="Toplam cirodaki payı">%${p.share} pay</div></td>
-        <td class="r num">${p.profit != null ? html`<span class="${p.profit < 0 ? 'down' : ''}">${money(p.profit)}</span>` : html`<span class="muted tiny" title="Ürüne alış fiyatı girilmemiş">—</span>`}</td>
+        <td class="r num">${p.profit != null ? html`<span class="${p.profit < 0 ? 'down' : ''}">${money(p.profit)}</span>` : (p.id || p.product_id ? costBtn(p.id || p.product_id, p.name, 'alış fiyatı gir') : html`<span class="muted tiny" title="Ürüne alış fiyatı girilmemiş">—</span>`)}</td>
         <td class="r small" style="white-space:nowrap">Ort: <b>${money(p.avg)}</b><div class="muted tiny">${money(p.min)} – ${money(p.max)}</div></td>
         <td class="r num">${p.lost ? html`<span class="down">${n(p.lost)}</span><div class="muted tiny">%${p.lostRate}</div>` : html`<span class="muted">0</span>`}</td>
         <td><div class="hbar" style="min-width:90px">${Object.entries(p.channels).map(([c, v]) => html`<span style="width:${(v / p.qty) * 100}%;background:${chColor(c)}" title="${ch(c).name}: ${v} adet"></span>`)}</div></td></tr>`; })}

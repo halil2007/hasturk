@@ -1,5 +1,6 @@
 // Panel uygulaması: gruplu yan menü, üst çubuk, alt menü (telefon), yönlendirme (#/sayfa/...?filtre=...), giriş, senkron, bildirimler.
 import { api, state, html, render, $, $$, toast, ch, ago, closeAllSheets, sheet, popMenu, store, busy, swrScope, prefetch, recorder, themeOf, applyTheme } from './core.js';
+import './costedit.js';
 import { dashboard } from './views/dashboard.js';
 import { orders } from './views/orders.js';
 import { products } from './views/products.js';

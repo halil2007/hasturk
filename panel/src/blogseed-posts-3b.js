@@ -1,14 +1,14 @@
 // Üçüncü parti hazır blog yazıları (bkz. blogseed.js, biçim blogseed-posts.js ile aynı)
 export const POSTS_3B = [
   {
-    slug: "kasim-indirimleri-black-friday-kampanya-hazirligi",
-    title: "Kasım İndirimleri ve Black Friday Hazırlığı: Pazaryeri Satıcıları İçin Stok, Fiyat ve Kargo Planı (2026)",
-    seo_title: "Black Friday Hazırlığı: Stok, Fiyat ve Kargo Planı (2026)",
-    seo_desc: "Kasım indirimleri ve Black Friday için 6 haftalık hazırlık planı: stok hesabı, zararına olmayan indirim, kargo kapasitesi ve kontrol listesi. Hemen okuyun.",
+    slug: "kasim-indirimleri-mubarek-cuma-kampanya-hazirligi",
+    title: "Kasım İndirimleri ve Mübarek Cuma Hazırlığı: Pazaryeri Satıcıları İçin Stok, Fiyat ve Kargo Planı (2026)",
+    seo_title: "Mübarek Cuma Hazırlığı: Stok, Fiyat ve Kargo Planı (2026)",
+    seo_desc: "Kasım indirimleri ve Mübarek Cuma için 6 haftalık hazırlık planı: stok hesabı, zararına olmayan indirim, kargo kapasitesi ve kontrol listesi. Hemen okuyun.",
     summary: "Kampanya dönemine hazırlıksız giren mağazada artan şey çoğu zaman yalnız sipariş sayısı olur: stoksuz ürünler, geciken kargolar ve zararına indirimler. Altı haftalık hazırlık takvimini, kampanya stoğu hesabını, indirimin kâra etkisini ve kampanya sonrası kontrolü örneklerle anlatıyoruz.",
-    tags: ["Kampanya","Black Friday","Stok Yönetimi","Fiyatlandırma"],
+    tags: ["Kampanya","Mübarek Cuma","Stok Yönetimi","Fiyatlandırma"],
     cover: "kampanya-hazirlik-kapak.jpg",
-    body: `Kasım, pazaryeri satıcıları için yılın en yoğun dönemlerinden biridir: 11.11 indirimleri, Kasım'ın son cuması olan Black Friday (2026'da **27 Kasım**) ve hemen ardından yılbaşı alışverişi birkaç haftaya sığar. Bu dönemde satış adedi artar, ama hazırlıksız giren mağaza için artan şey çoğu zaman yalnız sipariş sayısı olur: stoksuz kalan ürünler, geciken kargolar, zararına yapılmış indirimler ve iade dalgası.
+    body: `Kasım, pazaryeri satıcıları için yılın en yoğun dönemlerinden biridir: 11.11 indirimleri, Kasım'ın son cuması olan Mübarek Cuma (Black Friday; 2026'da **27 Kasım**) ve hemen ardından yılbaşı alışverişi birkaç haftaya sığar. Bu dönemde satış adedi artar, ama hazırlıksız giren mağaza için artan şey çoğu zaman yalnız sipariş sayısı olur: stoksuz kalan ürünler, geciken kargolar, zararına yapılmış indirimler ve iade dalgası.
 
 Bu yazıda kampanya dönemine **altı hafta önceden** nasıl hazırlanacağınızı adım adım anlatıyoruz: hangi ürünlerle girileceği, stok miktarının nasıl hesaplanacağı, indirimin kârınızı ne kadar eritebileceği, kargo ve paketleme kapasitesi ve kampanya sonrası kontrol. Pazaryerlerinin kendi kampanya tarihleri ve katılım koşulları her yıl değiştiği için onları kendi satıcı panelinizdeki duyurulardan takip edin; burada her kanalda işe yarayan hazırlık planını veriyoruz.
 
@@ -153,9 +153,9 @@ Paneli [canlı demoda](/demo) örnek verilerle gezebilir ya da kendi mağazalar�
 
 ## Sık sorulan sorular
 
-### Black Friday 2026 hangi gün?
+### Mübarek Cuma 2026 hangi gün?
 
-Black Friday, Kasım ayının dördüncü perşembesinden sonraki cumadır; 2026'da 27 Kasım Cuma gününe denk gelir. Pazaryerlerinin kendi indirim dönemleri bu günden önce başlayıp sonra bitebilir; kesin tarihleri ve katılım koşullarını satıcı panelinizdeki duyurulardan takip edin.
+Mübarek Cuma (Black Friday), Kasım ayının dördüncü perşembesinden sonraki cumadır; 2026'da 27 Kasım Cuma gününe denk gelir. Pazaryerlerinin kendi indirim dönemleri bu günden önce başlayıp sonra bitebilir; kesin tarihleri ve katılım koşullarını satıcı panelinizdeki duyurulardan takip edin.
 
 ### Kampanyaya ne kadar önceden hazırlanmalıyım?
 

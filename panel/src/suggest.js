@@ -40,7 +40,7 @@ export function suggestFor(r, settings) {
   return {
     kind, channel: ch, remote_id: r.remote_id, name: r.product_name || r.name, variant: r.variant_name || '', image: r.image || '', barcode: r.barcode, sku: r.sku,
     stock: r.stock, sold30: r.sold30 || 0, price: P, suggested: price, diff: r2(price - P), competitor, rank: r.rank, limited, checked_at: r.checked_at,
-    now, next, loss: !!(next && next.profit < 0), noCost: !(r.purchase_price > 0), pending: !!r.price_dirty, rule: !!r.rule_on,
+    now, next, loss: !!(next && next.profit < 0), noCost: !(r.purchase_price > 0), product_id: r.product_id || null, pending: !!r.price_dirty, rule: !!r.rule_on,
   };
 }
 
@@ -49,7 +49,7 @@ export async function listSuggestions(db, { channel, channels = [] } = {}) {
   if (!ids.length) return { items: [], counts: {}, checked: 0, kinds: KINDS };
   const since = Date.now() - 30 * 864e5;
   const [rows, settings] = await Promise.all([
-    all(db, `SELECT l.channel, l.remote_id, l.name, l.barcode, l.sku, l.price, l.commission, l.commission_src, l.price_dirty, COALESCE(NULLIF(l.image, ''), p.image) AS image,
+    all(db, `SELECT l.channel, l.remote_id, l.product_id, l.name, l.barcode, l.sku, l.price, l.commission, l.commission_src, l.price_dirty, COALESCE(NULLIF(l.image, ''), p.image) AS image,
         p.name AS product_name, p.variant_name, p.purchase_price, p.vat, p.stock, b.rank, b.buybox_price, b.second_price, b.multi, b.checked_at,
         r.enabled AS rule_on, r.min_price, r.max_price,
         (SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id = l.product_id AND o.channel = l.channel AND o.ordered_at >= ${since}
