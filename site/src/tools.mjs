@@ -36,8 +36,8 @@ const bdTable = (o, cap, x = br(o)) => ['table', { cap, head: ['Kalem', 'Tutar']
   ['**Net kâr**', `**${m(x.profit)}**`],
   ['Kâr marjı (satışa göre)', pc(x.margin)],
 ] }];
-const rateTable = (o, rates, cap) => ['table', { cap, num: true, head: ['Resmî oran (KDV hariç)', 'Kesilen (KDV dahil)', 'Komisyon tutarı', 'Hakediş', 'Net kâr'],
-  rows: rates.map((r) => { const x = br({ ...o, rate: r, basis: 'ex' }); return [pc(r), pc(x.eff), m(x.com), m(x.payout), m(x.profit)]; }) }];
+const rateTable = (o, rates, cap) => ['table', { cap, num: true, head: [`Resmî oran (KDV ${o.basis === 'inc' ? 'dahil' : 'hariç'})`, 'Kesilen (KDV dahil)', 'Komisyon tutarı', 'Hakediş', 'Net kâr'],
+  rows: rates.map((r) => { const x = br({ ...o, rate: r }); return [pc(r), pc(x.eff), m(x.com), m(x.payout), m(x.profit)]; }) }];
 const vatTable = ['table', { cap: 'KDV hariç orandan kesilen orana', num: true, head: ['Listede yazan (KDV hariç)', 'Komisyona eklenen KDV', 'Kesilen (KDV dahil)'],
   rows: [5, 10, 12, 15, 18, 20, 21.5, 25].map((r) => [pc(r), pc(r * 0.2), pc(r * 1.2)]) }];
 
@@ -47,14 +47,16 @@ const STOPAJ_P = '1 Ocak 2025\'ten bu yana pazaryerleri, satıcıya yaptıkları
 const AUTO_P = (mp, slug) => `Bu araç tek bir ürün için hesap yapar. [Hastürk CRM](/ozellikler/kar-zarar), ${mp} mağazanızı [resmî entegrasyonla](/entegrasyonlar/${slug}) bağladığınızda pazaryerinin kestiği komisyon, kargo ve hizmet bedeli kayıtlarını ve hakedişleri çeker; her siparişin net kârını alış maliyetinizle birlikte kendiliğinden hesaplar. Böylece kampanya, kargo ya da oran değişikliklerinin kârınıza etkisini sipariş sipariş görürsünüz.`;
 
 // Pazaryeri komisyon rehberi (Trendyol / Hepsiburada / N11): her kanal kendi örneği ve kendi metniyle
+// Resmî liste oranları KDV dahil mi (Trendyol MP sözleşme tablosu gibi)? O zaman metin ve örnekler KDV eklemeden anlatılır.
+const inclOf = (c) => !!(c && c.data && c.data.basis === 'kdv-dahil');
 function mpGuide(k) {
-  const ex = { price: k.price, rate: k.rate, basis: 'ex', ship: k.ship, fee: k.fee, cost: k.cost }, x = br(ex);
-  return (c) => [
+  return (c) => { const inc = inclOf(c), ex = { price: k.price, rate: k.rate, basis: inc ? 'inc' : 'ex', ship: k.ship, fee: k.fee, cost: k.cost }, x = br(ex); return [
     ['h2', `${k.name} komisyonu nasıl hesaplanır?`],
     ['p', k.intro],
-    ['p', `Komisyon, siparişteki satış tutarı yani müşterinin ödediği **KDV dahil** fiyat üzerinden hesaplanır. ${k.name} oranı ${k.basisText}; komisyon faturasına %20 KDV eklendiği için cebinizden çıkan oran listedekinin 1,2 katıdır. Listede %${nm(k.rate)} görüyorsanız kesilen komisyon satış fiyatınızın ${pc(k.rate * 1.2)}'üdür.`],
-    vatTable,
-    c.data ? ['p', `Yukarıdaki hesaplayıcıda kategorinizi seçtiğinizde ${k.name}'${k.sx} yayımladığı resmî komisyon listesindeki oran (${c.data.basis === 'kdv-haric' ? 'KDV hariç' : 'KDV dahil'}) gelir ve KDV\'si eklenerek hesaplanır. Tüm kategorilerin listesi için [${k.name} komisyon oranları](/araclar/${k.slug}-komisyon-oranlari) sayfasına bakın. Mağazanıza özel bir anlaşma ya da dönemsel indirim varsa oranı elle değiştirebilirsiniz.`]
+    inc ? ['p', `Komisyon, siparişteki satış tutarı yani müşterinin ödediği **KDV dahil** fiyat üzerinden hesaplanır. ${k.name}'${k.sx} resmî komisyon tablosundaki oranlar **KDV dahil** yayımlanır: listede %${nm(k.rate)} görüyorsanız kesilen komisyon, KDV'siyle birlikte satış fiyatınızın %${nm(k.rate)}'sidir; üzerine ayrıca KDV eklenmez. Oranı başka bir yerde KDV hariç görüyorsanız hesaplayıcıda "KDV hariç"i seçin; araç %20 KDV'yi ekler.`]
+      : ['p', `Komisyon, siparişteki satış tutarı yani müşterinin ödediği **KDV dahil** fiyat üzerinden hesaplanır. ${k.name} oranı ${k.basisText}; komisyon faturasına %20 KDV eklendiği için cebinizden çıkan oran listedekinin 1,2 katıdır. Listede %${nm(k.rate)} görüyorsanız kesilen komisyon satış fiyatınızın ${pc(k.rate * 1.2)}'üdür.`],
+    ...(inc ? [] : [vatTable]),
+    c.data ? ['p', `Yukarıdaki hesaplayıcıda kategorinizi seçtiğinizde ${k.name}'${k.sx} yayımladığı resmî komisyon listesindeki oran (${c.data.basis === 'kdv-haric' ? 'KDV hariç' : 'KDV dahil'}) gelir ve ${inc ? 'olduğu gibi kullanılır (KDV dahil olduğu için üzerine KDV eklenmez)' : 'KDV\'si eklenerek hesaplanır'}. Tüm kategorilerin listesi için [${k.name} komisyon oranları](/araclar/${k.slug}-komisyon-oranlari) sayfasına bakın. Mağazanıza özel bir anlaşma ya da dönemsel indirim varsa oranı elle değiştirebilirsiniz.`]
       : ['p', `Kategorinizin güncel oranını ${k.name} satıcı panelinizde ürün ya da kategori bazında görürsünüz. Hesaplayıcıya oranı panelde gördüğünüz gibi yazın ve "KDV hariç" seçili kalsın; araç %20 KDV'yi kendisi ekler.`],
     ['h2', `${k.name} hakedişinden düşülen kesintiler`],
     ['p', `Bir ${k.name} siparişinde satış fiyatının tamamı hesabınıza geçmez. Sipariş başına düşülen kalemler şunlardır:`],
@@ -68,16 +70,16 @@ function mpGuide(k) {
     ['p', STOPAJ_P],
     ['note', `Reklam, iade kargosu, ceza ya da kampanya katılım bedeli gibi kesintiler her siparişte olmaz; dönem sonunda ayrıca faturalanır. Bu araç sipariş başı kesintileri hesaplar, dönemsel kesintileri kendi kârlılık hesabınızda ayrıca düşün.`],
     ['h2', `Örnek hesap: ${m(k.price).replace(',00', '')}'lik ${k.name} satışı`],
-    ['p', `Ürünün satış fiyatı ${m(k.price)}, listede yazan komisyon %${nm(k.rate)} (KDV hariç), kargo ${m(k.ship)}, hizmet bedeli ${m(k.fee)}, ürün KDV'si %20 ve alış maliyeti ${m(k.cost)} olsun:`],
+    ['p', `Ürünün satış fiyatı ${m(k.price)}, listede yazan komisyon %${nm(k.rate)} (KDV ${inc ? 'dahil' : 'hariç'}), kargo ${m(k.ship)}, hizmet bedeli ${m(k.fee)}, ürün KDV'si %20 ve alış maliyeti ${m(k.cost)} olsun:`],
     bdTable(ex, `${k.name} örnek hesap (tutarlar örnektir)`),
-    ['p', `Bu satışta toplam kesinti ${m(x.cut)}, yani satış fiyatının ${pc((x.cut / k.price) * 100)}'idir. Komisyonu KDV'siz %${nm(k.rate)} sanıp hesaplasaydınız kârınızı ${m((k.price * k.rate * 0.2) / 100)} fazla görürdünüz.`],
+    ['p', `Bu satışta toplam kesinti ${m(x.cut)}, yani satış fiyatının ${pc((x.cut / k.price) * 100)}'idir.${inc ? ` KDV dahil %${nm(k.rate)} oranın üzerine bir de KDV ekleseydiniz kârınızı ${m((k.price * k.rate * 0.2) / 100)} eksik görürdünüz.` : ` Komisyonu KDV'siz %${nm(k.rate)} sanıp hesaplasaydınız kârınızı ${m((k.price * k.rate * 0.2) / 100)} fazla görürdünüz.`}`],
     ['h2', 'Komisyon oranı kârınızı ne kadar değiştirir?'],
     ['p', `Aynı ürünü farklı oranlı bir kategoride sattığınızda kâr hızla değişir. Yukarıdaki örnekte yalnız komisyon oranını değiştirince:`],
     rateTable(ex, k.rates, 'Komisyon oranına göre net kâr (diğer tutarlar sabit)'),
-    ['p', 'Oran 5 puan arttığında kâr, satış fiyatının %6\'sı kadar azalır (5 puan + KDV). Doğru kategoride listelemek, en kolay kâr artışıdır: ürününüzün gerçekten ait olduğu kategoriyi seçin, benzer ürünlerin hangi kategoride listelendiğine bakın.'],
+    ['p', (inc ? 'Oran 5 puan arttığında kâr, satış fiyatının %5\'i kadar azalır (oran KDV dahil).' : 'Oran 5 puan arttığında kâr, satış fiyatının %6\'sı kadar azalır (5 puan + KDV).') + ' Doğru kategoride listelemek, en kolay kâr artışıdır: ürününüzün gerçekten ait olduğu kategoriyi seçin, benzer ürünlerin hangi kategoride listelendiğine bakın.'],
     ['h2', 'Sık yapılan hatalar'],
     ['ul', [
-      `**Oranı KDV'siz hesaplamak.** ${k.name} listesindeki oran KDV hariçtir; kesilen tutar 1,2 katıdır.`,
+      inc ? `**KDV'yi iki kez eklemek.** ${k.name}'${k.sx} resmî tablosundaki oran zaten KDV dahildir; üzerine bir daha %20 eklemeyin.` : `**Oranı KDV'siz hesaplamak.** ${k.name} listesindeki oran KDV hariçtir; kesilen tutar 1,2 katıdır.`,
       '**Stopajı KDV dahil tutardan hesaplamak.** Stopaj matrahı satışın KDV hariç tutarıdır.',
       '**Kargo ve hizmet bedelini KDV hariç girmek.** Faturada yazan, cebinizden çıkan KDV dahil tutarı girin.',
       '**Liste fiyatından hesaplamak.** Kendi karşıladığınız indirim ya da kupon varsa komisyon indirimli satış tutarından kesilir; kârı da indirimli fiyattan hesaplayın ([indirim sonrası kâr](/araclar/indirim-kar-hesaplama)).',
@@ -94,11 +96,11 @@ function mpGuide(k) {
     ]],
     ['h2', 'Her sipariş için otomatik kâr hesabı'],
     ['p', AUTO_P(k.name, k.int)],
-  ];
+  ]; };
 }
 const mpFaq = (k) => (c) => [
   [`${k.name} komisyon oranı ne kadar?`, c.data ? `Oran kategoriye göre değişir. Bu sayfada kategorinizi seçtiğinizde ${k.name}'${k.sx} resmî komisyon listesindeki oran gelir (liste tarihi: ${c.dateText}); tüm kategoriler ${k.name} komisyon oranları sayfasında. Mağazanıza özel oran varsa elle girebilirsiniz.` : `Oran kategoriye göre değişir ve ${k.name} satıcı panelinizde ürün ya da kategori bazında görünür. Hesaplayıcıya panelde gördüğünüz oranı yazın; araç KDV'sini ekleyip kesilen tutarı hesaplar.`],
-  [`${k.name} komisyonu KDV dahil mi?`, `Hayır, ${k.name} oranı KDV hariç gösterir; komisyon faturasına %20 KDV eklenir. %${nm(k.rate)} oranın cebinizden çıkan karşılığı satış fiyatının ${pc(k.rate * 1.2)}'üdür. Araçta "KDV hariç" seçiliyken bu dönüşüm kendiliğinden yapılır.`],
+  [`${k.name} komisyonu KDV dahil mi?`, inclOf(c) ? `${k.name}'${k.sx} resmî komisyon tablosunda oranlar KDV dahil yayımlanır: %${nm(k.rate)} oran, satış fiyatınızın %${nm(k.rate)}'si kadar kesinti demektir, üzerine ayrıca KDV eklenmez. Araçta kategorinizi seçtiğinizde oran türü "KDV dahil" olarak ayarlanır.` : `Hayır, ${k.name} oranı KDV hariç gösterir; komisyon faturasına %20 KDV eklenir. %${nm(k.rate)} oranın cebinizden çıkan karşılığı satış fiyatının ${pc(k.rate * 1.2)}'üdür. Araçta "KDV hariç" seçiliyken bu dönüşüm kendiliğinden yapılır.`],
   [`${k.name} komisyonu hangi fiyat üzerinden kesilir?`, 'Siparişteki satış tutarı, yani müşterinin ödediği KDV dahil fiyat üzerinden. Kendi karşıladığınız bir indirim varsa komisyon indirimli tutardan hesaplanır.'],
   [`${k.name} hakedişimden hangi kesintiler düşülür?`, `Sipariş başına komisyon, kargo bedeli (anlaşmalı kargoyla gönderiyorsanız), ${k.feeShort} ve e-ticaret stopajı. Reklam, iade kargosu ya da ceza gibi kesintiler varsa dönemsel olarak ayrıca düşülür.`],
   [`${k.name} stopajı nasıl hesaplanır?`, 'Satışın KDV hariç tutarının %1\'i olarak: %20 KDV\'li 1.200 ₺\'lik satışta 1.000 ₺ × %1 = 10 ₺. Kesilen stopaj yıllık beyannamede ödenecek vergiden mahsup edilir.'],
@@ -139,10 +141,10 @@ export const TOOLS = [
     slug: 'trendyol-komisyon-hesaplama', group: 'pazaryeri', calc: 'komisyon', mp: 'trendyol', brand: ['T', '#f27a1a'], name: 'Trendyol komisyon', short: 'Kategori oranıyla net kâr ve hakediş',
     card: 'Trendyol satışınızda komisyon, kargo, platform hizmet bedeli ve stopaj sonrası hakedişinizi ve net kârınızı görün.',
     title: (c) => (c.data ? `Trendyol Komisyon Hesaplama ${YEAR}: Kategori Bazlı Oranlar` : `Trendyol Komisyon Hesaplama ${YEAR}: Net Kâr ve Hakediş`),
-    desc: (c) => (c.data ? `Trendyol komisyon hesaplama: kategorinizi seçin, resmî orana KDV eklensin; kargo, hizmet bedeli ve %1 stopaj sonrası net kârınızı görün. Ücretsiz.` : `Trendyol komisyon hesaplama: komisyon oranına KDV eklenir; kargo, platform hizmet bedeli ve %1 stopaj sonrası hakedişinizi ve net kârınızı görün.`),
+    desc: (c) => (inclOf(c) ? `Trendyol komisyon hesaplama: kategorinizi seçin, resmî KDV dahil oran gelsin; kargo, hizmet bedeli ve %1 stopaj sonrası net kârınızı görün. Ücretsiz.` : c.data ? `Trendyol komisyon hesaplama: kategorinizi seçin, resmî orana KDV eklensin; kargo, hizmet bedeli ve %1 stopaj sonrası net kârınızı görün. Ücretsiz.` : `Trendyol komisyon hesaplama: komisyon oranına KDV eklenir; kargo, platform hizmet bedeli ve %1 stopaj sonrası hakedişinizi ve net kârınızı görün.`),
     h1: ['Trendyol Komisyon', 'Hesaplama'],
-    lead: (c) => (c.data ? `Kategorinizi seçin; Trendyol'un resmî komisyon oranına KDV eklenerek kesinti, hakediş ve ürün başı net kârınız hesaplansın.` : 'Komisyon oranınızı panelde gördüğünüz gibi (KDV hariç) yazın; araç KDV\'yi ekleyip kargo, hizmet bedeli ve stopajla birlikte hakedişinizi ve net kârınızı hesaplasın.'),
-    formula: ['Kesilen komisyon = Satış × Oran (KDV hariç) × 1,20 ÷ 100', 'Stopaj = Satış ÷ (1 + KDV %) × %1', 'Hakediş = Satış − Komisyon − Kargo − Hizmet bedeli − Stopaj', 'Net kâr = Hakediş − Alış maliyeti'],
+    lead: (c) => (inclOf(c) ? `Kategorinizi seçin; Trendyol'un resmî komisyon tablosundaki KDV dahil oranla kesinti, hakediş ve ürün başı net kârınız hesaplansın.` : c.data ? `Kategorinizi seçin; Trendyol'un resmî komisyon oranına KDV eklenerek kesinti, hakediş ve ürün başı net kârınız hesaplansın.` : 'Komisyon oranınızı panelde gördüğünüz gibi (KDV hariç) yazın; araç KDV\'yi ekleyip kargo, hizmet bedeli ve stopajla birlikte hakedişinizi ve net kârınızı hesaplasın.'),
+    formula: (c) => [inclOf(c) ? 'Kesilen komisyon = Satış × Oran (KDV dahil) ÷ 100' : 'Kesilen komisyon = Satış × Oran (KDV hariç) × 1,20 ÷ 100', 'Stopaj = Satış ÷ (1 + KDV %) × %1', 'Hakediş = Satış − Komisyon − Kargo − Hizmet bedeli − Stopaj', 'Net kâr = Hakediş − Alış maliyeti'],
     guide: mpGuide(MP.trendyol), faq: mpFaq(MP.trendyol), howto: MP_HOWTO('Trendyol'),
     links: [['/entegrasyonlar/trendyol', 'Trendyol entegrasyonu', 'Sipariş, stok ve fiyat tek panelde'], ['/ozellikler/kar-zarar', 'Sipariş başı kâr', 'Her siparişin net kârı otomatik'], ['/ozellikler/buybox-takibi', 'Buybox ve otomatik fiyat', 'Alt sınırın altına inmeden']],
     related: ['hepsiburada-komisyon-hesaplama', 'n11-komisyon-hesaplama', 'kar-karsilastirma', 'satis-fiyati-hesaplama', 'e-ticaret-stopaj-hesaplama', 'desi-hesaplama'],

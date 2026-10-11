@@ -190,7 +190,7 @@
   // ---------- kategori seçici (resmî liste; yalnız kullanılınca yüklenir) ----------
   const cache = {};
   const loadList = (src) => (cache[src] ||= fetch(src, { credentials: 'same-origin' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then((d) => ({ d, rows: d.cats.map(([p, r]) => ({ p, r, f: fold(p), leaf: fold(p.split(' > ').pop()) })) })));
+    .then((d) => ({ d, rows: d.cats.map(([p, r, v]) => ({ p, r, v: v || '', f: fold(p), leaf: fold(p.split(' > ').pop()) })) })));
   function setupPicker(f, run) {
     const box = $('[data-cp]', f); if (!box) return;
     const srcs = JSON.parse(box.dataset.srcs || '{}'), q = $('#cp-q', box), list = $('#cp-list', box), st = $('[data-cp-st]', box), clr = $('[data-cp-clear]', box), cap = $('[data-cp-cap]', box);
@@ -201,11 +201,12 @@
     const status = () => {
       const s = info(); if (!s) { st.textContent = ''; return; }
       if (cp.sel) st.innerHTML = '';
-      const pc = (n) => `%${nf(n, 0, 2)}`;
+      const pc = (n) => `%${nf(n, 2, 2)}`;
       if (cp.sel) {
         const ex = cp.list.d.basis === 'kdv-haric', parts = cp.sel.p.split(' > ');
         st.append(Object.assign(document.createElement('span'), { className: 'cp-path', textContent: parts.join(' › ') }));
-        st.append(Object.assign(document.createElement('span'), { className: 'cp-rate', textContent: cp.manual ? `Elle girilen oran kullanılıyor (resmî oran ${pc(cp.sel.r)}${ex ? ' + KDV' : ''})` : `Resmî oran ${pc(cp.sel.r)}${ex ? ` (KDV hariç) → kesilen ${pc(cp.sel.r * 1.2)} (KDV dahil)` : ' (KDV dahil)'}` }));
+        st.append(Object.assign(document.createElement('span'), { className: 'cp-rate', textContent: cp.manual ? `Elle girilen oran kullanılıyor (resmî oran ${pc(cp.sel.r)}${ex ? ' + KDV' : ' KDV dahil'})` : `Resmî oran ${pc(cp.sel.r)}${ex ? ` (KDV hariç) → kesilen ${pc(cp.sel.r * 1.2)} (KDV dahil)` : ' (KDV dahil)'}` }));
+        if (cp.sel.v) st.append(Object.assign(document.createElement('span'), { className: 'cp-vade', textContent: `Vade: ${cp.sel.v}` }));
       } else st.textContent = `${s.name} resmî listesindeki ${s.count.toLocaleString('tr-TR')} kategoriden seçin ya da oranı elle girin. Liste tarihi: ${s.date}.`;
     };
     const sync = () => {
@@ -236,7 +237,7 @@
         const n = document.createElement('span'); n.className = 'cp-n';
         const b = document.createElement('b'); b.textContent = parts.pop(); n.append(b);
         if (parts.length) { const s = document.createElement('small'); s.textContent = parts.join(' › '); n.append(s); }
-        const r = document.createElement('em'); r.textContent = `%${nf(x.r, 0, 2)}${cp.list.d.basis === 'kdv-haric' ? ' + KDV' : ''}`;
+        const r = document.createElement('em'); r.textContent = `%${nf(x.r, 2, 2)}${cp.list.d.basis === 'kdv-haric' ? ' + KDV' : ' KDV dahil'}`;
         li.append(n, r); list.append(li);
       });
       if (rows.length > cp.items.length) { const li = document.createElement('li'); li.className = 'cp-none'; li.textContent = `${rows.length - cp.items.length} kategori daha var; aramayı daraltın.`; list.append(li); }

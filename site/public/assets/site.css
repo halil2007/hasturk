@@ -1393,6 +1393,9 @@ html, body { overflow-x: clip; } /* body'de "hidden" kalırsa body kaydırma kab
 .rt-g h2 small { font-size: 13.5px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
 .rt td:last-child { width: 1%; }
 .rt td a { font-weight: 650; font-size: 13.5px; }
+.rt .rt-v { font-size: 13px; color: var(--text-2); font-variant-numeric: normal; min-width: 7.5em; }
+.rate-src small.rate-note { color: var(--text-2); }
+.cp-vade { color: var(--text-2); }
 .rt-top { text-align: right; font-size: 13px; margin: -8px 0 0; }
 /* yazdırma: yalnız hesap ve sonuç */
 @media print {

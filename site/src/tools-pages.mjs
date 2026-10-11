@@ -2,11 +2,13 @@
 // İçerik src/tools.mjs'ten; kategori listeleri src/commission.mjs'ten. Sayfalar tamamen statik HTML'dir: rehber metni ve oran tabloları
 // derlemede yazılır, tools.js yalnız hesaplayıcıyı ve tablo içi aramayı çalıştırır (içerik için betik gerekmez).
 import { TOOLS, TOOL_GROUPS, UPDATED, YEAR, calcForm, miniProfit } from './tools.mjs';
-import { MARKETPLACES, GEN, groupByTop, charged, trDate, slugify } from './commission.mjs';
+import { MARKETPLACES, GEN, groupByTop, charged, trDate, slugify, sourceText } from './commission.mjs';
 
 const BRAND = ' | Hastürk CRM';
 const R = (v, c) => (typeof v === 'function' ? v(c) : v);
 const pct = (n) => `%${(Math.round(n * 100) / 100).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
+// Resmî liste oranı: listelerdeki gibi hep iki ondalık (%7,00)
+const pct2 = (n) => `%${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function makeToolPages({ esc, ico, tick, faqHtml, toolIc, channels, comm, siteUrl }) {
   const tById = Object.fromEntries(TOOLS.map((t) => [t.slug, t]));
@@ -24,7 +26,9 @@ export function makeToolPages({ esc, ico, tick, faqHtml, toolIc, channels, comm,
     table: () => table(v), note: () => `<p class="g-note">${ico('i-eye')}<span>${fmt(v)}</span></p>`,
   })[k]();
   const updated = `<time datetime="${UPDATED}">${trDate(UPDATED)}</time>`;
-  const srcLine = (mp) => { const s = srcs[mp]; return s ? `<a href="${esc(comm[mp].source)}" rel="nofollow noopener" target="_blank">${esc(s.name)} resmî komisyon listesi</a>, ${esc(s.date)} · <a href="${s.page}">tüm oranlar</a>` : ''; };
+  // Kaynak: herkese açık adres varsa bağlantı, yoksa (satıcıya verilen belge) bağlantısız "Başlık, GG.AA.YYYY"
+  const srcName = (d) => (d.source ? `<a href="${esc(d.source)}" rel="nofollow noopener" target="_blank">${esc(d.sourceTitle || `${MARKETPLACES[d.mp]} komisyon listesi`)}</a>` : esc(sourceText(d)));
+  const srcLine = (mp) => { const s = srcs[mp], d = comm[mp]; if (!s) return ''; return `${d.source ? `<a href="${esc(d.source)}" rel="nofollow noopener" target="_blank">${esc(s.name)} resmî komisyon listesi</a>, ${esc(s.date)}` : esc(sourceText(d))} · <a href="${s.page}">tüm oranlar</a>`; };
 
   const toolCard = (t) => `<a class="fcard tcard reveal" href="/araclar/${t.slug}">${toolIc(t)}<b>${esc(t.name)}</b><span>${esc(t.card)}</span><em>Hesapla ${ico('i-arrow')}</em></a>`;
   const TOOLS_JS = '<!-- head --><script src="/assets/tools.js?v={{v:tools.js}}" defer></script><!-- /head -->';
@@ -50,7 +54,7 @@ export function makeToolPages({ esc, ico, tick, faqHtml, toolIc, channels, comm,
       <p>${esc(R(t.lead, c))}</p>
       <div class="checks"><span>${tick}Ücretsiz, kayıt gerekmez</span><span>${tick}Tutarlar KDV dahil</span><span>${tick}Veriler tarayıcınızda kalır</span></div></div>
     ${calcForm(t, channels, t.mp ? (srcs[t.mp] ? { [t.mp]: srcs[t.mp] } : {}) : srcs)}
-    <p class="tool-meta">${mp && srcs[mp] ? `<span>${ico('i-shield')}<span>Kaynak: ${srcLine(mp)}</span></span>` : mp ? `<span>${ico('i-eye')}<span>${esc(MARKETPLACES[mp])} kategori oranını satıcı panelinizden girin; oran KDV hariçse araç KDV'yi ekler.</span></span>` : ''}<span>${ico('i-calendar')}<span>Son güncelleme: ${updated}</span></span></p>
+    <p class="tool-meta">${mp && srcs[mp] ? `<span>${ico('i-shield')}<span>Kaynak: ${srcLine(mp)}</span></span>${comm[mp].note ? `<span>${ico('i-eye')}<span>${esc(comm[mp].note)}</span></span>` : ''}` : mp ? `<span>${ico('i-eye')}<span>${esc(MARKETPLACES[mp])} kategori oranını satıcı panelinizden girin; oran KDV hariçse araç KDV'yi ekler.</span></span>` : ''}<span>${ico('i-calendar')}<span>Son güncelleme: ${updated}</span></span></p>
     <p class="tool-cta"><a href="/demo#deneme">Bu hesabı her sipariş için otomatik yapın ${ico('i-arrow')} <b>7 gün ücretsiz deneyin</b></a></p>
   </div>
 </section>
@@ -63,7 +67,7 @@ export function makeToolPages({ esc, ico, tick, faqHtml, toolIc, channels, comm,
     </aside>
     <article class="tg-body">
       <h2 id="formul">Hesaplama formülü</h2>
-      <div class="formula">${t.formula.map((f) => `<code>${esc(f)}</code>`).join('')}</div>
+      <div class="formula">${R(t.formula, c).map((f) => `<code>${esc(f)}</code>`).join('')}</div>
       ${guide.map(block).join('\n      ')}
       <p class="tg-upd">${ico('i-calendar')}Son güncelleme: ${updated}. Bu sayfadaki hesaplar bilgi amaçlıdır; vergi ve muhasebe kararları için mali müşavirinize danışın.</p>
     </article>
@@ -89,12 +93,12 @@ ${toolCta}`;
   function ratePage(mp) {
     const d = comm[mp], n = MARKETPLACES[mp], ng = n + GEN[mp], groups = groupByTop(d), url = `${siteUrl}/araclar/${mp}-komisyon-oranlari`;
     const calc = TOOLS.find((t) => t.mp === mp), date = trDate(d.published), ex = d.basis === 'kdv-haric';
-    const all = d.cats.map(([, r]) => r), lo = Math.min(...all), hi = Math.max(...all);
+    const all = d.cats.map(([, r]) => r), lo = Math.min(...all), hi = Math.max(...all), hasVade = d.cats.some((c) => c[2]);
     const faq = [
-      [`${n} komisyon oranları KDV dahil mi?`, ex ? `Hayır. ${ng} resmî listesindeki oranlar KDV hariçtir; komisyon faturasına %20 KDV eklenir. Tablodaki "Kesilen (KDV dahil)" sütunu cebinizden çıkan oranı gösterir.` : `Listede oranlar KDV dahil yayımlanmıştır; tablodaki iki sütun aynıdır.`],
+      [`${n} komisyon oranları KDV dahil mi?`, ex ? `Hayır. ${ng} resmî listesindeki oranlar KDV hariçtir; komisyon faturasına %20 KDV eklenir. Tablodaki "Kesilen (KDV dahil)" sütunu cebinizden çıkan oranı gösterir.` : `Evet. ${ng} resmî listesindeki oranlar KDV dahil yayımlanır; tablodaki oran doğrudan cebinizden çıkan orandır, üzerine ayrıca KDV eklenmez.`],
       [`${n} komisyon oranları hangi tarihte yayımlandı?`, `Bu sayfadaki oranlar ${ng} ${date} tarihli resmî komisyon listesinden alınmıştır. ${n} oranları dönemsel olarak güncelleyebilir; mağazanıza özel oranı satıcı panelinizden kontrol edin.`],
       [`${n} komisyonu nasıl hesaplanır?`, `Satış fiyatı (KDV dahil) × kategori oranı${ex ? ' × 1,20 (KDV)' : ''}. Kargo, hizmet bedeli ve %1 stopajla birlikte net kârınızı ${n} komisyon hesaplama aracında görebilirsiniz.`],
-      [`En düşük ve en yüksek ${n} komisyon oranı kaç?`, `Listede ${d.cats.length} kategori var; oranlar ${pct(lo)} ile ${pct(hi)} arasında (KDV ${ex ? 'hariç' : 'dahil'}).`],
+      [`En düşük ve en yüksek ${n} komisyon oranı kaç?`, `Listede ${d.cats.length} kategori var; oranlar ${pct2(lo)} ile ${pct2(hi)} arasında (KDV ${ex ? 'hariç' : 'dahil'}).`],
       ['Kategorimi listede bulamıyorum, ne yapmalıyım?', 'Sayfanın üstündeki arama kutusuna ürün türünü yazın; alt kategori adları da aranır. Bulamazsanız satıcı panelinizde ürünün kategorisindeki oranı kontrol edin ve hesaplayıcıya elle girin.'],
     ];
     const body = `${TOOLS_JS}<section class="page-hero fp-hero tool-hero rate-hero">
@@ -102,26 +106,26 @@ ${toolCta}`;
     ${crumbs([['/', 'Ana sayfa'], ['/araclar', 'Araçlar'], ['', `${n} komisyon oranları`]])}
     <div class="tool-head"><div class="fp-k">${toolIc(calc || { icon: 'i-list', color: 'c-blue' })}Resmî liste · ${d.cats.length} kategori</div>
       <h1>${esc(n)} Komisyon Oranları <span class="grad">${YEAR}</span></h1>
-      <p>${esc(ng)} yayımladığı resmî kategori komisyon listesi: ${d.cats.length} kategori, ${groups.length} ana kategori altında. Oranlar ${ex ? 'KDV hariçtir; yanındaki sütun %20 KDV eklenmiş, cebinizden çıkan oranı' : 'KDV dahildir'} gösterir.</p></div>
-    <div class="rate-src"><div>${ico('i-shield')}<span><b>Kaynak:</b> <a href="${esc(d.source)}" rel="nofollow noopener" target="_blank">${esc(d.sourceTitle || `${n} komisyon listesi`)}</a><small>Liste tarihi: ${esc(date)} · Sitemize aktarıldı: ${esc(trDate(d.retrieved))}${d.note ? ` · ${esc(d.note)}` : ''}</small></span></div>
+      <p>${esc(ng)} yayımladığı resmî kategori komisyon listesi: ${d.cats.length} kategori, ${groups.length} ana kategori altında. ${ex ? 'Oranlar KDV hariçtir; yanındaki sütun %20 KDV eklenmiş, cebinizden çıkan oranı gösterir.' : 'Oranlar KDV dahildir; cebinizden çıkan oranı doğrudan gösterir.'}</p></div>
+    <div class="rate-src"><div>${ico('i-shield')}<span><b>Kaynak:</b> ${srcName(d)}<small>Liste tarihi: ${esc(date)} · Sitemize aktarıldı: ${esc(trDate(d.retrieved))}${d.sourceDoc ? ` · Belge: ${esc(d.sourceDoc)}` : ''}</small>${d.note ? `<small class="rate-note">${esc(d.note)}</small>` : ''}</span></div>
       ${calc ? `<a class="btn btn-primary" href="/araclar/${calc.slug}">Kategorinizle hesaplayın ${ico('i-arrow')}</a>` : ''}</div>
     <div class="rt-find"><label class="cf-l" for="rt-q">Kategori arayın</label><div class="cp-box">${ico('i-search')}<input id="rt-q" class="in" type="search" data-rt-q autocomplete="off" placeholder="ör. tencere, telefon kılıfı, mont"></div><p class="cp-st" data-rt-st aria-live="polite"></p></div>
-    <nav class="rt-jump" aria-label="Ana kategoriler">${groups.map((g) => `<a href="#${g.id}">${esc(g.top)} <small>${g.min === g.max ? pct(g.min) : `${pct(g.min)}–${pct(g.max)}`}</small></a>`).join('')}</nav>
+    <nav class="rt-jump" aria-label="Ana kategoriler">${groups.map((g) => `<a href="#${g.id}">${esc(g.top)} <small>${g.min === g.max ? pct2(g.min) : `${pct2(g.min)}–${pct2(g.max)}`}</small></a>`).join('')}</nav>
   </div>
 </section>
 <section class="sec rate-sec">
   <div class="wrap" data-rt>
-    ${groups.map((g) => `<section class="rt-g" id="${g.id}" data-rt-g><h2>${esc(g.top)} <small>${g.rows.length} kategori · ${g.min === g.max ? pct(g.min) : `${pct(g.min)}–${pct(g.max)}`}</small></h2>
-    <div class="tw"><table class="gt num rt"><thead><tr><th scope="col">Kategori</th><th scope="col">Resmî oran<small>${ex ? 'KDV hariç' : 'KDV dahil'}</small></th>${ex ? '<th scope="col">Kesilen<small>KDV dahil</small></th>' : ''}<th scope="col"><span class="vh">Hesapla</span></th></tr></thead><tbody>${g.rows.map(([sub, r, path]) => `<tr data-q="${esc(path)}"><th scope="row">${esc(sub.split(' > ').join(' › '))}</th><td>${pct(r)}</td>${ex ? `<td>${pct(charged(r, d.basis))}</td>` : ''}<td>${calc ? `<a href="/araclar/${calc.slug}?kat=${encodeURIComponent(path)}" aria-label="${esc(sub)} için hesapla">Hesapla</a>` : ''}</td></tr>`).join('')}</tbody></table></div>
+    ${groups.map((g) => `<section class="rt-g" id="${g.id}" data-rt-g><h2>${esc(g.top)} <small>${g.rows.length} kategori · ${g.min === g.max ? pct2(g.min) : `${pct2(g.min)}–${pct2(g.max)}`}</small></h2>
+    <div class="tw"><table class="gt num rt"><thead><tr><th scope="col">Kategori</th><th scope="col">Resmî oran<small>${ex ? 'KDV hariç' : 'KDV dahil'}</small></th>${ex ? '<th scope="col">Kesilen<small>KDV dahil</small></th>' : ''}${hasVade ? '<th scope="col" class="rt-v">Vade</th>' : ''}<th scope="col"><span class="vh">Hesapla</span></th></tr></thead><tbody>${g.rows.map(([sub, r, path, vade]) => `<tr data-q="${esc(path)}"><th scope="row">${esc(sub.split(' > ').join(' › '))}</th><td>${pct2(r)}</td>${ex ? `<td>${pct2(charged(r, d.basis))}</td>` : ''}${hasVade ? `<td class="rt-v">${esc(vade)}</td>` : ''}<td>${calc ? `<a href="/araclar/${calc.slug}?kat=${encodeURIComponent(path)}" aria-label="${esc(sub)} için hesapla">Hesapla</a>` : ''}</td></tr>`).join('')}</tbody></table></div>
     <p class="rt-top"><a href="#rt-q">Başa dön ↑</a></p></section>`).join('\n    ')}
-    <p class="tg-upd">${ico('i-calendar')}Oranlar ${esc(ng)} ${esc(date)} tarihli resmî listesinden alınmıştır. Mağazanıza özel anlaşma, kampanya ya da dönemsel indirimler oranı değiştirebilir; kesin oran için satıcı panelinize bakın.</p>
+    <p class="tg-upd">${ico('i-calendar')}Oranlar ${esc(ng)} ${esc(date)} tarihli resmî listesinden alınmıştır${hasVade ? '; vade, listede yazan ödeme süresidir' : ''}. ${d.note ? esc(d.note) : 'Mağazanıza özel anlaşma, kampanya ya da dönemsel indirimler oranı değiştirebilir; kesin oran için satıcı panelinize bakın.'}</p>
   </div>
 </section>
 <section class="sec alt"><div class="wrap"><div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(n)} Komisyon Oranları Hakkında</h2></div>${faqHtml(faq)}</div></section>
 ${toolCta}`;
     const t = `${n} Komisyon Oranları ${YEAR}: Kategori Bazlı Liste`;
     const dsc = desc(`${n} komisyon oranları ${YEAR}: ${d.cats.length} kategorinin resmî oranı, KDV hariç ve KDV dahil haliyle. Kategorinizi arayın, tek tıkla hesaplayın.`.slice(0, 155), `${mp}-komisyon-oranlari`);
-    const ld = [{ '@type': 'Dataset', '@id': `${url}#data`, name: `${n} kategori komisyon oranları`, description: dsc, inLanguage: 'tr-TR', url, isBasedOn: d.source, dateModified: d.retrieved, temporalCoverage: `${d.published}/..`,
+    const ld = [{ '@type': 'Dataset', '@id': `${url}#data`, name: `${n} kategori komisyon oranları`, description: dsc, inLanguage: 'tr-TR', url, ...(d.source ? { isBasedOn: d.source } : {}), dateModified: d.retrieved, temporalCoverage: `${d.published}/..`,
       creator: { '@type': 'Organization', name: n }, publisher: { '@id': `${siteUrl}/#org` }, isAccessibleForFree: true,
       variableMeasured: [{ '@type': 'PropertyValue', name: `Komisyon oranı (${ex ? 'KDV hariç' : 'KDV dahil'})`, unitText: 'yüzde' }] }];
     return { meta: { title: title(t, mp), crumb: `${n} komisyon oranları`, description: dsc, url: `/araclar/${mp}-komisyon-oranlari`, nav: 'araclar', modified: d.retrieved, ld }, body, file: `araclar/${mp}-komisyon-oranlari.html` };
