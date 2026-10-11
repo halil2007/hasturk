@@ -197,6 +197,7 @@ export async function financeView(el, rest, query = {}) {
         <div class="kpi"><div class="label">Bu dönemde ödenen</div><div class="value num">${money0(t.paid)}</div><div class="delta flat">ödeme gününe göre</div></div>
         <div class="kpi"><div class="label">Mutabakat</div><div class="value num" style="color:${t.mismatched ? 'var(--warn, #b45309)' : 'var(--good)'}">${!t.checked ? '—' : t.mismatched ? `${n(t.mismatched)} fark` : 'Uyumlu'}</div><div class="delta flat">${n(t.checked)} sipariş kontrol edildi</div></div>
       </div>
+      ${t.commissionCredit && t.commissionCredit.orders ? html`<div class="notice small" style="margin:0 16px 12px"><i class="ico ico-check"></i><div><b>Komisyon iadesi / indirimi (pazaryeri karşıladı):</b> ${n(t.commissionCredit.orders)} siparişte ${money(t.commissionCredit.amount)}. Panel hesabına eklendi; fark sayılmadı.</div></div>` : ''}
       <div class="card-pad" style="padding-top:0;padding-bottom:6px"><b class="small">Yaklaşan ödemeler</b></div>
       ${dayTable(upc, 'due', 'stlup', 'Bekleyen ödeme yok', true)}
       <div class="card-pad" style="padding-bottom:6px"><b class="small">Bu dönemde ödenenler</b></div>
