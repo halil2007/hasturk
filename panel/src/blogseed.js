@@ -9,6 +9,7 @@ import { POSTS_2B } from './blogseed-posts-2b.js';
 import { POSTS_3A } from './blogseed-posts-3a.js';
 import { POSTS_3B } from './blogseed-posts-3b.js';
 import { POSTS_3C } from './blogseed-posts-3c.js';
+import { POSTS_3X } from './blogseed-posts-3x.js';
 // İkinci parti (10 yazı): 1 Ekim 2026'dan başlayarak her gün bir yazı, gün içinde farklı saatlerde (TR 09:00–17:00) yayımlanmış sayılır
 const AT = (i) => Date.UTC(2026, 9, 1 + i, 6 + ((i * 5) % 9), (i * 23) % 60);
 export const SECOND = [...POSTS_2A, ...POSTS_2B].map((p, i) => ({ ...p, at: AT(i) }));
@@ -16,7 +17,9 @@ export const SECOND = [...POSTS_2A, ...POSTS_2B].map((p, i) => ({ ...p, at: AT(i
 // karıştırılır (konu çeşitliliği). İleri tarihli yazı sitede tarihi gelince görünür.
 const AT3 = (i) => Date.UTC(2026, 9, 11 + i, 6 + ((i * 4 + 5) % 9), (i * 37 + 11) % 60);
 export const THIRD = [0, 1, 2, 3, 4, 5, 6].flatMap((i) => [POSTS_3A[i], POSTS_3B[i], POSTS_3C[i]]).filter(Boolean).map((p, i) => ({ ...p, at: AT3(i) }));
-const ALL = [...POSTS, ...SECOND, ...THIRD];
+// Ek yazılar (ana konumuz dışı): 2 Kasım'dan itibaren 3 günde bir
+const EXTRA = POSTS_3X.map((p, i) => ({ ...p, at: Date.UTC(2026, 10, 2 + i * 3, 7 + ((i * 3) % 7), (i * 29 + 7) % 60) }));
+const ALL = [...POSTS, ...SECOND, ...THIRD, ...EXTRA];
 const REDATE = 'once:blog_redate_1';
 
 const KEY = 'blog_seed';
