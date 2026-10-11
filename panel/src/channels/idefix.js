@@ -16,6 +16,35 @@ const STATUS = {
 };
 export const idefixStatus = (s) => STATUS[String(s || '').trim().toLowerCase().replace(/-/g, '_').replace(/^shipment_/, '')] || 'new';
 
+// Ürün havuzu (pool) durumları: satışa hazır / eşleşti → yayında; inceleme ve eşleşme onayı bekleyenler → bekliyor; eksik bilgi / red → onaylanmadı
+const PST = { ready_for_sale: [true, 'satışa hazır'], auto_matched: [true, 'katalogdaki ürünle eşleşti'], manual_matched: [true, 'eşleştirildi'],
+  waiting_catalog_action: [null, 'idefix inceliyor'], not_matched: [null, 'eşleşme yok · idefix operatörü inceliyor'], waiting_vendor_approve: [null, 'eşleşme onayı bekliyor (idefix panelinden onaylayın)'],
+  missing_info: [false, 'eksik bilgi'], platform_declined: [false, 'idefix reddetti'], vendor_declined: [false, 'eşleşme reddedildi'], decline: [false, 'reddedildi'] };
+const FAIL_TR = { CATEGORY_MANDATORY_ATTRIBUTE_MISSED: 'zorunlu kategori özelliği eksik', ATTRIBUTE_MULTIPLE_NOT_ALLOWED: 'aynı özellik birden fazla gönderildi', CUSTOM_ATTRIBUTE_NOT_SUPPORTED_YET: 'tanımsız özellik',
+  ATTRIBUTEVALUE_NOT_DEFINED: 'tanımsız özellik değeri', BRAND_NOT_EXIST: 'marka idefix\'te yok', VENDOR_RETURN_ADDRESS_NOT_CORRECT: 'iade adresi hatalı', VENDOR_SHIPMENT_ADDRESS_NOT_CORRECT: 'sevkiyat adresi hatalı',
+  PRODUCT_IMAGE_MANDATORY_ONCREATE: 'görsel zorunlu', VENDOR_CATEGORY_ACCESS_DENIED: 'kategori yetkisi yok', BRAND_EXCLUSIVE_NOT_AUTHORIZED: 'markada münhasır yetki yok', VENDOR_BRAND_ACCESS_DENIED: 'marka yetkisi yok',
+  VENDOR_ACCESS_DENIED: 'satıcı onaylı değil', DATA_PARSE_ERROR: 'istek okunamadı', NO_BATCH_ID_EXIST: 'gönderim kimliği bulunamadı', VENDOR_IN_VACATION_MODE: 'tatil modu açık',
+  BRAND_FAILED_TO_MATCH: 'marka katalogdaki ürünle uyuşmuyor', CATEGORY_FAILED_TO_MATCH: 'kategori katalogdaki ürünle uyuşmuyor' };
+const pstKey = (v) => String(v && typeof v === 'object' ? v.code || v.name || v.value || '' : v ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+const failText = (x) => { const c = typeof x === 'string' ? x : x && (x.code || x.failureReason || x.message || x.description); return c ? FAIL_TR[String(c).trim()] || String(c).trim() : ''; };
+// Havuzdaki ürünün yayın durumu → { remoteState, stateNote }. Durum alanının adı / biçimi dokümanda havuz listesi için ayrıca verilmemiş:
+// ürün oluşturma sonucundaki (batch-result) "status" değerleri (ready_for_sale, missing_info …) esas alınır; büyük harf / tire / boşluk
+// farkı ve olası alan adları (status, productStatus, poolStatus, state) tolere edilir. Durum yoksa ya da tanınmıyorsa ürün yayında sayılır
+// (eski davranış: yalnız reject / archive / passive içeren durum kapalıdır). idefix'in red / eksik bilgi nedeni varsa nota eklenir.
+export function idefixPoolState(p) {
+  const raw = p.status ?? p.productStatus ?? p.poolStatus ?? p.state, k = pstKey(raw);
+  const why = [...new Set([].concat(p.failureReasons || p.failureReason || p.declineReasons || p.rejectReasons || []).map(failText).filter(Boolean))].join(' · ');
+  const hit = PST[k];
+  if (hit) {
+    const [ok, tr] = hit;
+    if (ok === true) return { remoteState: 'live', stateNote: '' };
+    return { remoteState: ok === null ? 'pending' : 'rejected', stateNote: why && why !== tr ? `${tr}: ${why}` : tr };
+  }
+  if (/reject|declin/.test(k)) return { remoteState: 'rejected', stateNote: why || 'idefix onaylamadı' };
+  if (/archive|passive/.test(k)) return { remoteState: 'passive', stateNote: k.includes('archive') ? 'arşivde' : 'pasif' };
+  return { remoteState: 'live', stateNote: '' };
+}
+
 export function idefix(env, meta) {
   const key = str(env.IDEFIX_API_KEY), secret = str(env.IDEFIX_API_SECRET), vendor = str(env.IDEFIX_VENDOR_ID);
   // Kimlik: satıcı panelinde (Hesabım → Entegrasyon Bilgileri) yeni hesaplarda yalnızca Satıcı ID + API KEY verilir; eski hesaplarda
@@ -126,12 +155,13 @@ export function idefix(env, meta) {
   async function fetchListings() {
     const rows = await paged((page, n) => `/pim/pool/${vendor}/list?page=${page}&limit=${n}`, 1000);
     return rows.filter((p) => p.barcode).map((p) => {
-      const img = (p.images || p.imageUrls || [])[0], q = p.inventoryQuantity ?? p.quantity ?? p.stock;
+      const img = (p.images || p.imageUrls || [])[0], q = p.inventoryQuantity ?? p.quantity ?? p.stock, st = idefixPoolState(p);
       return { remoteId: str(p.barcode), remoteProductId: str(p.productMainId), sku: str(p.vendorStockCode || p.erpId), barcode: str(p.barcode), name: str(p.title), groupName: str(p.title), variantName: '',
         image: str(typeof img === 'string' ? img : img && (img.url || img.imageUrl)), images: imageList(p.images || p.imageUrls), price: num(p.price), listPrice: num(p.comparePrice) || num(p.price),
         // Stok bilgisi gelmezse bilinmiyor sayılır (0 sayılıp eşleştirmeden düşmesin)
         stock: q == null ? null : num(q),
-        active: !/reject|archive|passive/i.test(str(p.status)), brand: str(p.brandName) };
+        // Havuz, idefix'in henüz onaylamadığı (eksik bilgi, inceleme) ürünleri de verir: bunlar yayında değildir, stok / fiyat kabul etmez
+        ...st, active: st.remoteState === 'live', brand: str(p.brandName) };
     });
   }
 
@@ -169,7 +199,9 @@ export function idefix(env, meta) {
     const done = /^(completed|failed|cancelled)$/i.test(str(r.status)) && !rows.some((x) => /^created$/i.test(str(x.status)));
     return { done, items: rows.map((x) => {
       const bad = /^decline/i.test(str(x.status)), why = [].concat(x.failureReasons || x.failureReason || []).map(reasonText).filter(Boolean).join(' · ');
-      return { key: str(x.barcode), ok: bad ? false : /^completed$/i.test(str(x.status)) ? true : null, error: bad ? why || 'idefix reddetti' : '' };
+      // PRODUCT_NOT_FOUND: barkod idefix'in satıştaki ürünleri arasında yok (havuzda onay bekliyor / eksik bilgi): kanal kaynaklı
+      const notFound = bad && /PRODUCT_NOT_FOUND/.test(JSON.stringify(x.failureReasons ?? x.failureReason ?? ''));
+      return { key: str(x.barcode), ok: bad ? false : /^completed$/i.test(str(x.status)) ? true : null, error: bad ? why || 'idefix reddetti' : '', ...(notFound ? { side: 'channel' } : {}) };
     }) };
   }
 
@@ -306,15 +338,7 @@ export function idefix(env, meta) {
     }
     return { ref: refs.join(',') };
   }
-  // Ürün durumları: satışa hazır / eşleşti → onay; eksik bilgi / red → hata; inceleme ve eşleşme onayı bekleyenler → bekliyor
-  const PST = { ready_for_sale: [true, 'satışa hazır'], auto_matched: [true, 'katalogdaki ürünle eşleşti'], manual_matched: [true, 'eşleştirildi'],
-    waiting_catalog_action: [null, 'idefix inceliyor'], not_matched: [null, 'eşleşme yok · idefix operatörü inceliyor'], waiting_vendor_approve: [null, 'eşleşme onayı bekliyor (idefix panelinden onaylayın)'],
-    missing_info: [false, 'eksik bilgi'], platform_declined: [false, 'idefix reddetti'], vendor_declined: [false, 'eşleşme reddedildi'], decline: [false, 'reddedildi'] };
-  const FAIL_TR = { CATEGORY_MANDATORY_ATTRIBUTE_MISSED: 'zorunlu kategori özelliği eksik', ATTRIBUTE_MULTIPLE_NOT_ALLOWED: 'aynı özellik birden fazla gönderildi', CUSTOM_ATTRIBUTE_NOT_SUPPORTED_YET: 'tanımsız özellik',
-    ATTRIBUTEVALUE_NOT_DEFINED: 'tanımsız özellik değeri', BRAND_NOT_EXIST: 'marka idefix\'te yok', VENDOR_RETURN_ADDRESS_NOT_CORRECT: 'iade adresi hatalı', VENDOR_SHIPMENT_ADDRESS_NOT_CORRECT: 'sevkiyat adresi hatalı',
-    PRODUCT_IMAGE_MANDATORY_ONCREATE: 'görsel zorunlu', VENDOR_CATEGORY_ACCESS_DENIED: 'kategori yetkisi yok', BRAND_EXCLUSIVE_NOT_AUTHORIZED: 'markada münhasır yetki yok', VENDOR_BRAND_ACCESS_DENIED: 'marka yetkisi yok',
-    VENDOR_ACCESS_DENIED: 'satıcı onaylı değil', DATA_PARSE_ERROR: 'istek okunamadı', NO_BATCH_ID_EXIST: 'gönderim kimliği bulunamadı', VENDOR_IN_VACATION_MODE: 'tatil modu açık',
-    BRAND_FAILED_TO_MATCH: 'marka katalogdaki ürünle uyuşmuyor', CATEGORY_FAILED_TO_MATCH: 'kategori katalogdaki ürünle uyuşmuyor' };
+  // Ürün durumları (PST, FAIL_TR modül başında): satışa hazır / eşleşti → onay; eksik bilgi / red → hata; inceleme ve eşleşme onayı bekleyenler → bekliyor
   async function status(ref) {
     const items = [];
     let pending = false;

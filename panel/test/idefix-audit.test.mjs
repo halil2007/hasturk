@@ -56,7 +56,8 @@ test('idefix: stok/fiyat gönderimi batchRequestId döndürür; inventory-result
     const st = await c.pushStatus('101b-1');
     assert.match(calls[2].url, /\/pim\/catalog\/16705\/inventory-result\/101b-1$/);
     assert.equal(st.done, true);
-    assert.deepEqual(st.items, [{ key: 'B1', ok: true, error: '' }, { key: 'B2', ok: false, error: st.items[1].error }]);
+    // PRODUCT_NOT_FOUND kanal kaynaklıdır (ürün idefix'te henüz onaylanmamış): panel hatası sayılmaz
+    assert.deepEqual(st.items, [{ key: 'B1', ok: true, error: '' }, { key: 'B2', ok: false, error: st.items[1].error, side: 'channel' }]);
     assert.match(st.items[1].error, /idefix bu barkodu satıştaki ürünleri arasında bulamadı/);
     const pend = await c.pushStatus('101b-2');
     assert.equal(pend.done, false);

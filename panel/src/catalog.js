@@ -6,7 +6,7 @@
 // çekilince barkod / SKU ile otomatik eşleşir.
 import { all, first, run, allIn, getRaw, setSetting, getSettings, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
-import { importListings, catalogOf } from './sync.js';
+import { importListings, catalogOf, HELD_SQL } from './sync.js';
 import { fail, str, num, r2, isImageAttr, variantAxes } from './util.js';
 export { variantAxes };
 import { rank, localProfile, prepare, score } from './catmatch.js';
@@ -38,12 +38,14 @@ export async function productsFor(db, settings, { local, ch, ids }) {
   const ph = cats.map(() => '?').join(',');
   const q = (where) => `SELECT p.*, (SELECT MAX(l.price) FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) AS cat_price,
       (SELECT MAX(l.list_price) FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) AS cat_list,
-      EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel = ?) AS listed
+      EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel = ?) AS listed,
+      -- İlan kanalda var ama yayında değil (kanal onayı bekliyor / onaylamadı): "durum|not"; yayında bir ilan varsa boş
+      (SELECT CASE WHEN SUM(NOT ${HELD_SQL()}) > 0 THEN NULL ELSE MAX(l.remote_state || '|' || COALESCE(l.remote_state_note, '')) END FROM listings l WHERE l.product_id = p.id AND l.channel = ?) AS held
     FROM products p WHERE p.active = 1 AND ${where} ORDER BY COALESCE(NULLIF(p.group_name, ''), p.name), p.variant_name LIMIT 500`;
-  if (!ids) return all(db, q("COALESCE(p.category, '') = ?"), ...cats, ...cats, ch, local);
+  if (!ids) return all(db, q("COALESCE(p.category, '') = ?"), ...cats, ...cats, ch, ch, local);
   // Seçili ürünler parça parça okunur (D1 sorgu başına en fazla 100 değer), sonra aynı sırayla dizilir
   const key = (p) => `${p.group_name || p.name}\u0000${p.variant_name || ''}`;
-  return (await allIn(db, ids, (ph2, part) => [q(`p.id IN (${ph2})`), [...cats, ...cats, ch, ...part]], 60)).sort((a, b) => key(a).localeCompare(key(b))).slice(0, 500);
+  return (await allIn(db, ids, (ph2, part) => [q(`p.id IN (${ph2})`), [...cats, ...cats, ch, ch, ...part]], 60)).sort((a, b) => key(a).localeCompare(key(b))).slice(0, 500);
 }
 // Varyant grubu kodu (Trendyol / idefix / N11 productMainId, Hepsiburada VaryantGroupID): aynı ana ürünün varyantları aynı kodla gider.
 // Sıra: ürünün model kodu → ikas ana ürün kimliği (parent_key) → ana ürün adından sabit kod → SKU

@@ -16,7 +16,7 @@ export const GLOSSARY = {
   'Avantajlı etiket': 'Pazaryerinin belirli fiyatın altına inen ürünlere verdiği "yıldızlı / avantajlı ürün", "flaş indirim" gibi etiketler. Eşik fiyatları pazaryerinin Excel listesindedir.',
   'Fiyat önerisi': 'Rakiplerin pazaryerindeki fiyatına göre hazırlanan öneri: birinci sırayı almak için rakibin hemen altı ya da birinci sıra sizdeyse kârı artıracak fiyat.',
   'Net kâr': 'Brüt kâr (hakediş − alış maliyeti) eksi işletme giderleri (kira, personel, paketleme …). Gerçekte cebinize kalan.',
-  'İade maliyeti': 'İade edilen siparişin size maliyeti: geri gelmeyen gönderim kargosu, iade kargosu (kanalın kargo faturasından; yoksa Ayarlar → Giderler\'deki tahmini iade kargo bedeli), geri verilmeyen komisyon ve hizmet bedeli. Ürünlere göre kârlılıkta kâr bu maliyet düşülerek gösterilir.',
+  'İade maliyeti': 'İade edilen siparişin size maliyeti: geri gelmeyen gönderim kargosu, iade kargosu (kanalın kargo faturasından; yoksa Ayarlar → Giderler\'deki tahmini iade kargo bedeli, o da boşsa ürünün kargo tutarı — tahmini), geri verilmeyen komisyon ve hizmet bedeli. Ürünlere göre kârlılıkta kâr bu maliyet düşülerek gösterilir.',
   'Kritik stok': 'Bu adedin altına inen ürün için uyarı alırsınız.',
 };
 

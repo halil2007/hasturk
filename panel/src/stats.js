@@ -3,7 +3,7 @@ import { all, first, getSettings } from './db.js';
 import { dayKey, weekKey, monthKey, TR, r2, LATE, PRODUCT_SHIP } from './util.js';
 import { CHANNEL_IDS, isChannelId } from './channels/index.js';
 import { profit, costOf, rateGross } from '../public/profit.js';
-import { DESIRED } from './sync.js';
+import { DESIRED, HELD_SQL, REAL_ERR_SQL } from './sync.js';
 import { keptShare } from './finance.js';
 const LOW = (n) => `(CASE WHEN critical_stock > 0 THEN critical_stock ELSE ${Math.max(0, Math.round(Number(n) || 0))} END)`;
 
@@ -144,8 +144,8 @@ export async function dashboard(db, q) {
     all(db, "SELECT status, COUNT(*) AS n FROM orders WHERE status IN ('new', 'processing') GROUP BY status"),
     all(db, `SELECT id, name, sku, image, stock, critical_stock FROM products WHERE active = 1 AND stock <= ${LOW(settings.low_stock)} ORDER BY stock ASC LIMIT 8`),
     first(db, `SELECT (SELECT COUNT(*) FROM products WHERE active = 1) AS products, (SELECT COALESCE(SUM(MAX(stock, 0)), 0) FROM products WHERE active = 1) AS units,
-      (SELECT COUNT(*) FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED}) AS waiting,
-      (SELECT COUNT(*) FROM listings WHERE error IS NOT NULL) AS errors, (SELECT COUNT(*) FROM listings WHERE product_id IS NULL AND ignored = 0) AS unlinked,
+      (SELECT COUNT(*) FROM listings l JOIN products p ON p.id = l.product_id WHERE p.active = 1 AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED} AND NOT ${HELD_SQL()}) AS waiting,
+      (SELECT COUNT(*) FROM listings l WHERE ${REAL_ERR_SQL()}) AS errors, (SELECT COUNT(*) FROM listings WHERE product_id IS NULL AND ignored = 0) AS unlinked,
       (SELECT COUNT(*) FROM products WHERE active = 1 AND stock <= 0) AS out_, (SELECT COUNT(*) FROM products WHERE active = 1 AND stock > 0 AND stock <= ${LOW(settings.low_stock)}) AS below`),
     topProducts(db, fromMs, toMs, 6),
   ]);

@@ -3,12 +3,13 @@
 //     oran (KDV dahil: Trendyol oranı olduğu gibi, Hepsiburada oranı × 1,20) bulunur. Kanalın bildirdiği oran listeden 0,5 puandan fazla
 //     yüksekse "veri sorunu olabilir" diye gösterilir; ilanın oranı hiç bilinmiyorsa liste oranı tahmin olarak yazılır (commission_src 'list').
 //     Eşleşme yalnız birebir ad eşitliğiyle yapılır (Türkçe harf / büyük-küçük farkı yok sayılır); tahmin yapılmaz, eşleşmeyen ilan atlanır.
-//  2) Komisyon indirimi: sipariş satırındaki gerçek oran, ilanın olağan oranından (son 90 günün ortancası, en az 3 satır) ya da liste
+//  2) Komisyon indirimi (sipariş ayrıntısında satır komisyonu bildiren her kanal, dönem özetinde Trendyol / Hepsiburada): sipariş
+//     satırındaki gerçek oran, ilanın olağan oranından (son 90 günün ortancası, en az 3 satır) ya da liste
 //     oranından en az 1 puan düşükse satır "indirimli" sayılır; kazanç = (normal oran − gerçek oran) × satır tutarı. Saklanmaz, her
 //     seferinde hesaplanır.
 //  3) Sonradan gelen komisyon iadesi / düzeltmesi: hakediş kayıtlarından (bkz. finance.js commissionCredits).
 import { LISTS } from './commission-lists.js';
-import { all, allIn } from './db.js';
+import { all, allIn, first } from './db.js';
 import { keptShare, commissionCredits } from './finance.js';
 import { chunk, r2 } from './util.js';
 
@@ -67,6 +68,55 @@ export async function applyListRates(db, channel) {
   return st.length;
 }
 
+// ---------- ilanın ana (baz) komisyon oranı ----------
+// Sipariş satırındaki komisyon gerçek kesintidir (kâr raporları onu kullanır). Pazaryeri bazı siparişlerde kendi indirimini yapar
+// (idefix'in %4,x kestiği sipariş, Hepsiburada'nın sipariş başı indirimi, Trendyol komisyon kampanyası): bu oran sürekli değildir,
+// satıcıyı bağlamaz. İlana yazılan oran ileriye dönük hesapların (fiyat önerisi, başa baş fiyat, avantajlı etiket kârı, istatistik
+// tahmini, ürün formundaki kâr) ANA oranıdır: son 90 günün canlı satırlarındaki EN YÜKSEK oran; kategori resmî listeyle eşleşiyorsa
+// liste oranının altına inmez. Tek bir indirimli satır ana oranı düşürmez; oran artışı hemen yansır, kalıcı düşüş 90 gün sonra
+// (ya da elle girilerek). Elle girilen oran (commission_src 'manual') hiç değişmez.
+export const BASE_DAYS = 90;
+export function baseRate(rates, list) {
+  const v = [...(rates || []), ...(list != null && Number.isFinite(list) ? [list] : [])].filter((x) => Number.isFinite(x) && x > 0);
+  return v.length ? r2(Math.max(...v)) : null;
+}
+// Verilen ilanların (keys: remote_id listesi; boşsa kanalın son 90 günde satan tüm ilanları) ana oranını yeniden hesaplar ve değiştiyse
+// yazar (commission_src 'api'). Değişen ilan sayısı döner.
+export async function refreshBaseRates(db, channel, keys = null, now = Date.now()) {
+  const since = now - BASE_DAYS * D;
+  const sql = (extra) => `SELECT i.remote_key AS k, MAX(i.commission * 100.0 / i.total) AS r FROM order_items i JOIN orders o ON o.id = i.order_id
+    WHERE o.channel = ? AND o.ordered_at >= ? AND i.commission IS NOT NULL AND i.total > 0 AND COALESCE(i.remote_key, '') != '' AND ${LIVE_LINE}${extra} GROUP BY i.remote_key`;
+  const rows = keys ? (keys.length ? await allIn(db, [...new Set(keys)], (ph, part) => [sql(` AND i.remote_key IN (${ph})`), [channel, since, ...part]]) : [])
+    : await all(db, sql(''), channel, since);
+  if (!rows.length) return 0;
+  const top = new Map(rows.map((r) => [r.k, Number(r.r)]));
+  const ls = await allIn(db, [...top.keys()], (ph, part) => [`SELECT remote_id, mp_category, commission, commission_src FROM listings WHERE channel = ? AND remote_id IN (${ph})
+    AND (commission IS NULL OR commission_src IN ('api', 'list'))`, [channel, ...part]]);
+  const st = [];
+  for (const l of ls) {
+    const lr = listRate(channel, l.mp_category), v = baseRate([top.get(l.remote_id)], lr ? lr.rate : null);
+    if (v == null || (l.commission_src === 'api' && l.commission != null && Math.abs(l.commission - v) < 0.005)) continue;
+    st.push(db.prepare("UPDATE listings SET commission = ?, commission_src = 'api' WHERE channel = ? AND remote_id = ? AND (commission IS NULL OR commission_src IN ('api', 'list'))").bind(v, channel, l.remote_id));
+  }
+  for (const part of chunk(st, 90)) await db.batch(part);
+  return st.length;
+}
+// Tek seferlik: önceki kural ilana SON siparişin oranını yazıyordu (indirimli tek satır ana oranı düşürüyordu). Kanaldan oranı gelen
+// ilanlar yeni kurala göre yeniden hesaplanır. İşaret önce alınır (iki örnek aynı anda çalıştırmasın); hata olursa geri bırakılır.
+export async function rebaseOnce(db, now = Date.now()) {
+  const claim = await first(db, "INSERT INTO settings (k, v) VALUES ('once:comm_base_1', '1') ON CONFLICT (k) DO NOTHING RETURNING k").catch(() => null);
+  if (!claim) return null;
+  try {
+    const chans = (await all(db, `SELECT DISTINCT o.channel FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.ordered_at >= ? AND i.commission IS NOT NULL`, now - BASE_DAYS * D)).map((r) => r.channel);
+    let n = 0;
+    for (const c of chans) n += await refreshBaseRates(db, c, null, now);
+    return n;
+  } catch (e) {
+    await db.prepare("DELETE FROM settings WHERE k = 'once:comm_base_1'").run().catch(() => {});
+    throw e;
+  }
+}
+
 const median = (a) => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 // Satırın gerçek oranı ve normal oranı: max(olağan oran, liste oranı); indirim ≥ 1 puan ise kazanç
 export function lineDiscount({ commission, total, quantity, returned_qty }, usual, list) {
@@ -88,8 +138,8 @@ const LIVE_LINE = "COALESCE(i.status, '') NOT IN ('cancelled', 'returned')";
 
 // Sipariş ayrıntısı: satır satır komisyon indirimi ve hakedişteki komisyon iadesi
 export async function orderCommission(db, settings, o) {
+  // Satır komisyonu bildiren her kanalda (idefix, Hepsiburada, Trendyol …): olağan orana göre; resmî liste yalnız Trendyol / Hepsiburada
   const out = { lines: [], saved: 0, credit: 0, counted: 0 };
-  if (!mpOf(o.channel)) return out;
   const items = (o.items || []).filter((i) => i.commission != null && i.total > 0 && i.status !== 'cancelled' && i.status !== 'returned' && keptShare(i) > 0);
   const keys = [...new Set(items.map((i) => i.remote_key).filter(Boolean))];
   const [hist, cats, cr] = await Promise.all([

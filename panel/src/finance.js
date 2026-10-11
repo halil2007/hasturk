@@ -12,11 +12,13 @@ export const keptShare = (i) => { const q = Number(i.quantity) || 0, r = Math.mi
 const liveLine = (i) => i.status !== 'cancelled' && i.status !== 'returned' && keptShare(i) > 0;
 export function orderProfit(o, settings) {
   const ch = o.channel;
-  let revenue = 0, commission = 0, cost = 0, missing = 0, realCommission = true;
+  let revenue = 0, commission = 0, cost = 0, missing = 0, realCommission = true, sellerDiscount = 0;
   for (const i of o.items) {
     if (!liveLine(i)) continue;
     const rate = rateGross(settings, i.listing_commission, i.listing_commission_src) ?? costOf(settings, 'commission', ch), k = keptShare(i);
     revenue += i.total * k;
+    // Satıcının karşıladığı sepet / kupon indirimi (Trendyol lineSellerDiscount): satır tutarından zaten düşülmüş, yalnız gösterilir
+    sellerDiscount += (Number(i.seller_discount) || 0) * k;
     // Kanalın bildirdiği gerçek komisyon varsa o; yoksa ilan / kanal oranıyla tahmin (iade edilen adedin komisyonu kanal tarafından geri verilir)
     if (i.commission != null) commission += i.commission * k; else { commission += profit({ sale: i.total * k, commissionRate: rate }).commission; realCommission = false; }
     if (i.purchase_price) cost += i.purchase_price * i.quantity * k; else missing++;
@@ -35,7 +37,7 @@ export function orderProfit(o, settings) {
   const net = revenue - commission - shipping - fee - x.rateFee - x.withholding + credit;
   const shippingSrc = o.shipping_cost != null ? (o.shipping_src === 'api' ? 'api' : o.shipping_src === 'carrier' ? 'carrier' : 'manual') : prodShip > 0 ? 'product' : defShip > 0 ? 'default' : 'none';
   return {
-    revenue: r2(revenue), commission: r2(commission), commissionSrc: realCommission && o.items.length ? 'api' : 'estimate', commCredit: r2(credit), shipping: r2(shipping), shippingSrc,
+    revenue: r2(revenue), sellerDiscount: r2(sellerDiscount), commission: r2(commission), commissionSrc: realCommission && o.items.length ? 'api' : 'estimate', commCredit: r2(credit), shipping: r2(shipping), shippingSrc,
     fee: r2(fee), rateFee: r2(x.rateFee), withholding: r2(x.withholding), payout: r2(net), cost: r2(cost), profit: r2(net - cost), missingCost: missing,
   };
 }
@@ -54,6 +56,8 @@ export function orderProfit(o, settings) {
 //     iade edilen adedin alış maliyeti kayıptır.
 // invoiceShipping: kanalın kargosu dönemin kargo faturaları toplamından alınıyorsa (breakdown 'invoice') kargo kalemleri o toplamın
 // içindedir; çift sayılmaması için 0 yazılır (inInvoice'ta ayrıca gösterilir). feeFromInvoice: hizmet bedeli faturalardan alınıyorsa aynı.
+// Tahmini iade kargosu kaynakları: Ayarlar'daki iade kargo bedeli, ürünün kargo tutarı, Ayarlar'daki sipariş başı kargo
+export const EST_RET = ['estimate', 'product', 'default'];
 export const DAMAGED_RE = /hasar|kusur|defo|bozuk|kırık|arıza|ezik|akmış|defect|damag|broken/i;
 const retQty = (i, full) => { const q = Number(i.quantity) || 0; return i.status === 'cancelled' ? 0 : full || i.status === 'returned' ? q : Math.min(q, Math.max(0, Number(i.returned_qty) || 0)); };
 const itemKey = (i) => (i.product_id != null ? i.product_id : 'x:' + (i.sku || i.name));
@@ -71,11 +75,16 @@ export function returnCost(o, settings, { invoiceShipping = false, feeFromInvoic
     outbound = o.shipping_cost ?? (prodShip > 0 ? prodShip : defShip);
     outboundSrc = o.shipping_cost != null ? (['api', 'carrier'].includes(o.shipping_src) ? 'invoice' : 'manual') : prodShip > 0 ? 'product' : defShip > 0 ? 'default' : 'none';
   }
-  // İade kargosu
+  // İade kargosu: faturadaki iade kalemi → Ayarlar'daki iade kargo bedeli → (o da boşsa) iade edilen ürünün kargo tutarı (geri gelen koli
+  // gönderiyle aynı tutarda sayılır) → Ayarlar'daki sipariş başı kargo tutarı. Son ikisi "tahmini (ürün kargo tutarından)".
+  // 'lumped' eski kayıtta iade kargosu gönderim faturasında (shipping_cost) olabilir: tahmin eklenmez (çift sayılmasın).
   let returnShip = 0, returnShipSrc = 'none';
   if (o.return_ship_src === 'api' && o.return_ship_cost != null) { returnShip = Number(o.return_ship_cost) || 0; returnShipSrc = 'invoice'; }
   else if (o.return_ship_src === 'lumped') returnShipSrc = 'lumped';
-  else { returnShip = costOf(settings, 'return_shipping', ch); returnShipSrc = returnShip > 0 ? 'estimate' : 'none'; }
+  else {
+    const set = costOf(settings, 'return_shipping', ch), prod = Math.max(0, ...lines.map((x) => Number(x.i.ship_cost) || 0)), def = costOf(settings, 'shipping', ch);
+    [returnShip, returnShipSrc] = set > 0 ? [set, 'estimate'] : prod > 0 ? [prod, 'product'] : def > 0 ? [def, 'default'] : [0, 'none'];
+  }
   const commission = full ? Math.max(0, Number(o.ret_comm) || 0) : 0;
   const fee = full && !feeFromInvoice ? costOf(settings, 'service_fee', ch) : 0;
   // Hasarlı iade: talep satırları barkod / stok koduyla siparişin satırına bağlanır (tek ürünlü siparişte doğrudan)
@@ -101,7 +110,7 @@ export function returnCost(o, settings, { invoiceShipping = false, feeFromInvoic
   });
   return {
     id: o.id, channel: ch, full, units: sumU, outbound: r2(outbound), outboundSrc, returnShip: r2(returnShip), returnShipSrc, commission: r2(commission), fee: r2(fee), damaged: r2(damaged),
-    inInvoice: r2(inInvoice), total: r2(shared + damaged), estimated: returnShipSrc === 'estimate' || ['product', 'default'].includes(outboundSrc) || fee > 0, lines: out,
+    inInvoice: r2(inInvoice), total: r2(shared + damaged), estimated: EST_RET.includes(returnShipSrc) || ['product', 'default'].includes(outboundSrc) || fee > 0, lines: out,
   };
 }
 // Dönemin (sipariş tarihine göre) iade edilen siparişleri ve iade maliyetleri; productId: yalnız o ürünün geçtiği siparişler
@@ -146,7 +155,7 @@ export async function returnCosts(db, settings, { from, to, channel, productId }
 }
 
 const LIVE = "o.status NOT IN ('cancelled', 'returned')";
-const KEYS = ['revenue', 'commission', 'commCredit', 'shipping', 'fee', 'rateFee', 'withholding', 'ads', 'penalty', 'returnLoss', 'payout', 'cost', 'returnDamaged', 'profit'];
+const KEYS = ['revenue', 'sellerDiscount', 'commission', 'commCredit', 'shipping', 'fee', 'rateFee', 'withholding', 'ads', 'penalty', 'returnLoss', 'payout', 'cost', 'returnDamaged', 'profit'];
 // Siparişe bağlanamayan pazaryeri kesintileri (kesilen faturalardan, fatura tarihine göre dönemde)
 const INV_ADS = ['Reklam / pazarlama'], INV_PENALTY = ['Ceza', 'Diğer kesinti'];
 
@@ -209,7 +218,7 @@ async function aggregate(db, settings, { from, to, channel }) {
   const K = "(CASE WHEN i.quantity > 0 THEN (i.quantity - MIN(i.quantity, MAX(0, COALESCE(i.returned_qty, 0)))) * 1.0 / i.quantity ELSE 1 END)";
   // Tek geçiş: siparişler tarih dizininden bir kez okunur, satırlarıyla sipariş başına toplanır, sonra kanal başına toplanır
   // (önceki iki aşamalı sorgu siparişleri iki kez tarıyor ve ara sonuç için geçici dizin kuruyordu; 1 yıllık dönem ~%40 daha hızlı)
-  return all(db, `SELECT channel, COUNT(*) AS orders, COALESCE(SUM(rev), 0) AS revenue, COALESCE(SUM(comm), 0) AS commission,
+  return all(db, `SELECT channel, COUNT(*) AS orders, COALESCE(SUM(rev), 0) AS revenue, COALESCE(SUM(sdisc), 0) AS sellerDiscount, COALESCE(SUM(comm), 0) AS commission,
       SUM(CASE WHEN n > 0 AND estc = 0 THEN 1 ELSE 0 END) AS realCommission, COALESCE(SUM(cost), 0) AS cost, COALESCE(SUM(miss), 0) AS missingCost,
       SUM(CASE WHEN live > 0 THEN COALESCE(sc, pship, ${rate('shipping', 'channel')}) ELSE 0 END) AS shipping,
       SUM(CASE WHEN live > 0 AND sc IS NULL AND pship IS NOT NULL THEN 1 ELSE 0 END) AS productShipping,
@@ -219,6 +228,7 @@ async function aggregate(db, settings, { from, to, channel }) {
       SUM(rev * 100.0 / 120.0 * ${rate('withholding', 'channel')} / 100.0) AS withholding
     FROM (SELECT o.channel, o.shipping_cost AS sc, o.shipping_src AS ss,
         SUM(CASE WHEN ${LIVEI} THEN i.total * ${K} ELSE 0 END) AS rev,
+        SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.seller_discount, 0) * ${K} ELSE 0 END) AS sdisc,
         SUM(CASE WHEN ${LIVEI} THEN COALESCE(i.commission, i.total * COALESCE(l.commission * ${costVat(settings)}, ${rate('commission')}) / 100.0) * ${K} ELSE 0 END) AS comm,
         SUM(CASE WHEN ${LIVEI} AND i.commission IS NULL THEN 1 ELSE 0 END) AS estc,
         SUM(CASE WHEN ${LIVEI} AND COALESCE(p.purchase_price, 0) != 0 THEN p.purchase_price * i.quantity * ${K} ELSE 0 END) AS cost,
@@ -266,13 +276,14 @@ export async function breakdown(db, settings, { from, to, channel } = {}) {
   const inv = (c, types) => invRows.filter((r) => r.channel === c && types.includes(r.type)).reduce((a, r) => a + r.amount, 0);
   for (const c of new Set(invRows.filter((r) => [...INV_ADS, ...INV_PENALTY].includes(r.type)).map((r) => r.channel))) chOf(c);
   // Kanal başına iade özeti (kargo kalemleri ayrı tutulur: kargo faturası toplamı kullanılan kanalda onların içinde)
-  const RZ = () => ({ orders: 0, full: 0, partial: 0, units: 0, outbound: 0, returnShip: 0, returnShipEst: 0, estOrders: 0, commission: 0, fee: 0, damaged: 0, inInvoice: 0, lumped: 0 });
+  const RZ = () => ({ orders: 0, full: 0, partial: 0, units: 0, outbound: 0, returnShip: 0, returnShipEst: 0, estOrders: 0, returnShipProd: 0, commission: 0, fee: 0, damaged: 0, inInvoice: 0, lumped: 0 });
   const retBy = new Map();
   for (const r of returned) {
     chOf(r.channel);
     const a = retBy.get(r.channel) || retBy.set(r.channel, RZ()).get(r.channel);
     a.orders++; a[r.full ? 'full' : 'partial']++; a.units += r.units; a.outbound += r.outbound; a.returnShip += r.returnShip; a.commission += r.commission; a.fee += r.fee; a.damaged += r.damaged;
-    if (r.returnShipSrc === 'estimate') { a.returnShipEst += r.returnShip; a.estOrders++; }
+    if (EST_RET.includes(r.returnShipSrc)) { a.returnShipEst += r.returnShip; a.estOrders++; }
+    if (r.returnShipSrc === 'product' || r.returnShipSrc === 'default') a.returnShipProd += r.returnShip;
     if (r.returnShipSrc === 'lumped') a.lumped++;
   }
   total.returnInfo = RZ();
@@ -298,7 +309,7 @@ export async function breakdown(db, settings, { from, to, channel } = {}) {
     // toplamın içindedir, hizmet bedeli faturalardan alınıyorsa o da: ikinci kez düşülmez.
     const r = retBy.get(c);
     if (r) {
-      if (x.shippingSrc === 'invoice') { r.inInvoice = r.outbound + r.returnShip; r.outbound = 0; r.returnShip = 0; r.returnShipEst = 0; r.estOrders = 0; }
+      if (x.shippingSrc === 'invoice') { r.inInvoice = r.outbound + r.returnShip; r.outbound = 0; r.returnShip = 0; r.returnShipEst = 0; r.estOrders = 0; r.returnShipProd = 0; }
       if (x.feeSrc === 'invoice') r.fee = 0;
       for (const y of [x, total]) y.returns += r.orders;
       for (const [k, v] of Object.entries(r)) total.returnInfo[k] += v;
@@ -324,6 +335,8 @@ export async function breakdown(db, settings, { from, to, channel } = {}) {
   // Şelale: satıştan net kâra her basamak
   const steps = [
     { k: 'revenue', label: 'Satış (ciro)', v: total.revenue, note: total.returns ? `${total.returns} iade edilen siparişin iade edilen tutarı ciroya dahil değil` : '' },
+    // Bilgi: satıcının karşıladığı sepet / kupon indirimi (Trendyol sipariş satırından). Satış zaten indirim düşülmüş tutardır; toplamlara girmez.
+    ...(total.sellerDiscount ? [{ k: 'sellerDiscount', label: 'Sepet / kupon indirimi (sizin karşıladığınız)', v: -total.sellerDiscount, info: true, note: 'pazaryerinin sipariş satırındaki satıcı indirimi; satış tutarından zaten düşüldü, ayrıca düşülmez' }] : []),
     { k: 'commission', label: 'Komisyon', v: -total.commission, note: `${total.realCommission}/${total.orders} siparişte kanalın bildirdiği tutar` },
     ...(total.commCredit ? [{ k: 'commCredit', label: 'Komisyon iadesi / indirimi (pazaryeri karşıladı)', v: total.commCredit, note: `${total.creditOrders} siparişte pazaryerinin hakediş kaydından (komisyon düzeltmesi)` }] : []),
     { k: 'shipping', label: 'Kargo', v: -total.shipping, note: shipNote },
@@ -351,7 +364,7 @@ export function returnNote(ri) {
   if (!ri || !ri.orders) return 'dönemde iade yok';
   const parts = [`${ri.orders} iade (${ri.full} tamamı, ${ri.partial} kısmi; ${Math.round(ri.units)} adet)`];
   if (ri.outbound) parts.push(`geri gelmeyen gönderim kargosu ${tl(ri.outbound)}`);
-  if (ri.returnShip) parts.push(`iade kargosu ${tl(ri.returnShip)}${ri.returnShipEst ? ` (${tl(ri.returnShipEst)} tahmini, ${ri.estOrders} iade)` : ''}`);
+  if (ri.returnShip) parts.push(`iade kargosu ${tl(ri.returnShip)}${ri.returnShipEst ? ` (${tl(ri.returnShipEst)} tahmini, ${ri.estOrders} iade${ri.returnShipProd ? `; ${tl(ri.returnShipProd)} tahmini (ürün kargo tutarından)` : ''})` : ''}`);
   if (ri.commission) parts.push(`geri verilmeyen komisyon ${tl(ri.commission)}`);
   if (ri.fee) parts.push(`hizmet bedeli ${tl(ri.fee)}`);
   if (ri.inInvoice) parts.push(`kargo kalemleri (${tl(ri.inInvoice)}) Kargo basamağındaki fatura toplamında`);
@@ -437,7 +450,10 @@ export function lossVerdict(x) {
   return null;
 }
 // Başa baş (kâr = 0) satış fiyatı, beklenen iade maliyeti dahil. Kanalın gözlenen değerleri kullanılır:
-//   komisyon oranı = kesilen komisyon / ciro (kanalın bildirdiği KDV dahil tutar; yoksa ilan / Ayarlar oranı — orderProfit ile aynı)
+//   komisyon oranı = ilanın ANA oranı (bkz. commcheck.js refreshBaseRates: son 90 günün en yüksek satır oranı, resmî liste tabanı; elle
+//   girilen oran). Pazaryerinin geçici komisyon indirimi (idefix / Hepsiburada sipariş başı indirim) başa baş fiyatı olduğundan ucuz
+//   göstermesin diye gerçekleşen ortalama (kesilen komisyon / ciro) yalnız ilanın oranı bilinmiyorsa kullanılır, o da yoksa Ayarlar.
+//   Gerçekleşen oran ayrıca döner (actualRate)
 //   sabit gider / adet = (kargo + hizmet bedeli payı) / satılan adet
 //   beklenen iade maliyeti / satılan adet = iade oranı / (1 − iade oranı) × iade başı maliyet. İade oranı ürünün (tüm kanallar; müşteri
 //   ürünü kanaldan bağımsız iade eder, tek kanalın birkaç satışı yanıltmasın), iade başı maliyet kanalın (kargo kanala göre değişir; kanalda
@@ -446,12 +462,13 @@ export function lossVerdict(x) {
 // Fiyat = (alış + sabit + beklenen iade) / (1 − komisyon% − ek kesinti% − stopaj% / 1,2). Satışı olmayan kanalda Ayarlar'daki tutarlar.
 export function breakEven(c, { purchase, settings, shipCost = 0, listingRate = null, retRatio = null, perReturn = null }) {
   const ch = c.channel, units = Number(c.units) || 0;
-  const commissionRate = units && c.revenue ? (c.commission / c.revenue) * 100 : listingRate ?? costOf(settings, 'commission', ch);
+  const actualRate = units && c.revenue ? (c.commission / c.revenue) * 100 : null;
+  const commissionRate = listingRate ?? actualRate ?? costOf(settings, 'commission', ch);
   const fixed = units ? c.fixed / units : (shipCost > 0 ? shipCost : costOf(settings, 'shipping', ch)) + costOf(settings, 'service_fee', ch);
   const ratio = retRatio ?? (units ? (Number(c.returns) || 0) / units : 0), per = c.returns ? c.returnCost / c.returns : perReturn || 0;
   const expRet = ratio * per;
   const price = priceFor({ purchase: Number(purchase) || 0, commissionRate, shipping: fixed, extra: expRet, feeRate: costOf(settings, 'fee_rate', ch), withholdingRate: costOf(settings, 'withholding', ch), vatRate: 20 }, 0);
-  return { price: price == null ? null : r2(price), commissionRate: r2(commissionRate), fixed: r2(fixed), expReturn: r2(expRet), avgPrice: units ? r2(c.revenue / units) : null };
+  return { price: price == null ? null : r2(price), commissionRate: r2(commissionRate), actualRate: actualRate == null ? null : r2(actualRate), fixed: r2(fixed), expReturn: r2(expRet), avgPrice: units ? r2(c.revenue / units) : null };
 }
 // Ürün kartındaki uyarı: son 30 ve 90 günün kârı (iade dahil), zarar / iade uyarısı ve kanal başına başa baş fiyatı
 export async function productLoss(db, settings, id) {
@@ -557,9 +574,10 @@ export async function syncInvoices(env, db, { force = false, only } = {}) {
 // Pazaryerinin hesap ekstresi (satış / iade / indirim / komisyon kayıtları ve ödeme tarihleri) 6 saatte bir okunur ve saklanır.
 // İlk okumada son 60 gün; sonra son 20 gün — ödenmemiş kayıt varsa en eskisinin tarihinden (en çok 90 gün geriye): ödeme
 // kayda sonradan işlenir (Trendyol paymentOrderId, Hepsiburada WillBePaid → Paid), okunmazsa kayıt "ödenmedi / gecikti" kalırdı.
-const STL_SQL = `INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, payment_date, due_date, paid, payment_id, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+// raw: kanalın kayıttaki ham alanları (JSON; Hepsiburada: durum, amount / netAmount / taxAmount, paket no …) — mutabakat ayrıntısında gösterilir
+const STL_SQL = `INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, payment_date, due_date, paid, payment_id, synced_at, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT (channel, remote_id) DO UPDATE SET date = excluded.date, type = excluded.type, raw_type = excluded.raw_type, order_number = excluded.order_number, amount = excluded.amount, commission = excluded.commission,
-    payment_date = excluded.payment_date, due_date = excluded.due_date, paid = excluded.paid, payment_id = excluded.payment_id, synced_at = excluded.synced_at`;
+    payment_date = excluded.payment_date, due_date = excluded.due_date, paid = excluded.paid, payment_id = excluded.payment_id, synced_at = excluded.synced_at, raw = excluded.raw`;
 const fin = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : 0);
 const ms = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);
 export async function syncSettlements(env, db, { force = false, only } = {}) {
@@ -583,13 +601,17 @@ export async function syncSettlements(env, db, { force = false, only } = {}) {
         await db.batch(part.map((x) => {
           const date = ms(x.date), pay = ms(x.paymentDate);
           // Ödeme günü: vade → ödeme tarihi → kayıt tarihi (rapor vade dizininden okur; boş kalan kayıt hiçbir güne düşmezdi)
-          return db.prepare(STL_SQL).bind(ch.id, String(x.remoteId), date, x.type || 'Diğer', x.rawType || '', String(x.orderNumber || '').trim(), fin(x.amount), fin(x.commission), pay, ms(x.dueDate) || pay || date, x.paid ? 1 : 0, String(x.paymentId || ''), t);
+          return db.prepare(STL_SQL).bind(ch.id, String(x.remoteId), date, x.type || 'Diğer', x.rawType || '', String(x.orderNumber || '').trim(), fin(x.amount), fin(x.commission), pay, ms(x.dueDate) || pay || date, x.paid ? 1 : 0, String(x.paymentId || ''), t, x.raw ? String(x.raw).slice(0, 2000) : null);
         }));
       }
       // Tanınmayan kayıt türleri kaybolmaz: "Diğer" olarak saklanır, günlüğe yazılır (bağdaştırıcıya eklenmesi için)
       const unk = new Map();
       for (const x of rows) if (x.unknown) unk.set(x.rawType || '?', (unk.get(x.rawType || '?') || 0) + 1);
       if (unk.size && !ch.demo) await log(db, ch.id, 'warn', 'Tanınmayan hakediş kayıt türü "Diğer" olarak eklendi: ' + [...unk].map(([k, n]) => `${k} (${n})`).join(', '));
+      // Durum filtresi (Hepsiburada: Paid, WillBePaid) dışında kalıp sipariş numarasıyla bulunan kayıtlar: filtre bu kayıtları kaçırıyor demektir
+      const oof = new Map();
+      for (const x of rows) if (x.outOfFilter) { const k = `${x.rawType || '?'} / ${x.outOfFilter}`; oof.set(k, (oof.get(k) || 0) + 1); }
+      if (oof.size && !ch.demo) await log(db, ch.id, 'warn', 'Hakediş: durum filtresi dışında kalan kayıtlar sipariş numarasıyla bulundu (tür / durum): ' + [...oof].map(([k, n]) => `${k} (${n})`).join(', '));
       await setSetting(db, key, { at: t, n: rows.length });
       out[ch.id] = rows.length;
     } catch (e) {
@@ -654,6 +676,45 @@ export async function commissionCredits(db, settings, { from, to, channel, ids }
   return out;
 }
 
+// Mutabakat: eksik kaydı (komisyon ya da satış kaydı gelmemiş) ve hiçbir kaydı henüz ödenmemiş sipariş bu süre boyunca fark sayılmaz,
+// "bekleniyor" listesinde durur. Hepsiburada satışı (Payment) ve komisyonu (Commission) ayrı kayıtlarla işler; komisyon sonradan gelebilir.
+export const STL_WAIT = 45 * DAY;
+// Farkın tarafı: panel kaynaklı olabilir / pazaryeri eksik ödemiş / pazaryeri fazla ödemiş görünüyor
+export const STL_SIDES = {
+  panel: 'Panel kaynaklı olabilir (veri eşleşmedi / kayıt henüz gelmedi)',
+  short: 'Pazaryeri eksik ödemiş görünüyor (tüm kayıtlar geldi, tutar düşük)',
+  extra: 'Pazaryeri fazla ödemiş görünüyor (tüm kayıtlar geldi, tutar yüksek)',
+};
+export const STL_CODES = {
+  wait_commission: 'Komisyon kaydı henüz gelmedi', wait_sale: 'Satış kaydı henüz gelmedi',
+  cancelled_paid: 'İptal edilen siparişe ödeme kaydı', return_pending: 'İade kaydı pazaryerine henüz düşmedi', return_unknown: 'Pazaryerinde iade var, panelde yok',
+  no_commission: 'Komisyon kaydı yok / eşleşmedi', no_sale: 'Satış kaydı yok / eşleşmedi', campaign: 'Pazaryerinin karşıladığı kampanya indirimi',
+  commission_diff: 'Komisyon farklı', sale_low: 'Satış tutarı düşük', sale_high: 'Satış tutarı yüksek', mixed: 'Satış ve komisyon farklı',
+};
+// Fark ayrıntısı (tanı): siparişin tüm pazaryeri kayıtları (hakedişe girmeyenler de, ham alanlarıyla) ve panelin beklediği (satırlar, satış, komisyon)
+async function stlDetails(db, list, itemsOf, ctx) {
+  if (!list.length) return;
+  const byCh = new Map(), recs = new Map();
+  for (const x of list) (byCh.get(x.channel) || byCh.set(x.channel, new Set()).get(x.channel)).add(x.order_number);
+  for (const [c, nos] of byCh) {
+    for (const part of chunk([...nos], 80)) {
+      for (const r of await all(db, `SELECT order_number, remote_id, date, type, raw_type, amount, commission, due_date, payment_date, paid, raw FROM settlements WHERE channel = ? AND order_number IN (${part.map(() => '?').join(',')}) ORDER BY date, remote_id`, c, ...part)) {
+        let raw = null; try { raw = r.raw ? JSON.parse(r.raw) : null; } catch { raw = null; }
+        const k = c + '|' + r.order_number;
+        (recs.get(k) || recs.set(k, []).get(k)).push({ id: r.remote_id, type: r.type, rawType: r.raw_type || '', amount: r2(r.amount), commission: r2(r.commission || 0), date: r.date, due: r.due_date, paidAt: r.payment_date, paid: !!r.paid, counted: STL_ORDER.test(r.type || ''), raw });
+      }
+    }
+  }
+  for (const x of list) {
+    const c = ctx.get(x.id) || {}, p = c.p || {};
+    x.detail = {
+      records: recs.get(x.channel + '|' + x.order_number) || [],
+      lines: (itemsOf.get(x.id) || []).map((i) => ({ name: i.name || i.sku || '—', sku: i.sku || '', qty: Number(i.quantity) || 0, returned: Number(i.returned_qty) || 0, status: i.status || '', total: r2(i.total), commission: i.commission == null ? null : r2(i.commission), counted: !c.dead && liveLine(i) })),
+      expect: { dead: !!c.dead, revenue: c.dead ? 0 : r2(p.revenue || 0), commission: c.dead ? 0 : r2(p.commission || 0), commissionSrc: p.commissionSrc || '', credit: c.cr ? r2(c.cr.counted) : 0, payout: r2(c.expected || 0) },
+    };
+  }
+}
+
 // Hakediş raporu: ödeme günlerine göre (ödenen / ödenecek), dönem toplamları ve mutabakat (pazaryerinin hakedişi ile panelin tahmini farklı olan siparişler)
 export async function settlementReport(env, db, settings, q = {}) {
   const now = Date.now(), from = Number(q.from) || now - 30 * DAY, to = Number(q.to) || now + 1;
@@ -661,7 +722,7 @@ export async function settlementReport(env, db, settings, q = {}) {
   // Ödeme günü Türkiye saatiyle (UTC+3; yaz saati yok)
   const day = "strftime('%Y-%m-%d', due_date / 1000 + 10800, 'unixepoch')";
   const todayStart = Date.parse(new Date(now + 3 * 3600e3).toISOString().slice(0, 10) + 'T00:00:00Z') - 3 * 3600e3, late = todayStart - STL_GRACE;
-  const [days, tot, types, orders, unmatched] = await Promise.all([
+  const [days, tot, types, orders, unmatched, noOrder] = await Promise.all([
     // Ödeme günleri: seçilen aralıkta ödenenler + ödenmemiş tüm kayıtlar (dönemden önce gecikenler ve 60 günden sonraki vadeler de:
     // "Ödenecek / Geciken" kartlarıyla aynı kayıtlar; kart ile tablo toplamı tutsun)
     all(db, `SELECT channel, ${day} AS d, ROUND(SUM(CASE WHEN paid = 1 THEN amount ELSE 0 END), 2) AS paid, ROUND(SUM(CASE WHEN paid = 0 THEN amount ELSE 0 END), 2) AS due, COUNT(*) AS n, SUM(paid = 1) AS np, SUM(paid = 0) AS nd
@@ -678,65 +739,102 @@ export async function settlementReport(env, db, settings, q = {}) {
     // Panelde olmayan siparişlerin kayıtları (panel kurulmadan / geçmiş aktarılmadan önceki siparişler)
     all(db, `SELECT channel, order_number, ROUND(SUM(amount), 2) AS amount, MIN(date) AS date, COUNT(*) AS n FROM settlements s WHERE date >= ? AND date < ? AND order_number != ''${cw}
       AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.channel = s.channel AND o.order_number = s.order_number) GROUP BY channel, order_number ORDER BY date DESC LIMIT 1000`, from, to, ...ca),
+    // Sipariş numarası olmayan satış / komisyon / iade kayıtları: hiçbir siparişle eşleşemez (mutabakatta görünmez)
+    all(db, `SELECT channel, type, COUNT(*) AS n, ROUND(SUM(amount), 2) AS amount FROM settlements WHERE date >= ? AND date < ? AND COALESCE(order_number, '') = ''${cw}
+      AND (type LIKE 'Satış%' OR type LIKE 'Komisyon%' OR type LIKE 'İade%' OR type LIKE 'Kampanya indirimi%') GROUP BY channel, type`, from, to, ...ca),
   ]);
-  const diffs = [];
+  const diffs = [], pending = [];
   let checked = 0, creditN = 0, creditSum = 0;
+  const its0 = new Map(), ctx = new Map();
   if (orders.length) {
     const ids = orders.map((o) => o.id), items = [], rows = [];
-    for (const part of chunk(ids, 80)) items.push(...await all(db, `SELECT i.order_id, i.total, i.quantity, i.returned_qty, i.status, i.commission, l.commission AS listing_commission, l.commission_src AS listing_commission_src
+    for (const part of chunk(ids, 80)) items.push(...await all(db, `SELECT i.order_id, i.line_id, i.name, i.sku, i.total, i.quantity, i.returned_qty, i.status, i.commission, l.commission AS listing_commission, l.commission_src AS listing_commission_src
       FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN listings l ON l.channel = o.channel AND l.remote_id = i.remote_key WHERE i.order_id IN (${part.map(() => '?').join(',')})`, ...part));
     const byCh = new Map();
     for (const o of orders) (byCh.get(o.channel) || byCh.set(o.channel, []).get(o.channel)).push(o.order_number);
     for (const [c, nos] of byCh) {
-      for (const part of chunk([...new Set(nos)], 80)) rows.push(...(await all(db, `SELECT order_number, type, SUM(amount) AS amount, SUM(COALESCE(commission, 0)) AS commission, COUNT(*) AS n FROM settlements
+      for (const part of chunk([...new Set(nos)], 80)) rows.push(...(await all(db, `SELECT order_number, type, SUM(amount) AS amount, SUM(COALESCE(commission, 0)) AS commission, COUNT(*) AS n, SUM(paid) AS np FROM settlements
         WHERE channel = ? AND order_number IN (${part.map(() => '?').join(',')}) GROUP BY order_number, type`, c, ...part)).map((r) => ({ ...r, channel: c })));
     }
-    const by = new Map(), st = new Map();
+    const by = its0, st = new Map();
     // Komisyon iadesi / düzeltmesi (pazaryeri karşıladı): panel hesabına eklenir; fark sayılmaz, ayrıca özetlenir
     const credits = await commissionCredits(db, settings, { ids }).catch(() => new Map());
     for (const i of items) (by.get(i.order_id) || by.set(i.order_id, []).get(i.order_id)).push(i);
     for (const r of rows) { const k = r.channel + '|' + r.order_number; (st.get(k) || st.set(k, []).get(k)).push(r); }
     // Tahmin: satış − komisyon (kargo, hizmet bedeli, ek kesinti, stopaj pazaryerinde ayrı kayıt; tahmine de katılmaz)
     const est = { ...settings, shipping: {}, service_fee: {}, fee_rate: {}, withholding: {} };
+    const pct = (a, b) => (b ? `%${(Math.round((a / b) * 1000) / 10).toLocaleString('tr-TR')}` : '—');
+    const tl = (v) => `${r2(v).toLocaleString('tr-TR')} ₺`;
     for (const o of orders) {
       const recs = (st.get(o.channel + '|' + o.order_number) || []).filter((r) => STL_ORDER.test(r.type || ''));
       if (!recs.length) continue; // yalnız kargo / stopaj gibi ayrı kesintiler: karşılaştırılacak hakediş yok
-      checked++;
       const its = by.get(o.id) || [];
       const cr = credits.get(o.id), p = orderProfit({ ...o, shipping_cost: 0, comm_credit: cr ? cr.counted : 0, items: its }, est);
-      if (cr && cr.counted && o.status !== 'cancelled' && o.status !== 'returned') { creditN++; creditSum += cr.counted; }
       const actual = r2(recs.reduce((a, r) => a + (Number(r.amount) || 0), 0)), comm = r2(recs.reduce((a, r) => a + (Number(r.commission) || 0), 0)), sales = r2(actual + comm);
       // İptal / tamamı iade edilen siparişin hakedişi 0 olmalı (satırları ayrıca işaretlenmemiş olsa da)
       const dead = o.status === 'cancelled' || o.status === 'returned', expected = dead ? 0 : p.payout, diff = r2(actual - expected);
       // Yuvarlama payı: 1 ₺ ya da satışın binde 5'i (satır satır yuvarlanan komisyon, kuruş farkları)
       const tol = Math.max(1, 0.005 * Math.max(dead ? 0 : Math.abs(p.revenue), Math.abs(sales)));
-      if (Math.abs(diff) < tol) continue;
+      ctx.set(o.id, { p, cr, expected, dead });
+      if (Math.abs(diff) < tol) { checked++; if (cr && cr.counted && !dead) { creditN++; creditSum += cr.counted; } continue; }
+      // Eksik kayıt: Hepsiburada satışı (Payment) ve komisyonu (Commission) ayrı kayıtlarla işler; komisyon kaydı satıştan sonra gelebilir.
+      // Siparişin hiçbir kaydı henüz ödenmediyse ve sipariş STL_WAIT günden yeniyse fark sayılmaz: "bekleniyor" listesine girer.
+      const paidAny = recs.some((r) => Number(r.np) > 0);
+      const hasSale = recs.some((r) => /^Satış/.test(r.type) && Number(r.amount) > 0);
+      const hasComm = recs.some((r) => r.type === 'Komisyon' || Math.abs(Number(r.commission) || 0) >= 0.01);
+      const missing = dead ? '' : hasSale && !hasComm && p.commission >= tol ? 'comm' : !hasSale && hasComm ? 'sale' : '';
+      const base = { id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, sales, commission: comm, estRevenue: dead ? 0 : p.revenue, estCommission: dead ? 0 : p.commission };
+      if (missing && !paidAny && now - (Number(o.ordered_at) || now) < STL_WAIT) {
+        pending.push({ ...base, code: missing === 'comm' ? 'wait_commission' : 'wait_sale', side: 'panel', waitUntil: (Number(o.ordered_at) || now) + STL_WAIT,
+          reason: missing === 'comm' ? 'Komisyon kaydı henüz gelmedi: pazaryeri komisyonu satış kaydından sonra ayrı kayıtla işliyor; gelince otomatik eşleşir'
+            : 'Satış (ödeme) kaydı henüz gelmedi; gelince otomatik eşleşir' });
+        continue;
+      }
+      checked++;
+      if (cr && cr.counted && !dead) { creditN++; creditSum += cr.counted; }
       const panelRet = o.status === 'returned' || its.some((i) => i.status === 'returned' || Number(i.returned_qty) > 0);
       const mpRet = recs.some((r) => STL_RETURN.test(r.type) && Math.abs(Number(r.amount) || 0) >= 0.01);
-      const pct = (a, b) => (b ? `%${(Math.round((a / b) * 1000) / 10).toLocaleString('tr-TR')}` : '—');
-      let reason;
-      const crNote = cr && cr.credit ? `Komisyon iadesi / indirimi (pazaryeri karşıladı) ${r2(cr.credit).toLocaleString('tr-TR')} ₺ hesaba katıldı; kalan fark: ` : '';
-      if (o.status === 'cancelled') reason = 'Sipariş iptal ama pazaryerinde ödeme kaydı var';
-      else if (panelRet && !mpRet && diff > 0) reason = 'İade pazaryerinin kayıtlarına henüz düşmedi';
-      else if (mpRet && !panelRet && diff < 0) reason = 'Pazaryeri iade kaydetti, panelde iade yok';
-      else if (!comm && p.commission >= tol) reason = 'Komisyon kaydı pazaryerinde henüz yok';
+      const camp = r2(recs.filter((r) => /^Kampanya indirimi/.test(r.type)).reduce((a, r) => a + (Number(r.amount) || 0), 0));
+      let reason, code, side = 'panel';
+      const crNote = cr && cr.credit ? `Komisyon iadesi / indirimi (pazaryeri karşıladı) ${tl(cr.credit)} hesaba katıldı; kalan fark: ` : '';
+      if (o.status === 'cancelled') { code = 'cancelled_paid'; reason = 'Sipariş iptal ama pazaryerinde ödeme kaydı var'; }
+      else if (panelRet && !mpRet && diff > 0) { code = 'return_pending'; reason = 'İade pazaryerinin kayıtlarına henüz düşmedi'; }
+      else if (mpRet && !panelRet && diff < 0) { code = 'return_unknown'; reason = 'Pazaryeri iade kaydetti, panelde iade yok'; }
+      else if (missing === 'comm') {
+        code = 'no_commission';
+        reason = paidAny ? 'Satış ödendi ama siparişe bağlı komisyon kaydı yok (komisyon toplu / ayrı faturayla kesilmiş ya da kayıt sipariş numarasıyla eşleşmemiş olabilir)'
+          : `Komisyon kaydı ${Math.round(STL_WAIT / DAY)} günde gelmedi (kayıt sipariş numarasıyla eşleşmemiş olabilir)`;
+      } else if (missing === 'sale') { code = 'no_sale'; reason = 'Komisyon kaydı var ama satış (ödeme) kaydı yok (kayıt eşleşmemiş ya da okuma aralığı dışında kalmış olabilir)'; }
+      else if (camp > 0 && Math.abs(diff - camp) < tol) { code = 'campaign'; side = 'extra'; reason = `Pazaryerinin karşıladığı kampanya indirimi (${tl(camp)}) ödendi; panelin satış tutarında yok`; }
       else {
-        // Komisyon oranı aynıysa fark satış tutarındadır (indirim / kupon); satış aynıysa komisyondadır
+        // Tüm kayıtlar geldi: fark tutardadır. Komisyon oranı aynıysa fark satış tutarındadır (indirim / kupon); satış aynıysa komisyondadır
+        side = diff < 0 ? 'short' : 'extra';
         const dr = sales - p.revenue, sameRate = Math.abs((sales ? comm / sales : 0) - (p.revenue ? p.commission / p.revenue : 0)) < 0.003;
-        reason = Math.abs(dr) < tol ? `Komisyon farklı: pazaryeri ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)}`
-          : sameRate ? (dr < 0 ? 'Satış tutarı düşük: indirim, kupon ya da kısmi iade' : 'Satış tutarı panelden yüksek')
-          : `Satış ve komisyon farklı (pazaryeri komisyonu ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)})`;
+        if (Math.abs(dr) < tol) { code = 'commission_diff'; reason = `Komisyon farklı: pazaryeri ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)}`; }
+        else if (sameRate) { code = dr < 0 ? 'sale_low' : 'sale_high'; reason = dr < 0 ? 'Satış tutarı düşük: indirim, kupon ya da kısmi iade' : 'Satış tutarı panelden yüksek'; }
+        else { code = 'mixed'; reason = `Satış ve komisyon farklı (pazaryeri komisyonu ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)})`; }
       }
-      diffs.push({ id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, reason: crNote + reason, credit: cr ? cr.counted : 0, sales, commission: comm, estRevenue: dead ? 0 : p.revenue, estCommission: dead ? 0 : p.commission });
+      diffs.push({ ...base, code, side, reason: crNote + reason, credit: cr ? cr.counted : 0 });
     }
   }
   diffs.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  pending.sort((a, b) => b.ordered_at - a.ordered_at);
+  // Fark özeti: kanal × taraf × neden (tüm farklar; listede yalnız en büyük 100'ü)
+  const sumBy = new Map();
+  for (const x of [...diffs, ...pending]) {
+    const k = `${x.channel}|${x.code}`, s = sumBy.get(k) || sumBy.set(k, { channel: x.channel, side: x.side, code: x.code, label: STL_CODES[x.code] || x.code, pending: /^wait_/.test(x.code), n: 0, diff: 0 }).get(k);
+    s.n++; s.diff = r2(s.diff + x.diff);
+  }
+  const shownD = diffs.slice(0, 100), shownP = pending.slice(0, 50);
+  await stlDetails(db, [...shownD, ...shownP], its0, ctx).catch(() => {});
   const supported = (await getChannels(env, db)).filter((c) => c.enabled && c.settlements).map((c) => c.id);
   const um = unmatched.reduce((a, r) => a + (Number(r.amount) || 0), 0), period = types.reduce((a, r) => a + (Number(r.amount) || 0), 0);
   return {
-    from, to, lateBefore: late, supported, days, types, diffs: diffs.slice(0, 100), unmatched: unmatched.slice(0, 50),
-    totals: { ...tot, period: r2(period), checked, matched: checked - diffs.length, mismatched: diffs.length, limited: orders.length >= 3000, unmatched: unmatched.length, unmatchedAmount: r2(um),
-      commissionCredit: { orders: creditN, amount: r2(creditSum) } },
+    from, to, lateBefore: late, supported, days, types, diffs: shownD, pending: shownP, unmatched: unmatched.slice(0, 50), sides: STL_SIDES,
+    summary: [...sumBy.values()].sort((a, b) => (a.channel < b.channel ? -1 : a.channel > b.channel ? 1 : Math.abs(b.diff) - Math.abs(a.diff))),
+    noOrder: noOrder.filter((r) => Math.abs(Number(r.amount) || 0) >= 0.01),
+    totals: { ...tot, period: r2(period), checked, matched: checked - diffs.length, mismatched: diffs.length, pending: pending.length, limited: orders.length >= 3000, unmatched: unmatched.length, unmatchedAmount: r2(um),
+      short: diffs.filter((x) => x.side === 'short').length, commissionCredit: { orders: creditN, amount: r2(creditSum) } },
   };
 }
 

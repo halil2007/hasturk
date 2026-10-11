@@ -2,7 +2,7 @@
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES, DEV_TYPES, isIntl } from './config.js';
-import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
+import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, HELD_SQL, REAL_ERR_SQL, CH_SIDE_SQL, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
 import { createJob, listJobs, runJobs, cancelJob } from './backfill.js';
 import { checkBuybox, autoPrice, decide, BUYBOX_CHANNELS } from './buybox.js';
@@ -44,6 +44,7 @@ import { ek } from '../public/ek.js';
 const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).find((f) => f.k === k) || {}).label || k).join(', ');
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderCommission, commissionCheck } from './commcheck.js';
+import { shipInfo, shipFromInvoice } from './shipcost.js';
 import { orderProfit, breakdown, productProfit, productLoss, lossSummary, markLosses, lossCache, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE, HttpError } from './util.js';
@@ -783,8 +784,9 @@ async function listProducts(db, q) {
   if (q.filter === 'enough') where.push(`p.stock > ${low}`);
   if (q.filter === 'low') where.push(`p.stock <= ${low}`);
   if (q.filter === 'nocost') where.push('(p.purchase_price IS NULL OR p.purchase_price = 0)');
-  if (q.filter === 'waiting') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED})`);
-  if (q.filter === 'error') where.push('EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.error IS NOT NULL)');
+  // Kanal onayı bekleyen ilan gönderim beklemez (kanal kabul etmez); kanal kaynaklı hata hata sayılmaz
+  if (q.filter === 'waiting') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.pushed_stock IS NOT NULL AND l.pushed_stock != ${DESIRED} AND NOT ${HELD_SQL()})`);
+  if (q.filter === 'error') where.push(`EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND ${REAL_ERR_SQL()})`);
   if (q.filter === 'nosku') where.push("COALESCE(TRIM(p.sku), '') = ''");
   if (q.filter === 'nobarcode') where.push("COALESCE(TRIM(p.barcode), '') = ''");
   if (q.filter === 'nolisting') where.push('NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)');
@@ -839,7 +841,7 @@ async function listProducts(db, q) {
   const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    const [ls, soldRows] = await Promise.all([allIn(db, ids, (ph, part) => [`SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.extra_link, l.image, ${DESIRED} AS desired
+    const [ls, soldRows] = await Promise.all([allIn(db, ids, (ph, part) => [`SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.error_side, l.remote_state, l.remote_state_note, l.stock_mode, l.stock_value, l.match, l.extra_link, l.image, ${DESIRED} AS desired
       FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ph}) ORDER BY l.extra_link, l.remote_id`, part]),
     // Satış hızı: son 30 günde satılan adet ve mevcut stokla kaç gün yeteceği
     allIn(db, ids, (ph, part) => [`SELECT i.product_id AS id, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id IN (${ph}) AND o.ordered_at >= ?
@@ -915,6 +917,9 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
     if (num(b.stock)) await run(db, 'INSERT INTO stock_moves (product_id, delta, stock_after, reason, created_at) VALUES (?, ?, ?, ?, ?)', id, Math.round(num(b.stock)), Math.round(num(b.stock)), 'İlk stok', t);
   } else {
     const keys = Object.keys(f);
+    // Kargo tutarı elle değişti: faturalarla karşılaştırma bu andan sonraki gönderilerle yeniden başlar (bkz. shipcost.js)
+    const shipWas = 'ship_cost' in f ? await first(db, 'SELECT ship_cost FROM products WHERE id = ?', id) : null;
+    if (shipWas && Number(shipWas.ship_cost || 0) !== Number(f.ship_cost || 0)) { f.ship_set_at = t; f.ship_warn = null; keys.push('ship_set_at', 'ship_warn'); }
     if (keys.length) await run(db, `UPDATE products SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => f[k]), t, id);
     if (b.stock !== undefined && b.stock !== '') await stockChange(env, db, ctx, id, { mode: 'set', qty: b.stock, note: 'Ürün formu' }, user);
   }
@@ -978,6 +983,12 @@ async function productDetail(db, id) {
   p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired, r.min_price AS rule_min, r.max_price AS rule_max FROM listings l JOIN products p ON p.id = l.product_id
     LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.product_id = ? ORDER BY l.channel, l.extra_link, l.remote_id`, id);
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
+  // Kargo tutarı: faturaya göre son güncelleme / faturalar daha yüksek notu (bkz. shipcost.js)
+  p.ship_info = shipInfo(p);
+  // İlanın son siparişteki gerçek komisyon oranı (ilandaki oran ana orandır; indirimli sipariş ayrıca gösterilir)
+  const lastRates = p.listings.length ? await all(db, `SELECT o.channel, i.remote_key AS k, ROUND(i.commission * 100.0 / i.total, 2) AS r, o.ordered_at AS at FROM order_items i JOIN orders o ON o.id = i.order_id
+    WHERE i.product_id = ? AND o.ordered_at >= ? AND i.commission IS NOT NULL AND i.total > 0 AND COALESCE(i.status, '') NOT IN ('cancelled', 'returned') ORDER BY o.ordered_at DESC LIMIT 200`, id, Date.now() - 90 * 864e5) : [];
+  for (const l of p.listings) { const x = lastRates.find((r) => r.channel === l.channel && r.k === l.remote_id); if (x) l.last_rate = x.r; }
   // Aynı ana ürünün varyantları (tek ekrandan düzenleme için)
   const gk = p.parent_key || p.group_name;
   p.siblings = gk ? (await all(db, "SELECT id FROM products WHERE COALESCE(NULLIF(parent_key, ''), NULLIF(group_name, ''), name) = ? LIMIT 300", gk)).map((r) => r.id) : [id];
@@ -1056,14 +1067,16 @@ async function clearFailures(db, id, note) {
 async function channelsInfo(env, db) {
   // Tek seferde: ilan sayıları + tüm kanalların son senkron durumu (kanal başına ayrı sorgu yapılmaz)
   const [counts, lasts, chs] = await Promise.all([
-    all(db, 'SELECT channel, COUNT(*) AS n, SUM(product_id IS NOT NULL) AS linked, SUM(error IS NOT NULL) AS errors FROM listings GROUP BY channel'),
+    // Hatalı: panelin düzeltebileceği hatalar. Kanal kaynaklı (onay bekleyen / onaylanmayan ilan, kanal kaynaklı hata) ayrı sayılır
+    all(db, `SELECT channel, COUNT(*) AS n, SUM(product_id IS NOT NULL) AS linked, SUM(${REAL_ERR_SQL('listings')}) AS errors,
+      SUM(COALESCE(match, '') != 'gone' AND ${CH_SIDE_SQL('listings')}) AS chside FROM listings GROUP BY channel`),
     all(db, "SELECT k, v FROM settings WHERE k LIKE 'last:%'"),
     getChannels(env, db),
   ]);
   const last = new Map(lasts.map((r) => { try { return [r.k.slice(5), JSON.parse(r.v)]; } catch { return [r.k.slice(5), null]; } }));
   return chs.map((c) => {
     const x = counts.find((r) => r.channel === c.id) || {};
-    return { ...publicInfo(c), last: last.get(c.id) || null, listings: x.n || 0, linked: x.linked || 0, listingErrors: x.errors || 0 };
+    return { ...publicInfo(c), last: last.get(c.id) || null, listings: x.n || 0, linked: x.linked || 0, listingErrors: x.errors || 0, channelSide: x.chside || 0 };
   });
 }
 
@@ -1210,21 +1223,33 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // ---------- ilan hataları: nedenine göre gruplu, açıklamalı; yeniden deneme ----------
   if (path === 'listings/errors' && m === 'GET') {
     const w = q.channel ? ' AND l.channel = ?' : '', a = q.channel ? [String(q.channel)] : [];
-    const rows = await all(db, `SELECT l.channel, l.remote_id, l.sku, l.barcode, l.error, l.product_id, p.name, p.variant_name FROM listings l LEFT JOIN products p ON p.id = l.product_id
-      WHERE l.error IS NOT NULL${w} ORDER BY l.channel, l.error LIMIT 2000`, ...a);
-    const groups = new Map();
-    for (const r of rows) {
-      const k = r.channel + '|' + errorKey(r.error);
-      const g = groups.get(k) || groups.set(k, { channel: r.channel, error: r.error, ...explainError(r.error), count: 0, items: [] }).get(k);
-      g.count++;
-      if (g.items.length < 20) g.items.push({ remote_id: r.remote_id, sku: r.sku, barcode: r.barcode, product_id: r.product_id, name: r.name ? `${r.name}${r.variant_name ? ' · ' + r.variant_name : ''}` : '', error: r.error });
-    }
-    return json({ total: rows.length, groups: [...groups.values()].sort((x, y) => y.count - x.count) });
+    const COLS = 'l.channel, l.remote_id, l.sku, l.barcode, l.error, l.error_side, l.remote_state, l.remote_state_note, l.product_id, p.name, p.variant_name';
+    const [rows, side] = await Promise.all([
+      all(db, `SELECT ${COLS} FROM listings l LEFT JOIN products p ON p.id = l.product_id WHERE ${REAL_ERR_SQL()}${w} ORDER BY l.channel, l.error LIMIT 2000`, ...a),
+      // Kanal kaynaklı: kanalın onaylamadığı / onay bekleyen ilanlar ve kanal kaynaklı hatalar (panel hatası değil; ayrı grupta)
+      all(db, `SELECT ${COLS} FROM listings l LEFT JOIN products p ON p.id = l.product_id WHERE COALESCE(l.match, '') != 'gone' AND ${CH_SIDE_SQL()}${w}
+        ORDER BY l.channel, l.product_id IS NULL, l.remote_state, l.remote_state_note LIMIT 2000`, ...a),
+    ]);
+    const item = (r) => ({ remote_id: r.remote_id, sku: r.sku, barcode: r.barcode, product_id: r.product_id, name: r.name ? `${r.name}${r.variant_name ? ' · ' + r.variant_name : ''}` : '', error: r.error });
+    const group = (list, keyOf, make) => {
+      const groups = new Map();
+      for (const r of list) {
+        const k = r.channel + '|' + keyOf(r);
+        const g = groups.get(k) || groups.set(k, { channel: r.channel, ...make(r), count: 0, linked: 0, items: [] }).get(k);
+        g.count++; if (r.product_id) g.linked++;
+        if (g.items.length < 20) g.items.push(item(r));
+      }
+      return [...groups.values()].sort((x, y) => y.count - x.count);
+    };
+    const held = (r) => r.remote_state === 'pending' || r.remote_state === 'rejected';
+    return json({ total: rows.length, groups: group(rows, (r) => errorKey(r.error), (r) => ({ error: r.error, ...explainError(r.error) })),
+      channelSide: { total: side.length, groups: group(side, (r) => (held(r) ? `s:${r.remote_state}|${r.remote_state_note || ''}` : 'e:' + errorKey(r.error)),
+        (r) => (held(r) ? { state: r.remote_state, note: r.remote_state_note || '' } : { error: r.error, ...explainError(r.error) })) } });
   }
   if (path === 'listings/errors/retry' && m === 'POST') {
     const b = await body(req), w = b.channel ? ' AND channel = ?' : '', a = b.channel ? [str(b.channel)] : [];
     // Hata silinir; stok yeniden gönderilecek, fiyat hatasında fiyat yeniden gönderilecek olarak işaretlenir (sonraki senkron / şimdi)
-    const r = await run(db, `UPDATE listings SET pushed_stock = CASE WHEN error LIKE 'Fiyat%' THEN pushed_stock ELSE NULL END, price_dirty = CASE WHEN error LIKE 'Fiyat%' THEN 1 ELSE price_dirty END, error = NULL, error_at = NULL WHERE error IS NOT NULL${w}`, ...a);
+    const r = await run(db, `UPDATE listings SET pushed_stock = CASE WHEN error LIKE 'Fiyat%' THEN pushed_stock ELSE NULL END, price_dirty = CASE WHEN error LIKE 'Fiyat%' THEN 1 ELSE price_dirty END, error = NULL, error_at = NULL, error_side = NULL WHERE error IS NOT NULL AND NOT ${HELD_SQL('listings')}${w}`, ...a);
     const n = (r && r.meta && r.meta.changes) || 0;
     await log(db, b.channel || null, 'info', `${user.name}: ${n} ilan hatası temizlendi, stok / fiyat yeniden gönderilecek`);
     return json({ ok: true, n });
@@ -1660,6 +1685,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if ((path === 'settlements' || path === 'invoices' || path.startsWith('settlements/') || path.startsWith('invoices/')) && env.TENANT_SLUG) requireFeature(env, 'finance');
   if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
+  // Veri sağlık kontrolü (bkz. health.js): yönetici ya da Gelir, gider ve hakediş yetkisi; 1 saat önbellek, force=1 hemen yeniler
+  if (path === 'health/data' && m === 'GET') {
+    if (user.role !== 'admin' && !can(user, 'finance')) fail(403, 'Bu kontrol için Gelir, gider ve hakediş yetkisi gerekir');
+    return json(await (await import('./health.js')).healthReport(env, db, await getSettings(db), { force: q.force === '1' }));
+  }
   if (path === 'invoices' && m === 'GET') return json(await listInvoices(env, db, { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', type: str(q.type) }));
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); const [invoices, costs] = await Promise.all([syncInvoices(env, db, { force: true }), syncCosts(env, db, null, { force: true }).catch((e) => ({ error: e.message }))]); return json({ invoices, costs }); }
   if (path === 'finance/commission' && m === 'GET') return json(await commissionCheck(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
@@ -1982,6 +2012,11 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     }
   }
   // Hızlı alış fiyatı (raporlardaki "alış fiyatı yok" uyarısından): yalnız alış fiyatı değişir
+  // Ürün formundaki "Faturadaki tutarı kullan": kargo tutarı faturalı gönderilerin ortancası olur (Ürünler yazma yetkisi; bölüm denetimi yukarıda)
+  if ((x = path.match(/^products\/(\d+)\/ship-from-invoice$/)) && m === 'POST') {
+    if (!can(user, 'products', true)) fail(403, 'Kargo tutarını değiştirmek için Ürünler yetkisi gerekir');
+    return json(await shipFromInvoice(db, Number(x[1]), user));
+  }
   if ((x = path.match(/^products\/(\d+)\/cost$/)) && m === 'POST') {
     if (!can(user, 'products', true)) fail(403, 'Alış fiyatı girmek için Ürünler yetkisi gerekir');
     const b = await body(req), v = num(b.purchase_price), id = Number(x[1]);

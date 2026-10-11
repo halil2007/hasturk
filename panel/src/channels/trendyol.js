@@ -58,6 +58,14 @@ export function trendyol(env, meta) {
     const u = r2(num(l.lineGrossAmount) - num(l.lineSellerDiscount) + num(l.lineSgrFee));
     return net > 0 && (u > net + num(l.lineTyDiscount) + num(l.lineSgrFee) + 0.05 || u < net - 0.05) ? net : u;
   };
+  // Satıcının karşıladığı indirim (sepet / kupon kampanyası; lineSellerDiscount, adet başı): satır tutarından zaten düşülür (unitOf),
+  // panelde bilgi olarak saklanır. Yalnız brüt − satıcı indirimi yolu kullanıldıysa (alanların adet başı olduğu doğrulandıysa) yazılır.
+  // Trendyol'un karşıladığı indirim (lineTyDiscount) satıcıya ödenir, burada sayılmaz.
+  const sellerDiscOf = (l, qty) => {
+    const d = num(l.lineSellerDiscount);
+    if (l.lineGrossAmount == null || !(d > 0)) return 0;
+    return unitOf(l) === r2(num(l.lineGrossAmount) - d + num(l.lineSgrFee)) ? r2(d * qty) : 0;
+  };
   const pkgTotalOf = (p) => {
     const net = num(p.packageTotalPrice ?? p.totalPrice ?? p.grossAmount);
     if (p.packageGrossAmount == null) return net;
@@ -92,7 +100,7 @@ export function trendyol(env, meta) {
         const lid = lineIdOf(l), st = lineKind(p, l), qty = num(l.quantity, 1);
         const first = byKey.get(lid), key = first && first.status !== st ? `${lid}-${st || 'acik'}` : lid;
         const ex = byKey.get(key);
-        if (ex) { ex.quantity += qty; ex.total = r2(ex.unitPrice * ex.quantity); if (rates.has(key)) ex.commission = comm(ex.total, rates.get(key)); continue; }
+        if (ex) { ex.quantity += qty; ex.total = r2(ex.unitPrice * ex.quantity); if (rates.has(key)) ex.commission = comm(ex.total, rates.get(key)); if (ex.sellerDiscount) ex.sellerDiscount = r2(ex.sellerDiscount + sellerDiscOf(l, qty)); continue; }
         const unit = unitOf(l), total = r2(unit * qty);
         // commission: satırdaki komisyon ORANI (%); panelde satırın KDV dahil komisyon tutarı tutulur
         const rate = l.commission != null && l.commission !== '' ? num(l.commission, null) : null;
@@ -100,6 +108,7 @@ export function trendyol(env, meta) {
         const it = {
           lineId: key, sku: str(l.stockCode || l.merchantSku), barcode: str(l.barcode), name: str(l.productName), image: '',
           quantity: qty, unitPrice: unit, total, status: st, remoteKey: str(l.barcode), ...(rate != null ? { commission: comm(total, rate) } : {}),
+          ...(sellerDiscOf(l, qty) > 0 ? { sellerDiscount: sellerDiscOf(l, qty) } : {}),
         };
         byKey.set(key, it);
         items.push(it);
@@ -187,6 +196,8 @@ export function trendyol(env, meta) {
       groupName: str(p.title), variantName: [...new Set(attrs)].join(' / '),
       image: str(((p.images || v.images || [])[0] || {}).url), images: imageList((v.images || []).length ? v.images : p.images), price: num(price.salePrice ?? v.salePrice), listPrice: num(price.listPrice ?? v.listPrice),
       stock: num(stock ?? v.quantity ?? v.stock?.quantity), active: v.onSale !== false && !v.archived && !v.blacklisted && !v.locked,
+      // Satışa kapalı ilanın nedeni (Trendyol'un verdiği bayraklardan)
+      stateNote: [v.archived && 'arşivde', v.blacklisted && 'kara listede', v.locked && 'kilitli', v.onSale === false && 'satışa kapalı'].filter(Boolean).join(', '),
       brand: str((p.brand && typeof p.brand === 'object' ? p.brand.name : p.brand) || p.brandName), description: str(p.description),
       url: str(v.productUrl || p.productUrl),
       // Trendyol kategori adı (onaylı ürün v2: category { id, name }; eski filterProducts: categoryName): resmî komisyon listesiyle sağlama için
@@ -724,10 +735,43 @@ export function trendyol(env, meta) {
     return out;
   }
 
+  // ---------- veri sağlık kontrolü: salt okuma örnek (bkz. health.js) ----------
+  // En çok 5 kısa istek (tek deneme, 8 sn): son kargo faturasının kalemlerindeki türler (shipmentPackageType; belge örneği
+  // "Gönderi Kargo Bedeli" / "İade Kargo Bedeli") ve Satış kayıtlarında komisyon tutarı ↔ satış × komisyon oranı.
+  async function financeProbe(now = Date.now()) {
+    const o = { timeout: 8000, tries: 1 }, out = { cargo: null, sale: null };
+    let inv = null;
+    for (let k = 0; k < 2 && !inv; k++) {
+      const to = now - k * 14 * 864e5, from = to - 14 * 864e5;
+      const r = await call(`/finance/che/sellers/${seller}/otherfinancials?transactionType=DeductionInvoices&startDate=${from}&endDate=${to}&page=0&size=200`, o);
+      inv = (r.content || []).find((x) => /kargo|cargo/i.test(`${x.transactionType || ''} ${x.description || ''}`) && x.id) || null;
+    }
+    if (inv) {
+      const r = await call(`/finance/che/sellers/${seller}/cargo-invoice/${encodeURIComponent(inv.id)}/items?page=0&size=500`, o), types = {}, keys = new Set();
+      let ret = 0;
+      for (const it of r.content || []) {
+        Object.keys(it || {}).forEach((x) => keys.add(x));
+        const t = str(it.shipmentPackageType) || '(boş)';
+        types[t] = (types[t] || 0) + 1;
+        if (/[iİ]ade|return/i.test(`${it.shipmentPackageType || ''} ${it.type || ''} ${it.description || ''}`)) ret++;
+      }
+      out.cargo = { invoice: str(inv.id), date: num(inv.transactionDate) || null, items: (r.content || []).length, types, returnItems: ret, keys: [...keys].sort() };
+    } else out.cargo = { invoice: null, items: 0 };
+    const r = await call(`/finance/che/sellers/${seller}/settlements?transactionType=Sale&startDate=${now - 14 * 864e5}&endDate=${now}&page=0&size=100`, o);
+    const ratios = [], keys = new Set();
+    for (const x of r.content || []) {
+      Object.keys(x || {}).forEach((k) => keys.add(k));
+      const sale = num(x.credit) || num(x.debt), rate = num(x.commissionRate), com = Math.abs(num(x.commissionAmount));
+      if (sale > 0 && rate > 0 && com > 0) ratios.push(com / ((sale * rate) / 100));
+    }
+    out.sale = { records: (r.content || []).length, ratios, keys: [...keys].sort() };
+    return out;
+  }
+
   const missing = ['TRENDYOL_SELLER_ID', 'TRENDYOL_API_KEY', 'TRENDYOL_API_SECRET'].filter((k) => !env[k]);
   return {
     ...meta, type: 'trendyol', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'remote-async', pack: 'status', ship: 'remote', label: 'remote', cargo: 'change', createProduct: false, price: true, answer: { min: 10, max: 2000 } },
-    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, pushStatus, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim,
+    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, pushStatus, accept, split, ship, label, pack, cargoOptions, changeCargo, buybox, questions, answer, diagnose, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, financeProbe,
   };
 }
