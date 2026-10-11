@@ -26,9 +26,9 @@ export const DEMO_PRODUCTS = [
   ['SC-65W', '8690000000196', '65W GaN Hızlı Şarj Aleti', 549, 230, 1, 'charger', '#e5e7eb', '', 'Elektronik › Telefon Aksesuarı'],
   ['TK-LED', '8690000000202', 'Akıllı LED Masa Lambası', 749, 350, 2, 'lamp', '#0ea5e9', '', 'Ev & Mutfak › Aydınlatma'],
   ['GK-SPF', '8690000000219', 'Güneş Kremi SPF 50+', 349, 130, 1, 'tube', '#f97316', '', 'Kozmetik › Güneş Koruma'],
-  ['HG-SAKSI-20', '8690000000226', 'Organik Saksı Toprağı 20 Lt', 169, 80, 2, 'bag', '#92400e', '20 Lt', 'Bahçe › Toprak'],
+  ['HG-SAKSI-20', '8690000000226', 'Organik Saksı Toprağı 20 Lt', 169, 125, 2, 'bag', '#92400e', '20 Lt', 'Bahçe › Toprak'],
   ['DS-SET', '8690000000233', 'Damla Sulama Seti 25 Mt', 299, 140, 2, 'hose', '#16a34a', '', 'Bahçe › Sulama'],
-  ['BM-PRO', '8690000000240', 'Profesyonel Budama Makası', 249, 115, 1, 'shears', '#ea580c', '', 'Bahçe › El Aletleri'],
+  ['BM-PRO', '8690000000240', 'Profesyonel Budama Makası', 249, 150, 1, 'shears', '#ea580c', '', 'Bahçe › El Aletleri'],
 ];
 // Demo kanalları (en çok kullanılan pazaryerleri + tek site) ve günlük sipariş yoğunluğu
 export const DEMO_CHANNELS = ['ikas1', 'trendyol', 'hepsiburada', 'amazon', 'n11', 'ciceksepeti', 'pttavm', 'idefix', 'pazarama', 'koctas'];
@@ -45,6 +45,11 @@ function rng(seed) {
 const PRICE = { ikas1: 1, trendyol: 1.06, hepsiburada: 1.05, amazon: 1.08, n11: 1.04, ciceksepeti: 1.07, pttavm: 1.03, idefix: 1.05, pazarama: 1.03, koctas: 1.06 };
 const BRAND = { Elektronik: 'Volta', 'Ev & Mutfak': 'Casa', Kozmetik: 'Lumière', Spor: 'Atlas', Moda: 'Urban', Bahçe: 'HG' };
 const STREETS = ['Atatürk Cad.', 'Cumhuriyet Mah. Gül Sok.', 'İstiklal Cad.', 'Bağdat Cad.', 'Fevzi Çakmak Mah. Lale Sok.', 'Yıldız Mah. Çınar Sok.', 'Barbaros Bulv.', 'Kazım Karabekir Cad.'];
+// İade maliyeti ekranları için: bu ürünler sık iade edilir (beden / kalite / taşımada hasar); saksı toprağı ucuz ve ağır olduğu için
+// iade ve kargoyla zarar ettirir, budama makası kârlı ama iade kârının büyük kısmını götürür
+const RETURNY = { 'HG-SAKSI-20': 0.34, 'BM-PRO': 0.4, 'SN-RUN': 0.18 };
+// Örnek kargo tarifesi (KDV dahil, desiye göre): ürün kargo tutarı ve örnek kargo faturası için
+export const demoCargoFee = (desi) => (desi <= 1 ? 42.9 : desi <= 3 ? 59.9 : desi <= 6 ? 84.9 : 119.9);
 const CARRIER = { trendyol: 'Trendyol Express', hepsiburada: 'HepsiJet', amazon: 'Yurtiçi Kargo', n11: 'Aras Kargo', ciceksepeti: 'Aras Kargo', pttavm: 'PTT Kargo', idefix: 'Sürat Kargo', pazarama: 'Yurtiçi Kargo', koctas: 'Yurtiçi Kargo', ikas1: 'HepsiJet' };
 export function demo(meta) {
   const ch = meta.id;
@@ -74,7 +79,8 @@ export function demo(meta) {
         }
         const x = r();
         let status = age < 0.3 ? 'new' : age < 1.2 ? 'processing' : age < 4 ? 'shipped' : 'delivered';
-        if (x < 0.04) status = 'cancelled'; else if (x < 0.06 && age > 6) status = 'returned';
+        const retP = Math.max(0.06, ...lines.map((l) => RETURNY[l.sku] || 0));
+        if (x < 0.04) status = 'cancelled'; else if (x < retP && age > 6) status = 'returned';
         if (status === 'cancelled') lines.forEach((l) => (l.status = 'cancelled'));
         const [city, district] = CITIES[Math.floor(r() * CITIES.length)], name = NAMES[Math.floor(r() * NAMES.length)];
         // Örnek müşteri telefonu: aynı ad + il aynı müşteri sayılır (tekrar eden müşteri analizini denemek için)
@@ -259,6 +265,17 @@ export function demo(meta) {
     }
     return out;
   }
+  // Örnek kargo faturası (Trendyol / Hepsiburada): kargolanan her siparişte gönderim kalemi, iade edilen siparişte ayrıca iade
+  // gönderisi kalemi (gerçek kanalda kargo faturasındaki "İade" kalemi; bkz. trendyol.js cargoCosts)
+  async function cargoCosts(since, until) {
+    const items = [];
+    for (const o of await fetchOrders(since - 10 * 864e5, Math.min(until, Date.now()))) {
+      if (!['shipped', 'delivered', 'returned'].includes(o.status)) continue;
+      const fee = demoCargoFee(Math.max(1, ...o.items.map((l) => (DEMO_PRODUCTS.find((p) => p[0] === l.sku) || [])[5] || 1)));
+      items.push({ orderNumber: o.orderNumber, amount: fee, ...(o.status === 'returned' ? { returnAmount: fee } : {}) });
+    }
+    return { items };
+  }
   // ikas örneği: gerçek ikas gibi gönderi "ikas Kargo ile Gönder" ile açılır; siparişi yenileyince ikas Kargo gönderisi gelmiş olur
   const isIkas = meta.type === 'ikas';
   async function fetchOne(remoteId) {
@@ -271,7 +288,7 @@ export function demo(meta) {
     ...meta, enabled: true, missing: [], demo: true,
     caps: { accept: 'remote', split: 'local', pack: isIkas ? 'external' : 'remote', ...(isIkas ? { external: { label: 'ikas Kargo ile Gönder', url: 'https://demo.myikas.com/admin/order/view/' } } : {}), ship: isIkas ? 'local' : 'remote', label: 'remote', cargo: isIkas ? false : 'change', cancelPackage: true, createProduct: ['ikas', 'woocommerce', 'shopify'].includes(meta.type), price: true, ...(['trendyol', 'hepsiburada'].includes(ch) ? { answer: { min: 10, max: 2000 } } : {}) },
     fetchOrders, fetchListings, pushStock: ok, pushPrice: ok, accept: ok, ship: ok, ...(isIkas ? { fetchOne } : { pack }), label, cargoOptions, changeCargo, cancelPackage: ok,
-    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim, settlements, ...(ch === 'hepsiburada' ? { campaigns } : {}) } : {}),
+    ...(['trendyol', 'hepsiburada'].includes(ch) ? { buybox, questions, answer, catalog, claims, claimReasons, approveClaim, rejectClaim, settlements, cargoCosts, ...(ch === 'hepsiburada' ? { campaigns } : {}) } : {}),
     ...(['n11', 'idefix'].includes(ch) ? { catalog } : {}),
     ...(isIkas ? { storeCategories: async () => [...new Set(DEMO_PRODUCTS.map((p) => p[9]))].map((c, i) => ({ id: 'K' + (i + 1), name: c.split(' › ').pop(), path: c.split(' › ').slice(0, -1).join(' › ') })) } : {}),
     createProduct: async (pr, opts = {}) => {

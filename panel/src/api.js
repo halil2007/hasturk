@@ -44,7 +44,7 @@ import { ek } from '../public/ek.js';
 const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).find((f) => f.k === k) || {}).label || k).join(', ');
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderCommission, commissionCheck } from './commcheck.js';
-import { orderProfit, breakdown, productProfit, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
+import { orderProfit, breakdown, productProfit, productLoss, lossSummary, markLosses, lossCache, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE, HttpError } from './util.js';
 
@@ -788,6 +788,8 @@ async function listProducts(db, q) {
   if (q.filter === 'nosku') where.push("COALESCE(TRIM(p.sku), '') = ''");
   if (q.filter === 'nobarcode') where.push("COALESCE(TRIM(p.barcode), '') = ''");
   if (q.filter === 'nolisting') where.push('NOT EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id)');
+  // Zarar ettiren (son 30 gün, iade dahil): önbellekteki ürün kimlikleri (bkz. finance.js lossCache; rota önce tazeler)
+  if (q.filter === 'loss') where.push("p.id IN (SELECT CAST(json_extract(value, '$[0]') AS INTEGER) FROM json_each(COALESCE((SELECT v FROM settings WHERE k = 'loss_cache'), '{}'), '$.items'))");
   if (q.filter === 'passive') where.push('p.active = 0'); else if (q.filter !== 'all') where.push('p.active = 1');
   const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const limit = Math.max(1, Math.min(Number(q.limit) || 50, 500)), page = Math.max(1, Number(q.page) || 1);
@@ -1017,7 +1019,7 @@ async function saveSettings(db, b) {
     if (k === 'history_days') v = Math.min(365, Math.max(1, Math.round(num(v, 30))));
     if (k === 'origin') v = str(v).replace(/\s+/g, ' ').trim().slice(0, 40) || 'Türkiye';
     if (k === 'low_stock') v = Math.max(0, Math.round(num(v, 5)));
-    if (k === 'autoprice' || k === 'costs_vat_incl' || k === 'auto_approve_sure') v = !!v;
+    if (k === 'autoprice' || k === 'costs_vat_incl' || k === 'auto_approve_sure' || k === 'return_damaged_loss') v = !!v;
     if (k === 'answer_templates') v = (Array.isArray(v) ? v : []).map((t) => str(t).slice(0, 2000)).filter(Boolean).slice(0, 30);
     if (k === 'track_urls') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).map(([a, b]) => [str(a).slice(0, 40), str(b).slice(0, 300)]).filter(([a, b]) => a && /^https:\/\/[^\s]+$/i.test(b) && b.includes('{no}')).slice(0, 30));
     if (k === 'ads_conv') {
@@ -1662,6 +1664,9 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'invoices/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); const [invoices, costs] = await Promise.all([syncInvoices(env, db, { force: true }), syncCosts(env, db, null, { force: true }).catch((e) => ({ error: e.message }))]); return json({ invoices, costs }); }
   if (path === 'finance/commission' && m === 'GET') return json(await commissionCheck(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
   if (path === 'finance/products' && m === 'GET') return json(await productProfit(db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', sort: str(q.sort) }));
+  // Zarar uyarıları: ürün kartı (son 30 / 90 gün, başa baş fiyat) ve genel bakış kartı (zarar ettiren ürünler, bu ayın iade maliyeti)
+  if ((x = path.match(/^finance\/product\/(\d+)$/)) && m === 'GET') return json(await productLoss(db, await getSettings(db), Number(x[1])));
+  if (path === 'finance/losses' && m === 'GET') return json(await lossSummary(db, await getSettings(db)));
   if (path === 'expenses' && m === 'GET') return json(await listExpenses(db));
   if (path === 'expenses' && m === 'POST') return json(await saveExpense(db, await body(req)));
   if ((x = path.match(/^expenses\/(\d+)$/))) {
@@ -1882,7 +1887,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (path === 'products/skus/new' && m === 'GET') return json(await suggestSku(db, q));
   if (path === 'products/skus/preview' && m === 'POST') { const b = await body(req); return json(await previewSkus(db, b.ids, b.prefix)); }
   if (path === 'products/skus' && m === 'POST') { const b = await body(req); return json(await assignSkus(db, b.items, { prefix: b.prefix, user: user.name })); }
-  if (path === 'products' && m === 'GET') return json(await listProducts(db, q));
+  if (path === 'products' && m === 'GET') {
+    // Zarar rozeti / süzgeci yalnız kâr bilgisini görebilen kullanıcıya (önbellekten; liste hızı değişmez)
+    const fin = can(user, 'finance'), st = fin ? await getSettings(db) : null;
+    if (q.filter === 'loss') { if (!fin) fail(403, 'Bu bölüm için yetkiniz yok'); await lossCache(db, st); }
+    const r = await listProducts(db, q);
+    if (fin) { const c = await markLosses(db, st, r.products).catch(() => null); if (c) r.stats.loss = c.items.length; }
+    return json(r);
+  }
   // Varyant grubu: tek ekrandan tüm varyantlar (ad, kodlar, alış / satış, stok, kritik, kanal fiyatları, aktiflik) ve ortak alanlar
   if (path === 'products-variants' && m === 'GET') {
     const ids = str(q.ids).split(',').map(Number).filter((x) => x > 0).slice(0, 300);

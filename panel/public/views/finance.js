@@ -183,12 +183,12 @@ export async function financeView(el, rest, query = {}) {
     if (!stl.days.length && !stl.types.length && !t.upcoming) return render(box, html`${head()}<div class="empty">Henüz hakediş kaydı yok.${isAdmin() ? ' “Yenile” ile pazaryerinden alın.' : ' Kayıtlar 6 saatte bir alınır.'}</div>`);
     // Yaklaşan (ödenmemiş: en yakın gün üstte, gecikenler en üstte) ve dönemde ödenen günler (en yeni üstte)
     const last = new Date(Math.min(stl.to, Date.now()) - 1 + 3 * 3600e3).toISOString().slice(0, 10);
-    const upc = stl.days.filter((x) => x.due).sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)), paid = stl.days.filter((x) => !x.due && x.paid && x.d <= last);
+    const upc = stl.days.filter((x) => x.due).sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)), paid = stl.days.filter((x) => x.paid && x.d <= last).sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0)); // aynı günün ödenen ve ödenmeyen kısmı ayrı listelerde (kart toplamlarıyla aynı)
     const tag = (x) => x.d > today ? html`<span class="pill info tiny">bekleniyor</span>` : x.d === today ? html`<span class="pill info tiny">bugün</span>`
       : x.d < late ? html`<span class="pill bad tiny">gecikti</span>` : html`<span class="pill tiny">işleniyor</span>`;
     const dayTable = (rows, k, more, empty, withTag) => html`<div class="table-wrap"><table class="t stl-t"><thead><tr><th>Ödeme günü</th><th>Kanal</th><th class="r">Tutar</th><th class="r m-hide">Kayıt</th></tr></thead><tbody>
         ${rows.slice(0, f[more] ? 200 : 8).map((x) => html`<tr><td class="small" style="white-space:nowrap">${dmy(x.d)} ${withTag ? tag(x) : ''}</td><td>${chLogo(x.channel, true)}</td>
-          <td class="r num" style="font-weight:650;color:${x[k] < 0 ? 'var(--bad)' : 'inherit'}">${money(x[k])}</td><td class="r num muted m-hide">${n(x.n)}</td></tr>`)}
+          <td class="r num" style="font-weight:650;color:${x[k] < 0 ? 'var(--bad)' : 'inherit'}">${money(x[k])}</td><td class="r num muted m-hide">${n((k === 'due' ? x.nd : x.np) ?? x.n)}</td></tr>`)}
         ${!rows.length ? html`<tr><td colspan="4" class="empty">${empty}</td></tr>` : ''}
       </tbody></table></div>${rows.length > 8 && !f[more] ? html`<div class="pager"><button class="btn sm" data-act="stlmore" data-k="${more}">Tümünü göster (${n(rows.length)})</button></div>` : ''}`;
     render(box, html`${head()}
@@ -204,8 +204,8 @@ export async function financeView(el, rest, query = {}) {
       <div class="card-pad" style="padding-bottom:6px"><b class="small">Bu dönemde ödenenler</b></div>
       ${dayTable(paid, 'paid', 'stlpaid', 'Bu dönemde ödeme yok', false)}
       ${stl.types.length ? html`<div style="padding:12px 16px 4px"><div class="small" style="font-weight:650;margin-bottom:6px">Dönemin kayıtları <span class="muted">· toplam ${money0(t.period)}</span></div><div class="row wrap" style="gap:8px">${stl.types.map((x) => html`<span class="chip" title="${x.raw ? 'Kanalın gönderdiği tür: ' + x.raw : `${n(x.n)} kayıt`}">${x.type} <b class="num" style="margin-left:4px;color:${x.amount < 0 ? 'var(--bad)' : 'inherit'}">${money0(x.amount)}</b></span>`)}</div></div>` : ''}
-      ${stl.diffs.length ? html`<details style="padding:8px 16px 4px"><summary style="cursor:pointer;font-weight:650">Farklı çıkan siparişler (${n(stl.diffs.length)})</summary>
-        <div class="muted tiny" style="margin:6px 0">Pazaryerinin ödediği tutar, panelin hesabından farklı. Fark nedeni her satırda yazıyor.</div>
+      ${stl.diffs.length ? html`<details style="padding:8px 16px 4px"><summary style="cursor:pointer;font-weight:650">Farklı çıkan siparişler (${n(t.mismatched)})</summary>
+        <div class="muted tiny" style="margin:6px 0">Pazaryerinin ödediği tutar, panelin hesabından farklı. Fark nedeni her satırda yazıyor.${t.mismatched > stl.diffs.length ? ` Farkı en büyük ${n(stl.diffs.length)} sipariş listeleniyor.` : ''}</div>
         <div class="table-wrap"><table class="t stl-t"><thead><tr><th>Sipariş</th><th class="r m-hide">Panel hesabı</th><th class="r m-hide">Pazaryeri</th><th class="r">Fark</th></tr></thead><tbody>
         ${stl.diffs.map((x) => html`<tr><td><div>${chLogo(x.channel, true)} <a class="link" href="#/siparisler/${encodeURIComponent(x.id)}"><b>#${x.order_number}</b></a> <span class="muted tiny">${date(x.ordered_at)}</span></div><div class="tiny muted" style="white-space:normal;max-width:340px">${x.reason}</div><div class="tiny muted m-only">Panel ${money(x.expected)} · Pazaryeri ${money(x.actual)}</div></td>
           <td class="r num m-hide">${money(x.expected)}</td><td class="r num m-hide">${money(x.actual)}</td>

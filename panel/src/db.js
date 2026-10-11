@@ -356,6 +356,12 @@ export const MIGRATIONS = [
     current_price REAL, tiers TEXT, file_comm REAL, cur_comm REAL, starts_at INTEGER, ends_at INTEGER, raw TEXT, choice TEXT, chosen_price REAL, applied_price REAL, applied_at INTEGER,
     updated_at INTEGER, PRIMARY KEY (channel, kind, key))`,
   'CREATE TABLE IF NOT EXISTS offer_files (channel TEXT NOT NULL, kind TEXT NOT NULL, part INTEGER NOT NULL, meta TEXT, data TEXT, PRIMARY KEY (channel, kind, part))',
+  // İade maliyeti (bkz. finance.js returnCost): kanalın kargo faturasındaki iade gönderisinin tutarı ayrı saklanır (gönderim kargosu
+  // shipping_cost'ta kalır). return_ship_src: 'api' = faturadan; 'lumped' = eski kayıt, iade kargosu gönderimle birlikte shipping_cost'ta
+  // (ayrıştırılamadı; tahmin eklenmez, çift sayılmaz). Kargo faturasından gelen mevcut siparişler bu yüzden 'lumped' işaretlenir.
+  'ALTER TABLE orders ADD COLUMN return_ship_cost REAL',
+  'ALTER TABLE orders ADD COLUMN return_ship_src TEXT',
+  "UPDATE orders SET return_ship_src = 'lumped' WHERE shipping_src = 'api' AND return_ship_src IS NULL",
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
@@ -475,6 +481,11 @@ export const DEFAULT_SETTINGS = {
   fee_rate: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0, n11: 0, idefix: 0, pazarama: 0, amazon: 0, ciceksepeti: 0, koctas: 0, shopify: 0, woocommerce: 0, opencart: 0, etsy: 3.6, teknosa: 0, boyner: 0, pasaj: 0, trendyolgo: 0, getir: 0, yemeksepeti: 0, ebay: 0, ozon: 0, ticimax: 0, ideasoft: 0, tsoft: 0 },
   // E-ticaret stopajı %: pazaryeri hakedişten keser (KDV hariç satış üzerinden); kendi siteniz (ikas) için 0
   withholding: { ikas1: 0, ikas2: 0, trendyol: 1, hepsiburada: 1, pttavm: 1, n11: 1, idefix: 1, pazarama: 1, amazon: 1, ciceksepeti: 1, koctas: 1, shopify: 0, woocommerce: 0, opencart: 0, etsy: 0, teknosa: 1, boyner: 1, pasaj: 1, trendyolgo: 1, getir: 1, yemeksepeti: 1, ebay: 0, ozon: 0, ticimax: 0, ideasoft: 0, tsoft: 0 },
+  // İade kargo bedeli (tahmini, iade başı ₺, KDV dahil): kanal iade gönderisinin kargo faturasını vermediğinde iade maliyetine eklenir.
+  // Varsayılan boş: girilmedikçe sayılmaz (uydurma tutar yok). Bkz. finance.js returnCost
+  return_shipping: {},
+  // Hasarlı / kusurlu nedeniyle kabul edilen iadede ürün satılamaz sayılır: alış maliyeti iade maliyetine eklenir (varsayılan kapalı)
+  return_damaged_loss: false,
   // Stok senkronu: ilk ürün eşleştirmesi kontrol edildikten sonra açılır
   stock_sync: false,
   // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar
@@ -536,7 +547,10 @@ async function vatInclOnce(db, rows) {
       }
       st.push(db.prepare("UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND COALESCE(commission_src, 'manual') != 'api'"));
     }
-    st.push(db.prepare("UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND commission_src = 'api'"));
+    // Trendyol (Go hariç) ilan oranı, Trendyol çevrimi (once:ty_comm_incl_1, init'te) yapıldıysa zaten KDV dahil sipariş satırından
+    // yeniden hesaplandı: bu çevrimden önce açılmamış veritabanında üzerine ikinci kez %20 eklenmesin
+    st.push(db.prepare(`UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND commission_src = 'api'
+      AND NOT (channel LIKE 'trendyol%' AND channel NOT LIKE 'trendyolgo%' AND EXISTS (SELECT 1 FROM settings WHERE k = 'once:ty_comm_incl_1'))`));
     st.push(db.prepare("INSERT INTO settings (k, v) VALUES ('costs_vat_incl', 'true') ON CONFLICT (k) DO UPDATE SET v = excluded.v"));
     await db.batch(st);
     return true;

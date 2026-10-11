@@ -540,8 +540,10 @@ export function trendyol(env, meta) {
   // ---------- kargo gideri (gerçek) ----------
   // Cari hesap ekstresindeki kesinti faturalarından (DeductionInvoices) kargo faturaları bulunur; her kargo faturasının kalemleri
   // sipariş numarası ve kargo tutarını verir. Finans servisi en fazla 15 günlük aralık kabul eder.
+  // İade gönderisi (müşterinin geri yolladığı koli) aynı kargo faturasında ayrı kalemdir: kalem türü (shipmentPackageType, ör. "İade")
+  // ya da açıklaması iade diyorsa returnAmount'a yazılır (gönderim kargosu amount'ta kalır; iade maliyeti ayrıca hesaplanır).
   async function cargoCosts(since, until) {
-    const W = 14 * 864e5, invoices = new Set(), byOrder = new Map();
+    const W = 14 * 864e5, invoices = new Set(), byOrder = new Map(), retOf = new Map();
     for (let from = since; from < until; from += W) {
       const to = Math.min(until, from + W);
       for (let page = 0; page < 20; page++) {
@@ -553,11 +555,16 @@ export function trendyol(env, meta) {
     for (const id of invoices) {
       for (let page = 0; page < 50; page++) {
         const r = await call(`/finance/che/sellers/${seller}/cargo-invoice/${encodeURIComponent(id)}/items?page=${page}&size=500`);
-        for (const it of r.content || []) if (it.orderNumber && num(it.amount)) byOrder.set(String(it.orderNumber), (byOrder.get(String(it.orderNumber)) || 0) + num(it.amount));
+        for (const it of r.content || []) {
+          if (!it.orderNumber || !num(it.amount)) continue;
+          const no = String(it.orderNumber), m = /iade|return/i.test(`${it.shipmentPackageType || ''} ${it.type || ''} ${it.description || ''}`) ? retOf : byOrder;
+          m.set(no, (m.get(no) || 0) + num(it.amount));
+        }
         if (page + 1 >= (r.totalPages || 1)) break;
       }
     }
-    return { invoices: invoices.size, items: [...byOrder].map(([orderNumber, amount]) => ({ orderNumber, amount: Math.round(amount * 100) / 100 })) };
+    const r2c = (v) => Math.round(v * 100) / 100;
+    return { invoices: invoices.size, items: [...new Set([...byOrder.keys(), ...retOf.keys()])].map((orderNumber) => ({ orderNumber, amount: r2c(byOrder.get(orderNumber) || 0), ...(retOf.get(orderNumber) ? { returnAmount: r2c(retOf.get(orderNumber)) } : {}) })) };
   }
 
   // ---------- iade talepleri (claims) ----------
