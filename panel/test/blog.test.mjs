@@ -125,3 +125,27 @@ test('herkese açık uçlar: yalnız yayındaki yazılar, sayfalama, görsel, RS
   await run(db, "UPDATE blog_posts SET status = 'draft' WHERE id = ?", p1.id);
   assert.equal((await pub(env, 'public/blog/post/' + p1.slug)).status, 404, 'yayından kaldırılan yazı açılmaz');
 });
+
+test('herkese açık uçlar: ilgili yazılar etikete göre, kelime sayısı, kısa dizin (since), site haritasında kapak görseli', async () => {
+  const db = d1(); await init(db);
+  const env = { PANEL_PASSWORD: 'x-123456', DB: db, SITE_URL: 'https://hasturkcrm.com' };
+  const im = await call(db, 'POST', 'blog/images', { data: WEBP(), w: 1600, h: 900 });
+  const now = Date.now(), H = 3600e3;
+  const mk = (title, tags, at, extra = {}) => call(db, 'POST', 'blog', { title, body: `## Giriş\n\n${title} hakkında kısa bir metin.`, tags, status: 'published', published_at: at, ...extra });
+  const a = await mk('Kargo yazısı', ['Kargo', 'Trendyol'], now - 10 * H, { cover_id: im.id });
+  await mk('Stok yazısı 1', ['Stok'], now - 9 * H); await mk('Stok yazısı 2', ['Stok'], now - 8 * H); await mk('Stok yazısı 3', ['Stok'], now - 7 * H);
+  await mk('Kargo ve Trendyol', ['kargo', 'Trendyol'], now - 30 * H); await mk('Yalnız Trendyol', ['Trendyol'], now - 40 * H);
+  await mk('Gelecek kargo yazısı', ['Kargo', 'Trendyol'], now + 5 * H);
+  const p = await (await pub(env, 'public/blog/post/' + a.slug)).json();
+  assert.deepEqual(p.more.map((x) => x.title), ['Kargo ve Trendyol', 'Yalnız Trendyol', 'Stok yazısı 1'], 'önce ortak etiket sayısı, sonra tarihe yakınlık; ileri tarihli yok');
+  assert.equal(p.post.words, 7);
+  const ix = await (await pub(env, 'public/blog/index')).json();
+  assert.equal(ix.total, 6); assert.ok(!('body' in ix.posts[0]) && !('html' in ix.posts[0])); assert.equal(ix.posts[0].title, 'Stok yazısı 3');
+  assert.ok(ix.posts.every((x) => x.summary && x.slug && x.published_at));
+  // since: yalnız bu andan sonra yayına giren ya da değişenler (oluşturma anı = değişiklik anı; hepsi az önce yazıldı)
+  assert.equal((await (await pub(env, `public/blog/index?since=${Date.now() + 60e3}`)).json()).total, 0);
+  assert.equal((await (await pub(env, `public/blog/index?since=${now - 60e3}`)).json()).total, 6);
+  const sm = await (await pub(env, 'public/blog/sitemap')).text();
+  assert.match(sm, new RegExp(`<loc>https://hasturkcrm.com/blog/${a.slug}</loc><lastmod>[^<]+</lastmod><image:image><image:loc>https://hasturkcrm.com/blog/img/${im.id}</image:loc></image:image>`));
+  assert.doesNotMatch(sm, /gelecek-kargo/); assert.equal((sm.match(/<url>/g) || []).length, 7);
+});

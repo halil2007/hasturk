@@ -499,6 +499,38 @@ for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPa
   await writeFile(join(OUT, g.file), render(g.meta, g.body, g.file.includes('/') ? g.file.split('/')[0] + '-detay' : g.file.replace(/\.html$/, '')));
   pages.push({ file: g.file, ...g.meta });
 }
+// llms.txt (llmstxt.org): yapay zekâ asistanları için site özeti. Sabit kısım buradan (sayfa başlık / açıklamalarından) üretilir; src/worker.js
+// /llms.txt ve /llms-full.txt adreslerinde buna panelden blog yazılarını ekler. public/llms.txt yalnız Worker çalışmazsa kullanılan yedektir.
+const today = new Date().toISOString().slice(0, 10);
+const LLMS = (() => {
+  const byUrl = Object.fromEntries(pages.map((p) => [p.url, p])), intBySlug = Object.fromEntries(INTEGRATIONS.map((x) => [x.slug, x]));
+  const line = (p, name) => `- [${(name || pageName(p)).replace(/[[\]]/g, '')}](${SITE_URL}${p.url === '/' ? '/' : p.url}): ${p.description}`;
+  const group = (h, list) => (list.length ? `## ${h}\n\n${list.join('\n')}\n` : '');
+  const sub = (re, skip = () => false) => pages.filter((p) => re.test(p.url) && p.sitemap !== 'no' && !skip(p)).sort((a, b) => a.url.localeCompare(b.url));
+  const CORE = [['/', 'Ana sayfa'], ['/ozellikler', 'Özellikler'], ['/entegrasyonlar', 'Entegrasyonlar'], ['/paketler', 'Paketler ve fiyatlar'], ['/araclar', 'Ücretsiz hesaplama araçları'], ['/demo', 'Canlı demo ve ücretsiz deneme'], ['/hakkimizda', 'Hakkımızda'], ['/iletisim', 'İletişim']];
+  const names = (f) => activeCh.filter(f).map((x) => x.name).join(', ');
+  const tl = (n) => `${n.toLocaleString('tr-TR')} ₺`;
+  const plans = S.plans.filter((p) => p.monthly).map((p) => `${p.name} ${tl(p.monthly)}/ay ya da ${tl(p.yearly)}/yıl (${p.limits.join(', ')})`).join('; ');
+  const beta = INTEGRATIONS.filter((x) => x.beta && !x.dev).map((x) => x.name).join(', ');
+  return `# ${S.brand}
+
+> ${S.brand}, pazaryerlerinde ve kendi e-ticaret sitesinde satış yapan işletmeler için web tabanlı satış yönetim yazılımıdır. Trendyol, Hepsiburada, N11, ikas ve diğer kanalların siparişleri, kargo etiketleri, stokları, fiyatları ve her siparişin gerçek kârı tek panelden yönetilir.
+
+- Site: ${SITE_URL}/ · Panel (giriş): ${S.panelUrl}
+- Aktif entegrasyonlar: ${names(() => true)}${beta ? `\n- Test aşamasındaki entegrasyonlar: ${beta}` : ''}
+- Paketler (KDV dahil): ${plans}. Kurulum ücreti yoktur; 7 gün ücretsiz deneme ve kayıt olmadan canlı demo vardır.
+- Öne çıkanlar: çok kanallı stok senkronizasyonu, ortak barkodla kargo etiketi, kategori eşleştirmeyle çok kanala ürün yükleme, buybox takibi ve otomatik fiyat, komisyon / kargo / hizmet bedeli kesintileriyle sipariş başı net kâr, müşteri soruları ve iadeler, telefondan yönetim.
+- Şirket: ${S.company.legal || S.brand}${S.company.address ? `, ${S.company.address}` : ''}${S.company.email ? ` · ${S.company.email}` : ''}${S.company.phone ? ` · ${S.company.phone}` : ''}
+- Bu dosyanın sabit kısmı: ${today} · Blog bölümü yayındaki yazılardan kendiliğinden güncellenir.
+
+${group('Ana sayfalar', CORE.filter(([u]) => byUrl[u]).map(([u, n]) => line(byUrl[u], n)))}
+${group('Özellikler', sub(/^\/ozellikler\/./).map((p) => line(p)))}
+${group('Entegrasyonlar', sub(/^\/entegrasyonlar\/./, (p) => (intBySlug[p.url.split('/')[2]] || {}).dev).map((p) => line(p, (intBySlug[p.url.split('/')[2]] || {}).beta ? `${pageName(p)} (test aşamasında)` : '')))}
+${group('Ücretsiz hesaplama araçları', sub(/^\/araclar\/./, (p) => /-komisyon-oranlari$/.test(p.url)).map((p) => line(p)))}
+${group('Kategori komisyon oranı listeleri', sub(/^\/araclar\/.+-komisyon-oranlari$/).map((p) => line(p)))}`.replace(/\n{3,}/g, '\n\n');
+})();
+await writeFile(join(OUT, 'llms.txt'), `${LLMS}\n## Blog\n\n- [Blog](${SITE_URL}/blog): Pazaryeri, kargo, stok, fiyat ve kârlılık üzerine rehberler\n- [Blog RSS akışı](${SITE_URL}/blog/rss.xml)\n- [Blog site haritası](${SITE_URL}/blog/sitemap.xml)\n`);
+
 // Blog sayfa kalıbı (src/worker.js sunucuda doldurur): aynı üst menü / alt bilgi, yer tutucular {{T}} başlık, {{D}} açıklama, {{U}} adres,
 // {{R}} robots, {{O}} og:type, {{I}}/{{IW}}/{{IH}}/{{IA}} paylaşım görseli, {{J}} JSON-LD, {{H}} ek head, {{B}} gövde
 {
@@ -514,10 +546,9 @@ for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPa
     .replace(/data-nav="blog"/g, 'data-nav="blog" class="on" aria-current="page"');
   // Sayfadaki (statik) {{…}} benzeri metinler önce kaçışlanır, sonra yer tutucular {{X}} biçimine çevrilir
   shell = shell.replace(/\{\{/g, '{\u200b{').replace(/\u0001([A-Z]+)\u0001/g, '{{$1}}');
-  await writeFile(join(SRC, 'blog-shell.mjs'), `// node build.mjs üretir; elle düzenlemeyin (kaynak: src/layout.html)\nexport const SHELL = ${JSON.stringify(shell)};\nexport const PANEL_URL = ${JSON.stringify(S.panelUrl || 'https://panel.hasturkcrm.com')};\nexport const SITE_URL = ${JSON.stringify(SITE_URL)};\nexport const ORG = ${JSON.stringify(ORG)};\n`);
+  await writeFile(join(SRC, 'blog-shell.mjs'), `// node build.mjs üretir; elle düzenlemeyin (kaynak: src/layout.html)\nexport const SHELL = ${JSON.stringify(shell)};\nexport const PANEL_URL = ${JSON.stringify(S.panelUrl || 'https://panel.hasturkcrm.com')};\nexport const SITE_URL = ${JSON.stringify(SITE_URL)};\nexport const ORG = ${JSON.stringify(ORG)};\nexport const LLMS = ${JSON.stringify(LLMS)};\n`);
 }
 pages.push({ file: 'blog', url: '/blog' });
-const today = new Date().toISOString().slice(0, 10);
 const urls = pages.filter((p) => p.sitemap !== 'no').map((p) => `  <url><loc>https://hasturkcrm.com${p.url}</loc><lastmod>${p.modified || today}</lastmod></url>`).join('\n');
 await writeFile(join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
 console.log(`${pages.length} sayfa derlendi`);
