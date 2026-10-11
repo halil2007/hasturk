@@ -2,18 +2,16 @@
 // Zamanlanmış görev (wrangler.jsonc → triggers): 15 dakikada bir tüm kanalları senkronlar.
 // Müşteri panelleri (tenants.js): firma koduyla giriş yapan müşterinin istekleri kendi Durable Object'ine iletilir.
 import { init, getSettings } from './db.js';
-import { syncAll, quickSync } from './sync.js';
 import { report5xx } from './handler.js';
 import { extApi } from './extapi.js';
 import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
 import { publicCheckout, checkoutCallback, checkoutStatus, payLink, paymentWatch } from './billing.js';
 import { blogPublic } from './blog.js';
-import { serveImage } from './prodimg.js';
 import { trialRequest, trialLogin } from './trial.js';
 import { turnstileOk, turnstileSiteKey, CAPTCHA_ERROR } from './turnstile.js';
 import { resolveQuiet } from './errors.js';
-import { mainRoute } from './mainpanel.js';
+import { mainRoute, mainCron, mainImage, mainExtApi } from './mainpanel.js';
 import { serverTiming, meter } from './meter.js';
 import { edgeCached } from './edgecache.js';
 import { cookieTenant, getTenant, forward, tenantLogin, SLUG_RE, expired, tenantWatchdog, contactLine, tenantPassword, expiryReminders, expiredMessage, renewUrl } from './tenants.js';
@@ -86,7 +84,7 @@ async function productImage(req, env, ctx, url) {
   if (!env.DB) return none();
   const inner = new Request(req.url, { method: req.method, headers: req.headers.get('If-None-Match') ? { 'If-None-Match': req.headers.get('If-None-Match') } : {} });
   let res;
-  if (m[1] === '_') { await init(env.DB); res = await serveImage(env.DB, inner, m[2]); }
+  if (m[1] === '_') res = await mainImage(env, inner, m[2]);
   else {
     const t = SLUG_RE.test(m[1]) ? await getTenant(env.DB, m[1]) : null;
     if (!t || !t.active) return none();
@@ -147,7 +145,7 @@ const handler = {
         if (env.DB) await init(env.DB);
         const bl = env.DB ? await guardBlocked(env.DB, req) : null;
         if (bl) return json(blockedBody(bl), 429, blockedHeaders(bl));
-        const res = await extApi(req, env, ctx, path, { getTenant, forward, expired });
+        const res = await extApi(req, env, ctx, path, { getTenant, forward, expired, mainInner: mainExtApi });
         if (env.DB && res.status === 401) await guardAttempt(env.DB, req, { kind: 'api' });
         return res;
       }
@@ -200,7 +198,8 @@ const handler = {
     if (!env.DB) return;
     await init(env.DB);
     const quick = event && event.cron === '*/2 * * * *';
-    ctx.waitUntil((quick ? quickSync(env, env.DB) : syncAll(env, env.DB, { cron: true })).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r)))
+    // Ana panelin senkronu kendi nesnesinde (yerel veritabanıyla) çalışır (bkz. mainpanel.js)
+    ctx.waitUntil(mainCron(env, quick).then((r) => console.log(quick ? 'hızlı iş' : 'senkron', JSON.stringify(r)))
       // Dış nabız (isteğe bağlı, HEARTBEAT_URL: healthchecks.io vb.): zamanlanmış iş hiç çalışmazsa / düşerse servis e-postayla haber verir
       .then(() => !quick && env.HEARTBEAT_URL && fetch(env.HEARTBEAT_URL).catch(() => {}))
       .catch((e) => { console.error('senkron hatası', e); if (!quick && env.HEARTBEAT_URL) return fetch(String(env.HEARTBEAT_URL).replace(/\/+$/, '') + '/fail').catch(() => {}); }));

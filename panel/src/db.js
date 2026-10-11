@@ -386,6 +386,9 @@ export const MIGRATIONS = [
   'ALTER TABLE perf_stats ADD COLUMN db_ms INTEGER NOT NULL DEFAULT 0',
 ];
 
+// Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
+export const TABLES = [...SCHEMA.concat(MIGRATIONS).join('\n').matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
+
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
 // (her yeni Worker örneğinde onlarca şema sorgusu çalıştırmamak için; sayfa geçişlerini hızlandırır).
 const SCHEMA_V = (() => { let h = 0; for (const c of SCHEMA.concat(MIGRATIONS).join('|')) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0; return 'v' + (h >>> 0).toString(36); })();

@@ -10,7 +10,7 @@ const table = (title, sub, rows, empty, warnAt = 1000) => html`<div class="card 
   </tbody></table></div>` : html`<div class="empty">${empty}</div>`}</div>`;
 
 // Veritabanı altyapısı: sunucu nerede çalışıyor, veritabanı hangi bölgede, sorgu başına gidiş-dönüş ne kadar
-const PLACE = { DO: 'Veritabanının yanındaki ana panel nesnesi', '?': 'bilinmiyor' };
+const PLACE = { DO: 'Ana panel nesnesi (mağaza verisi yerelde; yalnız ortak tablolar)', '?': 'bilinmiyor' };
 function infraBox(d) {
   const rows = (d.infra || []).filter((x) => !x.slug).sort((a, b) => b.queries - a.queries);
   if (!rows.length) return '';
@@ -19,7 +19,7 @@ function infraBox(d) {
     <div class="table-wrap"><table class="t"><thead><tr><th>Sunucu → veritabanı bölgesi</th><th class="r">Sorgu</th><th class="r">Sorgu başı</th></tr></thead><tbody>
     ${rows.map((x) => { const [w, reg] = x.where.split(' → '); const place = w.startsWith('DO') ? PLACE.DO : `Kullanıcıya yakın sunucu (${w})`; return html`<tr><td class="small">${place} → <b>${reg}</b></td><td class="r num">${n(x.queries)}</td><td class="r num" style="font-weight:700;color:${x.rtt_ms >= 40 ? 'var(--bad)' : x.rtt_ms >= 15 ? 'var(--amber)' : 'var(--good)'}">${ms(x.rtt_ms)}</td></tr>`; })}
     </tbody></table></div>
-    <div class="muted tiny" style="margin-top:8px">${far ? 'Sorgu başına 20 ms üstü bekleme, sunucunun veritabanından uzakta çalıştığını gösterir; ana panel istekleri veritabanının yanındaki nesneye yönlendirildikçe bu satır azalır.' : 'Sorgular veritabanının yanında çalışıyor (sorgu başına birkaç ms).'}</div></div>`;
+    <div class="muted tiny" style="margin-top:8px">${far ? 'Ana veritabanı (yalnız firmalar, destek, hata kayıtları, blog gibi ortak tablolar) uzak bölgede; mağaza verisi (sipariş, ürün, stok, ayarlar) ana panelin kendi yerel veritabanında olduğundan bu sayılar sayfa hızını etkilemez.' : 'Sorgular veritabanının yanında çalışıyor (sorgu başına birkaç ms).'}</div></div>`;
 }
 
 export async function perfView(el) {

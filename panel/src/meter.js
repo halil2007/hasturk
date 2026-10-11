@@ -3,6 +3,9 @@
 // sorgunun kendisinden mi, sunucu ile veritabanı arasındaki mesafeden mi geliyor, bu ayrımla görülür (Destek → Sistem hızı).
 // Sayaç isteğe özeldir (AsyncLocalStorage); ölçüm dışındaki çağrılar (senkron, zamanlanmış işler) yalnız bölgeyi öğrenir.
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { isGlobal } from './router.js';
+// Testlerde (CHECK_MIXED=1): ortak ve yerel tabloyu aynı sorguda kullanan kod hemen hata verir (bkz. router.js)
+const CHECK = typeof process !== 'undefined' && process.env && process.env.CHECK_MIXED === '1';
 
 const als = new AsyncLocalStorage();
 export const measure = (fn) => als.run({ q: 0, ms: 0, sql: 0 }, fn);
@@ -40,7 +43,7 @@ export function meter(db) {
   if (!w) {
     w = {
       metered: true,
-      prepare: (q) => new Stmt(db.prepare(q)),
+      prepare: (q) => { if (CHECK) { try { isGlobal(q); } catch (e) { console.error('KARISIK ' + e.message); throw e; } } return new Stmt(db.prepare(q)); },
       async batch(list) { const t = now(), r = await db.batch(list.map((s) => (s instanceof Stmt ? s.st : s))); note(t, r || []); return r; },
       exec: (q) => db.exec(q),
       dump: () => db.dump(),

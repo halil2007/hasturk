@@ -85,7 +85,7 @@ export async function mainKeysApi(db, path, method, b, user) {
 }
 
 // Worker: anahtarı doğrula, firmanın paneline yönlendir. getTenant / forward tenants.js'ten verilir (döngüsel içe aktarmayı önlemek için)
-export async function extApi(req, env, ctx, path, { getTenant, forward, expired }) {
+export async function extApi(req, env, ctx, path, { getTenant, forward, expired, mainInner = (e, u, s, k) => extApiInner(e.DB, u, s, k) }) {
   if (req.method !== 'GET') return err(405, 'Yalnız GET desteklenir', 'method');
   const auth = req.headers.get('Authorization') || '', key = (/^Bearer\s+(.+)$/i.exec(auth) || [])[1] || req.headers.get('X-Api-Key') || '';
   // Ana panelin kendi mağazası (hsm_ anahtarı): ürünler ana veritabanından
@@ -107,7 +107,8 @@ export async function extApi(req, env, ctx, path, { getTenant, forward, expired 
     seen.set('main:' + k.id, s);
     const st = await getSettings(env.DB);
     const url = new URL(req.url);
-    return extApiInner(env.DB, new URL('https://main.internal/__api/' + path.replace(/^v1\/?/, '') + url.search), { slug: 'ana-panel', name: (st.company && st.company.title) || 'Ana mağaza' }, 'main:' + k.id);
+    // Ürünler ana panelin kendi veritabanından (nesnede, bkz. mainpanel.js)
+    return mainInner(env, new URL('https://main.internal/__api/' + path.replace(/^v1\/?/, '') + url.search), { slug: 'ana-panel', name: (st.company && st.company.title) || 'Ana mağaza' }, 'main:' + k.id);
   }
   const m = /^hst_([a-z0-9-]{3,32})_[A-Za-z0-9]{32}$/.exec(key.trim());
   if (!m) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');

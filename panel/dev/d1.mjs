@@ -33,10 +33,12 @@ class Stmt {
   runSync() { return this.st().run(...fix(this.args)); }
 }
 
+// CHECK_MIXED=1: ortak (müşteri panelleri / siteyle paylaşılan) ve yerel tabloları aynı sorguda kullanan kod yakalanır (bkz. src/router.js)
+const CHECK = process.env.CHECK_MIXED === '1' ? await import('../src/router.js') : null;
 export function d1(path = ':memory:') {
   const db = new DatabaseSync(path);
   return {
-    prepare: (sql) => new Stmt(db, sql),
+    prepare: (sql) => { if (CHECK) { try { CHECK.isGlobal(sql); } catch (e) { console.error('KARISIK ' + e.message); throw e; } } return new Stmt(db, sql); },
     async batch(stmts) {
       await wait();
       db.exec('BEGIN');
