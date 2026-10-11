@@ -348,6 +348,8 @@ export const MIGRATIONS = [
   // Pazaryerinin kendi kategori adı (Trendyol ürün kategorisi; Hepsiburada katalog veriyorsa): resmî komisyon listesiyle sağlama ve
   // ilanın oranı bilinmiyorsa listeden oran (commission_src = 'list'). listings.category'den ayrı: o, ürün kategorisine aktarılır.
   'ALTER TABLE listings ADD COLUMN mp_category TEXT',
+  // idefix red nedeni nesne geliyordu, "[object Object]" kaydedildi: bu ilanlar hemen yeniden denensin (yeni gönderimde okunur neden yazılır)
+  "UPDATE listings SET error_at = 0 WHERE error LIKE '%[object Object]%'",
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
