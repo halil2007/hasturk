@@ -211,7 +211,7 @@ export function addListing(p, onDone, chId) {
   const s = sheet({
     title: 'İlan ekle', size: 'narrow',
     body: html`<div class="stack"><div class="muted small">${p.group_name && p.variant_name ? `${p.group_name} · ${p.variant_name}` : p.name}</div>
-      <select class="input" data-ch>${chans.map((c) => html`<option value="${c.id}" ${c.id === f.channel ? 'selected' : ''}>${c.name}${mine.includes(c.id) ? ` (${(p.listings || []).filter((l) => l.channel === c.id).length} ilan bağlı)` : ''}</option>`)}</select>
+      <select class="input" data-lch>${chans.map((c) => html`<option value="${c.id}" ${c.id === f.channel ? 'selected' : ''}>${c.name}${mine.includes(c.id) ? ` (${(p.listings || []).filter((l) => l.channel === c.id).length} ilan bağlı)` : ''}</option>`)}</select>
       <div class="search" style="min-width:0"><i class="ico ico-search"></i><input class="input" type="search" placeholder="İlan adı, SKU veya barkod" data-lq></div>
       <div data-res class="stack" style="gap:6px"></div></div>`,
   });
@@ -224,7 +224,7 @@ export function addListing(p, onDone, chId) {
       ${l.product_id ? html`<span class="pill" title="Bu ilan başka bir ürüne bağlı; önce Eşleştirme'den kaldırın">Başka üründe</span>` : html`<button class="btn sm primary" data-rid="${l.remote_id}">Bağla</button>`}</div>`)}`
       : html`<div class="muted small">${r.error || 'Sonuç yok'}</div>`);
   };
-  $('[data-ch]', s.el).addEventListener('change', (e) => { f.channel = e.target.value; search(); });
+  $('[data-lch]', s.el).addEventListener('change', (e) => { f.channel = e.target.value; search(); });
   $('[data-lq]', s.el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); search(); }, 250));
   res.addEventListener('click', (e) => {
     const b = e.target.closest('[data-rid]');

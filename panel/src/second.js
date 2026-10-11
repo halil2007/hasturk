@@ -63,7 +63,8 @@ export async function secondSuggestions(db, { channel, q, limit = 50, page = 1 }
     const a = prep({ name: l.name, variant: l.variant_name, sku: l.sku, barcode: l.barcode });
     const hits = new Map(); // pid → { how, score }
     const put = (pid, how, sc) => {
-      if (!x.byPid.has(pid) || no.has(`${l.channel}|${l.remote_id}|${pid}`)) return;
+      // Reddedilen öneri ve kullanıcının kaldırdığı bağ ("x:<ürün>") yeniden önerilmez
+      if (!x.byPid.has(pid) || no.has(`${l.channel}|${l.remote_id}|${pid}`) || l.match === 'x:' + pid) return;
       const h = hits.get(pid);
       if (!h || RANK[how] > RANK[h.how] || (RANK[how] === RANK[h.how] && sc > h.score)) hits.set(pid, { how, score: sc });
     };
