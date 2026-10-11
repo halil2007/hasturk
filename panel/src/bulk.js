@@ -55,7 +55,8 @@ export async function exportProducts(env, db) {
   const { chans } = await context(env, db);
   const prods = await all(db, `SELECT id, sku, barcode, name, group_name, variant_name, purchase_price, sale_price, stock, critical_stock, desi, vat, active FROM products
     ORDER BY COALESCE(NULLIF(group_name, ''), name) COLLATE NOCASE, variant_name COLLATE NOCASE`);
-  const ls = await all(db, 'SELECT product_id, channel, price FROM listings WHERE product_id IS NOT NULL');
+  // Ürünün bir kanalda birden fazla ilanı varsa (ikinci eşleşme) Excel sütunu ilk ilanın fiyatıdır (Map'te son yazılan kalır)
+  const ls = await all(db, 'SELECT product_id, channel, price FROM listings WHERE product_id IS NOT NULL ORDER BY extra_link DESC, remote_id DESC');
   const used = chans.filter((c) => ls.some((l) => l.channel === c.id));
   const price = new Map(ls.map((l) => [`${l.product_id}|${l.channel}`, l.price]));
   const head = ['ID', 'SKU', 'Barkod', 'Ürün adı', 'Varyant', 'Durum', ...FIELDS.map((f) => f[1]), ...used.map((c) => `Fiyat: ${c.name}`), CHECK];
@@ -75,7 +76,7 @@ const EXTRA = [['brand', 'Marka'], ['category', 'Kategori'], ['images', 'Görsel
 const SAMPLE_SKU = 'ORNEK-001';
 export function templateCsv() {
   const head = ['ID', 'SKU', 'Barkod', 'Ürün adı', 'Varyant', 'Durum', ...FIELDS.map((f) => f[1]), ...EXTRA.map((f) => f[1])];
-  const row = ['', SAMPLE_SKU, '', 'Örnek ürün (bu satırı silin)', '5 kg', 'Aktif', '120,50', '249,90', '10', '2', '1', '20', 'Örnek marka', 'Bahçe › Tohum', 'https://ornek.com/gorsel.jpg', 'Kısa açıklama'];
+  const row = ['', SAMPLE_SKU, '', 'Örnek ürün (bu satırı silin)', '5 kg', 'Aktif', '120,50', '249,90', '10', '2', '1', '20', 'Örnek marka', 'Giyim › Kadın › Tişört', 'https://ornek.com/gorsel.jpg', 'Kısa açıklama'];
   return '﻿' + [head, row].map((r) => r.map(cell).join(';')).join('\r\n');
 }
 
@@ -118,7 +119,7 @@ export async function bulkUpdate(env, db, rows, { dry = true, user = 'Panel', ca
   const prods = await all(db, 'SELECT id, sku, barcode, name, variant_name, purchase_price, sale_price, stock, critical_stock, desi, vat, currency, fx_price FROM products');
   const byId = new Map(prods.map((p) => [p.id, p])), bySku = new Map(), byBc = new Map();
   for (const p of prods) { if (str(p.sku)) bySku.set(str(p.sku).toUpperCase(), p); if (str(p.barcode)) byBc.set(str(p.barcode), p); }
-  const listings = await all(db, 'SELECT product_id, channel, remote_id, price, remote_stock FROM listings WHERE product_id IS NOT NULL');
+  const listings = await all(db, 'SELECT product_id, channel, remote_id, price, remote_stock FROM listings WHERE product_id IS NOT NULL ORDER BY extra_link DESC, remote_id DESC');
   const lmap = new Map(listings.map((l) => [`${l.product_id}|${l.channel}`, l]));
   const rules = new Map((await all(db, 'SELECT channel, remote_id, min_price, max_price FROM price_rules WHERE enabled = 1')).map((r) => [`${r.channel}|${r.remote_id}`, r]));
   const siteStock = new Set(settings.stock_sync ? [] : listings.filter((l) => cats.includes(l.channel) && l.remote_stock != null).map((l) => l.product_id));

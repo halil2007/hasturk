@@ -121,9 +121,9 @@ export async function firmsView(el) {
       title: t ? `${t.name} · düzenle` : 'Yeni firma', size: 'wide',
       body: html`<form class="stack" data-f autocomplete="off">
         <div class="card"><h3 style="margin-bottom:10px">Firma</h3><div class="form-grid">
-          <label class="field"><span>Firma adı *</span><input class="input" name="name" value="${t ? t.name : ''}" required placeholder="ör. Yeşil Bahçe"></label>
+          <label class="field"><span>Firma adı *</span><input class="input" name="name" value="${t ? t.name : ''}" required placeholder="ör. Örnek Mağaza"></label>
           <label class="field"><span>Firma kodu *</span><input class="input" name="slug" value="${t ? t.slug : ''}" ${t ? 'disabled' : ''} required pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]" placeholder="ör. yesil-bahce" autocapitalize="none"><small>${t ? 'Sonradan değişmez' : 'Girişte yazılır: küçük harf, rakam, tire'}</small></label>
-          <label class="field"><span>Ticari ünvan</span><input class="input" name="legal" value="${t ? t.legal : ''}" placeholder="ör. Yeşil Bahçe Tarım Ltd. Şti."></label>
+          <label class="field"><span>Ticari ünvan</span><input class="input" name="legal" value="${t ? t.legal : ''}" placeholder="ör. Örnek Ticaret Ltd. Şti."></label>
           <label class="field"><span>Vergi dairesi / no</span><input class="input" name="tax" value="${t ? t.tax : ''}"></label>
           <label class="field"><span>Yetkili kişi</span><input class="input" name="contact" value="${t ? t.contact : ''}"></label>
           <label class="field"><span>E-posta</span><input class="input" type="email" name="email" value="${t ? t.email || '' : ''}">${t ? html`<small>Süre bitimi hatırlatmaları bu adrese gider</small>` : html`<small>Giriş bilgileri ve şifre belirleme bağlantısı bu adrese gider</small>`}</label>

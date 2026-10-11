@@ -230,8 +230,13 @@ export async function applyStock(db, orderIds, settings) {
         g.push(db.prepare(`UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ? AND ${cond}`).bind(delta, t, pid, ...ca));
         g.push(db.prepare(`INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) SELECT ?, ?, stock, ?, ?, ? FROM products WHERE id = ? AND ${cond}`)
           .bind(pid, -delta, delta > 0 ? 'Sipariş' : 'İptal/iade', label, t, pid, ...ca));
-        // Bu kanala ayrılmış (own) stok, aynı kanalın satışıyla azalır
-        if (r && r.channel) g.push(db.prepare(`UPDATE listings SET stock_value = COALESCE(stock_value, 0) - ? WHERE channel = ? AND product_id = ? AND stock_mode = 'own' AND ${cond}`).bind(delta, r.channel, pid, ...ca));
+        // Bu kanala ayrılmış (own) stok, aynı kanalın satışıyla azalır. Ürünün bu kanalda birden fazla ilanı varsa (ikinci eşleşme)
+        // yalnız satışın geldiği ilanınki azalır; satır ilana bağlanamıyorsa ilk ayrılmış ilanınki.
+        if (r && r.channel) g.push(db.prepare(`UPDATE listings SET stock_value = COALESCE(stock_value, 0) - ? WHERE channel = ? AND product_id = ? AND stock_mode = 'own'
+          AND (NOT EXISTS (SELECT 1 FROM listings x WHERE x.channel = listings.channel AND x.product_id = listings.product_id AND x.remote_id != listings.remote_id)
+            OR remote_id = COALESCE((SELECT x.remote_id FROM listings x JOIN order_items i ON i.remote_key = x.remote_id WHERE i.order_id = ? AND i.product_id = ? AND x.channel = listings.channel AND x.product_id = listings.product_id LIMIT 1),
+              (SELECT MIN(x.remote_id) FROM listings x WHERE x.channel = listings.channel AND x.product_id = listings.product_id AND x.stock_mode = 'own')))
+          AND ${cond}`).bind(delta, r.channel, pid, oid, pid, ...ca));
       }
       g.push(db.prepare(`INSERT INTO order_stock (order_id, product_id, qty) VALUES (?, ?, ?) ON CONFLICT (order_id, product_id) DO UPDATE SET qty = excluded.qty WHERE order_stock.qty = ?`).bind(oid, pid, w, h == null ? -1 : h));
       groups.push(g);

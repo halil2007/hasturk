@@ -210,7 +210,7 @@ export async function settingsView(el) {
       if (act === 'doc') { const s2 = sheet({ title: 'Stok API — kullanım kılavuzu', size: 'wide', body: html`<pre class="err-stack" style="max-height:none;font-size:12.5px">${apiGuide(store)}</pre>` }); return s2; }
       if (act === 'new') {
         const s2 = sheet({ title: 'Yeni stok API anahtarı', size: 'narrow', body: html`<div class="stack">
-          <label class="field"><span>Ad (kimin için?)</span><input class="input" data-kn placeholder="ör. Bayi — Yeşil Bahçe"></label>
+          <label class="field"><span>Ad (kimin için?)</span><input class="input" data-kn placeholder="ör. Bayi — Örnek Mağaza"></label>
           <label class="field"><span>İzin verilen IP adresleri (isteğe bağlı)</span><textarea class="input" rows="2" data-ki placeholder="Boş: her yerden · ör. 85.105.10.25, 85.105.10.0/24"></textarea></label></div>`,
           foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-ok>Oluştur</button>` });
         $('[data-ok]', s2.el).onclick = (ev) => busy(ev.currentTarget, async () => {

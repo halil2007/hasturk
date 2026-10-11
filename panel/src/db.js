@@ -326,6 +326,13 @@ export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS product_channel (product_id INTEGER NOT NULL, channel TEXT NOT NULL, state TEXT NOT NULL, ref TEXT, error TEXT, upload_id INTEGER,
     updated_at INTEGER, PRIMARY KEY (product_id, channel))`,
   'CREATE INDEX IF NOT EXISTS product_channel_upload ON product_channel(upload_id)',
+  // İkinci eşleşme: aynı kanaldaki ikinci (üçüncü …) ilan kullanıcı onayıyla aynı ürüne bağlandı. Onarım (repairDuplicates)
+  // ve otomatik eşleştirme bu bağı bozmaz. Eski "aynı ürün, bağla" (match = 'dup_ok') bağları da işaretlenir.
+  'ALTER TABLE listings ADD COLUMN extra_link INTEGER NOT NULL DEFAULT 0',
+  "UPDATE listings SET extra_link = 1 WHERE match = 'dup_ok' AND product_id IS NOT NULL",
+  // "Hayır, farklı ürün" denen ikinci eşleşme önerileri (ilan + ürün): bir daha önerilmez
+  `CREATE TABLE IF NOT EXISTS listing_twin_no (channel TEXT NOT NULL, remote_id TEXT NOT NULL, product_id INTEGER NOT NULL, at INTEGER, user TEXT,
+    PRIMARY KEY (channel, remote_id, product_id))`,
 ];
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır

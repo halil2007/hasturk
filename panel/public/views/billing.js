@@ -83,7 +83,7 @@ function buy(d, { title, amount, what, path, body }) {
         <label class="field"><span>TC kimlik no *</span><input class="input" name="tckn" value="${inv.tckn || ''}" inputmode="numeric" maxlength="11"></label>
       </div>
       <div class="form-grid" data-for="kurumsal">
-        <label class="field" style="grid-column:1/-1"><span>Firma unvanı *</span><input class="input" name="company" value="${inv.company || ''}" placeholder="ör. Yeşil Bahçe Tarım Ltd. Şti."></label>
+        <label class="field" style="grid-column:1/-1"><span>Firma unvanı *</span><input class="input" name="company" value="${inv.company || ''}" placeholder="ör. Örnek Ticaret Ltd. Şti."></label>
         <label class="field"><span>Vergi dairesi *</span><input class="input" name="taxOffice" value="${inv.taxOffice || ''}"></label>
         <label class="field"><span>Vergi no *</span><input class="input" name="taxNo" value="${inv.taxNo || ''}" inputmode="numeric" maxlength="11"><small>10 hane (şahıs şirketinde TC kimlik no)</small></label>
         <label class="field"><span>Yetkili ad soyad *</span><input class="input" name="contact" value="${inv.contact || ''}"></label>

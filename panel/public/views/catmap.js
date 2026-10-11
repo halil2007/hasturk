@@ -57,7 +57,7 @@ export async function catmapView(el) {
         ${x.state === 'mapped' ? html`<div><span class="muted small">Eşleşen</span><div><i class="ico ico-check" style="color:var(--good)"></i> <b>${x.name}</b></div></div>`
           : x.state === 'suggested' ? html`<div class="notice"><div><span class="pill ${x.sure ? 'good' : 'amber'}">${x.sure ? 'kesin' : 'öneri'}</span> <b>${x.name}</b><div class="tiny muted">${x.path || ''}</div>
             <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm primary" data-x="ok">Onayla</button><button class="btn sm ghost" data-x="rej">Uygun değil</button></div></div></div>` : ''}
-        <label class="field"><span>${x.state === 'mapped' ? 'Değiştir' : 'Kategori ara'}</span><input class="input" data-cq placeholder="ör. gübre, toprak"><div data-res class="stack" style="gap:4px;margin-top:4px"></div></label>
+        <label class="field"><span>${x.state === 'mapped' ? 'Değiştir' : 'Kategori ara'}</span><input class="input" data-cq placeholder="ör. elbise, kılıf"><div data-res class="stack" style="gap:4px;margin-top:4px"></div></label>
         ${x.state === 'mapped' && c.kind === 'market' ? html`<div data-attrs><div class="muted small"><i class="ico ico-sync spin"></i> Zorunlu özellikler…</div></div>` : ''}
         ${x.state === 'mapped' ? html`<button class="btn sm ghost danger" data-x="unmap" style="align-self:flex-start">Eşleşmeyi kaldır</button>` : ''}
       </div>`);

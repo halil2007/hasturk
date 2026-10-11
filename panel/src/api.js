@@ -22,6 +22,7 @@ import { publishApi } from './publish.js';
 import { catmapApi } from './catmap.js';
 import * as customers from './customers.js';
 import * as chp from './chproducts.js';
+import * as second from './second.js';
 import { listUsers, saveUser, changeOwnPassword, revokeSessions, deleteUser, userActivity, twofaApi, resetTfa, security, setSecurity, forgetNets } from './auth.js';
 import { stats, summary, dashboard, insights } from './stats.js';
 import { costRaw, COST_KEYS } from '../public/profit.js';
@@ -834,8 +835,8 @@ async function listProducts(db, q) {
   const total = totalRow.n, groups = groupRow ? groupRow.n : null;
   if (rows.length) {
     const ids = rows.map((r) => r.id);
-    const [ls, soldRows] = await Promise.all([allIn(db, ids, (ph, part) => [`SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.image, ${DESIRED} AS desired
-      FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ph})`, part]),
+    const [ls, soldRows] = await Promise.all([allIn(db, ids, (ph, part) => [`SELECT l.product_id, l.channel, l.remote_id, l.price, l.commission, l.pushed_stock, l.remote_stock, l.error, l.stock_mode, l.stock_value, l.match, l.extra_link, l.image, ${DESIRED} AS desired
+      FROM listings l JOIN products p ON p.id = l.product_id WHERE l.product_id IN (${ph}) ORDER BY l.extra_link, l.remote_id`, part]),
     // Satış hızı: son 30 günde satılan adet ve mevcut stokla kaç gün yeteceği
     allIn(db, ids, (ph, part) => [`SELECT i.product_id AS id, SUM(i.quantity) AS n FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.product_id IN (${ph}) AND o.ordered_at >= ?
       AND o.status NOT IN ('cancelled', 'returned') AND COALESCE(i.status, '') != 'cancelled' GROUP BY i.product_id`, [...part, Date.now() - 30 * 864e5]])]);
@@ -969,7 +970,7 @@ async function productDetail(db, id) {
   const p = await first(db, 'SELECT * FROM products WHERE id = ?', id);
   if (!p) fail(404, 'Ürün bulunamadı');
   p.listings = await all(db, `SELECT l.*, ${DESIRED} AS desired, r.min_price AS rule_min, r.max_price AS rule_max FROM listings l JOIN products p ON p.id = l.product_id
-    LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.product_id = ?`, id);
+    LEFT JOIN price_rules r ON r.channel = l.channel AND r.remote_id = l.remote_id AND r.enabled = 1 WHERE l.product_id = ? ORDER BY l.channel, l.extra_link, l.remote_id`, id);
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
   // Aynı ana ürünün varyantları (tek ekrandan düzenleme için)
   const gk = p.parent_key || p.group_name;
@@ -1233,7 +1234,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     const [rows, counts] = await Promise.all([
       suggestions(db, { channel: q.channel, q: q.q, limit: Math.min(Number(q.limit) || 60, 200) }),
       all(db, `SELECT channel, SUM(product_id IS NULL AND ignored = 0) AS pending, SUM(product_id IS NULL AND ignored = 1) AS ignored,
-        SUM(match IN ('barcode', 'sku', 'name', 'group', 'approved')) AS auto, SUM(match = 'new') AS created, SUM(match = 'manual') AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
+        SUM(match IN ('barcode', 'sku', 'name', 'group', 'approved')) AS auto, SUM(match = 'new') AS created, SUM(match IN ('manual', 'extra', 'dup_ok')) AS manual, COUNT(*) AS total FROM listings GROUP BY channel`),
     ]);
     return json({ listings: rows, counts });
   }
@@ -1259,18 +1260,15 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json({ ok: true });
   }
   if (path === 'match/unlink' && m === 'POST') {
-    const b = await body(req);
-    // Kaldırılan eşleşme hatırlanır ("x:<ürün>"): otomatik eşleştirme bu ilanı aynı ürüne tekrar bağlamaz
-    const l = await first(db, 'SELECT product_id, name FROM listings WHERE channel = ? AND remote_id = ?', b.channel, String(b.remote_id));
-    await run(db, 'UPDATE listings SET product_id = NULL, match = ? WHERE channel = ? AND remote_id = ?', l && l.product_id ? 'x:' + l.product_id : null, b.channel, String(b.remote_id));
-    // Bu ilanın siparişleriyle yanlış üründen düşülen stok geri eklenir
-    await run(db, 'UPDATE orders SET stock_dirty = 1 WHERE id IN (SELECT order_id FROM order_items WHERE remote_key = ? AND order_id LIKE ? AND product_id IS NOT NULL)', String(b.remote_id), b.channel + ':%');
-    await run(db, 'UPDATE order_items SET product_id = NULL WHERE remote_key = ? AND order_id LIKE ?', String(b.remote_id), b.channel + ':%');
+    // Kaldırılan eşleşme hatırlanır ("x:<ürün>"): otomatik eşleştirme bu ilanı aynı ürüne tekrar bağlamaz.
+    // Bu ilanın siparişleriyle yanlış üründen düşülen stok geri eklenir.
+    await second.unlinkListing(db, await body(req), user);
     await applyDirtyStock(db);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
-    await log(db, b.channel, 'info', `${user.name}: ${l ? l.name : b.remote_id} eşleşmesi kaldırıldı`);
     return json({ ok: true });
   }
+  // İkinci eşleşme önerileri: aynı ürünün aynı kanaldaki başka ilanı olabilir (görmek Eşleştirme yetkisiyle; bağlamak Ürünler yazma yetkisiyle)
+  if (path === 'match/second' && m === 'GET') return json(await second.secondSuggestions(db, { channel: q.channel, q: q.q, limit: Math.min(Number(q.limit) || 50, 200), page: Number(q.page) || 1 }));
   // Kanala özel stok kuralı: shared | limit (en fazla N) | own (bu kanala ayrılmış N adet)
   if (path === 'listings/stock' && m === 'POST') {
     const b = await body(req);
@@ -1833,7 +1831,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     if (!ids.length) fail(400, 'Ürün seçin');
     const [prods, ls] = await Promise.all([
       allIn(db, ids, (ph, part) => [`SELECT id, name, group_name, variant_name, sku, barcode, brand, image, purchase_price, sale_price, stock, critical_stock, vat, desi, active, currency, fx_price FROM products WHERE id IN (${ph}) ORDER BY variant_name COLLATE NOCASE, name COLLATE NOCASE`, part]),
-      allIn(db, ids, (ph, part) => [`SELECT product_id, channel, remote_id, price, commission, error FROM listings WHERE product_id IN (${ph})`, part]),
+      allIn(db, ids, (ph, part) => [`SELECT product_id, channel, remote_id, price, commission, error, extra_link FROM listings WHERE product_id IN (${ph}) ORDER BY extra_link, remote_id`, part]),
     ]);
     prods.sort((a, b) => String(a.variant_name || '').localeCompare(String(b.variant_name || ''), 'tr') || String(a.name).localeCompare(String(b.name), 'tr'));
     const st = await getSettings(db), cats = catalogOf(st);
@@ -1885,6 +1883,20 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   }
   // Ürün fotoğrafı yükleme (bilgisayardan / telefondan; tarayıcıda küçültülmüş JPEG). Herkese açık adresi döner (bkz. prodimg.js)
   if (path === 'products/images' && m === 'POST') return json(await uploadImage(req, env, db, await body(req)));
+  // İkinci eşleşme (aynı kanaldan ek ilan): onayla / farklı ürün / elle bağla / ayır / ilan ara. Ürünler yazma yetkisi gerekir (bkz. perms.js)
+  if (path === 'products/second-match/listings' && m === 'GET') return json(await second.searchListings(db, q));
+  if (path === 'products/second-match/approve' && m === 'POST') {
+    const r = await second.linkExtra(db, await body(req), user);
+    if (r.linked) { await applyDirtyStock(db); ctx.waitUntil(pushStocks(env, db).catch(() => {})); }
+    return json(r);
+  }
+  if (path === 'products/second-match/reject' && m === 'POST') return json(await second.rejectExtra(db, await body(req), user));
+  if (path === 'products/second-match/unlink' && m === 'POST') {
+    await second.unlinkListing(db, await body(req), user);
+    await applyDirtyStock(db);
+    ctx.waitUntil(pushStocks(env, db).catch(() => {}));
+    return json({ ok: true });
+  }
   if (path === 'products' && m === 'POST') return json(await saveProduct(env, db, ctx, 0, await body(req), user));
   if ((x = path.match(/^products\/(\d+)$/))) {
     const id = Number(x[1]);
@@ -1933,7 +1945,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
         dup ? null : l.sku || null, l.barcode || null, l.name || l.sku || l.remote_id, l.group_name || null, l.variant_name || null, l.image || '', l.price || 0, Math.max(0, l.remote_stock || 0), t, t);
       pid = r.id;
     }
-    await run(db, 'UPDATE listings SET product_id = ?, match = ?, ignored = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?', pid, pid ? (b.create ? 'new' : 'manual') : null, b.channel, String(b.remote_id));
+    await run(db, 'UPDATE listings SET product_id = ?, match = ?, ignored = 0, extra_link = 0, pushed_stock = remote_stock WHERE channel = ? AND remote_id = ?', pid, pid ? (b.create ? 'new' : 'manual') : null, b.channel, String(b.remote_id));
     if (pid) { await relinkItems(db); await applyDirtyStock(db); await fillProductInfo(db).catch(() => {}); }
     await log(db, b.channel, 'info', `${user.name}: ${b.remote_id} ${pid ? (b.create ? 'yeni ürün olarak eklendi' : 'ürüne bağlandı') : 'bağlantısı kaldırıldı'}`);
     ctx.waitUntil(pushStocks(env, db).catch(() => {}));
@@ -1983,7 +1995,7 @@ export async function deleteProducts(db, ids) {
     if (!rows.length) continue;
     const id = rows.map((r) => r.id), qq = id.map(() => '?').join(',');
     await db.batch([
-      db.prepare(`UPDATE listings SET product_id = NULL, ignored = 1, match = 'deleted' WHERE product_id IN (${qq})`).bind(...id),
+      db.prepare(`UPDATE listings SET product_id = NULL, ignored = 1, extra_link = 0, match = 'deleted' WHERE product_id IN (${qq})`).bind(...id),
       db.prepare(`UPDATE order_items SET product_id = NULL WHERE product_id IN (${qq})`).bind(...id),
       db.prepare(`DELETE FROM order_stock WHERE product_id IN (${qq})`).bind(...id),
       db.prepare(`DELETE FROM stock_moves WHERE product_id IN (${qq})`).bind(...id),

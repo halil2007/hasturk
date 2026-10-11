@@ -75,7 +75,7 @@ export async function uploadView(el) {
     const valOf = (a) => (cur && cur.remote_id === (cat && cat.id) && cur.attrs[a.id]) || (a.kind === 'variant' ? { value: '@variant' } : isImg(a) ? { value: '@image' } : null);
     function body() {
       s.setBody(html`<div class="stack">
-        <label class="field"><span>${c.name} kategorisi</span><input class="input" data-cq placeholder="Ara: gübre, toprak, pompa…" value="${cat ? cat.name : ''}"><div data-clist class="stack" style="gap:4px;margin-top:4px"></div></label>
+        <label class="field"><span>${c.name} kategorisi</span><input class="input" data-cq placeholder="Ara: elbise, kılıf, şampuan…" value="${cat ? cat.name : ''}"><div data-clist class="stack" style="gap:4px;margin-top:4px"></div></label>
         ${!cat ? html`<div data-sug><div class="muted small">Önerilen kategoriler aranıyor…</div></div>` : ''}
         ${cat ? html`<div class="small">Seçili: <b>${cat.name}</b> <span class="muted">(${cat.id})</span></div>` : ''}
         <div data-attrs>${cat ? html`<div class="muted small">Özellikler yükleniyor…</div>` : html`<div class="muted small">Önce kategori seçin.</div>`}</div>
