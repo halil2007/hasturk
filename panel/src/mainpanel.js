@@ -134,7 +134,11 @@ const CHUNK = { product_images: 20 };
 const STEP_MS = 20e3;
 export async function migrateStep(ctx, env, local, now = Date.now) {
   const st = (await ctx.storage.get('mig')) || { ti: 0, after: 0, rows: 0, started: now() };
-  if (st.done) return st;
+  // Bitti ama ana veritabanına "taşındı" işareti yazılamadıysa yeniden denenir (yoksa çalışan eski kopyadan okumaya devam eder)
+  if (st.done) {
+    if (!st.flagged) { await markMigrated(env, st); await ctx.storage.put('mig', st); await edgeDrop(MAIN_FLAG, env.DB).catch(() => {}); }
+    return st;
+  }
   const remote = meter(env.DB), sql = ctx.storage.sql, t0 = now();
   if (!st.ti && !st.after) await init(local);
   const tables = LOCAL_TABLES;
@@ -164,14 +168,20 @@ export async function migrateStep(ctx, env, local, now = Date.now) {
   if (st.ti >= tables.length) {
     st.done = true; st.at = now();
     await ctx.storage.put('mig', st);
-    await env.DB.prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v').bind(MAIN_FLAG, JSON.stringify({ at: st.at, rows: st.rows, hint: hintOf(env), skipped: st.skipped || [] })).run();
+    await markMigrated(env, st);
+    await ctx.storage.put('mig', st);
     if (st.skipped && st.skipped.length) {
       const { recordError } = await import('./errors.js');
       await recordError(env.DB, { slug: '', firm: '', source: 'server', message: `Ana panel taşıma: ${st.skipped.length} tablonun bir kısmı kopyalanamadı`, action: 'taşıma', detail: { skipped: st.skipped } }).catch(() => {});
     }
     await edgeDrop(MAIN_FLAG, env.DB).catch(() => {});
+    return { ...st, justDone: true };
   }
   return st;
+}
+async function markMigrated(env, st) {
+  await env.DB.prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v').bind(MAIN_FLAG, JSON.stringify({ at: st.at, rows: st.rows, hint: hintOf(env), skipped: st.skipped || [] })).run();
+  st.flagged = true;
 }
 const pct = (st) => (st.done ? 100 : Math.min(99, Math.round(((st.ti || 0) / Math.max(1, LOCAL_TABLES.length)) * 100)));
 
@@ -200,6 +210,7 @@ export class MainPanel {
     if (this.ok) return true;
     const st = await this.ctx.storage.get('mig');
     if (st && st.done) {
+      if (!st.flagged && !(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now()); // işaret yeniden yazılsın
       await backCopy(this.ctx, this.db.remote).catch((e) => console.error('bildirimler ana veritabanına kopyalanamadı', e));
       this.ok = true; this.fresh(); return true;
     }
@@ -213,7 +224,10 @@ export class MainPanel {
     const st = await migrateStep(this.ctx, this.env, this.local).catch((e) => { console.error('ana panel taşıma hatası', e); return null; });
     if (!st) return void (await this.ctx.storage.setAlarm(Date.now() + 30e3));
     if (!st.done) await this.ctx.storage.setAlarm(Date.now() + 50);
-    else { await this.ctx.storage.put('g:notices', Date.now()); this.ok = true; this.fresh(); console.log('ana panel taşındı', JSON.stringify(st)); }
+    else {
+      // Taşıma şimdi bittiyse yerel bildirimler ana veritabanındakinin kopyası: geri kopyalama gerekmez
+      if (st.justDone) await this.ctx.storage.put('g:notices', Date.now());
+      this.ok = true; this.fresh(); console.log('ana panel taşındı', JSON.stringify(st)); }
   }
   async fetch(req) {
     const url = new URL(req.url), env = { ...this.env, DB: this.db };

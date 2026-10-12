@@ -137,7 +137,13 @@ async function start(env, db, order, origin) {
   const itemName = order.kind === 'stores' ? `Hastürk CRM ${order.qty} ek mağaza (${order.period} gün)` : order.kind === 'charge' ? `Hastürk CRM ${order.plan || 'abonelik'} ödemesi${Number(order.period) ? ` (${order.period} ay)` : ''}`
     : up ? `Hastürk CRM ${PLANS[up.from].name} → ${PLANS[order.plan].name} paket yükseltme (${up.days} gün)` : '';
   // Taksit kısıtlanmaz: bankanın sunduğu tüm taksit seçenekleri ödeme sayfasında görünür (bkz. plans.js → INSTALLMENTS)
-  const r = await initCheckout(env, { ...order, buyer: JSON.parse(order.buyer), name, ...(itemName ? { itemName } : {}) }, callback);
+  let r;
+  try { r = await initCheckout(env, { ...order, buyer: JSON.parse(order.buyer), name, ...(itemName ? { itemName } : {}) }, callback); } catch (e) {
+    // Ödeme sayfası açılamadı: sipariş "başarısız" (sahipsiz bekleyen kayıt kalmaz), kullanıcıya anlaşılır mesaj (502)
+    const why = /fetch failed|bağlantı hatası|zaman aşımı|network/i.test(String(e.message)) ? 'ödeme sistemine şu an ulaşılamıyor' : String(e.message || 'bilinmeyen hata').slice(0, 200);
+    await run(db, "UPDATE sales_orders SET status = 'failed', error = ?, updated_at = ? WHERE id = ? AND status = 'pending'", why, Date.now(), order.id).catch(() => {});
+    throw new HttpError(502, `Ödeme başlatılamadı: ${why}. Biraz sonra tekrar deneyin.`);
+  }
   await run(db, 'UPDATE sales_orders SET token = ?, updated_at = ? WHERE id = ?', r.token, Date.now(), order.id);
   return { ok: true, url: r.url, order: order.id };
 }
@@ -491,7 +497,7 @@ export async function payLink(req, env) {
   try {
     const r = await start(env, env.DB, { ...o, status: 'pending' }, new URL(req.url).origin);
     return new Response(null, { status: 303, headers: { Location: r.url, 'Cache-Control': 'no-store' } });
-  } catch (e) { return resultPage('Ödeme başlatılamadı', `${esc(e.message)}. Biraz sonra tekrar deneyin.`, { status: 502 }); }
+  } catch (e) { return resultPage('Ödeme başlatılamadı', esc(e instanceof HttpError ? e.message : `${e.message}. Biraz sonra tekrar deneyin.`), { status: 502 }); }
 }
 async function completeCharge(env, order, { method, note }) {
   const buyer = JSON.parse(order.buyer || '{}'), months = Number(order.period) || 0;
