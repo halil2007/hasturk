@@ -481,7 +481,9 @@ details.adv summary::-webkit-details-marker { display: none; }
   body { background: #fff; display: block; }
   .side, .main, #sheet-root, #toast, .tabbar { display: none !important; }
   #print { display: block; }
+  html, body { margin: 0 !important; padding: 0 !important; }
 }
+.slabel:last-child { page-break-after: auto; }
 /* Kendi kargo etiketimiz: barkod alanı geniş ve beyaz kenarlı (okunabilirlik); boyut s-100x150 | s-a5 | s-a4 */
 .slabel { width: 100mm; height: 150mm; padding: 4.5mm; box-sizing: border-box; color: #000; background: #fff; font: 10pt/1.3 Arial, Helvetica, sans-serif; display: flex; flex-direction: column; gap: 2mm; page-break-after: always; overflow: hidden; }
 .slabel.s-a5 { width: 148mm; height: 210mm; padding: 8mm; font-size: 10.5pt; gap: 3mm; }
@@ -525,6 +527,13 @@ details.adv summary::-webkit-details-marker { display: none; }
 .slabel.s-a5 .lb-to, .slabel.s-a4 .lb-to { border-left: 0; padding-left: 0; border-top: 0.3mm solid #000; padding-top: 2mm; }
 .slabel.s-a5 .lb-bar svg, .slabel.s-a4 .lb-bar svg { height: 26mm; }
 .slabel.s-a5 .lb-items, .slabel.s-a4 .lb-items { flex: 0 0 auto; font-size: 10pt; }
+/* A5 / A4: etiket sayfanın üst bölümünde, ortalı ve içeriği kadar yer kaplar (ikinci sayfaya taşmaz, alt kısım boş kalmaz);
+   gönderen adresi "Gönderen" satırında, sayfa altındaki gönderen satırı yok */
+.slabel.s-a5, .slabel.s-a4 { height: auto; width: 100%; margin: 0 auto; page-break-inside: avoid; break-inside: avoid; }
+.slabel.s-a5 { max-width: 148mm; } .slabel.s-a4 { max-width: 210mm; }
+.slabel.s-a5 .lb-from, .slabel.s-a4 .lb-from { display: none; }
+.slabel .lb-sadr { display: none; }
+.slabel.s-a5 .lb-sadr, .slabel.s-a4 .lb-sadr { display: block; }
 
 /* ---------- 3. aşama: logo, gruplu menü, hızlı işler, çekmece ---------- */
 .brand-card { display: block; background: #fff; border-radius: 12px; padding: 10px 12px; margin: 0 2px 6px; }
