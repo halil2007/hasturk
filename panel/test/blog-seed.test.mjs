@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { d1 } from '../dev/d1.mjs';
 import { init, first, all, run } from '../src/db.js';
-import { blogSeed } from '../src/blogseed.js';
+import { blogSeed, REV } from '../src/blogseed.js';
 
 const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 const posts = [
@@ -134,9 +134,9 @@ test('düzeltme: kapak 14 gün içinde yenilenemezse vazgeçilir', async () => {
   await blogSeed(env, db, { posts: [{ slug: 'k', title: 'K yazısı', body: 'eski', cover: 'k.jpg' }], fetcher });
   const posts = [{ slug: 'k', title: 'K yazısı', body: 'yeni', cover: 'k.jpg' }], revisions = { k: { from: [await sha('eski')], cover: true } };
   assert.deepEqual((await blogSeed(env, db, { posts, fetcher, revisions, now: 0 })).revised, ['k']);
-  assert.deepEqual(JSON.parse((await first(db, "SELECT v FROM settings WHERE k = 'once:blog_rev_1'")).v).covers, ['k']);
+  assert.deepEqual(JSON.parse((await first(db, "SELECT v FROM settings WHERE k = ?", REV)).v).covers, ['k']);
   await blogSeed(env, db, { posts, fetcher: async () => new Response('', { status: 500 }), revisions, now: 15 * 864e5 });
-  assert.deepEqual(JSON.parse((await first(db, "SELECT v FROM settings WHERE k = 'once:blog_rev_1'")).v).covers, []);
+  assert.deepEqual(JSON.parse((await first(db, "SELECT v FROM settings WHERE k = ?", REV)).v).covers, []);
 });
 
 test('gerçek düzeltme listesi: eski gövdelerin özetleri güncel gövdeyle aynı değil, her yazı kaynakta var', async () => {

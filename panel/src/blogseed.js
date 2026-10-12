@@ -24,8 +24,11 @@ export const REVISIONS = {
   'pazaryeri-satis-fiyati-nasil-belirlenir': { cover: true, from: ['602080eadbb9de2bcf8b153c121f18093b6f21c6dcd421c5f1927effae1a8ce0'] },
   'trendyol-buybox-nedir-nasil-kazanilir': { from: ['82469bb500c9a3855e0e6f7d3921d13c4854ec3f0301d4deb8bba85c6a4be9a4'] },
   'pazaryeri-hakedis-nedir-ne-zaman-yatar': { cover: true, from: ['9f0f2b7253b0bb4e7b2eb3ffcf1820da01daefa679bfd26b9c8157a79adb9d53'] },
+  // 2: Amazon komisyon oranı da KDV dahildir (üzerine KDV eklenmez); kontrol listesindeki fatura maddesi sadeleşti
+  'amazon-turkiye-satici-olma-rehberi': { from: ['a8068c8cd5052bdafc7b16a09ad9cb0016cb69abb3e1f1644f63f57c7258c135'] },
 };
-const REV = 'once:blog_rev_1';
+// Yeni düzeltme eklenince sürüm artar: düzeltmeler yeniden taranır (önceki düzeltmeler gövde değiştiği için atlanır)
+export const REV = 'once:blog_rev_2';
 const FIELDS = ['title', 'summary', 'seo_title', 'seo_desc'];
 const sha256 = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((x) => x.toString(16).padStart(2, '0')).join('');
 
