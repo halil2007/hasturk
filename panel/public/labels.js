@@ -1,6 +1,6 @@
 // Kargo etiketi: 100×150 mm termal/ofis yazıcısı için yazdırılabilir etiket + Code 128 barkod.
 // Pazaryerinin resmi etiketi (ZPL/PDF) varsa ayrıca indirilebilir; panel etiketi her kanalda çalışır.
-import { esc, ch, money, state } from './core.js';
+import { esc, ch, money, state, sheet, html } from './core.js';
 
 // Code 128 desen tablosu (çubuk/boşluk genişlikleri), 0–102 veri, 103–105 başlangıç A/B/C, 106 bitiş
 const P = '212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112'.split(' ');
@@ -65,52 +65,62 @@ export const LABEL_SIZES = { '100x150': ['100mm', '150mm'], a5: ['148mm', '210mm
 const labelSize = () => (LABEL_SIZES[state.settings && state.settings.label_size] ? state.settings.label_size : '100x150');
 const fmtMoney = (v) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Number(v) || 0);
 
-// Etiket HTML'i (bir paket). Düzen: logolar → kargo firması ve anlaşma → gerçek kargo barkodu → sipariş / alıcı bilgileri → ürünler.
-export function labelHtml(order, pkg, total, sender = {}) {
+// Etiket verisi (bir paket): HTML etiket ve PDF etiket (labelpdf.js) aynı bilgiyi kullanır.
+// Çok paketli siparişte her paket kendi takip numarasını kullanır (siparişin numarası başka pakete ait olabilir);
+// kanalın kargo barkodu (ikas Kargo barkodu / HB barkodu) önceliklidir, yoksa takip numarası
+export function labelData(order, pkg, total, sender = {}) {
   const a = order.address || {};
-  // Çok paketli siparişte her paket kendi takip numarasını kullanır (siparişin numarası başka pakete ait olabilir)
-  // Kanalın kargo barkodu (ikas Kargo barkodu / HB barkodu) önceliklidir; yoksa takip numarası
   const tn = pkg.barcode || pkg.tracking || (total <= 1 ? order.tracking : '');
   const code = tn || `${order.order_number}-${pkg.no || 1}`;
   const internal = !tn;
-  const track = pkg.tracking && pkg.tracking !== code ? pkg.tracking : '';
   const rows = (pkg.items || []).map((x) => {
     const it = order.items.find((i) => String(i.line_id) === String(x.line_id)) || {};
-    const name = it.product_variant && it.product_group ? it.product_group : it.product_name || it.name || x.line_id;
     const unit = Number(it.quantity) ? (Number(it.total) || 0) / Number(it.quantity) : 0;
-    return `<tr><td class="q">${esc(x.qty)}×</td><td><div class="n">${esc(name)}</div>${it.product_variant ? `<span class="v">${esc(it.product_variant)}</span>` : ''}${it.sku ? `<span class="s">${esc(it.sku)}</span>` : ''}</td><td class="p">${unit ? esc(fmtMoney(unit * x.qty)) : ''}</td></tr>`;
-  }).join('');
-  const qty = (pkg.items || []).reduce((n, x) => n + (Number(x.qty) || 0), 0);
+    return { qty: x.qty, name: String(it.product_variant && it.product_group ? it.product_group : it.product_name || it.name || x.line_id), variant: it.product_variant || '', sku: it.sku || '',
+      price: unit ? fmtMoney(unit * (Number(x.qty) || 0)) : '' };
+  });
   const c = ch(order.channel), type = c.type || order.channel;
   const agr = internal ? null : agreementOf(order, pkg);
-  const cargo = pkg.cargo_company || order.cargo_company || '';
-  // Firma logosunu yüklediyse etikette onun logosu, yoksa Hastürk logosu (panel ekranlarındaki logo değişmez)
-  const logo = (state.settings && state.settings.logo) || 'logo.webp';
-  const size = labelSize();
+  return {
+    code, internal, track: pkg.tracking && pkg.tracking !== code ? pkg.tracking : '', rows, qty: (pkg.items || []).reduce((n, x) => n + (Number(x.qty) || 0), 0),
+    type, mark: MARK[type] || c.name, platform: c.name, agreement: agr ? AGREEMENT[agr] || '' : '', cargo: pkg.cargo_company || order.cargo_company || '',
+    pkgText: `${pkg.no || 1}/${total}`, orderNo: order.order_number, date: new Date(order.ordered_at).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' }),
+    // Firma logosunu yüklediyse etikette onun logosu, yoksa Hastürk logosu (panel ekranlarındaki logo değişmez)
+    logo: (state.settings && state.settings.logo) || 'logo.webp',
+    sender: { name: sender.name || '', phone: sender.phone || '', address: [sender.address, sender.city].filter(Boolean).join(' ') },
+    to: { name: a.name || order.customer || '', phone: a.phone || order.phone || '', line: a.line || '', city: [a.district, a.city].filter(Boolean).join(' / ') },
+  };
+}
+export const INTERNAL_WARN = 'İç barkod — kargo takip numarası yok, kargo firması bu barkodu okutmaz';
+
+// Etiket HTML'i (bir paket). Düzen: logolar → kargo firması ve anlaşma → gerçek kargo barkodu → sipariş / alıcı bilgileri → ürünler.
+export function labelHtml(order, pkg, total, sender = {}) {
+  const d = labelData(order, pkg, total, sender), size = labelSize();
+  const rows = d.rows.map((r) => `<tr><td class="q">${esc(r.qty)}×</td><td><div class="n">${esc(r.name)}</div>${r.variant ? `<span class="v">${esc(r.variant)}</span>` : ''}${r.sku ? `<span class="s">${esc(r.sku)}</span>` : ''}</td><td class="p">${esc(r.price)}</td></tr>`).join('');
   return `<section class="slabel s-${size}">
-    <header class="lb-hd"><img class="lb-logo" src="${esc(logo)}" alt=""><span class="lb-mark ${esc(type)}">${esc(MARK[type] || c.name)}</span></header>
-    <div class="lb-cargo"><div><b>${esc(cargo || 'Kargo firması belirtilmedi')}</b>${agr ? `<span class="lb-agr">${esc(AGREEMENT[agr] || '')}</span>` : ''}</div><div class="lb-pkg" title="Paket">${esc(pkg.no || 1)}/${esc(total)}</div></div>
+    <header class="lb-hd"><img class="lb-logo" src="${esc(d.logo)}" alt=""><span class="lb-mark ${esc(d.type)}">${esc(d.mark)}</span></header>
+    <div class="lb-cargo"><div><b>${esc(d.cargo || 'Kargo firması belirtilmedi')}</b>${d.agreement ? `<span class="lb-agr">${esc(d.agreement)}</span>` : ''}</div><div class="lb-pkg" title="Paket">${esc(d.pkgText)}</div></div>
     <div class="lb-main">
-      <div class="lb-bar">${barcodeSvg(code)}<div class="code">${esc(code)}</div>${internal ? '<div class="warn">İç barkod — kargo takip numarası yok, kargo firması bu barkodu okutmaz</div>' : ''}</div>
+      <div class="lb-bar">${barcodeSvg(d.code)}<div class="code">${esc(d.code)}</div>${d.internal ? `<div class="warn">${INTERNAL_WARN}</div>` : ''}</div>
       <div class="lb-info">
         <dl>
-          <dt>Sipariş No</dt><dd><b>${esc(order.order_number)}</b></dd>
-          <dt>Platform</dt><dd>${esc(c.name)}</dd>
-          ${track ? `<dt>Takip No</dt><dd>${esc(track)}</dd>` : ''}
-          <dt>Tarih</dt><dd>${esc(new Date(order.ordered_at).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' }))}</dd>
-          <dt>Gönderen</dt><dd>${esc(sender.name || '')}${sender.phone ? ` · ${esc(sender.phone)}` : ''}${sender.address || sender.city ? `<span class="lb-sadr">${esc([sender.address, sender.city].filter(Boolean).join(' '))}</span>` : ''}</dd>
+          <dt>Sipariş No</dt><dd><b>${esc(d.orderNo)}</b></dd>
+          <dt>Platform</dt><dd>${esc(d.platform)}</dd>
+          ${d.track ? `<dt>Takip No</dt><dd>${esc(d.track)}</dd>` : ''}
+          <dt>Tarih</dt><dd>${esc(d.date)}</dd>
+          <dt>Gönderen</dt><dd>${esc(d.sender.name)}${d.sender.phone ? ` · ${esc(d.sender.phone)}` : ''}</dd>
         </dl>
         <div class="lb-to">
           <div class="lbl">ALICI</div>
-          <div class="nm">${esc(a.name || order.customer)}</div>
-          <div class="ph">${esc(a.phone || order.phone || '')}</div>
-          <div class="ad">${esc(a.line || '')}</div>
-          <div class="ct">${esc([a.district, a.city].filter(Boolean).join(' / '))}</div>
+          <div class="nm">${esc(d.to.name)}</div>
+          <div class="ph">${esc(d.to.phone)}</div>
+          <div class="ad">${esc(d.to.line)}</div>
+          <div class="ct">${esc(d.to.city)}</div>
         </div>
       </div>
     </div>
-    <table class="lb-items"><thead><tr><th colspan="2">Ürünler (${esc(qty)} adet)</th><th class="p">Tutar</th></tr></thead><tbody>${rows}</tbody></table>
-    <footer class="lb-from"><b>GÖNDEREN:</b> ${esc(sender.name || '')} ${esc(sender.phone || '')} · ${esc([sender.address, sender.city].filter(Boolean).join(' '))}</footer>
+    <table class="lb-items"><thead><tr><th colspan="2">Ürünler (${esc(d.qty)} adet)</th><th class="p">Tutar</th></tr></thead><tbody>${rows}</tbody></table>
+    <footer class="lb-from"><b>GÖNDEREN:</b> ${esc(d.sender.name)} ${esc(d.sender.phone)} · ${esc(d.sender.address)}</footer>
   </section>`;
 }
 
@@ -127,11 +137,37 @@ function printHtml(markup, size = labelSize()) {
     Promise.race([Promise.all(imgs), new Promise((ok) => setTimeout(ok, 2000))]).then(() => setTimeout(() => window.print(), 50));
   });
 }
+// iPhone / iPad: Safari yazdırırken sayfa altına adres, tarih ve sayfa numarası ekler (kapatılamaz); bu cihazlarda etiket PDF
+// olarak hazırlanır (bkz. labelpdf.js) ve paylaşım menüsünden yazdırılır. Pencere kapanınca çözülür.
+export const needsPdf = () => typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+async function printPdf(labels, size, images = [], name = 'etiket') {
+  const { labelsPdf } = await import('./labelpdf.js');
+  const blob = await labelsPdf(labels, size, images);
+  const file = new File([blob], `${String(name).replace(/[^\w.-]+/g, '-')}.pdf`, { type: 'application/pdf' });
+  return new Promise((resolve) => {
+    const s = sheet({
+      title: 'Etiket hazır', size: 'narrow', onClose: resolve,
+      body: html`<p style="margin:0">Etiket PDF olarak hazırlandı (${labels.length + images.length} sayfa). “Yazdır”a basın, açılan menüden <b>Yazdır</b>'ı seçin.</p>`,
+      foot: html`<span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-share><i class="ico ico-print"></i> Yazdır</button>`,
+    });
+    s.el.querySelector('[data-share]').onclick = async () => {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file] }); s.close(); } catch { /* vazgeçildi */ }
+      } else { window.open(URL.createObjectURL(blob), '_blank'); s.close(); }
+    };
+  });
+}
 // Panel etiketleri: [{ order, pkg }] (her paket ayrı sayfa)
-export const printLabels = (list, sender) => printHtml(list.map(({ order, pkg }) => labelHtml(order, pkg, order.packages.length || 1, sender)).join(''));
+export const printLabels = (list, sender) => (needsPdf()
+  ? printPdf(list.map(({ order, pkg }) => labelData(order, pkg, order.packages.length || 1, sender)), labelSize(), [], list.length === 1 ? `etiket-${list[0].order.order_number}` : 'etiketler')
+  : printHtml(list.map(({ order, pkg }) => labelHtml(order, pkg, order.packages.length || 1, sender)).join('')));
 // Kanalın verdiği etiket görseli (ikas Kargo PNG/JPG)
 // Görsel verisi yalnız base64 karakterleri ve bilinen biçim olabilir (kanaldan gelen veri HTML'e karışmasın)
-export const printImages = (list) => printHtml(list.filter((x) => /^[A-Za-z0-9+/=\s]+$/.test(String(x.data || ''))).map((x) => `<section class="slabel img s-100x150"><img src="data:image/${({ jpg: 'jpeg', jpeg: 'jpeg', gif: 'gif', webp: 'webp' })[x.format] || 'png'};base64,${String(x.data).replace(/\s+/g, '')}" alt=""></section>`).join(''), '100x150');
+const imgSrc = (x) => `data:image/${({ jpg: 'jpeg', jpeg: 'jpeg', gif: 'gif', webp: 'webp' })[x.format] || 'png'};base64,${String(x.data).replace(/\s+/g, '')}`;
+export const printImages = (list) => {
+  const ok = list.filter((x) => /^[A-Za-z0-9+/=\s]+$/.test(String(x.data || '')));
+  return needsPdf() ? printPdf([], '100x150', ok.map(imgSrc)) : printHtml(ok.map((x) => `<section class="slabel img s-100x150"><img src="${imgSrc(x)}" alt=""></section>`).join(''), '100x150');
+};
 
 export function downloadFile(name, data, type) {
   const blob = type === 'application/pdf' ? new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], { type }) : new Blob([data], { type });
