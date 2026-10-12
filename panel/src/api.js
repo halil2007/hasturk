@@ -307,6 +307,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     return { ok: true, message: r.message };
   }
   if (action === 'split') {
+    if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
     if (o.packages.some((p) => p.carrier_ref && p.status === 'open')) fail(400, 'Kargo entegratöründe gönderisi açılmış paket var; yeniden bölmek için önce paket menüsünden gönderiyi iptal edin');
     const groups = (b.groups || []).map((g) => ({ desi: num(g.desi, 0) || null, items: (g.items || []).map((x) => ({ line_id: String(x.line_id), qty: Math.round(num(x.qty)) })).filter((x) => x.qty > 0) })).filter((g) => g.items.length);
     if (groups.length < 1) fail(400, 'En az bir paket gerekli');
@@ -342,6 +343,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     return { ok: true, message: `${groups.length} paket oluşturuldu` };
   }
   if (action === 'cargo') {
+    if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
     // Kargo firması seç / değiştir (seçenekler kanaldan gelir). İsteğe bağlı: bu kanalda varsayılan yap
     const cargo = b.cargo && { id: str(b.cargo.id), name: str(b.cargo.name) };
     if (!cargo || !cargo.name) fail(400, 'Kargo firması seçin');
@@ -391,7 +393,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (!ch || !ch.enabled || !ch.repack) fail(400, 'Bu kanalda desteklenmiyor');
     if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paket yeniden hazırlanamaz');
     const r = await ch.repack(o, pkg);
-    await run(db, "UPDATE packages SET remote_id = ?, remote_status = ?, barcode = '', tracking = '', cargo_company = ?, cargo_code = NULL, agreement = NULL, packed_at = ?, error = ? WHERE id = ?",
+    await run(db, "UPDATE packages SET remote_id = ?, remote_status = ?, barcode = '', tracking = '', cargo_company = ?, cargo_code = NULL, cargo_applied = NULL, agreement = NULL, packed_at = ?, error = ? WHERE id = ?",
       r.remoteId, r.remoteStatus || '', r.cargoCompany || '', Date.now(), r.error || null, pkg.id);
     await clearLabel(db, pkg.id);
     await event(db, o, 'pack', user, `Paket ${pkg.no}: ikas Kargo ile yeniden hazırlandı`);
@@ -404,12 +406,15 @@ async function orderAction(env, db, id, action, b, ctx, user) {
       if (!ch || !ch.enabled || !ch.cancelPackage) fail(400, `${ch ? ch.name : 'Kanal'} paketi API ile iptal edilemiyor; kanal panelinden yapın`);
       await ch.cancelPackage(o, pkg);
     }
-    await run(db, "UPDATE packages SET remote_id = NULL, remote_status = NULL, packed_at = NULL, barcode = '', tracking = '', error = NULL WHERE id = ?", pkg.id);
+    // Seçilen kargo firması tercih olarak kalır (cargo_code), yeni pakete yeniden uygulanır
+    await run(db, "UPDATE packages SET remote_id = NULL, remote_status = NULL, packed_at = NULL, barcode = '', tracking = '', error = NULL, cargo_applied = NULL WHERE id = ?", pkg.id);
     await clearLabel(db, pkg.id);
     await event(db, o, 'cancel-package', user, `Paket ${pkg.no}`);
     return { ok: true, message: `Paket ${pkg.no} paketlemesi iptal edildi` };
   }
   if (action === 'ship') {
+    // Ekran açıkken kanalda iptal / iade / teslim edilmiş siparişte kargo bildirimi yapılmaz
+    if (!live) fail(400, `Sipariş ${o.status === 'cancelled' ? 'iptal edilmiş' : o.status === 'returned' ? 'iade edilmiş' : 'teslim edilmiş'}; kargoya verilemez`);
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
     if (!pkg) fail(400, 'Gönderilecek açık paket yok');
@@ -505,6 +510,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     return { ok: true };
   }
   if (action === 'label') {
+    if (!live && !o.packages.length) fail(400, 'Bu siparişte işlem yapılamaz'); // kapanmış siparişte yeni paket açılmaz (eski etiket yeniden yazdırılabilir)
     o = await ensurePackages(db, ch, o);
     let pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages[0];
     if (!pkg) fail(404, 'Paket bulunamadı');
@@ -1572,6 +1578,7 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
         let o = await loadOrder(db, id);
         const ch = await channel(env, db, o.channel);
         if (b.fetch && o.status === 'new') { await acceptOrder(db, ch, o, user); o = await loadOrder(db, id); }
+        if (['cancelled', 'returned', 'delivered'].includes(o.status) && !o.packages.some((p) => p.has_label)) throw new Error(`${o.order_number}: iptal / iade / teslim edilmiş sipariş, etiket alınmadı`);
         o = await ensurePackages(db, ch, o);
         const labels = [];
         // Etiket alınırken paketlenmemiş paketler önce kanalda kargoya hazırlanır

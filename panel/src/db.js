@@ -384,6 +384,11 @@ export const MIGRATIONS = [
   // Sistem hızı: istek başına veritabanı sorgu sayısı ve sorguların beklettiği toplam süre (bkz. meter.js)
   'ALTER TABLE perf_stats ADD COLUMN db_n INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE perf_stats ADD COLUMN db_ms INTEGER NOT NULL DEFAULT 0',
+  // Trendyol, Amazon ve Çiçeksepeti komisyon oranı KDV dahildir (üzerine %20 eklenmez): KDV dahil çevriminde %20 eklenmiş varsayılan
+  // oran kayıtlıysa (elle değiştirilmemişse) eski değerine döner
+  "UPDATE settings SET v = json_set(v, '$.trendyol', 20) WHERE k = 'commission' AND json_valid(v) AND json_extract(v, '$.trendyol') = 24",
+  "UPDATE settings SET v = json_set(v, '$.amazon', 15) WHERE k = 'commission' AND json_valid(v) AND json_extract(v, '$.amazon') = 18",
+  "UPDATE settings SET v = json_set(v, '$.ciceksepeti', 20) WHERE k = 'commission' AND json_valid(v) AND json_extract(v, '$.ciceksepeti') = 24",
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
@@ -496,7 +501,7 @@ export const DEFAULT_SETTINGS = {
   fx: { source: 'tcmb', kind: 'sell', mode: 'daily', threshold: 0.5, rounding: 'none', margin: 0 },
   // Müşteri sorularına hazır cevaplar
   answer_templates: ['Merhaba, ilginiz için teşekkür ederiz. ', 'Merhaba, ürünümüz stoklarımızda mevcuttur; siparişiniz aynı gün kargoya verilir. İyi günler dileriz.'],
-  commission: { ikas1: 0, ikas2: 0, trendyol: 24, hepsiburada: 21.6, pttavm: 14.4, n11: 18, idefix: 18, pazarama: 18, amazon: 18, ciceksepeti: 24, koctas: 18, shopify: 0, woocommerce: 0, opencart: 0, etsy: 7.8, teknosa: 18, boyner: 24, pasaj: 14.4, trendyolgo: 18, getir: 24, yemeksepeti: 24, ebay: 15.6, ozon: 18, ticimax: 0, ideasoft: 0, tsoft: 0 },
+  commission: { ikas1: 0, ikas2: 0, trendyol: 20, hepsiburada: 21.6, pttavm: 14.4, n11: 18, idefix: 18, pazarama: 18, amazon: 15, ciceksepeti: 20, koctas: 18, shopify: 0, woocommerce: 0, opencart: 0, etsy: 7.8, teknosa: 18, boyner: 24, pasaj: 14.4, trendyolgo: 18, getir: 24, yemeksepeti: 24, ebay: 15.6, ozon: 18, ticimax: 0, ideasoft: 0, tsoft: 0 },
   shipping: { ikas1: 0, ikas2: 0, trendyol: 0, hepsiburada: 0, pttavm: 0 },
   // Tüm gider tutarları KDV dahil girilir (cepten çıkan tutar); üstüne KDV eklenmez. false: eski kurulum (KDV hariç girilmiş, hesapta %20 eklenir)
   costs_vat_incl: true,
@@ -554,6 +559,7 @@ export const DEFAULT_SETTINGS = {
 // kayıtlı komisyon / kargo / hizmet bedeli / ek kesinti ve ürüne elle girilen komisyon 1,2 ile çarpılır (kâr değişmez); kanaldan
 // gelen ilan komisyonu (önceden KDV'si ayrılarak saklanıyordu) de KDV dahile çevrilir. Aynı anda iki istek çevirmesin diye işaret önce alınır.
 const VAT_ONCE = 'once:vat_incl_1', vatDone = new WeakSet();
+const VAT_INCL_RATE = /^(trendyol(?!go)|amazon|ciceksepeti)\d*$/;
 async function vatInclOnce(db, rows) {
   if (vatDone.has(db)) return false;
   if (rows.some((r) => r.k === VAT_ONCE)) { vatDone.add(db); return false; }
@@ -567,15 +573,18 @@ async function vatInclOnce(db, rows) {
       for (const k of ['commission', 'shipping', 'service_fee', 'fee_rate']) {
         const v = get(k);
         if (!v || typeof v !== 'object') continue;
-        const g = Object.fromEntries(Object.entries(v).map(([c, x]) => [c, x === '' || x == null || !Number.isFinite(Number(x)) ? x : Math.round(Number(x) * 120) / 100]));
+        // Trendyol, Amazon, Çiçeksepeti komisyon oranı zaten KDV dahil (çevrilmez)
+        const g = Object.fromEntries(Object.entries(v).map(([c, x]) => [c, x === '' || x == null || !Number.isFinite(Number(x)) || (k === 'commission' && VAT_INCL_RATE.test(c)) ? x : Math.round(Number(x) * 120) / 100]));
         st.push(db.prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v').bind(k, JSON.stringify(g)));
       }
-      st.push(db.prepare("UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND COALESCE(commission_src, 'manual') != 'api'"));
+      st.push(db.prepare(`UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND COALESCE(commission_src, 'manual') != 'api'
+        AND NOT (channel LIKE 'trendyol%' AND channel NOT LIKE 'trendyolgo%') AND channel NOT LIKE 'amazon%' AND channel NOT LIKE 'ciceksepeti%'`));
     }
     // Trendyol (Go hariç) ilan oranı, Trendyol çevrimi (once:ty_comm_incl_1, init'te) yapıldıysa zaten KDV dahil sipariş satırından
     // yeniden hesaplandı: bu çevrimden önce açılmamış veritabanında üzerine ikinci kez %20 eklenmesin
     st.push(db.prepare(`UPDATE listings SET commission = ROUND(commission * 1.2, 2) WHERE commission IS NOT NULL AND commission_src = 'api'
-      AND NOT (channel LIKE 'trendyol%' AND channel NOT LIKE 'trendyolgo%' AND EXISTS (SELECT 1 FROM settings WHERE k = 'once:ty_comm_incl_1'))`));
+      AND NOT (channel LIKE 'trendyol%' AND channel NOT LIKE 'trendyolgo%' AND EXISTS (SELECT 1 FROM settings WHERE k = 'once:ty_comm_incl_1'))
+      AND channel NOT LIKE 'amazon%' AND channel NOT LIKE 'ciceksepeti%'`));
     st.push(db.prepare("INSERT INTO settings (k, v) VALUES ('costs_vat_incl', 'true') ON CONFLICT (k) DO UPDATE SET v = excluded.v"));
     await db.batch(st);
     return true;

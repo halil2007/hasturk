@@ -113,13 +113,17 @@ export async function http(url, { method = 'GET', headers = {}, body: b, timeout
       if (i < tries) { await sleep(800 * i); continue; }
       throw new Error(`${method} ${shortUrl(url)}: bağlantı hatası (${e.name === 'AbortError' ? 'zaman aşımı' : e.message})`);
     }
-    clearTimeout(t);
-    if ((res.status === 429 || res.status >= 500) && i < tries) { await sleep(1500 * i); continue; }
+    if ((res.status === 429 || res.status >= 500) && i < tries) { clearTimeout(t); res.body?.cancel().catch(() => {}); await sleep(1500 * i); continue; }
     if (raw) {
+      clearTimeout(t);
       if (!res.ok) throw new Error(`${method} ${shortUrl(url)}: HTTP ${res.status} ${htmlReason(await res.text(), res.status).slice(0, 300)}`);
       return res;
     }
-    const text = await res.text();
+    // Süre gövde okunana kadar geçerli: başlığı gönderip gövdede duran sunucu senkronu (ve kilidi) asılı bırakmasın
+    let text;
+    try { text = await res.text(); } catch (e) {
+      throw new Error(`${method} ${shortUrl(url)}: yanıt okunamadı (${e.name === 'AbortError' || ctl.signal.aborted ? 'zaman aşımı' : e.message})`);
+    } finally { clearTimeout(t); }
     let data = text;
     if (/json/i.test(res.headers.get('content-type') || '') || /^\s*[[{]/.test(text)) { try { data = JSON.parse(text); } catch { /* düz metin */ } }
     if (!res.ok) {

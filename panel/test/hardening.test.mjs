@@ -1,6 +1,6 @@
 // Güvenlik sıkılaştırmaları: destek talebi / mesaj / görsel sınırı, girişte e-posta kodu yağmuru, bozuk çerez, ana panelde
 // bildirimlerin ortak tabloda olması (çalışan tarafındaki satış / destek bildirimleri görünür), bildirimlerin yalnız yöneticiye
-// açık olması, tarayıcı ölçümlerinde ad sınırı, sunucu hatası kaydında adres kalıbı
+// açık olması, tarayıcı ölçümlerinde ad sınırı, sunucu hatası kaydında adres kalıbı, gövdede takılan dış istek, taşıma işaretinin yeniden yazılması
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { d1 } from '../dev/d1.mjs';
@@ -150,4 +150,34 @@ test('taşımadan sonra yerelde kalmış bildirim ve abonelikler bir kez ana ver
   assert.deepEqual(ns.map((n) => `${n.key}:${n.title}`), ['a:yeni', 'b:yerel']);
   assert.equal((await all(remote, 'SELECT endpoint FROM push_subs')).length, 1);
   assert.equal(await backCopy(ctx, remote), 0, 'bir kez');
+});
+
+test('dış istek: başlığı gönderip gövdede duran sunucu zaman aşımıyla kesilir (senkron asılı kalmaz)', async () => {
+  const { http } = await import('../src/util.js');
+  const nhttp = await import('node:http');
+  const srv = nhttp.createServer((q, r) => { r.writeHead(200, { 'content-type': 'application/json' }); r.write('{"a":'); }).listen(0);
+  try {
+    const t0 = Date.now();
+    await assert.rejects(http(`http://127.0.0.1:${srv.address().port}/x`, { timeout: 300, tries: 1 }), /zaman aşımı/);
+    assert.ok(Date.now() - t0 < 3000);
+  } finally { srv.closeAllConnections(); srv.close(); }
+});
+
+test('ana panel taşıması: "taşındı" işareti yazılamazsa sonraki denemede yeniden yazılır', async () => {
+  const { migrateStep, MAIN_FLAG } = await import('../src/mainpanel.js');
+  const { doD1 } = await import('../src/dosql.js');
+  const env = { DB: d1() }; await init(env.DB);
+  const ns = doNamespace(MainPanel, () => env), obj = ns.get(ns.idFromName('x'));
+  const real = env.DB.prepare.bind(env.DB);
+  let broken = true;
+  env.DB.prepare = (sql) => { if (broken && /INSERT INTO settings/.test(sql)) throw new Error('D1 geçici hata'); return real(sql); };
+  const local = doD1(obj.ctx.storage);
+  let st;
+  for (let i = 0; i < 50; i++) { try { st = await migrateStep(obj.ctx, env, local); } catch { st = await obj.ctx.storage.get('mig'); } if (st && st.done) break; }
+  assert.ok(st.done && !st.flagged);
+  assert.equal(await first(env.DB, 'SELECT v FROM settings WHERE k = ?', MAIN_FLAG), null);
+  broken = false;
+  st = await migrateStep(obj.ctx, env, local);
+  assert.ok(st.flagged);
+  assert.ok(await first(env.DB, 'SELECT v FROM settings WHERE k = ?', MAIN_FLAG));
 });

@@ -31,7 +31,7 @@ export function isGlobal(sql) {
 // Ana veritabanına da yazılanlar: ayar ve kanal bağlantısı değişiklikleri. Bu panele özel / anlık ayarlar hariç (şema sürümü,
 // tek seferlik işaretler, kilitler, giriş denemeleri, doğrulama kodları)
 const MIRROR = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i, MIRROR_T = new Set(['settings', 'channel_config']);
-const NO_MIRROR = /schema_v|schema_n|once:|_lock\b|login_fail:|tfa_fail:|mailcode|pwreset|errrep/;
+const NO_MIRROR = /schema_v|schema_n|once:|_lock\b|\block:|login_fail:|tfa_fail:|mailcode|pwreset|errrep/;
 export const mirrorable = (sql, args = []) => MIRROR.test(sql) && refsOf(sql).some((r) => MIRROR_T.has(r))
   && !NO_MIRROR.test(sql + ' ' + args.filter((a) => typeof a === 'string').map((a) => a.slice(0, 80)).join(' '));
 
