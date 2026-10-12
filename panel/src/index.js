@@ -159,7 +159,8 @@ const handler = {
         if (bl) return json(blockedBody(bl), 429, blockedHeaders(bl));
         const res = await guardedAuth(req, env, ctx, path, b);
         // "Şifremi unuttum" hep aynı yanıtı verir (hesabın varlığı anlaşılmasın): sayaç sıfırlanmaz, istek sayısı sınırlanır
-        if (res.status < 400 && path !== 'password/forgot') await guardOk(env.DB, req);
+        // Girişte sayaç yalnız oturum açılınca sıfırlanır (şifre doğru ama kod adımı bekleniyorsa kod denemeleri sayılmaya devam eder)
+        if (res.status < 400 && path !== 'password/forgot' && (path !== 'login' || res.headers.get('Set-Cookie'))) await guardOk(env.DB, req);
         return res;
       }
       // Müşteri panelinin logosu (e-postalar için, oturumsuz): /api/logo?t=firma-kodu

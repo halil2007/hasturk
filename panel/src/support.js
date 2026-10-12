@@ -30,9 +30,31 @@ async function ticketOf(db, id, c) {
   if (!t) fail(404, 'Talep bulunamadı');
   return t;
 }
+// Kötüye kullanım sınırı (yalnız firma tarafı; ana panel sınırsız): saatte 5 / günde 20 yeni talep, 10 dakikada 20 mesaj,
+// günde 40 görsel. Aşılırsa 429 (talep, bildirim ve e-posta yağmuru olmasın)
+export const LIMITS = { ticketsHour: 5, ticketsDay: 20, msgs10m: 20, filesDay: 40 };
+async function limits(db, c, kind, nfiles) {
+  if (c.staff) return;
+  const slug = c.slug || '', t = Date.now();
+  if (kind === 'ticket') {
+    const r = await first(db, 'SELECT COALESCE(SUM(created_at > ?), 0) AS h, COUNT(*) AS d FROM support_tickets WHERE slug = ? AND created_at > ?', t - 3600e3, slug, t - 864e5);
+    if (r.h >= LIMITS.ticketsHour || r.d >= LIMITS.ticketsDay) fail(429, 'Kısa sürede çok sayıda talep açıldı; lütfen açık talebinize yazın ya da biraz sonra tekrar deneyin');
+  } else {
+    const r = await first(db, 'SELECT COUNT(*) AS n FROM support_messages m JOIN support_tickets t ON t.id = m.ticket_id WHERE t.slug = ? AND m.admin = 0 AND m.created_at > ?', slug, t - 600e3);
+    if (r.n >= LIMITS.msgs10m) fail(429, 'Kısa sürede çok sayıda mesaj gönderildi; lütfen biraz sonra tekrar deneyin');
+  }
+  if (nfiles) {
+    const r = await first(db, 'SELECT COUNT(*) AS n FROM support_files f JOIN support_tickets t ON t.id = f.ticket_id WHERE t.slug = ? AND f.created_at > ?', slug, t - 864e5);
+    if (r.n + nfiles > LIMITS.filesDay) fail(429, 'Bugün için görsel ekleme sınırına ulaşıldı; görseli yarın ekleyebilir ya da sorunu yazıyla anlatabilirsiniz');
+  }
+}
+
 // Ana panele haber: bildirim kaydı + anlık bildirim (hata olsa da talep kaydedilir)
+// Aynı talebe art arda gelen mesajlarda telefona 2 dakikada en fazla bir bildirim
 async function tellStaff(db, t, text) {
+  const prev = await first(db, 'SELECT last_at FROM notices WHERE key = ? AND resolved_at IS NULL', `support:${t.id}`).catch(() => null);
   await notify(db, `support:${t.id}`, { level: 'warn', title: `Destek: ${t.firm || 'Panel'} — ${t.subject}`, msg: text.slice(0, 300) });
+  if (prev && Date.now() - prev.last_at < 120e3) return;
   await pushNotify(db, { title: `Destek talebi · ${t.firm || 'Panel'}`, body: t.subject, url: `#/destek/${t.id}` }).catch(() => {});
 }
 
@@ -63,6 +85,7 @@ export async function supportApi(req, db, path, c) {
     if (subject.length < 3) fail(400, 'Kısa bir konu yazın');
     if (body.length < 5) fail(400, 'Sorunu birkaç cümleyle anlatın');
     const fl = files(b.files), t = Date.now();
+    await limits(db, c, 'ticket', fl.length);
     const ctxText = JSON.stringify(b.context && typeof b.context === 'object' ? b.context : {}).slice(0, 2000);
     const r = await first(db, `INSERT INTO support_tickets (slug, firm, user_name, user_id, subject, category, status, page, context, created_at, updated_at, unread_admin, unread_user)
       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 1, 0) RETURNING id`, c.slug || '', c.firm || '', who, u.id ?? null, subject, cat, str(b.page).slice(0, 120), ctxText, t, t);
@@ -95,6 +118,7 @@ export async function supportApi(req, db, path, c) {
   if ((x = path.match(/^support\/(\d+)\/reply$/)) && m === 'POST') {
     const t = await ticketOf(db, x[1], c), body = str(b.body).slice(0, 6000), fl = files(b.files), now = Date.now();
     if (!body && !fl.length) fail(400, 'Mesaj yazın ya da görsel ekleyin');
+    await limits(db, c, 'reply', fl.length);
     const mid = (await first(db, 'INSERT INTO support_messages (ticket_id, author, admin, body, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id', t.id, c.staff ? `${who} (Destek)` : who, c.staff ? 1 : 0, body, now)).id;
     await saveFiles(db, t.id, mid, fl);
     await run(db, `UPDATE support_tickets SET status = ?, updated_at = ?, unread_admin = ?, unread_user = ? WHERE id = ?`, c.staff ? 'answered' : 'open', now, c.staff ? 0 : 1, c.staff ? 1 : 0, t.id);

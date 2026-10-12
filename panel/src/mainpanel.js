@@ -175,13 +175,34 @@ export async function migrateStep(ctx, env, local, now = Date.now) {
 }
 const pct = (st) => (st.done ? 100 : Math.min(99, Math.round(((st.ti || 0) / Math.max(1, LOCAL_TABLES.length)) * 100)));
 
+// Bildirimler ve bildirim abonelikleri sonradan ortak tabloya alındı: taşımadan sonra yerelde oluşanlar bir kez ana veritabanına
+// (aynı bildirim iki yerde varsa son güncellenen kalır; abonelik varsa dokunulmaz)
+export async function backCopy(ctx, remote) {
+  if (await ctx.storage.get('g:notices')) return 0;
+  const sql = ctx.storage.sql, rows = (q) => { try { return sql.exec(q).toArray(); } catch { return []; } };
+  const stmts = [];
+  for (const r of rows('SELECT key, level, channel, title, msg, count, first_at, last_at, read, resolved_at FROM notices'))
+    stmts.push(remote.prepare(`INSERT INTO notices (key, level, channel, title, msg, count, first_at, last_at, read, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (key) DO UPDATE SET level = excluded.level, channel = excluded.channel, title = excluded.title, msg = excluded.msg, count = excluded.count,
+        first_at = excluded.first_at, last_at = excluded.last_at, read = excluded.read, resolved_at = excluded.resolved_at WHERE excluded.last_at > notices.last_at`)
+      .bind(r.key, r.level, r.channel, r.title, r.msg, r.count, r.first_at, r.last_at, r.read, r.resolved_at));
+  for (const r of rows('SELECT endpoint, user_id, ua, created_at FROM push_subs'))
+    stmts.push(remote.prepare('INSERT OR IGNORE INTO push_subs (endpoint, user_id, ua, created_at) VALUES (?, ?, ?, ?)').bind(r.endpoint, r.user_id, r.ua, r.created_at));
+  for (let i = 0; i < stmts.length; i += 50) await remote.batch(stmts.slice(i, i + 50));
+  await ctx.storage.put('g:notices', Date.now());
+  return stmts.length;
+}
+
 // Kullanıcıya yakın, kendi veritabanıyla çalışan tek nesne (wrangler.jsonc → durable_objects MAIN)
 export class MainPanel {
   constructor(ctx, env) { this.ctx = ctx; this.env = env; this.local = doD1(ctx.storage); this.db = routeDb(this.local, meter(env.DB)); this.ok = false; }
   async ready() {
     if (this.ok) return true;
     const st = await this.ctx.storage.get('mig');
-    if (st && st.done) { this.ok = true; this.fresh(); return true; }
+    if (st && st.done) {
+      await backCopy(this.ctx, this.db.remote).catch((e) => console.error('bildirimler ana veritabanına kopyalanamadı', e));
+      this.ok = true; this.fresh(); return true;
+    }
     // Taşıma sürüyor / başlamadı: zamanlayıcı kurulu değilse hemen başlat
     if (!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now());
     return false;
@@ -192,7 +213,7 @@ export class MainPanel {
     const st = await migrateStep(this.ctx, this.env, this.local).catch((e) => { console.error('ana panel taşıma hatası', e); return null; });
     if (!st) return void (await this.ctx.storage.setAlarm(Date.now() + 30e3));
     if (!st.done) await this.ctx.storage.setAlarm(Date.now() + 50);
-    else { this.ok = true; this.fresh(); console.log('ana panel taşındı', JSON.stringify(st)); }
+    else { await this.ctx.storage.put('g:notices', Date.now()); this.ok = true; this.fresh(); console.log('ana panel taşındı', JSON.stringify(st)); }
   }
   async fetch(req) {
     const url = new URL(req.url), env = { ...this.env, DB: this.db };
