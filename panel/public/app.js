@@ -127,9 +127,10 @@ export function refreshChrome(s = state.summary) {
   render(box, html`<span class="led"></span><div><b>${on.length} kanal bağlı</b><span>${err.length ? `${err.length} kanalda hata` : on.some((c) => c.demo) ? 'Tüm kanallar canlı' : on.length ? `Son senkron ${ago(Math.max(...on.map((c) => (c.last && c.last.at) || 0))) || '—'}` : 'Entegrasyonları tamamlayın'}</span></div>`);
   $('[data-bell-dot]').classList.toggle('hide', !((s.notices && s.notices.unread) || n));
   // Menüde firma unvanı yerine ürün adı (unvan kurumsal görünmüyordu)
-  const logo = (s.settings && s.settings.logo) || 'logo.webp';
-  // Varsayılan logoda ürün adı zaten yazılı: tekrar edilmez; firmanın kendi logosu varsa altında ürün adı görünür
-  $('[data-company]').textContent = logo === 'logo.webp' ? '' : BRAND;
+  // Panel ekranlarında hep Hastürk logosu (firmanın yüklediği logo etikette, e-postada ve hazırlama listesinde kullanılır);
+  // logoda ürün adı zaten yazılı: tekrar edilmez
+  const logo = 'logo.webp';
+  $('[data-company]').textContent = '';
   $$('[data-logo]').forEach((i) => { if (i.getAttribute('src') !== logo) i.src = logo; });
   const u = state.user || {};
   $('[data-act=me]').textContent = (u.name || 'Y').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toLocaleUpperCase('tr');
@@ -326,7 +327,7 @@ function moreMenu() {
   // Genel Bakış tek başına bölüm olmasın: Satış bölümünün başına
   if (groups.length > 1 && !groups[0].sec) { groups[1].items.unshift(...groups[0].items); groups.shift(); }
   const u = state.user || {};
-  const logo = (state.settings && state.settings.logo) || 'logo.webp';
+  const logo = 'logo.webp'; // panel ekranlarında hep Hastürk logosu
   const s = sheet({
     title: 'Menü', size: 'menu-sheet',
     body: html`<div class="mm-head"><img src="${logo}" alt=""><div style="min-width:0"><b class="ellipsis">${BRAND}</b><span class="ellipsis">${[u.name && u.name !== 'Yönetici' ? u.name : '', u.role === 'admin' ? 'Yönetici' : 'Personel', state.tenant ? state.tenant.name : ''].filter(Boolean).join(' · ')}</span></div></div>
