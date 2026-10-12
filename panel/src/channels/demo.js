@@ -236,7 +236,7 @@ export function demo(meta) {
   // Örnek hakediş (Trendyol cari ekstresi / Hepsiburada muhasebe işlemleri gibi): teslim edilen siparişlerin satış, komisyon,
   // indirim, stopaj ve iade kayıtları; ödeme günü (Trendyol: vadenin ardından gelen çarşamba, Hepsiburada: vade günü).
   // Birkaç örnek fark: satıcı kuponu (panelde görünmeyen indirim) ve bir üründe farklı komisyon — mutabakat ekranını denemek için.
-  const STL_RATE = { trendyol: 24, hepsiburada: 21.6 };
+  const STL_RATE = { trendyol: 20, hepsiburada: 21.6 };
   async function settlements(since, until) {
     const D = 864e5, now = Date.now(), rate = STL_RATE[ch] || 20, out = [];
     const r2 = (v) => Math.round(v * 100) / 100;
