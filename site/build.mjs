@@ -311,7 +311,9 @@ function intFaq(x) {
     courier || (ship && [`${x.name} siparişlerinin kargo etiketi nasıl alınır?`, ship]) || track,
     capOn(x, /^Ürün (yükleme|oluşturma)/) && [`Ürünlerimi panelden ${x.name} ${isSite(x) ? 'siteme' : 'mağazama'} yükleyebilir miyim?`, `Evet. Ürünü panelde bir kez tanımlayın; kategori ve özellik eşleştirmesiyle ${sx(x, 1)} gönderin. Görseller, varyantlar ve fiyat da birlikte gider.`],
     [`Birden fazla ${x.name} ${isSite(x) ? 'sitesi' : 'mağazası'} bağlayabilir miyim?`, `Evet. Birden fazla ${x.name} ${isSite(x) ? 'sitenizi' : 'mağazanızı'} aynı panelde ayrı mağazalar olarak bağlayabilirsiniz. Bağlanabilecek mağaza sayısı paketinize göre değişir; gerekirse ek mağaza alabilirsiniz.`],
-    [`${x.name} entegrasyonu ücretli mi?`, `${x.name} entegrasyonu tüm paketlerde yer alır. Paketler aylık ${minPrice.toLocaleString('tr-TR')} ₺'den (KDV dahil) başlar; kurulum ücreti yoktur ve 7 gün ücretsiz deneyebilirsiniz.`],
+    x.kind === 'yurt dışı pazaryeri'
+      ? [`${x.name} entegrasyonu hangi pakette var?`, `${x.name} gibi yurt dışı pazaryerleri Kurumsal pakette yer alır (aylık ${tl(S.plans.find((p) => p.name === 'Kurumsal').monthly)} ₺, KDV dahil); kurulum ücreti yoktur ve 7 gün ücretsiz deneyebilirsiniz.`]
+      : [`${x.name} entegrasyonu ücretli mi?`, `${x.name} entegrasyonu tüm paketlerde yer alır. Paketler aylık ${minPrice.toLocaleString('tr-TR')} ₺'den (KDV dahil) başlar; kurulum ücreti yoktur ve 7 gün ücretsiz deneyebilirsiniz.`],
   ].filter(Boolean).slice(0, 6);
 }
 

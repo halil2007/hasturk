@@ -22,13 +22,22 @@ export const REVISIONS = {
     '28e1de0887eed0f6c6c91336406bafa9019c659d4112021aa0bf9050f2b1f856', // #194 (komisyon oranları bağlantısı)
   ] },
   'pazaryeri-satis-fiyati-nasil-belirlenir': { cover: true, from: ['602080eadbb9de2bcf8b153c121f18093b6f21c6dcd421c5f1927effae1a8ce0'] },
-  'trendyol-buybox-nedir-nasil-kazanilir': { from: ['82469bb500c9a3855e0e6f7d3921d13c4854ec3f0301d4deb8bba85c6a4be9a4'] },
+  'trendyol-buybox-nedir-nasil-kazanilir': { from: ['82469bb500c9a3855e0e6f7d3921d13c4854ec3f0301d4deb8bba85c6a4be9a4', '7eac057feea66d545e09127caef70366ef7aae65b9c9345dd7e3075eb8098b3b'] },
   'pazaryeri-hakedis-nedir-ne-zaman-yatar': { cover: true, from: ['9f0f2b7253b0bb4e7b2eb3ffcf1820da01daefa679bfd26b9c8157a79adb9d53'] },
   // 2: Amazon komisyon oranı da KDV dahildir (üzerine KDV eklenmez); kontrol listesindeki fatura maddesi sadeleşti
   'amazon-turkiye-satici-olma-rehberi': { from: ['a8068c8cd5052bdafc7b16a09ad9cb0016cb69abb3e1f1644f63f57c7258c135'] },
+  // 3: "15 dakika" ifadesi kaldırıldı (senkron aralığı süre olarak vurgulanmaz; "düzenli aralıklarla")
+  'coklu-pazaryeri-urun-eslestirme-barkod-stok-kodu': { from: ['48a2f4dfb121adc6a4df9da5d3cb345bca71db865e48c58754a5837f74fc1cf0'] },
+  'doviz-kuru-ile-fiyatlandirma-ithal-urun': { from: ['2a2b14418f1db9b1f0cfeaf62bf7deb081bd182cbc6d6cc752a0fca9804b9aa4'] },
+  'e-ticarette-stok-takibi-fazla-satis': { from: ['9a592327179aeeb668e4c226d8eb81d0fb1b5d73202e98346c180011e9d593db'] },
+  'pazaryeri-entegrasyon-programi-nasil-secilir': { from: ['8cc549a56887f094b743f08d984ffe5201fb760f424d8023216e5be5dab43009'] },
+  'pazaryeri-entegrasyonu-nedir': { from: ['6b171975ac13a8fd93dd658027af06dd8820eb7c96da7b6d4cebc8870f70593c'] },
+  'pazaryeri-siparis-yonetimi-geciken-siparis': { from: ['298656a389bf6fdd4ae0a8367885c20bd2be90f2a3c3af723b17d24f5504e055'] },
+  'trendyol-satici-puani-nasil-yukseltilir': { from: ['26bcfe97b11be73db3e78a81c38b7994dbb2eb95344f90b3218da8a5c666f84d'] },
+  'trendyol-satis-artirma-yollari': { from: ['3776fdeb6ca32018233a0041a9a28fdb4fbf60afb1521252c68254f31c46d443'] },
 };
 // Yeni düzeltme eklenince sürüm artar: düzeltmeler yeniden taranır (önceki düzeltmeler gövde değiştiği için atlanır)
-export const REV = 'once:blog_rev_2';
+export const REV = 'once:blog_rev_3';
 const FIELDS = ['title', 'summary', 'seo_title', 'seo_desc'];
 const sha256 = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((x) => x.toString(16).padStart(2, '0')).join('');
 
