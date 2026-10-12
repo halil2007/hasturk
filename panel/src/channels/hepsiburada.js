@@ -230,6 +230,15 @@ export function hepsiburada(env, meta) {
     return out;
   }
 
+  // Sipariş Hepsiburada'da var mı (sipariş numarasıyla ayrıntı): Hepsiburada panelinden paketlenmiş / kargolanmış sipariş de bulunur.
+  // Liste karşılaştırması yerine bu kesin kontrol kullanılır (bkz. orderclean.js checkMissing); yok: 404 ya da boş yanıt
+  async function orderExists(no) {
+    try {
+      const r = await call(`${OMS}/orders/merchantId/${m}/ordernumber/${encodeURIComponent(no)}`);
+      return !!(r && (g(r, 'orderNumber') || (g(r, 'items') || []).length));
+    } catch (e) { if (e.status === 404) return false; throw e; }
+  }
+
   async function fetchListings() {
     const out = [];
     for (let offset = 0; offset < 100000; offset += 1000) {
@@ -922,6 +931,6 @@ export function hepsiburada(env, meta) {
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns, financeProbe,
+    fetchOrders, orderExists, fetchListings, pushStock, pushPrice, pushStatus, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns, financeProbe,
   };
 }

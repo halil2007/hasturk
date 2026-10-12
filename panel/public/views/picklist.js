@@ -1,4 +1,4 @@
-import { api, state, html, render, $, n, ch, chLogo, thumb, sheet, busy, esc, dateTime, store } from '../core.js';
+import { api, state, html, render, $, n, ch, chLogo, thumb, sheet, busy, esc, dateTime, store, toast } from '../core.js';
 
 // Hazırlama listesi: kargoya çıkacak siparişlerin ürün ürün özeti ("şundan şu kadar"); etiket basılmadan hazırlığa başlanır.
 // Filtre: bugün gelenler / önceki günlerden / hepsi, kanal. Ürüne dokununca hangi siparişlerden geldiği açılır; toplanan ürün
@@ -44,9 +44,13 @@ export async function pickSheet({ channel = '', ids = [] } = {}) {
       </div>`; })}</div>` : html`<div class="pick-list">${d.list.map((o) => html`<div class="pick-row"><div class="pick-main" style="cursor:default">${chLogo(o.channel, true)}<div style="min-width:0;flex:1"><div class="pick-name">#${o.order_number} <span class="muted small">${o.customer || ''}</span></div><div class="muted tiny">${o.ordered_at ? dateTime(o.ordered_at) : ''}</div></div><b class="num">${o.lines.reduce((a, l) => a + l.qty, 0)} adet</b></div>
         <div class="pick-orders">${o.lines.map((l) => html`<div class="row small" style="gap:8px">${thumb(l.image, l.name, 'xs')}<span style="flex:1;min-width:0" class="ellipsis">${l.name}${l.variant ? html`<span class="var-tag">${l.variant}</span>` : ''}</span><b class="num">×${l.qty}</b></div>`)}</div></div>`)}</div>`}`}
     </div>`);
-    s.setFoot(d.items.length ? html`${picked ? html`<button class="btn ghost sm" data-reset>İşaretleri temizle</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-print><i class="ico ico-print"></i>Yazdır</button>` : null);
+    s.setFoot(d.items.length ? html`${picked ? html`<button class="btn ghost sm" data-reset>İşaretleri temizle</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Kapat</button>${navigator.share ? html`<button class="btn" data-share><i class="ico ico-send"></i>Paylaş</button>` : ''}<button class="btn" data-copy><i class="ico ico-copy"></i>Kopyala</button><button class="btn primary" data-print><i class="ico ico-print"></i>Yazdır</button>` : null);
     const pb = $('[data-print]', s.el);
     if (pb) pb.onclick = () => printList(d, scopeText(), f.view);
+    const cb = $('[data-copy]', s.el);
+    if (cb) cb.onclick = async () => { (await copyText(listText(d, scopeText(), f.view))) ? toast('Liste kopyalandı; WhatsApp\'a yapıştırabilirsiniz') : toast('Kopyalanamadı', true); };
+    const sb = $('[data-share]', s.el);
+    if (sb) sb.onclick = () => navigator.share({ title: 'Hazırlama listesi', text: listText(d, scopeText(), f.view) }).catch(() => {});
     const rb = $('[data-reset]', s.el);
     if (rb) rb.onclick = () => { done.clear(); saveDone(); draw(); };
   }
@@ -67,25 +71,61 @@ export async function pickSheet({ channel = '', ids = [] } = {}) {
   await load();
 }
 
+// Metin olarak liste (WhatsApp'a yapıştırmak için; *kalın* WhatsApp biçimi): ürüne göre ya da siparişe göre
+const chName = (c) => ch(c).short || ch(c).name;
+export function listText(d, scope, view = 'items') {
+  const day = new Date().toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' });
+  const head = [`*Hazırlama listesi* · ${day}`, scope, `${d.orders} sipariş · ${d.totalQty} adet`, ''];
+  const body = view === 'orders'
+    ? (d.list || []).map((o) => [`*${chName(o.channel)} #${o.order_number}*${o.customer ? ` · ${o.customer}` : ''}`,
+      ...o.lines.map((l) => `  - ${l.name}${l.variant ? ` (${l.variant})` : ''} ×${l.qty}`)].join('\n'))
+    : d.items.map((x) => [`☐ *${x.qty} adet* · ${x.name}${x.variant ? ` (${x.variant})` : ''}`,
+      ...(x.sku || x.barcode ? [`   ${[x.sku, x.barcode].filter(Boolean).join(' · ')}`] : []),
+      `   ${x.orders.map((o) => `#${o.order_number}${o.qty > 1 ? ` ×${o.qty}` : ''}`).join(', ')}`].join('\n'));
+  return head.concat(body.join('\n\n')).join('\n');
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch { /* eski tarayıcı */ }
+  const ta = document.createElement('textarea');
+  ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.append(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { /* desteklenmiyor */ }
+  ta.remove();
+  return ok;
+}
+// Ürün görseli (yalnız http(s) / panel adresi; tırnak ve parantez temizlenir)
+const imgTag = (src, cls = 'im') => (src && /^(https?:\/\/|\/)/.test(String(src)) ? `<img class="${cls}" src="${esc(String(src))}" alt="">` : `<span class="${cls} none"></span>`);
+
 // Yazdırma: ayrı pencerede sade tablo (işaret kutusu, adet büyük); sipariş numaraları her ürünün altında
 function printList(d, scope, view = 'items') {
   const w = window.open('', '_blank');
   if (!w) return alert('Yazdırma penceresi açılamadı (açılır pencere engelini kaldırın)');
-  const rows = d.items.map((x) => `<tr><td class="box"></td><td><b>${esc(x.name)}</b>${x.variant ? ` <span class="v">${esc(x.variant)}</span>` : ''}<div class="m">${esc([x.sku, x.barcode].filter(Boolean).join(' · '))}</div>
+  const rows = d.items.map((x) => `<tr><td class="box"></td><td class="pic">${imgTag(x.image)}</td><td><b>${esc(x.name)}</b>${x.variant ? ` <span class="v">${esc(x.variant)}</span>` : ''}<div class="m">${esc([x.sku, x.barcode].filter(Boolean).join(' · '))}</div>
     <div class="o">${x.orders.map((o) => `${esc(ch(o.channel).short || ch(o.channel).name)} #${esc(o.order_number)}${o.qty > 1 ? ` ×${o.qty}` : ''}`).join(' · ')}</div></td><td class="q">${x.qty}</td><td class="s">${x.stock ?? ''}</td></tr>`).join('');
   // Siparişe göre: her sipariş bir satır, içeriği altında
-  const orderRows = (d.list || []).map((o) => `<tr><td class="box"></td><td><b>${esc(ch(o.channel).short || ch(o.channel).name)} #${esc(o.order_number)}</b> <span class="m">${esc(o.customer || '')}</span>
-    <div class="o" style="font-size:12px;color:#222">${o.lines.map((l) => `${esc(l.name)}${l.variant ? ` (${esc(l.variant)})` : ''} <b>×${l.qty}</b>`).join('<br>')}</div></td><td class="q">${o.lines.reduce((a, l) => a + l.qty, 0)}</td><td class="s"></td></tr>`).join('');
+  const orderRows = (d.list || []).map((o) => `<tr><td class="box"></td><td colspan="2"><b>${esc(ch(o.channel).short || ch(o.channel).name)} #${esc(o.order_number)}</b> <span class="m">${esc(o.customer || '')}</span>
+    <div class="o" style="font-size:12px;color:#222">${o.lines.map((l) => `<div class="ln">${imgTag(l.image, 'im sm')}<span>${esc(l.name)}${l.variant ? ` (${esc(l.variant)})` : ''} <b>×${l.qty}</b></span></div>`).join('')}</div></td><td class="q">${o.lines.reduce((a, l) => a + l.qty, 0)}</td><td class="s"></td></tr>`).join('');
   w.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Hazırlama listesi</title><style>
     body{font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:16px;color:#111}h1{font-size:18px;margin:0 0 4px}.sub{color:#555;margin-bottom:12px}
     table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ccc;padding:7px 6px;vertical-align:top;text-align:left}th{font-size:11px;text-transform:uppercase;color:#555}
     .box{width:18px}.box:before{content:'';display:inline-block;width:14px;height:14px;border:1.5px solid #333;border-radius:3px}.q{font-size:20px;font-weight:800;text-align:right;width:60px}.s{text-align:right;color:#666;width:50px}
     .v{background:#eee;border-radius:4px;padding:0 5px;font-size:12px}.m{color:#555;font-size:11px}.o{color:#777;font-size:10.5px;margin-top:2px}@media print{body{margin:8mm}}
     .hd{display:flex;align-items:center;gap:14px;margin-bottom:6px}.hd img{max-height:46px;max-width:180px}
+    .pic{width:58px;padding-right:0}.im{display:block;width:52px;height:52px;object-fit:contain;border:1px solid #ddd;border-radius:6px;background:#fff}.im.none{background:#f2f2f2}
+    .im.sm{width:34px;height:34px;flex:none}.ln{display:flex;align-items:center;gap:8px;margin-top:4px}tr{break-inside:avoid;page-break-inside:avoid}
   </style></head><body><div class="hd">${state.settings && state.settings.logo ? `<img src="${esc(state.settings.logo)}" alt="">` : ''}<div><h1>Hazırlama listesi</h1>${state.settings && state.settings.company && state.settings.company.title ? `<div class="m">${esc(state.settings.company.title)}</div>` : ''}</div></div><div class="sub">${esc(scope)} · ${d.orders} sipariş · ${d.items.length} çeşit · <b>${d.totalQty} adet</b> · ${esc(dateTime(Date.now()))}</div>
-  <table><thead><tr><th></th><th>${view === 'orders' ? 'Sipariş' : 'Ürün'}</th><th style="text-align:right">Adet</th><th style="text-align:right">${view === 'orders' ? '' : 'Stok'}</th></tr></thead><tbody>${view === 'orders' ? orderRows : rows}</tbody></table>
+  <table><thead><tr><th></th><th colspan="2">${view === 'orders' ? 'Sipariş' : 'Ürün'}</th><th style="text-align:right">Adet</th><th style="text-align:right">${view === 'orders' ? '' : 'Stok'}</th></tr></thead><tbody>${view === 'orders' ? orderRows : rows}</tbody></table>
   </body></html>`);
   w.document.close();
   // Betik yazdırma penceresine gömülmez (güvenlik politikası): yazdırma bu pencereden başlatılır
-  setTimeout(() => { try { w.focus(); w.print(); } catch { /* pencere kapandı */ } }, 300);
+  // Görseller yüklenene kadar beklenir (en fazla 4 sn)
+  const t0 = Date.now();
+  const go = () => {
+    try {
+      if ([...w.document.images].some((i) => !i.complete) && Date.now() - t0 < 4000) return void setTimeout(go, 150);
+      w.focus(); w.print();
+    } catch { /* pencere kapandı */ }
+  };
+  setTimeout(go, 300);
 }
