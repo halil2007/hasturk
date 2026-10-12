@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 248 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2294 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 248 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2298 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -42,7 +42,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 24,4 | 9 |
+| 1 | HasTürk Solucan Gübresi  | 24,3 | 9 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 17,8 | 15 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 10,6 | 16 |
 | 4 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 7 | 10 |
@@ -160,7 +160,7 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 |---|---|---|---|
 | Leonardit - Organik Toprak Düzenleyici | 46 | 1,1 | %2 |
 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 36,5 | 0,9 | %2 |
-| İnsektisit MAX 5 Lt Kampanya Paketi | 31,8 | 0 | %0 |
+| İnsektisit MAX 5 Lt Kampanya Paketi | 32,8 | 0 | %0 |
 | HG Asidik Torf | 30,6 | 0,6 | %2 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 27,3 | 0 | %0 |
 | HG Mezar Toprağı | 23,6 | 0,6 | %3 |
