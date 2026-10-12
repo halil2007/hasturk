@@ -475,7 +475,10 @@ export async function payLink(req, env) {
   if (!env.PANEL_SECRET && !env.PANEL_PASSWORD) return resultPage('Ödeme bağlantısı geçersiz', 'Ödeme bağlantıları şu an kullanılamıyor.', { status: 503 });
   const v = str(new URL(req.url).searchParams.get('o')), [id, sig] = v.split('.');
   if (!id || !sig || !env.DB) return resultPage('Ödeme bağlantısı geçersiz', 'Bağlantı eksik ya da bozuk.', { status: 400 });
-  if (sig !== await linkSig(env, id)) return resultPage('Ödeme bağlantısı geçersiz', 'Bağlantı doğrulanamadı.', { status: 400 });
+  const want = await linkSig(env, id);
+  let diff = sig.length ^ want.length; // sabit süreli karşılaştırma (imza tahmin edilemesin)
+  for (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ (sig.charCodeAt(i) || 0);
+  if (diff) return resultPage('Ödeme bağlantısı geçersiz', 'Bağlantı doğrulanamadı.', { status: 400 });
   await init(env.DB);
   const o = await first(env.DB, "SELECT * FROM sales_orders WHERE id = ? AND kind = 'charge'", id);
   if (!o) return resultPage('Ödeme bulunamadı', 'Bu bağlantıya ait ödeme bulunamadı.', { status: 404 });
@@ -622,6 +625,8 @@ export async function paymentWatch(env, db, panel = '', fetchFn) {
     const r = await urgentAlert(env, db, 'pay:' + o.id, { title: `Ödeme alındı, işlem tamamlanmadı: ${o.slug || o.id}`, body: `${o.id} · ${o.amount} TL · ${o.error || 'işlem yarıda kaldı'} · ana panel → Firmalar'dan elle tamamlayın`, url: '#/firmalar' }).catch(() => null);
     if (r) out.alerted++;
   }
+  // Tamamlanmayan (başarısız ya da bekleyen, 2 günden eski) satışların geçici şifresi saklanmaz
+  await run(db, "UPDATE sales_orders SET pass_hash = NULL, pass_tmp = NULL WHERE pass_tmp IS NOT NULL AND status IN ('failed', 'pending') AND updated_at < ?", now - 2 * 864e5).catch(() => {});
   if (!iyzicoReady(env)) return out;
   const open = await all(db, "SELECT * FROM sales_orders WHERE status = 'pending' AND token IS NOT NULL AND token != '' AND updated_at < ? AND updated_at > ? ORDER BY updated_at LIMIT 10", now - 45 * 60e3, now - 864e5);
   for (const o of open) {

@@ -7,9 +7,13 @@ import { fail, str } from './util.js';
 
 const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const enc = (o) => b64u(new TextEncoder().encode(JSON.stringify(o)));
+// Ana panelde (yerel veritabanı) anahtar ve son bildirim metni ana veritabanında: çalışan tarafındaki bildirimler (satış, destek,
+// hata) de aynı anahtarla imzalar, servis çalışanı aynı metni okur
+const G = (db) => db.remote || db;
 
 // VAPID anahtarı: ilk kullanımda üretilir, ayarlarda saklanır (özel anahtar yalnız sunucuda kalır)
-async function vapid(db) {
+async function vapid(db0) {
+  const db = G(db0);
   let v = await getRaw(db, 'vapid');
   if (v && v.publicKey && v.privateJwk) return v;
   const k = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
@@ -40,13 +44,13 @@ export async function subscribe(db, user, sub, ua) {
   return { ok: true };
 }
 export async function unsubscribe(db, endpoint, user) { await run(db, 'DELETE FROM push_subs WHERE endpoint = ? AND user_id IS ?', str(endpoint), user ? user.id ?? null : null); return { ok: true }; }
-export async function latest(db) { return (await getRaw(db, 'push_latest')) || { title: 'Hastürk Panel', body: 'Yeni bildirim', url: '#/' }; }
+export async function latest(db) { return (await getRaw(G(db), 'push_latest')) || { title: 'Hastürk Panel', body: 'Yeni bildirim', url: '#/' }; }
 
 // Tüm abonelere bildirim: içerik "son bildirim" olarak saklanır, abonelere boş push gider. Süresi dolmuş abonelik silinir.
 // userId verilirse yalnız o kullanıcının cihazlarına (deneme bildirimi); son bildirim metni yalnız herkese gidende güncellenir
 export async function notify(db, msg, { fetchFn = fetch, userId } = {}) {
   const subs = userId === undefined ? await all(db, 'SELECT endpoint FROM push_subs') : await all(db, 'SELECT endpoint FROM push_subs WHERE user_id IS ?', userId);
-  await setSetting(db, 'push_latest', { ...msg, at: Date.now() });
+  await setSetting(G(db), 'push_latest', { ...msg, at: Date.now() });
   if (!subs.length) return { sent: 0 };
   const v = await vapid(db);
   let sent = 0;

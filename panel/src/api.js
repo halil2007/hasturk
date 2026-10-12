@@ -1143,6 +1143,8 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   if (!can(user, sec)) fail(403, 'Bu bölüm için yetkiniz yok (Personel → yetkiler)');
   // Yalnız görüntüleme yetkisi: okuma serbest, değişiklik yok (etiket / dışa aktarma gibi okuma amaçlı POST'lar hariç değil)
   if (m !== 'GET' && !can(user, sec, true)) fail(403, 'Bu bölümde yalnız görüntüleme yetkiniz var');
+  // Ana panelde destek, bildirimler (satışlar, firma hataları) yalnız yöneticiye
+  if (!env.TENANT_SLUG && user.role !== 'admin' && (path === 'support' || path.startsWith('support/') || path === 'notices' || path.startsWith('notices/') || path === 'push/latest')) fail(403, 'Bu bölüm yalnız yöneticiye açıktır');
   // Hepsiburada canlıya geçiş testi (yalnız yönetici)
   if (path.startsWith('hbtest/')) {
     if (user.role !== 'admin') fail(403, 'Bu bölüm için yönetici yetkisi gerekir');
@@ -1648,7 +1650,6 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
     return json(await errorsApi(req, db, path, q, m === 'GET' ? {} : await body(req)));
   }
   // Destek talepleri: ana panelde gelen kutusu (müşteri panellerinin istekleri Durable Object'te karşılanır, bkz. tenants.js)
-  if (!env.TENANT_SLUG && user.role !== 'admin' && (path === 'support' || path.startsWith('support/') || path === 'notices' || path.startsWith('notices/') || path === 'push/latest')) fail(403, 'Bu bölüm yalnız yöneticiye açıktır');
   if (path === 'support' || path.startsWith('support/')) {
     if (env.TENANT_SLUG) fail(404, 'Bulunamadı');
     return supportResponse(req, db, path, { slug: '', firm: '', user, staff: true, env });

@@ -38,10 +38,14 @@ export class PerfBuffer {
     this.m.set(r, e);
   }
   // Tarayıcının ölçtüğü süreler (kullanıcının gerçekten beklediği): sayfa açılışları ve istekler (ağ + sunucu)
+  // Kötüye kullanım: adres kalıbı dışındaki adlar alınmaz, günde en fazla 400 farklı ad (rapor tablosu şişmesin)
   client(b) {
+    const d = day();
+    if (!this.ck || this.ck.d !== d) this.ck = { d, keys: new Set() };
     const take = (obj, pre, re) => {
       for (const [k, v] of Object.entries(obj && typeof obj === 'object' ? obj : {}).slice(0, 60)) {
         if (!re.test(k) || !Array.isArray(v)) continue;
+        if (!this.ck.keys.has(pre + k)) { if (this.ck.keys.size >= 400) continue; this.ck.keys.add(pre + k); }
         const [n, total, max, slow] = v.map((x) => Math.max(0, Math.min(Number(x) || 0, 1e9)));
         if (!n || n > 1000) continue;
         const r = `${pre} ${k}`.slice(0, 120), e = this.m.get(r) || { n: 0, total: 0, max: 0, slow: 0, dbn: 0, dbms: 0 };
@@ -50,7 +54,7 @@ export class PerfBuffer {
       }
     };
     take(b && b.pages, 'SAYFA', /^[a-z0-9-]{0,40}$/);
-    take(b && b.api, 'TARAYICI', /^(GET|POST|PUT|DELETE) [\w:/.-]{1,100}$/);
+    take(b && b.api, 'TARAYICI', /^(GET|POST|PUT|DELETE) (?::id|[a-z0-9_-]{1,40})(?:\/(?::id|[a-z0-9_-]{1,40})){0,5}$/);
   }
   due() { return this.n > 0 && (Date.now() - this.at > 300e3 || this.n >= 500); }
   // Ana veritabanına yaz (slug: '' = ana panel); ortalaması çok yüksek işlem hata kaydına düşer

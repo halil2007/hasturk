@@ -7,7 +7,9 @@
 // reklam etiketleri, platform değerleri …).
 import { TABLES } from './db.js';
 
-export const GLOBAL_TABLES = ['tenants', 'tenant_payments', 'sales_orders', 'support_tickets', 'support_messages', 'support_files', 'error_reports', 'perf_stats', 'blog_posts', 'blog_images', 'ip_guard'];
+export const GLOBAL_TABLES = ['tenants', 'tenant_payments', 'sales_orders', 'support_tickets', 'support_messages', 'support_files', 'error_reports', 'perf_stats', 'blog_posts', 'blog_images', 'ip_guard',
+  // Bildirimler ve bildirim abonelikleri: satış, destek talebi, hata gibi olaylar çalışan tarafında da yazılır
+  'notices', 'push_subs'];
 const GSET = new Set(GLOBAL_TABLES);
 export const LOCAL_TABLES = TABLES.filter((n) => !GSET.has(n));
 const LSET = new Set(LOCAL_TABLES);

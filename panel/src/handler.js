@@ -63,7 +63,7 @@ export async function handle(req, env, ctx, db) {
     if (user.mustChange && !/^(me\/password|summary|me|brand|logo|errors\/report)$/.test(path)) return json({ error: 'Devam etmek için önce geçici şifrenizi değiştirin', mustChange: true }, 403);
     if (need2fa && !path.startsWith('me/2fa') && !/^(brand|logo)$/.test(path)) return json({ error: 'Yöneticiniz iki adımlı doğrulamayı zorunlu tuttu; devam etmek için açın', need2fa: true }, 403);
     // Tarayıcının ölçtüğü sayfa açılış / istek süreleri (dakikada en fazla bir kez gönderilir; bkz. public/core.js perfBeacon)
-    if (path === 'perf/client' && req.method === 'POST') { if (ctx.perf && !user.support) ctx.perf.client(await body(req)); return json({ ok: true }); }
+    if (path === 'perf/client' && req.method === 'POST') { if (ctx.perf && !user.support && env.DEMO !== '1') ctx.perf.client(await body(req)); return json({ ok: true }); }
     if (req.method !== 'GET') { const r = await api(req, env, ctx, db, path, user); bumpCache(db, user.id); return r; }
     if (!CACHEABLE.test(path)) return await api(req, env, ctx, db, path, user);
     const c = cacheOf(db), key = `${user.id}|${user.role}|${user.support ? 1 : 0}|${JSON.stringify(user.perms || null)}|${path}${url.search}`, now = Date.now(), hit = c.get(key);
@@ -81,9 +81,13 @@ export async function handle(req, env, ctx, db) {
     return r;
   } catch (e) {
     if (e instanceof HttpError) return json({ error: e.message }, e.status);
+    if (e instanceof URIError) return json({ error: 'Geçersiz adres' }, 400); // bozuk %-kodlu adres sunucu hatası sayılmaz
     console.error(e);
     // Hata kaydı için yığın (yanıta eklenmez; panelin sarmalayıcısı okur, bkz. errors.js)
-    const r = json({ error: e.message || 'Sunucu hatası' }, 500);
+    // Veritabanı iç hata metni kullanıcıya gösterilmez (tablo / sorgu yapısı sızmasın); hata kaydında tam metin kalır
+    const internal = /SQLITE|D1_|no such (table|column)|syntax error|constraint failed|datatype mismatch/i.test(String(e.message || ''));
+    const r = json({ error: internal ? 'Sunucu hatası; kayıt alındı, inceleniyor' : e.message || 'Sunucu hatası' }, 500);
+    if (internal) r.errMsg = String(e.message).slice(0, 500);
     r.errStack = String((e && e.stack) || '').slice(0, 2500);
     return r;
   }
@@ -92,9 +96,10 @@ export async function handle(req, env, ctx, db) {
 // Sunucu hatasını (5xx) ana panelin hata kayıtlarına yaz
 export async function report5xx(mainDb, req, res, c) {
   if (!mainDb || res.status < 500) return;
-  const url = new URL(req.url), path = url.pathname.slice(5).replace(/\/+$/, '');
+  // Adresteki kimlikler tek kalıba indirilir (her farklı adres ayrı hata kaydı / bildirim açmasın)
+  const url = new URL(req.url), path = url.pathname.slice(5).replace(/\/+$/, '').split('/').slice(0, 6).map((x) => (/^[a-z][a-z0-9_-]{0,40}$/.test(x) && !/\d/.test(x) ? x : ':x')).join('/');
   let msg = '';
-  try { msg = (await res.clone().json()).error || ''; } catch { msg = `HTTP ${res.status}`; }
+  try { msg = res.errMsg || (await res.clone().json()).error || ''; } catch { msg = `HTTP ${res.status}`; }
   const { recordError } = await import('./errors.js');
   await init(mainDb);
   await recordError(mainDb, { ...c, source: 'server', message: msg || `HTTP ${res.status}`, action: `${req.method} ${path}`, status: res.status, detail: { stack: res.errStack || '' } });

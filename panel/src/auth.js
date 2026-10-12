@@ -83,7 +83,8 @@ export async function userCookie(env, db, username, secure) {
 export async function currentUser(req, env, db) {
   const m = (req.headers.get('Cookie') || '').match(new RegExp(COOKIE + '=([^;]+)'));
   if (!m) return null;
-  let v = decodeURIComponent(m[1]);
+  let v;
+  try { v = decodeURIComponent(m[1]); } catch { return null; } // bozuk çerez: oturum yok (500 değil)
   const i = v.indexOf('~');
   if (env.TENANT_SLUG ? v.slice(0, i + 1) !== pre(env) : i >= 0) return null; // başka panelin çerezi
   if (i >= 0) v = v.slice(i + 1);
@@ -213,6 +214,10 @@ async function mailCheck(req, env, db, user, sv) {
   if ((await nets(db, user.id)).some((x) => x.net === net)) { await remember(db, user.id, net); return null; }
   const to = await emailOf(db, user.id);
   if (!validEmail(to)) { await log(db, null, 'warn', `${user.name}: yeni ağdan giriş (${net}) — e-posta adresi olmadığı için doğrulama kodu gönderilemedi`); return null; }
+  // Yeniden şifreyle giriş: son kod 45 sn içinde gönderildiyse yenisi gönderilmez (önceki kod geçerli); saatte en fazla 5 kod
+  const rec = (await getRaw(db, 'mailcode:' + user.id)) || {}, now = Date.now(), sent = (rec.sent || []).filter((t) => now - t < 3600e3);
+  if (rec.h && rec.exp > now && sent.length && now - sent[sent.length - 1] < 45e3) return { ok: false, status: 200, emailcode: true, ticket: await mailTicket(env, user.id, sv), to: mask(to) };
+  if (sent.length >= 5) return { ok: false, status: 429, error: 'Bir saatte en fazla 5 doğrulama kodu gönderilir. Biraz sonra tekrar deneyin.' };
   try { await sendCode(req, env, db, user, to); } catch (e) {
     await log(db, null, 'error', `${user.name}: giriş doğrulama kodu gönderilemedi (${String(e.message).slice(0, 200)}); giriş kodsuz yapıldı`);
     return null;
