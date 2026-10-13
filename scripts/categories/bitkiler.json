@@ -1,0 +1,63 @@
+{
+  "store": "hasturk",
+  "apply": false,
+  "categories": [
+    {
+      "name": "Bitkiler", "slug": "bitkiler",
+      "pageTitle": "Bitkiler | Salon, Çiçekli ve Bahçe Bitkileri | HasTürk",
+      "description": "Salon bitkileri, orkideler, kaktüs ve sukulentler, balkon ve bahçe bitkileri HasTürk Gübre'de. Sağlıklı bitkiler, uygun toprak ve gübre önerileriyle.",
+      "children": [
+        {
+          "name": "Salon ve Ev Bitkileri", "slug": "salon-ve-ev-bitkileri",
+          "pageTitle": "Salon ve Ev Bitkileri | İç Mekan Bitkileri | HasTürk",
+          "description": "Evinize ve ofisinize yeşil katan salon bitkileri: yapraklı bitkiler, palmiyeler, sarkan ve asma bitkiler. Bakım önerileri ve doğru toprak HasTürk'te.",
+          "children": [
+            {
+              "name": "Yapraklı Salon Bitkileri", "slug": "yaprakli-salon-bitkileri",
+              "pageTitle": "Yapraklı Salon Bitkileri | Monstera, Kauçuk | HasTürk",
+              "description": "Monstera, kauçuk, paşa kılıcı ve daha fazlası. Gösterişli yapraklarıyla salonunuzu canlandıran yapraklı salon bitkileri, bakım ve toprak önerileriyle."
+            },
+            {
+              "name": "Palmiyeler", "slug": "palmiyeler",
+              "pageTitle": "Salon Palmiyeleri | İç Mekan Palmiye Çeşitleri | HasTürk",
+              "description": "Areka, kentia ve diğer salon palmiyeleri. Ferah ve tropik bir görünüm için iç mekan palmiyeleri; sulama, ışık ve gübreleme önerileriyle HasTürk'te."
+            },
+            {
+              "name": "Sarkan ve Asma Bitkiler", "slug": "sarkan-ve-asma-bitkiler",
+              "pageTitle": "Sarkan ve Asma Bitkiler | Salon Sarmaşıkları | HasTürk",
+              "description": "Raflara, askılara ve duvarlara yakışan sarkan ve asma bitkiler: potos, sarmaşık, filodendron. Kolay bakımlı sarkan salon bitkileri HasTürk Gübre'de."
+            }
+          ]
+        },
+        {
+          "name": "Çiçekli Saksı Bitkileri", "slug": "cicekli-saksi-bitkileri",
+          "pageTitle": "Çiçekli Saksı Bitkileri | Orkide ve Çiçekler | HasTürk",
+          "description": "Orkideler ve renkli çiçekli saksı bitkileri. Hediye için ya da evinizi süslemek için çiçekli bitkiler; bakım, toprak ve besin önerileriyle HasTürk'te."
+        ,
+          "children": [
+            {
+              "name": "Orkideler", "slug": "orkideler",
+              "pageTitle": "Orkide Çeşitleri | Saksıda Orkide Satın Al | HasTürk",
+              "description": "Phalaenopsis ve farklı renklerde saksı orkideleri. Uzun süre çiçek açan orkideler için doğru orkide toprağı ve sıvı orkide besini önerileri HasTürk'te."
+            },
+            {
+              "name": "Diğer Çiçekli Bitkiler", "slug": "diger-cicekli-bitkiler",
+              "pageTitle": "Çiçekli Bitkiler | Antoryum, Begonya ve Daha Fazlası",
+              "description": "Antoryum, begonya, sardunya ve diğer çiçekli saksı bitkileri. Evinize renk katan çiçekler, bakım ipuçları ve uygun toprak önerileriyle HasTürk Gübre'de."
+            }
+          ]
+        },
+        {
+          "name": "Kaktüs ve Sukulent", "slug": "kaktus-ve-sukulent",
+          "pageTitle": "Kaktüs ve Sukulent Çeşitleri | Az Sulanan Bitkiler",
+          "description": "Az su isteyen, bakımı kolay kaktüs ve sukulent çeşitleri. Masa, pencere önü ve teraslar için ideal; kaktüs toprağı ve drenaj önerileriyle HasTürk'te."
+        },
+        {
+          "name": "Balkon ve Bahçe Bitkileri", "slug": "balkon-ve-bahce-bitkileri",
+          "pageTitle": "Balkon ve Bahçe Bitkileri | Dış Mekan Bitkileri | HasTürk",
+          "description": "Balkonunuzu ve bahçenizi canlandıran dış mekan bitkileri: çiçekler, aromatik bitkiler ve çalılar. Bahçe toprağı ve gübre önerileriyle HasTürk Gübre'de."
+        }
+      ]
+    }
+  ]
+}
