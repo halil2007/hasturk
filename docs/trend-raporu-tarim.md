@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2641 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2659 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -11,20 +11,20 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | # | Ürün | Hızlanma | Son 7 gün satış | Stokta |
 |---|---|---|---|---|
 | 1 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
-| 2 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×2,9 | 2 | evet |
+| 2 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×3 | 2 | evet |
 | 3 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×4,4 | 2 | evet |
 | 4 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | ×2,6 | 3 | evet |
-| 5 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3,4 | 0 | evet |
+| 5 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3,5 | 0 | evet |
 | 6 | Kaktüs ve Sukulent Toprağı | ×3,2 | 1 | evet |
 | 7 | HG 5’li Bitki Yetiştirme Seti | ×2,8 | 0 | evet |
-| 8 | Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 545 Litre | ×3,4 | 1 | evet |
-| 9 | Sıvı Solucan Gübresi 250 ml | ×2,9 | 2 | evet |
-| 10 | HG Avokado Toprağı Özel Karışım | ×3,1 | 2 | evet |
-| 11 | Chrysamed Konsantre EC Haşere İlacı 50 Ml | ×4,4 | 1 | evet |
-| 12 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | ×3,5 | 0 | evet |
-| 13 | Limon Ağacı Toprağı - Özel Organik Karışım | ×2,4 | 1 | evet |
-| 14 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | ×2,5 | 1 | evet |
-| 15 | HG Bonsai Saksı Toprağı | ×5 | 2 | evet |
+| 8 | Sıvı Solucan Gübresi 250 ml | ×2,9 | 2 | evet |
+| 9 | HG Avokado Toprağı Özel Karışım | ×3,1 | 2 | evet |
+| 10 | Chrysamed Konsantre EC Haşere İlacı 50 Ml | ×4,4 | 1 | evet |
+| 11 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | ×3,5 | 0 | evet |
+| 12 | Limon Ağacı Toprağı - Özel Organik Karışım | ×2,4 | 1 | evet |
+| 13 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | ×2,5 | 1 | evet |
+| 14 | HG Bonsai Saksı Toprağı | ×5 | 2 | evet |
+| 15 | HG Kauçuk Ağacı Toprağı | ×3,2 | 1 | evet |
 
 ## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)
 
@@ -43,17 +43,17 @@ _Henüz veri yok._
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
 | 1 | Katı Solucan Gübresi 20 KG Çuval | 14,8 | 4 |
-| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,3 | 16 |
+| 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,2 | 16 |
 | 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,4 | 6 |
 | 4 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,6 | 7 |
-| 5 | Leonardit - Organik Toprak Düzenleyici | 5,9 | 10 |
+| 5 | Leonardit - Organik Toprak Düzenleyici | 5,8 | 10 |
 | 6 | Kullanıma Hazır Cocopeat Torfu | 5,8 | 0 |
 | 7 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 5,1 | 0 |
 | 8 | HG Akıllı Bitki ve Saksı Toprağı | 4,7 | 5 |
-| 9 | Premium Fide Toprağı | 4,6 | 11 |
+| 9 | Premium Fide Toprağı | 4,5 | 11 |
 | 10 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 4,5 | 6 |
 | 11 | HG Asidik Torf | 4,5 | 7 |
-| 12 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,5 | 2 |
+| 12 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,4 | 2 |
 | 13 | Sıvı Solucan Gübresi 1 Lt | 4,2 | 2 |
 | 14 | HG Mezar Toprağı | 4,1 | 5 |
 | 15 | Sıvı Solucan Gübresi 250 ml | 4,1 | 3 |
@@ -83,17 +83,17 @@ _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 g
 | 12 | toprak | 3 | 2 |  |  |
 | 13 | star | 3 | 2 |  |  |
 | 14 | sebze tohumu | 4 | 1 |  |  |
-| 15 | ilaçlama pompası | 3 | 2 |  |  |
-| 16 | leonardit | 3 | 2 |  |  |
-| 17 | tahta | 2 | 2 |  |  |
-| 18 | orkide | 2 | 2 |  |  |
-| 19 | leo | 2 | 2 |  |  |
-| 20 | limo | 2 | 1 |  |  |
-| 21 | yaban mersini | 2 | 1 |  |  |
-| 22 | sıvı | 2 | 1 |  |  |
-| 23 | 15 | 2 | 1 |  |  |
-| 24 | soluca | 3 | 0 |  |  |
-| 25 | böcek | 2 | 1 |  |  |
+| 15 | leonar | 3 | 2 |  |  |
+| 16 | ilaçlama pompası | 3 | 2 |  |  |
+| 17 | leonardit | 3 | 2 |  |  |
+| 18 | tahta | 2 | 2 |  |  |
+| 19 | orkide | 2 | 2 |  |  |
+| 20 | leo | 2 | 2 |  |  |
+| 21 | limo | 2 | 1 |  |  |
+| 22 | yaban mersini | 2 | 1 |  |  |
+| 23 | sıvı | 2 | 1 |  |  |
+| 24 | 15 | 2 | 1 |  |  |
+| 25 | soluca | 3 | 0 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
@@ -133,11 +133,11 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 |---|---|---|---|
 | 1 | Sıvı Solucan Gübresi 1 Lt | 11,7 | 3 |
 | 2 | HG Tarım Perliti | 4 | 18,3 |
-| 3 | HasTürk Hümix Sıvı Hümik Asit | 2,9 | 25,6 |
-| 4 | Leonardit - Organik Toprak Düzenleyici | 2,7 | 44,8 |
+| 3 | Leonardit - Organik Toprak Düzenleyici | 3,7 | 46,8 |
+| 4 | HasTürk Hümix Sıvı Hümik Asit | 2,9 | 25,6 |
 | 5 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,2 | 0,5 |
 | 6 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 2,1 | 39,1 |
-| 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,1 | 37,1 |
+| 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,1 | 39,1 |
 | 8 | SGS Bahçe Seti 3 Parça | 2,1 | 1 |
 | 9 | Arzuman Giant Italiana Maydanoz Tohumu 25 Gr | 1,7 | 0 |
 | 10 | Kaktüs ve Sukulent Toprağı | 1,4 | 24,5 |
@@ -158,14 +158,14 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 | Ürün | Görüntüleme | Sepete ekleme | Oran |
 |---|---|---|---|
-| İnsektisit MAX 5 Lt Kampanya Paketi | 44,1 | 0,9 | %2 |
-| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 43,8 | 0,8 | %2 |
+| İnsektisit MAX 5 Lt Kampanya Paketi | 46,1 | 0,9 | %2 |
+| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 45,8 | 0,8 | %2 |
 | HG Asidik Torf | 36,2 | 0,6 | %2 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 30,3 | 0 | %0 |
 | HG Mezar Toprağı | 28,8 | 0 | %0 |
 | Yuka (Yucca) Toprağı Özel Karışım | 25,9 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 21,3 | 0 | %0 |
-| Uzman 5 lt Basınçlı İlaçlama Pompası | 20 | 0 | %0 |
+| Uzman 5 lt Basınçlı İlaçlama Pompası | 21 | 0 | %0 |
 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 18,9 | 0 | %0 |
 | Envaplas Esnek Yeşil Çim Ayırıcı ve Sınırlayıcı (25 Metre) | 18,8 | 0 | %0 |
 | Limon Ağacı Toprağı - Özel Organik Karışım | 16 | 0,7 | %4 |
@@ -226,7 +226,7 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 
 | Kategori | Önerilen ürünler |
 |---|---|
-| Saksılar ve Bahçe Yatakları | Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 545 Litre (`moduler-yukseltilmis-bahce-yatagi-545-litre`)<br>Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Dekoratif Oval Silindir Fiber Saksı 36 × 40 cm (`dekoratif-oval-silindir-fiber-saksi-36x40-cm`) |
+| Saksılar ve Bahçe Yatakları | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 545 Litre (`moduler-yukseltilmis-bahce-yatagi-545-litre`)<br>Dekoratif Oval Silindir Fiber Saksı 36 × 40 cm (`dekoratif-oval-silindir-fiber-saksi-36x40-cm`) |
 | Topraklar | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt (`hindistan-cevizi-torfu-cocopeat-5-kg`)<br>HG Tarım Perliti (`tarim-perliti`) |
 | Tohumlar | DSV Lippa Lisuna 6 Mix Çim Tohumu (`dsv-lippa-lisuna-6-mix-cim-tohumu`)<br>Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) (`ayas-beyaz-bodur-domates-ata-tohumu-50-adet`)<br>Altınvadi Pazı Tohumu 10 Gr | Geniş Yapraklı (`altinvadi-pazi-tohumu-10-gr`) |
 | Gübreler | Katı Solucan Gübresi 20 KG Çuval (`kati-solucan-gubresi-20-kg-cuval`)<br>Leonardit - Organik Toprak Düzenleyici (`leonardit-organik-toprak-duzenleyici`)<br>Sıvı Solucan Gübresi 1 Lt (`sivi-solucan-gubresi-1-lt`) |
