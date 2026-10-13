@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2477 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2483 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -17,8 +17,8 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 5 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | ×2,9 | 3 | evet |
 | 6 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×2,7 | 2 | evet |
 | 7 | HG Kaktüs ve Sukulent Toprağı | ×2,8 | 1 | evet |
-| 8 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×2,2 | 1 | evet |
-| 9 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3 | 0 | evet |
+| 8 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3 | 0 | evet |
+| 9 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×2,2 | 1 | evet |
 | 10 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | ×2,8 | 1 | evet |
 | 11 | HG Areka Palmiyesi Toprağı | ×5,8 | 2 | evet |
 | 12 | Uzman 16 Lt Sırt Pulverizatörü İlaçlama Pompası (K-103) | ×4,8 | 1 | evet |
@@ -42,8 +42,8 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 23,6 | 9 |
-| 2 | HasTürk Sıvı Solucan Gübresi  | 17,2 | 14 |
+| 1 | HasTürk Solucan Gübresi  | 23,5 | 9 |
+| 2 | HasTürk Sıvı Solucan Gübresi  | 17,1 | 14 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,5 | 16 |
 | 4 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,8 | 10 |
 | 5 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 6,6 | 5 |
@@ -54,7 +54,7 @@ _Henüz veri yok._
 | 10 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,7 | 2 |
 | 11 | Premium Fide Toprağı | 4,7 | 11 |
 | 12 | HG Asidik Torf | 4,6 | 7 |
-| 13 | HG Mezar Toprağı | 4,3 | 5 |
+| 13 | HG Mezar Toprağı | 4,2 | 5 |
 | 14 | HG Tarım Perliti | 3,9 | 3 |
 | 15 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 3,8 | 5 |
 | 16 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,6 | 5 |
@@ -159,8 +159,8 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | Ürün | Görüntüleme | Sepete ekleme | Oran |
 |---|---|---|---|
 | Leonardit - Organik Toprak Düzenleyici | 44,8 | 1 | %2 |
+| İnsektisit MAX 5 Lt Kampanya Paketi | 38,1 | 0,9 | %2 |
 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 37,8 | 0,8 | %2 |
-| İnsektisit MAX 5 Lt Kampanya Paketi | 37,1 | 0,9 | %3 |
 | HG Asidik Torf | 32,2 | 0,6 | %2 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 28,3 | 0 | %0 |
 | HG Mezar Toprağı | 25,8 | 0,6 | %2 |
