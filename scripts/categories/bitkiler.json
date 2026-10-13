@@ -1,6 +1,6 @@
 {
   "store": "hasturk",
-  "apply": false,
+  "apply": true,
   "categories": [
     {
       "name": "Bitkiler", "slug": "bitkiler",
