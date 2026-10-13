@@ -196,7 +196,7 @@ test('Hakediş raporu: ödeme günü İstanbul gece yarısına göre; ödenen / 
   // İstanbul 1 Ekim 00:30 = UTC 30 Eylül 21:30 → 2026-10-01; 30 Eylül 23:59 TR = UTC 20:59 → 2026-09-30
   const a = Date.parse('2026-09-30T21:30:00Z'), b = Date.parse('2026-09-30T20:59:00Z');
   await ins('a', a, 100, true); await ins('b', b, 50, true);
-  await ins('up', now + 5 * D, 200, false); await ins('late', now - 10 * D, 30, false); await ins('grace', now - 2 * D, 20, false); await ins('x', now + 5 * D, -3, false, 'Diğer');
+  await ins('up', now + 5 * D, 200, false); await ins('late', now - 10 * D, 30, false); await ins('grace', now - 2 * D, 20, false); await ins('x', now + 5 * D, -3, false, 'Diğer', Date.parse('2026-10-05T12:00:00Z'));
   const r = await settlementReport({ DB: db }, db, {}, { from: Date.parse('2026-09-01T00:00:00+03:00'), to: Date.parse('2026-10-11T00:00:00+03:00') });
   const day = (d) => r.days.find((x) => x.d === d);
   assert.equal(day('2026-10-01').paid, 100); assert.equal(day('2026-09-30').paid, 50);
