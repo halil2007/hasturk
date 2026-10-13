@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2483 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2488 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -42,7 +42,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 23,5 | 9 |
+| 1 | HasTürk Solucan Gübresi  | 23,4 | 9 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 17,1 | 14 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,5 | 16 |
 | 4 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,8 | 10 |
@@ -52,7 +52,7 @@ _Henüz veri yok._
 | 8 | Leonardit - Organik Toprak Düzenleyici | 5 | 10 |
 | 9 | HG Akıllı Bitki ve Saksı Toprağı | 4,8 | 7 |
 | 10 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,7 | 2 |
-| 11 | Premium Fide Toprağı | 4,7 | 11 |
+| 11 | Premium Fide Toprağı | 4,6 | 11 |
 | 12 | HG Asidik Torf | 4,6 | 7 |
 | 13 | HG Mezar Toprağı | 4,2 | 5 |
 | 14 | HG Tarım Perliti | 3,9 | 3 |

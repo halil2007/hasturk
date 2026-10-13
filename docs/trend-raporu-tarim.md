@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2483 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2488 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -42,7 +42,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | Katı Solucan Gübresi 20 KG Çuval | 15,2 | 4 |
+| 1 | Katı Solucan Gübresi 20 KG Çuval | 15,1 | 4 |
 | 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,5 | 16 |
 | 3 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,8 | 10 |
 | 4 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 6,6 | 5 |
@@ -51,7 +51,7 @@ _Henüz veri yok._
 | 7 | Leonardit - Organik Toprak Düzenleyici | 5 | 10 |
 | 8 | HG Akıllı Bitki ve Saksı Toprağı | 4,8 | 7 |
 | 9 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,7 | 2 |
-| 10 | Premium Fide Toprağı | 4,7 | 11 |
+| 10 | Premium Fide Toprağı | 4,6 | 11 |
 | 11 | HG Asidik Torf | 4,6 | 7 |
 | 12 | Sıvı Solucan Gübresi 1 Lt | 4,3 | 3 |
 | 13 | HG Mezar Toprağı | 4,2 | 5 |
@@ -131,7 +131,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 
 | # | Ürün | Sepete ekleme | Görüntüleme |
 |---|---|---|---|
-| 1 | Sıvı Solucan Gübresi 1 Lt | 11,7 | 2 |
+| 1 | Sıvı Solucan Gübresi 1 Lt | 11,7 | 3 |
 | 2 | HG Tarım Perliti | 4 | 17,3 |
 | 3 | HasTürk Hümix Sıvı Hümik Asit | 2,9 | 23,6 |
 | 4 | Leonardit - Organik Toprak Düzenleyici | 2,7 | 44,8 |
@@ -171,8 +171,8 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | Envaplas Esnek Yeşil Çim Ayırıcı ve Sınırlayıcı (25 Metre) | 15,8 | 0 | %0 |
 | İnce Tarım Perliti 0.5-2.0 mm (200 Litre) | 15 | 0 | %0 |
 | Chrysamed Subon Hijyen Sprey | 14,7 | 0 | %0 |
+| Katı Solucan Gübresi 1 KG | 14,2 | 0 | %0 |
 | Bahçe Toprağı Canlandırma Seti | 14,2 | 0 | %0 |
-| HG Çim Kapama Toprağı (Leonarditli Formül) | 13,6 | 0,5 | %3 |
 
 ## Birlikte satın alınanlar (son 180 gün)
 
