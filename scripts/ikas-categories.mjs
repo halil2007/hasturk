@@ -61,12 +61,28 @@ log(`Mevcut kategori: ${cats.length}`);
 const slugs = new Set(cats.map((c) => c.metaData && c.metaData.slug).filter(Boolean));
 
 const has = (n) => metaFields.some((f) => f.name === n);
+
+// Satış kanalı: yeni kategoriler mevcut kategorilerin çoğunun ayarını alır (sitede aynı şekilde görünsünler)
+let SC = null;
+const scIn = inFields.find((f) => f.name === 'salesChannels');
+if (scIn) {
+  try {
+    const scInType = tname(scIn.type), scInFields = (await typeFields(scInType)).map((f) => f.name);
+    const d = await gql(`{ listCategory { id parentId salesChannels { ${scInFields.join(' ')} } } }`).catch(() => null);
+    const list = d && (Array.isArray(d.listCategory) ? d.listCategory : d.listCategory.data);
+    const counts = new Map();
+    for (const c of list || []) { const k = JSON.stringify(c.salesChannels || null); counts.set(k, (counts.get(k) || 0) + 1); }
+    const best = [...counts].sort((a, b) => b[1] - a[1])[0];
+    if (best && best[0] !== 'null') SC = JSON.parse(best[0]);
+    log(`Satış kanalı (${scInType}: ${scInFields.join(', ')}): mevcut kategorilerin ${best ? best[1] : 0}/${(list || []).length} tanesindeki ayar kullanılacak → ${JSON.stringify(SC)}`);
+  } catch (e) { log('UYARI: satış kanalı ayarı okunamadı, ikas varsayılanı kullanılacak: ' + e.message.slice(0, 200)); }
+}
 function input(c, parentId) {
   const meta = { slug: c.slug, pageTitle: c.pageTitle, description: c.description };
-  if (has('targetType')) meta.targetType = 'CATEGORY';
   for (const k of Object.keys(meta)) if (!has(k)) delete meta[k];
   const o = { name: c.name, metaData: meta };
   if (parentId) o.parentId = parentId;
+  if (SC) o.salesChannels = SC;
   if (inFields.some((f) => f.name === 'conditions') && required.includes('conditions')) o.conditions = [];
   if (inFields.some((f) => f.name === 'orderType') && required.includes('orderType')) o.orderType = 'MANUAL';
   return o;
