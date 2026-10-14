@@ -111,6 +111,7 @@ const PRODUCT_OPTIONAL = {
   productVariantTypes: 'productVariantTypes { variantTypeId variantValueIds }',
   variantValueIds: 'variantValueIds { variantTypeId variantValueId }',
   sellIfOutOfStock: 'sellIfOutOfStock',
+  stockLocationId: 'stockLocationId',
   // Paket (BUNDLE) ürünlerin kendi stoğu yok; içindeki ürünlerden hesaplanır
   bundleSettings: 'bundleSettings { products { productId quantity filteredVariantIds } }',
 };
@@ -126,7 +127,7 @@ query ($page: Int!) {
       variants {
         id sku isActive ${o.sellIfOutOfStock} ${o.variantValueIds}
         prices { sellPrice discountPrice priceListId }
-        stocks { stockCount }
+        stocks { stockCount ${o.stockLocationId} }
         images { imageId fileName isMain order isVideo }
       }
     }
@@ -145,6 +146,21 @@ async function fetchProducts() {
     if (!r.hasNext || r.data.length === 0 || page > 100) break;
   }
   return all;
+}
+
+// Sitenin satış kanalının (STOREFRONT; IKAS_SALES_CHANNEL_ID verilmişse o) sattığı depolar. Stok sadece bu depolardan
+// sayılır: pazaryeri gibi başka kanalların deposundaki stok sitede satılamaz, Ürün Bul da "stokta" dememeli.
+async function fetchStockLocations() {
+  try {
+    const list = (await gql('{ listSalesChannel { id name type stockLocations { id } } }')).listSalesChannel || [];
+    const ch = list.find((c) => env.IKAS_SALES_CHANNEL_ID && c.id === env.IKAS_SALES_CHANNEL_ID) || list.find((c) => c.type === 'STOREFRONT');
+    if (!ch || !(ch.stockLocations || []).length) { console.warn('UYARI: sitenin satış kanalı deposu bulunamadı; tüm depolar sayılıyor'); return null; }
+    console.log(`Stok: "${ch.name}" kanalının ${ch.stockLocations.length} deposu sayılıyor`);
+    return new Set(ch.stockLocations.map((l) => l.id));
+  } catch (e) {
+    console.warn('UYARI: satış kanalı depoları okunamadı; tüm depolar sayılıyor: ' + String(e.message).slice(0, 160));
+    return null;
+  }
 }
 
 async function fetchCategories() {
@@ -193,7 +209,7 @@ function pickPrice(prices = []) {
   return { sell, disc };
 }
 
-function transform({ products, categories, variantTypes, merchantId, config }) {
+function transform({ products, categories, variantTypes, merchantId, config, locs }) {
   const valueName = new Map();
   for (const t of variantTypes) for (const v of t.values || []) valueName.set(v.id, v.name);
 
@@ -201,7 +217,12 @@ function transform({ products, categories, variantTypes, merchantId, config }) {
   const items = [];
 
   // Paket ürün stoğu: içindeki her ürünün (varsa izin verilen varyantlarından) en az biri istenen adette stokta olmalı
-  const vStock = (v) => (v.stocks || []).reduce((s, x) => s + (x.stockCount || 0), 0);
+  // Sadece sitenin satış kanalının depoları (locs); depo bilgisi gelmediyse hepsi
+  let otherLoc = 0;
+  const vStock = (v) => (v.stocks || []).reduce((s, x) => {
+    if (locs && x.stockLocationId && !locs.has(x.stockLocationId)) { if (x.stockCount > 0) otherLoc++; return s; }
+    return s + (x.stockCount || 0);
+  }, 0);
   const byId = new Map(products.map((p) => [p.id, p]));
   const isBundle = (p) => String(p.type || '').toUpperCase() === 'BUNDLE';
   function bundleInStock(p) {
@@ -956,10 +977,10 @@ async function main() {
   } else {
     TOKEN = await getToken();
     console.log('Token alındı');
-    const [products, categories, variantTypes, merchantId] = await Promise.all([
-      fetchProducts(), fetchCategories(), fetchVariantTypes(), fetchMerchantId(),
+    const [products, categories, variantTypes, merchantId, locs] = await Promise.all([
+      fetchProducts(), fetchCategories(), fetchVariantTypes(), fetchMerchantId(), fetchStockLocations(),
     ]);
-    raw = { products, categories, variantTypes, merchantId };
+    raw = { products, categories, variantTypes, merchantId, locs };
   }
   const out = transform({ ...raw, config });
   if (!out.items.length) die('Hiç ürün çıkmadı; products.json güncellenmedi.');
