@@ -308,6 +308,7 @@ function transform({ products, categories, variantTypes, merchantId, config, loc
     c.k = items.filter((it) => it.c.some((x) => ids.has(x))).length;
   }
 
+  if (otherLoc) console.log(`Stok: ${otherLoc} varyant-depo kaydındaki stok başka kanalın deposunda olduğu için sayılmadı`);
   return {
     v: 1,
     updated: new Date().toISOString(),
@@ -380,7 +381,7 @@ async function fetchTrends() {
 
 // Gerçek satışlar: [from, to] aralığındaki siparişlerde ürün satırları (iptal/iade hariç).
 // Uygulamanın sipariş okuma izni yoksa atlanır (ürün senkronu etkilenmez).
-let ORDER_Q = null; // çalışan sorgu biçimi (ilk denemede bulunur)
+let ORDER_Q = null; // çalışan sorgu biçiminin sırası (ilk denemede bulunur; tarih aralığı her çağrıda yeniden verilir)
 async function fetchOrdersRange(from, to, maxPages) {
   const line = 'orderLineItems { quantity status variant { id productId } }';
   const variants = [
@@ -389,7 +390,7 @@ async function fetchOrdersRange(from, to, maxPages) {
     (pg) => [`query($p: PaginationInput) { listOrder(pagination: $p) { hasNext data { status orderedAt orderLineItems { quantity variant { id productId } } } } }`, { p: pg }],
   ];
   let lastErr;
-  for (const build of ORDER_Q ? [ORDER_Q] : variants) {
+  for (const build of ORDER_Q != null ? [variants[ORDER_Q]] : variants) {
     try {
       const out = { orders: 0, lines: [], ts: [] };
       for (let page = 1; page <= maxPages; page++) {
@@ -411,7 +412,7 @@ async function fetchOrdersRange(from, to, maxPages) {
         }
         if (!r.hasNext || !(r.data || []).length || (old && old === r.data.length)) break;
       }
-      ORDER_Q = build;
+      ORDER_Q = variants.indexOf(build);
       return out;
     } catch (e) { lastErr = e; }
   }
