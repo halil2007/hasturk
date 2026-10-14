@@ -1,0 +1,23 @@
+name: Senkron kontrolü (canlı)
+
+# Yayındaki ürün dosyalarının güncelliğini ve rastgele ürünlerin fiyat/stok bilgisinin sitelerle aynı olduğunu
+# kontrol eder. Hiçbir şey değiştirmez; sonuç işin özet sayfasında.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/sync-check.mjs', '.github/workflows/sync-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/sync-check.mjs
