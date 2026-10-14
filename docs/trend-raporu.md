@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2666 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2680 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -42,9 +42,9 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 22,7 | 8 |
+| 1 | HasTürk Solucan Gübresi  | 22,6 | 8 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 16,4 | 13 |
-| 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,2 | 16 |
+| 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,1 | 16 |
 | 4 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,3 | 6 |
 | 5 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,5 | 7 |
 | 6 | Leonardit - Organik Toprak Düzenleyici | 5,8 | 10 |
@@ -57,8 +57,8 @@ _Henüz veri yok._
 | 13 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,4 | 2 |
 | 14 | HG Mezar Toprağı | 4,1 | 5 |
 | 15 | HG Tarım Perliti | 3,7 | 3 |
-| 16 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 3,7 | 5 |
-| 17 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,4 | 4 |
+| 16 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 3,6 | 5 |
+| 17 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,3 | 4 |
 | 18 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | 3,3 | 3 |
 | 19 | HG Avokado Toprağı Özel Karışım | 3,1 | 3 |
 | 20 | HasTürk Hümix Sıvı Hümik Asit | 2,9 | 1 |
