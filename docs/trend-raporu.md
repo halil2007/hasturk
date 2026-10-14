@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2664 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2666 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -43,10 +43,10 @@ _Henüz veri yok._
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
 | 1 | HasTürk Solucan Gübresi  | 22,7 | 8 |
-| 2 | HasTürk Sıvı Solucan Gübresi  | 16,5 | 13 |
+| 2 | HasTürk Sıvı Solucan Gübresi  | 16,4 | 13 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,2 | 16 |
 | 4 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,3 | 6 |
-| 5 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,6 | 7 |
+| 5 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,5 | 7 |
 | 6 | Leonardit - Organik Toprak Düzenleyici | 5,8 | 10 |
 | 7 | Kullanıma Hazır Cocopeat Torfu | 5,7 | 0 |
 | 8 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 5 | 0 |
@@ -59,7 +59,7 @@ _Henüz veri yok._
 | 15 | HG Tarım Perliti | 3,7 | 3 |
 | 16 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 3,7 | 5 |
 | 17 | Limon Ağacı Toprağı - Özel Organik Karışım  | 3,4 | 4 |
-| 18 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | 3,4 | 3 |
+| 18 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | 3,3 | 3 |
 | 19 | HG Avokado Toprağı Özel Karışım | 3,1 | 3 |
 | 20 | HasTürk Hümix Sıvı Hümik Asit | 2,9 | 1 |
 
@@ -162,8 +162,8 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | Leonardit - Organik Toprak Düzenleyici | 43,6 | 1,9 | %4 |
 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 42,7 | 0,8 | %2 |
 | HG Asidik Torf | 33,8 | 0,5 | %2 |
+| Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 28,5 | 0 | %0 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 28,3 | 0 | %0 |
-| Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 27,5 | 0 | %0 |
 | HG Mezar Toprağı | 26,8 | 0,5 | %2 |
 | Yuka (Yucca) Toprağı Özel Karışım | 24,2 | 0 | %0 |
 | Gold Valley Fare Kulağı Tohumu 500 Gr | 23 | 0 | %0 |
@@ -176,29 +176,29 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 ## Birlikte satın alınanlar (son 180 gün)
 
-1081 siparişin 429 tanesinde birden fazla ürün var. En az 2 siparişte birlikte alınan çiftler; kaldıraç = tesadüfe göre kaç kat sık birlikte alındığı. Sepete ekleme sonrası "Bunu alanlar bunları da aldı" önerisi bu listeden gelir (128 ürün); listede olmayan ürünlerde `config.json > crossSell` kuralları kullanılır.
+1080 siparişin 428 tanesinde birden fazla ürün var. En az 2 siparişte birlikte alınan çiftler; kaldıraç = tesadüfe göre kaç kat sık birlikte alındığı. Sepete ekleme sonrası "Bunu alanlar bunları da aldı" önerisi bu listeden gelir (128 ürün); listede olmayan ürünlerde `config.json > crossSell` kuralları kullanılır.
 
 | # | Ürün | Birlikte alınan | Sipariş | Kaldıraç |
 |---|---|---|---|---|
-| 1 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | HG Tarım Perliti | 22 | ×4,6 |
+| 1 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | HG Tarım Perliti | 22 | ×4,7 |
 | 2 | HasTürk Solucan Gübresi  | HasTürk Sıvı Solucan Gübresi  | 34 | ×1,8 |
 | 3 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 15 | ×32 |
-| 4 | HG Vermikülit | Leonardit - Organik Toprak Düzenleyici | 14 | ×9,6 |
+| 4 | HG Vermikülit | Leonardit - Organik Toprak Düzenleyici | 14 | ×9,9 |
 | 5 | Leonardit - Organik Toprak Düzenleyici | HG Tarım Perliti | 13 | ×5,2 |
-| 6 | HG Vermikülit | HG Tarım Perliti | 12 | ×7,9 |
+| 6 | HG Vermikülit | HG Tarım Perliti | 12 | ×8,2 |
 | 7 | Güzelbahçe İthal Torf Genel Kullanım | HG Tarım Perliti | 8 | ×7,1 |
-| 8 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | HG Vermikülit | 10 | ×3,6 |
-| 9 | HasTürk Solucan Gübresi  | Leonardit - Organik Toprak Düzenleyici | 13 | ×2 |
+| 8 | HasTürk Solucan Gübresi  | Leonardit - Organik Toprak Düzenleyici | 13 | ×2 |
+| 9 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | HG Vermikülit | 9 | ×3,4 |
 | 10 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | Leonardit - Organik Toprak Düzenleyici | 10 | ×2,2 |
 | 11 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | Turuncu Salkım Domates Ata Tohumu (50 Adet) | 6 | ×15,4 |
 | 12 | Kullanıma Hazır Cocopeat Torfu | HG Tarım Perliti | 6 | ×8,2 |
 | 13 | HasTürk Sıvı Solucan Gübresi  | Leonardit - Organik Toprak Düzenleyici | 11 | ×1,6 |
 | 14 | Leonardit - Organik Toprak Düzenleyici | Organik Toprak / Solucan Gübreli ve Leonarditli | 6 | ×4,4 |
-| 15 | Altınvadi Pembe Domates Tohumu 5 Gr | Arzuman Köy Tipi Domates Tohumu | 5 | ×44,7 |
+| 15 | Altınvadi Pembe Domates Tohumu 5 Gr | Arzuman Köy Tipi Domates Tohumu | 5 | ×44,6 |
 | 16 | Arzuman Çengelköy Hıyar Tohumu 10 Gr | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 5 | ×16,4 |
-| 17 | Arzuman Hercai Menekşe Tohumu - 100 Adet | Arzuman Lavanta Tohumu - 100 Adet | 5 | ×60,1 |
-| 18 | Arzuman Lavanta Tohumu - 100 Adet | Arzuman Petunya / Boru Çiçeği Tohumu (100 Adet) | 5 | ×60,1 |
-| 19 | Arzuman Papatya Tohumu (100 Adet) | Arzuman Şebboy Çiçeği Tohumu (100 Adet) | 5 | ×77,2 |
+| 17 | Arzuman Hercai Menekşe Tohumu - 100 Adet | Arzuman Lavanta Tohumu - 100 Adet | 5 | ×60 |
+| 18 | Arzuman Lavanta Tohumu - 100 Adet | Arzuman Petunya / Boru Çiçeği Tohumu (100 Adet) | 5 | ×60 |
+| 19 | Arzuman Papatya Tohumu (100 Adet) | Arzuman Şebboy Çiçeği Tohumu (100 Adet) | 5 | ×77,1 |
 | 20 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | Topak Patlıcan Ata Tohumu (50 Adet) | 5 | ×20 |
 | 21 | Doğal Orman Toprağı / %100 Organik ve Humuslu | HG Premium Sebze Yetiştirme Toprağı | 5 | ×5,2 |
 | 22 | HasTürk Solucan Gübresi  | HG Premium Sebze Yetiştirme Toprağı | 10 | ×1,2 |

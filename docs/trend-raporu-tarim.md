@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2664 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2666 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -45,7 +45,7 @@ _Henüz veri yok._
 | 1 | Katı Solucan Gübresi 20 KG Çuval | 14,7 | 4 |
 | 2 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9,2 | 16 |
 | 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,3 | 6 |
-| 4 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,6 | 7 |
+| 4 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6,5 | 7 |
 | 5 | Leonardit - Organik Toprak Düzenleyici | 5,8 | 10 |
 | 6 | Kullanıma Hazır Cocopeat Torfu | 5,7 | 0 |
 | 7 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 5 | 0 |
@@ -59,7 +59,7 @@ _Henüz veri yok._
 | 15 | Sıvı Solucan Gübresi 250 ml | 4,1 | 3 |
 | 16 | HG Tarım Perliti | 3,7 | 3 |
 | 17 | Limon Ağacı Toprağı - Özel Organik Karışım | 3,4 | 4 |
-| 18 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | 3,4 | 3 |
+| 18 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | 3,3 | 3 |
 | 19 | Sıvı Solucan Gübresi 500 ml | 3,2 | 3 |
 | 20 | Uzman 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası | 3,1 | 3 |
 
@@ -176,33 +176,33 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 ## Birlikte satın alınanlar (son 180 gün)
 
-1131 siparişin 436 tanesinde birden fazla ürün var. En az 2 siparişte birlikte alınan çiftler; kaldıraç = tesadüfe göre kaç kat sık birlikte alındığı. Sepete ekleme sonrası "Bunu alanlar bunları da aldı" önerisi bu listeden gelir (136 ürün); listede olmayan ürünlerde `config.json > crossSell` kuralları kullanılır.
+1130 siparişin 435 tanesinde birden fazla ürün var. En az 2 siparişte birlikte alınan çiftler; kaldıraç = tesadüfe göre kaç kat sık birlikte alındığı. Sepete ekleme sonrası "Bunu alanlar bunları da aldı" önerisi bu listeden gelir (136 ürün); listede olmayan ürünlerde `config.json > crossSell` kuralları kullanılır.
 
 | # | Ürün | Birlikte alınan | Sipariş | Kaldıraç |
 |---|---|---|---|---|
-| 1 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | HG Tarım Perliti | 22 | ×4,8 |
+| 1 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | HG Tarım Perliti | 22 | ×4,9 |
 | 2 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51) | 15 | ×33,5 |
-| 3 | HG Vermikülit | Leonardit - Organik Toprak Düzenleyici | 14 | ×10 |
+| 3 | HG Vermikülit | Leonardit - Organik Toprak Düzenleyici | 14 | ×10,3 |
 | 4 | Leonardit - Organik Toprak Düzenleyici | HG Tarım Perliti | 13 | ×5,4 |
-| 5 | HG Vermikülit | HG Tarım Perliti | 12 | ×8,3 |
+| 5 | HG Vermikülit | HG Tarım Perliti | 12 | ×8,5 |
 | 6 | Katı Solucan Gübresi 3 KG | Sıvı Solucan Gübresi 1 Lt | 11 | ×10,4 |
 | 7 | Katı Solucan Gübresi 20 KG Çuval | Sıvı Solucan Gübresi 1 Lt | 9 | ×4,8 |
 | 8 | Güzelbahçe İthal Torf Genel Kullanım | HG Tarım Perliti | 8 | ×7,4 |
-| 9 | HG Vermikülit | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 10 | ×3,8 |
-| 10 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | Turuncu Salkım Domates Ata Tohumu (50 Adet) | 7 | ×18,9 |
-| 11 | Katı Solucan Gübresi 5 KG | HG Tarım Perliti | 7 | ×7,1 |
+| 9 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | Turuncu Salkım Domates Ata Tohumu (50 Adet) | 7 | ×18,8 |
+| 10 | Katı Solucan Gübresi 5 KG | HG Tarım Perliti | 7 | ×7,1 |
+| 11 | HG Vermikülit | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 9 | ×3,5 |
 | 12 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | Leonardit - Organik Toprak Düzenleyici | 10 | ×2,3 |
-| 13 | Altınvadi Pembe Domates Tohumu 5 Gr | Arzuman Köy Tipi Domates Tohumu | 6 | ×56,1 |
-| 14 | Arzuman Çengelköy Hıyar Tohumu 10 Gr | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 6 | ×20,6 |
+| 13 | Altınvadi Pembe Domates Tohumu 5 Gr | Arzuman Köy Tipi Domates Tohumu | 6 | ×56 |
+| 14 | Arzuman Çengelköy Hıyar Tohumu 10 Gr | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 6 | ×20,5 |
 | 15 | Katı Solucan Gübresi 5 KG | Leonardit - Organik Toprak Düzenleyici | 6 | ×6,3 |
 | 16 | Kullanıma Hazır Cocopeat Torfu | HG Tarım Perliti | 6 | ×8,5 |
 | 17 | Organik Toprak ( Solucan Gübreli ve Leonarditli) | Leonardit - Organik Toprak Düzenleyici | 6 | ×4,6 |
 | 18 | Altınvadi Pembe Domates Tohumu 5 Gr | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 5 | ×17,1 |
 | 19 | Arzuman Hercai Menekşe Tohumu - 100 Adet | Arzuman Lavanta Tohumu - 100 Adet | 5 | ×62,8 |
 | 20 | Arzuman Lavanta Tohumu - 100 Adet | Arzuman Petunya / Boru Çiçeği Tohumu (100 Adet) | 5 | ×62,8 |
-| 21 | Arzuman Papatya Tohumu (100 Adet) | Arzuman Şebboy Çiçeği Tohumu (100 Adet) | 5 | ×80,8 |
+| 21 | Arzuman Papatya Tohumu (100 Adet) | Arzuman Şebboy Çiçeği Tohumu (100 Adet) | 5 | ×80,7 |
 | 22 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | Topak Patlıcan Ata Tohumu (50 Adet) | 5 | ×20,9 |
-| 23 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | Katı Solucan Gübresi 5 KG | 6 | ×3,3 |
+| 23 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | Katı Solucan Gübresi 5 KG | 6 | ×3,4 |
 | 24 | Sıvı Solucan Gübresi 250 ml | Katı Solucan Gübresi 1 KG | 6 | ×3,1 |
 | 25 | HG Premium Sebze Yetiştirme Toprağı | HG Çilek Toprağı Özel Karışım | 5 | ×4 |
 
