@@ -1,0 +1,26 @@
+name: Stok tanısı
+
+# Sadece okur: bir ürünün depo bazında stoğu ve satış kanallarının depoları (Ürün Bul ile sitenin stok farkı için).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/stock-diag.mjs', '.github/workflows/stock-diag.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/stock-diag.mjs
+        env:
+          IKAS_STORE: ${{ secrets.IKAS_STORE }}
+          IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
