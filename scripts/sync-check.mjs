@@ -39,7 +39,8 @@ for (const s of SITES) {
     try { const pr = await fetch(s.site + '/' + p.s, { headers: UA }); if (!pr.ok) { log(`  ? ${p.n.slice(0, 50)}: sayfa açılmadı (HTTP ${pr.status})`); skip++; continue; } html = await pr.text(); } catch (e) { skip++; continue; }
     const { prices, avail } = ld(html);
     if (!prices.size) { log(`  ? ${p.n.slice(0, 50)}: sayfada fiyat bilgisi okunamadı`); skip++; continue; }
-    const vp = new Set([money(p.p), ...(p.v || []).map((v) => money(v.p)).filter((x) => !isNaN(x))]);
+    // p = liste fiyatı, d = indirimli satış fiyatı (varsa); seçenekli üründe her seçeneğin fiyatı
+    const vp = new Set([p.p, p.d, ...(p.v || []).flatMap((v) => [v.p, v.d])].filter((x) => x != null).map(money).filter((x) => !isNaN(x)));
     const priceOk = [...vp].some((x) => prices.has(x));
     const stockOk = avail == null || (avail === 'in') === !!p.st;
     if (priceOk && stockOk) ok++;
