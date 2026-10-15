@@ -23,7 +23,9 @@ const USTA = 'Kesin bilgi için müşteri hizmetlerimizden destek alabilirsiniz.
 const out = [];
 // durum: hazir = doğrulanmış tablolardan/ürün bilgisinden üretildi, canlıda kullanılır. Claude'un yeni cevapları
 // sunucuda 'onay-bekliyor' olarak tutulur ve onaylanınca havuza katılır.
-const add = (e) => { if (e.urun && (e.tur === 'urun' || e.tur === 'saksi' || e.tur === 'pompa')) e.sorular = kisaKalip(e.sorular, ((bySlug.get(e.urun) || {}).n || '')); out.push({ id: 'h' + String(out.length + 1).padStart(4, '0'), durum: 'hazir', ...e }); };
+// Aynı cümle bir cevapta iki kez geçmesin ("Kesin bilgi için müşteri hizmetlerimizden…" gibi); " ." → "."
+const tekil = (c) => { const g = new Set(); return c.replace(/ +([.,;:])/g, '$1').replace(/[^.!?\n]+[.!?]/g, (m) => { const k = m.trim().toLocaleLowerCase('tr-TR'); if (k.length > 20 && g.has(k)) return ''; g.add(k); return m; }).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(); };
+const add = (e) => { if (e.cevap) e.cevap = tekil(e.cevap); if (e.urun && (e.tur === 'urun' || e.tur === 'saksi' || e.tur === 'pompa')) e.sorular = kisaKalip(e.sorular, ((bySlug.get(e.urun) || {}).n || '')); out.push({ id: 'h' + String(out.length + 1).padStart(4, '0'), durum: 'hazir', ...e }); };
 const lc = (s) => s.toLocaleLowerCase('tr-TR');
 // Kısa ürün adı: müşteri marka ve paket ölçüsü yazmaz ("hastürk sıvı solucan gübresi 1 lt" → "sıvı solucan gübresi")
 const MARKA = new Set(['hg', 'hastürk', 'hasturk', 'arzuman', 'altınvadi', 'egarden', 'reflex', 'wanpy', 'prochoice', 'chrysamed', 'brit', 'proline', 'uzman', 'raco', 'bestpet', 'quik', 'tigem', 'felicia', 'sgs', 'florist', 'jungle', 'tarm', 'delta', 'flip', 'güzelbahçe', 'lıtolan', 'litolan', 'beavis', 'dsv', 'lippa', 'spectrum', 'sinpest', 'trendline', 'ilposan', 'i̇lposan', 'biosas', 'komelon', 'envaplas', 'gartengold', 'icl', 'klasmann', 'pomsan', 'qts', 'serinova', 'özka', 'arom', 'gold', 'valley']);
@@ -123,6 +125,24 @@ for (const pl of (config.soilMatch || {}).plants || []) {
     urunler: ozel ? [ozel] : [], kaynak: 'config:soilMatch' });
 }
 
+// Ürün açıklamaları çoğu zaman ürün adını tekrar ederek başlar ("SUBON BUG STOP 500 ML – Bitki Spreyi Subon Bug Stop 500 ML, iç ve
+// dış mekân…"). Baştaki, kelimelerinin çoğu ürün adından oluşan (ya da tamamı büyük harf) parçalar atılır.
+const kel = (s) => lc(s).replace(/[^\p{L}\p{N} ]/gu, ' ').split(/\s+/).filter((x) => x.length > 1);
+const adAt = (s, ad) => {
+  const A = new Set(kel(ad)); s = String(s || '').trim();
+  for (let k = 0; k < 5; k++) {
+    const m = s.match(/^(.{3,120}?)(?:\s[–—-]\s|,\s|\s,\s?)/); if (!m) break;
+    const w = kel(m[1]); if (!w.length || w.length > 14) break;
+    const ad1 = w.filter((x) => A.has(x)).length / w.length, buyuk = /\p{L}/u.test(m[1]) && m[1] === m[1].toLocaleUpperCase('tr-TR');
+    if (ad1 < 0.6 && !buyuk) break;
+    s = s.slice(m[0].length).trim();
+  }
+  return s;
+};
+// İki metin aynı bilgiyi mi söylüyor (kelimelerin %80'i ortak)
+const benzer = (a, list) => { const A = new Set(kel(a).filter((x) => x.length > 2)); if (A.size < 4) return false;
+  return list.some((b) => { const B = new Set(kel(b).filter((x) => x.length > 2)); if (B.size < 4) return false; let n = 0; A.forEach((x) => B.has(x) && n++); return n / Math.min(A.size, B.size) > 0.8; }); };
+
 // E) Diğer tüm ürünler: ürün sayfasından otomatik kartlar ("ürün bilgisine göre")
 for (const [slug, c] of Object.entries(oto)) {
   if (!bySlug.has(slug)) continue;
@@ -136,19 +156,26 @@ for (const [slug, c] of Object.entries(oto)) {
     while (i < aw.length && i < ow.length && lc(ow[i]).replace(/[,:;]$/, '') === aw[i]) i++;
     if (i >= 3 && i >= aw.length * 0.6) oz = ow.slice(i).join(' ').replace(/^[\s,:;—–-]+/, '');
   }
+  // Açıklamadaki kaçış karakterleri ("\\n") ve satıcı bilgisi ("Ürün Kodu: … | Marka: … | Satıcı: …") müşteriye gösterilmez
+  const temiz = (t) => String(t || '').replace(/\\[nrt]/g, ' ').replace(/Ürün Kodu:[^|]*\|\s*Marka:[^|]*\|\s*Satıcı:\s*[^\s🐱🐶]+(\s+[^\s🐱🐶]+)?/g, ' ').replace(/\s+/g, ' ').trim();
+  oz = adAt(temiz(oz), c.ad);
   if (oz && oz.length < 25) oz = '';
   let cevap = `${c.ad}${oz ? ' — ' + oz.charAt(0).toLocaleUpperCase('tr-TR') + oz.slice(1) : ''}`;
   if (c.ph) cevap += `\n\npH: ${c.ph}`;
-  if (c.icerik) cevap += `\n\n${c.icerik}`;
+  if (c.icerik && !benzer(c.icerik, [oz])) cevap += `\n\n${c.icerik}`;
   const tu0 = toh.urunler[slug];
-  if (c.kullanim.length && !(tu0 && tu0.tur)) cevap += `\n\nÜrün bilgisine göre:\n${c.kullanim.map((k) => '• ' + k).join('\n')}`;
+  // Madde listesi: özetle ya da önceki maddeyle aynı olan, yalnız ürün adını tekrarlayan ve bilgi taşımayan başlık
+  // parçaları ("Kullanım Alanları X;") atılır
+  const km = [];
+  for (const k0 of c.kullanim) { const k = adAt(temiz(k0), c.ad); if (k.length >= 25 && !/[;:?]$|\?\s*\([^)]*\)$/.test(k) && !benzer(k, [oz, c.ozet || '', c.icerik || '', ...km])) km.push(k.charAt(0).toLocaleUpperCase('tr-TR') + k.slice(1)); }
+  if (km.length && !(tu0 && tu0.tur)) cevap += `\n\nÜrün bilgisine göre:\n${km.map((k) => '• ' + k).join('\n')}`;
   if (c.kural === 'ilac') cevap += `\n\nKullanım miktarı ve güvenlik uyarıları için ürün etiketine uyunuz. ${USTA}`;
   const tu = toh.urunler[slug], tt = tu && tu.tur && toh.turler[tu.tur];
   if (tt) {
     cevap += `\n\n${tt.ad} ekim bilgisi:\n${tohumMetin(tt)}`;
     if (tu.tohumSayisi) cevap += `\n• Bu pakette (${String(tu.gram).replace('.', ',')} g) yaklaşık ${tu.tohumSayisi[0].toLocaleString('tr-TR')}–${tu.tohumSayisi[1].toLocaleString('tr-TR')} tohum bulunur.`;
     if (tt.saklama) cevap += `\n• Serin, kuru ve karanlık yerde saklanırsa tohumlar yaklaşık ${tt.saklama} yıl canlı kalır.`;
-  } else if (tu) cevap += `\n\nGenel kural: ${toh.genel.derinlik}`;
+  } else if (tu) cevap += `\n\nGenel kural: ${toh.genel.derinlik.replace(/^Pratik kural:\s*/, '')}`;
   const tohum = c.kategori === 'Tohumlar' || !!tu;
   const sorular = [`${n} nasıl kullanılır`, `${n} ne işe yarar`, `${n} özellikleri`, `${n} nedir`, `${n} nasıl uygulanır`, `${n} ne zaman kullanılır`, `${n} hangi bitkilerde kullanılır`];
   if (tohum) sorular.push(`${n} ne zaman ekilir`, `${n} nasıl ekilir`, `${n} ekim zamanı`, `${n} kaç tohum var`, `${n} kaç cm derine ekilir`);
