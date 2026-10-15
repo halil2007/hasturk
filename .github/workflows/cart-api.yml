@@ -1,11 +1,12 @@
 name: Sepete ekleme isteği tanısı
 
-# Gerçek sitede sitenin kendi sepete ekleme isteği ve sayfa açmadan doğrudan ekleme denemesi. Anonim sepet, sipariş verilmez.
+# Gerçek sitede sepete ekleme: ikas'ın kendi window.addToCart işlevi ve Ürün Bul / Bilge Bey'den ekleme (daldaki widget).
+# Anonim sepet, sipariş verilmez.
 on:
   workflow_dispatch:
   push:
     branches: ['claude/**']
-    paths: ['scripts/cart-api.mjs', 'scripts/cart-win.mjs', '.github/workflows/cart-api.yml']
+    paths: ['scripts/cart-api.mjs', 'scripts/cart-win.mjs', 'scripts/cart-widget.mjs', '.github/workflows/cart-api.yml', 'public/pm-search.js']
 
 permissions:
   contents: read
@@ -18,7 +19,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { site: 'https://hasturkgubre.com.tr', product: 'tarim-perliti', other: 'kalin-tarim-perliti' }
+          - { site: 'https://hasturkgubre.com.tr', query: 'tarım perliti' }
+          - { site: 'https://tarim-dunyasi.com', query: 'perlit' }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -27,8 +29,7 @@ jobs:
       - run: |
           npm i --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
-      - run: node scripts/cart-win.mjs
+      - run: node scripts/cart-widget.mjs
         env:
           SITE_URL: ${{ matrix.site }}
-          PRODUCT: ${{ matrix.product }}
-          OTHER: ${{ matrix.other }}
+          QUERY: ${{ matrix.query }}
