@@ -167,10 +167,40 @@ for (const [konu, sorular] of Object.entries({
   sicak: ['yazlık sebzeler hangileri', 'sıcak iklim sebzeleri', 'ilkbaharda hangi sebzeler ekilir', 'soğuğa hassas sebzeler'],
 })) add({ tur: 'tohum-genel', konu, sorular, cevap: `${toh.genel[konu]}\n\n${tKaynak(toh.genel.k)}`, urunler: [], kaynak: `tohum:genel:${konu}` });
 
+// H) İlaçlama pompaları (bilgi/pompalar.json; akbilge-pompa.mjs üretir): akülü/manuel, şarj, kapasite, garanti
+const pm = JSON.parse(await readFile('bilgi/pompalar.json', 'utf8'));
+const pmSatir = (p) => [
+  p.tip === 'akulu' ? 'Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür' : `Tip: Manuel — şarj/akü gerektirmez${p.mekanizma ? ', ' + p.mekanizma : ''}`,
+  p.depo && `Depo: ${p.depo} litre${p.tasima ? ' · ' + p.tasima : ''}`,
+  p.aku && `Akü: ${p.aku}`,
+  (p.calisma || p.calismaDepo) && `Tek şarjla: ${[p.calisma, p.calismaDepo, p.calismaLitre && '≈ ' + p.calismaLitre].filter(Boolean).join(' · ')}`,
+  p.sarj && `Şarj: ${p.sarj}`, p.sarjGiris && `Şarj girişi: ${p.sarjGiris}`,
+  p.basinc && `Basınç: ${p.basinc}`, p.atis && `Atış mesafesi: ${p.atis}`, p.akis && `Akış: ${p.akis}`,
+  [p.nozul, p.hortum, p.lans, p.motor].filter(Boolean).join(', '),
+  `Garanti: ${pm.garanti.ay} ay`,
+].filter(Boolean).map((x) => '• ' + x).join('\n');
+for (const p of pm.pompalar) {
+  const n = lc(p.ad).replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  let cevap = `${p.ad}\n\n${pmSatir(p)}`;
+  if (p.tip === 'akulu' && !p.calisma && !p.calismaDepo) cevap += '\n\nTek şarjla çalışma süresi ürün bilgisinde belirtilmemiş; ustamız bilgi verebilir.';
+  if (p.bos) cevap += '\n\nDiğer teknik bilgiler için ustamız size yardımcı olsun.';
+  add({ tur: 'pompa', urun: p.slug, sorular: [`${n} akülü mü`, `${n} şarjlı mı`, `${n} manuel mi`, `${n} şarjı ne kadar gider`, `${n} kaç saat şarj olur`, `${n} kaç litre`, `${n} garantisi var mı`, `${n} özellikleri`],
+    cevap, urunler: [p.slug, ...((bySlug.get(p.slug) || {}).x || []).slice(0, 2)], kaynak: `pompa:${p.slug}` });
+}
+const akl = pm.pompalar.filter((p) => p.tip === 'akulu' && bySlug.has(p.slug)), man = pm.pompalar.filter((p) => p.tip === 'manuel' && bySlug.has(p.slug));
+const kisaP = (p) => `• ${p.ad}${p.calisma || p.calismaDepo ? ' — tek şarjla ' + [p.calisma, p.calismaDepo].filter(Boolean).join(' / ') : ''}${p.sarj ? '; ' + p.sarj : ''}`;
+add({ tur: 'pompa-genel', konu: 'garanti', sorular: ['ilaçlama pompası garantisi', 'pompanın garantisi var mı', 'ilaçlama pompası kaç yıl garantili', 'akülü pompa garanti süresi', 'garanti süresi ne kadar'],
+  cevap: `${pm.garanti.metin} (${pm.garanti.ay} ay = 2 yıl)`, urunler: [], kaynak: 'pompa:garanti' });
+add({ tur: 'pompa-genel', konu: 'akulu-manuel', sorular: ['akülü mü manuel mi ilaçlama pompası', 'akülü pompa mı almalıyım', 'manuel ilaçlama pompası mı akülü mü', 'hangi ilaçlama pompasını almalıyım', 'ilaçlama pompası önerisi'],
+  cevap: 'Manuel pompalar şarj gerektirmez, her an kullanıma hazırdır; küçük (0,5–2 L) basınçlı modeller birkaç kez pompalanıp basıncı tutar, 16–20 L sırt tipi kollu modeller ilaçlama sırasında elle pompalanır. Akülü (şarjlı) pompalar elle pompalama gerektirmez, sabit basınçla püskürtür; geniş bahçe, bağ ve tarlada daha az yorar.\n\nKüçük balkon/salon bitkileri için 0,5–2 L el tipi, birkaç ağaç ve sebze yatağı için 5–10 L omuz askılı, geniş alan için 16–20 L sırt tipi (akülü ya da manuel) uygundur. Tüm ilaçlama pompalarımız ' + pm.garanti.ay + ' ay garantilidir.',
+  urunler: [...akl.filter((p) => bySlug.get(p.slug).st > 0).slice(0, 2), ...man.filter((p) => bySlug.get(p.slug).st > 0).slice(0, 1)].map((p) => p.slug), kaynak: 'pompa:karsilastirma' });
+add({ tur: 'pompa-genel', konu: 'sarj', sorular: ['akülü ilaçlama pompası şarjı ne kadar gider', 'şarjlı pompa kaç saat çalışır', 'akülü pompa kaç depo atar', 'ilaçlama pompası şarj süresi', 'akülü pompa kaç saatte şarj olur'],
+  cevap: `Akülü modellerimizin ürün bilgisine göre tek şarjla çalışma süreleri:\n${akl.filter((p) => bySlug.get(p.slug).st > 0 && (p.calisma || p.calismaDepo)).map(kisaP).join('\n')}\n\nTüm ilaçlama pompalarımız ${pm.garanti.ay} ay garantilidir.`, urunler: akl.filter((p) => bySlug.get(p.slug).st > 0).slice(0, 3).map((p) => p.slug), dinamik: 'stok', kaynak: 'pompa:sarj' });
+
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
   cevap: `${pr.title || 'İndirim'}: ${pr.code} kodunu ödeme adımında kullanabilirsiniz${pr.note ? ' (' + pr.note + ')' : ''}.${pr.shipping ? ' ' + pr.shipping + '.' : ''}`, urunler: [], kaynak: 'config:promo' });
 await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel, pompa ${c('pompa')}+${c('pompa-genel')} genel, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);

@@ -1,7 +1,7 @@
 {
  "_aciklama": "Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.",
  "surum": 1,
- "kayit": 1200,
+ "kayit": 1227,
  "havuz": [
   {
    "id": "h0001",
@@ -25093,6 +25093,571 @@
   },
   {
    "id": "h1200",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "delta-10-lt-basincli-ilaclama-pompasi-k-83",
+   "sorular": [
+    "delta 10 lt basınçlı ilaçlama pompası k-83 akülü mü",
+    "delta 10 lt basınçlı ilaçlama pompası k-83 şarjlı mı",
+    "delta 10 lt basınçlı ilaçlama pompası k-83 manuel mi",
+    "delta 10 lt basınçlı ilaçlama pompası k-83 şarjı ne kadar gider",
+    "delta 10 lt basınçlı ilaçlama pompası k-83 kaç saat şarj olur",
+    "delta 10 lt basınçlı ilaçlama pompası k-83 kaç litre",
+    "delta 10 lt basınçlı ilaçlama pompası k-83 garantisi var mı",
+    "delta 10 lt basınçlı ilaçlama pompası k-83 özellikleri"
+   ],
+   "cevap": "Delta 10 Lt Basınçlı İlaçlama Pompası K-83\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 10 litre\n• Garanti: 24 ay",
+   "urunler": [
+    "delta-10-lt-basincli-ilaclama-pompasi-k-83"
+   ],
+   "kaynak": "pompa:delta-10-lt-basincli-ilaclama-pompasi-k-83"
+  },
+  {
+   "id": "h1201",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "delta-16-lt-manuel-ilaclama-pompasi-k-203",
+   "sorular": [
+    "delta 16 lt manuel ilaçlama pompası k-203 akülü mü",
+    "delta 16 lt manuel ilaçlama pompası k-203 şarjlı mı",
+    "delta 16 lt manuel ilaçlama pompası k-203 manuel mi",
+    "delta 16 lt manuel ilaçlama pompası k-203 şarjı ne kadar gider",
+    "delta 16 lt manuel ilaçlama pompası k-203 kaç saat şarj olur",
+    "delta 16 lt manuel ilaçlama pompası k-203 kaç litre",
+    "delta 16 lt manuel ilaçlama pompası k-203 garantisi var mı",
+    "delta 16 lt manuel ilaçlama pompası k-203 özellikleri"
+   ],
+   "cevap": "Delta 16 Lt Manuel İlaçlama Pompası K-203\n\n• Tip: Manuel — şarj/akü gerektirmez, kollu (sürekli pompalanır)\n• Depo: 16 litre\n• Garanti: 24 ay\n\nDiğer teknik bilgiler için ustamız size yardımcı olsun.",
+   "urunler": [
+    "delta-16-lt-manuel-ilaclama-pompasi-k-203"
+   ],
+   "kaynak": "pompa:delta-16-lt-manuel-ilaclama-pompasi-k-203"
+  },
+  {
+   "id": "h1202",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "delta-2-lt-ilaclama-pompasi",
+   "sorular": [
+    "delta 2 lt ilaçlama pompası akülü mü",
+    "delta 2 lt ilaçlama pompası şarjlı mı",
+    "delta 2 lt ilaçlama pompası manuel mi",
+    "delta 2 lt ilaçlama pompası şarjı ne kadar gider",
+    "delta 2 lt ilaçlama pompası kaç saat şarj olur",
+    "delta 2 lt ilaçlama pompası kaç litre",
+    "delta 2 lt ilaçlama pompası garantisi var mı",
+    "delta 2 lt ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Delta 2 lt İlaçlama Pompası\n\n• Tip: Manuel — şarj/akü gerektirmez\n• Depo: 2 litre · el tipi\n• Garanti: 24 ay\n\nDiğer teknik bilgiler için ustamız size yardımcı olsun.",
+   "urunler": [
+    "delta-2-lt-ilaclama-pompasi"
+   ],
+   "kaynak": "pompa:delta-2-lt-ilaclama-pompasi"
+  },
+  {
+   "id": "h1203",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "delta-20-lt-manuel-ilaclama-pompasi-k-205",
+   "sorular": [
+    "delta 20 lt manuel ilaçlama pompası k-205 akülü mü",
+    "delta 20 lt manuel ilaçlama pompası k-205 şarjlı mı",
+    "delta 20 lt manuel ilaçlama pompası k-205 manuel mi",
+    "delta 20 lt manuel ilaçlama pompası k-205 şarjı ne kadar gider",
+    "delta 20 lt manuel ilaçlama pompası k-205 kaç saat şarj olur",
+    "delta 20 lt manuel ilaçlama pompası k-205 kaç litre",
+    "delta 20 lt manuel ilaçlama pompası k-205 garantisi var mı",
+    "delta 20 lt manuel ilaçlama pompası k-205 özellikleri"
+   ],
+   "cevap": "Delta 20 Lt Manuel İlaçlama Pompası K-205\n\n• Tip: Manuel — şarj/akü gerektirmez, kollu (sürekli pompalanır)\n• Depo: 20 litre · sırt tipi\n• Atış mesafesi: 5–6 metre\n• Garanti: 24 ay",
+   "urunler": [
+    "delta-20-lt-manuel-ilaclama-pompasi-k-205"
+   ],
+   "kaynak": "pompa:delta-20-lt-manuel-ilaclama-pompasi-k-205"
+  },
+  {
+   "id": "h1204",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "delta-5-lt-basincli-ilaclama-pompasi-k-81",
+   "sorular": [
+    "delta 5 lt basınçlı ilaçlama pompası k-81 akülü mü",
+    "delta 5 lt basınçlı ilaçlama pompası k-81 şarjlı mı",
+    "delta 5 lt basınçlı ilaçlama pompası k-81 manuel mi",
+    "delta 5 lt basınçlı ilaçlama pompası k-81 şarjı ne kadar gider",
+    "delta 5 lt basınçlı ilaçlama pompası k-81 kaç saat şarj olur",
+    "delta 5 lt basınçlı ilaçlama pompası k-81 kaç litre",
+    "delta 5 lt basınçlı ilaçlama pompası k-81 garantisi var mı",
+    "delta 5 lt basınçlı ilaçlama pompası k-81 özellikleri"
+   ],
+   "cevap": "Delta 5 Lt Basınçlı İlaçlama Pompası K-81\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 5 litre\n• Garanti: 24 ay",
+   "urunler": [
+    "delta-5-lt-basincli-ilaclama-pompasi-k-81"
+   ],
+   "kaynak": "pompa:delta-5-lt-basincli-ilaclama-pompasi-k-81"
+  },
+  {
+   "id": "h1205",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "litolan-es-2-2-l-sarjli-elektrikli-puskurtucu",
+   "sorular": [
+    "litolan es-2 şarjlı elektrikli püskürtücü akülü mü",
+    "litolan es-2 şarjlı elektrikli püskürtücü şarjlı mı",
+    "litolan es-2 şarjlı elektrikli püskürtücü manuel mi",
+    "litolan es-2 şarjlı elektrikli püskürtücü şarjı ne kadar gider",
+    "litolan es-2 şarjlı elektrikli püskürtücü kaç saat şarj olur",
+    "litolan es-2 şarjlı elektrikli püskürtücü kaç litre",
+    "litolan es-2 şarjlı elektrikli püskürtücü garantisi var mı",
+    "litolan es-2 şarjlı elektrikli püskürtücü özellikleri"
+   ],
+   "cevap": "Litolan ES-2 (2 L) Şarjlı Elektrikli Püskürtücü\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 2 litre · el tipi\n• Akü: 2000 mAh\n• Tek şarjla: yaklaşık 2 saat\n• Şarj girişi: USB Type-C\n• Basınç: 1,5 ATM\n• Atış mesafesi: 0,5–4 metre\n• 2 nozul\n• Garanti: 24 ay",
+   "urunler": [
+    "litolan-es-2-2-l-sarjli-elektrikli-puskurtucu",
+    "hasturk-sivi-solucan-gubresi"
+   ],
+   "kaynak": "pompa:litolan-es-2-2-l-sarjli-elektrikli-puskurtucu"
+  },
+  {
+   "id": "h1206",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "litolan-10-lt-akulu-ilaclama-pompasi",
+   "sorular": [
+    "lıtolan 10 lt akülü ilaçlama pompası akülü mü",
+    "lıtolan 10 lt akülü ilaçlama pompası şarjlı mı",
+    "lıtolan 10 lt akülü ilaçlama pompası manuel mi",
+    "lıtolan 10 lt akülü ilaçlama pompası şarjı ne kadar gider",
+    "lıtolan 10 lt akülü ilaçlama pompası kaç saat şarj olur",
+    "lıtolan 10 lt akülü ilaçlama pompası kaç litre",
+    "lıtolan 10 lt akülü ilaçlama pompası garantisi var mı",
+    "lıtolan 10 lt akülü ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Lıtolan 10 Lt Akülü İlaçlama Pompası\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 10 litre · sırt tipi\n• Akü: 2000 mAh\n• Tek şarjla: yaklaşık 4 saat\n• Şarj girişi: USB Type-C\n• Garanti: 24 ay",
+   "urunler": [
+    "litolan-10-lt-akulu-ilaclama-pompasi"
+   ],
+   "kaynak": "pompa:litolan-10-lt-akulu-ilaclama-pompasi"
+  },
+  {
+   "id": "h1207",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "litolan-16-lt-akulu-ilaclama-pompasi",
+   "sorular": [
+    "lıtolan 16 lt akülü ilaçlama pompası akülü mü",
+    "lıtolan 16 lt akülü ilaçlama pompası şarjlı mı",
+    "lıtolan 16 lt akülü ilaçlama pompası manuel mi",
+    "lıtolan 16 lt akülü ilaçlama pompası şarjı ne kadar gider",
+    "lıtolan 16 lt akülü ilaçlama pompası kaç saat şarj olur",
+    "lıtolan 16 lt akülü ilaçlama pompası kaç litre",
+    "lıtolan 16 lt akülü ilaçlama pompası garantisi var mı",
+    "lıtolan 16 lt akülü ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Lıtolan 16 Lt Akülü İlaçlama Pompası\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 16 litre · sırt tipi\n• Tek şarjla: yaklaşık 4 saat\n• Şarj girişi: USB Type-C\n• Basınç: 7 bar\n• Garanti: 24 ay",
+   "urunler": [
+    "litolan-16-lt-akulu-ilaclama-pompasi"
+   ],
+   "kaynak": "pompa:litolan-16-lt-akulu-ilaclama-pompasi"
+  },
+  {
+   "id": "h1208",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "litolan-8-lt-akulu-ilaclama-pompasi",
+   "sorular": [
+    "lıtolan 8 lt akülü ilaçlama pompası akülü mü",
+    "lıtolan 8 lt akülü ilaçlama pompası şarjlı mı",
+    "lıtolan 8 lt akülü ilaçlama pompası manuel mi",
+    "lıtolan 8 lt akülü ilaçlama pompası şarjı ne kadar gider",
+    "lıtolan 8 lt akülü ilaçlama pompası kaç saat şarj olur",
+    "lıtolan 8 lt akülü ilaçlama pompası kaç litre",
+    "lıtolan 8 lt akülü ilaçlama pompası garantisi var mı",
+    "lıtolan 8 lt akülü ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Lıtolan 8 Lt Akülü İlaçlama Pompası\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 8 litre · sırt tipi\n• Akü: 2000 mAh\n• Tek şarjla: yaklaşık 4 saat\n• Şarj girişi: USB Type-C\n• Garanti: 24 ay",
+   "urunler": [
+    "litolan-8-lt-akulu-ilaclama-pompasi"
+   ],
+   "kaynak": "pompa:litolan-8-lt-akulu-ilaclama-pompasi"
+  },
+  {
+   "id": "h1209",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "pomsan-20-lt-manuel-ilaclama-pompasi-k-305",
+   "sorular": [
+    "pomsan 20 lt manuel ilaçlama pompası k-305 akülü mü",
+    "pomsan 20 lt manuel ilaçlama pompası k-305 şarjlı mı",
+    "pomsan 20 lt manuel ilaçlama pompası k-305 manuel mi",
+    "pomsan 20 lt manuel ilaçlama pompası k-305 şarjı ne kadar gider",
+    "pomsan 20 lt manuel ilaçlama pompası k-305 kaç saat şarj olur",
+    "pomsan 20 lt manuel ilaçlama pompası k-305 kaç litre",
+    "pomsan 20 lt manuel ilaçlama pompası k-305 garantisi var mı",
+    "pomsan 20 lt manuel ilaçlama pompası k-305 özellikleri"
+   ],
+   "cevap": "Pomsan 20 Lt Manuel İlaçlama Pompası K-305\n\n• Tip: Manuel — şarj/akü gerektirmez, kollu (sürekli pompalanır)\n• Depo: 20 litre\n• Garanti: 24 ay\n\nDiğer teknik bilgiler için ustamız size yardımcı olsun.",
+   "urunler": [
+    "pomsan-20-lt-manuel-ilaclama-pompasi-k-305"
+   ],
+   "kaynak": "pompa:pomsan-20-lt-manuel-ilaclama-pompasi-k-305"
+  },
+  {
+   "id": "h1210",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-05-lt-basincli-sprey-puskurtucu-k-4",
+   "sorular": [
+    "uzman 0.5 lt basınçlı sprey püskürtücü akülü mü",
+    "uzman 0.5 lt basınçlı sprey püskürtücü şarjlı mı",
+    "uzman 0.5 lt basınçlı sprey püskürtücü manuel mi",
+    "uzman 0.5 lt basınçlı sprey püskürtücü şarjı ne kadar gider",
+    "uzman 0.5 lt basınçlı sprey püskürtücü kaç saat şarj olur",
+    "uzman 0.5 lt basınçlı sprey püskürtücü kaç litre",
+    "uzman 0.5 lt basınçlı sprey püskürtücü garantisi var mı",
+    "uzman 0.5 lt basınçlı sprey püskürtücü özellikleri"
+   ],
+   "cevap": "Uzman 0.5 Lt Basınçlı Sprey Püskürtücü (K-4)\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 0,5 litre · el tipi\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-05-lt-basincli-sprey-puskurtucu-k-4"
+   ],
+   "kaynak": "pompa:uzman-05-lt-basincli-sprey-puskurtucu-k-4"
+  },
+  {
+   "id": "h1211",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-1-lt-basincli-sprey-puskurtucu-k-5",
+   "sorular": [
+    "uzman 1 lt basınçlı sprey püskürtücü akülü mü",
+    "uzman 1 lt basınçlı sprey püskürtücü şarjlı mı",
+    "uzman 1 lt basınçlı sprey püskürtücü manuel mi",
+    "uzman 1 lt basınçlı sprey püskürtücü şarjı ne kadar gider",
+    "uzman 1 lt basınçlı sprey püskürtücü kaç saat şarj olur",
+    "uzman 1 lt basınçlı sprey püskürtücü kaç litre",
+    "uzman 1 lt basınçlı sprey püskürtücü garantisi var mı",
+    "uzman 1 lt basınçlı sprey püskürtücü özellikleri"
+   ],
+   "cevap": "Uzman 1 Lt Basınçlı Sprey Püskürtücü (K-5)\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 1 litre · el tipi\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-1-lt-basincli-sprey-puskurtucu-k-5"
+   ],
+   "kaynak": "pompa:uzman-1-lt-basincli-sprey-puskurtucu-k-5"
+  },
+  {
+   "id": "h1212",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-10-lt-basincli-ilaclama-pompasi-k-73",
+   "sorular": [
+    "uzman 10 lt basınçlı ilaçlama pompası akülü mü",
+    "uzman 10 lt basınçlı ilaçlama pompası şarjlı mı",
+    "uzman 10 lt basınçlı ilaçlama pompası manuel mi",
+    "uzman 10 lt basınçlı ilaçlama pompası şarjı ne kadar gider",
+    "uzman 10 lt basınçlı ilaçlama pompası kaç saat şarj olur",
+    "uzman 10 lt basınçlı ilaçlama pompası kaç litre",
+    "uzman 10 lt basınçlı ilaçlama pompası garantisi var mı",
+    "uzman 10 lt basınçlı ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 10 litre · omuz askılı\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-10-lt-basincli-ilaclama-pompasi-k-73"
+   ],
+   "kaynak": "pompa:uzman-10-lt-basincli-ilaclama-pompasi-k-73"
+  },
+  {
+   "id": "h1213",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-16-lt-sarjli-ilaclama-pompasi-usr-403",
+   "sorular": [
+    "uzman 16 lt akülü ilaçlama pompası akülü mü",
+    "uzman 16 lt akülü ilaçlama pompası şarjlı mı",
+    "uzman 16 lt akülü ilaçlama pompası manuel mi",
+    "uzman 16 lt akülü ilaçlama pompası şarjı ne kadar gider",
+    "uzman 16 lt akülü ilaçlama pompası kaç saat şarj olur",
+    "uzman 16 lt akülü ilaçlama pompası kaç litre",
+    "uzman 16 lt akülü ilaçlama pompası garantisi var mı",
+    "uzman 16 lt akülü ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Uzman 16 Lt Akülü İlaçlama Pompası (USR-403)\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 16 litre · sırt tipi\n• Tek şarjla: en az 25 depo\n• bakır sargılı motor\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-16-lt-sarjli-ilaclama-pompasi-usr-403"
+   ],
+   "kaynak": "pompa:uzman-16-lt-sarjli-ilaclama-pompasi-usr-403"
+  },
+  {
+   "id": "h1214",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-16-lt-manuel-ilaclama-pompasi-k-103",
+   "sorular": [
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası akülü mü",
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası şarjlı mı",
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası manuel mi",
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası şarjı ne kadar gider",
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası kaç saat şarj olur",
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası kaç litre",
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası garantisi var mı",
+    "uzman 16 lt sırt pulverizatörü ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Uzman 16 Lt Sırt Pulverizatörü İlaçlama Pompası (K-103)\n\n• Tip: Manuel — şarj/akü gerektirmez, kollu (sürekli pompalanır)\n• Depo: 16 litre · sırt tipi\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-16-lt-manuel-ilaclama-pompasi-k-103"
+   ],
+   "kaynak": "pompa:uzman-16-lt-manuel-ilaclama-pompasi-k-103"
+  },
+  {
+   "id": "h1215",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-2-lt-basincli-el-puskurtucu",
+   "sorular": [
+    "uzman 2 lt basınçlı el püskürtücü akülü mü",
+    "uzman 2 lt basınçlı el püskürtücü şarjlı mı",
+    "uzman 2 lt basınçlı el püskürtücü manuel mi",
+    "uzman 2 lt basınçlı el püskürtücü şarjı ne kadar gider",
+    "uzman 2 lt basınçlı el püskürtücü kaç saat şarj olur",
+    "uzman 2 lt basınçlı el püskürtücü kaç litre",
+    "uzman 2 lt basınçlı el püskürtücü garantisi var mı",
+    "uzman 2 lt basınçlı el püskürtücü özellikleri"
+   ],
+   "cevap": "Uzman 2 Lt Basınçlı El Püskürtücü\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 2 litre · el tipi\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-2-lt-basincli-el-puskurtucu"
+   ],
+   "kaynak": "pompa:uzman-2-lt-basincli-el-puskurtucu"
+  },
+  {
+   "id": "h1216",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-2-lt-ilaclama-pompasi",
+   "sorular": [
+    "uzman 2 lt basınçlı ilaçlama pompası akülü mü",
+    "uzman 2 lt basınçlı ilaçlama pompası şarjlı mı",
+    "uzman 2 lt basınçlı ilaçlama pompası manuel mi",
+    "uzman 2 lt basınçlı ilaçlama pompası şarjı ne kadar gider",
+    "uzman 2 lt basınçlı ilaçlama pompası kaç saat şarj olur",
+    "uzman 2 lt basınçlı ilaçlama pompası kaç litre",
+    "uzman 2 lt basınçlı ilaçlama pompası garantisi var mı",
+    "uzman 2 lt basınçlı ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51)\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 2 litre · el tipi\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-2-lt-ilaclama-pompasi",
+    "chrysamed-insektisit-max-5-lt-ekonomik-tahtakurusu-akrep-ilaci",
+    "chrysamed-worm-ex-tahta-agac-kurdu-ilaci-2-lt"
+   ],
+   "kaynak": "pompa:uzman-2-lt-ilaclama-pompasi"
+  },
+  {
+   "id": "h1217",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-2-lt-metal-uclu-ilaclama-pompasi-k-61",
+   "sorular": [
+    "uzman 2 lt metal uçlu ilaçlama pompası akülü mü",
+    "uzman 2 lt metal uçlu ilaçlama pompası şarjlı mı",
+    "uzman 2 lt metal uçlu ilaçlama pompası manuel mi",
+    "uzman 2 lt metal uçlu ilaçlama pompası şarjı ne kadar gider",
+    "uzman 2 lt metal uçlu ilaçlama pompası kaç saat şarj olur",
+    "uzman 2 lt metal uçlu ilaçlama pompası kaç litre",
+    "uzman 2 lt metal uçlu ilaçlama pompası garantisi var mı",
+    "uzman 2 lt metal uçlu ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Uzman 2 Lt Metal Uçlu İlaçlama Pompası (K-61)\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 2 litre · el tipi\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-2-lt-metal-uclu-ilaclama-pompasi-k-61",
+    "hasturk-sivi-solucan-gubresi"
+   ],
+   "kaynak": "pompa:uzman-2-lt-metal-uclu-ilaclama-pompasi-k-61"
+  },
+  {
+   "id": "h1218",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-20-lt-manuel-ilaclama-pompasi-k-105",
+   "sorular": [
+    "uzman 20 lt manuel ilaçlama pompası k-105 akülü mü",
+    "uzman 20 lt manuel ilaçlama pompası k-105 şarjlı mı",
+    "uzman 20 lt manuel ilaçlama pompası k-105 manuel mi",
+    "uzman 20 lt manuel ilaçlama pompası k-105 şarjı ne kadar gider",
+    "uzman 20 lt manuel ilaçlama pompası k-105 kaç saat şarj olur",
+    "uzman 20 lt manuel ilaçlama pompası k-105 kaç litre",
+    "uzman 20 lt manuel ilaçlama pompası k-105 garantisi var mı",
+    "uzman 20 lt manuel ilaçlama pompası k-105 özellikleri"
+   ],
+   "cevap": "Uzman 20 Lt Manuel İlaçlama Pompası K-105\n\n• Tip: Manuel — şarj/akü gerektirmez, kollu (sürekli pompalanır)\n• Depo: 20 litre · sırt tipi\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-20-lt-manuel-ilaclama-pompasi-k-105"
+   ],
+   "kaynak": "pompa:uzman-20-lt-manuel-ilaclama-pompasi-k-105"
+  },
+  {
+   "id": "h1219",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-5-lt-basincli-ilaclama-pompasi-k-71",
+   "sorular": [
+    "uzman 5 lt basınçlı ilaçlama pompası akülü mü",
+    "uzman 5 lt basınçlı ilaçlama pompası şarjlı mı",
+    "uzman 5 lt basınçlı ilaçlama pompası manuel mi",
+    "uzman 5 lt basınçlı ilaçlama pompası şarjı ne kadar gider",
+    "uzman 5 lt basınçlı ilaçlama pompası kaç saat şarj olur",
+    "uzman 5 lt basınçlı ilaçlama pompası kaç litre",
+    "uzman 5 lt basınçlı ilaçlama pompası garantisi var mı",
+    "uzman 5 lt basınçlı ilaçlama pompası özellikleri"
+   ],
+   "cevap": "Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71)\n\n• Tip: Manuel — şarj/akü gerektirmez, basınçlı (birkaç kez pompalanır, basıncı tutar)\n• Depo: 5 litre · omuz askılı\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-5-lt-basincli-ilaclama-pompasi-k-71"
+   ],
+   "kaynak": "pompa:uzman-5-lt-basincli-ilaclama-pompasi-k-71"
+  },
+  {
+   "id": "h1220",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-lityum-akulu-ilaclama-pompasi-5-lt",
+   "sorular": [
+    "uzman lityum akülü ilaçlama pompası 5 lt akülü mü",
+    "uzman lityum akülü ilaçlama pompası 5 lt şarjlı mı",
+    "uzman lityum akülü ilaçlama pompası 5 lt manuel mi",
+    "uzman lityum akülü ilaçlama pompası 5 lt şarjı ne kadar gider",
+    "uzman lityum akülü ilaçlama pompası 5 lt kaç saat şarj olur",
+    "uzman lityum akülü ilaçlama pompası 5 lt kaç litre",
+    "uzman lityum akülü ilaçlama pompası 5 lt garantisi var mı",
+    "uzman lityum akülü ilaçlama pompası 5 lt özellikleri"
+   ],
+   "cevap": "Uzman Lityum Akülü İlaçlama Pompası 5 Lt\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 5 litre · sırt tipi\n• Akü: lityum\n• Tek şarjla: 23–37 depo · ≈ 115–185 litre\n• Şarj: 2–3 saatte tam dolar; ilk kullanımda 8 saat şarj edilmesi önerilir\n• Atış mesafesi: 8–10 metre\n• Akış: dakikada 3,1 litre\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-lityum-akulu-ilaclama-pompasi-5-lt"
+   ],
+   "kaynak": "pompa:uzman-lityum-akulu-ilaclama-pompasi-5-lt"
+  },
+  {
+   "id": "h1221",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "uzman-lityum-akulu-ilaclama-pompasi-8-lt",
+   "sorular": [
+    "uzman lityum akülü ilaçlama pompası 8 lt akülü mü",
+    "uzman lityum akülü ilaçlama pompası 8 lt şarjlı mı",
+    "uzman lityum akülü ilaçlama pompası 8 lt manuel mi",
+    "uzman lityum akülü ilaçlama pompası 8 lt şarjı ne kadar gider",
+    "uzman lityum akülü ilaçlama pompası 8 lt kaç saat şarj olur",
+    "uzman lityum akülü ilaçlama pompası 8 lt kaç litre",
+    "uzman lityum akülü ilaçlama pompası 8 lt garantisi var mı",
+    "uzman lityum akülü ilaçlama pompası 8 lt özellikleri"
+   ],
+   "cevap": "Uzman Lityum Akülü İlaçlama Pompası 8 Lt\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 8 litre · sırt tipi\n• Akü: lityum\n• Tek şarjla: 14–23 depo · ≈ 112–184 litre\n• Şarj: 2–3 saatte tam dolar; ilk kullanımda 8 saat şarj edilmesi önerilir\n• Atış mesafesi: 8–10 metre\n• Akış: dakikada 3,1 litre\n• Garanti: 24 ay",
+   "urunler": [
+    "uzman-lityum-akulu-ilaclama-pompasi-8-lt"
+   ],
+   "kaynak": "pompa:uzman-lityum-akulu-ilaclama-pompasi-8-lt"
+  },
+  {
+   "id": "h1222",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "ilposan-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi",
+   "sorular": [
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası akülü mü",
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası şarjlı mı",
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası manuel mi",
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası şarjı ne kadar gider",
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası kaç saat şarj olur",
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası kaç litre",
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası garantisi var mı",
+    "ilposan 16 lt akülü/şarjlı sırt pulverizatörü ilaçlama pompası özellikleri"
+   ],
+   "cevap": "İlposan 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 16 litre · sırt tipi\n• Akü: 12V 8A\n• Tek şarjla: en az 20 depo\n• Atış mesafesi: 10 metre\n• 6 nozul, 1,4 m PVC hortum, teleskopik püskürtme borusu\n• Garanti: 24 ay",
+   "urunler": [
+    "ilposan-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi"
+   ],
+   "kaynak": "pompa:ilposan-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi"
+  },
+  {
+   "id": "h1223",
+   "durum": "onay-bekliyor",
+   "tur": "pompa",
+   "urun": "ilposan-power-16-litre-akulu-ilaclama-pompasi",
+   "sorular": [
+    "ilposan power 16 litre akülü ilaçlama pompası akülü mü",
+    "ilposan power 16 litre akülü ilaçlama pompası şarjlı mı",
+    "ilposan power 16 litre akülü ilaçlama pompası manuel mi",
+    "ilposan power 16 litre akülü ilaçlama pompası şarjı ne kadar gider",
+    "ilposan power 16 litre akülü ilaçlama pompası kaç saat şarj olur",
+    "ilposan power 16 litre akülü ilaçlama pompası kaç litre",
+    "ilposan power 16 litre akülü ilaçlama pompası garantisi var mı",
+    "ilposan power 16 litre akülü ilaçlama pompası özellikleri"
+   ],
+   "cevap": "İlposan Power 16 Litre Akülü İlaçlama Pompası\n\n• Tip: Akülü (şarjlı) — elle pompalama gerektirmez, tetiğe basınca püskürtür\n• Depo: 16 litre · sırt tipi\n• Garanti: 24 ay\n\nTek şarjla çalışma süresi ürün bilgisinde belirtilmemiş; ustamız bilgi verebilir.",
+   "urunler": [
+    "ilposan-power-16-litre-akulu-ilaclama-pompasi"
+   ],
+   "kaynak": "pompa:ilposan-power-16-litre-akulu-ilaclama-pompasi"
+  },
+  {
+   "id": "h1224",
+   "durum": "onay-bekliyor",
+   "tur": "pompa-genel",
+   "konu": "garanti",
+   "sorular": [
+    "ilaçlama pompası garantisi",
+    "pompanın garantisi var mı",
+    "ilaçlama pompası kaç yıl garantili",
+    "akülü pompa garanti süresi",
+    "garanti süresi ne kadar"
+   ],
+   "cevap": "İlaçlama pompalarımız 24 ay garantilidir. (24 ay = 2 yıl)",
+   "urunler": [],
+   "kaynak": "pompa:garanti"
+  },
+  {
+   "id": "h1225",
+   "durum": "onay-bekliyor",
+   "tur": "pompa-genel",
+   "konu": "akulu-manuel",
+   "sorular": [
+    "akülü mü manuel mi ilaçlama pompası",
+    "akülü pompa mı almalıyım",
+    "manuel ilaçlama pompası mı akülü mü",
+    "hangi ilaçlama pompasını almalıyım",
+    "ilaçlama pompası önerisi"
+   ],
+   "cevap": "Manuel pompalar şarj gerektirmez, her an kullanıma hazırdır; küçük (0,5–2 L) basınçlı modeller birkaç kez pompalanıp basıncı tutar, 16–20 L sırt tipi kollu modeller ilaçlama sırasında elle pompalanır. Akülü (şarjlı) pompalar elle pompalama gerektirmez, sabit basınçla püskürtür; geniş bahçe, bağ ve tarlada daha az yorar.\n\nKüçük balkon/salon bitkileri için 0,5–2 L el tipi, birkaç ağaç ve sebze yatağı için 5–10 L omuz askılı, geniş alan için 16–20 L sırt tipi (akülü ya da manuel) uygundur. Tüm ilaçlama pompalarımız 24 ay garantilidir.",
+   "urunler": [
+    "uzman-16-lt-sarjli-ilaclama-pompasi-usr-403",
+    "uzman-lityum-akulu-ilaclama-pompasi-5-lt",
+    "delta-16-lt-manuel-ilaclama-pompasi-k-203"
+   ],
+   "kaynak": "pompa:karsilastirma"
+  },
+  {
+   "id": "h1226",
+   "durum": "onay-bekliyor",
+   "tur": "pompa-genel",
+   "konu": "sarj",
+   "sorular": [
+    "akülü ilaçlama pompası şarjı ne kadar gider",
+    "şarjlı pompa kaç saat çalışır",
+    "akülü pompa kaç depo atar",
+    "ilaçlama pompası şarj süresi",
+    "akülü pompa kaç saatte şarj olur"
+   ],
+   "cevap": "Akülü modellerimizin ürün bilgisine göre tek şarjla çalışma süreleri:\n• Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) — tek şarjla en az 25 depo\n• Uzman Lityum Akülü İlaçlama Pompası 5 Lt — tek şarjla 23–37 depo; 2–3 saatte tam dolar; ilk kullanımda 8 saat şarj edilmesi önerilir\n• Uzman Lityum Akülü İlaçlama Pompası 8 Lt — tek şarjla 14–23 depo; 2–3 saatte tam dolar; ilk kullanımda 8 saat şarj edilmesi önerilir\n• İlposan 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası — tek şarjla en az 20 depo\n\nTüm ilaçlama pompalarımız 24 ay garantilidir.",
+   "urunler": [
+    "uzman-16-lt-sarjli-ilaclama-pompasi-usr-403",
+    "uzman-lityum-akulu-ilaclama-pompasi-5-lt",
+    "uzman-lityum-akulu-ilaclama-pompasi-8-lt"
+   ],
+   "dinamik": "stok",
+   "kaynak": "pompa:sarj"
+  },
+  {
+   "id": "h1227",
    "durum": "onay-bekliyor",
    "tur": "magaza",
    "sorular": [
