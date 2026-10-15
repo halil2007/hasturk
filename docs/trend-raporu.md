@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3102 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3116 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -135,22 +135,22 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 2 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 4,4 | 20 |
 | 3 | Altınvadi Roka Tohumu (Toros İri Yaprak)  | 4,4 | 3,5 |
 | 4 | HasTürk Solucan Gübresi  | 4,2 | 33,5 |
-| 5 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,7 | 44,5 |
-| 6 | HG Tarım Perliti | 3,1 | 18,7 |
+| 5 | HG Tarım Perliti | 4,1 | 19,7 |
+| 6 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,7 | 44,5 |
 | 7 | Altınvadi Ispanak Tohumu 10 Gr | 2,9 | 2,3 |
 | 8 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,8 | 1,3 |
 | 9 | Arzuman Marmande Domates Tohumu | 2,8 | 4,7 |
-| 10 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 2,7 | 40,7 |
-| 11 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 2,7 | 18 |
-| 12 | Şahnalı Acı Sivri Biber Ata Tohumu (50 Adet) | 2,6 | 4,5 |
-| 13 | HasTürk Hümix Sıvı Hümik Asit | 2,5 | 45 |
-| 14 | Doğal Orman Toprağı / %100 Organik ve Humuslu | 2,4 | 19,2 |
-| 15 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 1,9 | 0,6 |
-| 16 | Altınvadi Tere Tohumu 10 Gr  | 1,9 | 0 |
-| 17 | Altınvadi Köy Tipi Domates Tohumu 5 Gr | 1,9 | 9,3 |
-| 18 | Arzuman Köy Tipi Domates Tohumu | 1,9 | 2,5 |
-| 19 | SGS Bahçe Seti 3 Parça | 1,8 | 0,9 |
-| 20 | Leonardit - Organik Toprak Düzenleyici | 1,8 | 45,5 |
+| 10 | Leonardit - Organik Toprak Düzenleyici | 2,8 | 46,5 |
+| 11 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 2,7 | 40,7 |
+| 12 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 2,7 | 18 |
+| 13 | Şahnalı Acı Sivri Biber Ata Tohumu (50 Adet) | 2,6 | 4,5 |
+| 14 | HasTürk Hümix Sıvı Hümik Asit | 2,5 | 45 |
+| 15 | Doğal Orman Toprağı / %100 Organik ve Humuslu | 2,4 | 19,2 |
+| 16 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 1,9 | 0,6 |
+| 17 | Altınvadi Tere Tohumu 10 Gr  | 1,9 | 0 |
+| 18 | Altınvadi Köy Tipi Domates Tohumu 5 Gr | 1,9 | 9,3 |
+| 19 | Arzuman Köy Tipi Domates Tohumu | 1,9 | 2,5 |
+| 20 | SGS Bahçe Seti 3 Parça | 1,8 | 0,9 |
 
 ## Çok bakılıp az sepete eklenenler
 
@@ -161,10 +161,9 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | Guanokalong Yarasa Gübresi Toz | 61 | 1 | %2 |
 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 51,7 | 0,7 | %1 |
 | İnsektisit MAX 5 Lt Kampanya Paketi | 46,8 | 0,8 | %2 |
-| Leonardit - Organik Toprak Düzenleyici | 45,5 | 1,8 | %4 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 33,9 | 0 | %0 |
+| HG Asidik Torf | 33,5 | 0,5 | %1 |
 | Chrysamed Subon Hijyen Sprey | 32,8 | 0 | %0 |
-| HG Asidik Torf | 32,5 | 0,5 | %2 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 30,1 | 0 | %0 |
 | HG Mezar Toprağı | 28,8 | 0,5 | %2 |
 | Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 28,5 | 0 | %0 |
@@ -173,6 +172,7 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 24,3 | 0 | %0 |
 | Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 22,1 | 0 | %0 |
 | Çim Kapama Toprağı (Leonarditli Formül) | 19,2 | 0,4 | %2 |
+| 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 17,4 | 0 | %0 |
 
 ## Birlikte satın alınanlar (son 180 gün)
 
@@ -208,20 +208,31 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 ## Çapraz satış önerilerinin sonucu (son 30 gün)
 
-Öneri 60 kez gösterildi, 0 kez sepete eklendi (%0).
+Öneri 66 kez gösterildi, 0 kez sepete eklendi (%0).
 
 | # | Önerilen ürün | Gösterildi | Eklendi | Oran |
 |---|---|---|---|---|
 | 1 | hasturk-kati-solucan-gubresi-3-kg | 17 | 0 | %0 |
 | 2 | kati-solucan-gubresi-20-kg-cuval | 17 | 0 | %0 |
-| 3 | Leonardit - Organik Toprak Düzenleyici | 9 | 0 | %0 |
-| 4 | HasTürk Solucan Gübresi  | 9 | 0 | %0 |
+| 3 | Leonardit - Organik Toprak Düzenleyici | 10 | 0 | %0 |
+| 4 | HasTürk Solucan Gübresi  | 10 | 0 | %0 |
 | 5 | HasTürk Sıvı Solucan Gübresi  | 3 | 0 | %0 |
-| 6 | hindistan-cevizi-torfu-cocopeat-5-kg | 1 | 0 | %0 |
-| 7 | kati-solucan-gubresi-5-kg | 1 | 0 | %0 |
-| 8 | HG Tarım Perliti | 1 | 0 | %0 |
-| 9 | Fide Toprağı | 1 | 0 | %0 |
-| 10 | HG Organik Sebze Yetiştirme Toprağı  | 1 | 0 | %0 |
+| 6 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 1 | 0 | %0 |
+| 7 | Florist Konsantre Orkide Besini | 1 | 0 | %0 |
+| 8 | Florist Tüm Bitkiler Genel Kullanım Bitki Besini | 1 | 0 | %0 |
+| 9 | HG Vermikülit | 1 | 0 | %0 |
+| 10 | hindistan-cevizi-torfu-cocopeat-5-kg | 1 | 0 | %0 |
+| 11 | kati-solucan-gubresi-5-kg | 1 | 0 | %0 |
+| 12 | HG Tarım Perliti | 1 | 0 | %0 |
+| 13 | Fide Toprağı | 1 | 0 | %0 |
+| 14 | HG Organik Sebze Yetiştirme Toprağı  | 1 | 0 | %0 |
+
+## Ak Bilge önerisinden sepete eklenenler (son 30 gün)
+
+| # | Ürün | Eklendi |
+|---|---|---|
+| 1 | Florist Sinek ve Unlu Bit Önleyici Bitki Spreyi | 1 |
+| 2 | HG Tarım Perliti | 1 |
 
 ## Masaüstü menü önerileri (kategori başına ilk 3)
 

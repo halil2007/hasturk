@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3102 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3116 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -133,8 +133,8 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 |---|---|---|---|
 | 1 | Sıvı Solucan Gübresi 1 Lt | 25,2 | 2,6 |
 | 2 | Altınvadi Roka Tohumu (Toros İri Yaprak) | 4,6 | 3,5 |
-| 3 | HG Tarım Perliti | 3,5 | 18,7 |
-| 4 | Leonardit - Organik Toprak Düzenleyici | 3,3 | 45,5 |
+| 3 | HG Tarım Perliti | 3,5 | 19,7 |
+| 4 | Leonardit - Organik Toprak Düzenleyici | 3,3 | 46,5 |
 | 5 | Altınvadi Ispanak Tohumu 10 Gr | 2,9 | 2,3 |
 | 6 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,8 | 1,3 |
 | 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,8 | 44,5 |
@@ -163,8 +163,8 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | İnsektisit MAX 5 Lt Kampanya Paketi | 46,8 | 0,8 | %2 |
 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 40,7 | 1,8 | %5 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 33,9 | 0 | %0 |
+| HG Asidik Torf | 33,5 | 0,5 | %1 |
 | Chrysamed Subon Hijyen Sprey | 32,8 | 0 | %0 |
-| HG Asidik Torf | 32,5 | 0,5 | %2 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 30,1 | 0 | %0 |
 | HG Mezar Toprağı | 28,8 | 0 | %0 |
 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici (0-3 mm) | 28,7 | 0 | %0 |
@@ -208,20 +208,31 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 ## Çapraz satış önerilerinin sonucu (son 30 gün)
 
-Öneri 60 kez gösterildi, 0 kez sepete eklendi (%0).
+Öneri 66 kez gösterildi, 0 kez sepete eklendi (%0).
 
 | # | Önerilen ürün | Gösterildi | Eklendi | Oran |
 |---|---|---|---|---|
 | 1 | Katı Solucan Gübresi 3 KG | 17 | 0 | %0 |
 | 2 | Katı Solucan Gübresi 20 KG Çuval | 17 | 0 | %0 |
-| 3 | Leonardit - Organik Toprak Düzenleyici | 9 | 0 | %0 |
-| 4 | hasturk-kati-solucan-gubresi | 9 | 0 | %0 |
+| 3 | Leonardit - Organik Toprak Düzenleyici | 10 | 0 | %0 |
+| 4 | hasturk-kati-solucan-gubresi | 10 | 0 | %0 |
 | 5 | hasturk-sivi-solucan-gubresi | 3 | 0 | %0 |
-| 6 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 1 | 0 | %0 |
-| 7 | Katı Solucan Gübresi 5 KG | 1 | 0 | %0 |
-| 8 | HG Tarım Perliti | 1 | 0 | %0 |
-| 9 | Fide Toprağı / Organik Tohum ve Fide Harcı | 1 | 0 | %0 |
-| 10 | HG Organik Sebze Yetiştirme Toprağı  | 1 | 0 | %0 |
+| 6 | cocopeat-hindistan-cevizi-torfu-5-kg | 1 | 0 | %0 |
+| 7 | Florist Konsantre Orkide Besini | 1 | 0 | %0 |
+| 8 | Florist Tüm Bitkiler Genel Kullanım Bitki Besini | 1 | 0 | %0 |
+| 9 | HG Vermikülit | 1 | 0 | %0 |
+| 10 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 1 | 0 | %0 |
+| 11 | Katı Solucan Gübresi 5 KG | 1 | 0 | %0 |
+| 12 | HG Tarım Perliti | 1 | 0 | %0 |
+| 13 | Fide Toprağı / Organik Tohum ve Fide Harcı | 1 | 0 | %0 |
+| 14 | HG Organik Sebze Yetiştirme Toprağı  | 1 | 0 | %0 |
+
+## Ak Bilge önerisinden sepete eklenenler (son 30 gün)
+
+| # | Ürün | Eklendi |
+|---|---|---|
+| 1 | Florist Sinek ve Unlu Bit Önleyici Bitki Spreyi | 1 |
+| 2 | HG Tarım Perliti | 1 |
 
 ## Masaüstü menü önerileri (kategori başına ilk 3)
 
