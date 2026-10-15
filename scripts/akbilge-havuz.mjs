@@ -8,6 +8,16 @@ const kb = JSON.parse(await readFile('bilgi/urunler.json', 'utf8')).urunler;
 const oto = JSON.parse(await readFile('bilgi/urunler-otomatik.json', 'utf8')).urunler;
 const prods = JSON.parse(await readFile('public/products.json', 'utf8'));
 const bySlug = new Map(prods.items.map((p) => [p.s, p]));
+const toh = JSON.parse(await readFile('bilgi/tohumlar.json', 'utf8'));
+const tKaynak = (ks) => 'Kaynak: ' + ks.map((k) => toh.kaynaklar[k].ad.replace(/\s*\(.*\)$/, '')).join('; ');
+const tohumMetin = (t) => [
+  `Yöntem: ${t.yontem === 'fide' ? 'fide ile yetiştirilir' : t.yontem}.`,
+  t.zaman && `Ne zaman: ${t.zaman}`,
+  t.derinlik && `Ekim derinliği: ${t.derinlik}.`,
+  t.mesafe && `Mesafe: ${t.mesafe}.`,
+  t.cimlenme && `Çimlenme: ${t.cimlenme}.`,
+  t.sicaklik, t.hasat && `Hasat: ${t.hasat}.`,
+].filter(Boolean).map((x) => '• ' + x).join('\n');
 const USTA = 'Bu konuda kesin bilgi için ustamız size yardımcı olsun.';
 const out = [];
 const add = (e) => out.push({ id: 'h' + String(out.length + 1).padStart(4, '0'), durum: 'onay-bekliyor', ...e });
@@ -80,11 +90,19 @@ for (const [slug, c] of Object.entries(oto)) {
   let cevap = `${c.ad}${c.ozet ? ' — ' + c.ozet : ''}`;
   if (c.ph) cevap += `\n\npH: ${c.ph}`;
   if (c.icerik) cevap += `\n\n${c.icerik}`;
-  if (c.kullanim.length) cevap += `\n\nÜrün bilgisine göre:\n${c.kullanim.map((k) => '• ' + k).join('\n')}`;
+  const tu0 = toh.urunler[slug];
+  if (c.kullanim.length && !(tu0 && tu0.tur)) cevap += `\n\nÜrün bilgisine göre:\n${c.kullanim.map((k) => '• ' + k).join('\n')}`;
   if (c.kural === 'ilac') cevap += `\n\nKullanım miktarı ve güvenlik uyarıları için ürün etiketine uyunuz. ${USTA}`;
-  const tohum = c.kategori === 'Tohumlar';
+  const tu = toh.urunler[slug], tt = tu && tu.tur && toh.turler[tu.tur];
+  if (tt) {
+    cevap += `\n\n${tt.ad} ekim bilgisi:\n${tohumMetin(tt)}`;
+    if (tu.tohumSayisi) cevap += `\n• Bu pakette (${String(tu.gram).replace('.', ',')} g) yaklaşık ${tu.tohumSayisi[0].toLocaleString('tr-TR')}–${tu.tohumSayisi[1].toLocaleString('tr-TR')} tohum bulunur.`;
+    if (tt.saklama) cevap += `\n• Serin, kuru ve karanlık yerde saklanırsa tohumlar yaklaşık ${tt.saklama} yıl canlı kalır.`;
+    cevap += `\n\n${tKaynak(tt.k)}`;
+  } else if (tu) cevap += `\n\nGenel kural: ${toh.genel.derinlik}`;
+  const tohum = c.kategori === 'Tohumlar' || !!tu;
   const sorular = [`${n} nasıl kullanılır`, `${n} ne işe yarar`, `${n} özellikleri`, `${n} nedir`];
-  if (tohum) sorular.push(`${n} ne zaman ekilir`, `${n} nasıl ekilir`, `${n} ekim zamanı`);
+  if (tohum) sorular.push(`${n} ne zaman ekilir`, `${n} nasıl ekilir`, `${n} ekim zamanı`, `${n} kaç tohum var`, `${n} kaç cm derine ekilir`);
   if (c.kategori === 'Kedi Ürünleri' || c.kategori === 'Köpek Ürünleri') sorular.push(`${n} günlük ne kadar verilir`, `${n} besleme miktarı`);
   add({ tur: 'urun', urun: slug, kartDurum: 'urun_sayfasi', kategori: c.kategori, sorular, cevap, urunler: [slug, ...((bySlug.get(slug) || {}).x || []).slice(0, 2)], kaynak: `urun_sayfasi:${slug}` });
 }
@@ -132,10 +150,27 @@ for (const p of sx.saksilar) {
   add({ tur: 'saksi', urun: p.slug, sorular, cevap, urunler: [p.slug, ...((bySlug.get(p.slug) || {}).x || []).slice(0, 2)], kaynak: `saksi:${p.slug}` });
 }
 
+// G) Tohum türleri (bilgi/tohumlar.json; akbilge-tohum.mjs üretir): "domates ne zaman ekilir" gibi genel sorular
+const TUR_ADLARI = { hiyar: ['hıyar', 'salatalık'], marul: ['marul', 'salata'], lahana: ['lahana', 'kara lahana'], balkabagi: ['bal kabağı'] };
+for (const [key, t] of Object.entries(toh.turler)) {
+  const adlar = TUR_ADLARI[key] || [lc(t.ad.replace(/\s*\(.*\)/, '').split('/')[0].trim())];
+  const sorular = adlar.flatMap((a) => [`${a} ne zaman ekilir`, `${a} tohumu nasıl ekilir`, `${a} ekim zamanı`, `${a} tohumu kaç cm derine ekilir`, `${a} kaç günde çimlenir`, `${a} ekim aralığı`,
+    ...(t.yontem === 'fide' ? [`${a} fidesi ne zaman dikilir`, `${a} fidesi nasıl yetiştirilir`] : [])]);
+  const urunlerT = Object.entries(toh.urunler).filter(([s2, u]) => u.tur === key && bySlug.has(s2)).sort((a, b) => ((bySlug.get(b[0]).st > 0) - (bySlug.get(a[0]).st > 0))).map(([s2]) => s2);
+  add({ tur: 'tohum', bitki: t.ad, sorular, cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}${t.saklama ? `\n• Tohum saklama ömrü: yaklaşık ${t.saklama} yıl.` : ''}\n\n${tKaynak(t.k)}`,
+    urunler: urunlerT.slice(0, 3), dinamik: 'stok', kaynak: `tohum:${key}` });
+}
+for (const [konu, sorular] of Object.entries({
+  derinlik: ['tohum kaç cm derine ekilir', 'tohum ekim derinliği', 'tohum ne kadar derine gömülür', 'tohumu toprağa nasıl ekerim'],
+  dogrudan: ['hangi sebzeler fide ile yetiştirilir', 'hangi tohumlar direkt ekilir', 'fide mi tohum mu', 'doğrudan tohum ekimi hangi sebzeler'],
+  serin: ['kışlık sebzeler hangileri', 'serin iklim sebzeleri', 'sonbaharda hangi sebzeler ekilir', 'soğuğa dayanıklı sebzeler'],
+  sicak: ['yazlık sebzeler hangileri', 'sıcak iklim sebzeleri', 'ilkbaharda hangi sebzeler ekilir', 'soğuğa hassas sebzeler'],
+})) add({ tur: 'tohum-genel', konu, sorular, cevap: `${toh.genel[konu]}\n\n${tKaynak(toh.genel.k)}`, urunler: [], kaynak: `tohum:genel:${konu}` });
+
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
   cevap: `${pr.title || 'İndirim'}: ${pr.code} kodunu ödeme adımında kullanabilirsiniz${pr.note ? ' (' + pr.note + ')' : ''}.${pr.shipping ? ' ' + pr.shipping + '.' : ''}`, urunler: [], kaynak: 'config:promo' });
 await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);

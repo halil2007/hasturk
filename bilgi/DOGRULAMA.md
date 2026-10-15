@@ -51,3 +51,28 @@ Güncelleme: 15 Ekim 2026 · Kapsam: en çok satan bitki ürünlerinden ilk 13 �
 ### Karar gerekenler (eklenenler)
 5. **TurfMaster 16-6-25:** doğru doz ve kapsama alanı etiketten teyit edilmeli.
 6. **Guanokalong, Biochar, Tarm GrassMaster, Florist besinler:** etiket fotoğrafı (kullanım talimatı kısmı).
+
+## Tohumlar (ekim bilgisi) — bilgi/tohumlar.json
+
+20 sebze türü için ekim zamanı, yöntem, derinlik, mesafe, çimlenme, 1 g'daki tohum sayısı ve saklama ömrü; 61 tohum ürünü türüyle eşleşti (26'sında paketteki tohum sayısı hesaplandı). Kaynak metinleri `docs/kaynak/` altında.
+
+| Kaynak | Tür |
+|---|---|
+| TİGEM – Mirasımız Yerel Tohum | Resmi kurum: dikim tarihleri (25 Nisan–15 Mayıs), roka/tere/dereotu/fasulye/lahana dönemleri |
+| Atalık Tohumlar Yetiştirici Rehberi (Dr. G. Beşirli, Dr. A. Karagöz) | Araştırma enstitüsü uzmanları: tür tür yetiştirme, çimlenme, saklama |
+| Ankara Üniv. Ziraat Fak. ders notu | Akademik çizelge: derinlik, mesafe, toprak sıcaklığı |
+| Ankara BB kurs notu, Tarım Kütüphanesi | Destekleyici |
+
+**Kaynaklar çeliştiği için kullanılmayan değerler:**
+- Turp ekim derinliği: Ankara Üniv. çizelgesinde 0,2 cm (diğerleri 1,3–2,5 cm; dizgi hatası olmalı) → 1,5–2 cm verildi.
+- Kavun ekim derinliği: Ankara Üniv. çizelgesinde 0,4 cm (diğerleri 2,5–5 cm) → kavun tohumu satılmadığı için eklenmedi.
+- Havuç: Ankara BB 2,5–3 cm diyor; üniversite 0,5 cm, Yalova uzmanları 1–1,5 cm → 1–1,5 cm verildi (tohum iriliği kuralıyla uyumlu).
+- Fasulye/bezelye paket tohum sayısı: tohum iriliği çeşide göre çok değiştiği için verilmez.
+
+**Doğrulanmış özel veri bulunamayanlar** (çiçekler, aromatik otlar, mısır, semizotu, enginar, kuşkonmaz, çilek, kudret narı): cevapta ürün sayfası bilgisi + genel derinlik kuralı verilir.
+
+**Ürün açıklamalarında yazım hatası:** Birçok ürün sayfasında kelimeler bitişik yazılmış (ör. "taze tüketim" → "tazetüketim", "üstün kaliteli" → "üstünkaliteli", "Aromatik ve" → "Aromatikve", "direkt tohumdan" → "direktohumdan"). Ak Bilge bu metni aynen aktarır; ikas'ta düzeltilmesi önerilir.
+
+## Saksılar — bilgi/saksilar.json
+
+39 saksı ürünü, 69 boy. Litre üreticiden; yoksa ölçülerden hesap (konik saksıda 0,72 × silindir; Line, Kozalak, Cornet 85 L, Çeşme 130 L üretici litreleriyle %5 içinde). Kurallar Colorado State, Clemson, NC State, Illinois, UConn, UC Master Gardeners yayınlarından. "Dibe çakıl" konusu kaynaklarda tartışmalı olduğu için öyle anlatılır.

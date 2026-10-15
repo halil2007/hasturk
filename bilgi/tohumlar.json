@@ -1,0 +1,838 @@
+{
+ "_aciklama": "Sebze tohumu ekim bilgisi. Değerler kaynaklar karşılaştırılarak alınmıştır (k: kaynak kodları). gram: 1 gramdaki tohum sayısı aralığı; saklama: uygun koşulda saklama ömrü (yıl). urunler: mağazadaki tohum ürünlerinin türle eşleşmesi.",
+ "surum": 1,
+ "kaynaklar": {
+  "TG": {
+   "ad": "TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri",
+   "url": "https://www.tigem.gov.tr/Files/Miras%c4%b1m%c4%b1z_Yerel_Tohum.pdf"
+  },
+  "BG": {
+   "ad": "Atalık Tohumlar için Yetiştirici Rehberi (Dr. Gülay Beşirli, Dr. Alptekin Karagöz; Buğday Derneği, Yalova Atatürk Bahçe Kültürleri MAE katkısıyla)",
+   "url": "https://www.bugday.org/blog/wp-content/uploads/2021/04/AtalikTohumlar.pdf"
+  },
+  "AU": {
+   "ad": "Ankara Üniversitesi Ziraat Fakültesi – Sebze türlerinde çoğaltma (ekim aralıkları ve tohum miktarı çizelgesi)",
+   "url": "https://acikders.ankara.edu.tr/mod/resource/view.php?id=4225"
+  },
+  "ABB": {
+   "ad": "Ankara Büyükşehir Belediyesi – Sebze Yetiştiriciliği kurs notu",
+   "url": "https://s.ankara.bel.tr/files/5214/3893/6685/SEBZE_YETTRCL.pdf"
+  },
+  "TK": {
+   "ad": "Tarım Kütüphanesi – Kökü yenen sebzeler (havuç, turp…)",
+   "url": "http://www.tarimkutuphanesi.com/koku_yenilen_sebzeler_(havuc,_turp,_kereviz,_sogan,_sarimsak)_00443.html"
+  }
+ },
+ "genel": {
+  "derinlik": "Pratik kural: her tohum kendi iriliğinin 2,5–3 katı derinliğe ekilir. Hafif (kumlu) topraklarda ve rüzgârlı yerlerde biraz daha derine, ağır, ıslak topraklarda biraz daha yüzeye ekilir.",
+  "dogrudan": "Doğrudan tohumla ekilenler: soğan, ıspanak, turp, roka, tere, bezelye, fasulye, bakla, börülce, bamya, havuç, maydanoz, dereotu, semizotu. Fideyle yetiştirilmesi daha ekonomik olanlar: domates, biber, patlıcan, hıyar, kavun, kabak, karpuz ve lahana grubu.",
+  "serin": "Serin iklim sebzeleri (aylık ortalama 15–18 °C'de en iyi gelişir): bezelye, ıspanak, soğan, sarımsak, turp, tere, maydanoz, marul, pırasa, pazı, lahana, kırmızı pancar, kereviz, brokoli, bakla, enginar, havuç.",
+  "sicak": "Sıcak iklim sebzeleri (aylık ortalama 25–30 °C'de en iyi gelişir, soğuğa hassastır): biber, bamya, domates, fasulye, hıyar, kavun, karpuz, kabak, patlıcan, mısır, patates.",
+  "k": [
+   "BG",
+   "ABB"
+  ]
+ },
+ "turler": {
+  "domates": {
+   "ad": "Domates",
+   "grup": "sıcak iklim",
+   "yontem": "fide",
+   "zaman": "Tohum, fide dikiminden 30–35 gün önce viyole ya da kapalı alanda fide yastığına ekilir; fideler 4–6 haftada dikime hazır olur. Fideler son don tarihinden bir hafta sonra, gece sıcaklığı 10 °C'nin üstüne çıkınca dikilir; bölgeye göre genellikle 25 Nisan–15 Mayıs arası (soğuk bölgelerde biraz daha geç, sıcak bölgelerde daha erken).",
+   "derinlik": "0,5–1 cm",
+   "cimlenme": "6–8 gün",
+   "mesafe": "Sıra arası 70–100 cm, sıra üzeri 40–60 cm (sırık çeşitler destekle yetiştirilir; koltukları alınır)",
+   "sicaklik": "Fide yetiştirirken ortam 20–25 °C, toprak nemli (ıslak değil) tutulur.",
+   "hasat": "Fide dikiminden sonra kiraz domateste ~60 gün, sofralıkta ~80 gün",
+   "gram": [
+    240,
+    400
+   ],
+   "saklama": 4,
+   "k": [
+    "BG",
+    "TG",
+    "AU",
+    "ABB"
+   ]
+  },
+  "biber": {
+   "ad": "Biber",
+   "grup": "sıcak iklim",
+   "yontem": "fide",
+   "zaman": "Tohum, fide dikiminden 45–50 gün önce viyole ya da kapalı alanda fide yastığına ekilir (ör. Ankara'da mart ortası ekim, mayıs ortası dikim). Fideler son don tarihinden bir hafta sonra, gece sıcaklığı 10 °C'nin üstüne çıkınca dikilir; bölgeye göre genellikle 25 Nisan–15 Mayıs arası (soğuk bölgelerde biraz daha geç, sıcak bölgelerde daha erken).",
+   "derinlik": "0,5–1 cm",
+   "cimlenme": "8–14 gün",
+   "mesafe": "Sıra arası 60–70 cm, sıra üzeri 20–40 cm",
+   "sicaklik": "Soğuğa çok hassastır; fideler don tehlikesi tamamen geçince dikilir.",
+   "hasat": "Yeşil biber fide dikiminden ~75 gün sonra",
+   "gram": [
+    140,
+    180
+   ],
+   "saklama": 4,
+   "k": [
+    "BG",
+    "TG",
+    "AU",
+    "ABB"
+   ]
+  },
+  "patlican": {
+   "ad": "Patlıcan",
+   "grup": "sıcak iklim",
+   "yontem": "fide",
+   "zaman": "Tohum, fide dikiminden 45–50 gün önce viyole ya da kapalı alanda fide yastığına ekilir. Fideler son don tarihinden bir hafta sonra, gece sıcaklığı 10 °C'nin üstüne çıkınca dikilir; bölgeye göre genellikle 25 Nisan–15 Mayıs arası (soğuk bölgelerde biraz daha geç, sıcak bölgelerde daha erken).",
+   "derinlik": "0,5–1 cm",
+   "cimlenme": "8–15 gün",
+   "mesafe": "Sıra arası 60–70 cm, sıra üzeri 50–60 cm",
+   "sicaklik": "Tohumun çimlenmesi için toprak sıcaklığı 19 °C'nin üzerinde olmalıdır.",
+   "hasat": "Fide dikiminden 75–90 gün sonra",
+   "gram": [
+    215,
+    280
+   ],
+   "saklama": 5,
+   "k": [
+    "BG",
+    "TG",
+    "AU",
+    "ABB"
+   ]
+  },
+  "hiyar": {
+   "ad": "Hıyar (salatalık)",
+   "grup": "sıcak iklim",
+   "yontem": "doğrudan (fideyle de olur)",
+   "zaman": "Tohum, son don tarihinden bir hafta sonra doğrudan yerine ekilir. Toprak sıcaklığı en az 11 °C olmalıdır. Fide ile de yetiştirilebilir.",
+   "derinlik": "2,5–3 cm",
+   "cimlenme": "6–8 gün",
+   "mesafe": "Ocaklar arası 45–60 cm, sıra arası 120–150 cm; her ocağa 4–5 tohum, çıkıştan sonra 2 bitki bırakılır (sırık çeşitlere destek verilir)",
+   "hasat": "Tohum ekiminden 55–70 gün sonra",
+   "gram": [
+    25,
+    50
+   ],
+   "saklama": 5,
+   "k": [
+    "BG",
+    "ABB",
+    "AU"
+   ]
+  },
+  "kabak": {
+   "ad": "Kabak",
+   "grup": "sıcak iklim",
+   "yontem": "doğrudan",
+   "zaman": "Tohum, son don tarihinden bir hafta sonra doğrudan yerine ekilir (fide yapılmadan, Nisan–Mayıs aylarında).",
+   "derinlik": "2–3 cm",
+   "cimlenme": "6–12 gün",
+   "mesafe": "Ocaklar arası 70–100 cm, sıra arası 100–150 cm; her ocağa 2–3 tohum, çıkıştan sonra 1 bitki bırakılır",
+   "hasat": "Sakız kabağında tohum ekiminden ~50 gün sonra",
+   "saklama": 5,
+   "k": [
+    "BG",
+    "TG",
+    "AU"
+   ]
+  },
+  "balkabagi": {
+   "ad": "Bal kabağı",
+   "grup": "sıcak iklim",
+   "yontem": "doğrudan",
+   "zaman": "Tohum, son don tarihinden bir hafta sonra doğrudan yerine ekilir (fide yapılmadan, Nisan–Mayıs aylarında).",
+   "derinlik": "3–5 cm",
+   "mesafe": "Sıra üzeri 50–90 cm, sıra arası 150–300 cm (geniş yer ister)",
+   "saklama": 5,
+   "k": [
+    "BG",
+    "TG"
+   ]
+  },
+  "fasulye": {
+   "ad": "Fasulye",
+   "grup": "sıcak iklim",
+   "yontem": "doğrudan",
+   "zaman": "İlkbaharda don tehlikesi geçip toprak ısınınca doğrudan yerine ekilir; ekim Nisan–Ağustos arasında yapılabilir. Çok sıcakta (30–35 °C) çiçekler döllenmez; yazı serin geçen yerlerde haziranda ikinci ekim yapılabilir.",
+   "derinlik": "3–5 cm",
+   "cimlenme": "1–2 hafta",
+   "mesafe": "Oturak (bodur): sıra arası 40–70 cm, sıra üzeri 10–20 cm. Sırık: sıra arası 70–120 cm, sıra üzeri 15–20 cm; bitkiler 10–15 cm olunca sırık/çıta verilir. Ocak usulünde her ocağa 2–3 tohum",
+   "hasat": "Taze fasulye tohum ekiminden 65–85 gün sonra",
+   "gram": [
+    1,
+    6
+   ],
+   "saklama": 3,
+   "k": [
+    "BG",
+    "TG",
+    "AU"
+   ]
+  },
+  "barbunya": {
+   "ad": "Barbunya",
+   "grup": "sıcak iklim",
+   "yontem": "doğrudan",
+   "zaman": "İlkbaharda don tehlikesi geçtikten sonra doğrudan yerine ekilir. En iyi meyve tutumu 18–25 °C'de olur; 30–35 °C'de döllenme olmaz.",
+   "derinlik": "3–5 cm",
+   "cimlenme": "6–9 gün",
+   "mesafe": "Ocaklar 30–50 cm arayla, her ocağa 2–3 tohum; sırık çeşitlere herek/kamış verilir",
+   "hasat": "Taze tüketim için tohum ekiminden 65–90 gün sonra",
+   "saklama": 3,
+   "k": [
+    "BG"
+   ]
+  },
+  "bezelye": {
+   "ad": "Bezelye",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "Kışı ılık geçen bölgelerde sonbaharda (15 Ekim–15 Kasım, aralığa kadar), kışı soğuk geçen bölgelerde ilkbaharda (15 Şubat–mart sonu) ekilir.",
+   "derinlik": "3–5 cm",
+   "cimlenme": "5–10 gün",
+   "mesafe": "Ocaklar 30–50 cm arayla, her ocağa 2–3 tohum; sırık tiplere destek verilir",
+   "hasat": "Taze tüketim için tohum ekiminden 60–120 gün sonra",
+   "gram": [
+    3,
+    4
+   ],
+   "saklama": 3,
+   "k": [
+    "BG",
+    "AU"
+   ]
+  },
+  "bamya": {
+   "ad": "Bamya",
+   "grup": "sıcak iklim",
+   "yontem": "doğrudan",
+   "zaman": "Sıcak iklim sebzesidir; ideal gelişme sıcaklığı 22–30 °C, bölgenize göre havalar bu sıcaklığa ulaşınca ekilir. Tohum sert kabuklu olduğu için ekimden 1 gün önce suda ıslatılır.",
+   "derinlik": "2–2,5 cm",
+   "cimlenme": "6–12 gün",
+   "mesafe": "Sıra üzeri 45 cm, sıra arası 75 cm (ya da 40–45 cm arayla ocaklara 2–3 tohum)",
+   "hasat": "Meyve olgunlaşması 85–95 gün",
+   "gram": [
+    15,
+    19
+   ],
+   "saklama": 2,
+   "k": [
+    "BG",
+    "ABB"
+   ]
+  },
+  "marul": {
+   "ad": "Marul / salata",
+   "grup": "serin iklim",
+   "yontem": "fide ya da doğrudan",
+   "zaman": "Serin iklim sebzesidir; ilkbahar ve sonbahar ekimleri uygundur. Fide yapılacaksa tohum, dikimden 25–30 gün önce ekilir. Tohumlar 4–27 °C toprak sıcaklığında çimlenir.",
+   "derinlik": "0,5–1 cm",
+   "cimlenme": "6–10 gün",
+   "mesafe": "Sıra arası 30–35 cm, sıra üzeri 20–30 cm",
+   "sicaklik": "Ekimden sonra üzerinin örtülmesi çimlenmeyi teşvik eder; fideler görününce örtü kaldırılır.",
+   "hasat": "Çeşide göre 55–90 gün",
+   "gram": [
+    700,
+    1300
+   ],
+   "saklama": 5,
+   "k": [
+    "BG",
+    "ABB",
+    "AU"
+   ]
+  },
+  "ispanak": {
+   "ad": "Ispanak",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "İdeal gelişme sıcaklığı 15–20 °C'dir; ılıman iklimde sulama ve çeşit seçimi doğru yapılırsa her mevsim ekilebilir. Ekimden sonra düzenli sulama çok önemlidir.",
+   "derinlik": "1–3 cm (hafif toprakta daha derin)",
+   "cimlenme": "5–10 gün",
+   "mesafe": "Serpme ya da sıraya; sıra arası 20–30 cm, sıra üzeri 5–10 cm",
+   "hasat": "Tohum ekiminden 35–50 gün sonra",
+   "gram": [
+    70,
+    104
+   ],
+   "saklama": 5,
+   "k": [
+    "BG",
+    "AU"
+   ]
+  },
+  "lahana": {
+   "ad": "Lahana (beyaz lahana, kara lahana)",
+   "grup": "serin iklim",
+   "yontem": "fide",
+   "zaman": "Fide ile yetiştirilir: kışlık üretimde tohumlar temmuz–ağustosta viyollere ekilir, 4–5 hafta sonra (5–6 yapraklı) fideler yerine dikilir.",
+   "derinlik": "0,5–1,5 cm",
+   "cimlenme": "4–10 gün",
+   "mesafe": "Sıra arası 60–100 cm, sıra üzeri 40–60 cm",
+   "hasat": "Fide dikiminden sonra çeşide göre 70–160 gün",
+   "gram": [
+    225,
+    300
+   ],
+   "saklama": 5,
+   "k": [
+    "TG",
+    "BG",
+    "AU"
+   ]
+  },
+  "havuc": {
+   "ad": "Havuç",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "Doğrudan yerine ekilir; ilkbaharda mart–nisan ana ekim dönemidir. İklimi uygun yerlerde şubattan kasıma kadar 2–3 hafta arayla kademeli ekim yapılabilir.",
+   "derinlik": "1–1,5 cm",
+   "cimlenme": "10–20 gün (yavaş çimlenir)",
+   "mesafe": "Sıra arası 20–30 cm; çıkıştan sonra seyreltilip sıra üzeri 5–8 cm bırakılır",
+   "sicaklik": "Tohum çok küçük olduğu için kum ya da toprakla karıştırılarak serpilir; toprak iyi inceltilmeli, gevşek ve derin olmalıdır.",
+   "hasat": "Tohum ekiminden 70–120 gün sonra",
+   "gram": [
+    826,
+    850
+   ],
+   "saklama": 3,
+   "k": [
+    "BG",
+    "TK",
+    "ABB"
+   ]
+  },
+  "turp": {
+   "ad": "Turp",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "Fındık turpu ağustostan mayısa kadar 15 gün arayla ekilebilir; kışlık büyük turplar (bayır, Japon/Çin turpu tipi) temmuz–ağustosta ekilir. Yumru en iyi 14–16 °C'de oluşur; sıcakta küçük kalır.",
+   "derinlik": "1,5–2 cm",
+   "cimlenme": "3–8 gün",
+   "mesafe": "Fındık turpu: sıra arası 20–25 cm, sıra üzeri 3–6 cm. Büyük turplar: sıra arası 30–40 cm, sıra üzeri 10–20 cm",
+   "hasat": "Fındık turpu 3–4 hafta, büyük turplar ~3 ay",
+   "gram": [
+    75,
+    150
+   ],
+   "saklama": 5,
+   "k": [
+    "TK",
+    "BG",
+    "AU"
+   ]
+  },
+  "maydanoz": {
+   "ad": "Maydanoz",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "İdeal gelişme sıcaklığı 15–20 °C'dir; sulama ayarlanırsa ılıman iklimde yıl boyu ekilebilir. Ekimden sonra düzenli sulama çok önemlidir.",
+   "derinlik": "0,5–1 cm",
+   "cimlenme": "14–21 gün (yavaş çimlenir, sabırlı olun)",
+   "mesafe": "Serpme ya da sıraya; sıraya ekimde sıra üzeri 2–5 cm",
+   "hasat": "İlk hasat 70–90 gün; biçildikten 20–25 gün sonra yeniden biçilebilir",
+   "gram": [
+    530,
+    833
+   ],
+   "saklama": 2,
+   "k": [
+    "BG",
+    "AU"
+   ]
+  },
+  "dereotu": {
+   "ad": "Dereotu",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "Mart–nisan aylarında doğrudan yerine ekilir. Çimlenme oranı düşük olduğu için biraz fazla tohum kullanılır; ekimden hemen sonra sulanır ve toprak nemli tutulur.",
+   "derinlik": "Çok yüzeysel: tohumlar serpilip toprağa hafifçe bastırılır",
+   "mesafe": "Sıra arası 20–25 cm, sıra üzeri 2–4 cm (ya da serpme)",
+   "k": [
+    "TG"
+   ]
+  },
+  "roka": {
+   "ad": "Roka",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "Mart–haziran arasında doğrudan yerine ekilir. Sıcak bölgelerde ekim mayıs sonuna kadar tamamlanır; serin bölgelerde eylülde ikinci ekim yapılabilir.",
+   "derinlik": "Yaklaşık 0,5 cm",
+   "mesafe": "Sıra arası 15–20 cm, sıra üzeri 4–5 cm",
+   "k": [
+    "TG"
+   ]
+  },
+  "tere": {
+   "ad": "Tere",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "Mart–haziran arasında doğrudan yerine ekilir. Sıcak bölgelerde ekim mayıs sonuna kadar tamamlanır; serin bölgelerde eylülde ikinci ekim yapılabilir.",
+   "derinlik": "Yaklaşık 0,5 cm",
+   "mesafe": "Sıra arası 15–20 cm, sıra üzeri 4–5 cm",
+   "k": [
+    "TG"
+   ]
+  },
+  "pazi": {
+   "ad": "Pazı",
+   "grup": "serin iklim",
+   "yontem": "doğrudan",
+   "zaman": "Serin iklim sebzesidir.",
+   "cimlenme": "8–16 gün",
+   "gram": [
+    37,
+    70
+   ],
+   "saklama": 4,
+   "k": [
+    "BG",
+    "ABB"
+   ]
+  }
+ },
+ "urunler": {
+  "altinvadi-arapsaci-marul-tohumu-kivircik": {
+   "tur": "marul"
+  },
+  "altinvadi-patlican-tohumu-aydin-siyahi-10-gr": {
+   "tur": "patlican",
+   "gram": 10,
+   "tohumSayisi": [
+    2150,
+    2800
+   ]
+  },
+  "altinvadi-salatalik-tohumu-beith-alpha-10-gr": {
+   "tur": "hiyar",
+   "gram": 10,
+   "tohumSayisi": [
+    250,
+    500
+   ]
+  },
+  "altinvadi-beyaz-lahana-tohumu": {
+   "tur": "lahana",
+   "gram": 10,
+   "tohumSayisi": [
+    2250,
+    3000
+   ]
+  },
+  "altinvadi-bezelye-tohumu-25-gr": {
+   "tur": "bezelye",
+   "gram": 25,
+   "tohumSayisi": [
+    80,
+    100
+   ]
+  },
+  "altinvadi-cherry-domates-tohumu-5-gr": {
+   "tur": "domates",
+   "gram": 5,
+   "tohumSayisi": [
+    1200,
+    2000
+   ]
+  },
+  "altinvadi-dereotu-tohumu-10-gr": {
+   "tur": "dereotu",
+   "gram": 10
+  },
+  "altinvadi-dolma-biber-tohumu-10-gr": {
+   "tur": "biber",
+   "gram": 10,
+   "tohumSayisi": [
+    1400,
+    1800
+   ]
+  },
+  "altinvadi-findik-turpu-tohumu-toros-kirmizi": {
+   "tur": "turp"
+  },
+  "altinvadi-gelincik-cicegi-tohumu": {
+   "tur": null
+  },
+  "altinvadi-ispanak-tohumu-10-gr": {
+   "tur": "ispanak",
+   "gram": 10,
+   "tohumSayisi": [
+    700,
+    1040
+   ]
+  },
+  "altinvadi-japon-beyazi-turp-tohumu": {
+   "tur": "turp"
+  },
+  "altinvadi-karagoz-kadife-cicegi-tohumu": {
+   "tur": null
+  },
+  "altinvadi-kudret-nari-tohumu": {
+   "tur": null
+  },
+  "altinvadi-kuskonmaz-tohumu": {
+   "tur": null,
+   "adet": 12
+  },
+  "altinvadi-koy-tipi-domates-tohumu-5-gr": {
+   "tur": "domates",
+   "gram": 5,
+   "tohumSayisi": [
+    1200,
+    2000
+   ]
+  },
+  "altinvadi-pazi-tohumu-10-gr": {
+   "tur": "pazi",
+   "gram": 10,
+   "tohumSayisi": [
+    370,
+    700
+   ]
+  },
+  "altinvadi-pembe-domates-tohumu-5-gr": {
+   "tur": "domates",
+   "gram": 5,
+   "tohumSayisi": [
+    1200,
+    2000
+   ]
+  },
+  "altinvadi-renkli-havuc-tohumu-5-gr": {
+   "tur": "havuc",
+   "gram": 5,
+   "tohumSayisi": [
+    4130,
+    4250
+   ]
+  },
+  "altinvadi-renkli-misir-tohumu": {
+   "tur": null
+  },
+  "altinvadi-roka-tohumu-toros-iri-yaprak": {
+   "tur": "roka"
+  },
+  "altinvadi-sarikiz-fasulye-tohumu-oturak-20-gr": {
+   "tur": "fasulye",
+   "gram": 20
+  },
+  "altinvadi-semizotu-tohumu-10-gr": {
+   "tur": null,
+   "gram": 10
+  },
+  "altinvadi-sirik-domates-tohumu-5-gr": {
+   "tur": "domates",
+   "gram": 5,
+   "tohumSayisi": [
+    1200,
+    2000
+   ]
+  },
+  "altinvadi-salatalik-tohumu-sirik-f1-5-gr": {
+   "tur": "hiyar",
+   "gram": 5,
+   "tohumSayisi": [
+    130,
+    250
+   ]
+  },
+  "altinvadi-tarhun-otu-tohumu-50-adet": {
+   "tur": null,
+   "adet": 50
+  },
+  "altinvadi-tere-tohumu-10-gr": {
+   "tur": "tere",
+   "gram": 10
+  },
+  "altinvadi-toros-kirmizisi-turp-tohumu": {
+   "tur": "turp"
+  },
+  "altinvadi-toros-maydanozu-tohumu-10-gr": {
+   "tur": "maydanoz",
+   "gram": 10,
+   "tohumSayisi": [
+    5300,
+    8330
+   ]
+  },
+  "altinvadi-toros-sus-biberi-tohumu": {
+   "tur": "biber"
+  },
+  "altinvadi-marul-tohumu-yedikule-10-gr": {
+   "tur": "marul",
+   "gram": 10,
+   "tohumSayisi": [
+    7000,
+    13000
+   ]
+  },
+  "altinvadi-cin-turpu-tohumu-5-gr": {
+   "tur": "turp",
+   "gram": 5,
+   "tohumSayisi": [
+    380,
+    750
+   ]
+  },
+  "altinvadi-oz-ayse-fasulye-tohumu-sirik-20-gr": {
+   "tur": "fasulye",
+   "gram": 20
+  },
+  "arom-dere-otu-ata-tohumu-50-adet": {
+   "tur": "dereotu",
+   "adet": 50
+  },
+  "arzuman-aci-kil-biber-tohumu-10-gr": {
+   "tur": "biber",
+   "gram": 10,
+   "tohumSayisi": [
+    1400,
+    1800
+   ]
+  },
+  "arzuman-bal-kabagi-tohumu-10-gr": {
+   "tur": "balkabagi",
+   "gram": 10
+  },
+  "arzuman-bamya-tohumu-sultani": {
+   "tur": "bamya"
+  },
+  "arzuman-beyaz-sakiz-kabak-tohumu-10-gr": {
+   "tur": "kabak",
+   "gram": 10
+  },
+  "arzuman-biberiye-tohumu-30-adet": {
+   "tur": null,
+   "adet": 30
+  },
+  "arzuman-dereotu-derem-tohumu-25-gr": {
+   "tur": "dereotu",
+   "gram": 25
+  },
+  "arzuman-enginar-tohumu-30-adet": {
+   "tur": null,
+   "adet": 30
+  },
+  "arzuman-fasulye-tohumu-kevser-sarikiz-tipi-50-gr": {
+   "tur": "fasulye",
+   "gram": 50
+  },
+  "arzuman-genis-sirik-fasulye-tohumu-helda-tipi-50-gr": {
+   "tur": "fasulye",
+   "gram": 50
+  },
+  "arzuman-giant-italiana-maydanoz-tohumu-25-gr": {
+   "tur": "maydanoz",
+   "gram": 25,
+   "tohumSayisi": [
+    13250,
+    20830
+   ]
+  },
+  "arzuman-helen-tere-tohumu-25-gr": {
+   "tur": "tere",
+   "gram": 25
+  },
+  "arzuman-hercai-menekse-tohumu": {
+   "tur": null,
+   "adet": 100
+  },
+  "arzuman-kadife-tohumu": {
+   "tur": null,
+   "adet": 50
+  },
+  "arzuman-karagoz-tohumu": {
+   "tur": null,
+   "adet": 50
+  },
+  "arzuman-karanfil-cicegi-tohumu-100-adet": {
+   "tur": null,
+   "adet": 100
+  },
+  "arzuman-kekik-zahter-tohumu-5-gr": {
+   "tur": null,
+   "gram": 5
+  },
+  "arzuman-koy-tipi-domates-tohumu": {
+   "tur": "domates"
+  },
+  "arzuman-kiz-gozu-cicegi-tohumu-100-adet": {
+   "tur": null,
+   "adet": 100
+  },
+  "arzuman-lavanta-tohumu-100-adet": {
+   "tur": null,
+   "adet": 100
+  },
+  "arzuman-msc-50-yer-domatesi-tohumu-5-gr": {
+   "tur": "domates",
+   "gram": 5,
+   "tohumSayisi": [
+    1200,
+    2000
+   ]
+  },
+  "arzuman-marmande-domates-tohumu": {
+   "tur": "domates"
+  },
+  "arzuman-mazamort-ucburun-biber-tohumu-10-gr": {
+   "tur": "biber",
+   "gram": 10,
+   "tohumSayisi": [
+    1400,
+    1800
+   ]
+  },
+  "arzuman-meramli-kiz-gazanya-cicegi-tohumu-20-adet": {
+   "tur": null,
+   "adet": 20
+  },
+  "arzuman-mor-reyhan-tohumu": {
+   "tur": null
+  },
+  "arzuman-nane-tohumu": {
+   "tur": null
+  },
+  "arzuman-nantes-havuc-tohumu-10-gr": {
+   "tur": "havuc",
+   "gram": 10,
+   "tohumSayisi": [
+    8260,
+    8500
+   ]
+  },
+  "arzuman-nasuhi-f1-sirik-hiyar-tohumu-10-adet": {
+   "tur": "hiyar",
+   "adet": 10
+  },
+  "arzuman-oturak-barbunya-tohumu-50-gr": {
+   "tur": "barbunya",
+   "gram": 50
+  },
+  "arzuman-papatya-tohumu-100-adet": {
+   "tur": null,
+   "adet": 100
+  },
+  "arzuman-petunya-boru-cicegi-tohumu-100-adet": {
+   "tur": null,
+   "adet": 100
+  },
+  "arzuman-portakal-nergisi-tohumu": {
+   "tur": null
+  },
+  "arzuman-rota-roka-tohumu-25-gr": {
+   "tur": "roka",
+   "gram": 25
+  },
+  "arzuman-selen-f1-oturak-hiyar-tohumu": {
+   "tur": "hiyar"
+  },
+  "arzuman-simbo-oturak-fasulye-tohumu-50-gr": {
+   "tur": "fasulye",
+   "gram": 50
+  },
+  "arzuman-siyah-kabak-tohumu": {
+   "tur": "kabak"
+  },
+  "arzuman-sirik-barbunya-tohumu-50-gr": {
+   "tur": "barbunya",
+   "gram": 50
+  },
+  "arzuman-tatli-kil-biber-tohumu-10-gr": {
+   "tur": "biber",
+   "gram": 10,
+   "tohumSayisi": [
+    1400,
+    1800
+   ]
+  },
+  "arzuman-tatli-misir-tohumu-25-gr": {
+   "tur": null,
+   "gram": 25
+  },
+  "arzuman-yaprak-karalahana-tohumu-10-gr": {
+   "tur": "lahana",
+   "gram": 10,
+   "tohumSayisi": [
+    2250,
+    3000
+   ]
+  },
+  "arzuman-yaglik-kapya-biber-tohumu-10-gr-salcalik": {
+   "tur": "biber",
+   "gram": 10,
+   "tohumSayisi": [
+    1400,
+    1800
+   ]
+  },
+  "arzuman-yesim-semizotu-tohumu-10-gr": {
+   "tur": null,
+   "gram": 10
+  },
+  "arzuman-zinya-kirli-hanim-cicegi-tohumu-30-adet": {
+   "tur": null,
+   "adet": 30
+  },
+  "arzuman-cengelkoy-hiyar-tohumu-10-gr": {
+   "tur": "hiyar",
+   "gram": 10,
+   "tohumSayisi": [
+    250,
+    500
+   ]
+  },
+  "arzuman-cilek-tohumu-100-adet": {
+   "tur": null,
+   "adet": 100
+  },
+  "arzuman-oz-ayse-fasulye-tohumu-50-gr": {
+   "tur": "fasulye",
+   "gram": 50
+  },
+  "arzuman-ince-yaprak-maydanoz-tohumu-25-gr": {
+   "tur": "maydanoz",
+   "gram": 25,
+   "tohumSayisi": [
+    13250,
+    20830
+   ]
+  },
+  "arzuman-sebboy-cicegi-tohumu-100-adet": {
+   "tur": null,
+   "adet": 100
+  },
+  "ayas-beyaz-bodur-domates-ata-tohumu-50-adet": {
+   "tur": "domates",
+   "adet": 50
+  },
+  "fare-kulagi-tohumu-500-gr": {
+   "tur": null,
+   "gram": 500
+  },
+  "kocas-patlicani-ata-tohumu-50-adet": {
+   "tur": "patlican",
+   "adet": 50
+  },
+  "topak-patlican-ata-tohumu-50-adet": {
+   "tur": "patlican",
+   "adet": 50
+  },
+  "turuncu-salkim-domates-ata-tohumu-50-adet": {
+   "tur": "domates",
+   "adet": 50
+  },
+  "yamula-patlicani-ata-tohumu-50-adet": {
+   "tur": "patlican",
+   "adet": 50
+  },
+  "cifteler-biberi-ata-tohumu-50-adet": {
+   "tur": "biber",
+   "adet": 50
+  },
+  "sahnali-aci-sivri-biber-ata-tohumu-50-adet": {
+   "tur": "biber",
+   "adet": 50
+  }
+ }
+}
