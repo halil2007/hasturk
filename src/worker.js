@@ -1,6 +1,7 @@
 // Cloudflare Worker: public/ klasöründeki dosyalar (widget, ürün verisi) doğrudan statik sunulur, bu kod onlarda çalışmaz.
-// Sadece iki adres için devreye girer:
+// Sadece şu adresler için devreye girer:
 //   POST /e       widget'tan gelen anonim ziyaretçi olayları (arama, tıklama, görüntüleme, sepete ekleme)
+//   GET  /ai/durum  Ak Bilgi için Anthropic anahtarı kayıtlı mı (anahtar gösterilmez)
 //   GET  /trends  son 30 günün özeti (ivme dahil) + son 2 yılın aynı dönemi (scripts/sync.mjs 2 saatte bir okur, products.json'a işler)
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
@@ -128,6 +129,11 @@ async function trends(env, ctx) {
   return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', 80), q0: top('q0', 50), m: top('m', 40), xs: top('xs', 60), xa: top('xa', 60), p, ly, ly2 });
 }
 
+// Anthropic anahtarının Cloudflare'deki adı: ANTHROPIC_API_KEY (önerilen) ya da akbilge / AKBILGE
+function aiKeyName(env) {
+  return ['ANTHROPIC_API_KEY', 'akbilge', 'AKBILGE', 'AkBilge', 'Akbilge'].find((n) => typeof env[n] === 'string' && env[n].trim()) || null;
+}
+
 export default {
   async fetch(req, env, ctx) {
     const { pathname } = new URL(req.url);
@@ -136,6 +142,14 @@ export default {
       return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' } });
     }
     if (pathname === '/trends') return trends(env, ctx).catch(() => new Response('{"ok":false}', { status: 500 }));
+    // Ak Bilgi hazırlığı: Anthropic anahtarı Cloudflare'de doğru adla (ANTHROPIC_API_KEY) kayıtlı mı. Anahtarın kendisi
+    // asla gösterilmez; sadece var/yok, uzunluk ve türünü belirten ilk ek (ör. "sk-ant-api")
+    if (pathname === '/ai/durum') {
+      const ad = aiKeyName(env), k = ad ? String(env[ad]).trim() : '';
+      const m = k.match(/^sk-ant-[a-z]+/);
+      return new Response(JSON.stringify({ anahtar: !!k, ad, tur: m ? m[0] : k ? 'beklenmeyen biçim' : null, uzunluk: k.length || 0 }),
+        { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
     return new Response('Bulunamadı', { status: 404 });
   },
 };

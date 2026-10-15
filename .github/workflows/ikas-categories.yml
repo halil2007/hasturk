@@ -1,0 +1,31 @@
+name: ikas kategorileri aç
+
+# scripts/categories/*.json planındaki kategori ağacını HasTürk mağazasında açar (menüye dokunmaz).
+# Planda "apply": false iken kuru çalıştırmadır: hiçbir şey değişmez, sadece ne yapılacağı özet sayfasına yazılır.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/categories/**', 'scripts/ikas-categories.mjs', '.github/workflows/ikas-categories.yml']
+
+permissions:
+  contents: read
+
+concurrency: ikas-categories
+
+jobs:
+  categories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: HasTürk kategorileri
+        run: node scripts/ikas-categories.mjs
+        env:
+          CATS_FILE: scripts/categories/bitkiler.json
+          IKAS_STORE: ${{ secrets.IKAS_STORE }}
+          IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
