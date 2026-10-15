@@ -684,9 +684,28 @@
     '.akbub p+p,.akbub ul+p,.akbub p+ul{margin-top:6px}.akbub ul{padding-left:18px}.akbub li{margin:2px 0}',
     '.akbub .aks{font-size:11.5px;color:var(--mu);margin-top:8px}.akbub .akn{font-size:12px;color:var(--mu);margin-top:8px}',
     '.akm-u{display:flex;justify-content:flex-end;margin:14px 0 0}.akm-u .akbub{background:var(--pr);color:#fff;border-bottom-right-radius:6px}',
-    '.akchips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0 52px}',
-    '.akchips button{font-size:13px;font-weight:600;color:var(--pr);background:#fff;border:1.5px solid var(--lt);border-radius:16px;padding:7px 12px;text-align:left}',
-    '.akchips button:hover{border-color:var(--pr)}',
+    /* Açılış ekranı: konu kartları, açılan sorular, çok satanlar şeridi */
+    '.akbas{margin:12px 0 0}',
+    '.akpg{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 12px 8px 8px;margin:0 0 8px;border-radius:14px;background:var(--soft);border:1.5px solid var(--lt)}',
+    '.akpg .im{width:46px;height:46px;flex:none;border-radius:10px;overflow:hidden;background:#fff;display:grid;place-items:center}.akpg .im img{width:100%;height:100%;object-fit:contain}',
+    '.akpg small{display:block;font-size:11.5px;color:var(--mu)}.akpg b{display:block;font-size:13.5px;color:var(--prd);line-height:1.3}',
+    '.akgo{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+    '.akgo button{display:flex;align-items:center;gap:9px;text-align:left;padding:10px;border-radius:14px;background:#fff;border:1.5px solid var(--lt);min-height:60px;transition:border-color .15s,background .15s}',
+    '.akgo button:hover{border-color:var(--pr)}.akgo button.on{border-color:var(--pr);background:var(--soft)}',
+    '.akgo i{width:34px;height:34px;border-radius:50%;background:var(--soft);color:var(--pr);display:grid;place-items:center;flex:none}.akgo button.on i{background:#fff}',
+    '.akgo i svg{width:17px;height:17px}.akgo span{min-width:0}',
+    '.akgo b{display:block;font-size:13.5px;color:var(--prd);line-height:1.25}.akgo small{display:block;font-size:11.5px;color:var(--mu);line-height:1.3;margin-top:2px}',
+    '.akopts{display:none;flex-wrap:wrap;gap:6px;margin:8px 0 0}.akopts.on{display:flex}',
+    '.akopts button{font-size:13px;font-weight:600;color:var(--pr);background:#fff;border:1.5px solid var(--lt);border-radius:16px;padding:7px 12px;text-align:left}',
+    '.akopts button:hover{border-color:var(--pr)}',
+    '.aksell{margin:14px 0 0}.aksell>b{display:block;font-size:12.5px;font-weight:700;color:var(--mu);margin:0 0 6px}',
+    '.aksell .row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:0 0 2px}.aksell .row::-webkit-scrollbar{display:none}',
+    '.aksell .row button{flex:0 0 128px;text-align:left;padding:8px;border-radius:14px;background:#fff;border:1.5px solid var(--lt);display:flex;flex-direction:column;gap:4px}',
+    '.aksell .row button:hover{border-color:var(--pr)}',
+    '.aksell .im{width:100%;height:84px;border-radius:10px;overflow:hidden;background:var(--bg);display:grid;place-items:center}.aksell .im img{width:100%;height:100%;object-fit:contain}',
+    '.aksell .n{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px}',
+    '.aksell em{font-style:normal;font-size:12px;font-weight:700;color:var(--pr)}',
+    '.akkargo{display:inline-flex;align-items:center;gap:6px;margin:12px 0 0;font-size:13px;font-weight:600;color:var(--pr);padding:6px 2px}.akkargo svg{width:16px;height:16px}',
     '.akpw{margin:8px 0 0 52px}.akpw .soil{margin:0}.akp{display:grid;gap:6px}@media(min-width:760px){.akp{grid-template-columns:1fr 1fr}}',
     '.akc{margin:8px 0 0 52px}.akc p{font-size:13px;color:var(--mu);margin-bottom:6px}.akc-l{display:flex;gap:8px;flex-wrap:wrap}',
     '.akc a{display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:20px;font-size:13.5px;font-weight:700}.akc a svg{width:18px;height:18px}',
@@ -1104,6 +1123,7 @@
     }
     else if (act === 'clear') { $q.value = ''; render(); $q.focus(); }
     else if (act === 'akq') akAsk(v);
+    else if (act === 'akgrp') akGroup(v);
     else if (act === 'akoy') akVote(v);
     else if (act === 'akyeni') { AK.log = []; akSave(); AK.built = false; akBuild(); }
     else if (act === 'q') { $q.value = v; shown = PAGE; render(); $q.focus(); }
@@ -1248,22 +1268,19 @@
     if (!$ak) return;
     if (!AK.built) {
       var c = CFG.akbilge || {}, name = akName(), pg = akPage();
-      var samples = akSamples();
-      if (pg) samples.unshift(BY_SLUG[pg].n.replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() + ' nasıl kullanılır?');
       $ak.innerHTML = '<div class="akh"><img src="' + esc(akImg('avatar')) + '" alt="" width="64" height="64"><div><b>' + esc(name) + '</b><span>' +
         esc(c.subtitle || 'Gübre, toprak, tohum, saksı ve bitki bakımı sorularınızı cevaplarım.') + '</span></div>' +
         (AK.log.length ? '<button type="button" class="aknew" data-act="akyeni">Yeni sohbet</button>' : '') + '</div>' + akLive() +
         '<div class="akwrap">' + akBot('selam', '<p>' + esc(c.greet || ('Merhaba, ben ' + name + '! Bitkiniz ya da ürünlerimizle ilgili sorunuzu yazın.')) + '</p>') +
-        '<div class="akchips">' + samples.map(function (x) { return '<button type="button" data-act="akq" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>' +
+        '<div class="akbas">' + akStart(pg) + '</div>' +
         '<div class="aklog" aria-live="polite"></div></div>';
-      $akf.innerHTML = '<input type="text" maxlength="300" enterkeyhint="send" placeholder="Sorunuzu yazın…" aria-label="' + esc(name) + '\'ye sorun">' +
+      $akf.innerHTML = '<input type="text" maxlength="300" enterkeyhint="send" placeholder="Sorunuzu yazın…" aria-label="' + esc(name + akYe(name)) + ' sorun">' +
         '<button type="submit" aria-label="Gönder">' + I.send + '</button>';
       if (!$akf.getAttribute('data-on')) {
         $akf.setAttribute('data-on', '1');
         $akf.addEventListener('submit', function (e) { e.preventDefault(); var inp = $akf.querySelector('input'); var v = inp.value; inp.value = ''; akAsk(v); });
       }
       AK.built = true;
-      akLoadPop();
       if (!DATA) load().then(function () { if (!AK.log.length) { AK.built = false; akBuild(); } else akRenderLog(); }, function () {});
     }
     akRenderLog();
@@ -1272,36 +1289,63 @@
   // 2) bu ayın ekim sorusu, 3) en çok satan ürünün kullanımı, 4) şu an yükselen (sezonu gelen) tohum, 5) en çok aranan bitki.
   // config.json > akbilge.samples doluysa o liste kullanılır.
   var AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-  function akKisa(n) { return String(n || '').replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/^(has ?türk|hg|altınvadi|arzuman|uzman)\s+/i, '').replace(/\s+\d+([.,]\d+)?\s*(gr|g|kg|lt|l|ml|adet)\b.*$/i, '').replace(/\s+/g, ' ').trim(); }
-  function akSamples() {
-    var c = CFG.akbilge || {}, out = [], add = function (q) { if (q && out.length < 4 && out.indexOf(q) === -1) out.push(q); };
-    if (c.samples && c.samples.length) return c.samples.slice(0, 4);
-    (AK.pop || []).slice(0, 2).forEach(function (q) { add(q.charAt(0).toLocaleUpperCase('tr-TR') + q.slice(1) + (/[?]$/.test(q) ? '' : '?')); });
-    add(AYLAR[new Date().getMonth()] + ' ayında ne ekilir?');
-    if (DATA) {
-      var tr = DATA.trend || {}, ok = function (s) { var x = BY_SLUG[s]; return x && x.st ? x : null; };
-      var best = (tr.best || []).map(ok).filter(Boolean)[0];
-      if (best) add(akKisa(best.n) + ' nasıl kullanılır?');
-      var seed = (tr.rising || []).map(ok).filter(function (x) { return x && /tohum/i.test(x.n) && !/çim/i.test(x.n); })[0];
-      if (seed) add(akKisa(seed.n).replace(/\s*tohumu.*$/i, '') + ' tohumu nasıl ekilir?');
-      for (var i = 0; i < (tr.q || []).length && out.length < 4; i++) { var pl = plantFor(fold(tr.q[i])); if (pl) add(pl.n + ' için hangi gübre?'); }
-    }
-    ['Domatese ne kadar solucan gübresi verilir?', 'Monstera için hangi toprak?', '17 cm saksıya ne kadar toprak gider?'].forEach(add);
-    return out;
+  // Kısa ürün adı (soru metni için): marka, paket ölçüsü, açıklama eki atılır ("HG Tarım Perliti" → "Tarım Perliti")
+  var AK_MARKA = /^(has ?türk|hasturk|hg|altınvadi|arzuman|uzman|arom|tarm|florist|chrysamed|gartengold|güzelbahçe|klasmann|qts|icl|biosas|serinova|raco|sgs|gold valley|ilposan|delta|pomsan|lıtolan|litolan|guanokalong)\s+/i;
+  function akKisa(n) {
+    var k = String(n || '').replace(/\s*[|–—].*$/, '').replace(/\s+-\s+.*$/, '').replace(/\s*\([^)]*\)/g, ' ')
+      .replace(/\s+\d+([.,]\d+)?(\s*[-–x×]\s*\d+([.,]\d+)?)?\s*(gr|g|kg|lt|l|ml|adet|cm)\b.*$/i, '').replace(/[\/,;:]+\s*$/, '').replace(/\s+/g, ' ').trim();
+    for (var i = 0; i < 2; i++) k = k.replace(AK_MARKA, '');
+    return k.replace(/\s+ata\s+tohumu/i, ' tohumu');
   }
-  function akLoadPop() {
-    if (AK.popAsked || !AK_URL) return;
-    AK.popAsked = true;
-    fetch(AK_URL.replace(/\/ak(\?|$)/, '/ak/populer$1')).then(function (r) { return r.json(); }).then(function (d) {
-      var l = (d && d.sorular) || [];
-      if (l.length < 2) return;
-      AK.pop = l;
-      var box = root.querySelector('.akchips'), pg = akPage();
-      if (!box || AK.log.length) return;
-      var samples = akSamples();
-      if (pg) samples.unshift(BY_SLUG[pg].n.replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() + ' nasıl kullanılır?');
-      box.innerHTML = samples.slice(0, 5).map(function (x) { return '<button type="button" data-act="akq" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('');
-    }, function () {});
+  // Açılış ekranı: 4 konu kartı (dokununca o konunun soruları açılır), çok satan ürünler şeridi, kargo sorusu.
+  // Buradaki her soru hazır cevap havuzundan gelir (anında, ücretsiz). config.json > akbilge.groups ile konular değişir:
+  // [{ "title": "…", "sub": "…", "icon": "leaf", "q": ["…", "…"] }]
+  function akGroups() {
+    var c = CFG.akbilge || {}, ay = AYLAR[new Date().getMonth()];
+    if (c.groups && c.groups.length) return c.groups;
+    var tr = (DATA && DATA.trend) || {}, seen = {}, seeds = [];
+    (tr.rising || []).concat(tr.best || []).forEach(function (s) {
+      var x = BY_SLUG[s];
+      if (!x || !x.st || !/tohum/i.test(x.n) || /çim|mama/i.test(x.n)) return;
+      var k = akKisa(x.n).replace(/\s*tohumu.*$/i, '');
+      if (k && !seen[k] && seeds.length < 2) { seen[k] = 1; seeds.push(k + ' tohumu nasıl ekilir?'); }
+    });
+    return [
+      { title: 'Bitkimde sorun var', sub: 'Sararma, solma, zararlılar', icon: 'leaf', q: ['Yapraklar neden sararır?', 'Saksıda küçük sinekler var', 'Çiçeğim neden açmıyor?', 'Yaprak biti nasıl geçer?'] },
+      { title: 'Hangi gübre?', sub: 'Bitkinize göre miktar', icon: 'drop', q: ['Zeytin için hangi gübre?', 'Limon için hangi gübre?', 'Domates için hangi gübre?', 'Fındık için hangi gübre?'] },
+      { title: 'Toprak ve saksı', sub: 'Hangi toprak, kaç litre', icon: 'sprout', q: ['Monstera için hangi toprak?', 'Kaktüs için hangi toprak?', '20 cm saksı kaç litre?', 'Saksı ne zaman değiştirilir?'] },
+      { title: 'Ne ekebilirim?', sub: 'Bu ayın ekim takvimi', icon: 'clock', q: [ay + ' ayında ne ekilir?'].concat(seeds, ['Tohum kaç cm derine ekilir?', 'Hangi sebzeler fide ile yetiştirilir?']).slice(0, 4) }
+    ];
+  }
+  function akChip(x) { return '<button type="button" data-act="akq" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }
+  function akStart(pg) {
+    var c = CFG.akbilge || {}, h = '', G = akGroups();
+    if (c.samples && c.samples.length) return '<div class="akopts on">' + c.samples.map(akChip).join('') + '</div>';
+    // Ürün sayfasındaysa o ürünle ilgili soru en üstte
+    if (pg && BY_SLUG[pg]) {
+      var p = BY_SLUG[pg], pq = akKisa(p.n) + ' nasıl kullanılır?';
+      h += '<button type="button" class="akpg" data-act="akq" data-v="' + esc(pq) + '">' + thumb(p.img, 120) + '<span><small>Bu ürün hakkında</small><b>' + esc(pq) + '</b></span></button>';
+    }
+    h += '<div class="akgo">' + G.map(function (g, i) {
+      return '<button type="button" data-act="akgrp" data-v="' + i + '"' + (AK.grp === i ? ' class="on" aria-expanded="true"' : ' aria-expanded="false"') + '><i>' + (I[g.icon] || I.leaf) + '</i><span><b>' + esc(g.title) + '</b><small>' + esc(g.sub || '') + '</small></span></button>';
+    }).join('') + '</div>';
+    h += '<div class="akopts' + (G[AK.grp] ? ' on' : '') + '">' + (G[AK.grp] ? G[AK.grp].q.map(akChip).join('') : '') + '</div>';
+    // Çok satanlar (bahçe ürünleri; mama, kum vb. hariç): dokununca "nasıl kullanılır?" sorulur
+    if (DATA) {
+      var tr = DATA.trend || {}, list = [];
+      (tr.best || []).forEach(function (s) { var x = BY_SLUG[s]; if (x && x.st && list.length < 4 && !/mama|kedi|köpek|kumu|ödül/i.test(x.n) && list.indexOf(x) === -1) list.push(x); });
+      if (list.length >= 2) h += '<div class="aksell"><b>Çok satanlar hakkında sorun</b><div class="row">' + list.map(function (x) {
+        return '<button type="button" data-act="akq" data-v="' + esc(akKisa(x.n) + ' nasıl kullanılır?') + '">' + thumb(x.img, 180) + '<span class="n">' + esc(akKisa(x.n)) + '</span><em>Nasıl kullanılır?</em></button>';
+      }).join('') + '</div></div>';
+    }
+    if (c.kargo) h += '<button type="button" class="akkargo" data-act="akq" data-v="Siparişim ne zaman gelir?">' + I.truck + 'Siparişim ne zaman gelir?</button>';
+    return h;
+  }
+  function akGroup(v) {
+    var i = +v, box = root.querySelector('.akbas');
+    AK.grp = AK.grp === i ? null : i;
+    if (AK.grp != null) track('akbilge_konu', (akGroups()[i] || {}).title || '');
+    if (box) box.innerHTML = akStart(akPage());
   }
   function akVote(v) {
     var m = String(v).split(':'), it = AK.log[+m[1]];
@@ -2234,7 +2278,7 @@
     if (!soilCard.seen) soilCard.seen = {};
     if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + (r.p ? r.p.n : 'yok')); }
     var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın') : '';
-    var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Uzmanımıza sorun</a>' : '';
+    var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Müşteri hizmetlerimize sorun</a>' : '';
     var head = function (txt) { return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' + txt + '</span></div></div>'; };
     if (r.exact) return head(esc(pl.n) + ' için önerdiğimiz toprak:') + '<div class="so-l">' + soilRow(r.p, '') + '</div></div>';
     if (r.none) {
