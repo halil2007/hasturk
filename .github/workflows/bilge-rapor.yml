@@ -1,0 +1,62 @@
+name: Bilge Bey haftalık rapor
+
+# Her pazartesi 08:30 (TR) son 7 günün sayılarını /ak/rapor'dan alıp docs/bilge-bey-rapor.md olarak yazar.
+# Yalnız sayılar ve hazır cevap kalıpları vardır; müşterinin yazdığı soru metinleri bu rapora girmez (depo herkese açık).
+# Müşteri soruları yalnız şifreli /ak/inceleme sayfasında görünür.
+on:
+  schedule:
+    - cron: '30 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: bilge-rapor
+
+jobs:
+  rapor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Raporu yaz
+        run: |
+          curl -sf 'https://hasturk-arama.halilc2007.workers.dev/ak/rapor?gun=7' -o /tmp/r.json
+          python3 - <<'PY'
+          import json, os
+          r = json.load(open('/tmp/r.json'))
+          if not r.get('ok'): raise SystemExit('rapor alınamadı')
+          urun = {p['s']: p['n'].strip() for p in json.load(open('public/products.json'))['items']}
+          tur = {'bitki-doz': 'Gübre miktarı', 'gubre-genel': 'Genel gübre', 'urun': 'Ürün kullanımı', 'bitki-toprak': 'Toprak', 'saksi': 'Saksı', 'saksi-hesap': 'Saksı litre', 'saksi-kural': 'Saksı seçimi',
+                 'tohum': 'Tohum ekimi', 'tohum-ay': 'Ayın ekimi', 'tohum-genel': 'Ekim bilgisi', 'pompa': 'Pompa', 'pompa-genel': 'Pompa', 'sorun': 'Bitki sorunu', 'magaza': 'Kargo/indirim', 'onayli': 'Onaylı Claude cevabı'}
+          gecmis_yol = 'docs/bilge-bey-rapor.json'
+          gecmis = json.load(open(gecmis_yol)) if os.path.exists(gecmis_yol) else []
+          gecmis = [g for g in gecmis if g.get('baslangic') != r['baslangic']] + [{k: r[k] for k in ('baslangic', 'toplam', 'hazir', 'claude', 'cevapsiz', 'tahmini_usd', 'sepete_eklenen')} | {'evet': r['oy']['evet'], 'hayir': r['oy']['hayir']}]
+          gecmis = gecmis[-52:]
+          json.dump(gecmis, open(gecmis_yol, 'w'), ensure_ascii=False, indent=1)
+          oran = round(100 * r['hazir'] / r['toplam']) if r['toplam'] else 0
+          L = [f"# Bilge Bey haftalık rapor", '', f"Son 7 gün ({r['baslangic']} – bugün). Her pazartesi otomatik güncellenir; müşteri soru metinleri burada yoktur (şifreli inceleme sayfasında).", '',
+               '| | |', '|---|---|',
+               f"| Sorulan soru | **{r['toplam']}** |", f"| Hazır cevaptan (ücretsiz, anında) | {r['hazir']} (%{oran}) |", f"| Claude'dan | {r['claude']} |",
+               f"| Cevaplanamayan / yönlendirilen | {r['cevapsiz']} |", f"| Tahmini Claude maliyeti | ${r['tahmini_usd']} |",
+               f"| Bilge Bey önerisinden sepete eklenen ürün | **{r['sepete_eklenen']}** |", f"| \"İşime yaradı\" evet / hayır | {r['oy']['evet']} / {r['oy']['hayir']} |", '']
+          if r['sepete_en_cok']:
+              L += ['## Bilge Bey önerisinden en çok sepete eklenenler', ''] + [f"- {urun.get(x['urun'], x['urun'])}: {x['n']}" for x in r['sepete_en_cok']] + ['']
+          if r['en_cok_konular']:
+              L += ['## En çok cevaplanan konular (hazır cevap)', ''] + [f"- {x['soru']}: {x['n']}" for x in r['en_cok_konular']] + ['']
+          if r['konu_turleri']:
+              L += ['## Konu dağılımı', ''] + [f"- {tur.get(k, k)}: {v}" for k, v in sorted(r['konu_turleri'].items(), key=lambda kv: -kv[1])] + ['']
+          if len(gecmis) > 1:
+              L += ['## Haftalar', '', '| Hafta başı | Soru | Hazır | Claude | Maliyet | Sepete eklenen | Evet/Hayır |', '|---|---|---|---|---|---|---|']
+              L += [f"| {g['baslangic']} | {g['toplam']} | {g['hazir']} | {g['claude']} | ${g['tahmini_usd']} | {g['sepete_eklenen']} | {g['evet']}/{g['hayir']} |" for g in reversed(gecmis)] + ['']
+          open('docs/bilge-bey-rapor.md', 'w').write('\n'.join(L))
+          print('\n'.join(L))
+          PY
+          cat docs/bilge-bey-rapor.md >> $GITHUB_STEP_SUMMARY
+      - name: Kaydet
+        run: |
+          git config user.name "bilge-bey-rapor"; git config user.email "actions@users.noreply.github.com"
+          git add docs/bilge-bey-rapor.md docs/bilge-bey-rapor.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Bilge Bey haftalık rapor"
+          for i in 1 2 3; do git pull -q --rebase origin ${GITHUB_REF_NAME} && git push origin HEAD:${GITHUB_REF_NAME} && break; sleep 5; done
