@@ -1,0 +1,9 @@
+{
+  "name": "hasturk-arama",
+  "private": true,
+  "type": "module",
+  "description": "Ürün Bul widget'ı + ziyaretçi eğilimleri + Ak Bilge (Cloudflare Worker: src/worker.js, statik dosyalar: public/)",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0"
+  }
+}

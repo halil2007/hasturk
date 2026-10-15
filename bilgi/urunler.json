@@ -1,188 +1,785 @@
 {
-  "_aciklama": "Ak Bilgi ürün kartları. Ak Bilgi doz ve kullanım bilgisini SADECE buradan (ve config.json > guides tablolarından) aktarır; rakam üretmez. durum: dogrulandi = ürün bilgisi + bağımsız kaynak uyumlu; uretici = HasTürk markalı, kaynak üretici etiketi/tablosu (iç tutarlılık kontrol edildi); kismi = bir kısmı doğrulandı, notlara bak; celiski = kaynaklar çelişiyor, bu satır müşteriye VERİLMEZ; eksik = doz bilgisi yok, müşteriye doz verilmez.",
-  "surum": 1,
-  "guncelleme": "2026-10-15",
-  "urunler": {
-    "hasturk-kati-solucan-gubresi": {
-      "ad": "HasTürk Solucan Gübresi (katı)",
-      "durum": "uretici",
-      "ozet": "%100 organik, yavaş salınımlı solucan gübresi (vermikompost). Sebze, meyve, tarla, süs bitkisi, çim ve saksıda kullanılır; önerilen dozlarda bitkiyi yakmaz.",
-      "rehber": "kati",
-      "kullanim": [
-        { "alan": "Saksı (iç mekan çiçekli bitkiler)", "miktar": "Saksı başına 100-125 g, harca karıştırarak", "kaynak": "rehber" },
-        { "alan": "Saksı / fide harcı hazırlama", "miktar": "Harcın %40-50'si oranında", "kaynak": "rehber" },
-        { "alan": "Fide yastığı / tohum yatağı", "miktar": "5 kg/m², harca karıştırarak", "kaynak": "rehber" },
-        { "alan": "Çim", "miktar": "100-125 kg/dekar (10-12,5 kg / 100 m²), yüzeye serpilerek", "kaynak": "rehber" },
-        { "alan": "Sebze (toprak hazırlığı)", "miktar": "Meyvesi yenenlerde 60-80 kg/dekar, yaprağı yenenlerde 50-60 kg/dekar, serpip toprak altına", "kaynak": "rehber" }
-      ],
-      "not": "Bitki bazında tam tablo config.json > guides (kati) içinde; Ak Bilgi bitkiye özel soruda oradaki satırı aktarır.",
-      "birlikte": ["hasturk-sivi-solucan-gubresi", "leonardit-organik-toprak-duzenleyici", "tarim-perliti"],
-      "kaynaklar": [
-        { "ad": "HasTürk kullanım miktarları tablosu (Ürün Bul rehberi / /pages/solucan-gubresi-kullanim-miktarlari)", "tur": "uretici" },
-        { "ad": "ikas ürün açıklaması", "tur": "uretici" }
-      ]
+ "_aciklama": "Ak Bilgi ürün kartları. Ak Bilgi doz ve kullanım bilgisini SADECE buradan (ve config.json > guides tablolarından) aktarır; rakam üretmez. durum: dogrulandi = ürün bilgisi + bağımsız kaynak uyumlu; uretici = HasTürk markalı, kaynak üretici etiketi/tablosu (iç tutarlılık kontrol edildi); kismi = bir kısmı doğrulandı, notlara bak; celiski = kaynaklar çelişiyor, bu satır müşteriye VERİLMEZ; eksik = doz bilgisi yok, müşteriye doz verilmez.",
+ "surum": 1,
+ "guncelleme": "2026-10-15",
+ "urunler": {
+  "hasturk-kati-solucan-gubresi": {
+   "ad": "HasTürk Solucan Gübresi (katı)",
+   "durum": "uretici",
+   "ozet": "%100 organik, yavaş salınımlı solucan gübresi (vermikompost). Sebze, meyve, tarla, süs bitkisi, çim ve saksıda kullanılır; önerilen dozlarda bitkiyi yakmaz.",
+   "rehber": "kati",
+   "kullanim": [
+    {
+     "alan": "Saksı (iç mekan çiçekli bitkiler)",
+     "miktar": "Saksı başına 100-125 g, harca karıştırarak",
+     "kaynak": "rehber"
     },
-    "hasturk-sivi-solucan-gubresi": {
-      "ad": "HasTürk Sıvı Solucan Gübresi",
-      "durum": "uretici",
-      "ozet": "Konsantre organik sıvı gübre; yapraktan püskürtme ya da sulama/damla sulama ile verilir. Sebze, meyve, süs bitkisi, çim ve saksı çiçeklerine uygundur.",
-      "rehber": "sivi",
-      "kullanim": [
-        { "alan": "Yapraktan püskürtme (saksı ve bahçe)", "miktar": "1 litre suya 10-20 ml", "kaynak": "urun_sayfasi" },
-        { "alan": "Sulama suyuna (saksı ve bahçe)", "miktar": "10 litre suya 50-100 ml", "kaynak": "urun_sayfasi" },
-        { "alan": "Fide viyolü bandırma", "miktar": "100 litre suya 1 litre", "kaynak": "rehber" },
-        { "alan": "Meyve ağaçları (damla sulama)", "miktar": "Su yürümesinden 10 gün sonra 1-1,5 L/dekar", "kaynak": "rehber" },
-        { "alan": "Çim (yağmurlama)", "miktar": "Her biçimden sonra 400-450 cc/dekar", "kaynak": "rehber" }
-      ],
-      "tutarlilik": "Ürün sayfasındaki yapraktan oran (1 L suya 10-20 ml = 100 L suya 1-2 L) rehberdeki bandırma oranıyla (100 L suya 1 L) ve akademik denemelerde kullanılan aralıkla (100 L suya 0,5-3 L) uyumlu.",
-      "birlikte": ["hasturk-kati-solucan-gubresi", "hasturk-humix-sivi-humik-asit"],
-      "kaynaklar": [
-        { "ad": "ikas ürün açıklaması (Uygulama ve Dozaj Rehberi)", "tur": "uretici" },
-        { "ad": "HasTürk kullanım miktarları tablosu", "tur": "uretici" },
-        { "ad": "Çeltikte farklı vermikompost uygulamaları (Recep Tayyip Erdoğan Üniv.)", "url": "https://avesis.erdogan.edu.tr/yayin/b673bde0-5bf5-4929-a035-d1a3da535d66/celtik-oryza-sativa-l-de-farkli-vermikompost-uygulamalarinin-bazi-bitkisel-ozellikler-uzerine-etkisi", "tur": "akademik" }
-      ]
+    {
+     "alan": "Saksı / fide harcı hazırlama",
+     "miktar": "Harcın %40-50'si oranında",
+     "kaynak": "rehber"
     },
-    "hasturk-humix-sivi-humik-asit": {
-      "ad": "HasTürk Hümix Sıvı Hümik Asit",
-      "durum": "kismi",
-      "ozet": "Toprak düzenleyici sıvı hümik asit; kök gelişimini, besin alımını ve toprağın su tutmasını destekler. Damla sulama, toprak ve yapraktan uygulanır.",
-      "rehber": "humik",
-      "kullanim": [
-        { "alan": "Meyve ağaçları (toprağa, taç izdüşümüne)", "miktar": "10 litre suya 100 cc", "kaynak": "rehber" },
-        { "alan": "Meyve ağaçları (yapraktan)", "miktar": "100 litre suya 100 cc", "kaynak": "rehber" },
-        { "alan": "Sebze (damla / sulama suyuna)", "miktar": "Sezon boyunca 5-6 kez, 250-300 cc/dekar", "kaynak": "rehber" },
-        { "alan": "Sebze (yapraktan)", "miktar": "Bitki 20-25 cm boya gelince, 20 gün arayla 2 kez, 100 cc/dekar", "kaynak": "rehber" }
-      ],
-      "eksik": "Saksı ve ev bitkileri için doz tabloda ve ürün sayfasında yok. Üretici dozu belirlenene kadar Ak Bilgi saksı için miktar VERMEZ.",
-      "birlikte": ["hasturk-sivi-solucan-gubresi", "hasturk-kati-solucan-gubresi"],
-      "kaynaklar": [
-        { "ad": "HasTürk hümik asit kullanım tablosu (/pages/humik-asit-nasil-kullanilir)", "tur": "uretici" }
-      ]
+    {
+     "alan": "Fide yastığı / tohum yatağı",
+     "miktar": "5 kg/m², harca karıştırarak",
+     "kaynak": "rehber"
     },
-    "leonardit-organik-toprak-duzenleyici": {
-      "ad": "Leonardit - Organik Toprak Düzenleyici",
-      "durum": "celiski",
-      "ozet": "Doğal organik toprak düzenleyici; toprağın su tutmasını ve havalanmasını iyileştirir, besin alımını destekler.",
-      "kullanim": [
-        { "alan": "Saksı toprağına karıştırma", "miktar": "Mevcut toprağın %10-20'si oranında", "kaynak": "urun_sayfasi", "dogrulama": "Akademik saksı denemelerindeki %5-20 aralığıyla uyumlu" },
-        { "alan": "Bahçe ve tarla", "miktar": "ÜRÜN SAYFASINDA: 1 litre (kg) / m²", "kaynak": "urun_sayfasi", "durum": "celiski", "dogrulama": "1 kg/m² = 1.000 kg/dekar. Türkiye'deki tarla denemelerinde 50-250 kg/dekar denenmiş, 200 kg/dekar en uygun bulunmuş. Ürün sayfasındaki değer 4-20 kat yüksek; düzeltilene kadar müşteriye verilmez." }
-      ],
-      "birlikte": ["tarim-perliti", "hg-vermikulit", "hasturk-kati-solucan-gubresi"],
-      "kaynaklar": [
-        { "ad": "ikas ürün açıklaması", "tur": "uretici" },
-        { "ad": "Buğdayda farklı leonardit miktarlarının toprak özelliklerine etkisi (Mardin Artuklu Üniv.)", "url": "https://gcris.artuklu.edu.tr/entities/publication/b9622e66-1e55-47ae-945a-7c4fe53f2e50", "tur": "akademik" },
-        { "ad": "Türk Tarım – Gıda Bilim ve Teknoloji Dergisi 6(4) 2018 (marul saksı denemesi %5-20)", "url": "https://agrifoodscience.com/index.php/TURJAF/article/download/1589/809", "tur": "akademik" },
-        { "ad": "Leonardit ve mikorizanın biber gelişimine etkisi", "url": "https://paperity.org/p/198606659/leonardit-ve-mikorizanin-biber-bitkisinin-gelisimi-ve-besin-elementi-konsantrasyonu", "tur": "akademik" }
-      ]
+    {
+     "alan": "Çim",
+     "miktar": "100-125 kg/dekar (10-12,5 kg / 100 m²), yüzeye serpilerek",
+     "kaynak": "rehber"
     },
-    "tarim-perliti": {
-      "ad": "HG Tarım Perliti",
-      "durum": "dogrulandi",
-      "ozet": "Doğal, steril toprak iyileştirici; sıkışan toprağı hafifletir, hava ve su dengesini sağlar. Zamanla erimez, tekrar kullanılabilir.",
-      "kullanim": [
-        { "alan": "Saksı / bahçe toprağı karışımı", "miktar": "Toprağın %20-30'u oranında, homojen karıştırarak", "kaynak": "urun_sayfasi", "dogrulama": "Ankara Üniv. ders notu: orta bünyeli karışımda 1 kısım toprak + 1 kısım organik madde + 1 kısım perlit (≈%33). Ürün sayfasındaki %20-30 bu aralıkta, temkinli tarafta." },
-        { "alan": "Tohum çimlendirme / çelik köklendirme", "miktar": "Tek başına ya da torfla 1:1 karıştırarak", "kaynak": "kaynak" }
-      ],
-      "birlikte": ["cocopeat-hindistan-cevizi-torfu-5-kg", "hg-vermikulit", "leonardit-organik-toprak-duzenleyici"],
-      "kaynaklar": [
-        { "ad": "ikas ürün açıklaması", "tur": "uretici" },
-        { "ad": "Ankara Üniversitesi Ziraat Fakültesi açık ders notu (yetiştirme ortamları)", "url": "https://acikders.ankara.edu.tr/mod/resource/view.php?id=72962", "tur": "akademik" }
-      ]
-    },
-    "hg-vermikulit": {
-      "ad": "HG Vermikülit",
-      "durum": "dogrulandi",
-      "ozet": "Doğal, steril, suyu sünger gibi tutup yavaş bırakan toprak düzenleyici; tohum çimlendirmede ve saksı karışımlarında kullanılır.",
-      "kullanim": [
-        { "alan": "Saksı toprağı karışımı", "miktar": "Toprağın (torf, kokopit vb.) %10-30'u oranında", "kaynak": "urun_sayfasi" },
-        { "alan": "Tohum çimlendirme / viyol", "miktar": "Tek başına, torfla karışık ya da tohumların üzerine ince örtü tabakası olarak", "kaynak": "urun_sayfasi" }
-      ],
-      "dogrulama": "Saksı karışımlarında kaba agrega payı ders notlarında ≈1/3; %10-30 bu sınırın altında, güvenli.",
-      "birlikte": ["tarim-perliti", "leonardit-organik-toprak-duzenleyici", "cocopeat-hindistan-cevizi-torfu-5-kg"],
-      "kaynaklar": [
-        { "ad": "ikas ürün açıklaması", "tur": "uretici" },
-        { "ad": "Ankara Üniversitesi Ziraat Fakültesi açık ders notu", "url": "https://acikders.ankara.edu.tr/mod/resource/view.php?id=72962", "tur": "akademik" }
-      ]
-    },
-    "cocopeat-hindistan-cevizi-torfu-5-kg": {
-      "ad": "Sıkıştırılmış Cocopeat (Kokopit) 4-5 Kg / 65 Lt",
-      "durum": "dogrulandi",
-      "ozet": "Sıkıştırılmış hindistan cevizi torfu; suyla şişirilince kullanıma hazır, temiz ve havadar yetiştirme ortamı olur.",
-      "kullanim": [
-        { "alan": "Hazırlama", "miktar": "5 kg bloğu en az 70-80 litrelik kaba koyun, 20-25 litre (tercihen ılık) su ekleyin, 20-30 dakika bekletip dağıtın; yaklaşık 60-65 litre torf elde edilir", "kaynak": "urun_sayfasi", "dogrulama": "Üretici verilerinde 5 kg blok için 65-75 litre genleşme; ürün sayfasındaki 60-65 L temkinli değer." },
-        { "alan": "Kullanım", "miktar": "Tohum çimlendirme, fide, saksı ve hidroponik; saksıda perlit ile karıştırılabilir", "kaynak": "urun_sayfasi" }
-      ],
-      "birlikte": ["tarim-perliti", "hg-vermikulit", "leonardit-organik-toprak-duzenleyici"],
-      "kaynaklar": [
-        { "ad": "ikas ürün açıklaması (3 adımda hazırlanış)", "tur": "uretici" },
-        { "ad": "Sri Lanka Export Development Board – cocopeat balya verileri", "url": "https://srilankabusiness.com/emarketplace/coconut-and-coconut-products/coconut-fiber/ole-cocopeat-bale", "tur": "uretici_verisi" }
-      ]
-    },
-    "kullanima-hazir-cocopeat-torfu": {
-      "ad": "Kullanıma Hazır Cocopeat Torfu",
-      "durum": "dogrulandi",
-      "ozet": "Şişirme gerektirmeyen, doğrudan kullanılan organik cocopeat; pH 5,8-6,8, yüksek su tutma ve havalanma.",
-      "kullanim": [
-        { "alan": "Kullanım", "miktar": "Doğrudan kullanılır; tohum çimlendirme, fide ve saksı bitkileri için tek başına ya da saksı toprağına karıştırılarak", "kaynak": "urun_sayfasi" }
-      ],
-      "birlikte": ["tarim-perliti", "hg-vermikulit"],
-      "kaynaklar": [{ "ad": "ikas ürün açıklaması", "tur": "uretici" }]
-    },
-    "hg-asidik-torf": {
-      "ad": "HG Asidik Torf",
-      "durum": "kismi",
-      "ozet": "Asit seven bitkiler (yaban mersini, böğürtlen, ortanca, azalea) için asidik, organik torf.",
-      "kullanim": [
-        { "alan": "Bahçe / dikim çukuru", "miktar": "Bahçe toprağına ya da fide çukuruna %40-50 oranında karıştırarak", "kaynak": "urun_sayfasi", "dogrulama": "Dikim çukurunda yaklaşık yarı yarıya toprak + organik madde önerisiyle uyumlu." },
-        { "alan": "Saksı harcı", "miktar": "Harcın %45'i oranında", "kaynak": "urun_sayfasi" }
-      ],
-      "not": "Yaban mersini için hedef toprak pH'ı kaynaklarda 4,0-5,5 (ideal ≈4,8) olarak geçiyor; pH bilgisi Ak Bilgi'de bu aralıkla verilir.",
-      "birlikte": ["yaban-mersini-ve-ortanca-topragi"],
-      "kaynaklar": [
-        { "ad": "ikas ürün açıklaması", "tur": "uretici" },
-        { "ad": "Wikifarmer – Yaban mersini toprak koşulları", "url": "https://wikifarmer.com/library/tr/article/blueberry-toprak-ko%C5%9Fullar%C4%B1-ve-alan-se%C3%A7imi", "tur": "yayim" }
-      ]
-    },
-    "yaban-mersini-ve-ortanca-topragi": {
-      "ad": "Yaban Mersini ve Ortanca Toprağı",
-      "durum": "eksik",
-      "ozet": "Asit seven bitkiler için hazır özel karışım.",
-      "eksik": "Ürün sayfasında kullanım miktarı / saksı başına miktar yok. Ak Bilgi doz vermez; ürünün hazır karışım olduğunu ve doğrudan saksı/çukur dolgusu olarak kullanıldığını söyler.",
-      "birlikte": ["hg-asidik-torf"],
-      "kaynaklar": [{ "ad": "ikas ürün açıklaması", "tur": "uretici" }]
-    },
-    "hg-premium-fide-topragi": {
-      "ad": "Premium Fide Toprağı",
-      "durum": "dogrulandi",
-      "ozet": "Tohum çimlendirme ve fide şaşırtma için hafif, steril karışım (cocopeat, torf, solucan gübresi, leonardit).",
-      "kullanim": [
-        { "alan": "Tohum ekimi", "miktar": "Viyol veya saksıyı doldurup hafifçe bastırın, tohumu uygun derinliğe yerleştirip aynı toprakla örtün, sprey ile nemlendirin", "kaynak": "urun_sayfasi" }
-      ],
-      "birlikte": ["hg-vermikulit", "45-goz-yuvarlak-fide-viyolu"],
-      "kaynaklar": [{ "ad": "ikas ürün açıklaması", "tur": "uretici" }]
-    },
-    "mezar-topragi-perlit-ve-solucan-gubresi-karisimli": {
-      "ad": "HG Mezar Toprağı",
-      "durum": "dogrulandi",
-      "ozet": "Mezar bakımı ve peyzaj için perlit ve solucan gübresi katkılı toprak.",
-      "kullanim": [
-        { "alan": "Uygulama", "miktar": "Alanın üzerine en az 5-10 cm kalınlıkta; mevcut toprakla karıştırarak ya da üst katman olarak. Ardından can suyu verilir.", "kaynak": "urun_sayfasi" }
-      ],
-      "kaynaklar": [{ "ad": "ikas ürün açıklaması", "tur": "uretici" }]
-    },
-    "dsv-lippa-lisuna-6-mix-cim-tohumu": {
-      "ad": "DSV Lippa Lisuna 6 Mix Çim Tohumu",
-      "durum": "kismi",
-      "ozet": "Yaz-kış yeşil kalan, dayanıklı 6'lı çim karışımı.",
-      "kullanim": [
-        { "alan": "Ekim miktarı", "miktar": "Metrekareye 50-60 gram", "kaynak": "urun_sayfasi", "dogrulama": "Serin iklim çim karışımlarında en iyi kalite 40-70 g/m² ekimle elde edilmiş (akademik çalışma); uyumlu." },
-        { "alan": "Serpme ekim", "miktar": "ÜRÜN SAYFASINDA: metrekareye 80-90 gram", "kaynak": "urun_sayfasi", "durum": "kontrol", "dogrulama": "Araştırma aralığının üstünde; DSV teknik föyü bulunamadı. Doğrulanana kadar Ak Bilgi 50-60 g/m² değerini verir." },
-        { "alan": "Hazırlık ve sulama", "miktar": "Ekimden önce alan 10-20 cm havalandırılıp düzeltilir; ekim sonrası 25-35 gün sabah ve akşam düzenli sulanır", "kaynak": "urun_sayfasi" }
-      ],
-      "kaynaklar": [
-        { "ad": "ikas ürün açıklaması", "tur": "uretici" },
-        { "ad": "Serin iklim çim karışımlarında tohumluk miktarı denemesi", "url": "https://acikerisim.omu.edu.tr/entities/publication/a2f2d18b-1185-4594-a3b6-e76c04621474", "tur": "akademik" }
-      ]
+    {
+     "alan": "Sebze (toprak hazırlığı)",
+     "miktar": "Meyvesi yenenlerde 60-80 kg/dekar, yaprağı yenenlerde 50-60 kg/dekar, serpip toprak altına",
+     "kaynak": "rehber"
     }
+   ],
+   "not": "Bitki bazında tam tablo config.json > guides (kati) içinde; Ak Bilgi bitkiye özel soruda oradaki satırı aktarır.",
+   "birlikte": [
+    "hasturk-sivi-solucan-gubresi",
+    "leonardit-organik-toprak-duzenleyici",
+    "tarim-perliti"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "HasTürk kullanım miktarları tablosu (Ürün Bul rehberi / /pages/solucan-gubresi-kullanim-miktarlari)",
+     "tur": "uretici"
+    },
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "hasturk-sivi-solucan-gubresi": {
+   "ad": "HasTürk Sıvı Solucan Gübresi",
+   "durum": "uretici",
+   "ozet": "Konsantre organik sıvı gübre; yapraktan püskürtme ya da sulama/damla sulama ile verilir. Sebze, meyve, süs bitkisi, çim ve saksı çiçeklerine uygundur.",
+   "rehber": "sivi",
+   "kullanim": [
+    {
+     "alan": "Yapraktan püskürtme (saksı ve bahçe)",
+     "miktar": "1 litre suya 10-20 ml",
+     "kaynak": "urun_sayfasi"
+    },
+    {
+     "alan": "Sulama suyuna (saksı ve bahçe)",
+     "miktar": "10 litre suya 50-100 ml",
+     "kaynak": "urun_sayfasi"
+    },
+    {
+     "alan": "Fide viyolü bandırma",
+     "miktar": "100 litre suya 1 litre",
+     "kaynak": "rehber"
+    },
+    {
+     "alan": "Meyve ağaçları (damla sulama)",
+     "miktar": "Su yürümesinden 10 gün sonra 1-1,5 L/dekar",
+     "kaynak": "rehber"
+    },
+    {
+     "alan": "Çim (yağmurlama)",
+     "miktar": "Her biçimden sonra 400-450 cc/dekar",
+     "kaynak": "rehber"
+    }
+   ],
+   "tutarlilik": "Ürün sayfasındaki yapraktan oran (1 L suya 10-20 ml = 100 L suya 1-2 L) rehberdeki bandırma oranıyla (100 L suya 1 L) ve akademik denemelerde kullanılan aralıkla (100 L suya 0,5-3 L) uyumlu.",
+   "birlikte": [
+    "hasturk-kati-solucan-gubresi",
+    "hasturk-humix-sivi-humik-asit"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması (Uygulama ve Dozaj Rehberi)",
+     "tur": "uretici"
+    },
+    {
+     "ad": "HasTürk kullanım miktarları tablosu",
+     "tur": "uretici"
+    },
+    {
+     "ad": "Çeltikte farklı vermikompost uygulamaları (Recep Tayyip Erdoğan Üniv.)",
+     "url": "https://avesis.erdogan.edu.tr/yayin/b673bde0-5bf5-4929-a035-d1a3da535d66/celtik-oryza-sativa-l-de-farkli-vermikompost-uygulamalarinin-bazi-bitkisel-ozellikler-uzerine-etkisi",
+     "tur": "akademik"
+    }
+   ]
+  },
+  "hasturk-humix-sivi-humik-asit": {
+   "ad": "HasTürk Hümix Sıvı Hümik Asit",
+   "durum": "kismi",
+   "ozet": "Toprak düzenleyici sıvı hümik asit; kök gelişimini, besin alımını ve toprağın su tutmasını destekler. Damla sulama, toprak ve yapraktan uygulanır.",
+   "rehber": "humik",
+   "kullanim": [
+    {
+     "alan": "Meyve ağaçları (toprağa, taç izdüşümüne)",
+     "miktar": "10 litre suya 100 cc",
+     "kaynak": "rehber"
+    },
+    {
+     "alan": "Meyve ağaçları (yapraktan)",
+     "miktar": "100 litre suya 100 cc",
+     "kaynak": "rehber"
+    },
+    {
+     "alan": "Sebze (damla / sulama suyuna)",
+     "miktar": "Sezon boyunca 5-6 kez, 250-300 cc/dekar",
+     "kaynak": "rehber"
+    },
+    {
+     "alan": "Sebze (yapraktan)",
+     "miktar": "Bitki 20-25 cm boya gelince, 20 gün arayla 2 kez, 100 cc/dekar",
+     "kaynak": "rehber"
+    }
+   ],
+   "eksik": "Saksı ve ev bitkileri için doz tabloda ve ürün sayfasında yok. Üretici dozu belirlenene kadar Ak Bilgi saksı için miktar VERMEZ.",
+   "birlikte": [
+    "hasturk-sivi-solucan-gubresi",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "HasTürk hümik asit kullanım tablosu (/pages/humik-asit-nasil-kullanilir)",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "leonardit-organik-toprak-duzenleyici": {
+   "ad": "Leonardit - Organik Toprak Düzenleyici",
+   "durum": "celiski",
+   "ozet": "Doğal organik toprak düzenleyici; toprağın su tutmasını ve havalanmasını iyileştirir, besin alımını destekler.",
+   "kullanim": [
+    {
+     "alan": "Saksı toprağına karıştırma",
+     "miktar": "Mevcut toprağın %10-20'si oranında",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "Akademik saksı denemelerindeki %5-20 aralığıyla uyumlu"
+    },
+    {
+     "alan": "Bahçe ve tarla",
+     "miktar": "ÜRÜN SAYFASINDA: 1 litre (kg) / m²",
+     "kaynak": "urun_sayfasi",
+     "durum": "celiski",
+     "dogrulama": "1 kg/m² = 1.000 kg/dekar. Türkiye'deki tarla denemelerinde 50-250 kg/dekar denenmiş, 200 kg/dekar en uygun bulunmuş. Ürün sayfasındaki değer 4-20 kat yüksek; düzeltilene kadar müşteriye verilmez."
+    }
+   ],
+   "birlikte": [
+    "tarim-perliti",
+    "hg-vermikulit",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    },
+    {
+     "ad": "Buğdayda farklı leonardit miktarlarının toprak özelliklerine etkisi (Mardin Artuklu Üniv.)",
+     "url": "https://gcris.artuklu.edu.tr/entities/publication/b9622e66-1e55-47ae-945a-7c4fe53f2e50",
+     "tur": "akademik"
+    },
+    {
+     "ad": "Türk Tarım – Gıda Bilim ve Teknoloji Dergisi 6(4) 2018 (marul saksı denemesi %5-20)",
+     "url": "https://agrifoodscience.com/index.php/TURJAF/article/download/1589/809",
+     "tur": "akademik"
+    },
+    {
+     "ad": "Leonardit ve mikorizanın biber gelişimine etkisi",
+     "url": "https://paperity.org/p/198606659/leonardit-ve-mikorizanin-biber-bitkisinin-gelisimi-ve-besin-elementi-konsantrasyonu",
+     "tur": "akademik"
+    }
+   ]
+  },
+  "tarim-perliti": {
+   "ad": "HG Tarım Perliti",
+   "durum": "dogrulandi",
+   "ozet": "Doğal, steril toprak iyileştirici; sıkışan toprağı hafifletir, hava ve su dengesini sağlar. Zamanla erimez, tekrar kullanılabilir.",
+   "kullanim": [
+    {
+     "alan": "Saksı / bahçe toprağı karışımı",
+     "miktar": "Toprağın %20-30'u oranında, homojen karıştırarak",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "Ankara Üniv. ders notu: orta bünyeli karışımda 1 kısım toprak + 1 kısım organik madde + 1 kısım perlit (≈%33). Ürün sayfasındaki %20-30 bu aralıkta, temkinli tarafta."
+    },
+    {
+     "alan": "Tohum çimlendirme / çelik köklendirme",
+     "miktar": "Tek başına ya da torfla 1:1 karıştırarak",
+     "kaynak": "kaynak"
+    }
+   ],
+   "birlikte": [
+    "cocopeat-hindistan-cevizi-torfu-5-kg",
+    "hg-vermikulit",
+    "leonardit-organik-toprak-duzenleyici"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    },
+    {
+     "ad": "Ankara Üniversitesi Ziraat Fakültesi açık ders notu (yetiştirme ortamları)",
+     "url": "https://acikders.ankara.edu.tr/mod/resource/view.php?id=72962",
+     "tur": "akademik"
+    }
+   ]
+  },
+  "hg-vermikulit": {
+   "ad": "HG Vermikülit",
+   "durum": "dogrulandi",
+   "ozet": "Doğal, steril, suyu sünger gibi tutup yavaş bırakan toprak düzenleyici; tohum çimlendirmede ve saksı karışımlarında kullanılır.",
+   "kullanim": [
+    {
+     "alan": "Saksı toprağı karışımı",
+     "miktar": "Toprağın (torf, kokopit vb.) %10-30'u oranında",
+     "kaynak": "urun_sayfasi"
+    },
+    {
+     "alan": "Tohum çimlendirme / viyol",
+     "miktar": "Tek başına, torfla karışık ya da tohumların üzerine ince örtü tabakası olarak",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "dogrulama": "Saksı karışımlarında kaba agrega payı ders notlarında ≈1/3; %10-30 bu sınırın altında, güvenli.",
+   "birlikte": [
+    "tarim-perliti",
+    "leonardit-organik-toprak-duzenleyici",
+    "cocopeat-hindistan-cevizi-torfu-5-kg"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    },
+    {
+     "ad": "Ankara Üniversitesi Ziraat Fakültesi açık ders notu",
+     "url": "https://acikders.ankara.edu.tr/mod/resource/view.php?id=72962",
+     "tur": "akademik"
+    }
+   ]
+  },
+  "cocopeat-hindistan-cevizi-torfu-5-kg": {
+   "ad": "Sıkıştırılmış Cocopeat (Kokopit) 4-5 Kg / 65 Lt",
+   "durum": "dogrulandi",
+   "ozet": "Sıkıştırılmış hindistan cevizi torfu; suyla şişirilince kullanıma hazır, temiz ve havadar yetiştirme ortamı olur.",
+   "kullanim": [
+    {
+     "alan": "Hazırlama",
+     "miktar": "5 kg bloğu en az 70-80 litrelik kaba koyun, 20-25 litre (tercihen ılık) su ekleyin, 20-30 dakika bekletip dağıtın; yaklaşık 60-65 litre torf elde edilir",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "Üretici verilerinde 5 kg blok için 65-75 litre genleşme; ürün sayfasındaki 60-65 L temkinli değer."
+    },
+    {
+     "alan": "Kullanım",
+     "miktar": "Tohum çimlendirme, fide, saksı ve hidroponik; saksıda perlit ile karıştırılabilir",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "birlikte": [
+    "tarim-perliti",
+    "hg-vermikulit",
+    "leonardit-organik-toprak-duzenleyici"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması (3 adımda hazırlanış)",
+     "tur": "uretici"
+    },
+    {
+     "ad": "Sri Lanka Export Development Board – cocopeat balya verileri",
+     "url": "https://srilankabusiness.com/emarketplace/coconut-and-coconut-products/coconut-fiber/ole-cocopeat-bale",
+     "tur": "uretici_verisi"
+    }
+   ]
+  },
+  "kullanima-hazir-cocopeat-torfu": {
+   "ad": "Kullanıma Hazır Cocopeat Torfu",
+   "durum": "dogrulandi",
+   "ozet": "Şişirme gerektirmeyen, doğrudan kullanılan organik cocopeat; pH 5,8-6,8, yüksek su tutma ve havalanma.",
+   "kullanim": [
+    {
+     "alan": "Kullanım",
+     "miktar": "Doğrudan kullanılır; tohum çimlendirme, fide ve saksı bitkileri için tek başına ya da saksı toprağına karıştırılarak",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "birlikte": [
+    "tarim-perliti",
+    "hg-vermikulit"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "hg-asidik-torf": {
+   "ad": "HG Asidik Torf",
+   "durum": "kismi",
+   "ozet": "Asit seven bitkiler (yaban mersini, böğürtlen, ortanca, azalea) için asidik, organik torf.",
+   "kullanim": [
+    {
+     "alan": "Bahçe / dikim çukuru",
+     "miktar": "Bahçe toprağına ya da fide çukuruna %40-50 oranında karıştırarak",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "Dikim çukurunda yaklaşık yarı yarıya toprak + organik madde önerisiyle uyumlu."
+    },
+    {
+     "alan": "Saksı harcı",
+     "miktar": "Harcın %45'i oranında",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "not": "Yaban mersini için hedef toprak pH'ı kaynaklarda 4,0-5,5 (ideal ≈4,8) olarak geçiyor; pH bilgisi Ak Bilgi'de bu aralıkla verilir.",
+   "birlikte": [
+    "yaban-mersini-ve-ortanca-topragi"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    },
+    {
+     "ad": "Wikifarmer – Yaban mersini toprak koşulları",
+     "url": "https://wikifarmer.com/library/tr/article/blueberry-toprak-ko%C5%9Fullar%C4%B1-ve-alan-se%C3%A7imi",
+     "tur": "yayim"
+    }
+   ]
+  },
+  "yaban-mersini-ve-ortanca-topragi": {
+   "ad": "Yaban Mersini ve Ortanca Toprağı",
+   "durum": "eksik",
+   "ozet": "Asit seven bitkiler için hazır özel karışım.",
+   "eksik": "Ürün sayfasında kullanım miktarı / saksı başına miktar yok. Ak Bilgi doz vermez; ürünün hazır karışım olduğunu ve doğrudan saksı/çukur dolgusu olarak kullanıldığını söyler.",
+   "birlikte": [
+    "hg-asidik-torf"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "hg-premium-fide-topragi": {
+   "ad": "Premium Fide Toprağı",
+   "durum": "dogrulandi",
+   "ozet": "Tohum çimlendirme ve fide şaşırtma için hafif, steril karışım (cocopeat, torf, solucan gübresi, leonardit).",
+   "kullanim": [
+    {
+     "alan": "Tohum ekimi",
+     "miktar": "Viyol veya saksıyı doldurup hafifçe bastırın, tohumu uygun derinliğe yerleştirip aynı toprakla örtün, sprey ile nemlendirin",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "birlikte": [
+    "hg-vermikulit",
+    "45-goz-yuvarlak-fide-viyolu"
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "mezar-topragi-perlit-ve-solucan-gubresi-karisimli": {
+   "ad": "HG Mezar Toprağı",
+   "durum": "dogrulandi",
+   "ozet": "Mezar bakımı ve peyzaj için perlit ve solucan gübresi katkılı toprak.",
+   "kullanim": [
+    {
+     "alan": "Uygulama",
+     "miktar": "Alanın üzerine en az 5-10 cm kalınlıkta; mevcut toprakla karıştırarak ya da üst katman olarak. Ardından can suyu verilir.",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "dsv-lippa-lisuna-6-mix-cim-tohumu": {
+   "ad": "DSV Lippa Lisuna 6 Mix Çim Tohumu",
+   "durum": "dogrulandi",
+   "ozet": "Yaz-kış yeşil kalan, dayanıklı 6'lı çim karışımı.",
+   "kullanim": [
+    {
+     "alan": "Ekim miktarı (makineyle / düzenli ekim)",
+     "miktar": "Metrekareye 50-60 gram",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "Serin iklim çim karışımlarında en iyi kalite 40-70 g/m² ekimle elde edilmiş (akademik çalışma); uyumlu."
+    },
+    {
+     "alan": "Elle serpme ekim",
+     "miktar": "Metrekareye 80-90 gram",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "Elle serpmede tohum düzensiz dağıldığı için miktar artırılır; aynı üreticinin Lippa Tamu sayfası da 'makineli 50-60, elle serpme 80-90 g/m²' der. Tutarlı."
+    },
+    {
+     "alan": "Hazırlık ve sulama",
+     "miktar": "Ekimden önce alan 10-20 cm havalandırılıp düzeltilir; ekim sonrası 25-35 gün sabah ve akşam düzenli sulanır",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    },
+    {
+     "ad": "Serin iklim çim karışımlarında tohumluk miktarı denemesi",
+     "url": "https://acikerisim.omu.edu.tr/entities/publication/a2f2d18b-1185-4594-a3b6-e76c04621474",
+     "tur": "akademik"
+    }
+   ]
+  },
+  "kati-solucan-gubresi-20-kg": {
+   "ad": "Hastürk Katı Solucan Gübresi 20 Kg",
+   "durum": "uretici",
+   "rehber": "kati",
+   "ozet": "HasTürk katı solucan gübresinin 20 kg ambalajı; doz ve kullanım ana ürünle aynı.",
+   "ayni": "hasturk-kati-solucan-gubresi",
+   "kaynaklar": [
+    {
+     "ad": "HasTürk kullanım miktarları tablosu",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "1-ton-solucan-gubresi-fiyati": {
+   "ad": "1 Ton Solucan Gübresi (20 KG çuvallarla)",
+   "durum": "uretici",
+   "rehber": "kati",
+   "ozet": "Profesyonel ölçek için 20 kg çuvallarda katı solucan gübresi; tarla dozları HasTürk tablosundadır.",
+   "ayni": "hasturk-kati-solucan-gubresi",
+   "kaynaklar": [
+    {
+     "ad": "HasTürk kullanım miktarları tablosu",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "1-ton-sivi-solucan-gubresi": {
+   "ad": "Sıvı Solucan Gübresi - 1 Ton (20 LT bidon)",
+   "durum": "uretici",
+   "rehber": "sivi",
+   "ayni": "hasturk-sivi-solucan-gubresi",
+   "ozet": "Profesyonel ölçek sıvı solucan gübresi.",
+   "kullanim": [
+    {
+     "alan": "Pülverizatör / yapraktan",
+     "miktar": "100 litre suya 1-2 litre",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "tutarlilik": "Ana ürünün yapraktan oranıyla (1 L suya 10-20 ml) birebir aynı.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "uretici"
+    },
+    {
+     "ad": "HasTürk kullanım miktarları tablosu",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "icl-landscaper-pro-ilk-adim-cim-baslangic-gubresi-20-20-8": {
+   "ad": "ICL Landscaper Pro İlk Adım Çim Başlangıç Gübresi 20-20-8",
+   "durum": "dogrulandi",
+   "ozet": "Yeni ekilen ya da yenilenen çim alanları için başlangıç gübresi.",
+   "kullanim": [
+    {
+     "alan": "Yeni çim / ekim öncesi",
+     "miktar": "Metrekareye 35 g (100 m² için 3,5 kg)",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "ICL ürün rehberinde New Grass için 35 g/m²; ICL serpme makinesi tablosunda 20-45 g/m² aralığı."
+    },
+    {
+     "alan": "Üst sınır",
+     "miktar": "Metrekareye en fazla 45 g",
+     "kaynak": "urun_sayfasi",
+     "dogrulama": "ICL ayar tablosundaki aralığın üst değeri."
+    }
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    },
+    {
+     "ad": "ICL Landscaper Pro 20-20-8 New Grass teknik föyü",
+     "url": "https://multisite-assets.icl-growingsolutions.com/wp-content/uploads/2023/05/12105359/Landscaper-Pro-20-20-8-New-Grass-_-24-5-82MgO-Allround.pdf",
+     "tur": "uretici"
+    },
+    {
+     "ad": "ICL AU/NZ Turf ürün rehberi 2021",
+     "url": "https://assets.test.icl-growingsolutions.com/wp-content/uploads/sites/39/2021/10/16023035/ICL-AU-NZ-Turf-Product-Guide-2021-04-Landscape-Range-Page-Insert.pdf",
+     "tur": "uretici"
+    }
+   ]
+  },
+  "turfmaster-16-6-25-sonbahar-kis-cim-gubresi-20-kg": {
+   "ad": "TurfMaster 16-6-25 Sonbahar & Kış Çim Gübresi 20 kg",
+   "durum": "celiski",
+   "ozet": "Yavaş salınımlı sonbahar-kış çim gübresi.",
+   "kullanim": [
+    {
+     "alan": "Çim",
+     "miktar": "ÜRÜN SAYFASINDA: metrekareye 20-35 g; ayrıca \"20 kg ≈ 400 m²\"",
+     "kaynak": "urun_sayfasi",
+     "durum": "celiski",
+     "dogrulama": "20 kg / 400 m² = metrekareye 50 g; yazılan 20-35 g aralığıyla çelişiyor (35 g ile 20 kg ≈ 570 m²). Üretici föyü bulunamadı. Düzeltilene kadar müşteriye doz verilmez."
+    }
+   ],
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "florist-konsantre-orkide-besini": {
+   "ad": "Florist Konsantre Orkide Besini",
+   "durum": "kismi",
+   "ozet": "20 ml tek kullanımlık şaseler halinde konsantre sıvı bitki besini.",
+   "kullanim": [
+    {
+     "alan": "Hazırlama",
+     "miktar": "1 şase (20 ml) + 1 litre su",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Uygulama sıklığı ve karışım oranı üretici etiketiyle teyit edilmedi (Florist resmi kaynağı bulunamadı). Ak Bilgi yalnızca hazırlama oranını \"ürün bilgisine göre\" diye aktarır, sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "florist-konsantre-sivi-kaktus-ve-sukulent-bitki-besini": {
+   "ad": "Florist Konsantre Sıvı Kaktüs ve Sukulent Bitki Besini",
+   "durum": "kismi",
+   "ozet": "20 ml tek kullanımlık şaseler halinde konsantre sıvı bitki besini.",
+   "kullanim": [
+    {
+     "alan": "Hazırlama",
+     "miktar": "1 şase (20 ml) + 1 litre su",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Uygulama sıklığı ve karışım oranı üretici etiketiyle teyit edilmedi (Florist resmi kaynağı bulunamadı). Ak Bilgi yalnızca hazırlama oranını \"ürün bilgisine göre\" diye aktarır, sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "florist-tum-bitkiler-genel-kullanim-bitki-besini": {
+   "ad": "Florist Tüm Bitkiler Genel Kullanım Bitki Besini",
+   "durum": "kismi",
+   "ozet": "20 ml tek kullanımlık şaseler halinde konsantre sıvı bitki besini.",
+   "kullanim": [
+    {
+     "alan": "Hazırlama",
+     "miktar": "1 şase (20 ml) + 1 litre su",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Uygulama sıklığı ve karışım oranı üretici etiketiyle teyit edilmedi (Florist resmi kaynağı bulunamadı). Ak Bilgi yalnızca hazırlama oranını \"ürün bilgisine göre\" diye aktarır, sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "florist-yesil-yaprakli-bitkiler-sivi-konsantre-besini": {
+   "ad": "Florist Yeşil Yapraklı Bitkiler Sıvı Konsantre Besini",
+   "durum": "kismi",
+   "ozet": "20 ml tek kullanımlık şaseler halinde konsantre sıvı bitki besini.",
+   "kullanim": [
+    {
+     "alan": "Hazırlama",
+     "miktar": "1 şase (20 ml) + 1 litre su",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Uygulama sıklığı ve karışım oranı üretici etiketiyle teyit edilmedi (Florist resmi kaynağı bulunamadı). Ak Bilgi yalnızca hazırlama oranını \"ürün bilgisine göre\" diye aktarır, sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "florist-cicekli-bitkiler-sivi-konsantre-bitki-besini": {
+   "ad": "Florist Çiçekli Bitkiler Sıvı Konsantre Bitki Besini",
+   "durum": "kismi",
+   "ozet": "20 ml tek kullanımlık şaseler halinde konsantre sıvı bitki besini.",
+   "kullanim": [
+    {
+     "alan": "Hazırlama",
+     "miktar": "1 şase (20 ml) + 1 litre su",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Uygulama sıklığı ve karışım oranı üretici etiketiyle teyit edilmedi (Florist resmi kaynağı bulunamadı). Ak Bilgi yalnızca hazırlama oranını \"ürün bilgisine göre\" diye aktarır, sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "tarm-cactus-core-kaktus-ve-sukulent-besini-sprey-500-ml": {
+   "ad": "Tarm Cactus Core Kaktüs ve Sukulent Besini Sprey",
+   "durum": "kismi",
+   "ozet": "Kullanıma hazır sprey; sulandırma gerekmez.",
+   "kullanim": [
+    {
+     "alan": "Kullanım",
+     "miktar": "Seyreltmeden doğrudan püskürtülür",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Püskürtme sıklığı ürün sayfasında yok; Ak Bilgi sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "tarm-evergreen-pro-salon-bitkisi-besini-500-ml": {
+   "ad": "Tarm EverGreen Pro Salon Bitkisi Besini",
+   "durum": "kismi",
+   "ozet": "Kullanıma hazır sprey; sulandırma gerekmez.",
+   "kullanim": [
+    {
+     "alan": "Kullanım",
+     "miktar": "Seyreltmeden doğrudan püskürtülür",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Püskürtme sıklığı ürün sayfasında yok; Ak Bilgi sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "tarm-orchid-elixir-sivi-orkide-besini-sprey-500-ml": {
+   "ad": "Tarm Orchid Elixir Sıvı Orkide Besini Sprey",
+   "durum": "kismi",
+   "ozet": "Kullanıma hazır sprey; sulandırma gerekmez.",
+   "kullanim": [
+    {
+     "alan": "Kullanım",
+     "miktar": "Seyreltmeden doğrudan püskürtülür",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Püskürtme sıklığı ürün sayfasında yok; Ak Bilgi sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "tarm-petal-power-cicekli-bitki-besini-sprey-500-ml": {
+   "ad": "Tarm Petal Power Çiçekli Bitki Besini Sprey",
+   "durum": "kismi",
+   "ozet": "Kullanıma hazır sprey; sulandırma gerekmez.",
+   "kullanim": [
+    {
+     "alan": "Kullanım",
+     "miktar": "Seyreltmeden doğrudan püskürtülür",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Püskürtme sıklığı ürün sayfasında yok; Ak Bilgi sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "biosas-home-genel-kullanim-sivi-bitki-besini-500-ml": {
+   "ad": "Biosas Home Genel Kullanım Sıvı Bitki Besini",
+   "durum": "kismi",
+   "ozet": "Kullanıma hazır sprey; sulandırma gerekmez.",
+   "kullanim": [
+    {
+     "alan": "Kullanım",
+     "miktar": "Seyreltmeden doğrudan püskürtülür",
+     "kaynak": "urun_sayfasi"
+    }
+   ],
+   "eksik": "Püskürtme sıklığı ürün sayfasında yok; Ak Bilgi sıklık vermez.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "guanokalong-yarasa-gubresi-toz": {
+   "ad": "Guanokalong Yarasa Gübresi Toz",
+   "durum": "eksik",
+   "ozet": "",
+   "eksik": "Ürün sayfasında kullanım miktarı yok. Ak Bilgi doz vermez; etiket bilgisi gerekli.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "guanokalong-extract-sivi-guano-gubresi": {
+   "ad": "Guanokalong Extract Sıvı Guano Gübresi",
+   "durum": "eksik",
+   "ozet": "",
+   "eksik": "Ürün sayfasında kullanım miktarı yok. Ak Bilgi doz vermez; etiket bilgisi gerekli.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "biochar-mese-odunu-bazli-karbon-toprak-duzenleyici": {
+   "ad": "Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici",
+   "durum": "eksik",
+   "ozet": "",
+   "eksik": "Ürün sayfasında kullanım miktarı yok. Ak Bilgi doz vermez; etiket bilgisi gerekli.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
+  },
+  "tarm-grassmaster-cim-gubresi-500-ml": {
+   "ad": "Tarm GrassMaster Canlandırıcı Çim Besini",
+   "durum": "eksik",
+   "ozet": "",
+   "eksik": "Ürün sayfasında kullanım miktarı yok. Ak Bilgi doz vermez; etiket bilgisi gerekli.",
+   "kaynaklar": [
+    {
+     "ad": "ikas ürün açıklaması",
+     "tur": "satici"
+    }
+   ]
   }
+ }
 }

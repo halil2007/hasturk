@@ -1,0 +1,34 @@
+name: Ak Bilge – site içi aramalar
+
+# Widget sunucusundaki son 30 günlük arama özetini (/trends) okuyup bilgi/aramalar.json olarak çalışma dalına kaydeder.
+# Sadece okuma; kişisel veri yok (gün + kelime + adet).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/aramalar.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  cek:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          curl -sf https://hasturk-arama.halilc2007.workers.dev/trends -o /tmp/t.json
+          python3 - <<'PY'
+          import json
+          t=json.load(open('/tmp/t.json'))
+          out={'guncelleme':t.get('updated'),'gun':t.get('days'),'kayit':t.get('rows'),
+               'aramalar':[{'kelime':x[0],'adet':x[1],'son7':x[3]} for x in t.get('q',[])],
+               'sonucsuz':[{'kelime':x[0],'adet':x[1],'son7':x[3]} for x in t.get('q0',[])],
+               'urunler':t.get('p',{}),'menu':[{'ad':x[0],'adet':x[1]} for x in t.get('m',[])]}
+          json.dump(out,open('bilgi/aramalar.json','w'),ensure_ascii=False,indent=1)
+          print(len(out['aramalar']),'arama,',len(out['sonucsuz']),'sonuçsuz')
+          PY
+          git config user.name "bilgi-bankasi"; git config user.email "actions@users.noreply.github.com"
+          git add bilgi/aramalar.json
+          git diff --cached --quiet || (git commit -m "Ak Bilge: site içi aramalar (son 30 gün)" && git push origin HEAD:${GITHUB_REF_NAME})

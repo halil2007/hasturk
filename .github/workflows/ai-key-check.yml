@@ -1,0 +1,28 @@
+name: Ak Bilge anahtar kontrolü
+
+# GitHub Secrets'taki ANTHROPIC_API_KEY var mı ve Anthropic kabul ediyor mu. Ücretsiz istek (model bilgisi sorgusu);
+# anahtar hiçbir yere yazılmaz, sadece var/yok, ilk ek (ör. sk-ant-api) ve HTTP durumu gösterilir.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/ai-key-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Anahtar
+        env:
+          K: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$K" ]; then echo "SONUÇ: GitHub Secrets'ta ANTHROPIC_API_KEY YOK" | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; fi
+          pre=$(printf '%s' "$K" | grep -oE '^sk-ant-[a-z]+' || echo 'beklenmeyen biçim')
+          code=$(curl -s -o /tmp/r.json -w '%{http_code}' https://api.anthropic.com/v1/models/claude-opus-5-5 -H "x-api-key: $K" -H "anthropic-version: 2023-06-01")
+          msg=$(python3 -c "import json;d=json.load(open('/tmp/r.json'));print(d.get('display_name') or (d.get('error') or {}).get('message','')[:160])" 2>/dev/null || true)
+          echo "SONUÇ: anahtar var · tür: $pre · uzunluk: ${#K} · Anthropic cevabı: HTTP $code ($msg)" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$code" = "200" ]

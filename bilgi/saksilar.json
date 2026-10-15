@@ -1,0 +1,1457 @@
+{
+ "_aciklama": "Saksı ölçüleri, toprak ihtiyacı ve saksı seçimi kuralları. kaynak: uretici = ürün sayfasındaki litre; hesap = ölçülerden yaklaşık. delik: var / kontrol (sayfada \"delik yoksa iç saksı kullanın\" uyarısı) / belirtilmemis.",
+ "surum": 1,
+ "kural": {
+  "boyut": {
+   "metin": "Saksı değiştirirken yeni saksı, eskisinden yalnızca 2,5–5 cm (1–2 inç) daha geniş olmalı. Çok büyük saksıdaki fazla toprak uzun süre ıslak kalır ve kök çürümesine yol açabilir.",
+   "kaynaklar": [
+    {
+     "ad": "Colorado State Univ. Extension – Repotting houseplants",
+     "url": "https://planttalk.colostate.edu/topics/houseplants/1316-houseplants-repotting/"
+    },
+    {
+     "ad": "Clemson HGIC – Repotting houseplants",
+     "url": "https://hgic.clemson.edu/?p=1556"
+    },
+    {
+     "ad": "NC State Extension – How to repot a houseplant",
+     "url": "https://wayne.ces.ncsu.edu/2015/11/repotting-houseplants"
+    },
+    {
+     "ad": "Univ. of Illinois Extension – Tips for repotting",
+     "url": "https://extension.illinois.edu/blogs/good-growing/2018-03-19-tips-repotting-houseplants"
+    }
+   ]
+  },
+  "delik": {
+   "metin": "Saksıda drenaj deliği olması en önemli koşuldur. Deliksiz dekoratif saksıyı dış saksı (kaşpo) olarak kullanın: bitkiyi delikli bir iç saksıda tutun, sulamadan sonra dipte biriken suyu boşaltın.",
+   "kaynaklar": [
+    {
+     "ad": "UC Master Gardeners – Succulent container gardens",
+     "url": "https://ucanr.edu/node/129776"
+    }
+   ]
+  },
+  "cakil": {
+   "metin": "Saksının dibine çakıl/taş koymanın süzülmeyi artırdığı tartışmalıdır: Washington State Üniversitesi yayını, ince topraktan iri katmana su geçişi zor olduğu için ıslak bölgenin yukarı çıktığını belirtir; bazı yeni çalışmalar ise sınırlı fayda bulmuştur. Güvenli yol: delikli saksı + iyi süzen toprak (gerekirse perlit karıştırılır).",
+   "kaynaklar": [
+    {
+     "ad": "WSU Puyallup – Container drainage (L. Chalker-Scott)",
+     "url": "https://Puyallup.WSU.edu/wp-content/uploads/sites/403/2015/03/container-drainage.pdf"
+    },
+    {
+     "ad": "PLOS One – Effect of drainage layers on water retention of potting media in containers",
+     "url": "https://tradescantia.uk/article/drainage-layers/"
+    }
+   ]
+  },
+  "zaman": {
+   "metin": "Kökler drenaj deliğinden çıkıyorsa, toprak çok çabuk kuruyorsa ya da su toprağa işlemeden akıp gidiyorsa saksı değiştirme zamanı gelmiştir. En uygun dönem bitkinin büyümeye başladığı ilkbahardır.",
+   "kaynaklar": [
+    {
+     "ad": "Clemson HGIC – Repotting houseplants",
+     "url": "https://hgic.clemson.edu/?p=1556"
+    }
+   ]
+  },
+  "orkide": {
+   "metin": "Orkide (Phalaenopsis) için delikli, şeffaf plastik saksı uygundur: kökler ve nem durumu dışarıdan görülür. Toprak yerine kabuk (bark) içeren orkide karışımı kullanılır; karışım yaklaşık 2 yılda bozulduğu için saksı değişiminde yenilenir. Saksı yalnızca bir boy büyütülür; çiçeklenme bittikten sonra yapılması önerilir.",
+   "kaynaklar": [
+    {
+     "ad": "UConn Home & Garden – Orchid care and repotting",
+     "url": "https://homegarden.cahnr.uconn.edu/factsheets/orchid-care-and-repotting"
+    },
+    {
+     "ad": "BBC Gardeners' World – How to repot a moth orchid",
+     "url": "https://www.gardenersworld.com/house-plants/how-to-repot-a-moth-orchid"
+    }
+   ]
+  },
+  "kaktus": {
+   "metin": "Kaktüs ve sukulentler delikli ve kökten biraz büyük saksıda, hızlı süzülen, su tutma kapasitesi düşük (kumlu) bir karışımda yetiştirilir. Fazla büyük saksı toprağın uzun süre ıslak kalmasına neden olur.",
+   "kaynaklar": [
+    {
+     "ad": "Univ. of Illinois Extension – Succulent container gardens",
+     "url": "https://extension.illinois.edu/sites/default/files/succulent_container_gardens_.pdf"
+    },
+    {
+     "ad": "UC Master Gardeners – Succulent container gardens",
+     "url": "https://ucanr.edu/node/129776"
+    }
+   ]
+  },
+  "hesap": "Standart (yukarı doğru genişleyen) saksıda hacim ≈ 0,72 × 3,14 × (üst çap ÷ 2)² × yükseklik. Toprak ihtiyacı hacmin ~%90'ı (üstte 2–3 cm sulama payı); sulamadan sonra toprak çöktüğü için ~%10 fazla alınır."
+ },
+ "tablo": [
+  {
+   "cap": 6,
+   "litre": 0.12,
+   "toprak": {
+    "litre": 0.11,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 7,
+   "litre": 0.18,
+   "toprak": {
+    "litre": 0.16,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 8,
+   "litre": 0.28,
+   "toprak": {
+    "litre": 0.25,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 9,
+   "litre": 0.39,
+   "toprak": {
+    "litre": 0.35,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 10,
+   "litre": 0.54,
+   "toprak": {
+    "litre": 0.49,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 11,
+   "litre": 0.72,
+   "toprak": {
+    "litre": 0.65,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 12,
+   "litre": 0.93,
+   "toprak": {
+    "litre": 0.84,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 13,
+   "litre": 1.2,
+   "toprak": {
+    "litre": 1.1,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 14,
+   "litre": 1.5,
+   "toprak": {
+    "litre": 1.4,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 15,
+   "litre": 1.8,
+   "toprak": {
+    "litre": 1.6,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 16,
+   "litre": 2.2,
+   "toprak": {
+    "litre": 2,
+    "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+   }
+  },
+  {
+   "cap": 17,
+   "litre": 2.6,
+   "toprak": {
+    "litre": 2.3,
+    "paket": "5 L"
+   }
+  },
+  {
+   "cap": 18,
+   "litre": 3.1,
+   "toprak": {
+    "litre": 2.8,
+    "paket": "5 L"
+   }
+  },
+  {
+   "cap": 19,
+   "litre": 3.7,
+   "toprak": {
+    "litre": 3.3,
+    "paket": "5 L"
+   }
+  },
+  {
+   "cap": 20,
+   "litre": 4.3,
+   "toprak": {
+    "litre": 3.9,
+    "paket": "5 L"
+   }
+  },
+  {
+   "cap": 21,
+   "litre": 5,
+   "toprak": {
+    "litre": 4.5,
+    "paket": "5 L"
+   }
+  },
+  {
+   "cap": 22,
+   "litre": 5.7,
+   "toprak": {
+    "litre": 5.1,
+    "paket": "10 L"
+   }
+  },
+  {
+   "cap": 23,
+   "litre": 6.5,
+   "toprak": {
+    "litre": 5.9,
+    "paket": "10 L"
+   }
+  },
+  {
+   "cap": 24,
+   "litre": 7.4,
+   "toprak": {
+    "litre": 6.7,
+    "paket": "10 L"
+   }
+  },
+  {
+   "cap": 25,
+   "litre": 8.4,
+   "toprak": {
+    "litre": 7.6,
+    "paket": "10 L"
+   }
+  },
+  {
+   "cap": 27,
+   "litre": 11,
+   "toprak": {
+    "litre": 9.9,
+    "paket": "10 L + 5 L"
+   }
+  },
+  {
+   "cap": 28,
+   "litre": 12,
+   "toprak": {
+    "litre": 11,
+    "paket": "10 L + 5 L"
+   }
+  },
+  {
+   "cap": 30,
+   "litre": 15,
+   "toprak": {
+    "litre": 14,
+    "paket": "10 L + 5 L"
+   }
+  },
+  {
+   "cap": 32,
+   "litre": 18,
+   "toprak": {
+    "litre": 16,
+    "paket": "20 L"
+   }
+  },
+  {
+   "cap": 35,
+   "litre": 23,
+   "toprak": {
+    "litre": 21,
+    "paket": "20 L + 5 L"
+   }
+  },
+  {
+   "cap": 40,
+   "litre": 34,
+   "toprak": {
+    "litre": 31,
+    "paket": "20 L + 10 L + 5 L"
+   }
+  },
+  {
+   "cap": 45,
+   "litre": 49,
+   "toprak": {
+    "litre": 44,
+    "paket": "40 L + 10 L"
+   }
+  },
+  {
+   "cap": 50,
+   "litre": 67,
+   "toprak": {
+    "litre": 60,
+    "paket": "40 L + 20 L + 10 L"
+   }
+  },
+  {
+   "cap": 55,
+   "litre": 89,
+   "toprak": {
+    "litre": 80,
+    "paket": "2 × 40 L + 10 L"
+   }
+  },
+  {
+   "cap": 60,
+   "litre": 115,
+   "toprak": {
+    "litre": 105,
+    "paket": "2 × 40 L + 20 L + 10 L + 5 L"
+   }
+  }
+ ],
+ "saksilar": [
+  {
+   "slug": "buyuk-oval-fiber-separator-saksi-130x30x100-cm",
+   "ad": "Büyük Oval Separatör Saksı 130×30×100 cm | İç ve Dış Mekân",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "yukseklik": 100,
+     "uzunluk": 130,
+     "genislik": 30,
+     "litre": 310,
+     "bicim": "uzun oval",
+     "toprak": {
+      "litre": 280,
+      "paket": "7 × 40 L + 20 L + 10 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l",
+   "ad": "Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L)",
+   "stok": 1,
+   "boylar": [
+    {
+     "litre": 12,
+     "cap": 28,
+     "yukseklik": 23.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 11,
+      "paket": "10 L + 5 L"
+     }
+    },
+    {
+     "litre": 25,
+     "cap": 35.5,
+     "yukseklik": 32.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 23,
+      "paket": "20 L + 5 L"
+     }
+    },
+    {
+     "litre": 50,
+     "cap": 45.5,
+     "yukseklik": 42.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 45,
+      "paket": "40 L + 10 L"
+     }
+    },
+    {
+     "litre": 85,
+     "cap": 55,
+     "yukseklik": 50.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 77,
+      "paket": "2 × 40 L + 5 L"
+     }
+    }
+   ],
+   "delik": "var",
+   "tabak": true,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-12-litre",
+   "ad": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 12 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 12,
+     "cap": 28,
+     "yukseklik": 26.5,
+     "toprak": {
+      "litre": 11,
+      "paket": "10 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": true,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-25-litre",
+   "ad": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 25 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 25,
+     "cap": 36.5,
+     "yukseklik": 34.5,
+     "toprak": {
+      "litre": 23,
+      "paket": "20 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": true,
+   "uygun": "Orta ve büyük boy bitkiler için uygun ölçü",
+   "dis": true
+  },
+  {
+   "slug": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-50-litre",
+   "ad": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 50 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 50,
+     "cap": 45.5,
+     "yukseklik": 43.5,
+     "toprak": {
+      "litre": 45,
+      "paket": "40 L + 10 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": true,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-85-litre",
+   "ad": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 85 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 85,
+     "cap": 55,
+     "yukseklik": 51,
+     "toprak": {
+      "litre": 77,
+      "paket": "2 × 40 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": true,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-altigen-fiber-saksi-28x45x60-cm",
+   "ad": "Dekoratif Altıgen Fiber Saksı 28 × 45 × 60 cm – İç ve Dış Mekân",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "yukseklik": 60,
+     "genislik": 45,
+     "derinlik": 28,
+     "litre": 53,
+     "bicim": "köşeli",
+     "toprak": {
+      "litre": 48,
+      "paket": "40 L + 10 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-buyuk-fiber-comlek-saksi-85x60-cm",
+   "ad": "Dekoratif Büyük Fiber Çömlek Saksı 85 × 60 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 85,
+     "yukseklik": 60,
+     "litre": 185,
+     "bicim": "bombeli çömlek",
+     "toprak": {
+      "litre": 165,
+      "paket": "4 × 40 L + 20 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-kure-fiber-saksi-40x32-cm",
+   "ad": "Dekoratif Küre Fiber Saksı 40 × 32 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 40,
+     "yukseklik": 32,
+     "litre": 20,
+     "bicim": "küre",
+     "toprak": {
+      "litre": 18,
+      "paket": "20 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "40 cm çap ve 32 cm yükseklik; salon bitkileri, dekoratif yeşil bitkiler, çiçekler ve uygun ölçüdeki küçük ağaçlar için yeterli alan sunar.",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-kure-fiber-saksi-45x38-cm",
+   "ad": "Dekoratif Küre Fiber Saksı 45 × 38 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 45,
+     "yukseklik": 38,
+     "litre": 30,
+     "bicim": "küre",
+     "toprak": {
+      "litre": 27,
+      "paket": "20 L + 10 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "45 cm çapı ve 38 cm yüksekliğiyle salon bitkileri, dekoratif yeşil bitkiler, çiçekler ve uygun büyüklükteki küçük ağaçlar için kullanılabilir.",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-kure-fiber-saksi-50x40-cm",
+   "ad": "Dekoratif Küre Fiber Saksı 50 × 40 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 50,
+     "yukseklik": 40,
+     "litre": 39,
+     "bicim": "küre",
+     "toprak": {
+      "litre": 35,
+      "paket": "40 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-kure-fiber-saksi-85x70-cm",
+   "ad": "Dekoratif Küre Fiber Saksı 85 × 70 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 85,
+     "yukseklik": 70,
+     "litre": 200,
+     "bicim": "küre",
+     "toprak": {
+      "litre": 180,
+      "paket": "5 × 40 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-lale-fiber-saksi-46x45-cm",
+   "ad": "Dekoratif Lale Fiber Saksı 46 × 45 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 46,
+     "yukseklik": 45,
+     "litre": 54,
+     "bicim": "konik",
+     "toprak": {
+      "litre": 49,
+      "paket": "40 L + 10 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "46 cm çapı ve 45 cm yüksekliğiyle salon bitkileri, dekoratif yeşil bitkiler ve uygun büyüklükteki dış mekân bitkileri için kullanılabilir.",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-lale-fiber-saksi-46x60-cm",
+   "ad": "Dekoratif Lale Fiber Saksı 46 × 60 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 46,
+     "yukseklik": 60,
+     "litre": 72,
+     "bicim": "konik",
+     "toprak": {
+      "litre": 65,
+      "paket": "40 L + 20 L + 10 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "oval-fiber-separator-saksi-100x25x70-cm",
+   "ad": "Dekoratif Oval Fiber Separatör Saksı 100×25×70 cm | İç ve Dış Mekân",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "yukseklik": 70,
+     "uzunluk": 100,
+     "genislik": 25,
+     "litre": 140,
+     "bicim": "uzun oval",
+     "toprak": {
+      "litre": 125,
+      "paket": "3 × 40 L + 20 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "Özellikle kafe, restoran, otel ve ofislerde bitkili separatör uygulamaları için ideal bir üründür.",
+   "dis": true
+  },
+  {
+   "slug": "dekoratif-oval-silindir-fiber-saksi-36x40-cm",
+   "ad": "Dekoratif Oval Silindir Fiber Saksı 36 × 40 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 36,
+     "yukseklik": 40,
+     "litre": 35,
+     "bicim": "silindir",
+     "toprak": {
+      "litre": 32,
+      "paket": "20 L + 10 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "36 cm çapı ve 40 cm yüksekliğiyle salon bitkileri, dekoratif yeşil bitkiler ve orta büyüklükteki iç veya dış mekân bitkileri için uygundur.",
+   "dis": true
+  },
+  {
+   "slug": "kaktus-kozalak-kare-saksi-015l",
+   "ad": "Kaktüs Kozalak Kare Saksı (0.15 L)",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 0.15,
+     "cap": 7.5,
+     "yukseklik": 7,
+     "toprak": {
+      "litre": 0.14,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "Minik kaktüs ve sukulentler için tasarlanmış mini bir saksıdır.",
+   "dis": false
+  },
+  {
+   "slug": "kaktus-kozalak-yuvarlak-saksi-015l",
+   "ad": "Kaktüs Kozalak Yuvarlak Saksı (0.15 L)",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 0.15,
+     "cap": 8,
+     "yukseklik": 7,
+     "toprak": {
+      "litre": 0.14,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "İç mekânlarda kaktüs, sukulent ve minik çiçekler için uygundur.",
+   "dis": false
+  },
+  {
+   "slug": "kozalak-tabakli-saksi",
+   "ad": "Kozalak Tabaklı Bitki Saksısı 0.75L / 1.6L / 3L / 5.6L",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 0.75,
+     "cap": 11.5,
+     "yukseklik": 10.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.68,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 1.6,
+     "cap": 14.5,
+     "yukseklik": 13.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 1.4,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 3,
+     "cap": 17.5,
+     "yukseklik": 15.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2.7,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 5.6,
+     "cap": 21.5,
+     "yukseklik": 20.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 5,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": true,
+   "uygun": "Hem iç hem dış mekân bitkileri için uygun olan seri, dayanıklı malzeme yapısı ve farklı boyut seçenekleriyle her ortama uyum sağlar.",
+   "dis": true
+  },
+  {
+   "slug": "line-dekoratif-saksi-1-1-litre",
+   "ad": "Line Dekoratif Saksı 1,1 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 1.1,
+     "cap": 13,
+     "yukseklik": 12.5,
+     "toprak": {
+      "litre": 0.99,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    }
+   ],
+   "delik": "var",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "line-dekoratif-saksi-10-litre",
+   "ad": "Line Dekoratif Saksı 10 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 10,
+     "cap": 25.5,
+     "yukseklik": 26.5,
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "var",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "line-dekoratif-saksi-2-2-litre",
+   "ad": "Line Dekoratif Saksı 2,2 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 2.2,
+     "cap": 16.5,
+     "yukseklik": 15.5,
+     "toprak": {
+      "litre": 2,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    }
+   ],
+   "delik": "var",
+   "tabak": false,
+   "uygun": "Küçük ve orta boy bitkiler için ideal ölçü",
+   "dis": true
+  },
+  {
+   "slug": "line-dekoratif-saksi-5-litre",
+   "ad": "Line Dekoratif Saksı 5 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 5,
+     "cap": 20.5,
+     "yukseklik": 21.5,
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    }
+   ],
+   "delik": "var",
+   "tabak": false,
+   "uygun": "5 litre hacmi, 20,5 cm çapı ve 21,5 cm yüksekliğiyle küçük ve orta boy bitkilerin yetiştirilmesi için uygun bir kullanım alanı sunar.",
+   "dis": true
+  },
+  {
+   "slug": "line-tabakli-bitki-saksisi",
+   "ad": "Line Tabaklı Bitki Saksısı 1.1L / 2.2L / 5L / 10L",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 1.1,
+     "cap": 12.8,
+     "yukseklik": 12.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.99,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 2.2,
+     "cap": 16,
+     "yukseklik": 15.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 5,
+     "cap": 21,
+     "yukseklik": 20.3,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 10,
+     "cap": 26,
+     "yukseklik": 25.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": true,
+   "uygun": "İç ve dış mekân bitkileri için uygundur.",
+   "dis": true
+  },
+  {
+   "slug": "line-saksi-acik-gri-ithal-torf-dahil",
+   "ad": "Line Tabaklı Bitki Saksısı | Açık Gri (4 Boy Seçenekli) | İthal Torf Hediye",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 1.1,
+     "cap": 12.8,
+     "yukseklik": 12.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.99,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 2.2,
+     "cap": 16,
+     "yukseklik": 15.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 5,
+     "cap": 21,
+     "yukseklik": 20.3,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 10,
+     "cap": 26,
+     "yukseklik": 25.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": true,
+   "uygun": "",
+   "dis": false
+  },
+  {
+   "slug": "line-saksi-acik-mint-yesili-ithal-torf-dahil",
+   "ad": "Line Tabaklı Bitki Saksısı | Açık Mint Yeşili (4 Boy Seçenekli) | İthal Torf Hediye",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 1.1,
+     "cap": 12.8,
+     "yukseklik": 12.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.99,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 2.2,
+     "cap": 16,
+     "yukseklik": 15.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 5,
+     "cap": 21,
+     "yukseklik": 20.3,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 10,
+     "cap": 26,
+     "yukseklik": 25.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": true,
+   "uygun": "",
+   "dis": false
+  },
+  {
+   "slug": "line-saksi-koyu-gri-ithal-torf-dahil",
+   "ad": "Line Tabaklı Bitki Saksısı | Koyu Gri (4 Boy Seçenekli) | İthal Torf Hediye",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 1.1,
+     "cap": 12.8,
+     "yukseklik": 12.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.99,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 2.2,
+     "cap": 16,
+     "yukseklik": 15.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 5,
+     "cap": 21,
+     "yukseklik": 20.3,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 10,
+     "cap": 26,
+     "yukseklik": 25.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": true,
+   "uygun": "",
+   "dis": false
+  },
+  {
+   "slug": "line-saksi-koyu-mavi-ithal-torf-dahil",
+   "ad": "Line Tabaklı Bitki Saksısı | Koyu Mavi (4 Boy Seçenekli) | İthal Torf Hediye",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 1.1,
+     "cap": 12.8,
+     "yukseklik": 12.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.99,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 2.2,
+     "cap": 16,
+     "yukseklik": 15.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 5,
+     "cap": 21,
+     "yukseklik": 20.3,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 10,
+     "cap": 26,
+     "yukseklik": 25.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": true,
+   "uygun": "",
+   "dis": false
+  },
+  {
+   "slug": "line-saksi-sari-hardal-ithal-torf-dahil",
+   "ad": "Line Tabaklı Bitki Saksısı | Sarı Hardal (4 Boy Seçenekli) | İthal Torf Hediye",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 1.1,
+     "cap": 12.8,
+     "yukseklik": 12.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.99,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 2.2,
+     "cap": 16,
+     "yukseklik": 15.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 5,
+     "cap": 21,
+     "yukseklik": 20.3,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 10,
+     "cap": 26,
+     "yukseklik": 25.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": true,
+   "uygun": "",
+   "dis": false
+  },
+  {
+   "slug": "mini-efes-dekoratif-saksi-28-litre",
+   "ad": "Mini Efes Dekoratif Saksı 28 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 28,
+     "cap": 35,
+     "yukseklik": 37,
+     "toprak": {
+      "litre": 25,
+      "paket": "20 L + 10 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "ufo-saksi-serisi",
+   "ad": "UFO Saksı Serisi | Seçilebilir Renk, Litre ve Bitki Türüne Özel Ücretsiz Toprak (2L/5L/10L)",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 2,
+     "cap": 19.5,
+     "yukseklik": 14.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 1.8,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 5,
+     "cap": 25,
+     "yukseklik": 18.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 4.5,
+      "paket": "5 L"
+     }
+    },
+    {
+     "litre": 10,
+     "cap": 32,
+     "yukseklik": 24,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 9,
+      "paket": "10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "venus-askili-balkon-saksisi-1-75-litre",
+   "ad": "Venüs Askılı Balkon Saksısı 1,75 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 1.75,
+     "cap": 16,
+     "yukseklik": 13,
+     "toprak": {
+      "litre": 1.6,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "1,75 litre hacmiyle mevsimlik çiçekler, sarkan bitkiler ve küçük aromatik bitkiler için uygundur.",
+   "dis": false
+  },
+  {
+   "slug": "venus-askili-balkon-saksisi-3-1-litre",
+   "ad": "Venüs Askılı Balkon Saksısı 3,1 Litre",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 3.1,
+     "toprak": {
+      "litre": 2.8,
+      "paket": "5 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "Mevsimlik çiçekler, sarkan bitkiler ve aromatik bitkiler için uygundur.",
+   "dis": false
+  },
+  {
+   "slug": "yuvarlak-vakum-saksi-13-x-10-5-cm",
+   "ad": "Yuvarlak Vakum Saksı - 13 X 10,5 CM",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "uretici",
+     "litre": 0.9,
+     "cap": 13,
+     "yukseklik": 10.5,
+     "toprak": {
+      "litre": 0.81,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "Saksının ağız çapı 130 mm, derinliği ise 105 mm olarak tasarlanmıştır, bu da bitkilerin kök gelişimi için yeterli alan sağlar.",
+   "dis": true
+  },
+  {
+   "slug": "cesme-dis-mekan-dekoratif-saksi-buyuk-boy-renk-ve-litre-secenekli",
+   "ad": "Çeşme Serisi Dış Mekan Dekoratif Saksı | Renk ve Büyük Boy Litre Seçenekleri (28L / 70L / 130L)",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 28,
+     "cap": 40,
+     "yukseklik": 34.5,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 25,
+      "paket": "20 L + 10 L"
+     }
+    },
+    {
+     "litre": 70,
+     "cap": 50,
+     "yukseklik": 50,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 63,
+      "paket": "40 L + 20 L + 10 L"
+     }
+    },
+    {
+     "litre": 130,
+     "cap": 62,
+     "yukseklik": 60,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 115,
+      "paket": "3 × 40 L + 10 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "ince-damla-buyuk-fiber-saksi-32x70-cm",
+   "ad": "İnce Damla Büyük Fiber Saksı 32 × 70 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 32,
+     "yukseklik": 70,
+     "litre": 31,
+     "bicim": "tabana doğru incelen",
+     "toprak": {
+      "litre": 28,
+      "paket": "20 L + 10 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "ince-damla-buyuk-fiber-saksi-37x100-cm",
+   "ad": "İnce Damla Büyük Fiber Saksı 37 × 100 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 37,
+     "yukseklik": 100,
+     "litre": 59,
+     "bicim": "tabana doğru incelen",
+     "toprak": {
+      "litre": 53,
+      "paket": "40 L + 20 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "ince-damla-fiber-saksi-36x40-cm",
+   "ad": "İnce Damla Fiber Saksı 36 × 40 cm",
+   "stok": 1,
+   "boylar": [
+    {
+     "kaynak": "hesap",
+     "cap": 36,
+     "yukseklik": 40,
+     "litre": 22,
+     "bicim": "tabana doğru incelen",
+     "toprak": {
+      "litre": 20,
+      "paket": "20 L + 5 L"
+     }
+    }
+   ],
+   "delik": "kontrol",
+   "tabak": false,
+   "uygun": "",
+   "dis": true
+  },
+  {
+   "slug": "seffaf-plastik-orkide-kaktus-saksisi",
+   "ad": "Şeffaf Plastik Orkide ve Kaktüs Saksısı (3 Boy Seçenekli)",
+   "stok": 0,
+   "boylar": [
+    {
+     "litre": 0.75,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 0.68,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 1.6,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 1.4,
+      "paket": "en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir"
+     }
+    },
+    {
+     "litre": 3,
+     "kaynak": "uretici",
+     "toprak": {
+      "litre": 2.7,
+      "paket": "5 L"
+     }
+    }
+   ],
+   "delik": "belirtilmemis",
+   "tabak": false,
+   "uygun": "Orkide, kaktüs ve sukulentler için uygun",
+   "dis": false
+  }
+ ]
+}

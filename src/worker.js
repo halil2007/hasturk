@@ -1,10 +1,13 @@
 // Cloudflare Worker: public/ klasöründeki dosyalar (widget, ürün verisi) doğrudan statik sunulur, bu kod onlarda çalışmaz.
 // Sadece şu adresler için devreye girer:
 //   POST /e       widget'tan gelen anonim ziyaretçi olayları (arama, tıklama, görüntüleme, sepete ekleme)
-//   GET  /ai/durum  Ak Bilgi için Anthropic anahtarı kayıtlı mı (anahtar gösterilmez)
+//   GET  /ai/durum  Ak Bilge için Anthropic anahtarı kayıtlı mı (anahtar gösterilmez)
+//   POST /ak      Ak Bilge: müşteri sorusu → önce hazır soru havuzu, yoksa Claude (bkz. src/akbilge.js)
 //   GET  /trends  son 30 günün özeti (ivme dahil) + son 2 yılın aynı dönemi (scripts/sync.mjs 2 saatte bir okur, products.json'a işler)
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
+
+import { handle as akHandle, populer as akPopuler } from './akbilge.js';
 
 const KINDS = {
   q: 'search',    // arama (sonuç bulundu)
@@ -134,12 +137,38 @@ function aiKeyName(env) {
   return ['ANTHROPIC_API_KEY', 'akbilge', 'AKBILGE', 'AkBilge', 'Akbilge'].find((n) => typeof env[n] === 'string' && env[n].trim()) || null;
 }
 
+// Ak Bilge'nin ürün bağlamı: public/products.json (statik dosya) okunur, 10 dakika bellekte tutulur
+const PRODS = {};
+function productsFor(req, env, site) {
+  return async () => {
+    const c = PRODS[site];
+    if (c && Date.now() - c.t < 600000) return c.list;
+    if (!env.ASSETS) return [];
+    const r = await env.ASSETS.fetch(new Request(new URL(site === 'tarim' ? '/tarim/products.json' : '/products.json', req.url)));
+    if (!r.ok) return c ? c.list : [];
+    const d = await r.json();
+    const list = (d.items || []).map((p) => ({ s: p.s, n: String(p.n || '').trim(), st: p.st }));
+    PRODS[site] = { t: Date.now(), list };
+    return list;
+  };
+}
+
 export default {
   async fetch(req, env, ctx) {
     const { pathname } = new URL(req.url);
     if (pathname === '/e' && req.method === 'POST') return ingest(req, env, ctx);
     if (pathname === '/e' && req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' } });
+    }
+    if (pathname === '/ak/populer') return akPopuler(env).catch(() => new Response('{"ok":false,"sorular":[]}', { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }));
+    if (pathname === '/ak' && req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' } });
+    }
+    if (pathname === '/ak' && req.method === 'POST') {
+      const site = new URL(req.url).searchParams.get('s') === 'tarim' ? 'tarim' : 'hasturk';
+      const ad = aiKeyName(env);
+      return akHandle(req, env, ctx, { aiKey: ad ? String(env[ad]).trim() : '', originOk: originOk(req, env), products: productsFor(req, env, site) })
+        .catch(() => new Response(JSON.stringify({ ok: false, why: 'sunucu' }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }));
     }
     if (pathname === '/trends') return trends(env, ctx).catch(() => new Response('{"ok":false}', { status: 500 }));
     // Ak Bilgi hazırlığı: Anthropic anahtarı Cloudflare'de doğru adla (ANTHROPIC_API_KEY) kayıtlı mı. Anahtarın kendisi

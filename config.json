@@ -151,6 +151,7 @@
   },
   "phone": "+90 553 942 29 61",
   "whatsapp": "905539422961",
+  "akbilge": { "enabled": true, "name": "Ak Bilge" },
   "pages": [
     {
       "title": "Blog",
@@ -1716,6 +1717,33 @@
     ],
     "reyhan": [
       "feslegen"
+    ],
+    "kompost": [
+      "solucan"
+    ],
+    "bluberi": [
+      "mersini"
+    ],
+    "blueberry": [
+      "mersini"
+    ],
+    "yabanmersini": [
+      "mersini"
+    ],
+    "yabanmersi": [
+      "mersini"
+    ],
+    "mandalina": [
+      "limon"
+    ],
+    "portakal": [
+      "limon"
+    ],
+    "narenciye": [
+      "limon"
+    ],
+    "turuncgil": [
+      "limon"
     ]
   },
   "soilMatch": {

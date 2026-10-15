@@ -1,0 +1,278 @@
+{
+ "_aciklama": "İlaçlama pompaları: ürün açıklamalarından çıkarılan teknik bilgiler. Garanti mağaza bilgisidir.",
+ "surum": 1,
+ "garanti": {
+  "ay": 24,
+  "metin": "İlaçlama pompalarımız 24 ay garantilidir.",
+  "kaynak": "mağaza"
+ },
+ "pompalar": [
+  {
+   "slug": "delta-10-lt-basincli-ilaclama-pompasi-k-83",
+   "ad": "Delta 10 Lt Basınçlı İlaçlama Pompası K-83",
+   "stok": 0,
+   "tip": "manuel",
+   "depo": "10",
+   "tasima": null,
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "delta-16-lt-manuel-ilaclama-pompasi-k-203",
+   "ad": "Delta 16 Lt Manuel İlaçlama Pompası K-203",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "16",
+   "tasima": null,
+   "mekanizma": "kollu (sürekli pompalanır)",
+   "bos": true
+  },
+  {
+   "slug": "delta-2-lt-ilaclama-pompasi",
+   "ad": "Delta 2 lt İlaçlama Pompası",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "2",
+   "tasima": "el tipi",
+   "mekanizma": null,
+   "bos": true
+  },
+  {
+   "slug": "delta-20-lt-manuel-ilaclama-pompasi-k-205",
+   "ad": "Delta 20 Lt Manuel İlaçlama Pompası K-205",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "20",
+   "tasima": "sırt tipi",
+   "mekanizma": "kollu (sürekli pompalanır)",
+   "atis": "5–6 metre",
+   "bos": false
+  },
+  {
+   "slug": "delta-5-lt-basincli-ilaclama-pompasi-k-81",
+   "ad": "Delta 5 Lt Basınçlı İlaçlama Pompası K-81",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "5",
+   "tasima": null,
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "litolan-es-2-2-l-sarjli-elektrikli-puskurtucu",
+   "ad": "Litolan ES-2 (2 L) Şarjlı Elektrikli Püskürtücü",
+   "stok": 0,
+   "tip": "akulu",
+   "depo": "2",
+   "tasima": "el tipi",
+   "aku": "2000 mAh",
+   "calisma": "yaklaşık 2 saat",
+   "sarjGiris": "USB Type-C",
+   "basinc": "1,5 ATM",
+   "atis": "0,5–4 metre",
+   "nozul": "2 nozul",
+   "bos": false
+  },
+  {
+   "slug": "litolan-10-lt-akulu-ilaclama-pompasi",
+   "ad": "Lıtolan 10 Lt Akülü İlaçlama Pompası",
+   "stok": 0,
+   "tip": "akulu",
+   "depo": "10",
+   "tasima": "sırt tipi",
+   "aku": "2000 mAh",
+   "calisma": "yaklaşık 4 saat",
+   "sarjGiris": "USB Type-C",
+   "bos": false
+  },
+  {
+   "slug": "litolan-16-lt-akulu-ilaclama-pompasi",
+   "ad": "Lıtolan 16 Lt Akülü İlaçlama Pompası",
+   "stok": 0,
+   "tip": "akulu",
+   "depo": "16",
+   "tasima": "sırt tipi",
+   "calisma": "yaklaşık 4 saat",
+   "sarjGiris": "USB Type-C",
+   "basinc": "7 bar",
+   "bos": false
+  },
+  {
+   "slug": "litolan-8-lt-akulu-ilaclama-pompasi",
+   "ad": "Lıtolan 8 Lt Akülü İlaçlama Pompası",
+   "stok": 0,
+   "tip": "akulu",
+   "depo": "8",
+   "tasima": "sırt tipi",
+   "aku": "2000 mAh",
+   "calisma": "yaklaşık 4 saat",
+   "sarjGiris": "USB Type-C",
+   "bos": false
+  },
+  {
+   "slug": "pomsan-20-lt-manuel-ilaclama-pompasi-k-305",
+   "ad": "Pomsan 20 Lt Manuel İlaçlama Pompası K-305",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "20",
+   "tasima": null,
+   "mekanizma": "kollu (sürekli pompalanır)",
+   "bos": true
+  },
+  {
+   "slug": "uzman-05-lt-basincli-sprey-puskurtucu-k-4",
+   "ad": "Uzman 0.5 Lt Basınçlı Sprey Püskürtücü (K-4)",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "0,5",
+   "tasima": "el tipi",
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-1-lt-basincli-sprey-puskurtucu-k-5",
+   "ad": "Uzman 1 Lt Basınçlı Sprey Püskürtücü (K-5)",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "1",
+   "tasima": "el tipi",
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-10-lt-basincli-ilaclama-pompasi-k-73",
+   "ad": "Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "10",
+   "tasima": "omuz askılı",
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-16-lt-sarjli-ilaclama-pompasi-usr-403",
+   "ad": "Uzman 16 Lt Akülü İlaçlama Pompası (USR-403)",
+   "stok": 1,
+   "tip": "akulu",
+   "depo": "16",
+   "tasima": "sırt tipi",
+   "calismaDepo": "en az 25 depo",
+   "motor": "bakır sargılı motor",
+   "bos": false
+  },
+  {
+   "slug": "uzman-16-lt-manuel-ilaclama-pompasi-k-103",
+   "ad": "Uzman 16 Lt Sırt Pulverizatörü İlaçlama Pompası (K-103)",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "16",
+   "tasima": "sırt tipi",
+   "mekanizma": "kollu (sürekli pompalanır)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-2-lt-basincli-el-puskurtucu",
+   "ad": "Uzman 2 Lt Basınçlı El Püskürtücü",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "2",
+   "tasima": "el tipi",
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-2-lt-ilaclama-pompasi",
+   "ad": "Uzman 2 Lt Basınçlı İlaçlama Pompası (K-51)",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "2",
+   "tasima": "el tipi",
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-2-lt-metal-uclu-ilaclama-pompasi-k-61",
+   "ad": "Uzman 2 Lt Metal Uçlu İlaçlama Pompası (K-61)",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "2",
+   "tasima": "el tipi",
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-20-lt-manuel-ilaclama-pompasi-k-105",
+   "ad": "Uzman 20 Lt Manuel İlaçlama Pompası K-105",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "20",
+   "tasima": "sırt tipi",
+   "mekanizma": "kollu (sürekli pompalanır)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-5-lt-basincli-ilaclama-pompasi-k-71",
+   "ad": "Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71)",
+   "stok": 1,
+   "tip": "manuel",
+   "depo": "5",
+   "tasima": "omuz askılı",
+   "mekanizma": "basınçlı (birkaç kez pompalanır, basıncı tutar)",
+   "bos": false
+  },
+  {
+   "slug": "uzman-lityum-akulu-ilaclama-pompasi-5-lt",
+   "ad": "Uzman Lityum Akülü İlaçlama Pompası 5 Lt",
+   "stok": 1,
+   "tip": "akulu",
+   "depo": "5",
+   "tasima": "sırt tipi",
+   "aku": "lityum",
+   "calismaDepo": "23–37 depo",
+   "calismaLitre": "115–185 litre",
+   "sarj": "2–3 saatte tam dolar; ilk kullanımda 8 saat şarj edilmesi önerilir",
+   "atis": "8–10 metre",
+   "akis": "dakikada 3,1 litre",
+   "bos": false
+  },
+  {
+   "slug": "uzman-lityum-akulu-ilaclama-pompasi-8-lt",
+   "ad": "Uzman Lityum Akülü İlaçlama Pompası 8 Lt",
+   "stok": 1,
+   "tip": "akulu",
+   "depo": "8",
+   "tasima": "sırt tipi",
+   "aku": "lityum",
+   "calismaDepo": "14–23 depo",
+   "calismaLitre": "112–184 litre",
+   "sarj": "2–3 saatte tam dolar; ilk kullanımda 8 saat şarj edilmesi önerilir",
+   "atis": "8–10 metre",
+   "akis": "dakikada 3,1 litre",
+   "bos": false
+  },
+  {
+   "slug": "ilposan-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi",
+   "ad": "İlposan 16 lt Akülü/Şarjlı Sırt Pulverizatörü İlaçlama Pompası",
+   "stok": 1,
+   "tip": "akulu",
+   "depo": "16",
+   "tasima": "sırt tipi",
+   "aku": "12V 8A",
+   "calismaDepo": "en az 20 depo",
+   "atis": "10 metre",
+   "nozul": "6 nozul",
+   "hortum": "1,4 m PVC hortum",
+   "lans": "teleskopik püskürtme borusu",
+   "bos": false
+  },
+  {
+   "slug": "ilposan-power-16-litre-akulu-ilaclama-pompasi",
+   "ad": "İlposan Power 16 Litre Akülü İlaçlama Pompası",
+   "stok": 1,
+   "tip": "akulu",
+   "depo": "16",
+   "tasima": "sırt tipi",
+   "bos": false
+  }
+ ]
+}
