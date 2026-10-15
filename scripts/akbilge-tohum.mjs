@@ -10,6 +10,8 @@ const KAYNAK = {
   BG: { ad: 'Atalık Tohumlar için Yetiştirici Rehberi (Dr. Gülay Beşirli, Dr. Alptekin Karagöz; Buğday Derneği, Yalova Atatürk Bahçe Kültürleri MAE katkısıyla)', url: 'https://www.bugday.org/blog/wp-content/uploads/2021/04/AtalikTohumlar.pdf' },
   AU: { ad: 'Ankara Üniversitesi Ziraat Fakültesi – Sebze türlerinde çoğaltma (ekim aralıkları ve tohum miktarı çizelgesi)', url: 'https://acikders.ankara.edu.tr/mod/resource/view.php?id=4225' },
   ABB: { ad: 'Ankara Büyükşehir Belediyesi – Sebze Yetiştiriciliği kurs notu', url: 'https://s.ankara.bel.tr/files/5214/3893/6685/SEBZE_YETTRCL.pdf' },
+  BU: { ad: 'Tarım ve Orman Bakanlığı Bitkisel Üretim Genel Müdürlüğü – Ekim ayı ekim önerisi (Sabah haberi)', url: 'https://www.sabah.com.tr/ekonomi/balkon-bahceciligi-hobi-olmaktan-cikiyor-7119190' },
+  SZ: { ad: 'Sözcü – Eylül ve Ekim aylarında ekim', url: 'https://www.sozcu.com.tr/eylul-ve-ekim-aylarinda-eken-kazaniyor-hasat-zamani-verim-2-kat-artiyor-p229165' },
   TK: { ad: 'Tarım Kütüphanesi – Kökü yenen sebzeler (havuç, turp…)', url: 'http://www.tarimkutuphanesi.com/koku_yenilen_sebzeler_(havuc,_turp,_kereviz,_sogan,_sarimsak)_00443.html' },
 };
 
@@ -109,13 +111,19 @@ const AYLAR = {
   fasulye: [{ t: [4, 5, 6, 7, 8], not: 'doğrudan yerine' }],
   bezelye: [{ t: [10, 11, 12], not: 'kışı ılık geçen bölgelerde' }, { t: [2, 3], not: 'kışı soğuk geçen bölgelerde' }],
   lahana: [{ t: [7, 8], not: 'kışlık için fide' }],
-  havuc: [{ t: [3, 4], not: 'ana ekim dönemi' }],
+  havuc: [{ t: [3, 4], not: 'ana ekim dönemi' }, { t: [10, 11], not: 'kışı toprakta geçirir, ilkbaharda erken hasat' }],
   turp: [{ t: [8, 9, 10, 11, 12, 1, 2, 3, 4, 5], not: 'fındık turpu, 15 gün arayla' }, { t: [7, 8], not: 'kışlık büyük turplar' }],
   dereotu: [{ t: [3, 4] }],
-  roka: [{ t: [3, 4, 5, 6] }, { t: [9], not: 'serin bölgelerde ikinci ekim' }],
-  tere: [{ t: [3, 4, 5, 6] }, { t: [9], not: 'serin bölgelerde ikinci ekim' }],
+  roka: [{ t: [3, 4, 5, 6] }, { t: [9], not: 'serin bölgelerde ikinci ekim' }, { t: [10], not: 'ılıman bölgelerde' }],
+  tere: [{ t: [3, 4, 5, 6] }, { t: [9], not: 'serin bölgelerde ikinci ekim' }, { t: [10] }],
+  ispanak: [{ t: [10] }],
+  marul: [{ t: [10] }],
+  maydanoz: [{ t: [9, 10], not: 'kış maydanozu; zor çimlendiği için biraz fazla tohum kullanılır' }],
 };
 for (const [k, v] of Object.entries(AYLAR)) TUR[k].aylar = v;
+// Ekim önerisini (BU) ve sonbahar ekimini (SZ) kaynak listesine ekle
+for (const k of ['havuc', 'ispanak', 'marul', 'maydanoz', 'tere', 'turp']) if (!TUR[k].k.includes('BU')) TUR[k].k.push('BU');
+for (const k of ['havuc', 'maydanoz', 'roka']) if (!TUR[k].k.includes('SZ')) TUR[k].k.push('SZ');
 
 // Ürün adı → tür (ilk eşleşen)
 const ESLE = [

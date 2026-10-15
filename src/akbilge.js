@@ -25,9 +25,12 @@ const FILL_STEM = new Set(['agac', 'agaci', 'agacl', 'agacm']);
 export const toks = (s) => [...new Set(norm(s).split(' ').filter((t) => t && !FILL.has(t)).map(stem).filter((t) => !FILL_STEM.has(t)))];
 
 // ---------- Havuz dizini (her Worker örneğinde bir kez kurulur) ----------
-let IDX = null;
+let IDX = null, IDX_X = { key: '', idx: null };
 function index(extra = []) {
   if (IDX && !extra.length) return IDX;
+  // Ek kayıtlarla (onaylı / kayıtlı Claude cevapları) kurulan dizin, liste değişmedikçe yeniden kurulmaz
+  const key = extra.length ? extra.length + ':' + extra[0].i + ':' + extra[extra.length - 1].i : '';
+  if (key && IDX_X.key === key) return IDX_X.idx;
   const entries = HAVUZ.concat(extra), pats = [], df = new Map();
   entries.forEach((e, ei) => e.s.forEach((q) => {
     const ts = toks(q); if (!ts.length) return;
@@ -39,7 +42,7 @@ function index(extra = []) {
   const byTok = new Map(); // ters dizin: kelime → kalıplar
   pats.forEach((p, pi) => { p.w = p.ts.reduce((a, t) => a + idf.get(t), 0); p.ts.forEach((t) => { if (!byTok.has(t)) byTok.set(t, []); byTok.get(t).push(pi); }); });
   const built = { entries, pats, idf, byTok, N };
-  if (!extra.length) IDX = built;
+  if (!extra.length) IDX = built; else IDX_X = { key, idx: built };
   return built;
 }
 // Konu kelimeleri: soru "gübre" diye soruyorsa "toprak" cevabı verilmez (bu kelimeler sık geçtiği için idf'leri düşük kalır)
@@ -106,6 +109,7 @@ Kurallar:
 - Bitki hastalığı ya da zararlı teşhisi koyma; en fazla olası nedenleri say ve fotoğrafla müşteri hizmetlerimize danışılmasını öner. İnsan veya hayvan sağlığı konusunda tavsiye verme.
 - Mağaza bilgisi: siparişler aynı gün kargoya teslim edilir; bölgeye göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir. Bunun dışındaki sipariş durumu, kargo takibi, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için müşteri hizmetlerimize yönlendir.
 - Yönlendirirken "usta" deme; "müşteri hizmetlerimizden destek alabilirsiniz" de.
+- Kaynak, yayın, kurum ya da "şuradan aldım" bilgisi verme; yalnız cevabı yaz.
 
 "durum" alanı:
 - "cevap": soruyu doğru ve güvenle cevapladın.
@@ -213,7 +217,7 @@ export async function sayac(env) {
   const [b, h] = await Promise.all([q(gun), q(hafta)]);
   const ozet = (rows) => {
     const ai = rows.filter((r) => r.kaynak === 'ai'), giris = ai.reduce((a, r) => a + r.giris, 0), cikis = ai.reduce((a, r) => a + r.cikis, 0);
-    return { satir: rows, toplam: rows.reduce((a, r) => a + r.n, 0), havuz: rows.filter((r) => r.kaynak === 'havuz').reduce((a, r) => a + r.n, 0),
+    return { satir: rows, toplam: rows.reduce((a, r) => a + r.n, 0), havuz: rows.filter((r) => r.kaynak === 'havuz' || r.kaynak === 'havuz-ai').reduce((a, r) => a + r.n, 0),
       claude: ai.reduce((a, r) => a + r.n, 0), giris, cikis, tahmini_usd: +((giris * 4 + cikis * 20) / 1e6).toFixed(3) };
   };
   return json({ ok: true, bugun: ozet(b), son7: ozet(h), oylar: oy, model: env.AK_MODEL || MODEL, gunluk_sinir: Number(env.AK_DAILY_LIMIT) || DAILY_LIMIT });
@@ -233,6 +237,24 @@ export async function populer(env) {
   }
   POP = { t: Date.now(), list };
   return json({ ok: true, sorular: list });
+}
+
+// Claude'un daha önce verdiği (müşteriye gösterilen, olumsuz oy almamış) cevaplar: aynı ya da neredeyse aynı soru
+// tekrar gelirse Claude'a gitmeden bu cevap verilir (sezonda maliyet birikmesin). 5 dakikada bir tazelenir.
+let RECENT = { t: 0, list: [], byQn: new Map() };
+async function recentAi(db) {
+  if (Date.now() - RECENT.t < 300000) return RECENT;
+  const since = new Date(Date.now() - 90 * 864e5).toISOString();
+  const { results } = await db.prepare("SELECT s.id, s.q, s.qn, s.cevap, s.urunler FROM ak_soru s WHERE s.kaynak = 'ai' AND s.durum = 'onay-bekliyor' AND s.ts >= ? " +
+    "AND NOT EXISTS (SELECT 1 FROM ak_oy o WHERE o.q = s.q AND o.oy = 0) ORDER BY s.id DESC LIMIT 3000").bind(since).all();
+  const list = [], byQn = new Map();
+  for (const r of results) {
+    if (byQn.has(r.qn)) continue;
+    const e = { i: 'a' + r.id, t: 'ai-kayit', s: [r.q], c: r.cevap, u: JSON.parse(r.urunler || '[]') };
+    byQn.set(r.qn, e); list.push(e);
+  }
+  RECENT = { t: Date.now(), list, byQn };
+  return RECENT;
 }
 
 const today = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); // Türkiye saati
@@ -268,6 +290,18 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
   if (hit) {
     log({ kaynak: 'havuz', havuz: hit.e.i, skor: hit.sc });
     return json({ ok: true, kaynak: 'havuz', id: hit.e.i, cevap: hit.e.c, urunler: hit.e.u, dinamik: hit.e.d || null, bitki: hit.e.b || null });
+  }
+  // Daha önce Claude'un cevapladığı aynı soru: kayıttan, ücretsiz
+  if (db) {
+    const R = await recentAi(db).catch(() => null);
+    if (R && R.list.length) {
+      let e = R.byQn.get(norm(q));
+      if (!e) { const m = match(q, { extra: R.list, top: 3 }).find((x) => x.e.t === 'ai-kayit' && x.sc >= 0.9 && x.cp >= 0.9 && x.cq >= 0.9); if (m) e = m.e; }
+      if (e) {
+        log({ kaynak: 'havuz-ai', havuz: e.i });
+        return json({ ok: true, kaynak: 'ai', tekrar: true, cevap: e.c, urunler: e.u });
+      }
+    }
   }
   // Claude: anahtar yoksa, kapalıysa ya da günlük sınır dolduysa "bilmiyorum + müşteri hizmetleri"
   const limit = Number(env.AK_DAILY_LIMIT) || DAILY_LIMIT;

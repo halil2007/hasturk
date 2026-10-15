@@ -1,0 +1,269 @@
+# Kaynak: https://www.sozcu.com.tr/eylul-ve-ekim-aylarinda-eken-kazaniyor-hasat-zamani-verim-2-kat-artiyor-p229165
+ 
+
+ BEFORE images load so above-the-fold failures are caught.
+ Bounded (max/page), kill-switch'li (window.imageOneRetryDisabled), sadece editöryel sozcucdn.
+ imageOneRetry.ts bundle ile dataset.imgRetry üzerinden koordineli (çift retry yok). -->
+
+ Eylül ve Ekim aylarında eken kazanıyor: Hasat zamanı verim 2 kat artıyor - Sözcü 
+
+ Son Dakika 
+
+ DOLAR 
+
+ 49,42 
+
+ 0,02 (%0,04) 
+
+ EURO 
+
+ 55,52 
+
+ 0,36 (%0,66) 
+
+ SON DAKİKA 
+
+ YAZARLAR 
+
+ GÜNDEM 
+
+ EKONOMİ 
+
+ DÜNYA 
+
+ GÜNÜN İÇİNDEN 
+
+ SPOR 
+
+ HAYAT 
+
+ MAGAZİN 
+
+ E-GAZETE 
+
+ OTOMOTİV 
+
+ FİNANS 
+
+ TEKNOLOJİ 
+
+ EĞİTİM 
+
+ RESMİ İLANLAR 
+
+ Sosyal Medya
+
+ Sözcü Tv 
+
+ Giriş Yap 
+
+ Abone Ol 
+
+ Daha fazla bilgi al 
+
+ SON DAKİKA 
+
+ YAZARLAR 
+
+ GÜNDEM 
+
+ EKONOMİ 
+
+ DÜNYA 
+
+ GÜNÜN İÇİNDEN 
+
+ SPOR 
+
+ HAYAT 
+
+ MAGAZİN 
+
+ FİNANS 
+
+ EĞİTİM 
+
+ RESMİ İLANLAR 
+
+ DOLAR 
+
+ 49,42 
+
+ 0,02 (%0,04) 
+
+ EURO 
+
+ 55,52 
+
+ 0,36 (%0,66) 
+
+ STERLIN 
+
+ 65,64 
+
+ 0,43 (%0,66) 
+
+ BITCOIN 
+
+ 80.866,24 
+
+ -2.531,76 (%-3,04) 
+
+ ALTIN 
+
+ 6.602,20 
+
+ 81,67 (%1,25) 
+
+ FAİZ 
+
+ 36,77 
+
+ -0,07 (%-0,19) 
+
+ Haberler
+ - 
+ Günün İçinden 
+
+ 19 Eylül 2025 - 12:07 
+
+ Güncellenme: 19 Eylül 2025 - 12:24 
+
+ Eylül ve Ekim aylarında eken kazanıyor: Hasat zamanı verim 2 kat artıyor
+
+ Eylül ayı, yalnızca yazın bereketli hasadının toplandığı dönem değil, aynı zamanda yeni ekimler için de en uygun zamanlardan biri olarak öne çıkıyor. Ilıman hava koşulları ve yüksek nem sayesinde bitkiler, kış gelmeden önce kök salabiliyor ya da ilkbaharda daha erken filizlenerek bahçıvanlara avantaj sağladığı ortaya çıktı.
+
+Haber Merkezi 
+
+ Facebook ile paylaş
+
+ Messenger ile gönder
+
+ E-posta ile gönder
+
+ Yazıları büyüt 
+
+ Yazıları küçült 
+
+ Standart boyut 
+
+ Google algoritmasına bırakmayın, okuyacağınız haberi siz seçin! Tıkla ve ekle 
+
+ Eylül ayı, yalnızca yazın bereketli hasadının toplandığı dönem değil, aynı zamanda yeni ekimler için de en uygun zamanlardan biri olarak öne çıkıyor. Ilıman hava koşulları ve yüksek nem sayesinde bitkiler, kış gelmeden önce kök salabiliyor ya da ilkbaharda daha erken filizlenerek bahçıvanlara avantaj sağladığı ortaya çıktı. 
+
+ Sonbaharda ekim için en uygun ürünlerden biri turp. Hızlı olgunlaşan türleri ekildiğinde, yaklaşık üç hafta içinde hasat yapılabiliyor. Bu dönemde zararlı böceklerin az olması da önemli bir avantaj. Kış maydanozu ise eylül sonu ile ekim başında ekiliyor. İlkbahar maydanozuna göre daha zor çimlendiği için daha fazla tohum kullanılmalı ve kış boyunca koruma amacıyla toprak örtülmeli.
+
+ KÖKLERİ DAHA GÜÇLÜ OLUYOR VERİMİ ARTIYOR
+
+ Eylül’ün en önemli işlerinden biri kışlık soğan ve sarımsak ekimi. Doğru zamanda ekildiğinde bu ürünler toprağa güçlü şekilde kök salıyor ve kar eridikten sonra hızla büyümeye başlıyor. Havuç ve pancar gibi ürünler ise ekim sonu ya da kasımda ekildiğinde toprakta kışı geçirip ilkbaharda erken hasat veriyor. Ayrıca marul, roka, ıspanak, yaprak hardalı ve dereotu gibi hızlı büyüyen yeşillikler de sonbaharda kolayca yetiştirilebiliyor.
+
+ RENKLİ BİR BAHÇE İÇİN EKİLMESİ GEREKEN ÇİÇEKLER
+
+ Bahçesini çiçeklerle süslemek isteyenler için eylül, soğanlı bitkilerin dikimi açısından en uygun dönem. Kardelen, muscari, çiğdem, lale, nergis ve sümbül bu aylarda ekildiğinde ilkbaharda baharın müjdecisi oluyor. Çok yıllık çiçeklerden şakayık, ortanca, papatya ve floks da yine bu dönemde dikilebiliyor.
+
+ Güller ise eylül sonu ile ekim ortasında toprağa dikildiğinde kış gelmeden kök salıyor. Soğuklara karşı korunması için kasım sonunda malçlama yapılması ve örtülmesi öneriliyor.
+
+ MEYVE AĞAÇLARI
+
+ Eylül, bahçeyi meyve ağaçları ve çalılarıyla genişletmek için de uygun bir dönem. Elma, armut, erik ve kiraz gibi fidanlar bu dönemde toprağa yerleştirildiğinde daha güçlü ve dayanıklı hale geliyor. Ahududu ve kuş üzümü gibi çalılar da ilkbahara göre daha hızlı gelişiyor.
+
+ Çilek fideleri ise eylül başından ekim ortasına kadar dikildiğinde ertesi yıl ilk hasadını veriyor. Ancak ilk donlardan en az 30 gün önce ekilmesi gerekiyor.
+
+ BAŞARILI SONBAHAR EKİMİ İÇİN İPUÇLARI
+
+ Toprak dikimden önce mutlaka gevşetilmeli, organik gübrelerle zenginleştirilmeli ve dikim sonrası bolca sulanmalı. Bazı bitkiler, özellikle maydanoz, gül ve ahududu, dondan korunması için kışın örtülmeli.
+
+ www.sozcu.com.tr internet sitesinde yayınlanan yazı, haber ve fotoğrafların her
+ türlü telif hakkı Mega Ajans
+ ve Rek. Tic. A.Ş'ye aittir. İzin alınmadan, kaynak gösterilerek dahi iktibas
+ edilemez.
+
+ Bu habere emoji ile tepki ver
+
+ GÜNÜN MANŞETLERİ 
+
+ Excalibur G915 Slim ile Güç Yanında
+
+ Günün İçinden Haberleri
+
+ Çürümüş et gibi kokuyor: Yaşamak için ışığa bile ihtiyacı yok 
+
+ Şantiyelerde kullanılan kaskların renkleri meğer bu anlama geliyormuş 
+
+ Türkiye ikiye bölündü: Turşu yıkanır mı yıkanmaz mı? 
+
+ Kırmızı altın kova kova hasat ediliyor: Kilosu 100 liradan bidon bidon satılıyor 
+
+ Trabzon'dan çıkmayan kamyonet İstanbul'da ceza yedi 
+
+ Palamut kafalarından yapılan yemek bir anda popüler oldu 
+
+ Yaz Sıcaklarında Serin Kalmanın 5 Pratik Yolu!
+
+ Haberler 
+
+ 31 Mart 2024 Yerel Seçim Sonuçları 
+
+ 2023 Seçim Sonuçları 
+
+ Yazarlar 
+
+ Finans Haberleri 
+
+ Ekonomi Haberleri 
+
+ Hayat Haberleri 
+
+ Dünya Haberleri 
+
+ Güncel Haberler 
+
+ Günün İçinden Haberler 
+
+ Sözcü Web TV 
+
+ Spor Haberleri 
+
+ Sözcü E-Gazete 
+
+ Tüm Haberler 
+
+ İletişim 
+
+ İletişim 
+
+ Künye 
+
+ Reklam Ver 
+
+ Vefat İlanları 
+
+ Kvkk 
+
+ Kişisel Verileri Koruma Kanunu 
+
+ Müşteri Aydınlatma Metni 
+
+ Çerez Politikası 
+
+ Kişisel Verileri Saklama ve İmha Politikası 
+
+ Kamera Aydınlatma Metni 
+
+ KVKK Başvuru Formu 
+
+ RSS 
+
+ Sosyal Medya
+
+ Uygulamalarımız
+
+ BİST hisse verileri 15 dakika gecikmelidir. BİST isim ve logosu "Koruma Marka Belgesi" altında korunmakta olup izinsiz kullanılamaz, iktibas edilemez, değiştirilemez. BİST ismi altında açıklanan tüm bilgilerin telif hakları tamamen BİST'e ait olup, tekrar yayınlanamaz. Veriler tarafından sağlanmaktadır.
+-->
+ -->
+
+ www.sozcu.com.tr internet sitesinde yayınlanan yazı, haber ve fotoğrafların her türlü telif hakkı Mega Ajans ve Rek. Tic. A.Ş'ye aittir. İzin alınmadan, kaynak gösterilerek dahi iktibas edilemez.
+
+ Copyright © 2023 - Tüm hakları saklıdır. Mega Ajans ve Rek. Tic. A.Ş.
+
+

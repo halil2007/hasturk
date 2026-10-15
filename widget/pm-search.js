@@ -1164,7 +1164,7 @@
       if (/^[•\-]\s+/.test(x)) { if (!ul) { out += '<ul>'; ul = true; } out += '<li>' + esc(x.replace(/^[•\-]\s+/, '')) + '</li>'; return; }
       if (ul) { out += '</ul>'; ul = false; }
       if (!x) return;
-      if (/^Kaynak:/.test(x)) { out += '<p class="aks">' + esc(x) + '</p>'; return; }
+      if (/^Kaynak:/.test(x)) return; // kaynak satırı müşteriye gösterilmez
       out += '<p>' + esc(x) + '</p>';
     });
     return out + (ul ? '</ul>' : '');
@@ -1202,7 +1202,7 @@
       var prods = '';
       if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl); pose = 'fide'; } }
       if (!prods && DATA) {
-        var list = (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 3);
+        var list = (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 4);
         if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>';
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
