@@ -13,13 +13,24 @@ const toh = JSON.parse(await readFile('bilgi/tohumlar.json', 'utf8'));
 const tKaynak = () => '';
 const tohumMetin = (t) => [
   t.yontem === 'fide' ? 'Nasıl: önce fide yetiştirilir, sonra yerine dikilir.' : t.yontem === 'doğrudan' ? 'Nasıl: tohum doğrudan yerine ekilir.' : `Nasıl: ${t.yontem}.`,
-  t.zaman && `Ne zaman: ${t.zaman}`,
+  t.zaman && `Ne zaman: ${t.zaman.replace(/\s*\([^)]{25,}\)/g, '').replace(/;\s*fideler \d+[–-]\d+ haftada dikime hazır olur/, '')}`,
   t.derinlik && `Ne kadar derine: ${t.derinlik}.`,
   t.mesafe && `Aralık: ${t.mesafe}.`,
   t.cimlenme && `Çimlenme: ${t.cimlenme}.`,
   t.sicaklik, t.hasat && `Hasat: ${t.hasat}.`,
 ].filter(Boolean).map((x) => '• ' + x).join('\n');
 const USTA = 'Kesin bilgi için müşteri hizmetlerimizden destek alabilirsiniz.';
+// Kıvam: cevaplar ne çok uzun ne eksik. Uzun metin cümle sınırında kısaltılır (yarım cümle kalmaz); süslü/abartılı
+// pazarlama cümleleri ("ideal bir çözüm", "avantaj sunar", "öne çıkmaktadır") bilgi taşımadığı için atılır.
+const SUS = /görsel şölen|özenle (hazırlan|üretil|seçil)|devrim|kesin çözüm|en gözde|dikkat çeken|zirveye|profesyonel ?çiftçi|bilinçli bahçıvan|ideal bir (çözüm|seçim|seçenek)|avantaj(ı)? sun|öne çık|haline getir|vazgeçilmez|eşsiz|mükemmel|harika|muhteşem|kusursuz|en iyi sonuç|kullanıcılar için|keyifli|göz alıcı|kalite(li)? arayan|tercih edilen|güvenle kullan/i;
+const kirp = (t, n) => {
+  t = String(t || '').trim();
+  if (t.length <= n) return t;
+  const c = t.match(/[^.!?]+[.!?]+(\s|$)/g) || [t];
+  let o = '';
+  for (const x of c) { if ((o + x).length > n && o) break; o += x; }
+  return o.trim().length <= n + 40 ? o.trim() : t.slice(0, n).replace(/\s+\S*$/, '') + '…';
+};
 // Sade dil: müşteriye giden cevaplarda ağır tarım terimleri ve kısaltmalar günlük dile çevrilir; miktarlar
 // "dekara 60–80 kg", "fidan başına 2 kg" gibi okunur biçimde yazılır. (Rakamlar değişmez, yalnız yazılışı değişir.)
 const TERIM = [
@@ -115,21 +126,24 @@ for (const g of config.guides || []) {
   }
 }
 
-// A2) Bitki için gübre (genel soru): o bitkinin tüm kullanım tabloları tek cevapta
+// A2) Bitki için gübre (genel soru): o bitkinin ürünleri tek cevapta, ürün başına ilk 2 uygulama (kıvam); bir ürünün
+// tüm uygulamaları A'daki "X için ürün" cevabında
 const BIRLESIK = new Map();
 for (const g of config.guides || []) {
   const ad = ((bySlug.get(g.product) || {}).n || g.title).trim();
   for (const gr of g.groups || []) for (const bitki of gr.plants) {
-    if (!BIRLESIK.has(bitki)) BIRLESIK.set(bitki, { grup: gr.name, parca: [], urunler: [] });
+    if (!BIRLESIK.has(bitki)) BIRLESIK.set(bitki, { grup: gr.name, parca: [], urunler: [], fazla: false });
     const B = BIRLESIK.get(bitki);
-    B.parca.push(`${ad}:\n${gr.steps.map(adim).join('\n')}`);
+    if (B.urunler.includes(g.product)) continue; // aynı ürünün ikinci tablosu (bitki iki grupta) yazılmaz
+    if (gr.steps.length > 2) B.fazla = true;
+    B.parca.push(`${ad}:\n${gr.steps.slice(0, 2).map(adim).join('\n')}`);
     B.urunler.push(g.product);
   }
 }
 for (const [bitki, B] of BIRLESIK) {
   const b = bitki.replace(/\s*\(.*\)\s*/g, '').trim(), l = lc(b);
   add({ tur: 'bitki-doz', bitki, grup: B.grup, sorular: [`${l} için gübre`, `${l} için besin`, `${l} için hangi gübre`, `${yon(bitki)} hangi gübre verilir`, `${l} gübreleme`, `${l} nasıl gübrelenir`, `${l} için en iyi gübre`, `${l} gübre önerisi`, `${l} ne zaman gübrelenir`, `${l} gübresi`],
-    cevap: dekarNot(`${b} için önerdiğimiz ürünler ve miktarları:\n\n${B.parca.join('\n\n')}\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.`), urunler: [...new Set(B.urunler)], kaynak: 'rehber:birlesik' });
+    cevap: dekarNot(`${b} için önerdiğimiz ürünler ve miktarları:\n\n${B.parca.join('\n\n')}\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.${B.fazla ? ` Bir ürünün tüm uygulama zamanlarını ayrıca sorabilirsiniz (ör. "${l} için sıvı solucan gübresi").` : ''}`), urunler: [...new Set(B.urunler)], kaynak: 'rehber:birlesik' });
 }
 
 // B) Ürün kartları
@@ -204,6 +218,9 @@ for (const [slug, c] of Object.entries(oto)) {
   const temiz = (t) => String(t || '').replace(/\\[nrt]/g, ' ').replace(/Ürün Kodu:[^|]*\|\s*Marka:[^|]*\|\s*Satıcı:\s*[^\s🐱🐶]+(\s+[^\s🐱🐶]+)?/g, ' ').replace(/\s+/g, ' ').trim();
   oz = adAt(temiz(oz), c.ad);
   if (oz && oz.length < 25) oz = '';
+  oz = kirp(oz.split(/(?<=[.!?])\s+/).filter((x) => !SUS.test(x) && !/\?$/.test(x)).join(' '), 220);
+  // Tohum türü bilinen tohumlarda "nasıl kullanılır"ın cevabı ekim bilgisidir; ürün sayfasının tanıtım cümlesi yazılmaz
+  if (toh.urunler[slug] && toh.urunler[slug].tur && toh.turler[toh.urunler[slug].tur]) oz = '';
   let cevap = `${c.ad}${oz ? ' — ' + oz.charAt(0).toLocaleUpperCase('tr-TR') + oz.slice(1) : ''}`;
   if (c.ph) cevap += `\n\npH: ${c.ph}`;
   if (c.icerik && !benzer(c.icerik, [oz])) cevap += `\n\n${c.icerik}`;
@@ -212,13 +229,16 @@ for (const [slug, c] of Object.entries(oto)) {
   // parçaları ("Kullanım Alanları X;") atılır
   const km = [];
   for (const k0 of c.kullanim) { const k = adAt(temiz(k0), c.ad); if (k.length >= 25 && !/[;:?]$|\?\s*\([^)]*\)$/.test(k) && !benzer(k, [oz, c.ozet || '', c.icerik || '', ...km])) km.push(k.charAt(0).toLocaleUpperCase('tr-TR') + k.slice(1)); }
-  if (km.length && !(tu0 && tu0.tur)) cevap += `\n\nÜrün bilgisine göre:\n${km.map((k) => '• ' + k).join('\n')}`;
+  // Kullanımla ilgili (sayı, oran, nasıl) maddeler öne alınır; süslü maddeler atılır; en çok 3 madde, her biri kısa
+  const km2 = km.filter((k) => !SUS.test(k)).map((k, i) => ({ k: kirp(k.replace(/^[^\p{L}\p{N}]+/u, ''), 160), i, w: /\d|kullan|karıştır|uygula|sula|ek(il|im)|serp|oran|litre|saksı|dikim/i.test(k) ? 0 : 1 }))
+    .sort((a, b) => a.w - b.w || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i).map((x) => x.k);
+  if (km2.length && !(tu0 && tu0.tur)) cevap += `\n\nÜrün bilgisine göre:\n${km2.map((k) => '• ' + k).join('\n')}`;
   if (c.kural === 'ilac') cevap += `\n\nKullanım miktarı ve güvenlik uyarıları için ürün etiketine uyunuz. ${USTA}`;
   const tu = toh.urunler[slug], tt = tu && tu.tur && toh.turler[tu.tur];
   if (tt) {
     cevap += `\n\n${tt.ad} ekim bilgisi:\n${tohumMetin(tt)}`;
     if (tu.tohumSayisi) cevap += `\n• Bu pakette (${String(tu.gram).replace('.', ',')} g) yaklaşık ${tu.tohumSayisi[0].toLocaleString('tr-TR')}–${tu.tohumSayisi[1].toLocaleString('tr-TR')} tohum bulunur.`;
-    if (tt.saklama) cevap += `\n• Serin, kuru ve karanlık yerde saklanırsa tohumlar yaklaşık ${tt.saklama} yıl canlı kalır.`;
+
   } else if (tu) cevap += `\n\nGenel kural: ${toh.genel.derinlik.replace(/^Pratik kural:\s*/, '')}`;
   const tohum = c.kategori === 'Tohumlar' || !!tu;
   const sorular = [`${n} nasıl kullanılır`, `${n} ne işe yarar`, `${n} özellikleri`, `${n} nedir`, `${n} nasıl uygulanır`, `${n} ne zaman kullanılır`, `${n} hangi bitkilerde kullanılır`];
@@ -279,12 +299,15 @@ for (const p of sx.saksilar) {
 const TUR_ADLARI = { hiyar: ['hıyar', 'salatalık'], marul: ['marul', 'salata'], lahana: ['lahana', 'kara lahana'], balkabagi: ['bal kabağı'] };
 for (const [key, t] of Object.entries(toh.turler)) {
   const adlar = TUR_ADLARI[key] || [lc(t.ad.replace(/\s*\(.*\)/, '').split('/')[0].trim())];
-  const sorular = adlar.flatMap((a) => [`${a} ekebilir miyim`, `${a} ne zaman dikilir`, `${a} ne zaman ekilmeli`, `${a} hangi ayda ekilir`, `${a} tohumu ne zaman atılır`, `şimdi ${a} ekilir mi`, `${a} saksıda yetişir mi`, `${a} ne zaman ekilir`, `${a} tohumu nasıl ekilir`, `${a} ekim zamanı`, `${a} tohumu kaç cm derine ekilir`, `${a} kaç günde çimlenir`, `${a} kaç günde çıkar`, `${a} ekim aralığı`,
+  const sorular = adlar.flatMap((a) => [`${a} ekebilir miyim`, `${a} ne zaman dikilir`, `${a} ne zaman ekilmeli`, `${a} hangi ayda ekilir`, `${a} tohumu ne zaman atılır`, `${a} tohumu ne zaman ekilir`, `${a} tohumu ekim zamanı`, `${a} tohumu ne zaman dikilir`, `şimdi ${a} ekilir mi`, `${a} saksıda yetişir mi`, `${a} ne zaman ekilir`, `${a} tohumu nasıl ekilir`, `${a} ekim zamanı`, `${a} tohumu kaç cm derine ekilir`, `${a} kaç günde çimlenir`, `${a} kaç günde çıkar`, `${a} ekim aralığı`,
     ...(t.gram ? [`${a} tohumu kaç tane`, `${a} tohumu 1 gramda kaç tohum var`, `${a} tohumu gramı kaç tane`] : []),
     ...(t.yontem === 'fide' ? [`${a} fidesi ne zaman dikilir`, `${a} fidesi nasıl yetiştirilir`] : [])]);
   const urunlerT = Object.entries(toh.urunler).filter(([s2, u]) => u.tur === key && bySlug.has(s2)).sort((a, b) => ((bySlug.get(b[0]).st > 0) - (bySlug.get(a[0]).st > 0))).map(([s2]) => s2);
-  add({ tur: 'tohum', bitki: t.ad, sorular, cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}${t.gram ? `\n• 1 gramda yaklaşık ${t.gram[0].toLocaleString('tr-TR')}–${t.gram[1].toLocaleString('tr-TR')} tohum vardır.` : ''}${t.saklama ? `\n• Tohum saklama ömrü: yaklaşık ${t.saklama} yıl.` : ''}`,
+  const gramQ = sorular.filter((x) => /kaç tane|kaç tohum/.test(x));
+  add({ tur: 'tohum', bitki: t.ad, sorular: sorular.filter((x) => !gramQ.includes(x)), cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}`,
     urunler: urunlerT.slice(0, 3), dinamik: 'stok', kaynak: `tohum:${key}` });
+  if (t.gram) add({ tur: 'tohum', bitki: t.ad, sorular: gramQ, cevap: `${t.ad.replace(/\s*\(.*\)/, '')} tohumunun 1 gramında yaklaşık ${t.gram[0].toLocaleString('tr-TR')}–${t.gram[1].toLocaleString('tr-TR')} tohum vardır.${t.saklama ? ` Serin, kuru ve karanlık yerde yaklaşık ${t.saklama} yıl saklanabilir.` : ''}`,
+    urunler: urunlerT.slice(0, 3), dinamik: 'stok', kaynak: `tohum:${key}:gram` });
 }
 // G2) Ay ay "bu ay ne ekilir" (yalnız kaynakta ayı açıkça yazan türler)
 const AY = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık'];
@@ -354,14 +377,15 @@ add({ tur: 'pompa-genel', konu: 'sarj', sorular: ['akülü ilaçlama pompası ş
   cevap: `Akülü modellerimizin ürün bilgisine göre tek şarjla çalışma süreleri:\n${akl.filter((p) => bySlug.get(p.slug).st > 0 && (p.calisma || p.calismaDepo)).map(kisaP).join('\n')}\n\nTüm ilaçlama pompalarımız ${pm.garanti.ay} ay garantilidir.`, urunler: akl.filter((p) => bySlug.get(p.slug).st > 0).slice(0, 3).map((p) => p.slug), dinamik: 'stok', kaynak: 'pompa:sarj' });
 
 // I) Bitki sorunları (bilgi/sorunlar.json; akbilge-sorun.mjs üretir): sararma, solma, çiçek açmama, zararlılar…
-// Ürün satırları "• Ad — fayda" biçiminde; sunucu stokta olmayan ürünün satırını cevaptan çıkarır (dinamik: sorun)
+// Kıvam: en çok 2 neden, 1 belirti, 3 öneri. Ürün adları metinde tekrar yazılmaz (kartlar hemen altında); sunucu stokta
+// olmayan ürünü listeden çıkarır (dinamik: sorun)
 const sr = JSON.parse(await readFile('bilgi/sorunlar.json', 'utf8'));
 const madde = (b, l) => l.length ? `\n\n${b}:\n${l.map((x) => '• ' + x).join('\n')}` : '';
 for (const s of sr.sorunlar) {
   const ur = s.urunler.filter((u) => bySlug.has(u.slug));
   add({ tur: 'sorun', konu: s.key, ...(s.bitki ? { bitki: s.bitki } : {}), sorular: s.sorular,
-    cevap: `${s.baslik}${madde('Olası nedenler', s.nedenler)}${madde('Nasıl anlarsınız', s.anlama)}${madde('Ne yapmalısınız', s.yapin)}${madde('Sitemizde işinize yarayacaklar', ur.map((u) => `${u.ad} — ${u.fayda}`))}\n\nSorun devam ederse ya da emin olamazsanız bitkinin ve yaprakların (alt yüzü dahil) fotoğrafıyla müşteri hizmetlerimizden destek alabilirsiniz.`,
-    urunler: ur.map((u) => u.slug), urunAdlari: ur.map((u) => u.ad), dinamik: 'sorun', kaynak: `sorun:${s.key}` });
+    cevap: `${s.baslik}${madde('Olası nedenler', s.nedenler.slice(0, 2))}${madde('Nasıl anlarsınız', (s.anlama || []).slice(0, 1))}${madde('Ne yapmalısınız', s.yapin.slice(0, 3))}${ur.length ? '\n\nİşinize yarayacak ürünler aşağıda.' : ''}\n\nEmin olamazsanız bitkinin fotoğrafıyla müşteri hizmetlerimize danışabilirsiniz.`,
+    urunler: ur.slice(0, 3).map((u) => u.slug), urunAdlari: ur.slice(0, 3).map((u) => u.ad), dinamik: 'sorun', kaynak: `sorun:${s.key}` });
 }
 
 // G3) Genel gübre soruları (herkesin bahçesine/saksısına uyan): ev ölçeğinde, doğrulanmış miktarlarla.
@@ -412,7 +436,7 @@ for (const g of GENEL_GUBRE) add({ tur: 'gubre-genel', konu: g.konu, sorular: g.
 // J) Blog "Sık Sorulan Sorular" (bilgi/blog-sss.json; akbilge-blog.mjs üretir): bakım bilgisi (sulama, ışık, toprak, saksı…).
 // En sona eklenir: aynı soruya doğrulanmış bir cevap varsa eşit puanda o kazanır. Gübre/ilaç miktarı veren blog cevapları alınmaz.
 const blog = JSON.parse(await readFile('bilgi/blog-sss.json', 'utf8'));
-for (const b of blog.sss) add({ tur: 'blog', konu: b.kaynak, sorular: [b.soru.replace(/\?$/, '')], cevap: b.cevap, urunler: b.urunler.filter((x) => bySlug.has(x) && bySlug.get(x).st > 0), kaynak: `blog:${b.kaynak}` });
+for (const b of blog.sss) add({ tur: 'blog', konu: b.kaynak, sorular: [b.soru.replace(/\?$/, '')], cevap: kirp(b.cevap, 420), urunler: b.urunler.filter((x) => bySlug.has(x) && bySlug.get(x).st > 0), kaynak: `blog:${b.kaynak}` });
 
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};

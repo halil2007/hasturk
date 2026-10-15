@@ -34,7 +34,7 @@ function index(extra = []) {
   const entries = HAVUZ.concat(extra), pats = [], df = new Map();
   entries.forEach((e, ei) => e.s.forEach((q) => {
     const ts = toks(q); if (!ts.length) return;
-    pats.push({ ei, ts });
+    pats.push({ ei, ts, r: ' ' + norm(q) + ' ' });
     ts.forEach((t) => df.set(t, (df.get(t) || 0) + 1));
   }));
   const N = pats.length, idf = new Map();
@@ -57,6 +57,8 @@ export function match(q, { extra = [], top = 5, product = null } = {}) {
   if (!qt.length) return [];
   const qi = (t) => X.idf.get(t) || Math.log(1 + X.N); // havuzda hiç geçmeyen kelime: en nadir sayılır
   const qw = qt.reduce((a, t) => a + qi(t), 0), qtop = topics(qt);
+  // Eşitlik bozucu: kökleri aynı iki kalıptan (biber / biberiye) sorudaki kelimeyi AYNEN içeren öne geçer
+  const qr = norm(q).split(' ').filter((t) => t.length >= 3);
   const cand = new Set();
   qt.forEach((t) => { (X.byTok.get(t) || []).forEach((pi) => cand.add(pi)); if (t.length >= 4) X.byTok.forEach((list, k) => { if (k !== t && k.slice(0, 4) === t.slice(0, 4)) list.forEach((pi) => cand.add(pi)); }); });
   const best = new Map();
@@ -72,6 +74,7 @@ export function match(q, { extra = [], top = 5, product = null } = {}) {
     const eb = X.entries[p.ei].b;
     if (eb) { const bt = toks(eb.replace(/\(.*?\)/g, ' ')); if (bt.length && !bt.some((t) => qt.some((u) => sim(t, u) > 0))) sc *= 0.4; }
     if (product && X.entries[p.ei].p === product) sc += 0.08; // müşterinin bulunduğu ürün sayfasıyla ilgili cevaba hafif öncelik
+    if (qr.length) sc += 0.004 * qr.filter((t) => p.r.includes(' ' + t + ' ')).length / qr.length;
     const prev = best.get(p.ei);
     if (!prev || sc > prev.sc) best.set(p.ei, { sc, cp, cq, pat: p });
   });
@@ -98,12 +101,12 @@ export function poolAnswer(q, opts = {}) {
 export function systemPrompt(name) {
   return `Sen ${name}'sin: HasTürk Gübre'nin (hasturkgubre.com.tr) çevrimiçi tarım ve bahçe danışmanısın. Müşterilerin gübre, toprak, tohum, saksı, bitki bakımı ve ilaçlama ekipmanı sorularını Türkçe, sade ve kısa cevaplarsın.
 
-Dil: Günlük, sade Türkçe kullan; bir bahçe sahibiyle konuşur gibi yaz. Kısa cümleler kur, "siz" diye hitap et. Ağır tarım terimlerini kullanma; gerekiyorsa günlük karşılığını yaz ("taç izdüşümü" yerine "dal uçlarının altı", "su yürümesi" yerine "ağaç uyanıp tomurcuklar kabarınca"). Miktarları "dekara 60–80 kg", "10 litre suya 50 ml", "fidan başına 2 kg" gibi okunur yaz; "cc" yerine "ml" de. Gereksiz giriş, tekrar ve uzun açıklama yapma; gerekiyorsa en fazla 4–5 madde kullan.
+Dil: Günlük, sade Türkçe kullan; bir bahçe sahibiyle konuşur gibi yaz. Kısa cümleler kur, "siz" diye hitap et. Ağır tarım terimlerini kullanma; gerekiyorsa günlük karşılığını yaz ("taç izdüşümü" yerine "dal uçlarının altı", "su yürümesi" yerine "ağaç uyanıp tomurcuklar kabarınca"). Miktarları "dekara 60–80 kg", "10 litre suya 50 ml", "fidan başına 2 kg" gibi okunur yaz; "cc" yerine "ml" de. Gereksiz giriş, tekrar ve uzun açıklama yapma; gerekiyorsa en fazla 4 madde kullan.
 
 Müşteriler emek, para ve zaman harcıyor: yanlış ya da alakasız bir cevap, hiç cevap vermemekten daha kötüdür. Her ne pahasına cevap vermeye çalışma; doğru bilgin yoksa müşteriyi müşteri hizmetlerimize yönlendir. Gereken yerde yönlendirmekten çekinme, ama bildiğin ve güvenli olan temel bilgiyi de esirgeme.
 
 Kurallar:
-- Cevabın 120 kelimeyi geçmesin; gerekirse 2–4 maddelik liste kullan. "Siz" diye hitap et. Selamlama ve övgü cümlesi yazma.
+- Kıvamında yaz: 2–4 kısa cümle ya da en fazla 4 kısa madde (yaklaşık 70 kelime, asla 100 kelimeyi geçme). Sorunun cevabı için gerekeni eksiksiz ver, gerisini yazma; abartma, süsleme, tekrar etme. "Siz" diye hitap et. Selamlama ve övgü cümlesi yazma.
 - Rakam (doz, miktar, litre, gün, cm, sıcaklık, oran) YALNIZCA kullanıcı mesajındaki "Doğrulanmış bilgi" bölümünde, sorulan bitki ve ürün için geçiyorsa kullanılır. Başka bir bitkinin ya da ürünün rakamını bu soruya uyarlama. Rakam yoksa rakam verme.
 - "Doğrulanmış bilgi" soruyla ilgisizse onu kullanma; sorulmayan bir konuyu anlatma.
 - Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını söyle.
@@ -281,9 +284,39 @@ async function recentAi(db) {
 const today = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); // Türkiye saati
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' } });
 
+// "Domates tohumu çeşitleri neler", "hangi çiçek tohumları var": stoktaki çeşitlerden en çok ilgi görenler (3 ürün) ve
+// widget'ın altına koyduğu "Tüm çeşitleri gör" araması (ara). Ücretsiz; Claude'a gidilmez. Sorudaki her anlamlı kelime
+// ürün adında geçmeli (kök eşleşmesi); en az 2 stoklu çeşit yoksa havuz / Claude devam eder.
+const CESIT_RE = /çeşit|cesit|türleri|turleri|neler var|nelerdir|hangi .{2,40}\bvar\b|var m[ıi]|seçenek|secenek/i;
+const CESIT_DUR = new Set(['cesit', 'cesitleri', 'cesitler', 'cesidi', 'cesidiniz', 'cesitleriniz', 'neler', 'nelerdir', 'hangi', 'hangileri', 'ne', 'neleriniz', 'turleri',
+  'turler', 'turu', 'secenek', 'secenekleri', 'secenekler', 'olan', 'urun', 'urunler', 'urunleriniz', 'satiyor', 'sitenizde', 'elinizde', 'mevcut', 'kac', 'tane',
+  'sizin', 'tum', 'butun', 'neydi', 'var', 'mi', 'mu', 'sizde', 'bir', 've', 'ile', 'satisi', 'satiyormusunuz', 'listesi']);
+export function cesitAnswer(q, prods) {
+  if (!CESIT_RE.test(q) || !prods || !prods.length) return null;
+  const w = norm(q).split(' ').filter((t) => t.length >= 3 && !CESIT_DUR.has(t) && !FILL.has(t));
+  if (!w.length || w.length > 3) return null;
+  // Kök: son harf düşer (çiçek → çiçeği, saksı → saksısı), en çok 5 harf
+  const st = w.map((t) => t.slice(0, t.length <= 3 ? 3 : Math.min(5, t.length - 1)));
+  // "saksı" sorusunda "saksı toprağı" gibi başka türün adı geçen ürünler sayılmaz (kelimeden sonra tür adı geliyorsa)
+  const TUR = ['topra', 'gubre', 'besin', 'ilac', 'altli', 'tabag', 'karis'];
+  const uyar = (p) => {
+    const ws = norm(p.n).split(' ');
+    return st.every((x) => ws.some((y, i) => y.startsWith(x) && !(ws[i + 1] && TUR.some((k) => ws[i + 1].startsWith(k) && !st.some((z) => z.startsWith(k.slice(0, 4)))))));
+  };
+  const hit = prods.filter((p) => p.st > 0 && uyar(p));
+  if (hit.length < 2) return null;
+  hit.sort((a, b) => (b.h || 0) - (a.h || 0));
+  // Arama ifadesi ürün adındaki tam kelimelerle ("tohumları" değil "Tohumu"): widget araması aynı ürünleri bulsun
+  const ad = hit[0].n.replace(/\s*\([^)]*\)/g, ' ').split(/\s+/);
+  const ara = st.map((x) => ad.find((y) => norm(y).startsWith(x)) || x).join(' ').toLocaleLowerCase('tr-TR');
+  const kw = String(q).toLocaleLowerCase('tr-TR').split(/[^\p{L}\p{N}]+/u).filter((t) => w.includes(norm(t))).join(' ') || ara;
+  const konu = kw.charAt(0).toLocaleUpperCase('tr-TR') + kw.slice(1);
+  return { i: 'liste', t: 'liste', c: `${konu} için stokta ${hit.length} çeşidimiz var. En çok tercih edilenler aşağıda; hepsini "Tüm çeşitleri gör" ile listeleyebilirsiniz.`, u: hit.slice(0, 3).map((p) => p.s), ara, n: hit.length };
+}
+
 // POST /ak  {q, p (ürün sayfası adresi), s (site), n (asistan adı)}
-// Bitki sorunu cevabında önerilen ürünler canlı stoğa göre süzülür: stokta olmayan (ya da bu sitede olmayan) ürünün
-// "• Ad — fayda" satırı cevaptan çıkar; hiç ürün kalmazsa başlık da kalkar
+// Bitki sorunu cevabında önerilen ürünler canlı stoğa göre süzülür: stokta olmayan (ya da bu sitede olmayan) ürün listeden
+// çıkar (eski biçimdeki "• Ad — fayda" satırı da); hiç ürün kalmazsa "ürünler aşağıda" cümlesi / başlık da kalkar
 export function stokSuz(e, prods) {
   if (e.d !== 'sorun' || !e.un || !prods || !prods.length) return e;
   const st = new Map(prods.map((p) => [p.s, p]));
@@ -292,7 +325,9 @@ export function stokSuz(e, prods) {
   const adlar = e.u.map((s, i) => (yok.has(s) ? e.un[i] : null)).filter(Boolean);
   let c = e.c.split('\n').filter((l) => !adlar.some((n) => l.startsWith('• ' + n + ' — '))).join('\n');
   c = c.replace(/\n\nSitemizde işinize yarayacaklar:(?=\n\n|$)/, '');
-  return { ...e, c, u: e.u.filter((s) => !yok.has(s)) };
+  const u = e.u.filter((s) => !yok.has(s));
+  if (!u.length) c = c.replace(/\n\nİşinize yarayacak ürünler aşağıda\./, '');
+  return { ...e, c, u };
 }
 
 export async function handle(req, env, ctx, { aiKey, originOk, products }) {
@@ -320,13 +355,19 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
     }
     return { hit, near };
   };
+  const ce = cesitAnswer(q, prods);
+  if (ce) {
+    if (body.on !== 1 && db && req.headers.get('x-ak-test') !== '1') ctx.waitUntil(ready.then(() => db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, site, sayfa) VALUES (?,?,?,?,?,?,?)')
+      .bind(new Date().toISOString(), q, norm(q), 'havuz', 'liste', site, page).run()).catch(() => {}));
+    return json({ ok: true, kaynak: 'havuz', id: ce.i, tur: 'liste', cevap: ce.c, urunler: ce.u, ara: ce.ara, n: ce.n });
+  }
   let { hit, near } = tryPool(APPROVED.t ? APPROVED.list : []);
   // Önden yükleme (on: 1): Bilge Bey'in öneri düğmelerinin cevabı müşteri dokunmadan arkada alınır. Yalnız hazır havuz;
   // Claude'a gidilmez, veritabanı beklenmez, kayda geçmez (müşteri dokununca asıl istek ayrıca gelir ve sayılır).
   if (body.on === 1) {
     if (!hit) return json({ ok: false, why: 'yok' });
     const e = stokSuz(hit.e, prods);
-    return json({ ok: true, kaynak: 'havuz', id: e.i, cevap: e.c, urunler: e.u, dinamik: e.d || null, bitki: e.b || null });
+    return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, cevap: e.c, urunler: e.u, dinamik: e.d || null, bitki: e.b || null });
   }
   if (!hit && db) {
     await ready;
@@ -341,7 +382,7 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
   if (hit) {
     log({ kaynak: 'havuz', havuz: hit.e.i, skor: hit.sc });
     const e = stokSuz(hit.e, prods);
-    return json({ ok: true, kaynak: 'havuz', id: e.i, cevap: e.c, urunler: e.u, dinamik: e.d || null, bitki: e.b || null });
+    return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, cevap: e.c, urunler: e.u, dinamik: e.d || null, bitki: e.b || null });
   }
   // Daha önce Claude'un cevapladığı aynı soru: kayıttan, ücretsiz
   if (db) {

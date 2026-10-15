@@ -867,6 +867,7 @@
     '.sh-h button svg{width:16px;height:16px}',
     '.sh-l{font-size:13px;font-weight:700;color:var(--mu);margin:16px 0 8px}',
     /* Bilge Bey "Hepsini sepete ekle" penceresi */
+    '.akmore{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:8px 0 0;border-radius:20px;border:1px solid var(--ln);background:#fff;color:var(--pr);font-weight:700;font-size:14px;text-decoration:none}.akmore svg{width:16px;height:16px}',
     '.akall{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:8px 0 0;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}.akall svg{width:17px;height:17px}',
     '.bun .sh-h b{font-size:16px;color:var(--prd)}.bhint{font-size:12.5px;color:var(--mu);margin:4px 0 6px}',
     '.akbl{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--ln)}.akoff .im,.akoff .blt{opacity:.45}',
@@ -1133,6 +1134,7 @@
     else if (act === 'akq') akAsk(v);
     else if (act === 'akgrp') akGroup(v);
     else if (act === 'akall') akAll(v);
+    else if (act === 'akmore') { track('akbilge_tumu', v); setTab('home'); $q.value = v; shown = PAGE; render(); }
     else if (act === 'akmic') akMic();
     else if (act === 'bt' || act === 'bv') akBundleAct(act, v);
     else if (act === 'bgo') akBundleGo();
@@ -1276,7 +1278,7 @@
       if (!prods && DATA) {
         var list = akListe(d.urunler || []);
         if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, x.__yerine ? 'stokta olmayan ' + akKisa(x.__yerine) + ' yerine' : ''); }).join('') + '</div>' +
-          (list.length >= 2 && cartOn() ? '<button type="button" class="akall" data-act="akall" data-v="' + idx + '">' + I.cart + 'Hepsini sepete ekle</button>' : '');
+          (list.length >= 2 && cartOn() ? '<button type="button" class="akall" data-act="akall" data-v="' + idx + '">' + I.cart + 'Hepsini sepete ekle</button>' : '') + akMore(list, q, d);
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
       // Cevap müşteriyi bize yönlendiriyorsa ("müşteri hizmetleri", "WhatsApp'tan yazın") düğmeler hemen altında olsun
@@ -1297,6 +1299,38 @@
   // (seçeneklerin ortası, ör. 1–20 kg arasında 5 kg). İçindekiler zaten listede olan set ("…Set", "…Seti") işaretsiz gelir. Stokta olmayan boy seçilemez; istenmeyen ürünün işareti kaldırılır.
   // Cevaptaki ürünler: stoktakiler; stokta olmayan ürünün yerine aynı kategoriden, adı benzeyen (ortak kelimeli) ve çok
   // satan stoktaki ürün konur (aynı ürün iki kez gösterilmez)
+  // "Tüm çeşitleri gör": cevapta 2–4 ürün gösterilir; aynı türden çok çeşit varsa (ör. 12 domates tohumu) hepsini
+  // Ürün Bul'da listeleyen düğme. Gösterilen ürünlerin ortak adıyla (ör. "Domates Tohumu") arama yapılır; ortak ad yoksa
+  // (tohum, saksı, toprak cevaplarında ya da "hangi / çeşit / neler" sorularında) ortak kategorinin sayfasına bağlantı.
+  // En az gösterilenden 2 fazla çeşit yoksa çıkmaz.
+  var AK_KEL = /^(hasturk|hastürk|hg|özel|ozel|için|icin|ve|ile|adet|organik|doğal|dogal|profesyonel|premium|yerli|ata)$/i;
+  var AK_GENEL = /^(tohumu|tohum|toprağı|toprak|gübresi|gübre|besini|besin|saksı|saksısı|seti|set|ilacı|pompası)$/i;
+  function akMore(list, q, d) {
+    if (!DATA || !list.length) return '';
+    var tur = d.tur || '';
+    // Sunucu "çeşitler" sorusunu tanıdıysa (ara): o aramayla tüm çeşitler
+    if (d.ara) return d.n > list.length ? '<button type="button" class="akmore" data-act="akmore" data-v="' + esc(d.ara) + '">Tüm çeşitleri gör (' + d.n + ')' + I.right + '</button>' : '';
+    var liste = /çeşit|cesit|neler|\bvar( m[ıi])?\b|seçenek|secenek/i.test(q);
+    if (list.length < 2 && !liste) return '';
+    var ws = function (n) { return akKisa(n).split(/[\s,/()-]+/).filter(function (w) { return w.length >= 3 && !AK_KEL.test(w) && !/\d/.test(w); }); };
+    // Kök karşılaştırma (biber / biberi, çiçek / çiçeği): son harf düşer, en çok 5 harf
+    var kok = function (w) { w = fold(w); return w.slice(0, w.length <= 3 ? 3 : Math.min(5, w.length - 1)); };
+    var w0 = ws(list[0].n), ortak = w0.filter(function (w) { return list.every(function (x) { return ws(x.n).map(kok).indexOf(kok(w)) !== -1; }); });
+    if (ortak.length && ortak.length <= 3 && !ortak.every(function (w) { return AK_GENEL.test(w); })) {
+      var qq = ortak.join(' '), n = search(qq).items.filter(function (r) { return r.p.st; }).length;
+      if (n >= list.length + 2) return '<button type="button" class="akmore" data-act="akmore" data-v="' + esc(qq) + '">Tüm ' + esc(qq.toLocaleLowerCase('tr-TR')) + ' çeşitleri (' + n + ')' + I.right + '</button>';
+    }
+    if (!liste && !/^(tohum|saksi|pompa)/.test(tur)) return '';
+    // Ortak kategori (üst kategoriler dahil); en dar olanı
+    var ata = function (x) { var o = {}; (x.c || []).forEach(function (id) { for (var k = 0; id && k < 6; k++) { o[id] = 1; id = (CATS_BY_ID[id] || {}).p; } }); return o; };
+    var sets = list.map(ata), best = null;
+    for (var id in sets[0]) {
+      var c = CATS_BY_ID[id];
+      if (!c || !c.k || c.k < list.length + 2 || !sets.every(function (o) { return o[id]; })) continue;
+      if (!best || c.k < best.k) best = c;
+    }
+    return best ? '<a class="akmore" href="' + esc(dmHref(best.s)) + '" data-n="' + esc(best.n) + '">Tüm ' + esc(best.n) + ' (' + best.k + ')' + I.right + '</a>' : '';
+  }
   function akListe(slugs) {
     var out = [], used = {};
     slugs.forEach(function (s) { if (BY_SLUG[s]) used[s] = 1; });
