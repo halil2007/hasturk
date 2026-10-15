@@ -131,10 +131,10 @@ const kel = (s) => lc(s).replace(/[^\p{L}\p{N} ]/gu, ' ').split(/\s+/).filter((x
 const adAt = (s, ad) => {
   const A = new Set(kel(ad)); s = String(s || '').trim();
   for (let k = 0; k < 5; k++) {
-    const m = s.match(/^(.{3,120}?)(?:\s[–—-]\s|,\s|\s,\s?)/); if (!m) break;
+    const m = s.match(/^(.{3,120}?)(?:\s[–—|-]\s|,\s|\s,\s?|:\s)/); if (!m) break;
     const w = kel(m[1]); if (!w.length || w.length > 14) break;
     const ad1 = w.filter((x) => A.has(x)).length / w.length, buyuk = /\p{L}/u.test(m[1]) && m[1] === m[1].toLocaleUpperCase('tr-TR');
-    if (ad1 < 0.6 && !buyuk) break;
+    if (ad1 < 0.5 && !buyuk) break;
     s = s.slice(m[0].length).trim();
   }
   return s;
