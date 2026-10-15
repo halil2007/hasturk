@@ -26,6 +26,8 @@ const TERIM = [
   [/yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına/gi, 'Yetişkin ağaçta; dal uçlarının altına 15 cm genişlik ve derinlikte bir çember açıp toprağa karıştırın'],
   [/([\d.,]+)\s*cc\s*-\s*([\d.,]+)\s*(L|lt)\/dekar/g, 'dekara $1 ml – $2 litre'],
   [/viyolü bandırma/gi, 'viyolünü suya batırma'],
+  [/vejetatif kök gelişim döneminde/gi, 'bitki büyümeye başladığında'], [/kardeşlenme döneminde/gi, 'yan sürgünler çıkarken (kardeşlenme)'],
+  [/sapa kalkma döneminde/gi, 'saplar uzarken'], [/tohuma kalkma/gi, 'tohum bağlama'],
   [/(ağaca )?su yürümesi başladıktan (\d+ gün )?sonra/gi, (m, a, g) => (g ? `ağaç uyanıp tomurcuklar kabardıktan ${g}sonra` : 'ağaç uyanıp tomurcuklar kabarınca')],
   [/su yürümesinden (\d+ gün) sonra/gi, 'ağaç uyanıp tomurcuklar kabardıktan $1 sonra'],
   [/su yürümesi/gi, 'ağacın uyanması (tomurcukların kabarması)'],
@@ -154,15 +156,16 @@ for (const [slug, c] of Object.entries(kb)) {
 // D) Bitki → toprak (config.json > soilMatch; Ürün Bul'daki eşleştirme). Ürün canlı stoktan seçilir (dinamik)
 const PH = { 1: 'asidik', 2: 'hafif asidik', 3: 'nötr', 4: 'kireçli' };
 const desc = (pr) => { const a = [+pr[0], +pr[1], +pr[2], +pr[3], +pr[4], pr[5]];
-  return [a[1] !== a[0] ? `${PH[a[0]]}–${PH[a[1]]}` : PH[a[0]], { 2: 'suyu iyi süzen', 3: 'suyu çok iyi süzen' }[a[2]], { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[a[3]],
-    { 1: 'besini az', 3: 'besince zengin' }[a[4]], { k: 'kumlu', h: 'havadar' }[a[5]]].filter(Boolean).join(', '); };
+  const ph = a[1] <= 2 ? 'kireçsiz (asidik)' : a[0] >= 4 ? 'kireçli' : '';
+  return [ph, { 2: 'suyu iyi süzen', 3: 'suyu çok iyi süzen' }[a[2]], { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[a[3]],
+    { 1: 'az besinli', 3: 'besince zengin' }[a[4]], { k: 'kumlu', h: 'havadar' }[a[5]]].filter(Boolean).join(', '); };
 for (const pl of (config.soilMatch || {}).plants || []) {
   const [ad, diger, grup, prof, ozel, strict] = pl;
   if (!/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(prof || '')) continue;
   const adlar = [ad, ...String(diger || '').split(',').map((x) => x.trim()).filter(Boolean)];
   add({ tur: 'bitki-toprak', bitki: ad, grup, dinamik: 'toprak',
     sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`, `${lc(n)} için en iyi toprak`, `${lc(n)} için uygun toprak`, `${lc(n)} toprak önerisi`, `${lc(n)} saksı değişimi toprak`]),
-    cevap: `${ad} ${desc(prof)} bir toprak sever.${strict === 's' ? ' Çok özel bir ortam ister; uygun hazır toprak yoksa başka toprak önermeyiz.' : ''} Size uygun toprağımız aşağıda.`,
+    cevap: `${ad} için ${desc(prof)} bir toprak uygundur.${strict === 's' ? ' Özel bir toprak ister; bu yüzden yalnız ona uygun toprağımızı öneriyoruz.' : ''} Size uygun toprağımız aşağıda.`,
     urunler: ozel ? [ozel] : [], kaynak: 'config:soilMatch' });
 }
 
@@ -245,7 +248,7 @@ for (const t of sx.tablo) {
   const d = t.cap, sonra = `${virg(d + 2.5)}–${d + 5} cm`;
   add({ tur: 'saksi-hesap', cap: d,
     sorular: [`${d} cm saksı kaç litre`, `${d} cm saksıya ne kadar toprak gider`, `${d}'lik saksı kaç litre`, `${d} numara saksı kaç litre`, `${d} numara saksıya ne kadar toprak`, `${d} cm saksıdan sonra kaç cm saksı`],
-    cevap: `Çapı ${d} cm, yüksekliği çapına yakın standart bir saksı yaklaşık ${virg(t.litre)} litredir. İçine yaklaşık ${virg(t.toprak.litre)} litre toprak gider (üstte 2–3 cm sulama payı kalır)${t.toprak.paket ? '; ' + (/^en küçük/.test(t.toprak.paket) ? t.toprak.paket : t.toprak.paket + ' paket yeter') : ''}.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı ${sonra} olmalı.`,
+    cevap: `Çapı ${d} cm, yüksekliği çapına yakın standart bir saksı yaklaşık ${virg(t.litre)} litredir. İçine yaklaşık ${virg(t.toprak.litre)} litre toprak gider (üstte 2–3 cm sulama payı kalır)${t.toprak.paket ? '; ' + (/^en küçük/.test(t.toprak.paket) ? t.toprak.paket : t.toprak.paket.replace(/(\d+)\s*L\b/, '$1 litrelik') + ' paket yeterli olur') : ''}.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı ${sonra} olmalı.`,
     urunler: [], kaynak: 'saksi:hesap' });
 }
 for (const p of sx.saksilar) {
@@ -301,12 +304,16 @@ for (let m = 1; m <= 12; m++) {
   }
   if (!tohumL.length && !dikimL.length) continue;
   const ay = AY[m - 1], hal = ayHal(m);
-  let cevap = `${AYB(m)} ayında:`;
+  let cevap = `${AYB(m)} ayında ekebilecekleriniz:`;
   if (tohumL.length) cevap += `\n\nTohum ekimi:\n${tohumL.map((x) => '• ' + x).join('\n')}`;
   if (dikimL.length) cevap += `\n\nFide dikimi:\n${dikimL.map((x) => '• ' + x).join('\n')}`;
   cevap += `\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir.${m >= 3 && m <= 6 ? ' Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir.' : ''} Bir sebzenin ayrıntısını sorabilirsiniz (ör. "${(tohumL[0] || dikimL[0]).replace(/\s*\(.*\)/, '').toLocaleLowerCase('tr-TR')} nasıl ekilir").`;
+  // O ayın hazır tohum seti sitede varsa (ör. "Ekim Ayı Sebze Tohumu Seti") öneri olarak eklenir
+  const AYS = { ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', ç: 'c' };
+  const set = prods.items.find((p) => p.st > 0 && p.s.startsWith(ay.replace(/[ğıöşüç]/g, (x) => AYS[x]) + '-ayi-sebze-tohumu-seti'));
+  if (set) { cevap += `\n\nKışlık sebze tohumlarını tek pakette isterseniz: ${set.n.trim()}.`; slugs.add(set.s); }
   add({ tur: 'tohum-ay', ay: m, sorular: [`${ay} ayında ne ekilir`, `${hal} ne ekilir`, `${ay} ayında hangi sebzeler ekilir`, `${hal} hangi tohumlar ekilir`, `${hal} hangi sebzeler ekilir`, `${ay} ayında ne dikilir`, `${hal} hangi fideler dikilir`, `${ay} ayı ekim takvimi`, `${ay} ayında hangi sebze ekilir`, `${hal} ne ekebilirim`, `${hal} hangi tohumları ekebilirim`, `${ay} ayında ekilecek sebzeler`, `${ay} ayında ekilen sebzeler`, `${ay} ayında bahçeye ne ekilir`, `${ay} ayında saksıya ne ekilir`],
-    cevap, urunler: [...slugs].sort((x, y) => sira(x) - sira(y)).slice(0, 4), dinamik: 'stok', kaynak: `tohum:ay:${m}` });
+    cevap, urunler: [...slugs].sort((x, y) => (/-ayi-sebze-tohumu-seti/.test(y) - /-ayi-sebze-tohumu-seti/.test(x)) || sira(x) - sira(y)).slice(0, 4), dinamik: 'stok', kaynak: `tohum:ay:${m}` });
 }
 
 for (const [konu, sorular] of Object.entries({
@@ -357,6 +364,44 @@ for (const s of sr.sorunlar) {
     urunler: ur.map((u) => u.slug), urunAdlari: ur.map((u) => u.ad), dinamik: 'sorun', kaynak: `sorun:${s.key}` });
 }
 
+// G3) Genel gübre soruları (herkesin bahçesine/saksısına uyan): ev ölçeğinde, doğrulanmış miktarlarla.
+// Kaynak: config.json > guides ve bilgi/urunler.json kullanım satırları; dekar başına miktar metrekareye çevrildi
+// (1 dekar = 1.000 m²: 60 kg/dekar = 60 g/m²). Uygun set varsa önerilir (çapraz satış).
+const varsa = (slug, metin) => (bySlug.has(slug) && bySlug.get(slug).st > 0 ? metin : '');
+const GENEL_GUBRE = [
+  { konu: 'saksi-cicek', sorular: ['saksı çiçeklerine hangi gübre', 'saksı çiçekleri için gübre', 'saksı bitkilerine hangi gübre', 'saksı bitkisi gübresi', 'çiçeklere hangi gübre verilir', 'çiçek gübresi', 'salon bitkilerine hangi gübre', 'ev bitkilerine hangi gübre', 'ev çiçeklerine gübre', 'bitkime hangi gübre', 'bitkime hangi gübreyi vermeliyim', 'çiçeğime ne gübre vereyim', 'saksıya gübre nasıl verilir', 'saksıdaki çiçeklere gübre'],
+    cevap: [
+      'Saksı çiçekleriniz için iki ürünü birlikte kullanmanızı öneririz:',
+      'HasTürk Solucan Gübresi — toprağı uzun süre besler, kök gelişimini destekler.\n• Saksı başına 100–125 g, toprağa karıştırarak.\n• Saksı toprağını kendiniz hazırlıyorsanız: toprağın %40–50\'si kadar.',
+      'HasTürk Sıvı Solucan Gübresi — bitki besini hızlı alır.\n• Sulama suyuna: 10 litre suya 50–100 ml.\n• Yapraklara püskürterek: 1 litre suya 10–20 ml.',
+      varsa('florist-cicekli-bitkiler-sivi-konsantre-bitki-besini', 'Çiçekli bitkileriniz için Florist Çiçekli Bitkiler Besini de var (ürün bilgisine göre 1 şase + 1 litre su).'),
+      varsa('cicek-topragi-bakim-seti', 'Saksı değiştirecekseniz Çiçek Toprağı Bakım Seti\'nde çiçek toprağı, sıvı solucan gübresi ve çiçek besini bir arada.'),
+    ], urunler: ['hasturk-kati-solucan-gubresi', 'hasturk-sivi-solucan-gubresi', 'cicek-topragi-bakim-seti', 'florist-cicekli-bitkiler-sivi-konsantre-bitki-besini'] },
+  { konu: 'sebze-bahce', sorular: ['sebze bahçesine hangi gübre', 'sebze bahçesi için gübre', 'sebzelere hangi gübre verilir', 'sebze gübresi', 'bahçeye hangi gübre atılır', 'bahçe gübresi', 'bahçem için gübre', 'domates biber için gübre', 'bostana hangi gübre', 'bostan gübresi', 'sebze ekmeden önce gübre', 'toprağa ekim öncesi gübre'],
+    cevap: [
+      'Sebze bahçeniz için önerimiz:',
+      'HasTürk Solucan Gübresi — ekimden ya da dikimden önce toprağa.\n• Domates, biber, patlıcan gibi sebzelerde: metrekareye 60–80 g (dekara 60–80 kg), toprağa serpip karıştırarak.\n• Marul, ıspanak gibi yaprağı yenen sebzelerde: metrekareye 50–60 g.\n• Fide yetiştirdiğiniz yatağa: metrekareye 5 kg, toprağa karıştırarak.',
+      'HasTürk Sıvı Solucan Gübresi — büyüme döneminde.\n• Sulama suyuna: 10 litre suya 50–100 ml.\n• Yapraklara püskürterek: 1 litre suya 10–20 ml.',
+      varsa('hasturk-mukemmel-uclu-set', 'Solucan gübresi, sıvı solucan gübresi ve Hümix\'i birlikte almak isterseniz HasTürk Mükemmel Üçlü Set avantajlı bir seçenek.'),
+    ], urunler: ['hasturk-kati-solucan-gubresi', 'hasturk-sivi-solucan-gubresi', 'hasturk-mukemmel-uclu-set'] },
+  { konu: 'fide', sorular: ['fidelere hangi gübre', 'fideye hangi gübre verilir', 'fide gübresi', 'fide için gübre', 'fideler için besin', 'fide dikerken gübre', 'fide toprağına gübre', 'fideyi nasıl beslerim', 'fide yetiştirirken gübre'],
+    cevap: [
+      'Fideleriniz için önerimiz:',
+      '• Fide toprağını hazırlarken: toprağın %40–50\'si kadar HasTürk Solucan Gübresi karıştırın.\n• Fideleri dikmeden önce: köklerini sıvı solucan gübreli suya batırın (10 litre suya 100 ml).\n• Fideler büyürken: HasTürk Sıvı Solucan Gübresi, sulama suyuna 10 litre suya 50–100 ml.',
+      varsa('fide-sasirtma-topragi', 'Hazır toprak isterseniz Profesyonel Fide Şaşırtma Toprağı fideler için hazırlanmıştır.'),
+    ], urunler: ['hasturk-sivi-solucan-gubresi', 'hasturk-kati-solucan-gubresi', 'fide-sasirtma-topragi'] },
+  { konu: 'meyve-agaci', sorular: ['meyve ağaçlarına hangi gübre', 'meyve ağacı için gübre', 'meyve ağacı gübresi', 'ağaçlara hangi gübre verilir', 'ağaç gübresi', 'fidana hangi gübre', 'fidan gübresi', 'fidan dikerken gübre', 'meyve ağaçlarını ne zaman gübrelemeli', 'bahçedeki ağaçlara gübre'],
+    cevap: [
+      'Meyve ağaçlarınız için önerimiz:',
+      'HasTürk Solucan Gübresi\n• Yeni fidan dikerken: fidan çukuruna 1,5–2 kg, köke değecek şekilde.\n• Yetişkin ağaçta: ağacın gölge çapı kaç metreyse o kadar kg (ör. 3 metre → 3 kg). Dal uçlarının altına açtığınız çembere toprakla karıştırın.',
+      'HasTürk Sıvı Solucan Gübresi\n• Çiçeklenme ve meyveler oluşurken yapraklara püskürterek: 1 litre suya 10–20 ml.',
+      'HasTürk Hümix Sıvı Hümik Asit\n• Ağaç uyanıp tomurcuklar kabarınca: 10 litre suya 100 ml, dal uçlarının altındaki toprağa.',
+      varsa('hasturk-mukemmel-uclu-set', 'Üçünü birlikte almak isterseniz HasTürk Mükemmel Üçlü Set avantajlı bir seçenek.'),
+    ], urunler: ['hasturk-kati-solucan-gubresi', 'hasturk-sivi-solucan-gubresi', 'hasturk-humix-sivi-humik-asit', 'hasturk-mukemmel-uclu-set'] },
+];
+for (const g of GENEL_GUBRE) add({ tur: 'gubre-genel', konu: g.konu, sorular: g.sorular, cevap: g.cevap.filter(Boolean).join('\n\n') + '\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.',
+  urunler: g.urunler.filter((x) => bySlug.has(x) && bySlug.get(x).st > 0), kaynak: `rehber:genel:${g.konu}` });
+
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
@@ -381,4 +426,4 @@ await writeFile('src/akbilge-havuz.json', JSON.stringify(out.filter((e) => e.dur
   return o;
 })));
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel+${c('tohum-ay')} ay, pompa ${c('pompa')}+${c('pompa-genel')} genel, bitki sorunu ${c('sorun')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel+${c('tohum-ay')} ay, pompa ${c('pompa')}+${c('pompa-genel')} genel, genel gübre ${c('gubre-genel')}, bitki sorunu ${c('sorun')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);

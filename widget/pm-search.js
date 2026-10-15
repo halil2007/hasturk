@@ -698,13 +698,6 @@
     '.akopts{display:none;flex-wrap:wrap;gap:6px;margin:8px 0 0}.akopts.on{display:flex}',
     '.akopts button{font-size:13px;font-weight:600;color:var(--pr);background:#fff;border:1.5px solid var(--lt);border-radius:16px;padding:7px 12px;text-align:left}',
     '.akopts button:hover{border-color:var(--pr)}',
-    '.aksell{margin:14px 0 0}.aksell>b{display:block;font-size:12.5px;font-weight:700;color:var(--mu);margin:0 0 6px}',
-    '.aksell .row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:0 0 2px}.aksell .row::-webkit-scrollbar{display:none}',
-    '.aksell .row button{flex:0 0 128px;text-align:left;padding:8px;border-radius:14px;background:#fff;border:1.5px solid var(--lt);display:flex;flex-direction:column;gap:4px}',
-    '.aksell .row button:hover{border-color:var(--pr)}',
-    '.aksell .im{width:100%;height:84px;border-radius:10px;overflow:hidden;background:var(--bg);display:grid;place-items:center}.aksell .im img{width:100%;height:100%;object-fit:contain}',
-    '.aksell .n{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px}',
-    '.aksell em{font-style:normal;font-size:12px;font-weight:700;color:var(--pr)}',
     '.akkargo{display:inline-flex;align-items:center;gap:6px;margin:12px 0 0;font-size:13px;font-weight:600;color:var(--pr);padding:6px 2px}.akkargo svg{width:16px;height:16px}',
     '.akpw{margin:8px 0 0 52px}.akpw .soil{margin:0}.akp{display:grid;gap:6px}@media(min-width:760px){.akp{grid-template-columns:1fr 1fr}}',
     '.akc{margin:8px 0 0 52px}.akc p{font-size:13px;color:var(--mu);margin-bottom:6px}.akc-l{display:flex;gap:8px;flex-wrap:wrap}',
@@ -888,6 +881,9 @@
     '.sxs.on{display:block;animation:sxsin .25s ease-out}@keyframes sxsin{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}',
     '.sxs-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}.sxs-h b{flex:1;font-size:14px}.sxs-h button{border:0;background:none;padding:4px;cursor:pointer;color:var(--mut,#667)}.sxs-h svg{width:18px;height:18px}',
     '.sxs-i{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--ln)}.sxs-i:first-of-type{border-top:0}.sxs-i .tx{flex:1;min-width:0}.sxs-i .tx a{display:block;color:inherit;text-decoration:none;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.sxs-i .tx b{font-size:13px;color:var(--prd,var(--ac))}',
+    '.sxs-i .im{width:52px;height:52px;border-radius:10px;background:#fff;border:1px solid var(--ln)}.sxs-i .im img{width:100%;height:100%;object-fit:contain;padding:3px}.sxs-i .im>svg{width:20px;height:20px}',
+    '.sxs-i .tx a{font-size:13.5px}.sxs-i .xsn{display:block;font-size:11.5px;color:var(--ok);margin-top:1px}',
+    '@media(max-width:759px){.sxs{bottom:calc(78px + env(safe-area-inset-bottom,0px));padding:10px 12px 12px}}',
     '.sxs-i .add{flex:none;display:inline-flex;align-items:center;gap:4px;padding:8px 12px;border-radius:12px;border:0;background:var(--pr);color:#fff;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none}.sxs-i .add svg{width:14px;height:14px}',
     '.ptoast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.3)}',
     '.ptoast span{min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}',
@@ -1297,7 +1293,7 @@
     for (var i = 0; i < 2; i++) k = k.replace(AK_MARKA, '');
     return k.replace(/\s+ata\s+tohumu/i, ' tohumu');
   }
-  // Açılış ekranı: 4 konu kartı (dokununca o konunun soruları açılır), çok satan ürünler şeridi, kargo sorusu.
+  // Açılış ekranı: 4 konu kartı (dokununca o konunun soruları açılır) ve kargo sorusu.
   // Buradaki her soru hazır cevap havuzundan gelir (anında, ücretsiz). config.json > akbilge.groups ile konular değişir:
   // [{ "title": "…", "sub": "…", "icon": "leaf", "q": ["…", "…"] }]
   function akGroups() {
@@ -1312,7 +1308,7 @@
     });
     return [
       { title: 'Bitkimde sorun var', sub: 'Sararma, solma, zararlılar', icon: 'leaf', q: ['Yapraklar neden sararır?', 'Saksıda küçük sinekler var', 'Çiçeğim neden açmıyor?', 'Yaprak biti nasıl geçer?'] },
-      { title: 'Hangi gübre?', sub: 'Bitkinize göre miktar', icon: 'drop', q: ['Zeytin için hangi gübre?', 'Limon için hangi gübre?', 'Domates için hangi gübre?', 'Fındık için hangi gübre?'] },
+      { title: 'Hangi gübre?', sub: 'Saksı, bahçe, fide, ağaç', icon: 'drop', q: ['Saksı çiçeklerine hangi gübre?', 'Sebze bahçesine hangi gübre?', 'Fidelere hangi gübre?', 'Meyve ağaçlarına hangi gübre?'] },
       { title: 'Toprak ve saksı', sub: 'Hangi toprak, kaç litre', icon: 'sprout', q: ['Monstera için hangi toprak?', 'Kaktüs için hangi toprak?', '20 cm saksı kaç litre?', 'Saksı ne zaman değiştirilir?'] },
       { title: 'Ne ekebilirim?', sub: 'Bu ayın ekim takvimi', icon: 'clock', q: [ay + ' ayında ne ekilir?'].concat(seeds, ['Tohum kaç cm derine ekilir?', 'Hangi sebzeler fide ile yetiştirilir?']).slice(0, 4) }
     ];
@@ -1330,14 +1326,6 @@
       return '<button type="button" data-act="akgrp" data-v="' + i + '"' + (AK.grp === i ? ' class="on" aria-expanded="true"' : ' aria-expanded="false"') + '><i>' + (I[g.icon] || I.leaf) + '</i><span><b>' + esc(g.title) + '</b><small>' + esc(g.sub || '') + '</small></span></button>';
     }).join('') + '</div>';
     h += '<div class="akopts' + (G[AK.grp] ? ' on' : '') + '">' + (G[AK.grp] ? G[AK.grp].q.map(akChip).join('') : '') + '</div>';
-    // Çok satanlar (bahçe ürünleri; mama, kum vb. hariç): dokununca "nasıl kullanılır?" sorulur
-    if (DATA) {
-      var tr = DATA.trend || {}, list = [];
-      (tr.best || []).forEach(function (s) { var x = BY_SLUG[s]; if (x && x.st && list.length < 4 && !/mama|kedi|köpek|kumu|ödül/i.test(x.n) && list.indexOf(x) === -1) list.push(x); });
-      if (list.length >= 2) h += '<div class="aksell"><b>Çok satanlar hakkında sorun</b><div class="row">' + list.map(function (x) {
-        return '<button type="button" data-act="akq" data-v="' + esc(akKisa(x.n) + ' nasıl kullanılır?') + '">' + thumb(x.img, 180) + '<span class="n">' + esc(akKisa(x.n)) + '</span><em>Nasıl kullanılır?</em></button>';
-      }).join('') + '</div></div>';
-    }
     if (c.kargo) h += '<button type="button" class="akkargo" data-act="akq" data-v="Siparişim ne zaman gelir?">' + I.truck + 'Siparişim ne zaman gelir?</button>';
     return h;
   }
@@ -2019,17 +2007,23 @@
   // Müşteri ürünü sitenin kendi "Sepete ekle" butonuyla eklediğinde (panel kapalı): "Bunu alanlar bunları da aldı"
   // kartı. Öneriler gerçek siparişlerden (p.x), yoksa config.json > crossSell kurallarından; sadece stoktakiler.
   // Ürün Bul'dan eklemede bu kart çıkmaz (orada panel içi öneri var). Kapatmak: config.json > "siteCross": false
+  // Müşteriyi rahatsız etmesin diye bir ziyarette (sekme açık kaldıkça) yalnız bir kez, en fazla 2 ürünle çıkar ve
+  // 8 sn sonra kendiliğinden kapanır; "siteCross": "her" her eklemede gösterir.
   var OWN_ADD_T = 0, SXS_T = 0;
+  function sxsSeen() { try { return sessionStorage.getItem('ua-sxs') === '1'; } catch (e) { return !!sxsSeen.v; } }
   function siteCross(vid) {
     if (CFG.siteCross === false || isOpen || ADDING || Date.now() - OWN_ADD_T < 10000 || !root) return;
+    if (CFG.siteCross !== 'her' && sxsSeen()) return;
     load('low').then(function () {
       var p = BY_VAR[vid];
       if (!p || isOpen || ADDING) return;
       ADDED[p.id] = 1;
       var list = crossFor(p);
       if (!list.length) return;
+      if (list.length > 2) { var fd = list.fromData; list = list.slice(0, 2); list.fromData = fd; }
       var el = root.querySelector('.sxs');
-      if (!el) return;
+      if (!el || (CFG.siteCross !== 'her' && sxsSeen())) return;
+      try { sessionStorage.setItem('ua-sxs', '1'); } catch (e) { sxsSeen.v = 1; }
       el.innerHTML = '<div class="sxs-h">' + I.check + '<b>' + (list.fromData ? 'Bunu alanlar bunları da aldı' : 'Yanına iyi gider') + '</b>' +
         '<button type="button" data-act="sxsx" aria-label="Kapat">' + I.x + '</button></div>' + list.map(function (x) {
           var multi = (x.v || []).filter(function (v) { return v.id; }).length > 1, href = esc(url(x.s));
@@ -2042,7 +2036,7 @@
       list.forEach(function (x) { ev('xs', x.s); });
       track('site_cross_show', p.n);
       var arm = function (ms) { clearTimeout(SXS_T); SXS_T = setTimeout(hideSiteCross, ms); };
-      arm(15000);
+      arm(8000);
       el.onpointerenter = function () { clearTimeout(SXS_T); };
       el.onpointerleave = function () { arm(6000); };
     }, function () {});
