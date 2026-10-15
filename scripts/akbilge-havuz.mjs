@@ -28,7 +28,7 @@ for (const g of config.guides || []) {
       const b = bitki.replace(/\s*\(.*\)\s*/g, '').trim();
       add({
         tur: 'bitki-doz', bitki, grup: gr.name, urun: g.product,
-        sorular: [`${b} için ${k} ne kadar kullanılır`, `${yon(bitki)} ${k} nasıl verilir`, `${b} ${k} dozu`, `${yon(bitki)} ne kadar ${k} atılır`],
+        sorular: [`${b} için ${k} ne kadar kullanılır`, `${yon(bitki)} ${k} nasıl verilir`, `${b} ${k} dozu`, `${yon(bitki)} ne kadar ${k} atılır`, `${lc(b)} için gübre`, `${lc(b)} için besin`],
         cevap: `${ad} — ${bitki} (${gr.name}) için önerilen uygulama:\n${satirlar}\n\n${g.note || ''}`.trim(),
         urunler: [g.product], kaynak: `rehber:${g.id}`,
       });
@@ -57,6 +57,10 @@ for (const [slug, c] of Object.entries(kb)) {
     cevap, urunler: [slug, ...(c.birlikte || []).slice(0, 2)], kaynak: `kart:${slug}`,
   });
 }
+// C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
+const pr = config.promo || {};
+if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
+  cevap: `${pr.title || 'İndirim'}: ${pr.code} kodunu ödeme adımında kullanabilirsiniz${pr.note ? ' (' + pr.note + ')' : ''}.${pr.shipping ? ' ' + pr.shipping + '.' : ''}`, urunler: [], kaynak: 'config:promo' });
 await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
