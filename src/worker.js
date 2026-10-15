@@ -7,6 +7,7 @@
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
 
+import { rapor as bbRapor, veri as bbVeri, karar as bbKarar, sayfa as bbSayfa } from './inceleme.js';
 import { handle as akHandle, populer as akPopuler, vote as akVote, sayac as akSayac, konum as akKonum, initDb as akInitDb } from './akbilge.js';
 
 const KINDS = {
@@ -204,6 +205,10 @@ export default {
     if (pathname === '/e' && req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' } });
     }
+    if (pathname === '/ak/rapor') return bbRapor(env, new URL(req.url)).catch(() => new Response('{"ok":false}', { status: 500 }));
+    if (pathname === '/ak/inceleme' && req.method === 'GET') return bbSayfa(env);
+    if (pathname === '/ak/inceleme/veri' && req.method === 'POST') return bbVeri(req, env).catch(() => new Response('{"ok":false}', { status: 500 }));
+    if (pathname === '/ak/inceleme/karar' && req.method === 'POST') return bbKarar(req, env).catch(() => new Response('{"ok":false}', { status: 500 }));
     if (pathname === '/ak/konum') return akKonum(req, env).catch(() => new Response('{"ok":false}', { status: 500 }));
     if (pathname === '/ak/sayac') return akSayac(env).catch(() => new Response('{"ok":false}', { status: 500 }));
     if (pathname === '/ak/populer') return akPopuler(env).catch(() => new Response('{"ok":false,"sorular":[]}', { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }));
