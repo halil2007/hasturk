@@ -1,6 +1,6 @@
 // Ak Bilge soru havuzu üretici: doğrulanmış kaynaklardan (config.json > guides kullanım tabloları ve bilgi/urunler.json
 // kartları) hazır soru-cevaplar üretir. Cevaplardaki rakamlar tablodan birebir alınır; yapay zeka rakam üretmez.
-// Çelişkili / eksik dozlar cevaba konmaz, müşteri ustaya yönlendirilir. Çıktı: bilgi/soru-havuzu.json
+// Çelişkili / eksik dozlar cevaba konmaz, müşteri hizmetlerine yönlendirilir. Çıktı: bilgi/soru-havuzu.json
 import { readFile, writeFile } from 'node:fs/promises';
 
 const config = JSON.parse(await readFile('config.json', 'utf8'));
@@ -18,7 +18,7 @@ const tohumMetin = (t) => [
   t.cimlenme && `Çimlenme: ${t.cimlenme}.`,
   t.sicaklik, t.hasat && `Hasat: ${t.hasat}.`,
 ].filter(Boolean).map((x) => '• ' + x).join('\n');
-const USTA = 'Bu konuda kesin bilgi için ustamız size yardımcı olsun.';
+const USTA = 'Kesin bilgi için müşteri hizmetlerimizden destek alabilirsiniz.';
 const out = [];
 // durum: hazir = doğrulanmış tablolardan/ürün bilgisinden üretildi, canlıda kullanılır. Claude'un yeni cevapları
 // sunucuda 'onay-bekliyor' olarak tutulur ve onaylanınca havuza katılır.
@@ -259,8 +259,8 @@ const pmSatir = (p) => [
 for (const p of pm.pompalar) {
   const n = lc(p.ad).replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
   let cevap = `${p.ad}\n\n${pmSatir(p)}`;
-  if (p.tip === 'akulu' && !p.calisma && !p.calismaDepo) cevap += '\n\nTek şarjla çalışma süresi ürün bilgisinde belirtilmemiş; ustamız bilgi verebilir.';
-  if (p.bos) cevap += '\n\nDiğer teknik bilgiler için ustamız size yardımcı olsun.';
+  if (p.tip === 'akulu' && !p.calisma && !p.calismaDepo) cevap += '\n\nTek şarjla çalışma süresi ürün bilgisinde belirtilmemiş; müşteri hizmetlerimizden bilgi alabilirsiniz.';
+  if (p.bos) cevap += '\n\nDiğer teknik bilgiler için müşteri hizmetlerimizden destek alabilirsiniz.';
   add({ tur: 'pompa', urun: p.slug, sorular: [`${n} akülü mü`, `${n} şarjlı mı`, `${n} manuel mi`, `${n} şarjı ne kadar gider`, `${n} kaç saat şarj olur`, `${n} kaç litre`, `${n} garantisi var mı`, `${n} özellikleri`],
     cevap, urunler: [p.slug, ...((bySlug.get(p.slug) || {}).x || []).slice(0, 2)], kaynak: `pompa:${p.slug}` });
 }
@@ -284,7 +284,7 @@ if (AKC.kargo) {
   const ship = pr.shipping ? ` ${pr.shipping}.` : '';
   add({ tur: 'magaza', konu: 'kargo', sorular: ['siparişler ne zaman kargoya verilir', 'sipariş ne zaman kargoya verilir', 'kargoya ne zaman verilir', 'siparişim ne zaman kargoya verilecek',
     'ne zaman kargolanır', 'kargo ne zaman çıkar', 'aynı gün kargo var mı', 'bugün kargoya verilir mi', 'siparişim ne zaman gelir', 'kargo kaç günde gelir', 'kaç günde teslim edilir', 'ne zaman elime ulaşır', 'kargom ne zaman gelir'],
-    cevap: `${AKC.kargo} Teslim süresi kargo firmasına ve adresinize göre değişir.${ship}\n\nSiparişinizin durumunu öğrenmek için WhatsApp'tan bize yazabilirsiniz.`, urunler: [], kaynak: 'config:akbilge.kargo' });
+    cevap: `${AKC.kargo}${ship}`, urunler: [], kaynak: 'config:akbilge.kargo' });
 }
 await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: hazir = canlıda kullanılır (doğrulanmış tablolar ve ürün bilgisi). Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
 // Sunucu (src/akbilge.js) için sıkıştırılmış kopya: soru kalıpları, cevap, ürünler, dinamik alan, ürün adı
