@@ -129,6 +129,11 @@ async function trends(env, ctx) {
   return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', 80), q0: top('q0', 50), m: top('m', 40), xs: top('xs', 60), xa: top('xa', 60), p, ly, ly2 });
 }
 
+// Anthropic anahtarının Cloudflare'deki adı: ANTHROPIC_API_KEY (önerilen) ya da akbilge / AKBILGE
+function aiKeyName(env) {
+  return ['ANTHROPIC_API_KEY', 'akbilge', 'AKBILGE', 'AkBilge', 'Akbilge'].find((n) => typeof env[n] === 'string' && env[n].trim()) || null;
+}
+
 export default {
   async fetch(req, env, ctx) {
     const { pathname } = new URL(req.url);
@@ -140,9 +145,9 @@ export default {
     // Ak Bilgi hazırlığı: Anthropic anahtarı Cloudflare'de doğru adla (ANTHROPIC_API_KEY) kayıtlı mı. Anahtarın kendisi
     // asla gösterilmez; sadece var/yok, uzunluk ve türünü belirten ilk ek (ör. "sk-ant-api")
     if (pathname === '/ai/durum') {
-      const k = typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY.trim() : '';
+      const ad = aiKeyName(env), k = ad ? String(env[ad]).trim() : '';
       const m = k.match(/^sk-ant-[a-z]+/);
-      return new Response(JSON.stringify({ anahtar: !!k, tur: m ? m[0] : k ? 'beklenmeyen biçim' : null, uzunluk: k.length || 0 }),
+      return new Response(JSON.stringify({ anahtar: !!k, ad, tur: m ? m[0] : k ? 'beklenmeyen biçim' : null, uzunluk: k.length || 0 }),
         { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     }
     return new Response('Bulunamadı', { status: 404 });
