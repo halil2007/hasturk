@@ -41,8 +41,10 @@ log('Başlangıç sepeti: ' + JSON.stringify(await cart()));
 
 // 1) Varyantlı ürün, 2. seçenek, adet 2
 await p.locator(R + '.fab:not(.akfab)').tap();
+const tq = Date.now();
 await p.locator(R + '.top input').fill(QUERY);
 await p.locator(R + '.results [data-act="add"]').first().waitFor({ timeout: 20000 });
+log(`Arama sonucu: ${Date.now() - tq} ms`);
 // Seçenekli (2+ stoklu seçenek) ilk ürün: ürün verisinden
 const MULTI = JSON.parse(readFileSync(SITE.includes('tarim-dunyasi') ? 'public/tarim/products.json' : 'public/products.json', 'utf8')).items
   .filter((x) => (x.v || []).filter((v) => v.st > 0).length >= 2).map((x) => x.id);
@@ -93,11 +95,14 @@ await p.keyboard.press('Escape').catch(() => {});
 await p.waitForTimeout(600);
 await p.locator(R + '.fab.akfab').tap().catch(async () => { log('  akfab yok, Ürün Bul içinden'); });
 await p.locator(R + '[data-act="akgrp"][data-v="1"]').first().tap({ timeout: 10000 }).catch(() => log('  konu düğmesi yok'));
+await p.waitForTimeout(1500); // müşteri soruları okurken
+const tak = Date.now();
 await p.locator(R + `[data-act="akq"][data-v="${AKQ}"]`).first().tap({ timeout: 5000 }).catch(async () => {
   log('  öneri düğmesi yok; soru yazılıyor');
   const inp = p.locator(R + '.akf input').first(); await inp.fill(AKQ.replace(/\?$/, '')); await inp.press('Enter');
 });
 await p.locator(R + '.akall').last().waitFor({ timeout: 30000 }).catch(() => log('  "Hepsini sepete ekle" çıkmadı'));
+log(`Bilge Bey cevabı (soruya dokunduktan sonra): ${Date.now() - tak} ms`);
 if (await p.locator(R + '.akall').count()) {
   const before = await cart();
   await p.locator(R + '.akall').last().tap();
