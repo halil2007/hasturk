@@ -1,7 +1,8 @@
 name: Ak Bilge canlı kontrol
 
 # Yayındaki Ak Bilge'yi dener: havuzdan cevaplanan bir soru, Claude'a giden bir soru, öne çıkan sorular ve sitedeki ayar.
-# Mağazaya dokunmaz. Claude soruları birkaç sent harcar.
+# Mağazaya dokunmaz. Varsayılan olarak yalnız havuz soruları ve sayaç (ücretsiz); ZOR=1 iken Claude'a giden zor sorular da
+# denenir (birkaç sent).
 on:
   workflow_dispatch:
   push:
@@ -14,18 +15,30 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Dene
+        env:
+          ZOR: '0'
         run: |
           W=https://hasturk-arama.halilc2007.workers.dev
           H='-H Origin:https://hasturkgubre.com.tr -H Content-Type:application/json'
           echo "## Havuz sorusu" | tee -a $GITHUB_STEP_SUMMARY
           curl -s -m 30 $H -d '{"q":"limon ağacına hangi gübre","s":"hasturk","n":"Ak Bilge"}' $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('kaynak:',d.get('kaynak'),'| ürün:',len(d.get('urunler') or []),'|',(d.get('cevap') or '')[:160].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
+          if [ "${ZOR:-0}" = "1" ]; then
           echo "## Claude sorusu" | tee -a $GITHUB_STEP_SUMMARY
           curl -s -m 40 $H -d '{"q":"fesleğen nasıl yetiştirilir, ne sıklıkla sulanır","s":"hasturk","n":"Ak Bilge"}' $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('kaynak:',d.get('kaynak'),'| neden:',d.get('neden'),'| ürün:',d.get('urunler'),'|',(d.get('cevap') or '')[:400].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
+          fi
+          echo "## Önerilen sorular (hepsi havuzdan, ücretsiz gelmeli)" | tee -a $GITHUB_STEP_SUMMARY
+          for q in "Ekim ayında ne ekilir?" "Solucan Gübresi nasıl kullanılır?" "Roka tohumu nasıl ekilir?" "Limon için hangi gübre?" "Siparişler ne zaman kargoya veriliyor?"; do
+            curl -s -m 30 $H -d "{\"q\":\"$q\",\"s\":\"hasturk\",\"n\":\"Ak Bilge\"}" $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('- $q →',d.get('kaynak'),'|',(d.get('cevap') or '')[:90].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
+          done
+          if [ "${ZOR:-0}" = "1" ]; then
           echo "## Zor sorular (yanlış bilgi vermemeli)" | tee -a $GITHUB_STEP_SUMMARY
           for q in "gül için solucan gübresi kaç gram verilir" "kargom ne zaman gelir" "domatesin yaprakları sararıp kuruyor ne yapmalıyım" "en iyi telefon hangisi" "fare zehiri kaç gram koymalıyım" "salyangozlar çileklerimi yiyor ne yapayım"; do
             echo "- $q" | tee -a $GITHUB_STEP_SUMMARY
             curl -s -m 40 $H -d "{\"q\":\"$q\",\"s\":\"hasturk\",\"n\":\"Ak Bilge\"}" $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('   kaynak:',d.get('kaynak'),'| neden:',d.get('neden'),'| ürün:',d.get('urunler'),'|',(d.get('cevap') or '')[:500].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
           done
+          fi
+          echo "## Sayaç (bugün / son 7 gün)" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 20 $W/ak/sayac | python3 -c "import sys,json;d=json.load(sys.stdin);[print(k, '→ toplam',d[k]['toplam'],'| havuz',d[k]['havuz'],'| claude',d[k]['claude'],'| token giriş',d[k]['giris'],'çıkış',d[k]['cikis'],'| tahmini \$',d[k]['tahmini_usd']) for k in ('bugun','son7')];print('ayrıntı:',d['bugun']['satir']);print('oylar:',d['oylar'],'| model:',d['model'],'| sınır:',d['gunluk_sinir'])" | tee -a $GITHUB_STEP_SUMMARY
           echo "## Öne çıkan sorular" | tee -a $GITHUB_STEP_SUMMARY
           curl -s -m 20 $W/ak/populer | tee -a $GITHUB_STEP_SUMMARY; echo
           echo "## Ayar ve widget" | tee -a $GITHUB_STEP_SUMMARY

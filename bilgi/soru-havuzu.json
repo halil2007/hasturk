@@ -1,7 +1,7 @@
 {
  "_aciklama": "Ak Bilge soru havuzu. durum: hazir = canlıda kullanılır (doğrulanmış tablolar ve ürün bilgisi). Rakamlar yalnız doğrulanmış tablolardan.",
  "surum": 1,
- "kayit": 1391,
+ "kayit": 1392,
  "havuz": [
   {
    "id": "h0001",
@@ -33132,6 +33132,30 @@
    "cevap": "İlk siparişe özel %5 indirim: HOSGELDİN5 kodunu ödeme adımında kullanabilirsiniz (750 TL ve üzeri siparişlerde geçerli). 975 TL ve üzeri siparişlerde kargo ücretsiz.",
    "urunler": [],
    "kaynak": "config:promo"
+  },
+  {
+   "id": "h1392",
+   "durum": "hazir",
+   "tur": "magaza",
+   "konu": "kargo",
+   "sorular": [
+    "siparişler ne zaman kargoya verilir",
+    "sipariş ne zaman kargoya verilir",
+    "kargoya ne zaman verilir",
+    "siparişim ne zaman kargoya verilecek",
+    "ne zaman kargolanır",
+    "kargo ne zaman çıkar",
+    "aynı gün kargo var mı",
+    "bugün kargoya verilir mi",
+    "siparişim ne zaman gelir",
+    "kargo kaç günde gelir",
+    "kaç günde teslim edilir",
+    "ne zaman elime ulaşır",
+    "kargom ne zaman gelir"
+   ],
+   "cevap": "Siparişleriniz aynı gün kargoya teslim edilir. Teslim süresi kargo firmasına ve adresinize göre değişir. 975 TL ve üzeri siparişlerde kargo ücretsiz.\n\nSiparişinizin durumunu öğrenmek için WhatsApp'tan bize yazabilirsiniz.",
+   "urunler": [],
+   "kaynak": "config:akbilge.kargo"
   }
  ]
 }

@@ -104,7 +104,7 @@ Kurallar:
 - Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını söyle.
 - Ürün önerisi yalnız "Önerilebilecek ürünler" listesinden ve yalnız soruyla gerçekten ilgiliyse yapılır; listede olmayan ürün, marka veya rakip mağaza adı yazma.
 - Bitki hastalığı ya da zararlı teşhisi koyma; en fazla olası nedenleri say ve fotoğrafla ustamıza danışılmasını öner. İnsan veya hayvan sağlığı konusunda tavsiye verme.
-- Sipariş, kargo, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için ustamıza yönlendir.
+- Mağaza bilgisi: siparişler aynı gün kargoya teslim edilir; teslim süresi kargo firmasına ve adrese göre değişir. Bunun dışındaki sipariş durumu, kargo takibi, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için ustamıza yönlendir.
 
 "durum" alanı:
 - "cevap": soruyu doğru ve güvenle cevapladın.
@@ -128,14 +128,15 @@ const SCHEMA = {
 
 // Bağlam: en yakın havuz cevapları (doğrulanmış) + onlardaki ürünler + soruda adı geçen ürünler
 function context(q, near, products) {
-  const facts = near.filter((x) => x.sc >= 0.3).slice(0, 4).map((x) => x.e.c);
+  // Maliyet: en yakın 3 cevap, her biri en fazla ~900 karakter (rakamlar ve kaynak satırı genelde baştadır)
+  const facts = near.filter((x) => x.sc >= 0.35).slice(0, 3).map((x) => (x.e.c.length > 900 ? x.e.c.slice(0, 900) + '…' : x.e.c));
   const slugs = new Set();
   near.slice(0, 4).forEach((x) => x.e.u.forEach((s) => slugs.add(s)));
   const qt = toks(q);
   products.map((p) => ({ p, h: toks(p.n).filter((t) => qt.includes(t)).length })).filter((x) => x.h >= 1)
-    .sort((a, b) => b.h - a.h).slice(0, 8).forEach((x) => slugs.add(x.p.s));
+    .sort((a, b) => b.h - a.h).slice(0, 6).forEach((x) => slugs.add(x.p.s));
   const byS = new Map(products.map((p) => [p.s, p]));
-  const list = [...slugs].map((s) => byS.get(s)).filter((p) => p && p.st).slice(0, 12);
+  const list = [...slugs].map((s) => byS.get(s)).filter((p) => p && p.st).slice(0, 10);
   return { facts, list };
 }
 export function userMessage(q, ctx, page) {
@@ -149,7 +150,7 @@ async function askClaude(env, key, name, q, ctx, page) {
   const client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 25000 });
   const msg = await client.beta.messages.create({
     model: env.AK_MODEL || MODEL,
-    max_tokens: 4000,
+    max_tokens: 2500,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
     output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
@@ -200,6 +201,23 @@ export async function vote(req, env, okOrigin) {
   return json({ ok: true });
 }
 
+// GET /ak/sayac: bugün ve son 7 gün kaç soru havuzdan / Claude'dan cevaplandı, Claude token kullanımı ve tahmini maliyet.
+// Soru metni gösterilmez (yalnız sayılar).
+export async function sayac(env) {
+  if (!env.DB) return json({ ok: false, why: 'db' });
+  await initDb(env.DB).catch(() => {});
+  const gun = today(), hafta = new Date(Date.now() + 3 * 3600e3 - 7 * 864e5).toISOString().slice(0, 10);
+  const q = (since) => env.DB.prepare("SELECT kaynak, COALESCE(durum,'') AS durum, COUNT(*) AS n, SUM(COALESCE(giris,0)) AS giris, SUM(COALESCE(cikis,0)) AS cikis FROM ak_soru WHERE substr(ts,1,10) >= ? GROUP BY kaynak, durum").bind(since).all().then((r) => r.results);
+  const oy = await env.DB.prepare('SELECT oy, COUNT(*) AS n FROM ak_oy GROUP BY oy').all().then((r) => r.results).catch(() => []);
+  const [b, h] = await Promise.all([q(gun), q(hafta)]);
+  const ozet = (rows) => {
+    const ai = rows.filter((r) => r.kaynak === 'ai'), giris = ai.reduce((a, r) => a + r.giris, 0), cikis = ai.reduce((a, r) => a + r.cikis, 0);
+    return { satir: rows, toplam: rows.reduce((a, r) => a + r.n, 0), havuz: rows.filter((r) => r.kaynak === 'havuz').reduce((a, r) => a + r.n, 0),
+      claude: ai.reduce((a, r) => a + r.n, 0), giris, cikis, tahmini_usd: +((giris * 4 + cikis * 20) / 1e6).toFixed(3) };
+  };
+  return json({ ok: true, bugun: ozet(b), son7: ozet(h), oylar: oy, model: env.AK_MODEL || MODEL, gunluk_sinir: Number(env.AK_DAILY_LIMIT) || DAILY_LIMIT });
+}
+
 // GET /ak/populer: son 30 günde havuzdan en çok cevaplanan sorular (öne çıkan sorular; en az 3 kez sorulmuş olmalı)
 let POP = { t: 0, list: [] };
 export async function populer(env) {
@@ -234,7 +252,13 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
   const extra = db ? await approved(db).catch(() => []) : [];
   const prods = await products().catch(() => []);
   const pageName = page ? ((prods.find((p) => p.s === page) || {}).n || '') : '';
-  const { hit, near } = poolAnswer(q, { extra, product: page, productName: pageName });
+  let { hit, near } = poolAnswer(q, { extra, product: page, productName: pageName });
+  // Ürün sayfasında "nasıl kullanılır / ne işe yarar / dozu / özellikleri" gibi sorular o ürünün havuz cevabından gelir
+  // (soru ürün adını tam içermese de; Claude'a gidip para harcamasın)
+  if (!hit && page && /kullan|işe yar|ise yar|nedir|özellik|ozellik|doz|miktar|nasıl|nasil|kaç litre|kac litre|ölçü|olcu|ekilir/i.test(q)) {
+    const pe = HAVUZ.find((e) => e.p === page && (e.t === 'urun' || e.t === 'saksi' || e.t === 'pompa'));
+    if (pe && !toks(q).some((t) => t.length >= 4 && !toks(pageName + ' nasıl kullanılır ne işe yarar nedir özellikleri dozu kullanım miktarı kaç litre ölçüleri ne zaman ekilir bu ürün urun').includes(t) && (IDX && IDX.idf.get(t) || 0) > 6)) hit = { e: pe, sc: 0.75 };
+  }
   const log = (o) => db && ctx.waitUntil(db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, skor, cevap, urunler, durum, site, sayfa, giris, cikis) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .bind(new Date().toISOString(), q, norm(q), o.kaynak, o.havuz || null, o.skor ?? null, o.cevap || null, JSON.stringify(o.urunler || []), o.durum || null, site, page, o.giris ?? null, o.cikis ?? null).run().catch(() => {}));
 
