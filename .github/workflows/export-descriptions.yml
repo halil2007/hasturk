@@ -1,0 +1,44 @@
+name: Bilgi bankası hammaddesi (ürün açıklamaları)
+
+# ikas'tan ürün açıklamalarını okur ve docs/bilgi/ altına çalışma dalına kaydeder (sadece okuma; mağazada değişiklik yok).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/export-descriptions.mjs', '.github/workflows/export-descriptions.yml']
+
+permissions:
+  contents: write
+
+concurrency: export-descriptions
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: HasTürk
+        run: node scripts/export-descriptions.mjs
+        env:
+          OUT_NAME: hasturk
+          IKAS_STORE: ${{ secrets.IKAS_STORE }}
+          IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+      - name: Tarım Dünyası
+        continue-on-error: true
+        run: node scripts/export-descriptions.mjs
+        env:
+          OUT_NAME: tarim
+          IKAS_STORE: hasturktarimdunyasi
+          IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
+      - name: Dala kaydet
+        run: |
+          git config user.name "bilgi-bankasi"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/bilgi
+          git diff --cached --quiet || (git commit -m "Bilgi bankası: ürün açıklamaları (ikas)" && git push origin HEAD:${GITHUB_REF_NAME})
