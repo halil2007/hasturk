@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: ['claude/**']
-    paths: ['scripts/cart-api.mjs', 'scripts/cart-win.mjs', 'scripts/cart-widget.mjs', '.github/workflows/cart-api.yml', 'public/pm-search.js']
+    paths: ['scripts/cart-api.mjs', 'scripts/cart-win.mjs', 'scripts/cart-widget.mjs', 'scripts/cart-par.mjs', '.github/workflows/cart-api.yml', 'public/pm-search.js']
 
 permissions:
   contents: read
@@ -29,6 +29,8 @@ jobs:
       - run: |
           npm i --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
+      - run: node scripts/cart-par.mjs
+        if: matrix.site == 'https://hasturkgubre.com.tr'
       - run: node scripts/cart-widget.mjs
         env:
           SITE_URL: ${{ matrix.site }}
