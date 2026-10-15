@@ -81,7 +81,7 @@ async function ingest(req, env, ctx) {
 
 // Ürün olaylarının tek sayıya çevrilmesi: sepete ekleme > tıklama > görüntüleme
 const EW = { a: 2, c: 1, v: 0.3 };
-async function trends(env, ctx) {
+async function trends(env, ctx, req) {
   const json = (o) => new Response(JSON.stringify(o), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
   if (!env.DB) return json({ ok: false, why: 'db' });
   await init(env.DB);
@@ -105,6 +105,8 @@ async function trends(env, ctx) {
     }
   }
   const r2 = (n) => Math.round(n * 100) / 100;
+  // ?n=500: arama listelerinin tamamı (rapor ve sonuçsuz arama incelemesi için; varsayılan ilk 80 / 50)
+  const lim = Math.min(1000, Math.max(0, parseInt(new URL(req.url).searchParams.get('n'), 10) || 0));
   for (const q of Object.values(p)) for (const k in q) q[k] = r2(q[k]);
   const top = (k, lim) => Object.entries(agg[k] || {}).sort((a, b) => b[1].s - a[1].s).slice(0, lim)
     .map(([x, o]) => [x, o.n, r2(o.s), o.n7]);
@@ -130,7 +132,7 @@ async function trends(env, ctx) {
   }
   const [ly, ly2] = [await year(1), await year(2)];
   if (Math.random() < 0.1) ctx.waitUntil(env.DB.prepare('DELETE FROM ev WHERE d < ?').bind(day(-KEEP_DAYS)).run().catch(() => {}));
-  return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', 80), q0: top('q0', 50), m: top('m', 40), xs: top('xs', 60), xa: top('xa', 60), ka: top('ka', 60), p, ly, ly2 });
+  return json({ ok: true, updated: new Date().toISOString(), days: DAYS, rows: results.length, q: top('q', lim || 80), q0: top('q0', lim || 50), m: top('m', 40), xs: top('xs', 60), xa: top('xa', 60), ka: top('ka', 60), p, ly, ly2 });
 }
 
 // Anthropic anahtarının Cloudflare'deki adı: ANTHROPIC_API_KEY (önerilen) ya da akbilge / AKBILGE
@@ -173,7 +175,7 @@ export default {
       return akHandle(req, env, ctx, { aiKey: ad ? String(env[ad]).trim() : '', originOk: originOk(req, env), products: productsFor(req, env, site) })
         .catch(() => new Response(JSON.stringify({ ok: false, why: 'sunucu' }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }));
     }
-    if (pathname === '/trends') return trends(env, ctx).catch(() => new Response('{"ok":false}', { status: 500 }));
+    if (pathname === '/trends') return trends(env, ctx, req).catch(() => new Response('{"ok":false}', { status: 500 }));
     // Ak Bilgi hazırlığı: Anthropic anahtarı Cloudflare'de doğru adla (ANTHROPIC_API_KEY) kayıtlı mı. Anahtarın kendisi
     // asla gösterilmez; sadece var/yok, uzunluk ve türünü belirten ilk ek (ör. "sk-ant-api")
     if (pathname === '/ai/durum') {

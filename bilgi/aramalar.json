@@ -1,17 +1,17 @@
 {
- "guncelleme": "2026-10-15T09:14:51.898Z",
+ "guncelleme": "2026-10-15T11:29:44.817Z",
  "gun": 30,
- "kayit": 3017,
+ "kayit": 3069,
  "aramalar": [
   {
    "kelime": "sıvı solucan gübresi",
-   "adet": 38,
-   "son7": 14
+   "adet": 57,
+   "son7": 33
   },
   {
    "kelime": "saksı",
-   "adet": 16,
-   "son7": 6
+   "adet": 18,
+   "son7": 8
   },
   {
    "kelime": "solucan",
@@ -34,17 +34,17 @@
    "son7": 1
   },
   {
+   "kelime": "modüler",
+   "adet": 5,
+   "son7": 4
+  },
+  {
    "kelime": "uzman",
    "adet": 5,
    "son7": 3
   },
   {
    "kelime": "toprak",
-   "adet": 4,
-   "son7": 3
-  },
-  {
-   "kelime": "modüler",
    "adet": 4,
    "son7": 3
   },
@@ -224,6 +224,21 @@
    "son7": 1
   },
   {
+   "kelime": "ilaç pom",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "ilaç pompası",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "mon",
+   "adet": 1,
+   "son7": 1
+  },
+  {
    "kelime": "yaban",
    "adet": 1,
    "son7": 1
@@ -387,21 +402,6 @@
    "kelime": "perli",
    "adet": 1,
    "son7": 1
-  },
-  {
-   "kelime": "taht",
-   "adet": 1,
-   "son7": 1
-  },
-  {
-   "kelime": "tahtakurusu",
-   "adet": 1,
-   "son7": 1
-  },
-  {
-   "kelime": "tahtakurusu ilaci",
-   "adet": 1,
-   "son7": 1
   }
  ],
  "sonucsuz": [
@@ -409,6 +409,11 @@
    "kelime": "nnh. cccccx x , z , vb. nb",
    "adet": 2,
    "son7": 0
+  },
+  {
+   "kelime": "zeytin toprağı",
+   "adet": 1,
+   "son7": 1
   },
   {
    "kelime": "adaçayı",
@@ -649,20 +654,15 @@
    "kelime": "yabanmersi torfu",
    "adet": 1,
    "son7": 1
-  },
-  {
-   "kelime": "zeytin",
-   "adet": 1,
-   "son7": 1
   }
  ],
  "urunler": {
   "hasturk-humix-sivi-humik-asit": {
    "a": 2.53,
    "c": 1.72,
-   "v": 27.04,
-   "e7": 6.7,
-   "e28": 28.8
+   "v": 43.04,
+   "e7": 11.5,
+   "e28": 33.6
   },
   "moduler-yukseltilmis-bahce-yatagi-sekilli-no-12-220x140": {
    "a": 0.79,
@@ -716,16 +716,16 @@
   "chrysamed-insektisit-max-2-lt-500-ml-bocek-ilaci-seti": {
    "a": 0,
    "c": 0.41,
-   "v": 14.51,
-   "e7": 3,
-   "e28": 7.6
+   "v": 15.51,
+   "e7": 3.3,
+   "e28": 7.9
   },
   "chrysamed-worm-ex-2-lt-2-lt-pompa-tahta-kurdu-seti": {
    "a": 0,
    "c": 0,
-   "v": 10.93,
-   "e7": 2.1,
-   "e28": 5.4
+   "v": 12.93,
+   "e7": 2.7,
+   "e28": 6
   },
   "chrysamed-worm-ex-tahta-agac-kurdu-ilaci-500-ml-sprey": {
    "a": 0,
@@ -737,9 +737,9 @@
   "dekoratif-kure-fiber-saksi-40x32-cm": {
    "a": 0,
    "c": 0,
-   "v": 2.56,
-   "e7": 0.6,
-   "e28": 1.2
+   "v": 3.56,
+   "e7": 0.9,
+   "e28": 1.5
   },
   "dekoratif-lale-fiber-saksi-46x60-cm": {
    "a": 0,
@@ -786,23 +786,23 @@
   "dsv-lippa-special-4s-cim-tohumu": {
    "a": 0,
    "c": 0,
-   "v": 2.15,
-   "e7": 0.3,
-   "e28": 1.2
+   "v": 3.15,
+   "e7": 0.6,
+   "e28": 1.5
   },
   "hasturk-kati-solucan-gubresi": {
-   "a": 3.19,
+   "a": 4.19,
    "c": 8.89,
    "v": 33.5,
-   "e7": 14.3,
-   "e28": 40.2
+   "e7": 16.3,
+   "e28": 42.2
   },
   "hasturk-sivi-solucan-gubresi": {
-   "a": 7.35,
+   "a": 13.35,
    "c": 5.61,
    "v": 25.77,
-   "e7": 17.3,
-   "e28": 48
+   "e7": 29.3,
+   "e28": 60
   },
   "hg-5li-bitki-yetistirme-seti": {
    "a": 1.05,
@@ -842,9 +842,9 @@
   "insektisit-max-5-lt-kampanya-paketi": {
    "a": 0.81,
    "c": 1.25,
-   "v": 44.81,
-   "e7": 14.1,
-   "e28": 24.1
+   "v": 45.81,
+   "e7": 14.4,
+   "e28": 24.4
   },
   "kaktus-sukulent-3lu-dikim-bakim-seti": {
    "a": 0,
@@ -912,9 +912,9 @@
   "uzman-16-lt-sarjli-ilaclama-pompasi-usr-403": {
    "a": 0,
    "c": 1.69,
-   "v": 27.48,
-   "e7": 7.6,
-   "e28": 15.9
+   "v": 28.48,
+   "e7": 7.9,
+   "e28": 16.2
   },
   "uzman-20-lt-manuel-ilaclama-pompasi-k-105": {
    "a": 0,
@@ -926,9 +926,9 @@
   "uzman-5-lt-basincli-ilaclama-pompasi-k-71": {
    "a": 0,
    "c": 0.41,
-   "v": 20.13,
-   "e7": 5.4,
-   "e28": 10.6
+   "v": 22.13,
+   "e7": 6,
+   "e28": 11.2
   },
   "uzman-lityum-akulu-ilaclama-pompasi-5-lt": {
    "a": 1.84,
@@ -1031,9 +1031,9 @@
   "guanokalong-yarasa-gubresi-toz": {
    "a": 1.02,
    "c": 0.57,
-   "v": 24.98,
-   "e7": 4.2,
-   "e28": 18.8
+   "v": 56.98,
+   "e7": 13.8,
+   "e28": 28.4
   },
   "hg-monstera-deve-tabani-topragi": {
    "a": 1.02,
@@ -1085,11 +1085,11 @@
    "e28": 2.3
   },
   "sivi-solucan-gubresi-1-lt": {
-   "a": 11.66,
+   "a": 24.66,
    "c": 1.04,
    "v": 2.61,
-   "e7": 12.6,
-   "e28": 47.2
+   "e7": 38.6,
+   "e28": 73.2
   },
   "uzman-05-lt-basincli-sprey-puskurtucu-k-4": {
    "a": 0.41,
@@ -1136,9 +1136,9 @@
   "hindistan-cevizi-torfu-cocopeat-5-kg": {
    "a": 0,
    "c": 0.91,
-   "v": 3,
-   "e7": 0.3,
-   "e28": 3.8
+   "v": 4,
+   "e7": 0.6,
+   "e28": 4.1
   },
   "ince-damla-buyuk-fiber-saksi-37x100-cm": {
    "a": 0.47,
@@ -1169,11 +1169,11 @@
    "e28": 2.8
   },
   "uzman-lityum-akulu-ilaclama-pompasi-8-lt": {
-   "a": 1.2,
+   "a": 2.2,
    "c": 2.86,
-   "v": 41.51,
-   "e7": 9.9,
-   "e28": 28.8
+   "v": 44.51,
+   "e7": 12.8,
+   "e28": 31.7
   },
   "1-ton-solucan-gubresi-fiyati": {
    "a": 0,
@@ -1206,9 +1206,9 @@
   "altinvadi-karagoz-kadife-cicegi-tohumu": {
    "a": 0,
    "c": 0,
-   "v": 2.85,
-   "e7": 0.3,
-   "e28": 1.5
+   "v": 3.85,
+   "e7": 0.6,
+   "e28": 1.8
   },
   "altinvadi-kuskonmaz-tohumu-10-adet": {
    "a": 0,
@@ -1325,9 +1325,9 @@
   "biochar-mese-odunu-bazli-karbon-toprak-duzenleyici-0-3-mm": {
    "a": 0,
    "c": 0.54,
-   "v": 10.72,
-   "e7": 2.1,
-   "e28": 6.4
+   "v": 26.72,
+   "e7": 6.9,
+   "e28": 11.2
   },
   "bitki-topragi-ozel-karisim-20-lt": {
    "a": 1.17,
@@ -1353,9 +1353,9 @@
   "chrysamed-g-05-pro-konsantre-bocek-ilaci": {
    "a": 0,
    "c": 0.81,
-   "v": 4.08,
-   "e7": 2.2,
-   "e28": 2.5
+   "v": 5.08,
+   "e7": 2.5,
+   "e28": 2.8
   },
   "chrysamed-insektisit-max-2-lt-tum-ev-bahce-bocek-ilaci": {
    "a": 0,
@@ -1388,9 +1388,9 @@
   "chrysamed-subon-hijyen-sprey": {
    "a": 0,
    "c": 0.44,
-   "v": 14.81,
-   "e7": 2.1,
-   "e28": 9.7
+   "v": 30.81,
+   "e7": 6.9,
+   "e28": 14.5
   },
   "chrysamed-unicid-c10-konsantre-hasere-ilaci-1-lt-olcekli": {
    "a": 0.54,
@@ -1437,9 +1437,9 @@
   "dogal-orman-topragi-humuslu": {
    "a": 1.67,
    "c": 0,
-   "v": 18.2,
-   "e7": 5.3,
-   "e28": 15.3
+   "v": 19.2,
+   "e7": 5.6,
+   "e28": 15.6
   },
   "ekim-ayi-sebze-tohumu-seti-6-cesit-kislik-tohum": {
    "a": 0,
@@ -1465,16 +1465,16 @@
   "fare-kulagi-tohumu-500-gr": {
    "a": 0.93,
    "c": 0.47,
-   "v": 24.27,
-   "e7": 8.3,
-   "e28": 14.1
+   "v": 25.27,
+   "e7": 8.6,
+   "e28": 14.4
   },
   "florist-mantar-onleyici-bitki-spreyi": {
    "a": 0,
    "c": 0,
-   "v": 8.69,
-   "e7": 1.8,
-   "e28": 4.5
+   "v": 24.69,
+   "e7": 6.6,
+   "e28": 9.3
   },
   "florist-sinek-ve-unlu-bit-onleyici-bitki-spreyi": {
    "a": 0,
@@ -1577,9 +1577,9 @@
   "hg-vermikulit": {
    "a": 1.15,
    "c": 1.52,
-   "v": 8.08,
-   "e7": 3.8,
-   "e28": 9.9
+   "v": 9.08,
+   "e7": 4.1,
+   "e28": 10.2
   },
   "hindistan-cevizi-torfu-tablet-cocopeat-12-adet": {
    "a": 0,
@@ -1612,9 +1612,9 @@
   "kaktus-ve-sukulent-topragi": {
    "a": 1.23,
    "c": 1.12,
-   "v": 24.03,
-   "e7": 5.1,
-   "e28": 17.4
+   "v": 25.03,
+   "e7": 5.4,
+   "e28": 17.7
   },
   "kalin-tarim-perliti": {
    "a": 0.5,
@@ -1654,9 +1654,9 @@
   "moduler-yukseltilmis-bahce-yatagi-217-litre": {
    "a": 0.54,
    "c": 0.54,
-   "v": 8.71,
-   "e7": 0.9,
-   "e28": 7.8
+   "v": 9.71,
+   "e7": 1.2,
+   "e28": 8.1
   },
   "moduler-yukseltilmis-bahce-yatagi-281-litre": {
    "a": 0.54,
@@ -1724,9 +1724,9 @@
   "proline-pate-somonlu-kedi-yas-mamasi-85-gr": {
    "a": 0,
    "c": 0.47,
-   "v": 8.05,
-   "e7": 1.2,
-   "e28": 5.5
+   "v": 9.05,
+   "e7": 1.5,
+   "e28": 5.8
   },
   "quik-dogal-kedi-cimi--fileli-": {
    "a": 0,
@@ -1822,9 +1822,9 @@
   "tarm-orchid-elixir-sivi-orkide-besini-sprey-500-ml": {
    "a": 0,
    "c": 0.5,
-   "v": 15.88,
-   "e7": 2.4,
-   "e28": 10.3
+   "v": 31.88,
+   "e7": 7.2,
+   "e28": 15.1
   },
   "trendline-gourmet-tavuklu-yetiskin-kedi-mamasi-15-kg": {
    "a": 0,
@@ -1836,9 +1836,9 @@
   "uzman-10-lt-basincli-ilaclama-pompasi-k-73": {
    "a": 0,
    "c": 0.62,
-   "v": 21.3,
-   "e7": 5.4,
-   "e28": 10.6
+   "v": 24.3,
+   "e7": 6.3,
+   "e28": 11.5
   },
   "uzman-2-lt-basincli-el-puskurtucu": {
    "a": 0,
@@ -1857,9 +1857,9 @@
   "yaban-mersini-bakim-seti-20-lt-toprak-500-ml-solucan-gubresi": {
    "a": 0,
    "c": 0,
-   "v": 3.64,
-   "e7": 0.6,
-   "e28": 1.8
+   "v": 4.64,
+   "e7": 0.9,
+   "e28": 2.1
   },
   "yonca-sabit-bahce-kulesi-6-kat-24-gozlu": {
    "a": 0,
@@ -1955,9 +1955,9 @@
   "turfmaster-16-6-25-sonbahar-kis-cim-gubresi-20-kg": {
    "a": 0,
    "c": 0.44,
-   "v": 9.74,
-   "e7": 2.4,
-   "e28": 5.5
+   "v": 10.74,
+   "e7": 2.7,
+   "e28": 5.8
   },
   "adm": {
    "a": 0,
@@ -2067,9 +2067,9 @@
   "florist-konsantre-sivi-kaktus-ve-sukulent-bitki-besini": {
    "a": 0,
    "c": 0,
-   "v": 1.51,
-   "e7": 0,
-   "e28": 0.9
+   "v": 2.51,
+   "e7": 0.3,
+   "e28": 1.2
   },
   "florist-mantar-onleyici-bitki-spreyi-250-ml": {
    "a": 0,
@@ -2109,9 +2109,9 @@
   "ilposan-power-16-litre-akulu-ilaclama-pompasi": {
    "a": 0,
    "c": 0.81,
-   "v": 10.53,
-   "e7": 3.7,
-   "e28": 5.8
+   "v": 11.53,
+   "e7": 4,
+   "e28": 6.1
   },
   "jungle-kedi-cimi-kutulu--fileli-": {
    "a": 0,
@@ -2151,9 +2151,9 @@
   "moduler-balkon-teras-sebze-yatagi-no-4-tekerlekli-110x60": {
    "a": 0.93,
    "c": 0,
-   "v": 4.57,
-   "e7": 0.3,
-   "e28": 6.4
+   "v": 5.57,
+   "e7": 0.6,
+   "e28": 6.7
   },
   "moduler-yukseltilmis-bahce-yatagi-153-litre": {
    "a": 0,
@@ -2240,11 +2240,11 @@
    "e28": 2.3
   },
   "uzman-16-lt-manuel-ilaclama-pompasi-k-103": {
-   "a": 0.76,
-   "c": 0.76,
-   "v": 10.06,
-   "e7": 5.7,
-   "e28": 7.5
+   "a": 1.76,
+   "c": 1.76,
+   "v": 11.06,
+   "e7": 9,
+   "e28": 10.8
   },
   "yediveren-bahce-kulesi-42-gozlu-dikey-tarim-kulesi": {
    "a": 0,
@@ -2382,9 +2382,9 @@
   "baris-cicegi-spathiphyllum-topragi": {
    "a": 0,
    "c": 0.5,
-   "v": 7.9,
-   "e7": 1.8,
-   "e28": 4.6
+   "v": 8.9,
+   "e7": 2.1,
+   "e28": 4.9
   },
   "brit-care-hypoallergenic-urinary-tavuklu-tahilsiz-kisirlastirilmis-kedi-mamasi-7": {
    "a": 0,
@@ -2501,9 +2501,9 @@
   "moduler-balkon-teras-sebze-yatagi-no-4-sabit-ayakli-110x60": {
    "a": 0,
    "c": 0,
-   "v": 2.34,
-   "e7": 0.3,
-   "e28": 1.2
+   "v": 4.34,
+   "e7": 0.9,
+   "e28": 1.8
   },
   "moduler-yukseltilmis-bahce-yatagi-108-litre": {
    "a": 0,
@@ -2571,9 +2571,9 @@
   "uzman-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi": {
    "a": 0,
    "c": 0,
-   "v": 3.85,
-   "e7": 0.9,
-   "e28": 1.8
+   "v": 4.85,
+   "e7": 1.2,
+   "e28": 2.1
   },
   "46c8bf89-9ba1-4981-a06b-3e4a219f70f1": {
    "a": 0.5,
@@ -2634,9 +2634,9 @@
   "altinvadi-koy-tipi-domates-tohumu-5-gr": {
    "a": 1.87,
    "c": 0.93,
-   "v": 8.25,
-   "e7": 7.1,
-   "e28": 8.3
+   "v": 9.25,
+   "e7": 7.4,
+   "e28": 8.6
   },
   "altinvadi-marul-tohumu-yedikule-10-gr": {
    "a": 0,
@@ -2746,9 +2746,9 @@
   "gartengold-orkide-topragi": {
    "a": 0.62,
    "c": 0.62,
-   "v": 2.92,
-   "e7": 0.6,
-   "e28": 4.2
+   "v": 3.92,
+   "e7": 0.9,
+   "e28": 4.5
   },
   "genel-saksi-topragi-ozel-karisim": {
    "a": 0,
@@ -2760,9 +2760,9 @@
   "hasturk-kati-solucan-gubresi-3-kg": {
    "a": 0,
    "c": 0,
-   "v": 12.99,
-   "e7": 3.3,
-   "e28": 5.4
+   "v": 13.99,
+   "e7": 3.6,
+   "e28": 5.7
   },
   "hasturk-sivi-solucan-gubresi-250-ml": {
    "a": 0,
@@ -2942,9 +2942,9 @@
   "moduler-yukseltilmis-bahce-yatagi-uzatma-seti-25x30-cm": {
    "a": 0,
    "c": 2.89,
-   "v": 4.41,
-   "e7": 4.2,
-   "e28": 5.8
+   "v": 5.41,
+   "e7": 4.5,
+   "e28": 6.1
   },
   "serinova-kaktus-dikim-seti": {
    "a": 0,
@@ -3229,9 +3229,9 @@
   "klasmann-potgrond-h-70-l-ithal-bitki-topragi-fide-torfu": {
    "a": 0.57,
    "c": 0,
-   "v": 0.57,
-   "e7": 0,
-   "e28": 2.3
+   "v": 1.57,
+   "e7": 0.3,
+   "e28": 2.6
   },
   "ince-damla-fiber-saksi-36x40-cm": {
    "a": 0,
@@ -3334,9 +3334,9 @@
   "moduler-yukseltilmis-bahce-yatagi-sekilli-no-21-165x165": {
    "a": 0,
    "c": 0,
-   "v": 0.57,
-   "e7": 0,
-   "e28": 0.3
+   "v": 1.57,
+   "e7": 0.3,
+   "e28": 0.6
   },
   "moduler-yukseltilmis-bahce-yatagi-sekilli-no-24-165x140": {
    "a": 0,
@@ -3866,9 +3866,9 @@
   "dekoratif-kure-fiber-saksi-45x38-cm": {
    "a": 0,
    "c": 0,
-   "v": 0.76,
-   "e7": 0.3,
-   "e28": 0.3
+   "v": 1.76,
+   "e7": 0.6,
+   "e28": 0.6
   },
   "felicia-sterilised-somonlu-kedi-yas-mamasi-85-gr": {
    "a": 0,
@@ -3894,9 +3894,9 @@
   "hg-dogal-orman-topragi": {
    "a": 0,
    "c": 0,
-   "v": 9.09,
-   "e7": 3.3,
-   "e28": 3.3
+   "v": 10.09,
+   "e7": 3.6,
+   "e28": 3.6
   },
   "line-dekoratif-saksi-2-2-litre": {
    "a": 0,
@@ -3936,9 +3936,9 @@
   "proline-pouch-kuzu-etli-kedi-yas-mamasi-85-gr": {
    "a": 0,
    "c": 0,
-   "v": 1.69,
-   "e7": 0.6,
-   "e28": 0.6
+   "v": 2.69,
+   "e7": 0.9,
+   "e28": 0.9
   },
   "quik-yaseminli-kedi-kumu-koku-giderici-25-gr": {
    "a": 0,
@@ -3957,9 +3957,9 @@
   "sgs-thermo-flex-1-2-20-metre-esnek-bahce-sulama-hortumu": {
    "a": 0,
    "c": 0,
-   "v": 0.76,
-   "e7": 0.3,
-   "e28": 0.3
+   "v": 1.76,
+   "e7": 0.6,
+   "e28": 0.6
   },
   "10586222-2304-4bf5-a99d-785e3c65865a": {
    "a": 0.81,
@@ -4174,9 +4174,9 @@
   "hg-4lu-bitki-yetistirme-seti": {
    "a": 0,
    "c": 0,
-   "v": 0.87,
-   "e7": 0.3,
-   "e28": 0.3
+   "v": 1.87,
+   "e7": 0.6,
+   "e28": 0.6
   },
   "kaktuslu-karisik-sukulent-aranjmani": {
    "a": 0,
@@ -4411,8 +4411,36 @@
   },
   "uzman-pomsan-delta-uyumlu-plastik-tetik": {
    "a": 0,
+   "c": 1,
+   "v": 1.93,
+   "e7": 1.6,
+   "e28": 1.6
+  },
+  "d751bcde-70fc-40cf-8aa6-e683ea8aab5d": {
+   "a": 1,
    "c": 0,
-   "v": 0.93,
+   "v": 0,
+   "e7": 2,
+   "e28": 2
+  },
+  "5li-profesyonel-toprak-duzenleyici-set": {
+   "a": 0,
+   "c": 0,
+   "v": 1,
+   "e7": 0.3,
+   "e28": 0.3
+  },
+  "arzuman-portakal-nergisi-tohumu": {
+   "a": 0,
+   "c": 0,
+   "v": 1,
+   "e7": 0.3,
+   "e28": 0.3
+  },
+  "king-sos-icerisinde-et-parcacikli-kuzu-etli-kopek-konservesi-400-grx6-adet": {
+   "a": 0,
+   "c": 0,
+   "v": 1,
    "e7": 0.3,
    "e28": 0.3
   },
@@ -4436,16 +4464,30 @@
    "v": 1,
    "e7": 0.3,
    "e28": 0.3
+  },
+  "uzman-16-lt-sirt-pulverizatoru-ilaclama-pompasi": {
+   "a": 0,
+   "c": 0,
+   "v": 1,
+   "e7": 0.3,
+   "e28": 0.3
+  },
+  "uzman-pomsan-delta-uyumlu-plastik-ilaclama-cubugu": {
+   "a": 0,
+   "c": 0,
+   "v": 1,
+   "e7": 0.3,
+   "e28": 0.3
   }
  },
  "menu": [
   {
    "ad": "Gübreler",
-   "adet": 41
+   "adet": 58
   },
   {
    "ad": "Saksılar ve Bahçe Yatakları",
-   "adet": 29
+   "adet": 31
   },
   {
    "ad": "Topraklar",
@@ -4572,6 +4614,10 @@
    "adet": 2
   },
   {
+   "ad": "İlaçlama Pompaları",
+   "adet": 2
+  },
+  {
    "ad": "Kil Bilyesi",
    "adet": 2
   },
@@ -4593,10 +4639,6 @@
   },
   {
    "ad": "Manuel İlaçlama Pompaları",
-   "adet": 1
-  },
-  {
-   "ad": "Fare İlaçları",
    "adet": 1
   }
  ]
