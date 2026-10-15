@@ -81,7 +81,7 @@
     });
     return m;
   }
-  function setCart(o) {
+  function setCart(o, isAdd) {
     var c = findCart(o, 0);
     if (!c) return;
     var v = c.orderLineItems.length ? +(c.totalFinalPrice != null ? c.totalFinalPrice : c.totalPrice) : 0;
@@ -91,22 +91,30 @@
     var prevLines = CART_LINES;
     CART_LINES = lineQty(c);
     // Sitenin herhangi bir yerinden sepete eklenen ürünler (ikas'ın kendi butonu dahil) eğilim verisine yazılır
-    if (prevLines) for (var vid in CART_LINES) if (CART_LINES[vid] > (prevLines[vid] || 0)) cartAdded(vid);
+    // isAdd: ana sayfanın kendi "sepete ekle" isteği; sepet daha önce okunmamış olsa da (ilk ürün) eklenen tanınır
+    if (prevLines || isAdd) for (var vid in CART_LINES) if (CART_LINES[vid] > ((prevLines || {})[vid] || 0)) cartAdded(vid, isAdd);
     if (c.id) CART_ID = c.id;
     try { sessionStorage.setItem(CART_KEY, JSON.stringify({ v: v, n: CART_N, t: Date.now(), id: CART_ID, l: CART_LINES })); } catch (e) {}
     updateShip();
   }
+  // Ana sayfadaki "sepete ekle" isteği (ikas: op=addItemToCart): sitenin kendi butonuyla eklemeyi kesin tanımak için
+  var ADD_RE = /add\w*to\w*cart|saveitemtocart|additem/i;
   function sniffCart(w) {
+    var main = w === window;
     try {
       var of = w.fetch;
       if (of && !of.__uaCart) {
         w.fetch = function (u, o) {
           // Sadece sepetle ilgili istekler (adresinde ya da gövdesinde "cart" geçen); ürün listesi vb. cevaplar açılmaz
-          var isCartReq = false;
-          try { isCartReq = /cart|sepet/i.test(String(u && u.url || u)) || (o && typeof o.body === 'string' && /cart/i.test(o.body.slice(0, 2000))); } catch (e) {}
+          var isCartReq = false, isAdd = false;
+          try {
+            var us = String(u && u.url || u), bs = o && typeof o.body === 'string' ? o.body.slice(0, 2000) : '';
+            isCartReq = /cart|sepet/i.test(us) || /cart/i.test(bs);
+            isAdd = main && isCartReq && (ADD_RE.test(us) || ADD_RE.test(bs));
+          } catch (e) {}
           return of.apply(this, arguments).then(function (r) {
             try {
-              if (isCartReq && r && /json/i.test(r.headers.get('content-type') || '')) r.clone().json().then(setCart, function () {});
+              if (isCartReq && r && /json/i.test(r.headers.get('content-type') || '')) r.clone().json().then(function (j) { setCart(j, isAdd); }, function () {});
             } catch (e) {}
             return r;
           });
@@ -119,8 +127,10 @@
         var oo = X.open, os = X.send;
         X.open = function (m, u) { this.__uaU = u; return oo.apply(this, arguments); };
         X.send = function (b) {
-          if (/cart|sepet/i.test(String(this.__uaU || '')) || (typeof b === 'string' && /cart/i.test(b.slice(0, 2000)))) this.addEventListener('load', function () {
-            try { setCart(this.responseType === 'json' ? this.response : JSON.parse(this.responseText)); } catch (e) {}
+          var bs = typeof b === 'string' ? b.slice(0, 2000) : '', us = String(this.__uaU || '');
+          var isAdd = main && (ADD_RE.test(us) || ADD_RE.test(bs));
+          if (/cart|sepet/i.test(us) || /cart/i.test(bs)) this.addEventListener('load', function () {
+            try { setCart(this.responseType === 'json' ? this.response : JSON.parse(this.responseText), isAdd); } catch (e) {}
           });
           return os.apply(this, arguments);
         };
@@ -804,6 +814,12 @@
     '.sh-go{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:23px;background:var(--pr);color:#fff;font-weight:800;font-size:15px}',
     '.sh-go svg{width:18px;height:18px}',
     '.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:8px;padding:10px 16px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap}',
+    // Sitenin kendi "Sepete ekle" butonundan sonra çıkan "Bunu alanlar bunları da aldı" kartı (panel kapalıyken)
+    '.sxs{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483000;display:none;width:min(440px,calc(100vw - 24px));padding:12px 14px 14px;border-radius:18px;background:#fff;border:1px solid var(--ln);box-shadow:0 12px 36px rgba(7,64,79,.22);font-size:14px;color:var(--ink)}',
+    '.sxs.on{display:block;animation:sxsin .25s ease-out}@keyframes sxsin{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}',
+    '.sxs-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}.sxs-h b{flex:1;font-size:14px}.sxs-h button{border:0;background:none;padding:4px;cursor:pointer;color:var(--mut,#667)}.sxs-h svg{width:18px;height:18px}',
+    '.sxs-i{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--ln)}.sxs-i:first-of-type{border-top:0}.sxs-i .tx{flex:1;min-width:0}.sxs-i .tx a{display:block;color:inherit;text-decoration:none;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.sxs-i .tx b{font-size:13px;color:var(--prd,var(--ac))}',
+    '.sxs-i .add{flex:none;display:inline-flex;align-items:center;gap:4px;padding:8px 12px;border-radius:12px;border:0;background:var(--pr);color:#fff;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none}.sxs-i .add svg{width:14px;height:14px}',
     '.ptoast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483001;display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:12px 18px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:600;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.3)}',
     '.ptoast span{min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}',
     '.ptoast span{flex:1}.ptoast{width:min(440px,calc(100vw - 32px))}',
@@ -914,6 +930,7 @@
       '<style>' + CSS + '</style><div class="root">' +
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="gl"></span><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
       '<div class="ptoast" role="status"></div>' +
+      '<div class="sxs" role="dialog" aria-label="Birlikte alınan ürünler"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
       '<div class="tabs" role="tablist">' + TABS.map(function (t) {
         return '<button class="tb" type="button" role="tab" data-act="tab" data-v="' + t[0] + '">' + I[t[2]] + '<span class="tl">' + t[1] + '</span><span class="ts">' + t[3] + '</span></button>';
@@ -1055,6 +1072,7 @@
     else if (act === 'goguideq') { GQ = v; $q.value = ''; render(); setTab('guide'); }
     else if (act === 'add') { var xs = !!b.getAttribute('data-xs'); if (xs) { track('cross_sell_add', v); if (BY_ID[v]) ev('xa', BY_ID[v].s); } openAdd(v, xs); }
     else if (act === 'xsx') hideCross();
+    else if (act === 'sxsx') hideSiteCross();
     else if (act === 'vo') pickVariant(v);
     else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
     else if (act === 'shx') closeSheet();
@@ -1270,6 +1288,8 @@
   function hideCross() { var el = root && root.querySelector('.xsell'); if (el) el.classList.remove('on'); clearTimeout(xsTimer); }
   // Sepete eklendi onayı: öneri varsa kartta, yoksa normal bildirim
   function addedMsg(p, v, fromXs) {
+    OWN_ADD_T = Date.now();
+    hideSiteCross();
     ADDED[p.id] = 1;
     var msg = 'Sepete eklendi' + (v.name ? ': ' + v.name : '') + shipNote();
     var list = !fromXs && isOpen && DATA && (CFG.crossSell || []).length && xsCount() < XS_MAX ? crossFor(p) : [];
@@ -1671,9 +1691,42 @@
     if (q.length < 2) return;
     noteQuery.t = setTimeout(function () { ev(n ? 'q' : 'q0', q); }, 1500);
   }
-  function cartAdded(vid) {
+  function cartAdded(vid, siteAdd) {
     if (DATA) { var p = BY_VAR[vid]; if (p) ev('a', p.s); } else ev('a', String(vid).toLowerCase());
+    if (siteAdd) siteCross(vid);
   }
+  // Müşteri ürünü sitenin kendi "Sepete ekle" butonuyla eklediğinde (panel kapalı): "Bunu alanlar bunları da aldı"
+  // kartı. Öneriler gerçek siparişlerden (p.x), yoksa config.json > crossSell kurallarından; sadece stoktakiler.
+  // Ürün Bul'dan eklemede bu kart çıkmaz (orada panel içi öneri var). Kapatmak: config.json > "siteCross": false
+  var OWN_ADD_T = 0, SXS_T = 0;
+  function siteCross(vid) {
+    if (CFG.siteCross === false || isOpen || ADDING || Date.now() - OWN_ADD_T < 10000 || !root) return;
+    load('low').then(function () {
+      var p = BY_VAR[vid];
+      if (!p || isOpen || ADDING) return;
+      ADDED[p.id] = 1;
+      var list = crossFor(p);
+      if (!list.length) return;
+      var el = root.querySelector('.sxs');
+      if (!el) return;
+      el.innerHTML = '<div class="sxs-h">' + I.check + '<b>' + (list.fromData ? 'Bunu alanlar bunları da aldı' : 'Yanına iyi gider') + '</b>' +
+        '<button type="button" data-act="sxsx" aria-label="Kapat">' + I.x + '</button></div>' + list.map(function (x) {
+          var multi = (x.v || []).filter(function (v) { return v.id; }).length > 1, href = esc(url(x.s));
+          return '<div class="sxs-i">' + thumb(x.img, 120) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
+            (price(x) != null ? '<b>' + (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) + '</b>' : '') + '</div>' +
+            (multi ? '<a class="add" href="' + href + '">İncele</a>'
+              : '<button class="add" type="button" data-act="add" data-xs="1" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button>') + '</div>';
+        }).join('');
+      el.classList.add('on');
+      list.forEach(function (x) { ev('xs', x.s); });
+      track('site_cross_show', p.n);
+      var arm = function (ms) { clearTimeout(SXS_T); SXS_T = setTimeout(hideSiteCross, ms); };
+      arm(15000);
+      el.onpointerenter = function () { clearTimeout(SXS_T); };
+      el.onpointerleave = function () { arm(6000); };
+    }, function () {});
+  }
+  function hideSiteCross() { var el = root && root.querySelector('.sxs'); if (el) el.classList.remove('on'); clearTimeout(SXS_T); }
   // Ürün sayfası görüntüleme (ikas sayfa yenilemeden geçiş yapar; adres değişimi de izlenir)
   // Ürün verisi gerekmez: adres tek parçalıysa (ikas ürün adresi /urun-adi) gönderilir; kategori sayfaları menü
   // verisinden ayıklanır, ürün olmayan adresleri sync.mjs zaten yok sayar
