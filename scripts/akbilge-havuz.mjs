@@ -12,20 +12,61 @@ const toh = JSON.parse(await readFile('bilgi/tohumlar.json', 'utf8'));
 // Kaynaklar müşteriye gösterilmez (kafa karıştırmasın); kayıt alanında (kaynak) ve bilgi/ dosyalarında durur
 const tKaynak = () => '';
 const tohumMetin = (t) => [
-  `Yöntem: ${t.yontem === 'fide' ? 'fide ile yetiştirilir' : t.yontem}.`,
+  t.yontem === 'fide' ? 'Nasıl: önce fide yetiştirilir, sonra yerine dikilir.' : t.yontem === 'doğrudan' ? 'Nasıl: tohum doğrudan yerine ekilir.' : `Nasıl: ${t.yontem}.`,
   t.zaman && `Ne zaman: ${t.zaman}`,
-  t.derinlik && `Ekim derinliği: ${t.derinlik}.`,
-  t.mesafe && `Mesafe: ${t.mesafe}.`,
+  t.derinlik && `Ne kadar derine: ${t.derinlik}.`,
+  t.mesafe && `Aralık: ${t.mesafe}.`,
   t.cimlenme && `Çimlenme: ${t.cimlenme}.`,
   t.sicaklik, t.hasat && `Hasat: ${t.hasat}.`,
 ].filter(Boolean).map((x) => '• ' + x).join('\n');
 const USTA = 'Kesin bilgi için müşteri hizmetlerimizden destek alabilirsiniz.';
+// Sade dil: müşteriye giden cevaplarda ağır tarım terimleri ve kısaltmalar günlük dile çevrilir; miktarlar
+// "dekara 60–80 kg", "fidan başına 2 kg" gibi okunur biçimde yazılır. (Rakamlar değişmez, yalnız yazılışı değişir.)
+const TERIM = [
+  [/yetişkin ağaçta taç izdüşümündeki kök bölgesine; 15 cm en ve 15 cm derinlikte çembere veya diskaro ile toprak altına/gi, 'Yetişkin ağaçta; dal uçlarının altına 15 cm genişlik ve derinlikte bir çember açıp toprağa karıştırın'],
+  [/([\d.,]+)\s*cc\s*-\s*([\d.,]+)\s*(L|lt)\/dekar/g, 'dekara $1 ml – $2 litre'],
+  [/viyolü bandırma/gi, 'viyolünü suya batırma'],
+  [/(ağaca )?su yürümesi başladıktan (\d+ gün )?sonra/gi, (m, a, g) => (g ? `ağaç uyanıp tomurcuklar kabardıktan ${g}sonra` : 'ağaç uyanıp tomurcuklar kabarınca')],
+  [/su yürümesinden (\d+ gün) sonra/gi, 'ağaç uyanıp tomurcuklar kabardıktan $1 sonra'],
+  [/su yürümesi/gi, 'ağacın uyanması (tomurcukların kabarması)'],
+  [/taç izdüşümündeki/gi, 'dal uçlarının altına denk gelen'], [/taç izdüşümüne/gi, 'dal uçlarının altına'], [/taç izdüşümü/gi, 'dal uçlarının altı'],
+  [/meyve tutumunda/gi, 'meyveler oluşurken'], [/meyve irileştirme döneminde/gi, 'meyveler büyürken'],
+  [/kökle temas edecek şekilde/gi, 'köke değecek şekilde'], [/veya diskaro ile/gi, 'ya da çapayla'], [/diskaro ile/gi, 'çapayla'],
+  [/([\d.,]+(?:\s*[-–]\s*[\d.,]+)?)\s*kg\/dekar/g, 'dekara $1 kg'], [/([\d.,]+(?:\s*[-–]\s*[\d.,]+)?)\s*kg\/m²/g, 'metrekareye $1 kg'],
+  [/([\d.,]+(?:\s*[-–]\s*[\d.,]+)?)\s*(kg|g)\/(fidan|asma|bitki|kök|ağaç|fide|saksı)/g, '$3 başına $1 $2'],
+  [/([\d.,]+(?:\s*[-–]\s*[\d.,]+)?)\s*cc\/dekar/g, 'dekara $1 ml'], [/([\d.,]+(?:\s*[-–]\s*[\d.,]+)?)\s*(L|lt)\/dekar/g, 'dekara $1 litre'],
+  [/([\d.,]+(?:\s*[-–]\s*[\d.,]+)?)\s*(L|lt)\/da\b/g, 'dekara $1 litre'],
+  [/Gölge çapı \(m\) = kg/g, 'ağacın gölge çapı kaç metreyse o kadar kg (ör. 3 metre → 3 kg)'],
+  [/(\d)\s*L suya/g, '$1 litre suya'], [/(\d)\s*cc\b/g, '$1 ml'], [/\bcc\b/g, 'ml'],
+  [/(\d)\s*-\s*(\d)/g, '$1–$2'],
+];
+const sadeMetin = (t) => { let x = String(t || ''); for (const [re, to] of TERIM) x = x.replace(re, to); return x; };
+// Dekar geçen cevaba bir kez açıklama eklenir
+const dekarNot = (t) => (/dekar/.test(t) && !/1 dekar =/.test(t) ? t + '\n\n(1 dekar = 1.000 metrekare)' : t);
+// Kullanım satırı: "• Ne zaman / nasıl: ne kadar (yöntem)". Yöntem zaten cümlede geçiyorsa tekrar yazılmaz.
+const YONTEM = { 'Serpme / Toprak altı': 'toprağa serpip karıştırarak', 'Harca karıştırma': 'toprağa karıştırarak', 'Bant uygulama': 'sıra boyunca', 'Kök bölgesine': 'kök çevresine',
+  'Fidan çukuruna': 'fidan çukuruna', 'Taç izdüşümü / Toprak altı': 'dal uçlarının altına, toprağa karıştırarak', 'Fide çukuruna': 'fide çukuruna', 'Dikim yalağına': 'dikim çukuruna',
+  'Serpme': 'serperek', 'Bandırma': 'köklerini batırarak', 'Damla sulama': 'damla sulamayla', 'Yapraktan': 'yapraklara püskürterek', 'Tohum ıslama': 'tohumu ıslatarak',
+  'Yağmurlama': 'yağmurlama sulamayla', 'Geniş toprak uygulaması': 'toprağa', 'Sıra üzeri şerit uygulama': 'sıra boyunca', 'Sıra üzeri uygulama': 'sıra boyunca',
+  'Damlama / sulama suyuna': 'sulama suyuna katarak', 'Damla sulama / sulama suyuna': 'sulama suyuna katarak', 'Toprağa': 'toprağa' };
+const ANAHTAR = { 'fidan çukuruna': /fidan çukur/i, 'fide çukuruna': /fide çukur/i, 'dikim çukuruna': /dikim/i, 'serperek': /serp/i, 'toprağa serpip karıştırarak': /serp/i, 'toprağa karıştırarak': /karıştır|harc/i,
+  'sıra boyunca': /sıra|bant|şerit/i, 'kök çevresine': /kök/i, 'yapraklara püskürterek': /yaprak/i, 'damla sulamayla': /damla/i, 'sulama suyuna katarak': /sulama/i, 'köklerini batırarak': /bandır|batır/i,
+  'tohumu ıslatarak': /ısla/i, 'yağmurlama sulamayla': /yağmurla/i, 'toprağa': /toprağa|toprak/i, 'dal uçlarının altına, toprağa karıştırarak': /taç|dal uç/i };
+const buyuk = (x) => x.charAt(0).toLocaleUpperCase('tr-TR') + x.slice(1);
+const adim = (st) => {
+  const tam = sadeMetin(st[0]).replace(/[.;]\s*$/, ''), y = YONTEM[st[1]] ?? lc(st[1]), mik = sadeMetin(st[2]);
+  const tekrar = ANAHTAR[y] ? ANAHTAR[y].test(st[0]) : lc(st[0]).includes(y);
+  // Uzun açıklama "; " ile bölünmüşse: önce kısa başlık ve miktar, sonra nasıl yapılacağı
+  const [ne, ...ek] = tam.split(/;\s*/);
+  return `• ${buyuk(ne)}: ${mik}${y && !tekrar ? ' (' + y + ')' : ''}${ek.length ? '. ' + buyuk(ek.join(', ')) + '.' : ''}`;
+};
+const NOT_SADE = (n) => (n && /genel uygulama rehberi/i.test(n) ? 'Bu miktarlar genel öneridir; uygularken ürün etiketine de bakın.' : sadeMetin(n || ''));
 const out = [];
 // durum: hazir = doğrulanmış tablolardan/ürün bilgisinden üretildi, canlıda kullanılır. Claude'un yeni cevapları
 // sunucuda 'onay-bekliyor' olarak tutulur ve onaylanınca havuza katılır.
 // Aynı cümle bir cevapta iki kez geçmesin ("Kesin bilgi için müşteri hizmetlerimizden…" gibi); " ." → "."
 const tekil = (c) => { const g = new Set(); return c.replace(/ +([.,;:])/g, '$1').replace(/[^.!?\n]+[.!?]/g, (m) => { const k = m.trim().toLocaleLowerCase('tr-TR'); if (k.length > 20 && g.has(k)) return ''; g.add(k); return m; }).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(); };
-const add = (e) => { if (e.cevap) e.cevap = tekil(e.cevap); if (e.urun && (e.tur === 'urun' || e.tur === 'saksi' || e.tur === 'pompa')) e.sorular = kisaKalip(e.sorular, ((bySlug.get(e.urun) || {}).n || '')); out.push({ id: 'h' + String(out.length + 1).padStart(4, '0'), durum: 'hazir', ...e }); };
+const add = (e) => { if (e.cevap) e.cevap = tekil(dekarNot(sadeMetin(e.cevap))); if (e.urun && (e.tur === 'urun' || e.tur === 'saksi' || e.tur === 'pompa')) e.sorular = kisaKalip(e.sorular, ((bySlug.get(e.urun) || {}).n || '')); out.push({ id: 'h' + String(out.length + 1).padStart(4, '0'), durum: 'hazir', ...e }); };
 const lc = (s) => s.toLocaleLowerCase('tr-TR');
 // Kısa ürün adı: müşteri marka ve paket ölçüsü yazmaz ("hastürk sıvı solucan gübresi 1 lt" → "sıvı solucan gübresi")
 const MARKA = new Set(['hg', 'hastürk', 'hasturk', 'arzuman', 'altınvadi', 'egarden', 'reflex', 'wanpy', 'prochoice', 'chrysamed', 'brit', 'proline', 'uzman', 'raco', 'bestpet', 'quik', 'tigem', 'felicia', 'sgs', 'florist', 'jungle', 'tarm', 'delta', 'flip', 'güzelbahçe', 'lıtolan', 'litolan', 'beavis', 'dsv', 'lippa', 'spectrum', 'sinpest', 'trendline', 'ilposan', 'i̇lposan', 'biosas', 'komelon', 'envaplas', 'gartengold', 'icl', 'klasmann', 'pomsan', 'qts', 'serinova', 'özka', 'arom', 'gold', 'valley']);
@@ -59,13 +100,13 @@ const kisa = { kati: 'solucan gübresi', sivi: 'sıvı solucan gübresi', humik:
 for (const g of config.guides || []) {
   const ad = ((bySlug.get(g.product) || {}).n || g.title).trim(), k = kisa[g.id] || lc(g.title);
   for (const gr of g.groups || []) {
-    const satirlar = gr.steps.map((s) => `• ${s[0]} — ${s[1]}: ${s[2]}`).join('\n');
+    const satirlar = gr.steps.map(adim).join('\n');
     for (const bitki of gr.plants) {
       const b = bitki.replace(/\s*\(.*\)\s*/g, '').trim();
       add({
         tur: 'bitki-doz', bitki, grup: gr.name, urun: g.product,
         sorular: [`${b} için ${k} ne kadar kullanılır`, `${yon(bitki)} ${k} nasıl verilir`, `${b} ${k} dozu`, `${yon(bitki)} ne kadar ${k} atılır`],
-        cevap: `${ad} — ${bitki} (${gr.name}) için önerilen uygulama:\n${satirlar}\n\n${g.note || ''}`.trim(),
+        cevap: dekarNot(`${bitki.replace(/\s*\(.*\)\s*/g, '').trim()} için ${ad} kullanımı:\n${satirlar}\n\n${NOT_SADE(g.note)}`.trim()),
         urunler: [g.product], kaynak: `rehber:${g.id}`,
       });
     }
@@ -79,14 +120,14 @@ for (const g of config.guides || []) {
   for (const gr of g.groups || []) for (const bitki of gr.plants) {
     if (!BIRLESIK.has(bitki)) BIRLESIK.set(bitki, { grup: gr.name, parca: [], urunler: [] });
     const B = BIRLESIK.get(bitki);
-    B.parca.push(`${ad}:\n${gr.steps.map((st) => `• ${st[0]} — ${st[1]}: ${st[2]}`).join('\n')}`);
+    B.parca.push(`${ad}:\n${gr.steps.map(adim).join('\n')}`);
     B.urunler.push(g.product);
   }
 }
 for (const [bitki, B] of BIRLESIK) {
   const b = bitki.replace(/\s*\(.*\)\s*/g, '').trim(), l = lc(b);
   add({ tur: 'bitki-doz', bitki, grup: B.grup, sorular: [`${l} için gübre`, `${l} için besin`, `${l} için hangi gübre`, `${yon(bitki)} hangi gübre verilir`, `${l} gübreleme`, `${l} nasıl gübrelenir`, `${l} için en iyi gübre`, `${l} gübre önerisi`, `${l} ne zaman gübrelenir`, `${l} gübresi`],
-    cevap: `${bitki} (${B.grup}) için önerdiğimiz ürünler ve kullanım miktarları:\n\n${B.parca.join('\n\n')}`, urunler: [...new Set(B.urunler)], kaynak: 'rehber:birlesik' });
+    cevap: dekarNot(`${b} için önerdiğimiz ürünler ve miktarları:\n\n${B.parca.join('\n\n')}\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.`), urunler: [...new Set(B.urunler)], kaynak: 'rehber:birlesik' });
 }
 
 // B) Ürün kartları
@@ -113,15 +154,15 @@ for (const [slug, c] of Object.entries(kb)) {
 // D) Bitki → toprak (config.json > soilMatch; Ürün Bul'daki eşleştirme). Ürün canlı stoktan seçilir (dinamik)
 const PH = { 1: 'asidik', 2: 'hafif asidik', 3: 'nötr', 4: 'kireçli' };
 const desc = (pr) => { const a = [+pr[0], +pr[1], +pr[2], +pr[3], +pr[4], pr[5]];
-  return [a[1] !== a[0] ? `${PH[a[0]]}–${PH[a[1]]}` : PH[a[0]], { 2: 'iyi süzen', 3: 'çok iyi süzen' }[a[2]], { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[a[3]],
-    { 1: 'besini az', 3: 'besince zengin' }[a[4]], { k: 'kumlu', h: 'havalı' }[a[5]]].filter(Boolean).join(', '); };
+  return [a[1] !== a[0] ? `${PH[a[0]]}–${PH[a[1]]}` : PH[a[0]], { 2: 'suyu iyi süzen', 3: 'suyu çok iyi süzen' }[a[2]], { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[a[3]],
+    { 1: 'besini az', 3: 'besince zengin' }[a[4]], { k: 'kumlu', h: 'havadar' }[a[5]]].filter(Boolean).join(', '); };
 for (const pl of (config.soilMatch || {}).plants || []) {
   const [ad, diger, grup, prof, ozel, strict] = pl;
   if (!/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(prof || '')) continue;
   const adlar = [ad, ...String(diger || '').split(',').map((x) => x.trim()).filter(Boolean)];
   add({ tur: 'bitki-toprak', bitki: ad, grup, dinamik: 'toprak',
     sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`, `${lc(n)} için en iyi toprak`, `${lc(n)} için uygun toprak`, `${lc(n)} toprak önerisi`, `${lc(n)} saksı değişimi toprak`]),
-    cevap: `${ad} ${desc(prof)} bir toprak sever.${strict === 's' ? ' Çok özel bir ortam ister; uygun hazır toprak yoksa başka toprak önermeyiz.' : ''} Önerdiğimiz toprak, o anki stok durumuna göre aşağıda gösterilir.`,
+    cevap: `${ad} ${desc(prof)} bir toprak sever.${strict === 's' ? ' Çok özel bir ortam ister; uygun hazır toprak yoksa başka toprak önermeyiz.' : ''} Size uygun toprağımız aşağıda.`,
     urunler: ozel ? [ozel] : [], kaynak: 'config:soilMatch' });
 }
 
