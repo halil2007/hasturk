@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2991 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3006 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -69,7 +69,7 @@ _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 g
 
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
-| 1 | sıvı solucan gübresi | 35 | 11 |  |  |
+| 1 | sıvı solucan gübresi | 38 | 14 | ↑ ×1,6 |  |
 | 2 | saksı | 16 | 6 |  |  |
 | 3 | solucan | 15 | 1 |  |  |
 | 4 | solucan gübresi | 13 | 3 |  |  |
@@ -131,7 +131,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 
 | # | Ürün | Sepete ekleme | Görüntüleme |
 |---|---|---|---|
-| 1 | Sıvı Solucan Gübresi 1 Lt | 10,2 | 2,6 |
+| 1 | Sıvı Solucan Gübresi 1 Lt | 12,2 | 2,6 |
 | 2 | Altınvadi Roka Tohumu (Toros İri Yaprak) | 4,6 | 3,5 |
 | 3 | HG Tarım Perliti | 3,5 | 18,7 |
 | 4 | Leonardit - Organik Toprak Düzenleyici | 3,3 | 43,5 |
@@ -139,7 +139,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 6 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,8 | 1,3 |
 | 7 | Arzuman Marmande Domates Tohumu | 2,8 | 4,7 |
 | 8 | Şahnalı Acı Sivri Biber Ata Tohumu (50 Adet) | 2,6 | 4,5 |
-| 9 | HasTürk Hümix Sıvı Hümik Asit | 2,5 | 25 |
+| 9 | HasTürk Hümix Sıvı Hümik Asit | 2,5 | 27 |
 | 10 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 2,1 | 0,6 |
 | 11 | Altınvadi Tere Tohumu 10 Gr | 1,9 | 0 |
 | 12 | Altınvadi Köy Tipi Domates Tohumu 5 Gr | 1,9 | 8,3 |
@@ -165,9 +165,9 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | HG Asidik Torf | 32,5 | 0,5 | %2 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 30,1 | 0 | %0 |
 | HG Mezar Toprağı | 28,8 | 0 | %0 |
+| Guanokalong Yarasa Gübresi Toz | 25 | 1 | %4 |
 | Yuka (Yucca) Toprağı Özel Karışım | 24,4 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 21,3 | 0 | %0 |
-| Guanokalong Yarasa Gübresi Toz | 21 | 1 | %5 |
 | Uzman 5 lt Basınçlı İlaçlama Pompası | 20,1 | 0 | %0 |
 | HG Çim Kapama Toprağı (Leonarditli Formül) | 19,2 | 0,4 | %2 |
 | Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı | 18 | 0,8 | %5 |
@@ -208,16 +208,16 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 ## Çapraz satış önerilerinin sonucu (son 30 gün)
 
-Öneri 10 kez gösterildi, 0 kez sepete eklendi (%0).
+Öneri 16 kez gösterildi, 0 kez sepete eklendi (%0).
 
 | # | Önerilen ürün | Gösterildi | Eklendi | Oran |
 |---|---|---|---|---|
-| 1 | hasturk-kati-solucan-gubresi | 2 | 0 | %0 |
-| 2 | Katı Solucan Gübresi 3 KG | 2 | 0 | %0 |
-| 3 | Katı Solucan Gübresi 20 KG Çuval | 2 | 0 | %0 |
-| 4 | hasturk-sivi-solucan-gubresi | 1 | 0 | %0 |
-| 5 | Fide Toprağı / Organik Tohum ve Fide Harcı | 1 | 0 | %0 |
-| 6 | Leonardit - Organik Toprak Düzenleyici | 1 | 0 | %0 |
+| 1 | Katı Solucan Gübresi 3 KG | 4 | 0 | %0 |
+| 2 | Katı Solucan Gübresi 20 KG Çuval | 4 | 0 | %0 |
+| 3 | hasturk-kati-solucan-gubresi | 3 | 0 | %0 |
+| 4 | Leonardit - Organik Toprak Düzenleyici | 2 | 0 | %0 |
+| 5 | hasturk-sivi-solucan-gubresi | 1 | 0 | %0 |
+| 6 | Fide Toprağı / Organik Tohum ve Fide Harcı | 1 | 0 | %0 |
 | 7 | HG Organik Sebze Yetiştirme Toprağı  | 1 | 0 | %0 |
 
 ## Masaüstü menü önerileri (kategori başına ilk 3)
@@ -229,7 +229,7 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 | Saksılar ve Bahçe Yatakları | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Dekoratif Oval Silindir Fiber Saksı 36 × 40 cm (`dekoratif-oval-silindir-fiber-saksi-36x40-cm`)<br>Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 545 Litre (`moduler-yukseltilmis-bahce-yatagi-545-litre`) |
 | Topraklar | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt (`hindistan-cevizi-torfu-cocopeat-5-kg`)<br>HG Tarım Perliti (`tarim-perliti`) |
 | Tohumlar | Altınvadi Roka Tohumu (Toros İri Yaprak) (`altinvadi-roka-tohumu-toros-iri-yaprak`)<br>Arom Dere Otu Ata Tohumu (50 Adet) (`arom-dere-otu-ata-tohumu-50-adet`)<br>Altınvadi Toros Maydanozu Tohumu 10 Gr (`altinvadi-toros-maydanozu-tohumu-10-gr`) |
-| Gübreler | Katı Solucan Gübresi 20 KG Çuval (`kati-solucan-gubresi-20-kg-cuval`)<br>Leonardit - Organik Toprak Düzenleyici (`leonardit-organik-toprak-duzenleyici`)<br>Hastürk Katı Solucan Gübresi 20 Kg (`kati-solucan-gubresi-20-kg`) |
+| Gübreler | Katı Solucan Gübresi 20 KG Çuval (`kati-solucan-gubresi-20-kg-cuval`)<br>Leonardit - Organik Toprak Düzenleyici (`leonardit-organik-toprak-duzenleyici`)<br>Sıvı Solucan Gübresi 1 Lt (`sivi-solucan-gubresi-1-lt`) |
 | Bahçe Ekipmanları | Uzman Lityum Akülü İlaçlama Pompası 5 Lt (`uzman-lityum-akulu-ilaclama-pompasi-5-lt`)<br>Uzman Lityum Akülü İlaçlama Pompası 8 Lt (`uzman-lityum-akulu-ilaclama-pompasi-8-lt`)<br>Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  (`uzman-10-lt-basincli-ilaclama-pompasi-k-73`) |
 | Halk Sağlığı Ürünleri | İnsektisit MAX 5 Lt Kampanya Paketi (`insektisit-max-5-lt-kampanya-paketi`)<br>Chrysamed Worm-Ex 5 Lt Tahta Kurdu İlacı (`chrysamed-worm-ex-tahta-agac-kurdu-ilaci-5-lt`)<br>Chrysamed İnsektisit Max 5 Lt | Tahtakurusu ve Akrep İlacı (`chrysamed-insektisit-max-5-lt-ekonomik-tahtakurusu-akrep-ilaci`) |
 | Kedi Ürünleri | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g (`reflex-plus-pate-kuzu-etli-yetiskin-kedi-mamasi-85-g`)<br>Reflex Pocket Treats Ağız ve Diş Sağlığı Kedi Ödül Maması 60 Gr (`reflex-pocket-treats-agiz-ve-dis-sagligi-kedi-odul-mamasi-60-gr`)<br>Reflex Plus Loaf Biftekli Yetişkin Kedi Konservesi 400 Gr (`reflex-plus-loaf-biftekli-yetiskin-kedi-konservesi-400-gr`) |
