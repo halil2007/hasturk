@@ -1,6 +1,7 @@
 // Cloudflare Worker: public/ klasöründeki dosyalar (widget, ürün verisi) doğrudan statik sunulur, bu kod onlarda çalışmaz.
-// Sadece iki adres için devreye girer:
+// Sadece şu adresler için devreye girer:
 //   POST /e       widget'tan gelen anonim ziyaretçi olayları (arama, tıklama, görüntüleme, sepete ekleme)
+//   GET  /ai/durum  Ak Bilgi için Anthropic anahtarı kayıtlı mı (anahtar gösterilmez)
 //   GET  /trends  son 30 günün özeti (ivme dahil) + son 2 yılın aynı dönemi (scripts/sync.mjs 2 saatte bir okur, products.json'a işler)
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
@@ -136,6 +137,14 @@ export default {
       return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' } });
     }
     if (pathname === '/trends') return trends(env, ctx).catch(() => new Response('{"ok":false}', { status: 500 }));
+    // Ak Bilgi hazırlığı: Anthropic anahtarı Cloudflare'de doğru adla (ANTHROPIC_API_KEY) kayıtlı mı. Anahtarın kendisi
+    // asla gösterilmez; sadece var/yok, uzunluk ve türünü belirten ilk ek (ör. "sk-ant-api")
+    if (pathname === '/ai/durum') {
+      const k = typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY.trim() : '';
+      const m = k.match(/^sk-ant-[a-z]+/);
+      return new Response(JSON.stringify({ anahtar: !!k, tur: m ? m[0] : k ? 'beklenmeyen biçim' : null, uzunluk: k.length || 0 }),
+        { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
     return new Response('Bulunamadı', { status: 404 });
   },
 };
