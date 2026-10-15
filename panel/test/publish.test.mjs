@@ -140,6 +140,20 @@ test('hazırlık: eksikler, kategori önerisi, marka otomatik eşleşir; yayınl
   } finally { done(); }
 });
 
+test('fiyat farkı (%): yayınla ekranında girilir, ilk gönderimde site fiyatına eklenir ve kanal için kaydedilir', async () => {
+  const { db, ids, calls, call } = await setup();
+  try {
+    await run(db, "INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES ('Gübre', 'trendyol', '2001', 'Organik Gübre', ?, 0, 'x')", JSON.stringify({ 47: { value: '@variant' }, 1192: { id: '10617', value: 'TR' }, 60: { id: '6001', value: 'Kahverengi' } }));
+    const pf = await call(`catalog/preflight?ids=${ids[0]}&channels=trendyol`);
+    assert.equal(pf.channels[0].markup, 0);
+    const pub = await call('catalog/publish', { method: 'POST', body: { ids, channels: ['trendyol'], opts: { trendyol: { cargoCompanyId: '17', markup: '10' } } } });
+    assert.equal(pub.results.trendyol.sent, 2);
+    const it = sends(calls)[0].body.items[0];
+    assert.equal(it.salePrice, 110); assert.equal(it.listPrice, 143);
+    assert.equal((await call(`catalog/preflight?ids=${ids[0]}&channels=trendyol`)).channels[0].markup, 10, 'kanal için hatırlanır');
+  } finally { done(); }
+});
+
 test('marka bulunamazsa seçilir ve hatırlanır', async () => {
   const { db, ids, calls, call } = await setup();
   try {

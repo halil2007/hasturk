@@ -200,7 +200,7 @@ export async function uploadView(el) {
     const c = C();
     const s = sheet({ title: `${c.name}: yükleme ayarları` });
     s.setBody(html`<div class="stack">
-      <label class="field"><span>Fiyat farkı (%)</span><input class="input" data-o="markup" inputmode="decimal" value="${c.opts.markup || ''}" placeholder="0"><small>ikas fiyatına eklenir (ör. komisyonu karşılamak için 10). Boşsa aynı fiyat.</small></label>
+      <label class="field"><span>Fiyat farkı (%)</span><input class="input" data-o="markup" inputmode="decimal" value="${c.opts.markup || ''}" placeholder="0"><small>Site fiyatına eklenir (ör. komisyonu karşılamak için 10 → 1.000 ₺ ürün 1.100 ₺ gider). Yalnız ilk gönderimde uygulanır; sonraki fiyat değişikliklerini kanal fiyatından yaparsınız. Boşsa aynı fiyat.</small></label>
       ${c.options.map((o) => html`<label class="field"><span>${o.label}</span><input class="input" data-o="${o.k}" value="${c.opts[o.k] || ''}"></label>`)}
     </div>`);
     s.setFoot(html`<div class="row" style="width:100%"><span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-x="save">Kaydet</button></div>`);
