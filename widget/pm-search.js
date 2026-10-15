@@ -8,7 +8,7 @@
  *   data-site      ikinci mağaza klasörü (örn. "tarim" → tarim/products.json, tarim/menu.json; kendi ürün ve renkleri)
  *   data-store     mağaza adresi (varsayılan: bulunulan site)
  *   data-fab       "off" → sağ alttaki "Ürün Bul" butonunu gösterme
- *   data-akfab     "off" → sol alttaki "Ak Bilge'ye sor" butonunu gösterme (Ak Bilge yine Ürün Bul içinde)
+ *   data-akfab     "off" → sol alttaki "Bilge Bey'e sor" butonunu gösterme (asistan yine Ürün Bul içinde)
  *   data-auto      "off" → sitedeki arama butonlarını otomatik tanıma
  */
 (function () {
@@ -968,7 +968,7 @@
     VSTACK.push({ v: view, q: $q ? $q.value : '', s: $body ? $body.scrollTop : 0, n: CSHOWN });
     if (VSTACK.length > 20) VSTACK.shift();
   }
-  var TABS = [['ak', 'Ak Bilge', 'bot', 'Ak Bilge'], ['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
+  var TABS = [['ak', 'Bilge Bey', 'bot', 'Bilge Bey'], ['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
   var BY_ID = {};
 
   function build() {
@@ -979,7 +979,7 @@
     root.innerHTML =
       '<style>' + CSS + '</style><div class="root">' +
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="gl"></span><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
-      '<button class="fab akfab hide" type="button" aria-label="Ak Bilge\'ye sor"><span class="gl"></span><span class="fi"></span><span class="t">Ak Bilge\'ye sor</span></button>' +
+      '<button class="fab akfab hide" type="button" aria-label="Bilge Bey\'e sor"><span class="gl"></span><span class="fi"></span><span class="t">Bilge Bey\'e sor</span></button>' +
       '<div class="ptoast" role="status"></div>' +
       '<div class="sxs" role="dialog" aria-label="Birlikte alınan ürünler"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
@@ -1162,7 +1162,7 @@
   })();
   try { AK.log = JSON.parse(sessionStorage.getItem('ua-ak-log') || '[]') || []; } catch (e) { AK.log = []; }
   function akOn() { var c = CFG.akbilge; return !!(AK_URL && c && (c.enabled || AK_PREV)); }
-  function akName() { return (CFG.akbilge && CFG.akbilge.name) || 'Ak Bilge'; }
+  function akName() { return (CFG.akbilge && CFG.akbilge.name) || 'Bilge Bey'; }
   // Yönelme eki (isim değişirse "…'ye / …'ya / …'e / …'a sor" doğru çıksın)
   function akYe(n) {
     var w = String(n).toLocaleLowerCase('tr-TR').replace(/[^a-zçğıöşü]+$/, ''), v = (w.match(/[aeıioöuü]/g) || ['e']).pop();
@@ -1203,8 +1203,10 @@
     if (it.oy === 0) return '<div class="akfb"><span>Geri bildiriminiz için teşekkürler.</span></div>' + akContact(it.q, 'Müşteri hizmetlerimizden doğru bilgiyi alabilirsiniz:');
     return '<div class="akfb"><span>İşinize yaradı mı?</span><button type="button" data-act="akoy" data-v="1:' + idx + '">Evet</button><button type="button" data-act="akoy" data-v="0:' + idx + '">Hayır</button></div>';
   }
-  // Başlıkta her zaman görünen küçük canlı destek bağlantısı (ısrarcı değil, elinin altında)
+  // Başlıktaki küçük canlı destek satırı: varsayılan kapalı (sohbet sade kalsın; iletişim düğmeleri yalnız gerektiğinde
+  // cevabın altında çıkar). config.json > akbilge.liveLine: true açar
   function akLive() {
+    if (!(CFG.akbilge || {}).liveLine) return '';
     var tel = CFG.phone ? 'tel:' + CFG.phone.replace(/[^\d+]/g, '') : '';
     if (!CFG.whatsapp && !tel) return '';
     return '<div class="aklive"><span>Müşteri hizmetleri:</span>' +
@@ -1225,7 +1227,11 @@
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
       // Cevap müşteriyi bize yönlendiriyorsa ("müşteri hizmetleri", "WhatsApp'tan yazın") düğmeler hemen altında olsun
-      var refer = /whatsapp|müşteri hizmet|ustamız|bize yazın|bizi arayın|uzmanımız/i.test(d.cevap) && it.oy == null;
+      // İletişim düğmeleri her cevabın altına konmaz: yalnız cevap esas olarak bize yönlendiriyorsa (bilgi kısmı çok kısaysa)
+      // çıkar. Bilgi veren uzun cevabın sonundaki "müşteri hizmetlerimizden destek alabilirsiniz" cümlesi düğme çıkarmaz.
+      var CRE = /whatsapp|müşteri hizmet|ustamız|bize yazın|bizi arayın|uzmanımız/i;
+      var bilgi = (String(d.cevap).match(/[^.!?\n]+[.!?]*/g) || []).filter(function (x) { return !CRE.test(x); }).join(' ').replace(/\s+/g, ' ').trim();
+      var refer = CRE.test(d.cevap) && bilgi.length < 160 && it.oy == null;
       return akBot(pose, html) + (prods ? '<div class="akpw">' + prods + '</div>' : '') + (refer ? akContact(q, '') : '') + akVoteHtml(it, idx);
     }
     var why = d.ok === false || d.neden === 'hata' ? 'Şu an bağlantıda bir sorun oldu.'

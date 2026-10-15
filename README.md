@@ -137,15 +137,15 @@ Puan = şimdi + ivme + 0,6 × sezon × teyit. Kullanıldığı yerler:
 
 Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collect="off"`.
 
-## Ak Bilge (tarım danışmanı)
+## Bilge Bey (tarım danışmanı; eski adı Ak Bilge)
 
-Ürün Bul penceresinde "Ak Bilge" sekmesi: müşteri gübre, toprak, tohum, saksı, pompa ya da bitki sorunu (yaprak sararması, solma, çiçek açmama, zararlılar) sorusunu yazar.
+Ürün Bul penceresinde "Bilge Bey" sekmesi (isim `config.json > akbilge.name`): müşteri gübre, toprak, tohum, saksı, pompa ya da bitki sorunu (yaprak sararması, solma, çiçek açmama, zararlılar) sorusunu yazar.
 
 1. Soru önce **hazır soru havuzunda** aranır (`src/akbilge-havuz.json`, ~1400 cevap). Bulunursa cevap anında ve ücretsizdir. Bitki sorunlarında olası nedenler, nasıl anlaşılır, ne yapılmalı ve sitedeki faydalı ürünler yazılır (`scripts/akbilge-sorun.mjs` → `bilgi/sorunlar.json`); stokta olmayan ürün cevaptan çıkar. Havuzdaki rakamlar yalnız doğrulanmış tablolardan gelir (`bilgi/`, kaynaklar `bilgi/DOGRULAMA.md`).
 2. Havuzda yoksa **Claude** (claude-opus-5-5, düşük düşünme seviyesi) en yakın havuz cevapları ve ilgili ürünlerle cevaplar; listede olmayan ürün ya da rakam veremez. Günlük sınır var.
 3. Cevap verilemezse WhatsApp / arama düğmesi çıkar (soru WhatsApp mesajına hazır yazılır).
 
-**Açma / deneme:** `config.json > akbilge.enabled` false iken sekme yalnız siteye `?akbilge=1` ile girene görünür (aynı tarayıcıda kalıcı; `?akbilge=0` kapatır). Herkese açmak için `"enabled": true`. İsim: `akbilge.name`. Ak Bilge açıkken penceredeki alttaki sabit WhatsApp/Ara çubuğu gizlenir (`"contactBar": true` ile yine gösterilir). Ak Bilge ayrıca Ürün Bul'un karşı köşesinde (sol alt) kendi butonuyla durur: "Ak Bilge'ye sor" (maskot avatarıyla); tıklanınca pencere doğrudan Ak Bilge sekmesinde açılır, sepet/ödeme sayfalarında gizlenir, alttaki sabit çubukların üstüne çıkar. `akbilge.fab: false` ya da script'te `data-akfab="off"` kapatır; `akbilge.fab: { "text": "…" }` yazıyı değiştirir.
+**Açma / deneme:** `config.json > akbilge.enabled` false iken sekme yalnız siteye `?akbilge=1` ile girene görünür (aynı tarayıcıda kalıcı; `?akbilge=0` kapatır). Herkese açmak için `"enabled": true`. İsim: `akbilge.name`. Ak Bilge açıkken penceredeki alttaki sabit WhatsApp/Ara çubuğu gizlenir (`"contactBar": true` ile yine gösterilir). Ak Bilge ayrıca Ürün Bul'un karşı köşesinde (sol alt) kendi butonuyla durur: "Bilge Bey'e sor" (maskot avatarıyla); tıklanınca pencere doğrudan Ak Bilge sekmesinde açılır, sepet/ödeme sayfalarında gizlenir, alttaki sabit çubukların üstüne çıkar. `akbilge.fab: false` ya da script'te `data-akfab="off"` kapatır; `akbilge.fab: { "text": "…" }` yazıyı değiştirir. WhatsApp/arama düğmeleri her cevabın altına konmaz: yalnız asistan bize yönlendirdiğinde (cevap veremediğinde, emin olmadığında, cevabın bilgi kısmı çok kısaysa) ve müşteri "Hayır" oyu verdiğinde çıkar. Başlıktaki "Müşteri hizmetleri" satırı varsayılan kapalı (`akbilge.liveLine: true` açar).
 
 **Cloudflare (hasturk-arama Worker → Settings → Variables and Secrets):** `ANTHROPIC_API_KEY` (Secret, zorunlu değil — yoksa yalnız havuz çalışır), `AK_DAILY_LIMIT` (günlük Claude sorgusu, varsayılan 150), `AK_AI=off` (Claude'u kapatır), `AK_MODEL`.
 

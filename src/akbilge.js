@@ -282,7 +282,7 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
   if (q.length < 3) return json({ ok: false, why: 'kisa' }, 400);
   const page = /^[a-z0-9-]{1,140}$/.test(body.p || '') ? body.p : null;
   const site = /^[a-z0-9-]{1,30}$/.test(body.s || '') ? body.s : 'hasturk';
-  const name = String(body.n || 'Ak Bilge').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 30) || 'Ak Bilge';
+  const name = String(body.n || 'Bilge Bey').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 30) || 'Bilge Bey';
   const db = env.DB;
   if (db) await initDb(db).catch(() => {});
   const extra = db ? await approved(db).catch(() => []) : [];
