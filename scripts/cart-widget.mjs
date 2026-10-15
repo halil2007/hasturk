@@ -102,7 +102,7 @@ if (await p.locator(R + '.akall').count()) {
   const before = await cart();
   await p.locator(R + '.akall').last().tap();
   await p.locator(R + '.sheet.on [data-act="bgo"]').waitFor({ timeout: 5000 });
-  const sec = await p.locator(R + '.sheet.on .bl:not(.off) .blt b').allTextContents();
+  const sec = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.bl:not(.off) .blt b')].map((x) => x.textContent.trim()));
   const f1 = frames; t0 = Date.now();
   await p.locator(R + '.sheet.on [data-act="bgo"]').tap();
   r = await waitToast(t0); c = await cart();
