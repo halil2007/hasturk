@@ -1,5 +1,5 @@
 {
- "guncelleme": "2026-10-15T11:29:44.817Z",
+ "guncelleme": "2026-10-15T11:30:55.106Z",
  "gun": 30,
  "kayit": 3069,
  "aramalar": [
@@ -402,6 +402,701 @@
    "kelime": "perli",
    "adet": 1,
    "son7": 1
+  },
+  {
+   "kelime": "taht",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "tahtakurusu",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "tahtakurusu ilaci",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "tahtakurusu t",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "yonca tohumu",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "begonvil",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "bio",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "bonsai saksı toprağı",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "dolucan",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "lep",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "marul",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "moduler",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "nar",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "ve",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "ya",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "çim gübre",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "bitkş besin",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "gu",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "guv",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "guver",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "habuç",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "kat",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "katı s",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "katı sol",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "kedi",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "kum",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "saksı beyaz",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "sıv",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "sıvı d",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "sıvı dolu",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "sıvı sol",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "taş bryaz",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "tre",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "yrendline",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "5 li",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "bitki besini",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "pon",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "sgs",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "taban",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "toprak saksı",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "areka",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cicek",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cift",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cocop",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "damla",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "damla fiber saksi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "grow",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hayva",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kadi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kati soluca",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kil t",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kil taşı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "limon ağacı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "menek",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "menekm",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "neyaz",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "or",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "se",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "suku",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "turunc",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "uzmana",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "a z",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "da",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ince",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ince damla",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kök",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kökl",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "lchrysamed",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "m ö m",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "yü",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "yükse",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "çuha",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ant",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ant hum",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "doma",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "domates",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "elma",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kö",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "köp",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "köpek mamas",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "köpek mamaso",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "köpek maması",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "köpel",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "lav",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "mons",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "sakaı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "salep t",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "un",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "uzman akülü",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "1.5",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "2.5",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "arı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "asidik t",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "barış",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "barış çiçe",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "bentonit",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "bestpet",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "bu l",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ci",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "civa",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "gül",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hümi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ilaç",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kaktüs top",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kaktüs toprağo",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "mezar",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "mont",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "narenciye",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "nilüfer çiçeği toprağı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "pot",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "re",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ref",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "reflex",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "saks",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "saksi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "tarım",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "tarım perlit",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "tarım perliti",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "yas kedi mamasi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "fare k",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "fide toprağı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "mama",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "çim a",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "çim ay",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hüm",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "pomza ta",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "saksı 30",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "tahta k",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "çim gübresi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "biyo",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "coco",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "gübr",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "gübre",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ilaçlam",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kil b",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "enjo",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "felici",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hümik",
+   "adet": 1,
+   "son7": 0
   }
  ],
  "sonucsuz": [
@@ -654,6 +1349,436 @@
    "kelime": "yabanmersi torfu",
    "adet": 1,
    "son7": 1
+  },
+  {
+   "kelime": "zeytin",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "çak",
+   "adet": 1,
+   "son7": 1
+  },
+  {
+   "kelime": "akçaağaç için toprak",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "açelya",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "açelya toprağı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "beyaz topuklu ayakkabı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "biobi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cicek tohumumenekse",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "eyaz topuklu ayakkabı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "fr",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "fr5",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "fr5wa",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "fr5waz",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kabuklu bi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "limon kekik",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ney",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "neyaz topuklu",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "neyaz topuklu ayakkab",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "neyaz topuklu ayakkabı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "pire ilacı",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "sukuor",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "bordo",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cc",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cc z",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "dak",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "i.",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kökle",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "lc",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "lch",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "lchry",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "lchrysa",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "sümbül",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "çç",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ççxffxxxxxxðdfff",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ççç",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ", ,",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ", , v b",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ", , v b ,jjg",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ".....",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "......",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ".......",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "........",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ".........",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "...........",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "............",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "............ .",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "............ .x x",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "akadama",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ant hu",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ant humik",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ant humiks",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "ibaraki",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "kç",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "nn",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "nnh. c",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "nnh. cccccx x",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "salep top",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "tower, buyukdere caddesi no 209 kat 9",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "yaban mersini torfu",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ". v",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "..ççççşlç",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": ".n",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "1.5 lt",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "1m5",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cr",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "cry",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "crys",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hibri",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hibrit",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hibrit sebze",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hibrit sebze ro",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hibrit sebze rohumu",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "hibrit sebze tohumu",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "jnji",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "evc",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "evcil hayvan",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "lav ta",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "saksı eni 3p",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "2 4 yılllık fidan in",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "2 4 yılllık fidan için",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "2 4 yılllık fidan içşn",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "biy",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "biyokö",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "biyokömür",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "fidan gübresi",
+   "adet": 1,
+   "son7": 0
+  },
+  {
+   "kelime": "karadeniz fasulye",
+   "adet": 1,
+   "son7": 0
   }
  ],
  "urunler": {
