@@ -81,6 +81,7 @@ Değişiklik bir sonraki sorguda geçerli olur, robotu kapatıp açmak gerekmez.
 | `esZamanli` | 6 | Aynı anda çalışan şirket sayısı. Bilgisayar yavaşsa düşürün. |
 | `kanal` | `chrome` | `chrome` ya da `msedge`. |
 | `gizli` | `false` | `true`: pencere görünmez. Giriş gerektiğinde çalışmaz; önce görünür modda giriş yapın. |
+| `proxy` | `""` | Tüm şirketler bu proxy üzerinden bağlanır. Biçim: `IP:PORT` (örn. `88.12.34.56:8080`) ya da `http://IP:PORT`. Boş: proxy yok. Yerel adresler (`127.0.0.1`) her zaman muaf. |
 | `girisBeklemeDk` | 5 | Giriş için en fazla kaç dakika beklenir. |
 | `adimZamanAsimiSn` / `sirketZamanAsimiSn` | 30 / 150 | Tek bir adım / bir şirketin tamamı için süre sınırı. |
 
@@ -94,5 +95,6 @@ Değişiklik bir sonraki sorguda geçerli olur, robotu kapatıp açmak gerekmez.
 
 - `sunucu.mjs` yerel arayüz ve API (`/api/teklif`, `/api/olaylar` canlı durum), `motor.mjs` sekme yönetimi + giriş bekleme + fiyat toplama, `kaydet.mjs` Playwright kaydını adaptöre çevirir (şifre satırlarını atar, örnek değerleri `veri.*` yapar), `yardimci.mjs` ortak parçalar.
 - Adaptör sözleşmesi: `export const adres` ve `export async function teklifAl(page, veri, arac)` → `{ fiyat, fiyatMetni }`. İsteğe bağlı: `export async function egmSorgu(page, veri, arac)` → araç bilgisi nesnesi (EGM kaynağı şirket için); `export async function girisGerekliMi(page)` (varsayılan: ekranda şifre kutusu var mı).
-- Deneme: `npm test` (ekransız Linux'ta `xvfb-run -a npm test`) — iki demo portalda giriş bekleme, oturumun korunması, fiyat okuma, dönüştürücü ve API'yi dener.
+- Proxy (`ayarlar.json` → `proxy`) tüm tarayıcı trafiğine uygulanır; tek proxy, IP:PORT. Kayıt (`kaydet.mjs`) de aynı proxy'den geçer, böylece portallar gerçek IP'nizi görür.
+- Deneme: `npm test` (ekransız Linux'ta `xvfb-run -a npm test`) — iki demo portalda giriş bekleme, oturumun korunması, fiyat okuma, proxy yönlendirmesi, dönüştürücü ve API'yi dener.
 - `kaydet.mjs` Playwright'ın kayıt özelliğini kullanır; bu yüzden Playwright sürümü `package.json`'da sabittir.

@@ -13,7 +13,17 @@ export function ayarlariOku() {
   if (process.env.TEKLIF_TARAYICI_YOLU) ayar.tarayiciYolu = process.env.TEKLIF_TARAYICI_YOLU;
   if (process.env.TEKLIF_GIZLI) ayar.gizli = process.env.TEKLIF_GIZLI === '1';
   if (process.env.TEKLIF_PORT) ayar.port = Number(process.env.TEKLIF_PORT);
+  if (process.env.TEKLIF_PROXY !== undefined) ayar.proxy = process.env.TEKLIF_PROXY;
   return ayar;
+}
+
+// "1.2.3.4:8080" ya da "http://1.2.3.4:8080" → Playwright proxy ayarı.
+// Tüm şirketler aynı proxy üzerinden bağlanır; yerel adresler proxy'den muaf.
+export function proxiAyari(proxy) {
+  const s = String(proxy || '').trim();
+  if (!s) return undefined;
+  const server = /^[a-z0-9]+:\/\//i.test(s) ? s : 'http://' + s;
+  return { server, bypass: 'localhost,127.0.0.1' };
 }
 
 export function sirketleriOku() {
@@ -29,6 +39,8 @@ export function sirketleriYaz(liste) {
 // için "beni hatırla" türü girişler kapatıp açınca da durur.
 export async function tarayiciAc(ayar) {
   const ortak = { headless: !!ayar.gizli, viewport: null, args: ['--start-maximized'] };
+  const proxy = proxiAyari(ayar.proxy);
+  if (proxy) ortak.proxy = proxy;
   const denemeler = [];
   if (ayar.tarayiciYolu) denemeler.push({ executablePath: ayar.tarayiciYolu });
   if (ayar.kanal) denemeler.push({ channel: ayar.kanal });

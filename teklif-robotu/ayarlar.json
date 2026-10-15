@@ -4,6 +4,7 @@
   "kanal": "chrome",
   "tarayiciYolu": "",
   "gizli": false,
+  "proxy": "",
   "girisBeklemeDk": 5,
   "adimZamanAsimiSn": 30,
   "sirketZamanAsimiSn": 150

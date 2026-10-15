@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -13,7 +14,7 @@ const gecici = fs.mkdtempSync(path.join(os.tmpdir(), 'teklif-test-'));
 process.env.TEKLIF_PORT = String(PORT);
 process.env.TEKLIF_PROFIL = path.join(gecici, 'profil-motor');
 
-const { KOK, ayarlariOku, aracDuzelt, aracOzet, tcGecerliMi, tutarCevir, veriHazirla } = await import('../yardimci.mjs');
+const { KOK, ayarlariOku, aracDuzelt, aracOzet, proxiAyari, tarayiciAc, tcGecerliMi, tutarCevir, veriHazirla } = await import('../yardimci.mjs');
 const { Motor } = await import('../motor.mjs');
 const { donustur } = await import('../kaydet.mjs');
 
@@ -36,6 +37,11 @@ await dene('veri hazırlama', () => {
   assert.deepEqual([v.plaka, v.plakaIl, v.plakaHarf, v.plakaNo], ['34ABC123', '34', 'ABC', '123']);
   assert.equal(v.dogumTarihi, '01.02.1985');
   assert.equal(v.dogumTarihiISO, '1985-02-01');
+});
+await dene('proxy ayarı biçimi', () => {
+  assert.equal(proxiAyari(''), undefined);
+  assert.deepEqual(proxiAyari('1.2.3.4:8080'), { server: 'http://1.2.3.4:8080', bypass: 'localhost,127.0.0.1' });
+  assert.equal(proxiAyari('http://1.2.3.4:8080').server, 'http://1.2.3.4:8080');
 });
 await dene('araç bilgisi düzeltme ve özet', () => {
   const a = aracDuzelt({ marka: ' renault ', modelYili: 'Model 2018 ', koltuk: '5 kişi', saseNo: 'nm 123 abc' });
@@ -121,6 +127,24 @@ try {
     assert.equal(girisler.length, 0);
   });
   await motor.kapat();
+
+  console.log('Proxy');
+  await dene('tarayıcı trafiği proxy üzerinden geçer', async () => {
+    let gorulen = null;
+    const proxy = http.createServer((q, s) => { gorulen = q.url; s.writeHead(200, { 'content-type': 'text/html' }); s.end('<html><body>PROXYDEN</body></html>'); });
+    await new Promise(ok => proxy.listen(0, '127.0.0.1', ok));
+    const port = proxy.address().port;
+    const ctx = await tarayiciAc({ ...ayarlariOku(), gizli: true, proxy: `127.0.0.1:${port}`, tarayiciYolu: process.env.TEKLIF_TARAYICI_YOLU, });
+    try {
+      const p = ctx.pages()[0] || await ctx.newPage();
+      await p.goto('http://sigorta-portali.example/giris', { waitUntil: 'domcontentloaded' });
+      assert.match(await p.content(), /PROXYDEN/, 'sayfa proxy üzerinden geldi');
+      assert.ok(gorulen?.includes('sigorta-portali.example'), 'proxy isteği gördü: ' + gorulen);
+    } finally {
+      await ctx.close().catch(() => {});
+      proxy.close();
+    }
+  });
 
   console.log('Yerel API');
   await dene('şirket listesi', async () => {
