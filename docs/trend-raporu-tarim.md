@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3063 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3064 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -70,7 +70,7 @@ _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 g
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | sıvı solucan gübresi | 56 | 32 | ↑ ×3,4 |  |
-| 2 | saksı | 16 | 6 |  |  |
+| 2 | saksı | 18 | 8 | ↑ ×1,9 |  |
 | 3 | solucan | 15 | 1 |  |  |
 | 4 | solucan gübresi | 13 | 3 |  |  |
 | 5 | modüler | 5 | 4 | ↑ ×2,5 |  |
@@ -137,7 +137,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 4 | Leonardit - Organik Toprak Düzenleyici | 3,3 | 43,5 |
 | 5 | Altınvadi Ispanak Tohumu 10 Gr | 2,9 | 2,3 |
 | 6 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,8 | 1,3 |
-| 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,8 | 42,5 |
+| 7 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 2,8 | 44,5 |
 | 8 | Arzuman Marmande Domates Tohumu | 2,8 | 4,7 |
 | 9 | Şahnalı Acı Sivri Biber Ata Tohumu (50 Adet) | 2,6 | 4,5 |
 | 10 | HasTürk Hümix Sıvı Hümik Asit | 2,5 | 39 |
