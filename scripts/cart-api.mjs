@@ -44,7 +44,8 @@ log('Sepet deposu: ' + JSON.stringify(await p.evaluate(() => {
   if (!cs) return 'bulunamadı';
   const fns = new Set(); let o = cs; while (o && o !== Object.prototype) { Object.getOwnPropertyNames(o).forEach((k) => { try { if (typeof cs[k] === 'function') fns.add(k); } catch (e) {} }); o = Object.getPrototypeOf(o); }
   const src = (k) => { try { return String(cs[k]).replace(/\s+/g, ' ').slice(0, 900); } catch (e) { return ''; } };
-  return { yontemler: [...fns].join(','), storeAlanlari: Object.keys(store).join(','), addItem: src('addItem'), changeItemQuantity: src('changeItemQuantity').slice(0, 300) };
+  return { yontemler: [...fns].join(','), windowAddToCart: src('_windowAddToCart').slice(0, 900), beforeCheck: src('beforeCartOperationCheck').slice(0, 500),
+    pencere: Object.keys(window).filter((k) => /cart|sepet|ikas/i.test(k)).map((k) => k + ':' + typeof window[k]).join(', ') };
 })));
 
 // Seçenek seç (ikinci seçenek) ve butona bas
@@ -64,7 +65,7 @@ const t1 = Date.now();
 await p.evaluate(() => [...document.querySelectorAll('button')].find((b) => /sepete ekle/i.test(b.textContent) && b.offsetWidth).click());
 await p.waitForTimeout(5000);
 log(`Butona basıldı; istekler (${Date.now() - t1} ms içinde):`);
-for (const a of adds) log(`  ${a.op} ${a.url.replace(/^https?:\/\/([^/]+)/, '$1')}\n    başlıklar: ${a.heads.join(', ')}\n    gövde: ${a.body.slice(0, 1500)}`);
+for (const a of adds) { let vars = ''; try { vars = JSON.stringify(JSON.parse(a.body).variables); } catch (e) {} log(`  ${a.op} ${a.url.replace(/^https?:\/\/([^/]+)/, '$1')}\n    başlıklar: ${a.heads.join(', ')}\n    değişkenler: ${vars.slice(0, 2500)}`); }
 
 // Aynı isteği sayfa açmadan başka ürün için gönder (doğrudan ekleme denemesi)
 const addReq = adds.find((a) => /add\w*cart|saveItemToCart/i.test(a.op));
@@ -74,12 +75,30 @@ if (addReq && other) {
   const res = await p.evaluate(async ({ a, vid, pid, oldV, oldP, vname }) => {
     let body = a.body.split(oldV).join(vid).split(oldP).join(pid);
     const t = Date.now();
-    const r = await fetch(a.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+    const hd = {}; for (const k in a.hdr) if (/^x-|content-type|accept$/i.test(k)) hd[k] = a.hdr[k];
+    const r = await fetch(a.url, { method: 'POST', headers: hd, body });
     const j = await r.json().catch(() => null);
     const d = j && j.data && Object.values(j.data)[0];
     return { ms: Date.now() - t, http: r.status, hata: j && j.errors ? JSON.stringify(j.errors).slice(0, 400) : '', satirlar: d ? (d.orderLineItems || []).map((x) => (x.variant && (x.variant.name || '')) + ' [' + String(x.variant && x.variant.id).slice(0, 8) + '] x' + x.quantity + ' ' + (x.finalPrice || x.price || '')).join(' | ') : '', beklenen: vname + ' [' + vid.slice(0, 8) + ']' };
   }, { a: addReq, vid: ov.id, pid: other.id, oldV: v2 ? v2.id : pr.v1, oldP: pr.id, vname: ov.name });
   log('Doğrudan ekleme (sayfa açmadan, yalnız kimlikler değişti): ' + JSON.stringify(res));
+}
+// Sitenin pencere işlevi (varsa) ile ekleme: kimlikle, sayfa açmadan
+if (other) {
+  const ov = (other.v || []).find((v) => v.st > 0 && v.id !== ((other.v || [])[0] || {}).id) || (other.v || [])[0] || { id: other.v1 };
+  const r2 = await p.evaluate(async ({ vid, pid }) => {
+    const cand = Object.keys(window).filter((k) => /cart/i.test(k) && typeof window[k] === 'function');
+    const res = { adaylar: cand.join(',') };
+    const fn = window.addToCart || window.ikasAddToCart || (cand[0] && window[cand[0]]);
+    if (!fn) return res;
+    res.kaynak = String(fn).replace(/\s+/g, ' ').slice(0, 600);
+    const t = Date.now();
+    try { const x = await fn(vid, pid, 1); res.sonuc = JSON.stringify(x).slice(0, 300); } catch (e) { res.hata = String(e).slice(0, 300); }
+    res.ms = Date.now() - t;
+    return res;
+  }, { vid: ov.id, pid: other.id });
+  log('Pencere işleviyle ekleme: ' + JSON.stringify(r2) + ' beklenen ' + ov.name);
+  await p.waitForTimeout(2500);
 }
 await b.close();
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, '```\n' + out.join('\n') + '\n```\n');
