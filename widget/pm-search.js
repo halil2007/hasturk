@@ -863,6 +863,15 @@
     '.sh-h button{width:36px;height:36px;border-radius:50%;background:var(--bg);display:grid;place-items:center;flex:none}',
     '.sh-h button svg{width:16px;height:16px}',
     '.sh-l{font-size:13px;font-weight:700;color:var(--mu);margin:16px 0 8px}',
+    /* Bilge Bey "Hepsini sepete ekle" penceresi */
+    '.akall{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:8px 0 0;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}.akall svg{width:17px;height:17px}',
+    '.bun .sh-h b{font-size:16px;color:var(--prd)}.bhint{font-size:12.5px;color:var(--mu);margin:4px 0 6px}',
+    '.akbl{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--ln)}.akoff .im,.akoff .blt{opacity:.45}',
+    '.bck{width:26px;height:26px;border-radius:8px;border:2px solid var(--pr);background:var(--pr);color:#fff;display:grid;place-items:center;flex:none;margin-top:13px}.akoff .bck{background:#fff}.bck svg{width:16px;height:16px}',
+    '.akbl .im{width:52px;height:52px;border-radius:10px;background:#fff;border:1px solid var(--ln)}.akbl .im img{object-fit:contain;padding:2px}',
+    '.blt{flex:1;min-width:0}.blt b{display:block;font-size:13.5px;line-height:1.3;margin:2px 0 6px}.blt>small{font-weight:700;color:var(--prd)}',
+    '.blt .vopts{gap:6px}.blt .vo{padding:5px 9px;font-size:12.5px}.blt .vo small{font-size:11px}',
+    '.btot{display:flex;flex-direction:column;flex:none}.btot small{font-size:12px;color:var(--mu)}.btot b{font-size:17px;color:var(--prd)}.sh-go[disabled]{opacity:.6}',
     '.vopts{display:flex;flex-wrap:wrap;gap:8px}',
     '.vo{display:flex;flex-direction:column;align-items:flex-start;padding:8px 12px;border-radius:12px;border:1.5px solid var(--ln);font-size:13.5px;font-weight:700;text-align:left}',
     '.vo small{font-size:12px;font-weight:600;color:var(--mu)}',
@@ -1120,6 +1129,9 @@
     else if (act === 'clear') { $q.value = ''; render(); $q.focus(); }
     else if (act === 'akq') akAsk(v);
     else if (act === 'akgrp') akGroup(v);
+    else if (act === 'akall') akAll(v);
+    else if (act === 'bt' || act === 'bv') akBundleAct(act, v);
+    else if (act === 'bgo') akBundleGo();
     else if (act === 'akoy') akVote(v);
     else if (act === 'akyeni') { AK.log = []; akSave(); AK.built = false; akBuild(); }
     else if (act === 'q') { $q.value = v; shown = PAGE; render(); $q.focus(); }
@@ -1239,7 +1251,8 @@
       if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl); pose = 'fide'; } }
       if (!prods && DATA) {
         var list = (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 4);
-        if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>';
+        if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>' +
+          (list.length >= 2 && cartOn() ? '<button type="button" class="akall" data-act="akall" data-v="' + idx + '">' + I.cart + 'Hepsini sepete ekle</button>' : '');
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
       // Cevap müşteriyi bize yönlendiriyorsa ("müşteri hizmetleri", "WhatsApp'tan yazın") düğmeler hemen altında olsun
@@ -1254,6 +1267,90 @@
       : d.neden === 'emin-degil' ? 'Bu konuda size kesin ve doğru bilgi verebilmem için müşteri hizmetlerimizin bakması daha doğru olur.'
       : 'Bu soruya henüz hazır bir cevabım yok.';
     return akBot('tesekkur', '<p>' + esc(why) + ' Müşteri hizmetlerimizden destek alabilirsiniz:</p>') + akContact(q, '');
+  }
+  // "Hepsini sepete ekle": Bilge Bey cevabındaki ürünler tek pencerede, her biri için boy seçilerek sırayla eklenir.
+  // Önceden seçili boy soruya göre: saksı / çiçek / balkon → en küçük boy; bahçe / sebze / ağaç / tarla → büyükçe boy
+  // (seçeneklerin ortası, ör. 1–20 kg arasında 5 kg). İçindekiler zaten listede olan set ("…Set", "…Seti") işaretsiz gelir. Stokta olmayan boy seçilemez; istenmeyen ürünün işareti kaldırılır.
+  var BUNDLE = null;
+  function akVsOk(p) { return (p.v || []).filter(function (v) { return v.id && vOk(v); }).sort(function (a, b) { return (vPrice(a) || 0) - (vPrice(b) || 0); }); }
+  function akBundleItems(it) {
+    var d = (it && it.d) || {};
+    return (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 4);
+  }
+  function akDefVariant(p, txt) {
+    var vs = akVsOk(p);
+    if (!vs.length) return { id: p.v1, p: p.p, d: p.d, st: p.st, name: '' };
+    var buyuk = /bahçe|bahce|sebze|bostan|ağaç|agac|fidan|meyve|tarla|dekar|zeytin|fındık|findik|ceviz|bağ\b|asma|çim\b|cim\b/i.test(txt) && !/saksı|saksi|balkon|salon|ev bitki|çiçeğim|orkide|kaktüs|monstera/i.test(txt);
+    return buyuk ? vs[Math.floor((vs.length - 1) / 2)] : vs[0];
+  }
+  function akAll(idx) {
+    var it = AK.log[+idx], list = akBundleItems(it);
+    if (list.length < 2) return;
+    var txt = it.q + ' ' + ((it.d && it.d.cevap) || '').slice(0, 200);
+    var SET = /\bset(i)?\b/i, tek = list.some(function (p) { return !SET.test(p.n); });
+    BUNDLE = { idx: +idx, items: list.map(function (p) { return { p: p, v: akDefVariant(p, it.q + ' ' + txt), on: !(tek && SET.test(p.n)) }; }) };
+    track('akbilge_hepsi_ac', it.q);
+    akBundleDraw();
+    $sheet.classList.add('on');
+  }
+  function akBundleDraw() {
+    if (!BUNDLE) return;
+    var total = 0, n = 0;
+    var rows = BUNDLE.items.map(function (b, i) {
+      var vs = (b.p.v || []).filter(function (v) { return v.id; });
+      if (b.on) { total += vPrice(b.v) || price(b.p) || 0; n++; }
+      return '<div class="akbl' + (b.on ? '' : ' akoff') + '"><button type="button" class="bck" data-act="bt" data-v="' + i + '" aria-pressed="' + b.on + '" aria-label="' + (b.on ? 'Çıkar' : 'Ekle') + '">' + (b.on ? I.check : '') + '</button>' +
+        thumb(b.p.img, 120) + '<div class="blt"><b>' + esc(b.p.n) + '</b>' +
+        (vs.length > 1 ? '<div class="vopts">' + vs.map(function (v) {
+          return '<button class="vo' + (v.id === b.v.id ? ' on' : '') + '" type="button" data-act="bv" data-v="' + i + ':' + esc(v.id) + '"' + (vOk(v) ? '' : ' disabled') + '>' + esc(v.name || 'Seçenek') + (vPrice(v) != null ? '<small>' + tl(vPrice(v)) + '</small>' : '') + '</button>';
+        }).join('') + '</div>' : '<small>' + (vPrice(b.v) != null ? tl(vPrice(b.v)) : '') + '</small>') + '</div></div>';
+    }).join('');
+    var lim = shipLimit(), kalan = lim && CART != null ? lim - CART - total : 0;
+    var ship = lim && CART != null ? (kalan <= 0 ? 'Bu ürünlerle kargonuz ücretsiz!' : 'Ücretsiz kargoya ' + tl(Math.ceil(kalan)) + ' kaldı') : (CFG.promo && CFG.promo.shipping) || '';
+    $sheet.innerHTML = '<div class="sh-in bun" role="dialog" aria-label="Hepsini sepete ekle"><div class="sh-h"><b>Önerilen ürünler</b>' +
+      '<button type="button" data-act="shx" aria-label="Kapat">' + I.x + '</button></div>' +
+      '<p class="bhint">Boyu değiştirebilir, istemediğiniz ürünün işaretini kaldırabilirsiniz.</p>' + rows +
+      '<div class="sh-f"><div class="btot"><small>Toplam</small><b>' + tl(total) + '</b></div>' +
+      '<button class="sh-go" type="button" data-act="bgo"' + (n ? '' : ' disabled') + '>' + I.cart + (n ? n + ' ürünü sepete ekle' : 'Ürün seçin') + '</button></div>' +
+      (ship ? '<div class="sh-ship">' + I.truck + esc(ship) + '</div>' : '') + '</div>';
+  }
+  function akBundleAct(act, v) {
+    if (!BUNDLE) return;
+    if (act === 'bt') { var b = BUNDLE.items[+v]; if (b) b.on = !b.on; }
+    else if (act === 'bv') {
+      var m = String(v).split(':'), x = BUNDLE.items[+m[0]], nv = x && (x.p.v || []).filter(function (y) { return y.id === m[1]; })[0];
+      if (nv && vOk(nv)) x.v = nv;
+    }
+    akBundleDraw();
+  }
+  // Ürün sepete eklenir (sitenin sepet yöntemi ya da gizli ürün sayfası); Promise döner
+  function addP(p, v) {
+    var fn = window.UrunAramaSepet;
+    if (typeof fn === 'function') return Promise.resolve().then(function () { return fn(v.id, 1, { productId: p.id, slug: p.s, name: p.n }); });
+    setBusy(p.id, true);
+    return directAdd(p, v).catch(function () { return queueFrameAdd(p, v); }).then(function () { setBusy(p.id, false); }, function (e) { setBusy(p.id, false); throw e; });
+  }
+  function akBundleGo() {
+    if (!BUNDLE || BUNDLE.busy) return;
+    var sel = BUNDLE.items.filter(function (b) { return b.on && b.v && b.v.id; });
+    if (!sel.length) return;
+    BUNDLE.busy = true;
+    var go = $sheet.querySelector('[data-act="bgo"]');
+    if (go) { go.disabled = true; go.innerHTML = '<span class="bspin"></span><span>Ekleniyor…</span>'; }
+    if (typeof window.UrunAramaSepet !== 'function') sel.forEach(function (b) { prepAdd(b.p); });
+    track('akbilge_hepsi', sel.length + ' ürün');
+    var ok = 0, fail = [];
+    sel.reduce(function (pr, b) {
+      return pr.then(function () {
+        return addP(b.p, b.v).then(function () { ok++; ev('a', b.p.s); ev('ka', b.p.s); track('add_to_cart_ok', b.p.n); }, function () { fail.push(b.p); track('add_to_cart_fail', b.p.n + ' (hepsi)'); });
+      });
+    }, Promise.resolve()).then(function () {
+      BUNDLE = null;
+      closeSheet();
+      syncSiteCart();
+      if (!fail.length) ptoast(ok + ' ürün sepete eklendi', false, true);
+      else ptoast(ok + ' ürün eklendi; ' + fail.map(function (p) { return p.n; }).join(', ') + ' eklenemedi. Ürün sayfasından ekleyebilirsiniz.', true, false, url(fail[0].s), 'Ürün sayfasına git');
+    });
   }
   function akRenderLog() {
     var log = root.querySelector('.aklog');
@@ -2406,7 +2503,7 @@
     SH.v = v;
     [].forEach.call($sheet.querySelectorAll('.vo'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === id); });
   }
-  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; }
+  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; if (BUNDLE && !BUNDLE.busy) BUNDLE = null; }
   function toast(msg) {
     $toast.innerHTML = I.check + esc(msg);
     $toast.classList.add('on');
