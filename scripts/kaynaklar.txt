@@ -1,0 +1,6 @@
+# Ak Bilge doğrulama kaynakları: ad<TAB>adres. GitHub Actions indirir, metnini docs/kaynak/<ad>.txt olarak dala kaydeder.
+tigem-yerel-tohum	https://www.tigem.gov.tr/Files/Miras%c4%b1m%c4%b1z_Yerel_Tohum.pdf
+ankara-bb-sebze	https://s.ankara.bel.tr/files/5214/3893/6685/SEBZE_YETTRCL.pdf
+bugday-atalik	https://www.bugday.org/blog/wp-content/uploads/2021/04/AtalikTohumlar.pdf
+au-acikders-4225	https://acikders.ankara.edu.tr/mod/resource/view.php?id=4225
+tarimkutuphanesi-koku	http://www.tarimkutuphanesi.com/koku_yenilen_sebzeler_(havuc,_turp,_kereviz,_sogan,_sarimsak)_00443.html
