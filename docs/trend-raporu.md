@@ -14,11 +14,11 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 2 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
 | 3 | Altınvadi Roka Tohumu (Toros İri Yaprak)  | ×9,9 | 6 | evet |
 | 4 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×2,9 | 4 | evet |
-| 5 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×3,5 | 2 | evet |
-| 6 | Arom Dere Otu Ata Tohumu (50 Adet) | ×9,9 | 5 | evet |
-| 7 | Altınvadi Toros Maydanozu Tohumu 10 Gr | ×6,8 | 5 | evet |
-| 8 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı)  | ×9,9 | 5 | evet |
-| 9 | Hastürk Katı Solucan Gübresi 20 Kg | ×5 | 3 | evet |
+| 5 | Arom Dere Otu Ata Tohumu (50 Adet) | ×9,9 | 5 | evet |
+| 6 | Altınvadi Toros Maydanozu Tohumu 10 Gr | ×6,8 | 5 | evet |
+| 7 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı)  | ×9,9 | 5 | evet |
+| 8 | Hastürk Katı Solucan Gübresi 20 Kg | ×5 | 3 | evet |
+| 9 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×2,5 | 1 | evet |
 | 10 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3,1 | 0 | evet |
 | 11 | Guanokalong Yarasa Gübresi Toz | ×2,5 | 0 | evet |
 | 12 | Uzman 16 Lt Sırt Pulverizatörü İlaçlama Pompası (K-103) | ×5,6 | 1 | evet |
