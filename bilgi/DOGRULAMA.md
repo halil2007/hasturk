@@ -31,3 +31,23 @@ Güncelleme: 15 Ekim 2026 · Kapsam: en çok satan bitki ürünlerinden ilk 13 �
 2. **Hümix saksı dozu:** üretici olarak ev/saksı bitkileri için sulama suyuna oranı belirlenmeli (ör. "1 litre suya … ml, … günde bir").
 3. **Yaban Mersini ve Ortanca Toprağı:** kullanım şekli (doğrudan dolgu mu, karışım oranı) yazılmalı.
 4. **DSV Lippa Lisuna:** DSV/distribütör teknik föyündeki ekim normu teyit edilmeli.
+
+---
+
+## Gübreler (devam ediyor) – 15 Ekim 2026
+
+32 ürünün kartı hazır (13 ilk grup + 19 gübre). Kalan gübreler: setler (içindeki ürünlerin kartları kullanılır), Chrysamed ve Florist koruyucu spreyler (ilaç/koruma kuralıyla ayrıca ele alınacak).
+
+| Ürün | Durum | Not |
+|---|---|---|
+| ICL Landscaper Pro 20-20-8 | ✅ Doğrulandı | 35 g/m² (ICL ürün rehberi), en fazla 45 g/m² |
+| Sıvı Solucan Gübresi 1 Ton | ✅ Üretici | 100 L suya 1-2 L; ana ürünle aynı oran |
+| Katı Solucan Gübresi 20 kg / 1 Ton | ✅ Üretici | HasTürk tablosu |
+| **TurfMaster 16-6-25** | ❌ Çelişki | Sayfada "20-35 g/m²" ve "20 kg ≈ 400 m²" (=50 g/m²) birlikte yazıyor |
+| Florist konsantre besinler (5 ürün) | ⚠️ Kısmi | 20 ml şase + 1 L su; kullanım sıklığı teyit edilemedi |
+| Tarm / Biosas hazır spreyler (5 ürün) | ⚠️ Kısmi | Seyreltmeden kullanılır; sıklık yok |
+| Guanokalong toz / sıvı, Biochar, Tarm GrassMaster | ⛔ Eksik | Sayfada doz yok |
+
+### Karar gerekenler (eklenenler)
+5. **TurfMaster 16-6-25:** doğru doz ve kapsama alanı etiketten teyit edilmeli.
+6. **Guanokalong, Biochar, Tarm GrassMaster, Florist besinler:** etiket fotoğrafı (kullanım talimatı kısmı).
