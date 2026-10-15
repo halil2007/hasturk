@@ -494,6 +494,26 @@
         },
         {
           "cat": "Meyveler",
+          "name": "Aronya",
+          "plants": [
+            "Aronya"
+          ],
+          "steps": [
+            [
+              "Yeni dikimde, fidan çukurunun dibine toprakla hafifçe karıştırarak",
+              "Fidan çukuruna",
+              "250-500 g/fidan"
+            ],
+            [
+              "Yetişkin bitkide",
+              "Taç izdüşümü / Toprak altı",
+              "1-3 kg/bitki"
+            ]
+          ],
+          "note": "Yetişkin bitkide miktar yaşına göre artar; gübrenin üzerini 5-10 cm toprakla örtün."
+        },
+        {
+          "cat": "Meyveler",
           "name": "Ahududu ve Böğürtlen",
           "plants": [
             "Ahududu",
@@ -749,7 +769,7 @@
             [
               "Saksı harcı hazırlanırken harca karıştırılarak",
               "Harca karıştırma",
-              "Harca %40-50"
+              "Harca %10-20"
             ]
           ]
         },
@@ -784,18 +804,31 @@
         },
         {
           "cat": "Yetiştiricilik",
-          "name": "Fide ve Fidan Yetiştiriciliği",
+          "name": "Fide Yetiştiriciliği",
           "plants": [
             "Fide",
+            "Fide Harcı"
+          ],
+          "steps": [
+            [
+              "Kullanılacak yetiştirme harcına karıştırılarak",
+              "Harca karıştırma",
+              "Harca en fazla %10"
+            ]
+          ]
+        },
+        {
+          "cat": "Yetiştiricilik",
+          "name": "Fidan Yetiştiriciliği",
+          "plants": [
             "Fidan",
-            "Fide Harcı",
             "Fidan Harcı"
           ],
           "steps": [
             [
               "Kullanılacak yetiştirme harcına karıştırılarak",
               "Harca karıştırma",
-              "Harca %40-50"
+              "Harca %10-20"
             ]
           ]
         }

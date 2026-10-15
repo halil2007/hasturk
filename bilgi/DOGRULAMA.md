@@ -12,7 +12,7 @@ Güncelleme: 15 Ekim 2026 · Kapsam: en çok satan bitki ürünlerinden ilk 13 �
 
 | Ürün | Durum | Not |
 |---|---|---|
-| HasTürk Solucan Gübresi (katı) | ✅ Üretici tablosu | 146 bitki; saksı 100-125 g, harç %40-50, çim 100-125 kg/da |
+| HasTürk Solucan Gübresi (katı) | ✅ Üretici tablosu | 146 bitki; saksı 100-125 g, harç %10-20 (blog; fidede en fazla %10), çim 100-125 kg/da |
 | HasTürk Sıvı Solucan Gübresi | ✅ Üretici + tutarlı | Yapraktan 1 L suya 10-20 ml; sulama 10 L suya 50-100 ml; akademik aralıkla uyumlu |
 | HasTürk Hümix Sıvı Hümik Asit | ⚠️ Kısmi | Bahçe/tarla/ağaç dozları var; **saksı/ev bitkisi dozu yok** |
 | Leonardit | ❌ Çelişki | Saksı %10-20 doğrulandı. **Bahçe "1 kg/m²" (=1.000 kg/da) kaynaklarda 50-250 kg/da** — sayfanın düzeltilmesi gerekiyor |
@@ -88,6 +88,6 @@ Kurallar: kesin teşhis yok ("olası nedenler"), ilaç dozu yok (etikete göre),
 hasturkgubre.com.tr/blog'daki 116 yazının "Sık Sorulan Sorular" bölümlerinden 288 cevap Bilge Bey'e eklendi (74 yazı; bakım, sulama, toprak, saksı, ekim zamanı). Bağlantı verilmez. Alınmayanlar `bilgi/BLOG-KONTROL.md`'de: gübre/ilaç miktarı veren cevaplar (doğrulanmış tablolar geçerli), doğrulanamayan verim/yüzde iddiaları, mağaza bilgisi (fiyat, taksit, stok), ilaçların insan/hayvan sağlığına etkisi. Reklam cümleleri ("şifa", "tartışmasız", "uzman kadromuz") cevaplardan çıkarıldı.
 
 **Karar gereken çelişkiler (blog ↔ üretici tablosu):**
-- Saksı/fide harcında solucan gübresi oranı: üretici tablosu "harcın %40–50'si"; blog (kendi-saksi-topragini-hazirlama, torf-nedir, solucan-gubresinin-zarari-var-mi) "%10–20; fidelerde en fazla %10, sukulentte %5". Araştırmalar %10–20'yi destekliyor (yüksek oran tuzluluk nedeniyle gelişimi yavaşlatabilir). Karar verilene kadar yeni genel gübre cevaplarında oran verilmiyor; tablo kaynaklı eski cevaplar değişmedi.
+- ~~Saksı/fide harcında solucan gübresi oranı~~ **Karar verildi (15.10.2026, mağaza sahibi: "blog baz al"):** harca %10–20, fidede en fazla %10, kaktüs/sukulentte %5. Üretici tablosundaki "%40–50" config.json, bilgi/urunler.json ve hazır cevaplarda değiştirildi; bu oranı içeren eski yapay zekâ cevapları tekrar verilmiyor. Sitede düzeltilmesi gerekenler: /pages/solucan-gubresi-kullanim-miktarlari sayfasındaki "Harca %40-50" satırları ve blogdaki solucan-gubresi-nasil-kullanilir yazısı ("%20–30").
 - Meyve ağacı: tablo "fidan çukuruna 1,5–2 kg, yetişkin ağaçta gölge çapı (m) = kg"; blog (meyve-agaclari-icin-en-iyi-gubre-hangisi) "yetişkin ağaca yılda 3–5 kg, fidana 1–1,5 kg".
-- Aronya: blog "fidan başına 250–500 g"; tabloda aronya yok (ahududu/böğürtlen grubunda 1–1,5 kg/bitki).
+- ~~Aronya~~ **Blog esas alındı (15.10.2026):** tabloya "Aronya" eklendi: fidan çukuruna 250–500 g, yetişkin bitkiye yaşına göre 1–3 kg (blog: aronya-bitkisinde-solucan-gubresi-kullanimi-ve-gubreleme-takvimi).

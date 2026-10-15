@@ -372,7 +372,7 @@ const GENEL_GUBRE = [
   { konu: 'saksi-cicek', sorular: ['saksı çiçeklerine hangi gübre', 'saksı çiçekleri için gübre', 'saksı bitkilerine hangi gübre', 'saksı bitkisi gübresi', 'çiçeklere hangi gübre verilir', 'çiçek gübresi', 'salon bitkilerine hangi gübre', 'ev bitkilerine hangi gübre', 'ev çiçeklerine gübre', 'bitkime hangi gübre', 'bitkime hangi gübreyi vermeliyim', 'çiçeğime ne gübre vereyim', 'saksıya gübre nasıl verilir', 'saksıdaki çiçeklere gübre'],
     cevap: [
       'Saksı çiçekleriniz için iki ürünü birlikte kullanmanızı öneririz:',
-      'HasTürk Solucan Gübresi — toprağı uzun süre besler, kök gelişimini destekler.\n• Saksı başına 100–125 g, toprağa karıştırarak.',
+      'HasTürk Solucan Gübresi — toprağı uzun süre besler, kök gelişimini destekler.\n• Saksı başına 100–125 g, toprağa karıştırarak.\n• Saksı toprağını kendiniz hazırlıyorsanız: toprağın %10–20\'si kadar (kaktüs ve sukulentte %5).',
       'HasTürk Sıvı Solucan Gübresi — bitki besini hızlı alır.\n• Sulama suyuna: 10 litre suya 50–100 ml.\n• Yapraklara püskürterek: 1 litre suya 10–20 ml.',
       varsa('florist-cicekli-bitkiler-sivi-konsantre-bitki-besini', 'Çiçekli bitkileriniz için Florist Çiçekli Bitkiler Besini de var (ürün bilgisine göre 1 şase + 1 litre su).'),
       varsa('cicek-topragi-bakim-seti', 'Saksı değiştirecekseniz Çiçek Toprağı Bakım Seti\'nde çiçek toprağı, sıvı solucan gübresi ve çiçek besini bir arada.'),
@@ -387,9 +387,16 @@ const GENEL_GUBRE = [
   { konu: 'fide', sorular: ['fidelere hangi gübre', 'fideye hangi gübre verilir', 'fide gübresi', 'fide için gübre', 'fideler için besin', 'fide dikerken gübre', 'fide toprağına gübre', 'fideyi nasıl beslerim', 'fide yetiştirirken gübre'],
     cevap: [
       'Fideleriniz için önerimiz:',
-      '• Fideleri dikmeden önce: köklerini sıvı solucan gübreli suya batırın (10 litre suya 100 ml).\n• Fideler büyürken: HasTürk Sıvı Solucan Gübresi, sulama suyuna 10 litre suya 50–100 ml.',
+      '• Fide toprağına HasTürk Solucan Gübresi karıştıracaksanız: toprağın en fazla %10\'u kadar (fazlası fideyi yorar).\n• Fideleri dikmeden önce: köklerini sıvı solucan gübreli suya batırın (10 litre suya 100 ml).\n• Fideler büyürken: HasTürk Sıvı Solucan Gübresi, sulama suyuna 10 litre suya 50–100 ml.',
       varsa('fide-sasirtma-topragi', 'Hazır toprak isterseniz Profesyonel Fide Şaşırtma Toprağı fideler için hazırlanmıştır.'),
     ], urunler: ['hasturk-sivi-solucan-gubresi', 'fide-sasirtma-topragi', 'hasturk-kati-solucan-gubresi'] },
+  // Harç oranı: blog esas alındı (mağaza sahibi kararı, bilgi/DOGRULAMA.md)
+  { konu: 'harc-orani', sorular: ['saksı toprağına ne kadar solucan gübresi karıştırılır', 'solucan gübresi saksı harcına oranı', 'solucan gübresi toprağa hangi oranda karıştırılır', 'solucan gübresi karışım oranı', 'saksı toprağı hazırlarken solucan gübresi oranı', 'toprağa ne kadar solucan gübresi katılır', 'harca ne kadar solucan gübresi', 'solucan gübresi toprak oranı', 'toprağa yüzde kaç solucan gübresi', 'solucan gübresi yüzde kaç karıştırılır'],
+    cevap: [
+      'Saksı toprağını hazırlarken HasTürk Solucan Gübresi\'ni toprağın %10–20\'si kadar karıştırın (ör. 10 litre toprağa 1–2 litre).\n• Fide toprağında: en fazla %10.\n• Kaktüs ve sukulentte: %5.',
+      'Daha fazlası bitkiye fayda sağlamaz; toprağı tuzlu yapıp gelişimi yavaşlatabilir.',
+      'Toprağını değiştirmeyeceğiniz bir saksı bitkisine eklemek isterseniz: saksı başına 100–125 g, üst toprağa karıştırarak.',
+    ], urunler: ['hasturk-kati-solucan-gubresi'] },
   { konu: 'meyve-agaci', sorular: ['meyve ağaçlarına hangi gübre', 'meyve ağacı için gübre', 'meyve ağacı gübresi', 'ağaçlara hangi gübre verilir', 'ağaç gübresi', 'fidana hangi gübre', 'fidan gübresi', 'fidan dikerken gübre', 'meyve ağaçlarını ne zaman gübrelemeli', 'bahçedeki ağaçlara gübre'],
     cevap: [
       'Meyve ağaçlarınız için önerimiz:',

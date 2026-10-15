@@ -186,12 +186,15 @@ export async function initDb(db) {
   ]);
   dbReady = true;
 }
+// Eskimiş bilgi içeren eski Claude cevapları tekrar verilmez: solucan gübresinin harca karışım oranı blogla aynı
+// %10–20 oldu (fidede en fazla %10); eski tablodaki "%40–50" geçen solucan gübresi cevapları atlanır
+const ESKI = (c) => /solucan/i.test(c) && /%\s?40\s?[–-]\s?50|40\s?[–-]\s?50\s?%/.test(c);
 // Onaylanmış Claude cevapları havuza eklenir (5 dakikada bir tazelenir)
 let APPROVED = { t: 0, list: [] };
 async function approved(db) {
   if (Date.now() - APPROVED.t < 300000) return APPROVED.list;
   const { results } = await db.prepare("SELECT id, q, cevap, urunler FROM ak_soru WHERE durum = 'onaylandi' ORDER BY id DESC LIMIT 2000").all();
-  APPROVED = { t: Date.now(), list: results.map((r) => ({ i: 'o' + r.id, t: 'onayli', s: [r.q], c: r.cevap, u: JSON.parse(r.urunler || '[]') })) };
+  APPROVED = { t: Date.now(), list: results.filter((r) => !ESKI(r.cevap || '')).map((r) => ({ i: 'o' + r.id, t: 'onayli', s: [r.q], c: r.cevap, u: JSON.parse(r.urunler || '[]') })) };
   return APPROVED.list;
 }
 
@@ -267,7 +270,7 @@ async function recentAi(db) {
     "AND NOT EXISTS (SELECT 1 FROM ak_oy o WHERE o.q = s.q AND o.oy = 0) ORDER BY s.id DESC LIMIT 3000").bind(since).all();
   const list = [], byQn = new Map();
   for (const r of results) {
-    if (byQn.has(r.qn)) continue;
+    if (byQn.has(r.qn) || ESKI(r.cevap || '')) continue;
     const e = { i: 'a' + r.id, t: 'ai-kayit', s: [r.q], c: r.cevap, u: JSON.parse(r.urunler || '[]') };
     byQn.set(r.qn, e); list.push(e);
   }
