@@ -20,8 +20,30 @@ const tohumMetin = (t) => [
 ].filter(Boolean).map((x) => '• ' + x).join('\n');
 const USTA = 'Bu konuda kesin bilgi için ustamız size yardımcı olsun.';
 const out = [];
-const add = (e) => out.push({ id: 'h' + String(out.length + 1).padStart(4, '0'), durum: 'onay-bekliyor', ...e });
+// durum: hazir = doğrulanmış tablolardan/ürün bilgisinden üretildi, canlıda kullanılır. Claude'un yeni cevapları
+// sunucuda 'onay-bekliyor' olarak tutulur ve onaylanınca havuza katılır.
+const add = (e) => { if (e.urun && (e.tur === 'urun' || e.tur === 'saksi' || e.tur === 'pompa')) e.sorular = kisaKalip(e.sorular, ((bySlug.get(e.urun) || {}).n || '')); out.push({ id: 'h' + String(out.length + 1).padStart(4, '0'), durum: 'hazir', ...e }); };
 const lc = (s) => s.toLocaleLowerCase('tr-TR');
+// Kısa ürün adı: müşteri marka ve paket ölçüsü yazmaz ("hastürk sıvı solucan gübresi 1 lt" → "sıvı solucan gübresi")
+const MARKA = new Set(['hg', 'hastürk', 'hasturk', 'arzuman', 'altınvadi', 'egarden', 'reflex', 'wanpy', 'prochoice', 'chrysamed', 'brit', 'proline', 'uzman', 'raco', 'bestpet', 'quik', 'tigem', 'felicia', 'sgs', 'florist', 'jungle', 'tarm', 'delta', 'flip', 'güzelbahçe', 'lıtolan', 'litolan', 'beavis', 'dsv', 'lippa', 'spectrum', 'sinpest', 'trendline', 'ilposan', 'i̇lposan', 'biosas', 'komelon', 'envaplas', 'gartengold', 'icl', 'klasmann', 'pomsan', 'qts', 'serinova', 'özka', 'arom', 'gold', 'valley']);
+const kisaAd = (ad) => lc(ad).replace(/\s*\|.*$/, '').replace(/\s+[-–]\s+.*$/, '').replace(/\(.*?\)/g, ' ')
+  .replace(/\b\d+(?:[.,]\d+)?\s*(?:gr|g|kg|lt|l|litre|ml|adet|cm|m)\b/g, ' ').replace(/[×x]\s*\d+/g, ' ')
+  .split(/\s+/).filter((w) => w && !MARKA.has(w)).join(' ').replace(/\s+/g, ' ').trim();
+// Ürün soru kalıplarına kısa adla da kopya ekle (kalıpların ortak başı ürün adıdır). Kısa adı birden çok üründe aynı
+// çıkıyorsa (ör. aynı serinin farklı litreleri) eklenmez; yoksa yanlış boy gösterilebilir.
+const KISA_SAY = new Map();
+prods.items.forEach((p) => { const k = kisaAd(p.n); KISA_SAY.set(k, (KISA_SAY.get(k) || 0) + 1); });
+const kisaKalip = (sorular, ad) => {
+  const k = kisaAd(ad);
+  if (sorular.length < 2) return sorular;
+  let pre = sorular.reduce((a, q) => { let i = 0; while (i < a.length && a[i] === q[i]) i++; return a.slice(0, i); });
+  pre = pre.slice(0, pre.lastIndexOf(' ') + 1);
+  if (pre.trim().length < 4) return sorular;
+  // Sadece marka çıkarılmış ad (ölçü kalır) her zaman; tamamen kısa ad yalnız tek ürüne aitse
+  const mk = pre.trim().split(/\s+/).filter((w) => !MARKA.has(w)).join(' ');
+  const adlar = [mk, KISA_SAY.get(k) > 1 ? '' : k].filter((a) => a && a !== pre.trim());
+  return [...new Set(sorular.concat(...adlar.map((a) => sorular.map((q) => a + ' ' + q.slice(pre.length)))))];
+};
 // Türkçe yönelme eki (domatese, limona, bibere…) — soru varyantlarında doğal görünsün diye
 const yon = (w) => {
   const s = lc(w).replace(/\s*\(.*\)\s*/g, '').trim(), last = s.split(' ').pop();
@@ -39,12 +61,29 @@ for (const g of config.guides || []) {
       const b = bitki.replace(/\s*\(.*\)\s*/g, '').trim();
       add({
         tur: 'bitki-doz', bitki, grup: gr.name, urun: g.product,
-        sorular: [`${b} için ${k} ne kadar kullanılır`, `${yon(bitki)} ${k} nasıl verilir`, `${b} ${k} dozu`, `${yon(bitki)} ne kadar ${k} atılır`, `${lc(b)} için gübre`, `${lc(b)} için besin`],
+        sorular: [`${b} için ${k} ne kadar kullanılır`, `${yon(bitki)} ${k} nasıl verilir`, `${b} ${k} dozu`, `${yon(bitki)} ne kadar ${k} atılır`],
         cevap: `${ad} — ${bitki} (${gr.name}) için önerilen uygulama:\n${satirlar}\n\n${g.note || ''}`.trim(),
         urunler: [g.product], kaynak: `rehber:${g.id}`,
       });
     }
   }
+}
+
+// A2) Bitki için gübre (genel soru): o bitkinin tüm kullanım tabloları tek cevapta
+const BIRLESIK = new Map();
+for (const g of config.guides || []) {
+  const ad = ((bySlug.get(g.product) || {}).n || g.title).trim();
+  for (const gr of g.groups || []) for (const bitki of gr.plants) {
+    if (!BIRLESIK.has(bitki)) BIRLESIK.set(bitki, { grup: gr.name, parca: [], urunler: [] });
+    const B = BIRLESIK.get(bitki);
+    B.parca.push(`${ad}:\n${gr.steps.map((st) => `• ${st[0]} — ${st[1]}: ${st[2]}`).join('\n')}`);
+    B.urunler.push(g.product);
+  }
+}
+for (const [bitki, B] of BIRLESIK) {
+  const b = bitki.replace(/\s*\(.*\)\s*/g, '').trim(), l = lc(b);
+  add({ tur: 'bitki-doz', bitki, grup: B.grup, sorular: [`${l} için gübre`, `${l} için besin`, `${l} için hangi gübre`, `${yon(bitki)} hangi gübre verilir`, `${l} gübreleme`, `${l} nasıl gübrelenir`],
+    cevap: `${bitki} (${B.grup}) için önerdiğimiz ürünler ve kullanım miktarları:\n\n${B.parca.join('\n\n')}`, urunler: [...new Set(B.urunler)], kaynak: 'rehber:birlesik' });
 }
 
 // B) Ürün kartları
@@ -147,6 +186,11 @@ for (const p of sx.saksilar) {
   if (p.uygun) cevap += `\n\nÜrün bilgisine göre: ${p.uygun.replace(/\s+$/, '')}${/[.!]$/.test(p.uygun) ? '' : '.'}`;
   cevap += '\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. "monstera toprağı").';
   const sorular = [`${n} kaç litre`, `${n} ne kadar toprak alır`, `${n} saksıya ne kadar toprak gider`, `${n} ölçüleri`, `${n} deliği var mı`, `${n} hangi bitki için uygun`];
+  // Seri adı + litre ("cornet 25 litre", "line 5 litre"): müşteri uzun ürün adını yazmaz
+  const seri = lc(p.ad).split(/\s+/)[0];
+  if (seri.length >= 3 && !/^(dekoratif|büyük|ince|yuvarlak|şeffaf|mini)$/.test(seri)) p.boylar.filter((b) => b.litre).forEach((b) => {
+    const L = virg(b.litre); sorular.push(`${seri} ${L} litre saksıya ne kadar toprak gider`, `${seri} ${L} litre saksı ölçüleri`, `${seri} ${L} litre kaç cm`);
+  });
   add({ tur: 'saksi', urun: p.slug, sorular, cevap, urunler: [p.slug, ...((bySlug.get(p.slug) || {}).x || []).slice(0, 2)], kaynak: `saksi:${p.slug}` });
 }
 
@@ -154,10 +198,11 @@ for (const p of sx.saksilar) {
 const TUR_ADLARI = { hiyar: ['hıyar', 'salatalık'], marul: ['marul', 'salata'], lahana: ['lahana', 'kara lahana'], balkabagi: ['bal kabağı'] };
 for (const [key, t] of Object.entries(toh.turler)) {
   const adlar = TUR_ADLARI[key] || [lc(t.ad.replace(/\s*\(.*\)/, '').split('/')[0].trim())];
-  const sorular = adlar.flatMap((a) => [`${a} ne zaman ekilir`, `${a} tohumu nasıl ekilir`, `${a} ekim zamanı`, `${a} tohumu kaç cm derine ekilir`, `${a} kaç günde çimlenir`, `${a} ekim aralığı`,
+  const sorular = adlar.flatMap((a) => [`${a} ne zaman ekilir`, `${a} tohumu nasıl ekilir`, `${a} ekim zamanı`, `${a} tohumu kaç cm derine ekilir`, `${a} kaç günde çimlenir`, `${a} kaç günde çıkar`, `${a} ekim aralığı`,
+    ...(t.gram ? [`${a} tohumu kaç tane`, `${a} tohumu 1 gramda kaç tohum var`, `${a} tohumu gramı kaç tane`] : []),
     ...(t.yontem === 'fide' ? [`${a} fidesi ne zaman dikilir`, `${a} fidesi nasıl yetiştirilir`] : [])]);
   const urunlerT = Object.entries(toh.urunler).filter(([s2, u]) => u.tur === key && bySlug.has(s2)).sort((a, b) => ((bySlug.get(b[0]).st > 0) - (bySlug.get(a[0]).st > 0))).map(([s2]) => s2);
-  add({ tur: 'tohum', bitki: t.ad, sorular, cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}${t.saklama ? `\n• Tohum saklama ömrü: yaklaşık ${t.saklama} yıl.` : ''}\n\n${tKaynak(t.k)}`,
+  add({ tur: 'tohum', bitki: t.ad, sorular, cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}${t.gram ? `\n• 1 gramda yaklaşık ${t.gram[0].toLocaleString('tr-TR')}–${t.gram[1].toLocaleString('tr-TR')} tohum vardır.` : ''}${t.saklama ? `\n• Tohum saklama ömrü: yaklaşık ${t.saklama} yıl.` : ''}\n\n${tKaynak(t.k)}`,
     urunler: urunlerT.slice(0, 3), dinamik: 'stok', kaynak: `tohum:${key}` });
 }
 for (const [konu, sorular] of Object.entries({
@@ -201,6 +246,15 @@ add({ tur: 'pompa-genel', konu: 'sarj', sorular: ['akülü ilaçlama pompası ş
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
   cevap: `${pr.title || 'İndirim'}: ${pr.code} kodunu ödeme adımında kullanabilirsiniz${pr.note ? ' (' + pr.note + ')' : ''}.${pr.shipping ? ' ' + pr.shipping + '.' : ''}`, urunler: [], kaynak: 'config:promo' });
-await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
+await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: hazir = canlıda kullanılır (doğrulanmış tablolar ve ürün bilgisi). Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
+// Sunucu (src/akbilge.js) için sıkıştırılmış kopya: soru kalıpları, cevap, ürünler, dinamik alan, ürün adı
+const adOf = (slug) => ((bySlug.get(slug) || {}).n || '').trim();
+await writeFile('src/akbilge-havuz.json', JSON.stringify(out.filter((e) => e.durum === 'hazir').map((e) => {
+  const o = { i: e.id, t: e.tur, s: e.sorular, c: e.cevap, u: e.urunler || [] };
+  if (e.dinamik) o.d = e.dinamik;
+  if (e.bitki) o.b = e.bitki;
+  if (e.urun) { o.p = e.urun; o.n = adOf(e.urun); }
+  return o;
+})));
 const c = (t) => out.filter((x) => x.tur === t).length;
 console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel, pompa ${c('pompa')}+${c('pompa-genel')} genel, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);

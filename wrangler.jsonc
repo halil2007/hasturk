@@ -1,10 +1,14 @@
-// Cloudflare Workers: public/ klasörünü statik dosya olarak yayınlar; src/worker.js sadece /e ve /trends adreslerinde çalışır.
+// Cloudflare Workers: public/ klasörünü statik dosya olarak yayınlar; src/worker.js sadece /e, /trends, /ak ve /ai/durum adreslerinde çalışır.
+// Ak Bilge ayarları (isteğe bağlı, Settings → Variables): AK_DAILY_LIMIT (günlük Claude sorgu sınırı, varsayılan 150), AK_AI=off (Claude kapalı,
+// yalnız havuz), AK_MODEL (varsayılan claude-opus-5-5). Anthropic anahtarı Secret olarak: ANTHROPIC_API_KEY
 {
   "name": "hasturk-arama",
   "compatibility_date": "2025-09-01",
   "main": "src/worker.js",
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    // Kod içinden okunur (env.ASSETS): Ak Bilge ürün listesini products.json'dan alır
+    "binding": "ASSETS"
   },
   // Ziyaretçi eğilimleri veritabanı: kimliği (database_id) yazılmadığı için ilk yayında Cloudflare otomatik oluşturur
   "d1_databases": [
