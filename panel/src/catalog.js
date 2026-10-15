@@ -288,10 +288,26 @@ export async function sentFilter(db, ch) {
   const now = Date.now();
   return (p) => ok.has(p.id) || (failed.has(p.id) && now - failed.get(p.id) < ((p.updated_at || 0) > failed.get(p.id) ? 3600e3 : 864e5));
 }
+// Otomatik gönderimin kategorileri müşteri seçer (kanal başına; "tümü" ya da bir kısmı). Seçim özelliği gelmeden önce otomatik
+// gönderimi açık olan kanallarda o güne kadar elle onaylanmış eşleşmeler bir kez seçili sayılır (çalışan gönderim durmasın).
+export const AUTO_MAP_SQL = "COALESCE(user, '') NOT LIKE 'Otomatik%'"; // sistemin kendi onayladığı eşleşme otomatik gönderimde kullanılmaz
+export async function autoCats(db, settings) {
+  settings = settings || await getSettings(db);
+  if (await getRaw(db, 'once:autoupload_cats')) return settings.auto_upload_cats || {};
+  const cats = { ...(settings.auto_upload_cats || {}) };
+  for (const ch of Object.keys(settings.auto_upload || {}).filter((k) => settings.auto_upload[k] && !cats[k])) {
+    cats[ch] = (await all(db, `SELECT local FROM category_map WHERE channel = ? AND ${AUTO_MAP_SQL}`, ch)).map((r) => r.local);
+  }
+  await setSetting(db, 'auto_upload_cats', cats);
+  await setSetting(db, 'once:autoupload_cats', Date.now());
+  settings.auto_upload_cats = cats;
+  return cats;
+}
 export async function autoUpload(env, db, settings) {
   settings = settings || await getSettings(db);
   const on = Object.keys(settings.auto_upload || {}).filter((k) => settings.auto_upload[k]);
   if (!on.length) return null;
+  const chosen = await autoCats(db, settings);
   const out = {};
   const allOpts = (await getRaw(db, 'upload_opts')) || {};
   for (const c of await getChannels(env, db)) {
@@ -303,7 +319,9 @@ export async function autoUpload(env, db, settings) {
       if (!last || Date.now() - last > 864e5) { await suggestAll(db, settings, c); await setSetting(db, 'automap:' + c.id, Date.now()); }
       const skip = await sentFilter(db, c.id), stale = await staleCheck(c), gone = [];
       const ready = [];
-      for (const map of (await all(db, 'SELECT * FROM category_map WHERE channel = ?', c.id)).map((m) => ({ ...m, attrs: JSON.parse(m.attrs || '{}') }))) {
+      // Yalnız müşterinin otomatik gönderim için seçtiği ve kendisinin onayladığı kategori eşleşmeleri
+      const pick = new Set(chosen[c.id] || []);
+      for (const map of (await all(db, `SELECT * FROM category_map WHERE channel = ? AND ${AUTO_MAP_SQL}`, c.id)).filter((m) => pick.has(m.local)).map((m) => ({ ...m, attrs: JSON.parse(m.attrs || '{}') }))) {
         if (ready.length >= 100) break;
         if (stale(map.remote_id)) { gone.push(map.local); continue; }
         const prods = (await productsFor(db, settings, { local: map.local, ch: c.id })).filter((p) => !p.listed && !skip(p) && (p.stock || 0) > 0).slice(0, 100 - ready.length);
@@ -342,14 +360,15 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       FROM products p WHERE p.active = 1 AND (EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.channel IN (${ph})) OR COALESCE(p.category, '') != '')
       GROUP BY 1 ORDER BY local = '', local`, ...cats);
     await migrateAuto(db);
-    const maps = await all(db, 'SELECT local, channel, remote_id, remote_name, attrs, updated_at FROM category_map');
+    const maps = await all(db, 'SELECT local, channel, remote_id, remote_name, attrs, updated_at, user FROM category_map');
+    const chosen = await autoCats(db, settings);
     const sugs = await all(db, 'SELECT local, channel, remote_id, remote_name, path, score, sure FROM category_suggest WHERE remote_id IS NOT NULL');
     return {
       channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo, test: !!c.sandbox,
         reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.type] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
-        auto: !!(settings.auto_upload || {})[c.id], stockPush: !!(settings.stock_push || {})[c.id] })),
+        auto: !!(settings.auto_upload || {})[c.id], autoCats: chosen[c.id] || [], stockPush: !!(settings.stock_push || {})[c.id] })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
-      maps: maps.map((x) => ({ ...x, attrs: JSON.parse(x.attrs || '{}') })),
+      maps: maps.map((x) => ({ ...x, attrs: JSON.parse(x.attrs || '{}'), auto: /^Otomatik/.test(x.user || ''), user: undefined })),
       suggestions: sugs,
       uploads: await uploadsWithListing(db),
       stockSync: !!settings.stock_sync,

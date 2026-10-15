@@ -31,7 +31,7 @@ export async function catmapView(el) {
         <input class="input" style="max-width:220px" type="search" placeholder="Kategori ara" data-q value="${q}">
       </div>
       <div class="small muted" data-prog>${mx.todo ? `${mx.todo} kategori × kanal için henüz öneri yok.` : 'Öneriyi onaylamak ya da değiştirmek için hücreye dokunun.'}</div>
-      ${isAdmin() ? html`<label class="check small"><input type="checkbox" data-autosure ${mx.autoSure ? 'checked' : ''}> Kesin eşleşmeleri otomatik onayla <span class="muted tiny">(her gün, yeni kategoriler için)</span></label>` : ''}`);
+      ${isAdmin() ? html`<label class="check small"><input type="checkbox" data-autosure ${mx.autoSure ? 'checked' : ''}> Kesin eşleşmeleri otomatik onayla <span class="muted tiny">(her gün, yeni kategoriler için; sistemin onayladığı eşleşmelerle ürün otomatik gönderilmez)</span></label>` : ''}`);
   }
   function drawBox() {
     const list = shown(), box = $('[data-box]', el);

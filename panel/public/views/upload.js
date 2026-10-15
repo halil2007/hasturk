@@ -10,6 +10,15 @@ export async function uploadView(el) {
   const C = () => st.channels.find((c) => c.id === chId);
   const mapOf = (local) => st.maps.find((m) => m.local === local && m.channel === chId);
   const sugOf = (local) => (st.suggestions || []).find((m) => m.local === local && m.channel === chId);
+  // Otomatik gönderim kategorileri: yalnız kişinin onayladığı eşleşmeler seçilebilir
+  const autoCol = () => isAdmin() && !locked('autoupload') && C() && C().auto;
+  const autoable = () => st.categories.filter((k) => { const m = mapOf(k.local); return m && !m.auto; }).map((k) => k.local);
+  const autoAll = () => { const a = autoable(); return a.length > 0 && a.every((l) => C().autoCats.includes(l)); };
+  async function saveCats(list) {
+    const cur = (state.settings && state.settings.auto_upload_cats) || {};
+    state.settings = await api('settings', { method: 'PUT', body: { auto_upload_cats: { ...cur, [chId]: list } } });
+    C().autoCats = list;
+  }
 
   // Kanal işlerken sayfa açıksa 30 saniyede bir yenilenir (sonuç beklemeden görünür)
   let poll = null;
@@ -34,21 +43,23 @@ export async function uploadView(el) {
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
         <h2 style="margin:0">Otomatik işlemler · ${c.name}</h2>
         ${locked('autoupload') ? html`<div class="notice small"><i class="ico ico-up"></i><div><b>Yeni ürünleri otomatik gönderme</b> Profesyonel ve Kurumsal pakette. Paketinizde ürünleri aşağıdan seçip gönderebilirsiniz. <a class="link" href="#/paketim">Paketim</a></div></div>` : html`<label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="auto_upload" ${c.auto ? 'checked' : ''}><span></span></span>
-          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Onayladığınız kategori eşleşmelerindeki, ${ek(c.name, 'da')} olmayan ve stoğu olan yeni ürünler kendiliğinden gönderilir; eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir.</span></span></label>`}
+          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Yalnız aşağıdaki tabloda <b>Otomatik</b> sütununda seçtiğiniz kategorilerdeki, ${ek(c.name, 'da')} olmayan ve stoğu olan ürünler kendiliğinden gönderilir. İsterseniz tümünü, isterseniz bir kısmını seçin. Eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir. Kategori eşleşmesi olmayan ürün hiçbir zaman gönderilmez.</span></span></label>
+          ${c.auto && !c.autoCats.length ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Otomatik gönderim açık ama kategori seçilmedi: hiçbir ürün gönderilmez. Aşağıdan <b>Otomatik</b> sütununda kategori seçin.</div></div>` : ''}`}
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="stock_push" ${c.stockPush ? 'checked' : ''}><span></span></span>
           <span><b>Stokları ${ek(c.name, 'a')} gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${ek(c.name, 'a')} gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
       </div>` : ''}
       <div class="card flush">
         <div class="card-head" style="padding:16px 16px 0"><div style="min-width:0"><h2>Kategori eşleştirme ve gönderim</h2><div class="muted small">Sistem her kategori için uygun ${c.name} kategorisini önerir; öneri doğruysa “Onayla”, değilse “Başka kategori seç”. Onaylamadığınız kategoride eşleşme yapılmaz ve ürün gönderilmez.</div></div><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorileri için en uygun ${c.name} kategorisini önerir; siz onaylamadan eşleşmez"><i class="ico ico-bolt"></i>Kategori öner</button><button class="btn sm" data-act="review" title="Mevcut eşleştirmeleri yeni algoritmayla kontrol eder; yanlış görünenler için daha uygun kategori önerir"><i class="ico ico-check"></i>Eşleştirmeleri kontrol et</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
-        <div class="table-wrap"><table class="t"><thead><tr><th>ikas kategorisi</th><th class="r">Ürün</th><th class="r">${ek(c.name, 'da')}</th><th>${c.name} kategorisi</th><th></th></tr></thead><tbody>
+        <div class="table-wrap"><table class="t"><thead><tr><th>ikas kategorisi</th><th class="r">Ürün</th><th class="r">${ek(c.name, 'da')}</th><th>${c.name} kategorisi</th>${autoCol() ? html`<th title="Otomatik gönderilecek kategoriler"><label class="check tiny"><input type="checkbox" data-autoall ${autoAll() ? 'checked' : ''} ${autoable().length ? '' : 'disabled'}> Otomatik</label></th>` : ''}<th></th></tr></thead><tbody>
           ${st.categories.map((k) => { const m = mapOf(k.local), open = k.n - (k.listed[chId] || 0); return html`<tr>
             <td><b>${catName(k.local)}</b></td><td class="r num">${n(k.n)}</td><td class="r num">${n(k.listed[chId] || 0)}</td>
-            <td>${m ? html`<span class="pill good">${m.remote_name || m.remote_id}</span> <span class="tiny muted">${Object.keys(m.attrs).length} özellik</span>`
+            <td>${m ? html`<span class="pill good">${m.remote_name || m.remote_id}</span> <span class="tiny muted">${Object.keys(m.attrs).length} özellik</span>${m.auto ? html`<div class="tiny" style="color:var(--warn)">Sistem onayladı: otomatik gönderimde kullanılmaz. Doğruysa “Düzenle → Kaydet” ile siz onaylayın.</div>` : ''}`
               : sugOf(k.local) ? html`<div class="row wrap" style="gap:6px"><span class="pill ${sugOf(k.local).sure ? 'info' : 'warn'}" title="Sistem önerisi: onaylamadan eşleşmez">Önerilen: ${sugOf(k.local).remote_name}</span>${sugOf(k.local).sure ? '' : html`<span class="tiny muted">zayıf öneri, kontrol edin</span>`}</div>${sugOf(k.local).path ? html`<div class="tiny muted">${sugOf(k.local).path}</div>` : ''}`
               : html`<span class="muted small">eşleştirilmedi</span>`}</td>
+            ${autoCol() ? html`<td>${m && !m.auto ? html`<input type="checkbox" class="cb" data-autocat="${k.local}" ${c.autoCats.includes(k.local) ? 'checked' : ''} title="Bu kategorideki yeni ürünler otomatik gönderilsin">` : html`<span class="tiny muted" title="${m ? 'Sistem onaylı eşleşme: önce siz onaylayın' : 'Kategori eşleşmesi yok'}">—</span>`}</td>` : ''}
             <td class="r"><div class="row" style="justify-content:flex-end;gap:6px">${isAdmin() && !m && sugOf(k.local) ? html`<button class="btn sm primary" data-act="accept" data-l="${k.local}" title="Önerilen kategoriyle eşleştir"><i class="ico ico-check"></i>Onayla</button><button class="btn sm ghost" data-act="reject" data-l="${k.local}" title="Bu öneriyi kaldır (tekrar önerilmez)"><i class="ico ico-x"></i></button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="map" data-l="${k.local}">${m ? 'Düzenle' : sugOf(k.local) ? 'Başka kategori seç' : 'Eşleştir'}</button>` : ''}
               ${m && open > 0 && isAdmin() ? html`<button class="btn sm primary" data-act="send" data-l="${k.local}"><i class="ico ico-upload"></i>${open} ürünü gönder</button>` : ''}</div></td></tr>`; })}
-          ${!st.categories.length ? html`<tr><td colspan="5" class="empty">Ürün yok. Önce ikas ürünlerini içe aktarın.</td></tr>` : ''}
+          ${!st.categories.length ? html`<tr><td colspan="${autoCol() ? 6 : 5}" class="empty">Ürün yok. Önce ikas ürünlerini içe aktarın.</td></tr>` : ''}
         </tbody></table></div></div>`}
       <div class="card flush" id="gonderimler">
         <div class="card-head" style="padding:16px 16px 0"><div style="min-width:0"><h2>Gönderimler</h2><div class="muted small">Pazaryerinin onay sonucu kendiliğinden burada güncellenir.</div></div><span class="spacer"></span>${st.uploads.length > 5 ? html`<button class="btn sm ghost" data-act="allup">${allUp ? 'Son 5' : `Tümü (${st.uploads.length})`}</button>` : ''}</div>
@@ -258,6 +269,15 @@ export async function uploadView(el) {
   });
   // Otomatik işlem anahtarları (kanal bazında): ayarlara kaydedilir
   el.addEventListener('change', async (e) => {
+    const ac = e.target.dataset && (e.target.dataset.autocat != null || e.target.matches('[data-autoall]'));
+    if (ac) {
+      const before = C().autoCats.slice();
+      const list = e.target.matches('[data-autoall]') ? (e.target.checked ? autoable() : [])
+        : e.target.checked ? [...new Set([...before, e.target.dataset.autocat])] : before.filter((l) => l !== e.target.dataset.autocat);
+      try { await saveCats(list); toast(list.length ? `${list.length} kategori otomatik gönderilecek` : 'Otomatik gönderilecek kategori yok'); draw(); }
+      catch (err) { C().autoCats = before; draw(); toast(err.message, true); }
+      return;
+    }
     const k = e.target.dataset && e.target.dataset.auto;
     if (!k) return;
     try {

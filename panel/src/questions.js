@@ -29,6 +29,7 @@ export async function syncQuestions(env, db, { only } = {}) {
       }
       await save(db, ch.id, items);
       if (more || cont) await setSetting(db, key, more ? { ...w, page: page } : null);
+      if (!more) items.push(...await recheckOld(db, ch, w.since, t).catch((e) => { if (e.budget) throw e; return []; }));
       out[ch.id] = items.length;
       await resolve(db, `questions:${ch.id}`);
     } catch (e) {
@@ -38,6 +39,28 @@ export async function syncQuestions(env, db, { only } = {}) {
     }
   }
   return out;
+}
+
+// Bekleyen eski sorular: Hepsiburada dışındaki kanallar soruları soruluş tarihine göre süzer. Son 3 günden önce sorulup sonradan
+// kanalın kendi panelinden cevaplanan soru normal pencerede bir daha gelmez ve panelde "bekliyor" kalırdı. Bekleyen en eski sorunun
+// tarihinden pencerenin başına kadar (en fazla 30 gün geriye) ayrıca okunur; kanalın tarih aralığı sınırı için 13 günlük parçalarla.
+const BY_MODIFIED = new Set(['hepsiburada']); // değişiklik tarihine göre süzer: cevaplanan soru normal pencerede zaten gelir
+const OLD_MAX = 30 * 864e5, SPAN = 13 * 864e5, OLD_PAGES = 10;
+async function recheckOld(db, ch, before, t) {
+  if (BY_MODIFIED.has(ch.type)) return [];
+  const old = await first(db, "SELECT MIN(asked_at) AS t FROM questions WHERE channel = ? AND status = 'waiting' AND asked_at < ? AND asked_at > ?", ch.id, before, t - OLD_MAX);
+  if (!old || !old.t) return [];
+  const from = Math.max(old.t - 3600e3, t - OLD_MAX), items = [];
+  for (let end = before; end > from; end -= SPAN) {
+    const start = Math.max(from, end - SPAN);
+    for (let page = 0; page < OLD_PAGES; page++) {
+      const r = await ch.questions({ since: start, until: end, page, size: 50 });
+      items.push(...r.items);
+      if (!(r.hasNext && r.items.length)) break;
+    }
+  }
+  await save(db, ch.id, items);
+  return items;
 }
 
 // Panelden cevaplanan soru, kanal cevabı henüz yansıtmadan gelen senkronla "bekliyor"a dönmez (2 gün; sonra kanalın durumu geçerli):

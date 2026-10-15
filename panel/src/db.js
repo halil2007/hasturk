@@ -521,6 +521,7 @@ export const DEFAULT_SETTINGS = {
   // Genel stok senkronu kapalıyken bile stok gönderilecek kanallar (ikas stoğu bu kanallara gider) ve otomatik ürün gönderimi açık kanallar
   stock_push: {},
   auto_upload: {},
+  auto_upload_cats: {}, // otomatik ürün gönderimi: kanal başına müşterinin seçtiği panel kategorileri (yalnız bunlar gönderilir)
   auto_approve_sure: false, // Kategori eşleştirme: kesin önerileri arka planda otomatik onayla (varsayılan kapalı)
   origin: 'Türkiye',        // Ürünlerin menşei: pazaryerine yüklemede Menşei özelliği (ürün kartında ayrıca girilebilir)
   stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)

@@ -62,3 +62,44 @@ test('Pazarama: sorular ve cevap', async () => {
   const last = calls[calls.length - 1];
   assert.equal(last.method, 'PUT'); assert.deepEqual(JSON.parse(last.body), { questionId: 'q1', text: 'Var' });
 });
+
+test('Senkron: kanal panelinden cevaplanan eski soru (normal pencerenin dışında) "bekliyor"da kalmaz', async () => {
+  const { d1 } = await import('../dev/d1.mjs');
+  const { init, run, first } = await import('../src/db.js');
+  const { getChannels, resetChannels } = await import('../src/channels/index.js');
+  const { syncQuestions } = await import('../src/questions.js');
+  const db = d1(); await init(db); resetChannels();
+  const env = { DEMO: '1' }, D = 864e5, now = Date.now();
+  const list = await getChannels(env, db);
+  for (const c of list) c.enabled = c.id === 'trendyol';
+  const ch = list.find((c) => c.id === 'trendyol');
+  // 6 gün önce sorulmuş, panelde bekleyen soru; kanalda sonradan cevaplandı. Kanal soruları soruluş tarihine göre süzer.
+  await run(db, "INSERT INTO questions (channel, remote_id, text, asked_at, status, remote_status, synced_at) VALUES ('trendyol', 'Q1', 'Kaç günde gelir?', ?, 'waiting', 'WAITING_FOR_ANSWER', ?)", now - 6 * D, now - D);
+  const windows = [];
+  ch.questions = async ({ since, until }) => {
+    windows.push([since, until]);
+    const askedAt = now - 6 * D;
+    return { items: askedAt >= since && askedAt <= until ? [{ remoteId: 'Q1', text: 'Kaç günde gelir?', askedAt, status: 'answered', remoteStatus: 'ANSWERED', answer: 'Yarın kargoda', answeredAt: now - D }] : [], hasNext: false };
+  };
+  await syncQuestions(env, db, {});
+  const q = await first(db, "SELECT status, answer, answered_by FROM questions WHERE remote_id = 'Q1'");
+  assert.deepEqual([q.status, q.answer, q.answered_by], ['answered', 'Yarın kargoda', 'kanal']);
+  assert.ok(windows.every(([s, u]) => u - s <= 14 * D), 'tarih aralığı kanal sınırını aşmaz');
+  // Bekleyen eski soru kalmadıysa ek okuma yapılmaz
+  windows.length = 0;
+  await syncQuestions(env, db, {});
+  assert.equal(windows.length, 1);
+  resetChannels();
+});
+
+test('N11: tüm durumlar sorgulanamıyorsa açık ve kapanan sorular ayrı okunur (N11 panelinden cevaplanan soru kapanır)', async () => {
+  const env = (body) => `<x><result><status>success</status></result><productQuestions>${body}</productQuestions><pagingData><totalCount>1</totalCount></pagingData></x>`;
+  mock([[/productService/, (u, o) => {
+    if (/<status><\/status>/.test(o.body)) return '<x><result><status>failure</status><errorMessage>status zorunlu</errorMessage></result></x>';
+    if (/<status>OPEN<\/status>/.test(o.body)) return env('<productQuestion><id>1</id><question>Açık?</question></productQuestion>');
+    return env('<productQuestion><id>2</id><question>Kapalı?</question><answer>Evet</answer></productQuestion>');
+  }]]);
+  const ch = n11({ N11_APP_KEY: 'k', N11_APP_SECRET: 's' }, { id: 'n11' });
+  const r = await ch.questions({ since: Date.parse('2026-10-01T00:00:00Z'), until: Date.parse('2026-10-05T00:00:00Z'), page: 0 });
+  assert.deepEqual(r.items.map((x) => [x.remoteId, x.status, x.answer]), [['1', 'waiting', null], ['2', 'answered', 'Evet']]);
+});
