@@ -18,6 +18,14 @@
    "ad": "Ankara Büyükşehir Belediyesi – Sebze Yetiştiriciliği kurs notu",
    "url": "https://s.ankara.bel.tr/files/5214/3893/6685/SEBZE_YETTRCL.pdf"
   },
+  "BU": {
+   "ad": "Tarım ve Orman Bakanlığı Bitkisel Üretim Genel Müdürlüğü – Ekim ayı ekim önerisi (Sabah haberi)",
+   "url": "https://www.sabah.com.tr/ekonomi/balkon-bahceciligi-hobi-olmaktan-cikiyor-7119190"
+  },
+  "SZ": {
+   "ad": "Sözcü – Eylül ve Ekim aylarında ekim",
+   "url": "https://www.sozcu.com.tr/eylul-ve-ekim-aylarinda-eken-kazaniyor-hasat-zamani-verim-2-kat-artiyor-p229165"
+  },
   "TK": {
    "ad": "Tarım Kütüphanesi – Kökü yenen sebzeler (havuç, turp…)",
    "url": "http://www.tarimkutuphanesi.com/koku_yenilen_sebzeler_(havuc,_turp,_kereviz,_sogan,_sarimsak)_00443.html"
@@ -332,7 +340,15 @@
    "k": [
     "BG",
     "ABB",
-    "AU"
+    "AU",
+    "BU"
+   ],
+   "aylar": [
+    {
+     "t": [
+      10
+     ]
+    }
    ]
   },
   "ispanak": {
@@ -351,7 +367,15 @@
    "saklama": 5,
    "k": [
     "BG",
-    "AU"
+    "AU",
+    "BU"
+   ],
+   "aylar": [
+    {
+     "t": [
+      10
+     ]
+    }
    ]
   },
   "lahana": {
@@ -401,7 +425,9 @@
    "k": [
     "BG",
     "TK",
-    "ABB"
+    "ABB",
+    "BU",
+    "SZ"
    ],
    "aylar": [
     {
@@ -410,6 +436,13 @@
       4
      ],
      "not": "ana ekim dönemi"
+    },
+    {
+     "t": [
+      10,
+      11
+     ],
+     "not": "kışı toprakta geçirir, ilkbaharda erken hasat"
     }
    ]
   },
@@ -430,7 +463,8 @@
    "k": [
     "TK",
     "BG",
-    "AU"
+    "AU",
+    "BU"
    ],
    "aylar": [
     {
@@ -473,7 +507,18 @@
    "saklama": 2,
    "k": [
     "BG",
-    "AU"
+    "AU",
+    "BU",
+    "SZ"
+   ],
+   "aylar": [
+    {
+     "t": [
+      9,
+      10
+     ],
+     "not": "kış maydanozu; zor çimlendiği için biraz fazla tohum kullanılır"
+    }
    ]
   },
   "dereotu": {
@@ -503,7 +548,8 @@
    "derinlik": "Yaklaşık 0,5 cm",
    "mesafe": "Sıra arası 15–20 cm, sıra üzeri 4–5 cm",
    "k": [
-    "TG"
+    "TG",
+    "SZ"
    ],
    "aylar": [
     {
@@ -519,6 +565,12 @@
       9
      ],
      "not": "serin bölgelerde ikinci ekim"
+    },
+    {
+     "t": [
+      10
+     ],
+     "not": "ılıman bölgelerde"
     }
    ]
   },
@@ -530,7 +582,8 @@
    "derinlik": "Yaklaşık 0,5 cm",
    "mesafe": "Sıra arası 15–20 cm, sıra üzeri 4–5 cm",
    "k": [
-    "TG"
+    "TG",
+    "BU"
    ],
    "aylar": [
     {
@@ -546,6 +599,11 @@
       9
      ],
      "not": "serin bölgelerde ikinci ekim"
+    },
+    {
+     "t": [
+      10
+     ]
     }
    ]
   },

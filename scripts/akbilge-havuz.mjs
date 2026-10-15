@@ -9,7 +9,8 @@ const oto = JSON.parse(await readFile('bilgi/urunler-otomatik.json', 'utf8')).ur
 const prods = JSON.parse(await readFile('public/products.json', 'utf8'));
 const bySlug = new Map(prods.items.map((p) => [p.s, p]));
 const toh = JSON.parse(await readFile('bilgi/tohumlar.json', 'utf8'));
-const tKaynak = (ks) => 'Kaynak: ' + ks.map((k) => toh.kaynaklar[k].ad.replace(/\s*\(.*\)$/, '')).join('; ');
+// Kaynaklar müşteriye gösterilmez (kafa karıştırmasın); kayıt alanında (kaynak) ve bilgi/ dosyalarında durur
+const tKaynak = () => '';
 const tohumMetin = (t) => [
   `Yöntem: ${t.yontem === 'fide' ? 'fide ile yetiştirilir' : t.yontem}.`,
   t.zaman && `Ne zaman: ${t.zaman}`,
@@ -82,7 +83,7 @@ for (const g of config.guides || []) {
 }
 for (const [bitki, B] of BIRLESIK) {
   const b = bitki.replace(/\s*\(.*\)\s*/g, '').trim(), l = lc(b);
-  add({ tur: 'bitki-doz', bitki, grup: B.grup, sorular: [`${l} için gübre`, `${l} için besin`, `${l} için hangi gübre`, `${yon(bitki)} hangi gübre verilir`, `${l} gübreleme`, `${l} nasıl gübrelenir`],
+  add({ tur: 'bitki-doz', bitki, grup: B.grup, sorular: [`${l} için gübre`, `${l} için besin`, `${l} için hangi gübre`, `${yon(bitki)} hangi gübre verilir`, `${l} gübreleme`, `${l} nasıl gübrelenir`, `${l} için en iyi gübre`, `${l} gübre önerisi`, `${l} ne zaman gübrelenir`, `${l} gübresi`],
     cevap: `${bitki} (${B.grup}) için önerdiğimiz ürünler ve kullanım miktarları:\n\n${B.parca.join('\n\n')}`, urunler: [...new Set(B.urunler)], kaynak: 'rehber:birlesik' });
 }
 
@@ -117,7 +118,7 @@ for (const pl of (config.soilMatch || {}).plants || []) {
   if (!/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(prof || '')) continue;
   const adlar = [ad, ...String(diger || '').split(',').map((x) => x.trim()).filter(Boolean)];
   add({ tur: 'bitki-toprak', bitki: ad, grup, dinamik: 'toprak',
-    sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`]),
+    sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`, `${lc(n)} için en iyi toprak`, `${lc(n)} için uygun toprak`, `${lc(n)} toprak önerisi`, `${lc(n)} saksı değişimi toprak`]),
     cevap: `${ad} ${desc(prof)} bir toprak sever.${strict === 's' ? ' Çok özel bir ortam ister; uygun hazır toprak yoksa başka toprak önermeyiz.' : ''} Önerdiğimiz toprak, o anki stok durumuna göre aşağıda gösterilir.`,
     urunler: ozel ? [ozel] : [], kaynak: 'config:soilMatch' });
 }
@@ -147,10 +148,9 @@ for (const [slug, c] of Object.entries(oto)) {
     cevap += `\n\n${tt.ad} ekim bilgisi:\n${tohumMetin(tt)}`;
     if (tu.tohumSayisi) cevap += `\n• Bu pakette (${String(tu.gram).replace('.', ',')} g) yaklaşık ${tu.tohumSayisi[0].toLocaleString('tr-TR')}–${tu.tohumSayisi[1].toLocaleString('tr-TR')} tohum bulunur.`;
     if (tt.saklama) cevap += `\n• Serin, kuru ve karanlık yerde saklanırsa tohumlar yaklaşık ${tt.saklama} yıl canlı kalır.`;
-    cevap += `\n\n${tKaynak(tt.k)}`;
   } else if (tu) cevap += `\n\nGenel kural: ${toh.genel.derinlik}`;
   const tohum = c.kategori === 'Tohumlar' || !!tu;
-  const sorular = [`${n} nasıl kullanılır`, `${n} ne işe yarar`, `${n} özellikleri`, `${n} nedir`];
+  const sorular = [`${n} nasıl kullanılır`, `${n} ne işe yarar`, `${n} özellikleri`, `${n} nedir`, `${n} nasıl uygulanır`, `${n} ne zaman kullanılır`, `${n} hangi bitkilerde kullanılır`];
   if (tohum) sorular.push(`${n} ne zaman ekilir`, `${n} nasıl ekilir`, `${n} ekim zamanı`, `${n} kaç tohum var`, `${n} kaç cm derine ekilir`);
   if (c.kategori === 'Kedi Ürünleri' || c.kategori === 'Köpek Ürünleri') sorular.push(`${n} günlük ne kadar verilir`, `${n} besleme miktarı`);
   add({ tur: 'urun', urun: slug, kartDurum: 'urun_sayfasi', kategori: c.kategori, sorular, cevap, urunler: [slug, ...((bySlug.get(slug) || {}).x || []).slice(0, 2)], kaynak: `urun_sayfasi:${slug}` });
@@ -159,7 +159,7 @@ for (const [slug, c] of Object.entries(oto)) {
 // F) Saksılar (bilgi/saksilar.json; akbilge-saksi.mjs üretir): hacim, toprak ihtiyacı, delik, saksı seçimi kuralları
 const sx = JSON.parse(await readFile('bilgi/saksilar.json', 'utf8'));
 const virg = (x) => String(x).replace('.', ',');
-const kaynakSatir = (k) => '\n\nKaynak: ' + k.kaynaklar.map((x) => x.ad).join('; ');
+const kaynakSatir = () => '';
 const KURAL_SORU = {
   boyut: ['saksı değiştirirken kaç numara büyük alınır', 'ne kadar büyük saksı almalıyım', 'saksı boyutu nasıl seçilir', 'büyük saksı zararlı mı', 'bir boy büyük saksı'],
   delik: ['deliksiz saksıya bitki dikilir mi', 'saksının deliği olmazsa ne olur', 'drenaj deliği şart mı', 'kaşpo nasıl kullanılır', 'deliksiz saksı'],
@@ -208,11 +208,11 @@ for (const p of sx.saksilar) {
 const TUR_ADLARI = { hiyar: ['hıyar', 'salatalık'], marul: ['marul', 'salata'], lahana: ['lahana', 'kara lahana'], balkabagi: ['bal kabağı'] };
 for (const [key, t] of Object.entries(toh.turler)) {
   const adlar = TUR_ADLARI[key] || [lc(t.ad.replace(/\s*\(.*\)/, '').split('/')[0].trim())];
-  const sorular = adlar.flatMap((a) => [`${a} ne zaman ekilir`, `${a} tohumu nasıl ekilir`, `${a} ekim zamanı`, `${a} tohumu kaç cm derine ekilir`, `${a} kaç günde çimlenir`, `${a} kaç günde çıkar`, `${a} ekim aralığı`,
+  const sorular = adlar.flatMap((a) => [`${a} ekebilir miyim`, `${a} ne zaman dikilir`, `${a} ne zaman ekilmeli`, `${a} hangi ayda ekilir`, `${a} tohumu ne zaman atılır`, `şimdi ${a} ekilir mi`, `${a} saksıda yetişir mi`, `${a} ne zaman ekilir`, `${a} tohumu nasıl ekilir`, `${a} ekim zamanı`, `${a} tohumu kaç cm derine ekilir`, `${a} kaç günde çimlenir`, `${a} kaç günde çıkar`, `${a} ekim aralığı`,
     ...(t.gram ? [`${a} tohumu kaç tane`, `${a} tohumu 1 gramda kaç tohum var`, `${a} tohumu gramı kaç tane`] : []),
     ...(t.yontem === 'fide' ? [`${a} fidesi ne zaman dikilir`, `${a} fidesi nasıl yetiştirilir`] : [])]);
   const urunlerT = Object.entries(toh.urunler).filter(([s2, u]) => u.tur === key && bySlug.has(s2)).sort((a, b) => ((bySlug.get(b[0]).st > 0) - (bySlug.get(a[0]).st > 0))).map(([s2]) => s2);
-  add({ tur: 'tohum', bitki: t.ad, sorular, cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}${t.gram ? `\n• 1 gramda yaklaşık ${t.gram[0].toLocaleString('tr-TR')}–${t.gram[1].toLocaleString('tr-TR')} tohum vardır.` : ''}${t.saklama ? `\n• Tohum saklama ömrü: yaklaşık ${t.saklama} yıl.` : ''}\n\n${tKaynak(t.k)}`,
+  add({ tur: 'tohum', bitki: t.ad, sorular, cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}${t.gram ? `\n• 1 gramda yaklaşık ${t.gram[0].toLocaleString('tr-TR')}–${t.gram[1].toLocaleString('tr-TR')} tohum vardır.` : ''}${t.saklama ? `\n• Tohum saklama ömrü: yaklaşık ${t.saklama} yıl.` : ''}`,
     urunler: urunlerT.slice(0, 3), dinamik: 'stok', kaynak: `tohum:${key}` });
 }
 // G2) Ay ay "bu ay ne ekilir" (yalnız kaynakta ayı açıkça yazan türler)
@@ -221,20 +221,24 @@ const AYB = (m) => AY[m - 1].charAt(0).toLocaleUpperCase('tr-TR') + AY[m - 1].sl
 const ayHal = (m) => { const a = AY[m - 1]; return a + (/[aıou][^aeıioöuü]*$/.test(a) ? 'da' : 'de').replace(/^d/, /[çfhkpsşt]$/.test(a) ? 't' : 'd'); }; // ocakta, şubatta, martta, nisanda, ekimde…
 for (let m = 1; m <= 12; m++) {
   const tohumL = [], dikimL = [], slugs = new Set();
-  for (const [key, t] of Object.entries(toh.turler)) for (const a of t.aylar || []) {
+  const tr = prods.trend || {}, sira = (s2) => { const i = (tr.rising || []).indexOf(s2), j = (tr.best || []).indexOf(s2); return (i < 0 ? 99 : i) + (j < 0 ? 99 : j); };
+  // Yalnız sitede stokta tohumu olan sebzeler yazılır (olmayan ürünü önermeyelim)
+  const satilan = (key) => Object.entries(toh.urunler).some(([s2, u]) => u.tur === key && bySlug.has(s2) && bySlug.get(s2).st > 0);
+  for (const [key, t] of Object.entries(toh.turler)) if (satilan(key)) for (const a of t.aylar || []) {
     const ad = t.ad.replace(/\s*\(.*\)/, '');
     if ((a.t || []).includes(m)) tohumL.push(`${ad}${a.not ? ' (' + a.not + ')' : ''}`);
     if ((a.d || []).includes(m)) dikimL.push(`${ad}${a.not ? ' (' + a.not + ')' : ''}`);
-    if ((a.t || []).includes(m) || (a.d || []).includes(m)) Object.entries(toh.urunler).filter(([s2, u]) => u.tur === key && bySlug.has(s2) && bySlug.get(s2).st > 0).slice(0, 1).forEach(([s2]) => slugs.add(s2));
+    if ((a.t || []).includes(m) || (a.d || []).includes(m)) Object.entries(toh.urunler).filter(([s2, u]) => u.tur === key && bySlug.has(s2) && bySlug.get(s2).st > 0)
+      .sort((x, y) => sira(x[0]) - sira(y[0])).slice(0, 1).forEach(([s2]) => slugs.add(s2));
   }
   if (!tohumL.length && !dikimL.length) continue;
   const ay = AY[m - 1], hal = ayHal(m);
   let cevap = `${AYB(m)} ayında:`;
   if (tohumL.length) cevap += `\n\nTohum ekimi:\n${tohumL.map((x) => '• ' + x).join('\n')}`;
   if (dikimL.length) cevap += `\n\nFide dikimi:\n${dikimL.map((x) => '• ' + x).join('\n')}`;
-  cevap += `\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. "${(tohumL[0] || dikimL[0]).replace(/\s*\(.*\)/, '').toLocaleLowerCase('tr-TR')} nasıl ekilir").\n\n${tKaynak(['TG', 'BG', 'TK'])}`;
-  add({ tur: 'tohum-ay', ay: m, sorular: [`${ay} ayında ne ekilir`, `${hal} ne ekilir`, `${ay} ayında hangi sebzeler ekilir`, `${hal} hangi tohumlar ekilir`, `${hal} hangi sebzeler ekilir`, `${ay} ayında ne dikilir`, `${hal} hangi fideler dikilir`, `${ay} ayı ekim takvimi`],
-    cevap, urunler: [...slugs].slice(0, 3), dinamik: 'stok', kaynak: `tohum:ay:${m}` });
+  cevap += `\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir.${m >= 3 && m <= 6 ? ' Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir.' : ''} Bir sebzenin ayrıntısını sorabilirsiniz (ör. "${(tohumL[0] || dikimL[0]).replace(/\s*\(.*\)/, '').toLocaleLowerCase('tr-TR')} nasıl ekilir").`;
+  add({ tur: 'tohum-ay', ay: m, sorular: [`${ay} ayında ne ekilir`, `${hal} ne ekilir`, `${ay} ayında hangi sebzeler ekilir`, `${hal} hangi tohumlar ekilir`, `${hal} hangi sebzeler ekilir`, `${ay} ayında ne dikilir`, `${hal} hangi fideler dikilir`, `${ay} ayı ekim takvimi`, `${ay} ayında hangi sebze ekilir`, `${hal} ne ekebilirim`, `${hal} hangi tohumları ekebilirim`, `${ay} ayında ekilecek sebzeler`, `${ay} ayında ekilen sebzeler`, `${ay} ayında bahçeye ne ekilir`, `${ay} ayında saksıya ne ekilir`],
+    cevap, urunler: [...slugs].sort((x, y) => sira(x) - sira(y)).slice(0, 4), dinamik: 'stok', kaynak: `tohum:ay:${m}` });
 }
 
 for (const [konu, sorular] of Object.entries({
@@ -242,7 +246,7 @@ for (const [konu, sorular] of Object.entries({
   dogrudan: ['hangi sebzeler fide ile yetiştirilir', 'hangi tohumlar direkt ekilir', 'fide mi tohum mu', 'doğrudan tohum ekimi hangi sebzeler'],
   serin: ['kışlık sebzeler hangileri', 'serin iklim sebzeleri', 'sonbaharda hangi sebzeler ekilir', 'soğuğa dayanıklı sebzeler'],
   sicak: ['yazlık sebzeler hangileri', 'sıcak iklim sebzeleri', 'ilkbaharda hangi sebzeler ekilir', 'soğuğa hassas sebzeler'],
-})) add({ tur: 'tohum-genel', konu, sorular, cevap: `${toh.genel[konu]}\n\n${tKaynak(toh.genel.k)}`, urunler: [], kaynak: `tohum:genel:${konu}` });
+})) add({ tur: 'tohum-genel', konu, sorular, cevap: toh.genel[konu], urunler: [], kaynak: `tohum:genel:${konu}` });
 
 // H) İlaçlama pompaları (bilgi/pompalar.json; akbilge-pompa.mjs üretir): akülü/manuel, şarj, kapasite, garanti
 const pm = JSON.parse(await readFile('bilgi/pompalar.json', 'utf8'));
