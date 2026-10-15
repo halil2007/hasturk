@@ -10,9 +10,11 @@
     // Kod içinden okunur (env.ASSETS): Ak Bilge ürün listesini products.json'dan alır
     "binding": "ASSETS"
   },
-  // Ziyaretçi eğilimleri veritabanı: kimliği (database_id) yazılmadığı için ilk yayında Cloudflare otomatik oluşturur
+  // Ziyaretçi eğilimleri + Bilge Bey veritabanı: Doğu Avrupa'da (EEUR, panelden konum ipucuyla açıldı, 15 Ekim 2026).
+  // DB_ESKI: ilk veritabanı (ABD batısı, WNAM); /tasi ile verisi yeniye kopyalanır, taşıma bitince bu bağlantı kaldırılır.
   "d1_databases": [
-    { "binding": "DB", "database_name": "hasturk-egilim" }
+    { "binding": "DB", "database_name": "hasturk-egilim-eu", "database_id": "2066b984-15b5-40bf-8718-c816821b5bdb" },
+    { "binding": "DB_ESKI", "database_name": "hasturk-egilim" }
   ],
   // Olay kabul edilen site(ler)
   "vars": {

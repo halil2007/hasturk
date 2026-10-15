@@ -7,7 +7,7 @@
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
 
-import { handle as akHandle, populer as akPopuler, vote as akVote, sayac as akSayac, konum as akKonum } from './akbilge.js';
+import { handle as akHandle, populer as akPopuler, vote as akVote, sayac as akSayac, konum as akKonum, initDb as akInitDb } from './akbilge.js';
 
 const KINDS = {
   q: 'search',    // arama (sonuç bulundu)
@@ -77,6 +77,47 @@ async function ingest(req, env, ctx) {
     await env.DB.batch([...counts].map(([key, n]) => { const [k, x] = key.split('\u0000'); return st.bind(d, k, x, n); }));
   })().catch(() => {}));
   return done;
+}
+
+// Veritabanı taşıma (ABD → Doğu Avrupa, 15 Ekim 2026): eski veritabanı (DB_ESKI, hasturk-egilim) yeniye (DB,
+// hasturk-egilim-eu) parça parça kopyalanır. GET /tasi her çağrıda en fazla 400 satır taşır ve ilerlemeyi yeni veritabanındaki
+// tasima tablosuna yazar; aynı anda iki çağrı kilitle engellenir, bitince "bitti" döner. Kişisel veri yok, yalnız kopya.
+const TASI = [
+  ['ev', ['d', 'k', 'x', 'n'], 'INSERT INTO ev (d, k, x, n) VALUES (?, ?, ?, ?) ON CONFLICT (d, k, x) DO UPDATE SET n = n + excluded.n'],
+  ['ak_soru', ['ts', 'q', 'qn', 'kaynak', 'havuz', 'skor', 'cevap', 'urunler', 'durum', 'site', 'sayfa', 'giris', 'cikis'],
+    'INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, skor, cevap, urunler, durum, site, sayfa, giris, cikis) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'],
+  ['ak_gun', ['d', 'n'], 'INSERT INTO ak_gun (d, n) VALUES (?, ?) ON CONFLICT (d) DO UPDATE SET n = n + excluded.n'],
+  ['ak_oy', ['ts', 'q', 'kaynak', 'havuz', 'oy', 'site'], 'INSERT INTO ak_oy (ts, q, kaynak, havuz, oy, site) VALUES (?,?,?,?,?,?)'],
+];
+async function tasi(env) {
+  const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+  const N = env.DB, O = env.DB_ESKI;
+  if (!N || !O) return json({ ok: false, why: 'baglanti yok' });
+  await N.exec('CREATE TABLE IF NOT EXISTS tasima (tablo TEXT PRIMARY KEY, son INTEGER NOT NULL DEFAULT 0, adet INTEGER NOT NULL DEFAULT 0, bitti INTEGER NOT NULL DEFAULT 0, kilit INTEGER)');
+  await N.batch(TASI.map(([t]) => N.prepare('INSERT OR IGNORE INTO tasima (tablo) VALUES (?)').bind(t)));
+  const durum = async () => (await N.prepare('SELECT tablo, son, adet, bitti FROM tasima ORDER BY rowid').all()).results;
+  const t = (await N.prepare('SELECT tablo, son FROM tasima WHERE bitti = 0 ORDER BY rowid LIMIT 1').first());
+  if (!t) return json({ ok: true, bitti: true, tablolar: await durum() });
+  const now = Date.now();
+  const lock = await N.prepare('UPDATE tasima SET kilit = ? WHERE tablo = ? AND (kilit IS NULL OR kilit < ?)').bind(now, t.tablo, now - 60000).run();
+  if (!lock.meta.changes) return json({ ok: true, mesgul: true, tablolar: await durum() });
+  try {
+    await init(N); await akInitDb(N);
+    const [, cols, sql] = TASI.find((x) => x[0] === t.tablo);
+    let rows;
+    try { rows = (await O.prepare(`SELECT rowid AS _r, ${cols.join(', ')} FROM ${t.tablo} WHERE rowid > ? ORDER BY rowid LIMIT 400`).bind(t.son).all()).results; }
+    catch (e) { rows = null; } // eski veritabanında tablo yoksa atlanır
+    if (!rows || !rows.length) await N.prepare('UPDATE tasima SET bitti = 1, kilit = NULL WHERE tablo = ?').bind(t.tablo).run();
+    else {
+      const st = N.prepare(sql);
+      for (let i = 0; i < rows.length; i += 100) await N.batch(rows.slice(i, i + 100).map((r) => st.bind(...cols.map((c) => (r[c] === undefined ? null : r[c])))));
+      await N.prepare('UPDATE tasima SET son = ?, adet = adet + ?, kilit = NULL WHERE tablo = ?').bind(rows[rows.length - 1]._r, rows.length, t.tablo).run();
+    }
+    return json({ ok: true, bitti: false, tablolar: await durum() });
+  } catch (e) {
+    await N.prepare('UPDATE tasima SET kilit = NULL WHERE tablo = ?').bind(t.tablo).run().catch(() => {});
+    return json({ ok: false, hata: String((e && e.message) || e).slice(0, 200) }, 500);
+  }
 }
 
 // Ürün olaylarının tek sayıya çevrilmesi: sepete ekleme > tıklama > görüntüleme
@@ -176,6 +217,7 @@ export default {
       return akHandle(req, env, ctx, { aiKey: ad ? String(env[ad]).trim() : '', originOk: originOk(req, env), products: productsFor(req, env, site) })
         .catch(() => new Response(JSON.stringify({ ok: false, why: 'sunucu' }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }));
     }
+    if (pathname === '/tasi') return tasi(env).catch((e) => new Response(JSON.stringify({ ok: false, hata: String(e && e.message || e).slice(0, 200) }), { status: 500 }));
     if (pathname === '/trends') return trends(env, ctx, req).catch(() => new Response('{"ok":false}', { status: 500 }));
     // Ak Bilgi hazırlığı: Anthropic anahtarı Cloudflare'de doğru adla (ANTHROPIC_API_KEY) kayıtlı mı. Anahtarın kendisi
     // asla gösterilmez; sadece var/yok, uzunluk ve türünü belirten ilk ek (ör. "sk-ant-api")
