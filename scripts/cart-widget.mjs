@@ -92,9 +92,10 @@ await p.locator(R + '.xbtn[data-act="close"]').first().tap().catch(() => {});
 await p.keyboard.press('Escape').catch(() => {});
 await p.waitForTimeout(600);
 await p.locator(R + '.fab.akfab').tap().catch(async () => { log('  akfab yok, Ürün Bul içinden'); });
-await p.locator(R + `[data-act="akq"][data-v="${AKQ}"]`).first().tap({ timeout: 10000 }).catch(async () => {
+await p.locator(R + '[data-act="akgrp"][data-v="1"]').first().tap({ timeout: 10000 }).catch(() => log('  konu düğmesi yok'));
+await p.locator(R + `[data-act="akq"][data-v="${AKQ}"]`).first().tap({ timeout: 5000 }).catch(async () => {
   log('  öneri düğmesi yok; soru yazılıyor');
-  const inp = p.locator(R + 'textarea, .akin input').first(); await inp.fill(AKQ.replace(/\?$/, '')); await inp.press('Enter');
+  const inp = p.locator(R + '.akf input').first(); await inp.fill(AKQ.replace(/\?$/, '')); await inp.press('Enter');
 });
 await p.locator(R + '.akall').last().waitFor({ timeout: 30000 }).catch(() => log('  "Hepsini sepete ekle" çıkmadı'));
 if (await p.locator(R + '.akall').count()) {
