@@ -76,3 +76,9 @@ Güncelleme: 15 Ekim 2026 · Kapsam: en çok satan bitki ürünlerinden ilk 13 �
 ## Saksılar — bilgi/saksilar.json
 
 39 saksı ürünü, 69 boy. Litre üreticiden; yoksa ölçülerden hesap (konik saksıda 0,72 × silindir; Line, Kozalak, Cornet 85 L, Çeşme 130 L üretici litreleriyle %5 içinde). Kurallar Colorado State, Clemson, NC State, Illinois, UConn, UC Master Gardeners yayınlarından. "Dibe çakıl" konusu kaynaklarda tartışmalı olduğu için öyle anlatılır.
+
+## Bitki sorunları — bilgi/sorunlar.json
+
+31 belirti (yaprak sararması, damar arası sararma, uç kuruması, solma, yaprak/tomurcuk dökümü, çiçek açmama, kök çürümesi, toprak sinekçiği, yaprak biti, unlu/kabuklu bit, kırmızı örümcek, beyaz sinek, külleme, fide devrilmesi ve boylanması, salyangoz, saksı darlığı, toprakta küf/tuz, güneş yanığı; orkide, limon/narenciye, domates/biber, kaktüs/sukulent, monstera, benjamin, ortanca). Kaynaklar: UC IPM (Houseplant Problems), Illinois Extension, Iowa State (orkide, çiçek burnu çürüklüğü), Clemson HGIC (çiçeklenme), Oregon State / Wisconsin / Maryland (sinekçik), UC Master Gardeners / UConn (bit, akar), Maryland (bitkisel yağ uyarısı), RHS + UC MG (narenciye), Nevada / Illinois / UF / MSU / UGA (domates), Utah State (salyangoz), Missouri BG (beyaz sinek), NC State (fide), Colorado State (kloroz).
+
+Kurallar: kesin teşhis yok ("olası nedenler"), ilaç dozu yok (etikete göre), ev/halk sağlığı böcek ilaçları (Chrysamed insektisit, Mite-Ex, Sinpest) bitkiye önerilmez. Ürün faydası yalnız ürün açıklamasında yazanla sınırlı: Tarm neem spreyi (yaprak biti, unlu bit, kabuklu bit, beyaz sinek), Florist sinek ve unlu bit spreyi (unlu bit, toprak sineklenmesi), Florist mantar önleyici ve Subon Hijyen (külleme). Kırmızı örümcek için etiketinde akar yazan bitki ürünü yok; müşteri hizmetlerine yönlendirilir. Salyangoz için ürün yok; elle toplama ve tuzak anlatılır.

@@ -139,9 +139,9 @@ Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collec
 
 ## Ak Bilge (tarım danışmanı)
 
-Ürün Bul penceresinde "Ak Bilge" sekmesi: müşteri gübre, toprak, tohum, saksı, pompa sorusunu yazar.
+Ürün Bul penceresinde "Ak Bilge" sekmesi: müşteri gübre, toprak, tohum, saksı, pompa ya da bitki sorunu (yaprak sararması, solma, çiçek açmama, zararlılar) sorusunu yazar.
 
-1. Soru önce **hazır soru havuzunda** aranır (`src/akbilge-havuz.json`, ~1400 cevap). Bulunursa cevap anında ve ücretsizdir. Havuzdaki rakamlar yalnız doğrulanmış tablolardan gelir (`bilgi/`, kaynaklar `bilgi/DOGRULAMA.md`).
+1. Soru önce **hazır soru havuzunda** aranır (`src/akbilge-havuz.json`, ~1400 cevap). Bulunursa cevap anında ve ücretsizdir. Bitki sorunlarında olası nedenler, nasıl anlaşılır, ne yapılmalı ve sitedeki faydalı ürünler yazılır (`scripts/akbilge-sorun.mjs` → `bilgi/sorunlar.json`); stokta olmayan ürün cevaptan çıkar. Havuzdaki rakamlar yalnız doğrulanmış tablolardan gelir (`bilgi/`, kaynaklar `bilgi/DOGRULAMA.md`).
 2. Havuzda yoksa **Claude** (claude-opus-5-5, düşük düşünme seviyesi) en yakın havuz cevapları ve ilgili ürünlerle cevaplar; listede olmayan ürün ya da rakam veremez. Günlük sınır var.
 3. Cevap verilemezse WhatsApp / arama düğmesi çıkar (soru WhatsApp mesajına hazır yazılır).
 
