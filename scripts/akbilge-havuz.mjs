@@ -372,7 +372,7 @@ const GENEL_GUBRE = [
   { konu: 'saksi-cicek', sorular: ['saksı çiçeklerine hangi gübre', 'saksı çiçekleri için gübre', 'saksı bitkilerine hangi gübre', 'saksı bitkisi gübresi', 'çiçeklere hangi gübre verilir', 'çiçek gübresi', 'salon bitkilerine hangi gübre', 'ev bitkilerine hangi gübre', 'ev çiçeklerine gübre', 'bitkime hangi gübre', 'bitkime hangi gübreyi vermeliyim', 'çiçeğime ne gübre vereyim', 'saksıya gübre nasıl verilir', 'saksıdaki çiçeklere gübre'],
     cevap: [
       'Saksı çiçekleriniz için iki ürünü birlikte kullanmanızı öneririz:',
-      'HasTürk Solucan Gübresi — toprağı uzun süre besler, kök gelişimini destekler.\n• Saksı başına 100–125 g, toprağa karıştırarak.\n• Saksı toprağını kendiniz hazırlıyorsanız: toprağın %40–50\'si kadar.',
+      'HasTürk Solucan Gübresi — toprağı uzun süre besler, kök gelişimini destekler.\n• Saksı başına 100–125 g, toprağa karıştırarak.',
       'HasTürk Sıvı Solucan Gübresi — bitki besini hızlı alır.\n• Sulama suyuna: 10 litre suya 50–100 ml.\n• Yapraklara püskürterek: 1 litre suya 10–20 ml.',
       varsa('florist-cicekli-bitkiler-sivi-konsantre-bitki-besini', 'Çiçekli bitkileriniz için Florist Çiçekli Bitkiler Besini de var (ürün bilgisine göre 1 şase + 1 litre su).'),
       varsa('cicek-topragi-bakim-seti', 'Saksı değiştirecekseniz Çiçek Toprağı Bakım Seti\'nde çiçek toprağı, sıvı solucan gübresi ve çiçek besini bir arada.'),
@@ -387,9 +387,9 @@ const GENEL_GUBRE = [
   { konu: 'fide', sorular: ['fidelere hangi gübre', 'fideye hangi gübre verilir', 'fide gübresi', 'fide için gübre', 'fideler için besin', 'fide dikerken gübre', 'fide toprağına gübre', 'fideyi nasıl beslerim', 'fide yetiştirirken gübre'],
     cevap: [
       'Fideleriniz için önerimiz:',
-      '• Fide toprağını hazırlarken: toprağın %40–50\'si kadar HasTürk Solucan Gübresi karıştırın.\n• Fideleri dikmeden önce: köklerini sıvı solucan gübreli suya batırın (10 litre suya 100 ml).\n• Fideler büyürken: HasTürk Sıvı Solucan Gübresi, sulama suyuna 10 litre suya 50–100 ml.',
+      '• Fideleri dikmeden önce: köklerini sıvı solucan gübreli suya batırın (10 litre suya 100 ml).\n• Fideler büyürken: HasTürk Sıvı Solucan Gübresi, sulama suyuna 10 litre suya 50–100 ml.',
       varsa('fide-sasirtma-topragi', 'Hazır toprak isterseniz Profesyonel Fide Şaşırtma Toprağı fideler için hazırlanmıştır.'),
-    ], urunler: ['hasturk-sivi-solucan-gubresi', 'hasturk-kati-solucan-gubresi', 'fide-sasirtma-topragi'] },
+    ], urunler: ['hasturk-sivi-solucan-gubresi', 'fide-sasirtma-topragi', 'hasturk-kati-solucan-gubresi'] },
   { konu: 'meyve-agaci', sorular: ['meyve ağaçlarına hangi gübre', 'meyve ağacı için gübre', 'meyve ağacı gübresi', 'ağaçlara hangi gübre verilir', 'ağaç gübresi', 'fidana hangi gübre', 'fidan gübresi', 'fidan dikerken gübre', 'meyve ağaçlarını ne zaman gübrelemeli', 'bahçedeki ağaçlara gübre'],
     cevap: [
       'Meyve ağaçlarınız için önerimiz:',
@@ -401,6 +401,11 @@ const GENEL_GUBRE = [
 ];
 for (const g of GENEL_GUBRE) add({ tur: 'gubre-genel', konu: g.konu, sorular: g.sorular, cevap: g.cevap.filter(Boolean).join('\n\n') + '\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.',
   urunler: g.urunler.filter((x) => bySlug.has(x) && bySlug.get(x).st > 0), kaynak: `rehber:genel:${g.konu}` });
+
+// J) Blog "Sık Sorulan Sorular" (bilgi/blog-sss.json; akbilge-blog.mjs üretir): bakım bilgisi (sulama, ışık, toprak, saksı…).
+// En sona eklenir: aynı soruya doğrulanmış bir cevap varsa eşit puanda o kazanır. Gübre/ilaç miktarı veren blog cevapları alınmaz.
+const blog = JSON.parse(await readFile('bilgi/blog-sss.json', 'utf8'));
+for (const b of blog.sss) add({ tur: 'blog', konu: b.kaynak, sorular: [b.soru.replace(/\?$/, '')], cevap: b.cevap, urunler: b.urunler.filter((x) => bySlug.has(x) && bySlug.get(x).st > 0), kaynak: `blog:${b.kaynak}` });
 
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
@@ -426,4 +431,4 @@ await writeFile('src/akbilge-havuz.json', JSON.stringify(out.filter((e) => e.dur
   return o;
 })));
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel+${c('tohum-ay')} ay, pompa ${c('pompa')}+${c('pompa-genel')} genel, genel gübre ${c('gubre-genel')}, bitki sorunu ${c('sorun')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel+${c('tohum-ay')} ay, pompa ${c('pompa')}+${c('pompa-genel')} genel, genel gübre ${c('gubre-genel')}, blog ${c('blog')}, bitki sorunu ${c('sorun')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
