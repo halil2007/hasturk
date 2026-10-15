@@ -1444,6 +1444,9 @@
   }
   function akBuild() {
     if (!$ak) return;
+    // Sunucuyu ısıt: ilk konunun ilk sorusu önden (sunucunun soru dizini ilk istekte kurulur, ~0,2 sn)
+    var g0 = akGroups()[0];
+    if (g0 && g0.q && g0.q[0]) akPre([g0.q[0]]);
     if (!AK.built) {
       var c = CFG.akbilge || {}, name = akName(), pg = akPage();
       $ak.innerHTML = '<div class="akh"><img src="' + esc(akImg('avatar')) + '" alt="" width="64" height="64"><div><b>' + esc(name) + '</b><span>' +
@@ -1508,6 +1511,10 @@
       var p = BY_SLUG[pg], pq = akKisa(p.n) + ' nasıl kullanılır?';
       h += '<button type="button" class="akpg" data-act="akq" data-v="' + esc(pq) + '">' + thumb(p.img, 120) + '<span><small>Bu ürün hakkında</small><b>' + esc(pq) + '</b></span></button>';
     }
+    var pq0 = [];
+    if (sp) pq0.push(akKisa(sp.n) + ' nasıl kullanılır?');
+    if (pg && BY_SLUG[pg]) pq0.push(akKisa(BY_SLUG[pg].n) + ' nasıl kullanılır?');
+    if (pq0.length) setTimeout(function () { akPre(pq0); }, 0);
     h += '<div class="akgo">' + G.map(function (g, i) {
       return '<button type="button" data-act="akgrp" data-v="' + i + '"' + (AK.grp === i ? ' class="on" aria-expanded="true"' : ' aria-expanded="false"') + '><i>' + (I[g.icon] || I.leaf) + '</i><span><b>' + esc(g.title) + '</b><small>' + esc(g.sub || '') + '</small></span></button>';
     }).join('') + '</div>';
@@ -1518,7 +1525,7 @@
   function akGroup(v) {
     var i = +v, box = root.querySelector('.akbas');
     AK.grp = AK.grp === i ? null : i;
-    if (AK.grp != null) track('akbilge_konu', (akGroups()[i] || {}).title || '');
+    if (AK.grp != null) { track('akbilge_konu', (akGroups()[i] || {}).title || ''); akPre((akGroups()[i] || {}).q || []); }
     if (box) box.innerHTML = akStart(akPage());
   }
   function akVote(v) {
@@ -1528,6 +1535,20 @@
     track('akbilge_oy', (it.oy ? 'evet' : 'hayir') + ' ' + (it.d.kaynak || ''));
     if (AK_URL) fetch(AK_URL.replace(/\/ak(\?|$)/, '/ak/oy$1'), { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: it.q, k: it.d.kaynak || '', h: it.d.id || '', oy: it.oy, s: SITE_DIR ? ds.site : 'hasturk' }) }).catch(function () {});
+  }
+  // Öneri düğmelerinin cevabı önceden: konu açılınca (ve ürün / sepet sorusu görününce) o soruların hazır havuz cevabı
+  // arkada alınır (on: 1 → yalnız havuz; Claude'a gidilmez, kayda geçmez). Müşteri dokununca cevap beklemeden görünür;
+  // soru yine sayılsın diye asıl istek arkada ayrıca gönderilir. Yavaş bağlantıda / veri tasarrufunda yapılmaz.
+  var AK_PRE = {};
+  function akBody(q, on) { return JSON.stringify({ q: q, p: akPage(), s: SITE_DIR ? ds.site : 'hasturk', n: akName(), on: on ? 1 : undefined }); }
+  function akPre(qs) {
+    if (!AK_URL || slowNet()) return;
+    qs.forEach(function (q) {
+      if (!q || AK_PRE[q]) return;
+      AK_PRE[q] = fetch(AK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: akBody(q, true) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { return d && d.ok && d.kaynak === 'havuz' && d.cevap ? d : null; }, function () { return null; });
+    });
   }
   function akAsk(q) {
     q = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 300);
@@ -1541,11 +1562,19 @@
       var fin = function () { akRenderLog(); akScroll(true); };
       if (DATA) fin(); else load().then(fin, fin);
     };
-    var body = JSON.stringify({ q: q, p: akPage(), s: SITE_DIR ? ds.site : 'hasturk', n: akName() });
+    var body = akBody(q);
     var t = setTimeout(function () { if (it.wait) done({ ok: false }); }, 30000);
-    fetch(AK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { clearTimeout(t); if (it.wait) done(d || { ok: false }); }, function () { clearTimeout(t); if (it.wait) done({ ok: false }); });
+    var send = function () { return fetch(AK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body }).then(function (r) { return r.json(); }); };
+    var ask = function () { send().then(function (d) { clearTimeout(t); if (it.wait) done(d || { ok: false }); }, function () { clearTimeout(t); if (it.wait) done({ ok: false }); }); };
+    var pre = AK_PRE[q];
+    if (!pre) return ask();
+    pre.then(function (d) {
+      if (!it.wait) return;
+      if (!d) return ask();
+      clearTimeout(t);
+      done(d);
+      send().catch(function () {}); // soru sayılsın (kayıt)
+    });
   }
   // Yeni cevabın başı görünsün (uzun cevapta en alta atlamasın)
   function akScroll(answer) {

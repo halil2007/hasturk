@@ -94,14 +94,15 @@ await p.locator(R + '.xbtn[data-act="close"]').first().tap().catch(() => {});
 await p.keyboard.press('Escape').catch(() => {});
 await p.waitForTimeout(600);
 await p.locator(R + '.fab.akfab').tap().catch(async () => { log('  akfab yok, Ürün Bul içinden'); });
-const tak = Date.now();
 await p.locator(R + '[data-act="akgrp"][data-v="1"]').first().tap({ timeout: 10000 }).catch(() => log('  konu düğmesi yok'));
+await p.waitForTimeout(1500); // müşteri soruları okurken
+const tak = Date.now();
 await p.locator(R + `[data-act="akq"][data-v="${AKQ}"]`).first().tap({ timeout: 5000 }).catch(async () => {
   log('  öneri düğmesi yok; soru yazılıyor');
   const inp = p.locator(R + '.akf input').first(); await inp.fill(AKQ.replace(/\?$/, '')); await inp.press('Enter');
 });
 await p.locator(R + '.akall').last().waitFor({ timeout: 30000 }).catch(() => log('  "Hepsini sepete ekle" çıkmadı'));
-log(`Bilge Bey cevabı (konu + soru dokunuşu dahil): ${Date.now() - tak} ms`);
+log(`Bilge Bey cevabı (soruya dokunduktan sonra): ${Date.now() - tak} ms`);
 if (await p.locator(R + '.akall').count()) {
   const before = await cart();
   await p.locator(R + '.akall').last().tap();

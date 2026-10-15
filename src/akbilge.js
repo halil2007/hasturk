@@ -321,6 +321,13 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
     return { hit, near };
   };
   let { hit, near } = tryPool(APPROVED.t ? APPROVED.list : []);
+  // Önden yükleme (on: 1): Bilge Bey'in öneri düğmelerinin cevabı müşteri dokunmadan arkada alınır. Yalnız hazır havuz;
+  // Claude'a gidilmez, veritabanı beklenmez, kayda geçmez (müşteri dokununca asıl istek ayrıca gelir ve sayılır).
+  if (body.on === 1) {
+    if (!hit) return json({ ok: false, why: 'yok' });
+    const e = stokSuz(hit.e, prods);
+    return json({ ok: true, kaynak: 'havuz', id: e.i, cevap: e.c, urunler: e.u, dinamik: e.d || null, bitki: e.b || null });
+  }
   if (!hit && db) {
     await ready;
     const extra = await approved(db).catch(() => []);
