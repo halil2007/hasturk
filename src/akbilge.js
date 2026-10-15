@@ -174,7 +174,7 @@ async function askClaude(env, key, name, q, ctx, page) {
 
 // ---------- Veritabanı ----------
 let dbReady = false;
-async function initDb(db) {
+export async function initDb(db) {
   if (dbReady) return;
   await db.batch([
     db.prepare('CREATE TABLE IF NOT EXISTS ak_soru (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, q TEXT NOT NULL, qn TEXT NOT NULL, kaynak TEXT NOT NULL, havuz TEXT, skor REAL, cevap TEXT, urunler TEXT, durum TEXT, site TEXT, sayfa TEXT, giris INTEGER, cikis INTEGER)'),

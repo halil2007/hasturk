@@ -1,0 +1,25 @@
+name: Veritabanı taşıma (ABD → Doğu Avrupa)
+
+# /tasi adresini taşıma bitene kadar tekrar çağırır (her çağrı en fazla 400 satır kopyalar), sonra yeni veritabanının
+# bölgesini /ak/konum ile gösterir. Tekrar çalıştırmak güvenlidir: bitmiş taşıma yeniden kopyalanmaz.
+on:
+  workflow_dispatch:
+
+jobs:
+  tasi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Taşı
+        run: |
+          W=https://hasturk-arama.halilc2007.workers.dev
+          for i in $(seq 1 300); do
+            r=$(curl -s -m 60 $W/tasi)
+            echo "$i: $r"
+            echo "$r" | grep -q '"bitti":true' && break
+            echo "$r" | grep -q '"ok":false' && sleep 5
+          done
+          echo "## Taşıma sonucu" >> $GITHUB_STEP_SUMMARY
+          echo "$r" >> $GITHUB_STEP_SUMMARY
+          echo "## Yeni veritabanı konumu" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 20 $W/ak/konum | tee -a $GITHUB_STEP_SUMMARY
