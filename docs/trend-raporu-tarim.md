@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3051 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3053 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
