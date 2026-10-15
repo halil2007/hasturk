@@ -278,6 +278,14 @@ add({ tur: 'pompa-genel', konu: 'sarj', sorular: ['akülü ilaçlama pompası ş
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
   cevap: `${pr.title || 'İndirim'}: ${pr.code} kodunu ödeme adımında kullanabilirsiniz${pr.note ? ' (' + pr.note + ')' : ''}.${pr.shipping ? ' ' + pr.shipping + '.' : ''}`, urunler: [], kaynak: 'config:promo' });
+// Kargo ve sipariş (config.json > akbilge.kargo: mağazanın verdiği bilgi)
+const AKC = config.akbilge || {};
+if (AKC.kargo) {
+  const ship = pr.shipping ? ` ${pr.shipping}.` : '';
+  add({ tur: 'magaza', konu: 'kargo', sorular: ['siparişler ne zaman kargoya verilir', 'sipariş ne zaman kargoya verilir', 'kargoya ne zaman verilir', 'siparişim ne zaman kargoya verilecek',
+    'ne zaman kargolanır', 'kargo ne zaman çıkar', 'aynı gün kargo var mı', 'bugün kargoya verilir mi', 'siparişim ne zaman gelir', 'kargo kaç günde gelir', 'kaç günde teslim edilir', 'ne zaman elime ulaşır', 'kargom ne zaman gelir'],
+    cevap: `${AKC.kargo} Teslim süresi kargo firmasına ve adresinize göre değişir.${ship}\n\nSiparişinizin durumunu öğrenmek için WhatsApp'tan bize yazabilirsiniz.`, urunler: [], kaynak: 'config:akbilge.kargo' });
+}
 await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: hazir = canlıda kullanılır (doğrulanmış tablolar ve ürün bilgisi). Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
 // Sunucu (src/akbilge.js) için sıkıştırılmış kopya: soru kalıpları, cevap, ürünler, dinamik alan, ürün adı
 const adOf = (slug) => ((bySlug.get(slug) || {}).n || '').trim();
