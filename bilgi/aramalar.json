@@ -1,5 +1,5 @@
 {
- "guncelleme": "2026-10-15T11:28:39.732Z",
+ "guncelleme": "2026-10-15T11:29:44.817Z",
  "gun": 30,
  "kayit": 3069,
  "aramalar": [
@@ -1031,9 +1031,9 @@
   "guanokalong-yarasa-gubresi-toz": {
    "a": 1.02,
    "c": 0.57,
-   "v": 55.98,
-   "e7": 13.5,
-   "e28": 28.1
+   "v": 56.98,
+   "e7": 13.8,
+   "e28": 28.4
   },
   "hg-monstera-deve-tabani-topragi": {
    "a": 1.02,
@@ -1325,9 +1325,9 @@
   "biochar-mese-odunu-bazli-karbon-toprak-duzenleyici-0-3-mm": {
    "a": 0,
    "c": 0.54,
-   "v": 25.72,
-   "e7": 6.6,
-   "e28": 10.9
+   "v": 26.72,
+   "e7": 6.9,
+   "e28": 11.2
   },
   "bitki-topragi-ozel-karisim-20-lt": {
    "a": 1.17,
@@ -1472,9 +1472,9 @@
   "florist-mantar-onleyici-bitki-spreyi": {
    "a": 0,
    "c": 0,
-   "v": 23.69,
-   "e7": 6.3,
-   "e28": 9
+   "v": 24.69,
+   "e7": 6.6,
+   "e28": 9.3
   },
   "florist-sinek-ve-unlu-bit-onleyici-bitki-spreyi": {
    "a": 0,
