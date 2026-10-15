@@ -681,6 +681,12 @@
     '.akc{margin:8px 0 0 52px}.akc p{font-size:13px;color:var(--mu);margin-bottom:6px}.akc-l{display:flex;gap:8px;flex-wrap:wrap}',
     '.akc a{display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:20px;font-size:13.5px;font-weight:700}.akc a svg{width:18px;height:18px}',
     '.akc .wa{background:#25a162;color:#fff}.akc .tel{background:var(--bg);color:var(--ink)}',
+    '.aklive{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:0 16px 6px 92px;font-size:12.5px;color:var(--mu)}',
+    '.aklive a{display:inline-flex;align-items:center;gap:5px;font-weight:700;color:var(--pr)}.aklive a svg{width:15px;height:15px}',
+    '@media(min-width:760px){.aklive{padding:0 20px 6px 96px}}',
+    '.akfb{display:flex;align-items:center;gap:8px;margin:6px 0 0 52px;font-size:12.5px;color:var(--mu)}',
+    '.akfb button{font-size:12.5px;font-weight:700;color:var(--pr);border:1.5px solid var(--lt);border-radius:14px;padding:4px 12px;background:#fff}',
+    '.akfb button:hover{border-color:var(--pr)}',
     '.akdots{display:flex;gap:5px;padding:4px 2px}.akdots i{width:7px;height:7px;border-radius:50%;background:var(--mu);opacity:.35;animation:akd 1s infinite}',
     '.akdots i:nth-child(2){animation-delay:.15s}.akdots i:nth-child(3){animation-delay:.3s}',
     '@keyframes akd{0%,100%{opacity:.25}50%{opacity:.9}}',
@@ -1085,6 +1091,7 @@
     }
     else if (act === 'clear') { $q.value = ''; render(); $q.focus(); }
     else if (act === 'akq') akAsk(v);
+    else if (act === 'akoy') akVote(v);
     else if (act === 'akyeni') { AK.log = []; akSave(); AK.built = false; akBuild(); }
     else if (act === 'q') { $q.value = v; shown = PAGE; render(); $q.focus(); }
     else if (act === 'del') { e.stopPropagation(); var f = fold(v); setRecent(getRecent().filter(function (x) { return fold(x) !== f; })); renderIdle(); }
@@ -1168,9 +1175,24 @@
       (CFG.whatsapp ? '<a class="wa" data-kind="whatsapp" data-name="akbilge" target="_blank" rel="noopener" href="' + esc(waHref(q ? 'Merhaba, şunu sormak istiyorum: ' + q : 'Merhaba')) + '">' + I.chat + '<span>WhatsApp\'tan yazın</span></a>' : '') +
       (tel ? '<a class="tel" data-kind="phone" data-name="akbilge" href="' + esc(tel) + '">' + I.phone + '<span>Arayın</span></a>' : '') + '</div></div>';
   }
-  function akAnswerHtml(it) {
+  // "İşinize yaradı mı?" — olumsuz oyda iletişim düğmeleri hemen çıkar; oylar sunucuda incelenir
+  function akVoteHtml(it, idx) {
+    if (it.oy === 1) return '<div class="akfb"><span>Teşekkürler!</span></div>';
+    if (it.oy === 0) return '<div class="akfb"><span>Geri bildiriminiz için teşekkürler.</span></div>' + akContact(it.q, 'Ustamız size doğrusunu söylesin:');
+    return '<div class="akfb"><span>İşinize yaradı mı?</span><button type="button" data-act="akoy" data-v="1:' + idx + '">Evet</button><button type="button" data-act="akoy" data-v="0:' + idx + '">Hayır</button></div>';
+  }
+  // Başlıkta her zaman görünen küçük canlı destek bağlantısı (ısrarcı değil, elinin altında)
+  function akLive() {
+    var tel = CFG.phone ? 'tel:' + CFG.phone.replace(/[^\d+]/g, '') : '';
+    if (!CFG.whatsapp && !tel) return '';
+    return '<div class="aklive"><span>Ustamızla konuşun:</span>' +
+      (CFG.whatsapp ? '<a data-kind="whatsapp" data-name="akbilge-ust" target="_blank" rel="noopener" href="' + esc(waHref('Merhaba')) + '">' + I.chat + 'WhatsApp</a>' : '') +
+      (tel ? '<a data-kind="phone" data-name="akbilge-ust" href="' + esc(tel) + '">' + I.phone + esc(CFG.phone) + '</a>' : '') + '</div>';
+  }
+  function akAnswerHtml(it, idx) {
     var d = it.d || {}, q = it.q, html = '', pose = 'fikir';
     if (it.wait) return akBot('dusunuyor', '<div class="akdots"><i></i><i></i><i></i></div>');
+    if (d.kaynak === 'yonlendir' && d.cevap) return akBot('tesekkur', akText(d.cevap)) + (d.neden === 'konu_disi' ? '' : akContact(q, ''));
     if (d.cevap) {
       html = akText(d.cevap);
       var prods = '';
@@ -1180,15 +1202,17 @@
         if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>';
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda ustamıza danışın.</p>';
-      return akBot(pose, html) + (prods ? '<div class="akpw">' + prods + '</div>' : '') + (d.kaynak === 'ai' ? akContact(q, '') : '');
+      return akBot(pose, html) + (prods ? '<div class="akpw">' + prods + '</div>' : '') + akVoteHtml(it, idx);
     }
-    var why = d.ok === false || d.neden === 'hata' ? 'Şu an bağlantıda bir sorun oldu.' : 'Bu soruya henüz hazır bir cevabım yok.';
+    var why = d.ok === false || d.neden === 'hata' ? 'Şu an bağlantıda bir sorun oldu.'
+      : d.neden === 'emin-degil' ? 'Bu konuda size kesin ve doğru bilgi verebilmem için ustamızın bakması daha doğru olur.'
+      : 'Bu soruya henüz hazır bir cevabım yok.';
     return akBot('tesekkur', '<p>' + esc(why) + ' Ustamız size hemen yardımcı olsun:</p>') + akContact(q, '');
   }
   function akRenderLog() {
     var log = root.querySelector('.aklog');
     if (!log) return;
-    log.innerHTML = AK.log.map(function (it) { return '<div class="akm-u"><div class="akbub">' + esc(it.q) + '</div></div>' + akAnswerHtml(it); }).join('');
+    log.innerHTML = AK.log.map(function (it, i) { return '<div class="akm-u"><div class="akbub">' + esc(it.q) + '</div></div>' + akAnswerHtml(it, i); }).join('');
   }
   function akBuild() {
     if (!$ak) return;
@@ -1198,7 +1222,7 @@
       if (pg) samples.unshift(BY_SLUG[pg].n.replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() + ' nasıl kullanılır?');
       $ak.innerHTML = '<div class="akh"><img src="' + esc(akImg('avatar')) + '" alt="" width="64" height="64"><div><b>' + esc(name) + '</b><span>' +
         esc(c.subtitle || 'Gübre, toprak, tohum, saksı ve bitki bakımı sorularınızı cevaplarım.') + '</span></div>' +
-        (AK.log.length ? '<button type="button" class="aknew" data-act="akyeni">Yeni sohbet</button>' : '') + '</div>' +
+        (AK.log.length ? '<button type="button" class="aknew" data-act="akyeni">Yeni sohbet</button>' : '') + '</div>' + akLive() +
         '<div class="akwrap">' + akBot('selam', '<p>' + esc(c.greet || ('Merhaba, ben ' + name + '! Bitkiniz ya da ürünlerimizle ilgili sorunuzu yazın.')) + '</p>') +
         '<div class="akchips">' + samples.map(function (x) { return '<button type="button" data-act="akq" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>' +
         '<div class="aklog" aria-live="polite"></div></div>';
@@ -1248,6 +1272,14 @@
       if (pg) samples.unshift(BY_SLUG[pg].n.replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() + ' nasıl kullanılır?');
       box.innerHTML = samples.slice(0, 5).map(function (x) { return '<button type="button" data-act="akq" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('');
     }, function () {});
+  }
+  function akVote(v) {
+    var m = String(v).split(':'), it = AK.log[+m[1]];
+    if (!it || it.oy != null || !it.d) return;
+    it.oy = +m[0]; akSave(); akRenderLog();
+    track('akbilge_oy', (it.oy ? 'evet' : 'hayir') + ' ' + (it.d.kaynak || ''));
+    if (AK_URL) fetch(AK_URL.replace(/\/ak(\?|$)/, '/ak/oy$1'), { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: it.q, k: it.d.kaynak || '', h: it.d.id || '', oy: it.oy, s: SITE_DIR ? ds.site : 'hasturk' }) }).catch(function () {});
   }
   function akAsk(q) {
     q = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 300);

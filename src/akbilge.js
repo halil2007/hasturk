@@ -95,26 +95,34 @@ export function poolAnswer(q, opts = {}) {
 export function systemPrompt(name) {
   return `Sen ${name}'sin: HasTürk Gübre'nin (hasturkgubre.com.tr) çevrimiçi tarım ve bahçe danışmanısın. Müşterilerin gübre, toprak, tohum, saksı, bitki bakımı ve ilaçlama ekipmanı sorularını Türkçe, sade ve kısa cevaplarsın.
 
+Müşteriler emek, para ve zaman harcıyor: yanlış ya da alakasız bir cevap, hiç cevap vermemekten daha kötüdür. Her ne pahasına cevap vermeye çalışma; doğru bilgin yoksa müşteriyi ustamıza yönlendir. Gereken yerde yönlendirmekten çekinme, ama bildiğin ve güvenli olan temel bilgiyi de esirgeme.
+
 Kurallar:
 - Cevabın 120 kelimeyi geçmesin; gerekirse 2–4 maddelik liste kullan. "Siz" diye hitap et. Selamlama ve övgü cümlesi yazma.
-- Rakam (doz, miktar, litre, gün, cm, sıcaklık, oran) YALNIZCA kullanıcı mesajındaki "Doğrulanmış bilgi" bölümünde geçiyorsa kullanılır. Orada yoksa rakam verme; "kullanım miktarı ürün etiketinde yazar" ya da "ustamız net bilgi versin" de.
-- Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını ve gerekirse ustamıza sorulmasını söyle.
-- Ürün önerisi yalnız "Önerilebilecek ürünler" listesinden yapılır; listede olmayan ürün, marka veya rakip mağaza adı yazma. Uygun ürün yoksa ürün önerme.
-- Bitki hastalığı teşhisi için kesin konuşma; olası nedenleri say ve fotoğrafla ustamıza danışılmasını öner. İnsan veya hayvan sağlığı konusunda tavsiye verme.
-- Sipariş, kargo, iade, fiyat pazarlığı ve stok sorularında: siparişlerin site üzerinden takip edildiğini ve bu konularda WhatsApp'tan yazılmasını söyle.
-- Emin olmadığın konuda tahmin yürütme; bilmediğini açıkça söyle.
-- Tarım, bahçe ve mağazayla ilgisi olmayan sorulara kibarca yalnız bu konularda yardımcı olabildiğini söyle.
+- Rakam (doz, miktar, litre, gün, cm, sıcaklık, oran) YALNIZCA kullanıcı mesajındaki "Doğrulanmış bilgi" bölümünde, sorulan bitki ve ürün için geçiyorsa kullanılır. Başka bir bitkinin ya da ürünün rakamını bu soruya uyarlama. Rakam yoksa rakam verme.
+- "Doğrulanmış bilgi" soruyla ilgisizse onu kullanma; sorulmayan bir konuyu anlatma.
+- Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını söyle.
+- Ürün önerisi yalnız "Önerilebilecek ürünler" listesinden ve yalnız soruyla gerçekten ilgiliyse yapılır; listede olmayan ürün, marka veya rakip mağaza adı yazma.
+- Bitki hastalığı ya da zararlı teşhisi koyma; en fazla olası nedenleri say ve fotoğrafla ustamıza danışılmasını öner. İnsan veya hayvan sağlığı konusunda tavsiye verme.
+- Sipariş, kargo, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için ustamıza yönlendir.
 
-Cevabı yalnız istenen JSON biçiminde ver: "cevap" müşteriye gösterilecek metin; "urunler" listeden seçtiğin ürünlerin kodları (en fazla 3, uygun yoksa boş); "emin" cevabın doğrulanmış bilgiye dayanıyorsa true.`;
+"durum" alanı:
+- "cevap": soruyu doğru ve güvenle cevapladın.
+- "yonlendir": soru insan desteği gerektiriyor (sipariş/kargo/iade, teşhis, elinde doğru bilgi olmayan teknik soru). "cevap" alanına müşteriye kısa ve nazik bir yönlendirme cümlesi yaz.
+- "konu_disi": soru tarım, bahçe ve mağazayla ilgisiz; kibarca yalnız bu konularda yardımcı olabildiğini yaz.
+"emin" alanı: cevabındaki her bilgi ya "Doğrulanmış bilgi"de geçiyorsa ya da kimseyi yanıltmayacak kadar temel, herkesçe kabul gören bahçe bilgisiyse (ör. "fesleğen güneşli yer sever") true; en küçük bir şüphen varsa false.
+
+Cevabı yalnız istenen JSON biçiminde ver: "cevap" müşteriye gösterilecek metin; "urunler" listeden seçtiğin ürünlerin kodları (en fazla 3, uygun yoksa boş); "durum"; "emin".`;
 }
 const SCHEMA = {
   type: 'object',
   properties: {
     cevap: { type: 'string' },
     urunler: { type: 'array', items: { type: 'string' } },
+    durum: { type: 'string', enum: ['cevap', 'yonlendir', 'konu_disi'] },
     emin: { type: 'boolean' },
   },
-  required: ['cevap', 'urunler', 'emin'],
+  required: ['cevap', 'urunler', 'durum', 'emin'],
   additionalProperties: false,
 };
 
@@ -155,7 +163,7 @@ async function askClaude(env, key, name, q, ctx, page) {
   try { out = JSON.parse(text); } catch { return { error: 'json', usage: msg.usage }; }
   if (msg.stop_reason === 'max_tokens' || typeof out.cevap !== 'string' || !out.cevap.trim()) return { error: 'kesik', usage: msg.usage };
   const allowed = new Set(ctx.list.map((p) => p.s));
-  return { cevap: out.cevap.trim(), urunler: (out.urunler || []).filter((s) => allowed.has(s)).slice(0, 3), emin: !!out.emin, usage: msg.usage, model: msg.model };
+  return { cevap: out.cevap.trim(), urunler: (out.urunler || []).filter((s) => allowed.has(s)).slice(0, 3), durum: out.durum || 'cevap', emin: !!out.emin, usage: msg.usage, model: msg.model };
 }
 
 // ---------- Veritabanı ----------
@@ -166,6 +174,7 @@ async function initDb(db) {
     db.prepare('CREATE TABLE IF NOT EXISTS ak_soru (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, q TEXT NOT NULL, qn TEXT NOT NULL, kaynak TEXT NOT NULL, havuz TEXT, skor REAL, cevap TEXT, urunler TEXT, durum TEXT, site TEXT, sayfa TEXT, giris INTEGER, cikis INTEGER)'),
     db.prepare('CREATE INDEX IF NOT EXISTS ak_soru_durum ON ak_soru (durum, ts)'),
     db.prepare('CREATE TABLE IF NOT EXISTS ak_gun (d TEXT PRIMARY KEY, n INTEGER NOT NULL)'),
+    db.prepare('CREATE TABLE IF NOT EXISTS ak_oy (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, q TEXT NOT NULL, kaynak TEXT, havuz TEXT, oy INTEGER NOT NULL, site TEXT)'),
   ]);
   dbReady = true;
 }
@@ -176,6 +185,19 @@ async function approved(db) {
   const { results } = await db.prepare("SELECT id, q, cevap, urunler FROM ak_soru WHERE durum = 'onaylandi' ORDER BY id DESC LIMIT 2000").all();
   APPROVED = { t: Date.now(), list: results.map((r) => ({ i: 'o' + r.id, t: 'onayli', s: [r.q], c: r.cevap, u: JSON.parse(r.urunler || '[]') })) };
   return APPROVED.list;
+}
+
+// POST /ak/oy {q, k (kaynak), h (havuz id), oy: 1|0}: müşterinin "işinize yaradı mı" oyu. Olumsuz oylar incelenip
+// havuz/kurallar düzeltilir.
+export async function vote(req, env, okOrigin) {
+  if (!okOrigin || !env.DB) return json({ ok: false }, okOrigin ? 200 : 403);
+  let b; try { b = await req.json(); } catch { return json({ ok: false }, 400); }
+  const q = String(b.q || '').replace(/\s+/g, ' ').trim().slice(0, MAX_Q);
+  if (q.length < 3 || (b.oy !== 1 && b.oy !== 0)) return json({ ok: false }, 400);
+  await initDb(env.DB).catch(() => {});
+  await env.DB.prepare('INSERT INTO ak_oy (ts, q, kaynak, havuz, oy, site) VALUES (?,?,?,?,?,?)')
+    .bind(new Date().toISOString(), q, String(b.k || '').slice(0, 20), /^[ho]\d{1,6}$/.test(b.h || '') ? b.h : null, b.oy, /^[a-z]{1,20}$/.test(b.s || '') ? b.s : 'hasturk').run().catch(() => {});
+  return json({ ok: true });
 }
 
 // GET /ak/populer: son 30 günde havuzdan en çok cevaplanan sorular (öne çıkan sorular; en az 3 kez sorulmuş olmalı)
@@ -243,7 +265,18 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
     log({ kaynak: r.refused ? 'red' : 'hata', durum: 'cevapsiz', giris: r.usage && r.usage.input_tokens, cikis: r.usage && r.usage.output_tokens });
     return json({ ok: true, kaynak: 'yok', cevap: null, urunler: [], neden: r.refused ? 'red' : 'hata' });
   }
-  log({ kaynak: 'ai', skor: near[0] ? near[0].sc : null, cevap: r.cevap, urunler: r.urunler, durum: 'onay-bekliyor',
-    giris: r.usage && (r.usage.input_tokens + (r.usage.cache_read_input_tokens || 0) + (r.usage.cache_creation_input_tokens || 0)), cikis: r.usage && r.usage.output_tokens });
-  return json({ ok: true, kaynak: 'ai', cevap: r.cevap, urunler: r.urunler, emin: r.emin });
+  const tok = { giris: r.usage && (r.usage.input_tokens + (r.usage.cache_read_input_tokens || 0) + (r.usage.cache_creation_input_tokens || 0)), cikis: r.usage && r.usage.output_tokens };
+  // Yönlendirme ve konu dışı: modelin kısa cümlesi + iletişim düğmeleri
+  if (r.durum === 'yonlendir' || r.durum === 'konu_disi') {
+    log({ kaynak: 'ai', skor: near[0] ? near[0].sc : null, cevap: r.cevap, durum: r.durum, ...tok });
+    return json({ ok: true, kaynak: 'yonlendir', cevap: r.cevap, urunler: [], neden: r.durum });
+  }
+  // Model kendi cevabından emin değilse cevap gösterilmez (yanlış bilgi riski); müşteri ustaya yönlendirilir.
+  // Cevap inceleme için kaydedilir.
+  if (!r.emin) {
+    log({ kaynak: 'ai', skor: near[0] ? near[0].sc : null, cevap: r.cevap, urunler: r.urunler, durum: 'emin-degil', ...tok });
+    return json({ ok: true, kaynak: 'yok', cevap: null, urunler: [], neden: 'emin-degil' });
+  }
+  log({ kaynak: 'ai', skor: near[0] ? near[0].sc : null, cevap: r.cevap, urunler: r.urunler, durum: 'onay-bekliyor', ...tok });
+  return json({ ok: true, kaynak: 'ai', cevap: r.cevap, urunler: r.urunler });
 }
