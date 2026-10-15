@@ -1,7 +1,7 @@
 name: Ak Bilge canlı kontrol
 
 # Yayındaki Ak Bilge'yi dener: havuzdan cevaplanan bir soru, Claude'a giden bir soru, öne çıkan sorular ve sitedeki ayar.
-# Mağazaya dokunmaz. Claude sorusu bir kez (~2 sent) harcar.
+# Mağazaya dokunmaz. Claude soruları birkaç sent harcar.
 on:
   workflow_dispatch:
   push:
@@ -21,6 +21,11 @@ jobs:
           curl -s -m 30 $H -d '{"q":"limon ağacına hangi gübre","s":"hasturk","n":"Ak Bilge"}' $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('kaynak:',d.get('kaynak'),'| ürün:',len(d.get('urunler') or []),'|',(d.get('cevap') or '')[:160].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
           echo "## Claude sorusu" | tee -a $GITHUB_STEP_SUMMARY
           curl -s -m 40 $H -d '{"q":"fesleğen nasıl yetiştirilir, ne sıklıkla sulanır","s":"hasturk","n":"Ak Bilge"}' $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('kaynak:',d.get('kaynak'),'| neden:',d.get('neden'),'| ürün:',d.get('urunler'),'|',(d.get('cevap') or '')[:400].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
+          echo "## Zor sorular (yanlış bilgi vermemeli)" | tee -a $GITHUB_STEP_SUMMARY
+          for q in "gül için solucan gübresi kaç gram verilir" "kargom ne zaman gelir" "domatesin yaprakları sararıp kuruyor ne yapmalıyım" "en iyi telefon hangisi" "fare zehiri kaç gram koymalıyım" "salyangozlar çileklerimi yiyor ne yapayım"; do
+            echo "- $q" | tee -a $GITHUB_STEP_SUMMARY
+            curl -s -m 40 $H -d "{\"q\":\"$q\",\"s\":\"hasturk\",\"n\":\"Ak Bilge\"}" $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('   kaynak:',d.get('kaynak'),'| neden:',d.get('neden'),'| ürün:',d.get('urunler'),'|',(d.get('cevap') or '')[:500].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
+          done
           echo "## Öne çıkan sorular" | tee -a $GITHUB_STEP_SUMMARY
           curl -s -m 20 $W/ak/populer | tee -a $GITHUB_STEP_SUMMARY; echo
           echo "## Ayar ve widget" | tee -a $GITHUB_STEP_SUMMARY
