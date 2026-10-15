@@ -1,7 +1,7 @@
 {
  "_aciklama": "Ak Bilge soru havuzu. durum: hazir = canlıda kullanılır (doğrulanmış tablolar ve ürün bilgisi). Rakamlar yalnız doğrulanmış tablolardan.",
  "surum": 1,
- "kayit": 1427,
+ "kayit": 1715,
  "havuz": [
   {
    "id": "h0001",
@@ -38458,6 +38458,16 @@
     "yaprakları sarardı nasıl geçer",
     "yaprakları sarardı nasıl kurtulurum",
     "yaprakları sarardı ne kullanmalıyım",
+    "çiçeğimin yaprakları sararıyor",
+    "çiçeğimin yaprakları sararıyor neden",
+    "çiçeğimin yaprakları sararıyor niye",
+    "çiçeğimin yaprakları sararıyor ne yapmalıyım",
+    "çiçeğimin yaprakları sararıyor ne yapabilirim",
+    "çiçeğimin yaprakları sararıyor çözümü",
+    "çiçeğimin yaprakları sararıyor ne iyi gelir",
+    "çiçeğimin yaprakları sararıyor nasıl geçer",
+    "çiçeğimin yaprakları sararıyor nasıl kurtulurum",
+    "çiçeğimin yaprakları sararıyor ne kullanmalıyım",
     "yaprakları neden sararır",
     "bitkimin yaprakları sararıyor",
     "çiçeğimin yaprakları sarardı",
@@ -39822,7 +39832,7 @@
     "saksıya gübre nasıl verilir",
     "saksıdaki çiçeklere gübre"
    ],
-   "cevap": "Saksı çiçekleriniz için iki ürünü birlikte kullanmanızı öneririz:\n\nHasTürk Solucan Gübresi — toprağı uzun süre besler, kök gelişimini destekler.\n• Saksı başına 100–125 g, toprağa karıştırarak.\n• Saksı toprağını kendiniz hazırlıyorsanız: toprağın %40–50'si kadar.\n\nHasTürk Sıvı Solucan Gübresi — bitki besini hızlı alır.\n• Sulama suyuna: 10 litre suya 50–100 ml.\n• Yapraklara püskürterek: 1 litre suya 10–20 ml.\n\nÇiçekli bitkileriniz için Florist Çiçekli Bitkiler Besini de var (ürün bilgisine göre 1 şase + 1 litre su).\n\nSaksı değiştirecekseniz Çiçek Toprağı Bakım Seti'nde çiçek toprağı, sıvı solucan gübresi ve çiçek besini bir arada.\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.",
+   "cevap": "Saksı çiçekleriniz için iki ürünü birlikte kullanmanızı öneririz:\n\nHasTürk Solucan Gübresi — toprağı uzun süre besler, kök gelişimini destekler.\n• Saksı başına 100–125 g, toprağa karıştırarak.\n\nHasTürk Sıvı Solucan Gübresi — bitki besini hızlı alır.\n• Sulama suyuna: 10 litre suya 50–100 ml.\n• Yapraklara püskürterek: 1 litre suya 10–20 ml.\n\nÇiçekli bitkileriniz için Florist Çiçekli Bitkiler Besini de var (ürün bilgisine göre 1 şase + 1 litre su).\n\nSaksı değiştirecekseniz Çiçek Toprağı Bakım Seti'nde çiçek toprağı, sıvı solucan gübresi ve çiçek besini bir arada.\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.",
    "urunler": [
     "hasturk-kati-solucan-gubresi",
     "hasturk-sivi-solucan-gubresi",
@@ -39874,11 +39884,11 @@
     "fideyi nasıl beslerim",
     "fide yetiştirirken gübre"
    ],
-   "cevap": "Fideleriniz için önerimiz:\n\n• Fide toprağını hazırlarken: toprağın %40–50'si kadar HasTürk Solucan Gübresi karıştırın.\n• Fideleri dikmeden önce: köklerini sıvı solucan gübreli suya batırın (10 litre suya 100 ml).\n• Fideler büyürken: HasTürk Sıvı Solucan Gübresi, sulama suyuna 10 litre suya 50–100 ml.\n\nHazır toprak isterseniz Profesyonel Fide Şaşırtma Toprağı fideler için hazırlanmıştır.\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.",
+   "cevap": "Fideleriniz için önerimiz:\n\n• Fideleri dikmeden önce: köklerini sıvı solucan gübreli suya batırın (10 litre suya 100 ml).\n• Fideler büyürken: HasTürk Sıvı Solucan Gübresi, sulama suyuna 10 litre suya 50–100 ml.\n\nHazır toprak isterseniz Profesyonel Fide Şaşırtma Toprağı fideler için hazırlanmıştır.\n\nBu miktarlar genel öneridir; uygularken ürün etiketine de bakın.",
    "urunler": [
     "hasturk-sivi-solucan-gubresi",
-    "hasturk-kati-solucan-gubresi",
-    "fide-sasirtma-topragi"
+    "fide-sasirtma-topragi",
+    "hasturk-kati-solucan-gubresi"
    ],
    "kaynak": "rehber:genel:fide"
   },
@@ -39911,6 +39921,3622 @@
   {
    "id": "h1426",
    "durum": "hazir",
+   "tur": "blog",
+   "konu": "akulu-mu-manuel-ilaclama-pompasi-mi-hangisini-secmelisiniz",
+   "sorular": [
+    "Akülü ilaçlama pompası mı daha iyi, manuel mi"
+   ],
+   "cevap": "Tek bir doğru cevap yoktur. Küçük alanlarda ve seyrek kullanımda manuel pompa pratik ve ekonomiktir. Geniş alanlarda ve sık kullanımda ise akülü pompa zaman ve emek açısından belirgin avantaj sağlar.",
+   "urunler": [],
+   "kaynak": "blog:akulu-mu-manuel-ilaclama-pompasi-mi-hangisini-secmelisiniz"
+  },
+  {
+   "id": "h1427",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "akulu-mu-manuel-ilaclama-pompasi-mi-hangisini-secmelisiniz",
+   "sorular": [
+    "Akülü ilaçlama pompasında pompalama yapmak gerekir mi"
+   ],
+   "cevap": "Hayır. Basıncı batarya ile çalışan elektrikli pompa sağlar, kullanıcının elle pompalaması gerekmez.",
+   "urunler": [],
+   "kaynak": "blog:akulu-mu-manuel-ilaclama-pompasi-mi-hangisini-secmelisiniz"
+  },
+  {
+   "id": "h1428",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "akulu-mu-manuel-ilaclama-pompasi-mi-hangisini-secmelisiniz",
+   "sorular": [
+    "Manuel ilaçlama pompası hangi alanlar için uygundur"
+   ],
+   "cevap": "Balkon, saksı bitkileri, küçük bahçeler ve sınırlı sayıda ağaç gibi dar ya da orta ölçekli alanlar için uygundur.",
+   "urunler": [],
+   "kaynak": "blog:akulu-mu-manuel-ilaclama-pompasi-mi-hangisini-secmelisiniz"
+  },
+  {
+   "id": "h1429",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "areka-palmiyesi-bakimi",
+   "sorular": [
+    "Areka palmiyesinin yaprak uçları neden kurur"
+   ],
+   "cevap": "En sık nedenler kuru hava, kireçli musluk suyu ve fazla gübreden kaynaklanan tuz birikimidir. Kaloriferli odalarda daha sık görülür.",
+   "urunler": [],
+   "kaynak": "blog:areka-palmiyesi-bakimi"
+  },
+  {
+   "id": "h1430",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "areka-palmiyesi-bakimi",
+   "sorular": [
+    "Areka palmiyesi ne sıklıkla sulanır"
+   ],
+   "cevap": "Toprağın üst 2–3 cm'si kuruduğunda. Yazın genellikle haftada bir, kışın daha seyrek.",
+   "urunler": [],
+   "kaynak": "blog:areka-palmiyesi-bakimi"
+  },
+  {
+   "id": "h1431",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "areka-palmiyesi-bakimi",
+   "sorular": [
+    "Areka palmiyesi kediler için zehirli mi"
+   ],
+   "cevap": "Hayır. Areka palmiyesi kediler ve köpekler için zehirli olmayan bitkiler arasında yer alır.",
+   "urunler": [],
+   "kaynak": "blog:areka-palmiyesi-bakimi"
+  },
+  {
+   "id": "h1432",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "areka-palmiyesi-bakimi",
+   "sorular": [
+    "Areka palmiyesi karanlıkta yaşar mı"
+   ],
+   "cevap": "Az ışığa bir süre dayanır ama gelişimi yavaşlar ve yapraklar sararır. Parlak, dolaylı ışık gerekir.",
+   "urunler": [],
+   "kaynak": "blog:areka-palmiyesi-bakimi"
+  },
+  {
+   "id": "h1433",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "areka-palmiyesi-bakimi",
+   "sorular": [
+    "Areka palmiyesi saksısı ne zaman değiştirilir"
+   ],
+   "cevap": "2–3 yılda bir, ilkbaharda. Kökler saksıyı doldurmuşsa veya drenaj deliğinden çıkıyorsa zamanı gelmiştir",
+   "urunler": [],
+   "kaynak": "blog:areka-palmiyesi-bakimi"
+  },
+  {
+   "id": "h1434",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "aronya-bitkisinde-solucan-gubresi-kullanimi-ve-gubreleme-takvimi",
+   "sorular": [
+    "Aronya için neden kimyasal gübre önermiyoruz"
+   ],
+   "cevap": "Kimyasal gübreler bitkiyi doğal olmayan bir şekilde şişirir. Bu durum, aronyanın içindeki tıbbi etken maddelerin (antioksidan, vitaminler) oranını düşürür. Ayrıca kimyasallar zamanla toprağın pH dengesini bozar, yararlı mikroorganizmaları öldürür ve bitkiyi kök hastalıklarına karşı tamamen savunmasız bırakır. Solucan gübresi ise toprağı iyileştirir, bitkiyi doğal yollarla korur ve meyve kalitesini maksimize eder.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:aronya-bitkisinde-solucan-gubresi-kullanimi-ve-gubreleme-takvimi"
+  },
+  {
+   "id": "h1435",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "aronya-bitkisinde-solucan-gubresi-kullanimi-ve-gubreleme-takvimi",
+   "sorular": [
+    "Sıvı solucan gübresi ile zirai ilaçlar karıştırılır mı"
+   ],
+   "cevap": "Evet, sıvı solucan gübresi yapraktan uygulanan birçok organik pestisit veya mantar ilacı ile karıştırılarak atılabilir. Hatta sölom sıvısı sayesinde uygulanan ilacın yaprağa daha iyi tutunmasını sağlayarak \"yayıcı-yapıştırıcı\" görevi görür ve ilacın etkisini artırır.",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:aronya-bitkisinde-solucan-gubresi-kullanimi-ve-gubreleme-takvimi"
+  },
+  {
+   "id": "h1436",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "aronya-bitkisinde-solucan-gubresi-kullanimi-ve-gubreleme-takvimi",
+   "sorular": [
+    "Mevcut aronya bahçemde verim düştü, solucan gübresi işe yarar mı"
+   ],
+   "cevap": "Kesinlikle. Verim düşüklüğünün en büyük sebebi yorulmuş ve sıkışmış topraktır. Solucan gübresi, toprağı yeniden canlandırarak içindeki kilitlenmiş besin maddelerini çözer. İlk sezondan itibaren yaprak canlanmasını ve meyveler oluşurkenki artışı gözle görebilirsiniz. Önerilen Yazı: Tıbbi ve Aromatik Bitkilerde Solucan Gübresi Kullanımı",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:aronya-bitkisinde-solucan-gubresi-kullanimi-ve-gubreleme-takvimi"
+  },
+  {
+   "id": "h1437",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "avokado-topragi-nasil-olmali-bakim-rehberi",
+   "sorular": [
+    "Normal bahçe toprağında avokado yetişir mi"
+   ],
+   "cevap": "Drenajı uygunsa yetişebilir. Ancak suyu uzun süre tutan, sıkışmış bahçe toprağı kökler için elverişli değildir.",
+   "urunler": [],
+   "kaynak": "blog:avokado-topragi-nasil-olmali-bakim-rehberi"
+  },
+  {
+   "id": "h1438",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "avokado-topragi-nasil-olmali-bakim-rehberi",
+   "sorular": [
+    "Evde yetiştirilen avokado meyve verir mi"
+   ],
+   "cevap": "Ev koşullarında meyve almak genellikle zordur. Çekirdekten yetişen bitkinin meyve özellikleri de ana bitkiyle aynı olmayabilir. Meyve üretimi hedefleniyorsa uygun iklim koşullarıyla birlikte çeşidi bilinen aşılı fidan seçimi değerlendirilmelidir.",
+   "urunler": [],
+   "kaynak": "blog:avokado-topragi-nasil-olmali-bakim-rehberi"
+  },
+  {
+   "id": "h1439",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bahce-topragi-saksida-kullanilir-mi",
+   "sorular": [
+    "Bahçe toprağı saksıda kullanılır mı"
+   ],
+   "cevap": "Tek başına önerilmez. Saksıda sıkışarak suyu uzun süre tutar ve kök çürümesine yol açar. Büyük dış mekân saksılarında organik madde ve perlitle karıştırılarak kullanılabilir.",
+   "urunler": [],
+   "kaynak": "blog:bahce-topragi-saksida-kullanilir-mi"
+  },
+  {
+   "id": "h1440",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bahce-topragi-saksida-kullanilir-mi",
+   "sorular": [
+    "Saksıya bahçe toprağı konursa ne olur"
+   ],
+   "cevap": "Toprak kısa sürede sertleşir, su yüzeyde bekler, kökler havasız kalır ve bitki sararıp sarkmaya başlar. Ayrıca yabancı ot, zararlı ve hastalık sorunları görülebilir.",
+   "urunler": [],
+   "kaynak": "blog:bahce-topragi-saksida-kullanilir-mi"
+  },
+  {
+   "id": "h1441",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bahce-topragi-saksida-kullanilir-mi",
+   "sorular": [
+    "Bahçe toprağı ile saksı toprağı arasındaki fark nedir"
+   ],
+   "cevap": "Bahçe toprağı ağır ve mineral ağırlıklıdır; saksı toprağı ise torf, cocopeat, perlit ve pomza gibi hafif bileşenlerden oluşur ve saksıda sıkışmaz.",
+   "urunler": [],
+   "kaynak": "blog:bahce-topragi-saksida-kullanilir-mi"
+  },
+  {
+   "id": "h1442",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bahce-topragi-saksida-kullanilir-mi",
+   "sorular": [
+    "Bahçe toprağına ne karıştırılırsa saksıda kullanılır"
+   ],
+   "cevap": "Yaklaşık üçte bir oranında solucan gübresi veya olgun kompost ve üçte bir oranında perlit veya pomza karıştırılabilir. Bu karışım büyük dış mekân saksıları için uygundur.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:bahce-topragi-saksida-kullanilir-mi"
+  },
+  {
+   "id": "h1443",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bahce-topragi-saksida-kullanilir-mi",
+   "sorular": [
+    "Salon bitkilerine bahçe toprağı konur mu"
+   ],
+   "cevap": "Konmamalıdır. İç mekânda toprak daha geç kurur ve bahçe toprağı kök çürümesi riskini ciddi şekilde artırır.",
+   "urunler": [],
+   "kaynak": "blog:bahce-topragi-saksida-kullanilir-mi"
+  },
+  {
+   "id": "h1444",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bahce-topragi-saksida-kullanilir-mi",
+   "sorular": [
+    "Bahçe toprağı fide için kullanılır mı"
+   ],
+   "cevap": "Önerilmez. Genç fideler hastalık etmenlerine ve sıkışmaya karşı çok hassastır; ince dokulu, temiz bir fide toprağı kullanılmalıdır.",
+   "urunler": [
+    "hg-fide-topragi"
+   ],
+   "kaynak": "blog:bahce-topragi-saksida-kullanilir-mi"
+  },
+  {
+   "id": "h1445",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bahce-topragi-saksida-kullanilir-mi",
+   "sorular": [
+    "Bahçe toprağı sterilize edilebilir mi"
+   ],
+   "cevap": "Küçük miktarlar fırında ısıl işlemle sterilize edilebilir, ancak bu yöntem zahmetlidir ve toprağın sıkışma sorununu çözmez.",
+   "urunler": [],
+   "kaynak": "blog:bahce-topragi-saksida-kullanilir-mi"
+  },
+  {
+   "id": "h1446",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "biochar-nedir",
+   "sorular": [
+    "Biochar gübre midir"
+   ],
+   "cevap": "Hayır. Biochar bir toprak düzenleyicidir. Besin sağlamaz; toprağın besin ve su tutma kapasitesini artırarak gübrelerden daha verimli yararlanılmasına yardımcı olur.",
+   "urunler": [],
+   "kaynak": "blog:biochar-nedir"
+  },
+  {
+   "id": "h1447",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "biochar-nedir",
+   "sorular": [
+    "Biochar ne kadar süre toprakta kalır"
+   ],
+   "cevap": "Çok yavaş ayrıştığı için toprakta yüzyıllarca kalabilir. Bu yüzden her yıl yüksek dozda uygulanması gerekmez.",
+   "urunler": [],
+   "kaynak": "blog:biochar-nedir"
+  },
+  {
+   "id": "h1448",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "biochar-nedir",
+   "sorular": [
+    "Biochar kireçli toprakta kullanılır mı"
+   ],
+   "cevap": "Kullanılabilir, ancak biochar genellikle alkali karakterli olduğu için kireçli topraklarda pH'ı düşürmez. Bu topraklarda asıl fayda su ve besin tutma kapasitesinin artmasıdır; düşük oranda ve şarj edilerek kullanılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:biochar-nedir"
+  },
+  {
+   "id": "h1449",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "biochar-nedir",
+   "sorular": [
+    "Biochar ile solucan gübresi birlikte kullanılır mı"
+   ],
+   "cevap": "Evet. Solucan gübresi, biochar'ı besin ve faydalı mikroorganizmalarla şarj etmek için en uygun malzemelerden biridir. İkisi birlikte hem kısa vadeli besleme hem de uzun vadeli toprak iyileştirme sağlar.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:biochar-nedir"
+  },
+  {
+   "id": "h1450",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "biochar-nedir",
+   "sorular": [
+    "Biochar ne zaman uygulanır"
+   ],
+   "cevap": "Sonbahar ve ilkbahar toprak hazırlığı, saksı değişimi ve fidan dikimi en uygun zamanlardır.",
+   "urunler": [],
+   "kaynak": "blog:biochar-nedir"
+  },
+  {
+   "id": "h1451",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitki-turlerine-gore-saksi-degisimi-nasil-yapilir",
+   "sorular": [
+    "Saksı değişimi hangi ayda yapılmalıdır"
+   ],
+   "cevap": "Bitkilerin aktif büyüme dönemine girdiği ilkbahar ayları (Mart, Nisan, Mayıs) saksı değişimi için en ideal zamanlardır. Ancak acil durumlarda (kök çürümesi, saksı kırılması vb.) dikkatli olmak şartıyla her mevsim değişim yapılabilir.",
+   "urunler": [],
+   "kaynak": "blog:bitki-turlerine-gore-saksi-degisimi-nasil-yapilir"
+  },
+  {
+   "id": "h1452",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitki-turlerine-gore-saksi-degisimi-nasil-yapilir",
+   "sorular": [
+    "Saksı değişimi yaparken eski toprak kullanılmalı mı"
+   ],
+   "cevap": "Hayır, eski toprak zamanla besin değerini yitirmiş ve tuz/kireç biriktirmiş olabilir. Mümkün olduğunca eski toprağı köklerden nazikçe silkeleyin ve besin değeri yüksek, solucan gübresi ile zenginleştirilmiş yeni, taze toprak kullanın.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:bitki-turlerine-gore-saksi-degisimi-nasil-yapilir"
+  },
+  {
+   "id": "h1453",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitki-turlerine-gore-saksi-degisimi-nasil-yapilir",
+   "sorular": [
+    "Saksı değişimi sonrası bitki neden boynunu büker"
+   ],
+   "cevap": "Buna \"transfer şoku\" denir. Kökler yeni ortamına alışmaya çalışmaktadır. Bu süreçte bitkiyi aşırı sulamaktan veya direkt yakıcı güneşe koymaktan kaçının. Organik solucan gübresi kullanımı bu şok sürecini minimuma indirir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:bitki-turlerine-gore-saksi-degisimi-nasil-yapilir"
+  },
+  {
+   "id": "h1454",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitki-turlerine-gore-saksi-degisimi-nasil-yapilir",
+   "sorular": [
+    "Yeni aldığım bitkinin saksısını hemen değiştirmeli miyim"
+   ],
+   "cevap": "Eğer bitki ufacık bir üretim saksısında sıkışıp kalmamışsa, hemen değiştirmeyin. Bitkinin önce evinizin ışığına, ısısına ve nemine alışması için 10–14 gün bekleyin, ardından saksı değişimi yapın.",
+   "urunler": [],
+   "kaynak": "blog:bitki-turlerine-gore-saksi-degisimi-nasil-yapilir"
+  },
+  {
+   "id": "h1455",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitkisel-toprak-nedir",
+   "sorular": [
+    "Bitkisel toprak nedir"
+   ],
+   "cevap": "Doğadaki toprağın en üst, organik maddece zengin katmanından alınan ve elenerek temizlenen humuslu topraktır. Nebati toprak olarak da bilinir.",
+   "urunler": [],
+   "kaynak": "blog:bitkisel-toprak-nedir"
+  },
+  {
+   "id": "h1456",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitkisel-toprak-nedir",
+   "sorular": [
+    "Bitkisel toprak ile saksı toprağı arasındaki fark nedir"
+   ],
+   "cevap": "Bitkisel toprak doğal ve mineral ağırlıklıdır; bahçede kullanılır. Saksı toprağı ise torf, cocopeat ve perlit gibi hafif bileşenlerden oluşur ve saksıda sıkışmaz.",
+   "urunler": [],
+   "kaynak": "blog:bitkisel-toprak-nedir"
+  },
+  {
+   "id": "h1457",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitkisel-toprak-nedir",
+   "sorular": [
+    "Bitkisel toprak saksıda kullanılır mı"
+   ],
+   "cevap": "Tek başına önerilmez; saksıda sıkışarak su tutar ve kök çürümesine yol açar. Büyük saksılarda saksı toprağı ve perlitle karıştırılarak kullanılabilir.",
+   "urunler": [],
+   "kaynak": "blog:bitkisel-toprak-nedir"
+  },
+  {
+   "id": "h1458",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitkisel-toprak-nedir",
+   "sorular": [
+    "Bitkisel toprak ile 3'lü karışım aynı şey mi"
+   ],
+   "cevap": "Hayır. 3'lü karışım, toprağa organik gübre ve kum veya dere mili eklenerek hazırlanan bir karışımdır. İçerik satıcıya göre değişebilir.",
+   "urunler": [],
+   "kaynak": "blog:bitkisel-toprak-nedir"
+  },
+  {
+   "id": "h1459",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "bitkisel-toprak-nedir",
+   "sorular": [
+    "Çim için ne kadar bitkisel toprak gerekir"
+   ],
+   "cevap": "Genellikle 10–20 cm kalınlık kullanılır. Alan (m²) ile kalınlığı (m) çarparak gereken metreküpü hesaplayabilirsiniz.",
+   "urunler": [],
+   "kaynak": "blog:bitkisel-toprak-nedir"
+  },
+  {
+   "id": "h1460",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ceviz-agaclarinda-solucan-gubresi-kullanimi",
+   "sorular": [
+    "Hem katı hem sıvı solucan gübresini aynı anda kullanabilir miyim"
+   ],
+   "cevap": "Evet, kullanabilirsiniz. Katı gübre toprak yapısını uzun vadede iyileştirip taban beslemesi yaparken; sıvı gübre yapraktan veya damlamadan verilerek ağacın anlık enerji ve besin ihtiyacını hızla karşılar. İkisi birbirini harika şekilde tamamlar.",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:ceviz-agaclarinda-solucan-gubresi-kullanimi"
+  },
+  {
+   "id": "h1461",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ceviz-agaclarinda-solucan-gubresi-kullanimi",
+   "sorular": [
+    "Uygulamayı sabah mı akşam mı yapmalıyım"
+   ],
+   "cevap": "Özellikle sıvı gübrenin yapraktan uygulamasını, güneş ışınlarının dik gelmediği sabah erken saatlerde veya akşamüzeri yapmanız, gübrenin buharlaşmadan bitki tarafından emilmesini sağlar. HasTürk Gübre Uzmanlarına Danışın!",
+   "urunler": [],
+   "kaynak": "blog:ceviz-agaclarinda-solucan-gubresi-kullanimi"
+  },
+  {
+   "id": "h1462",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ceviz-bahcesi-kurulumu-ve-fidan-dikimi",
+   "sorular": [
+    "Ceviz fidanı hangi aylarda dikilir"
+   ],
+   "cevap": "Açık köklü ceviz fidanları, ağaçların yaprak döktüğü Kasım ayından başlayarak ilkbaharda gözlerin uyanmasına kadar (Mart sonu/Nisan başı) olan dönemde dikilir. Tüplü (poşetli) fidanlar ise yılın 12 ayı dikilebilir.",
+   "urunler": [],
+   "kaynak": "blog:ceviz-bahcesi-kurulumu-ve-fidan-dikimi"
+  },
+  {
+   "id": "h1463",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ceviz-bahcesi-kurulumu-ve-fidan-dikimi",
+   "sorular": [
+    "Aşı noktası toprak altında kalırsa ne olur"
+   ],
+   "cevap": "Aşı bölgesinin toprakla temas etmesi veya gömülmesi durumunda mantari hastalıklar başlar, ağaç çürümeye yüz tutar ve ilerleyen yıllarda kurur.",
+   "urunler": [],
+   "kaynak": "blog:ceviz-bahcesi-kurulumu-ve-fidan-dikimi"
+  },
+  {
+   "id": "h1464",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ceviz-bahcesi-kurulumu-ve-fidan-dikimi",
+   "sorular": [
+    "Dikim esnasında gübre nasıl uygulanmalı"
+   ],
+   "cevap": "Asla fidanın köküne çiğ (yanmamış) hayvan gübresi veya kimyasal temas ettirmeyin. Fidan çukurunun dip kısmına HasTürk solucan gübresi ile karıştırılmış toprak koyun, fidanın kökünü bu harcın üzerine yerleştirin.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:ceviz-bahcesi-kurulumu-ve-fidan-dikimi"
+  },
+  {
+   "id": "h1465",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ciftci-rehberi",
+   "sorular": [
+    "Toprak numunesi nerelerden ALINMAZ"
+   ],
+   "cevap": "Hayvan gübresi yığılmış yerlerden, su birikintisi olan çukur noktalardan, tarla sınırı ve yol kenarlarından, ağaç altlarından ve daha önce kireç/gübre dökülmüş noktalardan numune alınmamalıdır.",
+   "urunler": [],
+   "kaynak": "blog:ciftci-rehberi"
+  },
+  {
+   "id": "h1466",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ciftci-rehberi",
+   "sorular": [
+    "Toprak analizi kaç yılda bir yapılmalıdır"
+   ],
+   "cevap": "İdeal olanı her ekim sezonu öncesi yaptırmaktır. Ancak bu mümkün olmuyorsa tarla bitkileri için en geç 2 yılda bir, meyve bahçeleri için ise 3 yılda bir mutlaka tekrarlanmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:ciftci-rehberi"
+  },
+  {
+   "id": "h1467",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "cim-bakimi-nasil-yapilir",
+   "sorular": [
+    "Sararan çimler tekrar yeşerir mi"
+   ],
+   "cevap": "Evet, sararmanın nedeni tespit edilip doğru müdahale yapıldığında çimler eski haline dönebilir. Mantar, yanlış sulama veya besin eksikliği kaynaklı sararmalarda organik solucan gübresi takviyesi ve doğru sulama periyodu ile çimler hızla canlı yeşil rengine kavuşur.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:cim-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1468",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "cim-bakimi-nasil-yapilir",
+   "sorular": [
+    "Çimler ne sıklıkla sulanmalıdır"
+   ],
+   "cevap": "Hava sıcaklığına ve toprak yapısına bağlı olarak haftada 2 ila 3 kez sulanmalıdır. Önemli olan her gün yüzeysel sulamak değil, aralıklı günlerde toprağın 10–15 cm altına işleyecek kadar bol ve derin sulama yapmaktır.",
+   "urunler": [],
+   "kaynak": "blog:cim-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1469",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "cim-bakimi-nasil-yapilir",
+   "sorular": [
+    "Güneş battıktan sonra çim sulanır mı"
+   ],
+   "cevap": "Tavsiye edilmez. Gece yapılan sulama, çim yüzeyinin uzun saatler ıslak kalmasına neden olur. Bu durum, mantari hastalıkların üremesi ve çim köklerinin çürümesi için mükemmel bir ortam yaratır. En iyi zaman sabahın erken saatleridir.",
+   "urunler": [],
+   "kaynak": "blog:cim-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1470",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "deve-tabani-topragi-nasil-olmali-monstera-bakim-rehberi",
+   "sorular": [
+    "Deve tabanının hava kökleri normal mi"
+   ],
+   "cevap": "Evet. Monstera tırmanıcı bir bitkidir ve hava kökleri doğal gelişiminin bir parçasıdır. Uygun bir destek, bitkinin dik ve düzenli büyümesine yardımcı olabilir.",
+   "urunler": [],
+   "kaynak": "blog:deve-tabani-topragi-nasil-olmali-monstera-bakim-rehberi"
+  },
+  {
+   "id": "h1471",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "deve-tabani-topragi-nasil-olmali-monstera-bakim-rehberi",
+   "sorular": [
+    "Yaprakların deliksiz olması toprak sorunu mu"
+   ],
+   "cevap": "Tek başına bunu göstermez. Genç Monstera deliciosa yaprakları deliksiz olabilir. Bitkinin olgunluğu ve aldığı ışık, yaprakların biçimini etkiler.",
+   "urunler": [],
+   "kaynak": "blog:deve-tabani-topragi-nasil-olmali-monstera-bakim-rehberi"
+  },
+  {
+   "id": "h1472",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "deve-tabani-topragi-nasil-olmali-monstera-bakim-rehberi",
+   "sorular": [
+    "Tek yapraktan deve tabanı çoğaltılır mı"
+   ],
+   "cevap": "Yeni bir bitki elde etmek için çelikte boğum ve büyüme gözü bulunan bir gövde parçası olmalıdır. Yalnızca yaprak ve yaprak sapı, yeni sürgün oluşturmak için yeterli değildir.",
+   "urunler": [],
+   "kaynak": "blog:deve-tabani-topragi-nasil-olmali-monstera-bakim-rehberi"
+  },
+  {
+   "id": "h1473",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "difenbahya-bakimi",
+   "sorular": [
+    "Difenbahya zehirli mi"
+   ],
+   "cevap": "Evet. Çiğnendiğinde ağız ve boğazda şiddetli tahrişe yol açar. Çocuklardan ve evcil hayvanlardan uzak tutulmalı, bakım sırasında eldiven kullanılmalıdır. Yutulma durumunda 114 Ulusal Zehir Danışma Merkezi aranmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:difenbahya-bakimi"
+  },
+  {
+   "id": "h1474",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "difenbahya-bakimi",
+   "sorular": [
+    "Difenbahya ne sıklıkla sulanır"
+   ],
+   "cevap": "Toprağın üst 2–3 cm'si kuruduğunda. Yazın genellikle haftada bir, kışın daha seyrek sulama yeterlidir.",
+   "urunler": [],
+   "kaynak": "blog:difenbahya-bakimi"
+  },
+  {
+   "id": "h1475",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "difenbahya-bakimi",
+   "sorular": [
+    "Difenbahyanın alt yaprakları neden dökülüyor"
+   ],
+   "cevap": "Bitki büyüdükçe alt yaprakların sararıp dökülmesi doğaldır. Çok sayıda yaprak aynı anda sararıyorsa neden genellikle fazla sulama veya soğuktur.",
+   "urunler": [],
+   "kaynak": "blog:difenbahya-bakimi"
+  },
+  {
+   "id": "h1476",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "difenbahya-bakimi",
+   "sorular": [
+    "Difenbahya karanlıkta yaşar mı"
+   ],
+   "cevap": "Az ışığa dayanır ama gelişimi yavaşlar, gövdesi uzar ve yaprak desenleri solar. Parlak, dolaylı ışık en iyi sonucu verir.",
+   "urunler": [],
+   "kaynak": "blog:difenbahya-bakimi"
+  },
+  {
+   "id": "h1477",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "difenbahya-bakimi",
+   "sorular": [
+    "Uzamış difenbahya ne yapılır"
+   ],
+   "cevap": "Tepe kısmı kesilerek yeni bir bitki olarak köklendirilir. Kalan gövde genellikle yeniden sürgün verir.",
+   "urunler": [],
+   "kaynak": "blog:difenbahya-bakimi"
+  },
+  {
+   "id": "h1478",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "difenbahya-bakimi",
+   "sorular": [
+    "Difenbahya için hangi toprak kullanılır"
+   ],
+   "cevap": "Nemi dengeleyen ama fazla suyu hızla tahliye eden havadar bir karışım. Torf, cocopeat ve perlit içeren hazır difenbahya toprakları uygundur.",
+   "urunler": [],
+   "kaynak": "blog:difenbahya-bakimi"
+  },
+  {
+   "id": "h1479",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "domates-ve-biberde-cicek-dokulmesi-neden-olur",
+   "sorular": [
+    "Domates ve biber çiçekteyken sulanır mı"
+   ],
+   "cevap": "Evet, sulanır ancak sulama rejimi çok dikkatli ayarlanmalıdır. Çiçek döneminde toprağın kurumasına izin vermek ne kadar tehlikeliyse, kökleri sürekli vıcık vıcık su içinde bırakmak da o kadar tehlikelidir. Toprağın üst yüzeyi hafifçe kuruduğunda, bitkinin kök bölgesine (yapraklara su değdirmeden) düzenli sulama yapılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:domates-ve-biberde-cicek-dokulmesi-neden-olur"
+  },
+  {
+   "id": "h1480",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "domates-ve-biberde-cicek-dokulmesi-neden-olur",
+   "sorular": [
+    "Çiçek dökülmesini durdurmak için hangi gübre verilir"
+   ],
+   "cevap": "Bu dönemde bitkiyi strese sokacak yüksek azotlu kimyasal gübrelerden kesinlikle uzak durulmalıdır. Çiçek dökülmesini durdurmak ve meyve tutumunu artırmak için bitkinin bağışıklığını güçlendiren, fosfor ve potasyum dengesi kuran organik solucan gübresi kullanılmalıdır.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:domates-ve-biberde-cicek-dokulmesi-neden-olur"
+  },
+  {
+   "id": "h1481",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "domates-ve-biberde-cicek-dokulmesi-neden-olur",
+   "sorular": [
+    "Rüzgarsız günlerde veya kapalı ortamda tozlaşma nasıl sağlanır"
+   ],
+   "cevap": "Eğer arı faaliyeti yoksa veya ortam rüzgar almıyorsa, çiçeklerin açtığı öğle saatlerinde bitkinin gövdesine çok hafifçe sırıkla vurarak veya parmaklarınızla dalları nazikçe sarsarak (titreşim yaratarak) polenlerin dökülmesini sağlayabilirsiniz. 👀 İlginizi Çekebilir: Önerilen Yazı Toprağınızın ve bitkilerinizin gerçek potansiyelini ortaya çıkarmak için hangi organik gübrenin size en uygun olduğunu merak ediyor musunuz? Hemen okuyun: 👉 Bitkiler İçin En Verimli Organik Gübre Hangisi?",
+   "urunler": [],
+   "kaynak": "blog:domates-ve-biberde-cicek-dokulmesi-neden-olur"
+  },
+  {
+   "id": "h1482",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "drenaj-nedir-saksida-neden-onemli",
+   "sorular": [
+    "Drenaj nedir"
+   ],
+   "cevap": "Sulama suyunun topraktan süzülerek saksıdan dışarı çıkabilmesidir. İyi drenaj, köklerin hem su hem de hava alabilmesini sağlar.",
+   "urunler": [],
+   "kaynak": "blog:drenaj-nedir-saksida-neden-onemli"
+  },
+  {
+   "id": "h1483",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "drenaj-nedir-saksida-neden-onemli",
+   "sorular": [
+    "Saksı dibine çakıl koymak gerekli mi"
+   ],
+   "cevap": "Gerekli değildir ve drenaj deliğinin yerini tutmaz. Drenajı asıl belirleyen şey saksı deliği ve toprağın yapısıdır.",
+   "urunler": [],
+   "kaynak": "blog:drenaj-nedir-saksida-neden-onemli"
+  },
+  {
+   "id": "h1484",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "drenaj-nedir-saksida-neden-onemli",
+   "sorular": [
+    "Deliksiz saksıda bitki yetişir mi"
+   ],
+   "cevap": "Önerilmez. Deliksiz saksıda fazla su dışarı çıkamaz ve kök çürümesi riski çok yükselir. Deliksiz dekoratif saksılar, içine delikli bir saksı konarak kullanılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:drenaj-nedir-saksida-neden-onemli"
+  },
+  {
+   "id": "h1485",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "drenaj-nedir-saksida-neden-onemli",
+   "sorular": [
+    "Saksıda drenaj nasıl anlaşılır"
+   ],
+   "cevap": "Bol su verdiğinizde su birkaç saniye içinde toprağa işleyip alttan akmaya başlıyorsa drenaj iyidir. Su uzun süre yüzeyde bekliyorsa toprak sıkışmıştır.",
+   "urunler": [],
+   "kaynak": "blog:drenaj-nedir-saksida-neden-onemli"
+  },
+  {
+   "id": "h1486",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "drenaj-nedir-saksida-neden-onemli",
+   "sorular": [
+    "Drenaj için toprağa ne eklenir"
+   ],
+   "cevap": "Perlit ve pomza en yaygın kullanılan malzemelerdir. Bunlar dibe değil, toprağın içine karıştırılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:drenaj-nedir-saksida-neden-onemli"
+  },
+  {
+   "id": "h1487",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "drenaj-nedir-saksida-neden-onemli",
+   "sorular": [
+    "Kil bilyesi saksı dibine konur mu"
+   ],
+   "cevap": "Konabilir, ancak tek başına drenaj sorununu çözmez. Kil bilyesi en çok toprağa karıştırıldığında, dekoratif saksı altında ve toprak yüzeyinde fayda sağlar.",
+   "urunler": [
+    "hg-kil-bilyesi"
+   ],
+   "kaynak": "blog:drenaj-nedir-saksida-neden-onemli"
+  },
+  {
+   "id": "h1488",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ekim-ayinda-ne-ekilir",
+   "sorular": [
+    "Sarımsak ne zaman ekilir"
+   ],
+   "cevap": "Türkiye'nin çoğu bölgesinde sarımsak ekim-kasım aylarında dikilir ve haziran-temmuz aylarında hasat edilir. Soğuk bölgelerde toprak donmadan dikim yapılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:ekim-ayinda-ne-ekilir"
+  },
+  {
+   "id": "h1489",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ekim-ayinda-ne-ekilir",
+   "sorular": [
+    "Ekim ayında domates ekilir mi"
+   ],
+   "cevap": "Açık alanda hayır. Domates sıcak seven bir bitkidir ve sonbaharda açık alanda yetişmez. Sadece ısıtmalı seralarda yetiştirilebilir.",
+   "urunler": [],
+   "kaynak": "blog:ekim-ayinda-ne-ekilir"
+  },
+  {
+   "id": "h1490",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ekim-ayinda-ne-ekilir",
+   "sorular": [
+    "Lale soğanı ne zaman dikilir"
+   ],
+   "cevap": "Toprak serinledikten sonra, genellikle ekim sonu ile kasım arası. Erken dikilen soğanlar sıcak toprakta vaktinden önce filizlenebilir.",
+   "urunler": [],
+   "kaynak": "blog:ekim-ayinda-ne-ekilir"
+  },
+  {
+   "id": "h1491",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ekim-ayinda-ne-ekilir",
+   "sorular": [
+    "Ekim ayında buğday ekilir mi"
+   ],
+   "cevap": "Evet. Kışlık buğday ve arpa ekimi Türkiye'de genellikle ekim-kasım aylarında yapılır; soğuk bölgelerde ayın başı tercih edilir.",
+   "urunler": [],
+   "kaynak": "blog:ekim-ayinda-ne-ekilir"
+  },
+  {
+   "id": "h1492",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ekim-ayinda-ne-ekilir",
+   "sorular": [
+    "Balkonda ekim ayında ne yetiştirilir"
+   ],
+   "cevap": "Roka, tere, maydanoz, dereotu, ıspanak ve taze soğan balkon için en kolay seçeneklerdir.",
+   "urunler": [],
+   "kaynak": "blog:ekim-ayinda-ne-ekilir"
+  },
+  {
+   "id": "h1493",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "en-verimli-organik-gubre",
+   "sorular": [
+    "Organik gübreler ne sıklıkla kullanılmalıdır"
+   ],
+   "cevap": "Bu, kullanılan gübreye ve bitki türüne göre değişir. Ancak genel kural olarak, ilkbahar başlangıcında (uyanma dönemi) ve meyve/çiçek tutumu evrelerinde uygulama yapılması önerilir. Solucan gübresini ise bitkinin her sulama periyodunda sıvı formda, yılda 2–3 kez ise katı formda güvenle verebilirsiniz.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:en-verimli-organik-gubre"
+  },
+  {
+   "id": "h1494",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "en-verimli-organik-gubre",
+   "sorular": [
+    "Hayvansal gübreyi bekletmeden toprağa atarsam ne olur"
+   ],
+   "cevap": "Taze hayvansal gübreler yüksek amonyak ve tuz içerir. Fermantasyon sürecini toprakta tamamlamaya çalışırken ortaya çıkan ısı ve gazlar bitkinin kök sistemini kelimenin tam anlamıyla \"yakar\" ve bitkiyi kurutur.",
+   "urunler": [],
+   "kaynak": "blog:en-verimli-organik-gubre"
+  },
+  {
+   "id": "h1495",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "eski-saksi-topragi-tekrar-kullanilir-mi",
+   "sorular": [
+    "Eski saksı toprağı tekrar kullanılır mı"
+   ],
+   "cevap": "Bitki sağlıklıysa ve toprakta sorun yaşanmadıysa, elenip taze toprak ve organik gübreyle karıştırılarak kullanılabilir.",
+   "urunler": [],
+   "kaynak": "blog:eski-saksi-topragi-tekrar-kullanilir-mi"
+  },
+  {
+   "id": "h1496",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "eski-saksi-topragi-tekrar-kullanilir-mi",
+   "sorular": [
+    "Ölen bitkinin toprağı tekrar kullanılır mı"
+   ],
+   "cevap": "Bitki kök çürümesi, mantar hastalığı veya zararlılar yüzünden öldüyse toprak tekrar kullanılmamalıdır. Bitki başka bir nedenle öldüyse ve toprakta sorun yoksa yenilenerek kullanılabilir.",
+   "urunler": [],
+   "kaynak": "blog:eski-saksi-topragi-tekrar-kullanilir-mi"
+  },
+  {
+   "id": "h1497",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "eski-saksi-topragi-tekrar-kullanilir-mi",
+   "sorular": [
+    "Eski saksı toprağı nasıl canlandırılır"
+   ],
+   "cevap": "Toprak elenir, gerekirse tuzları yıkanır, ardından taze saksı toprağı, solucan gübresi ve gerekirse perlitle karıştırılır.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:eski-saksi-topragi-tekrar-kullanilir-mi"
+  },
+  {
+   "id": "h1498",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "eski-saksi-topragi-tekrar-kullanilir-mi",
+   "sorular": [
+    "Eski saksı toprağına ne eklenir"
+   ],
+   "cevap": "Taze saksı toprağı, organik madde ve besin için solucan gübresi, havalanma için perlit eklenebilir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:eski-saksi-topragi-tekrar-kullanilir-mi"
+  },
+  {
+   "id": "h1499",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "eski-saksi-topragi-tekrar-kullanilir-mi",
+   "sorular": [
+    "Kullanılmış saksı toprağı bahçeye dökülür mü"
+   ],
+   "cevap": "Sağlıklı toprak bahçeye veya kompost yığınına eklenebilir. Hastalıklı toprak ise kapalı bir torbada atılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:eski-saksi-topragi-tekrar-kullanilir-mi"
+  },
+  {
+   "id": "h1500",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "eski-saksi-topragi-tekrar-kullanilir-mi",
+   "sorular": [
+    "Eski toprak fide için kullanılır mı"
+   ],
+   "cevap": "Önerilmez. Fideler hastalıklara karşı çok hassas olduğu için temiz bir fide toprağı kullanılmalıdır.",
+   "urunler": [
+    "hg-fide-topragi"
+   ],
+   "kaynak": "blog:eski-saksi-topragi-tekrar-kullanilir-mi"
+  },
+  {
+   "id": "h1501",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "eski-saksi-topragi-tekrar-kullanilir-mi",
+   "sorular": [
+    "Saksı toprağı ne kadar süre kullanılır"
+   ],
+   "cevap": "Çoğu bitki için 1–2 yıl. Bu süreden sonra toprak sıkışır ve besinini kaybeder; yenilenmesi gerekir.",
+   "urunler": [],
+   "kaynak": "blog:eski-saksi-topragi-tekrar-kullanilir-mi"
+  },
+  {
+   "id": "h1502",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "fide-topragi-nasil-olmali",
+   "sorular": [
+    "Genç fidelerim çimlendikten kısa süre sonra neden dipten kırılıp solar"
+   ],
+   "cevap": "Bu durum genellikle \"fide çökerten\" (Damping-off) hastalığından veya toprağın aşırı su tutup çamurlaşmasından kaynaklanır. Ağır ve sert topraklar suyu drene edemez. Fidelerinizi korumak için yüksek havalanma kapasitesine sahip, steril ve hafif yapılı özel fide toprakları kullanmalı, sulamayı sadece toprak yüzeyi hafif kuruduğunda yapmalısınız.",
+   "urunler": [],
+   "kaynak": "blog:fide-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1503",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "fide-topragi-nasil-olmali",
+   "sorular": [
+    "Fide toprağının kalitesini dokunarak nasıl anlarım"
+   ],
+   "cevap": "Kaliteli bir fide toprağını avucunuza alıp sıktığınızda sünger gibi esnemeli, elinizi açtığınızda ise taş gibi kalıp halinde durmak yerine yavaşça dağılmalıdır. Ağırlaşan ve beton gibi sertleşen topraklar fide gelişimi için uygun değildir.",
+   "urunler": [
+    "hg-fide-topragi"
+   ],
+   "kaynak": "blog:fide-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1504",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "fide-topragi-nasil-olmali",
+   "sorular": [
+    "Tohum ekerken nelere dikkat etmeliyim"
+   ],
+   "cevap": "Tohumu kendi çapının yaklaşık 2–3 katı derinliğe ekmeniz yeterlidir. Çok derine ekilen tohumlar yüzeye çıkacak enerjiyi bulamaz ve çürür. Ayrıca viyollerin ve kullandığınız tüm Bahçe Ekipmanları nın temiz, dezenfekte edilmiş olmasına dikkat etmelisiniz. HasTürk Gübre Uzmanlarına Danışın! Doğru teşhis, verimli bir hasadın ilk adımıdır.",
+   "urunler": [],
+   "kaynak": "blog:fide-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1505",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "findik-agaclarinda-solucan-gubresi-kullanimi",
+   "sorular": [
+    "Fındıkta sıvı solucan gübresi zirai ilaçlarla birlikte kullanılabilir mi"
+   ],
+   "cevap": "Evet, HasTürk solucan gübresi doğal bir ürün olduğu için mantar veya ot ilaçları gibi zirai ilaçlarla karıştırılarak güvenle kullanılabilir. Zirai ilacın bitkide yaratacağı stresi minimuma indirir.",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:findik-agaclarinda-solucan-gubresi-kullanimi"
+  },
+  {
+   "id": "h1506",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "hangi-bitkiye-hangi-toprak",
+   "sorular": [
+    "Her bitki için aynı toprak kullanılır mı"
+   ],
+   "cevap": "Hayır. Sukulentler, orkideler ve asit seven bitkiler, genel çiçek toprağından belirgin şekilde farklı topraklara ihtiyaç duyar.",
+   "urunler": [
+    "hg-cicek-topragi"
+   ],
+   "kaynak": "blog:hangi-bitkiye-hangi-toprak"
+  },
+  {
+   "id": "h1507",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "hangi-bitkiye-hangi-toprak",
+   "sorular": [
+    "Bitkiye özel toprak almak şart mı"
+   ],
+   "cevap": "Hassas bitkilerde (orkide, sukulentler, asit sevenler, menekşe) büyük fark yaratır. Dayanıklı yeşil yapraklı bitkilerin çoğu, kaliteli bir genel salon bitkisi toprağında da iyi gelişir.",
+   "urunler": [],
+   "kaynak": "blog:hangi-bitkiye-hangi-toprak"
+  },
+  {
+   "id": "h1508",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "hangi-bitkiye-hangi-toprak",
+   "sorular": [
+    "Saksı toprağı ne sıklıkla değiştirilir"
+   ],
+   "cevap": "Çoğu bitki için 1–2 yılda bir, ilkbaharda. Yavaş büyüyen sukulentlerde 2–3 yılda bir yeterlidir.",
+   "urunler": [],
+   "kaynak": "blog:hangi-bitkiye-hangi-toprak"
+  },
+  {
+   "id": "h1509",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "hangi-bitkiye-hangi-toprak",
+   "sorular": [
+    "Farklı topraklar birbirine karıştırılabilir mi"
+   ],
+   "cevap": "Evet. Örneğin çiçek toprağına perlit veya kaktüs toprağı karıştırılarak drenaj artırılabilir. Ancak asit seven bitkiler için kireçli veya bazik malzemeler karıştırılmamalıdır.",
+   "urunler": [
+    "hg-cicek-topragi"
+   ],
+   "kaynak": "blog:hangi-bitkiye-hangi-toprak"
+  },
+  {
+   "id": "h1510",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "hangi-bitkiye-hangi-toprak",
+   "sorular": [
+    "Bahçe toprağı saksıda kullanılır mı"
+   ],
+   "cevap": "Tek başına önerilmez; saksıda sıkışarak su tutar ve kök çürümesine yol açar.",
+   "urunler": [],
+   "kaynak": "blog:hangi-bitkiye-hangi-toprak"
+  },
+  {
+   "id": "h1511",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "humik-asit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Hümik asit bitkiyi yakar mı, toprağa zarar verir mi"
+   ],
+   "cevap": "Kesinlikle hayır. Hümik asit, sentetik kimyasal gübrelerin aksine toprağı tuzlandırmaz, bitki köklerini yakmaz veya ph dengesini alt üst etmez. Tamamen organik bir toprak düzenleyici olduğu için toprağınızı iyileştirir ve doğallığını korur.",
+   "urunler": [],
+   "kaynak": "blog:humik-asit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1512",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "humik-asit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Kimyasal gübre kullanmayı bırakmak istiyorum, hümik asit ve solucan gübresi yeterli olur mu"
+   ],
+   "cevap": "Evet! HasTürk Gübre olarak vizyonumuz tam da budur. Toprağın fiziksel hazırlığını Hümik Asit ile yapıp, bitkinin ihtiyaç duyduğu tüm besinleri ve canlı mikroorganizmaları Solucan Gübresi ile sağladığınızda, toprağı yoran ve zehirleyen kimyasal gübrelere asla ihtiyaç duymazsınız.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:humik-asit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1513",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "humik-asit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Hümik asit yılın hangi aylarında toprağa verilir"
+   ],
+   "cevap": "Organik yapısı sayesinde yılın 12 ayı güvenle kullanılabilir. Ancak etkisini en çok gösterdiği zirve dönemler; tohum ekim/fide dikim öncesi toprak hazırlığı, çiçeklenme başlangıcı ve meyve tutumu/büyüme dönemleridir.",
+   "urunler": [],
+   "kaynak": "blog:humik-asit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1514",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "humik-asit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Sıvı hümik asit mi, katı formda leonardit mi kullanmalıyım"
+   ],
+   "cevap": "Eğer hasat sezonu içindeyseniz, damlama sulama sisteminiz varsa ve hızlı emilim istiyorsanız mutlaka Sıvı Hümik Asit kullanmalısınız. Ancak sonbahar ve kış aylarında, uzun vadeli ve köklü bir organik toprak ıslahı yapmak istiyorsanız toprağa tabandan Katı Leonardit karıştırmak en kalıcı çözümdür. Doğa, kendine saygı duyan üreticiyi her zaman bol hasatla ödüllendirir. Toprağınızı kimyasalların esaretinden kurtarıp HasTürk Gübre'nin organik gücüyle tanıştırmak için bugün bir adım atın! Özel bir mahsul türü için tamamen doğal bir besleme programı hazırlamamı ister misiniz?",
+   "urunler": [
+    "organik-toprak",
+    "leonardit-organik-toprak-duzenleyici"
+   ],
+   "kaynak": "blog:humik-asit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1515",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ilaclama-pompasi-nasil-temizlenir",
+   "sorular": [
+    "İlaçlama pompası ne sıklıkla temizlenmeli"
+   ],
+   "cevap": "İdeal olan her kullanımdan hemen sonra temizlemektir. İlaç kalıntıları kurudukça temizlemek zorlaşır.",
+   "urunler": [],
+   "kaynak": "blog:ilaclama-pompasi-nasil-temizlenir"
+  },
+  {
+   "id": "h1516",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ilaclama-pompasi-nasil-temizlenir",
+   "sorular": [
+    "Pompayı sirke ile temizleyebilir miyim"
+   ],
+   "cevap": "Sirke kireç kalıntılarına karşı faydalı olabilir, ancak ilaç kalıntılarının temizliğinde genellikle deterjanlı su ve üçlü durulama daha etkilidir. Her durumda kullandığınız ilacın etiketindeki temizlik önerisini dikkate alın.",
+   "urunler": [],
+   "kaynak": "blog:ilaclama-pompasi-nasil-temizlenir"
+  },
+  {
+   "id": "h1517",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ilaclama-pompasi-nasil-temizlenir",
+   "sorular": [
+    "Pompam basınç tutmuyor, ne yapmalıyım"
+   ],
+   "cevap": "Çoğu zaman sorun, temizlik ve küçük bir yedek parça değişimiyle çözülür. İhtiyaç duyduğunuz parçalar için ilaçlama pompası yedek parçaları kategorisine göz atabilirsiniz. Sonuç Birkaç dakikanızı alan düzenli bir temizlik, ilaçlama pompanızın yıllarca ilk günkü gibi çalışmasını sağlar. Artan ilacı doğru şekilde tüketmek, üçlü durulama yapmak, memeleri ve filtreleri ayrıca temizlemek ve pompayı kuru, gölge bir yerde saklamak; bu dört alışkanlık sorunların büyük bölümünü önler.",
+   "urunler": [],
+   "kaynak": "blog:ilaclama-pompasi-nasil-temizlenir"
+  },
+  {
+   "id": "h1518",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ilkbahar-bahce-bakimi-nasil-yapilir",
+   "sorular": [
+    "Bahar budaması hangi ayda yapılır"
+   ],
+   "cevap": "İklim şartlarına bağlı olmakla birlikte, genellikle don riskinin azaldığı ancak ağaçların henüz uyanmadığı Mart ayı başları bahar budaması için en ideal zamandır.",
+   "urunler": [],
+   "kaynak": "blog:ilkbahar-bahce-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1519",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ilkbahar-bahce-bakimi-nasil-yapilir",
+   "sorular": [
+    "Solucan gübresi baharda ne zaman verilir"
+   ],
+   "cevap": "Toprağın işlenebilir hale geldiği ilk günlerden itibaren (Mart-Nisan), tohum ekiminden veya fide dikiminden hemen önce toprağa karıştırılarak uygulanması en yüksek verimi sağlar. Meyve ağaçlarında ise ağacın iz düşümüne çapa yapılarak bahar başında verilmelidir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:ilkbahar-bahce-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1520",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ilkbahar-bahce-bakimi-nasil-yapilir",
+   "sorular": [
+    "İlkbaharda bahçe toprağı nasıl olmalıdır"
+   ],
+   "cevap": "Kış çıkışı toprak sıkışık ve nemli olabilir. Toprak, elinize aldığınızda hamur gibi yapışmıyor, hafifçe dağılıyorsa çapalamak ve tohum ekmek için uygun tava gelmiş (tavında) demektir. Yabani otlardan arındırılmış, havalandırılmış ve organik maddece (solucan gübresi vb.) zenginleştirilmiş olmalıdır. Sonuç Bahar aylarında bahçe bakımı, sadece estetik bir kaygı değil, doğanın uyanışına saygı duyarak onunla uyum içinde çalışmanın bir gereğidir. Titiz bir temizlik, derin bir havalandırma, doğru tohum ve ekipman seçimi ve en önemlisi toprağı solucan gübresi gibi organik bir güçle beslemek, yaz aylarında içinde vakit geçirmeye doyamayacağınız o muhteşem bahçenin temelini atacaktır. Şimdi doğayla işbirliği yapma ve bahçenize hak ettiği değeri verme zamanı!",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:ilkbahar-bahce-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1521",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaktus-bakimi-nasil-yapilir-puf-noktalari-ve-dogru-toprak-secimi",
+   "sorular": [
+    "Kaktüsüm neden yumuşadı ve sarardı"
+   ],
+   "cevap": "Bu durum genellikle aşırı sulamanın ve kök çürümesinin en belirgin işaretidir. Eğer gövde tabandan itibaren şeffaflaşıp jöle gibi yumuşuyorsa, bitkinizi acilen kuru ve yüksek drenajlı yeni bir toprağa almalı, çürüyen kısımları temizlemelisiniz.",
+   "urunler": [],
+   "kaynak": "blog:kaktus-bakimi-nasil-yapilir-puf-noktalari-ve-dogru-toprak-secimi"
+  },
+  {
+   "id": "h1522",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaktus-bakimi-nasil-yapilir-puf-noktalari-ve-dogru-toprak-secimi",
+   "sorular": [
+    "Kaktüs radyasyonu emer mi"
+   ],
+   "cevap": "Toplumda kaktüslerin bilgisayar ve televizyon ekranlarından gelen radyasyonu emdiği yönünde çok yaygın bir şehir efsanesi vardır. Ancak bilimsel araştırmalar, kaktüslerin radyasyonu çekici veya yok edici özel bir güce sahip olmadığını göstermektedir. Yine de stresi azaltmak ve masanıza doğal bir güzellik katmak için harika bir seçenektir!",
+   "urunler": [],
+   "kaynak": "blog:kaktus-bakimi-nasil-yapilir-puf-noktalari-ve-dogru-toprak-secimi"
+  },
+  {
+   "id": "h1523",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaktus-bakimi-nasil-yapilir-puf-noktalari-ve-dogru-toprak-secimi",
+   "sorular": [
+    "Kaktüslere solucan gübresi nasıl uygulanır"
+   ],
+   "cevap": "Katı solucan gübresini saksı toprağının üst kısmına ince bir tabaka halinde serpip hafifçe toprağa karıştırabilir, sıvı solucan gübresini ise sulama suyuna önerilen dozajda ekleyerek güvenle bitkinize verebilirsiniz. HasTürk Gübre Uzmanlarına Danışın! Satış, ürün seçimi ve uygulama süreçleri hakkında aklınıza takılan her şey için uzmanlarımız yanınızda.",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "kati-solucan-gubresi-20-kg",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:kaktus-bakimi-nasil-yapilir-puf-noktalari-ve-dogru-toprak-secimi"
+  },
+  {
+   "id": "h1524",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaktus-topragi-nasil-olmali",
+   "sorular": [
+    "Kaktüs normal çiçek toprağında yetişir mi"
+   ],
+   "cevap": "Karışımın yapısına bağlıdır. Uzun süre ıslak kalan bir çiçek toprağı çöl kaktüsleri için uygun değildir. Geçirgenlik ve havalanma ihtiyacı karşılanmalıdır.",
+   "urunler": [
+    "hg-cicek-topragi"
+   ],
+   "kaynak": "blog:kaktus-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1525",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaktus-topragi-nasil-olmali",
+   "sorular": [
+    "Yılbaşı kaktüsüne aynı bakım uygulanır mı"
+   ],
+   "cevap": "Hayır. Yılbaşı kaktüsü tropikal orman kökenlidir; parlak dolaylı ışık ve daha düzenli nem ister. İyi drene olan bir saksı karışımı kullanılabilir, özel çöl kaktüsü karışımı şart değildir. Toprağını uzun süre tamamen kuru bırakmayın.",
+   "urunler": [],
+   "kaynak": "blog:kaktus-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1526",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaktus-topragi-nasil-olmali",
+   "sorular": [
+    "Kaktüs toprağı bütün sukulentlerde kullanılabilir mi"
+   ],
+   "cevap": "Birçok kuraklığa dayanıklı sukulent için uygun olabilir. Ancak sukulentlerin su ve ışık ihtiyaçları da farklıdır. Aynı saksıda yetiştirilecek bitkilerin bakım ihtiyaçlarının benzer olmasına dikkat edin.",
+   "urunler": [],
+   "kaynak": "blog:kaktus-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1527",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaliteli-bir-saksi-topragi-nasil-olmali",
+   "sorular": [
+    "Sokaktan veya bahçeden aldığım toprağı saksıda kullanabilir miyim"
+   ],
+   "cevap": "Kesinlikle önermiyoruz. Bahçe toprağı saksı gibi kapalı bir alana girdiğinde sıkışarak betonlaşır, suyu süzmez ve kökleri çürütür. Ayrıca bahçe toprağında bulunan yabani ot tohumları, zararlı böcek larvaları ve mantari hastalıklar evinizdeki bitkiye hızla bulaşır.",
+   "urunler": [],
+   "kaynak": "blog:kaliteli-bir-saksi-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1528",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaliteli-bir-saksi-topragi-nasil-olmali",
+   "sorular": [
+    "Solucan gübresi saksıda koku veya sinek yapar mı"
+   ],
+   "cevap": "Hayır, kesinlikle yapmaz. Kaliteli, olgunlaşmış ve elenmiş HasTürk Solucan Gübresi, taze toprak kokusuna (orman tabanı kokusuna) sahiptir. İçerisinde fermente olmamış hiçbir atık bulunmadığı için evinize sinek çekmez, koku yaymaz.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:kaliteli-bir-saksi-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1529",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kaliteli-bir-saksi-topragi-nasil-olmali",
+   "sorular": [
+    "Saksı toprağı ne sıklıkla değiştirilmelidir"
+   ],
+   "cevap": "Genel kural olarak bitkilerin saksı toprağı 1,5–2 yılda bir değiştirilmelidir. Ancak saksı değişimi yapmak istemiyorsanız, her bahar başlangıcında saksının üst kısmından 3–4 cm toprağı alıp, yerine taze solucan gübresi ekleyerek toprağın besin değerini yenileyebilirsiniz.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:kaliteli-bir-saksi-topragi-nasil-olmali"
+  },
+  {
+   "id": "h1530",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kati-solucan-gubresi-nasil-kullanilir",
+   "sorular": [
+    "İçinde yabani ot tohumu veya hastalık barındırır mı"
+   ],
+   "cevap": "Kaliforniya solucanlarının sindirim sisteminden geçen organik materyaller, solucanın midesindeki sölom sıvısı ve enzimlerle reaksiyona girer. Bu süreçte tüm yabani ot tohumları ve patojenler (hastalık yapıcılar) yok olur. Tarlanızda ekstra yabani ot çıkmasına neden olmaz, aksine bitkiye hastalıklara karşı direnç kazandırır. Önerilen Yazı: Katı solucan gübresinin yanı sıra, yapraktan veya damlama sulama sisteminden bitkilerinize hızlı bir enerji takviyesi yapmak isterseniz, Sıvı Solucan Gübresi Nedir ve Nasıl Kullanılır? başlıklı kapsamlı rehberimizi de mutlaka incelemenizi tavsiye ederiz.",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "kati-solucan-gubresi-20-kg",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:kati-solucan-gubresi-nasil-kullanilir"
+  },
+  {
+   "id": "h1531",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kendi-saksi-topragini-hazirlama-karisim-oranlari",
+   "sorular": [
+    "Saksı toprağı evde hazırlanır mı, yoksa hazır mı alınmalı"
+   ],
+   "cevap": "İkisi de olur. Kendi karışımınız bitkinize tam uyar. Hazır özel topraklar ise zaman kazandırır. Ölçmek ve karıştırmakla uğraşmak istemiyorsanız, tarifinizi hazır karışım olarak sipariş edebilirsiniz.",
+   "urunler": [],
+   "kaynak": "blog:kendi-saksi-topragini-hazirlama-karisim-oranlari"
+  },
+  {
+   "id": "h1532",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kendi-saksi-topragini-hazirlama-karisim-oranlari",
+   "sorular": [
+    "Torf yerine cocopeat kullanabilir miyim"
+   ],
+   "cevap": "Evet. Cocopeat daha havalıdır ve kuruduktan sonra daha kolay ıslanır. Asit seven bitkilerde ise asidik torf tercih edilmelidir.",
+   "urunler": [
+    "hg-asidik-torf"
+   ],
+   "kaynak": "blog:kendi-saksi-topragini-hazirlama-karisim-oranlari"
+  },
+  {
+   "id": "h1533",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kendi-saksi-topragini-hazirlama-karisim-oranlari",
+   "sorular": [
+    "Pomza mı perlit mi"
+   ],
+   "cevap": "İkisi de havalandırır. Pomza daha ağırdır ve zamanla ezilmez; büyük saksılarda ve sukulentlerde avantajlıdır. Perlit hafiftir, iç mekân bitkileri için pratiktir.",
+   "urunler": [],
+   "kaynak": "blog:kendi-saksi-topragini-hazirlama-karisim-oranlari"
+  },
+  {
+   "id": "h1534",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kendi-saksi-topragini-hazirlama-karisim-oranlari",
+   "sorular": [
+    "Eski saksı toprağı tekrar kullanılır mı"
+   ],
+   "cevap": "Bitki hastalık veya zararlı nedeniyle ölmediyse kullanılabilir. Eski kökleri ayıklayın, toprağı yarı yarıya taze karışımla birleştirin ve solucan gübresiyle yeniden besleyin.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:kendi-saksi-topragini-hazirlama-karisim-oranlari"
+  },
+  {
+   "id": "h1535",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kendi-saksi-topragini-hazirlama-karisim-oranlari",
+   "sorular": [
+    "Bahçe toprağı sterilize edilebilir mi"
+   ],
+   "cevap": "Nemli toprak fırında yaklaşık 80–90°C'de 30 dakika tutularak büyük ölçüde temizlenebilir. Ancak bu işlem toprağın sıkışma sorununu çözmez; saksıda yine az kullanılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:kendi-saksi-topragini-hazirlama-karisim-oranlari"
+  },
+  {
+   "id": "h1536",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kendi-saksi-topragini-hazirlama-karisim-oranlari",
+   "sorular": [
+    "Hazırladığım karışım neden kötü kokuyor"
+   ],
+   "cevap": "Çoğunlukla fazla su ve yetersiz havalanmadan kaynaklanır. Perlit oranını artırın ve saksının drenaj deliklerini kontrol edin.",
+   "urunler": [],
+   "kaynak": "blog:kendi-saksi-topragini-hazirlama-karisim-oranlari"
+  },
+  {
+   "id": "h1537",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kendi-saksi-topragini-hazirlama-karisim-oranlari",
+   "sorular": [
+    "Saksı toprağı ne sıklıkla değiştirilmeli"
+   ],
+   "cevap": "Çoğu saksı bitkisi için 1–2 yılda bir. Hızlı büyüyen bitkilerde ve sebzelerde her sezon yenilemek daha iyi sonuç verir.",
+   "urunler": [],
+   "kaynak": "blog:kendi-saksi-topragini-hazirlama-karisim-oranlari"
+  },
+  {
+   "id": "h1538",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kimyasal-gubrenin-zararlari-nelerdir",
+   "sorular": [
+    "Kimyasal gübre toprağı çoraklaştırır mı"
+   ],
+   "cevap": "Evet. Kimyasal gübreler içerdikleri nötral tuzlar sebebiyle uzun süreli kullanımlarda toprakta tuz birikimine neden olur ve bu durum çoraklaşmayı beraberinde getirir. Toprağın fiziksel yapısı bozulur ve bitkilerin kök gelişimi engellenir.",
+   "urunler": [],
+   "kaynak": "blog:kimyasal-gubrenin-zararlari-nelerdir"
+  },
+  {
+   "id": "h1539",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kimyasal-gubrenin-zararlari-nelerdir",
+   "sorular": [
+    "Kimyasal gübre suları nasıl kirletir"
+   ],
+   "cevap": "Toprağa atılan ancak bitki tarafından alınamayan aşırı azot ve fosfor bileşikleri, sulama suyu veya yağmurla yer altı sularına yıkanır. Bu durum sularda nitrat kirliliğine ve göllerde alg patlamalarına (ötrofikasyon) neden olarak sudaki yaşamı bitirir.",
+   "urunler": [],
+   "kaynak": "blog:kimyasal-gubrenin-zararlari-nelerdir"
+  },
+  {
+   "id": "h1540",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kisin-ev-bitkilerinde-sik-yapilan-hatalar",
+   "sorular": [
+    "Kışın ev bitkileri ne sıklıkla sulanır"
+   ],
+   "cevap": "Sabit bir aralık yoktur. Toprağın üst kısmı kuruduğunda sulanmalıdır; bu genellikle yaz aylarına göre yaklaşık iki kat daha seyrek sulamak anlamına gelir.",
+   "urunler": [],
+   "kaynak": "blog:kisin-ev-bitkilerinde-sik-yapilan-hatalar"
+  },
+  {
+   "id": "h1541",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kisin-ev-bitkilerinde-sik-yapilan-hatalar",
+   "sorular": [
+    "Kışın ev bitkilerine gübre verilir mi"
+   ],
+   "cevap": "Çoğu bitkiye verilmez. Kışın çiçek açan orkide, Atatürk çiçeği ve sıklamen gibi bitkiler hafif beslenebilir.",
+   "urunler": [],
+   "kaynak": "blog:kisin-ev-bitkilerinde-sik-yapilan-hatalar"
+  },
+  {
+   "id": "h1542",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kisin-ev-bitkilerinde-sik-yapilan-hatalar",
+   "sorular": [
+    "Ev bitkileri kışın neden sararır"
+   ],
+   "cevap": "En sık neden fazla sulamadır. Işık yetersizliği, kalorifer yakınlığı ve soğuk hava akımı da sararmaya yol açar.",
+   "urunler": [],
+   "kaynak": "blog:kisin-ev-bitkilerinde-sik-yapilan-hatalar"
+  },
+  {
+   "id": "h1543",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kisin-ev-bitkilerinde-sik-yapilan-hatalar",
+   "sorular": [
+    "Kışın ev bitkileri nereye konmalı"
+   ],
+   "cevap": "Evin en aydınlık penceresine yakın, ama camdan birkaç santim uzakta ve kaloriferden uzak bir yere.",
+   "urunler": [],
+   "kaynak": "blog:kisin-ev-bitkilerinde-sik-yapilan-hatalar"
+  },
+  {
+   "id": "h1544",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kisin-ev-bitkilerinde-sik-yapilan-hatalar",
+   "sorular": [
+    "Kışın saksı değiştirilir mi"
+   ],
+   "cevap": "Acil bir durum yoksa değiştirilmez. Saksı değişimi için en uygun zaman ilkbahardır.",
+   "urunler": [],
+   "kaynak": "blog:kisin-ev-bitkilerinde-sik-yapilan-hatalar"
+  },
+  {
+   "id": "h1545",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "kisin-ev-bitkilerinde-sik-yapilan-hatalar",
+   "sorular": [
+    "Kalorifer bitkilere zarar verir mi"
+   ],
+   "cevap": "Doğrudan sıcak hava ve düşük nem, yaprak uçlarında kuruma ve zararlı artışına yol açar. Bitkiler kaloriferden uzak tutulmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:kisin-ev-bitkilerinde-sik-yapilan-hatalar"
+  },
+  {
+   "id": "h1546",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "leonardit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Leonardit fazla kullanılırsa bitkiyi yakar mı"
+   ],
+   "cevap": "Kimyasal gübrelerin aksine, leonardit doğal bir mineral olduğu için tavsiye edilen dozun biraz üzerine çıkılması bitkiyi yakmaz. Ancak en iyi faydayı sağlamak için ideal ölçülerde kullanmak her zaman daha doğrudur.",
+   "urunler": [
+    "leonardit-organik-toprak-duzenleyici"
+   ],
+   "kaynak": "blog:leonardit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1547",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "leonardit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Leonardit ve solucan gübresi aynı anda kullanılabilir mi"
+   ],
+   "cevap": "Evet, hatta kullanılması bitki gelişimi açısından mükemmel sonuçlar verir. Biri toprağın fiziksel yapısını düzenlerken, diğeri bitkinin tüm biyolojik besin ihtiyacını karşılar.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi",
+    "leonardit-organik-toprak-duzenleyici"
+   ],
+   "kaynak": "blog:leonardit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1548",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "leonardit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Leonardit her bitkiye uygulanır mı"
+   ],
+   "cevap": "Evet; meyve ağaçlarından sebzelere, tarla bitkilerinden süs bitkilerine kadar tüm bitki türlerinde güvenle ve yüksek verimle kullanılabilir. HasTürk Gübre Uzmanlarına Danışın!",
+   "urunler": [
+    "leonardit-organik-toprak-duzenleyici"
+   ],
+   "kaynak": "blog:leonardit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1549",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-topragi-nasil-olmali-saksida-limon-bakimi",
+   "sorular": [
+    "Limon ağacının yaprakları neden sararır"
+   ],
+   "cevap": "Aşırı sulama, kök sorunları veya besin eksiklikleri sararmaya neden olabilir. Yalnızca yaprak rengine bakarak gübre eklemek yerine önce toprağın nemini, drenajı ve bakım koşullarını kontrol edin.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-topragi-nasil-olmali-saksida-limon-bakimi"
+  },
+  {
+   "id": "h1550",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-topragi-nasil-olmali-saksida-limon-bakimi",
+   "sorular": [
+    "Limon ağacı neden meyve vermez"
+   ],
+   "cevap": "Yetersiz ışık, düzensiz sulama, uygun olmayan sıcaklıklar ve bitkinin genç olması etkili olabilir. Çekirdekten yetişen limonlarda çiçeklenme uzun yıllar gecikebilir. Meyve hedefiyle yetiştiriciliğe başlanacaksa çeşidi bilinen aşılı fidanlar değerlendirilebilir.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-topragi-nasil-olmali-saksida-limon-bakimi"
+  },
+  {
+   "id": "h1551",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-topragi-nasil-olmali-saksida-limon-bakimi",
+   "sorular": [
+    "5 litre toprak bir limon ağacına yeter mi"
+   ],
+   "cevap": "Gereken miktar, saksının iç hacmine ve mevcut kök topunun kapladığı alana bağlıdır. Beş litre bir paket hacmidir; her limon ağacı için yeterli olacağı anlamına gelmez. Saksı değişiminde kök topunun çevresinde doldurulacak boşluğu dikkate alın.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-topragi-nasil-olmali-saksida-limon-bakimi"
+  },
+  {
+   "id": "h1552",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-yapraklari-neden-sararir",
+   "sorular": [
+    "Limon ağacının yaprakları neden sararıp dökülüyor"
+   ],
+   "cevap": "Saksıdaki limonlarda en sık neden fazla sulamadır. Kış aylarında soğuk ve ışık yetersizliği de sararma ve yaprak dökümüne yol açar.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-yapraklari-neden-sararir"
+  },
+  {
+   "id": "h1553",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-yapraklari-neden-sararir",
+   "sorular": [
+    "Limon ağacında damarlar yeşil, yaprak sarıysa ne olur"
+   ],
+   "cevap": "Bu durum genellikle demir eksikliğini gösterir ve kireçli topraklarda sık görülür. Şelatlı demir içeren gübre kullanılmalı ve toprak pH'ı düzeltilmelidir.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-yapraklari-neden-sararir"
+  },
+  {
+   "id": "h1554",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-yapraklari-neden-sararir",
+   "sorular": [
+    "Limon ağacının sararan yaprakları tekrar yeşillenir mi"
+   ],
+   "cevap": "Hafif eksikliklerde yapraklar kısmen toparlanabilir, ancak ileri derecede sararmış yapraklar genellikle eski rengine dönmez. İyileşme yeni gelen yapraklarda görülür.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-yapraklari-neden-sararir"
+  },
+  {
+   "id": "h1555",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-yapraklari-neden-sararir",
+   "sorular": [
+    "Saksıdaki limon ağacı için hangi toprak kullanılır"
+   ],
+   "cevap": "Drenajı yüksek, hafif asidik ve organik maddece zengin bir karışım kullanılmalıdır. Sıradan bahçe toprağı saksıda sıkışarak su tutar ve kök çürümesine yol açabilir.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-yapraklari-neden-sararir"
+  },
+  {
+   "id": "h1556",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-yapraklari-neden-sararir",
+   "sorular": [
+    "Limon ağacına ne zaman gübre verilir"
+   ],
+   "cevap": "Büyüme döneminde, ilkbahardan sonbahara kadar düzenli aralıklarla verilir. Kış aylarında gübreleme durdurulur.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-yapraklari-neden-sararir"
+  },
+  {
+   "id": "h1557",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "limon-agaci-yapraklari-neden-sararir",
+   "sorular": [
+    "Saksıdaki limon ağacı ne sıklıkla sulanır"
+   ],
+   "cevap": "Sabit bir gün yoktur. Toprağın üst 3–5 cm'si kuruduğunda sulanmalıdır; yazın daha sık, kışın daha seyrek sulama gerekir.",
+   "urunler": [],
+   "kaynak": "blog:limon-agaci-yapraklari-neden-sararir"
+  },
+  {
+   "id": "h1558",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "mart-ayinda-hangi-meyve-agaclari-dikilir",
+   "sorular": [
+    "Açık köklü fidan ile tüplü fidan arasındaki fark nedir, mart ayında hangisi dikilmelidir"
+   ],
+   "cevap": "Açık köklü fidanlar kış dinlenmesinde olan, topraksız satılan fidanlardır ve en geç mart sonuna kadar (tomurcuklar patlamadan) dikilmelidir. Tüplü fidanlar ise topraklı (saksılı) oldukları için yılın 12 ayı dikilebilir. Mart ayında her ikisini de güvenle dikebilirsiniz.",
+   "urunler": [],
+   "kaynak": "blog:mart-ayinda-hangi-meyve-agaclari-dikilir"
+  },
+  {
+   "id": "h1559",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "mart-ayinda-hangi-meyve-agaclari-dikilir",
+   "sorular": [
+    "Fidan diktikten sonra ne kadar can suyu vermeliyim"
+   ],
+   "cevap": "Can suyu, fidanın köklerindeki hava boşluklarını kapatmak için verilir. Toprak çamur gibi ıslak bile olsa, dikimden hemen sonra fidan başına en az 15–20 litre (toprağın yapısına göre) can suyu verilmesi zorunludur.",
+   "urunler": [],
+   "kaynak": "blog:mart-ayinda-hangi-meyve-agaclari-dikilir"
+  },
+  {
+   "id": "h1560",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "mart-ayinda-hangi-sebzeler-ekilir",
+   "sorular": [
+    "Mart ayında domates tohumu bahçeye ekilir mi"
+   ],
+   "cevap": "Hayır, mart ayında dışarıda don riski devam edebilir. Domates tohumlarını mart ayında kapalı alanlarda (viyollerde veya saksılarda) çimlendirmeli, mayıs ayında fide olarak bahçeye şaşırtmalısınız.",
+   "urunler": [],
+   "kaynak": "blog:mart-ayinda-hangi-sebzeler-ekilir"
+  },
+  {
+   "id": "h1561",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "mart-ayinda-hangi-sebzeler-ekilir",
+   "sorular": [
+    "Mart ayında ekilen tohumlar ne sıklıkla sulanmalıdır"
+   ],
+   "cevap": "Bahar aylarında toprak genellikle nemlidir. Ancak tohum ekiminden hemen sonra \"can suyu\" verilmelidir. Toprak yüzeyi kurudukça hafif yağmurlama şeklinde sulama yapılmalı, tohumlar çamur içinde bırakılmamalıdır.",
+   "urunler": [],
+   "kaynak": "blog:mart-ayinda-hangi-sebzeler-ekilir"
+  },
+  {
+   "id": "h1562",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "mart-ayinda-hangi-sebzeler-ekilir",
+   "sorular": [
+    "Ektiğim sebzelerde doğal yollarla verimi nasıl artırabilirim"
+   ],
+   "cevap": "Zararlı kimyasallar yerine tamamen organik olan solucan gübresi kullanarak toprağınızın mikrobiyolojik yapısını canlandırabilir, ürün verimini ve lezzetini doğal yollarla artırabilirsiniz. HasTürk Gübre Uzmanlarına Danışın!",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:mart-ayinda-hangi-sebzeler-ekilir"
+  },
+  {
+   "id": "h1563",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "meyve-agaclari-icin-en-iyi-gubre-hangisi",
+   "sorular": [
+    "Meyve ağaçlarına sadece organik gübre vermek yeterli midir"
+   ],
+   "cevap": "Evet, kesinlikle yeterlidir. Doğru miktarda ve düzenli uygulanan kaliteli bir solucan gübresi, ağacın azot, fosfor, potasyum ve mikro element ihtiyacını fazlasıyla karşılar. Toprağı yoran ve kimyasal birikim yapan sentetik ürünlere ihtiyacınız yoktur.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:meyve-agaclari-icin-en-iyi-gubre-hangisi"
+  },
+  {
+   "id": "h1564",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "monstera-yapraklari-neden-kararir-ve-kurur",
+   "sorular": [
+    "Kararan monstera yaprağı tekrar yeşillenir mi"
+   ],
+   "cevap": "Hayır. Kararmış doku geri dönmez, ancak neden düzeltildiğinde yeni yapraklar sağlıklı çıkar.",
+   "urunler": [],
+   "kaynak": "blog:monstera-yapraklari-neden-kararir-ve-kurur"
+  },
+  {
+   "id": "h1565",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "monstera-yapraklari-neden-kararir-ve-kurur",
+   "sorular": [
+    "Monstera ne sıklıkla sulanır"
+   ],
+   "cevap": "Yazın genellikle haftada bir, kışın 10–15 günde bir. En doğru yöntem toprağı parmakla kontrol etmektir.",
+   "urunler": [],
+   "kaynak": "blog:monstera-yapraklari-neden-kararir-ve-kurur"
+  },
+  {
+   "id": "h1566",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "monstera-yapraklari-neden-kararir-ve-kurur",
+   "sorular": [
+    "Monstera yapraklarına su spreylemek iyi mi"
+   ],
+   "cevap": "Etkisi kısa sürer ve sık yapılırsa mantar lekesi riskini artırır. Nem için nemlendirici veya çakıllı su tepsisi daha etkilidir.",
+   "urunler": [],
+   "kaynak": "blog:monstera-yapraklari-neden-kararir-ve-kurur"
+  },
+  {
+   "id": "h1567",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "monstera-yapraklari-neden-kararir-ve-kurur",
+   "sorular": [
+    "Monstera için hangi toprak kullanılır"
+   ],
+   "cevap": "Havadar, iyi drene olan ve organik madde içeren bir karışım. Yoğun bahçe toprağı kök çürümesine yol açar.",
+   "urunler": [],
+   "kaynak": "blog:monstera-yapraklari-neden-kararir-ve-kurur"
+  },
+  {
+   "id": "h1568",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayi-bahce-bakimi",
+   "sorular": [
+    "Nisan ayında hangi sebzeler ekilir"
+   ],
+   "cevap": "Nisan ayında havaların ısınmasıyla domates, biber, patlıcan, salatalık, kabak, fasulye, kavun, karpuz gibi yazlık sebzelerin tohumları ve fideleri toprağa ekilebilir. Ayrıca marul, roka, maydanoz gibi yeşillikler için de ideal bir aydır.",
+   "urunler": [],
+   "kaynak": "blog:nisan-ayi-bahce-bakimi"
+  },
+  {
+   "id": "h1569",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayi-bahce-bakimi",
+   "sorular": [
+    "Bahar gübrelemesi ne zaman yapılmalı"
+   ],
+   "cevap": "Bahar gübrelemesi, don riskinin geçtiği ve toprağın uyanmaya başladığı mart sonu ile nisan ayı boyunca yapılmalıdır. Bu dönemde bitkiler büyüme evresine girdiği için besin ihtiyaçları en üst düzeydedir.",
+   "urunler": [],
+   "kaynak": "blog:nisan-ayi-bahce-bakimi"
+  },
+  {
+   "id": "h1570",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayi-bahce-bakimi",
+   "sorular": [
+    "Kimyasal kullanmadan zararlılardan nasıl korunurum"
+   ],
+   "cevap": "Bitkilerinizi kimyasal zehirlere maruz bırakmak yerine onların bağışıklığını güçlendirmeye odaklanmalısınız. Düzenli solucan gübresi kullanımı, bitkiyi içeriden güçlendirerek zararlılara ve mantar hastalıklarına karşı doğal bir direnç (koruyucu kalkan) oluşturur.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:nisan-ayi-bahce-bakimi"
+  },
+  {
+   "id": "h1571",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayi-bahce-bakimi",
+   "sorular": [
+    "Solucan gübresi nisan ayında nasıl uygulanır"
+   ],
+   "cevap": "Fide dikimlerinde açtığınız çukura bir avuç katı solucan gübresi koyabilirsiniz. Mevcut ağaç ve bitkileriniz için ise gövdeden biraz uzak olacak şekilde (taç iz düşümüne) toprağı hafifçe eşeleyip gübreyi uygulayabilir ve üzerini tekrar toprakla kapatarak sulayabilirsiniz. HasTürk Gübre Uzmanlarına Danışın!",
+   "urunler": [
+    "kati-solucan-gubresi-20-kg",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:nisan-ayi-bahce-bakimi"
+  },
+  {
+   "id": "h1572",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayinda-hangi-sebzeler-ekilir",
+   "sorular": [
+    "Nisan ayında tohum ekilir mi fide mi dikilir"
+   ],
+   "cevap": "Nisan ayında her ikisi de yapılır. Kabak, salatalık, fasulye, mısır, kavun, karpuz ve tüm yeşillikler tohumdan ekilirken; domates, biber ve patlıcan gibi sıcağı daha çok seven sebzeler fide olarak dikilir (şaşırtılır).",
+   "urunler": [],
+   "kaynak": "blog:nisan-ayinda-hangi-sebzeler-ekilir"
+  },
+  {
+   "id": "h1573",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayinda-hangi-sebzeler-ekilir",
+   "sorular": [
+    "Evde saksıya nisan ayında ne ekebilirim"
+   ],
+   "cevap": "Balkonunuzdaki veya cam kenarındaki saksılara nisan ayında; çeri domates, süs biberi, nane, fesleğen, marul, maydanoz, dereotu, roka ve hatta yeterince derin bir saksınız varsa salatalık bile ekebilirsiniz.",
+   "urunler": [],
+   "kaynak": "blog:nisan-ayinda-hangi-sebzeler-ekilir"
+  },
+  {
+   "id": "h1574",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayinda-hangi-sebzeler-ekilir",
+   "sorular": [
+    "Ektiğim tohumlar neden çimlenmiyor"
+   ],
+   "cevap": "Tohumların çimlenmemesinin 3 ana sebebi vardır: Tohumun çok derine ekilmesi, toprağın çok fazla sulanarak tohumun çürütülmesi veya toprağın tamamen kurutulması. Ayrıca tohum kalitesi de büyük bir etkendir.",
+   "urunler": [],
+   "kaynak": "blog:nisan-ayinda-hangi-sebzeler-ekilir"
+  },
+  {
+   "id": "h1575",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "nisan-ayinda-hangi-sebzeler-ekilir",
+   "sorular": [
+    "Domates ve biber fidesi ne sıklıkla sulanmalıdır"
+   ],
+   "cevap": "Fideler dikildikten sonra ilk can suyunu alır. Daha sonra toprağın üzeri kurumaya yüz tuttukça sulanmalıdır. Çiçek açma döneminde su miktarı biraz azaltılmalı, meyveler oluşurkenn sonra tekrar artırılmalıdır. Aşırı sulama kök çürümesine yol açar. HasTürk Gübre Uzmanlarına Danışın!",
+   "urunler": [],
+   "kaynak": "blog:nisan-ayinda-hangi-sebzeler-ekilir"
+  },
+  {
+   "id": "h1576",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "orkide-neden-cicek-acmiyor",
+   "sorular": [
+    "Orkide çiçek açtıktan sonra ne kadar sürede tekrar açar"
+   ],
+   "cevap": "Sağlıklı bir Phalaenopsis genellikle 6–12 ay içinde tekrar çiçek açar. Doğru sıcaklık farkı ve ışık sağlanırsa bu süre kısalabilir.",
+   "urunler": [],
+   "kaynak": "blog:orkide-neden-cicek-acmiyor"
+  },
+  {
+   "id": "h1577",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "orkide-neden-cicek-acmiyor",
+   "sorular": [
+    "Orkideye buz küpü ile sulama yapılır mı"
+   ],
+   "cevap": "Pratik bir yöntem olarak yaygınlaşsa da tropikal kökenli bir bitkinin köklerine buz koymak ideal değildir ve karışımı eşit ıslatmaz. Oda sıcaklığında suya daldırma yöntemi çok daha sağlıklıdır.",
+   "urunler": [],
+   "kaynak": "blog:orkide-neden-cicek-acmiyor"
+  },
+  {
+   "id": "h1578",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "orkide-neden-cicek-acmiyor",
+   "sorular": [
+    "Orkide yaprakları sağlıklı ama neden çiçek açmıyor"
+   ],
+   "cevap": "En sık neden gece-gündüz sıcaklık farkının olmaması ve yetersiz ışıktır. Koyu yeşil yapraklar genellikle bitkinin daha fazla ışığa ihtiyaç duyduğunu gösterir.",
+   "urunler": [],
+   "kaynak": "blog:orkide-neden-cicek-acmiyor"
+  },
+  {
+   "id": "h1579",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "orkide-neden-cicek-acmiyor",
+   "sorular": [
+    "Orkide saksısı ne zaman değiştirilmeli"
+   ],
+   "cevap": "Her 1,5–2 yılda bir, çiçeklenme bittikten sonra. Karışım ufalanmışsa ya da kökler saksıdan taşıyorsa daha erken değiştirilebilir.",
+   "urunler": [],
+   "kaynak": "blog:orkide-neden-cicek-acmiyor"
+  },
+  {
+   "id": "h1580",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "orkide-neden-cicek-acmiyor",
+   "sorular": [
+    "Orkideye normal çiçek gübresi verilir mi"
+   ],
+   "cevap": "Verilebilir ama çok seyreltilerek. Orkide kökleri tuz birikimine hassastır. Orkideye özel formüller doz ve besin dengesi açısından daha güvenlidir. Sonuç: Orkideniz Aslında Hazır, Sadece Doğru Sinyali Bekliyor Orkidenin çiçek açmaması neredeyse her zaman çözülebilir bir sorundur. Doğru ışık, sonbaharda gece serinliği, köklere göre sulama, nefes alan bir yetiştirme ortamı ve düzenli ama hafif besleme. Bu beş koşul bir araya geldiğinde, orkideniz genellikle birkaç ay içinde yeni bir çiçek sapıyla karşılık verir. Saksı değişimi ve beslemeye birlikte başlamak istiyorsanız, orkide toprağı, orkide besini ve sıvı solucan gübresini bir arada sunan Orkide Bakım Seti, ihtiyacınız olanları tek seferde tamamlamanın pratik bir yolu.",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "orkide-topragi-besini-bakim-seti",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:orkide-neden-cicek-acmiyor"
+  },
+  {
+   "id": "h1581",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ortanca-cicegi-bakimi-nasil-yapilir",
+   "sorular": [
+    "Kuruyan ortanca çiçeği nasıl canlanır"
+   ],
+   "cevap": "Eğer ortancanız kuruyorsa sorun genellikle susuzluk, aşırı öğle güneşi veya besinsiz bir topraktır. Öncelikle kurumuş çiçekleri ve yaprakları temizleyin. Bitkiyi sabah güneşi alan bir yere taşıyın, toprağını sulayın ve köklerini beslemek için sıvı veya katı solucan gübresi takviyesi yapın.",
+   "urunler": [
+    "kati-solucan-gubresi-20-kg",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:ortanca-cicegi-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1582",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ortanca-cicegi-bakimi-nasil-yapilir",
+   "sorular": [
+    "Ortanca evde saksıda yetişir mi"
+   ],
+   "cevap": "Evet, yetişir. Geniş ve derin bir saksı tercih etmeli, drenaj deliklerinin açık olduğundan emin olmalısınız. Ayrıca odayı sık sık havalandırmak ve filtreli güneş ışığı alan bir noktaya koymak şarttır.",
+   "urunler": [],
+   "kaynak": "blog:ortanca-cicegi-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1583",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ortanca-cicegi-bakimi-nasil-yapilir",
+   "sorular": [
+    "Ortanca ne zaman çiçek açar"
+   ],
+   "cevap": "Ortancalar genellikle türüne ve iklim koşullarına bağlı olarak ilkbahar sonundan (Mayıs) sonbahar ortalarına (Ekim) kadar çiçek açarlar. Ortancalarınız İçin Uzman Desteği Alın!",
+   "urunler": [],
+   "kaynak": "blog:ortanca-cicegi-bakimi-nasil-yapilir"
+  },
+  {
+   "id": "h1584",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ortanca-neden-mavi-olmuyor",
+   "sorular": [
+    "Mavi ortanca neden pembeye döndü"
+   ],
+   "cevap": "Genellikle kireçli sulama suyu veya kireçli bahçe toprağı pH'ı yükselttiği için. Alüminyum kilitlendiğinde renk önce mora, sonra pembeye döner.",
+   "urunler": [],
+   "kaynak": "blog:ortanca-neden-mavi-olmuyor"
+  },
+  {
+   "id": "h1585",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ortanca-neden-mavi-olmuyor",
+   "sorular": [
+    "Ortanca için ideal toprak pH'ı kaçtır"
+   ],
+   "cevap": "Mavi renk için 5,0–5,5; pembe renk için 6,5 ve üzeri.",
+   "urunler": [],
+   "kaynak": "blog:ortanca-neden-mavi-olmuyor"
+  },
+  {
+   "id": "h1586",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ortanca-neden-mavi-olmuyor",
+   "sorular": [
+    "Saksıdaki ortanca mavi yapılabilir mi"
+   ],
+   "cevap": "Evet, hatta bahçeden daha kolaydır. Asidik bir ortanca toprağı ve kireçsiz su ile pH kolayca kontrol altında tutulur.",
+   "urunler": [],
+   "kaynak": "blog:ortanca-neden-mavi-olmuyor"
+  },
+  {
+   "id": "h1587",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "ortanca-neden-mavi-olmuyor",
+   "sorular": [
+    "Beyaz ortanca mavi olur mu"
+   ],
+   "cevap": "Hayır. Beyaz ortancalar toprak pH'ından etkilenmez. Ortancanın genel bakımı, sulaması ve konumu için Ortanca Çiçeği Bakımı rehberimize göz atabilirsiniz.",
+   "urunler": [],
+   "kaynak": "blog:ortanca-neden-mavi-olmuyor"
+  },
+  {
+   "id": "h1588",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "pasa-kilici-topragi-nasil-olmali-saksi-degisimi",
+   "sorular": [
+    "Paşa kılıcı için hangi toprak kullanılır"
+   ],
+   "cevap": "Hızlı drene olan, havadar ve sıkışmayan, perlit veya pomza içeren sukulent tipi bir toprak.",
+   "urunler": [],
+   "kaynak": "blog:pasa-kilici-topragi-nasil-olmali-saksi-degisimi"
+  },
+  {
+   "id": "h1589",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "pasa-kilici-topragi-nasil-olmali-saksi-degisimi",
+   "sorular": [
+    "Paşa kılıcı normal toprağa dikilir mi"
+   ],
+   "cevap": "Önerilmez. Normal toprak suyu uzun tuttuğu için kök çürümesine yol açar.",
+   "urunler": [],
+   "kaynak": "blog:pasa-kilici-topragi-nasil-olmali-saksi-degisimi"
+  },
+  {
+   "id": "h1590",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "pasa-kilici-topragi-nasil-olmali-saksi-degisimi",
+   "sorular": [
+    "Paşa kılıcının saksısı ne zaman değiştirilir"
+   ],
+   "cevap": "2–3 yılda bir, ilkbahar veya yaz başında. Kök çürümesi varsa mevsim beklenmez.",
+   "urunler": [],
+   "kaynak": "blog:pasa-kilici-topragi-nasil-olmali-saksi-degisimi"
+  },
+  {
+   "id": "h1591",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "pasa-kilici-topragi-nasil-olmali-saksi-degisimi",
+   "sorular": [
+    "Paşa kılıcı saksı değişiminden sonra ne zaman sulanır"
+   ],
+   "cevap": "Yaklaşık bir hafta sonra. Bu süre, zedelenen köklerin kuruyup iyileşmesini sağlar.",
+   "urunler": [],
+   "kaynak": "blog:pasa-kilici-topragi-nasil-olmali-saksi-degisimi"
+  },
+  {
+   "id": "h1592",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "pasa-kilici-topragi-nasil-olmali-saksi-degisimi",
+   "sorular": [
+    "Paşa kılıcı için büyük saksı mı küçük saksı mı"
+   ],
+   "cevap": "Kök kütlesinden yalnızca bir boy büyük saksı. Paşa kılıcı sıkışık saksıyı sever; büyük saksı çürüme riskini artırır.",
+   "urunler": [],
+   "kaynak": "blog:pasa-kilici-topragi-nasil-olmali-saksi-degisimi"
+  },
+  {
+   "id": "h1593",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "pasa-kilici-topragi-nasil-olmali-saksi-degisimi",
+   "sorular": [
+    "Paşa kılıcı kışın saksı değiştirilir mi"
+   ],
+   "cevap": "Acil bir durum yoksa değiştirilmez. Kök çürümesi varsa kışın da müdahale edilmelidir.",
+   "urunler": [],
+   "kaynak": "blog:pasa-kilici-topragi-nasil-olmali-saksi-degisimi"
+  },
+  {
+   "id": "h1594",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-bitkilerini-kisa-hazirlama",
+   "sorular": [
+    "Saksı bitkileri ne zaman içeri alınmalı"
+   ],
+   "cevap": "Tropikal bitkiler gece sıcaklıkları 12–15°C'nin altına inmeye başladığında, kaktüs ve sukulentler 5°C'nin altına inmeden içeri alınmalıdır. Türkiye'nin çoğu bölgesinde bu dönem eylül sonu ile ekim ayına denk gelir.",
+   "urunler": [],
+   "kaynak": "blog:saksi-bitkilerini-kisa-hazirlama"
+  },
+  {
+   "id": "h1595",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-bitkilerini-kisa-hazirlama",
+   "sorular": [
+    "İçeri alınan bitkinin yaprakları neden dökülüyor"
+   ],
+   "cevap": "Işık ve sıcaklık değişimine uyum sağlarken birkaç yaprağın dökülmesi normaldir. Kademeli alıştırma bu kaybı azaltır.",
+   "urunler": [],
+   "kaynak": "blog:saksi-bitkilerini-kisa-hazirlama"
+  },
+  {
+   "id": "h1596",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-bitkilerini-kisa-hazirlama",
+   "sorular": [
+    "Kışın saksı bitkileri ne sıklıkla sulanır"
+   ],
+   "cevap": "Sabit bir aralık yoktur. Toprağın üst 3–5 cm'si kuruduğunda sulayın; kışın bu süre yaza göre genellikle iki katına çıkar.",
+   "urunler": [],
+   "kaynak": "blog:saksi-bitkilerini-kisa-hazirlama"
+  },
+  {
+   "id": "h1597",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-bitkilerini-kisa-hazirlama",
+   "sorular": [
+    "Kışın bitkilere gübre verilir mi"
+   ],
+   "cevap": "Çoğu bitkide hayır. Kışın çiçek açan bitkiler dışında gübreleme ilkbahara kadar durdurulur.",
+   "urunler": [],
+   "kaynak": "blog:saksi-bitkilerini-kisa-hazirlama"
+  },
+  {
+   "id": "h1598",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-bitkilerini-kisa-hazirlama",
+   "sorular": [
+    "Limon ağacı kışın dışarıda kalabilir mi"
+   ],
+   "cevap": "Ilıman kıyı bölgelerinde kısa süreli hafif donlara dayanabilir, ancak saksıdaki limon daha hassastır. Soğuk bölgelerde aydınlık ve serin bir iç mekâna alınmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:saksi-bitkilerini-kisa-hazirlama"
+  },
+  {
+   "id": "h1599",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragi-neden-kokar-ve-kuflenir",
+   "sorular": [
+    "Saksı toprağındaki beyaz küf bitkiye zarar verir mi"
+   ],
+   "cevap": "Genellikle doğrudan zarar vermez, ancak toprağın fazla ıslak olduğunu gösterir. Nem sorunu devam ederse kök çürümesi riski artar.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragi-neden-kokar-ve-kuflenir"
+  },
+  {
+   "id": "h1600",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragi-neden-kokar-ve-kuflenir",
+   "sorular": [
+    "Kokan saksı toprağı tekrar kullanılır mı"
+   ],
+   "cevap": "Hayır. Kötü kokan veya kök çürümesi yaşanmış toprak, sorunu yeni bitkiye taşıyabilir. Atılması en güvenli yoldur.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragi-neden-kokar-ve-kuflenir"
+  },
+  {
+   "id": "h1601",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragi-neden-kokar-ve-kuflenir",
+   "sorular": [
+    "Saksıda çıkan sarı mantar tehlikeli mi"
+   ],
+   "cevap": "Bitkiye zarar vermez, ancak yenirse zehirli olabilir. Evde çocuk veya evcil hayvan varsa mantarları toplayıp atın.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragi-neden-kokar-ve-kuflenir"
+  },
+  {
+   "id": "h1602",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragi-neden-kokar-ve-kuflenir",
+   "sorular": [
+    "Saksı toprağı her yıl değiştirilmeli mi"
+   ],
+   "cevap": "Her bitki için gerekmez. Çoğu ev bitkisi için 1–2 yılda bir yeterlidir; hızlı büyüyenlerde her yıl, yavaş büyüyenlerde 2–3 yılda bir değiştirilir.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragi-neden-kokar-ve-kuflenir"
+  },
+  {
+   "id": "h1603",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragindaki-kucuk-beyaz-bocekler",
+   "sorular": [
+    "Saksı toprağındaki küçük beyaz böcekler nedir"
+   ],
+   "cevap": "Çoğu zaman kollembol, toprak akarı veya küçük toprak solucanıdır ve zararsızdır. Köklerde beyaz pamuksu kümeler varsa kök unlu biti olabilir ve zararlıdır.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragindaki-kucuk-beyaz-bocekler"
+  },
+  {
+   "id": "h1604",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragindaki-kucuk-beyaz-bocekler",
+   "sorular": [
+    "Saksıda zıplayan beyaz böcekler zararlı mı"
+   ],
+   "cevap": "Hayır. Zıplayan beyaz böcekler kollembollerdir; çürüyen organik maddeyle beslenir ve bitkiye zarar vermez. Toprağın fazla nemli olduğunu gösterirler.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragindaki-kucuk-beyaz-bocekler"
+  },
+  {
+   "id": "h1605",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragindaki-kucuk-beyaz-bocekler",
+   "sorular": [
+    "Saksıdaki beyaz böcekler nasıl yok edilir"
+   ],
+   "cevap": "Zararsız olanlar için sulamayı azaltmak ve toprağın üst kısmını kurutmak yeterlidir. Kök unlu biti varsa kökler temizlenmeli ve toprak tamamen değiştirilmelidir.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragindaki-kucuk-beyaz-bocekler"
+  },
+  {
+   "id": "h1606",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragindaki-kucuk-beyaz-bocekler",
+   "sorular": [
+    "Köklerde beyaz pamuk gibi şeyler var, nedir"
+   ],
+   "cevap": "Bu büyük olasılıkla kök unlu bitidir. Bitki diğerlerinden ayrılmalı, kökler temizlenmeli ve taze toprağa dikilmelidir.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragindaki-kucuk-beyaz-bocekler"
+  },
+  {
+   "id": "h1607",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragindaki-kucuk-beyaz-bocekler",
+   "sorular": [
+    "Saksıdaki beyaz böcekler insanlara zararlı mı"
+   ],
+   "cevap": "Kollembol, toprak akarı ve küçük toprak solucanları insanları ısırmaz ve sağlık açısından tehlike oluşturmaz.",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragindaki-kucuk-beyaz-bocekler"
+  },
+  {
+   "id": "h1608",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragindaki-kucuk-beyaz-bocekler",
+   "sorular": [
+    "Solucan gübresinde küçük beyaz canlılar olur mu"
+   ],
+   "cevap": "Olabilir. Canlı organik gübrelerde ve kompostta kollembol ve küçük toprak solucanları gibi zararsız ayrıştırıcı canlılar doğal olarak bulunabilir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:saksi-topragindaki-kucuk-beyaz-bocekler"
+  },
+  {
+   "id": "h1609",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksi-topragindaki-kucuk-beyaz-bocekler",
+   "sorular": [
+    "Saksıdaki beyaz böcekler kendiliğinden geçer mi"
+   ],
+   "cevap": "Zararsız olanlar, toprak kurudukça genellikle azalır. Kök unlu biti ise kendiliğinden geçmez; müdahale gerekir. Önerilen Yazı Saksıdaki Küçük Siyah Sinekler (Fungus Sineği) Nasıl Yok Edilir?",
+   "urunler": [],
+   "kaynak": "blog:saksi-topragindaki-kucuk-beyaz-bocekler"
+  },
+  {
+   "id": "h1610",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-mantar-cikti-zararli-mi",
+   "sorular": [
+    "Saksıda mantar çıkması neyi gösterir"
+   ],
+   "cevap": "Toprağın fazla nemli kaldığını ve organik madde içerdiğini gösterir. Mantar bitkiye zarar vermez, ancak sulamanın gözden geçirilmesi gerektiğine işaret eder.",
+   "urunler": [],
+   "kaynak": "blog:saksida-mantar-cikti-zararli-mi"
+  },
+  {
+   "id": "h1611",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-mantar-cikti-zararli-mi",
+   "sorular": [
+    "Saksıdaki sarı mantar zararlı mı"
+   ],
+   "cevap": "Bitkiye zarar vermez, ancak insanlar ve evcil hayvanlar için zehirlidir. Evde çocuk veya evcil hayvan varsa toplanmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:saksida-mantar-cikti-zararli-mi"
+  },
+  {
+   "id": "h1612",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-mantar-cikti-zararli-mi",
+   "sorular": [
+    "Saksıda çıkan mantar yenir mi"
+   ],
+   "cevap": "Hayır. Saksıda çıkan mantarların hiçbiri yenmemelidir.",
+   "urunler": [],
+   "kaynak": "blog:saksida-mantar-cikti-zararli-mi"
+  },
+  {
+   "id": "h1613",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-mantar-cikti-zararli-mi",
+   "sorular": [
+    "Saksıdaki mantar nasıl yok edilir"
+   ],
+   "cevap": "Mantarlar eldivenle toplanır, üst toprak yenilenir, sulama azaltılır ve ortam havalandırılır. Sorun tekrarlıyorsa toprak değiştirilebilir.",
+   "urunler": [],
+   "kaynak": "blog:saksida-mantar-cikti-zararli-mi"
+  },
+  {
+   "id": "h1614",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-mantar-cikti-zararli-mi",
+   "sorular": [
+    "Saksıdaki mantar için ilaç kullanılır mı"
+   ],
+   "cevap": "Gerek yoktur. Mantar ilaçları bu tür mantarlara karşı genellikle etkili değildir ve mantarlar bitkiye zarar vermez.",
+   "urunler": [],
+   "kaynak": "blog:saksida-mantar-cikti-zararli-mi"
+  },
+  {
+   "id": "h1615",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-mantar-cikti-zararli-mi",
+   "sorular": [
+    "Mantar çıkan toprağı değiştirmek gerekir mi"
+   ],
+   "cevap": "Her zaman gerekmez. Sulama düzenlendiğinde mantarlar genellikle azalır. Mantarlar sürekli çıkıyor ve toprak sıkışmışsa değiştirmek faydalı olur.",
+   "urunler": [],
+   "kaynak": "blog:saksida-mantar-cikti-zararli-mi"
+  },
+  {
+   "id": "h1616",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-mantar-cikti-zararli-mi",
+   "sorular": [
+    "Saksıdaki mantar diğer bitkilere geçer mi"
+   ],
+   "cevap": "Sporlar havayla yayılabilir, ancak diğer saksılarda mantar çıkması için yine nemli ve organik maddeli bir ortam gerekir. Bitkilere zarar vermez.",
+   "urunler": [],
+   "kaynak": "blog:saksida-mantar-cikti-zararli-mi"
+  },
+  {
+   "id": "h1617",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-toprak-suyu-emmiyor",
+   "sorular": [
+    "Saksıda toprak neden suyu emmiyor"
+   ],
+   "cevap": "Toprak aşırı kurumuş ve su itiyor, sıkışmış, ağır ya da saksının drenaj deliği tıkanmış olabilir.",
+   "urunler": [],
+   "kaynak": "blog:saksida-toprak-suyu-emmiyor"
+  },
+  {
+   "id": "h1618",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-toprak-suyu-emmiyor",
+   "sorular": [
+    "Su saksının kenarından akıp gidiyorsa ne yapmalıyım"
+   ],
+   "cevap": "Toprak aşırı kurumuş ve saksı kenarından ayrılmıştır. Saksıyı 20–30 dakika su dolu bir kaba koyarak alttan ıslatın.",
+   "urunler": [],
+   "kaynak": "blog:saksida-toprak-suyu-emmiyor"
+  },
+  {
+   "id": "h1619",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-toprak-suyu-emmiyor",
+   "sorular": [
+    "Su toprağın üstünde bekliyorsa ne yapmalıyım"
+   ],
+   "cevap": "Önce drenaj deliğini kontrol edin. Delik açıksa toprak sıkışmıştır; toprağı havadar ve taze bir toprakla yenileyin.",
+   "urunler": [],
+   "kaynak": "blog:saksida-toprak-suyu-emmiyor"
+  },
+  {
+   "id": "h1620",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-toprak-suyu-emmiyor",
+   "sorular": [
+    "Kurumuş saksı toprağı nasıl ıslatılır"
+   ],
+   "cevap": "Alttan daldırma yöntemiyle: Saksıyı su dolu bir kaba koyup toprağın suyu alttan çekmesini bekleyin.",
+   "urunler": [],
+   "kaynak": "blog:saksida-toprak-suyu-emmiyor"
+  },
+  {
+   "id": "h1621",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-toprak-suyu-emmiyor",
+   "sorular": [
+    "Toprağa perlit eklemek suyu emmesine yardımcı olur mu"
+   ],
+   "cevap": "Perlit, sıkışan ağır topraklarda suyun toprağa işlemesini ve fazlasının süzülmesini kolaylaştırır. Toprağın tamamına karıştırılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:saksida-toprak-suyu-emmiyor"
+  },
+  {
+   "id": "h1622",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksida-toprak-suyu-emmiyor",
+   "sorular": [
+    "Saksı toprağı ne sıklıkla değiştirilmeli"
+   ],
+   "cevap": "Çoğu bitki için 1–2 yılda bir, ilkbaharda. Sıkışma ve su emmeme sorunu, toprağın yenilenme zamanının geldiğini gösterir.",
+   "urunler": [],
+   "kaynak": "blog:saksida-toprak-suyu-emmiyor"
+  },
+  {
+   "id": "h1623",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir",
+   "sorular": [
+    "Saksıdaki küçük siyah sinekler bitkiye zarar verir mi"
+   ],
+   "cevap": "Yetişkin sinekler doğrudan zarar vermez, ancak topraktaki larvalar ince kökleri kemirebilir. Fide, çelik ve genç bitkilerde zarar daha belirgindir.",
+   "urunler": [],
+   "kaynak": "blog:saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir"
+  },
+  {
+   "id": "h1624",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir",
+   "sorular": [
+    "Fungus sineği insanlara zararlı mı"
+   ],
+   "cevap": "Hayır. Isırmaz, sokmaz ve hastalık taşımaz. Ancak ev içinde rahatsız edici olabilir.",
+   "urunler": [],
+   "kaynak": "blog:saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir"
+  },
+  {
+   "id": "h1625",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir",
+   "sorular": [
+    "Fungus sineği ne kadar sürede yok olur"
+   ],
+   "cevap": "Yaşam döngüsü yaklaşık 3–4 hafta sürdüğü için düzenli mücadeleyle genellikle 3–4 haftada kontrol altına alınır.",
+   "urunler": [],
+   "kaynak": "blog:saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir"
+  },
+  {
+   "id": "h1626",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir",
+   "sorular": [
+    "Kaktüste de fungus sineği olur mu"
+   ],
+   "cevap": "Nadiren. Kaktüs toprağı hızlı kuruduğu için larvalar yaşayamaz. Fazla sulanan kaktüslerde ise görülebilir.",
+   "urunler": [],
+   "kaynak": "blog:saksidaki-kucuk-siyah-sinekler-nasil-yok-edilir"
+  },
+  {
+   "id": "h1627",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksiya-kac-litre-toprak-gider",
+   "sorular": [
+    "20 cm saksıya kaç litre toprak gider"
+   ],
+   "cevap": "Standart bir 20 cm saksı yaklaşık 4 litre toprak alır. Oturma payıyla birlikte 5 litrelik bir paket yeterlidir.",
+   "urunler": [],
+   "kaynak": "blog:saksiya-kac-litre-toprak-gider"
+  },
+  {
+   "id": "h1628",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksiya-kac-litre-toprak-gider",
+   "sorular": [
+    "30 cm saksıya kaç litre toprak gider"
+   ],
+   "cevap": "Yaklaşık 14 litre. Oturma payıyla birlikte 20 litrelik bir paket önerilir.",
+   "urunler": [],
+   "kaynak": "blog:saksiya-kac-litre-toprak-gider"
+  },
+  {
+   "id": "h1629",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksiya-kac-litre-toprak-gider",
+   "sorular": [
+    "40 cm saksıya kaç litre toprak gider"
+   ],
+   "cevap": "Yaklaşık 33 litre. 40 litrelik bir paket yeterlidir.",
+   "urunler": [],
+   "kaynak": "blog:saksiya-kac-litre-toprak-gider"
+  },
+  {
+   "id": "h1630",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksiya-kac-litre-toprak-gider",
+   "sorular": [
+    "50 litre toprak kaç saksıya yeter"
+   ],
+   "cevap": "Saksı boyutuna göre değişir. Örneğin yaklaşık 12 adet 20 cm saksıya veya 3 adet 30 cm saksıya yeter.",
+   "urunler": [],
+   "kaynak": "blog:saksiya-kac-litre-toprak-gider"
+  },
+  {
+   "id": "h1631",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksiya-kac-litre-toprak-gider",
+   "sorular": [
+    "Saksının ne kadarı toprakla doldurulmalı"
+   ],
+   "cevap": "Saksının ağzından 2–3 cm aşağıya kadar doldurulmalı; üstte sulama payı bırakılmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:saksiya-kac-litre-toprak-gider"
+  },
+  {
+   "id": "h1632",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "saksiya-kac-litre-toprak-gider",
+   "sorular": [
+    "Saksı değişiminde ne kadar toprak alınmalı"
+   ],
+   "cevap": "Yeni saksının hacminden eski saksının hacmi çıkarılır ve üzerine 1–2 litre pay eklenir. Önerilen Yazı Bitki Türlerine Göre Saksı Değişimi Nasıl Yapılır?",
+   "urunler": [],
+   "kaynak": "blog:saksiya-kac-litre-toprak-gider"
+  },
+  {
+   "id": "h1633",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "salon-bitkileri-icin-toprak-nasil-olmali",
+   "sorular": [
+    "Salon bitkileri için hangi toprak kullanılır"
+   ],
+   "cevap": "Torf veya cocopeat, perlit, pomza ve organik gübre içeren hafif, havadar ve iyi drene olan bir saksı toprağı kullanılır.",
+   "urunler": [],
+   "kaynak": "blog:salon-bitkileri-icin-toprak-nasil-olmali"
+  },
+  {
+   "id": "h1634",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "salon-bitkileri-icin-toprak-nasil-olmali",
+   "sorular": [
+    "Salon bitkilerine bahçe toprağı konur mu"
+   ],
+   "cevap": "Önerilmez. Bahçe toprağı saksıda sıkışarak su tutar ve kök çürümesine yol açar.",
+   "urunler": [],
+   "kaynak": "blog:salon-bitkileri-icin-toprak-nasil-olmali"
+  },
+  {
+   "id": "h1635",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "salon-bitkileri-icin-toprak-nasil-olmali",
+   "sorular": [
+    "Her salon bitkisi aynı toprakta yetişir mi"
+   ],
+   "cevap": "Hayır. Yeşil yapraklı tropikaller genel bir karışımda iyi yetişirken, sukulentler daha hızlı drene olan, orkideler ise kabuk bazlı bir ortam ister.",
+   "urunler": [],
+   "kaynak": "blog:salon-bitkileri-icin-toprak-nasil-olmali"
+  },
+  {
+   "id": "h1636",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "salon-bitkileri-icin-toprak-nasil-olmali",
+   "sorular": [
+    "Eski saksı toprağı tekrar kullanılır mı"
+   ],
+   "cevap": "Saksıda tekrar kullanılması önerilmez. Sağlıklı bir bitkiden çıkan eski toprak kompost yığınına veya bahçe toprağına katılabilir.",
+   "urunler": [],
+   "kaynak": "blog:salon-bitkileri-icin-toprak-nasil-olmali"
+  },
+  {
+   "id": "h1637",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "salon-bitkileri-icin-toprak-nasil-olmali",
+   "sorular": [
+    "Salon bitkisi toprağına perlit eklenir mi"
+   ],
+   "cevap": "Evet. Toprak ağır geliyorsa veya bitki su tutmayı sevmiyorsa, perlit eklemek havalanmayı ve drenajı artırır.",
+   "urunler": [],
+   "kaynak": "blog:salon-bitkileri-icin-toprak-nasil-olmali"
+  },
+  {
+   "id": "h1638",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solan-cicek-nasil-canlandirilir",
+   "sorular": [
+    "Kuruyan çiçeğe şekerli, aspirinli su veya maya verilir mi"
+   ],
+   "cevap": "Kesinlikle hayır. Şeker ve maya, saksı toprağı gibi kapalı bir ekosistemde hızlıca zararlı bakteri ve mantar üremesine neden olarak kalan sağlam kökleri de çürütür, ayrıca sineklenme yapar. Aspirin gibi sentetik maddeler ise stres altındaki bitkinin doğal pH dengesini bozar.",
+   "urunler": [],
+   "kaynak": "blog:solan-cicek-nasil-canlandirilir"
+  },
+  {
+   "id": "h1639",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solan-cicek-nasil-canlandirilir",
+   "sorular": [
+    "Kurumuş dalları ve çiçekleri ne zaman kesmeliyim"
+   ],
+   "cevap": "Beklemeden hemen kesmelisiniz. Kurumuş bir dal yeniden yeşermez. Aksine, bitki o ölü bölgeyi onarmak için enerji harcamaya devam eder. Steril bir makasla, sağlam ve yeşil dokuya 1–2 cm mesafe kalacak şekilde ölü kısımları temizleyin.",
+   "urunler": [],
+   "kaynak": "blog:solan-cicek-nasil-canlandirilir"
+  },
+  {
+   "id": "h1640",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solan-cicek-nasil-canlandirilir",
+   "sorular": [
+    "Sıvı solucan gübresi mi, katı solucan gübresi mi kullanmalıyım"
+   ],
+   "cevap": "Eğer bitkinin acil bir müdahaleye ihtiyacı varsa ve toprağını değiştirmeyecekseniz, yapraklardan ve kökten hızla emilen Sıvı Solucan Gübresi ilk yardım için idealdir. Ancak toprak değişimi yapıyorsanız, yeni toprağına Katı Solucan Gübresi karıştırmak uzun vadeli ve kalıcı bir beslenme sağlar. İkisinin kombine kullanımı en mükemmel sonucu verir.",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "kati-solucan-gubresi-20-kg",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:solan-cicek-nasil-canlandirilir"
+  },
+  {
+   "id": "h1641",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solan-cicek-nasil-canlandirilir",
+   "sorular": [
+    "Çiçeğim soldu, hemen güneşe mi koymalıyım"
+   ],
+   "cevap": "Hayır. Stres altındaki bitkiler aşırı sıcak veya yakıcı güneş ışığına karşı çok hassastır. Bitkinizi toparlanma sürecinde direkt güneş ışığı almayan, aydınlık ve serin (oda sıcaklığında) bir yerde konumlandırın.",
+   "urunler": [],
+   "kaynak": "blog:solan-cicek-nasil-canlandirilir"
+  },
+  {
+   "id": "h1642",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solucan-gubresi-icerigi-nedir",
+   "sorular": [
+    "Solucan gübresi içindeki bakteriler sıcakta ölür mü"
+   ],
+   "cevap": "Direkt güneş ışığına maruz bırakılmadığı sürece ölmezler. Bu nedenle solucan gübresi yüzeye saçıldıktan hemen sonra toprağa (10–15 cm derine) karıştırılmalıdır. Toprak altında bekleyen bakteriler, ilk sulamayla birlikte hızla uyanıp çoğalmaya başlar.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:solucan-gubresi-icerigi-nedir"
+  },
+  {
+   "id": "h1643",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solucan-gubresinin-zarari-var-mi",
+   "sorular": [
+    "Solucan gübresi bitkiyi yakar mı"
+   ],
+   "cevap": "Kimyasal gübrelere göre yakma riski çok düşüktür. Ancak saksıda çok yüksek oranda kullanıldığında veya sıvı formu seyreltilmeden uygulandığında bitki gelişimini olumsuz etkileyebilir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:solucan-gubresinin-zarari-var-mi"
+  },
+  {
+   "id": "h1644",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solucan-gubresinin-zarari-var-mi",
+   "sorular": [
+    "Solucan gübresi insan sağlığına zararlı mı"
+   ],
+   "cevap": "Kaliteli ve olgunlaşmış ürün, bahçe toprağı kadar güvenlidir. Eldivenle kullanmak ve sonrasında ellerinizi yıkamak yeterlidir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:solucan-gubresinin-zarari-var-mi"
+  },
+  {
+   "id": "h1645",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solucan-gubresinin-zarari-var-mi",
+   "sorular": [
+    "Solucan gübresinin içinden solucan çıkar mı"
+   ],
+   "cevap": "Üründe solucan kokonları (yumurta kapsülleri) bulunabilir. Bu solucanlar canlı köklerle değil, çürüyen organik maddeyle beslenir; bitkiye zarar vermez. Saksı ortamında da genellikle uzun süre yaşamazlar.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:solucan-gubresinin-zarari-var-mi"
+  },
+  {
+   "id": "h1646",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solucan-gubresinin-zarari-var-mi",
+   "sorular": [
+    "Solucan gübresi her bitkide kullanılır mı"
+   ],
+   "cevap": "Çoğu bitkide kullanılabilir. Kaktüs ve sukulentlerde, toprağın su tutmasını artıracağı için düşük oranda kullanılmalıdır. Asit seven bitkilerde ise pH düzeltici olarak değil, organik madde kaynağı olarak düşünülmelidir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:solucan-gubresinin-zarari-var-mi"
+  },
+  {
+   "id": "h1647",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "solucan-gubresinin-zarari-var-mi",
+   "sorular": [
+    "Solucan gübresi kokar mı"
+   ],
+   "cevap": "Kaliteli ürün hafif orman toprağı gibi kokar. Keskin, ekşi veya amonyak kokusu olgunlaşmamış ürünün işaretidir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:solucan-gubresinin-zarari-var-mi"
+  },
+  {
+   "id": "h1648",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "sonbaharda-cim-ekimi",
+   "sorular": [
+    "Çim tohumu ne zaman ekilir"
+   ],
+   "cevap": "Türkiye'deki serin iklim çimleri için en uygun dönem sonbahardır. Çoğu bölgede eylül sonu ile ekim ayı idealdir; ekim, ilk dondan en az 6–8 hafta önce tamamlanmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:sonbaharda-cim-ekimi"
+  },
+  {
+   "id": "h1649",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "sonbaharda-cim-ekimi",
+   "sorular": [
+    "Metrekareye kaç gram çim tohumu atılır"
+   ],
+   "cevap": "Makineli ekimde 50–60 gram, elle serpmede 80–90 gram. Seyrelmiş alanların yenilenmesinde bu miktarın yaklaşık yarısı yeterlidir.",
+   "urunler": [],
+   "kaynak": "blog:sonbaharda-cim-ekimi"
+  },
+  {
+   "id": "h1650",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "sonbaharda-cim-ekimi",
+   "sorular": [
+    "Çim tohumu kaç günde çimlenir"
+   ],
+   "cevap": "Karışıma ve sıcaklığa bağlı olarak 7 gün ile 4 hafta arasında. Çim otu en hızlı, çayır salkımotu en yavaş çimlenen türdür.",
+   "urunler": [],
+   "kaynak": "blog:sonbaharda-cim-ekimi"
+  },
+  {
+   "id": "h1651",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "sonbaharda-cim-ekimi",
+   "sorular": [
+    "Kasım ayında çim ekilir mi"
+   ],
+   "cevap": "Akdeniz, Ege ve Güneydoğu'nun ılıman kesimlerinde kasım başına kadar ekilebilir. Soğuk bölgelerde kasım ayı çim ekimi için geçtir.",
+   "urunler": [],
+   "kaynak": "blog:sonbaharda-cim-ekimi"
+  },
+  {
+   "id": "h1652",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "sonbaharda-cim-ekimi",
+   "sorular": [
+    "Çim ekiminden sonra ne zaman gübre verilir"
+   ],
+   "cevap": "İlk biçimden sonra hafif bir besleme yapılır; kış öncesinde ise potasyumu yüksek bir gübre uygulanır.",
+   "urunler": [],
+   "kaynak": "blog:sonbaharda-cim-ekimi"
+  },
+  {
+   "id": "h1653",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tahtakurusu-nasil-anlasilir-ve-mucadele",
+   "sorular": [
+    "Tahtakurusu nasıl anlaşılır"
+   ],
+   "cevap": "En güvenilir belirtiler yatak dikişlerindeki küçük siyah lekeler, çarşaftaki kan lekeleri, deri kabukları ve canlı böceklerdir. Isırıklar tek başına teşhis için yeterli değildir.",
+   "urunler": [],
+   "kaynak": "blog:tahtakurusu-nasil-anlasilir-ve-mucadele"
+  },
+  {
+   "id": "h1654",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tahtakurusu-nasil-anlasilir-ve-mucadele",
+   "sorular": [
+    "Tahtakurusu kaç derecede ölür"
+   ],
+   "cevap": "Tahtakurusu ve yumurtaları yüksek ısıya dayanıksızdır. Kurutma makinesinde yüksek ısıda 30 dakika kurutma tüm evreleri öldürür. Eşyaların en az 49°C'de 90 dakika tutulması yumurtaları da öldürmek için yeterlidir.",
+   "urunler": [],
+   "kaynak": "blog:tahtakurusu-nasil-anlasilir-ve-mucadele"
+  },
+  {
+   "id": "h1655",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tahtakurusu-nasil-anlasilir-ve-mucadele",
+   "sorular": [
+    "Tahtakurusu kendiliğinden geçer mi"
+   ],
+   "cevap": "Hayır. Tahtakurusu uzun süre beslenmeden yaşayabilir ve hızla çoğalır. Müdahale edilmezse istila büyür.",
+   "urunler": [],
+   "kaynak": "blog:tahtakurusu-nasil-anlasilir-ve-mucadele"
+  },
+  {
+   "id": "h1656",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tahtakurusu-nasil-anlasilir-ve-mucadele",
+   "sorular": [
+    "Tahtakurusu kirlilikten mi olur"
+   ],
+   "cevap": "Hayır. Temiz evlerde de görülür; genellikle bavul, giysi ve ikinci el eşyalarla eve taşınır.",
+   "urunler": [],
+   "kaynak": "blog:tahtakurusu-nasil-anlasilir-ve-mucadele"
+  },
+  {
+   "id": "h1657",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tahtakurusu-nasil-anlasilir-ve-mucadele",
+   "sorular": [
+    "Tahtakurusu ilacı tek başına yeterli mi"
+   ],
+   "cevap": "Çoğu zaman değildir. Tahtakurularında ilaç direnci yaygındır. İlaç; ısı, vakum, yatak kılıfı ve tuzakla birlikte kullanıldığında sonuç verir.",
+   "urunler": [],
+   "kaynak": "blog:tahtakurusu-nasil-anlasilir-ve-mucadele"
+  },
+  {
+   "id": "h1658",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tarim-perliti-nedir-nasil-kullanilir",
+   "sorular": [
+    "Tarım Perliti Zehirli mi veya Sağlığa Zararlı mı"
+   ],
+   "cevap": "Hayır, kesinlikle değildir. Perlit, doğal bir volkanik camdır ve herhangi bir toksik madde barındırmaz. Kimyasal değildir, tamamen doğaldır ve insan/hayvan sağlığına zararı yoktur.",
+   "urunler": [
+    "tarim-perliti"
+   ],
+   "kaynak": "blog:tarim-perliti-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1659",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tarim-perliti-nedir-nasil-kullanilir",
+   "sorular": [
+    "Tarım Perliti Ne Kadar Süre Kullanılır"
+   ],
+   "cevap": "Perlit inorganik bir yapıya sahip olduğu için toprak içinde erimez, çürümez veya formunu kaybetmez. Yıllarca toprakta görevini (havalandırma ve su tutma) yapmaya devam eder.",
+   "urunler": [
+    "tarim-perliti"
+   ],
+   "kaynak": "blog:tarim-perliti-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1660",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tarim-perliti-nedir-nasil-kullanilir",
+   "sorular": [
+    "İnşaat Perliti ile Tarım Perliti Aynı Şey mi"
+   ],
+   "cevap": "Hayır! İnşaat perliti yalıtım amacıyla su itici (hidrofobik) maddelerle kaplanır. Bu yüzden suyu çekmez, aksine iter. Bitkilerinizde kesinlikle sadece suyu sünger gibi çeken \"tarım perliti\" kullanmalısınız.",
+   "urunler": [
+    "tarim-perliti"
+   ],
+   "kaynak": "blog:tarim-perliti-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1661",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tarim-perliti-nedir-nasil-kullanilir",
+   "sorular": [
+    "Sadece Perlit Kullanarak Bitki Yetiştirilir mi"
+   ],
+   "cevap": "Eğer hidroponik (topraksız) tarım yapmıyor ve dışarıdan sıvı besin takviyesi vermiyorsanız, sadece perlit kullanmak bitkiyi besinsiz bırakır. Perliti mutlaka kaliteli bir toprak ve solucan gübresi ile karıştırarak kullanmalısınız.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:tarim-perliti-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1662",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tarimda-en-iyi-gubre-hangisi-toprak-verimliligini-artiran-kesin-cozum",
+   "sorular": [
+    "Solucan gübresi bitkinin kökünü yakar mı"
+   ],
+   "cevap": "Hayır, kesinlikle yakmaz. Tamamen fermente olmuş ve organik yollarla elde edilmiş olduğu için doğrudan tohumla veya ince kılcal köklerle temas etmesinde hiçbir zarar yoktur; aksine köklenmeyi teşvik eder.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:tarimda-en-iyi-gubre-hangisi-toprak-verimliligini-artiran-kesin-cozum"
+  },
+  {
+   "id": "h1663",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tarimda-en-iyi-gubre-hangisi-toprak-verimliligini-artiran-kesin-cozum",
+   "sorular": [
+    "Meyve fidanları dikilirken gübre nasıl uygulanmalıdır"
+   ],
+   "cevap": "Fidan dikim çukurunun dibine 1–2 avuç solucan gübresi koyup hafifçe toprakla karıştırın. Fidanı yerleştirdikten sonra etrafını doldururken yine toprakla harmanlanmış gübre ekleyin ve mutlaka can suyu verin.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:tarimda-en-iyi-gubre-hangisi-toprak-verimliligini-artiran-kesin-cozum"
+  },
+  {
+   "id": "h1664",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tohum-cimlendirme-yontemleri",
+   "sorular": [
+    "Tohumlar ortalama kaç günde çimlenir"
+   ],
+   "cevap": "Çimlenme süresi tamamen tohumun türüne, ortamın sıcaklığına ve nem oranına bağlıdır. Örneğin marul, turp gibi tohumlar 3–5 günde çimlenirken; biber veya patlıcan tohumları 10–14 gün, bazı ağaç tohumları ise aylar sürebilir. Ortalama 22–25 °C oda sıcaklığı süreci hızlandırır.",
+   "urunler": [],
+   "kaynak": "blog:tohum-cimlendirme-yontemleri"
+  },
+  {
+   "id": "h1665",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tohum-cimlendirme-yontemleri",
+   "sorular": [
+    "Tohum çimlendirirken güneş ışığı şart mı"
+   ],
+   "cevap": "Çoğu tohum çimlenme aşamasında ışığa değil, sıcaklık ve neme ihtiyaç duyar (karanlıkta çimlenirler). Ancak tohum kabuğunu kırıp ilk yeşil yapraklarını (kotiledon) gösterdiği an, boylarının cılız ve uzun (sırık gibi) olmaması için derhal yeterli ve filtrelenmiş güneş ışığı alan bir yere taşınmalıdırlar.",
+   "urunler": [],
+   "kaynak": "blog:tohum-cimlendirme-yontemleri"
+  },
+  {
+   "id": "h1666",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tohum-cimlendirme-yontemleri",
+   "sorular": [
+    "Çimlendirme sırasında gübre verilir mi"
+   ],
+   "cevap": "Tohum patlama aşamasında ekstra bir besine ihtiyaç duymaz. Ancak tohumu ektiğiniz toprağın baştan Solucan Gübresi ile harmanlanmış olması, kökler çıktığı an bitkinin direkt besine ulaşmasını sağlar ve stresi sıfıra indirir.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:tohum-cimlendirme-yontemleri"
+  },
+  {
+   "id": "h1667",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "tohum-cimlendirme-yontemleri",
+   "sorular": [
+    "Üzerinde beyaz küf oluşursa ne yapmalıyım"
+   ],
+   "cevap": "Ortamın aşırı nemli ve havasız kaldığının işaretidir. Sera etkisi için kullandığınız streç filmi hemen kaldırın, ortamı havalandırın ve bir süre sulamayı/sislemeyi durdurun. 📞 HasTürk Gübre Uzmanlarına Danışın!",
+   "urunler": [],
+   "kaynak": "blog:tohum-cimlendirme-yontemleri"
+  },
+  {
+   "id": "h1668",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-analizi-nedir-nasil-yapilir",
+   "sorular": [
+    "Toprak numunesi nerelerden ALINMAZ"
+   ],
+   "cevap": "Hayvan gübresi yığılmış yerlerden, su birikintisi olan çukur noktalardan, tarla sınırı ve yol kenarlarından, ağaç altlarından ve daha önce kireç/gübre dökülmüş noktalardan numune alınmamalıdır.",
+   "urunler": [],
+   "kaynak": "blog:toprak-analizi-nedir-nasil-yapilir"
+  },
+  {
+   "id": "h1669",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-analizi-nedir-nasil-yapilir",
+   "sorular": [
+    "Toprak analizi kaç yılda bir yapılmalıdır"
+   ],
+   "cevap": "İdeal olanı her ekim sezonu öncesi yaptırmaktır. Ancak bu mümkün olmuyorsa tarla bitkileri için en geç 2 yılda bir, meyve bahçeleri için ise 3 yılda bir mutlaka tekrarlanmalıdır.",
+   "urunler": [],
+   "kaynak": "blog:toprak-analizi-nedir-nasil-yapilir"
+  },
+  {
+   "id": "h1670",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-florasi-nedir",
+   "sorular": [
+    "Toprak florası gözle görülür mü"
+   ],
+   "cevap": "Hayır, toprak florası ağırlıklı olarak bakteri, mikroskobik mantar ve alglerden oluştuğu için çıplak gözle görülmez. Ancak bu canlıların faaliyeti sonucu toprağın kokusunun güzelleşmesi, renginin koyulaşması ve dokusunun yumuşaması gözlemlenebilir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-florasi-nedir"
+  },
+  {
+   "id": "h1671",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-florasi-nedir",
+   "sorular": [
+    "Solucan gübresi toprak florasını nasıl güçlendirir"
+   ],
+   "cevap": "Solucan gübresi içerisinde yüksek miktarda faydalı mikroorganizma, enzim ve organik madde barındırır. Toprağa eklendiğinde bu yararlı mikroorganizmalar doğrudan toprak florasına katılır ve toprağın biyolojik yapısını canlandırır.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:toprak-florasi-nedir"
+  },
+  {
+   "id": "h1672",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-florasi-nedir",
+   "sorular": [
+    "Kimyasal içerikler toprak florasına zarar verir mi"
+   ],
+   "cevap": "Evet, maalesef sentetik içerikler toprakta tuzlanmaya sebep olarak toprağın pH dengesini bozar ve faydalı mikroorganizmaların büyük bir kısmının ölmesine neden olur. Bu durum uzun vadede toprağın verimliliğini tamamen bitirir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-florasi-nedir"
+  },
+  {
+   "id": "h1673",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-kireclenmesi-ve-tuzlanmasi-nasil-giderilir",
+   "sorular": [
+    "Kireçli toprağa hangi gübre atılmaz"
+   ],
+   "cevap": "Kireçli topraklara Kalsiyum Amonyum Nitrat (CAN) gibi bazik karakterli ve kireç içerikli gübreler atılmamalıdır. Bu durum topraktaki kilitlenmeyi daha da artırır.",
+   "urunler": [],
+   "kaynak": "blog:toprak-kireclenmesi-ve-tuzlanmasi-nasil-giderilir"
+  },
+  {
+   "id": "h1674",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-kireclenmesi-ve-tuzlanmasi-nasil-giderilir",
+   "sorular": [
+    "Tuzlu toprak ne kadar sürede düzelir"
+   ],
+   "cevap": "Doğru bir drenaj sistemi, tatlı su ile yıkama ve güçlü bir Solucan Gübresi takviyesi ile toprağın tuzluluk oranına bağlı olarak 1 ile 3 sezon içerisinde gözle görülür bir iyileşme sağlanır.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:toprak-kireclenmesi-ve-tuzlanmasi-nasil-giderilir"
+  },
+  {
+   "id": "h1675",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-kireclenmesi-ve-tuzlanmasi-nasil-giderilir",
+   "sorular": [
+    "Toprak analizi yaptırmak şart mı"
+   ],
+   "cevap": "Kesinlikle evet. Toprağınıza ne kadar kükürt, jips veya organik madde atacağınızı, ancak profesyonel bir toprak analizi sonucunda (pH ve EC değerlerini görerek) net olarak belirleyebilirsiniz. Katı Solucan Gübresi 10 KG Katı Solucan Gübresi 20 KG Çuval Sıvı Solucan Gübresi 1 Lt",
+   "urunler": [
+    "hasturk-sivi-solucan-gubresi",
+    "kati-solucan-gubresi-20-kg",
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:toprak-kireclenmesi-ve-tuzlanmasi-nasil-giderilir"
+  },
+  {
+   "id": "h1676",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-tahlili-kac-yilda-bir-yapilir",
+   "sorular": [
+    "Toprak tahlili kaç yılda bir yapılır"
+   ],
+   "cevap": "Seralarda her sezon, tek yıllık ürünlerde her yıl veya en geç 2 yılda bir, meyve bahçeleri ve zeytinliklerde 2–3 yılda bir, hobi bahçelerinde birkaç yılda bir yapılması önerilir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-tahlili-kac-yilda-bir-yapilir"
+  },
+  {
+   "id": "h1677",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-tahlili-kac-yilda-bir-yapilir",
+   "sorular": [
+    "Toprak tahlili ne zaman yapılmalı"
+   ],
+   "cevap": "Tek yıllık ürünlerde ekimden yaklaşık 1 ay önce, meyve bahçelerinde gübrelemeden 1–2 ay önce numune alınması önerilir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-tahlili-kac-yilda-bir-yapilir"
+  },
+  {
+   "id": "h1678",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-tahlili-kac-yilda-bir-yapilir",
+   "sorular": [
+    "Her yıl toprak tahlili yaptırmak gerekli mi"
+   ],
+   "cevap": "Seralarda ve yoğun sebze yetiştiriciliğinde evet. Meyve bahçeleri ve hobi bahçeleri için her yıl gerekli değildir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-tahlili-kac-yilda-bir-yapilir"
+  },
+  {
+   "id": "h1679",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-tahlili-kac-yilda-bir-yapilir",
+   "sorular": [
+    "Toprak tahlili nerede yaptırılır"
+   ],
+   "cevap": "İl ve ilçe tarım müdürlükleri, ziraat odaları, üniversitelerin ziraat fakülteleri ve yetkili özel laboratuvarlarda.",
+   "urunler": [],
+   "kaynak": "blog:toprak-tahlili-kac-yilda-bir-yapilir"
+  },
+  {
+   "id": "h1680",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-tahlili-kac-yilda-bir-yapilir",
+   "sorular": [
+    "Meyve ağaçlarında sadece toprak analizi yeterli mi"
+   ],
+   "cevap": "Tam bir değerlendirme için toprak analizine ek olarak yaprak analizi de önerilir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-tahlili-kac-yilda-bir-yapilir"
+  },
+  {
+   "id": "h1681",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-verimliligini-artirmanin-en-dogal-ve-etkili-5-yolu",
+   "sorular": [
+    "Kimyasal ürünler toprak verimliliğini neden düşürür"
+   ],
+   "cevap": "Kimyasallar, toprağın içindeki solucanlar ve faydalı bakteriler gibi doğal yaşam formlarını yok eder. Zamanla toprak sıkışır, su tutma kapasitesi düşer ve bitkiler hastalıklara karşı daha savunmasız hale gelir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-verimliligini-artirmanin-en-dogal-ve-etkili-5-yolu"
+  },
+  {
+   "id": "h1682",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "toprak-verimliligini-artirmanin-en-dogal-ve-etkili-5-yolu",
+   "sorular": [
+    "Toprağımın organik maddesinin eksik olduğunu nasıl anlarım"
+   ],
+   "cevap": "Eğer toprağınız sulandığında çamur gibi yapışkan oluyor, kuruduğunda ise beton gibi çatlıyorsa; su tutma kapasitesi düşmüş ve organik madde açısından fakirleşmiş demektir. Bitkilerde yavaş büyüme ve sararma da diğer belirtilerdir.",
+   "urunler": [],
+   "kaynak": "blog:toprak-verimliligini-artirmanin-en-dogal-ve-etkili-5-yolu"
+  },
+  {
+   "id": "h1683",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "torf-nedir-bitkiler-icin-torfun-faydalari-nelerdir",
+   "sorular": [
+    "Torf toprakta sineklenme olur mu"
+   ],
+   "cevap": "Hayır. Kaliteli ve sterilize edilmiş saf torf sineklenme yapmaz. Ev bitkilerinde görülen sineklenmenin ana sebebi; toprağın sürekli çamur halinde (aşırı nemli) bırakılması ve kalitesiz/hastalıklı dış mekân toprağı kullanılmasıdır.",
+   "urunler": [],
+   "kaynak": "blog:torf-nedir-bitkiler-icin-torfun-faydalari-nelerdir"
+  },
+  {
+   "id": "h1684",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "torf-nedir-bitkiler-icin-torfun-faydalari-nelerdir",
+   "sorular": [
+    "Her bitki torfta yetişir mi"
+   ],
+   "cevap": "Evet, neredeyse tüm iç mekan ve dış mekan bitkileri torf bazlı karışımları çok sever. Sadece kaktüs ve sukulent gibi suyu çok hızlı süzdüren ortamları seven bitkiler için, torfun içine bol miktarda pomza veya perlit eklenerek su tutuculuğunun azaltılması gerekir.",
+   "urunler": [],
+   "kaynak": "blog:torf-nedir-bitkiler-icin-torfun-faydalari-nelerdir"
+  },
+  {
+   "id": "h1685",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "unlu-bit-nasil-yok-edilir",
+   "sorular": [
+    "Unlu bit neden olur"
+   ],
+   "cevap": "En sık yeni alınan bitkilerle eve gelir. Kalabalık bitkiler, aşırı azotlu gübreleme, sıcak ve kuru ortam ile karıncalar yayılmasını kolaylaştırır.",
+   "urunler": [],
+   "kaynak": "blog:unlu-bit-nasil-yok-edilir"
+  },
+  {
+   "id": "h1686",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "unlu-bit-nasil-yok-edilir",
+   "sorular": [
+    "Unlu bit insanlara zararlı mı"
+   ],
+   "cevap": "Hayır. Unlu bit insanları ısırmaz ve sağlık açısından tehlike oluşturmaz; yalnızca bitkilere zarar verir.",
+   "urunler": [],
+   "kaynak": "blog:unlu-bit-nasil-yok-edilir"
+  },
+  {
+   "id": "h1687",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "unlu-bit-nasil-yok-edilir",
+   "sorular": [
+    "Unlu bit toprakta yaşar mı"
+   ],
+   "cevap": "Bazı türleri köklerde yaşar. Bitki doğru bakıma rağmen soluyorsa kökler kontrol edilmelidir.",
+   "urunler": [],
+   "kaynak": "blog:unlu-bit-nasil-yok-edilir"
+  },
+  {
+   "id": "h1688",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "unlu-bit-nasil-yok-edilir",
+   "sorular": [
+    "Unlu bit bir kez temizlenince geçer mi"
+   ],
+   "cevap": "Genellikle geçmez. Yumurtalar pamuksu keselerde korunduğu için uygulamaların birkaç hafta boyunca tekrarlanması gerekir.",
+   "urunler": [],
+   "kaynak": "blog:unlu-bit-nasil-yok-edilir"
+  },
+  {
+   "id": "h1689",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "unlu-bit-nasil-yok-edilir",
+   "sorular": [
+    "Unlu bit diğer bitkilere geçer mi"
+   ],
+   "cevap": "Evet. Hareketli yavrular, temas eden yapraklar ve karıncalar aracılığıyla yayılabilir. Bu yüzden bulaşmış bitki hemen ayrılmalıdır. Önerilen Yazı Saksıdaki Küçük Siyah Sinekler (Fungus Sineği) Nasıl Yok Edilir?",
+   "urunler": [],
+   "kaynak": "blog:unlu-bit-nasil-yok-edilir"
+  },
+  {
+   "id": "h1690",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-mi-perlit-mi",
+   "sorular": [
+    "Vermikülit ile perlit arasındaki fark nedir"
+   ],
+   "cevap": "Perlit toprağı havalandırır ve drenajı artırır; vermikülit ise suyu ve besinleri tutarak toprağın nemini korur.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-mi-perlit-mi"
+  },
+  {
+   "id": "h1691",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-mi-perlit-mi",
+   "sorular": [
+    "Perlit mi vermikülit mi daha iyi"
+   ],
+   "cevap": "Hangisinin daha iyi olduğu ihtiyaca bağlıdır. Drenaj sorunu varsa perlit, toprak çok çabuk kuruyorsa vermikülit daha uygundur.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-mi-perlit-mi"
+  },
+  {
+   "id": "h1692",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-mi-perlit-mi",
+   "sorular": [
+    "Perlit ve vermikülit birlikte kullanılır mı"
+   ],
+   "cevap": "Evet. Özellikle çelik köklendirme ve nem seven bitkilerde birlikte kullanıldığında hava ve nem dengesi en iyi şekilde sağlanır.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-mi-perlit-mi"
+  },
+  {
+   "id": "h1693",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-mi-perlit-mi",
+   "sorular": [
+    "Kaktüse vermikülit konur mu"
+   ],
+   "cevap": "Önerilmez. Vermikülit su tuttuğu için kaktüs ve sukulentlerde kök çürümesi riskini artırır. Bu bitkiler için perlit tercih edilmelidir.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-mi-perlit-mi"
+  },
+  {
+   "id": "h1694",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-mi-perlit-mi",
+   "sorular": [
+    "Tohum çimlendirmede hangisi kullanılır"
+   ],
+   "cevap": "Vermikülit, tohum çevresindeki nemi sabit tuttuğu için tohum çimlendirmede daha çok tercih edilir.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-mi-perlit-mi"
+  },
+  {
+   "id": "h1695",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-mi-perlit-mi",
+   "sorular": [
+    "Perlit toprağın yüzeyine neden çıkıyor"
+   ],
+   "cevap": "Perlit çok hafif olduğu için sulamayla yüzeye çıkabilir. Bu durum zararsızdır.",
+   "urunler": [],
+   "kaynak": "blog:vermikulit-mi-perlit-mi"
+  },
+  {
+   "id": "h1696",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-nedir-nasil-kullanilir",
+   "sorular": [
+    "Vermikülit tek başına toprak yerine kullanılır mı"
+   ],
+   "cevap": "Tohum çimlendirme ve çelik köklendirme işlemlerinde tek başına kullanılabilir. Ancak bitki büyümeye başladığında besine ihtiyaç duyacağı için kaliteli bir torf, bahçe toprağı ve mutlaka solucan gübresi ile karıştırılarak kullanılması en doğrusudur.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi",
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1697",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-nedir-nasil-kullanilir",
+   "sorular": [
+    "Bozulan bir ürün müdür"
+   ],
+   "cevap": "Vermikülit organik bir madde değil, bir mineraldir. Bu yüzden çürümez, küflenmez veya formunu kaybetmez. Toprağınızın içinde yıllarca görevini yapmaya devam eder. 👨‍🌾 Uzmanımıza Danışın! Toprak harcı hazırlama, tohum çimlendirme veya ürünlerimizin kullanımıyla ilgili aklınıza takılan her şey için ziraat mühendisimizden ücretsiz destek alabilirsiniz.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1698",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Vermikülit zehirli midir"
+   ],
+   "cevap": "Hayır, vermikülit doğada bulunan, kimyasal olarak nötr ve güvenli bir mineraldir.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1699",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Vermikülit tek başına kullanılır mı"
+   ],
+   "cevap": "Evet, özellikle tohum çimlendirme aşamasında nemi muhafaza etmek için tek başına doğrudan kullanılabilir.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1700",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Vermikülit perlit ile karıştırılabilir mi"
+   ],
+   "cevap": "Evet, karıştırılabilir. Vermikülit ve perlit karışımı, toprağın hem drenajını (su tahliyesini) hem de su tutma kapasitesini mükemmel bir şekilde optimize eder.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1701",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "vermikulit-nedir-ne-ise-yarar",
+   "sorular": [
+    "Vermikülit organik bahçecilik için uygun mudur"
+   ],
+   "cevap": "Evet, organik tarım ve bahçecilikte güvenle kullanılabilir. Tamamen doğal bir mineral olduğu için kimyasal içermez ve bitkilere zarar vermez.",
+   "urunler": [
+    "hg-vermikulit"
+   ],
+   "kaynak": "blog:vermikulit-nedir-ne-ise-yarar"
+  },
+  {
+   "id": "h1702",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yaban-mersini-yapraklari-neden-kizarir",
+   "sorular": [
+    "Yaban mersini yaprakları sonbaharda neden kızarır"
+   ],
+   "cevap": "Yaban mersini yaprak döken bir çalıdır. Sonbaharda yaprakların kızarıp dökülmesi doğal bir süreçtir ve sağlık sorunu anlamına gelmez.",
+   "urunler": [],
+   "kaynak": "blog:yaban-mersini-yapraklari-neden-kizarir"
+  },
+  {
+   "id": "h1703",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yaban-mersini-yapraklari-neden-kizarir",
+   "sorular": [
+    "Yaban mersini için ideal toprak pH'ı kaçtır"
+   ],
+   "cevap": "4,5 ile 5,5 arası. En iyi sonuç genellikle 4,8–5,2 aralığında alınır.",
+   "urunler": [],
+   "kaynak": "blog:yaban-mersini-yapraklari-neden-kizarir"
+  },
+  {
+   "id": "h1704",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yaban-mersini-yapraklari-neden-kizarir",
+   "sorular": [
+    "Yaban mersini bahçe toprağına dikilir mi"
+   ],
+   "cevap": "Toprak asidik değilse dikilmemelidir. Kireçli bahçe toprağında yaban mersini zamanla sararır, kızarır ve verimden düşer.",
+   "urunler": [],
+   "kaynak": "blog:yaban-mersini-yapraklari-neden-kizarir"
+  },
+  {
+   "id": "h1705",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yaban-mersini-yapraklari-neden-kizarir",
+   "sorular": [
+    "Kızaran yapraklar tekrar yeşillenir mi"
+   ],
+   "cevap": "Hafif etkilenmiş yapraklar toprak düzeltildiğinde kısmen toparlanabilir, ancak ağır hasarlı yapraklar eski haline dönmez. Asıl iyileşme yeni sürgünlerde görülür.",
+   "urunler": [],
+   "kaynak": "blog:yaban-mersini-yapraklari-neden-kizarir"
+  },
+  {
+   "id": "h1706",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yarasa-gubresi-guano-nedir-nasil-kullanilir",
+   "sorular": [
+    "Yarasa gübresi kötü kokar mı"
+   ],
+   "cevap": "Hayır, bazı organik gübrelerin aksine rahatsız edici bir koku yapmaz.",
+   "urunler": [],
+   "kaynak": "blog:yarasa-gubresi-guano-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1707",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yarasa-gubresi-guano-nedir-nasil-kullanilir",
+   "sorular": [
+    "Toz gübreden sıvı gübre yapılabilir mi"
+   ],
+   "cevap": "Evet. 1 kg gübreyi 10–15 litre suda 24 saat bekletip süzmeniz yeterlidir.",
+   "urunler": [],
+   "kaynak": "blog:yarasa-gubresi-guano-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1708",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yarasa-gubresi-guano-nedir-nasil-kullanilir",
+   "sorular": [
+    "Saksı bitkilerinde kullanılır mı"
+   ],
+   "cevap": "Evet. Saksı başına 50–100 g toprağa karıştırılabilir veya 15 günde bir sıvı olarak verilebilir.",
+   "urunler": [],
+   "kaynak": "blog:yarasa-gubresi-guano-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1709",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "yarasa-gubresi-guano-nedir-nasil-kullanilir",
+   "sorular": [
+    "Meyve ağaçlarına yılda kaç kez verilir"
+   ],
+   "cevap": "İlkbahar ve sonbaharda olmak üzere yılda iki kez, ağaç başına 1–2 kg önerilir. Sonuç Yarasa gübresi; yüksek besin değeri, toprağı canlandıran yapısı ve doğa dostu olmasıyla sebzeden meyve ağacına, bağdan saksı çiçeklerine kadar her alanda kullanılabilecek güçlü bir organik gübredir. Doğru miktarda ve doğru zamanda uygulandığında hem daha sağlıklı bitkiler hem de yıllar içinde daha verimli bir toprak elde edersiniz.",
+   "urunler": [],
+   "kaynak": "blog:yarasa-gubresi-guano-nedir-nasil-kullanilir"
+  },
+  {
+   "id": "h1710",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "zeytinde-hasat-sonrasi-gubreleme",
+   "sorular": [
+    "Zeytin ağacına ne zaman gübre verilir"
+   ],
+   "cevap": "Organik gübre, fosfor ve potasyum hasattan sonra kış döneminde; azotun ana kısmı şubat-mart aylarında ilkbahar yağmurlarından önce verilir.",
+   "urunler": [],
+   "kaynak": "blog:zeytinde-hasat-sonrasi-gubreleme"
+  },
+  {
+   "id": "h1711",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "zeytinde-hasat-sonrasi-gubreleme",
+   "sorular": [
+    "Zeytinde hasattan hemen sonra azotlu gübre verilir mi"
+   ],
+   "cevap": "Ana doz verilmez. Azot kış yağmurlarıyla yıkanır ve sonbaharda verilen fazla azot ağacı soğuğa karşı hassaslaştırabilir. Bazı yetiştiriciler azotun küçük bir kısmını sonbaharda verir, ancak soğuk bölgelerde bu önerilmez.",
+   "urunler": [],
+   "kaynak": "blog:zeytinde-hasat-sonrasi-gubreleme"
+  },
+  {
+   "id": "h1712",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "zeytinde-hasat-sonrasi-gubreleme",
+   "sorular": [
+    "Zeytin ağacına gübre nereye verilir"
+   ],
+   "cevap": "Gövde dibine değil, dalların uçlarının yere düşen izdüşümü boyunca, gövdeden en az 1 metre uzağa verilir.",
+   "urunler": [],
+   "kaynak": "blog:zeytinde-hasat-sonrasi-gubreleme"
+  },
+  {
+   "id": "h1713",
+   "durum": "hazir",
+   "tur": "blog",
+   "konu": "zeytinde-hasat-sonrasi-gubreleme",
+   "sorular": [
+    "Zeytin ağacına solucan gübresi verilir mi"
+   ],
+   "cevap": "Evet. Solucan gübresi organik madde kaynağı olarak hasat sonrası dönemde dal uçlarının altına uygulanabilir. Ancak fosfor ve potasyum ihtiyacını tek başına karşılamaz; analiz sonucuna göre mineral gübreyle birlikte kullanılmalıdır.",
+   "urunler": [
+    "hasturk-kati-solucan-gubresi"
+   ],
+   "kaynak": "blog:zeytinde-hasat-sonrasi-gubreleme"
+  },
+  {
+   "id": "h1714",
+   "durum": "hazir",
    "tur": "magaza",
    "sorular": [
     "indirim kodu",
@@ -39924,7 +43550,7 @@
    "kaynak": "config:promo"
   },
   {
-   "id": "h1427",
+   "id": "h1715",
    "durum": "hazir",
    "tur": "magaza",
    "konu": "kargo",

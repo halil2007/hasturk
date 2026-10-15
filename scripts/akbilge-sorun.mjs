@@ -61,7 +61,7 @@ const add = (o) => S.push(o);
 
 // ---------- Genel (tüm bitkiler) ----------
 add({ key: 'yaprak-sararma', baslik: 'Yapraklarda sararma',
-  sorular: [...qx('yapraklar sararıyor'), ...qx('yaprakları sarardı'), 'yaprakları neden sararır', 'bitkimin yaprakları sararıyor', 'çiçeğimin yaprakları sarardı', 'saksı bitkisi yaprak sararması', 'yaprak sararması neden olur',
+  sorular: [...qx('yapraklar sararıyor'), ...qx('yaprakları sarardı'), ...qx('çiçeğimin yaprakları sararıyor'), 'yaprakları neden sararır', 'bitkimin yaprakları sararıyor', 'çiçeğimin yaprakları sarardı', 'saksı bitkisi yaprak sararması', 'yaprak sararması neden olur',
     'alt yapraklar sararıyor', 'alt yaprakları sarardı', 'yapraklar sarı oldu', 'sararan yapraklar için ne yapmalı', 'sararan yaprak için gübre', 'yaprak sararmasına hangi gübre', 'yapraklar sararıp düşüyor', 'yapraklar sararıp dökülüyor', 'salon bitkisi yaprakları sararıyor'],
   nedenler: ['Fazla sulama ve suyun saksıda birikmesi (en sık neden): kökler havasız kalır', 'Besin (özellikle azot) eksikliği: önce yaşlı alt yapraklar açık yeşil-sarı olur', 'Yetersiz ışık: bitki solgun, sarımsı yeşil kalır', 'Yaşlı alt yaprakların doğal dökümü: birkaç yaprak sararıp düşüyorsa normaldir'],
   anlama: ['Toprağa parmağınızı 2-3 cm sokun: sürekli ıslaksa fazla sulamadır', 'Saksı dibinde delik var mı, tabakta su bekliyor mu bakın', 'Sararma alttaki yaşlı yapraklardaysa besin eksikliği, en uçtaki yeni yapraklarda damarlar yeşil kalıp ara yerler sararıyorsa demir/kireç sorunu olabilir', 'Kökleri kontrol edin: sağlıklı kök beyaz ve diridir; kahverengi-siyah ve yumuşak kök çürüme işaretidir'],
