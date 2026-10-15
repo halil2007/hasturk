@@ -43,14 +43,19 @@ log('Başlangıç sepeti: ' + JSON.stringify(await cart()));
 await p.locator(R + '.fab:not(.akfab)').tap();
 await p.locator(R + '.top input').fill(QUERY);
 await p.locator(R + '.results [data-act="add"]').first().waitFor({ timeout: 20000 });
-// Seçenekli (fiyatı "...'den" yazan) ilk ürün
-const pick = await p.evaluate(() => {
+// Seçenekli (2+ stoklu seçenek) ilk ürün: ürün verisinden
+const MULTI = JSON.parse(readFileSync(SITE.includes('tarim-dunyasi') ? 'public/tarim/products.json' : 'public/products.json', 'utf8')).items
+  .filter((x) => (x.v || []).filter((v) => v.st > 0).length >= 2).map((x) => x.id);
+await p.waitForTimeout(800);
+const pick = await p.evaluate((ids) => {
   const r = document.getElementById('urun-arama-root').shadowRoot;
   for (const bt of r.querySelectorAll('.results [data-act="add"]')) {
-    let el = bt; for (let i = 0; i < 4 && el.parentElement; i++) { el = el.parentElement; if (/[’']den\b/.test(el.textContent)) { const n = el.querySelector('.pname'); return { id: bt.getAttribute('data-v'), name: n ? n.textContent.trim() : '' }; } }
+    if (!ids.includes(bt.getAttribute('data-v'))) continue;
+    let el = bt; for (let i = 0; i < 4 && el.parentElement; i++) { el = el.parentElement; const n = el.querySelector('.pname'); if (n) return { id: bt.getAttribute('data-v'), name: n.textContent.trim() }; }
+    return { id: bt.getAttribute('data-v'), name: '?' };
   }
   return null;
-});
+}, MULTI);
 if (!pick) { log('Seçenekli ürün bulunamadı'); process.exit(1); }
 const name = pick.name, ADD = R + `.results [data-act="add"][data-v="${pick.id}"]`;
 const f0 = frames;
