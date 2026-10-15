@@ -376,6 +376,7 @@
   }
   var I = {
     search: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 2.2),
+    mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', 2.2),
     back: svg('<path d="M15 5l-7 7 7 7"/>', 2.4),
     x: svg('<path d="M6 6l12 12M18 6 6 18"/>', 2.2),
     clock: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
@@ -671,6 +672,8 @@
     '.akm .akf{display:flex}',
     '.akf input{flex:1;min-width:0;height:46px;border-radius:23px;border:2px solid var(--ln);padding:0 16px;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);outline:0}',
     '.akf input:focus{border-color:var(--pr);background:#fff}',
+    '.akf .akmic{background:var(--soft);color:var(--pr)}.akf .akmic.on{background:var(--ac);color:#fff;animation:mic 1.2s ease-in-out infinite}',
+    '@keyframes mic{0%,100%{box-shadow:0 0 0 0 rgba(215,55,47,.45)}50%{box-shadow:0 0 0 8px rgba(215,55,47,0)}}',
     '.akf button{flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--pr);color:#fff}.akf button svg{width:20px;height:20px}',
     '.akh{display:flex;align-items:center;gap:12px;padding:14px 16px 6px}',
     '.akh img{width:64px;height:64px;flex:none;object-fit:contain}',
@@ -1130,6 +1133,7 @@
     else if (act === 'akq') akAsk(v);
     else if (act === 'akgrp') akGroup(v);
     else if (act === 'akall') akAll(v);
+    else if (act === 'akmic') akMic();
     else if (act === 'bt' || act === 'bv') akBundleAct(act, v);
     else if (act === 'bgo') akBundleGo();
     else if (act === 'akoy') akVote(v);
@@ -1190,6 +1194,26 @@
   })();
   try { AK.log = JSON.parse(sessionStorage.getItem('ua-ak-log') || '[]') || []; } catch (e) { AK.log = []; }
   function akOn() { var c = CFG.akbilge; return !!(AK_URL && c && (c.enabled || AK_PREV)); }
+  // Sol alttaki buton yazısı: ürün sayfasında "Bu ürünü sor" (telefonda kısa), diğer sayfalarda "Bilge Bey'e sor"
+  function akFabText() {
+    if (!$akfab) return;
+    var akf = (CFG.akbilge || {}).fab || {}, pg = akPage() || akUrunSanisi();
+    var t = akf.text || (pg ? (window.innerWidth < 760 ? 'Bu ürünü sor' : 'Bu ürünü ' + akName() + akYe(akName()) + ' sor') : akName() + akYe(akName()) + ' sor');
+    var el = $akfab.querySelector('span.t');
+    if (el.textContent !== t) el.textContent = t;
+    $akfab.setAttribute('aria-label', pg ? 'Bu ürünü ' + akName() + akYe(akName()) + ' sor' : t);
+  }
+  // Ürün listesi henüz inmediyse (telefonda geç iner) ürün sayfası adresten tahmin edilir: tek parçalı adres, kategori
+  // (menü verisi) ya da bilinen sayfa (blog, sepet, hesap…) değilse ürün sayfasıdır (ikas ürün adresi /urun-adi)
+  function akUrunSanisi() {
+    if (DATA) return '';
+    var path = location.pathname.replace(/\/+$/, ''), s = slugOf(location.href);
+    if (!s || path.split('/').length !== 2 || !/^[a-z0-9-]{3,140}$/.test(s)) return '';
+    if (/^(home|anasayfa|blog|pages|sayfa|account|hesap|cart|sepet|checkout|odeme|search|arama|kategori|kampanyalar|iletisim|hakkimizda|sss|favoriler|login|giris|kayit)$/.test(s)) return '';
+    var cats = (LITE && LITE.cats) || [];
+    for (var i = 0; i < cats.length; i++) if (cats[i].s === s) return '';
+    return LITE ? s : '';
+  }
   function akName() { return (CFG.akbilge && CFG.akbilge.name) || 'Bilge Bey'; }
   // Yönelme eki (isim değişirse "…'ye / …'ya / …'e / …'a sor" doğru çıksın)
   function akYe(n) {
@@ -1303,6 +1327,35 @@
     });
     return top;
   }
+  // Sesle soru: tarayıcının kendi konuşma tanıması (Chrome, Android, iPhone Safari; ücretsiz, ses bize gelmez).
+  // Konuşma yazıya dönüp kutuya yazılır; müşteri kontrol edip "Gönder"e basar. Desteklemeyen tarayıcıda düğme çıkmaz.
+  var AK_SR = window.SpeechRecognition || window.webkitSpeechRecognition || null, AK_REC = null;
+  function akMic() {
+    var inp = $akf.querySelector('input'), btn = $akf.querySelector('.akmic');
+    if (!AK_SR || !inp) return;
+    if (AK_REC) { try { AK_REC.stop(); } catch (e) {} return; }
+    var rec;
+    try { rec = new AK_SR(); } catch (e) { return; }
+    rec.lang = 'tr-TR'; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
+    var once = inp.value ? inp.value + ' ' : '';
+    rec.onresult = function (e) {
+      var t = '';
+      for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+      inp.value = (once + t).replace(/\s+/g, ' ').trim().slice(0, 300);
+    };
+    rec.onerror = function (e) { if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) ptoast('Mikrofon izni verilmedi. Sorunuzu yazarak da sorabilirsiniz.', true); };
+    rec.onend = function () {
+      AK_REC = null;
+      if (btn) { btn.classList.remove('on'); btn.setAttribute('aria-label', 'Sesle sorun'); }
+      inp.placeholder = 'Sorunuzu yazın ya da konuşun…';
+      if (inp.value) { try { inp.focus(); } catch (e) {} }
+    };
+    try { rec.start(); } catch (e) { return; }
+    AK_REC = rec;
+    track('akbilge_ses', 'basladi');
+    if (btn) { btn.classList.add('on'); btn.setAttribute('aria-label', 'Dinlemeyi durdur'); }
+    inp.placeholder = 'Dinliyorum… konuşun';
+  }
   var BUNDLE = null;
   function akVsOk(p) { return (p.v || []).filter(function (v) { return v.id && vOk(v); }).sort(function (a, b) { return (vPrice(a) || 0) - (vPrice(b) || 0); }); }
   function akBundleItems(it) {
@@ -1399,7 +1452,8 @@
         '<div class="akwrap">' + akBot('selam', '<p>' + esc(c.greet || ('Merhaba, ben ' + name + '! Bitkiniz ya da ürünlerimizle ilgili sorunuzu yazın.')) + '</p>') +
         '<div class="akbas">' + akStart(pg) + '</div>' +
         '<div class="aklog" aria-live="polite"></div></div>';
-      $akf.innerHTML = '<input type="text" maxlength="300" enterkeyhint="send" placeholder="Sorunuzu yazın…" aria-label="' + esc(name + akYe(name)) + ' sorun">' +
+      $akf.innerHTML = '<input type="text" maxlength="300" enterkeyhint="send" placeholder="' + (AK_SR ? 'Sorunuzu yazın ya da konuşun…' : 'Sorunuzu yazın…') + '" aria-label="' + esc(name + akYe(name)) + ' sorun">' +
+        (AK_SR ? '<button type="button" class="akmic" data-act="akmic" aria-label="Sesle sorun">' + I.mic + '</button>' : '') +
         '<button type="submit" aria-label="Gönder">' + I.send + '</button>';
       if (!$akf.getAttribute('data-on')) {
         $akf.setAttribute('data-on', '1');
@@ -1540,8 +1594,7 @@
     // Ak Bilge butonu Ürün Bul'un karşı köşesinde durur; config.json > akbilge.fab: false kapatır, { "text": "…" } yazıyı değiştirir
     var akf = (CFG.akbilge || {}).fab || {};
     $akfab.classList.toggle('right', fab.side === 'left');
-    $akfab.querySelector('span.t').textContent = akf.text || akName() + akYe(akName()) + ' sor';
-    $akfab.setAttribute('aria-label', $akfab.querySelector('span.t').textContent);
+    akFabText();
     if (!$akfab.querySelector('img') && akOn()) $akfab.querySelector('.fi').innerHTML = '<img src="' + esc(akImg('avatar')) + '" alt="" width="40" height="40">';
     if (fab.bottom != null) $wrap.style.setProperty('--fb', (+fab.bottom || 0) + 'px');
     updateFab();
@@ -3313,6 +3366,7 @@
       var akh = isOpen || HIDE_PATHS.test(location.pathname) || !akOn() || ds.akfab === 'off' || (CFG.akbilge || {}).fab === false;
       $akfab.classList.toggle('hide', akh);
       $akfab.classList.toggle('still', (CFG.fab || {}).animate === false);
+      if (!akh) akFabText();
     }
     fabSpace();
   }
