@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2932 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2936 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -54,13 +54,13 @@ _Henüz veri yok._
 | 10 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı) | 4,9 | 5 |
 | 11 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 4,9 | 0 |
 | 12 | HG Akıllı Bitki ve Saksı Toprağı | 4,5 | 5 |
-| 13 | Premium Fide Toprağı | 4,4 | 11 |
+| 13 | Premium Fide Toprağı | 4,3 | 11 |
 | 14 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 4,3 | 6 |
 | 15 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,3 | 2 |
 | 16 | HG Asidik Torf | 4,2 | 7 |
 | 17 | Sıvı Solucan Gübresi 1 Lt | 4 | 2 |
 | 18 | HG Mezar Toprağı | 4 | 5 |
-| 19 | Sıvı Solucan Gübresi 250 ml | 4 | 3 |
+| 19 | Sıvı Solucan Gübresi 250 ml | 3,9 | 3 |
 | 20 | HG Tarım Perliti | 3,6 | 3 |
 
 _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 günde 20 adet, 3 ürün. Listelere alınmadı._

@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2932 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (2936 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -42,7 +42,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 22 | 8 |
+| 1 | HasTürk Solucan Gübresi  | 21,9 | 8 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 15,9 | 13 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 8,7 | 0 |
 | 4 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 7,1 | 6 |
@@ -56,7 +56,7 @@ _Henüz veri yok._
 | 12 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı)  | 4,9 | 5 |
 | 13 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 4,9 | 0 |
 | 14 | HG Akıllı Bitki ve Saksı Toprağı | 4,5 | 5 |
-| 15 | Premium Fide Toprağı | 4,4 | 11 |
+| 15 | Premium Fide Toprağı | 4,3 | 11 |
 | 16 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 4,3 | 6 |
 | 17 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,3 | 2 |
 | 18 | HG Asidik Torf | 4,2 | 7 |
