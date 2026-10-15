@@ -104,8 +104,9 @@ export function mountPublish(box, { ids, pre = null, beforePublish = null } = {}
   }
   function optBlock(c) {
     const need = (c.options || []).filter((o) => o.need);
-    if (!need.length) return '';
-    return html`<div class="pub-fix"><div class="small muted">Kanal ayarı (bir kez sorulur)</div><div class="form-grid">${need.map((o) => html`<label class="field"><span>${o.label}</span><input class="input" data-opt="${c.id}|${o.k}" value="${((draft.opts[c.id] || {})[o.k]) ?? o.value}" inputmode="${/day|warranty|Id$/i.test(o.k) ? 'numeric' : 'text'}"></label>`)}</div></div>`;
+    const mk = c.markup == null ? '' : html`<div class="pub-fix"><label class="field" style="max-width:320px"><span>Fiyat farkı (%)</span><input class="input" data-opt="${c.id}|markup" value="${((draft.opts[c.id] || {}).markup) ?? (c.markup || '')}" placeholder="0" inputmode="decimal"><small>Site fiyatının üstüne eklenir (ör. 10 → 1.000 ₺ ürün ${c.name}’da 1.100 ₺). Yalnız ilk gönderimde uygulanır; kanal için bir kez kaydedilir.</small></label></div>`;
+    if (!need.length) return mk;
+    return html`${mk}<div class="pub-fix"><div class="small muted">Kanal ayarı (bir kez sorulur)</div><div class="form-grid">${need.map((o) => html`<label class="field"><span>${o.label}</span><input class="input" data-opt="${c.id}|${o.k}" value="${((draft.opts[c.id] || {})[o.k]) ?? o.value}" inputmode="${/day|warranty|Id$/i.test(o.k) ? 'numeric' : 'text'}"></label>`)}</div></div>`;
   }
   function body(c) {
     if (c.kind !== 'market') {

@@ -90,6 +90,8 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
     };
     const optMissing = (o) => need.filter(([k]) => str(o[k]) === '').map(([, label]) => label);
     row.options = need.map(([k, label, own]) => ({ k, label, value: str(dOpts[k]), need: prods.some((p) => str(optsFor(p)[k]) === ''), own: !!own }));
+    // Pazaryeri fiyat farkı (%): site fiyatının üstüne eklenir, yalnız ilk gönderimde (Ürün yükle → Kanal ayarları ile aynı ayar)
+    if (kind === 'market') row.markup = num(dOpts.markup);
 
     if (kind === 'store') {
       const groups = new Map();
