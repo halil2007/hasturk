@@ -1,0 +1,2704 @@
+# Kaynak: https://www.bugday.org/blog/wp-content/uploads/2021/04/AtalikTohumlar.pdf
+Atalık Tohumlar için
+Yetiştirici Rehberi
+1990 yılında, yaşamını sürdürürken diğer yaşamlarla uyum içerisinde ve ekolojik bütüne
+saygılı bir toplum hayaliyle başlayan Buğday hareketi, 2002 yılında Buğday Ekolojik Yaşamı
+Destekleme Derneği’ne dönüştü. Bu hayale ulaşabilmek için “bu yönde örnekler oluşturmak,
+var olana destek olmak ve bilginin dolaşımını sağlamak” misyonunu istlenmektedir. Derneğin
+amacı; tek tek bireylerde ve bir bütün olarak toplumda ekolojik yaşam bilinci ve duyarlılığı
+oluşturmak; ekolojik dengelerin geri dönüşü olmayacak hız ve biçimde bozulması sonucunda
+ortaya çıkan sorunlara çözüm yolları sunmak ve doğa ile uyumlu yaşamı desteklemektir.
+www.bugday.org
+
+
+
+
+                    Bu yayının hazırlığı ve basımı UNDP Türkiye
+                    Hızlandırma Laboratuvarı tarafından desteklenmiştir.
+
+Buğday Ekolojik Yaşamı Destekleme Derneği tarafından yayınlanmıştır. Her hakkı saklıdır.
+Buğday Ekolojik Yaşamı Destekleme Derneği
+Osmanağa Mah. Kısmet Apt. Mürver Çiçeği Sk. No: 4 Da: 5, 34714 Kadıköy/İstanbul
+Tel: (0216) 349 99 33
+www.bugday.org
+Buğday Ekolojik Yaşamı
+Destekleme Derneği                     İÇİNDEKİLER
+Dönüşüm Kitaplığı-2                    Önsöz 3
+Atalık Tohumlar için                   Bu Rehberin Amacı 4
+                                       1. BÖLÜM: Tohum ve Tarım 5
+Yetiştirici Rehberi                      Anadolu’nun Tarımsal Biyolojik Çeşitlilik Açısından Önemi 6
+www.bugday.org                           Yerel Çeşitlerin Önemi 8
+                                         Tohumlar Neden Yok Oluyorlar? 10
+                                       2. BÖLÜM: Bitkileri Tanıyalım 11
+Editörler                                Bitkinin Yaşam Döngüsü 12
+Selen Akhuy, Güneşin Aydemir             Çiçeklenme 13
+                                         Tozlaşma15
+Yazarlar                                 Meyve ve Tohum 17
+Dr. Gülay Beşirli,                       Tohumların Dağılması ve Taşınması17
+Dr. Alptekin Karagöz,                  3. BÖLÜM: Tohum Üretimi 19
+Solmaz Karabaşa                          Tohum Üretiminde Dikkat Edilmesi Gereken Noktalar 20
+                                         Tohumluk Seçimi Neye Göre Yapılmalıdır? 22
+Çizimler                                 Tohum Uyandırma (Çimlendirme) İşleminin Püf Noktaları
+Nuray Çiftçi                             Nelerdir? 22
+                                         Sebzelerde Tohum Ekim Derinliği, Bitki Sıra Arası ve Sıra Üzeri
+Kapak Fotoğrafları                       Mesafeleri 24
+Şebnem Eraş                              Tozlaşma ve İzolasyon 27
+                                         Tohum Alırken Nelere Dikkat Edilmelidir? 35
+Tasarım ve Uygulama
+                                         Tohumları Doğal Koşullarında Ne Kadar Kurutabiliriz? 42
+Bilge Bostan
+                                         Tohumların Canlı Kalma Süresi 42
+                                         Tohumların Ev Koşullarında Saklanması 44
+Katkıda Bulunanlar
+Bahar Dölen, Batur Şehirlioğlu,          Tohumların Etiketlenmesi 44
+Durukan Dudu                           4. BÖLÜM: Değişik Sebze Türü Bitkilerinin Yetiştirme Tekniği
+                                          ve Tohum Üretim Kılavuzu 45
+Baskı                                  5. BÖLÜM: Geleneksel Kültürümüzde Tohum Saklama 71
+Miki Matbaacılık San. Tic. Ltd. Şti.   Yararlanılan Kaynaklar 78
+Matbaacılar Sanayi Sitesi              Buğday Ekolojik Yaşamı Destekleme Derneği
+1516/1 Cadde No: 27                    Dönüşüm Kitaplığı 79
+İvedik / ANKARA
+Tel: (0312) 395 21 28
+                                           Teşekkür
+Özür                                       “Ekolojik çiftçiler için rehber. 2010” isimli eserin
+Bu yayının üretimi aşamasında,             (Katalanca) metinlerini kullanmamıza izin verdikleri
+elinize ulaşana kadar                      için yazarları Josep Roselló ve Juan José Soriano’ya,
+tasarlanmasında ve basılmasında
+harcanan enerji, kağıt, kağıt              Tohum Takas Ağı’na verdikleri değerli katkılar için
+yapımında, boyalarda, bilgisayarda         Yalova Atatürk Bahçe Kültürleri Merkez Araştırma
+kullanılan kimyasallar ve yapay            Enstitüsü Müdürlüğü’ne, ve Buğday Derneği Tohum
+bir değiş tokuş aracı olan para
+için üzgünüz. Çabalarımız ve               Takas Ağı’nı gönüllü katkılarıyla mümkün kılan
+dualarımızla, doğal yaşama,                Yönlendirme Komitesi üyeleri ve çiftçilere sonsuz
+toplamda kullandığımızdan çok              teşekkürler! Buğday
+yararlı olabilmeyi umut ediyoruz.
+2
+                                                                                   ÖNSÖZ
+Tohumu ve onun döngüsünü anladığımızda her şey değişecek bizim için!
+
+Dünyada yaşamın mucizevi dönüşümünü gözümüz ile görmemiz için tohumdan tohuma
+yaşam döngüsüne bakmak izleyebileceğimiz en kolay yol.
+
+Bir tohum yaşamın sonsuzluğunu temsil eder. Onun ürettiği bir sürü meyve, bitki ve sayısız
+tohumun çoğu tükense, yenip yutulsa ve sadece bir adet sağlıklı tohum kalsa, bu yeni bir
+yaşamı başlatmak için yeterlidir. Her tohum, kendisini her nesilde yenileyip çok değişken
+koşullara ayak uydurarak sürekliliğini sağlamak üzere sonsuz bir yaşamı temsil eder.
+
+Aslında her düşünce, her davranış birçok tohum içerir. Bu tohumların doğallıkları; taşınırken,
+saklarken, paylaşırken ve ekerken gösterilen özen, geleceğimizi belirler. Biz de bir tohum
+idik kısa süre önce… Tohuma can veren bütünü ve varlık şeklini azot, potasyum, fosfat, mi-
+neraller ve hatta genler ile açıklamak, kontrol etmek, hele hele geliştirmek, bizim yeti ve
+kapasitemizin çok üstündedir.
+
+Bizim tohumlar için yapabileceğimiz en büyük iş; onlara sadakat göstermek, onları elimizde
+geleceğimizi tutuyor olmanın getirdiği sorumluluk ile saklamak, taşımak, paylaşmak, takas
+etmek ve sağlıklı toprakla, suyla tekrar tekrar buluşturmak olabilir ancak. Bu rehber işte bu-
+nun için hazırlandı ve sunuldu sizlere, Buğday Derneği ekibi ve bütün destekçilerimizin kat-
+kıları ile.
+
+Kitabı bir başak olarak kabul edin, birçok tohum içeriyor sayfalarında. Bu tohumlar yemeklik
+değil. Anaçlar; yani ekmeniz, dağıtmanız, çoğaltmanız gerekenler.
+
+Biz, sizlerin bu kitaptaki tohumları yaşama değer katacak şekilde taşıyacağınıza, dağıtacağı-
+nıza ve takas ederek, serperek çoğaltacağınıza inanıyoruz.
+
+Ve tabii sadece kendimiz için, insanlık için değil… Geleneklerimizde olduğu gibi: kurda,
+kuşa, aşa!
+
+                                                                         Victor Ananias
+    BU REHBERİN AMACI
+      Bu rehber içinde sunulan bilgiler, kendi tohumlarını üretmek, tohum konusunda kendine
+      yeterli bir düzen kurmak ve okullarda eğitim programları içinde tohum konusunu işlemek
+      isteyen herkesin kullanabileceği şekilde hazırlandı.
+
+      Doğa üzerindeki en büyük ayak izimizi tarım sistemimiz ile yaratıyoruz. Tarımın ilk halkası
+      olan tohumlarımıza sahip çıkmak ve devamlılığını sağlamak, sürdürülebilir bir tarım sistemi-
+      ne, bu yolla da sürdürülebilir bir topluma ulaşmak için önemli bir kapı açıyor bizlere.
+
+      Bir sivil toplum kuruluşu için tohumlarla uğraşmak, sofradaki lezzetin geri kazanımı, sağlıklı
+      gıdanın üretimi, biyolojik çeşitliliği koruma ve sürdürülebilir bir toplum yaratmanın olmazsa
+      olmazı. Bir bilim adamı için sonsuz bir deneyim alanı. Çiftçiler için sadece tarımın sürdürüle-
+      bilirliği değil, bunun yanında geleneksel bilginin de paylaşımı. Bazılarımız için kendi tohum-
+      larımızı yetiştirme hakkımızın kullanılması.
+
+      Her bir birey için ise, ister büyük bir tarlada, ister küçük bir bahçede, isterse de bir saksıda
+      tohumlar ile uğraşmanın yaşamın kuralları ve mekanizması hakkında çok eğitici ve sağaltıcı
+      etkileri olduğu apaçık.
+
+      Tohumlarla bilinçli şekilde ilgilenen ve kazandığı deneyimi paylaşan insanların sayısı arttıkça,
+      bu ”vatandaş bilimi” sayesinde bilimsel alanda bu konularda toplanan verilere de katkı sağ-
+      layabilir, daha yaşama odaklı bilgi üretilmesine destek olabiliriz.
+
+      Umuyoruz, bu rehber tüm tohum severlerin tohumla muhabbetlerinde yol gösterici olur.
+
+                                                                                         Editörler
+
+
+
+
+4
+1. BÖLÜM   TOHUM ve
+           TARIM
+                     Anadolu’nun Tarımsal Biyolojik Çeşitlilik
+                     Açısından Önemi / Dr. Alptekin KARAGÖZ
+                                                     Klasik mitolojide ve kadim uygarlıklarda tarım genel olarak “ilahi kay-
+                                                     naklı bir değer” olarak görülür. Çeşitli inanışlara göre tarım ürünleri tanrı
+                                                     ve tanrıçaların muhtelif koşullar altında insanlara sunduğu zenginlik-
+                                                     lerdir. Tarımsal ürünler için tanrılara kurban verilmesi ve verilen kurban
+                                                     karşılığında daha fazla ürün ve yeterince yağmur istenmesi de geçmişte
+                                                     gerçekleştirildiği bilinen uygulamalardır. Ülkemizde en eski tarım anıtı
+                                                     olarak bilinen İvriz kabartmalarında tarım, bir elinde buğday başakları
+                                                     diğer elinde üzüm salkımları tutan bir ilahi güç ile anlatılmaktadır.
+
+                                                     Tarımda bitkisel üretimin kaynağı ve başlangıç noktası tohumdur. To-
+                                                     hum için yapılan tanımların ortak noktası tohumun “canlı“ olduğu ve
+İvriz Kabartmaları
+
+
+
+
+                                                     içinde bir “embriyo” taşıdığıdır. Kısaca tohum, bitkinin “küçük bir örne-
+                                                     ğidir” veya “uygun ortamda büyüyüp gelişerek mükemmel bir bitkiyi
+                                                     meydana getirebilecek bir parçasıdır”. Binlerce yıl öncesinde ülkemize
+                                                     yakın coğrafyalarda tarım hep üretken güçlerle tanımlanmıştır. Tarımın,
+                                                     Mısır’da İsis, Antik Yunan’da Demeter ve Roma’da da Ceres gibi tanrıça-
+                                                     larla özdeşleştirilmesi bir tesadüf değildir.
+
+                               İnsanlar 2.000.000 yıldan bu yana dünya üzerinde yaşamaktadırlar. Bu sürenin % 99’undan
+                               daha uzun bir süre toplayıcı ve avcı konumunda olmuşlardır. Son 11.500 yıldan bu yana bit-
+                               kileri ve hayvanları kontrollü koşullarda yetiştirmeye başlamışlardır. Bu durum ülkemizdeki
+                               kazı alanlarından çıkarılan bitki kalıntılarından da anlaşılmaktadır (Çizelge 1). Aradan geçen
+                               süre içine insanların, özellikle bolca tükettikleri temel besin kaynaklarından olan buğday,
+                               mısır, çeltik gibi ürünlerin evrimleşmesinde büyük katkısı olmuştur. Bu etki evcil hayvanlar
+                               için de geçerlidir. Özellikle insan eliyle yapılan melezlemeler sonucu günümüzde birçok bitki
+                               ve hayvan türü orijinal görünümünden çok farklı bir duruma gelmiştir.
+
+
+
+
+                                                                                                                                kalıntıları ve bunların ait oldukları dönemler (Harlan, 1995;
+                                                                                                                                Çizelge 1. Türkiye’de bazı kazı alanlarından çıkarılan bitki
+                      Yaklaşık tarih (MÖ) Kazı Yerleri      Bitki Kalıntıları
+
+                      7500                 Aşıklı Höyük     Siyez, gernik, makarnalık buğday, arpa, mercimek, burçak,
+                                                            bezelye, nohut
+
+
+                                                                                                                                van Zeitz & de Roller, 1995; Karagöz vd., 2010).
+                      7200–6500            Çayönü           Yabani siyez, gernik ve arpa; kültüre alınmış siyez, gernik,
+                                                            bezelye, mercimek, fiğ ve keten
+
+                      6750                 Hacılar          Yabani siyez; kültüre alınmış gernik
+
+                      6500                 Can Hasan        Yabani siyez; kültüre alınmış siyez, gernik, buğday, arpa
+                                                            (2 sıralı), mercimek, fiğ
+
+                      6000-5000            Çatal Höyük      Kültüre alınmış siyez, gernik, buğday, arpa (çıplak),
+                                                            bezelye, fiğ
+                                           Erbaba           Kültüre alınmış siyez, gernik, buğday, arpa (2 sıralı ve çıplak),
+                                                            bezelye, mercimek, fiğ
+6
+Tarım Anadolu’da en az 11.500 yıldan bu yana yapılmaktadır. Çiftçiler115 yüzyıldır, yani yak-
+laşık 500 nesil boyunca belirli bitki ve hayvan türlerini yetiştirmişlerdir. Nesiller boyu tohum-
+lar, ürünler, hayvanlar, tarlalar, bağlar bahçeler ile birlikte bunlarla ilişkili geleneksel bilgiler
+de babadan oğula, anadan kıza, dededen toruna devredilmiştir.
+
+Tarımsal faaliyetler ve yetiştiricilik sistemleri bundan 60 yıl öncesine kadar fazla bir değişiklik
+göstermeden uygulanmıştır. Tarlalar karasabanla işlenmiş, ekim elle serperek yapılmış, güb-
+re olarak sadece ahır gübresi kullanılmış, hasat orakla veya yolarak, harman işlemleri elle
+veya geleneksel usullerle yapılmıştır. Kimyasallar hiç kullanılmamıştır. Bu yolla topraktan sa-
+dece verdiği kadarı geri alınmıştır.
+
+Cumhuriyet tarihinin 1927 yılında yapılan ilk sayımında nüfus 13,6 milyon olarak kaydedil-
+miştir. Bugün nüfusumuz yaklaşık 75 milyondur. Artan nüfusla birlikte gıdaya olan ihtiyaç
+da kaçınılmaz olarak artmış, hükümetler bu ihtiyacı karşılamak için çeşitli yollar denemeye
+başlamıştır. Dünyada özellikle 50’li yıllardan itibaren gündeme gelen ve tarımsal üretimi ar-
+tırmayı hedefleyen “yeşil devrim” hareketiyle aşağıdaki konularda gelişme sağlanması amaç-
+lanmıştır:
+• Bitki (ve hayvan) ıslahı, yüksek verimli çeşit geliştirme,
+• Tarımda makine kullanımı,
+• İlaçlama (yabancı ot, böcek, hastalık),
+• Kimyasal gübreleme,
+• Sulama sistemlerinde gelişmeler,
+• Yetiştirme tekniğinde gelişmeler.
+
+Mera ve orman alanlarının ağır makinelerle işlenerek tarla açılması ve ekim alanlarının ge-
+nişletilmesi (dolayısıyla da otlatma alanlarının ve doğal alanların daraltılması) bu dönemler-
+de başlamıştır. İlk yıllarda üretim ve verim bakımından başarılı sonuçlar alınmış olsa da, son
+40-50 yıldır bir yandan topraktan verebileceğinden fazlası istenirken bir yandan da doğal
+kaynaklar devamlı olarak aşındırılmış ve kirletilmiştir.
+
+Doğal kaynakların başında gelen toprak bu olumsuz gelişmeden nasibini almıştır. Toprak be-
+sin maddelerince fakirleştiği gibi, “ekmek ufağı kıvamı” dediğimiz tanecikli, geçirgen, hava-
+lanan özelliğini yitirerek un ufak bir hale gelmiştir. Bugün ne yaparsak yapalım topraklarımız
+eski verimliliklerinde, ürünlerimiz eski tadında, kokusunda, renginde değildir.
+
+Günümüzde geliştirilen üstün verimli çeşitler sadece ıslah edildikleri koşullarda en üstün
+verime ulaşabilirler. Bu çeşitler çoğu büyük il merkezlerinde bulunan ve bölgelerine ürün
+geliştirilen araştırma enstitülerinde, gerekli tüm yetiştirme istekleri karşılanarak geliştiril-
+mektedir. Bu bakımdan yüksek verimli çeşitler sadece benzer koşullar sağlanabilirse verim
+potansiyellerine ulaşabilirler. Elverişli olmayan koşullar için geliştirilmiş çeşit yoktur veya yok
+denecek kadar azdır. Islah programları en iyi tarımsal koşullara sahip alanlara hizmet eder.
+Koşullardan herhangi birinin olumsuz olması durumunda verimlerinde büyük ölçüde azal-
+ma görülür hatta hiç verim alınmayabilir.
+    Yerel Çeşitlerin Önemi / Dr. Alptekin KARAGÖZ
+    “Dünyanın en eski ıslahçıları çiftçilerdir”
+         Geleneksel tarım sistemi içinde binlerce yıldan bu yana nesilden nesle aktarılan tarımsal
+         ürünler çiftçi eliyle sürekli geliştirilmiş, bulunduğu yerin iklim ve arazi koşullarına en iyi uyum
+         sağlayan “yerel çeşitler” elde edilmiştir. Çiftçiler, binlerce yıldan bu yana önce yabani bitkiler
+         içinden en uygun tipleri seçip bunları yetiştirerek ve tekrar bunlar arasından seçim yaparak;
+         ileri aşamalarda da yabanilik özelliğini yitirmiş kültür çeşitleri içinden yine başaklar, bakla-
+         lar, kapsüller, meyveler ve tohumlar seçerek üstün verimli, damak zevkine uygun, albenisi
+         yüksek yerel çeşitler ortaya koymuşlardır. Bu nedenle çiftçiler, kendi koşullarına en uygun
+         çeşitleri kendi elleriyle geliştiren bitki (ve hayvan) ıslahçılarıdır.
+
+         Yerel çeşitler genetik ve dış görünüş olarak geliştirilmiş çeşitlere oranla daha fazla çeşitliliğe
+         sahiptir. Yerel bir buğday çeşidi içinde farklı boylara, farklı başak şekillerine, farklı tane rengi-
+         ne sahip bireyler bulunabilir. Bu durum geliştirilmiş çeşitlerde tamamen farklıdır. Geliştirilmiş
+         çeşitler benzer genetik yapıda, aynı boyda ve başaklanma-dallanma karakterleri, meyve ve
+         tohum özellikleri bakımından benzer özelliklere sahip bireylerden oluşur. Genetik yapıdaki
+         çeşitlilik yerel çeşitlere, değişen çevre koşullarına, hastalık ve zararlılara karşı dayanıklı birey-
+         ler bulundurma olasılığı bakımından, yüksek verimli çeşitlere göre üstünlük sağlamaktadır.
+         Geliştirilmiş çeşitlerin tamamı değişen bir çevre koşuluna aynı tepkiyi verecektir. Çeşidin has-
+         sas olduğu bir hastalığın ortaya çıkması veya beklenmedik bir kurak karşısında geliştirilmiş
+         çeşitlerin tamamının zarar görmesi söz konusudur. Bu gibi durumlarda farklı genetik yapıda-
+         ki bireyleri kapsayan yerel çeşitler dayanıklılık özelliğine sahip bireyleri sayesinde az da olsa
+         ürün verebilmektedir. Bu haliyle yerel çeşitler sigorta durumundadır.
+
+         Kimi yerel çeşitler de, yöresel ürünlerin hammaddesi olması ve yöresel tatları taşımaları bakı-
+         mından önem taşırlar. Özü olmayan buğday unundan yöresel ekmek, börek, baklava çeşitleri
+         üretilemez, üretilse de aynı tadı veremez. Aynı şekilde herhangi bir yüksek verimli sebze çe-
+         şidi de, kışlık olarak kurutulmak veya özel bir yemek çeşidini yapmak üzere yetiştirilen sebze
+         çeşitlerinin yerini tutamaz.
+
+         Dünyada doğal ürünlere ve yerel çeşitlere olan ilgi giderek artmaktadır. Yerel çeşitler, diğer
+         bazı faktörler yanında burada sıralanan temel özelliklerinden dolayı modern çeşitlere tercih
+         edilmeye başlanmıştır:
+
+         • İnsan sağlığı: Çağımızda geniş halk kitlelerini tehdit eden yüksek tansiyon, kalp, kolesterol,
+            kolit, alerji gibi sorunları azaltıcı etkileri vardır,
+         • Çevre sağlığı: Geliştirilmiş çeşitlere göre daha az su ve gübre kullanır, ayrıca bazılarının has-
+            talıklara ve zararlılara dayanımı daha iyidir. Böylece aşırı su, gübre ve kimyasal kullanımının
+            önüne geçer,
+         • Uyum yetenekleri: Bulundukları yörenin çevre, iklim, toprak koşullarına daha fazla uyum
+            gösterirler,
+         • Kalite: Kimyasal madde içerikleri (protein, lif, şeker, vitamin, antioksidan, glüten), renk, koku
+            gibi kalite özellikleri bakımından genellikle geliştirilmiş çeşitlere göre daha üstündür,
+
+
+
+8
+• Damak zevki ve yerel beslenme alışkanlıklarına uygunluk: Ülkemizde her yörenin kendine
+   has yemekleri ve beslenme alışkanlıkları vardır, yerel çeşitler ancak bu ürünlerin kullanı-
+   mıyla alışılmış lezzetleri verebilir,
+• Sürdürülebilirlik ve devamlılık: Yerel çeşitler zorlu koşullarda bile istikrarlı bir verim verirler.
+   Bu durum sürdürülebilir bir gıda güvenliği sağlar.
+
+Yerel ürünlerin ve tohumlarının korunarak gelecek nesillere aktarılması, çocuklarımızın daha
+iyi beslenebilmeleri ve bazı yerel geleneklerin devam ettirilmesi bakımından önemlidir. Bu
+şekilde kültürümüz, sağlığımız, çevremiz ve geleceğimiz de koruma altına alınmış olacaktır.
+Tohumlarımız geleceğin teminatıdır. Her dönemde altından daha değerlidir, zira kaybolan
+tohumlarımızın ve bunlarla birlikte yok olan lezzetlerin geri getirilmesi mümkün değildir.
+
+
+
+
+             Çeşit                         Köy Çeşidi                     F1 Hibrit Çeşit
+
+  Bir veya birden fazla genotipin        Islah edilmemiş olmakla             İki veya daha fazla
+  (canlıların kalıtımla bireylerine   beraber, uzun yıllardan beri      homojen yapıda materyalin
+   geçen özelliklerinin toplamı)      tanınmış, isim yapmış ve bir        (kendilenmiş hat, çeşit,
+   birleşmesinden ortaya çıkan          ilmi araştırmanın sonucu          klon veya F1 melezlerin)
+    ve kendine has özelliklerle        olarak araştırıcı tarafından    melezlenmesinden elde edilen
+      tanımlanan, sözü edilen              orijin ve özelliklerinin       tohumlukların üretimde
+  özelliklerden en az biriyle diğer    tespit edilmiş olduğu Tescil     kullanılmasıyla elde edilen
+   herhangi bir bitki grubundan        Komitesince kabul ve tescil       çeşitlere F1 hibrit çeşit adı
+       ayrılan, değişmeksizin            edilmiş çeşitlerdir. (Bitki                verilir.
+     çoğaltılmaya uygunluğu           Çeşitlerinin Tescil Edilmesine
+    bakımından bir bütün olan,         İlişkin Yönetmelik).yer alan
+   botanik taksonomi içinde yer         genetik yapıyı ifade eder.
+  alan genetik yapıyı ifade eder.         (Tohumculuk Kanunu)
+       (Tohumculuk Kanunu)
+     Tohumlar Neden Yok Oluyorlar? / Dr. Gülay BEŞİRLİ
+        İnsanların kendi ekolojilerinde üretilmeyen ürünleri talep etmeleri ve yılın uygun olmayan
+        mevsiminde her ürünü tüketmek istemeleri (örneğin her mevsim domates tüketmek isten-
+        mesi), taşınabilme kapasitesi olan çeşitlerin üretilmesini teşvik etmektedir. Ayrıca farklı ül-
+        kelerde değişim göstermekle beraber, hükümetlerin belirlenmiş ürünleri desteklemesi veya
+        bazı ürünlerin piyasada yüksek fiyata alıcı bulması, aynı üretim alanında sürekli olarak aynı
+        ürünlerin üretilmesi tercihini doğurmuştur. Bu durum ekim nöbetinin olmadığı monokültür
+        denilen tek ürün yetiştiriciliğinin yaygınlaşmasına sebep olmuştur.
+
+        Aynı ürünün sürekli olarak aynı üretim alanında üretilmesi sonucunda o bitkiye musallat
+        olan hastalık ve zararlıların söz konusu üretim alanındaki popülasyonu artmaktadır. Hastalık
+        ve zararlılara dayanıklılığı artırılan hibrit çeşitlerin piyasaya hakim hale gelmesi, yerel çeşitleri
+        baskı altına almış, tercih edilme potansiyellerini azaltmış hatta ortadan kaldırmıştır ki bu da
+        yerel çeşitlerin bir kenara itilmesi ve zaman içerisinde de kaybolmasına neden olmaktadır.
+
+        Tohum üretim teknikleri konusundaki bilgi eksikleri ve özellikle yabancı tozlanan bitkilerin
+        yan yana üretilmeleri sonucunda yerel çeşitler özelliklerini yitirmekte, tohumlar kaybolmak-
+        tadır.
+
+        Ülkemizde henüz değil ama dünyada GDO’lu bitki çeşitlerinin kullanımı ile yine izolasyon
+        mesafelerine dikkat edilmeden yapılan üretimler yüzünden bitki çeşitleri özelliklerini kay-
+        betmekte, var olan bitki çeşitleri kaybolma tehlikesi ile karşı karşıya kalmaktadır.
+
+
+
+                   GDO - Genetik Yapısı Değiştirilmiş Organizmalar
+
+             Çiftleşme ve/veya doğal melezlemelerle yani türlerin kendi içindeki gen alışverişleriyle meydana
+            gelmeyen, biyoteknolojik yöntemler kullanılarak farklı türlerden ve mikroorganizmalardan alınan
+           genlerle yeni bir genetik materyal kombinasyonu oluşturulmuş olan herhangi bir canlı organizmadır.
+                              (Organik Tarımın Esasları ve Uygulanmasına İlişkin Yönetmelik).
+
+
+
+
+10
+           BİTKİLERİ
+2. BÖLÜM
+           TANIYALIM
+     Bitkinin Yaşam Döngüsü / Roselló, J.; Soriano, J.J., 2010, s.41-42
+          Bitkinin büyümesi ara vermeyen bir faaliyettir, ancak bunun içinde üç evre tanımlanabilir:
+          Gençlik, erginlik ve yaşlılık.
+          − Gençlikte, hızlı gelişme görülür. Bu evre, tohumun çimlenmesiyle başlar, üreme yapıları
+          ortaya çıkınca biter. Bu evrede, yaprakların şekli ve büyüklüğü olgun evredekinden farklı
+          olabilir.
+          − Erginlikte, nebati (sap, dal, yaprak) gelişme hızı azalır ve çiçekler, ardından meyve ve to-
+          humlar oluşur. Bitkinin durumundan bağımsız olarak, herhangi bir uzvu kendisinden bekle-
+          nen işlevi gerçekleştirdiğinde ve azami boyuna ulaştığında “olgun” olarak tanımlanır.
+          − Yaşlılıkta, bitkinin yapıları yozlaşır ve evre bitkinin ölümüyle son bulur. Bu evrede bitki,
+          nesiller arası niteliklerini aktaran tohumlarını bırakmış olur.
+          Sebze bitkileri, birinci yıl çiçeklenen (tek yıllık), ikinci yıl çiçeklenen (iki yıllık) ve birden fazla
+          defa çiçeklenen (çok yıllık) bitkiler olarak ayrılabilir. Tek yıllık bitkiler, tohumlarının çimlendiği
+          yıl içinde (çoğunlukla yazın) çiçeklenirken, iki yıl ömürlü bitkiler kışın dinlenip bir sonraki
+          ilkbahar veya yazda çiçek verir.
+
+
+
+
+                                                                                                             Çizelge 1. Sebze türlerin çiçeklenme yılına göre sınıflandırma (Euskadi Tohum Ağı.Kaynak:Roselló, J.; Soriano, J.J.,
+             Tür                                   Tek Yıllık                 İki Yıllık
+             Pazı                                                             X
+             Enginar                               X
+             Fasulye                               X
+             Börülce                               X
+             Patlıcan                              X
+             Lahana                                                           X
+             Yaz Kabağı                            X
+             Soğan                                                            X
+             Karnabahar                            X                          X
+             Ispanak                               X
+             Bezelye                               X
+             Bakla                                 X
+             Marul                                 X
+             Mısır                                 X
+             Salatalık                             X
+             Biber                                 X
+             Turp                                  X
+             Pancar                                                           X
+             Domates                               X
+                                                                                                             2010, s. 43)
+
+
+
+
+             Havuç                                                            X
+12           Pırasa                                                           X
+                                                      Çiçeklenme / Dr. Gülay BEŞİRLİ
+Çiçeklenme, yani üreme yapılarının ortaya çıkması, bitkinin gelişmesinde anahtar aşamadır.
+Çiçek vermeden önce bitkinin belli bir boya gelmesi gerekir. Çiçeklenme, iç (bitkisel hormon-
+lar) ve dış (ışık ve sıcaklık) koşullar uygun olduğunda meydana gelir.
+
+
+                                               Erselik çiçekli sebzeler
+
+
+Sebze türlerinde çiçeklerin                    Monocie (tek evcikli) ve
+biyolojik yapıları                             andromonoecious
+
+
+                                               Diocie (iki evcikli) sebzeler
+
+
+
+                                                                               Tepecik
+
+                                                                               Dişicik borusu
+
+
+                                                                               Anter (Erkek organ)
+
+
+                                                                               Flament
+
+                                                                               Petal (Taç yaprak)
+
+
+                                                                               Yumurtalık
+
+
+
+                                                                               Sepal (Çanak yaprak)
+
+
+
+
+                                                                               Çiçek ekseni
+     ERSELİK ÇİÇEK YAPISINA SAHİP BİTKİLER
+     Erselik çiçek yapısı; erkek ve dişi organın aynı çiçek üzerinde olduğu çiçek yapısıdır (Şekil 1).
+     Resimde görülen erkek organlar (anterler) polenlerin oluştuğu organlardır. Oluşan polenle-
+     rin dişicik tepesine gelerek dişi organın üzerine ulaşmasına tozlaşma adı verilir. Olgunlaşmış
+     yapıya ulaşan bu polenlerin dişi organda bulunan polen tüpünden geçerek yumurtalığa
+     ulaşması ve burada erkek ve dişi üreme hücrelerinin birleşmesine döllenme adı verilir. Bu
+     yapıda olan bitkiler 3 gruba ayrılır:
+
+     1. Mutlak kendini dölleyen bitkiler:
+     Bu bitkilerde çiçek yapısı dışarıdan polen almaksızın döllenmeye müsaittir. Üreme organları
+     taç yaprakların arasında saklıdır, dışardan pek görülmezler. Örneğin baklagiller familyasın-
+     dan fasulye, bezelye ve börülce bu çiçek yapısında olan bitkilerdir.
+
+     2. Düşük oranda yabancı döllenme gösteren bitkiler:
+     Bu gruba giren bitkiler, patlıcangiller familyasından domates ve patlıcandır.
+
+     3. Yüksek oranda yabancı döllenen bitkiler:
+     Lahana, karnabahar, turp, şalgam, soğan, pırasa ve havuç bu tür döllenme yapısı gösteren
+     bitkilerdir.
+
+     MONOCİE (TEK EVCİKLİ) ÇİÇEKLİ BİTKİLER
+     Bu tür çiçek yapısında olan sebze türlerinde, erkek ve dişi organları taşıyan çiçekler aynı bitki
+     üzerinde fakat ayrı ayrı yerlerdedir. Bu tür çiçek yapısı en bariz olarak kabakgillerden hıyar,
+     kavun, karpuz ve kabaklarda görülür. Bu tür çiçek yapısına sahip olan bitkiler yabancı döllen-
+     me gösterir. Polenlerin erkek çiçeklerden dişicik tepesine taşınması için bir dölleyiciye ihtiyaç
+     vardır. Genellikle taşıyıcılar böcekler ve özellikle arılardır.
+
+     DİOCİE (İKİ EVCİKLİ) ÇİÇEKLİ SEBZELER
+     Bu çiçek yapısına sahip olan sebze türlerinde erkek ve dişi organları taşıyan çiçekler ayrı ayrı
+     bitkiler üzerinde bulunurlar. Bu tür bitkiler de mutlak yabancı döllenirler ve tozlaşma için bir
+     taşıyıcıya ihtiyaç duyarlar. Söz konusu taşıyıcılar böcekler, rüzgâr vb. olabilir. En güzel örnek
+     ıspanaktır.
+
+
+
+
+14
+                                                                Tozlaşma / Dr. Alptekin KARAGÖZ
+Bitkilerin bir kısmı kendi çiçek tozlarıyla döllenirken bir kısmı da dışarıdan toz alır, dışarıya toz
+verir. Bu yolla sürekli olarak yeni nesiller meydana gelir. Tabiatta sık sık yenilenen bu nesil-
+ler zaman içinde değişen çevre koşullarına (sıcaklık, kuraklık, kirlilik) uyum sağlayan bireyler
+oluşturur. Bu nedenle tabiatta doğal uyum sağlama mekanizması, yetiştirilen bitkilerden çok
+daha iyi işler.
+
+Yabancı tozlaşmanın iki yolu vardır;
+1. Rüzgârla
+2. Hayvanlar vasıtasıyla (böcek, arı, kuş, yarasa, insan eliyle)
+
+Rüzgârla tozlaşma doğada birçok yabani bitkide ve kültür bitkisinde görülür. Anter adı veri-
+len polen depoları olgunlaştıklarında patlayarak polenleri bırakır. Rüzgâra kapılan polenler
+yapışkan, pürüzlü ve kimi bitkilerde tüylü bir yapıda olan dişicik tepesi üzerine konarak toz-
+laşmayı ve daha sonra burada çimlenip polen tüpünü yumurtaya kadar uzattıktan sonra da
+döllenmeyi gerçekleştirir. Buğdayın yabani akrabalarının çoğu kendine döllenirken, evrimin
+ilk aşamasında ana görevi yapan yabani akrabası yabancı döllenmektedir. Kültürü yapılan
+tüm buğday çeşitleriyle arpa kendine döllenirken, çavdar yabancı döllenir. Yine de kendine
+döllenen bitkiler az da olsa dışarıdan toz alabilmektedir. Bu şekilde binlerce yıllık gelişme
+süreçlerinde dışarıdan toz alarak yeni genetik yapılar oluşturma şansına sahip olurlar.
+
+                  Arının baldan bile önemli ödevi: Tozlaşma
+ Doğada hayvanlarla olan döllenmenin çoğu                 tozlaşamayan bu türlerin nesillerini sürdürmesinin
+ böcekler ve arılar yardımıyla gerçekleşir. Bu            önünde engel olarak durmaktadır.
+ canlılar beslenmek için veya bal özü, polen              Böceklerin tozlaşmada oynadıkları rol dikkate
+ toplamak için yaptıkları çiçek ziyaretleri               alındığında bunlardan daha iyi yararlanabilmek
+ sırasında, ağız, hortum, kanat veya diğer                ve popülasyonlarının devamlılığını sağlamak
+ organlarına bulaşan polenleri başka çiçeklerin           açısından bazı önlemler alınabilir. Bunlardan
+ üzerine taşıyarak tozlaşmaya yardımcı olurlar.           en yaygın olanı özellikle ayçiçeği, korunga
+ Baklagiller familyasına bağlı bazı türlerde              gibi türlerin ekili olduğu alanların etrafına arı
+ döllenmenin olabilmesi için mutlaka böceklere            kovanları getirmektir. Bu şekilde bir yandan
+ ihtiyaç vardır. Benzer şekilde ayçiçeği ile kiraz gibi   tohum bir yandan da bal verimi artacaktır.
+ meyve türleri de böceklerin yardımı olmaksızın           Diğer bir önlem meyve bahçelerinin etrafına
+ döllenemez ve tohum veremezler. Bazı yıllarda            doğal bitkisel çit bitkileri dikerek böceklerin
+ döllenme mevsiminde havanın aşırı sıcak,                 yuvalanmasına olanak sağlayacak ortam
+ soğuk veya yağışlı olması gibi sebeplerle böcek          oluşturulmasıdır. Bu arada bahçelerin bir miktar
+ faaliyetleri sekteye uğradığında meyve ve tohum          otlu bırakılması veya bahçelerin muhtelif yerlerine
+ verimlerinde azalma görülür.                             böceklerin yuvalanmasını sağlayacak delikli
+ Böcekler tozlaşma için bu denli önemliyken,              tuğla, ortası boş kamış demetlerinden veya
+ günümüzde yaşanmakta olan küresel ısınma                 plastik borulardan oluşturulacak yuvalar koymak
+ ve iklim değişikliği sonucu dünyanın sıcaklığı           şeklinde çalışmalar da yapılabilir. Bu arada ot
+ artmakta ve bu durum binlerce yıldan beri                öldürücü ve böcek öldürücü ilaçlar yerine bunlarla
+ bitkilerde tozlaşmayı sağlayan bazı böcek                kültürel yollarla mücadele etmek de yararlı
+ türlerinin daha uygun iklime sahip alanlara              böceklerin popülasyonlarını korumamıza yardımcı
+ göçmesine neden olmaktadır. Buna ek olarak               olacaktır.
+ nedeni bilinmeyen toplu böcek ölümleri, böceksiz
+     Üreme:       Eşeysiz Üreme                      Eşeyli Üreme
+     Döllenme:                    Kendini dölleyen      Yabancı döllenme gösteren
+     Tozlaşma:                                       Böcek vasıtasıyla Rüzgâr vasıtasıyla
+     Pazı                                                                       X
+     Sarımsak       X
+     Enginar        X                                       X
+     Kereviz                             X
+
+
+
+
+                                                                                            (Euskadi Tohum Ağı ve Fuente Yagüe (1988)’den alıntılarla hazırlanmıştır. Kaynak: Roselló, J.; Soriano, J.J., 2010, s.45)
+     Patlıcan                            X                  X
+     Lahana                                                 X
+     Kış Kabağı                                             X
+     Soğan                                                  X
+     Karnabahar                                             X
+     Ispanak                                                                    X
+
+
+
+
+                                                                                            Çizelge 2 : Sebze bitkilerin üreme, döllenme ve tozlaşma şekline göre sınıflandırma.
+     Çilek          X
+     Bezelye                             X
+     Bakla                               X                  X
+     Fasulye                             X
+     Marul                               X
+     Mısır                                                  X                   X
+     Kavun                               X
+     Şalgam                              X                  X
+     Patates        X
+     Salatalık                                              X
+     Biber                               X                  X                   X
+     Pırasa                                                 X
+     Turp                                                   X
+     Pancar                                                 X                   X
+     Domates                             X                  X
+     Havuç                                                  X
+
+
+
+16
+                                       Meyve ve Tohum / Dr. Alptekin KARAGÖZ
+Bitkilerde tohum ve meyvenin oluşabilmesi için tozlaşma ve döllenmenin gerçekleşmesi
+gerekir. Tozlaşma, bitkinin erkek organlarındaki polen tozlarının, çiçeğin dişi organlarından
+biri olan dişicik tepesi üzerine konarak döllenmenin ilk aşamasını oluşturmak üzere burada
+çimlenmesi ve polen tüpünü yumurtalığa uzatma-
+sıdır. Döllenme ise, yumurtalığa ulaşan polen tü-
+pünün burada yumurta ile birleşmesi sonucu
+ilk canlı taslağını ve embriyonun ilk aşaması
+olan zigotu oluşturmasıdır. Oluşan zigot sü-
+rekli bölünerek gelişir ve embriyo denilen
+bitki taslağını oluşturur. Embriyo oluştuk-
+tan sonra etrafında koruyucu kabuk olu-
+şur ve kabuğun içinde besin depo edilir.
+Tohum, bu kabuk içerisinde bulunan besin
+deposu (kimi tohumlarda çenek) ve embri-
+yodan oluşur.
+
+
+
+
+Tohumların Dağılması ve Taşınması / Dr. Alptekin KARAGÖZ
+Tohumların ve meyvelerin bir yerden başka bir yere taşınması; bu türlerin dünya üzerine
+yayılmaları, gittikleri yerlerde popülasyonlar oluşturarak yeni çeşitlilikler ve değişik koşullara
+uyum sağlayan bireyler meydana getirmeleri bakımından önemlidir. Genel olarak dağılarak
+uzak mesafelere gidebilme özelliğine sahip bitkilerin farklı koşullara uygun bireyler ortaya
+çıkarma şansları daha yüksektir. Bitkilerin nesillerinin devamı için tozlaşma ne kadar önemli
+ise tohumların dağılması da o kadar önemlidir.
+
+Tohumların dağılma yolları şunlardır:
+1. Hayvanlarla taşınma: Hayvanlarla taşınan tohum ve meyveler, takılmayı sağlayan tüy, di-
+ken ve çengel veya yapışkan maddelere sahiptirler. Hayvanlarla taşınma üç şekilde olur:
+   a) Sindirilmeden atılan tohumlar: Hayvanlar tarafından yenen meyve veya tohum, sert
+   kabuk yapısından dolayı sindirilemeyip dışkı ile dışarı atılır. Sert ve küçük tohumlu bitkiler
+   ile küsküt gibi asalak bitkiler bu şekilde yayılırlar.
+
+  b) Yiyecek olarak taşınan tohumlar: Hayvanlar tarafından yiyecek olarak kullanılan meyve
+  ve tohumlardır. Hayvanlar tarafından depolanmak üzere taşınırlar. Karıncaların taşıdığı
+  tohumlar böyledir. Bir yöreye ait küçük tohumlu yabani bitkilerin neler olabileceğinin an-
+  laşılması için karınca yuvalarının etrafını incelemek kaba bir fikir verebilir.
+       c) Hayvanların üstüne takılarak dağılan tohumlar: Otlayan
+       hayvanlar, üzerlerine yapışan tohumları gezdikleri yerle-
+       re yayarlar. Bu hayvanların ihracatı ile hayvanların üze-
+       rindeki tohumlar kıtalar arasında taşınabilir. Avustralya
+       florasında bulunmayan birçok tek yıllık yonca türübu
+       kıtaya Avrupa’dan ithal edilen koyunların postlarına
+       tutunarak gelmiş, zaman içinde ortama uyum sağlayan-
+       lar burada geniş popülasyonlar oluşturmuştur. Günümüz-
+       de tek yıllık yonca tarımının en yaygın olarak yapıldığı ülke
+       Avustralya’dır.
+
+     2. Rüzgârla taşınan tohumlar: Tüy, kanat, balon gibi kısımları olan to-
+     hum ve meyveler rüzgâra kapılarak kilometrelerce uzağa taşınabilirler. Ya-
+     bani marul, hindiba, köygöçüren gibi bitkilerin tohumları böyle taşınır. Ayrıca
+     soda otu gibi bazı bir yıllık bazı bitkiler yaz mevsimi sonlarında tohum olgunlaş-
+     tırdıklarında şiddetli rüzgârların etkisiyle yerlerinden kopup yuvarlanarak uzak mesafelere
+     gidebilirler.
+
+     3. Su ile taşınan tohumlar: Meyve ve tohumlar yağmurla veya bitkinin yaşadığı ortamdaki
+     su ile taşınırlar. Su ile taşınan bu meyve ve tohumlar, genellikle yüzmeyi kolaylaştıran, hava
+     taşıyan zarımsı örtüye sahiptirler. Bitki tohumlarının sınır aşan nehir suları ile ülkeler arası
+     taşınması mümkündür. Ayrıca dere ve nehirlerden alınan sulama suları da tarım yapılan alan-
+     lara yabancı ot tohumlarını getirebilir.
+
+     4. Kendi kendine dağılan tohumlar: Tohum ve meyveler bitkiden düştükten sonra meyve
+     kabuğunun patlaması, çatlaması veya özel mekanik yapısı ile uzağa fırlatılırlar. Atkestanesi,
+     acı kavun, yabani fiğ, mercimek, mürdümük türleri bu şekilde dağılırlar.
+
+     5. İnsanlarla taşınan tohumlar: Tarımı yapılan türlerin dünya üzerindeki hareketleri insanlar
+     sayesinde olmaktadır. Asya ile Avrupa arasında köprü ve göç yolları üzerinde bulunan ül-
+     kemizden yüzyıllar boyunca birçok topluluklar geçmiş ve her topluluk kendilerine ait bitki
+     örneklerini Anadolu’ya bırakmışlardır. Diğer nedenlerin yanında bu nedenle de ülkemiz, kül-
+     türü yapılan bitkilerin birçoğunda önemli bir çeşitliliğe sahiptir.
+
+
+
+
+18
+           TOHUM
+3. BÖLÜM
+           ÜRETİMİ
+     Tohum Üretiminde Dikkat Edilmesi
+     Gereken Noktalar / Dr. Gülay BEŞİRLİ
+        Tohum, ait olduğu bitkiyi yeniden meydana getirebilen en küçük canlı yapıdır. Olumsuz çev-
+        re şartlarına dayanabilmek bakımından bitkinin en fazla uyum gösterebilen yaşam evresi
+        olması nedeniyle, türün zaman ve mekân içinde yayılma ve çoğalma işlevini görür.
+
+        Tarihsel süreçte, insanın gıdayı doğadan toplamak yerine yetiştirmeye başlaması tohumun
+        rolünün keşfedilmesi ile mümkün olmuştur. İnsanın yerleşik yaşama geçmesinden sonra, to-
+        hum, bitkisel üretim ile gıda zincirinin ilk ve en önemli halkası olmuştur, dolayısıyla gelecekte
+        de gıda güvenliğinin en kritik noktası olacaktır.
+
+        Tohum üretimi öncelikli olarak, tohumu üretilecek bitkinin yetiştirme tekniğinin bilinmesini
+        gerekli kılar. Çünkü ancak sağlıklı bitkilerden sağlıklı tohum elde edilir. Diğer taraftan iklim
+        ve toprak koşulları söz konusu bitkinin yetişmesi için uygun olmalıdır. Bu nedenle yerel ye-
+        tiştirilen bitki çeşitleri önemlidir. Bu çeşitler, geleneksel yöntemler kullanılarak yerli üreticiler
+        tarafından yıllar süren ve kendi amaçlarına uygun olarak yaptıkları bilinçli seçimler (seleksi-
+        yonlar) sonucunda geliştirilmiş yöreye uyum sağlamış köy popülasyonları, yerel çeşitler ya
+        da eski çeşitler olarak isimlendirilen çeşitlerdir. Söz konusu çeşitlerin genetik yapıları, hastalık
+        ve zararlılara, soğuk ve kurak koşullara dayanıklılık gibi özellikler taşımaktadır.
+
+        Tohum üretimi taze ürün üretimine göre biraz daha teknik bilgi isteyen bir alandır. Genel
+        olarak benzer prensipler ve ekolojik yöntemler kullanılmakla beraber, tohum üretimi için
+        özellikle dikkat edilmesi gereken hususlar şöyle özetlenebilir:
+
+        * Üretimi yapılan bitkinin yaşam döngüsü, çiçek ya-                Tohumluk Nedir ?
+        pısı ve döllenme biyolojisi özellikleri iyi bilinmeli,             / Dr. Alptekin KARAGÖZ
+        türe en uygun şartları temin edecek uygulamalar
+        vaktinde yapılmalıdır.                                           Tohum konusu anlatılırken bir de
+                                                                        “tohumluk” olarak sıkça kullanılan
+        * Toprak analizi yapılarak bitki besleme işlemleri vak-
+                                                                           ifadenin açıklanmasında yarar
+        tinde ve ihtiyaç kadar yapılmalıdır.
+                                                                         vardır. Gıda, Tarım ve Hayvancılık
+        * Tohum elde etmek için yapılan üretimde, bitki ge-              Bakanlığı tarafından 2005 yılında
+        nellikle (taze sebze üretimine kıyasla) çok daha uzun           yayımlanan Tohumluk Kanununda
+        süre tarlada durur. Örneğin, tek yıllık bir bitki olan fa-      tohumluk; “bitkilerin çoğaltımı için
+        sulyede, taze fasulye üretimine göre tohumluk fasul-           kullanılan tohum, yumru, fide, fidan,
+        ye üretiminde süreç daha uzundur. İki yıllık bitki olan           çelik gibi generatif ve vegetatif
+        pırasa, lahana, ıspanak ve soğanda da tohum üretim                (üreme yeteneğini ve canlılığını
+        süreci daha uzundur.                                            koruyan) bitki kısımlarıdır” şeklinde
+                                                                       tanımlanmaktadır. Yani yeni bir bitki
+        * Sağlıklı tohum üretimi için bitkilerin iyi beslenmesi
+                                                                        elde etmek amacıyla ekilen veya bu
+        gerekir. Bitki bakım işlemleri vaktinde yapılmalı, sağ-
+        lıklı bitki yetiştirilmelidir. Sağlıklı bitkiler çiçek açımı    amaçla ayrılan çoğaltma materyali
+        sonunda meyvelerin ve meyveler içindeki tohumla-                      “tohumluk” olarak bilinir.
+        rın iyi gelişmesini sağlar. Eğer gelişimin herhangi bir
+
+
+20
+aşamasında bakım işleri sekteye uğrarsa bitki strese girer ve tohum içinde embriyo iyi geliş-
+mez. Bu tür tohumlarda çimlenme oranı düşük olur. Sağlıklı olmayan tohumlar depolama/
+saklama sürecinde canlılıklarını çok çabuk kaybeder. Bu tür yanlış uygulamalarçeşit kaybına
+bile neden olabilir.
+
+     BİTKİLERİN SAĞLIKLI GELİŞİMİNİ ETKİLEYEN UNSURLAR
+                            Kaynak: Roselló, J.; Soriano, J.J., 2010, s. 50-53
+ Su                                                     Hava Sıcaklığı
+ Çiçeklerin açması, tozlaşma, döllenme, meyve           Tüm bitkilerin çimlenme, büyüme, çiçeklenme ve
+ ve tohumların olgunlaşması tohum üretimi               meyve vermeleri için belli sıcaklığa ihtiyacı vardır.
+ açısından kritik aşamalardır; bu evrelerde su          Az sıcaklık isteyen bitkiler gündüz 10 - 25ºC arası,
+ eksikliği tohum üretimini ve kalitesini düşürür.       gece 7 - 10ºC arası sıcaklıklarda gelişir, örneğin
+ Sebze üretiminde su çeşitli şekillerde temin edilir:   patates ve bezelye.
+ Çevredeki nem veya buhar. Bitki yeteri kadar           Orta sıcaklık isteyen bitkiler gündüz 16 - 30ºC
+ havalandırılmıyorsa, fazla nem mantar                  arası, gece 13 - 18ºC arası sıcaklıklarda gelişir,
+ hastalıklara yol açar. Aşırı nem düşüşü ve yüksek      örneğin domates ve biber.
+ sıcaklıklar bir araya gelince çiçeklerin vaktinden     Yüksek sıcaklık isteyen bitkiler gündüz 21 -36ºC
+ önce düşmesine ve tozlaşma bozukluklarına yol          arası, gece 18 - 24ºC arası sıcaklıklarda gelişir,
+ açabilir.                                              örneğin mısır ve birçok kabakgil türü.
+ Yağmur. Yağmurda böcekler uçmadığı ve uçan             İki yıllık bitkiler bir yandan bitki kaybını azaltmak
+ polen yere düştüğü için, çiçeklenme ve tozlaşma        için ılıman kış isterler, öbür yandan kışlama
+ vaktinde yağmurun yağması döllenmeyi                   sürecini tamamlamak için yeterince soğuk
+ aksatabilir.                                           havaya da ihtiyaç duyarlar.
+ Yapay sulama. Marul, lahana, soğan gibi pazara
+ yönelik olgunluğu çiçek ve tohum olgunluğundan         Rüzgâr
+ farklı olan bitkiler söz konusu olduğunda, yüksek      Özellikle rüzgâr vasıtasıyla tozlaşan bitkilerde
+ kaliteli tohum elde etmek için bu bitkileri aynı       rüzgâr çok önemli ve vazgeçilmez etkendir.
+ özenle ve sulamayı bırakmadan bakmaya devam            Tozlaşma için rüzgâra ihtiyacı olmayan bitkilerde
+ etmek gerekir.                                         ise olumsuz etken olabilir. İstenmeyen döllenme
+                                                        ve melezlenmelere sebep olabilir; rüzgâr
+ Güneş ışığı                                            soğuk veya kuruysa hassas üreme yapılarında
+ Güneş severler: Kusursuz gelişmeleri için, kavun       istenmeyen değişimlere yol açabilir.
+ ve patlıcan gibi bitkiler güneş ışığın yoğun           Rüzgâr ve su arası etkileşim örneği:
+ olmasını ister.                                        Tohum üretimi için yaz ve sonbaharın nispeten
+ Gölge severler: Az ışıkta yetişmeleri gerekir.         az nemli olması önemlidir. Tam ölçüsünde
+ Orta ışık ihtiyacı olan bitkilerin arasında lahana     sulama ve rüzgâr, tohumun doğru gelişmesini
+ ve patates vardır.                                     ve toplama işlemlerinin mümkün olduğu kadar
+                                                        az kayıpla gerçekleşmesini sağlamakta yardımcı
+ Toprak zenginliği ve besin                             olur. Bitkinin son aşamalarında yağmur yağması,
+ Yeterli ve doğru beslenme meyvenin ve tohumun          mantar hastalıklarını artırır ve genelde bitkinin
+ miktarını ve iriliğini arttırır. Besin maddelerinde    sağlığına zarar verir.
+ eksiklik tohum üretimini de etkiler.Fazla azot
+ çiçeklenmeyi geciktirir, az azot alan bitkiler         Diğer unsurlar
+ ise erken çiçek verir, verim düşer. Fosfor, çiçek      Ayrıca arazinin yükseltisi, eğimi ve hangi yöne
+ sayısını arttırır.                                     baktığı gibi fiziksel koşullar da tohum üretiminde
+ Tohum üretiminde ortalama kalitede toprakta            göz önünde bulundurulması gereken unsurlardır.
+ bitkilerin niteliklerini belli etmelerini isteriz      (Örneğin, hava sıcaklığı her 100 metrede 0,6 °C
+ ve bitkiler arasında fark tespit edildiğinde           derece azalır).
+ aralarından en uygunlarını seçerek tohumlarını
+ saklarız.
+     Tohumluk Seçimi Neye Göre Yapılmalıdır?
+     Dr. Gülay BEŞİRLİ
+
+
+           Öncelikle üretimde kullanılan bitkinin tohumunun bir önceki generasyonundan emin olun-
+           malıdır. Kaynağı bilinmelidir. Dışarıdan ticari olarak alındı ise sertifikası mutlaka temin edil-
+           miş olmalıdır. Amatörce temin edilmiş ise üretim koşulları sorgulanmalıdır. Çeşit safiyeti yö-
+           nünden homojen olmayan bir materyalden tohumluk temin etmek sağlıklı olmaz. Tohumluk
+           alımı yapacak bitkinin o çeşidi temsil ettiğinden kesinlikle emin olunmalıdır.
+
+
+
+
+     Tohum Uyandırma (Çimlendirme) İşleminin
+     Püf Noktaları Nelerdir? / Dr. Gülay BEŞİRLİ
+           Pratikte üretici koşullarında başarılı olmak için öncelikle çimlenme kabiliyetinde olan tohum-
+           lar ile işe başlanmalıdır.
+           Tohumların çimlenebilmesi için ayrıca;
+           • Tohum yatağı iyi hazırlanmalı
+           • Toprakta nemin uygun olduğu zaman ekim yapılmalı
+           • Tohum iriliğine bağlı olarak uygun derinlikte ekilmeli
+           • Ekimden sonra iklim ve toprak yapısına bağlı olarak uygun sulama programı izlenmeli
+           • Sağlıklı tohum kullanılmalı
+           • Tohum cinsine uygun ekim makinesi seçilmelidir.
+
+           Tohumunu çimlendirmek üzere ele alınan bitki to-
+           humunun özellikleri bilinmelidir. Örneğin bamya            Tohumun Çimlenmesi
+           tohumları sert bir kabuk ile kaplıdır. Tohum ekimin-            Dr. Alptekin KARAGÖZ
+           den sonra sulama yapılsa bile tohum embriyosuna
+           suyun ulaşması, domates ya da salatalık tohumuna          Tohumdaki embriyonun uygun koşullar
+                                                                      oluştuğunda ana bitkiye benzer bitkiyi
+           göre daha uzun sürer. Bu nedenle bu tür bitkilerde           vermek üzere büyüyüp tohumdan
+           ekim yapılmadan 1 gün önce tohumların bir kap                çıkması ve serbest hale geçmesine
+           içerisine konularak suyla ıslatılmaları çimlenmede            “çimlenme” denir. Çimlenmeden
+           kolaylık sağlar.                                           önce tohum su almaya başlar, tohum
+                                                                      kabuğu yırtılır ve embriyonun kökçüğü
+           Farklı bitki türlerinin çimlenme süreleri Çizelge 1’de       buradan çıkar. Kökçüğün toprakla
+           sunulmuştur.                                              teması ardından da emici kökler ve yan
+                                                                       kökler oluşmaya başlar. Başlangıçta
+                                                                     kendi besi dokusu ile beslenen embriyo,
+                                                                    topraktan çıkınca yeşillenen kotiledonları
+                                                                          (tohumlu bitkilerin tohumunda
+                                                                     bulunan ilk yapraklar) ile besin maddesi
+                                                                               sentezlemeye başlar.
+
+
+
+
+22
+                                                                              Sebze türü       Çimlenme süresi (gün)   Çizelge 1’de de görüleceği
+                                                                                                                       gibi, bezelye, fasulye ve bak-
+                                                                              Kırmızı pancar           8-16            la aynı familyaya (baklagiller)
+                                                                              Pazı                     8-16            ait olan türler olmakla bera-
+                                                                                                                       ber her birinin çimlenme sü-
+Çizelge 1. Farklı Sebze Türlerinde Tohumun Çimlenmesi için Geçen Gün Sayısı
+
+
+
+
+                                                                              Ispanak                  5-6             releri farklılık göstermektedir.
+                                                                                                                       Bezelye tohumu ekiminden
+                                                                              Lahana                   4-6             8-10 gün sonra çimlenirken
+                                                                              Karnabahar               5-6             fasulye 7-16 gün sonra ve
+                                                                                                                       bakla ise 10-14 gün sonra
+                                                                              Turp                     5-8
+                                                                                                                       çimlenmektedir.
+                                                                              Bezelye                  8-10
+                                                                                                                       Bazı bitki türlerinin tohumları
+                                                                              Fasulye                  7-16
+                                                                                                                       ekimden çimlenmeye kadar
+                                                                              Bakla                    10-14           ışık görmeyen karanlık or-
+                                                                              Hıyar                    6-8             tamlar isterler. Örneğin kere-
+                                                                                                                       viz, maydanoz ve salata-ma-
+                                                                              Domates                  6-8             rul türü sebzelerde bu nokta
+                                                                                                                       göz önünde bulundurulma-
+                                                                              Havuç                    10-12           lıdır. Üretici koşullarında ka-
+                                                                              Kereviz                  15-20           rartma yapmak üzere tohum
+                                                                                                                       ekiminden sonra sulama
+                                                                              Maydanoz                 14-18           yapılmalı ve gazete kâğıdı
+                                                                              Salata-Marul             6-12            vb. materyal ile üzerleri ka-
+                                                                                                                       patılmalıdır. Arada kontrol
+                                                                              Soğan                    10-30           edilerek fide hacminin nemli
+                                                                              Pırasa                   10-15           kalması sağlanmalıdır.
+     Sebzelerde Tohum Ekim Derinliği, Bitki Sıra Arası
+     ve Sıra Üzeri Mesafeleri / Dr. Gülay BEŞİRLİ
+        Tohum ekim derinliği; tohum iriliği, toprak yapısı, taban suyu seviyesi, sulama durumu ve
+        hava koşullarına göre farklılık göstermektedir. Ancak pratik olarak her tohum kendi iriliğinin
+        2,5-3 katı derinliğe ekildiğinde olumlu sonuç vermektedir (Çizelge 2). Hafif bünyeli toprak-
+        larda, hâkim rüzgârların olduğu bölgelerde tohumlar çizelgede verilen ekim derinliğinden
+        biraz daha derine ekilirken, ağır bünyeli, taban suyunun yüksek olduğu yağışlı bölgelerde ise
+        biraz daha yüzeye yakın ekilmelidir.
+
+        Her bir sebze türü için sıra üzeri ve sıra arası mesafeler ortalama değer olarak verilmiştir.
+        Ancak bu mesafeler de üretim bölgelerinin ekolojik koşullarına göre genişletilip daraltıla-
+        bilmelidir.
+
+        Bazı sebzeler doğrudan tohum ekimi ile üretilirler. Bunlar, soğan, ıspanak, turp, roka, tere,
+        bezelye, fasulye, bakla, börülce, bamya, havuç, maydanoz, dereotu ve semizotu türleridir. Ba-
+        zıları ise doğrudan tohum ekimi ile üretilebildikleri gibi fide ile üretilmeleri daha ekonomik
+        olan türlerdir. Bunlar domates, biber, patlıcan, hıyar, kavun, kabak, karpuz ve lahana grubu
+        sebzelerdir. Bu türler için ekim/dikim mesafeleri bilinir ise birim alana gerekli olabilecek to-
+        hum miktarını hesaplamak kolay olacaktır. Ancak bunun için üretimi yapılmak istenen sebze
+        türünün 1 gramdaki tohum sayısını ya da 1000 tohum ağırlığını bilmek gerekir. Çizelge 3’te
+        sebze türlerine ait 1000 tohum ağırlığı verilmiştir.
+
+        Çizelge 3’te sebze türlerine bağlı olarak tohumların çimlenme süreleri gün olarak verilmiştir.
+        Çizelge 3’ün en son sütununda türlere bağlı olarak değişim gösteren tohum saklama süreleri
+        verilmiştir. Bu özellik yönünden en kritik olan sebze türleri soğan (1 yıl), pırasa (1 yıl), bamya
+        (2 yıl) ve maydanoz (2yıl)’dur.
+
+        Tohumların Çizelge 3’te verilen sürelerde saklanabilmesi için;
+        • Yetiştirme döneminde bitkiler iyi bakılmalı ve beslenmelidir.
+        • Tohumlar tam olgunluğa ulaşınca hasat edilmelidir.
+        • Hasat edilen tohumlar iyi ayıklanmalı ve usulüne uygun kurutulmalıdır.
+        • Uygun kaplarda muhafaza edilmelidir.
+        • Saklama aşamasında nem ve sıcaklık etkilerinden korunmalıdır.
+
+
+
+
+24
+Sebze türü          Ekim derinliği   Sıra üzeri (cm)   Sıra arası (cm)
+Fasulye             3-5              5-10              30-40
+Brokoli             1-1,5            25-50             45-60
+Brüksel lahanazı    1-1,5            40-50             65-70
+Lahana              0,5-1,5          40-90             60-90
+Karnabahar          0,5-1,5          40-70             60-90
+Kavun               2,5-5            40-100            150-250
+Havuç               1-1,5            3-8               20-30
+Kereviz             0,5-1            15-30             45-90
+Çin lahanası        1                45-60             70
+Hıyar               3                45-60             120-150
+Hıyar (sera)        3                25-35             150
+Turşuluk hıyar      3                25                100
+Patlıcan            1                65-70             45-60
+Marul               0,6-1,3          20-30             30-60
+
+
+
+
+                                                                         Çizelge 2. Sebzelerde tohum ekim derinliği, sıra üzeri ve sıra arası mesafeleri
+Bamya               2-2,5            45                75
+Soğan               1,5              5-8               20-30
+Maydanoz            1                10-15             30-45
+Bezelye             3-5              2-7               60-90
+Biber               0,6-1,3          40-45             45-75
+Bal kabağı          3-5              50-90             150-300
+Turp                1,3-2,5          2-5               20-30
+Ispanak             3                7-15              30-45
+Kabak               2-3              50-70             120-150
+Sera domatesi       1                40-50             80-90
+Sofralık domates    0,6-1,3          30-40             150
+Endüstri domatesi   0,6-1,3          25-30             100-150
+Şalgam              1,5              5-10              30-40
+Karpuz              2,5-5            90-150            180-320
+                      1000 dane      1 g’daki       Çimlenme Saklama
+     Sebze türü       ağırlığı (g)   tohum sayısı   süresi (gün) ömrü (yıl)
+     Bakla            1100-2500      1-9            10-14         3
+     Bamya            68-69          15-19          -              2
+     Bezelye          100-500        3              8-10           3
+     Biber            6-7            150-180        -              4
+     Domates          2,7-3,3        240-400        6-8            4
+     Fasulye          150-1000       1-6            7-16           3
+     Havuç            1-1,4          826-833        10-12          3
+     Hıyar            16-33          25-50          6-8            5
+     Ispanak          9-11           70-104         5-6            5
+     Kabaka (Sakız)   94-95          -              6-12           5
+     Karnabahar       3-4            315-367        5-6            5
+     Karpuz (yerli)   125-126        7-11           5-10           5
+     Kavun            51-52          18-25          5-10           5
+     Kereviz          0,4-0,5        2000-2875      15-20          5
+     Kuşkonmaz        18-19          25-50          -              3
+     Lahana           3-4            225-300        4-6            5
+
+
+
+
+                                                                              Çizelge 3. Sebze türleri tohum özellikleri
+     Maydanoz         1,2-1,8        555-833        14-18          2
+     Patlıcan         4-5            228-280        8-15           5
+     Pazı             13-22          37-70          8-16           4
+     Pırasa           2,2-3,2        345-400        10-15          1
+     Salata-Marul     0,8-1,2        888-1300       8-12           5
+     Soğan            2,7-4          200-341        10-30          1
+     Turp             6,5-10         75-150         5-8            5
+
+
+
+
+26
+  Tozlaşma ve İzolasyon / Dr. Gülay Beşirli ve Dr. Alptekin Karagöz
+Sebzelerde yabancı tozlaşmanın sebepleri şunlardır:
+1) Erkek ve dişi organların aynı seviyede olmaması. Bitki erselik çiçek yapısında olsa bile er-
+kek ve dişi organlar arasında seviye farkının bulunması nedeni ile polenlerin dişicik tepesine
+ulaşımı kolay olmayabilir (Resim 1).
+
+
+
+
+                                          Resim 1. Biberde dişi ve erkek organların farklı
+
+
+
+
+                                                                                                                              Resim 2. Patlıcan çiçeğinde dişi organların
+                                                                                                                              erkek organlardan aşağı seviyede olduğu
+                                          seviyede olma durumu
+
+
+
+
+                                                                                                                              durum.
+Resim 1’de görüldüğü üzere, bu tür çiçek yapısında tozlaşmanın olabilmesi için aşağı seviye-
+de olan polenleri yukarı taşıyacak bir taşıyıcı gerekir. Bu durum yabancı döllenmeye neden
+olur. Dişi organın, erkek organ ile aynı seviyede ya da aşağı seviyede olması kendine döllen-
+meyi kolaylaştırır (Resim 2).
+
+2) Adına “Prodantri” adı verilen durumda bitki erselik çiçek yapısında olsa bile çiçek tozları ile
+dişi organın aynı anda döllenme çağına gelmemesi yabancı döllenme sebeplerinden biridir.
+Pırasa ve soğan bu tür çiçek yapısına sahip olan sebze türlerindendir (Resim 3).
+                                                                                             Resim 3. Pırasada çiçek yapısı
+     3) Erkek kısırlık, yabancı döllenmeyi gerektiren nedenlerden birisidir. Bazı sebzeler erselik
+     çiçeklere sahip olduğu halde, çiçek tozları dölleme kabiliyetinde değildir. Bu tür çiçek yapısı
+     soğan, lahana ve havuç sebze türlerinde görülebilir.
+
+     YABANCI DÖLLENMEDE İZOLASYON
+     Pazara yönelik taze üretim yaparken yabancı döllenen bitkilerin farklı çeşitleri yan yana eki-
+     lebilir/dikilebilir. Ancak çeşitlerin özellikleri birbirine karışmadan tohum üretimi yapmak iste-
+     niyorsa iki çeşit arasında yabancı döllenmeyi engelleyici önlemler almak gerekir.
+
+     Yabancı döllenmeyi önlemek için alınacak tedbirler iki grupta toplanabilir:
+     1. Mesafe izolasyonu
+     2. Kapalı izolasyon
+
+     Mesafe izolasyonu için bitki çeşitleri arasında bırakılacak uzaklık metre cinsinden Çizelge 4’te
+     verilmiştir. Örneğin biber (Capsicum annuum L.) bir bitki türüdür. Dolma biber, yağlık (salça-
+     lık) biber, çarliston biberi, tatlı sivri biber, acı sivri biber, Demre tipi biberler ise biber türünün
+     altındaki farklı çeşitlerdir. Dolma biber çeşidi ile tatlı sivri biber çeşidini yan yana dikip her iki-
+     sinden de tohum alarak seneye aynı özellikte hem dolma hem de tatlı sivri biber çeşitlerinin
+     elde edilmesi mümkün değildir. Biber yabancı döllenen bir bitki olduğundan birbirinin pole-
+     niyle olan döllenme sonunda her iki çeşit de özelliklerini kaybetmeye başlayacaktır. Önlem
+     almaksızın bu işlemlerin arka arkaya devam ettirilmesi yıllar içinde her iki çeşidin özelliğini
+     kaybederek yok olmasına sebep olacaktır.
+
+     Çizelge 4’te belirtildiği gibi, biber türü için çeşitlerin özelliğini kaybetmeksizin tohum üre-
+     timinin yapılabilmesi için gerekli olan izolasyon mesafesi 400 m’dir. Acılık özelliği baskın bir
+     karakterdir. Acı biberler ile tatlı biberler arasında bırakılması gereken mesafe ise 1500 m’dir.
+
+     Kendine döllenen domates bitkisinde iki çeşit arasında bırakılması gereken mesafe 50 m,
+     baklagillerden olan fasulye, börülce ve bezelye için ise 25 m’dir.
+
+     Aynı üretim alanında her yıl aynı bitki türüne ait farklı çeşitlerin üretimi de çeşit safiyetini
+     korumak bakımından sakınca doğurur. Bu nedenle araya yıl mesafesi koymak gerekir. Bir
+     üretim alanına aynı bitki türünün getirilebilmesi için geçmesi gereken süre de Çizelge 4’te
+     sunulmuştur. Yine biber bitkisinden örnek verilmesi durumunda bu süre 3 yıl olarak belirtil-
+     mektedir. Yıl izolasyonu çeşit safiyetini korumak kadar aynı türe araz olan hastalık ve zararlı
+     yoğunluğunu azaltmak ve toprağın sürdürülebilir kullanımı sağlamak için de uyulması gere-
+     ken zaman dilimidir. Bunun için taze üretim kadar tohum üretiminde de uygun ekim nöbeti
+     programlarının izlenmesi gerekir.
+
+
+
+
+28
+                             İzolasyon
+   Tür adı                   mesafesi (m)             Yıl*
+   Acur                      500                      1 (Acur ve hıyar)
+   Bakla                     200                      2 Bakla
+
+
+
+
+                                                                                                                Çizelge 4. Sebze türlerinin üretimi aşamasında uyulması gereken zorunlu izolasyon mesafesi ve arka arkaya getirilmeyecek türler arasındaki zaman
+   Bamya                     200                      3 (Bamya, ebegümeci, gülhatmi)
+   Bezelye                   25                       1 (Fasulye, bezelye, börülce)
+   Biber                     400                      3 (Biber, patlıcan)
+   Börülce                   25                       1 (Fasulye, bezelye, börülce)
+   Dereotu                   750                      1 Dereotu
+   Domates                   50                       3 (Domates, biber, patlıcan)
+   Fasulye                   25                       1 (Fasulye, bezelye)
+   Havuç                     750                      2 (Havuç, yabani havuç, kereviz, maydanoz)
+   Hıyar                     500                      3 (hıyar, kabak, kavun, karpuz, acur, kudret narı,
+                                                      kivano)
+   Ispanak                   750                      2 (Ispanak)
+                                                      3 (hıyar, kabak, kavun, karpuz, acur, kudret narı,
+   Kabak                     750                      kivano)
+                                                      3 (Lahanalar, yabani turp, turp, yabani hardal,
+   Karnabahar                750                      kolza, karnabahar)
+   Karpuz                    500                      3 (Hıyar, kabak, kavun, karpuz, acur, kudret
+                                                      narı, kivano)
+   Kavun                     750                      3 (Hıyar, kabak, kavun, karpuz, acur, kudret
+                                                      narı, kivano)
+   Kereviz                   750                      2 (Kereviz)
+   Kuşkonmaz                 750                      Şart yok
+   Lahana                    500                      3 (Lahanalar, yabani turp, turp, yabani hardal,
+                                                      kolza, karnabahar)
+   Maydanoz                  400                      2 (Maydanoz)
+   Patlıcan                  300                      3 (Domates, biber, patlıcan)
+   Pazı                      750                      2 (Pazı)
+   Pırasa                    750                      3 (Sarımsak, soğan, pırasa)
+   Roka                      750                      3 (Roka)
+                                                                                                                izolasyon süreleri (Anonim, 1999)
+
+
+
+   Salata-Marul              300                      2 (Salata-Marul)
+   Sebze pancarı             750                      2 (Şeker pancarı, pazı, kırmızı pancar)
+   Semizotu                  750                      1 (Semizotu)
+   Soğan                     750                      3 (Sarımsak, soğan, pırasa)
+   Tere                      400                      3 (Tere)
+   Turp                      750                      3 (Turp, lahana)
+*Aynı tarlaya aynı familyaya ait türlerin tekrar ekilebilmesi için geçmesi gereken süredir. Parantez içindeki
+türler belirtilen sürede yetiştirilmeyecek olan türlerdir.
+     Üretim alanının küçük olması durumunda iki farklı çeşit üretip tohum almak istendiğinde bu
+     mesafelere ulaşmak mümkün değildir. Bu koşullarda kapalı izolasyon tekniklerinden birisi
+     kullanılabilir.
+
+     3 farklı kapalı izolasyon tekniği vardır:
+     1. Çiçek ve salkım izolasyonu
+     2. Bitki izolasyonu
+     3. Bitkiler grubu izolasyonu
+
+     Çiçek ve salkım izolasyonu bitkinin çiçek yapısına bağlı olarak yapılır. Örneğin domateste
+     çiçekler salkım şeklindedir ve salkım izolasyonu yapılabilir (Resim 4).
+
+
+
+
+                                                                                            Resim 5. Biber bitkisinde tek çiçek izolasyonu
+                                   Resim 4: Domates bitkisinde salkım izolasyonu
+
+
+
+
+                                                                                            Resim 6. Patlıcan bitkisinde çiçek izolasyonu
+
+
+
+
+     Bazı bitkilerde tek çiçek izolasyonu
+     yapılabilir. Bu amaç ile de değişik
+     materyaller kullanılabilmektedir
+     (Resim 5 ve 6).
+
+
+
+
+30
+İzolasyonu yapılan çiçeklerden elde edilen meyvelerin hasat aşamasında diğer meyveler ile
+karışmasını önlemek amaçlı etiket takılabilir. Üretici koşullarında çiçek sapına değişik renk-
+lerde ip bağlanabilir (Resim 7). Çiçekler çok hassastır. Kullanılan malzeme hafif olmalıdır, aksi
+takdirde izolasyonu yapılan çiçekler sararıp düşebilir.
+
+
+
+
+                                                          Resim 7. İzolasyonu sağlanmış ve
+                                                          etiketlenmiş patlıcan çiçeği
+
+
+
+
+                                                                                               Resim 8. Soğan bitkisinde çiçek
+                                                                                               izolasyonu
+     Çiçek yerine bitkinin tamamı kapatılarak izolasyon sağlanabilir. Bunun için beyaz, ışık ve
+     hava geçiren kumaştan yapılmış kafeslerden yararlanılır (Resim 9). Aynı çeşide ait bitki grup-
+     ları bir arada izole edilebilir (Resim 10). İzolasyon kafeslerinde, kafes iskeleti olarak ahşap ya
+     da demir malzeme kullanılabilir.
+
+     İzolasyonu sağlanan bitkiler yabancı dölleniyor ise döllenmeyi sağlamak amacı ile kafes iç-
+     lerine ya özel üretilmiş böcekler konulur ya da elle döllenmeye yardımcı olunması gerekir.
+
+
+                                     Askı teli
+
+
+
+
+                                                                               Resim 9. Tek bitki izolasyonu
+
+
+                                                                                                               Resim 10. Bitki grubu izolasyonu
+
+
+
+
+32
+Yıl izolasyonu yaparken birbiri ardına yetiştirilecek bitkilerin seçimine dikkat etmek gerekir.
+Bitkiler yetişme periyodunca ve yetişme periyodu sonunda toprakta parçalanmaları esna-
+sında bulundukları ortama kimyasal bileşenler yayarlar. Toprağa bırakılan bu kimyasallar
+kendinden sonra gelen bitkiye olumlu ya da olumsuz etki yapar. Bir yetiştirme periyodunda
+üretilen bitkiye “ana bitki”, bir önceki periyotta üretilen bitkiye “ön bitki” ve bir sonraki yetiş-
+tirme periyodunda üretilecek bitkiye “art bitki” adı verilir. Art arda üretilecek bitki seçiminde
+aralarındaki etkileşime de dikkat etmek gerekir (Çizelge 5). Örneğin domates ülkemizde en
+fazla üretilen sebze türüdür. Domatesten önce ön bitki olarak hıyar, lahana, kereviz, şalgam
+ve baklagil sebze türlerinin, sonraki ekim içinse art bitki olarak ıspanak, havuç, bezelye, fasul-
+ye, bakla ve kereviz türlerinin tercih edilmesi önerilmektedir.
+
+
+ Tür               Ön bitki                                  Art bitki
+ Ispanak           Patates, Bezelye, Fasulye, Havuç,         Bezelye, Fasulye, Hıyar, Domates,
+
+
+
+
+                                                                                                       Çizelge 5. Sebzelerde ön, ana ve art bitki olma durumları
+                   Karnabahar, Lahana ve Salatalar           Patates, Lahana ve Soğan
+
+ Lahana            Lahanalar dışındaki tüm sebze             Domates, Fasulye, Salata, Hıyar,
+                   türleri                                   Turp, Pırasa, Bezelye
+ Fasulye           Patates, Domates, Kırmızı pancar,         Bütün sebze türleri. En şanslı grup
+                   Maydanoz, Havuç, Ispanak,
+                   Lahana, Soğan                             lahanagiller
+
+ Hıyar, Kavun,     Domates, Patates, Lahana, Şalgam,         Salatalar, Ispanak, Lahana, Soğan
+ Karpuz            Soğan, Ispanak, Turp, Salatalar
+ Domates,          Hıyar, Lahana, Kereviz, Şalgam,           Ispanak, Havuç, Bezelye, Fasulye,
+ Patlıcan          Baklagiller                               Bakla, Kereviz
+
+ Biber             Kabakgiller, Baklagiller, Salatalar,      Ispanak, Havuç, Bezelye, Fasulye,
+                   Ispanak, Turp                             Bakla, Kereviz
+     BAKLAGİL       BUĞDAYGİL     LAHANAGİL       BAKLAGİL
+     Bezelye        Tatlı Mısır   Lahana          Bezelye
+     Fasulye                      Brokoli         Fasulye
+
+
+     LAHANAGİL      PATLICANGİL   PATLICANGİL BUĞDAYGİL
+     Lahana         Domates       Domates     Tatlı Mısır
+     Brokoli        Biber         Biber
+
+
+
+            Birinci Yıl                   İkinci Yıl
+
+
+
+
+     PATLICANGİL LAHANAGİL        BUĞDAYGİL       PATLICANGİL
+     Domates     Lahana           Tatlı Mısır     Domates
+     Biber       Brokoli                          Biber
+
+
+     BUĞDAYGİL      BAKLAGİL      BAKLAGİL        LAHANAGİL     Çizelge 6. Ekim Nöbeti Örneği
+     Tatlı Mısır    Bezelye       Bezelye         Lahana
+                    Fasulye       Fasulye         Brokoli
+
+
+
+           Üçüncü Yıl                  Dördüncü Yıl
+
+
+
+
+34
+                                  Rüzgâr siperi ve canlı çitler
+                            Kaynak: Roselló, J.; Soriano, J.J., 2010, s. 54-56.
+ Tohum üretilen alanlarda, mikro klima koşulları          başka açılardan faydalı böcekleri barındırır. Kıyı
+ çit çevirerek iyileştirilebilir. Çit, tohum üretiminde   bölgelerde ise bitkileri yakıcı tuzlu rüzgârlardan
+ kullanılan en yaygın yöntemlerdendir.                    korur.
+
+ Çitler parselin karşısından gelen rüzgârdan              Diğer olumlu etkiyse, yabancı polen tanelerini
+ korur; çit yüksekliğinin 15 - 20 katı kadar mesafe       ekim alanı dışında tutmasıyla, istenmeyen
+ boyunca rüzgârın hızı %80 oranda kesilir.                çapraz döllenmeleri azaltmasıdır. Çit sayesinde
+ (Örneğin çit 5 metreyse, rüzgâr saatte 100 km            ırklar arası döllenmeyi engellemek için gereken
+ hızla geliyorsa, çitten sonraki 75 - 100 metre           mesafeler de azaltılabilir.
+ boyunca rüzgâr hızı saatte 20 km’ye düşer).
+ Bu işlevi görebilmesi için, çitin yarı-geçirgen          Çitler canlı (bitkisel) veya cansız, yani ahşap,
+ olması gerekir, aksi halde oluşan rüzgâr direnci         taş, plastik gibi maddelerden kurulmuş olabilir.
+ burgaçlara sebep olur ve hedeflenen etki elde            Canlı çitler, çeşitli hayvanları barındırdıkları için
+ edilemez.                                                biyolojik çeşitliliği arttırarak bölgenin ekolojik
+                                                          dengesini iyileştirir.
+ Bu şekilde korunan alanlarda bitkilerin
+ nem çıkarmasından veya topraktaki sıvının                Çiti oluşturan bitkiler mevsime göre geçici de
+ buharlaşmasından kaynaklanan nem kaybı                   olabilir. Örneğin, mısır, ayçiçeği, süpürge darısı
+ azalır; yapraklar daha az yıpranır ve mum                veya bezelye gibi tek yıllık ekinler bu işi görebilir.
+ tabakalarını korur; böylece bitki daha sağlıklı          Bunların birkaç sırasını ekerek alanları ayırıp
+ olur. Bunun ötesinde, canlı çitler tozlaşma ve           çapraz tozlaşmayı engelleyebiliriz.
+
+
+
+
+             Tohum Alırken Nelere Dikkat Edilmelidir?
+                                                                                                      Dr. Gülay BEŞİRLİ
+
+Üretim alanında bulunan bitkilerin en sağlıklısından tohumluk alma yoluna gidilmelidir. Yani
+üretici koşullarında çeşit korumaya yönelik seleksiyon yaparak tohumluk bitki seçimi yapıl-
+malıdır.
+
+Üretim alanına hastalık bulaşmış ise o parselden tohum almak yerine tohumu yenileme yolu-
+na gidilmeli, en az 3-4 yıl o parselde aynı bitki tür ve çeşidine yönelik üretim yapılmamalıdır.
+
+Tohum ayıklama işlemi bitki tür ve çeşidine bağlı olarak farklılık gösterir. Örneğin domates
+ve patlıcan tohumu su içinde yıkanarak çıkarılırken, biber tohumları meyvenin boyuna ikiye
+kesilmesi ile içinde bulunan tohumların ıslatılmadan elle ayıklanması şeklinde olur. Bamya
+bitkisinde tek tek elle ayıklama yapılır. Ayıklama işlemi sırasında böcek zararı olan tohumlar
+ayrılmalıdır.
+                                                  Tohumlar için Dezenfektasyon Yöntemleri
+     Yöntem          Sorun              Uygulama İşlem                                                              Gözlemler
+                                        zamanı
+
+     Dondurma        Böcekler:          Saklama        Temizlenmiş ve kurutulmuş tohumlar nem almayacak             Baklagil, mısır ve
+                     Kınkanatlılar ve   öncesi         şekilde kavanoza konup 3 – 4 gün buzlukta tutulur.           tahıllar için özellikle
+                     kelebekler                                                                                     uygun.
+
+     Doğal           Böcekler:          Saklama        Tohum kavanozuna bir avuç doğal piretrin dağıtılır.          Tahıllar için uygun.
+     piretrin        Kelebekler         öncesi
+
+
+     Öz yağlar       Böcekler           Saklama        Tohum kavanozuna Tohumları yayıp şu karışımı                 Mevcut böcekleri
+                                        öncesi         püskürtün (100 ml için):                                     kaçırır.
+                                                       - 10 ml bitkisel kaynaklı emülgatör
+                                                       - 20 damla şu bitkilerden birininveya her birinin öz yağı:
+                                                       lavanta, fesleğen, ıtır, limon otu (Cymbopogoncitratus),
+                                                       citronella, karanfil.- 100 ml’yi tamamlayacak kadar
+                                                       su.Tohumları kurutup saklayın. İkinci kez uygulamak
+                                                       gerekebilir. bir avuç doğal piretrin dağıtılır.
+
+     Şifalı                             Ekim           Tohumları 15 dakika sıcak sarıpapatya çayında bekletin.      Domates, kereviz,
+     bitkiler                           öncesi         Kurutup ekin.                                                patates ve soğan
+                                                                                                                    tohumunda kullanılır.
+                                                       Tohumları 15 dakika kedi otu özüyle karıştırdıktan sonra
+                                                       kurutup ekin.
+
+     Sirke           Mantar             Saklama        Tohumları şu karışımın içine koyun:                          Çimlenmeyi etkilemez.
+
+
+
+
+                                                                                                                                              Çizelge 7: Tohumlar için Dezenfeksiyon Yöntemleri
+                                        öncesi         - %10’a sulandırılmış sirke
+                                                       - %10 demir sülfat + %0,5 çinko sülfat: sirkenin
+                                                       etkinliğini arttırır.
+                                                       Kurutup saklayın.
+     Yağsız süt      Virüs              Saklama        Tohumları yağsız süt içinde 20 dakika bekletin.
+                                        öncesi         Süzdükten sonra kurutup saklayın.
+
+     Kuru buz        Böcekler           Saklama        Tohumları bolca kaplayacak kadar kuru buz kırılıp
+                                        öncesi         tohumlarla karıştırılır. CO2 uçana kadar ve/veya en az
+                                                       8 saat bekletilir. CO2 havadan daha ağır olduğu için
+                                                       ortamı havasız bırakır ve böcekler oksijen eksikliğinden
+                                                       ölür.
+
+     Çamaşır         Bakteri ve         Ekim           Tohumlar süzgece konur; böylece kolaylıkla sıvı karışıma     Tekrar kurutmayın;
+     suyu            mantar             öncesi         sokup çıkarılabilir. On dakika boyunca 1 litreye 30-50 g     çimlenme gücü
+                                                       klor olacak kadar sulandırılmış çamaşır suyuna batırıp       azalabilir.
+                                                       bekletilir. Bol suyla klor kokusu gidene kadar yıkanır.
+
+
+
+
+                Kaynak: Ashworth, 2002; Delmond, 2005; Deppe, 2000; Miller, 2011; Roselló, 2010.
+                Vinyals, N. [et al.], 2011, sayfa 70-72 ve 84’ten uyarlanmıştır.
+36
+                                        Tohumlar için Dezenfektasyon Yöntemleri
+Yöntem         Sorun          Uygulama İşlem                                                              Gözlemler
+                              zamanı
+
+Asitli         Mantar ve      Saklama        1. Meyve (örneğin domates) temiz bıçakla                     Özellikle domateste,
+fermantasyon   bakteri        öncesi         ortadan kesilir.                                             arazide sağlık sorunu
+                                             2. Tohumlar ve beraberinde çıkan suyu ve eti elle            yaşamış tohumlarda
+                                             veya kaşıkla kaba alınır.                                    bulunabilecek tüm
+                                             3. Etin en iri parçaları tohumdan ayrılır.                   zararlı patojenleri yok
+                                             4. Ayrılamayan et ve tohumlar, 3 - 7 gün arası               etmek için yeterli değil.
+                                             fermantasyona bırakılır. Bu süre boyunca iki günde           Virüsü yok etmez.
+                                             bir karıştırılır ve mümkün olduğunca tohumlar
+                                             didiklenerek lapaya dönüşen etten ayrılır.
+                                             5. Bu süre bittiğinde, kap suyla doldurulup karıştırılır.
+                                             Yaşayabilir tohumlar batarken, suyun üst kısmında
+                                             et parçaları ve yaşayamaz tohumlar kalır. Suyun bu
+                                             üst kısmı dikkatle dökülür. Bu işlem et ve geçersiz
+                                             tohumlar yok edilene kadar, her seferinde temiz
+                                             su ekleyerek, tekrar edilir ve dipte sadece temiz
+                                             yaşayabilir tohum kalır.
+                                             6. Temiz tohum süzülür.
+                                             7. Tohumlar tül (veya benzer hava geçiren kumaş)
+                                             torbalarda kurumaya asılır. Tamamen kuruması 1 ila 3
+                                             hafta sürebilir. Güneşte kurutulmaması gerekir.
+
+Hidroklorik    Mantar, bakteri Saklama       Tohumlarsüzgece konur; böylece kolaylıkla sıvı
+asit (H Cl)    ve tohumla      öncesi veya   karışıma sokup çıkarılabilir.
+               bulaşan virüs ekim öncesi     1 litre suda 40ml hidroklorik asit sulandırıldıktan
+                                             sonra, tohumlar 60 dakika boyunca batırılıp bekletilir.
+                                             Ekilecekse, bol suyla yıkanır. Saklanacaksa, kuru ve
+                                             havadarbir yerde kurutup saklanır.
+
+Sıcak su       Mantar ve      Saklama        Tohumlar 50ºC suya 20-30 dakika konur (aşağıdaki             Tohum, yumru kök ve
+               bakteri        öncesi         çizelgeye göre). Güvenilir ve hassas termometre              bitki soğanı için etkin
+                                             gerekir. Ancak en iyisi 0,5º hassasiyetli termostatik        yöntem, ancak işlem-
+                                             banyo kullanılmalıdır. Tohumların derhal bezle               den sonra çimlenme
+                                             durulanması ve 2-3 saat içinde yüzeylerinin kurumuş          oranı %5 - %10 arası
+                                             olması gerekir. Sonra, kurutma sürecinin havadar             düşebilir.
+                                             yerde 2-3 gün içinde tamamlanması gerekir.
+                                             - Yeşil karnabahar, Brüksel lahanası, kıvırcık lahana, Çin
+                                             lahanası: 20 dakika, 50º
+                                             - Patlıcan, ıspanak, şalgam: 25 dakika, 50º
+                                             - Kereviz, biber: 30 dakika, 50º
+                                             - Karnabahar: 25 dakika, 52º
+                                             - Lahana: 30 dakika, 52º
+                                             - Domates: 25 dakika, 52º
+     Tohumları Doğal Koşullarda Ne Kadar Kurutabiliriz?
+     Dr. Alptekin KARAGÖZ
+
+           Havada değişen oranlarda su buharı da vardır. Tohumun kuruması, havanın içinde bulunan
+           su buharı oranı ve hava sıcaklığına bağlıdır. Havanın birim hacminin tutabileceği nem mik-
+           tarı hava sıcaklığı arttıkça yükselmektedir. Havanın nem oranı ile doğal koşullarda kurutulan
+           tohumların nem oranı arasında bir denge vardır. Bir başka deyişle tohumlar, kurutma orta-
+           mının atmosferik nemine bağlı olarak belirli bir düzeye kadar kurutulabilir. Havanın nemi ile
+           tohumun getirilebileceği nem oranı arasındaki bu ilişkiye “denge nem kapsamı” denir.
+
+           Örneğin % 1,7 yağ oranına sahip arpa tohumu, % 50 nispi nem ve 25° C sıcaklıkta % 12,5
+           tohum neminde dengelenir. Yani bu çevre koşullarında arpanın en fazla kurutulabileceği
+           nokta budur ve ne kadar bekletirsek bekletelim daha fazla kurumaz. Aynı koşullarda % 4,4
+           yağ oranına sahip mısır bitkisi tohumu % 12,1 nem oranına; % 47,5 yağ oranına sahip susam
+           tohumu % 6,7 nem oranına kadar kuruyacaktır.
+
+           Aynı tohumların %20 nispi nem ve 15° hava sıcaklığına sahip ortamda kurutulması sonucu,
+           arpa % 7,7; mısır % 7,5 ve susam % 4,1 nem derecelerine kadar kuruyacaktır. Görüldüğü
+           gibi aynı çevre koşullarında yağlı tohumlu bitkiler daha düşük nem derecelerinde dengelen-
+           mektedir. Doğal olarak Şanlıurfa gibi nispi nemin düşük olduğu yerlerde tohumlar, İstanbul
+           veya Adana gibi nispi nemin yüksek olduğu yerlere göre daha düşük nem derecelerine kadar
+           kuruyabileceklerinden canlı kalma süreleri de uzayacaktır. Şanlıurfa’dan Adana’ya getirilen
+           tohum burada bir miktar nem alacak ve ağırlığı artacaktır.
+
+
+
+
+     Tohumların Canlı Kalma Süresi / Dr. Alptekin KARAGÖZ
+           Tohumlar olgunlaştıktan sonra çimleninceye kadar uyku halindedir. Çimlenmeye etki eden
+           faktörler, su, sıcaklık, kimi kimyasal maddeler, oksijen miktarı, ışık ve bazı hallerde de tohu-
+           mun çevresinde bulunan mikro mantarlardır. Tohum uygun ortamını bulmadan toprakta
+           uzun yıllar durgun vaziyette kalabilir. Dünyada çimlenen en eski tohuma ait kayıt İsrail’de
+           2.000 yıllık hurma bitkisine aittir. Bu çok uç bir örnek olmakla beraber özellikle toprak nemi
+           ve sıcaklığı başta olmak üzere birçok faktöre bağlı olarak, tarımı yapılan bitki tohumları top-
+           rakta 1-2 gün ile 40-50 yıl arasında canlı vaziyette kalıp uygun koşulları bulduğunda yeniden
+           çimlenebilir.
+
+
+
+
+38
+Tohum canlılığı üzerinde birçok faktör etkili olmaktadır. Bu faktörler şunlardır:
+1. Tohumun fiziksel durumu,
+2. Tohuma bulaşık olan hastalık etmenleri ve zararlılar,
+3. Tohumun olgunluk durumu,
+4. Tohumların depolamaya tepkileri,
+5. Tohum nemi,
+6. Ortam sıcaklığı,
+7. Ortam nemi,
+8. Olgunlaşma dönemindeki canlılık oranı,
+9. Tohum yağ oranı,
+10. Tohum nişasta oranı,
+11. Embriyo büyüklüğü.
+Tohumların canlı kalma süresine ilişkin olarak aşağıdaki prensipler geçerlidir:
+1. Yağlı tohumların ömrü daha kısadır
+2. Nişastalı tohumların ömrü daha uzundur
+3. Kuru tohumların ömrü daha uzundur
+4. Kuru yerde depolanan tohumların ömrü daha uzundur
+5. Hastalıksız ve sağlam tohumların ömrü daha uzundur
+6. Dolgun tohumların ömrü daha uzundur
+7. Yüksek çimlenme oranıyla depoya giren tohumların ömrü daha uzundur.
+Tohumlar hasat edildikten hemen sonra canlılık oranını yitirmeye başlar. Tohumların hasat
+sonrası durumları ve saklama koşulları bunların canlılık oranları üzerinde etkilidir.
+
+Örneğin hasat sonrası canlılık oranı % 99 olan % 14 nem oranına sahip arpanın 30° C sıcak-
+lıkta canlılık oranının % 95’e düşmesi için geçecek süre yaklaşık 30 gündür. Aynı süre % 10
+nemli tohumda 215 gün, % 7 nemli tohum için 1.761 gün olarak hesaplanır. Görüldüğü gibi
+tohum neminin düşük olması canlılık oranını yüksek tutmada yardımcı olmaktadır. Yukarı-
+daki hesap aynı koşullar altında soğan tohumları için yapıldığında % 14 tohum neminde 18
+gün; % 10 tohum neminde 57 gün ve % 7 tohum neminde de 195 gün değerleri bulunmak-
+tadır. Sonuç olarak aynı koşullarda soğan gibi yağ oranı yüksek tohumların canlılık oranları,
+yağ oranı düşük bitkilere oranla daha hızlı düşmektedir.
+
+Yukarıda yapılan işlemleri bir de aynı tohum nemi ve daha düşük sıcaklık dereceleri için ya-
+palım. Ortam sıcaklığını bu kez 15° C olarak alalım. Bu durumda arpa tohumlarının % 99
+canlılıktan % 95 canlılık oranına düşmesi için geçecek süre % 14 nemli tohumlarda 230 gün;
+% 10 nemli tohumlarda 1.670 gün; % 7 nemli tohumlarda 13.679 gün olarak hesaplanır. Bu
+süreler aynı koşullarda soğan tohumları için sırasıyla 136, 438 ve 1.509 gün olacaktır. Tohum
+neminin düşmesiyle birlikte depo sıcaklığının da düşmesi, canlılık oranının korunmasında
+olumlu rol oynamaktadır. Her koşulda yağlı tohumlu bitki tohumları için süre, nişasta oranı
+yüksek olanlara oranla daha kısadır.
+     Tohumların Ev Koşullarında Saklanması
+     Dr. Alptekin KARAGÖZ
+
+           Yukarıda sıralanan genel tohum depolama prensiplerinden de anlaşılacağı gibi tohumların
+           saklanması sırasında ev koşullarında dikkat edilecek en önemli konu, tohumların doğal ko-
+           şullarda olabildiğince kurutulduktan sonra güneş görmeyen serin yerlerde hava alabilecek
+           şekilde bez torbalar içinde muhafaza edilmesidir. Tohum, yukarıda da belirtildiği gibi canlı
+           bir bitki örneğidir. Tohumda canlı olma ve canlı kalmayla ilgili fizyolojik faaliyetler devam
+           etmektedir. Tohum ortam havasını ve nemini canlı kaldığı süre boyunca kullanmaktadır. Bu
+           nedenle tohumların naylon torbalar içinde muhafaza edilmesi yanlış bir uygulamadır.
+
+           Ticari sebze tohumları genellikle hava almayan kutular ve lamine alüminyum folyolar içinde
+           pazarlanmaktadır. Bu tohumlar pazarlanmadan önce genellikle doğal koşulların elverdiği
+           ölçüde kurutulup ilaçlandıktan sonra paketlenmektedir. Tohumların depolama için yüksek
+           kabul edilebilecek nem derecelerinde hava almayan kaplarda muhafaza edilmesi tohum
+           ömrünü kısaltır. Tohumların ilaçlı olması canlı kalma süresinin daha da kısa kalmasına neden
+           olacaktır.
+
+
+
+
+     Tohumların Etiketlenmesi / Dr. Gülay BEŞİRLİ
+           1 Bitki tür adı (Örnek: Biber)
+           2 Bitki çeşit adı (Örnek: Çarliston biberi)
+           3 Tohumluğun üretim yeri
+           4 Tohumluğun üretim yılı
+           5 Üretimin kim tarafından yapıldığı yazılmalıdır.
+
+           Ticari tohumluk üretiminde bu işlemler Tohumculuk Kanununda hangi üretim aşamasında
+           tohumluk üretimi yapılıyor ise (elit, anaç, sertifikalı, ticari) etiket hazırlama kuralları ayrı ayrı
+           verilmiştir. Burada verilen bilgiler üretici koşullarında tohumluk üretimi için geçerlidir. Bu ko-
+           şullarda dahi, tohumun üretim tarihi ve kimden, nereden temin edilebileceği gibi bilgilerin
+           etikette yer alması,üretim sürecinin takibi ve söz konusu tür ve çeşidin gelecekte sürekliliği-
+           nin sağlanması bakımından önem arz etmektedir.
+
+
+
+
+40
+           DEĞİŞİK SEBZE
+           TÜRÜ BİTKİLERİNİN
+4. BÖLÜM   YETİŞTİRME TEKNİĞİ
+           VE TOHUM ÜRETİM
+           KILAVUZU
+     Tohum Üretirken Dikkat Edilmesi Gerekenler
+     Dr. Gülay BEŞİRLİ
+
+
+
+               Sebze türleri                    Üretici koşullarında
+                                                olması gereken
+                                                mesafeler (m)
+
+               Bamya                            200
+               Biber                            400
+
+
+
+
+                                                                                  Tohum üretiminde aynı türe ait çeşitler arasında önerilen mesafeler
+               Havuç                            750
+               Hıyar                            500
+               Ispanak                          500
+               Kabak                            750
+               Karpuz                           500
+               Kavun                            500
+               Kereviz                          750
+               Lahana                           500
+               Maydanoz                         400
+               Patlıcan                         300
+               Pırasa                           750
+               Salata-Marul                     300
+               Soğan                            750
+
+
+
+
+     Hıyar
+           YETİŞTİRİCİLİK
+           Üretimi doğrudan tohum ekimi ile yapılır. Tohum ekimi son don tarihinden bir hafta sonra
+           hazırlanan ocaklara yapılır. 30-40 cm genişliğinde hazırlanan ocakların birbirine uzaklığı, bit-
+           ki sıra üzeri 60 cm ve sıra arası 130-150 cm olacak şekilde ayarlanır.
+
+           Tohumlar 2,5-3 cm derinliğe ekilir. Her ocağa 4-5 tohum atılır. Tohumlar çimlendikten ve her
+           bitkide 2-3 gerçek yaprak oluştuktan sonra her ocakta 2 bitki bırakmak üzere diğer bitkiler
+           bir makas yardımı ile kesilir. Bu mesafelerle dikim yapıldığında bir dekarda 2200 bitki yetişti-
+           rilir. Tohum ekiminden sonra ilk hasat 55-70 gün sonra yapılır.
+
+
+42
+TOHUM ÜRETİM
+Arazide birden fazla hıyar çeşidi yetiştirilmek istenirse, iki hıyar çeşidi arasında 1500 m me-
+safe bırakılmalıdır. Aynı arazide üst üste hıyar yetiştirmemeli, hıyarın ardından kabakgiller
+familyasına ait acur, kabak, kavun ve karpuz da üretilmemelidir. Ekim nöbetine uygun olarak
+ancak 3 yıl sonra hıyar veya kabakgiller familyasından bir başka tür yetiştirilebilir.
+
+İlk oluşan meyvelerden tohum alınır. Tohumluk meyve, dış kabuk tamamen sararıncaya
+kadar dalda bırakılmalıdır. Koparılan tohumluk meyveler 35-40 gün bekletilir, daha sonra
+meyve ortadan kesilir. Sap kısmı uzunlamasına ikiye kesilerek tohumlar ayıklanır. Uç kısımda
+oluşan tohumlar zayıf geliştiğinden bu kısımdan tohum alınmaz. Kuruyan tohumlar cam ka-
+vanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir saklama yönte-
+mi tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de buzdolabında
+saklamaktır.
+
+
+
+
+                                                                                       Kabak
+YETİŞTİRİCİLİK
+Üretimi doğrudan tohum ekimi ile yapılır. Tohum ekimi son don tarihinden bir hafta sonra
+hazırlanan ocaklara yapılır. 30-40 cm genişliğinde hazırlanan ocakların birbirine uzaklığı, bit-
+ki sıra üzeri 70 cm ve sıra arası 150 cm olacak şekilde ayarlanır.
+
+Tohumlar 2 cm derinliğe ekilir. Her ocağa 2-3 tohum atılır. Tohumlar çimlendikten ve her bit-
+kide 2-3 gerçek yaprak oluştuktan sonra her ocakta 1 bitki bırakmak üzere diğer bitkiler bir
+makas yardımı ile kesilir. Bu mesafelerle dikim yapıldığında bir dekarda 950 bitki yetiştirilir.
+Tohum ekiminden sonra ilk hasat 50 gün sonra yapılır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla kabak çeşidi yetiştirilmek istenirse, iki kabak çeşidi arasında 1500 m me-
+safe bırakılmalıdır. Aynı arazide üst üste kabak yetiştirmemeli, kabağın ardından kabakgiller
+familyasına ait acur, hıyar, kavun ve karpuz da üretilmemelidir. Ekim nöbetine uygun olarak
+ancak 3 yıl sonra kabak veya kabakgiller familyasından bir başka tür yetiştirilebilir.
+
+İlk oluşan meyvelerden tohum alınır. Tohumluk meyve, dış kabuk tamamen sararıncaya
+kadar dalda bırakılmalıdır. Koparılan tohumluk meyveler 35-40 gün bekletilir, daha sonra
+meyve ortadan kesilir. Sap kısmı uzunlamasına ikiye kesilerek tohumlar ayıklanır. Uç kısımda
+oluşan tohumlar zayıf geliştiğinden bu kısımdan tohum alınmaz. Kuruyan tohumlar cam ka-
+vanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir saklama yönte-
+mi tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de buzdolabında
+saklamaktır.
+     Karpuz
+       YETİŞTİRİCİLİK
+       Üretimi doğrudan tohum ile yapılır. Tohum ekimi son don tarihinden bir hafta sonra hazırla-
+       nan ocaklarda yapılır. 30-40 cm genişliğinde hazırlanan ocakların birbirine uzaklığı, bitki sıra
+       üzeri 100 cm ve sıra arası 180 cm olacak şekilde ayarlanır.
+
+       Tohumlar 3-4 cm derinliğe ekilir. Her ocağa 4-5 tohum atılır. Tohumlar çimlendikten ve her
+       bitkide 2-3 gerçek yaprak oluştuktan sonra her ocakta 2 bitki bırakmak üzere diğer bitkiler
+       bir makas yardımı ile kesilir. Bu mesafelerle dikim yapıldığında bir dekarda 1200 bitki yetişti-
+       rilir. Tohum ekiminden sonra ilk hasat 80-90 gün sonra yapılır.
+
+       TOHUM ÜRETİMİ
+       Arazide birden fazla karpuz çeşidi yetiştirilmek istenirse, iki karpuz çeşidi arasında 1500 m
+       mesafe bırakılmalıdır. Aynı arazide üst üste karpuz yetiştirmemeli, karpuzun ardından ka-
+       bakgiller familyasına ait acur, hıyar, kabak ve kavun da üretilmemelidir. Ekim nöbetine uygun
+       olarak ancak 3 yıl sonra karpuz veya kabakgiller familyasından bir başka tür yetiştirilebilir.
+
+       İlk oluşan meyvelerden tohum alınır. Koparılan tohumluk meyveler 35-40 gün bekletilir,
+       daha sonra meyve ortadan kesilir. Sap kısmı uzunlamasına ikiye kesilerek tohumlar ayıklanır.
+       Uç kısımda oluşan tohumlar zayıf geliştiğinden bu kısımdan tohum alınmaz. Kuruyan to-
+       humlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir
+       saklama yöntemi tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de
+       buzdolabında saklamaktır.
+
+
+
+
+44
+                                                                                       Kavun
+YETİŞTİRİCİLİK
+Üretimi doğrudan tohum ekimi ile yapılır. Tohum ekimi son don tarihinden bir hafta sonra
+hazırlanan ocaklara yapılır. 30-40 cm genişliğinde hazırlanan ocakların birbirine uzaklığı, bit-
+ki sıra üzeri 70 cm ve sıra arası 150 cm olacak şekilde ayarlanır.
+
+Tohumlar 3-4 cm derinliğe ekilir. Her ocağa 4-5 tohum atılır. Tohumlar çimlendikten ve her
+bitkide 2-3 gerçek yaprak oluştuktan sonra her ocakta 2 bitki bırakmak üzere diğer bitkiler
+bir makas yardımı ile kesilir. Bu mesafelerle dikim yapıldığında bir dekarda 1700 bitki yetişti-
+rilir. Tohum ekiminden sonra ilk hasat erkenci çeşitlerde 80 gün, Kırkağaç gibi kışlık çeşitler-
+deyse 120-130 gün sonra yapılır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla kavun çeşidi yetiştirilmek istenirse, iki kavun çeşidi arasında 1500 m me-
+safe bırakılmalıdır. Aynı arazide üst üste kavun yetiştirmemeli, kavunun ardından kabakgiller
+familyasına ait acur, hıyar, kabak ve karpuz da üretilmemelidir. Ekim nöbetine uygun olarak
+ancak 3 yıl sonra kavun veya kabakgiller familyasından bir başka tür yetiştirilebilir.
+
+İlk oluşan meyvelerden tohum alınır. Koparılan tohumluk meyveler 35-40 gün bekletilir (er-
+kenci çeşitlerde bu süre 10 gündür), daha sonra meyve ortadan kesilir. Sap kısmı uzunlama-
+sına ikiye kesilerek tohumlar ayıklanır. Uç kısımda oluşan tohumlar zayıf geliştiğinden bu
+kısımdan tohum alınmaz. Kışlık çeşitlerde tohum ayıklaması yapılmadan tohumluk meyveler
+bütün olarak saklanabilir. Tohum ekim zamanı meyveler arazide kesilip meyvesi yenir, to-
+humu ekilir. Kuruyan tohumlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir
+yerde saklanır. İkinci bir saklama yöntemi tohumları önce bez torbaya, sonra da kilitli plastik
+torbaya koyarak +4°C’de buzdolabında saklamaktır.
+     Biber
+        YETİŞTİRİCİLİK
+        Fide ile yetiştirilir. Tohum ekimi, araziye fide dikim tarihinden 45-50 gün önce kapalı alanda
+        viyollere ya da üzeri kapatılabilen fide yastıklarına yapılır. Tohumlar 0,5 cm derine ekilir. Vi-
+        yollerde tohum ekim torfu kullanılırken, yastıklarda 1:1:1 oranında karıştırılmış toprak, yan-
+        mış hayvan gübresi ve torf karışımı harç kullanılır. Eğer işletmede kompost yapılıyor ise fide
+        yetiştiriciliğinde ideal bir ortam olarak kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere
+        sahip tel eleklerden geçirilerek elendikten sonra kullanılır. Tohumların çimlenmesi 2 hafta
+        sürebilir. Gündüz toprak ısısı yaklaşık 27°C, gece 10°C’nin üstünde olduğu zaman açık alana
+        aktarılır. Bölgede sıcaklık dereceleri tutsa bile son don tarihinden bir hafta sonra araziye di-
+        kim yapılmalıdır. Fideler 3 gerçek yaprağa ulaştıktan sonra dikilmelidir.
+
+        Fideler arazide 40 cm sıra üzeri ve 60 cm sıra arası mesafeler ile dikilir. Bu mesafeler ile dikim
+        yapıldığında bir dekarda 4100 bitki yetiştirilir. Yeşil-taze tüketim için biberler fide dikiminden
+        75 gün sonra hasat edilebilir. Tohumluk üretimi için meyvelerin tamamen kırmızı olması bek-
+        lenir. Bu süre 120-130 gün olur. Küçük acı biberlerde bu süreler 10-20 gün kısalabilir.
+
+        TOHUM ÜRETİMİ
+        Arazide birden fazla biber çeşidi yetiştirilmek istenirse, iki biber çeşidi arasında 500 m me-
+        safe bırakılmalıdır. Aynı arazide üst üste biber yetiştirmemeli, biberin ardından patlıcangiller
+        familyasına ait domates, patlıcan ve güveyfeneri de üretilmemelidir. Ekim nöbetine uygun
+        olarak 3-4 yıl sonra biber veya patlıcangiller familyasından bir başka tür yetiştirilebilir.
+
+        İlk oluşan meyvelerden tohum alınır. Tam kırmızı renge ulaşmış halde hasat edilen mey-
+        velerden hemen tohum alımı yapılır. Meyve bir bıçak yardımı ile ortadan ikiye kesilir. Sap
+        kısmından uca doğru çizilerek açılır ve buradaki tohumlar el yordamıyla ayıklanıp gölgelik
+        bir yerde kurumaya bırakılır. Biber tohumları yıkanmaz. Uç kısımda oluşan tohumlar zayıf
+        geliştiğinden bu kısımdan tohum alınmaz. Kuruyan tohumlardan kahverengi siyah olanlar
+        ayıklanıp canlı sarı renkli olanlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin
+        bir yerde saklanır. İkinci bir saklama yöntemi, tohumları önce bez torbaya, sonra da kilitli
+        plastik torbaya koyarak +4°C’de buzdolabında saklamaktır. Acı, küçük biberler bitki olarak
+        kökünden sökülüp gölge bir yere asılarak meyveleri ile beraber kurutulur. Tohum ekme za-
+        manı meyvelerin içinden çıkarılan tohumlar ekilir. Bu da üretici koşullarında pratik bir tohum
+        saklama yöntemidir. Eti kalın biberlerde bu yöntem uygulanmaz.
+
+
+
+
+46
+                                                                                    Domates
+YETİŞTİRİCİLİK
+Fide ile yetiştirilir. Tohum ekimi, araziye fide dikim tarihinden 30-35 gün önce kapalı alanda
+viyollere ya da üzeri kapatılabilen fide yastıklarına yapılır. Tohumları 0,4 cm derine ekilir. Vi-
+yollerde tohum ekim torfu kullanılırken, yastıklarda 1:1:1 oranında karıştırılmış toprak, yan-
+mış hayvan gübresi ve torf karışımı harç kullanılır. Eğer işletmede kompost yapılıyor ise fide
+yetiştiriciliğinde ideal bir ortam olarak kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere
+sahip tel eleklerden geçirilerek elendikten sonra kullanılır. Tohumların çimlenmesi bir hafta
+sürebilir. Gündüz toprak ısısı yaklaşık 27°C, gece 10°C’nin üstünde olduğu zaman açık alana
+aktarılır. Bölgede sıcaklık dereceleri tutsa bile son don tarihinden bir hafta sonra araziye di-
+kim yapılmalıdır. Fideler 3 gerçek yaprağa ulaştıktan sonra dikilmelidir.
+
+Fideler arazide 40 cm sıra üzeri ve 100 cm sıra arası mesafeler ile dikilir. Bu mesafelerle dikim
+yapıldığında bir dekarda 2500 bitki yetiştirilir. Kiraz domateslerde fide dikiminden 60 gün,
+sofralık domateslerde ise 80 gün sonra meyveler olgunlaşıp hasat edilebilir. Tohumluk üreti-
+mi için meyvelerin tamamen kırmızı olması beklenir.
+
+Sırık domateslerde koltuk alma ve askıya almak önemlidir. Ana gövde üzeride yaprak koltuk-
+larında çıkan yan dallar 7 cm’den daha fazla büyümeden bir makas yardımı ile kesilerek ya da
+nazikçe koparılarak bitkiden uzaklaştırılmalıdır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla domates çeşidi yetiştirilmek istenirse, iki domates çeşidi arasında 50
+m mesafe bırakılmalıdır. Aynı arazide üst üste domates yetiştirmemeli, domatesin ardından
+patlıcangiller familyasına ait biber, patlıcan ve güveyfeneri de üretilmemelidir. Ekim nöbeti-
+ne uygun olarak 3-4 yıl sonra domates veya patlıcangiller familyasından bir başka tür yetiş-
+tirilebilir.
+
+İlk oluşan meyvelerden tohum alınır. Tam kırmızı renge ulaşmış halde hasat edilen meyveler-
+den hemen tohum alımı yapılır. Meyve bir bıçak yardımı ile ortadan ikiye kesilir. Suyla dolu
+bir kabın içinde elle orta kısım çıkarılır. Tohumlu posa bu kapta kalır, kabuklu kısım atılır.
+Sağlıklı tohumlar dibe çöker, üstte posa parçaları ve ölü tohumlar kalır. 3-5 kez tekrarlanan yı-
+kayıp süzme işleminden sonra elde edilen tohumlar kurutularak saklanır. Kuruyan tohumlar
+cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir saklama
+yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de buzdo-
+labında saklamaktır.
+     Güveyfeneri
+       YETİŞTİRİCİLİK
+       Fide ile yetiştirilir. Tohum ekimi, araziye fide dikim tarihinden 45-50 gün önce kapalı alanda
+       viyollere ya da üzeri kapatılabilen fide yastıklarına yapılır. Tohumlar 0,3 cm derine ekilir. Vi-
+       yollerde tohum ekim torfu kullanılırken, yastıklarda 1:1:1 oranında karıştırılmış toprak, yan-
+       mış hayvan gübresi ve torf karışımı harç kullanılır. Eğer işletmede kompost yapılıyor ise fide
+       yetiştiriciliğinde ideal bir ortam olarak kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere
+       sahip tel eleklerden geçirilerek elendikten sonra kullanılır. Tohumların çimlenmesi iki hafta
+       sürebilir. Gündüz toprak ısısı yaklaşık 27°C, gece 10°C’nin üstünde olduğu zaman açık alana
+       aktarılır. Bölgede sıcaklık dereceleri tutsa bile son don tarihinden bir hafta sonra araziye di-
+       kim yapılmalıdır. Fideler 3 gerçek yaprağa ulaştıktan sonra dikilmelidir.
+
+       Fideler arazide 100 cm sıra üzeri ve 100 cm sıra arası mesafeler ile dikilir. Bu mesafelerle dikim
+       yapıldığında bir dekarda 1000 bitki yetiştirilir. Fide dikiminden 75-90 gün sonra meyveler ol-
+       gunlaşıp hasat edilebilir. Domateste olduğu gibi sofralık meyve olgunlaşma süresi ile tohum
+       almaya uygun hale gelme süresi aynıdır. Olgunlaşan meyveler tamamen sarı/turuncu rengi
+       almış olmalıdır.
+
+       TOHUM ÜRETİMİ
+       Arazide birden fazla güveyfeneri çeşidi yetiştirilmek istenirse, iki güveyfeneri çeşidi arasında
+       500 m mesafe bırakılmalıdır. Aynı arazide üst üste güveyfeneri yetiştirmemeli, güveyfene-
+       rinin ardından patlıcangiller familyasına ait biber, patlıcan ve domates de üretilmemelidir.
+       Ekim nöbetine uygun olarak ancak 3-4 yıl sonra güveyfeneri veya patlıcangiller familyasın-
+       dan bir başka tür yetiştirilebilir.
+
+       İlk oluşan meyvelerden tohum alınır. Tam sarı/turuncu renge ulaşmış halde hasat edilen
+       meyvelerden hemen tohum alımı yapılır. Meyve, içinde su olan bir kabın içinde elle sıkılır. To-
+       humlu posa bu kapta kalır, kabuklu kısım atılır. Sağlıklı tohumlar dibe çöker, üstte posa par-
+       çaları ve ölü tohumlar kalır. 3-5 kez tekrarlanan yıkayıp süzme işleminden sonra elde edilen
+       tohumlar kurutularak saklanır. Kuruyan tohumlar cam kavanozlarda ağzı kapalı olarak ışık
+       görmeyen serin bir yerde saklanır. İkinci bir saklama yöntemi, tohumları önce bez torbaya,
+       sonra da kilitli plastik torbaya koyarak +4°C’de buzdolabında saklamaktır.
+
+
+
+
+48
+                                                                                      Patlıcan
+YETİŞTİRİCİLİK
+Fide ile yetiştirilir. Tohum ekimi, araziye fide dikim tarihinden 45-50 gün önce kapalı alanda
+viyollere ya da üzeri kapatılabilen fide yastıklarına yapılır. Tohumları 0,3 cm derine ekilir. Vi-
+yollerde, tohum ekim torfu kullanılırken yastıklarda 1:1:1 oranında karıştırılmış toprak, yan-
+mış hayvan gübresi ve torf karışımı harç kullanılır. Eğer işletmede kompost yapılıyor ise fide
+yetiştiriciliğinde ideal bir ortam olarak kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere
+sahip tel eleklerden geçirilerek elendikten sonra kullanılır. Tohumların çimlenmesi iki hafta
+sürebilir. Gündüz toprak ısısı yaklaşık 27°C, gece 10°C’nin üstünde olduğu zaman açık alana
+aktarılır. Bölgede sıcaklık dereceleri tutsa bile son don tarihinden bir hafta sonra araziye di-
+kim yapılmalıdır. Fideler 3 gerçek yaprağa ulaştıktan sonra dikilmelidir.
+
+Fideler arazide 50 cm sıra üzeri ve 60 cm sıra arası mesafeler ile dikilir. Bu mesafelerle dikim
+yapıldığında bir dekarda 3300 bitki yetiştirilir. Fide dikiminden 75-90 gün sonra meyveler
+olgunlaşıp hasat edilebilir. Yemeklik meyve olgunlaşma süresi ile tohum almaya uygun hale
+gelme süresi farklıdır. İlkinde meyve kabuğu mor iken, tohum alma olgunluğuna ulaşmış
+meyveler tamamen sarı/kahverengi olmalıdır. Erken hasat edilen tohumluk meyvelerden alı-
+nan tohumların çimlenme oranı düşük olur.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla patlıcan çeşidi yetiştirilmek istenirse, iki patlıcan çeşidi arasında 500 m
+mesafe bırakılmalıdır. Aynı arazide üst üste patlıcan yetiştirmemeli, patlıcanın ardından pat-
+lıcangiller familyasına ait biber, domates ve güveyfeneri de üretilmemelidir. Ekim nöbetine
+uygun olarak ancak 3-4 yıl sonra patlıcan veya patlıcangiller familyasından bir başka tür ye-
+tiştirilebilir.
+
+İlk oluşan meyvelerden tohum alınır. Tam sarı/kahverengiyken hasat edilen meyveler göl-
+gelik bir yerde 20-25 gün bekletildikten sonra tohumları ayıklanır. Meyve boyuna kesilir. Sap
+kısmından tohumlar el yordamıyla ayıklanıp yıkanır, gölgelik bir yerde kurumaya bırakılır.
+Meyvenin uç kısmında oluşan tohumlar zayıf geliştiğinden bu kısımdan tohum alınmaz. Ku-
+ruyan tohumlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır.
+İkinci bir saklama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koya-
+rak +4°C’de buzdolabında saklamaktır.
+     Bakla
+       YETİŞTİRİCİLİK
+       Doğrudan araziye tohum ekimi ile üretim yapılır. Tohum ekimi ılıman iklim koşullarında son-
+       baharda (15 Ekim - 15 Kasım, hatta aralık ayına kadar), kışı soğuk geçen bölgelerde ilkbahar-
+       da (15 Şubat - mart sonu arası) yapılır. Ekilen tohumlar toprak sıcaklığının 9°C, hava sıcaklığı-
+       nın 10-14°C olduğu dönemde çimlenir. Tohumlar 10-12 günde çimlenerek toprak yüzeyine
+       çıkar. Ocaklara ekim yapılır. 30-50 cm aralıklar ile açılan ocaklara 2-3 adet tohum ekilir. Tohum
+       iriliği çeşitlere bağlı olarak değişir. Ekim derinliği tohum iriliğine bağlı olarak 5-10 cm olur.
+       Dekara gerekli tohum miktarı 18-22 kg’dır.
+
+       Tohum ekiminden sonra taze tüketim için baklalar 70-90 gün sonra hasat edilir. Dekardan
+       700-900 kg ürün alınır.
+
+       TOHUM ÜRETİMİ
+       Arazide birden fazla bakla çeşidi yetiştirilmek istenirse, iki bakla çeşidi arasında 200 m me-
+       safe bırakılmalıdır. Aynı arazide ekim nöbeti bakımından baklagilleri üst üste yetiştirmede
+       genel olarak problem yoktur. Ancak tohum üretimi bakımından üst üste bakla yetiştirilme-
+       melidir. 2 yıl sonra bakla yetiştirilebilir. Baklanın ardından tohum üretimi bakımından bakla
+       dışında tüm bitkiler üretilebilir.
+
+       Tohum alınacak bitkilerden taze bakla hasadı yapılmaz, baklaları olgulaşmaya bırakılır. Bakla-
+       lar olgunlaşıp tamamen kahverengi/siyah renk alınca hasat edilir. Tohumluk baklalar dal üs-
+       tünde olgulaşmalıdır. Açılan baklalardan tohum dökülmemesi için tohumluk baklalar sabah
+       çiğ kalkmadan hasat edilir. Hasattan sonra yığın kalınlığı 15 cm’yi geçmeyecek şekilde yığın
+       yapılır. Gölgelik ve kuru bir yerde muhafaza edilir. 15-20 gün kadar bu şekilde muhafaza edi-
+       len baklalar az ise, tohumlar bakla içinde kalacak şekilde kaldırılır. Çok ise ve hacimsel olarak
+       fazla yer tutuyor ise baklalar ayıklanıp bez torbalara konur. Her bir torbanın içine bir kalıp
+       zeytinyağı sabunu konur, kuru ve serin bir odada üretim zamanına kadar muhafaza edilir.
+
+
+
+
+50
+                                                                                 Barbunya
+YETİŞTİRİCİLİK
+Doğrudan araziye tohum ekimi ile üretilir. Tohum ekimi ilkbaharda don tehlikesi geçtikten
+sonra yapılır. Ekilen tohumlar toprak sıcaklığının 9°C, hava sıcaklığının 10-14°C olduğu dö-
+nemde çimlenir. Tohumlar 6-9 günde çimlenerek toprak yüzeyine çıkar. Ocaklara ekim yapı-
+lır. 30-50 cm aralıklar ile açılan ocaklara 2-3 adet tohum ekilir. Tohum ekim derinliği 3-5 cm
+olmalıdır. 18-25°C’lerde en iyi meyve tutumu ve gelişimi olur. 30-35°C’lerde polenler ölür,
+döllenme olmaz, ürün alınmaz. Çeşit özelliğine bağlı olarak sırık ve yer tipi olmak üzere iki
+farklı gelişim gösterir. Sırık çeşitlerde ilk kol atmalar başlangıcında kamış, herek vb. sarılmaya
+yardımcı unsurlar bitkilerin yanına dikilerek bitkilerin yere yatmadan bu yapılara sarılması
+sağlanmalıdır. Tohum ekiminden sonra taze tüketim için baklalar 65-90 gün sonra hasat edi-
+lir. Dekardan 1200-1500 kg ürün alınır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla barbunya çeşidi yetiştirilmek istenirse, iki barbunya çeşidi arasında 25
+m mesafe bırakılmalıdır. Aynı arazide ekim nöbeti bakımından baklagilleri üst üste yetiştir-
+mede genel olarak problem yoktur. Ancak tohum üretimi bakımından üst üste barbunya
+yetiştirilmemelidir. 1 yıl sonra barbunya yetiştirilebilir. Barbunyanın arkasından tohum üre-
+timi bakımından baklagiller familyasından bezelye, börülce ve fasulye dışında tüm bitkiler
+üretilebilir.
+
+Tohum alınacak bitkilerden taze barbunya hasadı yapılmaz, baklaları olgunlaşmaya bırakılır.
+Bitki üzerinde bulunan alt baklalar olgunlaşıp sarı/kahverengi olunca bitkiler baklalarıyla be-
+raber hasat edilir. Diğer baklalar bitki üstünde olgunlaşmalıdır. Olgunlaşan baklalardan dane
+dökülmesini önlemek için bitkiler sabah çiğ kalkmadan hasat edilmelidir. Hasattan sonra yı-
+ğın kalınlığı 25 cm’yi geçmeyecek şekilde yığın yapılır. Gölgelik ve kuru bir yerde muhafaza
+edilir. 15-20 gün kadar bu şekilde muhafaza edilen baklalar az ise tohumlar bakla içinde ka-
+lacak şekilde kaldırılır. Çok ise ve hacimsel olarak fazla yer tutuyor ise baklalar ayıklanıp bez
+torbalara konur. Her bir torbanın içine bir kalıp zeytinyağı sabunu konur, kuru ve serin bir
+odada üretim zamanına kadar muhafaza edilir.
+     Bezelye
+       YETİŞTİRİCİLİK
+       Doğrudan araziye tohum ekimi ile üretim yapılır. Tohum ekimi ılıman iklim koşullarında son-
+       baharda (15 Ekim - 15 Kasım, hatta aralık ayına kadar) kışı soğuk geçen bölgelerde ilkba-
+       harda (15 Şubat - mart sonu arası) yapılır. Ekilen tohumlar toprak sıcaklığının 7-8°C, hava
+       sıcaklığının 10-14°C olduğu dönemde çimlenir. Tohumlar bu sıcaklıklarda 5-10 gün içinde
+       çimlenerek toprak yüzeyine çıkar. Ocaklara ekim yapılır. 30-50 cm aralıklar ile açılan ocaklara
+       2-3 adet tohum ekilir. Ekim derinliği 3-5 cm’dir. Dekara gerekli tohum miktarı 2-4 kg’dır. Sırık
+       tip olan bitkilerin dallı çalılara sardırılması bitki için daha uygudur. Tohum ekiminden sonra
+       taze tüketim için olgunlaşma süresi 60-120 gündür. Dekara dane verimi 300-500 kg’dır. De-
+       kardan baklalı 700-900 kg ürün alınır.
+
+       TOHUM ÜRETİMİ
+       Arazide birden fazla bezelye çeşidi yetiştirilmek istenirse, iki bezelye çeşidi arasında 25 m
+       mesafe bırakılmalıdır. Aynı arazide ekim nöbeti bakımından baklagilleri üst üste yetiştirme-
+       de genel olarak problem yoktur. Ancak tohum üretimi bakımından üst üste bezelye yetiştiril-
+       memelidir. 1 yıl sonra bezelye yetiştirilebilir. Bezelyenin ardından tohum üretimi bakımından
+       baklagiller familyasından barbunya, börülce ve fasulye dışında tüm bitkiler üretilebilir.
+
+       Tohum alınacak bitkilerden taze bezelye hasadı yapılmaz, baklaları olgulaşmaya bırakılır.
+       Bitki üzerinde bulunan alt baklalar olgulaşıp sarı/kahverengi olunca bitkiler baklalarıyla be-
+       raber hasat edilir. Diğer baklalar bitki üstünde olgulaşmalıdır. Olgunlaşan baklalardan dane
+       dökülmesini önlemek için bitkiler sabah çiğ kalkmadan hasat edilmelidir. Hasattan sonra yı-
+       ğın kalınlığı 25 cm’yi geçmeyecek şekilde yığın yapılır. Gölgelik ve kuru bir yerde muhafaza
+       edilir. 15-20 gün kadar bu şekilde muhafaza edilen baklalar az ise tohumlar bakla içinde ka-
+       lacak şekilde kaldırılır. Çok ise ve hacimsel olarak fazla yer tutuyor ise baklalar ayıklanıp bez
+       torbalara konur. Her bir torbanın içine bir kalıp zeytinyağı sabunu konur, kuru ve serin bir
+       odada üretim zamanına kadar muhafaza edilir.
+
+
+
+
+52
+                                                                                        Börülce
+YETİŞTİRİCİLİK
+Doğrudan araziye tohum ekimi ile üretim yapılır. Tohum ekimi ilkbaharda yapılır. Ekilen to-
+humlar toprak sıcaklığının 8-10°C, hava sıcaklığının 10-12°C olduğu dönemde çimlenir. To-
+humlar bu sıcaklıklarda 5-10 gün içinde çimlenerek toprak yüzeyine çıkar. Ekim mibzerle ya
+da elle yapılır. Bitkiler arası mesafenin 15 cm sıra üzeri ve 70 cm sıra arası olması uygundur.
+Ekim derinliği 4-5 cm’dir. Dekara gerekli tohum miktarı 6-8 kg’dır. Sırık tip olan bitkilerin dallı
+çalılara sardırılması bitki için daha iyidir. Sulamanın karık usulü yapılması uygundur. Tohum
+ekiminden sonra olgunlaşma süresi 60-120 gündür. Dekara dane verimi 300-500 kg’dır. De-
+kardan bakla verimi olarak 750-1000 kg ürün alınır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla börülce çeşidi yetiştirilmek istenirse, iki börülce çeşidi arasında 25 m
+mesafe bırakılmalıdır. Aynı arazide ekim nöbeti bakımından baklagilleri üst üste yetiştirme-
+de genel olarak problem yoktur. Ancak tohum üretimi bakımından üst üste börülce yetişti-
+rilmemelidir. 1 yıl sonra börülce yetiştirilebilir. Börülce ardından tohum üretimi bakımından
+baklagiller familyasından bezelye, barbunya ve fasulye dışında tüm bitkiler üretilebilir. Bir
+dekar alandan 100-150 kg tohumluk alınabilir.
+
+Tohum alınacak bitkilerden taze börülce hasadı yapılmaz, baklaları olgulaşmaya bırakılır.
+Bitki üzerinde bulunan alt baklalar olgulaşıp sarı/kahverengi olunca bitkiler baklalarıyla be-
+raber hasat edilir. Diğer baklalar bitki üstünde olgulaşmalıdır. Olgunlaşan baklalardan dane
+dökülmesini önlemek için bitkiler sabah çiğ kalkmadan hasat edilmelidir. Hasattan sonra yı-
+ğın kalınlığı 25 cm’yi geçmeyecek şekilde yığın yapılır. Gölgelik ve kuru bir yerde muhafaza
+edilir. 15-20 gün kadar bu şekilde muhafaza edilen baklalar az ise tohumlar bakla içinde ka-
+lacak şekilde kaldırılır. Çok ise ve hacimsel olarak fazla yer tutuyor ise baklalar ayıklanıp bez
+torbalara konur. Her bir torbanın içine bir kalıp zeytinyağı sabunu konur, kuru ve serin bir
+odada üretim zamanına kadar muhafaza edilir. Nemsiz ve serin yerde saklanan tohumlar 3-5
+yıl canlılıklarını muhafaza edebilirler.
+     Fasulye
+        YETİŞTİRİCİLİK
+        Doğrudan araziye tohum ekimi ile üretim yapılır. Tohum ekimi ilkbaharda yapılır. Ekilen to-
+        humlar toprak sıcaklığının 8-10°C, hava sıcaklığının 10-12°C olduğu dönemde çimlenir. To-
+        humlar bu sıcaklıklarda 6-8 gün içinde çimlenerek toprak yüzeyine çıkar. Ekim mibzerle ya
+        da elle yapılır. Bitkiler arası mesafenin sıra üzeri 20 cm ve sıra arası 40 cm olması uygundur.
+        Ocak usulü ekim de yapılabilir. Ocaklar 20-30 cm aralıklar ile açılır. Her ocağa 2-3 tohum ekilir.
+        Ekim derinliği 3-5 cm’dir. Dekara gerekli tohum miktarı 4-6 kg’dır. Sırık tip olan bitkilerin dallı
+        çalılara sardırılması bitki için daha iyidir. Sulamanın karık usulü yapılması uygundur. İkinci
+        turfanda fasulye ekimi, yazı çok sıcak geçmeyen yerlerde haziran ayında arpa, buğday hasadı
+        yerine yapılabilir. Sıcakta polen canlılığı olmaz ve verim alınmaz. Tohum ekiminden sonra
+        taze bakla olgunlaşma süresi 65-85 gündür. Dekara taze bakla verimi 1200-1500 kg’dır.
+
+        TOHUM ÜRETİMİ
+        Arazide birden fazla fasulye çeşidi yetiştirilmek istenirse, iki fasulye çeşidi arasında 25 m me-
+        safe bırakılmalıdır. Aynı arazide ekim nöbeti bakımından baklagilleri üst üste yetiştirmede
+        genel olarak problem yoktur. Ancak tohum üretimi bakımından üst üste fasulye yetiştiril-
+        memelidir. 1 yıl sonra fasulye yetiştirilebilir. Fasulyenin ardından tohum üretimi bakımından
+        baklagiller familyasından bezelye, börülce ve barbunya dışında tüm bitkiler üretilebilir. Bir
+        dekar alandan 150-200 kg tohumluk alınabilir.
+
+        Tohum alınacak ya da kuru fasulye üretimi yapılacak bitkilerden taze bakla hasadı yapılmaz,
+        baklaları olgulaşmaya bırakılır. Bitki üzerinde bulunan alt baklalar olgulaşıp sarı/kahverengi
+        olunca bitkiler baklalarıyla beraber hasat edilir. Diğer baklalar bitki üstünde olgulaşmalıdır.
+        Olgunlaşan baklalardan dane dökülmesini önlemek için bitkiler sabah çiğ kalkmadan hasat
+        edilmelidir. Hasattan sonra yığın kalınlığı 25 cm’yi geçmeyecek şekilde yığın yapılır. Gölgelik
+        ve kuru bir yerde muhafaza edilir. 15-20 gün kadar bu şekilde muhafaza edilen bitkilerden
+        tohumluk az ise tohumlar elle ayıklanır. Büyük alanda tohumluk üretimi yapılıyorsa bitki-
+        ler kol gücü ya da düşük devirli makine yardımı ile harmanlanır. Elde edilen tohumlar bez
+        torbalara konur. Her bir torbanın içine bir kalıp zeytinyağı sabunu konur, kuru ve serin bir
+        odada üretim zamanına kadar muhafaza edilir. Nemsiz ve serin yerde saklanan tohumlar 3-4
+        yıl canlılıklarını muhafaza edebilirler.
+
+
+
+
+54
+                                                               Beyaz Baş Lahana
+YETİŞTİRİCİLİK
+Fide ile yetiştirilir. Tohum ekimi, araziye fide dikim tarihinden 35-40 gün önce viyollere ya
+da fide yastıklarına yapılır. Tohumları 0,5-1,5 cm derine ekilir. Viyollerde tohum ekim torfu
+kullanılırken, yastıklarda 1:1:1 oranında karıştırılmış toprak, yanmış hayvan gübresi ve torf
+karışımı harç kullanılır. Eğer işletmede kompost yapılıyor ise fide yetiştiriciliğinde ideal bir
+ortam olarak kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere sahip tel eleklerden ge-
+çirilerek elendikten sonra kullanılır. Tohumların çimlenmesi 6-10 gün sürebilir. Fideler arazide
+40 cm sıra üzeri ve 70 cm sıra arası mesafeler ile dikilir. Bu mesafelerle dikim yapıldığında bir
+dekarda 3500 bitki yetiştirilir. Fide dikiminden sonra çeşitlerin erkenci, orta erkenci ya da
+geççi olma durumuna göre başların olgunlaşma süresi 70-160 gün arasında değişir. Dekara
+verim 4-6 tondur.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla lahana çeşidi yetiştirilmek istenirse, iki lahana çeşidi arasında 750 m
+mesafe bırakılmalıdır. Aynı arazide üst üste lahana yetiştirmemeli, lahananın ardından laha-
+nagiller familyasına ait lahanalar (Çin lahanası, Brüksel lahanası ve kırmızı baş lahana), turp,
+yabani turp, yabani hardal, kolza, karnabahar ve brokoli de üretilmemelidir. Ekim nöbetine
+uygun olarak ancak 3-4 yıl sonra lahana veya lahanagiller familyasından bir başka tür yetiş-
+tirilebilir.
+
+Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapılmadan arazi dolaşılır, çeşidi
+temsil eden baş gelişimine sahip bitkiler seçilip işaret konur. İlkbaharda havaların ısınması
+ile beraber lahana katlarını yırtarak çiçek sapı çıkar. Sıkı başlı çeşitlerde çiçek sapı çıkamaz,
+içerde katlanır. Bu çeşitlerde başı oluşturan yapraklar, üstten bir bıçak yardımıyla + işare-
+ti biçiminde kesilir. Açan çiçeklerde tohumlar ince baklalar içinde oluşur. Başlangıçta yeşil
+olan baklalar olgunlaşınca kahverengileşir. Bu baklalar açılmadan bitki üzerinden ana gövde
+kesilerek hasat edilir. Tohumluk hasadı sabah çiğ kalkmadan yapılmalı, hasat edilen bitkiler
+gölgelik ve havadar bir yerde kurumaya bırakılmalıdır. Baklalardan tohum döküleceğinden
+alta yaygı konmalıdır. Karıncaların tohum taşımasına karşı önlem alınmalıdır. Bu amaçla yay-
+gı etrafına toz kükürt dökülebilir.
+
+Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bitki
+atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde edilen
+tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan tohum-
+lar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir sak-
+lama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de
+buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 4-6 yıl muhafaza
+edebilir.
+     Brokoli
+        YETİŞTİRİCİLİK
+        Fide ile yetiştirilir. Tohum ekimi, araziye fide dikim tarihinden 30-35 gün önce viyollere ya da
+        fide yastıklarına yapılır. Tohum ekimi temmuz-ağustos aylarında yapılır. Bitkinin ideal geliş-
+        me sıcaklığı 15-20°C’dir. Taç gelişimi kalitesi için bölgelere göre bu sıcaklıklar takip edilerek
+        tohum ekim zamanı ayarlanmalıdır. Tohumları 1-1,5 cm derine ekilir. Viyollerde tohum ekim
+        torfu kullanılırken, yastıklarda 1:1:1 oranında karıştırılmış toprak, yanmış hayvan gübresi ve
+        torf karışımı harç kullanılır. Eğer işletmede kompost yapılıyor ise fide yetiştiriciliğinde ideal
+        bir ortam olarak kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere sahip tel eleklerden
+        geçirilerek elendikten sonra kullanılır. Tohumların çimlenme süresi 5 gündür. Fideler arazide
+        50 cm sıra üzeri ve 60 cm sıra arası mesafeler ile dikilir. Bu mesafelerle dikim yapıldığında
+        bir dekarda 3300 bitki yetiştirilir. Üretimde bor ve molibden minerallerinin eksikliği takip
+        edilmeli, gerekirse bu minerallerin uygulaması yapılmalıdır. Fide dikiminden sonra çeşitlerin
+        erkenci, orta erkenci ya da geççi olma durumuna göre başların olgunlaşma süresi 65-120
+        gün arasında değişir. Dekara verim 800-1500 kg’dır.
+
+        TOHUM ÜRETİMİ
+        Arazide birden fazla brokoli çeşidi yetiştirilmek istenirse, iki brokoli çeşidi arasında 750 m
+        mesafe bırakılmalıdır. Aynı arazide üst üste brokoli yetiştirmemeli, brokolinin ardından laha-
+        nagiller familyasına ait lahanalar (Çin lahanası, kırmızı baş lahana), turp, yabani turp, yabani
+        hardal, kolza ve karnabahar da üretilmemelidir. Ekim nöbetine uygun olarak ancak 3-4 yıl
+        sonra brokoli veya lahanagiller familyasından bir başka tür yetiştirilebilir.
+
+        Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapılmadan arazi dolaşılır, çe-
+        şidi temsil eden baş gelişimine sahip bitkiler seçilip işaret konur. Açan çiçeklerde tohumlar
+        ince baklalar içinde oluşur. Başlangıçta yeşil olan baklalar olgunlaşınca kahverengileşir. Bu
+        baklalar açılmadan bitki üzerinden ana gövde kesilerek hasat edilir. Tohumluk hasadı sabah
+        çiğ kalkmadan yapılmalı, hasat edilen bitkiler gölgelik ve havadar bir yerde kurumaya bı-
+        rakılmalıdır. Baklalardan tohum döküleceğinden alta yaygı konmalıdır. Karıncaların tohum
+        taşımasına karşı önlem alınmalıdır. Bu amaçla yaygı etrafına toz kükürt dökülebilir.
+
+        Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bit-
+        ki atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde
+        edilen tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan
+        tohumlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci
+        bir saklama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya konarak
+        +4°C’de buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 5 yıl mu-
+        hafaza edebilir.
+
+
+
+
+56
+                                                                             Karnabahar
+YETİŞTİRİCİLİK
+Fide ile yetiştirilir. Tohum ekimi, araziye fide dikim tarihinden 30-35 gün önce viyollere ya da
+fide yastıklarına yapılır. Bitkinin ideal gelişme sıcaklığı 15-20°C’dir. Taç gelişimi kalitesi için
+bölgelere göre bu sıcaklıklar takip edilerek tohum ekim zamanı ayarlanmalıdır. Tohumları
+0,5-1,5 cm derine ekilir. Viyollerde tohum ekim torfu kullanılırken, yastıklarda 1:1:1 oranın-
+da karıştırılmış toprak, yanmış hayvan gübresi ve torf karışımı harç kullanılır. Eğer işletmede
+kompost yapılıyor ise fide yetiştiriciliğinde ideal bir ortam olarak kullanılabilir. Hazırlanan
+harç 0,7 cm çapında deliklere sahip tel eleklerden geçirilerek elendikten sonra kullanılır. To-
+humların çimlenme süresi 6-10 gündür. Fideler arazide 50 cm sıra üzeri ve 70 cm sıra arası
+mesafeler ile dikilir. Bu mesafelerle dikim yapıldığında bir dekarda 2800 bitki yetiştirilir. Bro-
+kolide olduğu gibi üretimde bor ve molibden minerallerinin eksikliği takip edilmeli, gere-
+kirse bu minerallerin uygulaması yapılmalıdır. Fide dikiminden sonra çeşitlerin erkenci, orta
+erkenci ya da geççi olma durumuna göre başların olgunlaşma süresi 70-145 gün arasında
+değişir. Dekara verim 600-2000 kg’dır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla karnabahar çeşidi yetiştirilmek istenirse, iki karnabahar çeşidi arasında
+750 m mesafe bırakılmalıdır. Aynı arazide üst üste karnabahar yetiştirmemeli, karnabaharın
+ardından lahanagiller familyasına ait lahanalar (Çin lahanası, kırmızı baş lahana), turp, yabani
+turp, yabani hardal, kolza ve brokoli de üretilmemelidir. Ekim nöbetine uygun olarak 3-4 yıl
+sonra karnabahar veya lahanagiller familyasından bir başka tür yetiştirilebilir.
+
+Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapılmadan arazi dolaşılır, çeşidi
+temsil eden baş gelişimine sahip bitkiler seçilip işaret konur. Açan çiçeklerde tohumlar ince
+baklalar içinde oluşur. Başlangıçta yeşil olan baklalar olgunlaşınca kahverengileşir. Tohumluk
+hasadı sabah çiğ kalkmadan yapılmalı, hasat edilen bitkiler gölgelik ve havadar bir yerde ku-
+rumaya bırakılmalıdır. Baklalardan tohum döküleceğinden alta yaygı konmalıdır. Karıncala-
+rın tohum taşımasına karşı önlem alınmalıdır. Bu amaçla yaygı etrafına toz kükürt dökülebilir.
+
+Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bit-
+ki atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde
+edilen tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan
+tohumlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci
+bir saklama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya konarak
++4°C’de buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 3-5 yıl mu-
+hafaza edebilir.
+     Turp
+        YETİŞTİRİCİLİK
+        Doğrudan tohum ekimi ile üretilir. Bitkinin ideal yumru oluşturma sıcaklığı 14-16°C’dir. Yük-
+        sek sıcaklıklarda yumru gelişmez, küçük kalır ve yaprak oluşumu artar. Tohumların çimlenme
+        süresi 3-4 gündür. Tohumlar arazide 15 cm sıra üzeri ve 30 cm sıra arası mesafeler ile dikilir.
+        Bu mesafelerle dikim yapıldığında bir dekarda 20 bin bitki yetiştirilir. Olgunlaşma süresi 25-
+        35 gün arasında değişir. Dekara verim fındık turplarında 1000 kg, bayır ve kestane turpların-
+        da ise 5000 kg’dır.
+
+        TOHUM ÜRETİMİ
+        Arazide birden fazla turp çeşidi yetiştirilmek istenirse, iki turp çeşidi arasında 750 m mesafe
+        bırakılmalıdır. Aynı arazide üst üste turp yetiştirmemeli, turpun ardından lahanagiller famil-
+        yasına ait lahanalar (Çin lahanası, kırmızı baş lahana), karnabahar, yabani turp, yabani hardal,
+        kolza ve brokoli de üretilmemelidir. Ekim nöbetine uygun olarak ancak 3-4 yıl sonra turp
+        veya lahanagiller familyasından bir başka tür yetiştirilebilir.
+
+        Turp bitkisi düşük sıcaklığa maruz kaldığında sıcaklık normale döner dönmez sapa kalkar.
+        Açan çiçeklerde tohumlar ince baklalar içinde oluşur. Başlangıçta yeşil olan baklalar olgunla-
+        şınca kahverengileşir. Tohumluk hasadı sabah çiğ kalkmadan yapılmalı, hasat edilen bitkiler
+        gölgelik ve havadar bir yerde kurumaya bırakılmalıdır. Baklalardan tohum döküleceğinden
+        alta yaygı konmalıdır. Karıncaların tohum taşımasına karşı önlem alınmalıdır. Bu amaçla yay-
+        gı etrafına toz kükürt dökülebilir.
+
+        Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bit-
+        ki atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde
+        edilen tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan
+        tohumlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci
+        bir saklama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya konarak
+        +4°C’de buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 4-6 yıl mu-
+        hafaza edebilir.
+
+
+
+
+58
+                                                                                        Bamya
+YETİŞTİRİCİLİK
+Doğrudan tohum ekimi ile üretilir. Tohumlar biraz güç çimlenir, bu nedenle ekimden 1 gün
+önce suya konarak ıslatılmalıdır. Bitkinin ideal gelişme sıcaklığı 22-30°C’dir. Bölgelere göre bu
+sıcaklıklar takip edilerek tohum ekim zamanı ayarlanmalıdır. Tohumları 2-2,5 cm derine ekilir.
+Tohumların çimlenme süresi 6-12 gündür. Tohumlar arazide 45 cm sıra üzeri ve 75 cm sıra
+arası mesafeler ile ekilir. Bu mesafelerle dikim yapıldığında bir dekarda 3000 bitki yetiştirilir.
+40-45 cm aralıklar ile oluşturulan ocaklara da ekim yapılır. Her ocağa 2-3 tohum atılır. Kaymak
+tabakası oluşumunu engellemek ve bitki çıkışını kolaylaştırmak için tohum ekim alanı üze-
+rine birer avuç iyi yanmış hayvan gübresi atılır. Gelişen bitkilerde meyve olgunlaşma süresi
+85-95 gün arasında değişir. Dekara verim 1000 kg’dır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla bamya çeşidi yetiştirilmek istenirse, iki bamya çeşidi arasında 750 m
+mesafe bırakılmalıdır. Aynı arazide üst üste bamya yetiştirmemelidir. Ekim nöbetine uygun
+olarak ancak 3-4 yıl sonra bamya yetiştirilebilir.
+
+Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapılmadan arazi dolaşılır, çeşidi
+temsil eden bitkiler seçilip işaret konur. Meyveler olgunlaşmaya başlar. Başlangıçta yeşil olan
+meyveler tohumlar olgunlaşınca kahverengileşir. Bu meyveler açılmadan bitki üzerinden bir
+bıçak yardımı ile kesilip alınır. Tohumluk hasadı sabah çiğ kalkmadan yapılmalı, meyveler
+gölgelik ve havadar bir yerde kurumaya bırakılmalıdır. Meyvelerden tohum döküleceğinden
+alta yaygı konmalıdır. Karıncaların tohum taşımasına karşı önlem alınmalıdır. Bu amaçla yay-
+gı etrafına toz kükürt dökülebilir.
+
+Tamamen kuruyan meyvelerden tohumlar elle ayıklanır. Elde edilen tohumlar elek ya da bir
+yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan tohumlar cam kavanozlarda
+ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir saklama yöntemi, tohumla-
+rı önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de buzdolabında saklamak-
+tır. Bu koşullarda saklanan tohumlar canlılıklarını 2-3 yıl muhafaza edebilir.
+     Pırasa
+        YETİŞTİRİCİLİK
+        Fide ile üretim yapılır. Fideler yavaş gelişir, bu nedenle tohumlar fide dikiminden 70-80 gün
+        önce ekilmelidir. Tohumları 1,5 cm derine ekilir. Viyollerde tohum ekim torfu kullanılırken,
+        yastıklarda 1:1:1 oranında karıştırılmış toprak, yanmış hayvan gübresi ve torf karışımı harç
+        kullanılır. Eğer işletmede kompost yapılıyor ise fide yetiştiriciliğinde ideal bir ortam olarak
+        kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere sahip tel eleklerden geçirilerek elen-
+        dikten sonra kullanılır. Fide gelişiminde pişkinleşmeyi sağlamak üzere 2-3 kez bir makas yar-
+        dımı ile yapraklar kesilir. Kesimde büyüme noktasına zarar verilmemelidir. Kurşun kalem ka-
+        lınlığına ulaşan fideler sökülür, yaprak ve kök tıraşlaması (kesimi) yapılır. Bu hali ile doğrudan
+        dikilebilir. Gölgede 1-3 gün bekletmek de gelişimi olumlu etkiler. Tohumların çimlenmesi
+        7-10 gün sürer. Fideler arazide 10 cm sıra üzeri ve 30 cm sıra arası mesafeler ile dikilir. Bu
+        mesafelerle dikim yapıldığında bir dekarda 28-30 bin bitki yetiştirilir. Fidelikte yapılan yaprak
+        budaması gövde kalınlaşmasını teşvik etmek amacı ile yetiştirme döneminde de 2-3 kez tek-
+        rarlanır. Olgunlaşma süresi 90-120 gün arasında değişir. Dekara verim 3000 kg’dır.
+
+        TOHUM ÜRETİMİ
+        Arazide birden fazla pırasa çeşidi yetiştirilmek istenirse, iki pırasa çeşidi arasında 1500 m me-
+        safe bırakılmalıdır. Aynı arazide üst üste pırasa yetiştirmemeli, pırasanın ardından soğangiller
+        familyasına ait soğan ve sarımsak da üretilmemelidir. Ekim nöbetine uygun olarak ancak 3-4
+        yıl sonra pırasa veya soğangiller familyasından bir başka tür yetiştirilebilir.
+
+        Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapılmadan arazi dolaşılır, çeşidi
+        temsil eden bitki gelişimine sahip bitkiler seçilip işaret konur. Bu bitkiler ya yerlerinde bırakı-
+        lır ya da sökülüp hepsi bir arada olacak şekilde başka parsele 20X40 cm aralıklar ile 20-30 cm
+        derine dikilir. Dikim derinliği bitkilerin dik olarak ayakta durmasını sağlayacak şekilde ayar-
+        lanmalıdır. Çiçek sapı üzerinde çiçek tablası oluşunca ağırlaşır. Rüzgârda kırılmaları önlemek
+        üzere etrafa kazık çakıp bitkiler arasında ipleri karşılıklı olarak geçirilerek bir ağ oluşturmak
+        faydalı olur. Çiçek tablasında tohumlar olgunlaşınca tohum içeren kapsüller kahverengileşir
+        ve yavaş yavaş üstten açılmaya başlar. Açılma ilerler ise tohum dökülür. Buna meydan verme-
+        den tablalar bir bıçak yardımı ile kesilerek bir torbaya konur. Tohumluk hasadı sabah çiğ kalk-
+        madan yapılmalı, hasat edilen kısımlar gölgelik ve havadar bir yerde kurumaya bırakılmalıdır.
+        Kapsüllerden tohum döküleceğinden alta yaygı konmalıdır. Karıncaların tohum taşımasına
+        karşı önlem alınmalıdır. Bu amaçla yaygı etrafına toz kükürt dökülebilir.
+
+        Tohum ayıklama zamanı bitkiler 2-3 saat güneş altına konur ki gevrekleşsin ve tohumlar
+        kapsüllerden kolay çıkarılabilsin. Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla
+        döverek çıkarılır. Önce kaba bitki atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada to-
+        hum savrularak ayıklanır. Elde edilen tohumlar elek ya da bir yaygı üzerine konarak gölgede
+        tamamen kurutulur. Kuruyan tohumlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen
+        serin bir yerde saklanır. İkinci bir saklama yöntemi, tohumları önce bez torbaya, sonra da
+        kilitli plastik torbaya koyarak +4°C’de buzdolabında saklamaktır. Bu koşullarda saklanan to-
+        humlar canlılıklarını en fazla 3 yıl muhafaza edebilir.
+
+
+
+
+60
+                                                                                         Soğan
+YETİŞTİRİCİLİK
+Doğrudan tohum ekimi ile ya da arpacık/kıska adı verile küçük soğanlar ile üretilir. Tohum
+ekimi kısa gün çeşitlerinde 15 Ekim - 15 Kasım tarihleri arasında, uzun gün soğanlarında ise
+15 Şubat - 15 Mart tarihleri arasında yapılır. Arpacık dikimi ilkbaharda yapılır. Baş üretimi için
+küçük arpacıklar (1,2-1,5 cm çapında) yeşil soğan üretimi için iri arpacıklar kullanılmalıdır. Ye-
+şil soğan üretimi için her zaman arpacık dikilebilir. Soğan tohumları 1,3-2,5 cm derine ekilir.
+Tohumların çimlenmesi 6-10 gün sürer. Tohum ekimi 8 cm sıra üzeri ve 10 cm sıra arası me-
+safeler ile dikilir. Arpacıklarda bu mesafeler 10X15 cm’dir. Baş üretiminde olgunlaşma süresi
+150-180 gün arasında değişir. Dekar başına verim 3500 kg’dır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla soğan çeşidi yetiştirilmek istenirse, iki soğan çeşidi arasında 1500 m me-
+safe bırakılmalıdır. Aynı arazide üst üste soğan yetiştirmemeli, soğanın ardından soğangiller
+familyasına ait pırasa ve sarımsak da üretilmemelidir. Ekim nöbetine uygun olarak ancak 3-4
+yıl sonra soğan veya soğangiller familyasından bir başka tür yetiştirilebilir.
+
+Tohum üretimi yapılmak isteniyor ise üretilen başlardan tohumluk seçilir. Bunlar kışın se-
+rin ve nem almayan ortamda saklanır. Örgü yapılarak asılması kolaylık sağlar. İlkbaharda bu
+başlar 20X30 cm sıra üzeri ve sıra arası mesafeler ile dikilir. Önce yapraklar oluşur sonra çiçek
+sapları çıkmaya başlar Bir baştan 1-8 çiçek sapı gelişebilir. Çiçek sapı üzerinde çiçek tablası
+oluşunca ağırlaşır. Rüzgârda kırılmaları önlemek üzere etrafa kazık çakıp bitkiler arasından
+geçirilen ipler ile bir ağ oluşturmak faydalı olur. Çiçek tablasında tohumlar olgunlaşınca to-
+hum içeren kapsüller kahverengileşir ve yavaş yavaş üstten açılmaya başlar. Açılma ilerler ise
+tohum dökülür. Buna meydan vermeden tablalar bir bıçak yardımı ile kesilerek bir torbaya
+konur. Tohumluk hasadı sabah çiğ kalkmadan yapılmalı, hasat edilen kısımlar gölgelik ve
+havadar bir yerde kurumaya bırakılmalıdır. Kapsüllerden tohum döküleceğinden alta yaygı
+konmalıdır. Karıncaların tohum taşımasına karşı önlem alınmalıdır. Bu amaçla yaygı etrafına
+toz kükürt dökülebilir.
+
+Tohum ayıklama zamanı bitkiler 2-3 saat güneş altına konur ki gevrekleşsin ve tohumlar
+kapsüllerden kolay çıkarılabilsin. Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla
+döverek çıkarılır. Önce kaba bitki atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada to-
+hum savrularak ayıklanır. Elde edilen tohumlar elek ya da bir yaygı üzerine konarak gölgede
+tamamen kurutulur. Kuruyan tohumlar cam kavanozlarda ağzı kapalı olarak ışık görmeyen
+serin bir yerde saklanır. İkinci bir saklama yöntemi, tohumları önce bez torbaya, sonra da
+kilitli plastik torbaya koyarak +4°C’de buzdolabında saklamaktır. Bu koşullarda saklanan to-
+humlar canlılıklarını en fazla 3 yıl muhafaza edebilir.
+     Havuç
+       YETİŞTİRİCİLİK
+       Doğrudan tohum ekimi ile üretilir. Tohumları 1-1,5 cm derine ekilir. 8 cm sıra üzeri ve 20 cm
+       sıra arası mesafeler ile ekilir. Tohumlar ilkbaharda mart-nisan aylarında ekilir. İdeal gelişme
+       sıcaklığı 15-20°C’dir. Tohumların çimlenmesi 6-12 gün sürer. Olgunlaşma süresi 70-120 gün
+       arasında değişir. Dekar başına verim 2500 kg’dır.
+
+       TOHUM ÜRETİMİ
+       Arazide birden fazla havuç çeşidi yetiştirilmek istenirse, iki havuç çeşidi arasında 1500 m me-
+       safe bırakılmalıdır. Aynı arazide üst üste havuç yetiştirmemeli, havucun ardından aynı famil-
+       yada yer alan yabani havuç, kereviz ve maydanoz da üretilmemelidir. Ekim nöbetine uygun
+       olarak ancak 3-4 yıl sonra havuç veya aynı familyadan bir başka tür yetiştirilebilir.
+
+       Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapıldıktan sonra çeşit özelliği-
+       ne uygun yumrular seçilip serin bir yerde saklanır. Seçimden sonra bu yumruların yaprakları
+       3-4 cm yükseklikten kesilir. Kışı sert geçen bölgelerde yumrular serin, ışık ve nem almayan
+       ortamlarda saklanır. İklimin uygun olduğu yerlerde doğrudan yumru ekimi de yapılabilir.
+       Tekrar yeşil aksam oluşturan bitki ilkbaharda çiçek sapları oluşturur. Çiçek saplarında geniş
+       tabanlı çiçek tablası oluşur. Tohumlar olgunlaşınca çiçek tablaları hasat edilir. Şemsiye adı da
+       verilen tablalar saptan 8-10 cm uzunluğunda kesilmelidir. Tohumluk hasadı sabah çiğ kalk-
+       madan yapılmalı, tablalar gölgelik ve havadar bir yerde kurumaya bırakılmalıdır. Tohum dö-
+       küleceğinden alta yaygı konmalıdır. Karıncaların tohum taşımasına karşı önlem alınmalıdır.
+       Bu amaçla, yaygı etrafına toz kükürt dökülebilir.
+
+       Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bitki
+       atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde edilen
+       tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan tohum-
+       lar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir sak-
+       lama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de
+       buzdolabında saklamaktır.
+
+       Bu koşullarda saklanan tohumlar canlılıklarını 3-5 yıl muhafaza edebilir.
+
+
+
+
+62
+                                                                                       Kereviz
+YETİŞTİRİCİLİK
+Fide ile üretilir. Tohum ekimi, araziye fide dikim tarihinden 70-90 gün önce viyollere ya da
+fide yastıklarında yapılır. Bitkinin ideal gelişme sıcaklığı 15-20°C’dir. Tohumları 0,3-0,5 cm
+derine ekilir. Viyollerde tohum ekim torfu kullanılırken, yastıklarda 1:1:1 oranında karıştırıl-
+mış toprak, yanmış hayvan gübresi ve torf karışımı harç kullanılır. Eğer işletmede kompost
+yapılıyor ise fide yetiştiriciliğinde ideal bir ortam olarak kullanılabilir. Hazırlanan harç 0,7 cm
+çapında deliklere sahip tel eleklerden geçirilerek elendikten sonra kullanılır. Tohum ekimi
+yapıldıktan sonra üzeri ışık almayacak bir materyal ile örtülmelidir. Işık çimlenmeyi geciktirir
+hatta engeller. Tohumların çimlenme süresi 6-8 gündür. Fideler arazide 20 cm sıra üzeri ve 30
+cm sıra arası mesafeler ile dikilir. Bu mesafelerle dikim yapıldığında bir dekarda 16 bin bitki
+yetiştirilir. Taze tüketim için yumruların olgunlaşma süresi 80-90 gün arasında değişir. Dekara
+verim 3000 kg’dır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla kereviz çeşidi yetiştirilmek istenirse, iki kereviz çeşidi arasında 1500 m
+mesafe bırakılmalıdır. Aynı arazide üst üste kereviz yetiştirmemeli, kerevizin ardından aynı
+familyada yer alan havuç, yabani havuç ve maydanoz da üretilmemelidir. Ekim nöbetine uy-
+gun olarak ancak 3-4 yıl sonra kereviz veya aynı familyadan bir başka tür yetiştirilebilir.
+
+Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapılan yumrular şekil ve kalite
+yönünden incelenerek seçilir. Bu yumrular hazırlanan ocaklara 50 cm sıra üzeri ve 70 cm
+sıra arası mesafeler ile dikilir. Bitki ilkbaharda çiçek sapları oluşturur. Çiçek saplarında geniş
+tabanlı çiçek tablası oluşur. Tohumlar olgunlaşınca çiçek tablaları hasat edilir. Şemsiye adı da
+verilen tablalar saptan 8-10 cm uzunluğunda kesilmelidir. Tohumluk hasadı sabah çiğ kalk-
+madan yapılmalı, hasat edilen kısımlar gölgelik ve havadar bir yerde kurumaya bırakılmalıdır.
+Tohum döküleceğinden alta yaygı konmalıdır. Karıncaların tohum taşımasına karşı önlem
+alınmalıdır. Bu amaçla yaygı etrafına toz kükürt dökülebilir.
+
+Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bitki
+atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde edilen
+tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan tohum-
+lar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir sak-
+lama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de
+buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 3-5 yıl muhafaza
+edebilir.
+     Maydanoz
+       YETİŞTİRİCİLİK
+       Doğrudan tohum ekimi ile üretilir. Bitkinin ideal gelişme sıcaklığı 15-20°C’dir. Ancak sulama
+       koşulları ayarlanır ise ılıman iklim koşullarında yıl boyu maydanoz üretilebilir. Tohum eki-
+       minden sonra yağmurlama sulama çok önemlidir. Tohumları 1 cm derine ekilir. Tohumların
+       çimlenme süresi 15-18 gündür. Serpme ya da sıraya ekim yapılabilir. Sıraya ekimde 2-5 cm
+       sıra üzeri ve 10 cm sıra arası mesafeler ile ekim yapılır. Olgunlaşma süresi 70-90 gün arasında
+       değişir. Hasat biçerek yapılır. İlk biçimden 20-25 gün sonra bitkiler ikinci biçime hazır olur.
+       Yılda 6-8 biçim yapılabilir. Üretim yıllık yenilenmelidir. Dekara verim 2000 kg’dır.
+
+       TOHUM ÜRETİMİ
+       Arazide birden fazla maydanoz çeşidi yetiştirilmek istenirse, iki maydanoz çeşidi arasında
+       1500 m mesafe bırakılmalıdır. Aynı arazide üst üste maydanoz yetiştirmemeli, maydanozun
+       ardından aynı familyada yer alan havuç, yabani havuç ve kereviz de üretilmemelidir. Ekim
+       nöbetine uygun olarak ancak 3-4 yıl sonra maydanoz veya aynı familyadan bir başka tür
+       yetiştirilebilir.
+
+       Tohum üretimi yapılmak isteniyor ise taze tüketim için en son sonbaharda biçilen bitkiler
+       ilkbahara kadar bir daha biçilmez. Arazide soğukluk ihtiyacını karşılayan bitkiler ilkbaharda
+       çiçek sapı oluşturur. Çiçek saplarında geniş tabanlı çiçek tablası oluşur. Tohumlar olgunlaşın-
+       ca çiçek tablaları hasat edilir. Şemsiye adı da verilen tablalar saptan 8-10 cm uzunluğunda
+       kesilmelidir. Tohumluk hasadı sabah çiğ kalkmadan yapılmalı, hasat edilen kısımlar gölgelik
+       ve havadar bir yerde kurumaya bırakılmalıdır. Tohum döküleceğinden alta yaygı konmalıdır.
+       Karıncaların tohum taşımasına karşı önlem alınmalıdır. Bu amaçla yaygı etrafına toz kükürt
+       dökülebilir.
+
+       Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bitki
+       atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde edilen
+       tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan tohum-
+       lar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir sak-
+       lama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de
+       buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 2-3 yıl muhafaza
+       edebilir.
+
+
+
+
+64
+                                                                                       Ispanak
+YETİŞTİRİCİLİK
+Tohum ile üretilir. Bitkinin ideal gelişme sıcaklığı 15-20°C’dir. Ancak sulama koşulları ve çeşit
+seçimi doğru yapılır ise ılıman iklim koşullarında her mevsim ıspanak üretilebilir. Tohum eki-
+minden sonra yağmurlama sulama çok önemlidir. Tohumları 3 cm derine ekilir. Tohumların
+çimlenme süresi 8-10 gündür. Serpme ya da sıraya ekim yapılabilir. Sıraya ekimde 10 cm sıra
+üzeri ve 20 cm sıra arası mesafeler ile ekim yapılır. Olgunlaşma süresi 35-50 gün arasında de-
+ğişir. Hava koşulları yağışlı ve kapalı giderse bu gün sayısı artabilir. Dekara verim 1000 kg’dır.
+
+TOHUM ÜRETİMİ
+Arazide birden fazla ıspanak çeşidi yetiştirilmek istenirse, iki ıspanak çeşidi arasında 1000
+m mesafe bırakılmalıdır. Aynı arazide üst üste ıspanak yetiştirmemelidir. Ekim nöbeti bakı-
+mından 3 yıl sonra ıspanak yetiştirilebilir. Ispanağın ardından ekim nöbeti ve tohum üretimi
+bakımından ıspanak dışında tüm bitkiler üretilebilir.
+
+Tohum üretimi yapılmak isteniyor ise tohum ekimi sonbaharda ekim ayında yapılmalıdır.
+Bitkiler iyi bakılmalı, ilkbahara güçlü girmelidir. Düşük sıcaklık isteğini karşılayan bitkiler ilk-
+baharda çiçeklenir. Ispanakta dişi bitkiler ve erkek bitkiler vardır. Önce zayıf gelişen erkek
+bitkiler çiçek açar, sonra dişi bitkiler çiçeklenir. Çiçeklenme sonunda erkek bitkiler sararıp
+ölür. Tohumlu dişi bitkiler kalır. Tohumlar olgunlaşınca bu bitkiler de sararır. Tohumluk hasadı
+bitkilerin toprak seviyesinden 5-8 cm yüksekten biçilmesi ile olur. Tohumluk hasadı sabah çiğ
+kalkmadan yapılmalı, kesilen kısımlar gölgelik ve havadar bir yerde kurumaya bırakılmalıdır.
+Tohum döküleceğinden alta yaygı konmalıdır. Karıncaların tohum taşımasına karşı önlem
+alınmalıdır. Bu amaçla yaygı etrafına toz kükürt dökülebilir.
+
+Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bitki
+atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde edilen
+tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan tohum-
+lar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir sak-
+lama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de
+buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 3-5 yıl muhafaza
+edebilir.
+     Salata - Marul
+        YETİŞTİRİCİLİK
+        Doğrudan tohum ekimi ile üretilir. Fideler hızlı gelişir, bu nedenle tohumlar fide dikimin-
+        den 25-30 gün önce ekilmelidir. Tohumları 0,6-1,3 cm derine ekilir. Ekimden sonra kereviz-
+        de olduğu gibi tohum ekim alanının üzerinin kapatılması çimlenmeyi teşvik eder. Bitkiler
+        toprak yüzeyinde belirince bu örtü kaldırılmalıdır. Viyollerde tohum ekim torfu kullanılırken,
+        yastıklarda 1:1:1 oranında karıştırılmış toprak, yanmış hayvan gübresi ve torf karışımı harç
+        kullanılır. Eğer işletmede kompost yapılıyor ise fide yetiştiriciliğinde ideal bir ortam olarak
+        kullanılabilir. Hazırlanan harç 0,7 cm çapında deliklere sahip tel eleklerden geçirilerek elen-
+        dikten sonra kullanılır. Tohumların çimlenme süresi 5-8 gündür. Fideler arazide 20 cm sıra
+        üzeri ve 30 cm sıra arası mesafeler ile dikilir. Bu mesafelerle dikim yapıldığında bir dekarda 16
+        bin bitki yetiştirilir. Olgunlaşma süresi kıvırcık, baş salata ya da göbek marul olma durumuna
+        göre 55-90 gün arasında değişir. Dekara verim 2000 kg’dır.
+
+        TOHUM ÜRETİMİ
+        Arazide birden fazla salata-marul çeşidi yetiştirilmek istenirse, iki salata-marul çeşidi arasında
+        750 m mesafe bırakılmalıdır. Aynı arazide üst üste salata-marul yetiştirmemelidir. Ekim nö-
+        beti bakımından 2-3 yıl sonra salata-marul yetiştirilebilir. Salata-marulun ardından bu türden
+        bitkilerin haricindeki tüm bitki türleri yetiştirilebilir.
+
+        Tohum üretimi yapılmak isteniyor ise taze tüketim için hasat yapılmadan arazi dolaşılır, çeşidi
+        temsil eden özelliklere sahip bitkiler seçilip işaret konur. Bu bitkiler tohuma bırakılır. Açan
+        çiçeklerde tohumlar hızlı olgunlaşır. Bitki üzerinde tüylenmenin görülmesi tohumların ol-
+        gunlaştığı işaretini verir. Tohumlar hasat edilmezlerse hafif rüzgârda bile dökülüverirler.
+        Tohumluk hasadı, bitki üzerinden ana gövde kesilerek yapılır. Hasat sabah çiğ kalkmadan
+        yapılmalı, kesilen kısımlar gölgelik ve havadar bir yerde 2-3 hafta kurumaya bırakılmalıdır.
+        Bu bitkiler bir yaygı üzerine serilmelidir. Karıncaların tohum taşımasına karşı önlem alınma-
+        lıdır. Bu amaçla yaygı etrafına toz kükürt dökülebilir. Bir dekar alandan 50-75 kg tohum elde
+        edilebilir.
+
+        Tamamen kuruyan bitkiden tohumlar bir sopa yardımıyla döverek çıkarılır. Önce kaba bitki
+        atıkları üstten alınır. Kalan atıklar hafif rüzgârlı havada tohum savrularak ayıklanır. Elde edilen
+        tohumlar elek ya da bir yaygı üzerine konarak gölgede tamamen kurutulur. Kuruyan tohum-
+        lar cam kavanozlarda ağzı kapalı olarak ışık görmeyen serin bir yerde saklanır. İkinci bir sak-
+        lama yöntemi, tohumları önce bez torbaya, sonra da kilitli plastik torbaya koyarak +4°C’de
+        buzdolabında saklamaktır. Bu koşullarda saklanan tohumlar canlılıklarını 3-5 yıl muhafaza
+        edebilir.
+
+
+
+
+66
+           GELENEKSEL
+5. BÖLÜM   KÜLTÜRÜMÜZDE
+           TOHUM SAKLAMA
+           Solmaz Karabaşa
+     Tarım, insanın “birincil” ihtiyacı olan beslenmenin karşılanmasına dönük bir faaliyet oldu-
+     ğundan çok önemli ve hayati bir nitelik taşır. Ancak bugün geldiği noktada tarımsal faaliyet,
+     gerek faaliyetin organizasyonu, gerekse de ürettiği ürünler açısından hayatı tehdit eder hale
+     gelmiştir. Yoğun kimyasal kullanılarak, genetiği değiştirilerek üretilen ürünler, besine ulaşa-
+     mama riski vb. bu tehditlerin başında gelmektedir. Bütün bu riskler, geleneksel kültürdeki
+     tarıma daha çok dikkat vermemizi gerektirmektedir. (Geleneksel kültürün sürdürülebilir ni-
+     telikleri için bkz. Karabaşa, 2007)
+
+     Geleneksel kültürümüzde tarım, bütün bir yaşam biçiminin üstünde şekillendiği temel fa-
+     aliyettir. Tarımsal faaliyetin temeli olan tohum ise yaşamı içinde sakladığından ve yaşamın
+     sürdürülebilirliği onun yeşermesine bağlı olduğundan halk kültüründe azami özen görür.
+
+     Tohumla ilgili olarak özen gösterilmesi gereken üç etkinlik vardır:
+
+     1. TOHUMUN SEÇİLMESİ
+     Tohumlar elde edilen ürünün en iyilerinden seçilerek ayrılır, içindeki istenmeyen tohumlar
+     ayıklanır, temizlenir. Ancak günümüzde tohum satın alınması gittikçe yaygınlaşmaktadır.
+
+     Ekilen ekin içinde kendiliğinden biten diğer tahıl türlerine ekinin azması adı verilir. Örneğin;
+     arpanın içinde yulaf azması var gibi. Eğer ekilen buğday tohumluk yapılacaksa, içindeki çav-
+     dar azması, tarladayken kesilerek ayıklanır (çavdarın boyu daha yüksek olur). Tohuma bıra-
+     kılan sebzeler dalında bırakılır, iyice olgunlaştıktan sonra koparılır, tohumu alınır, kurutulur.
+
+      Bu yıl dikilen lahananın üstünden kış geçerse ertesi yıla tohumluk olur. Tohum çıkarmış lahana-
+      ya oka çıkmış denir. Yazın temmuz ayında tohumu alınır. (Ulus/Bartın)
+
+      Tohumluk için soğanın iri ve düzgünleri seçilerek, ayrı bir yere ekilir. (Sungurlu/Çorum)
+
+      Patates tohumu seçilirken tek gözü olanlar seçilir. Çok gözlü olan iyi olmaz. (Mustafapaşa/Nev-
+      şehir)
+
+     Bazen tohum ekmeden de ürün alınır. Örneğin bazı sebzelerin önceki yıldan tohumu tarlada
+     kalır, bu durumda kendiliğinden biten bu bitkiler tarla müsaitse muhafaza edilir, çünkü ilk
+     önce onlar olgunlaşır ve erkenden yenir.
+
+     Anlatı: Adam mahsulü (kabuklu bir yerli tahıl türü) soymuş ekmiş, buğday olacak sanmış, gene
+     mahsul olmuş. “Hay cinsini s..tiğim gene cinsine çekti” demiş. (Ladik/Samsun)
+
+     2. TOHUMUN SAKLANMASI
+     Tohumluğun bir sonraki yıla kadar en iyi koşullarda saklanması gerekir. Ürünü saklamak için
+     Anadolu’nun farklı yerlerinde farklı uygulamalar hayata geçirilmektedir. Örneğin çok yağ-
+     murlu Karadeniz’de direkler üzerine yapılmış serenderler, diğer pek çok yerde ambarlar, kimi
+     yerlerde de kuyular (patates, kestane gibi ürünler toprakta), kaya oyukları kullanılırken mey-
+     veler evin tavanlarında, hayatında asılarak saklanır.
+
+
+
+
+68
+Tahıl en yaygın biçimde ambarlarda saklanır. Ambarlar üstüne özel olarak çatı yapılmış halde
+dışarıda veya geleneksel mimarisi iki katlı olan evlerin alt katında yer alır. Ambarların içinde
+gözleri (bölmeleri) vardır. Her bir bölmeye un veya dene konabilir.
+
+ Ambarlar (hambar) kalastan geçirmeli yapılır. Genelde kapasiteleri 10-15 tonluktur. Ev için-
+ dekiler sandık gibi ve 150 yarımlık (1,5 tonluk) olur. Ancak bunların ağızları dar olduğundan
+ pek tercih edilmezler. Ambarlara buğday doldurulduktan sonra iki parmak kalınca yaş ceviz
+ yaprağı konur. (Nallıhan/Ankara)
+ Buğday ambara yerleştirilmeden önce böceklenmesin diye dibine deli incirin yaprakları serilir.
+ (Bayramiç/Çanakkale)
+
+ Ekinin iyice kurutulduktan sonra ambara konması gerekir. Bir önceki seneden buğday kalırsa,
+ yıkanır, kurutulur sonra yeniden ambara doldurulur. Bit olmasın diye ambarlar sıcak suyla yı-
+ kanır. (Ladik/Samsun)
+
+ Harmandan getirilen ekin önce yaygılarda serilir, kurutulur sonra akşamüzeri serinde ambar-
+ ların gözlerine doldurulur. Buğday günletilmeden ambara konursa bitlenir. Ambarlara mısır ve
+ fasulye de konabilir. Ambarlarda rutubet olmaması için hava alan tarafına tel takılır. (Pınarba-
+ şı/Kastamonu)
+
+ Ambarda saklanan darı böceklenmesin diye altına, üstüne incir yaprağı döşenir, tuz atılır. (Köp-
+ rülü Kanyon/Antalya)
+
+ Ambara konan fiğ bitlenmesin diye arasına ceviz yaprağı konur. (Sungurlu/Çorum)
+
+Ambarların yerini bazı bölgelerde kaya oyukları, kuyular almıştır.
+
+Orta Anadolu’nun bir sulak alan kıyısında olan yerleşimlerinde ürün, yaygın olarak
+zahraselesi’nde saklanmıştır. Zahra selesi 50 çinik (1 çinik buğday 7 kilo gelir) buğday kapa-
+sitelidir. Zahra selesi toprak evlerde hububatı fare gibi zararlılardan korumanın en güzel yolu
+olmuştur. Bu seleler 1,5 - 2 m boyunda ve kapaklı yapılmıştır. Yapımında kındıra ve topak
+berde kullanılmıştır. (Sultan Sazlığı/Kayseri) Bölgede bugün artık geleneksel tipte evler yapıl-
+madığından bu zahra selelerine de ihtiyaç kalmamış ve kullanılmaz olmuştur.
+
+Bütün sebze tohumları bez torbalarda saklanır. Kimi bölgelerde tohumlar odun külü ile ka-
+rıştırılır.
+
+ Tohum torbalarının ağızları büzülür, hayatlardaki (evin giriş bölümü) çengellere takılır. (Ladik/
+ Samsun)
+
+ İçinde tohum olan bez torbalar ambarlara da asılabilir. (Pınarbaşı/Kastamonu)
+
+ Karnıkara (fasulye türü), börülce kabak kırığına (su kabağından elde edilen kap) konur. Çeşitli
+ amaçlarla kullanılan kabaklar kırılıp su sızdırır hale geldiyse atılmayıp saklama kabı olarak kul-
+ lanılır. (Köprülü Kanyon/Antalya)
+     İnanışsal Pratikler
+       Hızır ambara da uğrasın diye Hıdrellezde mayalanan yoğurt ambarın üstüne konur. (Ladik/
+       Samsun)
+
+      Ambarın dibini süpürmezler, bereketi dibinde kalsın, arkası kesilmesin diye. (Ladik/Samsun)
+
+      Ambarın dibinde yarım ölçek, bir teneke bırakılır, bereketi gitmesin diye. (Ladik/Samsun)
+
+      Ekin bitince ambarın dibini süpürgeyle süpürmeyin, süpürge toplar gider derlermiş. Çorap çulu
+      gibi bir şeyle süpürürlermiş. (Nallıhan/Ankara)
+
+      Kertikli, çizgili, yazılı gibi taşlar bereket taşı olarak görülür ve ambara mahsulün içine konursa
+      mahsulün eksilmeyeceğine inanılır. (Köprülü Kanyon/Antalya)
+
+      Ürün bereketli olsun diye; ilkbaharda ilk gök gürlediğinde hemen ambarın kapağı açılır, üç kul-
+      vallah okunur, içine taş atılır. Bir de ambara Kurban Bayramı’nda köy odasından gelen ekmek
+      konur, bir yıl bekler, dualı olduğu için bozulmaz, bereket getirir. (Pınarbaşı/Kastamonu)
+
+     3. TOHUMUN EKİMİ
+     Tohumun yeniden ekimi esnasında gerek toprağın tavı, gerek zamanı gibi gerekli uygun ko-
+     şullar kollanır ve ekimi buna göre yapılır. Tohum eskiden elle ekilirken, günümüzde daha çok
+     makine ile ekim yapılmaktadır.
+
+     Toprağın Tavı
+       Toprağın tavını anlamak için eline bir avuç toprak alır sıkarsın, birbirine yapışıyorsa tav uygun
+       değil demektir, ekim yapılmaz, değirmende öğütülen hayvan yemi gibi ise tavı gelmiş demektir.
+       (Sungurlu/Çorum)
+
+     Ekimin Yapılışı
+      Tahıl tohumu boyuna takılan heybe ile saçılır. Kadın da erkek de ekin ekebilir ama genelde er-
+      kekler ekini, kadınlar sebzeyi eker. Ekin ekmeyi her erkek de bilemeyebilir, o zaman başkasın-
+      dan istenir. Ekin ekmedeki marifet tarlanın her yerine dene düşürmektir. Yani tarlada boş yer
+      kalmayacak. (Nallıhan/Ankara)
+
+      Tohumluk buğday önce odun külü ile karıştırılır, tarlaya bu şekilde saçılır. (Bayramiç/Çanak-
+      kale)
+
+      Tohum saçmak çok önemlidir. Genellikle eli çok iri, çok alan kişi saçması gerekir. (Sungurlu/
+      Çorum)
+
+      Tohumu düzgün saçabilmek için tarla evleklere bölünür. Bir evlek on metre olur. Ortadan gider-
+      sin, beş bir tarafta, beş bir tarafta kalır. (Sungurlu/Çorum)
+
+      Bizim burdaiki el gider: Bir yol ekilir, tekrar aynı yerden bir kez daha gidilir. Yani başka yerlerde
+      bir defa gitmek yeterlidir. Ancak burada (Ladik) yetmez çünkü ya çürür, ya da don keser. Ekim
+      ayında soğuklar gelmeden ekersen ve ekin gündönümüne (12. ayın 12sine) kadar toprağın üs-
+
+
+70
+ tüne çıkarsa o ekine bir şey olmaz. Tohum saçıldıktan sonra tarlanın üstünden tırmık, sürgü
+ ya da çok eskiden karamık tikeni ile geçilir. Bu şekilde hem kesekler iyice hallolmuş olur, hem
+ de tohum toprağa karışarak sıkıştırılmış olur. Eskiden tarlanın keseklerinin iyice hallolması için
+ sabah ezanı tarladan koyun sürüsü geçirilirmiş. (Ladik/Samsun)
+
+ Ekim öküzle yapılıyorsa 1 dönüme 1 yarım (1 yarım 8 kilodur) saçılır. Traktörle 1 dönüme 2,5
+ yarım saçılır. Buğday her adımda bir avuç saçılır. Arpa biraz sık ekilir. Birkaç kişi birden ekim
+ yapıyorsa en kenardaki ayağı ile işaret yapar. Bir kişi 2-2,5 m’lik bir alan götürür. Tarlanın es-
+ kiden beri ekilegelen bir tohum miktarı vardır. Buna göre önce ekilir, bu miktara ulaşılmamışsa
+ gereken tohum üstüne yeniden saçılır. (Nallıhan/Ankara)
+
+ Dönüme iki çinik (16 kilo -bir çinik 8 kilo-) tohum atılır. Tarlanın iyi ya da kötü oluşuna göre
+ ne kadar tohum atılacağı değişir. “Toprak insanoğluna benzer. Bi insanoğlu zayıftır, hali gücü
+ yoktur, mesela 30 kiloyu götürür, bir güçlü insanoğlu da neyi götürür, 100 kiloyu götürür”. Yani
+ güçlü tarlaya çok tohum atılır. (Sungurlu/Çorum)
+
+Ekim Zamanı
+Halk takvimi yerel iklimsel koşullara bağlı olarak oluşturulduğundan, Anadolu’nun hemen
+her bölgesi için farklılık gösterir. Dolayısıyla da her ürünün, her bölgeye göre değişen bir
+ekim takvimi vardır.
+
+Ekin, ekim ayında, ayın eskisinde ekilir. (Nallıhan/Ankara) Eğer tarlanın tavı yakalanamazsa
+eskiden baharda da ekim yapılırmış, ancak günümüzde bu verimli bulunmamaktadır.
+
+ Mayıstan sonra ekilen darıdan, kocasından sonra kalkan karıdan hayır gelmez (Köprülü Kan-
+ yon/Antalya)
+
+ İlk önce ince tohumlar (marul, maydanoz gibi küçük tohumlular) ekilir. İnce tohumlar özel ola-
+ rak yapılmış ocaklara dikilir. Mesela son cemrede (martta) biber, domates, pazı, (biber domates
+ arasına pazı ekilir) mancar (pazı), pırasa, sarımsak ekilir, bunlar nisan-mayıs aylarında fidelenir
+ (başka yere alınır). Fideleme işlemi akşamdan, serinde yapılır. Sarımsak yerinde kalır. Kabak ve
+ salatalık mayısta ekilir. Ama önceden nisanda çile konur. Bunun için kemrenin (hayvan gübresi)
+ yanmış olanından tenekeye bir kısım konur, içine salatalık tohumu karıştırılır, sobanın yanına
+ bırakılır. Arada bir kurumayacak şekilde ıslatılır. Bu bir hafta on gün içinde çillenir. Sonra karığa
+ dikilir. Kabak sık ekilirse tepesine çıkar, dökmez. Seyrek ekilmelidir. Bir kuyuya üç tane atılır. Bir
+ de kabak tefek atıp yayılacağından bostanın ortasına değil kenarına dikilir. (Pınarbaşı/Kasta-
+ monu)
+
+ Mısır da dalları olduğundan bahçenin kenarlarına bir sıra halinde ekilir. (Sungurlu/Çorum)
+
+ Ocak ayının eskisinde kara mancarın tohumu ekilir. (Ulus/Bartın)
+
+ Pakla havya çiçek açınca ekilir. (Mustafapaşa/Nevşehir)
+
+ Ay çıkmadan, anasının karnındayken yenisi olur. O zaman ekim yapılmaz, 6-7 gün sonra ekilir.
+ (Ulus/Bartın)
+      Bütün tohumlar ayın eskisinde ekilir. Fasulyenin ekimi Hıdrellezden on gün önce veya on gün
+      sonra yapılır. Hıdrellezde ekilirse tezeneği(haşere türü)basar denmektedir. Fasulye ekimi için
+      işaret yemişen çiçeğidir. Yemişen çiçek açıp da solunca fasulye ekilir. Eğer yemişen çiçekli iken
+      ekilirse döl vermez. Fasulyenin ekimi salı gününe denk getirilir, o gün ekilince salkım olurmuş.
+      Gene fasulye ve mısır deli günde (pazar) ekilirse iyi olurmuş. Bir başka kaynak kişiye göre de o
+      gün bir iş yapılırsa ters gider. İyi sayılmaz. (Pınarbaşı/Kastamonu)
+
+     Hıdrellezden sonraki bir haftada, bir başka ifadeyle mayısın ilk giriminde, ilk üç gününde
+     mısır ekilirse koza çıkarmayacağına inanılır. Çünkü bu tarihler acı tav zamanıdır. (Bir de eski
+     Kasım’ın 30’undan 35’ine kadar da acı tav, çürük tav vardır.)
+
+     Hıdrellezde yer hasta olurmuş, o yüzden Hıdrellezde ekim yapılmaz. (Ulus/Bartın) Mısır ekil-
+     mez, öküz koşulmaz ama bir gün evvel yeri hazır olursa o gün fasulye, domates, biber dikile-
+     bilir, dökümü güzel olur.
+
+     Hıdrellezde iş yapmaktan kaçınılmasına rağmen o gün dikilen fasulyenin, salatalığın çok
+     dökeceği yönünde de inanışlar vardır. Bunun sebebinin -Sivas’taki pratiklerden yola çıka-
+     rak- yine bir sağaltım beklentisi olabileceğini söyleyebiliriz. Sivas’ta kutlanan hıdrellez bay-
+     ramının yerel adı Eğrilce’dir ve o gün toprağa özellikle fasulye dikiler, böylece insanlara, hay-
+     vanlarına gelecek bütün hastalıkların, eğriliklerin dikilen fasulyelere gitmesi istenir.
+
+     İnanışsal Pratikler
+       İlk ekini ekmeğe gittiğimiz günrahmetlik anam helva bulardı. (Ladik/Samsun)
+
+      Helva pekmezle ya da şekerle yapılır, ilk rast gelene verilir (o da Allah rast getirsin, bol versin
+      der), öküzlere yedirilir, tohuma katılır, bir kısmı da yenir. “Bin ekiyom deli deli, Allah versin dolu
+      dolu” denir ekmeye başlanır. (Ladik/Samsun)
+
+      Ekin ekerken, öncelikle “kurda, kuşa, ihtiyaç sahiplerine ver, benim de ömrüm varsa çoluk çocu-
+      ğuma, hayırlı bol rızıklar ver” diyerek başlanır.
+      Ekinin elle ekildiği zamanlarda “önce kurdun kuşun nasibine, sonra insanların nasibine” gibi
+      sözlerle ekime başlanırmış. (Nallıhan/Ankara)
+
+      Mısır ekimi için: “Kasım 100, saban boyunduruğu düz”(halk takvimindeki Kasım’ın girişinden
+      itibaren yüz sayılır ve ekime hazır olunur), “Kasım 110, tarlaya kon denir.” (Ulus/Bartın)
+
+      Bahçeye tohum atmadan komşuya tohum verilmez (evin bereketi kaçmasın diye).
+      Bahçeye ilk olarak tatlı bir yiyeceğin tohumu atılır, biber gibi acı şeylerin tohumu atılmaz (ağ-
+      zımızın tadı kaçmasın diye).
+      Aybaşılı kadın tohum atmaz, fidan dikmez (ürünün bereketi kaçmasın diye).
+      Yılbaşı gecesi eve öküz çıkartılır; öküz eve girerken sağ ayağını atarsa o yıl bereketli geçer. (Rize)
+
+      Yılbaşı gecesi evin kadını fasulye tanelerini, evin duvarlarına fırlatır (evde bolluk bereket olsun
+      diye) (Rize)
+
+
+
+
+72
+                                        Ekici ol da bilici olma. (Ulus/Bartın)
+
+                              Anlatı: Aşağı Çamlı’da bir kişi Hıdrellez günü öküz koşmuş ve ta-
+                             ban yapıyormuş. Tabanın üstüne de bir taş koymuş. O taş gökyü-
+                            züne fırlamış ve çatlamış. (Ulus/Bartın)
+
+                            Görüldüğü üzere geleneksel kültürde tohumla ilgili bütün bu
+                            süreçlerde, öncelikle binlerce yılın deneyim ve birikimine bağlı
+                            olarak edinilmiş olan halk bilgisi yardıma koşmaktadır. Ancak
+                             söz konusu olan hayatın devamlılığı olduğundan doğaüstü
+                              güçlerin de her ihtimale karşın kontrol altına alınması gerek-
+                                mektedir. Bunun için bir dizi inanışsal pratik de uygulama-
+                                 ya konulmaktadır.
+
+Ancak günümüzde sürdürülebilirliği yerelliğine bağlı olan tarımsal faaliyetin, en önemli un-
+suru olan yerel tohumlar başta olmak üzere, bunların bilgisi, saklama yöntemleri ne yazık ki
+unutulmaktadır. Dahası makineleşme ve yeni tohumlar nedeniyle bu bilgiler geçerliliğini de
+yitirmektedir. Buna karşı durmak gerekliliği yok mudur, yoksa buna olanak mı yoktur?
+     Yararlanılan Kaynaklar
+        Bayraktar, K.1976. Sebze Yetiştirme, Cilt III. Sebzelerde Tohum Üretimi, Ege Üniversitesi
+        Matbaası, Bornova, İZMİR
+
+        Beşirli, G.; Sönmez, İ. 2012. Organik Sebze Tohum Üretimi, Organik Tarım Kitabı (Güncellenmiş
+        II. Bakı), 150-162, Yenibosna, İSTANBUL
+
+        Tohum Sever’in El Kitabı, “yerli ve köylü” (2009), Türkiye’nin Tarımsal Biyoçeşitliliğinin
+        Korunması için Tohum Ağının Kurulması Projesi Kitapçığı, Buğday Derneği.
+
+        Roselló, J.; Soriano, J.J. (2010). CómoObtener Sus PropiasSemillas. (Manual para
+        agricultoresecológicos). Sevilla.
+        (Roselló, J.; Soriano, J.J. Kendi Tohumlarınızı Nasıl Elde Edersiniz. (Ekolojik Çiftçiler için
+        Rehber.) Sevilla. 2010.)
+
+        Vinyals, N. [et al.] (2011). “Manual de produccióecològica de llavors i planterd’hortícoles”.
+        Fundació CEDRICAT i AssociacióL’Era, Espai de RecursosAgroecològics.
+        (Vinyals, N [ve diğerleri]. Ekolojik Tohum ve Sebze Fidan Üretim Rehberi. CEDRICAT ve
+        AssociacióL’Era, Solsona, Ispanya. 2011.)
+
+
+
+
+74
+BUĞDAY EKOLOJİK YAŞAMI DESTEKLEME DERNEĞİ
+                       DÖNÜŞÜM KİTAPLIĞI
+  “Yaşam dönüşümdür... Dönüşüm hizmetle şekillenir”
+                                   Victor Ananias
+  Elinizdeki Atalık Tohumlar için Yetiştirici Rehberi, Buğday Derneği’nin Dönüşüm Kitaplığı
+  Serisi’nin ikinci kitabıdır. Bu seri, Buğday hareketinin kurucusu ve lideri Victor Ananias’ın
+  “Ekolojik Dönüşüm Rehberi”nde önerdiği 10 başlığı kapsıyor. Victor Ananias, dönüşüm çem-
+  berine giriş niteliğindeki rehberde yaşamını dönüştürmek isteyenlerin attığı adımları ölçebi-
+  lecekleri bir yöntem öneriyor ve söz konusu ölçüm testini 10 ayrı başlıkta topluyor.
+
+  Yaşamını, ekolojik yaşamın esaslarına göre dönüştürmek isteyenler, bu ölçme yöntemini
+  uygulayıp, adım atarken her alanda yardıma ihtiyaç duyuyor. Atalık Tohumlar için Yetiştiri-
+  ci Rehberi, Ekolojik Dönüşüm Rehberi’nin başlıklarından “Beslenirken” ve “Üretirken” başlıklı
+  bölümlerinde ilerleyebilmek üzere size yol gösterecek.
+
+  Bu seride ayrıca, Ekolojik Dönüşüm Rehberi’ndeki ölçümlerde ve dönüşüm yolunda ataca-
+  ğınız adımlarda yol gösterici olması amacıyla “Nefes Alırken”, “Beslenirken”, “Barınırken”, “Ula-
+  şırken”, “Üretirken”, “Sermayemiz Zaman”, “Kılık Kıyafet”, “Temizlik ve Atıklar”, “Niyet ve İfade”
+  başlıklarını konu alan rehberler yayımlayacağız.
+
+
+  www.bugday.org
+  www.victorananias.org
+     TOHUM GÜNLÜĞÜ
+
+
+
+
+76
+                                Ekolojik dönüşüme siz de katılın.
+Buğday Ekolojik Yaşamı
+Destekleme Derneği                 Facebook: @bugdaydernegi
+Osmanağa Mah. Kısmet Apt.          Instagram: @bugday_dernegi
+Mürver Çiçeği Sk. No: 4 Da: 5      Twitter: @BugdayDernegi
+34714 Kadıköy/İstanbul
+                                   YouTube: bugdaymedya
+Tel: (0216) 349 99 33
+                                   LinkedIn: bugdaydernegi
+www.bugday.org                     Telegram: @bugdaydernegi
+
