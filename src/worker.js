@@ -192,7 +192,7 @@ function productsFor(req, env, site) {
     const r = await env.ASSETS.fetch(new Request(new URL(site === 'tarim' ? '/tarim/products.json' : '/products.json', req.url)));
     if (!r.ok) return c ? c.list : [];
     const d = await r.json();
-    const list = (d.items || []).map((p) => ({ s: p.s, n: String(p.n || '').trim(), st: p.st }));
+    const list = (d.items || []).map((p) => ({ s: p.s, n: String(p.n || '').trim(), st: p.st, h: p.h || 0 }));
     PRODS[site] = { t: Date.now(), list };
     return list;
   };
