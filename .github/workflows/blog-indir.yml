@@ -1,0 +1,29 @@
+name: Blog yazılarını indir
+
+# hasturkgubre.com.tr/blog yazılarını indirip metnini docs/blog/ altına çalışma dalına kaydeder (Ak Bilge bilgi kontrolü için).
+# Yalnız okuma yapar; mağazaya bir şey yazmaz.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/blog-indir.py', '.github/workflows/blog-indir.yml']
+
+permissions:
+  contents: write
+
+concurrency: blog-indir
+
+jobs:
+  indir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: İndir
+        run: python3 scripts/blog-indir.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Dala kaydet
+        run: |
+          git config user.name "bilgi-bankasi"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/blog
+          git diff --cached --quiet || (git commit -m "Blog yazıları (metin, Ak Bilge bilgi kontrolü için)" && git push origin HEAD:${GITHUB_REF_NAME})
