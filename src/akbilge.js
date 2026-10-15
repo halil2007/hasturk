@@ -208,6 +208,22 @@ export async function vote(req, env, okOrigin) {
 
 // GET /ak/sayac: bugün ve son 7 gün kaç soru havuzdan / Claude'dan cevaplandı, Claude token kullanımı ve tahmini maliyet.
 // Soru metni gösterilmez (yalnız sayılar).
+// Konum: cevabın hangi Cloudflare merkezinden döndüğü ve veritabanının (D1) hangi bölgede çalıştığı.
+// Ziyaretçinin kendi konumu yalnız kendisine gösterilir, kaydedilmez.
+const MERKEZ = { IST: 'İstanbul', ADB: 'İzmir', ESB: 'Ankara', SOF: 'Sofya', OTP: 'Bükreş', ATH: 'Atina', FRA: 'Frankfurt', AMS: 'Amsterdam', LHR: 'Londra', CDG: 'Paris', VIE: 'Viyana', MXP: 'Milano', WAW: 'Varşova', ARN: 'Stockholm', DME: 'Moskova', TLV: 'Tel Aviv', IAD: 'Washington (ABD)', ORD: 'Chicago (ABD)', DFW: 'Dallas (ABD)', SJC: 'San Jose (ABD)', LAX: 'Los Angeles (ABD)', SEA: 'Seattle (ABD)', ATL: 'Atlanta (ABD)', EWR: 'New York (ABD)' };
+const BOLGE = { EEUR: 'Doğu Avrupa', WEUR: 'Batı Avrupa', ENAM: 'Kuzey Amerika doğu', WNAM: 'Kuzey Amerika batı', APAC: 'Asya-Pasifik', OC: 'Okyanusya', ME: 'Orta Doğu', AF: 'Afrika' };
+export async function konum(req, env) {
+  const cf = req.cf || {}, out = { ok: true, cevap_merkezi: cf.colo ? `${cf.colo}${MERKEZ[cf.colo] ? ' — ' + MERKEZ[cf.colo] : ''}` : null, sizin_ulke: cf.country || null, havuz: 'Bilge Bey programının içinde (bu merkezde çalışır)' };
+  if (env.DB) {
+    const t0 = Date.now();
+    try {
+      const r = await env.DB.prepare('SELECT 1 AS x').all(), m = r.meta || {};
+      out.veritabani = { bolge: m.served_by_region ? `${m.served_by_region}${BOLGE[m.served_by_region] ? ' — ' + BOLGE[m.served_by_region] : ''}` : null, ana_kopya: m.served_by_primary ?? null, merkez: m.served_by_colo || null, sql_ms: m.timings ? m.timings.sql_duration_ms : (m.duration ?? null), toplam_ms: Date.now() - t0 };
+    } catch (e) { out.veritabani = { hata: true }; }
+  }
+  return json(out);
+}
+
 export async function sayac(env) {
   if (!env.DB) return json({ ok: false, why: 'db' });
   await initDb(env.DB).catch(() => {});
