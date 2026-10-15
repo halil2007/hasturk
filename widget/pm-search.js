@@ -1413,7 +1413,7 @@
     var fn = window.UrunAramaSepet;
     if (typeof fn === 'function') return Promise.resolve().then(function () { return fn(v.id, 1, { productId: p.id, slug: p.s, name: p.n }); });
     setBusy(p.id, true);
-    return directAdd(p, v).catch(function () { return queueFrameAdd(p, v); }).then(function () { setBusy(p.id, false); }, function (e) { setBusy(p.id, false); throw e; });
+    return addCore(p, v, 1).then(function (how) { setBusy(p.id, false); return how; }, function (e) { setBusy(p.id, false); throw e; });
   }
   function akBundleGo() {
     if (!BUNDLE || BUNDLE.busy) return;
@@ -1422,17 +1422,17 @@
     BUNDLE.busy = true;
     var go = $sheet.querySelector('[data-act="bgo"]');
     if (go) { go.disabled = true; go.innerHTML = '<span class="bspin"></span><span>Ekleniyor…</span>'; }
-    if (typeof window.UrunAramaSepet !== 'function') sel.forEach(function (b) { prepAdd(b.p); });
+    if (typeof window.UrunAramaSepet !== 'function' && !winOn()) prepAdd(sel[0].p); // gizli çerçeve gerekiyorsa yalnız ilki önceden (hepsi birden telefonu yorar)
     track('akbilge_hepsi', sel.length + ' ürün');
-    var ok = 0, fail = [];
+    var ok = 0, fail = [], frame = false;
     sel.reduce(function (pr, b) {
       return pr.then(function () {
-        return addP(b.p, b.v).then(function () { ok++; ev('a', b.p.s); ev('ka', b.p.s); track('add_to_cart_ok', b.p.n); }, function () { fail.push(b.p); track('add_to_cart_fail', b.p.n + ' (hepsi)'); });
+        return addP(b.p, b.v).then(function (how) { ok++; if (how !== 'win') frame = true; ev('a', b.p.s); ev('ka', b.p.s); track('add_to_cart_ok', b.p.n); }, function () { fail.push(b.p); track('add_to_cart_fail', b.p.n + ' (hepsi)'); });
       });
     }, Promise.resolve()).then(function () {
       BUNDLE = null;
       closeSheet();
-      syncSiteCart();
+      if (frame) syncSiteCart();
       if (!fail.length) ptoast(ok + ' ürün sepete eklendi', false, true);
       else ptoast(ok + ' ürün eklendi; ' + fail.map(function (p) { return p.n; }).join(', ') + ' eklenemedi. Ürün sayfasından ekleyebilirsiniz.', true, false, url(fail[0].s), 'Ürün sayfasına git');
     });
@@ -2186,6 +2186,7 @@
     noteQuery.t = setTimeout(function () { ev(n ? 'q' : 'q0', q); }, 1500);
   }
   function cartAdded(vid, siteAdd) {
+    if (WIN_OWN) return; // Ürün Bul / Bilge Bey'in kendi eklemesi (window.addToCart) ana sayfanın isteği olarak da görünür; çift sayılmasın
     if (DATA) { var p = BY_VAR[vid]; if (p) ev('a', p.s); } else ev('a', String(vid).toLowerCase());
     if (siteAdd) siteCross(vid);
   }
@@ -2579,7 +2580,7 @@
         return '<button class="vo' + (v === first ? ' on' : '') + '" type="button" data-act="vo" data-v="' + esc(v.id) + '"' + (vOk(v) ? '' : ' disabled') + '>' +
           esc(v.name || 'Seçenek') + (pr != null ? '<small>' + tl(pr) + '</small>' : '') + '</button>';
       }).join('') + '</div>' +
-      '<div class="sh-f">' + (typeof window.UrunAramaSepet === 'function' ? '<div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
+      '<div class="sh-f">' + (typeof window.UrunAramaSepet === 'function' || winOn() ? '<div class="qty"><button type="button" data-act="sq" data-v="-1" aria-label="Azalt">' + I.minus + '</button>' +
       '<input value="1" inputmode="numeric" aria-label="Adet" readonly><button type="button" data-act="sq" data-v="1" aria-label="Artır">' + I.plus + '</button></div>' : '') +
       '<button class="sh-go" type="button" data-act="shgo">' + I.cart + 'Sepete ekle</button></div>' +
       (CFG.promo && CFG.promo.shipping ? '<div class="sh-ship">' + I.truck + esc(CFG.promo.shipping) + '</div>' : '') + '</div>';
@@ -2613,12 +2614,12 @@
     // Ürün sayfasını görünmez bir çerçevede aç; seçeneği seçip sitenin kendi "Sepete Ekle" butonuna bas.
     // Müşteri arama panelinden ayrılmaz.
     setBusy(p.id, true);
-    directAdd(p, v).catch(function () { return queueFrameAdd(p, v); }).then(function () {
+    addCore(p, v, qty).then(function (how) {
       setBusy(p.id, false);
       if (SH.p === p) closeSheet();
       // Sepet yanıtı kanıt anında işlendi (kalan ücretsiz kargo tutarı güncel); bildirim beklemeden gösterilir
       addedMsg(p, v, xs);
-      syncSiteCart();
+      if (how !== 'win') syncSiteCart();
       track('add_to_cart_ok', p.n);
       ev('a', p.s);
     }, function (why) {
@@ -2843,6 +2844,52 @@
       }
     } catch (e) {}
   }
+  // ---- Hızlı ekleme 0: sitenin (ikas) kendi sepet işlevi window.addToCart({ variantId, quantity, itemId }) ----
+  // Açık sayfanın sepetine, ürün sayfası açmadan ekler (~0,3 sn); üstteki sepet sayacı da hemen güncellenir.
+  // ikas'ta quantity satırın TOPLAM adedidir: ürün sepette zaten varsa o satırın kimliğiyle (itemId) mevcut adet + yeni adet
+  // gönderilir (yoksa adet 1'e iner). Başarı ancak dönen sepette bu seçeneğin adedi artmışsa sayılır; olmazsa eski yönteme
+  // (gizli çerçeve) düşülür. Süre aşımında düşülmez (geç de olsa eklenmiş olabilir; çift eklenmesin). Kapatmak: cart.win: false
+  var WIN_OWN = 0, WINQ = Promise.resolve();
+  function winOn() { return (CFG.cart || {}).win !== false && typeof window.addToCart === 'function'; }
+  function lineOf(c, vid) {
+    var ls = (c && (c.items || c.orderLineItems)) || [];
+    for (var i = 0; i < ls.length; i++) if (ls[i] && ((ls[i].variant && ls[i].variant.id) || ls[i].variantId) === vid) return ls[i];
+    return null;
+  }
+  function winAdd(p, v, qty) {
+    if (!winOn() || !v || !v.id) return Promise.reject('no-win');
+    var run = WINQ.then(function () {
+      var cs = siteCartStore();
+      if (!cs) throw 'no-store'; // satır kimliği okunamazsa sepetteki adet ezilebilir; eski yönteme
+      var cur = cs.cart ? lineOf(cs.cart, v.id) : null, had = cur ? (+cur.quantity || 0) : 0, n = qty || 1, to;
+      var arg = { variantId: v.id, quantity: had + n };
+      if (cur && cur.id) arg.itemId = cur.id;
+      WIN_OWN++;
+      var end = function () { clearTimeout(to); setTimeout(function () { WIN_OWN--; }, 400); };
+      return Promise.race([
+        Promise.resolve().then(function () { return window.addToCart(arg); }),
+        new Promise(function (res, rej) { to = setTimeout(function () { rej('win-timeout'); }, 12000); })
+      ]).then(function (r) {
+        end();
+        var d = r && r.response && r.response.data, ln = d ? lineOf(d, v.id) : null;
+        if (!r || !r.success || !ln || (+ln.quantity || 0) < had + n) throw 'win-' + ((r && r.response && (r.response.errorCodes || [])[0]) || 'fail');
+        if (d.items && !d.orderLineItems) setCart({ orderLineItems: d.items, totalFinalPrice: d.totalFinalPrice != null ? d.totalFinalPrice : d.totalPrice, id: d.id });
+        else setCart(d);
+        track('add_win', p.n);
+        return 'win';
+      }, function (e) { end(); throw e; });
+    });
+    WINQ = run.catch(function () {});
+    return run;
+  }
+  // Sepete ekleme sırası: sitenin işlevi → (açıksa) öğrenilmiş istek → gizli çerçeve
+  function addCore(p, v, qty) {
+    return winAdd(p, v, qty).catch(function (e) {
+      if (e === 'win-timeout') throw e;
+      if (e !== 'no-win') addLog({ t: new Date().toISOString(), urun: p.n, secenek: v.name || '', adim: 'pencere-islevi-olmadi', neden: String(e) });
+      return directAdd(p, v).catch(function () { return queueFrameAdd(p, v); });
+    });
+  }
   function directAdd(p, v) {
     var t = ADD_TPL;
     if (!t || p.bn || !v || !v.id || (CFG.cart || {}).direct !== true) return Promise.reject('no-template');
@@ -2946,7 +2993,7 @@
   function schedulePrewarm(p) {
     clearTimeout(PREWARM_T);
     // Varsayılan kapalı (gerçek ürün sayfası arkada çalışırken telefonda kaydırma takılabilir); config.json > cart.prewarm: true açar
-    if ((CFG.cart || {}).prewarm !== true || !p || !p.st || WARM || ADDING || !cartOn() || !warmOn() || slowNet() || typeof window.UrunAramaSepet === 'function') return;
+    if ((CFG.cart || {}).prewarm !== true || winOn() || !p || !p.st || WARM || ADDING || !cartOn() || !warmOn() || slowNet() || typeof window.UrunAramaSepet === 'function') return;
     PREWARM_T = setTimeout(function () {
       if (!isOpen || WARM || ADDING || document.hidden) return;
       loadFrame(p).then(function (fr) { if (!WARM && !ADDING) promoteWarm(fr); }, function () {});
@@ -2960,7 +3007,7 @@
   }
   // "Ekle"ye basılınca / parmak değince: ürünü gizli çerçevede şimdiden aç (ekleme sürerken sıcak çerçeveye dokunma)
   function prepAdd(p) {
-    if (BUSY[p.id]) return;
+    if (BUSY[p.id] || winOn()) return;
     if (warmOn() && WARM && WARM.fr) { if (!ADDING) navWarm(p).catch(function () {}); return; }
     loadFrame(p).catch(function () {});
   }
