@@ -89,10 +89,53 @@ for (const [slug, c] of Object.entries(oto)) {
   add({ tur: 'urun', urun: slug, kartDurum: 'urun_sayfasi', kategori: c.kategori, sorular, cevap, urunler: [slug, ...((bySlug.get(slug) || {}).x || []).slice(0, 2)], kaynak: `urun_sayfasi:${slug}` });
 }
 
+// F) Saksılar (bilgi/saksilar.json; akbilge-saksi.mjs üretir): hacim, toprak ihtiyacı, delik, saksı seçimi kuralları
+const sx = JSON.parse(await readFile('bilgi/saksilar.json', 'utf8'));
+const virg = (x) => String(x).replace('.', ',');
+const kaynakSatir = (k) => '\n\nKaynak: ' + k.kaynaklar.map((x) => x.ad).join('; ');
+const KURAL_SORU = {
+  boyut: ['saksı değiştirirken kaç numara büyük alınır', 'ne kadar büyük saksı almalıyım', 'saksı boyutu nasıl seçilir', 'büyük saksı zararlı mı', 'bir boy büyük saksı'],
+  delik: ['deliksiz saksıya bitki dikilir mi', 'saksının deliği olmazsa ne olur', 'drenaj deliği şart mı', 'kaşpo nasıl kullanılır', 'deliksiz saksı'],
+  cakil: ['saksının altına taş konur mu', 'saksı dibine çakıl koymak', 'saksıya drenaj için ne konur', 'saksı altına perlit', 'saksı drenajı nasıl yapılır'],
+  zaman: ['saksı ne zaman değiştirilir', 'saksı değiştirme zamanı', 'bitki saksısı ne zaman büyütülür', 'kökler saksıdan çıkıyor', 'saksı değişimi hangi ay'],
+  orkide: ['orkide hangi saksıya dikilir', 'orkide saksısı', 'orkide şeffaf saksı', 'orkide saksı değişimi', 'orkide nasıl saksı değiştirilir'],
+  kaktus: ['kaktüs hangi saksıya dikilir', 'sukulent saksısı', 'kaktüs saksı boyutu', 'kaktüs saksı değişimi', 'sukulent hangi saksı'],
+};
+const KURAL_URUN = { orkide: ['seffaf-plastik-orkide-kaktus-saksisi', 'gartengold-orkide-topragi'], kaktus: ['kaktus-ve-sukulent-topragi', 'kaktus-kozalak-yuvarlak-saksi-015l'], cakil: ['tarim-perliti'] };
+for (const [k, sorular] of Object.entries(KURAL_SORU)) {
+  const r = sx.kural[k];
+  add({ tur: 'saksi-kural', konu: k, sorular, cevap: r.metin + kaynakSatir(r), urunler: (KURAL_URUN[k] || []).filter((s) => bySlug.has(s)), kaynak: `saksi:kural:${k}` });
+}
+for (const t of sx.tablo) {
+  const d = t.cap, sonra = `${virg(d + 2.5)}–${d + 5} cm`;
+  add({ tur: 'saksi-hesap', cap: d,
+    sorular: [`${d} cm saksı kaç litre`, `${d} cm saksıya ne kadar toprak gider`, `${d}'lik saksı kaç litre`, `${d} numara saksı kaç litre`, `${d} numara saksıya ne kadar toprak`, `${d} cm saksıdan sonra kaç cm saksı`],
+    cevap: `Çapı ${d} cm, yüksekliği çapına yakın standart bir saksı yaklaşık ${virg(t.litre)} litredir. İçine yaklaşık ${virg(t.toprak.litre)} litre toprak gider (üstte 2–3 cm sulama payı kalır)${t.toprak.paket ? '; ' + (/^en küçük/.test(t.toprak.paket) ? t.toprak.paket : t.toprak.paket + ' paket yeter') : ''}.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı ${sonra} olmalı.`,
+    urunler: [], kaynak: 'saksi:hesap' });
+}
+for (const p of sx.saksilar) {
+  const n = lc(p.ad).replace(/\s*\|.*$/, '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s*[-–].*$/, '')
+    .replace(/(?:\d+(?:[.,]\d+)?\s*(?:l|lt|litre)\b\s*\/\s*)+\d+(?:[.,]\d+)?\s*(?:l|lt|litre)\b/g, ' ').replace(/\s+/g, ' ').trim() + (/^line-saksi-/.test(p.slug) ? ' ' + lc(p.ad.split('|')[1] || '').trim() : '');
+  const satir = p.boylar.map((b) => {
+    const olcu = b.cap ? ` (Ø${virg(b.cap)}${b.yukseklik ? ' × ' + virg(b.yukseklik) : ''} cm)` : b.uzunluk ? ` (${b.uzunluk} × ${b.genislik} × ${b.yukseklik} cm)` : b.derinlik ? ` (${b.genislik} × ${b.derinlik} × ${b.yukseklik} cm)` : '';
+    const L = `${virg(b.litre)} L${b.kaynak === 'hesap' ? ' (ölçülerden yaklaşık)' : ''}`;
+    const tp = b.toprak ? ` → yaklaşık ${virg(b.toprak.litre)} L toprak${b.toprak.paket ? ', ' + (/^en küçük/.test(b.toprak.paket) ? 'en küçük paket (5 L) yeter' : b.toprak.paket + ' paket') : ''}` : '';
+    return `• ${L}${olcu}${tp}`;
+  }).join('\n');
+  let cevap = `${p.ad}\n\n${p.boylar.length > 1 ? 'Boylar ve toprak ihtiyacı:' : 'Hacim ve toprak ihtiyacı:'}\n${satir}`;
+  if (p.delik === 'var') cevap += '\n\nAltında su tahliye açıklığı var.';
+  else if (p.delik === 'kontrol') cevap += '\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).';
+  if (p.tabak) cevap += ' Tabağı var.';
+  if (p.uygun) cevap += `\n\nÜrün bilgisine göre: ${p.uygun.replace(/\s+$/, '')}${/[.!]$/.test(p.uygun) ? '' : '.'}`;
+  cevap += '\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. "monstera toprağı").';
+  const sorular = [`${n} kaç litre`, `${n} ne kadar toprak alır`, `${n} saksıya ne kadar toprak gider`, `${n} ölçüleri`, `${n} deliği var mı`, `${n} hangi bitki için uygun`];
+  add({ tur: 'saksi', urun: p.slug, sorular, cevap, urunler: [p.slug, ...((bySlug.get(p.slug) || {}).x || []).slice(0, 2)], kaynak: `saksi:${p.slug}` });
+}
+
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
   cevap: `${pr.title || 'İndirim'}: ${pr.code} kodunu ödeme adımında kullanabilirsiniz${pr.note ? ' (' + pr.note + ')' : ''}.${pr.shipping ? ' ' + pr.shipping + '.' : ''}`, urunler: [], kaynak: 'config:promo' });
 await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);

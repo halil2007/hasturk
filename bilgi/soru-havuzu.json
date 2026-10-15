@@ -1,7 +1,7 @@
 {
  "_aciklama": "Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.",
  "surum": 1,
- "kayit": 1101,
+ "kayit": 1176,
  "havuz": [
   {
    "id": "h0001",
@@ -23036,6 +23036,1362 @@
   },
   {
    "id": "h1101",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-kural",
+   "konu": "boyut",
+   "sorular": [
+    "saksı değiştirirken kaç numara büyük alınır",
+    "ne kadar büyük saksı almalıyım",
+    "saksı boyutu nasıl seçilir",
+    "büyük saksı zararlı mı",
+    "bir boy büyük saksı"
+   ],
+   "cevap": "Saksı değiştirirken yeni saksı, eskisinden yalnızca 2,5–5 cm (1–2 inç) daha geniş olmalı. Çok büyük saksıdaki fazla toprak uzun süre ıslak kalır ve kök çürümesine yol açabilir.\n\nKaynak: Colorado State Univ. Extension – Repotting houseplants; Clemson HGIC – Repotting houseplants; NC State Extension – How to repot a houseplant; Univ. of Illinois Extension – Tips for repotting",
+   "urunler": [],
+   "kaynak": "saksi:kural:boyut"
+  },
+  {
+   "id": "h1102",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-kural",
+   "konu": "delik",
+   "sorular": [
+    "deliksiz saksıya bitki dikilir mi",
+    "saksının deliği olmazsa ne olur",
+    "drenaj deliği şart mı",
+    "kaşpo nasıl kullanılır",
+    "deliksiz saksı"
+   ],
+   "cevap": "Saksıda drenaj deliği olması en önemli koşuldur. Deliksiz dekoratif saksıyı dış saksı (kaşpo) olarak kullanın: bitkiyi delikli bir iç saksıda tutun, sulamadan sonra dipte biriken suyu boşaltın.\n\nKaynak: UC Master Gardeners – Succulent container gardens",
+   "urunler": [],
+   "kaynak": "saksi:kural:delik"
+  },
+  {
+   "id": "h1103",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-kural",
+   "konu": "cakil",
+   "sorular": [
+    "saksının altına taş konur mu",
+    "saksı dibine çakıl koymak",
+    "saksıya drenaj için ne konur",
+    "saksı altına perlit",
+    "saksı drenajı nasıl yapılır"
+   ],
+   "cevap": "Saksının dibine çakıl/taş koymanın süzülmeyi artırdığı tartışmalıdır: Washington State Üniversitesi yayını, ince topraktan iri katmana su geçişi zor olduğu için ıslak bölgenin yukarı çıktığını belirtir; bazı yeni çalışmalar ise sınırlı fayda bulmuştur. Güvenli yol: delikli saksı + iyi süzen toprak (gerekirse perlit karıştırılır).\n\nKaynak: WSU Puyallup – Container drainage (L. Chalker-Scott); PLOS One – Effect of drainage layers on water retention of potting media in containers",
+   "urunler": [
+    "tarim-perliti"
+   ],
+   "kaynak": "saksi:kural:cakil"
+  },
+  {
+   "id": "h1104",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-kural",
+   "konu": "zaman",
+   "sorular": [
+    "saksı ne zaman değiştirilir",
+    "saksı değiştirme zamanı",
+    "bitki saksısı ne zaman büyütülür",
+    "kökler saksıdan çıkıyor",
+    "saksı değişimi hangi ay"
+   ],
+   "cevap": "Kökler drenaj deliğinden çıkıyorsa, toprak çok çabuk kuruyorsa ya da su toprağa işlemeden akıp gidiyorsa saksı değiştirme zamanı gelmiştir. En uygun dönem bitkinin büyümeye başladığı ilkbahardır.\n\nKaynak: Clemson HGIC – Repotting houseplants",
+   "urunler": [],
+   "kaynak": "saksi:kural:zaman"
+  },
+  {
+   "id": "h1105",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-kural",
+   "konu": "orkide",
+   "sorular": [
+    "orkide hangi saksıya dikilir",
+    "orkide saksısı",
+    "orkide şeffaf saksı",
+    "orkide saksı değişimi",
+    "orkide nasıl saksı değiştirilir"
+   ],
+   "cevap": "Orkide (Phalaenopsis) için delikli, şeffaf plastik saksı uygundur: kökler ve nem durumu dışarıdan görülür. Toprak yerine kabuk (bark) içeren orkide karışımı kullanılır; karışım yaklaşık 2 yılda bozulduğu için saksı değişiminde yenilenir. Saksı yalnızca bir boy büyütülür; çiçeklenme bittikten sonra yapılması önerilir.\n\nKaynak: UConn Home & Garden – Orchid care and repotting; BBC Gardeners' World – How to repot a moth orchid",
+   "urunler": [
+    "seffaf-plastik-orkide-kaktus-saksisi",
+    "gartengold-orkide-topragi"
+   ],
+   "kaynak": "saksi:kural:orkide"
+  },
+  {
+   "id": "h1106",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-kural",
+   "konu": "kaktus",
+   "sorular": [
+    "kaktüs hangi saksıya dikilir",
+    "sukulent saksısı",
+    "kaktüs saksı boyutu",
+    "kaktüs saksı değişimi",
+    "sukulent hangi saksı"
+   ],
+   "cevap": "Kaktüs ve sukulentler delikli ve kökten biraz büyük saksıda, hızlı süzülen, su tutma kapasitesi düşük (kumlu) bir karışımda yetiştirilir. Fazla büyük saksı toprağın uzun süre ıslak kalmasına neden olur.\n\nKaynak: Univ. of Illinois Extension – Succulent container gardens; UC Master Gardeners – Succulent container gardens",
+   "urunler": [
+    "kaktus-ve-sukulent-topragi",
+    "kaktus-kozalak-yuvarlak-saksi-015l"
+   ],
+   "kaynak": "saksi:kural:kaktus"
+  },
+  {
+   "id": "h1107",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 6,
+   "sorular": [
+    "6 cm saksı kaç litre",
+    "6 cm saksıya ne kadar toprak gider",
+    "6'lik saksı kaç litre",
+    "6 numara saksı kaç litre",
+    "6 numara saksıya ne kadar toprak",
+    "6 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 6 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 0,12 litredir. İçine yaklaşık 0,11 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 8,5–11 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1108",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 7,
+   "sorular": [
+    "7 cm saksı kaç litre",
+    "7 cm saksıya ne kadar toprak gider",
+    "7'lik saksı kaç litre",
+    "7 numara saksı kaç litre",
+    "7 numara saksıya ne kadar toprak",
+    "7 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 7 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 0,18 litredir. İçine yaklaşık 0,16 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 9,5–12 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1109",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 8,
+   "sorular": [
+    "8 cm saksı kaç litre",
+    "8 cm saksıya ne kadar toprak gider",
+    "8'lik saksı kaç litre",
+    "8 numara saksı kaç litre",
+    "8 numara saksıya ne kadar toprak",
+    "8 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 8 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 0,28 litredir. İçine yaklaşık 0,25 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 10,5–13 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1110",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 9,
+   "sorular": [
+    "9 cm saksı kaç litre",
+    "9 cm saksıya ne kadar toprak gider",
+    "9'lik saksı kaç litre",
+    "9 numara saksı kaç litre",
+    "9 numara saksıya ne kadar toprak",
+    "9 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 9 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 0,39 litredir. İçine yaklaşık 0,35 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 11,5–14 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1111",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 10,
+   "sorular": [
+    "10 cm saksı kaç litre",
+    "10 cm saksıya ne kadar toprak gider",
+    "10'lik saksı kaç litre",
+    "10 numara saksı kaç litre",
+    "10 numara saksıya ne kadar toprak",
+    "10 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 10 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 0,54 litredir. İçine yaklaşık 0,49 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 12,5–15 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1112",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 11,
+   "sorular": [
+    "11 cm saksı kaç litre",
+    "11 cm saksıya ne kadar toprak gider",
+    "11'lik saksı kaç litre",
+    "11 numara saksı kaç litre",
+    "11 numara saksıya ne kadar toprak",
+    "11 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 11 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 0,72 litredir. İçine yaklaşık 0,65 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 13,5–16 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1113",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 12,
+   "sorular": [
+    "12 cm saksı kaç litre",
+    "12 cm saksıya ne kadar toprak gider",
+    "12'lik saksı kaç litre",
+    "12 numara saksı kaç litre",
+    "12 numara saksıya ne kadar toprak",
+    "12 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 12 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 0,93 litredir. İçine yaklaşık 0,84 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 14,5–17 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1114",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 13,
+   "sorular": [
+    "13 cm saksı kaç litre",
+    "13 cm saksıya ne kadar toprak gider",
+    "13'lik saksı kaç litre",
+    "13 numara saksı kaç litre",
+    "13 numara saksıya ne kadar toprak",
+    "13 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 13 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 1,2 litredir. İçine yaklaşık 1,1 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 15,5–18 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1115",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 14,
+   "sorular": [
+    "14 cm saksı kaç litre",
+    "14 cm saksıya ne kadar toprak gider",
+    "14'lik saksı kaç litre",
+    "14 numara saksı kaç litre",
+    "14 numara saksıya ne kadar toprak",
+    "14 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 14 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 1,5 litredir. İçine yaklaşık 1,4 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 16,5–19 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1116",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 15,
+   "sorular": [
+    "15 cm saksı kaç litre",
+    "15 cm saksıya ne kadar toprak gider",
+    "15'lik saksı kaç litre",
+    "15 numara saksı kaç litre",
+    "15 numara saksıya ne kadar toprak",
+    "15 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 15 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 1,8 litredir. İçine yaklaşık 1,6 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 17,5–20 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1117",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 16,
+   "sorular": [
+    "16 cm saksı kaç litre",
+    "16 cm saksıya ne kadar toprak gider",
+    "16'lik saksı kaç litre",
+    "16 numara saksı kaç litre",
+    "16 numara saksıya ne kadar toprak",
+    "16 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 16 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 2,2 litredir. İçine yaklaşık 2 litre toprak gider (üstte 2–3 cm sulama payı kalır); en küçük paket (5 L) yeter; artan toprak başka saksılarda kullanılabilir.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 18,5–21 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1118",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 17,
+   "sorular": [
+    "17 cm saksı kaç litre",
+    "17 cm saksıya ne kadar toprak gider",
+    "17'lik saksı kaç litre",
+    "17 numara saksı kaç litre",
+    "17 numara saksıya ne kadar toprak",
+    "17 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 17 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 2,6 litredir. İçine yaklaşık 2,3 litre toprak gider (üstte 2–3 cm sulama payı kalır); 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 19,5–22 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1119",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 18,
+   "sorular": [
+    "18 cm saksı kaç litre",
+    "18 cm saksıya ne kadar toprak gider",
+    "18'lik saksı kaç litre",
+    "18 numara saksı kaç litre",
+    "18 numara saksıya ne kadar toprak",
+    "18 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 18 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 3,1 litredir. İçine yaklaşık 2,8 litre toprak gider (üstte 2–3 cm sulama payı kalır); 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 20,5–23 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1120",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 19,
+   "sorular": [
+    "19 cm saksı kaç litre",
+    "19 cm saksıya ne kadar toprak gider",
+    "19'lik saksı kaç litre",
+    "19 numara saksı kaç litre",
+    "19 numara saksıya ne kadar toprak",
+    "19 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 19 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 3,7 litredir. İçine yaklaşık 3,3 litre toprak gider (üstte 2–3 cm sulama payı kalır); 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 21,5–24 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1121",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 20,
+   "sorular": [
+    "20 cm saksı kaç litre",
+    "20 cm saksıya ne kadar toprak gider",
+    "20'lik saksı kaç litre",
+    "20 numara saksı kaç litre",
+    "20 numara saksıya ne kadar toprak",
+    "20 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 20 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 4,3 litredir. İçine yaklaşık 3,9 litre toprak gider (üstte 2–3 cm sulama payı kalır); 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 22,5–25 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1122",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 21,
+   "sorular": [
+    "21 cm saksı kaç litre",
+    "21 cm saksıya ne kadar toprak gider",
+    "21'lik saksı kaç litre",
+    "21 numara saksı kaç litre",
+    "21 numara saksıya ne kadar toprak",
+    "21 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 21 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 5 litredir. İçine yaklaşık 4,5 litre toprak gider (üstte 2–3 cm sulama payı kalır); 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 23,5–26 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1123",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 22,
+   "sorular": [
+    "22 cm saksı kaç litre",
+    "22 cm saksıya ne kadar toprak gider",
+    "22'lik saksı kaç litre",
+    "22 numara saksı kaç litre",
+    "22 numara saksıya ne kadar toprak",
+    "22 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 22 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 5,7 litredir. İçine yaklaşık 5,1 litre toprak gider (üstte 2–3 cm sulama payı kalır); 10 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 24,5–27 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1124",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 23,
+   "sorular": [
+    "23 cm saksı kaç litre",
+    "23 cm saksıya ne kadar toprak gider",
+    "23'lik saksı kaç litre",
+    "23 numara saksı kaç litre",
+    "23 numara saksıya ne kadar toprak",
+    "23 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 23 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 6,5 litredir. İçine yaklaşık 5,9 litre toprak gider (üstte 2–3 cm sulama payı kalır); 10 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 25,5–28 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1125",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 24,
+   "sorular": [
+    "24 cm saksı kaç litre",
+    "24 cm saksıya ne kadar toprak gider",
+    "24'lik saksı kaç litre",
+    "24 numara saksı kaç litre",
+    "24 numara saksıya ne kadar toprak",
+    "24 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 24 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 7,4 litredir. İçine yaklaşık 6,7 litre toprak gider (üstte 2–3 cm sulama payı kalır); 10 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 26,5–29 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1126",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 25,
+   "sorular": [
+    "25 cm saksı kaç litre",
+    "25 cm saksıya ne kadar toprak gider",
+    "25'lik saksı kaç litre",
+    "25 numara saksı kaç litre",
+    "25 numara saksıya ne kadar toprak",
+    "25 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 25 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 8,4 litredir. İçine yaklaşık 7,6 litre toprak gider (üstte 2–3 cm sulama payı kalır); 10 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 27,5–30 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1127",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 27,
+   "sorular": [
+    "27 cm saksı kaç litre",
+    "27 cm saksıya ne kadar toprak gider",
+    "27'lik saksı kaç litre",
+    "27 numara saksı kaç litre",
+    "27 numara saksıya ne kadar toprak",
+    "27 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 27 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 11 litredir. İçine yaklaşık 9,9 litre toprak gider (üstte 2–3 cm sulama payı kalır); 10 L + 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 29,5–32 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1128",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 28,
+   "sorular": [
+    "28 cm saksı kaç litre",
+    "28 cm saksıya ne kadar toprak gider",
+    "28'lik saksı kaç litre",
+    "28 numara saksı kaç litre",
+    "28 numara saksıya ne kadar toprak",
+    "28 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 28 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 12 litredir. İçine yaklaşık 11 litre toprak gider (üstte 2–3 cm sulama payı kalır); 10 L + 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 30,5–33 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1129",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 30,
+   "sorular": [
+    "30 cm saksı kaç litre",
+    "30 cm saksıya ne kadar toprak gider",
+    "30'lik saksı kaç litre",
+    "30 numara saksı kaç litre",
+    "30 numara saksıya ne kadar toprak",
+    "30 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 30 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 15 litredir. İçine yaklaşık 14 litre toprak gider (üstte 2–3 cm sulama payı kalır); 10 L + 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 32,5–35 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1130",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 32,
+   "sorular": [
+    "32 cm saksı kaç litre",
+    "32 cm saksıya ne kadar toprak gider",
+    "32'lik saksı kaç litre",
+    "32 numara saksı kaç litre",
+    "32 numara saksıya ne kadar toprak",
+    "32 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 32 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 18 litredir. İçine yaklaşık 16 litre toprak gider (üstte 2–3 cm sulama payı kalır); 20 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 34,5–37 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1131",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 35,
+   "sorular": [
+    "35 cm saksı kaç litre",
+    "35 cm saksıya ne kadar toprak gider",
+    "35'lik saksı kaç litre",
+    "35 numara saksı kaç litre",
+    "35 numara saksıya ne kadar toprak",
+    "35 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 35 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 23 litredir. İçine yaklaşık 21 litre toprak gider (üstte 2–3 cm sulama payı kalır); 20 L + 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 37,5–40 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1132",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 40,
+   "sorular": [
+    "40 cm saksı kaç litre",
+    "40 cm saksıya ne kadar toprak gider",
+    "40'lik saksı kaç litre",
+    "40 numara saksı kaç litre",
+    "40 numara saksıya ne kadar toprak",
+    "40 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 40 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 34 litredir. İçine yaklaşık 31 litre toprak gider (üstte 2–3 cm sulama payı kalır); 20 L + 10 L + 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 42,5–45 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1133",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 45,
+   "sorular": [
+    "45 cm saksı kaç litre",
+    "45 cm saksıya ne kadar toprak gider",
+    "45'lik saksı kaç litre",
+    "45 numara saksı kaç litre",
+    "45 numara saksıya ne kadar toprak",
+    "45 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 45 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 49 litredir. İçine yaklaşık 44 litre toprak gider (üstte 2–3 cm sulama payı kalır); 40 L + 10 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 47,5–50 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1134",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 50,
+   "sorular": [
+    "50 cm saksı kaç litre",
+    "50 cm saksıya ne kadar toprak gider",
+    "50'lik saksı kaç litre",
+    "50 numara saksı kaç litre",
+    "50 numara saksıya ne kadar toprak",
+    "50 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 50 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 67 litredir. İçine yaklaşık 60 litre toprak gider (üstte 2–3 cm sulama payı kalır); 40 L + 20 L + 10 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 52,5–55 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1135",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 55,
+   "sorular": [
+    "55 cm saksı kaç litre",
+    "55 cm saksıya ne kadar toprak gider",
+    "55'lik saksı kaç litre",
+    "55 numara saksı kaç litre",
+    "55 numara saksıya ne kadar toprak",
+    "55 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 55 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 89 litredir. İçine yaklaşık 80 litre toprak gider (üstte 2–3 cm sulama payı kalır); 2 × 40 L + 10 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 57,5–60 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1136",
+   "durum": "onay-bekliyor",
+   "tur": "saksi-hesap",
+   "cap": 60,
+   "sorular": [
+    "60 cm saksı kaç litre",
+    "60 cm saksıya ne kadar toprak gider",
+    "60'lik saksı kaç litre",
+    "60 numara saksı kaç litre",
+    "60 numara saksıya ne kadar toprak",
+    "60 cm saksıdan sonra kaç cm saksı"
+   ],
+   "cevap": "Çapı 60 cm, yüksekliği çapına yakın standart bir saksı yaklaşık 115 litredir. İçine yaklaşık 105 litre toprak gider (üstte 2–3 cm sulama payı kalır); 2 × 40 L + 20 L + 10 L + 5 L paket yeter.\n\nKâse biçimli, alçak saksılarda hacim daha azdır. Bitkinizi bu saksıdan taşıyacaksanız yeni saksının çapı 62,5–65 cm olmalı.",
+   "urunler": [],
+   "kaynak": "saksi:hesap"
+  },
+  {
+   "id": "h1137",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "buyuk-oval-fiber-separator-saksi-130x30x100-cm",
+   "sorular": [
+    "büyük oval separatör saksı 130×30×100 cm kaç litre",
+    "büyük oval separatör saksı 130×30×100 cm ne kadar toprak alır",
+    "büyük oval separatör saksı 130×30×100 cm saksıya ne kadar toprak gider",
+    "büyük oval separatör saksı 130×30×100 cm ölçüleri",
+    "büyük oval separatör saksı 130×30×100 cm deliği var mı",
+    "büyük oval separatör saksı 130×30×100 cm hangi bitki için uygun"
+   ],
+   "cevap": "Büyük Oval Separatör Saksı 130×30×100 cm | İç ve Dış Mekân\n\nHacim ve toprak ihtiyacı:\n• 310 L (ölçülerden yaklaşık) (130 × 30 × 100 cm) → yaklaşık 280 L toprak, 7 × 40 L + 20 L + 10 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "buyuk-oval-fiber-separator-saksi-130x30x100-cm"
+   ],
+   "kaynak": "saksi:buyuk-oval-fiber-separator-saksi-130x30x100-cm"
+  },
+  {
+   "id": "h1138",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l",
+   "sorular": [
+    "cornet iç ve dış mekan büyük saksı modelleri kaç litre",
+    "cornet iç ve dış mekan büyük saksı modelleri ne kadar toprak alır",
+    "cornet iç ve dış mekan büyük saksı modelleri saksıya ne kadar toprak gider",
+    "cornet iç ve dış mekan büyük saksı modelleri ölçüleri",
+    "cornet iç ve dış mekan büyük saksı modelleri deliği var mı",
+    "cornet iç ve dış mekan büyük saksı modelleri hangi bitki için uygun"
+   ],
+   "cevap": "Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L)\n\nBoylar ve toprak ihtiyacı:\n• 12 L (Ø28 × 23,6 cm) → yaklaşık 11 L toprak, 10 L + 5 L paket\n• 25 L (Ø35,5 × 32,6 cm) → yaklaşık 23 L toprak, 20 L + 5 L paket\n• 50 L (Ø45,5 × 42,5 cm) → yaklaşık 45 L toprak, 40 L + 10 L paket\n• 85 L (Ø55 × 50,5 cm) → yaklaşık 77 L toprak, 2 × 40 L + 5 L paket\n\nAltında su tahliye açıklığı var. Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l"
+   ],
+   "kaynak": "saksi:cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l"
+  },
+  {
+   "id": "h1139",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-12-litre",
+   "sorular": [
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 12 litre kaç litre",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 12 litre ne kadar toprak alır",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 12 litre saksıya ne kadar toprak gider",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 12 litre ölçüleri",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 12 litre deliği var mı",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 12 litre hangi bitki için uygun"
+   ],
+   "cevap": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 12 Litre\n\nHacim ve toprak ihtiyacı:\n• 12 L (Ø28 × 26,5 cm) → yaklaşık 11 L toprak, 10 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın). Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-12-litre"
+   ],
+   "kaynak": "saksi:cornet-ic-dis-mekan-tabakli-dekoratif-saksi-12-litre"
+  },
+  {
+   "id": "h1140",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-25-litre",
+   "sorular": [
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 25 litre kaç litre",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 25 litre ne kadar toprak alır",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 25 litre saksıya ne kadar toprak gider",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 25 litre ölçüleri",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 25 litre deliği var mı",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 25 litre hangi bitki için uygun"
+   ],
+   "cevap": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 25 Litre\n\nHacim ve toprak ihtiyacı:\n• 25 L (Ø36,5 × 34,5 cm) → yaklaşık 23 L toprak, 20 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın). Tabağı var.\n\nÜrün bilgisine göre: Orta ve büyük boy bitkiler için uygun ölçü.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-25-litre"
+   ],
+   "kaynak": "saksi:cornet-ic-dis-mekan-tabakli-dekoratif-saksi-25-litre"
+  },
+  {
+   "id": "h1141",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-50-litre",
+   "sorular": [
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 50 litre kaç litre",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 50 litre ne kadar toprak alır",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 50 litre saksıya ne kadar toprak gider",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 50 litre ölçüleri",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 50 litre deliği var mı",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 50 litre hangi bitki için uygun"
+   ],
+   "cevap": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 50 Litre\n\nHacim ve toprak ihtiyacı:\n• 50 L (Ø45,5 × 43,5 cm) → yaklaşık 45 L toprak, 40 L + 10 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın). Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-50-litre"
+   ],
+   "kaynak": "saksi:cornet-ic-dis-mekan-tabakli-dekoratif-saksi-50-litre"
+  },
+  {
+   "id": "h1142",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-85-litre",
+   "sorular": [
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 85 litre kaç litre",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 85 litre ne kadar toprak alır",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 85 litre saksıya ne kadar toprak gider",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 85 litre ölçüleri",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 85 litre deliği var mı",
+    "cornet iç ve dış mekân tabaklı dekoratif saksı 85 litre hangi bitki için uygun"
+   ],
+   "cevap": "Cornet İç ve Dış Mekân Tabaklı Dekoratif Saksı 85 Litre\n\nHacim ve toprak ihtiyacı:\n• 85 L (Ø55 × 51 cm) → yaklaşık 77 L toprak, 2 × 40 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın). Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "cornet-ic-dis-mekan-tabakli-dekoratif-saksi-85-litre"
+   ],
+   "kaynak": "saksi:cornet-ic-dis-mekan-tabakli-dekoratif-saksi-85-litre"
+  },
+  {
+   "id": "h1143",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-altigen-fiber-saksi-28x45x60-cm",
+   "sorular": [
+    "dekoratif altıgen fiber saksı 28 × 45 × 60 cm kaç litre",
+    "dekoratif altıgen fiber saksı 28 × 45 × 60 cm ne kadar toprak alır",
+    "dekoratif altıgen fiber saksı 28 × 45 × 60 cm saksıya ne kadar toprak gider",
+    "dekoratif altıgen fiber saksı 28 × 45 × 60 cm ölçüleri",
+    "dekoratif altıgen fiber saksı 28 × 45 × 60 cm deliği var mı",
+    "dekoratif altıgen fiber saksı 28 × 45 × 60 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Altıgen Fiber Saksı 28 × 45 × 60 cm – İç ve Dış Mekân\n\nHacim ve toprak ihtiyacı:\n• 53 L (ölçülerden yaklaşık) (45 × 28 × 60 cm) → yaklaşık 48 L toprak, 40 L + 10 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-altigen-fiber-saksi-28x45x60-cm"
+   ],
+   "kaynak": "saksi:dekoratif-altigen-fiber-saksi-28x45x60-cm"
+  },
+  {
+   "id": "h1144",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-buyuk-fiber-comlek-saksi-85x60-cm",
+   "sorular": [
+    "dekoratif büyük fiber çömlek saksı 85 × 60 cm kaç litre",
+    "dekoratif büyük fiber çömlek saksı 85 × 60 cm ne kadar toprak alır",
+    "dekoratif büyük fiber çömlek saksı 85 × 60 cm saksıya ne kadar toprak gider",
+    "dekoratif büyük fiber çömlek saksı 85 × 60 cm ölçüleri",
+    "dekoratif büyük fiber çömlek saksı 85 × 60 cm deliği var mı",
+    "dekoratif büyük fiber çömlek saksı 85 × 60 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Büyük Fiber Çömlek Saksı 85 × 60 cm\n\nHacim ve toprak ihtiyacı:\n• 185 L (ölçülerden yaklaşık) (Ø85 × 60 cm) → yaklaşık 165 L toprak, 4 × 40 L + 20 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-buyuk-fiber-comlek-saksi-85x60-cm"
+   ],
+   "kaynak": "saksi:dekoratif-buyuk-fiber-comlek-saksi-85x60-cm"
+  },
+  {
+   "id": "h1145",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-kure-fiber-saksi-40x32-cm",
+   "sorular": [
+    "dekoratif küre fiber saksı 40 × 32 cm kaç litre",
+    "dekoratif küre fiber saksı 40 × 32 cm ne kadar toprak alır",
+    "dekoratif küre fiber saksı 40 × 32 cm saksıya ne kadar toprak gider",
+    "dekoratif küre fiber saksı 40 × 32 cm ölçüleri",
+    "dekoratif küre fiber saksı 40 × 32 cm deliği var mı",
+    "dekoratif küre fiber saksı 40 × 32 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Küre Fiber Saksı 40 × 32 cm\n\nHacim ve toprak ihtiyacı:\n• 20 L (ölçülerden yaklaşık) (Ø40 × 32 cm) → yaklaşık 18 L toprak, 20 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nÜrün bilgisine göre: 40 cm çap ve 32 cm yükseklik; salon bitkileri, dekoratif yeşil bitkiler, çiçekler ve uygun ölçüdeki küçük ağaçlar için yeterli alan sunar.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-kure-fiber-saksi-40x32-cm"
+   ],
+   "kaynak": "saksi:dekoratif-kure-fiber-saksi-40x32-cm"
+  },
+  {
+   "id": "h1146",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-kure-fiber-saksi-45x38-cm",
+   "sorular": [
+    "dekoratif küre fiber saksı 45 × 38 cm kaç litre",
+    "dekoratif küre fiber saksı 45 × 38 cm ne kadar toprak alır",
+    "dekoratif küre fiber saksı 45 × 38 cm saksıya ne kadar toprak gider",
+    "dekoratif küre fiber saksı 45 × 38 cm ölçüleri",
+    "dekoratif küre fiber saksı 45 × 38 cm deliği var mı",
+    "dekoratif küre fiber saksı 45 × 38 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Küre Fiber Saksı 45 × 38 cm\n\nHacim ve toprak ihtiyacı:\n• 30 L (ölçülerden yaklaşık) (Ø45 × 38 cm) → yaklaşık 27 L toprak, 20 L + 10 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nÜrün bilgisine göre: 45 cm çapı ve 38 cm yüksekliğiyle salon bitkileri, dekoratif yeşil bitkiler, çiçekler ve uygun büyüklükteki küçük ağaçlar için kullanılabilir.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-kure-fiber-saksi-45x38-cm"
+   ],
+   "kaynak": "saksi:dekoratif-kure-fiber-saksi-45x38-cm"
+  },
+  {
+   "id": "h1147",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-kure-fiber-saksi-50x40-cm",
+   "sorular": [
+    "dekoratif küre fiber saksı 50 × 40 cm kaç litre",
+    "dekoratif küre fiber saksı 50 × 40 cm ne kadar toprak alır",
+    "dekoratif küre fiber saksı 50 × 40 cm saksıya ne kadar toprak gider",
+    "dekoratif küre fiber saksı 50 × 40 cm ölçüleri",
+    "dekoratif küre fiber saksı 50 × 40 cm deliği var mı",
+    "dekoratif küre fiber saksı 50 × 40 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Küre Fiber Saksı 50 × 40 cm\n\nHacim ve toprak ihtiyacı:\n• 39 L (ölçülerden yaklaşık) (Ø50 × 40 cm) → yaklaşık 35 L toprak, 40 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-kure-fiber-saksi-50x40-cm"
+   ],
+   "kaynak": "saksi:dekoratif-kure-fiber-saksi-50x40-cm"
+  },
+  {
+   "id": "h1148",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-kure-fiber-saksi-85x70-cm",
+   "sorular": [
+    "dekoratif küre fiber saksı 85 × 70 cm kaç litre",
+    "dekoratif küre fiber saksı 85 × 70 cm ne kadar toprak alır",
+    "dekoratif küre fiber saksı 85 × 70 cm saksıya ne kadar toprak gider",
+    "dekoratif küre fiber saksı 85 × 70 cm ölçüleri",
+    "dekoratif küre fiber saksı 85 × 70 cm deliği var mı",
+    "dekoratif küre fiber saksı 85 × 70 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Küre Fiber Saksı 85 × 70 cm\n\nHacim ve toprak ihtiyacı:\n• 200 L (ölçülerden yaklaşık) (Ø85 × 70 cm) → yaklaşık 180 L toprak, 5 × 40 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-kure-fiber-saksi-85x70-cm"
+   ],
+   "kaynak": "saksi:dekoratif-kure-fiber-saksi-85x70-cm"
+  },
+  {
+   "id": "h1149",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-lale-fiber-saksi-46x45-cm",
+   "sorular": [
+    "dekoratif lale fiber saksı 46 × 45 cm kaç litre",
+    "dekoratif lale fiber saksı 46 × 45 cm ne kadar toprak alır",
+    "dekoratif lale fiber saksı 46 × 45 cm saksıya ne kadar toprak gider",
+    "dekoratif lale fiber saksı 46 × 45 cm ölçüleri",
+    "dekoratif lale fiber saksı 46 × 45 cm deliği var mı",
+    "dekoratif lale fiber saksı 46 × 45 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Lale Fiber Saksı 46 × 45 cm\n\nHacim ve toprak ihtiyacı:\n• 54 L (ölçülerden yaklaşık) (Ø46 × 45 cm) → yaklaşık 49 L toprak, 40 L + 10 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nÜrün bilgisine göre: 46 cm çapı ve 45 cm yüksekliğiyle salon bitkileri, dekoratif yeşil bitkiler ve uygun büyüklükteki dış mekân bitkileri için kullanılabilir.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-lale-fiber-saksi-46x45-cm"
+   ],
+   "kaynak": "saksi:dekoratif-lale-fiber-saksi-46x45-cm"
+  },
+  {
+   "id": "h1150",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-lale-fiber-saksi-46x60-cm",
+   "sorular": [
+    "dekoratif lale fiber saksı 46 × 60 cm kaç litre",
+    "dekoratif lale fiber saksı 46 × 60 cm ne kadar toprak alır",
+    "dekoratif lale fiber saksı 46 × 60 cm saksıya ne kadar toprak gider",
+    "dekoratif lale fiber saksı 46 × 60 cm ölçüleri",
+    "dekoratif lale fiber saksı 46 × 60 cm deliği var mı",
+    "dekoratif lale fiber saksı 46 × 60 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Lale Fiber Saksı 46 × 60 cm\n\nHacim ve toprak ihtiyacı:\n• 72 L (ölçülerden yaklaşık) (Ø46 × 60 cm) → yaklaşık 65 L toprak, 40 L + 20 L + 10 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-lale-fiber-saksi-46x60-cm"
+   ],
+   "kaynak": "saksi:dekoratif-lale-fiber-saksi-46x60-cm"
+  },
+  {
+   "id": "h1151",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "oval-fiber-separator-saksi-100x25x70-cm",
+   "sorular": [
+    "dekoratif oval fiber separatör saksı 100×25×70 cm kaç litre",
+    "dekoratif oval fiber separatör saksı 100×25×70 cm ne kadar toprak alır",
+    "dekoratif oval fiber separatör saksı 100×25×70 cm saksıya ne kadar toprak gider",
+    "dekoratif oval fiber separatör saksı 100×25×70 cm ölçüleri",
+    "dekoratif oval fiber separatör saksı 100×25×70 cm deliği var mı",
+    "dekoratif oval fiber separatör saksı 100×25×70 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Oval Fiber Separatör Saksı 100×25×70 cm | İç ve Dış Mekân\n\nHacim ve toprak ihtiyacı:\n• 140 L (ölçülerden yaklaşık) (100 × 25 × 70 cm) → yaklaşık 125 L toprak, 3 × 40 L + 20 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nÜrün bilgisine göre: Özellikle kafe, restoran, otel ve ofislerde bitkili separatör uygulamaları için ideal bir üründür.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "oval-fiber-separator-saksi-100x25x70-cm"
+   ],
+   "kaynak": "saksi:oval-fiber-separator-saksi-100x25x70-cm"
+  },
+  {
+   "id": "h1152",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "dekoratif-oval-silindir-fiber-saksi-36x40-cm",
+   "sorular": [
+    "dekoratif oval silindir fiber saksı 36 × 40 cm kaç litre",
+    "dekoratif oval silindir fiber saksı 36 × 40 cm ne kadar toprak alır",
+    "dekoratif oval silindir fiber saksı 36 × 40 cm saksıya ne kadar toprak gider",
+    "dekoratif oval silindir fiber saksı 36 × 40 cm ölçüleri",
+    "dekoratif oval silindir fiber saksı 36 × 40 cm deliği var mı",
+    "dekoratif oval silindir fiber saksı 36 × 40 cm hangi bitki için uygun"
+   ],
+   "cevap": "Dekoratif Oval Silindir Fiber Saksı 36 × 40 cm\n\nHacim ve toprak ihtiyacı:\n• 35 L (ölçülerden yaklaşık) (Ø36 × 40 cm) → yaklaşık 32 L toprak, 20 L + 10 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nÜrün bilgisine göre: 36 cm çapı ve 40 cm yüksekliğiyle salon bitkileri, dekoratif yeşil bitkiler ve orta büyüklükteki iç veya dış mekân bitkileri için uygundur.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "dekoratif-oval-silindir-fiber-saksi-36x40-cm"
+   ],
+   "kaynak": "saksi:dekoratif-oval-silindir-fiber-saksi-36x40-cm"
+  },
+  {
+   "id": "h1153",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "kaktus-kozalak-kare-saksi-015l",
+   "sorular": [
+    "kaktüs kozalak kare saksı kaç litre",
+    "kaktüs kozalak kare saksı ne kadar toprak alır",
+    "kaktüs kozalak kare saksı saksıya ne kadar toprak gider",
+    "kaktüs kozalak kare saksı ölçüleri",
+    "kaktüs kozalak kare saksı deliği var mı",
+    "kaktüs kozalak kare saksı hangi bitki için uygun"
+   ],
+   "cevap": "Kaktüs Kozalak Kare Saksı (0.15 L)\n\nHacim ve toprak ihtiyacı:\n• 0,15 L (Ø7,5 × 7 cm) → yaklaşık 0,14 L toprak, en küçük paket (5 L) yeter\n\nÜrün bilgisine göre: Minik kaktüs ve sukulentler için tasarlanmış mini bir saksıdır.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "kaktus-kozalak-kare-saksi-015l"
+   ],
+   "kaynak": "saksi:kaktus-kozalak-kare-saksi-015l"
+  },
+  {
+   "id": "h1154",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "kaktus-kozalak-yuvarlak-saksi-015l",
+   "sorular": [
+    "kaktüs kozalak yuvarlak saksı kaç litre",
+    "kaktüs kozalak yuvarlak saksı ne kadar toprak alır",
+    "kaktüs kozalak yuvarlak saksı saksıya ne kadar toprak gider",
+    "kaktüs kozalak yuvarlak saksı ölçüleri",
+    "kaktüs kozalak yuvarlak saksı deliği var mı",
+    "kaktüs kozalak yuvarlak saksı hangi bitki için uygun"
+   ],
+   "cevap": "Kaktüs Kozalak Yuvarlak Saksı (0.15 L)\n\nHacim ve toprak ihtiyacı:\n• 0,15 L (Ø8 × 7 cm) → yaklaşık 0,14 L toprak, en küçük paket (5 L) yeter\n\nÜrün bilgisine göre: İç mekânlarda kaktüs, sukulent ve minik çiçekler için uygundur.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "kaktus-kozalak-yuvarlak-saksi-015l"
+   ],
+   "kaynak": "saksi:kaktus-kozalak-yuvarlak-saksi-015l"
+  },
+  {
+   "id": "h1155",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "kozalak-tabakli-saksi",
+   "sorular": [
+    "kozalak tabaklı bitki saksısı kaç litre",
+    "kozalak tabaklı bitki saksısı ne kadar toprak alır",
+    "kozalak tabaklı bitki saksısı saksıya ne kadar toprak gider",
+    "kozalak tabaklı bitki saksısı ölçüleri",
+    "kozalak tabaklı bitki saksısı deliği var mı",
+    "kozalak tabaklı bitki saksısı hangi bitki için uygun"
+   ],
+   "cevap": "Kozalak Tabaklı Bitki Saksısı 0.75L / 1.6L / 3L / 5.6L\n\nBoylar ve toprak ihtiyacı:\n• 0,75 L (Ø11,5 × 10,5 cm) → yaklaşık 0,68 L toprak, en küçük paket (5 L) yeter\n• 1,6 L (Ø14,5 × 13,5 cm) → yaklaşık 1,4 L toprak, en küçük paket (5 L) yeter\n• 3 L (Ø17,5 × 15,5 cm) → yaklaşık 2,7 L toprak, 5 L paket\n• 5,6 L (Ø21,5 × 20,5 cm) → yaklaşık 5 L toprak, 10 L paket Tabağı var.\n\nÜrün bilgisine göre: Hem iç hem dış mekân bitkileri için uygun olan seri, dayanıklı malzeme yapısı ve farklı boyut seçenekleriyle her ortama uyum sağlar.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "kozalak-tabakli-saksi"
+   ],
+   "kaynak": "saksi:kozalak-tabakli-saksi"
+  },
+  {
+   "id": "h1156",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-dekoratif-saksi-1-1-litre",
+   "sorular": [
+    "line dekoratif saksı 1,1 litre kaç litre",
+    "line dekoratif saksı 1,1 litre ne kadar toprak alır",
+    "line dekoratif saksı 1,1 litre saksıya ne kadar toprak gider",
+    "line dekoratif saksı 1,1 litre ölçüleri",
+    "line dekoratif saksı 1,1 litre deliği var mı",
+    "line dekoratif saksı 1,1 litre hangi bitki için uygun"
+   ],
+   "cevap": "Line Dekoratif Saksı 1,1 Litre\n\nHacim ve toprak ihtiyacı:\n• 1,1 L (Ø13 × 12,5 cm) → yaklaşık 0,99 L toprak, en küçük paket (5 L) yeter\n\nAltında su tahliye açıklığı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-dekoratif-saksi-1-1-litre"
+   ],
+   "kaynak": "saksi:line-dekoratif-saksi-1-1-litre"
+  },
+  {
+   "id": "h1157",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-dekoratif-saksi-10-litre",
+   "sorular": [
+    "line dekoratif saksı 10 litre kaç litre",
+    "line dekoratif saksı 10 litre ne kadar toprak alır",
+    "line dekoratif saksı 10 litre saksıya ne kadar toprak gider",
+    "line dekoratif saksı 10 litre ölçüleri",
+    "line dekoratif saksı 10 litre deliği var mı",
+    "line dekoratif saksı 10 litre hangi bitki için uygun"
+   ],
+   "cevap": "Line Dekoratif Saksı 10 Litre\n\nHacim ve toprak ihtiyacı:\n• 10 L (Ø25,5 × 26,5 cm) → yaklaşık 9 L toprak, 10 L paket\n\nAltında su tahliye açıklığı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-dekoratif-saksi-10-litre"
+   ],
+   "kaynak": "saksi:line-dekoratif-saksi-10-litre"
+  },
+  {
+   "id": "h1158",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-dekoratif-saksi-2-2-litre",
+   "sorular": [
+    "line dekoratif saksı 2,2 litre kaç litre",
+    "line dekoratif saksı 2,2 litre ne kadar toprak alır",
+    "line dekoratif saksı 2,2 litre saksıya ne kadar toprak gider",
+    "line dekoratif saksı 2,2 litre ölçüleri",
+    "line dekoratif saksı 2,2 litre deliği var mı",
+    "line dekoratif saksı 2,2 litre hangi bitki için uygun"
+   ],
+   "cevap": "Line Dekoratif Saksı 2,2 Litre\n\nHacim ve toprak ihtiyacı:\n• 2,2 L (Ø16,5 × 15,5 cm) → yaklaşık 2 L toprak, en küçük paket (5 L) yeter\n\nAltında su tahliye açıklığı var.\n\nÜrün bilgisine göre: Küçük ve orta boy bitkiler için ideal ölçü.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-dekoratif-saksi-2-2-litre"
+   ],
+   "kaynak": "saksi:line-dekoratif-saksi-2-2-litre"
+  },
+  {
+   "id": "h1159",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-dekoratif-saksi-5-litre",
+   "sorular": [
+    "line dekoratif saksı 5 litre kaç litre",
+    "line dekoratif saksı 5 litre ne kadar toprak alır",
+    "line dekoratif saksı 5 litre saksıya ne kadar toprak gider",
+    "line dekoratif saksı 5 litre ölçüleri",
+    "line dekoratif saksı 5 litre deliği var mı",
+    "line dekoratif saksı 5 litre hangi bitki için uygun"
+   ],
+   "cevap": "Line Dekoratif Saksı 5 Litre\n\nHacim ve toprak ihtiyacı:\n• 5 L (Ø20,5 × 21,5 cm) → yaklaşık 4,5 L toprak, 5 L paket\n\nAltında su tahliye açıklığı var.\n\nÜrün bilgisine göre: 5 litre hacmi, 20,5 cm çapı ve 21,5 cm yüksekliğiyle küçük ve orta boy bitkilerin yetiştirilmesi için uygun bir kullanım alanı sunar.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-dekoratif-saksi-5-litre"
+   ],
+   "kaynak": "saksi:line-dekoratif-saksi-5-litre"
+  },
+  {
+   "id": "h1160",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-tabakli-bitki-saksisi",
+   "sorular": [
+    "line tabaklı bitki saksısı kaç litre",
+    "line tabaklı bitki saksısı ne kadar toprak alır",
+    "line tabaklı bitki saksısı saksıya ne kadar toprak gider",
+    "line tabaklı bitki saksısı ölçüleri",
+    "line tabaklı bitki saksısı deliği var mı",
+    "line tabaklı bitki saksısı hangi bitki için uygun"
+   ],
+   "cevap": "Line Tabaklı Bitki Saksısı 1.1L / 2.2L / 5L / 10L\n\nBoylar ve toprak ihtiyacı:\n• 1,1 L (Ø12,8 × 12,5 cm) → yaklaşık 0,99 L toprak, en küçük paket (5 L) yeter\n• 2,2 L (Ø16 × 15,6 cm) → yaklaşık 2 L toprak, en küçük paket (5 L) yeter\n• 5 L (Ø21 × 20,3 cm) → yaklaşık 4,5 L toprak, 5 L paket\n• 10 L (Ø26 × 25,5 cm) → yaklaşık 9 L toprak, 10 L paket Tabağı var.\n\nÜrün bilgisine göre: İç ve dış mekân bitkileri için uygundur.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-tabakli-bitki-saksisi"
+   ],
+   "kaynak": "saksi:line-tabakli-bitki-saksisi"
+  },
+  {
+   "id": "h1161",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-saksi-acik-gri-ithal-torf-dahil",
+   "sorular": [
+    "line tabaklı bitki saksısı açık gri (4 boy seçenekli) kaç litre",
+    "line tabaklı bitki saksısı açık gri (4 boy seçenekli) ne kadar toprak alır",
+    "line tabaklı bitki saksısı açık gri (4 boy seçenekli) saksıya ne kadar toprak gider",
+    "line tabaklı bitki saksısı açık gri (4 boy seçenekli) ölçüleri",
+    "line tabaklı bitki saksısı açık gri (4 boy seçenekli) deliği var mı",
+    "line tabaklı bitki saksısı açık gri (4 boy seçenekli) hangi bitki için uygun"
+   ],
+   "cevap": "Line Tabaklı Bitki Saksısı | Açık Gri (4 Boy Seçenekli) | İthal Torf Hediye\n\nBoylar ve toprak ihtiyacı:\n• 1,1 L (Ø12,8 × 12,5 cm) → yaklaşık 0,99 L toprak, en küçük paket (5 L) yeter\n• 2,2 L (Ø16 × 15,6 cm) → yaklaşık 2 L toprak, en küçük paket (5 L) yeter\n• 5 L (Ø21 × 20,3 cm) → yaklaşık 4,5 L toprak, 5 L paket\n• 10 L (Ø26 × 25,5 cm) → yaklaşık 9 L toprak, 10 L paket Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-saksi-acik-gri-ithal-torf-dahil"
+   ],
+   "kaynak": "saksi:line-saksi-acik-gri-ithal-torf-dahil"
+  },
+  {
+   "id": "h1162",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-saksi-acik-mint-yesili-ithal-torf-dahil",
+   "sorular": [
+    "line tabaklı bitki saksısı açık mint yeşili (4 boy seçenekli) kaç litre",
+    "line tabaklı bitki saksısı açık mint yeşili (4 boy seçenekli) ne kadar toprak alır",
+    "line tabaklı bitki saksısı açık mint yeşili (4 boy seçenekli) saksıya ne kadar toprak gider",
+    "line tabaklı bitki saksısı açık mint yeşili (4 boy seçenekli) ölçüleri",
+    "line tabaklı bitki saksısı açık mint yeşili (4 boy seçenekli) deliği var mı",
+    "line tabaklı bitki saksısı açık mint yeşili (4 boy seçenekli) hangi bitki için uygun"
+   ],
+   "cevap": "Line Tabaklı Bitki Saksısı | Açık Mint Yeşili (4 Boy Seçenekli) | İthal Torf Hediye\n\nBoylar ve toprak ihtiyacı:\n• 1,1 L (Ø12,8 × 12,5 cm) → yaklaşık 0,99 L toprak, en küçük paket (5 L) yeter\n• 2,2 L (Ø16 × 15,6 cm) → yaklaşık 2 L toprak, en küçük paket (5 L) yeter\n• 5 L (Ø21 × 20,3 cm) → yaklaşık 4,5 L toprak, 5 L paket\n• 10 L (Ø26 × 25,5 cm) → yaklaşık 9 L toprak, 10 L paket Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-saksi-acik-mint-yesili-ithal-torf-dahil"
+   ],
+   "kaynak": "saksi:line-saksi-acik-mint-yesili-ithal-torf-dahil"
+  },
+  {
+   "id": "h1163",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-saksi-koyu-gri-ithal-torf-dahil",
+   "sorular": [
+    "line tabaklı bitki saksısı koyu gri (4 boy seçenekli) kaç litre",
+    "line tabaklı bitki saksısı koyu gri (4 boy seçenekli) ne kadar toprak alır",
+    "line tabaklı bitki saksısı koyu gri (4 boy seçenekli) saksıya ne kadar toprak gider",
+    "line tabaklı bitki saksısı koyu gri (4 boy seçenekli) ölçüleri",
+    "line tabaklı bitki saksısı koyu gri (4 boy seçenekli) deliği var mı",
+    "line tabaklı bitki saksısı koyu gri (4 boy seçenekli) hangi bitki için uygun"
+   ],
+   "cevap": "Line Tabaklı Bitki Saksısı | Koyu Gri (4 Boy Seçenekli) | İthal Torf Hediye\n\nBoylar ve toprak ihtiyacı:\n• 1,1 L (Ø12,8 × 12,5 cm) → yaklaşık 0,99 L toprak, en küçük paket (5 L) yeter\n• 2,2 L (Ø16 × 15,6 cm) → yaklaşık 2 L toprak, en küçük paket (5 L) yeter\n• 5 L (Ø21 × 20,3 cm) → yaklaşık 4,5 L toprak, 5 L paket\n• 10 L (Ø26 × 25,5 cm) → yaklaşık 9 L toprak, 10 L paket Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-saksi-koyu-gri-ithal-torf-dahil"
+   ],
+   "kaynak": "saksi:line-saksi-koyu-gri-ithal-torf-dahil"
+  },
+  {
+   "id": "h1164",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-saksi-koyu-mavi-ithal-torf-dahil",
+   "sorular": [
+    "line tabaklı bitki saksısı koyu mavi (4 boy seçenekli) kaç litre",
+    "line tabaklı bitki saksısı koyu mavi (4 boy seçenekli) ne kadar toprak alır",
+    "line tabaklı bitki saksısı koyu mavi (4 boy seçenekli) saksıya ne kadar toprak gider",
+    "line tabaklı bitki saksısı koyu mavi (4 boy seçenekli) ölçüleri",
+    "line tabaklı bitki saksısı koyu mavi (4 boy seçenekli) deliği var mı",
+    "line tabaklı bitki saksısı koyu mavi (4 boy seçenekli) hangi bitki için uygun"
+   ],
+   "cevap": "Line Tabaklı Bitki Saksısı | Koyu Mavi (4 Boy Seçenekli) | İthal Torf Hediye\n\nBoylar ve toprak ihtiyacı:\n• 1,1 L (Ø12,8 × 12,5 cm) → yaklaşık 0,99 L toprak, en küçük paket (5 L) yeter\n• 2,2 L (Ø16 × 15,6 cm) → yaklaşık 2 L toprak, en küçük paket (5 L) yeter\n• 5 L (Ø21 × 20,3 cm) → yaklaşık 4,5 L toprak, 5 L paket\n• 10 L (Ø26 × 25,5 cm) → yaklaşık 9 L toprak, 10 L paket Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-saksi-koyu-mavi-ithal-torf-dahil"
+   ],
+   "kaynak": "saksi:line-saksi-koyu-mavi-ithal-torf-dahil"
+  },
+  {
+   "id": "h1165",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "line-saksi-sari-hardal-ithal-torf-dahil",
+   "sorular": [
+    "line tabaklı bitki saksısı sarı hardal (4 boy seçenekli) kaç litre",
+    "line tabaklı bitki saksısı sarı hardal (4 boy seçenekli) ne kadar toprak alır",
+    "line tabaklı bitki saksısı sarı hardal (4 boy seçenekli) saksıya ne kadar toprak gider",
+    "line tabaklı bitki saksısı sarı hardal (4 boy seçenekli) ölçüleri",
+    "line tabaklı bitki saksısı sarı hardal (4 boy seçenekli) deliği var mı",
+    "line tabaklı bitki saksısı sarı hardal (4 boy seçenekli) hangi bitki için uygun"
+   ],
+   "cevap": "Line Tabaklı Bitki Saksısı | Sarı Hardal (4 Boy Seçenekli) | İthal Torf Hediye\n\nBoylar ve toprak ihtiyacı:\n• 1,1 L (Ø12,8 × 12,5 cm) → yaklaşık 0,99 L toprak, en küçük paket (5 L) yeter\n• 2,2 L (Ø16 × 15,6 cm) → yaklaşık 2 L toprak, en küçük paket (5 L) yeter\n• 5 L (Ø21 × 20,3 cm) → yaklaşık 4,5 L toprak, 5 L paket\n• 10 L (Ø26 × 25,5 cm) → yaklaşık 9 L toprak, 10 L paket Tabağı var.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "line-saksi-sari-hardal-ithal-torf-dahil"
+   ],
+   "kaynak": "saksi:line-saksi-sari-hardal-ithal-torf-dahil"
+  },
+  {
+   "id": "h1166",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "mini-efes-dekoratif-saksi-28-litre",
+   "sorular": [
+    "mini efes dekoratif saksı 28 litre kaç litre",
+    "mini efes dekoratif saksı 28 litre ne kadar toprak alır",
+    "mini efes dekoratif saksı 28 litre saksıya ne kadar toprak gider",
+    "mini efes dekoratif saksı 28 litre ölçüleri",
+    "mini efes dekoratif saksı 28 litre deliği var mı",
+    "mini efes dekoratif saksı 28 litre hangi bitki için uygun"
+   ],
+   "cevap": "Mini Efes Dekoratif Saksı 28 Litre\n\nHacim ve toprak ihtiyacı:\n• 28 L (Ø35 × 37 cm) → yaklaşık 25 L toprak, 20 L + 10 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "mini-efes-dekoratif-saksi-28-litre"
+   ],
+   "kaynak": "saksi:mini-efes-dekoratif-saksi-28-litre"
+  },
+  {
+   "id": "h1167",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "ufo-saksi-serisi",
+   "sorular": [
+    "ufo saksı serisi kaç litre",
+    "ufo saksı serisi ne kadar toprak alır",
+    "ufo saksı serisi saksıya ne kadar toprak gider",
+    "ufo saksı serisi ölçüleri",
+    "ufo saksı serisi deliği var mı",
+    "ufo saksı serisi hangi bitki için uygun"
+   ],
+   "cevap": "UFO Saksı Serisi | Seçilebilir Renk, Litre ve Bitki Türüne Özel Ücretsiz Toprak (2L/5L/10L)\n\nBoylar ve toprak ihtiyacı:\n• 2 L (Ø19,5 × 14,5 cm) → yaklaşık 1,8 L toprak, en küçük paket (5 L) yeter\n• 5 L (Ø25 × 18,5 cm) → yaklaşık 4,5 L toprak, 5 L paket\n• 10 L (Ø32 × 24 cm) → yaklaşık 9 L toprak, 10 L paket\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "ufo-saksi-serisi"
+   ],
+   "kaynak": "saksi:ufo-saksi-serisi"
+  },
+  {
+   "id": "h1168",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "venus-askili-balkon-saksisi-1-75-litre",
+   "sorular": [
+    "venüs askılı balkon saksısı 1,75 litre kaç litre",
+    "venüs askılı balkon saksısı 1,75 litre ne kadar toprak alır",
+    "venüs askılı balkon saksısı 1,75 litre saksıya ne kadar toprak gider",
+    "venüs askılı balkon saksısı 1,75 litre ölçüleri",
+    "venüs askılı balkon saksısı 1,75 litre deliği var mı",
+    "venüs askılı balkon saksısı 1,75 litre hangi bitki için uygun"
+   ],
+   "cevap": "Venüs Askılı Balkon Saksısı 1,75 Litre\n\nHacim ve toprak ihtiyacı:\n• 1,75 L (Ø16 × 13 cm) → yaklaşık 1,6 L toprak, en küçük paket (5 L) yeter\n\nÜrün bilgisine göre: 1,75 litre hacmiyle mevsimlik çiçekler, sarkan bitkiler ve küçük aromatik bitkiler için uygundur.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "venus-askili-balkon-saksisi-1-75-litre"
+   ],
+   "kaynak": "saksi:venus-askili-balkon-saksisi-1-75-litre"
+  },
+  {
+   "id": "h1169",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "venus-askili-balkon-saksisi-3-1-litre",
+   "sorular": [
+    "venüs askılı balkon saksısı 3,1 litre kaç litre",
+    "venüs askılı balkon saksısı 3,1 litre ne kadar toprak alır",
+    "venüs askılı balkon saksısı 3,1 litre saksıya ne kadar toprak gider",
+    "venüs askılı balkon saksısı 3,1 litre ölçüleri",
+    "venüs askılı balkon saksısı 3,1 litre deliği var mı",
+    "venüs askılı balkon saksısı 3,1 litre hangi bitki için uygun"
+   ],
+   "cevap": "Venüs Askılı Balkon Saksısı 3,1 Litre\n\nHacim ve toprak ihtiyacı:\n• 3,1 L → yaklaşık 2,8 L toprak, 5 L paket\n\nÜrün bilgisine göre: Mevsimlik çiçekler, sarkan bitkiler ve aromatik bitkiler için uygundur.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "venus-askili-balkon-saksisi-3-1-litre"
+   ],
+   "kaynak": "saksi:venus-askili-balkon-saksisi-3-1-litre"
+  },
+  {
+   "id": "h1170",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "yuvarlak-vakum-saksi-13-x-10-5-cm",
+   "sorular": [
+    "yuvarlak vakum saksı kaç litre",
+    "yuvarlak vakum saksı ne kadar toprak alır",
+    "yuvarlak vakum saksı saksıya ne kadar toprak gider",
+    "yuvarlak vakum saksı ölçüleri",
+    "yuvarlak vakum saksı deliği var mı",
+    "yuvarlak vakum saksı hangi bitki için uygun"
+   ],
+   "cevap": "Yuvarlak Vakum Saksı - 13 X 10,5 CM\n\nHacim ve toprak ihtiyacı:\n• 0,9 L (Ø13 × 10,5 cm) → yaklaşık 0,81 L toprak, en küçük paket (5 L) yeter\n\nÜrün bilgisine göre: Saksının ağız çapı 130 mm, derinliği ise 105 mm olarak tasarlanmıştır, bu da bitkilerin kök gelişimi için yeterli alan sağlar.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "yuvarlak-vakum-saksi-13-x-10-5-cm",
+    "45-goz-yuvarlak-fide-viyolu"
+   ],
+   "kaynak": "saksi:yuvarlak-vakum-saksi-13-x-10-5-cm"
+  },
+  {
+   "id": "h1171",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "cesme-dis-mekan-dekoratif-saksi-buyuk-boy-renk-ve-litre-secenekli",
+   "sorular": [
+    "çeşme serisi dış mekan dekoratif saksı kaç litre",
+    "çeşme serisi dış mekan dekoratif saksı ne kadar toprak alır",
+    "çeşme serisi dış mekan dekoratif saksı saksıya ne kadar toprak gider",
+    "çeşme serisi dış mekan dekoratif saksı ölçüleri",
+    "çeşme serisi dış mekan dekoratif saksı deliği var mı",
+    "çeşme serisi dış mekan dekoratif saksı hangi bitki için uygun"
+   ],
+   "cevap": "Çeşme Serisi Dış Mekan Dekoratif Saksı | Renk ve Büyük Boy Litre Seçenekleri (28L / 70L / 130L)\n\nBoylar ve toprak ihtiyacı:\n• 28 L (Ø40 × 34,5 cm) → yaklaşık 25 L toprak, 20 L + 10 L paket\n• 70 L (Ø50 × 50 cm) → yaklaşık 63 L toprak, 40 L + 20 L + 10 L paket\n• 130 L (Ø62 × 60 cm) → yaklaşık 115 L toprak, 3 × 40 L + 10 L paket\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "cesme-dis-mekan-dekoratif-saksi-buyuk-boy-renk-ve-litre-secenekli"
+   ],
+   "kaynak": "saksi:cesme-dis-mekan-dekoratif-saksi-buyuk-boy-renk-ve-litre-secenekli"
+  },
+  {
+   "id": "h1172",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "ince-damla-buyuk-fiber-saksi-32x70-cm",
+   "sorular": [
+    "ince damla büyük fiber saksı 32 × 70 cm kaç litre",
+    "ince damla büyük fiber saksı 32 × 70 cm ne kadar toprak alır",
+    "ince damla büyük fiber saksı 32 × 70 cm saksıya ne kadar toprak gider",
+    "ince damla büyük fiber saksı 32 × 70 cm ölçüleri",
+    "ince damla büyük fiber saksı 32 × 70 cm deliği var mı",
+    "ince damla büyük fiber saksı 32 × 70 cm hangi bitki için uygun"
+   ],
+   "cevap": "İnce Damla Büyük Fiber Saksı 32 × 70 cm\n\nHacim ve toprak ihtiyacı:\n• 31 L (ölçülerden yaklaşık) (Ø32 × 70 cm) → yaklaşık 28 L toprak, 20 L + 10 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "ince-damla-buyuk-fiber-saksi-32x70-cm"
+   ],
+   "kaynak": "saksi:ince-damla-buyuk-fiber-saksi-32x70-cm"
+  },
+  {
+   "id": "h1173",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "ince-damla-buyuk-fiber-saksi-37x100-cm",
+   "sorular": [
+    "ince damla büyük fiber saksı 37 × 100 cm kaç litre",
+    "ince damla büyük fiber saksı 37 × 100 cm ne kadar toprak alır",
+    "ince damla büyük fiber saksı 37 × 100 cm saksıya ne kadar toprak gider",
+    "ince damla büyük fiber saksı 37 × 100 cm ölçüleri",
+    "ince damla büyük fiber saksı 37 × 100 cm deliği var mı",
+    "ince damla büyük fiber saksı 37 × 100 cm hangi bitki için uygun"
+   ],
+   "cevap": "İnce Damla Büyük Fiber Saksı 37 × 100 cm\n\nHacim ve toprak ihtiyacı:\n• 59 L (ölçülerden yaklaşık) (Ø37 × 100 cm) → yaklaşık 53 L toprak, 40 L + 20 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "ince-damla-buyuk-fiber-saksi-37x100-cm"
+   ],
+   "kaynak": "saksi:ince-damla-buyuk-fiber-saksi-37x100-cm"
+  },
+  {
+   "id": "h1174",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "ince-damla-fiber-saksi-36x40-cm",
+   "sorular": [
+    "ince damla fiber saksı 36 × 40 cm kaç litre",
+    "ince damla fiber saksı 36 × 40 cm ne kadar toprak alır",
+    "ince damla fiber saksı 36 × 40 cm saksıya ne kadar toprak gider",
+    "ince damla fiber saksı 36 × 40 cm ölçüleri",
+    "ince damla fiber saksı 36 × 40 cm deliği var mı",
+    "ince damla fiber saksı 36 × 40 cm hangi bitki için uygun"
+   ],
+   "cevap": "İnce Damla Fiber Saksı 36 × 40 cm\n\nHacim ve toprak ihtiyacı:\n• 22 L (ölçülerden yaklaşık) (Ø36 × 40 cm) → yaklaşık 20 L toprak, 20 L + 5 L paket\n\nÜrün bilgisine göre dikimden önce drenaj çıkışını kontrol edin; drenaj deliği yoksa bitkiyi delikli bir iç saksıyla yerleştirin (saksıyı kaşpo olarak kullanın).\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "ince-damla-fiber-saksi-36x40-cm"
+   ],
+   "kaynak": "saksi:ince-damla-fiber-saksi-36x40-cm"
+  },
+  {
+   "id": "h1175",
+   "durum": "onay-bekliyor",
+   "tur": "saksi",
+   "urun": "seffaf-plastik-orkide-kaktus-saksisi",
+   "sorular": [
+    "şeffaf plastik orkide ve kaktüs saksısı kaç litre",
+    "şeffaf plastik orkide ve kaktüs saksısı ne kadar toprak alır",
+    "şeffaf plastik orkide ve kaktüs saksısı saksıya ne kadar toprak gider",
+    "şeffaf plastik orkide ve kaktüs saksısı ölçüleri",
+    "şeffaf plastik orkide ve kaktüs saksısı deliği var mı",
+    "şeffaf plastik orkide ve kaktüs saksısı hangi bitki için uygun"
+   ],
+   "cevap": "Şeffaf Plastik Orkide ve Kaktüs Saksısı (3 Boy Seçenekli)\n\nBoylar ve toprak ihtiyacı:\n• 0,75 L → yaklaşık 0,68 L toprak, en küçük paket (5 L) yeter\n• 1,6 L → yaklaşık 1,4 L toprak, en küçük paket (5 L) yeter\n• 3 L → yaklaşık 2,7 L toprak, 5 L paket\n\nÜrün bilgisine göre: Orkide, kaktüs ve sukulentler için uygun.\n\nBitkinizi taşıyorsanız mevcut saksısından 2,5–5 cm geniş olanı seçin. Bitkinize uygun toprağı da sorabilirsiniz (ör. \"monstera toprağı\").",
+   "urunler": [
+    "seffaf-plastik-orkide-kaktus-saksisi"
+   ],
+   "kaynak": "saksi:seffaf-plastik-orkide-kaktus-saksisi"
+  },
+  {
+   "id": "h1176",
    "durum": "onay-bekliyor",
    "tur": "magaza",
    "sorular": [
