@@ -4,3 +4,6 @@ ankara-bb-sebze	https://s.ankara.bel.tr/files/5214/3893/6685/SEBZE_YETTRCL.pdf
 bugday-atalik	https://www.bugday.org/blog/wp-content/uploads/2021/04/AtalikTohumlar.pdf
 au-acikders-4225	https://acikders.ankara.edu.tr/mod/resource/view.php?id=4225
 tarimkutuphanesi-koku	http://www.tarimkutuphanesi.com/koku_yenilen_sebzeler_(havuc,_turp,_kereviz,_sogan,_sarimsak)_00443.html
+sabah-bugem-ekim	https://www.sabah.com.tr/ekonomi/balkon-bahceciligi-hobi-olmaktan-cikiyor-7119190
+sozcu-eylul-ekim	https://www.sozcu.com.tr/eylul-ve-ekim-aylarinda-eken-kazaniyor-hasat-zamani-verim-2-kat-artiyor-p229165
+ensonhaber-kasim	https://www.ensonhaber.com/soguga-dayanikli-iste-kasim-ayinda-ekilecekdikilecek-bitkiler-h1484104
