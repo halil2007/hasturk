@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: ['claude/**']
-    paths: ['scripts/cart-api.mjs', '.github/workflows/cart-api.yml']
+    paths: ['scripts/cart-api.mjs', 'scripts/cart-win.mjs', '.github/workflows/cart-api.yml']
 
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - run: |
           npm i --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
-      - run: node scripts/cart-api.mjs
+      - run: node scripts/cart-win.mjs
         env:
           SITE_URL: ${{ matrix.site }}
           PRODUCT: ${{ matrix.product }}
