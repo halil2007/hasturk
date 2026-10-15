@@ -73,7 +73,7 @@
     return null;
   }
   // Sepetteki satırlar: varyant kimliği → adet
-  var CART_LINES = null;
+  var CART_LINES; // yukarıda oturumdan okunan değer silinmesin (var tanımı değer atamaz)
   function lineQty(c) {
     var m = {};
     (c.orderLineItems || []).forEach(function (it) {
@@ -376,6 +376,7 @@
   }
   var I = {
     search: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 2.2),
+    mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', 2.2),
     back: svg('<path d="M15 5l-7 7 7 7"/>', 2.4),
     x: svg('<path d="M6 6l12 12M18 6 6 18"/>', 2.2),
     clock: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
@@ -671,6 +672,8 @@
     '.akm .akf{display:flex}',
     '.akf input{flex:1;min-width:0;height:46px;border-radius:23px;border:2px solid var(--ln);padding:0 16px;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);outline:0}',
     '.akf input:focus{border-color:var(--pr);background:#fff}',
+    '.akf .akmic{background:var(--soft);color:var(--pr)}.akf .akmic.on{background:var(--ac);color:#fff;animation:mic 1.2s ease-in-out infinite}',
+    '@keyframes mic{0%,100%{box-shadow:0 0 0 0 rgba(215,55,47,.45)}50%{box-shadow:0 0 0 8px rgba(215,55,47,0)}}',
     '.akf button{flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--pr);color:#fff}.akf button svg{width:20px;height:20px}',
     '.akh{display:flex;align-items:center;gap:12px;padding:14px 16px 6px}',
     '.akh img{width:64px;height:64px;flex:none;object-fit:contain}',
@@ -863,6 +866,15 @@
     '.sh-h button{width:36px;height:36px;border-radius:50%;background:var(--bg);display:grid;place-items:center;flex:none}',
     '.sh-h button svg{width:16px;height:16px}',
     '.sh-l{font-size:13px;font-weight:700;color:var(--mu);margin:16px 0 8px}',
+    /* Bilge Bey "Hepsini sepete ekle" penceresi */
+    '.akall{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:8px 0 0;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}.akall svg{width:17px;height:17px}',
+    '.bun .sh-h b{font-size:16px;color:var(--prd)}.bhint{font-size:12.5px;color:var(--mu);margin:4px 0 6px}',
+    '.akbl{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--ln)}.akoff .im,.akoff .blt{opacity:.45}',
+    '.bck{width:26px;height:26px;border-radius:8px;border:2px solid var(--pr);background:var(--pr);color:#fff;display:grid;place-items:center;flex:none;margin-top:13px}.akoff .bck{background:#fff}.bck svg{width:16px;height:16px}',
+    '.akbl .im{width:52px;height:52px;border-radius:10px;background:#fff;border:1px solid var(--ln)}.akbl .im img{object-fit:contain;padding:2px}',
+    '.blt{flex:1;min-width:0}.blt b{display:block;font-size:13.5px;line-height:1.3;margin:2px 0 6px}.blt>small{font-weight:700;color:var(--prd)}',
+    '.blt .vopts{gap:6px}.blt .vo{padding:5px 9px;font-size:12.5px}.blt .vo small{font-size:11px}',
+    '.btot{display:flex;flex-direction:column;flex:none}.btot small{font-size:12px;color:var(--mu)}.btot b{font-size:17px;color:var(--prd)}.sh-go[disabled]{opacity:.6}',
     '.vopts{display:flex;flex-wrap:wrap;gap:8px}',
     '.vo{display:flex;flex-direction:column;align-items:flex-start;padding:8px 12px;border-radius:12px;border:1.5px solid var(--ln);font-size:13.5px;font-weight:700;text-align:left}',
     '.vo small{font-size:12px;font-weight:600;color:var(--mu)}',
@@ -1120,6 +1132,10 @@
     else if (act === 'clear') { $q.value = ''; render(); $q.focus(); }
     else if (act === 'akq') akAsk(v);
     else if (act === 'akgrp') akGroup(v);
+    else if (act === 'akall') akAll(v);
+    else if (act === 'akmic') akMic();
+    else if (act === 'bt' || act === 'bv') akBundleAct(act, v);
+    else if (act === 'bgo') akBundleGo();
     else if (act === 'akoy') akVote(v);
     else if (act === 'akyeni') { AK.log = []; akSave(); AK.built = false; akBuild(); }
     else if (act === 'q') { $q.value = v; shown = PAGE; render(); $q.focus(); }
@@ -1178,6 +1194,26 @@
   })();
   try { AK.log = JSON.parse(sessionStorage.getItem('ua-ak-log') || '[]') || []; } catch (e) { AK.log = []; }
   function akOn() { var c = CFG.akbilge; return !!(AK_URL && c && (c.enabled || AK_PREV)); }
+  // Sol alttaki buton yazısı: ürün sayfasında "Bu ürünü sor" (telefonda kısa), diğer sayfalarda "Bilge Bey'e sor"
+  function akFabText() {
+    if (!$akfab) return;
+    var akf = (CFG.akbilge || {}).fab || {}, pg = akPage() || akUrunSanisi();
+    var t = akf.text || (pg ? (window.innerWidth < 760 ? 'Bu ürünü sor' : 'Bu ürünü ' + akName() + akYe(akName()) + ' sor') : akName() + akYe(akName()) + ' sor');
+    var el = $akfab.querySelector('span.t');
+    if (el.textContent !== t) el.textContent = t;
+    $akfab.setAttribute('aria-label', pg ? 'Bu ürünü ' + akName() + akYe(akName()) + ' sor' : t);
+  }
+  // Ürün listesi henüz inmediyse (telefonda geç iner) ürün sayfası adresten tahmin edilir: tek parçalı adres, kategori
+  // (menü verisi) ya da bilinen sayfa (blog, sepet, hesap…) değilse ürün sayfasıdır (ikas ürün adresi /urun-adi)
+  function akUrunSanisi() {
+    if (DATA) return '';
+    var path = location.pathname.replace(/\/+$/, ''), s = slugOf(location.href);
+    if (!s || path.split('/').length !== 2 || !/^[a-z0-9-]{3,140}$/.test(s)) return '';
+    if (/^(home|anasayfa|blog|pages|sayfa|account|hesap|cart|sepet|checkout|odeme|search|arama|kategori|kampanyalar|iletisim|hakkimizda|sss|favoriler|login|giris|kayit)$/.test(s)) return '';
+    var cats = (LITE && LITE.cats) || [];
+    for (var i = 0; i < cats.length; i++) if (cats[i].s === s) return '';
+    return LITE ? s : '';
+  }
   function akName() { return (CFG.akbilge && CFG.akbilge.name) || 'Bilge Bey'; }
   // Yönelme eki (isim değişirse "…'ye / …'ya / …'e / …'a sor" doğru çıksın)
   function akYe(n) {
@@ -1238,8 +1274,9 @@
       var prods = '';
       if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl); pose = 'fide'; } }
       if (!prods && DATA) {
-        var list = (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 4);
-        if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>';
+        var list = akListe(d.urunler || []);
+        if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, x.__yerine ? 'stokta olmayan ' + akKisa(x.__yerine) + ' yerine' : ''); }).join('') + '</div>' +
+          (list.length >= 2 && cartOn() ? '<button type="button" class="akall" data-act="akall" data-v="' + idx + '">' + I.cart + 'Hepsini sepete ekle</button>' : '');
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
       // Cevap müşteriyi bize yönlendiriyorsa ("müşteri hizmetleri", "WhatsApp'tan yazın") düğmeler hemen altında olsun
@@ -1254,6 +1291,151 @@
       : d.neden === 'emin-degil' ? 'Bu konuda size kesin ve doğru bilgi verebilmem için müşteri hizmetlerimizin bakması daha doğru olur.'
       : 'Bu soruya henüz hazır bir cevabım yok.';
     return akBot('tesekkur', '<p>' + esc(why) + ' Müşteri hizmetlerimizden destek alabilirsiniz:</p>') + akContact(q, '');
+  }
+  // "Hepsini sepete ekle": Bilge Bey cevabındaki ürünler tek pencerede, her biri için boy seçilerek sırayla eklenir.
+  // Önceden seçili boy soruya göre: saksı / çiçek / balkon → en küçük boy; bahçe / sebze / ağaç / tarla → büyükçe boy
+  // (seçeneklerin ortası, ör. 1–20 kg arasında 5 kg). İçindekiler zaten listede olan set ("…Set", "…Seti") işaretsiz gelir. Stokta olmayan boy seçilemez; istenmeyen ürünün işareti kaldırılır.
+  // Cevaptaki ürünler: stoktakiler; stokta olmayan ürünün yerine aynı kategoriden, adı benzeyen (ortak kelimeli) ve çok
+  // satan stoktaki ürün konur (aynı ürün iki kez gösterilmez)
+  function akListe(slugs) {
+    var out = [], used = {};
+    slugs.forEach(function (s) { if (BY_SLUG[s]) used[s] = 1; });
+    slugs.forEach(function (s) {
+      var x = BY_SLUG[s];
+      if (!x || out.length >= 4) return;
+      if (x.st) { out.push(x); return; }
+      var alt = akAlt(x, used);
+      if (alt) { used[alt.s] = 1; out.push(Object.assign ? Object.assign({}, alt, { __yerine: x.n }) : alt); }
+    });
+    return out;
+  }
+  var KAMP = /kampanya|\bset(i)?\b|\+|\bton\b|toptan/i;
+  function akAlt(p, used) {
+    if (!DATA) return null;
+    var kel = function (n) { return fold(n).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 4 && !/^(hasturk|organik|ozel|bitki|bitkiler)$/.test(w); }); };
+    var pw = kel(p.n), c0 = (p.c || [])[0], best = (DATA.trend || {}).best || [], top = null, ts = 0;
+    DATA.items.forEach(function (x) {
+      if (!x.st || used[x.s] || x.s === p.s || !c0 || (x.c || []).indexOf(c0) === -1) return;
+      // Kampanya paketi / set / toptan ürün, tek ürünün yerine önerilmez; fiyatı 4 katından fazla farklı olan da
+      if (KAMP.test(x.n) && !KAMP.test(p.n)) return;
+      var pp = price(p), px = price(x), oran = pp && px ? Math.max(pp, px) / Math.min(pp, px) : 1;
+      if (oran > 4) return;
+      var xw = kel(x.n), ort = pw.filter(function (w) { return xw.indexOf(w) !== -1; }).length;
+      if (!ort) return;
+      var bi = best.indexOf(x.s), sc = ort * 3 + (bi === -1 ? 0 : Math.max(0, 2 - bi / 20)) - Math.log(oran);
+      if (sc > ts) { ts = sc; top = x; }
+    });
+    return top;
+  }
+  // Sesle soru: tarayıcının kendi konuşma tanıması (Chrome, Android, iPhone Safari; ücretsiz, ses bize gelmez).
+  // Konuşma yazıya dönüp kutuya yazılır; müşteri kontrol edip "Gönder"e basar. Desteklemeyen tarayıcıda düğme çıkmaz.
+  var AK_SR = window.SpeechRecognition || window.webkitSpeechRecognition || null, AK_REC = null;
+  function akMic() {
+    var inp = $akf.querySelector('input'), btn = $akf.querySelector('.akmic');
+    if (!AK_SR || !inp) return;
+    if (AK_REC) { try { AK_REC.stop(); } catch (e) {} return; }
+    var rec;
+    try { rec = new AK_SR(); } catch (e) { return; }
+    rec.lang = 'tr-TR'; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
+    var once = inp.value ? inp.value + ' ' : '';
+    rec.onresult = function (e) {
+      var t = '';
+      for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+      inp.value = (once + t).replace(/\s+/g, ' ').trim().slice(0, 300);
+    };
+    rec.onerror = function (e) { if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) ptoast('Mikrofon izni verilmedi. Sorunuzu yazarak da sorabilirsiniz.', true); };
+    rec.onend = function () {
+      AK_REC = null;
+      if (btn) { btn.classList.remove('on'); btn.setAttribute('aria-label', 'Sesle sorun'); }
+      inp.placeholder = 'Sorunuzu yazın ya da konuşun…';
+      if (inp.value) { try { inp.focus(); } catch (e) {} }
+    };
+    try { rec.start(); } catch (e) { return; }
+    AK_REC = rec;
+    track('akbilge_ses', 'basladi');
+    if (btn) { btn.classList.add('on'); btn.setAttribute('aria-label', 'Dinlemeyi durdur'); }
+    inp.placeholder = 'Dinliyorum… konuşun';
+  }
+  var BUNDLE = null;
+  function akVsOk(p) { return (p.v || []).filter(function (v) { return v.id && vOk(v); }).sort(function (a, b) { return (vPrice(a) || 0) - (vPrice(b) || 0); }); }
+  function akBundleItems(it) {
+    var d = (it && it.d) || {};
+    return akListe(d.urunler || []).map(function (x) { return BY_SLUG[x.s] || x; });
+  }
+  function akDefVariant(p, txt) {
+    var vs = akVsOk(p);
+    if (!vs.length) return { id: p.v1, p: p.p, d: p.d, st: p.st, name: '' };
+    var buyuk = /bahçe|bahce|sebze|bostan|ağaç|agac|fidan|meyve|tarla|dekar|zeytin|fındık|findik|ceviz|bağ\b|asma|çim\b|cim\b/i.test(txt) && !/saksı|saksi|balkon|salon|ev bitki|çiçeğim|orkide|kaktüs|monstera/i.test(txt);
+    return buyuk ? vs[Math.floor((vs.length - 1) / 2)] : vs[0];
+  }
+  function akAll(idx) {
+    var it = AK.log[+idx], list = akBundleItems(it);
+    if (list.length < 2) return;
+    var txt = it.q + ' ' + ((it.d && it.d.cevap) || '').slice(0, 200);
+    var SET = /\bset(i)?\b/i, tek = list.some(function (p) { return !SET.test(p.n); });
+    BUNDLE = { idx: +idx, items: list.map(function (p) { return { p: p, v: akDefVariant(p, it.q + ' ' + txt), on: !(tek && SET.test(p.n)) }; }) };
+    track('akbilge_hepsi_ac', it.q);
+    akBundleDraw();
+    $sheet.classList.add('on');
+  }
+  function akBundleDraw() {
+    if (!BUNDLE) return;
+    var total = 0, n = 0;
+    var rows = BUNDLE.items.map(function (b, i) {
+      var vs = (b.p.v || []).filter(function (v) { return v.id; });
+      if (b.on) { total += vPrice(b.v) || price(b.p) || 0; n++; }
+      return '<div class="akbl' + (b.on ? '' : ' akoff') + '"><button type="button" class="bck" data-act="bt" data-v="' + i + '" aria-pressed="' + b.on + '" aria-label="' + (b.on ? 'Çıkar' : 'Ekle') + '">' + (b.on ? I.check : '') + '</button>' +
+        thumb(b.p.img, 120) + '<div class="blt"><b>' + esc(b.p.n) + '</b>' +
+        (vs.length > 1 ? '<div class="vopts">' + vs.map(function (v) {
+          return '<button class="vo' + (v.id === b.v.id ? ' on' : '') + '" type="button" data-act="bv" data-v="' + i + ':' + esc(v.id) + '"' + (vOk(v) ? '' : ' disabled') + '>' + esc(v.name || 'Seçenek') + (vPrice(v) != null ? '<small>' + tl(vPrice(v)) + '</small>' : '') + '</button>';
+        }).join('') + '</div>' : '<small>' + (vPrice(b.v) != null ? tl(vPrice(b.v)) : '') + '</small>') + '</div></div>';
+    }).join('');
+    var lim = shipLimit(), kalan = lim && CART != null ? lim - CART - total : 0;
+    var ship = lim && CART != null ? (kalan <= 0 ? 'Bu ürünlerle kargonuz ücretsiz!' : 'Ücretsiz kargoya ' + tl(Math.ceil(kalan)) + ' kaldı') : (CFG.promo && CFG.promo.shipping) || '';
+    $sheet.innerHTML = '<div class="sh-in bun" role="dialog" aria-label="Hepsini sepete ekle"><div class="sh-h"><b>Önerilen ürünler</b>' +
+      '<button type="button" data-act="shx" aria-label="Kapat">' + I.x + '</button></div>' +
+      '<p class="bhint">Boyu değiştirebilir, istemediğiniz ürünün işaretini kaldırabilirsiniz.</p>' + rows +
+      '<div class="sh-f"><div class="btot"><small>Toplam</small><b>' + tl(total) + '</b></div>' +
+      '<button class="sh-go" type="button" data-act="bgo"' + (n ? '' : ' disabled') + '>' + I.cart + (n ? n + ' ürünü sepete ekle' : 'Ürün seçin') + '</button></div>' +
+      (ship ? '<div class="sh-ship">' + I.truck + esc(ship) + '</div>' : '') + '</div>';
+  }
+  function akBundleAct(act, v) {
+    if (!BUNDLE) return;
+    if (act === 'bt') { var b = BUNDLE.items[+v]; if (b) b.on = !b.on; }
+    else if (act === 'bv') {
+      var m = String(v).split(':'), x = BUNDLE.items[+m[0]], nv = x && (x.p.v || []).filter(function (y) { return y.id === m[1]; })[0];
+      if (nv && vOk(nv)) x.v = nv;
+    }
+    akBundleDraw();
+  }
+  // Ürün sepete eklenir (sitenin sepet yöntemi ya da gizli ürün sayfası); Promise döner
+  function addP(p, v) {
+    var fn = window.UrunAramaSepet;
+    if (typeof fn === 'function') return Promise.resolve().then(function () { return fn(v.id, 1, { productId: p.id, slug: p.s, name: p.n }); });
+    setBusy(p.id, true);
+    return directAdd(p, v).catch(function () { return queueFrameAdd(p, v); }).then(function () { setBusy(p.id, false); }, function (e) { setBusy(p.id, false); throw e; });
+  }
+  function akBundleGo() {
+    if (!BUNDLE || BUNDLE.busy) return;
+    var sel = BUNDLE.items.filter(function (b) { return b.on && b.v && b.v.id; });
+    if (!sel.length) return;
+    BUNDLE.busy = true;
+    var go = $sheet.querySelector('[data-act="bgo"]');
+    if (go) { go.disabled = true; go.innerHTML = '<span class="bspin"></span><span>Ekleniyor…</span>'; }
+    if (typeof window.UrunAramaSepet !== 'function') sel.forEach(function (b) { prepAdd(b.p); });
+    track('akbilge_hepsi', sel.length + ' ürün');
+    var ok = 0, fail = [];
+    sel.reduce(function (pr, b) {
+      return pr.then(function () {
+        return addP(b.p, b.v).then(function () { ok++; ev('a', b.p.s); ev('ka', b.p.s); track('add_to_cart_ok', b.p.n); }, function () { fail.push(b.p); track('add_to_cart_fail', b.p.n + ' (hepsi)'); });
+      });
+    }, Promise.resolve()).then(function () {
+      BUNDLE = null;
+      closeSheet();
+      syncSiteCart();
+      if (!fail.length) ptoast(ok + ' ürün sepete eklendi', false, true);
+      else ptoast(ok + ' ürün eklendi; ' + fail.map(function (p) { return p.n; }).join(', ') + ' eklenemedi. Ürün sayfasından ekleyebilirsiniz.', true, false, url(fail[0].s), 'Ürün sayfasına git');
+    });
   }
   function akRenderLog() {
     var log = root.querySelector('.aklog');
@@ -1270,7 +1452,8 @@
         '<div class="akwrap">' + akBot('selam', '<p>' + esc(c.greet || ('Merhaba, ben ' + name + '! Bitkiniz ya da ürünlerimizle ilgili sorunuzu yazın.')) + '</p>') +
         '<div class="akbas">' + akStart(pg) + '</div>' +
         '<div class="aklog" aria-live="polite"></div></div>';
-      $akf.innerHTML = '<input type="text" maxlength="300" enterkeyhint="send" placeholder="Sorunuzu yazın…" aria-label="' + esc(name + akYe(name)) + ' sorun">' +
+      $akf.innerHTML = '<input type="text" maxlength="300" enterkeyhint="send" placeholder="' + (AK_SR ? 'Sorunuzu yazın ya da konuşun…' : 'Sorunuzu yazın…') + '" aria-label="' + esc(name + akYe(name)) + ' sorun">' +
+        (AK_SR ? '<button type="button" class="akmic" data-act="akmic" aria-label="Sesle sorun">' + I.mic + '</button>' : '') +
         '<button type="submit" aria-label="Gönder">' + I.send + '</button>';
       if (!$akf.getAttribute('data-on')) {
         $akf.setAttribute('data-on', '1');
@@ -1317,7 +1500,10 @@
   function akStart(pg) {
     var c = CFG.akbilge || {}, h = '', G = akGroups();
     if (c.samples && c.samples.length) return '<div class="akopts on">' + c.samples.map(akChip).join('') + '</div>';
-    // Ürün sayfasındaysa o ürünle ilgili soru en üstte
+    // Ürün sayfasındaysa o ürünle ilgili soru en üstte; değilse sepetteki (mama/kum dışı) ilk ürünün kullanımı
+    var sp = null;
+    if (!pg && CART_LINES && DATA) for (var vid in CART_LINES) { var cx = BY_VAR[vid]; if (cx && !/mama|kedi|köpek|kumu|ödül/i.test(cx.n)) { sp = cx; break; } }
+    if (sp) h += '<button type="button" class="akpg" data-act="akq" data-v="' + esc(akKisa(sp.n) + ' nasıl kullanılır?') + '">' + thumb(sp.img, 120) + '<span><small>Sepetinizdeki ürün</small><b>' + esc(akKisa(sp.n)) + ' nasıl kullanılır?</b></span></button>';
     if (pg && BY_SLUG[pg]) {
       var p = BY_SLUG[pg], pq = akKisa(p.n) + ' nasıl kullanılır?';
       h += '<button type="button" class="akpg" data-act="akq" data-v="' + esc(pq) + '">' + thumb(p.img, 120) + '<span><small>Bu ürün hakkında</small><b>' + esc(pq) + '</b></span></button>';
@@ -1408,8 +1594,7 @@
     // Ak Bilge butonu Ürün Bul'un karşı köşesinde durur; config.json > akbilge.fab: false kapatır, { "text": "…" } yazıyı değiştirir
     var akf = (CFG.akbilge || {}).fab || {};
     $akfab.classList.toggle('right', fab.side === 'left');
-    $akfab.querySelector('span.t').textContent = akf.text || akName() + akYe(akName()) + ' sor';
-    $akfab.setAttribute('aria-label', $akfab.querySelector('span.t').textContent);
+    akFabText();
     if (!$akfab.querySelector('img') && akOn()) $akfab.querySelector('.fi').innerHTML = '<img src="' + esc(akImg('avatar')) + '" alt="" width="40" height="40">';
     if (fab.bottom != null) $wrap.style.setProperty('--fb', (+fab.bottom || 0) + 'px');
     updateFab();
@@ -2406,7 +2591,7 @@
     SH.v = v;
     [].forEach.call($sheet.querySelectorAll('.vo'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === id); });
   }
-  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; }
+  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; if (BUNDLE && !BUNDLE.busy) BUNDLE = null; }
   function toast(msg) {
     $toast.innerHTML = I.check + esc(msg);
     $toast.classList.add('on');
@@ -3181,6 +3366,7 @@
       var akh = isOpen || HIDE_PATHS.test(location.pathname) || !akOn() || ds.akfab === 'off' || (CFG.akbilge || {}).fab === false;
       $akfab.classList.toggle('hide', akh);
       $akfab.classList.toggle('still', (CFG.fab || {}).animate === false);
+      if (!akh) akFabText();
     }
     fabSpace();
   }
