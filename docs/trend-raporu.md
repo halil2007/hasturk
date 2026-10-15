@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3068 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3069 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -19,11 +19,11 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 7 | Altınvadi Toros Maydanozu Tohumu 10 Gr | ×6,8 | 5 | evet |
 | 8 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı)  | ×9,9 | 5 | evet |
 | 9 | Hastürk Katı Solucan Gübresi 20 Kg | ×5 | 3 | evet |
-| 10 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3 | 0 | evet |
-| 11 | Uzman 16 Lt Sırt Pulverizatörü İlaçlama Pompası (K-103) | ×5,6 | 1 | evet |
-| 12 | HG 4’lü Bitki Yetiştirme Seti | ×5,3 | 3 | evet |
-| 13 | Arzuman Nantes Havuç Tohumu (10 Gr) | ×6,4 | 2 | evet |
-| 14 | Guanokalong Yarasa Gübresi Toz | ×2,5 | 1 | evet |
+| 10 | Guanokalong Yarasa Gübresi Toz | ×2,9 | 1 | evet |
+| 11 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3 | 0 | evet |
+| 12 | Uzman 16 Lt Sırt Pulverizatörü İlaçlama Pompası (K-103) | ×5,6 | 1 | evet |
+| 13 | HG 4’lü Bitki Yetiştirme Seti | ×5,3 | 3 | evet |
+| 14 | Arzuman Nantes Havuç Tohumu (10 Gr) | ×6,4 | 2 | evet |
 | 15 | Altınvadi Bezelye Tohumu 25 Gr | ×6 | 2 | evet |
 
 ## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)
@@ -69,7 +69,7 @@ _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 g
 
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
-| 1 | sıvı solucan gübresi | 56 | 32 | ↑ ×3,4 |  |
+| 1 | sıvı solucan gübresi | 57 | 33 | ↑ ×3,5 |  |
 | 2 | saksı | 18 | 8 | ↑ ×1,9 |  |
 | 3 | solucan | 15 | 1 |  |  |
 | 4 | solucan gübresi | 13 | 3 |  |  |
@@ -143,7 +143,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 10 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 2,7 | 40,7 |
 | 11 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 2,7 | 18 |
 | 12 | Şahnalı Acı Sivri Biber Ata Tohumu (50 Adet) | 2,6 | 4,5 |
-| 13 | HasTürk Hümix Sıvı Hümik Asit | 2,5 | 39 |
+| 13 | HasTürk Hümix Sıvı Hümik Asit | 2,5 | 43 |
 | 14 | Doğal Orman Toprağı / %100 Organik ve Humuslu | 2,4 | 19,2 |
 | 15 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 1,9 | 0,6 |
 | 16 | Altınvadi Tere Tohumu 10 Gr  | 1,9 | 0 |
@@ -158,20 +158,20 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 | Ürün | Görüntüleme | Sepete ekleme | Oran |
 |---|---|---|---|
-| Guanokalong Yarasa Gübresi Toz | 49 | 1 | %2 |
+| Guanokalong Yarasa Gübresi Toz | 57 | 1 | %2 |
 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 48,7 | 0,7 | %1 |
 | İnsektisit MAX 5 Lt Kampanya Paketi | 45,8 | 0,8 | %2 |
 | Leonardit - Organik Toprak Düzenleyici | 43,5 | 1,8 | %4 |
 | HG Asidik Torf | 32,5 | 0,5 | %2 |
+| Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 31,9 | 0 | %0 |
+| Chrysamed Subon Hijyen Sprey | 30,8 | 0 | %0 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 30,1 | 0 | %0 |
 | HG Mezar Toprağı | 28,8 | 0,5 | %2 |
 | Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 28,5 | 0 | %0 |
-| Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 27,9 | 0 | %0 |
-| Chrysamed Subon Hijyen Sprey | 26,8 | 0 | %0 |
 | Gold Valley Fare Kulağı Tohumu 500 Gr | 25,3 | 0,9 | %4 |
 | Yuka (Yucca) Toprağı Özel Karışım | 24,4 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 24,3 | 0 | %0 |
-| Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 21,1 | 0 | %0 |
+| Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 22,1 | 0 | %0 |
 | Çim Kapama Toprağı (Leonarditli Formül) | 19,2 | 0,4 | %2 |
 
 ## Birlikte satın alınanlar (son 180 gün)
@@ -208,12 +208,12 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 ## Çapraz satış önerilerinin sonucu (son 30 gün)
 
-Öneri 56 kez gösterildi, 0 kez sepete eklendi (%0).
+Öneri 58 kez gösterildi, 0 kez sepete eklendi (%0).
 
 | # | Önerilen ürün | Gösterildi | Eklendi | Oran |
 |---|---|---|---|---|
-| 1 | hasturk-kati-solucan-gubresi-3-kg | 16 | 0 | %0 |
-| 2 | kati-solucan-gubresi-20-kg-cuval | 16 | 0 | %0 |
+| 1 | hasturk-kati-solucan-gubresi-3-kg | 17 | 0 | %0 |
+| 2 | kati-solucan-gubresi-20-kg-cuval | 17 | 0 | %0 |
 | 3 | Leonardit - Organik Toprak Düzenleyici | 9 | 0 | %0 |
 | 4 | HasTürk Solucan Gübresi  | 9 | 0 | %0 |
 | 5 | HasTürk Sıvı Solucan Gübresi  | 2 | 0 | %0 |
