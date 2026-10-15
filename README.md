@@ -137,6 +137,22 @@ Puan = şimdi + ivme + 0,6 × sezon × teyit. Kullanıldığı yerler:
 
 Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collect="off"`.
 
+## Ak Bilge (tarım danışmanı)
+
+Ürün Bul penceresinde "Ak Bilge" sekmesi: müşteri gübre, toprak, tohum, saksı, pompa sorusunu yazar.
+
+1. Soru önce **hazır soru havuzunda** aranır (`src/akbilge-havuz.json`, ~1400 cevap). Bulunursa cevap anında ve ücretsizdir. Havuzdaki rakamlar yalnız doğrulanmış tablolardan gelir (`bilgi/`, kaynaklar `bilgi/DOGRULAMA.md`).
+2. Havuzda yoksa **Claude** (claude-opus-5-5, düşük düşünme seviyesi) en yakın havuz cevapları ve ilgili ürünlerle cevaplar; listede olmayan ürün ya da rakam veremez. Günlük sınır var.
+3. Cevap verilemezse WhatsApp / arama düğmesi çıkar (soru WhatsApp mesajına hazır yazılır).
+
+**Açma / deneme:** `config.json > akbilge.enabled` false iken sekme yalnız siteye `?akbilge=1` ile girene görünür (aynı tarayıcıda kalıcı; `?akbilge=0` kapatır). Herkese açmak için `"enabled": true`. İsim: `akbilge.name`. Ak Bilge açıkken penceredeki alttaki sabit WhatsApp/Ara çubuğu gizlenir (`"contactBar": true` ile yine gösterilir).
+
+**Cloudflare (hasturk-arama Worker → Settings → Variables and Secrets):** `ANTHROPIC_API_KEY` (Secret, zorunlu değil — yoksa yalnız havuz çalışır), `AK_DAILY_LIMIT` (günlük Claude sorgusu, varsayılan 150), `AK_AI=off` (Claude'u kapatır), `AK_MODEL`.
+
+**Havuzu güncellemek:** `node scripts/akbilge-kartlar.mjs && node scripts/akbilge-saksi.mjs && node scripts/akbilge-tohum.mjs && node scripts/akbilge-pompa.mjs && node scripts/akbilge-havuz.mjs` (ürün açıklamaları `docs/bilgi/` altında, "Bilgi bankası hammaddesi" iş akışı yeniler).
+
+**Kayıt:** Her soru veritabanına (D1 `ak_soru`) yazılır: soru, havuzdan mı Claude'dan mı cevaplandığı, cevap. Claude'un cevapları `onay-bekliyor` durumundadır; `onaylandi` yapılanlar bir sonraki aynı soruda havuzdan (ücretsiz) gelir. Kişisel veri (IP, çerez) tutulmaz.
+
 ## Hız
 Ölçüm düzeneği: yavaş 4G (1,6 Mbps, 150 ms) + 4 kat yavaş işlemci, banner'lı ağır ana sayfa, Next.js benzeri ürün sayfası.
 - **Açılış**: Ürün Bul butonu sayfanın gövdesi oluşur oluşmaz kurulur (birkaç ms); ikas'ın betiklerinin ve banner'ların bitmesi beklenmez (canlı sitede telefonda HTML'in hazır olması ~7 sn sürüyor). Menü verisi (`menu.json`, ~5 KB) hemen; ürün verisi (`products.json`, ~300 KB) bilgisayarda sayfa tamamen yüklendikten sonra boşta; **telefonda sadece müşteri Ürün Bul'a / menüye dokunduğu an** iner (Ürün Bul'u kullanmayan ziyaretçinin telefonu hiç yorulmaz; ilk aramada veri o an iner). Müşteri o sırada panel/menü açarsa yüksek öncelikli ikinci indirme başlar, hangisi önce biterse o kullanılır. Panel kapalıyken veri hazırlığı tarayıcı boşa çıkınca yapılır.

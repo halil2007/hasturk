@@ -126,7 +126,17 @@ for (const pl of (config.soilMatch || {}).plants || []) {
 for (const [slug, c] of Object.entries(oto)) {
   if (!bySlug.has(slug)) continue;
   const n = lc(c.ad).replace(/\s*\|.*$/, '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
-  let cevap = `${c.ad}${c.ozet ? ' — ' + c.ozet : ''}`;
+  // Özet ürün adıyla başlıyorsa ad tekrar edilmez ("X — X, ..." yerine "X — ...")
+  let oz = c.ozet || '';
+  const adSade = lc(c.ad).replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const a of [lc(c.ad), adSade]) if (a && lc(oz).startsWith(a)) { oz = oz.slice(a.length).replace(/^[\s,:;—–-]+/, ''); break; }
+  { // ad ölçüsüz yazılmışsa ("X Tohumu 5 Gr" / "X Tohumu, ...") baştaki ortak kelimeler atılır
+    const aw = adSade.split(' '), ow = oz.split(' '); let i = 0;
+    while (i < aw.length && i < ow.length && lc(ow[i]).replace(/[,:;]$/, '') === aw[i]) i++;
+    if (i >= 3 && i >= aw.length * 0.6) oz = ow.slice(i).join(' ').replace(/^[\s,:;—–-]+/, '');
+  }
+  if (oz && oz.length < 25) oz = '';
+  let cevap = `${c.ad}${oz ? ' — ' + oz.charAt(0).toLocaleUpperCase('tr-TR') + oz.slice(1) : ''}`;
   if (c.ph) cevap += `\n\npH: ${c.ph}`;
   if (c.icerik) cevap += `\n\n${c.icerik}`;
   const tu0 = toh.urunler[slug];
