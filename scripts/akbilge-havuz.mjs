@@ -215,6 +215,28 @@ for (const [key, t] of Object.entries(toh.turler)) {
   add({ tur: 'tohum', bitki: t.ad, sorular, cevap: `${t.ad} (${t.grup} sebzesi):\n${tohumMetin(t)}${t.gram ? `\n• 1 gramda yaklaşık ${t.gram[0].toLocaleString('tr-TR')}–${t.gram[1].toLocaleString('tr-TR')} tohum vardır.` : ''}${t.saklama ? `\n• Tohum saklama ömrü: yaklaşık ${t.saklama} yıl.` : ''}\n\n${tKaynak(t.k)}`,
     urunler: urunlerT.slice(0, 3), dinamik: 'stok', kaynak: `tohum:${key}` });
 }
+// G2) Ay ay "bu ay ne ekilir" (yalnız kaynakta ayı açıkça yazan türler)
+const AY = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık'];
+const AYB = (m) => AY[m - 1].charAt(0).toLocaleUpperCase('tr-TR') + AY[m - 1].slice(1);
+const ayHal = (m) => { const a = AY[m - 1]; return a + (/[aıou][^aeıioöuü]*$/.test(a) ? 'da' : 'de').replace(/^d/, /[çfhkpsşt]$/.test(a) ? 't' : 'd'); }; // ocakta, şubatta, martta, nisanda, ekimde…
+for (let m = 1; m <= 12; m++) {
+  const tohumL = [], dikimL = [], slugs = new Set();
+  for (const [key, t] of Object.entries(toh.turler)) for (const a of t.aylar || []) {
+    const ad = t.ad.replace(/\s*\(.*\)/, '');
+    if ((a.t || []).includes(m)) tohumL.push(`${ad}${a.not ? ' (' + a.not + ')' : ''}`);
+    if ((a.d || []).includes(m)) dikimL.push(`${ad}${a.not ? ' (' + a.not + ')' : ''}`);
+    if ((a.t || []).includes(m) || (a.d || []).includes(m)) Object.entries(toh.urunler).filter(([s2, u]) => u.tur === key && bySlug.has(s2) && bySlug.get(s2).st > 0).slice(0, 1).forEach(([s2]) => slugs.add(s2));
+  }
+  if (!tohumL.length && !dikimL.length) continue;
+  const ay = AY[m - 1], hal = ayHal(m);
+  let cevap = `${AYB(m)} ayında:`;
+  if (tohumL.length) cevap += `\n\nTohum ekimi:\n${tohumL.map((x) => '• ' + x).join('\n')}`;
+  if (dikimL.length) cevap += `\n\nFide dikimi:\n${dikimL.map((x) => '• ' + x).join('\n')}`;
+  cevap += `\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. "${(tohumL[0] || dikimL[0]).replace(/\s*\(.*\)/, '').toLocaleLowerCase('tr-TR')} nasıl ekilir").\n\n${tKaynak(['TG', 'BG', 'TK'])}`;
+  add({ tur: 'tohum-ay', ay: m, sorular: [`${ay} ayında ne ekilir`, `${hal} ne ekilir`, `${ay} ayında hangi sebzeler ekilir`, `${hal} hangi tohumlar ekilir`, `${hal} hangi sebzeler ekilir`, `${ay} ayında ne dikilir`, `${hal} hangi fideler dikilir`, `${ay} ayı ekim takvimi`],
+    cevap, urunler: [...slugs].slice(0, 3), dinamik: 'stok', kaynak: `tohum:ay:${m}` });
+}
+
 for (const [konu, sorular] of Object.entries({
   derinlik: ['tohum kaç cm derine ekilir', 'tohum ekim derinliği', 'tohum ne kadar derine gömülür', 'tohumu toprağa nasıl ekerim'],
   dogrudan: ['hangi sebzeler fide ile yetiştirilir', 'hangi tohumlar direkt ekilir', 'fide mi tohum mu', 'doğrudan tohum ekimi hangi sebzeler'],
@@ -267,4 +289,4 @@ await writeFile('src/akbilge-havuz.json', JSON.stringify(out.filter((e) => e.dur
   return o;
 })));
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel, pompa ${c('pompa')}+${c('pompa-genel')} genel, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel+${c('tohum-ay')} ay, pompa ${c('pompa')}+${c('pompa-genel')} genel, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);

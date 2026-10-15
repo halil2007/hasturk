@@ -737,14 +737,16 @@ function coPurchase(out, orders, config) {
     for (const [x, y] of [[a, b], [b, a]]) {
       if (demoted(y) && !demoted(x)) continue;
       if (!per.has(x)) per.set(x, []);
-      per.get(x).push({ s: y, score });
+      per.get(x).push({ s: y, score, cnt });
     }
   }
   let withX = 0;
   for (const p of out.items) {
     const l = per.get(p.s);
     if (!l) continue;
-    p.x = l.sort((a, b) => b.score - a.score || (a.s < b.s ? -1 : 1)).slice(0, CO_MAX).map((o) => o.s);
+    const top = l.sort((a, b) => b.score - a.score || (a.s < b.s ? -1 : 1)).slice(0, CO_MAX);
+    p.x = top.map((o) => o.s);
+    p.xn = top.map((o) => o.cnt); // kaç siparişte birlikte alındı (öneri kartında sosyal kanıt olarak gösterilir)
     withX++;
   }
   pairs.sort((a, b) => b.score - a.score || (a.a + a.b < b.a + b.b ? -1 : 1));

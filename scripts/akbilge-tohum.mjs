@@ -99,6 +99,24 @@ const GENEL = {
   sicak: 'Sıcak iklim sebzeleri (aylık ortalama 25–30 °C\'de en iyi gelişir, soğuğa hassastır): biber, bamya, domates, fasulye, hıyar, kavun, karpuz, kabak, patlıcan, mısır, patates.',
   k: ['BG', 'ABB'],
 };
+// Ay ay ekim/dikim (yalnız kaynakta ay açıkça yazanlar; "ılıman iklimde her mevsim" gibi genel ifadeler aya çevrilmez).
+// t: tohum ekimi, d: fide dikimi, not: bölge açıklaması
+const AYLAR = {
+  domates: [{ t: [3, 4], not: 'fide için, kapalı alanda' }, { d: [4, 5], not: 'fide dikimi; sıcak bölgelerde daha erken' }],
+  biber: [{ t: [3], not: 'fide için, kapalı alanda' }, { d: [4, 5], not: 'fide dikimi' }],
+  patlican: [{ t: [3], not: 'fide için, kapalı alanda' }, { d: [4, 5], not: 'fide dikimi' }],
+  kabak: [{ t: [4, 5], not: 'doğrudan yerine' }], balkabagi: [{ t: [4, 5], not: 'doğrudan yerine' }],
+  fasulye: [{ t: [4, 5, 6, 7, 8], not: 'doğrudan yerine' }],
+  bezelye: [{ t: [10, 11, 12], not: 'kışı ılık geçen bölgelerde' }, { t: [2, 3], not: 'kışı soğuk geçen bölgelerde' }],
+  lahana: [{ t: [7, 8], not: 'kışlık için fide' }],
+  havuc: [{ t: [3, 4], not: 'ana ekim dönemi' }],
+  turp: [{ t: [8, 9, 10, 11, 12, 1, 2, 3, 4, 5], not: 'fındık turpu, 15 gün arayla' }, { t: [7, 8], not: 'kışlık büyük turplar' }],
+  dereotu: [{ t: [3, 4] }],
+  roka: [{ t: [3, 4, 5, 6] }, { t: [9], not: 'serin bölgelerde ikinci ekim' }],
+  tere: [{ t: [3, 4, 5, 6] }, { t: [9], not: 'serin bölgelerde ikinci ekim' }],
+};
+for (const [k, v] of Object.entries(AYLAR)) TUR[k].aylar = v;
+
 // Ürün adı → tür (ilk eşleşen)
 const ESLE = [
   [/bal kaba/i, 'balkabagi'], [/kudret nar/i, null], [/domates/i, 'domates'], [/biber(?!iye)/i, 'biber'], [/patlıcan/i, 'patlican'],

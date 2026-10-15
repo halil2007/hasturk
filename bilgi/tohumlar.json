@@ -54,6 +54,22 @@
     "TG",
     "AU",
     "ABB"
+   ],
+   "aylar": [
+    {
+     "t": [
+      3,
+      4
+     ],
+     "not": "fide için, kapalı alanda"
+    },
+    {
+     "d": [
+      4,
+      5
+     ],
+     "not": "fide dikimi; sıcak bölgelerde daha erken"
+    }
    ]
   },
   "biber": {
@@ -76,6 +92,21 @@
     "TG",
     "AU",
     "ABB"
+   ],
+   "aylar": [
+    {
+     "t": [
+      3
+     ],
+     "not": "fide için, kapalı alanda"
+    },
+    {
+     "d": [
+      4,
+      5
+     ],
+     "not": "fide dikimi"
+    }
    ]
   },
   "patlican": {
@@ -98,6 +129,21 @@
     "TG",
     "AU",
     "ABB"
+   ],
+   "aylar": [
+    {
+     "t": [
+      3
+     ],
+     "not": "fide için, kapalı alanda"
+    },
+    {
+     "d": [
+      4,
+      5
+     ],
+     "not": "fide dikimi"
+    }
    ]
   },
   "hiyar": {
@@ -134,6 +180,15 @@
     "BG",
     "TG",
     "AU"
+   ],
+   "aylar": [
+    {
+     "t": [
+      4,
+      5
+     ],
+     "not": "doğrudan yerine"
+    }
    ]
   },
   "balkabagi": {
@@ -147,6 +202,15 @@
    "k": [
     "BG",
     "TG"
+   ],
+   "aylar": [
+    {
+     "t": [
+      4,
+      5
+     ],
+     "not": "doğrudan yerine"
+    }
    ]
   },
   "fasulye": {
@@ -167,6 +231,18 @@
     "BG",
     "TG",
     "AU"
+   ],
+   "aylar": [
+    {
+     "t": [
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "not": "doğrudan yerine"
+    }
    ]
   },
   "barbunya": {
@@ -200,6 +276,23 @@
    "k": [
     "BG",
     "AU"
+   ],
+   "aylar": [
+    {
+     "t": [
+      10,
+      11,
+      12
+     ],
+     "not": "kışı ılık geçen bölgelerde"
+    },
+    {
+     "t": [
+      2,
+      3
+     ],
+     "not": "kışı soğuk geçen bölgelerde"
+    }
    ]
   },
   "bamya": {
@@ -279,6 +372,15 @@
     "TG",
     "BG",
     "AU"
+   ],
+   "aylar": [
+    {
+     "t": [
+      7,
+      8
+     ],
+     "not": "kışlık için fide"
+    }
    ]
   },
   "havuc": {
@@ -300,6 +402,15 @@
     "BG",
     "TK",
     "ABB"
+   ],
+   "aylar": [
+    {
+     "t": [
+      3,
+      4
+     ],
+     "not": "ana ekim dönemi"
+    }
    ]
   },
   "turp": {
@@ -320,6 +431,30 @@
     "TK",
     "BG",
     "AU"
+   ],
+   "aylar": [
+    {
+     "t": [
+      8,
+      9,
+      10,
+      11,
+      12,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "not": "fındık turpu, 15 gün arayla"
+    },
+    {
+     "t": [
+      7,
+      8
+     ],
+     "not": "kışlık büyük turplar"
+    }
    ]
   },
   "maydanoz": {
@@ -350,6 +485,14 @@
    "mesafe": "Sıra arası 20–25 cm, sıra üzeri 2–4 cm (ya da serpme)",
    "k": [
     "TG"
+   ],
+   "aylar": [
+    {
+     "t": [
+      3,
+      4
+     ]
+    }
    ]
   },
   "roka": {
@@ -361,6 +504,22 @@
    "mesafe": "Sıra arası 15–20 cm, sıra üzeri 4–5 cm",
    "k": [
     "TG"
+   ],
+   "aylar": [
+    {
+     "t": [
+      3,
+      4,
+      5,
+      6
+     ]
+    },
+    {
+     "t": [
+      9
+     ],
+     "not": "serin bölgelerde ikinci ekim"
+    }
    ]
   },
   "tere": {
@@ -372,6 +531,22 @@
    "mesafe": "Sıra arası 15–20 cm, sıra üzeri 4–5 cm",
    "k": [
     "TG"
+   ],
+   "aylar": [
+    {
+     "t": [
+      3,
+      4,
+      5,
+      6
+     ]
+    },
+    {
+     "t": [
+      9
+     ],
+     "not": "serin bölgelerde ikinci ekim"
+    }
    ]
   },
   "pazi": {

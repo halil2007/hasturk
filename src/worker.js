@@ -7,7 +7,7 @@
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
 
-import { handle as akHandle } from './akbilge.js';
+import { handle as akHandle, populer as akPopuler } from './akbilge.js';
 
 const KINDS = {
   q: 'search',    // arama (sonuç bulundu)
@@ -160,6 +160,7 @@ export default {
     if (pathname === '/e' && req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' } });
     }
+    if (pathname === '/ak/populer') return akPopuler(env).catch(() => new Response('{"ok":false,"sorular":[]}', { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }));
     if (pathname === '/ak' && req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' } });
     }

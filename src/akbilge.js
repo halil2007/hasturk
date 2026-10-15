@@ -77,7 +77,11 @@ export function match(q, { extra = [], top = 5, product = null } = {}) {
 }
 // Havuzdan cevap verilecek kadar emin miyiz
 export const SURE = 0.72;
+const AYLAR = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık'];
+// "bu ay ne ekilir" → "ekim ayında ne ekilir" (Türkiye saatine göre bu ay)
+const buAy = (q) => q.replace(/\b(bu|şu an(ki)?|şimdiki) ay(ı|da|ında|ki)?\b/giu, AYLAR[new Date(Date.now() + 3 * 3600e3).getUTCMonth()] + ' ayında');
 export function poolAnswer(q, opts = {}) {
+  q = buAy(q);
   let r = match(q, opts);
   // Ürün sayfasındaysa ve soruda ürün adı yoksa ("bunu nasıl kullanırım", "kaç litre"), ürün adıyla birlikte de dene
   if (opts.productName && (!r[0] || r[0].sc < SURE)) {
@@ -172,6 +176,22 @@ async function approved(db) {
   const { results } = await db.prepare("SELECT id, q, cevap, urunler FROM ak_soru WHERE durum = 'onaylandi' ORDER BY id DESC LIMIT 2000").all();
   APPROVED = { t: Date.now(), list: results.map((r) => ({ i: 'o' + r.id, t: 'onayli', s: [r.q], c: r.cevap, u: JSON.parse(r.urunler || '[]') })) };
   return APPROVED.list;
+}
+
+// GET /ak/populer: son 30 günde havuzdan en çok cevaplanan sorular (öne çıkan sorular; en az 3 kez sorulmuş olmalı)
+let POP = { t: 0, list: [] };
+export async function populer(env) {
+  if (Date.now() - POP.t < 600000) return json({ ok: true, sorular: POP.list });
+  let list = [];
+  if (env.DB) {
+    await initDb(env.DB).catch(() => {});
+    const since = new Date(Date.now() - 30 * 864e5).toISOString();
+    const { results } = await env.DB.prepare("SELECT havuz, MAX(q) AS q, COUNT(*) AS n FROM ak_soru WHERE kaynak = 'havuz' AND ts >= ? GROUP BY havuz HAVING n >= 3 ORDER BY n DESC LIMIT 6")
+      .bind(since).all().catch(() => ({ results: [] }));
+    list = results.map((r) => String(r.q || '').slice(0, 80)).filter((q) => q.length >= 6);
+  }
+  POP = { t: Date.now(), list };
+  return json({ ok: true, sorular: list });
 }
 
 const today = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); // Türkiye saati

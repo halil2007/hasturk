@@ -570,6 +570,7 @@
     '.xs-i .tx b{display:block;font-size:12.5px;margin-top:2px;color:var(--prd)}',
     '.xs-i .add{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--pr);color:#fff;padding:0}.xs-i .add svg{width:17px;height:17px}',
     '.xs-i .add span{display:none}',
+    '.xsn{display:block;font-size:11px;font-weight:600;color:var(--ok);margin-top:1px;line-height:1.2}',
     '.soil{margin:12px 16px 0;padding:12px;border-radius:18px;background:#f1f8ec;border:1px solid #d9ead0}',
     '@media(min-width:760px){.soil{margin:14px 20px 0}}',
     '.so-h{display:flex;gap:10px;align-items:flex-start}.so-h>svg{width:22px;height:22px;flex:none;color:#3f7d4f;margin-top:1px}',
@@ -1193,7 +1194,7 @@
     if (!$ak) return;
     if (!AK.built) {
       var c = CFG.akbilge || {}, name = akName(), pg = akPage();
-      var samples = (c.samples || ['Domatese ne kadar solucan gübresi verilir?', 'Monstera için hangi toprak?', 'Biber ne zaman ekilir?', '17 cm saksıya ne kadar toprak gider?']).slice(0, 4);
+      var samples = akSamples();
       if (pg) samples.unshift(BY_SLUG[pg].n.replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() + ' nasıl kullanılır?');
       $ak.innerHTML = '<div class="akh"><img src="' + esc(akImg('avatar')) + '" alt="" width="64" height="64"><div><b>' + esc(name) + '</b><span>' +
         esc(c.subtitle || 'Gübre, toprak, tohum, saksı ve bitki bakımı sorularınızı cevaplarım.') + '</span></div>' +
@@ -1208,9 +1209,45 @@
         $akf.addEventListener('submit', function (e) { e.preventDefault(); var inp = $akf.querySelector('input'); var v = inp.value; inp.value = ''; akAsk(v); });
       }
       AK.built = true;
-      if (!DATA) load().then(akRenderLog, function () {});
+      akLoadPop();
+      if (!DATA) load().then(function () { if (!AK.log.length) { AK.built = false; akBuild(); } else akRenderLog(); }, function () {});
     }
     akRenderLog();
+  }
+  // Öne çıkan sorular (rastgele değil): 1) müşterilerin Ak Bilge'ye en çok sorduğu sorular (sunucu, son 30 gün),
+  // 2) bu ayın ekim sorusu, 3) en çok satan ürünün kullanımı, 4) şu an yükselen (sezonu gelen) tohum, 5) en çok aranan bitki.
+  // config.json > akbilge.samples doluysa o liste kullanılır.
+  var AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  function akKisa(n) { return String(n || '').replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/^(has ?türk|hg|altınvadi|arzuman|uzman)\s+/i, '').replace(/\s+\d+([.,]\d+)?\s*(gr|g|kg|lt|l|ml|adet)\b.*$/i, '').replace(/\s+/g, ' ').trim(); }
+  function akSamples() {
+    var c = CFG.akbilge || {}, out = [], add = function (q) { if (q && out.length < 4 && out.indexOf(q) === -1) out.push(q); };
+    if (c.samples && c.samples.length) return c.samples.slice(0, 4);
+    (AK.pop || []).slice(0, 2).forEach(function (q) { add(q.charAt(0).toLocaleUpperCase('tr-TR') + q.slice(1) + (/[?]$/.test(q) ? '' : '?')); });
+    add(AYLAR[new Date().getMonth()] + ' ayında ne ekilir?');
+    if (DATA) {
+      var tr = DATA.trend || {}, ok = function (s) { var x = BY_SLUG[s]; return x && x.st ? x : null; };
+      var best = (tr.best || []).map(ok).filter(Boolean)[0];
+      if (best) add(akKisa(best.n) + ' nasıl kullanılır?');
+      var seed = (tr.rising || []).map(ok).filter(function (x) { return x && /tohum/i.test(x.n) && !/çim/i.test(x.n); })[0];
+      if (seed) add(akKisa(seed.n).replace(/\s*tohumu.*$/i, '') + ' tohumu nasıl ekilir?');
+      for (var i = 0; i < (tr.q || []).length && out.length < 4; i++) { var pl = plantFor(fold(tr.q[i])); if (pl) add(pl.n + ' için hangi gübre?'); }
+    }
+    ['Domatese ne kadar solucan gübresi verilir?', 'Monstera için hangi toprak?', '17 cm saksıya ne kadar toprak gider?'].forEach(add);
+    return out;
+  }
+  function akLoadPop() {
+    if (AK.popAsked || !AK_URL) return;
+    AK.popAsked = true;
+    fetch(AK_URL.replace(/\/ak(\?|$)/, '/ak/populer$1')).then(function (r) { return r.json(); }).then(function (d) {
+      var l = (d && d.sorular) || [];
+      if (l.length < 2) return;
+      AK.pop = l;
+      var box = root.querySelector('.akchips'), pg = akPage();
+      if (!box || AK.log.length) return;
+      var samples = akSamples();
+      if (pg) samples.unshift(BY_SLUG[pg].n.replace(/\s*\|.*$/, '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim() + ' nasıl kullanılır?');
+      box.innerHTML = samples.slice(0, 5).map(function (x) { return '<button type="button" data-act="akq" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('');
+    }, function () {});
   }
   function akAsk(q) {
     q = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 300);
@@ -1414,9 +1451,24 @@
     return out;
   }
   // Önce gerçek siparişlerde birlikte alınanlar (sync: p.x), yetmezse config.json > crossSell kuralları
+  // Seçim (alışveriş psikolojisi araştırmalarına göre): en fazla 2 öneri (az ve ilgili seçenek karar vermeyi kolaylaştırır);
+  // gerçek sipariş sayısı gösterilir ("N siparişte birlikte alındı": satın alma sayısı güven verir, görüntülenme sayısı vermez);
+  // sepet ücretsiz kargo sınırının az altındaysa sınırı geçiren ürün öne alınır; eşit durumda sezonu gelen ürün önce gelir.
   function crossFor(p) {
     var chain = catChain(p), picked = [], bySlug = BY_SLUG, ok = function (x) { return x && x.st && x.id !== p.id && !ADDED[x.id] && picked.indexOf(x) === -1; };
-    (p.x || []).forEach(function (s) { if (picked.length < 2 && ok(bySlug[s])) picked.push(bySlug[s]); });
+    var tr = DATA.trend || {}, season = (tr.season && tr.season.length ? tr.season : tr.rising) || [], lim = shipLimit(), gap = lim && CART != null && CART < lim ? lim - CART : 0;
+    var cand = [];
+    (p.x || []).forEach(function (s, i) { var x = bySlug[s]; if (ok(x)) cand.push({ x: x, n: (p.xn || [])[i] || 0, i: i }); });
+    // Sezonu gelen ürün en fazla bir sıra öne geçer (birlikte alınma sırası esas kalır)
+    var key = function (c) { return c.i - (season.indexOf(c.x.s) !== -1 ? 1.5 : 0); };
+    cand.sort(function (a, b) { return key(a) - key(b); });
+    // Kargo: sınıra 300 TL'den az kaldıysa, aradaki farkı kapatan en ucuz öneri ilk sıraya
+    if (gap > 0 && gap <= 300) {
+      var closer = cand.filter(function (c) { var pr = price(c.x); return pr != null && pr >= gap; })
+        .sort(function (a, b) { return price(a.x) - price(b.x); })[0];
+      if (closer && price(closer.x) <= gap * 3) { cand.splice(cand.indexOf(closer), 1); cand.unshift(closer); closer.ship = true; }
+    }
+    cand.slice(0, 2).forEach(function (c) { c.x.xsNote = c.ship ? 'Bununla kargonuz ücretsiz' : c.n >= 3 ? c.n + ' siparişte birlikte alındı' : ''; picked.push(c.x); });
     picked.fromData = picked.length;
     (CFG.crossSell || []).forEach(function (r) {
       if (!(r.when || []).some(function (n) { return chain.indexOf(fold(n)) !== -1; })) return;
@@ -1429,7 +1481,7 @@
         } else if (bySlug[o]) cands = [bySlug[o]];
         for (var i = 0; i < cands.length; i++) {
           var x = cands[i];
-          if (ok(x)) { picked.push(x); break; }
+          if (ok(x)) { x.xsNote = ''; picked.push(x); break; }
         }
       });
     });
@@ -1460,7 +1512,7 @@
       '<div class="xs-h">' + (list.fromData ? 'Bunu alanlar bunları da aldı' : 'Yanına iyi gider') + '</div><div class="xs-l">' + list.map(function (x) {
         var href = esc(url(x.s));
         return '<div class="xs-i">' + thumb(x.img, 180) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
-          (price(x) != null ? '<b>' + (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) + '</b>' : '') + '</div>' +
+          (price(x) != null ? '<b>' + (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) + '</b>' : '') + (x.xsNote ? '<small class="xsn">' + esc(x.xsNote) + '</small>' : '') + '</div>' +
           '<button class="add" type="button" data-act="add" data-xs="1" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button></div>';
       }).join('') + '</div>';
     el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
@@ -1870,7 +1922,7 @@
         '<button type="button" data-act="sxsx" aria-label="Kapat">' + I.x + '</button></div>' + list.map(function (x) {
           var multi = (x.v || []).filter(function (v) { return v.id; }).length > 1, href = esc(url(x.s));
           return '<div class="sxs-i">' + thumb(x.img, 120) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
-            (price(x) != null ? '<b>' + (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) + '</b>' : '') + '</div>' +
+            (price(x) != null ? '<b>' + (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) + '</b>' : '') + (x.xsNote ? '<small class="xsn">' + esc(x.xsNote) + '</small>' : '') + '</div>' +
             (multi ? '<a class="add" href="' + href + '">İncele</a>'
               : '<button class="add" type="button" data-act="add" data-xs="1" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button>') + '</div>';
         }).join('');

@@ -1,7 +1,7 @@
 {
  "_aciklama": "Ak Bilge soru havuzu. durum: hazir = canlıda kullanılır (doğrulanmış tablolar ve ürün bilgisi). Rakamlar yalnız doğrulanmış tablolardan.",
  "surum": 1,
- "kayit": 1379,
+ "kayit": 1391,
  "havuz": [
   {
    "id": "h0001",
@@ -31926,6 +31926,288 @@
   {
    "id": "h1348",
    "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 1,
+   "sorular": [
+    "ocak ayında ne ekilir",
+    "ocakta ne ekilir",
+    "ocak ayında hangi sebzeler ekilir",
+    "ocakta hangi tohumlar ekilir",
+    "ocakta hangi sebzeler ekilir",
+    "ocak ayında ne dikilir",
+    "ocakta hangi fideler dikilir",
+    "ocak ayı ekim takvimi"
+   ],
+   "cevap": "Ocak ayında:\n\nTohum ekimi:\n• Turp (fındık turpu, 15 gün arayla)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"turp nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:1"
+  },
+  {
+   "id": "h1349",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 2,
+   "sorular": [
+    "şubat ayında ne ekilir",
+    "şubatta ne ekilir",
+    "şubat ayında hangi sebzeler ekilir",
+    "şubatta hangi tohumlar ekilir",
+    "şubatta hangi sebzeler ekilir",
+    "şubat ayında ne dikilir",
+    "şubatta hangi fideler dikilir",
+    "şubat ayı ekim takvimi"
+   ],
+   "cevap": "Şubat ayında:\n\nTohum ekimi:\n• Bezelye (kışı soğuk geçen bölgelerde)\n• Turp (fındık turpu, 15 gün arayla)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"bezelye nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-bezelye-tohumu-25-gr",
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:2"
+  },
+  {
+   "id": "h1350",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 3,
+   "sorular": [
+    "mart ayında ne ekilir",
+    "martta ne ekilir",
+    "mart ayında hangi sebzeler ekilir",
+    "martta hangi tohumlar ekilir",
+    "martta hangi sebzeler ekilir",
+    "mart ayında ne dikilir",
+    "martta hangi fideler dikilir",
+    "mart ayı ekim takvimi"
+   ],
+   "cevap": "Mart ayında:\n\nTohum ekimi:\n• Domates (fide için, kapalı alanda)\n• Biber (fide için, kapalı alanda)\n• Patlıcan (fide için, kapalı alanda)\n• Bezelye (kışı soğuk geçen bölgelerde)\n• Havuç (ana ekim dönemi)\n• Turp (fındık turpu, 15 gün arayla)\n• Dereotu\n• Roka\n• Tere\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"domates nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-koy-tipi-domates-tohumu-5-gr",
+    "altinvadi-dolma-biber-tohumu-10-gr",
+    "altinvadi-patlican-tohumu-aydin-siyahi-10-gr"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:3"
+  },
+  {
+   "id": "h1351",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 4,
+   "sorular": [
+    "nisan ayında ne ekilir",
+    "nisanda ne ekilir",
+    "nisan ayında hangi sebzeler ekilir",
+    "nisanda hangi tohumlar ekilir",
+    "nisanda hangi sebzeler ekilir",
+    "nisan ayında ne dikilir",
+    "nisanda hangi fideler dikilir",
+    "nisan ayı ekim takvimi"
+   ],
+   "cevap": "Nisan ayında:\n\nTohum ekimi:\n• Domates (fide için, kapalı alanda)\n• Kabak (doğrudan yerine)\n• Bal kabağı (doğrudan yerine)\n• Fasulye (doğrudan yerine)\n• Havuç (ana ekim dönemi)\n• Turp (fındık turpu, 15 gün arayla)\n• Dereotu\n• Roka\n• Tere\n\nFide dikimi:\n• Domates (fide dikimi; sıcak bölgelerde daha erken)\n• Biber (fide dikimi)\n• Patlıcan (fide dikimi)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"domates nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-koy-tipi-domates-tohumu-5-gr",
+    "altinvadi-dolma-biber-tohumu-10-gr",
+    "altinvadi-patlican-tohumu-aydin-siyahi-10-gr"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:4"
+  },
+  {
+   "id": "h1352",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 5,
+   "sorular": [
+    "mayıs ayında ne ekilir",
+    "mayısta ne ekilir",
+    "mayıs ayında hangi sebzeler ekilir",
+    "mayısta hangi tohumlar ekilir",
+    "mayısta hangi sebzeler ekilir",
+    "mayıs ayında ne dikilir",
+    "mayısta hangi fideler dikilir",
+    "mayıs ayı ekim takvimi"
+   ],
+   "cevap": "Mayıs ayında:\n\nTohum ekimi:\n• Kabak (doğrudan yerine)\n• Bal kabağı (doğrudan yerine)\n• Fasulye (doğrudan yerine)\n• Turp (fındık turpu, 15 gün arayla)\n• Roka\n• Tere\n\nFide dikimi:\n• Domates (fide dikimi; sıcak bölgelerde daha erken)\n• Biber (fide dikimi)\n• Patlıcan (fide dikimi)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"kabak nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-koy-tipi-domates-tohumu-5-gr",
+    "altinvadi-dolma-biber-tohumu-10-gr",
+    "altinvadi-patlican-tohumu-aydin-siyahi-10-gr"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:5"
+  },
+  {
+   "id": "h1353",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 6,
+   "sorular": [
+    "haziran ayında ne ekilir",
+    "haziranda ne ekilir",
+    "haziran ayında hangi sebzeler ekilir",
+    "haziranda hangi tohumlar ekilir",
+    "haziranda hangi sebzeler ekilir",
+    "haziran ayında ne dikilir",
+    "haziranda hangi fideler dikilir",
+    "haziran ayı ekim takvimi"
+   ],
+   "cevap": "Haziran ayında:\n\nTohum ekimi:\n• Fasulye (doğrudan yerine)\n• Roka\n• Tere\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"fasulye nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "arzuman-fasulye-tohumu-kevser-sarikiz-tipi-50-gr",
+    "altinvadi-roka-tohumu-toros-iri-yaprak",
+    "altinvadi-tere-tohumu-10-gr"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:6"
+  },
+  {
+   "id": "h1354",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 7,
+   "sorular": [
+    "temmuz ayında ne ekilir",
+    "temmuzda ne ekilir",
+    "temmuz ayında hangi sebzeler ekilir",
+    "temmuzda hangi tohumlar ekilir",
+    "temmuzda hangi sebzeler ekilir",
+    "temmuz ayında ne dikilir",
+    "temmuzda hangi fideler dikilir",
+    "temmuz ayı ekim takvimi"
+   ],
+   "cevap": "Temmuz ayında:\n\nTohum ekimi:\n• Fasulye (doğrudan yerine)\n• Lahana (kışlık için fide)\n• Turp (kışlık büyük turplar)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"fasulye nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "arzuman-fasulye-tohumu-kevser-sarikiz-tipi-50-gr",
+    "altinvadi-beyaz-lahana-tohumu",
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:7"
+  },
+  {
+   "id": "h1355",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 8,
+   "sorular": [
+    "ağustos ayında ne ekilir",
+    "ağustosta ne ekilir",
+    "ağustos ayında hangi sebzeler ekilir",
+    "ağustosta hangi tohumlar ekilir",
+    "ağustosta hangi sebzeler ekilir",
+    "ağustos ayında ne dikilir",
+    "ağustosta hangi fideler dikilir",
+    "ağustos ayı ekim takvimi"
+   ],
+   "cevap": "Ağustos ayında:\n\nTohum ekimi:\n• Fasulye (doğrudan yerine)\n• Lahana (kışlık için fide)\n• Turp (fındık turpu, 15 gün arayla)\n• Turp (kışlık büyük turplar)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"fasulye nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "arzuman-fasulye-tohumu-kevser-sarikiz-tipi-50-gr",
+    "altinvadi-beyaz-lahana-tohumu",
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:8"
+  },
+  {
+   "id": "h1356",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 9,
+   "sorular": [
+    "eylül ayında ne ekilir",
+    "eylülde ne ekilir",
+    "eylül ayında hangi sebzeler ekilir",
+    "eylülde hangi tohumlar ekilir",
+    "eylülde hangi sebzeler ekilir",
+    "eylül ayında ne dikilir",
+    "eylülde hangi fideler dikilir",
+    "eylül ayı ekim takvimi"
+   ],
+   "cevap": "Eylül ayında:\n\nTohum ekimi:\n• Turp (fındık turpu, 15 gün arayla)\n• Roka (serin bölgelerde ikinci ekim)\n• Tere (serin bölgelerde ikinci ekim)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"turp nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi",
+    "altinvadi-roka-tohumu-toros-iri-yaprak",
+    "altinvadi-tere-tohumu-10-gr"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:9"
+  },
+  {
+   "id": "h1357",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 10,
+   "sorular": [
+    "ekim ayında ne ekilir",
+    "ekimde ne ekilir",
+    "ekim ayında hangi sebzeler ekilir",
+    "ekimde hangi tohumlar ekilir",
+    "ekimde hangi sebzeler ekilir",
+    "ekim ayında ne dikilir",
+    "ekimde hangi fideler dikilir",
+    "ekim ayı ekim takvimi"
+   ],
+   "cevap": "Ekim ayında:\n\nTohum ekimi:\n• Bezelye (kışı ılık geçen bölgelerde)\n• Turp (fındık turpu, 15 gün arayla)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"bezelye nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-bezelye-tohumu-25-gr",
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:10"
+  },
+  {
+   "id": "h1358",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 11,
+   "sorular": [
+    "kasım ayında ne ekilir",
+    "kasımda ne ekilir",
+    "kasım ayında hangi sebzeler ekilir",
+    "kasımda hangi tohumlar ekilir",
+    "kasımda hangi sebzeler ekilir",
+    "kasım ayında ne dikilir",
+    "kasımda hangi fideler dikilir",
+    "kasım ayı ekim takvimi"
+   ],
+   "cevap": "Kasım ayında:\n\nTohum ekimi:\n• Bezelye (kışı ılık geçen bölgelerde)\n• Turp (fındık turpu, 15 gün arayla)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"bezelye nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-bezelye-tohumu-25-gr",
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:11"
+  },
+  {
+   "id": "h1359",
+   "durum": "hazir",
+   "tur": "tohum-ay",
+   "ay": 12,
+   "sorular": [
+    "aralık ayında ne ekilir",
+    "aralıkta ne ekilir",
+    "aralık ayında hangi sebzeler ekilir",
+    "aralıkta hangi tohumlar ekilir",
+    "aralıkta hangi sebzeler ekilir",
+    "aralık ayında ne dikilir",
+    "aralıkta hangi fideler dikilir",
+    "aralık ayı ekim takvimi"
+   ],
+   "cevap": "Aralık ayında:\n\nTohum ekimi:\n• Bezelye (kışı ılık geçen bölgelerde)\n• Turp (fındık turpu, 15 gün arayla)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"bezelye nasıl ekilir\").\n\nKaynak: TİGEM – Mirasımız Yerel Tohum: yerel tohum yetiştirme yöntemleri; Atalık Tohumlar için Yetiştirici Rehberi; Tarım Kütüphanesi – Kökü yenen sebzeler",
+   "urunler": [
+    "altinvadi-bezelye-tohumu-25-gr",
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+   ],
+   "dinamik": "stok",
+   "kaynak": "tohum:ay:12"
+  },
+  {
+   "id": "h1360",
+   "durum": "hazir",
    "tur": "tohum-genel",
    "konu": "derinlik",
    "sorular": [
@@ -31939,7 +32221,7 @@
    "kaynak": "tohum:genel:derinlik"
   },
   {
-   "id": "h1349",
+   "id": "h1361",
    "durum": "hazir",
    "tur": "tohum-genel",
    "konu": "dogrudan",
@@ -31954,7 +32236,7 @@
    "kaynak": "tohum:genel:dogrudan"
   },
   {
-   "id": "h1350",
+   "id": "h1362",
    "durum": "hazir",
    "tur": "tohum-genel",
    "konu": "serin",
@@ -31969,7 +32251,7 @@
    "kaynak": "tohum:genel:serin"
   },
   {
-   "id": "h1351",
+   "id": "h1363",
    "durum": "hazir",
    "tur": "tohum-genel",
    "konu": "sicak",
@@ -31984,7 +32266,7 @@
    "kaynak": "tohum:genel:sicak"
   },
   {
-   "id": "h1352",
+   "id": "h1364",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "delta-10-lt-basincli-ilaclama-pompasi-k-83",
@@ -32021,7 +32303,7 @@
    "kaynak": "pompa:delta-10-lt-basincli-ilaclama-pompasi-k-83"
   },
   {
-   "id": "h1353",
+   "id": "h1365",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "delta-16-lt-manuel-ilaclama-pompasi-k-203",
@@ -32058,7 +32340,7 @@
    "kaynak": "pompa:delta-16-lt-manuel-ilaclama-pompasi-k-203"
   },
   {
-   "id": "h1354",
+   "id": "h1366",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "delta-2-lt-ilaclama-pompasi",
@@ -32095,7 +32377,7 @@
    "kaynak": "pompa:delta-2-lt-ilaclama-pompasi"
   },
   {
-   "id": "h1355",
+   "id": "h1367",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "delta-20-lt-manuel-ilaclama-pompasi-k-205",
@@ -32132,7 +32414,7 @@
    "kaynak": "pompa:delta-20-lt-manuel-ilaclama-pompasi-k-205"
   },
   {
-   "id": "h1356",
+   "id": "h1368",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "delta-5-lt-basincli-ilaclama-pompasi-k-81",
@@ -32169,7 +32451,7 @@
    "kaynak": "pompa:delta-5-lt-basincli-ilaclama-pompasi-k-81"
   },
   {
-   "id": "h1357",
+   "id": "h1369",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "litolan-es-2-2-l-sarjli-elektrikli-puskurtucu",
@@ -32199,7 +32481,7 @@
    "kaynak": "pompa:litolan-es-2-2-l-sarjli-elektrikli-puskurtucu"
   },
   {
-   "id": "h1358",
+   "id": "h1370",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "litolan-10-lt-akulu-ilaclama-pompasi",
@@ -32228,7 +32510,7 @@
    "kaynak": "pompa:litolan-10-lt-akulu-ilaclama-pompasi"
   },
   {
-   "id": "h1359",
+   "id": "h1371",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "litolan-16-lt-akulu-ilaclama-pompasi",
@@ -32257,7 +32539,7 @@
    "kaynak": "pompa:litolan-16-lt-akulu-ilaclama-pompasi"
   },
   {
-   "id": "h1360",
+   "id": "h1372",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "litolan-8-lt-akulu-ilaclama-pompasi",
@@ -32286,7 +32568,7 @@
    "kaynak": "pompa:litolan-8-lt-akulu-ilaclama-pompasi"
   },
   {
-   "id": "h1361",
+   "id": "h1373",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "pomsan-20-lt-manuel-ilaclama-pompasi-k-305",
@@ -32323,7 +32605,7 @@
    "kaynak": "pompa:pomsan-20-lt-manuel-ilaclama-pompasi-k-305"
   },
   {
-   "id": "h1362",
+   "id": "h1374",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-05-lt-basincli-sprey-puskurtucu-k-4",
@@ -32352,7 +32634,7 @@
    "kaynak": "pompa:uzman-05-lt-basincli-sprey-puskurtucu-k-4"
   },
   {
-   "id": "h1363",
+   "id": "h1375",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-1-lt-basincli-sprey-puskurtucu-k-5",
@@ -32381,7 +32663,7 @@
    "kaynak": "pompa:uzman-1-lt-basincli-sprey-puskurtucu-k-5"
   },
   {
-   "id": "h1364",
+   "id": "h1376",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-10-lt-basincli-ilaclama-pompasi-k-73",
@@ -32410,7 +32692,7 @@
    "kaynak": "pompa:uzman-10-lt-basincli-ilaclama-pompasi-k-73"
   },
   {
-   "id": "h1365",
+   "id": "h1377",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-16-lt-sarjli-ilaclama-pompasi-usr-403",
@@ -32439,7 +32721,7 @@
    "kaynak": "pompa:uzman-16-lt-sarjli-ilaclama-pompasi-usr-403"
   },
   {
-   "id": "h1366",
+   "id": "h1378",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-16-lt-manuel-ilaclama-pompasi-k-103",
@@ -32476,7 +32758,7 @@
    "kaynak": "pompa:uzman-16-lt-manuel-ilaclama-pompasi-k-103"
   },
   {
-   "id": "h1367",
+   "id": "h1379",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-2-lt-basincli-el-puskurtucu",
@@ -32513,7 +32795,7 @@
    "kaynak": "pompa:uzman-2-lt-basincli-el-puskurtucu"
   },
   {
-   "id": "h1368",
+   "id": "h1380",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-2-lt-ilaclama-pompasi",
@@ -32544,7 +32826,7 @@
    "kaynak": "pompa:uzman-2-lt-ilaclama-pompasi"
   },
   {
-   "id": "h1369",
+   "id": "h1381",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-2-lt-metal-uclu-ilaclama-pompasi-k-61",
@@ -32582,7 +32864,7 @@
    "kaynak": "pompa:uzman-2-lt-metal-uclu-ilaclama-pompasi-k-61"
   },
   {
-   "id": "h1370",
+   "id": "h1382",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-20-lt-manuel-ilaclama-pompasi-k-105",
@@ -32619,7 +32901,7 @@
    "kaynak": "pompa:uzman-20-lt-manuel-ilaclama-pompasi-k-105"
   },
   {
-   "id": "h1371",
+   "id": "h1383",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-5-lt-basincli-ilaclama-pompasi-k-71",
@@ -32648,7 +32930,7 @@
    "kaynak": "pompa:uzman-5-lt-basincli-ilaclama-pompasi-k-71"
   },
   {
-   "id": "h1372",
+   "id": "h1384",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-lityum-akulu-ilaclama-pompasi-5-lt",
@@ -32677,7 +32959,7 @@
    "kaynak": "pompa:uzman-lityum-akulu-ilaclama-pompasi-5-lt"
   },
   {
-   "id": "h1373",
+   "id": "h1385",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "uzman-lityum-akulu-ilaclama-pompasi-8-lt",
@@ -32706,7 +32988,7 @@
    "kaynak": "pompa:uzman-lityum-akulu-ilaclama-pompasi-8-lt"
   },
   {
-   "id": "h1374",
+   "id": "h1386",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "ilposan-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi",
@@ -32743,7 +33025,7 @@
    "kaynak": "pompa:ilposan-16-lt-akulu-sarjli-sirt-pulverizatoru-ilaclama-pompasi"
   },
   {
-   "id": "h1375",
+   "id": "h1387",
    "durum": "hazir",
    "tur": "pompa",
    "urun": "ilposan-power-16-litre-akulu-ilaclama-pompasi",
@@ -32780,7 +33062,7 @@
    "kaynak": "pompa:ilposan-power-16-litre-akulu-ilaclama-pompasi"
   },
   {
-   "id": "h1376",
+   "id": "h1388",
    "durum": "hazir",
    "tur": "pompa-genel",
    "konu": "garanti",
@@ -32796,7 +33078,7 @@
    "kaynak": "pompa:garanti"
   },
   {
-   "id": "h1377",
+   "id": "h1389",
    "durum": "hazir",
    "tur": "pompa-genel",
    "konu": "akulu-manuel",
@@ -32816,7 +33098,7 @@
    "kaynak": "pompa:karsilastirma"
   },
   {
-   "id": "h1378",
+   "id": "h1390",
    "durum": "hazir",
    "tur": "pompa-genel",
    "konu": "sarj",
@@ -32837,7 +33119,7 @@
    "kaynak": "pompa:sarj"
   },
   {
-   "id": "h1379",
+   "id": "h1391",
    "durum": "hazir",
    "tur": "magaza",
    "sorular": [
