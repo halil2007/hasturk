@@ -145,7 +145,7 @@ Kapatmak: `"analytics": false` (config.json) ya da script etiketine `data-collec
 2. Havuzda yoksa **Claude** (claude-opus-5-5, düşük düşünme seviyesi) en yakın havuz cevapları ve ilgili ürünlerle cevaplar; listede olmayan ürün ya da rakam veremez. Günlük sınır var.
 3. Cevap verilemezse WhatsApp / arama düğmesi çıkar (soru WhatsApp mesajına hazır yazılır).
 
-**Açma / deneme:** `config.json > akbilge.enabled` false iken sekme yalnız siteye `?akbilge=1` ile girene görünür (aynı tarayıcıda kalıcı; `?akbilge=0` kapatır). Herkese açmak için `"enabled": true`. İsim: `akbilge.name`. Ak Bilge açıkken penceredeki alttaki sabit WhatsApp/Ara çubuğu gizlenir (`"contactBar": true` ile yine gösterilir).
+**Açma / deneme:** `config.json > akbilge.enabled` false iken sekme yalnız siteye `?akbilge=1` ile girene görünür (aynı tarayıcıda kalıcı; `?akbilge=0` kapatır). Herkese açmak için `"enabled": true`. İsim: `akbilge.name`. Ak Bilge açıkken penceredeki alttaki sabit WhatsApp/Ara çubuğu gizlenir (`"contactBar": true` ile yine gösterilir). Ak Bilge ayrıca Ürün Bul'un karşı köşesinde (sol alt) kendi butonuyla durur: "Ak Bilge'ye sor" (maskot avatarıyla); tıklanınca pencere doğrudan Ak Bilge sekmesinde açılır, sepet/ödeme sayfalarında gizlenir, alttaki sabit çubukların üstüne çıkar. `akbilge.fab: false` ya da script'te `data-akfab="off"` kapatır; `akbilge.fab: { "text": "…" }` yazıyı değiştirir.
 
 **Cloudflare (hasturk-arama Worker → Settings → Variables and Secrets):** `ANTHROPIC_API_KEY` (Secret, zorunlu değil — yoksa yalnız havuz çalışır), `AK_DAILY_LIMIT` (günlük Claude sorgusu, varsayılan 150), `AK_AI=off` (Claude'u kapatır), `AK_MODEL`.
 

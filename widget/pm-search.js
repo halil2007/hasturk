@@ -8,6 +8,7 @@
  *   data-site      ikinci mağaza klasörü (örn. "tarim" → tarim/products.json, tarim/menu.json; kendi ürün ve renkleri)
  *   data-store     mağaza adresi (varsayılan: bulunulan site)
  *   data-fab       "off" → sağ alttaki "Ürün Bul" butonunu gösterme
+ *   data-akfab     "off" → sol alttaki "Ak Bilge'ye sor" butonunu gösterme (Ak Bilge yine Ürün Bul içinde)
  *   data-auto      "off" → sitedeki arama butonlarını otomatik tanıma
  */
 (function () {
@@ -438,6 +439,15 @@
     '.fab:hover{transform:translateY(-2px)}',
     '.fab.hide{opacity:0;pointer-events:none;transform:translateY(12px)}',
     '@media(max-width:759px){.fab{right:14px;height:50px}.fab.left{left:14px}}',
+    /* Ak Bilge butonu: Ürün Bul'un karşı köşesinde (varsayılan sol alt), beyaz zeminli, maskot avatarıyla */
+    '.fab.akfab{right:auto;left:20px;background:#fff;color:var(--pr);border:1px solid var(--ln);padding:0 18px 0 6px;box-shadow:0 10px 28px rgba(7,50,64,.22)}',
+    '.fab.akfab::before{border-color:var(--pr);animation-delay:1.4s}',
+    '.fab.akfab .gl::after{background:linear-gradient(100deg,transparent,rgba(11,93,115,.12),transparent)}',
+    '.fab.akfab .fi{width:40px;height:40px;background:var(--soft);overflow:hidden}',
+    '.fab.akfab .fi img{width:40px;height:40px;object-fit:cover;display:block}',
+    '.fab.akfab.right{left:auto;right:20px}',
+    '.fab.akfab.mini{padding:0 6px}',
+    '@media(max-width:759px){.fab.akfab{left:14px}.fab.akfab.right{left:auto;right:14px}}',
 
     /* Panel */
     '.ov{position:fixed;inset:0;z-index:2147483000;display:none;background:rgba(10,24,32,.5)}',
@@ -949,7 +959,7 @@
     '}'
   ].join('\n');
 
-  var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $sheet, $toast;
+  var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $akfab, $sheet, $toast;
   var $guide, GID = null, $ak, $akf;
   var isOpen = false, sel = -1, pushed = false;
   var catOpen = false, onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home', VSTACK = [];
@@ -969,6 +979,7 @@
     root.innerHTML =
       '<style>' + CSS + '</style><div class="root">' +
       '<button class="fab hide" type="button" aria-label="Ürün bul"><span class="gl"></span><span class="fi">' + I.search + '</span><span class="t">Ürün Bul</span></button>' +
+      '<button class="fab akfab hide" type="button" aria-label="Ak Bilge\'ye sor"><span class="gl"></span><span class="fi"></span><span class="t">Ak Bilge\'ye sor</span></button>' +
       '<div class="ptoast" role="status"></div>' +
       '<div class="sxs" role="dialog" aria-label="Birlikte alınan ürünler"></div>' +
       '<div class="ov"><div class="panel" role="dialog" aria-modal="true" aria-label="Ürün arama">' +
@@ -995,6 +1006,7 @@
     if (document.readyState !== 'complete') window.addEventListener('load', setFont);
     $wrap = root.querySelector('.root');
     $fab = root.querySelector('.fab');
+    $akfab = root.querySelector('.akfab');
     $ov = root.querySelector('.ov');
     $panel = root.querySelector('.panel');
     $q = root.querySelector('.top input');
@@ -1020,6 +1032,7 @@
     $q.addEventListener('input', function () { shown = PAGE; render(); });
     $q.addEventListener('keydown', onKey);
     $fab.addEventListener('click', function () { open(); });
+    $akfab.addEventListener('click', function () { open(undefined, 'ak'); });
     $ov.addEventListener('click', function (e) { if (e.target === $ov) close(); });
     $sheet.addEventListener('click', function (e) { if (e.target === $sheet) closeSheet(); });
     root.addEventListener('error', function (e) {
@@ -1150,6 +1163,11 @@
   try { AK.log = JSON.parse(sessionStorage.getItem('ua-ak-log') || '[]') || []; } catch (e) { AK.log = []; }
   function akOn() { var c = CFG.akbilge; return !!(AK_URL && c && (c.enabled || AK_PREV)); }
   function akName() { return (CFG.akbilge && CFG.akbilge.name) || 'Ak Bilge'; }
+  // Yönelme eki (isim değişirse "…'ye / …'ya / …'e / …'a sor" doğru çıksın)
+  function akYe(n) {
+    var w = String(n).toLocaleLowerCase('tr-TR').replace(/[^a-zçğıöşü]+$/, ''), v = (w.match(/[aeıioöuü]/g) || ['e']).pop();
+    return "'" + (/[aeıioöuü]$/.test(w) ? 'y' : '') + (/[aıou]/.test(v) ? 'a' : 'e');
+  }
   function akImg(pose) { return BASE + 'akbilge/' + pose + '.webp'; }
   function akSave() { try { sessionStorage.setItem('ua-ak-log', JSON.stringify(AK.log.slice(-20))); } catch (e) {} }
   function akPage() {
@@ -1349,6 +1367,12 @@
     var fab = CFG.fab || {};
     $fab.querySelector('span.t').textContent = fab.text || 'Ürün Bul';
     $fab.classList.toggle('left', fab.side === 'left');
+    // Ak Bilge butonu Ürün Bul'un karşı köşesinde durur; config.json > akbilge.fab: false kapatır, { "text": "…" } yazıyı değiştirir
+    var akf = (CFG.akbilge || {}).fab || {};
+    $akfab.classList.toggle('right', fab.side === 'left');
+    $akfab.querySelector('span.t').textContent = akf.text || akName() + akYe(akName()) + ' sor';
+    $akfab.setAttribute('aria-label', $akfab.querySelector('span.t').textContent);
+    if (!$akfab.querySelector('img') && akOn()) $akfab.querySelector('.fi').innerHTML = '<img src="' + esc(akImg('avatar')) + '" alt="" width="40" height="40">';
     if (fab.bottom != null) $wrap.style.setProperty('--fb', (+fab.bottom || 0) + 'px');
     updateFab();
     BY_ID = {};
@@ -3109,7 +3133,12 @@
     $fab.classList.toggle('hide', hide);
     if (!hide && !fabShown) { fabShown = true; $fab.classList.add('in'); setTimeout(function () { $fab.classList.remove('in'); }, 700); }
     $fab.classList.toggle('still', (CFG.fab || {}).animate === false);
-    if (!hide) fabSpace();
+    if ($akfab) {
+      var akh = isOpen || HIDE_PATHS.test(location.pathname) || !akOn() || ds.akfab === 'off' || (CFG.akbilge || {}).fab === false;
+      $akfab.classList.toggle('hide', akh);
+      $akfab.classList.toggle('still', (CFG.fab || {}).animate === false);
+    }
+    fabSpace();
   }
   // Çerez uyarısı, WhatsApp balonu, alt "Sepete Ekle" çubuğu gibi altta sabit duran bir şey butonun yerini
   // kaplıyorsa buton onun üstüne çıkar; kaybolunca eski yerine döner. Ekranı kaplayan pencerede gizlenir.
@@ -3120,12 +3149,12 @@
     }
     return null;
   }
-  function fabSpace() {
-    if (!$fab || $fab.classList.contains('hide') || !document.elementsFromPoint) return;
-    var W = window.innerWidth, H = window.innerHeight, left = $fab.classList.contains('left');
+  function fabSpace() { [$fab, $akfab].forEach(function (b) { if (b) fabSpaceFor(b); }); }
+  function fabSpaceFor($fab) {
+    if ($fab.classList.contains('hide') || !document.elementsFromPoint) return;
+    var W = window.innerWidth, H = window.innerHeight, rc = $fab.getBoundingClientRect();
     var base = parseFloat(getComputedStyle($wrap).getPropertyValue('--fb')) || 20;
-    var w = $fab.offsetWidth || 140, side = W < 760 ? 14 : 20;
-    var x1 = left ? side : W - side - w, x2 = x1 + w;
+    var x1 = Math.max(0, rc.left), x2 = Math.min(W, rc.right || x1 + 140);
     var ys = [H - base - 4, H - base - 26, H - base - 48];
     var xs = [x1 + 6, (x1 + x2) / 2, x2 - 6];
     var top = H, cover = false, seen = [];
@@ -3156,7 +3185,7 @@
       ticking = true;
       requestAnimationFrame(function () {
         var y = window.pageYOffset;
-        if (Math.abs(y - lastY) > 12) { $fab.classList.toggle('mini', y > lastY && y > 200); lastY = y; }
+        if (Math.abs(y - lastY) > 12) { var mn = y > lastY && y > 200; $fab.classList.toggle('mini', mn); if ($akfab) $akfab.classList.toggle('mini', mn); lastY = y; }
         ticking = false;
       });
     }, { passive: true });
@@ -3196,7 +3225,8 @@
       try { history.pushState({ urunArama: 1 }, ''); pushed = true; } catch (e) {}
     }
     if (typeof initial === 'string') $q.value = initial;
-    if (tab !== 'calc') $q.focus();
+    if (tab === 'ak') { var ai = $akf.querySelector('input'); if (ai && window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches) ai.focus(); }
+    else if (tab !== 'calc') $q.focus();
     shown = PAGE;
     render();
     renderIdle();
