@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: |
-          curl -sf https://hasturk-arama.halilc2007.workers.dev/trends -o /tmp/t.json
+          curl -sf 'https://hasturk-arama.halilc2007.workers.dev/trends?n=1000' -o /tmp/t.json
           python3 - <<'PY'
           import json
           t=json.load(open('/tmp/t.json'))
