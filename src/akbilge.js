@@ -300,21 +300,31 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
   const site = /^[a-z0-9-]{1,30}$/.test(body.s || '') ? body.s : 'hasturk';
   const name = String(body.n || 'Bilge Bey').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 30) || 'Bilge Bey';
   const db = env.DB;
-  if (db) await initDb(db).catch(() => {});
-  const extra = db ? await approved(db).catch(() => []) : [];
   const prods = await products().catch(() => []);
   const pageName = page ? ((prods.find((p) => p.s === page) || {}).n || '') : '';
-  let { hit, near } = poolAnswer(q, { extra, product: page, productName: pageName });
-  // Ürün sayfasında "nasıl kullanılır / ne işe yarar / dozu / özellikleri" gibi sorular o ürünün havuz cevabından gelir
-  // (soru ürün adını tam içermese de; Claude'a gidip para harcamasın)
-  if (!hit && page && /kullan|işe yar|ise yar|nedir|özellik|ozellik|doz|miktar|nasıl|nasil|kaç litre|kac litre|ölçü|olcu|ekilir/i.test(q)) {
-    const pe = HAVUZ.find((e) => e.p === page && (e.t === 'urun' || e.t === 'saksi' || e.t === 'pompa'));
-    if (pe && !toks(q).some((t) => t.length >= 4 && !toks(pageName + ' nasıl kullanılır ne işe yarar nedir özellikleri dozu kullanım miktarı kaç litre ölçüleri ne zaman ekilir bu ürün urun').includes(t) && (IDX && IDX.idf.get(t) || 0) > 6)) hit = { e: pe, sc: 0.75 };
-  }
+  // Veritabanının ana kopyası uzakta (ABD) olabilir: hazır cevap onu beklemeden verilir. Önce havuz + bellekteki onaylı
+  // cevaplarla bakılır; bulunamazsa veritabanı beklenip onaylı liste tazelenerek tekrar bakılır.
+  const ready = db ? initDb(db).catch(() => {}) : Promise.resolve();
+  const tryPool = (extra) => {
+    let { hit, near } = poolAnswer(q, { extra, product: page, productName: pageName });
+    // Ürün sayfasında "nasıl kullanılır / ne işe yarar / dozu / özellikleri" gibi sorular o ürünün havuz cevabından gelir
+    // (soru ürün adını tam içermese de; Claude'a gidip para harcamasın)
+    if (!hit && page && /kullan|işe yar|ise yar|nedir|özellik|ozellik|doz|miktar|nasıl|nasil|kaç litre|kac litre|ölçü|olcu|ekilir/i.test(q)) {
+      const pe = HAVUZ.find((e) => e.p === page && (e.t === 'urun' || e.t === 'saksi' || e.t === 'pompa'));
+      if (pe && !toks(q).some((t) => t.length >= 4 && !toks(pageName + ' nasıl kullanılır ne işe yarar nedir özellikleri dozu kullanım miktarı kaç litre ölçüleri ne zaman ekilir bu ürün urun').includes(t) && (IDX && IDX.idf.get(t) || 0) > 6)) hit = { e: pe, sc: 0.75 };
+    }
+    return { hit, near };
+  };
+  let { hit, near } = tryPool(APPROVED.t ? APPROVED.list : []);
+  if (!hit && db) {
+    await ready;
+    const extra = await approved(db).catch(() => []);
+    if (extra.length) ({ hit, near } = tryPool(extra));
+  } else if (db && Date.now() - APPROVED.t >= 300000) ctx.waitUntil(ready.then(() => approved(db)).catch(() => {}));
   // Canlı kontrol testleri (X-Ak-Test: 1) kayda geçmez: sayaç ve 'en çok sorulanlar' gerçek müşterileri göstersin
   const test = req.headers.get('x-ak-test') === '1';
-  const log = (o) => db && !test && ctx.waitUntil(db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, skor, cevap, urunler, durum, site, sayfa, giris, cikis) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .bind(new Date().toISOString(), q, norm(q), o.kaynak, o.havuz || null, o.skor ?? null, o.cevap || null, JSON.stringify(o.urunler || []), o.durum || null, site, page, o.giris ?? null, o.cikis ?? null).run().catch(() => {}));
+  const log = (o) => db && !test && ctx.waitUntil(ready.then(() => db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, skor, cevap, urunler, durum, site, sayfa, giris, cikis) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(new Date().toISOString(), q, norm(q), o.kaynak, o.havuz || null, o.skor ?? null, o.cevap || null, JSON.stringify(o.urunler || []), o.durum || null, site, page, o.giris ?? null, o.cikis ?? null).run()).catch(() => {}));
 
   if (hit) {
     log({ kaynak: 'havuz', havuz: hit.e.i, skor: hit.sc });
