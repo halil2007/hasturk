@@ -1115,7 +1115,11 @@
     else if (act === 'guide') { GID = v; renderGuide(); }
     else if (act === 'goguide') { GID = v; $q.value = ''; render(); setTab('guide'); }
     else if (act === 'goguideq') { GQ = v; $q.value = ''; render(); setTab('guide'); }
-    else if (act === 'add') { var xs = !!b.getAttribute('data-xs'); if (xs) { track('cross_sell_add', v); if (BY_ID[v]) ev('xa', BY_ID[v].s); } openAdd(v, xs); }
+    else if (act === 'add') {
+      var xs = !!b.getAttribute('data-xs'); if (xs) { track('cross_sell_add', v); if (BY_ID[v]) ev('xa', BY_ID[v].s); }
+      if (b.closest && b.closest('.pane.ak') && BY_ID[v]) { track('akbilge_add', v); ev('ka', BY_ID[v].s); } // Ak Bilge önerisi işe yaradı mı
+      openAdd(v, xs);
+    }
     else if (act === 'xsx') hideCross();
     else if (act === 'sxsx') hideSiteCross();
     else if (act === 'vo') pickVariant(v);
@@ -1178,14 +1182,14 @@
   // "İşinize yaradı mı?" — olumsuz oyda iletişim düğmeleri hemen çıkar; oylar sunucuda incelenir
   function akVoteHtml(it, idx) {
     if (it.oy === 1) return '<div class="akfb"><span>Teşekkürler!</span></div>';
-    if (it.oy === 0) return '<div class="akfb"><span>Geri bildiriminiz için teşekkürler.</span></div>' + akContact(it.q, 'Ustamız size doğrusunu söylesin:');
+    if (it.oy === 0) return '<div class="akfb"><span>Geri bildiriminiz için teşekkürler.</span></div>' + akContact(it.q, 'Müşteri hizmetlerimizden doğru bilgiyi alabilirsiniz:');
     return '<div class="akfb"><span>İşinize yaradı mı?</span><button type="button" data-act="akoy" data-v="1:' + idx + '">Evet</button><button type="button" data-act="akoy" data-v="0:' + idx + '">Hayır</button></div>';
   }
   // Başlıkta her zaman görünen küçük canlı destek bağlantısı (ısrarcı değil, elinin altında)
   function akLive() {
     var tel = CFG.phone ? 'tel:' + CFG.phone.replace(/[^\d+]/g, '') : '';
     if (!CFG.whatsapp && !tel) return '';
-    return '<div class="aklive"><span>Ustamızla konuşun:</span>' +
+    return '<div class="aklive"><span>Müşteri hizmetleri:</span>' +
       (CFG.whatsapp ? '<a data-kind="whatsapp" data-name="akbilge-ust" target="_blank" rel="noopener" href="' + esc(waHref('Merhaba')) + '">' + I.chat + 'WhatsApp</a>' : '') +
       (tel ? '<a data-kind="phone" data-name="akbilge-ust" href="' + esc(tel) + '">' + I.phone + esc(CFG.phone) + '</a>' : '') + '</div>';
   }
@@ -1201,15 +1205,15 @@
         var list = (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 3);
         if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>';
       }
-      if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda ustamıza danışın.</p>';
-      // Cevap müşteriyi bize yönlendiriyorsa ("ustamıza danışın", "WhatsApp'tan yazın") düğmeler hemen altında olsun
-      var refer = /whatsapp|ustamız|ustamıza|bize yazın|bizi arayın|uzmanımız/i.test(d.cevap) && it.oy == null;
+      if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
+      // Cevap müşteriyi bize yönlendiriyorsa ("müşteri hizmetleri", "WhatsApp'tan yazın") düğmeler hemen altında olsun
+      var refer = /whatsapp|müşteri hizmet|ustamız|bize yazın|bizi arayın|uzmanımız/i.test(d.cevap) && it.oy == null;
       return akBot(pose, html) + (prods ? '<div class="akpw">' + prods + '</div>' : '') + (refer ? akContact(q, '') : '') + akVoteHtml(it, idx);
     }
     var why = d.ok === false || d.neden === 'hata' ? 'Şu an bağlantıda bir sorun oldu.'
-      : d.neden === 'emin-degil' ? 'Bu konuda size kesin ve doğru bilgi verebilmem için ustamızın bakması daha doğru olur.'
+      : d.neden === 'emin-degil' ? 'Bu konuda size kesin ve doğru bilgi verebilmem için müşteri hizmetlerimizin bakması daha doğru olur.'
       : 'Bu soruya henüz hazır bir cevabım yok.';
-    return akBot('tesekkur', '<p>' + esc(why) + ' Ustamız size hemen yardımcı olsun:</p>') + akContact(q, '');
+    return akBot('tesekkur', '<p>' + esc(why) + ' Müşteri hizmetlerimizden destek alabilirsiniz:</p>') + akContact(q, '');
   }
   function akRenderLog() {
     var log = root.querySelector('.aklog');

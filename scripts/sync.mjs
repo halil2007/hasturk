@@ -704,7 +704,7 @@ function makeDemoted(out, config) {
 //  - öne çıkarılmayan kategorideki ürün (kedi/köpek) sadece yine öyle bir ürünün yanında önerilir
 // Widget sepete ekleme sonrası önce bu listeyi, yetmezse config.json > crossSell kurallarını kullanır.
 const CO_MIN = 2, CO_MAX = 4, CO_BASKET = 15;
-function coPurchase(out, orders, config) {
+function coPurchase(out, orders, config, trends) {
   const byId = new Map(out.items.map((p) => [p.id, p]));
   const byVar = new Map();
   for (const p of out.items) { if (p.v1) byVar.set(p.v1, p); for (const v of p.v || []) byVar.set(v.id, p); }
@@ -726,6 +726,11 @@ function coPurchase(out, orders, config) {
     for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) { const k = arr[i] + '|' + arr[j]; c.set(k, (c.get(k) || 0) + 1); }
   }
   const demoted = makeDemoted(out, config);
+  // Öğrenme: çapraz satış kartında gösterilip gerçekten sepete eklenen öneriler yükselir, hep gösterilip alınmayanlar
+  // düşer. Oran az veriyle sıçramasın diye düzeltilir (+0,5 / +5) ve 0,6–1,8 kat arasında tutulur; 5'ten az gösterimde etki yok.
+  const xs = new Map(((trends && trends.xs) || []).map(([x, n]) => [x, n])), xa = new Map(((trends && trends.xa) || []).map(([x, n]) => [x, n]));
+  const sumS = [...xs.values()].reduce((a, n) => a + n, 0), sumA = [...xa.values()].reduce((a, n) => a + n, 0), base = (sumA + 0.5) / (sumS + 5);
+  const learn = (y) => { const s = xs.get(y) || 0; if (s < 5) return 1; return Math.min(1.8, Math.max(0.6, ((xa.get(y) || 0) + 0.5) / (s + 5) / base)); };
   const pairs = [], per = new Map();
   for (const [k, cnt] of c) {
     if (cnt < CO_MIN) continue;
@@ -737,7 +742,7 @@ function coPurchase(out, orders, config) {
     for (const [x, y] of [[a, b], [b, a]]) {
       if (demoted(y) && !demoted(x)) continue;
       if (!per.has(x)) per.set(x, []);
-      per.get(x).push({ s: y, score, cnt });
+      per.get(x).push({ s: y, score: score * learn(y), cnt });
     }
   }
   let withX = 0;
@@ -830,6 +835,11 @@ async function writeReport(out, trends, orders, an, config) {
     tbl(['#', 'Önerilen ürün', 'Gösterildi', 'Eklendi', 'Oran'], [...new Set([...xs.keys(), ...xa.keys()])]
       .map((x) => [x, xs.get(x) || 0, xa.get(x) || 0]).sort((a, b) => b[2] - a[2] || b[1] - a[1]).slice(0, 15)
       .map(([x, a, b], i) => [i + 1, name(x), a, b, a ? pct(b / a) : '—']));
+  }
+  const ka = (trends && trends.ka) || [];
+  if (ka.length) {
+    L.push(`## Ak Bilge önerisinden sepete eklenenler (son ${trends.days} gün)`, '');
+    tbl(['#', 'Ürün', 'Eklendi'], ka.slice(0, 15).map(([x, n], i) => [i + 1, name(x), n]));
   }
 
   L.push('## Masaüstü menü önerileri (kategori başına ilk 3)', '', 'Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazsanız menü bu sıraya göre kendini günceller.', '');
@@ -1001,7 +1011,7 @@ async function main() {
     const [trends, own] = await Promise.all([fetchTrends(), fetchOrders()]);
     const orders = mergeOrders(own, await fetchOtherOrders(out));
     const an = applyTrends(out, trends, orders, config);
-    try { an.co = coPurchase(out, orders, config); } catch (e) { console.warn('UYARI: birlikte alınanlar hesaplanamadı: ' + String(e && e.message).slice(0, 200)); }
+    try { an.co = coPurchase(out, orders, config, trends); } catch (e) { console.warn('UYARI: birlikte alınanlar hesaplanamadı: ' + String(e && e.message).slice(0, 200)); }
     await writeReport(out, trends, orders, an, config);
   } catch (e) {
     console.warn('UYARI: eğilim hesaplanamadı: ' + (e.stack || e.message).slice(0, 300));

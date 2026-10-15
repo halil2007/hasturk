@@ -95,7 +95,7 @@ export function poolAnswer(q, opts = {}) {
 export function systemPrompt(name) {
   return `Sen ${name}'sin: HasTürk Gübre'nin (hasturkgubre.com.tr) çevrimiçi tarım ve bahçe danışmanısın. Müşterilerin gübre, toprak, tohum, saksı, bitki bakımı ve ilaçlama ekipmanı sorularını Türkçe, sade ve kısa cevaplarsın.
 
-Müşteriler emek, para ve zaman harcıyor: yanlış ya da alakasız bir cevap, hiç cevap vermemekten daha kötüdür. Her ne pahasına cevap vermeye çalışma; doğru bilgin yoksa müşteriyi ustamıza yönlendir. Gereken yerde yönlendirmekten çekinme, ama bildiğin ve güvenli olan temel bilgiyi de esirgeme.
+Müşteriler emek, para ve zaman harcıyor: yanlış ya da alakasız bir cevap, hiç cevap vermemekten daha kötüdür. Her ne pahasına cevap vermeye çalışma; doğru bilgin yoksa müşteriyi müşteri hizmetlerimize yönlendir. Gereken yerde yönlendirmekten çekinme, ama bildiğin ve güvenli olan temel bilgiyi de esirgeme.
 
 Kurallar:
 - Cevabın 120 kelimeyi geçmesin; gerekirse 2–4 maddelik liste kullan. "Siz" diye hitap et. Selamlama ve övgü cümlesi yazma.
@@ -103,8 +103,9 @@ Kurallar:
 - "Doğrulanmış bilgi" soruyla ilgisizse onu kullanma; sorulmayan bir konuyu anlatma.
 - Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını söyle.
 - Ürün önerisi yalnız "Önerilebilecek ürünler" listesinden ve yalnız soruyla gerçekten ilgiliyse yapılır; listede olmayan ürün, marka veya rakip mağaza adı yazma.
-- Bitki hastalığı ya da zararlı teşhisi koyma; en fazla olası nedenleri say ve fotoğrafla ustamıza danışılmasını öner. İnsan veya hayvan sağlığı konusunda tavsiye verme.
-- Mağaza bilgisi: siparişler aynı gün kargoya teslim edilir; teslim süresi kargo firmasına ve adrese göre değişir. Bunun dışındaki sipariş durumu, kargo takibi, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için ustamıza yönlendir.
+- Bitki hastalığı ya da zararlı teşhisi koyma; en fazla olası nedenleri say ve fotoğrafla müşteri hizmetlerimize danışılmasını öner. İnsan veya hayvan sağlığı konusunda tavsiye verme.
+- Mağaza bilgisi: siparişler aynı gün kargoya teslim edilir; bölgeye göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir. Bunun dışındaki sipariş durumu, kargo takibi, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için müşteri hizmetlerimize yönlendir.
+- Yönlendirirken "usta" deme; "müşteri hizmetlerimizden destek alabilirsiniz" de.
 
 "durum" alanı:
 - "cevap": soruyu doğru ve güvenle cevapladın.
@@ -259,14 +260,16 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
     const pe = HAVUZ.find((e) => e.p === page && (e.t === 'urun' || e.t === 'saksi' || e.t === 'pompa'));
     if (pe && !toks(q).some((t) => t.length >= 4 && !toks(pageName + ' nasıl kullanılır ne işe yarar nedir özellikleri dozu kullanım miktarı kaç litre ölçüleri ne zaman ekilir bu ürün urun').includes(t) && (IDX && IDX.idf.get(t) || 0) > 6)) hit = { e: pe, sc: 0.75 };
   }
-  const log = (o) => db && ctx.waitUntil(db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, skor, cevap, urunler, durum, site, sayfa, giris, cikis) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+  // Canlı kontrol testleri (X-Ak-Test: 1) kayda geçmez: sayaç ve 'en çok sorulanlar' gerçek müşterileri göstersin
+  const test = req.headers.get('x-ak-test') === '1';
+  const log = (o) => db && !test && ctx.waitUntil(db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, skor, cevap, urunler, durum, site, sayfa, giris, cikis) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .bind(new Date().toISOString(), q, norm(q), o.kaynak, o.havuz || null, o.skor ?? null, o.cevap || null, JSON.stringify(o.urunler || []), o.durum || null, site, page, o.giris ?? null, o.cikis ?? null).run().catch(() => {}));
 
   if (hit) {
     log({ kaynak: 'havuz', havuz: hit.e.i, skor: hit.sc });
     return json({ ok: true, kaynak: 'havuz', id: hit.e.i, cevap: hit.e.c, urunler: hit.e.u, dinamik: hit.e.d || null, bitki: hit.e.b || null });
   }
-  // Claude: anahtar yoksa, kapalıysa ya da günlük sınır dolduysa "bilmiyorum + ustaya sor"
+  // Claude: anahtar yoksa, kapalıysa ya da günlük sınır dolduysa "bilmiyorum + müşteri hizmetleri"
   const limit = Number(env.AK_DAILY_LIMIT) || DAILY_LIMIT;
   const off = !aiKey || env.AK_AI === 'off';
   let used = 0;
@@ -295,7 +298,7 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
     log({ kaynak: 'ai', skor: near[0] ? near[0].sc : null, cevap: r.cevap, durum: r.durum, ...tok });
     return json({ ok: true, kaynak: 'yonlendir', cevap: r.cevap, urunler: [], neden: r.durum });
   }
-  // Model kendi cevabından emin değilse cevap gösterilmez (yanlış bilgi riski); müşteri ustaya yönlendirilir.
+  // Model kendi cevabından emin değilse cevap gösterilmez (yanlış bilgi riski); müşteri hizmetlerine yönlendirilir.
   // Cevap inceleme için kaydedilir.
   if (!r.emin) {
     log({ kaynak: 'ai', skor: near[0] ? near[0].sc : null, cevap: r.cevap, urunler: r.urunler, durum: 'emin-degil', ...tok });

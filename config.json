@@ -151,7 +151,7 @@
   },
   "phone": "+90 553 942 29 61",
   "whatsapp": "905539422961",
-  "akbilge": { "enabled": true, "name": "Ak Bilge", "kargo": "Siparişleriniz aynı gün kargoya teslim edilir." },
+  "akbilge": { "enabled": true, "name": "Ak Bilge", "kargo": "Siparişiniz aynı gün kargoya teslim edilir. Bölgenize göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir." },
   "pages": [
     {
       "title": "Blog",
