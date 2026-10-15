@@ -73,7 +73,7 @@
     return null;
   }
   // Sepetteki satırlar: varyant kimliği → adet
-  var CART_LINES = null;
+  var CART_LINES; // yukarıda oturumdan okunan değer silinmesin (var tanımı değer atamaz)
   function lineQty(c) {
     var m = {};
     (c.orderLineItems || []).forEach(function (it) {
@@ -1250,8 +1250,8 @@
       var prods = '';
       if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl); pose = 'fide'; } }
       if (!prods && DATA) {
-        var list = (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 4);
-        if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>' +
+        var list = akListe(d.urunler || []);
+        if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, x.__yerine ? 'stokta olmayan ' + akKisa(x.__yerine) + ' yerine' : ''); }).join('') + '</div>' +
           (list.length >= 2 && cartOn() ? '<button type="button" class="akall" data-act="akall" data-v="' + idx + '">' + I.cart + 'Hepsini sepete ekle</button>' : '');
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
@@ -1271,11 +1271,43 @@
   // "Hepsini sepete ekle": Bilge Bey cevabındaki ürünler tek pencerede, her biri için boy seçilerek sırayla eklenir.
   // Önceden seçili boy soruya göre: saksı / çiçek / balkon → en küçük boy; bahçe / sebze / ağaç / tarla → büyükçe boy
   // (seçeneklerin ortası, ör. 1–20 kg arasında 5 kg). İçindekiler zaten listede olan set ("…Set", "…Seti") işaretsiz gelir. Stokta olmayan boy seçilemez; istenmeyen ürünün işareti kaldırılır.
+  // Cevaptaki ürünler: stoktakiler; stokta olmayan ürünün yerine aynı kategoriden, adı benzeyen (ortak kelimeli) ve çok
+  // satan stoktaki ürün konur (aynı ürün iki kez gösterilmez)
+  function akListe(slugs) {
+    var out = [], used = {};
+    slugs.forEach(function (s) { if (BY_SLUG[s]) used[s] = 1; });
+    slugs.forEach(function (s) {
+      var x = BY_SLUG[s];
+      if (!x || out.length >= 4) return;
+      if (x.st) { out.push(x); return; }
+      var alt = akAlt(x, used);
+      if (alt) { used[alt.s] = 1; out.push(Object.assign ? Object.assign({}, alt, { __yerine: x.n }) : alt); }
+    });
+    return out;
+  }
+  var KAMP = /kampanya|\bset(i)?\b|\+|\bton\b|toptan/i;
+  function akAlt(p, used) {
+    if (!DATA) return null;
+    var kel = function (n) { return fold(n).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 4 && !/^(hasturk|organik|ozel|bitki|bitkiler)$/.test(w); }); };
+    var pw = kel(p.n), c0 = (p.c || [])[0], best = (DATA.trend || {}).best || [], top = null, ts = 0;
+    DATA.items.forEach(function (x) {
+      if (!x.st || used[x.s] || x.s === p.s || !c0 || (x.c || []).indexOf(c0) === -1) return;
+      // Kampanya paketi / set / toptan ürün, tek ürünün yerine önerilmez; fiyatı 4 katından fazla farklı olan da
+      if (KAMP.test(x.n) && !KAMP.test(p.n)) return;
+      var pp = price(p), px = price(x), oran = pp && px ? Math.max(pp, px) / Math.min(pp, px) : 1;
+      if (oran > 4) return;
+      var xw = kel(x.n), ort = pw.filter(function (w) { return xw.indexOf(w) !== -1; }).length;
+      if (!ort) return;
+      var bi = best.indexOf(x.s), sc = ort * 3 + (bi === -1 ? 0 : Math.max(0, 2 - bi / 20)) - Math.log(oran);
+      if (sc > ts) { ts = sc; top = x; }
+    });
+    return top;
+  }
   var BUNDLE = null;
   function akVsOk(p) { return (p.v || []).filter(function (v) { return v.id && vOk(v); }).sort(function (a, b) { return (vPrice(a) || 0) - (vPrice(b) || 0); }); }
   function akBundleItems(it) {
     var d = (it && it.d) || {};
-    return (d.urunler || []).map(function (s) { return BY_SLUG[s]; }).filter(function (x) { return x && x.st; }).slice(0, 4);
+    return akListe(d.urunler || []).map(function (x) { return BY_SLUG[x.s] || x; });
   }
   function akDefVariant(p, txt) {
     var vs = akVsOk(p);
@@ -1414,7 +1446,10 @@
   function akStart(pg) {
     var c = CFG.akbilge || {}, h = '', G = akGroups();
     if (c.samples && c.samples.length) return '<div class="akopts on">' + c.samples.map(akChip).join('') + '</div>';
-    // Ürün sayfasındaysa o ürünle ilgili soru en üstte
+    // Ürün sayfasındaysa o ürünle ilgili soru en üstte; değilse sepetteki (mama/kum dışı) ilk ürünün kullanımı
+    var sp = null;
+    if (!pg && CART_LINES && DATA) for (var vid in CART_LINES) { var cx = BY_VAR[vid]; if (cx && !/mama|kedi|köpek|kumu|ödül/i.test(cx.n)) { sp = cx; break; } }
+    if (sp) h += '<button type="button" class="akpg" data-act="akq" data-v="' + esc(akKisa(sp.n) + ' nasıl kullanılır?') + '">' + thumb(sp.img, 120) + '<span><small>Sepetinizdeki ürün</small><b>' + esc(akKisa(sp.n)) + ' nasıl kullanılır?</b></span></button>';
     if (pg && BY_SLUG[pg]) {
       var p = BY_SLUG[pg], pq = akKisa(p.n) + ' nasıl kullanılır?';
       h += '<button type="button" class="akpg" data-act="akq" data-v="' + esc(pq) + '">' + thumb(p.img, 120) + '<span><small>Bu ürün hakkında</small><b>' + esc(pq) + '</b></span></button>';
