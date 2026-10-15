@@ -278,6 +278,17 @@ add({ tur: 'pompa-genel', konu: 'akulu-manuel', sorular: ['akülü mü manuel mi
 add({ tur: 'pompa-genel', konu: 'sarj', sorular: ['akülü ilaçlama pompası şarjı ne kadar gider', 'şarjlı pompa kaç saat çalışır', 'akülü pompa kaç depo atar', 'ilaçlama pompası şarj süresi', 'akülü pompa kaç saatte şarj olur'],
   cevap: `Akülü modellerimizin ürün bilgisine göre tek şarjla çalışma süreleri:\n${akl.filter((p) => bySlug.get(p.slug).st > 0 && (p.calisma || p.calismaDepo)).map(kisaP).join('\n')}\n\nTüm ilaçlama pompalarımız ${pm.garanti.ay} ay garantilidir.`, urunler: akl.filter((p) => bySlug.get(p.slug).st > 0).slice(0, 3).map((p) => p.slug), dinamik: 'stok', kaynak: 'pompa:sarj' });
 
+// I) Bitki sorunları (bilgi/sorunlar.json; akbilge-sorun.mjs üretir): sararma, solma, çiçek açmama, zararlılar…
+// Ürün satırları "• Ad — fayda" biçiminde; sunucu stokta olmayan ürünün satırını cevaptan çıkarır (dinamik: sorun)
+const sr = JSON.parse(await readFile('bilgi/sorunlar.json', 'utf8'));
+const madde = (b, l) => l.length ? `\n\n${b}:\n${l.map((x) => '• ' + x).join('\n')}` : '';
+for (const s of sr.sorunlar) {
+  const ur = s.urunler.filter((u) => bySlug.has(u.slug));
+  add({ tur: 'sorun', konu: s.key, ...(s.bitki ? { bitki: s.bitki } : {}), sorular: s.sorular,
+    cevap: `${s.baslik}${madde('Olası nedenler', s.nedenler)}${madde('Nasıl anlarsınız', s.anlama)}${madde('Ne yapmalısınız', s.yapin)}${madde('Sitemizde işinize yarayacaklar', ur.map((u) => `${u.ad} — ${u.fayda}`))}\n\nSorun devam ederse ya da emin olamazsanız bitkinin ve yaprakların (alt yüzü dahil) fotoğrafıyla müşteri hizmetlerimizden destek alabilirsiniz.`,
+    urunler: ur.map((u) => u.slug), urunAdlari: ur.map((u) => u.ad), dinamik: 'sorun', kaynak: `sorun:${s.key}` });
+}
+
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
@@ -298,7 +309,8 @@ await writeFile('src/akbilge-havuz.json', JSON.stringify(out.filter((e) => e.dur
   if (e.dinamik) o.d = e.dinamik;
   if (e.bitki) o.b = e.bitki;
   if (e.urun) { o.p = e.urun; o.n = adOf(e.urun); }
+  if (e.urunAdlari) o.un = e.urunAdlari;
   return o;
 })));
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel+${c('tohum-ay')} ay, pompa ${c('pompa')}+${c('pompa-genel')} genel, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, saksı ${c('saksi')}+${c('saksi-hesap')} hesap+${c('saksi-kural')} kural, tohum türü ${c('tohum')}+${c('tohum-genel')} genel+${c('tohum-ay')} ay, pompa ${c('pompa')}+${c('pompa-genel')} genel, bitki sorunu ${c('sorun')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);

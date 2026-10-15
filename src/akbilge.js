@@ -18,7 +18,7 @@ export const norm = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[
   .replace(/[^a-z0-9]+/g, ' ').trim();
 // Soruya anlam katmayan dolgu kelimeleri (soru kalıbı kelimeleri — ne, nasıl, kaç… — KALIR, niyeti onlar taşır)
 const FILL = new Set(['merhaba', 'selam', 'selamlar', 'iyi', 'gunler', 'aksamlar', 'lutfen', 'acaba', 'abi', 'abla', 'hocam', 'usta', 'kardesim',
-  'tesekkurler', 'tesekkur', 'ederim', 'almaliyim', 'almali', 'alayim', 'alsam', 'almak', 'onerirsiniz', 'onerir', 'misiniz', 'musunuz', 'yardimci', 'olur', 'musun', 'sayin', 'yetkili', 'bilgi', 'alabilir', 'miyim', 'sormak', 'istiyorum', 'istiyordum', 'bir', 'bu', 'su', 've', 'ile', 'ya', 'da', 'de', 'ki', 'mi', 'mu', 'benim', 'bana', 'sizde']);
+  'tesekkurler', 'tesekkur', 'ederim', 'almaliyim', 'almali', 'alayim', 'alsam', 'almak', 'onerirsiniz', 'onerir', 'misiniz', 'musunuz', 'yardimci', 'olur', 'musun', 'sayin', 'yetkili', 'bilgi', 'alabilir', 'miyim', 'sormak', 'istiyorum', 'istiyordum', 'bir', 'bu', 'su', 've', 'ile', 'ya', 'da', 'de', 'ki', 'mi', 'mu', 'benim', 'bana', 'sizde', 'var', 'cok', 'sey', 'seyler']);
 const stem = (t) => (t.length > 5 ? t.slice(0, 5) : t);
 // "ağaç/ağacı/ağacına" bitki adının parçası olarak anlam katmaz (limon ağacı = limon)
 const FILL_STEM = new Set(['agac', 'agaci', 'agacl', 'agacm']);
@@ -106,7 +106,7 @@ Kurallar:
 - "Doğrulanmış bilgi" soruyla ilgisizse onu kullanma; sorulmayan bir konuyu anlatma.
 - Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını söyle.
 - Ürün önerisi yalnız "Önerilebilecek ürünler" listesinden ve yalnız soruyla gerçekten ilgiliyse yapılır; listede olmayan ürün, marka veya rakip mağaza adı yazma.
-- Bitki hastalığı ya da zararlı teşhisi koyma; en fazla olası nedenleri say ve fotoğrafla müşteri hizmetlerimize danışılmasını öner. İnsan veya hayvan sağlığı konusunda tavsiye verme.
+- Bitki hastalığı ya da zararlı teşhisi koyma; "Doğrulanmış bilgi"de o belirtiye ait olası nedenler ve öneriler varsa onları kullan, yoksa yalnız olası nedenleri say. Her durumda fotoğrafla müşteri hizmetlerimize danışılmasını öner. Ev ve halk sağlığı böcek ilaçlarını (sinek, hamamböceği, tahtakurusu, akar spreyleri) bitkiye önerme. İnsan veya hayvan sağlığı konusunda tavsiye verme.
 - Mağaza bilgisi: siparişler aynı gün kargoya teslim edilir; bölgeye göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir. Bunun dışındaki sipariş durumu, kargo takibi, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için müşteri hizmetlerimize yönlendir.
 - Yönlendirirken "usta" deme; "müşteri hizmetlerimizden destek alabilirsiniz" de.
 - Kaynak, yayın, kurum ya da "şuradan aldım" bilgisi verme; yalnız cevabı yaz.
@@ -261,6 +261,19 @@ const today = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10)
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' } });
 
 // POST /ak  {q, p (ürün sayfası adresi), s (site), n (asistan adı)}
+// Bitki sorunu cevabında önerilen ürünler canlı stoğa göre süzülür: stokta olmayan (ya da bu sitede olmayan) ürünün
+// "• Ad — fayda" satırı cevaptan çıkar; hiç ürün kalmazsa başlık da kalkar
+export function stokSuz(e, prods) {
+  if (e.d !== 'sorun' || !e.un || !prods || !prods.length) return e;
+  const st = new Map(prods.map((p) => [p.s, p]));
+  const yok = new Set(e.u.filter((s) => !(st.get(s) || {}).st));
+  if (!yok.size) return e;
+  const adlar = e.u.map((s, i) => (yok.has(s) ? e.un[i] : null)).filter(Boolean);
+  let c = e.c.split('\n').filter((l) => !adlar.some((n) => l.startsWith('• ' + n + ' — '))).join('\n');
+  c = c.replace(/\n\nSitemizde işinize yarayacaklar:(?=\n\n|$)/, '');
+  return { ...e, c, u: e.u.filter((s) => !yok.has(s)) };
+}
+
 export async function handle(req, env, ctx, { aiKey, originOk, products }) {
   if (!originOk) return json({ ok: false, why: 'origin' }, 403);
   let body;
@@ -289,7 +302,8 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
 
   if (hit) {
     log({ kaynak: 'havuz', havuz: hit.e.i, skor: hit.sc });
-    return json({ ok: true, kaynak: 'havuz', id: hit.e.i, cevap: hit.e.c, urunler: hit.e.u, dinamik: hit.e.d || null, bitki: hit.e.b || null });
+    const e = stokSuz(hit.e, prods);
+    return json({ ok: true, kaynak: 'havuz', id: e.i, cevap: e.c, urunler: e.u, dinamik: e.d || null, bitki: e.b || null });
   }
   // Daha önce Claude'un cevapladığı aynı soru: kayıttan, ücretsiz
   if (db) {
