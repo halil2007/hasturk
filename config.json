@@ -1744,6 +1744,43 @@
     ],
     "turuncgil": [
       "limon"
+    ],
+    "acelya": [
+      "ortanca",
+      "asidik",
+      "seven"
+    ],
+    "gardenya": [
+      "ortanca",
+      "asidik",
+      "seven"
+    ],
+    "kamelya": [
+      "ortanca",
+      "asidik",
+      "seven"
+    ],
+    "biyokomur": [
+      "biochar"
+    ],
+    "altlik": [
+      "tabak"
+    ],
+    "sprayer": [
+      "puskurtucu",
+      "pompa"
+    ],
+    "evcil": [
+      "mama"
+    ],
+    "hayvan": [
+      "mama"
+    ],
+    "kabuklu": [
+      "neem"
+    ],
+    "hibrit": [
+      "tohum"
     ]
   },
   "soilMatch": {
