@@ -24,13 +24,13 @@ Güncelleme: 15 Ekim 2026 · Kapsam: en çok satan bitki ürünlerinden ilk 13 �
 | Yaban Mersini ve Ortanca Toprağı | ⛔ Eksik | Sayfada kullanım bilgisi yok |
 | Premium Fide Toprağı | ✅ Doğrulandı | Ekim talimatı |
 | HG Mezar Toprağı | ✅ Doğrulandı | 5-10 cm katman |
-| DSV Lippa Lisuna 6 Mix | ⚠️ Kısmi | 50-60 g/m² doğrulandı; "serpme 80-90 g/m²" araştırma aralığının üstünde |
+| DSV Lippa Lisuna 6 Mix | ✅ Doğrulandı | Makineyle 50-60 g/m² (araştırmayla uyumlu); elle serpme 80-90 g/m² (Lippa Tamu sayfasıyla tutarlı) |
 
 ## Karar gerekenler (HasTürk)
 1. **Leonardit bahçe dozu:** ürün sayfasındaki "metrekareye 1 litre/kg" yüksek. Öneri: tarla/bahçe için 100-200 kg/dekar (metrekareye 100-200 g). Sayfa düzeltilince kart güncellenir.
 2. **Hümix saksı dozu:** üretici olarak ev/saksı bitkileri için sulama suyuna oranı belirlenmeli (ör. "1 litre suya … ml, … günde bir").
 3. **Yaban Mersini ve Ortanca Toprağı:** kullanım şekli (doğrudan dolgu mu, karışım oranı) yazılmalı.
-4. **DSV Lippa Lisuna:** DSV/distribütör teknik föyündeki ekim normu teyit edilmeli.
+4. ~~**DSV Lippa Lisuna:**~~ Çözüldü: elle serpme miktarı makineli ekimden yüksek olur; iki değer de doğru.
 
 ---
 

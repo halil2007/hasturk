@@ -1,14 +1,25 @@
 # Altı pozlu sayfayı ayrı, şeffaf arka planlı karelere böler. Beyaz zemin kenarlardan taşma (flood fill) ile silinir;
 # robotun krem renkli gövdesi dış çizgiyle çevrili olduğu için içerideki açık renkler korunur.
+#   python3 scripts/akbilge-gorsel.py poz.png public/akbilge            → 6 poz (selam, dusunuyor, …)
+#   python3 scripts/akbilge-gorsel.py bust.png public/akbilge avatar    → tek görsel (avatar.png 512 + avatar.webp 256)
 from PIL import Image, ImageFilter
 from collections import deque
 import sys
 im = Image.open(sys.argv[1]).convert('RGBA')
 W, H = im.size
-names = ['selam', 'dusunuyor', 'harika', 'fide', 'fikir', 'tesekkur']
-cw, ch = W // 3, H // 2
+single = sys.argv[3] if len(sys.argv) > 3 else None
+names = [single] if single else ['selam', 'dusunuyor', 'harika', 'fide', 'fikir', 'tesekkur']
+cw, ch = (W, H) if single else (W // 3, H // 2)
+# Satır sınırı: tam ortadan kesmek alt sıradaki hilalleri yarıda bırakıyordu; her sütunda ortaya en yakın boş (beyaz) satır seçilir
+src = im.convert('RGB').load()
+def split_y(x0, x1):
+    if single: return H
+    free = [y for y in range(H // 2 - 80, H // 2 + 40) if all(min(src[x, y]) >= 225 for x in range(x0, x1))]
+    return min(free, key=lambda y: abs(y - H // 2)) if free else H // 2
 for i, n in enumerate(names):
-    c = im.crop(((i % 3) * cw, (i // 3) * ch, (i % 3 + 1) * cw, (i // 3 + 1) * ch))
+    x0, x1 = (i % 3) * cw, (i % 3 + 1) * cw
+    sy = split_y(x0, x1)
+    c = im.crop((x0, 0 if i < 3 else sy, x1, sy if (i < 3 and not single) else H))
     w, h = c.size; px = c.load()
     near = lambda p: p[0] > 238 and p[1] > 238 and p[2] > 238
     seen = bytearray(w * h); q = deque()
@@ -37,7 +48,7 @@ for i, n in enumerate(names):
             seen2[ny * w + nx] = 1
             p = px[nx, ny]
             if p[3] and gray(p): px[nx, ny] = (255, 255, 255, 0); q.append((nx, ny))
-    # Komşu karelerden taşan parçalar: yalnız en büyük bağlı parça (figür) kalır
+    # Kırıntılar: 30 pikselden küçük kopuk parçalar silinir (ampulün ışınları gibi küçük ama gerçek parçalar kalır)
     lab = [0] * (w * h); best, bestn, cur = 0, 0, 0; sizes = {}
     for sy in range(h):
         for sx in range(w):
@@ -52,7 +63,7 @@ for i, n in enumerate(names):
             if cnt > bestn: best, bestn = cur, cnt
     for y in range(h):
         for x in range(w):
-            if px[x, y][3] >= 40 and sizes.get(lab[y * w + x], 0) < bestn * 0.006: px[x, y] = (255, 255, 255, 0)
+            if px[x, y][3] >= 40 and sizes.get(lab[y * w + x], 0) < 30: px[x, y] = (255, 255, 255, 0)
     # Kenar yumuşatma: zeminle komşu yarı açık pikselleri biraz saydamlaştır (beyaz hare kalmasın)
     a = c.getchannel('A')
     edge = a.filter(ImageFilter.MinFilter(3))

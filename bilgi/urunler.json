@@ -404,21 +404,20 @@
   },
   "dsv-lippa-lisuna-6-mix-cim-tohumu": {
    "ad": "DSV Lippa Lisuna 6 Mix Çim Tohumu",
-   "durum": "kismi",
+   "durum": "dogrulandi",
    "ozet": "Yaz-kış yeşil kalan, dayanıklı 6'lı çim karışımı.",
    "kullanim": [
     {
-     "alan": "Ekim miktarı",
+     "alan": "Ekim miktarı (makineyle / düzenli ekim)",
      "miktar": "Metrekareye 50-60 gram",
      "kaynak": "urun_sayfasi",
      "dogrulama": "Serin iklim çim karışımlarında en iyi kalite 40-70 g/m² ekimle elde edilmiş (akademik çalışma); uyumlu."
     },
     {
-     "alan": "Serpme ekim",
-     "miktar": "ÜRÜN SAYFASINDA: metrekareye 80-90 gram",
+     "alan": "Elle serpme ekim",
+     "miktar": "Metrekareye 80-90 gram",
      "kaynak": "urun_sayfasi",
-     "durum": "kontrol",
-     "dogrulama": "Araştırma aralığının üstünde; DSV teknik föyü bulunamadı. Doğrulanana kadar Ak Bilgi 50-60 g/m² değerini verir."
+     "dogrulama": "Elle serpmede tohum düzensiz dağıldığı için miktar artırılır; aynı üreticinin Lippa Tamu sayfası da 'makineli 50-60, elle serpme 80-90 g/m²' der. Tutarlı."
     },
     {
      "alan": "Hazırlık ve sulama",

@@ -5,6 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const config = JSON.parse(await readFile('config.json', 'utf8'));
 const kb = JSON.parse(await readFile('bilgi/urunler.json', 'utf8')).urunler;
+const oto = JSON.parse(await readFile('bilgi/urunler-otomatik.json', 'utf8')).urunler;
 const prods = JSON.parse(await readFile('public/products.json', 'utf8'));
 const bySlug = new Map(prods.items.map((p) => [p.s, p]));
 const USTA = 'Bu konuda kesin bilgi için ustamız size yardımcı olsun.';
@@ -57,10 +58,41 @@ for (const [slug, c] of Object.entries(kb)) {
     cevap, urunler: [slug, ...(c.birlikte || []).slice(0, 2)], kaynak: `kart:${slug}`,
   });
 }
+// D) Bitki → toprak (config.json > soilMatch; Ürün Bul'daki eşleştirme). Ürün canlı stoktan seçilir (dinamik)
+const PH = { 1: 'asidik', 2: 'hafif asidik', 3: 'nötr', 4: 'kireçli' };
+const desc = (pr) => { const a = [+pr[0], +pr[1], +pr[2], +pr[3], +pr[4], pr[5]];
+  return [a[1] !== a[0] ? `${PH[a[0]]}–${PH[a[1]]}` : PH[a[0]], { 2: 'iyi süzen', 3: 'çok iyi süzen' }[a[2]], { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[a[3]],
+    { 1: 'besini az', 3: 'besince zengin' }[a[4]], { k: 'kumlu', h: 'havalı' }[a[5]]].filter(Boolean).join(', '); };
+for (const pl of (config.soilMatch || {}).plants || []) {
+  const [ad, diger, grup, prof, ozel, strict] = pl;
+  if (!/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(prof || '')) continue;
+  const adlar = [ad, ...String(diger || '').split(',').map((x) => x.trim()).filter(Boolean)];
+  add({ tur: 'bitki-toprak', bitki: ad, grup, dinamik: 'toprak',
+    sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`]),
+    cevap: `${ad} ${desc(prof)} bir toprak sever.${strict === 's' ? ' Çok özel bir ortam ister; uygun hazır toprak yoksa başka toprak önermeyiz.' : ''} Önerdiğimiz toprak, o anki stok durumuna göre aşağıda gösterilir.`,
+    urunler: ozel ? [ozel] : [], kaynak: 'config:soilMatch' });
+}
+
+// E) Diğer tüm ürünler: ürün sayfasından otomatik kartlar ("ürün bilgisine göre")
+for (const [slug, c] of Object.entries(oto)) {
+  if (!bySlug.has(slug)) continue;
+  const n = lc(c.ad).replace(/\s*\|.*$/, '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  let cevap = `${c.ad}${c.ozet ? ' — ' + c.ozet : ''}`;
+  if (c.ph) cevap += `\n\npH: ${c.ph}`;
+  if (c.icerik) cevap += `\n\n${c.icerik}`;
+  if (c.kullanim.length) cevap += `\n\nÜrün bilgisine göre:\n${c.kullanim.map((k) => '• ' + k).join('\n')}`;
+  if (c.kural === 'ilac') cevap += `\n\nKullanım miktarı ve güvenlik uyarıları için ürün etiketine uyunuz. ${USTA}`;
+  const tohum = c.kategori === 'Tohumlar';
+  const sorular = [`${n} nasıl kullanılır`, `${n} ne işe yarar`, `${n} özellikleri`, `${n} nedir`];
+  if (tohum) sorular.push(`${n} ne zaman ekilir`, `${n} nasıl ekilir`, `${n} ekim zamanı`);
+  if (c.kategori === 'Kedi Ürünleri' || c.kategori === 'Köpek Ürünleri') sorular.push(`${n} günlük ne kadar verilir`, `${n} besleme miktarı`);
+  add({ tur: 'urun', urun: slug, kartDurum: 'urun_sayfasi', kategori: c.kategori, sorular, cevap, urunler: [slug, ...((bySlug.get(slug) || {}).x || []).slice(0, 2)], kaynak: `urun_sayfasi:${slug}` });
+}
+
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],
   cevap: `${pr.title || 'İndirim'}: ${pr.code} kodunu ödeme adımında kullanabilirsiniz${pr.note ? ' (' + pr.note + ')' : ''}.${pr.shipping ? ' ' + pr.shipping + '.' : ''}`, urunler: [], kaynak: 'config:promo' });
 await writeFile('bilgi/soru-havuzu.json', JSON.stringify({ _aciklama: 'Ak Bilge soru havuzu. durum: onay-bekliyor → onaylandi olunca canlıda kullanılır. Rakamlar yalnız doğrulanmış tablolardan.', surum: 1, kayit: out.length, havuz: out }, null, 1) + '\n');
 const c = (t) => out.filter((x) => x.tur === t).length;
-console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
+console.log(`Soru havuzu: ${out.length} kayıt (bitki-doz ${c('bitki-doz')}, ürün ${c('urun')}, bitki-toprak ${c('bitki-toprak')}, mağaza ${c('magaza')}), ${out.reduce((a, x) => a + x.sorular.length, 0)} soru kalıbı`);
