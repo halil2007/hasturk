@@ -43,9 +43,18 @@ log('Başlangıç sepeti: ' + JSON.stringify(await cart()));
 await p.locator(R + '.fab:not(.akfab)').tap();
 await p.locator(R + '.top input').fill(QUERY);
 await p.locator(R + '.results [data-act="add"]').first().waitFor({ timeout: 20000 });
-const name = (await p.locator(R + '.results .pname').first().textContent()).trim();
+// Seçenekli (fiyatı "...'den" yazan) ilk ürün
+const pick = await p.evaluate(() => {
+  const r = document.getElementById('urun-arama-root').shadowRoot;
+  for (const bt of r.querySelectorAll('.results [data-act="add"]')) {
+    let el = bt; for (let i = 0; i < 4 && el.parentElement; i++) { el = el.parentElement; if (/[’']den\b/.test(el.textContent)) { const n = el.querySelector('.pname'); return { id: bt.getAttribute('data-v'), name: n ? n.textContent.trim() : '' }; } }
+  }
+  return null;
+});
+if (!pick) { log('Seçenekli ürün bulunamadı'); process.exit(1); }
+const name = pick.name, ADD = R + `.results [data-act="add"][data-v="${pick.id}"]`;
 const f0 = frames;
-await p.locator(R + '.results [data-act="add"]').first().tap();
+await p.locator(ADD).first().tap();
 await p.locator(R + '.sheet.on').waitFor({ timeout: 5000 }).catch(() => {});
 let vname = '', v8 = '';
 if (await p.locator(R + '.sheet.on .vo:not([disabled])').count() > 1) {
@@ -63,7 +72,7 @@ if (!/eklendi/i.test(r.t) || qtyOf(c, v8) !== 2) { bad++; log('   ✗ beklenen: 
 await hideToast();
 
 // 2) Aynı ürünü tekrar (1 adet): adet 3 olmalı (ezilmemeli)
-await p.locator(R + '.results [data-act="add"]').first().tap();
+await p.locator(ADD).first().tap();
 await p.locator(R + '.sheet.on').waitFor({ timeout: 5000 }).catch(() => {});
 if (v8) await p.locator(R + `.sheet.on .vo[data-v^="${v8}"]`).tap();
 t0 = Date.now();
