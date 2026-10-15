@@ -1,0 +1,29 @@
+name: Ak Bilge canlı kontrol
+
+# Yayındaki Ak Bilge'yi dener: havuzdan cevaplanan bir soru, Claude'a giden bir soru, öne çıkan sorular ve sitedeki ayar.
+# Mağazaya dokunmaz. Claude sorusu bir kez (~2 sent) harcar.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/ak-check.yml']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dene
+        run: |
+          W=https://hasturk-arama.halilc2007.workers.dev
+          H='-H Origin:https://hasturkgubre.com.tr -H Content-Type:application/json'
+          echo "## Havuz sorusu" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 30 $H -d '{"q":"limon ağacına hangi gübre","s":"hasturk","n":"Ak Bilge"}' $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('kaynak:',d.get('kaynak'),'| ürün:',len(d.get('urunler') or []),'|',(d.get('cevap') or '')[:160].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
+          echo "## Claude sorusu" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 40 $H -d '{"q":"fesleğen nasıl yetiştirilir, ne sıklıkla sulanır","s":"hasturk","n":"Ak Bilge"}' $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('kaynak:',d.get('kaynak'),'| neden:',d.get('neden'),'| ürün:',d.get('urunler'),'|',(d.get('cevap') or '')[:400].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
+          echo "## Öne çıkan sorular" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 20 $W/ak/populer | tee -a $GITHUB_STEP_SUMMARY; echo
+          echo "## Ayar ve widget" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 20 $W/products.json | python3 -c "import sys,json;print('akbilge ayarı:',json.load(sys.stdin)['config'].get('akbilge'))" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 20 $W/pm-search.js | grep -c 'akbilge' | sed 's/^/widget içinde akbilge: /' | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -o /dev/null -w 'maskot görseli: %{http_code}\n' $W/akbilge/avatar.webp | tee -a $GITHUB_STEP_SUMMARY
