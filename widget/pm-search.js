@@ -2006,13 +2006,13 @@
   }
   // Müşteri ürünü sitenin kendi "Sepete ekle" butonuyla eklediğinde (panel kapalı): "Bunu alanlar bunları da aldı"
   // kartı. Öneriler gerçek siparişlerden (p.x), yoksa config.json > crossSell kurallarından; sadece stoktakiler.
-  // Ürün Bul'dan eklemede bu kart çıkmaz (orada panel içi öneri var). Kapatmak: config.json > "siteCross": false
-  // Müşteriyi rahatsız etmesin diye bir ziyarette (sekme açık kaldıkça) yalnız bir kez, en fazla 2 ürünle çıkar ve
-  // 8 sn sonra kendiliğinden kapanır; "siteCross": "her" her eklemede gösterir.
+  // Ürün Bul'dan eklemede bu kart çıkmaz (orada panel içi öneri var). Varsayılan KAPALI (mağaza isteği: ürün sayfasında
+  // sepete ekleyince pencere çıkmasın; öneriler Bilge Bey ve Ürün Bul içinde). Açmak: config.json > "siteCross": true
+  // (bir ziyarette bir kez, en fazla 2 ürün, 8 sn) ya da "her" (her eklemede).
   var OWN_ADD_T = 0, SXS_T = 0;
   function sxsSeen() { try { return sessionStorage.getItem('ua-sxs') === '1'; } catch (e) { return !!sxsSeen.v; } }
   function siteCross(vid) {
-    if (CFG.siteCross === false || isOpen || ADDING || Date.now() - OWN_ADD_T < 10000 || !root) return;
+    if (!CFG.siteCross || isOpen || ADDING || Date.now() - OWN_ADD_T < 10000 || !root) return;
     if (CFG.siteCross !== 'her' && sxsSeen()) return;
     load('low').then(function () {
       var p = BY_VAR[vid];
