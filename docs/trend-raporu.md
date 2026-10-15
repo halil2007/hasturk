@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3139 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 244 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3150 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -42,8 +42,8 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 22,5 | 8 |
-| 2 | HasTürk Sıvı Solucan Gübresi  | 15,6 | 13 |
+| 1 | HasTürk Solucan Gübresi  | 22,4 | 8 |
+| 2 | HasTürk Sıvı Solucan Gübresi  | 15,5 | 13 |
 | 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,9 | 8 |
 | 4 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 8,5 | 0 |
 | 5 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 6,4 | 8 |
@@ -164,14 +164,14 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | İnsektisit MAX 5 Lt Kampanya Paketi | 46,8 | 0,8 | %2 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 45,9 | 0 | %0 |
 | Chrysamed Subon Hijyen Sprey | 44,8 | 0 | %0 |
-| HG Asidik Torf | 33,5 | 0,5 | %1 |
-| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 30,1 | 0 | %0 |
+| HG Asidik Torf | 34,5 | 0,5 | %1 |
+| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 31,1 | 0 | %0 |
 | HG Mezar Toprağı | 28,8 | 0,5 | %2 |
 | Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 28,5 | 0 | %0 |
+| Yuka (Yucca) Toprağı Özel Karışım | 26,4 | 1 | %4 |
 | Gold Valley Fare Kulağı Tohumu 500 Gr | 25,3 | 0,9 | %4 |
-| Yuka (Yucca) Toprağı Özel Karışım | 24,4 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 24,3 | 0 | %0 |
-| Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 22,1 | 0 | %0 |
+| Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 23,1 | 0 | %0 |
 | Çim Kapama Toprağı (Leonarditli Formül) | 19,2 | 0,4 | %2 |
 
 ## Birlikte satın alınanlar (son 180 gün)
@@ -234,6 +234,9 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 |---|---|---|
 | 1 | Florist Sinek ve Unlu Bit Önleyici Bitki Spreyi | 1 |
 | 2 | HG Tarım Perliti | 1 |
+| 3 | Yediveren Bahçe Kulesi – 42 Gözlü Dikey Tarım Kulesi (Balkon & Bahçe İçin) | 1 |
+| 4 | Yonca Sabit Bahçe Kulesi 6 Kat - 24 Gözlü Dikey Tarım Kulesi | 1 |
+| 5 | Yonca Sabit Bahçe Kulesi 8 Kat - 32 Gözlü Dikey Tarım Kulesi | 1 |
 
 ## Masaüstü menü önerileri (kategori başına ilk 3)
 
