@@ -67,6 +67,8 @@ test('otomatik gönderim: kategori yalnız önerilir; kullanıcı onaylayınca e
   const acc = await catalogApi({ DEMO: '1' }, db, null, 'catalog/suggest/accept', 'POST', {}, { channel: 'hepsiburada', local: 'Bahçe › Saksı Toprakları' }, { name: 'Yönetici' });
   assert.equal(acc.remote, 'Saksı Toprağı');
   assert.equal(await first(db, "SELECT 1 AS x FROM category_suggest WHERE channel = 'hepsiburada'"), null, 'onaylanan öneri kalkar');
+  assert.equal((await autoUpload({ DEMO: '1' }, db)).hepsiburada, 0, 'müşteri kategoriyi otomatik gönderim için seçmeden ürün gitmez');
+  await setSetting(db, 'auto_upload_cats', { hepsiburada: ['Bahçe › Saksı Toprakları'] });
   const r = await autoUpload({ DEMO: '1' }, db);
   assert.equal(r.hepsiburada, 1);
   const m = await first(db, "SELECT remote_id, remote_name, attrs, user FROM category_map WHERE channel = 'hepsiburada'");
@@ -76,6 +78,26 @@ test('otomatik gönderim: kategori yalnız önerilir; kullanıcı onaylayınca e
   const u = await first(db, "SELECT user, status, items FROM product_uploads WHERE channel = 'hepsiburada'");
   assert.equal(u.user, 'Otomatik'); assert.equal(JSON.parse(u.items)[0].id, 1);
   assert.equal((await autoUpload({ DEMO: '1' }, db)).hepsiburada, 0, 'aynı ürün tekrar gönderilmez');
+  // Sistemin kendi onayladığı ("kesin" öneri) eşleşme, kategori seçilmiş olsa bile otomatik gönderimde kullanılmaz
+  await run(db, `INSERT INTO products (id, name, sku, barcode, category, variant_name, sale_price, stock, created_at, updated_at) VALUES (2, 'Gübre 1 Kg', 'G-1', '8690000000888', 'Bahçe › Gübreler', '1 Kg', 90, 3, ${t}, ${t})`);
+  await run(db, "INSERT INTO listings (channel, remote_id, product_id, price, remote_stock) VALUES ('ikas1', 'v2', 2, 90, 3)");
+  await run(db, "INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES ('Bahçe › Gübreler', 'hepsiburada', ?, ?, ?, 1, 'Otomatik (kesin)')", m.remote_id, m.remote_name, m.attrs);
+  await setSetting(db, 'auto_upload_cats', { hepsiburada: ['Bahçe › Saksı Toprakları', 'Bahçe › Gübreler'] });
+  assert.equal((await autoUpload({ DEMO: '1' }, db)).hepsiburada, 0, 'sistem onaylı eşleşmeyle ürün gitmez');
+  await run(db, "UPDATE category_map SET user = 'Yönetici' WHERE local = 'Bahçe › Gübreler'");
+  assert.equal((await autoUpload({ DEMO: '1' }, db)).hepsiburada, 1, 'kişi onaylayınca gider');
+  resetChannels();
+});
+
+test('otomatik gönderim kategorileri: seçim gelmeden önce açık olan kanalda elle onaylı eşleşmeler bir kez seçili sayılır', async () => {
+  const { autoCats } = await import('../src/catalog.js');
+  const db = d1(); await init(db); resetChannels();
+  await run(db, "INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES ('A', 'trendyol', '5', 'X', '{}', 1, 'Yönetici'), ('B', 'trendyol', '6', 'Y', '{}', 1, 'Otomatik (kesin)'), ('C', 'hepsiburada', '7', 'Z', '{}', 1, 'Yönetici')");
+  await setSetting(db, 'auto_upload', { trendyol: true, hepsiburada: false });
+  assert.deepEqual(await autoCats(db), { trendyol: ['A'] });
+  // Sonradan eklenen eşleşme kendiliğinden seçilmez
+  await run(db, "INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES ('D', 'trendyol', '8', 'W', '{}', 1, 'Yönetici')");
+  assert.deepEqual(await autoCats(db), { trendyol: ['A'] });
   resetChannels();
 });
 

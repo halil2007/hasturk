@@ -288,11 +288,12 @@ test('N11: sorular durum süzgeci boş (tüm sorular) istenir, cevaplanan soru g
   assert.match(calls[0].body, /<status><\/status>/);
   assert.ok(calls[0].headers['User-Agent'], 'util http() kimliği eklenir');
   assert.deepEqual(r.items.map((q) => [q.remoteId, q.status, q.answer]), [['1', 'answered', 'Evet'], ['2', 'waiting', null]]);
-  calls = mock([[/productService/, (u, o) => (/<status><\/status>/.test(o.body) ? { __status: 500, body: '<s:Envelope><s:Body><s:Fault><faultstring>status zorunlu</faultstring></s:Fault></s:Body></s:Envelope>' } : xml)]]);
+  const none = '<x><result><status>success</status></result><productQuestions></productQuestions></x>';
+  calls = mock([[/productService/, (u, o) => (/<status><\/status>/.test(o.body) ? { __status: 500, body: '<s:Envelope><s:Body><s:Fault><faultstring>status zorunlu</faultstring></s:Fault></s:Body></s:Envelope>' } : /<status>CLOSED<\/status>/.test(o.body) ? none : xml)]]);
   const c2 = n11({ N11_APP_KEY: 'k', N11_APP_SECRET: 's' }, { id: 'n11' });
   assert.equal((await c2.questions({ since: Date.now() - D })).items.length, 2);
   await c2.questions({ since: Date.now() - D });
-  assert.deepEqual(calls.map((c) => /<status>OPEN<\/status>/.test(c.body)), [false, true, true], 'reddedilince bu bağlantıda yalnız açık sorular');
+  assert.deepEqual(calls.map((c) => (c.body.match(/<status>(\w*)<\/status>/) || [])[1]), ['', 'OPEN', 'CLOSED', 'OPEN', 'CLOSED'], 'reddedilince bu bağlantıda açık ve kapanan sorular ayrı');
   mock([[/productService/, { __status: 500, body: '<s:Envelope><s:Body><s:Fault><faultstring>Yetkisiz</faultstring></s:Fault></s:Body></s:Envelope>' }]]);
   await assert.rejects(c2.answer({ remote_id: '1' }, 'x'), /N11 SaveProductAnswer: HTTP 500 Yetkisiz/);
 });

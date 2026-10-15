@@ -1046,6 +1046,7 @@ async function saveSettings(db, b) {
     }
     if (k === 'label_size') v = ['100x150', 'a5', 'a4'].includes(v) ? v : '100x150';
     if (k === 'stock_push' || k === 'auto_upload') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, !!x]));
+    if (k === 'auto_upload_cats') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, [...new Set((Array.isArray(x) ? x : []).map((l) => str(l).slice(0, 200)))].slice(0, 2000)]));
     if (k === 'hold_channels') v = [...new Set((Array.isArray(v) ? v : []).filter((c) => isChannelId(c)))];
     if (k === 'mail_enabled' || k === 'daily_digest') v = !!v;
     if (k === 'mail_to') {

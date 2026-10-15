@@ -147,10 +147,12 @@ export function n11(env, meta) {
   async function questions({ since, until = Date.now(), page = 0 }) {
     if (page > 0) return { items: [], hasNext: false };
     const ask = (st) => soap('GetProductQuestionList', `<productQuestionSearch><productId></productId><buyerEmail></buyerEmail><subject></subject><status>${st}</status><startDate>${dmy(since)}</startDate><endDate>${dmy(until)}</endDate></productQuestionSearch><pagingData><currentPage>0</currentPage><pageSize>100</pageSize></pagingData>`);
-    let x;
+    let x, closed = '';
     if (qOpenOnly) x = await ask('OPEN');
     else try { x = await ask(''); } catch (e) { if (e.budget || /bağlantı hatası|HTTP 429/.test(e.message)) throw e; qOpenOnly = true; x = await ask('OPEN'); }
-    const items = tags(x, 'productQuestion').map((q) => ({
+    // Yalnız açık sorular okunabiliyorsa kapananlar ayrıca istenir: N11 panelinden cevaplanan soru panelde "bekliyor" kalmasın
+    if (qOpenOnly) try { closed = await ask('CLOSED'); } catch (e) { if (e.budget) throw e; }
+    const items = [...tags(x, 'productQuestion'), ...tags(closed, 'productQuestion')].map((q) => ({
       remoteId: tag(q, 'id'), text: [tag(q, 'questionSubject'), tag(q, 'question')].filter(Boolean).join(' — '), status: tag(q, 'answer') ? 'answered' : 'waiting', remoteStatus: tag(q, 'answer') ? 'CLOSED' : 'OPEN',
       productName: tag(q, 'productTitle'), sku: tag(q, 'productId'), answer: tag(q, 'answer') || null,
     })).filter((q) => q.remoteId);
