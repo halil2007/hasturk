@@ -151,7 +151,7 @@
   },
   "phone": "+90 553 942 29 61",
   "whatsapp": "905539422961",
-  "akbilge": { "enabled": false, "name": "Ak Bilge" },
+  "akbilge": { "enabled": true, "name": "Ak Bilge" },
   "pages": [
     {
       "title": "Blog",
