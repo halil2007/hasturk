@@ -1202,7 +1202,9 @@
         if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, ''); }).join('') + '</div>';
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda ustamıza danışın.</p>';
-      return akBot(pose, html) + (prods ? '<div class="akpw">' + prods + '</div>' : '') + akVoteHtml(it, idx);
+      // Cevap müşteriyi bize yönlendiriyorsa ("ustamıza danışın", "WhatsApp'tan yazın") düğmeler hemen altında olsun
+      var refer = /whatsapp|ustamız|ustamıza|bize yazın|bizi arayın|uzmanımız/i.test(d.cevap) && it.oy == null;
+      return akBot(pose, html) + (prods ? '<div class="akpw">' + prods + '</div>' : '') + (refer ? akContact(q, '') : '') + akVoteHtml(it, idx);
     }
     var why = d.ok === false || d.neden === 'hata' ? 'Şu an bağlantıda bir sorun oldu.'
       : d.neden === 'emin-degil' ? 'Bu konuda size kesin ve doğru bilgi verebilmem için ustamızın bakması daha doğru olur.'
