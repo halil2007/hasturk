@@ -209,18 +209,57 @@ export async function financeView(el, rest, query = {}) {
           <div class="muted tiny">Kargo, stopaj, hizmet bedeli ve reklam ayrı kesilir; ikisinde de hesaba girmez.</div></div></div>
     </div>`;
   };
+  // Farkın takibi (itiraz edildi / çözüldü / kabul edildi) ve pazaryerine iletilecek itiraz metni
+  const DISP_PILL = { disputed: 'warn', resolved: 'good', accepted: 'info' };
+  const dispLine = (x) => (x.dispute ? html`<div class="tiny" style="margin-top:3px;white-space:normal;max-width:380px"><span class="pill tiny ${DISP_PILL[x.dispute.status] || ''}" style="padding:2px 8px">${x.dispute.label}</span>
+    ${x.dispute.changed ? html`<b style="color:var(--bad)">fark değişti</b> · ` : ''}<span class="muted">${x.dispute.note || ''}${x.dispute.at ? ` · ${date(x.dispute.at)}` : ''}${x.dispute.by ? ` · ${x.dispute.by}` : ''}</span></div>` : '');
+  const stlRow = (id) => (stl ? [...stl.diffs, ...(stl.closed || []), ...(stl.pending || []), ...((stl.search || {}).found || [])].find((x) => x.id === id) : null);
+  const pctOf = (a, b) => (b ? `%${(Math.round((a / b) * 1000) / 10).toLocaleString('tr-TR')}` : '—');
+  const disputeText = (x) => {
+    const e = (x.detail || {}).expect || {}, recs = (x.detail || {}).records || [];
+    return [`Sipariş no: ${x.order_number} (${ch(x.channel).name})`, `Sipariş tarihi: ${date(x.ordered_at)}`,
+      `Beklenen hakediş (satış − komisyon, KDV dahil): ${money(x.expected)}`, `Pazaryerinin ödediği / ödeyeceği: ${money(x.actual)}`, `Fark: ${x.diff > 0 ? '+' : ''}${money(x.diff)}`,
+      `Satış: kayıtlarda ${money(x.sales)}, siparişte ${money(e.revenue ?? x.estRevenue)}`,
+      `Komisyon: kesilen ${money(x.commission)} (${pctOf(x.commission, x.sales)}), beklenen ${money(e.commission ?? x.estCommission)} (${pctOf(e.commission ?? x.estCommission, e.revenue ?? x.estRevenue)})`,
+      `Tespit: ${x.reason}`,
+      ...(recs.length ? ['Kayıtlar:', ...recs.map((r) => `- ${r.type}${r.rawType ? ` (${r.rawType})` : ''} ${money(r.amount)} · kayıt ${r.id}${r.raw && r.raw.invoiceNumber ? ` · fatura ${r.raw.invoiceNumber}` : ''} · vade ${r.due ? date(r.due) : '—'}`)] : []),
+      'Farkın kontrol edilip düzeltilmesini rica ederiz.'].join('\n');
+  };
+  function disputeForm(x) {
+    const d = x.dispute || {}, txt = disputeText(x);
+    const s = sheet({
+      title: `#${x.order_number} · fark takibi`, size: 'narrow',
+      body: html`<div class="stack">
+        <div class="small">Fark <b class="num" style="color:${x.diff < 0 ? 'var(--bad)' : 'var(--good)'}">${x.diff > 0 ? '+' : ''}${money(x.diff)}</b> · ${x.reason}</div>
+        <label class="field"><span>Durum</span><select class="input" data-d="status">
+          <option value="">Takip yok (açık fark)</option>
+          ${Object.entries(stl.disputes || {}).map(([k, l]) => html`<option value="${k}" ${d.status === k ? 'selected' : ''}>${l}</option>`)}</select></label>
+        <div class="muted tiny">İtiraz edildi: fark listede kalır, işaretli görünür; pazaryeri düzeltince kendiliğinden “Çözüldü” olur. Çözüldü / Kabul edildi: fark kapatılır, sayıya girmez; tutar değişirse yeniden açılır.</div>
+        <label class="field"><span>Not (talep no, görüşme …)</span><input class="input" data-d="note" maxlength="500" value="${d.note || ''}" placeholder="ör. Destek talebi 12345"></label>
+        <label class="field"><span>Pazaryerine iletilecek metin</span><textarea class="input" data-d="txt" rows="9" readonly style="font-size:12px">${txt}</textarea></label>
+      </div>`,
+      foot: html`<button class="btn ghost" data-copy><i class="ico ico-copy"></i>Metni kopyala</button><span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`,
+    });
+    $('[data-copy]', s.el).onclick = () => navigator.clipboard.writeText(txt).then(() => toast('İtiraz metni kopyalandı'), () => toast('Kopyalanamadı', true));
+    $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
+      await api('settlements/dispute', { method: 'POST', body: { channel: x.channel, order_number: x.order_number, status: $('[data-d=status]', s.el).value, note: $('[data-d=note]', s.el).value, diff: x.diff } });
+      s.close(); toast('Takip kaydedildi'); await loadStl();
+    });
+  }
   const diffTable = (rows) => html`<div class="table-wrap"><table class="t stl-t"><thead><tr><th>Sipariş</th><th class="r m-hide">Panel hesabı</th><th class="r m-hide">Pazaryeri</th><th class="r">Fark</th></tr></thead><tbody>
     ${rows.map((x) => html`<tr><td><div>${chLogo(x.channel, true)} <a class="link" href="#/siparisler/${encodeURIComponent(x.id)}"><b>#${x.order_number}</b></a> <span class="muted tiny">${date(x.ordered_at)}</span></div>
-        <div class="tiny muted" style="white-space:normal;max-width:380px">${sidePill(/^wait_/.test(x.code) ? 'wait' : x.side)} ${x.reason}</div><div class="tiny muted m-only">Panel ${money(x.expected)} · Pazaryeri ${money(x.actual)}</div>
-        <button class="btn sm ghost" style="margin-top:4px" data-act="stlx" data-id="${x.id}">${stlOpen.has(x.id) ? 'Ayrıntıyı gizle' : 'Ayrıntı'}</button></td>
+        <div class="tiny muted" style="white-space:normal;max-width:380px">${x.code === 'ok' ? html`<span class="pill tiny good" style="padding:2px 8px">Uyumlu</span>` : sidePill(/^wait_/.test(x.code) ? 'wait' : x.side)} ${x.reason}</div>${dispLine(x)}<div class="tiny muted m-only">Panel ${money(x.expected)} · Pazaryeri ${money(x.actual)}</div>
+        <div class="row" style="gap:4px;margin-top:4px"><button class="btn sm ghost" data-act="stlx" data-id="${x.id}">${stlOpen.has(x.id) ? 'Ayrıntıyı gizle' : 'Ayrıntı'}</button>
+        ${x.code !== 'ok' && !/^wait_/.test(x.code) && !viewOnly(state.user, 'finance') ? html`<button class="btn sm ghost" data-act="stldisp" data-id="${x.id}">${x.dispute ? 'Takibi düzenle' : 'İtiraz / takip'}</button>` : ''}</div></td>
       <td class="r num m-hide">${money(x.expected)}</td><td class="r num m-hide">${money(x.actual)}</td>
-      <td class="r num" style="font-weight:700;color:${/^wait_/.test(x.code) ? 'var(--text-2)' : x.diff < 0 ? 'var(--bad)' : 'var(--good)'}">${x.diff > 0 ? '+' : ''}${money(x.diff)}</td></tr>
+      <td class="r num" style="font-weight:700;color:${/^wait_/.test(x.code) || x.code === 'ok' ? 'var(--text-2)' : x.diff < 0 ? 'var(--bad)' : 'var(--good)'}">${x.diff > 0 ? '+' : ''}${money(x.diff)}</td></tr>
       ${stlOpen.has(x.id) ? html`<tr><td colspan="4" style="background:var(--surface-2, transparent);white-space:normal;max-width:0">${detailBox(x)}</td></tr>` : ''}`)}
     </tbody></table></div>`;
   const stlOpen = new Set();
   function drawSettlements() {
     const box = $('[data-stl]', el);
     const head = (sub = '') => html`<div class="card-pad card-head" style="flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:200px"><h2>Hakediş</h2><div class="muted small">${sub || 'Pazaryerinin size ödediği ve ödeyeceği tutarlar'}</div></div>
+      ${stl && !stl.locked && !stl.error && stl.totals && stl.totals.checked ? html`<a class="btn sm ghost" href="${'/api/settlements.csv?' + stlParams()}" title="Açık ve kapatılan farklar, bekleyenler; takip durumu ve notlarla"><i class="ico ico-download"></i>Farkları Excel'e aktar</a>` : ''}
       ${isAdmin() && stl && !stl.locked ? html`<button class="btn sm" data-act="stlsync"><i class="ico ico-sync"></i>Yenile</button>` : ''}</div>`;
     if (!stl) return render(box, html`${head()}<div class="empty"><i class="ico ico-sync spin"></i></div>`);
     if (stl.locked) return render(box, html`${head()}<div class="notice small" style="margin:12px"><i class="ico ico-key"></i><div><b>Hakediş takibi Profesyonel ve Kurumsal pakette.</b> Pazaryerinin ödemeleri ve kestiği faturalar burada görünür. <a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.</div></div>`);
@@ -244,9 +283,17 @@ export async function financeView(el, rest, query = {}) {
         <div class="kpi"><div class="label">Ödenecek</div><div class="value num">${money0(t.upcoming - t.overdue)}</div><div class="delta flat">henüz ödenmedi</div></div>
         <div class="kpi"><div class="label">Geciken</div><div class="value num" style="color:${t.overdue ? 'var(--bad)' : 'inherit'}">${money0(t.overdue)}</div><div class="delta flat">ödeme günü 3 günden fazla geçti</div></div>
         <div class="kpi"><div class="label">Bu dönemde ödenen</div><div class="value num">${money0(t.paid)}</div><div class="delta flat">ödeme gününe göre</div></div>
-        <div class="kpi"><div class="label">Mutabakat</div><div class="value num" style="color:${t.mismatched ? 'var(--warn, #b45309)' : 'var(--good)'}">${!t.checked ? '—' : t.mismatched ? `${n(t.mismatched)} fark` : 'Uyumlu'}</div><div class="delta flat">${n(t.checked)} sipariş kontrol edildi${t.pending ? ` · ${n(t.pending)} bekleniyor` : ''}</div></div>
+        <div class="kpi"><div class="label">Mutabakat</div><div class="value num" style="color:${t.mismatched ? 'var(--warn, #b45309)' : 'var(--good)'}">${!t.checked ? '—' : t.mismatched ? `${n(t.mismatched)} fark` : 'Uyumlu'}</div><div class="delta flat">${n(t.checked)} sipariş kontrol edildi${t.pending ? ` · ${n(t.pending)} bekleniyor` : ''}${t.disputed ? ` · ${n(t.disputed)} itirazda` : ''}${t.closed ? ` · ${n(t.closed)} kapatıldı` : ''}</div></div>
       </div>
       ${t.commissionCredit && t.commissionCredit.orders ? html`<div class="notice small" style="margin:0 16px 12px"><i class="ico ico-check"></i><div><b>Komisyon iadesi / indirimi (pazaryeri karşıladı):</b> ${n(t.commissionCredit.orders)} siparişte ${money(t.commissionCredit.amount)}. Panel hesabına eklendi; fark sayılmadı.</div></div>` : ''}
+      ${t.campaign && t.campaign.orders ? html`<div class="notice small" style="margin:0 16px 12px"><i class="ico ico-check"></i><div><b>Pazaryerinin karşıladığı kampanya indirimi:</b> ${n(t.campaign.orders)} siparişte ${money(t.campaign.amount)} ayrıca ödendi. Müşterinin ödediği tutara eklenen bu gelir fark sayılmadı.</div></div>` : ''}
+      ${t.short ? html`<div class="notice small bad" style="margin:0 16px 12px"><i class="ico ico-warn"></i><div><b>${n(t.short)} siparişte eksik ödeme görünüyor (${money(t.shortAmount)}).</b> Tüm kayıtlar geldiği halde pazaryerinin ödediği tutar düşük. “Farklı çıkan siparişler”den ayrıntıya bakın; “İtiraz / takip” ile pazaryerine iletilecek metni kopyalayıp itirazınızı takip edebilirsiniz.</div></div>` : ''}
+      ${(stl.fixed || []).length ? html`<div class="notice small" style="margin:0 16px 12px"><i class="ico ico-check"></i><div><b>${n(stl.fixed.length)} itiraz sonuçlandı:</b> pazaryeri farkı düzeltti (${stl.fixed.slice(0, 6).map((x) => '#' + x.order_number).join(', ')}${stl.fixed.length > 6 ? ' …' : ''}). Sonraki senkronda takip “Çözüldü” olur.</div></div>` : ''}
+      <div style="padding:0 16px 12px"><form class="row" style="gap:6px;max-width:420px" data-stlsearch><input class="input" name="q" placeholder="Sipariş no ile mutabakat ara" value="${f.stlq || ''}" style="flex:1" inputmode="search">
+        <button class="btn sm">Ara</button>${f.stlq ? html`<button class="btn sm ghost" type="button" data-act="stlclear">Temizle</button>` : ''}</form></div>
+      ${stl.search ? html`<div style="padding:0 16px 8px"><div class="small" style="font-weight:650;margin-bottom:6px">“${stl.search.q}” araması · ${n(stl.search.found.length)} sipariş</div>
+        ${stl.search.found.length ? diffTable(stl.search.found) : html`<div class="muted small">Seçilen dönemde bu numarayla hakediş kaydı olan panel siparişi yok.${stl.search.unmatched.length ? '' : ' Dönemi genişletmeyi deneyin.'}</div>`}
+        ${stl.search.unmatched.length ? html`<div class="muted tiny" style="margin-top:6px">Panelde olmayan siparişlerin kayıtları: ${stl.search.unmatched.map((x) => `#${x.order_number} (${money(x.amount)})`).join(', ')}</div>` : ''}</div>` : ''}
       <div class="card-pad" style="padding-top:0;padding-bottom:6px"><b class="small">Yaklaşan ödemeler</b></div>
       ${dayTable(upc, 'due', 'stlup', 'Bekleyen ödeme yok', true)}
       <div class="card-pad" style="padding-bottom:6px"><b class="small">Bu dönemde ödenenler</b></div>
@@ -262,6 +309,9 @@ export async function financeView(el, rest, query = {}) {
       ${stl.diffs.length ? html`<details style="padding:8px 16px 4px" ${f.stlOpenD ? 'open' : ''}><summary style="cursor:pointer;font-weight:650" data-act="stlopen" data-k="stlOpenD">Farklı çıkan siparişler (${n(t.mismatched)})</summary>
         <div class="muted tiny" style="margin:6px 0">Pazaryerinin ödediği tutar, panelin hesabından farklı. Fark nedeni ve tarafı her satırda yazıyor; “Ayrıntı” ile pazaryerinin kayıtlarını ve panelin beklediğini yan yana görebilirsiniz.${t.mismatched > stl.diffs.length ? ` Farkı en büyük ${n(stl.diffs.length)} sipariş listeleniyor.` : ''}</div>
         ${diffTable(stl.diffs)}</details>` : ''}
+      ${(stl.closed || []).length ? html`<details style="padding:8px 16px 4px" ${f.stlOpenC ? 'open' : ''}><summary style="cursor:pointer;font-weight:650" data-act="stlopen" data-k="stlOpenC">Kapatılan farklar (${n(t.closed)})</summary>
+        <div class="muted tiny" style="margin:6px 0">“Çözüldü” ya da “Kabul edildi” olarak işaretlediğiniz farklar. Mutabakat sayısına girmez; farkın tutarı değişirse yeniden açılır.</div>
+        ${diffTable(stl.closed)}</details>` : ''}
       ${(stl.pending || []).length ? html`<details style="padding:8px 16px 4px" ${f.stlOpenP ? 'open' : ''}><summary style="cursor:pointer;font-weight:650" data-act="stlopen" data-k="stlOpenP">Kaydı tamamlanmayı bekleyenler (${n(t.pending)})</summary>
         <div class="muted tiny" style="margin:6px 0">Pazaryeri bu siparişlerin satış kaydını gönderdi, komisyon kaydını henüz göndermedi (ya da tersi). Hepsiburada satışı ve komisyonu ayrı kayıtlarla işler; komisyon sonradan gelir. Fark sayılmaz; kayıt gelince otomatik eşleşir. Sipariş ${Math.round(((stl.pending[0] || {}).waitUntil - (stl.pending[0] || {}).ordered_at) / D) || 45} gün içinde tamamlanmazsa ya da ödeme yapıldığı halde kayıt gelmezse farka döner.${t.pending > stl.pending.length ? ` En yeni ${n(stl.pending.length)} sipariş listeleniyor.` : ''}</div>
         ${diffTable(stl.pending)}</details>` : ''}
@@ -272,6 +322,17 @@ export async function financeView(el, rest, query = {}) {
         </tbody></table></div></details>` : ''}
       <div class="muted tiny" style="padding:8px 16px 14px">Mutabakat: pazaryerinin ödediği tutar, panelin “satış − komisyon” hesabıyla karşılaştırılır. Kargo, stopaj ve hizmet bedeli ayrı kesildiği için hesaba girmez. Trendyol'un karşıladığı indirim ve kuponlar ay sonunda ayrıca ödenir. Hepsiburada'da satış ve komisyon ayrı kayıttır: komisyon kaydı gelene kadar sipariş “bekleniyor” listesinde durur. ${t.limited ? 'Dönemin en yeni 3.000 siparişi kontrol edildi.' : ''}</div>`);
   }
+  const stlParams = () => { const [from, to] = span(); return new URLSearchParams({ from, to, ...(f.channel ? { channel: f.channel } : {}) }); };
+  async function loadStl() {
+    if (locked('finance')) return;
+    const p = stlParams(); if (f.stlq) p.set('q', f.stlq);
+    stl = await api('settlements?' + p).catch((e) => ({ error: e.message }));
+    drawSettlements();
+  }
+  el.addEventListener('submit', (e) => {
+    const fm = e.target.closest('[data-stlsearch]'); if (!fm) return;
+    e.preventDefault(); f.stlq = fm.q.value.trim(); loadStl();
+  });
   async function load() {
     store.set('finance', { range: f.range });
     setQuery({ channel: f.channel });
@@ -287,7 +348,7 @@ export async function financeView(el, rest, query = {}) {
     stl = null; drawSettlements();
     [inv, stl] = locked('finance') ? [{ locked: true }, { locked: true }] : await Promise.all([
       api('invoices?' + p).catch((e) => ({ items: [], types: [], supported: [], total: 0, sum: 0, error: e.message })),
-      api('settlements?' + new URLSearchParams([...p].filter(([k]) => k !== 'type'))).catch((e) => ({ error: e.message })),
+      api('settlements?' + new URLSearchParams([...p].filter(([k]) => k !== 'type').concat(f.stlq ? [['q', f.stlq]] : []))).catch((e) => ({ error: e.message })),
     ]);
     drawInvoices(); drawSettlements();
   }
@@ -302,7 +363,9 @@ export async function financeView(el, rest, query = {}) {
     stlx: (t) => { const id = t.dataset.id; if (stlOpen.has(id)) stlOpen.delete(id); else stlOpen.add(id); drawSettlements(); },
     // <details> açık / kapalı durumu yeniden çizimde korunur (ayrıntı açınca liste kapanmasın)
     stlopen: (t) => { const d = t.closest('details'); f[t.dataset.k] = !(d && d.open); if (d) d.open = f[t.dataset.k]; },
-    stlretry: (t) => busy(t, async () => { const [from, to] = span(); stl = await api('settlements?' + new URLSearchParams({ from, to, ...(f.channel ? { channel: f.channel } : {}) })).catch((e) => ({ error: e.message })); drawSettlements(); }),
+    stlretry: (t) => busy(t, loadStl),
+    stldisp: (t) => { const x = stlRow(t.dataset.id); if (x) disputeForm(x); },
+    stlclear: () => { f.stlq = ''; loadStl(); },
     expadd: () => expenseForm(),
     expedit: (t) => expenseForm(exp.items.find((x) => x.id === Number(t.closest('tr').dataset.id))),
     expdel: async (t) => { const x = exp.items.find((y) => y.id === Number(t.closest('tr').dataset.id)); if (x && (await confirmBox(`"${x.title}" gideri silinsin mi?`, 'Sil'))) { await api(`expenses/${x.id}`, { method: 'DELETE' }); await load(); } },

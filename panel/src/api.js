@@ -45,7 +45,7 @@ const fieldNames = (id, keys) => (keys || []).map((k) => ((fieldsFor(id) || []).
 import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js';
 import { orderCommission, commissionCheck } from './commcheck.js';
 import { shipInfo, shipFromInvoice } from './shipcost.js';
-import { orderProfit, breakdown, productProfit, productLoss, lossSummary, markLosses, lossCache, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements } from './finance.js';
+import { orderProfit, breakdown, productProfit, productLoss, lossSummary, markLosses, lossCache, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements, saveDispute, settlementCsv } from './finance.js';
 import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE, HttpError } from './util.js';
 
@@ -1705,8 +1705,13 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
         : rejectClaim(env, db, x[1], id, { lineIds: b.lines, reasonId: b.reasonId, reason: b.reason, text: b.text, file: claimFile(b.file) }, user)));
     } catch (e) { if (e instanceof HttpError) throw e; fail(400, e.message); }
   }
-  if ((path === 'settlements' || path === 'invoices' || path.startsWith('settlements/') || path.startsWith('invoices/')) && env.TENANT_SLUG) requireFeature(env, 'finance');
-  if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' }));
+  if ((path === 'settlements' || path === 'settlements.csv' || path === 'invoices' || path.startsWith('settlements/') || path.startsWith('invoices/')) && env.TENANT_SLUG) requireFeature(env, 'finance');
+  if (path === 'settlements' && m === 'GET') return json(await settlementReport(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '', q: q.q }));
+  if (path === 'settlements.csv' && m === 'GET') {
+    const csv = await settlementCsv(env, db, await getSettings(db), { from: q.from, to: q.to, channel: isChannelId(q.channel) ? q.channel : '' });
+    return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="mutabakat-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
+  }
+  if (path === 'settlements/dispute' && m === 'POST') { const b = await body(req); if (!isChannelId(b.channel)) fail(400, 'Geçersiz kanal'); return json(await saveDispute(db, b, user)); }
   if (path === 'settlements/sync' && m === 'POST') { if (user.role !== 'admin') fail(403, 'Yönetici yetkisi gerekir'); return json(await syncSettlements(env, db, { force: true })); }
   // Veri sağlık kontrolü (bkz. health.js): yönetici ya da Gelir, gider ve hakediş yetkisi; 1 saat önbellek, force=1 hemen yeniler
   if (path === 'health/data' && m === 'GET') {

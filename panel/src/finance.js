@@ -1,7 +1,7 @@
 // Gelir & gider: sipariş kârı ve dönem bazında masraf basamakları
 //   Satış − komisyon − kargo − hizmet bedeli − ek kesinti (işlem / ödeme bedeli) − stopaj = hakediş; hakediş − alış maliyeti = kâr.
 // Komisyon ve kargo, kanal bildirdiyse gerçek tutardır (sipariş satırı komisyonu, kargo faturası); yoksa Ayarlar'daki oranlarla tahmin edilir.
-import { all, allIn, first, run, getRaw, setSetting, log, notify, resolve } from './db.js';
+import { all, allIn, first, run, getRaw, setSetting, getSettings, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { chunk, fail, PRODUCT_SHIP } from './util.js';
 import { profit, costOf, rateGross, costVat, priceFor } from '../public/profit.js';
@@ -620,6 +620,8 @@ export async function syncSettlements(env, db, { force = false, only } = {}) {
       await log(db, ch.id, 'error', 'Hakediş kayıtları alınamadı: ' + e.message);
     }
   }
+  // Yeni kayıt okunduysa mutabakat bildirimleri (eksik ödeme, geciken hakediş, sonuçlanan itiraz)
+  if (Object.values(out).some((v) => typeof v === 'number')) await stlNotify(env, db, await getSettings(db)).catch((e) => { if (e.budget) throw e; });
   return out;
 }
 
@@ -688,9 +690,23 @@ export const STL_SIDES = {
 export const STL_CODES = {
   wait_commission: 'Komisyon kaydı henüz gelmedi', wait_sale: 'Satış kaydı henüz gelmedi',
   cancelled_paid: 'İptal edilen siparişe ödeme kaydı', return_pending: 'İade kaydı pazaryerine henüz düşmedi', return_unknown: 'Pazaryerinde iade var, panelde yok',
-  no_commission: 'Komisyon kaydı yok / eşleşmedi', no_sale: 'Satış kaydı yok / eşleşmedi', campaign: 'Pazaryerinin karşıladığı kampanya indirimi',
+  no_commission: 'Komisyon kaydı yok / eşleşmedi', no_sale: 'Satış kaydı yok / eşleşmedi',
   commission_diff: 'Komisyon farklı', sale_low: 'Satış tutarı düşük', sale_high: 'Satış tutarı yüksek', mixed: 'Satış ve komisyon farklı',
 };
+// Farkın takibi: itiraz edildi (açık kalır, işaretli) / çözüldü, kabul edildi (kapatılır: fark değişmedikçe listeden ve sayıdan çıkar)
+export const STL_DISPUTE = { disputed: 'İtiraz edildi', resolved: 'Çözüldü', accepted: 'Kabul edildi' };
+const DISPUTE_CLOSED = new Set(['resolved', 'accepted']);
+export async function saveDispute(db, b = {}, user = {}) {
+  const channel = String(b.channel || '').trim(), no = String(b.order_number || '').trim(), status = String(b.status || '');
+  if (!/^[a-z0-9_-]{2,40}$/.test(channel) || !no || no.length > 64) fail(400, 'Sipariş bilgisi eksik');
+  if (status && !STL_DISPUTE[status]) fail(400, 'Geçersiz durum');
+  if (!status) { await run(db, 'DELETE FROM stl_disputes WHERE channel = ? AND order_number = ?', channel, no); return { ok: true, status: '' }; }
+  const t = Date.now(), note = String(b.note || '').trim().slice(0, 500), diff = Number.isFinite(Number(b.diff)) && b.diff !== '' && b.diff != null ? r2(Number(b.diff)) : null;
+  await run(db, `INSERT INTO stl_disputes (channel, order_number, status, note, diff, by_user, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (channel, order_number) DO UPDATE SET status = excluded.status, note = excluded.note, diff = COALESCE(excluded.diff, stl_disputes.diff), by_user = excluded.by_user, updated_at = excluded.updated_at`,
+  channel, no, status, note, diff, String(user.name || user.email || '').slice(0, 80), t, t);
+  return { ok: true, status };
+}
 // Fark ayrıntısı (tanı): siparişin tüm pazaryeri kayıtları (hakedişe girmeyenler de, ham alanlarıyla) ve panelin beklediği (satırlar, satış, komisyon)
 async function stlDetails(db, list, itemsOf, ctx) {
   if (!list.length) return;
@@ -719,6 +735,8 @@ async function stlDetails(db, list, itemsOf, ctx) {
 export async function settlementReport(env, db, settings, q = {}) {
   const now = Date.now(), from = Number(q.from) || now - 30 * DAY, to = Number(q.to) || now + 1;
   const cw = q.channel ? ' AND channel = ?' : '', ca = q.channel ? [q.channel] : [];
+  // Sipariş numarasıyla arama: yalnız o siparişler karşılaştırılır; eşleşenler de ("uyumlu") listelenir
+  const qs = String(q.q || '').replace(/[^0-9A-Za-z_-]/g, '').slice(0, 40), sw = qs ? ' AND o.order_number LIKE ?' : '', sa = qs ? [`%${qs}%`] : [];
   // Ödeme günü Türkiye saatiyle (UTC+3; yaz saati yok)
   const day = "strftime('%Y-%m-%d', due_date / 1000 + 10800, 'unixepoch')";
   const todayStart = Date.parse(new Date(now + 3 * 3600e3).toISOString().slice(0, 10) + 'T00:00:00Z') - 3 * 3600e3, late = todayStart - STL_GRACE;
@@ -735,16 +753,18 @@ export async function settlementReport(env, db, settings, q = {}) {
       FROM settlements WHERE date >= ? AND date < ?${cw} GROUP BY type ORDER BY ABS(SUM(amount)) DESC`, from, to, ...ca),
     // Mutabakat: dönemde verilen, pazaryerinde hakediş kaydı olan siparişler (iptal edilenler de: iptalde ödeme kaydı olmamalı)
     all(db, `SELECT o.id, o.channel, o.order_number, o.ordered_at, o.status FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ?${q.channel ? ' AND o.channel = ?' : ''}
-      AND COALESCE(o.order_number, '') != '' AND EXISTS (SELECT 1 FROM settlements s WHERE s.channel = o.channel AND s.order_number = o.order_number) ORDER BY o.ordered_at DESC LIMIT 3000`, from, to, ...ca),
+      AND COALESCE(o.order_number, '') != ''${sw} AND EXISTS (SELECT 1 FROM settlements s WHERE s.channel = o.channel AND s.order_number = o.order_number) ORDER BY o.ordered_at DESC LIMIT 3000`, from, to, ...ca, ...sa),
     // Panelde olmayan siparişlerin kayıtları (panel kurulmadan / geçmiş aktarılmadan önceki siparişler)
-    all(db, `SELECT channel, order_number, ROUND(SUM(amount), 2) AS amount, MIN(date) AS date, COUNT(*) AS n FROM settlements s WHERE date >= ? AND date < ? AND order_number != ''${cw}
-      AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.channel = s.channel AND o.order_number = s.order_number) GROUP BY channel, order_number ORDER BY date DESC LIMIT 1000`, from, to, ...ca),
+    all(db, `SELECT channel, order_number, ROUND(SUM(amount), 2) AS amount, MIN(date) AS date, COUNT(*) AS n FROM settlements s WHERE date >= ? AND date < ? AND order_number != ''${cw}${qs ? ' AND s.order_number LIKE ?' : ''}
+      AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.channel = s.channel AND o.order_number = s.order_number) GROUP BY channel, order_number ORDER BY date DESC LIMIT 1000`, from, to, ...ca, ...sa),
     // Sipariş numarası olmayan satış / komisyon / iade kayıtları: hiçbir siparişle eşleşemez (mutabakatta görünmez)
     all(db, `SELECT channel, type, COUNT(*) AS n, ROUND(SUM(amount), 2) AS amount FROM settlements WHERE date >= ? AND date < ? AND COALESCE(order_number, '') = ''${cw}
       AND (type LIKE 'Satış%' OR type LIKE 'Komisyon%' OR type LIKE 'İade%' OR type LIKE 'Kampanya indirimi%') GROUP BY channel, type`, from, to, ...ca),
   ]);
-  const diffs = [], pending = [];
-  let checked = 0, creditN = 0, creditSum = 0;
+  const diffs = [], pending = [], closed = [], fixed = [], found = [];
+  let checked = 0, creditN = 0, creditSum = 0, campN = 0, campSum = 0;
+  const disp = new Map((await all(db, `SELECT channel, order_number, status, note, diff, by_user, updated_at FROM stl_disputes${q.channel ? ' WHERE channel = ?' : ''}`, ...ca).catch(() => []))
+    .map((d) => [d.channel + '|' + d.order_number, { status: d.status, label: STL_DISPUTE[d.status] || d.status, note: d.note || '', diff: d.diff, by: d.by_user || '', at: d.updated_at }]));
   const its0 = new Map(), ctx = new Map();
   if (orders.length) {
     const ids = orders.map((o) => o.id), items = [], rows = [];
@@ -776,18 +796,27 @@ export async function settlementReport(env, db, settings, q = {}) {
       // Yuvarlama payı: 1 ₺ ya da satışın binde 5'i (satır satır yuvarlanan komisyon, kuruş farkları)
       const tol = Math.max(1, 0.005 * Math.max(dead ? 0 : Math.abs(p.revenue), Math.abs(sales)));
       ctx.set(o.id, { p, cr, expected, dead });
-      if (Math.abs(diff) < tol) { checked++; if (cr && cr.counted && !dead) { creditN++; creditSum += cr.counted; } continue; }
+      const dp = disp.get(o.channel + '|' + o.order_number);
+      const base = { id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, sales, commission: comm, estRevenue: dead ? 0 : p.revenue, estCommission: dead ? 0 : p.commission,
+        ...(dp ? { dispute: { ...dp, changed: dp.diff != null && Math.abs(dp.diff - diff) >= tol } } : {}) };
+      if (Math.abs(diff) < tol) {
+        checked++; if (cr && cr.counted && !dead) { creditN++; creditSum += cr.counted; }
+        // İtiraz edilen fark kapandı (pazaryeri düzeltti): senkron "çözüldü" yapar (bkz. stlNotify)
+        if (dp && dp.status === 'disputed') fixed.push({ ...base, code: 'ok' });
+        if (qs) found.push({ ...base, code: 'ok', reason: 'Uyumlu: pazaryerinin ödediği tutar panelin hesabıyla aynı' });
+        continue;
+      }
       // Eksik kayıt: Hepsiburada satışı (Payment) ve komisyonu (Commission) ayrı kayıtlarla işler; komisyon kaydı satıştan sonra gelebilir.
       // Siparişin hiçbir kaydı henüz ödenmediyse ve sipariş STL_WAIT günden yeniyse fark sayılmaz: "bekleniyor" listesine girer.
       const paidAny = recs.some((r) => Number(r.np) > 0);
       const hasSale = recs.some((r) => /^Satış/.test(r.type) && Number(r.amount) > 0);
       const hasComm = recs.some((r) => r.type === 'Komisyon' || Math.abs(Number(r.commission) || 0) >= 0.01);
       const missing = dead ? '' : hasSale && !hasComm && p.commission >= tol ? 'comm' : !hasSale && hasComm ? 'sale' : '';
-      const base = { id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, sales, commission: comm, estRevenue: dead ? 0 : p.revenue, estCommission: dead ? 0 : p.commission };
       if (missing && !paidAny && now - (Number(o.ordered_at) || now) < STL_WAIT) {
         pending.push({ ...base, code: missing === 'comm' ? 'wait_commission' : 'wait_sale', side: 'panel', waitUntil: (Number(o.ordered_at) || now) + STL_WAIT,
           reason: missing === 'comm' ? 'Komisyon kaydı henüz gelmedi: pazaryeri komisyonu satış kaydından sonra ayrı kayıtla işliyor; gelince otomatik eşleşir'
             : 'Satış (ödeme) kaydı henüz gelmedi; gelince otomatik eşleşir' });
+        if (qs) found.push(pending[pending.length - 1]);
         continue;
       }
       checked++;
@@ -805,8 +834,12 @@ export async function settlementReport(env, db, settings, q = {}) {
         reason = paidAny ? 'Satış ödendi ama siparişe bağlı komisyon kaydı yok (komisyon toplu / ayrı faturayla kesilmiş ya da kayıt sipariş numarasıyla eşleşmemiş olabilir)'
           : `Komisyon kaydı ${Math.round(STL_WAIT / DAY)} günde gelmedi (kayıt sipariş numarasıyla eşleşmemiş olabilir)`;
       } else if (missing === 'sale') { code = 'no_sale'; reason = 'Komisyon kaydı var ama satış (ödeme) kaydı yok (kayıt eşleşmemiş ya da okuma aralığı dışında kalmış olabilir)'; }
-      else if (camp > 0 && Math.abs(diff - camp) < tol) { code = 'campaign'; side = 'extra'; reason = `Pazaryerinin karşıladığı kampanya indirimi (${tl(camp)}) ödendi; panelin satış tutarında yok`; }
-      else {
+      else if (camp > 0 && Math.abs(diff - camp) < tol) {
+        // Pazaryerinin karşıladığı kampanya indirimi ödendi (panelin satış tutarında yok): fark değil, ayrıca özetlenir (komisyon iadesi gibi)
+        campN++; campSum += camp;
+        if (qs) found.push({ ...base, code: 'ok', reason: `Uyumlu: pazaryerinin karşıladığı kampanya indirimi (${tl(camp)}) ayrıca ödendi` });
+        continue;
+      } else {
         // Tüm kayıtlar geldi: fark tutardadır. Komisyon oranı aynıysa fark satış tutarındadır (indirim / kupon); satış aynıysa komisyondadır
         side = diff < 0 ? 'short' : 'extra';
         const dr = sales - p.revenue, sameRate = Math.abs((sales ? comm / sales : 0) - (p.revenue ? p.commission / p.revenue : 0)) < 0.003;
@@ -814,10 +847,14 @@ export async function settlementReport(env, db, settings, q = {}) {
         else if (sameRate) { code = dr < 0 ? 'sale_low' : 'sale_high'; reason = dr < 0 ? 'Satış tutarı düşük: indirim, kupon ya da kısmi iade' : 'Satış tutarı panelden yüksek'; }
         else { code = 'mixed'; reason = `Satış ve komisyon farklı (pazaryeri komisyonu ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)})`; }
       }
-      diffs.push({ ...base, code, side, reason: crNote + reason, credit: cr ? cr.counted : 0 });
+      const x = { ...base, code, side, reason: crNote + reason, credit: cr ? cr.counted : 0 };
+      // Kapatılan fark (çözüldü / kabul edildi): fark aynı kaldıkça açık farklara ve sayıya girmez; değişirse yeniden açılır
+      (dp && DISPUTE_CLOSED.has(dp.status) && !x.dispute.changed ? closed : diffs).push(x);
+      if (qs) found.push(x);
     }
   }
   diffs.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  closed.sort((a, b) => (b.dispute.at || 0) - (a.dispute.at || 0));
   pending.sort((a, b) => b.ordered_at - a.ordered_at);
   // Fark özeti: kanal × taraf × neden (tüm farklar; listede yalnız en büyük 100'ü)
   const sumBy = new Map();
@@ -825,17 +862,81 @@ export async function settlementReport(env, db, settings, q = {}) {
     const k = `${x.channel}|${x.code}`, s = sumBy.get(k) || sumBy.set(k, { channel: x.channel, side: x.side, code: x.code, label: STL_CODES[x.code] || x.code, pending: /^wait_/.test(x.code), n: 0, diff: 0 }).get(k);
     s.n++; s.diff = r2(s.diff + x.diff);
   }
-  const shownD = diffs.slice(0, 100), shownP = pending.slice(0, 50);
-  await stlDetails(db, [...shownD, ...shownP], its0, ctx).catch(() => {});
+  // Tam liste (dışa aktarma, bildirim): ayrıntısız; ekranda farkı en büyük 100, en yeni 50 bekleyen ve 50 kapatılan
+  const shownD = q.all ? diffs : diffs.slice(0, 100), shownP = q.all ? pending : pending.slice(0, 50), shownC = q.all ? closed : closed.slice(0, 50), shownF = found.slice(0, 30);
+  if (!q.all) await stlDetails(db, [...new Set([...shownD, ...shownP, ...shownC, ...shownF])], its0, ctx).catch(() => {});
   const supported = (await getChannels(env, db)).filter((c) => c.enabled && c.settlements).map((c) => c.id);
   const um = unmatched.reduce((a, r) => a + (Number(r.amount) || 0), 0), period = types.reduce((a, r) => a + (Number(r.amount) || 0), 0);
   return {
-    from, to, lateBefore: late, supported, days, types, diffs: shownD, pending: shownP, unmatched: unmatched.slice(0, 50), sides: STL_SIDES,
+    from, to, lateBefore: late, supported, days, types, diffs: shownD, pending: shownP, closed: shownC, fixed, unmatched: unmatched.slice(0, 50), sides: STL_SIDES, disputes: STL_DISPUTE,
+    ...(qs ? { search: { q: qs, found: shownF, unmatched: unmatched.slice(0, 30) } } : {}),
     summary: [...sumBy.values()].sort((a, b) => (a.channel < b.channel ? -1 : a.channel > b.channel ? 1 : Math.abs(b.diff) - Math.abs(a.diff))),
     noOrder: noOrder.filter((r) => Math.abs(Number(r.amount) || 0) >= 0.01),
-    totals: { ...tot, period: r2(period), checked, matched: checked - diffs.length, mismatched: diffs.length, pending: pending.length, limited: orders.length >= 3000, unmatched: unmatched.length, unmatchedAmount: r2(um),
-      short: diffs.filter((x) => x.side === 'short').length, commissionCredit: { orders: creditN, amount: r2(creditSum) } },
+    totals: { ...tot, period: r2(period), checked, matched: checked - diffs.length - closed.length, mismatched: diffs.length, closed: closed.length, pending: pending.length, limited: orders.length >= 3000, unmatched: unmatched.length, unmatchedAmount: r2(um),
+      short: diffs.filter((x) => x.side === 'short').length, shortAmount: r2(diffs.filter((x) => x.side === 'short').reduce((a, x) => a + x.diff, 0)),
+      disputed: diffs.filter((x) => x.dispute && x.dispute.status === 'disputed').length, fixed: fixed.length,
+      commissionCredit: { orders: creditN, amount: r2(creditSum) }, campaign: { orders: campN, amount: r2(campSum) } },
   };
+}
+
+// Mutabakat farkları Excel (CSV): açık farklar, kapatılanlar ve bekleyenler (pazaryerine itiraz / muhasebe için; listede gösterilen 100 ile sınırlı değil)
+export async function settlementCsv(env, db, settings, q = {}) {
+  const r = await settlementReport(env, db, settings, { ...q, all: true });
+  const names = Object.fromEntries((await getChannels(env, db)).map((c) => [c.id, c.name]));
+  const cell = (v) => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s)) s = "'" + s; return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const num = (v) => String(r2(Number(v) || 0)).replace('.', ',');
+  const day = (ms) => (ms ? new Date(ms + 3 * 3600e3).toISOString().slice(0, 10) : '');
+  const SIDE = { panel: 'Panel / veri', short: 'Eksik ödeme', extra: 'Fazla ödeme' };
+  const head = ['Kanal', 'Sipariş no', 'Sipariş tarihi', 'Liste', 'Panel hesabı (₺)', 'Pazaryeri ödemesi (₺)', 'Fark (₺)', 'Pazaryeri satış (₺)', 'Pazaryeri komisyon (₺)', 'Panel satış (₺)', 'Panel komisyon (₺)', 'Taraf', 'Neden', 'Takip', 'Not'];
+  const row = (x, list) => [names[x.channel] || x.channel, x.order_number, day(x.ordered_at), list, num(x.expected), num(x.actual), num(x.diff), num(x.sales), num(x.commission), num(x.estRevenue), num(x.estCommission),
+    /^wait_/.test(x.code) ? 'Bekleniyor' : SIDE[x.side] || '', x.reason, x.dispute ? x.dispute.label + (x.dispute.changed ? ' (fark değişti)' : '') : '', x.dispute ? x.dispute.note : ''].map(cell).join(';');
+  const lines = [...r.diffs.map((x) => row(x, 'Açık fark')), ...r.closed.map((x) => row(x, 'Kapatılan')), ...r.pending.map((x) => row(x, 'Bekleniyor'))];
+  return '\ufeff' + [head.join(';'), ...lines].join('\r\n');
+}
+
+// Senkron sonrası mutabakat bildirimleri (son 60 gün, kanal başına): yeni eksik ödeme görünen siparişler, geciken hakediş, itirazı sonuçlanan
+// siparişler (pazaryeri farkı düzeltti: takip "çözüldü" olur). Aynı durum tekrar bildirilmez; düzelince bildirim kapanır.
+export async function stlNotify(env, db, settings) {
+  const now = Date.now(), chs = (await getChannels(env, db)).filter((c) => c.enabled && c.settlements && !c.demo);
+  if (!chs.length) return null;
+  const r = await settlementReport(env, db, settings, { from: now - 60 * DAY, to: now + 1, all: true });
+  const prev = (await getRaw(db, 'stl_notify').catch(() => null)) || {}, next = {}, out = {};
+  const todayStart = Date.parse(new Date(now + 3 * 3600e3).toISOString().slice(0, 10) + 'T00:00:00Z') - 3 * 3600e3;
+  // Geciken: ödeme günü 3 günden fazla geçmiş, son 30 günde vadesi gelmiş ödenmemiş kayıtlar (daha eskisi "ödendi" bilgisi güncellenmeyen kayıt olabilir: Sistem durumu)
+  const late = new Map((await all(db, `SELECT channel, ROUND(SUM(amount), 2) AS s, COUNT(*) AS n FROM settlements WHERE paid = 0 AND amount != 0 AND due_date < ? AND due_date >= ? GROUP BY channel`,
+    todayStart - STL_GRACE, now - 30 * DAY)).map((x) => [x.channel, x]));
+  for (const c of chs) {
+    const o = { short: 0, late: 0, fixed: 0 };
+    // Eksik ödeme: itiraz edilmemiş açık farklar; yalnız yeni sipariş çıkınca bildirilir
+    const sh = r.diffs.filter((x) => x.channel === c.id && x.side === 'short' && !(x.dispute && x.dispute.status === 'disputed'));
+    const seen = new Set((prev[c.id] && prev[c.id].short) || []), fresh = sh.filter((x) => !seen.has(x.order_number));
+    if (!sh.length) await resolve(db, 'stl:short:' + c.id);
+    else if (fresh.length) {
+      const sum = sh.reduce((a, x) => a + x.diff, 0);
+      await notify(db, 'stl:short:' + c.id, { level: 'warn', channel: c.id, title: `${c.name}: ${sh.length} siparişte eksik ödeme görünüyor (toplam ${tl(-sum)})`,
+        msg: `Yeni: ${fresh.slice(0, 5).map((x) => `#${x.order_number} (${tl(-x.diff)})`).join(', ')}${fresh.length > 5 ? ` ve ${fresh.length - 5} sipariş daha` : ''}. Gelir & Gider → Hakediş → Farklı çıkan siparişler'den ayrıntıya bakın; pazaryerine itiraz ettiyseniz siparişi "İtiraz edildi" olarak işaretleyin.` });
+      o.short = fresh.length;
+    }
+    const lt = late.get(c.id), lateSum = lt ? r2(lt.s) : 0, was = (prev[c.id] && prev[c.id].late) || 0;
+    if (lateSum < 1) await resolve(db, 'stl:late:' + c.id);
+    else if (Math.abs(lateSum - was) >= 1) {
+      await notify(db, 'stl:late:' + c.id, { level: 'warn', channel: c.id, title: `${c.name}: ${tl(lateSum)} hakediş ödeme gününü geçti`,
+        msg: `${lt.n} kayıt ödeme gününden 3 günden fazla geçmesine rağmen "ödendi" görünmüyor. Ödeme hesabınıza geçtiyse kayıt bir sonraki senkronda güncellenir; geçmediyse pazaryerine sorun. Gelir & Gider → Hakediş → Yaklaşan ödemeler.` });
+      o.late = lateSum;
+    }
+    // İtirazı sonuçlanan: pazaryeri farkı düzeltti
+    const fx = r.fixed.filter((x) => x.channel === c.id);
+    for (const x of fx) await run(db, "UPDATE stl_disputes SET status = 'resolved', note = TRIM(COALESCE(note, '') || ' (Fark kapandı: pazaryeri düzeltti)'), updated_at = ? WHERE channel = ? AND order_number = ? AND status = 'disputed'", now, x.channel, x.order_number);
+    if (fx.length) {
+      await notify(db, 'stl:fixed:' + c.id, { level: 'info', channel: c.id, title: `${c.name}: ${fx.length} itiraz sonuçlandı`,
+        msg: `Pazaryeri farkı düzeltti; sipariş artık panel hesabıyla uyumlu: ${fx.slice(0, 8).map((x) => '#' + x.order_number).join(', ')}${fx.length > 8 ? ` ve ${fx.length - 8} sipariş daha` : ''}. Takip "Çözüldü" yapıldı.` });
+      o.fixed = fx.length;
+    }
+    next[c.id] = { short: sh.map((x) => x.order_number).slice(0, 500), late: lateSum >= 1 ? lateSum : 0 };
+    out[c.id] = o;
+  }
+  await setSetting(db, 'stl_notify', next);
+  return out;
 }
 
 export async function listInvoices(env, db, q = {}) {

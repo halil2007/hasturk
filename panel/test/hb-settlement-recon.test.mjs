@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { hepsiburada } from '../src/channels/hepsiburada.js';
 import { d1 } from '../dev/d1.mjs';
 import { init } from '../src/db.js';
-import { syncSettlements, settlementReport, STL_WAIT } from '../src/finance.js';
+import { syncSettlements, settlementReport, STL_WAIT, saveDispute, settlementCsv, stlNotify } from '../src/finance.js';
 import { resetChannels } from '../src/channels/index.js';
 import { saveOrders } from '../src/sync.js';
 
@@ -136,7 +136,7 @@ test('Mutabakat (Hepsiburada): komisyon kaydı henüz gelmeyen yeni sipariş far
   resetChannels();
 });
 
-test('Mutabakat (Hepsiburada): tüm kayıtlar geldi ve tutar düşük → pazaryeri eksik ödemiş; pazaryerinin karşıladığı kampanya indirimi ayrı nedenle', async () => {
+test('Mutabakat (Hepsiburada): tüm kayıtlar geldi ve tutar düşük → pazaryeri eksik ödemiş; pazaryerinin karşıladığı kampanya indirimi fark değil, ayrıca özetlenir', async () => {
   const { db, now } = await reconDb(
     [['SHORT', 3000, 612], ['CAMP', 925, 204], ['EXTRA', 1000, 204]],
     [['SHORT', 'Satış', 'Payment', 3000], ['SHORT', 'Komisyon', 'Commission', -700, 700],
@@ -148,11 +148,92 @@ test('Mutabakat (Hepsiburada): tüm kayıtlar geldi ve tutar düşük → pazary
   const by = Object.fromEntries(r.diffs.map((x) => [x.order_number, x]));
   assert.deepEqual([by.SHORT.code, by.SHORT.side, by.SHORT.diff], ['commission_diff', 'short', -88]);
   assert.match(by.SHORT.reason, /Komisyon farklı/);
-  assert.deepEqual([by.CAMP.code, by.CAMP.side, by.CAMP.diff], ['campaign', 'extra', 75]);
-  assert.match(by.CAMP.reason, /kampanya indirimi \(75 ₺\)/);
+  assert.equal(by.CAMP, undefined, 'kampanya geliri fark sayılmaz');
+  assert.deepEqual(r.totals.campaign, { orders: 1, amount: 75 });
   assert.deepEqual([by.EXTRA.code, by.EXTRA.side], ['sale_high', 'extra']);
-  assert.equal(r.totals.short, 1);
+  assert.deepEqual([r.totals.short, r.totals.shortAmount, r.totals.checked, r.totals.matched, r.totals.mismatched], [1, -88, 3, 1, 2]);
+  // Sipariş numarasıyla arama: eşleşen sipariş de "uyumlu" olarak listelenir
+  const sr = await settlementReport({ DB: db }, db, SET, { from: now - 30 * D, to: now + 1, q: 'CAM' });
+  assert.deepEqual(sr.search.found.map((x) => [x.order_number, x.code]), [['CAMP', 'ok']]);
+  assert.match(sr.search.found[0].reason, /kampanya indirimi \(75 ₺\)/);
+  assert.ok(sr.search.found[0].detail.records.length === 3);
   assert.equal(r.totals.pending, 0);
   assert.ok(STL_WAIT >= 30 * D);
+  resetChannels();
+});
+
+test('Mutabakat (Hepsiburada): fark takibi (itiraz edildi / kabul edildi), fark değişince yeniden açılır, Excel çıktısı', async () => {
+  const { db, now } = await reconDb(
+    [['SHORT', 3000, 612], ['SHORT2', 1000, 204], ['EXTRA', 1000, 204]],
+    [['SHORT', 'Satış', 'Payment', 3000], ['SHORT', 'Komisyon', 'Commission', -700, 700],
+      ['SHORT2', 'Satış', 'Payment', 1000], ['SHORT2', 'Komisyon', 'Commission', -254, 254],
+      ['EXTRA', 'Satış', 'Payment', 1100], ['EXTRA', 'Komisyon', 'Commission', -224.4, 224.4]],
+  );
+  const Q = { from: now - 30 * D, to: now + 1 };
+  await assert.rejects(saveDispute(db, { channel: 'hepsiburada', order_number: 'SHORT', status: 'bilinmez' }), /Geçersiz durum/);
+  await saveDispute(db, { channel: 'hepsiburada', order_number: 'SHORT', status: 'disputed', note: 'Talep 123', diff: -88 }, { name: 'Ali' });
+  await saveDispute(db, { channel: 'hepsiburada', order_number: 'EXTRA', status: 'accepted', note: 'Fiyat farkı doğru', diff: 75.6 }, { name: 'Ali' });
+  let r = await settlementReport({ DB: db }, db, SET, Q);
+  const by = Object.fromEntries(r.diffs.map((x) => [x.order_number, x]));
+  // İtiraz edilen açık kalır, işaretlidir; kabul edilen kapatılanlara geçer
+  assert.deepEqual([by.SHORT.dispute.status, by.SHORT.dispute.label, by.SHORT.dispute.note, by.SHORT.dispute.by, by.SHORT.dispute.changed], ['disputed', 'İtiraz edildi', 'Talep 123', 'Ali', false]);
+  assert.equal(by.EXTRA, undefined);
+  assert.deepEqual(r.closed.map((x) => [x.order_number, x.dispute.status]), [['EXTRA', 'accepted']]);
+  assert.ok(r.closed[0].detail, 'kapatılanın da ayrıntısı var');
+  assert.deepEqual([r.totals.mismatched, r.totals.closed, r.totals.disputed, r.totals.matched], [2, 1, 1, 0]);
+  assert.ok(!r.summary.some((x) => x.code === 'sale_high'), 'kapatılan fark özete girmez');
+  // Excel: açık farklar + kapatılanlar, takip ve not sütunlarıyla
+  const csv = await settlementCsv({ DB: db }, db, SET, Q);
+  const lines = csv.replace(/^\ufeff/, '').split('\r\n');
+  assert.match(lines[0], /^Kanal;Sipariş no;Sipariş tarihi;Liste;Panel hesabı/);
+  assert.equal(lines.length, 4);
+  assert.ok(lines.some((l) => /;SHORT;/.test(l) && /;Açık fark;/.test(l) && /;-88;/.test(l) && /Eksik ödeme/.test(l) && /İtiraz edildi;Talep 123$/.test(l)), lines.join('\n'));
+  assert.ok(lines.some((l) => /;EXTRA;/.test(l) && /;Kapatılan;/.test(l) && /Kabul edildi;Fiyat farkı doğru$/.test(l)));
+  // Kapatılan farkın tutarı değişirse yeniden açılır
+  await db.prepare("INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, due_date, paid, synced_at) VALUES ('hepsiburada', 'x2', ?, 'İade', 'Return', 'EXTRA', -50, 0, ?, 0, 0)").bind(now, now + 20 * D).run();
+  r = await settlementReport({ DB: db }, db, SET, Q);
+  const ex = r.diffs.find((x) => x.order_number === 'EXTRA');
+  assert.ok(ex && ex.dispute.changed && ex.dispute.status === 'accepted');
+  assert.equal(r.totals.closed, 0);
+  // Takibi kaldır
+  await saveDispute(db, { channel: 'hepsiburada', order_number: 'EXTRA', status: '' });
+  r = await settlementReport({ DB: db }, db, SET, Q);
+  assert.equal(r.diffs.find((x) => x.order_number === 'EXTRA').dispute, undefined);
+  resetChannels();
+});
+
+test('Mutabakat bildirimleri (Hepsiburada): yeni eksik ödeme, geciken hakediş; itirazı sonuçlanan sipariş "çözüldü" olur; düzelince bildirim kapanır', async () => {
+  const { db, now } = await reconDb(
+    [['SHORT', 3000, 612], ['SHORT2', 1000, 204]],
+    [['SHORT', 'Satış', 'Payment', 3000], ['SHORT', 'Komisyon', 'Commission', -700, 700],
+      ['SHORT2', 'Satış', 'Payment', 1000], ['SHORT2', 'Komisyon', 'Commission', -254, 254]],
+  );
+  const env = { DB: db, ...HB_ENV };
+  // Ödeme günü 5 gün geçmiş, ödenmemiş kayıt
+  await db.prepare("INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, due_date, paid, synced_at) VALUES ('hepsiburada', 'late1', ?, 'Satış', 'Payment', 'ESKI', 450, 0, ?, 0, 0)").bind(now - 20 * D, now - 5 * D).run();
+  await saveDispute(db, { channel: 'hepsiburada', order_number: 'SHORT2', status: 'disputed', diff: -50 });
+  const notices = async () => Object.fromEntries((await db.prepare('SELECT key, level, title, msg, count, resolved_at FROM notices').all()).results.map((x) => [x.key, x]));
+  let o = await stlNotify(env, db, SET);
+  assert.deepEqual(o.hepsiburada, { short: 1, late: 450, fixed: 0 });
+  let nt = await notices();
+  assert.match(nt['stl:short:hepsiburada'].title, /Hepsiburada: 1 siparişte eksik ödeme görünüyor \(toplam 88 ₺\)/);
+  assert.match(nt['stl:short:hepsiburada'].msg, /#SHORT \(88 ₺\)/);
+  assert.ok(!/SHORT2/.test(nt['stl:short:hepsiburada'].msg), 'itiraz edilen bildirilmez');
+  assert.match(nt['stl:late:hepsiburada'].title, /450 ₺ hakediş ödeme gününü geçti/);
+  // Aynı durum tekrar bildirilmez
+  o = await stlNotify(env, db, SET);
+  assert.deepEqual(o.hepsiburada, { short: 0, late: 0, fixed: 0 });
+  assert.equal((await notices())['stl:short:hepsiburada'].count, 1);
+  // Pazaryeri SHORT2 farkını düzeltti, SHORT'u kabul ettik, geciken ödendi
+  await db.prepare("INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, due_date, paid, synced_at) VALUES ('hepsiburada', 'fx', ?, 'Komisyon', 'Commission', 'SHORT2', 50, -50, ?, 0, 0)").bind(now, now + 20 * D).run();
+  await db.prepare("UPDATE settlements SET paid = 1 WHERE remote_id = 'late1'").run();
+  await saveDispute(db, { channel: 'hepsiburada', order_number: 'SHORT', status: 'accepted', diff: -88 });
+  o = await stlNotify(env, db, SET);
+  assert.equal(o.hepsiburada.fixed, 1);
+  nt = await notices();
+  assert.ok(nt['stl:short:hepsiburada'].resolved_at && nt['stl:late:hepsiburada'].resolved_at);
+  assert.match(nt['stl:fixed:hepsiburada'].title, /1 itiraz sonuçlandı/);
+  const d = await db.prepare("SELECT status, note FROM stl_disputes WHERE order_number = 'SHORT2'").first();
+  assert.equal(d.status, 'resolved'); assert.match(d.note, /pazaryeri düzeltti/);
   resetChannels();
 });
