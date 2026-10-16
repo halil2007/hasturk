@@ -164,6 +164,8 @@ export async function settingsView(el) {
           <small>Her satır: <b>Firma = adres</b>; adreste takip numarasının geleceği yere <b>{no}</b> yazın. Kanal resmi takip bağlantısı verdiyse (ikas, Trendyol) önce o kullanılır.</small></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="label_own" ${st.label_own !== false ? 'checked' : ''} ${dis}><span></span></span>
           <span><b>Hepsiburada etiketini bizim tasarımla bas</b><br><span class="small muted">Kapalıysa Hepsiburada'nın etiketi basılır.</span></span></label>
+        <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="carrier_auto_ship" ${st.carrier_auto_ship !== false ? 'checked' : ''} ${dis}><span></span></span>
+          <span><b>Kargo entegratörü (Kargonomi…) durumunu siteye otomatik bildir</b><br><span class="small muted">Kargo firması paketi teslim alınca “Kargoya ver” kendiliğinden yapılır, takip numarası ve kargo firması sitenize (ikas, WooCommerce…) gider; teslim edilince sitede de “Teslim edildi” olur.</span></span></label>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-s="zpl_pdf" ${st.zpl_pdf ? 'checked' : ''} ${dis}><span></span></span>
           <span><b>Etiketleri PDF olarak ver (normal yazıcı)</b><br><span class="small muted">Etiket PDF olarak açılır.</span></span></label>
       </div>

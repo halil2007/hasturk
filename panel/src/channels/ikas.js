@@ -498,6 +498,22 @@ export function ikas(env, p, meta) {
     return { remoteId: pkg.remote_id };
   }
 
+  // Entegratör gönderisinin takip kodu sonradan geldi (Kargonomi takip kodunu firma kabulünden sonra verir): kargoya verilmiş ikas
+  // paketinin takip bilgisi güncellenir (müşteriye ikas'tan bildirim gider). Kargoya verilmemiş pakete "Kargoya ver"de yazılır.
+  async function updateTracking(order, pkg, t) {
+    if (!own(pkg) || !pkg.remote_id || pkg.status !== 'shipped') return;
+    await gql('mutation ($input: UpdateOrderPackageStatusInput!) { updateOrderPackageStatus(input: $input) { id } }', {
+      input: { orderId: order.remote_id, packages: [{ packageId: pkg.remote_id, status: 'FULFILLED', trackingInfo: tinfo(t, true) }] },
+    });
+  }
+  // Kargo firması teslim etti: entegratör gönderisinin ikas paketi "Teslim edildi" olur (ikas Kargo gönderisine dokunulmaz)
+  async function markDelivered(order, pkg) {
+    if (!own(pkg) || !pkg.remote_id) return;
+    const t = { tracking: pkg.tracking, barcode: pkg.barcode, cargoCompany: pkg.cargo_company, trackingUrl: pkg.tracking_url };
+    await gql('mutation ($input: UpdateOrderPackageStatusInput!) { updateOrderPackageStatus(input: $input) { id } }', {
+      input: { orderId: order.remote_id, packages: [{ packageId: pkg.remote_id, status: 'DELIVERED', trackingInfo: tinfo(t, false) }] },
+    });
+  }
   // Paketi iptal et (ikas'ta paketlemeyi geri al) — kargo firmasını değiştirmek veya yeniden bölmek için
   async function cancelPackage(order, pkg) {
     if (!pkg.remote_id) return;
@@ -681,6 +697,6 @@ export function ikas(env, p, meta) {
   return {
     ...meta, type: 'ikas', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', pack: 'external', external: { label: 'ikas Kargo ile Gönder', url: adminUrl }, ship: 'local', manualTracking: false, ownCarrier: true, label: 'remote', cargo: false, repack: false, cancelPackage: true, createProduct: true, price: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, ownShipment, createProduct, storeCategories, cargoOptions, label, cancelPackage, diagnose,
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, ownShipment, updateTracking, markDelivered, createProduct, storeCategories, cargoOptions, label, cancelPackage, diagnose,
   };
 }
