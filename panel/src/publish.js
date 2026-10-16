@@ -14,7 +14,7 @@ import { fail, str, num, brandKey } from './util.js';
 import { markupPct, cleanMarkup, AUTO_MAP_SQL } from './catalog.js';
 import { exclusive } from './locks.js';
 import { rank } from './catmatch.js';
-import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes } from './catalog.js';
+import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes, autoFill, inferBrand } from './catalog.js';
 import { HELD_SQL } from './sync.js';
 
 // Kanalın bir kez sorulan zorunlu seçenekleri (Ürün yükle → kanal seçenekleri ile aynı yer: upload_opts). Üçüncü değer: ürünün kendi alanı varsa o kullanılır.
@@ -165,7 +165,10 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
       catBox.set(key, box);
       return box;
     }
-    async function brandFor(p, catId) {
+    // Marka alanı boş ürün: paneldeki markalardan yalnız biri adında geçiyorsa o (bkz. catalog.js inferBrand)
+    const known = prods.some((p) => !str(p.brand)) ? (await all(db, "SELECT DISTINCT brand FROM products WHERE COALESCE(TRIM(brand), '') != ''")).map((r) => r.brand) : [];
+    async function brandFor(p0, catId) {
+      const p = !str(p0.brand) && known.length && inferBrand(p0.name, known) ? { ...p0, brand: inferBrand(p0.name, known) } : p0;
       const dB = (draft.brands || {})[c.id] || {};
       const pick = dB.remote_id ? dB : dB[p.brand || ''];
       if (pick && str(pick.remote_id)) return { state: 'ok', remote_id: str(pick.remote_id), name: str(pick.name), draft: true };
@@ -225,7 +228,15 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
         if (brand.remote_id) pr.brandId = brand.remote_id;
         if (brand.name && brand.state === 'ok' && (brand.remote_id || !row.brandSearch)) pr.brand = brand.name;
         try {
-          const b = await c.catalog.build(pr, map, { opts: o, pick });
+          let b = await c.catalog.build(pr, map, { opts: o, pick });
+          // Eksik zorunlu özellik ürün adından / kategorisinden kesin algılanırsa doldurulur (bkz. catalog.js inferValue)
+          if (b.missing.length) {
+            const f = await autoFill(c, cat.remote_id, map, p, b.missing);
+            if (f.filled.length) {
+              b = await c.catalog.build(pr, { ...map, attrs: f.attrs }, { opts: o, pick });
+              for (const x of f.filled) vals[x.attr] = { id: f.attrs[x.attr].id, value: x.value, from: 'auto' };
+            }
+          }
           key = b.key; payload = b.payload;
           for (const m of b.missing) {
             if (/^marka/i.test(m) || /\(Ürün yükle[^)]*seçenekleri\)/i.test(m)) continue;

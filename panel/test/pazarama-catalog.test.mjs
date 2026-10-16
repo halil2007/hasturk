@@ -87,3 +87,60 @@ test('Pazarama ürün yükleme: eşleştirme, eksik kontrolü, gönderim ve sonu
     assert.equal(r10.ok, false); assert.match(r10.error, /İndirimli satış fiyatı/);
   } finally { globalThis.fetch = realFetch; resetChannels(); }
 });
+
+test('eksik zorunlu özellik ürün adından / kategorisinden kesin algılanır (Miktar, Ürün Tipi), belirsizde eksik kalır; boş marka addan', async () => {
+  const { inferValue, inferBrand } = await import('../src/catalog.js');
+  const miktar = ['1 kg', '2 kg', '5 kg', '15 kg', '20 kg', '1000 kg', 'Diğer'].map((value, i) => ({ id: String(i + 1), value }));
+  const tip = ['Katı', 'Sıvı', 'Granül', 'Organik', 'Diğer'].map((value, i) => ({ id: 't' + i, value }));
+  const cat = 'Gübreler > Solucan Gübresi > Katı Solucan Gübresi';
+  assert.equal(inferValue(miktar, { name: 'HasTürk Solucan Gübresi - 15 Kg', category: cat }).value, '15 kg');
+  assert.equal(inferValue(miktar, { name: 'Solucan Gübresi', variant_name: '5 Kg', category: cat }).value, '5 kg');
+  assert.equal(inferValue(miktar, { name: 'Gübre 2000 gr', category: cat }).value, '2 kg', 'birim çevrilir');
+  assert.equal(inferValue(miktar, { name: "1 Ton Solucan Gübresi (20 KG'lık Çuvallarla)", category: cat }), null, 'iki ölçü: belirsiz');
+  assert.equal(inferValue(miktar, { name: 'HasTürk Solucan Gübresi (HGKSG01)', category: cat }), null, 'ölçü yok');
+  assert.equal(inferValue(miktar, { name: 'Gübre 3 Kg', category: cat }), null, 'listede yok');
+  assert.equal(inferValue(tip, { name: 'HasTürk Solucan Gübresi', category: cat }).value, 'Katı');
+  assert.equal(inferValue(tip, { name: 'Sıvı ve Katı Gübre Seti', category: cat }), null, 'adda iki değer: belirsiz');
+  assert.equal(inferValue(['1', '2', '5'].map((value) => ({ id: value, value })), { name: 'Gübre 5 Kg' }), null, 'yalnız rakam değer metinden seçilmez');
+  assert.equal(inferBrand('HasTürk Mükemmel Üçlü Set', ['HasTürk', 'HG']), 'HasTürk');
+  assert.equal(inferBrand('Bahçe Toprağı Seti', ['HasTürk']), '');
+  // Ürün Yükle: kategori eşleştirmesinde seçilmemiş Miktar / Ürün Tipi otomatik dolar, belirsiz ürün eksik kalır
+  const db = d1(); await init(db); resetChannels();
+  const env = { PANEL_PASSWORD: 'x-123456', PANEL_SECRET: 's'.repeat(32), DB: db };
+  const t = Date.now();
+  const ins = (sku, bc, name, brand) => run(db, `INSERT INTO products (sku, barcode, name, brand, category, image, sale_price, vat, desi, stock, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'https://cdn.ornek.com/a.webp', 100, 10, 2, 7, ?, ?)`, sku, bc, name, brand, cat, t, t);
+  await ins('A15', '8690015', 'HasTürk Solucan Gübresi - 15 Kg', 'HasTürk');
+  await ins('A1T', '8690016', "1 Ton Solucan Gübresi (20 KG'lık Çuvallarla)", 'HasTürk');
+  await ins('ASET', '8690017', 'HasTürk Mükemmel Üçlü Set 5 Kg', '');
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.startsWith('https://panel.test')) return real(url, opts);
+    const J = (b) => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
+    if (/connect\/token/.test(u)) return J({ data: { accessToken: 'tok', expiresIn: 3600 } });
+    if (/getCategoryTree/.test(u)) return J({ data: [{ id: G(2), parentCategories: ['Bahçe'], name: 'Katı Solucan Gübresi', leaf: true }] });
+    if (/getCategoryWithAttributes/.test(u)) return J({ data: { attributes: [
+      { id: G(60), name: 'Miktar', isRequired: true, isVariantable: false, attributeValues: miktar.map((v) => ({ id: G(100 + Number(v.id)), value: v.value })) },
+      { id: G(61), name: 'Ürün Tipi', isRequired: true, isVariantable: false, attributeValues: tip.map((v, i) => ({ id: G(200 + i), value: v.value })) }] } });
+    if (/brand\/getBrands/.test(u)) return J({ data: [{ id: G(555), name: 'HasTürk' }] });
+    return J({ data: [] });
+  };
+  try {
+    let cookie = '';
+    const call = async (path, o = {}) => {
+      const r = await worker.fetch(new Request('https://panel.test/api/' + path, { ...o, headers: { 'Content-Type': 'application/json', Cookie: cookie } }), env, { waitUntil() {} });
+      if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+      return r.json();
+    };
+    await call('login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await call('integrations/pazarama', { method: 'PUT', body: JSON.stringify({ values: { PAZARAMA_CLIENT_ID: 'id', PAZARAMA_CLIENT_SECRET: 'sec' } }) });
+    await setSetting(db, 'verified:pazarama', { at: Date.now() + 1000 }); resetChannels();
+    await call('catalog/map', { method: 'POST', body: JSON.stringify({ local: cat, channel: 'pazarama', remote_id: G(2), remote_name: 'Katı Solucan Gübresi', attrs: {} }) });
+    const cand = await call('catalog/candidates?channel=pazarama&local=' + encodeURIComponent(cat));
+    const by = Object.fromEntries(cand.items.map((x) => [x.sku, x]));
+    assert.deepEqual(by.A15.missing, [], JSON.stringify(by.A15));
+    assert.deepEqual(by.A15.auto.map((a) => `${a.name}=${a.value}`).sort(), ['Miktar=15 kg', 'Ürün Tipi=Katı']);
+    assert.deepEqual(by.A1T.missing, ['Miktar'], 'iki ölçülü üründe Miktar seçilmez');
+    assert.deepEqual(by.ASET.missing, []); assert.ok(by.ASET.auto.some((a) => a.name === 'Marka' && a.value === 'HasTürk'));
+  } finally { globalThis.fetch = real; resetChannels(); }
+});

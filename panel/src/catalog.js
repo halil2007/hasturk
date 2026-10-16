@@ -104,18 +104,87 @@ export function picker(c, catId) {
     return hits.length === 1 ? hits[0] : null;
   };
 }
+// ---------- eksik zorunlu özellikleri ürün bilgisinden algılama (yalnız kesin eşleşmede) ----------
+// Ölçü özelliği (değerleri "5 kg", "500 ml", "3 adet"…): üründe (varyant, ad) o türden TEK ölçü varsa ve listede aynı ölçü varsa.
+// Metin özelliği ("Ürün Tipi": Katı, Sıvı…): listedeki değerlerden yalnız BİRİ ürün varyantında / adında / kategorisinde kelimesi
+// kelimesine geçiyorsa (sırayla bakılır; aynı yerde birden çok değer geçerse belirsizdir, seçilmez). Genel değerler (Diğer, Yok…) seçilmez.
+const QFAM = (q) => (/(?:mg|mcg|g|kg)$/.test(q) ? 'mass' : /(?:ml|l)$/.test(q) ? 'vol' : /(?:ad|pk)$/.test(q) ? 'count' : q.replace(/^[\d.]+/, ''));
+const toKg = (t) => String(t || '').replace(/(\d+(?:[.,]\d+)?)\s*ton\b/gi, (m, v) => `${Number(v.replace(',', '.')) * 1000} kg`);
+const qtyOf = (t) => [...quantities(toKg(t))];
+const GENERIC = /^(di[gğ]er|yok|belirtilmemi[sş]|standart|karışık|karisik|mevcut de[gğ]il|hepsi|genel|other|none)$/i;
+const wordsKey = (t) => ` ${normTr(t).replace(/[^a-z0-9]+/g, ' ').trim()} `;
+function normTr(t) { return String(t || '').toLocaleLowerCase('tr').replace(/[ıİ]/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c'); }
+export function inferValue(list, p) {
+  const vals = (list || []).filter((v) => str(v.value) && !GENERIC.test(str(v.value).trim()));
+  if (!vals.length) return null;
+  const vq = vals.map((v) => ({ v, q: qtyOf(v.value) }));
+  // Ölçü özelliği: değerlerin çoğu ölçü
+  if (vq.filter((x) => x.q.length === 1).length >= Math.max(2, vals.length * 0.6)) {
+    for (const t of [p.variant_name, p.name]) {
+      const pq = qtyOf(t);
+      if (!pq.length) continue;
+      const fams = new Set(vq.filter((x) => x.q.length === 1).map((x) => QFAM(x.q[0])));
+      const mine = [...new Set(pq.filter((q) => fams.has(QFAM(q))))];
+      if (mine.length !== 1) return null; // ölçü yok ya da birden çok (ör. "1 Ton … 20 kg'lık") → belirsiz
+      const hits = vq.filter((x) => x.q.length === 1 && x.q[0] === mine[0]);
+      return hits.length === 1 ? { id: String(hits[0].v.id), value: str(hits[0].v.value), auto: true } : null;
+    }
+    return null;
+  }
+  // Metin özelliği: varyant → ürün adı → kategori yaprağı → kategori yolu
+  const cat = String(p.category || '');
+  for (const t of [p.variant_name, p.name, cat.split(/›|>/).pop(), cat]) {
+    const k = wordsKey(t);
+    if (k.trim() === '') continue;
+    // Yalnız rakamdan oluşan değer ("5") metinde ölçü / kod parçasıyla karışır: metin eşleşmesinde kullanılmaz
+    const hits = vals.filter((v) => { const w = wordsKey(v.value); return w.trim().length >= 2 && !/^\d+([.,]\d+)?$/.test(str(v.value).trim()) && k.includes(w); });
+    // Biri diğerini içeriyorsa (ör. "Solucan Gübresi" ve "Gübre") en uzunu
+    const best = hits.filter((h) => !hits.some((o) => o !== h && wordsKey(o.value).includes(wordsKey(h.value))));
+    if (best.length === 1) return { id: String(best[0].id), value: str(best[0].value), auto: true };
+    if (best.length > 1) return null;
+  }
+  return null;
+}
+// Marka: ürünün marka alanı boşsa paneldeki markalardan yalnız biri ürün adında geçiyorsa o
+export function inferBrand(name, brands) {
+  const k = wordsKey(name);
+  const hits = (brands || []).filter((b) => { const w = wordsKey(b); return w.trim().length >= 2 && k.includes(w); });
+  const best = hits.filter((h) => !hits.some((o) => o !== h && wordsKey(o).includes(wordsKey(h))));
+  return best.length === 1 ? best[0] : '';
+}
+export async function autoFill(c, catId, m, p, missing) {
+  const attrs = await c.catalog.attributes(catId).catch(() => []), add = {}, filled = [];
+  for (const a of attrs) {
+    if (!a.mandatory || isImageAttr(a)) continue;
+    if (!missing.some((x) => x === a.name || x.startsWith(a.name + ' ('))) continue;
+    const v = inferValue(await c.catalog.values(catId, a.id).catch(() => []), p);
+    if (v) { add[a.id] = { id: v.id, value: v.value }; filled.push({ attr: a.id, name: a.name, value: v.value }); }
+  }
+  return { attrs: { ...m.attrs, ...add }, filled };
+}
+
 async function buildAll(c, map, prods, opts, zeroStock, db) {
   const pick = picker(c, map.remote_id), out = [];
   // Marka eşleştirmesi (Kanallarda yayınla ekranında seçilen / adı birebir aynı bulunup hatırlanan kanal markası): ürün markasının adı
   // kanaldakiyle aynı olmasa da eşleşmiş marka kullanılır
   const brands = db && c.catalog.brands && !c.catalog.brandByCategory ? new Map((await all(db, 'SELECT brand, remote_id, remote_name FROM brand_map WHERE channel = ? AND COALESCE(remote_id, \'\') != \'\'', c.id).catch(() => [])).map((r) => [r.brand, r])) : new Map();
+  // Marka alanı boş ürün: paneldeki markalardan adında geçen (tek) marka
+  const known = db && prods.some((p) => !str(p.brand)) ? (await all(db, "SELECT DISTINCT brand FROM products WHERE COALESCE(TRIM(brand), '') != ''").catch(() => [])).map((r) => r.brand) : [];
   for (const p of prods) {
-    const pr = shape(p, opts, zeroStock);
-    const bm = brands.get(str(p.brand));
+    const pr = shape(p, opts, zeroStock), auto = [];
+    if (!str(p.brand) && known.length) { const g = inferBrand(p.name, known); if (g) { pr.brand = g; auto.push({ name: 'Marka', value: g }); } }
+    const bm = brands.get(str(pr.brand));
     if (bm) { pr.brandId = bm.remote_id; pr.brand = str(bm.remote_name) || pr.brand; }
     const m = str(p.origin) ? { ...map, attrs: await withOrigin(c, map.remote_id, map.attrs || {}, p) } : map;
-    try { out.push({ p: pr, ...(await c.catalog.build(pr, m, { opts, pick })) }); }
-    catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: ['hata: ' + e.message] }); }
+    try {
+      let b = await c.catalog.build(pr, m, { opts, pick });
+      // Eksik zorunlu özellik: ürün bilgisinden kesin algılanabiliyorsa doldurulup yeniden kurulur (doldurulanlar listede "otomatik")
+      if (b.missing.length) {
+        const f = await autoFill(c, map.remote_id, m, p, b.missing);
+        if (f.filled.length) { b = await c.catalog.build(pr, { ...m, attrs: f.attrs }, { opts, pick }); auto.push(...f.filled); }
+      }
+      out.push({ p: pr, ...b, auto });
+    } catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: ['hata: ' + e.message], auto }); }
   }
   return out;
 }
@@ -458,7 +527,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     return {
       map, listed: prods.length - open.length,
       items: open.map((p) => { const x = byId.get(p.id); const s = x ? x.p : shape(p, allOpts[c.id] || {}, !!Number(q.zero));
-        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, stock: s.stock, variant: s.variant, missing: x ? x.missing : [gone ? STALE_MSG : 'kategori eşleştirilmemiş'], sent: sent.has(p.id) }; }),
+        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, stock: s.stock, variant: s.variant, missing: x ? x.missing : [gone ? STALE_MSG : 'kategori eşleştirilmemiş'], auto: (x && x.auto) || [], sent: sent.has(p.id) }; }),
       ...(gone ? { stale: STALE_MSG } : {}),
     };
   }
