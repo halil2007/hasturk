@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3391 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3428 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -10,7 +10,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 
 | # | Ürün | Hızlanma | Son 7 gün satış | Stokta |
 |---|---|---|---|---|
-| 1 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×3,4 | 4 | evet |
+| 1 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×4,7 | 4 | evet |
 | 2 | HG Tarım Perliti | ×3,2 | 0 | evet |
 | 3 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
 | 4 | Guanokalong Yarasa Gübresi Toz | ×4,1 | 0 | evet |
@@ -24,7 +24,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 12 | Hastürk Katı Solucan Gübresi 20 Kg | ×5,1 | 3 | evet |
 | 13 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3,6 | 0 | evet |
 | 14 | Altınvadi Bezelye Tohumu 25 Gr | ×8,7 | 2 | evet |
-| 15 | Altınvadi Ispanak Tohumu 10 Gr | ×7,1 | 1 | evet |
+| 15 | HasTürk Sıvı Solucan Gübresi  | ×1,7 | 2 | evet |
 
 ## Yaklaşan sezon (geçmiş yıllarda önümüzdeki 1 ayda satanlar)
 
@@ -42,9 +42,9 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 21,9 | 8 |
-| 2 | HasTürk Sıvı Solucan Gübresi  | 16 | 13 |
-| 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,6 | 8 |
+| 1 | HasTürk Solucan Gübresi  | 21,8 | 8 |
+| 2 | HasTürk Sıvı Solucan Gübresi  | 16 | 11 |
+| 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,5 | 6 |
 | 4 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 7,2 | 9 |
 | 5 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 6,8 | 0 |
 | 6 | Altınvadi Roka Tohumu (Toros İri Yaprak)  | 6,1 | 6 |
@@ -58,7 +58,7 @@ _Henüz veri yok._
 | 14 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı)  | 4,6 | 5 |
 | 15 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 4,6 | 0 |
 | 16 | HG Akıllı Bitki ve Saksı Toprağı | 4,3 | 5 |
-| 17 | Premium Fide Toprağı | 4,2 | 0 |
+| 17 | Premium Fide Toprağı | 4,1 | 0 |
 | 18 | HG Asidik Torf | 4 | 6 |
 | 19 | HG Mezar Toprağı | 3,8 | 5 |
 | 20 | HG Tarım Perliti | 3,4 | 3 |
@@ -75,8 +75,8 @@ _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 g
 | 4 | tarım perliti | 7 | 6 | ↑ ×3,3 |  |
 | 5 | solucan gübresi | 15 | 4 |  |  |
 | 6 | solucan | 16 | 2 |  |  |
-| 7 | kaktüs | 3 | 3 | ↑ ×2,4 |  |
-| 8 | toprak | 4 | 3 | ↑ ×2,1 |  |
+| 7 | toprak | 5 | 4 | ↑ ×2,5 |  |
+| 8 | kaktüs | 3 | 3 | ↑ ×2,4 |  |
 | 9 | torf | 8 | 0 |  |  |
 | 10 | modüler | 5 | 2 |  |  |
 | 11 | uzman | 5 | 2 |  |  |
@@ -102,30 +102,30 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | # | Kelime | Arama |
 |---|---|---|
 | 1 | nnh. cccccx x , z , vb. nb | 2 |
-| 2 | blur | 1 |
-| 3 | proline kalın | 1 |
-| 4 | proline kedi kumu kalın | 1 |
-| 5 | zeytin toprağı | 1 |
-| 6 | adaçayı | 1 |
-| 7 | adaçayı tohumu | 1 |
-| 8 | akülü budama m | 1 |
-| 9 | akülü budama ma | 1 |
-| 10 | akülü budama mak | 1 |
-| 11 | akülü budama makas | 1 |
-| 12 | akülü budama makası | 1 |
-| 13 | altlık | 1 |
-| 14 | bahçe yatağıaranjman | 1 |
-| 15 | brokoli | 1 |
-| 16 | brokoli tohumu | 1 |
-| 17 | deet 50 | 1 |
-| 18 | safran | 1 |
-| 19 | щюз | 1 |
-| 20 | щюң ю ңңб ю | 1 |
-| 21 | щюң ю ңңб ю ьььььбң | 1 |
-| 22 | щюң ю ңңб ю ьььььбң ң | 1 |
-| 23 | щюң ю ңңб ю ң | 1 |
-| 24 | kompost | 2 |
-| 25 | gardenya | 1 |
+| 2 | starlicw ortanca | 1 |
+| 3 | blur | 1 |
+| 4 | proline kalın | 1 |
+| 5 | proline kedi kumu kalın | 1 |
+| 6 | zeytin toprağı | 1 |
+| 7 | adaçayı | 1 |
+| 8 | adaçayı tohumu | 1 |
+| 9 | akülü budama m | 1 |
+| 10 | akülü budama ma | 1 |
+| 11 | akülü budama mak | 1 |
+| 12 | akülü budama makas | 1 |
+| 13 | akülü budama makası | 1 |
+| 14 | altlık | 1 |
+| 15 | bahçe yatağıaranjman | 1 |
+| 16 | brokoli | 1 |
+| 17 | brokoli tohumu | 1 |
+| 18 | deet 50 | 1 |
+| 19 | safran | 1 |
+| 20 | щюз | 1 |
+| 21 | щюң ю ңңб ю | 1 |
+| 22 | щюң ю ңңб ю ьььььбң | 1 |
+| 23 | щюң ю ңңб ю ьььььбң ң | 1 |
+| 24 | щюң ю ңңб ю ң | 1 |
+| 25 | kompost | 2 |
 
 ## En çok sepete eklenenler
 
@@ -139,18 +139,18 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 6 | Altınvadi Ispanak Tohumu 10 Gr | 4,7 | 4,1 |
 | 7 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 4,4 | 21 |
 | 8 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,4 | 50,9 |
-| 9 | Altınvadi Bezelye Tohumu 25 Gr | 2,9 | 3,6 |
-| 10 | Altınvadi Arapsaçı Marul Tohumu (Kıvırcık) | 2,9 | 13,6 |
-| 11 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 2,8 | 1,5 |
-| 12 | Guanokalong Yarasa Gübresi Toz | 2,8 | 95,5 |
-| 13 | Altınvadi Tere Tohumu 10 Gr  | 2,8 | 1 |
-| 14 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,6 | 2,3 |
-| 15 | Arzuman Marmande Domates Tohumu | 2,6 | 4,4 |
-| 16 | Leonardit - Organik Toprak Düzenleyici | 2,6 | 48,3 |
-| 17 | Bitki Toprağı Özel Karışım - 40 LT | 2,5 | 18,6 |
-| 18 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 2,5 | 42,7 |
-| 19 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 2,5 | 16,8 |
-| 20 | Şahnalı Acı Sivri Biber Ata Tohumu (50 Adet) | 2,5 | 5,1 |
+| 9 | Doğal Orman Toprağı / %100 Organik ve Humuslu | 3,3 | 20,9 |
+| 10 | Altınvadi Bezelye Tohumu 25 Gr | 2,9 | 3,6 |
+| 11 | Altınvadi Arapsaçı Marul Tohumu (Kıvırcık) | 2,9 | 13,6 |
+| 12 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 2,8 | 1,5 |
+| 13 | Guanokalong Yarasa Gübresi Toz | 2,8 | 95,5 |
+| 14 | Altınvadi Tere Tohumu 10 Gr  | 2,8 | 1 |
+| 15 | Arom Dere Otu Ata Tohumu (50 Adet) | 2,6 | 2,3 |
+| 16 | Arzuman Marmande Domates Tohumu | 2,6 | 4,4 |
+| 17 | Leonardit - Organik Toprak Düzenleyici | 2,6 | 48,3 |
+| 18 | Bitki Toprağı Özel Karışım - 40 LT | 2,5 | 18,6 |
+| 19 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 2,5 | 42,7 |
+| 20 | HG Monstera (Deve Tabanı) Toprağı (8 Özel Bileşen) | 2,5 | 16,8 |
 
 ## Çok bakılıp az sepete eklenenler
 
@@ -160,19 +160,19 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 |---|---|---|---|
 | Guanokalong Yarasa Gübresi Toz | 95,5 | 2,8 | %3 |
 | HasTürk Hümix Sıvı Hümik Asit | 61,8 | 2,4 | %4 |
-| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 51 | 0,7 | %1 |
-| İnsektisit MAX 5 Lt Kampanya Paketi | 49,5 | 1,7 | %3 |
+| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 53 | 1,7 | %3 |
+| İnsektisit MAX 5 Lt Kampanya Paketi | 50,5 | 1,7 | %3 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 48,5 | 0 | %0 |
 | Chrysamed Subon Hijyen Sprey | 47,5 | 0 | %0 |
 | HG Asidik Torf | 35,1 | 0,5 | %1 |
-| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 32 | 0 | %0 |
+| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 33 | 0 | %0 |
 | Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 29,6 | 0 | %0 |
 | HG Mezar Toprağı | 27,8 | 0,5 | %2 |
-| Yuka (Yucca) Toprağı Özel Karışım | 26,6 | 0,9 | %3 |
-| Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 24,6 | 0 | %0 |
+| Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 25,6 | 0 | %0 |
+| Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 23,6 | 0 | %0 |
 | Gold Valley Fare Kulağı Tohumu 500 Gr | 23,6 | 0,9 | %4 |
-| Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 22,6 | 0 | %0 |
 | Çim Kapama Toprağı (Leonarditli Formül) | 18,9 | 0,4 | %2 |
+| Tarm BioLeaf Protector Neem Yağı Yaprak Biti ve Böcek Kovucu Sprey 500 ml | 18,6 | 0 | %0 |
 
 ## Birlikte satın alınanlar (son 180 gün)
 
