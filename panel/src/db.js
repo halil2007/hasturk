@@ -421,6 +421,8 @@ export const MIGRATIONS = [
   "INSERT OR IGNORE INTO ext_sale_refs (src, ref, tok, at) SELECT src, ref, 'eski', MIN(at) FROM ext_sales GROUP BY src, ref",
   // Anahtar başına günlük satış adedi sınırı (son 24 saat) için
   'CREATE INDEX IF NOT EXISTS ext_sales_src_at ON ext_sales(src, at)',
+  // Kargonomi teklif numarası ↔ sipariş / paket (başka paketin teklifi onaylanmasın; bkz. carriers.js saveQuote). 2 gün sonra silinir
+  'CREATE TABLE IF NOT EXISTS carrier_quotes (provider TEXT NOT NULL, ref TEXT NOT NULL, order_id TEXT NOT NULL, package_id INTEGER, package_no INTEGER, at INTEGER NOT NULL, PRIMARY KEY (provider, ref))',
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
