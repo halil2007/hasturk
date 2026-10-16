@@ -55,7 +55,7 @@ const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d
 const LABEL_REMOTE = ['ikas', 'trendyol', 'hepsiburada', 'pttavm'];
 const bbIds = () => CHANNEL_IDS.filter((c) => BUYBOX_CHANNELS.includes(typeOf(c)));
 const remoteLabel = (col) => `(${col} IN ('ikas1', 'ikas2', ${LABEL_REMOTE.slice(1).map((x) => `'${x}'`).join(', ')}) OR ${LABEL_REMOTE.map((x) => `${col} LIKE '${x}\\_%' ESCAPE '\\'`).join(' OR ')})`;
-const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, cargo_applied, tracking, barcode, agreement, tracking_url, carrier_provider, carrier_ref, carrier_cost, carrier_state, carrier_status, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
+const PKG_COLS = 'id, order_id, no, remote_id, items, status, remote_status, cargo_company, cargo_code, cargo_applied, tracking, barcode, agreement, tracking_url, carrier_provider, carrier_ref, carrier_cost, carrier_cost_final, carrier_state, carrier_status, desi, created_at, shipped_at, packed_at, error, label_format, label_at, label_viewed_at, label_printed_at, label_prints, (label_data IS NOT NULL) AS has_label';
 
 // ---------- siparişler ----------
 async function loadOrder(db, id) {
@@ -296,7 +296,7 @@ export async function autoShip(env, db, orderId, packageId) {
 // ve etiketi temizlenir (paket yeniden gönderilebilir), ikas'ta açılmış entegratör paketi geri alınır. Dönüş: kanal tarafında kalan sorun
 async function finishCarrierCancel(db, o, ch, pkg, user, name, note = '') {
   if (pkg.carrier_cost && o.shipping_src === 'carrier') await run(db, 'UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) - ?) WHERE id = ?', pkg.carrier_cost, o.id);
-  await run(db, "UPDATE packages SET carrier_provider = NULL, carrier_ref = NULL, carrier_cost = NULL, carrier_state = NULL, carrier_status = NULL, carrier_checked_at = NULL, tracking = '', barcode = '', cargo_company = '', tracking_url = NULL, agreement = NULL, error = NULL, site_sync = NULL WHERE id = ?", pkg.id);
+  await run(db, "UPDATE packages SET carrier_provider = NULL, carrier_ref = NULL, carrier_cost = NULL, carrier_cost_final = NULL, carrier_state = NULL, carrier_status = NULL, carrier_checked_at = NULL, tracking = '', barcode = '', cargo_company = '', tracking_url = NULL, agreement = NULL, error = NULL, site_sync = NULL WHERE id = ?", pkg.id);
   await clearLabel(db, pkg.id);
   for (const k of ['failed', 'orphan', 'cancelno']) await resolve(db, `carrier:${k}:${pkg.id}`);
   // Not "Paket N:" ile başlar: yeniden açılan gönderinin referans eki bu kayıtlardan sayılır (bkz. carriers.js withAttempt)
@@ -526,7 +526,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     }
     const tn = str(r.tracking || r.barcode), t = Date.now();
     if (!tn && !r.ref) fail(502, `${c.name} gönderi numarası vermedi`);
-    await run(db, `UPDATE packages SET carrier_provider = ?, carrier_ref = ?, carrier_cost = ?, tracking = ?, barcode = ?, cargo_company = ?, tracking_url = ?, desi = ?,
+    await run(db, `UPDATE packages SET carrier_provider = ?, carrier_ref = ?, carrier_cost = ?, carrier_cost_final = ${r.costFinal ? 1 : 'NULL'}, tracking = ?, barcode = ?, cargo_company = ?, tracking_url = ?, desi = ?,
       agreement = 'own', packed_at = COALESCE(packed_at, ?), label_format = ?, label_data = ?, label_at = ?, label_viewed_at = NULL, label_printed_at = NULL, error = NULL WHERE id = ?`,
     c.id, str(r.ref) || null, grossCost(r), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
     t, r.label ? r.label.format : null, r.label ? r.label.data : null, r.label ? t : null, pkg.id);

@@ -119,12 +119,17 @@ export function make(values) {
   }
   const result = (s) => {
     const tracking = str(s.shipping_webservice_tracking_code), carrier = str(s.shipping_provider_name);
+    // Şubede ölçülen desi (paket başına real_desi) ve kesin ücret (real_price; ek ücret extra_shipping_price ayrıca eklenir)
+    const pk = Array.isArray(s.shipment_packages) ? s.shipment_packages : [];
+    const realDesi = pk.length && pk.every((x) => money(x.real_desi) != null) ? Math.round(pk.reduce((a, x) => a + money(x.real_desi), 0) * 100) / 100 : null;
+    const real = money(s.real_price), extra = money(s.extra_shipping_price) || 0;
     return {
+      realDesi,
       ref: str(s.id), tracking, // barkod: kargo firmasının okuttuğu barkod (Kargonomi'nin kendi sipariş barkodu değil; bizim tasarımdaki etikete basılır)
       barcode: str(s.shipping_webservice_barcode) || tracking, carrier: carrier || 'Kargonomi',
       // DOĞRULA: real_price / estimated_price KDV hariç kabul edildi (Kargonomi fiyat listeleri KDV hariç)
       // costFinal: gerçek ücret (real_price) geldi; tahmini ücretin yerine geçer (bkz. carriers.js trackCarriers)
-      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costFinal: money(s.real_price) != null, costVatIncluded: false,
+      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: real != null ? Math.round((real + extra) * 100) / 100 : money(s.estimated_price), costFinal: real != null, costVatIncluded: false,
       state: STATES[s.status] || null, text: str(s.status_label),
     };
   };
