@@ -14,7 +14,7 @@ export async function uploadView(el) {
   const mapOf = (local) => st.maps.find((m) => m.local === local && m.channel === chId);
   const sugOf = (local) => (st.suggestions || []).find((m) => m.local === local && m.channel === chId);
   // Otomatik gönderim kategorileri: yalnız kişinin onayladığı eşleşmeler seçilebilir
-  const autoCol = () => isAdmin() && !locked('autoupload') && C() && C().auto;
+  const autoCol = () => isAdmin() && !locked('autoupload') && C() && C().auto && C().scope !== 'selected';
   const autoable = () => st.categories.filter((k) => { const m = mapOf(k.local); return m && !m.auto; }).map((k) => k.local);
   const autoAll = () => { const a = autoable(); return a.length > 0 && a.every((l) => C().autoCats.includes(l)); };
   async function saveCats(list) {
@@ -45,8 +45,13 @@ export async function uploadView(el) {
       ${isAdmin() ? html`<div class="card stack" style="gap:10px">
         <h2 style="margin:0">Otomatik işlemler · ${c.name}</h2>
         ${locked('autoupload') ? html`<div class="notice small"><i class="ico ico-up"></i><div><b>Yeni ürünleri otomatik gönderme</b> Profesyonel ve Kurumsal pakette. Paketinizde ürünleri aşağıdan seçip gönderebilirsiniz. <a class="link" href="#/paketim">Paketim</a></div></div>` : html`<label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="auto_upload" ${c.auto ? 'checked' : ''}><span></span></span>
-          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">Yalnız aşağıdaki tabloda <b>Otomatik</b> sütununda seçtiğiniz kategorilerdeki, ${ek(c.name, 'da')} olmayan ve stoğu olan ürünler kendiliğinden gönderilir. İsterseniz tümünü, isterseniz bir kısmını seçin. Eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir. Kategori eşleşmesi olmayan ürün hiçbir zaman gönderilmez.</span></span></label>
-          ${c.auto && !c.autoCats.length ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Otomatik gönderim açık ama kategori seçilmedi: hiçbir ürün gönderilmez. Aşağıdan <b>Otomatik</b> sütununda kategori seçin.</div></div>` : ''}`}
+          <span><b>Yeni ürünleri otomatik gönder</b><br><span class="small muted">${c.scope === 'selected' ? html`Yalnız <b>${ek(c.name, 'a')} gönderilmek üzere seçtiğiniz</b>, ${ek(c.name, 'da')} olmayan ve stoğu olan ürünler kendiliğinden gönderilir.` : html`Yalnız aşağıdaki tabloda <b>Otomatik</b> sütununda seçtiğiniz kategorilerdeki, ${ek(c.name, 'da')} olmayan ve stoğu olan ürünler kendiliğinden gönderilir. İsterseniz tümünü, isterseniz bir kısmını seçin.`} Eksik bilgisi olanlar atlanır, reddedilenler düzeltilince yeniden denenir. Kategori eşleşmesi olmayan ürün hiçbir zaman gönderilmez.</span></span></label>
+          ${c.auto && c.scope !== 'selected' && !c.autoCats.length ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Otomatik gönderim açık ama kategori seçilmedi: hiçbir ürün gönderilmez. Aşağıdan <b>Otomatik</b> sütununda kategori seçin.</div></div>` : ''}
+          ${c.auto && c.scope === 'selected' && !c.picked ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Otomatik gönderim açık ama ${ek(c.name, 'a')} gönderilecek ürün seçilmedi: hiçbir ürün gönderilmez. Ürünler sayfasında ürünleri seçip <b>Pazaryeri seçimi</b> ile ekleyin.</div></div>` : ''}`}
+        <div class="stack" style="gap:6px"><b>${ek(c.name, 'a')} gönderilecek ürünler</b>
+          <label class="check"><input type="radio" name="scope" data-scope="all" ${c.scope !== 'selected' ? 'checked' : ''}> <span><b>Tüm ürünler</b> <span class="small muted">· kategori eşleştirmesine göre (aşağıdaki tablo)</span></span></label>
+          <label class="check"><input type="radio" name="scope" data-scope="selected" ${c.scope === 'selected' ? 'checked' : ''}> <span><b>Yalnız seçtiğim ürünler</b> <span class="small muted">· ${c.scope === 'selected' ? html`<a class="link" href="#/urunler">${n(c.picked)} ürün seçili</a>` : 'ürün bazında seçersiniz'}</span></span></label>
+          <div class="tiny muted">Seçim: Ürünler sayfasında ürünleri işaretleyip <b>Pazaryeri seçimi</b>, ya da ürün kartında <b>Pazaryeri seçimi</b>. Yalnız yeni ilan açmayı etkiler; ${ek(c.name, 'da')} zaten olan ilanların stok ve fiyatı güncellenmeye devam eder.</div></div>
         <label class="row" style="align-items:flex-start;gap:12px"><span class="switch"><input type="checkbox" data-auto="stock_push" ${c.stockPush ? 'checked' : ''}><span></span></span>
           <span><b>Stokları ${ek(c.name, 'a')} gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${ek(c.name, 'a')} gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
       </div>` : ''}
@@ -178,10 +183,11 @@ export async function uploadView(el) {
         <div class="row wrap small"><span><b>${data.items.length}</b> ürün ${ek(c.name, 'da')} yok · <b style="color:var(--good)">${ready.length}</b> gönderime hazır${data.listed ? ` · ${data.listed} ürün zaten kanalda` : ''}</span><span class="spacer"></span>
           <label class="check"><input type="checkbox" data-zero ${zero ? 'checked' : ''}> Stok 0 gönder</label><label class="check"><input type="checkbox" data-all checked> Hazır olanların tümü</label></div>
         <div class="table-wrap" style="max-height:52vh;overflow:auto"><table class="t"><thead><tr><th></th><th>Ürün</th><th class="r">Fiyat</th><th class="r">Stok</th><th>Durum</th></tr></thead><tbody>
-          ${data.items.map((x) => html`<tr><td><input type="checkbox" data-id="${x.id}" ${x.missing.length ? 'disabled' : x.sent ? '' : 'checked'} title="${x.sent ? 'Daha önce gönderildi: yeniden göndermek için işaretleyin' : ''}"></td>
+          ${data.items.map((x) => html`<tr><td><input type="checkbox" data-id="${x.id}" ${x.missing.length ? 'disabled' : x.sent || x.picked === false ? '' : 'checked'} title="${x.sent ? 'Daha önce gönderildi: yeniden göndermek için işaretleyin' : x.picked === false ? `${c.name} için seçili değil: göndermek için işaretleyin` : ''}"></td>
             <td><div class="row" style="gap:8px">${thumb(x.image, x.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:340px">${x.name}</div><div class="tiny muted">${x.sku} · ${x.barcode || 'barkod yok'}</div></div></div></td>
             <td class="r num">${fmtPrice(x)}</td><td class="r num">${x.stock}</td>
             <td>${x.missing.length ? html`<span class="tiny" style="color:var(--bad)">Eksik: ${x.missing.join(', ')}</span>` : x.sent ? html`<span class="pill warn">daha önce gönderildi</span>` : html`<span class="pill good">hazır</span>`}
+              ${x.picked === false ? html`<div class="tiny muted">${c.name} için seçili değil</div>` : ''}
               ${(x.auto || []).length ? html`<div class="tiny muted" title="Ürün adından / kategorisinden kesin eşleşmeyle dolduruldu">otomatik: ${x.auto.map((a) => `${a.name} ${a.value}`).join(' · ')}</div>` : ''}</td></tr>`)}
         </tbody></table></div>
         <p class="muted tiny" style="margin:0">Fiyat: ikas satış fiyatı${c.opts.markup ? ` + %${String(c.opts.markup).replace(/%/g, "")} (kanal ayarı)` : ''}${fxNote(data.items)}. Eksikleri ürün sayfasından ya da kategori eşleştirmesinden tamamlayın.</p>
@@ -287,6 +293,15 @@ export async function uploadView(el) {
         : e.target.checked ? [...new Set([...before, e.target.dataset.autocat])] : before.filter((l) => l !== e.target.dataset.autocat);
       try { await saveCats(list); toast(list.length ? `${list.length} kategori otomatik gönderilecek` : 'Otomatik gönderilecek kategori yok'); draw(); }
       catch (err) { C().autoCats = before; draw(); toast(err.message, true); }
+      return;
+    }
+    const sc = e.target.dataset && e.target.dataset.scope;
+    if (sc) {
+      try {
+        state.settings = await api('settings', { method: 'PUT', body: { upload_scope: { [chId]: sc } } });
+        toast(sc === 'selected' ? `${C().name}: yalnız seçtiğiniz ürünler gönderilecek` : `${C().name}: tüm ürünler (kategoriye göre) gönderilecek`);
+        await load();
+      } catch (err) { toast(err.message, true); await load(); }
       return;
     }
     const k = e.target.dataset && e.target.dataset.auto;

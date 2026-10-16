@@ -13,6 +13,7 @@ import { rank, localProfile, prepare, score } from './catmatch.js';
 import { quantities, withoutQty, norm as normQ } from './match.js';
 import { orderRate } from './fx.js';
 import { exclusive } from './locks.js';
+import { scopeOf, pendingPicks, pickCounts } from './targets.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
@@ -493,8 +494,23 @@ export async function autoUpload(env, db, settings) {
       if (!last || Date.now() - last > 864e5) { await suggestAll(db, settings, c); await setSetting(db, 'automap:' + c.id, Date.now()); }
       const skip = await sentFilter(db, c.id), stale = await staleCheck(c), gone = [];
       const ready = [];
+      // "Yalnız seçtiğim ürünler": kategori seçimi yerine ürün bazında bu kanal için seçilen ürünler (kategori eşleşmesi yine
+      // kişinin onayladığı eşleşme olmalı; eşleşmesi olmayan ürün gönderilmez)
+      if (scopeOf(settings, c.id) === 'selected') {
+        const ids = await pendingPicks(db, c.id);
+        const prods = ids.length ? (await productsFor(db, settings, { ch: c.id, ids })).filter((p) => !p.listed && !skip(p) && (p.stock || 0) > 0) : [];
+        const groups = new Map();
+        for (const p of prods) { const k = str(p.category); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+        for (const [local, list] of groups) {
+          if (ready.length >= 100) break;
+          const m = await first(db, `SELECT * FROM category_map WHERE channel = ? AND local = ? AND ${AUTO_MAP_SQL}`, c.id, local);
+          if (!m) continue;
+          if (stale(m.remote_id)) { gone.push(local); continue; }
+          for (const x of await buildAll(c, { ...m, attrs: JSON.parse(m.attrs || '{}') }, list.slice(0, 100 - ready.length), allOpts[c.id] || {}, false, db)) if (!x.missing.length) ready.push(x);
+        }
+      }
       // Yalnız müşterinin otomatik gönderim için seçtiği ve kendisinin onayladığı kategori eşleşmeleri
-      const pick = new Set(chosen[c.id] || []);
+      const pick = new Set(scopeOf(settings, c.id) === 'selected' ? [] : chosen[c.id] || []);
       for (const map of (await all(db, `SELECT * FROM category_map WHERE channel = ? AND ${AUTO_MAP_SQL}`, c.id)).filter((m) => pick.has(m.local)).map((m) => ({ ...m, attrs: JSON.parse(m.attrs || '{}') }))) {
         if (ready.length >= 100) break;
         if (stale(map.remote_id)) { gone.push(map.local); continue; }
@@ -537,10 +553,12 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const maps = await all(db, 'SELECT local, channel, remote_id, remote_name, attrs, updated_at, user FROM category_map');
     const chosen = await autoCats(db, settings);
     const sugs = await all(db, 'SELECT local, channel, remote_id, remote_name, path, score, sure FROM category_suggest WHERE remote_id IS NOT NULL');
+    const picks = await pickCounts(db);
     return {
       channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo, test: !!c.sandbox,
         reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.type] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
-        auto: !!(settings.auto_upload || {})[c.id], autoCats: chosen[c.id] || [], stockPush: !!(settings.stock_push || {})[c.id] })),
+        auto: !!(settings.auto_upload || {})[c.id], autoCats: chosen[c.id] || [], stockPush: !!(settings.stock_push || {})[c.id],
+        scope: scopeOf(settings, c.id), picked: picks[c.id] || 0 })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
       maps: maps.map((x) => ({ ...x, attrs: JSON.parse(x.attrs || '{}'), auto: /^Otomatik/.test(x.user || ''), user: undefined })),
       suggestions: sugs,
@@ -610,13 +628,16 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const sent = new Set((await all(db, "SELECT items FROM product_uploads WHERE channel = ? AND status IN ('sent', 'done') AND created_at > ?", c.id, Date.now() - 14 * 864e5))
       .flatMap((u) => JSON.parse(u.items || '[]').filter((x) => x.ok !== false).map((x) => x.id)));
     const open = prods.filter((p) => !p.listed);
+    const selected = scopeOf(settings, c.id) === 'selected';
+    const picked = selected && open.length ? new Set((await allIn(db, open.map((p) => p.id), (ph, part) => [`SELECT product_id FROM product_targets WHERE channel = ? AND product_id IN (${ph})`, [c.id, ...part]])).map((r) => r.product_id)) : null;
     const gone = map && (await staleCheck(c))(map.remote_id);
     const built = map && !gone ? await buildAll(c, map, open, allOpts[c.id] || {}, !!Number(q.zero), db) : [];
     const byId = new Map(built.map((x) => [x.p.id, x]));
     return {
       map, listed: prods.length - open.length,
       items: open.map((p) => { const x = byId.get(p.id); const s = x ? x.p : shape(p, allOpts[c.id] || {}, !!Number(q.zero));
-        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, currency: s.currency || 'TRY', fxRate: s.fxRate || null, stock: s.stock, variant: s.variant, missing: x ? x.missing : [gone ? STALE_MSG : 'kategori eşleştirilmemiş'], auto: (x && x.auto) || [], sent: sent.has(p.id) }; }),
+        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, currency: s.currency || 'TRY', fxRate: s.fxRate || null, stock: s.stock, variant: s.variant, missing: x ? x.missing : [gone ? STALE_MSG : 'kategori eşleştirilmemiş'], auto: (x && x.auto) || [], sent: sent.has(p.id), ...(picked ? { picked: picked.has(p.id) } : {}) }; }),
+      scope: selected ? 'selected' : 'all',
       ...(gone ? { stale: STALE_MSG } : {}),
     };
   }

@@ -23,7 +23,8 @@ export function mountPublish(box, { ids, pre = null, beforePublish = null } = {}
 
   async function load(path = `catalog/preflight?ids=${ids.join(',')}`, body) {
     data = body ? await api(path, { method: 'POST', body }) : await api(path, { fresh: true });
-    if (!checked) checked = new Set(data.channels.filter((c) => (pre ? pre.includes(c.id) : true) && !c.disabled && c.items.some((x) => ['ready', 'missing'].includes(x.state))).map((c) => c.id));
+    // "Yalnız seçtiğim ürünler" kapsamındaki kanal: ürünlerden biri o kanal için seçili değilse kendiliğinden işaretlenmez
+    if (!checked) checked = new Set(data.channels.filter((c) => (pre ? pre.includes(c.id) : c.scope !== 'selected' || (c.picked || []).length > 0) && !c.disabled && c.items.some((x) => ['ready', 'missing'].includes(x.state))).map((c) => c.id));
     for (const c of data.channels) if (c.items.some((x) => x.state === 'missing' || x.state === 'rejected' || x.state === 'error') && c.kind === 'market' && checked.has(c.id) && !open.size) open.add(c.id);
     draw();
     poll();
@@ -145,6 +146,7 @@ export function mountPublish(box, { ids, pre = null, beforePublish = null } = {}
             ${fixable || (c.kind === 'market' && c.cats.length) ? html`<button type="button" class="icon-btn sm" data-p="toggle" aria-label="Ayrıntı"><i class="ico ico-down"></i></button>` : ''}
           </div>
           ${s.parts ? html`<div class="tiny muted">${s.parts}</div>` : ''}
+          ${c.scope === 'selected' && !done ? html`<div class="tiny muted" title="Ürün yükle → ${c.name} → Gönderilecek ürünler">Bu kanala yalnız seçtiğiniz ürünler gider${data.products.length > 1 ? ` · ${(c.picked || []).length}/${data.products.length} seçili` : (c.picked || []).length ? ' · bu ürün seçili' : ' · bu ürün seçili değil'}. Yayınlarsanız seçili olur.</div>` : ''}
           ${done ? html`<div class="tiny muted">${s.st === 'live' ? 'Kanalda açık' : 'Kanal sonucu bekleniyor'}</div>` : checked.has(c.id) && !sendable(c) && !c.disabled && c.items.some((x) => x.state === 'missing') ? html`<div class="tiny" style="color:var(--amber)">Eksikleri tamamlayınca gönderilir</div>` : ''}
           ${isOpen ? html`<div class="pub-body">${body(c)}</div>` : ''}
         </div>`;

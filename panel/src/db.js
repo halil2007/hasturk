@@ -434,6 +434,9 @@ export const MIGRATIONS = [
   "UPDATE packages SET carrier_cost_final = 0 WHERE carrier_provider = 'kargonomi' AND carrier_cost_final = 1 AND COALESCE(shipped_at, created_at, 0) > (CAST(strftime('%s', 'now') AS INTEGER) - 20 * 86400) * 1000",
   // Cevabı kayıtlı olduğu halde "bekliyor"da kalan sorular (kanalın durum alanı geride kalmıştı) cevaplanmış sayılır (bkz. questions.js settled)
   "UPDATE questions SET status = 'answered' WHERE status = 'waiting' AND answer IS NOT NULL AND answer != ''",
+  // Kanal başına "yalnız seçtiğim ürünler": ürünün gönderileceği kanallar (bkz. targets.js; kanal kapsamı ayarı upload_scope)
+  'CREATE TABLE IF NOT EXISTS product_targets (product_id INTEGER NOT NULL, channel TEXT NOT NULL, at INTEGER, PRIMARY KEY (product_id, channel))',
+  'CREATE INDEX IF NOT EXISTS product_targets_ch ON product_targets(channel, at)',
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
@@ -568,6 +571,7 @@ export const DEFAULT_SETTINGS = {
   stock_push: {},
   auto_upload: {},
   auto_upload_cats: {}, // otomatik ürün gönderimi: kanal başına müşterinin seçtiği panel kategorileri (yalnız bunlar gönderilir)
+  upload_scope: {},     // kanal başına gönderilecek ürünler: yoksa tüm ürünler (kategoriye göre), 'selected' = yalnız ürün bazında seçilenler (targets.js)
   auto_approve_sure: false, // Kategori eşleştirme: kesin önerileri arka planda otomatik onayla (varsayılan kapalı)
   origin: 'Türkiye',        // Ürünlerin menşei: pazaryerine yüklemede Menşei özelliği (ürün kartında ayrıca girilebilir)
   stock_since: 0,           // bu zamandan önceki siparişler stoktan düşmez (ilk kurulumdaki eski siparişler)
