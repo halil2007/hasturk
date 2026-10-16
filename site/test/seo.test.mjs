@@ -7,6 +7,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { analyze, MIN_WORDS } from '../scripts/similarity.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..'), PUB = join(ROOT, 'public'), SITE = 'https://hasturkcrm.com';
 const S = (() => { const ctx = { window: {}, document: { documentElement: { classList: { add() {} } } } }; vm.runInNewContext(readFileSync(join(PUB, 'assets', 'config.js'), 'utf8'), ctx); return ctx.window.SITE; })();
@@ -55,6 +56,35 @@ test('başlık ve açıklamalar sayfalar arasında tekrar etmez', () => {
       assert.ok(!seen.has(v), `${k} tekrarı: ${url} ve ${seen.get(v)}`); seen.set(v, url);
     }
   }
+});
+
+// Sayfalar birbirinin adı değiştirilmiş kopyası olmamalı (Google: scaled content abuse / yinelenen içerik). Ölçüm scripts/similarity.mjs'te:
+// marka ve sayfanın kendi adı (ör. "Koçtaş", "Koçtaş'a") maskelenip karşılaştırılır.
+const SIM = analyze(PUB);
+test('başlık ve açıklamalar sayfanın kendi adı çıkarılınca da birbirinin aynısı değil', () => {
+  assert.deepEqual(SIM.dupTitle.map(([a, b, v]) => `${a} = ${b}: ${v}`), [], 'ad değiştirilmiş aynı başlık');
+  assert.deepEqual(SIM.dupDesc.map(([a, b, v]) => `${a} = ${b}: ${v}`), [], 'ad değiştirilmiş aynı açıklama');
+  // Çok benzer açıklama (kelime ikilileri Jaccard): şablondan üretilmiş açıklama yakalanır
+  const near = SIM.pairs.filter((p) => p.desc > 0.5).map((p) => `${p.a} ↔ ${p.b}: ${p.desc.toFixed(2)}`);
+  assert.deepEqual(near, [], 'çok benzer açıklama');
+});
+
+test('aynı ailedeki sayfaların gövde metni birbirine benzemez (3 kelimelik Jaccard)', () => {
+  // Entegrasyon sayfaları (kanal + kargo): en çok 0,20 (yeniden yazımdan sonra en yüksek ~0,08); diğer aileler en çok 0,35
+  const LIMIT = { entegrasyonlar: 0.2 };
+  const over = SIM.pairs.filter((p) => p.body > (LIMIT[p.fam] ?? 0.35)).map((p) => `${p.fam}: ${p.a} ↔ ${p.b} ${p.body.toFixed(3)}`);
+  assert.deepEqual(over, []);
+  assert.ok((SIM.fams.entegrasyonlar || []).length >= 30, 'entegrasyon sayfaları ölçüldü');
+});
+
+test(`entegrasyon ve özellik sayfalarında aynı cümle iki sayfada geçmez (${MIN_WORDS}+ kelime)`, () => {
+  // Gezinme ızgaraları (diğer entegrasyonlar, ilgili özellikler) hariç; sayfa sonundaki çağrı bandı dahil.
+  // Entegrasyon ailesine Kargonomi sayfası (/ozellikler/kargonomi-entegrasyonu) da katılır.
+  for (const fam of ['entegrasyonlar', 'ozellikler']) {
+    const dup = SIM.sentDup[fam].map(([x, u]) => `${u.join(', ')}: "${x}"`);
+    assert.deepEqual(dup, [], `${fam}: tekrarlanan cümle`);
+  }
+  assert.ok(SIM.pages.some((p) => p.url === '/ozellikler/kargonomi-entegrasyonu'), 'Kargonomi sayfası denetlendi');
 });
 
 test('başlık sırası atlanmaz (H1 → H2 → H3 …)', () => {

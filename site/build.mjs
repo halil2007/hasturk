@@ -190,7 +190,8 @@ const MOCKS = {
     ${[['AY', 'Ayşe Y.', 'Yönetici', 'Tüm bölümler'], ['MK', 'Mehmet K.', 'Depo / sevkiyat', 'Siparişler · Kargo · Stok'], ['ZD', 'Zeynep D.', 'Müşteri hizmetleri', 'Sorular · İadeler · Siparişler (görür)']].map(([i, n, r, p]) => `<div class="mc-row"><span class="av">${i}</span><div><b>${n} <em>${r}</em></b><small>${p}</small></div><span class="mc-ok">${ico('i-shield')}</span></div>`).join('')}
     <div class="mc-note">Örnek görünüm</div></div>`,
 };
-const ctaBand = `<section class="sec"><div class="wrap"><div class="ask big reveal"><div><b>Kendi gözünüzle görün</b><span>Kayıt olmadan demo panelini açın, örnek siparişlerle her şeyi deneyin. Beğenirseniz kendi mağazanızla 7 gün ücretsiz kullanın; kurulum ücreti yok.</span></div>
+// Sayfa sonu çağrı bandı: metni sayfaya özeldir (özelliklerde data.mjs → FEATURE_CTA); düğmeler ortaktır
+const ctaBand = ([b, t]) => `<section class="sec"><div class="wrap"><div class="ask big reveal"><div><b>${esc(b)}</b><span>${esc(t)}</span></div>
   <div class="ctas"><a class="btn btn-primary" data-demo href="/demo">Canlı demoyu açın ${ico('i-arrow')}</a><a class="btn btn-outline" data-call href="/iletisim">${ico('i-phone')}Hemen arayın</a></div></div></div></section>`;
 // Bölümler sırayla açık mavi / beyaz zemin alır (ilk = alt)
 const alt = (parts, first = true) => parts.filter(Boolean).map((c, i) => `<section class="sec${(i % 2 === 0) === first ? ' alt' : ''}"><div class="wrap">${c}</div></section>`).join('\n');
@@ -231,7 +232,7 @@ function featureChannels(f) {
   const re = FEATURE_CAPS[f.slug]; if (!re) return '';
   const list = INTEGRATIONS.filter((x) => !x.dev && capOn(x, re));
   if (!list.length) return '';
-  return `<div class="sec-head reveal"><div class="kicker">Entegrasyonlar</div><h2>Hangi Kanallarda Çalışır?</h2><p>${esc(f.name)} şu kanallarda kullanılabilir. Her kanalın sayfasında desteklenen işlemlerin tamamı ve kurulum adımları yazar.</p></div>
+  return `<div class="sec-head reveal"><div class="kicker">Entegrasyonlar</div><h2>Hangi Kanallarda Çalışır?</h2></div>
     <div class="rels">${list.map((x) => `<a class="rl" href="/entegrasyonlar/${x.slug}">${logoTile(x.word, x.color, 'sm')}<span><b>${esc(x.name)} entegrasyonu</b><small>${esc(x.kind)}${x.beta ? `<span data-beta="${x.beta}"> · test aşamasında</span>` : ''}</small></span></a>`).join('')}</div>`;
 }
 const intFeatures = (x) => Object.entries(FEATURE_CAPS).filter(([slug, re]) => fById[slug] && (slug === 'kar-zarar' || capOn(x, re))).map(([slug]) => fById[slug]);
@@ -256,7 +257,7 @@ ${f.why ? `<section class="sec"><div class="wrap"><div class="sec-head reveal"><
 ${alt([
   `<div class="sec-head reveal"><div class="kicker">Neler yapabilirsiniz?</div><h2>${esc(f.name)}</h2></div>
     <div class="trust">${f.points.map(([i, t, d], k) => `<div class="tr reveal"><span class="ic ${['c-blue', 'c-green', 'c-purple', 'c-orange', 'c-teal', 'c-pink'][k % 6]}">${ico(i)}</span><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('')}</div>`,
-  f.carriers && `<div class="sec-head reveal"><div class="kicker">Kargo firmaları</div><h2>Bağlanabileceğiniz Firmalar</h2><p>Her firmanın sayfasında neleri desteklediğini ve kurulum için firmadan hangi bilgileri isteyeceğinizi bulabilirsiniz.</p></div>
+  f.carriers && `<div class="sec-head reveal"><div class="kicker">Kargo firmaları</div><h2>Bağlanabileceğiniz Firmalar</h2></div>
     <div class="rels">${CARRIERS.filter((c) => carrierHref(c) !== `/ozellikler/${f.slug}`).map((c) => `<a class="rl" href="${carrierHref(c)}">${logoTile(c.word, c.color, 'sm')}<span><b>${esc(c.name)}</b><small>${esc(c.kind)}</small></span></a>`).join('')}</div>`,
   featureChannels(f),
   f.example && EXAMPLES[f.example],
@@ -269,237 +270,82 @@ ${alt([
   `<div class="sec-head reveal"><div class="kicker">İlgili özellikler</div><h2>Bunlara da Göz Atın</h2></div>
     <div class="grid g3">${rel.map((r) => `<a class="card rel reveal" href="/ozellikler/${r.slug}"><span class="ic ${r.color}">${ico(r.icon)}</span><b>${esc(r.name)}</b><span>${esc(r.short)}</span><em>İncele ${ico('i-arrow')}</em></a>`).join('')}</div>`,
 ], !!f.why)}
-${ctaBand}`;
+${ctaBand(f.cta)}`;
   return { meta: { title: f.seoTitle || f.title, crumb: f.name, description: f.desc || clip(f.lead), url: `/ozellikler/${f.slug}`, nav: 'ozellikler' }, body, file: `ozellikler/${f.slug}.html` };
 }
 
-// ---------- entegrasyon sayfası arama metinleri (kanalın gerçek özelliklerinden üretilir; söz verdiğimiz kadar) ----------
-// Türkçe ekler (ilgi / yönelme / ayrılma): okunuşa göre (N11 → "en on bir", PttAVM → "pe te te a ve me")
-const SUF = { trendyol: ['un', 'a', 'dan'], hepsiburada: ['nın', 'ya', 'dan'], n11: ['in', 'e', 'den'], ikas: ['ın', 'a', 'tan'], woocommerce: ['ın', 'a', 'tan'], pttavm: ['nin', 'ye', 'den'],
-  idefix: ['in', 'e', 'ten'], pazarama: ['nın', 'ya', 'dan'], amazon: ['un', 'a', 'dan'], ciceksepeti: ['nin', 'ye', 'den'], koctas: ['ın', 'a', 'tan'], shopify: ['ın', 'a', 'dan'], opencart: ['ın', 'a', 'tan'], etsy: ['nin', 'ye', 'den'], teknosa: ["nın", "ya", "dan"], boyner: ["in", "e", "den"], pasaj: ["ın", "a", "dan"], trendyolgo: ["nun", "ya", "dan"], getir: ["nın", "ya", "dan"], yemeksepeti: ["in", "e", "ten"], ebay: ["in", "e", "den"], ozon: ["un", "a", "dan"], ticimax: ["in", "e", "ten"], ideasoft: ["un", "a", "tan"], tsoft: ["un", "a", "tan"] };
-const sx = (x, i) => `${x.name}'${(SUF[x.slug] || ['in', 'e', 'den'])[i]}`;
-const capVal = (x, re) => (x.caps.find(([k]) => re.test(k)) || [])[1];
-const minPrice = Math.min(...S.plans.filter((p) => p.monthly).map((p) => p.monthly));
-function intDesc(x) {
-  const parts = ['siparişlerinizi', capOn(x, /^Stok/) && 'stoklarınızı', capOn(x, /^Stok/) && 'fiyatlarınızı', capOn(x, /^Kargo etiketi/) && 'kargo etiketlerini', capOn(x, /soru/i) && 'müşteri sorularını'].filter(Boolean);
-  const and = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a[0]);
-  const t = `${x.name} entegrasyonu: ${and(parts)} tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.`;
-  return t.length <= 158 ? t : clip(x.lead);
-}
-function intIntro(x) {
-  const on = x.caps.filter(([, v]) => v !== false).map(([k]) => k.toLocaleLowerCase('tr'));
-  const list = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ve ${a[a.length - 1]}` : a.join(''));
-  const where = /pazaryeri/.test(x.kind) ? `${x.name} pazaryerindeki mağazanızı` : /market/.test(x.kind) ? `${x.name} mağazanızı` : `${x.name} sitenizi`;
-  return [
-    `Hastürk CRM, ${where} resmi entegrasyon servisi üzerinden bağlar. ${x.name} siparişleriniz otomatik olarak panele gelir; diğer pazaryerleri ve e-ticaret sitelerinizin siparişleriyle aynı listede, tek ekranda yönetilir.`,
-    `${x.name} entegrasyonunda desteklenen işlemler: ${list(on)}.`,
-    `Ürünleriniz barkod ve stok koduyla eşleşir; bir kanalda satılan ürünün stoğu ${capOn(x, /^Stok/) ? `${x.name} dahil ` : ''}stok gönderimi açık tüm kanallarda düşer, böylece fazla satış yaşamazsınız. Komisyon, kargo ve diğer kesintilerle her siparişin gerçek kârını da aynı panelde görürsünüz.`,
-  ];
-}
+// ---------- entegrasyon ve kargo sayfaları: /entegrasyonlar/<slug> ----------
+// Metinlerin tamamı sayfaya özeldir (src/integration-pages.mjs). Şablon yalnız düzeni verir: sayfalar arasında ortak cümle üretmez
+// (test/seo.test.mjs aynı cümlenin iki entegrasyon sayfasında geçmesine izin vermez). Ortak olanlar yalnız gezinme ızgaralarıdır.
 const isSite = (x) => /site/.test(x.kind);
-const where = (x) => (isSite(x) ? `${x.name} sitenizde` : `${x.name} mağazanızda`);
-function intFaq(x) {
-  if (x.dev) {
-    const on = x.caps.filter(([, v]) => v !== false).map(([k]) => k.toLocaleLowerCase('tr'));
-    return [
-      [`${x.name} entegrasyonu şu an kullanılabiliyor mu?`, `Henüz değil. ${x.name} entegrasyonu geliştirme aşamasında; kullanıma açıldığında panelinizdeki Entegrasyonlar sayfasından bağlayabilirsiniz.`],
-      [`${x.name} entegrasyonunda neler olacak?`, `Planlanan işlemler: ${on.length > 1 ? `${on.slice(0, -1).join(', ')} ve ${on[on.length - 1]}` : on.join('')}.`],
-      ['Kullanıma açılınca haber alabilir miyim?', `Evet. İletişim sayfasından ${x.name} için talep bırakın; entegrasyon açıldığında size haber verelim.`],
-      ['Bu arada diğer kanallarımı bağlayabilir miyim?', 'Evet. Aktif kanallarınızı bugün bağlayıp 7 gün ücretsiz deneyebilirsiniz; kurulum ücreti yoktur.'],
-    ];
-  }
-  const lbl = capVal(x, /^Kargo etiketi/);
-  const ship = lbl === 'Ortak barkod' ? `${sx(x, 0)} anlaşmalı kargosuyla gönderimde barkod doğrudan ${sx(x, 2)} alınır; etiketi panelden termal ya da normal yazıcıya tek tek veya toplu basarsınız.`
-    : lbl === 'ikas Kargo' ? 'Gönderi ikas Kargo ile oluşturulur ve etiket ikas\'tan alınır. Kendi kargo anlaşmanızla gönderiyorsanız Kurumsal pakette Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ya da Sürat Kargo\'dan etiketi doğrudan panelden alabilirsiniz.'
-    : lbl === 'Panel etiketi' ? 'Kargo etiketi sipariş ve adres bilgisiyle panelden basılır. Kendi kargo anlaşmanızla gönderiyorsanız Kurumsal pakette Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ya da Sürat Kargo\'dan etiket ve takip numarasını doğrudan panelden alabilirsiniz.'
-    : lbl ? ((x.extra || []).find(([, t]) => /etiket/i.test(t)) || [0, 0, `Kargo etiketi: ${lbl}.`])[2] : '';
-  const courier = capOn(x, /kuryeye/) && [`${x.name} siparişlerini kim teslim eder?`, `Kurye ${x.name} platformundan gelir. Siz siparişi hazırlayıp panelden “hazırlandı” olarak bildirirsiniz.`];
-  const track = !ship && capOn(x, /takip bildirimi|^Kargo bildirimi/) && [`Kargo takip numarası ${sx(x, 1)} nasıl iletilir?`, `Siparişi kendi kargo anlaşmanızla gönderin; kargo firması ve takip numarası panelden ${sx(x, 1)} bildirilir.`];
-  return [
-    [`${x.name} entegrasyonu nasıl yapılır?`, `${x.help} Ardından Hastürk CRM panelinde Entegrasyonlar sayfasındaki ${x.name} kartına bilgileri girip “Kaydet ve test et”e basın. Bağlantı hemen test edilir; siparişleriniz ve ürünleriniz birkaç dakika içinde gelmeye başlar.`],
-    capOn(x, /^Stok/) && [`${x.name} stok ve fiyatlarım otomatik güncellenir mi?`, `Evet. Stok gönderimini açtığınızda bir kanalda satılan ürünün stoğu ${where(x)} da kendiliğinden düşer; panelde değiştirdiğiniz fiyat ve stoklar otomatik olarak ${sx(x, 1)} gönderilir.`],
-    courier || (ship && [`${x.name} siparişlerinin kargo etiketi nasıl alınır?`, ship]) || track,
-    capOn(x, /^Ürün (yükleme|oluşturma)/) && [`Ürünlerimi panelden ${x.name} ${isSite(x) ? 'siteme' : 'mağazama'} yükleyebilir miyim?`, `Evet. Ürünü panelde bir kez tanımlayın; kategori ve özellik eşleştirmesiyle ${sx(x, 1)} gönderin. Görseller, varyantlar ve fiyat da birlikte gider.`],
-    [`Birden fazla ${x.name} ${isSite(x) ? 'sitesi' : 'mağazası'} bağlayabilir miyim?`, `Evet. Birden fazla ${x.name} ${isSite(x) ? 'sitenizi' : 'mağazanızı'} aynı panelde ayrı mağazalar olarak bağlayabilirsiniz. Bağlanabilecek mağaza sayısı paketinize göre değişir; gerekirse ek mağaza alabilirsiniz.`],
-    x.kind === 'yurt dışı pazaryeri'
-      ? [`${x.name} entegrasyonu hangi pakette var?`, `${x.name} gibi yurt dışı pazaryerleri Kurumsal pakette yer alır (aylık ${tl(S.plans.find((p) => p.name === 'Kurumsal').monthly)} ₺, KDV dahil); kurulum ücreti yoktur ve 7 gün ücretsiz deneyebilirsiniz.`]
-      : [`${x.name} entegrasyonu ücretli mi?`, `${x.name} entegrasyonu tüm paketlerde yer alır. Paketler aylık ${minPrice.toLocaleString('tr-TR')} ₺'den (KDV dahil) başlar; kurulum ücreti yoktur ve 7 gün ücretsiz deneyebilirsiniz.`],
-  ].filter(Boolean).slice(0, 6);
-}
-
-// "Neler yapabilirsiniz" kutuları: yalnız kanalın caps listesinde açık olan işlemlerden üretilir (söz verdiğimizden fazlası yazılmaz)
-function capTiles(x) {
-  const n = x.name, T = [], has = (re) => capOn(x, re), pt = (icon) => x.points.find(([i]) => i === icon);
-  T.push(['i-cart', 'Sipariş yönetimi', `${n} siparişleri kendiliğinden panele gelir${has(/onay/) ? '; panelden onaylar,' : ' ve'} diğer kanallarla aynı listede yönetirsiniz.`]);
-  if (has(/^Stok ve fiyat/)) T.push(['i-sync', 'Stok ve fiyat eşitleme', `Bir kanalda satılan ürünün stoğu ${where(x)} da düşer; fiyat değişiklikleri panelden gönderilir.`]);
-  if (has(/^Ürün yükleme/)) T.push(['i-up', 'Ürün yükleme', `Ürünü panelde bir kez tanımlayın; görsel, varyant ve fiyatıyla ${sx(x, 1)} gönderin.`], ['i-list', 'Kategori eşleştirme', `Panel ${n} için uygun kategoriyi önerir, siz onaylarsınız.`]);
-  if (has(/^Ürün oluşturma/)) T.push(['i-up', 'Ürün oluşturma', `Paneldeki ürünleri ${n} sitenizde oluşturun.`]);
-  if (has(/^Ana katalog/) && pt('i-box')) T.push(['i-box', 'Ana katalog', pt('i-box')[2]]);
-  const lbl = capVal(x, /^Kargo etiketi/);
-  if (lbl === 'Ortak barkod') T.push(['i-tag', 'Kargo etiketi', `Anlaşmalı kargo barkodu ${sx(x, 2)} alınır; etiketi panelden tek tek ya da toplu basarsınız.`]);
-  else if (lbl === 'ikas Kargo') T.push(['i-tag', 'ikas Kargo', 'Gönderi ikas Kargo ile oluşturulur, etiket ikas\'tan gelir; takip numarası siparişe işlenir.']);
-  else if (lbl === 'Panel etiketi') T.push(['i-tag', 'Kargo etiketi', 'Kendi kargo anlaşmanızla gönderimde etiket, sipariş ve adres bilgisiyle panelden basılır.']);
-  else if (lbl && pt('i-truck') && !has(/takip bildirimi/)) T.push(['i-truck', 'Kargo', pt('i-truck')[2]]);
-  if (has(/takip bildirimi|^Kargo bildirimi/)) T.push(['i-truck', 'Kargo takip bildirimi', `Kargo firması ve takip numarası panelden ${sx(x, 1)} bildirilir.`]);
-  if (has(/kuryeye/)) T.push(['i-truck', 'Hazırlama ve kurye', 'Sipariş hazırlanınca panelden bildirirsiniz; kurye platformdan gelir.']);
-  if (has(/^Paket bölme|^Kargo firması değiştirme/)) T.push(['i-box', 'Paket işlemleri', `Paketi bölün${has(/iptal/) ? ' ya da iptal edin' : ''}; gerekirse kargo firmasını panelden değiştirin.`]);
-  if (has(/^Müşteri soruları/)) T.push(['i-chat', 'Müşteri soruları', `${n} müşteri sorularını diğer kanallarla aynı ekranda yanıtlayın.`]);
-  if (has(/^İade/)) T.push(['i-orders', 'İade talepleri', 'İade taleplerini panelden onaylayın ya da gerekçesiyle reddedin.']);
-  if (has(/^Hakediş/)) T.push(['i-calc', 'Gerçek kâr', `Komisyon, kargo ve hizmet bedeli faturaları ile hakedişler ${sx(x, 2)} çekilir; her siparişin net kârı hesaplanır.`]);
-  if (has(/^Buybox/)) T.push(['i-chart', 'Buybox ve otomatik fiyat', 'Buybox durumunu izleyin; kural tanımladığınız ilanlarda fiyat, alt sınırınızın altına inmeden ayarlanır.']);
-  if (has(/^Birden fazla site/)) T.push(['i-store', 'Birden fazla site', `Birden fazla ${n} sitenizi ayrı mağazalar olarak bağlayın.`]);
-  if (has(/FBA/)) T.push(['i-eye', 'Amazon\'un gönderdiği siparişler', 'Amazon deposundan gönderilen (FBA) siparişlerin durumu da panelde izlenir.']);
-  if (has(/^Döviz/)) T.push(['i-calc', 'Döviz ile fiyat', 'Fiyatları döviz kuruna bağlayın; kur değişince kendiliğinden güncellenir. Kurumsal pakette.']);
-  // Kanala özel bilgiler (data.mjs → extra; ör. kargo modeli, şube bazında stok) ve points'teki özel notlar (alıcı bilgisi, bağlantı dosyası)
-  for (const t of x.extra || []) T.push(t);
-  for (const [i, t, d] of x.points) if (i === 'i-shield' || i === 'i-link' || (i === 'i-box' && !has(/^Ana katalog|^Paket bölme/))) T.push([i, t, d]);
-  return T;
-}
-
-function integrationPage(x) {
-  const cap = ([k, v]) => `<li class="${v === false ? 'no' : ''}">${v === false ? `<i class="x">${ico('i-minus')}</i>` : tick}<span>${esc(k)}</span>${typeof v === 'string' ? `<em>${esc(v)}</em>` : v === false ? '<em class="muted">yok</em>' : ''}</li>`;
-  const cat = catOf(x);
-  const rel = [...INTEGRATIONS.filter((o) => o.slug !== x.slug && catOf(o) === cat && !o.dev), ...INTEGRATIONS.filter((o) => o.slug !== x.slug && catOf(o) !== cat && !o.dev)].slice(0, 8);
-  const colors = ['c-blue', 'c-green', 'c-purple', 'c-orange', 'c-teal', 'c-pink'];
-  const ctas = x.dev
-    ? `<a class="btn btn-primary" href="/iletisim?konu=kanal">Açılınca haber verin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a>`
-    : `<a class="btn btn-primary" href="/demo#deneme">Ücretsiz deneyin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a>`;
-  const steps = [
-    ['i-key', 'API bilgilerini girin', `${n2(x)} aldığınız bilgileri panelde Entegrasyonlar sayfasına yapıştırın; bağlantı hemen test edilir.`],
-    ['i-link', 'Ürünler eşleşir', 'İlanlarınız barkod ve stok koduyla paneldeki ürünlere kendiliğinden bağlanır.'],
-    ['i-sync', 'Siparişler ve stok otomatik', `Siparişler panele gelir; stok ve fiyat değişiklikleri ${sx(x, 1)} kendiliğinden gönderilir.`],
-  ];
-  const body = `<section class="page-hero fp-hero int-hero">
+const PAGE_FIELDS = ['title', 'desc', 'lead', 'tiles', 'setup', 'faq', 'cta'];
+const needPage = (x) => {
+  const miss = PAGE_FIELDS.filter((k) => !x[k] || (Array.isArray(x[k]) && !x[k].length)), at = `/entegrasyonlar/${x.slug}`;
+  if (miss.length) throw new Error(`${at}: src/integration-pages.mjs'te eksik alan: ${miss.join(', ')}`);
+  if (x.title.length > 60) throw new Error(`${at}: başlık ${x.title.length} karakter (en çok 60)`);
+  if (x.desc.length < 110 || x.desc.length > 160) throw new Error(`${at}: açıklama ${x.desc.length} karakter (110–160)`);
+};
+const COLORS = ['c-blue', 'c-green', 'c-purple', 'c-orange', 'c-teal', 'c-pink'];
+const tilesHtml = (tiles) => `<div class="feats">${tiles.map(([i, t, d], k) => `<div class="feat reveal"><span class="ic ${COLORS[k % 6]}">${ico(i)}</span><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('')}</div>`;
+const STEP_ICONS = ['i-key', 'i-gear', 'i-sync', 'i-check'];
+const stepsHtml = (steps) => `<div class="how${steps.length === 3 ? ' three' : ''}">${steps.map(([t, d], k) => `<div class="hs reveal"><div class="ic">${ico(STEP_ICONS[k] || 'i-check')}</div><h3>${esc(t)}</h3><p>${esc(d)}</p></div>`).join('')}</div>`;
+const notesHtml = (items) => `<div class="note-box reveal"><div class="nb-h">${ico('i-shield')}<b>Bilmeniz gerekenler</b></div><ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+const featureGrid = (list) => `<div class="grid g3">${list.map((r) => `<a class="card rel reveal" href="/ozellikler/${r.slug}"><span class="ic ${r.color}">${ico(r.icon)}</span><b>${esc(r.name)}</b><span>${esc(r.short)}</span><em>İncele ${ico('i-arrow')}</em></a>`).join('')}</div>`;
+const askBand = ([b, t], ctas) => `<div class="ask big reveal"><div><b>${esc(b)}</b><span>${esc(t)}</span></div><div class="ctas">${ctas}</div></div>`;
+const capItem = ([k, v]) => `<li>${tick}<span>${esc(k)}</span>${typeof v === 'string' ? `<em>${esc(v)}</em>` : ''}</li>`;
+const intHero = (x, logo, tag, capTitle, capSub, caps, ctas) => `<section class="page-hero fp-hero int-hero">
   <div class="wrap fp-grid">
     <div class="txt">
       <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/entegrasyonlar">Entegrasyonlar</a><span>›</span><b>${esc(x.name)}</b></nav>
-      <div class="int-logo">${logoTile(x.word, x.color, 'lg')}${statusTag(x)}</div>
+      <div class="int-logo">${logo}${tag}</div>
       <h1>${esc(x.name)} <span class="grad">entegrasyonu</span></h1>
       <p>${esc(x.lead)}</p>
       <div class="ctas">${ctas}</div>
       ${heroChecks}
     </div>
-    <div class="vis"><div class="capcard"><div class="cc-h"><b>${x.dev ? 'Planlanan işlemler' : 'Desteklenen işlemler'}</b><small>${esc(x.name)} resmi entegrasyon servisi</small></div><ul>${x.caps.filter(([, v]) => v !== false).map(cap).join('')}</ul></div></div>
+    <div class="vis"><div class="capcard"><div class="cc-h"><b>${capTitle}</b><small>${esc(capSub)}</small></div><ul>${caps.filter(([, v]) => v !== false).map(capItem).join('')}</ul></div></div>
   </div>
-</section>
-<section class="sec">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">${x.dev ? 'Kullanıma açıldığında' : `${esc(x.name)} ile`}</div><h2>Neler Yapabilirsiniz?</h2></div>
-    <div class="feats">${capTiles(x).map(([i, t, d], k) => `<div class="feat reveal"><span class="ic ${colors[k % 6]}">${ico(i)}</span><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('')}</div>
-  </div>
-</section>
-<section class="sec alt">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">${x.dev ? 'Kullanıma açıldığında' : 'Kurulum'}</div><h2>Nasıl Çalışır?</h2></div>
-    <div class="how three">${steps.map(([i, t, d]) => `<div class="hs reveal"><div class="ic">${ico(i)}</div><h3>${esc(t)}</h3><p>${esc(d)}</p></div>`).join('')}</div>
-    ${x.dev ? '' : '<p class="how-note reveal">Kurulumda yanınızdayız; ilk siparişlerinizi birlikte kontrol ederiz.</p>'}
-  </div>
-</section>
-${x.dev ? '' : `<section class="sec">
-  <div class="wrap narrow-text">
-    <div class="sec-head reveal"><div class="kicker">${esc(x.name)} entegrasyonu nedir?</div><h2>${esc(x.name)} ${isSite(x) ? 'Sitenizi' : 'Mağazanızı'} Tek Panelden Yönetin</h2></div>
-    ${intIntro(x).filter((_, i) => i !== 1).map((t) => `<p class="reveal seo-p">${esc(t)}</p>`).join('')}
-    <p class="reveal seo-p">${esc(x.name)} için kullanabileceğiniz özellikler: ${intFeatures(x).map((f) => `<a href="/ozellikler/${f.slug}">${esc(f.name.toLocaleLowerCase('tr'))}</a>`).join(', ')}.</p>
-  </div>
-</section>`}
-<section class="sec${x.dev ? '' : ' alt'}">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(x.name)} Entegrasyonu Hakkında</h2></div>${faqHtml(intFaq(x))}
-  </div>
-</section>
-<section class="sec${x.dev ? ' alt' : ''}">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Diğer entegrasyonlar</div><h2>Tüm Kanallarınız Tek Panelde</h2><p>Stok ve fiyat bağladığınız tüm kanallarda eşit kalır.</p></div>
+</section>`;
+function integrationPage(x) {
+  needPage(x);
+  const cat = catOf(x);
+  const rel = [...INTEGRATIONS.filter((o) => o.slug !== x.slug && catOf(o) === cat && !o.dev), ...INTEGRATIONS.filter((o) => o.slug !== x.slug && catOf(o) !== cat && !o.dev)].slice(0, 8);
+  const ctas = x.dev
+    ? `<a class="btn btn-primary" href="/iletisim?konu=kanal">Açılınca haber verin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a>`
+    : `<a class="btn btn-primary" href="/demo#deneme">Ücretsiz deneyin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a>`;
+  const feats = intFeatures(x);
+  const body = `${intHero(x, logoTile(x.word, x.color, 'lg'), statusTag(x), x.dev ? 'Planlanan işlemler' : 'Desteklenen işlemler', `${x.name} resmi entegrasyon servisi`, x.caps, ctas)}
+${alt([
+  `<div class="sec-head reveal"><div class="kicker">${x.dev ? 'Planlanan kapsam' : `${esc(x.name)} ile`}</div><h2>Neler Yapabilirsiniz?</h2></div>${tilesHtml(x.tiles)}`,
+  `<div class="sec-head reveal"><div class="kicker">${x.dev ? 'Kullanıma açıldığında' : 'Kurulum'}</div><h2>${x.dev ? 'Bağlantı Nasıl Kurulacak?' : 'Nasıl Bağlanır?'}</h2></div>${stepsHtml(x.setup)}`,
+  x.notes && notesHtml(x.notes),
+  `<div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(x.name)} Entegrasyonu Hakkında</h2></div>${faqHtml(x.faq)}`,
+  !x.dev && feats.length && `<div class="sec-head reveal"><div class="kicker">Özellikler</div><h2>${esc(x.name)} ile Kullanılan Özellikler</h2></div>${featureGrid(feats)}`,
+  `<div class="sec-head reveal"><div class="kicker">Diğer entegrasyonlar</div><h2>Tüm Kanallarınız Tek Panelde</h2></div>
     <div class="rels">${rel.map((o) => `<a class="rl" href="/entegrasyonlar/${o.slug}">${logoTile(o.word, o.color, 'sm')}<span><b>${esc(o.name)}</b><small>${esc(o.kind)}</small></span></a>`).join('')}</div>
-    <div class="center-cta"><a class="btn btn-line" href="/entegrasyonlar">Tüm entegrasyonlar ${ico('i-arrow')}</a></div>
-  </div>
-</section>
-<section class="sec"><div class="wrap"><div class="ask big reveal"><div>${x.dev ? `<b>${esc(x.name)} açılınca haber verelim</b><span>Talebinizi bırakın; entegrasyon kullanıma açıldığında size ulaşalım. Bu arada demo panelini kayıt olmadan inceleyebilirsiniz.</span>` : `<b>${esc(x.name)} ${isSite(x) ? 'sitenizi' : 'mağazanızı'} bugün bağlayın</b><span>7 gün ücretsiz deneyin; kurulum ücreti yok, kurulumda yanınızdayız.</span>`}</div>
-  <div class="ctas">${ctas}</div></div></div></section>`;
-  const desc = x.dev ? `${x.name} entegrasyonu geliştirme aşamasında: siparişler, stok ve fiyat tek panelde olacak. Kullanıma açılınca haber verelim.` : x.desc || intDesc(x);
-  return { meta: { title: x.seoTitle || [`${x.name} Entegrasyonu: Sipariş, Stok ve Fiyat | Hastürk CRM`, `${x.name} Entegrasyonu: Sipariş ve Stok | Hastürk CRM`, `${x.name} Entegrasyonu | Hastürk CRM`].find((t) => t.length <= 60) || `${x.name} Entegrasyonu | Hastürk CRM`, crumb: `${x.name} Entegrasyonu`, description: clip(desc), url: `/entegrasyonlar/${x.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${x.slug}.html` };
+    <div class="center-cta"><a class="btn btn-line" href="/entegrasyonlar">Tüm entegrasyonlar ${ico('i-arrow')}</a></div>`,
+  askBand(x.cta, ctas),
+], false)}`;
+  return { meta: { title: x.title, crumb: `${x.name} Entegrasyonu`, description: x.desc, url: `/entegrasyonlar/${x.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${x.slug}.html` };
 }
-// "Trendyol satıcı panelinizden" / "ikas yönetim panelinizden"
-const n2 = (x) => `${x.name} ${isSite(x) ? 'yönetim' : 'satıcı'} panelinizden`;
 
-// ---------- kargo firması / kargo entegratörü sayfası: /entegrasyonlar/<slug> ----------
-// İçerik data.mjs → CARRIERS (panel/src/carriers.js'teki bağlantının bugün yaptıkları); ortak akış panel/src/carriers.js'ten:
-// gönderi açılınca takip no + etiket pakete yazılır, "Kargoya ver" takip no'yu kanala bildirir (firma teslim alınca kendiliğinden),
-// kargo durumu düzenli sorgulanır, hepsi teslim edilince sipariş "Teslim edildi" olur; kapıda ödemeli sipariş bu bağlantıyla gönderilemez.
-const kurumsal = () => S.plans.find((p) => p.name === 'Kurumsal');
-function carrierFaq(c) {
-  const plan = c.plan || 'Kurumsal';
-  return [
-    [`${c.name} entegrasyonu nasıl kurulur?`, `Gereken bilgiler: ${c.need} Bilgileri Hastürk CRM panelinde Entegrasyonlar → Kargo entegrasyonları → ${c.name} kartına girip kaydedin; bağlantı hemen test edilir.`],
-    ['Takip numarası satış kanalıma gider mi?', 'Evet. Paketi “Kargoya ver” ile kapattığınızda takip numarası ve kargo firması siparişin geldiği kanala bildirilir (kanal bu bildirimi destekliyorsa). Kargo firması paketi teslim alınca bu adım kendiliğinden yapılır; isterseniz Ayarlar\'dan kapatabilirsiniz.'],
-    ['Kargo teslim edilince ne olur?', `Panel kargo durumunu ${c.name} üzerinden düzenli sorgular. Siparişin paketlerinin hepsi teslim edilince sipariş kendiliğinden “Teslim edildi” olur; ikas ve WooCommerce siparişlerinde teslim bilgisi sitenize de işlenir.`],
-    ['Kapıda ödemeli siparişleri gönderebilir miyim?', `Hayır. Bu bağlantı tahsilatlı (kapıda ödemeli) gönderi açmaz; bu siparişler için ${c.name} panelini kullanın. Panel kapıda ödemeli siparişte gönderiyi açmadan sizi uyarır.`],
-    [`${c.name} entegrasyonu hangi pakette var?`, `${plan} pakette yer alır (Kurumsal paket aylık ${tl(kurumsal().monthly)} ₺, KDV dahil). Pazaryerlerinin anlaşmalı kargosu ve ikas Kargo tüm paketlerde çalışır; bunlar için ${c.name} entegrasyonu gerekmez. Kurulum ücreti yoktur, 7 gün ücretsiz deneyebilirsiniz.`],
-  ];
-}
+// Kargo firması / entegratör sayfası. Ortak akış (panel/src/carriers.js) her sayfada firmanın kendi yöntemiyle anlatılır (CARRIER_PAGES).
 function carrierPage(c) {
-  const cap = ([k, v]) => `<li>${tick}<span>${esc(k)}</span>${typeof v === 'string' ? `<em>${esc(v)}</em>` : ''}</li>`;
-  const colors = ['c-blue', 'c-green', 'c-purple', 'c-orange', 'c-teal', 'c-pink'];
+  needPage(c);
   const isInt = c.kind === 'kargo entegratörü';
   const ctas = `<a class="btn btn-primary" href="/demo#deneme">Ücretsiz deneyin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a>`;
-  const tiles = [...c.tiles,
-    ['i-sync', 'Kanala takip bildirimi', 'Takip numarası ve kargo firması siparişin geldiği kanala (pazaryeri, ikas, WooCommerce…) bildirilir; firma paketi teslim alınca bu adım kendiliğinden yapılır.'],
-    ['i-eye', 'Teslimat takibi', 'Kargo durumu düzenli sorgulanır; paketlerin hepsi teslim edilince sipariş kendiliğinden “Teslim edildi” olur.'],
-    ['i-orders', 'Tek ekranda', 'Gönderiyi siparişin içinden açarsınız; etiketleri tek tek ya da toplu yazdırırsınız, sipariş listeniz pazaryeri ve site siparişleriyle bir arada kalır.'],
-  ];
-  const steps = [
-    ['i-key', `${c.name} bilgilerinizi alın`, c.need],
-    ['i-gear', 'Panele girin', `Bilgileri Entegrasyonlar → Kargo entegrasyonları → ${c.name} kartına girin; bağlantı test edilir. İsterseniz varsayılan kargo firmanız olarak seçin.`],
-    ['i-truck', 'Gönderin', 'Siparişte “Kargo firmasından etiket al” deyin; takip numarası ve etiket pakete yazılır. Etiketi yazdırıp paketi kargoya verirsiniz.'],
-  ];
   const others = CARRIERS.filter((o) => o.slug !== c.slug);
-  const body = `<section class="page-hero fp-hero int-hero">
-  <div class="wrap fp-grid">
-    <div class="txt">
-      <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/entegrasyonlar">Entegrasyonlar</a><span>›</span><b>${esc(c.name)}</b></nav>
-      <div class="int-logo">${logoTile(c.word, c.color, 'lg')}${carrierTag(c)}</div>
-      <h1>${esc(c.name)} <span class="grad">entegrasyonu</span></h1>
-      <p>${esc(c.lead)}</p>
-      <div class="ctas">${ctas}</div>
-      ${heroChecks}
-    </div>
-    <div class="vis"><div class="capcard"><div class="cc-h"><b>Desteklenen işlemler</b><small>${esc(c.name)} ${isInt ? 'hesabınızla' : 'kurumsal anlaşmanızla'}</small></div><ul>${c.caps.filter(([, v]) => v !== false).map(cap).join('')}</ul></div></div>
-  </div>
-</section>
-<section class="sec">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">${esc(c.name)} ile</div><h2>Neler Yapabilirsiniz?</h2></div>
-    <div class="feats">${tiles.map(([i, t, d], k) => `<div class="feat reveal"><span class="ic ${colors[k % 6]}">${ico(i)}</span><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('')}</div>
-  </div>
-</section>
-<section class="sec alt">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Kurulum</div><h2>Nasıl Çalışır?</h2></div>
-    <div class="how three">${steps.map(([i, t, d]) => `<div class="hs reveal"><div class="ic">${ico(i)}</div><h3>${esc(t)}</h3><p>${esc(d)}</p></div>`).join('')}</div>
-    <p class="how-note reveal">Kurulumda yanınızdayız; ilk gönderilerinizi birlikte kontrol ederiz.</p>
-  </div>
-</section>
-<section class="sec">
-  <div class="wrap narrow-text">
-    <div class="sec-head reveal"><div class="kicker">${esc(c.name)} entegrasyonu nedir?</div><h2>${isInt ? 'Tek Hesaptan Gönderi, Tek Panelden Takip' : 'Kendi Kargo Anlaşmanızla Tek Panelden Gönderi'}</h2></div>
-    <p class="reveal seo-p">${esc(`${c.name} entegrasyonu, ${isInt ? `${c.name} hesabınızla` : `${c.name} ile yaptığınız kurumsal anlaşmayla`} gönderdiğiniz siparişlerin gönderisini Hastürk CRM panelinden açmanızı sağlar. Pazaryerlerinden ve e-ticaret sitenizden gelen siparişler aynı listede durur; gönderi açıldığında takip numarası, kargo firması ve etiket pakete yazılır.`)}</p>
-    <p class="reveal seo-p">${esc(`Pazaryerlerinin anlaşmalı kargosuyla gönderdiğiniz siparişlerde barkod pazaryerinden gelir; ${c.name} entegrasyonu kendi anlaşmanızla gönderdiğiniz siparişler içindir. Kargo ücretini bildiren firmalarda ücret siparişin kargo giderine yazılır, böylece her siparişin net kârı gerçek kargo maliyetiyle hesaplanır.`)}</p>
-  </div>
-</section>
-<section class="sec alt">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(c.name)} Entegrasyonu Hakkında</h2></div>${faqHtml(carrierFaq(c))}
-  </div>
-</section>
-<section class="sec">
-  <div class="wrap">
-    <div class="sec-head reveal"><div class="kicker">Diğer kargo entegrasyonları</div><h2>Kargo Firmanız Hangisi?</h2><p>Birden fazla kargo firmasını bağlayıp her gönderide seçebilirsiniz.</p></div>
+  const body = `${intHero(c, logoTile(c.word, c.color, 'lg'), carrierTag(c), 'Desteklenen işlemler', `${c.name} ${isInt ? 'hesabınızla' : 'kurumsal anlaşmanızla'}`, c.caps, ctas)}
+${alt([
+  `<div class="sec-head reveal"><div class="kicker">${esc(c.name)} ile</div><h2>Neler Yapabilirsiniz?</h2></div>${tilesHtml(c.tiles)}`,
+  `<div class="sec-head reveal"><div class="kicker">Kurulum</div><h2>Nasıl Bağlanır?</h2></div>${stepsHtml(c.setup)}`,
+  c.notes && notesHtml(c.notes),
+  `<div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(c.name)} Entegrasyonu Hakkında</h2></div>${faqHtml(c.faq)}`,
+  `<div class="sec-head reveal"><div class="kicker">Diğer kargo entegrasyonları</div><h2>Kargo Firmanız Hangisi?</h2></div>
     <div class="rels">${others.map((o) => `<a class="rl" href="${carrierHref(o)}">${logoTile(o.word, o.color, 'sm')}<span><b>${esc(o.name)}</b><small>${esc(o.kind)}</small></span></a>`).join('')}</div>
-    <div class="center-cta"><a class="btn btn-line" href="/ozellikler/kargo-entegrasyonu">Kargo entegrasyonu ${ico('i-arrow')}</a> <a class="btn btn-line" href="/ozellikler/kargo-ve-etiket">Kargo ve etiket ${ico('i-arrow')}</a> <a class="btn btn-line" href="/entegrasyonlar#kargo">Tüm entegrasyonlar ${ico('i-arrow')}</a></div>
-  </div>
-</section>
-<section class="sec alt"><div class="wrap"><div class="ask big reveal"><div><b>${esc(c.name)} gönderilerinizi tek panelden yönetin</b><span>7 gün ücretsiz deneyin; kurulum ücreti yok, kurulumda yanınızdayız. Önce görmek isterseniz demo panelini kayıt olmadan açın.</span></div>
-  <div class="ctas">${ctas}</div></div></div></section>`;
+    <div class="center-cta"><a class="btn btn-line" href="/ozellikler/kargo-entegrasyonu">Kargo entegrasyonu ${ico('i-arrow')}</a> <a class="btn btn-line" href="/ozellikler/kargo-ve-etiket">Kargo ve etiket ${ico('i-arrow')}</a> <a class="btn btn-line" href="/entegrasyonlar#kargo">Tüm entegrasyonlar ${ico('i-arrow')}</a></div>`,
+  askBand(c.cta, ctas),
+], false)}`;
   return { meta: { title: c.title, crumb: `${c.name} Entegrasyonu`, description: c.desc, url: `/entegrasyonlar/${c.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${c.slug}.html` };
 }
 

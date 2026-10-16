@@ -76,7 +76,11 @@ Ayarlar (değiştirdikten sonra `node build.mjs` çalıştırın; arama motoru v
   Bir pakete henüz aktif olmayan özellik eklemek için `soon: [...]` kullanın; kartta "Yakında" rozetiyle görünür.
 - **Kanal listesi (aktif / test aşamasında / yakında):** `public/assets/site.js` → `ACTIVE`, `TEST`, `SOON`; kanal sayfaları `src/data.mjs` → `INTEGRATIONS`. Kanal yetenek tablosu `src/pages/entegrasyonlar.html` içindedir.
   Liste sayfasındaki kartlar (arama + kategori sekmeleri: Pazaryerleri, E-ticaret siteleri, Yurt dışı, Hızlı teslimat, Kargo) `data.mjs`'teki `kind`'dan derlenir; kargo firmalarının kartları ve kendi sayfaları (`/entegrasyonlar/<firma>`) `data.mjs` → `CARRIERS`'tan derlenir (içerik `panel/src/carriers.js` ve `panel/src/carriers/<firma>.js`'teki bağlantının yaptıklarıyla birebir olmalı; test aşamasındaki firmada `beta: true`). Sekme adresle de açılır: `/entegrasyonlar#kargo`.
-  Kanal sayfasındaki "Neler yapabilirsiniz" kutuları ve kart özetleri yalnız `caps`'te açık olan işlemlerden üretilir (`build.mjs` → `capTiles`, `capShort`).
+  Kart özetleri ve "Desteklenen işlemler" kutusu yalnız `caps`'te açık olan işlemlerden üretilir (`build.mjs` → `capShort`). Kanal ve kargo sayfalarının
+  metinleri (başlık, açıklama, giriş, kutular, kurulum, SSS, çağrı bandı) `src/integration-pages.mjs`'tedir ve her sayfaya özel yazılır; şablon cümle yoktur.
+  **Sayfalar birbirinin adı değiştirilmiş kopyası olmamalı** (Google: scaled content abuse): yeni kanal eklerken başka sayfadan cümle kopyalamayın.
+  `node scripts/similarity.mjs` aynı ailedeki sayfaların benzerliğini (kelime üçlüsü Jaccard), aynı / çok benzer başlık ve açıklamaları ve tekrarlanan
+  cümleleri raporlar; `test/seo.test.mjs` entegrasyon ve özellik sayfalarında tekrarlanan cümleye ve benzerlik sınırının aşılmasına izin vermez.
   Test aşamasındaki kanallar (Amazon, Çiçeksepeti, Koçtaş, Shopify, OpenCart, Etsy; `data.mjs`'te `beta`) menüde, kartlarda ve kendi sayfalarında **“Test aşamasında”** etiketiyle görünür.
   Ana panelde Entegrasyonlar → kanal → **“Test yazısını kaldır”** denince etiket sitede de kalkar (sayfalar `/api/public/channels`'tan okur; derleme gerekmez).
 - **Rakamlar şeridi** (ana sayfa, `class="stats"`): yalnız doğrulanabilir bilgiler yazın (müşteri sayısı, memnuniyet oranı gibi değerleri gerçek veri olmadan eklemeyin).
