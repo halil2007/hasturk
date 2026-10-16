@@ -7,7 +7,7 @@
 import { all, first, run, allIn, getRaw, setSetting, getSettings, log, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { importListings, catalogOf, HELD_SQL } from './sync.js';
-import { fail, str, num, r2, isImageAttr, variantAxes } from './util.js';
+import { fail, str, num, r2, isImageAttr, variantAxes, cleanHtml } from './util.js';
 export { variantAxes };
 import { rank, localProfile, prepare, score } from './catmatch.js';
 import { quantities } from './match.js';
@@ -77,7 +77,7 @@ export function shape(p, opts, zeroStock) {
   try { extra = JSON.parse(p.images || '[]'); } catch { /* bozuk liste */ }
   const images = [...new Set([img, ...extra.map(big)].filter(Boolean))].slice(0, 10);
   return {
-    id: p.id, sku: str(p.sku), barcode: str(p.barcode), name: str(p.name), brand: str(p.brand), description: str(p.description) || str(p.name),
+    id: p.id, sku: str(p.sku), barcode: str(p.barcode), name: str(p.name), brand: str(p.brand), description: cleanHtml(p.description) || str(p.name),
     image: img || images[0] || '', images, vat: p.vat ?? 20, desi: p.desi || 1, stock: zeroStock ? 0 : Math.max(0, Math.round(p.stock || 0)),
     price: r2(base * k), listPrice: r2((own || Math.max(p.cat_list || 0, base)) * k), weight: num(p.weight) > 0 ? num(p.weight) : null,
     group: groupCode(p), variant: str(p.variant_name),

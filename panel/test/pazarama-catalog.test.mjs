@@ -6,6 +6,7 @@ import { d1 } from '../dev/d1.mjs';
 import { init, run, setSetting } from '../src/db.js';
 import { resetChannels } from '../src/channels/index.js';
 import worker from '../src/index.js';
+import { cleanHtml } from '../src/util.js';
 
 const G = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`;
 test('Pazarama ürün yükleme: eşleştirme, eksik kontrolü, gönderim ve sonuç (hatalı ürün nedeniyle)', async () => {
@@ -19,6 +20,8 @@ test('Pazarama ürün yükleme: eşleştirme, eksik kontrolü, gönderim ve sonu
   await ins('SOL-5', '869001', 'Solucan Gübresi 5 Kg', '5 Kg', 'https://cdn.ornek.com/a.webp');
   await ins('SOL-10', '869002', 'Solucan Gübresi 10 Kg', '10 Kg', 'https://cdn.ornek.com/b.webp');
   await ins('SOL-X', '', 'Barkodsuz', '1 Kg', '');
+  // Word'den kopyalanmış açıklama (Pazarama "Microsoft Office-specific tags" diye reddeder)
+  await run(db, `UPDATE products SET description = ? WHERE sku = 'SOL-5'`, `<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]--><p class=MsoNormal style='mso-pagination:widow-orphan'><b><span lang=TR style='mso-ansi-language:TR'>%100 organik</span></b><o:p></o:p></p><p class="MsoNormal">&nbsp;<o:p></o:p></p>`);
   const calls = [], realFetch = globalThis.fetch;
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url);
@@ -75,6 +78,7 @@ test('Pazarama ürün yükleme: eşleştirme, eksik kontrolü, gönderim ve sonu
     assert.equal(s5.salePrice, 100); assert.equal(s5.listPrice, 120); assert.equal(s5.vatRate, 10); assert.equal(s5.desi, 2); assert.equal(s5.stockCount, 7);
     assert.deepEqual(s5.attributes, [{ attributeId: G(47), attributeValueId: G(901) }, { attributeId: G(48), attributeValueId: G(903) }]);
     assert.equal(s5.images[0].imageurl, 'https://cdn.ornek.com/a.webp');
+    assert.equal(s5.description, '<p><b>%100 organik</b></p>');
     // Varyantlar aynı grup kodunu alır; Pazarama sınırı 10 karakter
     const s10 = sent.find((x) => x.code === '869002');
     assert.equal(s5.groupCode, s10.groupCode); assert.ok(s5.groupCode.length <= 10, s5.groupCode);
@@ -143,4 +147,15 @@ test('eksik zorunlu özellik ürün adından / kategorisinden kesin algılanır 
     assert.deepEqual(by.A1T.missing, ['Miktar'], 'iki ölçülü üründe Miktar seçilmez');
     assert.deepEqual(by.ASET.missing, []); assert.ok(by.ASET.auto.some((a) => a.name === 'Marka' && a.value === 'HasTürk'));
   } finally { globalThis.fetch = real; resetChannels(); }
+});
+
+test('açıklama temizliği: Word / Office etiketleri silinir, temel biçim ve metin kalır', () => {
+  const w = `<!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:AllowPNG/></o:OfficeDocumentSettings></xml><![endif]--><style>p.MsoNormal{mso-style-parent:"";}</style>
+<p class=MsoListParagraph style='mso-list:l0 level1 lfo1'><![if !supportLists]><span style='font-family:Symbol'>·</span><![endif]><span lang=TR>Kök gelişimi</span><o:p></o:p></p>
+<ul><li style="mso-list:l0">Toprak</li></ul><p><st1:place w:st="on">Türkiye</st1:place></p><a href="javascript:alert(1)" onclick="x">a</a><a href="https://h.com/x">b</a><img src="https://h.com/i.jpg" style="width:3px">`;
+  const c = cleanHtml(w);
+  assert.doesNotMatch(c, /mso|Mso|<o:|<w:|<st1:|xml|style|class|lang=|<!|onclick|javascript/i);
+  assert.equal(c, '<p>·Kök gelişimi</p> <ul><li>Toprak</li></ul><p>Türkiye</p><a>a</a><a href="https://h.com/x">b</a><img src="https://h.com/i.jpg">');
+  assert.equal(cleanHtml('Düz metin, <b>kalın</b>'), 'Düz metin, <b>kalın</b>');
+  assert.equal(cleanHtml(null), '');
 });
