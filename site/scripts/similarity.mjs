@@ -34,13 +34,20 @@ const maskRe = (names) => {
 };
 
 const family = (url) => (/^\/(entegrasyonlar|ozellikler|araclar)\/./.test(url) ? url.split('/')[1] : 'üst düzey');
+// Cümle tekrarı denetiminde entegrasyon ailesine katılan özellik sayfaları (kargo entegratörünün kendi sayfası)
+export const INT_EXTRA = ['/ozellikler/kargonomi-entegrasyonu'];
+NAMES['/ozellikler/kargonomi-entegrasyonu'].push('Kargonomi');
+// Cümleler: blok sonları ve cümle sonu noktalamasından bölünür; 6 kelimeden kısa parçalar (düğme, etiket, başlık) sayılmaz
+export const MIN_WORDS = 6;
+const sentences = (body) => body.split(/\n|(?<=[.!?])\s+/).map((x) => words(x).join(' ')).filter((x) => x.split(' ').length >= MIN_WORDS);
 
 // <main> içinden ortak / gezinme parçalarını atıp düz metin
 export function bodyText(html) {
   let m = html.slice(html.indexOf('<main>') + 6, html.indexOf('</main>'));
   m = m.replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<svg[\s\S]*?<\/svg>/g, ' ');
-  // Bölüm bölüm: ortak CTA bandı ve ızgara bölümleri (diğer entegrasyonlar, ilgili özellikler, kargo firmaları listesi) atılır
-  m = m.replace(/<section\b[\s\S]*?<\/section>/g, (s) => (/class="ask big|class="rels"|class="grid g3"|class="mega-|data-integ=/.test(s) ? ' ' : s));
+  // Bölüm bölüm: gezinme ızgaraları (diğer entegrasyonlar, ilgili özellikler, kargo firmaları listesi) atılır. Sayfa sonundaki
+  // CTA bandı (class="ask big") metne dahildir: o da sayfaya özel olmalı.
+  m = m.replace(/<section\b[\s\S]*?<\/section>/g, (s) => (/class="rels"|class="grid g3"|class="mega-|data-integ=/.test(s) ? ' ' : s));
   m = m.replace(/<nav class="crumbs"[\s\S]*?<\/nav>/g, ' ')
     .replace(/<div class="checks">[\s\S]*?<\/div>/g, ' ')
     .replace(/<div class="ctas">[\s\S]*?<\/div>/g, ' ')
@@ -74,6 +81,15 @@ export function analyze(pub = join(ROOT, 'public')) {
     pairs.push({ fam: a.fam, a: a.url, b: b.url, body: jaccard(a.sh, b.sh), desc: jaccard(a.shDesc, b.shDesc), sameTitle: a.nTitle === b.nTitle, sameDesc: a.nDesc === b.nDesc });
   }
   pairs.sort((x, y) => y.body - x.body);
+  // Aynı cümle (sayfanın kendi adı maskelenmiş) aynı ailede 2+ sayfada: { aile: [[cümle, [adresler]]] }.
+  // Entegrasyon ailesine Kargonomi sayfası da katılır (INT_EXTRA).
+  const sentDup = {};
+  const groups = { ...fams, entegrasyonlar: [...(fams.entegrasyonlar || []), ...pages.filter((p) => INT_EXTRA.includes(p.url))] };
+  for (const [fam, list] of Object.entries(groups)) {
+    const at = new Map();
+    for (const p of list) for (const s of new Set(sentences(p.body))) (at.get(s) || at.set(s, []).get(s)).push(p.url);
+    sentDup[fam] = [...at].filter(([, u]) => u.length >= 2).sort((a, b) => b[1].length - a[1].length);
+  }
   // Ailede 3+ sayfada geçen aynı cümle (maskelenmiş): şablon kalıntısı
   const repeated = {};
   for (const [fam, list] of Object.entries(fams)) {
@@ -83,7 +99,7 @@ export function analyze(pub = join(ROOT, 'public')) {
   }
   // Tüm sitede: başlık / açıklama birebir ya da maskelemeden sonra aynı
   const dup = (k) => { const m = new Map(), out = []; for (const p of pages) { const v = p[k]; if (m.has(v)) out.push([m.get(v), p.url, v]); else m.set(v, p.url); } return out; };
-  return { pages, fams, pairs, repeated, dupTitle: dup('nTitle'), dupDesc: dup('nDesc'), dupH1: dup('h1') };
+  return { pages, fams, pairs, repeated, sentDup, dupTitle: dup('nTitle'), dupDesc: dup('nDesc'), dupH1: dup('h1') };
 }
 
 // ---------- komut satırı ----------
@@ -105,11 +121,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const rep = r.repeated[fam].slice(0, 5);
     if (rep.length) { console.log('  tekrar eden cümleler:'); for (const [s, n] of rep) console.log(`    ${n}× ${s.slice(0, 120)}`); }
   }
+  console.log(`\n== Tekrarlanan cümleler (${MIN_WORDS}+ kelime, sayfanın kendi adı maskeli; aynı ailede 2+ sayfa)`);
+  for (const [fam, list] of Object.entries(r.sentDup)) {
+    console.log(`  ${fam}: ${list.length} cümle${list.slice(0, top).map(([s, u]) => `\n    ${u.length}× ${s.slice(0, 110)}  [${u.slice(0, 3).map((x) => x.split('/').pop()).join(', ')}${u.length > 3 ? ' …' : ''}]`).join('')}`);
+  }
   const nearDesc = r.pairs.filter((p) => p.desc > 0.4).sort((a, b) => b.desc - a.desc);
   console.log(`\n== Başlık / açıklama (marka ve sayfanın kendi adı çıkarılarak)`);
   console.log(`  aynı başlık: ${r.dupTitle.length}${r.dupTitle.slice(0, top).map(([a, b, v]) => `\n    ${a} = ${b}: "${v}"`).join('')}`);
   console.log(`  aynı açıklama: ${r.dupDesc.length}${r.dupDesc.slice(0, top).map(([a, b, v]) => `\n    ${a} = ${b}: "${v}"`).join('')}`);
   console.log(`  aynı H1: ${r.dupH1.length}${r.dupH1.slice(0, top).map(([a, b, v]) => `\n    ${a} = ${b}: "${v}"`).join('')}`);
   console.log(`  çok benzer açıklama (2'li Jaccard > 0,4): ${nearDesc.length}${nearDesc.slice(0, top).map((p) => `\n    ${f3(p.desc)} ${p.a} ↔ ${p.b}`).join('')}`);
-  if (out) writeFileSync(out, JSON.stringify({ summary, dupTitle: r.dupTitle, dupDesc: r.dupDesc, dupH1: r.dupH1, nearDesc: nearDesc.map((p) => [p.a, p.b, +f3(p.desc)]) }, null, 1));
+  if (out) writeFileSync(out, JSON.stringify({ summary, sentDup: Object.fromEntries(Object.entries(r.sentDup).map(([f, l]) => [f, l.length])), dupTitle: r.dupTitle, dupDesc: r.dupDesc, dupH1: r.dupH1, nearDesc: nearDesc.map((p) => [p.a, p.b, +f3(p.desc)]) }, null, 1));
 }
