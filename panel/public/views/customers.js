@@ -2,11 +2,12 @@
 // müşteri sayısı, sipariş sayısı dağılımı, aylık yeni / tekrar eden müşteri, iller) ve müşteri ayrıntısı (tüm siparişleri).
 import { api, html, render, $, money, money0, n, ch, chLogo, chBadge, chColor, statusPill, dateTime, date, actions, debounce, sheet, store, toast } from '../core.js';
 import { setQuery } from '../app.js';
+import { customBox, customSpan, bindCustom } from '../daterange.js';
 import { columnChart } from '../chart.js';
 import { openOrder } from './orderops.js';
 import { turkeyMap, cityTable } from './trmap.js';
 
-const RANGES = [['all', 'Tümü'], ['365', 'Son 1 yıl'], ['90', 'Son 90 gün'], ['30', 'Son 30 gün']];
+const RANGES = [['all', 'Tümü'], ['365', 'Son 1 yıl'], ['90', 'Son 90 gün'], ['30', 'Son 30 gün'], ['custom', 'Özel tarih']];
 const SORTS = [['last', 'Son sipariş'], ['orders', 'Sipariş sayısı'], ['spend', 'Toplam harcama'], ['first', 'Yeni müşteri']];
 const MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
@@ -15,7 +16,8 @@ export async function customersView(el, rest, query = {}) {
   let S = null, L = null;
   const params = () => {
     const p = new URLSearchParams();
-    if (f.range !== 'all') p.set('from', String(Date.now() - Number(f.range) * 864e5));
+    if (f.range === 'custom') { const [a, b] = customSpan(f); p.set('from', String(a)); p.set('to', String(b - 1)); }
+    else if (f.range !== 'all') p.set('from', String(Date.now() - Number(f.range) * 864e5));
     return p;
   };
   render(el, html`<div class="stack">
@@ -38,7 +40,7 @@ export async function customersView(el, rest, query = {}) {
   </div>`);
 
   function drawSummary() {
-    render($('[data-ranges]', el), html`${RANGES.map(([k, t]) => html`<button class="chip ${f.range === k ? 'on' : ''}" data-act="range" data-k="${k}">${t}</button>`)}`);
+    render($('[data-ranges]', el), html`${RANGES.map(([k, t]) => html`<button class="chip ${f.range === k ? 'on' : ''}" data-act="range" data-k="${k}">${t}</button>`)}${customBox(f)}`);
     render($('[data-kpis]', el), html`
       <div class="kpi"><div class="label">Toplam müşteri</div><div class="value num">${n(S.customers)}</div><div class="delta flat">${n(S.multi)} müşteri birden çok kanalda</div></div>
       <div class="kpi"><div class="label">Toplam sipariş</div><div class="value num">${n(S.orders)}</div><div class="delta flat">müşteri başına ${n(S.ordersPerCustomer)} sipariş</div></div>
@@ -82,7 +84,7 @@ export async function customersView(el, rest, query = {}) {
     p.set('page', f.page);
     L = await api('customers?' + p); drawList();
   }
-  const save = () => { store.set('customers', { range: f.range, sort: f.sort, repeat: f.repeat, cityView: f.cityView }); setQuery({ channel: f.channel }); };
+  const save = () => { store.set('customers', { range: f.range, from: f.from, to: f.to, sort: f.sort, repeat: f.repeat, cityView: f.cityView }); setQuery({ channel: f.channel }); };
 
   async function openCustomer(key) {
     const s = sheet({ title: 'Müşteri', size: 'wide', body: html`<div class="empty"><i class="ico ico-sync spin"></i></div>` });
@@ -115,6 +117,7 @@ export async function customersView(el, rest, query = {}) {
   $('[data-ch]', el).addEventListener('change', (e) => { f.channel = e.target.value; f.page = 1; save(); loadList().catch(() => {}); });
   $('[data-sort]', el).addEventListener('change', (e) => { f.sort = e.target.value; f.page = 1; save(); loadList().catch(() => {}); });
   $('[data-repeat]', el).addEventListener('change', (e) => { f.repeat = e.target.checked ? '1' : ''; f.page = 1; save(); loadList().catch(() => {}); });
+  bindCustom(el, f, () => { f.page = 1; save(); Promise.all([loadSummary(), loadList()]).catch((e) => toast(e.message, true)); });
   await Promise.all([loadSummary(), loadList()]);
   if (query.key) openCustomer(query.key);
 }

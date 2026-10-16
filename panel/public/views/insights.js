@@ -4,10 +4,11 @@ import { turkeyMap } from './trmap.js';
 import { costBtn } from '../costedit.js';
 import { api, html, render, $, money, money0, n, delta, ch, chLogo, chColor, thumb, store, toast, actions, date, isMobile, activeChannels } from '../core.js';
 import { setQuery } from '../app.js';
+import { customBox, customDays, bindCustom } from '../daterange.js';
 import { statsView } from './stats.js';
 
 const UNITS = [['day', 'Gün'], ['week', 'Hafta'], ['month', 'Ay'], ['year', 'Yıl']];
-const RANGES = [['today', 'Bugün'], ['yesterday', 'Dün'], ['week', 'Bu hafta'], ['month', 'Bu ay'], ['30', 'Son 30 gün'], ['year', 'Bu yıl']];
+const RANGES = [['today', 'Bugün'], ['yesterday', 'Dün'], ['week', 'Bu hafta'], ['month', 'Bu ay'], ['30', 'Son 30 gün'], ['year', 'Bu yıl'], ['custom', 'Özel tarih']];
 const cardTitle = (u, i) => ({
   day: ['Bugün', 'Dün', '2 gün önce', '3 gün önce'],
   week: ['Bu hafta', 'Geçen hafta', '2 hafta önce', '3 hafta önce'],
@@ -47,7 +48,7 @@ async function summary(el, query) {
     const chs = activeChannels().filter((c) => c.enabled || c.demo);
     render($('[data-chs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Toplam</button>${chs.map((c) => html`<button class="ch-tab ${f.channel === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}${c.name}</button>`)}`);
     render($('[data-units]', el), html`${UNITS.map(([k, t]) => html`<button class="${f.unit === k ? 'on' : ''}" data-act="unit" data-k="${k}">${t}</button>`)}`);
-    render($('[data-ranges]', el), html`${RANGES.map(([k, t]) => html`<button class="chip ${f.range === k ? 'on' : ''}" data-act="range" data-k="${k}">${t}</button>`)}`);
+    render($('[data-ranges]', el), html`${RANGES.map(([k, t]) => html`<button class="chip ${f.range === k ? 'on' : ''}" data-act="range" data-k="${k}">${t}</button>`)}${customBox(f)}`);
     $('[data-rlabel]', el).textContent = `${date(d.range.from)} – ${date(Math.min(d.range.to, Date.now()) - 1)}`;
     render($('[data-sort]', el), html`<button class="${f.sort === 'qty' ? 'on' : ''}" data-act="sort" data-k="qty">Adede göre</button><button class="${f.sort === 'revenue' ? 'on' : ''}" data-act="sort" data-k="revenue">Ciroya göre</button>`);
     // 1) son 4 dönem kartları
@@ -108,12 +109,13 @@ async function summary(el, query) {
         Object.entries(p.channels).map(([c, v]) => `${ch(c).name}: ${v}`).join(', ')])];
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.map((r) => r.map(cell).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-    a.download = `en-cok-satanlar-${new Date(d.range.from).toISOString().slice(0, 10)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    a.download = `en-cok-satanlar-${new Date(d.range.from + 3 * 3600e3).toISOString().slice(0, 10)}_${new Date(Math.min(d.range.to, Date.now()) - 1 + 3 * 3600e3).toISOString().slice(0, 10)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
   async function load() {
-    store.set('insights', { unit: f.unit, range: f.range, cityView: f.cityView });
+    store.set('insights', { unit: f.unit, range: f.range, cityView: f.cityView, from: f.from, to: f.to });
     setQuery({ channel: f.channel });
     const p = new URLSearchParams({ unit: f.unit, range: f.range, sort: f.sort, limit: 500 });
+    if (f.range === 'custom') { const [a, b] = customDays(f); p.set('from', a); p.set('to', b); }
     if (f.channel) p.set('channel', f.channel);
     d = await api('insights?' + p);
     draw();
@@ -127,8 +129,9 @@ async function summary(el, query) {
     allcities: () => { f.allCities = !f.allCities; draw(); },
     topmore: () => { f.more = !f.more; drawTop(); },
     csv: () => (d && d.top.length ? csv() : toast('Bu dönemde satış yok', true)),
-    cview: (t) => { f.cityView = t.dataset.k; store.set('insights', { unit: f.unit, range: f.range, cityView: f.cityView }); draw(); },
+    cview: (t) => { f.cityView = t.dataset.k; store.set('insights', { unit: f.unit, range: f.range, cityView: f.cityView, from: f.from, to: f.to }); draw(); },
   });
+  bindCustom(el, f, refresh);
   $('[data-tq]', el).addEventListener('input', (e) => { f.tq = e.target.value.trim(); if (d) drawTop(); });
   await refresh();
   return { refresh };
