@@ -1,9 +1,15 @@
 // Kategori eşleştirme puanı (PROPOSED, sector-agnostic): panel kategorisi + o kategorideki ürün adları ↔ pazaryeri kategorisi (ad + yol).
-//   1. Türkçe normalizasyon + ek / yumuşama farkına dayanıklı kelime eşitliği (kılıfları ~ kılıf, rujlar ~ ruj, yağları ~ yağ).
+//   1. Türkçe normalizasyon + ek / yumuşama farkına dayanıklı kelime eşitliği (kılıfları ~ kılıf, rujlar ~ ruj, yağları ~ yağ, kumu ~ kumları);
+//      yapım eki anlamı değiştirir (bitki ≠ bitkisel, koku ≠ kokulu, ilaç ≠ ilaçlama).
+//   1b. Baş kelime: kategorinin asıl nesnesi (Türkçe tamlamada son kelime; ürün adlarının çoğunluğu başka bir ad kelimesini kullanıyorsa o).
+//      Kanal kategorisinin de başıyla eşleşmesi tam puan, yalnız niteleyicisiyle eşleşmesi az puan; başı yereldeki hiçbir nesneye
+//      karşılık gelmeyen kategori cezalı (Balkon Bitkileri ≠ Balkon Salıncağı, Süs Bitkileri ≠ Bitkisel Yağ).
 //   2. Genel eş anlamlılar tablosu (tüm e-ticaret sektörleri): tişört ~ t-shirt, kılıf ~ kapak, şarj aleti ~ şarj cihazı …
 //   3. FASETLER (sektörden bağımsız ayırt ediciler): cinsiyet, yaş grubu, tür (pet), cihaz ailesi, malzeme, kıvam.
 //      İki taraf farklı değer söylüyorsa büyük ceza; kategori daha dar bir hedef söylüyor ve yerelde kanıt yoksa küçük ceza.
-//   4. Alan paketleri: kavramın bağlamla değiştiği yerler (ilaçlama pompası ≠ su pompası, organik ≠ kimyevi). Bahçe paketi korunur;
+//      Yerel kategorinin adı bir tür söylüyor (Kedi …), kanal kategorisi hiçbir tür için değilse ceza (kedi macunu ≠ bitki vitamini).
+//   4. Alan paketleri: kavramın bağlamla değiştiği yerler (ilaçlama pompası ≠ su pompası, organik ≠ kimyevi, kedi vitamini ≠ bitki vitamini).
+//      Yerel kategori bir alana açıkça giriyor, kanal kategorisi hiçbirine girmiyorsa ceza (Viyoller ≠ Viyola). Bahçe paketi korunur;
 //      başka sektörler aynı yapıyla paket ekleyebilir. Eski "alakasız alan" (x-*) listeleri kaldırıldı: giyim / ayakkabı / bebek /
 //      elektronik kategorilerini HER yerel kategori için cezalandırıyordu.
 //   5. Genel kategori ("Diğer", "Genel", "Kampanya", "Yeni Gelenler") yalnız ürün adlarıyla puanlanır ve hiçbir zaman "kesin" olmaz.
@@ -18,11 +24,15 @@ export const tokens = (s) => fold(s).split(' ').filter((w) => w.length >= 2 && !
 
 const SOFT = { k: 'g', p: 'b', t: 'd', c: 'c' };
 const soft = (w) => (SOFT[w[w.length - 1]] ? w.slice(0, -1) + SOFT[w[w.length - 1]] : w);
+// Yapım ekleri kelimenin anlamını değiştirir: bitki ≠ bitkisel, koku ≠ kokulu, ilaç ≠ ilaçlama, tuz ≠ tuzsuz, kahve ≠ kahveci.
+// Çekim ekleri (-lar / -ler, -ı / -sı, -da, -ın …) serbesttir. Kalıp, kısa kelimeden sonra gelen kalanın başına bakar.
+const DERIV = /^(l[iu]k?|s[iu]z|s[ae]l|c[iu]|l[ae]m[ae])/;
 function pm(a, b) {
   const [s, l] = a.length <= b.length ? [a, b] : [b, a];
   if (s.length < 3) return s === l;
-  if (s.length === 3) return l.startsWith(s) && l.length - s.length <= 2 && !/^(ik|ım|lik)$/.test(l.slice(3)); // "bal" ≠ "balık"
-  return l.startsWith(s) && l.length - s.length <= 5;
+  if (!l.startsWith(s) || DERIV.test(l.slice(s.length))) return false;
+  if (s.length === 3) return l.length - s.length <= 2 && !/^(ik|ım|lik)$/.test(l.slice(3)); // "bal" ≠ "balık"
+  return l.length - s.length <= 5;
 }
 // Çoğul / iyelik ekleri; çoğul eki 3 harfli köke kadar inebilir (rujlar → ruj, yağları → yağ)
 const SUFFIX = ['larindan', 'lerinden', 'larinin', 'lerinin', 'lari', 'leri', 'lar', 'ler', 'sini', 'sunu', 'nin', 'nun', 'si', 'su', 'in', 'un', 'i', 'u'];
@@ -35,7 +45,9 @@ export function stem(w) {
   return w;
 }
 // "bot" ≠ "body": yumuşama yalnız 4+ harfte; kısa kök ancak birebir ya da çoğul ekiyle eşleşir
-const same0 = (a, b) => a === b || pm(a, b) || (a.length > 3 && pm(soft(a), b)) || (b.length > 3 && pm(a, soft(b))) || (a.length > 4 || b.length > 4) && stem(a) === stem(b) || (a.length > 4 && b.length > 4 && pm(stem(a), stem(b)));
+// 3 harfli kök + iyelik eki ("kumu", "yağı", "tuzu") ile aynı kökün çoğulu ("kumları", "yağları"): kök birebir aynıysa eşittir
+const p3 = (a, b) => a.length === 4 && /[iu]$/.test(a) && b.length > 4 && stem(b) === a.slice(0, 3);
+const same0 = (a, b) => a === b || pm(a, b) || p3(a, b) || p3(b, a) || (a.length > 3 && pm(soft(a), b)) || (b.length > 3 && pm(a, soft(b))) || (a.length > 4 || b.length > 4) && stem(a) === stem(b) || (a.length > 4 && b.length > 4 && pm(stem(a), stem(b)));
 // Kelime çifti sonucu önbellekte (binlerce kategori × yerel kelime: aynı çiftler tekrar tekrar karşılaştırılır)
 // Eşleşen iki kelimenin ilk iki harfi her zaman aynıdır (önek, yumuşama ve ek yalnız sonu değiştirir): farklıysa hemen hayır.
 const SAME = new Map();
@@ -54,6 +66,8 @@ const has = (list, w) => list.some((x) => same(x, w));
 
 // ---------- genel eş anlamlılar (tüm sektörler) ----------
 // Her satır bir eşdeğerlik sınıfıdır; ilk kelime pazaryerinde en sık kullanılan biçim. Çok kelimeli ifadeler tek kelimeye indirgenir.
+// Başta { when } varsa eş anlam yalnız o alanda geçerlidir: "besin" bitki / toprak bağlamında gübredir, kedi / gıda bağlamında değil.
+const PLANT = { when: ['plant', 'fert', 'soil', 'seed', 'pot'] };
 const SYN_GROUPS = [
   ['tisort', 'tshirt', 't-shirt'], ['sweatshirt', 'sweat', 'hoodie', 'kapusonlu'], ['jean', 'kot', 'denim'], ['mont', 'kaban', 'parka'], ['tayt', 'legging'],
   ['ayakkabi', 'sneaker', 'spor ayakkabi'], ['canta', 'cantasi'], ['sal', 'esarp', 'fular'],
@@ -71,12 +85,22 @@ const SYN_GROUPS = [
   ['motor yagi', 'madeni yag', 'yag'], ['oto paspas', 'paspas'], ['telefon tutucu', 'tutucu'], ['fren balatasi', 'balata'], ['silecek', 'silecek supurgesi'],
   ['roman', 'kitap'], ['hikaye kitabi', 'masal', 'cocuk kitabi'], ['yapboz', 'puzzle'], ['pelus', 'pelus oyuncak'], ['kumandali araba', 'rc araba', 'uzaktan kumandali'],
   ['kurşun kalem', 'kalem'], ['defter', 'bloknot'],
-  ['gubre', 'bitki besini', 'besin'], ['toprak', 'torf', 'harc'], ['tohum', 'fide'], ['hortum', 'sulama hortumu'], ['matkap', 'delici'],
+  [PLANT, 'gubre', 'bitki besini', 'besin'], [PLANT, 'toprak', 'torf', 'harc'], ['tohum', 'fide'], ['hortum', 'sulama hortumu'], ['matkap', 'delici'],
   ['fungisit', 'mantar ilaci'], ['insektisit', 'bocek ilaci'], ['herbisit', 'ot ilaci'], ['pulverizator', 'ilaclama pompasi'],
 ];
-const SYN = new Map();
-for (const g of SYN_GROUPS) { const fw = g.map((x) => fold(x).split(' ').filter(Boolean)); for (const a of fw) for (const b of fw) if (a !== b) { const k = a[a.length - 1]; for (const w of b) (SYN.get(k) || SYN.set(k, new Set()).get(k)).add(w); } }
-const synOf = (w) => { const out = new Set(); for (const [k, v] of SYN) if (same(k, w)) for (const x of v) out.add(x); return [...out]; };
+// Çok kelimeli ifade ancak bütün kelimeleri birlikte geçiyorsa eş anlamlısını getirir: "ilaçlama pompası" ≡ pulverizatör, ama her "pompa"
+// değil (havuz / bisiklet pompası); "ekran koruyucu" ≡ temperli cam, ama "güneş koruyucu" değil.
+const SYN = new Map(); // son kelime → [{ need: ifadenin diğer kelimeleri, words: eş anlamlılar, when: alan koşulu | null }]
+for (const g0 of SYN_GROUPS) {
+  const when = typeof g0[0] === 'object' ? g0[0].when : null, g = when ? g0.slice(1) : g0;
+  const fw = g.map((x) => fold(x).split(' ').filter(Boolean));
+  for (const a of fw) { const k = a[a.length - 1]; (SYN.get(k) || SYN.set(k, []).get(k)).push({ need: a.slice(0, -1), words: fw.filter((b) => b !== a).flat(), when }); }
+}
+const synOf = (w, ctx, base) => {
+  const out = new Set();
+  for (const [k, v] of SYN) if (same(k, w)) for (const e of v) if ((!e.when || e.when.some((c) => ctx.has(c))) && e.need.every((x) => has(base, x))) for (const x of e.words) out.add(x);
+  return [...out];
+};
 
 // ---------- fasetler (sektörden bağımsız) ----------
 // values: değer → kelimeler; def: hiçbir şey söylenmediğinde varsayılan değer (yaş: yetişkin); target: kategori dar bir hedef
@@ -131,16 +155,20 @@ function facetScore(lf, kf) {
 // Bahçe / tarım paketi (eski davranış korunur). Başka sektör aynı biçimde paket ekleyebilir.
 const CONCEPTS = [
   { id: 'spray', any: ['ilaclama', 'pulverizator', 'puskurtme', 'atomizor', 'sprayer'] },
-  { id: 'spray', any: ['pompa', 'pompasi'], with: ['ilac', 'ilaclama', 'sirt', 'zirai', 'bahce', 'basincli', 'akulu', 'manuel'] },
+  { id: 'spray', any: ['pompa', 'pompasi'], with: ['ilac', 'ilaclama', 'sirt', 'zirai', 'basincli', 'akulu', 'manuel'] }, // "bahçe" alan adıdır: Bahçe › Havuz Pompası ilaçlama değildir
   { id: 'water', any: ['dalgic', 'hidrofor', 'motopomp', 'santrifuj', 'jet', 'kuyu', 'foseptik', 'sintine'] },
   { id: 'water', any: ['pompa', 'pompasi', 'motor', 'motoru'], with: ['su', 'temiz', 'pis', 'kirli', 'havuz'] },
   { id: 'pest', any: ['ilac', 'insektisit', 'fungisit', 'herbisit', 'pestisit', 'akarisit', 'nematisit', 'zirai', 'koruma'] },
-  { id: 'fert', any: ['gubre', 'fertilizer', 'npk', 'kompost', 'vermikompost', 'humik', 'fulvik', 'besin', 'besini', 'aminoasit', 'solucan'] },
+  { id: 'fert', any: ['gubre', 'fertilizer', 'npk', 'kompost', 'vermikompost', 'humik', 'fulvik', 'aminoasit', 'solucan'] },
+  { id: 'fert', any: ['besin', 'besini'], with: ['bitki', 'gubre', 'toprak', 'cicek', 'bahce', 'tarim', 'sebze', 'meyve', 'cim', 'yaprak'] }, // kedi "ek besin"i gübre değildir
   { id: 'soil', any: ['toprak', 'torf', 'perlit', 'kokopit', 'harc', 'vermikulit', 'kompost', 'zeolit'] },
   { id: 'seed', any: ['tohum', 'fide', 'fidan', 'sogan', 'yumru'] },
   { id: 'pot', any: ['saksi', 'saksilar', 'jardinyer'] },
   { id: 'irrig', any: ['sulama', 'hortum', 'damla', 'fiskiye', 'sprinkler', 'yagmurlama', 'damlatma'] },
   { id: 'plant', any: ['bitki', 'cicek', 'agac', 'sebze', 'meyve', 'cim', 'bahce', 'tarim', 'ziraat', 'sera'] },
+  // Evcil hayvan alanı: "Kedi › Vitamin" bitki vitamini, "Kedi Çimi" bahçe çimi değildir
+  { id: 'pet', any: ['kedi', 'kopek', 'akvaryum', 'kemirgen', 'hamster', 'evcil'] },
+  { id: 'pet', any: ['pet'], with: ['shop'] },
 ];
 export function concepts(words) {
   const out = new Set();
@@ -158,6 +186,17 @@ const families = (words, group) => group.map((f, i) => (f.some((w) => has(words,
 const GENERIC = new Set(['diger', 'genel', 'kampanya', 'kampanyali', 'indirim', 'indirimli', 'firsat', 'outlet', 'yeni', 'gelenler', 'tum', 'hepsi', 'cok', 'satanlar', 'one', 'cikanlar', 'vitrin', 'sezon', 'ozel', 'urunler', 'kategorisiz', 'misc', 'other', 'sale']);
 export const isGeneric = (local) => { const w = rawWords(String(local || '').split(/›|>|\//).pop()); return !w.length || w.every((x) => GENERIC.has(x)); };
 
+// Baş kelime (kategorinin asıl nesnesi): Türkçe tamlamada son kelime ("Ödül Maması" → mama, "Bitki Vitamini" → vitamin). Virgül / "ve"
+// ile sıralanan her parçanın kendi başı vardır ("Torf ve Toprak"); "Bahçe, Balkon Salıncağı" / "Salon ve Ev Bitkileri" eksiltmesinde
+// eksiz tek kelimelik parça, ardından gelen iyelik ekli başa bağlanır (bahçe salıncağı, salon bitkileri) ve baş sayılmaz;
+// çoğul / ekli tek kelime kendi başına nesnedir ("Saksılar ve Bahçe Yatakları").
+const PARTS = /\s*(?:,|&|\/|\+|\s(?:ve|veya|ile|and)\s)\s*/i;
+function headsOf(text) {
+  const parts = String(text || '').split(PARTS).map(tokens).filter((t) => t.length);
+  return parts.flatMap((t, i) => (t.length === 1 && stem(t[0]) === t[0] && parts.slice(i + 1).some((u) => u.length > 1 && /[iu]$/.test(u[u.length - 1])) ? [] : [t[t.length - 1]]));
+}
+const isFacetWord = (w) => Object.keys(facetsOf([w])).length > 0;
+
 export function localProfile(local, names = []) {
   const segs = String(local || '').split(/›|>|\//).map((x) => x.trim()).filter(Boolean);
   const generic = isGeneric(local);
@@ -171,13 +210,27 @@ export function localProfile(local, names = []) {
   // Genel kategori: ürün adlarının en sık baş ismi "baş" sayılır (çoğunluk varsa)
   if (generic && prod.length && prod[0][1] >= 0.6) { head = [prod[0][0]]; prod = prod.slice(1); }
   const base = [...head, ...other, ...prod.map(([w]) => w)];
-  const syn = [...new Set(base.flatMap(synOf))].filter((w) => !has(base, w));
+  const bc = concepts(base);
+  const syn = [...new Set(base.flatMap((w) => synOf(w, bc, base)))].filter((w) => !has(base, w));
   const all = [...base, ...syn];
-  const core = head[head.length - 1] || '';
+  // Baş kelime: kategori adının son kelimesi; ürün adlarının belirgin çoğunluğu başka bir ad kelimesini kullanıyorsa o ("Kedi Ödül Maması":
+  // ürünler "… Kedi Ödül Maması / Ödül Çubuğu / Kedi Ödülleri" → ödül). Faset kelimeleri (kedi, kadın, bebek …)
+  // ve üst kategoride de geçen kelimeler ("Kedi Kumu › Kedi Kumu Koku Giderici"de kum) ayırt etmez, baş olamaz.
+  let core = head[head.length - 1] || '';
+  const ns = names.slice(0, 60).map(tokens), share = (w) => ns.filter((t) => has(t, w)).length / Math.max(1, ns.length);
+  const up = tokens(segs.slice(0, -1).join(' '));
+  if (!generic && ns.length >= 3) { const c = head.filter((w) => !isFacetWord(w) && !has(up, w)); const b = c.reduce((a, x) => (share(x) > share(a) ? x : a), core); if (share(b) - share(core) >= 0.1) core = b; }
+  // Kategorinin "nesneleri": her yol parçasının başı + baş kelime + ürün adlarının çoğunluğundaki kelimeler (en az 3 ürün)
+  const objs = generic ? [...head] : [...new Set([...segs.flatMap(headsOf), core, ...(total >= 3 ? prod.filter(([, r]) => r >= 0.5).map(([w]) => w) : [])])].filter(Boolean);
   const segWords = segs.flatMap((x) => rawWords(x));
   const lf = facetsOf(segWords), nf = nameFacets(names);
+  const speciesX = !!lf.species; // tür kategori adında açıkça söyleniyor (ürün adlarından değil)
   for (const [k, v] of Object.entries(nf)) if (!lf[k]) lf[k] = v; // kategori adı söylemiyorsa ürün adlarının çoğunluğu
-  return { head, other, prod, syn, all, core, generic, facets: lf, coreConcepts: concepts(core ? [core] : []), concepts: concepts(all) };
+  const parentHeads = generic ? [] : segs.slice(0, -1).reverse().flatMap((x) => headsOf(x).reverse()); // en yakın üst kategoriden köke
+  // Kavramlar: kategorinin kendi adı ve nesnelerinden gelenler güçlü (objConcepts); üst kategorideki niteleyiciden / az sayıda ürün adından
+  // gelenler zayıf ("Çiçekli Saksı Bitkileri › Orkideler" saksı değildir)
+  const objConcepts = concepts([...head, ...objs, ...[...head, ...objs].flatMap((w) => synOf(w, bc, base))]);
+  return { head, other, prod, nNames: ns.length, syn, all, core, objs, parentHeads, speciesX, generic, facets: lf, coreConcepts: concepts(core ? [core] : []), concepts: concepts(all), objConcepts };
 }
 
 const prepared = new WeakMap();
@@ -186,7 +239,7 @@ export function prepare(list) {
   const out = list.map((c) => {
     const name = tokens(c.name), path = tokens(c.path).filter((w) => !has(name, w));
     const raw = [...rawWords(c.path), ...rawWords(c.name)];
-    return { c, name, path, concepts: concepts([...name, ...path]), facets: facetsOf(raw), fam: EXCLUSIVE.map((g) => families(name, g)) };
+    return { c, name, path, heads: headsOf(c.name), concepts: concepts([...name, ...path]), facets: facetsOf(raw), fam: EXCLUSIVE.map((g) => families(name, g)) };
   });
   // 2 harflik önek dizini (yalnız kategori ADI kelimeleri: öneri için en az bir ad kelimesi eşleşmeli)
   out.index = new Map();
@@ -201,7 +254,13 @@ export function score(L, k) {
   for (const w of L.other) { if (has(k.name, w)) { s += 1.5; hit++; } else if (has(k.path, w)) s += 0.8; }
   for (const [w, r] of L.prod) { if (has(k.name, w)) { s += 2 * r + 0.5; hit++; } else if (has(k.path, w)) s += 0.6 * r; }
   for (const w of L.syn) { if (has(k.name, w)) { s += 1.5; hit++; } else if (has(k.path, w)) s += 0.5; }
-  if (L.core && has(k.name, L.core)) s += 2;
+  // Baş kelime kanal kategorisinin de başıysa tam puan; yalnız niteleyicisiyse ("Süs Bitkileri" ↔ "Bitki Vitamini") az puan
+  if (L.core && has(k.name, L.core)) s += has(k.heads, L.core) ? 2 : 0.5;
+  // Kanal kategorisinin başı yereldeki hiçbir nesneye karşılık gelmiyor ve baş kelime de adında yok: başka bir nesne ("Balkon Bitkileri" ↔ "Balkon Salıncağı")
+  // (başı yalnız birkaç ürün adında geçiyorsa yarım ceza)
+  else if (L.objs.length && k.heads.length && !k.heads.some((h) => has(L.objs, h) || has(L.syn, h))) s -= L.nNames >= 2 && k.heads.some((h) => L.prod.some(([w]) => same(w, h))) ? 1 : 2;
+  // Yerel kategori bir hayvan türü için (adında "kedi" / "köpek" …) ama kanal kategorisi hiçbir tür için değil (bitki vitamini, oyuncak kum …)
+  if (L.speciesX && !k.facets.species) s -= 3;
   const cc = [...L.coreConcepts].filter((c) => c !== 'plant');
   if (cc.length && !cc.some((c) => k.concepts.has(c))) s -= 3;
   EXCLUSIVE.forEach((g, i) => { const a = families(L.all, g), b = k.fam[i]; if (a.length && b.length && !b.some((x) => a.includes(x))) s -= 3; });
@@ -209,9 +268,12 @@ export function score(L, k) {
   s -= Math.min(3, extra);
   if (L.head.length && L.head.length === k.name.length && L.head.every((w) => has(k.name, w))) s += 2;
   const shared = [...k.concepts].filter((c) => L.concepts.has(c));
-  s += Math.min(5, shared.length * 2.5);
+  s += Math.min(5, shared.reduce((a, c) => a + (L.objConcepts.has(c) ? 2.5 : 1), 0));
   const kc = [...k.concepts].filter((c) => c !== 'plant'), lc = [...L.concepts].filter((c) => c !== 'plant');
   if (kc.length && lc.length && !kc.some((c) => L.concepts.has(c))) s -= 6;
+  // Alan uyumu: yerel kategori bir alan paketine açıkça giriyor (adında ilaçlama, gübre, tohum, kedi …), kanal kategorisi hiçbirine girmiyor
+  // ("Viyoller" ↔ müzik aleti "Viyola", "İlaçlama Pompaları" ↔ "Tekne Pompaları")
+  else if (!k.concepts.size && [...L.objConcepts].some((c) => c !== 'plant')) s -= 2;
   if (L.concepts.has('spray') && k.concepts.has('water')) s -= 6;
   if (L.concepts.has('water') && k.concepts.has('spray')) s -= 6;
   s += facetScore(L.facets, k.facets);
@@ -226,6 +288,11 @@ export function rank(list, local, names = [], n = 5) {
   if (!L.all.length) return [];
   const P = prepare(list), cand = new Set();
   for (const w of [...L.all, ...L.all.map(stem)]) for (const k of P.index.get(w.slice(0, 2)) || []) cand.add(k);
+  // Baş kelime kanalın hiçbir kategori adında geçmiyorsa (ağaçta "Orkide" yok) en yakın üst kategorinin başı geçer: orkide bir "bitki"dir
+  if (L.core && ![...cand].some((k) => has(k.name, L.core))) {
+    const up = L.parentHeads.find((h) => [...cand].some((k) => has(k.name, h)));
+    if (up) { L.core = up; L.coreConcepts = concepts([up]); }
+  }
   return [...cand].map((k) => ({ k, ...score(L, k) })).filter((x) => x.hit > 0 && x.score >= 2)
     .sort((a, b) => b.score - a.score || a.k.name.length - b.k.name.length).slice(0, n)
     .map((x) => ({ ...x.k.c, score: x.score, ...(L.generic ? { generic: true } : {}) }));
