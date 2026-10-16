@@ -46,7 +46,7 @@ test('gönderen il / ilçe: Ayarlar\'daki tek alandan ayrılır', () => {
   assert.equal(trackUrl('hepsijet', 'X1'), 'https://www.hepsijet.com/gonderi-takibi/X1');
 });
 
-test('Kargonomi: il / ilçe numarası bulunur, taslak → en ucuz firma → takip no + PDF etiket; takip ve iptal', async () => {
+test('Kargonomi: il / ilçe numarası bulunur, taslak → kullanıcının seçtiği firma → takip no + PDF etiket; takip ve iptal', async () => {
   const calls = mock([
     [/GET .*\/states$/, () => ({ data: [{ id: 34, name: 'İSTANBUL' }, { id: 42, name: 'KONYA' }] })],
     [/GET .*\/cities\/34$/, () => ({ data: [{ id: 828, name: 'ÜSKÜDAR' }, { id: 830, name: 'KADIKÖY' }] })],
@@ -61,14 +61,14 @@ test('Kargonomi: il / ilçe numarası bulunur, taslak → en ucuz firma → taki
   try {
     const a = kargonomi.make({ KARGONOMI_API_KEY: 'tok' });
     assert.match((await a.test()).message, /bakiye 122,8/);
-    const r = await a.create(ship());
+    const r = await a.create(ship(), { providerId: '11' });
     const body = JSON.parse(calls.find((c) => /POST .*\/shipments$/.test(`${c.method} ${c.url}`)).body).shipment;
     assert.equal(body.buyer_state_id, 34);
     assert.equal(body.buyer_city_id, 830);
     assert.equal(body.warehouse_id, 12707, 'ana depo');
     assert.equal(body.buyer_phone, '5321234567');
     assert.equal(body.packages[0].desi, 2.4);
-    assert.equal(JSON.parse(calls.find((c) => /confirm/.test(c.url)).body).shipping_provider_id, -1);
+    assert.equal(JSON.parse(calls.find((c) => /confirm/.test(c.url)).body).shipping_provider_id, 11, 'seçilen firma (otomatik seçim yok)');
     assert.equal(calls[0].headers.Authorization, 'Bearer tok');
     assert.equal(r.ref, '77');
     assert.equal(r.tracking, '5551234');

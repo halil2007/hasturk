@@ -43,9 +43,10 @@
   const CARGO = [
     ['Yurtiçi Kargo', 'kargo firması', '#004a99', 'Y'], ['Aras Kargo', 'kargo firması', '#e30613', 'A'], ['DHL eCommerce', 'kargo firması', '#d40511', 'D'],
     ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'], ['HepsiJET', 'kargo firması', '#ff6000', 'hj'],
+    ['Kargonomi', 'kargo entegratörü · internet siteleri', '#ff6b00', 'K', '/ozellikler/kargonomi-entegrasyonu'],
     ['Kolay Gelsin', 'kargo firması · test aşamasında', '#00a651', 'KG'], ['Sendeo', 'kargo firması · test aşamasında', '#00b140', 'Sd'], ['DHL Express', 'kargo firması · test aşamasında', '#ffcc00', 'DHL'],
   ];
-  const CARGO_SOON = [['Kargonomi', 'kargo entegratörü', '#ff6b00', 'K'], ['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N']];
+  const CARGO_SOON = [['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N']];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
@@ -57,7 +58,7 @@
   const cargoCard = (x, soon) => {
     const test = / test aşamasında/.test(x[1]), kind = x[1].replace(/ · test aşamasında/, '');
     const st = soon ? '<span class="st dev">Geliştirme aşamasında</span>' : test ? '<span class="st test">Test aşamasında</span>' : '<span class="st ok">Aktif</span>';
-    return `<a class="ch${soon ? ' is-dev' : ''}" href="/ozellikler/kargo-entegrasyonu" data-cat="kargo" data-q="${esc(x[0] + ' ' + kind)}">${logoTile(x[0], x[2])}<span class="ch-n"><b>${esc(x[0])}</b><small>${esc(kind)}</small></span><span class="ch-d">${soon ? 'Etiket ve takip numarası · hazırlanıyor' : 'Etiket · Takip numarası · Teslimat takibi'}</span><span class="ch-f">${st}<em>${soon ? 'İncele' : 'Ayrıntılar'} <svg><use href="#i-arrow"/></svg></em></span></a>`;
+    return `<a class="ch${soon ? ' is-dev' : ''}" href="${x[4] || '/ozellikler/kargo-entegrasyonu'}" data-cat="kargo" data-q="${esc(x[0] + ' ' + kind)}">${logoTile(x[0], x[2])}<span class="ch-n"><b>${esc(x[0])}</b><small>${esc(kind)}</small></span><span class="ch-d">${soon ? 'Etiket ve takip numarası · hazırlanıyor' : 'Etiket · Takip numarası · Teslimat takibi'}</span><span class="ch-f">${st}<em>${soon ? 'İncele' : 'Ayrıntılar'} <svg><use href="#i-arrow"/></svg></em></span></a>`;
   };
   let refilter = () => {};
   const drawChannels = () => {

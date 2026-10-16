@@ -1,6 +1,6 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
 import { all, first, run, allIn, getSettings, setSetting, getRaw, log, resolve, DEFAULT_SETTINGS } from './db.js';
-import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
+import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId, isSite } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES, DEV_TYPES, isIntl } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, HELD_SQL, REAL_ERR_SQL, CH_SIDE_SQL, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
 import { suggestions, linkedGroups, repairDuplicates, autoMatch, approveConfident, manualImport } from './match.js';
@@ -46,7 +46,7 @@ import { CURRENCIES, refreshRates, applyFx, rateOf, FX_DEFAULTS } from './fx.js'
 import { orderCommission, commissionCheck } from './commcheck.js';
 import { shipInfo, shipFromInvoice } from './shipcost.js';
 import { orderProfit, breakdown, productProfit, productLoss, lossSummary, markLosses, lossCache, listExpenses, saveExpense, deleteExpense, listInvoices, syncInvoices, settlementReport, syncSettlements, saveDispute, settlementCsv } from './finance.js';
-import { allows, requireFeature, planInfo, tenantPlan } from './plans.js';
+import { allows, requireFeature, planInfo, tenantPlan, carrierFeature } from './plans.js';
 import { json, fail, body, num, str, r2, mergeStatus, STATUS, toB64, LATE, explainHttp, pool, imageList, chunk, DEAD_LINE, HttpError } from './util.js';
 
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
@@ -440,8 +440,8 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   // Kargo entegratöründen (Kargonomi, Navlungo…) gönderi + etiket: kendi anlaşmanızla gönderim (bkz. carriers.js).
   // Takip no, kargo firması ve etiket pakete yazılır; "Kargoya ver" takip numarasını kanala bildirir.
   if (action === 'carrier-label') {
-    if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
-    requireFeature(env, 'carrier');
+    if (!live) fail(400, `Sipariş ${({ cancelled: 'iptal edilmiş', returned: 'iade edilmiş', delivered: 'teslim edilmiş' })[o.status] || 'kapanmış'}; gönderi açılamaz`);
+    requireFeature(env, carrierFeature(str(b.provider) || (await carrierFor(env, db, null).catch(() => ({}))).id));
     if (ch && ch.caps && ch.caps.manualTracking === false && !ch.caps.ownCarrier) fail(400, `${ch.name}: gönderi yalnız kanalın kargosu ile yapılır; kargo entegratörü kullanılamaz`);
     if (o.status === 'new') { await acceptOrder(db, ch, o, user); o = await loadOrder(db, o.id); }
     o = await ensurePackages(db, ch, o);
@@ -451,10 +451,12 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (pkg.carrier_ref) fail(400, `Bu paketin ${(CARRIERS[pkg.carrier_provider] || { name: 'entegratör' }).name} gönderisi zaten var (takip no ${pkg.tracking || pkg.carrier_ref}); yenisi için önce gönderiyi iptal edin`);
     if (pkg.remote_id && (pkg.barcode || pkg.tracking) && pkg.agreement !== 'own') fail(400, `Bu pakette ${ch ? ch.name : 'kanal'} kargo barkodu var; kanalın kargosuyla gönderin ya da önce paketi kanalda iptal edin`);
     const c = await carrierFor(env, db, str(b.provider) || null);
+    siteOnly(c, ch);
     const { shipment, missing } = shipmentOf(o, pkg, settings.sender || {}, { desi: num(b.desi, 0) });
     if (missing.length) fail(400, 'Gönderi için eksik bilgi: ' + missing.join(', '));
     let r;
-    try { r = (await c.api.create(shipment)) || {}; } catch (e) {
+    // Kargo firması kullanıcının seçimi: fiyat teklifinden (quote_id + firm_id) ya da adıyla (toplu gönderim: firm)
+    try { r = (await c.api.create(shipment, { draftId: str(b.quote_id) || null, providerId: str(b.firm_id) || null, firm: str(b.firm) || null })) || {}; } catch (e) {
       await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${c.name}: ${e.message}`.slice(0, 500), pkg.id);
       await log(db, o.channel, 'warn', `#${o.order_number} ${c.name} gönderisi açılamadı: ${e.message}`);
       throw e;
@@ -483,6 +485,26 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     const fresh = await loadOrder(db, o.id);
     const lab = r.label ? { ...r.label, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label.format}` } : null;
     return { ok: true, message: `${c.name} gönderisi oluşturuldu: ${str(r.carrier) || ''} ${tn}`.trim() + chNote, order: fresh, package_id: pkg.id, official: lab, panel: !lab, sender: settings.sender };
+  }
+  // Kargonomi fiyat teklifi: gönderi taslağı açılır, kargo firmalarının fiyatları döner; kullanıcı firmayı seçince carrier-label
+  // (quote_id + firm_id) taslağı onaylar. Vazgeçilirse carrier-quote-cancel taslağı siler. Sipariş / paket durumu değişmez.
+  if (action === 'carrier-quote') {
+    if (!live) fail(400, 'Bu siparişte işlem yapılamaz');
+    const c = await carrierFor(env, db, str(b.provider) || null);
+    requireFeature(env, carrierFeature(c.id));
+    siteOnly(c, ch);
+    if (!c.api.quote) fail(400, `${c.name} fiyat teklifi vermiyor`);
+    const pkg = (b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open')) || { no: 1, items: o.items.filter((i) => !DEAD_LINE(i.status)).map((i) => ({ line_id: i.line_id, qty: i.quantity })) };
+    if (pkg.carrier_ref) fail(400, `Bu paketin ${c.name} gönderisi zaten var`);
+    const { shipment, missing } = shipmentOf(o, pkg, settings.sender || {}, { desi: num(b.desi, 0) });
+    if (missing.length) fail(400, 'Gönderi için eksik bilgi: ' + missing.join(', '));
+    const q = await c.api.quote(shipment);
+    return { ok: true, quote_id: str(q.ref), offers: q.offers || [], desi: shipment.desi };
+  }
+  if (action === 'carrier-quote-cancel') {
+    const c = await carrierFor(env, db, str(b.provider) || null);
+    if (c.api.discard && str(b.quote_id)) await c.api.discard(str(b.quote_id)).catch(() => null);
+    return { ok: true };
   }
   if (action === 'carrier-cancel') {
     const pkg = pkgOf(b.package_id);
@@ -672,6 +694,10 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false, env = null
 
 // Firmadan etiket (ve henüz yoksa takip numarası): etiketi gönderiden sonra hazırlayan firmalar için.
 // Firma etiketi hiç vermiyorsa (PTT, Sürat ön kabul) null döner: panel etiketi firmanın barkoduyla basılır.
+// Kargonomi yalnız firmanın internet sitesi siparişlerinde (pazaryeri siparişi pazaryerinin kargosuyla gider)
+function siteOnly(c, ch) {
+  if (c && c.id === 'kargonomi' && !isSite(ch)) fail(400, `Kargonomi ile gönderim yalnız internet sitesi siparişlerinde kullanılır${ch ? `; ${ch.name} siparişi ${ch.name}'in kargosuyla gönderilir` : ''}`);
+}
 async function carrierLabel(env, db, pkg) {
   // Firma gönderiyi oluşturamadı: etiket beklenmez, kullanıcı iptal edip yeniden oluşturur
   if (pkg.carrier_state === 'failed') return { error: pkg.error || 'Kargo firması gönderiyi oluşturamadı; gönderiyi iptal edip yeniden oluşturun.' };
@@ -1752,14 +1778,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
   // bizim geliştirme durumumuzdur, müşteriyi ilgilendirmez
   const carrierLock = (list0) => {
     const list = env.TENANT_SLUG || env.DEMO === '1' ? list0.filter((c) => c.ready) : list0;
-    return allows(env, 'carrier') ? list : list.map((c) => ({ ...c, usable: false, locked: true }));
+    return list.map((c) => (allows(env, carrierFeature(c.id)) ? c : { ...c, usable: false, locked: true }));
   };
   if (path === 'carriers' && m === 'GET') return json(carrierLock(await carrierList(env, db)));
   // Entegrasyonlar (yalnız yönetici): bilgiler, kaydet, bağlantı testi, varsayılan
   if (path === 'integrations/carriers' && m === 'GET') return json(carrierLock(await carrierList(env, db, { withFields: true })));
   if ((x = path.match(/^integrations\/carriers\/([a-z]+)$/)) && m === 'PUT') {
     if (!CARRIERS[x[1]]) fail(404, 'Bilinmeyen kargo entegratörü');
-    requireFeature(env, 'carrier');
+    requireFeature(env, carrierFeature(x[1]));
     const b = await body(req);
     await saveConfig(env, db, x[1], { values: b.values || {}, clear: b.clear || [], active: b.active });
     await log(db, null, 'info', `${user.name}: ${CARRIERS[x[1]].name} kargo entegratörü bilgileri güncellendi`);

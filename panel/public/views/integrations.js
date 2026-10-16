@@ -154,8 +154,8 @@ export async function integrations(el, rest = []) {
         ${!c.ready ? html`<div class="ic-need small"><span class="pill warn tiny">${c.configured ? 'Bilgiler kayıtlı · bağlantı hazırlanıyor' : 'API bilgisi gelince açılır'}</span></div>` : ''}
         <div class="ic-need small muted">${c.about}</div></div>`; };
     return html`<div class="card stack" style="--g:12px">
-      <div><h2 class="row" style="gap:8px">Kargo entegrasyonları <span class="pill info tiny">Kurumsal paket</span></h2><div class="muted small">Kendi kargo anlaşmanızla etiket alın.</div></div>
-      ${locked ? html`<div class="notice warn small"><i class="ico ico-key"></i><div>Kendi anlaşmalı kargo entegrasyonu <b>Kurumsal</b> pakette. Pazaryeri ortak barkodu ve ikas Kargo etiketleri tüm paketlerde çalışır. ${isAdmin() ? html`<a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.` : ''}</div></div>` : ''}
+      <div><h2 class="row" style="gap:8px">Kargo entegrasyonları <span class="pill info tiny">Kargonomi: Profesyonel ve Kurumsal · diğerleri: Kurumsal</span></h2><div class="muted small">Kendi kargo anlaşmanızla etiket alın. Kargonomi internet sitenizin siparişlerinde kullanılır.</div></div>
+      ${locked ? html`<div class="notice warn small"><i class="ico ico-key"></i><div>${carriers.find((c) => c.id === 'kargonomi' && c.locked) ? html`Kargonomi <b>Profesyonel</b> ve Kurumsal pakette; diğer kargo firmaları` : 'Kendi anlaşmalı kargo entegrasyonu'} <b>Kurumsal</b> pakette. Pazaryeri ortak barkodu ve ikas Kargo etiketleri tüm paketlerde çalışır. ${isAdmin() ? html`<a class="link" href="#/paketim">Paketim</a>'den yükseltebilirsiniz.` : ''}</div></div>` : ''}
       <div class="small" style="font-weight:650">Kargo firmaları (doğrudan bağlantı)</div>
       <div class="icards">${direct.map(card)}</div>
       ${rest.length ? html`<div class="small" style="font-weight:650">Kargo entegratörleri (tek hesaptan birçok firma)</div><div class="icards">${rest.map(card)}</div>` : ''}
@@ -165,7 +165,7 @@ export async function integrations(el, rest = []) {
   function carrierSheet(id) {
     const c = carriers.find((x) => x.id === id);
     if (!c) return;
-    if (c.locked) return toast('Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette; Paketim\'den yükseltebilirsiniz', true);
+    if (c.locked) return toast(c.id === 'kargonomi' ? 'Kargonomi Profesyonel ve Kurumsal pakette; Paketim\'den yükseltebilirsiniz' : 'Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette; Paketim\'den yükseltebilirsiniz', true);
     const admin = isAdmin(), fields = c.fields || [], dis = admin ? '' : 'disabled';
     const cfield = (f2) => html`<label class="field"><span class="row" style="gap:6px">${f2.label}${f2.req ? html`<b style="color:var(--bad)">*</b>` : ''}${f2.source === 'panel' ? html`<span class="src panel">kayıtlı</span>` : ''}</span>
         ${f2.choices ? html`<select class="input" data-k="${f2.k}" ${dis}>${f2.choices.map(([v, t]) => html`<option value="${v}" ${(f2.value || '') === v ? 'selected' : ''}>${t}</option>`)}</select>`

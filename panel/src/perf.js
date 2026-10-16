@@ -10,7 +10,7 @@ const SLOW = 1000, ALERT = 1000, ALERT_EXT = 10000;
 // kargo bildirimi, bağlantı testi, soru cevabı …). Raporda ayrı gösterilir; panelin kendi hızı (ortalama yanıt) bunlarsız ölçülür.
 export const EXTERNAL = new RegExp('^(POST (sync|import|push-stock|buybox/check|questions/sync|claims/sync|invoices/sync|settlements/sync|backfill(/run)?|campaigns'
   + '|channel-products/(accept|add)|mail/test|digest/test|push/test|orders-bulk|labels|fx/apply|suggestions/apply|listings/stock|catalog/.*'
-  + '|orders/:id/(accept|pack|split|ship|label|label-pdf|cargo|refresh|repack|cancel-package|carrier-label|carrier-cancel)'
+  + '|orders/:id/(accept|pack|split|ship|label|label-pdf|cargo|refresh|repack|cancel-package|carrier-label|carrier-cancel|carrier-quote|carrier-quote-cancel)'
   + '|integrations/[a-z0-9_]+/(test|diagnose)|integrations/carriers/[a-z]+/test|claims/[a-z0-9_]+/.+/(approve|reject)|questions/[a-z0-9_]+/.+/answer)'
   + '|GET (orders/:id/cargo|campaigns/.+|catalog/.*))$');
 const day = (t = Date.now()) => new Date(t + 3 * 3600e3).toISOString().slice(0, 10);

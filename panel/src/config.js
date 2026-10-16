@@ -30,7 +30,7 @@ export const FIELDS = {
     { k: 'KARGONOMI_API_KEY', label: 'API anahtarı (token)', secret: true, req: true, hint: 'Kargonomi\'nin e-postayla gönderdiği token (destek@kargonomi.com.tr adresinden istenir; telefonla verilmez)' },
     { k: 'KARGONOMI_WAREHOUSE', label: 'Depo numarası', adv: true, hint: 'Boşsa Kargonomi\'deki ana depo (gönderen adresi) kullanılır' },
     // Firma, gönderinin fiyat tekliflerinden (shipment-price-comparison) adına göre seçilir: Kargonomi'deki firma numarasına bağlı değil
-    { k: 'KARGONOMI_PROVIDER', label: 'Kargo firması', adv: true, hint: 'Seçilen firma o gönderi için teklif vermezse gönderi açılmaz, hangi firmaların teklif verdiği yazılır', choices: [['', 'Otomatik (en ucuz)'], ['aras', 'Aras Kargo'], ['yurtici', 'Yurtiçi Kargo'], ['surat', 'Sürat Kargo'], ['ptt', 'PTT Kargo'], ['hepsijet', 'HepsiJET'], ['kolaygelsin', 'Kolay Gelsin'], ['mng', 'DHL eCommerce (MNG)']] },
+    { k: 'KARGONOMI_PROVIDER', label: 'Önce işaretli gelecek kargo firması', adv: true, hint: 'Gönderirken firmayı her zaman siz seçersiniz (fiyatlar Kargonomi\'den gelir); bu yalnız seçim ekranında önce işaretli gelir', choices: [['', 'Seçim yok (her gönderide ben seçerim)'], ['aras', 'Aras Kargo'], ['yurtici', 'Yurtiçi Kargo'], ['surat', 'Sürat Kargo'], ['ptt', 'PTT Kargo'], ['hepsijet', 'HepsiJET'], ['kolaygelsin', 'Kolay Gelsin'], ['mng', 'DHL eCommerce (MNG)']] },
   ],
   navlungo: [
     { k: 'NAVLUNGO_USER', label: 'API kullanıcı adı', req: true, hint: 'Navlungo → Entegrasyonlar\'da açılan API kullanıcısı (panel giriş bilgisi değil)' },

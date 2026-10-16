@@ -1,6 +1,6 @@
 // Siparişler: kanal sekmeleri, arama / tarih / kargo filtresi, durum sekmeleri, toplu işlem, satır içi sipariş işlemleri, sayfalama.
-import { api, state, html, render, $, $$, money, ch, chLogo, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel, activeChannels, lateBadge, extNote, isAdmin, confirmBox } from '../core.js';
-import { mountOps, openOrder, bulkLabels } from './orderops.js';
+import { api, state, html, render, $, $$, money, ch, chLogo, sheet, chBadge, statusPill, thumb, actions, busy, toast, debounce, popMenu, shortDT, isMobile, rangeLabel, activeChannels, lateBadge, extNote, isAdmin, confirmBox } from '../core.js';
+import { mountOps, openOrder, bulkLabels, carrierOptions } from './orderops.js';
 import { loadSummary, setQuery } from '../app.js';
 import { listingUrl } from '../listingurl.js';
 import { pickSheet } from './picklist.js';
@@ -15,6 +15,11 @@ export async function orders(el, rest, query = {}) {
   if (rest[0] === 'durum') f.status = rest[1] || 'new';
   if (rest[0] && !['kanal', 'durum'].includes(rest[0])) setTimeout(() => openOrder(rest[0], refresh), 0);
   const sel = new Set();
+  // Kargonomi bağlı ve aktifse toplu "Kargonomi ile gönder" (yalnız internet sitesi siparişleri; pazaryeri siparişleri atlanır)
+  let kgOn = false;
+  carrierOptions().then((cs) => { kgOn = cs.some((c) => c.id === 'kargonomi' && c.usable); if (kgOn && sel.size) draw(); }).catch(() => {});
+  const chOfId = (id) => String(id).split(':')[0];
+  const siteSel = () => [...sel].filter((id) => !!ch(chOfId(id)).site);
   let data = { orders: [], counts: {}, total: 0 }, expanded = null, mobile = isMobile();
 
   render(el, html`<div class="stack">
@@ -131,6 +136,7 @@ export async function orders(el, rest, query = {}) {
       <button class="btn sm outline" data-act="bulk-accept"><i class="ico ico-play"></i>İşleme al</button>
       <button class="btn sm outline" data-act="pick"><i class="ico ico-box"></i>Hazırlama listesi</button>
       <button class="btn sm outline" data-act="bulk-label"><i class="ico ico-tag"></i>Etiket al</button>
+      ${kgOn && siteSel().length ? html`<button class="btn sm outline" data-act="bulk-kg"><i class="ico ico-truck"></i>Kargonomi ile gönder${siteSel().length < sel.size ? ` (${siteSel().length})` : ''}</button>` : ''}
       <button class="btn sm outline" data-act="bulk-print"><i class="ico ico-print"></i>Yazdır</button>
       ${isAdmin() ? html`<button class="btn sm danger ghost" data-act="bulk-del"><i class="ico ico-trash"></i>Sil</button>` : ''}
       <button class="icon-btn" data-act="clearsel" title="Seçimi kaldır" aria-label="Seçimi kaldır"><i class="ico ico-x"></i></button></div>` : '';
@@ -212,6 +218,7 @@ export async function orders(el, rest, query = {}) {
     'bulk-label': (t) => busy(t, async () => { await bulkLabels([...sel], { fetch: true, done: load }); await load(); }),
     'bulk-print': (t) => busy(t, async () => { await bulkLabels([...sel], { fetch: false }); }),
     'bulk-del': (t) => delOrders(t, [...sel]),
+    'bulk-kg': () => bulkKargonomi(),
     'miss-on': () => { Object.assign(f, { missing: '1', status: 'all', page: 1 }); sel.clear(); refresh(); },
     'miss-off': () => { Object.assign(f, { missing: '', status: 'new', page: 1 }); sel.clear(); refresh(); },
     'miss-del': async (t) => {
@@ -240,6 +247,36 @@ export async function orders(el, rest, query = {}) {
   $('[data-q]', el).addEventListener('input', debounce((e) => { f.q = e.target.value.trim(); if (f.q && f.status === 'new') f.status = 'all'; f.page = 1; refresh(); }, 300));
   const onResize = debounce(() => { if (isMobile() !== mobile) draw(); }, 150);
   window.addEventListener('resize', onResize);
+  // Toplu Kargonomi gönderimi: kargo firmasını kullanıcı seçer (tüm seçili siparişler aynı firmayla); fiyat her gönderide Kargonomi'den.
+  // Seçilen firma bir sipariş için teklif vermezse o sipariş atlanır ve nedeni yazılır. Bitince etiketler yazdırılabilir.
+  const KG_FIRMS = [['aras', 'Aras Kargo'], ['yurtici', 'Yurtiçi Kargo'], ['surat', 'Sürat Kargo'], ['ptt', 'PTT Kargo'], ['hepsijet', 'HepsiJET'], ['kolaygelsin', 'Kolay Gelsin'], ['mng', 'DHL eCommerce (MNG)']];
+  function bulkKargonomi() {
+    const ids = siteSel(), skip = sel.size - ids.length;
+    const s = sheet({ title: `Kargonomi ile gönder · ${ids.length} sipariş`, size: 'narrow', body: html`<div class="stack">
+      ${skip ? html`<div class="notice small"><i class="ico ico-warn"></i><div>${skip} pazaryeri siparişi atlanacak: pazaryeri siparişleri pazaryerinin kargosuyla gönderilir.</div></div>` : ''}
+      <label class="field"><span>Kargo firması</span><select class="input" data-firm><option value="">Seçin…</option>${KG_FIRMS.map(([k, t]) => html`<option value="${k}">${t}</option>`)}</select></label>
+      <label class="field"><span>Desi (isteğe bağlı)</span><input class="input" type="number" min="0.1" step="0.1" data-desi placeholder="boşsa siparişteki desi" style="max-width:200px"></label>
+      <div class="muted tiny">Her siparişin ücreti Kargonomi'den o gönderi için alınır ve Kargonomi bakiyenizden düşer. Seçtiğiniz firma bir sipariş için teklif vermezse o sipariş atlanır. Tek siparişte firmaları fiyatlarıyla karşılaştırmak için siparişin içinden “Kargonomi ile gönder”i kullanın.</div>
+      <div data-res></div></div>`,
+      foot: html`<span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-go><i class="ico ico-truck"></i>Gönderileri oluştur</button>` });
+    $('[data-go]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
+      const firm = $('[data-firm]', s.el).value, desi = $('[data-desi]', s.el).value;
+      if (!firm) return toast('Kargo firmasını seçin', true);
+      const r = { done: [], errors: [] };
+      // Her gönderi Kargonomi'ye birkaç istek: 10'arlı parçalar
+      for (let i = 0; i < ids.length; i += 10) {
+        if (ids.length > 10) toast(`Kargonomi gönderileri: ${Math.min(i + 10, ids.length)} / ${ids.length}`);
+        const part = await api('orders-bulk', { method: 'POST', body: { ids: ids.slice(i, i + 10), action: 'carrier-label', provider: 'kargonomi', firm, desi: desi || undefined } });
+        r.done.push(...part.done); r.errors.push(...part.errors);
+      }
+      render($('[data-res]', s.el), html`<div class="notice small ${r.errors.length ? 'warn' : ''}"><i class="ico ico-${r.errors.length ? 'warn' : 'check'}"></i><div><b>${r.done.length} gönderi oluşturuldu${r.errors.length ? `, ${r.errors.length} sipariş atlandı` : ''}.</b>
+        ${r.errors.length ? html`<ul class="tiny" style="margin:6px 0 0;padding-left:18px">${r.errors.slice(0, 20).map((x) => html`<li>${String(x).replace(/^([a-z0-9_]+):([^:]+):\s*/, (m, c, no) => `${ch(c).name} #${no}: `)}</li>`)}</ul>${r.errors.length > 20 ? html`<div class="tiny muted">ve ${r.errors.length - 20} sipariş daha</div>` : ''}` : ''}</div></div>`);
+      s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>${r.done.length ? html`<button class="btn primary" data-print><i class="ico ico-print"></i>Etiketleri yazdır</button>` : ''}`);
+      const pr = $('[data-print]', s.el);
+      if (pr) pr.onclick = (ev) => busy(ev.currentTarget, async () => { await bulkLabels(r.done, { fetch: true, done: load }); });
+      sel.clear(); await load(); loadSummary().catch(() => {});
+    });
+  }
   await refresh();
   return { refresh, destroy: () => window.removeEventListener('resize', onResize) };
 }

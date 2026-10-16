@@ -437,7 +437,7 @@ test('Kendi anlaşmalı kargo: ikas siparişi Kargonomi ile gönderilir (etiket,
     // Entegratör bağlanmadan gönderi açılamaz
     assert.equal((await admin(`/api/orders/${id}/carrier-label`, J({}))).status, 400);
     await ok(await admin('/api/integrations/carriers/kargonomi', J({ values: { KARGONOMI_API_KEY: 'tok', KARGONOMI_WAREHOUSE: '1' } }, 'PUT')));
-    const cl = await ok(await admin(`/api/orders/${id}/carrier-label`, J({ provider: 'kargonomi' })));
+    const cl = await ok(await admin(`/api/orders/${id}/carrier-label`, J({ provider: 'kargonomi', firm_id: '11' })));
     assert.equal(cl.official.format, 'pdf');
     const draft = n.find('POST', /kargonomi\.com\.tr\/api\/v1\/shipments$/)[0].body.shipment;
     assert.equal(draft.buyer_state_id, 34); assert.equal(draft.buyer_city_id, 3401); assert.equal(draft.buyer_phone, '5321112233');
@@ -464,7 +464,7 @@ test('Kendi anlaşmalı kargo: ikas siparişi Kargonomi ile gönderilir (etiket,
     assert.equal((await ok(await admin('/api/orders/' + id))).order.status, 'shipped');
     // İkinci sipariş: gönderi açılır, sonra iptal edilir (entegratör + ikas paketi geri alınır, kargo gideri düşer)
     const id2 = oid('ikas1:io2');
-    const c2 = await ok(await admin(`/api/orders/${id2}/carrier-label`, J({})));
+    const c2 = await ok(await admin(`/api/orders/${id2}/carrier-label`, J({ firm_id: '11' })));
     const pk2 = c2.order.packages[0];
     await ok(await admin(`/api/orders/${id2}/carrier-cancel`, J({ package_id: pk2.id })));
     assert.deepEqual(kg.cancelled, [902]);

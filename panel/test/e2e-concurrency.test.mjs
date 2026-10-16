@@ -321,7 +321,7 @@ test('Eşzamanlı: "Entegratörle gönder"e iki kez basılır (çift tık / iki 
     const id = oid('ikas1:io1');
     await ok(await admin(`/api/orders/${id}/label`, J({})).catch(() => ({ status: 200, text: async () => '{}' }))); // paket oluşsun
     const pk = (await ok(await admin('/api/orders/' + id))).order.packages[0];
-    const [r1, r2] = await both(admin(`/api/orders/${id}/carrier-label`, J({ package_id: pk.id })), S(`/api/orders/${id}/carrier-label`, J({ package_id: pk.id })));
+    const [r1, r2] = await both(admin(`/api/orders/${id}/carrier-label`, J({ package_id: pk.id, firm_id: '11' })), S(`/api/orders/${id}/carrier-label`, J({ package_id: pk.id, firm_id: '11' })));
     no500(r1, r2);
     assert.equal(kg.created, 1, `Kargonomi\'de ${kg.created} gönderi açıldı (HTTP ${r1.status} / ${r2.status})`);
   } finally { n.restore(); }
