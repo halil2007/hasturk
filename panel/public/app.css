@@ -7,6 +7,8 @@
 :root {
   color-scheme: light;
   --bg: #f3f5f9; --surface: #ffffff; --surface-2: #f6f8fb; --surface-3: #eef2f8; --line: #e6e9f0; --line-2: #d8dde7;
+  /* Harita (illere göre satış): 5 kademeli tek renk ölçek, az → çok (açık zeminde en açık ton da zeminden ayrılır) */
+  --map1: #86b6ef; --map2: #3987e5; --map3: #256abf; --map4: #184f95; --map5: #0d366b;
   --text: #0f172a; --text-2: #475569; --muted: #8a94a6;
   --primary: #1f63e9; --primary-2: #1a55cc; --primary-ink: #ffffff; --primary-soft: #e8f0fe; --primary-soft-2: #d6e4fd;
   --nav-bg: #0f1c35; --nav-bg-2: #15264a; --nav-text: #c3cde0; --nav-muted: #7f8db0; --nav-active: #1d3768; --nav-active-text: #ffffff;
@@ -24,6 +26,7 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #0b1220; --surface: #121b2d; --surface-2: #172238; --surface-3: #1c2942; --line: #23314d; --line-2: #2d3d5e;
+    --map1: #184f95; --map2: #256abf; --map3: #3987e5; --map4: #86b6ef; --map5: #cde2fb;
     --text: #e8edf6; --text-2: #b4c0d6; --muted: #7e8ba5;
     --primary: #4c8bf5; --primary-2: #6aa0f7; --primary-ink: #ffffff; --primary-soft: #16284b; --primary-soft-2: #1d3563;
     --nav-bg: #0a1426; --nav-bg-2: #101d36; --nav-active: #1d3768;
@@ -36,6 +39,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0b1220; --surface: #121b2d; --surface-2: #172238; --surface-3: #1c2942; --line: #23314d; --line-2: #2d3d5e;
+  --map1: #184f95; --map2: #256abf; --map3: #3987e5; --map4: #86b6ef; --map5: #cde2fb;
   --text: #e8edf6; --text-2: #b4c0d6; --muted: #7e8ba5;
   --primary: #4c8bf5; --primary-2: #6aa0f7; --primary-ink: #ffffff; --primary-soft: #16284b; --primary-soft-2: #1d3563;
   --nav-bg: #0a1426; --nav-bg-2: #101d36; --nav-active: #1d3768;
