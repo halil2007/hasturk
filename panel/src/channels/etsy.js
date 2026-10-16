@@ -204,7 +204,6 @@ export function etsy(env, meta) {
     shipping_profile_id: 'Etsy kargo profili numarası (shipping_profile_id)',
     readiness_state_id: 'Etsy hazırlık profili numarası (processing profile, readiness_state_id)',
     return_policy_id: 'Etsy iade politikası numarası (return_policy_id; AB\'de kurulu mağaza “yok” yazabilir)',
-    fx_rate: 'Kur: Etsy mağazanızın para birimi TL değilse 1 birimi kaç TL (ör. 41,25)',
   };
   const options = Object.entries(OPT).map(([k, label]) => ({ k, label }));
   const why = (e) => str((e && e.data && (e.data.error || e.data.message)) || (e && e.message)).replace(/^(GET|POST|PUT|PATCH|DELETE) \S+: /, '').slice(0, 400);
@@ -258,6 +257,8 @@ export function etsy(env, meta) {
     return v;
   }
   const shopInfo = () => once('shop', () => call(`/shops/${shop}`));
+  // Mağazanın para birimi: ürün yüklemede panel fiyatı buna çevrilir (bkz. catalog.js inCurrency)
+  const currency = async () => str((await shopInfo()).currency_code).toUpperCase();
   const PROFILES = {
     shipping_profile_id: async () => (((await call(`/shops/${shop}/shipping-profiles`)) || {}).results || []).filter((x) => !x.is_deleted)
       .map((x) => ({ id: str(x.shipping_profile_id), name: str(x.title) || str(x.origin_country_iso) })),
@@ -289,11 +290,11 @@ export function etsy(env, meta) {
     const bad = [...new Set(title.match(/[^\p{L}\p{Nd}\p{P}\p{Sm}\p{Zs}™©®]/gu) || [])];
     if (bad.length) missing.push(`ürün adında Etsy'nin kabul etmediği karakter var (${bad.map((c) => `“${c}”`).join(' ')})`);
     for (const ch of '%:&+') if (title.split(ch).length > 2) missing.push(`ürün adında “${ch}” Etsy'de en fazla bir kez kullanılabilir`);
-    // Fiyat mağazanın para biriminde gönderilir (currency_code); TL değilse kullanıcının girdiği kurla çevrilir
-    const cur = str((await shopInfo()).currency_code).toUpperCase(), rate = num(o.fx_rate), tl = num(pr.price);
-    const price = Math.round((cur === 'TRY' ? tl : rate > 0 ? tl / rate : 0) * 100) / 100;
-    if (!(tl > 0)) missing.push('fiyat');
-    else if (cur !== 'TRY' && !(rate > 0)) missing.push(`${OPT.fx_rate} — mağazanızın para birimi ${cur || 'bilinmiyor'}`);
+    // Fiyat mağazanın para biriminde gönderilir (currency_code). Panel fiyatı catalog.js'te TCMB kuruyla bu para birimine çevrilmiş gelir
+    // (catalog.currency; pr.currency). Çevrilmemiş (TL) fiyat başka para birimli mağazaya gönderilmez.
+    const cur = await currency(), price = Math.round(num(pr.price) * 100) / 100, pcur = str(pr.currency || 'TRY').toUpperCase();
+    if (!(num(pr.price) > 0)) missing.push('fiyat');
+    else if (pcur !== cur) missing.push(`fiyat para birimi (${pcur}; Etsy mağazanız ${cur || 'bilinmiyor'} kullanıyor)`);
     else if (!(price > 0)) missing.push(`fiyat (${cur} ile 0'a yuvarlanıyor)`);
     const quantity = Math.max(0, Math.round(num(pr.stock)));
     if (quantity < 1) missing.push('stok (Etsy en az 1 adet ister)');
@@ -301,16 +302,18 @@ export function etsy(env, meta) {
     if (!images.length) missing.push('görsel');
     // Satıcı beyanları
     const who = str(o.who_made).toLowerCase(), when = str(o.when_made).toLowerCase(), sup = supply(o.is_supply);
-    if (!who) missing.push(OPT.who_made); else if (!WHO.includes(who)) missing.push(`${OPT.who_made}: “${o.who_made}” geçersiz`);
-    if (!when) missing.push(OPT.when_made); else if (!WHEN.test(when)) missing.push(`${OPT.when_made}: “${o.when_made}” geçersiz`);
-    if (str(o.is_supply) === '') missing.push(OPT.is_supply); else if (sup == null) missing.push(`${OPT.is_supply}: “${o.is_supply}” geçersiz`);
+    // Girilmemiş seçenek "(Ürün yükle → Etsy seçenekleri)" ile biter: Kanallarda yayınla bunu kendi seçenek kutusunda sorar (publish.js NEED)
+    const NOPT = ' (Ürün yükle → Etsy seçenekleri)';
+    if (!who) missing.push(OPT.who_made + NOPT); else if (!WHO.includes(who)) missing.push(`${OPT.who_made}: “${o.who_made}” geçersiz`);
+    if (!when) missing.push(OPT.when_made + NOPT); else if (!WHEN.test(when)) missing.push(`${OPT.when_made}: “${o.when_made}” geçersiz`);
+    if (str(o.is_supply) === '') missing.push(OPT.is_supply + NOPT); else if (sup == null) missing.push(`${OPT.is_supply}: “${o.is_supply}” geçersiz`);
     // Profiller: numara mağazanın listesinde olmalı (liste okunabildiyse); iade politikası AB mağazasında "yok"
     const ids = {};
     for (const k of ['shipping_profile_id', 'readiness_state_id', 'return_policy_id']) {
       const v = str(o[k]);
       if (k === 'return_policy_id' && /^yok$/i.test(v)) continue;
       const list = await profiles(k);
-      if (!v) { missing.push(OPT[k] + hint(list)); continue; }
+      if (!v) { missing.push(OPT[k] + hint(list) + NOPT); continue; }
       if (!/^\d+$/.test(v)) { missing.push(`${OPT[k]}: “${v}” numara olmalı`); continue; }
       if (list && !list.some((x) => x.id === v)) { missing.push(`${OPT[k]}: “${v}” mağazanızda yok${hint(list)}`); continue; }
       ids[k] = Number(v);
@@ -452,7 +455,7 @@ export function etsy(env, meta) {
     return { ref: id };
   }
   const status = async (ref) => results(await work(String(ref), STEP));
-  const catalog = { categories, allCategories, attributes, values, build, send, status, options };
+  const catalog = { categories, allCategories, attributes, values, build, send, status, options, currency };
 
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();

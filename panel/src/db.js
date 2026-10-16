@@ -411,6 +411,10 @@ export const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN site_tracking TEXT',
   // Entegratörün kesin ücreti geldi mi (Kargonomi real_price: şubede ölçülen desiyle); gelmediyse teslimden sonra da sorgulanır
   'ALTER TABLE packages ADD COLUMN carrier_cost_final INTEGER',
+  // Paket ölçüleri (cm): bazı pazaryerleri (Ozon, Amazon, eBay) ürün açarken gerçek en / boy / yükseklik ister; desiden türetilmez
+  'ALTER TABLE products ADD COLUMN width REAL',
+  'ALTER TABLE products ADD COLUMN height REAL',
+  'ALTER TABLE products ADD COLUMN length REAL',
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)

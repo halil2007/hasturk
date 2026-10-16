@@ -6,8 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { d1 } from '../dev/d1.mjs';
-import { init, run, setSetting, first } from '../src/db.js';
-import { resetChannels, getChannels } from '../src/channels/index.js';
+import { init, run, setSetting, first, all } from '../src/db.js';
+import { resetChannels } from '../src/channels/index.js';
+import { shape, picker, markSent } from '../src/catalog.js';
 import { ozon } from '../src/channels/ozon.js';
 import worker from '../src/index.js';
 
@@ -80,10 +81,12 @@ async function login(call, db) {
   await call('login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
   await call('integrations/ozon', { method: 'PUT', body: JSON.stringify({ values: { OZON_CLIENT_ID: '123456', OZON_API_KEY: 'key-uuid' } }) });
   await setSetting(db, 'verified:ozon', { at: Date.now() + 1000 }); resetChannels();
+  // TCMB kuru (döviz alış): panel fiyatı (TL) Ozon hesap para birimine bununla çevrilir (bkz. catalog.js inCurrency)
+  await setSetting(db, 'fx_rates', { at: Date.now(), source: 'tcmb', rates: { RUB: { buy: 0.4, sell: 0.41 } } });
 }
 
 test('Ozon ürün yükleme: kategori, özellik, eşleştirme, eksikler (ölçü / ağırlık / görsel / seçenek), gönderim ve sonuç', async () => {
-  const { db, env, call, ins } = await setup();
+  const { db, call, ins } = await setup();
   await ins('OZ-5', '869001', 'Solucan Gübresi 5 Kg', '5 Kg', 'https://cdn.ornek.com/a.jpg', 5.2);
   await ins('OZ-10', '869002', 'Solucan Gübresi 10 Kg', '10 Kg', 'https://cdn.ornek.com/b.PNG?v=2', 10.3);
   await ins('OZ-W', '869003', 'Solucan Gübresi 3 Kg', '3 Kg', 'https://cdn.ornek.com/c.webp', null);
@@ -146,12 +149,19 @@ test('Ozon ürün yükleme: kategori, özellik, eşleştirme, eksikler (ölçü 
     assert.equal(up.sent, 0); assert.equal(up.skipped.length, 3);
     assert.ok(!m.calls.some((c) => c.path === '/v3/product/import'));
 
-    // Panelde paket ölçüsü alanı olduğu varsayımıyla (shape() en / boy / yükseklik cm verirse): gönderim ve sonuç
-    const ch = (await getChannels(env, db)).find((c) => c.id === 'ozon'), orig = ch.catalog.build;
-    ch.catalog.build = (pr, map, o) => orig({ ...pr, width: 20, height: 35.5, length: 8 }, map, o);
-    up = await call('catalog/upload', { method: 'POST', body: JSON.stringify({ channel: 'ozon', ids: cand.items.map((x) => x.id) }) });
-    assert.equal(up.sent, 2, JSON.stringify(up)); assert.deepEqual(up.skipped.map((x) => x.name), ['Solucan Gübresi 3 Kg']);
-    assert.equal(up.ref, '172549793:OZ-5,OZ-10');
+    // Panelde paket ölçüsü alanı yok: gönderim, ürün kaydı (shape) + en / boy / yükseklik (cm) eklenerek kanal üzerinden yapılır ve
+    // catalog/upload'ın yazdığı gönderim kaydı aynı biçimde yazılır; sonuç worker üzerinden (catalog/uploads/{id}/check) sorgulanır
+    const ch = ozon({ OZON_CLIENT_ID: '123456', OZON_API_KEY: 'key-uuid' }, { id: 'ozon', name: 'Ozon' });
+    const mr = await first(db, "SELECT * FROM category_map WHERE local = 'Gübre' AND channel = 'ozon'"), map = { ...mr, attrs: JSON.parse(mr.attrs) };
+    const prods = await all(db, "SELECT * FROM products WHERE sku IN ('OZ-5', 'OZ-10') ORDER BY id"), opts = { vat: '%20', currency: 'rub' }, pk = picker(ch, CAT);
+    const built = [];
+    for (const p of prods) built.push(await ch.catalog.build({ ...shape(p, opts), width: 20, height: 35.5, length: 8, currency: 'RUB' }, map, { opts, pick: pk }));
+    assert.deepEqual(built.map((b) => b.missing), [[], []]);
+    const { ref } = await ch.catalog.send(built.map((b) => b.payload));
+    assert.equal(ref, '172549793:OZ-5,OZ-10');
+    const items = prods.map((p, i) => ({ id: p.id, key: built[i].key, name: p.name }));
+    up = await first(db, "INSERT INTO product_uploads (channel, ref, status, items, user, created_at) VALUES ('ozon', ?, 'sent', ?, 'Test', ?) RETURNING id", ref, JSON.stringify(items), Date.now());
+    await markSent(db, 'ozon', items.map((x) => x.id), up.id, ref);
     const imp = m.calls.filter((c) => c.path === '/v3/product/import');
     assert.equal(imp.length, 1);
     const s5 = imp[0].body.items.find((x) => x.offer_id === 'OZ-5'), s10 = imp[0].body.items.find((x) => x.offer_id === 'OZ-10');
@@ -182,11 +192,26 @@ test('Ozon ürün yükleme: kategori, özellik, eşleştirme, eksikler (ölçü 
     assert.equal(r10.ok, false); assert.equal(r10.status, 'Ozon kabul etmedi'); assert.equal(r10.error, 'Ağırlık: Değer kategoriye uygun değil');
     const pc = await first(db, "SELECT state, error FROM product_channel WHERE channel = 'ozon' AND product_id = ?", by['OZ-10'].id);
     assert.equal(pc.state, 'rejected'); assert.match(pc.error, /Değer kategoriye uygun değil/);
+
+    // Panelde paket ölçüsü girilince ürün Ürün yükle'den gider; fiyat (TL) TCMB döviz alış kuruyla (1 RUB = 0,4 TL) rubleye çevrilir
+    await run(db, "UPDATE products SET width = 20, height = 35.5, length = 8 WHERE sku = 'OZ-5'");
+    cand = await call('catalog/candidates?channel=ozon&local=G%C3%BCbre');
+    assert.deepEqual(cand.items.find((x) => x.sku === 'OZ-5').missing, []);
+    const nImp = m.calls.filter((c) => c.path === '/v3/product/import').length;
+    up = await call('catalog/upload', { method: 'POST', body: JSON.stringify({ channel: 'ozon', ids: [by['OZ-5'].id] }) });
+    assert.equal(up.sent, 1, JSON.stringify(up));
+    const last = m.calls.filter((c) => c.path === '/v3/product/import')[nImp].body.items[0];
+    assert.deepEqual([last.price, last.old_price, last.currency_code, last.width, last.height, last.depth], ['250', '300', 'RUB', 200, 355, 80]);
+    // Kur alınamazsa TL fiyat rubleymiş gibi gönderilmez: ürün eksik
+    await setSetting(db, 'fx_rates', { at: Date.now(), source: 'tcmb', rates: {} });
+    await setSetting(db, 'fx_orders', { at: Date.now(), source: 'tcmb', rates: {} });
+    cand = await call('catalog/candidates?channel=ozon&local=G%C3%BCbre');
+    assert.deepEqual(cand.items.find((x) => x.sku === 'OZ-5').missing, ['döviz kuru (RUB) alınamadı; fiyat çevrilemedi']);
   } finally { m.restore(); resetChannels(); }
 });
 
 const PR = (i, o = {}) => ({ id: i, sku: `SKU-${i}`, barcode: `86900${i}`, name: `Ürün ${i}`, brand: 'HG', description: '<p>Açıklama</p>', image: 'https://cdn.ornek.com/x.jpg', images: [],
-  vat: 20, desi: 1, stock: 3, price: 50, listPrice: 50, weight: 1, group: `G${i}`, variant: '5 Kg', width: 10, height: 10, length: 10, ...o });
+  vat: 20, desi: 1, stock: 3, price: 50, listPrice: 50, weight: 1, group: `G${i}`, variant: '5 Kg', width: 10, height: 10, length: 10, currency: 'CNY', ...o });
 const MAP = { remote_id: CAT, attrs: { 23171: { value: '@variant' }, 4389: { id: '90295', value: 'Турция' } } };
 const OPTS = { vat: '10', currency: 'CNY' };
 const pick = async (a, text) => (/^5 kg$/i.test(text) ? { id: '971', value: '5 kg' } : null);

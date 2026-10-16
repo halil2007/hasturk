@@ -188,9 +188,8 @@ export function ciceksepeti(env, meta) {
     return rankBrands(valuesOf((await rawAttrs(cat)).find(isBrand)).map((v) => ({ id: v.id, name: v.value })), q);
   }
   const plain = (h) => str(String(h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&[a-z]+;|&#\d+;/gi, 'x').replace(/\s+/g, ' '));
-  // Seçenek eksikliği metni "(Ürün yükle … seçenekleri)" biçiminde değil: Kanallarda yayınla bu biçimi kendi seçenek listesine (publish.js NEED)
-  // bırakıp gizler; Çiçeksepeti orada henüz yok, eksik gizlenirse ürün teslimat bilgisi olmadan gönderilirdi
-  const OPT = '(Çiçeksepeti kanal seçeneği; Ürün yükle ekranında girilir)';
+  // Seçenek eksikliği "(Ürün yükle → … seçenekleri)" biçiminde: Kanallarda yayınla bunu kendi seçenek listesinde sorar (publish.js NEED)
+  const OPT = '(Ürün yükle → Çiçeksepeti seçenekleri)';
   async function build(pr, map, { opts = {}, pick } = {}) {
     const missing = [], attrs = [];
     for (const a of await rawAttrs(map.remote_id)) {

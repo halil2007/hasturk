@@ -11,6 +11,7 @@ import { fail, str, num, r2, isImageAttr, variantAxes, cleanHtml } from './util.
 export { variantAxes };
 import { rank, localProfile, prepare, score } from './catmatch.js';
 import { quantities, withoutQty, norm as normQ } from './match.js';
+import { orderRate } from './fx.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
@@ -80,6 +81,8 @@ export function shape(p, opts, zeroStock) {
     id: p.id, sku: str(p.sku), barcode: str(p.barcode), name: str(p.name), brand: str(p.brand), description: cleanHtml(p.description) || str(p.name),
     image: img || images[0] || '', images, vat: p.vat ?? 20, desi: p.desi || 1, stock: zeroStock ? 0 : Math.max(0, Math.round(p.stock || 0)),
     price: r2(base * k), listPrice: r2((own || Math.max(p.cat_list || 0, base)) * k), weight: num(p.weight) > 0 ? num(p.weight) : null,
+    // Paket ölçüleri (cm); girilmemişse null (kanal gerçek ölçü istiyorsa eksik sayar)
+    width: num(p.width) > 0 ? num(p.width) : null, height: num(p.height) > 0 ? num(p.height) : null, length: num(p.length) > 0 ? num(p.length) : null,
     group: groupCode(p), variant: str(p.variant_name),
   };
 }
@@ -209,15 +212,42 @@ export async function autoFill(c, catId, m, p, missing) {
   return { attrs: { ...m.attrs, ...add }, filled };
 }
 
+// Yurt dışı kanal (catalog.currency: kanalın fiyat beklediği para birimi): panel fiyatı (TL) TCMB döviz alış kuruyla çevrilir
+// (siparişlerin TL'ye çevrildiği kurla aynı; bkz. fx.js orderRate). Kullanıcıdan elle kur alınmaz: eski kur yanlış fiyat demek.
+// Kur ya da para birimi okunamazsa fiyat çevrilmez ve ürün eksik sayılır (TL tutar başka para birimiyle gönderilmez).
+// Dönen fonksiyon ürünün fiyatını yerinde çevirir ve eksik listesi döndürür (para birimi ve kur bir kez okunur).
+export function inCurrency(c, db) {
+  if (!c.catalog || !c.catalog.currency || !db) return async () => [];
+  // currency(opts): kanal hesabından okunur (eBay, Etsy, Amazon) ya da kanal seçeneğinden gelir (Ozon hesap para birimi)
+  const memo = new Map();
+  const load = async (opts) => {
+    let cur = '';
+    try { cur = str(await c.catalog.currency(opts || {})).toUpperCase(); } catch (e) { if (e.budget) throw e; return { err: `${c.name} para birimi okunamadı (${e.message})` }; }
+    if (!cur) return { skip: true }; // para birimi seçilmemiş: kanalın kendi eksik kontrolü bildirir, fiyat çevrilmez
+    if (cur === 'TRY' || cur === 'TL') return { cur: 'TRY', rate: 1 };
+    if (!memo.has(cur)) memo.set(cur, orderRate(db, cur).catch((e) => { if (e.budget) throw e; return null; }));
+    const rate = await memo.get(cur);
+    return rate > 0 ? { cur, rate } : { err: `döviz kuru (${cur}) alınamadı; fiyat çevrilemedi` };
+  };
+  return async (pr, opts) => {
+    const x = await load(opts);
+    if (x.skip) return [];
+    if (x.err) return [x.err];
+    pr.currency = x.cur;
+    if (x.rate !== 1) { pr.price = r2(pr.price / x.rate); pr.listPrice = r2(pr.listPrice / x.rate); pr.fxRate = x.rate; }
+    return [];
+  };
+}
+
 async function buildAll(c, map, prods, opts, zeroStock, db) {
-  const pick = picker(c, map.remote_id), out = [];
+  const pick = picker(c, map.remote_id), out = [], fx = inCurrency(c, db);
   // Marka eşleştirmesi (Kanallarda yayınla ekranında seçilen / adı birebir aynı bulunup hatırlanan kanal markası): ürün markasının adı
   // kanaldakiyle aynı olmasa da eşleşmiş marka kullanılır
   const brands = db && c.catalog.brands && !c.catalog.brandByCategory ? new Map((await all(db, 'SELECT brand, remote_id, remote_name FROM brand_map WHERE channel = ? AND COALESCE(remote_id, \'\') != \'\'', c.id).catch(() => [])).map((r) => [r.brand, r])) : new Map();
   // Marka alanı boş ürün: paneldeki markalardan adında geçen (tek) marka
   const known = db && prods.some((p) => !str(p.brand)) ? (await all(db, "SELECT DISTINCT brand FROM products WHERE COALESCE(TRIM(brand), '') != ''").catch(() => [])).map((r) => r.brand) : [];
   for (const p of prods) {
-    const pr = shape(p, opts, zeroStock), auto = [];
+    const pr = shape(p, opts, zeroStock), auto = [], fxMiss = await fx(pr, opts);
     if (!str(p.brand) && known.length) { const g = inferBrand(p.name, known); if (g) { pr.brand = g; auto.push({ name: 'Marka', value: g }); } }
     const bm = brands.get(str(pr.brand));
     if (bm) { pr.brandId = bm.remote_id; pr.brand = str(bm.remote_name) || pr.brand; }
@@ -229,8 +259,9 @@ async function buildAll(c, map, prods, opts, zeroStock, db) {
         const f = await autoFill(c, map.remote_id, m, p, b.missing);
         if (f.filled.length) { b = await c.catalog.build(pr, { ...m, attrs: f.attrs }, { opts, pick }); auto.push(...f.filled); }
       }
-      out.push({ p: pr, ...b, auto });
-    } catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: ['hata: ' + e.message], auto }); }
+      // Kur alınamadıysa kanalın "fiyat para birimi" eksiği aynı şeyi söyler: bir kez gösterilir
+      out.push({ p: pr, ...b, missing: [...fxMiss, ...b.missing.filter((m) => !(fxMiss.length && /^fiyat para birimi/.test(m)))], auto });
+    } catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: [...fxMiss, 'hata: ' + e.message], auto }); }
   }
   return out;
 }

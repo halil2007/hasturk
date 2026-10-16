@@ -270,7 +270,7 @@ export function ozon(env, meta) {
   const searchBrands = async (q, cat) => rankBrands(await findBrands(q, cat), str(q));
   // KDV seçeneği: "20", "%20", "0,2" → "0.2"; Ozon'un kabul ettiği oranlardan biri değilse boş
   const vatOf = (v) => { const s = str(v).replace(/[%\s]/g, '').replace(',', '.'); if (!s || !Number.isFinite(Number(s))) return ''; const x = Number(s) > 1 ? Number(s) / 100 : Number(s); return VATS.find((o) => Math.abs(Number(o) - x) < 1e-9) || ''; };
-  const price = (v) => String(Math.round(num(v) * 100) / 100);
+  const money = (v) => String(Math.round(num(v) * 100) / 100);
   async function build(pr, map, { opts = {}, pick } = {}) {
     const missing = [], attrs = [], complex = new Map(), vals = map.attrs || {};
     const add = (a, values) => {
@@ -314,10 +314,12 @@ export function ozon(env, meta) {
     const vat = vatOf(opts.vat), cur = str(opts.currency).toUpperCase();
     if (!vat) missing.push('KDV oranı (Ürün yükle → Ozon seçenekleri)');
     if (!CURS.includes(cur)) missing.push('para birimi (Ürün yükle → Ozon seçenekleri)');
+    // Fiyat catalog.js'te TCMB kuruyla hesap para birimine çevrilmiş gelir (catalog.currency; pr.currency); çevrilmemiş TL fiyat gönderilmez
+    else if (str(pr.currency || 'TRY').toUpperCase() !== cur) missing.push(`fiyat para birimi (${str(pr.currency || 'TRY').toUpperCase()}; Ozon hesabınız ${cur})`);
     const sale = num(pr.price), list = Math.max(num(pr.listPrice), sale);
     const item = {
       offer_id: str(pr.sku), name: str(pr.name).slice(0, 500), ...(pr.barcode ? { barcode: str(pr.barcode) } : {}), ...catIds(map.remote_id),
-      price: price(sale), ...(list > sale ? { old_price: price(list) } : {}), currency_code: cur, vat,
+      price: money(sale), ...(list > sale ? { old_price: money(list) } : {}), currency_code: cur, vat,
       height: h, width: w, depth: d, dimension_unit: 'mm', weight: g, weight_unit: 'g',
       primary_image: imgs[0] || '', images: imgs.slice(1, 30), attributes: attrs,
       ...(complex.size ? { complex_attributes: [...complex.values()].map((x) => ({ attributes: x })) } : {}),
@@ -327,7 +329,7 @@ export function ozon(env, meta) {
   // Gönderim: istekte en çok 100 ürün. Kayıt: "<task_id>:<offer_id,…>" parçaları ";" ile (offer_id URL kodlu). İlk parça kabul edilmezse hata
   // atılır; sonraki bir parça reddedilirse o parçanın ürünleri "0:<offer_id,…>:<hata>" olarak kaydedilir (gönderilenlerin takibi kaybolmasın).
   // Yazma isteği sonucu belirsizken tekrarlanmaz (tries: 1).
-  async function send(items) {
+  async function sendProducts(items) {
     const refs = [];
     for (const part of chunk(items, 100)) {
       const keys = part.map((x) => encodeURIComponent(x.offer_id)).join(',');
@@ -344,7 +346,7 @@ export function ozon(env, meta) {
     return { ref: refs.join(';') };
   }
   const errText = (x) => [...new Set((x.errors || []).map((e) => [str(e.attribute_name), str(e.description || e.message || e.code)].filter(Boolean).join(': ')).filter(Boolean))].join(' · ');
-  async function status(ref) {
+  async function importStatus(ref) {
     const items = [];
     let pending = false;
     for (const part of String(ref).split(';').filter(Boolean)) {
@@ -364,8 +366,10 @@ export function ozon(env, meta) {
     return { done: !pending, items };
   }
   const raw = async (ref) => call('/v1/product/import/info', { task_id: Number(String(ref).split(/[;:]/)[0]) });
-  const catalog = { categories, allCategories, attributes, values, build, send, status, raw, brands: searchBrands, brandByCategory: true, chunk: 100,
-    options: [{ k: 'vat', label: 'Ozon KDV oranı (%): 0, 5, 7, 10, 20 ya da 22' }, { k: 'currency', label: 'Ozon hesap para birimi (RUB, CNY, USD, EUR, KZT, BYN): fiyatlar çevrilmeden bu para biriminde gönderilir' }] };
+  // Hesap para birimi kanal seçeneğinden: panel fiyatı (TL) catalog.js'te TCMB kuruyla buna çevrilir
+  const currency = (opts = {}) => { const c = str(opts.currency).toUpperCase(); return CURS.includes(c) ? c : ''; };
+  const catalog = { categories, allCategories, attributes, values, build, send: sendProducts, status: importStatus, raw, brands: searchBrands, brandByCategory: true, chunk: 100, currency,
+    options: [{ k: 'vat', label: 'Ozon KDV oranı (%): 0, 5, 7, 10, 20 ya da 22' }, { k: 'currency', label: 'Ozon hesap para birimi (RUB, CNY, USD, EUR, KZT, BYN): panel fiyatı TCMB kuruyla bu para birimine çevrilir' }] };
 
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();

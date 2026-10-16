@@ -881,8 +881,8 @@ async function listBuybox(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months', 'origin'];
-const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price', 'list_price', 'weight', 'preparing_days', 'warranty_months']);
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin', 'model_code', 'list_price', 'weight', 'width', 'height', 'length', 'preparing_days', 'warranty_months', 'origin'];
+const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price', 'list_price', 'weight', 'width', 'height', 'length', 'preparing_days', 'warranty_months']);
 // Görsel bağlantıları: dizi ya da satır satır metin → tekrarsız https adresleri
 const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/[\s,]+/));
 export function cleanProduct(b) {

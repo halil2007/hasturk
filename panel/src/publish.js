@@ -14,7 +14,7 @@ import { fail, str, num, brandKey } from './util.js';
 import { markupPct, cleanMarkup, AUTO_MAP_SQL } from './catalog.js';
 import { exclusive } from './locks.js';
 import { rank } from './catmatch.js';
-import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes, autoFill, inferBrand } from './catalog.js';
+import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes, autoFill, inferBrand, inCurrency } from './catalog.js';
 import { HELD_SQL } from './sync.js';
 
 // Kanalın bir kez sorulan zorunlu seçenekleri (Ürün yükle → kanal seçenekleri ile aynı yer: upload_opts). Üçüncü değer: ürünün kendi alanı varsa o kullanılır.
@@ -23,6 +23,10 @@ const NEED = {
   trendyol: [['cargoCompanyId', 'Kargo firması numarası']],
   idefix: [['cargoCompanyId', 'Kargo firması numarası']],
   hepsiburada: [['warranty', 'Garanti süresi (ay)', 'warranty_months']],
+  ciceksepeti: [['deliveryType', 'Teslimat tipi (1 servis aracı, 2 kargo, 3 ikisi)'], ['deliveryMessageType', 'Teslimat mesaj tipi kodu']],
+  ozon: [['vat', 'Ozon KDV oranı (%)'], ['currency', 'Ozon hesap para birimi (RUB, CNY, USD, EUR, KZT, BYN)']],
+  etsy: [['who_made', 'Etsy: ürünü kim yaptı (i_did / someone_else / collective)'], ['when_made', 'Etsy: ürün ne zaman yapıldı'], ['is_supply', 'Etsy: malzeme mi (evet / hayır)'],
+    ['shipping_profile_id', 'Etsy kargo profili numarası'], ['readiness_state_id', 'Etsy hazırlık profili numarası'], ['return_policy_id', 'Etsy iade politikası numarası']],
 };
 const MAX = 200;
 const cap = (s) => (s ? s.charAt(0).toLocaleUpperCase('tr') + s.slice(1) : s);
@@ -69,7 +73,7 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
   const saved = await savedAttrs(db, all0);
   const states = new Map((await allIn(db, all0, (ph, part) => [`SELECT * FROM product_channel WHERE product_id IN (${ph})`, part])).map((r) => [`${r.product_id}|${r.channel}`, r]));
   const brandRows = new Map((await all(db, 'SELECT * FROM brand_map')).map((r) => [`${r.brand}|${r.channel}`, r]));
-  const out = { products: [], channels: [] };
+  const out = { products: [], channels: [] }, fxOf = new Map();
   let first = true;
   for (const c of chans) {
     const kind = kindOf(c);
@@ -225,6 +229,9 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
         brand = await brandFor(p, cat.remote_id);
         const o = optsFor(p);
         const pr = shape(p, o, false);
+        // Yurt dışı kanal: fiyat kanalın para birimine TCMB kuruyla çevrilir (kur yoksa ürün eksik; bkz. catalog.js inCurrency)
+        if (!fxOf.has(c.id)) fxOf.set(c.id, inCurrency(c, db));
+        for (const m of await fxOf.get(c.id)(pr, o)) missing.push(cap(m));
         if (brand.remote_id) pr.brandId = brand.remote_id;
         if (brand.name && brand.state === 'ok' && (brand.remote_id || !row.brandSearch)) pr.brand = brand.name;
         try {
@@ -238,7 +245,9 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
             }
           }
           key = b.key; payload = b.payload;
+          const fxBad = missing.some((m) => /^Döviz kuru|para birimi okunamadı/i.test(m));
           for (const m of b.missing) {
+            if (fxBad && /^fiyat para birimi/.test(m)) continue;
             if (/^marka/i.test(m) || /\(Ürün yükle[^)]*seçenekleri\)/i.test(m)) continue;
             missing.push(cap(m.replace(/\s*\(Ürün yükle[^)]*\)/i, '')));
           }
