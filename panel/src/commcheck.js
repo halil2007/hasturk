@@ -9,7 +9,7 @@
 //     seferinde hesaplanır.
 //  3) Sonradan gelen komisyon iadesi / düzeltmesi: hakediş kayıtlarından (bkz. finance.js commissionCredits).
 import { LISTS } from './commission-lists.js';
-import { all, allIn, first } from './db.js';
+import { all, allIn, first, getRaw, setSetting, notify, log } from './db.js';
 import { keptShare, commissionCredits } from './finance.js';
 import { chunk, r2 } from './util.js';
 
@@ -113,6 +113,69 @@ export async function rebaseOnce(db, now = Date.now()) {
     return n;
   } catch (e) {
     await db.prepare("DELETE FROM settings WHERE k = 'once:comm_base_1'").run().catch(() => {});
+    throw e;
+  }
+}
+
+// Tek seferlik (11–12 Ekim 2026 sürümü): "tüm giderler KDV dahil" çevrimi kısa süre Trendyol (Go hariç), Amazon ve Çiçeksepeti
+// komisyonlarını da 1,2 ile çarpıyordu (bu kanalların oranı zaten KDV dahil). Kod ertesi gün düzeldi; o arada çevrimi çalışmış panelde
+// ilan / kanal oranı şişik kalmış olabilir. Tahminle toplu bölme YAPILMAZ: ilan oranı, o ilanın son 365 gündeki gerçek sipariş satırı
+// oranlarının ortancasıyla karşılaştırılır; oran tam olarak gerçek × 1,2 ise (ve gerçekten belirgin farklıysa) 1,2'ye bölünür.
+// Kanıtı (siparişi) olmayan elle girilmiş oranlara dokunulmaz, kullanıcıya kontrol için bildirilir. Kanal ortalaması (Ayarlar → komisyon)
+// için de aynı kural kanalın tüm satırlarıyla (en az 10 satır) uygulanır.
+const VAT_INCL_CH = /^(trendyol(?!go)|amazon|ciceksepeti)(_\w+)?$/;
+const inflated = (c, r) => r > 0 && c > 0 && Math.abs(c / 1.2 - r) <= Math.max(0.6, 0.05 * r) && Math.abs(c - r) > Math.max(1, 0.08 * r);
+export async function vatFixOnce(db, now = Date.now()) {
+  const claim = await first(db, "INSERT INTO settings (k, v) VALUES ('once:vat_fix_2', '1') ON CONFLICT (k) DO NOTHING RETURNING k").catch(() => null);
+  if (!claim) return null;
+  try {
+    // Yalnız o sürümde çevrimi çalışmış olabilecek panel: çevrim işareti var ve panel o tarihten önce kurulmuş (yeni panel hiç etkilenmedi)
+    const CUT = Date.parse('2026-10-12T06:40:20Z');
+    const ran = await first(db, "SELECT 1 AS x FROM settings WHERE k = 'once:vat_incl_1'");
+    const born = await first(db, 'SELECT MIN(created_at) AS t FROM products');
+    if (!ran || !born || !(Number(born.t) > 0 && Number(born.t) < CUT)) return { skipped: true };
+    const since = now - 365 * D;
+    const chans = (await all(db, 'SELECT DISTINCT channel FROM listings WHERE commission IS NOT NULL')).map((r) => r.channel).filter((c) => VAT_INCL_CH.test(c));
+    const fixed = [], unsure = [], st = [];
+    const set = (await getRaw(db, 'commission')) || {};
+    let setChanged = false;
+    for (const ch of chans) {
+      const lines = await all(db, `SELECT i.remote_key AS k, i.commission * 100.0 / i.total AS r FROM order_items i JOIN orders o ON o.id = i.order_id
+        WHERE o.channel = ? AND o.ordered_at >= ? AND i.commission IS NOT NULL AND i.commission > 0 AND i.total > 0 AND COALESCE(i.remote_key, '') != '' AND ${LIVE_LINE}`, ch, since);
+      const by = new Map();
+      for (const l of lines) by.set(l.k, [...(by.get(l.k) || []), Number(l.r)]);
+      for (const l of await all(db, 'SELECT remote_id, name, commission, commission_src FROM listings WHERE channel = ? AND commission IS NOT NULL AND commission > 0', ch)) {
+        const ev = by.get(l.remote_id);
+        if (ev && ev.length) {
+          const r = median(ev);
+          if (inflated(Number(l.commission), r)) {
+            const v = r2(Number(l.commission) / 1.2);
+            st.push(db.prepare('UPDATE listings SET commission = ? WHERE channel = ? AND remote_id = ? AND commission = ?').bind(v, ch, l.remote_id, l.commission));
+            fixed.push({ ch, id: l.remote_id, name: l.name, from: l.commission, to: v, real: r2(r) });
+          }
+        } else if (l.commission_src !== 'api' && l.commission_src !== 'list') unsure.push({ ch, id: l.remote_id, name: l.name, c: l.commission });
+      }
+      // Kanal ortalaması: kanalın tüm satırlarının ortancası
+      const base = ch.replace(/_\w+$/, ''), cur = Number(set[ch] ?? set[base]);
+      const all1 = lines.map((x) => Number(x.r));
+      if (all1.length >= 10 && Number.isFinite(cur) && inflated(cur, median(all1))) {
+        const key = set[ch] != null ? ch : base;
+        fixed.push({ ch, id: '(kanal ortalaması)', name: 'Ayarlar → komisyon', from: set[key], to: r2(Number(set[key]) / 1.2), real: r2(median(all1)) });
+        set[key] = r2(Number(set[key]) / 1.2); setChanged = true;
+      }
+    }
+    for (const part of chunk(st, 90)) await db.batch(part);
+    if (setChanged) await setSetting(db, 'commission', set);
+    if (fixed.length) {
+      await log(db, null, 'info', `Komisyon düzeltmesi: ${fixed.length} oran gerçek sipariş oranına göre 1,2'ye bölündü (eski KDV çevrimi) · ${fixed.slice(0, 8).map((x) => `${x.ch} ${x.id}: %${x.from} → %${x.to} (sipariş %${x.real})`).join(', ')}`);
+      await notify(db, 'commfix:vat', { level: 'info', title: `${fixed.length} komisyon oranı düzeltildi`, msg: `Eski bir KDV dönüşümü Trendyol / Amazon / Çiçeksepeti komisyonlarını 1,2 ile çarpmıştı. Siparişlerdeki gerçek orana göre düzeltildi: ${fixed.slice(0, 3).map((x) => `${x.name || x.id} %${x.from} → %${x.to}`).join(' · ')}${fixed.length > 3 ? ` ve ${fixed.length - 3} oran daha` : ''}.` });
+    }
+    if (unsure.length) {
+      await notify(db, 'commfix:check', { level: 'warn', title: `${unsure.length} ilanın elle girilmiş komisyonunu kontrol edin`, msg: `Trendyol / Amazon / Çiçeksepeti komisyon oranları KDV dahildir. Bu ilanlarda elle girilmiş oranı doğrulayacak sipariş yok; oran KDV eklenerek (1,2 kat) girilmiş olabilir: ${unsure.slice(0, 3).map((x) => `${x.name || x.id} %${x.c}`).join(' · ')}${unsure.length > 3 ? ` ve ${unsure.length - 3} ilan daha` : ''}. Ürünler → ilan komisyonundan kontrol edin.` });
+    }
+    return { fixed: fixed.length, unsure: unsure.length };
+  } catch (e) {
+    await db.prepare("DELETE FROM settings WHERE k = 'once:vat_fix_2'").run().catch(() => {});
     throw e;
   }
 }

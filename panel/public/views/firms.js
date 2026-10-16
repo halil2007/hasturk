@@ -218,7 +218,8 @@ export async function firmsView(el) {
       ${a.hasKey ? html`<dl class="kv"><dt>Anahtar</dt><dd class="num">${a.hint}</dd><dt>Oluşturma</dt><dd>${a.created_at ? dateTime(a.created_at) : '—'}</dd>
         <dt>Son erişim</dt><dd>${a.last_at ? html`${ago(a.last_at)}${a.last_ip ? html` <span class="muted tiny">(${a.last_ip})</span>` : ''}` : 'henüz yok'}</dd><dt>Toplam istek</dt><dd>${n(a.calls || 0)}</dd></dl>
         <label class="check" style="margin-top:8px"><input type="checkbox" data-x="api-write" ${a.write ? 'checked' : ''}> <span>Bu anahtar satış bildirebilsin (stok düşer)</span></label>
-        <div class="tiny muted">${a.write ? 'Dış sistem satış bildirebilir: bildirilen adet stoktan düşer.' : 'Kapalı: anahtar yalnız stok okur; satış bildirimi reddedilir.'}</div>` : ''}
+        <div class="tiny muted">${a.write ? 'Dış sistem satış bildirebilir: bildirilen adet stoktan düşer.' : 'Kapalı: anahtar yalnız stok okur; satış bildirimi reddedilir.'}</div>
+        <label class="field" style="margin-top:8px"><span>Günlük en fazla satış adedi (boş = sınırsız)</span><input class="input" type="number" min="0" step="1" inputmode="numeric" data-api-day value="${a.day_limit || ''}" placeholder="sınırsız" style="max-width:160px"></label>` : ''}
       <label class="field" style="margin-top:8px"><span>İzin verilen IP adresleri (isteğe bağlı)</span><textarea class="input" rows="2" data-api-ips placeholder="Boş: her yerden · ör. 85.105.10.25, 85.105.10.0/24">${(a.ips || []).join(', ')}</textarea></label>
       <div class="row wrap" style="gap:6px;margin-top:8px">
         ${!a.hasKey ? html`<button class="btn sm primary" data-x="api-enable"><i class="ico ico-key"></i>API erişimini aç</button>`
@@ -286,6 +287,14 @@ export async function firmsView(el) {
           </div>
         </div>`);
     };
+    // Dış API günlük satış sınırı: alandan çıkınca kaydedilir (boş = sınırsız)
+    s.el.addEventListener('change', async (e) => {
+      const i = e.target.closest('[data-api-day]');
+      if (!i) return;
+      const v = i.value;
+      i.disabled = true;
+      try { await api(`tenants/${slug}/api`, { method: 'POST', body: { action: 'day_limit', day_limit: v } }); await refresh(); await draw2(); toast(Number(v) > 0 ? `Günlük satış sınırı: ${n(Number(v))} adet` : 'Günlük satış sınırı kaldırıldı'); } catch (y) { i.disabled = false; toast(y.message, true); }
+    });
     s.el.addEventListener('click', async (e) => {
       const x = e.target.closest('[data-x]');
       if (!x) return;

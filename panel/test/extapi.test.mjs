@@ -6,6 +6,7 @@ import { doNamespace } from '../dev/do.mjs';
 import worker, { TenantPanel } from '../src/index.js';
 import { resetChannels } from '../src/channels/index.js';
 import { ipAllowed, parseIps, extApiInner } from '../src/extapi.js';
+import { getRaw, setSetting } from '../src/db.js';
 
 function setup() {
   const env = { PANEL_PASSWORD: 'x-123456', PANEL_SECRET: 's'.repeat(32), DB: d1() };
@@ -249,7 +250,7 @@ test('stok API satış güvenliği: izin, stok yeterliliği, sınırlar, senkron
   assert.equal(await stockOf('P-1'), 0);
   // Kalem sınırı
   assert.equal((await X('sales', J({ ref: 'R-3', items: Array.from({ length: 101 }, () => ({ sku: 'P-2', quantity: 1 })) }))).status, 400);
-  assert.equal((await X('sales', J({ ref: 'R-3', items: [{ sku: 'P-3', quantity: 5001 }] }))).status, 400);
+  assert.equal((await X('sales', J({ ref: 'R-3', items: [{ sku: 'P-3', quantity: 100001 }] }))).status, 400);
   // İptal edilmiş numara: tekrar bildirim 409 'cancelled' (stok düşmez)
   assert.equal((await X('sales/R-1/cancel', J({}))).status, 200);
   assert.equal(await stockOf('P-1'), 3);
@@ -293,15 +294,23 @@ test('stok API satış güvenliği: izin, stok yeterliliği, sınırlar, senkron
   assert.equal(await stockOf('P-1'), 0);
   assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM ext_sale_refs WHERE ref IN ('L-3', 'L-4')").first()).n, 1);
   assert.equal((await lastX.find((x) => x.status === 409).json()).code, 'insufficient_stock');
-  // Günlük sınır: anahtar başına son 24 saatte 5.000 adet
+  // Günlük sınır yok (varsayılan): stok yettikçe büyük satışlar kabul edilir
   r = await X('sales', J({ ref: 'D-1', items: [{ sku: 'P-3', quantity: 4980 }] }));
   assert.equal(r.status, 201);
   r = await X('sales', J({ ref: 'D-2', items: [{ sku: 'P-3', quantity: 100 }] }));
-  assert.equal(r.status, 429); assert.equal((await r.json()).code, 'daily_limit');
-  assert.equal(await stockOf('P-3'), 1020);
-  // Başka anahtarın sınırı ayrı
+  assert.equal(r.status, 201);
+  assert.equal(await stockOf('P-3'), 920);
+  // Anahtara günlük sınır verilince uygulanır (son 24 saatte bu anahtarla bildirilen + 20); başka anahtarın sınırı ayrı
+  const used = (await env.DB.prepare('SELECT SUM(qty) AS n FROM ext_sales WHERE src = ?').bind(kid).first()).n, lim = used + 20;
+  assert.equal((await (await O('/api/extapi/' + kid, J({ day_limit: lim }, 'PUT'))).json()).keys.find((x) => x.id === kid).day_limit, lim);
+  r = await X('sales', J({ ref: 'D-3', items: [{ sku: 'P-3', quantity: 21 }] }));
+  assert.equal(r.status, 429); const dl = await r.json(); assert.equal(dl.code, 'daily_limit'); assert.match(dl.error, new RegExp(`günlük sınırı ${lim.toLocaleString('tr-TR').replace('.', '\\.')} adet`));
+  assert.equal(await stockOf('P-3'), 920);
+  assert.equal((await X('sales', J({ ref: 'D-3', items: [{ sku: 'P-3', quantity: 20 }] }))).status, 201);
   await O('/api/extapi/' + k2.keys.find((x) => x.name === 'Okuyucu').id, J({ write: true }, 'PUT'));
   assert.equal((await X0(k2.key)('sales', J({ ref: 'D-2', items: [{ sku: 'P-3', quantity: 100 }] }))).status, 201);
+  assert.equal((await O('/api/extapi/' + kid, J({ day_limit: 'çok' }, 'PUT'))).status, 400);
+  assert.equal((await (await O('/api/extapi/' + kid, J({ day_limit: '' }, 'PUT'))).json()).keys.find((x) => x.id === kid).day_limit, null);
   // Stok senkronu kapalı: stoğu siteden (ikas) aynalanan üründe satış ve iptal reddedilir; aynalanmayan üründe satış işlenir (uyarıyla)
   r = await X('sales', J({ ref: 'S-1', items: [{ sku: 'P-2', quantity: 1 }] }));
   assert.equal(r.status, 201);
@@ -311,7 +320,7 @@ test('stok API satış güvenliği: izin, stok yeterliliği, sınırlar, senkron
   r = await X('sales', J({ ref: 'S-2', items: [{ sku: 'P-2', quantity: 1 }, { sku: 'P-4', quantity: 1 }] }));
   assert.equal(r.status, 409);
   const so = await r.json();
-  assert.equal(so.code, 'stock_sync_off'); assert.match(so.error, /stok senkronu kapalı; satış stoğa işlenemez/); assert.deepEqual(so.items.map((x) => x.sku), ['P-2']);
+  assert.equal(so.code, 'stock_sync_off'); assert.match(so.error, /stok senkronu kapalı; satış stoğa işlenemez/); assert.match(so.error, /Ayarlar → Stok → 'Stokları tüm kanallarda senkron tut' açılmalı/); assert.deepEqual(so.items.map((x) => x.sku), ['P-2']);
   assert.equal(await stockOf('P-2'), p2);
   r = await X('sales/S-1/cancel', J({}));
   assert.equal(r.status, 409); assert.equal((await r.json()).code, 'stock_sync_off');
@@ -322,4 +331,133 @@ test('stok API satış güvenliği: izin, stok yeterliliği, sınırlar, senkron
   await O('/api/settings', J({ stock_sync: true }, 'PUT'));
   assert.equal((await X('sales', J({ ref: 'S-2', items: [{ sku: 'P-2', quantity: 1 }] }))).status, 201);
   assert.equal(await stockOf('P-2'), p2 - 1);
+});
+
+// Eski anahtar uyumu (satış izni eklenmeden önce oluşturulmuş, izin alanı olmayan anahtar): daha önce satış bildirdiyse devam eder ve
+// izin kalıcı olarak açık kaydedilir; hiç satış bildirmemişse yalnız okur; izin açıkça kapalıysa her zaman reddedilir. Günlük sınır
+// anahtar başına, isteğe bağlı (varsayılan sınırsız)
+test('stok API (ana panel): eski anahtar uyumu ve anahtar başına isteğe bağlı günlük sınır', async () => {
+  resetChannels();
+  const { env, call } = setup();
+  const X0 = (key) => (path, opts = {}) => worker.fetch(new Request('https://panel.test/api/v1/' + path, { ...opts, headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', Authorization: 'Bearer ' + key } }), env, { waitUntil() {} });
+  const O = call('owner');
+  await O('/api/login', J({ password: 'x-123456' }));
+  await O('/api/settings', J({ stock_sync: true }, 'PUT'));
+  await O('/api/products', J({ name: 'Çok stoklu', sku: 'Z-1', sale_price: 10, stock: 30000 }));
+  const stockOf = async (sku) => (await env.DB.prepare('SELECT stock FROM products WHERE sku = ?').bind(sku).first()).stock;
+  const stored = async (name) => ((await getRaw(env.DB, 'extapi_keys')) || []).find((x) => x.name === name);
+  // Eski anahtarı taklit et: izin alanını sil
+  const legacyOf = async (name) => { const l = await getRaw(env.DB, 'extapi_keys'); delete l.find((x) => x.name === name).write; await setSetting(env.DB, 'extapi_keys', l); };
+  const a = await (await O('/api/extapi', J({ name: 'Eski bayi', write: true }))).json();
+  const b = await (await O('/api/extapi', J({ name: 'Eski okuyucu' }))).json();
+  const A = X0(a.key), B = X0(b.key);
+  assert.equal((await A('sales', J({ ref: 'G-1', items: [{ sku: 'Z-1', quantity: 1 }] }))).status, 201);
+  await legacyOf('Eski bayi'); await legacyOf('Eski okuyucu');
+  assert.equal((await stored('Eski bayi')).write, undefined);
+  // Daha önce satış bildirmiş eski anahtar: izinli; ilk başarılı satışta izin kalıcı olarak açılır
+  let r = await A('sales', J({ ref: 'G-2', items: [{ sku: 'Z-1', quantity: 2 }] }));
+  assert.equal(r.status, 201, await r.clone().text());
+  assert.equal((await stored('Eski bayi')).write, true);
+  assert.equal((await (await O('/api/extapi')).json()).keys.find((x) => x.name === 'Eski bayi').write, true);
+  // İptal de aynı kural: eski anahtarla iptal (izin kalıcı açılır)
+  await legacyOf('Eski bayi');
+  assert.equal((await A('sales/G-2/cancel', J({}))).status, 200);
+  assert.equal((await stored('Eski bayi')).write, true);
+  assert.equal(await stockOf('Z-1'), 29999);
+  // Hiç satış bildirmemiş eski anahtar: yalnız okur (satış ve iptal 403), izin açılmaz; istemcinin iç parametreyi göndermesi işe yaramaz
+  r = await B('sales', J({ ref: 'H-1', items: [{ sku: 'Z-1', quantity: 1 }] }));
+  assert.equal(r.status, 403); assert.equal((await r.json()).code, 'readonly');
+  assert.equal((await B('sales/G-1/cancel', J({}))).status, 403);
+  assert.equal((await B('stock')).status, 200);
+  assert.equal((await stored('Eski okuyucu')).write, undefined);
+  // İzin açıkça kapalı: her zaman 403 (önceki satış olsa da)
+  await O('/api/extapi/' + a.keys[0].id, J({ write: false }, 'PUT'));
+  assert.equal((await A('sales', J({ ref: 'G-3', items: [{ sku: 'Z-1', quantity: 1 }] }))).status, 403);
+  assert.equal((await A('sales?_x_legacy=1', J({ ref: 'G-3', items: [{ sku: 'Z-1', quantity: 1 }] }))).status, 403);
+  assert.equal((await A('sales/G-1/cancel', J({}))).status, 403);
+  assert.equal(await stockOf('Z-1'), 29999);
+  // Günlük sınır yok (varsayılan): tek günde 20.000 adet, stok yettikçe kabul
+  const c = await (await O('/api/extapi', J({ name: 'Dropship', write: true }))).json();
+  assert.equal(c.keys.find((x) => x.name === 'Dropship').day_limit, null);
+  const C = X0(c.key);
+  assert.equal((await C('sales', J({ ref: 'Q-1', items: [{ sku: 'Z-1', quantity: 15000 }] }))).status, 201);
+  assert.equal((await C('sales', J({ ref: 'Q-2', items: [{ sku: 'Z-1', quantity: 5000 }] }))).status, 201);
+  assert.equal(await stockOf('Z-1'), 9999);
+  // Stoktan fazlası yine reddedilir
+  r = await C('sales', J({ ref: 'Q-3', items: [{ sku: 'Z-1', quantity: 10000 }] }));
+  assert.equal(r.status, 409); assert.equal((await r.json()).code, 'insufficient_stock');
+  // Günlük sınır 10 (yeni anahtarda verilir): 10 adet kabul, 11. adet 429; istemci iç parametreyle sınırı aşamaz
+  const d = await (await O('/api/extapi', J({ name: 'Sınırlı', write: true, day_limit: 10 }))).json();
+  assert.equal(d.keys.find((x) => x.name === 'Sınırlı').day_limit, 10);
+  const D = X0(d.key);
+  assert.equal((await D('sales', J({ ref: 'L-1', items: [{ sku: 'Z-1', quantity: 4 }] }))).status, 201);
+  assert.equal((await D('sales', J({ ref: 'L-2', items: [{ sku: 'Z-1', quantity: 6 }] }))).status, 201);
+  r = await D('sales?_x_day=0', J({ ref: 'L-3', items: [{ sku: 'Z-1', quantity: 1 }] }));
+  assert.equal(r.status, 429); const dl = await r.json(); assert.equal(dl.code, 'daily_limit'); assert.match(dl.error, /günlük sınırı 10 adet/);
+  assert.equal(await stockOf('Z-1'), 9989);
+  // Sınır kaldırılınca (boş) yeniden kabul
+  await O('/api/extapi/' + d.keys.find((x) => x.name === 'Sınırlı').id, J({ day_limit: '' }, 'PUT'));
+  assert.equal((await D('sales', J({ ref: 'L-3', items: [{ sku: 'Z-1', quantity: 1 }] }))).status, 201);
+});
+
+test('stok API (firma paneli): eski anahtar uyumu ve isteğe bağlı günlük sınır', async () => {
+  resetChannels();
+  const { env, call } = setup();
+  const O = call('owner'), A = call('a'), B = call('b');
+  await O('/api/login', J({ password: 'x-123456' }));
+  for (const [slug, who] of [['magaza-a', A], ['magaza-b', B]]) {
+    assert.equal((await O('/api/tenants', J({ slug, name: slug.toUpperCase(), admin_username: 'yon', admin_password: 'gizli-sifre-1' }))).status, 200);
+    assert.equal((await who('/api/login', J({ tenant: slug, username: 'yon', password: 'gizli-sifre-1' }))).status, 200);
+    assert.equal((await who('/api/settings', J({ stock_sync: true }, 'PUT'))).status, 200);
+    await who('/api/products', J({ name: 'Ürün', sku: 'T-1', sale_price: 10, stock: 30000 }));
+  }
+  const X0 = (key) => (path, opts = {}) => call('ext')('/api/v1/' + path, { ...opts, headers: { Authorization: 'Bearer ' + key, 'CF-Connecting-IP': '1.2.3.4' } });
+  const stockOf = async (X) => (await (await X('stock?sku=T-1')).json()).items[0].stock;
+  const apiRow = async (slug) => JSON.parse((await env.DB.prepare('SELECT api FROM tenants WHERE slug = ?').bind(slug).first()).api);
+  const ka = (await (await O('/api/tenants/magaza-a/api', J({ action: 'enable' }))).json()).key;
+  const kb = (await (await O('/api/tenants/magaza-b/api', J({ action: 'enable' }))).json()).key;
+  const XA = X0(ka), XB = X0(kb);
+  // A: önce izinle bir satış, sonra izin alanı silinir (eski anahtar)
+  await O('/api/tenants/magaza-a/api', J({ action: 'write', write: true }));
+  assert.equal((await XA('sales', J({ ref: 'W-1', items: [{ sku: 'T-1', quantity: 1 }] }))).status, 201);
+  await env.DB.prepare("UPDATE tenants SET api = json_remove(api, '$.write') WHERE slug = 'magaza-a'").run();
+  assert.equal((await apiRow('magaza-a')).write, undefined);
+  let r = await XA('sales', J({ ref: 'W-2', items: [{ sku: 'T-1', quantity: 2 }] }));
+  assert.equal(r.status, 201, await r.clone().text());
+  assert.equal((await apiRow('magaza-a')).write, true);
+  assert.equal((await (await O('/api/tenants/magaza-a/api')).json()).write, true);
+  // İptal de aynı kural
+  await env.DB.prepare("UPDATE tenants SET api = json_remove(api, '$.write') WHERE slug = 'magaza-a'").run();
+  assert.equal((await XA('sales/W-2/cancel', J({}))).status, 200);
+  assert.equal((await apiRow('magaza-a')).write, true);
+  assert.equal(await stockOf(XA), 29999);
+  // B: izin alanı hiç yok (yeni / eski anahtar), hiç satış yok → yalnız okur; iç parametre işe yaramaz
+  assert.equal((await apiRow('magaza-b')).write, undefined);
+  r = await XB('sales?_x_legacy=1', J({ ref: 'W-1', items: [{ sku: 'T-1', quantity: 1 }] }));
+  assert.equal(r.status, 403); assert.equal((await r.json()).code, 'readonly');
+  assert.equal((await XB('sales/W-1/cancel', J({}))).status, 403);
+  assert.equal((await apiRow('magaza-b')).write, undefined);
+  assert.equal(await stockOf(XB), 30000);
+  // Açıkça kapalı: önceki satış olsa da 403
+  await O('/api/tenants/magaza-a/api', J({ action: 'write', write: false }));
+  assert.equal((await XA('sales', J({ ref: 'W-3', items: [{ sku: 'T-1', quantity: 1 }] }))).status, 403);
+  assert.equal((await XA('sales?_x_legacy=1', J({ ref: 'W-3', items: [{ sku: 'T-1', quantity: 1 }] }))).status, 403);
+  await O('/api/tenants/magaza-a/api', J({ action: 'write', write: true }));
+  // Günlük sınır yok (varsayılan): tek günde 20.000 adet
+  assert.equal((await (await O('/api/tenants/magaza-a/api')).json()).day_limit, null);
+  assert.equal((await XA('sales', J({ ref: 'Q-1', items: [{ sku: 'T-1', quantity: 15000 }] }))).status, 201);
+  assert.equal((await XA('sales', J({ ref: 'Q-2', items: [{ sku: 'T-1', quantity: 5000 }] }))).status, 201);
+  assert.equal(await stockOf(XA), 9999);
+  // Günlük sınır 10 (B): 10 adet kabul, 11. adet 429; firma yöneticisi sınırı değiştiremez; istemci iç parametreyle aşamaz
+  assert.ok([403, 404].includes((await B('/api/tenants/magaza-b/api', J({ action: 'day_limit', day_limit: 0 }))).status));
+  assert.equal((await O('/api/tenants/magaza-b/api', J({ action: 'day_limit', day_limit: -3 }))).status, 400);
+  assert.equal((await (await O('/api/tenants/magaza-b/api', J({ action: 'day_limit', day_limit: 10 }))).json()).api.day_limit, 10);
+  await O('/api/tenants/magaza-b/api', J({ action: 'write', write: true }));
+  assert.equal((await XB('sales', J({ ref: 'L-1', items: [{ sku: 'T-1', quantity: 10 }] }))).status, 201);
+  r = await XB('sales?_x_day=0', J({ ref: 'L-2', items: [{ sku: 'T-1', quantity: 1 }] }));
+  assert.equal(r.status, 429); const dl = await r.json(); assert.equal(dl.code, 'daily_limit'); assert.match(dl.error, /günlük sınırı 10 adet/);
+  assert.equal(await stockOf(XB), 29990);
+  // Sınır kaldırılınca kabul
+  assert.equal((await (await O('/api/tenants/magaza-b/api', J({ action: 'day_limit', day_limit: '' }))).json()).api.day_limit, null);
+  assert.equal((await XB('sales', J({ ref: 'L-2', items: [{ sku: 'T-1', quantity: 1 }] }))).status, 201);
 });
