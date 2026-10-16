@@ -145,7 +145,8 @@ test('eksik zorunlu özellik ürün adından / kategorisinden kesin algılanır 
     assert.deepEqual(by.A15.missing, [], JSON.stringify(by.A15));
     assert.deepEqual(by.A15.auto.map((a) => `${a.name}=${a.value}`).sort(), ['Miktar=15 kg', 'Ürün Tipi=Katı']);
     assert.deepEqual(by.A1T.missing, ['Miktar'], 'iki ölçülü üründe Miktar seçilmez');
-    assert.deepEqual(by.ASET.missing, []); assert.ok(by.ASET.auto.some((a) => a.name === 'Marka' && a.value === 'HasTürk'));
+    // Set ürününde addaki ölçü setin tamamını anlatmayabilir: Miktar seçilmez; Ürün Tipi kategoriden, marka addan
+    assert.deepEqual(by.ASET.missing, ['Miktar']); assert.ok(by.ASET.auto.some((a) => a.name === 'Marka' && a.value === 'HasTürk'));
   } finally { globalThis.fetch = real; resetChannels(); }
 });
 
@@ -158,4 +159,71 @@ test('açıklama temizliği: Word / Office etiketleri silinir, temel biçim ve m
   assert.equal(c, '<p>·Kök gelişimi</p> <ul><li>Toprak</li></ul><p>Türkiye</p><a>a</a><a href="https://h.com/x">b</a><img src="https://h.com/i.jpg">');
   assert.equal(cleanHtml('Düz metin, <b>kalın</b>'), 'Düz metin, <b>kalın</b>');
   assert.equal(cleanHtml(null), '');
+});
+
+test('ölçü algılama: karma değer seçilmez, çoklu paket / koli, aynı ölçünün farklı yazımı, set ve seçenekli ürün belirsiz', async () => {
+  const { inferValue } = await import('../src/catalog.js');
+  const L = (arr) => arr.map((value, i) => ({ id: 'v' + i, value }));
+  // "10 lt / H - 5 Bar" yalnız ölçü değil (debi + basınç): tank hacmi 10 Lt olan pompaya seçilmez
+  const bar = L(['10 lt / H - 5 Bar', '5 lt / H - 10 Bar', '0.5 lt / 5 Bar']);
+  assert.equal(inferValue(bar, { name: 'Delta 10 Lt Basınçlı İlaçlama Pompası' }), null);
+  const birim = L(['85 gr', '400 gr', '1.5 kg', '1500 gr', '15 kg', '3 x 5 gr', '12 x 400 gr', '6 x 400gr', '2 kg + 2 adet Pouch Hediye', '15kg - 100 gr', '5 gr']);
+  assert.equal(inferValue(birim, { name: 'Kedi Maması 15 Kg' }).value, '15 kg');
+  assert.equal(inferValue(birim, { name: 'Kedi Maması 1,5 Kg' }).value, '1.5 kg', 'aynı ölçünün iki yazımı: ürünle aynı sayı');
+  assert.equal(inferValue(birim, { name: 'Kedi Ödül Çubuğu 3X5 Gr' }).value, '3 x 5 gr', 'çoklu paket birebir');
+  assert.equal(inferValue(birim, { name: 'Kedi Ödül 5 gr' }).value, '5 gr', 'tek ölçü çoklu pakete gitmez');
+  assert.equal(inferValue(birim, { name: 'Kedi Konservesi 400 Gr - 12 Adet' }).value, '12 x 400 gr', 'koli');
+  assert.equal(inferValue(birim, { name: 'Kedi Konservesi 400 Gr - 6 Adet' }).value, '6 x 400gr');
+  assert.equal(inferValue(birim, { name: 'Kedi Konservesi 400 Gr - 4 Adet' }), null, 'koli listede yok');
+  assert.equal(inferValue(birim, { name: 'Sıvı Kedi Ödülü 3x5 Grx12 Paket' }), null, 'paketlerin kolisi: 3 x 5 gr değil');
+  assert.equal(inferValue(L(['6 Adet', '12 Adet', '400 gr', '6 x 400 gr']), { name: 'Köpek Konservesi 400 Grx6 Adet' }).value, '6 x 400 gr', 'bitişik x');
+  assert.equal(inferValue(L(['6 Adet', '12 Adet', '400 gr']), { name: 'Köpek Konservesi 400 Grx6 Adet' }), null);
+  assert.equal(inferValue(L(['12 Adet', '5 x 14 gr', '14 gr']), { name: 'Sıvı Ödül 5x14 Grx12 Adet' }), null);
+  assert.equal(inferValue(L(['5 gr', '50 adet', '10 gr']), { name: 'Domates Tohumu 5 Gr (50 Adet)' }), null, 'ölçü + adet, paket değeri yok: belirsiz');
+  const miktar = L(['20 lt', '1 lt', '5 kg', '20 kg']);
+  assert.equal(inferValue(miktar, { name: 'Kaktüs Bakım Seti – 20 LT Toprak + Bitki Besini Kampanyası' }), null, 'set / kampanya');
+  assert.equal(inferValue(miktar, { name: 'Gübre 20 Kg + 1 Lt Hediye' }), null);
+  assert.equal(inferValue(miktar, { name: 'Bitki Besini', variant_name: '1 Lt' }).value, '1 lt', 'varyant her zaman kullanılır');
+  // Renk: "Seçilebilir Renk … Ücretsiz Toprak" adında "Toprak" rengi seçilmez; varyanttaki renk seçilir
+  const renk = L(['Siyah', 'Gri', 'Toprak', 'Mavi', 'Beyaz']);
+  assert.equal(inferValue(renk, { name: 'UFO Saksı | Seçilebilir Renk, Bitkiye Özel Ücretsiz Toprak' }), null);
+  assert.equal(inferValue(renk, { name: 'UFO Saksı | Seçilebilir Renk', variant_name: 'Gri' }).value, 'Gri');
+  assert.equal(inferValue(renk, { name: 'Line Saksı Koyu Gri' }).value, 'Gri');
+  // Set / "+" içeren adda tek değer: kategori de aynısını söylüyorsa seçilir
+  const pet = L(['Kedi', 'Köpek']);
+  assert.equal(inferValue(pet, { name: 'Tavuklu Pate + Et Parçacıklı (Kısırlaştırılmış Kedi) 400 Gr', category: 'Kedi Ürünleri > Kedi Konserve Maması' }).value, 'Kedi');
+  assert.equal(inferValue(pet, { name: 'Kedi Tasması + Köpek Tasması Seti', category: 'Evcil Hayvan > Tasma' }), null);
+  assert.equal(inferValue(L(['Sebze Tohumu', 'Çiçek Tohumu']), { name: 'Ekim Ayı Sebze Tohumu Seti', category: 'Tohumlar > Aylık Tohum Setleri' }), null);
+});
+
+test('Pazarama: markası Pazarama\'da olmayan ürün "veri bulunamadı" hatasıyla düşmez, marka eksik olarak gösterilir', async () => {
+  const db = d1(); await init(db); resetChannels();
+  const env = { PANEL_PASSWORD: 'x-123456', PANEL_SECRET: 's'.repeat(32), DB: db };
+  const t = Date.now(), cat = 'Saksılar';
+  await run(db, `INSERT INTO products (sku, barcode, name, brand, category, image, sale_price, vat, desi, stock, created_at, updated_at) VALUES ('S1', '8691', 'Yuvarlak Saksı', 'Bilinmeyen Marka', ?, 'https://cdn.ornek.com/a.webp', 100, 20, 1, 3, ?, ?)`, cat, t, t);
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.startsWith('https://panel.test')) return real(url, opts);
+    const J = (b) => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
+    if (/connect\/token/.test(u)) return J({ data: { accessToken: 'tok', expiresIn: 3600 } });
+    if (/getCategoryTree/.test(u)) return J({ data: [{ id: G(3), parentCategories: ['Bahçe'], name: 'Saksı', leaf: true }] });
+    if (/getCategoryWithAttributes/.test(u)) return J({ data: { attributes: [] } });
+    if (/brand\/getBrands/.test(u)) return J({ data: null, success: false, messageCode: 'CAT_60', message: 'Listelenecek veri bulunamadı!', userMessage: 'Listelenecek veri bulunamadı!' });
+    return J({ data: [] });
+  };
+  try {
+    let cookie = '';
+    const call = async (path, o = {}) => {
+      const r = await worker.fetch(new Request('https://panel.test/api/' + path, { ...o, headers: { 'Content-Type': 'application/json', Cookie: cookie } }), env, { waitUntil() {} });
+      if (r.headers.get('set-cookie')) cookie = r.headers.get('set-cookie').split(';')[0];
+      return r.json();
+    };
+    await call('login', { method: 'POST', body: JSON.stringify({ password: 'x-123456' }) });
+    await call('integrations/pazarama', { method: 'PUT', body: JSON.stringify({ values: { PAZARAMA_CLIENT_ID: 'id', PAZARAMA_CLIENT_SECRET: 'sec' } }) });
+    await setSetting(db, 'verified:pazarama', { at: Date.now() + 1000 }); resetChannels();
+    await call('catalog/map', { method: 'POST', body: JSON.stringify({ local: cat, channel: 'pazarama', remote_id: G(3), remote_name: 'Saksı', attrs: {} }) });
+    const cand = await call('catalog/candidates?channel=pazarama&local=' + encodeURIComponent(cat));
+    assert.deepEqual(cand.items[0].missing, ["marka “Bilinmeyen Marka” Pazarama'da bulunamadı"]);
+  } finally { globalThis.fetch = real; resetChannels(); }
 });

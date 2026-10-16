@@ -20,6 +20,8 @@ const STOP = new Set(['ve', 'ile', 'icin', 'the', 'and', 'of', 'x', 'adet', 'li'
 const KSTOP = new Set(['ve', 'ile', 'icin', 'the', 'and', 'of', 'yeni', 'urun', 'orijinal']);
 
 // 1000 g = 1 kg, 0,25 kg = 250 g (canonical: smallest integer-friendly unit)
+// Metinden ölçüler çıkarılınca kalan (ör. "10 lt / H - 5 Bar" → " / h - 5 bar"): değerin yalnız ölçüden oluşup oluşmadığını anlamak için
+export const withoutQty = (s) => norm(s).replace(new RegExp(QRE.source, 'g'), ' ');
 export function quantities(s) {
   const out = new Set();
   let m;
