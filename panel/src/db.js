@@ -81,6 +81,12 @@ const SCHEMA = [
   // Geçmiş sipariş aktarımı (kanal başına, parça parça ilerler)
   `CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, channel TEXT NOT NULL, from_ms INTEGER NOT NULL, to_ms INTEGER NOT NULL, cursor_ms INTEGER NOT NULL,
     status TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, error TEXT, created_at INTEGER, updated_at INTEGER)`,
+  // Her açılışta (yoksa) oluşturulur: bu tablolar bir sürümde göç listesinin ARASINA eklendiği için o tarihte güncel olan panellerde
+  // göç adımı atlanmıştı (tablo hiç oluşmadı; Stok API satışı, ürün silme kaydı ve sonraki göçler hata verdi). Göç listesi yalnız SONA eklenir.
+  'CREATE TABLE IF NOT EXISTS deleted_products (id INTEGER PRIMARY KEY, sku TEXT, barcode TEXT, at INTEGER NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS ext_sales (src TEXT NOT NULL, ref TEXT NOT NULL, product_id INTEGER NOT NULL, qty INTEGER NOT NULL, at INTEGER NOT NULL, cancelled_at INTEGER, PRIMARY KEY (src, ref, product_id))',
+  'CREATE TABLE IF NOT EXISTS ext_sale_refs (src TEXT NOT NULL, ref TEXT NOT NULL, tok TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (src, ref))',
+  'CREATE TABLE IF NOT EXISTS carrier_quotes (provider TEXT NOT NULL, ref TEXT NOT NULL, order_id TEXT NOT NULL, package_id INTEGER, package_no INTEGER, at INTEGER NOT NULL, PRIMARY KEY (provider, ref))',
 ];
 // Sonradan eklenen sütunlar (mevcut veritabanlarına eklenir; zaten varsa hata yok sayılır)
 // YALNIZ SONA EKLEYİN: araya eklenen geçiş mevcut veritabanlarında hiç çalışmaz (bkz. init → schema_n; test/migrations.test.mjs)
@@ -429,7 +435,8 @@ export const MIGRATIONS = [
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
-export const TABLES = [...SCHEMA.concat(MIGRATIONS).join('\n').matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
+// (bir tablo hem temel şemada hem göçte geçebilir: tekrarlar atılır, sıra son geçtiği yere göredir — taşıma sırası değişmesin)
+export const TABLES = [...SCHEMA.concat(MIGRATIONS).join('\n').matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).filter((t, i, a) => a.lastIndexOf(t) === i);
 
 // Şema sürümü: tablo/sütun listesi değişince değişir. Veritabanı güncelse açılışta tek sorgu yapılır
 // (her yeni Worker örneğinde onlarca şema sorgusu çalıştırmamak için; sayfa geçişlerini hızlandırır).
