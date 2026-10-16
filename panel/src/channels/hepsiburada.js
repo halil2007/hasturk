@@ -493,14 +493,20 @@ export function hepsiburada(env, meta) {
     if (since) q.set('minModifiedAt', new Date(since).toISOString());
     const r = await hb(`${QNA}/issues?${q}`, { headers: qh() });
     const items = (g(r, 'data') || []).map((x) => {
-      const conv = g(x, 'conversations') || [];
-      const first = conv.find((c) => /customer/i.test(g(c, 'from') || '')) || {};
-      const ans = conv.slice().reverse().find((c) => /merchant/i.test(g(c, 'from') || ''));
+      // Yazışma sırası tarihe göre: son mesaj satıcıdansa soru cevaplanmıştır (kanalın durum alanı geride kalabilir, ör. cevap onay
+      // beklerken); cevaptan sonra müşteri yeniden yazdıysa yeni mesaj "ek soru" olarak bekler
+      const conv = (g(x, 'conversations') || []).map((c, i) => ({ c, i, t: hbTime(g(c, 'createdAt')) || 0 })).sort((a, b) => a.t - b.t || a.i - b.i).map((e) => e.c);
+      const isCust = (c) => /customer|user/i.test(g(c, 'from') || ''), isMer = (c) => /merchant|seller/i.test(g(c, 'from') || '');
+      const first = conv.find(isCust) || {};
+      const ai = conv.findLastIndex(isMer), ans = ai >= 0 ? conv[ai] : null, follow = ai >= 0 ? conv.slice(ai + 1).filter(isCust) : [];
       const prod = g(x, 'product') || {}, subj = g(x, 'subject') || {};
-      const st = g(x, 'status');
+      const st = g(x, 'status'), mapped = QST[st] || 'other';
+      const status = mapped === 'rejected' ? mapped : ans && !follow.length ? 'answered' : follow.length ? 'waiting' : mapped;
+      const text = [str(g(first, 'content') || g(x, 'lastContent')), ...follow.map((c) => 'Ek soru: ' + str(g(c, 'content')))].filter(Boolean).join('\n\n');
       return {
-        remoteId: str(g(x, 'issueNumber') || g(x, 'id')), text: str(g(first, 'content') || g(x, 'lastContent')), askedAt: hbTime(g(x, 'createdAt')) || Date.now(),
-        status: QST[st] || 'other', remoteStatus: str(st), productName: [str(g(subj, 'description')), str(g(prod, 'name'))].filter(Boolean).join(' · '),
+        remoteId: str(g(x, 'issueNumber') || g(x, 'id')), text, askedAt: hbTime(g(x, 'createdAt')) || Date.now(),
+        lastAskedAt: follow.length ? hbTime(g(follow[follow.length - 1], 'createdAt')) || null : null,
+        status, remoteStatus: str(st), productName: [str(g(subj, 'description')), str(g(prod, 'name'))].filter(Boolean).join(' · '),
         productImage: str(g(prod, 'imageUrl')).replace('{size}', '300'), barcode: str(g(prod, 'sku')), sku: str(g(prod, 'stockCode')),
         customer: g(x, 'orderNumber') ? `Sipariş #${g(x, 'orderNumber')}` : '', answer: ans ? str(g(ans, 'content')) : null, answeredAt: ans ? hbTime(g(ans, 'createdAt')) || null : null,
         dueAt: hbTime(g(x, 'expireDate')) || null,
