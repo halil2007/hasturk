@@ -60,8 +60,14 @@ test('dış API: ana panel yetkilendirir; mağaza yalnız kendi stoklarını oku
   assert.equal((await (await ext(call, en.key, '/api/v1/ping')).json()).ok, true);
   // B'nin anahtarı yok: A'nın gizli kısmıyla B koduna istek reddedilir
   assert.equal((await ext(call, en.key.replace('magaza-a', 'magaza-b'))).status, 401);
-  // Yazma yok
-  assert.equal((await call('ext')('/api/v1/stock', { method: 'POST', body: '{}', headers: { Authorization: 'Bearer ' + en.key } })).status, 405);
+  // Stok listesine yazılmaz (yazma yalnız satış bildirimi); başka yöntem yok
+  assert.equal((await call('ext')('/api/v1/stock', { method: 'POST', body: '{}', headers: { Authorization: 'Bearer ' + en.key } })).status, 404);
+  assert.equal((await call('ext')('/api/v1/stock', { method: 'DELETE', headers: { Authorization: 'Bearer ' + en.key } })).status, 405);
+  // Firma panelinde satış bildirimi: kendi ürününün stoğu düşer; başka firmanın ürünü bulunamaz
+  const sale = (body) => call('ext')('/api/v1/sales', { method: 'POST', body: JSON.stringify(body), headers: { Authorization: 'Bearer ' + en.key, 'CF-Connecting-IP': '1.2.3.4' } });
+  let sr = await sale({ ref: 'WEB-1', items: [{ sku: 'A-1', quantity: 1 }] });
+  assert.equal(sr.status, 201, await sr.clone().text());
+  assert.equal((await sale({ ref: 'WEB-2', items: [{ sku: 'B-1', quantity: 1 }] })).status, 422);
   // IP kısıtı
   await O('/api/tenants/magaza-a/api', J({ action: 'ips', ips: '85.105.10.0/24' }));
   assert.equal((await ext(call, en.key, '/api/v1/stock', '1.2.3.4')).status, 403);
@@ -99,4 +105,81 @@ test('ana panelin kendi ürünleri: birden çok adlı anahtar, kapatma, silme, I
   await O('/api/extapi/' + id1, { method: 'DELETE' });
   assert.equal((await ext(call, k1.key)).status, 401);
   assert.equal((await ext(call, k1.key.replace(/.$/, 'x'))).status, 401);
+});
+
+// Bayi satışı: bayinin sitesinde satılan ürün stoktan düşer ve tüm kanallara gider; sipariş panele düşmez. Pasif / silinen ürün
+// "değişenler" çekiminde bildirilir (bayi satmayı bıraksın)
+test('stok API: satış bildirimi stok düşer (tekrar / aynı anda çift bildirimde bir kez), iptalde geri gelir, kanallara gider; pasif / silinen ürün bildirilir', async () => {
+  resetChannels();
+  const { env, call } = setup();
+  const pend = [];
+  const X0 = (key) => (path, opts = {}) => worker.fetch(new Request('https://panel.test/api/v1/' + path, { ...opts, headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', Authorization: 'Bearer ' + key } }), env, { waitUntil(p) { pend.push(p); } });
+  const O = call('owner');
+  await O('/api/login', J({ password: 'x-123456' }));
+  await O('/api/settings', J({ stock_sync: true }, 'PUT'));
+  await O('/api/products', J({ name: 'Domates Tohumu', sku: 'DT-1', barcode: '8690001', sale_price: 120, stock: 10 }));
+  await O('/api/products', J({ name: 'Biber Tohumu', sku: 'BT-1', sale_price: 90, stock: 5 }));
+  await O('/api/products', J({ name: 'Eski Ürün', sku: 'ES-1', sale_price: 50, stock: 3 }));
+  const id = async (sku) => (await env.DB.prepare('SELECT id FROM products WHERE sku = ?').bind(sku).first()).id;
+  // Trendyol'da aynı ürünün ilanı: bayi satışı Trendyol'a da stok olarak gider
+  await O('/api/integrations/trendyol', J({ values: { TRENDYOL_SELLER_ID: '123', TRENDYOL_API_KEY: 'k', TRENDYOL_API_SECRET: 's' } }, 'PUT'));
+  await env.DB.prepare("INSERT INTO listings (channel, remote_id, product_id, sku, barcode, name, pushed_stock, remote_stock) VALUES ('trendyol', '8690001', ?, 'DT-1', '8690001', 'Domates', 10, 10)").bind(await id('DT-1')).run();
+  const real = globalThis.fetch, ty = [];
+  globalThis.fetch = async (url, o = {}) => { if (/trendyol/.test(String(url))) { ty.push(o.body || ''); return new Response(JSON.stringify({ batchRequestId: 'b1' }), { headers: { 'Content-Type': 'application/json' } }); } return real(url, o); };
+  try {
+    const X = X0((await (await O('/api/extapi', J({ name: 'Bayi Örnek' }))).json()).key);
+    const stockOf = async (sku) => (await (await X('stock?sku=' + sku)).json()).items[0].stock;
+    const t0 = new Date(Date.now() - 1000).toISOString();
+    // Bilinmeyen ürün: hiçbir stok düşmez
+    let r = await X('sales', J({ ref: 'S-1', items: [{ sku: 'DT-1', quantity: 1 }, { sku: 'YOK', quantity: 1 }] }));
+    assert.equal(r.status, 422); assert.equal(await stockOf('DT-1'), 10);
+    assert.equal((await X('sales', J({ items: [{ sku: 'DT-1', quantity: 1 }] }))).status, 400);
+    assert.equal((await X('sales', J({ ref: 'S-1', items: [{ sku: 'DT-1', quantity: 0 }] }))).status, 400);
+    assert.equal((await X('sales', { method: 'POST', body: '{bozuk' })).status, 400);
+    // Satış: stok düşer (sku, barkod ya da id ile), Trendyol'a yeni stok gider
+    const body = { ref: 'S-1', items: [{ sku: 'DT-1', quantity: 2 }, { barcode: '8690001', quantity: 1 }, { id: await id('BT-1'), quantity: 1 }] };
+    r = await X('sales', J(body));
+    assert.equal(r.status, 201, await r.clone().text());
+    const o = await r.json();
+    assert.equal(o.created, true); assert.equal(o.sale.status, 'active');
+    assert.equal(await stockOf('DT-1'), 7); assert.equal(await stockOf('BT-1'), 4);
+    await Promise.allSettled(pend.splice(0));
+    assert.ok(ty.some((b) => /"barcode":"8690001","quantity":7/.test(b)), 'Trendyol: ' + ty.join(' | '));
+    // Tekrar (ağ hatası sonrası) ve aynı anda iki bildirim: stok bir kez düşer
+    r = await X('sales', J(body));
+    assert.equal(r.status, 200); assert.equal((await r.json()).created, false);
+    const both = await Promise.all([X('sales', J({ ref: 'S-2', items: [{ sku: 'DT-1', quantity: 1 }] })), X('sales', J({ ref: 'S-2', items: [{ sku: 'DT-1', quantity: 1 }] }))]);
+    assert.deepEqual(both.map((x) => x.status).sort(), [200, 201]);
+    assert.equal(await stockOf('DT-1'), 6);
+    // Aynı numara farklı adetle: reddedilir
+    assert.equal((await X('sales', J({ ref: 'S-1', items: [{ sku: 'DT-1', quantity: 9 }] }))).status, 409);
+    // Panelde: sipariş yok, ürünün stok hareketinde "Bayi satışı"
+    assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM orders').first()).n, 0);
+    const mv = await env.DB.prepare("SELECT delta, reason, ref FROM stock_moves WHERE product_id = ? AND reason = 'Bayi satışı'").bind(await id('DT-1')).all();
+    assert.equal(mv.results.reduce((a, x) => a + x.delta, 0), -4); assert.match(mv.results[0].ref, /Bayi Örnek #S-1/);
+    // İptal: stok geri gelir; ikinci iptal bir şey değiştirmez
+    r = await X('sales/S-1/cancel', J({}));
+    assert.equal(r.status, 200); assert.equal((await r.json()).sale.status, 'cancelled');
+    assert.equal(await stockOf('DT-1'), 9); assert.equal(await stockOf('BT-1'), 5);
+    await X('sales/S-1/cancel', J({}));
+    assert.equal(await stockOf('DT-1'), 9);
+    assert.equal((await X('sales/YOK/cancel', J({}))).status, 404);
+    assert.equal((await (await X('sales/S-2')).json()).sale.items[0].quantity, 1);
+    // Başka bayinin aynı numarası ayrı satış sayılır; bu bayinin satışını iptal edemez
+    const Y = X0((await (await O('/api/extapi', J({ name: 'Bayi 2' }))).json()).key);
+    assert.equal((await Y('sales/S-2/cancel', J({}))).status, 404);
+    assert.equal((await Y('sales', J({ ref: 'S-2', items: [{ sku: 'DT-1', quantity: 1 }] }))).status, 201);
+    assert.equal(await stockOf('DT-1'), 8);
+    // Değişenler çekimi: pasife alınan ürün stok 0 ile, silinen ürün "deleted" listesinde gelir; sonraki çekim zamanı verilir
+    await O('/api/products/' + (await id('BT-1')), J({ active: false }, 'PUT'));
+    await O('/api/products/' + (await id('ES-1')), { method: 'DELETE' });
+    const ch = await (await X('stock?updated_since=' + encodeURIComponent(t0))).json();
+    const bt = ch.items.find((x) => x.sku === 'BT-1');
+    assert.ok(bt, 'pasif ürün değişenlerde'); assert.equal(bt.active, false); assert.equal(bt.stock, 0);
+    assert.deepEqual(ch.deleted.map((x) => x.sku), ['ES-1']);
+    assert.ok(Date.parse(ch.next_since) < Date.parse(ch.generated_at));
+    // Tam liste: pasif ürün varsayılan olarak gelmez
+    assert.ok(!(await (await X('stock')).json()).items.some((x) => x.sku === 'BT-1'));
+    await Promise.allSettled(pend);
+  } finally { globalThis.fetch = real; }
 });

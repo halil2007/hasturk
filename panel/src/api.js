@@ -2292,6 +2292,8 @@ export async function deleteProducts(db, ids) {
       db.prepare(`UPDATE order_items SET product_id = NULL WHERE product_id IN (${qq})`).bind(...id),
       db.prepare(`DELETE FROM order_stock WHERE product_id IN (${qq})`).bind(...id),
       db.prepare(`DELETE FROM stock_moves WHERE product_id IN (${qq})`).bind(...id),
+        // Stok API: silinen ürün dış sisteme "silindi" olarak bildirilir (bayi satmaya devam etmesin; bkz. extapi.js)
+      db.prepare(`INSERT OR REPLACE INTO deleted_products (id, sku, barcode, at) SELECT id, sku, barcode, ? FROM products WHERE id IN (${qq})`).bind(Date.now(), ...id),
       db.prepare(`DELETE FROM products WHERE id IN (${qq})`).bind(...id),
     ]);
     deleted += rows.length;

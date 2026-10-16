@@ -74,9 +74,9 @@ export async function mainImage(env, req, id) {
   if (!(await mainOn(env))) { await init(env.DB); return serveImage(env.DB, req, id); }
   return toMain(env, new Request(req.url, { method: req.method, headers: req.headers.get('If-None-Match') ? { 'If-None-Match': req.headers.get('If-None-Match') } : {} }), `https://main.internal/__img/${id}`);
 }
-export async function mainExtApi(env, url, store, rkey) {
-  if (!(await mainOn(env))) return extApiInner(env.DB, url, store, rkey);
-  return toMain(env, new Request(url.href), url.href, { 'X-Ext-Store': encodeURIComponent(JSON.stringify(store)), 'X-Ext-Key': rkey });
+export async function mainExtApi(env, url, store, rkey, o = {}) {
+  if (!(await mainOn(env))) return extApiInner(env.DB, url, store, rkey, { method: o.method, body: o.raw ? JSON.parse(o.raw) : null, env, ctx: o.ctx });
+  return toMain(env, new Request(url.href, { method: o.method || 'GET', body: o.raw || undefined, headers: { 'Content-Type': 'application/json' } }), url.href, { 'X-Ext-Store': encodeURIComponent(JSON.stringify(store)), 'X-Ext-Key': rkey });
 }
 // Zamanlanmış senkron (Worker'ın zamanlayıcısından): ana panelin senkronu nesnede çalışır
 export async function mainCron(env, quick) {
@@ -245,7 +245,10 @@ export class MainPanel {
       await init(rdb);
       let store = { slug: 'ana-panel', name: 'Ana mağaza' };
       try { store = JSON.parse(decodeURIComponent(req.headers.get('X-Ext-Store') || '')) || store; } catch { /* varsayılan */ }
-      return extApiInner(rdb, url, store, req.headers.get('X-Ext-Key') || 'main');
+      // Taşıma sürerken (veritabanı salt okunur) satış yazılmaz
+      if (req.method !== 'GET' && !ok) return json({ error: 'Panel kısa bir bakımda; birkaç dakika sonra yeniden gönderin', code: 'busy' }, 503, { 'Retry-After': '60' });
+      return extApiInner(rdb, url, store, req.headers.get('X-Ext-Key') || 'main', { method: req.method, body: req.method === 'POST' ? await req.json().catch(() => null) : null,
+        env, ctx: { waitUntil: (p) => this.ctx.waitUntil(p) } });
     }
     if (!ok) {
       const st = (await this.ctx.storage.get('mig')) || {};

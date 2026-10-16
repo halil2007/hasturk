@@ -200,7 +200,7 @@ export async function settingsView(el) {
     if (!keys) keys = (await api('extapi', { fresh: true })).keys;
     const store = (state.settings && state.settings.company && state.settings.company.title) || 'Ana mağaza';
     render(box, html`<div class="row wrap" style="gap:10px;align-items:flex-start"><div style="flex:1;min-width:240px"><h2>Stok API (dış sistemlere stok aktarımı)</h2>
-        <div class="muted small" style="margin-top:4px">Bayiniz ya da kendi sisteminiz (ERP, site, muhasebe) panelinizdeki ürün ve stokları anahtarla okur; yazma yok. Her dış sistem için ayrı anahtar oluşturun, gerektiğinde tek tek kapatın. Firma panellerinin API'si Firmalar ekranından verilir.</div></div>
+        <div class="muted small" style="margin-top:4px">Bayiniz ya da kendi sisteminiz (ERP, site) ürün ve stokları anahtarla çeker; orada satılan ürünü bildirince stok düşer ve tüm kanallara gider (sipariş panele düşmez, ürünün stok hareketlerinde “Bayi satışı” görünür). Her dış sistem için ayrı anahtar oluşturun, gerektiğinde tek tek kapatın. Firma panellerinin API'si Firmalar ekranından verilir.</div></div>
         <button class="btn primary" data-api="new"><i class="ico ico-plus"></i>Yeni anahtar</button></div>
       ${keys.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Ad</th><th>Anahtar</th><th>IP kısıtı</th><th>Son erişim</th><th class="r">İstek</th><th>Durum</th><th></th></tr></thead><tbody>
         ${keys.map((k) => html`<tr data-kid="${k.id}"><td><b>${k.name}</b><div class="tiny muted">${dateTime(k.created_at)}${k.created_by ? ` · ${k.created_by}` : ''}</div></td><td class="num small">${k.hint}</td>

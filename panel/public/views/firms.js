@@ -214,7 +214,7 @@ export async function firmsView(el) {
   function apiCard(t2) {
     const a = t2.api || {};
     return html`<div class="card"><div class="card-head"><h3>Dış API (stok aktarımı)</h3><span class="pill ${a.on ? 'good' : ''}">${a.on ? 'Açık' : 'Kapalı'}</span></div>
-      <div class="muted small" style="margin-bottom:8px">Firmanın kendi sistemi (ERP, site, muhasebe) bu mağazanın ürün ve stoklarını okur. Yalnız bu mağaza; yazma yok. Firma yöneticisi bu ayarı göremez ve değiştiremez.</div>
+      <div class="muted small" style="margin-bottom:8px">Firmanın kendi sistemi (ERP, site) bu mağazanın ürün ve stoklarını çeker; orada satılanı bildirince stok düşer ve tüm kanallara gider (sipariş panele düşmez). Yalnız bu mağaza. Firma yöneticisi bu ayarı göremez ve değiştiremez.</div>
       ${a.hasKey ? html`<dl class="kv"><dt>Anahtar</dt><dd class="num">${a.hint}</dd><dt>Oluşturma</dt><dd>${a.created_at ? dateTime(a.created_at) : '—'}</dd>
         <dt>Son erişim</dt><dd>${a.last_at ? html`${ago(a.last_at)}${a.last_ip ? html` <span class="muted tiny">(${a.last_ip})</span>` : ''}` : 'henüz yok'}</dd><dt>Toplam istek</dt><dd>${n(a.calls || 0)}</dd></dl>` : ''}
       <label class="field" style="margin-top:8px"><span>İzin verilen IP adresleri (isteğe bağlı)</span><textarea class="input" rows="2" data-api-ips placeholder="Boş: her yerden · ör. 85.105.10.25, 85.105.10.0/24">${(a.ips || []).join(', ')}</textarea></label>

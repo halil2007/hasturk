@@ -3,10 +3,13 @@
 //  - Anahtar ana panelde (Firmalar → firma → Dış API) üretilir; yalnız bir kez gösterilir, veritabanında özeti saklanır.
 //  - Anahtar firma koduna bağlıdır: hst_<firma-kodu>_<gizli> → yalnız o firmanın paneline yönlendirilir.
 //  - Firmanın kendi yöneticisi açamaz / kapatamaz / anahtar üretemez. İsteğe bağlı IP kısıtı. Dakikada 120 istek.
-// Uç noktalar (GET, başlık: Authorization: Bearer <anahtar>):
-//   /api/v1/ping                     bağlantı testi
-//   /api/v1/stock                    ürünler ve stoklar (sayfalı): page, limit (en fazla 1000), updated_since, sku, barcode, include_inactive
-import { first, run, init, getRaw, setSetting, getSettings } from './db.js';
+// Uç noktalar (başlık: Authorization: Bearer <anahtar>):
+//   GET  /api/v1/ping                bağlantı testi
+//   GET  /api/v1/stock               ürünler ve stoklar (sayfalı): page, limit (en fazla 1000), updated_since, sku, barcode, include_inactive
+//   POST /api/v1/sales               dış sistemde satılan ürün: stok düşer, tüm kanallara gider (sipariş panele düşmez; bayi kendisi gönderir)
+//   POST /api/v1/sales/{ref}/cancel  satış iptal / iade: stok geri gelir
+//   GET  /api/v1/sales/{ref}         bildirilen satışın durumu
+import { first, all, run, init, getRaw, setSetting, getSettings } from './db.js';
 import { json, str, fail } from './util.js';
 
 const enc = new TextEncoder();
@@ -85,8 +88,15 @@ export async function mainKeysApi(db, path, method, b, user) {
 }
 
 // Worker: anahtarı doğrula, firmanın paneline yönlendir. getTenant / forward tenants.js'ten verilir (döngüsel içe aktarmayı önlemek için)
-export async function extApi(req, env, ctx, path, { getTenant, forward, expired, mainInner = (e, u, s, k) => extApiInner(e.DB, u, s, k) }) {
-  if (req.method !== 'GET') return err(405, 'Yalnız GET desteklenir', 'method');
+export async function extApi(req, env, ctx, path, { getTenant, forward, expired, mainInner = (e, u, s, k, o) => extApiInner(e.DB, u, s, k, { ...o, env: e, body: o && o.raw ? JSON.parse(o.raw) : null }) }) {
+  if (!['GET', 'POST'].includes(req.method)) return err(405, 'Yalnız GET ve POST desteklenir', 'method');
+  // POST gövdesi (satış bildirimi; JSON, en fazla 256 KB) burada okunur, firmanın paneline aynen iletilir
+  let raw = null;
+  if (req.method === 'POST') {
+    raw = await req.text();
+    if (raw.length > 256e3) return err(413, 'Gövde en fazla 256 KB olabilir', 'body');
+    try { JSON.parse(raw || 'null'); } catch { return err(400, 'Gövde geçerli JSON olmalı', 'body'); }
+  }
   const auth = req.headers.get('Authorization') || '', key = (/^Bearer\s+(.+)$/i.exec(auth) || [])[1] || req.headers.get('X-Api-Key') || '';
   // Ana panelin kendi mağazası (hsm_ anahtarı): ürünler ana veritabanından
   const mk = MAIN_KEY.exec(key.trim());
@@ -108,7 +118,8 @@ export async function extApi(req, env, ctx, path, { getTenant, forward, expired,
     const st = await getSettings(env.DB);
     const url = new URL(req.url);
     // Ürünler ana panelin kendi veritabanından (nesnede, bkz. mainpanel.js)
-    return mainInner(env, new URL('https://main.internal/__api/' + path.replace(/^v1\/?/, '') + url.search), { slug: 'ana-panel', name: (st.company && st.company.title) || 'Ana mağaza' }, 'main:' + k.id);
+    return mainInner(env, new URL('https://main.internal/__api/' + path.replace(/^v1\/?/, '') + url.search), { slug: 'ana-panel', name: (st.company && st.company.title) || 'Ana mağaza', key: k.id, source: k.name }, 'main:' + k.id,
+      { method: req.method, raw, ctx });
   }
   const m = /^hst_([a-z0-9-]{3,32})_[A-Za-z0-9]{32}$/.exec(key.trim());
   if (!m) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
@@ -128,40 +139,142 @@ export async function extApi(req, env, ctx, path, { getTenant, forward, expired,
   }
   seen.set(t.slug, s);
   const url = new URL(req.url);
-  return forward(new Request('https://tenant.internal/__api/' + path.replace(/^v1\/?/, '') + url.search, { method: 'GET' }), env, t);
+  return forward(new Request('https://tenant.internal/__api/' + path.replace(/^v1\/?/, '') + url.search, { method: req.method, body: raw, headers: { 'Content-Type': 'application/json' } }), env, t);
 }
 
 // Müşteri panelinin (Durable Object) içinde: kendi veritabanından ürün ve stok
 const rate = new Map();
-export async function extApiInner(db, url, store, rkey = store.slug) {
+// ---------- satış bildirimi: dış sistemde (bayinin sitesi) satılan ürün panelin stoğundan düşer ----------
+// Sipariş panele düşmez (bayi siparişi kendisi yönetir ve gönderir); yalnız stok düşer, ürünün stok hareketlerinde "Bayi satışı" görünür
+// ve yeni stok tüm kanallara gider. Satış numarası (ref) anahtar başına tektir: aynı satış tekrar gelirse (ağ hatası sonrası yeniden
+// gönderim, aynı anda iki istek) stok ikinci kez düşmez. Her ürünün yazımları "bu satış daha önce işlenmedi" koşuluyla tek işlemdedir.
+const REF_RE = /^[A-Za-z0-9][A-Za-z0-9._\-/#]{0,63}$/;
+const nostore = { 'Cache-Control': 'no-store' };
+async function saleOut(db, src, ref) {
+  const rows = await all(db, 'SELECT s.product_id, s.qty, s.at, s.cancelled_at, p.sku, p.barcode, p.stock FROM ext_sales s LEFT JOIN products p ON p.id = s.product_id WHERE s.src = ? AND s.ref = ? ORDER BY s.product_id', src, ref);
+  if (!rows.length) return null;
+  return { ref, status: rows.every((r) => r.cancelled_at) ? 'cancelled' : 'active', created_at: new Date(Math.min(...rows.map((r) => r.at))).toISOString(),
+    items: rows.map((r) => ({ product_id: r.product_id, sku: r.sku || null, barcode: r.barcode || null, quantity: r.qty, stock: r.stock == null ? null : Math.max(0, r.stock) })) };
+}
+async function afterSale(db, opts, pids) {
+  await import('./handler.js').then((m) => m.bumpCache(db)).catch(() => {});
+  const settings = await getSettings(db).catch(() => ({}));
+  if (opts.env && opts.ctx && opts.ctx.waitUntil) opts.ctx.waitUntil(import('./sync.js').then((m) => m.pushStocks(opts.env, db, settings)).catch(() => {}));
+  const w = [];
+  if (!settings.stock_sync) w.push('Panelde stok senkronu kapalı: stok düştü ama kanallara gönderilmedi');
+  if (pids.length) for (const r of await all(db, `SELECT sku, name, stock FROM products WHERE id IN (${pids.map(() => '?').join(',')}) AND stock < 0`, ...pids)) w.push(`${r.sku || r.name}: stok yetmedi (stok ${r.stock}); satış kaydedildi`);
+  return w;
+}
+async function reportSale(db, src, store, b, opts) {
+  if (!b || typeof b !== 'object') return err(400, 'Gövde JSON olmalı', 'body');
+  const ref = str(b.ref ?? b.order_number).trim();
+  if (!REF_RE.test(ref)) return err(400, 'ref gerekli: satışın (siparişinizin) numarası; harf, rakam, . _ - / # (en fazla 64 karakter)', 'param');
+  // Ürün kimliği "id" (stok listesindeki) ya da "product_id" olarak verilebilir
+  const items = (Array.isArray(b.items) ? b.items : []).map((x) => (x && typeof x === 'object' ? { ...x, product_id: x.product_id ?? x.id } : x));
+  if (!items.length || items.length > 200) return err(400, 'items: 1–200 kalem olmalı', 'param');
+  for (const [i, x] of items.entries()) {
+    const q = Number(x && x.quantity);
+    if (!x || typeof x !== 'object' || !Number.isInteger(q) || q < 1 || q > 100000) return err(400, `items[${i}].quantity 1 ya da daha büyük tam sayı olmalı`, 'param');
+    if (!(Number(x.product_id) > 0) && !str(x.sku).trim() && !str(x.barcode).trim()) return err(400, `items[${i}]: product_id, sku ya da barcode gerekli`, 'param');
+  }
+  // Ürünler: kimlik (stok listesindeki id), stok kodu ya da barkod. Bulunamayan varsa hiçbir stok düşmez
+  const { itemResolver } = await import('./match.js');
+  const maps = await itemResolver(db);
+  const ids = items.map((x) => Number(x.product_id)).filter((x) => Number.isInteger(x) && x > 0);
+  const known = new Set(ids.length ? (await all(db, `SELECT id FROM products WHERE id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((r) => r.id) : []);
+  const want = new Map(), bad = [];
+  items.forEach((x, i) => {
+    const pid = Number(x.product_id) > 0 ? (known.has(Number(x.product_id)) ? Number(x.product_id) : null) : maps.resolve('api', { sku: str(x.sku), barcode: str(x.barcode) });
+    if (!pid) bad.push({ line: i + 1, product_id: x.product_id ?? null, sku: x.sku ?? null, barcode: x.barcode ?? null });
+    else want.set(pid, (want.get(pid) || 0) + Number(x.quantity));
+  });
+  if (bad.length) return json({ error: `${bad.length} kalemin ürünü bulunamadı; hiçbir stok düşmedi (ürünleri /stock ile alıp id ya da sku gönderin)`, code: 'unknown_items', items: bad }, 422, nostore);
+  // Aynı satış daha önce bildirildi: ürünler aynıysa aynen döner (stok yeniden düşmez), farklıysa reddedilir
+  const had = await all(db, 'SELECT product_id, qty FROM ext_sales WHERE src = ? AND ref = ?', src, ref);
+  if (had.length) {
+    const same = had.length === want.size && had.every((r) => want.get(r.product_id) === r.qty);
+    if (!same) return err(409, 'Bu satış numarası daha önce farklı ürün / adetle bildirildi; değiştirmek için önce iptal edip yeni numarayla bildirin', 'conflict');
+    return json({ ok: true, created: false, sale: await saleOut(db, src, ref), warnings: [] }, 200, nostore);
+  }
+  const t = Date.now(), label = `${store.source} #${ref}`.slice(0, 120), st = [];
+  const fresh = 'NOT EXISTS (SELECT 1 FROM ext_sales WHERE src = ? AND ref = ? AND product_id = ?)';
+  for (const [pid, q] of want) {
+    st.push(db.prepare(`UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ? AND ${fresh}`).bind(q, t, pid, src, ref, pid));
+    st.push(db.prepare(`INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) SELECT ?, ?, stock, 'Bayi satışı', ?, ? FROM products WHERE id = ? AND ${fresh}`).bind(pid, -q, label, t, pid, src, ref, pid));
+    st.push(db.prepare('INSERT OR IGNORE INTO ext_sales (src, ref, product_id, qty, at) VALUES (?, ?, ?, ?, ?)').bind(src, ref, pid, q, t));
+  }
+  await db.batch(st);
+  const warnings = await afterSale(db, opts, [...want.keys()]);
+  return json({ ok: true, created: true, sale: await saleOut(db, src, ref), warnings }, 201, nostore);
+}
+async function cancelSale(db, src, ref, store, opts) {
+  const rows = await all(db, 'SELECT product_id, qty, cancelled_at FROM ext_sales WHERE src = ? AND ref = ?', src, ref);
+  if (!rows.length) return err(404, 'Bu numarayla bildirilmiş satış yok', 'notfound');
+  const t = Date.now(), label = `${store.source} #${ref}`.slice(0, 120), st = [];
+  const open = 'EXISTS (SELECT 1 FROM ext_sales WHERE src = ? AND ref = ? AND product_id = ? AND cancelled_at IS NULL)';
+  for (const r of rows.filter((x) => !x.cancelled_at)) {
+    st.push(db.prepare(`UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ? AND ${open}`).bind(r.qty, t, r.product_id, src, ref, r.product_id));
+    st.push(db.prepare(`INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) SELECT ?, ?, stock, 'Bayi satışı iptal', ?, ? FROM products WHERE id = ? AND ${open}`).bind(r.product_id, r.qty, label, t, r.product_id, src, ref, r.product_id));
+    st.push(db.prepare('UPDATE ext_sales SET cancelled_at = ? WHERE src = ? AND ref = ? AND product_id = ? AND cancelled_at IS NULL').bind(t, src, ref, r.product_id));
+  }
+  if (st.length) await db.batch(st);
+  const warnings = st.length ? await afterSale(db, opts, []) : [];
+  return json({ ok: true, sale: await saleOut(db, src, ref), warnings }, 200, nostore);
+}
+
+export async function extApiInner(db, url, store, rkey = store.slug, opts = {}) {
   const now = Date.now(), r = rate.get(rkey) || { at: now, n: 0 };
   if (now - r.at > 60e3) { r.at = now; r.n = 0; }
   r.n++; rate.set(rkey, r);
   if (r.n > 120) return err(429, 'Dakikada en fazla 120 istek', 'rate');
   const p = url.pathname.replace(/^\/__api\/?/, '').replace(/\/+$/, ''), q = Object.fromEntries(url.searchParams);
+  const method = opts.method || 'GET';
+  // Satış bildirimi (anahtar başına ayrı numara alanı: iki bayinin aynı numarası karışmaz)
+  const src = str(store.key || 'site').replace(/[^a-z0-9-]/gi, '') || 'site';
+  store = { ...store, source: str(store.source || store.name || 'API') };
+  if (p === 'sales' && method === 'POST') return reportSale(db, src, store, opts.body, opts);
+  const sm = /^sales\/([^/]+)(\/cancel)?$/.exec(p);
+  if (sm) {
+    const ref = decodeURIComponent(sm[1]);
+    if (!REF_RE.test(ref)) return err(400, 'Satış numarası geçersiz', 'param');
+    if (sm[2] && method === 'POST') return cancelSale(db, src, ref, store, opts);
+    if (!sm[2] && method === 'GET') { const x = await saleOut(db, src, ref); return x ? json({ sale: x }, 200, nostore) : err(404, 'Bu numarayla bildirilmiş satış yok', 'notfound'); }
+  }
+  if (method !== 'GET') return err(404, 'Uç nokta bulunamadı (yazma yalnız POST /sales ve /sales/{ref}/cancel)', 'notfound');
   if (p === 'ping') return json({ ok: true, store: { code: store.slug, name: store.name }, time: new Date().toISOString() }, 200, { 'Cache-Control': 'no-store' });
   if (p === 'stock') {
     const where = [], args = [];
-    if (q.include_inactive !== '1') where.push('p.active = 1');
+    let since = null;
+    if (q.updated_since) {
+      since = /^\d+$/.test(q.updated_since) ? Number(q.updated_since) : Date.parse(q.updated_since);
+      if (!Number.isFinite(since)) return err(400, 'updated_since geçersiz (ISO tarih ya da milisaniye)', 'param');
+    }
+    // Değişenler çekiminde pasife alınan ürün de gelir (stok 0, active false): bayi satmayı bıraksın
+    if (q.include_inactive !== '1' && since == null) where.push('p.active = 1');
     if (q.sku) { where.push('p.sku = ?'); args.push(str(q.sku)); }
     if (q.barcode) { where.push('p.barcode = ?'); args.push(str(q.barcode)); }
-    if (q.updated_since) {
-      const t = /^\d+$/.test(q.updated_since) ? Number(q.updated_since) : Date.parse(q.updated_since);
-      if (!Number.isFinite(t)) return err(400, 'updated_since geçersiz (ISO tarih ya da milisaniye)', 'param');
-      where.push('p.updated_at > ?'); args.push(t);
-    }
+    if (since != null) { where.push('p.updated_at > ?'); args.push(since); }
     const limit = Math.min(1000, Math.max(1, Number(q.limit) || 500)), page = Math.max(1, Number(q.page) || 1);
     const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const [total, rows] = await Promise.all([
+    const now = Date.now();
+    const [total, rows, gone] = await Promise.all([
       first(db, `SELECT COUNT(*) AS n FROM products p ${W}`, ...args),
       db.prepare(`SELECT p.id, p.sku, p.barcode, p.name, p.variant_name, p.group_name, p.brand, p.stock, p.sale_price, p.vat, p.active, p.updated_at FROM products p ${W} ORDER BY p.id LIMIT ? OFFSET ?`)
         .bind(...args, limit, (page - 1) * limit).all().then((x) => x.results || []),
+      // Silinen ürünler: yalnız değişenler çekiminde, ilk sayfada
+      since != null && page === 1 && !q.sku && !q.barcode
+        ? db.prepare('SELECT id, sku, barcode, at FROM deleted_products WHERE at > ? ORDER BY at LIMIT 5000').bind(since).all().then((x) => x.results || []).catch(() => [])
+        : [],
     ]);
     return json({
-      store: { code: store.slug, name: store.name }, page, limit, total: total.n, has_more: page * limit < total.n, generated_at: new Date().toISOString(),
+      store: { code: store.slug, name: store.name }, page, limit, total: total.n, has_more: page * limit < total.n, generated_at: new Date(now).toISOString(),
+      // Sonraki "değişenler" çekiminde kullanılacak zaman: bu yanıtın zamanından 2 dk önce (çekim sırasında değişen ürün kaçmasın)
+      next_since: new Date(now - 120e3).toISOString(),
       items: rows.map((x) => ({ id: x.id, sku: x.sku || null, barcode: x.barcode || null, name: x.name, variant: x.variant_name || null, group: x.group_name || null, brand: x.brand || null,
-        stock: Math.max(0, x.stock || 0), price: x.sale_price || 0, vat: x.vat ?? null, active: !!x.active, updated_at: x.updated_at ? new Date(x.updated_at).toISOString() : null })),
+        // Satılabilir stok: pasif üründe 0
+        stock: x.active ? Math.max(0, x.stock || 0) : 0, price: x.sale_price || 0, vat: x.vat ?? null, active: !!x.active, updated_at: x.updated_at ? new Date(x.updated_at).toISOString() : null })),
+      deleted: gone.map((x) => ({ id: x.id, sku: x.sku || null, barcode: x.barcode || null, stock: 0, deleted_at: new Date(x.at).toISOString() })),
     }, 200, { 'Cache-Control': 'no-store' });
   }
-  return err(404, 'Uç nokta bulunamadı (kullanılabilir: /api/v1/ping, /api/v1/stock)', 'notfound');
+  return err(404, 'Uç nokta bulunamadı (kullanılabilir: GET /ping, /stock, /sales/{ref}; POST /sales, /sales/{ref}/cancel)', 'notfound');
 }
