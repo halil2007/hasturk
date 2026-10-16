@@ -397,3 +397,59 @@ test('Kargonomi: pakete bölünmüş sipariş — her paket ayrı gönderi / eti
     assert.equal(s2.filter((p) => p.carrier_ref).length, 3);
   } finally { globalThis.fetch = real; }
 });
+
+test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (siteye takip), sonradan gelen takip kodu siteye yazılır, teslim edilince sitede not + panelde "Teslim edildi"; ayar kapalıysa yapılmaz', async () => {
+  const { trackCarriers } = await import('../src/carriers.js');
+  const real = globalThis.fetch, woo = [];
+  let st = 'webservice_order_created', tn = null;
+  globalThis.fetch = async (url, o = {}) => {
+    const u = String(url), m = o.method || 'GET', J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { 'Content-Type': 'application/json' } });
+    if (/magaza\.test/.test(u)) { woo.push(`${m} ${u.replace(/\?.*$/, '')} ${o.body || ''}`); return J(/notes/.test(u) ? { id: 1 } : /orders\/W9$/.test(u) ? { id: 'W9', status: 'completed' } : []); }
+    if (/\/states$/.test(u)) return J({ data: [{ id: 42, name: 'KONYA' }] });
+    if (/\/cities\/42$/.test(u)) return J({ data: [{ id: 600, name: 'SELÇUKLU' }] });
+    if (/\/warehouses$/.test(u)) return J({ data: [{ id: 1, is_main: 1 }] });
+    if (m === 'POST' && /\/shipments$/.test(u)) return J({ data: { id: 77, status: 'draft' } });
+    if (/confirm-shipping-price/.test(u)) return J({});
+    if (/\/shipments\/77\/barcode/.test(u)) return J({ data: { barcode: 'JVBERi0' + 'C'.repeat(150) } });
+    if (/\/shipments\/77$/.test(u)) return J({ data: { id: 77, status: st, shipping_webservice_tracking_code: tn, shipping_webservice_barcode: 'SB77', shipping_provider_name: 'Sürat Kargo', estimated_price: '40' } });
+    return new Response('?', { status: 404 });
+  };
+  try {
+    const { env, call, post } = await panel();
+    await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '03320000000', address: 'Sanayi Cd. 1', city: 'Selçuklu / Konya' });
+    await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'k' } }) });
+    await call('/api/integrations/woocommerce', { method: 'PUT', body: JSON.stringify({ values: { WOO_URL: 'https://magaza.test', WOO_KEY: 'ck_1', WOO_SECRET: 'cs_1' } }) });
+    await setSetting(env.DB, 'verified:woocommerce', { at: Date.now() + 1000 }); // bağlantı testi geçti (onaylı kanal)
+    const { resetChannels } = await import('../src/channels/index.js'); resetChannels();
+    await saveOrders(env.DB, 'woocommerce', [order('W9')]);
+    const id = encodeURIComponent('woocommerce:W9');
+    let r = await post(`/api/orders/${id}/carrier-label`, { provider: 'kargonomi', firm_id: '15' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const pkg = () => env.DB.prepare("SELECT status, tracking, barcode, carrier_state, label_format FROM packages WHERE order_id = 'woocommerce:W9'").first();
+    assert.deepEqual([(await pkg()).status, (await pkg()).label_format, (await pkg()).barcode], ['open', 'pdf', 'SB77'], 'etiket takip kodu beklenmeden alındı');
+    // Firma teslim aldı: kargoya verilir, siteye takip / durum gider
+    st = 'webservice_shipment_started'; tn = null;
+    let t = await trackCarriers(env, env.DB, { force: true });
+    assert.equal(t.shipped, 1, JSON.stringify(t));
+    assert.equal((await pkg()).status, 'shipped');
+    assert.ok(woo.some((x) => /PUT .*orders\/W9 .*completed/.test(x)), woo.join('\n'));
+    // Takip kodu sonradan geldi: siteye müşteri notu
+    tn = 'SRT123';
+    t = await trackCarriers(env, env.DB, { force: true });
+    assert.ok(woo.some((x) => /notes .*SRT123.*"customer_note":true/.test(x)), woo.join('\n'));
+    assert.equal((await pkg()).tracking, 'SRT123');
+    // Teslim edildi: sitede not, panelde sipariş teslim edildi
+    st = 'webservice_shipment_delivered';
+    t = await trackCarriers(env, env.DB, { force: true });
+    assert.ok(woo.some((x) => /notes .*teslim edildi/i.test(x)), woo.join('\n'));
+    assert.equal((await call(`/api/orders/${id}`)).body.order.status, 'delivered');
+    // Ayar kapalıysa siteye bildirilmez / kendiliğinden kargoya verilmez
+    await setSetting(env.DB, 'carrier_auto_ship', false);
+    await saveOrders(env.DB, 'woocommerce', [order('W10')]);
+    st = 'webservice_order_created'; tn = null;
+    await post(`/api/orders/${encodeURIComponent('woocommerce:W10')}/carrier-label`, { provider: 'kargonomi', firm_id: '15' });
+    st = 'webservice_shipment_started';
+    t = await trackCarriers(env, env.DB, { force: true });
+    assert.equal(t.shipped, 0);
+  } finally { globalThis.fetch = real; }
+});

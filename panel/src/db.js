@@ -543,6 +543,9 @@ export const DEFAULT_SETTINGS = {
   zpl_pdf: false,
   // Hepsiburada etiketi bizim tasarımla basılır (barkod / takip no Hepsiburada'dan); kapalıysa Hepsiburada'nın kendi etiketi
   label_own: true,
+  // Kargo entegratörü (Kargonomi…) gönderisi: firma paketi teslim alınca "Kargoya ver" kendiliğinden yapılır (siteye takip bilgisi gider),
+  // takip kodu sonradan gelirse siteye yazılır, teslim edilince sitede de "Teslim edildi" olur
+  carrier_auto_ship: true,
   // Kendi kargo etiketimizin boyutu: 100x150 (termal) | a5 | a4
   label_size: '100x150',
   // Kargo firması takip sayfaları ({no} = takip numarası). Kanal resmi takip bağlantısı verdiyse o kullanılır.

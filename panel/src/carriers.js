@@ -12,7 +12,8 @@
 //   label(pkg)                      → etiketi sonradan veren firmalarda (Kargonomi, Navlungo, DHL, Sürat) etiket
 // Firma bağlantıları src/carriers/<firma>.js'te. "ready: false": bağlantı henüz yok; bilgiler kaydedilebilir, gönderi açıklamayla reddedilir.
 import { loadConfig, describe } from './config.js';
-import { getRaw, setSetting, all, run, first, notify } from './db.js';
+import { getRaw, setSetting, getSettings, all, run, first, notify } from './db.js';
+import { getChannels } from './channels/index.js';
 import { HttpError, str, pool } from './util.js';
 import * as kargonomi from './carriers/kargonomi.js';
 import * as navlungo from './carriers/navlungo.js';
@@ -194,13 +195,18 @@ const TRACK_EVERY = 2 * 3600e3;
 export async function trackCarriers(env, db, { limit = 40, force = false } = {}) {
   const t = Date.now();
   const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.tracking, p.barcode, p.tracking_url, p.cargo_company, p.carrier_provider, p.carrier_ref, p.carrier_cost, p.carrier_state, p.desi,
-      o.status AS order_status, o.shipping_src FROM packages p JOIN orders o ON o.id = p.order_id
+      p.remote_id, p.agreement, o.status AS order_status, o.shipping_src, o.channel AS order_channel, o.remote_id AS order_remote FROM packages p JOIN orders o ON o.id = p.order_id
     WHERE p.carrier_provider IS NOT NULL AND p.carrier_provider != 'demo' AND p.carrier_ref IS NOT NULL
       AND COALESCE(p.carrier_state, '') NOT IN ('delivered', 'cancelled', 'failed') AND o.status NOT IN ('cancelled', 'returned', 'delivered')
       AND COALESCE(p.label_at, p.created_at, 0) >= ? AND (? OR COALESCE(p.carrier_checked_at, 0) < ?)
     ORDER BY COALESCE(p.carrier_checked_at, 0) LIMIT ?`, t - 30 * 86400e3, force ? 1 : 0, t - TRACK_EVERY, limit);
   if (!rows.length) return { checked: 0 };
-  const apis = {}, out = { checked: 0, delivered: 0, updated: 0, errors: 0 };
+  const apis = {}, out = { checked: 0, delivered: 0, updated: 0, errors: 0, shipped: 0, synced: 0 };
+  // Siteye otomatik bildirim (Ayarlar → Kargo: carrier_auto_ship): firma teslim alınca "Kargoya ver", sonradan gelen takip kodu,
+  // teslim edildi. Kanal hatası takibi durdurmaz (günlüğe yazılır, bir sonraki turda yeniden denenir)
+  const settings = await getSettings(db).catch(() => ({})), auto = settings.carrier_auto_ship !== false;
+  const chans = auto ? new Map((await getChannels(env, db).catch(() => [])).map((c) => [c.id, c])) : new Map();
+  const after = [];
   await pool(rows, 4, async (p) => {
     try {
       if (!(p.carrier_provider in apis)) apis[p.carrier_provider] = await carrierFor(env, db, p.carrier_provider).catch(() => null);
@@ -236,11 +242,37 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
           p.order_id, t, r.state, `Paket ${p.no}: ${c.name} · ${str(r.text) || (r.state === 'delivered' ? 'Teslim edildi' : 'İade')}`.slice(0, 300));
       }
       if (r.state === 'delivered') out.delivered++;
+      if (auto) after.push({ p, r, tn: tn || '', cn });
     } catch (e) {
       out.errors++;
       await run(db, 'UPDATE packages SET carrier_checked_at = ? WHERE id = ?', t, p.id);
     }
   });
+  // Kanala bildirim (sırayla: aynı siparişin paketleri kilitle işlenir)
+  for (const { p, r, tn, cn } of after) {
+    const ch = chans.get(p.order_channel);
+    const live = !['cancelled', 'returned', 'delivered'].includes(p.order_status);
+    try {
+      // Firma paketi teslim aldı (yolda / teslim edildi) ve paket hâlâ açık: "Kargoya ver" — takip bilgisi kanala gider
+      if (live && p.status === 'open' && ['transit', 'delivered'].includes(r.state) && r.state !== p.carrier_state) {
+        const { autoShip } = await import('./api.js');
+        await autoShip(env, db, p.order_id, p.id);
+        out.shipped++;
+        p.status = 'shipped';
+      } else if (ch && ch.enabled && ch.updateTracking && p.status === 'shipped' && tn && tn !== p.tracking) {
+        // Kargoya verildikten sonra gelen takip kodu kanala yazılır
+        await ch.updateTracking({ remote_id: p.order_remote, id: p.order_id }, { ...p, tracking: tn }, { tracking: tn, barcode: tn, cargoCompany: cn || p.cargo_company, trackingUrl: str(r.trackingUrl) || p.tracking_url });
+        out.synced++;
+      }
+      if (ch && ch.enabled && ch.markDelivered && r.state === 'delivered' && p.carrier_state !== 'delivered') {
+        const fresh = await first(db, 'SELECT id, no, status, remote_id, agreement, carrier_provider, tracking, barcode, cargo_company, tracking_url FROM packages WHERE id = ?', p.id);
+        await ch.markDelivered({ remote_id: p.order_remote, id: p.order_id }, fresh || p);
+        out.synced++;
+      }
+    } catch (e) {
+      await run(db, "INSERT INTO logs (at, channel, level, msg) VALUES (?, ?, 'warn', ?)", Date.now(), p.order_channel, `Paket ${p.no} (${p.order_id}): kargo durumu kanala bildirilemedi: ${String(e.message).slice(0, 300)}`).catch(() => {});
+    }
+  }
   // Kargoya verilmiş ve firmanın teslim ettiği siparişler: tüm paketleri teslim edildiyse sipariş "Teslim edildi"
   const done = await all(db, `SELECT o.id FROM orders o WHERE o.status = 'shipped' AND EXISTS (SELECT 1 FROM packages p WHERE p.order_id = o.id AND p.carrier_state = 'delivered')
     AND NOT EXISTS (SELECT 1 FROM packages p WHERE p.order_id = o.id AND (p.status != 'shipped' OR COALESCE(p.carrier_state, '') != 'delivered')) LIMIT 200`);

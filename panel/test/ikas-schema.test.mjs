@@ -40,6 +40,12 @@ test('ikas: tüm sorgu ve mutasyonlar resmi şemayla uyumlu (işlem, argüman, d
     const own = { ...pkg, remote_id: null, agreement: 'own', carrier_provider: 'kargonomi', tracking: 'KG1', cargo_company: 'Yurtiçi' };
     await ch.ownShipment(order, own, { tracking: 'KG1', cargoCompany: 'Yurtiçi' });
     await ch.ship(order, { ...own, remote_id: 'pk1' });
+    // Sonradan gelen takip kodu ve teslim edildi: entegratör paketinde ikas'a yazılır (ikas Kargo paketine yazılmaz)
+    const n0 = seen.size;
+    await ch.updateTracking(order, { ...pkg, status: 'shipped' }, { tracking: 'X' });
+    assert.equal(seen.size, n0, 'ikas Kargo paketine takip yazılmaz');
+    await ch.updateTracking(order, { ...own, remote_id: 'pk1', status: 'shipped' }, { tracking: 'KG2', cargoCompany: 'Sürat Kargo' });
+    await ch.markDelivered(order, { ...own, remote_id: 'pk1', status: 'shipped' });
   } finally { globalThis.fetch = real; }
   assert.ok(seen.size >= 13, `${seen.size} işlem`);
   assert.ok([...seen].some((q) => /fulfillOrder/.test(q)) && [...seen].some((q) => /updateOrderPackageStatus/.test(q)));

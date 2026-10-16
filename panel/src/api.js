@@ -287,6 +287,11 @@ async function acceptOrder(db, ch, o, user) {
   await event(db, o, 'accept', user);
 }
 
+// Kargo firması paketi teslim aldı (entegratör takibi, bkz. carriers.js trackCarriers): "Kargoya ver" sistem adına yapılır —
+// takip bilgisi siparişin kanalına (ikas, WooCommerce…) gider. Aynı siparişte aynı anda tek işlem (kilit).
+export async function autoShip(env, db, orderId, packageId) {
+  return exclusive(db, 'order:' + orderId, () => orderAction(env, db, orderId, 'ship', { package_id: packageId }, { waitUntil() {} }, { name: 'Sistem (kargo firması teslim aldı)', role: 'admin' }));
+}
 async function orderAction(env, db, id, action, b, ctx, user) {
   let o = await loadOrder(db, id);
   const ch = await channel(env, db, o.channel);

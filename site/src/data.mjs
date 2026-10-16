@@ -609,8 +609,8 @@ FEATURES.push({
     ['i-calc', 'Fiyatları görerek seçin', 'Her gönderide Kargonomi\'deki kargo firmalarının o gönderi için fiyatı listelenir; firmayı siz seçersiniz, sistem kendiliğinden seçmez.'],
     ['i-tag', 'Etiket ve takip numarası', 'Gönderi panelden açılır; Kargonomi etiketi (PDF) ve takip numarası pakete yazılır, yazdırırsınız.'],
     ['i-orders', 'Toplu gönderim', 'Siparişleri seçin, kargo firmasını seçin, tek seferde gönderin; etiketleri toplu yazdırın.'],
-    ['i-sync', 'Sitenize bildirim', '“Kargoya ver” dediğinizde takip numarası ve kargo firması sitenize (ikas, WooCommerce…) bildirilir; müşteriniz kargosunu takip eder.'],
-    ['i-eye', 'Teslimat takibi', 'Gönderinin durumu Kargonomi\'den sorgulanır; teslim edilen sipariş kendiliğinden “Teslim edildi” olur.'],
+    ['i-sync', 'Sitenize otomatik bildirim', 'Kargo firması paketi teslim alınca sipariş kendiliğinden “Kargoda” olur; takip numarası ve kargo firması sitenize (ikas, WooCommerce…) gider, müşteriniz kargosunu takip eder.'],
+    ['i-eye', 'Teslimat takibi', 'Gönderinin durumu Kargonomi\'den düzenli sorgulanır; teslim edilen sipariş panelde ve sitenizde kendiliğinden “Teslim edildi” olur.'],
     ['i-calc', 'Gerçek kargo maliyeti', 'Kargonomi\'nin kestiği ücret siparişin kargo giderine yazılır; kâr hesabınız doğru çıkar.'],
   ],
   steps: [
@@ -630,7 +630,7 @@ FEATURES.push({
     ['Kargo firmasını kim seçer?', 'Siz seçersiniz. Her gönderide Kargonomi\'deki firmaların o gönderi için fiyatı listelenir; sistem kendiliğinden (örneğin en ucuzu) seçmez. Toplu gönderimde tüm seçili siparişler için seçtiğiniz firma kullanılır.'],
     ['Pazaryeri siparişlerini Kargonomi ile gönderebilir miyim?', 'Hayır. Trendyol, Hepsiburada, N11 gibi pazaryerleri siparişi kendi anlaşmalı kargosuyla gönderir; bu siparişlerde Kargonomi seçeneği görünmez.'],
     ['Hangi pakette var?', 'Profesyonel ve Kurumsal pakette. Kurumsal pakette ayrıca Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo ile kendi anlaşmanızla doğrudan bağlantı vardır.'],
-    ['Takip numarası siteme gider mi?', 'Evet. Paketi “Kargoya ver” ile kapattığınızda takip numarası ve kargo firması sitenize bildirilir; ikas siparişinde paket ikas\'ta takip bilgisiyle açılır.'],
+    ['Takip numarası ve teslimat siteme kendiliğinden gider mi?', 'Evet. Kargo firması paketi teslim alınca panel “Kargoya ver”i kendisi yapar; takip numarası ve kargo firması sitenize gider (ikas\'ta paket “Kargoda” olur, müşteriye ikas bildirim gönderir; WooCommerce\'te sipariş tamamlanır ve müşteriye takip notu gider). Takip kodu sonradan gelirse o da siteye yazılır; teslim edilince ikas\'ta paket “Teslim edildi” olur. İsterseniz Ayarlar\'dan kapatabilirsiniz.'],
   ],
   related: ['kargo-entegrasyonu', 'kargo-ve-etiket', 'siparis-yonetimi'],
 });

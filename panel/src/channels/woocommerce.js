@@ -253,6 +253,16 @@ export function woocommerce(env, meta) {
     return {};
   }
 
+  // Takip kodu kargoya verdikten sonra geldi: müşteriye görünen not (Woo müşteriye e-posta gönderir)
+  async function updateTracking(order, pkg, { tracking, cargoCompany } = {}) {
+    if (pkg.status !== 'shipped' || !tracking) return;
+    await call(`/orders/${encodeURIComponent(order.remote_id)}/notes`, { method: 'POST', body: { note: [cargoCompany && `Kargo: ${cargoCompany}`, `Takip: ${tracking}`].filter(Boolean).join(' · '), customer_note: true } });
+  }
+  // Kargo firması teslim etti: sipariş zaten "Tamamlandı"; mağaza için (müşteriye gitmeyen) not düşülür
+  async function markDelivered(order, pkg) {
+    await call(`/orders/${encodeURIComponent(order.remote_id)}/notes`, { method: 'POST', body: { note: `Kargo teslim edildi${pkg.cargo_company ? ` (${pkg.cargo_company}${pkg.tracking ? ` · ${pkg.tracking}` : ''})` : ''}`, customer_note: false } });
+  }
+
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();
     const okAuth = await diagStep(out, 'WooCommerce bağlantısı', async () => {
@@ -278,6 +288,6 @@ export function woocommerce(env, meta) {
   return {
     ...meta, type: 'woocommerce', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: true, price: true, manualTracking: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, createProduct, storeCategories, diagnose,
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, ship, updateTracking, markDelivered, createProduct, storeCategories, diagnose,
   };
 }
