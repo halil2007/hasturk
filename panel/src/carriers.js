@@ -12,7 +12,7 @@
 //   label(pkg)                      → etiketi sonradan veren firmalarda (Kargonomi, Navlungo, DHL, Sürat) etiket
 // Firma bağlantıları src/carriers/<firma>.js'te. "ready: false": bağlantı henüz yok; bilgiler kaydedilebilir, gönderi açıklamayla reddedilir.
 import { loadConfig, describe } from './config.js';
-import { getRaw, setSetting, getSettings, all, run, first, notify } from './db.js';
+import { getRaw, setSetting, getSettings, all, run, first, notify, resolve } from './db.js';
 import { getChannels } from './channels/index.js';
 import { HttpError, str, pool } from './util.js';
 import * as kargonomi from './carriers/kargonomi.js';
@@ -136,6 +136,41 @@ export async function withAttempt(db, s) {
   } catch { return s; }
 }
 
+// ---------- fiyat teklifleri (Kargonomi taslak gönderisi) ----------
+// Teklif numarası (taslak gönderi) istemciden geri gelir: başka siparişin taslağı ya da başka paketin onaylı gönderisi olabilir. Teklif
+// açılırken numara sipariş + paketle sunucuda saklanır; carrier-label / carrier-quote-cancel yalnız o sipariş / pakete ait numarayı kabul eder.
+// Ayrı, kısa ömürlü tablo (ayarlara yazılmaz: ayarlar ekrana döner ve ana veritabanına yansır); ilk kullanımda oluşur, 2 günde temizlenir.
+export const QUOTE_RE = /^\d+$/;
+const QUOTE_TTL = 2 * 86400e3;
+const quoteDbs = new WeakSet();
+async function quoteTable(db) {
+  if (db && typeof db === 'object' && quoteDbs.has(db)) return;
+  await run(db, 'CREATE TABLE IF NOT EXISTS carrier_quotes (provider TEXT NOT NULL, ref TEXT NOT NULL, order_id TEXT NOT NULL, package_id INTEGER, package_no INTEGER, at INTEGER NOT NULL, PRIMARY KEY (provider, ref))');
+  if (db && typeof db === 'object') quoteDbs.add(db);
+}
+// pkg: teklifin paketi (paketi henüz olmayan siparişte yalnız no: id boş)
+export async function saveQuote(db, provider, ref, orderId, pkg) {
+  const t = Date.now();
+  await quoteTable(db);
+  await run(db, 'DELETE FROM carrier_quotes WHERE at < ?', t - QUOTE_TTL);
+  await run(db, 'INSERT OR REPLACE INTO carrier_quotes (provider, ref, order_id, package_id, package_no, at) VALUES (?, ?, ?, ?, ?, ?)', provider, String(ref), orderId, pkg && pkg.id != null ? Number(pkg.id) : null, pkg && pkg.no != null ? Number(pkg.no) : null, t);
+}
+// Teklif bu sipariş / pakete mi ait (süresi geçmemiş)? pkg verilmezse yalnız sipariş denetlenir
+export async function quoteBelongs(db, provider, ref, orderId, pkg) {
+  if (!QUOTE_RE.test(String(ref || ''))) return false;
+  await quoteTable(db);
+  const q = await first(db, 'SELECT order_id, package_id, package_no FROM carrier_quotes WHERE provider = ? AND ref = ? AND at >= ?', provider, String(ref), Date.now() - QUOTE_TTL);
+  if (!q || q.order_id !== orderId) return false;
+  if (!pkg) return true;
+  return q.package_id != null ? Number(q.package_id) === Number(pkg.id) : Number(q.package_no) === Number(pkg.no);
+}
+export async function dropQuotes(db, provider, refs) {
+  const ids = (refs || []).map(String).filter(Boolean);
+  if (!ids.length) return;
+  await quoteTable(db);
+  await run(db, `DELETE FROM carrier_quotes WHERE provider = ? AND ref IN (${ids.map(() => '?').join(',')})`, provider, ...ids);
+}
+
 // Kapıda ödemeli sipariş: hiçbir kargo bağlantısı tahsilatlı (kapıda ödeme) gönderi açmıyor; gönderi tahsilatsız açılırsa
 // ürün parası tahsil edilmeden teslim edilir. Kanal bağdaştırıcıları siparişe extra.cod = true yazar (WooCommerce payment_method 'cod',
 // ikas paymentMethods.type *_ON_DELIVERY, OpenCart payment_code 'cod', T-Soft / Ticimax ödeme tipi adı "Kapıda …").
@@ -224,6 +259,19 @@ async function syncDelivered(db, chans, out, t) {
 
 // Kanalda paketi iptal edilen / siparişi iptal edilen pakette açık kalan entegratör gönderisi (ücretli): bkz. sync.js saveOrders
 export const ORPHAN_MSG = 'Kanalda bu paket iptal edildi ama kargo entegratörü gönderisi hâlâ açık (ücretli). Göndermeyecekseniz paket menüsünden “Entegratör gönderisini iptal et”.';
+// Gönderisi entegratörde bulunamayan paket (Kargonomi'de silinmiş, 404): kayıt kendiliğinden silinmez (API anahtarı başka hesaba
+// çevrildiyse gönderi eski hesapta canlı olabilir); kullanıcı paket menüsündeki iptalle kaldırır (iptal 404'te kesin iptal sayılır)
+export const GONE_MSG = 'Gönderi kargo entegratöründe bulunamadı (silinmiş olabilir). Etiketi kullanmayın; paket menüsünden “Entegratör gönderisini iptal et” ile kaydı kaldırıp yeniden gönderebilirsiniz.';
+// Açık kalan / yetim / bulunamayan gönderi: takip seyrek (12 saatte bir); bildirim yalnız ilk tespitte ya da durum değişince
+const SLOW_EVERY = 12 * 3600e3;
+// Bildirim yalnız yeni durumda: aynı anahtar ve aynı metinle bildirim zaten varsa (okunmuş / kapatılmış olsa da) yeniden açılmaz.
+// Metin durumu (sipariş durumu, gönderi numarası) içerir: durum değişince yeniden bildirilir. notices ortak tabloda: ayrı sorgu
+async function notifyOnce(db, key, n) {
+  const ex = await first(db, 'SELECT msg FROM notices WHERE key = ?', key).catch(() => null);
+  if (ex && String(ex.msg || '') === String(n.msg || '').slice(0, 1000)) return false;
+  await notify(db, key, n);
+  return true;
+}
 const SHIP_TRIES = 6;
 // Kesin ücreti sonradan bildiren entegratörler (Kargonomi real_price): teslimden sonra da kesin ücret beklenir
 const FINAL_COST = ['kargonomi'];
@@ -235,9 +283,10 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
   const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.tracking, p.barcode, p.tracking_url, p.cargo_company, p.carrier_provider, p.carrier_ref, p.carrier_cost, p.carrier_cost_final, p.carrier_state, p.desi,
       p.remote_id, p.agreement, p.error, p.site_tracking, p.ship_sync, o.status AS order_status, o.order_number, o.channel AS order_channel, o.remote_id AS order_remote FROM packages p JOIN orders o ON o.id = p.order_id
     WHERE p.carrier_provider IS NOT NULL AND p.carrier_provider != 'demo' AND p.carrier_ref IS NOT NULL AND COALESCE(p.label_at, p.created_at, 0) >= ?
-      AND ((COALESCE(p.carrier_state, '') NOT IN ('delivered', 'cancelled', 'failed') AND o.status != 'delivered' AND (? OR COALESCE(p.carrier_checked_at, 0) < ?))
+      AND ((COALESCE(p.carrier_state, '') NOT IN ('delivered', 'cancelled', 'failed') AND o.status != 'delivered' AND (? OR COALESCE(p.carrier_checked_at, 0) <
+          CASE WHEN COALESCE(p.carrier_state, '') != 'cancelling' AND (p.error = ? OR (p.status = 'open' AND (o.status IN ('cancelled', 'returned') OR p.error = ?))) THEN ? ELSE ? END))
         OR (p.carrier_state = 'delivered' AND p.carrier_provider IN (${FINAL_COST.map((x) => `'${x}'`).join(', ')}) AND COALESCE(p.carrier_cost_final, 0) = 0 AND COALESCE(p.shipped_at, p.label_at, 0) >= ? AND (? OR COALESCE(p.carrier_checked_at, 0) < ?)))
-    ORDER BY COALESCE(p.carrier_checked_at, 0) LIMIT ?`, t - 50 * 86400e3, force ? 1 : 0, t - TRACK_EVERY, t - 20 * 86400e3, force ? 1 : 0, t - 12 * 3600e3, limit);
+    ORDER BY COALESCE(p.carrier_checked_at, 0) LIMIT ?`, t - 50 * 86400e3, force ? 1 : 0, GONE_MSG, ORPHAN_MSG, t - SLOW_EVERY, t - TRACK_EVERY, t - 20 * 86400e3, force ? 1 : 0, t - 12 * 3600e3, limit);
   const apis = {}, out = { checked: 0, delivered: 0, updated: 0, errors: 0, shipped: 0, synced: 0 };
   // Siteye otomatik bildirim (Ayarlar → Kargo: carrier_auto_ship): firma teslim alınca "Kargoya ver", sonradan gelen takip kodu,
   // teslim edildi. Kanal hatası takibi durdurmaz (günlüğe yazılır, sonraki turlarda yeniden denenir, olmazsa bildirim)
@@ -246,7 +295,12 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
   const reship = auto ? await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.ship_sync, p.carrier_state, o.channel AS order_channel, o.order_number FROM packages p JOIN orders o ON o.id = p.order_id
     WHERE p.carrier_ref IS NOT NULL AND p.status = 'open' AND p.carrier_state = 'delivered' AND o.status NOT IN ('cancelled', 'returned', 'delivered')
       AND COALESCE(p.ship_sync, '') != 'fail' AND COALESCE(p.carrier_checked_at, 0) < ? LIMIT 20`, t - 30 * 60e3) : [];
-  if (!rows.length && !reship.length && !(auto && await first(db, `SELECT 1 FROM packages WHERE carrier_state = 'delivered' AND carrier_provider IS NOT NULL AND (site_sync IS NULL OR site_sync LIKE 'e%') LIMIT 1`))) return { checked: 0 };
+  // Aynı paket iki listede olmasın: takip turundaki paket "Kargoya ver"i orada alır (iki kez kanala bildirilmesin)
+  { const ids = new Set(rows.map((p) => p.id)); for (let i = reship.length - 1; i >= 0; i--) if (ids.has(reship[i].id)) reship.splice(i, 1); }
+  // Erken çıkış: siteye "teslim edildi" yazılacak paket yoksa (syncDelivered ile aynı süzgeç: kargoya verilmiş, son 20 gün, yeniden deneme
+  // zamanı gelmiş) kanallar hiç yüklenmez
+  if (!rows.length && !reship.length && !(auto && await first(db, `SELECT 1 FROM packages WHERE carrier_state = 'delivered' AND status = 'shipped' AND carrier_provider IS NOT NULL AND carrier_provider != 'demo'
+      AND (site_sync IS NULL OR (site_sync LIKE 'e%' AND CAST(substr(site_sync, instr(site_sync, ':') + 1) AS INTEGER) < ?)) AND COALESCE(shipped_at, carrier_checked_at, 0) >= ? LIMIT 1`, t - SYNC_GAP, t - 20 * 86400e3))) return { checked: 0 };
   let chOk = true;
   const chans = auto ? new Map((await getChannels(env, db).catch(() => { chOk = false; return []; })).map((c) => [c.id, c])) : new Map();
   const after = [];
@@ -260,13 +314,28 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
       if (!c || !c.api.track) { await upd('UPDATE packages SET carrier_checked_at = ? WHERE id = ?', t, p.id); return; }
       const r = (await c.api.track(p)) || {};
       out.checked++;
+      // Gönderi entegratörde yok (silinmiş): bir kez bildirilir, pakete açıklama yazılır, takip seyrekleşir (kayıt kullanıcı iptaliyle kalkar)
+      if (r.gone) {
+        // İptal talebi iletilmiş gönderi silinmiş: kullanıcı zaten iptal istemişti, paket serbest bırakılır
+        if (p.carrier_state === 'cancelling' && p.status === 'open') {
+          const { carrierCancelDone } = await import('./api.js');
+          try { await carrierCancelDone(env, db, p.order_id, p.id, `iptal talebinden sonra gönderi ${c.name}'de bulunamadı`, p.carrier_ref); return; } catch (e) {
+            await upd('UPDATE packages SET carrier_checked_at = ? WHERE id = ?', t, p.id); await warnLog(p, `iptal işlenemedi, yeniden denenecek: ${e.message}`); return;
+          }
+        }
+        await upd('UPDATE packages SET carrier_checked_at = ?, error = ? WHERE id = ?', t, GONE_MSG, p.id);
+        await notifyOnce(db, `carrier:gone:${p.id}`, { level: 'warn', title: `Paket ${p.no}: ${c.name} gönderisi bulunamadı`, msg: `Sipariş #${p.order_number}: ${c.name} gönderisi (${p.carrier_ref}) ${c.name}'de bulunamadı (silinmiş olabilir). ${p.status === 'open' ? 'Etiketi kullanmayın; paket menüsünden “Entegratör gönderisini iptal et” ile kaydı kaldırıp yeniden gönderebilirsiniz.' : `${c.name} panelinden kontrol edin.`}` });
+        return;
+      }
+      // Bulunamayan gönderi yeniden göründü: açıklama ve bildirim kalkar
+      if (p.error === GONE_MSG) { await upd('UPDATE packages SET error = NULL WHERE id = ? AND error = ?', p.id, GONE_MSG); await resolve(db, `carrier:gone:${p.id}`); p.error = null; }
       // Gönderi kesin iptal edildi (panelden istenen iptal onaylandı ya da Kargonomi / kargo firması iptal etti): ücret geri alınır,
       // paket serbest kalır (yeniden gönderilebilir). Kilit doluysa durum yazılmaz, sonraki turda yeniden denenir
       if (r.state === 'cancelled') {
         const asked = p.carrier_state === 'cancelling';
         if (p.status === 'open') {
           const { carrierCancelDone } = await import('./api.js');
-          try { await carrierCancelDone(env, db, p.order_id, p.id, asked ? 'iptal talebi onaylandı' : `${c.name} tarafında iptal edildi`); } catch (e) {
+          try { await carrierCancelDone(env, db, p.order_id, p.id, asked ? 'iptal talebi onaylandı' : `${c.name} tarafında iptal edildi`, p.carrier_ref); } catch (e) {
             await upd('UPDATE packages SET carrier_checked_at = ? WHERE id = ?', t, p.id); await warnLog(p, `iptal işlenemedi, yeniden denenecek: ${e.message}`); return;
           }
           if (!asked) await notify(db, `carrier:cancelled:${p.id}`, { level: 'warn', title: `Paket ${p.no}: ${c.name} gönderisi iptal edildi`, msg: `Sipariş #${p.order_number}: gönderi ${c.name} tarafında iptal edildi; etiket geçersiz. Ücret kargo giderinden düşüldü, paket yeniden gönderilebilir.` });
@@ -276,9 +345,11 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
         }
         return;
       }
-      // İptal talebi kabul edilmedi (gönderi devam ediyor): kullanıcıya bildirilir, takip olağan sürer
-      if (p.carrier_state === 'cancelling' && r.state && r.state !== 'cancelling') {
-        await notify(db, `carrier:cancelno:${p.id}`, { level: 'warn', title: `Paket ${p.no}: ${c.name} iptal talebi kabul edilmedi`, msg: `Sipariş #${p.order_number}: gönderi devam ediyor (${str(r.text) || r.state}). Kargo firması paketi aldıysa iptal ${c.name} panelinden / müşteri iadesiyle yapılır.` });
+      // İptal talebi sonrası: Kargonomi durumu hemen "iptal talebi" yapmayabilir. Gönderi hâlâ "oluşturuldu" ise talep bekliyor sayılır
+      // ('cancelling' korunur, bildirim yok); yalnız kargo firması paketi aldıysa (yolda / teslim edildi) talep kabul edilmemiştir
+      const keep = p.carrier_state === 'cancelling' && (!r.state || r.state === 'created');
+      if (p.carrier_state === 'cancelling' && ['transit', 'delivered'].includes(r.state)) {
+        await notifyOnce(db, `carrier:cancelno:${p.id}`, { level: 'warn', title: `Paket ${p.no}: ${c.name} iptal talebi kabul edilmedi`, msg: `Sipariş #${p.order_number}: gönderi (${p.carrier_ref}) devam ediyor (${str(r.text) || r.state}). Kargo firması paketi aldıysa iptal ${c.name} panelinden / müşteri iadesiyle yapılır.` });
       }
       const tn = str(r.tracking);
       // Firmanın kendi takip numarası geldiyse (ön kabul → şube kabulü) pakete yazılır
@@ -289,19 +360,20 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
       // Kargo firması adı (gönderi açılırken okunamadıysa entegratör adı yazılmıştı): "Kargoya ver" pazaryerine doğru firmayı bildirsin
       const cn = str(r.carrier);
       if (cn && cn !== c.name && (!p.cargo_company || p.cargo_company === c.name)) await upd('UPDATE packages SET cargo_company = ? WHERE id = ?', cn, p.id);
-      // Ücret: ilk gelen yazılır; firma sonradan gerçek ücreti verirse (costFinal) tahmini ücretin yerine geçer, sipariş kargo gideri farkla düzeltilir
+      // Ücret: ilk gelen yazılır; firma sonradan gerçek ücreti verirse (costKnown: teslimden önce, değişebilir · costFinal: kesin) tahmini
+      // ücretin yerine geçer, sipariş kargo gideri farkla düzeltilir
       const cost = r.cost != null ? grossCost(r) : null;
-      if (cost != null && r.state !== 'failed' && (p.carrier_cost == null || (r.costFinal && Math.abs(cost - Number(p.carrier_cost)) >= 0.01))) {
+      if (cost != null && r.state !== 'failed' && (p.carrier_cost == null || ((r.costFinal || r.costKnown) && Math.abs(cost - Number(p.carrier_cost)) >= 0.01))) {
         const delta = Math.round((cost - (Number(p.carrier_cost) || 0)) * 100) / 100;
         const x = await upd('UPDATE packages SET carrier_cost = ? WHERE id = ?', cost, p.id);
         if (x && x.meta && x.meta.changes) await run(db, "UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) + ?), shipping_src = 'carrier' WHERE id = ? AND COALESCE(shipping_src, '') != 'manual'", delta, p.order_id);
         // Kesin ücret tahminden farklı geldi (şubede ölçülen desi): siparişin geçmişinde görünür
-        if (r.costFinal && p.carrier_cost != null && Math.abs(delta) >= 0.01) {
+        if ((r.costFinal || r.costKnown) && p.carrier_cost != null && Math.abs(delta) >= 0.01) {
           await run(db, "INSERT INTO order_events (order_id, at, source, action, status, note, user) VALUES (?, ?, 'carrier', 'carrier_cost', NULL, ?, 'Sistem')", p.order_id, t,
-            `Paket ${p.no}: ${c.name} kesin kargo ücreti ${cost.toLocaleString('tr-TR')} ₺ (tahmini ${Number(p.carrier_cost).toLocaleString('tr-TR')} ₺)${r.realDesi != null ? ` · şubede ölçülen desi ${r.realDesi} (girilen ${p.desi ?? '—'})` : ''}`.slice(0, 300));
+            `Paket ${p.no}: ${c.name} ${r.costFinal ? 'kesin' : 'güncel'} kargo ücreti ${cost.toLocaleString('tr-TR')} ₺ (önceki ${Number(p.carrier_cost).toLocaleString('tr-TR')} ₺)${r.realDesi != null ? ` · şubede ölçülen desi ${r.realDesi} (girilen ${p.desi ?? '—'})` : ''}`.slice(0, 300));
         }
       }
-      // Kesin ücret geldi: işaretlenir (teslimden sonra sorgu durur); şubede ölçülen desi pakete yazılır
+      // Kesin ücret geldi (teslim edildi + gerçek ücret): işaretlenir (teslimden sonra sorgu durur); şubede ölçülen desi pakete yazılır
       if (r.costFinal && !p.carrier_cost_final) await upd('UPDATE packages SET carrier_cost_final = 1 WHERE id = ?', p.id);
       if (r.realDesi != null && r.realDesi > 0 && Math.abs(r.realDesi - (Number(p.desi) || 0)) >= 0.01) await upd('UPDATE packages SET desi = ? WHERE id = ?', r.realDesi, p.id);
       // Firma gönderiyi oluşturamadı (onaydan sonra gelir): pakete hata yazılır, tahmini ücret geri alınır, bildirim gider
@@ -312,15 +384,17 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
         if (was && x && x.meta && x.meta.changes) await run(db, "UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) - ?) WHERE id = ? AND shipping_src = 'carrier'", was, p.order_id);
         await notify(db, `carrier:failed:${p.id}`, { level: 'error', title: `Paket ${p.no}: ${c.name} gönderisi oluşturulamadı`, msg: msg + ` Sipariş: #${p.order_number}` });
       }
-      await upd('UPDATE packages SET carrier_checked_at = ?, carrier_state = COALESCE(?, carrier_state), carrier_status = COALESCE(NULLIF(?, \'\'), carrier_status) WHERE id = ?', t, r.state || null, str(r.text).slice(0, 200), p.id);
+      if (keep) await upd('UPDATE packages SET carrier_checked_at = ? WHERE id = ?', t, p.id);
+      else await upd('UPDATE packages SET carrier_checked_at = ?, carrier_state = COALESCE(?, carrier_state), carrier_status = COALESCE(NULLIF(?, \'\'), carrier_status) WHERE id = ?', t, r.state || null, str(r.text).slice(0, 200), p.id);
       if (r.state && r.state !== p.carrier_state && ['delivered', 'returned'].includes(r.state)) {
         await run(db, "INSERT INTO order_events (order_id, at, source, action, status, note, user) VALUES (?, ?, 'carrier', 'carrier_track', ?, ?, 'Sistem')",
           p.order_id, t, r.state, `Paket ${p.no}: ${c.name} · ${str(r.text) || (r.state === 'delivered' ? 'Teslim edildi' : 'İade')}`.slice(0, 300));
       }
       if (r.state === 'delivered') out.delivered++;
       // Sipariş iptal / iade edildi ya da kanalda paket iptal edildi ama gönderi açık (kargoya verilmemiş): ücretli gönderi unutulmasın
-      if (p.status === 'open' && !['cancelling', 'transit', 'delivered'].includes(r.state) && (['cancelled', 'returned'].includes(p.order_status) || p.error === ORPHAN_MSG)) {
-        await notify(db, `carrier:orphan:${p.id}`, { level: 'warn', title: `Paket ${p.no}: ${c.name} gönderisi açık kaldı`, msg: `Sipariş #${p.order_number} ${p.order_status === 'cancelled' ? 'iptal edildi' : p.order_status === 'returned' ? 'iade edildi' : 'kanalda paketi iptal edildi'} ama ${c.name} gönderisi açık (ücretli). Kargo firmasına vermeyecekseniz siparişin paket menüsünden “Entegratör gönderisini iptal et”.` });
+      // Yalnız ilk tespitte / durum değişince bildirilir (her takip turunda yeniden açılmaz)
+      if (p.status === 'open' && p.carrier_state !== 'cancelling' && !['cancelling', 'transit', 'delivered'].includes(r.state) && (['cancelled', 'returned'].includes(p.order_status) || p.error === ORPHAN_MSG)) {
+        await notifyOnce(db, `carrier:orphan:${p.id}`, { level: 'warn', title: `Paket ${p.no}: ${c.name} gönderisi açık kaldı`, msg: `Sipariş #${p.order_number} ${p.order_status === 'cancelled' ? 'iptal edildi' : p.order_status === 'returned' ? 'iade edildi' : 'kanalda paketi iptal edildi'} ama ${c.name} gönderisi (${p.carrier_ref}) açık (ücretli). Kargo firmasına vermeyecekseniz siparişin paket menüsünden “Entegratör gönderisini iptal et”.` });
       }
       if (auto && chOk) after.push({ p, r, tn: tn || '', cn });
     } catch (e) {
@@ -330,6 +404,8 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
   });
   // "Kargoya ver" denemesi başarısız: sayaç (ship_sync e1…), SHIP_TRIES denemeden sonra bildirim
   const shipFail = async (p, e) => {
+    // Paket bu arada (kullanıcı ya da önceki tur) kargoya verildi: hata sayılmaz
+    if (/zaten kargoya verildi/.test(String(e && e.message))) { await run(db, 'UPDATE packages SET ship_sync = NULL WHERE id = ?', p.id); return; }
     const n = (Number(String(p.ship_sync || '').replace(/^e/, '')) || 0) + 1;
     await run(db, 'UPDATE packages SET ship_sync = ? WHERE id = ?', n >= SHIP_TRIES ? 'fail' : 'e' + n, p.id);
     await warnLog(p, `kargo firması teslim aldı ama "Kargoya ver" yapılamadı (${n}. deneme): ${e.message}`);

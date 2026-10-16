@@ -5,9 +5,11 @@
 // kargo OR23 (takip no) + OR24 (kargoya verildi). Teklifler (ilanlar) OF21; stok / fiyat OF24 (asenkron, import_id döner). Hesap A01, taşıyıcılar SH21.
 // OF24 teklifi bütün olarak yazar (gönderilmeyen alanlar sıfırlanır): bu yüzden önce teklifin güncel hali OF21'den okunur ve korunarak gönderilir.
 // Kargo satıcının kendi anlaşmasıyla: takip no panelden girilir. Teknosa anlaşmalı kargo kullanan hesaplarda takip no Teknosa'dan gelir;
-// o durumda yalnız OR24 (kargoya verildi) gönderilir. Soru-cevap (M11), iade, ürün yükleme (P41) yok.
+// o durumda yalnız OR24 (kargoya verildi) gönderilir. Soru-cevap (M11) ve iade yok.
+// Ürün yükleme (catalog): mirakl-catalog.js — barkod katalogda varsa (P31) yalnız teklif (OF24), yoksa ürün dosyası (P41) ve onaydan sonra teklif.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
 import { http, num, str, chunk, imageList, diagStep, pool, DEAD_LINE } from '../util.js';
+import { miraklCatalog } from './mirakl-catalog.js';
 
 // INCIDENT_OPEN / INCIDENT_CLOSED: kargodan sonra açılan / kapanan müşteri sorunu (sipariş gönderilmiş durumda kalır)
 const STATUS = { WAITING_ACCEPTANCE: 'new', WAITING_DEBIT: 'new', WAITING_DEBIT_PAYMENT: 'new', STAGING: 'new', SHIPPING: 'processing', SHIPPED: 'shipped', TO_COLLECT: 'shipped',
@@ -39,7 +41,11 @@ export function teknosa(env, meta) {
     const s = p.toString();
     return `${base}/api${path}${s ? '?' + s : ''}`;
   };
-  const call = (path, q, opts = {}) => http(url(path, q), { ...opts, headers: { Authorization: env.TEKNOSA_API_KEY, Accept: 'application/json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) }, body: opts.body && JSON.stringify(opts.body) });
+  // JSON gövde ya da çok parçalı dosya (P41: FormData; Content-Type sınırıyla birlikte fetch tarafından yazılır). Rapor dosyaları için Accept değiştirilebilir.
+  const call = (path, q, opts = {}) => {
+    const form = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    return http(url(path, q), { ...opts, headers: { Authorization: env.TEKNOSA_API_KEY, Accept: opts.accept || 'application/json', ...(opts.body && !form ? { 'Content-Type': 'application/json' } : {}) }, body: opts.body && !form ? JSON.stringify(opts.body) : opts.body });
+  };
 
   function norm(o) {
     const c = o.customer || {}, a = c.shipping_address || {};
@@ -87,9 +93,15 @@ export function teknosa(env, meta) {
     }
     return out;
   }
+  // Tüm liste okunduysa (fullAt) ya da SKU süzgeciyle sorulup bulunamadıysa (none) önbellekte olmayan SKU'nun teklifi yok sayılır: aynı nesnede
+  // (bir istek / senkron) liste yeniden okunmaz. OF21'de çoklu SKU süzgeci yok (sku tek değer), bu yüzden çok SKU'da tüm liste bir kez okunur.
+  let fullAt = 0;
+  const none = new Map(), FRESH = 10 * 60e3;
   async function fetchListings() {
-    cache.clear();
-    return (await loadOffers()).filter((o) => o.shop_sku).map((o) => {
+    cache.clear(); none.clear(); fullAt = 0;
+    const all = await loadOffers();
+    fullAt = Date.now();
+    return all.filter((o) => o.shop_sku).map((o) => {
       const price = num(o.price) || num(o.applicable_pricing && o.applicable_pricing.price), d = o.discount || {};
       const images = imageList((o.product_medias || []).map((m) => m.media_url || m.url || m));
       return {
@@ -99,11 +111,13 @@ export function teknosa(env, meta) {
       };
     });
   }
-  // Önbellekte olmayan teklifler: azsa tek tek (OF21 sku süzgeci), çoksa tüm liste yeniden okunur
+  // Önbellekte olmayan teklifler: azsa tek tek (OF21 sku süzgeci), çoksa tüm liste bir kez okunur (sonraki çağrılar yeniden okumaz)
   async function offersFor(skus) {
-    const lack = skus.filter((k) => !cache.has(k));
-    if (lack.length > 20) await loadOffers();
-    else await pool(lack, 4, async (k) => { await loadOffers({ sku: k }, 1); });
+    const now = Date.now(), lack = [...new Set(skus)].filter((k) => !cache.has(k) && !(now - num(none.get(k)) < FRESH));
+    if (lack.length && !(now - fullAt < FRESH)) {
+      if (lack.length > 20) { await loadOffers(); fullAt = Date.now(); }
+      else await pool(lack, 4, async (k) => { await loadOffers({ sku: k }, 1); if (!cache.has(k)) none.set(k, Date.now()); });
+    }
     return skus.map((k) => cache.get(k) || null);
   }
   // OF24 satırı: ürün kimliği önce Mirakl ürün SKU'su (SKU), yoksa EAN barkodu; teklifin mevcut alanları korunur
@@ -185,6 +199,9 @@ export function teknosa(env, meta) {
     return { tracking: tn };
   }
 
+  // ---------- ürün yükleme (H11 / PM11 / VL11 / P31 / P41 / P42 / P44 / P47 / OF24 / OF02 / OF03): ortak Mirakl modülü ----------
+  const catalog = miraklCatalog({ name: 'Teknosa', call, kv: meta && meta.kv, offersFor, scope: base });
+
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();
     await diagStep(out, 'Hesap (A01)', async () => { const r = (await call('/account')) || {}; return { detail: `${str(r.shop_name) || 'mağaza'} · mağaza ID ${r.shop_id ?? '?'}${r.shop_state ? ' · durum ' + r.shop_state : ''} · adres ${base}` }; });
@@ -201,6 +218,6 @@ export function teknosa(env, meta) {
   return {
     ...meta, type: 'teknosa', enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, accept, ship, diagnose,
+    fetchOrders, fetchListings, pushStock, pushPrice, pushStatus, accept, ship, diagnose, catalog,
   };
 }

@@ -411,6 +411,18 @@ export const MIGRATIONS = [
   'ALTER TABLE packages ADD COLUMN site_tracking TEXT',
   // Entegratörün kesin ücreti geldi mi (Kargonomi real_price: şubede ölçülen desiyle); gelmediyse teslimden sonra da sorgulanır
   'ALTER TABLE packages ADD COLUMN carrier_cost_final INTEGER',
+  // Paket ölçüleri (cm): bazı pazaryerleri (Ozon, Amazon, eBay) ürün açarken gerçek en / boy / yükseklik ister; desiden türetilmez
+  'ALTER TABLE products ADD COLUMN width REAL',
+  'ALTER TABLE products ADD COLUMN height REAL',
+  'ALTER TABLE products ADD COLUMN length REAL',
+  // Stok API satış numarası (anahtar + numara benzersiz): numarayı ilk alan istek (tok) satışı yazar; aynı anda gelen farklı ürünlü
+  // iki istek birleşmez, ikincisi reddedilir (bkz. extapi.js reportSale). Eski satışların numaraları da kaydedilir
+  'CREATE TABLE IF NOT EXISTS ext_sale_refs (src TEXT NOT NULL, ref TEXT NOT NULL, tok TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (src, ref))',
+  "INSERT OR IGNORE INTO ext_sale_refs (src, ref, tok, at) SELECT src, ref, 'eski', MIN(at) FROM ext_sales GROUP BY src, ref",
+  // Anahtar başına günlük satış adedi sınırı (son 24 saat) için
+  'CREATE INDEX IF NOT EXISTS ext_sales_src_at ON ext_sales(src, at)',
+  // Kargonomi teklif numarası ↔ sipariş / paket (başka paketin teklifi onaylanmasın; bkz. carriers.js saveQuote). 2 gün sonra silinir
+  'CREATE TABLE IF NOT EXISTS carrier_quotes (provider TEXT NOT NULL, ref TEXT NOT NULL, order_id TEXT NOT NULL, package_id INTEGER, package_no INTEGER, at INTEGER NOT NULL, PRIMARY KEY (provider, ref))',
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
@@ -625,7 +637,7 @@ async function vatInclOnce(db, rows) {
 export async function getSettings(db) {
   if (!vatDone.has(db)) await vatInclOnce(db, await all(db, "SELECT k, v FROM settings WHERE k IN ('once:vat_incl_1', 'costs_vat_incl', 'commission', 'shipping', 'service_fee', 'fee_rate')").catch(() => []));
   const rows = await all(db, `SELECT k, CASE WHEN k = 'logo' AND length(v) > 2 THEN json_quote('logo:' || length(v) || ':' || substr(v, -24, 20)) ELSE v END AS v
-    FROM settings WHERE k NOT LIKE 'login_fail:%'`);
+    FROM settings WHERE k NOT LIKE 'login_fail:%' AND k NOT LIKE 'kv:%'`); // kanal kv kayıtları (belirteç, gönderim kuyruğu) ayarlarda kullanılmaz: her istekte okunmaz
   const out = structuredClone(DEFAULT_SETTINGS);
   for (const r of rows) {
     try {

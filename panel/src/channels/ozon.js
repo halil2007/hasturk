@@ -8,8 +8,9 @@
 // Stok: /v2/products/stocks (100'erli; depo no zorunlu: girilmediyse hesapta tek FBS deposu varsa o kullanılır). Fiyat: /v1/product/import/prices (1000'erli).
 // İşleme al: /v4/posting/fbs/ship ("Topla": gönderi awaiting_packaging → awaiting_deliver, etiket hazırlanır). Etiket: /v2/posting/fbs/package-label (PDF).
 // Kargoya ver: FBS'de kurye Ozon'un (panel yalnız toplanmış olduğunu garanti eder); rFBS'de takip no girildiyse tracking-number/set + delivering.
-// Ürün oluşturma, iade, soru-cevap yok. Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, diagStep, imageList, toB64, sleep, DEAD_LINE } from '../util.js';
+// Ürün yükleme (Ürün yükle / Kanallarda yayınla): /v1/description-category/* (kategori ağacı, özellikler, değerler) → /v3/product/import (100'erli)
+// → /v1/product/import/info (task_id ile sonuç). İade, soru-cevap yok. Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
+import { http, num, str, chunk, diagStep, imageList, toB64, sleep, DEAD_LINE, rankBrands, brandKey } from '../util.js';
 
 const API = 'https://api-seller.ozon.ru';
 const STATUS = { awaiting_registration: 'new', acceptance_in_progress: 'new', awaiting_approve: 'new', awaiting_packaging: 'new', awaiting_verification: 'new',
@@ -177,6 +178,202 @@ export function ozon(env, meta) {
     throw new Error('Ozon etiketi alınamadı');
   }
 
+  // ---------- ürün yükleme ----------
+  // Kaynak: Ozon Seller API OpenAPI şemasından üretilmiş istemciler (docs.ozon.ru bu ortamdan açılmadı), çapraz doğrulandı:
+  //   generated-ozon-seller-api-client@1.0.0 (dist/OzonSellerAPI.d.ts: V1GetTreeResponseItem, V1GetAttributesResponseAttribute,
+  //   V1GetAttributeValuesRequest/Response, V1SearchAttributeValuesRequest, V3ImportProductsRequestItem, GetImportProductsInfoResponseResultItem),
+  //   artefactby-ozon-seller-api@0.18.0 (dist/index.d.ts: aynı uçların örnek istek / cevapları), @seller-sdk/ozon@0.3.2
+  //   (dist/endpoints/category/*, product/import/{create,get-status}), daytona-ozon-seller-api@2.2.17 (last_value_id sayfalama).
+  // Kategori: /v1/description-category/tree. Ürün yalnız son düzeydeki "tür" (type_id) düğümüne açılır; düğüm description_category_id taşımaz,
+  //   üstündeki kategorinin kimliğiyle birlikte kullanılır. Paneldeki tek kimlik "<description_category_id>:<type_id>" (ikisi de pozitif tam sayı).
+  //   disabled = true: o kategoride ürün oluşturulamaz (atlanır).
+  // Dil: istekler language = TR (şemadaki LanguageLanguage: DEFAULT, RU, EN, TR, ZH_HANS; varsayılan Rusça). Çevirisi olmayan ad / değer Ozon'un
+  //   döndürdüğü gibi (ör. Rusça) gösterilir; değer kimliği (dictionary_value_id) dilden bağımsızdır.
+  // Özellik: dictionary_id 0 değilse değer listeden seçilir (/v1/description-category/attribute/values, en çok 2000'lik sayfa, last_value_id = önceki
+  //   sayfanın son kimliği, has_next). is_aspect (aynı modelin ürünlerini ayıran özellik: renk, beden…) → varyant özelliği. attribute_complex_id 0
+  //   değilse özellik complex_attributes içinde (complex_id ile) gönderilir.
+  // Üründen dolan özellikler (kategori eşleştirmesinde sorulmaz): 8229 tür (type_id gönderilince gerekmez: V3ImportProductsRequestItem.type_id
+  //   açıklaması), 85 marka (attribute/values örneğinde marka sözlüğü; Kanallarda yayınla'da kategori başına aranır), 4180 ürün adı ve 4191 açıklama
+  //   (/v4/product/info/attributes örnek cevabında 4180 = name, 4191 = açıklama metni), 9048 model adı (aynı 9048 değerini alan kartlar Ozon'da tek
+  //   kartta birleşir — /v3/product/import açıklaması): ürünün varyant grubu kodu. Bunlar yalnız kategorinin özellik listesinde varsa gönderilir.
+  // /v3/product/import: istekte en çok 100 ürün; ürünün tüm bilgisi (özellikler, barkod, görsel, gerçek paket ölçüleri ve ağırlığı — 0 olamaz,
+  //   boş bırakılamaz —, fiyat, para birimi) gönderilir. Görsel: JPG / PNG bağlantısı, ana görsel (primary_image) + en çok 29 görsel. Para birimi
+  //   hesabın para birimiyle aynı olmalı (RUB, BYN, KZT, EUR, USD, CNY). KDV: 0, 0.05, 0.07, 0.1, 0.2, 0.22. offer_id en çok 50, ad en çok 500 karakter.
+  //   Sınır aşımı: 429 (dakikalık) / item_limit_exceeded (günlük). Cevap yalnız task_id; ürün ürün sonuç /v1/product/import/info
+  //   (pending · imported · failed · skipped; errors[]). Onaylanan ürün /v3/product/list'te offer_id ile görünür: key = offer_id = panel SKU'su.
+  const LANG = 'TR';
+  const OWN = { TYPE: 8229, BRAND: 85, NAME: 4180, DESC: 4191, MODEL: 9048 };
+  const VATS = ['0', '0.05', '0.07', '0.1', '0.2', '0.22'], CURS = ['RUB', 'EUR', 'USD', 'CNY']; // TCMB kuru olanlar (BYN / KZT için kur yok: fiyat çevrilemez)
+  const catIds = (id) => {
+    const m = /^(\d+):(\d+)$/.exec(str(id));
+    if (!m) throw new Error(`Ozon kategori kimliği geçersiz (“${str(id).slice(0, 40)}”): kategoriyi yeniden seçin`);
+    return { description_category_id: Number(m[1]), type_id: Number(m[2]) };
+  };
+  let catCache = null;
+  async function categories(q) {
+    if (!catCache || Date.now() - catCache.at > 6 * 3600e3) {
+      const all = [];
+      const walk = (nodes, path, dc) => {
+        for (const n of nodes || []) {
+          if (n.disabled) continue;
+          if (num(n.type_id) > 0) { if (dc) all.push({ id: `${dc}:${n.type_id}`, name: str(n.type_name), path: path.join(' › ') }); continue; }
+          walk(n.children, [...path, str(n.category_name)].filter(Boolean), num(n.description_category_id) || dc);
+        }
+      };
+      walk(((await call('/v1/description-category/tree', { language: LANG })) || {}).result, [], 0);
+      catCache = { at: Date.now(), all };
+    }
+    const k = String(q || '').toLocaleLowerCase('tr').trim();
+    return { total: catCache.all.length, items: catCache.all.filter((c) => !k || `${c.name} ${c.path} ${c.id}`.toLocaleLowerCase('tr').includes(k)).slice(0, 60) };
+  }
+  const allCategories = async () => { await categories(''); return catCache.all; };
+  const attrCache = new Map();
+  async function rawAttrs(cat) {
+    if (!attrCache.has(cat)) attrCache.set(cat, ((await call('/v1/description-category/attribute', { ...catIds(cat), language: LANG })) || {}).result || []);
+    return attrCache.get(cat);
+  }
+  const isBrand = (a) => num(a.id) === OWN.BRAND;
+  const ownAttr = (a) => Object.values(OWN).includes(num(a.id));
+  const attributes = async (cat) => (await rawAttrs(cat)).filter((a) => !ownAttr(a)).map((a) => ({ id: String(a.id), name: str(a.name), mandatory: !!a.is_required,
+    kind: a.is_aspect ? 'variant' : 'category', type: num(a.dictionary_id) ? 'enum' : str(a.type).toLowerCase() || 'text', custom: !num(a.dictionary_id), multi: !!a.is_collection }));
+  // Değer listesi: 2000'lik sayfalar, en çok 10 sayfa (çok büyük sözlüklerde ilk 20 000 değer)
+  const valCache = new Map();
+  async function values(cat, attr) {
+    const a = (await rawAttrs(cat)).find((x) => String(x.id) === String(attr));
+    if (!a || !num(a.dictionary_id)) return [];
+    const ck = `${cat}|${attr}`;
+    if (!valCache.has(ck)) {
+      const out = [];
+      let last = 0;
+      for (let page = 0; page < 10; page++) {
+        const r = (await call('/v1/description-category/attribute/values', { ...catIds(cat), attribute_id: num(a.id), language: LANG, limit: 2000, ...(last ? { last_value_id: last } : {}) })) || {};
+        const rows = r.result || [];
+        out.push(...rows.map((v) => ({ id: String(v.id), value: str(v.value) })));
+        if (!r.has_next || !rows.length) break;
+        last = num(rows[rows.length - 1].id);
+      }
+      valCache.set(ck, out);
+    }
+    return valCache.get(ck);
+  }
+  // Marka: kategorinin marka özelliğinde arama (/v1/description-category/attribute/values/search: en az 2 karakter, en çok 100 sonuç)
+  const brandHits = new Map();
+  async function findBrands(q, cat) {
+    const k = str(q);
+    if (!cat || k.length < 2) return [];
+    const a = (await rawAttrs(cat)).find(isBrand);
+    if (!a) return [];
+    const ck = `${cat}|${k}`;
+    if (!brandHits.has(ck)) brandHits.set(ck, (((await call('/v1/description-category/attribute/values/search', { ...catIds(cat), attribute_id: num(a.id), value: k, limit: 100 })) || {}).result || []).map((v) => ({ id: String(v.id), name: str(v.value) })));
+    return brandHits.get(ck);
+  }
+  const searchBrands = async (q, cat) => rankBrands(await findBrands(q, cat), str(q));
+  // KDV seçeneği: "20", "%20", "0,2" → "0.2"; Ozon'un kabul ettiği oranlardan biri değilse boş
+  const vatOf = (v) => { const s = str(v).replace(/[%\s]/g, '').replace(',', '.'); if (!s || !Number.isFinite(Number(s))) return ''; const x = Number(s) > 1 ? Number(s) / 100 : Number(s); return VATS.find((o) => Math.abs(Number(o) - x) < 1e-9) || ''; };
+  const money = (v) => String(Math.round(num(v) * 100) / 100);
+  async function build(pr, map, { opts = {}, pick } = {}) {
+    const missing = [], attrs = [], complex = new Map(), vals = map.attrs || {};
+    const add = (a, values) => {
+      const row = { id: num(a.id), complex_id: num(a.attribute_complex_id), values };
+      if (row.complex_id) complex.set(row.complex_id, [...(complex.get(row.complex_id) || []), row]); else attrs.push(row);
+    };
+    for (const a of await rawAttrs(map.remote_id)) {
+      const id = String(a.id), v = vals[id], dict = !!num(a.dictionary_id), name = str(a.name);
+      if (num(a.id) === OWN.TYPE) continue; // type_id alanı gönderilir
+      if (!v && isBrand(a)) {
+        let bid = str(pr.brandId), bname = str(pr.brand);
+        if (!bid && bname) { const hit = (await findBrands(bname, map.remote_id)).find((b) => brandKey(b.name) === brandKey(bname)); if (hit) { bid = hit.id; bname = hit.name; } }
+        if (bid) add(a, [{ dictionary_value_id: num(bid), value: bname }]);
+        else if (a.is_required) missing.push(bname ? `marka “${bname}” Ozon'da bulunamadı` : 'marka');
+        continue;
+      }
+      if (!v && num(a.id) === OWN.NAME) { if (pr.name) add(a, [{ value: str(pr.name).slice(0, 500) }]); continue; }
+      if (!v && num(a.id) === OWN.DESC) { if (pr.description) add(a, [{ value: pr.description }]); continue; }
+      if (!v && num(a.id) === OWN.MODEL) { if (str(pr.group)) add(a, [{ value: str(pr.group) }]); else if (a.is_required) missing.push(name); continue; }
+      let valueId = v && v.id, text = v && v.value;
+      if (text === '@variant') { const hit = pr.variant && pick ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? hit.value : dict ? '' : str(pr.variant); }
+      else if (text === '@image') text = pr.image;
+      if (dict && valueId) add(a, [{ dictionary_value_id: num(valueId), value: str(text) }]);
+      else if (!dict && str(text)) add(a, [{ value: str(text) }]);
+      // Zorunlu özellik: seçilmemiş / değer Ozon listesinde yok (liste özelliğinde kimlik gerekir) / varyanttan okunacak ama varyant listede yok
+      else if (a.is_required) missing.push(name + (v && v.value === '@variant' ? (pr.variant ? ` (varyant “${pr.variant}” Ozon listesinde yok)` : ' (ürünün varyantı yok; kategori eşleştirmesinde değer seçin)') : v && str(v.value) ? ` (“${v.value}” Ozon listesinde yok)` : ''));
+    }
+    if (!pr.sku) missing.push('SKU'); else if (str(pr.sku).length > 50) missing.push('SKU (Ozon en çok 50 karakter kabul eder)');
+    if (!pr.name) missing.push('ürün adı');
+    if (!(pr.price > 0)) missing.push('fiyat');
+    // Görsel: yalnız JPG / PNG (uzantısız bağlantı kabul edilir; .webp, .gif… gönderilmez)
+    const all = imageList([pr.image, ...(pr.images || [])], 40);
+    const imgs = all.filter((u) => { const ext = (/\.([a-z0-9]{2,5})$/i.exec(u.split(/[?#]/)[0]) || [])[1]; return !ext || /^(jpe?g|png)$/i.test(ext); }).slice(0, 30);
+    if (!imgs.length) missing.push(all.length ? 'görsel (Ozon yalnız JPG / PNG kabul eder)' : 'görsel');
+    // Paket ölçüleri ve ağırlığı: gerçek değer zorunlu (0 ya da boş olamaz). Panelde en / boy / yükseklik alanı yok: desiden türetilmez.
+    // pr.width / pr.height / pr.length (cm) gelirse milimetreye çevrilir. Ağırlık panelde kg: grama çevrilir (Ozon tam sayı ister).
+    const mm = (v) => Math.round(num(v) * 10), w = mm(pr.width), h = mm(pr.height), d = mm(pr.length);
+    if (!(w > 0 && h > 0 && d > 0)) missing.push('paket ölçüleri (en, boy, yükseklik)');
+    const g = Math.round(num(pr.weight) * 1000);
+    if (!(g > 0)) missing.push('ağırlık (kg)');
+    const vat = vatOf(opts.vat), cur = str(opts.currency).toUpperCase();
+    // Boş seçenek "(Ürün yükle → Ozon seçenekleri)" ekiyle; geçersiz değer eksiz (her ekranda gönderimi engeller)
+    if (str(opts.vat) === '') missing.push('KDV oranı (Ürün yükle → Ozon seçenekleri)');
+    else if (!vat) missing.push(`KDV oranı “${str(opts.vat)}” geçersiz (0, 5, 7, 10, 20 ya da 22; Ozon seçeneklerinden düzeltin)`);
+    if (!cur) missing.push('para birimi (Ürün yükle → Ozon seçenekleri)');
+    else if (!CURS.includes(cur)) missing.push(`para birimi “${cur}” geçersiz (${CURS.join(', ')}; Ozon seçeneklerinden düzeltin)`);
+    // Fiyat catalog.js'te TCMB kuruyla hesap para birimine çevrilmiş gelir (catalog.currency; pr.currency); çevrilmemiş TL fiyat gönderilmez
+    else if (str(pr.currency || 'TRY').toUpperCase() !== cur) missing.push(`fiyat para birimi (${str(pr.currency || 'TRY').toUpperCase()}; Ozon hesabınız ${cur})`);
+    const sale = num(pr.price), list = Math.max(num(pr.listPrice), sale);
+    const item = {
+      offer_id: str(pr.sku), name: str(pr.name).slice(0, 500), ...(pr.barcode ? { barcode: str(pr.barcode) } : {}), ...catIds(map.remote_id),
+      price: money(sale), ...(list > sale ? { old_price: money(list) } : {}), currency_code: cur, vat,
+      height: h, width: w, depth: d, dimension_unit: 'mm', weight: g, weight_unit: 'g',
+      primary_image: imgs[0] || '', images: imgs.slice(1, 30), attributes: attrs,
+      ...(complex.size ? { complex_attributes: [...complex.values()].map((x) => ({ attributes: x })) } : {}),
+    };
+    return { key: str(pr.sku), missing, payload: item };
+  }
+  // Gönderim: istekte en çok 100 ürün. Kayıt: "<task_id>:<offer_id,…>" parçaları ";" ile (offer_id URL kodlu). İlk parça kabul edilmezse hata
+  // atılır; sonraki bir parça reddedilirse o parçanın ürünleri "0:<offer_id,…>:<hata>" olarak kaydedilir (gönderilenlerin takibi kaybolmasın).
+  // Yazma isteği sonucu belirsizken tekrarlanmaz (tries: 1).
+  async function sendProducts(items) {
+    const refs = [];
+    for (const part of chunk(items, 100)) {
+      const keys = part.map((x) => encodeURIComponent(x.offer_id)).join(',');
+      try {
+        const task = str((((await call('/v3/product/import', { items: part }, { tries: 1 })) || {}).result || {}).task_id);
+        if (!/^\d+$/.test(task) || task === '0') throw new Error('Ozon görev numarası (task_id) vermedi');
+        refs.push(`${task}:${keys}`);
+      } catch (e) {
+        if (e.budget) throw e;
+        if (!refs.length) throw new Error(e.message.replace(/^POST \S+: /, ''));
+        refs.push(`0:${keys}:${encodeURIComponent(e.message.replace(/^POST \S+: /, '').slice(0, 300))}`);
+      }
+    }
+    return { ref: refs.join(';') };
+  }
+  const errText = (x) => [...new Set((x.errors || []).map((e) => [str(e.attribute_name), str(e.description || e.message || e.code)].filter(Boolean).join(': ')).filter(Boolean))].join(' · ');
+  async function importStatus(ref) {
+    const items = [];
+    let pending = false;
+    for (const part of String(ref).split(';').filter(Boolean)) {
+      const [task, k = '', err = ''] = part.split(':'), keys = k.split(',').filter(Boolean).map(decodeURIComponent);
+      if (task === '0') { for (const key of keys) items.push({ key, ok: false, status: 'Ozon\'a gönderilemedi', error: decodeURIComponent(err) || 'gönderilemedi' }); continue; }
+      const r = ((await call('/v1/product/import/info', { task_id: Number(task) })) || {}).result || {};
+      const rows = new Map((r.items || []).map((x) => [str(x.offer_id), x]));
+      if (!rows.size || [...rows.values()].some((x) => !x.status || x.status === 'pending')) { pending = true; continue; }
+      for (const key of keys) {
+        const x = rows.get(key);
+        if (!x) { items.push({ key, ok: false, status: 'Ozon sonuç vermedi', error: 'Ozon bu ürün için sonuç vermedi' }); continue; }
+        if (x.status === 'imported') items.push({ key, ok: true, status: 'Ozon\'a yüklendi (Ozon onayı bekliyor)', error: '' });
+        else if (x.status === 'skipped') items.push({ key, ok: true, status: 'Ozon\'da zaten aynı (değişiklik yok)', error: '' });
+        else items.push({ key, ok: false, status: 'Ozon kabul etmedi', error: errText(x) || `Ozon durumu: ${str(x.status) || 'bilinmiyor'}` });
+      }
+    }
+    return { done: !pending, items };
+  }
+  const raw = async (ref) => call('/v1/product/import/info', { task_id: Number(String(ref).split(/[;:]/)[0]) });
+  // Hesap para birimi kanal seçeneğinden: panel fiyatı (TL) catalog.js'te TCMB kuruyla buna çevrilir
+  const currency = (opts = {}) => { const c = str(opts.currency).toUpperCase(); return CURS.includes(c) ? c : ''; };
+  const catalog = { categories, allCategories, attributes, values, build, send: sendProducts, status: importStatus, raw, brands: searchBrands, brandByCategory: true, chunk: 100, currency,
+    options: [{ k: 'vat', label: 'Ozon KDV oranı (%): 0, 5, 7, 10, 20 ya da 22' }, { k: 'currency', label: 'Ozon hesap para birimi (RUB, CNY, USD, EUR): panel fiyatı TCMB kuruyla bu para birimine çevrilir' }] };
+
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();
     const ok = await diagStep(out, 'Kimlik (Client-Id + Api-Key) · depolar', async () => { const w = await warehouses(); return { detail: `bağlantı kuruldu · ${w.length} FBS deposu${w.length ? ': ' + w.slice(0, 5).map((x) => `${x.name} (${x.warehouse_id})`).join(', ') : ''}${wh ? ` · seçili depo ${wh}` : ''}` }; });
@@ -194,6 +391,6 @@ export function ozon(env, meta) {
   return {
     ...meta, type: 'ozon', enabled: !missing.length, missing,
     caps: { accept: 'remote', split: 'local', ship: 'remote', label: 'remote', createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, accept, ship, label, diagnose,
+    fetchOrders, fetchOne, fetchListings, pushStock, pushPrice, accept, ship, label, diagnose, catalog,
   };
 }

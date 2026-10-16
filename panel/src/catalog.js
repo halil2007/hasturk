@@ -11,10 +11,12 @@ import { fail, str, num, r2, isImageAttr, variantAxes, cleanHtml } from './util.
 export { variantAxes };
 import { rank, localProfile, prepare, score } from './catmatch.js';
 import { quantities, withoutQty, norm as normQ } from './match.js';
+import { orderRate } from './fx.js';
+import { exclusive } from './locks.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
-const NO_UPLOAD = ['amazon', 'ciceksepeti', 'koctas', 'shopify', 'woocommerce', 'opencart', 'etsy', 'teknosa', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ebay', 'ozon', 'ticimax', 'ideasoft', 'tsoft'];
+const NO_UPLOAD = ['shopify', 'woocommerce', 'opencart', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ticimax', 'ideasoft', 'tsoft'];
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').replace(/\s+/g, '').replace(/(lt|litre|l)$/, 'lt').replace(/(kg|kilo|kilogram)$/, 'kg');
 
 async function targets(env, db) {
@@ -80,6 +82,8 @@ export function shape(p, opts, zeroStock) {
     id: p.id, sku: str(p.sku), barcode: str(p.barcode), name: str(p.name), brand: str(p.brand), description: cleanHtml(p.description) || str(p.name),
     image: img || images[0] || '', images, vat: p.vat ?? 20, desi: p.desi || 1, stock: zeroStock ? 0 : Math.max(0, Math.round(p.stock || 0)),
     price: r2(base * k), listPrice: r2((own || Math.max(p.cat_list || 0, base)) * k), weight: num(p.weight) > 0 ? num(p.weight) : null,
+    // Paket ölçüleri (cm); girilmemişse null (kanal gerçek ölçü istiyorsa eksik sayar)
+    width: num(p.width) > 0 ? num(p.width) : null, height: num(p.height) > 0 ? num(p.height) : null, length: num(p.length) > 0 ? num(p.length) : null,
     group: groupCode(p), variant: str(p.variant_name),
   };
 }
@@ -136,7 +140,14 @@ function normTr(t) { return String(t || '').toLocaleLowerCase('tr').replace(/[ı
 // addaki ölçü / kelime ürünün kendisini değil eki ya da seçeneği anlatıyor olabilir: addaki ölçü kullanılmaz, addaki tek değer ancak kategori de
 // aynısını söylüyorsa seçilir (varyant her zaman kullanılır)
 const BUNDLE = /\+|\b(set|seti|setler\w*|kampanya\w*|hediye\w*|ucretsiz|secilebilir|secenekli)\b/;
-export function inferValue(list, p) {
+// Ölçünün yanında paket çarpanı ("5Kgx4", "5 kg × 4") ya da aralık ("4-5 Kg", "1–2 Lt"): ürünün ölçüsü tek bir değer değil → belirsiz
+const UNIT_RX = '(?:kg|kilo|gr|g|mg|ml|lt|l|cl|litre)';
+const QTY_AMBIG = new RegExp(`\\d\\s*${UNIT_RX}\\s*[x×*]\\s*\\d+(?![.,]?\\d*\\s*(?:${UNIT_RX.slice(3, -1)}|adet|ad|paket|pk)\\b)|\\d+(?:[.,]\\d+)?\\s*[-–]\\s*\\d+(?:[.,]\\d+)?\\s*${UNIT_RX}\\b`, 'i');
+// Renk özelliği ürün adının yalnız ayraçtan ("|", "-", "/", "(", ",") sonraki bölümünden okunur: "Kırmızı Biber Tohumu" renk değil,
+// "Line Saksı | Koyu Gri" renk
+const COLOR_ATTR = /^(renk|color|colour|ana renk|ürün rengi)\b/i;
+const afterSep = (t) => { const m = /\s[|/–-]\s|\(|,/.exec(String(t || '')); return m ? String(t).slice(m.index + m[0].length) : ''; };
+export function inferValue(list, p, attrName = '') {
   const vals = (list || []).filter((v) => str(v.value) && !GENERIC.test(str(v.value).trim()));
   if (!vals.length) return null;
   const vq = vals.map((v) => ({ v, q: pureQty(v.value) }));
@@ -146,6 +157,7 @@ export function inferValue(list, p) {
     const fams = new Set(pure.map((x) => x.q.fam));
     for (const t of [p.variant_name, p.name]) {
       if (!str(t)) continue;
+      if (QTY_AMBIG.test(t)) return null;
       const all = qtyKeys(t).keys;
       let mine = all.filter((k) => fams.has(k.fam));
       // Ölçü + adet birlikte: koli ("400 Gr - 12 Adet" = 12 x 400 gr) yalnız listede o paket değeri varsa; yoksa ya da daha karmaşıksa
@@ -172,7 +184,8 @@ export function inferValue(list, p) {
   const cat = String(p.category || '');
   const bundle = BUNDLE.test(normQ(p.name));
   let pending = null; // set / hediyeli ürün adında tek değer: ancak kategori de aynı değeri söylerse seçilir
-  for (const t of [p.variant_name, p.name, cat.split(/›|>/).pop(), cat]) {
+  const color = COLOR_ATTR.test(str(attrName)), nameText = color ? afterSep(p.name) : p.name;
+  for (const t of [p.variant_name, nameText, ...(color ? [] : [cat.split(/›|>/).pop(), cat])]) {
     const k = wordsKey(t);
     if (k.trim() === '') continue;
     // Yalnız rakamdan oluşan değer ("5") metinde ölçü / kod parçasıyla karışır: metin eşleşmesinde kullanılmaz
@@ -181,7 +194,7 @@ export function inferValue(list, p) {
     const best = hits.filter((h) => !hits.some((o) => o !== h && wordsKey(o.value).includes(wordsKey(h.value))));
     // Set / hediyeli / seçenekli ürünün adında geçen değer eki ya da seçeneği anlatıyor olabilir ("Ücretsiz Toprak", "Sıvı ve Katı … Seti"):
     // adda birden çok değer → belirsiz; tek değer → kategoride de aynısı geçerse
-    if (t === p.name && bundle) { if (best.length > 1) return null; if (best.length === 1) pending = best[0]; continue; }
+    if (t === nameText && bundle) { if (best.length > 1) return null; if (best.length === 1) pending = best[0]; continue; }
     if (pending) {
       if (!best.length) continue;
       return best.length === 1 && best[0] === pending ? { id: String(pending.id), value: str(pending.value), auto: true } : null;
@@ -203,21 +216,50 @@ export async function autoFill(c, catId, m, p, missing) {
   for (const a of attrs) {
     if (!a.mandatory || isImageAttr(a)) continue;
     if (!missing.some((x) => x === a.name || x.startsWith(a.name + ' ('))) continue;
-    const v = inferValue(await c.catalog.values(catId, a.id).catch(() => []), p);
+    const v = inferValue(await c.catalog.values(catId, a.id).catch(() => []), p, a.name);
     if (v) { add[a.id] = { id: v.id, value: v.value }; filled.push({ attr: a.id, name: a.name, value: v.value }); }
   }
   return { attrs: { ...m.attrs, ...add }, filled };
 }
 
+// Yurt dışı kanal (catalog.currency: kanalın fiyat beklediği para birimi): panel fiyatı (TL) TCMB döviz alış kuruyla çevrilir
+// (siparişlerin TL'ye çevrildiği kurla aynı; bkz. fx.js orderRate). Kullanıcıdan elle kur alınmaz: eski kur yanlış fiyat demek.
+// Kur ya da para birimi okunamazsa fiyat çevrilmez ve ürün eksik sayılır (TL tutar başka para birimiyle gönderilmez).
+// Dönen fonksiyon ürünün fiyatını yerinde çevirir ve eksik listesi döndürür (para birimi ve kur bir kez okunur).
+export function inCurrency(c, db) {
+  if (!c.catalog || !c.catalog.currency || !db) return async () => [];
+  // currency(opts): kanal hesabından okunur (eBay, Etsy, Amazon) ya da kanal seçeneğinden gelir (Ozon hesap para birimi)
+  const memo = new Map();
+  const load = async (opts) => {
+    let cur = '';
+    try { cur = str(await c.catalog.currency(opts || {})).toUpperCase(); } catch (e) { if (e.budget) throw e; return { err: `${c.name} para birimi okunamadı (${e.message})` }; }
+    if (!cur) return { skip: true }; // para birimi seçilmemiş: kanalın kendi eksik kontrolü bildirir, fiyat çevrilmez
+    if (cur === 'TRY' || cur === 'TL') return { cur: 'TRY', rate: 1 };
+    if (!memo.has(cur)) memo.set(cur, orderRate(db, cur).catch((e) => { if (e.budget) throw e; return null; }));
+    const rate = await memo.get(cur);
+    return rate > 0 ? { cur, rate } : { err: `döviz kuru (${cur}) alınamadı; fiyat çevrilemedi` };
+  };
+  return async (pr, opts) => {
+    const x = await load(opts);
+    if (x.skip) return [];
+    if (x.err) return [x.err];
+    pr.currency = x.cur;
+    if (x.rate !== 1) { pr.price = r2(pr.price / x.rate); pr.listPrice = r2(pr.listPrice / x.rate); pr.fxRate = x.rate; }
+    return [];
+  };
+}
+
 async function buildAll(c, map, prods, opts, zeroStock, db) {
-  const pick = picker(c, map.remote_id), out = [];
+  const pick = picker(c, map.remote_id), out = [], fx = inCurrency(c, db);
   // Marka eşleştirmesi (Kanallarda yayınla ekranında seçilen / adı birebir aynı bulunup hatırlanan kanal markası): ürün markasının adı
   // kanaldakiyle aynı olmasa da eşleşmiş marka kullanılır
   const brands = db && c.catalog.brands && !c.catalog.brandByCategory ? new Map((await all(db, 'SELECT brand, remote_id, remote_name FROM brand_map WHERE channel = ? AND COALESCE(remote_id, \'\') != \'\'', c.id).catch(() => [])).map((r) => [r.brand, r])) : new Map();
   // Marka alanı boş ürün: paneldeki markalardan adında geçen (tek) marka
   const known = db && prods.some((p) => !str(p.brand)) ? (await all(db, "SELECT DISTINCT brand FROM products WHERE COALESCE(TRIM(brand), '') != ''").catch(() => [])).map((r) => r.brand) : [];
+  // Kanalın toplu ön hazırlığı (ör. Mirakl barkodları 100'lük toplu arar): ürün başına ayrı dış istek olmasın; hata gönderimi durdurmaz
+  if (c.catalog.prepare && prods.length) { try { await c.catalog.prepare(prods.map((p) => shape(p, opts, zeroStock)), { opts }); } catch (e) { if (e.budget) throw e; } }
   for (const p of prods) {
-    const pr = shape(p, opts, zeroStock), auto = [];
+    const pr = shape(p, opts, zeroStock), auto = [], fxMiss = await fx(pr, opts);
     if (!str(p.brand) && known.length) { const g = inferBrand(p.name, known); if (g) { pr.brand = g; auto.push({ name: 'Marka', value: g }); } }
     const bm = brands.get(str(pr.brand));
     if (bm) { pr.brandId = bm.remote_id; pr.brand = str(bm.remote_name) || pr.brand; }
@@ -229,8 +271,9 @@ async function buildAll(c, map, prods, opts, zeroStock, db) {
         const f = await autoFill(c, map.remote_id, m, p, b.missing);
         if (f.filled.length) { b = await c.catalog.build(pr, { ...m, attrs: f.attrs }, { opts, pick }); auto.push(...f.filled); }
       }
-      out.push({ p: pr, ...b, auto });
-    } catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: ['hata: ' + e.message], auto }); }
+      // Kur alınamadıysa kanalın "fiyat para birimi" eksiği aynı şeyi söyler: bir kez gösterilir
+      out.push({ p: pr, ...b, missing: [...fxMiss, ...b.missing.filter((m) => !(fxMiss.length && /^fiyat para birimi/.test(m)))], auto });
+    } catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: [...fxMiss, 'hata: ' + e.message], auto }); }
   }
   return out;
 }
@@ -573,7 +616,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     return {
       map, listed: prods.length - open.length,
       items: open.map((p) => { const x = byId.get(p.id); const s = x ? x.p : shape(p, allOpts[c.id] || {}, !!Number(q.zero));
-        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, stock: s.stock, variant: s.variant, missing: x ? x.missing : [gone ? STALE_MSG : 'kategori eşleştirilmemiş'], auto: (x && x.auto) || [], sent: sent.has(p.id) }; }),
+        return { id: p.id, name: s.name, sku: s.sku, barcode: s.barcode, image: p.image, price: s.price, currency: s.currency || 'TRY', fxRate: s.fxRate || null, stock: s.stock, variant: s.variant, missing: x ? x.missing : [gone ? STALE_MSG : 'kategori eşleştirilmemiş'], auto: (x && x.auto) || [], sent: sent.has(p.id) }; }),
       ...(gone ? { stale: STALE_MSG } : {}),
     };
   }
@@ -581,10 +624,16 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const c = await target(env, db, str(b.channel));
     const ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter(Boolean);
     if (!ids.length) fail(400, 'Ürün seçin');
+    // Bir kanala aynı anda tek gönderim (çift tıklama / iki kullanıcı aynı ürünü iki kez açmasın); sonucu beklenen (gönderildi) ürün yeniden
+    // gönderilmez: kanal önceki gönderimi işlerken ikinci bir ilan açılabilir (sonuç gelince ya da 3 gün sonra yeniden gönderilebilir)
+    return exclusive(db, `upload:${c.id}`, async () => {
+    const wait = new Set((await allIn(db, ids, (ph, part) => [`SELECT product_id FROM product_channel WHERE channel = ? AND state = 'sent' AND COALESCE(updated_at, 0) > ? AND product_id IN (${ph})`,
+      [c.id, Date.now() - 3 * 864e5, ...part]])).map((r) => r.product_id));
     const prods = (await productsFor(db, settings, { ch: c.id, ids })).filter((p) => !p.listed);
     const groups = new Map();
-    for (const p of prods) { const k = str(p.category); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+    for (const p of prods) { if (wait.has(p.id)) continue; const k = str(p.category); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
     const ready = [], skipped = [], stale = await staleCheck(c);
+    for (const p of prods.filter((x) => wait.has(x.id))) skipped.push({ id: p.id, name: p.name, missing: ['önceki gönderimin sonucu bekleniyor (Gönderimler listesinden sonucu sorgulayın)'] });
     for (const [local, list] of groups) {
       const map = await mapOf(db, local, c.id);
       if (!map) { skipped.push(...list.map((p) => ({ id: p.id, name: p.name, missing: ['kategori eşleştirilmemiş'] }))); continue; }
@@ -605,6 +654,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       await log(db, c.id, 'error', `Ürün gönderimi başarısız: ${e.message}`);
       fail(502, `${c.name} ürünleri kabul etmedi: ${e.message}`);
     }
+    }, { ttl: 300e3, busy: 'Bu kanala şu an başka bir ürün gönderimi sürüyor; bitince tekrar deneyin.' });
   }
   // Kanalın ham durum cevabı (teşhis için: Hepsiburada'nın döndürdüğü JSON olduğu gibi)
   const mr = path.match(/^catalog\/uploads\/(\d+)\/raw$/);
@@ -626,7 +676,8 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
 
 // Gönderimin sonucunu kanaldan sorgula; tamamlandıysa ilanlar çekilip onaylanan ürünler panel ürününe bağlanır
 export async function checkUpload(env, db, ctx, u, c) {
-  const st = await c.catalog.status(u.ref);
+  // Gönderilen ürün anahtarları da verilir: kanal kaydı kaybolduysa ürün ürün açık sonuç yazabilsin (bkz. amazon.js status)
+  const st = await c.catalog.status(u.ref, JSON.parse(u.items || '[]').map((x) => x.key));
   const res = new Map(st.items.map((x) => [x.key, x]));
   const items = JSON.parse(u.items || '[]').map((x) => { const r = res.get(x.key); return r ? { ...x, ok: r.ok, status: r.status, error: r.error } : x; });
   const status = st.done ? 'done' : 'sent';

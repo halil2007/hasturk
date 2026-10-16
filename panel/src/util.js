@@ -90,14 +90,27 @@ export const chunk = (arr, n) => { const out = []; for (let i = 0; i < arr.lengt
 // (paragraf, satır, liste, kalın / italik, başlık, tablo, bağlantı, görsel); stil / sınıf öznitelikleri silinir, metin korunur.
 const KEEP_TAGS = new Set(['p', 'br', 'ul', 'ol', 'li', 'b', 'strong', 'i', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'a', 'img', 'sup', 'sub', 'hr', 'blockquote']);
 const KEEP_ATTRS = { a: ['href'], img: ['src', 'alt'], td: ['colspan', 'rowspan'], th: ['colspan', 'rowspan'] };
+// Bilinen (standart) HTML öğeleri: izinli olmayanlar silinir, içerikleri kalır (span, font, section …). Bilinmeyen ve ad alansız "<…>" HTML
+// sayılmaz: metin olarak (&lt; … &gt;) korunur ("Boy x<y ve z>w" bozulmaz; "<svg onload=…>" gibi etiket etkisiz yazıya döner).
+const HTML_TAGS = new Set(('html body head main section article aside header footer nav div span font center small big s strike del ins label abbr code pre '
+  + 'figure figcaption picture source mark cite q dl dt dd caption colgroup col tfoot form input button select option optgroup textarea fieldset legend '
+  + 'iframe object embed param video audio track canvas svg math noscript template slot details summary dialog menu address time data var samp kbd tt '
+  + 'bdi bdo wbr ruby rt rp meta link base area map').split(' '));
 export function cleanHtml(v) {
   let s = String(v ?? '');
   if (!s.includes('<')) return s.trim();
+  // Tembel (lazy) desenler doğrusal: yorum / koşullu yorum / blok etiketleri
   s = s.replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '').replace(/<!\[(?:if[^\]]*|endif)\]>/gi, '').replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(xml|style|script|head|title)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<!doctype[^>]*>/gi, '');
-  s = s.replace(/<(\/?)([a-z][\w:-]*)([^>]*)>/gi, (m, close, tag, rest) => {
+    .replace(/<(xml|style|script|head|title)\b[^<>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<!doctype[^<>]*>/gi, '');
+  // Tek geçişte etiket ya da tek başına < / > : etiket gövdesi < ve > içermez (kapanmamış "<a" sonraya kadar taranmaz; "<<x>img …>" gibi
+  // iç içe hile yeni etiket üretemez: eşleşmeyen her < / > metin olarak &lt; / &gt; yazılır)
+  s = s.replace(/<(\/?)([a-zA-Z][\w:-]*)([^<>]*)>|[<>]/g, (m, close, tag, rest) => {
+    if (!tag) return m === '<' ? '&lt;' : '&gt;';
     const t = tag.toLowerCase();
-    if (!KEEP_TAGS.has(t)) return t === 'div' ? (close ? '' : '<br>') : '';
+    if (!KEEP_TAGS.has(t)) {
+      if (t.includes(':') || HTML_TAGS.has(t)) return t === 'div' ? (close ? '' : '<br>') : ''; // Word (o:p, w:…) ve bilinen öğe: silinir
+      return m.replace(/</g, '&lt;').replace(/>/g, '&gt;'); // HTML değil: metin
+    }
     if (close) return t === 'br' || t === 'img' || t === 'hr' ? '' : `</${t}>`;
     const keep = KEEP_ATTRS[t] || [], attrs = [];
     for (const a of rest.matchAll(/([^\s=/]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/g)) {
@@ -106,9 +119,13 @@ export function cleanHtml(v) {
     }
     return `<${t}${attrs.join('')}>`;
   });
-  // Boş paragraf / biçim etiketleri (Word'ün boşluk satırları) ve fazla boşluklar
-  for (let i = 0; i < 3; i++) s = s.replace(/<(p|b|strong|i|em|u|li|h[1-6]|sup|sub)>(?:\s|&nbsp;|&#160;| )*<\/\1>/gi, '');
-  return s.replace(/^(?:\s|<br>)+|(?:\s|<br>)+$/g, '').replace(/(?:<br>\s*){3,}/g, '<br><br>').replace(/[ \t\r\n]+/g, ' ').trim();
+  // Boş paragraf / biçim etiketleri (Word'ün boşluk satırları). \s zaten U+00A0'ı kapsar: seçenekler çakışmaz (üstel geri izleme yok)
+  for (let i = 0; i < 3; i++) s = s.replace(/<(p|b|strong|i|em|u|li|h[1-6]|sup|sub)>(?:\s|&nbsp;|&#160;)*<\/\1>/gi, '');
+  s = s.replace(/[ \t\r\n\u00a0]+/g, ' ').replace(/(?:<br> ?){3,}/g, '<br><br>');
+  // Baştaki / sondaki boşluk ve <br>: döngüyle (uzun boşluk dizisinde regex geri izlemesi olmasın)
+  for (let k = -1; k !== s.length;) { k = s.length; s = s.replace(/^ +/, '').replace(/^<br>/, ''); }
+  for (let k = -1; k !== s.length;) { k = s.length; s = s.replace(/ +$/, '').replace(/<br>$/, ''); }
+  return s;
 }
 
 // Dış API isteği: zaman aşımı, 429/5xx'te kısa tekrar, anlaşılır hata mesajı
@@ -124,10 +141,11 @@ export function htmlReason(text, status) {
 }
 export async function http(url, { method = 'GET', headers = {}, body: b, timeout = 25000, tries = 2, raw = false } = {}) {
   for (let i = 1; ; i++) {
+    // Bütçe önce düşülür: sınır doluysa zamanlayıcı kurulmadan hata verilir (yoksa açık kalan zamanlayıcı işi bekletir)
+    spendBudget();
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeout);
     let res;
-    spendBudget();
     try {
       // Kimliksiz (User-Agent'sız) istekleri bazı pazaryeri güvenlik duvarları 403 ile reddeder: verilmediyse panel kimliği eklenir
       const h = headers && !Object.keys(headers).some((k) => k.toLowerCase() === 'user-agent') ? { ...headers, 'User-Agent': 'HasturkPanel/1.0 (+https://workers.cloudflare.com)' } : headers;

@@ -1,13 +1,17 @@
 // Dış API (stok aktarımı): yalnız ana panelin yetkilendirdiği müşteri panelleri için. Firmanın dış sistemi (ERP, kendi sitesi,
-// muhasebe programı …) kendi mağazasının ürün ve stoklarını okur; başka mağazaya erişemez, hiçbir şey yazamaz.
-//  - Anahtar ana panelde (Firmalar → firma → Dış API) üretilir; yalnız bir kez gösterilir, veritabanında özeti saklanır.
+// muhasebe programı …) kendi mağazasının ürün ve stoklarını okur; başka mağazaya erişemez. Yazma (satış bildirimi) yalnız
+// "satış bildirebilir" izni açık anahtarla: izin anahtar başınadır, eski / yeni anahtarlarda kapalı başlar (açılmadıkça anahtar yalnız okur).
+//  - Anahtar ana panelde (Firmalar → firma → Dış API; ana panelin kendi ürünleri için Ayarlar → Stok API) üretilir; yalnız bir kez
+//    gösterilir, veritabanında özeti saklanır. Satış izni de orada açılıp kapanır.
 //  - Anahtar firma koduna bağlıdır: hst_<firma-kodu>_<gizli> → yalnız o firmanın paneline yönlendirilir.
 //  - Firmanın kendi yöneticisi açamaz / kapatamaz / anahtar üretemez. İsteğe bağlı IP kısıtı. Dakikada 120 istek.
 // Uç noktalar (başlık: Authorization: Bearer <anahtar>):
 //   GET  /api/v1/ping                bağlantı testi
 //   GET  /api/v1/stock               ürünler ve stoklar (sayfalı): page, limit (en fazla 1000), updated_since, sku, barcode, include_inactive
-//   POST /api/v1/sales               dış sistemde satılan ürün: stok düşer, tüm kanallara gider (sipariş panele düşmez; bayi kendisi gönderir)
-//   POST /api/v1/sales/{ref}/cancel  satış iptal / iade: stok geri gelir
+//   POST /api/v1/sales               dış sistemde satılan ürün: stok düşer, tüm kanallara gider (sipariş panele düşmez; bayi kendisi gönderir).
+//                                    Yalnız satış izni olan anahtar; stok yetmezse, stok senkronu kapalıyken siteden aynalanan üründe
+//                                    ya da günlük adet sınırı aşılınca reddedilir (hiçbir stok düşmez)
+//   POST /api/v1/sales/{ref}/cancel  satış iptal / iade: stok geri gelir (satış izni gerekir)
 //   GET  /api/v1/sales/{ref}         bildirilen satışın durumu
 import { first, all, run, init, getRaw, setSetting, getSettings } from './db.js';
 import { json, str, fail } from './util.js';
@@ -19,7 +23,7 @@ const B62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 export const apiOf = (t) => { try { const a = JSON.parse((t && t.api) || 'null'); return a && typeof a === 'object' ? a : {}; } catch { return {}; } };
 // Ana panele gösterilen durum (anahtar özeti hariç)
-export const apiPublic = (t) => { const a = apiOf(t); return { on: !!a.on, hasKey: !!a.hash, hint: a.hint || '', ips: a.ips || [], created_at: a.created_at || null, last_at: a.last_at || null, last_ip: a.last_ip || '', calls: a.calls || 0 }; };
+export const apiPublic = (t) => { const a = apiOf(t); return { on: !!a.on, write: !!a.write, hasKey: !!a.hash, hint: a.hint || '', ips: a.ips || [], created_at: a.created_at || null, last_at: a.last_at || null, last_ip: a.last_ip || '', calls: a.calls || 0 }; };
 
 export async function newKey(slug) {
   const r = crypto.getRandomValues(new Uint8Array(32));
@@ -53,7 +57,7 @@ const seen = new Map(); // kullanım kaydı: firma başına dakikada en fazla bi
 // ---------- ana panelin kendi mağazası: birden çok anahtar (ör. her bayi / dış sistem için ayrı) ----------
 // Anahtar biçimi hsm_<kimlik>_<gizli>; ayarlarda (extapi_keys) yalnız özeti tutulur. Yalnız ana panel yöneticisi yönetir.
 const MAIN_KEY = /^hsm_([a-z0-9]{8})_[A-Za-z0-9]{32}$/;
-const keysPublic = (list) => (list || []).map((k) => ({ id: k.id, name: k.name, hint: k.hint, on: !!k.on, ips: k.ips || [], created_at: k.created_at, created_by: k.created_by || '', last_at: k.last_at || null, last_ip: k.last_ip || '', calls: k.calls || 0 }));
+const keysPublic = (list) => (list || []).map((k) => ({ id: k.id, name: k.name, hint: k.hint, on: !!k.on, write: !!k.write, ips: k.ips || [], created_at: k.created_at, created_by: k.created_by || '', last_at: k.last_at || null, last_ip: k.last_ip || '', calls: k.calls || 0 }));
 export async function mainKeysApi(db, path, method, b, user) {
   const list = (await getRaw(db, 'extapi_keys')) || [];
   const save = (l) => setSetting(db, 'extapi_keys', l);
@@ -67,7 +71,7 @@ export async function mainKeysApi(db, path, method, b, user) {
     const key = `hsm_${id}_${secret}`;
     let ips = [];
     try { ips = parseIps(b.ips); } catch (e) { fail(400, e.message); }
-    list.push({ id, name, hash: await hex(key), hint: `hsm_${id}_…${secret.slice(-4)}`, on: true, ips, created_at: Date.now(), created_by: (user && user.name) || '' });
+    list.push({ id, name, hash: await hex(key), hint: `hsm_${id}_…${secret.slice(-4)}`, on: true, write: b.write === true, ips, created_at: Date.now(), created_by: (user && user.name) || '' });
     await save(list);
     return { ok: true, key, keys: keysPublic(list) };
   }
@@ -79,6 +83,8 @@ export async function mainKeysApi(db, path, method, b, user) {
     if (method === 'PUT') {
       if (b.name !== undefined) k.name = str(b.name).trim().slice(0, 80) || k.name;
       if (b.on !== undefined) k.on = !!b.on;
+      // Satış bildirme (yazma) izni: kapalıyken anahtar yalnız okur
+      if (b.write !== undefined) k.write = b.write === true;
       if (b.ips !== undefined) { try { k.ips = parseIps(b.ips); } catch (e) { fail(400, e.message); } }
       await save(list);
       return { ok: true, keys: keysPublic(list) };
@@ -87,27 +93,48 @@ export async function mainKeysApi(db, path, method, b, user) {
   fail(404, 'Bulunamadı');
 }
 
-// Worker: anahtarı doğrula, firmanın paneline yönlendir. getTenant / forward tenants.js'ten verilir (döngüsel içe aktarmayı önlemek için)
+// POST gövdesi (satış bildirimi; JSON) en fazla 256 KB: Content-Length büyükse hiç okunmaz, yoksa okurken sınır aşılınca kesilir
+export const MAX_BODY = 256 * 1024;
+async function readBody(req) {
+  const cl = Number(req.headers.get('Content-Length'));
+  if (Number.isFinite(cl) && cl > MAX_BODY) return { res: err(413, 'Gövde en fazla 256 KB olabilir', 'body') };
+  let raw = '';
+  if (req.body) {
+    const rd = req.body.getReader(), parts = [];
+    let n = 0;
+    for (;;) {
+      const { done, value } = await rd.read();
+      if (done) break;
+      n += value.byteLength;
+      if (n > MAX_BODY) { rd.cancel().catch(() => {}); return { res: err(413, 'Gövde en fazla 256 KB olabilir', 'body') }; }
+      parts.push(value);
+    }
+    raw = await new Blob(parts).text();
+  }
+  try { JSON.parse(raw || 'null'); } catch { return { res: err(400, 'Gövde geçerli JSON olmalı', 'body') }; }
+  return { raw };
+}
+const READONLY = 'Bu API anahtarı yalnız stok okuma içindir; satış bildirme izni yok. Mağaza yetkilisinden bu anahtara "satış bildirebilsin" iznini açmasını isteyin.';
+
+// Worker: anahtarı doğrula, firmanın paneline yönlendir. getTenant / forward tenants.js'ten verilir (döngüsel içe aktarmayı önlemek için).
+// Sıra: anahtar → durum / IP → yazma izni → gövde (kimliği doğrulanmamış istekte gövde okunmaz)
 export async function extApi(req, env, ctx, path, { getTenant, forward, expired, mainInner = (e, u, s, k, o) => extApiInner(e.DB, u, s, k, { ...o, env: e, body: o && o.raw ? JSON.parse(o.raw) : null }) }) {
   if (!['GET', 'POST'].includes(req.method)) return err(405, 'Yalnız GET ve POST desteklenir', 'method');
-  // POST gövdesi (satış bildirimi; JSON, en fazla 256 KB) burada okunur, firmanın paneline aynen iletilir
-  let raw = null;
-  if (req.method === 'POST') {
-    raw = await req.text();
-    if (raw.length > 256e3) return err(413, 'Gövde en fazla 256 KB olabilir', 'body');
-    try { JSON.parse(raw || 'null'); } catch { return err(400, 'Gövde geçerli JSON olmalı', 'body'); }
-  }
-  const auth = req.headers.get('Authorization') || '', key = (/^Bearer\s+(.+)$/i.exec(auth) || [])[1] || req.headers.get('X-Api-Key') || '';
+  const post = req.method === 'POST';
+  const auth = req.headers.get('Authorization') || '', key = ((/^Bearer\s+(.+)$/i.exec(auth) || [])[1] || req.headers.get('X-Api-Key') || '').trim();
   // Ana panelin kendi mağazası (hsm_ anahtarı): ürünler ana veritabanından
-  const mk = MAIN_KEY.exec(key.trim());
+  const mk = MAIN_KEY.exec(key);
   if (mk && env.DB) {
     await init(env.DB);
     const list = (await getRaw(env.DB, 'extapi_keys')) || [];
     const k = list.find((x) => x.id === mk[1]);
-    if (!k || !same(await hex(key.trim()), k.hash)) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
+    if (!k || !same(await hex(key), k.hash)) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
     if (!k.on) return err(403, 'Bu API anahtarı kapalı', 'disabled');
     const ip = req.headers.get('CF-Connecting-IP') || '';
     if (!ipAllowed(ip, k.ips)) return err(403, `Bu IP adresine izin verilmemiş (${ip || 'bilinmiyor'})`, 'ip');
+    if (post && !k.write) return err(403, READONLY, 'readonly');
+    let raw = null;
+    if (post) { const b = await readBody(req); if (b.res) return b.res; raw = b.raw; }
     const s = seen.get('main:' + k.id) || { n: 0, at: 0 };
     s.n++;
     if (Date.now() - s.at > 60e3) {
@@ -121,15 +148,18 @@ export async function extApi(req, env, ctx, path, { getTenant, forward, expired,
     return mainInner(env, new URL('https://main.internal/__api/' + path.replace(/^v1\/?/, '') + url.search), { slug: 'ana-panel', name: (st.company && st.company.title) || 'Ana mağaza', key: k.id, source: k.name }, 'main:' + k.id,
       { method: req.method, raw, ctx });
   }
-  const m = /^hst_([a-z0-9-]{3,32})_[A-Za-z0-9]{32}$/.exec(key.trim());
+  const m = /^hst_([a-z0-9-]{3,32})_[A-Za-z0-9]{32}$/.exec(key);
   if (!m) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
   const t = env.DB ? await getTenant(env.DB, m[1], true) : null;
   const a = apiOf(t);
-  if (!t || !a.hash || !same(await hex(key.trim()), a.hash)) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
+  if (!t || !a.hash || !same(await hex(key), a.hash)) return err(401, 'API anahtarı eksik ya da geçersiz', 'auth');
   if (!a.on) return err(403, 'Bu mağaza için API erişimi kapalı', 'disabled');
   if (!t.active || expired(t)) return err(403, 'Mağaza paneli askıda ya da aboneliği dolmuş', 'inactive');
   const ip = req.headers.get('CF-Connecting-IP') || '';
   if (!ipAllowed(ip, a.ips)) return err(403, `Bu IP adresine izin verilmemiş (${ip || 'bilinmiyor'})`, 'ip');
+  if (post && !a.write) return err(403, READONLY, 'readonly');
+  let raw = null;
+  if (post) { const b = await readBody(req); if (b.res) return b.res; raw = b.raw; }
   // Kullanım: son erişim, IP ve sayaç (ana veritabanına en fazla dakikada bir)
   const s = seen.get(t.slug) || { n: 0, at: 0 };
   s.n++;
@@ -147,23 +177,59 @@ const rate = new Map();
 // ---------- satış bildirimi: dış sistemde (bayinin sitesi) satılan ürün panelin stoğundan düşer ----------
 // Sipariş panele düşmez (bayi siparişi kendisi yönetir ve gönderir); yalnız stok düşer, ürünün stok hareketlerinde "Bayi satışı" görünür
 // ve yeni stok tüm kanallara gider. Satış numarası (ref) anahtar başına tektir: aynı satış tekrar gelirse (ağ hatası sonrası yeniden
-// gönderim, aynı anda iki istek) stok ikinci kez düşmez. Her ürünün yazımları "bu satış daha önce işlenmedi" koşuluyla tek işlemdedir.
+// gönderim, aynı anda iki istek) stok ikinci kez düşmez; aynı numara farklı ürünle gelirse ya da iptal edildiyse reddedilir (409).
+// Numara önce ext_sale_refs'e (src + ref benzersiz) koşullu yazılır: koşul "her ürünün stoğu yeterli ve günlük sınır aşılmıyor".
+// Kaydı alan istek (tok) ürün yazımlarını yapar, diğerleri hiçbir şey yazmaz; hepsi tek işlemde (aynı anda gelen istekler birleşmez).
+// Stok eksiye düşmez: istenen adet mevcut stoktan fazlaysa satış reddedilir (409), hiçbir stok düşmez.
+// Stok senkronu kapalıyken stok siteden (ikas, katalog kanalı) aynalanan üründe satış reddedilir: düşülen adet bir sonraki senkronda
+// sitedeki stokla ezilirdi (bkz. sync.js mirrorStock); iptal de aynı nedenle reddedilir.
 const REF_RE = /^[A-Za-z0-9][A-Za-z0-9._\-/#]{0,63}$/;
+export const SALE_LIMITS = { lines: 100, dayQty: 5000 };
 const nostore = { 'Cache-Control': 'no-store' };
+const DAY = 864e5;
 async function saleOut(db, src, ref) {
   const rows = await all(db, 'SELECT s.product_id, s.qty, s.at, s.cancelled_at, p.sku, p.barcode, p.stock FROM ext_sales s LEFT JOIN products p ON p.id = s.product_id WHERE s.src = ? AND s.ref = ? ORDER BY s.product_id', src, ref);
   if (!rows.length) return null;
   return { ref, status: rows.every((r) => r.cancelled_at) ? 'cancelled' : 'active', created_at: new Date(Math.min(...rows.map((r) => r.at))).toISOString(),
     items: rows.map((r) => ({ product_id: r.product_id, sku: r.sku || null, barcode: r.barcode || null, quantity: r.qty, stock: r.stock == null ? null : Math.max(0, r.stock) })) };
 }
-async function afterSale(db, opts, pids) {
+async function afterSale(db, opts) {
   await import('./handler.js').then((m) => m.bumpCache(db)).catch(() => {});
   const settings = await getSettings(db).catch(() => ({}));
   if (opts.env && opts.ctx && opts.ctx.waitUntil) opts.ctx.waitUntil(import('./sync.js').then((m) => m.pushStocks(opts.env, db, settings)).catch(() => {}));
-  const w = [];
-  if (!settings.stock_sync) w.push('Panelde stok senkronu kapalı: stok düştü ama kanallara gönderilmedi');
-  if (pids.length) for (const r of await all(db, `SELECT sku, name, stock FROM products WHERE id IN (${pids.map(() => '?').join(',')}) AND stock < 0`, ...pids)) w.push(`${r.sku || r.name}: stok yetmedi (stok ${r.stock}); satış kaydedildi`);
-  return w;
+  return settings.stock_sync ? [] : ['Panelde stok senkronu kapalı: stok düştü ama kanallara gönderilmedi'];
+}
+// Stok senkronu kapalıyken stoğu katalog kanalından (ikas) aynalanan ürünler (mirrorStock'un okuduğu ilanlar)
+async function mirrored(db, pids) {
+  const settings = await getSettings(db).catch(() => ({}));
+  if (settings.stock_sync || !pids.length) return [];
+  const { catalogOf } = await import('./sync.js');
+  return all(db, `SELECT p.id, p.sku, p.barcode, p.name FROM products p WHERE p.id IN (SELECT value FROM json_each(?))
+    AND EXISTS (SELECT 1 FROM listings l WHERE l.product_id = p.id AND l.remote_stock IS NOT NULL AND l.channel IN (SELECT value FROM json_each(?))) ORDER BY p.id`,
+  JSON.stringify(pids), JSON.stringify(catalogOf(settings)));
+}
+const syncOff = (rows, what) => json({ error: `Panelde stok senkronu kapalı; ${what} stoğa işlenemez: ${rows.length} ürünün stoğu siteden (ikas) okunuyor, değişiklik bir sonraki senkronda geri yazılırdı. Hiçbir stok değişmedi; mağaza yetkilisi stok senkronunu açınca yeniden gönderin.`,
+  code: 'stock_sync_off', items: rows.map((r) => ({ product_id: r.id, sku: r.sku || null, barcode: r.barcode || null, name: r.name })) }, 409, nostore);
+// Satış neden işlenemez: yetersiz stok (pasif ürün satılamaz: stok listesinde 0 görünür) ya da anahtarın günlük adet sınırı
+async function blocker(db, src, want) {
+  const rows = await all(db, 'SELECT id, sku, barcode, name, stock, active FROM products WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify([...want.keys()]));
+  const short = rows.map((r) => ({ product_id: r.id, sku: r.sku || null, barcode: r.barcode || null, name: r.name, requested: want.get(r.id), available: r.active ? Math.max(0, r.stock || 0) : 0 }))
+    .filter((x) => x.requested > x.available);
+  if (short.length) return json({ error: `Stok yetersiz: ${short.length} üründe istenen adet mevcut stoktan fazla; hiçbir stok düşmedi (güncel stoğu /stock ile alın)`, code: 'insufficient_stock', items: short }, 409, nostore);
+  const used = Number((await first(db, 'SELECT COALESCE(SUM(qty), 0) AS n FROM ext_sales WHERE src = ? AND at > ?', src, Date.now() - DAY)).n) || 0;
+  const total = [...want.values()].reduce((a, x) => a + x, 0);
+  if (used + total > SALE_LIMITS.dayQty) return json({ error: `Günlük sınır: bu anahtarla son 24 saatte en fazla ${SALE_LIMITS.dayQty.toLocaleString('tr-TR')} adet satış bildirilebilir (şu ana kadar ${used}, bu satış ${total}); hiçbir stok düşmedi. Daha fazlası gerekiyorsa mağaza yetkilisiyle görüşün.`, code: 'daily_limit' }, 429, nostore);
+  return null;
+}
+// Aynı numara daha önce bildirildi: iptal edildiyse reddedilir; ürünler aynıysa aynen döner (stok yeniden düşmez), farklıysa reddedilir
+async function priorSale(db, src, ref, want) {
+  const had = await all(db, 'SELECT product_id, qty, cancelled_at FROM ext_sales WHERE src = ? AND ref = ?', src, ref);
+  const head = had.length ? null : await first(db, 'SELECT 1 AS x FROM ext_sale_refs WHERE src = ? AND ref = ?', src, ref);
+  if (!had.length && !head) return null;
+  if (had.some((r) => r.cancelled_at)) return err(409, 'Bu satış numarası iptal edildi; yeniden satış için yeni numara kullanın', 'cancelled');
+  const same = had.length === want.size && had.every((r) => want.get(r.product_id) === r.qty);
+  if (!same) return err(409, 'Bu satış numarası daha önce farklı ürün / adetle bildirildi; değiştirmek için önce iptal edip yeni numarayla bildirin', 'conflict');
+  return json({ ok: true, created: false, sale: await saleOut(db, src, ref), warnings: [] }, 200, nostore);
 }
 async function reportSale(db, src, store, b, opts) {
   if (!b || typeof b !== 'object') return err(400, 'Gövde JSON olmalı', 'body');
@@ -171,17 +237,17 @@ async function reportSale(db, src, store, b, opts) {
   if (!REF_RE.test(ref)) return err(400, 'ref gerekli: satışın (siparişinizin) numarası; harf, rakam, . _ - / # (en fazla 64 karakter)', 'param');
   // Ürün kimliği "id" (stok listesindeki) ya da "product_id" olarak verilebilir
   const items = (Array.isArray(b.items) ? b.items : []).map((x) => (x && typeof x === 'object' ? { ...x, product_id: x.product_id ?? x.id } : x));
-  if (!items.length || items.length > 200) return err(400, 'items: 1–200 kalem olmalı', 'param');
+  if (!items.length || items.length > SALE_LIMITS.lines) return err(400, `items: 1–${SALE_LIMITS.lines} kalem olmalı`, 'param');
   for (const [i, x] of items.entries()) {
     const q = Number(x && x.quantity);
-    if (!x || typeof x !== 'object' || !Number.isInteger(q) || q < 1 || q > 100000) return err(400, `items[${i}].quantity 1 ya da daha büyük tam sayı olmalı`, 'param');
+    if (!x || typeof x !== 'object' || !Number.isInteger(q) || q < 1 || q > SALE_LIMITS.dayQty) return err(400, `items[${i}].quantity 1–${SALE_LIMITS.dayQty} arası tam sayı olmalı`, 'param');
     if (!(Number(x.product_id) > 0) && !str(x.sku).trim() && !str(x.barcode).trim()) return err(400, `items[${i}]: product_id, sku ya da barcode gerekli`, 'param');
   }
   // Ürünler: kimlik (stok listesindeki id), stok kodu ya da barkod. Bulunamayan varsa hiçbir stok düşmez
   const { itemResolver } = await import('./match.js');
   const maps = await itemResolver(db);
-  const ids = items.map((x) => Number(x.product_id)).filter((x) => Number.isInteger(x) && x > 0);
-  const known = new Set(ids.length ? (await all(db, `SELECT id FROM products WHERE id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((r) => r.id) : []);
+  const ids = [...new Set(items.map((x) => Number(x.product_id)).filter((x) => Number.isInteger(x) && x > 0))];
+  const known = new Set(ids.length ? (await all(db, 'SELECT id FROM products WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(ids))).map((r) => r.id) : []);
   const want = new Map(), bad = [];
   items.forEach((x, i) => {
     const pid = Number(x.product_id) > 0 ? (known.has(Number(x.product_id)) ? Number(x.product_id) : null) : maps.resolve('api', { sku: str(x.sku), barcode: str(x.barcode) });
@@ -189,36 +255,48 @@ async function reportSale(db, src, store, b, opts) {
     else want.set(pid, (want.get(pid) || 0) + Number(x.quantity));
   });
   if (bad.length) return json({ error: `${bad.length} kalemin ürünü bulunamadı; hiçbir stok düşmedi (ürünleri /stock ile alıp id ya da sku gönderin)`, code: 'unknown_items', items: bad }, 422, nostore);
-  // Aynı satış daha önce bildirildi: ürünler aynıysa aynen döner (stok yeniden düşmez), farklıysa reddedilir
-  const had = await all(db, 'SELECT product_id, qty FROM ext_sales WHERE src = ? AND ref = ?', src, ref);
-  if (had.length) {
-    const same = had.length === want.size && had.every((r) => want.get(r.product_id) === r.qty);
-    if (!same) return err(409, 'Bu satış numarası daha önce farklı ürün / adetle bildirildi; değiştirmek için önce iptal edip yeni numarayla bildirin', 'conflict');
-    return json({ ok: true, created: false, sale: await saleOut(db, src, ref), warnings: [] }, 200, nostore);
-  }
-  const t = Date.now(), label = `${store.source} #${ref}`.slice(0, 120), st = [];
-  const fresh = 'NOT EXISTS (SELECT 1 FROM ext_sales WHERE src = ? AND ref = ? AND product_id = ?)';
+  const prior = await priorSale(db, src, ref, want);
+  if (prior) return prior;
+  const mir = await mirrored(db, [...want.keys()]);
+  if (mir.length) return syncOff(mir, 'satış');
+  const stop = await blocker(db, src, want);
+  if (stop) return stop;
+  const t = Date.now(), label = `${store.source} #${ref}`.slice(0, 120), total = [...want.values()].reduce((a, x) => a + x, 0);
+  const tok = [...crypto.getRandomValues(new Uint8Array(12))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  // Numarayı al: yalnız tüm ürünlerin stoğu yeterliyse ve günlük sınır aşılmıyorsa (aynı işlemde, eşzamanlı satışlar da kapsanır)
+  const st = [db.prepare(`INSERT OR IGNORE INTO ext_sale_refs (src, ref, tok, at) SELECT ?, ?, ?, ?
+    WHERE NOT EXISTS (SELECT 1 FROM json_each(?) j LEFT JOIN products p ON p.id = json_extract(j.value, '$[0]')
+      WHERE p.id IS NULL OR p.active = 0 OR p.stock < json_extract(j.value, '$[1]'))
+    AND (SELECT COALESCE(SUM(qty), 0) FROM ext_sales WHERE src = ? AND at > ?) + ? <= ?`)
+    .bind(src, ref, tok, t, JSON.stringify([...want]), src, t - DAY, total, SALE_LIMITS.dayQty)];
+  const mine = 'EXISTS (SELECT 1 FROM ext_sale_refs WHERE src = ? AND ref = ? AND tok = ?) AND NOT EXISTS (SELECT 1 FROM ext_sales WHERE src = ? AND ref = ? AND product_id = ?)';
   for (const [pid, q] of want) {
-    st.push(db.prepare(`UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ? AND ${fresh}`).bind(q, t, pid, src, ref, pid));
-    st.push(db.prepare(`INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) SELECT ?, ?, stock, 'Bayi satışı', ?, ? FROM products WHERE id = ? AND ${fresh}`).bind(pid, -q, label, t, pid, src, ref, pid));
-    st.push(db.prepare('INSERT OR IGNORE INTO ext_sales (src, ref, product_id, qty, at) VALUES (?, ?, ?, ?, ?)').bind(src, ref, pid, q, t));
+    st.push(db.prepare(`UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ? AND ${mine}`).bind(q, t, pid, src, ref, tok, src, ref, pid));
+    st.push(db.prepare(`INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) SELECT ?, ?, stock, 'Bayi satışı', ?, ? FROM products WHERE id = ? AND ${mine}`).bind(pid, -q, label, t, pid, src, ref, tok, src, ref, pid));
+    st.push(db.prepare(`INSERT OR IGNORE INTO ext_sales (src, ref, product_id, qty, at) SELECT ?, ?, ?, ?, ? WHERE ${mine}`).bind(src, ref, pid, q, t, src, ref, tok, src, ref, pid));
   }
   await db.batch(st);
-  const warnings = await afterSale(db, opts, [...want.keys()]);
+  const won = await first(db, 'SELECT tok FROM ext_sale_refs WHERE src = ? AND ref = ?', src, ref);
+  if (!won) return (await blocker(db, src, want)) || err(409, 'Satış şu an işlenemedi (stok bu sırada değişti); yeniden gönderin', 'retry');
+  if (won.tok !== tok) return (await priorSale(db, src, ref, want)) || err(409, 'Bu satış numarası şu an işleniyor; biraz sonra durumunu sorgulayın', 'conflict');
+  const warnings = await afterSale(db, opts);
   return json({ ok: true, created: true, sale: await saleOut(db, src, ref), warnings }, 201, nostore);
 }
 async function cancelSale(db, src, ref, store, opts) {
   const rows = await all(db, 'SELECT product_id, qty, cancelled_at FROM ext_sales WHERE src = ? AND ref = ?', src, ref);
   if (!rows.length) return err(404, 'Bu numarayla bildirilmiş satış yok', 'notfound');
+  const openRows = rows.filter((x) => !x.cancelled_at);
+  const mir = await mirrored(db, openRows.map((r) => r.product_id));
+  if (mir.length) return syncOff(mir, 'iptal');
   const t = Date.now(), label = `${store.source} #${ref}`.slice(0, 120), st = [];
   const open = 'EXISTS (SELECT 1 FROM ext_sales WHERE src = ? AND ref = ? AND product_id = ? AND cancelled_at IS NULL)';
-  for (const r of rows.filter((x) => !x.cancelled_at)) {
+  for (const r of openRows) {
     st.push(db.prepare(`UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ? AND ${open}`).bind(r.qty, t, r.product_id, src, ref, r.product_id));
     st.push(db.prepare(`INSERT INTO stock_moves (product_id, delta, stock_after, reason, ref, created_at) SELECT ?, ?, stock, 'Bayi satışı iptal', ?, ? FROM products WHERE id = ? AND ${open}`).bind(r.product_id, r.qty, label, t, r.product_id, src, ref, r.product_id));
     st.push(db.prepare('UPDATE ext_sales SET cancelled_at = ? WHERE src = ? AND ref = ? AND product_id = ? AND cancelled_at IS NULL').bind(t, src, ref, r.product_id));
   }
   if (st.length) await db.batch(st);
-  const warnings = st.length ? await afterSale(db, opts, []) : [];
+  const warnings = st.length ? await afterSale(db, opts) : [];
   return json({ ok: true, sale: await saleOut(db, src, ref), warnings }, 200, nostore);
 }
 
@@ -235,7 +313,8 @@ export async function extApiInner(db, url, store, rkey = store.slug, opts = {}) 
   if (p === 'sales' && method === 'POST') return reportSale(db, src, store, opts.body, opts);
   const sm = /^sales\/([^/]+)(\/cancel)?$/.exec(p);
   if (sm) {
-    const ref = decodeURIComponent(sm[1]);
+    let ref = '';
+    try { ref = decodeURIComponent(sm[1]); } catch { /* bozuk % dizisi: geçersiz numara */ }
     if (!REF_RE.test(ref)) return err(400, 'Satış numarası geçersiz', 'param');
     if (sm[2] && method === 'POST') return cancelSale(db, src, ref, store, opts);
     if (!sm[2] && method === 'GET') { const x = await saleOut(db, src, ref); return x ? json({ sale: x }, 200, nostore) : err(404, 'Bu numarayla bildirilmiş satış yok', 'notfound'); }

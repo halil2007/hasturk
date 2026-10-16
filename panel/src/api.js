@@ -35,7 +35,7 @@ import { perfReport } from './perf.js';
 import { mainKeysApi } from './extapi.js';
 import { supportResponse } from './support.js';
 import { guardConfig, setGuardConfig, guardList, guardUnblock, guardIp } from './guard.js';
-import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS, grossCost } from './carriers.js';
+import { carrierList, carrierFor, setDefaultCarrier, shipmentOf, isCarrierId, CARRIERS, grossCost, QUOTE_RE, saveQuote, quoteBelongs, dropQuotes } from './carriers.js';
 import { can, sectionOf } from '../public/perms.js';
 import { exclusive } from './locks.js';
 import { uploadImage, checkProductImages, dropUnused, hostedIds } from './prodimg.js';
@@ -298,7 +298,7 @@ async function finishCarrierCancel(db, o, ch, pkg, user, name, note = '') {
   if (pkg.carrier_cost && o.shipping_src === 'carrier') await run(db, 'UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) - ?) WHERE id = ?', pkg.carrier_cost, o.id);
   await run(db, "UPDATE packages SET carrier_provider = NULL, carrier_ref = NULL, carrier_cost = NULL, carrier_cost_final = NULL, carrier_state = NULL, carrier_status = NULL, carrier_checked_at = NULL, tracking = '', barcode = '', cargo_company = '', tracking_url = NULL, agreement = NULL, error = NULL, site_sync = NULL WHERE id = ?", pkg.id);
   await clearLabel(db, pkg.id);
-  for (const k of ['failed', 'orphan', 'cancelno']) await resolve(db, `carrier:${k}:${pkg.id}`);
+  for (const k of ['failed', 'orphan', 'cancelno', 'gone']) await resolve(db, `carrier:${k}:${pkg.id}`);
   // Not "Paket N:" ile başlar: yeniden açılan gönderinin referans eki bu kayıtlardan sayılır (bkz. carriers.js withAttempt)
   await event(db, o, 'carrier-cancel', user, `Paket ${pkg.no}: ${name}${note ? ` · ${note}` : ''}`);
   if (ch && ch.enabled && ch.caps && ch.caps.ownCarrier && pkg.remote_id && ch.cancelPackage) {
@@ -313,11 +313,13 @@ async function finishCarrierCancel(db, o, ch, pkg, user, name, note = '') {
   }
   return '';
 }
-// Takip turu (carriers.js): entegratör gönderiyi kesin iptal etti. Sipariş kilidiyle; kilit doluysa sonraki turda yeniden denenir
-export async function carrierCancelDone(env, db, orderId, pkgId, note) {
+// Takip turu (carriers.js): entegratör gönderiyi kesin iptal etti. Sipariş kilidiyle; kilit doluysa sonraki turda yeniden denenir.
+// ref: iptal edilen gönderinin numarası — okuma ile kilit arasında paket iptal edilip yeni gönderi açıldıysa yeni gönderinin kaydı silinmez
+export async function carrierCancelDone(env, db, orderId, pkgId, note, ref) {
   return exclusive(db, 'order:' + orderId, async () => {
     const o = await loadOrder(db, orderId), pkg = o.packages.find((p) => p.id === Number(pkgId));
     if (!pkg || !pkg.carrier_provider) return '';
+    if (ref !== undefined && String(pkg.carrier_ref ?? '') !== String(ref ?? '')) return '';
     const ch = await channel(env, db, o.channel);
     return finishCarrierCancel(db, o, ch, pkg, { name: 'Sistem (kargo entegratörü)', role: 'admin' }, (CARRIERS[pkg.carrier_provider] || { name: 'Entegratör' }).name, note);
   });
@@ -455,6 +457,9 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     o = await ensurePackages(db, ch, o);
     const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
     if (!pkg) fail(400, 'Gönderilecek açık paket yok');
+    // Paket zaten kargoya verildi (çift tıklama, takip turu ile kullanıcı aynı anda): kanala ikinci bildirim gitmez
+    if (pkg.status === 'shipped') fail(400, `Paket ${pkg.no} zaten kargoya verildi`);
+    if (pkg.status !== 'open') fail(400, `Paket ${pkg.no} açık değil; kargoya verilemez`);
     if (pkg.carrier_state === 'cancelling') fail(400, `Paket ${pkg.no}: entegratör gönderisi için iptal talebi bekleniyor; bu etiketle kargoya verilmez`);
     if (pkg.carrier_state === 'failed') fail(400, `Paket ${pkg.no}: kargo firması gönderiyi oluşturamadı; gönderiyi iptal edip yeniden oluşturun`);
     // ikas: ikas Kargo gönderisi ya da bağlı kargo entegratörüyle açılmış gönderi kargoya verilebilir; elle takip bilgisi kabul edilmez.
@@ -516,9 +521,16 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     const { shipment, missing } = shipmentOf(o, pkg, settings.sender || {}, { desi: num(sel.desi, 0) });
     if (missing.length) fail(400, 'Gönderi için eksik bilgi: ' + missing.join(', '));
     let r;
+    // Teklif numarası sunucuda doğrulanır: yalnız bu sipariş / paket için açılmış (carrier-quote), henüz hiçbir pakete bağlanmamış taslak
+    const draftId = str(sel.quote_id) || null;
+    if (draftId) {
+      if (!QUOTE_RE.test(draftId)) fail(400, 'Geçersiz teklif numarası');
+      if (!(await quoteBelongs(db, c.id, draftId, o.id, pkg))) fail(400, 'Fiyat teklifi bu pakete ait değil ya da süresi doldu; fiyatları yeniden getirin');
+      if (await first(db, 'SELECT 1 FROM packages WHERE carrier_provider = ? AND carrier_ref = ?', c.id, draftId)) fail(400, 'Bu fiyat teklifi zaten bir gönderiye bağlandı; fiyatları yeniden getirin');
+    }
     // Kargo firması kullanıcının seçimi: fiyat teklifinden (quote_id + firm_id) ya da adıyla (toplu gönderim: firm)
     // Çoklu / toplu gönderimde firma etiketi beklenmez (arayüz etiketleri sonra toplar); tek gönderide birkaç saniye beklenir
-    try { r = (await c.api.create(shipment, { draftId: str(sel.quote_id) || null, providerId: str(sel.firm_id) || null, firm: str(sel.firm) || null, noWait: !!(b.all || b.firm) })) || {}; } catch (e) {
+    try { r = (await c.api.create(shipment, { draftId, providerId: str(sel.firm_id) || null, firm: str(sel.firm) || null, noWait: !!(b.all || b.firm) })) || {}; } catch (e) {
       const em = e.message.startsWith(c.name) ? e.message : `${c.name}: ${e.message}`;
       await run(db, 'UPDATE packages SET error = ? WHERE id = ?', em.slice(0, 500), pkg.id);
       await log(db, o.channel, 'warn', `#${o.order_number} gönderi açılamadı: ${em}`);
@@ -526,6 +538,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     }
     const tn = str(r.tracking || r.barcode), t = Date.now();
     if (!tn && !r.ref) fail(502, `${c.name} gönderi numarası vermedi`);
+    if (draftId) await dropQuotes(db, c.id, [draftId]).catch(() => {});
     await run(db, `UPDATE packages SET carrier_provider = ?, carrier_ref = ?, carrier_cost = ?, carrier_cost_final = ${r.costFinal ? 1 : 'NULL'}, tracking = ?, barcode = ?, cargo_company = ?, tracking_url = ?, desi = ?,
       agreement = 'own', packed_at = COALESCE(packed_at, ?), label_format = ?, label_data = ?, label_at = ?, label_viewed_at = NULL, label_printed_at = NULL, error = NULL WHERE id = ?`,
     c.id, str(r.ref) || null, grossCost(r), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
@@ -569,8 +582,13 @@ async function orderAction(env, db, id, action, b, ctx, user) {
           if (missing.length) fail(400, 'Gönderi için eksik bilgi: ' + missing.join(', '));
           const q = await c.api.quote(shipment);
           out.push({ package_id: p.id, no: p.no, quote_id: str(q.ref), offers: q.offers || [], desi: shipment.desi });
+          await saveQuote(db, c.id, str(q.ref), o.id, p);
         }
-      } catch (e) { for (const x of out) await c.api.discard(x.quote_id).catch(() => null); throw e; }
+      } catch (e) {
+        for (const x of out) await c.api.discard(x.quote_id).catch(() => null);
+        await dropQuotes(db, c.id, out.map((x) => x.quote_id)).catch(() => {});
+        throw e;
+      }
       return { ok: true, packages: out };
     }
     const pkg = (b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open')) || { no: 1, items: o.items.filter((i) => !DEAD_LINE(i.status)).map((i) => ({ line_id: i.line_id, qty: i.quantity })) };
@@ -578,14 +596,19 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     const { shipment, missing } = shipmentOf(o, pkg, settings.sender || {}, { desi: num(b.desi, 0) });
     if (missing.length) fail(400, 'Gönderi için eksik bilgi: ' + missing.join(', '));
     const q = await c.api.quote(shipment);
+    try { await saveQuote(db, c.id, str(q.ref), o.id, pkg); } catch (e) { await c.api.discard(str(q.ref)).catch(() => null); throw e; }
     return { ok: true, quote_id: str(q.ref), offers: q.offers || [], desi: shipment.desi };
   }
   if (action === 'carrier-quote-cancel') {
     const c = await carrierFor(env, db, str(b.provider) || null);
-    // Bir pakete bağlanmış (onaylanmış) gönderi taslak sayılmaz: silinmez
-    const ids = [b.quote_id, ...(Array.isArray(b.quote_ids) ? b.quote_ids : [])].map(str).filter(Boolean).slice(0, 20);
+    // Yalnız bu sipariş için açılmış teklif silinir (başka siparişin taslağı / gönderisi silinemez); bir pakete bağlanmış (onaylanmış)
+    // gönderi taslak sayılmaz: silinmez
+    const ids0 = [b.quote_id, ...(Array.isArray(b.quote_ids) ? b.quote_ids : [])].map(str).filter((x) => QUOTE_RE.test(x)).slice(0, 20);
+    const ids = [];
+    for (const id of ids0) if (await quoteBelongs(db, c.id, id, o.id)) ids.push(id);
     const used = new Set(ids.length ? (await all(db, `SELECT carrier_ref FROM packages WHERE carrier_provider = ? AND carrier_ref IN (${ids.map(() => '?').join(',')})`, c.id, ...ids)).map((r) => String(r.carrier_ref)) : []);
     for (const id of ids) if (c.api.discard && !used.has(id)) await c.api.discard(id).catch(() => null);
+    await dropQuotes(db, c.id, ids).catch(() => {});
     return { ok: true };
   }
   if (action === 'carrier-cancel') {
@@ -604,8 +627,11 @@ async function orderAction(env, db, id, action, b, ctx, user) {
       await event(db, o, 'carrier-cancel-req', user, `Paket ${pkg.no}: ${c.name} iptal talebi (${pkg.carrier_ref})`);
       return { ok: true, pending: true, message: `Paket ${pkg.no}: ${c.name} iptal talebi iletildi. Onaylanınca ücret geri alınır ve paket yeniden gönderilebilir (birkaç saat sürebilir); bu sürede etiketi kullanmayın.` };
     }
-    const warn = await finishCarrierCancel(db, o, ch, pkg, user, c.name);
-    return { ok: true, message: `Paket ${pkg.no}: ${c.name} gönderisi iptal edildi${warn ? `; ${warn}` : ''}` };
+    // Gönderi entegratörde bulunamadı (silinmiş): iptal edilecek gönderi yok, panel kaydı kaldırılır
+    const gone = !!(res && res.gone);
+    const warn = await finishCarrierCancel(db, o, ch, pkg, user, c.name, gone ? `gönderi ${c.name}'de bulunamadı, kayıt kaldırıldı` : '');
+    return { ok: true, message: gone ? `Paket ${pkg.no}: ${c.name} gönderisi ${c.name}'de bulunamadı (silinmiş olabilir); panel kaydı kaldırıldı, paket yeniden gönderilebilir${warn ? `; ${warn}` : ''}`
+      : `Paket ${pkg.no}: ${c.name} gönderisi iptal edildi${warn ? `; ${warn}` : ''}` };
   }
   if (action === 'tracking') {
     // Kanal dışı (kendi anlaşmanızla) gönderimde takip no elle girilir — ikas'ta yok: gönderi yalnız ikas Kargo ile
@@ -881,8 +907,8 @@ async function listBuybox(db, q) {
 }
 
 // ---------- ürünler ----------
-const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months', 'origin'];
-const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price', 'list_price', 'weight', 'preparing_days', 'warranty_months']);
+const PRODUCT_FIELDS = ['sku', 'barcode', 'name', 'group_name', 'variant_name', 'brand', 'category', 'description', 'image', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'currency', 'fx_price', 'fx_margin', 'model_code', 'list_price', 'weight', 'width', 'height', 'length', 'preparing_days', 'warranty_months', 'origin'];
+const NUMERIC = new Set(['purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'active', 'fx_price', 'list_price', 'weight', 'width', 'height', 'length', 'preparing_days', 'warranty_months']);
 // Görsel bağlantıları: dizi ya da satır satır metin → tekrarsız https adresleri
 const imagesIn = (v) => imageList(Array.isArray(v) ? v : String(v || '').split(/[\s,]+/));
 export function cleanProduct(b) {

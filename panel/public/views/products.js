@@ -496,6 +496,7 @@ export async function productForm(id, done) {
         <label class="field"><span>KDV oranı</span><select class="input" name="vat">${[0, 1, 10, 20].map((v) => html`<option value="${v}" ${Number(p.vat) === v ? 'selected' : ''}>%${v}</option>`)}</select></label>
         <label class="field"><span>Desi</span><input class="input" name="desi" inputmode="decimal" value="${p.desi || ''}"></label>
         <label class="field"><span>Ağırlık (kg)</span><input class="input" name="weight" inputmode="decimal" placeholder="isteğe bağlı" value="${p.weight || ''}"></label>
+        <label class="field"><span>Paket ölçüsü (cm)</span><div class="row" style="gap:6px"><input class="input" name="width" inputmode="decimal" placeholder="en" aria-label="En (cm)" value="${p.width || ''}"><input class="input" name="length" inputmode="decimal" placeholder="boy" aria-label="Boy (cm)" value="${p.length || ''}"><input class="input" name="height" inputmode="decimal" placeholder="yükseklik" aria-label="Yükseklik (cm)" value="${p.height || ''}"></div></label>
         <label class="field"><span>Kargoya hazırlık (gün)</span><input class="input" name="preparing_days" inputmode="numeric" placeholder="kanal ayarı" value="${p.preparing_days || ''}"></label>
         <label class="field"><span>Garanti (ay)</span><input class="input" name="warranty_months" inputmode="numeric" placeholder="kanal ayarı" value="${p.warranty_months || ''}"></label>
         <label class="field"><span>Menşei</span><input class="input" name="origin" maxlength="40" placeholder="${(state.settings && state.settings.origin) || 'Türkiye'}" value="${p.origin || ''}"></label>
@@ -685,8 +686,8 @@ export async function productForm(id, done) {
   $('[data-save]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
     const fd = new FormData(form), b = {};
     if (uploading) return toast('Fotoğraflar yükleniyor; bitince kaydedin', true);
-    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'model_code', 'list_price', 'weight', 'preparing_days', 'warranty_months', 'origin']) b[k] = fd.get(k);
-    for (const k of ['purchase_price', 'sale_price', 'desi', 'ship_cost', 'list_price', 'weight', 'preparing_days', 'warranty_months']) b[k] = numIn(b[k]);
+    for (const k of ['name', 'sku', 'barcode', 'brand', 'category', 'group_name', 'variant_name', 'description', 'purchase_price', 'sale_price', 'vat', 'desi', 'ship_cost', 'critical_stock', 'model_code', 'list_price', 'weight', 'width', 'height', 'length', 'preparing_days', 'warranty_months', 'origin']) b[k] = fd.get(k);
+    for (const k of ['purchase_price', 'sale_price', 'desi', 'ship_cost', 'list_price', 'weight', 'width', 'height', 'length', 'preparing_days', 'warranty_months']) b[k] = numIn(b[k]);
     b.active = fd.get('active') ? 1 : 0;
     if (form.currency) { b.currency = fd.get('currency') || ''; b.fx_price = numIn(fd.get('fx_price')); b.fx_margin = String(fd.get('fx_margin') || '').trim() === '' ? '' : numIn(fd.get('fx_margin')); }
     if (!b.name.trim()) { const i = form.name; i.classList.add('err'); i.focus(); i.addEventListener('input', () => i.classList.remove('err'), { once: true }); return toast('Ürün adı gerekli', true); }

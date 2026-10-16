@@ -1,5 +1,8 @@
 // Ürün yükle: ikas kategorilerini pazaryeri kategorileriyle eşleştir, kanalda olmayan ürünleri seçip gönder, sonucu takip et.
 import { api, ek, locked, html, render, $, $$, money, n, dateTime, actions, busy, toast, sheet, debounce, chLogo, ch, thumb, isAdmin, store, state } from '../core.js';
+// Yurt dışı kanal: fiyat kanalın para biriminde (TCMB kuruyla çevrilmiş) gösterilir
+const fmtPrice = (x) => (x.currency && x.currency !== 'TRY' ? (() => { try { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: x.currency }).format(x.price); } catch { return `${x.price} ${x.currency}`; } })() : money(x.price));
+const fxNote = (items) => { const x = items.find((i) => i.currency && i.currency !== 'TRY' && i.fxRate); return x ? `, ${x.currency} fiyatı TCMB döviz alış kuruyla çevrilir (1 ${x.currency} = ${String(Math.round(x.fxRate * 10000) / 10000).replace('.', ',')} ₺)` : ''; };
 
 const ST = { sent: ['warn', 'Kanal işliyor'], done: ['good', 'Tamamlandı'], error: ['bad', 'Gönderilemedi'] };
 const catName = (l) => l || 'Kategorisiz';
@@ -175,13 +178,13 @@ export async function uploadView(el) {
         <div class="row wrap small"><span><b>${data.items.length}</b> ürün ${ek(c.name, 'da')} yok · <b style="color:var(--good)">${ready.length}</b> gönderime hazır${data.listed ? ` · ${data.listed} ürün zaten kanalda` : ''}</span><span class="spacer"></span>
           <label class="check"><input type="checkbox" data-zero ${zero ? 'checked' : ''}> Stok 0 gönder</label><label class="check"><input type="checkbox" data-all checked> Hazır olanların tümü</label></div>
         <div class="table-wrap" style="max-height:52vh;overflow:auto"><table class="t"><thead><tr><th></th><th>Ürün</th><th class="r">Fiyat</th><th class="r">Stok</th><th>Durum</th></tr></thead><tbody>
-          ${data.items.map((x) => html`<tr><td><input type="checkbox" data-id="${x.id}" ${x.missing.length ? 'disabled' : 'checked'}></td>
+          ${data.items.map((x) => html`<tr><td><input type="checkbox" data-id="${x.id}" ${x.missing.length ? 'disabled' : x.sent ? '' : 'checked'} title="${x.sent ? 'Daha önce gönderildi: yeniden göndermek için işaretleyin' : ''}"></td>
             <td><div class="row" style="gap:8px">${thumb(x.image, x.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:340px">${x.name}</div><div class="tiny muted">${x.sku} · ${x.barcode || 'barkod yok'}</div></div></div></td>
-            <td class="r num">${money(x.price)}</td><td class="r num">${x.stock}</td>
+            <td class="r num">${fmtPrice(x)}</td><td class="r num">${x.stock}</td>
             <td>${x.missing.length ? html`<span class="tiny" style="color:var(--bad)">Eksik: ${x.missing.join(', ')}</span>` : x.sent ? html`<span class="pill warn">daha önce gönderildi</span>` : html`<span class="pill good">hazır</span>`}
               ${(x.auto || []).length ? html`<div class="tiny muted" title="Ürün adından / kategorisinden kesin eşleşmeyle dolduruldu">otomatik: ${x.auto.map((a) => `${a.name} ${a.value}`).join(' · ')}</div>` : ''}</td></tr>`)}
         </tbody></table></div>
-        <p class="muted tiny" style="margin:0">Fiyat: ikas satış fiyatı${c.opts.markup ? ` + %${String(c.opts.markup).replace(/%/g, "")} (kanal ayarı)` : ''}. Eksikleri ürün sayfasından ya da kategori eşleştirmesinden tamamlayın.</p>
+        <p class="muted tiny" style="margin:0">Fiyat: ikas satış fiyatı${c.opts.markup ? ` + %${String(c.opts.markup).replace(/%/g, "")} (kanal ayarı)` : ''}${fxNote(data.items)}. Eksikleri ürün sayfasından ya da kategori eşleştirmesinden tamamlayın.</p>
       </div>`);
       s.setFoot(html`<div class="row" style="width:100%"><span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-x="go" ${ready.length ? '' : 'disabled'}><i class="ico ico-upload"></i>${C() && C().test ? 'Seçilenleri TEST ortamına gönder' : 'Seçilenleri gönder'}</button></div>`);
     }

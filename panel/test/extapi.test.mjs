@@ -5,7 +5,7 @@ import { d1 } from '../dev/d1.mjs';
 import { doNamespace } from '../dev/do.mjs';
 import worker, { TenantPanel } from '../src/index.js';
 import { resetChannels } from '../src/channels/index.js';
-import { ipAllowed, parseIps } from '../src/extapi.js';
+import { ipAllowed, parseIps, extApiInner } from '../src/extapi.js';
 
 function setup() {
   const env = { PANEL_PASSWORD: 'x-123456', PANEL_SECRET: 's'.repeat(32), DB: d1() };
@@ -38,7 +38,7 @@ test('dış API: ana panel yetkilendirir; mağaza yalnız kendi stoklarını oku
     assert.equal((await O('/api/tenants', J({ slug, name: slug.toUpperCase(), admin_username: 'yon', admin_password: 'gizli-sifre-1' }))).status, 200);
     assert.equal((await who('/api/login', J({ tenant: slug, username: 'yon', password: 'gizli-sifre-1' }))).status, 200);
   }
-  for (let i = 1; i <= 3; i++) assert.equal((await A('/api/products', J({ name: 'A ürün ' + i, sku: 'A-' + i, barcode: '86900' + i, sale_price: 100 + i }))).status, 200);
+  for (let i = 1; i <= 3; i++) assert.equal((await A('/api/products', J({ name: 'A ürün ' + i, sku: 'A-' + i, barcode: '86900' + i, sale_price: 100 + i, stock: 5 }))).status, 200);
   await B('/api/products', J({ name: 'B ürün', sku: 'B-1', sale_price: 50 }));
   // Firma yöneticisi yetkilendiremez
   assert.ok([403, 404].includes((await A('/api/tenants/magaza-a/api', J({ action: 'enable' }))).status));
@@ -47,7 +47,7 @@ test('dış API: ana panel yetkilendirir; mağaza yalnız kendi stoklarını oku
   assert.equal((await ext(call, 'hst_magaza-a_' + 'x'.repeat(32))).status, 401);
   // Ana panel açar: anahtar bir kez döner, sonra gösterilmez
   const en = await (await O('/api/tenants/magaza-a/api', J({ action: 'enable' }))).json();
-  assert.match(en.key, /^hst_magaza-a_[A-Za-z0-9]{32}$/); assert.equal(en.api.on, true);
+  assert.match(en.key, /^hst_magaza-a_[A-Za-z0-9]{32}$/); assert.equal(en.api.on, true); assert.equal(en.api.write, false, 'satış izni kapalı başlar');
   const st = await (await O('/api/tenants/magaza-a/api')).json();
   assert.equal(st.key, undefined); assert.equal(st.hash, undefined); assert.match(st.hint, /…/);
   // Okuma: yalnız A'nın ürünleri
@@ -60,13 +60,29 @@ test('dış API: ana panel yetkilendirir; mağaza yalnız kendi stoklarını oku
   assert.equal((await (await ext(call, en.key, '/api/v1/ping')).json()).ok, true);
   // B'nin anahtarı yok: A'nın gizli kısmıyla B koduna istek reddedilir
   assert.equal((await ext(call, en.key.replace('magaza-a', 'magaza-b'))).status, 401);
+  // Satış izni kapalıyken (varsayılan) anahtar yalnız okur: hiçbir POST kabul edilmez
+  const sale = (body) => call('ext')('/api/v1/sales', { method: 'POST', body: JSON.stringify(body), headers: { Authorization: 'Bearer ' + en.key, 'CF-Connecting-IP': '1.2.3.4' } });
+  let sr = await sale({ ref: 'WEB-1', items: [{ sku: 'A-1', quantity: 1 }] });
+  assert.equal(sr.status, 403); assert.equal((await sr.json()).code, 'readonly');
+  assert.equal((await call('ext')('/api/v1/stock', { method: 'POST', body: '{}', headers: { Authorization: 'Bearer ' + en.key } })).status, 403);
+  assert.equal((await (await ext(call, en.key, '/api/v1/stock?sku=A-1')).json()).items[0].stock, 5);
+  // Firma yöneticisi izni açamaz; ana panel açar
+  assert.ok([403, 404].includes((await A('/api/tenants/magaza-a/api', J({ action: 'write', write: true }))).status));
+  assert.equal((await (await O('/api/tenants/magaza-a/api', J({ action: 'write', write: true }))).json()).api.write, true);
   // Stok listesine yazılmaz (yazma yalnız satış bildirimi); başka yöntem yok
   assert.equal((await call('ext')('/api/v1/stock', { method: 'POST', body: '{}', headers: { Authorization: 'Bearer ' + en.key } })).status, 404);
   assert.equal((await call('ext')('/api/v1/stock', { method: 'DELETE', headers: { Authorization: 'Bearer ' + en.key } })).status, 405);
   // Firma panelinde satış bildirimi: kendi ürününün stoğu düşer; başka firmanın ürünü bulunamaz
-  const sale = (body) => call('ext')('/api/v1/sales', { method: 'POST', body: JSON.stringify(body), headers: { Authorization: 'Bearer ' + en.key, 'CF-Connecting-IP': '1.2.3.4' } });
-  let sr = await sale({ ref: 'WEB-1', items: [{ sku: 'A-1', quantity: 1 }] });
+  sr = await sale({ ref: 'WEB-1', items: [{ sku: 'A-1', quantity: 1 }] });
   assert.equal(sr.status, 201, await sr.clone().text());
+  assert.equal((await (await ext(call, en.key, '/api/v1/stock?sku=A-1')).json()).items[0].stock, 4);
+  // Stoktan fazla: reddedilir, stok düşmez
+  sr = await sale({ ref: 'WEB-3', items: [{ sku: 'A-2', quantity: 6 }] });
+  assert.equal(sr.status, 409); assert.equal((await sr.json()).code, 'insufficient_stock');
+  // İzin kapatılınca yeniden yalnız okur; yeniden açılır
+  await O('/api/tenants/magaza-a/api', J({ action: 'write', write: false }));
+  assert.equal((await sale({ ref: 'WEB-4', items: [{ sku: 'A-2', quantity: 1 }] })).status, 403);
+  await O('/api/tenants/magaza-a/api', J({ action: 'write', write: true }));
   assert.equal((await sale({ ref: 'WEB-2', items: [{ sku: 'B-1', quantity: 1 }] })).status, 422);
   // IP kısıtı
   await O('/api/tenants/magaza-a/api', J({ action: 'ips', ips: '85.105.10.0/24' }));
@@ -127,7 +143,7 @@ test('stok API: satış bildirimi stok düşer (tekrar / aynı anda çift bildir
   const real = globalThis.fetch, ty = [];
   globalThis.fetch = async (url, o = {}) => { if (/trendyol/.test(String(url))) { ty.push(o.body || ''); return new Response(JSON.stringify({ batchRequestId: 'b1' }), { headers: { 'Content-Type': 'application/json' } }); } return real(url, o); };
   try {
-    const X = X0((await (await O('/api/extapi', J({ name: 'Bayi Örnek' }))).json()).key);
+    const X = X0((await (await O('/api/extapi', J({ name: 'Bayi Örnek', write: true }))).json()).key);
     const stockOf = async (sku) => (await (await X('stock?sku=' + sku)).json()).items[0].stock;
     const t0 = new Date(Date.now() - 1000).toISOString();
     // Bilinmeyen ürün: hiçbir stok düşmez
@@ -166,7 +182,7 @@ test('stok API: satış bildirimi stok düşer (tekrar / aynı anda çift bildir
     assert.equal((await X('sales/YOK/cancel', J({}))).status, 404);
     assert.equal((await (await X('sales/S-2')).json()).sale.items[0].quantity, 1);
     // Başka bayinin aynı numarası ayrı satış sayılır; bu bayinin satışını iptal edemez
-    const Y = X0((await (await O('/api/extapi', J({ name: 'Bayi 2' }))).json()).key);
+    const Y = X0((await (await O('/api/extapi', J({ name: 'Bayi 2', write: true }))).json()).key);
     assert.equal((await Y('sales/S-2/cancel', J({}))).status, 404);
     assert.equal((await Y('sales', J({ ref: 'S-2', items: [{ sku: 'DT-1', quantity: 1 }] }))).status, 201);
     assert.equal(await stockOf('DT-1'), 8);
@@ -182,4 +198,128 @@ test('stok API: satış bildirimi stok düşer (tekrar / aynı anda çift bildir
     assert.ok(!(await (await X('stock')).json()).items.some((x) => x.sku === 'BT-1'));
     await Promise.allSettled(pend);
   } finally { globalThis.fetch = real; }
+});
+
+// Satış izni, yetersiz stok, günlük / kalem sınırı, senkron kapalıyken aynalanan ürün, iptal edilmiş numara, eşzamanlı farklı ürünlü
+// aynı numara, büyük gövde (kimlik doğrulamadan önce okunmaz), bozuk numara
+test('stok API satış güvenliği: izin, stok yeterliliği, sınırlar, senkron, iptal numarası, eşzamanlılık, gövde, bozuk ref', async () => {
+  resetChannels();
+  const { env, call } = setup();
+  const X0 = (key) => (path, opts = {}) => worker.fetch(new Request('https://panel.test/api/v1/' + path, { ...opts, headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', Authorization: 'Bearer ' + key, ...(opts.headers || {}) } }), env, { waitUntil() {} });
+  const O = call('owner');
+  await O('/api/login', J({ password: 'x-123456' }));
+  await O('/api/settings', J({ stock_sync: true }, 'PUT'));
+  for (const [sku, stock] of [['P-1', 3], ['P-2', 10], ['P-3', 6000], ['P-4', 20]]) await O('/api/products', J({ name: 'Ürün ' + sku, sku, sale_price: 10, stock }));
+  const id = async (sku) => (await env.DB.prepare('SELECT id FROM products WHERE sku = ?').bind(sku).first()).id;
+  const stockOf = async (sku) => (await env.DB.prepare('SELECT stock FROM products WHERE sku = ?').bind(sku).first()).stock;
+  const moves = async () => (await env.DB.prepare('SELECT COUNT(*) AS n FROM stock_moves').first()).n;
+  // İzin: yeni anahtar varsayılan olarak yalnız okur
+  const k = await (await O('/api/extapi', J({ name: 'Bayi' }))).json();
+  const kid = k.keys[0].id, X = X0(k.key);
+  assert.equal(k.keys[0].write, false);
+  let r = await X('sales', J({ ref: 'R-1', items: [{ sku: 'P-1', quantity: 1 }] }));
+  assert.equal(r.status, 403); const ro = await r.json(); assert.equal(ro.code, 'readonly'); assert.match(ro.error, /satış bildirme izni yok/);
+  assert.equal((await X('sales/R-1/cancel', J({}))).status, 403);
+  assert.equal((await X('stock')).status, 200);
+  assert.equal(await stockOf('P-1'), 3);
+  assert.equal((await (await O('/api/extapi/' + kid, J({ write: true }, 'PUT'))).json()).keys[0].write, true);
+  // Büyük gövde: Content-Length 256 KB üstü 413 (gövde okunmaz); yazma izni yoksa / anahtar geçersizse önce o
+  const big = JSON.stringify({ ref: 'B-1', items: [{ sku: 'P-1', quantity: 1 }], pad: 'x'.repeat(300 * 1024) });
+  assert.equal((await X('sales', { method: 'POST', body: big })).status, 413);
+  assert.equal((await X('sales', { method: 'POST', body: '{}', headers: { 'Content-Length': String(400 * 1024) } })).status, 413);
+  assert.equal((await X0('hsm_abcdefgh_' + 'x'.repeat(32))('sales', { method: 'POST', body: big })).status, 401);
+  const k2 = await (await O('/api/extapi', J({ name: 'Okuyucu' }))).json();
+  assert.equal((await X0(k2.key)('sales', { method: 'POST', body: big })).status, 403);
+  // Bozuk % dizisi: 400 (500 değil)
+  assert.equal((await X('sales/%E0%A4%A')).status, 400);
+  assert.equal((await X('sales/%ZZ/cancel', J({}))).status, 400);
+  // Yetersiz stok: hangi ürünlerde yetmediği listelenir, hiçbir stok düşmez; aynı numara sonra kullanılabilir
+  r = await X('sales', J({ ref: 'R-1', items: [{ sku: 'P-1', quantity: 4 }, { sku: 'P-2', quantity: 2 }, { sku: 'P-4', quantity: 21 }] }));
+  assert.equal(r.status, 409);
+  const ins = await r.json();
+  assert.equal(ins.code, 'insufficient_stock');
+  assert.deepEqual(ins.items.map((x) => [x.sku, x.requested, x.available]).sort(), [['P-1', 4, 3], ['P-4', 21, 20]]);
+  assert.equal(await stockOf('P-1'), 3); assert.equal(await stockOf('P-2'), 10); assert.equal(await moves(), 4);
+  // Aynı ürün iki satırda: toplam adet stokla karşılaştırılır
+  assert.equal((await X('sales', J({ ref: 'R-1', items: [{ sku: 'P-1', quantity: 2 }, { sku: 'P-1', quantity: 2 }] }))).status, 409);
+  r = await X('sales', J({ ref: 'R-1', items: [{ sku: 'P-1', quantity: 3 }] }));
+  assert.equal(r.status, 201, await r.clone().text());
+  assert.equal(await stockOf('P-1'), 0);
+  assert.equal((await X('sales', J({ ref: 'R-2', items: [{ sku: 'P-1', quantity: 1 }] }))).status, 409);
+  assert.equal(await stockOf('P-1'), 0);
+  // Kalem sınırı
+  assert.equal((await X('sales', J({ ref: 'R-3', items: Array.from({ length: 101 }, () => ({ sku: 'P-2', quantity: 1 })) }))).status, 400);
+  assert.equal((await X('sales', J({ ref: 'R-3', items: [{ sku: 'P-3', quantity: 5001 }] }))).status, 400);
+  // İptal edilmiş numara: tekrar bildirim 409 'cancelled' (stok düşmez)
+  assert.equal((await X('sales/R-1/cancel', J({}))).status, 200);
+  assert.equal(await stockOf('P-1'), 3);
+  r = await X('sales', J({ ref: 'R-1', items: [{ sku: 'P-1', quantity: 3 }] }));
+  assert.equal(r.status, 409); const cn = await r.json(); assert.equal(cn.code, 'cancelled'); assert.match(cn.error, /yeni numara/);
+  assert.equal(await stockOf('P-1'), 3);
+  // Eşzamanlı, aynı numara farklı ürünlerle: biri işlenir, diğeri 409; kalemler birleşmez
+  const race = await Promise.all([X('sales', J({ ref: 'C-1', items: [{ sku: 'P-2', quantity: 1 }] })), X('sales', J({ ref: 'C-1', items: [{ sku: 'P-4', quantity: 1 }] }))]);
+  assert.deepEqual(race.map((x) => x.status).sort(), [201, 409]);
+  const rows = (await env.DB.prepare("SELECT product_id FROM ext_sales WHERE ref = 'C-1'").all()).results;
+  assert.equal(rows.length, 1);
+  assert.equal((await stockOf('P-2')) + (await stockOf('P-4')), 29);
+  // Eşzamanlı, aynı numara aynı ürünle: bir kez düşer
+  const twin = await Promise.all([1, 2, 3].map(() => X('sales', J({ ref: 'C-2', items: [{ sku: 'P-4', quantity: 2 }] }))));
+  assert.deepEqual(twin.map((x) => x.status).sort(), [200, 200, 201]);
+  // Eşzamanlı, farklı numaralar son stok için: stok eksiye düşmez
+  const last = await Promise.all([X('sales', J({ ref: 'L-1', items: [{ sku: 'P-1', quantity: 2 }] })), X('sales', J({ ref: 'L-2', items: [{ sku: 'P-1', quantity: 2 }] }))]);
+  assert.deepEqual(last.map((x) => x.status).sort(), [201, 409]);
+  assert.equal(await stockOf('P-1'), 1);
+  // Kesin eşzamanlı (aynı numara, farklı ürün): iki istek de "daha önce bildirilmedi" denetimini geçip yazıma birlikte varır (yazım bekletilir)
+  let waiting = [];
+  const gated = { prepare: (q) => env.DB.prepare(q), batch: async (st) => {
+    await new Promise((ok) => { waiting.push(ok); if (waiting.length >= 2) { waiting.forEach((f) => f()); waiting = []; } else setTimeout(ok, 500); });
+    return env.DB.batch(st);
+  } };
+  const inner = (body) => extApiInner(gated, new URL('https://main.internal/__api/sales'), { slug: 'ana-panel', name: 'Ana', key: kid, source: 'Bayi' }, 'race:' + Math.random(), { method: 'POST', body });
+  const p24 = (await stockOf('P-2')) + (await stockOf('P-4'));
+  const exact = await Promise.all([inner({ ref: 'C-3', items: [{ sku: 'P-2', quantity: 1 }] }), inner({ ref: 'C-3', items: [{ sku: 'P-4', quantity: 1 }] })]);
+  assert.deepEqual(exact.map((x) => x.status).sort(), [201, 409]);
+  assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM ext_sales WHERE ref = 'C-3'").first()).n, 1);
+  assert.equal((await stockOf('P-2')) + (await stockOf('P-4')), p24 - 1);
+  const p4 = await stockOf('P-4');
+  // Aynı ürünle kesin eşzamanlı: stok bir kez düşer, ikincisi 200 (created false)
+  const same2 = await Promise.all([inner({ ref: 'C-4', items: [{ sku: 'P-4', quantity: 1 }] }), inner({ ref: 'C-4', items: [{ sku: 'P-4', quantity: 1 }] })]);
+  assert.deepEqual(same2.map((x) => x.status).sort(), [200, 201]);
+  assert.equal(await stockOf('P-4'), p4 - 1);
+  // Son stok için kesin eşzamanlı iki farklı numara: biri reddedilir, stok eksiye düşmez
+  const p1 = await stockOf('P-1');
+  const lastX = await Promise.all([inner({ ref: 'L-3', items: [{ sku: 'P-1', quantity: p1 }] }), inner({ ref: 'L-4', items: [{ sku: 'P-1', quantity: p1 }] })]);
+  assert.deepEqual(lastX.map((x) => x.status).sort(), [201, 409]);
+  assert.equal(await stockOf('P-1'), 0);
+  assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM ext_sale_refs WHERE ref IN ('L-3', 'L-4')").first()).n, 1);
+  assert.equal((await lastX.find((x) => x.status === 409).json()).code, 'insufficient_stock');
+  // Günlük sınır: anahtar başına son 24 saatte 5.000 adet
+  r = await X('sales', J({ ref: 'D-1', items: [{ sku: 'P-3', quantity: 4980 }] }));
+  assert.equal(r.status, 201);
+  r = await X('sales', J({ ref: 'D-2', items: [{ sku: 'P-3', quantity: 100 }] }));
+  assert.equal(r.status, 429); assert.equal((await r.json()).code, 'daily_limit');
+  assert.equal(await stockOf('P-3'), 1020);
+  // Başka anahtarın sınırı ayrı
+  await O('/api/extapi/' + k2.keys.find((x) => x.name === 'Okuyucu').id, J({ write: true }, 'PUT'));
+  assert.equal((await X0(k2.key)('sales', J({ ref: 'D-2', items: [{ sku: 'P-3', quantity: 100 }] }))).status, 201);
+  // Stok senkronu kapalı: stoğu siteden (ikas) aynalanan üründe satış ve iptal reddedilir; aynalanmayan üründe satış işlenir (uyarıyla)
+  r = await X('sales', J({ ref: 'S-1', items: [{ sku: 'P-2', quantity: 1 }] }));
+  assert.equal(r.status, 201);
+  await env.DB.prepare("INSERT INTO listings (channel, remote_id, product_id, sku, name, remote_stock) VALUES ('ikas1', 'v-2', ?, 'P-2', 'Ürün P-2', 8)").bind(await id('P-2')).run();
+  await O('/api/settings', J({ stock_sync: false }, 'PUT'));
+  const p2 = await stockOf('P-2');
+  r = await X('sales', J({ ref: 'S-2', items: [{ sku: 'P-2', quantity: 1 }, { sku: 'P-4', quantity: 1 }] }));
+  assert.equal(r.status, 409);
+  const so = await r.json();
+  assert.equal(so.code, 'stock_sync_off'); assert.match(so.error, /stok senkronu kapalı; satış stoğa işlenemez/); assert.deepEqual(so.items.map((x) => x.sku), ['P-2']);
+  assert.equal(await stockOf('P-2'), p2);
+  r = await X('sales/S-1/cancel', J({}));
+  assert.equal(r.status, 409); assert.equal((await r.json()).code, 'stock_sync_off');
+  assert.equal(await stockOf('P-2'), p2);
+  r = await X('sales', J({ ref: 'S-3', items: [{ sku: 'P-4', quantity: 1 }] }));
+  assert.equal(r.status, 201); assert.match((await r.json()).warnings.join(' '), /senkronu kapalı/);
+  // Senkron açılınca aynı numarayla gönderilebilir
+  await O('/api/settings', J({ stock_sync: true }, 'PUT'));
+  assert.equal((await X('sales', J({ ref: 'S-2', items: [{ sku: 'P-2', quantity: 1 }] }))).status, 201);
+  assert.equal(await stockOf('P-2'), p2 - 1);
 });

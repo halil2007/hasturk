@@ -5,9 +5,10 @@
 // yalnız il / ilçe gelir, ad boş kalır. Satır servisi (orderItems) yavaş kotalıdır (0,5 istek/sn): çağrı başına en eski 100 sipariş işlenir,
 // fazlası varsa imleç son işlenenin güncellenme zamanında kalır (partialUntil), kalanlar sonraki senkronda. FBA (AFN) siparişlerini Amazon gönderir: durum OrderStatus'tan okunur, panelden kargoya verilmez.
 // Ürün / stok / fiyat: Listings Items 2021-08-01 (searchListingsItems; patchListingsItem SKU başına bir istek, 5 istek/sn).
-// Kargoya verme: shipmentConfirmation (takip no + kargo firması). Ürün oluşturma, etiket, iade yok.
+// Kargoya verme: shipmentConfirmation (takip no + kargo firması). Etiket, iade yok.
+// Ürün yükleme (Ürün Yükle / Kanallarda yayınla): kategori = Amazon ürün tipi (Product Type Definitions), ilan putListingsItem ile (aşağıda).
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, sleep, diagStep, imageList, DEAD_LINE } from '../util.js';
+import { http, num, str, r2, sleep, diagStep, imageList, oneAxis, DEAD_LINE } from '../util.js';
 
 const STATUS = { Pending: 'new', PendingAvailability: 'new', Unshipped: 'new', InvoiceUnconfirmed: 'new', PartiallyShipped: 'processing', Shipped: 'shipped', Canceled: 'cancelled', Unfulfillable: 'cancelled' };
 // Pazar yeri → para birimi (fiyat gönderiminde purchasable_offer.currency)
@@ -16,7 +17,28 @@ const CURRENCY = { A33AVAJ2PDY3EV: 'TRY', A1PA6795UKMFR9: 'EUR', A13V1IB3VIYZZH:
   ATVPDKIKX0DER: 'USD', A2EUQ1WTGCTBG2: 'CAD', A1AM78C64UM0Y8: 'MXN', A2Q3Y263D00KWC: 'BRL', A1VC38T7YXB528: 'JPY', A39IBJ37TRP1C6: 'AUD', A19VAU5U5O7RUS: 'SGD' };
 const MAX_ORDERS = 100;
 const money = (m) => num(m && m.Amount);
+// Ürün tipi listesi ve şemalar modül düzeyinde önbellekte (kanal nesnesi istek başına yeniden kurulabilir): API + pazar yeri + satıcı anahtarıyla, 6 saat
+const PT_CACHE = new Map(), SCHEMA_CACHE = new Map();
 const iso = (ms) => encodeURIComponent(new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z'));
+// Açıklama düz metne çevrilir: Amazon metin alanlarında HTML etiketi kabul etmez ("An HTML tag cannot be included in this field",
+// Listings Items API Issues Troubleshooting)
+const plain = (h) => String(h || '').replace(/<\s*br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n').replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+  .replace(/[ \t]+/g, ' ').replace(/ *\n[\s]*/g, '\n').trim();
+const bytes = (s) => new TextEncoder().encode(s).length;
+// Uzun metin sınırda kelime ortasından değil son boşluktan kesilir (yalnız açıklama; ürün adı kesilmez, eksik bildirilir)
+function cut(s, max, inBytes) {
+  const len = (x) => (inBytes ? bytes(x) : x.length);
+  if (!max || len(s) <= max) return s;
+  let t = s.slice(0, max);
+  while (t && len(t) > max) t = t.slice(0, -1);
+  const sp = t.lastIndexOf(' ');
+  return (sp > max * 0.6 ? t.slice(0, sp) : t).trim();
+}
+// Listings Items 2021-08-01 Issue: { code, message, severity: ERROR | WARNING | INFO, attributeNames, categories }; yalnız ERROR gönderimi durdurur
+const issueText = (list) => [...new Set((list || []).filter((i) => i && i.severity === 'ERROR').map((i) => str(i.message)).filter(Boolean))].join(' · ').slice(0, 900);
+// ErrorList: { errors: [{ code, message, details }] } (400 / 403 / 404 / 413 / 415 / 429 / 500 / 503)
+const apiErr = (e) => ((e && e.data && Array.isArray(e.data.errors) && e.data.errors.map((x) => [str(x.message), str(x.details)].filter(Boolean).join(' ')).filter(Boolean).join(' · ')) || str(e && e.message)).slice(0, 900);
 
 export function amazon(env, meta) {
   const seller = str(env.AMAZON_SELLER_ID), market = str(env.AMAZON_MARKETPLACE_ID) || 'A33AVAJ2PDY3EV';
@@ -168,6 +190,373 @@ export function amazon(env, meta) {
     return { tracking };
   }
 
+  // ---------- ürün yükleme: Product Type Definitions 2020-09-01 + Listings Items 2021-08-01 (putListingsItem) ----------
+  // Kaynaklar: resmi modeller github.com/amzn/selling-partner-api-models (models/product-type-definitions-api-model/definitionsProductTypes_2020-09-01.json,
+  // models/listings-items-api-model/listingsItems_2021-08-01.json; aynıları @sp-api-sdk/*-api npm paketlerinde) ve developer-docs.amazon.com/sp-api
+  // sayfaları (@amazon-sp-api-release/sp-api-dev-mcp 1.0.5 paketindeki belge dizininden okundu): Building Listings Management Workflows Guide,
+  // Retrieve a Product Type Definition, Product Type Definitions Meta-Schema (v1), Get recommended browse nodes or item type keywords,
+  // Tutorial: Retrieve Merchant Shipping Templates, Mapping product attributes, Manage purchasable offer, Submit media attributes,
+  // Listings APIs FAQ, Listings Items API Issues Troubleshooting, Listings Items / Product Type Definitions API Rate Limits.
+  // - Kategori = Amazon ürün tipi: searchDefinitionsProductTypes (keywords olmadan tüm ürün tipleri, keywords ile Amazon araması) → { productTypes: [{ name, displayName, marketplaceIds }] }.
+  // - Özellikler: getDefinitionsProductType (requirements=LISTING: ürün bilgisi + satış koşulları, requirementsEnforced=ENFORCED, parentageLevel=NONE:
+  //   varyasyon ailesi dışı tek ilan şeması, sellerId: satıcıya özel değerler) → schema.link.resource (S3 bağlantısı, 7 gün geçerli, kimliksiz GET).
+  //   Şema JSON Schema 2019-09: kök "required" zorunlu özellikler; her özellik bir dizi, items.properties.value (enum + enumNames, ya da anyOf
+  //   [serbest metin, enum]), marketplace_id / language_tag ($ref "#/$defs/…"). Yalnız value (+ marketplace_id / language_tag) içeren basit özellikler
+  //   eşleştirilir; birimli / çok alanlı zorunlu özellikler (ör. ağırlık + birim) eksik olarak bildirilir. Koşullu zorunluluklar (allOf if/then)
+  //   değerlendirilmez: Amazon bunları gönderimde INVALID + issues olarak bildirir.
+  // - Gönderim: putListingsItem SKU başına bir istek (5 istek/sn, burst 10). ACCEPTED = ilk doğrulama geçti, Amazon işlemeye aldı; INVALID = kaydedilmedi.
+  //   mode=VALIDATION_PREVIEW kullanılmaz: INVALID gönderim zaten kaydedilmez, aynı sorunlar gerçek gönderimin cevabında gelir (iki kat istek olurdu).
+  //   putListingsItem tam değiştirmedir (SKU varsa ilanın tüm özellikleri gönderilenle değişir): önce getListingsItem (summaries) ile SKU
+  //   sorulur; 200 = Amazon'da zaten var → dokunulmaz, 404 = yok → gönderilir.
+  //   Sonuçlar kanal deposunda (gönderim başına kv "up:<kimlik>") saklanır; kabul edilenler getListingsItem (summaries, issues) ile izlenir:
+  //   özet (ASIN) gelince oluşturuldu, işleme sırasında ERROR sorunu çıkarsa reddedildi (Listings APIs FAQ: getListingsItem 1-5 dk içinde güncellenir).
+  // - Anahtar: SKU (fetchListings ilanı SKU ile tanıtır; Amazon'da ilan kimliği satıcı SKU'sudur).
+  const PTD = '/definitions/2020-09-01/productTypes', kv = meta && meta.kv;
+  const ptRow = (p) => ({ id: str(p.name), name: str(p.displayName) || str(p.name), path: str(p.name) });
+  async function productTypes(keywords) {
+    const r = await call(`${PTD}?${mq}${keywords ? '&keywords=' + encodeURIComponent(keywords) : ''}`, { tries: 4 });
+    return ((r && r.productTypes) || []).filter((p) => !(p.marketplaceIds || []).length || p.marketplaceIds.includes(market)).map(ptRow).filter((p) => p.id);
+  }
+  const ck = `${API}|${market}|${seller}`;
+  if (!PT_CACHE.has(ck)) PT_CACHE.set(ck, { list: null, hits: new Map() });
+  const ptc = PT_CACHE.get(ck), ptHits = ptc.hits;
+  async function allCategories() {
+    if (!ptc.list || Date.now() - ptc.list.at > 6 * 3600e3) ptc.list = { at: Date.now(), all: await productTypes('') };
+    return ptc.list.all;
+  }
+  async function categories(q) {
+    const all = await allCategories(), k = str(q).toLocaleLowerCase('tr');
+    let items = all.filter((c) => !k || `${c.name} ${c.id}`.toLocaleLowerCase('tr').includes(k));
+    // Amazon'un anahtar kelime araması (ürün tipinin adında geçmeyen kelimeler için): yerel eşleşmelerin ardından
+    if (k && items.length < 60) {
+      if (ptHits.size > 200) ptHits.clear();
+      if (!ptHits.has(k)) ptHits.set(k, await productTypes(str(q)).catch((e) => { if (e.budget) throw e; return []; }));
+      const have = new Set(items.map((c) => c.id));
+      items = [...items, ...ptHits.get(k).filter((c) => !have.has(c.id))];
+    }
+    return { total: all.length, items: items.slice(0, 60) };
+  }
+
+  // Şema: yerel $ref ("#/$defs/language_tag" …) çözülür; yalnız zorunlu ve panelin kendisinin doldurduğu özellikler özetlenir
+  const AUTO = new Set(['item_name', 'brand', 'product_description', 'externally_assigned_product_identifier', 'supplier_declared_has_product_identifier_exemption',
+    'purchasable_offer', 'list_price', 'fulfillment_availability', 'item_package_weight', 'item_package_dimensions', 'main_product_image_locator', ...Array.from({ length: 8 }, (_, i) => `other_product_image_locator_${i + 1}`)]);
+  const ptr = (root, ref) => (typeof ref === 'string' && ref.startsWith('#/') ? ref.slice(2).split('/').reduce((o, k) => (o == null ? o : o[k.replace(/~1/g, '/').replace(/~0/g, '~')]), root) : null);
+  const deref = (root, x) => { for (let i = 0; x && x.$ref && i < 10; i++) x = ptr(root, x.$ref); return x || {}; };
+  // Değer listesi: enum (+ enumNames) doğrudan ya da anyOf / oneOf içinde; enum'suz anyOf kolu = serbest değer de kabul edilir
+  function scalar(root, v) {
+    v = deref(root, v);
+    const alts = [...(v.anyOf || []), ...(v.oneOf || [])].map((x) => deref(root, x)), list = [];
+    for (const e of [v, ...alts]) (e.enum || []).forEach((x, i) => list.push({ id: String(x), value: str((e.enumNames || [])[i]) || String(x) }));
+    const type = v.type || (alts.find((x) => x.type) || {}).type || 'string';
+    return { type, list, free: !v.enum && (!alts.length || alts.some((x) => !x.enum)), max: v.maxLength || v.maxUtf8ByteLength || 0, bytes: !v.maxLength && !!v.maxUtf8ByteLength, def: v.default };
+  }
+  function digest(s) {
+    const req = new Set(s.required || []), props = {};
+    for (const [name, raw] of Object.entries(s.properties || {})) {
+      if (!req.has(name) && !AUTO.has(name)) continue;
+      const p = deref(s, raw), items = deref(s, p.items), ip = items.properties || {}, ireq = items.required || [];
+      const sub = {};
+      const nest = {};
+      for (const [k, x] of Object.entries(ip)) {
+        const d = deref(s, x);
+        if (d.type !== 'object' && d.type !== 'array') sub[k] = scalar(s, d);
+        // İç içe nesne (ör. item_package_dimensions.length = { value, unit }): yalnız düz alanları özetlenir
+        else if (d.type === 'object') nest[k] = { keys: Object.keys(d.properties || {}), sub: Object.fromEntries(Object.entries(d.properties || {}).map(([j, y]) => [j, scalar(s, y)])) };
+      }
+      // Dil etiketi: şemadaki varsayılan; yoksa listede tek değer varsa o (birden çok ve varsayılansızsa belirlenemez)
+      const lt = sub.language_tag, lang = lt ? str(lt.def) || (lt.list.length === 1 ? lt.list[0].id : '') : '';
+      const value = ip.value ? sub.value || null : null;
+      props[name] = { name, title: str(p.title) || name, required: req.has(name), keys: Object.keys(ip), req: ireq, sub, nest, lang, value,
+        simple: !!value && ireq.every((k) => ['value', 'marketplace_id', 'language_tag'].includes(k)) };
+    }
+    return { productType: str((/\/([^/]+)$/.exec(str(s.$id)) || [])[1]), props };
+  }
+  function schemaOf(pt) {
+    const key = `${ck}|${pt}`, hit = SCHEMA_CACHE.get(key);
+    if (hit && Date.now() - hit.at < 6 * 3600e3) return hit.p;
+    const p = (async () => {
+      const d = await call(`${PTD}/${encodeURIComponent(pt)}?${mq}&sellerId=${encodeURIComponent(seller)}&requirements=LISTING&requirementsEnforced=ENFORCED&parentageLevel=NONE`, { tries: 4 });
+      const link = d && d.schema && d.schema.link;
+      if (!link || !link.resource) throw new Error(`Amazon: ${pt} ürün tipinin şema bağlantısı alınamadı`);
+      // Ön imzalı S3 bağlantısı: Amazon erişim belirteci gönderilmez (resmi örnek uygulama da düz GET ile okur)
+      const s = await http(link.resource, { method: str(link.verb) || 'GET', timeout: 60000, tries: 3 });
+      if (!s || typeof s !== 'object' || !s.properties) throw new Error(`Amazon: ${pt} ürün tipinin şeması okunamadı`);
+      return { ...digest(s), productType: str(d.productType) || pt };
+    })();
+    if (SCHEMA_CACHE.size > 100) SCHEMA_CACHE.delete(SCHEMA_CACHE.keys().next().value);
+    SCHEMA_CACHE.set(key, { at: Date.now(), p });
+    p.catch(() => SCHEMA_CACHE.delete(key));
+    return p;
+  }
+  const attrType = (p) => (!p.simple ? 'complex' : p.value.list.length || p.value.type === 'boolean' ? 'enum' : p.value.type === 'string' ? 'text' : 'number');
+  async function attributes(pt) {
+    const { props } = await schemaOf(str(pt));
+    return Object.values(props).filter((p) => p.required && !AUTO.has(p.name)).map((p) => ({ id: p.name, name: p.title, mandatory: true, kind: 'category',
+      type: attrType(p), custom: p.simple && p.value.free && p.value.type !== 'boolean', multi: false }));
+  }
+  async function values(pt, attr) {
+    const p = (await schemaOf(str(pt))).props[str(attr)];
+    if (!p || !p.simple) return [];
+    return p.value.type === 'boolean' ? [{ id: 'true', value: 'Evet' }, { id: 'false', value: 'Hayır' }] : p.value.list;
+  }
+
+  // Basit özellik girdisi: { value, language_tag?, marketplace_id? } (şemadaki alanlara göre); uymazsa nedeni
+  function cell(p, raw, label) {
+    if (!p.simple) return { err: `${label} (birimli / çok alanlı özellik; panelden gönderilemiyor, Amazon Seller Central'dan girin)` };
+    const v = p.value;
+    let x;
+    if (v.type === 'boolean') {
+      x = { true: true, false: false, evet: true, 'hayır': false }[String(raw).toLocaleLowerCase('tr')];
+      if (x == null) return { err: `${label} (evet / hayır seçin)` };
+    } else if (v.type === 'number' || v.type === 'integer') {
+      x = num(raw, NaN);
+      if (!Number.isFinite(x) || (v.type === 'integer' && !Number.isInteger(x))) return { err: `${label} (sayı olmalı)` };
+    } else {
+      x = str(raw);
+      if (!x) return { err: label };
+      const hit = v.list.find((e) => e.id === x) || v.list.find((e) => e.value.toLocaleLowerCase('tr') === x.toLocaleLowerCase('tr'));
+      if (hit) x = hit.id; else if (v.list.length && !v.free) return { err: `${label} (“${x}” Amazon listesinde yok)` };
+      if (v.max && (v.bytes ? bytes(x) : x.length) > v.max) return { err: `${label} en fazla ${v.max} ${v.bytes ? 'bayt' : 'karakter'} olabilir` };
+    }
+    const e = { value: x };
+    if (p.keys.includes('language_tag')) { if (p.lang) e.language_tag = p.lang; else if (p.req.includes('language_tag')) return { err: `${label} (dil etiketi şemada belirlenemedi)` }; }
+    if (p.keys.includes('marketplace_id')) e.marketplace_id = market;
+    return { entry: e };
+  }
+  const mp = (p) => (p.keys.includes('marketplace_id') ? { marketplace_id: market } : {});
+  const inList = (p, k, v) => { const s = p.sub[k]; return !s || !s.list.length || s.free ? v : (s.list.find((e) => e.id.toLowerCase() === String(v).toLowerCase()) || {}).id; };
+  const YES = /^(1|evet|e|true|yes)$/i;
+
+  async function build(pr, map, { opts = {}, pick } = {}) {
+    const s = await schemaOf(str(map.remote_id)), P = s.props, missing = [], at = {}, sku = str(pr.sku);
+    // Fiyatlar pazar yerinin para biriminde gelir (panel çevirir: pr.currency); gelmediyse pazar yerinin para birimi
+    const cur = str(pr.currency) || currency;
+    if (!sku) missing.push('SKU');
+    const put = (name, label, raw, { cutText } = {}) => {
+      const p = P[name];
+      if (cutText && p.simple && p.value.max) raw = cut(raw, p.value.max, p.value.bytes);
+      const r = cell(p, raw, label);
+      if (r.err) missing.push(r.err); else at[name] = [r.entry];
+    };
+    if (P.item_name) { if (pr.name) put('item_name', 'ürün adı', pr.name); else missing.push('ürün adı'); }
+    if (P.brand) {
+      const p = P.brand, b = str(pr.brand);
+      // Satıcıya özel şemada marka listesi varsa (sellerId ile gelir) marka listede olmalı
+      if (!b) missing.push('marka');
+      else if (p.simple && p.value.list.length && !p.value.free && !p.value.list.some((e) => e.id === b || e.value.toLocaleLowerCase('tr') === b.toLocaleLowerCase('tr'))) missing.push(`marka “${b}” Amazon'da bulunamadı`);
+      else put('brand', 'marka', b);
+    }
+    if (P.product_description) { const d = plain(pr.description); if (d) put('product_description', 'açıklama', d, { cutText: true }); else if (P.product_description.required) missing.push('açıklama'); }
+
+    // Ürün kimliği: UPC 12, EAN 13, GTIN 14 hane (Issues Troubleshooting). Barkodsuz ürün yalnız Amazon'un onayladığı GTIN muafiyetiyle
+    // (supplier_declared_has_product_identifier_exemption = true; Listings APIs FAQ) oluşturulabilir.
+    const bc = str(pr.barcode).replace(/\s+/g, ''), idp = P.externally_assigned_product_identifier, ex = P.supplier_declared_has_product_identifier_exemption;
+    if (bc) {
+      const kind = /^\d{12}$/.test(bc) ? 'upc' : /^\d{13}$/.test(bc) ? 'ean' : /^\d{14}$/.test(bc) ? 'gtin' : '';
+      const type = kind && idp && idp.keys.includes('type') && idp.keys.includes('value') && idp.sub.type && idp.sub.type.list.length ? inList(idp, 'type', kind) : '';
+      if (!kind) missing.push('barkod Amazon için 12 (UPC), 13 (EAN) ya da 14 (GTIN) haneli olmalı');
+      else if (!type) missing.push(`barkod (${kind.toUpperCase()}) bu ürün tipinin şemasında gönderilemiyor`);
+      else at.externally_assigned_product_identifier = [{ type, value: bc, ...mp(idp) }];
+    } else if (YES.test(str(opts.gtinExempt)) && ex && ex.simple && ex.value.type === 'boolean') at.supplier_declared_has_product_identifier_exemption = [{ value: true, ...mp(ex) }];
+    else missing.push(YES.test(str(opts.gtinExempt)) ? 'barkod (bu ürün tipinde GTIN muafiyeti alanı yok)' : 'barkod');
+
+    // Satış koşulları: our_price.schedule.value_with_tax (KDV dahil), audience ALL; liste fiyatı purchasable_offer.list_price (Mapping product
+    // attributes → Pricing Feed mappings, Manage purchasable offer). Stok: fulfillment_availability DEFAULT kanalı (satıcı gönderimi).
+    const po = P.purchasable_offer;
+    if (po) {
+      if (!(pr.price > 0)) missing.push('fiyat');
+      else if (!po.keys.includes('our_price')) missing.push('fiyat (satış koşulu alanı şemada tanınmadı)');
+      else {
+        const o = { ...(po.keys.includes('currency') ? { currency: cur } : {}), ...mp(po), our_price: [{ schedule: [{ value_with_tax: r2(pr.price) }] }] };
+        if (po.keys.includes('audience') && inList(po, 'audience', 'ALL')) o.audience = inList(po, 'audience', 'ALL');
+        if (po.keys.includes('list_price') && pr.listPrice > pr.price) o.list_price = [{ schedule: [{ value_with_tax: r2(pr.listPrice) }] }];
+        at.purchasable_offer = [o];
+      }
+    }
+    const lp = P.list_price, lpKey = lp && (lp.keys.includes('value_with_tax') ? 'value_with_tax' : lp.keys.includes('value') ? 'value' : '');
+    if (lp && lpKey && pr.listPrice > 0 && (lp.required || pr.listPrice > pr.price)) at.list_price = [{ [lpKey]: r2(pr.listPrice), ...(lp.keys.includes('currency') ? { currency: cur } : {}), ...mp(lp) }];
+    else if (lp && lp.required) missing.push('liste fiyatı');
+    const fa = P.fulfillment_availability;
+    if (fa) {
+      if (fa.keys.includes('fulfillment_channel_code') && fa.keys.includes('quantity') && inList(fa, 'fulfillment_channel_code', 'DEFAULT')) at.fulfillment_availability = [{ fulfillment_channel_code: 'DEFAULT', quantity: Math.max(0, Math.round(num(pr.stock))), ...mp(fa) }];
+      else if (fa.required) missing.push('stok (gönderim kanalı alanı şemada tanınmadı)');
+    }
+    // Paket ağırlığı / ölçüleri: { value, unit } (birim tam adıyla: "kilograms", "centimeters"; Mapping product attributes → "Unit of measure requires
+    // full names"; Catalog Items örneğinde item_package_dimensions { length, width, height: { unit, value } }). Şemadaki birim listesinde yoksa eksik.
+    const unitOk = (sub, u) => sub && sub.unit && sub.value && (!sub.unit.list.length ? false : sub.unit.list.some((e) => e.id === u));
+    const pw = P.item_package_weight;
+    if (pw) {
+      if (num(pr.weight) > 0 && pw.keys.includes('value') && unitOk(pw.sub, 'kilograms')) at.item_package_weight = [{ value: num(pr.weight), unit: 'kilograms', ...mp(pw) }];
+      else if (pw.required) missing.push(num(pr.weight) > 0 ? 'paket ağırlığı (kilogram birimi bu ürün tipinde yok)' : 'paket ağırlığı (kg)');
+    }
+    const pd = P.item_package_dimensions;
+    if (pd) {
+      const dims = { length: num(pr.length), width: num(pr.width), height: num(pr.height) }, ks = Object.keys(dims);
+      const shapeOk = ks.every((k) => pd.nest[k] && unitOk(pd.nest[k].sub, 'centimeters'));
+      if (ks.every((k) => dims[k] > 0) && shapeOk) at.item_package_dimensions = [{ ...Object.fromEntries(ks.map((k) => [k, { value: dims[k], unit: 'centimeters' }])), ...mp(pd) }];
+      else if (pd.required) missing.push(shapeOk || !ks.every((k) => dims[k] > 0) ? 'paket ölçüleri (en, boy, yükseklik cm)' : 'paket ölçüleri (santimetre birimi bu ürün tipinde yok)');
+    }
+    // Görseller: main_product_image_locator + other_product_image_locator_1…8, { media_location } (Submit media attributes); herkese açık adres
+    const imgs = [pr.image, ...(pr.images || []).filter((u) => u !== pr.image)].map(str).filter((u) => /^https?:\/\//i.test(u));
+    ['main_product_image_locator', ...Array.from({ length: 8 }, (_, i) => `other_product_image_locator_${i + 1}`)].forEach((k, i) => {
+      const p = P[k];
+      if (!p || !p.keys.includes('media_location')) { if (p && p.required) missing.push('görsel (görsel alanı şemada tanınmadı)'); return; }
+      if (imgs[i]) at[k] = [{ media_location: imgs[i], ...mp(p) }];
+      else if (p.required) missing.push(i ? `${i + 1}. görsel` : 'görsel');
+    });
+
+    // Kategori eşleştirmesindeki değerler (zorunlu özellikler): liste değeri kimliği, serbest metin, '@variant' (ürünün varyant adından)
+    const attrs = map.attrs || {};
+    for (const p of Object.values(P)) {
+      if (AUTO.has(p.name) || (!p.required && !attrs[p.name])) continue;
+      const v = attrs[p.name], text = v && str(v.value);
+      let raw = v && (str(v.id) || text);
+      if (text === '@variant') {
+        const hit = pr.variant && pick ? await pick({ id: p.name }, pr.variant) : null;
+        raw = hit ? hit.id : p.simple && p.value.free && p.value.type === 'string' ? oneAxis(pr.variant) : '';
+        if (!raw) { missing.push(p.title + (pr.variant ? ` (varyant “${pr.variant}” Amazon listesinde yok)` : ' (ürünün varyantı yok; kategori eşleştirmesinde değer seçin)')); continue; }
+      } else if (text === '@image') raw = imgs[0] || '';
+      if (!p.simple) { missing.push(cell(p, raw, p.title).err); continue; }
+      if (raw === '' || raw == null) { missing.push(p.title); continue; }
+      const r = cell(p, raw, p.title);
+      if (r.err) missing.push(r.err); else at[p.name] = [r.entry];
+    }
+    return { key: sku, missing: [...new Set(missing)], payload: { sku, productType: s.productType || str(map.remote_id), attributes: at } };
+  }
+
+  // Gönderim sonuçları kanal deposunda, gönderim başına ayrı kayıt (settings "kv:<kanal>:up:<kimlik>"): aynı kaydı yalnız o gönderim / onun
+  // sorguları yazar (eşzamanlı başka gönderim üzerine yazamaz). Kayıtlar 30 gün saklanır (dizin "upidx": kimlik → zaman; süresi geçen kayıt
+  // boşaltılır). Sonuçlanan gönderimin kaydı küçültülür (gönderim kimliği / sorgu zamanı atılır). Depo yoksa bellekte.
+  const KEEP = 30 * 864e5, LOST = "Amazon gönderim kaydı bulunamadı; Amazon Seller Central'dan kontrol edin";
+  const mem = new Map();
+  const sget = async (k) => {
+    if (kv) { try { const v = await kv.get(k); if (v != null) return v; } catch (e) { if (e.budget) throw e; } }
+    return mem.has(k) ? structuredClone(mem.get(k)) : null;
+  };
+  const sset = async (k, v) => {
+    if (v == null) mem.delete(k); else mem.set(k, structuredClone(v));
+    if (kv) { try { await kv.set(k, v); } catch (e) { if (e.budget) throw e; } }
+  };
+  // Eski biçim (tüm gönderimler tek "uploads" kaydında, 4 gün): yalnız okunur; en yenisi saklama süresini geçince boşaltılır
+  async function load(id) {
+    const r = await sget('up:' + id);
+    if (r && typeof r === 'object') return r;
+    const old = await sget('uploads');
+    return (old && typeof old === 'object' && old[id]) || null;
+  }
+  let pruned = false;
+  async function register(id) {
+    const now = Date.now(), idx = (await sget('upidx')) || {};
+    idx[id] = now;
+    for (const [k, at] of Object.entries(idx)) if (now - num(at) > KEEP) { delete idx[k]; await sset('up:' + k, null); }
+    await sset('upidx', idx);
+    if (pruned) return;
+    pruned = true;
+    const old = await sget('uploads');
+    if (old && typeof old === 'object' && Object.keys(old).length && Object.values(old).every((u) => now - num(u && u.at) > KEEP)) await sset('uploads', null);
+  }
+  const FINAL = new Set(['L', 'X', 'I', 'R', 'E']);
+  // Sonuçlanan gönderim: yalnız görünüm için gerekenler kalır
+  const compact = (u) => ({ at: u.at, done: true, items: Object.fromEntries(Object.entries(u.items || {}).map(([k, x]) => [k,
+    Object.fromEntries(Object.entries({ s: x.s, asin: x.asin, buy: x.buy, e: x.e && String(x.e).slice(0, 400) }).filter(([, v]) => v)) ])) });
+  const settle = (u) => (!u.open && Object.values(u.items || {}).every((x) => FINAL.has(x.s)) ? compact(u) : u);
+
+  const itemUrl = (sku) => `/listings/2021-08-01/items/${encodeURIComponent(seller)}/${encodeURIComponent(sku)}?${mq}`;
+  // getListingsItem ve putListingsItem ayrı kotalıdır (her biri 5 istek/sn, burst 10): her biri kendi son isteğinden en az 250 ms sonra
+  let lastPut = 0, lastGet = 0;
+  const gap = async (last) => { const w = last + 250 - Date.now(); if (w > 0) await sleep(w); };
+  async function getItem(sku, data) {
+    await gap(lastGet);
+    try { return await call(`${itemUrl(sku)}&includedData=${data}`, { tries: 3 }); } catch (e) { if (e.status === 404) return null; throw e; } finally { lastGet = Date.now(); }
+  }
+  // Gönderim: SKU başına önce getListingsItem (summaries): ilan zaten varsa (200) dokunulmaz (putListingsItem tam değiştirme / upsert olduğu için
+  // var olan ilanı panelin bilgisiyle ezerdi); 404 = yok → putListingsItem. Takip kimliği başta belirlenir, sonuçlar her 10 üründe ara kaydedilir
+  // (istek yarıda kesilirse gidenlerin kaydı kalır). Hiçbir istek cevaplanmadıysa (kimlik / yetki / bağlantı) hata fırlatılır; bir kısmı gittiyse
+  // gidemeyenler ürün bazında hata olarak kaydedilir (gönderilenlerin takibi kaybolmasın)
+  const SAVE_EVERY = 10, NOT_SENT = 'Gönderilmedi (bu işlemin dış istek sınırı doldu); yeniden gönderin';
+  async function send(payloads) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), key = 'up:' + id, at = Date.now(), res = {};
+    let answered = 0, first = null, stop = null, done = 0, saved = false;
+    await register(id);
+    for (const p of payloads) {
+      const sku = str(p.sku);
+      if (stop) { res[sku] = { s: 'E', e: NOT_SENT }; continue; }
+      try {
+        const cur = await getItem(sku, 'summaries');
+        if (cur) {
+          answered++;
+          const sm = (cur.summaries || []).find((x) => x.marketplaceId === market) || (cur.summaries || [])[0];
+          if (sm && sm.productType) types.set(sku, sm.productType);
+          res[sku] = { s: 'X', asin: str(sm && sm.asin) };
+        } else {
+          await gap(lastPut);
+          try {
+            const r = await call(`${itemUrl(sku)}&includedData=issues,identifiers`, { method: 'PUT', tries: 4, body: { productType: p.productType, requirements: 'LISTING', attributes: p.attributes } });
+            answered++;
+            if (r && r.status === 'ACCEPTED') {
+              types.set(sku, p.productType);
+              res[sku] = { s: 'A', sid: str(r.submissionId), asin: str(((r.identifiers || []).find((x) => x.marketplaceId === market) || {}).asin) };
+            } else res[sku] = { s: 'I', e: issueText(r && r.issues) || `Amazon kabul etmedi (${str(r && r.status) || 'cevap yok'})` };
+          } finally { lastPut = Date.now(); }
+        }
+      } catch (e) {
+        if (e.budget) { stop = e; res[sku] = { s: 'E', e: NOT_SENT }; continue; }
+        first = first || e;
+        res[sku] = { s: 'E', e: apiErr(e) };
+      }
+      if (++done % SAVE_EVERY === 0 && done < payloads.length) { await sset(key, { at, open: true, items: res }); saved = true; }
+    }
+    if (!answered) { if (saved) await sset(key, null); if (stop) throw stop; if (first) throw new Error(apiErr(first)); }
+    await sset(key, settle({ at, items: res }));
+    return { ref: 'amz:' + id };
+  }
+  const VIEW = {
+    A: () => ({ ok: null, status: 'Amazon işliyor (gönderim kabul edildi)', error: '' }),
+    L: (x) => ({ ok: true, status: `Amazon'da oluşturuldu${x.asin ? ` · ASIN ${x.asin}` : ''}${x.buy ? ' · satışta' : ''}`, error: '' }),
+    X: () => ({ ok: true, status: "Amazon'da bu SKU ile ilan zaten var (değiştirilmedi)", error: '' }),
+    I: (x) => ({ ok: false, status: 'Amazon kabul etmedi', error: x.e }),
+    R: (x) => ({ ok: false, status: 'Amazon işlerken sorun bildirdi', error: x.e }),
+    E: (x) => ({ ok: false, status: 'Gönderilemedi', error: x.e }),
+  };
+  // Kabul edilenler getListingsItem ile izlenir (sorgu başına en çok 40 SKU, 250 ms arayla). Sıra son sorgu zamanına göre (hiç sorulmamış /
+  // en eski sorulan önce): 404'te kalanlar sonrakilerin önünü tıkamaz. 404 = henüz oluşmadı (işleniyor), ERROR sorunu = reddedildi,
+  // pazar yeri özeti (ASIN) = oluşturuldu. Kayıt yoksa (süresi geçmiş / yazılamamış) her ürün için açık hata (keys verildiyse) ve bitti.
+  async function status(ref, keys) {
+    const id = String(ref).replace(/^amz:/, ''), key = 'up:' + id, u = await load(id);
+    if (!u) return { done: true, error: LOST, items: (Array.isArray(keys) ? keys : []).map((k) => ({ key: str(k), ok: false, status: 'Gönderim kaydı bulunamadı', error: LOST })) };
+    const changes = new Map();
+    if (!u.done) {
+      const due = Object.entries(u.items || {}).filter(([, x]) => x.s === 'A').sort(([, a], [, b]) => num(a.q) - num(b.q)).slice(0, 40);
+      for (const [sku, x] of due) {
+        const r = await getItem(sku, 'summaries,issues');
+        const ch = { q: Date.now() };
+        if (r) {
+          const errs = issueText(r.issues), sm = (r.summaries || []).find((y) => y.marketplaceId === market) || (r.summaries || [])[0];
+          if (errs) Object.assign(ch, { s: 'R', e: errs });
+          else if (sm) Object.assign(ch, { s: 'L', asin: str(sm.asin) || x.asin, buy: (sm.status || []).includes('BUYABLE') });
+          if (sm && sm.productType) types.set(sku, sm.productType);
+        }
+        Object.assign(x, ch);
+        changes.set(sku, ch);
+      }
+    }
+    if (changes.size) {
+      // Yazmadan önce güncel kayıt okunur: eşzamanlı başka sorgunun sonuçlandırdığı SKU geri alınmaz
+      const fresh = (await sget(key)) || u;
+      if (!fresh.done) {
+        for (const [sku, ch] of changes) { const x = fresh.items && fresh.items[sku]; if (x && x.s === 'A') Object.assign(x, ch); }
+        await sset(key, settle(fresh));
+      }
+    }
+    const open = u.open && Date.now() - num(u.at) < 15 * 60e3;
+    const items = Object.entries(u.items || {}).map(([k, x]) => ({ key: k, ...(VIEW[x.s] || VIEW.E)(x) }));
+    return { done: !open && !items.some((x) => x.ok === null), items };
+  }
+  const raw = async (ref) => load(String(ref).replace(/^amz:/, ''));
+  // Pazar yerinin para birimi: panel fiyatları build'den önce bu para birimine çevirir (pr.currency)
+  const catalog = { categories, allCategories, attributes, values, build, send, status, raw, currency: async () => currency,
+    options: [{ k: 'gtinExempt', label: 'Barkodsuz ürünler: Amazon GTIN muafiyeti onayınız varsa “evet” yazın' }] };
+
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();
     await diagStep(out, 'Kimlik (LWA belirteci)', async () => { await auth(); return { detail: `alındı · ${API.replace('https://', '')} · pazar yeri ${market}` }; });
@@ -181,6 +570,6 @@ export function amazon(env, meta) {
   return {
     ...meta, type: 'amazon', enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose,
+    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose, catalog,
   };
 }

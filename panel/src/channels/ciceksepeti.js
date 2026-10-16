@@ -3,8 +3,9 @@
 // tarih aralığı en fazla ~14 gün olduğundan aralık dilimlenir. Ürünler: GET Products (sayfa başına 60). Stok / fiyat: PUT Products/price-and-stock
 // (asenkron, batchId döner; istekte en fazla 200 satır). İlanların anahtarı satıcı stok kodu (stockCode); sipariş satırı da stok koduyla eşleşir.
 // Kargo: Çiçeksepeti anlaşmalı kargosu; etiket Çiçeksepeti panelinden basılır, takip no kanaldan gelir (elle takip / API'den kargoya verme yok).
-// Onay (işleme al) servisi kullanılmaz. Soru-cevap, iade, ürün yükleme yok. Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
-import { http, num, str, chunk, imageList, diagStep, TR } from '../util.js';
+// Onay (işleme al) servisi kullanılmaz. Soru-cevap, iade yok. Ürün yükleme: Categories, Categories/{id}/attributes, POST Products, Products/batch-status
+// (ayrıntı ve kaynaklar aşağıda "ürün yükleme" bölümünde). Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
+import { http, num, str, r2, chunk, sleep, imageList, diagStep, rankBrands, brandKey, TR } from '../util.js';
 
 const RANKS = ['new', 'processing', 'shipped', 'delivered'];
 // Satır durumu metinle gelir (ör. Yeni, Hazırlanıyor, Kargoya Verildi, Teslim Edildi, İptal, İade). Sıra önemli: önce kesin sonuçlar.
@@ -140,6 +141,136 @@ export function ciceksepeti(env, meta) {
   const pushStock = (items) => update(items.map((x) => ({ stockCode: x.remoteId || x.sku, stockQuantity: Math.max(0, Math.round(num(x.stock))) })));
   const pushPrice = (items) => update(items.map((x) => ({ stockCode: x.remoteId || x.sku, listPrice: Math.max(num(x.listPrice), num(x.price)), salesPrice: num(x.price) })));
 
+  // ---------- ürün yükleme (Ürün yükle / Kanallarda yayınla) ----------
+  // Resmi belge (ciceksepeti.dev) bu ortamdan açılamadı. Uçlar ve alanlar açık kaynak istemcilerden, birbirini tutanlar alındı:
+  //  [A] npm ciceksepeti-api 1.1.1 (resources/category.js, resources/product.js, index.d.ts; github.com/Coskntkk/ciceksepeti-api documentation.md)
+  //  [B] github.com/developkariyer/iwapim src/Connector/Marketplace/CiceksepetiConnector.php + src/MessageHandler/CiceksepetiListingHandler.php
+  //  [C] npm turkish-marketplaces 2.6.7 (lib/integrations/Ciceksepeti.js, lib/types/ciceksepeti.d.ts)
+  //  [D] github.com/backlex/backlex packages/integrations/src/providers/ciceksepeti.ts (+ apps/web/tests/integrations/ciceksepeti-listing.test.ts)
+  //  [E] github.com/1212falcon1212/zunaproV4 apps/api/src/modules/marketplace/ciceksepeti.service.ts
+  //  [F] github.com/LUNEX3D/LysiaETIC backend/services/ciceksepeti/ciceksepetiService.js
+  //  [G] github.com/oguzhanayyldz/moon-lib src/services/response-interpreters/ciceksepeti.interpreter.ts
+  // GET Categories → { categories: [{ id, name, parentCategoryId, subCategories: [...] }] } (ağaç; ürün yaprak kategoriye açılır) [A][B][D][G]
+  // GET Categories/{id}/attributes → { categoryId, categoryName, categoryAttributes: [{ attributeId, attributeName, required, varianter, type,
+  //   attributeValues: [{ id, name }] }] } [A][B][D][G]. Değer listeden seçilir: ürüne { id, valueId, textLength: 0 } gider [A][B][D][E].
+  //   Marka da bir kategori özelliğidir ("Marka") [B][C]: eşleştirmede sorulmaz, ürünün markasından listedeki karşılığı bulunur (N11 gibi).
+  //   type "Kişiselleştirilebilir Özellik" alıcının sipariş verirken yazdığı metindir; satıcı değer vermez, gönderilmez [D].
+  // POST Products { products: [...] } → { batchId } (asenkron) [A][B][D][E][F]; istekte en fazla 1000 ürün, farklı gövdeyle 5 saniyede 1 istek [D][E][F].
+  // GET Products/batch-status/{batchId} → { batchId, itemCount, items: [{ itemId, data: { stockCode, … }, status, failureReasons }] } [A][B][C][D][E][G]
+  //   status: Pending | Processing | Success | Failed | Warning [C][D][G]; Warning = işlem başarılı, uyarı notuyla [D][G].
+  //   failureReasons: [{ message, code }] [C][D][E] (eski tanımda düz metin listesi [A]; ikisi de okunur).
+  // Ürün anahtarı satıcı stok kodu (stockCode): fetchListings ilanı stockCode ile tanıtır, sonuçta da data.stockCode döner [D][E].
+  let catCache = null;
+  async function categories(q) {
+    if (!catCache || Date.now() - catCache.at > 6 * 3600e3) {
+      const out = [];
+      const walk = (list, path) => { for (const c of list || []) { if (c == null || c.id == null) continue; const kids = c.subCategories || []; if (kids.length) walk(kids, path.concat(str(c.name))); else out.push({ id: String(c.id), name: str(c.name), path: path.join(' › ') }); } };
+      walk(((await call('/Categories')) || {}).categories, []);
+      catCache = { at: Date.now(), all: out };
+    }
+    const k = String(q || '').toLocaleLowerCase('tr').trim();
+    return { total: catCache.all.length, items: catCache.all.filter((c) => !k || `${c.name} ${c.path} ${c.id}`.toLocaleLowerCase('tr').includes(k)).slice(0, 60) };
+  }
+  const allCategories = async () => { await categories(''); return catCache.all; };
+  const attrCache = new Map();
+  async function rawAttrs(cat) {
+    if (!attrCache.has(cat)) attrCache.set(cat, (((await call(`/Categories/${encodeURIComponent(cat)}/attributes`)) || {}).categoryAttributes || []).filter((a) => !/^ki[sş]iselle[sş]tirilebilir/i.test(str(a.type))));
+    return attrCache.get(cat);
+  }
+  const isBrand = (a) => /^marka$/i.test(str(a.attributeName));
+  const attributes = async (cat) => (await rawAttrs(cat)).filter((a) => !isBrand(a)).map((a) => ({ id: String(a.attributeId), name: str(a.attributeName), mandatory: !!a.required,
+    kind: a.varianter ? 'variant' : 'category', type: 'enum', custom: false, multi: false }));
+  const valuesOf = (a) => ((a && a.attributeValues) || []).map((v) => ({ id: String(v.id), value: str(v.name) }));
+  async function values(cat, attr) { return valuesOf((await rawAttrs(cat)).find((x) => String(x.attributeId) === String(attr))); }
+  // Marka: kategorinin "Marka" özelliğinin değerleri içinde (büyük / küçük harf, boşluk, noktalama farkı gözetmeden birebir)
+  async function searchBrands(q, cat) {
+    if (!cat || !str(q)) return [];
+    return rankBrands(valuesOf((await rawAttrs(cat)).find(isBrand)).map((v) => ({ id: v.id, name: v.value })), q);
+  }
+  const plain = (h) => str(String(h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&[a-z]+;|&#\d+;/gi, 'x').replace(/\s+/g, ' '));
+  // Seçenek eksikliği "(Ürün yükle → … seçenekleri)" biçiminde: Kanallarda yayınla bunu kendi seçenek listesinde sorar (publish.js NEED)
+  const OPT = '(Ürün yükle → Çiçeksepeti seçenekleri)';
+  async function build(pr, map, { opts = {}, pick } = {}) {
+    const missing = [], attrs = [];
+    for (const a of await rawAttrs(map.remote_id)) {
+      const id = String(a.attributeId), v = (map.attrs || {})[id], list = valuesOf(a);
+      let valueId = v && v.id, text = v && v.value;
+      if (!v && isBrand(a)) { text = pr.brand; if (pr.brandId) valueId = pr.brandId; }
+      if (text === '@variant') { const hit = pr.variant && pick ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : pr.variant; }
+      if (text === '@image') text = '';
+      // Değer kimliği listede olmalı; yazılan değer listede aynı adla aranır (serbest metin değer kabul edilmez)
+      if (valueId && !list.some((x) => x.id === String(valueId))) valueId = null;
+      if (!valueId && text) valueId = (list.find((x) => (isBrand(a) ? brandKey(x.value) === brandKey(text) : x.value.toLocaleLowerCase('tr') === str(text).toLocaleLowerCase('tr'))) || {}).id;
+      if (valueId) attrs.push({ id: Number(id), valueId: Number(valueId), textLength: 0 });
+      else if (a.required) {
+        if (isBrand(a)) missing.push(text ? `marka “${text}” Çiçeksepeti'de bulunamadı` : 'marka');
+        else missing.push(str(a.attributeName) + (v && v.value === '@variant' ? (pr.variant ? ` (varyant “${pr.variant}” Çiçeksepeti listesinde yok)` : ' (ürünün varyantı yok; kategori eşleştirmesinde değer seçin)') : text ? ` (“${text}” Çiçeksepeti listesinde yok)` : ''));
+      }
+    }
+    if (!pr.sku) missing.push('SKU');
+    // Görsel: düz adres listesi [A][D]; en fazla 5 görsel [B]
+    const images = [pr.image, ...(pr.images || [])].filter((u, i, l) => /^https?:\/\//i.test(str(u)) && l.indexOf(u) === i).slice(0, 5);
+    if (!images.length) missing.push('görsel');
+    if (!(pr.price > 0)) missing.push('fiyat');
+    // Açıklama: düz metin en az 30, HTML en fazla 20.000 karakter [D][E][B]
+    const description = str(pr.description) || str(pr.name);
+    if (plain(description).length < 30) missing.push('açıklama (en az 30 karakter)');
+    else if (description.length > 20000) missing.push('açıklama (en fazla 20.000 karakter)');
+    // Teslimat tipi (1 Çiçeksepeti servis aracı · 2 kargo · 3 ikisi) [A][D] ve teslimat mesaj tipi (sayısal kod) [A][B][D][E]: zorunlu, varsayılan yok
+    // Boş seçenek "(Ürün yükle → … seçenekleri)" ekiyle (Kanallarda yayınla kendi kutusunda sorar); geçersiz değer eksiz: her ekranda engeller
+    const dt = Number(opts.deliveryType), dm = Number(opts.deliveryMessageType);
+    if (str(opts.deliveryType) === '') missing.push(`teslimat tipi ${OPT}`);
+    else if (![1, 2, 3].includes(dt)) missing.push(`teslimat tipi “${str(opts.deliveryType)}” geçersiz (1, 2 ya da 3 olmalı; Çiçeksepeti seçeneklerinden düzeltin)`);
+    if (str(opts.deliveryMessageType) === '') missing.push(`teslimat mesaj tipi ${OPT}`);
+    else if (!(Number.isInteger(dm) && dm > 0)) missing.push(`teslimat mesaj tipi “${str(opts.deliveryMessageType)}” geçersiz (pozitif tam sayı olmalı; Çiçeksepeti seçeneklerinden düzeltin)`);
+    const item = {
+      productName: str(pr.name).slice(0, 255), mainProductCode: str(pr.group || pr.sku), stockCode: str(pr.sku), categoryId: Number(map.remote_id), description,
+      deliveryMessageType: dm, deliveryType: dt, stockQuantity: Math.max(0, Math.round(num(pr.stock))), salesPrice: r2(pr.price), listPrice: r2(Math.max(num(pr.listPrice), num(pr.price))),
+      ...(str(pr.barcode) ? { barcode: str(pr.barcode) } : {}), images, attributes: attrs,
+    };
+    return { key: str(pr.sku), missing, payload: item };
+  }
+  // Gönderim: istekte en fazla 1000 ürün, iki istek arası en az 5 sn. Kayıt: "<batchId>:<stok kodları>;…" (sonuçtaki stok kodu eşleşmesi için).
+  // Ürün oluşturma tekrar denenmez (aynı ürün iki kez açılmasın).
+  let lastCreate = 0;
+  async function send(items) {
+    const refs = [];
+    for (const part of chunk(items, 1000)) {
+      const wait = lastCreate + 5500 - Date.now();
+      if (wait > 0) await sleep(wait);
+      let r;
+      try { r = await call('/Products', { method: 'POST', body: { products: part }, tries: 1 }); } finally { lastCreate = Date.now(); }
+      const bid = str(r && r.batchId);
+      if (!bid) throw new Error('Çiçeksepeti takip numarası (batchId) vermedi: ' + (str(r && (r.message || r.Message)) || JSON.stringify(r).slice(0, 300)));
+      refs.push(bid + ':' + part.map((x) => encodeURIComponent(x.stockCode)).join(',')); // stok kodunda , ; : olabilir
+    }
+    return { ref: refs.join(';') };
+  }
+  const reasons = (f) => [].concat(f || []).map((x) => (typeof x === 'string' ? x : str(x && (x.message || x.Message)))).filter(Boolean);
+  const batch = (bid) => call(`/Products/batch-status/${encodeURIComponent(bid)}`);
+  async function status(ref) {
+    const items = [];
+    let pending = false;
+    for (const part of String(ref).split(';').filter(Boolean)) {
+      const i = part.indexOf(':'), bid = i < 0 ? part : part.slice(0, i), keys = i < 0 ? [] : part.slice(i + 1).split(',').filter(Boolean).map((k) => { try { return decodeURIComponent(k); } catch { return k; } });
+      const r = (await batch(bid)) || {}, list = r.items || [], seen = new Set();
+      for (const it of list) {
+        const k = str((it.data || {}).stockCode), st = str(it.status), why = [...new Set(reasons(it.failureReasons))].join(' · ');
+        if (/^(success|warning)$/i.test(st)) items.push({ key: k, ok: true, status: /^warning$/i.test(st) ? `Çiçeksepeti kabul etti (uyarı${why ? ': ' + why : ''})` : 'Çiçeksepeti kabul etti', error: '' });
+        else if (/^failed$/i.test(st)) items.push({ key: k, ok: false, status: 'Çiçeksepeti kabul etmedi', error: why || 'Çiçeksepeti neden belirtmedi' });
+        else { pending = true; continue; }
+        seen.add(k);
+      }
+      // Sonuç listesi henüz boşsa ya da gönderilen stok kodlarının hepsi sonuçlanmadıysa işlem sürüyor
+      if (!list.length || (keys.length && keys.some((k) => !seen.has(k)) && list.length < Math.max(keys.length, num(r.itemCount)))) pending = true;
+    }
+    return { done: !pending, items: items.filter((x) => x.key) };
+  }
+  const raw = (ref) => batch(String(ref).split(/[:;]/)[0]);
+  const catalog = { categories, allCategories, attributes, values, build, send, status, raw, brands: searchBrands, brandByCategory: true, chunk: 1000,
+    options: [{ k: 'deliveryType', label: 'Teslimat tipi (deliveryType): 1 Çiçeksepeti servis aracı, 2 kargo, 3 servis aracı ve kargo' },
+      { k: 'deliveryMessageType', label: 'Teslimat mesaj tipi kodu (deliveryMessageType; Çiçeksepeti entegrasyon belgesindeki / mevcut ürününüzdeki sayı)' }] };
+
   async function diagnose() {
     const out = [], now = Date.now();
     out.push({ name: 'Ortam', ok: null, detail: API.includes('sandbox') ? 'Test (sandbox) ortamı' : 'Canlı ortam' });
@@ -147,7 +278,11 @@ export function ciceksepeti(env, meta) {
       const r = (await page(now - 864e5, now, 0, 10)) || {}, list = r.supplierOrderListWithBranch || [];
       return { detail: `${r.orderListCount ?? list.length} sipariş satırı${list[0] ? ` · örnek durum: ${lineStatus(list[0]).raw} → ${lineStatus(list[0]).st}` : ''}` };
     });
-    await diagStep(out, 'Ürünler', async () => { const r = (await call('/Products?PageSize=1&Page=1')) || {}; return { detail: `${r.totalCount ?? (r.products || []).length} ürün` }; });
+    // Örnek üründeki teslimat kodları: ürün yükleme seçenekleri (teslimat tipi / teslimat mesaj tipi) için yol gösterir
+    await diagStep(out, 'Ürünler', async () => {
+      const r = (await call('/Products?PageSize=1&Page=1')) || {}, p = (r.products || [])[0] || {}, dt = pick(p, 'deliveryType', 'DeliveryType'), dm = pick(p, 'deliveryMessageType', 'DeliveryMessageType');
+      return { detail: `${r.totalCount ?? (r.products || []).length} ürün${dt !== '' || dm !== '' ? ` · örnek ürün: teslimat tipi ${dt}, teslimat mesaj tipi ${dm}` : ''}` };
+    });
     return out;
   }
 
@@ -156,6 +291,6 @@ export function ciceksepeti(env, meta) {
     ...meta, type: 'ciceksepeti', byOrderDate: true, enabled: !missing.length, missing,
     // Kargo Çiçeksepeti anlaşmasıyla: etiket kanal panelinden, takip no siparişle gelir; elle takip girilmez
     caps: { accept: 'local', split: 'local', ship: 'local', label: null, createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, diagnose,
+    fetchOrders, fetchListings, pushStock, pushPrice, diagnose, catalog,
   };
 }
