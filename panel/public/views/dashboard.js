@@ -187,6 +187,10 @@ export async function dashboard(el) {
   function drawLosses() {
     const box = $('[data-losses]', el);
     if (!box || !losses || (!losses.count && !losses.month.cost)) return;
+    // Çarpıyla kapatılır: aynı tablo (zarar eden ürün sayısı ve başı çekenler) için bir daha gösterilmez; yeni zarar eden ürün çıkınca
+    // yeniden görünür. Zarar ettiren ürünler ayrıca Bildirimler'e düşer (haftalık, bkz. finance.js lossNotify).
+    const sig = `${losses.count}|${losses.top.map((x) => x.id).join(',')}|${losses.month.orders}`;
+    if (store.get('dismiss:losses') === sig) { box.hidden = true; return; }
     const m = losses.month, bad = losses.count > 0;
     render(box, html`<div class="card loss-card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;${bad ? 'border-left:4px solid var(--bad)' : ''}">
       <span class="ic" style="font-size:22px;color:${bad ? 'var(--bad)' : 'var(--amber)'}"><i class="ico ico-warn"></i></span>
@@ -194,8 +198,10 @@ export async function dashboard(el) {
           <div class="small muted ellipsis">${losses.top.map((x, i) => html`${i ? ' · ' : ''}<a class="link" href="#/urunler/${x.id}">${x.name}${x.variant && !x.name.includes(x.variant) ? ` ${x.variant}` : ''}</a> ${money0(-x.profit)}`)}</div>`
         : html`<b>Zarar ettiren ürün yok</b> <span class="muted small">(son ${losses.days} gün, iade dahil)</span>`}
         <div class="small" style="margin-top:2px">İade maliyeti bu ay: <b class="num">${money0(m.cost)}</b> <span class="muted">(${n(m.orders)} iade${m.estimated ? `, ${money0(m.estimated)} tahmini` : ''})</span></div></div>
-      <a class="btn sm ${bad ? 'primary' : ''}" href="#/gelir-gider?urun=zarar&donem=30">${bad ? 'Zarar ettirenleri gör' : 'Ürün kârlılığı'} <i class="ico ico-chev"></i></a></div>`);
+      <a class="btn sm ${bad ? 'primary' : ''}" href="#/gelir-gider?urun=zarar&donem=30">${bad ? 'Zarar ettirenleri gör' : 'Ürün kârlılığı'} <i class="ico ico-chev"></i></a>
+      <button type="button" class="icon-btn" data-xloss aria-label="Kapat" title="Kapat: yeni zarar eden ürün çıkınca yeniden görünür; Bildirimler'de de yer alır"><i class="ico ico-x"></i></button></div>`);
     box.hidden = false;
+    $('[data-xloss]', box).onclick = () => { store.set('dismiss:losses', sig); box.hidden = true; toast('Kapatıldı. Zarar ettiren ürünler Bildirimler’de de yer alır.'); };
   }
   function drawChart() {
     if (chart) chart.destroy();

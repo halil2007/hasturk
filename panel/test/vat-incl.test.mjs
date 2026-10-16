@@ -52,7 +52,7 @@ test('KDV dahil çevriminde %20 eklenmiş Trendyol / Amazon / Çiçeksepeti vars
   await setSetting(db, 'commission', { trendyol: 24, amazon: 18, ciceksepeti: 21, n11: 18 });
   // Yeni sürümün geçişleri (init yalnız eklenen geçişleri çalıştırır)
   const { MIGRATIONS } = await import('../src/db.js');
-  for (const m of MIGRATIONS.slice(-3)) await run(db, m);
+  for (const m of MIGRATIONS.filter((x) => /k = 'commission'/.test(x) && /json_set/.test(x))) await run(db, m);
   const s = await getSettings(db);
   assert.equal(s.commission.trendyol, 20); assert.equal(s.commission.amazon, 15);
   assert.equal(s.commission.ciceksepeti, 21, 'elle girilen oran değişmez'); assert.equal(s.commission.n11, 18);

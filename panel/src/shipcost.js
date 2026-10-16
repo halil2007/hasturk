@@ -1,16 +1,15 @@
 // Ürün kargo tutarı ↔ gerçek kargo faturası
 // Ürüne girilen kargo tutarı (products.ship_cost, KDV dahil, sipariş başı) kanal kargo faturası / kargo firması ücreti gelmeyen
 // siparişlerin kâr tahmininde kullanılır. Faturası gelen siparişin kârında zaten faturadaki tutar kullanılır (orders.shipping_cost,
-// shipping_src 'api' / 'carrier'; bkz. finance.js orderProfit). Burada ürünün tahmini faturalara göre bakımı yapılır:
+// shipping_src 'api' / 'carrier'; bkz. finance.js orderProfit). Burada ürünün tutarı faturalara göre tutulur:
 //   · Örnek: tek ürünlü, tek adetlik, iptal edilmemiş siparişlerin faturalı kargo tutarı (son 90 gün; birden çok ürün / adet içeren
 //     kolinin tutarı ürüne bölünemez, sayılmaz). İade kargosu gönderimle birlikte faturalanmış eski kayıtlar ('lumped') sayılmaz.
-//     Kanal farkı gözetilmez (tüm kanalların ortancası): ürüne tek tutar girilir.
-//   · Ürün tutarı en son girildikten / güncellendikten sonraki (ship_set_at) gönderiler karşılaştırılır: elle girilen tutar eski
-//     faturalarla hemen ezilmez, kullanıcı yeniden uyarılmaz.
-//   · Faturalar DÜŞÜK (son en çok 5 gönderinin ortancası, en az 3 gönderi; girilen tutardan %3'ten ve 1 ₺'den fazla düşük): ürünün
-//     kargo tutarı ortancaya indirilir, önceki tutar ship_auto'da saklanır (formda "faturaya göre güncellendi: 65 → 54,90 ₺") ve günlüğe yazılır.
-//   · Faturalar YÜKSEK (aynı ortanca, %5'ten ve 2 ₺'den fazla yüksek): tutar değiştirilmez; bildirim düşer. Ürün başına en fazla iki kez:
-//     ilk tespitte ve 30 gün sonra hâlâ yüksekse bir kez daha. Ürün formunda sakin bir not ve "Faturadaki tutarı kullan" düğmesi.
+//     Kanal farkı gözetilmez (tüm kanalların ortancası): ürüne tek tutar girilir. Son en çok 5 gönderinin ortancası, en az 3 gönderi.
+//   · Tutar BOŞ: pazaryerinden gelen kargo tutarı (ortanca) yazılır, kaynağı 'channel' (formda "Pazaryerinden gelen kargo bilgisi").
+//   · Kaynak 'channel' (sistem yazdı): faturalar belirgin biçimde değişirse (%3 / 1 ₺ düşük ya da %5 / 2 ₺ yüksek) tutar ortancaya güncellenir.
+//   · Kaynak 'user' (kullanıcı girdi): sistem bir daha DEĞİŞTİRMEZ. Faturalar belirgin biçimde yüksek ya da düşükse ürün formunda not
+//     ve bildirim (ürün başına en fazla iki kez: ilk tespitte ve 30 gün sonra hâlâ farklıysa bir kez daha).
+//   · Ürün tutarı en son girildikten / güncellendikten sonraki (ship_set_at) gönderiler karşılaştırılır.
 import { all, allIn, first, run, getRaw, setSetting, log, notify, resolve } from './db.js';
 import { fail, r2 } from './util.js';
 
@@ -41,42 +40,47 @@ export async function shipSamples(db, { productIds = null, now = Date.now() } = 
   return by;
 }
 
-// Ürünün durumu: { n, median, entered, action: 'lower' | 'higher' | 'ok' | null (yetersiz veri) }
+// Ürünün durumu: { n, median, entered, action: 'fill' | 'lower' | 'higher' | 'ok' | null (yetersiz veri) }
 export function evaluateShip(p, samples) {
   const entered = Number(p.ship_cost) || 0;
-  if (!(entered > 0)) return null;
   const fresh = (samples || []).filter((s) => !p.ship_set_at || s.at > p.ship_set_at).slice(0, SHIP_LAST);
   if (fresh.length < SHIP_MIN) return { n: fresh.length, median: null, entered, action: null };
-  const med = r2(median(fresh.map((s) => s.cost))), diff = med - entered;
+  const med = r2(median(fresh.map((s) => s.cost)));
+  if (!(entered > 0)) return { n: fresh.length, median: med, entered: 0, action: 'fill' };
+  const diff = med - entered;
   const action = -diff > entered * (LOWER_PCT / 100) && -diff > LOWER_MIN ? 'lower' : diff > entered * (HIGHER_PCT / 100) && diff > HIGHER_MIN ? 'higher' : 'ok';
   return { n: fresh.length, median: med, entered, action };
 }
 
-// Senkron işi: düşükse güncelle, yüksekse (ürün başına en fazla iki kez) uyar. force: 6 saat beklemesini atla
+// Senkron işi: boşsa pazaryerinden doldur, sistemin yazdığını güncelle, kullanıcının girdiği farklıysa (ürün başına en fazla iki kez) uyar.
+// force: 6 saat beklemesini atla
 export async function shipCheck(db, { force = false, now = Date.now() } = {}) {
   const last = await getRaw(db, 'shipcheck').catch(() => null);
   if (!force && last && now - last.at < TTL) return null;
   await setSetting(db, 'shipcheck', { at: now });
-  const products = await all(db, 'SELECT id, name, variant_name, ship_cost, ship_set_at, ship_warn FROM products WHERE ship_cost > 0');
-  if (!products.length) { await resolve(db, 'shipcost:high'); return { lowered: 0, higher: 0, notified: 0 }; }
   const samples = await shipSamples(db, { now });
-  const out = { lowered: 0, higher: 0, notified: 0 }, due = [], st = [];
+  const cols = 'id, name, variant_name, ship_cost, ship_set_at, ship_warn, ship_src';
+  const products = await all(db, `SELECT ${cols} FROM products WHERE ship_cost > 0`);
+  const have = new Set(products.map((p) => p.id)), empty = [...samples.keys()].filter((id) => !have.has(id));
+  if (empty.length) products.push(...await allIn(db, empty, (ph, part) => [`SELECT ${cols} FROM products WHERE id IN (${ph}) AND COALESCE(ship_cost, 0) <= 0`, part]));
+  const out = { filled: 0, updated: 0, lower: 0, higher: 0, notified: 0 }, due = [], st = [];
   const nameOf = (p) => [p.name, p.variant_name].filter(Boolean).join(' · ');
   for (const p of products) {
     const e = evaluateShip(p, samples.get(p.id));
-    const warn = parse(p.ship_warn);
+    const warn = parse(p.ship_warn), own = p.ship_src !== 'channel';
     if (!e || !e.action) continue; // yetersiz fatura: önceki durum korunur
-    if (e.action === 'lower') {
-      const auto = { from: e.entered, to: e.median, at: now, n: e.n, by: 'Sistem' };
-      st.push(db.prepare('UPDATE products SET ship_cost = ?, ship_set_at = ?, ship_auto = ?, ship_warn = NULL, updated_at = ? WHERE id = ? AND ship_cost = ?')
-        .bind(e.median, now, JSON.stringify(auto), now, p.id, p.ship_cost));
-      out.lowered++;
-      await log(db, null, 'info', `${nameOf(p)}: kargo tutarı faturaya göre güncellendi: ${tl(e.entered)} → ${tl(e.median)} (son ${e.n} gönderinin ortancası)`);
-    } else if (e.action === 'higher') {
-      out.higher++;
-      const w = warn || { first_at: now, notified_at: null, count: 0 };
+    if (e.action === 'fill' || (!own && (e.action === 'lower' || e.action === 'higher'))) {
+      const auto = { from: e.entered || null, to: e.median, at: now, n: e.n, by: 'Pazaryeri' };
+      st.push(db.prepare(`UPDATE products SET ship_cost = ?, ship_src = 'channel', ship_set_at = ?, ship_auto = ?, ship_warn = NULL, updated_at = ? WHERE id = ? AND COALESCE(ship_cost, 0) = ?`)
+        .bind(e.median, now, JSON.stringify(auto), now, p.id, Number(p.ship_cost) || 0));
+      if (e.action === 'fill') out.filled++; else out.updated++;
+      await log(db, null, 'info', e.action === 'fill' ? `${nameOf(p)}: kargo tutarı pazaryerinden gelen kargo bilgisiyle yazıldı: ${tl(e.median)} (son ${e.n} gönderinin ortancası)`
+        : `${nameOf(p)}: kargo tutarı pazaryerinden gelen kargo bilgisine göre güncellendi: ${tl(e.entered)} → ${tl(e.median)} (son ${e.n} gönderinin ortancası)`);
+    } else if (e.action === 'lower' || e.action === 'higher') {
+      out[e.action]++;
+      const w = warn && warn.dir === e.action ? warn : { first_at: now, notified_at: null, count: 0 };
       const notifyNow = w.count < MAX_NOTICES && (!w.notified_at || now - w.notified_at >= REMIND_DAYS * D);
-      const next = { ...w, median: e.median, n: e.n, entered: e.entered, at: now, ...(notifyNow ? { notified_at: now, count: w.count + 1 } : {}) };
+      const next = { ...w, dir: e.action, median: e.median, n: e.n, entered: e.entered, at: now, ...(notifyNow ? { notified_at: now, count: w.count + 1 } : {}) };
       st.push(db.prepare('UPDATE products SET ship_warn = ? WHERE id = ?').bind(JSON.stringify(next), p.id));
       if (notifyNow) due.push({ p, e });
     } else if (warn) st.push(db.prepare('UPDATE products SET ship_warn = NULL WHERE id = ?').bind(p.id));
@@ -84,11 +88,11 @@ export async function shipCheck(db, { force = false, now = Date.now() } = {}) {
   for (let i = 0; i < st.length; i += 90) await db.batch(st.slice(i, i + 90));
   if (due.length) {
     out.notified = due.length;
-    await notify(db, 'shipcost:high', { level: 'warn', title: `${due.length} üründe kargo, ürüne girilen tutardan yüksek gidiyor`,
-      msg: due.slice(0, 5).map(({ p, e }) => `${nameOf(p)}: sistemde kargo ${tl(e.entered)} yazıyor ama ${tl(e.median)} fiyattan gidiyor (son ${e.n} gönderi)`).join(' · ')
-        + (due.length > 5 ? ` ve ${due.length - 5} ürün daha` : '') + '. Kâr tahmini düşük kargoyla hesaplanıyor: Ürünler → Düzenle → "Faturadaki tutarı kullan". Bu uyarı ürün başına en fazla iki kez gönderilir.' });
+    await notify(db, 'shipcost:diff', { level: 'warn', title: `${due.length} üründe girdiğiniz kargo tutarı pazaryerinden gelen tutardan farklı`,
+      msg: due.slice(0, 5).map(({ p, e }) => `${nameOf(p)}: sizin girdiğiniz ${tl(e.entered)}, pazaryerinden gelen ${tl(e.median)} (${e.action === 'higher' ? 'kargo daha pahalı gidiyor' : 'kargo daha ucuz gidiyor'}, son ${e.n} gönderi)`).join(' · ')
+        + (due.length > 5 ? ` ve ${due.length - 5} ürün daha` : '') + '. Girdiğiniz tutar değiştirilmez; kâr tahmini bu tutarla hesaplanır. Düzeltmek için Ürünler → Düzenle → "Pazaryerindeki tutarı kullan". Bu uyarı ürün başına en fazla iki kez gönderilir.' });
   }
-  if (!out.higher && !(await first(db, 'SELECT 1 AS x FROM products WHERE ship_warn IS NOT NULL LIMIT 1'))) await resolve(db, 'shipcost:high');
+  if (!(out.lower + out.higher) && !(await first(db, 'SELECT 1 AS x FROM products WHERE ship_warn IS NOT NULL LIMIT 1'))) { await resolve(db, 'shipcost:diff'); await resolve(db, 'shipcost:high'); }
   return out;
 }
 
@@ -100,15 +104,15 @@ export async function shipFromInvoice(db, id, user, now = Date.now()) {
   const fresh = s.filter((x) => !p.ship_set_at || x.at > p.ship_set_at).slice(0, SHIP_LAST);
   if (fresh.length < SHIP_MIN) fail(409, `Faturalı gönderi yetersiz (${fresh.length}; en az ${SHIP_MIN} tek ürünlü gönderi gerekir)`);
   const med = r2(median(fresh.map((x) => x.cost)));
-  await run(db, 'UPDATE products SET ship_cost = ?, ship_set_at = ?, ship_auto = ?, ship_warn = NULL, updated_at = ? WHERE id = ?',
+  await run(db, "UPDATE products SET ship_cost = ?, ship_src = 'channel', ship_set_at = ?, ship_auto = ?, ship_warn = NULL, updated_at = ? WHERE id = ?",
     med, now, JSON.stringify({ from: p.ship_cost, to: med, at: now, n: fresh.length, by: (user && user.name) || '' }), now, p.id);
   await log(db, null, 'info', `${(user && user.name) || 'Sistem'}: ${p.name} kargo tutarı faturadaki tutara göre ${tl(p.ship_cost || 0)} → ${tl(med)}`);
-  if (!(await first(db, 'SELECT 1 AS x FROM products WHERE ship_warn IS NOT NULL LIMIT 1'))) await resolve(db, 'shipcost:high');
+  if (!(await first(db, 'SELECT 1 AS x FROM products WHERE ship_warn IS NOT NULL LIMIT 1'))) { await resolve(db, 'shipcost:diff'); await resolve(db, 'shipcost:high'); }
   return { ok: true, ship_cost: med, n: fresh.length };
 }
 
 // Ürün formu için: son otomatik güncelleme ve yüksek fatura notu
 export function shipInfo(p) {
   const auto = parse(p.ship_auto), warn = parse(p.ship_warn);
-  return { auto: auto && Number(p.ship_cost) === Number(auto.to) ? auto : null, warn };
+  return { auto: auto && Number(p.ship_cost) === Number(auto.to) ? auto : null, warn, src: p.ship_src || (Number(p.ship_cost) > 0 ? 'user' : null) };
 }

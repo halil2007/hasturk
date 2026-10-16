@@ -389,6 +389,10 @@ export const MIGRATIONS = [
   "UPDATE settings SET v = json_set(v, '$.trendyol', 20) WHERE k = 'commission' AND json_valid(v) AND json_extract(v, '$.trendyol') = 24",
   "UPDATE settings SET v = json_set(v, '$.amazon', 15) WHERE k = 'commission' AND json_valid(v) AND json_extract(v, '$.amazon') = 18",
   "UPDATE settings SET v = json_set(v, '$.ciceksepeti', 20) WHERE k = 'commission' AND json_valid(v) AND json_extract(v, '$.ciceksepeti') = 24",
+  // Ürün kargo tutarının kaynağı: 'channel' = boş ürüne pazaryeri kargo faturalarından yazıldı (faturalarla güncellenmeye devam eder),
+  // 'user' = kullanıcı girdi (sistem bir daha değiştirmez, faturalarla farkı uyarılır). Var olan tutarlar kullanıcınındır.
+  'ALTER TABLE products ADD COLUMN ship_src TEXT',
+  "UPDATE products SET ship_src = 'user' WHERE ship_cost > 0 AND ship_src IS NULL",
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
