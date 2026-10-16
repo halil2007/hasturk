@@ -6,9 +6,14 @@
 // Kargo firması: kullanıcı seçer (otomatik seçim yok): gönderinin teklifleri (GET /shipment-price-comparison/{id}) fiyatlarıyla gösterilir.
 // Alan kuralları (doküman): alıcı adı en az 5 karakter ve 2 kelime, adres 10–512 karakter, telefon 10 hane, desi > 0.
 import { http, str } from '../util.js';
-import { phone10, nameKey, fullAddress, money, b64, trackUrl } from './common.js';
+import { phone10, nameKey, fullAddress, money, b64, trackUrl, ascii } from './common.js';
 
 const API = 'https://app.kargonomi.com.tr/api/v1';
+// Paket içeriği: Kargonomi yalnız Latin harf, rakam ve izinli noktalama kabul eder (uzun tire, tırnak, ×, ₺, emoji, Kiril / Arapça
+// reddedilir). Türkçe harfler ASCII'ye çevrilir, tire / tırnak türleri sadeleşir, kalan izinsiz karakterler atılır.
+export const safeText = (t) => ascii(String(t || '').normalize('NFKC'))
+  .replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[\u2018\u2019\u201A\u2032`´]/g, "'").replace(/[\u201C\u201D\u201E\u2033«»]/g, '"').replace(/[×✕]/g, 'x')
+  .replace(/[^A-Za-z0-9 .,;:()\/&+%#'"-]/g, ' ').replace(/\s+/g, ' ').trim();
 const places = new Map(); // il / ilçe listeleri (isolate ömrü boyunca)
 const unwrap = (j) => (j && j.data && !Array.isArray(j.data) && typeof j.data === 'object' ? j.data : j);
 const list = (j) => (Array.isArray(j) ? j : Array.isArray(j && j.data) ? j.data : []);
@@ -70,19 +75,34 @@ export function make(values) {
     const r = s.receiver, phone = phone10(r.phone);
     if (phone.length !== 10) throw new Error('Kargonomi alıcı telefonunu zorunlu istiyor (10 hane); siparişte geçerli telefon yok');
     if (!r.district) throw new Error('Kargonomi alıcı ilçesini zorunlu istiyor; sipariş adresinde ilçe yok');
-    const buyer = str(r.name).replace(/\s+/g, ' ');
+    // Ad / adres: Türkçe harfler kalır, emoji ve Latin dışı yazılar atılır (Kargonomi reddeder)
+    const clean = (t) => String(t || '').replace(/[^\p{Script=Latin}\p{N}\s.,;:()\/&+%#'"-]/gu, ' ').replace(/[\u2010-\u2015]/g, '-');
+    const buyer = clean(str(r.name)).replace(/\s+/g, ' ').trim();
     if (buyer.length < 5 || buyer.split(' ').length < 2) throw new Error(`Kargonomi alıcı adını ad ve soyadıyla istiyor (en az 2 kelime, 5 karakter); siparişteki ad: “${buyer || '—'}”`);
-    const addr = fullAddress(r).slice(0, 512);
+    const addr = clean(fullAddress(r)).replace(/\s+/g, ' ').trim().slice(0, 512);
     if (addr.replace(/\s/g, '').length < 10) throw new Error('Kargonomi alıcı adresini en az 10 karakter istiyor; sipariş adresi çok kısa');
     const stateId = await placeId('state', null, r.city);
     if (!stateId) throw new Error(`Kargonomi: alıcı ili bulunamadı (“${r.city}”)`);
     const cityId = await placeId('city', stateId, r.district);
     if (!cityId) throw new Error(`Kargonomi: alıcı ilçesi bulunamadı (“${r.district}”, ${r.city})`);
-    const draft = unwrap(await req('POST', '/shipments', { shipment: {
+    const body = { shipment: {
       warehouse_id: await warehouse(), buyer_name: buyer.slice(0, 255), buyer_email: r.email || undefined, buyer_phone: phone, buyer_address: addr,
       buyer_state_id: stateId, buyer_city_id: cityId,
-      packages: [{ desi: Number(s.desi) > 0 ? Number(s.desi) : 1, content: (s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ').slice(0, 200) || s.reference }],
-    } }));
+      packages: [{ desi: Number(s.desi) > 0 ? Number(s.desi) : 1, content: safeText((s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ')).slice(0, 200) || safeText(s.reference) || 'Urun' }],
+    } };
+    let draft;
+    try { draft = unwrap(await req('POST', '/shipments', body)); } catch (e) {
+      // Kargonomi bir alanın yazımını reddetti (karakter / biçim): alan arka planda sadeleştirilip bir kez yeniden denenir —
+      // içerik "Siparis <no>", ad / adres / e-posta ASCII; kullanıcıya hata yalnız ikinci deneme de olmazsa gösterilir
+      const m = String(e.message || '');
+      if (!/karakter|harf|içerik|icerik|content|buyer_|alıcı|adres|address|name|isim|e-posta|email|geçersiz|invalid|format/i.test(m) || /bakiye|credit|yetki|401|token/i.test(m)) throw e;
+      const sh = body.shipment;
+      sh.packages[0].content = safeText(`Siparis ${s.orderNumber || s.reference || ''}`).slice(0, 200) || 'Urun';
+      sh.buyer_name = safeText(sh.buyer_name).slice(0, 255);
+      sh.buyer_address = safeText(sh.buyer_address).slice(0, 512);
+      if (sh.buyer_email && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(sh.buyer_email)) delete sh.buyer_email;
+      draft = unwrap(await req('POST', '/shipments', body));
+    }
     if (!draft || !draft.id) throw new Error('Kargonomi gönderi numarası vermedi');
     return draft;
   }

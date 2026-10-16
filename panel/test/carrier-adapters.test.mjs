@@ -68,6 +68,9 @@ test('Kargonomi: il / ilçe numarası bulunur, taslak → kullanıcının seçti
     assert.equal(body.warehouse_id, 12707, 'ana depo');
     assert.equal(body.buyer_phone, '5321234567');
     assert.equal(body.packages[0].desi, 2.4);
+    assert.equal(body.packages[0].content, '2x Gubre 5 kg', 'içerik Latin harf / rakam / izinli noktalama');
+    const { safeText } = await import('../src/carriers/kargonomi.js');
+    assert.equal(safeText('Toprak Karışımı – Ücretsiz “Özel” × ₺99 😊 Москва'), 'Toprak Karisimi - Ucretsiz "Ozel" x 99');
     assert.equal(JSON.parse(calls.find((c) => /confirm/.test(c.url)).body).shipping_provider_id, 11, 'seçilen firma (otomatik seçim yok)');
     assert.equal(calls[0].headers.Authorization, 'Bearer tok');
     assert.equal(r.ref, '77');
@@ -135,6 +138,29 @@ test('Kargonomi: firma onayının yanıtı alınamadı (5xx) ama gönderi işlen
     await assert.rejects(a.create(ship()));
     const rest = calls.slice(n0);
     assert.ok(rest.some((c) => c.method === 'DELETE') && !rest.some((c) => /shipments\/cancel$/.test(c.url)), 'taslak silinir');
+  } finally { restore(); }
+});
+
+test('Kargonomi: alan reddedilirse (karakter / biçim) arka planda sadeleştirilip bir kez yeniden denenir; bakiye hatası yeniden denenmez', async () => {
+  let n = 0, fail = 'content';
+  const calls = mock([
+    [/GET .*\/states$/, () => ({ data: [{ id: 34, name: 'İSTANBUL' }] })],
+    [/GET .*\/cities\/34$/, () => ({ data: [{ id: 830, name: 'KADIKÖY' }] })],
+    [/GET .*\/warehouses$/, () => ({ data: [{ id: 5, is_main: true }] })],
+    [/POST .*\/shipments$/, () => (n++ === 0 ? [422, { message: fail === 'content' ? 'İçerik alanında yalnızca Latin harfleri, rakam ve izinli noktalama işaretleri kullanılabilir' : 'Yetersiz bakiye' }] : { data: { id: 95, status: 'draft' } })],
+    [/GET .*\/shipment-price-comparison\/95$/, () => ({ shipping_provider_with_price: [{ id: 11, name: 'Aras Kargo', slug: 'aras', price: 50 }] })],
+  ]);
+  try {
+    const a = kargonomi.make({ KARGONOMI_API_KEY: 't' });
+    const q = await a.quote(ship());
+    assert.equal(q.ref, '95');
+    const posts = calls.filter((c) => c.method === 'POST' && /\/shipments$/.test(c.url)).map((c) => JSON.parse(c.body).shipment);
+    assert.equal(posts.length, 2);
+    assert.equal(posts[1].packages[0].content, 'Siparis 1001');
+    assert.equal(posts[1].buyer_name, 'Ayse Yilmaz');
+    n = 0; fail = 'credit';
+    await assert.rejects(a.quote(ship()), /bakiye/);
+    assert.equal(n, 1, 'bakiye hatası yeniden denenmez');
   } finally { restore(); }
 });
 
