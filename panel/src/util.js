@@ -85,6 +85,32 @@ export async function pool(items, n, fn) {
 }
 export const chunk = (arr, n) => { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; };
 
+// Ürün açıklaması pazaryerine temiz HTML gider: Word'den kopyalanan metindeki Office etiketleri (MsoNormal, mso- stilleri, <o:p>,
+// koşullu yorumlar, <xml>) pazaryerlerince reddedilir ("Microsoft Office-specific tags"). Yalnız temel biçim etiketleri kalır
+// (paragraf, satır, liste, kalın / italik, başlık, tablo, bağlantı, görsel); stil / sınıf öznitelikleri silinir, metin korunur.
+const KEEP_TAGS = new Set(['p', 'br', 'ul', 'ol', 'li', 'b', 'strong', 'i', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'a', 'img', 'sup', 'sub', 'hr', 'blockquote']);
+const KEEP_ATTRS = { a: ['href'], img: ['src', 'alt'], td: ['colspan', 'rowspan'], th: ['colspan', 'rowspan'] };
+export function cleanHtml(v) {
+  let s = String(v ?? '');
+  if (!s.includes('<')) return s.trim();
+  s = s.replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '').replace(/<!\[(?:if[^\]]*|endif)\]>/gi, '').replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(xml|style|script|head|title)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<!doctype[^>]*>/gi, '');
+  s = s.replace(/<(\/?)([a-z][\w:-]*)([^>]*)>/gi, (m, close, tag, rest) => {
+    const t = tag.toLowerCase();
+    if (!KEEP_TAGS.has(t)) return t === 'div' ? (close ? '' : '<br>') : '';
+    if (close) return t === 'br' || t === 'img' || t === 'hr' ? '' : `</${t}>`;
+    const keep = KEEP_ATTRS[t] || [], attrs = [];
+    for (const a of rest.matchAll(/([^\s=/]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/g)) {
+      const name = a[1].toLowerCase(), val = a[2].replace(/^["']|["']$/g, '');
+      if (keep.includes(name) && !((name === 'href' || name === 'src') && !/^https?:\/\//i.test(val.trim()))) attrs.push(` ${name}="${val.replace(/"/g, '&quot;')}"`);
+    }
+    return `<${t}${attrs.join('')}>`;
+  });
+  // Boş paragraf / biçim etiketleri (Word'ün boşluk satırları) ve fazla boşluklar
+  for (let i = 0; i < 3; i++) s = s.replace(/<(p|b|strong|i|em|u|li|h[1-6]|sup|sub)>(?:\s|&nbsp;|&#160;| )*<\/\1>/gi, '');
+  return s.replace(/^(?:\s|<br>)+|(?:\s|<br>)+$/g, '').replace(/(?:<br>\s*){3,}/g, '<br><br>').replace(/[ \t\r\n]+/g, ' ').trim();
+}
+
 // Dış API isteği: zaman aşımı, 429/5xx'te kısa tekrar, anlaşılır hata mesajı
 // Hata yanıtı HTML sayfasıysa (bakım sayfası, güvenlik duvarı, sunucu hata sayfası) ham HTML yerine sayfanın başlığı ve
 // anlaşılır açıklama: "Bakımdayız | PTTAVM" → "kanal bakımda (…): bakım bitince panel kendiliğinden devam eder"
