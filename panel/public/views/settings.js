@@ -200,17 +200,25 @@ export async function settingsView(el) {
     if (!keys) keys = (await api('extapi', { fresh: true })).keys;
     const store = (state.settings && state.settings.company && state.settings.company.title) || 'Ana mağaza';
     render(box, html`<div class="row wrap" style="gap:10px;align-items:flex-start"><div style="flex:1;min-width:240px"><h2>Stok API (dış sistemlere stok aktarımı)</h2>
-        <div class="muted small" style="margin-top:4px">Bayiniz ya da kendi sisteminiz (ERP, site) ürün ve stokları anahtarla çeker; orada satılan ürünü bildirince stok düşer ve tüm kanallara gider (sipariş panele düşmez, ürünün stok hareketlerinde “Bayi satışı” görünür). Her dış sistem için ayrı anahtar oluşturun, gerektiğinde tek tek kapatın. Anahtar varsayılan olarak yalnız stok okur; satış bildirecek anahtarda “Satış bildirebilir” kutusunu işaretleyin (bildirilen satış stoktan düşer). Firma panellerinin API'si Firmalar ekranından verilir.</div></div>
+        <div class="muted small" style="margin-top:4px">Bayiniz ya da kendi sisteminiz (ERP, site) ürün ve stokları anahtarla çeker; orada satılan ürünü bildirince stok düşer ve tüm kanallara gider (sipariş panele düşmez, ürünün stok hareketlerinde “Bayi satışı” görünür). Her dış sistem için ayrı anahtar oluşturun, gerektiğinde tek tek kapatın. Anahtar varsayılan olarak yalnız stok okur; satış bildirecek anahtarda “Satış bildirebilir” kutusunu işaretleyin (bildirilen satış stoktan düşer). İsterseniz anahtara günlük en fazla satış adedi verin (boş = sınırsız; stoktan fazlası zaten satılamaz). Firma panellerinin API'si Firmalar ekranından verilir.</div></div>
         <button class="btn primary" data-api="new"><i class="ico ico-plus"></i>Yeni anahtar</button></div>
       ${keys.length ? html`<div class="table-wrap"><table class="t"><thead><tr><th>Ad</th><th>Anahtar</th><th>Satış bildirebilir</th><th>IP kısıtı</th><th>Son erişim</th><th class="r">İstek</th><th>Durum</th><th></th></tr></thead><tbody>
         ${keys.map((k) => html`<tr data-kid="${k.id}"><td><b>${k.name}</b><div class="tiny muted">${dateTime(k.created_at)}${k.created_by ? ` · ${k.created_by}` : ''}</div></td><td class="num small">${k.hint}</td>
-          <td><label class="check small" title="Bu anahtar satış bildirebilsin (stok düşer)"><input type="checkbox" data-api="write" ${k.write ? 'checked' : ''}> <span>${k.write ? 'Evet' : 'Hayır (yalnız okur)'}</span></label></td>
+          <td><label class="check small" title="Bu anahtar satış bildirebilsin (stok düşer)"><input type="checkbox" data-api="write" ${k.write ? 'checked' : ''}> <span>${k.write ? 'Evet' : 'Hayır (yalnız okur)'}</span></label>
+            <label class="row" style="gap:6px;align-items:center;margin-top:4px" title="Günlük en fazla satış adedi (boş = sınırsız)"><span class="tiny muted">Günlük en fazla</span><input class="input" type="number" min="0" step="1" inputmode="numeric" data-api-day value="${k.day_limit || ''}" placeholder="sınırsız" style="width:96px" aria-label="Günlük en fazla satış adedi (boş = sınırsız)"></label></td>
           <td class="small">${k.ips.length ? k.ips.join(', ') : html`<span class="muted">her yerden</span>`}</td>
           <td class="small">${k.last_at ? html`${dateTime(k.last_at)}${k.last_ip ? html`<div class="tiny muted">${k.last_ip}</div>` : ''}` : html`<span class="muted">henüz yok</span>`}</td>
           <td class="r num">${n(k.calls)}</td><td><span class="pill ${k.on ? 'good' : ''}">${k.on ? 'Açık' : 'Kapalı'}</span></td>
           <td class="r"><div class="row" style="justify-content:flex-end;gap:4px"><button class="btn sm" data-api="toggle">${k.on ? 'Kapat' : 'Aç'}</button><button class="btn sm ghost" data-api="ips">IP</button><button class="icon-btn sm" data-api="del" aria-label="Sil"><i class="ico ico-x"></i></button></div></td></tr>`)}
       </tbody></table></div>` : html`<div class="empty">Henüz anahtar yok. “Yeni anahtar” ile oluşturun; anahtar bir kez gösterilir.</div>`}
       <div class="row"><span class="spacer"></span><button class="btn sm ghost" data-api="doc"><i class="ico ico-help"></i>Kullanım kılavuzu</button></div>`);
+    // Günlük satış sınırı: alandan çıkınca kaydedilir (boş = sınırsız)
+    box.onchange = async (e) => {
+      const i = e.target.closest('[data-api-day]'), k = i && keys.find((x) => x.id === i.closest('[data-kid]').dataset.kid);
+      if (!k) return;
+      i.disabled = true;
+      try { await drawApi((await api('extapi/' + k.id, { method: 'PUT', body: { day_limit: i.value } })).keys); toast(Number(i.value) > 0 ? `“${k.name}”: günde en fazla ${n(Number(i.value))} adet` : `“${k.name}”: günlük sınır yok`); } catch (x) { i.value = k.day_limit || ''; i.disabled = false; toast(x.message, true); }
+    };
     box.onclick = async (e) => {
       const b = e.target.closest('[data-api]');
       if (!b) return;
@@ -221,10 +229,11 @@ export async function settingsView(el) {
           <label class="field"><span>Ad (kimin için?)</span><input class="input" data-kn placeholder="ör. Bayi — Örnek Mağaza"></label>
           <label class="field"><span>İzin verilen IP adresleri (isteğe bağlı)</span><textarea class="input" rows="2" data-ki placeholder="Boş: her yerden · ör. 85.105.10.25, 85.105.10.0/24"></textarea></label>
           <label class="check"><input type="checkbox" data-kw> <span>Bu anahtar satış bildirebilsin (stok düşer)</span></label>
-          <div class="tiny muted">İşaretlemezseniz anahtar yalnız stok okur. Sonradan listeden açıp kapatabilirsiniz.</div></div>`,
+          <div class="tiny muted">İşaretlemezseniz anahtar yalnız stok okur. Sonradan listeden açıp kapatabilirsiniz.</div>
+          <label class="field"><span>Günlük en fazla satış adedi (boş = sınırsız)</span><input class="input" type="number" min="0" step="1" inputmode="numeric" data-kd placeholder="sınırsız" style="max-width:160px"></label></div>`,
           foot: html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-ok>Oluştur</button>` });
         $('[data-ok]', s2.el).onclick = (ev) => busy(ev.currentTarget, async () => {
-          const r = await api('extapi', { method: 'POST', body: { name: $('[data-kn]', s2.el).value, ips: $('[data-ki]', s2.el).value, write: $('[data-kw]', s2.el).checked } });
+          const r = await api('extapi', { method: 'POST', body: { name: $('[data-kn]', s2.el).value, ips: $('[data-ki]', s2.el).value, write: $('[data-kw]', s2.el).checked, day_limit: $('[data-kd]', s2.el).value } });
           s2.close(); await drawApi(r.keys);
           const s3 = sheet({ title: 'Anahtar oluşturuldu', size: 'narrow', body: html`<div class="stack">
             <div class="notice warn small"><i class="ico ico-warn"></i><div>Anahtar <b>yalnız bir kez</b> gösterilir. Kopyalayıp dış sisteme girin ya da güvenli yolla iletin.</div></div>

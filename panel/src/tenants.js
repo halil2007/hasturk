@@ -8,7 +8,7 @@ import { all, first, run, init } from './db.js';
 import { handle, report5xx } from './handler.js';
 import { recordError, clientReport, actionSucceeded, syncSucceeded } from './errors.js';
 import { PerfBuffer } from './perf.js';
-import { extApiInner, apiOf, apiPublic, newKey, parseIps } from './extapi.js';
+import { extApiInner, apiOf, apiPublic, newKey, parseIps, parseDayLimit } from './extapi.js';
 import { syncAll } from './sync.js';
 import { doD1 } from './dosql.js';
 import { hashPassword, supportCookie, currentUser, demoCookie, userCookie } from './auth.js';
@@ -404,6 +404,8 @@ export async function tenantApi(req, env, db, path, user) {
       else if (act === 'ips') { try { a.ips = parseIps(b.ips); } catch (e) { fail(400, e.message); } }
       // Satış bildirme (yazma) izni: kapalıyken anahtar yalnız stok okur (eski anahtarlarda kapalı)
       else if (act === 'write') a.write = b.write === true;
+      // Günlük satış adedi sınırı (isteğe bağlı): boş / 0 = sınırsız
+      else if (act === 'day_limit') a.day_limit = parseDayLimit(b.day_limit);
       else fail(400, 'Geçersiz işlem');
       await run(db, 'UPDATE tenants SET api = ?, updated_at = ? WHERE slug = ?', JSON.stringify(a), Date.now(), t.slug);
       forgetTenant(t.slug);
