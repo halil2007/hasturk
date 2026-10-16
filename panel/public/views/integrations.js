@@ -188,7 +188,7 @@ ${c.mail.body}</textarea></details>` : ''}</div></div>
     foot: admin ? html`${c.usable && !c.isDefault ? html`<button class="btn" data-def>Varsayılan yap</button>` : ''}<span class="spacer"></span>${c.demo ? '' : html`<button class="btn" data-save>Kaydet</button>`}<button class="btn primary" data-test><i class="ico ico-key"></i>${c.demo ? 'Bağlantıyı test et' : 'Kaydet ve test et'}</button>` : html`<span class="muted small">Bilgileri yalnız yönetici değiştirebilir.</span>` });
     const save = async () => {
       if (c.demo) return;
-      const values = {}; $$('[data-k]', s.el).forEach((i) => { values[i.dataset.k] = i.value; });
+      const values = {}; $$('.input[data-k]', s.el).forEach((i) => { values[i.dataset.k] = i.value; });
       const act = $('[data-active]', s.el);
       await api('integrations/carriers/' + c.id, { method: 'PUT', body: { values, ...(act ? { active: act.checked } : {}) } });
     };
@@ -324,7 +324,7 @@ ${c.mail.body}</textarea></details>` : ''}</div></div>
   const draw = () => (id ? detail() : overview());
 
   // Adres alanlarında https:// yazılmadıysa eklenir
-  const values = (cid) => { const o = {}; $$(`[data-ch="${cid}"] [data-k]`, el).forEach((i) => { let v = i.value.trim(); if (v && /_(URL|BASE)$/.test(i.dataset.k) && !/^https?:\/\//i.test(v)) { v = 'https://' + v; i.value = v; } o[i.dataset.k] = v; }); return o; };
+  const values = (cid) => { const o = {}; $$(`[data-ch="${cid}"] .input[data-k]`, el).forEach((i) => { let v = String(i.value ?? '').trim(); if (v && /_(URL|BASE)$/.test(i.dataset.k) && !/^https?:\/\//i.test(v)) { v = 'https://' + v; i.value = v; } o[i.dataset.k] = v; }); return o; };
   // Sunucu mesajındaki alan kodları (WOO_URL …) alan adlarıyla gösterilir
   const labelize = (cid, msg) => { const c = data && data.channels.find((x) => x.id === cid); let t = String(msg || ''); if (c) for (const f2 of [...c.fields].sort((a, b) => b.k.length - a.k.length)) t = t.split(f2.k).join(f2.label); return t; };
   const after = async () => { await loadSummary().catch(() => {}); await load(); };
