@@ -83,7 +83,7 @@ export const FEATURES = [
       ['i-eye', 'Gönderim takibi', 'Kanalın ürünü kabul edip etmediği ve ilanın mağazada görünüp görünmediği izlenir; reddedilen ürün nedeniyle birlikte gösterilir.'],
       ['i-tag', 'Toplu fiyat ve maliyet', 'Excel ile fiyat, stok ve alış fiyatı güncelleme; döviz bazlı fiyat (USD, EUR, GBP) ve anlık kur.'],
     ],
-    note: { title: 'Bilmeniz gerekenler', items: ['Panelden ürün yükleme Trendyol, Hepsiburada, N11 ve idefix\'te çalışır. PttAVM ve Pazarama\'da yeni ilan kanalın kendi panelinden açılır; stok ve fiyat yine panelden gider.', 'Otomatik gönderim siz bir kanal için açana kadar kapalıdır. Reddedilen ürün, düzelttiyseniz 1 saat, düzeltmediyseniz 24 saat sonra tekrar denenir.'] },
+    note: { title: 'Bilmeniz gerekenler', items: ['Panelden ürün yükleme Trendyol, Hepsiburada, N11, idefix ve Pazarama\'da çalışır. PttAVM\'de yeni ilan kanalın kendi panelinden açılır; stok ve fiyat yine panelden gider.', 'Otomatik gönderim siz bir kanal için açana kadar kapalıdır. Reddedilen ürün, düzelttiyseniz 1 saat, düzeltmediyseniz 24 saat sonra tekrar denenir.'] },
     faq: [
       ['Ürünlerim nereden geliyor?', 'Bağladığınız kanallardaki ilanlarınızdan seçerek panele alırsınız. ikas siteniz varsa ürünler, kategoriler, görseller ve varyantlar oradan ana katalog olarak gelebilir.'],
       ['Kanal ürünümü reddederse ne olur?', 'Panel kanalın verdiği hata nedenini gösterir. Eksiği tamamladığınızda ürün tekrar gönderilir.'],
@@ -327,7 +327,7 @@ export const INTEGRATIONS = [
       ['i-cart', 'Sipariş onayı', 'Yeni Pazarama siparişlerini panelden onaylayın.'],
       ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız diğer kanallarla eşit kalır.'],
       ['i-chat', 'Müşteri soruları', 'Pazarama sorularını diğer kanallarla aynı listede yanıtlayın.'],
-      ['i-box', 'Ürünler', 'Yeni ilanı Pazarama panelinden açarsınız; ilan paneldeki ürüne kendiliğinden bağlanır.'],
+      ['i-box', 'Ürünler', 'Ürünlerinizi kategori ve özellik eşleştirmesiyle panelden Pazarama\'ya yüklersiniz (onaydan sonra satışa açılır); Pazarama\'da açtığınız ilanlar da paneldeki ürüne kendiliğinden bağlanır.'],
     ],
     help: 'Pazarama iş ortağı paneli → Hesabım → Hesap Bilgileri → Entegrasyon Bilgileri. API Key (Client ID) ve API Secret bilgileriniz gerekir.',
   },
