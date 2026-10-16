@@ -72,6 +72,10 @@ test('Hepsiburada hakediş: komisyon kaydı gelmeyen satış, sipariş numarası
   assert.equal(JSON.parse(rows[0].raw).status, 'Open');
   const lg = (await db.prepare("SELECT level, msg FROM logs WHERE channel = 'hepsiburada'").all()).results;
   assert.ok(lg.some((x) => x.level === 'warn' && /durum filtresi dışında/.test(x.msg) && /Commission \/ Open \(1\)/.test(x.msg)), JSON.stringify(lg));
+  // Sonraki senkron: komisyonu artık panelde olan sipariş yeniden aranmaz (her senkron aynı siparişleri okumaz)
+  const n0 = calls.length;
+  await syncSettlements({ DB: db, ...HB_ENV }, db, { force: true });
+  assert.equal(calls.slice(n0).filter((u) => /OrderNumber=/.test(u)).length, 0);
   resetChannels();
 });
 
@@ -235,5 +239,41 @@ test('Mutabakat bildirimleri (Hepsiburada): yeni eksik ödeme, geciken hakediş;
   assert.match(nt['stl:fixed:hepsiburada'].title, /1 itiraz sonuçlandı/);
   const d = await db.prepare("SELECT status, note FROM stl_disputes WHERE order_number = 'SHORT2'").first();
   assert.equal(d.status, 'resolved'); assert.match(d.note, /pazaryeri düzeltti/);
+  resetChannels();
+});
+
+test('Mutabakat düzeltmeleri: arama sayıları daraltmaz; 60 günden eski itiraz da sonuçlanır ve kayıtlı fark güncellenir (düzeltme geri alınınca yeniden açılır); geciken tutar azalınca bildirim yeniden okunmadı olmaz', async () => {
+  const { db, now } = await reconDb(
+    [['SHORT', 3000, 612], ['OK1', 1000, 204], ['OLD', 1000, 204, { age: 80 }]],
+    [['SHORT', 'Satış', 'Payment', 3000], ['SHORT', 'Komisyon', 'Commission', -700, 700],
+      ['OK1', 'Satış', 'Payment', 1000], ['OK1', 'Komisyon', 'Commission', -204, 204],
+      ['OLD', 'Satış', 'Payment', 1000], ['OLD', 'Komisyon', 'Commission', -254, 254]],
+  );
+  const env = { DB: db, ...HB_ENV };
+  // Arama: kartlar tüm dönemi gösterir, numarası uyan sipariş ayrıca listelenir
+  const sr = await settlementReport({ DB: db }, db, SET, { from: now - 30 * D, to: now + 1, q: 'OK1' });
+  assert.deepEqual([sr.totals.checked, sr.totals.mismatched], [2, 1]);
+  assert.deepEqual(sr.search.found.map((x) => [x.order_number, x.code]), [['OK1', 'ok']]);
+  // 80 günlük siparişin itirazı: pazaryeri düzeltince (60 günlük bildirim penceresi dışında da) "çözüldü" olur
+  await saveDispute(db, { channel: 'hepsiburada', order_number: 'OLD', status: 'disputed', diff: -50 });
+  await db.prepare("INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, due_date, paid, synced_at) VALUES ('hepsiburada', 'fx', ?, 'Komisyon', 'Commission', 'OLD', 50, -50, ?, 0, 0)").bind(now, now + 20 * D).run();
+  // Geciken iki kayıt
+  for (const [id, a] of [['l1', 300], ['l2', 200]]) await db.prepare("INSERT INTO settlements (channel, remote_id, date, type, raw_type, order_number, amount, commission, due_date, paid, synced_at) VALUES ('hepsiburada', ?, ?, 'Satış', 'Payment', 'X', ?, 0, ?, 0, 0)").bind(id, now - 20 * D, a, now - 5 * D).run();
+  let o = await stlNotify(env, db, SET);
+  assert.equal(o.hepsiburada.fixed, 1);
+  let d = await db.prepare("SELECT status, diff FROM stl_disputes WHERE order_number = 'OLD'").first();
+  assert.deepEqual([d.status, Math.abs(d.diff) < 1], ['resolved', true]);
+  // Düzeltme geri alındı: fark yeniden açılır ("değişti"), kapatılanlarda saklanmaz
+  await db.prepare("DELETE FROM settlements WHERE remote_id = 'fx'").run();
+  const r = await settlementReport({ DB: db }, db, SET, { from: now - 90 * D, to: now + 1 });
+  const old = r.diffs.find((x) => x.order_number === 'OLD');
+  assert.ok(old && old.dispute.changed, 'geri alınan düzeltme yeniden açık fark');
+  // Kısmi ödeme: geciken tutar azaldı → bildirim başlığı güncellenir, yeniden okunmadı yapılmaz
+  await db.prepare("UPDATE notices SET read = 1 WHERE key = 'stl:late:hepsiburada'").run();
+  await db.prepare("UPDATE settlements SET paid = 1 WHERE remote_id = 'l1'").run();
+  await stlNotify(env, db, SET);
+  const n = await db.prepare("SELECT title, read, count FROM notices WHERE key = 'stl:late:hepsiburada'").first();
+  assert.deepEqual([n.read, n.count], [1, 1]);
+  assert.match(n.title, /200 ₺/);
   resetChannels();
 });

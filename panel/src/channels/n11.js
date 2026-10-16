@@ -142,6 +142,12 @@ export function n11(env, meta) {
     if (/^failure$/i.test(tag(tag(x, 'result') || x, 'status'))) throw new Error(`N11 ${op}: ${tag(x, 'errorMessage') || 'başarısız'}`);
     return x;
   }
+  // N11 tarihi: "16/10/2026 14:05(:00)" (Türkiye saati) ya da ISO; okunamazsa boş
+  const n11Date = (s) => {
+    const m = /^(\d{2})[./](\d{2})[./](\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(String(s || '').trim());
+    if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)) - 3 * 3600e3;
+    const t = Date.parse(s); return Number.isFinite(t) ? t : null;
+  };
   const dmy = (ms) => { const d = new Date(ms + 3 * 3600e3); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
   let qOpenOnly = false;
   async function questions({ since, until = Date.now(), page = 0 }) {
@@ -149,12 +155,15 @@ export function n11(env, meta) {
     const ask = (st) => soap('GetProductQuestionList', `<productQuestionSearch><productId></productId><buyerEmail></buyerEmail><subject></subject><status>${st}</status><startDate>${dmy(since)}</startDate><endDate>${dmy(until)}</endDate></productQuestionSearch><pagingData><currentPage>0</currentPage><pageSize>100</pageSize></pagingData>`);
     let x, closed = '';
     if (qOpenOnly) x = await ask('OPEN');
-    else try { x = await ask(''); } catch (e) { if (e.budget || /bağlantı hatası|HTTP 429/.test(e.message)) throw e; qOpenOnly = true; x = await ask('OPEN'); }
+    // Durum boş gönderilemiyorsa yalnız açık sorular istenir; istek sınırı / bağlantı hatası bu kipe geçirmez (hata olarak döner)
+    else try { x = await ask(''); } catch (e) { if (e.budget || /bağlantı hatası|HTTP 429|limit|too many|çok fazla|dakika/i.test(e.message)) throw e; qOpenOnly = true; x = await ask('OPEN'); }
     // Yalnız açık sorular okunabiliyorsa kapananlar ayrıca istenir: N11 panelinden cevaplanan soru panelde "bekliyor" kalmasın
     if (qOpenOnly) try { closed = await ask('CLOSED'); } catch (e) { if (e.budget) throw e; }
     const items = [...tags(x, 'productQuestion'), ...tags(closed, 'productQuestion')].map((q) => ({
       remoteId: tag(q, 'id'), text: [tag(q, 'questionSubject'), tag(q, 'question')].filter(Boolean).join(' — '), status: tag(q, 'answer') ? 'answered' : 'waiting', remoteStatus: tag(q, 'answer') ? 'CLOSED' : 'OPEN',
       productName: tag(q, 'productTitle'), sku: tag(q, 'productId'), answer: tag(q, 'answer') || null,
+      // Soru tarihi (yoksa ilk görüldüğü an yazılır): eski bekleyen soruların yeniden okunması bu tarihe göre yapılır
+      askedAt: n11Date(tag(q, 'createdDate') || tag(q, 'questionDate') || tag(q, 'creationDate') || tag(q, 'date')),
     })).filter((q) => q.remoteId);
     return { items, hasNext: false, total: Number(tag(x, 'totalCount')) || items.length };
   }

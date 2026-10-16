@@ -27,9 +27,10 @@ export const FIELDS = {
   // ---------- kargo entegratörleri (kanal değil; siparişin kargo etiketi bu firmalar üzerinden alınır: src/carriers.js) ----------
   // Alanlar firmaların API'lerinin istediği bilgiler (src/carriers/<firma>.js)
   kargonomi: [
-    { k: 'KARGONOMI_API_KEY', label: 'API anahtarı (token)', secret: true, req: true, hint: 'Kargonomi destek ekibinin verdiği API anahtarı (destek@kargonomi.com.tr)' },
+    { k: 'KARGONOMI_API_KEY', label: 'API anahtarı (token)', secret: true, req: true, hint: 'Kargonomi\'nin e-postayla gönderdiği token (destek@kargonomi.com.tr adresinden istenir; telefonla verilmez)' },
     { k: 'KARGONOMI_WAREHOUSE', label: 'Depo numarası', adv: true, hint: 'Boşsa Kargonomi\'deki ana depo (gönderen adresi) kullanılır' },
-    { k: 'KARGONOMI_PROVIDER', label: 'Kargo firması', adv: true, choices: [['', 'Otomatik (en ucuz)'], ['3', 'Kolay Gelsin'], ['4', 'Aras Kargo'], ['5', 'Sürat Kargo'], ['6', 'HepsiJET'], ['7', 'PTT Kargo']] },
+    // Firma, gönderinin fiyat tekliflerinden (shipment-price-comparison) adına göre seçilir: Kargonomi'deki firma numarasına bağlı değil
+    { k: 'KARGONOMI_PROVIDER', label: 'Kargo firması', adv: true, hint: 'Seçilen firma o gönderi için teklif vermezse gönderi açılmaz, hangi firmaların teklif verdiği yazılır', choices: [['', 'Otomatik (en ucuz)'], ['aras', 'Aras Kargo'], ['yurtici', 'Yurtiçi Kargo'], ['surat', 'Sürat Kargo'], ['ptt', 'PTT Kargo'], ['hepsijet', 'HepsiJET'], ['kolaygelsin', 'Kolay Gelsin'], ['mng', 'DHL eCommerce (MNG)']] },
   ],
   navlungo: [
     { k: 'NAVLUNGO_USER', label: 'API kullanıcı adı', req: true, hint: 'Navlungo → Entegrasyonlar\'da açılan API kullanıcısı (panel giriş bilgisi değil)' },

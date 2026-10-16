@@ -45,15 +45,21 @@ export async function syncQuestions(env, db, { only } = {}) {
 // kanalın kendi panelinden cevaplanan soru normal pencerede bir daha gelmez ve panelde "bekliyor" kalırdı. Bekleyen en eski sorunun
 // tarihinden pencerenin başına kadar (en fazla 30 gün geriye) ayrıca okunur; kanalın tarih aralığı sınırı için 13 günlük parçalarla.
 const BY_MODIFIED = new Set(['hepsiburada']); // değişiklik tarihine göre süzer: cevaplanan soru normal pencerede zaten gelir
-const OLD_MAX = 30 * 864e5, SPAN = 13 * 864e5, OLD_PAGES = 10;
+const OLD_MAX = 30 * 864e5, SPAN = 13 * 864e5, OLD_PAGES = 10, OLD_EVERY = 3 * 3600e3;
+// Soru listesi dakikada bir çağrılabilen kanal: eski sorular tek istekle (parçasız, tek sayfa) okunur
+const ONE_CALL = new Set(['n11']);
 async function recheckOld(db, ch, before, t) {
   if (BY_MODIFIED.has(ch.type)) return [];
+  // En sık 3 saatte bir (her senkronda aynı aralık baştan okunmasın, istek bütçesi ve kanal sınırı korunsun)
+  const key = `qold:${ch.id}`, last = await getRaw(db, key).catch(() => null);
+  if (last && t - last.at < OLD_EVERY) return [];
   const old = await first(db, "SELECT MIN(asked_at) AS t FROM questions WHERE channel = ? AND status = 'waiting' AND asked_at < ? AND asked_at > ?", ch.id, before, t - OLD_MAX);
   if (!old || !old.t) return [];
-  const from = Math.max(old.t - 3600e3, t - OLD_MAX), items = [];
-  for (let end = before; end > from; end -= SPAN) {
-    const start = Math.max(from, end - SPAN);
-    for (let page = 0; page < OLD_PAGES; page++) {
+  await setSetting(db, key, { at: t });
+  const from = Math.max(old.t - 3600e3, t - OLD_MAX), items = [], one = ONE_CALL.has(ch.type);
+  for (let end = before; end > from; end -= one ? Infinity : SPAN) {
+    const start = one ? from : Math.max(from, end - SPAN);
+    for (let page = 0; page < (one ? 1 : OLD_PAGES); page++) {
       const r = await ch.questions({ since: start, until: end, page, size: 50 });
       items.push(...r.items);
       if (!(r.hasNext && r.items.length)) break;
@@ -70,7 +76,7 @@ export async function save(db, channel, items) {
   for (const part of chunk(items, 40)) {
     await db.batch(part.map((q) => db.prepare(`INSERT INTO questions (channel, remote_id, text, asked_at, status, remote_status, product_name, product_image, product_url, barcode, sku, customer, answer, answered_at, answered_by, due_at, synced_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (channel, remote_id) DO UPDATE SET text = excluded.text,
+      ON CONFLICT (channel, remote_id) DO UPDATE SET text = excluded.text, asked_at = MIN(COALESCE(questions.asked_at, excluded.asked_at), excluded.asked_at),
         status = CASE WHEN questions.status = 'answered' AND questions.answered_by = 'panel' AND excluded.status = 'waiting' AND questions.answered_at > ${t - 2 * 864e5} THEN 'answered' ELSE excluded.status END, remote_status = excluded.remote_status,
         product_name = COALESCE(NULLIF(excluded.product_name, ''), questions.product_name), product_image = COALESCE(NULLIF(excluded.product_image, ''), questions.product_image),
         product_url = COALESCE(NULLIF(excluded.product_url, ''), questions.product_url), answer = COALESCE(excluded.answer, questions.answer),

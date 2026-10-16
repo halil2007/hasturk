@@ -156,7 +156,7 @@ test('Kargo: boş ürüne pazaryerinden gelen kargo bilgisi yazılır (son 5 gö
   const p = await prod(db);
   assert.deepEqual([p.ship_cost, p.ship_src, p.ship_auto.from, p.ship_auto.to, p.ship_auto.n, p.ship_auto.by], [54.9, 'channel', null, 54.9, 5, 'Pazaryeri']);
   assert.ok(p.ship_set_at > 0);
-  assert.match((await first(db, "SELECT msg FROM logs WHERE msg LIKE '%pazaryerinden gelen kargo bilgisiyle yazıldı%'")).msg, /54,90 ₺/);
+  assert.match((await first(db, "SELECT msg FROM logs WHERE msg LIKE '%pazaryerinden gelen kargo bilgisiyle%yazıldı%'")).msg, /54,90 ₺/);
   // Tekrar çalışınca değişmez (yeni gönderi yok)
   assert.equal((await shipCheck(db, { force: true })).filled, 0);
   // Kullanıcının girdiği tutar (65) faturalardan yüksek: tutar değişmez, uyarılır

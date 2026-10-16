@@ -19,13 +19,14 @@ function mock(routes) {
 
 test('N11: açık sorular SOAP ile alınır, cevap SaveProductAnswer ile gider', async () => {
   const xml = `<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Body><ns3:GetProductQuestionListResponse xmlns:ns3="http://www.n11.com/ws/schemas">
-    <result><status>success</status></result><productQuestions><productQuestion><id>555</id><productId>77</productId><productTitle>Solucan Gübresi 5 Kg</productTitle><question>Kaç günde gelir?</question><questionSubject>Kargo</questionSubject></productQuestion></productQuestions>
+    <result><status>success</status></result><productQuestions><productQuestion><id>555</id><productId>77</productId><productTitle>Solucan Gübresi 5 Kg</productTitle><question>Kaç günde gelir?</question><questionSubject>Kargo</questionSubject><createdDate>03/10/2026 14:05</createdDate></productQuestion></productQuestions>
     <pagingData><currentPage>0</currentPage><pageSize>100</pageSize><totalCount>1</totalCount><pageCount>1</pageCount></pagingData></ns3:GetProductQuestionListResponse></SOAP-ENV:Body></SOAP-ENV:Envelope>`;
   const calls = mock([[/productService/, (u, o) => (/SaveProductAnswer/.test(o.body) ? '<x><result><status>success</status></result></x>' : xml)]]);
   const ch = n11({ N11_APP_KEY: 'k&1', N11_APP_SECRET: 's' }, { id: 'n11' });
   const r = await ch.questions({ since: Date.parse('2026-10-01T00:00:00Z'), until: Date.parse('2026-10-05T00:00:00Z'), page: 0 });
   assert.equal(r.items.length, 1);
   assert.deepEqual([r.items[0].remoteId, r.items[0].status, r.items[0].productName, r.items[0].text], ['555', 'waiting', 'Solucan Gübresi 5 Kg', 'Kargo — Kaç günde gelir?']);
+  assert.equal(r.items[0].askedAt, Date.parse('2026-10-03T14:05:00+03:00'), 'soru tarihi (Türkiye saati) okunur');
   assert.match(calls[0].body, /<sch:GetProductQuestionListRequest><auth><appKey>k&amp;1<\/appKey>/);
   assert.match(calls[0].body, /<startDate>01\/10\/2026<\/startDate>/);
   assert.equal(calls[0].headers.SOAPAction, 'GetProductQuestionList');
@@ -86,6 +87,11 @@ test('Senkron: kanal panelinden cevaplanan eski soru (normal pencerenin dışın
   assert.deepEqual([q.status, q.answer, q.answered_by], ['answered', 'Yarın kargoda', 'kanal']);
   assert.ok(windows.every(([s, u]) => u - s <= 14 * D), 'tarih aralığı kanal sınırını aşmaz');
   // Bekleyen eski soru kalmadıysa ek okuma yapılmaz
+  windows.length = 0;
+  await syncQuestions(env, db, {});
+  assert.equal(windows.length, 1);
+  // Eski soru kontrolü en sık 3 saatte bir: yeni bekleyen eski soru olsa da hemen ardından yeniden okunmaz
+  await run(db, "INSERT INTO questions (channel, remote_id, text, asked_at, status, remote_status, synced_at) VALUES ('trendyol', 'Q2', 'Rengi?', ?, 'waiting', 'WAITING_FOR_ANSWER', ?)", now - 8 * D, now - D);
   windows.length = 0;
   await syncQuestions(env, db, {});
   assert.equal(windows.length, 1);

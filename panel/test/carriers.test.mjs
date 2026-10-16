@@ -225,3 +225,59 @@ test('kargo firması (HepsiJET, sahte sunucu): etiket → kargoya ver → firma 
     assert.equal(r.body.order.packages[0].cargo_company, 'Aras Kargo');
   } finally { globalThis.fetch = real; }
 });
+
+test('otomatik gönderim kategorileri: kanal bazında kaydedilir; başka kanalın seçimi (eski sekmeden gelen istek) ezilmez', async () => {
+  const { env, call } = await panel();
+  await setSetting(env.DB, 'auto_upload_cats', { trendyol: ['Bahçe'], hepsiburada: ['Gübre'] });
+  const r = await call('/api/settings', { method: 'PUT', body: JSON.stringify({ auto_upload_cats: { hepsiburada: ['Gübre', 'Saksı'] } }) });
+  assert.equal(r.status, 200);
+  const v = JSON.parse((await env.DB.prepare("SELECT v FROM settings WHERE k = 'auto_upload_cats'").first()).v);
+  assert.deepEqual(v, { trendyol: ['Bahçe'], hepsiburada: ['Gübre', 'Saksı'] });
+});
+
+test('Kargonomi: gerçek ücret tahmini ücretin yerine geçer; firma gönderiyi sonradan oluşturamazsa pakete hata ve bildirim, ücret geri alınır, etiket beklenmez, iptal kilitlenmez', async () => {
+  const { trackCarriers } = await import('../src/carriers.js');
+  const real = globalThis.fetch;
+  let st = 'webservice_order_creating', price = { estimated_price: '40.00' };
+  globalThis.fetch = async (url, o = {}) => {
+    const u = String(url), J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { 'Content-Type': 'application/json' } });
+    if (/\/states$/.test(u)) return J({ data: [{ id: 42, name: 'KONYA' }] });
+    if (/\/cities\/42$/.test(u)) return J({ data: [{ id: 600, name: 'SELÇUKLU' }] });
+    if (/\/warehouses$/.test(u)) return J({ data: [{ id: 1, is_main: 1 }] });
+    if (/\/shipments$/.test(u)) return J({ id: 9 });
+    if (/confirm-shipping-price/.test(u)) return J({});
+    if (/shipments\/cancel/.test(u) || (o.method === 'DELETE')) return J({ message: 'olmaz' }, 422);
+    if (/\/shipments\/9$/.test(u)) return J({ id: 9, status: st, status_label: st === 'webservice_order_failed' ? 'Kargo Sipariş Oluşturulamadı' : 'Oluşturuluyor', shipping_provider_name: 'Aras Kargo', ...price });
+    return new Response('?', { status: 404 });
+  };
+  try {
+    const { env, call, post } = await panel();
+    await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '03320000000', address: 'Sanayi Cd. 1', city: 'Selçuklu / Konya' });
+    await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'k' } }) });
+    await saveOrders(env.DB, 'trendyol', [order('F1')]);
+    const id = encodeURIComponent('trendyol:F1');
+    let r = await post(`/api/orders/${id}/carrier-label`, { provider: 'kargonomi' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const shipCost = async () => (await env.DB.prepare("SELECT shipping_cost FROM orders WHERE id = 'trendyol:F1'").first()).shipping_cost;
+    assert.equal(await shipCost(), 48, 'tahmini 40 + KDV');
+    // Gerçek ücret geldi: fark sipariş kargo giderine yansır
+    price = { estimated_price: '40.00', real_price: '45.00' };
+    await trackCarriers(env, env.DB, { force: true });
+    assert.equal(await shipCost(), 54);
+    // Firma gönderiyi oluşturamadı
+    st = 'webservice_order_failed';
+    await trackCarriers(env, env.DB, { force: true });
+    const pk = await env.DB.prepare("SELECT id, error, carrier_state, carrier_cost FROM packages WHERE order_id = 'trendyol:F1'").first();
+    assert.equal(pk.carrier_state, 'failed');
+    assert.match(pk.error, /oluşturamadı/);
+    assert.equal(pk.carrier_cost, null);
+    assert.equal(await shipCost(), 0);
+    assert.ok(await env.DB.prepare(`SELECT 1 FROM notices WHERE key = 'carrier:failed:${pk.id}' AND resolved_at IS NULL`).first());
+    r = await post(`/api/orders/${id}/label`, { package_id: pk.id });
+    assert.match(JSON.stringify(r.body), /oluşturamadı/);
+    // Kargonomi iptali reddetse de (gönderi zaten oluşmadı) paket temizlenir, yeni gönderi açılabilir
+    r = await post(`/api/orders/${id}/carrier-cancel`, { package_id: pk.id });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal((await env.DB.prepare('SELECT carrier_ref FROM packages WHERE id = ?').bind(pk.id).first()).carrier_ref, null);
+  } finally { globalThis.fetch = real; }
+});

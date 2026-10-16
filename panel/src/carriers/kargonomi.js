@@ -3,6 +3,8 @@
 // → firma gönderisi oluşunca takip no ve etiket (GET /shipments/{id}, /shipments/{id}/barcode?format=pdf).
 // Alıcı il / ilçesi Kargonomi'nin numaralarıyla gönderilir (Kargonomi'de "state" = il, "city" = ilçe): adlardan bulunur, önbelleklenir.
 // Gönderen: Kargonomi panelindeki depo (warehouse); numara girilmediyse ana depo kullanılır.
+// Kargo firması: otomatik (-1 = en ucuz) ya da adına göre: gönderinin teklifleri (GET /shipment-price-comparison/{id}) içinden seçilir.
+// Alan kuralları (doküman): alıcı adı en az 5 karakter ve 2 kelime, adres 10–512 karakter, telefon 10 hane, desi > 0.
 import { http, str } from '../util.js';
 import { phone10, nameKey, fullAddress, money, b64, trackUrl } from './common.js';
 
@@ -16,7 +18,8 @@ const label = (x) => str(x && (x.name || x.title || x.state_name || x.city_name)
 const STATES = {
   draft: 'created', ready: 'created', webservice_order_creating: 'created', webservice_order_created: 'created', webservice_checking_shipment: 'created',
   webservice_shipment_started: 'transit', webservice_shipment_not_delivered: 'transit', webservice_shipment_delivered: 'delivered',
-  webservice_shipment_returning: 'returned', webservice_shipment_missing: 'transit', cancelled: 'cancelled', request_for_cancellation: 'cancelled',
+  // İptal talebi kesin iptal değildir (Kargonomi 36 saate kadar işler, reddedebilir): takip sürer
+  webservice_shipment_returning: 'returned', webservice_shipment_missing: 'transit', cancelled: 'cancelled', request_for_cancellation: 'cancelling',
   webservice_order_failed: 'failed',
 };
 
@@ -46,12 +49,24 @@ export function make(values) {
     if (!w) throw new Error('Kargonomi: gönderen depo tanımlı değil. Kargonomi panelinde Depolarım bölümünden bir depo (gönderen adresi) ekleyin.');
     return w.id;
   }
+  // Seçilen kargo firması → bu gönderinin teklifleri içindeki numarası (yoksa hangi firmaların teklif verdiği yazılır)
+  const LEGACY = { 3: 'kolaygelsin', 4: 'aras', 5: 'surat', 6: 'hepsijet', 7: 'ptt' }; // eski sürümde kaydedilen firma numaraları
+  async function providerId(id) {
+    let want = str(values.KARGONOMI_PROVIDER);
+    if (LEGACY[want]) want = LEGACY[want];
+    if (!want || want === '-1') return -1;
+    const offers = list(unwrap(await req('GET', `/shipment-price-comparison/${id}`)).shipping_provider_with_price || []).filter((o) => String(o.id) !== '-1');
+    const k = nameKey(want), hit = offers.find((o) => nameKey(o.slug) === k || nameKey(o.slug).startsWith(k) || nameKey(o.name).startsWith(k));
+    if (!hit) throw new Error(`Kargonomi: seçilen kargo firması (${want}) bu gönderi için teklif vermedi. Teklif verenler: ${offers.map((o) => `${str(o.name)}${o.price != null ? ` (${o.price} TL)` : ''}`).join(', ') || 'yok'}. Ayarlardan başka firma ya da “Otomatik” seçin.`);
+    return Number(hit.id) || hit.id;
+  }
   const result = (s) => {
     const tracking = str(s.shipping_webservice_tracking_code), carrier = str(s.shipping_provider_name);
     return {
       ref: str(s.id), tracking, barcode: str(s.shipping_webservice_barcode) || tracking, carrier: carrier || 'Kargonomi',
       // DOĞRULA: real_price / estimated_price KDV hariç kabul edildi (Kargonomi fiyat listeleri KDV hariç)
-      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costVatIncluded: false,
+      // costFinal: gerçek ücret (real_price) geldi; tahmini ücretin yerine geçer (bkz. carriers.js trackCarriers)
+      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costFinal: money(s.real_price) != null, costVatIncluded: false,
       state: STATES[s.status] || null, text: str(s.status_label),
     };
   };
@@ -69,21 +84,28 @@ export function make(values) {
       const r = s.receiver, phone = phone10(r.phone);
       if (phone.length !== 10) throw new Error('Kargonomi alıcı telefonunu zorunlu istiyor (10 hane); siparişte geçerli telefon yok');
       if (!r.district) throw new Error('Kargonomi alıcı ilçesini zorunlu istiyor; sipariş adresinde ilçe yok');
+      const buyer = str(r.name).replace(/\s+/g, ' ');
+      if (buyer.length < 5 || buyer.split(' ').length < 2) throw new Error(`Kargonomi alıcı adını ad ve soyadıyla istiyor (en az 2 kelime, 5 karakter); siparişteki ad: “${buyer || '—'}”`);
+      const addr = fullAddress(r).slice(0, 512);
+      if (addr.replace(/\s/g, '').length < 10) throw new Error('Kargonomi alıcı adresini en az 10 karakter istiyor; sipariş adresi çok kısa');
       const stateId = await placeId('state', null, r.city);
       if (!stateId) throw new Error(`Kargonomi: alıcı ili bulunamadı (“${r.city}”)`);
       const cityId = await placeId('city', stateId, r.district);
       if (!cityId) throw new Error(`Kargonomi: alıcı ilçesi bulunamadı (“${r.district}”, ${r.city})`);
       const draft = unwrap(await req('POST', '/shipments', { shipment: {
-        warehouse_id: await warehouse(), buyer_name: r.name, buyer_email: r.email || undefined, buyer_phone: phone, buyer_address: fullAddress(r).slice(0, 512),
+        warehouse_id: await warehouse(), buyer_name: buyer.slice(0, 255), buyer_email: r.email || undefined, buyer_phone: phone, buyer_address: addr,
         buyer_state_id: stateId, buyer_city_id: cityId,
-        packages: [{ desi: s.desi, content: (s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ').slice(0, 200) || s.reference }],
+        packages: [{ desi: Number(s.desi) > 0 ? Number(s.desi) : 1, content: (s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ').slice(0, 200) || s.reference }],
       } }));
       if (!draft || !draft.id) throw new Error('Kargonomi gönderi numarası vermedi');
-      const provider = str(values.KARGONOMI_PROVIDER) || '-1';
       try {
-        await req('POST', '/confirm-shipping-price', { shipment_id: draft.id, shipping_provider_id: Number(provider) || provider });
+        await req('POST', '/confirm-shipping-price', { shipment_id: draft.id, shipping_provider_id: await providerId(draft.id) });
       } catch (e) {
-        await req('DELETE', `/shipments/${draft.id}`).catch(() => null); // seçilemeyen taslak kalmasın
+        // Onay yanıtı alınamadı ama Kargonomi işlemiş olabilir (zaman aşımı / 5xx): gönderi taslak değilse iptal edilir, taslaksa silinir.
+        // Durumu okunamazsa ikisi de denenir: ücretli ve panelde kaydı olmayan gönderi kalmasın
+        const now = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => null)) || {};
+        const drop = () => req('DELETE', `/shipments/${draft.id}`);
+        await (now.status === 'draft' ? drop() : req('POST', '/shipments/cancel', { shipment_id: draft.id }).catch(drop)).catch(() => null);
         throw e;
       }
       // Fiyat onayından sonraki hata: gönderi panele yazılmaz (takipsiz taslak / gönderi kalmasın) → iptal edilir, olmazsa silinir (en iyi çaba)
