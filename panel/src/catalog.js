@@ -10,7 +10,7 @@ import { importListings, catalogOf, HELD_SQL } from './sync.js';
 import { fail, str, num, r2, isImageAttr, variantAxes, cleanHtml } from './util.js';
 export { variantAxes };
 import { rank, localProfile, prepare, score } from './catmatch.js';
-import { quantities } from './match.js';
+import { quantities, withoutQty, norm as normQ } from './match.js';
 
 const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
@@ -110,29 +110,68 @@ export function picker(c, catId) {
 // kelimesine geçiyorsa (sırayla bakılır; aynı yerde birden çok değer geçerse belirsizdir, seçilmez). Genel değerler (Diğer, Yok…) seçilmez.
 const QFAM = (q) => (/(?:mg|mcg|g|kg)$/.test(q) ? 'mass' : /(?:ml|l)$/.test(q) ? 'vol' : /(?:ad|pk)$/.test(q) ? 'count' : q.replace(/^[\d.]+/, ''));
 const toKg = (t) => String(t || '').replace(/(\d+(?:[.,]\d+)?)\s*ton\b/gi, (m, v) => `${Number(v.replace(',', '.')) * 1000} kg`);
-const qtyOf = (t) => [...quantities(toKg(t))];
+// Ölçüler: tekli ("15 kg" → 15kg) ve çoklu paket ("6 x 405 gr" → 6x405g; içindeki 405 gr ayrıca sayılmaz)
+const PACK = /(\d+)\s*[x×*]\s*(\d+(?:[.,]\d+)?\s*['’]?\s*[a-zçğıöşü]+)/gi;
+function qtyKeys(t) {
+  const out = [];
+  // "400 Grx6 Adet" / "5x14 Grx12": birime bitişik "x" ayrılır (yoksa "400 Gr" ölçü olarak okunmaz)
+  const rest = toKg(t).replace(/(\d\s*(?:kg|gr|g|mg|ml|lt|l|cl|adet|paket))\s*[x×]\s*(?=\d)/gi, '$1 x ').replace(PACK, (m, n, q) => {
+    const one = [...quantities(q)];
+    if (one.length !== 1) return m;
+    out.push(+n > 1 ? { key: `${+n}x${one[0]}`, fam: 'pack-' + QFAM(one[0]) } : { key: one[0], fam: QFAM(one[0]) });
+    return ' ';
+  });
+  for (const q of quantities(rest)) out.push({ key: q, fam: QFAM(q) });
+  return { keys: [...new Map(out.map((x) => [x.key, x])).values()], rest };
+}
+// Değer yalnız tek bir ölçüden mi oluşuyor ("5 kg", "6 x 405 gr" evet; "10 lt / H - 5 Bar", "2 kg + 2 adet Pouch Hediye", "15kg - 100 gr" hayır)
+function pureQty(v) {
+  const { keys, rest } = qtyKeys(v);
+  return keys.length === 1 && !/[a-z0-9]/.test(withoutQty(rest)) ? keys[0] : null;
+}
 const GENERIC = /^(di[gğ]er|yok|belirtilmemi[sş]|standart|karışık|karisik|mevcut de[gğ]il|hepsi|genel|other|none)$/i;
 const wordsKey = (t) => ` ${normTr(t).replace(/[^a-z0-9]+/g, ' ').trim()} `;
 function normTr(t) { return String(t || '').toLocaleLowerCase('tr').replace(/[ıİ]/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c'); }
+// Set / kampanya / hediyeli / seçenekli ürün ("20 Lt Toprak + Bitki Besini", "… Seti", "Torf Hediye", "Seçilebilir Renk … Ücretsiz Toprak"):
+// addaki ölçü / kelime ürünün kendisini değil eki ya da seçeneği anlatıyor olabilir: addaki ölçü kullanılmaz, addaki tek değer ancak kategori de
+// aynısını söylüyorsa seçilir (varyant her zaman kullanılır)
+const BUNDLE = /\+|\b(set|seti|setler\w*|kampanya\w*|hediye\w*|ucretsiz|secilebilir|secenekli)\b/;
 export function inferValue(list, p) {
   const vals = (list || []).filter((v) => str(v.value) && !GENERIC.test(str(v.value).trim()));
   if (!vals.length) return null;
-  const vq = vals.map((v) => ({ v, q: qtyOf(v.value) }));
-  // Ölçü özelliği: değerlerin çoğu ölçü
-  if (vq.filter((x) => x.q.length === 1).length >= Math.max(2, vals.length * 0.6)) {
+  const vq = vals.map((v) => ({ v, q: pureQty(v.value) }));
+  const pure = vq.filter((x) => x.q);
+  // Ölçü özelliği: değerlerin çoğu yalnız ölçü
+  if (pure.length >= Math.max(2, vals.length * 0.6)) {
+    const fams = new Set(pure.map((x) => x.q.fam));
     for (const t of [p.variant_name, p.name]) {
-      const pq = qtyOf(t);
-      if (!pq.length) continue;
-      const fams = new Set(vq.filter((x) => x.q.length === 1).map((x) => QFAM(x.q[0])));
-      const mine = [...new Set(pq.filter((q) => fams.has(QFAM(q))))];
-      if (mine.length !== 1) return null; // ölçü yok ya da birden çok (ör. "1 Ton … 20 kg'lık") → belirsiz
-      const hits = vq.filter((x) => x.q.length === 1 && x.q[0] === mine[0]);
-      return hits.length === 1 ? { id: String(hits[0].v.id), value: str(hits[0].v.value), auto: true } : null;
+      if (!str(t)) continue;
+      const all = qtyKeys(t).keys;
+      let mine = all.filter((k) => fams.has(k.fam));
+      // Ölçü + adet birlikte: koli ("400 Gr - 12 Adet" = 12 x 400 gr) yalnız listede o paket değeri varsa; yoksa ya da daha karmaşıksa
+      // ("5x14 Gr x 12 Paket", "4'lü … 20 Kg (260 Litre)") belirsiz: tek ölçüyü seçmek ürünün tamamını yanlış anlatır
+      const cnt = all.filter((k) => k.fam === 'count' && parseFloat(k.key) > 1), meas = all.filter((k) => k.fam !== 'count');
+      if (cnt.length && meas.length) {
+        const pack = cnt.length === 1 && meas.length === 1 && !meas[0].fam.startsWith('pack-') ? `${parseFloat(cnt[0].key)}x${meas[0].key}` : '';
+        if (!pack || !pure.some((x) => x.q.key === pack)) return null;
+        mine = [{ key: pack }];
+      }
+      if (!mine.length) continue;
+      // ölçü birden çok (ör. "1 Ton … 20 kg'lık", "4-5 Kg / 65 Lt") ya da set / kampanya / seçenekli ürün → belirsiz
+      if (mine.length !== 1 || BUNDLE.test(normQ(t))) return null;
+      const hits = pure.filter((x) => x.q.key === mine[0].key);
+      if (!hits.length) return null;
+      // Aynı ölçünün listede farklı yazımları ("1.5 kg" / "1500 gr"): hepsi doğru; üründeki yazıma en yakını (sayı aynı olan) seçilir
+      const num = (x) => (normQ(x).match(/\d+(?:[.,]\d+)?/g) || []).map((n) => String(+n.replace(',', '.')));
+      const mineNums = new Set(num(t)), h = hits.find((x) => num(x.v.value).every((n) => mineNums.has(n))) || hits[0];
+      return { id: String(h.v.id), value: str(h.v.value), auto: true };
     }
     return null;
   }
   // Metin özelliği: varyant → ürün adı → kategori yaprağı → kategori yolu
   const cat = String(p.category || '');
+  const bundle = BUNDLE.test(normQ(p.name));
+  let pending = null; // set / hediyeli ürün adında tek değer: ancak kategori de aynı değeri söylerse seçilir
   for (const t of [p.variant_name, p.name, cat.split(/›|>/).pop(), cat]) {
     const k = wordsKey(t);
     if (k.trim() === '') continue;
@@ -140,6 +179,13 @@ export function inferValue(list, p) {
     const hits = vals.filter((v) => { const w = wordsKey(v.value); return w.trim().length >= 2 && !/^\d+([.,]\d+)?$/.test(str(v.value).trim()) && k.includes(w); });
     // Biri diğerini içeriyorsa (ör. "Solucan Gübresi" ve "Gübre") en uzunu
     const best = hits.filter((h) => !hits.some((o) => o !== h && wordsKey(o.value).includes(wordsKey(h.value))));
+    // Set / hediyeli / seçenekli ürünün adında geçen değer eki ya da seçeneği anlatıyor olabilir ("Ücretsiz Toprak", "Sıvı ve Katı … Seti"):
+    // adda birden çok değer → belirsiz; tek değer → kategoride de aynısı geçerse
+    if (t === p.name && bundle) { if (best.length > 1) return null; if (best.length === 1) pending = best[0]; continue; }
+    if (pending) {
+      if (!best.length) continue;
+      return best.length === 1 && best[0] === pending ? { id: String(pending.id), value: str(pending.value), auto: true } : null;
+    }
     if (best.length === 1) return { id: String(best[0].id), value: str(best[0].value), auto: true };
     if (best.length > 1) return null;
   }

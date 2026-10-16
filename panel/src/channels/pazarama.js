@@ -7,6 +7,7 @@
 import { http, basic, num, str, chunk, imageList, diagStep, sleep, DEAD_LINE, TR, rankBrands } from '../util.js';
 
 const API = 'https://isortagimapi.pazarama.com';
+const NO_DATA = (r) => r.messageCode === 'CAT_60' || /listelenecek veri bulunamad|kay[ıi]t bulunamad|no (data|record)/i.test(`${r.message || ''} ${r.userMessage || ''}`);
 // Satır durum kodları (Siparişler dokümanı, OrderItemStatus): 3 alındı · 12 hazırlanıyor · 18 iptal süreci başlatıldı (satıcı onayı / Pazarama incelemesi
 // bekleniyor, sipariş hâlâ açık) · 5 kargoya verildi · 16 mağazada · 19 teslimat noktasında · 14 teslim edilemedi · 11 teslim edildi · 9 iade reddedildi
 // (ürün müşteride kalır) · 6 iptal · 13 tedarik edilemedi · 7 iade süreci başlatıldı · 8 iade onaylandı · 10 iade edildi
@@ -47,6 +48,8 @@ export function pazarama(env, meta) {
   }
   const call = async (path, opts = {}) => {
     const r = await http(API + path, { ...opts, headers: { Authorization: `Bearer ${await auth()}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: opts.body && JSON.stringify(opts.body) });
+    // Liste okumada "Listelenecek veri bulunamadı" (CAT_60) hata değil boş sonuçtur (ör. Pazarama'da olmayan marka araması, ilanı olmayan mağaza)
+    if (r && r.success === false && opts.list && NO_DATA(r)) return { success: true, data: [] };
     if (r && r.success === false) throw new Error('Pazarama: ' + (r.userMessage || r.message || 'işlem başarısız'));
     return r;
   };
@@ -85,7 +88,7 @@ export function pazarama(env, meta) {
     for (let to = end; to > since; to -= W) {
       const from = Math.max(since, to - W);
       for (let page = 1; page <= 50; page++) {
-        const r = await call('/order/getOrdersForApi', { method: 'POST', body: { pageSize: 100, pageNumber: page, startDate: minute(from), endDate: minute(to) } });
+        const r = await call('/order/getOrdersForApi', { list: true, method: 'POST', body: { pageSize: 100, pageNumber: page, startDate: minute(from), endDate: minute(to) } });
         const rows = (r && r.data) || [];
         for (const o of rows) { const n = norm(o); out.set(n.remoteId, n); }
         if (rows.length < 100) break;
@@ -103,7 +106,7 @@ export function pazarama(env, meta) {
     const out = [];
     let cursor = '';
     for (let i = 0; i < 1000; i++) {
-      const r = (await call(`/product/products/approved?Size=100${cursor ? '&Cursor=' + encodeURIComponent(cursor) : ''}`)) || {};
+      const r = (await call(`/product/products/approved?Size=100${cursor ? '&Cursor=' + encodeURIComponent(cursor) : ''}`, { list: true })) || {};
       const d = r.data || {}, rows = Array.isArray(d) ? d : d.sellerProducts || [];
       for (const p of rows) {
         const g = (p.productGroups || []).find((x) => str(x.code) === str(p.code));
@@ -181,7 +184,7 @@ export function pazarama(env, meta) {
   // questionStatus: 0 cevap bekliyor · 1 cevaplandı · 2 onay bekliyor (cevap Pazarama onayında) · 3 reddedildi
   const QST = { 0: 'Cevap bekliyor', 1: 'Cevaplandı', 2: 'Onay bekliyor', 3: 'Reddedildi' };
   async function questions({ since, until = Date.now(), page = 0, size = 50 }) {
-    const r = await call('/QuestionAnswer/getApprovalAnswersByMerchantSearch', { method: 'POST', body: { questionStartDate: new Date(since).toISOString(), questionEndDate: new Date(until).toISOString(), pageIndex: page + 1, pageSize: size } });
+    const r = await call('/QuestionAnswer/getApprovalAnswersByMerchantSearch', { list: true, method: 'POST', body: { questionStartDate: new Date(since).toISOString(), questionEndDate: new Date(until).toISOString(), pageIndex: page + 1, pageSize: size } });
     const d = r.data || {}, list = d.approvalAnswersByMerchantSearchs || d.items || (Array.isArray(d) ? d : []), pr = d.pageResponse || {};
     const items = list.map((x) => {
       const qs = x.questionStatus == null ? null : Number(x.questionStatus);
@@ -236,7 +239,7 @@ export function pazarama(env, meta) {
   async function findBrands(name) {
     const k = str(name);
     if (!k) return [];
-    if (!brandHits.has(k)) brandHits.set(k, list(await call(`/brand/getBrands?Page=1&Size=100&name=${encodeURIComponent(k)}`)).map((b) => ({ id: str(b.id), name: str(b.name) })));
+    if (!brandHits.has(k)) brandHits.set(k, list(await call(`/brand/getBrands?Page=1&Size=100&name=${encodeURIComponent(k)}`, { list: true })).map((b) => ({ id: str(b.id), name: str(b.name) })));
     return brandHits.get(k);
   }
   // Marka adı büyük / küçük harf, boşluk ve noktalama farkı gözetmeden birebir aranır ("HG Tarım" = "HG-TARIM")
