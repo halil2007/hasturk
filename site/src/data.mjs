@@ -317,7 +317,7 @@ export const INTEGRATIONS = [
   {
     slug: 'amazon', beta: 'amazon', name: 'Amazon', kind: 'pazaryeri', color: '#232f3e', badge: 'a', word: 'amazon',
     lead: 'Amazon mağazanızın siparişlerini diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını Amazon\'a bildirin.',
-    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Amazon\'un gönderdiği (FBA) siparişler', 'Durum takibi'], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Amazon\'un gönderdiği (FBA) siparişler', 'Durum takibi'], ['Ürün yükleme', true], ['Müşteri soruları', false], ['İade talepleri', false]],
     points: [
       ['i-cart', 'Siparişler', 'Amazon siparişleri diğer kanallarla aynı listeye gelir; Amazon\'un kendi deposundan gönderdiği siparişlerin durumu da izlenir.'],
       ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız ilanlarınıza gönderilir; diğer kanallarla eşit kalır.'],
@@ -329,7 +329,7 @@ export const INTEGRATIONS = [
   {
     slug: 'ciceksepeti', beta: 'ciceksepeti', name: 'Çiçeksepeti', kind: 'pazaryeri', color: '#1e9e57', badge: 'Çs', word: 'çiçeksepeti',
     lead: 'Çiçeksepeti mağazanızın siparişlerini ve ürünlerini diğer kanallarla aynı panelde görün, stok ve fiyatlarınızı eşitleyin.',
-    caps: [['Siparişler', true], ['Ürün ve stok okuma', true], ['Stok ve fiyat gönderimi', true], ['Kargo etiketi', 'Çiçeksepeti panelinden'], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    caps: [['Siparişler', true], ['Ürün ve stok okuma', true], ['Stok ve fiyat gönderimi', true], ['Kargo etiketi', 'Çiçeksepeti panelinden'], ['Ürün yükleme', true], ['Müşteri soruları', false], ['İade talepleri', false]],
     points: [
       ['i-cart', 'Siparişler', 'Çiçeksepeti siparişleri diğer kanallarla aynı listeye gelir; durumları kanaldan güncellenir.'],
       ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız ilanlarınıza gönderilir; diğer kanallarla eşit kalır.'],
@@ -341,12 +341,12 @@ export const INTEGRATIONS = [
   {
     slug: 'koctas', beta: 'koctas', name: 'Koçtaş', kind: 'pazaryeri', color: '#e5541b', badge: 'K', word: 'koçtaş',
     lead: 'Koçtaş pazaryeri siparişlerinizi panelden onaylayın, kargo takip numarasını bildirin, stok ve fiyatlarınızı diğer kanallarla eşitleyin.',
-    caps: [['Siparişler ve onay', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    caps: [['Siparişler ve onay', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Ürün yükleme', true], ['Müşteri soruları', false], ['İade talepleri', false]],
     points: [
       ['i-cart', 'Sipariş onayı', 'Yeni Koçtaş siparişlerini panelden onaylayın; diğer kanallarla aynı listede yönetin.'],
       ['i-truck', 'Kargo bildirimi', 'Kendi kargo anlaşmanızla gönderip takip numarasını panelden Koçtaş\'a bildirin.'],
       ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız tekliflerinize gönderilir; diğer kanallarla eşit kalır.'],
-      ['i-box', 'Ürünler', 'Yeni teklifi Koçtaş panelinden açarsınız; teklif paneldeki ürüne bağlanır.'],
+      ['i-box', 'Ürünler', 'Barkodu Koçtaş kataloğunda olan ürün için teklif doğrudan açılır; katalogda olmayan ürün Koçtaş onayından sonra satışa açılır. Mevcut teklifleriniz paneldeki ürüne bağlanır.'],
     ],
     help: 'Koçtaş satıcı paneli → sağ üstteki kullanıcı menüsü → API Anahtarı sayfasından anahtarınızı alın.',
   },
@@ -377,7 +377,7 @@ export const INTEGRATIONS = [
   {
     slug: 'etsy', beta: 'etsy', name: 'Etsy', kind: 'yurt dışı pazaryeri', color: '#f1641e', badge: 'E', word: 'Etsy',
     lead: 'Etsy mağazanızın siparişlerini diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını Etsy\'ye bildirin. Yurt dışı pazaryerleri Kurumsal pakette yer alır.',
-    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Ürün yükleme', false], ['Müşteri soruları', false], ['İade talepleri', false]],
+    caps: [['Siparişler', true], ['Stok ve fiyat gönderimi', true], ['Kargo / takip bildirimi', true], ['Ürün yükleme', true], ['Müşteri soruları', false], ['İade talepleri', false]],
     points: [
       ['i-cart', 'Siparişler', 'Etsy siparişleri diğer kanallarla aynı listeye gelir.'],
       ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız ilanlarınıza ve varyantlarına gönderilir; diğer kanallarla eşit kalır.'],
@@ -389,79 +389,246 @@ export const INTEGRATIONS = [
   {
     slug: 'teknosa', beta: 'teknosa', name: "Teknosa", kind: 'pazaryeri', color: '#005bab', badge: "T", word: "Teknosa",
     lead: "Teknosa siparişlerinizi diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını panelden bildirin.",
-    caps: [["Siparişler ve onay", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Ürün yükleme", false], ["Müşteri soruları", false], ["İade talepleri", false]],
-    points: [["i-cart", "Siparişler", "Teknosa siparişleri diğer kanallarla aynı listeye gelir, panelden onaylanır."], ["i-sync", "Stok ve fiyat", "Stok ve fiyatlarınız diğer kanallarla eşit kalır."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası panelden bildirilir."], ["i-box", "Ürünler", "İlanlarınız panele gelir, paneldeki ürünle eşleşir."]],
-    help: "Teknosa satıcı paneline (Mirakl, https://teknosatr-prod.mirakl.net) girin → sağ üst kullanıcı menüsü → API Anahtarı (API Key sekmesi) → anahtarı oluşturup kopyalayın. Birden çok mağazanız varsa Mağaza ID'yi de girin.",
+    caps: [["Siparişler ve onay", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Ürün yükleme", true], ["Sipariş komisyonu", true], ["Müşteri soruları", false], ["İade talepleri", false]],
+    points: [["i-cart", "Siparişler", "Teknosa siparişleri diğer kanallarla aynı listeye gelir, panelden kabul edilir."], ["i-sync", "Stok ve fiyat", "Stok ve fiyatlarınız diğer kanallarla eşit kalır."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası panelden bildirilir."], ["i-box", "Ürünler", "Barkodu Teknosa kataloğunda olan ürün için teklif doğrudan açılır; katalogda olmayan ürün Teknosa onayından sonra satışa açılır. Mevcut teklifleriniz paneldeki ürüne bağlanır."]],
+    extra: [["i-truck", "İki kargo modeli", "Kendi kargo anlaşmanızla gönderimde takip numarası panelden Teknosa'ya bildirilir; Teknosa'nın anlaşmalı kargosunu kullanıyorsanız takip numarası Teknosa'dan gelir, panel yalnız kargoya verildiğini bildirir."], ["i-calc", "Komisyon siparişte", "Teknosa'nın sipariş satırındaki komisyonu panele gelir; her siparişin net kârı bu tutarla hesaplanır."]],
+    help: "Teknosa satıcı paneline girin → sağ üst kullanıcı menüsü → API Anahtarı → anahtarı oluşturup kopyalayın. Birden çok mağazanız varsa mağaza numaranızı da girin.",
   },
   {
     slug: 'boyner', dev: true, name: "Boyner", kind: 'pazaryeri', color: '#000000', badge: "B", word: "Boyner",
     lead: "Boyner siparişlerinizi diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını panelden bildirin.",
     caps: [["Siparişler ve onay", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Ürün yükleme", false], ["Müşteri soruları", false], ["İade talepleri", false]],
     points: [["i-cart", "Siparişler", "Boyner siparişleri diğer kanallarla aynı listeye gelir, panelden onaylanır."], ["i-sync", "Stok ve fiyat", "Stok ve fiyatlarınız diğer kanallarla eşit kalır."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası panelden bildirilir."], ["i-box", "Ürünler", "İlanlarınız panele gelir, paneldeki ürünle eşleşir."]],
-    help: "Boyner satıcı paneline (merchant.boyner.com.tr) girin → sağ üstte mağaza adı → Hesabım → Entegrasyon Bilgileri. Ekrandaki Satıcı ID, API Key ve API Secret değerlerini kopyalayın. Ekran yoksa Boyner satıcı destek / entegrasyon ekibinden isteyin.",
+    extra: [["i-box", "Paketler tek siparişte", "Boyner aynı siparişin paketlerini ayrı kayıtlar olarak verir; panel bunları tek siparişte toplar."], ["i-truck", "İki kargo modeli", "Boyner'in anlaşmalı kargosunda takip numarası Boyner'den gelir; kendi kargo anlaşmanızla gönderimde takip numarası panelden bildirilir."]],
+    help: "Boyner satıcı paneline (merchant.boyner.com.tr) girin → sağ üstte mağaza adı → Hesabım → Entegrasyon Bilgileri. Satıcı ID, API Key ve API Secret değerlerini kopyalayın; ekran yoksa Boyner entegrasyon ekibinden isteyin.",
   },
   {
     slug: 'pasaj', dev: true, name: "Turkcell Pasaj", kind: 'pazaryeri', color: '#ffc900', badge: "P", word: "Pasaj",
     lead: "Turkcell Pasaj siparişlerinizi diğer kanallarla aynı listede yönetin, stok ve fiyatlarınızı eşitleyin, kargo takip numarasını panelden bildirin.",
     caps: [["Siparişler ve onay", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Ürün yükleme", false], ["Müşteri soruları", false], ["İade talepleri", false]],
     points: [["i-cart", "Siparişler", "Turkcell Pasaj siparişleri diğer kanallarla aynı listeye gelir, panelden onaylanır."], ["i-sync", "Stok ve fiyat", "Stok ve fiyatlarınız diğer kanallarla eşit kalır."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası panelden bildirilir."], ["i-box", "Ürünler", "İlanlarınız panele gelir, paneldeki ürünle eşleşir."]],
-    help: "API özelliği varsayılan kapalıdır: önce Pasaj danışmanınızdan API erişimini ve entegrasyon belgesini (servis adresi) isteyin. Sonra https://pasaj.turkcell.com.tr/seller-admin adresine girin → sağ üstte kullanıcı adınız → Entegrasyon Bilgileri → \"Yeni Oluştur\". Ekranda Satıcı ID, API Key ve API Secret oluşur.",
+    extra: [["i-box", "Paketler tek siparişte", "Pasaj aynı siparişin paketlerini ayrı kayıtlar olarak verir; panel bunları tek siparişte toplar."], ["i-truck", "İki kargo modeli", "Pasaj'ın anlaşmalı kargosunda takip numarası Pasaj'dan gelir; kendi kargo anlaşmanızla gönderimde takip numarası panelden bildirilir."]],
+    help: "Önce Pasaj danışmanınızdan API erişiminin açılmasını ve entegrasyon adresini isteyin (API varsayılan olarak kapalıdır). Ardından Pasaj Seller Admin → sağ üstte kullanıcı adınız → Entegrasyon Bilgileri → \"Yeni Oluştur\" ile Satıcı ID, API Key ve API Secret oluşturun.",
   },
   {
     slug: 'trendyolgo', beta: 'trendyolgo', name: "Trendyol Go", kind: 'hızlı market', color: '#ff6000', badge: "TG", word: "Trendyol Go",
     lead: "Trendyol Go siparişlerini pazaryeri siparişlerinizle aynı ekranda görün, hazırlayıp kuryeye teslim edin; stok ve fiyatlarınız tüm kanallarla eşit kalsın.",
     caps: [["Siparişler", true], ["Hazırlandı / kuryeye teslim bildirimi", true], ["Stok ve fiyat gönderimi", true], ["Kurye", "Platformun kuryesi"], ["Ürün yükleme", false]],
     points: [["i-cart", "Siparişler", "Trendyol Go siparişleri diğer kanallarla aynı listeye gelir."], ["i-truck", "Hazırlama ve teslim", "Sipariş hazırlanınca panelden bildirirsiniz; kurye platformdan gelir."], ["i-sync", "Stok ve fiyat", "Tükenen ürün bu kanalda da tükenir, fiyatlarınız eşit kalır."], ["i-box", "Ürünler", "Mağaza ürünleriniz panele gelir, paneldeki ürünle eşleşir."]],
-    help: "Trendyol Go by Uber Eats satıcı paneline (partner.tgomarket.com) girin → sağ üstte mağaza adınız → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key ve API Secret. Anahtarlar tüm şubelerde aynıdır; şube ID'lerini (storeId) kategori sorumlunuzdan alın (bağlantı testi şube listesini de gösterir). Test ortamı için 0850 258 58 00'dan IP yetkilendirmesi istenir.",
+    extra: [["i-store", "Şube bazında stok ve fiyat", "Stok ve fiyat şube (mağaza) bazında gönderilir; birden çok şubeniz varsa her biri için ayrı tutulur."], ["i-orders", "Sipariş akışı", "Siparişi panelden işleme alırsınız; toplama bitince “hazırlandı” bildirilir ve sipariş kuryenin teslim almasına hazır olur."]],
+    help: "Trendyol Go satıcı paneline (partner.tgomarket.com) girin → sağ üstte mağaza adınız → Hesap Bilgilerim → Entegrasyon Bilgileri: Satıcı ID, API Key ve API Secret. Şube numaralarınızı kategori sorumlunuzdan alın; bağlantı testi şube listesini de gösterir.",
   },
   {
     slug: 'getir', dev: true, name: "Getir Çarşı", kind: 'hızlı market', color: '#5d3ebc', badge: "G", word: "getir",
     lead: "Getir Çarşı siparişlerini pazaryeri siparişlerinizle aynı ekranda görün, hazırlayıp kuryeye teslim edin; stok ve fiyatlarınız tüm kanallarla eşit kalsın.",
     caps: [["Siparişler", true], ["Hazırlandı / kuryeye teslim bildirimi", true], ["Stok ve fiyat gönderimi", true], ["Kurye", "Platformun kuryesi"], ["Ürün yükleme", false]],
     points: [["i-cart", "Siparişler", "Getir Çarşı siparişleri diğer kanallarla aynı listeye gelir."], ["i-truck", "Hazırlama ve teslim", "Sipariş hazırlanınca panelden bildirirsiniz; kurye platformdan gelir."], ["i-sync", "Stok ve fiyat", "Tükenen ürün bu kanalda da tükenir, fiyatlarınız eşit kalır."], ["i-box", "Ürünler", "Mağaza ürünleriniz panele gelir, paneldeki ürünle eşleşir."]],
-    help: "GetirÇarşı API anahtarları satıcı panelinden alınmaz: getircarsiapi@getir.com adresine (ya da Getir temsilcinize) mağaza adı ve mağaza ID'si ile API erişimi talep edin; Getir uygulama anahtarı (appSecretKey) ve mağaza anahtarını (shopSecretKey), gerekirse API adresiyle birlikte iletir. Test ortamı anahtarları da Getir'den gelir.",
+    extra: [["i-bolt", "Hızlı yanıt", "Getir Çarşı siparişlerinin kısa sürede yanıtlanması gerekir; yeni siparişi panelden işleme alır, hazır olunca bildirirsiniz."], ["i-tag", "Üstü çizili fiyat", "Satış fiyatıyla birlikte üstü çizili fiyat da gönderilebilecek."]],
+    help: "Getir Çarşı API anahtarları satıcı panelinden alınmaz: getircarsiapi@getir.com adresine (ya da Getir temsilcinize) mağaza adı ve mağaza numaranızla API erişimi talep edin; Getir uygulama anahtarını ve mağaza anahtarını iletir.",
   },
   {
     slug: 'yemeksepeti', beta: 'yemeksepeti', name: "Yemeksepeti Market", kind: 'hızlı market', color: '#fa0050', badge: "YS", word: "yemeksepeti",
     lead: "Yemeksepeti Market siparişlerini pazaryeri siparişlerinizle aynı ekranda görün, hazırlayıp kuryeye teslim edin; stok ve fiyatlarınız tüm kanallarla eşit kalsın.",
     caps: [["Siparişler", true], ["Hazırlandı / kuryeye teslim bildirimi", true], ["Stok ve fiyat gönderimi", true], ["Kurye", "Platformun kuryesi"], ["Ürün yükleme", false]],
     points: [["i-cart", "Siparişler", "Yemeksepeti Market siparişleri diğer kanallarla aynı listeye gelir."], ["i-truck", "Hazırlama ve teslim", "Sipariş hazırlanınca panelden bildirirsiniz; kurye platformdan gelir."], ["i-sync", "Stok ve fiyat", "Tükenen ürün bu kanalda da tükenir, fiyatlarınız eşit kalır."], ["i-box", "Ürünler", "Mağaza ürünleriniz panele gelir, paneldeki ürünle eşleşir."]],
-    help: "Yemeksepeti Partner Portal'a girin → Mağaza Entegrasyonları (Shop Integrations) eklentisi → Partner API için client_id ve client_secret oluşturun; zincir (chain) ve mağaza (vendor) kimliği aynı ekranda ya da hesap yöneticinizden alınır. Tek anahtar zincirdeki tüm mağazalarda geçer.",
+    extra: [["i-orders", "Bulunamayan ürün", "Toplama sırasında bulamadığınız ürünü siparişten çıkarırsınız; Yemeksepeti'ne bu satır “bulunamadı” olarak bildirilir."], ["i-store", "Şube bazında stok ve fiyat", "Zincirinizdeki her şube ayrı mağaza olarak eklenir; stok ve fiyat şube bazında gönderilir."], ["i-truck", "Kurye modeli", "Yemeksepeti kuryesiyle çalışıyorsanız sipariş “teslim almaya hazır”, kendi kuryenizle çalışıyorsanız “yola çıktı” olarak bildirilir."]],
+    help: "Yemeksepeti Partner Portal → Mağaza Entegrasyonları (Shop Integrations) bölümünden client_id ve client_secret oluşturun; zincir ve mağaza numaralarınızı aynı ekrandan ya da hesap yöneticinizden alın.",
   },
   {
     slug: 'ebay', beta: 'ebay', name: "eBay", kind: 'yurt dışı pazaryeri', color: '#E53238', badge: "e", word: "ebay",
     lead: "eBay siparişlerinizi Türkiye'deki kanallarınızla aynı panelde yönetin; stok ve fiyatlarınızı eşitleyin, takip numarasını panelden bildirin. Yurt dışı pazaryerleri Kurumsal pakette yer alır.",
-    caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Döviz ile fiyat (Kurumsal)", true], ["Ürün yükleme", false]],
+    caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Döviz ile fiyat (Kurumsal)", true], ["Ürün yükleme", true]],
     points: [["i-cart", "Siparişler", "eBay siparişleri TCMB kuruyla TL'ye çevrilerek diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Yurt içinde satılan ürünün stoğu bu kanalda da düşer."], ["i-truck", "Kargo bildirimi", "Takip numarası panelden bildirilir."], ["i-calc", "Döviz", "Döviz kuruna endeksli fiyatla birlikte kullanılabilir."]],
-    help: "developer.ebay.com'da ücretsiz geliştirici hesabı açın → Application Keys sayfasında Production anahtar seti oluşturun (App ID + Cert ID). Aynı sayfadaki User Tokens bölümünde \"Get a Token from eBay via Your Application\" ile bir RuName (yönlendirme adı) tanımlayıp eBay satıcı hesabınızla oturum açın ve izin verin; OAuth bölümünde görünen refresh token'ı (v^1.1#…) kopyalayın. Kapsamlarda sell.fulfillment ve sell.inventory seçili olmalı. Ürünlerin panelde görünmesi için ilanların Inventory API ile oluşturulmuş ya da Seller Hub'dan Inventory API'ye taşınmış (bulk_migrate_listing) olması gerekir.",
+    extra: [["i-globe", "eBay pazarınız", "ABD, İngiltere, Almanya gibi hangi eBay pazarında satıyorsanız bağlantı o pazar için kurulur."], ["i-box", "İlanlar ve varyantlar", "eBay'in envanter sistemindeki ilanlarınız panele gelir; panelden yüklediğiniz üründe her varyant ayrı ilan olarak açılır."]],
+    help: "developer.ebay.com'da ücretsiz geliştirici hesabı açıp üretim (Production) anahtar setini (App ID ve Cert ID) oluşturun; ardından aynı ekrandan eBay satıcı hesabınızla oturum açıp izin vererek refresh token alın. Kurulumda bu adımları birlikte yapıyoruz.",
   },
   {
     slug: 'ozon', beta: 'ozon', name: "Ozon", kind: 'yurt dışı pazaryeri', color: '#005BFF', badge: "O", word: "OZON",
     lead: "Ozon siparişlerinizi Türkiye'deki kanallarınızla aynı panelde yönetin; stok ve fiyatlarınızı eşitleyin, takip numarasını panelden bildirin. Yurt dışı pazaryerleri Kurumsal pakette yer alır.",
-    caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Döviz ile fiyat (Kurumsal)", true], ["Ürün yükleme", false]],
+    caps: [["Siparişler ve onay", true], ["Stok ve fiyat gönderimi", true], ["Kargo etiketi", "Ozon etiketi (FBS)"], ["Kargo / takip bildirimi", true], ["Döviz ile fiyat (Kurumsal)", true], ["Ürün yükleme", true]],
     points: [["i-cart", "Siparişler", "Ozon siparişleri TCMB kuruyla TL'ye çevrilerek diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Yurt içinde satılan ürünün stoğu bu kanalda da düşer."], ["i-truck", "Kargo bildirimi", "Takip numarası panelden bildirilir."], ["i-calc", "Döviz", "Döviz kuruna endeksli fiyatla birlikte kullanılabilir."]],
-    help: "seller.ozon.ru satıcı panelinde Ayarlar (Настройки) → Seller API sayfasında Client ID görünür; \"Anahtar oluştur\" ile Admin rolünde bir API anahtarı oluşturup kopyalayın (anahtar yalnız bir kez gösterilir). Birden fazla FBS deposunuz varsa stokların yazılacağı deponun numarasını (Logistics → Depolar) gelişmiş alana girin.",
+    extra: [["i-tag", "Ozon etiketi", "FBS siparişlerinde panelden “Topla” dediğinizde Ozon gönderiyi hazırlar; etiket (PDF) Ozon'dan alınır."], ["i-truck", "FBS ve rFBS", "Ozon lojistiğiyle giden FBS gönderilerinde kurye Ozon'undur; kendi gönderdiğiniz rFBS siparişlerinde takip numarası panelden Ozon'a bildirilir."]],
+    help: "seller.ozon.ru → Ayarlar → Seller API sayfasında Client ID'yi kopyalayın ve Admin rolünde bir API anahtarı oluşturun (anahtar yalnız bir kez gösterilir). Birden fazla FBS deponuz varsa stokların yazılacağı depoyu kurulumda seçeriz.",
   },
   {
     slug: 'ticimax', beta: 'ticimax', name: "Ticimax", kind: 'e-ticaret sitesi', color: '#00A8E8', badge: "Tx", word: "ticimax",
     lead: "Ticimax sitenizin siparişlerini pazaryeri siparişlerinizle aynı listede yönetin; stok ve fiyatlarınızı tüm kanallarla eşit tutun.",
     caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Birden fazla site", true], ["Ürün oluşturma", false]],
     points: [["i-cart", "Siparişler", "Ticimax siparişleri diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Pazaryerinde satılan ürünün stoğu sitenizde de düşer."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası sitenize işlenir."], ["i-box", "Ürünler", "Ürün ve varyantlarınız panele gelir, paneldeki ürünle eşleşir."]],
-    help: "Ticimax yönetim paneline girin → Ayarlar → WS Yetki Kodu Yönetimi → Yeni kod oluşturun. Yetki tablosunda Sipariş Servisi (SelectSiparis, SetSiparisDurum) ve Ürün Servisi (SelectUrun, StokAdediGuncelle, VaryasyonGuncelle) metotlarını işaretleyip kaydedin. Kodu ve mağazanın alan adını panele girin. Not: Ticimax yetkisiz / yanlış kodda hata vermez, boş liste döner; tanılama bunu ayrıca uyarır.",
+    extra: [["i-truck", "Müşteriye kargo bildirimi", "Sipariş kargoya verildiğinde takip numarası ve takip bağlantısı Ticimax sitenize işlenir; Ticimax müşterinize e-posta gönderir."], ["i-box", "Varyantlar", "Ticimax'taki her varyasyon panelde ayrı ilan olarak eşleşir; stok ve fiyat varyasyon bazında gönderilir."]],
+    help: "Ticimax yönetim paneli → Ayarlar → WS Yetki Kodu Yönetimi → yeni kod oluşturun; yetki tablosunda sipariş ve ürün servislerini işaretleyip kaydedin. Kodu ve sitenizin alan adını panele girin; bağlantı testi yetki eksikse uyarır.",
   },
   {
     slug: 'ideasoft', beta: 'ideasoft', name: "IdeaSoft", kind: 'e-ticaret sitesi', color: '#F26B21', badge: "iS", word: "IdeaSoft",
     lead: "IdeaSoft sitenizin siparişlerini pazaryeri siparişlerinizle aynı listede yönetin; stok ve fiyatlarınızı tüm kanallarla eşit tutun.",
     caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Birden fazla site", true], ["Ürün oluşturma", false]],
     points: [["i-cart", "Siparişler", "IdeaSoft siparişleri diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Pazaryerinde satılan ürünün stoğu sitenizde de düşer."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası sitenize işlenir."], ["i-box", "Ürünler", "Ürün ve varyantlarınız panele gelir, paneldeki ürünle eşleşir."]],
-    help: "IdeaSoft yönetim paneli → Entegrasyonlar → API → Ekle: uygulamaya ad ve yönlendirme adresi (Redirect URI, ör. https://www.getpostman.com/oauth2/callback) verin, sipariş okuma/güncelleme ve ürün güncelleme izinlerini seçin; Client ID ve Client Secret üretilir. Ardından https://MAGAZA/panel/auth?client_id=…&response_type=code&state=…&redirect_uri=… adresinde izin verin, dönen code'u 30 saniye içinde POST https://MAGAZA/oauth/v2/token (grant_type=authorization_code, client_id, client_secret, code, redirect_uri) ile token'a çevirin (Postman'in OAuth 2.0 ekranı bunu otomatik yapar). Yanıttaki refresh_token'ı panele girin.",
+    extra: [["i-box", "Varyantlar", "IdeaSoft'taki her varyant panelde ayrı ilan olarak eşleşir; stok ve fiyat varyant bazında gönderilir."], ["i-truck", "Kargo bildirimi", "Sipariş kargoya verildiğinde durumu ve takip kodu IdeaSoft sitenize işlenir."]],
+    help: "IdeaSoft yönetim paneli → Entegrasyonlar → API → Ekle ile bir uygulama oluşturun ve sipariş ile ürün izinlerini verin. Yetkilendirme adımını kurulumda birlikte yapıyoruz; bağlantı bir kez kurulduktan sonra panel kendini yeniler.",
   },
   {
     slug: 'tsoft', beta: 'tsoft', name: "T-Soft", kind: 'e-ticaret sitesi', color: '#E30613', badge: "T", word: "T-Soft",
     lead: "T-Soft sitenizin siparişlerini pazaryeri siparişlerinizle aynı listede yönetin; stok ve fiyatlarınızı tüm kanallarla eşit tutun.",
     caps: [["Siparişler", true], ["Stok ve fiyat gönderimi", true], ["Kargo / takip bildirimi", true], ["Birden fazla site", true], ["Ürün oluşturma", false]],
     points: [["i-cart", "Siparişler", "T-Soft siparişleri diğer kanallarla aynı listeye gelir."], ["i-sync", "Stok ve fiyat", "Pazaryerinde satılan ürünün stoğu sitenizde de düşer."], ["i-truck", "Kargo bildirimi", "Kargo firması ve takip numarası sitenize işlenir."], ["i-box", "Ürünler", "Ürün ve varyantlarınız panele gelir, paneldeki ürünle eşleşir."]],
-    help: "T-Soft yönetim paneline girin → Ayarlar → Kullanıcı Yönetimi → Web Servis Kullanıcıları → Yeni kullanıcı. Sipariş (order2), ürün (product) ve alt ürün (subProduct) metotlarına yetki verin; isterseniz IP kısıtı ekleyin ve 'Sınırlı Hesap' işaretleyin (panel girişi kapanır, yalnız API). Kullanıcı adı ve şifreyi panele girin. Bilgileri https://MAGAZA/rest1/console adresinde (ya da kullanıcı listesindeki Console Giriş butonuyla) deneyebilirsiniz.",
+    extra: [["i-calc", "KDV doğru yazılır", "T-Soft fiyatları KDV hariç tutar; panel KDV dahil fiyatınızı KDV'yi düşerek gönderir."], ["i-box", "Ana ürün ve alt ürünler", "Alt ürünleriniz (varyantlar) panelde ayrı ilan olarak eşleşir; stok varyant bazında gönderilir."]],
+    help: "T-Soft yönetim paneli → Ayarlar → Kullanıcı Yönetimi → Web Servis Kullanıcıları → Yeni kullanıcı: sipariş ve ürün servislerine yetki verin (isterseniz yalnız API için “Sınırlı Hesap” seçin). Kullanıcı adı ve şifreyi panele girin.",
+  },
+];
+
+// ---------- kargo firması ve kargo entegratörü sayfaları: /entegrasyonlar/<slug> ----------
+// Kaynak: panel/src/carriers.js ve panel/src/carriers/<firma>.js (yalnız bağlantının bugün yaptıkları yazılır).
+// Alanlar: slug, panel (paneldeki firma kimliği), name, kind ('kargo firması' | 'kargo entegratörü'), color, word (logo kutusundaki yazı),
+// beta (panelde test aşamasında), plan, lead, caps [işlem, true | false | 'açıklama'], tiles [ikon, başlık, metin] (firmaya özel),
+// need (firmadan istenecek bilgiler), setup [başlık, metin] (kurulum adımları), faq [soru, cevap] (firmaya özel), title / desc (arama sonucu).
+// Kargonomi'nin ayrıntılı sayfası /ozellikler/kargonomi-entegrasyonu'dur (page ile oraya bağlanır, ayrı sayfa üretilmez).
+export const CARRIERS = [
+  {
+    slug: 'yurtici-kargo', panel: 'yurtici', name: 'Yurtiçi Kargo', kind: 'kargo firması', color: '#004a99', word: 'Yurtiçi',
+    lead: 'Yurtiçi Kargo ile yaptığınız kurumsal anlaşmayla gönderilerinizi panelden açın: kargo anahtarı etikete barkod olarak basılır, şube okutunca Yurtiçi gönderi kodu ve takip adresi siparişe kendiliğinden yazılır, teslimat panelden izlenir.',
+    caps: [['Gönderi oluşturma', true], ['Kargo etiketi', 'Panel etiketi + barkod'], ['Takip numarası', 'Şube kabulünden sonra'], ['Kargo durumu takibi', true], ['Kargo ücreti', true], ['Gönderi iptali', true]],
+    tiles: [
+      ['i-tag', 'Barkodlu etiket', 'Gönderi açılınca panel, Yurtiçi\'ne bildirilen kargo anahtarını barkod olarak etikete basar; etiketi termal ya da normal yazıcıdan yazdırırsınız.'],
+      ['i-eye', 'Gönderi kodu kendiliğinden', 'Şube paketi okuttuğunda Yurtiçi gönderi kodunu ve takip adresini verir; panel takip sorgusuyla bunları pakete yazar.'],
+      ['i-calc', 'Kargo ücreti', 'Yurtiçi\'nin bildirdiği toplam kargo ücreti siparişin kargo giderine yazılır; sipariş kârınız gerçek maliyetle hesaplanır.'],
+    ],
+    need: 'Yurtiçi Kargo şubenizden gönderici ödemeli web servis kullanıcı adı ve şifresi.',
+    title: 'Yurtiçi Kargo Entegrasyonu: Etiket ve Takip | Hastürk CRM',
+    desc: 'Yurtiçi Kargo entegrasyonu: kendi anlaşmanızla gönderi açın, barkodlu etiketi basın; gönderi kodu, kargo ücreti ve teslimat panele gelsin.',
+  },
+  {
+    slug: 'aras-kargo', panel: 'aras', name: 'Aras Kargo', kind: 'kargo firması', color: '#e30613', word: 'Aras',
+    lead: 'Aras Kargo ile kendi anlaşmanızdan gönderi açın: barkod yetkili hesaplarda Aras etiketi ve takip numarası anında gelir, diğer hesaplarda etiket panelden barkodla basılır. Kargo durumu ve ücreti Aras\'tan düzenli okunur.',
+    caps: [['Gönderi oluşturma', true], ['Kargo etiketi', 'Aras etiketi (ZPL) ya da panel etiketi'], ['Takip numarası', true], ['Kargo durumu takibi', true], ['Kargo ücreti', true], ['Gönderi iptali', 'İrsaliye kesilmeden önce']],
+    tiles: [
+      ['i-tag', 'Aras etiketi', 'Hesabınızda barkod yetkisi varsa Aras etiketi (termal yazıcı için ZPL) ve 13 haneli takip numarası gönderiyle birlikte gelir; yoksa etiket parça barkoduyla panelden basılır.'],
+      ['i-eye', 'Durum ve ücret takibi', 'Aras\'ın takip servisi bağlıysa gönderinin durumu ve kargo ücreti panele düzenli olarak gelir.'],
+      ['i-x', 'İptal', 'Henüz irsaliyesi kesilmemiş gönderiyi panelden iptal edersiniz; irsaliye kesildiyse iptali Aras şubesi yapar.'],
+    ],
+    need: 'Aras Kargo şubenizden ya da entegrasyon ekibinden sevkiyat entegrasyonu kullanıcı adı ve şifresi; kargo durumu takibi için Aras\'ın kurumsal panelinde (esasweb) açacağınız takip servisi kullanıcısı ve müşteri kodunuz.',
+    title: 'Aras Kargo Entegrasyonu: Etiket ve Takip | Hastürk CRM',
+    desc: 'Aras Kargo entegrasyonu: kendi anlaşmanızla gönderi açın, Aras etiketi ve takip numarasını panelden alın; kargo durumu ve ücreti kendiliğinden gelsin.',
+  },
+  {
+    slug: 'ptt-kargo', panel: 'ptt', name: 'PTT Kargo', kind: 'kargo firması', color: '#f5b400', word: 'PTT Kargo',
+    lead: 'PTT Kargo kurumsal müşterisi olarak gönderilerinizi panelden PTT\'ye yükleyin: size verilen barkod aralığından sıradaki barkod etikete basılır, şubede okutulunca gönderi kabul edilir ve takibi panelden yapılır.',
+    caps: [['Gönderi oluşturma (veri yükleme)', true], ['Kargo etiketi', 'Panel etiketi + PTT barkodu'], ['Takip numarası', true], ['Kargo durumu takibi', 'Şube kabulünden sonra'], ['Gönderi iptali', 'Şube kabulünden önce']],
+    tiles: [
+      ['i-tag', 'PTT barkodu', 'PTT\'nin size verdiği barkod aralığından sıradaki numara kontrol hanesiyle birlikte etikete basılır; sıra sayacı panelde tutulur.'],
+      ['i-eye', 'Şube kabulü ve takip', 'Paket şubede okutulunca gönderi kabul edilir; panel kargo durumunu bu andan sonra PTT\'den sorgular.'],
+      ['i-x', 'İptal', 'Şubeye verilmemiş gönderinin kaydı panelden silinir.'],
+    ],
+    need: 'PTT Kargo bölge müdürlüğünüzden müşteri numarası, web servis şifresi ve barkod aralığı (12 haneli başlangıç ve bitiş numarası).',
+    title: 'PTT Kargo Entegrasyonu: Barkod ve Takip | Hastürk CRM',
+    desc: 'PTT Kargo entegrasyonu: gönderilerinizi panelden PTT\'ye yükleyin, barkodlu etiketi basın; şube kabulünden sonra kargo durumu panelden izlensin.',
+  },
+  {
+    slug: 'ups-kargo', panel: 'ups', name: 'UPS Kargo', kind: 'kargo firması', color: '#351c15', word: 'UPS',
+    lead: 'UPS Türkiye ile yurt içi gönderilerinizi panelden açın: UPS takip numarası ve paket etiketi anında gelir, teslimat UPS\'ten izlenir, UPS\'in hesapladığı kargo ücreti siparişe yazılır.',
+    caps: [['Gönderi oluşturma', true], ['Kargo etiketi', 'UPS etiketi (görsel)'], ['Takip numarası', true], ['Kargo durumu takibi', true], ['Kargo ücreti', true], ['Gönderi iptali', true]],
+    tiles: [
+      ['i-tag', 'UPS etiketi', 'Gönderi açıldığında UPS takip numarası ve her paketin etiketi aynı anda gelir; yazdırıp paketin üzerine yapıştırırsınız.'],
+      ['i-truck', 'Servis seçimi', 'Standart, Express Saver ya da Express 10:30 servislerinden anlaşmanıza uygun olanı seçersiniz.'],
+      ['i-calc', 'Kargo ücreti', 'UPS\'in gönderi için hesapladığı ücret paket bilgisinden okunur ve siparişin kargo giderine yazılır.'],
+    ],
+    need: 'UPS Türkiye satış temsilcinizden müşteri numarası ve web servis kullanıcı adı / şifresi (takip için ayrı kullanıcı verildiyse onu da).',
+    title: 'UPS Kargo Entegrasyonu: Etiket ve Takip | Hastürk CRM',
+    desc: 'UPS Kargo entegrasyonu: yurt içi gönderiyi panelden açın, UPS etiketi ve takip numarası anında gelsin; teslimat ve kargo ücreti kendiliğinden izlensin.',
+  },
+  {
+    slug: 'hepsijet', panel: 'hepsijet', name: 'HepsiJET', kind: 'kargo firması', color: '#ff6000', word: 'HepsiJET',
+    lead: 'HepsiJET ile kendi anlaşmanızdan gönderi açın: HepsiJET etiketi gönderiyle aynı anda gelir, termal yazıcıdan basılır; gönderinin durumu HepsiJET\'ten izlenir.',
+    caps: [['Gönderi oluşturma', true], ['Kargo etiketi', 'HepsiJET etiketi (ZPL)'], ['Takip numarası', true], ['Kargo durumu takibi', true], ['Teslimat türü', 'Standart, ertesi gün, aynı gün'], ['Gönderi iptali', true]],
+    tiles: [
+      ['i-tag', 'Anında etiket', 'Gönderi açılır açılmaz HepsiJET etiketi (termal yazıcı için ZPL) ve gönderi numarası pakete yazılır.'],
+      ['i-truck', 'Teslimat türü', 'Anlaşmanıza göre standart, ertesi gün ya da aynı gün teslimat türünü seçersiniz.'],
+      ['i-store', 'Çıkış deposu', 'Gönderiler HepsiJET\'in size tanımladığı çıkış deposundan (XDock) çıkar; depo kodu bağlantıda bir kez girilir.'],
+    ],
+    need: 'HepsiJET kurumsal satış ekibinden entegrasyon kullanıcı adı, şifre, firma kodu ve çıkış deposu (XDock) kodu.',
+    title: 'HepsiJET Entegrasyonu: Etiket ve Takip | Hastürk CRM',
+    desc: 'HepsiJET entegrasyonu: kendi anlaşmanızla gönderi açın, HepsiJET etiketi anında gelsin; standart, ertesi gün ya da aynı gün teslimat. Takip panelde.',
+  },
+  {
+    slug: 'dhl-ecommerce', panel: 'dhl', name: 'DHL eCommerce', kind: 'kargo firması', color: '#d40511', word: 'DHL eCom',
+    lead: 'DHL eCommerce (eski MNG Kargo) ile kendi anlaşmanızdan gönderi açın: gönderi numarası ve DHL etiketi panele gelir, kargo durumu ve kesinleşen kargo ücreti DHL\'den düzenli okunur.',
+    caps: [['Gönderi oluşturma', true], ['Kargo etiketi', 'DHL etiketi (ZPL)'], ['Takip numarası', true], ['Kargo durumu takibi', true], ['Kargo ücreti', true], ['Gönderi iptali', true]],
+    tiles: [
+      ['i-tag', 'DHL etiketi', 'Gönderi açılınca DHL eCommerce gönderi numarasını ve termal yazıcı için etiketi verir. Varış şubesi o an belirlenemezse etiket hazır olunca panel kendisi alır.'],
+      ['i-calc', 'Kesin kargo ücreti', 'DHL\'in gönderi için hesapladığı toplam ücret takipte okunur ve siparişin kargo giderine yazılır.'],
+      ['i-x', 'İptal', 'Gönderiyi panelden iptal edersiniz; DHL\'deki sipariş kaydı ve barkod birlikte iptal edilir.'],
+    ],
+    need: 'DHL eCommerce geliştirici portalında açacağınız uygulamanın Client ID / Client Secret bilgileri ile şubenizden alacağınız müşteri numarası ve şifresi.',
+    title: 'DHL eCommerce (MNG) Kargo Entegrasyonu | Hastürk CRM',
+    desc: 'DHL eCommerce (MNG Kargo) entegrasyonu: kendi anlaşmanızla gönderi açın, DHL etiketi ve takip numarası panele gelsin; kargo ücreti ve teslimat izlensin.',
+  },
+  {
+    slug: 'surat-kargo', panel: 'surat', name: 'Sürat Kargo', kind: 'kargo firması', color: '#0b3c8c', word: 'Sürat',
+    lead: 'Sürat Kargo ile kendi anlaşmanızdan gönderi açın: gönderi Sürat\'a ön kabul olarak bildirilir, etiket barkoduyla basılır; şube okutunca Sürat takip numarası siparişe kendiliğinden yazılır.',
+    caps: [['Gönderi oluşturma (ön kabul)', true], ['Kargo etiketi', 'Panel etiketi ya da Sürat etiketi (PDF)'], ['Takip numarası', 'Şube kabulünden sonra'], ['Kargo durumu takibi', true], ['Gönderi iptali', true]],
+    tiles: [
+      ['i-tag', 'Etiket', 'Gönderinin barkodu panel etiketine basılır; hesabınızda barkod yetkisi varsa Sürat\'ın kendi etiketini (PDF) de panelden alırsınız.'],
+      ['i-eye', 'Takip numarası kendiliğinden', 'Şube paketi okuttuğunda Sürat takip numarasını verir; panel takip sorgusuyla bunu pakete yazar ve durumu izler.'],
+      ['i-x', 'İptal', 'Sürat web servis şifrenizi girdiyseniz gönderiyi panelden iptal edersiniz.'],
+    ],
+    need: 'Sürat Kargo şubenizden cari kodunuz ve web servis şifresi; panelden iptal ve Sürat etiketi için e-Sürat profilinizde belirlediğiniz web servis şifresi.',
+    title: 'Sürat Kargo Entegrasyonu: Gönderi ve Takip | Hastürk CRM',
+    desc: 'Sürat Kargo entegrasyonu: kendi anlaşmanızla gönderi açın, barkodlu etiketi basın; takip numarası şube kabulünden sonra siparişe yazılsın.',
+  },
+  {
+    slug: 'kolay-gelsin', panel: 'kolaygelsin', name: 'Kolay Gelsin', kind: 'kargo firması', color: '#00a651', word: 'Kolay Gelsin', beta: true,
+    lead: 'Kolay Gelsin ile kendi anlaşmanızdan gönderi açın: Kolay Gelsin gönderi numarası takip numarası olarak siparişe yazılır, etiket paketi taşıyacak müşteri barkoduyla panelden basılır.',
+    caps: [['Gönderi oluşturma', true], ['Kargo etiketi', 'Panel etiketi + müşteri barkodu'], ['Takip numarası', true], ['Kargo durumu takibi', true], ['Gönderi iptali', true]],
+    tiles: [
+      ['i-tag', 'Müşteri barkoduyla etiket', 'Kolay Gelsin paketi sizin barkodunuzla taşır: panel bu barkodu etikete basar, gönderi numarası takip numarası olarak siparişe yazılır.'],
+      ['i-eye', 'Durum takibi', 'Kolay Gelsin panelinde takip etmek istediğiniz gönderi durumlarını seçtiğinizde bu durumlar panele gelir.'],
+      ['i-x', 'İptal ve iade', 'Toplanmamış gönderi panelden iptal edilir; toplanmış ama teslim edilmemiş gönderide teslimat durdurulur ve iade süreci başlar.'],
+    ],
+    need: 'Kolay Gelsin kurumsal satış ekibinden entegrasyon anahtarı (token), müşteri numaranız ve gönderen adres numaranız.',
+    title: 'Kolay Gelsin Entegrasyonu: Etiket ve Takip | Hastürk CRM',
+    desc: 'Kolay Gelsin entegrasyonu: kendi anlaşmanızla gönderi açın, müşteri barkodlu etiketi panelden basın; takip numarası ve kargo durumu siparişe gelsin.',
+  },
+  {
+    slug: 'sendeo', panel: 'sendeo', name: 'Sendeo', kind: 'kargo firması', color: '#00b140', word: 'Sendeo', beta: true,
+    lead: 'Sendeo ile kendi anlaşmanızdan gönderi açın: iş emri Sendeo\'ya iletilir, Sendeo etiketi ve takip numarası anında gelir; kargo durumu ve ücreti Sendeo\'dan izlenir.',
+    caps: [['Gönderi oluşturma (iş emri)', true], ['Kargo etiketi', 'Sendeo etiketi (ZPL)'], ['Takip numarası', true], ['Kargo durumu takibi', true], ['Kargo ücreti', true], ['Gönderi iptali', 'Toplanmadan önce']],
+    tiles: [
+      ['i-tag', 'Sendeo etiketi', 'Gönderi açılınca Sendeo etiketi (termal yazıcı için ZPL), takip numarası ve takip adresi aynı anda gelir.'],
+      ['i-truck', 'Adresinizden toplama', 'Gönderi, paketin sizin adresinizden alınıp müşterinize teslim edileceği iş emri olarak açılır.'],
+      ['i-x', 'İptal', 'Sendeo henüz toplamadıysa gönderiyi panelden iptal edersiniz.'],
+    ],
+    need: 'Sendeo kurumsal satış ekibinden canlı ortam web servis müşteri adı ve şifresi.',
+    title: 'Sendeo Kargo Entegrasyonu: Etiket ve Takip | Hastürk CRM',
+    desc: 'Sendeo entegrasyonu: kendi anlaşmanızla gönderi açın, Sendeo etiketi ve takip numarası anında gelsin; kargo durumu ve ücreti panelden izlensin.',
+  },
+  {
+    slug: 'dhl-express', panel: 'dhlexpress', name: 'DHL Express', kind: 'kargo firması', color: '#ffcc00', word: 'DHL Express', beta: true,
+    lead: 'DHL Express Türkiye hesabınızla yurt içi ekspres gönderi açın: gönderi numarası (AWB) ve PDF etiket tek seferde gelir, gönderi DHL Express hesabınıza faturalanır, durumu panelden izlenir.',
+    caps: [['Yurt içi ekspres gönderi', true], ['Kargo etiketi', 'DHL Express etiketi (PDF)'], ['Takip numarası (AWB)', true], ['Kargo durumu takibi', true], ['Kargo ücreti', true]],
+    tiles: [
+      ['i-tag', 'Tek adımda etiket', 'Gönderi açıldığında DHL Express gönderi numarası (AWB) ve PDF etiket aynı yanıtta gelir; normal yazıcıdan basarsınız.'],
+      ['i-coin', 'Hesabınıza faturalanır', 'Gönderiler DHL Express gönderen hesap numaranıza faturalanır; DHL\'in bildirdiği ücret siparişe yazılır.'],
+      ['i-truck', 'Teslim', 'Bu bağlantı kurye çağırmaz: paketi DHL Express şubesine verirsiniz ya da düzenli alım anlaşmanızı kullanırsınız.'],
+    ],
+    need: 'DHL geliştirici portalında oluşturacağınız MyDHL API uygulamasının API Key / Secret bilgileri (canlı erişim DHL Express Türkiye satış temsilcinizin onayıyla açılır) ve gönderen hesap numaranız.',
+    title: 'DHL Express Entegrasyonu: Yurt İçi Ekspres | Hastürk CRM',
+    desc: 'DHL Express entegrasyonu: yurt içi ekspres gönderiyi panelden açın; AWB numarası ve PDF etiket anında gelsin, kargo durumu panelden izlensin.',
+  },
+  {
+    slug: 'navlungo', panel: 'navlungo', name: 'Navlungo', kind: 'kargo entegratörü', color: '#1d4ed8', word: 'Navlungo',
+    lead: 'Navlungo hesabınızla Sürat, HepsiJET, Kolay Gelsin, Aras, PTT ve Yurtiçi gibi firmalara tek hesaptan, cüzdan bakiyenizle gönderi açın: takip numarası, etiket ve kargo ücreti panele gelir.',
+    caps: [['Gönderi oluşturma', true], ['Kargo firması seçimi', 'Otomatik ya da sabit firma'], ['Kargo etiketi', 'Navlungo etiketi (PDF)'], ['Takip numarası', true], ['Kargo durumu takibi', true], ['Kargo ücreti', true], ['Gönderi iptali', true]],
+    tiles: [
+      ['i-truck', 'Tek hesap, birçok firma', 'Gönderiler Navlungo\'daki fiyat listelerinize göre Sürat, HepsiJET, Kolay Gelsin, Aras, PTT ya da Yurtiçi ile çıkar; firmayı otomatik bırakabilir ya da sabitleyebilirsiniz.'],
+      ['i-tag', 'Etiket ve takip numarası', 'Gönderi kargo firmasına iletildikten kısa süre sonra takip numarası ve PDF etiket hazır olur; panel bunları kendisi alır.'],
+      ['i-coin', 'Bakiyeden ödeme', 'Kargo ücreti Navlungo cüzdan bakiyenizden düşer ve siparişin kargo giderine yazılır.'],
+    ],
+    need: 'Navlungo panelinde Entegrasyonlar bölümünden oluşturacağınız API kullanıcısı (kullanıcı adı / şifre) ve Adres Defteri\'ndeki gönderici adresinizin numarası. Kullanacağınız kargo firmaları için Navlungo\'da fiyat listesi tanımlı olmalıdır.',
+    title: 'Navlungo Entegrasyonu: Tek Hesaptan Kargo | Hastürk CRM',
+    desc: 'Navlungo entegrasyonu: Sürat, HepsiJET, Aras, PTT ve Yurtiçi gönderilerini tek hesaptan açın; etiket, takip numarası ve kargo ücreti panele gelsin.',
+  },
+  {
+    slug: 'kargonomi', panel: 'kargonomi', page: '/ozellikler/kargonomi-entegrasyonu', name: 'Kargonomi', kind: 'kargo entegratörü', color: '#ff6b00', word: 'Kargonomi',
+    plan: 'Profesyonel ve Kurumsal', short: 'İnternet sitesi siparişlerinde, firmaların fiyatlarını görerek gönderim',
   },
 ];
 
@@ -566,13 +733,14 @@ FEATURES.push({
   ],
   note: { title: 'Bilmeniz gerekenler', items: ['Kargo firması entegrasyonu Kurumsal pakette yer alır.', 'Web servis bilgileri kargo firmasıyla yaptığınız kurumsal anlaşmayla, firmanın şube ya da satış ekibinden alınır.', 'Trendyol ve Hepsiburada gibi pazaryerlerinin anlaşmalı kargosuyla gönderimde barkod pazaryerinden gelir; bu entegrasyona gerek yoktur.'] },
   faq: [
-    ['Hangi kargo firmalarıyla entegrasyon var?', 'Yurtiçi Kargo, Aras Kargo, PTT Kargo, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo ile doğrudan entegrasyon vardır. Kolay Gelsin, Sendeo ve DHL Express test aşamasında. İnternet sitenizin siparişlerini Kargonomi hesabınızla da gönderebilirsiniz (Profesyonel ve Kurumsal pakette): kargo firmasını fiyatlarını görerek siz seçersiniz.'],
+    ['Hangi kargo firmalarıyla entegrasyon var?', 'Yurtiçi Kargo, Aras Kargo, PTT Kargo, UPS, HepsiJET, DHL eCommerce, Sürat Kargo, Kolay Gelsin, Sendeo ve DHL Express ile doğrudan entegrasyon vardır. Navlungo hesabınızla birçok firmaya tek hesaptan gönderebilirsiniz. İnternet sitenizin siparişlerini Kargonomi hesabınızla da gönderebilirsiniz (Profesyonel ve Kurumsal pakette): kargo firmasını fiyatlarını görerek siz seçersiniz.'],
     ['Kargo entegrasyonu için ne gerekir?', 'Kargo firmasıyla kurumsal anlaşmanız ve firmanın verdiği web servis kullanıcı adı / şifresi gerekir. Bilgileri panele girdiğinizde bağlantı hemen test edilir.'],
     ['Takip numarası satış kanalına gider mi?', 'Evet. Paketi “Kargoya ver” ile kapattığınızda takip numarası ve kargo firması siparişin geldiği kanala bildirilir; müşteriniz kargosunu takip edebilir.'],
     ['Kargo teslim edilince ne olur?', 'Panel kargo firmasından durumu düzenli sorgular; teslim edilen sipariş kendiliğinden “Teslim edildi” olur, iade dönen gönderi işaretlenir.'],
     ['Hangi pakette var?', 'Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette yer alır. Pazaryerlerinin anlaşmalı kargosu ve ikas Kargo tüm paketlerde çalışır.'],
   ],
   related: ['kargonomi-entegrasyonu', 'kargo-ve-etiket', 'siparis-yonetimi'],
+  carriers: true,
 });
 
 // ---------- Kargonomi ile gönderim (Profesyonel ve Kurumsal paket): internet sitesi siparişleri ----------
@@ -609,6 +777,7 @@ FEATURES.push({
     ['Takip numarası ve teslimat siteme kendiliğinden gider mi?', 'Evet. Kargo firması paketi teslim alınca panel “Kargoya ver”i kendisi yapar; takip numarası ve kargo firması sitenize gider (ikas\'ta paket “Kargoda” olur, müşteriye ikas bildirim gönderir; WooCommerce\'te sipariş tamamlanır ve müşteriye takip notu gider). Takip kodu sonradan gelirse o da siteye yazılır; teslim edilince ikas\'ta paket “Teslim edildi” olur. İsterseniz Ayarlar\'dan kapatabilirsiniz.'],
   ],
   related: ['kargo-entegrasyonu', 'kargo-ve-etiket', 'siparis-yonetimi'],
+  carriers: true,
 });
 
 // ---------- arama motoru başlık ve açıklamaları ----------

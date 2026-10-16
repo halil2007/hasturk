@@ -38,31 +38,14 @@
   // Geliştirme aşamasındakiler: listede görünür, panelde henüz bağlanamaz
   const DEV = new Set(['boyner', 'pasaj', 'getir']);
   const SOON = [];
-  // Kargo: entegratörler (altyapı hazır, firmaların API'si bağlanınca açılır) ve doğrudan bağlanacak kargo firmaları
-  // Kargo: bağlı firmalar (Kurumsal pakette) ve yakında gelecekler
-  const CARGO = [
-    ['Yurtiçi Kargo', 'kargo firması', '#004a99', 'Y'], ['Aras Kargo', 'kargo firması', '#e30613', 'A'], ['DHL eCommerce', 'kargo firması', '#d40511', 'D'],
-    ['Sürat Kargo', 'kargo firması', '#0b3c8c', 'S'], ['PTT Kargo', 'kargo firması', '#f5b400', 'P'], ['UPS', 'kargo firması', '#351c15', 'U'], ['HepsiJET', 'kargo firması', '#ff6000', 'hj'],
-    ['Kargonomi', 'kargo entegratörü · internet siteleri', '#ff6b00', 'K', '/ozellikler/kargonomi-entegrasyonu'],
-    ['Kolay Gelsin', 'kargo firması · test aşamasında', '#00a651', 'KG'], ['Sendeo', 'kargo firması · test aşamasında', '#00b140', 'Sd'], ['DHL Express', 'kargo firması · test aşamasında', '#ffcc00', 'DHL'],
-  ];
-  const CARGO_SOON = [['Navlungo', 'kargo entegratörü', '#1d4ed8', 'N']];
   const badge = ([, , c, s]) => `<span class="b" style="background:${c}">${esc(s)}</span>`;
   const wordmark = (n) => ({ Hepsiburada: 'hepsiburada', Trendyol: 'trendyol', N11: 'n11', Pazarama: 'pazarama' }[n] || n);
   // Logo şeridi: kayan bant (iki kopya yan yana döner; hareket azaltma tercihinde yalnız ilk kopya durur)
   const wms = (dup, link = true) => ACTIVE.map((x) => `<${link ? 'a href="/entegrasyonlar"' : 'span'} class="wm${dup ? ' dup' : ''}" style="${x[4]}" title="${esc(x[0])}"${dup ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(wordmark(x[0]))}</${link ? 'a' : 'span'}>`).join('');
   const integ = (list, soon) => list.map((x) => `<div class="it${soon ? ' soon' : ''}">${badge(x)}<div style="min-width:0"><b>${esc(x[0])}</b><small>${esc(x[1])}${soon ? ' · yakında' : ''}${TEST.has(x[5]) ? '<span class="tt">Test aşamasında</span>' : DEV.has(x[5]) ? '<span class="tt">Geliştirme aşamasında</span>' : ''}</small></div></div>`).join('');
-  // Entegrasyonlar sayfası: kargo kartları (kanal kartlarıyla aynı tasarım; build.mjs → chCard / logoTile ile eş)
-  const lum = (h) => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
-  const logoTile = (w, c) => `<span class="lt${lum(c) > 0.62 ? ' fill' : ''}" style="--c:${c};--k:${w.length <= 6 ? 1 : w.length <= 9 ? 0.86 : w.length <= 11 ? 0.76 : 0.68};--n:${w.length}" aria-hidden="true"><span>${esc(w)}</span></span>`;
-  const cargoCard = (x, soon) => {
-    const test = / test aşamasında/.test(x[1]), kind = x[1].replace(/ · test aşamasında/, '');
-    const st = soon ? '<span class="st dev">Geliştirme aşamasında</span>' : test ? '<span class="st test">Test aşamasında</span>' : '<span class="st ok">Aktif</span>';
-    return `<a class="ch${soon ? ' is-dev' : ''}" href="${x[4] || '/ozellikler/kargo-entegrasyonu'}" data-cat="kargo" data-q="${esc(x[0] + ' ' + kind)}">${logoTile(x[0], x[2])}<span class="ch-n"><b>${esc(x[0])}</b><small>${esc(kind)}</small></span><span class="ch-d">${soon ? 'Etiket ve takip numarası · hazırlanıyor' : 'Etiket · Takip numarası · Teslimat takibi'}</span><span class="ch-f">${st}<em>${soon ? 'İncele' : 'Ayrıntılar'} <svg><use href="#i-arrow"/></svg></em></span></a>`;
-  };
+  // Kargo firması kartları ve sayfaları derlemede üretilir (build.mjs → CARRIERS, src/data.mjs)
   let refilter = () => {};
   const drawChannels = () => {
-    $$('[data-cargo-cards]').forEach((el) => { el.innerHTML = CARGO.map((x) => cargoCard(x)).join('') + CARGO_SOON.map((x) => cargoCard(x, true)).join(''); });
     const logos = $('[data-logos]');
     if (logos) logos.innerHTML = wms(false) + wms(true) + wms(true) + wms(true);
     const logosStatic = $('[data-logos-static]');
@@ -74,7 +57,6 @@
     $$('[data-count-note]').forEach((el) => { el.textContent = nTest ? `Entegrasyon: ${live.length - nTest} aktif, ${nTest} testte` : 'Aktif entegrasyon'; });
     $$('[data-integ="active"]').forEach((el) => { el.innerHTML = integ(ACTIVE); });
     $$('[data-integ="soon"]').forEach((el) => { el.innerHTML = integ(SOON, true); });
-    $$('[data-integ="cargo"]').forEach((el) => { el.innerHTML = integ(CARGO, false) + integ(CARGO_SOON, true); });
     // Derlenmiş sayfalardaki "Test aşamasında" etiketleri (menü, kartlar, kanal sayfası): testi biten türde kalkar, yerine "Aktif entegrasyon"
     $$('[data-beta]').forEach((el) => { if (!TEST.has(el.dataset.beta)) el.remove(); });
     $$('[data-beta-on]').forEach((el) => { el.hidden = TEST.has(el.dataset.betaOn); });

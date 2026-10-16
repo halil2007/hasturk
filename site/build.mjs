@@ -16,7 +16,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
-import { FEATURES, INTEGRATIONS } from './src/data.mjs';
+import { FEATURES, INTEGRATIONS, CARRIERS } from './src/data.mjs';
 import { TOOLS, TOOL_GROUPS, CHANNEL_RATES, miniProfit } from './src/tools.mjs';
 import { makeToolPages } from './src/tools-pages.mjs';
 import { MARKETPLACES, loadCommission, file as commFile } from './src/commission.mjs';
@@ -36,14 +36,13 @@ const S = (() => { const ctx = { window: {}, document: { documentElement: { clas
 const ver = Object.fromEntries(['site.css', 'site.js', 'tools.js', 'config.js', 'gtag.js', 'logo.webp', 'icon.svg', 'icon-48.png', 'apple-touch-icon.png'].map((f) => [f, createHash('sha1').update(readFileSync(join(OUT, 'assets', f))).digest('hex').slice(0, 10)]));
 
 // ---------- üst menü açılır listeleri ----------
-// Test aşamasındaki kanalın etiketi (data-beta): panelde "Test yazısını kaldır" denince site.js kaldırır; data-beta-on olanlar o zaman görünür
-const testTag = (x, cls = 'pill soon') => (x.dev ? `<span class="${cls}">Geliştirme aşamasında</span>` : x.beta ? `<span class="${cls}" data-beta="${x.beta}">Test aşamasında</span>` : '');
 const featureCards = FEATURES.map((f) => `<a class="fcard reveal" href="/ozellikler/${f.slug}"><span class="ic ${f.color}">${ico(f.icon)}</span><b>${esc(f.name)}</b><span>${esc(f.short)}</span><ul>${f.points.slice(0, 3).map(([, t]) => `<li>${tick}${esc(t)}</li>`).join('')}</ul><em>İncele ${ico('i-arrow')}</em></a>`).join('');
 // ---------- kanal kartları (entegrasyonlar listesi) ----------
 // Kategori: liste sayfasındaki sekmeler (kargo kartları site.js'teki CARGO listesinden gelir)
 const CATS = [['pazaryeri', 'Pazaryerleri', 'pazaryerleri'], ['site', 'E-ticaret siteleri', 'e-ticaret'], ['yurtdisi', 'Yurt dışı', 'yurt-disi'], ['hizli', 'Hızlı teslimat', 'hizli-teslimat'], ['kargo', 'Kargo', 'kargo']];
 const catOf = (x) => (/yurt dışı/.test(x.kind) ? 'yurtdisi' : /market/.test(x.kind) ? 'hizli' : /site/.test(x.kind) ? 'site' : 'pazaryeri');
 // Logo kutusu: beyaz zemin, kanal renginde yazı; açık renkli markalarda (sarı) yazı okunaklı olsun diye koyulaşır
+const capOn = (x, re) => (x.caps || []).some(([k, v]) => re.test(k) && v !== false);
 const lum = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
 const logoTile = (word, color, size = '') => { const k = word.length <= 6 ? 1 : word.length <= 9 ? 0.86 : word.length <= 11 ? 0.76 : 0.68;
   return `<span class="lt${size ? ` lt-${size}` : ''}${lum(color) > 0.62 ? ' fill' : ''}" style="--c:${color};--k:${k};--n:${word.length}" aria-hidden="true"><span>${esc(word)}</span></span>`; };
@@ -157,7 +156,15 @@ const capShort = (x) => CAP_SHORT.filter(([re, , ok]) => x.caps.some(([k, v]) =>
 const chCard = (x) => `<a class="ch${x.dev ? ' is-dev' : ''}" href="/entegrasyonlar/${x.slug}" data-cat="${catOf(x)}" data-q="${esc(`${x.name} ${x.word} ${x.kind}`)}">${logoTile(x.word, x.color)}
   <span class="ch-n"><b>${esc(x.name)}</b><small>${esc(x.kind)}</small></span><span class="ch-d">${esc(capShort(x))}</span>
   <span class="ch-f">${statusTag(x)}<em>${x.dev ? 'İncele' : 'Ayrıntılar'} ${ico('i-arrow')}</em></span></a>`;
-const integrationCards = INTEGRATIONS.map(chCard).join('\n');
+// Kargo firması / entegratör kartları: /entegrasyonlar/<slug> (Kargonomi'nin sayfası özellik sayfasıdır: page). Test aşamasındaki kargo
+// firmalarının etiketi sabittir (panelin /api/public/channels yanıtı yalnız satış kanallarını içerir; data-beta kullanılmaz).
+const carrierHref = (c) => c.page || `/entegrasyonlar/${c.slug}`;
+const carrierTag = (c) => (c.beta ? '<span class="st test">Test aşamasında</span>' : '<span class="st ok">Aktif</span>');
+const carrierShort = (c) => c.short || ['Gönderi', 'Etiket', 'Takip', capOn(c, /^Kargo ücreti/) && 'Kargo ücreti'].filter(Boolean).join(' · ');
+const carrierCard = (c) => `<a class="ch" href="${carrierHref(c)}" data-cat="kargo" data-q="${esc(`${c.name} ${c.word} ${c.kind} kargo`)}">${logoTile(c.word, c.color)}
+  <span class="ch-n"><b>${esc(c.name)}</b><small>${esc(c.kind)}</small></span><span class="ch-d">${esc(carrierShort(c))}</span>
+  <span class="ch-f">${carrierTag(c)}<em>Ayrıntılar ${ico('i-arrow')}</em></span></a>`;
+const integrationCards = [...INTEGRATIONS.map(chCard), ...CARRIERS.map(carrierCard)].join('\n');
 const integrationTabs = `<button type="button" class="ftab" data-f="all" aria-pressed="true">Tümü <span data-n="all"></span></button>${CATS.map(([id, l, h]) => `<button type="button" class="ftab" data-f="${id}" data-h="${h}" aria-pressed="false">${l} <span data-n="${id}"></span></button>`).join('')}`;
 const TAB_FEATURES = ['siparis-yonetimi', 'kargo-ve-etiket', 'stok-senkronizasyonu', 'urun-yonetimi', 'buybox-takibi', 'kar-zarar', 'raporlar', 'musteri-sorulari-ve-iadeler', 'mobil-yonetim'];
 const featureTabs = () => { const list = TAB_FEATURES.map((s) => fById[s]); return `<div class="ftabs" data-ftabs>
@@ -238,6 +245,8 @@ ${f.why ? `<section class="sec"><div class="wrap"><div class="sec-head reveal"><
 ${alt([
   `<div class="sec-head reveal"><div class="kicker">Neler yapabilirsiniz?</div><h2>${esc(f.name)}</h2></div>
     <div class="trust">${f.points.map(([i, t, d], k) => `<div class="tr reveal"><span class="ic ${['c-blue', 'c-green', 'c-purple', 'c-orange', 'c-teal', 'c-pink'][k % 6]}">${ico(i)}</span><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('')}</div>`,
+  f.carriers && `<div class="sec-head reveal"><div class="kicker">Kargo firmaları</div><h2>Bağlanabileceğiniz Firmalar</h2><p>Her firmanın sayfasında neleri desteklediğini ve kurulum için firmadan hangi bilgileri isteyeceğinizi bulabilirsiniz.</p></div>
+    <div class="rels">${CARRIERS.filter((c) => carrierHref(c) !== `/ozellikler/${f.slug}`).map((c) => `<a class="rl" href="${carrierHref(c)}">${logoTile(c.word, c.color, 'sm')}<span><b>${esc(c.name)}</b><small>${esc(c.kind)}</small></span></a>`).join('')}</div>`,
   f.example && EXAMPLES[f.example],
   f.steps && `<div class="sec-head reveal"><div class="kicker">Nasıl çalışır?</div><h2>${f.steps.length} Adımda</h2></div>
   <div class="how three">${f.steps.map(([t, d], k) => `<div class="hs reveal"><div class="ic">${ico(['i-gear', 'i-bolt', 'i-eye'][k] || 'i-check')}</div><h3>${esc(t)}</h3><p>${esc(d)}</p></div>`).join('')}</div>`,
@@ -257,7 +266,6 @@ ${ctaBand}`;
 const SUF = { trendyol: ['un', 'a', 'dan'], hepsiburada: ['nın', 'ya', 'dan'], n11: ['in', 'e', 'den'], ikas: ['ın', 'a', 'tan'], woocommerce: ['ın', 'a', 'tan'], pttavm: ['nin', 'ye', 'den'],
   idefix: ['in', 'e', 'ten'], pazarama: ['nın', 'ya', 'dan'], amazon: ['un', 'a', 'dan'], ciceksepeti: ['nin', 'ye', 'den'], koctas: ['ın', 'a', 'tan'], shopify: ['ın', 'a', 'dan'], opencart: ['ın', 'a', 'tan'], etsy: ['nin', 'ye', 'den'], teknosa: ["nın", "ya", "dan"], boyner: ["in", "e", "den"], pasaj: ["ın", "a", "dan"], trendyolgo: ["nun", "ya", "dan"], getir: ["nın", "ya", "dan"], yemeksepeti: ["in", "e", "ten"], ebay: ["in", "e", "den"], ozon: ["un", "a", "dan"], ticimax: ["in", "e", "ten"], ideasoft: ["un", "a", "tan"], tsoft: ["un", "a", "tan"] };
 const sx = (x, i) => `${x.name}'${(SUF[x.slug] || ['in', 'e', 'den'])[i]}`;
-const capOn = (x, re) => x.caps.some(([k, v]) => re.test(k) && v !== false);
 const capVal = (x, re) => (x.caps.find(([k]) => re.test(k)) || [])[1];
 const minPrice = Math.min(...S.plans.filter((p) => p.monthly).map((p) => p.monthly));
 function intDesc(x) {
@@ -292,7 +300,7 @@ function intFaq(x) {
   const ship = lbl === 'Ortak barkod' ? `${sx(x, 0)} anlaşmalı kargosuyla gönderimde barkod doğrudan ${sx(x, 2)} alınır; etiketi panelden termal ya da normal yazıcıya tek tek veya toplu basarsınız.`
     : lbl === 'ikas Kargo' ? 'Gönderi ikas Kargo ile oluşturulur ve etiket ikas\'tan alınır. Kendi kargo anlaşmanızla gönderiyorsanız Kurumsal pakette Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ya da Sürat Kargo\'dan etiketi doğrudan panelden alabilirsiniz.'
     : lbl === 'Panel etiketi' ? 'Kargo etiketi sipariş ve adres bilgisiyle panelden basılır. Kendi kargo anlaşmanızla gönderiyorsanız Kurumsal pakette Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ya da Sürat Kargo\'dan etiket ve takip numarasını doğrudan panelden alabilirsiniz.'
-    : lbl ? `Kargo etiketi: ${lbl}.` : '';
+    : lbl ? ((x.extra || []).find(([, t]) => /etiket/i.test(t)) || [0, 0, `Kargo etiketi: ${lbl}.`])[2] : '';
   const courier = capOn(x, /kuryeye/) && [`${x.name} siparişlerini kim teslim eder?`, `Kurye ${x.name} platformundan gelir. Siz siparişi hazırlayıp panelden “hazırlandı” olarak bildirirsiniz.`];
   const track = !ship && capOn(x, /takip bildirimi|^Kargo bildirimi/) && [`Kargo takip numarası ${sx(x, 1)} nasıl iletilir?`, `Siparişi kendi kargo anlaşmanızla gönderin; kargo firması ve takip numarası panelden ${sx(x, 1)} bildirilir.`];
   return [
@@ -319,7 +327,7 @@ function capTiles(x) {
   if (lbl === 'Ortak barkod') T.push(['i-tag', 'Kargo etiketi', `Anlaşmalı kargo barkodu ${sx(x, 2)} alınır; etiketi panelden tek tek ya da toplu basarsınız.`]);
   else if (lbl === 'ikas Kargo') T.push(['i-tag', 'ikas Kargo', 'Gönderi ikas Kargo ile oluşturulur, etiket ikas\'tan gelir; takip numarası siparişe işlenir.']);
   else if (lbl === 'Panel etiketi') T.push(['i-tag', 'Kargo etiketi', 'Kendi kargo anlaşmanızla gönderimde etiket, sipariş ve adres bilgisiyle panelden basılır.']);
-  else if (lbl && pt('i-truck')) T.push(['i-truck', 'Kargo', pt('i-truck')[2]]);
+  else if (lbl && pt('i-truck') && !has(/takip bildirimi/)) T.push(['i-truck', 'Kargo', pt('i-truck')[2]]);
   if (has(/takip bildirimi|^Kargo bildirimi/)) T.push(['i-truck', 'Kargo takip bildirimi', `Kargo firması ve takip numarası panelden ${sx(x, 1)} bildirilir.`]);
   if (has(/kuryeye/)) T.push(['i-truck', 'Hazırlama ve kurye', 'Sipariş hazırlanınca panelden bildirirsiniz; kurye platformdan gelir.']);
   if (has(/^Paket bölme|^Kargo firması değiştirme/)) T.push(['i-box', 'Paket işlemleri', `Paketi bölün${has(/iptal/) ? ' ya da iptal edin' : ''}; gerekirse kargo firmasını panelden değiştirin.`]);
@@ -330,7 +338,8 @@ function capTiles(x) {
   if (has(/^Birden fazla site/)) T.push(['i-store', 'Birden fazla site', `Birden fazla ${n} sitenizi ayrı mağazalar olarak bağlayın.`]);
   if (has(/FBA/)) T.push(['i-eye', 'Amazon\'un gönderdiği siparişler', 'Amazon deposundan gönderilen (FBA) siparişlerin durumu da panelde izlenir.']);
   if (has(/^Döviz/)) T.push(['i-calc', 'Döviz ile fiyat', 'Fiyatları döviz kuruna bağlayın; kur değişince kendiliğinden güncellenir. Kurumsal pakette.']);
-  // Kanala özel bilgiler (ör. yeni ilanın kanal panelinden açılması, alıcı bilgisi, bağlantı dosyası)
+  // Kanala özel bilgiler (data.mjs → extra; ör. kargo modeli, şube bazında stok) ve points'teki özel notlar (alıcı bilgisi, bağlantı dosyası)
+  for (const t of x.extra || []) T.push(t);
   for (const [i, t, d] of x.points) if (i === 'i-shield' || i === 'i-link' || (i === 'i-box' && !has(/^Ana katalog|^Paket bölme/))) T.push([i, t, d]);
   return T;
 }
@@ -355,8 +364,6 @@ function integrationPage(x) {
       <div class="int-logo">${logoTile(x.word, x.color, 'lg')}${statusTag(x)}</div>
       <h1>${esc(x.name)} <span class="grad">entegrasyonu</span></h1>
       <p>${esc(x.lead)}</p>
-      ${x.dev ? `<p class="beta-note"><b>Geliştirme aşamasında:</b> ${esc(x.name)} entegrasyonu hazırlanıyor ve henüz bağlanamıyor. Kullanıma açıldığında panelinizdeki Entegrasyonlar sayfasından bağlayabilirsiniz.</p>` : ''}
-      ${x.beta ? `<p class="beta-note" data-beta="${x.beta}"><b>Test aşamasında:</b> ${esc(x.name)} entegrasyonu panelde kullanıma açıktır, son testleri sürmektedir. Kurulumda ilk siparişlerinizi ve stoklarınızı birlikte kontrol ederiz.</p>` : ''}
       <div class="ctas">${ctas}</div>
       ${heroChecks}
     </div>
@@ -401,6 +408,87 @@ ${x.dev ? '' : `<section class="sec">
 }
 // "Trendyol satıcı panelinizden" / "ikas yönetim panelinizden"
 const n2 = (x) => `${x.name} ${isSite(x) ? 'yönetim' : 'satıcı'} panelinizden`;
+
+// ---------- kargo firması / kargo entegratörü sayfası: /entegrasyonlar/<slug> ----------
+// İçerik data.mjs → CARRIERS (panel/src/carriers.js'teki bağlantının bugün yaptıkları); ortak akış panel/src/carriers.js'ten:
+// gönderi açılınca takip no + etiket pakete yazılır, "Kargoya ver" takip no'yu kanala bildirir (firma teslim alınca kendiliğinden),
+// kargo durumu düzenli sorgulanır, hepsi teslim edilince sipariş "Teslim edildi" olur; kapıda ödemeli sipariş bu bağlantıyla gönderilemez.
+const kurumsal = () => S.plans.find((p) => p.name === 'Kurumsal');
+function carrierFaq(c) {
+  const plan = c.plan || 'Kurumsal';
+  return [
+    [`${c.name} entegrasyonu nasıl kurulur?`, `Gereken bilgiler: ${c.need} Bilgileri Hastürk CRM panelinde Entegrasyonlar → Kargo entegrasyonları → ${c.name} kartına girip kaydedin; bağlantı hemen test edilir.`],
+    ['Takip numarası satış kanalıma gider mi?', 'Evet. Paketi “Kargoya ver” ile kapattığınızda takip numarası ve kargo firması siparişin geldiği kanala bildirilir (kanal bu bildirimi destekliyorsa). Kargo firması paketi teslim alınca bu adım kendiliğinden yapılır; isterseniz Ayarlar\'dan kapatabilirsiniz.'],
+    ['Kargo teslim edilince ne olur?', `Panel kargo durumunu ${c.name} üzerinden düzenli sorgular. Siparişin paketlerinin hepsi teslim edilince sipariş kendiliğinden “Teslim edildi” olur; ikas ve WooCommerce siparişlerinde teslim bilgisi sitenize de işlenir.`],
+    ['Kapıda ödemeli siparişleri gönderebilir miyim?', `Hayır. Bu bağlantı tahsilatlı (kapıda ödemeli) gönderi açmaz; bu siparişler için ${c.name} panelini kullanın. Panel kapıda ödemeli siparişte gönderiyi açmadan sizi uyarır.`],
+    [`${c.name} entegrasyonu hangi pakette var?`, `${plan} pakette yer alır (Kurumsal paket aylık ${tl(kurumsal().monthly)} ₺, KDV dahil). Pazaryerlerinin anlaşmalı kargosu ve ikas Kargo tüm paketlerde çalışır; bunlar için ${c.name} entegrasyonu gerekmez. Kurulum ücreti yoktur, 7 gün ücretsiz deneyebilirsiniz.`],
+  ];
+}
+function carrierPage(c) {
+  const cap = ([k, v]) => `<li>${tick}<span>${esc(k)}</span>${typeof v === 'string' ? `<em>${esc(v)}</em>` : ''}</li>`;
+  const colors = ['c-blue', 'c-green', 'c-purple', 'c-orange', 'c-teal', 'c-pink'];
+  const isInt = c.kind === 'kargo entegratörü';
+  const ctas = `<a class="btn btn-primary" href="/demo#deneme">Ücretsiz deneyin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a>`;
+  const tiles = [...c.tiles,
+    ['i-sync', 'Kanala takip bildirimi', 'Takip numarası ve kargo firması siparişin geldiği kanala (pazaryeri, ikas, WooCommerce…) bildirilir; firma paketi teslim alınca bu adım kendiliğinden yapılır.'],
+    ['i-eye', 'Teslimat takibi', 'Kargo durumu düzenli sorgulanır; paketlerin hepsi teslim edilince sipariş kendiliğinden “Teslim edildi” olur.'],
+    ['i-orders', 'Tek ekranda', 'Gönderiyi siparişin içinden açarsınız; etiketleri tek tek ya da toplu yazdırırsınız, sipariş listeniz pazaryeri ve site siparişleriyle bir arada kalır.'],
+  ];
+  const steps = [
+    ['i-key', `${c.name} bilgilerinizi alın`, c.need],
+    ['i-gear', 'Panele girin', `Bilgileri Entegrasyonlar → Kargo entegrasyonları → ${c.name} kartına girin; bağlantı test edilir. İsterseniz varsayılan kargo firmanız olarak seçin.`],
+    ['i-truck', 'Gönderin', 'Siparişte “Kargo firmasından etiket al” deyin; takip numarası ve etiket pakete yazılır. Etiketi yazdırıp paketi kargoya verirsiniz.'],
+  ];
+  const others = CARRIERS.filter((o) => o.slug !== c.slug);
+  const body = `<section class="page-hero fp-hero int-hero">
+  <div class="wrap fp-grid">
+    <div class="txt">
+      <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/entegrasyonlar">Entegrasyonlar</a><span>›</span><b>${esc(c.name)}</b></nav>
+      <div class="int-logo">${logoTile(c.word, c.color, 'lg')}${carrierTag(c)}</div>
+      <h1>${esc(c.name)} <span class="grad">entegrasyonu</span></h1>
+      <p>${esc(c.lead)}</p>
+      <div class="ctas">${ctas}</div>
+      ${heroChecks}
+    </div>
+    <div class="vis"><div class="capcard"><div class="cc-h"><b>Desteklenen işlemler</b><small>${esc(c.name)} ${isInt ? 'hesabınızla' : 'kurumsal anlaşmanızla'}</small></div><ul>${c.caps.filter(([, v]) => v !== false).map(cap).join('')}</ul></div></div>
+  </div>
+</section>
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">${esc(c.name)} ile</div><h2>Neler Yapabilirsiniz?</h2></div>
+    <div class="feats">${tiles.map(([i, t, d], k) => `<div class="feat reveal"><span class="ic ${colors[k % 6]}">${ico(i)}</span><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('')}</div>
+  </div>
+</section>
+<section class="sec alt">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">Kurulum</div><h2>Nasıl Çalışır?</h2></div>
+    <div class="how three">${steps.map(([i, t, d]) => `<div class="hs reveal"><div class="ic">${ico(i)}</div><h3>${esc(t)}</h3><p>${esc(d)}</p></div>`).join('')}</div>
+    <p class="how-note reveal">Kurulumda yanınızdayız; ilk gönderilerinizi birlikte kontrol ederiz.</p>
+  </div>
+</section>
+<section class="sec">
+  <div class="wrap narrow-text">
+    <div class="sec-head reveal"><div class="kicker">${esc(c.name)} entegrasyonu nedir?</div><h2>${isInt ? 'Tek Hesaptan Gönderi, Tek Panelden Takip' : 'Kendi Kargo Anlaşmanızla Tek Panelden Gönderi'}</h2></div>
+    <p class="reveal seo-p">${esc(`${c.name} entegrasyonu, ${isInt ? `${c.name} hesabınızla` : `${c.name} ile yaptığınız kurumsal anlaşmayla`} gönderdiğiniz siparişlerin gönderisini Hastürk CRM panelinden açmanızı sağlar. Pazaryerlerinden ve e-ticaret sitenizden gelen siparişler aynı listede durur; gönderi açıldığında takip numarası, kargo firması ve etiket pakete yazılır.`)}</p>
+    <p class="reveal seo-p">${esc(`Pazaryerlerinin anlaşmalı kargosuyla gönderdiğiniz siparişlerde barkod pazaryerinden gelir; ${c.name} entegrasyonu kendi anlaşmanızla gönderdiğiniz siparişler içindir. Kargo ücretini bildiren firmalarda ücret siparişin kargo giderine yazılır, böylece her siparişin net kârı gerçek kargo maliyetiyle hesaplanır.`)}</p>
+  </div>
+</section>
+<section class="sec alt">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(c.name)} Entegrasyonu Hakkında</h2></div>${faqHtml(carrierFaq(c))}
+  </div>
+</section>
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">Diğer kargo entegrasyonları</div><h2>Kargo Firmanız Hangisi?</h2><p>Birden fazla kargo firmasını bağlayıp her gönderide seçebilirsiniz.</p></div>
+    <div class="rels">${others.map((o) => `<a class="rl" href="${carrierHref(o)}">${logoTile(o.word, o.color, 'sm')}<span><b>${esc(o.name)}</b><small>${esc(o.kind)}</small></span></a>`).join('')}</div>
+    <div class="center-cta"><a class="btn btn-line" href="/ozellikler/kargo-entegrasyonu">Kargo entegrasyonu ${ico('i-arrow')}</a> <a class="btn btn-line" href="/ozellikler/kargo-ve-etiket">Kargo ve etiket ${ico('i-arrow')}</a> <a class="btn btn-line" href="/entegrasyonlar#kargo">Tüm entegrasyonlar ${ico('i-arrow')}</a></div>
+  </div>
+</section>
+<section class="sec alt"><div class="wrap"><div class="ask big reveal"><div><b>${esc(c.name)} gönderilerinizi tek panelden yönetin</b><span>7 gün ücretsiz deneyin; kurulum ücreti yok, kurulumda yanınızdayız. Önce görmek isterseniz demo panelini kayıt olmadan açın.</span></div>
+  <div class="ctas">${ctas}</div></div></div></section>`;
+  return { meta: { title: c.title, crumb: `${c.name} Entegrasyonu`, description: c.desc, url: `/entegrasyonlar/${c.slug}`, nav: 'entegrasyonlar' }, body, file: `entegrasyonlar/${c.slug}.html` };
+}
 
 // ---------- ücretsiz hesaplama araçları: /araclar ve /araclar/<slug> ----------
 // Kategori komisyon listeleri (yalnız resmî listeden üretilmiş public/assets/komisyon-<pazaryeri>.json varsa; yoksa elle oran)
@@ -487,7 +575,7 @@ for (const file of (await readdir(join(SRC, 'pages'))).filter((f) => f.endsWith(
   pages.push({ file, ...meta });
 }
 for (const dir of ['ozellikler', 'entegrasyonlar', 'araclar']) await mkdir(join(OUT, dir), { recursive: true });
-for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPage), ...TP.pages()]) {
+for (const g of [...FEATURES.map(featurePage), ...INTEGRATIONS.map(integrationPage), ...CARRIERS.filter((c) => !c.page).map(carrierPage), ...TP.pages()]) {
   await writeFile(join(OUT, g.file), render(g.meta, g.body, g.file.includes('/') ? g.file.split('/')[0] + '-detay' : g.file.replace(/\.html$/, '')));
   pages.push({ file: g.file, ...g.meta });
 }
@@ -503,13 +591,15 @@ const LLMS = (() => {
   const names = (f) => activeCh.filter(f).map((x) => x.name).join(', ');
   const tl = (n) => `${n.toLocaleString('tr-TR')} ₺`;
   const plans = S.plans.filter((p) => p.monthly).map((p) => `${p.name} ${tl(p.monthly)}/ay ya da ${tl(p.yearly)}/yıl (${p.limits.join(', ')})`).join('; ');
-  const beta = INTEGRATIONS.filter((x) => x.beta && !x.dev).map((x) => x.name).join(', ');
+  const beta = [...INTEGRATIONS.filter((x) => x.beta && !x.dev), ...CARRIERS.filter((c) => c.beta)].map((x) => x.name).join(', ');
+  const cargo = CARRIERS.map((c) => c.name).join(', ');
   return `# ${S.brand}
 
 > ${S.brand}, pazaryerlerinde ve kendi e-ticaret sitesinde satış yapan işletmeler için web tabanlı satış yönetim yazılımıdır. Trendyol, Hepsiburada, N11, ikas ve diğer kanalların siparişleri, kargo etiketleri, stokları, fiyatları ve her siparişin gerçek kârı tek panelden yönetilir.
 
 - Site: ${SITE_URL}/ · Panel (giriş): ${S.panelUrl}
 - Aktif entegrasyonlar: ${names(() => true)}${beta ? `\n- Test aşamasındaki entegrasyonlar: ${beta}` : ''}
+- Kargo entegrasyonları (kendi kargo anlaşmanızla etiket ve takip): ${cargo}
 - Paketler (KDV dahil): ${plans}. Kurulum ücreti yoktur; 7 gün ücretsiz deneme ve kayıt olmadan canlı demo vardır.
 - Öne çıkanlar: çok kanallı stok senkronizasyonu, ortak barkodla kargo etiketi, kategori eşleştirmeyle çok kanala ürün yükleme, buybox takibi ve otomatik fiyat, komisyon / kargo / hizmet bedeli kesintileriyle sipariş başı net kâr, müşteri soruları ve iadeler, telefondan yönetim.
 - Şirket: ${S.company.legal || S.brand}${S.company.address ? `, ${S.company.address}` : ''}${S.company.email ? ` · ${S.company.email}` : ''}${S.company.phone ? ` · ${S.company.phone}` : ''}
@@ -517,7 +607,7 @@ const LLMS = (() => {
 
 ${group('Ana sayfalar', CORE.filter(([u]) => byUrl[u]).map(([u, n]) => line(byUrl[u], n)))}
 ${group('Özellikler', sub(/^\/ozellikler\/./).map((p) => line(p)))}
-${group('Entegrasyonlar', sub(/^\/entegrasyonlar\/./, (p) => (intBySlug[p.url.split('/')[2]] || {}).dev).map((p) => line(p, (intBySlug[p.url.split('/')[2]] || {}).beta ? `${pageName(p)} (test aşamasında)` : '')))}
+${group('Entegrasyonlar', sub(/^\/entegrasyonlar\/./, (p) => (intBySlug[p.url.split('/')[2]] || {}).dev).map((p) => line(p)))}
 ${group('Ücretsiz hesaplama araçları', sub(/^\/araclar\/./, (p) => /-komisyon-oranlari$/.test(p.url)).map((p) => line(p)))}
 ${group('Kategori komisyon oranı listeleri', sub(/^\/araclar\/.+-komisyon-oranlari$/).map((p) => line(p)))}`.replace(/\n{3,}/g, '\n\n');
 })();
