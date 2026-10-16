@@ -100,7 +100,7 @@ test('yazı: tek panel isteği, JSON-LD (BlogPosting, Breadcrumb, FAQPage), cano
   assert.equal(canonical(a.text), `${SITE}/blog/${slug}`);
   assert.equal(meta(a.text, 'property', 'og:type'), 'article'); assert.equal(meta(a.text, 'property', 'og:image'), `${SITE}/blog/img/abcdef0123456789abcd`);
   assert.equal(meta(a.text, 'property', 'og:url'), `${SITE}/blog/${slug}`); assert.equal(meta(a.text, 'name', 'twitter:card'), 'summary_large_image');
-  assert.match(a.text, /<div class="bl-sum"><b>Özet<\/b><p>Kısa cevap 225/); assert.match(a.text, /Son güncelleme: <time/); assert.match(a.text, /\d+ dk okuma/);
+  assert.match(a.text, /<div class="bl-sum"><b>Özet<\/b><p>Kısa cevap 225/); assert.match(a.text, /Yayın: <time/); assert.match(a.text, /\d+ dk okuma/);
   assert.match(a.text, /<aside class="bl-toc"/); assert.match(a.text, /<details class="bl-tocm">/);
   assert.match(a.res.headers.get('cache-control'), /s-maxage=600/);
   // İlgili yazılar: 3 tane, ortak etiketli ve yalnız yayındakiler

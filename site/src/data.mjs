@@ -303,7 +303,7 @@ export const INTEGRATIONS = [
   {
     slug: 'pazarama', name: 'Pazarama', kind: 'pazaryeri', color: '#7a2bc9', badge: 'Pz', word: 'pazarama',
     lead: 'Pazarama mağazanızın siparişlerini onaylayın, stok ve fiyatlarınızı eşitleyin, müşteri sorularını panelden yanıtlayın.',
-    caps: [['Siparişler ve onay', true], ['Stok ve fiyat gönderimi', true], ['Kargo etiketi', 'Panel etiketi'], ['Müşteri soruları', true], ['Ürün yükleme', false], ['İade talepleri', false]],
+    caps: [['Siparişler ve onay', true], ['Stok ve fiyat gönderimi', true], ['Kargo etiketi', 'Panel etiketi'], ['Müşteri soruları', true], ['Ürün yükleme', true], ['İade talepleri', false]],
     points: [
       ['i-cart', 'Sipariş onayı', 'Yeni Pazarama siparişlerini panelden onaylayın.'],
       ['i-sync', 'Stok ve fiyat', 'Stok ve fiyatlarınız diğer kanallarla eşit kalır.'],
@@ -786,7 +786,7 @@ FEATURES.push({
 const FEATURE_SEO = {
   'siparis-yonetimi': ['Pazaryeri Sipariş Yönetimi Programı | Hastürk CRM', 'Trendyol, Hepsiburada, N11 ve ikas siparişlerini tek listede yönetin: gecikme uyarısı, toplu işlem, sipariş başı kâr. 7 gün ücretsiz deneyin.'],
   'kargo-ve-etiket': ['Pazaryeri Kargo Etiketi ve Toplu Yazdırma | Hastürk CRM', 'Trendyol ve Hepsiburada ortak barkodlu kargo etiketi, ikas Kargo, termal yazıcı (ZPL) ve toplu etiket yazdırma tek panelde. 7 gün ücretsiz deneyin.'],
-  'kargonomi-entegrasyonu': ['Kargonomi Entegrasyonu: Sitenizden Kargo Gönderin | Hastürk CRM', 'ikas, WooCommerce ve Shopify siparişlerinizi Kargonomi ile gönderin: firmaların fiyatlarını görün, firmayı seçin, etiket ve takip numarası panele gelsin.'],
+  'kargonomi-entegrasyonu': ['Kargonomi Entegrasyonu ile Kargo Gönderimi | Hastürk CRM', 'ikas, WooCommerce ve Shopify siparişlerinizi Kargonomi ile gönderin: firmaların fiyatlarını görün, firmayı seçin, etiket ve takip numarası panele gelsin.'],
   'kargo-entegrasyonu': ['Kargo Entegrasyonu: Yurtiçi, Aras, PTT, UPS | Hastürk CRM', 'Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo entegrasyonu: kendi anlaşmanızla etiket, takip numarası ve otomatik teslimat takibi.'],
   'stok-senkronizasyonu': ['Pazaryeri Stok Senkronizasyonu ve Stok Takibi | Hastürk CRM', 'Bir kanalda satılan ürünün stoğu Trendyol, Hepsiburada, N11 ve sitenizde otomatik düşer. Fazla satışa son; çoklu mağaza stok takibi tek panelde.'],
   'urun-yonetimi': ['Toplu Ürün Yükleme ve Pazaryeri Ürün Yönetimi | Hastürk CRM', 'Ürünü bir kez tanımlayın; Trendyol, Hepsiburada, N11 ve idefix\'e toplu ürün yükleyin. Kategori eşleştirme, varyant ve görseller otomatik gider.'],
@@ -795,7 +795,7 @@ const FEATURE_SEO = {
   'raporlar': ['E-Ticaret Satış Raporları ve Analiz | Hastürk CRM', 'Günlük, haftalık ve aylık satış raporları; en çok satan ürünler, kanal dağılımı, il bazında satış haritası ve sadık müşteriler. Tüm pazaryerleri tek raporda.'],
   'musteri-sorulari-ve-iadeler': ['Pazaryeri Müşteri Soruları ve İade Yönetimi | Hastürk CRM', 'Trendyol, Hepsiburada ve N11 müşteri sorularını hazır cevaplarla yanıtlayın, iade taleplerini panelden onaylayın ya da reddedin.'],
   'ekip-ve-guvenlik': ['Personel Yetkilendirme ve Güvenlik | Hastürk CRM', 'Ekibinize yalnız ihtiyaç duyduğu bölümleri açın; hazır roller, iki adımlı doğrulama ve şifreli saklanan API bilgileriyle mağazanız güvende.'],
-  'doviz-endeksli-fiyat': ['Döviz Kuruna Endeksli Otomatik Fiyat Güncelleme | Hastürk CRM', 'Ürün fiyatını dolar veya euro ile girin; kur değişince TL fiyatınız Trendyol, Hepsiburada ve sitenizde otomatik güncellensin.'],
+  'doviz-endeksli-fiyat': ['Döviz Kuruna Endeksli Otomatik Fiyat | Hastürk CRM', 'Ürün fiyatını dolar veya euro ile girin; kur değişince TL fiyatınız Trendyol, Hepsiburada ve sitenizde otomatik güncellensin.'],
   'mobil-yonetim': ['Pazaryeri Mağazanızı Telefondan Yönetin | Hastürk CRM', 'Siparişleri işleme alın, stok güncelleyin, soruları yanıtlayın: panel telefonda uygulama gibi çalışır, yeni siparişte anlık bildirim gelir.'],
 };
 for (const f of FEATURES) { const s = FEATURE_SEO[f.slug]; if (s) [f.seoTitle, f.desc] = s; }
@@ -804,5 +804,6 @@ for (const f of FEATURES) { const s = FEATURE_SEO[f.slug]; if (s) [f.seoTitle, f
 const INTEGRATION_SEO = {
   trendyol: 'Trendyol entegrasyonu: siparişler, ortak barkodlu kargo etiketi, stok ve fiyat, ürün yükleme, buybox ve gerçek kâr tek panelde. 7 gün ücretsiz deneyin.',
   hepsiburada: 'Hepsiburada entegrasyonu: siparişler ve paketleme, kargo etiketi, stok ve fiyat, ürün yükleme, buybox ve hakediş tek panelde. 7 gün ücretsiz deneyin.',
+  pazarama: 'Pazarama entegrasyonu: siparişleri onaylayın, stok ve fiyatlarınızı eşitleyin, kargo etiketini panelden basın, müşteri sorularını tek ekranda yanıtlayın.',
 };
 for (const x of INTEGRATIONS) if (INTEGRATION_SEO[x.slug]) x.desc = INTEGRATION_SEO[x.slug];

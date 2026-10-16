@@ -289,7 +289,7 @@ section, #deneme { scroll-margin-top: 76px; }
 @media (min-width: 900px) { .contact { grid-template-columns: 1fr 1.25fr; gap: 36px; } }
 .contact .info { align-self: start; background: linear-gradient(135deg, #2a78ff 0%, #1450d8 100%); color: #fff; border-radius: 22px; padding: 32px; position: relative; overflow: hidden; box-shadow: 0 24px 50px rgb(31 107 255 / .28); }
 .contact .info::after { content: ""; position: absolute; right: -80px; top: -80px; width: 240px; height: 240px; border-radius: 50%; background: rgb(255 255 255 / .08); }
-.contact .info h3 { font-size: 26px; font-weight: 850; letter-spacing: -.02em; }
+.contact .info h3, .contact .info h2 { font-size: 26px; font-weight: 850; letter-spacing: -.02em; }
 .contact .info p { color: #dbe7ff; margin-top: 10px; }
 .contact .info ul { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 14px; }
 .contact .info li { display: flex; gap: 12px; align-items: flex-start; color: #fff; }
@@ -329,7 +329,7 @@ textarea.in { min-height: 110px; resize: vertical; }
 .foot { background: linear-gradient(180deg, #f5f8fe 0%, #eef3fc 100%); color: var(--text-2); padding: 56px 0 28px; border-top: 1px solid var(--line); }
 .foot .cols { display: grid; gap: 28px; }
 @media (min-width: 800px) { .foot .cols { grid-template-columns: 1.4fr 1fr 1fr 1fr; } }
-.foot h4 { color: var(--text); margin: 0 0 12px; font-size: 15px; }
+.foot h4, .foot .fh { color: var(--text); margin: 0 0 12px; font-size: 15px; font-weight: 700; line-height: 1.5; letter-spacing: normal; }
 .foot a { color: var(--text-2); display: block; padding: 3px 0; font-size: 14.5px; }
 .foot a:hover { color: var(--primary); text-decoration: none; }
 .foot a.brand { display: inline-flex; padding: 0; }
