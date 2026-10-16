@@ -42,7 +42,7 @@ const LI = 'id sku name quantity currentQuantity variant { id barcode } image { 
 const ORDER = `id name createdAt updatedAt displayFinancialStatus displayFulfillmentStatus cancelledAt taxesIncluded email phone customer { id firstName lastName }
     shippingAddress { name address1 address2 city province phone } totalPriceSet { shopMoney { amount currencyCode } } currentTotalPriceSet { shopMoney { amount } }
     lineItems(first: 10) { pageInfo { hasNextPage endCursor } nodes { ${LI} } }
-    fulfillments(first: 10) { displayStatus trackingInfo(first: 3) { number company } }`;
+    fulfillments(first: 10) { displayStatus trackingInfo(first: 3) { number company } } shippingLine { title }`;
 const ORDERS = `query($first: Int!, $after: String, $q: String, $sort: OrderSortKeys) { orders(first: $first, after: $after, query: $q, sortKey: $sort) {
   pageInfo { hasNextPage endCursor }
   nodes { ${ORDER} } } }`;
@@ -171,6 +171,8 @@ export function shopify(env, meta = {}) {
       // Türkiye adreslerinde province = il, city = ilçe
       address: { name: str(a.name) || name, line: [a.address1, a.address2].map(str).filter(Boolean).join(' '), district: a.province ? str(a.city) : '', city: str(a.province || a.city), phone: str(a.phone || o.phone) },
       total, currency: str(o.totalPriceSet && o.totalPriceSet.shopMoney && o.totalPriceSet.shopMoney.currencyCode) || 'TRY',
+      // Müşterinin ödeme sayfasında seçtiği kargo yöntemi (bilgi notu): Order.shippingLine.title
+      cargoChoice: str(o.shippingLine && o.shippingLine.title),
       cargoCompany: str(ti.company), tracking: str(ti.number), items, packages: null,
     };
   }

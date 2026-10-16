@@ -61,6 +61,8 @@ export function opencart(env, meta) {
       address: { name: name2(a('firstname'), a('lastname')) || customer, line: name2(a('address_1'), a('address_2')),
         district: il && city && il.toLocaleLowerCase('tr') !== city.toLocaleLowerCase('tr') ? city : '', city: il || city, phone: str(o.telephone) },
       total: money(o.total), currency: str(o.currency_code) || 'TRY',
+      // Müşterinin ödeme sayfasında seçtiği kargo yöntemi (bilgi notu): bağlantı dosyası shipping_method adını verir
+      cargoChoice: str(o.shipping_method),
       cargoCompany: '', tracking: '', items, packages: null,
     };
   }
