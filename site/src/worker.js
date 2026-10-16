@@ -5,7 +5,7 @@
 // build.mjs'in ürettiği blog-shell.mjs'tendir: layout.html ya da sayfalar değişince `node build.mjs`. Panel adresi: config.js → panelUrl
 // (derlemede alınır) ya da Worker değişkeni PANEL_URL.
 // Panel yükü: her sayfa panelden TEK istekle çizilir (yazı + ilgili yazılar aynı yanıtta) ve Cloudflare önbelleğinde saklanır (aşağıda TTL).
-import { SHELL, PANEL_URL, SITE_URL, ORG, LLMS } from './blog-shell.mjs';
+import { SHELL, PANEL_URL, SITE_URL, ORG, LLMS, LLMS_FULL } from './blog-shell.mjs';
 
 // Önbellek (Cloudflare Cache API, veri merkezi başına): [taze, bayat] saniye. Taze kopya panel sorulmadan sunulur; süresi geçince ziyaretçiye
 // beklemeden eski kopya verilir ve arka planda panelden yenilenir (stale-while-revalidate). Panel yanıt vermezse bayat kopya sunulmaya devam eder.
@@ -16,7 +16,7 @@ const CC = { list: 'public, max-age=60, s-maxage=120, stale-while-revalidate=600
   feed: 'public, max-age=300, s-maxage=300, stale-while-revalidate=3600', llms: 'public, max-age=900, s-maxage=900, stale-while-revalidate=86400', img: 'public, max-age=31536000, immutable' };
 const ROBOTS = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
 const BRAND = 'Hastürk CRM';
-const DEFAULT_IMG = { src: `${SITE_URL}/img/genel-bakis.jpg`, w: 1440, h: 900, alt: 'Hastürk CRM panelinin genel bakış ekranı' };
+const DEFAULT_IMG = { src: `${SITE_URL}/img/og-hasturk-crm.jpg`, w: 1200, h: 630, alt: 'Hastürk CRM: pazaryeri ve e-ticaret satış yönetim paneli' };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const ico = (id) => `<svg><use href="#${id}"/></svg>`;
 const clip = (t, n = 155) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length <= n ? t : t.slice(0, t.lastIndexOf(' ', n - 1)).replace(/[,;:.]$/, '') + '…'; };
@@ -50,7 +50,7 @@ function page(env, m, status = 200) {
 }
 const orgGraph = () => [ORG, { '@type': 'WebSite', '@id': `${SITE_URL}/#site`, url: `${SITE_URL}/`, name: BRAND, inLanguage: 'tr-TR', publisher: { '@id': ORG['@id'] } }];
 const crumbs = (items) => ({ '@type': 'BreadcrumbList', '@id': `${items[items.length - 1][1]}#crumbs`, itemListElement: items.map(([name, item], i) => ({ '@type': 'ListItem', position: i + 1, name, item })) });
-const PUBLISHER = { '@type': 'Organization', '@id': ORG['@id'], name: BRAND, url: `${SITE_URL}/`, logo: { '@type': 'ImageObject', url: ORG.logo || `${SITE_URL}/assets/logo.webp` } };
+const PUBLISHER = { '@type': 'Organization', '@id': ORG['@id'], name: BRAND, url: `${SITE_URL}/`, logo: ORG.logo && typeof ORG.logo === 'object' ? ORG.logo : { '@type': 'ImageObject', url: ORG.logo || `${SITE_URL}/assets/logo.webp` } };
 
 // Yazı kartı (liste ve "ilgili yazılar")
 function card(p, feat = false) {
@@ -121,18 +121,18 @@ async function postPage(env, slug) {
   const tocMob = toc.length >= 3 ? `<details class="bl-tocm"><summary>Bu yazıda (${toc.length} başlık)</summary>${tocList}</details>` : '';
   const faq = faqOf(html);
   // Yayın ve son güncelleme tarihi görünür (aynı günse yalnız biri)
-  const dates = ymd(mod) !== ymd(pub) ? `<span>Yayın: ${day(pub)}</span><span>Son güncelleme: ${day(mod)}</span>` : `<span>Son güncelleme: ${day(mod)}</span>`;
+  const dates = ymd(mod) !== ymd(pub) ? `<span>Yayın: ${day(pub)}</span><span>Güncellendi: ${day(mod)}</span>` : `<span>Yayın: ${day(pub)}</span>`;
   const body = `<div class="bl-progress" data-progress aria-hidden="true"></div><article class="bl-post">
   <header class="bl-head"><div class="wrap">
     <nav class="crumbs" aria-label="Konum"><a href="/">Ana sayfa</a><span>›</span><a href="/blog">Blog</a><span>›</span><b>${esc(clip(p.title, 60))}</b></nav>
     ${p.tags.length ? `<div class="bl-ptags">${p.tags.map((t) => `<a href="/blog?etiket=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')}</div>` : ''}
     <h1>${esc(p.title)}</h1>
     ${p.summary ? `<div class="bl-sum"><b>Özet</b><p>${esc(p.summary)}</p></div>` : ''}
-    <div class="bl-meta"><span>${esc(p.author || BRAND)}</span>${dates}<span>${p.minutes} dk okuma</span></div>
+    <div class="bl-meta"><span>Yazar: ${isOrg ? `<a href="/hakkimizda">${esc(p.author || BRAND)}</a>` : esc(p.author)}</span>${dates}<span>${p.minutes} dk okuma</span></div>
   </div></header>
   ${cover ? `<figure class="bl-cover"><img src="${esc(cover)}" alt="${esc(p.title)}"${p.cover_w ? ` width="${p.cover_w}" height="${p.cover_h}"` : ''} fetchpriority="high" decoding="async"></figure>` : ''}
   <div class="bl-body${tocHtml ? ' has-toc' : ''}"><div class="bl-main">${tocMob}<div class="bl-art">${html}</div>
-  <div class="bl-author"><span class="bl-av">${esc((p.author || BRAND).slice(0, 1))}</span><div><b>${esc(p.author || `${BRAND} Ekibi`)}</b><span>${isOrg ? 'Pazaryeri ve e-ticaret operasyonu üzerine yazıyoruz. Panelimizi kullanan satıcıların sahada karşılaştığı sorunlardan derliyoruz.' : `${BRAND} blog yazarı`}</span></div></div>
+  <div class="bl-author"><span class="bl-av">${esc((p.author || BRAND).slice(0, 1))}</span><div><b>${isOrg ? `<a href="/hakkimizda">${esc(p.author || `${BRAND} Ekibi`)}</a>` : esc(p.author)}</b><span>${isOrg ? 'Pazaryeri ve e-ticaret operasyonu üzerine yazıyoruz. Panelimizi kullanan satıcıların sahada karşılaştığı sorunlardan derliyoruz. <a href="/hakkimizda">Hakkımızda</a>' : `${BRAND} blog yazarı`}</span></div></div>
   <footer class="bl-foot">
     <div class="bl-share"><b>Paylaşın:</b><a href="https://wa.me/?text=${stitle}%20${share}" target="_blank" rel="noopener">WhatsApp</a><a href="https://www.linkedin.com/sharing/share-offsite/?url=${share}" target="_blank" rel="noopener">LinkedIn</a><a href="https://x.com/intent/post?url=${share}&amp;text=${stitle}" target="_blank" rel="noopener">X</a><a href="https://www.facebook.com/sharer/sharer.php?u=${share}" target="_blank" rel="noopener">Facebook</a></div>
     <a class="bl-back" href="/blog">‹ Tüm yazılar</a>
@@ -178,7 +178,8 @@ async function passthrough(env, path, type, cache) {
 
 // /llms.txt (llmstxt.org): yapay zekâ asistanlarının (ChatGPT, Claude, Gemini, Perplexity, Copilot …) siteyi doğru anlatıp kaynak gösterebilmesi için
 // kısa özet. Sabit kısım (ürün, özellikler, entegrasyonlar, araçlar, fiyatlar) derlemede üretilir; blog bölümü panelden tek istekle eklenir.
-// /llms-full.txt: aynı özet + yayındaki tüm yazıların başlığı, adresi ve kısa özeti (yazı gövdesi yok; küçük kalır).
+// /llms-full.txt: aynı özet + ayrıntılı bilgiler (derlemede: kanal başına desteklenen işlemler, paketler, özellikler) + yayındaki tüm yazıların
+// başlığı, adresi ve kısa özeti (yazı gövdesi yok; küçük kalır).
 const md = (s) => String(s || '').replace(/[[\]]/g, (c) => (c === '[' ? '(' : ')')).replace(/\s+/g, ' ').trim();
 const LLMS_TAIL = `- [Blog](${SITE_URL}/blog): Pazaryeri, kargo, stok, fiyat ve kârlılık üzerine rehberler\n- [Blog RSS akışı](${SITE_URL}/blog/rss.xml)\n- [Blog site haritası](${SITE_URL}/blog/sitemap.xml)\n`;
 const textRes = (body, cc) => new Response(body, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': cc, 'X-Content-Type-Options': 'nosniff' } });
@@ -187,7 +188,7 @@ async function llms(env, full) {
   if (!d) d = await panel(env, '?limit=50'); // panel henüz güncellenmediyse son 50 yazı
   const posts = (d && d.posts) || [], list = full ? posts : posts.slice(0, 30);
   const line = (p) => `- [${md(p.title)}](${SITE_URL}/blog/${p.slug}): ${md(clip(p.summary, 160))} (${ymd(p.published_at)})`;
-  return textRes(`${LLMS}\n## Blog${full ? `: tüm yazılar (${posts.length})` : ': son yazılar'}\n\n${list.length ? list.map(line).join('\n') + '\n' : ''}${LLMS_TAIL}`
+  return textRes(`${LLMS}\n${full ? `${LLMS_FULL}\n` : ''}## Blog${full ? `: tüm yazılar (${posts.length})` : ': son yazılar'}\n\n${list.length ? list.map(line).join('\n') + '\n' : ''}${LLMS_TAIL}`
     + (full ? '' : `\n## Optional\n\n- [Tüm blog yazıları](${SITE_URL}/llms-full.txt): ${posts.length} yazının başlığı, adresi ve özeti\n`), CC.llms);
 }
 
@@ -273,7 +274,7 @@ export default {
       try { res = serve(await render(env, key, cache, ck, ctx), 'MISS'); } catch (e) {
         console.error('blog', e);
         // llms.txt panel açılmasa da sabit kısmıyla sunulur
-        res = path.startsWith('/llms') ? textRes(`${LLMS}\n## Blog\n\n${LLMS_TAIL}`, 'public, max-age=60') : unavailable(env);
+        res = path.startsWith('/llms') ? textRes(`${LLMS}\n${path === '/llms-full.txt' ? `${LLMS_FULL}\n` : ''}## Blog\n\n${LLMS_TAIL}`, 'public, max-age=60') : unavailable(env);
       }
     }
     return req.method === 'HEAD' ? new Response(null, res) : res;

@@ -58,7 +58,7 @@
 - [Navlungo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/navlungo): Navlungo entegrasyonu: Sürat, HepsiJET, Aras, PTT ve Yurtiçi gönderilerini tek hesaptan açın; etiket, takip numarası ve kargo ücreti panele gelsin.
 - [OpenCart Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/opencart): OpenCart entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
 - [Ozon Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ozon): Ozon entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Pazarama Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/pazarama): Pazarama mağazanızın siparişlerini onaylayın, stok ve fiyatlarınızı eşitleyin, müşteri sorularını panelden yanıtlayın.
+- [Pazarama Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/pazarama): Pazarama entegrasyonu: siparişleri onaylayın, stok ve fiyatlarınızı eşitleyin, kargo etiketini panelden basın, müşteri sorularını tek ekranda yanıtlayın.
 - [PTT Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ptt-kargo): PTT Kargo entegrasyonu: gönderilerinizi panelden PTT'ye yükleyin, barkodlu etiketi basın; şube kabulünden sonra kargo durumu panelden izlensin.
 - [PttAVM Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/pttavm): PttAVM entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
 - [Sendeo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/sendeo): Sendeo entegrasyonu: kendi anlaşmanızla gönderi açın, Sendeo etiketi ve takip numarası anında gelsin; kargo durumu ve ücreti panelden izlensin.

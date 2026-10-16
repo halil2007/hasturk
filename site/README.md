@@ -40,7 +40,27 @@ Derleme ayrıca:
 - `site.css`, `site.js`, `config.js` adreslerine içerik özeti ekler (`?v=…`). Bu dosyalar tarayıcıda uzun süre saklanır (`public/_headers`);
   değiştirdikten sonra **mutlaka derleyin**, yoksa ziyaretçiler eski sürümü görmeye devam eder (`config.js` en geç 10 dakikada yenilenir).
 - Sayfanın ilk büyük görselini öncelikli, diğerlerini ekrana yaklaşınca yükler.
-- `public/llms.txt`'in ve `src/blog-shell.mjs` → `LLMS`'in sabit kısmını (ürün, özellikler, entegrasyonlar, araçlar, fiyatlar) üretir.
+- `public/llms.txt`'in ve `src/blog-shell.mjs` → `LLMS`'in sabit kısmını (ürün, özellikler, entegrasyonlar, araçlar, fiyatlar) üretir;
+  `/llms-full.txt` buna `LLMS_FULL`'u (kanal başına desteklenen işlemler, paket içerikleri, özellikler) ve tüm blog yazılarını ekler.
+- `site.js`'in tarayıcıda doldurduğu içeriği (şirket / iletişim bilgileri, paket kartları ve fiyatlar, karşılaştırma tablosu, ana sayfadaki kanal listesi)
+  HTML'e de yazar: JavaScript çalıştırmayan arama motoru ve yapay zekâ tarayıcıları (GPTBot, ClaudeBot, PerplexityBot …) da görür.
+  `site.js`'teki biçimi değiştirirseniz `build.mjs` → `planCards`, `compareTable`, `integList` de aynı kalmalı.
+- Site haritasındaki `lastmod`, sayfanın içeriği (`<main>`) değişince ilerler; sayfa başına içerik özeti ve tarih `src/lastmod.json`'da tutulur
+  (derleme günceller, `public/` ile birlikte kaydedin). `/blog` ve yazılar `/blog/sitemap.xml`'dedir (panel, gerçek tarihleriyle).
+
+Arama motoru denetimi: `cd site && node --test` → `test/seo.test.mjs` her sayfada başlık (≤60), açıklama (110–160), canonical, tek H1, başlık sırası,
+Open Graph / X kartı, JSON-LD (çakışmasız; SSS cevapları sayfada görünür; fiyatlar config.js ve panel/src/plans.js ile aynı), site haritası, kırık iç bağlantı,
+görsel alt / boyut, JS'siz okunan fiyat ve şirket bilgileri, robots.txt ve llms.txt'i denetler.
+
+Paylaşım görseli (Open Graph / X, 1200×630): `public/img/og-hasturk-crm.jpg`; logo ya da ekran görüntüsü değişince `python3 scripts/og-image.py` ile yeniden üretin.
+
+IndexNow (Bing, Yandex, Seznam, Naver; Google kullanmaz): anahtar dosyası `public/<anahtar>.txt`. Yayından **sonra** değişen sayfaları bildirmek için:
+```bash
+cd site && node scripts/indexnow.mjs            # lastmod'u bugün olan sayfalar (--since 2026-10-01, --all, --dry-run)
+```
+Blog yazıları Worker'ın zamanlayıcısıyla bildirilir (aşağıda `INDEXNOW_KEY`; aynı anahtarı kullanabilirsiniz). Alternatif: Cloudflare → alan adı →
+Caching → Configuration → **Crawler Hints** açılırsa Cloudflare değişen sayfaları IndexNow'a kendisi bildirir (betiğe gerek kalmaz).
+Ayrıca Google Search Console ve Bing Webmaster Tools'a `https://hasturkcrm.com/sitemap.xml` ve `https://hasturkcrm.com/blog/sitemap.xml` ekleyin.
 
 Blog (`src/worker.js`): `/blog`, `/blog/<adres>`, `/blog/rss.xml`, `/blog/sitemap.xml`, `/llms.txt`, `/llms-full.txt` panelden tek istekle çizilir ve
 Cloudflare önbelleğinde tutulur (liste 2 dk, yazı 10 dk, 404 1 dk; süresi geçen sayfa beklemeden sunulup arka planda yenilenir, panel açılmazsa eski kopya sunulur).

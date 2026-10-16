@@ -1,0 +1,306 @@
+{
+ "/": {
+  "h": "49338e3193e3",
+  "d": "2026-10-16"
+ },
+ "/araclar": {
+  "h": "572f59c8255b",
+  "d": "2026-10-11"
+ },
+ "/araclar/desi-hesaplama": {
+  "h": "682b70b82ab1",
+  "d": "2026-10-11"
+ },
+ "/araclar/e-ticaret-stopaj-hesaplama": {
+  "h": "59d1ff5e2fea",
+  "d": "2026-10-11"
+ },
+ "/araclar/hepsiburada-komisyon-hesaplama": {
+  "h": "943ccbecae08",
+  "d": "2026-10-11"
+ },
+ "/araclar/hepsiburada-komisyon-oranlari": {
+  "h": "412b2356b698",
+  "d": "2026-10-11"
+ },
+ "/araclar/indirim-kar-hesaplama": {
+  "h": "d1afd0f24869",
+  "d": "2026-10-11"
+ },
+ "/araclar/kar-karsilastirma": {
+  "h": "105e3e0c82d9",
+  "d": "2026-10-11"
+ },
+ "/araclar/kdv-hesaplama": {
+  "h": "eba9622af967",
+  "d": "2026-10-11"
+ },
+ "/araclar/n11-komisyon-hesaplama": {
+  "h": "3b3b1de16cf0",
+  "d": "2026-10-11"
+ },
+ "/araclar/pazaryeri-komisyon-hesaplama": {
+  "h": "b40074b598ea",
+  "d": "2026-10-11"
+ },
+ "/araclar/satis-fiyati-hesaplama": {
+  "h": "b37a811f4532",
+  "d": "2026-10-11"
+ },
+ "/araclar/trendyol-komisyon-hesaplama": {
+  "h": "fe3e19230cdd",
+  "d": "2026-10-11"
+ },
+ "/araclar/trendyol-komisyon-oranlari": {
+  "h": "54fd0d83aa11",
+  "d": "2026-10-11"
+ },
+ "/araclar/yuzde-hesaplama": {
+  "h": "5060123bbdc8",
+  "d": "2026-10-11"
+ },
+ "/demo": {
+  "h": "86e1f6312d88",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar": {
+  "h": "27a365f2b0cc",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/amazon": {
+  "h": "60ce17a16ca5",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/aras-kargo": {
+  "h": "6d068de6f4c7",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/boyner": {
+  "h": "4721d9611aba",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ciceksepeti": {
+  "h": "924b4254e002",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/dhl-ecommerce": {
+  "h": "ab7e3ac2cbdb",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/dhl-express": {
+  "h": "df864b5f539c",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ebay": {
+  "h": "ab9fdf81691a",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/etsy": {
+  "h": "3033c4a0dcbb",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/getir": {
+  "h": "1907c12f9505",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/hepsiburada": {
+  "h": "6d26f4d38d83",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/hepsijet": {
+  "h": "baa50a298f6d",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ideasoft": {
+  "h": "9e575d0c1828",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/idefix": {
+  "h": "c0970dfb279d",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ikas": {
+  "h": "4c393fc909ee",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/koctas": {
+  "h": "e81847daebf2",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/kolay-gelsin": {
+  "h": "9e937ccf8ca8",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/n11": {
+  "h": "a6745f994a89",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/navlungo": {
+  "h": "0b52d7d77544",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/opencart": {
+  "h": "c4b763f5e7ad",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ozon": {
+  "h": "17f793865def",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/pasaj": {
+  "h": "7e64e738abfb",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/pazarama": {
+  "h": "e15114decad6",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ptt-kargo": {
+  "h": "ee6463171764",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/pttavm": {
+  "h": "a33d05f41326",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/sendeo": {
+  "h": "a9a77274571e",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/shopify": {
+  "h": "ac3701266e97",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/surat-kargo": {
+  "h": "632878b841b8",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/teknosa": {
+  "h": "cef8ca5b1e60",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ticimax": {
+  "h": "eaaeb6ba3450",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/trendyol": {
+  "h": "4c43962bc84d",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/trendyolgo": {
+  "h": "60182106103a",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/tsoft": {
+  "h": "8be4f0d1bd17",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/ups-kargo": {
+  "h": "0f050c45a2db",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/woocommerce": {
+  "h": "44047b796f4b",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/yemeksepeti": {
+  "h": "a18451c6436c",
+  "d": "2026-10-16"
+ },
+ "/entegrasyonlar/yurtici-kargo": {
+  "h": "94dd86cbb27c",
+  "d": "2026-10-16"
+ },
+ "/gizlilik": {
+  "h": "c4eec5918c70",
+  "d": "2026-10-16"
+ },
+ "/hakkimizda": {
+  "h": "9874590f4b12",
+  "d": "2026-10-16"
+ },
+ "/iletisim": {
+  "h": "b6a1b3976c9e",
+  "d": "2026-10-16"
+ },
+ "/iptal-iade": {
+  "h": "a2c85e93f496",
+  "d": "2026-10-16"
+ },
+ "/kullanim-kosullari": {
+  "h": "b5a36463fb9c",
+  "d": "2026-10-16"
+ },
+ "/kvkk": {
+  "h": "0729e5159a38",
+  "d": "2026-10-16"
+ },
+ "/mesafeli-satis-sozlesmesi": {
+  "h": "5c914f74cfd2",
+  "d": "2026-10-16"
+ },
+ "/on-bilgilendirme": {
+  "h": "0370ee925d35",
+  "d": "2026-10-16"
+ },
+ "/ozellikler": {
+  "h": "781cab6b3032",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/buybox-takibi": {
+  "h": "6b6fcb8fc3f2",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/doviz-endeksli-fiyat": {
+  "h": "ebff6d4a5c6a",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/ekip-ve-guvenlik": {
+  "h": "1d20d858db98",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/kar-zarar": {
+  "h": "d1cc983f74b8",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/kargo-entegrasyonu": {
+  "h": "29694ac452bc",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/kargo-ve-etiket": {
+  "h": "b5a2cb5bb534",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/kargonomi-entegrasyonu": {
+  "h": "c973c4042742",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/mobil-yonetim": {
+  "h": "e711a535a705",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/musteri-sorulari-ve-iadeler": {
+  "h": "810dcc7eadc4",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/raporlar": {
+  "h": "d0c7af8f9266",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/siparis-yonetimi": {
+  "h": "324c0bbc6d1e",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/stok-senkronizasyonu": {
+  "h": "27ce6bdbab43",
+  "d": "2026-10-16"
+ },
+ "/ozellikler/urun-yonetimi": {
+  "h": "cc9f855088b5",
+  "d": "2026-10-16"
+ },
+ "/paketler": {
+  "h": "28c2a2a07e2e",
+  "d": "2026-10-16"
+ }
+}
