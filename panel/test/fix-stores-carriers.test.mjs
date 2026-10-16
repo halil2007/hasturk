@@ -127,7 +127,7 @@ test('Kargonomi: fiyat onayından sonra hata → gönderi iptal edilir (takipsiz
   ]);
   try {
     const a = kargonomi.make({ KARGONOMI_API_KEY: 't' });
-    await assert.rejects(a.create(ship()), /kargo firması gönderiyi oluşturamadı/);
+    await assert.rejects(a.create(ship(), { providerId: '3' }), /kargo firması gönderiyi oluşturamadı/);
     assert.ok(calls.some((c) => c.method === 'POST' && /\/shipments\/cancel$/.test(c.url) && JSON.parse(c.body).shipment_id === 88), 'taslak iptal edildi');
   } finally { restore(); }
   mock([[/GET .*\/shipments\/5$/, () => ({ data: { id: 5, status: 'ready', real_price: '50' } })]]);

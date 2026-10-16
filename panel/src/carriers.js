@@ -30,7 +30,7 @@ import * as dhlexpress from './carriers/dhlexpress.js';
 export const CARRIERS = {
   kargonomi: {
     id: 'kargonomi', name: 'Kargonomi', site: 'https://www.kargonomi.com.tr', ready: true,
-    about: 'Kargo karşılaştırma ve gönderi platformu: Aras, Yurtiçi, Sürat, PTT, HepsiJET, Kolay Gelsin gibi firmalarla tek hesaptan, bakiye yükleyerek gönderim. Varsayılan olarak en ucuz firma seçilir.',
+    about: 'Kargo karşılaştırma ve gönderi platformu: Aras, Yurtiçi, Sürat, PTT, HepsiJET, Kolay Gelsin gibi firmalarla tek hesaptan, bakiye yükleyerek gönderim. İnternet sitenizin siparişlerinde; kargo firmasını her gönderide fiyatlarını görerek siz seçersiniz.',
     // Kargonomi API anahtarını (token) yalnız kendi müşterisine, hesabına bağlı olarak ve e-postayla verir (telefonla verilmez):
     // her firma kendi Kargonomi hesabı için destek@kargonomi.com.tr adresinden ister. Panel e-postayı hazır metinle açar (mail).
     howto: 'Kargonomi API anahtarını (token) yalnızca kendi müşterilerine, e-postayla verir; telefonla verilmez. Önce Kargonomi hesabınızı açın, Depolarım bölümünden gönderen adresinizi (depo) ekleyin. Sonra Kargonomi\'de kayıtlı e-posta adresinizden destek@kargonomi.com.tr adresine yazıp hesabınız için API token isteyin (aşağıdaki “E-postayı hazırla” ile metin hazır gelir). Gelen token\'ı buraya girin. Bakiye yetersizse gönderi açılmaz.',
@@ -119,7 +119,7 @@ export async function carrierFor(env, db, id) {
   if (!make) throw notReady(c);
   const api = make(env, values, { db });
   // İptalden sonra yeniden açılan gönderide referans eki: firma aynı referansı "zaten var" sayıp iptal edilmiş gönderiyi döndürmesin
-  if (api.create && db) { const create = api.create.bind(api); api.create = async (s) => create(await withAttempt(db, s)); }
+  if (api.create && db) { const create = api.create.bind(api); api.create = async (s, opts) => create(await withAttempt(db, s), opts); }
   return { ...c, api };
 }
 

@@ -43,7 +43,7 @@ window.SITE = {
     { key: 'baslangic', name: 'Başlangıç', tag: 'Az kanalla satış yapan küçük ekipler', monthly: 990, yearly: 9900, limits: ['3 mağaza', '2 kullanıcı'],
       items: ['Tüm aktif entegrasyonlar', 'Sipariş, kargo etiketi ve toplama listesi', 'Stok senkronu ve ürün eşleştirme', 'Çok kanala ürün yükleme', 'Gelir & gider, kâr-zarar raporu', 'Müşteri soruları ve iade talepleri', 'E-posta ve WhatsApp destek'] },
     { key: 'profesyonel', name: 'Profesyonel', tag: 'Çok kanalda büyüyen işletmeler', monthly: 1990, yearly: 19900, featured: true, limits: ['10 mağaza', '5 kullanıcı'], base: 'Başlangıç',
-      items: ['Buybox takibi ve otomatik fiyat', 'Otomatik ürün gönderimi', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
+      items: ['Buybox takibi ve otomatik fiyat', 'Otomatik ürün gönderimi', 'Kargonomi ile kargo gönderimi (internet sitesi siparişleri)', 'Hakediş takvimi ve kesilen faturalar', 'Excel ile toplu fiyat / stok / maliyet', 'Personel yetkileri ve rol şablonları', 'Öncelikli destek'] },
     { key: 'kurumsal', name: 'Kurumsal', tag: 'Yüksek hacimli ve yurt dışına satan firmalar', monthly: 3990, yearly: 39900, limits: ['25 mağaza', 'Sınırsız kullanıcı'], base: 'Profesyonel',
       items: ['Yurt dışı pazaryerleri (eBay, Etsy, Ozon, yurt dışı Amazon)', 'Kendi kargo anlaşmanızla 7 kargo firması', 'Döviz kuruna endeksli otomatik fiyat', 'Kurulum ve veri aktarımında birebir destek', 'Telefon destek hattı', 'Yeni kanal ve özel geliştirme önceliği'],
       // soon: pakete eklenecek ama henüz aktif olmayan özellikler ("Yakında" rozetiyle görünür). Yapay zekâ planlanan bir özelliktir; kaldırmayın
@@ -63,6 +63,7 @@ window.SITE = {
       ['Sipariş yönetimi ve gecikme uyarısı', true, true, true],
       ['Kargo etiketi ve toplama listesi', true, true, true],
       ['Müşteri soruları ve iade talepleri', true, true, true],
+      ['Kargonomi ile kargo gönderimi (internet sitesi siparişleri)', false, true, true],
       ['Kendi anlaşmalı kargo entegrasyonu (7 kargo firması)', false, false, true],
     ] },
     { group: 'Ürün ve stok', rows: [

@@ -210,9 +210,9 @@ test('kargo firması (HepsiJET, sahte sunucu): etiket → kargoya ver → firma 
 
     // Kargonomi: firma gönderisi birkaç saniye sonra oluşur → etiket istenince takip no ve PDF alınır
     await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'k' } }) });
-    await saveOrders(env.DB, 'trendyol', [order('K9')]);
-    const kid = encodeURIComponent('trendyol:K9');
-    r = await post(`/api/orders/${kid}/carrier-label`, { provider: 'kargonomi' });
+    await saveOrders(env.DB, 'woocommerce', [order('K9')]);
+    const kid = encodeURIComponent('woocommerce:K9');
+    r = await post(`/api/orders/${kid}/carrier-label`, { provider: 'kargonomi', firm_id: '11' });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     const kp = r.body.order.packages[0];
     assert.equal(kp.carrier_ref, '9');
@@ -254,11 +254,11 @@ test('Kargonomi: gerçek ücret tahmini ücretin yerine geçer; firma gönderiyi
     const { env, call, post } = await panel();
     await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '03320000000', address: 'Sanayi Cd. 1', city: 'Selçuklu / Konya' });
     await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'k' } }) });
-    await saveOrders(env.DB, 'trendyol', [order('F1')]);
-    const id = encodeURIComponent('trendyol:F1');
-    let r = await post(`/api/orders/${id}/carrier-label`, { provider: 'kargonomi' });
+    await saveOrders(env.DB, 'woocommerce', [order('F1')]);
+    const id = encodeURIComponent('woocommerce:F1');
+    let r = await post(`/api/orders/${id}/carrier-label`, { provider: 'kargonomi', firm_id: '11' });
     assert.equal(r.status, 200, JSON.stringify(r.body));
-    const shipCost = async () => (await env.DB.prepare("SELECT shipping_cost FROM orders WHERE id = 'trendyol:F1'").first()).shipping_cost;
+    const shipCost = async () => (await env.DB.prepare("SELECT shipping_cost FROM orders WHERE id = 'woocommerce:F1'").first()).shipping_cost;
     assert.equal(await shipCost(), 48, 'tahmini 40 + KDV');
     // Gerçek ücret geldi: fark sipariş kargo giderine yansır
     price = { estimated_price: '40.00', real_price: '45.00' };
@@ -267,7 +267,7 @@ test('Kargonomi: gerçek ücret tahmini ücretin yerine geçer; firma gönderiyi
     // Firma gönderiyi oluşturamadı
     st = 'webservice_order_failed';
     await trackCarriers(env, env.DB, { force: true });
-    const pk = await env.DB.prepare("SELECT id, error, carrier_state, carrier_cost FROM packages WHERE order_id = 'trendyol:F1'").first();
+    const pk = await env.DB.prepare("SELECT id, error, carrier_state, carrier_cost FROM packages WHERE order_id = 'woocommerce:F1'").first();
     assert.equal(pk.carrier_state, 'failed');
     assert.match(pk.error, /oluşturamadı/);
     assert.equal(pk.carrier_cost, null);
@@ -280,4 +280,66 @@ test('Kargonomi: gerçek ücret tahmini ücretin yerine geçer; firma gönderiyi
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal((await env.DB.prepare('SELECT carrier_ref FROM packages WHERE id = ?').bind(pk.id).first()).carrier_ref, null);
   } finally { globalThis.fetch = real; }
+});
+
+test('Kargonomi ile gönder: yalnız internet sitesi siparişi; fiyat teklifi → kullanıcının seçtiği firmayla aynı taslak onaylanır; vazgeçilince taslak silinir; toplu gönderimde firma adıyla; seçim yoksa açılmaz', async () => {
+  const real = globalThis.fetch, calls = [];
+  let n = 0;
+  globalThis.fetch = async (url, o = {}) => {
+    const u = String(url), m = o.method || 'GET', J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { 'Content-Type': 'application/json' } });
+    calls.push(`${m} ${u}` + (o.body ? ' ' + o.body : ''));
+    if (/\/states$/.test(u)) return J({ data: [{ id: 42, name: 'KONYA' }] });
+    if (/\/cities\/42$/.test(u)) return J({ data: [{ id: 600, name: 'SELÇUKLU' }] });
+    if (/\/warehouses$/.test(u)) return J({ data: [{ id: 1, is_main: 1 }] });
+    if (m === 'POST' && /\/shipments$/.test(u)) return J({ data: { id: 70 + (++n), status: 'draft' } });
+    if (/shipment-price-comparison\/\d+$/.test(u)) return J({ shipping_provider_with_price: [{ id: '-1', name: 'Otomatik', price: 40 }, { id: 11, name: 'Aras Kargo', slug: 'aras', price: '52.40' }, { id: 14, name: 'Yurtiçi Kargo', slug: 'yurtici', price: '61' }] });
+    if (/confirm-shipping-price/.test(u)) return J({});
+    if (m === 'DELETE') return new Response(null, { status: 204 });
+    if (/\/shipments\/\d+$/.test(u)) { const id = Number(u.split('/').pop()); return J({ data: { id, status: 'webservice_order_creating', shipping_provider_name: 'Yurtiçi Kargo', estimated_price: '61' } }); }
+    return new Response('?', { status: 404 });
+  };
+  try {
+    const { env, call, post } = await panel();
+    await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '03320000000', address: 'Sanayi Cd. 1', city: 'Selçuklu / Konya' });
+    await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'k' } }) });
+    await saveOrders(env.DB, 'trendyol', [order('T1')]);
+    await saveOrders(env.DB, 'woocommerce', [order('W1'), order('W2'), order('W3')]);
+    // Pazaryeri siparişi: Kargonomi seçeneği yok (sunucu da reddeder)
+    let r = await post(`/api/orders/${encodeURIComponent('trendyol:T1')}/carrier-quote`, { provider: 'kargonomi' });
+    assert.equal(r.status, 400); assert.match(r.body.error, /yalnız internet sitesi/);
+    r = await post(`/api/orders/${encodeURIComponent('trendyol:T1')}/carrier-label`, { provider: 'kargonomi', firm: 'aras' });
+    assert.equal(r.status, 400);
+    const sum = await call('/api/summary');
+    assert.equal(sum.body.channels.find((c) => c.id === 'woocommerce').site, true);
+    assert.equal(sum.body.channels.find((c) => c.id === 'trendyol').site, false);
+    // Site siparişi: teklif → firmalar fiyatlarıyla (otomatik seçenek yok)
+    const w1 = encodeURIComponent('woocommerce:W1');
+    r = await post(`/api/orders/${w1}/carrier-quote`, { provider: 'kargonomi', desi: 2 });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(r.body.offers.map((x) => [x.id, x.name, x.price]), [['11', 'Aras Kargo', 52.4], ['14', 'Yurtiçi Kargo', 61]]);
+    const q = r.body.quote_id, drafts0 = calls.filter((c) => /^POST .*\/shipments /.test(c)).length;
+    // Seçilen firmayla aynı taslak onaylanır (yeni taslak açılmaz)
+    r = await post(`/api/orders/${w1}/carrier-label`, { provider: 'kargonomi', quote_id: q, firm_id: '14', desi: 2 });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(calls.filter((c) => /^POST .*\/shipments /.test(c)).length, drafts0);
+    assert.match(calls.filter((c) => /confirm-shipping-price/.test(c)).pop(), new RegExp(`"shipment_id":${q}.*"shipping_provider_id":14`));
+    // Vazgeçilen teklif: taslak silinir
+    r = await post(`/api/orders/${encodeURIComponent('woocommerce:W2')}/carrier-quote`, { provider: 'kargonomi' });
+    await post(`/api/orders/${encodeURIComponent('woocommerce:W2')}/carrier-quote-cancel`, { provider: 'kargonomi', quote_id: r.body.quote_id });
+    assert.ok(calls.some((c) => c.startsWith(`DELETE `) && c.includes(`/shipments/${r.body.quote_id}`)));
+    // Firma seçilmeden gönderi açılmaz
+    r = await post(`/api/orders/${encodeURIComponent('woocommerce:W3')}/carrier-label`, { provider: 'kargonomi' });
+    assert.ok(r.status >= 400); assert.match(r.body.error, /firması seçilmedi/);
+    // Toplu: firma adıyla (her siparişin teklifinden); pazaryeri siparişi hata ile döner
+    r = await post('/api/orders-bulk', { ids: ['woocommerce:W2', 'woocommerce:W3', 'trendyol:T1'], action: 'carrier-label', provider: 'kargonomi', firm: 'aras' });
+    assert.deepEqual(r.body.done.sort(), ['woocommerce:W2', 'woocommerce:W3']);
+    assert.equal(r.body.errors.length, 1); assert.match(r.body.errors[0], /trendyol:T1.*internet sitesi/);
+  } finally { globalThis.fetch = real; }
+});
+
+test('paket: Kargonomi Profesyonel pakette açık, diğer kargo firmaları Kurumsal; Başlangıç\'ta Kargonomi kilitli', async () => {
+  const { carrierFeature, allows } = await import('../src/plans.js');
+  assert.equal(carrierFeature('kargonomi'), 'kargonomi'); assert.equal(carrierFeature('navlungo'), 'carrier');
+  const pro = { TENANT_SLUG: 'x', TENANT_PLAN: 'profesyonel' }, base = { TENANT_SLUG: 'x', TENANT_PLAN: 'baslangic' }, kur = { TENANT_SLUG: 'x', TENANT_PLAN: 'kurumsal' };
+  assert.deepEqual([allows(pro, 'kargonomi'), allows(pro, 'carrier'), allows(base, 'kargonomi'), allows(kur, 'kargonomi'), allows(kur, 'carrier')], [true, false, false, true, true]);
 });

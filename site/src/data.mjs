@@ -590,13 +590,49 @@ FEATURES.push({
   ],
   note: { title: 'Bilmeniz gerekenler', items: ['Kargo firması entegrasyonu Kurumsal pakette yer alır.', 'Web servis bilgileri kargo firmasıyla yaptığınız kurumsal anlaşmayla, firmanın şube ya da satış ekibinden alınır.', 'Trendyol ve Hepsiburada gibi pazaryerlerinin anlaşmalı kargosuyla gönderimde barkod pazaryerinden gelir; bu entegrasyona gerek yoktur.'] },
   faq: [
-    ['Hangi kargo firmalarıyla entegrasyon var?', 'Yurtiçi Kargo, Aras Kargo, PTT Kargo, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo ile doğrudan entegrasyon vardır. Kolay Gelsin, Sendeo ve DHL Express test aşamasında. Kargonomi ve Navlungo hesabınızı da bağlayabilirsiniz: kargo firmasını otomatik (en ucuz) ya da kendiniz seçersiniz; Kargonomi API anahtarını kendi müşterilerine e-postayla (destek@kargonomi.com.tr) verir.'],
+    ['Hangi kargo firmalarıyla entegrasyon var?', 'Yurtiçi Kargo, Aras Kargo, PTT Kargo, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo ile doğrudan entegrasyon vardır. Kolay Gelsin, Sendeo ve DHL Express test aşamasında. İnternet sitenizin siparişlerini Kargonomi hesabınızla da gönderebilirsiniz (Profesyonel ve Kurumsal pakette): kargo firmasını fiyatlarını görerek siz seçersiniz.'],
     ['Kargo entegrasyonu için ne gerekir?', 'Kargo firmasıyla kurumsal anlaşmanız ve firmanın verdiği web servis kullanıcı adı / şifresi gerekir. Bilgileri panele girdiğinizde bağlantı hemen test edilir.'],
     ['Takip numarası satış kanalına gider mi?', 'Evet. Paketi “Kargoya ver” ile kapattığınızda takip numarası ve kargo firması siparişin geldiği kanala bildirilir; müşteriniz kargosunu takip edebilir.'],
     ['Kargo teslim edilince ne olur?', 'Panel kargo firmasından durumu düzenli sorgular; teslim edilen sipariş kendiliğinden “Teslim edildi” olur, iade dönen gönderi işaretlenir.'],
     ['Hangi pakette var?', 'Kendi anlaşmalı kargo entegrasyonu Kurumsal pakette yer alır. Pazaryerlerinin anlaşmalı kargosu ve ikas Kargo tüm paketlerde çalışır.'],
   ],
-  related: ['kargo-ve-etiket', 'siparis-yonetimi', 'kar-zarar'],
+  related: ['kargonomi-entegrasyonu', 'kargo-ve-etiket', 'siparis-yonetimi'],
+});
+
+// ---------- Kargonomi ile gönderim (Profesyonel ve Kurumsal paket): internet sitesi siparişleri ----------
+FEATURES.push({
+  slug: 'kargonomi-entegrasyonu', name: 'Kargonomi entegrasyonu', icon: 'i-truck', color: 'c-orange', short: 'İnternet sitesi siparişlerini Kargonomi ile gönderin',
+  title: 'Kargonomi Entegrasyonu — Hastürk CRM', h1: ['Sitenizin Siparişlerini', 'Kargonomi ile Gönderin'],
+  lead: 'ikas, WooCommerce, Shopify, OpenCart, Ticimax, IdeaSoft ve T-Soft sitenizden gelen siparişleri Kargonomi hesabınızla gönderin: Aras, Yurtiçi, Sürat, PTT, HepsiJET, Kolay Gelsin gibi firmaların fiyatlarını panelde görün, istediğiniz firmayı seçin; etiket ve takip numarası panele gelsin.',
+  img: 'kargo',
+  points: [
+    ['i-calc', 'Fiyatları görerek seçin', 'Her gönderide Kargonomi\'deki kargo firmalarının o gönderi için fiyatı listelenir; firmayı siz seçersiniz, sistem kendiliğinden seçmez.'],
+    ['i-tag', 'Etiket ve takip numarası', 'Gönderi panelden açılır; Kargonomi etiketi (PDF) ve takip numarası pakete yazılır, yazdırırsınız.'],
+    ['i-orders', 'Toplu gönderim', 'Siparişleri seçin, kargo firmasını seçin, tek seferde gönderin; etiketleri toplu yazdırın.'],
+    ['i-sync', 'Sitenize bildirim', '“Kargoya ver” dediğinizde takip numarası ve kargo firması sitenize (ikas, WooCommerce…) bildirilir; müşteriniz kargosunu takip eder.'],
+    ['i-eye', 'Teslimat takibi', 'Gönderinin durumu Kargonomi\'den sorgulanır; teslim edilen sipariş kendiliğinden “Teslim edildi” olur.'],
+    ['i-calc', 'Gerçek kargo maliyeti', 'Kargonomi\'nin kestiği ücret siparişin kargo giderine yazılır; kâr hesabınız doğru çıkar.'],
+  ],
+  steps: [
+    ['Kargonomi hesabı açın', 'kargonomi.com.tr\'de hesabınızı açın, bakiye yükleyin ve Depolarım bölümünden gönderen adresinizi (depo) ekleyin.'],
+    ['API anahtarını e-postayla isteyin', 'Kargonomi API anahtarını (token) yalnız kendi müşterilerine, e-postayla verir; telefonla verilmez. Kargonomi\'de kayıtlı e-posta adresinizden destek@kargonomi.com.tr adresine yazıp hesabınız için API token isteyin. Panelde Entegrasyonlar → Kargo entegrasyonları → Kargonomi\'deki “E-postayı hazırla” düğmesi talep metnini hazır getirir.'],
+    ['Token\'ı panele girin', 'Gelen token\'ı Entegrasyonlar → Kargo entegrasyonları → Kargonomi\'ye yapıştırın ve “Bağlantıyı test et” deyin; bakiyeniz görünürse bağlantı tamamdır.'],
+    ['Siparişi gönderin', 'İnternet sitenizden gelen siparişte “Kargonomi ile gönder”e basın, “Fiyatları getir” ile firmaların fiyatlarını görün, istediğiniz firmayı seçin; etiket ve takip numarası gelir. Birden çok sipariş için listeden seçip toplu gönderin.'],
+  ],
+  note: { title: 'Bilmeniz gerekenler', items: [
+    'Kargonomi ile gönderim Profesyonel ve Kurumsal pakette yer alır.',
+    'Yalnız internet sitenizin (ikas, WooCommerce, Shopify, OpenCart, Ticimax, IdeaSoft, T-Soft) siparişlerinde kullanılır. Trendyol, Hepsiburada gibi pazaryerlerinin siparişleri pazaryerinin anlaşmalı kargosuyla gönderilir.',
+    '“Kargonomi ile gönder” seçeneği yalnız Kargonomi bağlantınız kurulu ve aktifken görünür.',
+    'Kargo ücreti Kargonomi bakiyenizden düşer; bakiye yetersizse gönderi açılmaz.',
+  ] },
+  faq: [
+    ['Kargonomi API anahtarını nereden alırım?', 'Kargonomi API anahtarını (token) yalnız kendi müşterilerine, e-postayla verir. Kargonomi\'de kayıtlı e-posta adresinizden destek@kargonomi.com.tr adresine yazıp hesabınız için API token isteyin. Telefonla verilmez.'],
+    ['Kargo firmasını kim seçer?', 'Siz seçersiniz. Her gönderide Kargonomi\'deki firmaların o gönderi için fiyatı listelenir; sistem kendiliğinden (örneğin en ucuzu) seçmez. Toplu gönderimde tüm seçili siparişler için seçtiğiniz firma kullanılır.'],
+    ['Pazaryeri siparişlerini Kargonomi ile gönderebilir miyim?', 'Hayır. Trendyol, Hepsiburada, N11 gibi pazaryerleri siparişi kendi anlaşmalı kargosuyla gönderir; bu siparişlerde Kargonomi seçeneği görünmez.'],
+    ['Hangi pakette var?', 'Profesyonel ve Kurumsal pakette. Kurumsal pakette ayrıca Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo ile kendi anlaşmanızla doğrudan bağlantı vardır.'],
+    ['Takip numarası siteme gider mi?', 'Evet. Paketi “Kargoya ver” ile kapattığınızda takip numarası ve kargo firması sitenize bildirilir; ikas siparişinde paket ikas\'ta takip bilgisiyle açılır.'],
+  ],
+  related: ['kargo-entegrasyonu', 'kargo-ve-etiket', 'siparis-yonetimi'],
 });
 
 // ---------- arama motoru başlık ve açıklamaları ----------
@@ -605,6 +641,7 @@ FEATURES.push({
 const FEATURE_SEO = {
   'siparis-yonetimi': ['Pazaryeri Sipariş Yönetimi Programı | Hastürk CRM', 'Trendyol, Hepsiburada, N11 ve ikas siparişlerini tek listede yönetin: gecikme uyarısı, toplu işlem, sipariş başı kâr. 7 gün ücretsiz deneyin.'],
   'kargo-ve-etiket': ['Pazaryeri Kargo Etiketi ve Toplu Yazdırma | Hastürk CRM', 'Trendyol ve Hepsiburada ortak barkodlu kargo etiketi, ikas Kargo, termal yazıcı (ZPL) ve toplu etiket yazdırma tek panelde. 7 gün ücretsiz deneyin.'],
+  'kargonomi-entegrasyonu': ['Kargonomi Entegrasyonu: Sitenizden Kargo Gönderin | Hastürk CRM', 'ikas, WooCommerce ve Shopify siparişlerinizi Kargonomi ile gönderin: firmaların fiyatlarını görün, firmayı seçin, etiket ve takip numarası panele gelsin.'],
   'kargo-entegrasyonu': ['Kargo Entegrasyonu: Yurtiçi, Aras, PTT, UPS | Hastürk CRM', 'Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo entegrasyonu: kendi anlaşmanızla etiket, takip numarası ve otomatik teslimat takibi.'],
   'stok-senkronizasyonu': ['Pazaryeri Stok Senkronizasyonu ve Stok Takibi | Hastürk CRM', 'Bir kanalda satılan ürünün stoğu Trendyol, Hepsiburada, N11 ve sitenizde otomatik düşer. Fazla satışa son; çoklu mağaza stok takibi tek panelde.'],
   'urun-yonetimi': ['Toplu Ürün Yükleme ve Pazaryeri Ürün Yönetimi | Hastürk CRM', 'Ürünü bir kez tanımlayın; Trendyol, Hepsiburada, N11 ve idefix\'e toplu ürün yükleyin. Kategori eşleştirme, varyant ve görseller otomatik gider.'],

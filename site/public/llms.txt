@@ -8,7 +8,7 @@
 - Paketler (KDV dahil): Başlangıç 990 ₺/ay ya da 9.900 ₺/yıl (3 mağaza, 2 kullanıcı); Profesyonel 1.990 ₺/ay ya da 19.900 ₺/yıl (10 mağaza, 5 kullanıcı); Kurumsal 3.990 ₺/ay ya da 39.900 ₺/yıl (25 mağaza, Sınırsız kullanıcı). Kurulum ücreti yoktur; 7 gün ücretsiz deneme ve kayıt olmadan canlı demo vardır.
 - Öne çıkanlar: çok kanallı stok senkronizasyonu, ortak barkodla kargo etiketi, kategori eşleştirmeyle çok kanala ürün yükleme, buybox takibi ve otomatik fiyat, komisyon / kargo / hizmet bedeli kesintileriyle sipariş başı net kâr, müşteri soruları ve iadeler, telefondan yönetim.
 - Şirket: Hastürk Gübre Sanayi ve Ticaret Limited Şirketi, Kızılcaali Mahallesi, Karakoçan Çıkmazı Sokak, No:7/1, 34540 Çatalca / İstanbul · info@hasturkcrm.com · +90 553 942 29 61
-- Bu dosyanın sabit kısmı: 2026-10-11 · Blog bölümü yayındaki yazılardan kendiliğinden güncellenir.
+- Bu dosyanın sabit kısmı: 2026-10-16 · Blog bölümü yayındaki yazılardan kendiliğinden güncellenir.
 
 ## Ana sayfalar
 
@@ -29,6 +29,7 @@
 - [Gelir, gider ve kâr-zarar](https://hasturkcrm.com/ozellikler/kar-zarar): Komisyon, kargo, hizmet bedeli, stopaj ve reklam kesintileriyle sipariş başı gerçek kârınızı görün. Trendyol ve Hepsiburada hakedişleri otomatik.
 - [Kargo firması entegrasyonu](https://hasturkcrm.com/ozellikler/kargo-entegrasyonu): Yurtiçi, Aras, PTT, UPS, HepsiJET, DHL eCommerce ve Sürat Kargo entegrasyonu: kendi anlaşmanızla etiket, takip numarası ve otomatik teslimat takibi.
 - [Kargo ve etiket](https://hasturkcrm.com/ozellikler/kargo-ve-etiket): Trendyol ve Hepsiburada ortak barkodlu kargo etiketi, ikas Kargo, termal yazıcı (ZPL) ve toplu etiket yazdırma tek panelde. 7 gün ücretsiz deneyin.
+- [Kargonomi entegrasyonu](https://hasturkcrm.com/ozellikler/kargonomi-entegrasyonu): ikas, WooCommerce ve Shopify siparişlerinizi Kargonomi ile gönderin: firmaların fiyatlarını görün, firmayı seçin, etiket ve takip numarası panele gelsin.
 - [Telefondan yönetim](https://hasturkcrm.com/ozellikler/mobil-yonetim): Siparişleri işleme alın, stok güncelleyin, soruları yanıtlayın: panel telefonda uygulama gibi çalışır, yeni siparişte anlık bildirim gelir.
 - [Müşteri soruları ve iadeler](https://hasturkcrm.com/ozellikler/musteri-sorulari-ve-iadeler): Trendyol, Hepsiburada ve N11 müşteri sorularını hazır cevaplarla yanıtlayın, iade taleplerini panelden onaylayın ya da reddedin.
 - [Raporlar ve analiz](https://hasturkcrm.com/ozellikler/raporlar): Günlük, haftalık ve aylık satış raporları; en çok satan ürünler, kanal dağılımı, il bazında satış haritası ve sadık müşteriler. Tüm pazaryerleri tek raporda.
