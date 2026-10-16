@@ -11,6 +11,10 @@
 // OF24, P42, OF02 en fazla dakikada bir; AF01 ve OF61 günde bir (kv'de 24 saat saklanır). Tek gönderimde tüm teklifler tek OF24 isteğinde, tüm yeni
 // ürünler tek P41 dosyasında gider (belgede istek başına ürün sınırı yok; sınır çağrı sıklığı).
 // OF24 teklifi bütün olarak yazar (gönderilmeyen alanlar sıfırlanır): aynı SKU ile teklif zaten varsa (OF21) teklif gönderilmez, dokunulmaz.
+// P41 ve OF24 tekrar denenmez (tries: 1): zaman aşımında Mirakl isteği almış olabilir; P41'in ikinci denemesi 15 dakika sınırına takılır, import_id kaybolur.
+// Onaydan (günler) sonra açılan teklif stok 0 ile açılır: gönderim anının stoğu bu arada tükenmiş olabilir (fazla satış). Gerçek stoğu panel, ilan
+// bağlandıktan sonra stok gönderimiyle yazar (kanalın pushStock'u teklifin OF21'deki fiyat / indirimini koruyarak yalnız miktarı değiştirir).
+// Kanal toplu ürün kurmadan önce catalog.prepare(prs) çağrılabilir: barkodlar 100'lük P31 istekleriyle önceden aranır, build tek tek sormaz.
 // Operatöre bırakılanlar sabit varsayılmaz: kategoriler H11, özellikler / zorunluluk / varyant ekseni PM11 (requirement_level, variant, type, type_parameter),
 // değer listeleri VL11, CSV ayırıcı PC01 (features.operator_csv_delimiter), teklif durumu OF61, zorunlu teklif alanları AF01 (entities=OFFER).
 // Belgede ürün adı / barkod / kategori gibi özelliklerin hangi PM11 kodu olduğu tanımlı değil (roles alanının türleri belgelenmemiş): bu kodlar kanal
@@ -154,10 +158,17 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
     return types.size === 1 ? [...types][0] : '';
   });
   const eanType = async (opts) => str(opts.eanType) || await refType();
+  // build'in kullandığı kimlik türü kv'de: prepare ayarsız çağrılırsa aynı türle önceden arar
+  let typeSeen;
+  async function rememberType(type) {
+    if (typeSeen === undefined) typeSeen = str(await sget('eantype'));
+    if (type && type !== typeSeen) { typeSeen = type; await sset('eantype', type); }
+  }
   // P31: barkodla katalog araması (istekte en fazla 100 referans); sonuç 30 dk Worker belleğinde
   const seen = { get: (k) => SEEN.get(scope + '|' + k), set: (k, v) => { SEEN.set(scope + '|' + k, v); if (SEEN.size > 5000) SEEN.delete(SEEN.keys().next().value); } };
   // fresh: sonuç sorgusunda önbellek kullanılmaz (ürün onaylanıp kataloğa yeni girmiş olabilir)
   async function lookup(type, codes, fresh = false) {
+    codes = [...new Set(codes)];
     const out = new Map(), need = [];
     for (const c of codes) { const h = !fresh && seen.get(type + '|' + c); if (h && Date.now() - h.at < 30 * 60e3) { if (h.v) out.set(c, h.v); } else need.push(c); }
     for (let i = 0; i < need.length; i += 100) {
@@ -189,8 +200,10 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
     if (!state) missing.push(`teklif durumu (${name} ayarlarından “Teklif durumu kodu” girin)`);
     for (const f of await af01()) missing.push(`teklif alanı “${f}” (${name} zorunlu tutuyor; panelden gönderilemiyor)`);
     const type = await eanType(opts);
+    await rememberType(type);
     if (!type) { missing.push(`barkod kimlik türü (${name} ayarlarından girin, ör. EAN)`); return { key, missing, payload: null }; }
     const offer = offerRow(pr, state, opts);
+    // prepare() önceden aradıysa önbellekten (30 dk), yoksa tek barkod için P31
     const found = pr.barcode ? (await lookup(type, [str(pr.barcode)])).get(str(pr.barcode)) : null;
     // Ürün katalogda var: yalnız teklif
     if (found) return { key, missing, payload: { key, mode: 'offer', offer: { ...offer, product_id: str(found.product_sku), product_id_type: 'SKU' } } };
@@ -234,6 +247,17 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
     return { key, missing, payload: { key, mode: 'product', barcode: str(pr.barcode), type, row, offer } };
   }
 
+  // Toplu ön arama (isteğe bağlı kanca): panel bir kategori grubunu build etmeden önce şekillenmiş ürünlerle bir kez çağırır. Barkodlar 100'lük P31
+  // istekleriyle aranır, sonuç build'in kullandığı önbelleğe (30 dk) yazılır. Hata gönderimi durdurmaz (build tek tek arar).
+  async function prepare(prs, { opts } = {}) {
+    const codes = [...new Set((prs || []).map((p) => str(p && p.barcode)).filter(Boolean))];
+    if (!codes.length) return;
+    try {
+      const type = (opts && str(opts.eanType)) || (typeSeen !== undefined ? typeSeen : (typeSeen = str(await sget('eantype')))) || await refType();
+      if (type) await lookup(type, codes);
+    } catch (e) { if (e.budget) throw e; }
+  }
+
   // ---------- gönderim ----------
   // Kayıt: "<tür><değer>:<sku>,<sku>…" parçaları ";" ile (değer ve SKU'lar URL kodlu). O = OF24 içe aktarma no · P = P41 içe aktarma no ·
   // E = aynı SKU ile teklif zaten var (gönderilmedi) · X = gönderilemedi (değer: neden)
@@ -263,7 +287,7 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
     const offers = fresh.filter((x) => x.mode === 'offer'), prods = fresh.filter((x) => x.mode === 'product');
     if (offers.length) {
       try {
-        const r = await call('/offers', {}, { method: 'POST', body: { offers: offers.map((x) => x.offer) } });
+        const r = await call('/offers', {}, { method: 'POST', body: { offers: offers.map((x) => x.offer) }, tries: 1 });
         parts.push(part('O', r && r.import_id != null ? String(r.import_id) : '0', offers));
       } catch (e) { if (e.budget) throw e; errs.push(e.message); parts.push(part('X', e.message, offers)); }
     }
@@ -276,7 +300,11 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
         fd.append('file', new Blob([csv], { type: 'text/csv' }), 'urunler.csv');
         fd.append('operator_format', 'true');
         let r;
-        try { r = await call('/products/imports', {}, { method: 'POST', body: fd }); } finally { await sset('p41at', Date.now()); }
+        // Tek deneme: zaman aşımı / bağlantı hatası / sunucu hatasında dosya Mirakl'a ulaşmış olabilir (ikinci deneme 15 dk sınırına takılırdı)
+        try { r = await call('/products/imports', {}, { method: 'POST', body: fd, tries: 1 }); } catch (e) {
+          if (e.budget || (e.status && e.status < 500)) throw e;
+          throw new Error(`${name} ürün dosyası gönderiminde yanıt alınamadı (${e.message}). Mirakl'a dosya gitmiş olabilir; 15 dakika sonra ${name} panelinde içe aktarmaları kontrol edin, sonra yeniden gönderin`);
+        } finally { await sset('p41at', Date.now()); }
         const id = r && r.import_id != null ? String(r.import_id) : '';
         if (!id) throw new Error(`${name} içe aktarma numarası (import_id) dönmedi`);
         await sset('p41:' + id, { at: Date.now(), head, type: prods[0].type, items: prods.map((x) => ({ key: x.key, barcode: x.barcode, offer: x.offer })), offers: [], made: [] });
@@ -291,20 +319,33 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
   const ACCEPT = 'application/octet-stream, text/csv, */*';
   const report = async (path) => String((await call(path, {}, { accept: ACCEPT }).catch((e) => { if (e.budget) throw e; return ''; })) || '');
   // OF02 durumu: WAITING_SYNCHRONIZATION_PRODUCT / WAITING / RUNNING sürüyor, COMPLETE / FAILED bitti; hatalı satırlar OF03 raporundan
-  async function offerResult(id, keys) {
-    if (id === '0') return { pending: false, items: keys.map((k) => ({ key: k, ok: true, status: `${name}'a iletildi`, error: '' })) };
+  // note: başarılı satırın durum metnine eklenir (onaydan sonra stok 0 ile açılan teklif)
+  async function offerResult(id, keys, note = '') {
+    if (id === '0') return { pending: false, items: keys.map((k) => ({ key: k, ok: true, status: `${name}'a iletildi${note}`, error: '' })) };
     const r = (await call(`/offers/imports/${encodeURIComponent(id)}`)) || {}, st = str(r.status || r.import_status).toUpperCase();
     if (st !== 'COMPLETE' && st !== 'FAILED') return { pending: true, items: keys.map((k) => ({ key: k, ok: null, status: `${name} teklifi işliyor`, error: '' })) };
     if (st === 'FAILED') return { pending: false, items: keys.map((k) => ({ key: k, ok: false, status: `${name} teklifi kabul etmedi`, error: str(r.reason_status) || 'Teklif içe aktarması başarısız' })) };
     const errLines = num(r.lines_in_error), bad = errLines > 0 || r.has_error_report === true ? reportErrors(await report(`/offers/imports/${encodeURIComponent(id)}/error_report`), (v) => (keys.includes(v) ? v : '')) : new Map();
     const unknown = errLines > 0 && !bad.size;
     return { pending: false, items: keys.map((k) => (bad.has(k) ? { key: k, ok: false, status: `${name} teklifi kabul etmedi`, error: bad.get(k).join(' · ') }
-      : unknown ? { key: k, ok: null, status: `${errLines} teklif satırı hatalı; ${name} hata raporu okunamadı`, error: '' } : { key: k, ok: true, status: `Teklif açıldı (${name})`, error: '' })) };
+      : unknown ? { key: k, ok: null, status: `${errLines} teklif satırı hatalı; ${name} hata raporu okunamadı`, error: '' } : { key: k, ok: true, status: `Teklif açıldı (${name})${note}`, error: '' })) };
   }
   // P42 durumu: TRANSFORMATION_WAITING / TRANSFORMATION_RUNNING / WAITING / RUNNING işleniyor · SENT operatöre gönderildi (onay bekliyor) ·
   // COMPLETE bitti (P44 hata raporu) · FAILED / CANCELLED / TRANSFORMATION_FAILED başarısız. Dönüşüm hataları P47 raporunda (SENT / COMPLETE'te).
+  // Sonuç kesinleşince (bekleyen yok) kv kaydı küçültülür: yalnız ürün başına son durum kalır (dosya başlığı, teklif satırları atılır);
+  // sonraki sorgular Mirakl'a gitmeden bu durumu döndürür.
+  const OPENED = '; stok panelin stok gönderimiyle yazılır';
+  async function settle(id, items) {
+    await sset('p41:' + id, { at: Date.now(), done: true, r: items.map((x) => [x.key, x.ok, x.status, x.error]) });
+    return { pending: false, items };
+  }
   async function productResult(id, keys) {
-    const ent = await sget('p41:' + id), info = new Map(((ent && ent.items) || []).map((x) => [x.key, x])), byBc = new Map([...info.values()].map((x) => [x.barcode, x.key]));
+    const ent = await sget('p41:' + id);
+    if (ent && ent.done) {
+      const r = new Map((ent.r || []).map(([key, ok, status, error]) => [key, { key, ok, status, error }]));
+      return { pending: false, items: keys.map((k) => r.get(k) || { key: k, ok: false, status: `${name} sonucu bulunamadı`, error: 'Gönderim sonucu kayıtlı değil: ürünü yeniden gönderin' }) };
+    }
+    const info = new Map(((ent && ent.items) || []).map((x) => [x.key, x])), byBc = new Map([...info.values()].map((x) => [x.barcode, x.key]));
     const keyOf = (v) => (keys.includes(v) ? v : byBc.get(v) || '');
     const r = (await call(`/products/imports/${encodeURIComponent(id)}`)) || {}, st = str(r.import_status).toUpperCase(), bad = new Map();
     const add = (m) => { for (const [k, e] of m) bad.set(k, [...new Set([...(bad.get(k) || []), ...e])]); };
@@ -312,7 +353,8 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
     if (r.has_transformation_error_report === true) add(reportErrors(await report(`/products/imports/${encodeURIComponent(id)}/transformation_error_report`), keyOf, head));
     const fail = (k, e) => ({ key: k, ok: false, status: `${name} ürünü kabul etmedi`, error: e });
     if (['FAILED', 'CANCELLED', 'TRANSFORMATION_FAILED'].includes(st)) {
-      return { pending: false, items: keys.map((k) => fail(k, (bad.get(k) || []).join(' · ') || str(r.reason_status) || `Ürün içe aktarması ${st === 'CANCELLED' ? 'iptal edildi' : 'başarısız'}`)) };
+      const items = keys.map((k) => fail(k, (bad.get(k) || []).join(' · ') || str(r.reason_status) || `Ürün içe aktarması ${st === 'CANCELLED' ? 'iptal edildi' : 'başarısız'}`));
+      return ent ? settle(id, items) : { pending: false, items };
     }
     if (st !== 'COMPLETE') {
       const wait = st === 'SENT' ? `${name} ürün onayı bekleniyor` : `${name} ürün dosyasını işliyor`;
@@ -325,15 +367,16 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
       for (const k of ok) items.push(fail(k, `Ürün ${name} kataloğuna alındı ama teklif açılamadı (gönderim bilgisi bulunamadı): ürünü yeniden gönderin, bu kez yalnız teklif açılır`));
       return { pending: false, items };
     }
-    // Onaylanan ürünler için teklif: ürün P31'de bulununca OF24 ile açılır (aynı SKU ile teklif varsa dokunulmaz); bulunamayanlar beklemede kalır
+    // Onaylanan ürünler için teklif: ürün P31'de bulununca OF24 ile açılır (aynı SKU ile teklif varsa dokunulmaz); bulunamayanlar beklemede kalır.
+    // Stok 0: gönderim anının stoğu günler sonra geçerli olmayabilir; gerçek stok ilan bağlanınca panelin stok gönderimiyle yazılır. Fiyat gönderim anının.
     const made = new Set(ent.made || []), exists = new Set(ent.exists || []), todo = ok.filter((k) => !made.has(k) && !exists.has(k));
     let pending = false;
     if (todo.length) {
       for (const k of await existing(todo)) exists.add(k);
       const need = todo.filter((k) => !exists.has(k)), hit = ent.type ? await lookup(ent.type, need.map((k) => (info.get(k) || {}).barcode).filter(Boolean), true) : new Map();
-      const rows = need.map((k) => { const x = info.get(k) || {}, p = hit.get(x.barcode); return p && x.offer ? { k, o: { ...x.offer, product_id: str(p.product_sku), product_id_type: 'SKU' } } : null; }).filter(Boolean);
+      const rows = need.map((k) => { const x = info.get(k) || {}, p = hit.get(x.barcode); return p && x.offer ? { k, o: { ...x.offer, quantity: 0, product_id: str(p.product_sku), product_id_type: 'SKU' } } : null; }).filter(Boolean);
       if (rows.length) {
-        const res = await call('/offers', {}, { method: 'POST', body: { offers: rows.map((x) => x.o) } });
+        const res = await call('/offers', {}, { method: 'POST', body: { offers: rows.map((x) => x.o) }, tries: 1 });
         ent.offers = [...(ent.offers || []), { id: res && res.import_id != null ? String(res.import_id) : '0', keys: rows.map((x) => x.k) }];
         for (const x of rows) made.add(x.k);
       }
@@ -343,11 +386,11 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
     for (const k of ok) if (exists.has(k)) items.push({ key: k, ok: true, status: `Ürün kataloğa alındı; bu SKU ile teklif zaten vardı (değiştirilmedi)`, error: '' });
     for (const k of ok) if (!made.has(k) && !exists.has(k)) { pending = true; items.push({ key: k, ok: null, status: `${name} ürün onayı / kataloğa eklenmesi bekleniyor`, error: '' }); }
     for (const o of ent.offers || []) {
-      const res = await offerResult(o.id, o.keys.filter((k) => ok.includes(k)));
+      const res = await offerResult(o.id, o.keys.filter((k) => ok.includes(k)), OPENED);
       if (res.pending) pending = true;
       items.push(...res.items);
     }
-    return { pending, items };
+    return pending ? { pending, items } : settle(id, items);
   }
   async function status(ref) {
     const items = [];
@@ -375,5 +418,5 @@ export function miraklCatalog({ name, call, kv, offersFor, scope = name }) {
     { k: 'attrBrand', label: `${name} ürün şablonu: marka özellik kodu` },
     { k: 'attrGroup', label: `${name} ürün şablonu: varyant grup kodu özellik kodu` },
   ];
-  return { categories, allCategories, attributes, values, build, send, status, options };
+  return { categories, allCategories, attributes, values, prepare, build, send, status, options };
 }

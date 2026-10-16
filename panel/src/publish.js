@@ -24,7 +24,7 @@ const NEED = {
   idefix: [['cargoCompanyId', 'Kargo firması numarası']],
   hepsiburada: [['warranty', 'Garanti süresi (ay)', 'warranty_months']],
   ciceksepeti: [['deliveryType', 'Teslimat tipi (1 servis aracı, 2 kargo, 3 ikisi)'], ['deliveryMessageType', 'Teslimat mesaj tipi kodu']],
-  ozon: [['vat', 'Ozon KDV oranı (%)'], ['currency', 'Ozon hesap para birimi (RUB, CNY, USD, EUR, KZT, BYN)']],
+  ozon: [['vat', 'Ozon KDV oranı (%)'], ['currency', 'Ozon hesap para birimi (RUB, CNY, USD, EUR)']],
   etsy: [['who_made', 'Etsy: ürünü kim yaptı (i_did / someone_else / collective)'], ['when_made', 'Etsy: ürün ne zaman yapıldı'], ['is_supply', 'Etsy: malzeme mi (evet / hayır)'],
     ['shipping_profile_id', 'Etsy kargo profili numarası'], ['readiness_state_id', 'Etsy hazırlık profili numarası'], ['return_policy_id', 'Etsy iade politikası numarası']],
 };
@@ -196,6 +196,8 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
       return brandCache.get(ck);
     }
     const catRows = new Map();
+    // Kanalın toplu ön hazırlığı (ör. Mirakl barkodlarını 100'lük toplu arar; bkz. catalog.js buildAll)
+    if (kind === 'market' && c.catalog && c.catalog.prepare && prods.length) { try { await c.catalog.prepare(prods.map((p) => shape(p, optsFor(p), false)), { opts: dOpts }); } catch (e) { if (e.budget) throw e; } }
     for (const p of prods) {
       const cat = await catFor(p);
       const missing = [];
@@ -305,6 +307,9 @@ async function saveDraft(env, db, ids, b, user) {
     const cur = { ...(allOpts[cid] || {}) };
     for (const [k, v] of Object.entries(o)) {
       if (!keys.has(k)) continue;
+      // Kanal ayarları (fiyat farkı, kargo şablonu …) kanalın tüm ürünlerini etkiler: Ürün yükle'deki gibi yalnız yönetici değiştirir
+      const same = k === 'markup' ? cleanMarkup(v) === (cur.markup ?? '') : str(v) === '' || str(v) === str(cur[k] ?? '');
+      if (!same && user && user.role !== 'admin') fail(403, `${c.name} kanal ayarlarını (fiyat farkı, kargo / teslimat seçenekleri) yalnız yönetici değiştirebilir`);
       // Fiyat farkı: boş bırakılınca kayıtlı fark kaldırılır (önizlemedeki 0 ile gönderilen fiyat aynı olsun); geçersizse hata
       if (k === 'markup') { const m = cleanMarkup(v); if (m === '') { if ('markup' in cur) { delete cur.markup; optsChanged = true; } } else { cur.markup = m; optsChanged = true; } continue; }
       if (str(v) !== '') { cur[k] = str(v); optsChanged = true; }

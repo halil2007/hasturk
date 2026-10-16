@@ -217,9 +217,12 @@ export function ciceksepeti(env, meta) {
     if (plain(description).length < 30) missing.push('açıklama (en az 30 karakter)');
     else if (description.length > 20000) missing.push('açıklama (en fazla 20.000 karakter)');
     // Teslimat tipi (1 Çiçeksepeti servis aracı · 2 kargo · 3 ikisi) [A][D] ve teslimat mesaj tipi (sayısal kod) [A][B][D][E]: zorunlu, varsayılan yok
+    // Boş seçenek "(Ürün yükle → … seçenekleri)" ekiyle (Kanallarda yayınla kendi kutusunda sorar); geçersiz değer eksiz: her ekranda engeller
     const dt = Number(opts.deliveryType), dm = Number(opts.deliveryMessageType);
-    if (![1, 2, 3].includes(dt)) missing.push(`teslimat tipi ${OPT}`);
-    if (!(Number.isInteger(dm) && dm > 0)) missing.push(`teslimat mesaj tipi ${OPT}`);
+    if (str(opts.deliveryType) === '') missing.push(`teslimat tipi ${OPT}`);
+    else if (![1, 2, 3].includes(dt)) missing.push(`teslimat tipi “${str(opts.deliveryType)}” geçersiz (1, 2 ya da 3 olmalı; Çiçeksepeti seçeneklerinden düzeltin)`);
+    if (str(opts.deliveryMessageType) === '') missing.push(`teslimat mesaj tipi ${OPT}`);
+    else if (!(Number.isInteger(dm) && dm > 0)) missing.push(`teslimat mesaj tipi “${str(opts.deliveryMessageType)}” geçersiz (pozitif tam sayı olmalı; Çiçeksepeti seçeneklerinden düzeltin)`);
     const item = {
       productName: str(pr.name).slice(0, 255), mainProductCode: str(pr.group || pr.sku), stockCode: str(pr.sku), categoryId: Number(map.remote_id), description,
       deliveryMessageType: dm, deliveryType: dt, stockQuantity: Math.max(0, Math.round(num(pr.stock))), salesPrice: r2(pr.price), listPrice: r2(Math.max(num(pr.listPrice), num(pr.price))),
@@ -239,7 +242,7 @@ export function ciceksepeti(env, meta) {
       try { r = await call('/Products', { method: 'POST', body: { products: part }, tries: 1 }); } finally { lastCreate = Date.now(); }
       const bid = str(r && r.batchId);
       if (!bid) throw new Error('Çiçeksepeti takip numarası (batchId) vermedi: ' + (str(r && (r.message || r.Message)) || JSON.stringify(r).slice(0, 300)));
-      refs.push(bid + ':' + part.map((x) => x.stockCode).join(','));
+      refs.push(bid + ':' + part.map((x) => encodeURIComponent(x.stockCode)).join(',')); // stok kodunda , ; : olabilir
     }
     return { ref: refs.join(';') };
   }
@@ -249,7 +252,7 @@ export function ciceksepeti(env, meta) {
     const items = [];
     let pending = false;
     for (const part of String(ref).split(';').filter(Boolean)) {
-      const i = part.indexOf(':'), bid = i < 0 ? part : part.slice(0, i), keys = i < 0 ? [] : part.slice(i + 1).split(',').filter(Boolean);
+      const i = part.indexOf(':'), bid = i < 0 ? part : part.slice(0, i), keys = i < 0 ? [] : part.slice(i + 1).split(',').filter(Boolean).map((k) => { try { return decodeURIComponent(k); } catch { return k; } });
       const r = (await batch(bid)) || {}, list = r.items || [], seen = new Set();
       for (const it of list) {
         const k = str((it.data || {}).stockCode), st = str(it.status), why = [...new Set(reasons(it.failureReasons))].join(' · ');

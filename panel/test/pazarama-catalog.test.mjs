@@ -159,6 +159,14 @@ test('açıklama temizliği: Word / Office etiketleri silinir, temel biçim ve m
   assert.equal(c, '<p>·Kök gelişimi</p> <ul><li>Toprak</li></ul><p>Türkiye</p><a>a</a><a href="https://h.com/x">b</a><img src="https://h.com/i.jpg">');
   assert.equal(cleanHtml('Düz metin, <b>kalın</b>'), 'Düz metin, <b>kalın</b>');
   assert.equal(cleanHtml(null), '');
+  // Güvenlik ve dayanıklılık: iç içe hile yeni etiket üretmez, HTML olmayan <…> metin kalır, uzun NBSP / boşluk dizisi takılmaz
+  assert.equal(cleanHtml('<p><<x>img src=x onerror=alert(1)></p>'), '<p>&lt;&lt;x&gt;img src=x onerror=alert(1)&gt;</p>');
+  assert.equal(cleanHtml('<svg onload=alert(1)>x'), 'x');
+  assert.equal(cleanHtml('Boy x<y ve z>w'), 'Boy x&lt;y ve z&gt;w');
+  assert.equal(cleanHtml('<script>alert(1)</script><p>a</p>'), '<p>a</p>');
+  const t0 = Date.now();
+  cleanHtml('<p>' + '\u00a0'.repeat(20000) + 'x</p>'); cleanHtml('<p>a</p>' + ' '.repeat(200000) + '<p>b</p>'); cleanHtml('<p>x</p>' + '<a'.repeat(50000));
+  assert.ok(Date.now() - t0 < 1500, 'doğrusal süre');
 });
 
 test('ölçü algılama: karma değer seçilmez, çoklu paket / koli, aynı ölçünün farklı yazımı, set ve seçenekli ürün belirsiz', async () => {
@@ -187,8 +195,13 @@ test('ölçü algılama: karma değer seçilmez, çoklu paket / koli, aynı öl�
   // Renk: "Seçilebilir Renk … Ücretsiz Toprak" adında "Toprak" rengi seçilmez; varyanttaki renk seçilir
   const renk = L(['Siyah', 'Gri', 'Toprak', 'Mavi', 'Beyaz']);
   assert.equal(inferValue(renk, { name: 'UFO Saksı | Seçilebilir Renk, Bitkiye Özel Ücretsiz Toprak' }), null);
-  assert.equal(inferValue(renk, { name: 'UFO Saksı | Seçilebilir Renk', variant_name: 'Gri' }).value, 'Gri');
-  assert.equal(inferValue(renk, { name: 'Line Saksı Koyu Gri' }).value, 'Gri');
+  assert.equal(inferValue(renk, { name: 'UFO Saksı | Seçilebilir Renk', variant_name: 'Gri' }, 'Renk').value, 'Gri');
+  // Renk özelliği yalnız ad içindeki ayraçtan sonraki bölümden: "Kırmızı Biber Tohumu" renk değil
+  assert.equal(inferValue(renk, { name: 'Line Saksı | Koyu Gri' }, 'Renk').value, 'Gri');
+  assert.equal(inferValue(L(['Kırmızı', 'Yeşil']), { name: 'Kırmızı Biber Tohumu', category: 'Tohum > Kırmızı' }, 'Renk'), null);
+  // Paket çarpanı ve aralık belirsiz
+  const kg = L(['1 kg', '4 kg', '5 kg']);
+  for (const n of ['Gübre 5Kgx4', 'Gübre 5 kg × 4', 'Gübre 4-5 Kg']) assert.equal(inferValue(kg, { name: n }), null, n);
   // Set / "+" içeren adda tek değer: kategori de aynısını söylüyorsa seçilir
   const pet = L(['Kedi', 'Köpek']);
   assert.equal(inferValue(pet, { name: 'Tavuklu Pate + Et Parçacıklı (Kısırlaştırılmış Kedi) 400 Gr', category: 'Kedi Ürünleri > Kedi Konserve Maması' }).value, 'Kedi');

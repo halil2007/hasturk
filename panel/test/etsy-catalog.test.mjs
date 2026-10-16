@@ -78,6 +78,9 @@ function fakeEtsy({ currency = 'TRY', hook } = {}) {
     if (m && method === 'PUT') return J({ property_id: +m[2], property_name: 'x', scale_id: null, scale_name: null, value_ids: c.form.value_ids.split(',').map(Number), values: c.form.values.split(',') });
     m = p.match(/^\/listings\/(\d+)\/inventory$/);
     if (m && method === 'PUT') { const b = JSON.parse(opts.body); listings.get(+m[1]).inventory = b; return J({ products: b.products.map((x, i) => ({ product_id: 1 + i, ...x, is_deleted: false })) }); }
+    // getListing (includes=Images): ilan yoksa 404
+    m = p.match(/^\/listings\/(\d+)(\?.*)?$/);
+    if (m && method === 'GET') { const l = listings.get(+m[1]); return l ? J({ ...l, images: l.images }) : J({ error: `Listing ${m[1]} not found` }, 404); }
     m = p.match(/^\/shops\/123\/listings\/(\d+)$/);
     if (m && method === 'PATCH') { const l = listings.get(+m[1]); l.state = c.form.state; return J({ listing_id: l.listing_id, state: l.state }); }
     // İlan listesi (fetchListings): aktif ilanlar envanteriyle
@@ -282,9 +285,16 @@ test('Etsy: gönderim parça parça işlenir (send ilk 3, her sorgu 8); geçici 
     while (!s.done) s = await ch.catalog.status(ref);
     assert.equal(s.items.filter((x) => x.ok === true).length, 13);
     assert.equal([...fake.listings.values()].filter((l) => l.state === 'active').length, 13);
-    // Bitince yükler silinir, sonuç kalır
-    const part = kv.m.get(`up:${ref}:0`);
-    assert.deepEqual(Object.keys(part[0].p), ['key']);
+    // Bitince parça kayıtları (yükler) silinir, sonuç özeti başlıkta kalır
+    assert.equal(kv.m.get(`up:${ref}:0`), null);
+    const head = kv.m.get('up:' + ref);
+    assert.equal(head.parts, 0); assert.equal(head.res.length, 14); assert.deepEqual(Object.keys(head.res[0].p), ['key']);
+    assert.ok(head.res.every((x) => !('p' in x.st)));
+    const again = await ch.catalog.status(ref);
+    assert.equal(again.done, true); assert.equal(again.items.filter((x) => x.ok === true).length, 13);
+    // SKU kayıtları: ilan numarası kalır, ürün bırakılmıştır
+    assert.deepEqual(Object.keys(kv.m.get('sku:SKU-7')).sort(), ['by', 'job', 'listing', 'until']);
+    assert.equal(kv.m.get('sku:SKU-7').job, null); assert.ok(fake.listings.has(+kv.m.get('sku:SKU-7').listing));
     // Kayıt yoksa: sonuç yok, bitti sayılır
     assert.deepEqual(await ch.catalog.status('jbilinmeyen'), { done: true, items: [] });
   } finally { globalThis.fetch = realFetch; }
@@ -308,7 +318,8 @@ test('Etsy: kalıcı ret (görsel yok / yetki) ürünü düşürür; aynı gönd
     globalThis.fetch = fakeEtsy().handler;
     const ch2 = etsy(EENV, { id: 'etsy', kv });
     const { ref: ref2 } = await ch2.catalog.send([]);
-    const head = kv.m.get('up:' + ref2);
+    const { res, ...head } = kv.m.get('up:' + ref2);
+    assert.deepEqual(res, []); // boş gönderim hemen biter
     kv.m.set(`up:${ref2}:0`, [{ p: b2.payload, st: {} }]); kv.m.set('up:' + ref2, { ...head, parts: 1, lock: { tok: 'baska', until: Date.now() + 60e3 } });
     const s2 = await ch2.catalog.status(ref2);
     assert.equal(s2.done, false); assert.equal(s2.items[0].ok, null);
@@ -335,5 +346,142 @@ test('Etsy: mağaza para birimi TL değilse çevrilmemiş (TL) fiyat gönderilme
     assert.equal(b.payload.listing.return_policy_id, undefined);
     b = await ch.catalog.build(prod(1, { variant: 'Mor', currency: 'USD' }), { ...MAP, attrs: { 200: { value: '@variant' } } }, { opts: OPTS, pick: async () => null });
     assert.deepEqual(b.missing, ['Primary color (varyant “Mor” Etsy listesinde yok)']);
+  } finally { globalThis.fetch = realFetch; }
+});
+
+const writes = (fake, from = 0) => fake.calls.filter((x, i) => i >= from && x.url.startsWith(API) && x.method !== 'GET');
+const createsOf = (fake) => fake.calls.filter((x) => x.method === 'POST' && x.url === `${API}/shops/${SHOP}/listings`);
+
+test('Etsy: aynı SKU yeniden gönderilince SKU kaydındaki ilan kullanılır (taslak sürer, yayındaysa dokunulmaz, silinmişse yeniden açılır)', async () => {
+  let reject = true;
+  const fake = fakeEtsy({ hook: (c) => {
+    if (reject && c.method === 'PUT' && /\/listings\/\d+\/inventory$/.test(c.url)) return J({ error: 'The price must be a positive number' }, 400);
+  } });
+  globalThis.fetch = fake.handler;
+  try {
+    const kv = memKv(), ch = etsy(EENV, { id: 'etsy', kv });
+    const b = await ch.catalog.build(prod(1), MAP, { opts: OPTS });
+    // 1. gönderim: envanter reddedilir, taslak kalır; numarası SKU kaydında
+    let s = await ch.catalog.status((await ch.catalog.send([b.payload])).ref);
+    assert.equal(s.items[0].ok, false);
+    assert.match(s.items[0].error, /taslak ilan #\d+ açıldı: düzeltip ürünü yeniden gönderin \(aynı taslak kullanılır\)/);
+    const id1 = createsOf(fake).length && [...fake.listings.keys()][0];
+    assert.equal(kv.m.get('sku:SKU-1').listing, String(id1)); assert.equal(kv.m.get('sku:SKU-1').job, null);
+    assert.equal(fake.listings.get(id1).images.length, 1);
+    // 2. gönderim (düzeltildi): yeni taslak açılmaz, görsel yeniden yüklenmez; özellik, envanter, yayına alma aynı ilanda
+    reject = false;
+    let from = fake.calls.length;
+    s = await ch.catalog.status((await ch.catalog.send([b.payload])).ref);
+    assert.equal(s.items[0].ok, true, JSON.stringify(s.items[0])); assert.equal(s.items[0].status, `Etsy'de yayında (ilan #${id1})`);
+    assert.equal(createsOf(fake).length, 1); assert.equal(fake.listings.size, 1);
+    assert.equal(fake.listings.get(id1).images.length, 1); assert.equal(fake.listings.get(id1).state, 'active');
+    assert.ok(fake.calls.some((x, i) => i >= from && x.method === 'GET' && x.url === `${API}/listings/${id1}?includes=Images`));
+    assert.deepEqual(writes(fake, from).map((x) => `${x.method} ${x.url.slice(API.length).replace(String(id1), 'L').replace(/\/properties\/\d+/, '/properties')}`),
+      ['PUT /shops/123/listings/L/properties', 'PUT /listings/L/inventory', 'PATCH /shops/123/listings/L']);
+    // 3. gönderim: ilan yayında → "zaten var", Etsy'de hiçbir şey değişmez
+    from = fake.calls.length;
+    s = await ch.catalog.status((await ch.catalog.send([b.payload])).ref);
+    assert.equal(s.items[0].ok, true); assert.equal(s.items[0].status, `Etsy'de bu ürünün ilanı zaten var (ilan #${id1})`);
+    assert.equal(writes(fake, from).length, 0);
+    // 4. ilan Etsy'de silinmiş (getListing 404): kayıt düşer, yeni ilan açılır
+    fake.listings.delete(id1);
+    s = await ch.catalog.status((await ch.catalog.send([b.payload])).ref);
+    assert.equal(s.items[0].ok, true);
+    assert.equal(createsOf(fake).length, 2);
+    const id2 = [...fake.listings.keys()][0];
+    assert.notEqual(id2, id1); assert.equal(kv.m.get('sku:SKU-1').listing, String(id2)); assert.equal(fake.listings.get(id2).state, 'active');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('Etsy: aynı SKU başka bir gönderimde işlenirken ikinci gönderim beklemede kalır ("önceki gönderim sürüyor"), ikinci ilan açılmaz', async () => {
+  let hold = true;
+  const fake = fakeEtsy({ hook: (c) => {
+    if (hold && c.method === 'POST' && /\/images$/.test(c.url)) return J({ error: 'Too many requests' }, 429);
+  } });
+  globalThis.fetch = fake.handler;
+  try {
+    const kv = memKv(), ch = etsy(EENV, { id: 'etsy', kv });
+    const b1 = await ch.catalog.build(prod(1), MAP, { opts: OPTS }), b2 = await ch.catalog.build(prod(2), MAP, { opts: OPTS });
+    const { ref: a } = await ch.catalog.send([b1.payload]);
+    let sa = await ch.catalog.status(a);
+    assert.equal(sa.items[0].ok, null); assert.match(sa.items[0].status, /yükleniyor \(ilan #\d+\)/);
+    assert.equal(kv.m.get('sku:SKU-1').job, a);
+    // İkinci gönderim (aynı SKU + başka ürün): SKU-1 beklemede, SKU-2 işlenir
+    hold = false;
+    const { ref: b } = await ch.catalog.send([b1.payload, b2.payload]);
+    let sb = await ch.catalog.status(b);
+    const by = (x) => Object.fromEntries(x.items.map((i) => [i.key, i]));
+    assert.equal(sb.done, false);
+    assert.equal(by(sb)['SKU-1'].ok, null); assert.match(by(sb)['SKU-1'].status, /önceki gönderim sürüyor/);
+    assert.equal(by(sb)['SKU-2'].ok, true);
+    assert.equal(createsOf(fake).filter((x) => x.form.title === 'Gübre 1').length, 1);
+    // İlk gönderim biter → SKU bırakılır; ikinci gönderim ilanı yayında bulur, dokunmaz
+    sa = await ch.catalog.status(a);
+    assert.equal(sa.items[0].ok, true);
+    const from = fake.calls.length;
+    sb = await ch.catalog.status(b);
+    assert.equal(sb.done, true);
+    assert.match(by(sb)['SKU-1'].status, /^Etsy'de bu ürünün ilanı zaten var \(ilan #\d+\)$/);
+    assert.equal(writes(fake, from).length, 0);
+    assert.equal([...fake.listings.values()].filter((l) => l.title === 'Gübre 1').length, 1);
+    // Sahibi süresi dolmuş (iş bırakılmış) kayıt: bekletmez
+    kv.m.set('sku:SKU-2', { ...kv.m.get('sku:SKU-2'), job: 'jeski', by: 'jeski', until: Date.now() - 1 });
+    const sc = await ch.catalog.status((await ch.catalog.send([b2.payload])).ref);
+    assert.equal(sc.items[0].ok, true); assert.match(sc.items[0].status, /zaten var/);
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('Etsy: yarıda kesilen iş (işçi durdu, finally çalışmadı) sürdürülünce yüklenen görsel yeniden yüklenmez', async () => {
+  let release = null;
+  const fake = fakeEtsy({ hook: (c) => {
+    // 2. görselin yükleme isteği hiç dönmez: işçi bu noktada "öldü" sayılır
+    if (c.method === 'POST' && /\/images$/.test(c.url) && c.body.get('image').name === '1b.jpg' && !release) return new Promise((r) => { release = r; });
+  } });
+  globalThis.fetch = fake.handler;
+  try {
+    const kv = memKv(), ch = etsy(EENV, { id: 'etsy', kv });
+    const b = await ch.catalog.build(prod(1, { images: ['https://cdn.ornek.com/1b.jpg', 'https://cdn.ornek.com/1c.jpg'] }), MAP, { opts: OPTS });
+    const zombie = ch.catalog.send([b.payload]);
+    while (!release) await new Promise((r) => realTimeout(r, 5));
+    const ref = [...kv.m.keys()].find((k) => /^up:j[^:]+$/.test(k)).slice(3);
+    // Kaydedilmiş ilerleme: ilan + 1. görsel
+    const st = kv.m.get(`up:${ref}:0`)[0].st;
+    assert.equal(st.img, 1); assert.equal(st.up, 1); assert.ok(st.listing);
+    // Kilit süresi doldu; yeni işçi kaldığı yerden sürer
+    kv.m.set('up:' + ref, { ...kv.m.get('up:' + ref), lock: null });
+    const s = await etsy(EENV, { id: 'etsy', kv }).catalog.status(ref);
+    assert.equal(s.items[0].ok, true, JSON.stringify(s.items[0]));
+    const l = fake.listings.get(+st.listing);
+    assert.deepEqual(l.images.map((x) => x.rank), [1, 2, 3]);
+    assert.equal(fake.calls.filter((x) => x.method === 'POST' && /\/images$/.test(x.url) && x.body.get('image').name === '1.jpg').length, 1);
+    assert.equal(createsOf(fake).length, 1);
+    release(J({ error: 'Service Unavailable' }, 503));
+    await zombie;
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('Etsy: 10 MB üstü görsel indirilmez (Content-Length) ya da akış sınırı aşınca kesilir', async () => {
+  let pulled = 0;
+  const MB = 1024 * 1024;
+  const fake = fakeEtsy({ hook: (c) => {
+    if (c.url === 'https://cdn.ornek.com/buyuk.jpg') return new Response(new Uint8Array(4), { headers: { 'Content-Type': 'image/jpeg', 'Content-Length': String(25 * MB) } });
+    if (c.url === 'https://cdn.ornek.com/akis.jpg') {
+      return new Response(new ReadableStream({ pull(ctl) { pulled++; if (pulled > 100) ctl.close(); else ctl.enqueue(new Uint8Array(MB)); } }), { headers: { 'Content-Type': 'image/jpeg' } });
+    }
+  } });
+  globalThis.fetch = fake.handler;
+  try {
+    const kv = memKv(), ch = etsy(EENV, { id: 'etsy', kv });
+    const b = await ch.catalog.build(prod(1, { image: 'https://cdn.ornek.com/buyuk.jpg', images: ['https://cdn.ornek.com/akis.jpg', 'https://cdn.ornek.com/kucuk.jpg'] }), MAP, { opts: OPTS });
+    const s = await ch.catalog.status((await ch.catalog.send([b.payload])).ref);
+    assert.equal(s.items[0].ok, true);
+    assert.match(s.items[0].status, /görsel 1 indirilemedi \(görsel çok büyük \(10 MB üstü\)\) · görsel 2 indirilemedi \(görsel çok büyük \(10 MB üstü\)\)$/);
+    assert.ok(pulled <= 13, `okunan parça: ${pulled}`);
+    const imgs = fake.calls.filter((x) => x.method === 'POST' && /\/images$/.test(x.url));
+    assert.deepEqual(imgs.map((x) => [x.body.get('image').name, x.body.get('rank')]), [['kucuk.jpg', '1']]);
+    // Yalnız büyük görsel varsa ürün reddedilir
+    const b2 = await ch.catalog.build(prod(2, { image: 'https://cdn.ornek.com/buyuk.jpg' }), MAP, { opts: OPTS });
+    const s2 = await ch.catalog.status((await ch.catalog.send([b2.payload])).ref);
+    assert.equal(s2.items[0].ok, false); assert.match(s2.items[0].error, /^Etsy: görsel yüklenemedi \(görsel 1 indirilemedi \(görsel çok büyük \(10 MB üstü\)\)\)/);
   } finally { globalThis.fetch = realFetch; }
 });

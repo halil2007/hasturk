@@ -216,7 +216,9 @@ export async function firmsView(el) {
     return html`<div class="card"><div class="card-head"><h3>Dış API (stok aktarımı)</h3><span class="pill ${a.on ? 'good' : ''}">${a.on ? 'Açık' : 'Kapalı'}</span></div>
       <div class="muted small" style="margin-bottom:8px">Firmanın kendi sistemi (ERP, site) bu mağazanın ürün ve stoklarını çeker; orada satılanı bildirince stok düşer ve tüm kanallara gider (sipariş panele düşmez). Yalnız bu mağaza. Firma yöneticisi bu ayarı göremez ve değiştiremez.</div>
       ${a.hasKey ? html`<dl class="kv"><dt>Anahtar</dt><dd class="num">${a.hint}</dd><dt>Oluşturma</dt><dd>${a.created_at ? dateTime(a.created_at) : '—'}</dd>
-        <dt>Son erişim</dt><dd>${a.last_at ? html`${ago(a.last_at)}${a.last_ip ? html` <span class="muted tiny">(${a.last_ip})</span>` : ''}` : 'henüz yok'}</dd><dt>Toplam istek</dt><dd>${n(a.calls || 0)}</dd></dl>` : ''}
+        <dt>Son erişim</dt><dd>${a.last_at ? html`${ago(a.last_at)}${a.last_ip ? html` <span class="muted tiny">(${a.last_ip})</span>` : ''}` : 'henüz yok'}</dd><dt>Toplam istek</dt><dd>${n(a.calls || 0)}</dd></dl>
+        <label class="check" style="margin-top:8px"><input type="checkbox" data-x="api-write" ${a.write ? 'checked' : ''}> <span>Bu anahtar satış bildirebilsin (stok düşer)</span></label>
+        <div class="tiny muted">${a.write ? 'Dış sistem satış bildirebilir: bildirilen adet stoktan düşer.' : 'Kapalı: anahtar yalnız stok okur; satış bildirimi reddedilir.'}</div>` : ''}
       <label class="field" style="margin-top:8px"><span>İzin verilen IP adresleri (isteğe bağlı)</span><textarea class="input" rows="2" data-api-ips placeholder="Boş: her yerden · ör. 85.105.10.25, 85.105.10.0/24">${(a.ips || []).join(', ')}</textarea></label>
       <div class="row wrap" style="gap:6px;margin-top:8px">
         ${!a.hasKey ? html`<button class="btn sm primary" data-x="api-enable"><i class="ico ico-key"></i>API erişimini aç</button>`
@@ -292,6 +294,12 @@ export async function firmsView(el) {
       if (k.startsWith('api-')) {
         const act = k.slice(4);
         if (act === 'doc') return apiDoc(t2);
+        if (act === 'write') {
+          const want = x.checked;
+          x.disabled = true;
+          try { await api(`tenants/${slug}/api`, { method: 'POST', body: { action: 'write', write: want } }); await refresh(); await draw2(); toast(want ? 'Satış bildirimi açıldı' : 'Satış bildirimi kapatıldı: anahtar yalnız stok okur'); } catch (y) { x.checked = !want; x.disabled = false; toast(y.message, true); }
+          return;
+        }
         if (act === 'rotate' && !(await confirmBox('Yeni anahtar oluşturulsun mu? Eski anahtar hemen geçersiz olur; firmanın dış sistemine yenisini girmeniz gerekir.', 'Yeni anahtar'))) return;
         if (act === 'disable' && !(await confirmBox(`${t2.name} için dış API erişimi kapatılsın mı? Dış sistem stokları okuyamaz (anahtar saklanır, yeniden açılabilir).`, 'Kapat'))) return;
         busy(x, async () => {

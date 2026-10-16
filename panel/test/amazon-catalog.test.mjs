@@ -109,7 +109,7 @@ function fakeApi({ put = () => null, get = () => null, realFetch } = {}) {
     const it = /\/listings\/2021-08-01\/items\/A1SELLER\/([^?]+)\?/.exec(u);
     if (it) {
       const sku = decodeURIComponent(it[1]);
-      const out = method === 'GET' ? get(sku, c) : put(sku, JSON.parse(opts.body), c);
+      const out = await (method === 'GET' ? get(sku, c) : put(sku, JSON.parse(opts.body), c));
       if (out && out.status && 'body' in out) return J(out.body, out.status);
       return out ? J(out) : J({ errors: [{ code: 'NOT_FOUND', message: `SKU '${sku}' not found in marketplace ${MP}` }] }, 404);
     }
@@ -120,6 +120,8 @@ function fakeApi({ put = () => null, get = () => null, realFetch } = {}) {
   };
   return calls;
 }
+// Gönderim öncesi var-yok sorgusu (includedData=summaries) / izleme sorgusu (summaries,issues)
+const pre = (c) => /includedData=summaries$/.test(c.url), poll = (c) => /includedData=summaries,issues$/.test(c.url);
 const accepted = (sku) => ({ sku, status: 'ACCEPTED', submissionId: 'f1dc2914-75dd-11ea-bc55-0242ac130003', issues: [] });
 // Model sandbox örneği (VALIDATION_INVALID) biçiminde ret
 const invalid = (sku) => ({ sku, status: 'INVALID', submissionId: 'a1c562c2-1695-11ee-be56-0242ac120002', identifiers: [], issues: [
@@ -150,7 +152,8 @@ test('Amazon ürün yükleme (uçtan uca): ürün tipi, şema, eşleştirme, eks
   const calls = fakeApi({
     realFetch,
     put: (sku) => (sku === 'SOL-20' ? invalid(sku) : accepted(sku)),
-    get: (sku) => {
+    get: (sku, c) => {
+      if (pre(c)) return null; // Amazon'da henüz yok
       if (sku === 'SOL-5') return polls++ ? { sku, summaries: [{ marketplaceId: MP, asin: 'B0TEST0005', productType: 'FERTILIZER', conditionType: 'new_new', status: ['BUYABLE', 'DISCOVERABLE'],
         itemName: 'Solucan Gübresi 5 Kg', createdDate: '2026-10-16T10:00:00Z', lastUpdatedDate: '2026-10-16T10:01:00Z' }], issues: [] } : null;
       // İşleme sonrası (asenkron) sorun: Issues Troubleshooting 100980
@@ -229,9 +232,12 @@ test('Amazon ürün yükleme (uçtan uca): ürün tipi, şema, eşleştirme, eks
       manufacturer: [{ value: 'HasTürk Tarım', ...tr }], batteries_required: [{ value: false, ...m }] } });
     assert.deepEqual(JSON.parse(puts.find((c) => /SOL-10\?/.test(c.url)).body).attributes.externally_assigned_product_identifier, [{ type: 'upc', value: '869000000002', ...m }]);
     assert.deepEqual(JSON.parse(puts.find((c) => /SOL-20\?/.test(c.url)).body).attributes.externally_assigned_product_identifier, [{ type: 'gtin', value: '86900000000033', ...m }]);
-    // Sonuçlar kanal deposunda
-    const kept = await getRaw(db, 'kv:amazon:uploads');
-    assert.equal(kept[up.ref.slice(4)].items['SOL-20'].s, 'I');
+    // Gönderim öncesi her SKU Amazon'da sorulur (yoksa gönderilir)
+    assert.deepEqual(calls.filter((c) => c.method === 'GET' && pre(c)).map((c) => new URL(c.url).pathname.split('/').pop()).sort(), ['SOL-10', 'SOL-20', 'SOL-5']);
+    // Sonuçlar kanal deposunda, gönderim başına ayrı kayıt
+    const kept = await getRaw(db, 'kv:amazon:up:' + up.ref.slice(4));
+    assert.equal(kept.items['SOL-20'].s, 'I');
+    assert.equal(await getRaw(db, 'kv:amazon:uploads'), null, 'eski tek kayıt yazılmaz');
 
     // 1. sorgu: SOL-20 ret (yalnız ERROR sorunları), SOL-10 işleme sonrası ret, SOL-5 henüz oluşmadı (404) → bitmedi
     let ck = await call(`catalog/uploads/${up.id}/check`, { method: 'POST' });
@@ -240,7 +246,7 @@ test('Amazon ürün yükleme (uçtan uca): ürün tipi, şema, eşleştirme, eks
     assert.equal(r['SOL-20'].ok, false); assert.equal(r['SOL-20'].error, "'condition_type' is required but not supplied.");
     assert.equal(r['SOL-10'].ok, false); assert.match(r['SOL-10'].error, /barcode is already associated/); assert.match(r['SOL-10'].status, /işlerken sorun/);
     assert.equal(r['SOL-5'].ok, null); assert.match(r['SOL-5'].status, /işliyor/);
-    const gets = calls.filter((c) => c.method === 'GET' && /items\/A1SELLER\/SOL/.test(c.url));
+    const gets = calls.filter((c) => c.method === 'GET' && poll(c));
     assert.ok(gets.some((c) => c.url === `${API}/listings/2021-08-01/items/A1SELLER/SOL-10?marketplaceIds=${MP}&includedData=summaries,issues`));
     assert.equal(gets.length, 2, 'reddedilen (INVALID) SKU sorgulanmaz ' + gets.map((c) => c.url).join(' '));
     // 2. sorgu: SOL-5 oluştu (ASIN); sonuçlanmış SKU'lar yeniden sorulmaz
@@ -316,12 +322,12 @@ test('Amazon build: birimli / iç içe zorunlu özellik eksik, satıcıya özel 
   } finally { globalThis.fetch = real; delete SCHEMAS.NO_LANG; }
 });
 
-test('Amazon gönderim: hız sınırı (≥250 ms), kısmi hata, tümü başarısız, istek sınırı, izleme parçası (40 SKU)', async () => {
+test('Amazon gönderim: hız sınırı (≥250 ms), kısmi hata, tümü başarısız, istek sınırı, izleme parçası (40 SKU), kayıp kayıt', async () => {
   const real = globalThis.fetch;
   try {
     const kv = memKv();
     const P = (sku) => ({ sku, productType: 'FERTILIZER', attributes: { item_name: [{ value: sku, language_tag: 'tr_TR', marketplace_id: MP }] } });
-    // Hız sınırı: istekler arası en az 250 ms (5 istek/sn)
+    // Hız sınırı: aynı türden istekler arası en az 250 ms (getListingsItem ve putListingsItem 5 istek/sn)
     slow();
     let calls = fakeApi({ put: (sku) => accepted(sku) });
     let ch = amazon(AENV, { id: 'amazon', kv });
@@ -329,6 +335,8 @@ test('Amazon gönderim: hız sınırı (≥250 ms), kısmi hata, tümü başarı
     await ch.catalog.send([P('A'), P('B'), P('C')]);
     assert.ok(Date.now() - t0 >= 480, `${Date.now() - t0} ms`);
     fast();
+    const at = (m) => calls.filter((c) => c.method === m && /items\/A1SELLER\//.test(c.url)).map((c) => c.t);
+    assert.equal(at('GET').length, 3); assert.equal(at('PUT').length, 3);
     // Kısmi hata: 400 ErrorList ürün bazında kaydedilir, diğerleri gider
     calls = fakeApi({ put: (sku) => (sku === 'B' ? { status: 400, body: { errors: [{ code: 'InvalidInput', message: 'Request has missing or invalid parameters and cannot be parsed.', details: 'productType' }] } } : accepted(sku)) });
     ch = amazon(AENV, { id: 'amazon', kv });
@@ -337,32 +345,139 @@ test('Amazon gönderim: hız sınırı (≥250 ms), kısmi hata, tümü başarı
     const r = Object.fromEntries(st.items.map((x) => [x.key, x]));
     assert.equal(r.B.ok, false); assert.equal(r.B.status, 'Gönderilemedi'); assert.equal(r.B.error, 'Request has missing or invalid parameters and cannot be parsed. productType');
     assert.equal(r.A.ok, null); assert.equal(st.done, false);
-    assert.deepEqual(await ch.catalog.raw(ref), (await kv.get('uploads'))[ref.slice(4)]);
+    assert.deepEqual(await ch.catalog.raw(ref), await kv.get('up:' + ref.slice(4)));
     // Kabul edilen SKU'nun ürün tipi sonraki stok / fiyat güncellemesinde kullanılır
     await ch.pushStock([{ remoteId: 'A', stock: 2 }]);
     assert.equal(JSON.parse(calls.filter((c) => c.method === 'PATCH').at(-1).body).productType, 'FERTILIZER');
     // Tümü başarısız (yetki): gönderim hatası
-    fakeApi({ put: () => ({ status: 403, body: { errors: [{ code: 'Unauthorized', message: 'Access to requested resource is denied.', details: '' }] } }) });
+    fakeApi({ get: () => ({ status: 403, body: { errors: [{ code: 'Unauthorized', message: 'Access to requested resource is denied.', details: '' }] } }) });
     await assert.rejects(amazon(AENV, { id: 'amazon', kv }).catalog.send([P('A'), P('B')]), /Access to requested resource is denied/);
-    // İstek sınırı gönderimin ortasında dolarsa gidenlerin takibi korunur, kalanlar "gönderilmedi"
+    // İstek sınırı gönderimin ortasında dolarsa gidenlerin takibi korunur, kalanlar "gönderilmedi" (belirteç + SKU başına sorgu + gönderim)
     calls = fakeApi({ put: (sku) => accepted(sku) });
     ch = amazon(AENV, { id: 'amazon', kv });
-    const part = await withBudget(3, () => ch.catalog.send([P('A'), P('B'), P('C'), P('D')]));
+    const part = await withBudget(5, () => ch.catalog.send([P('A'), P('B'), P('C'), P('D')]));
     st = await ch.catalog.raw(part.ref);
     assert.deepEqual(Object.values(st.items).map((x) => x.s), ['A', 'A', 'E', 'E']);
     // Hiç istek gidemeden sınır dolarsa sınır hatası olduğu gibi iletilir (sonraki senkronda yeniden)
     await assert.rejects(withBudget(0, () => amazon(AENV, { id: 'amazon', kv }).catalog.send([P('A')])), (e) => e.budget === true);
     // İzleme: sorgu başına en çok 40 SKU
     let gets = 0;
-    fakeApi({ put: (sku) => accepted(sku), get: (sku) => { gets++; return { sku, summaries: [{ marketplaceId: MP, asin: 'B0' + sku, status: ['DISCOVERABLE'] }], issues: [] }; } });
-    ch = amazon(AENV, { id: 'amazon', kv: memKv() });
+    fakeApi({ put: (sku) => accepted(sku), get: (sku, c) => { if (pre(c)) return null; gets++; return { sku, summaries: [{ marketplaceId: MP, asin: 'B0' + sku, status: ['DISCOVERABLE'] }], issues: [] }; } });
+    const kv2 = memKv();
+    ch = amazon(AENV, { id: 'amazon', kv: kv2 });
     const many = await ch.catalog.send(Array.from({ length: 45 }, (_, i) => P('S' + i)));
     st = await ch.catalog.status(many.ref);
     assert.equal(gets, 40); assert.equal(st.done, false); assert.equal(st.items.filter((x) => x.ok === true).length, 40);
     assert.equal(st.items[0].status, "Amazon'da oluşturuldu · ASIN B0S0");
     st = await ch.catalog.status(many.ref);
     assert.equal(gets, 45); assert.equal(st.done, true);
-    // Kaydı bulunmayan (süresi geçmiş) gönderim
-    assert.deepEqual(await ch.catalog.status('amz:yok'), { done: true, items: [] });
+    // Sonuçlanan gönderimin kaydı küçültülür (gönderim kimliği / sorgu zamanı atılır)
+    const fin = await kv2.get('up:' + many.ref.slice(4));
+    assert.equal(fin.done, true); assert.deepEqual(fin.items.S0, { s: 'L', asin: 'B0S0' });
+    // Sonuçlanmış kayıt yeniden sorgulanmaz
+    st = await ch.catalog.status(many.ref);
+    assert.equal(gets, 45); assert.equal(st.done, true);
+    // Kaydı bulunmayan gönderim: "işleniyor" kalmaz; ürün anahtarları verilirse her biri için açık hata
+    const LOST = "Amazon gönderim kaydı bulunamadı; Amazon Seller Central'dan kontrol edin";
+    st = await ch.catalog.status('amz:yok');
+    assert.equal(st.done, true); assert.equal(st.error, LOST); assert.deepEqual(st.items, []);
+    st = await ch.catalog.status('amz:yok', ['S1', 'S2']);
+    assert.deepEqual(st, { done: true, error: LOST, items: ['S1', 'S2'].map((key) => ({ key, ok: false, status: 'Gönderim kaydı bulunamadı', error: LOST })) });
   } finally { globalThis.fetch = real; fast(); }
+});
+
+const P = (sku) => ({ sku, productType: 'FERTILIZER', attributes: { item_name: [{ value: sku, language_tag: 'tr_TR', marketplace_id: MP }] } });
+
+test('Amazon gönderim: Amazon\'da var olan SKU değiştirilmez (getListingsItem 200 → PUT yok), sorgu hatasında gönderilmez', async () => {
+  const real = globalThis.fetch;
+  try {
+    const kv = memKv();
+    const calls = fakeApi({
+      put: (sku) => accepted(sku),
+      get: (sku, c) => {
+        if (sku === 'OLD') return { sku, summaries: [{ marketplaceId: MP, asin: 'B0OLD00001', productType: 'PLANT_SEED', status: ['BUYABLE'], itemName: 'Eski ilan' }] };
+        if (sku === 'ERR' && pre(c)) return { status: 500, body: { errors: [{ code: 'InternalFailure', message: 'We encountered an internal error. Please try again.', details: '' }] } };
+        return null;
+      },
+    });
+    const ch = amazon(AENV, { id: 'amazon', kv });
+    const { ref } = await ch.catalog.send([P('OLD'), P('NEW'), P('ERR')]);
+    const puts = calls.filter((c) => c.method === 'PUT').map((c) => new URL(c.url).pathname.split('/').pop());
+    assert.deepEqual(puts, ['NEW'], 'var olan ilan ve var-yok sorgusu başarısız olan SKU gönderilmez');
+    const pre1 = calls.find((c) => c.method === 'GET' && /OLD\?/.test(c.url));
+    assert.equal(pre1.url, `${API}/listings/2021-08-01/items/A1SELLER/OLD?marketplaceIds=${MP}&includedData=summaries`);
+    const st = await ch.catalog.status(ref);
+    const r = Object.fromEntries(st.items.map((x) => [x.key, x]));
+    assert.deepEqual(r.OLD, { key: 'OLD', ok: true, status: "Amazon'da bu SKU ile ilan zaten var (değiştirilmedi)", error: '' });
+    assert.equal(r.ERR.ok, false); assert.match(r.ERR.error, /internal error/);
+    assert.equal(r.NEW.ok, null);
+    // Var olan ilanın ürün tipi stok / fiyat güncellemesinde kullanılır; izlemede yeniden sorulmaz
+    assert.equal(calls.filter((c) => c.method === 'GET' && poll(c) && /OLD\?/.test(c.url)).length, 0);
+    await ch.pushPrice([{ remoteId: 'OLD', price: 10 }]);
+    assert.equal(JSON.parse(calls.filter((c) => c.method === 'PATCH').at(-1).body).productType, 'PLANT_SEED');
+  } finally { globalThis.fetch = real; }
+});
+
+test('Amazon gönderim: eşzamanlı uzun sorgu ve yeni gönderim birbirinin kaydını ezmez; ara kayıt; sıralı sorgu; saklama', async () => {
+  const real = globalThis.fetch;
+  try {
+    const kv = memKv();
+    let hold = null, release;
+    fakeApi({ put: (sku) => accepted(sku), get: async (sku, c) => { if (!pre(c) && hold) { const h = hold; hold = null; await h; } return null; } });
+    const ch1 = amazon(AENV, { id: 'amazon', kv }), ch2 = amazon(AENV, { id: 'amazon', kv });
+    const u1 = await ch1.catalog.send([P('A1'), P('A2')]);
+    // u1'in sorgusu sürerken (ilk istek bekletilir) başka bağlantıdan yeni gönderim yapılır
+    hold = new Promise((ok) => { release = ok; });
+    const q = ch1.catalog.status(u1.ref);
+    await new Promise((ok) => realTimeout(ok, 5));
+    const u2 = await ch2.catalog.send([P('B1')]);
+    release();
+    assert.equal((await q).done, false);
+    assert.deepEqual(Object.keys((await kv.get('up:' + u2.ref.slice(4))).items), ['B1'], 'yeni gönderimin kaydı korunur');
+    assert.deepEqual(Object.keys((await kv.get('up:' + u1.ref.slice(4))).items), ['A1', 'A2']);
+    assert.deepEqual(Object.keys(await kv.get('upidx')).sort(), [u1.ref.slice(4), u2.ref.slice(4)].sort());
+
+    // Ara kayıt: her 10 üründe bir; takip kimliği gönderimin başında belli (istek yarıda kesilse de gidenler kayıtlı)
+    let snap = null;
+    const kv3 = memKv();
+    fakeApi({ put: (sku) => { if (sku === 'S20') snap = [...kv3.m].filter(([k]) => k.startsWith('up:')).map(([, v]) => structuredClone(v)); return accepted(sku); } });
+    const big = await amazon(AENV, { id: 'amazon', kv: kv3 }).catalog.send(Array.from({ length: 25 }, (_, i) => P('S' + i)));
+    assert.equal(snap.length, 1); assert.equal(snap[0].open, true);
+    assert.deepEqual(Object.keys(snap[0].items), Array.from({ length: 20 }, (_, i) => 'S' + i));
+    const done = await kv3.get('up:' + big.ref.slice(4));
+    assert.equal(done.open, undefined); assert.equal(Object.keys(done.items).length, 25);
+
+    // Sıralı sorgu: 404'te kalanlar sonrakilerin önünü tıkamaz (en eski sorgulanan önce)
+    const asked = [];
+    fakeApi({ put: (sku) => accepted(sku), get: (sku, c) => { if (pre(c)) return null; asked.push(sku); return sku === 'S41' ? { sku, summaries: [{ marketplaceId: MP, asin: 'B0S41' }], issues: [] } : null; } });
+    const ch = amazon(AENV, { id: 'amazon', kv: memKv() });
+    const many = await ch.catalog.send(Array.from({ length: 45 }, (_, i) => P('S' + i)));
+    let st = await ch.catalog.status(many.ref);
+    assert.deepEqual(asked, Array.from({ length: 40 }, (_, i) => 'S' + i));
+    asked.length = 0;
+    st = await ch.catalog.status(many.ref);
+    assert.deepEqual(asked, [...['S40', 'S41', 'S42', 'S43', 'S44'], ...Array.from({ length: 35 }, (_, i) => 'S' + i)]);
+    assert.equal(st.items.find((x) => x.key === 'S41').ok, true); assert.equal(st.done, false);
+    asked.length = 0;
+    await ch.catalog.status(many.ref);
+    assert.deepEqual(asked.slice(0, 5), ['S35', 'S36', 'S37', 'S38', 'S39']);
+    assert.ok(!asked.includes('S41'));
+
+    // Saklama: 30 günü geçen kayıt boşaltılır, 14 günlük kayıt korunur; eski tek kayıt ("uploads") okunur
+    const kv4 = memKv(), now = Date.now();
+    kv4.m.set('upidx', { eski: now - 31 * 864e5, yeni: now - 14 * 864e5 });
+    kv4.m.set('up:eski', { at: now - 31 * 864e5, items: { X: { s: 'L' } } });
+    kv4.m.set('up:yeni', { at: now - 14 * 864e5, items: { Y: { s: 'A' } } });
+    kv4.m.set('uploads', { leg: { at: now - 2 * 864e5, items: { Z: { s: 'A' } } } });
+    fakeApi({ put: (sku) => accepted(sku), get: (sku, c) => (pre(c) ? null : { sku, summaries: [{ marketplaceId: MP, asin: 'B0' + sku }], issues: [] }) });
+    const c4 = amazon(AENV, { id: 'amazon', kv: kv4 });
+    await c4.catalog.send([P('N1')]);
+    assert.equal(await kv4.get('up:eski'), null);
+    assert.deepEqual(Object.keys(await kv4.get('upidx')).filter((k) => k !== 'yeni').length, 1);
+    assert.equal((await c4.catalog.status('amz:yeni')).done, true);
+    st = await c4.catalog.status('amz:leg');
+    assert.deepEqual(st.items.map((x) => [x.key, x.ok]), [['Z', true]]);
+    assert.equal((await kv4.get('up:leg')).done, true, 'eski kayıttaki gönderimin sonucu yeni biçimde yazılır');
+    assert.ok((await kv4.get('uploads')).leg, 'eski tek kayıt değiştirilmez');
+  } finally { globalThis.fetch = real; }
 });

@@ -148,7 +148,9 @@ test('Koçtaş ürün yükleme: kategori / özellik / değer, eksik kontrolü, k
     assert.ok(by['MAT-2'].missing.includes('Koçtaş ürün şablonu: barkod özellik kodu'));
     assert.ok(by['MAT-X'].missing.includes('barkod'));
     const p31 = M.calls.find((c) => c.path === '/products');
-    assert.equal(p31.q.get('product_references'), 'EAN|8690001');
+    // Barkodlar kategori başına bir kez, toplu (prepare) sorgulanır: ürün başına ayrı istek yok
+    assert.deepEqual(p31.q.get('product_references').split(',').sort(), ['EAN|8690001', 'EAN|8690002', 'EAN|8690003', 'EAN|8690004', 'EAN|8690005']);
+    assert.equal(M.calls.filter((c) => c.path === '/products').length, 1);
     assert.equal(p31.headers.Authorization, 'mk-1');
 
     await call('catalog/options', { method: 'POST', body: JSON.stringify({ channel: 'koctas', opts: { attrCategory: 'category', attrTitle: 'title', attrEan: 'ean', attrSku: 'shop_sku', attrDesc: 'description', attrBrand: 'brand' } }) });
@@ -206,7 +208,8 @@ test('Koçtaş ürün yükleme: kategori / özellik / değer, eksik kontrolü, k
     assert.equal(ck.done, false);
     const of24b = M.calls.filter((c) => c.method === 'POST' && c.path === '/offers');
     assert.equal(of24b.length, 2);
-    assert.deepEqual(JSON.parse(of24b[1].body).offers, [{ shop_sku: 'MAT-2', price: 120, quantity: 7, state_code: '11', update_delete: 'update', discount: { price: 100 }, product_id: 'MKP2', product_id_type: 'SKU' }]);
+    // Onaydan sonra açılan teklif stok 0 ile (gerçek stok panelin stok gönderimiyle yazılır); fiyat gönderim anının
+    assert.deepEqual(JSON.parse(of24b[1].body).offers, [{ shop_sku: 'MAT-2', price: 120, quantity: 0, state_code: '11', update_delete: 'update', discount: { price: 100 }, product_id: 'MKP2', product_id_type: 'SKU' }]);
     assert.equal(r['MAT-2'].ok, null); assert.match(r['MAT-2'].status, /teklifi işliyor/);
     assert.equal(r['MAT-3'].ok, false);
 
@@ -215,7 +218,7 @@ test('Koçtaş ürün yükleme: kategori / özellik / değer, eksik kontrolü, k
     ck = await call(`catalog/uploads/${up.id}/check`, { method: 'POST' });
     r = Object.fromEntries(ck.items.map((x) => [x.key, x]));
     assert.equal(ck.done, true);
-    assert.equal(r['MAT-2'].ok, true); assert.match(r['MAT-2'].status, /Teklif açıldı/);
+    assert.equal(r['MAT-2'].ok, true); assert.match(r['MAT-2'].status, /Teklif açıldı.*stok panelin stok gönderimiyle yazılır/);
     assert.equal(M.calls.filter((c) => c.method === 'POST' && c.path === '/offers').length, 2);
     await Promise.all(jobs);
 
@@ -310,5 +313,84 @@ test('Teknosa: varsayılan Mirakl adresiyle katalogda olan ürüne teklif; rapor
     assert.deepEqual(parseCsv('a,b\n"x\ny","z ""q"""\n'), [['a', 'b'], ['x\ny', 'z "q"']]);
     const m = reportErrors('"sku";"title";"problem"\n"T-1";"Ad";"Görsel indirilemedi"\n"T-9";"";"başka"\n', (v) => (v === 'T-1' ? v : ''), ['sku', 'title']);
     assert.deepEqual([...m], [['T-1', ['Görsel indirilemedi']]]);
+  } finally { globalThis.fetch = real; }
+});
+
+test('Mirakl: P41 / OF24 tekrar denenmez (zaman aşımında anlaşılır uyarı), prepare toplu P31, OF21 tek okuma, stok 0 teklif + stok gönderimi fiyatı korur, kv kaydı küçülür', async () => {
+  const S = { catalog: {}, offers: {}, nextOffer: 500, p41Id: 600, p42: {}, p47: {}, p44: {}, of02: {}, of03: {} };
+  const M = mirakl(BASE, S), real = globalThis.fetch;
+  let p41Down = true, of24Down = true;
+  globalThis.fetch = async (url, o = {}) => {
+    const p = new URL(String(url)).pathname;
+    if (o.method === 'POST' && p === '/api/products/imports' && p41Down) { M.calls.push({ path: '/products/imports', method: 'POST' }); throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }); }
+    if (o.method === 'POST' && p === '/api/offers' && of24Down) { M.calls.push({ path: '/offers', method: 'POST' }); return new Response('{"message":"Bad gateway"}', { status: 502, headers: { 'Content-Type': 'application/json' } }); }
+    return M.fn(url, o);
+  };
+  const count = (m, path, f = () => true) => M.calls.filter((c) => c.method === m && c.path === path && f(c)).length;
+  try {
+    const kv = new Map(), meta = { id: 'koctas', kv: { get: async (k) => kv.get(k) ?? null, set: async (k, v) => { kv.set(k, v); } } };
+    const make = () => koctas({ KOCTAS_URL: 'https://koctas-prod.mirakl.net', KOCTAS_API_KEY: 'k' }, meta);
+    const opts = { attrCategory: 'category', attrTitle: 'title', attrEan: 'ean', attrSku: 'shop_sku', attrBrand: 'brand', eanType: 'EAN', offerState: '11' };
+    const map = { remote_id: 'MATKAP', attrs: { color: { id: 'RED', value: 'Kırmızı' }, material: { id: 'MET', value: 'Metal' }, main_image: { value: '@image' } } };
+    const pr = (sku, barcode, stock = 7) => ({ sku, barcode, name: 'Matkap ' + sku, brand: 'Makita', description: 'x', image: 'https://cdn/x.jpg', images: ['https://cdn/x.jpg'], price: 100, listPrice: 120, stock, group: 'G', variant: '' });
+
+    // prepare: 150 barkod → 2 P31 isteği (100'lük); build önbellekten, yeniden sormaz
+    let ch = make();
+    const prs = Array.from({ length: 150 }, (_, i) => pr('S-' + i, String(8691000 + i)));
+    S.catalog[String(8691000 + 3)] = 'MKP-3';
+    await ch.catalog.prepare(prs, { opts });
+    assert.equal(count('GET', '/products'), 2);
+    assert.equal(M.calls.filter((c) => c.path === '/products')[0].q.get('product_references').split(',').length, 100);
+    const built = [];
+    for (const x of prs.slice(0, 30)) built.push(await ch.catalog.build(x, map, { opts }));
+    assert.equal(count('GET', '/products'), 2, 'build önbellekteki sonucu kullanır');
+    assert.equal(built[3].payload.mode, 'offer'); assert.equal(built[0].payload.mode, 'product');
+    // opts verilmeden: build'in kaydettiği kimlik türüyle
+    await make().catalog.prepare([pr('Y-1', '8699999')]);
+    assert.equal(M.calls.filter((c) => c.path === '/products').at(-1).q.get('product_references'), 'EAN|8699999');
+
+    // OF21: 20'den fazla SKU'da tüm liste bir kez okunur; aynı nesnede yeniden okunmaz
+    const offers = built.filter((b) => b.payload.mode === 'product').slice(0, 25).map((b) => ({ ...b.payload, mode: 'offer', offer: { ...b.payload.offer, product_id: 'P', product_id_type: 'SKU' } }));
+    of24Down = true;
+    await assert.rejects(ch.catalog.send(offers), /HTTP 502/);
+    assert.equal(count('POST', '/offers'), 1, 'OF24 tekrar denenmez');
+    await assert.rejects(ch.catalog.send(offers), /HTTP 502/);
+    assert.equal(count('GET', '/offers', (c) => !c.q.get('sku') && c.q.get('max') === '100' && c.q.get('offset') === '0'), 1, 'tüm liste bir kez');
+
+    // P41 zaman aşımı: tek deneme; kullanıcıya dosyanın gitmiş olabileceği söylenir
+    of24Down = false;
+    const prod = built.find((b) => b.payload.mode === 'product').payload;
+    await assert.rejects(ch.catalog.send([prod]), (e) => /dosya gitmiş olabilir; 15 dakika sonra Koçtaş panelinde içe aktarmaları kontrol edin, sonra yeniden gönderin/.test(e.message) && /zaman aşımı/.test(e.message));
+    assert.equal(count('POST', '/products/imports'), 1, 'P41 tekrar denenmez');
+    await assert.rejects(ch.catalog.send([prod]), /15 dakikada bir/);
+
+    // Onaydan sonra teklif stok 0 ile; sonuç kesinleşince kv kaydı küçülür, sonraki sorgu Mirakl'a gitmez
+    kv.delete('p41at'); p41Down = false;
+    ch = make();
+    const s = await ch.catalog.send([prod]);
+    assert.equal(s.ref, `P600:${prod.key}`);
+    assert.ok(kv.get('p41:600').items.length === 1 && kv.get('p41:600').head.length);
+    S.p42['600'] = p42(600, { import_status: 'COMPLETE' });
+    S.catalog[prod.barcode] = 'MKP-NEW';
+    let st = await ch.catalog.status(s.ref);
+    assert.equal(st.done, false);
+    const of24 = M.calls.filter((c) => c.method === 'POST' && c.path === '/offers' && c.body).at(-1);
+    assert.deepEqual(JSON.parse(of24.body).offers, [{ ...prod.offer, quantity: 0, product_id: 'MKP-NEW', product_id_type: 'SKU' }]);
+    assert.equal(prod.offer.quantity, 7);
+    S.of02[String(S.nextOffer - 1)] = of02(S.nextOffer - 1);
+    st = await ch.catalog.status(s.ref);
+    assert.deepEqual(st, { done: true, items: [{ key: prod.key, ok: true, status: 'Teklif açıldı (Koçtaş); stok panelin stok gönderimiyle yazılır', error: '' }] });
+    assert.deepEqual(kv.get('p41:600'), { at: kv.get('p41:600').at, done: true, r: [[prod.key, true, 'Teklif açıldı (Koçtaş); stok panelin stok gönderimiyle yazılır', '']] });
+    const n = M.calls.length;
+    assert.deepEqual(await make().catalog.status(s.ref), st);
+    assert.equal(M.calls.length, n, 'kesinleşmiş sonuç Mirakl\'a sorulmaz');
+
+    // Stok gönderimi: yeni teklifin fiyatı / indirimi (OF21) korunur, yalnız miktar yazılır
+    S.offers[prod.key] = { shop_sku: prod.key, product_sku: 'MKP-NEW', price: 100, origin_price: 120, discount: { origin_price: 120, discount_price: 100 }, quantity: 0, state_code: '11',
+      product_references: [{ reference_type: 'EAN', reference: prod.barcode }] };
+    const res = await make().pushStock([{ remoteId: prod.key, sku: prod.key, stock: 7 }]);
+    assert.deepEqual(res.done, [prod.key]);
+    const push = M.calls.filter((c) => c.method === 'POST' && c.path === '/offers' && c.body).at(-1);
+    assert.deepEqual(JSON.parse(push.body).offers, [{ shop_sku: prod.key, product_id: 'MKP-NEW', product_id_type: 'SKU', price: 120, quantity: 7, state_code: '11', update_delete: 'update', discount: { price: 100 } }]);
   } finally { globalThis.fetch = real; }
 });

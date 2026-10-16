@@ -810,7 +810,9 @@ export async function settlementReport(env, db, settings, q = {}) {
       const hasComm0 = recs.some((r) => r.type === 'Komisyon' || Math.abs(Number(r.commission) || 0) >= 0.01);
       // Pazaryerinin bu siparişteki gerçek oranı (kesilen komisyon / satış) siparişin panel tutarına uygulanır: kupon, kısmi iade gibi
       // satış farkları doğru tutarla (komisyonu düşülmüş) görünür
-      const byMp = p0.commissionSrc !== 'api' && hasComm0 && sales > 0;
+      // Oran makul aralıkta değilse (kısmi iadede komisyon iadesi geç gelmiş: oran %60'ı aşar ya da eksi) panel tahminine dönülür:
+      // uç oran beklenen tutarı orantılı çekip gerçek komisyon farkını gizlerdi
+      const byMp = p0.commissionSrc !== 'api' && hasComm0 && sales > 0 && comm / sales >= 0 && comm / sales <= 0.6;
       const mpRate = byMp ? comm / sales : 0, mpComm = r2(p0.revenue * mpRate);
       const cr = byMp ? null : cr0;
       const p = byMp ? { ...p0, commission: mpComm, commissionSrc: 'marketplace', commCredit: 0, payout: r2(p0.revenue - mpComm) } : p0;

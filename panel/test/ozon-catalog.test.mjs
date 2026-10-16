@@ -233,7 +233,7 @@ test('Ozon build: marka bulunamadı, zorunlu özellik / varyant eksik, KDV ve pa
     assert.deepEqual(b.payload.attributes[0], { id: 85, complex_id: 0, values: [{ dictionary_value_id: 555, value: 'HasTürk' }] });
     assert.ok(!m.calls.slice(before).some((c) => /search/.test(c.path)));
     b = await ch.catalog.build(PR(5, { variant: '' }), { remote_id: CAT, attrs: { 23171: { value: '@variant' } } }, { opts: { vat: '1', currency: 'TRY' }, pick });
-    assert.deepEqual(b.missing, ['Üretici ülke', 'Ağırlık (ürünün varyantı yok; kategori eşleştirmesinde değer seçin)', 'KDV oranı (Ürün yükle → Ozon seçenekleri)', 'para birimi (Ürün yükle → Ozon seçenekleri)']);
+    assert.deepEqual(b.missing, ['Üretici ülke', 'Ağırlık (ürünün varyantı yok; kategori eşleştirmesinde değer seçin)', 'KDV oranı “1” geçersiz (0, 5, 7, 10, 20 ya da 22; Ozon seçeneklerinden düzeltin)', 'para birimi “TRY” geçersiz (RUB, EUR, USD, CNY; Ozon seçeneklerinden düzeltin)']);
     // Listede olmayan yazılı değer (liste özelliği kimlik ister)
     b = await ch.catalog.build(PR(6), { remote_id: CAT, attrs: { 23171: { value: '@variant' }, 4389: { value: 'Türkiye' } } }, { opts: OPTS, pick });
     assert.deepEqual(b.missing, ['Üretici ülke (“Türkiye” Ozon listesinde yok)']);

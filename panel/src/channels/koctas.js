@@ -89,9 +89,15 @@ export function koctas(env, meta) {
     }
     return out;
   }
+  // Tüm liste okunduysa (fullAt) ya da SKU süzgeciyle sorulup bulunamadıysa (none) önbellekte olmayan SKU'nun teklifi yok sayılır: aynı nesnede
+  // (bir istek / senkron) liste yeniden okunmaz. OF21'de çoklu SKU süzgeci yok (sku tek değer), bu yüzden çok SKU'da tüm liste bir kez okunur.
+  let fullAt = 0;
+  const none = new Map(), FRESH = 10 * 60e3;
   async function fetchListings() {
-    cache.clear();
-    return (await loadOffers()).filter((o) => o.shop_sku).map((o) => {
+    cache.clear(); none.clear(); fullAt = 0;
+    const all = await loadOffers();
+    fullAt = Date.now();
+    return all.filter((o) => o.shop_sku).map((o) => {
       const price = num(o.price) || num(o.applicable_pricing && o.applicable_pricing.price), d = o.discount || {};
       const images = imageList((o.product_medias || []).map((m) => m.media_url || m.url || m));
       return {
@@ -101,11 +107,13 @@ export function koctas(env, meta) {
       };
     });
   }
-  // Önbellekte olmayan teklifler: azsa tek tek (OF21 sku süzgeci), çoksa tüm liste yeniden okunur
+  // Önbellekte olmayan teklifler: azsa tek tek (OF21 sku süzgeci), çoksa tüm liste bir kez okunur (sonraki çağrılar yeniden okumaz)
   async function offersFor(skus) {
-    const lack = skus.filter((k) => !cache.has(k));
-    if (lack.length > 20) await loadOffers();
-    else await pool(lack, 4, async (k) => { await loadOffers({ sku: k }, 1); });
+    const now = Date.now(), lack = [...new Set(skus)].filter((k) => !cache.has(k) && !(now - num(none.get(k)) < FRESH));
+    if (lack.length && !(now - fullAt < FRESH)) {
+      if (lack.length > 20) { await loadOffers(); fullAt = Date.now(); }
+      else await pool(lack, 4, async (k) => { await loadOffers({ sku: k }, 1); if (!cache.has(k)) none.set(k, Date.now()); });
+    }
     return skus.map((k) => cache.get(k) || null);
   }
   // OF24 satırı: ürün kimliği önce Mirakl ürün SKU'su (SKU), yoksa EAN barkodu; teklifin mevcut alanları korunur

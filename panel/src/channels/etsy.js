@@ -194,7 +194,9 @@ export function etsy(env, meta) {
   // kullanılmaz, eksik metninde önerilir. Panel ürünü (her varyant) ayrı ilan olur; SKU envantere yazılır, ilan listesinde (fetchListings)
   // SKU ile tanınır: key = SKU. Etsy sonucu senkron verir: gönderim kanalın kv deposunda sıraya alınır, send ilk birkaç ürünü, her status
   // sorgusu sıradaki ürünleri işler (ürün başına 5-25 istek; istekler arası en az 200 ms; Rate Limits: QPS / QPD aşımında 429 + retry-after).
-  // Yarım kalan ürün (geçici hata / istek bütçesi) kaldığı adımdan sürer; ilan iki kez açılmaz.
+  // Yarım kalan ürün (geçici hata / istek bütçesi / kesilen iş) kaldığı adımdan sürer; her adım hemen kaydedilir, ilan iki kez açılmaz.
+  // Aynı SKU yeniden gönderilirse (elle ya da otomatik gönderimin yeniden denemesi) kv'deki SKU kaydındaki ilan kullanılır: Etsy'de duruyorsa
+  // (getListing) yeni taslak açılmaz, eksik adımlar o ilanda sürer; ilan zaten yayındaysa dokunulmaz; silinmişse (404) yeniden açılır.
   const WHO = ['i_did', 'someone_else', 'collective'];
   const WHEN = /^(made_to_order|\d{4}_\d{4}|before_\d{4}|\d{4}s)$/; // şemadaki değerler: made_to_order, 2020_2026, 2010_2019 … 1700s, before_1700
   const OPT = {
@@ -336,75 +338,140 @@ export function etsy(env, meta) {
     return { key: sku, missing, payload: { key: sku, listing, images, props, sku, price, quantity, readiness_state_id: ids.readiness_state_id ?? null } };
   }
 
-  // ---- gönderim kuyruğu (kv): "up:<id>" başlık { at, parts, lock }, "up:<id>:<n>" en çok 25 ürün [{ p: yük, st: adım durumu }]
+  // ---- gönderim kuyruğu (kv): "up:<id>" başlık { at, parts, lock }, "up:<id>:<n>" en çok 25 ürün [{ p: yük, st: adım durumu }].
+  // Bitince parçalar silinir, sonuç özeti başlıkta kalır (res). "sku:<sku>" { listing, job, by, until }: SKU'nun Etsy ilanı (süresiz; gönderimler
+  // arasında ilan iki kez açılmaz) ve o ürünü şu an işleyen gönderim (job, `until`a kadar; ürün sonuçlanınca bırakılır).
   const mem = new Map();
   const jget = async (k) => (kv ? kv.get(k) : structuredClone(mem.get(k) ?? null));
   const jset = async (k, v) => (kv ? kv.set(k, v) : mem.set(k, structuredClone(v)));
-  const PART = 25, STEP = 8, FIRST = 3, GAP = 200;
+  const jdel = async (k) => (kv ? (kv.delete ? kv.delete(k) : kv.set(k, null)) : mem.delete(k));
+  const PART = 25, STEP = 8, FIRST = 3, GAP = 200, CLAIM = 3 * 3600e3, MAXIMG = 10 * 1024 * 1024, IMGTIME = 20e3;
   let lastCall = 0;
   async function paced(path, opts) {
     const w = lastCall + GAP - Date.now();
     if (w > 0) await sleep(w);
     try { return await call(path, opts); } finally { lastCall = Date.now(); }
   }
+  const big = () => Object.assign(new Error('görsel çok büyük (10 MB üstü)'), { status: 413 });
+  // Görsel en çok 10 MB ve 20 sn içinde okunur (Content-Length büyükse hiç indirilmez; akış sayılarak okunur, sınırı aşınca kesilir)
   async function download(u) {
     const res = await http(u, { raw: true, timeout: 30000 });
     const type = str(res.headers.get('content-type')).split(';')[0];
     if (!/^image\//i.test(type)) { res.body?.cancel().catch(() => {}); throw new Error(`HTTP 415 görsel değil (${type || 'tür yok'})`); }
+    if (num(res.headers.get('content-length')) > MAXIMG) { res.body?.cancel().catch(() => {}); throw big(); }
     const name = decodeURIComponent((new URL(u).pathname.split('/').pop() || 'image').slice(0, 80)) || 'image';
-    return { blob: new Blob([await res.arrayBuffer()], { type }), name };
+    const chunks = [];
+    if (res.body) {
+      const rd = res.body.getReader();
+      let total = 0, timer;
+      const late = new Promise((_, rej) => { timer = setTimeout(() => rej(Object.assign(new Error('görsel 20 sn içinde indirilemedi (zaman aşımı)'), { status: 408 })), IMGTIME); });
+      try {
+        for (;;) {
+          const { done, value } = await Promise.race([rd.read(), late]);
+          if (done) break;
+          total += value.byteLength;
+          if (total > MAXIMG) throw big();
+          chunks.push(value);
+        }
+      } catch (e) { rd.cancel().catch(() => {}); throw e; } finally { clearTimeout(timer); }
+    }
+    return { blob: new Blob(chunks, { type }), name };
   }
-  // Tek ürün: adımlar sırayla, her adımdan sonra durum st'ye yazılır. Dönüş 'stop' = geçici hata (ürün sırada kalır)
-  async function one(it, save) {
-    const p = it.p, st = it.st;
+  // Tek ürün: adımlar sırayla, her adımdan sonra durum st'ye yazılıp kaydedilir (save). Dönüş 'stop' = geçici hata (ürün sırada kalır),
+  // 'wait' = aynı SKU başka bir gönderimde işleniyor (ürün sırada kalır, o bitince sürer)
+  async function one(it, save, job) {
+    const p = it.p, st = it.st, sk = 'sku:' + p.sku;
+    let rec = null;
     try {
+      rec = (await jget(sk)) || {};
+      if (rec.job && rec.job !== job && num(rec.until) > Date.now()) { rec = null; st.wait = true; return 'wait'; }
+      // Ürünü başka bir gönderim işlediyse bu gönderimin eski ilerlemesine güvenilmez: ilan SKU kaydından okunup denetlenir
+      if (rec.by && rec.by !== job && st.listing) for (const k of ['listing', 'createAt', 'img', 'up', 'prop', 'inv', 'act']) delete st[k];
+      if (st.listing && !rec.listing) rec.listing = st.listing; // ilan açılıp SKU kaydı yazılamadan kesilmiş
+      Object.assign(rec, { job, by: job, until: Date.now() + CLAIM });
+      await jset(sk, rec);
+      const chk = await jget(sk);
+      if (!chk || chk.job !== job) { rec = null; st.wait = true; return 'wait'; }
+      delete st.wait;
+      const bind = async () => { rec.listing = st.listing; await jset(sk, rec); };
+      if (!st.listing && rec.listing) {
+        // Bu SKU için daha önce açılmış ilan: Etsy'de duruyorsa yeni taslak açılmaz (silinmişse kayıt düşer, yeniden oluşturulur)
+        let l = null;
+        try { l = await paced(`/listings/${rec.listing}?includes=Images`); } catch (e) { if (e.status !== 404) throw e; rec.listing = null; await jset(sk, rec); }
+        if (l) {
+          const state = str(l.state).toLowerCase();
+          if (state === 'active') { st.listing = String(rec.listing); st.exists = true; st.inv = st.act = true; st.ok = true; await save(); return ''; }
+          if (state !== 'draft') throw Object.assign(new Error(`Etsy'de bu ürünün ilanı zaten var (ilan #${rec.listing}, durum: ${state || 'bilinmiyor'}); Etsy panelinden yönetin`), { status: 409 });
+          st.listing = String(rec.listing); st.reused = true;
+          const n = (l.images || []).length;
+          if (n) { st.img = p.images.length; st.up = n; } // taslakta görsel var: yeniden yüklenmez
+          await save();
+        }
+      }
       if (!st.listing && st.createAt) {
         // Önceki oluşturma isteği cevapsız kaldı (bağlantı / 5xx): Etsy ilanı yine de açmış olabilir; aynı başlıklı yeni taslak varsa o kullanılır
         const r = await paced(`/shops/${shop}/listings?state=draft&limit=100`);
         const hit = ((r && r.results) || []).find((l) => ent(l.title) === p.listing.title && num(l.created_timestamp || l.creation_timestamp) * 1000 >= st.createAt - 120e3);
-        if (hit) { st.listing = String(hit.listing_id); await save(); }
+        if (hit) { st.listing = String(hit.listing_id); await save(); await bind(); }
       }
       if (!st.listing) {
         st.createAt = Date.now(); await save();
         const r = await paced(`/shops/${shop}/listings`, { method: 'POST', form: p.listing, tries: 1 });
         if (!r || !r.listing_id) throw Object.assign(new Error('Etsy ilan numarası dönmedi'), { status: 400 });
-        st.listing = String(r.listing_id); await save();
+        st.listing = String(r.listing_id); await save(); await bind();
       }
-      for (let i = num(st.img); i < p.images.length; i = st.img = i + 1) {
-        let f;
-        try { f = await download(p.images[i]); } catch (e) { if (temp(e)) throw e; (st.warn ||= []).push(`görsel ${i + 1} indirilemedi (${why(e).slice(0, 80)})`); continue; }
-        const fd = new FormData();
-        fd.append('image', f.blob, f.name); fd.append('rank', String(num(st.up) + 1));
-        try { await paced(`/shops/${shop}/listings/${st.listing}/images`, { method: 'POST', data: fd, tries: 1 }); st.up = num(st.up) + 1; } catch (e) {
-          if (temp(e) || e.status === 401 || e.status === 403) throw e;
-          (st.warn ||= []).push(`görsel ${i + 1}: ${why(e).slice(0, 120)}`);
+      for (let i = num(st.img); i < p.images.length; i++) {
+        let f = null;
+        try { f = await download(p.images[i]); } catch (e) { if (temp(e)) throw e; (st.warn ||= []).push(`görsel ${i + 1} indirilemedi (${why(e).slice(0, 80)})`); }
+        if (f) {
+          const fd = new FormData();
+          fd.append('image', f.blob, f.name); fd.append('rank', String(num(st.up) + 1));
+          try { await paced(`/shops/${shop}/listings/${st.listing}/images`, { method: 'POST', data: fd, tries: 1 }); st.up = num(st.up) + 1; } catch (e) {
+            if (temp(e) || e.status === 401 || e.status === 403) throw e;
+            (st.warn ||= []).push(`görsel ${i + 1}: ${why(e).slice(0, 120)}`);
+          }
         }
+        st.img = i + 1; await save(); // yarıda kesilirse yüklenen görsel yeniden yüklenmez
       }
       if (!num(st.up)) throw Object.assign(new Error(`görsel yüklenemedi${st.warn ? ` (${st.warn.join(' · ')})` : ''}; Etsy yayındaki ilanda en az bir görsel ister`), { status: 400 });
-      for (let i = num(st.prop); i < p.props.length; i = st.prop = i + 1) {
+      for (let i = num(st.prop); i < p.props.length; i++) {
         const x = p.props[i];
         await paced(`/shops/${shop}/listings/${st.listing}/properties/${x.property_id}`, { method: 'PUT', form: { value_ids: x.value_ids.join(','), values: x.values.join(','), scale_id: x.scale_id } });
+        st.prop = i + 1; await save();
       }
       if (!st.inv) {
         await paced(`/listings/${st.listing}/inventory`, { method: 'PUT', body: {
           products: [{ sku: p.sku, property_values: [], offerings: [{ price: p.price, quantity: p.quantity, is_enabled: true, readiness_state_id: p.readiness_state_id }] }],
           price_on_property: [], quantity_on_property: [], sku_on_property: [], readiness_state_on_property: [] } });
-        st.inv = true;
+        st.inv = true; await save();
       }
       if (!st.act) { await paced(`/shops/${shop}/listings/${st.listing}`, { method: 'PATCH', form: { state: 'active' } }); st.act = true; }
       st.ok = true;
     } catch (e) {
       if (temp(e) && (e.budget || (st.tries = num(st.tries) + 1) < 5)) { st.last = why(e); return 'stop'; }
       st.ok = false;
-      st.error = `Etsy: ${why(e)}${st.listing && !st.act ? ` · Etsy'de taslak ilan #${st.listing} açıldı: düzeltip Etsy panelinden tamamlayın ya da silin (ürünü yeniden göndermek ikinci ilan açar)` : ''}`;
+      st.error = `Etsy: ${why(e)}${st.listing && !st.act ? ` · Etsy'de taslak ilan #${st.listing} açıldı: düzeltip ürünü yeniden gönderin (aynı taslak kullanılır) ya da Etsy panelinden tamamlayın` : ''}`;
+    } finally {
+      // Ürün sonuçlandı: SKU başka gönderimlere bırakılır (ilan numarası kalır)
+      if (rec && st.ok != null) { rec.job = null; await jset(sk, rec).catch(() => {}); }
     }
     return '';
   }
-  async function parts(id, head) { const out = []; for (let i = 0; i < head.parts; i++) out.push((await jget(`up:${id}:${i}`)) || []); return out; }
+  async function parts(id, head) {
+    if (head.res) return [head.res];
+    const out = [];
+    for (let i = 0; i < head.parts; i++) out.push((await jget(`up:${id}:${i}`)) || []);
+    return out;
+  }
   // Sıradaki ürünler işlenir (en çok `limit` ürün, ~20 sn, istek bütçesi). Aynı gönderimi aynı anda tek işlem yürütür (kilit 2 dk)
   async function work(id, limit) {
     const hk = 'up:' + id, head = await jget(hk);
     if (!head) return null;
+    if (head.res) {
+      // Bitmiş gönderim: parçalar silinememişse şimdi silinir
+      if (head.parts) { for (let i = 0; i < head.parts; i++) await jdel(`up:${id}:${i}`); head.parts = 0; await jset(hk, head); }
+      return { head, list: [head.res] };
+    }
     if (head.lock && head.lock.until > Date.now()) return { head, list: await parts(id, head) };
     const tok = Math.random().toString(36).slice(2);
     head.lock = { tok, until: Date.now() + 120e3 };
@@ -412,30 +479,38 @@ export function etsy(env, meta) {
     const chk = await jget(hk);
     if (!chk || !chk.lock || chk.lock.tok !== tok) return { head, list: await parts(id, head) };
     const list = await parts(id, head), dirty = new Set(), t0 = Date.now();
-    let n = 0;
+    let n = 0, fin = false;
     try {
       out: for (let pi = 0; pi < list.length; pi++) {
         for (const it of list[pi]) {
           if (it.st.ok != null) continue;
           if (n >= limit || Date.now() - t0 > 20e3 || budgetLeft() < 60) break out;
-          n++; dirty.add(pi);
-          if ((await one(it, () => jset(`up:${id}:${pi}`, list[pi]))) === 'stop') break out;
+          dirty.add(pi);
+          const r = await one(it, () => jset(`up:${id}:${pi}`, list[pi]), id);
+          if (r === 'stop') break out;
+          if (r !== 'wait') n++;
         }
       }
-      // Hepsi sonuçlandıysa yükler (açıklama, görsel adresleri) silinir; sonuç kalır
-      if (list.every((x) => x.every((it) => it.st.ok != null))) for (let pi = 0; pi < list.length; pi++) { list[pi] = list[pi].map((it) => ({ p: { key: it.p.key }, st: it.st })); dirty.add(pi); }
+      fin = list.every((x) => x.every((it) => it.st.ok != null));
     } finally {
-      for (const pi of dirty) await jset(`up:${id}:${pi}`, list[pi]);
       head.lock = null;
+      if (fin) {
+        // Hepsi sonuçlandı: sonuç özeti başlığa yazılır, parçalar (yükler: açıklama, görsel adresleri) silinir
+        head.res = list.flat().map(({ p, st }) => ({ p: { key: p.key }, st: Object.fromEntries(['ok', 'listing', 'exists', 'warn', 'error'].filter((k) => st[k] != null).map((k) => [k, st[k]])) }));
+        await jset(hk, head);
+        for (let i = 0; i < head.parts; i++) await jdel(`up:${id}:${i}`);
+        head.parts = 0;
+      } else for (const pi of dirty) await jset(`up:${id}:${pi}`, list[pi]);
       await jset(hk, head);
     }
-    return { head, list };
+    return { head, list: fin ? [head.res] : list };
   }
   function results(r) {
     if (!r) return { done: true, items: [] }; // kuyruk kaydı yok (silinmiş): sonuç verilemez
-    const items = r.list.flat().map(({ p, st }) => (st.ok === true ? { key: p.key, ok: true, status: `Etsy'de yayında (ilan #${st.listing})${st.warn ? ` · ${st.warn.join(' · ')}` : ''}`, error: '' }
+    const items = r.list.flat().map(({ p, st }) => (st.ok === true ? { key: p.key, ok: true, status: `${st.exists ? 'Etsy\'de bu ürünün ilanı zaten var' : 'Etsy\'de yayında'} (ilan #${st.listing})${st.warn ? ` · ${st.warn.join(' · ')}` : ''}`, error: '' }
       : st.ok === false ? { key: p.key, ok: false, status: 'Etsy kabul etmedi', error: st.error }
-        : { key: p.key, ok: null, status: st.listing ? `Etsy'ye yükleniyor (ilan #${st.listing})` : 'Etsy\'ye gönderilmek üzere sırada', error: st.last ? `son deneme: ${st.last}` : '' }));
+        : st.wait ? { key: p.key, ok: null, status: 'Etsy: önceki gönderim sürüyor (bu ürün başka bir gönderimde işleniyor; o bitince sürer)', error: '' }
+          : { key: p.key, ok: null, status: st.listing ? `Etsy'ye yükleniyor (ilan #${st.listing})` : 'Etsy\'ye gönderilmek üzere sırada', error: st.last ? `son deneme: ${st.last}` : '' }));
     return { done: items.every((x) => x.ok != null), items };
   }
   async function send(payloads) {

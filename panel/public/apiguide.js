@@ -39,10 +39,19 @@ Kurallar (yanlış ürün satmamak için):
   3. Günde bir kez tam listeyi yeniden çekip karşılaştırmanız önerilir.
 
 Satış bildirimi (sitenizde satılınca stok düşsün):
+  İzin: anahtar varsayılan olarak yalnız stok okur. Satış bildirmek (ve iptal etmek) için ${store} yetkilisinin bu anahtara
+  "satış bildirebilsin" iznini açması gerekir; izin yoksa POST istekleri 403 (code "readonly") alır.
   POST ${apiBase()}/sales        Content-Type: application/json
   { "ref": "WEB-1001", "items": [ { "sku": "OM-TS-XL", "quantity": 2 }, { "id": 12, "quantity": 1 } ] }
   - ref: sizin sipariş numaranız. Aynı ref tekrar gelirse stok ikinci kez düşmez (ağ hatasında güvenle yeniden gönderin).
   - Ürün sku, barcode ya da stok listesindeki id ile verilir. Ürünlerden biri bulunamazsa hiçbir stok düşmez (422).
+  - Bir istekte en fazla 100 kalem; bir anahtarla son 24 saatte en fazla 5.000 adet (aşılırsa 429, code "daily_limit").
+  - Satış ya tamamen işlenir ya hiç: reddedilen satışta hiçbir ürünün stoğu düşmez. Ret durumları (409):
+      insufficient_stock  istenen adet mevcut stoktan fazla (yanıttaki "items": ürün, requested, available). Stoğu yenileyin.
+      stock_sync_off      ${store} panelinde stok senkronu kapalı ve ürünün stoğu siteden okunuyor; satış stoğa işlenemez.
+                          Senkron açılınca aynı numarayla yeniden gönderin (iptal de aynı nedenle reddedilebilir).
+      cancelled           bu numara iptal edildi; yeniden satış için yeni numara kullanın.
+      conflict            bu numara daha önce farklı ürün / adetle bildirildi.
   - Yanıt 201: { "created": true, "sale": { "ref", "status": "active", "items": [ { "sku", "quantity", "stock" } ] }, "warnings": [] }
   İptal / iade (stok geri gelir):   POST ${apiBase()}/sales/WEB-1001/cancel
   Durum:                            GET  ${apiBase()}/sales/WEB-1001
@@ -52,5 +61,7 @@ curl -X POST -H "Authorization: Bearer ${key}" -H "Content-Type: application/jso
 
 Bağlantı testi: ${apiBase()}/ping
 Sınır: dakikada 120 istek. Hata kodları: 400 hatalı parametre, 401 anahtar geçersiz, 403 erişim kapalı / IP izni yok,
-404 bulunamadı, 409 aynı ref farklı ürünle, 422 ürün bulunamadı, 429 sınır aşıldı. Hata yanıtı: { "error": "açıklama", "code": "..." }
+403 satış izni yok (readonly), 404 bulunamadı, 409 satış reddedildi (yetersiz stok, senkron kapalı, iptal edilmiş ya da
+farklı ürünlü numara; "code" alanına bakın), 413 gövde 256 KB'tan büyük, 422 ürün bulunamadı, 429 dakika / gün sınırı aşıldı.
+Hata yanıtı: { "error": "açıklama", "code": "..." }
 Anahtarı kimseyle paylaşmayın; sızdığını düşünürseniz ${store} yetkilisinden yenisini isteyin.`;

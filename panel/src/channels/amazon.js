@@ -206,8 +206,10 @@ export function amazon(env, meta) {
   //   değerlendirilmez: Amazon bunları gönderimde INVALID + issues olarak bildirir.
   // - Gönderim: putListingsItem SKU başına bir istek (5 istek/sn, burst 10). ACCEPTED = ilk doğrulama geçti, Amazon işlemeye aldı; INVALID = kaydedilmedi.
   //   mode=VALIDATION_PREVIEW kullanılmaz: INVALID gönderim zaten kaydedilmez, aynı sorunlar gerçek gönderimin cevabında gelir (iki kat istek olurdu).
-  //   Sonuçlar kanal deposunda (kv "uploads") saklanır; kabul edilenler getListingsItem (summaries, issues) ile izlenir: özet (ASIN) gelince
-  //   oluşturuldu, işleme sırasında ERROR sorunu çıkarsa reddedildi (Listings APIs FAQ: getListingsItem 1-5 dk içinde güncellenir).
+  //   putListingsItem tam değiştirmedir (SKU varsa ilanın tüm özellikleri gönderilenle değişir): önce getListingsItem (summaries) ile SKU
+  //   sorulur; 200 = Amazon'da zaten var → dokunulmaz, 404 = yok → gönderilir.
+  //   Sonuçlar kanal deposunda (gönderim başına kv "up:<kimlik>") saklanır; kabul edilenler getListingsItem (summaries, issues) ile izlenir:
+  //   özet (ASIN) gelince oluşturuldu, işleme sırasında ERROR sorunu çıkarsa reddedildi (Listings APIs FAQ: getListingsItem 1-5 dk içinde güncellenir).
   // - Anahtar: SKU (fetchListings ilanı SKU ile tanıtır; Amazon'da ilan kimliği satıcı SKU'sudur).
   const PTD = '/definitions/2020-09-01/productTypes', kv = meta && meta.kv;
   const ptRow = (p) => ({ id: str(p.name), name: str(p.displayName) || str(p.name), path: str(p.name) });
@@ -422,78 +424,135 @@ export function amazon(env, meta) {
     return { key: sku, missing: [...new Set(missing)], payload: { sku, productType: s.productType || str(map.remote_id), attributes: at } };
   }
 
-  // Gönderim sonuçları kanal deposunda (settings "kv:<kanal>:uploads"): son 4 günün en çok 30 gönderimi; depo yoksa bellekte
-  let memBook = {};
-  async function book() {
-    if (kv) { try { const v = await kv.get('uploads'); return v && typeof v === 'object' ? v : {}; } catch (e) { if (e.budget) throw e; } }
-    return memBook;
+  // Gönderim sonuçları kanal deposunda, gönderim başına ayrı kayıt (settings "kv:<kanal>:up:<kimlik>"): aynı kaydı yalnız o gönderim / onun
+  // sorguları yazar (eşzamanlı başka gönderim üzerine yazamaz). Kayıtlar 30 gün saklanır (dizin "upidx": kimlik → zaman; süresi geçen kayıt
+  // boşaltılır). Sonuçlanan gönderimin kaydı küçültülür (gönderim kimliği / sorgu zamanı atılır). Depo yoksa bellekte.
+  const KEEP = 30 * 864e5, LOST = "Amazon gönderim kaydı bulunamadı; Amazon Seller Central'dan kontrol edin";
+  const mem = new Map();
+  const sget = async (k) => {
+    if (kv) { try { const v = await kv.get(k); if (v != null) return v; } catch (e) { if (e.budget) throw e; } }
+    return mem.has(k) ? structuredClone(mem.get(k)) : null;
+  };
+  const sset = async (k, v) => {
+    if (v == null) mem.delete(k); else mem.set(k, structuredClone(v));
+    if (kv) { try { await kv.set(k, v); } catch (e) { if (e.budget) throw e; } }
+  };
+  // Eski biçim (tüm gönderimler tek "uploads" kaydında, 4 gün): yalnız okunur; en yenisi saklama süresini geçince boşaltılır
+  async function load(id) {
+    const r = await sget('up:' + id);
+    if (r && typeof r === 'object') return r;
+    const old = await sget('uploads');
+    return (old && typeof old === 'object' && old[id]) || null;
   }
-  async function keep(b) {
-    const now = Date.now(), ids = Object.keys(b).filter((k) => now - num(b[k].at) < 4 * 864e5).sort((x, y) => b[y].at - b[x].at).slice(0, 30);
-    memBook = Object.fromEntries(ids.map((k) => [k, b[k]]));
-    if (kv) { try { await kv.set('uploads', memBook); } catch (e) { if (e.budget) throw e; } }
+  let pruned = false;
+  async function register(id) {
+    const now = Date.now(), idx = (await sget('upidx')) || {};
+    idx[id] = now;
+    for (const [k, at] of Object.entries(idx)) if (now - num(at) > KEEP) { delete idx[k]; await sset('up:' + k, null); }
+    await sset('upidx', idx);
+    if (pruned) return;
+    pruned = true;
+    const old = await sget('uploads');
+    if (old && typeof old === 'object' && Object.keys(old).length && Object.values(old).every((u) => now - num(u && u.at) > KEEP)) await sset('uploads', null);
   }
+  const FINAL = new Set(['L', 'X', 'I', 'R', 'E']);
+  // Sonuçlanan gönderim: yalnız görünüm için gerekenler kalır
+  const compact = (u) => ({ at: u.at, done: true, items: Object.fromEntries(Object.entries(u.items || {}).map(([k, x]) => [k,
+    Object.fromEntries(Object.entries({ s: x.s, asin: x.asin, buy: x.buy, e: x.e && String(x.e).slice(0, 400) }).filter(([, v]) => v)) ])) });
+  const settle = (u) => (!u.open && Object.values(u.items || {}).every((x) => FINAL.has(x.s)) ? compact(u) : u);
+
   const itemUrl = (sku) => `/listings/2021-08-01/items/${encodeURIComponent(seller)}/${encodeURIComponent(sku)}?${mq}`;
-  // putListingsItem: SKU başına bir istek, en az 250 ms arayla (5 istek/sn). Hiçbir istek cevaplanmadıysa (kimlik / yetki / bağlantı) hata fırlatılır;
-  // bir kısmı gittiyse gidemeyenler ürün bazında hata olarak kaydedilir (gönderilenlerin takibi kaybolmasın)
-  let lastPut = 0;
+  // getListingsItem ve putListingsItem ayrı kotalıdır (her biri 5 istek/sn, burst 10): her biri kendi son isteğinden en az 250 ms sonra
+  let lastPut = 0, lastGet = 0;
+  const gap = async (last) => { const w = last + 250 - Date.now(); if (w > 0) await sleep(w); };
+  async function getItem(sku, data) {
+    await gap(lastGet);
+    try { return await call(`${itemUrl(sku)}&includedData=${data}`, { tries: 3 }); } catch (e) { if (e.status === 404) return null; throw e; } finally { lastGet = Date.now(); }
+  }
+  // Gönderim: SKU başına önce getListingsItem (summaries): ilan zaten varsa (200) dokunulmaz (putListingsItem tam değiştirme / upsert olduğu için
+  // var olan ilanı panelin bilgisiyle ezerdi); 404 = yok → putListingsItem. Takip kimliği başta belirlenir, sonuçlar her 10 üründe ara kaydedilir
+  // (istek yarıda kesilirse gidenlerin kaydı kalır). Hiçbir istek cevaplanmadıysa (kimlik / yetki / bağlantı) hata fırlatılır; bir kısmı gittiyse
+  // gidemeyenler ürün bazında hata olarak kaydedilir (gönderilenlerin takibi kaybolmasın)
+  const SAVE_EVERY = 10, NOT_SENT = 'Gönderilmedi (bu işlemin dış istek sınırı doldu); yeniden gönderin';
   async function send(payloads) {
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), res = {};
-    let answered = 0, first = null, stop = null;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), key = 'up:' + id, at = Date.now(), res = {};
+    let answered = 0, first = null, stop = null, done = 0, saved = false;
+    await register(id);
     for (const p of payloads) {
       const sku = str(p.sku);
-      if (stop) { res[sku] = { s: 'E', e: 'Gönderilmedi (bu işlemin dış istek sınırı doldu); yeniden gönderin' }; continue; }
-      const wait = lastPut + 250 - Date.now();
-      if (wait > 0) await sleep(wait);
+      if (stop) { res[sku] = { s: 'E', e: NOT_SENT }; continue; }
       try {
-        const r = await call(`${itemUrl(sku)}&includedData=issues,identifiers`, { method: 'PUT', tries: 4, body: { productType: p.productType, requirements: 'LISTING', attributes: p.attributes } });
-        answered++;
-        if (r && r.status === 'ACCEPTED') {
-          types.set(sku, p.productType);
-          res[sku] = { s: 'A', sid: str(r.submissionId), asin: str(((r.identifiers || []).find((x) => x.marketplaceId === market) || {}).asin) };
-        } else res[sku] = { s: 'I', e: issueText(r && r.issues) || `Amazon kabul etmedi (${str(r && r.status) || 'cevap yok'})` };
+        const cur = await getItem(sku, 'summaries');
+        if (cur) {
+          answered++;
+          const sm = (cur.summaries || []).find((x) => x.marketplaceId === market) || (cur.summaries || [])[0];
+          if (sm && sm.productType) types.set(sku, sm.productType);
+          res[sku] = { s: 'X', asin: str(sm && sm.asin) };
+        } else {
+          await gap(lastPut);
+          try {
+            const r = await call(`${itemUrl(sku)}&includedData=issues,identifiers`, { method: 'PUT', tries: 4, body: { productType: p.productType, requirements: 'LISTING', attributes: p.attributes } });
+            answered++;
+            if (r && r.status === 'ACCEPTED') {
+              types.set(sku, p.productType);
+              res[sku] = { s: 'A', sid: str(r.submissionId), asin: str(((r.identifiers || []).find((x) => x.marketplaceId === market) || {}).asin) };
+            } else res[sku] = { s: 'I', e: issueText(r && r.issues) || `Amazon kabul etmedi (${str(r && r.status) || 'cevap yok'})` };
+          } finally { lastPut = Date.now(); }
+        }
       } catch (e) {
-        if (e.budget) { stop = e; res[sku] = { s: 'E', e: 'Gönderilmedi (bu işlemin dış istek sınırı doldu); yeniden gönderin' }; continue; }
+        if (e.budget) { stop = e; res[sku] = { s: 'E', e: NOT_SENT }; continue; }
         first = first || e;
         res[sku] = { s: 'E', e: apiErr(e) };
-      } finally { lastPut = Date.now(); }
+      }
+      if (++done % SAVE_EVERY === 0 && done < payloads.length) { await sset(key, { at, open: true, items: res }); saved = true; }
     }
-    if (!answered) { if (stop) throw stop; if (first) throw new Error(apiErr(first)); }
-    const b = await book();
-    b[id] = { at: Date.now(), items: res };
-    await keep(b);
+    if (!answered) { if (saved) await sset(key, null); if (stop) throw stop; if (first) throw new Error(apiErr(first)); }
+    await sset(key, settle({ at, items: res }));
     return { ref: 'amz:' + id };
   }
   const VIEW = {
     A: () => ({ ok: null, status: 'Amazon işliyor (gönderim kabul edildi)', error: '' }),
     L: (x) => ({ ok: true, status: `Amazon'da oluşturuldu${x.asin ? ` · ASIN ${x.asin}` : ''}${x.buy ? ' · satışta' : ''}`, error: '' }),
+    X: () => ({ ok: true, status: "Amazon'da bu SKU ile ilan zaten var (değiştirilmedi)", error: '' }),
     I: (x) => ({ ok: false, status: 'Amazon kabul etmedi', error: x.e }),
     R: (x) => ({ ok: false, status: 'Amazon işlerken sorun bildirdi', error: x.e }),
     E: (x) => ({ ok: false, status: 'Gönderilemedi', error: x.e }),
   };
-  // Kabul edilenler getListingsItem ile izlenir (sorgu başına en çok 40 SKU, 250 ms arayla): 404 = henüz oluşmadı (işleniyor),
-  // ERROR sorunu = reddedildi, pazar yeri özeti (ASIN) = oluşturuldu
-  async function status(ref) {
-    const id = String(ref).replace(/^amz:/, ''), b = await book(), u = b[id];
-    if (!u) return { done: true, items: [] };
-    let checked = 0, dirty = false;
-    for (const [sku, x] of Object.entries(u.items || {})) {
-      if (x.s !== 'A' || checked >= 40) continue;
-      if (checked++) await sleep(250);
-      const r = await call(`${itemUrl(sku)}&includedData=summaries,issues`, { tries: 3 }).catch((e) => { if (e.status === 404) return null; throw e; });
-      if (!r) continue;
-      const errs = issueText(r.issues), sm = (r.summaries || []).find((y) => y.marketplaceId === market) || (r.summaries || [])[0];
-      if (errs) Object.assign(x, { s: 'R', e: errs });
-      else if (sm) Object.assign(x, { s: 'L', asin: str(sm.asin) || x.asin, buy: (sm.status || []).includes('BUYABLE') });
-      else continue;
-      dirty = true;
-      if (sm && sm.productType) types.set(sku, sm.productType);
+  // Kabul edilenler getListingsItem ile izlenir (sorgu başına en çok 40 SKU, 250 ms arayla). Sıra son sorgu zamanına göre (hiç sorulmamış /
+  // en eski sorulan önce): 404'te kalanlar sonrakilerin önünü tıkamaz. 404 = henüz oluşmadı (işleniyor), ERROR sorunu = reddedildi,
+  // pazar yeri özeti (ASIN) = oluşturuldu. Kayıt yoksa (süresi geçmiş / yazılamamış) her ürün için açık hata (keys verildiyse) ve bitti.
+  async function status(ref, keys) {
+    const id = String(ref).replace(/^amz:/, ''), key = 'up:' + id, u = await load(id);
+    if (!u) return { done: true, error: LOST, items: (Array.isArray(keys) ? keys : []).map((k) => ({ key: str(k), ok: false, status: 'Gönderim kaydı bulunamadı', error: LOST })) };
+    const changes = new Map();
+    if (!u.done) {
+      const due = Object.entries(u.items || {}).filter(([, x]) => x.s === 'A').sort(([, a], [, b]) => num(a.q) - num(b.q)).slice(0, 40);
+      for (const [sku, x] of due) {
+        const r = await getItem(sku, 'summaries,issues');
+        const ch = { q: Date.now() };
+        if (r) {
+          const errs = issueText(r.issues), sm = (r.summaries || []).find((y) => y.marketplaceId === market) || (r.summaries || [])[0];
+          if (errs) Object.assign(ch, { s: 'R', e: errs });
+          else if (sm) Object.assign(ch, { s: 'L', asin: str(sm.asin) || x.asin, buy: (sm.status || []).includes('BUYABLE') });
+          if (sm && sm.productType) types.set(sku, sm.productType);
+        }
+        Object.assign(x, ch);
+        changes.set(sku, ch);
+      }
     }
-    if (dirty) await keep(b);
-    const items = Object.entries(u.items || {}).map(([key, x]) => ({ key, ...(VIEW[x.s] || VIEW.E)(x) }));
-    return { done: !items.some((x) => x.ok === null), items };
+    if (changes.size) {
+      // Yazmadan önce güncel kayıt okunur: eşzamanlı başka sorgunun sonuçlandırdığı SKU geri alınmaz
+      const fresh = (await sget(key)) || u;
+      if (!fresh.done) {
+        for (const [sku, ch] of changes) { const x = fresh.items && fresh.items[sku]; if (x && x.s === 'A') Object.assign(x, ch); }
+        await sset(key, settle(fresh));
+      }
+    }
+    const open = u.open && Date.now() - num(u.at) < 15 * 60e3;
+    const items = Object.entries(u.items || {}).map(([k, x]) => ({ key: k, ...(VIEW[x.s] || VIEW.E)(x) }));
+    return { done: !open && !items.some((x) => x.ok === null), items };
   }
-  const raw = async (ref) => (await book())[String(ref).replace(/^amz:/, '')] || null;
+  const raw = async (ref) => load(String(ref).replace(/^amz:/, ''));
   // Pazar yerinin para birimi: panel fiyatları build'den önce bu para birimine çevirir (pr.currency)
   const catalog = { categories, allCategories, attributes, values, build, send, status, raw, currency: async () => currency,
     options: [{ k: 'gtinExempt', label: 'Barkodsuz ürünler: Amazon GTIN muafiyeti onayınız varsa “evet” yazın' }] };

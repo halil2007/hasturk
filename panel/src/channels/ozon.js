@@ -203,7 +203,7 @@ export function ozon(env, meta) {
   //   (pending · imported · failed · skipped; errors[]). Onaylanan ürün /v3/product/list'te offer_id ile görünür: key = offer_id = panel SKU'su.
   const LANG = 'TR';
   const OWN = { TYPE: 8229, BRAND: 85, NAME: 4180, DESC: 4191, MODEL: 9048 };
-  const VATS = ['0', '0.05', '0.07', '0.1', '0.2', '0.22'], CURS = ['RUB', 'BYN', 'KZT', 'EUR', 'USD', 'CNY'];
+  const VATS = ['0', '0.05', '0.07', '0.1', '0.2', '0.22'], CURS = ['RUB', 'EUR', 'USD', 'CNY']; // TCMB kuru olanlar (BYN / KZT için kur yok: fiyat çevrilemez)
   const catIds = (id) => {
     const m = /^(\d+):(\d+)$/.exec(str(id));
     if (!m) throw new Error(`Ozon kategori kimliği geçersiz (“${str(id).slice(0, 40)}”): kategoriyi yeniden seçin`);
@@ -312,8 +312,11 @@ export function ozon(env, meta) {
     const g = Math.round(num(pr.weight) * 1000);
     if (!(g > 0)) missing.push('ağırlık (kg)');
     const vat = vatOf(opts.vat), cur = str(opts.currency).toUpperCase();
-    if (!vat) missing.push('KDV oranı (Ürün yükle → Ozon seçenekleri)');
-    if (!CURS.includes(cur)) missing.push('para birimi (Ürün yükle → Ozon seçenekleri)');
+    // Boş seçenek "(Ürün yükle → Ozon seçenekleri)" ekiyle; geçersiz değer eksiz (her ekranda gönderimi engeller)
+    if (str(opts.vat) === '') missing.push('KDV oranı (Ürün yükle → Ozon seçenekleri)');
+    else if (!vat) missing.push(`KDV oranı “${str(opts.vat)}” geçersiz (0, 5, 7, 10, 20 ya da 22; Ozon seçeneklerinden düzeltin)`);
+    if (!cur) missing.push('para birimi (Ürün yükle → Ozon seçenekleri)');
+    else if (!CURS.includes(cur)) missing.push(`para birimi “${cur}” geçersiz (${CURS.join(', ')}; Ozon seçeneklerinden düzeltin)`);
     // Fiyat catalog.js'te TCMB kuruyla hesap para birimine çevrilmiş gelir (catalog.currency; pr.currency); çevrilmemiş TL fiyat gönderilmez
     else if (str(pr.currency || 'TRY').toUpperCase() !== cur) missing.push(`fiyat para birimi (${str(pr.currency || 'TRY').toUpperCase()}; Ozon hesabınız ${cur})`);
     const sale = num(pr.price), list = Math.max(num(pr.listPrice), sale);
@@ -369,7 +372,7 @@ export function ozon(env, meta) {
   // Hesap para birimi kanal seçeneğinden: panel fiyatı (TL) catalog.js'te TCMB kuruyla buna çevrilir
   const currency = (opts = {}) => { const c = str(opts.currency).toUpperCase(); return CURS.includes(c) ? c : ''; };
   const catalog = { categories, allCategories, attributes, values, build, send: sendProducts, status: importStatus, raw, brands: searchBrands, brandByCategory: true, chunk: 100, currency,
-    options: [{ k: 'vat', label: 'Ozon KDV oranı (%): 0, 5, 7, 10, 20 ya da 22' }, { k: 'currency', label: 'Ozon hesap para birimi (RUB, CNY, USD, EUR, KZT, BYN): panel fiyatı TCMB kuruyla bu para birimine çevrilir' }] };
+    options: [{ k: 'vat', label: 'Ozon KDV oranı (%): 0, 5, 7, 10, 20 ya da 22' }, { k: 'currency', label: 'Ozon hesap para birimi (RUB, CNY, USD, EUR): panel fiyatı TCMB kuruyla bu para birimine çevrilir' }] };
 
   async function diagnose({ orderId } = {}) {
     const out = [], now = Date.now();
