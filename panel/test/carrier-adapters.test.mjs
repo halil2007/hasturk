@@ -100,14 +100,16 @@ test('Kargonomi: firma adına göre teklif içinden seçilir (eski firma numaras
   ]);
   try {
     const confirm = () => JSON.parse(calls.filter((c) => /confirm/.test(c.url)).pop().body).shipping_provider_id;
-    await kargonomi.make({ KARGONOMI_API_KEY: 't', KARGONOMI_PROVIDER: 'yurtici' }).create(ship({ desi: 0 }));
+    // Entegrasyondaki "önce işaretli gelecek firma" kendiliğinden seçim yapmaz: firma her gönderide kullanıcının seçimi
+    await assert.rejects(kargonomi.make({ KARGONOMI_API_KEY: 't', KARGONOMI_PROVIDER: 'yurtici' }).create(ship()), /firması seçilmedi/);
+    await kargonomi.make({ KARGONOMI_API_KEY: 't' }).create(ship({ desi: 0 }), { firm: 'yurtici' });
     assert.equal(confirm(), 14, 'Kargonomi\'deki numarası tekliften');
-    assert.equal(JSON.parse(calls.find((c) => /POST .*\/shipments$/.test(`${c.method} ${c.url}`)).body).shipment.packages[0].desi, 1);
-    await kargonomi.make({ KARGONOMI_API_KEY: 't', KARGONOMI_PROVIDER: '4' }).create(ship());
+    assert.equal(JSON.parse(calls.filter((c) => /POST .*\/shipments$/.test(`${c.method} ${c.url}`)).pop().body).shipment.packages[0].desi, 1);
+    await kargonomi.make({ KARGONOMI_API_KEY: 't' }).create(ship(), { firm: '4' });
     assert.equal(confirm(), 11, 'eski kayıt (4 = Aras) ada çevrilir');
     // Teklif vermeyen firma: gönderi açılmaz, taslak silinir, teklif verenler yazılır
     const n0 = calls.length;
-    await assert.rejects(kargonomi.make({ KARGONOMI_API_KEY: 't', KARGONOMI_PROVIDER: 'ptt' }).create(ship()), /teklif vermedi.*Aras Kargo \(52\.4 TL\).*Yurtiçi/);
+    await assert.rejects(kargonomi.make({ KARGONOMI_API_KEY: 't' }).create(ship(), { firm: 'ptt' }), /teklif vermedi.*Aras Kargo \(52\.4 TL\).*Yurtiçi/);
     assert.ok(calls.slice(n0).some((c) => c.method === 'DELETE' && /shipments\/90$/.test(c.url)));
     assert.ok(!calls.slice(n0).some((c) => /confirm/.test(c.url)));
     // Doküman kuralları: alıcı adı en az 2 kelime, adres en az 10 karakter (istek atılmadan açıklamalı hata)
@@ -131,13 +133,17 @@ test('Kargonomi: firma onayının yanıtı alınamadı (5xx) ama gönderi işlen
   ]);
   try {
     const a = kargonomi.make({ KARGONOMI_API_KEY: 't' });
-    await assert.rejects(a.create(ship()));
+    await assert.rejects(a.create(ship(), { providerId: '11' }), /Kargonomi sunucusu|Bad gateway/);
     assert.ok(calls.some((c) => c.method === 'POST' && /shipments\/cancel$/.test(c.url)), 'işlenmiş gönderi iptal');
     status = 'draft';
     const n0 = calls.length;
-    await assert.rejects(a.create(ship()));
+    await assert.rejects(a.create(ship(), { providerId: '11' }));
     const rest = calls.slice(n0);
     assert.ok(rest.some((c) => c.method === 'DELETE') && !rest.some((c) => /shipments\/cancel$/.test(c.url)), 'taslak silinir');
+    // Kullanıcının teklif ekranından onayladığı taslak hata sonrası taslaksa korunur (başka firma seçip yeniden dener; vazgeçerse ekran siler)
+    const n1 = calls.length;
+    await assert.rejects(a.create(ship(), { draftId: '91', providerId: '11' }));
+    assert.ok(!calls.slice(n1).some((c) => c.method === 'DELETE'), 'seçilen teklifin taslağı silinmez');
   } finally { restore(); }
 });
 

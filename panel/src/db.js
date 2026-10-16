@@ -400,6 +400,10 @@ export const MIGRATIONS = [
   // Kargo firmasının "teslim edildi" bilgisi siteye (ikas / WooCommerce) yazıldı mı: 'delivered' = yazıldı, 'skip' = kanal desteklemiyor.
   // Boşsa (kanal o an hata verdi) her takip turunda yeniden denenir
   'ALTER TABLE packages ADD COLUMN site_sync TEXT',
+  // Entegratör gönderisi: "Kargoya ver" kendiliğinden yapılamadıysa deneme sayacı (e1…, 'fail') ve siteye yazılan takip kodu
+  // (sonradan gelen takip kodu kanal hata verdiyse yeniden yazılsın; bkz. carriers.js trackCarriers)
+  'ALTER TABLE packages ADD COLUMN ship_sync TEXT',
+  'ALTER TABLE packages ADD COLUMN site_tracking TEXT',
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)

@@ -34,10 +34,19 @@ export function make(values) {
     try {
       return await http(API + path, { method, tries: method === 'GET' ? 2 : 1, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
     } catch (e) {
-      // Laravel doğrulama hatası: { message, errors: { alan: [..] } } → okunur metin
-      const m = /HTTP (\d+) (.*)$/s.exec(e.message || '');
-      if (m && m[1] === '401') throw new Error('Kargonomi API anahtarı geçersiz (401). Kargonomi panelindeki anahtarı yeniden girin.');
-      throw new Error('Kargonomi: ' + (m ? m[2] : e.message));
+      // Laravel doğrulama hatası: { message, errors: { alan: [..] } } → alan mesajları (İngilizce genel "The given data was invalid." yerine)
+      const m = /HTTP (\d+) (.*)$/s.exec(e.message || ''), code = m ? m[1] : String(e.status || '');
+      if (code === '401') throw new Error('Kargonomi API anahtarı geçersiz (401). Kargonomi panelindeki anahtarı yeniden girin.');
+      const d = e.data || {}, fields = d.errors && typeof d.errors === 'object' ? Object.values(d.errors).flat().map(str).filter(Boolean) : [];
+      let msg = fields.length ? fields.join(' · ') : str(d.message) || (m ? m[2] : e.message);
+      if (code === '404' && !fields.length) msg = 'gönderi Kargonomi\'de bulunamadı (silinmiş ya da iptal edilmiş olabilir)';
+      else if (/^the given data was invalid\.?$/i.test(msg)) msg = 'Kargonomi bilgileri kabul etmedi (eksik / hatalı alan)';
+      else if (/unauthenticated/i.test(msg)) msg = 'API anahtarı kabul edilmedi';
+      else if (/too many/i.test(msg)) msg = 'çok fazla istek; birkaç dakika sonra yeniden deneyin';
+      else if (/server error/i.test(msg)) msg = 'Kargonomi sunucusu yanıt veremedi; birkaç dakika sonra yeniden deneyin';
+      const out = new Error('Kargonomi: ' + msg);
+      out.status = e.status;
+      throw out;
     }
   };
   async function placeId(kind, parent, name) {
@@ -59,10 +68,12 @@ export function make(values) {
   // Kargo firması her zaman kullanıcının seçimidir (otomatik / en ucuz seçilmez): tekliften numarası (firmId) ya da adı (toplu gönderimde
   // seçilen firma, yoksa Ayarlar'daki varsayılan firma). Hiçbiri yoksa gönderi açılmaz.
   const offersOf = async (id) => list(unwrap(await req('GET', `/shipment-price-comparison/${id}`)).shipping_provider_with_price || []).filter((o) => String(o.id) !== '-1')
-    .map((o) => ({ id: String(o.id), name: str(o.name), slug: str(o.slug), price: o.price == null ? null : money(o.price) }));
+    .map((o) => ({ id: String(o.id), name: str(o.name), slug: str(o.slug), price: o.price == null ? null : money(o.price), note: money(o.price) == null && o.price != null ? str(o.price) : '' }))
+    // Fiyat yerine açıklama gelen firma (ör. "Hizmet Dışı Bölge") bu gönderiyi taşımaz: listelenmez
+    .filter((o) => o.price != null);
   async function providerId(id, { firmId, firm } = {}) {
     if (firmId && String(firmId) !== '-1') return Number(firmId) || firmId;
-    let want = str(firm) || str(values.KARGONOMI_PROVIDER);
+    let want = str(firm);
     if (LEGACY[want]) want = LEGACY[want];
     if (!want || want === '-1') throw new Error('Kargonomi: kargo firması seçilmedi. Gönderirken firmayı seçin (fiyatlar Kargonomi\'den gelir)');
     const offers = await offersOf(id);
@@ -135,17 +146,29 @@ export function make(values) {
       const draft = await openDraft(s);
       try { return { ref: str(draft.id), offers: await offersOf(draft.id) }; } catch (e) { await req('DELETE', `/shipments/${draft.id}`).catch(() => null); throw e; }
     },
-    async discard(ref) { await req('DELETE', `/shipments/${ref}`); },
+    // Vazgeçilen teklif: yalnız hâlâ taslaksa silinir (yanıtı kaybolmuş onaylı gönderi silinmesin)
+    async discard(ref) {
+      const s = unwrap(await req('GET', `/shipments/${ref}`).catch(() => null)) || {};
+      if (str(s.status) === 'draft') await req('DELETE', `/shipments/${ref}`);
+    },
     async create(s, opts = {}) {
       const draft = opts.draftId ? { id: Number(opts.draftId) || opts.draftId } : await openDraft(s);
+      // Firma seçimi onaydan önce: seçilen firma teklif vermediyse gönderi hiç onaylanmaz; panelin açtığı taslak silinir
+      let pid;
+      try { pid = await providerId(draft.id, { firmId: opts.providerId, firm: opts.firm }); } catch (e) {
+        if (!opts.draftId) await req('DELETE', `/shipments/${draft.id}`).catch(() => null);
+        throw e;
+      }
       try {
-        await req('POST', '/confirm-shipping-price', { shipment_id: draft.id, shipping_provider_id: await providerId(draft.id, { firmId: opts.providerId, firm: opts.firm }) });
+        await req('POST', '/confirm-shipping-price', { shipment_id: draft.id, shipping_provider_id: pid });
       } catch (e) {
         // Onay yanıtı alınamadı ama Kargonomi işlemiş olabilir (zaman aşımı / 5xx): gönderi taslak değilse iptal edilir, taslaksa silinir.
         // Durumu okunamazsa ikisi de denenir: ücretli ve panelde kaydı olmayan gönderi kalmasın
         const now = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => null)) || {};
-        const drop = () => req('DELETE', `/shipments/${draft.id}`);
-        await (now.status === 'draft' ? drop() : req('POST', '/shipments/cancel', { shipment_id: draft.id }).catch(drop)).catch(() => null);
+        // Kullanıcının seçtiği teklif (draftId) taslak kaldıysa korunur: başka firma seçip yeniden deneyebilir (vazgeçerse ekran siler)
+        if (now.status === 'draft') { if (!opts.draftId) await req('DELETE', `/shipments/${draft.id}`).catch(() => null); }
+        else if (now.status) await req('POST', '/shipments/cancel', { shipment_id: draft.id }).catch(() => null);
+        else await req('POST', '/shipments/cancel', { shipment_id: draft.id }).catch(() => (opts.draftId ? null : req('DELETE', `/shipments/${draft.id}`))).catch(() => null);
         throw e;
       }
       // Fiyat onayından sonraki hata: gönderi panele yazılmaz (takipsiz taslak / gönderi kalmasın) → iptal edilir, olmazsa silinir (en iyi çaba)
@@ -165,16 +188,23 @@ export function make(values) {
         throw e;
       }
     },
+    // İptal: Kargonomi'de iptal bir taleptir (kargo firması paketi almadıysa 36 saate kadar işlenir, reddedilebilir).
+    // Dönüş: { done } kesin iptal (ya da silinen taslak) · { pending } talep iletildi, sonuç takipte gelir (bkz. carriers.js)
     async cancel(ref) {
-      try { await req('POST', '/shipments/cancel', { shipment_id: Number(ref) || ref }); } catch (e) {
-        // Henüz firmaya iletilmemiş taslak: silinir
-        try { await req('DELETE', `/shipments/${ref}`); } catch { throw e; }
-      }
+      const id = Number(ref) || ref;
+      const statusOf = async () => str((unwrap(await req('GET', `/shipments/${id}`).catch(() => null)) || {}).status);
+      const now = await statusOf();
+      if (now === 'cancelled') return { done: true };
+      if (now === 'draft') { await req('DELETE', `/shipments/${id}`); return { done: true }; }
+      if (now === 'request_for_cancellation') return { pending: true };
+      await req('POST', '/shipments/cancel', { shipment_id: id });
+      return (await statusOf()) === 'cancelled' ? { done: true } : { pending: true };
     },
     async track(pkg) { return result(unwrap(await req('GET', `/shipments/${pkg.carrier_ref}`))); },
     // Etiket, firma gönderisi oluştuktan (takip no geldikten) sonra hazır olur
     async label(pkg) {
       const raw = unwrap(await req('GET', `/shipments/${pkg.carrier_ref}`)), s = result(raw);
+      if (raw.status === 'webservice_order_failed') return { failed: true, text: str(raw.status_label) };
       if (!labelReady(raw)) return null;
       const lab = await getLabel(pkg.carrier_ref);
       return lab ? { ...lab, tracking: s.tracking, barcode: s.barcode, carrier: s.carrier, trackingUrl: s.trackingUrl } : null;

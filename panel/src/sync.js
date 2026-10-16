@@ -28,7 +28,7 @@ import { pushDigest } from './push.js';
 import { dailyDigest } from './digest.js';
 import { urgentAlert, alertResolved } from './alerts.js';
 import { allows } from './plans.js';
-import { trackCarriers } from './carriers.js';
+import { trackCarriers, ORPHAN_MSG } from './carriers.js';
 import { shipCheck } from './shipcost.js';
 export { relinkItems };
 
@@ -150,13 +150,16 @@ export async function saveOrders(db, ch, orders, maps) {
       if (Array.isArray(o.packages)) {
         const remoteIds = o.packages.map((p) => p.remoteId).filter(Boolean);
         if (remoteIds.length) {
-          st.push(db.prepare(`DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND remote_id NOT IN (${remoteIds.map(() => '?').join(',')})`).bind(id, ...remoteIds));
+          // Entegratör gönderisi açık paket silinmez (ücretli gönderi takipsiz kalmasın): kanaldan ayrılır, uyarı yazılır (bkz. carriers.js ORPHAN_MSG)
+          st.push(db.prepare(`UPDATE packages SET remote_id = NULL, remote_status = NULL, error = ? WHERE order_id = ? AND remote_id IS NOT NULL AND carrier_ref IS NOT NULL AND remote_id NOT IN (${remoteIds.map(() => '?').join(',')})`).bind(ORPHAN_MSG, id, ...remoteIds));
+          st.push(db.prepare(`DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND carrier_ref IS NULL AND remote_id NOT IN (${remoteIds.map(() => '?').join(',')})`).bind(id, ...remoteIds));
           // Kanalda paket oluştuysa (panelden ya da kanalın kendi panelinden) paneldeki taslak paketler kaldırılır
           // (kargo entegratöründe gönderisi açılmış taslak korunur: takip no ve etiket kaybolmasın)
           st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NULL AND status = 'open' AND carrier_provider IS NULL").bind(id));
         } else if (!o.packages.length) {
           // Kanalda paket kalmadı (ör. ikas'ta paket iptal edildi): kanal paketleri kaldırılır, taslaklar korunur
-          st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND status = 'open'").bind(id));
+          st.push(db.prepare("UPDATE packages SET remote_id = NULL, remote_status = NULL, error = ? WHERE order_id = ? AND remote_id IS NOT NULL AND carrier_ref IS NOT NULL AND status = 'open'").bind(ORPHAN_MSG, id));
+          st.push(db.prepare("DELETE FROM packages WHERE order_id = ? AND remote_id IS NOT NULL AND carrier_ref IS NULL AND status = 'open'").bind(id));
         }
         for (const p of o.packages) {
           if (!p.remoteId) continue;
@@ -171,7 +174,8 @@ export async function saveOrders(db, ch, orders, maps) {
               shipped_at = CASE WHEN excluded.status = 'shipped' THEN COALESCE(packages.shipped_at, excluded.shipped_at) ELSE packages.shipped_at END,
               cargo_company = CASE WHEN packages.carrier_provider IS NOT NULL THEN packages.cargo_company ELSE COALESCE(NULLIF(excluded.cargo_company, ''), packages.cargo_company) END,
               tracking = CASE WHEN packages.carrier_provider IS NOT NULL THEN packages.tracking ELSE COALESCE(NULLIF(excluded.tracking, ''), packages.tracking) END,
-              barcode = CASE WHEN packages.carrier_provider IS NOT NULL THEN packages.barcode ELSE COALESCE(NULLIF(excluded.barcode, ''), packages.barcode) END, error = excluded.error,
+              barcode = CASE WHEN packages.carrier_provider IS NOT NULL THEN packages.barcode ELSE COALESCE(NULLIF(excluded.barcode, ''), packages.barcode) END,
+              error = CASE WHEN packages.carrier_provider IS NOT NULL AND excluded.error IS NULL THEN packages.error ELSE excluded.error END,
               agreement = CASE WHEN packages.agreement = 'own' THEN 'own' ELSE COALESCE(excluded.agreement, packages.agreement) END,
               tracking_url = COALESCE(NULLIF(excluded.tracking_url, ''), packages.tracking_url),
               packed_at = CASE WHEN excluded.packed_at IS NULL THEN NULL ELSE COALESCE(packages.packed_at, excluded.packed_at) END`)

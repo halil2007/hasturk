@@ -129,7 +129,7 @@ export async function http(url, { method = 'GET', headers = {}, body: b, timeout
     if (!res.ok) {
       const msg = typeof data === 'object' && data ? (data.message || data.errorMessage || (data.errors && JSON.stringify(data.errors)) || JSON.stringify(data)) : htmlReason(text, res.status);
       const err = new Error(`${method} ${shortUrl(url)}: HTTP ${res.status} ${String(msg).slice(0, 400)}`);
-      err.status = res.status;
+      err.status = res.status; err.data = typeof data === 'object' ? data : null;
       throw err;
     }
     return data;

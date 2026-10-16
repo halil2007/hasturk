@@ -162,12 +162,12 @@ const ikasOrder = (id, no, lines, o = {}) => ({
 });
 // Kargonomi (kendi anlaşmalı kargo entegratörü): taslak → firma seçimi → takip no + PDF etiket
 function kargonomiMock(n) {
-  const st = { created: 0, cancelled: [] };
+  const st = { created: 0, cancelled: [], approve: false };
   n.on('GET', /app\.kargonomi\.com\.tr\/api\/v1\/states$/, { data: [{ id: 34, name: 'İstanbul' }, { id: 16, name: 'Bursa' }] });
   n.on('GET', /app\.kargonomi\.com\.tr\/api\/v1\/cities\/\d+$/, { data: [{ id: 3401, name: 'Kadıköy' }, { id: 1601, name: 'Nilüfer' }] });
   n.on('POST', /app\.kargonomi\.com\.tr\/api\/v1\/shipments$/, () => ({ data: { id: 900 + (++st.created), status: 'draft' } }));
   n.on('POST', /confirm-shipping-price$/, {});
-  n.on('GET', /app\.kargonomi\.com\.tr\/api\/v1\/shipments\/\d+$/, (c) => { const id = c.url.split('/').pop(); return { data: { id: Number(id), status: 'webservice_order_created', shipping_webservice_tracking_code: 'KG' + id, shipping_provider_name: 'Aras Kargo', shipping_provider_slug: 'aras', real_price: 54.9 } }; });
+  n.on('GET', /app\.kargonomi\.com\.tr\/api\/v1\/shipments\/\d+$/, (c) => { const id = c.url.split('/').pop(); return { data: { id: Number(id), status: st.cancelled.includes(Number(id)) ? (st.approve ? 'cancelled' : 'request_for_cancellation') : 'webservice_order_created', shipping_webservice_tracking_code: 'KG' + id, shipping_provider_name: 'Aras Kargo', shipping_provider_slug: 'aras', real_price: 54.9 } }; });
   n.on('GET', /\/shipments\/\d+\/barcode\?format=pdf$/, { data: 'JVBERi0xLjQK' + 'A'.repeat(200) });
   n.on('POST', /\/shipments\/cancel$/, (c) => { st.cancelled.push(c.body.shipment_id); return {}; });
   return st;
@@ -467,8 +467,18 @@ test('Kendi anlaşmalı kargo: ikas siparişi Kargonomi ile gönderilir (etiket,
     const id2 = oid('ikas1:io2');
     const c2 = await ok(await admin(`/api/orders/${id2}/carrier-label`, J({ firm_id: '11' })));
     const pk2 = c2.order.packages[0];
-    await ok(await admin(`/api/orders/${id2}/carrier-cancel`, J({ package_id: pk2.id })));
+    // Kargonomi'de iptal bir taleptir: onaylanana kadar ücret ve takip korunur, paket kargoya verilemez / yeniden gönderilemez
+    const cr = await ok(await admin(`/api/orders/${id2}/carrier-cancel`, J({ package_id: pk2.id })));
+    assert.equal(cr.pending, true);
     assert.deepEqual(kg.cancelled, [902]);
+    d = await ok(await admin('/api/orders/' + id2));
+    assert.equal(d.order.packages[0].carrier_state, 'cancelling'); assert.equal(d.order.packages[0].carrier_provider, 'kargonomi');
+    assert.ok(d.order.shipping_cost > 0, 'onaydan önce ücret geri alınmaz');
+    assert.equal((await admin(`/api/orders/${id2}/ship`, J({ package_id: pk2.id }))).status, 400);
+    assert.equal((await admin(`/api/orders/${id2}/carrier-cancel`, J({ package_id: pk2.id }))).status, 400, 'iptal talebi tekrar gönderilmez');
+    // Kargonomi iptali onayladı: takip turu ücreti geri alır, paketi serbest bırakır, ikas paketini geri alır
+    kg.approve = true;
+    await ok(await admin('/api/sync', J({})));
     d = await ok(await admin('/api/orders/' + id2));
     assert.equal(d.order.packages[0].carrier_provider, null); assert.equal(d.order.packages[0].tracking, ''); assert.equal(d.order.packages[0].remote_id, null);
     assert.equal(d.order.shipping_cost, 0);
