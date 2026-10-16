@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { d1 } from '../dev/d1.mjs';
-import { init, run, first } from '../src/db.js';
+import { init, run, first, all } from '../src/db.js';
 import { save } from '../src/questions.js';
 import { hepsiburada } from '../src/channels/hepsiburada.js';
 
@@ -54,4 +54,37 @@ test('Göç: cevabı kayıtlı olduğu halde bekleyen eski sorular cevaplandı o
   await run(db, sql);
   assert.equal((await first(db, "SELECT status FROM questions WHERE remote_id = 'O1'")).status, 'answered');
   assert.equal((await first(db, "SELECT status FROM questions WHERE remote_id = 'O2'")).status, 'waiting');
+});
+
+test('Hepsiburada: panelde bekleyen eski soru (liste yalnız bekleyenleri döndürse bile) cevaplanan / tek soru sorgusuyla güncellenir; süresi dolan kapanır', async () => {
+  const { getChannels, resetChannels } = await import('../src/channels/index.js');
+  const { syncQuestions } = await import('../src/questions.js');
+  const db = d1(); await init(db); resetChannels();
+  const t = Date.now(), H = 3600e3, iso = (ms) => new Date(ms).toISOString().slice(0, 19);
+  const env = { HB_MERCHANT_ID: 'M1', HB_PASSWORD: 'x', HB_USER_AGENT: 'dev' };
+  for (const [id, asked, due] of [['B1', t - 5 * 864e5, t + 864e5], ['B2', t - 2 * 864e5, t + 864e5], ['B3', t - 10 * 864e5, t - 2 * 864e5], ['B4', t - 3 * H, t + 864e5]]) {
+    await run(db, "INSERT INTO questions (channel, remote_id, text, asked_at, status, due_at, synced_at) VALUES ('hepsiburada', ?, 'soru', ?, 'waiting', ?, ?)", id, asked, due, t - H);
+  }
+  const urls = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url); urls.push(u);
+    if (/token|authenticate/i.test(u)) return J({ token: 't' });
+    if (/\/issues\/B2$/.test(u)) return J({ data: issue('B2', 'Answered', [msg('Customer', 'soru', iso(t - 2 * 864e5)), msg('Merchant', 'HB panelinden cevap', iso(t - 864e5))]) });
+    if (/\/issues\/B3$/.test(u)) return J({ data: issue('B3', 'WaitingForAnswer', [msg('Customer', 'soru', iso(t - 10 * 864e5))]) });
+    if (/\/issues\?/.test(u) && /status=Answered/.test(u)) return J({ data: [issue('B1', 'Answered', [msg('Customer', 'soru', iso(t - 5 * 864e5)), msg('Merchant', 'cevap', iso(t - 4 * 864e5))])], currentPage: 1, totalPageCount: 1 });
+    if (/\/issues\?/.test(u)) return J({ data: [], currentPage: 1, totalPageCount: 1 }); // varsayılan liste: hiçbiri
+    return J({});
+  };
+  try {
+    const chs = await getChannels(env, db);
+    const hb = chs.find((c) => c.id === 'hepsiburada');
+    assert.ok(hb && hb.questions && hb.question, 'Hepsiburada kanalı soru sorgularıyla');
+    hb.enabled = true;
+    await syncQuestions(env, db, { only: ['hepsiburada'] });
+    const st = Object.fromEntries((await all(db, "SELECT remote_id, status FROM questions WHERE channel = 'hepsiburada'")).map((r) => [r.remote_id, r.status]));
+    assert.deepEqual(st, { B1: 'answered', B2: 'answered', B3: 'other', B4: 'waiting' });
+    assert.ok(urls.some((u) => /status=AutoClosed/.test(u)), 'kapanan sorular da istenir');
+    assert.ok(!urls.some((u) => /\/issues\/B4$/.test(u)), '6 saatten yeni bekleyen soru tek tek sorulmaz');
+  } finally { globalThis.fetch = real; resetChannels(); }
 });
