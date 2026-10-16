@@ -34,7 +34,6 @@
 - [Müşteri soruları ve iadeler](https://hasturkcrm.com/ozellikler/musteri-sorulari-ve-iadeler): Trendyol, Hepsiburada ve N11 müşteri sorularını hazır cevaplarla yanıtlayın, iade taleplerini panelden onaylayın ya da reddedin.
 - [Raporlar ve analiz](https://hasturkcrm.com/ozellikler/raporlar): Günlük, haftalık ve aylık satış raporları; en çok satan ürünler, kanal dağılımı, il bazında satış haritası ve sadık müşteriler. Tüm pazaryerleri tek raporda.
 - [Sipariş yönetimi](https://hasturkcrm.com/ozellikler/siparis-yonetimi): Trendyol, Hepsiburada, N11 ve ikas siparişlerini tek listede yönetin: gecikme uyarısı, toplu işlem, sipariş başı kâr. 7 gün ücretsiz deneyin.
-- [Stok API](https://hasturkcrm.com/ozellikler/stok-api): Güncel stoklarınızı kendi sitenize, ERP'nize ya da bayilerinizin sistemine API ile aktarın. Her bayiye ayrı anahtar, IP kısıtı ve kurulum kılavuzu.
 - [Stok senkronizasyonu](https://hasturkcrm.com/ozellikler/stok-senkronizasyonu): Bir kanalda satılan ürünün stoğu Trendyol, Hepsiburada, N11 ve sitenizde otomatik düşer. Fazla satışa son; çoklu mağaza stok takibi tek panelde.
 - [Ürün yönetimi ve otomatik gönderim](https://hasturkcrm.com/ozellikler/urun-yonetimi): Ürünü bir kez tanımlayın; Trendyol, Hepsiburada, N11 ve idefix'e toplu ürün yükleyin. Kategori eşleştirme, varyant ve görseller otomatik gider.
 

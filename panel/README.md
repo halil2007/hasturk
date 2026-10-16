@@ -221,7 +221,7 @@ Kullanıcılar → **Müşteri panelleri** (yalnız ana panel yöneticisi): firm
 - Her müşteri paneli ayrı bir **Durable Object**'te kendi SQLite veritabanıyla çalışır: siparişler, ürünler, kullanıcılar ve şifreli API bilgileri yalnız o firmaya aittir; ana panelin API bilgileri, şifresi ve deneme modu müşteriye geçmez. Müşteri kendi kullanıcılarını, mağazalarını ve ayarlarını kendisi yönetir.
 - Kod ortak olduğu için panelin her güncellemesi tüm müşteri panellerine aynı anda gelir. Her müşteri paneli 15 dakikada bir kendi kanallarını senkronlar.
 - Ana panelden: askıya alma (giriş ve senkron durur, veri korunur), yönetici şifresini sıfırlama, istatistik, **Panele gir** (2 saatlik destek oturumu; üstte “Ana panele dön”) ve kalıcı silme.
-- **Paketler** (`src/plans.js`, sitedeki paketlerle aynı): Başlangıç 3 mağaza / 2 kullanıcı; Profesyonel 10 / 5 + buybox ve otomatik fiyat, otomatik ürün gönderimi, hakediş ve faturalar, Excel, personel yetkileri; Kurumsal 25 / sınırsız + Stok API. Firma kartında paket seçilir; mağaza ve kullanıcı sınırı elle de girilebilir ("Özel" pakette sınır yoktur). Paket yükseltilince kısıtlar hemen kalkar.
+- **Paketler** (`src/plans.js`, sitedeki paketlerle aynı): Başlangıç 3 mağaza / 2 kullanıcı; Profesyonel 10 / 5 + buybox ve otomatik fiyat, otomatik ürün gönderimi, hakediş ve faturalar, Excel, personel yetkileri; Kurumsal 25 / sınırsız. Stok API hiçbir paketin özelliği değildir (iç kullanım; bkz. **Stok API (iç kullanım)**). Firma kartında paket seçilir; mağaza ve kullanıcı sınırı elle de girilebilir ("Özel" pakette sınır yoktur). Paket yükseltilince kısıtlar hemen kalkar.
 - **Abonelik / deneme bitişi**: son 7 günde müşteri panelinin üstünde uyarı çıkar, firma kartındaki e-postaya 7, 3 ve 1 gün kala hatırlatma gider (ana panelin e-posta servisiyle). Süre dolunca giriş ve arka plan senkronu durur, veriler korunur; giriş ekranında ana panelin **Ayarlar → Firma** bölümündeki telefon ve e-posta gösterilir (doldurun). Ödeme kaydıyla süre uzayınca senkron kendiliğinden devam eder.
 - **Hoş geldiniz e-postası**: firma oluşturulurken e-posta girildiyse giriş adresi, firma kodu, kullanıcı adı ve 7 gün geçerli "şifrenizi belirleyin" bağlantısı gider.
 - **Şifremi unuttum**: giriş ekranında (firma koduyla) — kullanıcıya kayıtlı e-postaya 1 saat geçerli, tek kullanımlık bağlantı gider; şifre değişince diğer oturumlar kapanır.
@@ -245,12 +245,17 @@ Kullanıcılar → **Müşteri panelleri** (yalnız ana panel yöneticisi): firm
 - **Cloudflare limitleri:** Ücretsiz planda istek başına işlemci süresi ve veritabanı sorgu sayısı sınırlıdır. Kayıtlarda "CPU" veya "too many" hatası görünürse **Workers Paid** planına (aylık 5 $) geçin. Kod değişikliği gerekmez.
 - **Kişisel veriler:** Müşteri adı, adresi ve telefonu yalnızca sizin Cloudflare veritabanınızda tutulur. Panel girişsiz hiçbir veri vermez. Oturum, imzalı ve HttpOnly bir çerezle tutulur. Başka sitelerden gelen yazma istekleri reddedilir.
 
-## Dış API (stok aktarımı)
+## Stok API (iç kullanım)
 
-Yalnız ana panelin yetkilendirdiği müşteri panelleri için: **Firmalar → firma → Dış API (stok aktarımı) → API erişimini aç**.
+Stok API ana panelin iç özelliğidir: müşterilere paket özelliği olarak sunulmaz, tanıtım sitesinde ve blogda anlatılmaz.
+- **Ana panel:** **Ayarlar → Stok API** — ana panelin kendi ürün ve stokları için anahtar üretilir.
+- **Belirli bir firma için (isteğe bağlı):** süper yönetici tek bir müşteri paneline **Firmalar → firma → Dış API (stok aktarımı) → API erişimini aç**
+  ile açabilir. Firma yöneticisi bu ayarı göremez / değiştiremez.
+
 Anahtar bir kez gösterilir (veritabanında yalnız özeti tutulur) ve firma koduna bağlıdır; dış sistem yalnız o mağazanın ürün ve
-stoklarını **okur** (yazma yok). Firma yöneticisi bu ayarı göremez / değiştiremez. İsteğe bağlı IP kısıtı (adres ya da IPv4 aralığı),
-dakikada 120 istek; kapatma, yeni anahtar (eskisi hemen geçersiz) ve son erişim / istek sayısı aynı kartta.
+stoklarını **okur** (satış bildirimi `POST /api/v1/sales` yalnız "satış bildirebilir" izni açık anahtarla; bkz. `src/extapi.js`).
+İsteğe bağlı IP kısıtı (adres ya da IPv4 aralığı), dakikada 120 istek; kapatma, yeni anahtar (eskisi hemen geçersiz) ve son erişim /
+istek sayısı aynı kartta.
 
 ```bash
 curl -H "Authorization: Bearer hst_<firma-kodu>_<gizli>" "https://<panel-adresi>/api/v1/stock?page=1&limit=500"

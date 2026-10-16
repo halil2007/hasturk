@@ -16,6 +16,7 @@ import { exclusive } from './locks.js';
 import { rank } from './catmatch.js';
 import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes, autoFill, inferBrand, inCurrency } from './catalog.js';
 import { HELD_SQL } from './sync.js';
+import { scopeOf, targetsOf, setTargets } from './targets.js';
 
 // Kanalın bir kez sorulan zorunlu seçenekleri (Ürün yükle → kanal seçenekleri ile aynı yer: upload_opts). Üçüncü değer: ürünün kendi alanı varsa o kullanılır.
 const NEED = {
@@ -73,6 +74,7 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
   const saved = await savedAttrs(db, all0);
   const states = new Map((await allIn(db, all0, (ph, part) => [`SELECT * FROM product_channel WHERE product_id IN (${ph})`, part])).map((r) => [`${r.product_id}|${r.channel}`, r]));
   const brandRows = new Map((await all(db, 'SELECT * FROM brand_map')).map((r) => [`${r.brand}|${r.channel}`, r]));
+  const targetPicks = await targetsOf(db, all0);
   const out = { products: [], channels: [] }, fxOf = new Map();
   let first = true;
   for (const c of chans) {
@@ -83,6 +85,8 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
       first = false;
     }
     const row = { id: c.id, name: c.name, kind, disabled: c.hold ? 'Beklemede' : '', options: [], cats: [], items: [], counts: {}, brandSearch: !!(c.catalog && c.catalog.brands), brandByCategory: !!(c.catalog && c.catalog.brandByCategory) };
+    // "Yalnız seçtiğim ürünler" kapsamındaki kanal: ürünlerden hangileri bu kanal için seçili (ekranda ön seçim için)
+    if (scopeOf(settings, c.id) === 'selected') { row.scope = 'selected'; row.picked = all0.filter((id) => (targetPicks[id] || []).includes(c.id)); }
     out.channels.push(row);
     if (c.hold) { row.items = prods.map((p) => ({ id: p.id, state: 'off', missing: ['Kanal beklemede'] })); continue; }
     const dOpts = { ...(allOpts[c.id] || {}), ...((draft.opts || {})[c.id] || {}) };
@@ -412,6 +416,8 @@ async function publish(env, db, ctx, b, user) {
       if (!go.length || row.disabled || !c) continue;
       if (row.kind === 'market') await sendMarket(db, c, go, results[row.id], user);
       else await sendStore(db, c, go, results[row.id], user);
+      // Elle yayınlanan ürün, "yalnız seçtiğim ürünler" kapsamındaki kanalda seçili sayılır
+      if (row.scope === 'selected') await setTargets(db, go.map((x) => x.id), [row.id], true);
     }
     const after = await plan(env, db, { ids, channels: only.length ? only : null });
     return { results, ...after };

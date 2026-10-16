@@ -18,6 +18,7 @@ import { dailyDigest } from './digest.js';
 import { listClaims, approveClaim, rejectClaim, claimReasons, syncClaims } from './claims.js';
 import { sendMail, orderMail, validEmail, logoPath, logoUrl } from './mail.js';
 import { catalogApi } from './catalog.js';
+import { setTargets, targetsOf } from './targets.js';
 import { publishApi } from './publish.js';
 import { catmapApi } from './catmap.js';
 import * as customers from './customers.js';
@@ -1162,6 +1163,8 @@ async function productDetail(db, id) {
   p.moves = await all(db, 'SELECT * FROM stock_moves WHERE product_id = ? ORDER BY id DESC LIMIT 30', id);
   // Kargo tutarı: faturaya göre son güncelleme / faturalar daha yüksek notu (bkz. shipcost.js)
   p.ship_info = shipInfo(p);
+  // "Yalnız seçtiğim ürünler" kapsamındaki kanallar için bu ürünün seçildiği kanallar
+  p.targets = (await targetsOf(db, [p.id]))[p.id] || [];
   // İlanın son siparişteki gerçek komisyon oranı (ilandaki oran ana orandır; indirimli sipariş ayrıca gösterilir)
   const lastRates = p.listings.length ? await all(db, `SELECT o.channel, i.remote_key AS k, ROUND(i.commission * 100.0 / i.total, 2) AS r, o.ordered_at AS at FROM order_items i JOIN orders o ON o.id = i.order_id
     WHERE i.product_id = ? AND o.ordered_at >= ? AND i.commission IS NOT NULL AND i.total > 0 AND COALESCE(i.status, '') NOT IN ('cancelled', 'returned') ORDER BY o.ordered_at DESC LIMIT 200`, id, Date.now() - 90 * 864e5) : [];
@@ -1179,7 +1182,7 @@ const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS).concat(['stock_channels', 'lo
 // Tarayıcıya yalnız panel ayarları gider; iç kayıtlar (bildirim imza anahtarı, senkron imleçleri, giriş sayaçları …) gitmez
 // Logo: içerik yerine önbelleklenebilir adresi gider (özet her açılışta yüzlerce KB taşımasın)
 const publicSettings = (st, env) => ({ ...Object.fromEntries(SETTING_KEYS.filter((k) => k in st).map((k) => [k, st[k]])), logo: logoPath(env, st) });
-async function saveSettings(db, b) {
+export async function saveSettings(db, b) {
   const cur = await getSettings(db);
   for (const k of Object.keys(b)) {
     if (!SETTING_KEYS.includes(k) || k === 'stock_since') continue;
@@ -1219,6 +1222,8 @@ async function saveSettings(db, b) {
     if (k === 'stock_push' || k === 'auto_upload') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, !!x]));
     // Kanal bazında birleştirilir: istekte olmayan kanalın seçimi korunur (iki sekme / iki yönetici birbirinin seçimini ezmesin)
     if (k === 'auto_upload_cats') v = { ...(cur.auto_upload_cats || {}), ...Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, [...new Set((Array.isArray(x) ? x : []).map((l) => str(l).slice(0, 200)))].slice(0, 2000)])) };
+    // Kanal bazında birleştirilir; yalnız 'selected' saklanır (yoksa tüm ürünler)
+    if (k === 'upload_scope') v = Object.fromEntries(Object.entries({ ...(cur.upload_scope || {}), ...(v && typeof v === 'object' ? v : {}) }).filter(([c, x]) => isChannelId(c) && x === 'selected'));
     if (k === 'hold_channels') v = [...new Set((Array.isArray(v) ? v : []).filter((c) => isChannelId(c)))];
     if (k === 'mail_enabled' || k === 'daily_digest') v = !!v;
     if (k === 'mail_to') {
@@ -2174,6 +2179,14 @@ export async function api(req, env, ctx, db, path, user = { id: 0, name: 'Yönet
       await log(db, null, 'info', `${user.name}: ${r.deleted} ürün silindi`);
       return json({ changed: r.deleted });
     }
+    // Kanal seçimi ("yalnız seçtiğim ürünler" kapsamındaki kanallar için): ekle / çıkar
+    if (b.action === 'targets') {
+      const chans = (Array.isArray(b.channels) ? b.channels : []).map(str).filter((c) => isChannelId(c)).slice(0, 60);
+      if (!chans.length) fail(400, 'Kanal seçin');
+      const changed = await setTargets(db, ids, chans, b.on !== false);
+      await log(db, null, 'info', `${user.name}: ${ids.length} ürün ${chans.join(', ')} için ${b.on !== false ? 'seçildi' : 'seçimden çıkarıldı'}`);
+      return json({ changed });
+    }
     const set = b.action === 'activate' ? ['active = 1'] : b.action === 'deactivate' ? ['active = 0'] : b.action === 'critical' ? ['critical_stock = ?'] : null;
     if (!set) fail(400, 'Geçersiz işlem');
     const extra = b.action === 'critical' ? [Math.max(0, Math.round(num(b.value)))] : [];
@@ -2320,6 +2333,7 @@ export async function deleteProducts(db, ids) {
       db.prepare(`DELETE FROM stock_moves WHERE product_id IN (${qq})`).bind(...id),
         // Stok API: silinen ürün dış sisteme "silindi" olarak bildirilir (bayi satmaya devam etmesin; bkz. extapi.js)
       db.prepare(`INSERT OR REPLACE INTO deleted_products (id, sku, barcode, at) SELECT id, sku, barcode, ? FROM products WHERE id IN (${qq})`).bind(Date.now(), ...id),
+      db.prepare(`DELETE FROM product_targets WHERE product_id IN (${qq})`).bind(...id),
       db.prepare(`DELETE FROM products WHERE id IN (${qq})`).bind(...id),
     ]);
     deleted += rows.length;

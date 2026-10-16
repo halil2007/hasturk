@@ -68,7 +68,7 @@ export const FEATURES = [
       ['Aynı ürün farklı kanallarda farklı barkodla satılıyorsa?', 'Eşleştirme ekranından ilanları elle aynı ürüne bağlayabilirsiniz; bir kez bağladıktan sonra stok birlikte yönetilir.'],
       ['Bir kanala stoğumun tamamını göstermek istemiyorum.', 'Kanala özel en fazla adet tanımlayabilirsiniz; panel o kanala bu sınırı aşmayan adedi gönderir.'],
     ],
-    related: ['urun-yonetimi', 'siparis-yonetimi', 'stok-api'],
+    related: ['urun-yonetimi', 'siparis-yonetimi', 'kargo-ve-etiket'],
   },
   {
     slug: 'urun-yonetimi', name: 'Ürün yönetimi ve otomatik gönderim', icon: 'i-box', color: 'c-orange', short: 'Çok kanala ürün yükleme, otomatik gönderim',
@@ -190,26 +190,7 @@ export const FEATURES = [
       ['Kaç personel ekleyebilirim?', 'Paketinize göre: Başlangıç 2, Profesyonel 5, Kurumsal sınırsız kullanıcı.'],
       ['Personel ayarları değiştirebilir mi?', 'Hayır. Ayarlar, kanal API bilgileri ve kullanıcı yönetimi yalnız yöneticiye açıktır.'],
     ],
-    related: ['musteri-sorulari-ve-iadeler', 'siparis-yonetimi', 'stok-api'],
-  },
-  {
-    slug: 'stok-api', name: 'Stok API', icon: 'i-link', color: 'c-purple', short: 'Stoklarınızı bayilerinize aktarın',
-    title: 'Stok API — Hastürk CRM', h1: ['Stoklarınızı', 'Bayilerinize Aktarın'],
-    lead: 'Paneldeki güncel stoklarınızı kendi sitenize, ERP\'nize ya da bayilerinizin sistemine aktarın. Her bayi için ayrı anahtar, IP kısıtı ve hazır kurulum kılavuzu.',
-    mock: 'api',
-    points: [
-      ['i-key', 'Ayrı anahtar', 'Her bayi ya da sistem için ayrı API anahtarı; birini iptal etmek diğerlerini etkilemez.'],
-      ['i-lock', 'IP kısıtı', 'Anahtarı yalnız belirttiğiniz IP adreslerinden kullanılabilir hale getirin.'],
-      ['i-eye', 'Yalnız okuma', 'API yalnız sizin ürünlerinizin stok ve satış fiyatını okur; hiçbir şeyi değiştiremez.'],
-      ['i-shield', 'Güvenli saklama', 'Anahtarın kendisi saklanmaz, yalnız özeti tutulur; anahtar oluşturulduğunda bir kez gösterilir.'],
-      ['i-clock', 'Hız sınırı', 'Dakikada 120 istek; bayilerinizin sistemi panelinizi yavaşlatmaz.'],
-      ['i-orders', 'Kurulum kılavuzu', 'Bayinizin yazılımcısına gönderebileceğiniz hazır kılavuz ve örnek istekler.'],
-    ],
-    faq: [
-      ['Hangi pakette var?', 'Stok API Kurumsal pakette yer alır. Anahtarı kurulumda birlikte oluşturuyoruz.'],
-      ['Bayim stoğumu değiştirebilir mi?', 'Hayır. API yalnız okuma içindir.'],
-    ],
-    related: ['stok-senkronizasyonu', 'ekip-ve-guvenlik', 'urun-yonetimi'],
+    related: ['musteri-sorulari-ve-iadeler', 'siparis-yonetimi', 'mobil-yonetim'],
   },
   {
     slug: 'doviz-endeksli-fiyat', name: 'Döviz kuruna endeksli fiyat', icon: 'i-calc', color: 'c-teal', short: 'Dolar / euro fiyatı, kurla otomatik TL fiyat',
@@ -537,11 +518,6 @@ const MORE = {
     steps: [['Döviz fiyatı girin', 'Ürün kartında para birimini ve döviz fiyatını yazın.'], ['Kuralı seçin', 'Kur kaynağı, güncelleme sıklığı, eşik ve yuvarlama.'], ['Gerisini panel yapsın', 'Kur değişince TL fiyatı ve kanal fiyatları kendiliğinden güncellenir.']],
     benefits: [['i-up', 'Zarar yok', 'Maliyet kurla birlikte izlenir'], ['i-clock', 'Zaman kazancı', 'Elle fiyat güncelleme biter'], ['i-sync', 'Tüm kanallar', 'Tek seferde her yerde'], ['i-shield', 'Resmi kur', 'TCMB ya da anlık piyasa']],
   },
-  'stok-api': {
-    why: ['Bayileriniz ya da kendi siteniz güncel stoğunuzu bilmezse olmayan ürünü satar. Stok listesini e-postayla ya da Excel\'le göndermek gecikmeli ve hatalıdır.', 'Bayinizin sistemi panelinizdeki güncel stoğu güvenli bir API ile kendisi okur; siz hiçbir şey göndermezsiniz.'],
-    steps: [['Anahtarı oluşturalım', 'Bayi ya da sistem için ayrı anahtar ve izin verilen IP adresleri tanımlanır.'], ['Bayiniz bağlansın', 'Hazır kılavuzla yazılımcısı birkaç saatte bağlar.'], ['Stok hep güncel', 'Her istekte paneldeki son stok ve fiyat döner.']],
-    benefits: [['i-sync', 'Anlık stok', 'Her istekte güncel'], ['i-lock', 'Güvenli', 'Anahtar + IP kısıtı'], ['i-eye', 'Yalnız okuma', 'Hiçbir şey değiştirilemez'], ['i-clock', 'Elle liste yok', 'E-posta, Excel bitti']],
-  },
 };
 for (const f of FEATURES) Object.assign(f, MORE[f.slug] || {});
 
@@ -650,7 +626,6 @@ const FEATURE_SEO = {
   'raporlar': ['E-Ticaret Satış Raporları ve Analiz | Hastürk CRM', 'Günlük, haftalık ve aylık satış raporları; en çok satan ürünler, kanal dağılımı, il bazında satış haritası ve sadık müşteriler. Tüm pazaryerleri tek raporda.'],
   'musteri-sorulari-ve-iadeler': ['Pazaryeri Müşteri Soruları ve İade Yönetimi | Hastürk CRM', 'Trendyol, Hepsiburada ve N11 müşteri sorularını hazır cevaplarla yanıtlayın, iade taleplerini panelden onaylayın ya da reddedin.'],
   'ekip-ve-guvenlik': ['Personel Yetkilendirme ve Güvenlik | Hastürk CRM', 'Ekibinize yalnız ihtiyaç duyduğu bölümleri açın; hazır roller, iki adımlı doğrulama ve şifreli saklanan API bilgileriyle mağazanız güvende.'],
-  'stok-api': ['Stok API: Bayilere ve ERP\'ye Stok Aktarımı | Hastürk CRM', 'Güncel stoklarınızı kendi sitenize, ERP\'nize ya da bayilerinizin sistemine API ile aktarın. Her bayiye ayrı anahtar, IP kısıtı ve kurulum kılavuzu.'],
   'doviz-endeksli-fiyat': ['Döviz Kuruna Endeksli Otomatik Fiyat Güncelleme | Hastürk CRM', 'Ürün fiyatını dolar veya euro ile girin; kur değişince TL fiyatınız Trendyol, Hepsiburada ve sitenizde otomatik güncellensin.'],
   'mobil-yonetim': ['Pazaryeri Mağazanızı Telefondan Yönetin | Hastürk CRM', 'Siparişleri işleme alın, stok güncelleyin, soruları yanıtlayın: panel telefonda uygulama gibi çalışır, yeni siparişte anlık bildirim gelir.'],
 };

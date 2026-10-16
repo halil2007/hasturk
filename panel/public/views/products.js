@@ -9,6 +9,31 @@ import { attachCatPicker } from './catpick.js';
 import { normCat } from '../catpath.js';
 import { explainError, isHeld, realError, isChannelSide, channelStateText, SELLER_PANEL } from '../listerr.js';
 const errText = (e) => { const x = explainError(e); return `${x.kind ? x.kind + ': ' : ''}${x.title} — ${x.fix}`; };
+// Ürün yüklenebilen pazaryerleri ve "yalnız seçtiğim ürünler" kapsamı (Ürün yükle → kanal → Gönderilecek ürünler)
+const uploadChannels = () => activeChannels().filter((c) => c.enabled && !c.hold && (c.can || {}).upload);
+const scopeSel = (id) => ((state.settings || {}).upload_scope || {})[id] === 'selected';
+// Seçili ürünleri pazaryerleri için seç / seçimden çıkar
+function targetsSheet(ids, done) {
+  const chans = uploadChannels();
+  const s = sheet({ title: `Pazaryeri seçimi · ${ids.length} ürün` });
+  s.setBody(html`<div class="stack">
+    <div class="muted small">Bir pazaryerinde <b>Yalnız seçtiğim ürünler</b> açıksa o kanala yalnız burada seçtiğiniz ürünler gönderilir (otomatik gönderim ve Kanallarda yayınla ön seçimi). <b>Tüm ürünler</b> açık kanallarda seçim saklanır ama gönderimi değiştirmez. Kanalda zaten olan ilanların stok ve fiyatı etkilenmez.</div>
+    ${chans.length ? html`<div class="stack" style="gap:8px">${chans.map((c) => html`<label class="check"><input type="checkbox" data-tch value="${c.id}" ${scopeSel(c.id) ? 'checked' : ''}> ${chLogo(c.id, true)}${c.name} <span class="tiny muted">${scopeSel(c.id) ? 'yalnız seçtiğim ürünler' : 'tüm ürünler'}</span></label>`)}</div>`
+      : html`<div class="empty">Ürün yüklenebilen bağlı pazaryeri yok.</div>`}
+    <div class="tiny muted">Kanalın gönderim şekli: Ürün yükle → kanal → Otomatik işlemler → Gönderilecek ürünler.</div>
+  </div>`);
+  s.setFoot(html`<button class="btn" data-close>Vazgeç</button><span class="spacer"></span><button class="btn danger ghost" data-ton="0">Seçimden çıkar</button><button class="btn primary" data-ton="1">Seçili kanallara ekle</button>`);
+  for (const b of $$('[data-ton]', s.el)) b.onclick = () => {
+    const channels = $$('[data-tch]', s.body).filter((x) => x.checked).map((x) => x.value);
+    if (!channels.length) return toast('Kanal seçin', true);
+    busy(b, async () => {
+      const on = b.dataset.ton === '1';
+      await api('products-bulk', { method: 'POST', body: { ids, action: 'targets', channels, on } });
+      toast(on ? `${n(ids.length)} ürün ${channels.length} kanal için seçildi` : `${n(ids.length)} ürün ${channels.length} kanalın seçiminden çıkarıldı`);
+      s.close(); if (done) done();
+    });
+  };
+}
 // Ürün formu: kanal kaynaklı durumlar (kanalın onaylamadığı / onay beklediği ilan, kanal kaynaklı hata) sakin bir bilgi kutusunda,
 // kanal adı ve nedeniyle. Ürünler listesinde hata olarak görünmez.
 function chSideNotice(ls) {
@@ -140,6 +165,7 @@ export async function products(el, rest, query = {}) {
       <button class="btn sm" data-act="bulk" data-a="activate"><i class="ico ico-check"></i>Aktif yap</button>
       <button class="btn sm" data-act="bulk" data-a="deactivate"><i class="ico ico-minus"></i>Pasife al</button>
       <button class="btn sm" data-act="bulk" data-a="critical"><i class="ico ico-db"></i>Kritik stok sınırı</button>
+      ${uploadChannels().length && can(state.user, 'products', true) ? html`<button class="btn sm" data-act="targets" title="Hangi pazaryerine gönderileceğini seçin"><i class="ico ico-grid"></i>Pazaryeri seçimi</button>` : ''}
       <button class="btn sm primary" data-act="publish"><i class="ico ico-send"></i>Kanallarda yayınla</button>
       <button class="btn sm danger ghost" data-act="bulk" data-a="delete"><i class="ico ico-trash"></i>Sil</button>
       <span class="spacer"></span><button class="btn sm ghost" data-act="clearsel">Seçimi kaldır</button></div>`;
@@ -216,6 +242,7 @@ export async function products(el, rest, query = {}) {
     new: () => productForm(0, refresh),
     clearsel: () => { sel.clear(); draw(); },
     publish: () => publishSheet([...sel]),
+    targets: () => targetsSheet([...sel], () => { sel.clear(); refresh(); }),
     menu: (t) => {
       const p = byId(t.dataset.id);
       if (!p) return;
@@ -523,6 +550,10 @@ export async function productForm(id, done) {
           <td class="r num" data-lprofit style="font-weight:650;color:${r.unitProfit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money(r.unitProfit)}</td>
           <td class="r num"><button type="button" class="plain" data-rule style="align-items:flex-end">${l.desired ?? l.remote_stock ?? '—'}<span class="tiny muted">${isHeld(l) ? 'kanal yayına alınca gönderilir' : ruleText(l) || 'ortak stok'}</span></button>${l.price_dirty ? html`<div class="tiny" style="color:var(--warn)">fiyat gönderilecek</div>` : ''}</td></tr>`; })}
       </tbody></table></div><div class="row wrap" style="padding:10px 16px"><button type="button" class="btn sm" data-addl><i class="ico ico-plus"></i>İlan ekle</button><span class="muted tiny">Aynı ürün bir kanalda iki kez listelendiyse ikinci ilanı buradan bağlayın.</span></div></div>` : ''}
+    ${id && uploadChannels().some((c) => scopeSel(c.id)) ? html`<div class="card stack" style="gap:8px"><h3>Pazaryeri seçimi</h3>
+      <div class="muted small">Bu pazaryerlerinde <b>yalnız seçtiğiniz ürünler</b> gönderilir. İşaretlediğiniz kanala bu ürün${p.siblings && p.siblings.length > 1 ? ` (ve ${p.siblings.length - 1} varyantı)` : ''} gönderilebilir; işaretsizse gönderilmez.</div>
+      <div class="row wrap" style="gap:6px 16px">${uploadChannels().filter((c) => scopeSel(c.id)).map((c) => html`<label class="check"><input type="checkbox" data-target value="${c.id}" ${(p.targets || []).includes(c.id) ? 'checked' : ''}> ${chLogo(c.id, true)}${c.name}</label>`)}</div>
+    </div>` : ''}
     ${pubCh.length ? html`<div class="card stack"><h3>Kanallarda yayınla</h3>
       ${id ? html`<div data-pub></div>` : html`<div class="muted small">Kaydedince seçtiğiniz kanallar için yayın paneli açılır.</div>
         <div class="row wrap" style="gap:6px 16px">${pubCh.map((c) => html`<label class="check"><input type="checkbox" data-pubon value="${c.id}" checked> ${chLogo(c.id, true)}${c.name}</label>`)}</div>`}
@@ -537,7 +568,10 @@ export async function productForm(id, done) {
   let formDirty = false, pubAfter = null;
   const pubBox = $('[data-pub]', s.body);
   if (pubBox) mountPublish(pubBox, { ids: [id], beforePublish: (chans) => { if (!formDirty) return true; pubAfter = chans; $('[data-save]', s.el).click(); return false; } });
-  $('[data-form]', s.body).addEventListener('input', (e) => { if (!e.target.closest('[data-pub]')) formDirty = true; });
+  $('[data-form]', s.body).addEventListener('input', (e) => { if (!e.target.closest('[data-pub]') && !e.target.matches('[data-target]')) formDirty = true; });
+  // Pazaryeri seçimi hemen kaydedilir (formun kaydını beklemez); varyantlar birlikte gider
+  for (const cb of $$('[data-target]', s.body)) cb.onchange = () => api('products-bulk', { method: 'POST', body: { ids: p.siblings && p.siblings.length ? p.siblings : [id], action: 'targets', channels: [cb.value], on: cb.checked } })
+    .then(() => toast(cb.checked ? `${ch(cb.value).name} için seçildi` : `${ch(cb.value).name} seçiminden çıkarıldı`)).catch((e) => { cb.checked = !cb.checked; toast(e.message, true); });
   const allv = $("[data-allvar]", s.body);
   if (allv) allv.onclick = () => { s.close(); variantEditor(p.siblings, done, p.group_name || p.name); };
   s.setFoot(html`${id ? html`<button class="btn danger ghost" data-del>Sil</button>` : ''}<span class="spacer"></span><button class="btn" data-close>Vazgeç</button><button class="btn primary" data-save>Kaydet</button>`);

@@ -88,7 +88,7 @@ const menuIntegrations = `<div class="dd-p mm" id="mm-int" data-mm-panel><div cl
 </div></div>`;
 const mnavIntegrations = MM_GROUPS.map(([href, , , t, sub]) => `<a class="m-gi" href="${href}">${esc(t)}<small>${esc(sub)}</small></a>`).join('') + '<a class="m-gi m-req" href="/iletisim?konu=kanal">Aradığınız yok mu? Kanal talep edin</a>';
 // ---------- Özellikler mega menüsü (Entegrasyonlar ile aynı kalıp: gruplar · araçlar · öne çıkan kart · alt bağlantılar) ----------
-// Bağlantılar data.mjs'teki özellik sayfalarına gider (sayfası olmayan slug derlemeyi durdurur). Stok API menüde yer almaz.
+// Bağlantılar data.mjs'teki özellik sayfalarına gider (sayfası olmayan slug derlemeyi durdurur).
 const fLink = (slug) => { if (!fById[slug]) throw new Error(`Özellikler menüsü: "${slug}" özellik sayfası yok`); return `/ozellikler/${slug}`; };
 const FM_GROUPS = [
   ['siparis-yonetimi', 'Sipariş yönetimi', 'Tüm kanalların siparişleri tek listede'],
@@ -182,16 +182,6 @@ const MOCKS = {
   team: `<div class="mockcard"><div class="mc-h"><b>Personel</b><span class="pill">2 adımlı doğrulama zorunlu</span></div>
     ${[['AY', 'Ayşe Y.', 'Yönetici', 'Tüm bölümler'], ['MK', 'Mehmet K.', 'Depo / sevkiyat', 'Siparişler · Kargo · Stok'], ['ZD', 'Zeynep D.', 'Müşteri hizmetleri', 'Sorular · İadeler · Siparişler (görür)']].map(([i, n, r, p]) => `<div class="mc-row"><span class="av">${i}</span><div><b>${n} <em>${r}</em></b><small>${p}</small></div><span class="mc-ok">${ico('i-shield')}</span></div>`).join('')}
     <div class="mc-note">Örnek görünüm</div></div>`,
-  api: `<div class="mockcard code"><div class="mc-h"><b>GET /api/v1/stock</b><span class="pill">Authorization: Bearer hst_…</span></div>
-<pre>{
-  "page": 1, "total": 248, "has_more": false,
-  "items": [
-    { "sku": "HG-SOL-5", "barcode": "8690000000011",
-      "name": "Solucan Gübresi 5 Kg",
-      "stock": 42, "price": 189, "active": true },
-    …
-  ]
-}</pre><div class="mc-note">Örnek yanıt</div></div>`,
 };
 const ctaBand = `<section class="sec"><div class="wrap"><div class="ask big reveal"><div><b>Kendi gözünüzle görün</b><span>Kayıt olmadan demo panelini açın, örnek siparişlerle her şeyi deneyin. Beğenirseniz kendi mağazanızla 7 gün ücretsiz kullanın; kurulum ücreti yok.</span></div>
   <div class="ctas"><a class="btn btn-primary" data-demo href="/demo">Canlı demoyu açın ${ico('i-arrow')}</a><a class="btn btn-outline" data-call href="/iletisim">${ico('i-phone')}Hemen arayın</a></div></div></div></section>`;
