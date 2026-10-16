@@ -412,7 +412,7 @@ test('Kargonomi: pakete bölünmüş sipariş — her paket ayrı gönderi / eti
 test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (siteye takip), sonradan gelen takip kodu siteye yazılır, teslim edilince sitede not + panelde "Teslim edildi"; ayar kapalıysa yapılmaz', async () => {
   const { trackCarriers } = await import('../src/carriers.js');
   const real = globalThis.fetch, woo = [];
-  let st = 'webservice_order_created', tn = null, failDel = false;
+  let st = 'webservice_order_created', tn = null, failDel = false, realPrice = null, realDesi = null;
   globalThis.fetch = async (url, o = {}) => {
     const u = String(url), m = o.method || 'GET', J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { 'Content-Type': 'application/json' } });
     if (failDel && /magaza\.test.*notes/.test(u) && /teslim edildi/i.test(o.body || '')) { failDel = false; return J({ message: 'yetki yok' }, 403); }
@@ -423,7 +423,7 @@ test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (site
     if (m === 'POST' && /\/shipments$/.test(u)) return J({ data: { id: 77, status: 'draft' } });
     if (/confirm-shipping-price/.test(u)) return J({});
     if (/\/shipments\/77\/barcode/.test(u)) return J({ data: { barcode: 'JVBERi0' + 'C'.repeat(150) } });
-    if (/\/shipments\/77$/.test(u)) return J({ data: { id: 77, status: st, shipping_webservice_tracking_code: tn, shipping_webservice_barcode: 'SB77', shipping_provider_name: 'Sürat Kargo', estimated_price: '40' } });
+    if (/\/shipments\/77$/.test(u)) return J({ data: { id: 77, status: st, shipping_webservice_tracking_code: tn, shipping_webservice_barcode: 'SB77', shipping_provider_name: 'Sürat Kargo', estimated_price: '40', real_price: realPrice, extra_shipping_price: '0.0000', shipment_packages: [{ desi: '1', real_desi: realDesi }] } });
     return new Response('?', { status: 404 });
   };
   try {
@@ -457,14 +457,27 @@ test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (site
     st = 'webservice_shipment_delivered'; failDel = true;
     t = await trackCarriers(env, env.DB, { force: true });
     const sync = async () => (await env.DB.prepare("SELECT site_sync FROM packages WHERE order_id = 'woocommerce:W9'").first()).site_sync;
-    assert.equal(await sync(), 'e1');
+    assert.match(await sync(), /^e1:\d+$/);
     assert.ok(!woo.some((x) => /notes .*teslim edildi/i.test(x)));
     await trackCarriers(env, env.DB, { force: true });
-    assert.equal(await sync(), 'e1', 'yarım saat dolmadan yeniden denenmez');
-    await env.DB.prepare("UPDATE packages SET carrier_checked_at = ? WHERE order_id = 'woocommerce:W9'").bind(Date.now() - 31 * 60e3).run();
+    assert.match(await sync(), /^e1:/, 'yarım saat dolmadan yeniden denenmez');
+    await env.DB.prepare("UPDATE packages SET site_sync = ? WHERE order_id = 'woocommerce:W9'").bind('e1:' + (Date.now() - 31 * 60e3)).run();
     await trackCarriers(env, env.DB, { force: true });
     assert.equal(await sync(), 'delivered');
     assert.ok(woo.some((x) => /notes .*teslim edildi/i.test(x)), woo.join('\n'));
+    // Kesin ücret (şubede ölçülen desiyle) teslimden sonra geldi: kargo gideri, paketin desisi ve ücret durumu güncellenir
+    const cost0 = (await call(`/api/orders/${id}`)).body.order.shipping_cost;
+    assert.equal(cost0, 48, 'tahmini 40 + KDV');
+    realPrice = '55.00'; realDesi = '3';
+    await env.DB.prepare("UPDATE packages SET carrier_checked_at = ? WHERE order_id = 'woocommerce:W9'").bind(Date.now() - 13 * 3600e3).run();
+    await trackCarriers(env, env.DB);
+    const od = (await call(`/api/orders/${id}`)).body;
+    assert.equal(od.order.shipping_cost, 66, 'kesin 55 + KDV');
+    assert.equal(od.order.packages[0].carrier_cost_final, 1); assert.equal(od.order.packages[0].desi, 3);
+    assert.ok((od.events || od.order.events || []).some((e) => e.action === 'carrier_cost') || await env.DB.prepare("SELECT 1 FROM order_events WHERE action = 'carrier_cost' AND order_id = 'woocommerce:W9'").first());
+    // Kesin ücret alındı: teslim edilen gönderi bir daha sorgulanmaz
+    await env.DB.prepare("UPDATE packages SET carrier_checked_at = ? WHERE order_id = 'woocommerce:W9'").bind(Date.now() - 13 * 3600e3).run();
+    assert.equal((await trackCarriers(env, env.DB)).checked || 0, 0);
     assert.equal((await call(`/api/orders/${id}`)).body.order.status, 'delivered');
     // Kargonomi / kargo firması gönderiyi kendisi iptal etti: ücret geri alınır, paket serbest kalır, bildirim düşer
     await saveOrders(env.DB, 'woocommerce', [order('W11')]);

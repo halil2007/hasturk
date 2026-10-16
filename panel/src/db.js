@@ -409,6 +409,8 @@ export const MIGRATIONS = [
   // (sonradan gelen takip kodu kanal hata verdiyse yeniden yazılsın; bkz. carriers.js trackCarriers)
   'ALTER TABLE packages ADD COLUMN ship_sync TEXT',
   'ALTER TABLE packages ADD COLUMN site_tracking TEXT',
+  // Entegratörün kesin ücreti geldi mi (Kargonomi real_price: şubede ölçülen desiyle); gelmediyse teslimden sonra da sorgulanır
+  'ALTER TABLE packages ADD COLUMN carrier_cost_final INTEGER',
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
