@@ -68,6 +68,9 @@ test('Kargonomi: il / ilçe numarası bulunur, taslak → kullanıcının seçti
     assert.equal(body.warehouse_id, 12707, 'ana depo');
     assert.equal(body.buyer_phone, '5321234567');
     assert.equal(body.packages[0].desi, 2.4);
+    assert.equal(body.packages[0].content, '2x Gubre 5 kg', 'içerik Latin harf / rakam / izinli noktalama');
+    const { safeText } = await import('../src/carriers/kargonomi.js');
+    assert.equal(safeText('Toprak Karışımı – Ücretsiz “Özel” × ₺99 😊 Москва'), 'Toprak Karisimi - Ucretsiz "Ozel" x 99');
     assert.equal(JSON.parse(calls.find((c) => /confirm/.test(c.url)).body).shipping_provider_id, 11, 'seçilen firma (otomatik seçim yok)');
     assert.equal(calls[0].headers.Authorization, 'Bearer tok');
     assert.equal(r.ref, '77');
