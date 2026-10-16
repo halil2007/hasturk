@@ -393,6 +393,10 @@ export const MIGRATIONS = [
   // 'user' = kullanıcı girdi (sistem bir daha değiştirmez, faturalarla farkı uyarılır). Var olan tutarlar kullanıcınındır.
   'ALTER TABLE products ADD COLUMN ship_src TEXT',
   "UPDATE products SET ship_src = 'user' WHERE ship_cost > 0 AND ship_src IS NULL",
+  // Mutabakat farkının takibi (sipariş başına): itiraz edildi / çözüldü / kabul edildi, not ve işaretlendiği andaki fark
+  // (fark sonradan değişirse kapatılan fark yeniden açılır; itiraz edilen sipariş eşleşince senkron "çözüldü" yapar)
+  `CREATE TABLE IF NOT EXISTS stl_disputes (channel TEXT NOT NULL, order_number TEXT NOT NULL, status TEXT NOT NULL, note TEXT, diff REAL, by_user TEXT,
+    created_at INTEGER, updated_at INTEGER, PRIMARY KEY (channel, order_number))`,
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
