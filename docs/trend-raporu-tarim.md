@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3541 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3545 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -20,7 +20,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 8 | Altınvadi Toros Maydanozu Tohumu 10 Gr | ×9,9 | 5 | evet |
 | 9 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | ×6,4 | 2 | evet |
 | 10 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı) | ×9,9 | 5 | evet |
-| 11 | Proline Bebek Pudra Kokulu Bentonit Kedi Kumu 10 LT | ×5,3 | 3 | evet |
+| 11 | Proline Bebek Pudra Kokulu Bentonit Kedi Kumu 10 LT | ×5,5 | 3 | evet |
 | 12 | Hastürk Katı Solucan Gübresi 20 Kg | ×4,9 | 3 | evet |
 | 13 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3,8 | 0 | evet |
 | 14 | Altınvadi Bezelye Tohumu 25 Gr | ×8,7 | 2 | evet |
@@ -46,10 +46,10 @@ _Henüz veri yok._
 | 2 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,4 | 6 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 6,7 | 0 |
 | 4 | Altınvadi Roka Tohumu (Toros İri Yaprak) | 6 | 6 |
-| 5 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6 | 7 |
+| 5 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 5,9 | 7 |
 | 6 | Leonardit - Organik Toprak Düzenleyici | 5,3 | 3 |
 | 7 | Kullanıma Hazır Cocopeat Torfu | 5,2 | 0 |
-| 8 | Arom Dere Otu Ata Tohumu (50 Adet) | 5,2 | 5 |
+| 8 | Arom Dere Otu Ata Tohumu (50 Adet) | 5,1 | 5 |
 | 9 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 5 | 7 |
 | 10 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,7 | 3 |
 | 11 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 4,7 | 5 |
@@ -138,11 +138,11 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 5 | Altınvadi Ispanak Tohumu 10 Gr | 4,7 | 4,1 |
 | 6 | Arom Dere Otu Ata Tohumu (50 Adet) | 4,6 | 2,3 |
 | 7 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 4,4 | 21 |
-| 8 | Leonardit - Organik Toprak Düzenleyici | 4 | 59,3 |
+| 8 | Leonardit - Organik Toprak Düzenleyici | 4 | 60,3 |
 | 9 | Altınvadi Tere Tohumu 10 Gr | 3,8 | 1 |
 | 10 | Altınvadi Dereotu Tohumu 10 Gr | 3,7 | 1,4 |
 | 11 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 3,7 | 59 |
-| 12 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,6 | 56,9 |
+| 12 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,6 | 57,9 |
 | 13 | HG 5’li Bitki Yetiştirme Seti | 3 | 19,9 |
 | 14 | Altınvadi Bezelye Tohumu 25 Gr | 2,9 | 3,6 |
 | 15 | Altınvadi Arapsaçı Marul Tohumu (Kıvırcık) | 2,9 | 13,6 |
@@ -160,17 +160,17 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 |---|---|---|---|
 | Guanokalong Yarasa Gübresi Toz | 95,5 | 2,8 | %3 |
 | HasTürk Hümix Sıvı Hümik Asit | 61,8 | 2,4 | %4 |
-| İnsektisit MAX 5 Lt Kampanya Paketi | 53,5 | 1,7 | %3 |
+| İnsektisit MAX 5 Lt Kampanya Paketi | 54,5 | 1,7 | %3 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 48,5 | 0 | %0 |
 | Chrysamed Subon Hijyen Sprey | 47,5 | 0 | %0 |
 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 44,7 | 1,7 | %4 |
 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici (0-3 mm) | 43,7 | 0 | %0 |
 | Florist Mantar Önleyici Bitki Spreyi | 41,8 | 0 | %0 |
-| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 36 | 0 | %0 |
-| HG Asidik Torf | 35,1 | 0,5 | %1 |
+| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 37 | 0 | %0 |
+| HG Asidik Torf | 36,1 | 0,5 | %1 |
 | HG Mezar Toprağı | 33,8 | 0 | %0 |
 | Kaktüs ve Sukulent Toprağı | 29,1 | 1,2 | %4 |
-| Uzman 5 lt Basınçlı İlaçlama Pompası | 26,6 | 0 | %0 |
+| Uzman 5 lt Basınçlı İlaçlama Pompası | 27,6 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 25,6 | 0 | %0 |
 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 21,3 | 1 | %5 |
 
