@@ -63,7 +63,7 @@ async function summaryNow(db, q) {
   const W = 'WHERE ' + where.join(' AND ');
   const since = Date.now() - 365 * 864e5;
   const M = (col) => `strftime('%Y-%m', ${col} / 1000 + 10800, 'unixepoch')`;
-  const [tot, chans, monthly, cities] = await Promise.all([
+  const [tot, chans, monthly, cities, cityCh] = await Promise.all([
     // Müşteri başına (dönem içi): sipariş sayısı, harcama, kaç kanalda alışveriş → genel toplamlar ve dağılım
     first(db, `SELECT COUNT(*) AS customers, COALESCE(SUM(n), 0) AS orders, COALESCE(SUM(spend), 0) AS revenue, COALESCE(SUM(n > 1), 0) AS repeat,
         COALESCE(SUM(CASE WHEN n > 1 THEN n ELSE 0 END), 0) AS repeatOrders, COALESCE(SUM(ch > 1), 0) AS multi,
@@ -83,7 +83,15 @@ async function summaryNow(db, q) {
       FROM (SELECT o.id, o.ckey, o.total, json_extract(o.address, '$.city') AS city FROM orders o ${W}) x
       LEFT JOIN (SELECT order_id, SUM(quantity) AS units FROM order_items WHERE COALESCE(status, '') NOT IN ('cancelled', 'returned') GROUP BY order_id) u ON u.order_id = x.id
       WHERE COALESCE(x.city, '') != '' GROUP BY x.city ORDER BY orders DESC LIMIT 200`, ...args),
+    // İlin kanal dökümü (haritada ile basınca): kanal başına sipariş, adet, ciro
+    all(db, `SELECT x.city, x.channel, COUNT(*) AS orders, SUM(x.total) AS revenue, COALESCE(SUM(u.units), 0) AS units
+      FROM (SELECT o.id, o.channel, o.total, json_extract(o.address, '$.city') AS city FROM orders o ${W}) x
+      LEFT JOIN (SELECT order_id, SUM(quantity) AS units FROM order_items WHERE COALESCE(status, '') NOT IN ('cancelled', 'returned') GROUP BY order_id) u ON u.order_id = x.id
+      WHERE COALESCE(x.city, '') != '' GROUP BY x.city, x.channel LIMIT 5000`, ...args),
   ]);
+  const chOf = new Map();
+  for (const r of cityCh) (chOf.get(r.city) || chOf.set(r.city, {}).get(r.city))[r.channel] = { orders: r.orders, units: r.units, revenue: Math.round((r.revenue || 0) * 100) / 100 };
+  for (const c of cities) c.channels = chOf.get(c.city) || {};
   const { customers, orders, revenue, repeat, multi } = tot;
   const dist = [tot.d1, tot.d2, tot.d3, tot.d4, tot.d5].map((n, i) => ({ k: i === 4 ? '5+' : String(i + 1), n }));
   return {

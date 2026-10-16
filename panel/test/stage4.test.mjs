@@ -183,6 +183,9 @@ test('analizler: dönem kartları, iller ve en çok satanların ortalama/min/mak
   assert.equal(r.cards[0].orders, 3); assert.equal(r.cards[0].lost, 1); assert.equal(r.cards[0].revenue, 400);
   assert.equal(r.cards[0].lostRate, 25);
   assert.deepEqual(r.cities.map((c) => [c.city, c.orders]), [['İZMİR', 2], ['ANKARA', 1]], 'il adları birleştirilir; iptal sayılmaz');
+  // İlin kanal dökümü (haritada ile basınca): kanal başına sipariş, adet, ciro
+  assert.deepEqual(r.cities[0].channels, { trendyol: { orders: 2, units: 3, revenue: 320 } });
+  assert.deepEqual(Object.keys(r.cities[1].channels), ['ikas1']);
   const t = r.top[0];
   assert.equal(t.qty, 4); assert.equal(t.min, 80); assert.equal(t.max, 120); assert.equal(t.avg, 100);
   const ty = await insights(db, { unit: 'day', range: 'today', channel: 'trendyol' });
@@ -347,4 +350,21 @@ test('kargo firması: paketlemeden önce seçilir, paketlenince uygulanır; kana
   assert.equal(d.order.packages[0].cargo_company, opts.options[2].name);
   const o2 = await call(`orders/${id2}/cargo-options?package_id=${d.order.packages[0].id}`);
   assert.equal(o2.default.name, opts.options[2].name);
+});
+
+test('harita renk kademeleri: doğal gruplar (log ölçek); az satan açık, en çok satan en koyu, yakın değerler aynı ton; satışsız il boş', async () => {
+  const { mapClasses } = await import('../public/views/trmap.js');
+  const { cls, legend } = mapClasses([0, 1, 1, 1, 2, 2, 3, 5, 8, 12, 40, 300]);
+  assert.equal(cls(0), 0);
+  assert.equal(cls(1), 1, 'en az satan en açık ton');
+  assert.equal(cls(300), 5, 'en çok satan en koyu ton');
+  assert.ok(cls(40) > cls(5) && cls(5) > cls(1), 'tek büyük il diğerlerini tek tona ezmez');
+  // Birbirine yakın değerler aynı ton, belirgin büyük olan ayrı
+  const g = mapClasses([1051, 1100, 1146, 1217, 3340]);
+  assert.deepEqual([1051, 1100, 1146, 1217, 3340].map(g.cls), [1, 1, 1, 1, 5]);
+  assert.deepEqual([legend[0].lo, legend[legend.length - 1].hi], [1, 300]);
+  for (let i = 1; i < legend.length; i++) assert.ok(legend[i].lo > legend[i - 1].hi && legend[i].tone > legend[i - 1].tone, 'dilimler sıralı, ton koyulaşır');
+  // Tek değer: tek dilim, en koyu ton
+  assert.deepEqual(mapClasses([4, 4]).legend.map((g) => g.tone), [5]);
+  assert.deepEqual(mapClasses([0]).legend, []);
 });

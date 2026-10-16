@@ -214,16 +214,19 @@ export async function insights(db, q) {
   for (const w of weeks) w.revenue = r2(w.revenue);
   // 3) İller ve 4) en çok satanlar: seçilen aralıkta
   const [from, to] = rangeOf(q);
-  const crows = await all(db, `SELECT o.address, o.total, o.status, (SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status NOT IN ('cancelled', 'returned')) AS units FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
+  const crows = await all(db, `SELECT o.channel, o.address, o.total, o.status, (SELECT COALESCE(SUM(i.quantity), 0) FROM order_items i WHERE i.order_id = o.id AND i.status NOT IN ('cancelled', 'returned')) AS units FROM orders o WHERE o.ordered_at >= ? AND o.ordered_at < ? AND ${LIVE}${cw}`, from, to, ...ca);
   const cm = new Map();
   for (const r of crows) {
     let a = {}; try { a = JSON.parse(r.address || '{}'); } catch { /* boş */ }
     const k = cityName(a.city) || 'BİLİNMİYOR';
-    const x = cm.get(k) || { city: k, orders: 0, revenue: 0, shipped: 0, units: 0 };
+    const x = cm.get(k) || { city: k, orders: 0, revenue: 0, shipped: 0, units: 0, channels: {} };
     x.orders++; x.revenue += r.total; x.units += r.units || 0; if (r.status === 'shipped' || r.status === 'delivered') x.shipped++;
+    // İlin kanal dökümü (haritada ile basınca: hangi kanaldan kaç sipariş, adet, ciro)
+    const c = x.channels[r.channel] || (x.channels[r.channel] = { orders: 0, units: 0, revenue: 0 });
+    c.orders++; c.units += r.units || 0; c.revenue += r.total;
     cm.set(k, x);
   }
-  const cities = [...cm.values()].map((x) => ({ ...x, revenue: r2(x.revenue) })).sort((a, b) => b.orders - a.orders);
+  const cities = [...cm.values()].map((x) => ({ ...x, revenue: r2(x.revenue), channels: Object.fromEntries(Object.entries(x.channels).map(([k, c]) => [k, { ...c, revenue: r2(c.revenue) }])) })).sort((a, b) => b.orders - a.orders);
   const trows = await all(db, `SELECT i.product_id, COALESCE(p.name, i.name) AS name, COALESCE(p.sku, i.sku) AS sku, COALESCE(p.image, i.image) AS image, p.stock, p.purchase_price AS cost, o.channel,
       SUM(i.quantity) AS qty, SUM(i.total) AS revenue, COUNT(DISTINCT o.id) AS orders, MIN(i.unit_price) AS min, MAX(i.unit_price) AS max
     FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
