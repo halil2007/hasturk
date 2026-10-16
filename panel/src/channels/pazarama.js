@@ -239,9 +239,11 @@ export function pazarama(env, meta) {
     if (!brandHits.has(k)) brandHits.set(k, list(await call(`/brand/getBrands?Page=1&Size=100&name=${encodeURIComponent(k)}`)).map((b) => ({ id: str(b.id), name: str(b.name) })));
     return brandHits.get(k);
   }
+  // Marka adı büyük / küçük harf, boşluk ve noktalama farkı gözetmeden birebir aranır ("HG Tarım" = "HG-TARIM")
+  const bkey = (x) => str(x).toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]+/gu, '');
   async function brandId(name) {
-    const k = str(name).toLocaleLowerCase('tr');
-    const hit = (await findBrands(name)).find((b) => b.name.toLocaleLowerCase('tr') === k);
+    const k = bkey(name);
+    const hit = (await findBrands(name)).find((b) => bkey(b.name) === k);
     return hit ? hit.id : null;
   }
   async function searchBrands(q) {
@@ -266,7 +268,8 @@ export function pazarama(env, meta) {
       const text = v && v.value;
       if (text === '@variant') { const hit = pr.variant && pick ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; }
       if (valueId) attrs.push({ attributeId: id, attributeValueId: String(valueId) });
-      else if (a.isRequired) missing.push(str(a.displayName || a.name) + (text && text !== '@variant' ? ` (“${text}” listede yok)` : text === '@variant' && pr.variant ? ` (“${pr.variant}” listede yok)` : ''));
+      // Zorunlu özellik: kategori eşleştirmesinde seçilmemiş / değer Pazarama listesinde yok / varyanttan okunacak ama ürünün varyantı bu özelliğe uymuyor
+      else if (a.isRequired) missing.push(str(a.displayName || a.name) + (text && text !== '@variant' ? ` (“${text}” Pazarama listesinde yok)` : text === '@variant' ? (pr.variant ? ` (varyant “${pr.variant}” Pazarama listesinde yok)` : ' (ürünün varyantı yok; kategori eşleştirmesinde değer seçin)') : ''));
     }
     const bid = pr.brandId ? str(pr.brandId) : pr.brand ? await brandId(pr.brand) : null;
     if (!pr.brand && !bid) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” Pazarama'da bulunamadı`);

@@ -104,10 +104,15 @@ export function picker(c, catId) {
     return hits.length === 1 ? hits[0] : null;
   };
 }
-async function buildAll(c, map, prods, opts, zeroStock) {
+async function buildAll(c, map, prods, opts, zeroStock, db) {
   const pick = picker(c, map.remote_id), out = [];
+  // Marka eşleştirmesi (Kanallarda yayınla ekranında seçilen / adı birebir aynı bulunup hatırlanan kanal markası): ürün markasının adı
+  // kanaldakiyle aynı olmasa da eşleşmiş marka kullanılır
+  const brands = db && c.catalog.brands && !c.catalog.brandByCategory ? new Map((await all(db, 'SELECT brand, remote_id, remote_name FROM brand_map WHERE channel = ? AND COALESCE(remote_id, \'\') != \'\'', c.id).catch(() => [])).map((r) => [r.brand, r])) : new Map();
   for (const p of prods) {
     const pr = shape(p, opts, zeroStock);
+    const bm = brands.get(str(p.brand));
+    if (bm) { pr.brandId = bm.remote_id; pr.brand = str(bm.remote_name) || pr.brand; }
     const m = str(p.origin) ? { ...map, attrs: await withOrigin(c, map.remote_id, map.attrs || {}, p) } : map;
     try { out.push({ p: pr, ...(await c.catalog.build(pr, m, { opts, pick })) }); }
     catch (e) { out.push({ p: pr, key: pr.barcode || pr.sku, missing: ['hata: ' + e.message] }); }
@@ -337,7 +342,7 @@ export async function autoUpload(env, db, settings) {
         if (stale(map.remote_id)) { gone.push(map.local); continue; }
         const prods = (await productsFor(db, settings, { local: map.local, ch: c.id })).filter((p) => !p.listed && !skip(p) && (p.stock || 0) > 0).slice(0, 100 - ready.length);
         if (!prods.length) continue;
-        for (const x of await buildAll(c, map, prods, allOpts[c.id] || {}, false)) if (!x.missing.length) ready.push(x);
+        for (const x of await buildAll(c, map, prods, allOpts[c.id] || {}, false, db)) if (!x.missing.length) ready.push(x);
       }
       if (gone.length) await staleNotice(db, c, gone).catch(() => {});
       if (!ready.length) { out[c.id] = 0; continue; }
@@ -448,7 +453,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       .flatMap((u) => JSON.parse(u.items || '[]').filter((x) => x.ok !== false).map((x) => x.id)));
     const open = prods.filter((p) => !p.listed);
     const gone = map && (await staleCheck(c))(map.remote_id);
-    const built = map && !gone ? await buildAll(c, map, open, allOpts[c.id] || {}, !!Number(q.zero)) : [];
+    const built = map && !gone ? await buildAll(c, map, open, allOpts[c.id] || {}, !!Number(q.zero), db) : [];
     const byId = new Map(built.map((x) => [x.p.id, x]));
     return {
       map, listed: prods.length - open.length,
@@ -469,7 +474,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
       const map = await mapOf(db, local, c.id);
       if (!map) { skipped.push(...list.map((p) => ({ id: p.id, name: p.name, missing: ['kategori eşleştirilmemiş'] }))); continue; }
       if (stale(map.remote_id)) { skipped.push(...list.map((p) => ({ id: p.id, name: p.name, missing: [STALE_MSG] }))); continue; }
-      for (const x of await buildAll(c, map, list, allOpts[c.id] || {}, !!b.zeroStock)) (x.missing.length ? skipped.push({ id: x.p.id, name: x.p.name, missing: x.missing }) : ready.push(x));
+      for (const x of await buildAll(c, map, list, allOpts[c.id] || {}, !!b.zeroStock, db)) (x.missing.length ? skipped.push({ id: x.p.id, name: x.p.name, missing: x.missing }) : ready.push(x));
     }
     if (!ready.length) return { sent: 0, skipped };
     const items = ready.map((x) => ({ id: x.p.id, key: x.key, name: x.p.name }));

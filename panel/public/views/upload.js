@@ -163,7 +163,15 @@ export async function uploadView(el) {
       s.setBody(html`<div class="muted small">Ürünler kontrol ediliyor…</div>`);
       data = await api(`catalog/candidates?channel=${chId}&local=${encodeURIComponent(local)}&zero=${zero ? 1 : 0}`);
       const ready = data.items.filter((x) => !x.missing.length);
+      // En sık eksikler: çoğu kategori eşleştirmesinde bir kez seçilince (özellik değeri) ya da marka eşleştirmesiyle tüm ürünlerde kalkar
+      const cnt = new Map();
+      for (const x of data.items) for (const m of new Set(x.missing)) cnt.set(m, (cnt.get(m) || 0) + 1);
+      const top = [...cnt].sort((a, b) => b[1] - a[1]).slice(0, 8);
+      const isAttr = (m) => !/^(barkod|SKU|görsel|fiyat|marka)\b|^marka |^hata:/i.test(m);
       s.setBody(html`<div class="stack">
+        ${top.length ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>En sık eksikler</b>
+          <div style="margin-top:4px;line-height:1.7">${top.map(([m, k]) => html`<span class="pill tiny" style="margin:0 4px 4px 0">${m} · ${k} ürün</span>`)}</div>
+          <div class="tiny" style="margin-top:4px">${top.some(([m]) => isAttr(m)) ? html`Özellikler kategori başına bir kez seçilir: kategori satırındaki <b>Düzenle</b> ile değeri seçin, bu kategorideki tüm ürünlerde kalkar. ` : ''}${top.some(([m]) => /^marka/i.test(m)) ? html`Marka ${ek(c.name, 'da')} aynı adla bulunamadıysa ürünü <b>Kanallarda yayınla</b> ekranından gönderin; orada ${c.name} markasını bir kez seçersiniz, sonra hatırlanır. ` : ''}${top.some(([m]) => /^(barkod|SKU|görsel|fiyat)$/i.test(m)) ? 'Barkod, SKU, görsel ve fiyat ürün sayfasından girilir.' : ''}</div></div></div>` : ''}
         <div class="row wrap small"><span><b>${data.items.length}</b> ürün ${ek(c.name, 'da')} yok · <b style="color:var(--good)">${ready.length}</b> gönderime hazır${data.listed ? ` · ${data.listed} ürün zaten kanalda` : ''}</span><span class="spacer"></span>
           <label class="check"><input type="checkbox" data-zero ${zero ? 'checked' : ''}> Stok 0 gönder</label><label class="check"><input type="checkbox" data-all checked> Hazır olanların tümü</label></div>
         <div class="table-wrap" style="max-height:52vh;overflow:auto"><table class="t"><thead><tr><th></th><th>Ürün</th><th class="r">Fiyat</th><th class="r">Stok</th><th>Durum</th></tr></thead><tbody>
