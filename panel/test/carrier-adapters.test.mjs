@@ -141,6 +141,29 @@ test('Kargonomi: firma onayının yanıtı alınamadı (5xx) ama gönderi işlen
   } finally { restore(); }
 });
 
+test('Kargonomi: alan reddedilirse (karakter / biçim) arka planda sadeleştirilip bir kez yeniden denenir; bakiye hatası yeniden denenmez', async () => {
+  let n = 0, fail = 'content';
+  const calls = mock([
+    [/GET .*\/states$/, () => ({ data: [{ id: 34, name: 'İSTANBUL' }] })],
+    [/GET .*\/cities\/34$/, () => ({ data: [{ id: 830, name: 'KADIKÖY' }] })],
+    [/GET .*\/warehouses$/, () => ({ data: [{ id: 5, is_main: true }] })],
+    [/POST .*\/shipments$/, () => (n++ === 0 ? [422, { message: fail === 'content' ? 'İçerik alanında yalnızca Latin harfleri, rakam ve izinli noktalama işaretleri kullanılabilir' : 'Yetersiz bakiye' }] : { data: { id: 95, status: 'draft' } })],
+    [/GET .*\/shipment-price-comparison\/95$/, () => ({ shipping_provider_with_price: [{ id: 11, name: 'Aras Kargo', slug: 'aras', price: 50 }] })],
+  ]);
+  try {
+    const a = kargonomi.make({ KARGONOMI_API_KEY: 't' });
+    const q = await a.quote(ship());
+    assert.equal(q.ref, '95');
+    const posts = calls.filter((c) => c.method === 'POST' && /\/shipments$/.test(c.url)).map((c) => JSON.parse(c.body).shipment);
+    assert.equal(posts.length, 2);
+    assert.equal(posts[1].packages[0].content, 'Siparis 1001');
+    assert.equal(posts[1].buyer_name, 'Ayse Yilmaz');
+    n = 0; fail = 'credit';
+    await assert.rejects(a.quote(ship()), /bakiye/);
+    assert.equal(n, 1, 'bakiye hatası yeniden denenmez');
+  } finally { restore(); }
+});
+
 test('Navlungo: token → gönderi (adres no, telefon biçimi) → takip no ve etiket hazır olunca alınır; aynı referans tekrarında mevcut gönderi kullanılır', async () => {
   let n = 0;
   const calls = mock([

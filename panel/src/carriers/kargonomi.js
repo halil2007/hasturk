@@ -85,11 +85,24 @@ export function make(values) {
     if (!stateId) throw new Error(`Kargonomi: alıcı ili bulunamadı (“${r.city}”)`);
     const cityId = await placeId('city', stateId, r.district);
     if (!cityId) throw new Error(`Kargonomi: alıcı ilçesi bulunamadı (“${r.district}”, ${r.city})`);
-    const draft = unwrap(await req('POST', '/shipments', { shipment: {
+    const body = { shipment: {
       warehouse_id: await warehouse(), buyer_name: buyer.slice(0, 255), buyer_email: r.email || undefined, buyer_phone: phone, buyer_address: addr,
       buyer_state_id: stateId, buyer_city_id: cityId,
       packages: [{ desi: Number(s.desi) > 0 ? Number(s.desi) : 1, content: safeText((s.items || []).map((x) => `${x.qty}x ${x.name}`).join(', ')).slice(0, 200) || safeText(s.reference) || 'Urun' }],
-    } }));
+    } };
+    let draft;
+    try { draft = unwrap(await req('POST', '/shipments', body)); } catch (e) {
+      // Kargonomi bir alanın yazımını reddetti (karakter / biçim): alan arka planda sadeleştirilip bir kez yeniden denenir —
+      // içerik "Siparis <no>", ad / adres / e-posta ASCII; kullanıcıya hata yalnız ikinci deneme de olmazsa gösterilir
+      const m = String(e.message || '');
+      if (!/karakter|harf|içerik|icerik|content|buyer_|alıcı|adres|address|name|isim|e-posta|email|geçersiz|invalid|format/i.test(m) || /bakiye|credit|yetki|401|token/i.test(m)) throw e;
+      const sh = body.shipment;
+      sh.packages[0].content = safeText(`Siparis ${s.orderNumber || s.reference || ''}`).slice(0, 200) || 'Urun';
+      sh.buyer_name = safeText(sh.buyer_name).slice(0, 255);
+      sh.buyer_address = safeText(sh.buyer_address).slice(0, 512);
+      if (sh.buyer_email && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(sh.buyer_email)) delete sh.buyer_email;
+      draft = unwrap(await req('POST', '/shipments', body));
+    }
     if (!draft || !draft.id) throw new Error('Kargonomi gönderi numarası vermedi');
     return draft;
   }
