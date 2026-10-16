@@ -175,7 +175,11 @@ export async function integrations(el, rest = []) {
     const s = sheet({ title: `${c.name} · ${c.kind === 'direct' ? 'kargo firması' : 'kargo entegratörü'}`, size: 'narrow', body: html`<div class="stack">
       <div class="small">${c.about}</div>
       ${!c.ready ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div><b>Bağlantı hazırlanıyor.</b> ${c.name} API dokümanı ve test hesabı geldiğinde gönderi oluşturma açılacak. Bilgilerinizi şimdiden kaydedebilirsiniz; o zamana kadar etiketi ${c.name} panelinden alıp takip numarasını paket menüsünden “Kendi anlaşmamla gönder” ile girebilirsiniz.</div></div>` : ''}
-      <div class="notice small"><i class="ico ico-key"></i><div>${c.howto}${c.site ? html` <a class="link" href="${c.site}" target="_blank" rel="noopener">${c.site.replace(/^https?:\/\/(www\.)?/, '')}</a>` : ''}</div></div>
+      <div class="notice small"><i class="ico ico-key"></i><div>${c.howto}${c.site ? html` <a class="link" href="${c.site}" target="_blank" rel="noopener">${c.site.replace(/^https?:\/\/(www\.)?/, '')}</a>` : ''}
+        ${c.mail ? html`<div class="row wrap" style="gap:8px;margin-top:8px;align-items:center"><a class="btn sm" href="${`mailto:${c.mail.to}?subject=${encodeURIComponent(c.mail.subject)}&body=${encodeURIComponent(c.mail.body)}`}"><i class="ico ico-send"></i>E-postayı hazırla</a><span class="muted tiny">Alıcı: <b>${c.mail.to}</b></span></div>
+          <details style="margin-top:6px"><summary class="tiny" style="cursor:pointer">E-posta açılmazsa metni kopyalayın</summary><textarea class="input" readonly rows="8" style="margin-top:6px;font-size:12px">Konu: ${c.mail.subject}
+
+${c.mail.body}</textarea></details>` : ''}</div></div>
       ${c.demo ? '' : html`<div class="form-grid">${fields.filter((f2) => !f2.adv).map(cfield)}</div>
         ${fields.some((f2) => f2.adv) ? html`<details class="adv"><summary class="small">Gelişmiş ayarlar (isteğe bağlı)</summary><div class="form-grid" style="margin-top:10px">${fields.filter((f2) => f2.adv).map(cfield)}</div></details>` : ''}`}
       ${c.configured && !c.demo ? html`<label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" data-active ${c.active ? 'checked' : ''} ${admin ? '' : 'disabled'}><span class="small">Aktif (kapalıysa sipariş ekranında kullanılmaz)</span></label>` : ''}

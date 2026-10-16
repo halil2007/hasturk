@@ -84,6 +84,36 @@ test('Kargonomi: il / ilçe numarası bulunur, taslak → en ucuz firma → taki
   } finally { restore(); }
 });
 
+test('Kargonomi: firma adına göre teklif içinden seçilir (eski firma numarası da), teklif yoksa taslak silinir; alıcı adı / adres kuralları; desi boşsa 1', async () => {
+  const calls = mock([
+    [/GET .*\/states$/, () => ({ data: [{ id: 34, name: 'İSTANBUL' }] })],
+    [/GET .*\/cities\/34$/, () => ({ data: [{ id: 830, name: 'KADIKÖY' }] })],
+    [/GET .*\/warehouses$/, () => ({ data: [{ id: 5, is_main: true }] })],
+    [/POST .*\/shipments$/, () => ({ data: { id: 90, status: 'draft' } })],
+    [/GET .*\/shipment-price-comparison\/90$/, () => ({ shipping_provider_with_price: [{ id: '-1', name: 'Otomatik', slug: 'auto', price: 40 }, { id: 11, name: 'Aras Kargo', slug: 'aras', price: 52.4 }, { id: 14, name: 'Yurtiçi Kargo', slug: 'yurtici', price: 61 }] })],
+    [/POST .*\/confirm-shipping-price$/, () => ({ shipping_provider_with_price: [] })],
+    [/GET .*\/shipments\/90$/, () => ({ data: { id: 90, status: 'ready' } })],
+    [/DELETE .*\/shipments\/90$/, () => [204, '']],
+  ]);
+  try {
+    const confirm = () => JSON.parse(calls.filter((c) => /confirm/.test(c.url)).pop().body).shipping_provider_id;
+    await kargonomi.make({ KARGONOMI_API_KEY: 't', KARGONOMI_PROVIDER: 'yurtici' }).create(ship({ desi: 0 }));
+    assert.equal(confirm(), 14, 'Kargonomi\'deki numarası tekliften');
+    assert.equal(JSON.parse(calls.find((c) => /POST .*\/shipments$/.test(`${c.method} ${c.url}`)).body).shipment.packages[0].desi, 1);
+    await kargonomi.make({ KARGONOMI_API_KEY: 't', KARGONOMI_PROVIDER: '4' }).create(ship());
+    assert.equal(confirm(), 11, 'eski kayıt (4 = Aras) ada çevrilir');
+    // Teklif vermeyen firma: gönderi açılmaz, taslak silinir, teklif verenler yazılır
+    const n0 = calls.length;
+    await assert.rejects(kargonomi.make({ KARGONOMI_API_KEY: 't', KARGONOMI_PROVIDER: 'ptt' }).create(ship()), /teklif vermedi.*Aras Kargo \(52\.4 TL\).*Yurtiçi/);
+    assert.ok(calls.slice(n0).some((c) => c.method === 'DELETE' && /shipments\/90$/.test(c.url)));
+    assert.ok(!calls.slice(n0).some((c) => /confirm/.test(c.url)));
+    // Doküman kuralları: alıcı adı en az 2 kelime, adres en az 10 karakter (istek atılmadan açıklamalı hata)
+    const a = kargonomi.make({ KARGONOMI_API_KEY: 't' });
+    await assert.rejects(a.create(ship({ receiver: { ...ship().receiver, name: 'Ayşe' } })), /ad ve soyadıyla/);
+    await assert.rejects(a.create(ship({ receiver: { ...ship().receiver, address: 'No 1', district: 'K', city: 'İ' } })), /en az 10 karakter/);
+  } finally { restore(); }
+});
+
 test('Navlungo: token → gönderi (adres no, telefon biçimi) → takip no ve etiket hazır olunca alınır; aynı referans tekrarında mevcut gönderi kullanılır', async () => {
   let n = 0;
   const calls = mock([

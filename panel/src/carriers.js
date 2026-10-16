@@ -31,7 +31,11 @@ export const CARRIERS = {
   kargonomi: {
     id: 'kargonomi', name: 'Kargonomi', site: 'https://www.kargonomi.com.tr', ready: true,
     about: 'Kargo karşılaştırma ve gönderi platformu: Aras, Yurtiçi, Sürat, PTT, HepsiJET, Kolay Gelsin gibi firmalarla tek hesaptan, bakiye yükleyerek gönderim. Varsayılan olarak en ucuz firma seçilir.',
-    howto: 'Kargonomi hesabınızda Depolarım bölümünden gönderen adresinizi (depo) ekleyin. API anahtarını Kargonomi destek ekibinden (destek@kargonomi.com.tr · 0850 811 87 97) isteyip buraya girin. Bakiye yetersizse gönderi açılmaz.',
+    // Kargonomi API anahtarını (token) yalnız kendi müşterisine, hesabına bağlı olarak ve e-postayla verir (telefonla verilmez):
+    // her firma kendi Kargonomi hesabı için destek@kargonomi.com.tr adresinden ister. Panel e-postayı hazır metinle açar (mail).
+    howto: 'Kargonomi API anahtarını (token) yalnızca kendi müşterilerine, e-postayla verir; telefonla verilmez. Önce Kargonomi hesabınızı açın, Depolarım bölümünden gönderen adresinizi (depo) ekleyin. Sonra Kargonomi\'de kayıtlı e-posta adresinizden destek@kargonomi.com.tr adresine yazıp hesabınız için API token isteyin (aşağıdaki “E-postayı hazırla” ile metin hazır gelir). Gelen token\'ı buraya girin. Bakiye yetersizse gönderi açılmaz.',
+    mail: { to: 'destek@kargonomi.com.tr', subject: 'API token talebi (Hastürk CRM entegrasyonu)',
+      body: 'Merhaba,\n\nKargonomi hesabımı sipariş yönetim panelim Hastürk CRM\'ye bağlayıp gönderileri API ile oluşturmak istiyorum. Hesabım için API erişim anahtarı (token) iletebilir misiniz?\n\nKargonomi hesap e-postası: \nFirma adı: \nVergi no: \n\nTeşekkürler.' },
   },
   navlungo: {
     id: 'navlungo', name: 'Navlungo', site: 'https://navlungo.com', ready: true,
@@ -93,7 +97,7 @@ export async function carrierList(env, db, { withFields = false } = {}) {
     const missing = d.fields.filter((f) => f.req && !f.source).map((f) => f.label);
     const configured = !missing.length;
     return {
-      id: c.id, kind: c.kind || 'integrator', color: c.color || '', name: c.name, site: c.site, about: c.about, howto: c.howto, ready: c.ready,
+      id: c.id, kind: c.kind || 'integrator', color: c.color || '', name: c.name, site: c.site, about: c.about, howto: c.howto, mail: c.mail || null, ready: c.ready,
       active: d.active, configured, missing, usable: c.ready && configured && d.active, isDefault: def === c.id, updated: d.updated,
       ...(withFields ? { fields: d.fields } : {}),
     };
