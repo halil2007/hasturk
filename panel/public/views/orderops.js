@@ -16,7 +16,9 @@ export function stepper(status) {
 const lineOf = (o, lid) => o.items.find((i) => String(i.line_id) === String(lid)) || {};
 // Etiket var mı: kanal etiketi / geçerli panel etiketi. Etiket servisi olan kanalda (ikas Kargo, Trendyol, Hepsiburada)
 // yalnızca barkod gelmiş olması etiket sayılmaz; kendi anlaşmanızla gönderimde ve etiket servisi olmayan kanalda sayılır.
-const hasLabel = (p, chId) => !!(p.has_label || p.label_at || ((p.barcode || p.tracking) && (p.agreement === 'own' || p.virtual || (ch(chId || p.channel).caps || {}).label !== 'remote')));
+// Etiketi firmanın verdiği entegratör gönderisi (Kargonomi, Navlungo, DHL): yalnız firma etiketi geldiyse etiket var sayılır
+const LATE = { kargonomi: 'Kargonomi', navlungo: 'Navlungo', dhl: 'DHL eCommerce' };
+const hasLabel = (p, chId) => (LATE[p.carrier_provider] ? !!p.has_label : !!(p.has_label || p.label_at || ((p.barcode || p.tracking) && (p.agreement === 'own' || p.virtual || (ch(chId || p.channel).caps || {}).label !== 'remote'))));
 // Paket durumu: paketlenmedi → kargoya hazır (etiket bekleniyor) → etiket hazır → yazdırıldı → kargoda
 export function labelState(o, pkg) {
   const c = o.channel || pkg.channel;
@@ -24,6 +26,8 @@ export function labelState(o, pkg) {
   if (pkg.error) return { key: 'error', text: 'Kanal hatası', cls: 'bad' };
   if (pkg.label_printed_at) return { key: 'printed', text: 'Etiket yazdırıldı', cls: 'good' };
   if (hasLabel(pkg, c)) return { key: 'ready', text: 'Etiket hazır', cls: 'info' };
+  // Kargonomi (entegratör) gönderisi açıldı, firma etiketi henüz gelmedi: ikas Kargo / kanal kargosu değil, entegratör anlaşmasıyla gider
+  if (LATE[pkg.carrier_provider]) return { key: 'carrier', text: `${LATE[pkg.carrier_provider]} anlaşmasıyla gönderilecek · etiket hazırlanıyor`, cls: 'amber' };
   if (pkg.packed_at && (pkg.barcode || pkg.tracking)) return { key: 'created', text: 'Gönderi oluştu · etiket bekleniyor', cls: 'amber' };
   if ((ch(c).caps || {}).external) return { key: 'external', text: pkg.packed_at ? 'ikas Kargo ile gönderilmedi' : 'ikas Kargo ile gönderilecek', cls: 'warn' };
   if (pkg.packed_at) return { key: 'packed', text: 'Kargoya hazır', cls: 'amber' };
@@ -162,6 +166,8 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     draw();
   }
   const caps = () => (d.channel && d.channel.caps) || {};
+  // Kargonomi ile gönderilebilecek paketler (bölünmüş sipariş: her paket ayrı gönderi / etiket)
+  const kgAll = () => (kgOn && live() ? packagesOf(d.order).filter((p) => !p.virtual && carrierAllowed(d, p)) : []);
   const live = () => !['cancelled', 'returned', 'delivered'].includes(d.order.status);
   const chName = () => ch(d.order.channel).name;
 
@@ -172,6 +178,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     if (caps().hold && ['unpacked', 'packed', 'created'].includes(ls.key)) return html`<button class="btn sm" data-op="label" data-id="${p.id}"><i class="ico ico-sync"></i>Etiketi ${ek(chName(), 'dan')} kontrol et</button>`;
     // Kargonomi ile gönder: yalnız internet sitesi siparişinde ve Kargonomi bağlı / aktifse (pazaryerinde gösterilmez)
     const kg = kgOn && carrierAllowed(d, p) ? html`<button class="btn sm ${ls.key === 'unpacked' && !caps().label && !caps().pack ? 'primary' : ''}" data-op="kargonomi" data-id="${p.id}"><i class="ico ico-truck"></i>Kargonomi ile gönder</button>` : '';
+    if (ls.key === 'carrier') return html`<button class="btn sm primary" data-op="label" data-id="${p.id}"><i class="ico ico-tag"></i>${LATE[p.carrier_provider]} etiketini al</button>`;
     if (ls.key === 'external') return html`${kg}<button class="btn sm ${kg ? '' : 'primary'}" data-op="ext"><i class="ico ico-truck"></i>${caps().external.label}${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}</button><button class="btn sm" style="flex:0 0 auto" data-op="refresh" title="ikas'tan hemen kontrol et" aria-label="Kontrol et"><i class="ico ico-sync"></i></button>`;
     // Kanalın kargo etiketi servisi yoksa ve bağlı kargo entegratörü varsa: etiket ve takip no entegratörden
     if (ls.key === 'unpacked' && !caps().label && !caps().pack && kg) return html`${kg}<button class="btn sm" data-op="label" data-id="${p.id}">Etiket oluştur</button>`;
@@ -211,7 +218,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       <div class="hd"><span class="box"><i class="ico ico-box"></i></span><b>Paket ${p.no}</b><span class="muted small">• ${qty} ürün</span><span class="spacer"></span><span class="pill ${ls.cls}">${ls.text}</span></div>
       ${mode === 'panel' ? html`<div class="small muted ellipsis">${p.items.map((x) => `${lineOf(o, x.line_id).product_name || lineOf(o, x.line_id).name} ×${x.qty}`).join(', ')}</div>`
         : p.items.map((x) => { const it = lineOf(o, x.line_id); return html`<div class="line">${thumb(it.product_image || it.image, it.name, 'sm')}<div style="min-width:0;flex:1"><div class="pname" style="font-weight:600">${it.product_name || it.name}</div><div class="muted tiny">${it.sku || ''}</div></div><span class="spacer"></span><b>×${x.qty}</b></div>`; })}
-      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${p.cargo_company || (pick && pick.name ? `${pick.name} (seçildi, paketlerken uygulanır)` : '') || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}${p.carrier_status ? html` · <span class="pill tiny ${p.carrier_state === 'delivered' ? 'good' : p.carrier_state === 'returned' ? 'warn' : ''}">${p.carrier_status}</span>` : ''}</span>
+      <div class="cargo-row"><i class="ico ico-truck muted"></i><span class="ellipsis" style="flex:1"><b>${LATE[p.carrier_provider] ? `${LATE[p.carrier_provider]} anlaşmasıyla${p.cargo_company && p.cargo_company !== LATE[p.carrier_provider] ? ` · ${p.cargo_company}` : ''}` : p.cargo_company || (pick && pick.name ? `${pick.name} (seçildi, paketlerken uygulanır)` : '') || o.cargo_company || (/^ikas/.test(o.channel) ? `ikas Kargo${carrierOf(o.extra && o.extra.cargoChoice) ? ` · ${carrierOf(o.extra.cargoChoice)}` : ''}${o.extra && o.extra.cargoChoice ? ` (müşteri: ${o.extra.cargoChoice})` : ''}` : 'Kanalın kargosu')}</b>${p.barcode || p.tracking ? html` · <span class="num">${p.barcode || p.tracking}</span>` : ''}${p.carrier_status ? html` · <span class="pill tiny ${p.carrier_state === 'delivered' ? 'good' : p.carrier_state === 'returned' ? 'warn' : ''}">${p.carrier_status}</span>` : ''}</span>
         ${canCargo ? html`<button class="btn sm outline" style="flex:0 0 auto" data-op="cargo" data-id="${p.id}">${p.cargo_company || (pick && pick.name) ? 'Değiştir' : 'Kargo firması seç'}</button>` : ''}${p.status === 'shipped' || ['shipped', 'delivered'].includes(o.status) ? trackBtn(p, o) : ''}</div>
       ${mode !== 'panel' && !p.virtual ? labelSteps(p) : ''}
       ${p.error ? html`<div class="err"><b>${chName()}:</b> ${p.error} <button class="btn sm ghost" data-op="diag">Tanıla</button></div>` : ''}
@@ -242,6 +249,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         <div class="row" style="margin-top:14px">
           <button class="btn outline" style="flex:1" data-op="split" ${splittable ? '' : 'disabled'}><i class="ico ico-split"></i>Pakete böl</button>
         </div>
+        ${kgAll().length > 1 ? html`<button class="btn outline block" style="margin-top:6px" data-op="kgall"><i class="ico ico-truck"></i>Tüm paketleri Kargonomi ile gönder (${kgAll().length})</button>` : ''}
         <button class="btn ghost sm block" style="margin-top:6px" data-op="detail">Sipariş detayı</button>`);
       return;
     }
@@ -252,6 +260,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
         ${live() ? html`<div class="row wrap" style="margin-top:8px">
           ${o.status === 'new' ? html`<button class="btn ghost" style="flex:1" data-op="accept" title="Etiket almadan yalnız onayla"><i class="ico ico-play"></i>Yalnız işleme al</button>` : ''}
           ${open.length > 1 && open.some((p) => !hasLabel(p, d.order.channel)) ? html`<button class="btn primary" style="flex:1" data-op="labels"><i class="ico ico-tag"></i>Tüm etiketleri al</button>` : ''}
+          ${kgAll().length > 1 ? html`<button class="btn outline" style="flex:1" data-op="kgall"><i class="ico ico-truck"></i>Tüm paketleri Kargonomi ile gönder (${kgAll().length})</button>` : ''}
           <button class="btn outline" style="flex:1" data-op="split" ${splittable ? '' : 'disabled'}><i class="ico ico-split"></i>Pakete böl</button>
           <button class="btn outline" style="flex:1" data-op="addpkg" ${splittable ? '' : 'disabled'}><i class="ico ico-plus"></i>Paket ekle</button>
         </div>` : ''}
@@ -355,6 +364,7 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
     cargo: (b) => cargoDialog(d, pkgOf(b.dataset.id), changed),
     carrier: (b) => carrierDialog(d, pkgOf(b.dataset.id), changed),
     kargonomi: (b) => kargonomiDialog(d, pkgOf(b.dataset.id), changed),
+    kgall: () => kargonomiAllDialog(d, kgAll(), changed),
     diag: () => diagnoseDialog(d.order.channel, d.order.id, d.order.order_number),
     more: (b) => {
       const pkg = pkgOf(b.dataset.id), c = caps(), open = pkg.status === 'open' && live();
@@ -468,7 +478,68 @@ async function kargonomiDialog(d, pkg, done) {
       if (!x) return toast('Kargo firmasını seçin', true);
       const r = await api(`orders/${enc}/carrier-label`, { method: 'POST', body: { package_id: pkg.virtual ? undefined : pkg.id, provider: 'kargonomi', quote_id: quote.quote_id, firm_id: x.value, desi: quote.desi } });
       sent = true; s.close(); toast(r.message);
-      await outputLabel(r, { done });
+      if (r.official) await outputLabel(r, { done }); else await waitCarrierLabels(o.id, [r.package_id], done);
+      await done();
+    });
+  };
+  draw();
+}
+// Kargonomi etiketi gönderiden birkaç saniye sonra hazır olur: hazır olana kadar (en çok ~45 sn) beklenir, sonra yazdırılır.
+// Panelin iç etiketi basılmaz (kargo firması okutmaz).
+async function waitCarrierLabels(orderId, pkgIds, done) {
+  const enc = encodeURIComponent(orderId), left = new Set(pkgIds.map(String));
+  toast('Kargonomi etiketi hazırlanıyor…');
+  for (let i = 0; i < 15 && left.size; i++) {
+    await new Promise((res) => setTimeout(res, 3000));
+    for (const id of [...left]) {
+      const r = await api(`orders/${enc}/label`, { method: 'POST', body: { package_id: Number(id) } }).catch(() => null);
+      if (r && r.official) left.delete(id);
+    }
+  }
+  if (left.size < pkgIds.length) await bulkLabels([orderId], { fetch: false, done });
+  if (left.size) toast(`${left.size} paketin Kargonomi etiketi henüz hazır değil; birazdan paketin “Etiketi al” düğmesiyle alın`, true);
+}
+// Bölünmüş sipariş: tüm paketler Kargonomi ile (her paket ayrı gönderi ve etiket). Her paketin teklifi alınır; tüm paketlere teklif veren
+// firmalar toplam ücretiyle listelenir, kullanıcı firmayı seçer. Vazgeçilirse taslaklar silinir. Bitince tüm etiketler yazdırılır.
+async function kargonomiAllDialog(d, pkgs, done) {
+  const o = d.order, enc = encodeURIComponent(o.id);
+  let q = null, sent = false;
+  const desi = Object.fromEntries(pkgs.map((p) => [p.id, p.desi || 1]));
+  const discard = () => { if (q && !sent) api(`orders/${enc}/carrier-quote-cancel`, { method: 'POST', body: { provider: 'kargonomi', quote_ids: q.packages.map((x) => x.quote_id) } }).catch(() => {}); };
+  const s = sheet({ title: `#${o.order_number} · ${pkgs.length} paketi Kargonomi ile gönder`, size: 'narrow', onClose: discard });
+  const draw = (err = '') => {
+    // Tüm paketlere teklif veren firmalar: paket fiyatları ve toplam
+    const firms = q ? (q.packages[0] || { offers: [] }).offers.map((f) => {
+      const per = q.packages.map((x) => (x.offers || []).find((y) => String(y.id) === String(f.id)));
+      return per.every(Boolean) ? { id: f.id, name: f.name, per, total: per.every((y) => y.price != null) ? per.reduce((a, y) => a + y.price, 0) : null } : null;
+    }).filter(Boolean).sort((a, b) => (a.total ?? 1e9) - (b.total ?? 1e9)) : [];
+    s.setBody(html`<div class="stack">
+      <div class="small muted">${ch(o.channel).name} · #${o.order_number} · ${o.customer}</div>
+      <div class="notice small"><i class="ico ico-box"></i><div>Sipariş ${pkgs.length} pakete bölünmüş: her paket için Kargonomi'de ayrı gönderi açılır, her pakete ayrı etiket ve takip numarası gelir.</div></div>
+      <div class="stack" style="gap:6px">${pkgs.map((p) => html`<div class="row" style="gap:8px;align-items:center"><b class="small" style="width:70px">Paket ${p.no}</b><span class="muted tiny" style="flex:1">${p.items.reduce((a, x) => a + x.qty, 0)} ürün</span>
+        <label class="row small" style="gap:6px;align-items:center">Desi <input class="input" type="number" min="0.1" step="0.1" data-pdesi="${p.id}" value="${desi[p.id]}" style="width:80px"></label></div>`)}</div>
+      <button class="btn" data-q style="align-self:flex-start"><i class="ico ico-sync"></i>${q ? 'Fiyatları yenile' : 'Fiyatları getir'}</button>
+      ${err ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div>${err}</div></div>` : ''}
+      ${q ? (firms.length ? html`<div class="small" style="font-weight:650">Kargo firmasını seçin (tüm paketler bu firmayla gider)</div><div class="stack" style="gap:6px">${firms.map((f, i) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="kgfirm" value="${f.id}"><span style="flex:1"><b>${f.name}</b>
+          <div class="tiny muted">${f.per.map((y, k) => `Paket ${q.packages[k].no}: ${y.price != null ? money(y.price) : '—'}`).join(' · ')}</div></span>
+          ${f.total != null ? html`<span class="num" style="font-weight:700">${money(f.total)}</span><span class="muted tiny">+ KDV</span>` : ''}${i === 0 && firms.length > 1 && f.total != null ? html`<span class="pill good tiny">en uygun</span>` : ''}</label>`)}</div>`
+        : html`<div class="notice warn small">Tüm paketlere teklif veren kargo firması yok. Desileri kontrol edin ya da paketleri tek tek gönderin.</div>`)
+        : html`<div class="muted small">Fiyatları getirince her paketin ücreti ve toplamı firmalara göre listelenir; firmayı siz seçersiniz.</div>`}
+    </div>`);
+    s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Vazgeç</button>${firms.length ? html`<button class="btn primary" data-go><i class="ico ico-tag"></i>${pkgs.length} gönderi oluştur ve etiketleri al</button>` : ''}`);
+    $$('[data-pdesi]', s.el).forEach((x) => { x.onchange = () => { desi[x.dataset.pdesi] = x.value; }; });
+    $('[data-q]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
+      discard(); q = null;
+      try { q = await api(`orders/${enc}/carrier-quote`, { method: 'POST', body: { provider: 'kargonomi', all: true, desis: desi } }); draw(); } catch (x) { draw(x.message); }
+    });
+    const go = $('[data-go]', s.el);
+    if (go) go.onclick = (e) => busy(e.currentTarget, async () => {
+      const x = $('input[name=kgfirm]:checked', s.el);
+      if (!x) return toast('Kargo firmasını seçin', true);
+      const quotes = Object.fromEntries(q.packages.map((p) => [p.package_id, { quote_id: p.quote_id, firm_id: x.value, desi: p.desi }]));
+      const r = await api(`orders/${enc}/carrier-label`, { method: 'POST', body: { provider: 'kargonomi', all: true, quotes } });
+      sent = true; s.close(); toast(r.message, !!(r.errors && r.errors.length));
+      await waitCarrierLabels(o.id, r.packages || [], done);
       await done();
     });
   };
@@ -767,6 +838,8 @@ export async function bulkLabels(ids, { fetch = true, done } = {}) {
       if (l.official) (['png', 'jpg', 'gif'].includes(l.official.format) ? images : files).push(l.official);
       // Kendi etiketimiz yalnızca: kanal bunu onayladıysa (ör. Trendyol'da ortak etiketi olmayan firma), kanalın etiket servisi yoksa
       // ya da gönderi kendi anlaşmanızla yapıldıysa. Etiket servisi olan kanalda gerçek etiket gelmeden kendi etiketimiz basılmaz.
+      // Etiketi firmanın verdiği gönderide (Kargonomi, Navlungo, DHL) firma etiketi gelmeden iç etiket basılmaz
+      else if (['kargonomi', 'navlungo', 'dhl'].includes(pkg.carrier_provider)) continue;
       else if (l.panel || ((pkg.agreement === 'own' || (ch(order.channel).caps || {}).label !== 'remote') && (pkg.barcode || pkg.tracking))) panel.push({ order, pkg });
       else continue;
       marks.push({ orderId: order.id, pkgId: pkg.id });

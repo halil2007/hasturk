@@ -109,13 +109,16 @@ export function make(values) {
   const result = (s) => {
     const tracking = str(s.shipping_webservice_tracking_code), carrier = str(s.shipping_provider_name);
     return {
-      ref: str(s.id), tracking, barcode: str(s.shipping_webservice_barcode) || tracking, carrier: carrier || 'Kargonomi',
+      ref: str(s.id), tracking, barcode: str(s.shipping_webservice_barcode) || tracking || str(s.barcode_of_order_id), carrier: carrier || 'Kargonomi',
       // DOĞRULA: real_price / estimated_price KDV hariç kabul edildi (Kargonomi fiyat listeleri KDV hariç)
       // costFinal: gerçek ücret (real_price) geldi; tahmini ücretin yerine geçer (bkz. carriers.js trackCarriers)
       trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costFinal: money(s.real_price) != null, costVatIncluded: false,
       state: STATES[s.status] || null, text: str(s.status_label),
     };
   };
+  // Etiket hazır mı: kargo firmasında gönderi oluştu (takip kodu firma kabulünden sonra gelebilir; etiket ondan önce de alınır)
+  const LABEL_READY = new Set(['webservice_order_created', 'webservice_checking_shipment', 'webservice_shipment_started', 'webservice_shipment_not_delivered', 'webservice_shipment_returning', 'webservice_shipment_missing']);
+  const labelReady = (s) => LABEL_READY.has(s.status) || !!str(s.shipping_webservice_barcode) || !!str(s.shipping_webservice_tracking_code);
   async function getLabel(id) {
     const j = await req('GET', `/shipments/${id}/barcode?format=pdf`);
     const d = typeof j === 'string' ? j : [j && j.data, j && j.data && j.data.barcode, j && j.data && j.data.base64, j && j.data && j.data.pdf, j && j.barcode, j && j.base64, j && j.pdf].find((x) => typeof x === 'string' && x.length > 100);
@@ -146,10 +149,15 @@ export function make(values) {
       }
       // Fiyat onayından sonraki hata: gönderi panele yazılmaz (takipsiz taslak / gönderi kalmasın) → iptal edilir, olmazsa silinir (en iyi çaba)
       try {
-        const s2 = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => draft));
+        // Kargo firması gönderiyi birkaç saniyede oluşturur: kısa bir süre (en çok ~6 sn) beklenir, oluşunca etiket hemen alınır
+        let s2 = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => draft));
+        for (let i = 0; i < 3 && !labelReady(s2) && s2.status !== 'webservice_order_failed' && !opts.noWait; i++) {
+          await new Promise((res) => setTimeout(res, 2000));
+          s2 = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => s2));
+        }
         if (s2.status === 'webservice_order_failed') throw new Error(`Kargonomi: kargo firması gönderiyi oluşturamadı (${str(s2.status_label)})`);
         const out = result(s2);
-        out.label = out.tracking ? await getLabel(draft.id).catch(() => null) : null;
+        out.label = labelReady(s2) ? await getLabel(draft.id).catch(() => null) : null;
         return out;
       } catch (e) {
         await req('POST', '/shipments/cancel', { shipment_id: draft.id }).catch(() => req('DELETE', `/shipments/${draft.id}`)).catch(() => null);
@@ -165,10 +173,10 @@ export function make(values) {
     async track(pkg) { return result(unwrap(await req('GET', `/shipments/${pkg.carrier_ref}`))); },
     // Etiket, firma gönderisi oluştuktan (takip no geldikten) sonra hazır olur
     async label(pkg) {
-      const s = result(unwrap(await req('GET', `/shipments/${pkg.carrier_ref}`)));
-      if (!s.tracking) return null;
+      const raw = unwrap(await req('GET', `/shipments/${pkg.carrier_ref}`)), s = result(raw);
+      if (!labelReady(raw)) return null;
       const lab = await getLabel(pkg.carrier_ref);
-      return lab ? { ...lab, tracking: s.tracking, trackingUrl: s.trackingUrl } : null;
+      return lab ? { ...lab, tracking: s.tracking, barcode: s.barcode, carrier: s.carrier, trackingUrl: s.trackingUrl } : null;
     },
   };
 }
