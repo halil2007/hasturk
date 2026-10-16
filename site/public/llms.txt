@@ -40,45 +40,45 @@
 
 ## Entegrasyonlar
 
-- [Amazon Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/amazon): Amazon entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Aras Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/aras-kargo): Aras Kargo entegrasyonu: kendi anlaşmanızla gönderi açın, Aras etiketi ve takip numarasını panelden alın; kargo durumu ve ücreti kendiliğinden gelsin.
-- [Çiçeksepeti Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ciceksepeti): Çiçeksepeti entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [DHL eCommerce Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/dhl-ecommerce): DHL eCommerce (MNG Kargo) entegrasyonu: kendi anlaşmanızla gönderi açın, DHL etiketi ve takip numarası panele gelsin; kargo ücreti ve teslimat izlensin.
-- [DHL Express Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/dhl-express): DHL Express entegrasyonu: yurt içi ekspres gönderiyi panelden açın; AWB numarası ve PDF etiket anında gelsin, kargo durumu panelden izlensin.
-- [eBay Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ebay): eBay entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Etsy Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/etsy): Etsy entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Hepsiburada Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/hepsiburada): Hepsiburada entegrasyonu: siparişler ve paketleme, kargo etiketi, stok ve fiyat, ürün yükleme, buybox ve hakediş tek panelde. 7 gün ücretsiz deneyin.
-- [HepsiJET Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/hepsijet): HepsiJET entegrasyonu: kendi anlaşmanızla gönderi açın, HepsiJET etiketi anında gelsin; standart, ertesi gün ya da aynı gün teslimat. Takip panelde.
-- [IdeaSoft Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ideasoft): IdeaSoft entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [idefix Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/idefix): idefix mağazanızın siparişlerini onaylayın ve kargoya verin, stok ve fiyatlarınızı eşitleyin, ürün yükleyin, sorularınızı ve iadelerinizi panelden yönetin.
-- [ikas Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ikas): ikas entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Koçtaş Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/koctas): Koçtaş entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Kolay Gelsin Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/kolay-gelsin): Kolay Gelsin entegrasyonu: kendi anlaşmanızla gönderi açın, müşteri barkodlu etiketi panelden basın; takip numarası ve kargo durumu siparişe gelsin.
-- [N11 Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/n11): N11 mağazanızın siparişlerini onaylayın, stok ve fiyatlarınızı eşitleyin, ürün yükleyin, müşteri sorularını ve iade taleplerini panelden yönetin.
-- [Navlungo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/navlungo): Navlungo entegrasyonu: Sürat, HepsiJET, Aras, PTT ve Yurtiçi gönderilerini tek hesaptan açın; etiket, takip numarası ve kargo ücreti panele gelsin.
-- [OpenCart Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/opencart): OpenCart entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Ozon Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ozon): Ozon entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Pazarama Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/pazarama): Pazarama entegrasyonu: siparişleri onaylayın, stok ve fiyatlarınızı eşitleyin, kargo etiketini panelden basın, müşteri sorularını tek ekranda yanıtlayın.
-- [PTT Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ptt-kargo): PTT Kargo entegrasyonu: gönderilerinizi panelden PTT'ye yükleyin, barkodlu etiketi basın; şube kabulünden sonra kargo durumu panelden izlensin.
-- [PttAVM Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/pttavm): PttAVM entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Sendeo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/sendeo): Sendeo entegrasyonu: kendi anlaşmanızla gönderi açın, Sendeo etiketi ve takip numarası anında gelsin; kargo durumu ve ücreti panelden izlensin.
-- [Shopify Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/shopify): Shopify entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Sürat Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/surat-kargo): Sürat Kargo entegrasyonu: kendi anlaşmanızla gönderi açın, barkodlu etiketi basın; takip numarası şube kabulünden sonra siparişe yazılsın.
-- [Teknosa Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/teknosa): Teknosa entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Ticimax Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ticimax): Ticimax entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Trendyol Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/trendyol): Trendyol entegrasyonu: siparişler, ortak barkodlu kargo etiketi, stok ve fiyat, ürün yükleme, buybox ve gerçek kâr tek panelde. 7 gün ücretsiz deneyin.
-- [Trendyol Go Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/trendyolgo): Trendyol Go entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [T-Soft Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/tsoft): T-Soft entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [UPS Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ups-kargo): UPS Kargo entegrasyonu: yurt içi gönderiyi panelden açın, UPS etiketi ve takip numarası anında gelsin; teslimat ve kargo ücreti kendiliğinden izlensin.
-- [WooCommerce Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/woocommerce): WooCommerce entegrasyonu: siparişlerinizi, stoklarınızı, fiyatlarınızı ve kargo etiketlerini tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Yemeksepeti Market Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/yemeksepeti): Yemeksepeti Market entegrasyonu: siparişlerinizi, stoklarınızı ve fiyatlarınızı tek panelden yönetin. Kolay kurulum, 7 gün ücretsiz deneme.
-- [Yurtiçi Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/yurtici-kargo): Yurtiçi Kargo entegrasyonu: kendi anlaşmanızla gönderi açın, barkodlu etiketi basın; gönderi kodu, kargo ücreti ve teslimat panele gelsin.
+- [Amazon Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/amazon): Amazon Selling Partner API ile FBM siparişlerine takip numarası bildirin, FBA siparişlerini izleyin, stoku SKU bazında yazın; ürünü ürün tipiyle yükleyin.
+- [Aras Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/aras-kargo): Aras Kargo ile kendi anlaşmanızdan gönderi açın; barkod yetkili hesapta Aras ZPL etiketi ve 13 haneli takip numarası anında gelir, durum ve ücret esasweb'den.
+- [Çiçeksepeti Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ciceksepeti): Çiçeksepeti siparişleri stok koduyla panele gelir, fiyat-stok 200 satırlık partilerle gider; ürün yüklemede teslimat tipi ve marka özelliği doldurulur.
+- [DHL eCommerce Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/dhl-ecommerce): DHL eCommerce (eski MNG Kargo) ile iki adımda gönderi açın: sipariş kaydı ve barkod. Varış şubesi belli olmazsa etiket sonra gelir; kesin ücret takipte okunur.
+- [DHL Express Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/dhl-express): MyDHL API ile yurt içi ekspres gönderi açın: AWB numarası ve PDF etiket aynı yanıtta, gümrük beyanı gerekmez. Kurye çağrılmaz, gönderi hesabınıza faturalanır.
+- [eBay Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ebay): eBay pazar yerinize Fulfillment ve Inventory API ile bağlanın: siparişler TL'ye çevrilir, stok ve fiyat 25'erli gider, varyantlar ayrı ilan olarak açılır.
+- [Etsy Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/etsy): Etsy Open API v3 ile receipt siparişlerini alın, takip numarasıyla alıcıya bildirim gönderin, envanteri varyant bazında güncelleyin, ilanı profilleriyle açın.
+- [Hepsiburada Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/hepsiburada): Hepsiburada açık satırlarını panelde paketleyin, HepsiJET ya da Aras ortak barkodunu alın; fiyat kilidi uyarısı, Satıcıya Sor ve muhasebe kayıtlarından hakediş.
+- [HepsiJET Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/hepsijet): HepsiJET ile kendi anlaşmanızdan gönderi açın: ZPL etiket aynı yanıtta gelir; standart, ertesi gün ya da aynı gün teslimat, çıkış deposu kodu bir kez girilir.
+- [IdeaSoft Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ideasoft): IdeaSoft Admin API'ye OAuth ile bağlanın: varyantlar ayrı ilan, KDV hariç fiyatlı ürünlerde doğru tutar, kargo kodu siparişe yazılır; token kendini yeniler.
+- [idefix Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/idefix): idefix siparişini picking ile işleme alın, kendi kargonuzla takip adresi bildirin, ürünü havuza gönderin ve onay durumunu izleyin; soru ve iadeler panelde.
+- [ikas Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ikas): ikas sitenizin siparişlerini pazaryerleriyle birlikte yönetin: ikas Kargo etiketi, çok lokasyonlu stok, varyant ve kategorilerle ana katalog, birden çok site.
+- [Koçtaş Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/koctas): Koçtaş Mirakl panelinizi API anahtarıyla bağlayın: sipariş satırlarını kabul edin, takip numarası bildirin, teklif fiyatını koruyarak stok gönderin.
+- [Kolay Gelsin Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/kolay-gelsin): Kolay Gelsin gönderisini tek istekte açın; paket sizin barkodunuzla taşınır, gönderi numarası takip numarası olur. Toplanmış pakette teslimat durdurulup iade.
+- [N11 Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/n11): N11 siparişlerini Picking ile onaylayın, fiyat-stok görevlerini SKU bazında izleyin, ürünü kategori özellikleriyle yükleyin; sorular ve iadeler panelde.
+- [Navlungo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/navlungo): Navlungo API kullanıcınızla Sürat, HepsiJET, Kolay Gelsin, Aras, PTT ve Yurtiçi gönderisi açın; firmayı otomatik bırakın, ücret cüzdan bakiyenizden düşsün.
+- [OpenCart Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/opencart): OpenCart'ın yönetim API'si olmadığı için panelden indirilen tek PHP dosyasıyla bağlanın; seçenek bazında stok, özel fiyat ve müşteriye kargo notu.
+- [Ozon Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ozon): Ozon Seller API ile FBS gönderilerini “Topla” deyip Ozon etiketiyle hazırlayın, rFBS'de takip numarası bildirin; depo bazında stok ve saatlik fiyat sınırı.
+- [Pazarama Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/pazarama): Pazarama siparişlerini Hazırlanıyor durumuna alın, kendi kargonuzla takip bildirin, sorulara cevap verin ve ürünleri yaprak kategoriye yükleyin.
+- [PTT Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ptt-kargo): PTT Kargo kurumsal web servisine gönderi verisi yükleyin; size ayrılan barkod aralığından sıradaki numara kontrol hanesiyle etikete basılır, takip şubeden.
+- [PttAVM Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/pttavm): PttAVM REST servisiyle siparişleri alın, depo numaranızla kargo barkodu ve ZPL etiket oluşturun; stok ve fiyatı 1000'erli kuyruk işlemleriyle gönderin.
+- [Sendeo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/sendeo): Sendeo'ya adresinizden toplama iş emri gönderin; ZPL etiket, takip numarası ve adresi aynı yanıtta gelir. İlçe kodu panelde bulunur; iptal toplamadan önce.
+- [Shopify Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/shopify): Shopify Dev Dashboard uygulamasıyla bağlanın: siparişlere takip bilgisiyle fulfillment açın, stoku seçtiğiniz lokasyona yazın, ürünü varyantlarıyla oluşturun.
+- [Sürat Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/surat-kargo): Sürat Kargo'ya gönderiyi ön kabul olarak bildirin; özel takip kodunuz etikete basılır, şube okutunca Sürat takip numarası siparişe yazılır. PDF etiket seçeneği.
+- [Teknosa Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/teknosa): Teknosa siparişlerini kabul edin; kendi kargonuzda takip numarası, Teknosa kargosunda yalnız kargoya verildi bildirimi gider. Satır komisyonu kâra yazılır.
+- [Ticimax Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ticimax): Ticimax sitenizi WS Yetki Koduyla bağlayın: varyasyon bazında stok ve fiyat, kargoya verildi bildirimiyle müşteriye takip e-postası, yarım siparişler hariç.
+- [Trendyol Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/trendyol): Trendyol paketlerini Picking ve Invoiced adımlarıyla işleyin, Trendyol Express ve Aras ortak barkodunu basın; buybox sırası ve cari ekstre panelde.
+- [Trendyol Go Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/trendyolgo): Trendyol Go hızlı market siparişlerini şube bazında alın, toplamayı başlatın, provizyon aralığına göre hazırlandı bildirin; şube stok ve fiyatı panelden.
+- [T-Soft Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/tsoft): T-Soft REST1 servisine yetkili web servis kullanıcısıyla bağlanın: KDV hariç fiyat doğru yazılır, alt ürün stoğu ayrı gider, kargo koduyla Kargoya Verildi.
+- [UPS Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/ups-kargo): UPS Türkiye ile yurt içi gönderiyi Standart, Express Saver ya da Express 10:30 servisiyle açın; 1Z takip numarası ve paket başına etiket görseli hemen gelir.
+- [WooCommerce Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/woocommerce): WooCommerce REST API ile siparişleri alın, ödeme bekleyenleri ayırın, kargo notunu müşteriye gönderin; varyasyon stoğu ve panelden ürün oluşturma dahil.
+- [Yemeksepeti Market Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/yemeksepeti): Yemeksepeti Market siparişlerini toplayın, bulunamayan ürünü bildirin, kurye modeline göre teslim almaya hazır ya da yola çıktı deyin; şube stok ve fiyatı.
+- [Yurtiçi Kargo Entegrasyonu](https://hasturkcrm.com/entegrasyonlar/yurtici-kargo): Yurtiçi Kargo web servisine kargo anahtarıyla veri gönderin, barkodlu etiketi basın; şube okutunca gönderi kodu, takip adresi ve kargo ücreti siparişe yazılsın.
 
 ## Ücretsiz hesaplama araçları
 
 - [Desi hesaplama](https://hasturkcrm.com/araclar/desi-hesaplama): Kargo desi hesaplama: en × boy × yükseklik ÷ 3000 ile desiyi bulun, birden fazla koli ekleyin; ücretin desiden mi kilogramdan mı alınacağını görün.
 - [E-ticaret stopajı](https://hasturkcrm.com/araclar/e-ticaret-stopaj-hesaplama): E-ticaret stopajı hesaplama: pazaryerinin kestiği %1 stopajı KDV dahil satış tutarından hesaplayın; KDV hariç matrahı ve hakedişten düşülecek tutarı görün.
-- [Hepsiburada komisyon](https://hasturkcrm.com/araclar/hepsiburada-komisyon-hesaplama): Hepsiburada komisyon hesaplama: kategorinizi seçin, resmî orana KDV eklensin; kargo, hizmet bedeli ve %1 stopaj sonrası net kârınızı görün.
+- [Hepsiburada komisyon](https://hasturkcrm.com/araclar/hepsiburada-komisyon-hesaplama): Hepsiburada komisyon hesaplama: kategorinin +KDV oranını seçin, komisyon KDV'siyle kesilsin; hizmet ve işlem bedeli, stopaj sonrası net kâr.
 - [İndirim sonrası kâr](https://hasturkcrm.com/araclar/indirim-kar-hesaplama): İndirim sonrası kâr hesaplama: kampanyada ürün başı kârınızı, zarar etmeden yapabileceğiniz en yüksek indirimi ve gereken satış artışını görün.
 - [Kâr karşılaştırma](https://hasturkcrm.com/araclar/kar-karsilastirma): Aynı ürünün Trendyol, Hepsiburada, N11, PttAVM, idefix ve Pazarama'daki net kârını yan yana görün. Komisyon, kargo ve hizmet bedelini kanal başına girin.
 - [KDV hesaplama](https://hasturkcrm.com/araclar/kdv-hesaplama): KDV hesaplama: KDV hariç fiyattan KDV dahil fiyatı, KDV dahil fiyattan KDV hariç tutarı ve KDV'yi saniyede bulun. %1, %10, %20 ve özel oran. Ücretsiz.
@@ -90,8 +90,8 @@
 
 ## Kategori komisyon oranı listeleri
 
-- [Hepsiburada komisyon oranları](https://hasturkcrm.com/araclar/hepsiburada-komisyon-oranlari): Hepsiburada komisyon oranları 2026: 156 kategorinin resmî oranı, KDV hariç ve KDV dahil haliyle. Kategorinizi arayın, tek tıkla hesaplayın.
-- [Trendyol komisyon oranları](https://hasturkcrm.com/araclar/trendyol-komisyon-oranlari): Trendyol komisyon oranları 2026: 381 kategorinin resmî oranı, KDV hariç ve KDV dahil haliyle. Kategorinizi arayın, tek tıkla hesaplayın.
+- [Hepsiburada komisyon oranları](https://hasturkcrm.com/araclar/hepsiburada-komisyon-oranlari): Hepsiburada komisyon oranları 2026: 40 ana başlıkta 156 kategorinin +KDV resmî oranı ve %20 KDV eklenmiş kesilen oran. Kategorinizi arayıp hesaplayın.
+- [Trendyol komisyon oranları](https://hasturkcrm.com/araclar/trendyol-komisyon-oranlari): Trendyol komisyon oranları 2026: 381 kategorinin KDV dahil resmî oranı, ana kategori gruplarıyla; oran doğrudan kesintidir. Arayın, tek tıkla hesaplayın.
 
 ## Blog
 

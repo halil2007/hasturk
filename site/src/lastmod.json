@@ -4,211 +4,211 @@
   "d": "2026-10-16"
  },
  "/araclar": {
-  "h": "572f59c8255b",
-  "d": "2026-10-11"
+  "h": "4b76c1ecb481",
+  "d": "2026-10-16"
  },
  "/araclar/desi-hesaplama": {
-  "h": "682b70b82ab1",
-  "d": "2026-10-11"
+  "h": "c1b0daa3dcbb",
+  "d": "2026-10-16"
  },
  "/araclar/e-ticaret-stopaj-hesaplama": {
-  "h": "59d1ff5e2fea",
-  "d": "2026-10-11"
+  "h": "c90651a33718",
+  "d": "2026-10-16"
  },
  "/araclar/hepsiburada-komisyon-hesaplama": {
-  "h": "943ccbecae08",
-  "d": "2026-10-11"
+  "h": "70dc72a2c080",
+  "d": "2026-10-16"
  },
  "/araclar/hepsiburada-komisyon-oranlari": {
-  "h": "412b2356b698",
-  "d": "2026-10-11"
+  "h": "a55b9ed840cb",
+  "d": "2026-10-16"
  },
  "/araclar/indirim-kar-hesaplama": {
-  "h": "d1afd0f24869",
-  "d": "2026-10-11"
+  "h": "f91a70aaf44c",
+  "d": "2026-10-16"
  },
  "/araclar/kar-karsilastirma": {
-  "h": "105e3e0c82d9",
-  "d": "2026-10-11"
+  "h": "128935a8700f",
+  "d": "2026-10-16"
  },
  "/araclar/kdv-hesaplama": {
-  "h": "eba9622af967",
-  "d": "2026-10-11"
+  "h": "24c4e856667d",
+  "d": "2026-10-16"
  },
  "/araclar/n11-komisyon-hesaplama": {
-  "h": "3b3b1de16cf0",
-  "d": "2026-10-11"
+  "h": "fb97065abdba",
+  "d": "2026-10-16"
  },
  "/araclar/pazaryeri-komisyon-hesaplama": {
-  "h": "b40074b598ea",
-  "d": "2026-10-11"
+  "h": "b48257775196",
+  "d": "2026-10-16"
  },
  "/araclar/satis-fiyati-hesaplama": {
-  "h": "b37a811f4532",
-  "d": "2026-10-11"
+  "h": "033cc2924c3b",
+  "d": "2026-10-16"
  },
  "/araclar/trendyol-komisyon-hesaplama": {
-  "h": "fe3e19230cdd",
-  "d": "2026-10-11"
+  "h": "ad06440d9b88",
+  "d": "2026-10-16"
  },
  "/araclar/trendyol-komisyon-oranlari": {
-  "h": "54fd0d83aa11",
-  "d": "2026-10-11"
+  "h": "e1c29b5f2a95",
+  "d": "2026-10-16"
  },
  "/araclar/yuzde-hesaplama": {
-  "h": "5060123bbdc8",
-  "d": "2026-10-11"
+  "h": "e77e72f84a9b",
+  "d": "2026-10-16"
  },
  "/demo": {
   "h": "86e1f6312d88",
   "d": "2026-10-16"
  },
  "/entegrasyonlar": {
-  "h": "27a365f2b0cc",
+  "h": "94889520861f",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/amazon": {
-  "h": "60ce17a16ca5",
+  "h": "25761063466c",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/aras-kargo": {
-  "h": "6d068de6f4c7",
+  "h": "ca67d8f78c06",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/boyner": {
-  "h": "4721d9611aba",
+  "h": "cec0c06c7e7f",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ciceksepeti": {
-  "h": "924b4254e002",
+  "h": "69b9f2fe502a",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/dhl-ecommerce": {
-  "h": "ab7e3ac2cbdb",
+  "h": "5e8e76ff8ba7",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/dhl-express": {
-  "h": "df864b5f539c",
+  "h": "86d6f54bfea3",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ebay": {
-  "h": "ab9fdf81691a",
+  "h": "e33026838c09",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/etsy": {
-  "h": "3033c4a0dcbb",
+  "h": "d751d8c25ed1",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/getir": {
-  "h": "1907c12f9505",
+  "h": "6ba6883cc72e",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/hepsiburada": {
-  "h": "6d26f4d38d83",
+  "h": "cce12f5eddfd",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/hepsijet": {
-  "h": "baa50a298f6d",
+  "h": "4b32b0226f7f",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ideasoft": {
-  "h": "9e575d0c1828",
+  "h": "091103d446c0",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/idefix": {
-  "h": "c0970dfb279d",
+  "h": "893897051a1c",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ikas": {
-  "h": "4c393fc909ee",
+  "h": "86b530caba78",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/koctas": {
-  "h": "e81847daebf2",
+  "h": "6de6922314c3",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/kolay-gelsin": {
-  "h": "9e937ccf8ca8",
+  "h": "8dc8fc5c85f3",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/n11": {
-  "h": "a6745f994a89",
+  "h": "52ddfc343793",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/navlungo": {
-  "h": "0b52d7d77544",
+  "h": "8cad8c93fa3f",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/opencart": {
-  "h": "c4b763f5e7ad",
+  "h": "798376962b61",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ozon": {
-  "h": "17f793865def",
+  "h": "cab24cdeef57",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/pasaj": {
-  "h": "7e64e738abfb",
+  "h": "4c5e05ff25de",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/pazarama": {
-  "h": "e15114decad6",
+  "h": "ee4e3bce3476",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ptt-kargo": {
-  "h": "ee6463171764",
+  "h": "55c8f926fe0d",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/pttavm": {
-  "h": "a33d05f41326",
+  "h": "caa4c64057e3",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/sendeo": {
-  "h": "a9a77274571e",
+  "h": "076fec18e291",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/shopify": {
-  "h": "ac3701266e97",
+  "h": "7ae60577a325",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/surat-kargo": {
-  "h": "632878b841b8",
+  "h": "9ed3c5013d45",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/teknosa": {
-  "h": "cef8ca5b1e60",
+  "h": "387cdfe16c59",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ticimax": {
-  "h": "eaaeb6ba3450",
+  "h": "9d6ab0894876",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/trendyol": {
-  "h": "4c43962bc84d",
+  "h": "da8124fe1824",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/trendyolgo": {
-  "h": "60182106103a",
+  "h": "bf42f4c4b7b6",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/tsoft": {
-  "h": "8be4f0d1bd17",
+  "h": "d9f567462733",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/ups-kargo": {
-  "h": "0f050c45a2db",
+  "h": "bb15371fbe04",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/woocommerce": {
-  "h": "44047b796f4b",
+  "h": "d895a4636a6b",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/yemeksepeti": {
-  "h": "a18451c6436c",
+  "h": "59fc49099ff0",
   "d": "2026-10-16"
  },
  "/entegrasyonlar/yurtici-kargo": {
-  "h": "94dd86cbb27c",
+  "h": "7308fb8daaad",
   "d": "2026-10-16"
  },
  "/gizlilik": {
@@ -216,7 +216,7 @@
   "d": "2026-10-16"
  },
  "/hakkimizda": {
-  "h": "9874590f4b12",
+  "h": "0da24dacb6a2",
   "d": "2026-10-16"
  },
  "/iletisim": {
@@ -244,59 +244,59 @@
   "d": "2026-10-16"
  },
  "/ozellikler": {
-  "h": "781cab6b3032",
+  "h": "5695985620a1",
   "d": "2026-10-16"
  },
  "/ozellikler/buybox-takibi": {
-  "h": "6b6fcb8fc3f2",
+  "h": "a5ccb6e00b26",
   "d": "2026-10-16"
  },
  "/ozellikler/doviz-endeksli-fiyat": {
-  "h": "ebff6d4a5c6a",
+  "h": "c7d5522ecbfc",
   "d": "2026-10-16"
  },
  "/ozellikler/ekip-ve-guvenlik": {
-  "h": "1d20d858db98",
+  "h": "dc5346a1804d",
   "d": "2026-10-16"
  },
  "/ozellikler/kar-zarar": {
-  "h": "d1cc983f74b8",
+  "h": "a79de63432dc",
   "d": "2026-10-16"
  },
  "/ozellikler/kargo-entegrasyonu": {
-  "h": "29694ac452bc",
+  "h": "e145f84d1d08",
   "d": "2026-10-16"
  },
  "/ozellikler/kargo-ve-etiket": {
-  "h": "b5a2cb5bb534",
+  "h": "485c05d6aae6",
   "d": "2026-10-16"
  },
  "/ozellikler/kargonomi-entegrasyonu": {
-  "h": "c973c4042742",
+  "h": "dcf081c770e7",
   "d": "2026-10-16"
  },
  "/ozellikler/mobil-yonetim": {
-  "h": "e711a535a705",
+  "h": "ed89badbcdcf",
   "d": "2026-10-16"
  },
  "/ozellikler/musteri-sorulari-ve-iadeler": {
-  "h": "810dcc7eadc4",
+  "h": "fe35441e29fd",
   "d": "2026-10-16"
  },
  "/ozellikler/raporlar": {
-  "h": "d0c7af8f9266",
+  "h": "c393f4aa4abd",
   "d": "2026-10-16"
  },
  "/ozellikler/siparis-yonetimi": {
-  "h": "324c0bbc6d1e",
+  "h": "847de4b131ac",
   "d": "2026-10-16"
  },
  "/ozellikler/stok-senkronizasyonu": {
-  "h": "27ce6bdbab43",
+  "h": "df4867acfd2f",
   "d": "2026-10-16"
  },
  "/ozellikler/urun-yonetimi": {
-  "h": "cc9f855088b5",
+  "h": "05f3cb8cd2b1",
   "d": "2026-10-16"
  },
  "/paketler": {

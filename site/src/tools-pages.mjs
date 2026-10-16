@@ -32,7 +32,7 @@ export function makeToolPages({ esc, ico, tick, faqHtml, toolIc, channels, comm,
 
   const toolCard = (t) => `<a class="fcard tcard reveal" href="/araclar/${t.slug}">${toolIc(t)}<b>${esc(t.name)}</b><span>${esc(t.card)}</span><em>Hesapla ${ico('i-arrow')}</em></a>`;
   const TOOLS_JS = '<!-- head --><script src="/assets/tools.js?v={{v:tools.js}}" defer></script><!-- /head -->';
-  const toolCta = `<section class="sec"><div class="wrap"><div class="ask big reveal"><div><b>Bu hesabı her sipariş için otomatik yapın</b><span>Hastürk CRM, pazaryerinin kestiği komisyon, kargo ve hizmet bedeli kayıtlarıyla her siparişin net kârını kendiliğinden hesaplar. Kurulum ücreti yok.</span></div>
+  const toolCta = `<section class="sec"><div class="wrap"><div class="ask big reveal"><div><b>Bu hesabı her sipariş için otomatik yapın</b><span>Hastürk CRM her siparişin net kârını kendiliğinden hesaplar: pazaryeri kesinti kayıtlarını veriyorsa onlardan, vermiyorsa kanal için tanımladığınız orandan. Kurulum ücreti yok.</span></div>
   <div class="ctas"><a class="btn btn-primary" href="/demo#deneme">7 gün ücretsiz deneyin ${ico('i-arrow')}</a><a class="btn btn-line" data-demo href="/demo">Canlı demo</a></div></div></div></section>`;
   const crumbs = (items) => `<nav class="crumbs" aria-label="Konum">${items.map(([h, l], i) => (i < items.length - 1 ? `<a href="${h}">${esc(l)}</a><span>›</span>` : `<b>${esc(l)}</b>`)).join('')}</nav>`;
   const webApp = (url, name, d) => ({ '@type': 'WebApplication', '@id': `${url}#app`, name, url, description: d, applicationCategory: 'FinanceApplication', operatingSystem: 'Web', browserRequirements: 'JavaScript', inLanguage: 'tr-TR',
@@ -124,7 +124,9 @@ ${toolCta}`;
 <section class="sec alt"><div class="wrap"><div class="sec-head reveal"><div class="kicker">Sık sorulanlar</div><h2>${esc(n)} Komisyon Oranları Hakkında</h2></div>${faqHtml(faq)}</div></section>
 ${toolCta}`;
     const t = `${n} Komisyon Oranları ${YEAR}: Kategori Bazlı Liste`;
-    const dsc = desc(`${n} komisyon oranları ${YEAR}: ${d.cats.length} kategorinin resmî oranı, KDV hariç ve KDV dahil haliyle. Kategorinizi arayın, tek tıkla hesaplayın.`.slice(0, 155), `${mp}-komisyon-oranlari`);
+    // Açıklama listenin oran türüne göre (KDV hariç liste: kesilen oran ayrı sütunda; KDV dahil liste: oran doğrudan kesinti)
+    const dsc = desc((ex ? `${n} komisyon oranları ${YEAR}: ${groups.length} ana başlıkta ${d.cats.length} kategorinin +KDV resmî oranı ve %20 KDV eklenmiş kesilen oran. Kategorinizi arayıp hesaplayın.`
+      : `${n} komisyon oranları ${YEAR}: ${d.cats.length} kategorinin KDV dahil resmî oranı, ana kategori gruplarıyla; oran doğrudan kesintidir. Arayın, tek tıkla hesaplayın.`).slice(0, 155), `${mp}-komisyon-oranlari`);
     const ld = [{ '@type': 'Dataset', '@id': `${url}#data`, name: `${n} kategori komisyon oranları`, description: dsc, inLanguage: 'tr-TR', url, ...(d.source ? { isBasedOn: d.source } : {}), dateModified: d.retrieved, temporalCoverage: `${d.published}/..`,
       creator: { '@type': 'Organization', name: n }, publisher: { '@id': `${siteUrl}/#org` }, isAccessibleForFree: true,
       variableMeasured: [{ '@type': 'PropertyValue', name: `Komisyon oranı (${ex ? 'KDV hariç' : 'KDV dahil'})`, unitText: 'yüzde' }] }];
