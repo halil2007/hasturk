@@ -1,7 +1,9 @@
 // eBay (Sell API'leri: Fulfillment v1 + Inventory v1). developer.ebay.com → Application Keys: App ID (Client ID) + Cert ID (Client Secret).
 // Kimlik: OAuth 2 "authorization code" ile alınmış kullanıcı refresh token'ı (≈18 ay geçerli, eBay yenilemede yenisini VERMEZ) →
 // POST /identity/v1/oauth2/token (grant_type=refresh_token, Authorization: Basic base64(client_id:client_secret)) → ≈2 saatlik erişim belirteci.
-// Kapsam parametresi gönderilmez: eBay ilk onaydaki kapsamları kullanır (sell.fulfillment, sell.inventory gerekli). Belirteç süresince
+// Kapsam parametresi gönderilmez: eBay ilk onaydaki kapsamları kullanır (sell.fulfillment, sell.inventory gerekli; ürün yüklemede iş politikaları
+// için sell.account ya da sell.account.readonly da gerekir). Kategori / özellik / para birimi (Taxonomy, Metadata) uygulama belirteciyle okunur:
+// grant_type=client_credentials, scope=https://api.ebay.com/oauth/api_scope (eBay'in ebay-oauth-nodejs-client 1.2.2 paketi). Belirteç süresince
 // kanalın kv deposunda { access, exp, fp } olarak saklanır (fp: refresh token + ortam parmak izi; kullanıcı yeni token girerse eskisi kullanılmaz).
 // Ortam: canlı api.ebay.com, test api.sandbox.ebay.com. Pazar yeri (EBAY_US, EBAY_GB, EBAY_DE …) X-EBAY-C-MARKETPLACE-ID başlığında gider.
 // Siparişler: GET /sell/fulfillment/v1/order (senkronda filter=lastmodifieddate:[..], geçmiş aktarımında creationdate:[..]; en çok 200/sayfa,
@@ -10,7 +12,8 @@
 // Ürünler: yalnızca Inventory API ile oluşturulmuş (ya da bulk_migrate_listing ile taşınmış) ilanlar görünür: GET /inventory_item (stok, başlık,
 // görsel, EAN/UPC) + SKU başına GET /offer?sku= (fiyat, ilan no, yayın durumu). Seller Hub / Trading API ile açılmış eski ilanlar listelenmez.
 // Stok / fiyat: POST /bulk_update_price_quantity (çağrı başına en çok 25 SKU; yanıt satır satır statusCode döner, 207 kısmi başarı).
-// Kargoya verme: POST /order/{id}/shipping_fulfillment (satırlar + takip no + taşıyıcı kodu). İşleme alma panelde. Etiket, iade, ürün oluşturma yok.
+// Kargoya verme: POST /order/{id}/shipping_fulfillment (satırlar + takip no + taşıyıcı kodu). İşleme alma panelde. Etiket, iade yok.
+// Ürün yükleme (catalog): Inventory API ile stok kaydı + teklif + yayın (ayrıntı "ürün yükleme" bölümünde); varyantlar ayrı ilan olarak açılır.
 // Bağlantı onaylanana kadar kanal yalnızca Entegrasyonlar'da görünür.
 import { http, num, str, chunk, pool, sleep, diagStep, imageList, DEAD_LINE } from '../util.js';
 
@@ -52,11 +55,37 @@ export function ebay(env, meta) {
     if (!force && access && Date.now() < exp) return access;
     return (pending ||= renew(force).finally(() => { pending = null; }));
   }
+  // Uygulama belirteci (client credentials): Taxonomy / Metadata gibi herkese açık veriler için; kv'de { access, exp, fp } ('apptoken')
+  const afp = `${sandbox ? 's' : 'p'}:${cid}`;
+  let appAccess = null, appExp = 0, appPending = null;
+  async function appRenew(force) {
+    if (!force) {
+      try { const v = kv ? await kv.get('apptoken') : null; if (v && v.fp === afp && v.access && v.exp > Date.now()) { appAccess = v.access; appExp = v.exp; return appAccess; } } catch { /* kv okunamadı */ }
+    }
+    let r;
+    try {
+      r = await http(`${HOST}/identity/v1/oauth2/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: 'Basic ' + btoa(`${cid}:${secret}`) },
+        body: new URLSearchParams({ grant_type: 'client_credentials', scope: 'https://api.ebay.com/oauth/api_scope' }).toString() });
+    } catch (e) {
+      if (e.status === 400 || e.status === 401) throw new Error(`eBay uygulama belirteci alınamadı (App ID / Cert ID ${sandbox ? 'Sandbox' : 'Production'} anahtar setinden olmalı): ${e.message.slice(0, 200)}`);
+      throw e;
+    }
+    if (!r || !r.access_token) throw new Error('eBay uygulama belirteci alınamadı');
+    appAccess = r.access_token; appExp = Date.now() + Math.max(60, num(r.expires_in, 7200) - 120) * 1000;
+    try { if (kv) await kv.set('apptoken', { access: appAccess, exp: appExp, fp: afp }); } catch { /* saklanamadı */ }
+    return appAccess;
+  }
+  async function appAuth(force) {
+    if (!force && appAccess && Date.now() < appExp) return appAccess;
+    return (appPending ||= appRenew(force).finally(() => { appPending = null; }));
+  }
+  // opts.app: uygulama belirteciyle; opts.headers: ek başlıklar (ör. Content-Language)
   async function call(path, opts = {}, retried) {
-    const headers = { Authorization: `Bearer ${await auth()}`, Accept: 'application/json', 'X-EBAY-C-MARKETPLACE-ID': market, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) };
+    const headers = { Authorization: `Bearer ${opts.app ? await appAuth() : await auth()}`, Accept: 'application/json', 'X-EBAY-C-MARKETPLACE-ID': market, ...(opts.body ? { 'Content-Type': 'application/json' } : {}), ...(opts.headers || {}) };
     try { return await http(HOST + path, { ...opts, headers, body: opts.body && JSON.stringify(opts.body) }); } catch (e) {
       if (e.status !== 401 || retried) throw e;
-      access = null; exp = 0; await auth(true); // belirteç geçersiz kılındı: bir kez yenilenip tekrar denenir
+      // belirteç geçersiz kılındı: bir kez yenilenip tekrar denenir
+      if (opts.app) { appAccess = null; appExp = 0; await appAuth(true); } else { access = null; exp = 0; await auth(true); }
       return call(path, opts, true);
     }
   }
