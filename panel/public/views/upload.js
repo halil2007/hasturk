@@ -178,7 +178,8 @@ export async function uploadView(el) {
           ${data.items.map((x) => html`<tr><td><input type="checkbox" data-id="${x.id}" ${x.missing.length ? 'disabled' : 'checked'}></td>
             <td><div class="row" style="gap:8px">${thumb(x.image, x.name, 'sm')}<div style="min-width:0"><div class="ellipsis" style="max-width:340px">${x.name}</div><div class="tiny muted">${x.sku} · ${x.barcode || 'barkod yok'}</div></div></div></td>
             <td class="r num">${money(x.price)}</td><td class="r num">${x.stock}</td>
-            <td>${x.missing.length ? html`<span class="tiny" style="color:var(--bad)">Eksik: ${x.missing.join(', ')}</span>` : x.sent ? html`<span class="pill warn">daha önce gönderildi</span>` : html`<span class="pill good">hazır</span>`}</td></tr>`)}
+            <td>${x.missing.length ? html`<span class="tiny" style="color:var(--bad)">Eksik: ${x.missing.join(', ')}</span>` : x.sent ? html`<span class="pill warn">daha önce gönderildi</span>` : html`<span class="pill good">hazır</span>`}
+              ${(x.auto || []).length ? html`<div class="tiny muted" title="Ürün adından / kategorisinden kesin eşleşmeyle dolduruldu">otomatik: ${x.auto.map((a) => `${a.name} ${a.value}`).join(' · ')}</div>` : ''}</td></tr>`)}
         </tbody></table></div>
         <p class="muted tiny" style="margin:0">Fiyat: ikas satış fiyatı${c.opts.markup ? ` + %${String(c.opts.markup).replace(/%/g, "")} (kanal ayarı)` : ''}. Eksikleri ürün sayfasından ya da kategori eşleştirmesinden tamamlayın.</p>
       </div>`);
