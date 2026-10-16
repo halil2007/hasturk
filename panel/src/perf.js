@@ -127,6 +127,12 @@ export async function maintain(db) {
   await del('push_checks', "DELETE FROM push_checks WHERE at < ?", t - 7 * 864e5);
   await del('perf_stats', 'DELETE FROM perf_stats WHERE day < ?', day(t - 45 * 864e5));
   await del('mail_queue', 'DELETE FROM mail_queue WHERE sent_at IS NOT NULL AND sent_at < ?', t - 30 * 864e5);
+  // Stok API: bir yıldan eski iptal edilmiş bayi satışları ve artık satırı kalmayan satış numaraları; 90 günden eski silinen ürün kayıtları
+  // (bayi updated_since ile en geç bu süre içinde okur). Kanal kv'sinde boşaltılmış (null) kayıtlar (gönderim kuyruğu parçaları vb.)
+  await del('ext_sales', 'DELETE FROM ext_sales WHERE cancelled_at IS NOT NULL AND cancelled_at < ?', t - 365 * 864e5);
+  await del('ext_sale_refs', 'DELETE FROM ext_sale_refs WHERE at < ? AND NOT EXISTS (SELECT 1 FROM ext_sales s WHERE s.src = ext_sale_refs.src AND s.ref = ext_sale_refs.ref)', t - 365 * 864e5);
+  await del('deleted_products', 'DELETE FROM deleted_products WHERE at < ?', t - 90 * 864e5);
+  await del('kv_null', "DELETE FROM settings WHERE k LIKE 'kv:%' AND (v IS NULL OR v = 'null')");
   await del('product_uploads', "DELETE FROM product_uploads WHERE status IN ('done', 'error', 'failed', 'success') AND created_at < ?", t - 90 * 864e5);
   await del('jobs', "DELETE FROM jobs WHERE status IN ('done', 'error', 'cancelled') AND COALESCE(updated_at, created_at) < ?", t - 90 * 864e5);
   // Ürün fotoğrafları: hiçbir üründe kullanılmayan, 1 günden eski fotoğraflar (bkz. prodimg.js)

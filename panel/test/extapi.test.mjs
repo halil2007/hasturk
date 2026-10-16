@@ -5,7 +5,7 @@ import { d1 } from '../dev/d1.mjs';
 import { doNamespace } from '../dev/do.mjs';
 import worker, { TenantPanel } from '../src/index.js';
 import { resetChannels } from '../src/channels/index.js';
-import { ipAllowed, parseIps } from '../src/extapi.js';
+import { ipAllowed, parseIps, extApiInner } from '../src/extapi.js';
 
 function setup() {
   const env = { PANEL_PASSWORD: 'x-123456', PANEL_SECRET: 's'.repeat(32), DB: d1() };
@@ -269,6 +269,30 @@ test('stok API satış güvenliği: izin, stok yeterliliği, sınırlar, senkron
   const last = await Promise.all([X('sales', J({ ref: 'L-1', items: [{ sku: 'P-1', quantity: 2 }] })), X('sales', J({ ref: 'L-2', items: [{ sku: 'P-1', quantity: 2 }] }))]);
   assert.deepEqual(last.map((x) => x.status).sort(), [201, 409]);
   assert.equal(await stockOf('P-1'), 1);
+  // Kesin eşzamanlı (aynı numara, farklı ürün): iki istek de "daha önce bildirilmedi" denetimini geçip yazıma birlikte varır (yazım bekletilir)
+  let waiting = [];
+  const gated = { prepare: (q) => env.DB.prepare(q), batch: async (st) => {
+    await new Promise((ok) => { waiting.push(ok); if (waiting.length >= 2) { waiting.forEach((f) => f()); waiting = []; } else setTimeout(ok, 500); });
+    return env.DB.batch(st);
+  } };
+  const inner = (body) => extApiInner(gated, new URL('https://main.internal/__api/sales'), { slug: 'ana-panel', name: 'Ana', key: kid, source: 'Bayi' }, 'race:' + Math.random(), { method: 'POST', body });
+  const p24 = (await stockOf('P-2')) + (await stockOf('P-4'));
+  const exact = await Promise.all([inner({ ref: 'C-3', items: [{ sku: 'P-2', quantity: 1 }] }), inner({ ref: 'C-3', items: [{ sku: 'P-4', quantity: 1 }] })]);
+  assert.deepEqual(exact.map((x) => x.status).sort(), [201, 409]);
+  assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM ext_sales WHERE ref = 'C-3'").first()).n, 1);
+  assert.equal((await stockOf('P-2')) + (await stockOf('P-4')), p24 - 1);
+  const p4 = await stockOf('P-4');
+  // Aynı ürünle kesin eşzamanlı: stok bir kez düşer, ikincisi 200 (created false)
+  const same2 = await Promise.all([inner({ ref: 'C-4', items: [{ sku: 'P-4', quantity: 1 }] }), inner({ ref: 'C-4', items: [{ sku: 'P-4', quantity: 1 }] })]);
+  assert.deepEqual(same2.map((x) => x.status).sort(), [200, 201]);
+  assert.equal(await stockOf('P-4'), p4 - 1);
+  // Son stok için kesin eşzamanlı iki farklı numara: biri reddedilir, stok eksiye düşmez
+  const p1 = await stockOf('P-1');
+  const lastX = await Promise.all([inner({ ref: 'L-3', items: [{ sku: 'P-1', quantity: p1 }] }), inner({ ref: 'L-4', items: [{ sku: 'P-1', quantity: p1 }] })]);
+  assert.deepEqual(lastX.map((x) => x.status).sort(), [201, 409]);
+  assert.equal(await stockOf('P-1'), 0);
+  assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM ext_sale_refs WHERE ref IN ('L-3', 'L-4')").first()).n, 1);
+  assert.equal((await lastX.find((x) => x.status === 409).json()).code, 'insufficient_stock');
   // Günlük sınır: anahtar başına son 24 saatte 5.000 adet
   r = await X('sales', J({ ref: 'D-1', items: [{ sku: 'P-3', quantity: 4980 }] }));
   assert.equal(r.status, 201);
