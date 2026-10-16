@@ -1,6 +1,6 @@
 // Ürünler: varyantlar ana ürün altında gruplanır; merkezi stok (her kanala kendi kuralıyla gönderilir), hızlı stok girişi,
 // ürün ekleme/düzenleme, kanal ilanlarının fiyat/komisyonu ve kanallardan içe aktarma. Eşleştirme ayrı sayfadadır.
-import { api, ek, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu } from '../core.js';
+import { api, ek, state, locked, html, raw, render, $, $$, money, money0, n, ago, dateTime, ch, chColor, chLogo, thumb, isMobile, actions, busy, toast, sheet, debounce, confirmBox, numIn , activeChannels, popMenu, store } from '../core.js';
 import { readSheet } from '../sheetread.js';
 import { profit, costOf, costRaw, rateGross } from '../profit.js';
 import { can } from '../perms.js';
@@ -425,26 +425,34 @@ export function lossCard(box, r) {
       <td class="r num" style="font-weight:650;color:${c.profit >= 0 ? 'var(--good)' : 'var(--bad)'}">${money0(c.profit)}</td>
       <td class="r num" style="font-weight:700;${c.price != null && c.avgPrice != null && c.price > c.avgPrice ? 'color:var(--bad)' : ''}">${c.price == null ? html`<span class="muted" title="Kesintiler satışın tamamını götürüyor">—</span>` : money(Math.ceil(c.price))}</td></tr>`)}
     </tbody></table></div><div class="tiny muted" style="margin-top:6px">Başa baş fiyat ilanın ana komisyon oranıyla (pazaryerinin geçici komisyon indirimleri hariç), kanalın son 90 gündeki kargo tutarlarıyla, ürünün iade oranı × kanalın iade başı maliyetiyle hesaplanır. ${d && d.estReturn ? `İade maliyetinin ${money0(d.estReturn)}'si tahmini (ürün kargo tutarından ya da Ayarlar → Giderler tutarlarından).` : ''}</div>` : '';
+  // Zarar / iade uyarısı çarpıyla kapatılır: bu ürün için aynı tutarda bir daha gösterilmez; zarar %10'dan fazla büyürse yeniden görünür
+  const pid = r.product && r.product.id, amt = v && v.level === 'loss' ? v.loss : v && v.level === 'returns' ? d.returnCost : 0;
+  const dk = 'dismiss:loss:' + pid, was = store.get(dk);
+  const closeBtn = html`<button type="button" class="icon-btn" data-xlosscard aria-label="Kapat" title="Kapat: zarar büyürse yeniden görünür" style="align-self:flex-start"><i class="ico ico-x"></i></button>`;
+  if (pid && amt && was && was.level === v.level && Math.abs(amt) <= Math.abs(was.amt) * 1.1) { box.hidden = true; return; }
   let body;
   if (v && v.level === 'loss') {
     body = html`<div class="notice bad"><i class="ico ico-warn"></i><div style="flex:1;min-width:0"><b>Bu üründen son ${days} günde ${money(v.loss)} zarar ettiniz</b> (${n(d.units)} satış${d.returns ? `, ${n(d.returns)} iade` : ''}${d.returnCost ? `, iade maliyeti ${money(d.returnCost)}` : ''}).
       ${main ? html`Kârlı olması için en az <b>${money(Math.ceil(main.price))}</b> fiyat gerekir (${ch(main.channel).name}${main.avgPrice ? `; şu an ortalama ${money(main.avgPrice)}` : ''}).` : ''}
-      ${d.returnCost && d.profitExRet > 0 ? html`<div class="small" style="margin-top:4px">İade olmasa ${money(d.profitExRet)} kâr ederdiniz: zararın nedeni iade maliyeti.</div>` : ''}${table}</div></div>`;
+      ${d.returnCost && d.profitExRet > 0 ? html`<div class="small" style="margin-top:4px">İade olmasa ${money(d.profitExRet)} kâr ederdiniz: zararın nedeni iade maliyeti.</div>` : ''}${table}</div>${closeBtn}</div>`;
   } else if (v && v.level === 'returns') {
     body = html`<div class="notice warn"><i class="ico ico-warn"></i><div style="flex:1;min-width:0"><b>İade maliyeti kârınızın %${n(v.share)} kadarını götürüyor</b> (son ${days} gün: iade öncesi kâr ${money(d.profitExRet)}, iade maliyeti ${money(d.returnCost)}, iade oranı %${n(d.returnRate)}). İade nedenlerini kontrol edin ya da fiyatı gözden geçirin.
-      <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Kanallara göre kâr ve başa baş fiyat</summary>${table}</details></div></div>`;
+      <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Kanallara göre kâr ve başa baş fiyat</summary>${table}</details></div>${closeBtn}</div>`;
   } else if (d) {
     body = html`<div class="muted small" style="padding:0 2px">Son 90 gün: ${n(d.units)} satış · kâr ${money0(d.profit)} (iade dahil${d.returns ? `; ${n(d.returns)} iade, ${money0(d.returnCost)}` : ''}).${chs.length ? html` <details style="display:inline"><summary class="link" style="display:inline;cursor:pointer">Başa baş fiyatlar</summary>${table}</details>` : ''}</div>`;
   } else return;
   render(box, body);
   box.hidden = false;
+  const x = $('[data-xlosscard]', box);
+  if (x) x.onclick = () => { store.set(dk, { level: v.level, amt }); box.hidden = true; toast('Uyarı kapatıldı'); };
 }
-// Kargo tutarı alanının altındaki not (bkz. src/shipcost.js): faturaya göre otomatik güncellendiyse eski → yeni tutar; faturalar
-// girilen tutardan yüksekse sakin bir not ve "Faturadaki tutarı kullan" düğmesi
+// Kargo tutarı alanının altındaki not (bkz. src/shipcost.js): pazaryerinden gelen kargo bilgisiyle yazıldıysa / güncellendiyse kaynağı;
+// kullanıcının girdiği tutar faturalardan belirgin biçimde yüksek ya da düşükse not ve "Pazaryerindeki tutarı kullan" düğmesi
 function shipNote(p) {
   const x = p.ship_info || {};
-  if (x.warn && x.warn.median) return html`<div data-shipnote class="tiny" style="margin-top:4px;color:var(--amber)">Faturalara göre kargo ortalama ${money(x.warn.median)}; ürüne girilen ${money(x.warn.entered)} <span class="muted">(son ${n(x.warn.n)} gönderi)</span>
-    ${can(state.user, 'products', true) ? html`<button type="button" class="btn sm" style="margin-left:6px" data-shipfix>Faturadaki tutarı kullan</button>` : ''}</div>`;
+  if (x.warn && x.warn.median && store.get('dismiss:ship:' + p.id) !== `${x.warn.dir}|${x.warn.median}`) return html`<div data-shipnote class="tiny" style="margin-top:4px;color:var(--amber)"><button type="button" class="icon-btn" data-xship aria-label="Kapat" title="Kapat (tutar değişirse yeniden görünür)" style="float:right;width:22px;height:22px"><i class="ico ico-x"></i></button>Pazaryerinden gelen kargo bilgisi: ${money(x.warn.median)} (son ${n(x.warn.n)} gönderi). Girdiğiniz ${money(x.warn.entered)} ${x.warn.dir === 'lower' ? 'daha yüksek' : 'daha düşük'}; kâr tahmini sizin tutarınızla hesaplanır.
+    ${can(state.user, 'products', true) ? html`<button type="button" class="btn sm" style="margin-left:6px" data-shipfix>Pazaryerindeki tutarı kullan</button>` : ''}</div>`;
+  if (x.src === 'channel' && x.auto) return html`<div data-shipnote class="tiny muted" style="margin-top:4px">Pazaryerinden gelen kargo bilgisi${x.auto.from ? `: ${money(x.auto.from)} → ${money(x.auto.to)}` : ''} <span title="${x.auto.n} gönderinin ortancası${x.auto.by && x.auto.by !== 'Pazaryeri' ? ' · ' + x.auto.by : ''}">(son ${n(x.auto.n)} gönderi, ${dateTime(x.auto.at)})</span>. Değiştirirseniz sistem bir daha dokunmaz.</div>`;
   if (x.auto) return html`<div data-shipnote class="tiny muted" style="margin-top:4px">Kargo tutarı faturaya göre güncellendi: ${money(x.auto.from)} → ${money(x.auto.to)} <span title="${x.auto.n} gönderinin ortancası${x.auto.by ? ' · ' + x.auto.by : ''}">(${dateTime(x.auto.at)})</span></div>`;
   return '';
 }
@@ -491,7 +499,7 @@ export async function productForm(id, done) {
         <label class="field"><span>Kargoya hazırlık (gün)</span><input class="input" name="preparing_days" inputmode="numeric" placeholder="kanal ayarı" value="${p.preparing_days || ''}"></label>
         <label class="field"><span>Garanti (ay)</span><input class="input" name="warranty_months" inputmode="numeric" placeholder="kanal ayarı" value="${p.warranty_months || ''}"></label>
         <label class="field"><span>Menşei</span><input class="input" name="origin" maxlength="40" placeholder="${(state.settings && state.settings.origin) || 'Türkiye'}" value="${p.origin || ''}"></label>
-        <label class="field"><span>Kargo tutarı (sipariş başı)</span><div class="input-group"><input class="input" name="ship_cost" inputmode="decimal" placeholder="girilmedi" value="${p.ship_cost || ''}"><span class="suffix">₺</span></div><small>Kâr hesabında kargo gideri; kanal kargo faturası gelirse o kullanılır</small>${shipNote(p)}</label>
+        <label class="field"><span>Kargo tutarı (sipariş başı)</span><div class="input-group"><input class="input" name="ship_cost" inputmode="decimal" placeholder="girilmedi" value="${p.ship_cost || ''}"><span class="suffix">₺</span></div><small>Kâr hesabında kargo gideri; siparişin kargo faturası gelirse o kullanılır. Boş bırakırsanız pazaryerinden gelen kargo tutarı yazılır.</small>${shipNote(p)}</label>
         ${siteStock(p) ? html`<label class="field"><span>Stok</span><input class="input" type="number" value="${p.stock}" readonly><small>ikas sitesinden okunur (stok senkronu kapalı)</small></label>` : html`<label class="field"><span>Stok</span><input class="input" name="stock" type="number" inputmode="numeric" value="${p.stock}"></label>`}
         <label class="field"><span>Kritik stok uyarısı</span><input class="input" name="critical_stock" type="number" inputmode="numeric" value="${p.critical_stock || 0}"></label>
       </div>
@@ -616,13 +624,15 @@ export async function productForm(id, done) {
     form.sku.value = (await api('products/skus/new?' + q)).sku;
     toast('SKU oluşturuldu — kaydetmeyi unutmayın');
   });
-  // Kargo faturaları girilen tutardan yüksek: "Faturadaki tutarı kullan" (sunucu son gönderilerin ortancasını yazar)
+  const xShip = $('[data-xship]', form);
+  if (xShip) xShip.onclick = () => { const w = (p.ship_info || {}).warn || {}; store.set('dismiss:ship:' + id, `${w.dir}|${w.median}`); const box = $('[data-shipnote]', form); if (box) box.remove(); };
+  // Kargo faturaları girilen tutardan farklı: "Pazaryerindeki tutarı kullan" (sunucu son gönderilerin ortancasını yazar)
   const shipFix = $('[data-shipfix]', form);
   if (shipFix) shipFix.onclick = (e) => busy(e.currentTarget, async () => {
     const r = await api(`products/${id}/ship-from-invoice`, { method: 'POST', body: {} });
     form.ship_cost.value = r.ship_cost;
     const box = $('[data-shipnote]', form);
-    if (box) render(box, html`<span class="tiny" style="color:var(--good)">Kargo tutarı faturadaki tutara göre ${money(r.ship_cost)} yapıldı</span>`);
+    if (box) render(box, html`<span class="tiny" style="color:var(--good)">Kargo tutarı pazaryerinden gelen tutara göre ${money(r.ship_cost)} yapıldı</span>`);
     toast('Kargo tutarı güncellendi');
   });
   // Barkod oluştur: benzersiz EAN-13 önerisi alanına yazılır, ürün kaydedilince geçerli olur

@@ -143,37 +143,50 @@ async function cargoDb(shipCost, invoices, { lumped = [], multi = [] } = {}) {
   }
   return db;
 }
-const prod = async (db) => { const p = { ...(await first(db, 'SELECT ship_cost, ship_set_at, ship_auto, ship_warn FROM products WHERE id = 1')) }; p.ship_auto = JSON.parse(p.ship_auto || 'null'); p.ship_warn = JSON.parse(p.ship_warn || 'null'); return p; };
+const prod = async (db) => { const p = { ...(await first(db, 'SELECT ship_cost, ship_set_at, ship_auto, ship_warn, ship_src FROM products WHERE id = 1')) }; p.ship_auto = JSON.parse(p.ship_auto || 'null'); p.ship_warn = JSON.parse(p.ship_warn || 'null'); return p; };
 
-test('Kargo: faturalar düşükse (son 5 gönderinin ortancası) ürün kargo tutarı güncellenir, eski tutar saklanır; çok ürünlü / çok adetli / "lumped" sayılmaz', async () => {
+test('Kargo: boş ürüne pazaryerinden gelen kargo bilgisi yazılır (son 5 gönderinin ortancası); sistemin yazdığı faturalarla güncellenir; kullanıcının girdiğine dokunulmaz, uyarılır; çok ürünlü / çok adetli / "lumped" sayılmaz', async () => {
   // 5 tek ürünlü gönderi (54,9 ortanca) + sayılmayanlar: 2 ürünlü koli (20), 2 adet (20), iade kargosu karışık eski kayıt (20)
-  const db = await cargoDb(65, [54.9, 52, 56, [20, { qty: 2 }], 54.9, 20, 55, 20], { multi: [6], lumped: [8] });
+  const inv = [54.9, 52, 56, [20, { qty: 2 }], 54.9, 20, 55, 20], cnt = { multi: [6], lumped: [8] };
+  const db = await cargoDb(null, inv, cnt);
   const s = (await shipSamples(db)).get(1);
   assert.deepEqual(s.map((x) => x.cost), [54.9, 52, 56, 54.9, 55]);
   const r = await shipCheck(db, { force: true });
-  assert.equal(r.lowered, 1);
+  assert.equal(r.filled, 1);
   const p = await prod(db);
-  assert.equal(p.ship_cost, 54.9);
-  assert.deepEqual([p.ship_auto.from, p.ship_auto.to, p.ship_auto.n], [65, 54.9, 5]);
+  assert.deepEqual([p.ship_cost, p.ship_src, p.ship_auto.from, p.ship_auto.to, p.ship_auto.n, p.ship_auto.by], [54.9, 'channel', null, 54.9, 5, 'Pazaryeri']);
   assert.ok(p.ship_set_at > 0);
-  assert.match((await first(db, "SELECT msg FROM logs WHERE msg LIKE '%kargo tutarı faturaya göre güncellendi%'")).msg, /65,00 ₺ → 54,90 ₺/);
+  assert.match((await first(db, "SELECT msg FROM logs WHERE msg LIKE '%pazaryerinden gelen kargo bilgisiyle yazıldı%'")).msg, /54,90 ₺/);
   // Tekrar çalışınca değişmez (yeni gönderi yok)
-  assert.equal((await shipCheck(db, { force: true })).lowered, 0);
-  // Eşik altındaki fark (%3 / 1 ₺) güncellenmez; 3'ten az gönderi karar vermez
+  assert.equal((await shipCheck(db, { force: true })).filled, 0);
+  // Kullanıcının girdiği tutar (65) faturalardan yüksek: tutar değişmez, uyarılır
+  const db2 = await cargoDb(65, inv, cnt);
+  const r2 = await shipCheck(db2, { force: true });
+  assert.deepEqual([r2.lower, r2.updated, r2.notified], [1, 0, 1]);
+  const p2 = await prod(db2);
+  assert.deepEqual([p2.ship_cost, p2.ship_warn.dir, p2.ship_warn.median], [65, 'lower', 54.9]);
+  assert.match((await first(db2, "SELECT msg FROM notices WHERE key = 'shipcost:diff'")).msg, /sizin girdiğiniz 65,00 ₺, pazaryerinden gelen 54,90 ₺ \(kargo daha ucuz gidiyor/);
+  // Sistemin yazdığı tutar faturalar değişince güncellenir
+  await run(db2, "UPDATE products SET ship_src = 'channel', ship_warn = NULL WHERE id = 1");
+  const r3 = await shipCheck(db2, { force: true });
+  assert.equal(r3.updated, 1);
+  assert.deepEqual([(await prod(db2)).ship_cost, (await prod(db2)).ship_auto.from], [54.9, 65]);
+  // Eşik altındaki fark (%3 / 1 ₺) sayılmaz; 3'ten az gönderi karar vermez; boş tutar doldurulur
   assert.equal(evaluateShip({ ship_cost: 56 }, [{ cost: 55, at: 1 }, { cost: 55, at: 2 }, { cost: 55, at: 3 }]).action, 'ok');
   assert.equal(evaluateShip({ ship_cost: 65 }, [{ cost: 40, at: 1 }, { cost: 40, at: 2 }]).action, null);
+  assert.equal(evaluateShip({ ship_cost: null }, [{ cost: 40, at: 1 }, { cost: 41, at: 2 }, { cost: 42, at: 3 }]).action, 'fill');
   // 6 saatte bir çalışır
   assert.equal(await shipCheck(db), null);
 });
 
 test('Kargo: faturalar yüksekse tutar değişmez, ürün başına en fazla iki bildirim (ilk + 30 gün sonra); düzelince kalkar', async () => {
   const db = await cargoDb(65, [72.4, 71, 74, 72.4]);
-  const notice = () => first(db, "SELECT count, resolved_at, msg FROM notices WHERE key = 'shipcost:high'");
+  const notice = () => first(db, "SELECT count, resolved_at, msg FROM notices WHERE key = 'shipcost:diff'");
   const t0 = Date.now();
   let r = await shipCheck(db, { force: true, now: t0 });
-  assert.deepEqual([r.higher, r.notified, r.lowered], [1, 1, 0]);
+  assert.deepEqual([r.higher, r.notified, r.updated], [1, 1, 0]);
   assert.equal((await prod(db)).ship_cost, 65);
-  assert.match((await notice()).msg, /sistemde kargo 65,00 ₺ yazıyor ama 72,40 ₺ fiyattan gidiyor/);
+  assert.match((await notice()).msg, /sizin girdiğiniz 65,00 ₺, pazaryerinden gelen 72,40 ₺ \(kargo daha pahalı gidiyor/);
   // Aynı ay içinde tekrar: bildirim yok
   r = await shipCheck(db, { force: true, now: t0 + 10 * D });
   assert.equal(r.notified, 0); assert.equal((await notice()).count, 1);
@@ -205,7 +218,7 @@ test('Kargo: "Faturadaki tutarı kullan" düğmesi (Ürünler yazma yetkisi); el
   const r = await call('products/1/ship-from-invoice', editor, 'POST');
   assert.deepEqual([r.ok, r.ship_cost, r.n], [true, 72.4, 4]);
   const p = await prod(db);
-  assert.deepEqual([p.ship_cost, p.ship_warn, p.ship_auto.from, p.ship_auto.to, p.ship_auto.by], [72.4, null, 65, 72.4, 'E']);
+  assert.deepEqual([p.ship_cost, p.ship_warn, p.ship_auto.from, p.ship_auto.to, p.ship_auto.by, p.ship_src], [72.4, null, 65, 72.4, 'E', 'channel']);
   const d2 = await call('products/1', admin);
   assert.deepEqual([d2.ship_info.auto.from, d2.ship_info.auto.to, d2.ship_info.warn], [65, 72.4, null]);
   // Tutar girildikten sonra yeni gönderi yok: tekrar kullanılamaz (yetersiz fatura)
@@ -213,14 +226,19 @@ test('Kargo: "Faturadaki tutarı kullan" düğmesi (Ürünler yazma yetkisi); el
   // Elle değişiklik (ürün formu): karşılaştırma bundan sonraki gönderilerle başlar — eski faturalar kullanıcının tutarını ezmez
   await call('products/1', admin, 'PUT', { name: 'Termos', ship_cost: 60 });
   const p2 = await prod(db);
-  assert.equal(p2.ship_cost, 60); assert.ok(p2.ship_set_at > 0);
+  assert.equal(p2.ship_cost, 60); assert.ok(p2.ship_set_at > 0); assert.equal(p2.ship_src, 'user');
   const r2 = await shipCheck(db, { force: true });
-  assert.deepEqual([r2.lowered, r2.higher], [0, 0]);
+  assert.deepEqual([r2.lower, r2.higher, r2.updated], [0, 0, 0]);
   assert.equal((await prod(db)).ship_cost, 60);
   // Aynı tutarla kayıt (form her alanı gönderir): karşılaştırma sıfırlanmaz
   const at = (await prod(db)).ship_set_at;
   await call('products/1', admin, 'PUT', { name: 'Termos', ship_cost: 60 });
   assert.equal((await prod(db)).ship_set_at, at);
+  // Tutar silinirse pazaryerinden gelen kargo bilgisi yeniden yazılır
+  await call('products/1', admin, 'PUT', { name: 'Termos', ship_cost: '' });
+  assert.deepEqual([(await prod(db)).ship_src, (await prod(db)).ship_set_at], [null, null]);
+  assert.equal((await shipCheck(db, { force: true })).filled, 1);
+  assert.deepEqual([(await prod(db)).ship_cost, (await prod(db)).ship_src], [72.4, 'channel']);
 });
 
 test('Kargo: kargo faturası gelen siparişin kârında faturadaki tutar, gelmeyende ürünün (güncellenmiş) kargo tutarı', async () => {

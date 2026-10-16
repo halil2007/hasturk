@@ -916,6 +916,7 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
   // Panelde barındırılan fotoğraflar: üründen çıkarılanlar (başka ürün kullanmıyorsa) kayıttan sonra silinir
   const oldImg = id && ('image' in f || 'images' in f) ? await first(db, 'SELECT image, images FROM products WHERE id = ?', id) : null;
   if (!id) {
+    if (num(f.ship_cost) > 0) { f.ship_src = 'user'; f.ship_set_at = t; }
     const keys = Object.keys(f);
     const r = await first(db, `INSERT INTO products (${keys.join(', ')}, stock, created_at, updated_at) VALUES (${keys.map(() => '?').join(', ')}, ?, ?, ?) RETURNING id`,
       ...keys.map((k) => f[k]), Math.round(num(b.stock)), t, t);
@@ -923,9 +924,13 @@ async function saveProductInner(env, db, ctx, id, b, user, { push = true } = {})
     if (num(b.stock)) await run(db, 'INSERT INTO stock_moves (product_id, delta, stock_after, reason, created_at) VALUES (?, ?, ?, ?, ?)', id, Math.round(num(b.stock)), Math.round(num(b.stock)), 'İlk stok', t);
   } else {
     const keys = Object.keys(f);
-    // Kargo tutarı elle değişti: faturalarla karşılaştırma bu andan sonraki gönderilerle yeniden başlar (bkz. shipcost.js)
+    // Kargo tutarı elle değişti: tutar artık kullanıcının (sistem değiştirmez, faturalarla farkı uyarılır); karşılaştırma bu andan
+    // sonraki gönderilerle yeniden başlar. Boşaltılırsa pazaryeri faturasından yeniden doldurulabilir (bkz. shipcost.js)
     const shipWas = 'ship_cost' in f ? await first(db, 'SELECT ship_cost FROM products WHERE id = ?', id) : null;
-    if (shipWas && Number(shipWas.ship_cost || 0) !== Number(f.ship_cost || 0)) { f.ship_set_at = t; f.ship_warn = null; keys.push('ship_set_at', 'ship_warn'); }
+    if (shipWas && Number(shipWas.ship_cost || 0) !== Number(f.ship_cost || 0)) {
+      const own = num(f.ship_cost) > 0; f.ship_set_at = own ? t : null; f.ship_warn = null; f.ship_src = own ? 'user' : null; f.ship_auto = null;
+      keys.push('ship_set_at', 'ship_warn', 'ship_src', 'ship_auto');
+    }
     if (keys.length) await run(db, `UPDATE products SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => f[k]), t, id);
     if (b.stock !== undefined && b.stock !== '') await stockChange(env, db, ctx, id, { mode: 'set', qty: b.stock, note: 'Ürün formu' }, user);
   }
