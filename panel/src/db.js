@@ -423,6 +423,9 @@ export const MIGRATIONS = [
   'CREATE INDEX IF NOT EXISTS ext_sales_src_at ON ext_sales(src, at)',
   // Kargonomi teklif numarası ↔ sipariş / paket (başka paketin teklifi onaylanmasın; bkz. carriers.js saveQuote). 2 gün sonra silinir
   'CREATE TABLE IF NOT EXISTS carrier_quotes (provider TEXT NOT NULL, ref TEXT NOT NULL, order_id TEXT NOT NULL, package_id INTEGER, package_no INTEGER, at INTEGER NOT NULL, PRIMARY KEY (provider, ref))',
+  // Kargonomi kesin ücret: önceki sürüm onay anında gelen ücreti de "kesin" sayıyordu (teslimden sonra şubede ölçülen desiyle değişen
+  // ücret alınmıyordu). Son 20 günün bu paketleri yeniden "tahmini" sayılır: teslimden sonra kesin ücret yeniden sorgulanır (yalnız okuma)
+  "UPDATE packages SET carrier_cost_final = 0 WHERE carrier_provider = 'kargonomi' AND carrier_cost_final = 1 AND COALESCE(shipped_at, created_at, 0) > (CAST(strftime('%s', 'now') AS INTEGER) - 20 * 86400) * 1000",
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)

@@ -9,7 +9,7 @@ import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, r
 import { getChannels, SITE_TYPES } from './channels/index.js';
 import { typeOf, INTL_TYPES } from './config.js';
 import { syncInvoices, syncSettlements, lossNotify } from './finance.js';
-import { applyListRates, refreshBaseRates, rebaseOnce, BASE_DAYS } from './commcheck.js';
+import { applyListRates, refreshBaseRates, rebaseOnce, vatFixOnce, BASE_DAYS } from './commcheck.js';
 import { maintain } from './perf.js';
 import { syncFx, orderRate } from './fx.js';
 import { mergeStatus, chunk, str, sleep, explainHttp, withBudget, budgetLeft, budgetUsed, budgetElapsed } from './util.js';
@@ -567,6 +567,16 @@ export async function syncAll(env, db, opts = {}) {
   // Dış istek bütçesi (bkz. util.js withBudget): ~150 istek veritabanı / bildirim / kullanım özeti için ayrılır
   try { return await withBudget(Number(env.SUBREQ_BUDGET) || 850, () => syncAllInner(env, db, opts)); } finally { (await import('./handler.js')).bumpCache(db); (await import('./api.js')).soldStale(db); }
 }
+// Türkiye dışı Amazon pazar yeri (ilan fiyatı EUR / USD …): döviz kuru güncellemesi (fx.js applyFx) bu ilanların fiyatını TL oranıyla
+// çarpmasın (eBay / Etsy / Ozon gibi). Liste kanal ayarından (pazar yeri) çıkarılır; değişince kaydedilir.
+async function foreignOnce(env, db) {
+  try {
+    const out = [];
+    for (const c of await getChannels(env, db)) if (c.type === 'amazon' && c.catalog && c.catalog.currency && str(await c.catalog.currency()).toUpperCase() !== 'TRY') out.push(c.id);
+    const cur = (await getRaw(db, 'fx_foreign')) || [];
+    if (out.join(',') !== [].concat(cur).join(',')) await setSetting(db, 'fx_foreign', out);
+  } catch (e) { if (e.budget) throw e; }
+}
 async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
   const t = Date.now();
   // Kilit tek sorguda alınır (aynı anda iki senkron başlayamaz); "Senkronla" da kilide uyar, yalnız kanal beklemesini atlar
@@ -576,6 +586,7 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     await maybePurgeDemo(env, db);
     const settings = await getSettings(db);
     await stockOnce(env, db, settings);
+    await foreignOnce(env, db);
     const maps = await productMaps(db);
     const changed = [];
     // Yurt dışı pazaryeri (eBay, Etsy, Ozon) paket dışı kaldıysa senkron yapılmaz (Kurumsal pakette)
@@ -685,6 +696,7 @@ async function syncAllInner(env, db, { only, force, listings, cron } = {}) {
     if (!only) out.shipCheck = await shipCheck(db).catch((e) => 'hata: ' + e.message);
     // Tek seferlik: ilanların komisyon oranı ana oran kuralıyla yeniden hesaplanır (bkz. commcheck.js rebaseOnce)
     if (!only) out.commBase = await rebaseOnce(db).catch((e) => 'hata: ' + e.message);
+    if (!only) out.commVat = await vatFixOnce(db).catch((e) => 'hata: ' + e.message);
     if (!only && allows(env, 'finance')) out.invoices = await opt(150, () => syncInvoices(env, db)).catch((e) => 'hata: ' + e.message);
     if (!only && allows(env, 'finance')) out.settlements = await opt(150, () => syncSettlements(env, db)).catch((e) => 'hata: ' + e.message);
     // Zarar ettiren ürünler (iade dahil, son 30 gün): yeni ürün çıktıysa haftada en fazla bir bildirim

@@ -105,6 +105,7 @@ export async function applyFx(db, settings, rates, { user = 'Otomatik', ids = nu
   const fx = { ...FX_DEFAULTS, ...(settings.fx || {}) };
   const prods = await all(db, `SELECT id, name, currency, fx_price, fx_margin, sale_price FROM products WHERE currency IN ('USD', 'EUR', 'GBP') AND fx_price > 0${ids ? ` AND id IN (${ids.map(() => '?').join(',')})` : ''}`, ...(ids || []));
   let changed = 0, listings = 0;
+  const foreign = JSON.stringify([].concat((await getRaw(db, 'fx_foreign')) || []));
   for (const part of chunk(prods, 40)) {
     const st = [];
     for (const p of part) {
@@ -119,7 +120,7 @@ export async function applyFx(db, settings, rates, { user = 'Otomatik', ids = nu
       const k = p.sale_price > 0 ? price / p.sale_price : null;
       // Yurt dışı kanallardaki (eBay, Etsy, Ozon) ilan fiyatı kanalın para birimindedir: TL kuruyla çarpılmaz (dolar fiyatı kur arttıkça şişmesin)
       st.push(db.prepare(`UPDATE listings SET price = ROUND(CASE WHEN ? IS NOT NULL AND price > 0 THEN price * ? ELSE ? END, 2), price_dirty = 1 WHERE product_id = ?
-        AND channel NOT LIKE 'ebay%' AND channel NOT LIKE 'etsy%' AND channel NOT LIKE 'ozon%'`).bind(k, k, price, p.id));
+        AND channel NOT LIKE 'ebay%' AND channel NOT LIKE 'etsy%' AND channel NOT LIKE 'ozon%' AND channel NOT IN (SELECT value FROM json_each(?))`).bind(k, k, price, p.id, foreign));
     }
     if (st.length) await db.batch(st);
   }
