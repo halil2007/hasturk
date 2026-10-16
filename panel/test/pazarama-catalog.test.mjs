@@ -60,6 +60,13 @@ test('Pazarama ürün yükleme: eşleştirme, eksik kontrolü, gönderim ve sonu
     const a = cand.items.find((x) => x.sku === 'SOL-5'), b = cand.items.find((x) => x.sku === 'SOL-10'), bad = cand.items.find((x) => x.sku === 'SOL-X');
     assert.deepEqual(a.missing, []); assert.deepEqual(b.missing, []);
     assert.ok(bad.missing.includes('barkod') && bad.missing.includes('görsel'), JSON.stringify(bad.missing));
+    // Pazarama'da aynı adla bulunamayan marka: eksik; Kanallarda yayınla'da seçilen marka eşleştirmesi (brand_map) Ürün Yükle'de de kullanılır
+    await run(db, "UPDATE products SET brand = 'HasTürk Tarım' WHERE sku = 'SOL-10'");
+    let c2 = await call('catalog/candidates?channel=pazarama&local=G%C3%BCbre');
+    assert.ok(c2.items.find((x) => x.sku === 'SOL-10').missing.some((m) => /marka/.test(m)));
+    await run(db, "INSERT INTO brand_map (brand, channel, remote_id, remote_name) VALUES ('HasTürk Tarım', 'pazarama', ?, 'HG')", G(555));
+    c2 = await call('catalog/candidates?channel=pazarama&local=G%C3%BCbre');
+    assert.deepEqual(c2.items.find((x) => x.sku === 'SOL-10').missing, []);
     const up = await call('catalog/upload', { method: 'POST', body: JSON.stringify({ channel: 'pazarama', ids: [a.id, b.id, bad.id] }) });
     assert.equal(up.sent, 2, JSON.stringify(up)); assert.equal(up.skipped.length, 1);
     const sent = JSON.parse(calls.find((c) => /product\/create/.test(c.url)).body).products;
