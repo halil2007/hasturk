@@ -192,6 +192,31 @@ export const grossCost = (r) => (r.cost == null ? null : Math.round(Number(r.cos
 // Firma gönderisi açılmış paketler son 30 gün içinde sorgulanır: gerçek takip numarası (şube kabulünden sonra veren firmalar),
 // takip adresi ve kargo ücreti pakete yazılır; kargoya verilmiş paketlerin hepsi teslim edildiyse sipariş "Teslim edildi" olur.
 const TRACK_EVERY = 2 * 3600e3;
+// Teslim edildi → siteye (ikas / WooCommerce: paket "Teslim edildi"). Kanal o an hata verirse yarım saat arayla 8 kez yeniden
+// denenir (site_sync: e1..e8), olmazsa bildirim gider. Pazaryeri (markDelivered yok) teslimi kendisi bilir: 'skip'
+const SYNC_TRIES = 8, SYNC_GAP = 30 * 60e3;
+async function syncDelivered(db, chans, out, t) {
+  const del = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.remote_id, p.agreement, p.carrier_provider, p.tracking, p.barcode, p.cargo_company, p.tracking_url,
+      p.site_sync, o.channel AS order_channel, o.remote_id AS order_remote FROM packages p JOIN orders o ON o.id = p.order_id
+    WHERE p.carrier_provider IS NOT NULL AND p.carrier_provider != 'demo' AND p.carrier_state = 'delivered' AND p.status = 'shipped'
+      AND (p.site_sync IS NULL OR (p.site_sync LIKE 'e%' AND COALESCE(p.carrier_checked_at, 0) < ?)) AND COALESCE(p.carrier_checked_at, 0) >= ?
+    ORDER BY p.carrier_checked_at LIMIT 40`, t - SYNC_GAP, t - 14 * 86400e3);
+  for (const p of del) {
+    const ch = chans.get(p.order_channel);
+    if (!ch || !ch.enabled || !ch.markDelivered) { await run(db, "UPDATE packages SET site_sync = 'skip' WHERE id = ?", p.id); continue; }
+    try {
+      await ch.markDelivered({ remote_id: p.order_remote, id: p.order_id }, p);
+      await run(db, "UPDATE packages SET site_sync = 'delivered' WHERE id = ?", p.id);
+      out.synced++;
+    } catch (e) {
+      const n = (Number(String(p.site_sync || '').slice(1)) || 0) + 1, msg = String(e.message).slice(0, 300);
+      await run(db, 'UPDATE packages SET site_sync = ?, carrier_checked_at = ? WHERE id = ?', n >= SYNC_TRIES ? 'fail' : 'e' + n, t, p.id);
+      await run(db, "INSERT INTO logs (at, channel, level, msg) VALUES (?, ?, 'warn', ?)", Date.now(), p.order_channel, `Paket ${p.no} (${p.order_id}): "teslim edildi" siteye yazılamadı (${n}. deneme): ${msg}`).catch(() => {});
+      if (n >= SYNC_TRIES) await notify(db, `carrier:sitesync:${p.id}`, { level: 'warn', title: `Paket ${p.no}: "teslim edildi" siteye yazılamadı`, msg: `${ch.name} ${SYNC_TRIES} denemede kabul etmedi (${msg}). Siparişi sitenizin panelinden "Teslim edildi" yapın. Sipariş: ${p.order_id}` });
+    }
+  }
+}
+
 export async function trackCarriers(env, db, { limit = 40, force = false } = {}) {
   const t = Date.now();
   const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.tracking, p.barcode, p.tracking_url, p.cargo_company, p.carrier_provider, p.carrier_ref, p.carrier_cost, p.carrier_state, p.desi,
@@ -200,11 +225,11 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
       AND COALESCE(p.carrier_state, '') NOT IN ('delivered', 'cancelled', 'failed') AND o.status NOT IN ('cancelled', 'returned', 'delivered')
       AND COALESCE(p.label_at, p.created_at, 0) >= ? AND (? OR COALESCE(p.carrier_checked_at, 0) < ?)
     ORDER BY COALESCE(p.carrier_checked_at, 0) LIMIT ?`, t - 30 * 86400e3, force ? 1 : 0, t - TRACK_EVERY, limit);
-  if (!rows.length) return { checked: 0 };
   const apis = {}, out = { checked: 0, delivered: 0, updated: 0, errors: 0, shipped: 0, synced: 0 };
   // Siteye otomatik bildirim (Ayarlar → Kargo: carrier_auto_ship): firma teslim alınca "Kargoya ver", sonradan gelen takip kodu,
   // teslim edildi. Kanal hatası takibi durdurmaz (günlüğe yazılır, bir sonraki turda yeniden denenir)
   const settings = await getSettings(db).catch(() => ({})), auto = settings.carrier_auto_ship !== false;
+  if (!rows.length && !(auto && await first(db, `SELECT 1 FROM packages WHERE carrier_state = 'delivered' AND carrier_provider IS NOT NULL AND (site_sync IS NULL OR site_sync LIKE 'e%') LIMIT 1`))) return { checked: 0 };
   const chans = auto ? new Map((await getChannels(env, db).catch(() => [])).map((c) => [c.id, c])) : new Map();
   const after = [];
   await pool(rows, 4, async (p) => {
@@ -264,15 +289,11 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
         await ch.updateTracking({ remote_id: p.order_remote, id: p.order_id }, { ...p, tracking: tn }, { tracking: tn, barcode: tn, cargoCompany: cn || p.cargo_company, trackingUrl: str(r.trackingUrl) || p.tracking_url });
         out.synced++;
       }
-      if (ch && ch.enabled && ch.markDelivered && r.state === 'delivered' && p.carrier_state !== 'delivered') {
-        const fresh = await first(db, 'SELECT id, no, status, remote_id, agreement, carrier_provider, tracking, barcode, cargo_company, tracking_url FROM packages WHERE id = ?', p.id);
-        await ch.markDelivered({ remote_id: p.order_remote, id: p.order_id }, fresh || p);
-        out.synced++;
-      }
     } catch (e) {
       await run(db, "INSERT INTO logs (at, channel, level, msg) VALUES (?, ?, 'warn', ?)", Date.now(), p.order_channel, `Paket ${p.no} (${p.order_id}): kargo durumu kanala bildirilemedi: ${String(e.message).slice(0, 300)}`).catch(() => {});
     }
   }
+  if (auto) await syncDelivered(db, chans, out, t);
   // Kargoya verilmiş ve firmanın teslim ettiği siparişler: tüm paketleri teslim edildiyse sipariş "Teslim edildi"
   const done = await all(db, `SELECT o.id FROM orders o WHERE o.status = 'shipped' AND EXISTS (SELECT 1 FROM packages p WHERE p.order_id = o.id AND p.carrier_state = 'delivered')
     AND NOT EXISTS (SELECT 1 FROM packages p WHERE p.order_id = o.id AND (p.status != 'shipped' OR COALESCE(p.carrier_state, '') != 'delivered')) LIMIT 200`);

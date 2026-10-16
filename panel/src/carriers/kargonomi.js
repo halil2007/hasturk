@@ -109,7 +109,8 @@ export function make(values) {
   const result = (s) => {
     const tracking = str(s.shipping_webservice_tracking_code), carrier = str(s.shipping_provider_name);
     return {
-      ref: str(s.id), tracking, barcode: str(s.shipping_webservice_barcode) || tracking || str(s.barcode_of_order_id), carrier: carrier || 'Kargonomi',
+      ref: str(s.id), tracking, // barkod: kargo firmasının okuttuğu barkod (Kargonomi'nin kendi sipariş barkodu değil; bizim tasarımdaki etikete basılır)
+      barcode: str(s.shipping_webservice_barcode) || tracking, carrier: carrier || 'Kargonomi',
       // DOĞRULA: real_price / estimated_price KDV hariç kabul edildi (Kargonomi fiyat listeleri KDV hariç)
       // costFinal: gerçek ücret (real_price) geldi; tahmini ücretin yerine geçer (bkz. carriers.js trackCarriers)
       trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costFinal: money(s.real_price) != null, costVatIncluded: false,

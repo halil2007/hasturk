@@ -373,7 +373,9 @@ export function mountOps(el, id, { mode = 'expand', onChange } = {}) {
       if (hasLabel(pkg, d.order.channel) || pkg.barcode || pkg.tracking) {
         if (!pkg.carrier_provider) items.push({ icon: 'sync', label: 'Etiketi kanaldan yeniden al', run: () => busy(null, async () => { const r = await getLabel(pkg, { refresh: true }); toast(r.official || r.panel ? 'Etiket yenilendi' : r.error || r.pending || 'Etiket alınamadı', !(r.official || r.panel)); await changed(); }) });
         if (pkg.has_label && pkg.label_format === 'zpl') items.push({ icon: 'print', label: 'Etiketi PDF olarak aç', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official && r.official.format === 'zpl') await zplChoice(d.order, pkg, r.official); else if (r.official) await outputLabel({ ...r, order: r.order || d.order, package_id: pkg.id }, { ask: false }); }) });
-        if (pkg.has_label) items.push({ icon: 'download', label: 'Etiket dosyasını indir', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official) { downloadFile(r.official.filename, r.official.data, r.official.format === 'zpl' ? 'text/plain' : r.official.format === 'pdf' ? 'application/pdf' : 'image/' + r.official.format); await mark(d.order.id, [pkg.id], 'viewed'); } }) });
+        // Kargonomi etiketi bizim tasarımla basılıyor: firmanın kendi PDF etiketi yine indirilebilir
+        if (pkg.has_label && LATE[pkg.carrier_provider]) items.push({ icon: 'download', label: `${LATE[pkg.carrier_provider]} etiketini indir (PDF)`, run: () => busy(null, async () => { const r = await api(`orders/${encodeURIComponent(d.order.id)}/label-pdf`, { method: 'POST', body: { package_id: pkg.id } }); downloadFile(r.official.filename, r.official.data, r.official.format === 'pdf' ? 'application/pdf' : 'image/' + r.official.format); }) });
+        else if (pkg.has_label) items.push({ icon: 'download', label: 'Etiket dosyasını indir', run: () => busy(null, async () => { const r = await getLabel(pkg); if (r.official) { downloadFile(r.official.filename, r.official.data, r.official.format === 'zpl' ? 'text/plain' : r.official.format === 'pdf' ? 'application/pdf' : 'image/' + r.official.format); await mark(d.order.id, [pkg.id], 'viewed'); } }) });
         items.push(pkg.label_printed_at
           ? { icon: 'x', label: 'Yazdırıldı işaretini kaldır', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'unprinted'); await changed(); }) }
           : { icon: 'check', label: 'Yazdırıldı olarak işaretle', run: () => busy(null, async () => { await mark(d.order.id, [pkg.id], 'printed'); toast('İşaretlendi'); await changed(); }) });
@@ -478,7 +480,7 @@ async function kargonomiDialog(d, pkg, done) {
       if (!x) return toast('Kargo firmasını seçin', true);
       const r = await api(`orders/${enc}/carrier-label`, { method: 'POST', body: { package_id: pkg.virtual ? undefined : pkg.id, provider: 'kargonomi', quote_id: quote.quote_id, firm_id: x.value, desi: quote.desi } });
       sent = true; s.close(); toast(r.message);
-      if (r.official) await outputLabel(r, { done }); else await waitCarrierLabels(o.id, [r.package_id], done);
+      if (r.official || (r.panel && r.order)) await outputLabel(r, { done }); else await waitCarrierLabels(o.id, [r.package_id], done);
       await done();
     });
   };
@@ -493,7 +495,7 @@ async function waitCarrierLabels(orderId, pkgIds, done) {
     await new Promise((res) => setTimeout(res, 3000));
     for (const id of [...left]) {
       const r = await api(`orders/${enc}/label`, { method: 'POST', body: { package_id: Number(id) } }).catch(() => null);
-      if (r && r.official) left.delete(id);
+      if (r && (r.official || r.panel)) left.delete(id);
     }
   }
   if (left.size < pkgIds.length) await bulkLabels([orderId], { fetch: false, done });
@@ -839,7 +841,8 @@ export async function bulkLabels(ids, { fetch = true, done } = {}) {
       // Kendi etiketimiz yalnızca: kanal bunu onayladıysa (ör. Trendyol'da ortak etiketi olmayan firma), kanalın etiket servisi yoksa
       // ya da gönderi kendi anlaşmanızla yapıldıysa. Etiket servisi olan kanalda gerçek etiket gelmeden kendi etiketimiz basılmaz.
       // Etiketi firmanın verdiği gönderide (Kargonomi, Navlungo, DHL) firma etiketi gelmeden iç etiket basılmaz
-      else if (['kargonomi', 'navlungo', 'dhl'].includes(pkg.carrier_provider)) continue;
+      // (Kargonomi'de barkod gelince bizim tasarım: l.panel)
+      else if (['kargonomi', 'navlungo', 'dhl'].includes(pkg.carrier_provider) && !l.panel) continue;
       else if (l.panel || ((pkg.agreement === 'own' || (ch(order.channel).caps || {}).label !== 'remote') && (pkg.barcode || pkg.tracking))) panel.push({ order, pkg });
       else continue;
       marks.push({ orderId: order.id, pkgId: pkg.id });

@@ -397,6 +397,9 @@ export const MIGRATIONS = [
   // (fark sonradan değişirse kapatılan fark yeniden açılır; itiraz edilen sipariş eşleşince senkron "çözüldü" yapar)
   `CREATE TABLE IF NOT EXISTS stl_disputes (channel TEXT NOT NULL, order_number TEXT NOT NULL, status TEXT NOT NULL, note TEXT, diff REAL, by_user TEXT,
     created_at INTEGER, updated_at INTEGER, PRIMARY KEY (channel, order_number))`,
+  // Kargo firmasının "teslim edildi" bilgisi siteye (ikas / WooCommerce) yazıldı mı: 'delivered' = yazıldı, 'skip' = kanal desteklemiyor.
+  // Boşsa (kanal o an hata verdi) her takip turunda yeniden denenir
+  'ALTER TABLE packages ADD COLUMN site_sync TEXT',
 ];
 
 // Tüm tablo adları (ana panelin yerel / ortak veritabanı ayrımı için, bkz. router.js)
@@ -543,6 +546,7 @@ export const DEFAULT_SETTINGS = {
   zpl_pdf: false,
   // Hepsiburada etiketi bizim tasarımla basılır (barkod / takip no Hepsiburada'dan); kapalıysa Hepsiburada'nın kendi etiketi
   label_own: true,
+  label_own_carrier: true,
   // Kargo entegratörü (Kargonomi…) gönderisi: firma paketi teslim alınca "Kargoya ver" kendiliğinden yapılır (siteye takip bilgisi gider),
   // takip kodu sonradan gelirse siteye yazılır, teslim edilince sitede de "Teslim edildi" olur
   carrier_auto_ship: true,
