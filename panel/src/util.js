@@ -124,10 +124,11 @@ export function htmlReason(text, status) {
 }
 export async function http(url, { method = 'GET', headers = {}, body: b, timeout = 25000, tries = 2, raw = false } = {}) {
   for (let i = 1; ; i++) {
+    // Bütçe önce düşülür: sınır doluysa zamanlayıcı kurulmadan hata verilir (yoksa açık kalan zamanlayıcı işi bekletir)
+    spendBudget();
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeout);
     let res;
-    spendBudget();
     try {
       // Kimliksiz (User-Agent'sız) istekleri bazı pazaryeri güvenlik duvarları 403 ile reddeder: verilmediyse panel kimliği eklenir
       const h = headers && !Object.keys(headers).some((k) => k.toLowerCase() === 'user-agent') ? { ...headers, 'User-Agent': 'HasturkPanel/1.0 (+https://workers.cloudflare.com)' } : headers;
