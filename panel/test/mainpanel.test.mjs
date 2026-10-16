@@ -108,3 +108,31 @@ test('tarayıcı ölçümleri (sayfa açılışı, istek) ve veritabanı altyap�
   assert.ok(c && c.avg_ms === 450 && c.server_ms != null, JSON.stringify(rep.client));
   assert.ok(!rep.routes.some((r) => /^(SAYFA|TARAYICI|DB) /.test(r.route)), 'ölçüm satırları işlem listesine karışmaz');
 });
+
+test('ana panel (nesne üzerinden) Stok API: eski anahtar (izin alanı yok) daha önce satış bildirdiyse satış kabul edilir ve izin kalıcı açılır; hiç bildirmemişse 403', async () => {
+  const { env, call, J } = setup();
+  assert.equal((await call('login', J({ password: 'x-123456' }))).status, 200);
+  const { obj, migrate } = attach(env);
+  await call('summary'); await migrate();
+  assert.equal((await call('products', J({ name: 'Bayi ürünü', sku: 'BAYI-1', sale_price: 100, stock: 50 }))).status, 200);
+  const mk = async (name) => (await (await call('extapi', J({ name }))).json()).key;
+  const kOld = await mk('Eski bayi'), kNew = await mk('Yeni anahtar');
+  // İzin alanı olmayan (önceki sürümde verilmiş) anahtarlar
+  const keys = JSON.parse((await first(env.DB, "SELECT v FROM settings WHERE k = 'extapi_keys'")).v).map((k) => { delete k.write; return k; });
+  await env.DB.prepare("UPDATE settings SET v = ? WHERE k = 'extapi_keys'").bind(JSON.stringify(keys)).run();
+  const idOld = /^hsm_([a-z0-9]{8})_/.exec(kOld)[1];
+  const loc = obj().ctx.storage.sql;
+  const pid = loc.exec("SELECT id FROM products WHERE sku = 'BAYI-1'").toArray()[0].id;
+  loc.exec("INSERT INTO ext_sales (src, ref, product_id, qty, at) VALUES (?, 'ESKI-1', ?, 1, ?)", idOld, pid, Date.now() - 864e5);
+  const sale = (key, ref) => worker.fetch(new Request('https://panel.test/api/v1/sales', { method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref, items: [{ sku: 'BAYI-1', quantity: 2 }] }) }), env, { waitUntil() {} });
+  let r = await sale(kOld, 'WEB-1');
+  assert.equal(r.status, 201, await r.clone().text());
+  assert.equal(loc.exec("SELECT stock FROM products WHERE sku = 'BAYI-1'").toArray()[0].stock, 48);
+  const after = JSON.parse((await first(env.DB, "SELECT v FROM settings WHERE k = 'extapi_keys'")).v);
+  assert.equal(after.find((k) => k.id === idOld).write, true, 'izin kalıcı açıldı');
+  r = await sale(kNew, 'WEB-2');
+  assert.equal(r.status, 403);
+  assert.equal((await r.json()).code, 'readonly');
+  assert.equal(loc.exec("SELECT stock FROM products WHERE sku = 'BAYI-1'").toArray()[0].stock, 48);
+});
