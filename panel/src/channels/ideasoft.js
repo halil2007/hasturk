@@ -98,6 +98,7 @@ export function ideasoft(env, meta = {}) {
       customer, phone: str(o.customerPhone || s.mobilePhoneNumber || s.phoneNumber), email: str(o.customerEmail), customerId: o.member && o.member.id ? str(o.member.id) : '',
       address: { name: name2(s.firstname, s.surname) || customer, line: str(s.address), district: str(s.subLocation), city: str(s.location), phone: str(s.mobilePhoneNumber || s.phoneNumber || o.customerPhone) },
       total: num(o.finalAmount) || num(o.generalAmount), currency: str(o.currency).replace(/^TL$/i, 'TRY') || 'TRY',
+      cargoChoice: str(o.shippingCompanyName || o.shippingProviderName), // müşterinin seçtiği kargo (bilgi notu)
       cargoCompany: str(o.shippingCompanyName || o.shippingProviderName), tracking: str(o.shippingTrackingCode), items, packages: null,
     };
   }

@@ -57,6 +57,8 @@ export function woocommerce(env, meta) {
       address: { name: name || [b.first_name, b.last_name].map(str).filter(Boolean).join(' '), line: [s.address_1, s.address_2].map(str).filter(Boolean).join(' '),
         district: il ? str(s.city) : '', city: il || str(s.city || s.state), phone: str(s.phone || b.phone) },
       total: num(o.total), currency: str(o.currency) || 'TRY',
+      // Müşterinin ödeme sayfasında seçtiği kargo yöntemi (bilgi notu; etiketi zorunlu kılmaz): shipping_lines[].method_title
+      cargoChoice: str(((o.shipping_lines || []).find((x) => str(x && x.method_title)) || {}).method_title),
       cargoCompany: str(st.custom_tracking_provider || st.tracking_provider || (tp && tp.value)), tracking: str(st.tracking_number || (tn && typeof tn.value !== 'object' ? tn.value : '')),
       items, packages: null,
     };

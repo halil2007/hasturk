@@ -110,6 +110,7 @@ export function ticimax(env, meta = {}) {
       address: { name: name || customer, line: [txt(adr, 'Mahalle'), txt(adr, 'Adres')].filter(Boolean).join(' '), district: txt(adr, 'Ilce'), city: txt(adr, 'Il'), phone: txt(adr, 'AliciTelefon') },
       // DOĞRULA: SiparisToplamTutari ödenecek genel toplam (kargo ve indirimler dahil) kabul edildi
       total: num(txt(o, 'SiparisToplamTutari')) || num(txt(o, 'ToplamTutar')), currency: (txt(o, 'ParaBirimi') || 'TRY').replace(/^TL$/i, 'TRY'),
+      cargoChoice: txt(o, 'KargoFirmaTanim'), // müşterinin ödeme sayfasında seçtiği kargo (bilgi notu)
       cargoCompany: txt(o, 'KargoFirmaTanim'), tracking: txt(o, 'KargoTakipNo'), shipBy: tmxParse(txt(o, 'KargoyaSonVerilmeTarihi')) || null,
       items, packages: null,
     };

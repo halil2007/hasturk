@@ -6,7 +6,7 @@
 //  Başarısız adım bir kez daha denenir; üst üste başarısız olursa Bildirimler'e yazılır.
 import { compareFetched, checkMissing } from './orderclean.js';
 import { all, first, run, allIn, getSettings, getRaw, setSetting, log, notify, resolve } from './db.js';
-import { getChannels } from './channels/index.js';
+import { getChannels, SITE_TYPES } from './channels/index.js';
 import { typeOf, INTL_TYPES } from './config.js';
 import { syncInvoices, syncSettlements, lossNotify } from './finance.js';
 import { applyListRates, refreshBaseRates, rebaseOnce, BASE_DAYS } from './commcheck.js';
@@ -112,7 +112,7 @@ export async function saveOrders(db, ch, orders, maps) {
     for (const o of part) {
       const id = `${ch}:${o.remoteId}`, ex = existing.get(id);
       const status = mergeStatus(o.status, ex && ex.local_status);
-      const extra = JSON.stringify({ awaitingPayment: !!o.awaitingPayment, ...(o.demo ? { demo: true } : {}), ...(o.cargoChoice ? { cargoChoice: o.cargoChoice } : {}), ...(o.customerId ? { customerId: o.customerId } : {}), ...(o.guest ? { guest: true } : {}), ...(o.fx ? { fx: o.fx } : {}), ...(o.cod ? { cod: true } : {}) });
+      const extra = JSON.stringify({ awaitingPayment: !!o.awaitingPayment, ...(o.demo ? { demo: true } : {}), ...(o.cargoChoice && SITE_TYPES.includes(typeOf(ch)) ? { cargoChoice: str(o.cargoChoice).slice(0, 120) } : {}), ...(o.customerId ? { customerId: o.customerId } : {}), ...(o.guest ? { guest: true } : {}), ...(o.fx ? { fx: o.fx } : {}), ...(o.cod ? { cod: true } : {}) });
       // Kanalda durum değişti ve panelden yapılmadı → kanal tarafında işlem (satıcı paneli, kargo, müşteri…)
       let ext = null;
       if (ex && ex.remote_status && o.remoteStatus && ex.remote_status !== o.remoteStatus && !recent.has(id)) {

@@ -104,6 +104,7 @@ export function tsoft(env, meta = {}) {
       customerId: num(o.CustomerId) > 0 ? str(o.CustomerId) : '',
       address: { name, line: str(o.DeliveryAddress), district: str(o.DeliveryTown || o.DeliveryDistrict), city: str(o.DeliveryCity), phone: str(o.DeliveryMobile || o.DeliveryTelephone || o.Mobile || o.CustomerPhone) },
       total: num(o.OrderTotalPrice ?? o.GeneralTotal ?? o.Total), currency: (str(o.Currency) || 'TRY').replace(/^TL$/i, 'TRY'),
+      cargoChoice: str(o.CargoName || o.CargoCompanyName || o.Cargo), // müşterinin seçtiği kargo (bilgi notu)
       cargoCompany: str(o.Cargo || o.CargoName || o.CargoCompanyName || o.CargoCode), tracking: str(o.CargoTrackingCode), items, packages: null,
     };
   }

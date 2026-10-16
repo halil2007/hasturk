@@ -449,6 +449,12 @@ export const carrierAllowed = (d, pkg) => pkg.status === 'open' && (((d.channel 
   && !(pkg.remote_id && (pkg.barcode || pkg.tracking) && pkg.agreement !== 'own');
 // Siparişte kullanılabilecek entegratörler: Kargonomi yalnız internet sitesi siparişinde (pazaryeri kendi kargosuyla gönderir)
 export const usableFor = (list, d) => list.filter((c) => c.usable && (c.id !== 'kargonomi' || !!((d && d.channel) || {}).site));
+// Müşterinin sitenin ödeme sayfasında seçtiği kargo (yalnız internet sitesi siparişlerinde gelir; pazaryerinde yok). Bilgi notudur: etiket
+// başka firmayla da alınabilir (müşteri seçse de o firmayla gönderilmeyebilir). Seçenek firmayla eşleşirse listede işaretlenir, seçili gelmez.
+export const cargoChoiceOf = (d) => (d && d.channel && d.channel.site && d.order && d.order.extra && String(d.order.extra.cargoChoice || '').trim()) || '';
+const choiceNote = (d) => { const c = cargoChoiceOf(d); return c ? html`<div class="notice small"><i class="ico ico-truck"></i><div>Müşteri ödeme sayfasında <b>${c}</b> seçti. Bilgi amaçlıdır: dilediğiniz firmayla gönderebilirsiniz.</div></div>` : ''; };
+const isChoice = (d, name) => { const c = carrierOf(cargoChoiceOf(d)); return !!c && c === carrierOf(name); };
+const choicePill = (d, name) => (isChoice(d, name) ? html`<span class="pill info tiny">müşterinin seçtiği</span>` : '');
 // Kargonomi ile gönder: firmaların fiyatları Kargonomi'den alınır, kargo firmasını kullanıcı seçer (otomatik seçim yok).
 // Fiyat almak için Kargonomi'de taslak açılır; vazgeçilirse taslak silinir.
 async function kargonomiDialog(d, pkg, done) {
@@ -464,10 +470,11 @@ async function kargonomiDialog(d, pkg, done) {
     const offers = quote ? [...quote.offers].sort((x, y) => (x.price ?? 1e9) - (y.price ?? 1e9)) : [];
     s.setBody(html`<div class="stack">
       <div class="small muted">${ch(o.channel).name} · #${o.order_number} · ${o.customer} · ${[a.district, a.city].filter(Boolean).join(' / ') || html`<span style="color:var(--bad)">adres yok</span>`}</div>
+      ${choiceNote(d)}
       <div class="row" style="gap:8px;align-items:flex-end"><label class="field" style="margin:0"><span>Desi</span><input class="input" type="number" min="0.1" step="0.1" data-desi value="${(quote && quote.desi) || pkg.desi || 1}" style="max-width:110px"></label>
         <button class="btn" data-q><i class="ico ico-sync"></i>${quote ? 'Fiyatları yenile' : 'Fiyatları getir'}</button></div>
       ${err ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div>${err}</div></div>` : ''}
-      ${quote ? (offers.length ? html`<div class="small" style="font-weight:650">Kargo firmasını seçin</div><div class="stack" style="gap:6px">${offers.map((c, i) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="kgfirm" value="${c.id}" data-name="${c.name}" ${prefer && (c.slug || '').toLowerCase().startsWith(prefer) ? 'checked' : ''}><span style="flex:1"><b>${c.name}</b></span>
+      ${quote ? (offers.length ? html`<div class="small" style="font-weight:650">Kargo firmasını seçin</div><div class="stack" style="gap:6px">${offers.map((c, i) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="kgfirm" value="${c.id}" data-name="${c.name}" ${prefer && (c.slug || '').toLowerCase().startsWith(prefer) ? 'checked' : ''}><span style="flex:1"><b>${c.name}</b> ${choicePill(d, c.name)}</span>
           ${c.price != null ? html`<span class="num" style="font-weight:700">${money(c.price)}</span><span class="muted tiny">+ KDV</span>` : ''}${i === 0 && offers.length > 1 && c.price != null ? html`<span class="pill good tiny">en uygun</span>` : ''}</label>`)}</div>
         <div class="muted tiny">Fiyatlar Kargonomi'nin bu gönderi için verdiği tekliflerdir (KDV hariç); ücret Kargonomi bakiyenizden düşer ve siparişin kargo giderine yazılır.</div>`
         : html`<div class="notice warn small">Kargonomi bu gönderi için teklif vermedi. Desiyi ya da adresi kontrol edin.</div>`)
@@ -525,12 +532,13 @@ async function kargonomiAllDialog(d, pkgs, done) {
     }).filter(Boolean).sort((a, b) => (a.total ?? 1e9) - (b.total ?? 1e9)) : [];
     s.setBody(html`<div class="stack">
       <div class="small muted">${ch(o.channel).name} · #${o.order_number} · ${o.customer}</div>
+      ${choiceNote(d)}
       <div class="notice small"><i class="ico ico-box"></i><div>Sipariş ${pkgs.length} pakete bölünmüş: her paket için Kargonomi'de ayrı gönderi açılır, her pakete ayrı etiket ve takip numarası gelir.</div></div>
       <div class="stack" style="gap:6px">${pkgs.map((p) => html`<div class="row" style="gap:8px;align-items:center"><b class="small" style="width:70px">Paket ${p.no}</b><span class="muted tiny" style="flex:1">${p.items.reduce((a, x) => a + x.qty, 0)} ürün</span>
         <label class="row small" style="gap:6px;align-items:center">Desi <input class="input" type="number" min="0.1" step="0.1" data-pdesi="${p.id}" value="${desi[p.id]}" style="width:80px"></label></div>`)}</div>
       <button class="btn" data-q style="align-self:flex-start"><i class="ico ico-sync"></i>${q ? 'Fiyatları yenile' : 'Fiyatları getir'}</button>
       ${err ? html`<div class="notice bad small"><i class="ico ico-warn"></i><div>${err}</div></div>` : ''}
-      ${q ? (firms.length ? html`<div class="small" style="font-weight:650">Kargo firmasını seçin (tüm paketler bu firmayla gider)</div><div class="stack" style="gap:6px">${firms.map((f, i) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="kgfirm" value="${f.id}"><span style="flex:1"><b>${f.name}</b>
+      ${q ? (firms.length ? html`<div class="small" style="font-weight:650">Kargo firmasını seçin (tüm paketler bu firmayla gider)</div><div class="stack" style="gap:6px">${firms.map((f, i) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="kgfirm" value="${f.id}"><span style="flex:1"><b>${f.name}</b> ${choicePill(d, f.name)}
           <div class="tiny muted">${f.per.map((y, k) => `Paket ${q.packages[k].no}: ${y.price != null ? money(y.price) : '—'}`).join(' · ')}</div></span>
           ${f.total != null ? html`<span class="num" style="font-weight:700">${money(f.total)}</span><span class="muted tiny">+ KDV</span>` : ''}${i === 0 && firms.length > 1 && f.total != null ? html`<span class="pill good tiny">en uygun</span>` : ''}</label>`)}</div>`
         : html`<div class="notice warn small">Tüm paketlere teklif veren kargo firması yok. Desileri kontrol edin ya da paketleri tek tek gönderin.</div>`)
@@ -563,7 +571,8 @@ async function carrierDialog(d, pkg, done) {
   const snd = (state.settings && state.settings.sender) || {};
   const s = sheet({ title: `Paket ${pkg.no} · kargo firmasından etiket`, size: 'narrow', body: html`<div class="stack">
     <div class="small muted">${ch(o.channel).name} · #${o.order_number} · ${o.customer}</div>
-    ${usable.length ? html`<div class="stack" style="gap:6px">${usable.map((c) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="carrier" value="${c.id}" ${def && def.id === c.id ? 'checked' : ''}><span style="flex:1"><span style="font-weight:600">${c.name}</span><div class="tiny muted">${c.about || ''}</div></span>${c.isDefault ? html`<span class="pill good">varsayılan</span>` : ''}</label>`)}</div>
+    ${choiceNote(d)}
+    ${usable.length ? html`<div class="stack" style="gap:6px">${usable.map((c) => html`<label class="cand" style="cursor:pointer"><input type="radio" name="carrier" value="${c.id}" ${def && def.id === c.id ? 'checked' : ''}><span style="flex:1"><span style="font-weight:600">${c.name}</span> ${choicePill(d, c.name)}<div class="tiny muted">${c.about || ''}</div></span>${c.isDefault ? html`<span class="pill good">varsayılan</span>` : ''}</label>`)}</div>
       <label class="field"><span>Desi</span><input class="input" type="number" min="0.1" step="0.1" data-desi value="${pkg.desi || 1}" style="max-width:120px"></label>
       <dl class="kv small"><dt>Alıcı</dt><dd>${a.name || o.customer || '—'} · ${[a.district, a.city].filter(Boolean).join(' / ') || html`<span style="color:var(--bad)">adres yok</span>`}</dd>
         <dt>Gönderen</dt><dd>${snd.name || html`<span style="color:var(--bad)">tanımlı değil</span>`}${snd.city ? ` · ${snd.city}` : ''} <a class="link tiny" href="#/ayarlar">değiştir</a></dd></dl>
@@ -595,6 +604,7 @@ function shipDialog(d, pkg, done, { editOnly = false } = {}) {
     title: editOnly ? `Paket ${pkg.no} · kendi anlaşmanızla gönderim` : `Paket ${pkg.no} kargoya ver`, size: 'narrow',
     body: html`<div class="stack">
       <div class="small muted">${name} · #${o.order_number} · ${o.customer}</div>
+      ${!code ? choiceNote(d) : ''}
       ${!editOnly && !code && c.manualTracking === false ? html`<div class="notice warn small"><i class="ico ico-warn"></i><div>Bu pakette henüz kargo barkodu yok. ikas siparişi <b>ikas Kargo</b> ile (ikas panelinde “ikas Kargo ile Gönder”; etiket panele kendiliğinden gelir) ya da bağlı <b>kargo entegratörünüzle</b> (paket menüsü → Entegratörle gönder) gönderilir; elle kargo/takip bilgisi girilmez.</div></div>`
         : !editOnly && code ? html`<dl class="kv small"><dt>Kargo</dt><dd>${pkg.cargo_company || '—'}</dd><dt>Barkod / takip</dt><dd class="num">${code}</dd><dt>Etiket</dt><dd>${pkg.label_printed_at ? `yazdırıldı (${shortDT(pkg.label_printed_at)})` : html`<span style="color:var(--amber)">yazdırılmadı</span>`}</dd></dl>`
         : html`${editOnly ? html`<div class="notice small">Kanalın kargo sistemi dışında (kendi kargo anlaşmanızla) gönderdiğiniz paketler içindir.</div>` : ''}
