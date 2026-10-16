@@ -4,6 +4,7 @@ import { api, locked, html, render, $, $$, money, money0, n, ch, chLogo, chBadge
 import { costBtn } from '../costedit.js';
 import { viewOnly } from '../perms.js';
 import { setQuery } from '../app.js';
+import { customBox, customSpan, bindCustom } from '../daterange.js';
 
 const D = 864e5;
 const startOfMonth = (k = 0) => { const d = new Date(Date.now() + 3 * 3600e3); d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0); d.setUTCMonth(d.getUTCMonth() - k); return d.getTime() - 3 * 3600e3; };
@@ -13,6 +14,7 @@ const RANGES = [
   ['30', 'Son 30 gün', () => [Date.now() - 30 * D, Date.now() + 1]],
   ['90', 'Son 90 gün', () => [Date.now() - 90 * D, Date.now() + 1]],
   ['year', 'Son 1 yıl', () => [Date.now() - 365 * D, Date.now() + 1]],
+  ['custom', 'Özel tarih', (f) => customSpan(f)],
 ];
 
 export async function financeView(el, rest, query = {}) {
@@ -40,11 +42,11 @@ export async function financeView(el, rest, query = {}) {
   </div>`);
 
   $('[data-health]', el).onclick = async () => (await import('./health.js')).healthSheet();
-  const span = () => (RANGES.find((r) => r[0] === f.range) || RANGES[0])[2]();
+  const span = () => (RANGES.find((r) => r[0] === f.range) || RANGES[0])[2](f);
   function draw() {
     const chs = activeChannels().filter((c) => c.enabled || c.demo);
     render($('[data-chs]', el), html`<button class="ch-tab ${!f.channel ? 'on' : ''}" data-act="ch" data-id=""><i class="ico ico-grid"></i>Tüm kanallar</button>${chs.map((c) => html`<button class="ch-tab ${f.channel === c.id ? 'on' : ''}" data-act="ch" data-id="${c.id}">${chLogo(c.id)}${c.name}</button>`)}`);
-    render($('[data-ranges]', el), html`${RANGES.map(([k, t]) => html`<button class="chip ${f.range === k ? 'on' : ''}" data-act="range" data-k="${k}">${t}</button>`)}`);
+    render($('[data-ranges]', el), html`${RANGES.map(([k, t]) => html`<button class="chip ${f.range === k ? 'on' : ''}" data-act="range" data-k="${k}">${t}</button>`)}${customBox(f)}`);
     $('[data-rlabel]', el).textContent = `${date(d.from)} – ${date(Math.min(d.to, Date.now()) - 1)}`;
     const t = d.total, ded = t.commission - (t.commCredit || 0) + t.shipping + t.fee + t.rateFee + t.withholding + t.ads + t.penalty + t.returnLoss, net = f.channel ? t.profit : t.net;
     render($('[data-kpis]', el), html`
@@ -334,7 +336,7 @@ export async function financeView(el, rest, query = {}) {
     e.preventDefault(); f.stlq = fm.q.value.trim(); loadStl();
   });
   async function load() {
-    store.set('finance', { range: f.range });
+    store.set('finance', { range: f.range, from: f.from, to: f.to });
     setQuery({ channel: f.channel });
     const [from, to] = span();
     const p = new URLSearchParams({ from, to });
@@ -372,6 +374,7 @@ export async function financeView(el, rest, query = {}) {
     stlsync: (t) => busy(t, async () => { const r = await api('settlements/sync', { method: 'POST' }); toast(Object.entries(r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} kayıt`}`).join(' · ') || 'Hakediş bilgisi veren kanal yok'); await load(); }),
     invsync: (t) => busy(t, async () => { const r = await api('invoices/sync', { method: 'POST' }); toast(Object.entries(r.invoices || r).map(([k, v]) => `${ch(k).name}: ${typeof v === 'string' ? v : `${v} fatura`}${r.costs && typeof r.costs[k] === 'number' ? `, ${r.costs[k]} siparişe kargo` : ''}`).join(' · ') || 'Fatura bilgisi veren kanal yok'); await load(); }),
   });
+  bindCustom(el, f, refresh);
   await refresh();
   return { refresh };
 }

@@ -188,6 +188,14 @@ test('analizler: dönem kartları, iller ve en çok satanların ortalama/min/mak
   const ty = await insights(db, { unit: 'day', range: 'today', channel: 'trendyol' });
   assert.equal(ty.cards[0].orders, 2);
   assert.equal(ty.top[0].qty, 3);
+  // Özel tarih aralığı (başlangıç ve bitiş günü dahil, Türkiye saati): eski sipariş yalnız kendi aralığında görünür
+  const ymd = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10);
+  await saveOrders(db, 'trendyol', [{ ...o('e', 'trendyol', 'Bursa', 50, 5), orderedAt: now - 40 * 864e5, items: [{ lineId: 'el', sku: 'S2', name: 'Vana', quantity: 5, unitPrice: 50, total: 250 }] }]);
+  const old = await insights(db, { unit: 'day', range: 'custom', from: ymd(now - 41 * 864e5), to: ymd(now - 40 * 864e5) });
+  assert.deepEqual(old.top.map((x) => [x.name, x.qty]), [['Vana', 5]]);
+  assert.deepEqual(old.cities.map((c) => c.city), ['BURSA']);
+  const cur = await insights(db, { unit: 'day', range: 'custom', from: ymd(now - 7 * 864e5), to: ymd(now) });
+  assert.deepEqual(cur.top.map((x) => x.name), ['Pompa']);
 });
 
 test('bekleyen kanal (N11): bilgi girilip bağlantı testi başarılı olana kadar gizli; sonra devreye girer', async () => {
