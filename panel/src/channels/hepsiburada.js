@@ -825,7 +825,7 @@ export function hepsiburada(env, meta) {
   // (en çok 25 sipariş / senkron). Paid / WillBePaid dışında durumdaki (ör. henüz ödemeye bağlanmamış) kayıt böylece görünür;
   // iptal / ret durumundakiler alınmaz. Bulunanlar outOfFilter ile işaretlenir (senkron günlüğe yazar: filtre gözden geçirilsin).
   const STL_LOOKUP = 25;
-  async function settlements(since, until) {
+  async function settlements(since, until, opts = {}) {
     const W = 28 * 864e5, d = (ms) => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10), out = new Map();
     for (let from = since; from < until; from += W) {
       const to = Math.min(until, from + W);
@@ -841,7 +841,10 @@ export function hepsiburada(env, meta) {
       if (r.type === 'Satış' && r.amount > 0) sale.set(r.orderNumber, Math.min(sale.get(r.orderNumber) ?? Infinity, r.date || Infinity));
       if (r.type === 'Komisyon') comm.add(r.orderNumber);
     }
-    const look = [...sale].filter(([no]) => !comm.has(no)).sort((a, b) => a[1] - b[1]).slice(0, STL_LOOKUP);
+    // Komisyon kaydı daha önce (filtre dışından) bulunmuş siparişler yeniden aranmaz: her senkron aynı 25 siparişi okumasın, sıradakilere geçilsin
+    const cand = [...sale].filter(([no]) => !comm.has(no));
+    const known = opts.hasCommission && cand.length ? await opts.hasCommission(cand.map(([no]) => no)).catch(() => new Set()) : new Set();
+    const look = cand.filter(([no]) => !known.has(no)).sort((a, b) => a[1] - b[1]).slice(0, STL_LOOKUP);
     for (const [no] of look) {
       try {
         const rows = list(await call(`${FIN}/transactions/merchantid/${m}?Offset=0&Limit=100&OrderNumber=${encodeURIComponent(no)}`));

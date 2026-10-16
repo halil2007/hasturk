@@ -151,6 +151,13 @@ test('fiyat farkı (%): yayınla ekranında girilir, ilk gönderimde site fiyat�
     const it = sends(calls)[0].body.items[0];
     assert.equal(it.salePrice, 110); assert.equal(it.listPrice, 143);
     assert.equal((await call(`catalog/preflight?ids=${ids[0]}&channels=trendyol`)).channels[0].markup, 10, 'kanal için hatırlanır');
+    // "%10" yazımı okunur; boş bırakılınca kayıtlı fark kaldırılır (önizleme ile gönderilen fiyat aynı); geçersiz değer hata
+    const { markupPct, cleanMarkup } = await import('../src/catalog.js');
+    assert.deepEqual([markupPct('%10'), markupPct('10,5'), markupPct(''), cleanMarkup(' %12 '), cleanMarkup('')], [10, 10.5, 0, '12', '']);
+    assert.throws(() => cleanMarkup('on'), /sayı olmalı/);
+    assert.throws(() => cleanMarkup('500'), /-50 ile 300/);
+    await call('catalog/publish', { method: 'POST', body: { ids: [ids[0]], channels: ['trendyol'], opts: { trendyol: { cargoCompanyId: '17', markup: '' } } } });
+    assert.equal((await call(`catalog/preflight?ids=${ids[0]}&channels=trendyol`)).channels[0].markup, 0, 'temizlenen fark kaldırıldı');
   } finally { done(); }
 });
 
@@ -244,4 +251,23 @@ test('siteler: WooCommerce varyantlı ürün, Shopify seçenekli ürün (liste f
     assert.deepEqual([v[0].price, v[0].compareAtPrice, v[0].inventoryItem.measurement.weight.value, v[1].compareAtPrice], ['10', '12', 5, undefined]);
     assert.deepEqual(s.map((x) => [x.pid, x.remoteId]), [[1, '91'], [2, '92']]);
   } finally { globalThis.fetch = realFetch; }
+});
+
+test('sistemin eşleştirdiği kategori ("Otomatik (kesin)") elle yayınlamada da onay ister; onaylanınca gönderilir ve onaylayan yazılır', async () => {
+  const { db, ids, calls, call } = await setup();
+  try {
+    await run(db, "INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES ('Gübre', 'trendyol', '2001', 'Organik Gübre', ?, 0, 'Otomatik (kesin)')", JSON.stringify({ 47: { value: '@variant' }, 1192: { id: '10617', value: 'TR' }, 60: { id: '6001', value: 'Kahverengi' } }));
+    const pf = await call(`catalog/preflight?ids=${ids[0]}&channels=trendyol`);
+    const cat = pf.channels[0].cats[0];
+    assert.deepEqual([cat.state, cat.remote_id, cat.sure], ['suggested', '2001', true]);
+    assert.ok(pf.channels[0].items.every((x) => x.missing.includes('Kategori onayı')));
+    let pub = await call('catalog/publish', { method: 'POST', body: { ids, channels: ['trendyol'], opts: { trendyol: { cargoCompanyId: '17' } } } });
+    assert.ok(!(pub.results.trendyol || {}).sent, 'onaysız gönderilmez');
+    assert.equal(sends(calls).length, 0);
+    pub = await call('catalog/publish', { method: 'POST', body: { ids, channels: ['trendyol'], approve: { trendyol: { category: '2001', name: 'Organik Gübre' } }, opts: { trendyol: { cargoCompanyId: '17' } } } });
+    assert.equal(pub.results.trendyol.sent, 2);
+    const m = await first(db, "SELECT user, attrs FROM category_map WHERE local = 'Gübre' AND channel = 'trendyol'");
+    assert.ok(!/^Otomatik/.test(m.user), m.user);
+    assert.match(m.attrs, /6001/, 'sistemin özellik değerleri korunur');
+  } finally { done(); }
 });

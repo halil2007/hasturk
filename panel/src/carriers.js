@@ -12,7 +12,7 @@
 //   label(pkg)                      → etiketi sonradan veren firmalarda (Kargonomi, Navlungo, DHL, Sürat) etiket
 // Firma bağlantıları src/carriers/<firma>.js'te. "ready: false": bağlantı henüz yok; bilgiler kaydedilebilir, gönderi açıklamayla reddedilir.
 import { loadConfig, describe } from './config.js';
-import { getRaw, setSetting, all, run, first } from './db.js';
+import { getRaw, setSetting, all, run, first, notify } from './db.js';
 import { HttpError, str, pool } from './util.js';
 import * as kargonomi from './carriers/kargonomi.js';
 import * as navlungo from './carriers/navlungo.js';
@@ -193,10 +193,10 @@ export const grossCost = (r) => (r.cost == null ? null : Math.round(Number(r.cos
 const TRACK_EVERY = 2 * 3600e3;
 export async function trackCarriers(env, db, { limit = 40, force = false } = {}) {
   const t = Date.now();
-  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.tracking, p.barcode, p.tracking_url, p.carrier_provider, p.carrier_ref, p.carrier_cost, p.carrier_state, p.desi,
+  const rows = await all(db, `SELECT p.id, p.order_id, p.no, p.status, p.tracking, p.barcode, p.tracking_url, p.cargo_company, p.carrier_provider, p.carrier_ref, p.carrier_cost, p.carrier_state, p.desi,
       o.status AS order_status, o.shipping_src FROM packages p JOIN orders o ON o.id = p.order_id
     WHERE p.carrier_provider IS NOT NULL AND p.carrier_provider != 'demo' AND p.carrier_ref IS NOT NULL
-      AND COALESCE(p.carrier_state, '') NOT IN ('delivered', 'cancelled') AND o.status NOT IN ('cancelled', 'returned', 'delivered')
+      AND COALESCE(p.carrier_state, '') NOT IN ('delivered', 'cancelled', 'failed') AND o.status NOT IN ('cancelled', 'returned', 'delivered')
       AND COALESCE(p.label_at, p.created_at, 0) >= ? AND (? OR COALESCE(p.carrier_checked_at, 0) < ?)
     ORDER BY COALESCE(p.carrier_checked_at, 0) LIMIT ?`, t - 30 * 86400e3, force ? 1 : 0, t - TRACK_EVERY, limit);
   if (!rows.length) return { checked: 0 };
@@ -212,10 +212,23 @@ export async function trackCarriers(env, db, { limit = 40, force = false } = {})
       // Firmanın kendi takip numarası geldiyse (ön kabul → şube kabulü) pakete yazılır
       if (tn && tn !== p.tracking) { out.updated++; await run(db, 'UPDATE packages SET tracking = ?, tracking_url = COALESCE(NULLIF(?, \'\'), tracking_url) WHERE id = ?', tn, str(r.trackingUrl), p.id); }
       else if (r.trackingUrl && !p.tracking_url) await run(db, 'UPDATE packages SET tracking_url = ? WHERE id = ?', str(r.trackingUrl), p.id);
-      if (r.cost != null && p.carrier_cost == null) {
-        const cost = grossCost(r);
+      // Kargo firması adı (gönderi açılırken okunamadıysa entegratör adı yazılmıştı): "Kargoya ver" pazaryerine doğru firmayı bildirsin
+      const cn = str(r.carrier);
+      if (cn && cn !== c.name && (!p.cargo_company || p.cargo_company === c.name)) await run(db, 'UPDATE packages SET cargo_company = ? WHERE id = ?', cn, p.id);
+      // Ücret: ilk gelen yazılır; firma sonradan gerçek ücreti verirse (costFinal) tahmini ücretin yerine geçer, sipariş kargo gideri farkla düzeltilir
+      const cost = r.cost != null ? grossCost(r) : null;
+      if (cost != null && (p.carrier_cost == null || (r.costFinal && Math.abs(cost - Number(p.carrier_cost)) >= 0.01))) {
+        const delta = Math.round((cost - (Number(p.carrier_cost) || 0)) * 100) / 100;
         await run(db, 'UPDATE packages SET carrier_cost = ? WHERE id = ?', cost, p.id);
-        if (p.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", cost, p.order_id);
+        if (p.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) + ?), shipping_src = 'carrier' WHERE id = ?", delta, p.order_id);
+      }
+      // Firma gönderiyi oluşturamadı (onaydan sonra gelir): pakete hata yazılır, tahmini ücret geri alınır, bildirim gider
+      if (r.state === 'failed' && p.carrier_state !== 'failed') {
+        const msg = `${c.name}: kargo firması gönderiyi oluşturamadı${r.text ? ` (${str(r.text)})` : ''}. Gönderiyi iptal edip yeniden oluşturun.`;
+        await run(db, 'UPDATE packages SET error = ?, carrier_cost = NULL WHERE id = ?', msg.slice(0, 300), p.id);
+        const was = cost != null ? cost : Number(p.carrier_cost) || 0;
+        if (was && p.shipping_src === 'carrier') await run(db, 'UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) - ?) WHERE id = ?', was, p.order_id);
+        await notify(db, `carrier:failed:${p.id}`, { level: 'error', title: `Paket ${p.no}: ${c.name} gönderisi oluşturulamadı`, msg: msg + ` Sipariş: ${p.order_id}` });
       }
       await run(db, 'UPDATE packages SET carrier_checked_at = ?, carrier_state = COALESCE(?, carrier_state), carrier_status = COALESCE(NULLIF(?, \'\'), carrier_status) WHERE id = ?', t, r.state || null, str(r.text).slice(0, 200), p.id);
       if (r.state && r.state !== p.carrier_state && ['delivered', 'returned'].includes(r.state)) {

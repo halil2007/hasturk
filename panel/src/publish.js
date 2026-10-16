@@ -11,6 +11,7 @@
 import { all, first, run, allIn, getRaw, setSetting, getSettings, log } from './db.js';
 import { getChannels } from './channels/index.js';
 import { fail, str, num, brandKey } from './util.js';
+import { markupPct, cleanMarkup, AUTO_MAP_SQL } from './catalog.js';
 import { exclusive } from './locks.js';
 import { rank } from './catmatch.js';
 import { shape, picker, groupCode, namesOf, confident, autoAttrs, checkUpload, markSent, productsFor, originOf, withOrigin, staleCheck, clearSuggest, STALE_MSG, variantAxes } from './catalog.js';
@@ -91,7 +92,7 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
     const optMissing = (o) => need.filter(([k]) => str(o[k]) === '').map(([, label]) => label);
     row.options = need.map(([k, label, own]) => ({ k, label, value: str(dOpts[k]), need: prods.some((p) => str(optsFor(p)[k]) === ''), own: !!own }));
     // Pazaryeri fiyat farkı (%): site fiyatının üstüne eklenir, yalnız ilk gönderimde (Ürün yükle → Kanal ayarları ile aynı ayar)
-    if (kind === 'market') row.markup = num(dOpts.markup);
+    if (kind === 'market') row.markup = markupPct(dOpts.markup);
 
     if (kind === 'store') {
       const groups = new Map();
@@ -141,9 +142,15 @@ async function plan(env, db, { ids, channels, draft = {}, build = false }) {
       const local = str(p.category), own = ((saved[p.id] || {})[c.id] || {})['@category'];
       const key = local && !own ? 'l:' + local : 'p:' + p.id;
       const d = (appr.cats || {})[key] || (appr.category ? { id: appr.category, name: appr.name } : null);
-      if (d && str(d.id)) return { key, local, remote_id: str(d.id), name: str(d.name), state: 'mapped', draft: true, product: !local || !!own || maps.has(local) };
+      if (d && str(d.id)) {
+        // Sistemin eşleştirdiği kategori aynen onaylanıyor: onun özellik değerleri kullanılır
+        const am = local && !own && maps.get(local), same = am && /^Otomatik/.test(str(am.user)) && String(am.remote_id) === str(d.id);
+        return { key, local, remote_id: str(d.id), name: str(d.name), state: 'mapped', draft: true, product: !local || !!own || (maps.has(local) && !same), ...(same ? { attrs: am.attrs } : {}) };
+      }
       if (own && own.id) return { key, local, remote_id: own.id, name: own.value, state: 'mapped', product: true };
       const m = local && maps.get(local);
+      // Sistemin kendi onayladığı eşleşme ("Otomatik (kesin)"): elle gönderimde de kişinin onayı istenir (öneri olarak gelir)
+      if (m && /^Otomatik/.test(str(m.user))) return { key, local, remote_id: m.remote_id, name: m.remote_name, path: '', state: 'suggested', sure: true, auto: true, alts: [] };
       if (m) {
         if (!staleOf) staleOf = await staleCheck(c);
         return { key, local, remote_id: m.remote_id, name: m.remote_name, state: 'mapped', attrs: m.attrs, ...(staleOf(m.remote_id) ? { stale: true } : {}) };
@@ -276,7 +283,12 @@ async function saveDraft(env, db, ids, b, user) {
     if (!c || !o || typeof o !== 'object') continue;
     const keys = new Set([...((c.catalog && c.catalog.options) || []).map((x) => x.k), ...(NEED[c.type] || []).map(([k]) => k), 'markup']);
     const cur = { ...(allOpts[cid] || {}) };
-    for (const [k, v] of Object.entries(o)) if (keys.has(k) && str(v) !== '') { cur[k] = str(v); optsChanged = true; }
+    for (const [k, v] of Object.entries(o)) {
+      if (!keys.has(k)) continue;
+      // Fiyat farkı: boş bırakılınca kayıtlı fark kaldırılır (önizlemedeki 0 ile gönderilen fiyat aynı olsun); geçersizse hata
+      if (k === 'markup') { const m = cleanMarkup(v); if (m === '') { if ('markup' in cur) { delete cur.markup; optsChanged = true; } } else { cur.markup = m; optsChanged = true; } continue; }
+      if (str(v) !== '') { cur[k] = str(v); optsChanged = true; }
+    }
     allOpts[cid] = cur;
   }
   if (optsChanged) await setSetting(db, 'upload_opts', allOpts);
@@ -285,7 +297,8 @@ async function saveDraft(env, db, ids, b, user) {
     // Kategori onayı: ikas kategorisi henüz eşleşmemişse kategori eşleştirmesi (aynı kategorideki diğer ürünler de kullanır), yoksa ürüne özel
     const appr = (b.approve || {})[c.id];
     if (appr) {
-      const maps = new Set((await all(db, 'SELECT local FROM category_map WHERE channel = ?', c.id)).map((r) => r.local));
+      const maps = new Set((await all(db, `SELECT local FROM category_map WHERE channel = ? AND ${AUTO_MAP_SQL}`, c.id)).map((r) => r.local));
+      const autoMaps = new Map((await all(db, `SELECT local, remote_id FROM category_map WHERE channel = ? AND NOT (${AUTO_MAP_SQL})`, c.id)).map((r) => [r.local, String(r.remote_id)]));
       const doneLocal = new Set();
       for (const p of prods) {
         const local = str(p.category), own = ((saved[p.id] || {})[c.id] || {})['@category'];
@@ -295,6 +308,12 @@ async function saveDraft(env, db, ids, b, user) {
         if (local && !own && !maps.has(local)) {
           if (doneLocal.has(local)) continue;
           doneLocal.add(local);
+          // Sistemin eşleştirdiği kategori aynen onaylandı: yalnız onaylayan yazılır (özellikleri korunur)
+          if (autoMaps.get(local) === str(d.id)) {
+            await run(db, 'UPDATE category_map SET user = ?, updated_at = ? WHERE local = ? AND channel = ?', user.name, t, local, c.id);
+            await log(db, c.id, 'info', `${user.name}: sistemin eşleştirdiği kategori onaylandı (${local} → ${str(d.name)})`);
+            continue;
+          }
           const { attrs } = await autoAttrs(c, str(d.id), { origin: originOf(await getSettings(db)) }).catch(() => ({ attrs: {} }));
           await run(db, `INSERT INTO category_map (local, channel, remote_id, remote_name, attrs, updated_at, user) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (local, channel) DO UPDATE SET remote_id = excluded.remote_id, remote_name = excluded.remote_name, attrs = excluded.attrs, updated_at = excluded.updated_at, user = excluded.user`,

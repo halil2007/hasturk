@@ -63,7 +63,7 @@ export async function shipCheck(db, { force = false, now = Date.now() } = {}) {
   const products = await all(db, `SELECT ${cols} FROM products WHERE ship_cost > 0`);
   const have = new Set(products.map((p) => p.id)), empty = [...samples.keys()].filter((id) => !have.has(id));
   if (empty.length) products.push(...await allIn(db, empty, (ph, part) => [`SELECT ${cols} FROM products WHERE id IN (${ph}) AND COALESCE(ship_cost, 0) <= 0`, part]));
-  const out = { filled: 0, updated: 0, lower: 0, higher: 0, notified: 0 }, due = [], st = [];
+  const out = { filled: 0, updated: 0, lower: 0, higher: 0, notified: 0 }, due = [], st = [], done = [];
   const nameOf = (p) => [p.name, p.variant_name].filter(Boolean).join(' · ');
   for (const p of products) {
     const e = evaluateShip(p, samples.get(p.id));
@@ -74,8 +74,7 @@ export async function shipCheck(db, { force = false, now = Date.now() } = {}) {
       st.push(db.prepare(`UPDATE products SET ship_cost = ?, ship_src = 'channel', ship_set_at = ?, ship_auto = ?, ship_warn = NULL, updated_at = ? WHERE id = ? AND COALESCE(ship_cost, 0) = ?`)
         .bind(e.median, now, JSON.stringify(auto), now, p.id, Number(p.ship_cost) || 0));
       if (e.action === 'fill') out.filled++; else out.updated++;
-      await log(db, null, 'info', e.action === 'fill' ? `${nameOf(p)}: kargo tutarı pazaryerinden gelen kargo bilgisiyle yazıldı: ${tl(e.median)} (son ${e.n} gönderinin ortancası)`
-        : `${nameOf(p)}: kargo tutarı pazaryerinden gelen kargo bilgisine göre güncellendi: ${tl(e.entered)} → ${tl(e.median)} (son ${e.n} gönderinin ortancası)`);
+      done.push(e.action === 'fill' ? `${nameOf(p)}: ${tl(e.median)}` : `${nameOf(p)}: ${tl(e.entered)} → ${tl(e.median)}`);
     } else if (e.action === 'lower' || e.action === 'higher') {
       out[e.action]++;
       const w = warn && warn.dir === e.action ? warn : { first_at: now, notified_at: null, count: 0 };
@@ -86,6 +85,8 @@ export async function shipCheck(db, { force = false, now = Date.now() } = {}) {
     } else if (warn) st.push(db.prepare('UPDATE products SET ship_warn = NULL WHERE id = ?').bind(p.id));
   }
   for (let i = 0; i < st.length; i += 90) await db.batch(st.slice(i, i + 90));
+  // Tek özet günlük kaydı (ürün başına ayrı kayıt senkronu yavaşlatmasın)
+  if (done.length) await log(db, null, 'info', `Kargo tutarı pazaryerinden gelen kargo bilgisiyle ${out.filled ? `${out.filled} üründe yazıldı` : ''}${out.filled && out.updated ? ', ' : ''}${out.updated ? `${out.updated} üründe güncellendi` : ''} (son gönderilerin ortancası): ${done.slice(0, 20).join(' · ')}${done.length > 20 ? ` ve ${done.length - 20} ürün daha` : ''}`);
   if (due.length) {
     out.notified = due.length;
     await notify(db, 'shipcost:diff', { level: 'warn', title: `${due.length} üründe girdiğiniz kargo tutarı pazaryerinden gelen tutardan farklı`,

@@ -53,9 +53,20 @@ const TR_ASCII = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' };
 export const slug = (s) => String(s || '').toLocaleLowerCase('tr').replace(/[çğıöşü]/g, (c) => TR_ASCII[c]).normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
   .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').toUpperCase().slice(0, 40);
 export const groupCode = (p) => str(p.model_code).trim() || str(p.parent_key).split(':').pop() || slug(p.group_name) || str(p.sku);
+// Fiyat farkı (%): "%10", "10,5", " 10 " gibi yazımlar okunur; eski kayıtlardaki "%10" de doğru uygulanır
+export const markupPct = (v) => { const x = Number(String(v ?? '').replace(/[%\s]/g, '').replace(',', '.')); return Number.isFinite(x) ? x : 0; };
+// Kaydederken: boş = kaldır (''), sayı değilse ya da -50…300 dışındaysa açıklamalı hata
+export function cleanMarkup(v) {
+  const s = String(v ?? '').replace(/[%\s]/g, '').replace(',', '.');
+  if (!s) return '';
+  const x = Number(s);
+  if (!Number.isFinite(x)) fail(400, `Fiyat farkı sayı olmalı (ör. 10); yazılan: “${String(v).slice(0, 20)}”`);
+  if (x < -50 || x > 300) fail(400, 'Fiyat farkı -50 ile 300 arasında olmalı (yüzde)');
+  return String(Math.round(x * 100) / 100);
+}
 export function shape(p, opts, zeroStock) {
   const base = p.cat_price > 0 ? p.cat_price : p.sale_price;
-  const k = 1 + num(opts.markup) / 100;
+  const k = 1 + markupPct(opts.markup) / 100;
   // Kanal görselinin küçük boyutu büyüğüyle değiştirilir (panelde barındırılan fotoğrafın adresine dokunulmaz: /img/<firma>/<kimlik>.jpg)
   const big = (u) => (/\/img\/[^/]+\/[a-f0-9]{32}\.\w+$/.test(str(u)) ? str(u) : str(u).replace(/\/(180|360)\//, '/1080/'));
   // Ürünün liste (üstü çizili) fiyatı: satış fiyatından düşükse kullanılmaz
@@ -422,7 +433,10 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
   if (path === 'catalog/options' && m === 'POST') {
     const c = await target(env, db, str(b.channel));
     const o = {};
-    for (const x of [...(c.catalog.options || []), { k: 'markup' }]) if (b.opts && str(b.opts[x.k]) !== '') o[x.k] = str(b.opts[x.k]);
+    for (const x of [...(c.catalog.options || []), { k: 'markup' }]) {
+      const v = x.k === 'markup' ? cleanMarkup(b.opts && b.opts.markup) : str(b.opts && b.opts[x.k]);
+      if (b.opts && v !== '') o[x.k] = v;
+    }
     await setSetting(db, 'upload_opts', { ...allOpts, [c.id]: o });
     return { ok: true };
   }

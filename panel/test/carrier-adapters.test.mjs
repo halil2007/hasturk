@@ -114,6 +114,30 @@ test('Kargonomi: firma adına göre teklif içinden seçilir (eski firma numaras
   } finally { restore(); }
 });
 
+test('Kargonomi: firma onayının yanıtı alınamadı (5xx) ama gönderi işlenmiş: iptal edilir (ücretli, kayıtsız gönderi kalmaz); taslaksa silinir', async () => {
+  let status = 'ready';
+  const calls = mock([
+    [/GET .*\/states$/, () => ({ data: [{ id: 34, name: 'İSTANBUL' }] })],
+    [/GET .*\/cities\/34$/, () => ({ data: [{ id: 830, name: 'KADIKÖY' }] })],
+    [/GET .*\/warehouses$/, () => ({ data: [{ id: 5, is_main: true }] })],
+    [/POST .*\/shipments$/, () => ({ data: { id: 91, status: 'draft' } })],
+    [/POST .*\/confirm-shipping-price$/, () => [502, { message: 'Bad gateway' }]],
+    [/GET .*\/shipments\/91$/, () => ({ data: { id: 91, status } })],
+    [/POST .*\/shipments\/cancel$/, () => ({ message: 'ok' })],
+    [/DELETE .*\/shipments\/91$/, () => [204, '']],
+  ]);
+  try {
+    const a = kargonomi.make({ KARGONOMI_API_KEY: 't' });
+    await assert.rejects(a.create(ship()));
+    assert.ok(calls.some((c) => c.method === 'POST' && /shipments\/cancel$/.test(c.url)), 'işlenmiş gönderi iptal');
+    status = 'draft';
+    const n0 = calls.length;
+    await assert.rejects(a.create(ship()));
+    const rest = calls.slice(n0);
+    assert.ok(rest.some((c) => c.method === 'DELETE') && !rest.some((c) => /shipments\/cancel$/.test(c.url)), 'taslak silinir');
+  } finally { restore(); }
+});
+
 test('Navlungo: token → gönderi (adres no, telefon biçimi) → takip no ve etiket hazır olunca alınır; aynı referans tekrarında mevcut gönderi kullanılır', async () => {
   let n = 0;
   const calls = mock([

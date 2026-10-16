@@ -18,7 +18,8 @@ const label = (x) => str(x && (x.name || x.title || x.state_name || x.city_name)
 const STATES = {
   draft: 'created', ready: 'created', webservice_order_creating: 'created', webservice_order_created: 'created', webservice_checking_shipment: 'created',
   webservice_shipment_started: 'transit', webservice_shipment_not_delivered: 'transit', webservice_shipment_delivered: 'delivered',
-  webservice_shipment_returning: 'returned', webservice_shipment_missing: 'transit', cancelled: 'cancelled', request_for_cancellation: 'cancelled',
+  // İptal talebi kesin iptal değildir (Kargonomi 36 saate kadar işler, reddedebilir): takip sürer
+  webservice_shipment_returning: 'returned', webservice_shipment_missing: 'transit', cancelled: 'cancelled', request_for_cancellation: 'cancelling',
   webservice_order_failed: 'failed',
 };
 
@@ -64,7 +65,8 @@ export function make(values) {
     return {
       ref: str(s.id), tracking, barcode: str(s.shipping_webservice_barcode) || tracking, carrier: carrier || 'Kargonomi',
       // DOĞRULA: real_price / estimated_price KDV hariç kabul edildi (Kargonomi fiyat listeleri KDV hariç)
-      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costVatIncluded: false,
+      // costFinal: gerçek ücret (real_price) geldi; tahmini ücretin yerine geçer (bkz. carriers.js trackCarriers)
+      trackingUrl: tracking ? trackUrl(s.shipping_provider_slug, tracking) : '', cost: money(s.real_price) ?? money(s.estimated_price), costFinal: money(s.real_price) != null, costVatIncluded: false,
       state: STATES[s.status] || null, text: str(s.status_label),
     };
   };
@@ -99,7 +101,11 @@ export function make(values) {
       try {
         await req('POST', '/confirm-shipping-price', { shipment_id: draft.id, shipping_provider_id: await providerId(draft.id) });
       } catch (e) {
-        await req('DELETE', `/shipments/${draft.id}`).catch(() => null); // seçilemeyen taslak kalmasın
+        // Onay yanıtı alınamadı ama Kargonomi işlemiş olabilir (zaman aşımı / 5xx): gönderi taslak değilse iptal edilir, taslaksa silinir.
+        // Durumu okunamazsa ikisi de denenir: ücretli ve panelde kaydı olmayan gönderi kalmasın
+        const now = unwrap(await req('GET', `/shipments/${draft.id}`).catch(() => null)) || {};
+        const drop = () => req('DELETE', `/shipments/${draft.id}`);
+        await (now.status === 'draft' ? drop() : req('POST', '/shipments/cancel', { shipment_id: draft.id }).catch(drop)).catch(() => null);
         throw e;
       }
       // Fiyat onayından sonraki hata: gönderi panele yazılmaz (takipsiz taslak / gönderi kalmasın) → iptal edilir, olmazsa silinir (en iyi çaba)

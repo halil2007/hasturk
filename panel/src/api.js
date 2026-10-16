@@ -1,5 +1,5 @@
 // Panel API'si (/api/*). Tüm adresler girişten sonra çalışır.
-import { all, first, run, allIn, getSettings, setSetting, getRaw, log, DEFAULT_SETTINGS } from './db.js';
+import { all, first, run, allIn, getSettings, setSetting, getRaw, log, resolve, DEFAULT_SETTINGS } from './db.js';
 import { getChannels, channel, publicInfo, resetChannels, CHANNEL_IDS, GATED, isChannelId } from './channels/index.js';
 import { loadConfig, saveConfig, describe, addStore, removeStore, typeOf, isExtra, fieldsFor, releasedTypes, BETA_TYPES, TYPE_NAMES, DEV_TYPES, isIntl } from './config.js';
 import { syncAll, importListings, applyStock, applyDirtyStock, pushStocks, pushPrices, autoLink, relinkItems, purgeDemo, DESIRED, HELD_SQL, REAL_ERR_SQL, CH_SIDE_SQL, catalogOf, saveOrders, fillProductInfo, syncCosts, mergeCategories } from './sync.js';
@@ -489,16 +489,24 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (!pkg.carrier_provider) fail(400, 'Bu pakette entegratör gönderisi yok');
     if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş paketin gönderisi panelden iptal edilemez; entegratör panelinden yapın');
     const c = await carrierFor(env, db, pkg.carrier_provider);
-    if (pkg.carrier_ref) await c.api.cancel(pkg.carrier_ref);
-    // ikas'ta açılmış entegratör paketi de geri alınır (ürünler yeniden paketlenebilir)
-    if (ch && ch.enabled && ch.caps && ch.caps.ownCarrier && pkg.remote_id && ch.cancelPackage) {
-      await ch.cancelPackage(o, pkg);
-      await run(db, 'UPDATE packages SET remote_id = NULL, remote_status = NULL WHERE id = ?', pkg.id);
-    }
+    // Firmada zaten iptal / oluşturulamamış gönderi: firmanın iptal hatası paketi kilitlemez
+    if (pkg.carrier_ref) await c.api.cancel(pkg.carrier_ref).catch((e) => { if (!['cancelled', 'failed'].includes(pkg.carrier_state)) throw e; });
+    // Firma iptali tamam: paketin gönderi bilgisi hemen temizlenir (kanal tarafındaki adım hata verse de yeniden iptal / yeni gönderi açılabilsin)
     if (pkg.carrier_cost && o.shipping_src === 'carrier') await run(db, 'UPDATE orders SET shipping_cost = MAX(0, COALESCE(shipping_cost, 0) - ?) WHERE id = ?', pkg.carrier_cost, o.id);
     await run(db, "UPDATE packages SET carrier_provider = NULL, carrier_ref = NULL, carrier_cost = NULL, carrier_state = NULL, carrier_status = NULL, carrier_checked_at = NULL, tracking = '', barcode = '', cargo_company = '', tracking_url = NULL, agreement = NULL, error = NULL WHERE id = ?", pkg.id);
     await clearLabel(db, pkg.id);
+    await resolve(db, `carrier:failed:${pkg.id}`);
     await event(db, o, 'carrier-cancel', user, `Paket ${pkg.no}: ${c.name}`);
+    // ikas'ta açılmış entegratör paketi de geri alınır (ürünler yeniden paketlenebilir); olmazsa pakete hata yazılır
+    if (ch && ch.enabled && ch.caps && ch.caps.ownCarrier && pkg.remote_id && ch.cancelPackage) {
+      try {
+        await ch.cancelPackage(o, pkg);
+        await run(db, 'UPDATE packages SET remote_id = NULL, remote_status = NULL WHERE id = ?', pkg.id);
+      } catch (e) {
+        await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${c.name} gönderisi iptal edildi ama ${ch.name} paketi geri alınamadı: ${e.message}`.slice(0, 300), pkg.id);
+        return { ok: true, message: `Paket ${pkg.no}: ${c.name} gönderisi iptal edildi; ${ch.name} paketi geri alınamadı (${e.message}). ${ch.name} panelinden kontrol edin.` };
+      }
+    }
     return { ok: true, message: `Paket ${pkg.no}: ${c.name} gönderisi iptal edildi` };
   }
   if (action === 'tracking') {
@@ -665,6 +673,8 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false, env = null
 // Firmadan etiket (ve henüz yoksa takip numarası): etiketi gönderiden sonra hazırlayan firmalar için.
 // Firma etiketi hiç vermiyorsa (PTT, Sürat ön kabul) null döner: panel etiketi firmanın barkoduyla basılır.
 async function carrierLabel(env, db, pkg) {
+  // Firma gönderiyi oluşturamadı: etiket beklenmez, kullanıcı iptal edip yeniden oluşturur
+  if (pkg.carrier_state === 'failed') return { error: pkg.error || 'Kargo firması gönderiyi oluşturamadı; gönderiyi iptal edip yeniden oluşturun.' };
   if (!pkg.carrier_ref) return null;
   const c = await carrierFor(env, db, pkg.carrier_provider);
   let t = null;
@@ -1051,7 +1061,8 @@ async function saveSettings(db, b) {
     }
     if (k === 'label_size') v = ['100x150', 'a5', 'a4'].includes(v) ? v : '100x150';
     if (k === 'stock_push' || k === 'auto_upload') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, !!x]));
-    if (k === 'auto_upload_cats') v = Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, [...new Set((Array.isArray(x) ? x : []).map((l) => str(l).slice(0, 200)))].slice(0, 2000)]));
+    // Kanal bazında birleştirilir: istekte olmayan kanalın seçimi korunur (iki sekme / iki yönetici birbirinin seçimini ezmesin)
+    if (k === 'auto_upload_cats') v = { ...(cur.auto_upload_cats || {}), ...Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([c]) => isChannelId(c)).map(([c, x]) => [c, [...new Set((Array.isArray(x) ? x : []).map((l) => str(l).slice(0, 200)))].slice(0, 2000)])) };
     if (k === 'hold_channels') v = [...new Set((Array.isArray(v) ? v : []).filter((c) => isChannelId(c)))];
     if (k === 'mail_enabled' || k === 'daily_digest') v = !!v;
     if (k === 'mail_to') {

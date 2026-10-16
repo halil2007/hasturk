@@ -15,8 +15,7 @@ export async function uploadView(el) {
   const autoable = () => st.categories.filter((k) => { const m = mapOf(k.local); return m && !m.auto; }).map((k) => k.local);
   const autoAll = () => { const a = autoable(); return a.length > 0 && a.every((l) => C().autoCats.includes(l)); };
   async function saveCats(list) {
-    const cur = (state.settings && state.settings.auto_upload_cats) || {};
-    state.settings = await api('settings', { method: 'PUT', body: { auto_upload_cats: { ...cur, [chId]: list } } });
+    state.settings = await api('settings', { method: 'PUT', body: { auto_upload_cats: { [chId]: list } } });
     C().autoCats = list;
   }
 
@@ -49,7 +48,7 @@ export async function uploadView(el) {
           <span><b>Stokları ${ek(c.name, 'a')} gönder</b><br><span class="small muted">${st.stockSync ? 'Genel stok senkronu açık; stok zaten tüm kanallara gidiyor.' : `Genel stok senkronu kapalıyken bile ikas'taki stok adetleri yalnız ${ek(c.name, 'a')} gönderilir (değişen ilanlar, her senkronda).`}</span></span></label>
       </div>` : ''}
       <div class="card flush">
-        <div class="card-head" style="padding:16px 16px 0"><div style="min-width:0"><h2>Kategori eşleştirme ve gönderim</h2><div class="muted small">Sistem her kategori için uygun ${c.name} kategorisini önerir; öneri doğruysa “Onayla”, değilse “Başka kategori seç”. Onaylamadığınız kategoride eşleşme yapılmaz ve ürün gönderilmez.</div></div><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorileri için en uygun ${c.name} kategorisini önerir; siz onaylamadan eşleşmez"><i class="ico ico-bolt"></i>Kategori öner</button><button class="btn sm" data-act="review" title="Mevcut eşleştirmeleri yeni algoritmayla kontrol eder; yanlış görünenler için daha uygun kategori önerir"><i class="ico ico-check"></i>Eşleştirmeleri kontrol et</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${c.opts.markup}` : ''}</button>` : ''}</div>
+        <div class="card-head" style="padding:16px 16px 0"><div style="min-width:0"><h2>Kategori eşleştirme ve gönderim</h2><div class="muted small">Sistem her kategori için uygun ${c.name} kategorisini önerir; öneri doğruysa “Onayla”, değilse “Başka kategori seç”. Onaylamadığınız kategoride eşleşme yapılmaz ve ürün gönderilmez.</div></div><span class="spacer"></span>${isAdmin() ? html`<button class="btn sm" data-act="automap" title="Eşleştirilmemiş ikas kategorileri için en uygun ${c.name} kategorisini önerir; siz onaylamadan eşleşmez"><i class="ico ico-bolt"></i>Kategori öner</button><button class="btn sm" data-act="review" title="Mevcut eşleştirmeleri yeni algoritmayla kontrol eder; yanlış görünenler için daha uygun kategori önerir"><i class="ico ico-check"></i>Eşleştirmeleri kontrol et</button>` : ''}${isAdmin() ? html`<button class="btn sm" data-act="opts"><i class="ico ico-gear"></i>Kanal ayarları${c.opts.markup ? ` · fiyat %${String(c.opts.markup).replace(/%/g, "")}` : ''}</button>` : ''}</div>
         <div class="table-wrap"><table class="t"><thead><tr><th>ikas kategorisi</th><th class="r">Ürün</th><th class="r">${ek(c.name, 'da')}</th><th>${c.name} kategorisi</th>${autoCol() ? html`<th title="Otomatik gönderilecek kategoriler"><label class="check tiny"><input type="checkbox" data-autoall ${autoAll() ? 'checked' : ''} ${autoable().length ? '' : 'disabled'}> Otomatik</label></th>` : ''}<th></th></tr></thead><tbody>
           ${st.categories.map((k) => { const m = mapOf(k.local), open = k.n - (k.listed[chId] || 0); return html`<tr>
             <td><b>${catName(k.local)}</b></td><td class="r num">${n(k.n)}</td><td class="r num">${n(k.listed[chId] || 0)}</td>
@@ -173,7 +172,7 @@ export async function uploadView(el) {
             <td class="r num">${money(x.price)}</td><td class="r num">${x.stock}</td>
             <td>${x.missing.length ? html`<span class="tiny" style="color:var(--bad)">Eksik: ${x.missing.join(', ')}</span>` : x.sent ? html`<span class="pill warn">daha önce gönderildi</span>` : html`<span class="pill good">hazır</span>`}</td></tr>`)}
         </tbody></table></div>
-        <p class="muted tiny" style="margin:0">Fiyat: ikas satış fiyatı${c.opts.markup ? ` + %${c.opts.markup} (kanal ayarı)` : ''}. Eksikleri ürün sayfasından ya da kategori eşleştirmesinden tamamlayın.</p>
+        <p class="muted tiny" style="margin:0">Fiyat: ikas satış fiyatı${c.opts.markup ? ` + %${String(c.opts.markup).replace(/%/g, "")} (kanal ayarı)` : ''}. Eksikleri ürün sayfasından ya da kategori eşleştirmesinden tamamlayın.</p>
       </div>`);
       s.setFoot(html`<div class="row" style="width:100%"><span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-x="go" ${ready.length ? '' : 'disabled'}><i class="ico ico-upload"></i>${C() && C().test ? 'Seçilenleri TEST ortamına gönder' : 'Seçilenleri gönder'}</button></div>`);
     }
