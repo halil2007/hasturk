@@ -166,12 +166,22 @@ test('Mutabakat: gerçek fark nedeniyle işaretlenir (komisyon, satıcı kuponu,
   const r = await settlementReport({ DB: db }, db, SET, { from: now - 30 * D, to: now + 1 });
   const by = Object.fromEntries(r.diffs.map((x) => [x.order_number, x]));
   assert.equal(r.totals.checked, 5);
-  assert.deepEqual(Object.keys(by).sort(), ['C1', 'M2', 'R1', 'SC1']);
-  assert.equal(by.M2.expected, 760); assert.equal(by.M2.actual, 700); assert.equal(by.M2.diff, -60);
-  assert.match(by.M2.reason, /Komisyon farklı: pazaryeri %30, panel %24/);
+  // M2: kanal satır komisyonunu bildirmedi (panel Ayarlar'daki ortalama %24 ile tahmin ediyordu): ürün / kategori komisyonu farklı olabilir,
+  // pazaryerinin kestiği %30 esas alınır, fark sayılmaz
+  assert.deepEqual(Object.keys(by).sort(), ['C1', 'R1', 'SC1']);
   assert.match(by.SC1.reason, /Satış tutarı düşük/); assert.equal(by.SC1.diff, -38);
   assert.match(by.C1.reason, /iptal/); assert.equal(by.C1.expected, 0);
   assert.match(by.R1.reason, /İade pazaryerinin kayıtlarına henüz düşmedi/);
+  resetChannels();
+});
+
+test('Mutabakat: kanal satır komisyonunu bildirdiyse (gerçek veri) komisyon farkı yine işaretlenir', async () => {
+  const { db, now } = await reconDb([['M2', 'Satış', 700, 300]]);
+  await db.prepare("UPDATE order_items SET commission = 240 WHERE order_id = (SELECT id FROM orders WHERE order_number = 'M2')").run();
+  const r = await settlementReport({ DB: db }, db, SET, { from: now - 30 * D, to: now + 1 });
+  const m2 = r.diffs.find((x) => x.order_number === 'M2');
+  assert.ok(m2, JSON.stringify(r.diffs)); assert.equal(m2.expected, 760); assert.equal(m2.diff, -60);
+  assert.match(m2.reason, /Komisyon farklı: pazaryeri %30, panel %24/);
   resetChannels();
 });
 

@@ -205,7 +205,8 @@ export async function financeView(el, rest, query = {}) {
         </tbody></table></div>
         <div class="small" style="margin-top:6px;line-height:1.7">${e.dead ? html`<div>Sipariş iptal / tamamı iade: beklenen hakediş <b>0</b></div>` : html`
           <div>Satış <b class="num">${money(e.revenue)}</b></div>
-          <div>− Komisyon (KDV dahil${e.commissionSrc === 'estimate' ? ', tahmin' : ''}) <b class="num">${money(e.commission)}</b></div>
+          <div>− Komisyon (KDV dahil${e.commissionSrc === 'estimate' ? ', tahmin' : e.commissionSrc === 'marketplace' ? ', pazaryerinin kestiği' : ''}) <b class="num">${money(e.commission)}</b></div>
+          ${e.commissionSrc === 'marketplace' ? html`<div class="muted tiny">Bu siparişte kanal ürün komisyonunu bildirmedi; komisyon ürüne / kategoriye / kampanyaya göre değiştiği için pazaryerinin kestiği tutar esas alındı${e.estCommission != null ? ` (panelin ortalama orandan tahmini ${money(e.estCommission)})` : ''}. Fark yalnız satış, iade ve iptal tutarında aranır.</div>` : ''}
           ${e.credit ? html`<div>+ Komisyon iadesi / indirimi <b class="num">${money(e.credit)}</b></div>` : ''}
           <div>= Beklenen hakediş <b class="num">${money(e.payout)}</b></div>`}
           <div class="muted tiny">Kargo, stopaj, hizmet bedeli ve reklam ayrı kesilir; ikisinde de hesaba girmez.</div></div></div>

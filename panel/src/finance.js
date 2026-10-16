@@ -730,7 +730,7 @@ async function stlDetails(db, list, itemsOf, ctx) {
     x.detail = {
       records: recs.get(x.channel + '|' + x.order_number) || [],
       lines: (itemsOf.get(x.id) || []).map((i) => ({ name: i.name || i.sku || '—', sku: i.sku || '', qty: Number(i.quantity) || 0, returned: Number(i.returned_qty) || 0, status: i.status || '', total: r2(i.total), commission: i.commission == null ? null : r2(i.commission), counted: !c.dead && liveLine(i) })),
-      expect: { dead: !!c.dead, revenue: c.dead ? 0 : r2(p.revenue || 0), commission: c.dead ? 0 : r2(p.commission || 0), commissionSrc: p.commissionSrc || '', credit: c.cr ? r2(c.cr.counted) : 0, payout: r2(c.expected || 0) },
+      expect: { dead: !!c.dead, revenue: c.dead ? 0 : r2(p.revenue || 0), commission: c.dead ? 0 : r2(p.commission || 0), commissionSrc: p.commissionSrc || '', estCommission: c.p0 && c.p0 !== p ? r2(c.p0.commission || 0) : null, credit: c.cr ? r2(c.cr.counted) : 0, payout: r2(c.expected || 0) },
     };
   }
 }
@@ -802,13 +802,23 @@ export async function settlementReport(env, db, settings, q = {}) {
       const recs = (st.get(o.channel + '|' + o.order_number) || []).filter((r) => STL_ORDER.test(r.type || ''));
       if (!recs.length) continue; // yalnız kargo / stopaj gibi ayrı kesintiler: karşılaştırılacak hakediş yok
       const its = by.get(o.id) || [];
-      const cr = credits.get(o.id), p = orderProfit({ ...o, shipping_cost: 0, comm_credit: cr ? cr.counted : 0, items: its }, est);
+      const cr0 = credits.get(o.id), p0 = orderProfit({ ...o, shipping_cost: 0, comm_credit: cr0 ? cr0.counted : 0, items: its }, est);
       const actual = r2(recs.reduce((a, r) => a + (Number(r.amount) || 0), 0)), comm = r2(recs.reduce((a, r) => a + (Number(r.commission) || 0), 0)), sales = r2(actual + comm);
+      // Komisyon oranı ürüne / kategoriye / kampanyaya göre değişir; Ayarlar'daki oran yalnız ortalamadır. Kanal siparişte satır komisyonunu
+      // bildirmediyse (panel tahmini) pazaryerinin kestiği komisyon esas alınır: fark yalnız satış / iade / iptal tutarında aranır.
+      // Kanalın bildirdiği satır komisyonu varsa (gerçek veri) komisyon da karşılaştırılır.
+      const hasComm0 = recs.some((r) => r.type === 'Komisyon' || Math.abs(Number(r.commission) || 0) >= 0.01);
+      // Pazaryerinin bu siparişteki gerçek oranı (kesilen komisyon / satış) siparişin panel tutarına uygulanır: kupon, kısmi iade gibi
+      // satış farkları doğru tutarla (komisyonu düşülmüş) görünür
+      const byMp = p0.commissionSrc !== 'api' && hasComm0 && sales > 0;
+      const mpRate = byMp ? comm / sales : 0, mpComm = r2(p0.revenue * mpRate);
+      const cr = byMp ? null : cr0;
+      const p = byMp ? { ...p0, commission: mpComm, commissionSrc: 'marketplace', commCredit: 0, payout: r2(p0.revenue - mpComm) } : p0;
       // İptal / tamamı iade edilen siparişin hakedişi 0 olmalı (satırları ayrıca işaretlenmemiş olsa da)
       const dead = o.status === 'cancelled' || o.status === 'returned', expected = dead ? 0 : p.payout, diff = r2(actual - expected);
       // Yuvarlama payı: 1 ₺ ya da satışın binde 5'i (satır satır yuvarlanan komisyon, kuruş farkları)
       const tol = Math.max(1, 0.005 * Math.max(dead ? 0 : Math.abs(p.revenue), Math.abs(sales)));
-      ctx.set(o.id, { p, cr, expected, dead });
+      ctx.set(o.id, { p, p0, cr, expected, dead });
       const dp = disp.get(o.channel + '|' + o.order_number);
       const base = { id: o.id, channel: o.channel, order_number: o.order_number, ordered_at: o.ordered_at, status: o.status, expected: r2(expected), actual, diff, sales, commission: comm, estRevenue: dead ? 0 : p.revenue, estCommission: dead ? 0 : p.commission,
         ...(dp ? { dispute: { ...dp, changed: dp.diff != null && Math.abs(dp.diff - diff) >= tol } } : {}) };
@@ -854,8 +864,8 @@ export async function settlementReport(env, db, settings, q = {}) {
       } else {
         // Tüm kayıtlar geldi: fark tutardadır. Komisyon oranı aynıysa fark satış tutarındadır (indirim / kupon); satış aynıysa komisyondadır
         side = diff < 0 ? 'short' : 'extra';
-        const dr = sales - p.revenue, sameRate = Math.abs((sales ? comm / sales : 0) - (p.revenue ? p.commission / p.revenue : 0)) < 0.003;
-        if (Math.abs(dr) < tol) { code = 'commission_diff'; reason = `Komisyon farklı: pazaryeri ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)}`; }
+        const dr = sales - p.revenue, sameRate = byMp || Math.abs((sales ? comm / sales : 0) - (p.revenue ? p.commission / p.revenue : 0)) < 0.003;
+        if (Math.abs(dr) < tol && !byMp) { code = 'commission_diff'; reason = `Komisyon farklı: pazaryeri ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)}`; }
         else if (sameRate) { code = dr < 0 ? 'sale_low' : 'sale_high'; reason = dr < 0 ? 'Satış tutarı düşük: indirim, kupon ya da kısmi iade' : 'Satış tutarı panelden yüksek'; }
         else { code = 'mixed'; reason = `Satış ve komisyon farklı (pazaryeri komisyonu ${pct(comm, sales)}, panel ${pct(p.commission, p.revenue)})`; }
       }
