@@ -30,6 +30,9 @@ export async function syncQuestions(env, db, { only } = {}) {
       await save(db, ch.id, items);
       if (more || cont) await setSetting(db, key, more ? { ...w, page: page } : null);
       if (!more) items.push(...await recheckOld(db, ch, w.since, t).catch((e) => { if (e.budget) throw e; return []; }));
+      // Cevap süresi dolmuş, kanalın da başka durum bildirmediği soru artık cevaplanamaz (kanal kapatır): "bekliyor"da kalıp yeni
+      // soruları gölgelemesin. Kanal sonradan cevaplandı / kapandı derse senkronla o durum yazılır.
+      await run(db, "UPDATE questions SET status = 'other', remote_status = 'Süresi doldu' WHERE channel = ? AND status = 'waiting' AND due_at IS NOT NULL AND due_at < ?", ch.id, t - EXPIRE_GRACE);
       out[ch.id] = items.length;
       await resolve(db, `questions:${ch.id}`);
     } catch (e) {
@@ -44,18 +47,22 @@ export async function syncQuestions(env, db, { only } = {}) {
 // Bekleyen eski sorular: Hepsiburada dışındaki kanallar soruları soruluş tarihine göre süzer. Son 3 günden önce sorulup sonradan
 // kanalın kendi panelinden cevaplanan soru normal pencerede bir daha gelmez ve panelde "bekliyor" kalırdı. Bekleyen en eski sorunun
 // tarihinden pencerenin başına kadar (en fazla 30 gün geriye) ayrıca okunur; kanalın tarih aralığı sınırı için 13 günlük parçalarla.
-const BY_MODIFIED = new Set(['hepsiburada']); // değişiklik tarihine göre süzer: cevaplanan soru normal pencerede zaten gelir
-const OLD_MAX = 30 * 864e5, SPAN = 13 * 864e5, OLD_PAGES = 10, OLD_EVERY = 3 * 3600e3;
+// Değişiklik tarihine göre süzen kanal (Hepsiburada): tarih aralığı yerine, bekleyen en eski sorudan bu yana cevaplanan / kapanan sorular
+// durumlarıyla ayrıca istenir; yine de bekleyen kalan eski sorular tek tek sorulur (liste varsayılanı yalnız bekleyenleri döndürse bile)
+const BY_MODIFIED = { hepsiburada: ['Answered', 'AutoClosed', 'Rejected'] };
+const OLD_MAX = 30 * 864e5, SPAN = 13 * 864e5, OLD_PAGES = 10, OLD_EVERY = 3 * 3600e3, ONE_MAX = 40, EXPIRE_GRACE = 6 * 3600e3;
 // Soru listesi dakikada bir çağrılabilen kanal: eski sorular tek istekle (parçasız, tek sayfa) okunur
 const ONE_CALL = new Set(['n11']);
 async function recheckOld(db, ch, before, t) {
-  if (BY_MODIFIED.has(ch.type)) return [];
   // En sık 3 saatte bir (her senkronda aynı aralık baştan okunmasın, istek bütçesi ve kanal sınırı korunsun)
   const key = `qold:${ch.id}`, last = await getRaw(db, key).catch(() => null);
   if (last && t - last.at < OLD_EVERY) return [];
-  const old = await first(db, "SELECT MIN(asked_at) AS t FROM questions WHERE channel = ? AND status = 'waiting' AND asked_at < ? AND asked_at > ?", ch.id, before, t - OLD_MAX);
+  // Değişiklik tarihine göre süzen kanalda pencere soruluş tarihini kapsamaz: 6 saatten eski her bekleyen soru kontrol edilir
+  if (BY_MODIFIED[ch.type]) before = t - 6 * 3600e3;
+  const old = await first(db, "SELECT MIN(asked_at) AS t FROM questions WHERE channel = ? AND status = 'waiting' AND asked_at < ? AND asked_at > ?", ch.id, before, t - (BY_MODIFIED[ch.type] ? 365 * 864e5 : OLD_MAX));
   if (!old || !old.t) return [];
   await setSetting(db, key, { at: t });
+  if (BY_MODIFIED[ch.type]) return recheckModified(db, ch, old.t, before);
   const from = Math.max(old.t - 3600e3, t - OLD_MAX), items = [], one = ONE_CALL.has(ch.type);
   for (let end = before; end > from; end -= one ? Infinity : SPAN) {
     const start = one ? from : Math.max(from, end - SPAN);
@@ -66,6 +73,30 @@ async function recheckOld(db, ch, before, t) {
     }
   }
   await save(db, ch.id, items);
+  return items;
+}
+
+async function recheckModified(db, ch, oldest, before) {
+  const items = [], since = Math.max(oldest - 3600e3, Date.now() - OLD_MAX);
+  for (const status of BY_MODIFIED[ch.type]) {
+    for (let page = 0; page < OLD_PAGES; page++) {
+      let r;
+      try { r = await ch.questions({ since, page, size: 50, status }); } catch (e) { if (e.budget) throw e; break; }
+      items.push(...r.items);
+      if (!(r.hasNext && r.items.length)) break;
+    }
+  }
+  await save(db, ch.id, items);
+  // Hâlâ bekleyen eski sorular tek tek (kanal tek soru sorgusunu destekliyorsa)
+  if (ch.question) {
+    const ids = (await all(db, "SELECT remote_id FROM questions WHERE channel = ? AND status = 'waiting' AND asked_at < ? ORDER BY asked_at LIMIT ?", ch.id, before, ONE_MAX)).map((r) => r.remote_id);
+    const one = [];
+    for (const id of ids) {
+      try { const q = await ch.question(id); if (q) one.push(q); } catch (e) { if (e.budget) throw e; if (!one.length) break; }
+    }
+    await save(db, ch.id, one);
+    items.push(...one);
+  }
   return items;
 }
 

@@ -488,11 +488,22 @@ export function hepsiburada(env, meta) {
   const QNA = `https://api-asktoseller-merchant${test}.hepsiburada.com/api/v1.0`;
   const qh = () => ({ ...headers(), merchantId: String(m) });
   const QST = { WaitingForAnswer: 'waiting', 1: 'waiting', Answered: 'answered', 2: 'answered', Rejected: 'rejected', 3: 'rejected', AutoClosed: 'other', 4: 'other' };
-  async function questions({ since, page: p = 0, size = 50 }) {
+  // status: yalnız bu durumdaki sorular (eski bekleyen soruların kontrolünde: cevaplanan / kapanan sorular ayrıca istenir)
+  async function questions({ since, page: p = 0, size = 50, status }) {
     const q = new URLSearchParams({ page: String(p + 1), size: String(size), desc: 'true' });
     if (since) q.set('minModifiedAt', new Date(since).toISOString());
+    if (status) q.set('status', status);
     const r = await hb(`${QNA}/issues?${q}`, { headers: qh() });
-    const items = (g(r, 'data') || []).map((x) => {
+    const items = (g(r, 'data') || []).map(issue);
+    return { items, total: num(g(r, 'totalItemCount')), hasNext: num(g(r, 'currentPage')) < num(g(r, 'totalPageCount')) };
+  }
+  // Tek soru (sayı ile): panelde bekleyen eski sorunun Hepsiburada'daki güncel durumu
+  async function question(id) {
+    const r = await hb(`${QNA}/issues/${encodeURIComponent(id)}`, { headers: qh() });
+    const x = (r && (g(r, 'data') && !Array.isArray(g(r, 'data')) ? g(r, 'data') : r)) || null;
+    return x && (g(x, 'issueNumber') || g(x, 'id')) ? issue(x) : null;
+  }
+  function issue(x) {
       // Yazışma sırası tarihe göre: son mesaj satıcıdansa soru cevaplanmıştır (kanalın durum alanı geride kalabilir, ör. cevap onay
       // beklerken); cevaptan sonra müşteri yeniden yazdıysa yeni mesaj "ek soru" olarak bekler
       const conv = (g(x, 'conversations') || []).map((c, i) => ({ c, i, t: hbTime(g(c, 'createdAt')) || 0 })).sort((a, b) => a.t - b.t || a.i - b.i).map((e) => e.c);
@@ -511,8 +522,6 @@ export function hepsiburada(env, meta) {
         customer: g(x, 'orderNumber') ? `Sipariş #${g(x, 'orderNumber')}` : '', answer: ans ? str(g(ans, 'content')) : null, answeredAt: ans ? hbTime(g(ans, 'createdAt')) || null : null,
         dueAt: hbTime(g(x, 'expireDate')) || null,
       };
-    });
-    return { items, total: num(g(r, 'totalItemCount')), hasNext: num(g(r, 'currentPage')) < num(g(r, 'totalPageCount')) };
   }
   // Cevap: multipart/form-data, alan adı "Answer" (en fazla 2000 karakter)
   async function answer(q, text) {
@@ -940,6 +949,6 @@ export function hepsiburada(env, meta) {
   return {
     ...meta, type: 'hepsiburada', enabled: !missing.length, missing, sandbox: !!test,
     caps: { accept: 'local', split: 'remote', pack: 'remote', ship: 'local', label: 'remote', cargo: 'change', cancelPackage: true, createProduct: false, price: true, answer: { min: 2, max: 2000 } },
-    fetchOrders, orderExists, fetchListings, pushStock, pushPrice, pushStatus, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns, financeProbe,
+    fetchOrders, orderExists, fetchListings, pushStock, pushPrice, pushStatus, split, label, pack, cargoOptions, changeCargo, cancelPackage, buybox, diagnose, questions, question, answer, sit, catalog, cargoCosts, invoices, settlements, claims, claimReasons, approveClaim, rejectClaim, campaigns, financeProbe,
   };
 }
