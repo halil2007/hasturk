@@ -101,8 +101,9 @@ test('Hakediş: Trendyol ekstresi saklanır; ödeme günleri, ödenecek toplam v
   const r = await settlementReport(env, db, { commission: { trendyol: 20 }, costs_vat_incl: true }, { from: now - 30 * 864e5, to: now + 1 });
   assert.equal(r.totals.upcoming, 190); assert.equal(r.totals.paid, 0);
   assert.equal(r.types.find((x) => x.type === 'İade').amount, -80);
-  // Panel tahmini: 240 − %20 = 192; pazaryeri 190 → 2 TL fark
-  assert.equal(r.diffs.length, 1); assert.equal(r.diffs[0].diff, -2);
+  // Panelin ortalama oranı (%20 → 192) yalnız tahmindir: kanal satır komisyonunu bildirmediği için pazaryerinin kestiği komisyon
+  // (50 TL) esas alınır, satış tutarı aynı → fark yok
+  assert.equal(r.diffs.length, 0, JSON.stringify(r.diffs)); assert.equal(r.totals.checked, 1); assert.equal(r.totals.matched, 1);
   resetChannels();
 });
 
