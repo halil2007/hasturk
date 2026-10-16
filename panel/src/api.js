@@ -445,18 +445,40 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (ch && ch.caps && ch.caps.manualTracking === false && !ch.caps.ownCarrier) fail(400, `${ch.name}: gönderi yalnız kanalın kargosu ile yapılır; kargo entegratörü kullanılamaz`);
     if (o.status === 'new') { await acceptOrder(db, ch, o, user); o = await loadOrder(db, o.id); }
     o = await ensurePackages(db, ch, o);
-    const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
-    if (!pkg) fail(404, 'Paket bulunamadı');
-    if (pkg.status === 'shipped') fail(400, 'Kargoya verilmiş pakete yeni gönderi açılamaz');
-    if (pkg.carrier_ref) fail(400, `Bu paketin ${(CARRIERS[pkg.carrier_provider] || { name: 'entegratör' }).name} gönderisi zaten var (takip no ${pkg.tracking || pkg.carrier_ref}); yenisi için önce gönderiyi iptal edin`);
-    if (pkg.remote_id && (pkg.barcode || pkg.tracking) && pkg.agreement !== 'own') fail(400, `Bu pakette ${ch ? ch.name : 'kanal'} kargo barkodu var; kanalın kargosuyla gönderin ya da önce paketi kanalda iptal edin`);
     const c = await carrierFor(env, db, str(b.provider) || null);
     siteOnly(c, ch);
-    const { shipment, missing } = shipmentOf(o, pkg, settings.sender || {}, { desi: num(b.desi, 0) });
+    const pkgErr = (pkg) => (pkg.status === 'shipped' ? 'Kargoya verilmiş pakete yeni gönderi açılamaz'
+      : pkg.carrier_ref ? `Bu paketin ${(CARRIERS[pkg.carrier_provider] || { name: 'entegratör' }).name} gönderisi zaten var (takip no ${pkg.tracking || pkg.carrier_ref}); yenisi için önce gönderiyi iptal edin`
+        : pkg.remote_id && (pkg.barcode || pkg.tracking) && pkg.agreement !== 'own' ? `Bu pakette ${ch ? ch.name : 'kanal'} kargo barkodu var; kanalın kargosuyla gönderin ya da önce paketi kanalda iptal edin` : '');
+    // Tüm paketler (all): bölünmüş siparişin her açık paketi için ayrı gönderi ve etiket (Kargonomi gönderisi paket başınadır).
+    // Paket başına seçim: quotes[paket] = { quote_id, firm_id, desi } (fiyat teklifinden) ya da firma adı (firm, toplu gönderim)
+    if (b.all) {
+      const list = o.packages.filter((p) => p.status === 'open' && !pkgErr(p));
+      if (!list.length) fail(400, o.packages.find((p) => p.status === 'open') ? pkgErr(o.packages.find((p) => p.status === 'open')) : 'Gönderilecek açık paket yok');
+      const done = [], errs = [];
+      for (const p of list) {
+        const sel = (b.quotes || {})[p.id] || (b.quotes || {})[String(p.id)] || {};
+        try { done.push(await shipPkg(p, { quote_id: sel.quote_id, firm_id: sel.firm_id, firm: b.firm, desi: sel.desi || (b.desi && list.length === 1 ? b.desi : 0) })); }
+        catch (e) { errs.push(`Paket ${p.no}: ${e.message}`); }
+      }
+      if (!done.length) fail(400, errs.join(' · '));
+      return { ok: true, message: `${done.length} paket için ${c.name} gönderisi oluşturuldu${errs.length ? ` · açılamayan: ${errs.join(' · ')}` : ''}`, order: await loadOrder(db, o.id), packages: done.map((x) => x.package_id), errors: errs, sender: settings.sender };
+    }
+    const pkg = b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open');
+    if (!pkg) fail(404, 'Paket bulunamadı');
+    if (pkgErr(pkg)) fail(400, pkgErr(pkg));
+    const one = await shipPkg(pkg, { quote_id: b.quote_id, firm_id: b.firm_id, firm: b.firm, desi: b.desi });
+    return { ok: true, ...one, order: await loadOrder(db, o.id), sender: settings.sender };
+  }
+  // Bir paket için entegratör gönderisi (carrier-label): gönderi + etiket pakete yazılır, ikas'a takip bilgisi, kargo ücreti siparişe
+  async function shipPkg(pkg, sel) {
+    const c = await carrierFor(env, db, str(b.provider) || null);
+    const { shipment, missing } = shipmentOf(o, pkg, settings.sender || {}, { desi: num(sel.desi, 0) });
     if (missing.length) fail(400, 'Gönderi için eksik bilgi: ' + missing.join(', '));
     let r;
     // Kargo firması kullanıcının seçimi: fiyat teklifinden (quote_id + firm_id) ya da adıyla (toplu gönderim: firm)
-    try { r = (await c.api.create(shipment, { draftId: str(b.quote_id) || null, providerId: str(b.firm_id) || null, firm: str(b.firm) || null })) || {}; } catch (e) {
+    // Çoklu / toplu gönderimde firma etiketi beklenmez (arayüz etiketleri sonra toplar); tek gönderide birkaç saniye beklenir
+    try { r = (await c.api.create(shipment, { draftId: str(sel.quote_id) || null, providerId: str(sel.firm_id) || null, firm: str(sel.firm) || null, noWait: !!(b.all || b.firm) })) || {}; } catch (e) {
       await run(db, 'UPDATE packages SET error = ? WHERE id = ?', `${c.name}: ${e.message}`.slice(0, 500), pkg.id);
       await log(db, o.channel, 'warn', `#${o.order_number} ${c.name} gönderisi açılamadı: ${e.message}`);
       throw e;
@@ -466,7 +488,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     await run(db, `UPDATE packages SET carrier_provider = ?, carrier_ref = ?, carrier_cost = ?, tracking = ?, barcode = ?, cargo_company = ?, tracking_url = ?, desi = ?,
       agreement = 'own', packed_at = COALESCE(packed_at, ?), label_format = ?, label_data = ?, label_at = ?, label_viewed_at = NULL, label_printed_at = NULL, error = NULL WHERE id = ?`,
     c.id, str(r.ref) || null, grossCost(r), tn, str(r.barcode || r.tracking), str(r.carrier) || c.name, str(r.trackingUrl) || null, shipment.desi,
-    t, r.label ? r.label.format : null, r.label ? r.label.data : null, t, pkg.id);
+    t, r.label ? r.label.format : null, r.label ? r.label.data : null, r.label ? t : null, pkg.id);
     // ikas: entegratör gönderisi ikas'ta takip bilgili paket olarak açılır ("Kargoya Hazır"); yazılamazsa "Kargoya ver"de yeniden denenir
     let chNote = '';
     if (ch && ch.enabled && ch.caps && ch.caps.ownCarrier && ch.ownShipment && !pkg.remote_id) {
@@ -482,9 +504,9 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (r.cost != null && o.shipping_src !== 'manual') await run(db, "UPDATE orders SET shipping_cost = COALESCE(shipping_cost, 0) + ?, shipping_src = 'carrier' WHERE id = ?", grossCost(r), o.id);
     if (o.status === 'new') await setLocalStatus(db, o, 'processing');
     await event(db, o, 'carrier', user, `Paket ${pkg.no}: ${c.name} · ${str(r.carrier) || ''} ${tn}`.trim());
-    const fresh = await loadOrder(db, o.id);
     const lab = r.label ? { ...r.label, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label.format}` } : null;
-    return { ok: true, message: `${c.name} gönderisi oluşturuldu: ${str(r.carrier) || ''} ${tn}`.trim() + chNote, order: fresh, package_id: pkg.id, official: lab, panel: !lab, sender: settings.sender };
+    const late = !lab && LATE_LABEL.has(c.id);
+    return { message: `${c.name} gönderisi oluşturuldu: ${str(r.carrier) || ''} ${tn}`.trim() + chNote, package_id: pkg.id, official: lab, panel: !lab && !late, ...(late ? { pending: `${c.name} etiketi hazırlanıyor` } : {}) };
   }
   // Kargonomi fiyat teklifi: gönderi taslağı açılır, kargo firmalarının fiyatları döner; kullanıcı firmayı seçince carrier-label
   // (quote_id + firm_id) taslağı onaylar. Vazgeçilirse carrier-quote-cancel taslağı siler. Sipariş / paket durumu değişmez.
@@ -494,6 +516,21 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     requireFeature(env, carrierFeature(c.id));
     siteOnly(c, ch);
     if (!c.api.quote) fail(400, `${c.name} fiyat teklifi vermiyor`);
+    // Tüm paketler: her açık paket için ayrı teklif (bölünmüş sipariş: paket başına gönderi)
+    if (b.all) {
+      const list = o.packages.filter((p) => p.status === 'open' && !p.carrier_ref);
+      if (!list.length) fail(400, 'Gönderilecek açık paket yok');
+      const out = [];
+      try {
+        for (const p of list) {
+          const { shipment, missing } = shipmentOf(o, p, settings.sender || {}, { desi: num(((b.desis || {})[p.id]), 0) });
+          if (missing.length) fail(400, 'Gönderi için eksik bilgi: ' + missing.join(', '));
+          const q = await c.api.quote(shipment);
+          out.push({ package_id: p.id, no: p.no, quote_id: str(q.ref), offers: q.offers || [], desi: shipment.desi });
+        }
+      } catch (e) { for (const x of out) await c.api.discard(x.quote_id).catch(() => null); throw e; }
+      return { ok: true, packages: out };
+    }
     const pkg = (b.package_id ? o.packages.find((p) => p.id === Number(b.package_id)) : o.packages.find((p) => p.status === 'open')) || { no: 1, items: o.items.filter((i) => !DEAD_LINE(i.status)).map((i) => ({ line_id: i.line_id, qty: i.quantity })) };
     if (pkg.carrier_ref) fail(400, `Bu paketin ${c.name} gönderisi zaten var`);
     const { shipment, missing } = shipmentOf(o, pkg, settings.sender || {}, { desi: num(b.desi, 0) });
@@ -503,7 +540,7 @@ async function orderAction(env, db, id, action, b, ctx, user) {
   }
   if (action === 'carrier-quote-cancel') {
     const c = await carrierFor(env, db, str(b.provider) || null);
-    if (c.api.discard && str(b.quote_id)) await c.api.discard(str(b.quote_id)).catch(() => null);
+    for (const id of [b.quote_id, ...(Array.isArray(b.quote_ids) ? b.quote_ids : [])].map(str).filter(Boolean).slice(0, 20)) if (c.api.discard) await c.api.discard(id).catch(() => null);
     return { ok: true };
   }
   if (action === 'carrier-cancel') {
@@ -639,8 +676,13 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false, env = null
       if (got && got.error) return { official: null, pending: got.error };
       if (got && got.label) r = { label_format: got.label.format, label_data: got.label.data };
     }
+    if (r && r.label_data) {
+      await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?) WHERE id = ?', Date.now(), pkg.id);
+      return { official: { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` } };
+    }
+    // Etiketi firmanın verdiği gönderi (Kargonomi, Navlungo, DHL): panelin iç etiketi basılmaz (kargo firması okutmaz); firma etiketi beklenir
+    if (LATE_LABEL.has(pkg.carrier_provider)) return { official: null, pending: `${(CARRIERS[pkg.carrier_provider] || { name: 'Kargo firması' }).name} etiketi hazırlanıyor (gönderi kargo firmasına iletiliyor); birkaç saniye sonra “Etiketi al” ile tekrar deneyin.` };
     await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?) WHERE id = ?', Date.now(), pkg.id);
-    if (r && r.label_data) return { official: { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` } };
     return { official: null, panel: true };
   }
   if (pkg.has_label && !refresh) {
@@ -698,6 +740,8 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false, env = null
 function siteOnly(c, ch) {
   if (c && c.id === 'kargonomi' && !isSite(ch)) fail(400, `Kargonomi ile gönderim yalnız internet sitesi siparişlerinde kullanılır${ch ? `; ${ch.name} siparişi ${ch.name}'in kargosuyla gönderilir` : ''}`);
 }
+// Etiketi gönderiden sonra firmanın verdiği entegratörler: etiket gelene kadar panel etiketi basılmaz
+const LATE_LABEL = new Set(['kargonomi', 'navlungo', 'dhl']);
 async function carrierLabel(env, db, pkg) {
   // Firma gönderiyi oluşturamadı: etiket beklenmez, kullanıcı iptal edip yeniden oluşturur
   if (pkg.carrier_state === 'failed') return { error: pkg.error || 'Kargo firması gönderiyi oluşturamadı; gönderiyi iptal edip yeniden oluşturun.' };
@@ -709,11 +753,14 @@ async function carrierLabel(env, db, pkg) {
   const tn = str((lab && lab.tracking) || (t && t.tracking));
   if (tn && tn !== pkg.tracking) await run(db, 'UPDATE packages SET tracking = ?, barcode = ?, tracking_url = COALESCE(?, tracking_url), cargo_company = COALESCE(NULLIF(?, \'\'), cargo_company) WHERE id = ?', tn, str((t && t.barcode) || tn), str((lab && lab.trackingUrl) || (t && t.trackingUrl)) || null, str(t && t.carrier), pkg.id);
   if (lab && lab.data) {
-    await run(db, 'UPDATE packages SET label_format = ?, label_data = ?, label_at = ?, error = NULL WHERE id = ?', lab.format, lab.data, Date.now(), pkg.id);
+    // Takip kodu henüz yoksa da (firma kabulünden sonra gelir) etiketteki barkod ve kargo firması pakete yazılır
+    await run(db, `UPDATE packages SET label_format = ?, label_data = ?, label_at = ?, error = NULL, barcode = CASE WHEN COALESCE(barcode, '') = '' THEN ? ELSE barcode END,
+      cargo_company = CASE WHEN COALESCE(cargo_company, '') IN ('', ?) AND ? != '' THEN ? ELSE cargo_company END WHERE id = ?`,
+    lab.format, lab.data, Date.now(), str(lab.barcode || tn), c.name, str(lab.carrier), str(lab.carrier), pkg.id);
     return { label: { format: lab.format, data: lab.data } };
   }
   // Etiket henüz hazır değil ama firma sonradan veriyor: kullanıcıya bekleme mesajı
-  if (c.api.label && !tn && ['kargonomi', 'navlungo', 'dhl'].includes(c.id)) return { error: `${c.name} etiketi henüz hazır değil (gönderi firmaya iletiliyor); birkaç dakika sonra tekrar deneyin.` };
+  if (c.api.label && LATE_LABEL.has(c.id)) return { error: `${c.name} etiketi henüz hazır değil (gönderi firmaya iletiliyor); birkaç dakika sonra tekrar deneyin.` };
   return null;
 }
 
@@ -738,7 +785,7 @@ async function listPackages(db, q) {
   // Paketler, sekme sayıları ve paketsiz siparişler aynı anda okunur
   const keys = Object.keys(states), noPkg = `FROM orders o WHERE o.status IN ('new', 'processing') AND NOT EXISTS (SELECT 1 FROM packages k WHERE k.order_id = o.id) ${where.length ? 'AND ' + where.join(' AND ') : ''}`;
   const [rows, unpacked, extraWaiting, ...cn] = await Promise.all([all(db, `SELECT p.id, p.order_id, p.no, p.status, p.cargo_company, p.tracking, p.barcode, p.agreement, p.tracking_url, p.desi, p.items, p.label_format, (p.label_data IS NOT NULL) AS has_label, p.shipped_at,
-      p.packed_at, p.error, p.label_at, p.label_printed_at, p.remote_id,
+      p.packed_at, p.error, p.label_at, p.label_printed_at, p.remote_id, p.carrier_provider,
       o.channel, o.order_number, o.customer, o.address, o.ordered_at, o.ship_by, o.status AS order_status, (SELECT COUNT(*) FROM packages x WHERE x.order_id = p.order_id) AS pkg_total
     ${base} ${w(st)} ORDER BY o.ordered_at ASC LIMIT 300`, ...args),
     // Paketi olmayan ve hazırlanan siparişler: tek paket olarak işlenecekler

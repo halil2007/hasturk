@@ -255,8 +255,8 @@ export async function orders(el, rest, query = {}) {
     const s = sheet({ title: `Kargonomi ile gönder · ${ids.length} sipariş`, size: 'narrow', body: html`<div class="stack">
       ${skip ? html`<div class="notice small"><i class="ico ico-warn"></i><div>${skip} pazaryeri siparişi atlanacak: pazaryeri siparişleri pazaryerinin kargosuyla gönderilir.</div></div>` : ''}
       <label class="field"><span>Kargo firması</span><select class="input" data-firm><option value="">Seçin…</option>${KG_FIRMS.map(([k, t]) => html`<option value="${k}">${t}</option>`)}</select></label>
-      <label class="field"><span>Desi (isteğe bağlı)</span><input class="input" type="number" min="0.1" step="0.1" data-desi placeholder="boşsa siparişteki desi" style="max-width:200px"></label>
-      <div class="muted tiny">Her siparişin ücreti Kargonomi'den o gönderi için alınır ve Kargonomi bakiyenizden düşer. Seçtiğiniz firma bir sipariş için teklif vermezse o sipariş atlanır. Tek siparişte firmaları fiyatlarıyla karşılaştırmak için siparişin içinden “Kargonomi ile gönder”i kullanın.</div>
+      <label class="field"><span>Desi (isteğe bağlı, tek paketli siparişlerde)</span><input class="input" type="number" min="0.1" step="0.1" data-desi placeholder="boşsa paketin desisi" style="max-width:200px"></label>
+      <div class="muted tiny">Her siparişin ücreti Kargonomi'den o gönderi için alınır ve Kargonomi bakiyenizden düşer. Pakete bölünmüş siparişte her paket için ayrı gönderi ve etiket açılır. Seçtiğiniz firma bir sipariş için teklif vermezse o sipariş atlanır. Tek siparişte firmaları fiyatlarıyla karşılaştırmak için siparişin içinden “Kargonomi ile gönder”i kullanın.</div>
       <div data-res></div></div>`,
       foot: html`<span class="spacer"></span><button class="btn" data-close>Kapat</button><button class="btn primary" data-go><i class="ico ico-truck"></i>Gönderileri oluştur</button>` });
     $('[data-go]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
@@ -266,7 +266,7 @@ export async function orders(el, rest, query = {}) {
       // Her gönderi Kargonomi'ye birkaç istek: 10'arlı parçalar
       for (let i = 0; i < ids.length; i += 10) {
         if (ids.length > 10) toast(`Kargonomi gönderileri: ${Math.min(i + 10, ids.length)} / ${ids.length}`);
-        const part = await api('orders-bulk', { method: 'POST', body: { ids: ids.slice(i, i + 10), action: 'carrier-label', provider: 'kargonomi', firm, desi: desi || undefined } });
+        const part = await api('orders-bulk', { method: 'POST', body: { ids: ids.slice(i, i + 10), action: 'carrier-label', provider: 'kargonomi', all: true, firm, desi: desi || undefined } });
         r.done.push(...part.done); r.errors.push(...part.errors);
       }
       render($('[data-res]', s.el), html`<div class="notice small ${r.errors.length ? 'warn' : ''}"><i class="ico ico-${r.errors.length ? 'warn' : 'check'}"></i><div><b>${r.done.length} gönderi oluşturuldu${r.errors.length ? `, ${r.errors.length} sipariş atlandı` : ''}.</b>

@@ -218,6 +218,8 @@ test('kargo firması (HepsiJET, sahte sunucu): etiket → kargoya ver → firma 
     assert.equal(kp.carrier_ref, '9');
     r = await post(`/api/orders/${kid}/label`, { package_id: kp.id });
     assert.match(r.body.pending || '', /henüz hazır değil/);
+    assert.ok(!r.body.panel && !r.body.official, 'firma etiketi gelmeden panelin iç etiketi basılmaz');
+    assert.ok(!(await call(`/api/orders/${kid}`)).body.order.packages[0].label_at, 'etiket yokken etiket hazır sayılmaz');
     kgReady = true;
     r = await post(`/api/orders/${kid}/label`, { package_id: kp.id });
     assert.equal(r.body.official.format, 'pdf');
@@ -342,4 +344,56 @@ test('paket: Kargonomi Profesyonel pakette açık, diğer kargo firmaları Kurum
   assert.equal(carrierFeature('kargonomi'), 'kargonomi'); assert.equal(carrierFeature('navlungo'), 'carrier');
   const pro = { TENANT_SLUG: 'x', TENANT_PLAN: 'profesyonel' }, base = { TENANT_SLUG: 'x', TENANT_PLAN: 'baslangic' }, kur = { TENANT_SLUG: 'x', TENANT_PLAN: 'kurumsal' };
   assert.deepEqual([allows(pro, 'kargonomi'), allows(pro, 'carrier'), allows(base, 'kargonomi'), allows(kur, 'kargonomi'), allows(kur, 'carrier')], [true, false, false, true, true]);
+});
+
+test('Kargonomi: pakete bölünmüş sipariş — her paket ayrı gönderi / etiket; teklifler paket başına, seçilen firmayla; toplu gönderimde tüm paketler', async () => {
+  const real = globalThis.fetch, calls = [];
+  let n = 0;
+  globalThis.fetch = async (url, o = {}) => {
+    const u = String(url), m = o.method || 'GET', J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { 'Content-Type': 'application/json' } });
+    calls.push(`${m} ${u}` + (o.body ? ' ' + o.body : ''));
+    if (/\/states$/.test(u)) return J({ data: [{ id: 42, name: 'KONYA' }] });
+    if (/\/cities\/42$/.test(u)) return J({ data: [{ id: 600, name: 'SELÇUKLU' }] });
+    if (/\/warehouses$/.test(u)) return J({ data: [{ id: 1, is_main: 1 }] });
+    if (m === 'POST' && /\/shipments$/.test(u)) return J({ data: { id: 80 + (++n), status: 'draft' } });
+    if (/shipment-price-comparison\/\d+$/.test(u)) return J({ shipping_provider_with_price: [{ id: 11, name: 'Aras Kargo', slug: 'aras', price: '50' }, { id: 14, name: 'Yurtiçi Kargo', slug: 'yurtici', price: '60' }] });
+    if (/confirm-shipping-price/.test(u)) return J({});
+    if (m === 'DELETE') return new Response(null, { status: 204 });
+    if (/\/shipments\/\d+\/barcode/.test(u)) return J({ data: { barcode: 'JVBERi0' + 'C'.repeat(150) } });
+    if (/\/shipments\/\d+$/.test(u)) { const id = Number(u.split('/').pop()); return J({ data: { id, status: 'webservice_order_created', shipping_webservice_tracking_code: 'AR' + id, shipping_provider_name: 'Aras Kargo', estimated_price: '50' } }); }
+    return new Response('?', { status: 404 });
+  };
+  try {
+    const { env, call, post } = await panel();
+    await setSetting(env.DB, 'sender', { name: 'HasTürk', phone: '03320000000', address: 'Sanayi Cd. 1', city: 'Selçuklu / Konya' });
+    await call('/api/integrations/carriers/kargonomi', { method: 'PUT', body: JSON.stringify({ values: { KARGONOMI_API_KEY: 'k' } }) });
+    const three = (id) => order(id, { items: [{ lineId: id + '-1', sku: 'A', barcode: '111', name: 'Ürün A', quantity: 3, unitPrice: 100, total: 300, status: '', remoteKey: '111' }], total: 300 });
+    await saveOrders(env.DB, 'woocommerce', [three('S1'), three('S2')]);
+    const split = async (id) => post(`/api/orders/${encodeURIComponent(id)}/split`, { groups: [1, 2, 3].map((k) => ({ desi: k, items: [{ line_id: id.split(':')[1] + '-1', qty: 1 }] })) });
+    for (const id of ['woocommerce:S1', 'woocommerce:S2']) { const r = await split(id); assert.equal(r.status, 200, JSON.stringify(r.body)); }
+    const s1 = encodeURIComponent('woocommerce:S1');
+    // Teklif: her paket için ayrı taslak
+    let r = await post(`/api/orders/${s1}/carrier-quote`, { provider: 'kargonomi', all: true });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.packages.length, 3);
+    assert.deepEqual(r.body.packages.map((x) => x.desi), [1, 2, 3], 'paketin desisi');
+    const quotes = Object.fromEntries(r.body.packages.map((x) => [x.package_id, { quote_id: x.quote_id, firm_id: '14', desi: x.desi }]));
+    r = await post(`/api/orders/${s1}/carrier-label`, { provider: 'kargonomi', all: true, quotes });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.packages.length, 3);
+    const pk = r.body.order.packages;
+    assert.deepEqual(pk.map((p) => p.carrier_provider), ['kargonomi', 'kargonomi', 'kargonomi']);
+    assert.equal(new Set(pk.map((p) => p.tracking)).size, 3, 'her pakete ayrı takip no');
+    const confirms = calls.filter((c) => /confirm-shipping-price/.test(c));
+    assert.equal(confirms.length, 3);
+    assert.ok(confirms.every((c) => /"shipping_provider_id":14/.test(c)));
+    // Etiketler: her paket ayrı
+    const lb = await post('/api/labels', { ids: ['woocommerce:S1'], fetch: true });
+    assert.equal(lb.body.orders[0].labels.filter((l) => l.official).length, 3);
+    // Toplu: bölünmüş siparişin tüm paketleri gider
+    r = await post('/api/orders-bulk', { ids: ['woocommerce:S2'], action: 'carrier-label', provider: 'kargonomi', all: true, firm: 'aras' });
+    assert.deepEqual(r.body.done, ['woocommerce:S2'], JSON.stringify(r.body));
+    const s2 = (await call(`/api/orders/${encodeURIComponent('woocommerce:S2')}`)).body.order.packages;
+    assert.equal(s2.filter((p) => p.carrier_ref).length, 3);
+  } finally { globalThis.fetch = real; }
 });
