@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3428 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 243 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3455 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -21,8 +21,8 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 | 9 | Altınvadi Toros Maydanozu Tohumu 10 Gr | ×9,9 | 5 | evet |
 | 10 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı) | ×9,9 | 5 | evet |
 | 11 | Proline Bebek Pudra Kokulu Bentonit Kedi Kumu 10 LT | ×5,3 | 3 | evet |
-| 12 | Hastürk Katı Solucan Gübresi 20 Kg | ×4,6 | 3 | evet |
-| 13 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3,6 | 0 | evet |
+| 12 | Hastürk Katı Solucan Gübresi 20 Kg | ×4,9 | 3 | evet |
+| 13 | İnsektisit MAX 5 Lt Kampanya Paketi | ×3,7 | 0 | evet |
 | 14 | Altınvadi Bezelye Tohumu 25 Gr | ×8,7 | 2 | evet |
 | 15 | Arzuman Nantes Havuç Tohumu (10 Gr) | ×8,4 | 2 | evet |
 
@@ -47,21 +47,21 @@ _Henüz veri yok._
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 6,8 | 0 |
 | 4 | Altınvadi Roka Tohumu (Toros İri Yaprak) | 6,1 | 6 |
 | 5 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 6 | 7 |
-| 6 | Leonardit - Organik Toprak Düzenleyici | 5,3 | 7 |
-| 7 | Kullanıma Hazır Cocopeat Torfu | 5,3 | 0 |
+| 6 | Leonardit - Organik Toprak Düzenleyici | 5,3 | 3 |
+| 7 | Kullanıma Hazır Cocopeat Torfu | 5,2 | 0 |
 | 8 | Arom Dere Otu Ata Tohumu (50 Adet) | 5,2 | 5 |
 | 9 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 5,1 | 7 |
-| 10 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,9 | 3 |
+| 10 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,8 | 3 |
 | 11 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 4,8 | 5 |
 | 12 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı) | 4,6 | 5 |
 | 13 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 4,6 | 0 |
-| 14 | HG Akıllı Bitki ve Saksı Toprağı | 4,3 | 5 |
+| 14 | HG Akıllı Bitki ve Saksı Toprağı | 4,2 | 5 |
 | 15 | Premium Fide Toprağı | 4,1 | 0 |
 | 16 | HG Asidik Torf | 4 | 6 |
 | 17 | Sıvı Solucan Gübresi 500 ml | 4 | 3 |
 | 18 | Sıvı Solucan Gübresi 1 Lt | 3,8 | 1 |
 | 19 | HG Mezar Toprağı | 3,8 | 5 |
-| 20 | Sıvı Solucan Gübresi 250 ml | 3,8 | 3 |
+| 20 | Sıvı Solucan Gübresi 250 ml | 3,7 | 3 |
 
 _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 günde 23 adet, 3 ürün. Listelere alınmadı._
 
@@ -70,30 +70,30 @@ _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 g
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
 | 1 | sıvı solucan gübresi | 57 | 32 | ↑ ×3,3 |  |
-| 2 | perlit | 21 | 12 | ↑ ×2,8 |  |
+| 2 | perlit | 22 | 13 | ↑ ×3 |  |
 | 3 | saksı | 20 | 9 | ↑ ×1,9 |  |
 | 4 | tarım perliti | 7 | 6 | ↑ ×3,3 |  |
-| 5 | solucan gübresi | 15 | 4 |  |  |
+| 5 | solucan gübresi | 16 | 5 |  |  |
 | 6 | solucan | 16 | 2 |  |  |
 | 7 | toprak | 5 | 4 | ↑ ×2,5 |  |
-| 8 | kaktüs | 3 | 3 | ↑ ×2,4 |  |
-| 9 | torf | 8 | 0 |  |  |
-| 10 | modüler | 5 | 2 |  |  |
-| 11 | uzman | 5 | 2 |  |  |
-| 12 | kil | 4 | 0 |  |  |
-| 13 | sıvı | 3 | 2 |  |  |
-| 14 | saksı toprağı | 4 | 1 |  |  |
-| 15 | limon | 4 | 1 |  |  |
-| 16 | difen | 2 | 2 |  |  |
-| 17 | proline | 2 | 2 |  |  |
-| 18 | star | 3 | 2 |  |  |
-| 19 | yaban | 2 | 2 |  |  |
-| 20 | sebze tohumu | 4 | 0 |  |  |
-| 21 | leonar | 3 | 1 |  |  |
-| 22 | ilaçlama pompası | 3 | 1 |  |  |
-| 23 | leonardit | 3 | 1 |  |  |
-| 24 | kum | 2 | 2 |  |  |
-| 25 | tahta | 2 | 2 |  |  |
+| 8 | leo | 4 | 3 | ↑ ×2,1 |  |
+| 9 | kaktüs | 3 | 3 | ↑ ×2,4 |  |
+| 10 | torf | 8 | 0 |  |  |
+| 11 | modüler | 5 | 2 |  |  |
+| 12 | uzman | 5 | 2 |  |  |
+| 13 | kil | 4 | 0 |  |  |
+| 14 | sıvı | 3 | 2 |  |  |
+| 15 | lotu | 3 | 2 |  |  |
+| 16 | saksı toprağı | 4 | 1 |  |  |
+| 17 | limon | 4 | 1 |  |  |
+| 18 | difen | 2 | 2 |  |  |
+| 19 | proline | 2 | 2 |  |  |
+| 20 | star | 3 | 2 |  |  |
+| 21 | yaban | 2 | 2 |  |  |
+| 22 | sebze tohumu | 4 | 0 |  |  |
+| 23 | leonar | 3 | 1 |  |  |
+| 24 | ilaçlama pompası | 3 | 1 |  |  |
+| 25 | leonardit | 3 | 1 |  |  |
 
 ## Sonuç bulunamayan aramalar
 
@@ -102,30 +102,30 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | # | Kelime | Arama |
 |---|---|---|
 | 1 | nnh. cccccx x , z , vb. nb | 2 |
-| 2 | starlicw ortanca | 1 |
-| 3 | blur | 1 |
-| 4 | proline kalın | 1 |
-| 5 | proline kedi kumu kalın | 1 |
-| 6 | zeytin toprağı | 1 |
-| 7 | adaçayı | 1 |
-| 8 | adaçayı tohumu | 1 |
-| 9 | akülü budama m | 1 |
-| 10 | akülü budama ma | 1 |
-| 11 | akülü budama mak | 1 |
-| 12 | akülü budama makas | 1 |
-| 13 | akülü budama makası | 1 |
-| 14 | altlık | 1 |
-| 15 | bahçe yatağıaranjman | 1 |
-| 16 | brokoli | 1 |
-| 17 | brokoli tohumu | 1 |
-| 18 | deet 50 | 1 |
-| 19 | safran | 1 |
-| 20 | щюз | 1 |
-| 21 | щюң ю ңңб ю | 1 |
-| 22 | щюң ю ңңб ю ьььььбң | 1 |
-| 23 | щюң ю ңңб ю ьььььбң ң | 1 |
-| 24 | щюң ю ңңб ю ң | 1 |
-| 25 | kompost | 2 |
+| 2 | arı kovanı | 1 |
+| 3 | starlicw ortanca | 1 |
+| 4 | blur | 1 |
+| 5 | proline kalın | 1 |
+| 6 | proline kedi kumu kalın | 1 |
+| 7 | zeytin toprağı | 1 |
+| 8 | adaçayı | 1 |
+| 9 | adaçayı tohumu | 1 |
+| 10 | akülü budama m | 1 |
+| 11 | akülü budama ma | 1 |
+| 12 | akülü budama mak | 1 |
+| 13 | akülü budama makas | 1 |
+| 14 | akülü budama makası | 1 |
+| 15 | altlık | 1 |
+| 16 | bahçe yatağıaranjman | 1 |
+| 17 | brokoli | 1 |
+| 18 | brokoli tohumu | 1 |
+| 19 | deet 50 | 1 |
+| 20 | safran | 1 |
+| 21 | щюз | 1 |
+| 22 | щюң ю ңңб ю | 1 |
+| 23 | щюң ю ңңб ю ьььььбң | 1 |
+| 24 | щюң ю ңңб ю ьььььбң ң | 1 |
+| 25 | щюң ю ңңб ю ң | 1 |
 
 ## En çok sepete eklenenler
 
@@ -137,9 +137,9 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 4 | Altınvadi Ispanak Tohumu 10 Gr | 4,7 | 4,1 |
 | 5 | Arom Dere Otu Ata Tohumu (50 Adet) | 4,6 | 2,3 |
 | 6 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 4,4 | 21 |
-| 7 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 4 | 1,5 |
-| 8 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,6 | 50,9 |
-| 9 | Leonardit - Organik Toprak Düzenleyici | 3 | 48,3 |
+| 7 | Leonardit - Organik Toprak Düzenleyici | 4 | 51,3 |
+| 8 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 4 | 1,5 |
+| 9 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,6 | 51,9 |
 | 10 | HG 5’li Bitki Yetiştirme Seti | 3 | 18,9 |
 | 11 | Altınvadi Bezelye Tohumu 25 Gr | 2,9 | 3,6 |
 | 12 | Altınvadi Arapsaçı Marul Tohumu (Kıvırcık) | 2,9 | 13,6 |
@@ -160,19 +160,19 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 |---|---|---|---|
 | Guanokalong Yarasa Gübresi Toz | 95,5 | 2,8 | %3 |
 | HasTürk Hümix Sıvı Hümik Asit | 61,8 | 2,4 | %4 |
-| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 53 | 1,7 | %3 |
-| İnsektisit MAX 5 Lt Kampanya Paketi | 50,5 | 1,7 | %3 |
+| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 54 | 1,7 | %3 |
+| İnsektisit MAX 5 Lt Kampanya Paketi | 51,5 | 1,7 | %3 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 48,5 | 0 | %0 |
 | Chrysamed Subon Hijyen Sprey | 47,5 | 0 | %0 |
 | Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici (0-3 mm) | 43,7 | 0 | %0 |
 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 42,7 | 1,7 | %4 |
 | Florist Mantar Önleyici Bitki Spreyi | 41,8 | 0 | %0 |
 | HG Asidik Torf | 35,1 | 0,5 | %1 |
-| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 33 | 0 | %0 |
+| Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 35 | 0 | %0 |
 | Kaktüs ve Sukulent Toprağı | 28,1 | 1,2 | %4 |
 | HG Mezar Toprağı | 27,8 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 25,6 | 0 | %0 |
-| Uzman 5 lt Basınçlı İlaçlama Pompası | 23,6 | 0 | %0 |
+| Uzman 5 lt Basınçlı İlaçlama Pompası | 24,6 | 0 | %0 |
 
 ## Birlikte satın alınanlar (son 180 gün)
 
