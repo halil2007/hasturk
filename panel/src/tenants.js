@@ -478,7 +478,8 @@ export class TenantPanel {
     if (url.pathname.startsWith('/__api/')) {
       if (await this.ctx.storage.get('suspended')) return json({ error: 'Mağaza paneli askıda' }, 403);
       await init(this.db);
-      return extApiInner(this.db, url, this.t);
+      return extApiInner(this.db, url, { ...this.t, key: 'site', source: 'Kendi sistemi (API)' }, this.t.slug, { method: req.method, body: req.method === 'POST' ? await req.json().catch(() => null) : null,
+        env, ctx: { waitUntil: (p) => this.ctx.waitUntil(p) } });
     }
     if (await this.ctx.storage.get('suspended')) return json({ error: 'Bu müşteri paneli askıya alınmış' }, 403);
     // Destek talepleri: firmanın kendi talepleri, ana panelin veritabanında (ana panel yanıtlar)

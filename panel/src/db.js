@@ -397,6 +397,11 @@ export const MIGRATIONS = [
   // (fark sonradan değişirse kapatılan fark yeniden açılır; itiraz edilen sipariş eşleşince senkron "çözüldü" yapar)
   `CREATE TABLE IF NOT EXISTS stl_disputes (channel TEXT NOT NULL, order_number TEXT NOT NULL, status TEXT NOT NULL, note TEXT, diff REAL, by_user TEXT,
     created_at INTEGER, updated_at INTEGER, PRIMARY KEY (channel, order_number))`,
+  // Silinen ürünler (Stok API'nin "değişenler" çekiminde silindi bilgisi için; 90 günden eski kayıtlar temizlenebilir)
+  'CREATE TABLE IF NOT EXISTS deleted_products (id INTEGER PRIMARY KEY, sku TEXT, barcode TEXT, at INTEGER NOT NULL)',
+  // Stok API satış bildirimleri (bayinin / firmanın kendi sitesinde satılan): anahtar (src) + satış numarası + ürün başına düşülen adet.
+  // Tekrar gelen bildirim stoğu ikinci kez düşürmez; iptalde adet geri eklenir (bkz. extapi.js)
+  'CREATE TABLE IF NOT EXISTS ext_sales (src TEXT NOT NULL, ref TEXT NOT NULL, product_id INTEGER NOT NULL, qty INTEGER NOT NULL, at INTEGER NOT NULL, cancelled_at INTEGER, PRIMARY KEY (src, ref, product_id))',
   // Kargo firmasının "teslim edildi" bilgisi siteye (ikas / WooCommerce) yazıldı mı: 'delivered' = yazıldı, 'skip' = kanal desteklemiyor.
   // Boşsa (kanal o an hata verdi) her takip turunda yeniden denenir
   'ALTER TABLE packages ADD COLUMN site_sync TEXT',
