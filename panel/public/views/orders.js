@@ -210,7 +210,7 @@ export async function orders(el, rest, query = {}) {
       for (let i = 0; i < ids.length; i += 100) {
         if (ids.length > 100) toast(`İşleme alınıyor: ${Math.min(i + 100, ids.length)} / ${ids.length}`);
         const part = await api('orders-bulk', { method: 'POST', body: { ids: ids.slice(i, i + 100), action: 'accept' } });
-        r.done.push(...part.done); r.errors.push(...part.errors);
+        r.done.push(...part.done); r.errors.push(...part.errors); r.pkgs.push(...Object.values(part.packages || {}).flat());
       }
       toast(`${r.done.length} sipariş işleme alındı${r.errors.length ? `, ${r.errors.length} atlandı` : ''}`, !!r.errors.length && !r.done.length);
       sel.clear(); await load(); loadSummary().catch(() => {});
@@ -262,18 +262,30 @@ export async function orders(el, rest, query = {}) {
     $('[data-go]', s.el).onclick = (e) => busy(e.currentTarget, async () => {
       const firm = $('[data-firm]', s.el).value, desi = $('[data-desi]', s.el).value;
       if (!firm) return toast('Kargo firmasını seçin', true);
-      const r = { done: [], errors: [] };
+      const r = { done: [], errors: [], pkgs: [] };
       // Her gönderi Kargonomi'ye birkaç istek: 10'arlı parçalar
       for (let i = 0; i < ids.length; i += 10) {
         if (ids.length > 10) toast(`Kargonomi gönderileri: ${Math.min(i + 10, ids.length)} / ${ids.length}`);
         const part = await api('orders-bulk', { method: 'POST', body: { ids: ids.slice(i, i + 10), action: 'carrier-label', provider: 'kargonomi', all: true, firm, desi: desi || undefined } });
         r.done.push(...part.done); r.errors.push(...part.errors);
       }
-      render($('[data-res]', s.el), html`<div class="notice small ${r.errors.length ? 'warn' : ''}"><i class="ico ico-${r.errors.length ? 'warn' : 'check'}"></i><div><b>${r.done.length} gönderi oluşturuldu${r.errors.length ? `, ${r.errors.length} sipariş atlandı` : ''}.</b>
+      render($('[data-res]', s.el), html`<div class="notice small ${r.errors.length ? 'warn' : ''}"><i class="ico ico-${r.errors.length ? 'warn' : 'check'}"></i><div><b>${r.pkgs.length || r.done.length} gönderi oluşturuldu (${r.done.length} sipariş)${r.errors.length ? `, ${r.errors.length} hata` : ''}.</b>
         ${r.errors.length ? html`<ul class="tiny" style="margin:6px 0 0;padding-left:18px">${r.errors.slice(0, 20).map((x) => html`<li>${String(x).replace(/^([a-z0-9_]+):([^:]+):\s*/, (m, c, no) => `${ch(c).name} #${no}: `)}</li>`)}</ul>${r.errors.length > 20 ? html`<div class="tiny muted">ve ${r.errors.length - 20} sipariş daha</div>` : ''}` : ''}</div></div>`);
       s.setFoot(html`<span class="spacer"></span><button class="btn" data-close>Kapat</button>${r.done.length ? html`<button class="btn primary" data-print><i class="ico ico-print"></i>Etiketleri yazdır</button>` : ''}`);
       const pr = $('[data-print]', s.el);
-      if (pr) pr.onclick = (ev) => busy(ev.currentTarget, async () => { await bulkLabels(r.done, { fetch: true, done: load }); });
+      // Kargonomi etiketi gönderiden birkaç saniye sonra hazır olur: hazır olana kadar (en çok ~45 sn) beklenir, yalnız yeni paketler yazdırılır
+      if (pr) pr.onclick = (ev) => busy(ev.currentTarget, async () => {
+        const want = new Set(r.pkgs.map(String));
+        for (let i = 0; i < 15 && want.size; i++) {
+          for (let k = 0; k < r.done.length && want.size; k += 30) {
+            const x = await api('labels', { method: 'POST', body: { ids: r.done.slice(k, k + 30), fetch: true } }).catch(() => null);
+            for (const o of (x && x.orders) || []) for (const l of o.labels) if (l.official || l.panel) want.delete(String(l.package_id));
+          }
+          if (want.size) { toast(`Kargonomi etiketleri hazırlanıyor… (${r.pkgs.length - want.size} / ${r.pkgs.length})`); await new Promise((res) => setTimeout(res, 3000)); }
+        }
+        await bulkLabels(r.done, { fetch: true, done: load, only: r.pkgs.filter((x) => !want.has(String(x))) });
+        if (want.size) toast(`${want.size} paketin etiketi henüz hazır değil; birazdan Kargo ekranından yazdırın`, true);
+      });
       sel.clear(); await load(); loadSummary().catch(() => {});
     });
   }

@@ -292,11 +292,12 @@ test('Kargonomi: gerçek ücret tahmini ücretin yerine geçer; firma gönderiyi
 });
 
 test('Kargonomi ile gönder: yalnız internet sitesi siparişi; fiyat teklifi → kullanıcının seçtiği firmayla aynı taslak onaylanır; vazgeçilince taslak silinir; toplu gönderimde firma adıyla; seçim yoksa açılmaz', async () => {
-  const real = globalThis.fetch, calls = [];
+  const real = globalThis.fetch, calls = [], confirmed = new Set();
   let n = 0;
   globalThis.fetch = async (url, o = {}) => {
     const u = String(url), m = o.method || 'GET', J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { 'Content-Type': 'application/json' } });
     calls.push(`${m} ${u}` + (o.body ? ' ' + o.body : ''));
+    if (/confirm-shipping-price/.test(u)) confirmed.add(JSON.parse(o.body).shipment_id);
     if (/\/states$/.test(u)) return J({ data: [{ id: 42, name: 'KONYA' }] });
     if (/\/cities\/42$/.test(u)) return J({ data: [{ id: 600, name: 'SELÇUKLU' }] });
     if (/\/warehouses$/.test(u)) return J({ data: [{ id: 1, is_main: 1 }] });
@@ -304,7 +305,7 @@ test('Kargonomi ile gönder: yalnız internet sitesi siparişi; fiyat teklifi �
     if (/shipment-price-comparison\/\d+$/.test(u)) return J({ shipping_provider_with_price: [{ id: '-1', name: 'Otomatik', price: 40 }, { id: 11, name: 'Aras Kargo', slug: 'aras', price: '52.40' }, { id: 14, name: 'Yurtiçi Kargo', slug: 'yurtici', price: '61' }] });
     if (/confirm-shipping-price/.test(u)) return J({});
     if (m === 'DELETE') return new Response(null, { status: 204 });
-    if (/\/shipments\/\d+$/.test(u)) { const id = Number(u.split('/').pop()); return J({ data: { id, status: 'webservice_order_creating', shipping_provider_name: 'Yurtiçi Kargo', estimated_price: '61' } }); }
+    if (/\/shipments\/\d+$/.test(u)) { const id = Number(u.split('/').pop()); return J({ data: { id, status: confirmed.has(id) ? 'webservice_order_creating' : 'draft', shipping_provider_name: 'Yurtiçi Kargo', estimated_price: '61' } }); }
     return new Response('?', { status: 404 });
   };
   try {
@@ -332,6 +333,9 @@ test('Kargonomi ile gönder: yalnız internet sitesi siparişi; fiyat teklifi �
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal(calls.filter((c) => /^POST .*\/shipments /.test(c)).length, drafts0);
     assert.match(calls.filter((c) => /confirm-shipping-price/.test(c)).pop(), new RegExp(`"shipment_id":${q}.*"shipping_provider_id":14`));
+    // Yanıtı kaybolmuş ekran kapanınca "vazgeç" gelirse onaylı (pakete bağlı) gönderi silinmez
+    await post(`/api/orders/${w1}/carrier-quote-cancel`, { provider: 'kargonomi', quote_id: q });
+    assert.ok(!calls.some((c) => c.startsWith('DELETE ') && c.includes(`/shipments/${q}`)), 'onaylı gönderi silinmedi');
     // Vazgeçilen teklif: taslak silinir
     r = await post(`/api/orders/${encodeURIComponent('woocommerce:W2')}/carrier-quote`, { provider: 'kargonomi' });
     await post(`/api/orders/${encodeURIComponent('woocommerce:W2')}/carrier-quote-cancel`, { provider: 'kargonomi', quote_id: r.body.quote_id });
@@ -446,6 +450,9 @@ test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (site
     t = await trackCarriers(env, env.DB, { force: true });
     assert.ok(woo.some((x) => /notes .*SRT123.*"customer_note":true/.test(x)), woo.join('\n'));
     assert.equal((await pkg()).tracking, 'SRT123');
+    // Etiket yeniden alınınca barkod kargo firmasının barkodu kalır (takip kodu barkodun yerine yazılmaz)
+    await post(`/api/orders/${id}/label`, {});
+    assert.equal((await pkg()).barcode, 'SB77');
     // Teslim edildi: sitede not, panelde sipariş teslim edildi. Site o an hata verirse yarım saat sonra yeniden denenir
     st = 'webservice_shipment_delivered'; failDel = true;
     t = await trackCarriers(env, env.DB, { force: true });
@@ -459,6 +466,17 @@ test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (site
     assert.equal(await sync(), 'delivered');
     assert.ok(woo.some((x) => /notes .*teslim edildi/i.test(x)), woo.join('\n'));
     assert.equal((await call(`/api/orders/${id}`)).body.order.status, 'delivered');
+    // Kargonomi / kargo firması gönderiyi kendisi iptal etti: ücret geri alınır, paket serbest kalır, bildirim düşer
+    await saveOrders(env.DB, 'woocommerce', [order('W11')]);
+    st = 'webservice_order_created'; tn = null;
+    await post(`/api/orders/${encodeURIComponent('woocommerce:W11')}/carrier-label`, { provider: 'kargonomi', firm_id: '15' });
+    const cost11 = (await call(`/api/orders/${encodeURIComponent('woocommerce:W11')}`)).body.order.shipping_cost;
+    assert.ok(cost11 > 0);
+    st = 'cancelled';
+    await trackCarriers(env, env.DB, { force: true });
+    const o11 = (await call(`/api/orders/${encodeURIComponent('woocommerce:W11')}`)).body.order;
+    assert.equal(o11.packages[0].carrier_provider, null); assert.equal(o11.shipping_cost, 0);
+    assert.ok(await env.DB.prepare("SELECT 1 FROM notices WHERE key LIKE 'carrier:cancelled:%' AND resolved_at IS NULL").first(), 'bildirim');
     // Ayar kapalıysa siteye bildirilmez / kendiliğinden kargoya verilmez
     await setSetting(env.DB, 'carrier_auto_ship', false);
     await saveOrders(env.DB, 'woocommerce', [order('W10')]);
@@ -468,4 +486,21 @@ test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (site
     t = await trackCarriers(env, env.DB, { force: true });
     assert.equal(t.shipped, 0);
   } finally { globalThis.fetch = real; }
+});
+
+test('kanalda paketi iptal edilen siparişte entegratör gönderisi açık paket silinmez (ücretli gönderi takipsiz kalmaz), uyarı yazılır', async () => {
+  const { env } = await panel();
+  const o = { ...order('IK1'), packages: [{ remoteId: 'pk-9', status: 'open', items: [{ line_id: 'l1', qty: 1 }] }] };
+  await saveOrders(env.DB, 'ikas1', [o]);
+  await env.DB.prepare("UPDATE packages SET carrier_provider = 'kargonomi', carrier_ref = '555', carrier_cost = 60, agreement = 'own' WHERE order_id = 'ikas1:IK1'").run();
+  // ikas'ta paket iptal edildi (ikas iptal paketleri listelemez)
+  await saveOrders(env.DB, 'ikas1', [{ ...o, packages: [], total: o.total + 0.01 }]);
+  const p = await env.DB.prepare("SELECT remote_id, carrier_ref, error FROM packages WHERE order_id = 'ikas1:IK1'").first();
+  assert.ok(p, 'paket silinmedi'); assert.equal(p.carrier_ref, '555'); assert.equal(p.remote_id, null);
+  const { ORPHAN_MSG } = await import('../src/carriers.js');
+  assert.equal(p.error, ORPHAN_MSG);
+  // Gönderisiz kanal paketi her zamanki gibi kaldırılır
+  await saveOrders(env.DB, 'ikas1', [{ ...order('IK2'), packages: [{ remoteId: 'pk-10', status: 'open', items: [] }] }]);
+  await saveOrders(env.DB, 'ikas1', [{ ...order('IK2'), packages: [], total: 1 }]);
+  assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM packages WHERE order_id = 'ikas1:IK2'").first()).n, 0);
 });
