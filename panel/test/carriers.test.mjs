@@ -222,9 +222,16 @@ test('kargo firması (HepsiJET, sahte sunucu): etiket → kargoya ver → firma 
     assert.ok(!(await call(`/api/orders/${kid}`)).body.order.packages[0].label_at, 'etiket yokken etiket hazır sayılmaz');
     kgReady = true;
     r = await post(`/api/orders/${kid}/label`, { package_id: kp.id });
-    assert.equal(r.body.official.format, 'pdf');
+    // Bizim tasarım (varsayılan): kargo firmasının barkoduyla panel etiketi; Kargonomi'nin PDF'i saklanır ve indirilebilir
+    assert.ok(r.body.panel && !r.body.official, JSON.stringify(r.body).slice(0, 300));
     assert.equal(r.body.order.packages[0].tracking, 'AR123');
+    assert.ok(r.body.order.packages[0].barcode, 'kargo firmasının barkodu');
     assert.equal(r.body.order.packages[0].cargo_company, 'Aras Kargo');
+    assert.equal((await post(`/api/orders/${kid}/label-pdf`, { package_id: kp.id })).body.official.format, 'pdf');
+    // Ayar kapalı: Kargonomi'nin etiketi
+    await setSetting(env.DB, 'label_own_carrier', false);
+    r = await post(`/api/orders/${kid}/label`, { package_id: kp.id });
+    assert.equal(r.body.official.format, 'pdf');
   } finally { globalThis.fetch = real; }
 });
 
@@ -389,7 +396,7 @@ test('Kargonomi: pakete bölünmüş sipariş — her paket ayrı gönderi / eti
     assert.ok(confirms.every((c) => /"shipping_provider_id":14/.test(c)));
     // Etiketler: her paket ayrı
     const lb = await post('/api/labels', { ids: ['woocommerce:S1'], fetch: true });
-    assert.equal(lb.body.orders[0].labels.filter((l) => l.official).length, 3);
+    assert.equal(lb.body.orders[0].labels.filter((l) => l.panel).length, 3, 'bizim tasarımla, her paket kendi kargo barkoduyla');
     // Toplu: bölünmüş siparişin tüm paketleri gider
     r = await post('/api/orders-bulk', { ids: ['woocommerce:S2'], action: 'carrier-label', provider: 'kargonomi', all: true, firm: 'aras' });
     assert.deepEqual(r.body.done, ['woocommerce:S2'], JSON.stringify(r.body));
@@ -401,9 +408,10 @@ test('Kargonomi: pakete bölünmüş sipariş — her paket ayrı gönderi / eti
 test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (siteye takip), sonradan gelen takip kodu siteye yazılır, teslim edilince sitede not + panelde "Teslim edildi"; ayar kapalıysa yapılmaz', async () => {
   const { trackCarriers } = await import('../src/carriers.js');
   const real = globalThis.fetch, woo = [];
-  let st = 'webservice_order_created', tn = null;
+  let st = 'webservice_order_created', tn = null, failDel = false;
   globalThis.fetch = async (url, o = {}) => {
     const u = String(url), m = o.method || 'GET', J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { 'Content-Type': 'application/json' } });
+    if (failDel && /magaza\.test.*notes/.test(u) && /teslim edildi/i.test(o.body || '')) { failDel = false; return J({ message: 'yetki yok' }, 403); }
     if (/magaza\.test/.test(u)) { woo.push(`${m} ${u.replace(/\?.*$/, '')} ${o.body || ''}`); return J(/notes/.test(u) ? { id: 1 } : /orders\/W9$/.test(u) ? { id: 'W9', status: 'completed' } : []); }
     if (/\/states$/.test(u)) return J({ data: [{ id: 42, name: 'KONYA' }] });
     if (/\/cities\/42$/.test(u)) return J({ data: [{ id: 600, name: 'SELÇUKLU' }] });
@@ -438,9 +446,17 @@ test('Kargonomi takibi siteye otomatik: firma teslim alınca "Kargoya ver" (site
     t = await trackCarriers(env, env.DB, { force: true });
     assert.ok(woo.some((x) => /notes .*SRT123.*"customer_note":true/.test(x)), woo.join('\n'));
     assert.equal((await pkg()).tracking, 'SRT123');
-    // Teslim edildi: sitede not, panelde sipariş teslim edildi
-    st = 'webservice_shipment_delivered';
+    // Teslim edildi: sitede not, panelde sipariş teslim edildi. Site o an hata verirse yarım saat sonra yeniden denenir
+    st = 'webservice_shipment_delivered'; failDel = true;
     t = await trackCarriers(env, env.DB, { force: true });
+    const sync = async () => (await env.DB.prepare("SELECT site_sync FROM packages WHERE order_id = 'woocommerce:W9'").first()).site_sync;
+    assert.equal(await sync(), 'e1');
+    assert.ok(!woo.some((x) => /notes .*teslim edildi/i.test(x)));
+    await trackCarriers(env, env.DB, { force: true });
+    assert.equal(await sync(), 'e1', 'yarım saat dolmadan yeniden denenmez');
+    await env.DB.prepare("UPDATE packages SET carrier_checked_at = ? WHERE order_id = 'woocommerce:W9'").bind(Date.now() - 31 * 60e3).run();
+    await trackCarriers(env, env.DB, { force: true });
+    assert.equal(await sync(), 'delivered');
     assert.ok(woo.some((x) => /notes .*teslim edildi/i.test(x)), woo.join('\n'));
     assert.equal((await call(`/api/orders/${id}`)).body.order.status, 'delivered');
     // Ayar kapalıysa siteye bildirilmez / kendiliğinden kargoya verilmez

@@ -496,7 +496,7 @@ details.adv summary::-webkit-details-marker { display: none; }
 .slabel .lb-logo { max-height: 11mm; max-width: 48mm; object-fit: contain; }
 .slabel.s-a5 .lb-logo, .slabel.s-a4 .lb-logo { max-height: 15mm; max-width: 70mm; }
 .slabel .lb-mark { font: 900 14pt/1 Arial, Helvetica, sans-serif; letter-spacing: -0.3mm; border: 0.6mm solid #000; border-radius: 2mm; padding: 1.2mm 2.5mm; white-space: nowrap; }
-.slabel .lb-mark.ikas { text-transform: lowercase; } .slabel .lb-mark.pttavm { letter-spacing: 0; }
+.slabel .lb-mark.ikas { text-transform: lowercase; } .slabel .lb-mark.kargonomi { text-transform: lowercase; } .slabel .lb-mark.pttavm { letter-spacing: 0; }
 .slabel .lb-cargo { display: flex; align-items: center; justify-content: space-between; gap: 2mm; }
 .slabel .lb-cargo b { display: block; font-size: 15pt; font-weight: 900; line-height: 1.1; }
 .slabel .lb-agr { display: inline-block; margin-top: 1mm; font-size: 8.5pt; font-weight: 700; border: 0.35mm solid #000; border-radius: 1mm; padding: 0.4mm 1.5mm; }

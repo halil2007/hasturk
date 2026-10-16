@@ -510,7 +510,8 @@ async function orderAction(env, db, id, action, b, ctx, user) {
     if (o.status === 'new') await setLocalStatus(db, o, 'processing');
     await event(db, o, 'carrier', user, `Paket ${pkg.no}: ${c.name} · ${str(r.carrier) || ''} ${tn}`.trim());
     const lab = r.label ? { ...r.label, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label.format}` } : null;
-    const late = !lab && LATE_LABEL.has(c.id);
+    const late = !lab && LATE_LABEL.has(c.id), own = !!lab && ownCarrierDesign(settings, c.id) && !!str(r.barcode);
+    if (own) return { message: `${c.name} gönderisi oluşturuldu: ${str(r.carrier) || ''} ${tn}`.trim() + chNote, package_id: pkg.id, official: null, panel: true, order: await loadOrder(db, o.id), sender: settings.sender };
     return { message: `${c.name} gönderisi oluşturuldu: ${str(r.carrier) || ''} ${tn}`.trim() + chNote, package_id: pkg.id, official: lab, panel: !lab && !late, ...(late ? { pending: `${c.name} etiketi hazırlanıyor` } : {}) };
   }
   // Kargonomi fiyat teklifi: gönderi taslağı açılır, kargo firmalarının fiyatları döner; kullanıcı firmayı seçince carrier-label
@@ -667,6 +668,8 @@ export async function zplToPdf(lab) {
 
 // Hepsiburada: etiket bizim tasarımla basılır (Ayarlar → Kargo etiketi), barkod Hepsiburada'dan gelir. Kanalın etiketi yine saklanır.
 const ownDesign = (settings, ch) => !!ch && ch.type === 'hepsiburada' && settings.label_own !== false;
+// Kargonomi: etiket bizim tasarımla (kargo firmasının barkodu Kargonomi'den gelir); kapalıysa Kargonomi'nin PDF etiketi
+const ownCarrierDesign = (settings, provider) => provider === 'kargonomi' && settings.label_own_carrier !== false;
 
 // ---------- kargo etiketi (kanalın kendi sisteminden) ----------
 // ikas: ikas Kargo etiket görseli / barkodu · Trendyol: ortak etiket (ZPL) ya da takip barkodu · Hepsiburada: paket etiketi (ZPL/PDF).
@@ -683,6 +686,9 @@ async function makeLabel(db, ch, o, pkg, settings, { refresh = false, env = null
     }
     if (r && r.label_data) {
       await run(db, 'UPDATE packages SET label_at = COALESCE(label_at, ?) WHERE id = ?', Date.now(), pkg.id);
+      // Bizim tasarım (Ayarlar → Kargo etiketi): kargo firmasının barkodu, firma adı ve Kargonomi işaretiyle panel etiketi basılır;
+      // Kargonomi'nin PDF etiketi saklanır (paket menüsünden indirilir). Barkod henüz gelmediyse firmanın etiketi verilir
+      if (ownCarrierDesign(settings, pkg.carrier_provider) && str((await first(db, 'SELECT barcode FROM packages WHERE id = ?', pkg.id) || {}).barcode)) return { official: null, panel: true };
       return { official: { format: r.label_format, data: r.label_data, filename: `${o.channel}-${o.order_number}-${pkg.no}.${r.label_format}` } };
     }
     // Etiketi firmanın verdiği gönderi (Kargonomi, Navlungo, DHL): panelin iç etiketi basılmaz (kargo firması okutmaz); firma etiketi beklenir

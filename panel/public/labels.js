@@ -52,6 +52,8 @@ export const AGREEMENT = {
   ikas: 'ikas Kargo anlaşmalı gönderi', trendyol: 'Trendyol anlaşmalı gönderi', hepsiburada: 'Hepsiburada anlaşmalı gönderi', pttavm: 'PttAVM anlaşmalı gönderi',
   n11: 'N11 anlaşmalı gönderi', idefix: 'idefix anlaşmalı gönderi', pazarama: 'Pazarama anlaşmalı gönderi', ciceksepeti: 'Çiçeksepeti anlaşmalı gönderi', own: 'Satıcı anlaşmalı gönderi',
 };
+// Kargo entegratörü gönderisi (bizim tasarımda): etiketin işareti ve anlaşma ifadesi; barkod kargo firmasının (Sürat, Aras…) barkodu
+const CARRIER_MARK = { kargonomi: ['kargonomi', 'Kargonomi anlaşmalı gönderi'] };
 const MARKETPLACES = ['trendyol', 'hepsiburada', 'pttavm', 'n11', 'idefix', 'pazarama', 'ciceksepeti'];
 // Anlaşma: pakete kaydedilen (ikas Kargo işlediyse 'ikas', kendi anlaşmanızsa 'own'); yoksa pazaryeri barkodu o pazaryerinin anlaşmasıdır
 export function agreementOf(order, pkg) {
@@ -80,10 +82,11 @@ export function labelData(order, pkg, total, sender = {}) {
       price: unit ? fmtMoney(unit * (Number(x.qty) || 0)) : '' };
   });
   const c = ch(order.channel), type = c.type || order.channel;
-  const agr = internal ? null : agreementOf(order, pkg);
+  const agr = internal ? null : agreementOf(order, pkg), cm = !internal && CARRIER_MARK[pkg.carrier_provider];
   return {
     code, internal, track: pkg.tracking && pkg.tracking !== code ? pkg.tracking : '', rows, qty: (pkg.items || []).reduce((n, x) => n + (Number(x.qty) || 0), 0),
-    type, mark: MARK[type] || c.name, platform: c.name, agreement: agr ? AGREEMENT[agr] || '' : '', cargo: pkg.cargo_company || order.cargo_company || '',
+    type: cm ? pkg.carrier_provider : type, mark: cm ? cm[0] : MARK[type] || c.name, platform: c.name, agreement: cm ? cm[1] : agr ? AGREEMENT[agr] || '' : '',
+    cargo: pkg.cargo_company || order.cargo_company || '',
     pkgText: `${pkg.no || 1}/${total}`, orderNo: order.order_number, date: new Date(order.ordered_at).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' }),
     // Firma logosunu yüklediyse etikette onun logosu, yoksa Hastürk logosu (panel ekranlarındaki logo değişmez)
     logo: (state.settings && state.settings.logo) || 'logo.webp',

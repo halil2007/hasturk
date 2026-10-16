@@ -438,7 +438,7 @@ test('Kendi anlaşmalı kargo: ikas siparişi Kargonomi ile gönderilir (etiket,
     assert.equal((await admin(`/api/orders/${id}/carrier-label`, J({}))).status, 400);
     await ok(await admin('/api/integrations/carriers/kargonomi', J({ values: { KARGONOMI_API_KEY: 'tok', KARGONOMI_WAREHOUSE: '1' } }, 'PUT')));
     const cl = await ok(await admin(`/api/orders/${id}/carrier-label`, J({ provider: 'kargonomi', firm_id: '11' })));
-    assert.equal(cl.official.format, 'pdf');
+    assert.ok(cl.panel && !cl.official, 'etiket bizim tasarımla (kargo barkodu Kargonomi\'den)');
     const draft = n.find('POST', /kargonomi\.com\.tr\/api\/v1\/shipments$/)[0].body.shipment;
     assert.equal(draft.buyer_state_id, 34); assert.equal(draft.buyer_city_id, 3401); assert.equal(draft.buyer_phone, '5321112233');
     let d = await ok(await admin('/api/orders/' + id));
@@ -454,9 +454,10 @@ test('Kendi anlaşmalı kargo: ikas siparişi Kargonomi ile gönderilir (etiket,
     await ok(await admin('/api/sync', J({ channels: ['ikas1'], force: true })));
     d = await ok(await admin('/api/orders/' + id));
     assert.equal(d.order.packages.length, 1); assert.equal(d.order.packages[0].carrier_provider, 'kargonomi'); assert.equal(d.order.packages[0].tracking, 'KG901');
-    // Etiket kayıtlı (entegratörün PDF'i)
+    // Etiket bizim tasarımla (kargo barkoduyla); entegratörün PDF'i kayıtlı
     const lb = await ok(await admin(`/api/orders/${id}/label`, J({ package_id: pk.id })));
-    assert.equal(lb.official.format, 'pdf');
+    assert.ok(lb.panel && !lb.official);
+    assert.equal((await ok(await admin(`/api/orders/${id}/label-pdf`, J({ package_id: pk.id })))).official.format, 'pdf');
     // Kargoya ver → ikas'ta paket FULFILLED (müşteriye bildirim ikas'tan)
     await ok(await admin(`/api/orders/${id}/ship`, J({ package_id: pk.id })));
     const up = ik.gql.find((b) => /updateOrderPackageStatus/.test(b.query));
