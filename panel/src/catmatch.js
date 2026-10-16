@@ -25,8 +25,9 @@ export const tokens = (s) => fold(s).split(' ').filter((w) => w.length >= 2 && !
 const SOFT = { k: 'g', p: 'b', t: 'd', c: 'c' };
 const soft = (w) => (SOFT[w[w.length - 1]] ? w.slice(0, -1) + SOFT[w[w.length - 1]] : w);
 // Yapım ekleri kelimenin anlamını değiştirir: bitki ≠ bitkisel, koku ≠ kokulu, ilaç ≠ ilaçlama, tuz ≠ tuzsuz, kahve ≠ kahveci.
-// Çekim ekleri (-lar / -ler, -ı / -sı, -da, -ın …) serbesttir. Kalıp, kısa kelimeden sonra gelen kalanın başına bakar.
-const DERIV = /^(l[iu]k?|s[iu]z|s[ae]l|c[iu]|l[ae]m[ae])/;
+// Çekim ekleri (-lar / -ler, -ı / -sı, -da, -ın …) serbesttir. Kalıp, kısa kelimeden (ya da gövdesinden: bitk-i) sonra gelen kalanın başına
+// bakar; gövdede düşen ünlü kalanın başında olabilir (bitk + isel).
+const DERIV = /^[aeiu]?(l[iu]k?|l$|s[iu]z|s[ae]l|c[iu]|l[ae]m[ae])/;
 function pm(a, b) {
   const [s, l] = a.length <= b.length ? [a, b] : [b, a];
   if (s.length < 3) return s === l;
