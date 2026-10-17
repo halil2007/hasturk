@@ -24,3 +24,11 @@ jobs:
           IKAS_STORE: ${{ secrets.IKAS_STORE }}
           IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
           IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+      - name: Tarım Dünyası (2. mağaza, yalnız okur)
+        continue-on-error: true
+        run: node scripts/ikas-not-alani.mjs
+        env:
+          MAGAZA: tarim
+          IKAS_STORE: hasturktarimdunyasi
+          IKAS_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}

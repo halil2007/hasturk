@@ -51,4 +51,11 @@ if (q) {
     if (set) console.log('Türler:', [...new Set(set.options.map((o) => o.type))].join(', '), '· metin seçeneği:', set.options.some((o) => /TEXT/i.test(o.type)) ? 'VAR' : 'yok');
   } catch (e) { console.log('Okuma hatası (alanlar farklı olabilir):', e.message.slice(0, 300)); }
 }
+// Tarım Dünyası: seçenek setleri ve "kendi toprak karışımı" benzeri ürün var mı
+if (env.MAGAZA === 'tarim') {
+  const d = await gql(`{ listProductOptionSet { id name options { id type } } }`);
+  console.log('Tarım Dünyası seçenek setleri:', JSON.stringify((d.listProductOptionSet || []).map((x) => ({ ad: x.name, secenek: x.options.length }))));
+  const P = JSON.parse(readFileSync('public/tarim/products.json', 'utf8')).items.filter((x) => /karis|karış|kendi/i.test(x.n) && /topra/i.test(x.n));
+  console.log('Tarım Dünyası ürünlerinde karışım/kendi toprak:', P.map((x) => x.s).join(', ') || 'yok');
+}
 console.log(env.YAZ === '1' ? 'YAZ=1: henüz yazma adımı tanımlı değil (ön kontrol sonucu görülmeden yazılmaz).' : 'Ön kontrol bitti: hiçbir şey değiştirilmedi.');
