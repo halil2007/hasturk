@@ -76,7 +76,7 @@ async function journey(browser, name, prof, mode) {
     for (const a of links.slice(0, 14)) { const b = await a.boundingBox().catch(() => null); if (b && b.y < 200) { await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 4 }); await page.waitForTimeout(180); } }
     await page.mouse.move(700, 600, { steps: 4 });
   } else {
-    const fab = page.locator('#urun-arama-root >> .fab');
+    const fab = page.locator('#urun-arama-root >> .fab:not(.akfab)');
     if (await fab.count()) {
       const a = Date.now();
       await fab.tap().catch(() => {});

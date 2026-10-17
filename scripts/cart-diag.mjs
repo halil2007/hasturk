@@ -80,12 +80,12 @@ const cartCount = async (p) => p.evaluate(async () => {
   const reqs = [];
   ctx.on('request', (r) => { if (/graphql|cart|sepet/i.test(r.url()) && r.method() === 'POST') reqs.push({ t: Date.now(), url: r.url().replace(/^https?:\/\/[^/]+/, '').slice(0, 90), body: (r.postData() || '').replace(/\s+/g, ' ').slice(0, 140) }); });
   await p.goto(SITE + '/', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await p.locator('#urun-arama-root >> .fab:not(.hide)').waitFor({ timeout: 30000 });
+  await p.locator('#urun-arama-root >> .fab:not(.akfab):not(.hide)').waitFor({ timeout: 30000 });
   await p.waitForTimeout(3000);
   const store = () => p.evaluate(() => ({ ls: Object.keys(localStorage).filter((k) => /cart|sepet|ikas/i.test(k)).map((k) => k + '=' + String(localStorage.getItem(k)).slice(0, 60)), ss: Object.keys(sessionStorage).filter((k) => /cart|sepet|ikas/i.test(k)).map((k) => k + '=' + String(sessionStorage.getItem(k)).slice(0, 60)), ck: document.cookie.split('; ').filter((c) => /cart|sepet/i.test(c)).map((c) => c.slice(0, 80)) }));
   log('Sepet kimliği (önce): ' + JSON.stringify(await store()));
   log('Widget testi başlangıç sepet: ' + await cartCount(p));
-  await p.locator('#urun-arama-root >> .fab').tap();
+  await p.locator('#urun-arama-root >> .fab:not(.akfab)').tap();
   await p.locator('#urun-arama-root >> .top input').fill(QUERY);
   await p.locator('#urun-arama-root >> .results [data-act="add"]').first().waitFor({ timeout: 20000 });
   const name = await p.locator('#urun-arama-root >> .results .pname').first().textContent();
