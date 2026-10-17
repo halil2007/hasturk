@@ -1,0 +1,22 @@
+name: Perlit Market karışım tanısı
+
+# perlitmarket.com: kendi karışımını yap sistemi ve bitkiye özel toprakların içerik oranları (yalnız herkese açık sayfalar).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tara:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - run: node scripts/pm-tara.mjs

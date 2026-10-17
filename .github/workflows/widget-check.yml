@@ -4,7 +4,7 @@ name: Widget derleme kontrolü
 # Bu kontrol, yayınlanan küçültülmüş dosyanın kaynakla güncel olduğundan emin olur.
 on:
   pull_request:
-    paths: ['widget/**', 'public/pm-search.js', 'public/pm-search.js.map', 'scripts/build-widget.mjs']
+    paths: ['widget/**', 'public/pm-search.js', 'public/pm-search.js.map', 'scripts/build-widget.mjs', 'src/toprak.js', 'scripts/toprak-esit.mjs']
 
 permissions:
   contents: read
@@ -22,3 +22,5 @@ jobs:
         run: node scripts/build-widget.mjs --check
       - name: Eski telefonlar için ES5 uyumu
         run: npx --yes acorn@8 --ecma5 public/pm-search.js > /dev/null
+      - name: Toprak tarifleri (sunucu = widget, 10 ölçü, solucan en çok %20)
+        run: node scripts/toprak-esit.mjs
