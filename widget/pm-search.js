@@ -622,18 +622,27 @@
 
     /* Kategoriler */
     // Sekmeler sığmazsa yana kayar (sıkışıp iç içe girmesin); yarım görünen son sekme kaydırılabildiğini gösterir
-    '.tabs{flex:none;display:flex;border-bottom:1px solid var(--ln);background:#fff;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding:0 4px}.tabs::-webkit-scrollbar{display:none}',
+    '.tabs{flex:none;display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid var(--ln);background:var(--bg);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scroll-padding:0 10px}.tabs::-webkit-scrollbar{display:none}',
     '.tb .tl{display:none}',
 
-    '.tb{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:46px;padding:0 15px;font-size:14px;font-weight:700;color:var(--mu);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap;scroll-snap-align:start}',
-    '.tb svg{display:none}',
-    '@media(max-width:379px){.tb{font-size:13px;padding:0 12px}}',
-    '.mx{padding:14px 16px 20px}.mx-h b{display:block;font-size:16px}.mx-h p{margin:4px 0 0;font-size:13.5px;color:var(--mu);line-height:1.45}',
-    '.mx-f{display:flex;gap:8px;margin:12px 0 8px}.mx-f input{flex:1;min-width:0;height:42px;border:1.5px solid var(--ln);border-radius:21px;padding:0 14px;font:inherit;font-size:14px}.mx-f button{flex:none;height:42px;padding:0 16px;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:13.5px}',
-    '.mx-c{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.mx-c::-webkit-scrollbar{display:none}.mx-c button{flex:none;padding:6px 12px;border-radius:16px;border:1.5px solid var(--ln);font-size:13px;font-weight:700;background:#fff}',
-    '.mx-m{font-size:13px;color:var(--prd);background:var(--soft);border-radius:10px;padding:8px 10px;margin:8px 0 0}.mx-w{color:#9a5b00;background:#fff6e5}',
-    '.kar .kr.kz .kn,.kar .kr.kz .kq b{color:var(--mu)}.kar .kn small{display:block;font-size:12px;color:var(--mu)}',
-    '.mx-l{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mx-l label{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700}.mx-l input{width:90px;height:38px;border:1.5px solid var(--ln);border-radius:12px;padding:0 10px;font:inherit;font-size:15px;font-weight:700;text-align:right}',
+    '.tb{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 14px 0 12px;border-radius:19px;border:1.5px solid var(--ln);background:#fff;font-size:13.5px;font-weight:700;color:#4b5963;white-space:nowrap;scroll-snap-align:start;transition:background .15s,color .15s,border-color .15s}',
+    '.tb svg{display:block;width:16px;height:16px;flex:none}',
+    // Karışım sekmesi hafifçe öne çıkar (yeni araç)
+    '.tb[data-v="mix"]{border-color:var(--pr);color:var(--prd);background:linear-gradient(135deg,#fff 40%,var(--soft))}.tb[data-v="mix"] svg{color:var(--pr)}',
+    '@media(max-width:379px){.tb{font-size:13px;padding:0 12px 0 10px}}',
+    '.mx{padding:12px 14px 0;background:var(--bg);min-height:100%}',
+    '.mxh{display:flex;align-items:center;gap:12px;padding:4px 2px 12px}.mxh .mxi{width:46px;height:46px;border-radius:14px;background:var(--pr);color:#fff;display:grid;place-items:center;flex:none}.mxh .mxi svg{width:26px;height:26px}.mxh b{display:block;font-size:17px;color:var(--prd)}.mxh span{display:block;font-size:13px;color:var(--mu);line-height:1.4;margin-top:2px}',
+    '.mxseg{display:flex;background:#fff;border:1.5px solid var(--ln);border-radius:14px;padding:4px;gap:4px;margin-bottom:10px}.mxseg button{flex:1;height:38px;border-radius:10px;font-size:13.5px;font-weight:800;color:var(--mu)}.mxseg button.on{background:var(--soft);color:var(--prd)}',
+    '.mxk{background:#fff;border:1px solid var(--ln);border-radius:16px;padding:14px;margin-bottom:10px}',
+    '.mxs{display:flex;align-items:center;gap:10px;margin-bottom:10px}.mxs i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--prd);display:grid;place-items:center;font-size:13px;font-weight:800;flex:none}.mxs b{font-size:15px;flex:1}.mxs small{font-size:12px;color:var(--mu);font-weight:400}.mxs .mx0{color:var(--pr);font-weight:700;font-size:13px}',
+    '.mx-f{display:flex;gap:8px;margin:0 0 10px}.mx-f input{flex:1;min-width:0;height:44px;border:1.5px solid var(--ln);border-radius:12px;padding:0 12px;font:inherit;font-size:15px;background:var(--bg)}.mx-f input:focus{outline:0;border-color:var(--pr);background:#fff}.mx-f button{flex:none;height:44px;padding:0 16px;border-radius:12px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}',
+    '.mx-c{display:flex;flex-wrap:wrap;gap:6px}.mx-c button{padding:6px 11px;border-radius:15px;border:1px solid var(--ln);font-size:12.5px;font-weight:700;background:#fff;color:#4b5963}.mx-c button:hover{border-color:var(--pr);color:var(--pr)}',
+    '.mx-m{font-size:13px;color:var(--prd);background:var(--soft);border-radius:10px;padding:8px 10px;margin:10px 0 0}.mx-w{color:#9a5b00;background:#fff6e5}',
+    '.mxbr{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:2px 0 6px;background:var(--bg)}.mxbr span{display:block;height:100%;transition:width .2s}',
+    '.mx .kr{gap:10px}.mx .kr .dot{width:12px;height:12px;border-radius:4px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}.mx .kn small{display:block;font-size:12px;color:var(--mu)}.mx .kq b{min-width:58px;font-size:13px}.mx .kr:last-child{border-bottom:0}',
+    '.mxa{margin-top:12px}.mxa .mxa-t{font-size:12.5px;font-weight:700;color:var(--mu);margin-bottom:8px}.mxa .mxa-t small{font-weight:400}.mxa .mx-c button{display:flex;align-items:center;gap:6px}.mxa .mx-c .dot{width:10px;height:10px;border-radius:3px}',
+    '.mx-l{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mx-l .vo{padding:8px 12px}.mx-l label{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:var(--mu)}.mx-l input{width:96px;height:40px;border:1.5px solid var(--ln);border-radius:12px;padding:0 10px;font:inherit;font-size:15px;font-weight:800;text-align:right;color:var(--ink)}.mx-l input:focus{outline:0;border-color:var(--pr)}.mxk .hint{font-size:12px;color:var(--mu);margin:8px 0 0;line-height:1.4}',
+    '.mx-s{position:sticky;bottom:0;z-index:3;margin:0 -14px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--ln);box-shadow:0 -6px 18px rgba(0,0,0,.06)}.mx-s .sh-f{margin-top:0}.mx-s .bhint{margin:6px 0 0;font-size:11.5px;color:var(--mu)}.mx-s .pk{font-size:12px;color:var(--mu);margin-bottom:6px}',
 
     /* Kullanım rehberi */
     '.gd{padding:16px 16px 8px}',
@@ -683,6 +692,7 @@
     /* Ak Bilge */
     '.akt{display:none;flex:1;min-width:0;font-size:16px;font-weight:800;color:var(--prd);padding-left:4px}',
     '.akm .field{display:none}.akm .akt{display:block}.akm .cta,.akm .xsell{display:none!important}',
+    '.mxm .field{display:none}.mxm .akt{display:block}.mxm .cta,.mxm .xsell{display:none!important}',
     '.akf{display:none;flex:none;gap:8px;align-items:center;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);background:#fff}',
     '.akm .akf{display:flex}',
     '.akf input{flex:1;min-width:0;height:46px;border-radius:23px;border:2px solid var(--ln);padding:0 16px;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);outline:0}',
@@ -731,7 +741,7 @@
     '.akdots i:nth-child(2){animation-delay:.15s}.akdots i:nth-child(3){animation-delay:.3s}',
     '@keyframes akd{0%,100%{opacity:.25}50%{opacity:.9}}',
     '@media(min-width:760px){.akh{padding:18px 20px 6px}.akwrap{padding:4px 20px 14px}.akf{padding:10px 20px 12px}}',
-    '.tb.on{color:var(--pr);border-bottom-color:var(--pr)}',
+    '.tb.on,.tb[data-v="mix"].on{background:var(--pr);border-color:var(--pr);color:#fff}.tb.on svg{color:#fff}',
     '.hw{display:block}.cside{display:none}',
     '@media(min-width:760px){.hw{display:grid;grid-template-columns:250px minmax(0,1fr);align-items:start}',
     ' .cside{display:block;position:sticky;top:0;max-height:calc(min(84vh,760px) - 170px);overflow-y:auto;padding:0 8px 16px 12px;border-right:1px solid var(--ln);scrollbar-width:thin}',
@@ -886,7 +896,6 @@
     '.kbtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:9px 0 0;border-radius:20px;background:var(--pr);color:#fff;font-weight:800;font-size:13.5px}.kbtn svg{width:16px;height:16px}',
     '.kar .kr{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)}.kar .kn{flex:1;min-width:0;font-size:13.5px}.kar .kq{display:flex;align-items:center;gap:6px}.kar .kq b{min-width:44px;text-align:center;font-size:13.5px}',
     '.kar .kq button{width:28px;height:28px;border-radius:50%;border:1px solid var(--ln);display:grid;place-items:center;background:#fff}.kar .kq button[disabled]{opacity:.35}.kar .kq svg{width:14px;height:14px}.kar .kp{width:84px;text-align:right;font-weight:700;font-size:13.5px}',
-    '.mx .kq b{min-width:62px}.mx .sh-l{overflow:hidden}',
     '.kar .sh-l small{font-weight:400;color:var(--mu)}.kar .kek{margin:10px 0 2px}.kar .kek summary{cursor:pointer;color:var(--pr);font-weight:700;font-size:13.5px;margin-bottom:8px}.kar .ksum{display:flex;justify-content:space-between;padding:10px 0 4px;color:var(--mu);font-size:13px}',
     '.akmore{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:8px 0 0;border-radius:20px;border:1px solid var(--ln);background:#fff;color:var(--pr);font-weight:700;font-size:14px;text-decoration:none}.akmore svg{width:16px;height:16px}',
     '.akall{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:8px 0 0;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}.akall svg{width:17px;height:17px}',
@@ -998,10 +1007,10 @@
     /* Masaüstü geçersiz kılmaları (temel kurallardan sonra) */
     '@media(min-width:760px){',
     ' .tabs{justify-content:flex-start;gap:4px;padding:8px 16px 0;background:var(--bg);border-bottom:1px solid var(--ln)}',
-    ' .tb{flex:none;padding:0 18px;height:44px;font-size:14px;border-radius:12px 12px 0 0;border:1px solid transparent;border-bottom:0;margin-bottom:-1px;color:#4b5963}',
+    ' .tb{flex:none;padding:0 18px;height:44px;font-size:14px;border-radius:12px 12px 0 0;border:1px solid transparent;border-bottom:0;margin-bottom:-1px;color:#4b5963;background:transparent}',
     ' .tb svg{display:block;width:18px;height:18px}.tb .tl{display:inline}.tb .ts{display:none}',
     ' .tb:hover{color:var(--ink)}',
-    ' .tb.on{background:#fff;border-color:var(--ln);color:var(--pr)}',
+    ' .tb.on,.tb[data-v="mix"].on{background:#fff;border-color:var(--ln);color:var(--pr)}.tb.on svg{color:var(--pr)}.tb[data-v="mix"]{background:transparent;border-color:transparent}',
     ' .mfoot{justify-content:flex-start;padding:10px 20px}.mfoot a{flex:none;padding:0 18px;height:42px}',
     ' .mfoot .tel .ts{display:none}',
     ' .cban{display:flex;justify-content:center;background:var(--bg)}.cban img{width:auto;max-width:100%;max-height:300px}',
@@ -1198,7 +1207,7 @@
     else if (act === 'shx') closeSheet();
     else if (act === 'shgo') doAdd();
     else if (act === 'kar') { var kn = v; var ko = function () { karOpen(kn); }; if (KAR) ko(); else { var kl = karLoad(); if (kl) kl.then(function () { if (KAR) ko(); else ptoast('Karışım fiyatları yüklenemedi.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git'); }); } }
-    else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0') mixAct(act, v);
+    else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0' || act === 'mxm') mixAct(act, v);
     else if (act === 'kargo') karGo();
     else if (act === 'tocm') { e.preventDefault(); var ub = $calc.querySelector('.unit [data-v="cm"]'); if (ub) calcAction('unit', 'cm', ub); }
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
@@ -1672,6 +1681,8 @@
     $guide.classList.toggle('on', t === 'guide');
     $ak.classList.toggle('on', t === 'ak');
     $panel.classList.toggle('akm', t === 'ak');
+    $panel.classList.toggle('mxm', t === 'mix');
+    var akt = root.querySelector('.akt'); if (akt) akt.textContent = t === 'mix' ? 'Toprak Karışımı' : '';
     if (t === 'ak') { if ($q.value) { $q.value = ''; render(); } akBuild(); }
     if (t === 'guide') renderGuide();
     if (t === 'calc') calcBuild();
@@ -2694,7 +2705,7 @@
   // ---- Karışım sekmesi: müşteri bileşenleri ve oranları kendisi seçer (ya da bitkinin tarifiyle başlar), istediği
   // litreyi yazar. Bir pakette bileşen başına en çok ~100 L satılabildiği için büyük miktar eşit paketlere bölünür
   // (adet = paket sayısı; hazırlama ücreti paket başına). En az paketle, her bileşen kendi en büyük seçeneğine sığacak şekilde.
-  var MX = { parts: [], L: 10, ad: '', msg: '', busy: false };
+  var MX = { parts: [], L: 10, ad: '', msg: '', busy: false, mode: 'bitki' };
   function karMax(b) { return b.d[b.d.length - 1][0]; }
   function mixPlan(parts, L) {
     parts = parts.filter(function (x) { return x[0] > 0 && karB(x[1]); });
@@ -2712,7 +2723,7 @@
     var key = KAR_KEY[pl.n];
     if (key && !TARIF[key] && TARIF_IST[key]) { TARIF_IST[key].then(function () { karOpen(name); }); return; }
     mixSet(pl, (key && TARIF[key]) || soilParts(pl.pf, pl.grp));
-    MX.L = 10;
+    MX.L = 10; MX.mode = 'bitki';
     track('karisim_ac', pl.n);
     setTab('mix');
   }
@@ -2740,42 +2751,52 @@
     if (kl) kl.then(function () { if (KAR) mixDraw(); else $mix.innerHTML = '<div class="mx"><div class="mx-h"><b>Kendi toprak karışımınızı hazırlayın</b><p>Fiyatlar yüklenemedi. <a href="' + esc(url(CFG.soilMatch.custom)) + '">Ürün sayfasından hazırlayabilirsiniz.</a></p></div></div>'; });
   }
   var MX_CHIPS = ['Monstera', 'Kaktüs', 'Domates', 'Limon', 'Lavanta', 'Gül', 'Yaban mersini', 'Zeytin', 'Orkide', 'Çilek'];
+  // Bileşen renkleri (karışım şeridi ve satırdaki nokta): toprak tonları, taşlar, beyaz perlit
+  var MX_RENK = { sphagnum: '#8a5a33', asidik: '#5e3b20', cocopeat: '#c08b55', orman: '#4d6b2f', 'ince-perlit': '#f1eee6', 'kalin-perlit': '#d9d4c7', pomza: '#b44a30', vermikulit: '#d4aa2c', bentonit: '#9aa5ab', solucan: '#2f2a25', leonardit: '#55493d' };
   function mixDraw() {
     if (!KAR || !$mix) return;
-    var S = MX.parts.reduce(function (a, x) { return a + x[0]; }, 0), pn = {};
-    MX.parts.forEach(function (x) { pn[x[1]] = x[0]; });
-    var plan = mixPlan(MX.parts, MX.L);
-    var sol = S ? (pn.solucan || 0) / S : 0;
-    $mix.innerHTML = '<div class="mx kar"><div class="mx-h"><b>Kendi toprak karışımınızı hazırlayın</b><p>Bitkinizi yazın, tarifini getirelim; ya da bileşenleri ve oranlarını kendiniz seçin. İstediğiniz litrede taze hazırlanıp gönderilir.</p></div>' +
-      '<form class="mx-f" autocomplete="off"><input type="search" data-k="mxb" enterkeyhint="go" placeholder="Bitki adı (ör. monstera, limon)" value="' + esc(MX.ad) + '"><button type="submit">Tarif getir</button></form>' +
+    var plan = mixPlan(MX.parts, MX.L), serbest = MX.mode === 'serbest';
+    var adim = function (n, t, ek) { return '<div class="mxs"><i>' + n + '</i><b>' + t + '</b>' + (ek || '') + '</div>'; };
+    var S = MX.parts.reduce(function (a, x) { return a + x[0]; }, 0);
+    var bitki = '<section class="mxk">' + adim(1, 'Ne yetiştiriyorsunuz?') +
+      '<form class="mx-f" autocomplete="off"><input type="search" data-k="mxb" enterkeyhint="go" placeholder="Bitki adı: monstera, limon, kaktüs…" value="' + esc(MX.ad) + '"><button type="submit">Tarif getir</button></form>' +
       '<div class="mx-c">' + MX_CHIPS.map(function (c) { return '<button type="button" data-act="mxb" data-v="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>' +
-      (MX.msg ? '<p class="mx-m">' + esc(MX.msg) + '</p>' : '') +
-      '<div class="sh-l">Bileşenler <small>(ölçü = aynı kap; oranı belirler)</small>' + (S ? ' <button type="button" class="mx0" data-act="mx0" style="float:right;color:var(--pr);font-weight:700">Temizle</button>' : '') + '</div><div class="mx-r">' + mixRows(plan) + '</div>' +
-      (sol > 0.2 ? '<p class="mx-m mx-w">Solucan gübresinin karışımın %20\'sini geçmemesi önerilir.</p>' : '') +
-      '<div class="sh-l">Toplam miktar <small>(istediğiniz litreyi yazın)</small></div><div class="mx-l">' + [10, 20, 50, 100, 250, 500, 1000].map(function (L) { return '<button type="button" class="vo' + (L === MX.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') +
-      '<label><input data-k="mxL" inputmode="numeric" aria-label="Litre" value="' + MX.L + '"> L</label></div>' +
+      (MX.msg ? '<p class="mx-m">' + esc(MX.msg) + '</p>' : '') + '</section>';
+    var karisim = '<section class="mxk">' + adim(serbest ? 1 : 3, serbest ? 'Bileşenleri seçin' : 'Karışımınız', S ? '<button type="button" class="mx0" data-act="mx0">Temizle</button>' : '') +
+      '<div class="mx-r">' + mixRows(plan) + '</div></section>';
+    var litre = '<section class="mxk">' + adim(2, 'Kaç litre?') + '<div class="mx-l">' + [10, 20, 50, 100, 250, 500, 1000].map(function (L) { return '<button type="button" class="vo' + (L === MX.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') +
+      '<label>veya <input data-k="mxL" inputmode="decimal" aria-label="Litre" value="' + MX.L + '"> L</label></div>' +
+      '<p class="hint">İstediğiniz miktarı yazın. Bir pakete bileşen başına en çok 100 litre girdiğinden büyük miktarlar eşit paketlere bölünür.</p></section>';
+    $mix.innerHTML = '<div class="mx kar"><div class="mxh"><span class="mxi">' + I.sprout + '</span><div><b>Toprağınızı hazırlayalım</b><span>Bitkinize özel tarif ya da kendi oranlarınız; istediğiniz litrede, taze karışım.</span></div></div>' +
+      '<div class="mxseg" role="tablist"><button type="button" role="tab" data-act="mxm" data-v="bitki"' + (serbest ? '' : ' class="on" aria-selected="true"') + '>Bitkime göre</button><button type="button" role="tab" data-act="mxm" data-v="serbest"' + (serbest ? ' class="on" aria-selected="true"' : '') + '>Kendim seçeceğim</button></div>' +
+      (serbest ? karisim + litre : bitki + litre + karisim) +
       '<div class="mx-s">' + mixSum(plan) + '</div></div>';
   }
-  // Bileşen satırları (oran, bu litredeki miktar ve fiyat); litre yazılırken yalnız bu kısım ve özet yenilenir (kutu odakta kalır)
+  // Seçili bileşenler (renk, oran, bu litredeki miktar ve fiyat) + oran şeridi + eklenebilecek diğer bileşenler; litre
+  // yazılırken yalnız bu kısım ve alt çubuk yenilenir (kutu odakta kalır)
   function mixRows(plan) {
     var S = MX.parts.reduce(function (a, x) { return a + x[0]; }, 0), pn = {};
     MX.parts.forEach(function (x) { pn[x[1]] = x[0]; });
     var lit = {}; if (plan) plan.rows.forEach(function (r) { lit[r.k] = r; });
-    return KAR.bilesen.filter(function (b) { return b.k && KAR_AD[b.k]; }).map(function (b) {
-      var n = pn[b.k] || 0, r = lit[b.k];
-      return '<div class="kr' + (n ? '' : ' kz') + '"><span class="kn">' + esc(b.ad) + (n && S ? '<small>%' + Math.round(n / S * 100) + (r && plan ? ' · ' + String(r.v[0] * plan.Q).replace('.', ',') + ' L' : '') + '</small>' : '') + '</span>' +
-        '<span class="kq"><button type="button" data-act="mxp" data-v="' + esc(b.k) + ':-1" aria-label="Azalt"' + (n ? '' : ' disabled') + '>' + I.minus + '</button><b>' + String(n).replace('.', ',') + ' ölçü</b>' +
-        '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1" aria-label="Artır">' + I.plus + '</button></span><span class="kp">' + (r && plan ? tl(r.v[2] * plan.Q) : '') + '</span></div>';
-    }).join('');
+    var bes = KAR.bilesen.filter(function (b) { return b.k && KAR_AD[b.k]; });
+    var secili = bes.filter(function (b) { return pn[b.k]; }).sort(function (a, b) { return pn[b.k] - pn[a.k]; }), diger = bes.filter(function (b) { return !pn[b.k]; });
+    var sol = S ? (pn.solucan || 0) / S : 0;
+    return (secili.length ? '<div class="mxbr" aria-hidden="true">' + secili.map(function (b) { return '<span style="width:' + (pn[b.k] / S * 100).toFixed(1) + '%;background:' + (MX_RENK[b.k] || '#999') + '" title="' + esc(b.ad) + '"></span>'; }).join('') + '</div>' : '<p class="mx-m">Henüz bileşen yok. ' + (MX.mode === 'serbest' ? 'Aşağıdan ekleyin.' : 'Bitkinizi yazın ya da aşağıdan kendiniz ekleyin.') + '</p>') +
+      secili.map(function (b) {
+        var n = pn[b.k], r = lit[b.k];
+        return '<div class="kr"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span><span class="kn">' + esc(b.ad) + '<small>%' + Math.round(n / S * 100) + (r && plan ? ' · ' + String(+(r.v[0] * plan.Q).toFixed(1)).replace('.', ',') + ' L' : '') + '</small></span>' +
+          '<span class="kq"><button type="button" data-act="mxp" data-v="' + esc(b.k) + ':-1" aria-label="Azalt">' + I.minus + '</button><b>' + String(n).replace('.', ',') + ' ölçü</b>' +
+          '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1" aria-label="Artır">' + I.plus + '</button></span><span class="kp">' + (r && plan ? tl(r.v[2] * plan.Q) : '') + '</span></div>';
+      }).join('') +
+      (sol > 0.2 ? '<p class="mx-m mx-w">Solucan gübresinin karışımın %20\'sini geçmemesi önerilir.</p>' : '') +
+      (diger.length ? '<div class="mxa"><div class="mxa-t">' + (secili.length ? 'Başka bileşen ekleyin' : 'Bileşenler') + ' <small>(ölçü = aynı kap; oranı belirler)</small></div><div class="mx-c">' + diger.map(function (b) { return '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span>+ ' + esc(KAR_AD[b.k]) + '</button>'; }).join('') + '</div></div>' : '');
   }
   function mixSum(plan) {
-    if (!plan) return '<p class="mx-m">Karışıma en az bir bileşen ekleyin ve litreyi yazın.</p>';
-    return (plan.Q > 1 ? '<div class="ksum"><span>' + plan.Q + ' paket × ' + String(plan.unitL).replace('.', ',') + ' L</span><span>bileşen sınırı nedeniyle</span></div>' : '') +
-      '<div class="ksum"><span>Karışım hazırlama' + (plan.Q > 1 ? ' (' + plan.Q + ' × ' + tl(KAR.taban) + ')' : '') + '</span><span>' + tl(KAR.taban * plan.Q) + '</span></div>' +
-      '<div class="sh-f"><div class="btot"><small>Toplam · ' + String(plan.lt).replace('.', ',') + ' L</small><b>' + tl(plan.tot) + '</b></div>' +
+    if (!plan) return '<div class="sh-f"><div class="btot"><small>Toplam</small><b>—</b></div><button class="sh-go" type="button" disabled>' + I.cart + 'Karışımı sepete ekle</button></div>';
+    return '<div class="pk">' + (plan.Q > 1 ? plan.Q + ' paket × ' + String(+plan.unitL.toFixed(1)).replace('.', ',') + ' L · ' : '') + 'hazırlama ' + (plan.Q > 1 ? plan.Q + ' × ' : '') + tl(KAR.taban) + ' dahil</div>' +
+      '<div class="sh-f"><div class="btot"><small>Toplam · ' + String(+plan.lt.toFixed(1)).replace('.', ',') + ' L</small><b>' + tl(plan.tot) + '</b></div>' +
       '<button class="sh-go" type="button" data-act="kargo"' + (MX.busy || !karOn() ? ' disabled' : '') + '>' + (MX.busy ? '<span class="bspin"></span><span>Ekleniyor…</span>' : I.cart + 'Karışımı sepete ekle') + '</button></div>' +
-      (karOn() ? '' : '<p class="bhint"><a href="' + esc(url(CFG.soilMatch.custom)) + '">Ürün sayfasından</a> bu oranlarla hazırlayabilirsiniz.</p>') +
-      '<p class="bhint">Bileşenler siparişinize özel tek karışım olarak taze hazırlanır.</p>';
+      (karOn() ? '' : '<p class="bhint"><a href="' + esc(url(CFG.soilMatch.custom)) + '">Ürün sayfasından</a> bu oranlarla hazırlayabilirsiniz.</p>');
   }
   function mixLitre(v) {
     var L = Math.min(20000, Math.max(0, parseFloat(String(v).replace(',', '.')) || 0));
@@ -2790,6 +2811,7 @@
     if (act === 'karL') MX.L = +v;
     else if (act === 'mxb') { mixPlant(v); return; }
     else if (act === 'mx0') { MX.parts = []; MX.ad = ''; MX.msg = ''; }
+    else if (act === 'mxm') { MX.mode = v === 'serbest' ? 'serbest' : 'bitki'; track('karisim_mod', MX.mode); }
     else if (act === 'mxp') {
       var m = String(v).split(':'), k = m[0], d = +m[1] * 0.5, x = MX.parts.filter(function (p) { return p[1] === k; })[0];
       if (!x) { if (d > 0) MX.parts.push([1, k]); }
