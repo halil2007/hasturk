@@ -47,11 +47,11 @@ const nd = async (slug) => {
 };
 // __NEXT_DATA__ içinde ürün: varyant kimliği → { sell, disc, final }
 const fiyatlar = (j) => {
-  const V = new Map(); let ad = null;
+  const V = new Map(); let ad = null, urun = 0;
   const walk = (o, d) => {
     if (!o || typeof o !== 'object' || d > 14) return;
     if (Array.isArray(o)) { o.forEach((x) => walk(x, d + 1)); return; }
-    if (o.variants && Array.isArray(o.variants) && o.name && !ad) ad = o.name;
+    if (o.variants && Array.isArray(o.variants) && o.name) { urun++; if (!ad) ad = o.name; }
     if (o.id && Array.isArray(o.prices) && o.prices.length) {
       const p = o.prices.find((x) => !x.priceListId) || o.prices[0];
       if (p && (p.sellPrice != null)) V.set(o.id, { sell: p.sellPrice, disc: p.discountPrice ?? null, final: p.finalPrice ?? null });
@@ -59,13 +59,14 @@ const fiyatlar = (j) => {
     for (const k in o) walk(o[k], d + 1);
   };
   walk(j, 0);
-  return { V, ad };
+  return { V, ad, urun };
 };
 const gercekEksik = [];
 for (const s of eksik.slice(0, 40)) {
   const r = await nd(s);
   const f = r.j ? fiyatlar(r.j) : null;
-  if (f && f.V.size) gercekEksik.push(`${s} (${f.ad || '?'}; ${f.V.size} varyant)`);
+  // Marka / kategori sayfaları birden çok ürün listeler: yalnız tek ürünlü sayfa ürün sayfasıdır
+  if (f && f.V.size && f.urun === 1) gercekEksik.push(`${s} (${f.ad || '?'}; ${f.V.size} varyant)`);
 }
 log(gercekEksik.length ? `Sitede satışta olup Ürün Bul'da OLMAYAN ürünler (${gercekEksik.length}):\n  ` + gercekEksik.join('\n  ') : 'Sitede olup Ürün Bul\'da olmayan ürün yok');
 const fazla = live2.items.filter((x) => !sayfa.has(x.s)).map((x) => x.s);
