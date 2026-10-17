@@ -638,6 +638,8 @@
     '.mx-f{display:flex;gap:8px;margin:0 0 10px}.mx-f input{flex:1;min-width:0;height:44px;border:1.5px solid var(--ln);border-radius:12px;padding:0 12px;font:inherit;font-size:15px;background:var(--bg)}.mx-f input:focus{outline:0;border-color:var(--pr);background:#fff}.mx-f button{flex:none;height:44px;padding:0 16px;border-radius:12px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}',
     '.mx-c{display:flex;flex-wrap:wrap;gap:6px}.mx-c button{padding:6px 11px;border-radius:15px;border:1px solid var(--ln);font-size:12.5px;font-weight:700;background:#fff;color:#4b5963}.mx-c button:hover{border-color:var(--pr);color:var(--pr)}',
     '.mx-m{font-size:13px;color:var(--prd);background:var(--soft);border-radius:10px;padding:8px 10px;margin:10px 0 0}.mx-w{color:#9a5b00;background:#fff6e5}',
+    '.mxo{background:var(--bg);border-radius:14px;padding:12px 14px;margin-bottom:12px}.mxo-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mxo-h b{font-size:16px;color:var(--prd)}.mxt{font-size:11.5px;font-weight:800;color:var(--prd);background:var(--soft);border-radius:10px;padding:3px 9px}',
+    '.mxo-p{font-size:26px;font-weight:800;color:var(--prd);margin:6px 0 2px;letter-spacing:-.3px}.mxo-d{font-size:13px;color:var(--mu)}.mxo-k{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;font-weight:700;color:#4b5963;background:#fff;border:1px solid var(--ln);border-radius:14px;padding:4px 10px}.mxo-k svg{width:16px;height:16px}.mxo-k.ok{color:var(--prd);border-color:var(--pr)}',
     '.mxbr{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:2px 0 6px;background:var(--bg)}.mxbr span{display:block;height:100%;transition:width .2s}',
     '.mx .kr{gap:10px}.mx .kr .dot{width:12px;height:12px;border-radius:4px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}.mx .kn small{display:block;font-size:12px;color:var(--mu)}.mx .kq b{min-width:58px;font-size:13px}.mx .kr:last-child{border-bottom:0}',
     '.mxa{margin-top:12px}.mxa .mxa-t{font-size:12.5px;font-weight:700;color:var(--mu);margin-bottom:8px}.mxa .mxa-t small{font-weight:400}.mxa .mx-c button{display:flex;align-items:center;gap:6px}.mxa .mx-c .dot{width:10px;height:10px;border-radius:3px}',
@@ -2637,7 +2639,7 @@
   // HG formülleri sunucuda gizli (src/formul.js); tarif /tarif'ten gelir: bitkinin kendi toprağı → formül birebir, benzer
   // toprak → o formül + küçük ayar. Gelmezse (Tarım Dünyası, etçil bitki, bağlantı hatası) yukarıdaki kural tarifi kullanılır.
   // Hazır toprağı olan bitkide tarif yalnız müşteri karışımı kendisi yapmak istediğini söylerse gösterilir (KENDIM_RE).
-  var TARIF = {}, TARIF_IST = {}, KAR_KEY = {};
+  var TARIF = {}, TARIF_IST = {}, TARIF_K = {}, KAR_KEY = {};
   // Sunucudaki src/toprak.js > KENDIM ile aynı
   var KENDIM_RE = /kendim|kendi (toprak )?karisim|karisim(i|ini)? (yap|hazirla|olustur)|karistir|hazirla(yabilir|r mi|r misin|yin|sana|mak)|hazir (istemiyorum|almak istemiyorum|olmasin)|olusturur? (mu|musun|misin)|(den|dan) (yap|hazirla|olustur)/;
   function tarifKaynak(pl, r) {
@@ -2664,7 +2666,7 @@
     var qs = 's=' + encodeURIComponent(k.s) + (k.t ? '&t=1' : '&p=' + pf.ph + pf.ph2 + pf.dr + pf.su + pf.bs + pf.yp + '&g=' + encodeURIComponent(pl.grp) +
       (sp ? '&sp=' + sp.ph + sp.dr + sp.su + sp.bs + sp.yp : ''));
     TARIF_IST[key] = fetch(BASE + 'tarif?' + qs, { credentials: 'omit' }).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { TARIF[key] = d && d.ok && d.parts && d.parts.length && /^hg/.test(d.kaynak) ? d.parts : soilParts(pl.pf, pl.grp); }, function () { TARIF[key] = soilParts(pl.pf, pl.grp); })
+      .then(function (d) { var hg = d && d.ok && d.parts && d.parts.length && /^hg/.test(d.kaynak); TARIF[key] = hg ? d.parts : soilParts(pl.pf, pl.grp); TARIF_K[key] = hg ? d.kaynak : 'kural'; }, function () { TARIF[key] = soilParts(pl.pf, pl.grp); })
       .then(function () { tarifYaz(key, pl); });
   }
   function tarifYaz(key, pl) {
@@ -2722,14 +2724,15 @@
     if (!pl) return;
     var key = KAR_KEY[pl.n];
     if (key && !TARIF[key] && TARIF_IST[key]) { TARIF_IST[key].then(function () { karOpen(name); }); return; }
-    mixSet(pl, (key && TARIF[key]) || soilParts(pl.pf, pl.grp));
+    mixSet(pl, (key && TARIF[key]) || soilParts(pl.pf, pl.grp), key && TARIF_K[key]);
     MX.L = 10; MX.mode = 'bitki';
     track('karisim_ac', pl.n);
     setTab('mix');
   }
-  function mixSet(pl, parts) {
+  function mixSet(pl, parts, kaynak) {
     MX.parts = parts.map(function (a) { return [a[0], a[1]]; });
     MX.ad = pl ? pl.n : '';
+    MX.kaynak = kaynak || 'kural'; MX.degisti = false;
     MX.msg = pl ? pl.n + ' için tarif hazır; oranları ve litreyi değiştirebilirsiniz.' : '';
   }
   // Bitki adından tarif: kendi toprağı varsa onun formülü, yoksa en yakın formül (sunucudan); bulunamazsa kullanıcı seçer
@@ -2741,7 +2744,7 @@
     var r = soilFor(pl), tk = tarifKaynak(pl, r), key = pl.n + '|' + (tk ? tk.s + (tk.t ? '!' : '') : '');
     KAR_KEY[pl.n] = key;
     tarifIste(pl, tk, key);
-    var done = function () { mixSet(pl, TARIF[key] || soilParts(pl.pf, pl.grp)); track('karisim_bitki', pl.n); mixDraw(); };
+    var done = function () { mixSet(pl, TARIF[key] || soilParts(pl.pf, pl.grp), TARIF_K[key]); track('karisim_bitki', pl.n); mixDraw(); };
     if (TARIF[key] || !TARIF_IST[key]) done(); else { MX.msg = 'Tarif hazırlanıyor…'; mixDraw(); TARIF_IST[key].then(done); }
   }
   function mixBuild() {
@@ -2781,7 +2784,7 @@
     var bes = KAR.bilesen.filter(function (b) { return b.k && KAR_AD[b.k]; });
     var secili = bes.filter(function (b) { return pn[b.k]; }).sort(function (a, b) { return pn[b.k] - pn[a.k]; }), diger = bes.filter(function (b) { return !pn[b.k]; });
     var sol = S ? (pn.solucan || 0) / S : 0;
-    return (secili.length ? '<div class="mxbr" aria-hidden="true">' + secili.map(function (b) { return '<span style="width:' + (pn[b.k] / S * 100).toFixed(1) + '%;background:' + (MX_RENK[b.k] || '#999') + '" title="' + esc(b.ad) + '"></span>'; }).join('') + '</div>' : '<p class="mx-m">Henüz bileşen yok. ' + (MX.mode === 'serbest' ? 'Aşağıdan ekleyin.' : 'Bitkinizi yazın ya da aşağıdan kendiniz ekleyin.') + '</p>') +
+    return mixOzet(plan) + (secili.length ? '<div class="mxbr" aria-hidden="true">' + secili.map(function (b) { return '<span style="width:' + (pn[b.k] / S * 100).toFixed(1) + '%;background:' + (MX_RENK[b.k] || '#999') + '" title="' + esc(b.ad) + '"></span>'; }).join('') + '</div>' : '<p class="mx-m">Henüz bileşen yok. ' + (MX.mode === 'serbest' ? 'Aşağıdan ekleyin.' : 'Bitkinizi yazın ya da aşağıdan kendiniz ekleyin.') + '</p>') +
       secili.map(function (b) {
         var n = pn[b.k], r = lit[b.k];
         return '<div class="kr"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span><span class="kn">' + esc(b.ad) + '<small>%' + Math.round(n / S * 100) + (r && plan ? ' · ' + String(+(r.v[0] * plan.Q).toFixed(1)).replace('.', ',') + ' L' : '') + '</small></span>' +
@@ -2790,6 +2793,19 @@
       }).join('') +
       (sol > 0.2 ? '<p class="mx-m mx-w">Solucan gübresinin karışımın %20\'sini geçmemesi önerilir.</p>' : '') +
       (diger.length ? '<div class="mxa"><div class="mxa-t">' + (secili.length ? 'Başka bileşen ekleyin' : 'Bileşenler') + ' <small>(ölçü = aynı kap; oranı belirler)</small></div><div class="mx-c">' + diger.map(function (b) { return '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span>+ ' + esc(KAR_AD[b.k]) + '</button>'; }).join('') + '</div></div>' : '');
+  }
+  // Sonuç özeti: tarifin kaynağı, toplam, litre fiyatı, yaklaşık ağırlık (kargo / taşıma için) ve ücretsiz kargo durumu
+  // (sepetteki ürünlerle birlikte). Ağırlık nemli, gevşek hacim için yaklaşık kg/L.
+  var MX_KG = { sphagnum: 0.3, asidik: 0.3, cocopeat: 0.25, orman: 0.6, 'ince-perlit': 0.1, 'kalin-perlit': 0.09, pomza: 0.65, vermikulit: 0.12, bentonit: 0.9, solucan: 0.6, leonardit: 0.7 };
+  function mixOzet(plan) {
+    if (!plan) return '';
+    var kg = plan.rows.reduce(function (a, r) { return a + r.v[0] * (MX_KG[r.k] || 0.4); }, 0) * plan.Q;
+    var rozet = MX.degisti ? 'Kendi oranlarınız' : MX.kaynak === 'hg' ? 'HasTürk tarifi' : MX.kaynak === 'hg-uyarla' ? 'HasTürk tarifinden uyarlandı' : MX.ad ? 'Önerilen tarif' : 'Kendi oranlarınız';
+    var lim = shipLimit(), kalan = lim ? lim - (CART || 0) - plan.tot : 0;
+    return '<div class="mxo"><div class="mxo-h"><b>' + esc(MX.ad || 'Kendi karışımınız') + '</b><span class="mxt">' + rozet + '</span></div>' +
+      '<div class="mxo-p">' + tl(plan.tot) + '</div>' +
+      '<div class="mxo-d">' + String(+plan.lt.toFixed(1)).replace('.', ',') + ' L · litresi ' + tl(Math.round(plan.tot / plan.lt * 100) / 100) + ' · yaklaşık ' + (kg < 10 ? String(+kg.toFixed(1)).replace('.', ',') : Math.round(kg)) + ' kg' + (plan.Q > 1 ? ' · ' + plan.Q + ' paket' : '') + '</div>' +
+      (lim ? '<div class="mxo-k' + (kalan <= 0 ? ' ok' : '') + '">' + I.truck + (kalan <= 0 ? 'Kargo ücretsiz' : 'Ücretsiz kargoya ' + tl(Math.ceil(kalan)) + ' kaldı') + '</div>' : '') + '</div>';
   }
   function mixSum(plan) {
     if (!plan) return '<div class="sh-f"><div class="btot"><small>Toplam</small><b>—</b></div><button class="sh-go" type="button" disabled>' + I.cart + 'Karışımı sepete ekle</button></div>';
@@ -2810,10 +2826,11 @@
     if (MX.busy) return;
     if (act === 'karL') MX.L = +v;
     else if (act === 'mxb') { mixPlant(v); return; }
-    else if (act === 'mx0') { MX.parts = []; MX.ad = ''; MX.msg = ''; }
+    else if (act === 'mx0') { MX.parts = []; MX.ad = ''; MX.msg = ''; MX.kaynak = ''; MX.degisti = false; }
     else if (act === 'mxm') { MX.mode = v === 'serbest' ? 'serbest' : 'bitki'; track('karisim_mod', MX.mode); }
     else if (act === 'mxp') {
       var m = String(v).split(':'), k = m[0], d = +m[1] * 0.5, x = MX.parts.filter(function (p) { return p[1] === k; })[0];
+      MX.degisti = true;
       if (!x) { if (d > 0) MX.parts.push([1, k]); }
       else { x[0] = Math.max(0, Math.min(20, x[0] + d)); if (!x[0]) MX.parts = MX.parts.filter(function (p) { return p !== x; }); }
     }
