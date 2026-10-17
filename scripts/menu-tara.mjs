@@ -23,9 +23,13 @@ const tasan = (p) => p.evaluate(() => {
   const r = document.getElementById('urun-arama-root').shadowRoot, W = innerWidth, bad = [];
   r.querySelectorAll('.panel *').forEach((e) => {
     const b = e.getBoundingClientRect();
-    if (!b.width || !b.height || e.closest('.rail,.chips,.hscroll,[class*="scroll"]')) return;
+    if (!b.width || !b.height) return;
     const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.display === 'none') return;
-    if (b.right > W + 2 || b.left < -2) bad.push((e.className && String(e.className).slice(0, 30)) || e.tagName);
+    if (!(b.right > W + 2 || b.left < -2)) return;
+    // Yatay kayan şerit içindeyse (ürün şeritleri, sekme/çip satırları) taşma değildir
+    for (let a = e.parentElement; a && a !== r.host; a = a.parentElement) { const ox = getComputedStyle(a).overflowX; if (ox === 'auto' || ox === 'scroll' || ox === 'hidden' || ox === 'clip') return; }
+    const ad = (x) => (x && (typeof x.className === 'string' ? x.className : x.getAttribute && x.getAttribute('class')) || x.tagName || '').toString().slice(0, 24);
+    bad.push(ad(e) + ' ⊂ ' + ad(e.parentElement) + ' "' + (e.textContent || '').trim().slice(0, 20) + '"');
   });
   const pn = r.querySelector('.panel .body, .panel');
   return { n: bad.length, ilk: [...new Set(bad)].slice(0, 5), yatay: pn ? pn.scrollWidth > pn.clientWidth + 2 : false };
@@ -86,7 +90,7 @@ for (const [ad, opt] of Object.entries(PROF)) {
     const ts = await tasan(p);
     log(`  [${t}] içerik ${tx} karakter${ts.n ? ` · taşan ${ts.n} öğe (${ts.ilk.join(', ')})` : ''}${ts.yatay ? ' · YATAY KAYDIRMA' : ''}`);
     if (tx < 40) S(`${ad} [${t}] sekmesi boş görünüyor`);
-    if (ts.n || ts.yatay) S(`${ad} [${t}] ekrandan taşan öğe: ${ts.ilk.join(', ') || 'panel'}`);
+    if (ts.n || ts.yatay) { S(`${ad} [${t}] ekrandan taşan öğe: ${ts.ilk.join(', ') || 'panel'}`); await p.screenshot({ path: `tara-${ad}-${t}.png` }).catch(() => {}); }
     (await linkTopla(p)).forEach((h) => hrefs.add(h));
 
     if (t === 'home') {
@@ -94,7 +98,10 @@ for (const [ad, opt] of Object.entries(PROF)) {
       await p.evaluate(() => { const b = document.getElementById('urun-arama-root').shadowRoot.querySelector('[data-act="catx"]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); });
       await p.waitForTimeout(500);
       const cats = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('[data-act="cat"]')].filter((b) => b.offsetHeight).map((b) => b.getAttribute('data-v')).filter(Boolean));
-      log(`  Kategoriler: ${cats.length} görünür kategori düğmesi`);
+      const catLink = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.panel a.li, .panel aside a')].filter((a) => a.offsetHeight).length);
+      log(`  Kategoriler: ${cats.length} kategori düğmesi, ${catLink} kategori bağlantısı`);
+      if (!cats.length && !catLink) S(`${ad}: Kategoriler sekmesinde kategori yok`);
+      await p.screenshot({ path: `tara-${ad}-kategoriler.png` }).catch(() => {});
       for (const c of cats.slice(0, 4)) {
         await p.evaluate((v) => { const b = [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('[data-act="cat"]')].find((x) => x.getAttribute('data-v') === v && x.offsetHeight); if (b) b.click(); }, c);
         await p.waitForTimeout(900);

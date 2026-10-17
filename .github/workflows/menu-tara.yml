@@ -30,3 +30,9 @@ jobs:
       - run: node scripts/menu-tara.mjs
         env:
           SITE_URL: ${{ matrix.site }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tara-${{ strategy.job-index }}
+          path: tara-*.png
+          if-no-files-found: ignore

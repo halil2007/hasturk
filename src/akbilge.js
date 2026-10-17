@@ -298,17 +298,21 @@ export async function sayac(env) {
 
 // GET /ak/populer: son 30 günde havuzdan en çok cevaplanan sorular (öne çıkan sorular; en az 3 kez sorulmuş olmalı)
 let POP = { t: 0, list: [] };
+let HAVUZ_I = null;
 export async function populer(env) {
   if (Date.now() - POP.t < 600000) return json({ ok: true, sorular: POP.list });
   let list = [];
   if (env.DB) {
     await initDb(env.DB).catch(() => {});
     const since = new Date(Date.now() - 30 * 864e5).toISOString();
-    const { results } = await env.DB.prepare("SELECT havuz, MAX(q) AS q, COUNT(*) AS n FROM ak_soru WHERE kaynak = 'havuz' AND ts >= ? GROUP BY havuz HAVING n >= 3 ORDER BY n DESC LIMIT 14")
+    const { results } = await env.DB.prepare("SELECT havuz, COUNT(*) AS n FROM ak_soru WHERE kaynak = 'havuz' AND ts >= ? GROUP BY havuz HAVING n >= 3 ORDER BY n DESC LIMIT 14")
       .bind(since).all().catch(() => ({ results: [] }));
-    // Havuz yeniden üretilince aynı sorunun kimliği değişir: aynı soru iki kez görünmesin (yazılışa göre tekilleştir)
+    // Müşterinin yazdığı metin herkese gösterilmez (ad, telefon vb. içerebilir): aynı hazır cevabın kendi soru kalıbı
+    // gösterilir. Havuz yeniden üretilince kimlik değişebilir; bulunamayan atlanır, aynı soru iki kez görünmez.
+    if (!HAVUZ_I) HAVUZ_I = new Map(HAVUZ.map((e) => [e.i, e]));
     const gor = new Set();
-    list = results.map((r) => String(r.q || '').slice(0, 80)).filter((q) => q.length >= 6 && !gor.has(norm(q)) && gor.add(norm(q))).slice(0, 6);
+    list = results.map((r) => { const e = HAVUZ_I.get(r.havuz); return e && e.s && e.s[0] ? String(e.s[0]).slice(0, 80) : ''; })
+      .map((q) => q.charAt(0).toLocaleUpperCase('tr-TR') + q.slice(1)).filter((q) => q.length >= 6 && !gor.has(norm(q)) && gor.add(norm(q))).slice(0, 6);
   }
   POP = { t: Date.now(), list };
   return json({ ok: true, sorular: list });
