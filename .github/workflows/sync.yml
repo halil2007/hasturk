@@ -2,7 +2,7 @@ name: ikas ürünlerini senkronla
 
 on:
   schedule:
-    - cron: '17 */2 * * *'   # 2 saatte bir
+    - cron: '17 * * * *'     # saatte bir (GitHub zamanlaması genelde 20–40 dk gecikir)
   workflow_dispatch:          # Actions sekmesinden elle çalıştırma
   push:
     branches: [main]          # sadece yayındaki dalda; çalışma dallarına commit atmasın

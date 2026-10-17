@@ -1,25 +1,27 @@
 # ikas sitesi bu dosyaları başka bir alan adından çağırdığı için CORS izni gerekir.
+# Önbellek kısa: ürün/fiyat değişikliği (senkron saatte bir) müşteriye bir sonraki açılışta yansısın; eskiden 24 saat
+# eski kopya gösterilebiliyordu. Widget ayrıca her açılışta "değişti mi" diye sorar (cache: no-cache, 304).
 /products.json
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=600, stale-while-revalidate=86400
+  Cache-Control: public, max-age=60, stale-while-revalidate=600
 
 /menu.json
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=600, stale-while-revalidate=86400
+  Cache-Control: public, max-age=60, stale-while-revalidate=600
 
 /karisim.json
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=600, stale-while-revalidate=86400
+  Cache-Control: public, max-age=60, stale-while-revalidate=600
 
 /pm-search.js
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+  Cache-Control: public, max-age=600, stale-while-revalidate=3600
 
 # İkinci site (data-site="tarim"): aynı izin ve önbellek
 /tarim/products.json
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=600, stale-while-revalidate=86400
+  Cache-Control: public, max-age=60, stale-while-revalidate=600
 
 /tarim/menu.json
   Access-Control-Allow-Origin: *
-  Cache-Control: public, max-age=600, stale-while-revalidate=86400
+  Cache-Control: public, max-age=60, stale-while-revalidate=600

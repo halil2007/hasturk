@@ -3,7 +3,7 @@
 //   POST /e       widget'tan gelen anonim ziyaretçi olayları (arama, tıklama, görüntüleme, sepete ekleme)
 //   GET  /ai/durum  Ak Bilge için Anthropic anahtarı kayıtlı mı (anahtar gösterilmez)
 //   POST /ak      Ak Bilge: müşteri sorusu → önce hazır soru havuzu, yoksa Claude (bkz. src/akbilge.js)
-//   GET  /trends  son 30 günün özeti (ivme dahil) + son 2 yılın aynı dönemi (scripts/sync.mjs 2 saatte bir okur, products.json'a işler)
+//   GET  /trends  son 30 günün özeti (ivme dahil) + son 2 yılın aynı dönemi (scripts/sync.mjs saatte bir okur, products.json'a işler)
 // Kişisel veri tutulmaz: IP, çerez, kullanıcı kimliği yok; sadece gün + olay türü + ürün/arama kelimesi + adet.
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
 

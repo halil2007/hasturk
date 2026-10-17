@@ -783,7 +783,7 @@ async function writeReport(out, trends, orders, an, config) {
     ].join('; ') + '.', '',
     ...(OTHER_ERR ? [`> **Uyarı:** ${env.OTHER_STORE} mağazasının siparişleri alınamadı (${OTHER_ERR.replace(/[|\n]/g, ' ')}). ` +
       'Algoritma şu an yalnız bu mağazanın siparişleriyle çalışıyor. ikas\'ta o mağazanın API uygulamasını ve GitHub Secrets\'taki anahtarları kontrol edin.', ''] : []),
-    'Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. ' +
+    'Bu dosya saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. ' +
     'Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.', '');
 
   L.push('## Yükselen ürünler (son 7 gün, önceki 3 haftaya göre)', '', 'Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkarılıyor.', '');
