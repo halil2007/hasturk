@@ -7,7 +7,7 @@ import { extApi } from './extapi.js';
 import { leadRequest, demoRequest, siteOrigins } from './lead.js';
 import { releasedTypes, BETA_TYPES } from './config.js';
 import { publicCheckout, checkoutCallback, checkoutStatus, payLink, paymentWatch } from './billing.js';
-import { blogPublic } from './blog.js';
+import { blogPublic, siteUrl } from './blog.js';
 import { trialRequest, trialLogin } from './trial.js';
 import { turnstileOk, turnstileSiteKey, CAPTCHA_ERROR } from './turnstile.js';
 import { resolveQuiet } from './errors.js';
@@ -100,6 +100,8 @@ const handler = {
     if (url.pathname.startsWith('/img/')) return await productImage(req, env, ctx, url);
     // Hazır blog yazıları (public/_seed): yalnız Worker okur; yayın tarihi gelmemiş yazılar dışarıdan görülmesin
     if (url.pathname.startsWith('/_seed/')) return new Response('Bulunamadı', { status: 404 });
+    // Panelin site haritası yok (giriş gerektirir, robots.txt ile kapalı): tarayıcılar tanıtım sitesinin haritasına yönlenir
+    if (url.pathname === '/sitemap.xml') return Response.redirect(`${siteUrl(env)}/sitemap.xml`, 301);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? secure(await env.ASSETS.fetch(req)) : new Response('Bulunamadı', { status: 404 });
     const path = url.pathname.slice(5).replace(/\/+$/, '');
     // Herkese açık uçlar: IP başına dakikada 120 istek (veritabanı yükü / kötüye kullanım)

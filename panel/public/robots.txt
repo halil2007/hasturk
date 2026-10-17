@@ -1,0 +1,7 @@
+# Hastürk CRM paneli: giriş gerektiren müşteri paneli; arama motorları ve yapay zekâ tarayıcıları için kapalıdır.
+# Tanıtım sitesi ve blog: https://hasturkcrm.com
+User-agent: *
+Disallow: /
+
+Sitemap: https://hasturkcrm.com/sitemap.xml
+Sitemap: https://hasturkcrm.com/blog/sitemap.xml
