@@ -21,7 +21,13 @@ const bilesen = set.options.filter((o) => o.type === 'CHECKBOX' && o.childOption
   return { k: (ANAHTAR.find(([re]) => re.test(ad)) || [, ''])[1], ad, cb: o.id, ch: ch.id,
     d: ((ch.selectSettings || {}).values || []).filter((x) => !x.deleted).map((x) => [parseFloat(String(x.value).replace(',', '.')), x.id, x.price]).filter((x) => x[0] > 0 && x[2] != null).sort((a, b) => a[0] - b[0]) };
 }).filter((x) => x.d.length);
+// Not alanı (metin seçeneği, ör. "Not" / "Karışım adı"): widget karışımın adını (bitki / kendi oranları) buraya yazar,
+// sipariş gelince hangi toprak için hazırlandığı görünür
+const notOpt = set.options.find((o) => /TEXT/i.test(o.type || ''));
+console.log('Seçenekler: ' + set.options.map((o) => `${o.type}${o.isOptional === false || o.required ? '*' : ''} "${String(o.name).replace(/\s+/g, ' ').trim().slice(0, 40)}"`).join(' | '));
+if (notOpt) console.log('Not alanı: ' + JSON.stringify({ id: notOpt.id, ad: notOpt.name, tur: notOpt.type, ayar: notOpt.textSettings || null }));
 const out = { _aciklama: 'Kendi Toprak Karışımını Oluştur: bileşenler ve litre fiyatları (karisim-veri.mjs, ürün sayfasından). d: [litre, değer kimliği, fiyat TL].', guncelleme: new Date().toISOString().slice(0, 16),
-  urun: urun.id, varyant: v.id, set: set.id, taban: fiyat.discountPrice || fiyat.sellPrice || 0, bilesen };
+  urun: urun.id, varyant: v.id, set: set.id, taban: fiyat.discountPrice || fiyat.sellPrice || 0, bilesen,
+  not: notOpt ? { id: notOpt.id, ad: String(notOpt.name).replace(/\s+/g, ' ').trim(), max: (notOpt.textSettings || {}).max || null } : null };
 await writeFile('public/karisim.json', JSON.stringify(out) + '\n');
 console.log(`Kendi karışımı: taban ${out.taban} TL, ${bilesen.length} bileşen (${bilesen.map((b) => b.k + ':' + b.d.length).join(', ')})`);
