@@ -33,30 +33,35 @@ for (const k of KAT) {
 for (const s of [...SAY].slice(0, 60)) {
   if (!(await git(SITE + s))) continue;
   const v = await metin();
-  log(`\n=== ${v.h1} (${s})\n${v.sat.join('\n')}`);
+  const oran = v.sat.filter((l) => /^%\s?\d|^\d+\s?%|%\d+ |Bileşenler /.test(l));
+  log(`=== ${v.h1.slice(0, 80)} (${s}) :: ${oran.join(' | ').slice(0, 700) || '-'}`);
 }
-// "Kendin Seç" robotu: sayfa yapısı ve bitkiye göre seçim
+// "Kendin Seç" robotu: tariflerini /_pmw/api/karisim/liste adresinden alıyor; önce doğrudan okunur, sonra robot düğmesiyle denenir
 if (await git(SITE + '/kendin-sec-bitki-topragi-karisimi')) {
-  const v = await metin();
-  log(`\n=== ROBOT ${v.h1}\n${v.sat.join('\n')}`);
-  const yapi = await p.evaluate(() => ({
-    girdiler: [...document.querySelectorAll('input, textarea, select, button')].filter((e) => e.offsetWidth).slice(0, 80).map((e) => `${e.tagName}${e.type ? '[' + e.type + ']' : ''} name=${e.name || ''} ph=${e.placeholder || ''} "${(e.innerText || e.value || '').replace(/\s+/g, ' ').trim().slice(0, 60)}"`),
-    secenekler: [...document.querySelectorAll('label')].filter((e) => e.offsetWidth).map((e) => e.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 80),
-  }));
-  log('GİRDİLER:\n' + yapi.girdiler.join('\n') + '\nETİKETLER:\n' + yapi.secenekler.join(' | '));
-  const istek = []; p.on('request', (r) => { if (!/\.(png|jpe?g|webp|svg|woff2?|css)(\?|$)|google|facebook|analytics|gtm|hotjar|clarity/i.test(r.url())) istek.push(r.method() + ' ' + r.url().slice(0, 160) + (r.postData() ? ' ' + r.postData().slice(0, 300) : '')); });
-  for (const bitki of ['monstera', 'limon', 'kaktüs', 'yaban mersini', 'domates', 'orkide', 'lavanta', 'zeytin', 'aloe vera', 'çilek', 'bonsai', 'eğrelti']) {
-    istek.length = 0;
-    const g = await p.$('input[type=text]:visible, input:not([type]):visible, textarea:visible, input[type=search]:visible');
-    if (!g) { log('Robot: bitki kutusu bulunamadı'); break; }
-    const once = await p.evaluate(() => document.body.innerText);
-    await g.fill(''); await g.type(bitki, { delay: 40 }); await p.keyboard.press('Enter'); await p.waitForTimeout(1200);
-    const btn = await p.$('button:has-text("Robot"), button:has-text("Öner"), button:has-text("Hesapla"), button:has-text("Oluştur"), button:has-text("Seç"), button:has-text("Getir")');
-    if (btn) { await btn.click().catch(() => {}); }
-    await p.waitForTimeout(4500);
-    const sonra = await p.evaluate(() => ({ t: document.body.innerText, sec: [...document.querySelectorAll('input:checked, select')].map((e) => e.tagName === 'SELECT' ? (e.options[e.selectedIndex] || {}).text : ((e.closest('label') || e.parentElement || {}).innerText || e.value)).map((x) => String(x || '').replace(/\s+/g, ' ').trim()).filter(Boolean) }));
-    const yeni = sonra.t.split('\n').map((l) => l.trim()).filter((l) => l && !once.includes(l)).slice(0, 40);
-    log(`\n--- Robot "${bitki}" (düğme: ${btn ? 'var' : 'yok'})\nYENİ METİN: ${yeni.join(' / ')}\nSEÇİLİ: ${sonra.sec.join(' | ').slice(0, 900)}\nİSTEKLER: ${istek.slice(0, 8).join('\n  ')}`);
+  const api = await p.evaluate(async () => { try { const r = await fetch('/_pmw/api/karisim/liste'); return { http: r.status, t: await r.text() }; } catch (e) { return { hata: String(e) }; } });
+  log(`\n### ROBOT API /_pmw/api/karisim/liste HTTP ${api.http} ${api.hata || ''} uzunluk ${(api.t || '').length}`);
+  try {
+    const j = JSON.parse(api.t);
+    const dizi = Array.isArray(j) ? j : Object.values(j).find(Array.isArray) || [];
+    log('anahtarlar: ' + (Array.isArray(j) ? 'dizi' : Object.keys(j).join(',')) + ' | kayıt: ' + dizi.length);
+    log('ilk kayıtlar: ' + JSON.stringify(dizi.slice(0, 3)).slice(0, 3000));
+    dizi.forEach((x) => log('  ' + JSON.stringify(x).slice(0, 600)));
+    if (!dizi.length) log(api.t.slice(0, 20000));
+  } catch (e) { log((api.t || '').slice(0, 20000)); }
+  const yanit = [];
+  p.on('response', async (r) => { if (!/_pmw\/api\/(?!olay)/.test(r.url())) return; let t = ''; try { t = await r.text(); } catch (e) {} yanit.push(r.request().method() + ' ' + r.url().replace(SITE, '') + ' ' + (r.request().postData() || '').slice(0, 200) + ' → ' + t.slice(0, 1500)); });
+  for (const bitki of ['monstera', 'limon', 'kaktüs', 'yaban mersini', 'domates', 'orkide', 'lavanta', 'zeytin']) {
+    yanit.length = 0;
+    await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /yapay zek|robot/i.test(x.innerText)); if (b) b.click(); });
+    await p.waitForTimeout(1500);
+    const kutu = await p.evaluate(() => [...document.querySelectorAll('input, textarea')].filter((e) => e.offsetWidth && !/mail/i.test(e.placeholder || '') && e.type !== 'number').map((e) => e.placeholder || e.name || e.type));
+    const g = (await p.$$('input:visible, textarea:visible')).length ? await p.evaluateHandle(() => [...document.querySelectorAll('input, textarea')].reverse().find((e) => e.offsetWidth && !/mail/i.test(e.placeholder || '') && e.type !== 'number' && e.type !== 'checkbox' && e.type !== 'radio')) : null;
+    if (g && g.asElement()) { await g.asElement().fill(bitki); await p.keyboard.press('Enter'); }
+    await p.waitForTimeout(1500);
+    await p.evaluate(() => { const b = [...document.querySelectorAll('button')].filter((x) => x.offsetWidth).find((x) => /oluştur|öner|hazırla|gönder|bul|seç/i.test(x.innerText) && !/sepete/i.test(x.innerText)); if (b) b.click(); });
+    await p.waitForTimeout(5000);
+    const ekran = await p.evaluate(() => { const d = [...document.querySelectorAll('[class*="rb" i], [id*="rb" i], [class*="robot" i], [id*="robot" i], [role="dialog"]')].filter((e) => e.offsetWidth); return d.map((e) => e.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' || ').slice(0, 1500); });
+    log(`\n--- Robot "${bitki}" kutular: ${kutu.join(',')}\nEKRAN: ${ekran}\nAPI: ${yanit.join('\n  ')}`);
     await git(SITE + '/kendin-sec-bitki-topragi-karisimi');
   }
 }
