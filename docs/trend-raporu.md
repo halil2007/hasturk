@@ -171,8 +171,8 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | HG Mezar Toprağı | 35,5 | 0,4 | %1 |
 | Uzman 5 Lt Basınçlı İlaçlama Pompası (K-71) | 32,7 | 0 | %0 |
 | Uzman 16 Lt Akülü İlaçlama Pompası (USR-403) | 30,6 | 0 | %0 |
+| Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 28,9 | 0 | %0 |
 | Tarm BioLeaf Protector Neem Yağı Yaprak Biti ve Böcek Kovucu Sprey 500 ml | 28,3 | 0 | %0 |
-| Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 27,9 | 0 | %0 |
 
 ## Birlikte satın alınanlar (son 180 gün)
 
