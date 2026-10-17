@@ -1,0 +1,25 @@
+name: Kendi karışımı ürünü tanısı
+
+# "Kendi Toprak Karışımını Oluştur" ürününün seçenek yapısı ve fiyatları (gerçek site, sipariş verilmez).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/karisim-diag.mjs', 'scripts/karisim-veri.mjs', '.github/workflows/karisim-diag.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - run: node scripts/karisim-veri.mjs && cat public/karisim.json

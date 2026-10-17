@@ -35,6 +35,9 @@ jobs:
           OTHER_CLIENT_ID: ${{ secrets.IKAS2_CLIENT_ID }}
           OTHER_CLIENT_SECRET: ${{ secrets.IKAS2_CLIENT_SECRET }}
           OTHER_PRODUCTS: public/tarim/products.json
+      - name: Kendi karışımı fiyatları (ürün sayfasından)
+        continue-on-error: true
+        run: node scripts/karisim-veri.mjs
       - name: Tarım Dünyası ürünlerini çek (2. mağaza)
         # Anahtarlar yoksa atlanır; hata olursa 1. mağazanın senkronu yine kaydedilir
         continue-on-error: true
@@ -54,6 +57,7 @@ jobs:
           git config user.name "urun-senkron"
           git config user.email "actions@users.noreply.github.com"
           git add public/products.json
+          if [ -f public/karisim.json ]; then git add public/karisim.json; fi
           if [ -f public/menu.json ]; then git add public/menu.json; fi
           if [ -f docs/trend-raporu.md ]; then git add docs/trend-raporu.md; fi
           if [ -d public/tarim ]; then git add public/tarim; fi
