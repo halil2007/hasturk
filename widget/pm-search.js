@@ -2859,11 +2859,20 @@
     }
     mixDraw();
   }
+  function mixNot(plan) {
+    var S = plan.rows.reduce(function (a, r) { return a + r.v[0]; }, 0) || 1;
+    var rozet = MX.degisti ? 'kendi oranları' : MX.kaynak === 'hg' ? 'HasTürk tarifi' : MX.kaynak === 'hg-uyarla' ? 'HasTürk tarifinden uyarlandı' : MX.ad ? 'önerilen tarif' : 'kendi oranları';
+    return (MX.ad ? MX.ad + ' toprağı' : 'Kendi karışımı') + ' · ' + rozet + ' · ' + plan.rows.map(function (r) { return '%' + Math.round(r.v[0] / S * 100) + ' ' + (KAR_AD[r.k] || r.k); }).join(', ') +
+      (plan.Q > 1 ? ' · ' + plan.Q + ' paket × ' + String(+plan.unitL.toFixed(1)).replace('.', ',') + ' L' : '');
+  }
   function karGo() {
     var plan = mixPlan(MX.parts, MX.L);
     if (!plan || MX.busy || !karOn()) return;
     var opts = [], unit = plan.unit, tot = plan.tot, Q = plan.Q;
     plan.rows.forEach(function (r) { var b = karB(r.k); opts.push({ productOptionId: b.cb, productOptionsSetId: KAR.set, values: ['true'] }, { productOptionId: b.ch, productOptionsSetId: KAR.set, values: [r.v[1]] }); });
+    // Üründe metin (not) seçeneği varsa karışımın adı ve tarifi yazılır: sipariş gelince hangi bitki için, hangi oranlarla
+    // hazırlanacağı görünür (karisim.json > not; ikas'ta seçenek setine "Metin" türünde seçenek eklenince senkron bulur)
+    if (KAR.not && KAR.not.id) opts.push({ productOptionId: KAR.not.id, productOptionsSetId: KAR.set, values: [mixNot(plan).slice(0, KAR.not.max || 250)] });
     MX.busy = true; mixDraw();
     track('karisim_ekle', (MX.ad || 'serbest') + ' ' + plan.lt + ' L ' + Math.round(tot) + ' TL');
     var bitir = function (ok) {
