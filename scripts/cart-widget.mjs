@@ -134,7 +134,7 @@ if (!SITE.includes('tarim')) {
     log('   düğme: ' + (await kb.textContent()).trim());
     await kb.tap();
     await p.locator(R + '.kar [data-act="kargo"]').waitFor({ timeout: 10000 });
-    const sat = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.kar .kr')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | '));
+    const sat = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.kar .kr:not(.kz)')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | '));
     const top = (await p.locator(R + '.kar .btot b').textContent()).trim();
     const once = await cart();
     await hideToast();
@@ -149,6 +149,23 @@ if (!SITE.includes('tarim')) {
     log('   sepetteki karışım tutarı: ' + tutar);
     if (!/eklendi/.test(rk.t) || sonra.lines.length !== once.lines.length + 1) { bad++; log('   ✗ karışım eklenmedi'); }
   } else { bad++; log('   ✗ "Bu tarifle hazırlat" düğmesi çıkmadı'); }
+  // 5) Karışım sekmesi: tarif çipi + serbest litre (250 L → paketlere bölünür), sepette adet ve paket fiyatı
+  await p.locator(R + '.tb[data-v="mix"]').click();
+  await p.locator(R + '.mx-c button').first().waitFor({ timeout: 15000 });
+  await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.mx-c button')].find((b) => b.textContent === 'Kaktüs').click());
+  await p.waitForTimeout(1500);
+  await p.locator(R + 'input[data-k="mxL"]').fill('250'); await p.waitForTimeout(500);
+  const ozet = (await p.locator(R + '.mx-s').innerText()).replace(/\s+/g, ' ');
+  const q5 = +((ozet.match(/(\d+) paket/) || [])[1] || 1);
+  const once5 = await cart(); await hideToast();
+  const t5 = Date.now();
+  await p.locator(R + '.mx [data-act="kargo"]').tap();
+  let r5 = { t: '' };
+  for (let i = 0; i < 100 && !/Karışım/i.test(r5.t); i++) { await p.waitForTimeout(100); r5 = { ms: Date.now() - t5, t: await toast() }; }
+  await p.waitForTimeout(500);
+  const satir = await p.evaluate(() => { const el = document.getElementById('__next'), ck = el && Object.keys(el).find((k) => k.startsWith('__reactContainer$')); const st = ck ? [el[ck]] : []; let cs = null, n = 0; while (st.length && !cs && n < 8000) { const f = st.pop(); n++; const q = f.memoizedProps; if (q && q.store && q.store.cartStore) cs = q.store.cartStore; if (f.sibling) st.push(f.sibling); if (f.child) st.push(f.child); } return (cs && cs.cart && cs.cart.items || []).filter((i) => /Kendi Toprak/.test(i.variant && i.variant.name || '')).map((i) => i.quantity + ' adet × ' + i.finalPrice).join(', '); });
+  log(`5) Karışım sekmesi (Kaktüs, 250 L): ${ozet.slice(0, 160)} → ${r5.ms} ms "${r5.t}" · sepetteki karışım satırları: ${satir}`);
+  if (!/eklendi/.test(r5.t) || !new RegExp('(^|, )' + q5 + ' adet').test(satir)) { bad++; log('   ✗ karışım sekmesinden doğru adetle eklenmedi'); }
 }
 log('Ekleme kaydı: ' + String(await p.evaluate(() => localStorage.getItem('ua-addlog'))).slice(0, 600));
 log(bad ? `SONUÇ: ${bad} sorun` : 'SONUÇ: hepsi doğru');

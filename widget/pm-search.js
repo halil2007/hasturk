@@ -621,12 +621,19 @@
     '.banner>svg{width:22px;height:22px;flex:none}',
 
     /* Kategoriler */
-    '.tabs{flex:none;display:flex;border-bottom:1px solid var(--ln);background:#fff}',
+    // Sekmeler sığmazsa yana kayar (sıkışıp iç içe girmesin); yarım görünen son sekme kaydırılabildiğini gösterir
+    '.tabs{flex:none;display:flex;border-bottom:1px solid var(--ln);background:#fff;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding:0 4px}.tabs::-webkit-scrollbar{display:none}',
     '.tb .tl{display:none}',
 
-    '.tb{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:46px;font-size:13.5px;font-weight:700;color:var(--mu);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap}',
+    '.tb{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:46px;padding:0 15px;font-size:14px;font-weight:700;color:var(--mu);border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap;scroll-snap-align:start}',
     '.tb svg{display:none}',
-    '@media(max-width:379px){.tb{font-size:12.5px}}',
+    '@media(max-width:379px){.tb{font-size:13px;padding:0 12px}}',
+    '.mx{padding:14px 16px 20px}.mx-h b{display:block;font-size:16px}.mx-h p{margin:4px 0 0;font-size:13.5px;color:var(--mu);line-height:1.45}',
+    '.mx-f{display:flex;gap:8px;margin:12px 0 8px}.mx-f input{flex:1;min-width:0;height:42px;border:1.5px solid var(--ln);border-radius:21px;padding:0 14px;font:inherit;font-size:14px}.mx-f button{flex:none;height:42px;padding:0 16px;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:13.5px}',
+    '.mx-c{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.mx-c::-webkit-scrollbar{display:none}.mx-c button{flex:none;padding:6px 12px;border-radius:16px;border:1.5px solid var(--ln);font-size:13px;font-weight:700;background:#fff}',
+    '.mx-m{font-size:13px;color:var(--prd);background:var(--soft);border-radius:10px;padding:8px 10px;margin:8px 0 0}.mx-w{color:#9a5b00;background:#fff6e5}',
+    '.kar .kr.kz .kn,.kar .kr.kz .kq b{color:var(--mu)}.kar .kn small{display:block;font-size:12px;color:var(--mu)}',
+    '.mx-l{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mx-l label{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700}.mx-l input{width:90px;height:38px;border:1.5px solid var(--ln);border-radius:12px;padding:0 10px;font:inherit;font-size:15px;font-weight:700;text-align:right}',
 
     /* Kullanım rehberi */
     '.gd{padding:16px 16px 8px}',
@@ -878,7 +885,8 @@
     '.so-tf{margin:8px 0 6px;padding:10px 12px;border-radius:12px;background:var(--soft);font-size:13.5px;line-height:1.45}.so-tf b{display:block;font-size:13px;margin-bottom:3px}.so-tf small{display:block;margin-top:4px;color:var(--mu);font-size:12px}',
     '.kbtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:9px 0 0;border-radius:20px;background:var(--pr);color:#fff;font-weight:800;font-size:13.5px}.kbtn svg{width:16px;height:16px}',
     '.kar .kr{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)}.kar .kn{flex:1;min-width:0;font-size:13.5px}.kar .kq{display:flex;align-items:center;gap:6px}.kar .kq b{min-width:44px;text-align:center;font-size:13.5px}',
-    '.kar .kq button{width:28px;height:28px;border-radius:50%;border:1px solid var(--ln);display:grid;place-items:center;background:#fff}.kar .kq svg{width:14px;height:14px}.kar .kp{width:72px;text-align:right;font-weight:700;font-size:13.5px}',
+    '.kar .kq button{width:28px;height:28px;border-radius:50%;border:1px solid var(--ln);display:grid;place-items:center;background:#fff}.kar .kq button[disabled]{opacity:.35}.kar .kq svg{width:14px;height:14px}.kar .kp{width:84px;text-align:right;font-weight:700;font-size:13.5px}',
+    '.mx .kq b{min-width:62px}.mx .sh-l{overflow:hidden}',
     '.kar .sh-l small{font-weight:400;color:var(--mu)}.kar .kek{margin:10px 0 2px}.kar .kek summary{cursor:pointer;color:var(--pr);font-weight:700;font-size:13.5px;margin-bottom:8px}.kar .ksum{display:flex;justify-content:space-between;padding:10px 0 4px;color:var(--mu);font-size:13px}',
     '.akmore{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:8px 0 0;border-radius:20px;border:1px solid var(--ln);background:#fff;color:var(--pr);font-weight:700;font-size:14px;text-decoration:none}.akmore svg{width:16px;height:16px}',
     '.akall{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:8px 0 0;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}.akall svg{width:17px;height:17px}',
@@ -1000,7 +1008,7 @@
     '}'
   ].join('\n');
 
-  var host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $akfab, $sheet, $toast;
+  var $mix, host, root, $wrap, $ov, $panel, $q, $clr, $rail, $tools, $res, $idle, $home, $calc, $pages, $body, $cta, $mfoot, $help, $fab, $akfab, $sheet, $toast;
   var $guide, GID = null, $ak, $akf;
   var isOpen = false, sel = -1, pushed = false;
   var catOpen = false, onlyStock = false, sortMode = 'rel', shown = PAGE, view = null, tab = 'home', VSTACK = [];
@@ -1009,7 +1017,7 @@
     VSTACK.push({ v: view, q: $q ? $q.value : '', s: $body ? $body.scrollTop : 0, n: CSHOWN });
     if (VSTACK.length > 20) VSTACK.shift();
   }
-  var TABS = [['ak', 'Bilge Bey', 'bot', 'Bilge Bey'], ['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
+  var TABS = [['ak', 'Bilge Bey', 'bot', 'Bilge Bey'], ['home', 'Kategoriler', 'grid', 'Kategoriler'], ['mix', 'Toprak Karışımı Hazırla', 'sprout', 'Karışım'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
   var BY_ID = {};
 
   function build() {
@@ -1035,7 +1043,7 @@
       '<button class="xbtn" type="button" data-act="close" aria-label="Kapat">' + I.x + '</button></div>' +
       '<div class="mid"><div class="help" hidden></div>' +
       '<div class="main"><div class="tools"></div>' +
-      '<div class="body"><div class="idle"><div class="pane ak"></div><div class="pane home on"></div><div class="pane calc-p"></div><div class="pane guide"></div><div class="pane pages"></div></div>' +
+      '<div class="body"><div class="idle"><div class="pane ak"></div><div class="pane home on"></div><div class="pane mix"></div><div class="pane calc-p"></div><div class="pane guide"></div><div class="pane pages"></div></div>' +
       '<div class="results" aria-live="polite"></div></div>' +
       '<form class="akf" autocomplete="off"></form><div class="cta"></div><div class="xsell"></div><div class="shipbar"></div><div class="mfoot"></div>' +
       '<div class="sheet"></div><div class="toast"></div></div></div>' +
@@ -1058,6 +1066,7 @@
     $idle = root.querySelector('.idle');
     $home = root.querySelector('.pane.home');
     $calc = root.querySelector('.pane.calc-p');
+    $mix = root.querySelector('.pane.mix');
     $pages = root.querySelector('.pane.pages');
     $guide = root.querySelector('.pane.guide');
     $ak = root.querySelector('.pane.ak');
@@ -1099,8 +1108,10 @@
     root.addEventListener('input', function (e) {
       if (e.target === $q) return;
       if (e.target.getAttribute('data-k') === 'gq') { GQ = e.target.value; guideSearch(); return; }
+      if (e.target.getAttribute('data-k') === 'mxL') { mixLitre(e.target.value); return; }
       calcInput(e.target);
     });
+    root.addEventListener('submit', function (e) { var fm = e.target; if (fm && fm.classList && fm.classList.contains('mx-f')) { e.preventDefault(); mixPlant((fm.querySelector('input') || {}).value || ''); } });
     root.addEventListener('focusin', function (e) { calcFocus(e.target, true); });
     root.addEventListener('focusout', function (e) { calcFocus(e.target, false); });
     $panel.addEventListener('keydown', function (e) {
@@ -1187,7 +1198,7 @@
     else if (act === 'shx') closeSheet();
     else if (act === 'shgo') doAdd();
     else if (act === 'kar') { var kn = v; var ko = function () { karOpen(kn); }; if (KAR) ko(); else { var kl = karLoad(); if (kl) kl.then(function () { if (KAR) ko(); else ptoast('Karışım fiyatları yüklenemedi.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git'); }); } }
-    else if (act === 'karL' || act === 'karp' || act === 'karek') karAct(act, v);
+    else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0') mixAct(act, v);
     else if (act === 'kargo') karGo();
     else if (act === 'tocm') { e.preventDefault(); var ub = $calc.querySelector('.unit [data-v="cm"]'); if (ub) calcAction('unit', 'cm', ub); }
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
@@ -1197,6 +1208,7 @@
   function tabOk(t) {
     if (t === 'ak') return akOn();
     if (t === 'calc') return calcEnabled();
+    if (t === 'mix') return !SITE_DIR && !!(CFG.soilMatch && CFG.soilMatch.custom);
     if (t === 'pages') return (CFG.pages || []).length > 0;
     if (t === 'guide') return (CFG.guides || []).length > 0;
     return true;
@@ -1655,6 +1667,7 @@
     $home.classList.toggle('on', t === 'home');
     $panel.classList.toggle('sub', !!view && t === 'home');
     $calc.classList.toggle('on', t === 'calc');
+    $mix.classList.toggle('on', t === 'mix');
     $pages.classList.toggle('on', t === 'pages');
     $guide.classList.toggle('on', t === 'guide');
     $ak.classList.toggle('on', t === 'ak');
@@ -1662,7 +1675,10 @@
     if (t === 'ak') { if ($q.value) { $q.value = ''; render(); } akBuild(); }
     if (t === 'guide') renderGuide();
     if (t === 'calc') calcBuild();
+    if (t === 'mix') mixBuild();
     $body.scrollTop = 0;
+    // Sekme çubuğu yana kayar: seçili sekme görünür alana gelsin
+    try { var on = root.querySelector('.tb.on'), bar = on && on.parentNode; if (bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2); } catch (e) {}
   }
 
   function applyConfig() {
@@ -2653,7 +2669,7 @@
   // ---- Kendi karışımını hazırlat: tarif + litre → bileşen bileşen fiyat, toplam, tek dokunuşla sepete ----
   // Veri: karisim.json (ürün sayfasındaki ikas seçenek seti; senkron 2 saatte bir yeniler). Sepete ikas'ın kendi işleviyle
   // (window.addToCart, options: bileşen kutusu + litre seçimi) eklenir; sepetteki fiyat hesaplananla aynı olmalı.
-  var KAR = null, KAR_LOAD = null, KS = null;
+  var KAR = null, KAR_LOAD = null;
   function karLoad() {
     if (KAR || KAR_LOAD || SITE_DIR) return KAR_LOAD;
     KAR_LOAD = fetch(JSON_URL.replace(/products\.json(\?.*)?$/, 'karisim.json'), { credentials: 'omit', cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; })
@@ -2675,67 +2691,130 @@
   }
   function karTot(rows) { return (KAR ? KAR.taban : 0) + rows.reduce(function (a, r) { return a + (r.v ? r.v[2] : 0); }, 0); }
   function karOn() { return !!(KAR && winOn() && cartOn()); }
+  // ---- Karışım sekmesi: müşteri bileşenleri ve oranları kendisi seçer (ya da bitkinin tarifiyle başlar), istediği
+  // litreyi yazar. Bir pakette bileşen başına en çok ~100 L satılabildiği için büyük miktar eşit paketlere bölünür
+  // (adet = paket sayısı; hazırlama ücreti paket başına). En az paketle, her bileşen kendi en büyük seçeneğine sığacak şekilde.
+  var MX = { parts: [], L: 10, ad: '', msg: '', busy: false };
+  function karMax(b) { return b.d[b.d.length - 1][0]; }
+  function mixPlan(parts, L) {
+    parts = parts.filter(function (x) { return x[0] > 0 && karB(x[1]); });
+    var S = parts.reduce(function (a, x) { return a + x[0]; }, 0);
+    if (!S || !(L > 0)) return null;
+    var Q = Math.max(1, Math.ceil(L / 100));
+    for (; Q < 2000; Q++) if (parts.every(function (x) { return x[0] / S * (L / Q) <= karMax(karB(x[1])) + 1e-9; })) break;
+    var rows = karFromParts(parts, L / Q), lt = rows.reduce(function (a, r) { return a + (r.v ? r.v[0] : 0); }, 0), unit = karTot(rows);
+    return { Q: Q, rows: rows, unitL: lt, unit: unit, lt: lt * Q, tot: unit * Q };
+  }
+  // Bilge Bey / arama / rehber kartındaki "Bu tarifle hazırlat": karışım sekmesi o bitkinin tarifiyle açılır
   function karOpen(name) {
     var pl = soilData().plants.filter(function (x) { return x.n === name; })[0];
-    if (!pl || !KAR) return;
+    if (!pl) return;
     var key = KAR_KEY[pl.n];
     if (key && !TARIF[key] && TARIF_IST[key]) { TARIF_IST[key].then(function () { karOpen(name); }); return; }
-    var parts = (key && TARIF[key]) || soilParts(pl.pf, pl.grp);
-    KS = { n: pl.n, parts: parts.map(function (a) { return [a[0], a[1]]; }), L: 10, rows: null, busy: false };
-    KS.rows = karFromParts(KS.parts, KS.L);
+    mixSet(pl, (key && TARIF[key]) || soilParts(pl.pf, pl.grp));
+    MX.L = 10;
     track('karisim_ac', pl.n);
-    karDraw();
-    $sheet.classList.add('on');
+    setTab('mix');
   }
-  function karDraw() {
-    if (!KS || !KAR) return;
-    var tot = karTot(KS.rows), lt = KS.rows.reduce(function (a, r) { return a + (r.v ? r.v[0] : 0); }, 0);
-    var used = {}; KS.rows.forEach(function (r) { used[r.k] = 1; });
-    var rows = KS.rows.map(function (r, i) {
-      var b = karB(r.k);
-      return '<div class="kr"><span class="kn">' + esc(b.ad) + '</span><span class="kq"><button type="button" data-act="karp" data-v="' + i + ':-1" aria-label="Azalt">' + I.minus + '</button><b>' + String(r.v[0]).replace('.', ',') + ' L</b>' +
-        '<button type="button" data-act="karp" data-v="' + i + ':1" aria-label="Artır">' + I.plus + '</button></span><span class="kp">' + tl(r.v[2]) + '</span></div>';
+  function mixSet(pl, parts) {
+    MX.parts = parts.map(function (a) { return [a[0], a[1]]; });
+    MX.ad = pl ? pl.n : '';
+    MX.msg = pl ? pl.n + ' için tarif hazır; oranları ve litreyi değiştirebilirsiniz.' : '';
+  }
+  // Bitki adından tarif: kendi toprağı varsa onun formülü, yoksa en yakın formül (sunucudan); bulunamazsa kullanıcı seçer
+  function mixPlant(v) {
+    v = String(v || '').trim();
+    if (v.length < 3) return;
+    var pl = plantFor(fold(v + ' toprak'));
+    if (!pl) { MX.msg = '"' + v + '" bitkisini tanıyamadık; bileşenleri ve oranları aşağıdan kendiniz seçebilirsiniz.'; mixDraw(); return; }
+    var r = soilFor(pl), tk = tarifKaynak(pl, r), key = pl.n + '|' + (tk ? tk.s + (tk.t ? '!' : '') : '');
+    KAR_KEY[pl.n] = key;
+    tarifIste(pl, tk, key);
+    var done = function () { mixSet(pl, TARIF[key] || soilParts(pl.pf, pl.grp)); track('karisim_bitki', pl.n); mixDraw(); };
+    if (TARIF[key] || !TARIF_IST[key]) done(); else { MX.msg = 'Tarif hazırlanıyor…'; mixDraw(); TARIF_IST[key].then(done); }
+  }
+  function mixBuild() {
+    if (KAR) { mixDraw(); return; }
+    $mix.innerHTML = '<div class="mx"><div class="mx-h"><b>Kendi toprak karışımınızı hazırlayın</b><p>Bileşen fiyatları yükleniyor…</p></div></div>';
+    var kl = karLoad();
+    if (kl) kl.then(function () { if (KAR) mixDraw(); else $mix.innerHTML = '<div class="mx"><div class="mx-h"><b>Kendi toprak karışımınızı hazırlayın</b><p>Fiyatlar yüklenemedi. <a href="' + esc(url(CFG.soilMatch.custom)) + '">Ürün sayfasından hazırlayabilirsiniz.</a></p></div></div>'; });
+  }
+  var MX_CHIPS = ['Monstera', 'Kaktüs', 'Domates', 'Limon', 'Lavanta', 'Gül', 'Yaban mersini', 'Zeytin', 'Orkide', 'Çilek'];
+  function mixDraw() {
+    if (!KAR || !$mix) return;
+    var S = MX.parts.reduce(function (a, x) { return a + x[0]; }, 0), pn = {};
+    MX.parts.forEach(function (x) { pn[x[1]] = x[0]; });
+    var plan = mixPlan(MX.parts, MX.L);
+    var sol = S ? (pn.solucan || 0) / S : 0;
+    $mix.innerHTML = '<div class="mx kar"><div class="mx-h"><b>Kendi toprak karışımınızı hazırlayın</b><p>Bitkinizi yazın, tarifini getirelim; ya da bileşenleri ve oranlarını kendiniz seçin. İstediğiniz litrede taze hazırlanıp gönderilir.</p></div>' +
+      '<form class="mx-f" autocomplete="off"><input type="search" data-k="mxb" enterkeyhint="go" placeholder="Bitki adı (ör. monstera, limon)" value="' + esc(MX.ad) + '"><button type="submit">Tarif getir</button></form>' +
+      '<div class="mx-c">' + MX_CHIPS.map(function (c) { return '<button type="button" data-act="mxb" data-v="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>' +
+      (MX.msg ? '<p class="mx-m">' + esc(MX.msg) + '</p>' : '') +
+      '<div class="sh-l">Bileşenler <small>(ölçü = aynı kap; oranı belirler)</small>' + (S ? ' <button type="button" class="mx0" data-act="mx0" style="float:right;color:var(--pr);font-weight:700">Temizle</button>' : '') + '</div><div class="mx-r">' + mixRows(plan) + '</div>' +
+      (sol > 0.2 ? '<p class="mx-m mx-w">Solucan gübresinin karışımın %20\'sini geçmemesi önerilir.</p>' : '') +
+      '<div class="sh-l">Toplam miktar <small>(istediğiniz litreyi yazın)</small></div><div class="mx-l">' + [10, 20, 50, 100, 250, 500, 1000].map(function (L) { return '<button type="button" class="vo' + (L === MX.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') +
+      '<label><input data-k="mxL" inputmode="numeric" aria-label="Litre" value="' + MX.L + '"> L</label></div>' +
+      '<div class="mx-s">' + mixSum(plan) + '</div></div>';
+  }
+  // Bileşen satırları (oran, bu litredeki miktar ve fiyat); litre yazılırken yalnız bu kısım ve özet yenilenir (kutu odakta kalır)
+  function mixRows(plan) {
+    var S = MX.parts.reduce(function (a, x) { return a + x[0]; }, 0), pn = {};
+    MX.parts.forEach(function (x) { pn[x[1]] = x[0]; });
+    var lit = {}; if (plan) plan.rows.forEach(function (r) { lit[r.k] = r; });
+    return KAR.bilesen.filter(function (b) { return b.k && KAR_AD[b.k]; }).map(function (b) {
+      var n = pn[b.k] || 0, r = lit[b.k];
+      return '<div class="kr' + (n ? '' : ' kz') + '"><span class="kn">' + esc(b.ad) + (n && S ? '<small>%' + Math.round(n / S * 100) + (r && plan ? ' · ' + String(r.v[0] * plan.Q).replace('.', ',') + ' L' : '') + '</small>' : '') + '</span>' +
+        '<span class="kq"><button type="button" data-act="mxp" data-v="' + esc(b.k) + ':-1" aria-label="Azalt"' + (n ? '' : ' disabled') + '>' + I.minus + '</button><b>' + String(n).replace('.', ',') + ' ölçü</b>' +
+        '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1" aria-label="Artır">' + I.plus + '</button></span><span class="kp">' + (r && plan ? tl(r.v[2] * plan.Q) : '') + '</span></div>';
     }).join('');
-    var ek = KAR.bilesen.filter(function (b) { return b.k && !used[b.k]; }).map(function (b) { return '<button type="button" class="vo" data-act="karek" data-v="' + esc(b.k) + '">+ ' + esc(KAR_AD[b.k] || b.ad) + '</button>'; }).join('');
-    $sheet.innerHTML = '<div class="sh-in kar" role="dialog" aria-label="Kendi karışımını hazırlat"><div class="sh-h"><b>' + esc(KS.n) + ' için karışım</b><button type="button" data-act="shx" aria-label="Kapat">' + I.x + '</button></div>' +
-      '<div class="sh-l">Toplam miktar</div><div class="vopts">' + [5, 10, 20, 40, 60, 100].map(function (L) { return '<button type="button" class="vo' + (L === KS.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') + '</div>' +
-      '<div class="sh-l">Bileşenler <small>(oranları değiştirebilirsiniz)</small></div>' + rows +
-      (ek ? '<details class="kek"><summary>Bileşen ekle</summary><div class="vopts">' + ek + '</div></details>' : '') +
-      '<div class="ksum"><span>Karışım hazırlama</span><span>' + tl(KAR.taban) + '</span></div>' +
-      '<div class="sh-f"><div class="btot"><small>Toplam · ' + String(lt).replace('.', ',') + ' L</small><b>' + tl(tot) + '</b></div>' +
-      '<button class="sh-go" type="button" data-act="kargo"' + (KS.rows.length && !KS.busy ? '' : ' disabled') + '>' + (KS.busy ? '<span class="bspin"></span><span>Ekleniyor…</span>' : I.cart + 'Karışımı sepete ekle') + '</button></div>' +
-      '<p class="bhint">Bileşenler siparişinize özel tek karışım olarak taze hazırlanır.</p></div>';
   }
-  function karAct(act, v) {
-    if (!KS || KS.busy) return;
-    if (act === 'karL') { KS.L = +v; KS.rows = karFromParts(KS.parts, KS.L); }
-    else if (act === 'karp') {
-      var m = String(v).split(':'), r = KS.rows[+m[0]], b = r && karB(r.k);
-      if (!b) return;
-      var i = b.d.indexOf(r.v) + (+m[1]);
-      if (i < 0) { KS.rows.splice(+m[0], 1); KS.parts = KS.parts.filter(function (x) { return x[1] !== r.k; }); }
-      else if (i < b.d.length) r.v = b.d[i];
-    } else if (act === 'karek') { var nb = karB(v); if (nb && !KS.rows.some(function (x) { return x.k === v; })) { KS.rows.push({ k: v, v: karSnap(nb, 1) }); KS.parts.push([1, v]); } }
-    karDraw();
+  function mixSum(plan) {
+    if (!plan) return '<p class="mx-m">Karışıma en az bir bileşen ekleyin ve litreyi yazın.</p>';
+    return (plan.Q > 1 ? '<div class="ksum"><span>' + plan.Q + ' paket × ' + String(plan.unitL).replace('.', ',') + ' L</span><span>bileşen sınırı nedeniyle</span></div>' : '') +
+      '<div class="ksum"><span>Karışım hazırlama' + (plan.Q > 1 ? ' (' + plan.Q + ' × ' + tl(KAR.taban) + ')' : '') + '</span><span>' + tl(KAR.taban * plan.Q) + '</span></div>' +
+      '<div class="sh-f"><div class="btot"><small>Toplam · ' + String(plan.lt).replace('.', ',') + ' L</small><b>' + tl(plan.tot) + '</b></div>' +
+      '<button class="sh-go" type="button" data-act="kargo"' + (MX.busy || !karOn() ? ' disabled' : '') + '>' + (MX.busy ? '<span class="bspin"></span><span>Ekleniyor…</span>' : I.cart + 'Karışımı sepete ekle') + '</button></div>' +
+      (karOn() ? '' : '<p class="bhint"><a href="' + esc(url(CFG.soilMatch.custom)) + '">Ürün sayfasından</a> bu oranlarla hazırlayabilirsiniz.</p>') +
+      '<p class="bhint">Bileşenler siparişinize özel tek karışım olarak taze hazırlanır.</p>';
+  }
+  function mixLitre(v) {
+    var L = Math.min(20000, Math.max(0, parseFloat(String(v).replace(',', '.')) || 0));
+    MX.L = L;
+    [].forEach.call($mix.querySelectorAll('[data-act="karL"]'), function (b) { b.classList.toggle('on', +b.getAttribute('data-v') === L); });
+    var plan = mixPlan(MX.parts, MX.L), box = $mix.querySelector('.mx-s'), rw = $mix.querySelector('.mx-r');
+    if (rw) rw.innerHTML = mixRows(plan);
+    if (box) box.innerHTML = mixSum(plan);
+  }
+  function mixAct(act, v) {
+    if (MX.busy) return;
+    if (act === 'karL') MX.L = +v;
+    else if (act === 'mxb') { mixPlant(v); return; }
+    else if (act === 'mx0') { MX.parts = []; MX.ad = ''; MX.msg = ''; }
+    else if (act === 'mxp') {
+      var m = String(v).split(':'), k = m[0], d = +m[1] * 0.5, x = MX.parts.filter(function (p) { return p[1] === k; })[0];
+      if (!x) { if (d > 0) MX.parts.push([1, k]); }
+      else { x[0] = Math.max(0, Math.min(20, x[0] + d)); if (!x[0]) MX.parts = MX.parts.filter(function (p) { return p !== x; }); }
+    }
+    mixDraw();
   }
   function karGo() {
-    if (!KS || KS.busy || !KS.rows.length || !karOn()) return;
-    var opts = [], tot = karTot(KS.rows);
-    KS.rows.forEach(function (r) { var b = karB(r.k); opts.push({ productOptionId: b.cb, productOptionsSetId: KAR.set, values: ['true'] }, { productOptionId: b.ch, productOptionsSetId: KAR.set, values: [r.v[1]] }); });
-    KS.busy = true; karDraw();
-    track('karisim_ekle', KS.n + ' ' + Math.round(tot) + ' TL');
+    var plan = mixPlan(MX.parts, MX.L);
+    if (!plan || MX.busy || !karOn()) return;
+    var opts = [], unit = plan.unit, tot = plan.tot, Q = plan.Q;
+    plan.rows.forEach(function (r) { var b = karB(r.k); opts.push({ productOptionId: b.cb, productOptionsSetId: KAR.set, values: ['true'] }, { productOptionId: b.ch, productOptionsSetId: KAR.set, values: [r.v[1]] }); });
+    MX.busy = true; mixDraw();
+    track('karisim_ekle', (MX.ad || 'serbest') + ' ' + plan.lt + ' L ' + Math.round(tot) + ' TL');
     var bitir = function (ok) {
-      var n = KS && KS.n; KS = null; closeSheet();
-      if (ok) { ptoast('Karışımınız sepete eklendi (' + tl(tot) + ')', false, true); syncSiteCart(); }
-      else ptoast('Karışım sepete eklenemedi. Ürün sayfasından hazırlayabilirsiniz.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git');
-      if (!ok) track('karisim_hata', n || '');
+      MX.busy = false; mixDraw();
+      if (ok) { ptoast('Karışımınız sepete eklendi (' + (Q > 1 ? Q + ' paket, ' : '') + tl(tot) + ')', false, true); syncSiteCart(); }
+      else { ptoast('Karışım sepete eklenemedi. Ürün sayfasından hazırlayabilirsiniz.', true, false, url(CFG.soilMatch.custom), 'Ürün sayfasına git'); track('karisim_hata', MX.ad || ''); }
     };
     WIN_OWN++;
-    Promise.resolve().then(function () { return window.addToCart({ variantId: KAR.varyant, quantity: 1, options: opts }); }).then(function (x) {
+    Promise.resolve().then(function () { return window.addToCart({ variantId: KAR.varyant, quantity: Q, options: opts }); }).then(function (x) {
       setTimeout(function () { WIN_OWN--; }, 400);
       var d = x && x.response && x.response.data, its = d ? (d.items || d.orderLineItems || []) : [];
-      // Sepette bu seçeneklerle, hesaplanan fiyatta bir satır olmalı (fiyat değiştiyse eklenen satır yine sepette kalır)
-      var ok = x && x.success && its.some(function (it) { return it && it.variant && it.variant.id === KAR.varyant && Math.abs((+(it.finalPrice != null ? it.finalPrice : it.price) || 0) - tot) < 1; });
+      // Sepette bu seçeneklerle, hesaplanan paket fiyatında bir satır olmalı (fiyat değiştiyse eklenen satır yine sepette kalır)
+      var ok = x && x.success && its.some(function (it) { return it && it.variant && it.variant.id === KAR.varyant && Math.abs((+(it.finalPrice != null ? it.finalPrice : it.price) || 0) - unit) < 1; });
       if (d) setCart(d.items && !d.orderLineItems ? { orderLineItems: d.items, totalFinalPrice: d.totalFinalPrice != null ? d.totalFinalPrice : d.totalPrice, id: d.id } : d);
       bitir(!!(x && x.success) && (ok || its.length > 0));
     }, function () { setTimeout(function () { WIN_OWN--; }, 400); bitir(false); });
@@ -2905,7 +2984,7 @@
     SH.v = v;
     [].forEach.call($sheet.querySelectorAll('.vo'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === id); });
   }
-  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; if (BUNDLE && !BUNDLE.busy) BUNDLE = null; if (KS && !KS.busy) KS = null; }
+  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; if (BUNDLE && !BUNDLE.busy) BUNDLE = null; }
   function toast(msg) {
     $toast.innerHTML = I.check + esc(msg);
     $toast.classList.add('on');
