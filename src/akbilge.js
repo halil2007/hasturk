@@ -264,9 +264,11 @@ export async function populer(env) {
   if (env.DB) {
     await initDb(env.DB).catch(() => {});
     const since = new Date(Date.now() - 30 * 864e5).toISOString();
-    const { results } = await env.DB.prepare("SELECT havuz, MAX(q) AS q, COUNT(*) AS n FROM ak_soru WHERE kaynak = 'havuz' AND ts >= ? GROUP BY havuz HAVING n >= 3 ORDER BY n DESC LIMIT 6")
+    const { results } = await env.DB.prepare("SELECT havuz, MAX(q) AS q, COUNT(*) AS n FROM ak_soru WHERE kaynak = 'havuz' AND ts >= ? GROUP BY havuz HAVING n >= 3 ORDER BY n DESC LIMIT 14")
       .bind(since).all().catch(() => ({ results: [] }));
-    list = results.map((r) => String(r.q || '').slice(0, 80)).filter((q) => q.length >= 6);
+    // Havuz yeniden üretilince aynı sorunun kimliği değişir: aynı soru iki kez görünmesin (yazılışa göre tekilleştir)
+    const gor = new Set();
+    list = results.map((r) => String(r.q || '').slice(0, 80)).filter((q) => q.length >= 6 && !gor.has(norm(q)) && gor.add(norm(q))).slice(0, 6);
   }
   POP = { t: Date.now(), list };
   return json({ ok: true, sorular: list });
