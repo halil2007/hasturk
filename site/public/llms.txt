@@ -9,7 +9,7 @@
 - Paketler (KDV dahil): Başlangıç 990 ₺/ay ya da 9.900 ₺/yıl (3 mağaza, 2 kullanıcı); Profesyonel 1.990 ₺/ay ya da 19.900 ₺/yıl (10 mağaza, 5 kullanıcı); Kurumsal 3.990 ₺/ay ya da 39.900 ₺/yıl (25 mağaza, Sınırsız kullanıcı). Kurulum ücreti yoktur; 7 gün ücretsiz deneme ve kayıt olmadan canlı demo vardır.
 - Öne çıkanlar: çok kanallı stok senkronizasyonu, ortak barkodla kargo etiketi, kategori eşleştirmeyle çok kanala ürün yükleme, buybox takibi ve otomatik fiyat, komisyon / kargo / hizmet bedeli kesintileriyle sipariş başı net kâr, müşteri soruları ve iadeler, telefondan yönetim.
 - Şirket: Hastürk Gübre Sanayi ve Ticaret Limited Şirketi, Kızılcaali Mahallesi, Karakoçan Çıkmazı Sokak, No:7/1, 34540 Çatalca / İstanbul · info@hasturkcrm.com · +90 553 942 29 61
-- Bu dosyanın sabit kısmı: 2026-10-16 · Blog bölümü yayındaki yazılardan kendiliğinden güncellenir.
+- Bu dosyanın sabit kısmı: 2026-10-17 · Blog bölümü yayındaki yazılardan kendiliğinden güncellenir.
 
 ## Ana sayfalar
 

@@ -13,7 +13,7 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/blog", "/blog/*", "/llms.txt", "/llms-full.txt"]
+    "run_worker_first": ["/blog", "/blog/*", "/llms.txt", "/llms-full.txt", "/yandex_4903668f0c4f7638.html"]
   },
   "triggers": { "crons": ["*/15 * * * *"] }
 }

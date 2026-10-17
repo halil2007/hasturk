@@ -6,6 +6,7 @@
 // (derlemede alınır) ya da Worker değişkeni PANEL_URL.
 // Panel yükü: her sayfa panelden TEK istekle çizilir (yazı + ilgili yazılar aynı yanıtta) ve Cloudflare önbelleğinde saklanır (aşağıda TTL).
 import { SHELL, PANEL_URL, SITE_URL, ORG, LLMS, LLMS_FULL } from './blog-shell.mjs';
+const YANDEX = '4903668f0c4f7638'; // Yandex Webmaster doğrulama kodu (layout.html'deki yandex-verification ile aynı)
 
 // Önbellek (Cloudflare Cache API, veri merkezi başına): [taze, bayat] saniye. Taze kopya panel sorulmadan sunulur; süresi geçince ziyaretçiye
 // beklemeden eski kopya verilir ve arka planda panelden yenilenir (stale-while-revalidate). Panel yanıt vermezse bayat kopya sunulmaya devam eder.
@@ -254,6 +255,8 @@ const refreshing = new Set(); // aynı adres için eşzamanlı ikinci yenileme b
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url), path = url.pathname;
+    // Yandex Webmaster site doğrulama dosyası: tam bu adreste 200 dönmeli (statik .html adresleri uzantısız adrese yönlendiği için burada)
+    if (path === `/yandex_${YANDEX}.html`) return new Response(`<html>\n    <head>\n        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\n    </head>\n    <body>Verification: ${YANDEX}</body>\n</html>\n`, { headers: { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'public, max-age=3600' } });
     if (path !== '/blog' && !path.startsWith('/blog/') && path !== '/llms.txt' && path !== '/llms-full.txt') return env.ASSETS.fetch(req);
     if (req.method !== 'GET' && req.method !== 'HEAD') return new Response('Yalnız GET', { status: 405, headers: { Allow: 'GET, HEAD' } });
     if (path.length > 5 && path.endsWith('/')) return Response.redirect(`${url.origin}${path.replace(/\/+$/, '')}${url.search}`, 301);
