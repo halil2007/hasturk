@@ -113,7 +113,7 @@ Kurallar:
 - "Doğrulanmış bilgi" soruyla ilgisizse onu kullanma; sorulmayan bir konuyu anlatma.
 - Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını söyle.
 - Ürün önerisi yalnız "Önerilebilecek ürünler" listesinden ve yalnız soruyla gerçekten ilgiliyse yapılır; listede olmayan ürün, marka veya rakip mağaza adı yazma.
-- Toprak sorulduysa (hangi toprak, nasıl bir toprak, toprak karışımı) yalnız toprak öner; gübreyi toprak yerine önerme. Bitkinin kendi toprağı "Önerilebilecek ürünler"de yoksa "Toprak rehberi"nden bitkiye en uygun grubu seç ve şunu yaz: bitkinin nasıl bir toprak sevdiği (bir cümle), o grubun hazır toprağı (en yakın seçenek olarak) ve "Kendi Toprak Karışımını Oluştur" ürünüyle hazırlanacak karışım tarifi (ölçü oranlarıyla, rehberdeki gibi). Ürün olarak en uygun hazır toprağı ve Kendi Toprak Karışımını Oluştur'u seç. Bitkiyi tanımıyorsan genel grubu öner ve müşteri hizmetlerimize danışılabileceğini ekle.
+- Toprak sorulduysa (hangi toprak, nasıl bir toprak, toprak karışımı) yalnız toprak öner; gübreyi toprak yerine önerme. Bitkinin kendi hazır toprağı "Önerilebilecek ürünler"de varsa onu öner, tarif verme; müşteri hazır almak istemeyip karışımı kendisi yapmak istediğini söylerse "Kendi Toprak Karışımını Oluştur" ürününü ve rehberdeki tarifi ver. Bitkinin kendi toprağı "Önerilebilecek ürünler"de yoksa "Toprak rehberi"nden bitkiye en uygun grubu seç ve şunu yaz: bitkinin nasıl bir toprak sevdiği (bir cümle), o grubun hazır toprağı (en yakın seçenek olarak) ve "Kendi Toprak Karışımını Oluştur" ürünüyle hazırlanacak karışım tarifi (ölçü oranlarıyla, rehberdeki gibi). Ürün olarak en uygun hazır toprağı ve Kendi Toprak Karışımını Oluştur'u seç. Bitkiyi tanımıyorsan genel grubu öner ve müşteri hizmetlerimize danışılabileceğini ekle.
 - Bitki hastalığı ya da zararlı teşhisi koyma; "Doğrulanmış bilgi"de o belirtiye ait olası nedenler ve öneriler varsa onları kullan, yoksa yalnız olası nedenleri say. Her durumda fotoğrafla müşteri hizmetlerimize danışılmasını öner. Ev ve halk sağlığı böcek ilaçlarını (sinek, hamamböceği, tahtakurusu, akar spreyleri) bitkiye önerme. İnsan veya hayvan sağlığı konusunda tavsiye verme.
 - Mağaza bilgisi: siparişler aynı gün kargoya teslim edilir; bölgeye göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir. Bunun dışındaki sipariş durumu, kargo takibi, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için müşteri hizmetlerimize yönlendir.
 - Yönlendirirken "usta" deme; "müşteri hizmetlerimizden destek alabilirsiniz" de.
@@ -140,7 +140,7 @@ const SCHEMA = {
 };
 
 // Bağlam: en yakın havuz cevapları (doğrulanmış) + onlardaki ürünler + soruda adı geçen ürünler
-function context(q, near, products) {
+function context(q, near, products, F) {
   // Toprak sorusu: gübre cevapları bilgi olarak verilmez (yapay zekâ toprak yerine gübre önermesin); toprak rehberi,
   // grupların hazır toprakları ve "Kendi Toprak Karışımını Oluştur" önerilebilir ürünlere eklenir
   const toprak = TOPRAK_SORUSU.test(norm(q));
@@ -148,7 +148,7 @@ function context(q, near, products) {
   const byS = new Map(products.map((p) => [p.s, p]));
   // Maliyet: en yakın 3 cevap, her biri en fazla ~900 karakter (rakamlar ve kaynak satırı genelde baştadır)
   const facts = near.filter((x) => x.sc >= 0.35).slice(0, toprak ? 2 : 3).map((x) => (x.e.c.length > 900 ? x.e.c.slice(0, 900) + '…' : x.e.c));
-  if (toprak) facts.push(rehberMetni(byS));
+  if (toprak) facts.push(rehberMetni(byS, F));
   const slugs = new Set();
   if (toprak) [OZEL_KARISIM, ...new Set(GRUPLAR.flatMap((g) => g.hazir)), 'tarim-perliti', 'hg-asidik-torf'].forEach((s) => slugs.add(s));
   near.slice(0, 4).forEach((x) => x.e.u.forEach((s) => slugs.add(s)));
@@ -341,7 +341,7 @@ export function stokSuz(e, prods) {
   return { ...e, c, u };
 }
 
-export async function handle(req, env, ctx, { aiKey, originOk, products }) {
+export async function handle(req, env, ctx, { aiKey, originOk, products, formul }) {
   if (!originOk) return json({ ok: false, why: 'origin' }, 403);
   let body;
   try { body = await req.json(); } catch { return json({ ok: false, why: 'json' }, 400); }
@@ -419,7 +419,7 @@ export async function handle(req, env, ctx, { aiKey, originOk, products }) {
     log({ kaynak: 'yok', skor: near[0] ? near[0].sc : null, durum: 'cevapsiz' });
     return json({ ok: true, kaynak: 'yok', cevap: null, urunler: [], neden: off ? 'kapali' : 'sinir' });
   }
-  const c = context(q, near, prods);
+  const c = context(q, near, prods, formul ? await formul().catch(() => null) : null);
   let r;
   try { r = await askClaude(env, aiKey, name, q, c, pageName); }
   catch (e) {

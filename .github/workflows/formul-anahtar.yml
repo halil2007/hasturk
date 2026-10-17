@@ -1,0 +1,21 @@
+name: Formül şifreleme anahtarı
+
+# Worker'ın açık anahtarını ve /tarif durumunu gösterir (özel anahtar yalnız Cloudflare D1'de; burada asla görünmez).
+# Açık anahtarla formüller yerelde şifrelenir: node scripts/formul-sifrele.mjs <formuller.json> <acik-anahtar.json>
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  anahtar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: |
+          curl -sS https://hasturk-arama.halilc2007.workers.dev/tarif-anahtar
+          echo
+          echo "Tarif denemesi (Monstera, kendi toprağı):"
+          curl -sS "https://hasturk-arama.halilc2007.workers.dev/tarif?s=hg-monstera-deve-tabani-topragi&t=1" | head -c 200
+          echo

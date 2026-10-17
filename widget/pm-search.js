@@ -1287,7 +1287,9 @@
     if (d.cevap) {
       html = akText(d.cevap);
       var prods = '';
-      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl); pose = 'fide'; } }
+      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl, q); pose = 'fide'; } }
+      // Müşteri karışımı kendisi yapmak istiyorsa (cevap havuzdan gelmese de) bitkinin toprak kartı tarifle gösterilir
+      if (!prods && DATA && KENDIM_RE.test(fold(q || ''))) { var kpl = plantFor(fold(q)); if (kpl) { prods = soilCard(kpl, q); pose = 'fide'; } }
       if (!prods && DATA) {
         var list = akListe(d.urunler || []);
         if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, x.__yerine ? 'stokta olmayan ' + akKisa(x.__yerine) + ' yerine' : ''); }).join('') + '</div>' +
@@ -2082,7 +2084,7 @@
 
     html += guideCards(r.tokens);
     var spl = plantFor(fold(q));
-    if (spl) html += soilCard(spl);
+    if (spl) html += soilCard(spl, q);
     if (calcEnabled() && r.tokens.some(function (t) { return /^(hacim|litre|kac|hesap|olcu|metrekup)/.test(t); })) {
       html += '<button class="banner" type="button" data-act="gocalc"><span class="bi">' + I.calc + '</span><div class="tx"><b>Toprak hesaplayıcı</b>' +
         '<span>Ölçüleri gir, kaç litre gerektiğini öğren</span></div>' + I.arrow + '</button>';
@@ -2567,10 +2569,48 @@
     }
     return x;
   }
-  function soilRecipe(pl) {
-    var pf = pl.pf;
-    return soilParts(pf, pl.grp).map(function (a) { return a[0] + ' ölçü ' + KAR_AD[a[1]]; }).join(' + ') +
-      (pf.bs <= 1 ? ' (gübre eklemeyin)' : '') + (pf.ph >= 3 ? '; nötr-kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+
+
+  // HG formülleri sunucuda gizli (src/formul.js); tarif /tarif'ten gelir: bitkinin kendi toprağı → formül birebir, benzer
+  // toprak → o formül + küçük ayar. Gelmezse (Tarım Dünyası, etçil bitki, bağlantı hatası) yukarıdaki kural tarifi kullanılır.
+  // Hazır toprağı olan bitkide tarif yalnız müşteri karışımı kendisi yapmak istediğini söylerse gösterilir (KENDIM_RE).
+  var TARIF = {}, TARIF_IST = {}, KAR_KEY = {};
+  var KENDIM_RE = /kendim|kendi karisim|karisimi (ben|kendi)|karisim (yap|hazirla)|karistirmak|hazir (istemiyorum|almak istemiyorum|olmasin)/;
+  function tarifKaynak(pl, r) {
+    if (r.exact) return { s: r.p.s, t: 1 };
+    if (r.p) return { s: r.p.s };
+    // Yeterince benzer hazır toprak yoksa da en yakın HG toprağının formülü çıkış noktasıdır
+    var S = soilData(), best = null, bs = -1;
+    Object.keys(S.soils).forEach(function (sl) {
+      var pf = S.soils[sl]; if (pf.only || !pf.v) return;
+      var sc = soilScore(pl, pf) + (pf.grp === pl.grp ? 0.05 : 0);
+      if (sc > bs) { bs = sc; best = sl; }
+    });
+    return best ? { s: best } : null;
+  }
+  function tarifSunucu(pl) { return !SITE_DIR && !/^ozel/.test(pl.grp); }
+  function tarifText(parts, pf) {
+    return parts.map(function (a) { return String(a[0]).replace('.', ',') + ' ölçü ' + KAR_AD[a[1]]; }).join(' + ') +
+      (pf.bs <= 1 && !parts.some(function (a) { return a[1] === 'solucan' || a[1] === 'leonardit'; }) ? ' (gübre eklemeyin)' : '') +
+      (pf.ph >= 3 ? '; nötr-kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+  }
+  function tarifIste(pl, k, key) {
+    if (TARIF[key] || TARIF_IST[key] || !k || !tarifSunucu(pl)) return;
+    var sp = soilData().soils[k.s], pf = pl.pf;
+    var qs = 's=' + encodeURIComponent(k.s) + (k.t ? '&t=1' : '&p=' + pf.ph + pf.ph2 + pf.dr + pf.su + pf.bs + pf.yp + '&g=' + encodeURIComponent(pl.grp) +
+      (sp ? '&sp=' + sp.ph + sp.dr + sp.su + sp.bs + sp.yp : ''));
+    TARIF_IST[key] = fetch(BASE + 'tarif?' + qs, { credentials: 'omit' }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { TARIF[key] = d && d.ok && d.parts && d.parts.length && /^hg/.test(d.kaynak) ? d.parts : soilParts(pl.pf, pl.grp); }, function () { TARIF[key] = soilParts(pl.pf, pl.grp); })
+      .then(function () { tarifYaz(key, pl); });
+  }
+  function tarifYaz(key, pl) {
+    if (!root || !root.querySelectorAll) return;
+    [].forEach.call(root.querySelectorAll('.so-tf[data-tk]'), function (el) {
+      if (el.getAttribute('data-tk') !== key) return;
+      var t = el.querySelector('.tf-t'), p = el.querySelector('.kbtn .kp');
+      if (t) t.textContent = tarifText(TARIF[key], pl.pf);
+      if (p && KAR) p.textContent = ' · 10 L ' + tl(karTot(karFromParts(TARIF[key], 10)));
+    });
   }
 
   // ---- Kendi karışımını hazırlat: tarif + litre → bileşen bileşen fiyat, toplam, tek dokunuşla sepete ----
@@ -2601,7 +2641,10 @@
   function karOpen(name) {
     var pl = soilData().plants.filter(function (x) { return x.n === name; })[0];
     if (!pl || !KAR) return;
-    KS = { n: pl.n, parts: soilParts(pl.pf, pl.grp), L: 10, rows: null, busy: false };
+    var key = KAR_KEY[pl.n];
+    if (key && !TARIF[key] && TARIF_IST[key]) { TARIF_IST[key].then(function () { karOpen(name); }); return; }
+    var parts = (key && TARIF[key]) || soilParts(pl.pf, pl.grp);
+    KS = { n: pl.n, parts: parts.map(function (a) { return [a[0], a[1]]; }), L: 10, rows: null, busy: false };
     KS.rows = karFromParts(KS.parts, KS.L);
     track('karisim_ac', pl.n);
     karDraw();
@@ -2666,29 +2709,37 @@
       '<b>' + (price(x) != null ? (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) : '') + (note ? ' <em>' + esc(note) + '</em>' : '') + '</b></div>' +
       (cartOn() ? '<button class="add" type="button" data-act="add" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button>' : '') + '</div>';
   }
-  function soilCard(pl) {
-    var r = soilFor(pl), S = soilData();
+  function soilCard(pl, q) {
+    var r = soilFor(pl), S = soilData(), kendim = KENDIM_RE.test(fold(q || ''));
     if (!soilCard.seen) soilCard.seen = {};
     if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + (r.p ? r.p.n : 'yok')); }
     var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın') : '';
-    karLoad();
-    var kp = KAR ? karTot(karFromParts(soilParts(pl.pf, pl.grp), 10)) : 0;
-    var tarif = '<div class="so-tf"><b>Kendi karışımınız için tarif</b>' + esc(soilRecipe(pl)) + '<small>Ölçü: aynı kap (ör. bir kova); 10 litrede 1 ölçü = 1 litre. Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small>' +
-      (karOn() || (!KAR && !SITE_DIR && winOn()) ? '<button type="button" class="kbtn" data-act="kar" data-v="' + esc(pl.n) + '">' + I.cart + 'Bu tarifle hazırlat' + (kp ? ' · 10 L ' + tl(kp) : '') + '</button>' : '') + '</div>';
+    var tarifHtml = function () {
+      var tk = tarifKaynak(pl, r), key = pl.n + '|' + (tk ? tk.s + (tk.t ? '!' : '') : '');
+      KAR_KEY[pl.n] = key;
+      tarifIste(pl, tk, key);
+      var parts = TARIF[key] || (tarifSunucu(pl) && tk ? null : soilParts(pl.pf, pl.grp));
+      karLoad();
+      var kp = KAR && parts ? karTot(karFromParts(parts, 10)) : 0;
+      return '<div class="so-tf" data-tk="' + esc(key) + '"><b>' + (r.exact ? 'Bu toprağın tarifiyle kendi karışımınız' : 'Kendi karışımınız için tarif') + '</b><span class="tf-t">' +
+        (parts ? esc(tarifText(parts, pl.pf)) : 'Tarif hazırlanıyor…') + '</span><small>Ölçü: aynı kap (ör. bir kova); 10 litrede 1 ölçü = 1 litre. Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small>' +
+        (karOn() || (!KAR && !SITE_DIR && winOn()) ? '<button type="button" class="kbtn" data-act="kar" data-v="' + esc(pl.n) + '">' + I.cart + 'Bu tarifle hazırlat<span class="kp">' + (kp ? ' · 10 L ' + tl(kp) : '') + '</span></button>' : '') + '</div>';
+    };
     var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Müşteri hizmetlerimize sorun</a>' : '';
     var head = function (txt) { return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' + txt + '</span></div></div>'; };
-    if (r.exact) return head(esc(pl.n) + ' için önerdiğimiz toprak:') + '<div class="so-l">' + soilRow(r.p, '') + '</div></div>';
+    if (r.exact) return head(esc(pl.n) + ' için önerdiğimiz toprak:') + '<div class="so-l">' + soilRow(r.p, '') + '</div>' +
+      (kendim && custom ? '<div class="so-or">Hazır almak istemezseniz aynı tarifle kendiniz hazırlatabilirsiniz:</div>' + tarifHtml() + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
     if (r.none) {
       return head(r.strict
         ? esc(pl.n) + ' çok özel bir yetiştirme ortamı ister (' + esc(plantDesc(pl.pf)) + '); buna uygun hazır toprağımız yok. Yanlış toprak bitkiye zarar verebilir; aşağıdaki tarifle hazırlatabilirsiniz.' + ask
         : esc(pl.n) + ' için hazır karışımlarımızdan hiçbiri yeterince uygun değil. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever; ihtiyacına göre karışım hazırlatabilirsiniz.' + ask) +
-        (custom ? tarif + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
+        (custom ? tarifHtml() + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
     }
     return head(esc(pl.n) + ' için özel toprağımız yok. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever. Özellikleri en yakın hazır karışımımız' +
       (r.adds.length ? ' ve eksik kalan özelliği tamamlayan ürün' : '') + ':') +
       '<div class="so-l">' + soilRow(r.p, '%' + Math.round(r.fit * 100) + ' uyum') +
       r.adds.map(function (a) { return soilRow(a.p, '+ ' + a.why); }).join('') + '</div>' +
-      (custom ? '<div class="so-or">ya da bitkinizin ihtiyacına göre kendi karışımınızı hazırlatın:</div>' + tarif + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
+      (custom ? '<div class="so-or">ya da bitkinizin ihtiyacına göre kendi karışımınızı hazırlatın:</div>' + tarifHtml() + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
   }
   function guideSearch() {
     var res = $guide.querySelector('.gres'), lst = $guide.querySelector('.glist');
@@ -2698,7 +2749,7 @@
     lst.style.display = 'none';
     var hits = guides().map(function (gd) { return { gd: gd, hit: plantHit(gd, toks, 3) }; });
     var any = hits.some(function (x) { return x.hit; });
-    var gpl = plantFor(fold(GQ)), soilHtml = gpl ? soilCard(gpl) : '';
+    var gpl = plantFor(fold(GQ)), soilHtml = gpl ? soilCard(gpl, GQ) : '';
     if (!any && soilHtml) { res.innerHTML = soilHtml; return; }
     if (!any) {
       res.innerHTML = '<div class="empty" style="padding:28px 8px 8px"><div class="ic">' + I.sprout + '</div><b>“' + esc(GQ.trim()) + '” rehberde yok</b><p>Bitki adını farklı yazmayı deneyin (örn. biber, elma, çim).' +

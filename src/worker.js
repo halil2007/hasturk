@@ -8,6 +8,7 @@
 // Veritabanı (D1, "DB") ilk yayında Cloudflare tarafından otomatik oluşturulur; yoksa olaylar sessizce yok sayılır.
 
 import { rapor as bbRapor, veri as bbVeri, karar as bbKarar, sayfa as bbSayfa } from './inceleme.js';
+import { anahtar as formulAnahtar, formuller, tarif as formulTarif } from './formul.js';
 import { handle as akHandle, populer as akPopuler, vote as akVote, sayac as akSayac, konum as akKonum, initDb as akInitDb } from './akbilge.js';
 
 const KINDS = {
@@ -221,9 +222,11 @@ export default {
     if (pathname === '/ak' && req.method === 'POST') {
       const site = new URL(req.url).searchParams.get('s') === 'tarim' ? 'tarim' : 'hasturk';
       const ad = aiKeyName(env);
-      return akHandle(req, env, ctx, { aiKey: ad ? String(env[ad]).trim() : '', originOk: originOk(req, env), products: productsFor(req, env, site) })
+      return akHandle(req, env, ctx, { aiKey: ad ? String(env[ad]).trim() : '', originOk: originOk(req, env), products: productsFor(req, env, site), formul: () => formuller(env) })
         .catch(() => new Response(JSON.stringify({ ok: false, why: 'sunucu' }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }));
     }
+    if (pathname === '/tarif-anahtar') return formulAnahtar(env).catch(() => new Response('{"ok":false}', { status: 500 }));
+    if (pathname === '/tarif') return formulTarif(req, env).catch(() => new Response('{"ok":false}', { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }));
     if (pathname === '/tasi') return tasi(env).catch((e) => new Response(JSON.stringify({ ok: false, hata: String(e && e.message || e).slice(0, 200) }), { status: 500 }));
     if (pathname === '/trends') return trends(env, ctx, req).catch(() => new Response('{"ok":false}', { status: 500 }));
     // Ak Bilgi hazırlığı: Anthropic anahtarı Cloudflare'de doğru adla (ANTHROPIC_API_KEY) kayıtlı mı. Anahtarın kendisi

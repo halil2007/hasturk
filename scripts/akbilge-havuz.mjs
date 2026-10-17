@@ -180,7 +180,9 @@ for (const pl of (config.soilMatch || {}).plants || []) {
   // bitki: adı ve diğer adları (sinekkapan → Etçil bitki); eşleştirmede bitki adı soruda geçmeli, widget kartı da buradan bulur
   add({ tur: 'bitki-toprak', bitki: adlar.join(', '), grup, dinamik: 'toprak',
     sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`, `${lc(n)} için en iyi toprak`, `${lc(n)} için uygun toprak`, `${lc(n)} toprak önerisi`, `${lc(n)} saksı değişimi toprak`,
-      `${lc(n)} için nasıl bir toprak`, `${lc(n)} hangi toprağı sever`, `${lc(n)} toprak karışımı`, `${lc(n)} için toprak karışımı nasıl hazırlanır`, `${yon(n)} nasıl bir toprak alınır`]),
+      `${lc(n)} için nasıl bir toprak`, `${lc(n)} hangi toprağı sever`, `${lc(n)} toprak karışımı`, `${lc(n)} için toprak karışımı nasıl hazırlanır`, `${yon(n)} nasıl bir toprak alınır`,
+      // Hazır almak istemeyip kendisi karıştırmak isteyen: kart hazır toprağın yanında tarifi de gösterir (widget KENDIM_RE)
+      `${lc(n)} toprağını kendim karıştırmak istiyorum`, `${lc(n)} için kendi karışımımı yapmak istiyorum`, `${lc(n)} toprak karışımını kendim yapacağım`, `${lc(n)} için hazır toprak istemiyorum karışım yapmak istiyorum`]),
     // Özel toprağı olmayan bitkide widget kartı en yakın hazır karışımı, eksik özelliği tamamlayan ürünü ve "Kendi Toprak
     // Karışımını Oluştur" ile hazırlanacak ölçü oranlı tarifi gösterir (soilRecipe)
     cevap: `${ad} için ${desc(prof)} bir toprak uygundur.${strict === 's' ? (ozel ? ' Özel bir toprak ister; bu yüzden yalnız ona uygun toprağımızı öneriyoruz.' : ' Özel bir yetiştirme ortamı ister.') : ''} ${ozel ? 'Size uygun toprağımız aşağıda.' : 'Ona özel hazır toprağımız yok; en yakın hazır karışımımızı ve kendi karışımınız için tarifi aşağıda bulabilirsiniz.'}`,
