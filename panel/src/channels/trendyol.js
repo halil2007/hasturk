@@ -495,21 +495,29 @@ export function trendyol(env, meta) {
       let valueId = v && v.id, text = v && v.value;
       if (text === '@variant') { const hit = pr.variant ? await pick({ id }, pr.variant) : null; valueId = hit && hit.id; text = hit ? '' : oneAxis(pr.variant); }
       if (text === '@image') text = pr.image;
-      // V2 biçimi: listeden değer → attributeValueIds, serbest metin (izin varsa) → attributeValue
+      // Ürün yaratma v2/products: Trendyol'un Türkçe API başvurusu (developers.trendyol.com/reference/createproducts) listeden değer için
+      // attributeValueIds (dizi), serbest metin için attributeValue ister; İngilizce örnekler eski V1 biçimini (attributeValueId /
+      // customAttributeValue) gösterir. Başvuru şeması esas alınır; V1'e düşülürse aşağıda V1 biçimine çevrilir.
       if (valueId) attrs.push({ attributeId: Number(id), attributeValueIds: [Number(valueId)] });
       else if (text && a.allowCustom) attrs.push({ attributeId: Number(id), attributeValue: String(text) });
       else if (a.required) missing.push(attrName(a) + (text ? ` (“${text}” listede yok)` : ''));
     }
     const bid = pr.brandId ? Number(pr.brandId) || pr.brandId : pr.brand ? await brandId(pr.brand) : null;
     if (!pr.brand && !bid) missing.push('marka'); else if (!bid) missing.push(`marka “${pr.brand}” Trendyol'da bulunamadı`);
+    // Ürün yaratma v2 kuralları (developers.trendyol.com → Ürün Yaratma v2): barkod en çok 40 karakter, özel karakter yalnız . - _ (boşluk
+    // Trendyol'da silinir: stok / fiyat eşleşmesi bozulur); stockCode zorunlu (en çok 100); görseller https, en çok 8
     if (!pr.barcode) missing.push('barkod');
-    if (!pr.image) missing.push('görsel');
+    else if (str(pr.barcode).length > 40 || !/^[\p{L}\p{N}._-]+$/u.test(str(pr.barcode))) missing.push(`barkod “${str(pr.barcode).slice(0, 45)}” Trendyol'a uygun değil (en çok 40 karakter; harf, rakam ve . - _ dışında karakter ve boşluk olamaz)`);
+    if (!str(pr.sku)) missing.push('SKU (stok kodu)');
+    else if (str(pr.sku).length > 100) missing.push('SKU (Trendyol en çok 100 karakter kabul eder)');
+    const all = [...new Set([pr.image, ...(pr.images || [])].map(str).filter(Boolean))], imgs = all.filter((u) => /^https:\/\//i.test(u)).slice(0, 8);
+    if (!imgs.length) missing.push(all.length ? 'görsel (Trendyol yalnız https bağlantı kabul eder)' : 'görsel');
     if (!(pr.price > 0)) missing.push('fiyat');
     const item = {
       barcode: pr.barcode, title: str(pr.name).slice(0, 100), productMainId: str(pr.group).slice(0, 40), brandId: bid, categoryId: Number(map.remote_id),
       quantity: pr.stock, stockCode: pr.sku, dimensionalWeight: pr.desi || 1, description: pr.description || pr.name, currencyType: 'TRY',
       listPrice: Math.max(pr.listPrice || 0, pr.price), salePrice: pr.price, vatRate: pr.vat ?? 20,
-      images: [pr.image, ...(pr.images || []).slice(1, 8)].filter(Boolean).map((url) => ({ url })), attributes: attrs,
+      images: imgs.map((url) => ({ url })), attributes: attrs,
     };
     if (opts.cargoCompanyId) item.cargoCompanyId = Number(opts.cargoCompanyId);
     return { key: pr.barcode, missing, payload: item };

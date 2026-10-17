@@ -129,6 +129,79 @@ export function yemeksepeti(env, meta) {
     return editProducts(items.filter(skuOf).map((x) => ({ sku: skuOf(x), price: Math.round(num(x.price) * 100) / 100 })));
   };
 
+  // ---------- ürün ekleme (BETA; Partner API v2.0.2 OpenAPI: POST /v2/chains/{chain}/catalog "Add Products", GET …/catalog/jobs/{job_id}) ----------
+  // Yemeksepeti bu servisi beta (pilot) olarak sunar: hesap yöneticisi açmadan kullanılmaz; panelde YEMEKSEPETI_CATALOG = 1 ile açılır.
+  // Kategoriler: GET …/vendors/{vendor}/categories?only_leaves=false (global_id, parent_global_id, details.name { tr_TR }); ürün son kategoriye atanır.
+  // Ürün: sku, title { tr_TR }, price zorunlu; barcodes (en çok 1) ağırlıkla satılmayan üründe zorunlu; images yalnız JPG / PNG (en az 400x400,
+  // beyaz zemin); description { tr_TR }; categories [global_id]. Cevap 202 { job_id, duplicated_products: ["vendor:sku"] } (önceki bir
+  // gönderimde işlenen SKU bu istekten çıkarılır). Sonuç: job_status QUEUED · IN_PROGRESS · COMPLETED · FAILED; result.item_level_feedback
+  // ürün bazında (status, rejection_reasons [{ rejected_data, rejected_reason }]).
+  const LOC = 'tr_TR';
+  const loc = (o) => (o && typeof o === 'object' ? str(o[LOC] || o.tr || Object.values(o)[0]) : str(o));
+  let catCache = null;
+  async function categories(q) {
+    if (!catCache || Date.now() - catCache.at > 6 * 3600e3) {
+      const rows = ((await call(`${vp}/categories`, { query: { only_leaves: 'false' } })) || {}).categories || [];
+      const byId = new Map(rows.map((c) => [str(c.global_id), c]));
+      const parents = new Set(rows.map((c) => str(c.parent_global_id)).filter(Boolean));
+      const pathOf = (c) => { const p = []; let x = byId.get(str(c.parent_global_id)); for (let i = 0; x && i < 8; i++) { p.unshift(loc(x.details && x.details.name)); x = byId.get(str(x.parent_global_id)); } return p.filter(Boolean).join(' › '); };
+      catCache = { at: Date.now(), all: rows.filter((c) => c.global_id && c.active !== false && !parents.has(str(c.global_id))).map((c) => ({ id: str(c.global_id), name: loc(c.details && c.details.name), path: pathOf(c) })) };
+    }
+    const k = String(q || '').toLocaleLowerCase('tr').trim();
+    return { total: catCache.all.length, items: catCache.all.filter((c) => !k || `${c.name} ${c.path} ${c.id}`.toLocaleLowerCase('tr').includes(k)).slice(0, 60) };
+  }
+  const allCategories = async () => { await categories(''); return catCache.all; };
+  const plain = (h) => str(h).replace(/<br\s*\/?>|<\/(p|li|h\d)>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+  async function build(pr, map) {
+    const missing = [];
+    if (!str(pr.sku)) missing.push('SKU');
+    if (!str(pr.barcode)) missing.push('barkod');
+    if (!str(pr.name)) missing.push('ürün adı');
+    if (!(num(pr.price) > 0)) missing.push('fiyat');
+    const all = [...new Set([pr.image, ...(pr.images || [])].map(str).filter((u) => /^https?:\/\//i.test(u)))];
+    // Görsel: yalnız JPG / PNG (uzantısız bağlantı kabul edilir; .webp, .gif… gönderilmez)
+    const imgs = all.filter((u) => { const ext = (/\.([a-z0-9]{2,5})$/i.exec(u.split(/[?#]/)[0]) || [])[1]; return !ext || /^(jpe?g|png)$/i.test(ext); });
+    if (!imgs.length) missing.push(all.length ? 'görsel (Yemeksepeti yalnız JPG / PNG kabul eder)' : 'görsel');
+    const desc = plain(pr.description);
+    const payload = { sku: str(pr.sku), title: { [LOC]: str(pr.name) }, barcodes: str(pr.barcode) ? [str(pr.barcode)] : [], ...(desc && desc !== str(pr.name) ? { description: { [LOC]: desc } } : {}),
+      images: imgs, categories: [str(map.remote_id)], price: Math.round(num(pr.price) * 100) / 100 };
+    return { key: str(pr.sku), missing, payload };
+  }
+  // Gönderim: 500'lük parçalar; kayıt "job_id:sku1,sku2" (ilk parça reddedilirse hata, sonraki reddedilirse o parça "gönderilemedi")
+  async function send(items) {
+    const refs = [];
+    for (const part of chunk(items, 500)) {
+      const keys = part.map((x) => encodeURIComponent(x.sku)).join(',');
+      try {
+        const r = (await call(`${cv}/catalog`, { method: 'POST', body: { vendors: [vendor], products: part } })) || {};
+        if (!r.job_id) throw new Error('Yemeksepeti: ürün ekleme işi oluşturulamadı (job_id yok)');
+        refs.push(`${r.job_id}:${keys}`);
+      } catch (e) { if (e.budget || !refs.length) throw e; refs.push(`0:${keys}`); }
+    }
+    return { ref: refs.join(';') };
+  }
+  async function status(ref) {
+    const items = [];
+    let pending = false;
+    for (const part of String(ref).split(';').filter(Boolean)) {
+      const i = part.indexOf(':'), job = part.slice(0, i), keys = part.slice(i + 1).split(',').filter(Boolean).map(decodeURIComponent);
+      if (job === '0') { for (const k of keys) items.push({ key: k, ok: false, status: 'Yemeksepeti\'ne gönderilemedi', error: 'Bu parça Yemeksepeti tarafından kabul edilmedi; ürünü yeniden gönderin' }); continue; }
+      const r = (await call(`${cv}/catalog/jobs/${encodeURIComponent(job)}`)) || {}, st = str(r.job_status).toUpperCase(), res = r.result || {};
+      if (st === 'QUEUED' || st === 'IN_PROGRESS' || !st) { pending = true; continue; }
+      const fb = new Map((res.item_level_feedback || []).filter((x) => !x.vendor_id || str(x.vendor_id) === vendor).map((x) => [str(x.sku), x]));
+      const dup = new Set((res.duplicated_products || []).map((x) => str(x).split(':').slice(1).join(':')));
+      for (const k of keys) {
+        const f = fb.get(k), why = ((f && f.rejection_reasons) || []).map((x) => [str(x.rejected_data), str(x.rejected_reason)].filter(Boolean).join(': ')).filter(Boolean);
+        if (dup.has(k)) items.push({ key: k, ok: false, status: 'Yemeksepeti işlemedi', error: 'Bu SKU önceki bir gönderimde işleniyor (tekrarlı istek dışarıda bırakıldı)' });
+        else if (st === 'FAILED') items.push({ key: k, ok: false, status: 'Yemeksepeti işi başarısız', error: why.join(' · ') || 'Ürün ekleme işi başarısız oldu' });
+        else if (f && (why.length || /fail|reject|başarısız|hata/i.test(str(f.status)))) items.push({ key: k, ok: false, status: 'Yemeksepeti kabul etmedi', error: why.join(' · ') || str(f.status) });
+        else items.push({ key: k, ok: true, status: str(f && f.status) || 'Yemeksepeti\'ne eklendi', error: '' });
+      }
+    }
+    return { done: !pending, items };
+  }
+  const catalog = str(env.YEMEKSEPETI_CATALOG) === '1' ? { categories, allCategories, attributes: async () => [], values: async () => [], build, send, status, chunk: 500, options: [] } : undefined;
+
   // ---------- sipariş işlemleri ----------
   const orderPath = (id) => `${cv}/orders/${encodeURIComponent(id)}`;
   // Hazır: kalemler güncel sipariş detayından (_id, fiyatlama türü, adet/ağırlık) kurulur; panelde iptal edilen satır NOT_FOUND
@@ -170,6 +243,6 @@ export function yemeksepeti(env, meta) {
     ...meta, type: 'yemeksepeti', enabled: !missing.length, missing,
     // courier: 'platform' → kargo platformun kuryesiyle (takip no / etiket yok); "Kargoya ver" = hazır (READY_FOR_PICKUP / DISPATCHED)
     caps: { accept: 'local', split: 'local', ship: 'remote', label: null, createProduct: false, price: true, manualTracking: false, courier: 'platform' },
-    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose,
+    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose, catalog,
   };
 }
