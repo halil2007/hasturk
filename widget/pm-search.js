@@ -628,7 +628,13 @@
     '.tb{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 14px 0 12px;border-radius:19px;border:1.5px solid var(--ln);background:#fff;font-size:13.5px;font-weight:700;color:#4b5963;white-space:nowrap;scroll-snap-align:start;transition:background .15s,color .15s,border-color .15s}',
     '.tb svg{display:block;width:16px;height:16px;flex:none}',
     // Karışım sekmesi hafifçe öne çıkar (yeni araç)
-    '.tb[data-v="mix"]{border-color:var(--pr);color:var(--prd);background:linear-gradient(135deg,#fff 40%,var(--soft))}.tb[data-v="mix"] svg{color:var(--pr)}',
+    // Toprağını Hazırla sekmesi: çevresinde dönen ışık şeridi (yalnız transform; hareket azaltma tercihinde durur)
+    '.tb[data-v="mix"]{position:relative;overflow:hidden;isolation:isolate;border-color:transparent;color:var(--prd);background:transparent}.tb[data-v="mix"] svg{color:var(--pr)}',
+    '.tb[data-v="mix"]::before{content:"";position:absolute;left:50%;top:50%;width:240%;aspect-ratio:1;transform:translate(-50%,-50%);background:conic-gradient(from 0deg,var(--soft) 0 38%,var(--pr) 52%,#5cc46a 64%,#ffd54a 76%,#ff9a3c 84%,var(--soft) 96%);animation:mxspin 2.4s linear infinite;z-index:-2}',
+    '.tb[data-v="mix"]::after{content:"";position:absolute;inset:2.5px;border-radius:15px;background:linear-gradient(135deg,#fff 45%,var(--soft));z-index:-1}',
+    '.tb[data-v="mix"].on{color:#fff;background:transparent;border-color:transparent}.tb[data-v="mix"].on::after{background:var(--pr)}.tb[data-v="mix"].on svg{color:#fff}',
+    '@keyframes mxspin{to{transform:translate(-50%,-50%) rotate(360deg)}}',
+    '@media(prefers-reduced-motion:reduce){.tb[data-v="mix"]::before{animation:none;background:var(--pr)}}',
     '@media(max-width:379px){.tb{font-size:13px;padding:0 12px 0 10px}}',
     '.mx{padding:12px 14px 0;background:var(--bg);min-height:100%}',
     '.mxh{display:flex;align-items:center;gap:12px;padding:4px 2px 12px}.mxh .mxi{width:46px;height:46px;border-radius:14px;background:var(--pr);color:#fff;display:grid;place-items:center;flex:none}.mxh .mxi svg{width:26px;height:26px}.mxh b{display:block;font-size:17px;color:var(--prd)}.mxh span{display:block;font-size:13px;color:var(--mu);line-height:1.4;margin-top:2px}',
@@ -642,6 +648,7 @@
     '.mxo-p{font-size:26px;font-weight:800;color:var(--prd);margin:6px 0 2px;letter-spacing:-.3px}.mxo-d{font-size:13px;color:var(--mu)}.mxo-k{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;font-weight:700;color:#4b5963;background:#fff;border:1px solid var(--ln);border-radius:14px;padding:4px 10px}.mxo-k svg{width:16px;height:16px}.mxo-k.ok{color:var(--prd);border-color:var(--pr)}',
     '.mxbr{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:2px 0 6px;background:var(--bg)}.mxbr span{display:block;height:100%;transition:width .2s}',
     '.mx .kr{gap:10px}.mx .kr .dot{width:12px;height:12px;border-radius:4px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}.mx .kn small{display:block;font-size:12px;color:var(--mu)}.mx .kq b{min-width:58px;font-size:13px}.mx .kr:last-child{border-bottom:0}',
+    '.mxe{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin-top:12px;border-radius:12px;border:1.5px dashed var(--pr);color:var(--pr);font-weight:800;font-size:14px;background:#fff}.mxe svg{width:17px;height:17px}',
     '.mxa{margin-top:12px}.mxa .mxa-t{font-size:12.5px;font-weight:700;color:var(--mu);margin-bottom:8px}.mxa .mxa-t small{font-weight:400}.mxa .mx-c button{display:flex;align-items:center;gap:6px}.mxa .mx-c .dot{width:10px;height:10px;border-radius:3px}',
     '.mx-l{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mx-l .vo{padding:8px 12px}.mx-l label{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:var(--mu)}.mx-l input{width:96px;height:40px;border:1.5px solid var(--ln);border-radius:12px;padding:0 10px;font:inherit;font-size:15px;font-weight:800;text-align:right;color:var(--ink)}.mx-l input:focus{outline:0;border-color:var(--pr)}.mxk .hint{font-size:12px;color:var(--mu);margin:8px 0 0;line-height:1.4}',
     '.mx-s{position:sticky;bottom:0;z-index:3;margin:0 -14px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--ln);box-shadow:0 -6px 18px rgba(0,0,0,.06)}.mx-s .sh-f{margin-top:0}.mx-s .bhint{margin:6px 0 0;font-size:11.5px;color:var(--mu)}.mx-s .pk{font-size:12px;color:var(--mu);margin-bottom:6px}',
@@ -743,7 +750,7 @@
     '.akdots i:nth-child(2){animation-delay:.15s}.akdots i:nth-child(3){animation-delay:.3s}',
     '@keyframes akd{0%,100%{opacity:.25}50%{opacity:.9}}',
     '@media(min-width:760px){.akh{padding:18px 20px 6px}.akwrap{padding:4px 20px 14px}.akf{padding:10px 20px 12px}}',
-    '.tb.on,.tb[data-v="mix"].on{background:var(--pr);border-color:var(--pr);color:#fff}.tb.on svg{color:#fff}',
+    '.tb.on{background:var(--pr);border-color:var(--pr);color:#fff}.tb.on svg{color:#fff}',
     '.hw{display:block}.cside{display:none}',
     '@media(min-width:760px){.hw{display:grid;grid-template-columns:250px minmax(0,1fr);align-items:start}',
     ' .cside{display:block;position:sticky;top:0;max-height:calc(min(84vh,760px) - 170px);overflow-y:auto;padding:0 8px 16px 12px;border-right:1px solid var(--ln);scrollbar-width:thin}',
@@ -1012,7 +1019,8 @@
     ' .tb{flex:none;padding:0 18px;height:44px;font-size:14px;border-radius:12px 12px 0 0;border:1px solid transparent;border-bottom:0;margin-bottom:-1px;color:#4b5963;background:transparent}',
     ' .tb svg{display:block;width:18px;height:18px}.tb .tl{display:inline}.tb .ts{display:none}',
     ' .tb:hover{color:var(--ink)}',
-    ' .tb.on,.tb[data-v="mix"].on{background:#fff;border-color:var(--ln);color:var(--pr)}.tb.on svg{color:var(--pr)}.tb[data-v="mix"]{background:transparent;border-color:transparent}',
+    ' .tb.on{background:#fff;border-color:var(--ln);color:var(--pr)}.tb.on svg{color:var(--pr)}',
+    ' .tb[data-v="mix"]{border-radius:12px 12px 0 0}.tb[data-v="mix"]::after{border-radius:10px 10px 0 0;bottom:0}.tb[data-v="mix"].on{color:var(--pr)}.tb[data-v="mix"].on::after{background:#fff}.tb[data-v="mix"].on svg{color:var(--pr)}',
     ' .mfoot{justify-content:flex-start;padding:10px 20px}.mfoot a{flex:none;padding:0 18px;height:42px}',
     ' .mfoot .tel .ts{display:none}',
     ' .cban{display:flex;justify-content:center;background:var(--bg)}.cban img{width:auto;max-width:100%;max-height:300px}',
@@ -1028,7 +1036,7 @@
     VSTACK.push({ v: view, q: $q ? $q.value : '', s: $body ? $body.scrollTop : 0, n: CSHOWN });
     if (VSTACK.length > 20) VSTACK.shift();
   }
-  var TABS = [['ak', 'Bilge Bey', 'bot', 'Bilge Bey'], ['home', 'Kategoriler', 'grid', 'Kategoriler'], ['mix', 'Toprak Karışımı Hazırla', 'sprout', 'Karışım'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
+  var TABS = [['ak', 'Bilge Bey', 'bot', 'Bilge Bey'], ['mix', 'Toprağını Hazırla', 'sprout', 'Toprağını Hazırla'], ['home', 'Kategoriler', 'grid', 'Kategoriler'], ['calc', 'Kaç Litre Toprak?', 'calc', 'Kaç Litre?'], ['guide', 'Kullanım Rehberi', 'book', 'Rehber'], ['pages', 'Sayfalar', 'doc', 'Sayfalar']];
   var BY_ID = {};
 
   function build() {
@@ -1209,7 +1217,7 @@
     else if (act === 'shx') closeSheet();
     else if (act === 'shgo') doAdd();
     else if (act === 'kar') { var kn = v; var ko = function () { karOpen(kn); }; if (KAR) ko(); else { var kl = karLoad(); if (kl) kl.then(function () { if (KAR) ko(); else ptoast('Karışım fiyatları yüklenemedi.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git'); }); } }
-    else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0' || act === 'mxm') mixAct(act, v);
+    else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0' || act === 'mxm' || act === 'mxe') mixAct(act, v);
     else if (act === 'kargo') karGo();
     else if (act === 'tocm') { e.preventDefault(); var ub = $calc.querySelector('.unit [data-v="cm"]'); if (ub) calcAction('unit', 'cm', ub); }
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
@@ -1684,7 +1692,7 @@
     $ak.classList.toggle('on', t === 'ak');
     $panel.classList.toggle('akm', t === 'ak');
     $panel.classList.toggle('mxm', t === 'mix');
-    var akt = root.querySelector('.akt'); if (akt) akt.textContent = t === 'mix' ? 'Toprak Karışımı' : '';
+    var akt = root.querySelector('.akt'); if (akt) akt.textContent = t === 'mix' ? 'Toprağını Hazırla' : '';
     if (t === 'ak') { if ($q.value) { $q.value = ''; render(); } akBuild(); }
     if (t === 'guide') renderGuide();
     if (t === 'calc') calcBuild();
@@ -2732,7 +2740,7 @@
   function mixSet(pl, parts, kaynak) {
     MX.parts = parts.map(function (a) { return [a[0], a[1]]; });
     MX.ad = pl ? pl.n : '';
-    MX.kaynak = kaynak || 'kural'; MX.degisti = false;
+    MX.kaynak = kaynak || 'kural'; MX.degisti = false; MX.duzen = false;
     MX.msg = pl ? pl.n + ' için tarif hazır; oranları ve litreyi değiştirebilirsiniz.' : '';
   }
   // Bitki adından tarif: kendi toprağı varsa onun formülü, yoksa en yakın formül (sunucudan); bulunamazsa kullanıcı seçer
@@ -2765,7 +2773,7 @@
       '<form class="mx-f" autocomplete="off"><input type="search" data-k="mxb" enterkeyhint="go" placeholder="Bitki adı: monstera, limon, kaktüs…" value="' + esc(MX.ad) + '"><button type="submit">Tarif getir</button></form>' +
       '<div class="mx-c">' + MX_CHIPS.map(function (c) { return '<button type="button" data-act="mxb" data-v="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>' +
       (MX.msg ? '<p class="mx-m">' + esc(MX.msg) + '</p>' : '') + '</section>';
-    var karisim = '<section class="mxk">' + adim(serbest ? 1 : 3, serbest ? 'Bileşenleri seçin' : 'Karışımınız', S ? '<button type="button" class="mx0" data-act="mx0">Temizle</button>' : '') +
+    var karisim = '<section class="mxk">' + adim(serbest ? 1 : 3, serbest ? 'Bileşenleri seçin' : 'Karışımınız', !S ? '' : !serbest && MX.duzen ? '<button type="button" class="mx0" data-act="mxe" data-v="0">Bitti</button>' : serbest ? '<button type="button" class="mx0" data-act="mx0">Temizle</button>' : '') +
       '<div class="mx-r">' + mixRows(plan) + '</div></section>';
     var litre = '<section class="mxk">' + adim(2, 'Kaç litre?') + '<div class="mx-l">' + [10, 20, 50, 100, 250, 500, 1000].map(function (L) { return '<button type="button" class="vo' + (L === MX.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') +
       '<label>veya <input data-k="mxL" inputmode="decimal" aria-label="Litre" value="' + MX.L + '"> L</label></div>' +
@@ -2784,15 +2792,19 @@
     var bes = KAR.bilesen.filter(function (b) { return b.k && KAR_AD[b.k]; });
     var secili = bes.filter(function (b) { return pn[b.k]; }).sort(function (a, b) { return pn[b.k] - pn[a.k]; }), diger = bes.filter(function (b) { return !pn[b.k]; });
     var sol = S ? (pn.solucan || 0) / S : 0;
+    // Tarif hazırlanınca önce sade sonuç gösterilir; "Oranları değiştir" ile düzenleme açılır ("Kendim seçeceğim"de hep açık)
+    var duzen = MX.mode === 'serbest' || MX.duzen || !secili.length;
     return mixOzet(plan) + (secili.length ? '<div class="mxbr" aria-hidden="true">' + secili.map(function (b) { return '<span style="width:' + (pn[b.k] / S * 100).toFixed(1) + '%;background:' + (MX_RENK[b.k] || '#999') + '" title="' + esc(b.ad) + '"></span>'; }).join('') + '</div>' : '<p class="mx-m">Henüz bileşen yok. ' + (MX.mode === 'serbest' ? 'Aşağıdan ekleyin.' : 'Bitkinizi yazın ya da aşağıdan kendiniz ekleyin.') + '</p>') +
       secili.map(function (b) {
         var n = pn[b.k], r = lit[b.k];
         return '<div class="kr"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span><span class="kn">' + esc(b.ad) + '<small>%' + Math.round(n / S * 100) + (r && plan ? ' · ' + String(+(r.v[0] * plan.Q).toFixed(1)).replace('.', ',') + ' L' : '') + '</small></span>' +
-          '<span class="kq"><button type="button" data-act="mxp" data-v="' + esc(b.k) + ':-1" aria-label="Azalt">' + I.minus + '</button><b>' + String(n).replace('.', ',') + ' ölçü</b>' +
-          '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1" aria-label="Artır">' + I.plus + '</button></span><span class="kp">' + (r && plan ? tl(r.v[2] * plan.Q) : '') + '</span></div>';
+          (duzen ? '<span class="kq"><button type="button" data-act="mxp" data-v="' + esc(b.k) + ':-1" aria-label="Azalt">' + I.minus + '</button><b>' + String(n).replace('.', ',') + ' ölçü</b>' +
+            '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1" aria-label="Artır">' + I.plus + '</button></span>' : '<span class="kq"><b>' + String(n).replace('.', ',') + ' ölçü</b></span>') +
+          '<span class="kp">' + (r && plan ? tl(r.v[2] * plan.Q) : '') + '</span></div>';
       }).join('') +
       (sol > 0.2 ? '<p class="mx-m mx-w">Solucan gübresinin karışımın %20\'sini geçmemesi önerilir.</p>' : '') +
-      (diger.length ? '<div class="mxa"><div class="mxa-t">' + (secili.length ? 'Başka bileşen ekleyin' : 'Bileşenler') + ' <small>(ölçü = aynı kap; oranı belirler)</small></div><div class="mx-c">' + diger.map(function (b) { return '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span>+ ' + esc(KAR_AD[b.k]) + '</button>'; }).join('') + '</div></div>' : '');
+      (!duzen ? '<button type="button" class="mxe" data-act="mxe" data-v="1">' + I.calc + 'Oranları değiştir</button>' : '') +
+      (duzen && diger.length ? '<div class="mxa"><div class="mxa-t">' + (secili.length ? 'Başka bileşen ekleyin' : 'Bileşenler') + ' <small>(ölçü = aynı kap; oranı belirler)</small></div><div class="mx-c">' + diger.map(function (b) { return '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span>+ ' + esc(KAR_AD[b.k]) + '</button>'; }).join('') + '</div></div>' : '');
   }
   // Sonuç özeti: tarifin kaynağı, toplam, litre fiyatı, yaklaşık ağırlık (kargo / taşıma için) ve ücretsiz kargo durumu
   // (sepetteki ürünlerle birlikte). Ağırlık nemli, gevşek hacim için yaklaşık kg/L.
@@ -2828,6 +2840,7 @@
     else if (act === 'mxb') { mixPlant(v); return; }
     else if (act === 'mx0') { MX.parts = []; MX.ad = ''; MX.msg = ''; MX.kaynak = ''; MX.degisti = false; }
     else if (act === 'mxm') { MX.mode = v === 'serbest' ? 'serbest' : 'bitki'; track('karisim_mod', MX.mode); }
+    else if (act === 'mxe') { MX.duzen = v === '1'; if (MX.duzen) track('karisim_oran', MX.ad || ''); }
     else if (act === 'mxp') {
       var m = String(v).split(':'), k = m[0], d = +m[1] * 0.5, x = MX.parts.filter(function (p) { return p[1] === k; })[0];
       MX.degisti = true;
