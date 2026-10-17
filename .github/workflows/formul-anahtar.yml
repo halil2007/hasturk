@@ -17,5 +17,8 @@ jobs:
           curl -sS https://hasturk-arama.halilc2007.workers.dev/tarif-anahtar
           echo
           echo "Tarif denemesi (Monstera, kendi toprağı):"
-          curl -sS "https://hasturk-arama.halilc2007.workers.dev/tarif?s=hg-monstera-deve-tabani-topragi&t=1" | head -c 200
+          curl -sS "https://hasturk-arama.halilc2007.workers.dev/tarif?s=hg-monstera-deve-tabani-topragi&t=1" | head -c 60
+          echo
+          echo "Benzer toprakla (Philodendron → Benjamin):"
+          curl -sS "https://hasturk-arama.halilc2007.workers.dev/tarif?s=hg-benjamin-saksi-topragi&p=22322h&g=salon&sp=2321h" | head -c 60
           echo
