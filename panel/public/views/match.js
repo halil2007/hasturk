@@ -193,8 +193,8 @@ export function findProduct(key, onDone, endpoint = 'listings/link', opts = {}) 
     render(res, r.products.length ? html`${r.products.map((p) => {
       const mine = (p.listings || []).find((l) => l.channel === key.channel);
       const same = mine && mine.remote_id === key.remote_id;
-      return html`<div class="cand">${thumb(p.image, p.name, 'sm')}<div style="flex:1;min-width:0"><div class="ellipsis" style="font-weight:600">${p.name}${vtag(p.variant_name, p.name)}</div>
-        <div class="muted tiny ellipsis">${[p.sku, p.barcode, `stok ${p.stock}`].filter(Boolean).join(' · ')}${(p.listings || []).length ? ' · ' + [...new Set(p.listings.map((l) => ch(l.channel).short || l.channel))].join(', ') : ''}</div></div>
+      return html`<div class="cand">${thumb(p.image, p.name, 'sm')}<div style="flex:1;min-width:0"><div class="cand-name">${p.name}${vtag(p.variant_name, p.name)}</div>
+        <div class="muted tiny cand-meta">${[p.sku, p.barcode, `stok ${p.stock}`].filter(Boolean).join(' · ')}${(p.listings || []).length ? ' · ' + [...new Set(p.listings.map((l) => ch(l.channel).short || l.channel))].join(', ') : ''}</div></div>
         ${same ? html`<span class="pill good">Bağlı</span>` : mine ? html`<button class="btn sm" data-pick2="${p.id}" data-n="${(p.listings || []).filter((l) => l.channel === key.channel).length + 1}" title="Bu ürünün bu kanalda zaten ilanı var: bu ilanı ikinci ilan olarak bağlar">2. ilan olarak bağla</button>` : html`<button class="btn sm primary" data-pick="${p.id}">Bağla</button>`}</div>`;
     })}` : html`<div class="muted small">Sonuç yok</div>`);
   };
