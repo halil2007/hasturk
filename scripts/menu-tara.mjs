@@ -98,7 +98,7 @@ for (const [ad, opt] of Object.entries(PROF)) {
       await p.evaluate(() => { const b = document.getElementById('urun-arama-root').shadowRoot.querySelector('[data-act="catx"]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); });
       await p.waitForTimeout(500);
       const cats = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('[data-act="cat"]')].filter((b) => b.offsetHeight).map((b) => b.getAttribute('data-v')).filter(Boolean));
-      const catLink = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.panel a.li, .panel aside a')].filter((a) => a.offsetHeight).length);
+      const catLink = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.panel a.li, .panel aside a, .panel .cside [data-act="catp"]')].filter((a) => a.offsetHeight).length);
       log(`  Kategoriler: ${cats.length} kategori düğmesi, ${catLink} kategori bağlantısı`);
       if (!cats.length && !catLink) S(`${ad}: Kategoriler sekmesinde kategori yok`);
       await p.screenshot({ path: `tara-${ad}-kategoriler.png` }).catch(() => {});
