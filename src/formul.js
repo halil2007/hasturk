@@ -75,6 +75,10 @@ export function uyarla(f, pf, sp) {
     if (db < 0 && !azalt(1, 'leonardit')) { const s = get('solucan'); if (s) s[0] = s[0] / 2; }
     if (db > 0) ekle(0.5, 'solucan');
   }
+  // Toplam ölçü formüldeki gibi kalsın (10 ölçü = 10 litre): fark en büyük taban bileşenine (torf / cocopeat / orman) yazılır
+  const T0 = f.reduce((a, r) => a + r[0], 0), T1 = x.reduce((a, r) => a + r[0], 0);
+  const taban = x.filter((r) => /^(sphagnum|asidik|cocopeat|orman)$/.test(r[1])).sort((a, b) => b[0] - a[0])[0];
+  if (taban && T1 !== T0 && taban[0] + T0 - T1 >= 1) taban[0] += T0 - T1;
   const out = x.filter((r) => r[0] > 0);
   // Solucan gübresi toplamın en çok %20'si
   const top = out.reduce((a, r) => a + r[0], 0), s = out.find((r) => r[1] === 'solucan');

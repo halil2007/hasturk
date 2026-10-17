@@ -7,7 +7,7 @@
 // Kişisel veri tutulmaz: soru metni, cevap, tarih; IP / çerez / kimlik yok.
 import Anthropic from '@anthropic-ai/sdk';
 import HAVUZ from './akbilge-havuz.json';
-import { rehberMetni, GRUPLAR, OZEL_KARISIM, TOPRAK_SORUSU } from './toprak.js';
+import { rehberMetni, GRUPLAR, OZEL_KARISIM, TOPRAK_SORUSU, KENDIM } from './toprak.js';
 
 export const MODEL = 'claude-opus-5-5';
 const DAILY_LIMIT = 150;     // günde en fazla bu kadar Claude sorgusu (env.AK_DAILY_LIMIT ile değişir)
@@ -83,6 +83,46 @@ export function match(q, { extra = [], top = 5, product = null } = {}) {
   return [...best.entries()].sort((a, b) => b[1].sc - a[1].sc).slice(0, top)
     .map(([ei, r]) => ({ e: X.entries[ei], sc: +r.sc.toFixed(3), cp: +r.cp.toFixed(3), cq: +r.cq.toFixed(3) }));
 }
+// ---------- Toprak niyeti: bitki adı (yazım hatasına dayanıklı) + toprak sorusu → bitkinin toprak kartı ----------
+// "Bengovil toprağı lazım" (yazım hatası), "kızılcık toprağı hazırlayabilir misin" (karışım isteği) gibi sorular havuz
+// kalıbına uymasa da yapay zekâya gitmeden bitkinin kartına (hazır toprak; karışım istenirse tarif ve sepete ekleme) gider.
+const mesafe = (a, b) => { // harf ekleme / silme / değiştirme / yan yana yer değiştirme sayısı
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[a.length][b.length];
+};
+let BT = null;
+function bitkiler() {
+  if (BT) return BT;
+  const voc = new Set(); HAVUZ.forEach((e) => e.s.forEach((q) => norm(q).split(' ').forEach((w) => voc.add(w))));
+  const list = HAVUZ.filter((e) => e.t === 'bitki-toprak' && e.b).map((e) => ({ e, adlar: e.b.split(',').map((x) => norm(x.replace(/\(.*?\)/g, ' ')).split(' ').filter((w) => w.length >= 3)).filter((a) => a.length) }));
+  const adK = new Set(list.flatMap((x) => x.adlar.flat()));
+  return (BT = { list, voc, adK });
+}
+// Sorudaki kelime bitki adının kelimesi mi: aynısı, ekli hali (begonvilin) ya da sözlükte olmayan yazım hatası (bengovil)
+function kelimeUyar(w, t, voc) {
+  if (w === t || (t.length >= 3 && w.startsWith(t) && w.length - t.length <= 4)) return 2;
+  if (t.length < 5 || w[0] !== t[0] || voc.has(w)) return 0;
+  const k = t.length >= 7 ? 2 : 1;
+  return mesafe(w, t) <= k || mesafe(w.slice(0, t.length), t) <= k ? 1 : 0;
+}
+export function toprakNiyet(q) {
+  const n = norm(q);
+  if (!TOPRAK_SORUSU.test(n) || /gubre|ilac|bocek|hastalik|zararli|sulam|budam/.test(n)) return null;
+  const B = bitkiler(), ws = n.split(' ').filter((w) => w.length >= 3);
+  let best = null;
+  B.list.forEach((x) => x.adlar.forEach((ad) => {
+    let puan = 0;
+    for (const t of ad) { const m = Math.max(0, ...ws.map((w) => kelimeUyar(w, t, B.voc))); if (!m) return; puan += m * t.length; }
+    if (!best || puan > best.puan) best = { e: x.e, puan };
+  }));
+  return best ? { e: best.e, kendim: KENDIM.test(n) } : null;
+}
+
 // Havuzdan cevap verilecek kadar emin miyiz
 export const SURE = 0.72;
 const AYLAR = ['ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran', 'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık'];
@@ -373,6 +413,15 @@ export async function handle(req, env, ctx, { aiKey, originOk, products, formul 
     return json({ ok: true, kaynak: 'havuz', id: ce.i, tur: 'liste', cevap: ce.c, urunler: ce.u, ara: ce.ara, n: ce.n });
   }
   let { hit, near } = tryPool(APPROVED.t ? APPROVED.list : []);
+  // Bitkiye toprak sorusu (yazım hatası, "hazırlar mısın" gibi karışım isteği dahil): bitkinin toprak kartı
+  const tn = toprakNiyet(q);
+  if (tn && (tn.kendim || !hit || hit.e.t === 'bitki-toprak') && body.on !== 1) {
+    const e = tn.e, ad = e.b.split(',')[0].trim();
+    if (db && req.headers.get('x-ak-test') !== '1') ctx.waitUntil(ready.then(() => db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, site, sayfa) VALUES (?,?,?,?,?,?,?)')
+      .bind(new Date().toISOString(), q, norm(q), 'havuz', e.i, site, page).run()).catch(() => {}));
+    return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, dinamik: 'toprak', bitki: e.b, kendim: tn.kendim, urunler: e.u,
+      cevap: tn.kendim ? `${ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : e.c });
+  }
   // Önden yükleme (on: 1): Bilge Bey'in öneri düğmelerinin cevabı müşteri dokunmadan arkada alınır. Yalnız hazır havuz;
   // Claude'a gidilmez, veritabanı beklenmez, kayda geçmez (müşteri dokununca asıl istek ayrıca gelir ve sayılır).
   if (body.on === 1) {

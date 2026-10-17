@@ -11,6 +11,8 @@ let bad = 0;
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
 await ctx.route((u) => u.hostname === HOST && u.pathname === '/pm-search.js', (r) => r.fulfill({ status: 200, body: readFileSync('public/pm-search.js'), contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' } }));
+// Bilge Bey soruları test olarak işaretlenir (gerçek müşteri istatistiğine karışmaz)
+await ctx.route((u) => u.hostname === HOST && u.pathname === '/ak', (r) => r.continue({ headers: { ...r.request().headers(), 'x-ak-test': '1' } }));
 const p = await ctx.newPage();
 let frames = 0;
 p.on('frameattached', () => frames++);
@@ -115,10 +117,18 @@ if (await p.locator(R + '.akall').count()) {
   log(`3) Hepsini sepete ekle (${sec.length}: ${sec.join(' + ')}) → ${r.ms} ms "${r.t}" · sepete ${added} adet eklendi · sayaç ${c.sayac} · gizli çerçeve: ${frames - f1}`);
   if (added !== sec.length || !/eklendi/.test(r.t) || /eklenemedi/.test(r.t)) { bad++; log('   ✗ hepsi eklenmedi'); }
 }
-// 4) Kendi karışımını hazırlat (yalnız HasTürk): Bilge Bey'e özel toprağı olmayan bitki sor, tarifle sepete ekle
+// Son Bilge Bey cevabının toprak kartı (metin, "Hepsini sepete ekle" var mı)
+const sonKart = () => p.evaluate(() => { const r = document.getElementById('urun-arama-root').shadowRoot, pw = r.querySelectorAll('.akpw'), lp = pw[pw.length - 1]; const s = lp && lp.querySelector('.soil'); return { t: s ? s.innerText.replace(/\s+/g, ' ').slice(0, 300) : '-', hepsi: lp ? lp.querySelectorAll('.akall').length : 0 }; });
+const sor = async (q) => { const n0 = await p.evaluate(() => document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.akpw').length); await p.locator(R + '.akf input').first().fill(q); await p.locator(R + '.akf input').first().press('Enter');
+  for (let i = 0; i < 150; i++) { if (await p.evaluate((n) => document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.akpw').length > n, n0)) break; await p.waitForTimeout(100); } await p.waitForTimeout(1500); return sonKart(); };
+// 4) Kendi karışımını hazırlat (yalnız HasTürk): müşterinin gerçekte yazdığı gibi (yazım hatası, sesle yazma), tarifle sepete ekle
 if (!SITE.includes('tarim')) {
-  await p.locator(R + '.akf input').first().fill('singonyum için nasıl bir toprak almam lazım');
-  await p.locator(R + '.akf input').first().press('Enter');
+  const bg = await sor('Bengovil toprağı lazım');
+  log(`4a) "Bengovil toprağı lazım" → ${bg.t} · hepsini ekle: ${bg.hepsi}`);
+  if (!/Begonvil Toprağı/.test(bg.t) || bg.hepsi) { bad++; log('   ✗ Begonvil toprağı önerilmedi'); }
+  const kz = await sor('E kızılcık toprağı hazırlayabilir misin kendi toprak karışımı oluştur önünden');
+  log(`4b) Kızılcık karışım isteği → ${kz.t} · hepsini ekle: ${kz.hepsi}`);
+  if (!/Kızılcık/.test(kz.t) || !/karışımınız/.test(kz.t) || kz.hepsi) { bad++; log('   ✗ kızılcık karışımı hazırlanmadı'); }
   const kb = p.locator(R + '.kbtn').last();
   if (await kb.waitFor({ timeout: 20000 }).then(() => true, () => false)) {
     log('   düğme: ' + (await kb.textContent()).trim());

@@ -65,6 +65,9 @@ export const GRUPLAR = [
 ];
 export const OZEL_KARISIM = 'kendi-toprak-karisimini-olustur';
 export const TOPRAK_SORUSU = /topra|harc|karisim|torf|saksi degis/;
+// Müşteri hazır toprak yerine karışımı kendisi yapmak / bizden hazırlatmak istiyor (sadeleştirilmiş metinde; widget'taki
+// KENDIM_RE ile aynı): "kendim karıştırırım", "kızılcık toprağı hazırlayabilir misin", "kendi toprak karışımı oluştur ürününden"
+export const KENDIM = /kendim|kendi (toprak )?karisim|karisim(i|ini)? (yap|hazirla|olustur)|karistir|hazirla(yabilir|r mi|r misin|yin|sana|mak)|hazir (istemiyorum|almak istemiyorum|olmasin)|olusturur? (mu|musun|misin)|(den|dan) (yap|hazirla|olustur)/;
 
 // Yapay zekâya giden "Doğrulanmış bilgi" bloğu (ürün adları canlı listeden)
 // F: çözülmüş HG formülleri (src/formul.js); varsa grubun hazır toprağının formülü tarif olarak verilir

@@ -1287,13 +1287,13 @@
     if (d.cevap) {
       html = akText(d.cevap);
       var prods = '';
-      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl, q); pose = 'fide'; } }
+      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl, q, d.kendim); pose = 'fide'; } }
       // Müşteri karışımı kendisi yapmak istiyorsa (cevap havuzdan gelmese de) bitkinin toprak kartı tarifle gösterilir
       if (!prods && DATA && KENDIM_RE.test(fold(q || ''))) { var kpl = plantFor(fold(q)); if (kpl) { prods = soilCard(kpl, q); pose = 'fide'; } }
       if (!prods && DATA) {
         var list = akListe(d.urunler || []);
         if (list.length) prods = '<div class="akp">' + list.map(function (x) { return soilRow(x, x.__yerine ? 'stokta olmayan ' + akKisa(x.__yerine) + ' yerine' : ''); }).join('') + '</div>' +
-          (list.length >= 2 && cartOn() ? '<button type="button" class="akall" data-act="akall" data-v="' + idx + '">' + I.cart + 'Hepsini sepete ekle</button>' : '') + akMore(list, q, d);
+          (list.length >= 2 && cartOn() && akHepsi(list) ? '<button type="button" class="akall" data-act="akall" data-v="' + idx + '">' + I.cart + 'Hepsini sepete ekle</button>' : '') + akMore(list, q, d);
       }
       if (d.kaynak === 'ai') html += '<p class="akn">Bu cevabı yapay zekâ hazırladı; önemli kararlarda müşteri hizmetlerimize danışabilirsiniz.</p>';
       // Cevap müşteriyi bize yönlendiriyorsa ("müşteri hizmetleri", "WhatsApp'tan yazın") düğmeler hemen altında olsun
@@ -1345,6 +1345,13 @@
       if (!best || c.k < best.k) best = c;
     }
     return best ? '<a class="akmore" href="' + esc(dmHref(best.s)) + '" data-n="' + esc(best.n) + '">Tüm ' + esc(best.n) + ' (' + best.k + ')' + I.right + '</a>' : '';
+  }
+  // "Hepsini sepete ekle" yalnız birlikte kullanılan ürünlerde: birbirinin yerine geçen topraklar ya da bileşensiz
+  // "Kendi Toprak Karışımını Oluştur" varken çıkmaz
+  function akHepsi(list) {
+    var oz = CFG.soilMatch && CFG.soilMatch.custom, top = 0;
+    for (var i = 0; i < list.length; i++) { if (list[i].s === oz) return false; if (/topra|torf|karisim/.test(list[i].s)) top++; }
+    return top < 2;
   }
   function akListe(slugs) {
     var out = [], used = {};
@@ -2485,8 +2492,34 @@
     S.plants.forEach(function (pl) {
       pl.res.forEach(function (re, i) { var n = pl.names[i]; if (re.test(q) && n.length > bl) { best = pl; bl = n.length; } });
     });
+    if (!best && /topra|karisim|harc/.test(q)) best = plantFuzzy(ws, S.plants);
     var own = best ? words(best.names.join(' ')) : [];
     if (best && ws.some(function (w) { return NOT_SOIL.test(w) && own.indexOf(w) === -1; })) return null;
+    return best;
+  }
+  // Yazım hatalı bitki adı ("bengovil" → begonvil): ilk harf aynı, 5+ harfli addan en çok 1 (7+ harfte 2) harf farkı
+  var FUZ_SKIP = /^(topra|karis|harc|saksi|lazim|icin|hazir|kendi|olust|istiy)/;
+  function mesafe(a, b) {
+    var d = [], i, j;
+    for (i = 0; i <= a.length; i++) { d[i] = [i]; for (j = 1; j <= b.length; j++) d[i][j] = i ? 0 : j; }
+    for (i = 1; i <= a.length; i++) for (j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+      if (i > 1 && j > 1 && a.charAt(i - 1) === b.charAt(j - 2) && a.charAt(i - 2) === b.charAt(j - 1)) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+    return d[a.length][b.length];
+  }
+  function plantFuzzy(ws, plants) {
+    var best = null, bd = 9;
+    ws.forEach(function (w) {
+      if (w.length < 5 || FUZ_SKIP.test(w)) return;
+      plants.forEach(function (pl) {
+        pl.names.forEach(function (n) {
+          if (n.indexOf(' ') !== -1 || n.length < 5 || n.charAt(0) !== w.charAt(0)) return;
+          var k = n.length >= 7 ? 2 : 1, m = Math.min(mesafe(w, n), mesafe(w.slice(0, n.length), n));
+          if (m <= k && m < bd) { bd = m; best = pl; }
+        });
+      });
+    });
     return best;
   }
   function soilScore(pl, pf) {
@@ -2575,7 +2608,8 @@
   // toprak → o formül + küçük ayar. Gelmezse (Tarım Dünyası, etçil bitki, bağlantı hatası) yukarıdaki kural tarifi kullanılır.
   // Hazır toprağı olan bitkide tarif yalnız müşteri karışımı kendisi yapmak istediğini söylerse gösterilir (KENDIM_RE).
   var TARIF = {}, TARIF_IST = {}, KAR_KEY = {};
-  var KENDIM_RE = /kendim|kendi karisim|karisimi (ben|kendi)|karisim (yap|hazirla)|karistirmak|hazir (istemiyorum|almak istemiyorum|olmasin)/;
+  // Sunucudaki src/toprak.js > KENDIM ile aynı
+  var KENDIM_RE = /kendim|kendi (toprak )?karisim|karisim(i|ini)? (yap|hazirla|olustur)|karistir|hazirla(yabilir|r mi|r misin|yin|sana|mak)|hazir (istemiyorum|almak istemiyorum|olmasin)|olusturur? (mu|musun|misin)|(den|dan) (yap|hazirla|olustur)/;
   function tarifKaynak(pl, r) {
     if (r.exact) return { s: r.p.s, t: 1 };
     if (r.p) return { s: r.p.s };
@@ -2703,17 +2737,22 @@
       bitir(!!(x && x.success) && (ok || its.length > 0));
     }, function () { setTimeout(function () { WIN_OWN--; }, 400); bitir(false); });
   }
-  function soilRow(x, note) {
-    var href = esc(url(x.s));
+  // "Kendi Toprak Karışımını Oluştur" bileşensiz (yalnız taban ücretiyle) sepete eklenmez: bitki biliniyorsa düğme karışımı
+  // açar, bilinmiyorsa ürün sayfasına gider
+  function soilRow(x, note, karBitki) {
+    var href = esc(url(x.s)), oz = CFG.soilMatch && x.s === CFG.soilMatch.custom;
     return '<div class="xs-i">' + thumb(x.img, 180) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
       '<b>' + (price(x) != null ? (x.multi ? tl(price(x)) + '\'den' : tl(price(x))) : '') + (note ? ' <em>' + esc(note) + '</em>' : '') + '</b></div>' +
-      (cartOn() ? '<button class="add" type="button" data-act="add" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button>' : '') + '</div>';
+      (oz ? (karBitki && (karOn() || (!KAR && !SITE_DIR && winOn())) ? '<button class="add" type="button" data-act="kar" data-v="' + esc(karBitki) + '" aria-label="Karışımı hazırla">' + I.plus + '<span>Hazırla</span></button>' :
+        '<a class="add" href="' + href + '" aria-label="Ürün sayfası">' + I.arrow + '<span>Seç</span></a>') :
+      cartOn() ? '<button class="add" type="button" data-act="add" data-v="' + esc(x.id) + '" aria-label="Sepete ekle">' + I.plus + '<span>Ekle</span></button>' : '') + '</div>';
   }
-  function soilCard(pl, q) {
-    var r = soilFor(pl), S = soilData(), kendim = KENDIM_RE.test(fold(q || ''));
+  function soilCard(pl, q, kendim) {
+    var r = soilFor(pl), S = soilData();
+    kendim = !!kendim || KENDIM_RE.test(fold(q || ''));
     if (!soilCard.seen) soilCard.seen = {};
     if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + (r.p ? r.p.n : 'yok')); }
-    var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın') : '';
+    var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın', pl.n) : '';
     var tarifHtml = function () {
       var tk = tarifKaynak(pl, r), key = pl.n + '|' + (tk ? tk.s + (tk.t ? '!' : '') : '');
       KAR_KEY[pl.n] = key;
@@ -2735,6 +2774,9 @@
         : esc(pl.n) + ' için hazır karışımlarımızdan hiçbiri yeterince uygun değil. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever; ihtiyacına göre karışım hazırlatabilirsiniz.' + ask) +
         (custom ? tarifHtml() + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
     }
+    // Müşteri karışım istiyorsa önce tarif, sonra en yakın hazır toprak
+    if (kendim && custom) return head(esc(pl.n) + ' için özel toprağımız yok. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever; karışımınız:') +
+      tarifHtml() + '<div class="so-l">' + custom + '</div><div class="so-or">Hazır isterseniz özellikleri en yakın toprağımız:</div><div class="so-l">' + soilRow(r.p, '%' + Math.round(r.fit * 100) + ' uyum') + '</div></div>';
     return head(esc(pl.n) + ' için özel toprağımız yok. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever. Özellikleri en yakın hazır karışımımız' +
       (r.adds.length ? ' ve eksik kalan özelliği tamamlayan ürün' : '') + ':') +
       '<div class="so-l">' + soilRow(r.p, '%' + Math.round(r.fit * 100) + ' uyum') +
