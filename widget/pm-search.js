@@ -240,6 +240,9 @@
   // Bir anlık ağ / sunucu hatasında (mobil veri, sağlayıcı yavaşlığı) 1,5 sn sonra bir kez daha istenir
   function getJson(u, init) {
     init.credentials = 'omit';
+    // Tarayıcı önbellekteki kopyayı sormadan kullanmasın: her açılışta sunucuya "değişti mi" diye sorar (değişmediyse
+    // küçük 304 cevabı). Yoksa yeni eklenen ürün / değişen fiyat 24 saate kadar eski görünebiliyordu.
+    init.cache = 'no-cache';
     var once = function () { return fetch(u, init).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); };
     return once().catch(function (e) { uaErr('veri ' + String(u).split('/').pop() + ' ' + String(e && e.message || e).slice(0, 30)); return new Promise(function (res) { setTimeout(res, 1500); }).then(once); });
   }
@@ -2653,7 +2656,7 @@
   var KAR = null, KAR_LOAD = null, KS = null;
   function karLoad() {
     if (KAR || KAR_LOAD || SITE_DIR) return KAR_LOAD;
-    KAR_LOAD = fetch(JSON_URL.replace(/products\.json(\?.*)?$/, 'karisim.json'), { credentials: 'omit' }).then(function (r) { return r.ok ? r.json() : null; })
+    KAR_LOAD = fetch(JSON_URL.replace(/products\.json(\?.*)?$/, 'karisim.json'), { credentials: 'omit', cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { if (d && d.bilesen && d.bilesen.length && d.varyant) KAR = d; return KAR; }, function () { return null; });
     return KAR_LOAD;
   }

@@ -1,0 +1,28 @@
+name: Ürün ve fiyat güncelliği
+
+# ikas mağazasındaki ürünler / fiyatlar ile Ürün Bul'un kullandığı products.json karşılaştırılır (yalnız okuma).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/guncellik.mjs', '.github/workflows/guncellik.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ['https://hasturkgubre.com.tr', 'https://tarim-dunyasi.com']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/guncellik.mjs
+        env:
+          SITE_URL: ${{ matrix.site }}

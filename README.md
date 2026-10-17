@@ -1,9 +1,9 @@
 # ikas Özel Arama — Kurulum
 
-Tamamen ücretsiz: **GitHub** (ürünleri 2 saatte bir çeker) + **Cloudflare Pages** (dosyaları yayınlar) + ikas'a **tek satır** kod.
+Tamamen ücretsiz: **GitHub** (ürünleri saatte bir çeker) + **Cloudflare Pages** (dosyaları yayınlar) + ikas'a **tek satır** kod.
 
 ```
-ikas API ──(GitHub Actions, 2 saatte bir)──▶ public/products.json ──▶ Cloudflare Pages ──▶ sitendeki arama
+ikas API ──(GitHub Actions, saatte bir)──▶ public/products.json ──▶ Cloudflare Pages ──▶ sitendeki arama
 ```
 
 > **Satış paneli:** İki ikas sitesi + Trendyol + Hepsiburada + PttAVM'nin sipariş, kargo, stok, kârlılık ve istatistiklerini tek ekrandan yöneten panel `panel/` klasöründedir (ayrı bir Cloudflare Worker). Kurulum: [panel/README.md](panel/README.md).
@@ -12,7 +12,7 @@ ikas API ──(GitHub Actions, 2 saatte bir)──▶ public/products.json ─�
 | Dosya | Ne işe yarar |
 |---|---|
 | `scripts/sync.mjs` | ikas'tan ürün, kategori, fiyat, stok, görsel, varyantları çeker → `public/products.json` |
-| `.github/workflows/sync.yml` | Senkronu 2 saatte bir otomatik çalıştırır |
+| `.github/workflows/sync.yml` | Senkronu saatte bir otomatik çalıştırır |
 | `widget/pm-search.js` | Arama menüsünün kendisi (tasarım + arama motoru) — **düzenlemeler burada yapılır** |
 | `public/pm-search.js` | Sitede yayınlanan küçültülmüş hali (`node scripts/build-widget.mjs` üretir; elle düzenlenmez) |
 | `public/menu.json` | Küçük menü verisi (kategoriler, ana ekran ayarları, masaüstü menüsünün öne çıkan ürünleri — sunucuda hesaplanır); ☰ menüsü, Ürün Bul ana ekranı ve masaüstü menüsü ürün verisini beklemeden kurulur. Senkron üretir |
@@ -85,7 +85,7 @@ Menüye bağlantı olarak `#hacim-hesapla` eklersen tıklayınca doğrudan topra
 - `soilMatch`: Bitkiye göre toprak önerisi. Arama kutusuna ya da Rehber sekmesine bitki adı yazılınca (örn. "monstera", "zeytin") "… için toprak" kartı çıkar. Bitkiye özel toprak varsa o, yoksa profili en yakın toprak "uyum %" ile önerilir; eksik özellik için katkı (perlit, asidik torf, vermikülit, solucan gübresi) eklenir. Profiller `docs/bitki-toprak-eslestirme.xlsx` dosyasından gelir (pH 1–4, drenaj/su/besin 1–3, yapı k/h/d).
   - **Yeni toprak eklerken güncelleme gerekmez:**
     1. Ürün adında listedeki bir bitki geçiyorsa (örn. "HG Philodendron Toprağı") o bitkiye kendiliğinden önerilir.
-    2. ikas'ta ürüne şu etiketler eklenirse benzerlik önerilerine de girer: `pH:asidik|hafif asidik|nötr|kireçli`, `Drenaj:orta|yüksek|çok yüksek`, `Su:düşük|orta|yüksek`, `Besin:düşük|orta|zengin`, `Yapı:kumlu|havalı|dengeli`; isteğe bağlı `Grup:Salon|Sukulent|Çiçek|Asit seven|Meyve|Sebze|Aromatik` ve `Genel` (her bitkiye önerilebilir). Ürünler 2 saatte bir senkronlandığı için en geç 2 saatte menüye yansır.
+    2. ikas'ta ürüne şu etiketler eklenirse benzerlik önerilerine de girer: `pH:asidik|hafif asidik|nötr|kireçli`, `Drenaj:orta|yüksek|çok yüksek`, `Su:düşük|orta|yüksek`, `Besin:düşük|orta|zengin`, `Yapı:kumlu|havalı|dengeli`; isteğe bağlı `Grup:Salon|Sukulent|Çiçek|Asit seven|Meyve|Sebze|Aromatik` ve `Genel` (her bitkiye önerilebilir). Ürünler saatte bir senkronlandığı için genelde 1–1,5 saatte menüye yansır.
   - Toprak özellikleri, üreticinin 10 litrelik karışım tariflerinden hesaplanır (`docs/bitki-toprak-eslestirme.xlsx` → Tarifler; hesap kuralları "Nasıl kullanılır" sayfasında). Benzerlik önerisinde yalnızca tarifi doğrulanmış (`v`) ya da ikas'ta etiketlenmiş topraklar kullanılır; tarifi olmayanlar sadece kendi bitkisine önerilir.
   - Bitkilerin pH ihtiyacı aralık olarak tutulur (örn. hafif asidik–nötr); toprak aralık içindeyse pH farkı sayılmaz.
   - Etiketsiz ve adında bitki geçmeyen toprak benzerlik önerisine girmez (yanlış öneri olmasın).
@@ -122,7 +122,7 @@ config.json'u GitHub'da düzenleyip kaydettiğinde senkron kendiliğinden çalı
 ## Ziyaretçi eğilimleri (analiz)
 Widget anonim olarak (IP, çerez, kimlik tutmadan) şunları sayar: aranan kelimeler, sonuç bulunamayan aramalar, panelden/menüden ürün tıklamaları, ürün sayfası görüntülemeleri ve **sitenin her yerinden** sepete eklemeler (ikas'ın kendi butonu dahil; sepet yanıtından okunur). Her olay bir oturumda bir kez sayılır, toplu gönderilir. Kayıt için ürün verisi (`products.json`) gerekmez: görüntülemede sayfa adresi, ikas butonuyla sepete eklemede (ürün verisi inmemişse) varyant kimliği gönderilir; senkron bunları ürüne çevirir, ürün olmayan adresleri yok sayar. Cloudflare'de günlük toplamlar tutulur (D1 veritabanı `hasturk-egilim`, ilk yayında otomatik oluşur; son 2 yılın sezonu için 800 gün saklanır).
 
-`scripts/sync.mjs` 2 saatte bir şu verileri birleştirir: son 30 günün site içi olayları, ikas'taki son 60 günün siparişleri ve **1 ile 2 yıl önceki aynı dönem** (sipariş + site içi). Ürün puanı `h` (0-100) dört parçadan oluşur:
+`scripts/sync.mjs` saatte bir şu verileri birleştirir: son 30 günün site içi olayları, ikas'taki son 60 günün siparişleri ve **1 ile 2 yıl önceki aynı dönem** (sipariş + site içi). Ürün puanı `h` (0-100) dört parçadan oluşur:
 1. **Şimdi:** 4 × satış + 2 × sepete ekleme + 1 × tıklama + 0,3 × görüntüleme. Yeni olan ağır basar (sipariş yarı ömrü 20 gün, olaylar 10 gün); sert sıfırlama yok.
 2. **İvme:** Son 7 günün hızı ÷ önceki 3 haftanın hızı. En az 1,5 kat hızlanan ve yeterli hacmi olan ürün "yükselen" sayılır, ek puan alır. Bu yıl yeni tutan ürün sezon verisini beklemeden öne çıkar.
 3. **Sezon:** Geçmiş yıllarda bugünden 1 hafta önce ile 1 ay sonrası arasında satılanlar (geçen yıl ağırlık 1, 2 yıl önce 0,5). Mağazanın büyüme oranıyla ölçeklenir.
@@ -181,7 +181,7 @@ GitHub Actions (özel depo: ayda 2000 dk ücretsiz, bu iş ~360 dk kullanır) + 
 
 Aynı widget ve menü sistemi, kendi ürünleri/fiyatları/stoğu ve kendi renk paletiyle çalışır.
 
-- **Ürünler:** `sync.yml` 2 saatte bir `hasturktarimdunyasi` mağazasının API'sinden `public/tarim/products.json` ve `public/tarim/menu.json` üretir (anahtarlar: Secrets > `IKAS2_CLIENT_ID`, `IKAS2_CLIENT_SECRET`).
+- **Ürünler:** `sync.yml` saatte bir `hasturktarimdunyasi` mağazasının API'sinden `public/tarim/products.json` ve `public/tarim/menu.json` üretir (anahtarlar: Secrets > `IKAS2_CLIENT_ID`, `IKAS2_CLIENT_SECRET`).
 - **Ayarlar:** `config.json` ortak; `config.tarim.json` üzerine yazar (renkler, `slugMap`, `pageMap`). `config.json`'daki ürün adresleri (öne çıkanlar, çapraz satış, kategori görselleri, rehber ürünleri) Tarım Dünyası'nın adreslerine otomatik çevrilir: aynı adres → aynı adlı ürün → `slugMap`. Bulunamayanlar senkron günlüğünde uyarı olarak yazılır.
 - **Eğilimler:** ziyaretçi olayları iki sitede ortak toplanır (aynı Worker); satış verisi her mağazanın kendi siparişlerinden. Rapor: `docs/trend-raporu-tarim.md`.
 - **ikas > Scriptler (Tarım Dünyası):**
