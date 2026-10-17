@@ -10,7 +10,7 @@ await ctx.route((u) => u.hostname === 'hasturk-arama.halilc2007.workers.dev', (r
 const p = await ctx.newPage();
 // Seçenek setini ürün sayfasının HTML'inden (__NEXT_DATA__) oku — tarayıcı gerekmeden de okunabiliyor mu?
 const html = await (await fetch(SITE + '/kendi-toprak-karisimini-olustur')).text();
-const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+const m = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
 let set = null, vid = null;
 if (m) { (function walk(o, d) { if (!o || typeof o !== 'object' || d > 16) return; if (o.metaData && o.metaData.slug === 'kendi-toprak-karisimini-olustur' && o.productOptionSet) { set = o.productOptionSet; vid = o.variants[0].id; } for (const k in o) walk(o[k], d + 1); })(JSON.parse(m[1]), 0); }
 log(`HTML'den seçenek seti: ${set ? set.options.length + ' bileşen' : 'YOK'} · HTML ${Math.round(html.length / 1024)} KB`);
