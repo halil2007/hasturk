@@ -61,13 +61,20 @@ export async function veri(req, env) {
   if (!env.DB) return json({ ok: false, why: 'db' });
   await initDb(env.DB).catch(() => {});
   const bas = gunOnce(30), db = env.DB, al = (sql, ...x) => db.prepare(sql).bind(...x).all().then((r) => r.results).catch(() => []);
-  const [bekleyen, hayir, cevapsiz] = await Promise.all([
+  const [bekleyen, hayir, evet, cevapsiz] = await Promise.all([
     al("SELECT id, ts, q, cevap, urunler FROM ak_soru WHERE kaynak = 'ai' AND durum = 'onay-bekliyor' AND substr(ts,1,10) >= ? ORDER BY id DESC LIMIT 100", bas),
     al('SELECT ts, q, kaynak, havuz FROM ak_oy WHERE oy = 0 AND substr(ts,1,10) >= ? ORDER BY id DESC LIMIT 100', bas),
+    al('SELECT ts, q, kaynak, havuz FROM ak_oy WHERE oy = 1 AND substr(ts,1,10) >= ? ORDER BY id DESC LIMIT 100', bas),
     al("SELECT id, ts, q, kaynak, durum, cevap FROM ak_soru WHERE durum IN ('cevapsiz','emin-degil','yonlendir') AND substr(ts,1,10) >= ? ORDER BY id DESC LIMIT 150", bas),
   ]);
+  // Oylanan cevabın metni: hazır cevapsa havuzdan, yapay zekâ cevabıysa o sorunun kayıttaki son cevabından
+  const metin = async (list) => {
+    const qs = [...new Set(list.filter((r) => !(r.havuz && HAVUZ_ID.get(r.havuz))).map((r) => r.q))].slice(0, 90), m = new Map();
+    if (qs.length) (await al(`SELECT q, cevap FROM ak_soru WHERE cevap IS NOT NULL AND q IN (${qs.map(() => '?').join(',')}) ORDER BY id DESC`, ...qs)).forEach((r) => { if (!m.has(r.q)) m.set(r.q, r.cevap); });
+    return list.map((r) => ({ ts: r.ts, q: r.q, kaynak: r.kaynak, cevap: String((r.havuz && HAVUZ_ID.get(r.havuz) ? HAVUZ_ID.get(r.havuz).c : m.get(r.q)) || '').slice(0, 600) }));
+  };
   const sonuc = await rapor(env, new URL('http://x/?gun=7')).then((r) => r.json());
-  return json({ ok: true, ozet: sonuc, bekleyen, hayir: hayir.map((r) => ({ ...r, hazir: r.havuz && HAVUZ_ID.get(r.havuz) ? HAVUZ_ID.get(r.havuz).c.slice(0, 400) : null })), cevapsiz });
+  return json({ ok: true, ozet: sonuc, bekleyen, hayir: await metin(hayir), evet: await metin(evet), cevapsiz });
 }
 export async function karar(req, env) {
   let b; try { b = await req.json(); } catch { return json({ ok: false }, 400); }
@@ -95,8 +102,9 @@ main{max-width:860px;margin:0 auto;padding:16px}h1{font-size:22px;color:var(--pr
 button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}.on{background:var(--ok);color:#fff}.red{background:#fff;border:1.5px solid var(--ln);color:var(--ink);margin-left:6px}
 .giris{background:#fff;border:1px solid var(--ln);border-radius:14px;padding:16px;max-width:380px}.giris input{width:100%;font:inherit;padding:10px;border:1px solid var(--ln);border-radius:10px;margin:8px 0}
 .giris button{background:var(--pr);color:#fff;width:100%}.oz{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}.oz div{background:#fff;border:1px solid var(--ln);border-radius:12px;padding:10px}
-.oz b{display:block;font-size:20px;color:var(--prd)}.oz span{font-size:12.5px;color:var(--mu)}.bos{color:var(--mu);font-size:14px}.hz{font-size:13px;color:var(--mu);white-space:pre-wrap;margin-top:6px}
-</style></head><body><main><h1>Bilge Bey inceleme</h1><p class="not">Müşteri soruları yalnız burada görünür. Onayladığınız cevap Bilge Bey'in hazır cevaplarına eklenir; aynı soru bir daha sorulduğunda ücretsiz ve anında gelir.</p><div id="app"></div></main>
+.oz b{display:block;font-size:22px;color:var(--prd)}.oz span{font-size:13px;color:var(--mu)}.bos{color:var(--mu);font-size:14px}.hz{font-size:14px;color:#33424c;white-space:pre-wrap;margin-top:8px;background:#f6f8f9;border-radius:10px;padding:8px 10px}.hz b{color:var(--prd)}
+.sek{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 6px}.sek button{background:#fff;border:1.5px solid var(--ln);color:var(--ink);padding:10px 12px}.sek button small{color:var(--mu);font-weight:700}.sek .sec{border-color:var(--pr);background:var(--soft);color:var(--prd)}
+</style></head><body><main><h1>Bilge Bey inceleme</h1><p class="not">Müşterilerin Bilge Bey'e sorduğu sorular ve verdiği cevaplar yalnız burada görünür.</p><div id="app"></div></main>
 <script>
 var ACIK='__ACIK__',K='';try{K=sessionStorage.getItem('bb-k')||''}catch(e){}
 var app=document.getElementById('app');
@@ -106,15 +114,21 @@ function giris(m){app.innerHTML=ACIK?'<form class="giris" id="f"><b>Şifre</b>'+
 var f=document.getElementById('f');if(f)f.onsubmit=function(ev){ev.preventDefault();K=document.getElementById('k').value;try{sessionStorage.setItem('bb-k',K)}catch(x){}yukle()}}
 function post(u,o){o.k=K;return fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)}).then(function(r){return r.json()})}
 function yukle(){app.innerHTML='<p class="not">Yükleniyor…</p>';post('/ak/inceleme/veri',{}).then(function(d){if(!d.ok){try{sessionStorage.removeItem('bb-k')}catch(x){}return giris(d.why==='sifre'?'Şifre yanlış.':'Bir sorun oldu.')}ciz(d)},function(){giris('Bağlantı sorunu.')})}
-function ciz(d){var o=d.ozet||{},h='<h2>Son 7 gün</h2><div class="oz">'+
-[[o.toplam,'soru'],[o.hazir,'hazır cevaptan (ücretsiz)'],[o.claude,"Claude'dan"],['$'+(o.tahmini_usd||0),'tahmini maliyet'],[o.sepete_eklenen,'Bilge Bey önerisinden sepete eklenen'],[(o.oy||{}).evet+' / '+(o.oy||{}).hayir,'işe yaradı: evet / hayır']].map(function(x){return '<div><b>'+e(x[0])+'</b><span>'+e(x[1])+'</span></div>'}).join('')+'</div>';
-h+='<h2>Onay bekleyen Claude cevapları ('+d.bekleyen.length+')</h2><p class="not">Doğruysa onaylayın (isterseniz önce düzeltin). Yanlışsa reddedin; bir daha kullanılmaz.</p>';
-h+=d.bekleyen.length?d.bekleyen.map(function(r){return '<div class="kart" id="b'+r.id+'"><div class="q">'+e(r.q)+'</div><div class="ts">'+t(r.ts)+'</div><textarea id="c'+r.id+'">'+e(r.cevap)+'</textarea><button class="on" data-id="'+r.id+'" data-k="onaylandi">Onayla</button><button class="red" data-id="'+r.id+'" data-k="reddedildi">Reddet</button></div>'}).join(''):'<p class="bos">Bekleyen cevap yok.</p>';
-h+='<h2>Müşterinin "işime yaramadı" dediği cevaplar ('+d.hayir.length+')</h2><p class="not">Bunları bana iletirseniz cevabı düzeltirim.</p>';
-h+=d.hayir.length?d.hayir.map(function(r){return '<div class="kart"><div class="q">'+e(r.q)+'</div><div class="ts">'+t(r.ts)+' · '+e(r.kaynak==='havuz'?'hazır cevap':r.kaynak)+'</div>'+(r.hazir?'<div class="hz">'+e(r.hazir)+'</div>':'')+'</div>'}).join(''):'<p class="bos">Yok.</p>';
-h+='<h2>Cevaplanamayan sorular ('+d.cevapsiz.length+')</h2><p class="not">Bilge Bey bu sorularda müşteriyi size yönlendirdi. Sık tekrar edenleri hazır cevaplara ekleyebiliriz.</p>';
-h+=d.cevapsiz.length?d.cevapsiz.map(function(r){return '<div class="kart"><div class="q">'+e(r.q)+'</div><div class="ts">'+t(r.ts)+' · '+e({cevapsiz:'cevap bulunamadı','emin-degil':'emin olamadı',yonlendir:'yönlendirdi'}[r.durum]||r.durum)+'</div></div>'}).join(''):'<p class="bos">Yok.</p>';
+var SEK='hayir',D=null;
+var KAY={havuz:'hazır cevap',ai:'yapay zekâ','havuz-ai':'yapay zekâ (kayıttan)',yok:'cevap verilemedi',yonlendir:'müşteri hizmetlerine yönlendirdi'};
+function kart(r,alt){return '<div class="kart"><div class="ts">'+t(r.ts)+(r.kaynak?' · '+e(KAY[r.kaynak]||r.kaynak):'')+'</div><div class="q">Müşteri: '+e(r.q)+'</div>'+(r.cevap?'<div class="hz"><b>Bilge Bey:</b> '+e(r.cevap)+'</div>':'')+(alt||'')+'</div>'}
+function ciz(d){D=d;var o=d.ozet||{},oy=o.oy||{};
+var h='<div class="oz"><div><b>'+e(o.toplam||0)+'</b><span>soru (son 7 gün)</span></div><div><b>👍 '+e(oy.evet||0)+'</b><span>"işime yaradı"</span></div><div><b>👎 '+e(oy.hayir||0)+'</b><span>"işime yaramadı"</span></div><div><b>'+e(o.cevapsiz||0)+'</b><span>cevaplanamayan</span></div></div>';
+var S=[['hayir','👎 Yaramadı',d.hayir.length],['evet','👍 Yaradı',d.evet.length],['cevapsiz','❓ Cevaplanamayan',d.cevapsiz.length],['bekleyen','✍️ Onay bekleyen',d.bekleyen.length]];
+h+='<div class="sek">'+S.map(function(x){return '<button data-s="'+x[0]+'" class="'+(SEK===x[0]?'sec':'')+'">'+x[1]+' <small>'+x[2]+'</small></button>'}).join('')+'</div>';
+var NOT={hayir:'Müşterinin "işime yaramadı" dediği cevaplar (son 30 gün). Düzeltilmesini istediğiniz varsa bana sohbette söyleyin, düzeltirim.',evet:'Müşterinin "işime yaradı" dediği cevaplar (son 30 gün).',cevapsiz:'Bilge Bey’in cevap veremeyip müşteriyi size yönlendirdiği sorular. Cevabını bana sohbette söylerseniz eklerim.',bekleyen:'Yapay zekânın verdiği cevaplar. Doğruysa onaylayın (isterseniz önce düzeltin), yanlışsa reddedin.'};
+h+='<p class="not">'+NOT[SEK]+'</p>';
+var L=d[SEK]||[];
+if(!L.length)h+='<p class="bos">Şu an yok.</p>';
+else if(SEK==='bekleyen')h+=L.map(function(r){return '<div class="kart" id="b'+r.id+'"><div class="ts">'+t(r.ts)+'</div><div class="q">Müşteri: '+e(r.q)+'</div><textarea id="c'+r.id+'">'+e(r.cevap)+'</textarea><button class="on" data-id="'+r.id+'" data-k="onaylandi">Onayla</button><button class="red" data-id="'+r.id+'" data-k="reddedildi">Reddet</button></div>'}).join('');
+else h+=L.map(function(r){return kart(SEK==='cevapsiz'?{ts:r.ts,q:r.q,kaynak:r.durum==='yonlendir'?'yonlendir':'yok'}:r)}).join('');
 app.innerHTML=h;
-[].forEach.call(app.querySelectorAll('button[data-id]'),function(b){b.onclick=function(){var id=b.getAttribute('data-id'),k=b.getAttribute('data-k'),c=document.getElementById('c'+id);b.disabled=true;post('/ak/inceleme/karar',{id:id,karar:k,cevap:c?c.value:''}).then(function(r){var kart=document.getElementById('b'+id);if(r.ok&&kart)kart.innerHTML='<div class="q">'+(k==='onaylandi'?'Onaylandı ✓ Hazır cevaplara eklendi.':'Reddedildi.')+'</div>';else b.disabled=false})}})}
+[].forEach.call(app.querySelectorAll('.sek button'),function(b){b.onclick=function(){SEK=b.getAttribute('data-s');ciz(D)}});
+[].forEach.call(app.querySelectorAll('button[data-id]'),function(b){b.onclick=function(){var id=b.getAttribute('data-id'),k=b.getAttribute('data-k'),c=document.getElementById('c'+id);b.disabled=true;post('/ak/inceleme/karar',{id:id,karar:k,cevap:c?c.value:''}).then(function(r){var kt=document.getElementById('b'+id);if(r.ok&&kt)kt.innerHTML='<div class="q">'+(k==='onaylandi'?'Onaylandı ✓ Hazır cevaplara eklendi.':'Reddedildi.')+'</div>';else b.disabled=false})}})}
 if(K)yukle();else giris();
 </script></body></html>`;
