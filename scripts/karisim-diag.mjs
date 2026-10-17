@@ -30,16 +30,24 @@ const raw = await p.evaluate(() => {
 });
 log('ÜRÜN:\n' + raw.urun);
 raw.setler.forEach((x, i) => log(`SEÇENEK SETİ ${i}:\n` + x));
-// 2) Bileşen başlıklarına tıkla, açılan öğeleri listele
-const basliklar = ['Sphagnum', 'Cocopeat', 'Longoz', 'İnce Tarım', 'Kalın Tarım', 'Pomza', 'Vermikülit', 'Bentonit', 'Solucan', 'Leonardit', 'Asidik'];
-for (const t of basliklar.slice(0, 2)) { const l = p.getByText(t, { exact: false }).first(); try { await l.click({ timeout: 3000 }); await p.waitForTimeout(500); } catch (e) { log('tıklanamadı: ' + t); } }
-const ui = await p.evaluate(() => {
-  const vis = (e) => !!(e.offsetWidth || e.offsetHeight);
-  return [...document.querySelectorAll('input, select, textarea, [role="checkbox"], [role="radio"], [role="spinbutton"]')].filter(vis).slice(0, 80)
-    .map((e) => { let l = e.closest('div'); for (let i = 0; i < 3 && l && (l.innerText || '').length < 4; i++) l = l.parentElement; return `${e.tagName}[${e.type || ''}] val=${e.value} min=${e.min || ''} max=${e.max || ''} step=${e.step || ''} :: ${(l && l.innerText || '').replace(/\s+/g, ' ').slice(0, 120)}`; }).join('\n');
-});
-log('Tıklama sonrası öğeler:\n' + ui);
-const html = await p.evaluate(() => { const e = [...document.querySelectorAll('*')].find((x) => /Sphagnum Ham Torf/.test(x.textContent || '') && (x.textContent || '').length < 3000 && x.children.length > 3); return e ? e.outerHTML.replace(/\s+/g, ' ').slice(0, 6000) : 'yok'; });
-log('Seçim alanı HTML:\n' + html);
+// 2) Gerçek seçim: Sphagnum 2 Lt + Cocopeat 1 LT, sepete ekle; giden istekteki options biçimi
+const sec = async (ad, deger) => {
+  const blok = p.locator('.options-main', { hasText: ad }).first();
+  await blok.locator('.option-checkbox').first().click();
+  await p.waitForTimeout(400);
+  await blok.locator('.react-select__control').first().click();
+  await p.waitForTimeout(300);
+  await p.locator('.react-select__option', { hasText: new RegExp('^' + deger + '\\s*$', 'i') }).first().click();
+  await p.waitForTimeout(400);
+};
+try { await sec('Sphagnum Ham Torf', '2 Lt'); await sec('Cocopeat Torfu', '1 LT'); log('seçimler yapıldı'); } catch (e) { log('seçim hatası: ' + e.message.slice(0, 200)); }
+log('Sayfadaki fiyat: ' + await p.evaluate(() => (document.body.innerText.match(/₺\s?[\d.,]+/g) || []).slice(0, 4).join(' | ')));
+reqs.length = 0;
+await p.getByText('SEPETE EKLE', { exact: true }).first().click();
+await p.waitForTimeout(5000);
+for (const r of reqs) { let v = ''; try { v = JSON.stringify(JSON.parse(r).variables); } catch (e) { v = r.slice(0, 500); } log('İSTEK değişkenleri: ' + v.slice(0, 4000)); }
+// 3) Aynı biçimle window.addToCart (sayfa açmadan ekleme denemesi): Sphagnum 5 Lt + Kalın perlit 2 Lt
+const opt = reqs.length ? (() => { try { return JSON.parse(reqs[reqs.length - 1]).variables.input.item; } catch (e) { return null; } })() : null;
+log('item: ' + JSON.stringify(opt).slice(0, 3000));
 await b.close();
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, '```\n' + out.join('\n').slice(0, 60000) + '\n```\n');
