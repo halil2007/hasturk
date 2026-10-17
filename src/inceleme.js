@@ -56,7 +56,8 @@ export async function rapor(env, url) {
 // ---------- Şifreli inceleme ----------
 export async function veri(req, env) {
   let b; try { b = await req.json(); } catch { return json({ ok: false }, 400); }
-  if (!(await yetkili(env, b.k))) return json({ ok: false, why: 'sifre' }, 403);
+  // Yanlış şifrede kısa bekleme: deneme-yanılmayı yavaşlatır
+  if (!(await yetkili(env, b.k))) { await new Promise((r) => setTimeout(r, 1500)); return json({ ok: false, why: 'sifre' }, 403); }
   if (!env.DB) return json({ ok: false, why: 'db' });
   await initDb(env.DB).catch(() => {});
   const bas = gunOnce(30), db = env.DB, al = (sql, ...x) => db.prepare(sql).bind(...x).all().then((r) => r.results).catch(() => []);
@@ -70,7 +71,8 @@ export async function veri(req, env) {
 }
 export async function karar(req, env) {
   let b; try { b = await req.json(); } catch { return json({ ok: false }, 400); }
-  if (!(await yetkili(env, b.k))) return json({ ok: false, why: 'sifre' }, 403);
+  // Yanlış şifrede kısa bekleme: deneme-yanılmayı yavaşlatır
+  if (!(await yetkili(env, b.k))) { await new Promise((r) => setTimeout(r, 1500)); return json({ ok: false, why: 'sifre' }, 403); }
   const id = parseInt(b.id, 10), k = b.karar === 'onaylandi' ? 'onaylandi' : b.karar === 'reddedildi' ? 'reddedildi' : null;
   if (!id || !k || !env.DB) return json({ ok: false }, 400);
   const cevap = typeof b.cevap === 'string' && b.cevap.trim().length >= 10 ? b.cevap.trim().slice(0, 3000) : null;

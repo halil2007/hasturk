@@ -42,6 +42,8 @@ function clean(kind, x) {
   x = x.normalize('NFC').trim();
   if (kind === 'search') {
     x = x.toLocaleLowerCase('tr-TR').replace(/[^\p{L}\p{N} .,-]/gu, ' ').replace(/\s+/g, ' ').trim();
+    // Telefon numarası gibi kişisel veri kaydedilmez (9+ rakam; "20-20-20" gibi gübre formülleri kalır)
+    if ((x.match(/\d/g) || []).length >= 9) return '';
     return x.length >= 2 && x.length <= 40 ? x : '';
   }
   if (kind === 'slug') return /^[a-z0-9-]{1,140}$/.test(x) ? x : '';
