@@ -15,9 +15,12 @@ import { orderRate } from './fx.js';
 import { exclusive } from './locks.js';
 import { scopeOf, pendingPicks, pickCounts } from './targets.js';
 
-const NO_API = { pttavm: 'Ürün yükleme PttAVM panelinden yapılır' };
+// PttAVM: ürün ekleme servisi (UpdateProductsV3) yalnız SOAP'ta; REST (API Key + Token) hesabında eski kullanıcı adı / şifre de girilince açılır
+const NO_API = { pttavm: 'PttAVM ürün yükleme için Entegrasyonlar → PttAVM → gelişmiş alanlara eski API kullanıcı adı ve şifresini girin (PttAVM ürün ekleme servisi yalnız bu girişle çalışır)' };
 // Test modülündeki kanallar: ürün yükleme henüz yok (ilanlar kanalın kendi panelinden açılır; stok / fiyat panelden gider)
-const NO_UPLOAD = ['shopify', 'woocommerce', 'opencart', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'yemeksepeti', 'ticimax', 'ideasoft', 'tsoft'];
+const NO_UPLOAD = ['shopify', 'woocommerce', 'opencart', 'boyner', 'pasaj', 'trendyolgo', 'getir', 'ticimax', 'ideasoft', 'tsoft'];
+// Kanal bağlı ama ürün yükleme kapalı: nedeni ve açma yolu
+const OFF = { yemeksepeti: 'Yemeksepeti ürün ekleme servisi beta: hesap yöneticinize hesabınızda açtırın, sonra Entegrasyonlar → Yemeksepeti → “Ürün ekleme (beta)” seçeneğini Açık yapın' };
 const norm = (s) => String(s || '').toLocaleLowerCase('tr').replace(/,/g, '.').replace(/\s+/g, '').replace(/(lt|litre|l)$/, 'lt').replace(/(kg|kilo|kilogram)$/, 'kg');
 
 async function targets(env, db) {
@@ -27,7 +30,7 @@ export async function target(env, db, id) {
   const c = (await getChannels(env, db)).find((x) => x.id === id);
   if (!c) fail(404, 'Kanal yok');
   if (c.hold) fail(400, `${c.name} beklemede: yazma işlemleri kapalı`);
-  if (!c.enabled || !c.catalog) fail(400, NO_API[c.type] || `${c.name} için ürün yükleme desteklenmiyor ya da API bilgileri girilmemiş`);
+  if (!c.enabled || !c.catalog) fail(400, NO_API[c.type] || (c.enabled && OFF[c.type]) || `${c.name} için ürün yükleme desteklenmiyor ya da API bilgileri girilmemiş`);
   return c;
 }
 async function mapOf(db, local, ch) {
@@ -556,7 +559,7 @@ export async function catalogApi(env, db, ctx, path, m, q, b, user) {
     const picks = await pickCounts(db);
     return {
       channels: chans.map((c) => ({ id: c.id, name: c.name, ready: !!(c.enabled && c.catalog && !c.hold), demo: !!c.demo, test: !!c.sandbox,
-        reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.type] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
+        reason: c.hold ? 'Beklemede' : !c.catalog ? NO_API[c.type] || OFF[c.type] || 'Desteklenmiyor' : '', options: (c.catalog && c.catalog.options) || [], opts: allOpts[c.id] || {},
         auto: !!(settings.auto_upload || {})[c.id], autoCats: chosen[c.id] || [], stockPush: !!(settings.stock_push || {})[c.id],
         scope: scopeOf(settings, c.id), picked: picks[c.id] || 0 })),
       categories: rows.map((r) => ({ local: r.local, n: r.n, listed: Object.fromEntries(chans.map((c) => [c.id, r['l_' + c.id] || 0])) })),
