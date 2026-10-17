@@ -127,9 +127,12 @@ if (!SITE.includes('tarim')) {
     const sat = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.kar .kr')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | '));
     const top = (await p.locator(R + '.kar .btot b').textContent()).trim();
     const once = await cart();
+    await hideToast();
     const t0k = Date.now();
     await p.locator(R + '.kar [data-act="kargo"]').tap();
-    const rk = await waitToast(t0k);
+    let rk = { t: '' };
+    for (let i = 0; i < 100 && !/Karışım/i.test(rk.t); i++) { await p.waitForTimeout(100); rk = { ms: Date.now() - t0k, t: await toast() }; }
+    await p.waitForTimeout(500);
     const sonra = await cart();
     log(`4) Karışım: ${sat} · ekranda ${top} → ${rk.ms} ms "${rk.t}" · sepet satırı ${once.lines.length} → ${sonra.lines.length}`);
     const tutar = await p.evaluate(() => { const el = document.getElementById('__next'), ck = el && Object.keys(el).find((k) => k.startsWith('__reactContainer$')); const st = ck ? [el[ck]] : []; let cs = null, n = 0; while (st.length && !cs && n < 8000) { const f = st.pop(); n++; const q = f.memoizedProps; if (q && q.store && q.store.cartStore) cs = q.store.cartStore; if (f.sibling) st.push(f.sibling); if (f.child) st.push(f.child); } const its = (cs && cs.cart && cs.cart.items || []).filter((i) => /Kendi Toprak/.test(i.variant && i.variant.name || '')); return its.map((i) => i.finalPrice).join(','); });
