@@ -640,6 +640,10 @@
     '.mxh{display:flex;align-items:center;gap:12px;padding:4px 2px 12px}.mxh .mxi{width:46px;height:46px;border-radius:14px;background:var(--pr);color:#fff;display:grid;place-items:center;flex:none}.mxh .mxi svg{width:26px;height:26px}.mxh b{display:block;font-size:17px;color:var(--prd)}.mxh span{display:block;font-size:13px;color:var(--mu);line-height:1.4;margin-top:2px}',
     '.mxseg{display:flex;background:#fff;border:1.5px solid var(--ln);border-radius:14px;padding:4px;gap:4px;margin-bottom:10px}.mxseg button{flex:1;height:38px;border-radius:10px;font-size:13.5px;font-weight:800;color:var(--mu)}.mxseg button.on{background:var(--soft);color:var(--prd)}',
     '.mxk{background:#fff;border:1px solid var(--ln);border-radius:16px;padding:14px;margin-bottom:10px}',
+    '.mxw{display:flex;gap:6px;margin-bottom:12px}.mxw button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 4px;border-radius:12px;background:#fff;border:1.5px solid var(--ln);color:var(--mu);font-size:12px;font-weight:800}.mxw i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-size:13px}.mxw i svg{width:15px;height:15px}.mxw span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.mxw .on{border-color:var(--pr);color:var(--prd);background:var(--soft)}.mxw .on i{background:var(--pr);color:#fff}.mxw .ok{color:var(--prd)}.mxw .ok i{background:var(--soft);color:var(--prd)}.mxw button[disabled]{opacity:.5}',
+    '.mxip{font-size:13px;color:var(--mu);line-height:1.45;margin:0 0 10px}.mxip b{color:var(--prd)}.mxs2{font-size:12px;font-weight:800;color:var(--mu);margin:12px 0 6px}.mxgb{display:inline-flex;align-items:center;gap:6px;color:var(--pr);font-weight:800;font-size:13.5px;padding:6px 2px 12px}.mxgb svg{width:16px;height:16px}',
+    '.mx .mxq button{width:36px;height:36px;border-color:var(--pr);color:var(--pr)}.mx .mxq svg{width:16px;height:16px}.mx .mxq b{min-width:64px}',
+    '.mxlq{display:flex;align-items:center;gap:10px;margin-top:12px}.mxlq button{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--pr);color:var(--pr);display:grid;place-items:center;background:#fff;flex:none}.mxlq svg{width:18px;height:18px}.mxlq label{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--mu)}.mxlq input{width:110px;height:44px;border:1.5px solid var(--ln);border-radius:12px;padding:0 12px;font:inherit;font-size:18px;font-weight:800;text-align:right;color:var(--ink)}.mxlq input:focus{outline:0;border-color:var(--pr)}',
     '.mxs{display:flex;align-items:center;gap:10px;margin-bottom:10px}.mxs i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--prd);display:grid;place-items:center;font-size:13px;font-weight:800;flex:none}.mxs b{font-size:15px;flex:1}.mxs small{font-size:12px;color:var(--mu);font-weight:400}.mxs .mx0{color:var(--pr);font-weight:700;font-size:13px}',
     '.mx-f{display:flex;gap:8px;margin:0 0 10px}.mx-f input{flex:1;min-width:0;height:44px;border:1.5px solid var(--ln);border-radius:12px;padding:0 12px;font:inherit;font-size:15px;background:var(--bg)}.mx-f input:focus{outline:0;border-color:var(--pr);background:#fff}.mx-f button{flex:none;height:44px;padding:0 16px;border-radius:12px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}',
     '.mx-c{display:flex;flex-wrap:wrap;gap:6px}.mx-c button{padding:6px 11px;border-radius:15px;border:1px solid var(--ln);font-size:12.5px;font-weight:700;background:#fff;color:#4b5963}.mx-c button:hover{border-color:var(--pr);color:var(--pr)}',
@@ -1218,7 +1222,7 @@
     else if (act === 'shx') closeSheet();
     else if (act === 'shgo') doAdd();
     else if (act === 'kar') { var kn = v; var ko = function () { karOpen(kn); }; if (KAR) ko(); else { var kl = karLoad(); if (kl) kl.then(function () { if (KAR) ko(); else ptoast('Karışım fiyatları yüklenemedi.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git'); }); } }
-    else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0' || act === 'mxm' || act === 'mxe') mixAct(act, v);
+    else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0' || act === 'mxm' || act === 'mxn' || act === 'mxl') mixAct(act, v);
     else if (act === 'kargo') karGo();
     else if (act === 'tocm') { e.preventDefault(); var ub = $calc.querySelector('.unit [data-v="cm"]'); if (ub) calcAction('unit', 'cm', ub); }
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
@@ -2739,7 +2743,7 @@
   // ---- Karışım sekmesi: müşteri bileşenleri ve oranları kendisi seçer (ya da bitkinin tarifiyle başlar), istediği
   // litreyi yazar. Bir pakette bileşen başına en çok ~100 L satılabildiği için büyük miktar eşit paketlere bölünür
   // (adet = paket sayısı; hazırlama ücreti paket başına). En az paketle, her bileşen kendi en büyük seçeneğine sığacak şekilde.
-  var MX = { parts: [], L: 10, ad: '', msg: '', busy: false, mode: 'bitki' };
+  var MX = { parts: [], L: 10, ad: '', msg: '', busy: false, mode: 'bitki', adim: 1 };
   function karMax(b) { return b.d[b.d.length - 1][0]; }
   function mixPlan(parts, L) {
     parts = parts.filter(function (x) { return x[0] > 0 && karB(x[1]); });
@@ -2757,15 +2761,15 @@
     var key = KAR_KEY[pl.n];
     if (key && !TARIF[key] && TARIF_IST[key]) { TARIF_IST[key].then(function () { karOpen(name); }); return; }
     mixSet(pl, (key && TARIF[key]) || soilParts(pl.pf, pl.grp), key && TARIF_K[key]);
-    MX.L = 10; MX.mode = 'bitki';
+    MX.L = 10; MX.mode = 'bitki'; MX.adim = 3;
     track('karisim_ac', pl.n);
     setTab('mix');
   }
   function mixSet(pl, parts, kaynak) {
     MX.parts = parts.map(function (a) { return [a[0], a[1]]; });
     MX.ad = pl ? pl.n : '';
-    MX.kaynak = kaynak || 'kural'; MX.degisti = false; MX.duzen = false;
-    MX.msg = pl ? pl.n + ' için tarif hazır; oranları ve litreyi değiştirebilirsiniz.' : '';
+    MX.kaynak = kaynak || 'kural'; MX.degisti = false;
+    MX.msg = pl ? pl.n + ' için tarif hazır. İsterseniz oranları değiştirin, sonra litreyi seçin.' : '';
   }
   // Bitki adından tarif: kendi toprağı varsa onun formülü, yoksa en yakın formül (sunucudan); bulunamazsa kullanıcı seçer
   function mixPlant(v) {
@@ -2784,11 +2788,12 @@
     mixPlantGo(pl, v);
   }
   function mixPlantGo(pl, v) {
-    if (!pl) { MX.msg = '"' + v + '" bitkisini tanıyamadık; bileşenleri ve oranları aşağıdan kendiniz seçebilirsiniz.'; mixDraw(); return; }
+    if (!pl) { MX.msg = '"' + v + '" bitkisini tanıyamadık. Adını farklı yazmayı deneyin ya da bileşenleri kendiniz seçin.'; MX.bilinmez = 1; mixDraw(); return; }
+    MX.bilinmez = 0;
     var r = soilFor(pl), tk = tarifKaynak(pl, r), key = pl.n + '|' + (tk ? tk.s + (tk.t ? '!' : '') : '');
     KAR_KEY[pl.n] = key;
     tarifIste(pl, tk, key);
-    var done = function () { mixSet(pl, TARIF[key] || soilParts(pl.pf, pl.grp), TARIF_K[key]); track('karisim_bitki', pl.n); mixDraw(); };
+    var done = function () { mixSet(pl, TARIF[key] || soilParts(pl.pf, pl.grp), TARIF_K[key]); MX.adim = 2; track('karisim_bitki', pl.n); mixDraw(); };
     if (TARIF[key] || !TARIF_IST[key]) done(); else { MX.msg = 'Tarif hazırlanıyor…'; mixDraw(); TARIF_IST[key].then(done); }
   }
   function mixBuild() {
@@ -2800,47 +2805,58 @@
   var MX_CHIPS = ['Monstera', 'Kaktüs', 'Domates', 'Limon', 'Lavanta', 'Gül', 'Yaban mersini', 'Zeytin', 'Orkide', 'Çilek'];
   // Bileşen renkleri (karışım şeridi ve satırdaki nokta): toprak tonları, taşlar, beyaz perlit
   var MX_RENK = { sphagnum: '#8a5a33', asidik: '#5e3b20', cocopeat: '#c08b55', orman: '#4d6b2f', 'ince-perlit': '#f1eee6', 'kalin-perlit': '#d9d4c7', pomza: '#b44a30', vermikulit: '#d4aa2c', bentonit: '#9aa5ab', solucan: '#2f2a25', leonardit: '#55493d' };
+  // Adım adım: 1) bitki (ya da kendim seçeceğim) → 2) karışım: oranları gör, artır / azalt, bileşen ekle → 3) litre ve
+  // sepet. Her adım tek ekran; müşteri aşağı kaydırmadan ne yapacağını görür.
   function mixDraw() {
     if (!KAR || !$mix) return;
-    var plan = mixPlan(MX.parts, MX.L), serbest = MX.mode === 'serbest';
-    var adim = function (n, t, ek) { return '<div class="mxs"><i>' + n + '</i><b>' + t + '</b>' + (ek || '') + '</div>'; };
-    var S = MX.parts.reduce(function (a, x) { return a + x[0]; }, 0);
-    var bitki = '<section class="mxk">' + adim(1, 'Ne yetiştiriyorsunuz?') +
-      '<form class="mx-f" autocomplete="off"><input type="search" data-k="mxb" enterkeyhint="go" placeholder="Bitki adı: monstera, limon, kaktüs…" value="' + esc(MX.ad) + '"><button type="submit">Tarif getir</button></form>' +
-      '<div class="mx-c">' + MX_CHIPS.map(function (c) { return '<button type="button" data-act="mxb" data-v="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>' +
-      (MX.msg ? '<p class="mx-m">' + esc(MX.msg) + '</p>' : '') + '</section>';
-    var karisim = '<section class="mxk">' + adim(serbest ? 1 : 3, serbest ? 'Bileşenleri seçin' : 'Karışımınız', !S ? '' : !serbest && MX.duzen ? '<button type="button" class="mx0" data-act="mxe" data-v="0">Bitti</button>' : serbest ? '<button type="button" class="mx0" data-act="mx0">Temizle</button>' : '') +
-      '<div class="mx-r">' + mixRows(plan) + '</div></section>';
-    var litre = '<section class="mxk">' + adim(2, 'Kaç litre?') + '<div class="mx-l">' + [10, 20, 50, 100, 250, 500, 1000].map(function (L) { return '<button type="button" class="vo' + (L === MX.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') +
-      '<label>veya <input data-k="mxL" inputmode="decimal" aria-label="Litre" value="' + MX.L + '"> L</label></div>' +
-      '<p class="hint">İstediğiniz miktarı yazın. Bir pakete bileşen başına en çok 100 litre girdiğinden büyük miktarlar eşit paketlere bölünür.</p></section>';
-    $mix.innerHTML = '<div class="mx kar"><div class="mxh"><span class="mxi">' + I.sprout + '</span><div><b>Toprağınızı hazırlayalım</b><span>Bitkinize özel tarif ya da kendi oranlarınız; istediğiniz litrede, taze karışım.</span></div></div>' +
-      '<div class="mxseg" role="tablist"><button type="button" role="tab" data-act="mxm" data-v="bitki"' + (serbest ? '' : ' class="on" aria-selected="true"') + '>Bitkime göre</button><button type="button" role="tab" data-act="mxm" data-v="serbest"' + (serbest ? ' class="on" aria-selected="true"' : '') + '>Kendim seçeceğim</button></div>' +
-      (serbest ? karisim + litre : bitki + litre + karisim) +
-      '<div class="mx-s">' + mixSum(plan) + '</div></div>';
+    var plan = mixPlan(MX.parts, MX.L), serbest = MX.mode === 'serbest', A = MX.adim || 1, var_ = !!plan;
+    if (A > 1 && !var_ && !serbest) A = MX.adim = 1;
+    if (A > 2 && !var_) A = MX.adim = 2;
+    var yol = [['Bitki', 1], ['Karışım', 2], ['Litre ve sepet', 3]].map(function (x) {
+      var n = x[1], ok = n === 1 || (n === 2 && (var_ || serbest)) || (n === 3 && var_);
+      return '<button type="button" class="' + (n === A ? 'on' : n < A ? 'ok' : '') + '" data-act="mxn" data-v="' + n + '"' + (ok ? '' : ' disabled') + '><i>' + (n < A ? I.check : n) + '</i><span>' + x[0] + '</span></button>';
+    }).join('');
+    var geri = function (n, t) { return '<button type="button" class="mxgb" data-act="mxn" data-v="' + n + '">' + I.back + t + '</button>'; };
+    var body = '';
+    if (A === 1) {
+      body = '<section class="mxk"><div class="mxs"><b>Ne yetiştiriyorsunuz?</b></div>' +
+        '<form class="mx-f" autocomplete="off"><input type="search" data-k="mxb" enterkeyhint="go" placeholder="Bitki adı: monstera, limon, kaktüs…" value="' + esc(MX.ad) + '"><button type="submit">Tarif getir</button></form>' +
+        (MX.msg ? '<p class="mx-m' + (MX.bilinmez ? ' mx-w' : '') + '">' + esc(MX.msg) + '</p>' : '') +
+        '<div class="mxs2">Örnekler</div><div class="mx-c">' + MX_CHIPS.map(function (c) { return '<button type="button" data-act="mxb" data-v="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') + '</div>' +
+        '<button type="button" class="mxe" data-act="mxm" data-v="serbest">' + I.calc + 'Bitki yok, bileşenleri kendim seçeceğim</button></section>';
+    } else if (A === 2) {
+      body = '<section class="mxk"><div class="mxs"><b>' + (MX.ad ? esc(MX.ad) + ' karışımı' : 'Bileşenleri seçin') + '</b>' +
+        (MX.parts.length ? '<button type="button" class="mx0" data-act="mx0">Temizle</button>' : '') + '</div>' +
+        (MX.msg && MX.ad ? '<p class="mx-m">' + esc(MX.msg) + '</p>' : '') +
+        '<p class="mxip">Her bileşenin miktarını <b>−</b> ve <b>+</b> ile değiştirin. Ölçü = aynı kap (ör. bir kova); oranı belirler, litreyi bir sonraki adımda seçersiniz.</p>' +
+        '<div class="mx-r">' + mixRows(plan, true) + '</div></section>' + geri(1, 'Bitkiyi değiştir');
+    } else {
+      body = '<section class="mxk"><div class="mxs"><b>Kaç litre hazırlayalım?</b></div><div class="mx-l">' + [10, 20, 50, 100, 250, 500, 1000].map(function (L) { return '<button type="button" class="vo' + (L === MX.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') + '</div>' +
+        '<div class="mxlq"><button type="button" data-act="mxl" data-v="-10" aria-label="10 litre azalt">' + I.minus + '</button><label><input data-k="mxL" inputmode="decimal" aria-label="Litre" value="' + MX.L + '"> litre</label><button type="button" data-act="mxl" data-v="10" aria-label="10 litre artır">' + I.plus + '</button></div>' +
+        '<p class="hint">İstediğiniz miktarı yazın. Bir pakete bileşen başına en çok 100 litre girdiğinden büyük miktarlar eşit paketlere bölünür.</p></section>' +
+        '<section class="mxk"><div class="mx-r">' + mixRows(plan, false) + '</div>' +
+        '<button type="button" class="mxe" data-act="mxn" data-v="2">' + I.calc + 'Oranları düzenle</button></section>';
+    }
+    $mix.innerHTML = '<div class="mx kar"><div class="mxh"><span class="mxi">' + I.sprout + '</span><div><b>Toprağınızı hazırlayalım</b><span>3 kolay adım: bitkinizi yazın, karışımı düzenleyin, litreyi seçip sepete ekleyin.</span></div></div>' +
+      '<div class="mxw">' + yol + '</div>' + body +
+      (A > 1 ? '<div class="mx-s">' + mixSum(plan) + '</div>' : '') + '</div>';
   }
-  // Seçili bileşenler (renk, oran, bu litredeki miktar ve fiyat) + oran şeridi + eklenebilecek diğer bileşenler; litre
+  // Bileşenler (renk, oran, bu litredeki miktar ve fiyat) + oran şeridi; duzen: artır / azalt ve bileşen ekleme. Litre
   // yazılırken yalnız bu kısım ve alt çubuk yenilenir (kutu odakta kalır)
-  function mixRows(plan) {
+  function mixRows(plan, duzen) {
     var S = MX.parts.reduce(function (a, x) { return a + x[0]; }, 0), pn = {};
     MX.parts.forEach(function (x) { pn[x[1]] = x[0]; });
     var lit = {}; if (plan) plan.rows.forEach(function (r) { lit[r.k] = r; });
     var bes = KAR.bilesen.filter(function (b) { return b.k && KAR_AD[b.k]; });
     var secili = bes.filter(function (b) { return pn[b.k]; }).sort(function (a, b) { return pn[b.k] - pn[a.k]; }), diger = bes.filter(function (b) { return !pn[b.k]; });
-    var sol = S ? (pn.solucan || 0) / S : 0;
-    // Tarif hazırlanınca önce sade sonuç gösterilir; "Oranları değiştir" ile düzenleme açılır ("Kendim seçeceğim"de hep açık)
-    var duzen = MX.mode === 'serbest' || MX.duzen || !secili.length;
-    return mixOzet(plan) + (secili.length ? '<div class="mxbr" aria-hidden="true">' + secili.map(function (b) { return '<span style="width:' + (pn[b.k] / S * 100).toFixed(1) + '%;background:' + (MX_RENK[b.k] || '#999') + '" title="' + esc(b.ad) + '"></span>'; }).join('') + '</div>' : '<p class="mx-m">Henüz bileşen yok. ' + (MX.mode === 'serbest' ? 'Aşağıdan ekleyin.' : 'Bitkinizi yazın ya da aşağıdan kendiniz ekleyin.') + '</p>') +
+    return (duzen ? '' : mixOzet(plan)) + (secili.length ? '<div class="mxbr" aria-hidden="true">' + secili.map(function (b) { return '<span style="width:' + (pn[b.k] / S * 100).toFixed(1) + '%;background:' + (MX_RENK[b.k] || '#999') + '" title="' + esc(b.ad) + '"></span>'; }).join('') + '</div>' : '<p class="mx-m">Henüz bileşen yok. Aşağıdan ekleyin.</p>') +
       secili.map(function (b) {
         var n = pn[b.k], r = lit[b.k];
-        return '<div class="kr"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span><span class="kn">' + esc(b.ad) + '<small>%' + Math.round(n / S * 100) + (r && plan ? ' · ' + String(+(r.v[0] * plan.Q).toFixed(1)).replace('.', ',') + ' L' : '') + '</small></span>' +
-          (duzen ? '<span class="kq"><button type="button" data-act="mxp" data-v="' + esc(b.k) + ':-1" aria-label="Azalt">' + I.minus + '</button><b>' + String(n).replace('.', ',') + ' ölçü</b>' +
-            '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1" aria-label="Artır">' + I.plus + '</button></span>' : '<span class="kq"><b>' + String(n).replace('.', ',') + ' ölçü</b></span>') +
-          '<span class="kp">' + (r && plan ? tl(r.v[2] * plan.Q) : '') + '</span></div>';
+        return '<div class="kr"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span><span class="kn">' + esc(b.ad) + '<small>%' + Math.round(n / S * 100) + (r && plan && !duzen ? ' · ' + String(+(r.v[0] * plan.Q).toFixed(1)).replace('.', ',') + ' L' : '') + '</small></span>' +
+          (duzen ? '<span class="kq mxq"><button type="button" data-act="mxp" data-v="' + esc(b.k) + ':-1" aria-label="Azalt">' + I.minus + '</button><b>' + String(n).replace('.', ',') + ' ölçü</b>' +
+            '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1" aria-label="Artır">' + I.plus + '</button></span>' : '<span class="kq"><b>' + String(n).replace('.', ',') + ' ölçü</b></span><span class="kp">' + (r && plan ? tl(r.v[2] * plan.Q) : '') + '</span>') + '</div>';
       }).join('') +
-      (sol > 0.2 ? '<p class="mx-m mx-w">Solucan gübresinin karışımın %20\'sini geçmemesi önerilir.</p>' : '') +
-      (!duzen ? '<button type="button" class="mxe" data-act="mxe" data-v="1">' + I.calc + 'Oranları değiştir</button>' : '') +
-      (duzen && diger.length ? '<div class="mxa"><div class="mxa-t">' + (secili.length ? 'Başka bileşen ekleyin' : 'Bileşenler') + ' <small>(ölçü = aynı kap; oranı belirler)</small></div><div class="mx-c">' + diger.map(function (b) { return '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span>+ ' + esc(KAR_AD[b.k]) + '</button>'; }).join('') + '</div></div>' : '');
+      (duzen && diger.length ? '<div class="mxa"><div class="mxa-t">' + (secili.length ? 'Başka bileşen ekleyin' : 'Bileşenler') + '</div><div class="mx-c">' + diger.map(function (b) { return '<button type="button" data-act="mxp" data-v="' + esc(b.k) + ':1"><span class="dot" style="background:' + (MX_RENK[b.k] || '#999') + '"></span>+ ' + esc(KAR_AD[b.k]) + '</button>'; }).join('') + '</div></div>' : '');
   }
   // Sonuç özeti: tarifin kaynağı, toplam, litre fiyatı, yaklaşık ağırlık (kargo / taşıma için) ve ücretsiz kargo durumu
   // (sepetteki ürünlerle birlikte). Ağırlık nemli, gevşek hacim için yaklaşık kg/L.
@@ -2856,7 +2872,9 @@
       (lim ? '<div class="mxo-k' + (kalan <= 0 ? ' ok' : '') + '">' + I.truck + (kalan <= 0 ? 'Kargo ücretsiz' : 'Ücretsiz kargoya ' + tl(Math.ceil(kalan)) + ' kaldı') + '</div>' : '') + '</div>';
   }
   function mixSum(plan) {
-    if (!plan) return '<div class="sh-f"><div class="btot"><small>Toplam</small><b>—</b></div><button class="sh-go" type="button" disabled>' + I.cart + 'Karışımı sepete ekle</button></div>';
+    if (!plan) return '<div class="sh-f"><div class="btot"><small>Toplam</small><b>—</b></div><button class="sh-go" type="button" disabled>' + (MX.adim === 2 ? 'Önce bileşen ekleyin' : I.cart + 'Karışımı sepete ekle') + '</button></div>';
+    if (MX.adim === 2) return '<div class="sh-f"><div class="btot"><small>' + String(+plan.lt.toFixed(1)).replace('.', ',') + ' L için</small><b>' + tl(plan.tot) + '</b></div>' +
+      '<button class="sh-go" type="button" data-act="mxn" data-v="3">Devam: litreyi seç' + I.arrow + '</button></div>';
     return '<div class="pk">' + (plan.Q > 1 ? plan.Q + ' paket × ' + String(+plan.unitL.toFixed(1)).replace('.', ',') + ' L · ' : '') + 'hazırlama ' + (plan.Q > 1 ? plan.Q + ' × ' : '') + tl(KAR.taban) + ' dahil</div>' +
       '<div class="sh-f"><div class="btot"><small>Toplam · ' + String(+plan.lt.toFixed(1)).replace('.', ',') + ' L</small><b>' + tl(plan.tot) + '</b></div>' +
       '<button class="sh-go" type="button" data-act="kargo"' + (MX.busy || !karOn() ? ' disabled' : '') + '>' + (MX.busy ? '<span class="bspin"></span><span>Ekleniyor…</span>' : I.cart + 'Karışımı sepete ekle') + '</button></div>' +
@@ -2867,7 +2885,8 @@
     MX.L = L;
     [].forEach.call($mix.querySelectorAll('[data-act="karL"]'), function (b) { b.classList.toggle('on', +b.getAttribute('data-v') === L); });
     var plan = mixPlan(MX.parts, MX.L), box = $mix.querySelector('.mx-s'), rw = $mix.querySelector('.mx-r');
-    if (rw) rw.innerHTML = mixRows(plan);
+    if (rw) rw.innerHTML = mixRows(plan, MX.adim === 2);
+    var li = $mix.querySelector('input[data-k="mxL"]'); if (li && root.activeElement !== li) li.value = String(L).replace('.', ',');
     if (box) box.innerHTML = mixSum(plan);
   }
   function mixAct(act, v) {
@@ -2875,8 +2894,9 @@
     if (act === 'karL') MX.L = +v;
     else if (act === 'mxb') { mixPlant(v); return; }
     else if (act === 'mx0') { MX.parts = []; MX.ad = ''; MX.msg = ''; MX.kaynak = ''; MX.degisti = false; }
-    else if (act === 'mxm') { MX.mode = v === 'serbest' ? 'serbest' : 'bitki'; track('karisim_mod', MX.mode); }
-    else if (act === 'mxe') { MX.duzen = v === '1'; if (MX.duzen) track('karisim_oran', MX.ad || ''); }
+    else if (act === 'mxm') { MX.mode = v === 'serbest' ? 'serbest' : 'bitki'; if (MX.mode === 'serbest') { MX.adim = 2; MX.ad = ''; MX.msg = ''; MX.parts = []; MX.kaynak = ''; MX.degisti = false; } track('karisim_mod', MX.mode); }
+    else if (act === 'mxn') { MX.adim = Math.max(1, Math.min(3, +v || 1)); if (MX.adim === 1) MX.mode = 'bitki'; if (MX.adim === 2) track('karisim_oran', MX.ad || ''); mixDraw(); if ($body) $body.scrollTop = 0; return; }
+    else if (act === 'mxl') { mixLitre(Math.max(1, Math.round((MX.L + +v) / 10) * 10 || 10)); return; }
     else if (act === 'mxp') {
       var m = String(v).split(':'), k = m[0], d = +m[1] * 0.5, x = MX.parts.filter(function (p) { return p[1] === k; })[0];
       MX.degisti = true;
