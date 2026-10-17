@@ -101,7 +101,7 @@ await p.waitForTimeout(1500); // müşteri soruları okurken
 const tak = Date.now();
 await p.locator(R + `[data-act="akq"][data-v="${AKQ}"]`).first().tap({ timeout: 5000 }).catch(async () => {
   log('  öneri düğmesi yok; soru yazılıyor');
-  const inp = p.locator(R + '.akf input').first(); await inp.fill(AKQ.replace(/\?$/, '')); await inp.press('Enter');
+  const inp = p.locator(R + '.akf textarea').first(); await inp.fill(AKQ.replace(/\?$/, '')); await inp.press('Enter');
 });
 await p.locator(R + '.akall').last().waitFor({ timeout: 30000 }).catch(() => log('  "Hepsini sepete ekle" çıkmadı'));
 log(`Bilge Bey cevabı (soruya dokunduktan sonra): ${Date.now() - tak} ms`);
@@ -119,7 +119,7 @@ if (await p.locator(R + '.akall').count()) {
 }
 // Son Bilge Bey cevabının toprak kartı (metin, "Hepsini sepete ekle" var mı)
 const sonKart = () => p.evaluate(() => { const r = document.getElementById('urun-arama-root').shadowRoot, pw = r.querySelectorAll('.akpw'), lp = pw[pw.length - 1]; const s = lp && lp.querySelector('.soil'); return { t: s ? s.innerText.replace(/\s+/g, ' ').slice(0, 300) : '-', hepsi: lp ? lp.querySelectorAll('.akall').length : 0 }; });
-const sor = async (q) => { const n0 = await p.evaluate(() => document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.akpw').length); await p.locator(R + '.akf input').first().fill(q); await p.locator(R + '.akf input').first().press('Enter');
+const sor = async (q) => { const n0 = await p.evaluate(() => document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.akpw').length); await p.locator(R + '.akf textarea').first().fill(q); await p.locator(R + '.akf textarea').first().press('Enter');
   for (let i = 0; i < 150; i++) { if (await p.evaluate((n) => document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.akpw').length > n, n0)) break; await p.waitForTimeout(100); } await p.waitForTimeout(1500); return sonKart(); };
 // 4) Kendi karışımını hazırlat (yalnız HasTürk): müşterinin gerçekte yazdığı gibi (yazım hatası, sesle yazma), tarifle sepete ekle
 if (!SITE.includes('tarim')) {

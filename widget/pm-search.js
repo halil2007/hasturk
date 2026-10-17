@@ -702,10 +702,10 @@
     '.akt{display:none;flex:1;min-width:0;font-size:16px;font-weight:800;color:var(--prd);padding-left:4px}',
     '.akm .field{display:none}.akm .akt{display:block}.akm .cta,.akm .xsell{display:none!important}',
     '.mxm .field{display:none}.mxm .akt{display:block}.mxm .cta,.mxm .xsell{display:none!important}',
-    '.akf{display:none;flex:none;gap:8px;align-items:center;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);background:#fff}',
+    '.akf{display:none;flex:none;gap:8px;align-items:flex-end;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);background:#fff}',
     '.akm .akf{display:flex}',
-    '.akf input{flex:1;min-width:0;height:46px;border-radius:23px;border:2px solid var(--ln);padding:0 16px;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);outline:0}',
-    '.akf input:focus{border-color:var(--pr);background:#fff}',
+    '.akf textarea{flex:1;min-width:0;height:46px;min-height:46px;max-height:156px;border-radius:23px;border:2px solid var(--ln);padding:11px 16px;font:inherit;font-size:16px;line-height:1.35;color:var(--ink);background:var(--bg);outline:0;resize:none;overflow-y:auto;display:block}',
+    '.akf textarea:focus{border-color:var(--pr);background:#fff}',
     '.akf .akmic{background:var(--soft);color:var(--pr)}.akf .akmic.on{background:var(--ac);color:#fff;animation:mic 1.2s ease-in-out infinite}',
     '@keyframes mic{0%,100%{box-shadow:0 0 0 0 rgba(215,55,47,.45)}50%{box-shadow:0 0 0 8px rgba(215,55,47,0)}}',
     '.akf button{flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--pr);color:#fff}.akf button svg{width:20px;height:20px}',
@@ -1126,6 +1126,7 @@
     root.addEventListener('load', function (e) { if (e.target && e.target.tagName === 'IMG') e.target.classList.add('ok'); }, true);
     root.addEventListener('input', function (e) {
       if (e.target === $q) return;
+      if (e.target.tagName === 'TEXTAREA' && e.target.parentNode === $akf) { akGrow(e.target); return; }
       if (e.target.getAttribute('data-k') === 'gq') { GQ = e.target.value; guideSearch(); return; }
       if (e.target.getAttribute('data-k') === 'mxL') { mixLitre(e.target.value); return; }
       calcInput(e.target);
@@ -1419,9 +1420,10 @@
   }
   // Sesle soru: tarayıcının kendi konuşma tanıması (Chrome, Android, iPhone Safari; ücretsiz, ses bize gelmez).
   // Konuşma yazıya dönüp kutuya yazılır; müşteri kontrol edip "Gönder"e basar. Desteklemeyen tarayıcıda düğme çıkmaz.
+  function akGrow(el) { if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight + 4, 156) + 'px'; el.style.borderRadius = el.scrollHeight > 50 ? '18px' : ''; }
   var AK_SR = window.SpeechRecognition || window.webkitSpeechRecognition || null, AK_REC = null;
   function akMic() {
-    var inp = $akf.querySelector('input'), btn = $akf.querySelector('.akmic');
+    var inp = $akf.querySelector('textarea'), btn = $akf.querySelector('.akmic');
     if (!AK_SR || !inp) return;
     if (AK_REC) { try { AK_REC.stop(); } catch (e) {} return; }
     var rec;
@@ -1432,6 +1434,7 @@
       var t = '';
       for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
       inp.value = (once + t).replace(/\s+/g, ' ').trim().slice(0, 300);
+      akGrow(inp);
     };
     rec.onerror = function (e) { if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) ptoast('Mikrofon izni verilmedi. Sorunuzu yazarak da sorabilirsiniz.', true); };
     rec.onend = function () {
@@ -1545,12 +1548,19 @@
         '<div class="akwrap">' + akBot('selam', '<p>' + esc(c.greet || ('Merhaba, ben ' + name + '! Bitkiniz ya da ürünlerimizle ilgili sorunuzu yazın.')) + '</p>') +
         '<div class="akbas">' + akStart(pg) + '</div>' +
         '<div class="aklog" aria-live="polite"></div></div>';
-      $akf.innerHTML = '<input type="text" maxlength="300" enterkeyhint="send" placeholder="' + (AK_SR ? 'Sorunuzu yazın ya da konuşun…' : 'Sorunuzu yazın…') + '" aria-label="' + esc(name + akYe(name)) + ' sorun">' +
+      // Çok satırlı kutu: uzun soru yazıldıkça aşağı doğru büyür (en çok ~6 satır), müşteri yazdığının tamamını görür
+      $akf.innerHTML = '<textarea rows="1" maxlength="300" enterkeyhint="send" placeholder="' + (AK_SR ? 'Sorunuzu yazın ya da konuşun…' : 'Sorunuzu yazın…') + '" aria-label="' + esc(name + akYe(name)) + ' sorun"></textarea>' +
         (AK_SR ? '<button type="button" class="akmic" data-act="akmic" aria-label="Sesle sorun">' + I.mic + '</button>' : '') +
         '<button type="submit" aria-label="Gönder">' + I.send + '</button>';
       if (!$akf.getAttribute('data-on')) {
         $akf.setAttribute('data-on', '1');
-        $akf.addEventListener('submit', function (e) { e.preventDefault(); var inp = $akf.querySelector('input'); var v = inp.value; inp.value = ''; akAsk(v); });
+        $akf.addEventListener('submit', function (e) { e.preventDefault(); var inp = $akf.querySelector('textarea'); var v = inp.value; inp.value = ''; akGrow(inp); akAsk(v); });
+        // Enter gönderir (klavyedeki "Gönder"); Shift+Enter yeni satır
+        $akf.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' || e.shiftKey || e.isComposing || !e.target || e.target.tagName !== 'TEXTAREA') return;
+          e.preventDefault();
+          if ($akf.requestSubmit) $akf.requestSubmit(); else $akf.dispatchEvent(new Event('submit', { cancelable: true }));
+        });
       }
       AK.built = true;
       if (!DATA) load().then(function () { if (!AK.log.length) { AK.built = false; akBuild(); } else akRenderLog(); }, function () {});
@@ -3946,7 +3956,7 @@
       try { history.pushState({ urunArama: 1 }, ''); pushed = true; } catch (e) {}
     }
     if (typeof initial === 'string') $q.value = initial;
-    if (tab === 'ak') { var ai = $akf.querySelector('input'); if (ai && window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches) ai.focus(); }
+    if (tab === 'ak') { var ai = $akf.querySelector('textarea'); if (ai && window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches) ai.focus(); }
     else if (tab !== 'calc') $q.focus();
     shown = PAGE;
     render();
