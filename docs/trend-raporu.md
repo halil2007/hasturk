@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 246 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3753 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3758 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -12,9 +12,9 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 |---|---|---|---|---|
 | 1 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×3,7 | 3 | evet |
 | 2 | HG Tarım Perliti | ×3,2 | 0 | evet |
-| 3 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
-| 4 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×3 | 5 | evet |
-| 5 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×3,2 | 2 | evet |
+| 3 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×3,5 | 2 | evet |
+| 4 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
+| 5 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | ×3,1 | 5 | evet |
 | 6 | Altınvadi Roka Tohumu (Toros İri Yaprak)  | ×9,9 | 6 | evet |
 | 7 | Guanokalong Yarasa Gübresi Toz | ×4,1 | 0 | evet |
 | 8 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | ×6,4 | 2 | evet |
@@ -42,9 +42,9 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | HasTürk Solucan Gübresi  | 21 | 5 |
-| 2 | HasTürk Sıvı Solucan Gübresi  | 15,5 | 8 |
-| 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,2 | 5 |
+| 1 | HasTürk Solucan Gübresi  | 20,8 | 5 |
+| 2 | HasTürk Sıvı Solucan Gübresi  | 15,4 | 8 |
+| 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,1 | 5 |
 | 4 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 6,9 | 9 |
 | 5 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 6,6 | 0 |
 | 6 | Altınvadi Roka Tohumu (Toros İri Yaprak)  | 5,9 | 6 |
@@ -133,9 +133,9 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 |---|---|---|---|
 | 1 | HG Tarım Perliti | 19,6 | 19,1 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 15,3 | 32,8 |
-| 3 | HasTürk Solucan Gübresi  | 6,5 | 36,8 |
-| 4 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 6,4 | 51,7 |
-| 5 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 5,8 | 25,9 |
+| 3 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 7,4 | 54,7 |
+| 4 | HasTürk Solucan Gübresi  | 6,5 | 36,8 |
+| 5 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 5,8 | 26,9 |
 | 6 | Altınvadi Roka Tohumu (Toros İri Yaprak)  | 4,7 | 4 |
 | 7 | Altınvadi Ispanak Tohumu 10 Gr | 4,4 | 3,8 |
 | 8 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | 4,1 | 22,6 |
