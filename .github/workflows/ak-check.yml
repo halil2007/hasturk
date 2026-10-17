@@ -44,6 +44,8 @@ jobs:
             curl -s -m 40 $H -d "{\"q\":\"$q\",\"s\":\"hasturk\",\"n\":\"Ak Bilge\"}" $W/ak | python3 -c "import sys,json;d=json.load(sys.stdin);print('   kaynak:',d.get('kaynak'),'| neden:',d.get('neden'),'| ürün:',d.get('urunler'),'|',(d.get('cevap') or '')[:500].replace(chr(10),' '))" | tee -a $GITHUB_STEP_SUMMARY
           done
           fi
+          echo "## Widget sağlığı (son 30 gün: kaç sn'de çalıştı, hatalar)" | tee -a $GITHUB_STEP_SUMMARY
+          curl -s -m 20 "$W/trends" | python3 -c "import sys,json;d=json.load(sys.stdin);print('yükleme:', '; '.join(f'{x[0]}: {x[1]}' for x in d.get('yt',[])) or '-');print('hatalar:', '; '.join(f'{x[0]}: {x[1]}' for x in d.get('er',[])) or '-')" | tee -a $GITHUB_STEP_SUMMARY
           echo "## Sayaç (bugün / son 7 gün)" | tee -a $GITHUB_STEP_SUMMARY
           curl -s -m 20 $W/ak/sayac | python3 -c "import sys,json;d=json.load(sys.stdin);[print(k, '→ toplam',d[k]['toplam'],'| havuz',d[k]['havuz'],'| claude',d[k]['claude'],'| token giriş',d[k]['giris'],'çıkış',d[k]['cikis'],'| tahmini \$',d[k]['tahmini_usd']) for k in ('bugun','son7')];print('ayrıntı:',d['bugun']['satir']);print('oylar:',d['oylar'],'| model:',d['model'],'| sınır:',d['gunluk_sinir'])" | tee -a $GITHUB_STEP_SUMMARY
           echo "## Öne çıkan sorular" | tee -a $GITHUB_STEP_SUMMARY

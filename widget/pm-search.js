@@ -156,8 +156,7 @@
   }
   function loadLite() {
     if (DATA || LITE || liteLoading || !MENU_URL) return liteLoading || Promise.resolve();
-    liteLoading = fetch(MENU_URL, { credentials: 'omit' })
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    liteLoading = getJson(MENU_URL, {})
       .then(function (m) {
         if (DATA || !m || !m.cats) return;
         LITE = m;
@@ -238,10 +237,16 @@
     applyConfig();
   }
 
+  // Bir anlık ağ / sunucu hatasında (mobil veri, sağlayıcı yavaşlığı) 1,5 sn sonra bir kez daha istenir
+  function getJson(u, init) {
+    init.credentials = 'omit';
+    var once = function () { return fetch(u, init).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); };
+    return once().catch(function (e) { uaErr('veri ' + String(u).split('/').pop() + ' ' + String(e && e.message || e).slice(0, 30)); return new Promise(function (res) { setTimeout(res, 1500); }).then(once); });
+  }
   function fetchData(pri) {
-    var init = { credentials: 'omit' };
+    var init = {};
     if (pri) init.priority = pri; // boşta önceden indirme düşük öncelikli: banner'ların önüne geçmez
-    return fetch(JSON_URL, init).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+    return getJson(JSON_URL, init);
   }
   function load(pri) {
     if (DATA) return Promise.resolve(DATA);
@@ -2226,6 +2231,13 @@
   // Günlük toplamlar Cloudflare'de tutulur, scripts/sync.mjs 2 saatte bir okuyup sıralama ve önerilere işler.
   // Kapatmak: config.json > "analytics": false ya da script etiketine data-collect="off"
   var EVQ = [], EV_SEEN = {}, EV_T = 0, EV_URL = ds.collect === 'off' ? '' : (ds.collect || BASE + 'e');
+  // Sağlık kaydı (#ua-debug olmadan da): widget'ın sayfa açıldıktan kaç sn sonra çalıştığı (kova) ve kendi hatalarımız.
+  // "Bazen hiç görünmüyor" şikâyetini veriyle ayırmak için: geç mi yükleniyor, hata mı veriyor. Kişisel veri yok.
+  function uaErr(m) { try { ev('er', (SITE_DIR ? SITE_DIR.slice(0, -1) : 'hasturk') + ' ' + String(m).replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').slice(0, 54)); } catch (e) {} }
+  function uaYuk() {
+    var t = T_EXEC / 1000, k = t < 2 ? '0-2' : t < 4 ? '2-4' : t < 7 ? '4-7' : t < 12 ? '7-12' : '12+';
+    ev('yt', (SITE_DIR ? SITE_DIR.slice(0, -1) : 'hasturk') + ' ' + k + ' sn' + (wideScreen() ? ' pc' : ' tel'));
+  }
   try { EV_SEEN = JSON.parse(sessionStorage.getItem('ua-ev') || '{}') || {}; } catch (e) {}
   function ev(k, x) {
     if (!EV_URL || !x || CFG.analytics === false) return;
@@ -4536,7 +4548,21 @@
   function boot() {
     if (boot.done) return;
     boot.done = true;
-    build();
+    try { build(); }
+    catch (e) {
+      // Açılışta beklenmedik hata: kaydet, yarım kalan kutuyu kaldır ve 1 sn sonra bir kez daha kur
+      uaErr('kurulum ' + (e && e.message || e));
+      try { if (host && host.parentNode) host.parentNode.removeChild(host); } catch (x) {}
+      host = null;
+      setTimeout(function () { try { build(); } catch (e2) { uaErr('kurulum2 ' + (e2 && e2.message || e2)); } }, 1000);
+    }
+    try { uaYuk(); } catch (e) {}
+    // Bekçi: site sayfa geçişinde ya da yeniden çizerken kutumuzu sayfadan silerse geri takılır (durum korunur)
+    setInterval(function () {
+      if (!host || host.isConnected || !document.body) return;
+      document.body.appendChild(host);
+      uaErr('kutu silinmisti, geri takildi');
+    }, 2000);
     loadLite().then(evPage);
     var later = function () { setTimeout(function () { idle(function () { prefetch('idle'); }, 4000); }, 1500); };
     if (!wideScreen() || slowNet()) return;
@@ -4586,5 +4612,9 @@
     if (document.body) setTimeout(go, 0); else document.addEventListener('DOMContentLoaded', go);
   })();
 
+  window.addEventListener('error', function (e) {
+    var f = String((e && e.filename) || '');
+    if (f.indexOf('pm-search') !== -1) uaErr('js ' + (e.message || '') + ' @' + (e.lineno || 0));
+  });
   window.UrunArama = window.PMSearch = { open: open, close: close, calc: function () { open('', 'calc'); }, search: function (q) { return load().then(function () { return search(q); }); } };
 })();
