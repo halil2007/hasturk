@@ -14,7 +14,7 @@ let urun = null;
 if (!urun) throw new Error('ürün / seçenek seti bulunamadı');
 const set = urun.productOptionSet, v = urun.variants[0], fiyat = (v.prices || [])[0] || {};
 // Bileşen anahtarı: widget tarifindeki adlarla eşleşir
-const ANAHTAR = [[/sphagnum/i, 'sphagnum'], [/asidik/i, 'asidik'], [/cocopeat/i, 'cocopeat'], [/orman/i, 'orman'], [/ince.*perlit/i, 'ince-perlit'], [/kal[ıi]n.*perlit/i, 'kalin-perlit'],
+const ANAHTAR = [[/sphagnum/i, 'sphagnum'], [/asidik/i, 'asidik'], [/cocopeat/i, 'cocopeat'], [/orman/i, 'orman'], [/[İi]nce.*perlit/i, 'ince-perlit'], [/kal[ıi]n.*perlit/i, 'kalin-perlit'],
   [/pomza/i, 'pomza'], [/vermik/i, 'vermikulit'], [/bentonit/i, 'bentonit'], [/solucan/i, 'solucan'], [/leonardit/i, 'leonardit']];
 const bilesen = set.options.filter((o) => o.type === 'CHECKBOX' && o.childOptions && o.childOptions.length).map((o) => {
   const ch = o.childOptions[0], ad = o.name.replace(/^[^\p{L}]+/u, '').replace(/\s+/g, ' ').trim();

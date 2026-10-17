@@ -115,6 +115,28 @@ if (await p.locator(R + '.akall').count()) {
   log(`3) Hepsini sepete ekle (${sec.length}: ${sec.join(' + ')}) → ${r.ms} ms "${r.t}" · sepete ${added} adet eklendi · sayaç ${c.sayac} · gizli çerçeve: ${frames - f1}`);
   if (added !== sec.length || !/eklendi/.test(r.t) || /eklenemedi/.test(r.t)) { bad++; log('   ✗ hepsi eklenmedi'); }
 }
+// 4) Kendi karışımını hazırlat (yalnız HasTürk): Bilge Bey'e özel toprağı olmayan bitki sor, tarifle sepete ekle
+if (!SITE.includes('tarim')) {
+  await p.locator(R + '.akf input').first().fill('singonyum için nasıl bir toprak almam lazım');
+  await p.locator(R + '.akf input').first().press('Enter');
+  const kb = p.locator(R + '.kbtn').last();
+  if (await kb.waitFor({ timeout: 20000 }).then(() => true, () => false)) {
+    log('   düğme: ' + (await kb.textContent()).trim());
+    await kb.tap();
+    await p.locator(R + '.kar [data-act="kargo"]').waitFor({ timeout: 10000 });
+    const sat = await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.kar .kr')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | '));
+    const top = (await p.locator(R + '.kar .btot b').textContent()).trim();
+    const once = await cart();
+    const t0k = Date.now();
+    await p.locator(R + '.kar [data-act="kargo"]').tap();
+    const rk = await waitToast(t0k);
+    const sonra = await cart();
+    log(`4) Karışım: ${sat} · ekranda ${top} → ${rk.ms} ms "${rk.t}" · sepet satırı ${once.lines.length} → ${sonra.lines.length}`);
+    const tutar = await p.evaluate(() => { const el = document.getElementById('__next'), ck = el && Object.keys(el).find((k) => k.startsWith('__reactContainer$')); const st = ck ? [el[ck]] : []; let cs = null, n = 0; while (st.length && !cs && n < 8000) { const f = st.pop(); n++; const q = f.memoizedProps; if (q && q.store && q.store.cartStore) cs = q.store.cartStore; if (f.sibling) st.push(f.sibling); if (f.child) st.push(f.child); } const its = (cs && cs.cart && cs.cart.items || []).filter((i) => /Kendi Toprak/.test(i.variant && i.variant.name || '')); return its.map((i) => i.finalPrice).join(','); });
+    log('   sepetteki karışım tutarı: ' + tutar);
+    if (!/eklendi/.test(rk.t) || sonra.lines.length !== once.lines.length + 1) { bad++; log('   ✗ karışım eklenmedi'); }
+  } else { bad++; log('   ✗ "Bu tarifle hazırlat" düğmesi çıkmadı'); }
+}
 log('Ekleme kaydı: ' + String(await p.evaluate(() => localStorage.getItem('ua-addlog'))).slice(0, 600));
 log(bad ? `SONUÇ: ${bad} sorun` : 'SONUÇ: hepsi doğru');
 await b.close();

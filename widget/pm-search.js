@@ -868,6 +868,10 @@
     '.sh-l{font-size:13px;font-weight:700;color:var(--mu);margin:16px 0 8px}',
     /* Bilge Bey "Hepsini sepete ekle" penceresi */
     '.so-tf{margin:8px 0 6px;padding:10px 12px;border-radius:12px;background:var(--soft);font-size:13.5px;line-height:1.45}.so-tf b{display:block;font-size:13px;margin-bottom:3px}.so-tf small{display:block;margin-top:4px;color:var(--mu);font-size:12px}',
+    '.kbtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:9px 0 0;border-radius:20px;background:var(--pr);color:#fff;font-weight:800;font-size:13.5px}.kbtn svg{width:16px;height:16px}',
+    '.kar .kr{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln)}.kar .kn{flex:1;min-width:0;font-size:13.5px}.kar .kq{display:flex;align-items:center;gap:6px}.kar .kq b{min-width:44px;text-align:center;font-size:13.5px}',
+    '.kar .kq button{width:28px;height:28px;border-radius:50%;border:1px solid var(--ln);display:grid;place-items:center;background:#fff}.kar .kq svg{width:14px;height:14px}.kar .kp{width:72px;text-align:right;font-weight:700;font-size:13.5px}',
+    '.kar .sh-l small{font-weight:400;color:var(--mu)}.kar .kek{margin:10px 0 2px}.kar .kek summary{cursor:pointer;color:var(--pr);font-weight:700;font-size:13.5px;margin-bottom:8px}.kar .ksum{display:flex;justify-content:space-between;padding:10px 0 4px;color:var(--mu);font-size:13px}',
     '.akmore{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:8px 0 0;border-radius:20px;border:1px solid var(--ln);background:#fff;color:var(--pr);font-weight:700;font-size:14px;text-decoration:none}.akmore svg{width:16px;height:16px}',
     '.akall{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:8px 0 0;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}.akall svg{width:17px;height:17px}',
     '.bun .sh-h b{font-size:16px;color:var(--prd)}.bhint{font-size:12.5px;color:var(--mu);margin:4px 0 6px}',
@@ -1174,6 +1178,9 @@
     else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
     else if (act === 'shx') closeSheet();
     else if (act === 'shgo') doAdd();
+    else if (act === 'kar') { var kn = v; var ko = function () { karOpen(kn); }; if (KAR) ko(); else { var kl = karLoad(); if (kl) kl.then(function () { if (KAR) ko(); else ptoast('Karışım fiyatları yüklenemedi.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git'); }); } }
+    else if (act === 'karL' || act === 'karp' || act === 'karek') karAct(act, v);
+    else if (act === 'kargo') karGo();
     else if (act === 'tocm') { e.preventDefault(); var ub = $calc.querySelector('.unit [data-v="cm"]'); if (ub) calcAction('unit', 'cm', ub); }
     else if (act === 'shape' || act === 'unit' || act === 'qty') calcAction(act, v, b);
   }
@@ -2513,14 +2520,109 @@
   }
   // Kendi karışımı için ölçü oranlı tarif (ölçü = aynı kap): bitkinin toprak profiline göre "Kendi Toprak Karışımını
   // Oluştur" ürünündeki bileşenlerle. Solucan gübresi en çok ~%20. Sunucudaki src/toprak.js > tarif ile aynı kurallar.
+  // Tarif parçaları: [ölçü, bileşen anahtarı] (anahtar public/karisim.json > bilesen.k ile eşleşir)
+  var KAR_AD = { sphagnum: 'sphagnum torf', asidik: 'asidik torf', cocopeat: 'cocopeat', pomza: 'pomza', 'ince-perlit': 'ince perlit', 'kalin-perlit': 'kalın perlit', vermikulit: 'vermikülit', solucan: 'solucan gübresi', leonardit: 'leonardit', orman: 'orman toprağı', bentonit: 'bentonit' };
+  function soilParts(pf) {
+    var asit = pf.ph2 <= 1 || (pf.ph <= 1 && pf.ph2 <= 2), taban = asit ? 'asidik' : 'sphagnum', x = [];
+    if (pf.yp === 'k') { var kurak = pf.dr >= 3 && pf.su <= 1; x.push([kurak ? 4 : 5, taban], [kurak ? 4 : 3, 'pomza'], [2, 'kalin-perlit']); }
+    else if (pf.yp === 'h') x.push([5, taban], [pf.dr >= 3 ? 4 : 3, 'kalin-perlit']);
+    else x.push([6, taban], [pf.dr >= 3 ? 3 : 2, pf.dr >= 3 ? 'kalin-perlit' : 'ince-perlit']);
+    if (pf.su >= 3 && pf.yp !== 'k') x.push([1, 'vermikulit']);
+    if (pf.bs >= 3) x.push([2, 'solucan']); else if (pf.bs === 2) x.push([1, 'solucan']);
+    return x;
+  }
   function soilRecipe(pf) {
-    var asit = pf.ph2 <= 1 || (pf.ph <= 1 && pf.ph2 <= 2), taban = asit ? 'asidik torf' : 'sphagnum torf', x = [];
-    if (pf.yp === 'k') { var kurak = pf.dr >= 3 && pf.su <= 1; x.push([kurak ? 4 : 5, taban], [kurak ? 4 : 3, 'pomza'], [2, 'kalın perlit']); }
-    else if (pf.yp === 'h') x.push([5, taban + (asit ? '' : ' ya da cocopeat')], [pf.dr >= 3 ? 4 : 3, 'kalın perlit']);
-    else x.push([6, taban], [pf.dr >= 3 ? 3 : 2, pf.dr >= 3 ? 'kalın perlit' : 'ince perlit']);
-    if (pf.su >= 3 && pf.yp !== 'k') x.push([1, 'vermikülit']);
-    if (pf.bs >= 3) x.push([2, 'solucan gübresi']); else if (pf.bs === 2) x.push([1, 'solucan gübresi']);
-    return x.map(function (a) { return a[0] + ' ölçü ' + a[1]; }).join(' + ') + (pf.bs <= 1 ? ' (gübre eklemeyin)' : '') + (pf.ph >= 4 ? '; kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+    var asit = pf.ph2 <= 1 || (pf.ph <= 1 && pf.ph2 <= 2);
+    return soilParts(pf).map(function (a) { return a[0] + ' ölçü ' + KAR_AD[a[1]] + (a[1] === 'sphagnum' && pf.yp === 'h' && !asit ? ' ya da cocopeat' : ''); }).join(' + ') +
+      (pf.bs <= 1 ? ' (gübre eklemeyin)' : '') + (pf.ph >= 4 ? '; kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+  }
+
+  // ---- Kendi karışımını hazırlat: tarif + litre → bileşen bileşen fiyat, toplam, tek dokunuşla sepete ----
+  // Veri: karisim.json (ürün sayfasındaki ikas seçenek seti; senkron 2 saatte bir yeniler). Sepete ikas'ın kendi işleviyle
+  // (window.addToCart, options: bileşen kutusu + litre seçimi) eklenir; sepetteki fiyat hesaplananla aynı olmalı.
+  var KAR = null, KAR_LOAD = null, KS = null;
+  function karLoad() {
+    if (KAR || KAR_LOAD || SITE_DIR) return KAR_LOAD;
+    KAR_LOAD = fetch(JSON_URL.replace(/products\.json(\?.*)?$/, 'karisim.json'), { credentials: 'omit' }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d && d.bilesen && d.bilesen.length && d.varyant) KAR = d; return KAR; }, function () { return null; });
+    return KAR_LOAD;
+  }
+  function karB(k) { if (!KAR) return null; for (var i = 0; i < KAR.bilesen.length; i++) if (KAR.bilesen[i].k === k) return KAR.bilesen[i]; return null; }
+  // Hedef litreye en yakın satılan değer (0 = yok)
+  function karSnap(b, l) { var best = null; b.d.forEach(function (x) { if (!best || Math.abs(x[0] - l) < Math.abs(best[0] - l)) best = x; }); return best; }
+  function karFromParts(parts, L) {
+    var S = parts.reduce(function (a, x) { return a + x[0]; }, 0);
+    var rows = parts.map(function (x) { var b = karB(x[1]); if (!b) return null; var v = karSnap(b, x[0] / S * L); return { k: x[1], v: v, n: x[0] }; }).filter(Boolean);
+    // Litre adımları (1–10, sonra 5'er) yüzünden toplam şaşarsa en büyük bileşen toplamı hedefe en yakın getirecek değere çekilir
+    if (rows.length) {
+      var big = rows.reduce(function (a, r) { return r.n > a.n ? r : a; }, rows[0]), diger = rows.reduce(function (a, r) { return a + (r === big ? 0 : r.v[0]); }, 0);
+      karB(big.k).d.forEach(function (x) { if (Math.abs(diger + x[0] - L) < Math.abs(diger + big.v[0] - L)) big.v = x; });
+    }
+    return rows;
+  }
+  function karTot(rows) { return (KAR ? KAR.taban : 0) + rows.reduce(function (a, r) { return a + (r.v ? r.v[2] : 0); }, 0); }
+  function karOn() { return !!(KAR && winOn() && cartOn()); }
+  function karOpen(name) {
+    var pl = soilData().plants.filter(function (x) { return x.n === name; })[0];
+    if (!pl || !KAR) return;
+    KS = { n: pl.n, parts: soilParts(pl.pf), L: 10, rows: null, busy: false };
+    KS.rows = karFromParts(KS.parts, KS.L);
+    track('karisim_ac', pl.n);
+    karDraw();
+    $sheet.classList.add('on');
+  }
+  function karDraw() {
+    if (!KS || !KAR) return;
+    var tot = karTot(KS.rows), lt = KS.rows.reduce(function (a, r) { return a + (r.v ? r.v[0] : 0); }, 0);
+    var used = {}; KS.rows.forEach(function (r) { used[r.k] = 1; });
+    var rows = KS.rows.map(function (r, i) {
+      var b = karB(r.k);
+      return '<div class="kr"><span class="kn">' + esc(b.ad) + '</span><span class="kq"><button type="button" data-act="karp" data-v="' + i + ':-1" aria-label="Azalt">' + I.minus + '</button><b>' + String(r.v[0]).replace('.', ',') + ' L</b>' +
+        '<button type="button" data-act="karp" data-v="' + i + ':1" aria-label="Artır">' + I.plus + '</button></span><span class="kp">' + tl(r.v[2]) + '</span></div>';
+    }).join('');
+    var ek = KAR.bilesen.filter(function (b) { return b.k && !used[b.k]; }).map(function (b) { return '<button type="button" class="vo" data-act="karek" data-v="' + esc(b.k) + '">+ ' + esc(KAR_AD[b.k] || b.ad) + '</button>'; }).join('');
+    $sheet.innerHTML = '<div class="sh-in kar" role="dialog" aria-label="Kendi karışımını hazırlat"><div class="sh-h"><b>' + esc(KS.n) + ' için karışım</b><button type="button" data-act="shx" aria-label="Kapat">' + I.x + '</button></div>' +
+      '<div class="sh-l">Toplam miktar</div><div class="vopts">' + [5, 10, 20, 40, 60, 100].map(function (L) { return '<button type="button" class="vo' + (L === KS.L ? ' on' : '') + '" data-act="karL" data-v="' + L + '">' + L + ' L</button>'; }).join('') + '</div>' +
+      '<div class="sh-l">Bileşenler <small>(oranları değiştirebilirsiniz)</small></div>' + rows +
+      (ek ? '<details class="kek"><summary>Bileşen ekle</summary><div class="vopts">' + ek + '</div></details>' : '') +
+      '<div class="ksum"><span>Karışım hazırlama</span><span>' + tl(KAR.taban) + '</span></div>' +
+      '<div class="sh-f"><div class="btot"><small>Toplam · ' + String(lt).replace('.', ',') + ' L</small><b>' + tl(tot) + '</b></div>' +
+      '<button class="sh-go" type="button" data-act="kargo"' + (KS.rows.length && !KS.busy ? '' : ' disabled') + '>' + (KS.busy ? '<span class="bspin"></span><span>Ekleniyor…</span>' : I.cart + 'Karışımı sepete ekle') + '</button></div>' +
+      '<p class="bhint">Bileşenler siparişinize özel tek karışım olarak taze hazırlanır.</p></div>';
+  }
+  function karAct(act, v) {
+    if (!KS || KS.busy) return;
+    if (act === 'karL') { KS.L = +v; KS.rows = karFromParts(KS.parts, KS.L); }
+    else if (act === 'karp') {
+      var m = String(v).split(':'), r = KS.rows[+m[0]], b = r && karB(r.k);
+      if (!b) return;
+      var i = b.d.indexOf(r.v) + (+m[1]);
+      if (i < 0) { KS.rows.splice(+m[0], 1); KS.parts = KS.parts.filter(function (x) { return x[1] !== r.k; }); }
+      else if (i < b.d.length) r.v = b.d[i];
+    } else if (act === 'karek') { var nb = karB(v); if (nb && !KS.rows.some(function (x) { return x.k === v; })) { KS.rows.push({ k: v, v: karSnap(nb, 1) }); KS.parts.push([1, v]); } }
+    karDraw();
+  }
+  function karGo() {
+    if (!KS || KS.busy || !KS.rows.length || !karOn()) return;
+    var opts = [], tot = karTot(KS.rows);
+    KS.rows.forEach(function (r) { var b = karB(r.k); opts.push({ productOptionId: b.cb, productOptionsSetId: KAR.set, values: ['true'] }, { productOptionId: b.ch, productOptionsSetId: KAR.set, values: [r.v[1]] }); });
+    KS.busy = true; karDraw();
+    track('karisim_ekle', KS.n + ' ' + Math.round(tot) + ' TL');
+    var bitir = function (ok) {
+      var n = KS && KS.n; KS = null; closeSheet();
+      if (ok) { ptoast('Karışımınız sepete eklendi (' + tl(tot) + ')', false, true); syncSiteCart(); }
+      else ptoast('Karışım sepete eklenemedi. Ürün sayfasından hazırlayabilirsiniz.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git');
+      if (!ok) track('karisim_hata', n || '');
+    };
+    WIN_OWN++;
+    Promise.resolve().then(function () { return window.addToCart({ variantId: KAR.varyant, quantity: 1, options: opts }); }).then(function (x) {
+      setTimeout(function () { WIN_OWN--; }, 400);
+      var d = x && x.response && x.response.data, its = d ? (d.items || d.orderLineItems || []) : [];
+      // Sepette bu seçeneklerle, hesaplanan fiyatta bir satır olmalı (fiyat değiştiyse eklenen satır yine sepette kalır)
+      var ok = x && x.success && its.some(function (it) { return it && it.variant && it.variant.id === KAR.varyant && Math.abs((+(it.finalPrice != null ? it.finalPrice : it.price) || 0) - tot) < 1; });
+      if (d) setCart(d.items && !d.orderLineItems ? { orderLineItems: d.items, totalFinalPrice: d.totalFinalPrice != null ? d.totalFinalPrice : d.totalPrice, id: d.id } : d);
+      bitir(!!(x && x.success) && (ok || its.length > 0));
+    }, function () { setTimeout(function () { WIN_OWN--; }, 400); bitir(false); });
   }
   function soilRow(x, note) {
     var href = esc(url(x.s));
@@ -2533,7 +2635,10 @@
     if (!soilCard.seen) soilCard.seen = {};
     if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + (r.p ? r.p.n : 'yok')); }
     var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın') : '';
-    var tarif = '<div class="so-tf"><b>Kendi karışımınız için tarif</b>' + esc(soilRecipe(pl.pf)) + '<small>Ölçü: aynı kap (ör. bir kova). Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small></div>';
+    karLoad();
+    var kp = KAR ? karTot(karFromParts(soilParts(pl.pf), 10)) : 0;
+    var tarif = '<div class="so-tf"><b>Kendi karışımınız için tarif</b>' + esc(soilRecipe(pl.pf)) + '<small>Ölçü: aynı kap (ör. bir kova). Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small>' +
+      (karOn() || (!KAR && !SITE_DIR && winOn()) ? '<button type="button" class="kbtn" data-act="kar" data-v="' + esc(pl.n) + '">' + I.cart + 'Bu tarifle hazırlat' + (kp ? ' · 10 L ' + tl(kp) : '') + '</button>' : '') + '</div>';
     var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Müşteri hizmetlerimize sorun</a>' : '';
     var head = function (txt) { return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' + txt + '</span></div></div>'; };
     if (r.exact) return head(esc(pl.n) + ' için önerdiğimiz toprak:') + '<div class="so-l">' + soilRow(r.p, '') + '</div></div>';
@@ -2668,7 +2773,7 @@
     SH.v = v;
     [].forEach.call($sheet.querySelectorAll('.vo'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === id); });
   }
-  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; if (BUNDLE && !BUNDLE.busy) BUNDLE = null; }
+  function closeSheet() { $sheet.classList.remove('on'); $sheet.innerHTML = ''; if (BUNDLE && !BUNDLE.busy) BUNDLE = null; if (KS && !KS.busy) KS = null; }
   function toast(msg) {
     $toast.innerHTML = I.check + esc(msg);
     $toast.classList.add('on');
