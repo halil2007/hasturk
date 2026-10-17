@@ -127,6 +127,9 @@ if (!SITE.includes('tarim')) {
   const mz = await sor('Mimoza ağacı için hangi toprak kullanmalıyım');
   log(`4.0) Listede olmayan bitki (mimoza) → ${mz.t}`);
   if (!/Mimoza/i.test(mz.t) || !/ölçü/.test(mz.t)) { bad++; log('   ✗ listede olmayan bitkiye toprak kartı / tarif çıkmadı'); }
+  const ym = await sor('2 adet yaban Mersin’im var kaç litre toprak lazım');
+  log(`4.1) "2 adet yaban Mersin’im var kaç litre toprak lazım" → ${ym.t}`);
+  if (!/Yaban mersini/i.test(ym.t) || /^Mersin için/.test(ym.t)) { bad++; log('   ✗ yaban mersini tanınmadı'); }
   const bg = await sor('Bengovil toprağı lazım');
   log(`4a) "Bengovil toprağı lazım" → ${bg.t} · hepsini ekle: ${bg.hepsi}`);
   if (!/Begonvil Toprağı/.test(bg.t) || bg.hepsi) { bad++; log('   ✗ Begonvil toprağı önerilmedi'); }

@@ -16,7 +16,7 @@ const MAX_Q = 300;           // karakter
 // ---------- Türkçe metin ----------
 const FOLD = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i', û: 'u' };
 export const norm = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[çğıöşüâîû]/g, (c) => FOLD[c])
-  .replace(/[^a-z0-9]+/g, ' ').trim();
+  .replace(/['’‘`´]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 // Soruya anlam katmayan dolgu kelimeleri (soru kalıbı kelimeleri — ne, nasıl, kaç… — KALIR, niyeti onlar taşır)
 const FILL = new Set(['merhaba', 'selam', 'selamlar', 'iyi', 'gunler', 'aksamlar', 'lutfen', 'acaba', 'abi', 'abla', 'hocam', 'usta', 'kardesim',
   'tesekkurler', 'tesekkur', 'ederim', 'almaliyim', 'almali', 'alayim', 'alsam', 'almak', 'onerirsiniz', 'onerir', 'misiniz', 'musunuz', 'yardimci', 'olur', 'musun', 'sayin', 'yetkili', 'bilgi', 'alabilir', 'miyim', 'sormak', 'istiyorum', 'istiyordum', 'bir', 'bu', 'su', 've', 'ile', 'ya', 'da', 'de', 'ki', 'mi', 'mu', 'benim', 'bana', 'sizde', 'var', 'cok', 'sey', 'seyler', 'lazim', 'gerek', 'gerekir', 'gerekiyor', 'almam', 'alirim', 'kullanmaliyim', 'kullanayim', 'kullanmam']);
@@ -106,6 +106,8 @@ function bitkiler() {
 // Sorudaki kelime bitki adının kelimesi mi: aynısı, ekli hali (begonvilin) ya da sözlükte olmayan yazım hatası (bengovil)
 function kelimeUyar(w, t, voc) {
   if (w === t || (t.length >= 3 && w.startsWith(t) && w.length - t.length <= 4)) return 2;
+  // Ad sonundaki ünlü düşmüş: "yaban mersin" → yaban mersini
+  if (w.length >= 5 && t.length === w.length + 1 && t.startsWith(w) && /[iu]$/.test(t)) return 1;
   if (t.length < 5 || w[0] !== t[0] || voc.has(w)) return 0;
   const k = t.length >= 7 ? 2 : 1;
   return mesafe(w, t) <= k || mesafe(w.slice(0, t.length), t) <= k ? 1 : 0;
@@ -123,6 +125,36 @@ export function toprakNiyet(q) {
     if (!best || puan > best.puan) best = { e: x.e, puan };
   }));
   return best ? { e: best.e, kendim: KENDIM.test(n) } : null;
+}
+// "2 adet yaban mersinim var kaç litre toprak lazım", "3 tane 30 cm saksı": saksı sayısı ve çapından toplam toprak litresi.
+// Litreler havuzdaki saksı hesabı cevaplarından (çap → içine giren toprak). Çap yoksa sorulur.
+let SAKSI = null;
+function saksiTablo() {
+  if (SAKSI) return SAKSI;
+  SAKSI = HAVUZ.filter((e) => e.t === 'saksi-hesap').map((e) => {
+    const d = /^(\d+) cm saks/.exec(e.s[0]), l = /çine yaklaşık ([\d,]+) litre/.exec(e.c);
+    return d && l ? [+d[1], +l[1].replace(',', '.')] : null;
+  }).filter(Boolean).sort((a, b) => a[0] - b[0]);
+  return SAKSI;
+}
+const SAYI = { bir: 1, iki: 2, uc: 3, dort: 4, bes: 5, alti: 6, yedi: 7, sekiz: 8, dokuz: 9, on: 10 };
+const lt = (x) => String(x >= 5 ? Math.round(x) : Math.round(x * 10) / 10).replace('.', ',');
+export function litreHesap(q) {
+  const n = norm(q);
+  if (!/kac (litre|lt|kilo|kg|torba|paket)|ne kadar (toprak|harc)|kac litrelik|litre (toprak )?(lazim|gerek)/.test(n)) return null;
+  const sm = n.match(/(\d{1,3}) (adet|tane|saksi|fidan|fide|bitki|agac|kok)/) || n.match(/(?:^| )(bir|iki|uc|dort|bes|alti|yedi|sekiz|dokuz|on) (adet|tane|saksi|fidan|fide|bitki|agac|kok)/);
+  const adet = Math.min(500, Math.max(1, sm ? SAYI[sm[1]] || +sm[1] : 1)), cm = n.match(/(\d{1,3}) ?(cm|santim)/), T = saksiTablo();
+  const ornek = (d) => T.find((r) => r[0] === d);
+  if (cm && T.length) {
+    const d = +cm[1], x = T.reduce((a, r) => (Math.abs(r[0] - d) < Math.abs(a[0] - d) ? r : a));
+    if (Math.abs(x[0] - d) <= 3) {
+      const top = x[1] * adet;
+      return { litre: Math.ceil(top), metin: `${d} cm'lik saksıya yaklaşık ${lt(x[1])} litre toprak gider` + (adet > 1 ? `; ${adet} saksı için toplam yaklaşık ${lt(top)} litre.` : '.') };
+    }
+  }
+  const a = ornek(30), b = ornek(40);
+  return { metin: 'Kaç litre gerektiği saksınızın boyuna bağlı. Saksınızın çapını yazarsanız (ör. "30 cm") hesaplayayım' +
+    (a && b ? `: 30 cm'lik saksıya yaklaşık ${lt(a[1])} litre, 40 cm'lik saksıya yaklaşık ${lt(b[1])} litre toprak gider` : '') + (adet > 1 ? `; ${adet} saksı için bunun ${adet} katı gerekir.` : '.') };
 }
 // Sorudaki bitki, yapay zekânın daha önce tanıdığı bitkilerden biri mi (yazım hatası ve ekli hali dahil)
 export function bitkiBul(q, list) {
@@ -540,12 +572,13 @@ export async function handle(req, env, ctx, { aiKey, originOk, products, formul 
   let { hit, near } = tryPool(APPROVED.t ? APPROVED.list : []);
   // Bitkiye toprak sorusu (yazım hatası, "hazırlar mısın" gibi karışım isteği dahil): bitkinin toprak kartı
   const tn = toprakNiyet(q);
-  if (tn && (tn.kendim || !hit || hit.e.t === 'bitki-toprak') && body.on !== 1) {
+  if (tn && (tn.kendim || !hit || hit.e.t === 'bitki-toprak' || (/^saksi/.test(hit.e.t) && litreHesap(q))) && body.on !== 1) {
     const e = tn.e, ad = e.b.split(',')[0].trim();
     if (db && req.headers.get('x-ak-test') !== '1') ctx.waitUntil(ready.then(() => db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, site, sayfa) VALUES (?,?,?,?,?,?,?)')
       .bind(new Date().toISOString(), q, norm(q), 'havuz', e.i, site, page).run()).catch(() => {}));
-    return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, dinamik: 'toprak', bitki: e.b, kendim: tn.kendim, urunler: e.u,
-      cevap: tn.kendim ? `${ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : e.c });
+    const lh = litreHesap(q), metin = tn.kendim ? `${ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : e.c;
+    return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, dinamik: 'toprak', bitki: e.b, kendim: tn.kendim, urunler: e.u, ...(lh && lh.litre ? { litre: lh.litre } : {}),
+      cevap: lh ? `${lh.metin}\n\n${metin}` : metin });
   }
   // Önden yükleme (on: 1): Bilge Bey'in öneri düğmelerinin cevabı müşteri dokunmadan arkada alınır. Yalnız hazır havuz;
   // Claude'a gidilmez, veritabanı beklenmez, kayda geçmez (müşteri dokununca asıl istek ayrıca gelir ve sayılır).
@@ -573,8 +606,12 @@ export async function handle(req, env, ctx, { aiKey, originOk, products, formul 
   // kartını (en yakın hazır toprak + HG formülünden uyarlanan tarif + sepete ekleme) gösterir. Aynı bitki tekrar
   // sorulursa kayıttan, ücretsiz.
   const kendim = KENDIM.test(norm(q));
-  const kart = (b, cevap, tekrar) => json({ ok: true, kaynak: 'ai', ...(tekrar ? { tekrar: true } : {}), dinamik: 'toprak', bitki: b.ad, prof: b.prof, grup: b.grup, kendim,
-    cevap: kendim ? `${b.ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : cevap, urunler: [] });
+  const lh = litreHesap(q);
+  const kart = (b, cevap, tekrar) => {
+    const metin = kendim ? `${b.ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : cevap;
+    return json({ ok: true, kaynak: 'ai', ...(tekrar ? { tekrar: true } : {}), dinamik: 'toprak', bitki: b.ad, prof: b.prof, grup: b.grup, kendim, ...(lh && lh.litre ? { litre: lh.litre } : {}),
+      cevap: lh ? `${lh.metin}\n\n${metin}` : metin, urunler: [] });
+  };
   if (db && toprakOk(norm(q))) {
     const b = bitkiBul(q, await bitkiKayit(db).catch(() => []));
     if (b) {
