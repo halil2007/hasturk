@@ -7,6 +7,7 @@
 // Kişisel veri tutulmaz: soru metni, cevap, tarih; IP / çerez / kimlik yok.
 import Anthropic from '@anthropic-ai/sdk';
 import HAVUZ from './akbilge-havuz.json';
+import { rehberMetni, GRUPLAR, OZEL_KARISIM, TOPRAK_SORUSU } from './toprak.js';
 
 export const MODEL = 'claude-opus-5-5';
 const DAILY_LIMIT = 150;     // günde en fazla bu kadar Claude sorgusu (env.AK_DAILY_LIMIT ile değişir)
@@ -18,7 +19,7 @@ export const norm = (s) => String(s || '').toLocaleLowerCase('tr-TR').replace(/[
   .replace(/[^a-z0-9]+/g, ' ').trim();
 // Soruya anlam katmayan dolgu kelimeleri (soru kalıbı kelimeleri — ne, nasıl, kaç… — KALIR, niyeti onlar taşır)
 const FILL = new Set(['merhaba', 'selam', 'selamlar', 'iyi', 'gunler', 'aksamlar', 'lutfen', 'acaba', 'abi', 'abla', 'hocam', 'usta', 'kardesim',
-  'tesekkurler', 'tesekkur', 'ederim', 'almaliyim', 'almali', 'alayim', 'alsam', 'almak', 'onerirsiniz', 'onerir', 'misiniz', 'musunuz', 'yardimci', 'olur', 'musun', 'sayin', 'yetkili', 'bilgi', 'alabilir', 'miyim', 'sormak', 'istiyorum', 'istiyordum', 'bir', 'bu', 'su', 've', 'ile', 'ya', 'da', 'de', 'ki', 'mi', 'mu', 'benim', 'bana', 'sizde', 'var', 'cok', 'sey', 'seyler']);
+  'tesekkurler', 'tesekkur', 'ederim', 'almaliyim', 'almali', 'alayim', 'alsam', 'almak', 'onerirsiniz', 'onerir', 'misiniz', 'musunuz', 'yardimci', 'olur', 'musun', 'sayin', 'yetkili', 'bilgi', 'alabilir', 'miyim', 'sormak', 'istiyorum', 'istiyordum', 'bir', 'bu', 'su', 've', 'ile', 'ya', 'da', 'de', 'ki', 'mi', 'mu', 'benim', 'bana', 'sizde', 'var', 'cok', 'sey', 'seyler', 'lazim', 'gerek', 'gerekir', 'gerekiyor', 'almam', 'alirim', 'kullanmaliyim', 'kullanayim', 'kullanmam']);
 const stem = (t) => (t.length > 5 ? t.slice(0, 5) : t);
 // "ağaç/ağacı/ağacına" bitki adının parçası olarak anlam katmaz (limon ağacı = limon)
 const FILL_STEM = new Set(['agac', 'agaci', 'agacl', 'agacm']);
@@ -72,7 +73,8 @@ export function match(q, { extra = [], top = 5, product = null } = {}) {
     if (qtop.size) { const pt = topics(p.ts); if (pt.size && ![...qtop].some((x) => pt.has(x))) sc *= 0.5; }
     // Belirli bir bitkiye ait cevap (doz, toprak, ekim) yalnız o bitki soruda geçiyorsa verilir
     const eb = X.entries[p.ei].b;
-    if (eb) { const bt = toks(eb.replace(/\(.*?\)/g, ' ')); if (bt.length && !bt.some((t) => qt.some((u) => sim(t, u) > 0))) sc *= 0.4; }
+    // Bitki adı yazım benzerliğiyle değil, kökünden eşleşmeli (kaladyum ≠ kalanşo): biri ötekinin başıysa (nane / naneye) sayılır
+    if (eb) { const bt = toks(eb.replace(/\(.*?\)/g, ' ')); if (bt.length && !bt.some((t) => qt.some((u) => t.length >= 3 && u.length >= 3 && (u.startsWith(t) || t.startsWith(u))))) sc *= 0.4; }
     if (product && X.entries[p.ei].p === product) sc += 0.08; // müşterinin bulunduğu ürün sayfasıyla ilgili cevaba hafif öncelik
     if (qr.length) sc += 0.004 * qr.filter((t) => p.r.includes(' ' + t + ' ')).length / qr.length;
     const prev = best.get(p.ei);
@@ -111,6 +113,7 @@ Kurallar:
 - "Doğrulanmış bilgi" soruyla ilgisizse onu kullanma; sorulmayan bir konuyu anlatma.
 - Zirai ilaç, böcek/haşere/kemirgen ilacı ve dezenfektanlar için asla doz, karışım oranı veya uygulama tarifi verme: ürün etiketine uyulmasını söyle.
 - Ürün önerisi yalnız "Önerilebilecek ürünler" listesinden ve yalnız soruyla gerçekten ilgiliyse yapılır; listede olmayan ürün, marka veya rakip mağaza adı yazma.
+- Toprak sorulduysa (hangi toprak, nasıl bir toprak, toprak karışımı) yalnız toprak öner; gübreyi toprak yerine önerme. Bitkinin kendi toprağı "Önerilebilecek ürünler"de yoksa "Toprak rehberi"nden bitkiye en uygun grubu seç ve şunu yaz: bitkinin nasıl bir toprak sevdiği (bir cümle), o grubun hazır toprağı (en yakın seçenek olarak) ve "Kendi Toprak Karışımını Oluştur" ürünüyle hazırlanacak karışım tarifi (ölçü oranlarıyla, rehberdeki gibi). Ürün olarak en uygun hazır toprağı ve Kendi Toprak Karışımını Oluştur'u seç. Bitkiyi tanımıyorsan genel grubu öner ve müşteri hizmetlerimize danışılabileceğini ekle.
 - Bitki hastalığı ya da zararlı teşhisi koyma; "Doğrulanmış bilgi"de o belirtiye ait olası nedenler ve öneriler varsa onları kullan, yoksa yalnız olası nedenleri say. Her durumda fotoğrafla müşteri hizmetlerimize danışılmasını öner. Ev ve halk sağlığı böcek ilaçlarını (sinek, hamamböceği, tahtakurusu, akar spreyleri) bitkiye önerme. İnsan veya hayvan sağlığı konusunda tavsiye verme.
 - Mağaza bilgisi: siparişler aynı gün kargoya teslim edilir; bölgeye göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir. Bunun dışındaki sipariş durumu, kargo takibi, iade, fiyat, kampanya ve stok sorularını cevaplama; bu konular için müşteri hizmetlerimize yönlendir.
 - Yönlendirirken "usta" deme; "müşteri hizmetlerimizden destek alabilirsiniz" de.
@@ -138,15 +141,21 @@ const SCHEMA = {
 
 // Bağlam: en yakın havuz cevapları (doğrulanmış) + onlardaki ürünler + soruda adı geçen ürünler
 function context(q, near, products) {
+  // Toprak sorusu: gübre cevapları bilgi olarak verilmez (yapay zekâ toprak yerine gübre önermesin); toprak rehberi,
+  // grupların hazır toprakları ve "Kendi Toprak Karışımını Oluştur" önerilebilir ürünlere eklenir
+  const toprak = TOPRAK_SORUSU.test(norm(q));
+  if (toprak) near = near.filter((x) => !/^(bitki-doz|gubre-genel)$/.test(x.e.t));
+  const byS = new Map(products.map((p) => [p.s, p]));
   // Maliyet: en yakın 3 cevap, her biri en fazla ~900 karakter (rakamlar ve kaynak satırı genelde baştadır)
-  const facts = near.filter((x) => x.sc >= 0.35).slice(0, 3).map((x) => (x.e.c.length > 900 ? x.e.c.slice(0, 900) + '…' : x.e.c));
+  const facts = near.filter((x) => x.sc >= 0.35).slice(0, toprak ? 2 : 3).map((x) => (x.e.c.length > 900 ? x.e.c.slice(0, 900) + '…' : x.e.c));
+  if (toprak) facts.push(rehberMetni(byS));
   const slugs = new Set();
+  if (toprak) [OZEL_KARISIM, ...new Set(GRUPLAR.flatMap((g) => g.hazir)), 'tarim-perliti', 'hg-asidik-torf'].forEach((s) => slugs.add(s));
   near.slice(0, 4).forEach((x) => x.e.u.forEach((s) => slugs.add(s)));
   const qt = toks(q);
   products.map((p) => ({ p, h: toks(p.n).filter((t) => qt.includes(t)).length })).filter((x) => x.h >= 1)
     .sort((a, b) => b.h - a.h).slice(0, 6).forEach((x) => slugs.add(x.p.s));
-  const byS = new Map(products.map((p) => [p.s, p]));
-  const list = [...slugs].map((s) => byS.get(s)).filter((p) => p && p.st).slice(0, 10);
+  const list = [...slugs].map((s) => byS.get(s)).filter((p) => p && p.st).slice(0, toprak ? 14 : 10);
   return { facts, list };
 }
 export function userMessage(q, ctx, page) {
