@@ -215,6 +215,8 @@ export function n11(env, meta) {
     }
     const images = [pr.image, ...(pr.images || [])].filter((u, i, l) => /^https:\/\//i.test(u) && l.indexOf(u) === i);
     if (!pr.sku) missing.push('SKU');
+    // Ürün oluşturma barkod ya da N11 katalog numarası (catalogId) ile yapılır (Mağaza Destek → Katalog Servisi): katalog numarası gönderilmediği için barkod gerekir
+    if (!str(pr.barcode)) missing.push('barkod');
     if (!images.length) missing.push('görsel (https)');
     if (!(pr.price > 0)) missing.push('fiyat');
     if (![0, 1, 10, 20].includes(Number(pr.vat ?? 20))) missing.push(`KDV oranı %${pr.vat} (N11: 0, 1, 10, 20)`);

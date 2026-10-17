@@ -41,15 +41,12 @@ function findAll(node, test, out = []) {
 }
 const pick = (o, ...keys) => { for (const k of keys) { const hit = Object.keys(o).find((x) => x.toLowerCase() === k.toLowerCase()); if (hit && o[hit] !== '' && typeof o[hit] !== 'object') return o[hit]; } return ''; };
 
-function pttavmSoap(env, meta) {
+// SOAP çağrısı (WS-Security kullanıcı adı / şifre). Hem eski SOAP kanalı hem ürün yükleme (pttCatalog) kullanır.
+function makeSoap(env) {
   const user = env.PTTAVM_USERNAME, pass = env.PTTAVM_PASSWORD;
   const URL_ = env.PTTAVM_SOAP_URL || 'https://ws.pttavm.com:93/service.svc';
   const NS = env.PTTAVM_NS || 'http://tempuri.org/';
   const IFACE = env.PTTAVM_INTERFACE || 'IService';
-  const ORDER_METHOD = env.PTTAVM_ORDER_METHOD || 'SiparisKontrolListesiV2';
-  const STOCK_METHOD = env.PTTAVM_STOCK_METHOD || 'StokFiyatGuncelle3';
-  const trDate = env.PTTAVM_DATE_FORMAT === 'tr';
-
   async function soap(method, inner) {
     const xml = `<?xml version="1.0" encoding="utf-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${NS}">
@@ -61,6 +58,15 @@ function pttavmSoap(env, meta) {
     if (fault) throw new Error(`PttAVM ${method}: ${pick(flat(fault), 'faultstring', 'Reason', 'Text') || 'SOAP hatası'}`);
     return tree;
   }
+  return { soap, URL_ };
+}
+
+function pttavmSoap(env, meta) {
+  const user = env.PTTAVM_USERNAME, pass = env.PTTAVM_PASSWORD;
+  const { soap, URL_ } = makeSoap(env);
+  const ORDER_METHOD = env.PTTAVM_ORDER_METHOD || 'SiparisKontrolListesiV2';
+  const STOCK_METHOD = env.PTTAVM_STOCK_METHOD || 'StokFiyatGuncelle3';
+  const trDate = env.PTTAVM_DATE_FORMAT === 'tr';
 
   const fmt = (ms) => {
     const d = new Date(ms + 3 * 3600e3).toISOString();
@@ -171,14 +177,16 @@ function pttavmSoap(env, meta) {
     await diagStep(out, 'Siparişler (son 24 saat)', async () => { const o = await fetchOrders(now - 864e5, now); return { detail: `${o.length} sipariş okundu` }; });
     await diagStep(out, 'Ürün / stok listesi', async () => { const l = await fetchListings(); return { ok: l.length ? true : null, detail: l.length ? `${l.length} ürün` : 'Yanıt geldi ama ürün satırı tanınmadı (yöntem adı ya da alan adları farklı olabilir)' }; });
     out.push({ name: 'Kargo barkodu', ok: env.PTTAVM_WAREHOUSE_ID ? null : false, detail: env.PTTAVM_WAREHOUSE_ID ? `Depo ${env.PTTAVM_WAREHOUSE_ID} tanımlı (barkod servisi ilk gönderimde denenir)` : 'Depo numarası girilmemiş: kargo barkodu alınamaz' });
+    await catalogDiag(out, catalog);
     return out;
   }
 
   const missing = ['PTTAVM_USERNAME', 'PTTAVM_PASSWORD'].filter((k) => !env[k]);
+  const catalog = missing.length ? undefined : pttCatalog(soap);
   return {
     ...meta, type: 'pttavm', byOrderDate: true, enabled: !missing.length, missing,
     caps: { accept: 'local', split: 'local', ship: env.PTTAVM_WAREHOUSE_ID ? 'remote' : 'local', label: null, createProduct: false, price: true },
-    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose,
+    fetchOrders, fetchListings, pushStock, pushPrice, ship, diagnose, catalog,
   };
 }
 
@@ -400,14 +408,208 @@ function pttavmRest(env, meta) {
     if (orderId) await diagStep(out, `Sipariş ${orderId}`, async () => { const o = await fetchOne(orderId); return { detail: `${o.items.length} ürün · ${o.remoteStatus} → ${o.status}${o.tracking ? ` · barkod ${o.tracking}` : ''}` }; });
     await diagStep(out, 'Ürün listesi', async () => { const l = await fetchListings(); return { ok: l.length ? true : null, detail: l.length ? `${l.length} ilan` : 'Cevap geldi ama ürün bulunamadı' }; });
     await diagStep(out, 'Kargo depoları', async () => { const w = await warehouses(); return { ok: w.length ? true : null, detail: w.length ? w.map((x) => `${x.name} (${x.id})`).join(', ') : 'Depo tanımlı değil: kargo barkodu alınamaz' }; });
+    await catalogDiag(out, catalog);
     return out;
   }
 
+  // Ürün yükleme REST'te doğrulanamadı: PttAVM'in ürün ekleme servisi (UpdateProductsV3) SOAP'ta; eski kullanıcı adı / şifre de girildiyse kullanılır
+  const catalog = env.PTTAVM_USERNAME && env.PTTAVM_PASSWORD ? pttCatalog(makeSoap(env).soap) : undefined;
   return {
     ...meta, type: 'pttavm', byOrderDate: true, enabled: true, missing: [], api: 'rest',
     caps: { accept: 'local', split: 'local', ship: 'remote', label: 'remote', createProduct: false, price: true },
-    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, pushStatus, ship, label, diagnose,
+    fetchOrders, fetchOne, orderExists, fetchListings, pushStock, pushPrice, pushStatus, ship, label, diagnose, catalog,
   };
+}
+
+// ---------- ürün yükleme (SOAP Katalog Entegrasyonu: "Ürün Ekleme Güncelleme") ----------
+// Kaynak: PttAVM servis sözleşmesi (https://ws.pttavm.com:93/service.svc/service?wsdl); WSDL'den svcutil 8.0 ile üretilmiş istemci:
+// github.com/zfrtemel/IntegrationService → Providers/IntegrationService.Providers.Pttavm/Connected Services/PttAvmService/Reference.cs.
+//   UpdateProductsV3(ProductV3Request[] items) → ProductsUpdateResult { Success, Message, TrackingId, CountOfProductsToBeProcessed }
+//   GetProductsTrackingResult(string trackingId) → { Status, Progress, ProductsSubTrackingResult { ProductBasedInfos: [{ Barcode, ProductId, Status, Message, FailureReasons }] } }
+//   GetMainCategories() → { success, main_category: [{ id, name }] } · GetCategoryTree(parent_id, last_update) → { success, category_tree: [{ id, name, parent_id, children }] }
+//   GetCargoProfiles() → [{ Id, Name, Description, Type }] · BarkodKontrolBulk(string[] Barkod) → StokKontrolDetay[] (UrunId > 0: barkod PttAVM'de kayıtlı)
+// PttAVM kategorilerinde özellik servisi yok: marka serbest metin (Brand), varyant tanımı serbest metin (Definition / Value).
+// REST Entegrasyon API'sinde ürün ekleme ucu ve alan adları doğrulanamadı; bu yüzden ürün yükleme eski API kullanıcı adı / şifresiyle (SOAP) yapılır.
+// Varyantlar: VariantV3.Price alanının (fiyat farkı mı, satış fiyatı mı) anlamı belgelenmediği için her varyant kendi barkoduyla ayrı ürün olarak açılır.
+// Not: UpdateProductsV3 aynı barkodlu mevcut ürünü günceller (varyant gönderilmezse varyantlarını siler): PttAVM'de zaten kayıtlı barkod gönderilmez.
+const REQ_NS = 'http://schemas.datacontract.org/2004/07/ePttAVMService.Model.Requests';
+const ARR_NS = 'http://schemas.microsoft.com/2003/10/Serialization/Arrays';
+// ProductV3Request alanları DataContract (WSDL) sırasıyla: WCF sıra dışı alanı yok sayar
+const V3_ORDER = ['Active', 'Barcode', 'BasketMaxQuantity', 'Brand', 'CargoProfileId', 'CatalogBarcode', 'CategoryId', 'Desi', 'Discount', 'EstimatedCourierDelivery', 'Gtin', 'Images',
+  'IsCargoFromSupplier', 'LongDescription', 'Name', 'NoShippingProduct', 'Parts', 'PriceWithVat', 'PriceWithoutVat', 'ProductCode', 'Quantity', 'ShortDescription', 'SingleBox', 'VATRate',
+  'Variants', 'WarrantyDuration', 'WarrantySupplier'];
+export function v3Xml(p) {
+  const out = [];
+  for (const k of V3_ORDER) {
+    const v = p[k];
+    if (v == null || v === '') continue;
+    if (k === 'Images') { if (v.length) out.push(`<r:Images>${v.map((u) => `<r:ProductImageV3><r:Url>${esc(u)}</r:Url></r:ProductImageV3>`).join('')}</r:Images>`); continue; }
+    out.push(`<r:${k}>${esc(typeof v === 'boolean' ? String(v) : v)}</r:${k}>`);
+  }
+  return `<r:ProductV3Request>${out.join('')}</r:ProductV3Request>`;
+}
+const kid = (n, name) => (n && n.children.find((c) => c.name === name)) || null;
+const kids = (n, name) => (n ? n.children.filter((c) => c.name === name) : []);
+const txt = (n, name) => { const c = kid(n, name); return c ? str(c.text) : ''; };
+
+export function pttCatalog(soap) {
+  // Kategoriler: önce tüm ağaç (GetCategoryTree, boş parent_id); ağaç alt düğümsüz gelirse ana kategoriler (GetMainCategories) tek tek açılır.
+  // Ürün yalnız son kategoriye (alt kategorisi olmayan) açılır.
+  let catCache = null;
+  const okOf = (tree, what) => {
+    const s = findAll(tree, (n) => n.name === 'success')[0];
+    if (s && str(s.text).toLowerCase() === 'false') { const e = findAll(tree, (n) => n.name === 'error_message')[0]; throw Object.assign(new Error(`PttAVM ${what}: ${str(e && e.text) || 'başarısız'}`), { ptt: true }); }
+  };
+  const treeOf = async (parent) => {
+    const t = await soap('GetCategoryTree', `<tem:parent_id>${esc(parent)}</tem:parent_id><tem:last_update></tem:last_update>`);
+    okOf(t, 'kategori ağacı');
+    return kids(findAll(t, (n) => n.name === 'category_tree')[0], 'Category');
+  };
+  async function load() {
+    const leaves = [];
+    const walk = (node, path) => {
+      const id = txt(node, 'id'), name = txt(node, 'name'), sub = kids(kid(node, 'children'), 'Category');
+      if (!id) return;
+      if (!sub.length) { leaves.push({ id, name, path: path.join(' › ') }); return; }
+      for (const c of sub) walk(c, [...path, name]);
+    };
+    // Boş parent_id'yi kabul etmeyen servis (SOAP hatası) ana kategorilerden yürünür; servisin kendi hata cevabı (success=false) olduğu gibi döner
+    let top = [];
+    try { top = await treeOf(''); } catch (e) { if (e.budget || e.ptt) throw e; }
+    if (!top.some((n) => kids(kid(n, 'children'), 'Category').length)) {
+      const t = await soap('GetMainCategories', '');
+      okOf(t, 'ana kategoriler');
+      const mains = kids(findAll(t, (n) => n.name === 'main_category')[0], 'category').map((n) => ({ id: txt(n, 'id'), name: txt(n, 'name') })).filter((x) => x.id);
+      if (mains.length) {
+        top = [];
+        for (const m of mains) {
+          const sub = await treeOf(m.id);
+          // Ağaç ana kategorinin kendisiyle ya da doğrudan alt kategorileriyle gelebilir
+          const self = sub.length === 1 && txt(sub[0], 'id') === m.id;
+          for (const n of self ? kids(kid(sub[0], 'children'), 'Category') : sub) walk(n, [m.name]);
+          if (!sub.length) leaves.push({ id: m.id, name: m.name, path: '' });
+        }
+        return leaves;
+      }
+    }
+    for (const n of top) walk(n, []);
+    return leaves;
+  }
+  async function categories(q) {
+    if (!catCache || Date.now() - catCache.at > 6 * 3600e3) catCache = { at: Date.now(), all: await load() };
+    const k = String(q || '').toLocaleLowerCase('tr').trim();
+    return { total: catCache.all.length, items: catCache.all.filter((c) => !k || `${c.name} ${c.path} ${c.id}`.toLocaleLowerCase('tr').includes(k)).slice(0, 60) };
+  }
+  const allCategories = async () => { await categories(''); return catCache.all; };
+
+  // Kargo profilleri (isteğe bağlı seçenek: adı ya da numarası yazılır)
+  let profiles = null;
+  async function cargoProfiles() {
+    if (!profiles) profiles = findAll(await soap('GetCargoProfiles', ''), (n) => n.name === 'CargoProfileModel').map((n) => ({ id: txt(n, 'Id'), name: txt(n, 'Name') })).filter((x) => x.id);
+    return profiles;
+  }
+  // PttAVM'de zaten kayıtlı barkodlar (BarkodKontrolBulk, 100'lük): bunlar yeni ürün olarak gönderilmez (UpdateProductsV3 mevcut ürünün üstüne yazar)
+  const taken = new Set(), checked = new Set();
+  async function prepare(prs) {
+    const todo = [...new Set(prs.map((p) => str(p.barcode)).filter((b) => b && !checked.has(b)))];
+    for (const part of chunk(todo, 100)) {
+      const t = await soap('BarkodKontrolBulk', `<tem:Barkod xmlns:arr="${ARR_NS}">${part.map((b) => `<arr:string>${esc(b)}</arr:string>`).join('')}</tem:Barkod>`);
+      for (const n of findAll(t, (x) => x.name === 'StokKontrolDetay')) if (num(txt(n, 'UrunId')) > 0 && txt(n, 'Barkod')) taken.add(txt(n, 'Barkod'));
+      for (const b of part) checked.add(b);
+    }
+  }
+  async function build(pr, map, { opts = {} } = {}) {
+    const missing = [];
+    const cat = Number(map.remote_id);
+    if (!Number.isInteger(cat) || cat <= 0) throw new Error(`PttAVM kategori kimliği geçersiz: ${map.remote_id}`);
+    const barcode = str(pr.barcode).trim();
+    if (!barcode) missing.push('barkod');
+    else if (taken.has(barcode)) missing.push('barkod PttAVM\'de başka bir üründe kayıtlı (yeni ürün açılmaz; ilanı PttAVM\'den eşleştirin)');
+    if (!str(pr.name).trim()) missing.push('ürün adı');
+    const imgs = [...new Set([pr.image, ...(pr.images || [])].map(str).filter((u) => /^https?:\/\//i.test(u)))];
+    if (!imgs.length) missing.push('görsel');
+    if (!(num(pr.price) > 0)) missing.push('fiyat');
+    const vat = num(pr.vat ?? 20);
+    if (!(vat >= 0 && vat <= 100)) missing.push(`KDV oranı “${pr.vat}” geçersiz`);
+    // Kargo profili (isteğe bağlı): numara ya da PttAVM'deki adı; yazılan profil yoksa engeller (tanımlı profiller listelenir)
+    let profile = null;
+    if (str(opts.cargoProfileId)) {
+      const want = str(opts.cargoProfileId), list = await cargoProfiles().catch(() => null);
+      const hit = list && list.find((x) => x.id === want || x.name.toLocaleLowerCase('tr') === want.toLocaleLowerCase('tr'));
+      if (hit) profile = Number(hit.id);
+      else if (!list && /^\d+$/.test(want)) profile = Number(want);
+      else missing.push(`kargo profili “${want}” PttAVM'de yok${list && list.length ? ` (tanımlı: ${list.slice(0, 5).map((x) => `${x.name} ${x.id}`).join(', ')})` : ''}; PttAVM seçeneklerinden düzeltin`);
+    }
+    let days = null;
+    if (str(opts.preparingDay)) {
+      days = Number(str(opts.preparingDay).replace(',', '.'));
+      if (!(Number.isInteger(days) && days >= 1 && days <= 30)) { missing.push(`kargoya veriliş süresi “${str(opts.preparingDay)}” geçersiz (1–30 gün; PttAVM seçeneklerinden düzeltin)`); days = null; }
+    }
+    const payload = {
+      Active: true, Barcode: barcode, Brand: str(pr.brand).slice(0, 100), CargoProfileId: profile, CategoryId: cat, Desi: Math.max(1, Math.round(num(pr.desi, 1) * 100) / 100), Discount: 0,
+      EstimatedCourierDelivery: days, Images: imgs, LongDescription: str(pr.description) || str(pr.name), Name: str(pr.name).trim().slice(0, 200),
+      PriceWithVat: (Math.round(num(pr.price) * 100) / 100).toFixed(2), ProductCode: str(pr.sku).slice(0, 100), Quantity: Math.max(0, Math.min(9999, Math.round(num(pr.stock)))), VATRate: vat,
+    };
+    return { key: barcode, missing, payload };
+  }
+  // Gönderim: istekte en fazla 100 ürün; her parça bir takip kimliği. Kayıt "takip:barkodlar" (parça sonucu bu kimlikle sorgulanır).
+  // İlk parça reddedilirse hata; sonraki parça reddedilirse o parçanın ürünleri sonuçta "gönderilemedi" olur (gönderilenler kaybolmaz).
+  async function send(items) {
+    const refs = [];
+    for (const part of chunk(items, 100)) {
+      const keys = part.map((x) => x.Barcode).join(',');
+      try {
+        const t = await soap('UpdateProductsV3', `<tem:items xmlns:r="${REQ_NS}">${part.map(v3Xml).join('')}</tem:items>`);
+        const res = findAll(t, (n) => n.name === 'UpdateProductsV3Result')[0];
+        const o = res ? flat(res) : {};
+        const tid = str(pick(o, 'TrackingId'));
+        if (!res || String(pick(o, 'Success')).toLowerCase() !== 'true' || !tid) throw new Error('PttAVM ürün gönderimi: ' + (str(pick(o, 'Message')) || 'işlem kabul edilmedi'));
+        refs.push(`${tid}:${keys}`);
+      } catch (e) {
+        if (e.budget || !refs.length) throw e;
+        refs.push(`0:${keys}`);
+      }
+    }
+    return { ref: refs.join(';') };
+  }
+  async function tracking(tid) {
+    const t = await soap('GetProductsTrackingResult', `<tem:trackingId>${esc(tid)}</tem:trackingId>`);
+    return findAll(t, (n) => n.name === 'GetProductsTrackingResultResult')[0] || null;
+  }
+  async function status(ref) {
+    const items = [];
+    let pending = false;
+    for (const part of String(ref).split(';').filter(Boolean)) {
+      const i = part.indexOf(':'), tid = i < 0 ? part : part.slice(0, i), keys = i < 0 ? [] : part.slice(i + 1).split(',').filter(Boolean);
+      if (tid === '0') { for (const k of keys) items.push({ key: k, ok: false, status: 'PttAVM\'e gönderilemedi', error: 'Bu parça PttAVM tarafından kabul edilmedi; ürünü yeniden gönderin' }); continue; }
+      const r = await tracking(tid);
+      const st = txt(r, 'Status'), done = /complet|cancel|fail|error/i.test(st) || num(txt(r, 'Progress')) >= 100;
+      if (!done) pending = true;
+      const seen = new Set();
+      for (const n of findAll(r || { children: [] }, (x) => x.name === 'ProductBasedInfo')) {
+        const s = txt(n, 'Status'), key = txt(n, 'Barcode');
+        const why = [txt(n, 'Message'), ...findAll(kid(n, 'FailureReasons') || { children: [] }, () => true).map((x) => str(x.text))].filter(Boolean);
+        const ok = /complet|success/i.test(s) ? true : /fail|error|cancel/i.test(s) ? false : null;
+        seen.add(key);
+        items.push({ key, ok, status: ok === true ? 'PttAVM kabul etti' : ok === false ? 'PttAVM kabul etmedi' : s || 'İşleniyor', error: ok === false ? [...new Set(why)].join(' · ') || 'PttAVM kabul etmedi' : '' });
+        if (ok === null) pending = true;
+      }
+      if (done) for (const k of keys) if (!seen.has(k)) items.push({ key: k, ok: false, status: 'PttAVM sonuç vermedi', error: 'PttAVM bu ürün için sonuç vermedi' });
+    }
+    return { done: !pending, items };
+  }
+  async function raw(tid) { const r = await tracking(String(tid).split(':')[0]); return r ? flat(r) : null; }
+  return {
+    categories, allCategories, attributes: async () => [], values: async () => [], build, send, status, raw, prepare, chunk: 100,
+    options: [{ k: 'cargoProfileId', label: 'Kargo profili: adı ya da numarası (isteğe bağlı; PttAVM → Kargo Profilleri)' }, { k: 'preparingDay', label: 'Kargoya veriliş süresi, gün (isteğe bağlı)' }],
+    cargoProfiles,
+  };
+}
+// Tanılama: ürün yükleme servisi (yalnız eski kullanıcı adı / şifre girildiyse)
+async function catalogDiag(out, catalog) {
+  if (!catalog) { out.push({ name: 'Ürün yükleme', ok: null, detail: 'Eski API kullanıcı adı / şifresi girilmemiş: ürün yükleme kapalı (PttAVM ürün ekleme servisi SOAP\'ta)' }); return; }
+  await diagStep(out, 'Ürün yükleme: kategori ağacı', async () => { const c = await catalog.allCategories(); return { ok: c.length ? true : null, detail: c.length ? `${c.length} son kategori` : 'Kategori okunamadı' }; });
+  await diagStep(out, 'Ürün yükleme: kargo profilleri', async () => { const p = await catalog.cargoProfiles(); return { ok: null, detail: p.length ? p.map((x) => `${x.name} (${x.id})`).join(', ') : 'Kargo profili yok (isteğe bağlı)' }; });
 }
 
 // Seçim: API Key + Token girildiyse yeni REST API; yoksa eski SOAP (kullanıcı adı / şifre). İkisi de yoksa eksik alan API Key + Token.
