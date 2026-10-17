@@ -2530,23 +2530,44 @@
       { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[pf.su], { 1: 'besini az', 3: 'besince zengin' }[pf.bs],
       { k: 'kumlu', h: 'havalı' }[pf.yp]].filter(Boolean).join(', ');
   }
-  // Kendi karışımı için ölçü oranlı tarif (ölçü = aynı kap): bitkinin toprak profiline göre "Kendi Toprak Karışımını
-  // Oluştur" ürünündeki bileşenlerle. Solucan gübresi en çok ~%20. Sunucudaki src/toprak.js > tarif ile aynı kurallar.
+  // Kendi karışımı için ölçü oranlı tarif (ölçü = aynı kap): bitkinin toprak profili ve grubuna göre "Kendi Toprak
+  // Karışımını Oluştur" ürünündeki bileşenlerle. Sunucudaki src/toprak.js ile birebir aynı (scripts/toprak-esit.mjs).
   // Tarif parçaları: [ölçü, bileşen anahtarı] (anahtar public/karisim.json > bilesen.k ile eşleşir)
   var KAR_AD = { sphagnum: 'sphagnum torf', asidik: 'asidik torf', cocopeat: 'cocopeat', pomza: 'pomza', 'ince-perlit': 'ince perlit', 'kalin-perlit': 'kalın perlit', vermikulit: 'vermikülit', solucan: 'solucan gübresi', leonardit: 'leonardit', orman: 'orman toprağı', bentonit: 'bentonit' };
-  function soilParts(pf) {
-    var asit = pf.ph2 <= 1 || (pf.ph <= 1 && pf.ph2 <= 2), taban = asit ? 'asidik' : 'sphagnum', x = [];
-    if (pf.yp === 'k') { var kurak = pf.dr >= 3 && pf.su <= 1; x.push([kurak ? 4 : 5, taban], [kurak ? 4 : 3, 'pomza'], [2, 'kalin-perlit']); }
-    else if (pf.yp === 'h') x.push([5, taban], [pf.dr >= 3 ? 4 : 3, 'kalin-perlit']);
-    else x.push([6, taban], [pf.dr >= 3 ? 3 : 2, pf.dr >= 3 ? 'kalin-perlit' : 'ince-perlit']);
-    if (pf.su >= 3 && pf.yp !== 'k') x.push([1, 'vermikulit']);
-    if (pf.bs >= 3) x.push([2, 'solucan']); else if (pf.bs === 2) x.push([1, 'solucan']);
+  // Bileşen parçaları [ölçü, anahtar], toplam 10 ölçü (10 litrede 1 ölçü = 1 litre). Mantık: HG karışımları — torf +
+  // cocopeat taban, perlit / pomza süzülme, solucan gübresi %10–20; çiçek-sebzeye leonardit, ağaçlara orman toprağı, su
+  // bitkisine bentonit. Kaktüste %60–70 mineral, asit severde asidik torf, nötr-kireçli sevene torf yerine cocopeat.
+  // Yalnız doğal bileşenler (kimyasal gübre yok).
+  function soilParts(pf, grp) {
+    var g = String(grp || ''), asit = pf.ph2 <= 1 || (pf.ph <= 1 && pf.ph2 <= 2), kirec = pf.ph >= 3;
+    var torf = asit ? 'asidik' : kirec ? 'cocopeat' : 'sphagnum', sol = pf.bs >= 3 ? 2 : pf.bs === 2 ? 1 : 0, x = [];
+    var ek = function (n, k) { if (n <= 0) return; for (var i = 0; i < x.length; i++) if (x[i][1] === k) { x[i][0] += n; return; } x.push([n, k]); };
+    if (/^ozel/.test(g)) { ek(6, 'sphagnum'); ek(4, 'ince-perlit'); return x; }
+    if (/^su /.test(g)) { ek(4, 'sphagnum'); ek(3, 'bentonit'); ek(1, 'cocopeat'); ek(1, 'solucan'); ek(1, 'leonardit'); return x; }
+    if (pf.yp === 'k') {
+      var m = (pf.dr >= 3 && pf.su <= 1 ? 7 : 6) - (sol ? 1 : 0); sol = Math.min(sol, 1);
+      ek(10 - m - sol, torf); ek(Math.ceil(m / 2), 'pomza'); ek(Math.floor(m / 2), 'kalin-perlit'); ek(sol, 'solucan');
+    } else if (pf.yp === 'h') {
+      var nem = pf.su >= 3, kuru = pf.su <= 1, d = pf.dr >= 3 || kuru ? 4 : 3, o = 10 - d - sol;
+      ek(Math.ceil(o / 2), torf); ek(Math.floor(o / 2), 'cocopeat');
+      if (kuru) { ek(2, 'pomza'); ek(2, 'kalin-perlit'); } else { ek(d - 1, nem ? 'ince-perlit' : 'kalin-perlit'); ek(1, nem ? 'vermikulit' : 'pomza'); }
+      ek(sol, 'solucan');
+    } else if (asit) {
+      ek(5, 'asidik'); ek(2, 'orman'); ek(2, pf.dr >= 3 ? 'kalin-perlit' : 'ince-perlit'); ek(1, 'solucan');
+    } else if (pf.bs <= 1) {
+      ek(4, torf); ek(2, 'cocopeat'); ek(2, 'vermikulit'); ek(2, 'ince-perlit');
+    } else if ((/^meyve/.test(g) || /^bahce/.test(g)) && !(pf.bs >= 3 && pf.dr <= 2)) {
+      ek(3, 'orman'); ek(4 - sol, torf); ek(2, 'pomza'); ek(1, 'kalin-perlit'); ek(sol, 'solucan');
+    } else {
+      var dd = pf.dr >= 3 ? 3 : 2, lb = pf.bs >= 3 ? 1 : 0, v = pf.su >= 3 ? 1 : 0, ob = 10 - dd - sol - lb;
+      ek(ob - 2, torf); ek(2, 'cocopeat'); ek(dd - v, pf.dr >= 3 ? 'kalin-perlit' : 'ince-perlit'); ek(v, 'vermikulit'); ek(sol, 'solucan'); ek(lb, 'leonardit');
+    }
     return x;
   }
-  function soilRecipe(pf) {
-    var asit = pf.ph2 <= 1 || (pf.ph <= 1 && pf.ph2 <= 2);
-    return soilParts(pf).map(function (a) { return a[0] + ' ölçü ' + KAR_AD[a[1]] + (a[1] === 'sphagnum' && pf.yp === 'h' && !asit ? ' ya da cocopeat' : ''); }).join(' + ') +
-      (pf.bs <= 1 ? ' (gübre eklemeyin)' : '') + (pf.ph >= 4 ? '; kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+  function soilRecipe(pl) {
+    var pf = pl.pf;
+    return soilParts(pf, pl.grp).map(function (a) { return a[0] + ' ölçü ' + KAR_AD[a[1]]; }).join(' + ') +
+      (pf.bs <= 1 ? ' (gübre eklemeyin)' : '') + (pf.ph >= 3 ? '; nötr-kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
   }
 
   // ---- Kendi karışımını hazırlat: tarif + litre → bileşen bileşen fiyat, toplam, tek dokunuşla sepete ----
@@ -2577,7 +2598,7 @@
   function karOpen(name) {
     var pl = soilData().plants.filter(function (x) { return x.n === name; })[0];
     if (!pl || !KAR) return;
-    KS = { n: pl.n, parts: soilParts(pl.pf), L: 10, rows: null, busy: false };
+    KS = { n: pl.n, parts: soilParts(pl.pf, pl.grp), L: 10, rows: null, busy: false };
     KS.rows = karFromParts(KS.parts, KS.L);
     track('karisim_ac', pl.n);
     karDraw();
@@ -2648,8 +2669,8 @@
     if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + (r.p ? r.p.n : 'yok')); }
     var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın') : '';
     karLoad();
-    var kp = KAR ? karTot(karFromParts(soilParts(pl.pf), 10)) : 0;
-    var tarif = '<div class="so-tf"><b>Kendi karışımınız için tarif</b>' + esc(soilRecipe(pl.pf)) + '<small>Ölçü: aynı kap (ör. bir kova). Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small>' +
+    var kp = KAR ? karTot(karFromParts(soilParts(pl.pf, pl.grp), 10)) : 0;
+    var tarif = '<div class="so-tf"><b>Kendi karışımınız için tarif</b>' + esc(soilRecipe(pl)) + '<small>Ölçü: aynı kap (ör. bir kova); 10 litrede 1 ölçü = 1 litre. Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small>' +
       (karOn() || (!KAR && !SITE_DIR && winOn()) ? '<button type="button" class="kbtn" data-act="kar" data-v="' + esc(pl.n) + '">' + I.cart + 'Bu tarifle hazırlat' + (kp ? ' · 10 L ' + tl(kp) : '') + '</button>' : '') + '</div>';
     var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Müşteri hizmetlerimize sorun</a>' : '';
     var head = function (txt) { return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' + txt + '</span></div></div>'; };
