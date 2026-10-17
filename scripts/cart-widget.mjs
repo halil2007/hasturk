@@ -149,6 +149,10 @@ if (!SITE.includes('tarim')) {
     log('   sepetteki karışım tutarı: ' + tutar);
     if (!/eklendi/.test(rk.t) || sonra.lines.length !== once.lines.length + 1) { bad++; log('   ✗ karışım eklenmedi'); }
   } else { bad++; log('   ✗ "Bu tarifle hazırlat" düğmesi çıkmadı'); }
+  // 4c) Listede olmayan bitki: Bilge Bey yapay zekâdan bitkinin toprak profilini alır, toprak kartı ve tarif çıkar
+  const mz = await sor('Mimoza ağacı için hangi toprak kullanmalıyım');
+  log(`4c) Listede olmayan bitki (mimoza) → ${mz.t}`);
+  if (!/Mimoza/i.test(mz.t) || !/ölçü/.test(mz.t)) { bad++; log('   ✗ listede olmayan bitkiye toprak kartı / tarif çıkmadı'); }
   // 5) Karışım sekmesi: tarif çipi + serbest litre (250 L → paketlere bölünür), sepette adet ve paket fiyatı
   await p.locator(R + '.tb[data-v="mix"]').click();
   await p.locator(R + '.mx-c button').first().waitFor({ timeout: 15000 });
