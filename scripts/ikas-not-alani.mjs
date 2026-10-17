@@ -19,7 +19,11 @@ const sch = await gql(`${T} { __schema { queryType { fields { name args { name t
 const ilgili = (f) => /option/i.test(f.name);
 const tn = (t) => t ? (t.name || tn(t.ofType)) : '?';
 console.log('Sorgular:', sch.__schema.queryType.fields.filter(ilgili).map((f) => f.name + '(' + f.args.map((a) => a.name + ':' + tn(a.type)).join(',') + ')').join(' | '));
-const muts = sch.__schema.mutationType.fields.filter(ilgili);
+const tumMut = sch.__schema.mutationType.fields;
+console.log(`Tüm değişiklikler (${tumMut.length}):`, tumMut.map((f) => f.name).join(', '));
+const urunMut = tumMut.filter((f) => /product|custom|kisisel|personal/i.test(f.name));
+console.log('Ürün / kişiselleştirme ile ilgili:', urunMut.map((f) => f.name + '(' + f.args.map((a) => a.name + ':' + tn(a.type)).join(',') + ')').join(' | ') || 'yok');
+const muts = tumMut.filter(ilgili);
 console.log('Değişiklikler:', muts.map((f) => f.name + '(' + f.args.map((a) => a.name + ':' + tn(a.type)).join(',') + ')').join(' | '));
 // Girdi türlerinin alanları
 const tipAlan = async (ad, d = 0) => {
@@ -31,6 +35,11 @@ const tipAlan = async (ad, d = 0) => {
   for (const f of t.inputFields || []) { const n = tn(f.type); if (/Input$|Type$|Enum$/.test(n) && !/^(String|Float|Int|Boolean)$/.test(n)) await tipAlan(n, d + 1); }
 };
 for (const m of muts.filter((f) => /save|create|update/i.test(f.name) && /set/i.test(f.name))) for (const a of m.args) await tipAlan(tn(a.type));
+// Ürün kaydetme girdisinde seçenek / kişiselleştirme alanı var mı
+for (const m of urunMut.filter((f) => /^(save|create|update)Product$/i.test(f.name))) for (const a of m.args) {
+  const t = (await gql(`${T} query($n:String!){ __type(name:$n){ inputFields { name type { ...T } } } }`, { n: tn(a.type) })).__type;
+  console.log(`${m.name}.${a.name} (${tn(a.type)}) alanları:`, t ? t.inputFields.map((f) => f.name + ':' + tn(f.type)).join(', ') : '-');
+}
 // 2) Seçenek setinin şu anki hali
 const q = sch.__schema.queryType.fields.find((f) => /^list.*optionset/i.test(f.name) || /optionset/i.test(f.name));
 console.log('Okuma sorgusu:', q && q.name);
