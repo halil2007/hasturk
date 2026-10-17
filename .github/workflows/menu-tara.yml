@@ -1,0 +1,32 @@
+name: Menü sistemi taraması
+
+# Canlı sitede Ürün Bul paneli, sekmeler, arama, masaüstü menü; kırık bağlantı/görsel, taşan öğe, hata; Worker uç noktaları.
+# Anonim, sipariş yok, sepete ekleme yok.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['scripts/menu-tara.mjs', '.github/workflows/menu-tara.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  tara:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ['https://hasturkgubre.com.tr', 'https://tarim-dunyasi.com']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: |
+          npm i --no-save playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - run: node scripts/menu-tara.mjs
+        env:
+          SITE_URL: ${{ matrix.site }}
