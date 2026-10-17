@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3548 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3551 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -10,7 +10,7 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 
 | # | Ürün | Hızlanma | Son 7 gün satış | Stokta |
 |---|---|---|---|---|
-| 1 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×4 | 4 | evet |
+| 1 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×4,1 | 4 | evet |
 | 2 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
 | 3 | Altınvadi Roka Tohumu (Toros İri Yaprak) | ×9,9 | 6 | evet |
 | 4 | Guanokalong Yarasa Gübresi Toz | ×4,1 | 0 | evet |
@@ -42,7 +42,7 @@ _Henüz veri yok._
 
 | # | Ürün | Satış puanı | Son 28 gün adet |
 |---|---|---|---|
-| 1 | Katı Solucan Gübresi 20 KG Çuval | 13,3 | 2 |
+| 1 | Katı Solucan Gübresi 20 KG Çuval | 13,2 | 2 |
 | 2 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,4 | 6 |
 | 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 6,7 | 0 |
 | 4 | Altınvadi Roka Tohumu (Toros İri Yaprak) | 6 | 6 |
@@ -53,13 +53,13 @@ _Henüz veri yok._
 | 9 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 5 | 7 |
 | 10 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,7 | 3 |
 | 11 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 4,7 | 5 |
-| 12 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı) | 4,6 | 5 |
+| 12 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı) | 4,5 | 5 |
 | 13 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 4,5 | 0 |
 | 14 | HG Akıllı Bitki ve Saksı Toprağı | 4,2 | 5 |
 | 15 | Premium Fide Toprağı | 4,1 | 0 |
 | 16 | HG Asidik Torf | 3,9 | 6 |
 | 17 | Sıvı Solucan Gübresi 500 ml | 3,9 | 3 |
-| 18 | Sıvı Solucan Gübresi 1 Lt | 3,8 | 1 |
+| 18 | Sıvı Solucan Gübresi 1 Lt | 3,7 | 1 |
 | 19 | HG Mezar Toprağı | 3,7 | 5 |
 | 20 | Sıvı Solucan Gübresi 250 ml | 3,7 | 3 |
 
@@ -141,7 +141,7 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 | 8 | Leonardit - Organik Toprak Düzenleyici | 3,8 | 56,2 |
 | 9 | Altınvadi Tere Tohumu 10 Gr | 3,6 | 0,9 |
 | 10 | Altınvadi Dereotu Tohumu 10 Gr | 3,5 | 1,3 |
-| 11 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 3,4 | 55,1 |
+| 11 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 3,4 | 56,1 |
 | 12 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 3,3 | 54,1 |
 | 13 | HG 5’li Bitki Yetiştirme Seti | 2,8 | 18,5 |
 | 14 | Altınvadi Bezelye Tohumu 25 Gr | 2,7 | 3,3 |

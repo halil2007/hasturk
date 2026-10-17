@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3548 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 245 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3551 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -45,7 +45,7 @@ _Henüz veri yok._
 | 1 | HasTürk Solucan Gübresi  | 21,4 | 6 |
 | 2 | HasTürk Sıvı Solucan Gübresi  | 15,7 | 10 |
 | 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 8,4 | 6 |
-| 4 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 7,1 | 9 |
+| 4 | Kendi Toprak Karışımını Oluştur – İstediğin Litrede (Sınırsız Sipariş) | 7 | 9 |
 | 5 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 6,7 | 0 |
 | 6 | Altınvadi Roka Tohumu (Toros İri Yaprak)  | 6 | 6 |
 | 7 | DSV Lippa Lisuna 6 Mix Çim Tohumu | 5,9 | 7 |
@@ -55,7 +55,7 @@ _Henüz veri yok._
 | 11 | Uzman Lityum Akülü İlaçlama Pompası 8 Lt | 5 | 7 |
 | 12 | Chrysamed İnsektisit Max 5 Lt / Tahtakurusu ve Akrep İlacı | 4,7 | 3 |
 | 13 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 4,7 | 5 |
-| 14 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı)  | 4,6 | 5 |
+| 14 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı)  | 4,5 | 5 |
 | 15 | 4'lü Sıkıştırılmış Cocopeat (Kokopit) Blok - 20 Kg (260 Litre) | 4,5 | 0 |
 | 16 | HG Akıllı Bitki ve Saksı Toprağı | 4,2 | 5 |
 | 17 | Premium Fide Toprağı | 4,1 | 0 |
@@ -160,7 +160,7 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 |---|---|---|---|
 | Guanokalong Yarasa Gübresi Toz | 89,1 | 2,6 | %3 |
 | HasTürk Hümix Sıvı Hümik Asit | 57,7 | 2,2 | %4 |
-| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 55,1 | 1,6 | %3 |
+| Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 56,1 | 1,6 | %3 |
 | İnsektisit MAX 5 Lt Kampanya Paketi | 50,9 | 1,6 | %3 |
 | Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 45,3 | 0 | %0 |
 | Chrysamed Subon Hijyen Sprey | 44,4 | 0 | %0 |
