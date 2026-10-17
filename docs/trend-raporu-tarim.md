@@ -1,6 +1,6 @@
 # Ziyaretçi ve satış eğilimleri
 
-Kaynaklar: son 60 günde 247 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3790 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
+Kaynaklar: son 60 günde 247 sipariş (HasTürk + Tarım Dünyası birlikte); site içi olaylar son 30 gün (3793 kayıt); 1 yıl önce aynı dönemde veri yok; 2 yıl önce aynı dönemde veri yok.
 
 Bu dosya 2 saatte bir otomatik güncellenir. Puan = şimdiki talep + yükselme ivmesi + 0,6 × geçmiş yılların sezonu × bu yılki teyit. Masaüstü menüde ürün sabitlemek için `config.json > desktopMenu.picks`.
 
@@ -10,18 +10,18 @@ Bu yıl hızla ilgi görmeye başlayanlar; sezon verisi beklenmeden öne çıkar
 
 | # | Ürün | Hızlanma | Son 7 gün satış | Stokta |
 |---|---|---|---|---|
-| 1 | HG Tarım Perliti | ×5,7 | 0 | evet |
+| 1 | HG Tarım Perliti | ×6 | 0 | evet |
 | 2 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | ×4,2 | 3 | evet |
-| 3 | Spectrum Care Tüy Yumağı Önleyici Malt Paste 100 g | ×9,9 | 10 | evet |
-| 4 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
-| 5 | Altınvadi Roka Tohumu (Toros İri Yaprak) | ×9,9 | 6 | evet |
-| 6 | Sıvı Solucan Gübresi 1 Lt | ×2,8 | 0 | evet |
+| 3 | Sıvı Solucan Gübresi 1 Lt | ×3,1 | 0 | evet |
+| 4 | Spectrum Care Tüy Yumağı Önleyici Malt Paste 100 g | ×9,9 | 10 | evet |
+| 5 | Reflex Plus Pate Kuzu Etli Yetişkin Kedi Maması 85 g | ×9,9 | 10 | evet |
+| 6 | Altınvadi Roka Tohumu (Toros İri Yaprak) | ×9,9 | 6 | evet |
 | 7 | Guanokalong Yarasa Gübresi Toz | ×4,1 | 0 | evet |
 | 8 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | ×3 | 3 | evet |
-| 9 | Altınvadi Toros Maydanozu Tohumu 10 Gr | ×9,9 | 5 | evet |
-| 10 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | ×6,4 | 2 | evet |
-| 11 | Arom Dere Otu Ata Tohumu (50 Adet) | ×8,7 | 5 | evet |
-| 12 | HasTürk Hümix Sıvı Hümik Asit | ×2,9 | 0 | evet |
+| 9 | HasTürk Hümix Sıvı Hümik Asit | ×3 | 0 | evet |
+| 10 | Altınvadi Toros Maydanozu Tohumu 10 Gr | ×9,9 | 5 | evet |
+| 11 | Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) | ×6,4 | 2 | evet |
+| 12 | Arom Dere Otu Ata Tohumu (50 Adet) | ×8,7 | 5 | evet |
 | 13 | Altınvadi Fındık Turpu Tohumu (Toros Kırmızı) | ×9,9 | 5 | evet |
 | 14 | HG Çim Kapama Toprağı (Leonarditli Formül) | ×4,7 | 3 | evet |
 | 15 | Proline Bebek Pudra Kokulu Bentonit Kedi Kumu 10 LT | ×5,7 | 3 | evet |
@@ -69,8 +69,8 @@ _Öne çıkarılmayan kategoriler (Kedi Ürünleri, Köpek Ürünleri): son 28 g
 
 | # | Kelime | Son 30 gün | Son 7 gün | Yükseliyor | Geçen yıl bu dönem |
 |---|---|---|---|---|---|
-| 1 | sıvı solucan gübresi | 63 | 36 | ↑ ×3,4 |  |
-| 2 | perlit | 38 | 29 | ↑ ×6,1 |  |
+| 1 | sıvı solucan gübresi | 66 | 39 | ↑ ×3,7 |  |
+| 2 | perlit | 40 | 31 | ↑ ×6,5 |  |
 | 3 | tarım perliti | 15 | 14 | ↑ ×6,6 |  |
 | 4 | saksı | 21 | 9 | ↑ ×1,8 |  |
 | 5 | solucan | 22 | 8 |  |  |
@@ -131,8 +131,8 @@ Bu kelimeler için ürün eklemeyi ya da `config.json > synonyms` ile eşanlaml�
 
 | # | Ürün | Sepete ekleme | Görüntüleme |
 |---|---|---|---|
-| 1 | HG Tarım Perliti | 40,1 | 19,1 |
-| 2 | Sıvı Solucan Gübresi 1 Lt | 23,9 | 2,3 |
+| 1 | HG Tarım Perliti | 42,1 | 19,1 |
+| 2 | Sıvı Solucan Gübresi 1 Lt | 25,9 | 2,3 |
 | 3 | Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım | 5,4 | 60,1 |
 | 4 | Altınvadi Roka Tohumu (Toros İri Yaprak) | 4,9 | 4 |
 | 5 | Altınvadi Toros Maydanozu Tohumu 10 Gr | 4,7 | 1,4 |
@@ -158,21 +158,21 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 | Ürün | Görüntüleme | Sepete ekleme | Oran |
 |---|---|---|---|
-| HasTürk Hümix Sıvı Hümik Asit | 100,7 | 2,2 | %2 |
+| HasTürk Hümix Sıvı Hümik Asit | 104,7 | 2,2 | %2 |
 | Guanokalong Yarasa Gübresi Toz | 89,1 | 2,6 | %3 |
-| Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 66,3 | 0 | %0 |
-| Chrysamed Subon Hijyen Sprey | 64,4 | 0 | %0 |
+| Tarm Orchid Elixir Sıvı Orkide Besini Sprey 500 ml | 68,3 | 0 | %0 |
+| Chrysamed Subon Hijyen Sprey | 66,4 | 0 | %0 |
+| Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici (0-3 mm) | 62,8 | 0 | %0 |
 | İnsektisit MAX 5 Lt Kampanya Paketi | 61,9 | 1,6 | %3 |
-| Biochar Meşe Odunu Bazlı Karbon Toprak Düzenleyici (0-3 mm) | 60,8 | 0 | %0 |
 | Uzman Lityum Akülü İlaçlama Pompası 5 Lt | 56,7 | 2,6 | %5 |
+| Guanokalong Extract Sıvı Guano Gübresi | 44,5 | 0 | %0 |
 | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) | 40,5 | 1 | %2 |
-| Guanokalong Extract Sıvı Guano Gübresi | 40,5 | 0 | %0 |
 | Florist Mantar Önleyici Bitki Spreyi | 39 | 0 | %0 |
 | HG Asidik Torf | 36,7 | 0,4 | %1 |
 | HG Mezar Toprağı | 35,5 | 0 | %0 |
 | Uzman 5 lt Basınçlı İlaçlama Pompası | 31,7 | 0 | %0 |
+| Tarm BioLeaf Protector Neem Yağı Yaprak Biti ve Böcek Kovucu Sprey 500 ml | 27,3 | 0 | %0 |
 | Uzman 10 Lt Basınçlı İlaçlama Pompası (K-73)  | 26,9 | 0 | %0 |
-| Tarm BioLeaf Protector Neem Yağı Yaprak Biti ve Böcek Kovucu Sprey 500 ml | 26,3 | 0 | %0 |
 
 ## Birlikte satın alınanlar (son 180 gün)
 
@@ -208,17 +208,17 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 
 ## Çapraz satış önerilerinin sonucu (son 30 gün)
 
-Öneri 195 kez gösterildi, 0 kez sepete eklendi (%0).
+Öneri 209 kez gösterildi, 0 kez sepete eklendi (%0).
 
 | # | Önerilen ürün | Gösterildi | Eklendi | Oran |
 |---|---|---|---|---|
-| 1 | Leonardit - Organik Toprak Düzenleyici | 51 | 0 | %0 |
-| 2 | HG Vermikülit | 40 | 0 | %0 |
-| 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 27 | 0 | %0 |
-| 4 | Katı Solucan Gübresi 3 KG | 19 | 0 | %0 |
-| 5 | Katı Solucan Gübresi 20 KG Çuval | 19 | 0 | %0 |
-| 6 | hasturk-kati-solucan-gubresi | 13 | 0 | %0 |
-| 7 | HG Tarım Perliti | 4 | 0 | %0 |
+| 1 | Leonardit - Organik Toprak Düzenleyici | 54 | 0 | %0 |
+| 2 | HG Vermikülit | 42 | 0 | %0 |
+| 3 | Sıkıştırılmış Cocopeat (Kokopit) Hindistan Cevizi Torfu 4-5 Kg / 65 Lt | 29 | 0 | %0 |
+| 4 | Katı Solucan Gübresi 3 KG | 21 | 0 | %0 |
+| 5 | Katı Solucan Gübresi 20 KG Çuval | 21 | 0 | %0 |
+| 6 | hasturk-kati-solucan-gubresi | 15 | 0 | %0 |
+| 7 | HG Tarım Perliti | 5 | 0 | %0 |
 | 8 | Fide Toprağı / Organik Tohum ve Fide Harcı | 4 | 0 | %0 |
 | 9 | hasturk-sivi-solucan-gubresi | 4 | 0 | %0 |
 | 10 | 45 Göz Yuvarlak Fide Viyolü | 2 | 0 | %0 |
@@ -235,7 +235,7 @@ Fiyat, görsel veya açıklama gözden geçirilebilir.
 | 1 | Florist Çiçekli Bitkiler Sıvı Konsantre Bitki Besini | 4 |
 | 2 | hasturk-kati-solucan-gubresi | 4 |
 | 3 | hasturk-sivi-solucan-gubresi | 4 |
-| 4 | kendi-toprak-karisimini-olustur | 1 |
+| 4 | kendi-toprak-karisimini-olustur | 2 |
 | 5 | cicek-topragi-bakim-seti | 1 |
 | 6 | Florist Sinek ve Unlu Bit Önleyici Bitki Spreyi | 1 |
 | 7 | HG Tarım Perliti | 1 |
@@ -249,7 +249,7 @@ Onayladıklarınızı `desktopMenu.picks` içine yazarsanız sabitlenir; yazmazs
 
 | Kategori | Önerilen ürünler |
 |---|---|
-| Saksılar ve Bahçe Yatakları | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 545 Litre (`moduler-yukseltilmis-bahce-yatagi-545-litre`)<br>Dekoratif Oval Silindir Fiber Saksı 36 × 40 cm (`dekoratif-oval-silindir-fiber-saksi-36x40-cm`) |
+| Saksılar ve Bahçe Yatakları | Cornet İç ve Dış Mekan Büyük Saksı Modelleri - 4 Renk 4 Boy (12L / 25L / 50L / 85L) (`cornet-ic-ve-dis-mekan-buyuk-saksi-modelleri-12l-25l-50l-85l`)<br>Modüler Yükseltilmiş Bahçe Yatağı (Sebze ve Çiçek) 545 Litre (`moduler-yukseltilmis-bahce-yatagi-545-litre`)<br>45 Göz Yuvarlak Fide Viyolü (`45-goz-yuvarlak-fide-viyolu`) |
 | Topraklar | HG Tarım Perliti (`tarim-perliti`)<br>Yaban Mersini ve Ortanca Toprağı – Asidik Bitkiler İçin Özel Karışım (`yaban-mersini-ve-ortanca-topragi`)<br>HG Çim Kapama Toprağı (Leonarditli Formül) (`cim-kapama-topragi-leonarditli-formul`) |
 | Tohumlar | Altınvadi Roka Tohumu (Toros İri Yaprak) (`altinvadi-roka-tohumu-toros-iri-yaprak`)<br>Ayaş Beyaz Bodur Domates Ata Tohumu (50 Adet) (`ayas-beyaz-bodur-domates-ata-tohumu-50-adet`)<br>Altınvadi Toros Maydanozu Tohumu 10 Gr (`altinvadi-toros-maydanozu-tohumu-10-gr`) |
 | Gübreler | Sıvı Solucan Gübresi 1 Lt (`sivi-solucan-gubresi-1-lt`)<br>HasTürk Hümix Sıvı Hümik Asit (`hasturk-humix-sivi-humik-asit`)<br>Guanokalong Yarasa Gübresi Toz (`guanokalong-yarasa-gubresi-toz`) |
