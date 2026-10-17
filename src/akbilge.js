@@ -149,12 +149,12 @@ export function litreHesap(q) {
     const d = +cm[1], x = T.reduce((a, r) => (Math.abs(r[0] - d) < Math.abs(a[0] - d) ? r : a));
     if (Math.abs(x[0] - d) <= 3) {
       const top = x[1] * adet;
-      return { litre: Math.ceil(top), metin: `${d} cm'lik saksıya yaklaşık ${lt(x[1])} litre toprak gider` + (adet > 1 ? `; ${adet} saksı için toplam yaklaşık ${lt(top)} litre.` : '.') };
+      return { adet, cap: d, litre: Math.ceil(top), metin: `${d} cm'lik saksıya yaklaşık ${lt(x[1])} litre toprak gider` + (adet > 1 ? `; ${adet} saksı için toplam yaklaşık ${lt(top)} litre.` : '.') };
     }
   }
   const a = ornek(30), b = ornek(40);
-  return { metin: 'Kaç litre gerektiği saksınızın boyuna bağlı. Saksınızın çapını yazarsanız (ör. "30 cm") hesaplayayım' +
-    (a && b ? `: 30 cm'lik saksıya yaklaşık ${lt(a[1])} litre, 40 cm'lik saksıya yaklaşık ${lt(b[1])} litre toprak gider` : '') + (adet > 1 ? `; ${adet} saksı için bunun ${adet} katı gerekir.` : '.') };
+  return { adet, metin: 'Kaç litre gerektiği saksınızın boyuna bağlı. Aşağıya saksınızın ölçüsünü yazın, hesaplayayım' +
+    (a && b ? ` (30 cm'lik saksıya yaklaşık ${lt(a[1])} litre, 40 cm'lik saksıya yaklaşık ${lt(b[1])} litre toprak gider).` : '.') };
 }
 // Sorudaki bitki, yapay zekânın daha önce tanıdığı bitkilerden biri mi (yazım hatası ve ekli hali dahil)
 export function bitkiBul(q, list) {
@@ -577,7 +577,7 @@ export async function handle(req, env, ctx, { aiKey, originOk, products, formul 
     if (db && req.headers.get('x-ak-test') !== '1') ctx.waitUntil(ready.then(() => db.prepare('INSERT INTO ak_soru (ts, q, qn, kaynak, havuz, site, sayfa) VALUES (?,?,?,?,?,?,?)')
       .bind(new Date().toISOString(), q, norm(q), 'havuz', e.i, site, page).run()).catch(() => {}));
     const lh = litreHesap(q), metin = tn.kendim ? `${ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : e.c;
-    return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, dinamik: 'toprak', bitki: e.b, kendim: tn.kendim, urunler: e.u, ...(lh && lh.litre ? { litre: lh.litre } : {}),
+    return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, dinamik: 'toprak', bitki: e.b, kendim: tn.kendim, urunler: e.u, ...(lh && lh.litre ? { litre: lh.litre } : {}), ...(lh ? { saksi: { adet: lh.adet, cap: lh.cap || '' } } : {}),
       cevap: lh ? `${lh.metin}\n\n${metin}` : metin });
   }
   // Önden yükleme (on: 1): Bilge Bey'in öneri düğmelerinin cevabı müşteri dokunmadan arkada alınır. Yalnız hazır havuz;
@@ -609,7 +609,7 @@ export async function handle(req, env, ctx, { aiKey, originOk, products, formul 
   const lh = litreHesap(q);
   const kart = (b, cevap, tekrar) => {
     const metin = kendim ? `${b.ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : cevap;
-    return json({ ok: true, kaynak: 'ai', ...(tekrar ? { tekrar: true } : {}), dinamik: 'toprak', bitki: b.ad, prof: b.prof, grup: b.grup, kendim, ...(lh && lh.litre ? { litre: lh.litre } : {}),
+    return json({ ok: true, kaynak: 'ai', ...(tekrar ? { tekrar: true } : {}), dinamik: 'toprak', bitki: b.ad, prof: b.prof, grup: b.grup, kendim, ...(lh && lh.litre ? { litre: lh.litre } : {}), ...(lh ? { saksi: { adet: lh.adet, cap: lh.cap || '' } } : {}),
       cevap: lh ? `${lh.metin}\n\n${metin}` : metin, urunler: [] });
   };
   if (db && toprakOk(norm(q))) {
