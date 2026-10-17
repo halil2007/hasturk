@@ -867,6 +867,7 @@
     '.sh-h button svg{width:16px;height:16px}',
     '.sh-l{font-size:13px;font-weight:700;color:var(--mu);margin:16px 0 8px}',
     /* Bilge Bey "Hepsini sepete ekle" penceresi */
+    '.so-tf{margin:8px 0 6px;padding:10px 12px;border-radius:12px;background:var(--soft);font-size:13.5px;line-height:1.45}.so-tf b{display:block;font-size:13px;margin-bottom:3px}.so-tf small{display:block;margin-top:4px;color:var(--mu);font-size:12px}',
     '.akmore{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:40px;margin:8px 0 0;border-radius:20px;border:1px solid var(--ln);background:#fff;color:var(--pr);font-weight:700;font-size:14px;text-decoration:none}.akmore svg{width:16px;height:16px}',
     '.akall{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;margin:8px 0 0;border-radius:21px;background:var(--pr);color:#fff;font-weight:800;font-size:14px}.akall svg{width:17px;height:17px}',
     '.bun .sh-h b{font-size:16px;color:var(--prd)}.bhint{font-size:12.5px;color:var(--mu);margin:4px 0 6px}',
@@ -2510,6 +2511,17 @@
       { 1: 'çabuk kuruyan', 3: 'nemini koruyan' }[pf.su], { 1: 'besini az', 3: 'besince zengin' }[pf.bs],
       { k: 'kumlu', h: 'havalı' }[pf.yp]].filter(Boolean).join(', ');
   }
+  // Kendi karışımı için ölçü oranlı tarif (ölçü = aynı kap): bitkinin toprak profiline göre "Kendi Toprak Karışımını
+  // Oluştur" ürünündeki bileşenlerle. Solucan gübresi en çok ~%20. Sunucudaki src/toprak.js > tarif ile aynı kurallar.
+  function soilRecipe(pf) {
+    var asit = pf.ph2 <= 1 || (pf.ph <= 1 && pf.ph2 <= 2), taban = asit ? 'asidik torf' : 'sphagnum torf', x = [];
+    if (pf.yp === 'k') { var kurak = pf.dr >= 3 && pf.su <= 1; x.push([kurak ? 4 : 5, taban], [kurak ? 4 : 3, 'pomza'], [2, 'kalın perlit']); }
+    else if (pf.yp === 'h') x.push([5, taban + (asit ? '' : ' ya da cocopeat')], [pf.dr >= 3 ? 4 : 3, 'kalın perlit']);
+    else x.push([6, taban], [pf.dr >= 3 ? 3 : 2, pf.dr >= 3 ? 'kalın perlit' : 'ince perlit']);
+    if (pf.su >= 3 && pf.yp !== 'k') x.push([1, 'vermikülit']);
+    if (pf.bs >= 3) x.push([2, 'solucan gübresi']); else if (pf.bs === 2) x.push([1, 'solucan gübresi']);
+    return x.map(function (a) { return a[0] + ' ölçü ' + a[1]; }).join(' + ') + (pf.bs <= 1 ? ' (gübre eklemeyin)' : '') + (pf.ph >= 4 ? '; kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+  }
   function soilRow(x, note) {
     var href = esc(url(x.s));
     return '<div class="xs-i">' + thumb(x.img, 180) + '<div class="tx"><a data-kind="product" data-name="' + esc(x.n) + '" href="' + href + '">' + esc(x.n) + '</a>' +
@@ -2521,20 +2533,21 @@
     if (!soilCard.seen) soilCard.seen = {};
     if (!soilCard.seen[pl.n]) { soilCard.seen[pl.n] = 1; track('soil_match', pl.n + ' → ' + (r.p ? r.p.n : 'yok')); }
     var custom = S.custom && S.custom.st ? soilRow(S.custom, 'bitkine göre hazırlatın') : '';
+    var tarif = '<div class="so-tf"><b>Kendi karışımınız için tarif</b>' + esc(soilRecipe(pl.pf)) + '<small>Ölçü: aynı kap (ör. bir kova). Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small></div>';
     var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Müşteri hizmetlerimize sorun</a>' : '';
     var head = function (txt) { return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' + txt + '</span></div></div>'; };
     if (r.exact) return head(esc(pl.n) + ' için önerdiğimiz toprak:') + '<div class="so-l">' + soilRow(r.p, '') + '</div></div>';
     if (r.none) {
       return head(r.strict
-        ? esc(pl.n) + ' çok özel bir yetiştirme ortamı ister; şu an buna uygun hazır toprağımız stokta yok. Yanlış toprak bitkiye zarar verebilir.' + ask
+        ? esc(pl.n) + ' çok özel bir yetiştirme ortamı ister (' + esc(plantDesc(pl.pf)) + '); buna uygun hazır toprağımız yok. Yanlış toprak bitkiye zarar verebilir; aşağıdaki tarifle hazırlatabilirsiniz.' + ask
         : esc(pl.n) + ' için hazır karışımlarımızdan hiçbiri yeterince uygun değil. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever; ihtiyacına göre karışım hazırlatabilirsiniz.' + ask) +
-        (!r.strict && custom ? '<div class="so-l">' + custom + '</div>' : '') + '</div>';
+        (custom ? tarif + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
     }
     return head(esc(pl.n) + ' için özel toprağımız yok. Bu bitki ' + esc(plantDesc(pl.pf)) + ' toprak sever. Özellikleri en yakın hazır karışımımız' +
       (r.adds.length ? ' ve eksik kalan özelliği tamamlayan ürün' : '') + ':') +
       '<div class="so-l">' + soilRow(r.p, '%' + Math.round(r.fit * 100) + ' uyum') +
       r.adds.map(function (a) { return soilRow(a.p, '+ ' + a.why); }).join('') + '</div>' +
-      (custom ? '<div class="so-or">ya da bitkinizin ihtiyacına göre kendi karışımınızı hazırlatın:</div><div class="so-l">' + custom + '</div>' : '') + '</div>';
+      (custom ? '<div class="so-or">ya da bitkinizin ihtiyacına göre kendi karışımınızı hazırlatın:</div>' + tarif + '<div class="so-l">' + custom + '</div>' : '') + '</div>';
   }
   function guideSearch() {
     var res = $guide.querySelector('.gres'), lst = $guide.querySelector('.glist');

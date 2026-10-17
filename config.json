@@ -151,7 +151,11 @@
   },
   "phone": "+90 553 942 29 61",
   "whatsapp": "905539422961",
-  "akbilge": { "enabled": true, "name": "Bilge Bey", "kargo": "Siparişiniz aynı gün kargoya teslim edilir. Bölgenize göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir." },
+  "akbilge": {
+    "enabled": true,
+    "name": "Bilge Bey",
+    "kargo": "Siparişiniz aynı gün kargoya teslim edilir. Bölgenize göre teslimat ertesi gün ya da 2-3 gün içinde gerçekleşir."
+  },
   "pages": [
     {
       "title": "Blog",
@@ -2485,6 +2489,829 @@
         "23133d",
         "lotus-nilufer-cicegi-topragi",
         "s"
+      ],
+      [
+        "Singonyum",
+        "syngonium, ok yaprağı",
+        "Salon",
+        "22322h",
+        ""
+      ],
+      [
+        "Kolokasya",
+        "colocasia, gölevez",
+        "Salon",
+        "22233h",
+        ""
+      ],
+      [
+        "Kroton",
+        "croton, codiaeum",
+        "Salon",
+        "23222d",
+        ""
+      ],
+      [
+        "Fittonya",
+        "fittonia, sinir bitkisi",
+        "Salon",
+        "22232h",
+        ""
+      ],
+      [
+        "Peperomya",
+        "peperomia",
+        "Salon",
+        "23312h",
+        ""
+      ],
+      [
+        "Hoya",
+        "mum çiçeği",
+        "Salon",
+        "22312h",
+        ""
+      ],
+      [
+        "Tradeskantya",
+        "tradescantia, telgraf çiçeği",
+        "Salon",
+        "23222d",
+        ""
+      ],
+      [
+        "Ficus ginseng",
+        "ginseng ficus",
+        "Salon",
+        "23222d",
+        ""
+      ],
+      [
+        "Kordiline",
+        "cordyline",
+        "Salon",
+        "23222d",
+        ""
+      ],
+      [
+        "Aspidistra",
+        "dökme demir bitkisi",
+        "Salon",
+        "23222d",
+        ""
+      ],
+      [
+        "Ktenant",
+        "ctenanthe",
+        "Salon",
+        "22232h",
+        ""
+      ],
+      [
+        "Stromanthe",
+        "stromante",
+        "Salon",
+        "22232h",
+        ""
+      ],
+      [
+        "Scindapsus",
+        "saten pothos",
+        "Salon",
+        "22322h",
+        ""
+      ],
+      [
+        "Rhaphidophora",
+        "mini monstera",
+        "Salon",
+        "22322h",
+        ""
+      ],
+      [
+        "Chamaedorea",
+        "salon palmiyesi, dağ palmiyesi",
+        "Salon",
+        "22222h",
+        ""
+      ],
+      [
+        "Palmiye",
+        "washingtonia, phoenix, chamaerops, yelpaze palmiyesi, kanarya palmiyesi",
+        "Salon",
+        "23312d",
+        ""
+      ],
+      [
+        "Sikas",
+        "cycas, sago palmiyesi",
+        "Salon",
+        "23312k",
+        ""
+      ],
+      [
+        "Raphis palmiyesi",
+        "rhapis",
+        "Salon",
+        "22222d",
+        ""
+      ],
+      [
+        "Yılbaşı kaktüsü",
+        "schlumbergera, noel kaktüsü",
+        "Salon",
+        "22322h",
+        ""
+      ],
+      [
+        "Ripsalis",
+        "rhipsalis",
+        "Salon",
+        "22322h",
+        ""
+      ],
+      [
+        "Haworthia",
+        "zebra kaktüsü",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Ekeverya",
+        "echeveria",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Sedum",
+        "dam koruğu",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Agav",
+        "agave",
+        "Sukulent",
+        "34311k",
+        ""
+      ],
+      [
+        "Gasteria",
+        "",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Litops",
+        "lithops, taş bitkisi",
+        "Sukulent",
+        "34311k",
+        ""
+      ],
+      [
+        "Çöl gülü",
+        "adenium",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Sütleğen",
+        "euphorbia, dikenler tacı",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Portulakarya",
+        "portulacaria",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "İnci dizisi",
+        "senecio, inci kolye",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Sıklamen",
+        "cyclamen, tavşan kulağı",
+        "Çiçek",
+        "22222h",
+        ""
+      ],
+      [
+        "Gloksinya",
+        "gloxinia",
+        "Çiçek",
+        "22222h",
+        ""
+      ],
+      [
+        "Kala",
+        "zantedeschia, gala çiçeği, kala zambağı",
+        "Çiçek",
+        "22233d",
+        ""
+      ],
+      [
+        "Krizantem",
+        "kasımpatı, chrysanthemum",
+        "Çiçek",
+        "23223d",
+        ""
+      ],
+      [
+        "Gerbera",
+        "",
+        "Çiçek",
+        "22222d",
+        ""
+      ],
+      [
+        "Hercai menekşe",
+        "viola, hercai",
+        "Çiçek",
+        "23222d",
+        ""
+      ],
+      [
+        "Kadife çiçeği",
+        "tagetes",
+        "Çiçek",
+        "23222d",
+        ""
+      ],
+      [
+        "Cam güzeli",
+        "impatiens",
+        "Çiçek",
+        "22232d",
+        ""
+      ],
+      [
+        "Fuşya",
+        "küpe çiçeği, fuchsia",
+        "Çiçek",
+        "22232d",
+        ""
+      ],
+      [
+        "Lantana",
+        "ağaç minesi",
+        "Çiçek",
+        "23312k",
+        ""
+      ],
+      [
+        "Mine çiçeği",
+        "verbena",
+        "Çiçek",
+        "23312d",
+        ""
+      ],
+      [
+        "Zinya",
+        "zinnia",
+        "Çiçek",
+        "23222d",
+        ""
+      ],
+      [
+        "Kozmos",
+        "cosmos",
+        "Çiçek",
+        "23312k",
+        ""
+      ],
+      [
+        "Salvia",
+        "ateş çiçeği",
+        "Çiçek",
+        "23222d",
+        ""
+      ],
+      [
+        "Zambak",
+        "lilyum, lilium",
+        "Çiçek",
+        "23312d",
+        ""
+      ],
+      [
+        "Sümbül",
+        "hyacinth",
+        "Çiçek",
+        "23312d",
+        ""
+      ],
+      [
+        "Nergis",
+        "narcissus",
+        "Çiçek",
+        "23312d",
+        ""
+      ],
+      [
+        "Frezya",
+        "freesia",
+        "Çiçek",
+        "23312d",
+        ""
+      ],
+      [
+        "Amarilis",
+        "amaryllis, hippeastrum",
+        "Çiçek",
+        "23312d",
+        ""
+      ],
+      [
+        "Dalya",
+        "dahlia",
+        "Çiçek",
+        "23223d",
+        ""
+      ],
+      [
+        "Glayöl",
+        "gladiolus",
+        "Çiçek",
+        "23312d",
+        ""
+      ],
+      [
+        "Hibiskus",
+        "çin gülü, hibiscus",
+        "Çiçek",
+        "22223d",
+        ""
+      ],
+      [
+        "Mandevilla",
+        "dipladenia",
+        "Çiçek",
+        "23222d",
+        ""
+      ],
+      [
+        "Plumeria",
+        "frangipani",
+        "Çiçek",
+        "23312k",
+        ""
+      ],
+      [
+        "Mor salkım",
+        "wisteria, glisin",
+        "Bahçe",
+        "23222d",
+        ""
+      ],
+      [
+        "Hanımeli",
+        "lonicera",
+        "Bahçe",
+        "23222d",
+        ""
+      ],
+      [
+        "Duvar sarmaşığı",
+        "hedera, orman sarmaşığı",
+        "Bahçe",
+        "23222d",
+        ""
+      ],
+      [
+        "Zakkum",
+        "oleander, nerium",
+        "Bahçe",
+        "34312d",
+        ""
+      ],
+      [
+        "Manolya",
+        "magnolia",
+        "Bahçe",
+        "12222d",
+        ""
+      ],
+      [
+        "Japon akçaağacı",
+        "acer palmatum",
+        "Bahçe",
+        "12222d",
+        ""
+      ],
+      [
+        "Leylak",
+        "syringa",
+        "Bahçe",
+        "34222d",
+        ""
+      ],
+      [
+        "Şimşir",
+        "buxus",
+        "Bahçe",
+        "34222d",
+        ""
+      ],
+      [
+        "Defne",
+        "laurus nobilis",
+        "Bahçe",
+        "34312d",
+        ""
+      ],
+      [
+        "Mersin",
+        "myrtus",
+        "Bahçe",
+        "23312d",
+        ""
+      ],
+      [
+        "Kurtbağrı",
+        "ligustrum",
+        "Bahçe",
+        "23222d",
+        ""
+      ],
+      [
+        "Mazı",
+        "tuya, thuja",
+        "Bahçe",
+        "23222d",
+        ""
+      ],
+      [
+        "Servi",
+        "selvi, cupressus, leylandi",
+        "Bahçe",
+        "34312k",
+        ""
+      ],
+      [
+        "Çam",
+        "pinus, karaçam",
+        "Bahçe",
+        "12312k",
+        ""
+      ],
+      [
+        "Ateş dikeni",
+        "pyracantha",
+        "Bahçe",
+        "23222d",
+        ""
+      ],
+      [
+        "Kartopu",
+        "viburnum",
+        "Bahçe",
+        "23222d",
+        ""
+      ],
+      [
+        "Ormangülü",
+        "rhododendron, orman gülü",
+        "Asit seven",
+        "11222d",
+        "ortanca-bogurtlen-acelya-topragi",
+        "s"
+      ],
+      [
+        "Pieris",
+        "",
+        "Asit seven",
+        "12222d",
+        "",
+        "s"
+      ],
+      [
+        "Funda",
+        "erica, calluna, süpürge otu",
+        "Asit seven",
+        "11312k",
+        "",
+        "s"
+      ],
+      [
+        "Kestane",
+        "",
+        "Asit seven",
+        "12222d",
+        ""
+      ],
+      [
+        "Mercanköşk",
+        "majoran, oregano",
+        "Aromatik",
+        "34311k",
+        ""
+      ],
+      [
+        "Melisa",
+        "oğul otu",
+        "Aromatik",
+        "23222d",
+        ""
+      ],
+      [
+        "Limon otu",
+        "lemongrass",
+        "Aromatik",
+        "23232d",
+        ""
+      ],
+      [
+        "Stevya",
+        "stevia, şeker otu",
+        "Aromatik",
+        "22222d",
+        ""
+      ],
+      [
+        "Tarhun",
+        "estragon",
+        "Aromatik",
+        "23312d",
+        ""
+      ],
+      [
+        "Kişniş",
+        "",
+        "Aromatik",
+        "23222d",
+        ""
+      ],
+      [
+        "Papatya",
+        "",
+        "Aromatik",
+        "23312d",
+        ""
+      ],
+      [
+        "Ekinezya",
+        "echinacea",
+        "Aromatik",
+        "23312k",
+        ""
+      ],
+      [
+        "Safran",
+        "",
+        "Aromatik",
+        "34312k",
+        ""
+      ],
+      [
+        "Zencefil",
+        "",
+        "Aromatik",
+        "22322h",
+        ""
+      ],
+      [
+        "Zerdeçal",
+        "",
+        "Aromatik",
+        "22322h",
+        ""
+      ],
+      [
+        "Tere",
+        "",
+        "Sebze",
+        "23232d",
+        "solucan-gubreli-sebze-topragi"
+      ],
+      [
+        "Mısır",
+        "",
+        "Sebze",
+        "23223d",
+        "hg-bol-verimli-sebze-topragi"
+      ],
+      [
+        "Bamya",
+        "",
+        "Sebze",
+        "23223d",
+        "hg-bol-verimli-sebze-topragi"
+      ],
+      [
+        "Kavun",
+        "karpuz",
+        "Sebze",
+        "23223d",
+        "hg-bol-verimli-sebze-topragi"
+      ],
+      [
+        "Patates",
+        "tatlı patates",
+        "Sebze",
+        "22322k",
+        ""
+      ],
+      [
+        "Pazı",
+        "",
+        "Sebze",
+        "23222d",
+        "solucan-gubreli-sebze-topragi"
+      ],
+      [
+        "Enginar",
+        "",
+        "Sebze",
+        "23223d",
+        ""
+      ],
+      [
+        "Kuşkonmaz",
+        "",
+        "Sebze",
+        "34322d",
+        ""
+      ],
+      [
+        "Kayısı",
+        "zerdali",
+        "Meyve",
+        "34222d",
+        ""
+      ],
+      [
+        "Vişne",
+        "",
+        "Meyve",
+        "23222d",
+        ""
+      ],
+      [
+        "Ayva",
+        "",
+        "Meyve",
+        "23222d",
+        ""
+      ],
+      [
+        "Dut",
+        "",
+        "Meyve",
+        "23222d",
+        ""
+      ],
+      [
+        "Ceviz",
+        "",
+        "Meyve",
+        "34222d",
+        ""
+      ],
+      [
+        "Badem",
+        "",
+        "Meyve",
+        "34312k",
+        ""
+      ],
+      [
+        "Fındık",
+        "",
+        "Meyve",
+        "22222d",
+        ""
+      ],
+      [
+        "Antep fıstığı",
+        "fıstık ağacı",
+        "Meyve",
+        "34311k",
+        ""
+      ],
+      [
+        "Mango",
+        "",
+        "Meyve",
+        "22322d",
+        ""
+      ],
+      [
+        "Papaya",
+        "",
+        "Meyve",
+        "23322d",
+        ""
+      ],
+      [
+        "Ananas",
+        "",
+        "Meyve",
+        "12322h",
+        ""
+      ],
+      [
+        "Ejder meyvesi",
+        "pitaya, pitahaya",
+        "Meyve",
+        "23312k",
+        ""
+      ],
+      [
+        "Çarkıfelek",
+        "passiflora, passion fruit",
+        "Meyve",
+        "23222d",
+        ""
+      ],
+      [
+        "Guava",
+        "",
+        "Meyve",
+        "23222d",
+        ""
+      ],
+      [
+        "Yenidünya",
+        "malta eriği",
+        "Meyve",
+        "23222d",
+        ""
+      ],
+      [
+        "Keçiboynuzu",
+        "harnup",
+        "Meyve",
+        "34311k",
+        ""
+      ],
+      [
+        "Goji",
+        "goji berry",
+        "Meyve",
+        "34312d",
+        ""
+      ],
+      [
+        "Frenk üzümü",
+        "ribes, bektaşi üzümü",
+        "Meyve",
+        "22222d",
+        ""
+      ],
+      [
+        "Kızılcık",
+        "",
+        "Meyve",
+        "23222d",
+        ""
+      ],
+      [
+        "Kuşburnu",
+        "",
+        "Meyve",
+        "34312d",
+        ""
+      ],
+      [
+        "Etçil bitki",
+        "sinekkapan, venüs sinekkapanı, nepenthes, sarracenia, dionaea",
+        "Özel",
+        "11131h",
+        "",
+        "s"
+      ],
+      [
+        "Kaladyum",
+        "caladium",
+        "Salon",
+        "22232h",
+        ""
+      ],
+      [
+        "Fil ayağı",
+        "nolina, beaucarnea",
+        "Sukulent",
+        "23311k",
+        ""
+      ],
+      [
+        "Fikus",
+        "ficus",
+        "Salon",
+        "23222d",
+        ""
       ]
     ]
   },

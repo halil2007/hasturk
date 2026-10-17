@@ -177,9 +177,13 @@ for (const pl of (config.soilMatch || {}).plants || []) {
   const [ad, diger, grup, prof, ozel, strict] = pl;
   if (!/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(prof || '')) continue;
   const adlar = [ad, ...String(diger || '').split(',').map((x) => x.trim()).filter(Boolean)];
-  add({ tur: 'bitki-toprak', bitki: ad, grup, dinamik: 'toprak',
-    sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`, `${lc(n)} için en iyi toprak`, `${lc(n)} için uygun toprak`, `${lc(n)} toprak önerisi`, `${lc(n)} saksı değişimi toprak`]),
-    cevap: `${ad} için ${desc(prof)} bir toprak uygundur.${strict === 's' ? ' Özel bir toprak ister; bu yüzden yalnız ona uygun toprağımızı öneriyoruz.' : ''} Size uygun toprağımız aşağıda.`,
+  // bitki: adı ve diğer adları (sinekkapan → Etçil bitki); eşleştirmede bitki adı soruda geçmeli, widget kartı da buradan bulur
+  add({ tur: 'bitki-toprak', bitki: adlar.join(', '), grup, dinamik: 'toprak',
+    sorular: adlar.flatMap((n) => [`${lc(n)} için hangi toprak`, `${lc(n)} toprağı`, `${lc(n)} saksı toprağı`, `${yon(n)} hangi toprak kullanılır`, `${lc(n)} için en iyi toprak`, `${lc(n)} için uygun toprak`, `${lc(n)} toprak önerisi`, `${lc(n)} saksı değişimi toprak`,
+      `${lc(n)} için nasıl bir toprak`, `${lc(n)} hangi toprağı sever`, `${lc(n)} toprak karışımı`, `${lc(n)} için toprak karışımı nasıl hazırlanır`, `${yon(n)} nasıl bir toprak alınır`]),
+    // Özel toprağı olmayan bitkide widget kartı en yakın hazır karışımı, eksik özelliği tamamlayan ürünü ve "Kendi Toprak
+    // Karışımını Oluştur" ile hazırlanacak ölçü oranlı tarifi gösterir (soilRecipe)
+    cevap: `${ad} için ${desc(prof)} bir toprak uygundur.${strict === 's' ? (ozel ? ' Özel bir toprak ister; bu yüzden yalnız ona uygun toprağımızı öneriyoruz.' : ' Özel bir yetiştirme ortamı ister.') : ''} ${ozel ? 'Size uygun toprağımız aşağıda.' : 'Ona özel hazır toprağımız yok; en yakın hazır karışımımızı ve kendi karışımınız için tarifi aşağıda bulabilirsiniz.'}`,
     urunler: ozel ? [ozel] : [], kaynak: 'config:soilMatch' });
 }
 
