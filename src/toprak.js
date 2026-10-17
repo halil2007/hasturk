@@ -40,11 +40,13 @@ export function soilParts(pf, grp) {
   return x;
 }
 
+const olc = (n) => String(n).replace('.', ',');
+export const metin = (parts, pf) => parts.map(([n, k]) => `${olc(n)} ölçü ${KAR_AD[k]}`).join(' + ') +
+  (pf && pf.bs <= 1 && !parts.some(([, k]) => k === 'solucan' || k === 'leonardit') ? ' (gübre eklemeyin)' : '') + (pf && pf.ph >= 3 ? '; nötr-kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+
 export function tarif(prof, grp) {
   const pf = profil(prof);
-  if (!pf) return '';
-  return soilParts(pf, grupKey(grp)).map(([n, k]) => `${n} ölçü ${KAR_AD[k]}`).join(' + ') +
-    (pf.bs <= 1 ? ' (gübre eklemeyin)' : '') + (pf.ph >= 3 ? '; nötr-kireçli toprağı sever, asidik torf kullanmayın' : '') + '.';
+  return pf ? metin(soilParts(pf, grupKey(grp)), pf) : '';
 }
 
 // Yapay zekâ için toprak rehberi: bitki hazır listede yoksa en yakın gruba göre hazır toprak + karışım tarifi önerilir
@@ -65,8 +67,9 @@ export const OZEL_KARISIM = 'kendi-toprak-karisimini-olustur';
 export const TOPRAK_SORUSU = /topra|harc|karisim|torf|saksi degis/;
 
 // Yapay zekâya giden "Doğrulanmış bilgi" bloğu (ürün adları canlı listeden)
-export function rehberMetni(byS) {
+// F: çözülmüş HG formülleri (src/formul.js); varsa grubun hazır toprağının formülü tarif olarak verilir
+export function rehberMetni(byS, F) {
   const ad = (s) => (byS.get(s) || {}).n || s;
-  return 'Toprak rehberi (bitkinin özel toprağı listede yoksa en uygun gruba göre öner; tarif "Kendi Toprak Karışımını Oluştur" ürünüyle istenen litrede hazırlanır, ölçü = aynı kap, 10 ölçü = 10 litrede 1 ölçü 1 litre):\n' +
-    GRUPLAR.map((g) => `• ${g.ad}: ${g.ozellik} toprak. Hazır: ${g.hazir.filter((s) => (byS.get(s) || {}).st).map(ad).join(' / ') || '-'}. Karışım: ${tarif(g.prof, g.grp)}`).join('\n');
+  return 'Toprak rehberi (bitkinin kendi hazır toprağı varsa onu öner; müşteri hazır istemeyip kendisi karıştırmak isterse ya da özel toprağı yoksa en uygun gruba göre öner; tarif "Kendi Toprak Karışımını Oluştur" ürünüyle istenen litrede hazırlanır, ölçü = aynı kap, 10 ölçü = 10 litrede 1 ölçü 1 litre):\n' +
+    GRUPLAR.map((g) => `• ${g.ad}: ${g.ozellik} toprak. Hazır: ${g.hazir.filter((s) => (byS.get(s) || {}).st).map(ad).join(' / ') || '-'}. Karışım: ${F && g.hazir.some((h) => F[h]) ? metin(F[g.hazir.find((h) => F[h])], profil(g.prof)) : tarif(g.prof, g.grp)}`).join('\n');
 }
