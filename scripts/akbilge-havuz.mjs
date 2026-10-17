@@ -442,6 +442,19 @@ for (const g of GENEL_GUBRE) add({ tur: 'gubre-genel', konu: g.konu, sorular: g.
 const blog = JSON.parse(await readFile('bilgi/blog-sss.json', 'utf8'));
 for (const b of blog.sss) add({ tur: 'blog', konu: b.kaynak, sorular: [b.soru.replace(/\?$/, '')], cevap: kirp(b.cevap, 420), urunler: b.urunler.filter((x) => bySlug.has(x) && bySlug.get(x).st > 0), kaynak: `blog:${b.kaynak}` });
 
+// K) Toprak karışımlarımızın içeriği (bilgi/toprak-icerik.json; yalnız bileşen adları, oranlar gizli): "gül toprağının içinde ne var"
+const tic = JSON.parse(await readFile('bilgi/toprak-icerik.json', 'utf8')).urunler;
+for (const [slug, t] of Object.entries(tic)) {
+  const p = bySlug.get(slug); if (!p) continue;
+  const ad = p.n.replace(/\s*[|–—].*$/, '').trim(), b = t.bilesen;
+  const liste = `${b.slice(0, -1).join(', ')} ve ${b[b.length - 1]}`;
+  // Ürünün "nasıl kullanılır / ne işe yarar" cevabına da içindekiler eklenir
+  for (const e of out) if (e.tur === 'urun' && e.urun === slug && !/İçindekiler:/.test(e.cevap)) e.cevap = e.cevap.replace(/\s*İçindekiler\s*$/, '') + `\n\nİçindekiler: ${liste}.`;
+  add({ tur: 'urun', urun: slug, konu: 'icerik', sorular: t.kisa.flatMap((k) => [`${k} içeriği`, `${k} içinde ne var`, `${k} neden yapılmış`, `${k} bileşenleri`, `${k} neler içerir`, `${k} içinde neler var`]),
+    cevap: `${ad} şunlardan hazırlanır: ${liste}.`,
+    urunler: [slug], kaynak: `toprak-icerik:${slug}` });
+}
+
 // C) Mağaza bilgileri (config.json > promo): aramalarda "indirim kodu" soruluyor
 const pr = config.promo || {};
 if (pr.code) add({ tur: 'magaza', sorular: ['indirim kodu', 'indirim var mı', 'kupon kodu', 'kargo ücretsiz mi', 'ücretsiz kargo'],

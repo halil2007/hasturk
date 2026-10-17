@@ -1,0 +1,82 @@
+{
+ "_aciklama": "HasTürk toprak karışımlarının bileşenleri (mağaza sahibinin formül tablosundan; çoktan aza sıralı). Oranlar gizli tutulur, burada yalnız bileşen adları vardır. akbilge-havuz.mjs okur.",
+ "urunler": {
+  "salon-bitkilerine-ozel-toprak-karisimi": {
+   "kisa": [
+    "salon bitkilerine özel toprak",
+    "salon bitkileri toprağı",
+    "salon toprağı"
+   ],
+   "bilesen": [
+    "torf",
+    "cocopeat (hindistan cevizi torfu)",
+    "perlit",
+    "pomza",
+    "solucan gübresi"
+   ]
+  },
+  "lotus-nilufer-cicegi-topragi": {
+   "kisa": [
+    "lotus nilüfer toprağı",
+    "nilüfer toprağı",
+    "lotus toprağı"
+   ],
+   "bilesen": [
+    "torf",
+    "bentonit",
+    "solucan gübresi",
+    "leonardit",
+    "cocopeat"
+   ]
+  },
+  "trabzon-hurmasi-cennet-hurmasi-topragi": {
+   "kisa": [
+    "trabzon hurması toprağı",
+    "cennet hurması toprağı"
+   ],
+   "bilesen": [
+    "orman toprağı",
+    "torf",
+    "pomza (volkanik taş)",
+    "cocopeat",
+    "solucan gübresi"
+   ]
+  },
+  "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi": {
+   "kisa": [
+    "aronya toprağı"
+   ],
+   "bilesen": [
+    "asidik torf",
+    "perlit",
+    "orman toprağı",
+    "solucan gübresi"
+   ]
+  },
+  "ortanca-bogurtlen-acelya-topragi": {
+   "kisa": [
+    "asit seven bitkiler toprağı",
+    "asit seven toprak",
+    "açelya toprağı"
+   ],
+   "bilesen": [
+    "asidik torf",
+    "cocopeat",
+    "perlit",
+    "solucan gübresi"
+   ]
+  },
+  "hg-gul-topragi-gullere-ozel-toprak-karisimi": {
+   "kisa": [
+    "gül toprağı"
+   ],
+   "bilesen": [
+    "torf",
+    "cocopeat",
+    "perlit",
+    "solucan gübresi",
+    "toz leonardit"
+   ]
+  }
+ }
+}
