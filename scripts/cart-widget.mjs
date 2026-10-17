@@ -155,10 +155,15 @@ if (!SITE.includes('tarim')) {
   } else { bad++; log('   ✗ "Bu tarifle hazırlat" düğmesi çıkmadı'); }
   // 5) Karışım sekmesi: tarif çipi + serbest litre (250 L → paketlere bölünür), sepette adet ve paket fiyatı
   await p.locator(R + '.tb[data-v="mix"]').click();
+  // Adım adım: 1) bitki çipi → 2) karışım (oranlar) → "Devam" → 3) litre ve sepet
+  await p.locator(R + '.mxw [data-v="1"]').click().catch(() => {});
   await p.locator(R + '.mx-c button').first().waitFor({ timeout: 15000 });
   await p.evaluate(() => [...document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.mx-c button')].find((b) => b.textContent === 'Kaktüs').click());
-  await p.waitForTimeout(1500);
+  await p.locator(R + '.mx-s [data-act="mxn"][data-v="3"]').waitFor({ timeout: 15000 });
+  const a2 = (await p.locator(R + '.mxw .on').innerText()).replace(/\s+/g, ' ');
+  await p.locator(R + '.mx-s [data-act="mxn"][data-v="3"]').tap();
   await p.locator(R + 'input[data-k="mxL"]').fill('250'); await p.waitForTimeout(500);
+  log(`5) Adımlar: çipten sonra "${a2}" → Devam → "${(await p.locator(R + '.mxw .on').innerText()).replace(/\s+/g, ' ')}"`);
   const ozet = (await p.locator(R + '.mx-s').innerText()).replace(/\s+/g, ' ');
   const q5 = +((ozet.match(/(\d+) paket/) || [])[1] || 1);
   const once5 = await cart(); await hideToast();
