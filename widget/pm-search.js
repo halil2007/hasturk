@@ -640,6 +640,12 @@
     '.mxh{display:flex;align-items:center;gap:12px;padding:4px 2px 12px}.mxh .mxi{width:46px;height:46px;border-radius:14px;background:var(--pr);color:#fff;display:grid;place-items:center;flex:none}.mxh .mxi svg{width:26px;height:26px}.mxh b{display:block;font-size:17px;color:var(--prd)}.mxh span{display:block;font-size:13px;color:var(--mu);line-height:1.4;margin-top:2px}',
     '.mxseg{display:flex;background:#fff;border:1.5px solid var(--ln);border-radius:14px;padding:4px;gap:4px;margin-bottom:10px}.mxseg button{flex:1;height:38px;border-radius:10px;font-size:13.5px;font-weight:800;color:var(--mu)}.mxseg button.on{background:var(--soft);color:var(--prd)}',
     '.mxk{background:#fff;border:1px solid var(--ln);border-radius:16px;padding:14px;margin-bottom:10px}',
+    '.lhac{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:44px;margin-top:10px;border-radius:12px;border:1.5px dashed var(--pr);color:var(--pr);font-weight:800;font-size:14px;background:#fff}.lhac svg,.lh-h svg{width:18px;height:18px}',
+    '.lh{margin-top:10px;background:#fff;border:1.5px solid var(--pr);border-radius:16px;padding:12px}.lh-h{display:flex;align-items:center;gap:8px;color:var(--prd);margin-bottom:8px}.lh-h b{font-size:15px}',
+    '.lh-s{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -2px 10px;padding:0 2px}.lh-s::-webkit-scrollbar{display:none}.lh-s button{flex:none;height:34px;padding:0 12px;border-radius:17px;border:1.5px solid var(--ln);font-size:13px;font-weight:700;color:var(--ink);background:#fff;white-space:nowrap}.lh-s .on{border-color:var(--pr);background:var(--soft);color:var(--prd)}',
+    '.lh-f{display:flex;gap:8px;flex-wrap:wrap}.lh-f label{flex:1;min-width:80px;display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--mu)}.lh-f input{height:42px;border:1.5px solid var(--ln);border-radius:12px;padding:0 10px;font:inherit;font-size:16px;font-weight:800;color:var(--ink);width:100%;min-width:0}.lh-f input:focus{outline:0;border-color:var(--pr)}.lh-f input::placeholder{font-size:13px;font-weight:600}',
+    '.lh-r{margin-top:10px}.lh-i{font-size:13px;color:var(--mu);margin:0}.lh-t b{display:block;font-size:22px;color:var(--prd)}.lh-t span{font-size:12.5px;color:var(--mu)}',
+    '.lh-o{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px;border-radius:12px;background:var(--bg)}.lh-o span{flex:1;min-width:0;font-size:13.5px}.lh-o small{display:block;font-size:12px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lh-o button{flex:none;display:flex;align-items:center;gap:6px;height:38px;padding:0 12px;border-radius:12px;background:var(--pr);color:#fff;font-weight:800;font-size:13px}.lh-o button svg{width:16px;height:16px}.lh .kbtn{margin-top:10px}',
     '.mxw{display:flex;gap:6px;margin-bottom:12px}.mxw button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 4px;border-radius:12px;background:#fff;border:1.5px solid var(--ln);color:var(--mu);font-size:12px;font-weight:800}.mxw i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-size:13px}.mxw i svg{width:15px;height:15px}.mxw span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.mxw .on{border-color:var(--pr);color:var(--prd);background:var(--soft)}.mxw .on i{background:var(--pr);color:#fff}.mxw .ok{color:var(--prd)}.mxw .ok i{background:var(--soft);color:var(--prd)}.mxw button[disabled]{opacity:.5}',
     '.mxip{font-size:13px;color:var(--mu);line-height:1.45;margin:0 0 10px}.mxip b{color:var(--prd)}.mxs2{font-size:12px;font-weight:800;color:var(--mu);margin:12px 0 6px}.mxgb{display:inline-flex;align-items:center;gap:6px;color:var(--pr);font-weight:800;font-size:13.5px;padding:6px 2px 12px}.mxgb svg{width:16px;height:16px}',
     '.mx .mxq button{width:36px;height:36px;border-color:var(--pr);color:var(--pr)}.mx .mxq svg{width:16px;height:16px}.mx .mxq b{min-width:64px}',
@@ -1133,6 +1139,7 @@
       if (e.target.tagName === 'TEXTAREA' && e.target.parentNode === $akf) { akGrow(e.target); return; }
       if (e.target.getAttribute('data-k') === 'gq') { GQ = e.target.value; guideSearch(); return; }
       if (e.target.getAttribute('data-k') === 'mxL') { mixLitre(e.target.value); return; }
+      if (e.target.getAttribute('data-k') === 'lh') { lhGir(e.target); return; }
       calcInput(e.target);
     });
     root.addEventListener('submit', function (e) { var fm = e.target; if (fm && fm.classList && fm.classList.contains('mx-f')) { e.preventDefault(); mixPlant((fm.querySelector('input') || {}).value || ''); } });
@@ -1221,7 +1228,11 @@
     else if (act === 'sq') { SH.qty = Math.max(1, Math.min(99, SH.qty + (+v))); $sheet.querySelector('.qty input').value = SH.qty; }
     else if (act === 'shx') closeSheet();
     else if (act === 'shgo') doAdd();
-    else if (act === 'kar') { var kn = v; var ko = function () { karOpen(kn); }; if (KAR) ko(); else { var kl = karLoad(); if (kl) kl.then(function () { if (KAR) ko(); else ptoast('Karışım fiyatları yüklenemedi.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git'); }); } }
+    else if (act === 'kar') karAc(v);
+    else if (act === 'lhac') { var li = AK.log[+v]; if (li) { lhDurum(li).ac = true; akSave(); akRenderLog(); } }
+    else if (act === 'lhs') { var lv = String(v).split(':'), lit = AK.log[+lv[0]]; if (lit) { lhDurum(lit).sekil = lv[1]; akSave(); lhCiz(+lv[0]); } }
+    else if (act === 'lhh') lhSepet(+v);
+    else if (act === 'lhk') { var lk = lhOzet(+v); if (lk && lk.x) { KAR_LT[lk.pl.n] = lk.x.top; track('litre_karisim', lk.pl.n + ' ' + lk.x.top + ' L'); karAc(lk.pl.n); } }
     else if (act === 'karL' || act === 'mxp' || act === 'mxb' || act === 'mx0' || act === 'mxm' || act === 'mxn' || act === 'mxl') mixAct(act, v);
     else if (act === 'kargo') karGo();
     else if (act === 'tocm') { e.preventDefault(); var ub = $calc.querySelector('.unit [data-v="cm"]'); if (ub) calcAction('unit', 'cm', ub); }
@@ -1326,7 +1337,7 @@
     if (d.cevap) {
       html = akText(d.cevap);
       var prods = '';
-      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)) || aiPlant(d); if (pl) { prods = soilCard(pl, q, d.kendim); pose = 'fide'; } }
+      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)) || aiPlant(d); if (pl) { KAR_LT[pl.n] = d.litre > 0 ? Math.min(20000, d.litre) : 0; LH_PL[idx] = pl; prods = soilCard(pl, q, d.kendim) + lhHtml(it, idx); pose = 'fide'; } }
       // Müşteri karışımı kendisi yapmak istiyorsa (cevap havuzdan gelmese de) bitkinin toprak kartı tarifle gösterilir
       if (!prods && DATA && KENDIM_RE.test(fold(q || ''))) { var kpl = plantFor(fold(q)); if (kpl) { prods = soilCard(kpl, q); pose = 'fide'; } }
       if (!prods && DATA) {
@@ -2522,16 +2533,18 @@
       var names = [pl[0]].concat(String(pl[1] || '').split(',')).map(function (n) { return fold(n).trim(); }).filter(function (n) { return n.length >= 3; });
       return { n: pl[0], names: names, grp: fold(pl[2] || ''), pf: pf, special: pl[4] || '', strict: pl[5] === 's',
         // Kelimenin kendisi ya da kısa bir ekle (güller, limonun); "gülhatmi", "narenciye" eşleşmez
-        res: names.map(function (n) { return new RegExp('(^| )' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[a-z]{0,' + (n.length <= 3 ? 3 : 4) + '}( |$)'); }) };
+        res: names.map(function (n) { var e = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); if (n.length >= 6 && /[iu]$/.test(n)) e += '?'; return new RegExp('(^| )' + e + '[a-z]{0,' + (n.length <= 3 ? 3 : 4) + '}( |$)'); }) };
     }).filter(Boolean);
     // Adında bitki geçen toprak ürünleri (etiket gerekmeden): "HG Philodendron Toprağı" → Philodendron'un özel toprağı
     var soilCat = DATA.cats.filter(function (c) { return c.f === 'topraklar'; })[0];
     var soilItems = !soilCat ? [] : DATA.items.filter(function (x) {
       return !x.bn && /topra|torf|karisim/.test(x.nf) && catChain(x).indexOf(soilCat.f) !== -1;
     }).map(function (x) { return { x: x, nm: words(x.nf).join(' ') }; });
+    var adEs = function (pl, nm) { for (var i = 0; i < pl.res.length; i++) if (pl.res[i].test(nm)) return pl.names[i]; return ''; };
     plants.forEach(function (pl) {
       pl.auto = soilItems.filter(function (o) {
-        return pl.res.some(function (re) { return re.test(o.nm); });
+        var a = adEs(pl, o.nm);
+        return a && !plants.some(function (q) { var b = q !== pl && adEs(q, o.nm); return b && b.length > a.length && b.indexOf(a.replace(/[iu]$/, '')) !== -1; });
       }).map(function (o) { return o.x; }).sort(function (a, b) { return (b.st ? 1 : 0) - (a.st ? 1 : 0) || (b.r || 0) - (a.r || 0); });
     });
     SOIL = { soils: soils, plants: plants, bySlug: bySlug, w: sm.weights || [3, 2, 2, 1, 1, 12], add: sm.addons || {},
@@ -2556,7 +2569,7 @@
   var NOT_SOIL = /^(tohum|gubre|ilac|pompa|saksi|besin|vitamin|mama|fidesi|fidan|hormon|kok|sprey)/;
   function plantFor(qn) {
     if (!DATA || !CFG.soilMatch || qn.replace(/\s/g, '').length < 3) return null;
-    var S = soilData(), ws = words(qn), q = ws.join(' '), best = null, bl = 0;
+    var S = soilData(), ws = words(qn.replace(/['’‘`´]/g, '')), q = ws.join(' '), best = null, bl = 0;
     S.plants.forEach(function (pl) {
       pl.res.forEach(function (re, i) { var n = pl.names[i]; if (re.test(q) && n.length > bl) { best = pl; bl = n.length; } });
     });
@@ -2675,7 +2688,7 @@
   // HG formülleri sunucuda gizli (src/formul.js); tarif /tarif'ten gelir: bitkinin kendi toprağı → formül birebir, benzer
   // toprak → o formül + küçük ayar. Gelmezse (Tarım Dünyası, etçil bitki, bağlantı hatası) yukarıdaki kural tarifi kullanılır.
   // Hazır toprağı olan bitkide tarif yalnız müşteri karışımı kendisi yapmak istediğini söylerse gösterilir (KENDIM_RE).
-  var TARIF = {}, TARIF_IST = {}, TARIF_K = {}, KAR_KEY = {};
+  var TARIF = {}, TARIF_IST = {}, TARIF_K = {}, KAR_KEY = {}, KAR_LT = {};
   // Sunucudaki src/toprak.js > KENDIM ile aynı
   var KENDIM_RE = /kendim|kendi (toprak )?karisim|karisim(i|ini)? (yap|hazirla|olustur)|karistir|hazirla(yabilir|r mi|r misin|yin|sana|mak)|hazir (istemiyorum|almak istemiyorum|olmasin)|olusturur? (mu|musun|misin)|(den|dan) (yap|hazirla|olustur)/;
   function tarifKaynak(pl, r) {
@@ -2711,8 +2724,107 @@
       if (el.getAttribute('data-tk') !== key) return;
       var t = el.querySelector('.tf-t'), p = el.querySelector('.kbtn .kp');
       if (t) t.textContent = tarifText(TARIF[key], pl.pf);
-      if (p && KAR) p.textContent = ' · 10 L ' + tl(karTot(karFromParts(TARIF[key], 10)));
+      var Lk = KAR_LT[pl.n] || 10, kpl = KAR ? mixPlan(TARIF[key], Lk) : null;
+      if (p && kpl) p.textContent = ' · ' + Lk + ' L ' + tl(kpl.tot);
     });
+  }
+
+  // ---- Kaç litre toprak lazım: saksı ölçüsünden hesap → hazır toprak paketi ya da o litrede karışım ----
+  // Hacim (scripts/akbilge-saksi.mjs ve Bilge Bey'in saksı cevaplarıyla aynı): standart (yukarı genişleyen) saksı
+  // 0,72 × π × (çap/2)² × yükseklik (yükseklik yazılmazsa çapın 0,95'i), düz saksı π × (çap/2)² × yükseklik,
+  // kare/dikdörtgen saksı 0,7 × en × boy × yükseklik, bahçe yatağı / kasa en × boy × derinlik. Toprak hacmin %90'ı
+  // (üstte sulama payı); sulayınca çöktüğü için %10 fazlası alınır.
+  var LH_S = [['k', 'Standart saksı'], ['y', 'Düz saksı'], ['d', 'Kare / dikdörtgen'], ['b', 'Bahçe yatağı / kasa']], LH_PL = {};
+  function lhDurum(it) {
+    var sk = (it.d && it.d.saksi) || {};
+    return it.lh || (it.lh = { sekil: 'k', cap: sk.cap || '', h: '', en: '', boy: '', adet: sk.adet || 1, ac: !!it.d.saksi });
+  }
+  function lhSayi(x) { var n = parseFloat(String(x == null ? '' : x).replace(',', '.')); return n > 0 && n < 100000 ? n : 0; }
+  function lhHesap(s) {
+    var a = Math.max(1, Math.min(999, Math.round(lhSayi(s.adet) || 1))), c = lhSayi(s.cap), h = lhSayi(s.h), en = lhSayi(s.en), boy = lhSayi(s.boy), V = 0;
+    if (s.sekil === 'k' && c) V = 0.72 * Math.PI * c * c / 4 * (h || c * 0.95);
+    else if (s.sekil === 'y' && c && h) V = Math.PI * c * c / 4 * h;
+    else if (s.sekil === 'd' && en && boy && h) V = 0.7 * en * boy * h;
+    else if (s.sekil === 'b' && en && boy && h) V = en * boy * h;
+    if (!V) return null;
+    var tek = V / 1000 * 0.9;
+    return { adet: a, tek: tek, top: Math.max(1, Math.ceil(tek * a * 1.1)) };
+  }
+  // Hazır toprağın litre seçenekleriyle L litreyi en ucuza karşılayan paketler (yarım litre adımlarla)
+  function lhPaket(p, L) {
+    var vs = (p.v || []).filter(function (v) { return (v.st == null || v.st > 0) && /\d\s*(l|lt|litre)\b/i.test(v.name || ''); }).map(function (v) {
+      return { v: v, u: Math.round(parseFloat(v.name.match(/(\d+(?:[.,]\d+)?)/)[1].replace(',', '.')) * 2), f: v.d != null && v.d < v.p ? v.d : v.p };
+    }).filter(function (x) { return x.u > 0 && x.f > 0; });
+    if (!vs.length || L > 4000) return null;
+    var hedef = Math.ceil(L * 2), N = hedef + Math.max.apply(null, vs.map(function (x) { return x.u; })), cost = [0], from = [-1], i, j;
+    for (i = 1; i <= N; i++) { cost[i] = Infinity; for (j = 0; j < vs.length; j++) if (i >= vs[j].u && cost[i - vs[j].u] + vs[j].f < cost[i]) { cost[i] = cost[i - vs[j].u] + vs[j].f; from[i] = j; } }
+    var bu = -1; for (i = hedef; i <= N; i++) if (cost[i] < Infinity && (bu < 0 || cost[i] < cost[bu])) bu = i;
+    if (bu < 0) return null;
+    var say = {}; for (i = bu; i > 0; i -= vs[from[i]].u) say[from[i]] = (say[from[i]] || 0) + 1;
+    var list = Object.keys(say).map(function (k) { return { v: vs[k].v, n: say[k], l: vs[k].u / 2 }; }).sort(function (a, b) { return b.l - a.l; });
+    return { list: list, lt: bu / 2, tl: cost[bu] };
+  }
+  function lhOzet(idx) {
+    var it = AK.log[idx], pl = LH_PL[idx];
+    if (!it || !pl) return null;
+    var r = soilFor(pl), hazir = r && r.p && r.p.st ? r.p : null;
+    return { it: it, pl: pl, x: lhHesap(lhDurum(it)), hazir: hazir };
+  }
+  function lhSonuc(idx) {
+    var o = lhOzet(idx); if (!o) return '';
+    var x = o.x, s = o.it.lh;
+    if (!x) return '<p class="lh-i">' + (s.sekil === 'k' ? 'Saksının üst çapını yazın; yüksekliğini bilmiyorsanız boş bırakın.' : 'Ölçüleri yazın, sonuç hemen çıksın.') + '</p>';
+    var lt = function (n) { return nf(n < 10 ? Math.round(n * 10) / 10 : Math.round(n), 1); };
+    var h = '<div class="lh-t"><b>≈ ' + x.top + ' L toprak</b><span>' + (x.adet > 1 ? x.adet + ' × ' : 'saksı başına ') + lt(x.tek) + ' L, sulayınca çöktüğü için %10 fazlası</span></div>';
+    var hp = o.hazir ? lhPaket(o.hazir, x.top) : null;
+    if (hp && cartOn()) h += '<div class="lh-o"><span><small>' + esc(o.hazir.n) + '</small><b>' + hp.list.map(function (z) { return (z.n > 1 ? z.n + ' × ' : '') + nf(z.l, 1) + ' L'; }).join(' + ') + '</b> · ' + tl(hp.tl) + '</span>' +
+      '<button type="button" data-act="lhh" data-v="' + idx + '">' + I.cart + 'Sepete ekle</button></div>';
+    var S = soilData(), oz = S.custom && S.custom.st && (karOn() || (!KAR && !SITE_DIR && winOn()));
+    if (oz) {
+      var key = KAR_KEY[o.pl.n], parts = (key && TARIF[key]) || soilParts(o.pl.pf, o.pl.grp), mp = KAR ? mixPlan(parts, x.top) : null;
+      h += '<button type="button" class="kbtn" data-act="lhk" data-v="' + idx + '">' + I.cart + (hp ? 'ya da bu tarifle ' : 'Bu tarifle ') + x.top + ' L hazırlat' + (mp ? '<span class="kp"> · ' + tl(mp.tot) + '</span>' : '') + '</button>';
+    }
+    return h;
+  }
+  function lhHtml(it, idx) {
+    var s = lhDurum(it);
+    if (!s.ac) return '<button type="button" class="lhac" data-act="lhac" data-v="' + idx + '">' + I.calc + 'Kaç litre toprak lazım? Hesaplayın</button>';
+    var f = function (k, t, ph) { return '<label><span>' + t + '</span><input data-k="lh" data-i="' + idx + '" data-f="' + k + '" inputmode="decimal" autocomplete="off" value="' + esc(String(s[k] || '')) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '></label>'; };
+    var alan = s.sekil === 'k' ? f('cap', 'Üst çap, cm') + f('h', 'Yükseklik, cm', 'bilmiyorum') : s.sekil === 'y' ? f('cap', 'Çap, cm') + f('h', 'Yükseklik, cm') :
+      f('en', 'En, cm') + f('boy', 'Boy, cm') + f('h', s.sekil === 'b' ? 'Derinlik, cm' : 'Yükseklik, cm');
+    return '<div class="lh" data-i="' + idx + '"><div class="lh-h">' + I.calc + '<b>Kaç litre toprak lazım?</b></div>' +
+      '<div class="lh-s">' + LH_S.map(function (z) { return '<button type="button" data-act="lhs" data-v="' + idx + ':' + z[0] + '" class="' + (s.sekil === z[0] ? 'on' : '') + '">' + z[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="lh-f">' + alan + f('adet', 'Adet') + '</div><div class="lh-r">' + lhSonuc(idx) + '</div></div>';
+  }
+  function lhCiz(idx) { var el = root.querySelector('.lh[data-i="' + idx + '"]'); if (el) el.outerHTML = lhHtml(AK.log[idx], idx); }
+  function lhGir(inp) {
+    var idx = +inp.getAttribute('data-i'), it = AK.log[idx]; if (!it) return;
+    lhDurum(it)[inp.getAttribute('data-f')] = inp.value;
+    var el = root.querySelector('.lh[data-i="' + idx + '"] .lh-r'); if (el) el.innerHTML = lhSonuc(idx);
+    clearTimeout(lhGir.t); lhGir.t = setTimeout(akSave, 600);
+  }
+  function lhSepet(idx) {
+    var o = lhOzet(idx), hp = o && o.x && o.hazir ? lhPaket(o.hazir, o.x.top) : null;
+    if (!hp || lhSepet.busy) return;
+    lhSepet.busy = true;
+    var bt = root.querySelector('.lh[data-i="' + idx + '"] [data-act="lhh"]'); if (bt) { bt.disabled = true; bt.innerHTML = '<span class="bspin"></span>'; }
+    track('litre_hazir', o.hazir.n + ' ' + hp.lt + ' L');
+    var fn = window.UrunAramaSepet, ok = 0, frame = false;
+    hp.list.reduce(function (pr, z) {
+      return pr.then(function () {
+        var a = typeof fn === 'function' ? Promise.resolve().then(function () { return fn(z.v.id, z.n, { productId: o.hazir.id, slug: o.hazir.s, name: o.hazir.n }); }) : addCore(o.hazir, z.v, z.n);
+        return a.then(function (how) { ok++; if (how !== 'win') frame = true; ev('a', o.hazir.s); ev('ka', o.hazir.s); });
+      });
+    }, Promise.resolve()).then(function () { return true; }, function () { return false; }).then(function (tam) {
+      lhSepet.busy = false; lhCiz(idx);
+      if (frame) syncSiteCart();
+      if (tam) ptoast(o.hazir.n + ': ' + hp.lt + ' L sepete eklendi', false, true);
+      else ptoast((ok ? 'Paketlerin bir kısmı eklendi. ' : '') + 'Ürün sayfasından ekleyebilirsiniz.', true, false, url(o.hazir.s), 'Ürün sayfasına git');
+    });
+  }
+  function karAc(kn) {
+    var ko = function () { karOpen(kn); };
+    if (KAR) ko(); else { var kl = karLoad(); if (kl) kl.then(function () { if (KAR) ko(); else ptoast('Karışım fiyatları yüklenemedi.', true, false, url('kendi-toprak-karisimini-olustur'), 'Ürün sayfasına git'); }); }
   }
 
   // ---- Kendi karışımını hazırlat: tarif + litre → bileşen bileşen fiyat, toplam, tek dokunuşla sepete ----
@@ -2761,7 +2873,7 @@
     var key = KAR_KEY[pl.n];
     if (key && !TARIF[key] && TARIF_IST[key]) { TARIF_IST[key].then(function () { karOpen(name); }); return; }
     mixSet(pl, (key && TARIF[key]) || soilParts(pl.pf, pl.grp), key && TARIF_K[key]);
-    MX.L = 10; MX.mode = 'bitki'; MX.adim = 3;
+    MX.L = KAR_LT[pl.n] || 10; MX.mode = 'bitki'; MX.adim = 3;
     track('karisim_ac', pl.n);
     setTab('mix');
   }
@@ -2958,10 +3070,10 @@
       tarifIste(pl, tk, key);
       var parts = TARIF[key] || (tarifSunucu(pl) && tk ? null : soilParts(pl.pf, pl.grp));
       karLoad();
-      var kp = KAR && parts ? karTot(karFromParts(parts, 10)) : 0;
+      var Lk = KAR_LT[pl.n] || 10, kpl = KAR && parts ? mixPlan(parts, Lk) : null, kp = kpl ? kpl.tot : 0;
       return '<div class="so-tf" data-tk="' + esc(key) + '"><b>' + (r.exact ? 'Bu toprağın tarifiyle kendi karışımınız' : 'Kendi karışımınız için tarif') + '</b><span class="tf-t">' +
         (parts ? esc(tarifText(parts, pl.pf)) : 'Tarif hazırlanıyor…') + '</span><small>Ölçü: aynı kap (ör. bir kova); 10 litrede 1 ölçü = 1 litre. Bu bileşenlerle istediğiniz litrede hazırlatabilirsiniz.</small>' +
-        (karOn() || (!KAR && !SITE_DIR && winOn()) ? '<button type="button" class="kbtn" data-act="kar" data-v="' + esc(pl.n) + '">' + I.cart + 'Bu tarifle hazırlat<span class="kp">' + (kp ? ' · 10 L ' + tl(kp) : '') + '</span></button>' : '') + '</div>';
+        (karOn() || (!KAR && !SITE_DIR && winOn()) ? '<button type="button" class="kbtn" data-act="kar" data-v="' + esc(pl.n) + '">' + I.cart + 'Bu tarifle hazırlat<span class="kp">' + (kp ? ' · ' + Lk + ' L ' + tl(kp) : '') + '</span></button>' : '') + '</div>';
     };
     var ask = CFG.whatsapp ? ' <a target="_blank" rel="noopener" href="' + esc(waHref('Merhaba, ' + pl.n + ' için hangi toprağı kullanmalıyım?')) + '">Müşteri hizmetlerimize sorun</a>' : '';
     var head = function (txt) { return '<div class="soil"><div class="so-h">' + I.sprout + '<div><b>' + esc(pl.n) + ' için toprak</b><span>' + txt + '</span></div></div>'; };
