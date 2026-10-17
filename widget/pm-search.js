@@ -1322,7 +1322,7 @@
     if (d.cevap) {
       html = akText(d.cevap);
       var prods = '';
-      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)); if (pl) { prods = soilCard(pl, q, d.kendim); pose = 'fide'; } }
+      if (d.dinamik === 'toprak' && d.bitki && DATA) { var pl = plantFor(fold(d.bitki)) || aiPlant(d); if (pl) { prods = soilCard(pl, q, d.kendim); pose = 'fide'; } }
       // Müşteri karışımı kendisi yapmak istiyorsa (cevap havuzdan gelmese de) bitkinin toprak kartı tarifle gösterilir
       if (!prods && DATA && KENDIM_RE.test(fold(q || ''))) { var kpl = plantFor(fold(q)); if (kpl) { prods = soilCard(kpl, q); pose = 'fide'; } }
       if (!prods && DATA) {
@@ -2534,6 +2534,20 @@
       min: sm.minFit != null ? +sm.minFit : 0.85, custom: sm.custom && bySlug[sm.custom] };
     return SOIL;
   }
+  // Listede olmayan bitki: Bilge Bey'in (yapay zekâ) verdiği toprak profili (d.prof "23322h", d.grup). Karışım sekmesi ve
+  // "Bu tarifle hazırlat" da bulabilsin diye bitki listesine eklenir.
+  function aiPlant(d) {
+    var S = soilData(), n = String(d.bitki || '').trim(), pr = String(d.prof || '');
+    if (n.length < 3 || !/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(pr)) return null;
+    var ex = S.plants.filter(function (x) { return x.n === n; })[0];
+    if (ex) return ex;
+    var nf = words(fold(n)).join(' ');
+    if (nf.length < 3) return null;
+    var pl = { n: n, names: [nf], grp: fold(d.grup || ''), pf: { ph: +pr[0], ph2: +pr[1], dr: +pr[2], su: +pr[3], bs: +pr[4], yp: pr[5] }, special: '', strict: false, auto: [],
+      res: [new RegExp('(^| )' + nf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[a-z]{0,4}( |$)')] };
+    S.plants.push(pl);
+    return pl;
+  }
   // Başka bir ürün türü aranıyorsa (domates tohumu, limon gübresi) toprak kartı çıkmaz
   var NOT_SOIL = /^(tohum|gubre|ilac|pompa|saksi|besin|vitamin|mama|fidesi|fidan|hormon|kok|sprey)/;
   function plantFor(qn) {
@@ -2758,6 +2772,18 @@
     v = String(v || '').trim();
     if (v.length < 3) return;
     var pl = plantFor(fold(v + ' toprak'));
+    // Listede yoksa Bilge Bey'e (yapay zekâ) sorulur; bitkiyi tanırsa toprak profiliyle tarif hazırlanır
+    if (!pl && AK_URL) {
+      MX.msg = 'Tarif hazırlanıyor…'; mixDraw();
+      var tm = new Promise(function (r) { setTimeout(r, 30000); });
+      Promise.race([tm, fetch(AK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: akBody(v + ' için toprak karışımı hazırla') })
+        .then(function (r) { return r.json(); })]).then(function (d) { return d && d.dinamik === 'toprak' && d.bitki ? plantFor(fold(d.bitki)) || aiPlant(d) : null; }, function () { return null; })
+        .then(function (p) { mixPlantGo(p, v); });
+      return;
+    }
+    mixPlantGo(pl, v);
+  }
+  function mixPlantGo(pl, v) {
     if (!pl) { MX.msg = '"' + v + '" bitkisini tanıyamadık; bileşenleri ve oranları aşağıdan kendiniz seçebilirsiniz.'; mixDraw(); return; }
     var r = soilFor(pl), tk = tarifKaynak(pl, r), key = pl.n + '|' + (tk ? tk.s + (tk.t ? '!' : '') : '');
     KAR_KEY[pl.n] = key;

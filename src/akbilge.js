@@ -110,9 +110,11 @@ function kelimeUyar(w, t, voc) {
   const k = t.length >= 7 ? 2 : 1;
   return mesafe(w, t) <= k || mesafe(w.slice(0, t.length), t) <= k ? 1 : 0;
 }
+const TOPRAK_DEGIL = /gubre|ilac|bocek|hastalik|zararli|sulam|budam/;
+const toprakOk = (n) => TOPRAK_SORUSU.test(n) && !TOPRAK_DEGIL.test(n);
 export function toprakNiyet(q) {
   const n = norm(q);
-  if (!TOPRAK_SORUSU.test(n) || /gubre|ilac|bocek|hastalik|zararli|sulam|budam/.test(n)) return null;
+  if (!toprakOk(n)) return null;
   const B = bitkiler(), ws = n.split(' ').filter((w) => w.length >= 3);
   let best = null;
   B.list.forEach((x) => x.adlar.forEach((ad) => {
@@ -121,6 +123,19 @@ export function toprakNiyet(q) {
     if (!best || puan > best.puan) best = { e: x.e, puan };
   }));
   return best ? { e: best.e, kendim: KENDIM.test(n) } : null;
+}
+// Sorudaki bitki, yapay zekânın daha önce tanıdığı bitkilerden biri mi (yazım hatası ve ekli hali dahil)
+export function bitkiBul(q, list) {
+  const n = norm(q);
+  if (!toprakOk(n)) return null;
+  const B = bitkiler(), ws = n.split(' ').filter((w) => w.length >= 3);
+  let best = null, bp = 0;
+  for (const x of list) {
+    let puan = 0;
+    for (const t of x.w) { const m = Math.max(0, ...ws.map((w) => kelimeUyar(w, t, B.voc))); if (!m) { puan = 0; break; } puan += m * t.length; }
+    if (puan > bp) { best = x; bp = puan; }
+  }
+  return best;
 }
 
 // Havuzdan cevap verilecek kadar emin miyiz
@@ -165,7 +180,38 @@ Kurallar:
 - "konu_disi": soru tarım, bahçe ve mağazayla ilgisiz; kibarca yalnız bu konularda yardımcı olabildiğini yaz.
 "emin" alanı: cevabındaki her bilgi ya "Doğrulanmış bilgi"de geçiyorsa ya da kimseyi yanıltmayacak kadar temel, herkesçe kabul gören bahçe bilgisiyse (ör. "fesleğen güneşli yer sever") true; en küçük bir şüphen varsa false.
 
+"bitki" alanı (yalnız toprak sorularında istenir): soruda adı geçen bitkiyi gerçekten tanıyorsan "taninan": true, "ad": bitkinin yaygın Türkçe adı (ilk harfi büyük, ör. "Kızılcık"), ve sevdiği toprağı şu ölçeklerle yaz: "ph_min" / "ph_max" 1 asidik (pH 5,5 altı), 2 hafif asidik (5,5–6,5), 3 nötr (6,5–7,5), 4 kireçli (7,5 üstü); "drenaj" 1 orta, 2 yüksek, 3 çok yüksek; "su" (nem isteği) 1 az, 2 orta, 3 çok; "besin" 1 az, 2 orta, 3 zengin; "yapi" "k" kumlu-mineralli (kaktüs, Akdeniz bitkisi), "h" havalı-lifli (tropikal salon bitkisi), "d" dengeli; "grup" listeden en yakını. Örnekler (ph_min ph_max drenaj su besin yapi grup): Monstera 2 3 3 2 2 h Salon; Eğrelti otu 2 2 2 3 2 h Salon; Kaktüs 2 3 3 1 1 k Sukulent; Lavanta 3 4 3 1 1 k Aromatik; Zeytin 3 4 3 1 1 k Meyve; Gül 2 2 2 2 3 d Çiçek; Limon 2 3 3 2 3 d Meyve; Domates 2 3 2 2 3 d Sebze; Yaban mersini 1 1 2 2 2 d Asit seven. Soruda bitki yoksa, bitkiyi tanımıyorsan ya da sevdiği toprağı bilmiyorsan "taninan": false yaz (diğer alanlara listedeki herhangi bir değeri yaz). Bitkiyi tanıdıysan cevapta karışım tarifi, ölçü ve ürün adı yazma (bitkiye uygun hazır toprak, karışım tarifi ve fiyatı cevabın altında kartta kendiliğinden gösterilir); "cevap"a yalnız bitkinin nasıl bir toprak sevdiğini 1–2 kısa cümleyle yaz, "urunler"i boş bırak.
+
 Cevabı yalnız istenen JSON biçiminde ver: "cevap" müşteriye gösterilecek metin; "urunler" listeden seçtiğin ürünlerin kodları (en fazla 3, uygun yoksa boş); "durum"; "emin".`;
+}
+// Toprak sorusunda bitkinin toprak profili (config.json > soilMatch.plants ile aynı ölçek); widget bununla toprak kartını
+// (en yakın hazır toprak + HG formülünden uyarlanan tarif + sepete ekleme) gösterir
+const GRUP_AI = ['Salon', 'Sukulent', 'Çiçek', 'Asit seven', 'Aromatik', 'Meyve', 'Sebze', 'Bahçe', 'Su bitkisi'];
+const BITKI = {
+  type: 'object',
+  properties: {
+    taninan: { type: 'boolean' },
+    ad: { type: 'string' },
+    ph_min: { type: 'integer', enum: [1, 2, 3, 4] },
+    ph_max: { type: 'integer', enum: [1, 2, 3, 4] },
+    drenaj: { type: 'integer', enum: [1, 2, 3] },
+    su: { type: 'integer', enum: [1, 2, 3] },
+    besin: { type: 'integer', enum: [1, 2, 3] },
+    yapi: { type: 'string', enum: ['k', 'h', 'd'] },
+    grup: { type: 'string', enum: GRUP_AI },
+  },
+  required: ['taninan', 'ad', 'ph_min', 'ph_max', 'drenaj', 'su', 'besin', 'yapi', 'grup'],
+  additionalProperties: false,
+};
+// Modelin bitki profili → { ad, prof: "23322h", grup } ya da null (tanınmadı / geçersiz)
+export function bitkiProfil(b) {
+  if (!b || b.taninan !== true) return null;
+  const ad = String(b.ad || '').replace(/[^\p{L}\p{N} '-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  const n = [b.ph_min, b.ph_max, b.drenaj, b.su, b.besin];
+  if (ad.length < 3 || !n.every((x) => Number.isInteger(x)) || !/^[khd]$/.test(b.yapi) || !GRUP_AI.includes(b.grup)) return null;
+  const [p1, p2] = [Math.min(n[0], n[1]), Math.max(n[0], n[1])];
+  const prof = `${p1}${p2}${n[2]}${n[3]}${n[4]}${b.yapi}`;
+  return /^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(prof) ? { ad: ad[0].toLocaleUpperCase('tr-TR') + ad.slice(1), prof, grup: b.grup } : null;
 }
 const SCHEMA = {
   type: 'object',
@@ -178,6 +224,7 @@ const SCHEMA = {
   required: ['cevap', 'urunler', 'durum', 'emin'],
   additionalProperties: false,
 };
+const SCHEMA_TOPRAK = { ...SCHEMA, properties: { ...SCHEMA.properties, bitki: BITKI }, required: [...SCHEMA.required, 'bitki'] };
 
 // Bağlam: en yakın havuz cevapları (doğrulanmış) + onlardaki ürünler + soruda adı geçen ürünler
 function context(q, near, products, F) {
@@ -196,7 +243,7 @@ function context(q, near, products, F) {
   products.map((p) => ({ p, h: toks(p.n).filter((t) => qt.includes(t)).length })).filter((x) => x.h >= 1)
     .sort((a, b) => b.h - a.h).slice(0, 6).forEach((x) => slugs.add(x.p.s));
   const list = [...slugs].map((s) => byS.get(s)).filter((p) => p && p.st).slice(0, toprak ? 14 : 10);
-  return { facts, list };
+  return { facts, list, toprak };
 }
 export function userMessage(q, ctx, page) {
   return `Doğrulanmış bilgi:\n${ctx.facts.length ? ctx.facts.map((f, i) => `[${i + 1}] ${f}`).join('\n\n') : '(yok)'}\n\n` +
@@ -212,7 +259,7 @@ async function askClaude(env, key, name, q, ctx, page) {
     max_tokens: 2500,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: ctx.toprak ? SCHEMA_TOPRAK : SCHEMA } },
     // Uzun ve sabit sistem talimatı önbelleğe alınır (her soruda yeniden ücretlendirilmesin)
     system: [{ type: 'text', text: systemPrompt(name), cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userMessage(q, ctx, page) }],
@@ -223,7 +270,8 @@ async function askClaude(env, key, name, q, ctx, page) {
   try { out = JSON.parse(text); } catch { return { error: 'json', usage: msg.usage }; }
   if (msg.stop_reason === 'max_tokens' || typeof out.cevap !== 'string' || !out.cevap.trim()) return { error: 'kesik', usage: msg.usage };
   const allowed = new Set(ctx.list.map((p) => p.s));
-  return { cevap: out.cevap.trim(), urunler: (out.urunler || []).filter((s) => allowed.has(s)).slice(0, 3), durum: out.durum || 'cevap', emin: !!out.emin, usage: msg.usage, model: msg.model };
+  return { cevap: out.cevap.trim(), urunler: (out.urunler || []).filter((s) => allowed.has(s)).slice(0, 3), durum: out.durum || 'cevap', emin: !!out.emin,
+    bitki: ctx.toprak ? bitkiProfil(out.bitki) : null, usage: msg.usage, model: msg.model };
 }
 
 // ---------- Veritabanı ----------
@@ -334,6 +382,24 @@ async function recentAi(db) {
   }
   RECENT = { t: Date.now(), list, byQn };
   return RECENT;
+}
+
+// Yapay zekânın tanıdığı bitkiler (ak_soru'da durum 'bitki-ai', havuz "bitki:Ad|23322h|Grup"): aynı bitki tekrar
+// sorulunca Claude'a gidilmeden toprak kartı verilir. Olumsuz oy alanlar atlanır. 5 dakikada bir tazelenir.
+let BITKI_AI = { t: 0, list: [] };
+async function bitkiKayit(db) {
+  if (Date.now() - BITKI_AI.t < 300000) return BITKI_AI.list;
+  const { results } = await db.prepare("SELECT s.havuz, s.cevap FROM ak_soru s WHERE s.durum = 'bitki-ai' AND s.havuz LIKE 'bitki:%' " +
+    "AND NOT EXISTS (SELECT 1 FROM ak_oy o WHERE o.q = s.q AND o.oy = 0) ORDER BY s.id DESC LIMIT 2000").all();
+  const seen = new Set(), list = [];
+  for (const r of results) {
+    const [ad, prof, grup] = String(r.havuz).slice(6).split('|'), k = norm(ad);
+    if (!k || seen.has(k) || !/^[1-4][1-4][1-3][1-3][1-3][khd]$/.test(prof || '')) continue;
+    seen.add(k);
+    list.push({ ad, prof, grup, cevap: r.cevap, w: k.split(' ').filter((w) => w.length >= 3) });
+  }
+  BITKI_AI = { t: Date.now(), list: list.filter((x) => x.w.length) };
+  return BITKI_AI.list;
 }
 
 const today = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10); // Türkiye saati
@@ -448,6 +514,19 @@ export async function handle(req, env, ctx, { aiKey, originOk, products, formul 
     const e = stokSuz(hit.e, prods);
     return json({ ok: true, kaynak: 'havuz', id: e.i, tur: e.t, cevap: e.c, urunler: e.u, dinamik: e.d || null, bitki: e.b || null });
   }
+  // Listede olmayan bitkiye toprak sorusu: yapay zekâ bitkiyi tanıyıp toprak profilini verir, widget bununla toprak
+  // kartını (en yakın hazır toprak + HG formülünden uyarlanan tarif + sepete ekleme) gösterir. Aynı bitki tekrar
+  // sorulursa kayıttan, ücretsiz.
+  const kendim = KENDIM.test(norm(q));
+  const kart = (b, cevap, tekrar) => json({ ok: true, kaynak: 'ai', ...(tekrar ? { tekrar: true } : {}), dinamik: 'toprak', bitki: b.ad, prof: b.prof, grup: b.grup, kendim,
+    cevap: kendim ? `${b.ad} için karışımınızı hazırladım; tarif ve fiyatı aşağıda. "Bu tarifle hazırlat"a dokunursanız bileşenler tek seferde sepete eklenir; litreyi değiştirebilirsiniz.` : cevap, urunler: [] });
+  if (db && toprakOk(norm(q))) {
+    const b = bitkiBul(q, await bitkiKayit(db).catch(() => []));
+    if (b) {
+      log({ kaynak: 'havuz-ai', havuz: `bitki:${b.ad}|${b.prof}|${b.grup}` });
+      return kart(b, b.cevap, true);
+    }
+  }
   // Daha önce Claude'un cevapladığı aynı soru: kayıttan, ücretsiz
   if (db) {
     const R = await recentAi(db).catch(() => null);
@@ -484,6 +563,12 @@ export async function handle(req, env, ctx, { aiKey, originOk, products, formul 
     return json({ ok: true, kaynak: 'yok', cevap: null, urunler: [], neden: r.refused ? 'red' : 'hata' });
   }
   const tok = { giris: r.usage && (r.usage.input_tokens + (r.usage.cache_read_input_tokens || 0) + (r.usage.cache_creation_input_tokens || 0)), cikis: r.usage && r.usage.output_tokens };
+  if (r.bitki && toprakOk(norm(q)) && r.durum !== 'konu_disi') {
+    const b = r.bitki, cevap = r.emin && r.durum === 'cevap' ? r.cevap : `${b.ad} için toprak önerimiz aşağıda.`;
+    log({ kaynak: 'ai', havuz: `bitki:${b.ad}|${b.prof}|${b.grup}`, skor: near[0] ? near[0].sc : null, cevap, durum: 'bitki-ai', ...tok });
+    if (!test) BITKI_AI.list.unshift({ ...b, cevap, w: norm(b.ad).split(' ').filter((w) => w.length >= 3) });
+    return kart(b, cevap);
+  }
   // Yönlendirme ve konu dışı: modelin kısa cümlesi + iletişim düğmeleri
   if (r.durum === 'yonlendir' || r.durum === 'konu_disi') {
     log({ kaynak: 'ai', skor: near[0] ? near[0].sc : null, cevap: r.cevap, durum: r.durum, ...tok });
