@@ -1,7 +1,7 @@
 {
  "_aciklama": "Ak Bilge soru havuzu. durum: hazir = canlıda kullanılır (doğrulanmış tablolar ve ürün bilgisi). Rakamlar yalnız doğrulanmış tablolardan.",
  "surum": 1,
- "kayit": 1849,
+ "kayit": 1855,
  "havuz": [
   {
    "id": "h0001",
@@ -29050,7 +29050,7 @@
    "urunler": [
     "akilli-toprak-organik-bitki-topragi",
     "dogal-orman-topragi-humuslu",
-    "yaban-mersini-ve-ortanca-topragi"
+    "kaktus-ve-sukulent-topragi"
    ],
    "kaynak": "urun_sayfasi:akilli-toprak-organik-bitki-topragi"
   },
@@ -29194,7 +29194,7 @@
     "aronya toprağı ne zaman kullanılır",
     "aronya toprağı hangi bitkilerde kullanılır"
    ],
-   "cevap": "HG Aronya Toprağı — Özel Karışım Profesyonel Asidik Bitki Toprağı | Aronia Melanocarpa İçin Aronya bitkinizin tam ihtiyaç duyduğu asidik yapı, ideal pH dengesi ve organik besin profilini tek torbada bir araya getiren özel formülasyonlu aronya toprağı.\n\npH: 4.8–5.2\n\nKarışımın temelini oluşturan asidik torf, doğal pH değeri 4.8–5.2 aralığında olan, Kuzey Avrupa kaynaklı yüksek kaliteli bir bahçecilik torfudur.\n\nÜrün bilgisine göre:\n• Hobi bahçıvanından profesyonel üreticiye kadar herkes için harmanlanmış, kullanıma hazır karışım.\n• Sıradan saksı toprağı veya bahçe toprağı kullanıldığında aronya bitkisinde sararma, yaprak dökümü, meyve azlığı ve kök çürümesi gibi sorunlar çok yaygındır.\n• Bu sorunların önüne geçmek için dört farklı doğal bileşenin laboratuvar oranlarında karıştırılmasıyla üretilmiştir.",
+   "cevap": "HG Aronya Toprağı — Özel Karışım Profesyonel Asidik Bitki Toprağı | Aronia Melanocarpa İçin Aronya bitkinizin tam ihtiyaç duyduğu asidik yapı, ideal pH dengesi ve organik besin profilini tek torbada bir araya getiren özel formülasyonlu aronya toprağı.\n\npH: 4.8–5.2\n\nKarışımın temelini oluşturan asidik torf, doğal pH değeri 4.8–5.2 aralığında olan, Kuzey Avrupa kaynaklı yüksek kaliteli bir bahçecilik torfudur.\n\nÜrün bilgisine göre:\n• Hobi bahçıvanından profesyonel üreticiye kadar herkes için harmanlanmış, kullanıma hazır karışım.\n• Sıradan saksı toprağı veya bahçe toprağı kullanıldığında aronya bitkisinde sararma, yaprak dökümü, meyve azlığı ve kök çürümesi gibi sorunlar çok yaygındır.\n• Bu sorunların önüne geçmek için dört farklı doğal bileşenin laboratuvar oranlarında karıştırılmasıyla üretilmiştir.\n\nİçindekiler: asidik torf, perlit, orman toprağı ve solucan gübresi.",
    "urunler": [
     "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi",
     "yaban-mersini-ve-ortanca-topragi"
@@ -29224,7 +29224,7 @@
     "asit seven bikiler için özel karışım organik torf ne zaman kullanılır",
     "asit seven bikiler için özel karışım organik torf hangi bitkilerde kullanılır"
    ],
-   "cevap": "HG Asit Seven Bikiler İçin Özel Karışım Organik Torf — Böğürtlen, ortanca, açelya ve gardenya toprağı Asit seven bitkiler sıradan toprakta zorlanır; sararır, çiçek tutmaz, meyve veremez.\n\npH: 4.8–5.2\n\nÜrün bilgisine göre:\n• Asit seven bitkilere göre hazırlanmış formül – İçeriğindeki asidik sphagnum torfunun doğal (ham) pH değeri 4.8 – 5.2 aralığındadır\n• Solucan gübresiyle zenginleştirilmiş – Besleyici, canlı ve organik\n• Asitli ortam seven süs ağaçları ve çalılar İçindekiler",
+   "cevap": "HG Asit Seven Bikiler İçin Özel Karışım Organik Torf — Böğürtlen, ortanca, açelya ve gardenya toprağı Asit seven bitkiler sıradan toprakta zorlanır; sararır, çiçek tutmaz, meyve veremez.\n\npH: 4.8–5.2\n\nÜrün bilgisine göre:\n• Asit seven bitkilere göre hazırlanmış formül – İçeriğindeki asidik sphagnum torfunun doğal (ham) pH değeri 4.8 – 5.2 aralığındadır\n• Solucan gübresiyle zenginleştirilmiş – Besleyici, canlı ve organik\n• Asitli ortam seven süs ağaçları ve çalılar\n\nİçindekiler: asidik torf, cocopeat, perlit ve solucan gübresi.",
    "urunler": [
     "ortanca-bogurtlen-acelya-topragi",
     "yaban-mersini-ve-ortanca-topragi"
@@ -29564,7 +29564,7 @@
     "gül toprağı ne zaman kullanılır",
     "gül toprağı hangi bitkilerde kullanılır"
    ],
-   "cevap": "HG Gül Toprağı – Güllere Özel Toprak Karışımı — Güllerin yetiştirilmesinde kullanılmak üzere torf, cocopeat, perlit, solucan gübresi ve leonarditin belirli oranlarda bir araya getirilmesiyle hazırlanan özel bir gül yetiştirme toprağı karışımıdır.\n\nKarışımda bulunan torf ve cocopeat, yetiştirme ortamının nem tutma kapasitesine katkı sağlarken; perlit, toprağın daha gevşek ve havadar bir yapıda kalmasına yardımcı olur.\n\nÜrün bilgisine göre:\n• Saksıda, balkonda, terasta veya bahçede yetiştirilen güllerde kullanılabilir.\n• Kullanım Alanları Saksı gülleri, bahçe gülleri ve farklı gül çeşitlerinin dikim veya saksı değişim işlemlerinde yetiştirme ortamı olarak kullanılabilir.\n• Güller için uygun fiziksel yapı ile organik bileşenleri bir araya getiren, pratik ve kullanıma hazır bir gül toprağı karışımıdır.",
+   "cevap": "HG Gül Toprağı – Güllere Özel Toprak Karışımı — Güllerin yetiştirilmesinde kullanılmak üzere torf, cocopeat, perlit, solucan gübresi ve leonarditin belirli oranlarda bir araya getirilmesiyle hazırlanan özel bir gül yetiştirme toprağı karışımıdır.\n\nKarışımda bulunan torf ve cocopeat, yetiştirme ortamının nem tutma kapasitesine katkı sağlarken; perlit, toprağın daha gevşek ve havadar bir yapıda kalmasına yardımcı olur.\n\nÜrün bilgisine göre:\n• Saksıda, balkonda, terasta veya bahçede yetiştirilen güllerde kullanılabilir.\n• Kullanım Alanları Saksı gülleri, bahçe gülleri ve farklı gül çeşitlerinin dikim veya saksı değişim işlemlerinde yetiştirme ortamı olarak kullanılabilir.\n• Güller için uygun fiziksel yapı ile organik bileşenleri bir araya getiren, pratik ve kullanıma hazır bir gül toprağı karışımıdır.\n\nİçindekiler: torf, cocopeat, perlit, solucan gübresi ve toz leonardit.",
    "urunler": [
     "hg-gul-topragi-gullere-ozel-toprak-karisimi",
     "yaban-mersini-ve-ortanca-topragi"
@@ -29627,7 +29627,7 @@
    "urunler": [
     "kaktus-ve-sukulent-topragi",
     "florist-konsantre-sivi-kaktus-ve-sukulent-bitki-besini",
-    "hasturk-kati-solucan-gubresi"
+    "akilli-toprak-organik-bitki-topragi"
    ],
    "kaynak": "urun_sayfasi:kaktus-ve-sukulent-topragi"
   },
@@ -29744,7 +29744,7 @@
     "lotus nilüfer çiçeği toprağı ne zaman kullanılır",
     "lotus nilüfer çiçeği toprağı hangi bitkilerde kullanılır"
    ],
-   "cevap": "HG Lotus Nilüfer Çiçeği Toprağı | Özel Karışım Su Bitkisi Toprağı\n\nÜrün bilgisine göre:\n• Saksıda, havuzda veya su bahçelerinde yetiştirilen lotus (Nelumbo spp.) ve nilüfer (Nymphaea spp.) türleri için kullanıma uygundur.\n• Kullanıma hazır özel formül.\n• Hazırlama ve Kullanım Önerisi Toprak karışımını kesinlikle kuru hâlde doğrudan suyun üzerine veya havuz içerisine dökmeyiniz.",
+   "cevap": "HG Lotus Nilüfer Çiçeği Toprağı | Özel Karışım Su Bitkisi Toprağı\n\nÜrün bilgisine göre:\n• Saksıda, havuzda veya su bahçelerinde yetiştirilen lotus (Nelumbo spp.) ve nilüfer (Nymphaea spp.) türleri için kullanıma uygundur.\n• Kullanıma hazır özel formül.\n• Hazırlama ve Kullanım Önerisi Toprak karışımını kesinlikle kuru hâlde doğrudan suyun üzerine veya havuz içerisine dökmeyiniz.\n\nİçindekiler: torf, bentonit, solucan gübresi, leonardit ve cocopeat.",
    "urunler": [
     "lotus-nilufer-cicegi-topragi"
    ],
@@ -29985,7 +29985,7 @@
     "salon bitkilerine özel toprak karışımı ne zaman kullanılır",
     "salon bitkilerine özel toprak karışımı hangi bitkilerde kullanılır"
    ],
-   "cevap": "HG Salon Bitkilerine Özel Toprak Karışımı — Ev, ofis vediğer iç mekânlarda yetiştirilen salon bitkilerinin kök gelişimi, havageçirgenliği, nem dengesi ve sağlıklı yetişme ortamı dikkate alınarakhazırlanmış özel formüllü, kullanıma hazır saksı toprağıdır.\n\nSalon Bitkilerine Özel Toprak Karışımı; torf ve cocopeatinnem tutma özelliğini, perlit ve pomzanın havalandırıcı ve drenaj sağlayanyapısıyla birleştirir.\n\nÜrün bilgisine göre:\n• 10 Solucan Gübresi: Organik madde bakımından zengin yapısıyla yetiştirme ortamını destekler ve bitkilerin beslenmesine doğal katkı sağlar.\n• Çok sayıda iç mekânve dekoratif yapraklı bitkinin yetiştirilmesinde kullanılabilir.\n• Salon bitkileri için özel hazırlanmış formül",
+   "cevap": "HG Salon Bitkilerine Özel Toprak Karışımı — Ev, ofis vediğer iç mekânlarda yetiştirilen salon bitkilerinin kök gelişimi, havageçirgenliği, nem dengesi ve sağlıklı yetişme ortamı dikkate alınarakhazırlanmış özel formüllü, kullanıma hazır saksı toprağıdır.\n\nSalon Bitkilerine Özel Toprak Karışımı; torf ve cocopeatinnem tutma özelliğini, perlit ve pomzanın havalandırıcı ve drenaj sağlayanyapısıyla birleştirir.\n\nÜrün bilgisine göre:\n• 10 Solucan Gübresi: Organik madde bakımından zengin yapısıyla yetiştirme ortamını destekler ve bitkilerin beslenmesine doğal katkı sağlar.\n• Çok sayıda iç mekânve dekoratif yapraklı bitkinin yetiştirilmesinde kullanılabilir.\n• Salon bitkileri için özel hazırlanmış formül\n\nİçindekiler: torf, cocopeat (hindistan cevizi torfu), perlit, pomza ve solucan gübresi.",
    "urunler": [
     "salon-bitkilerine-ozel-toprak-karisimi"
    ],
@@ -30103,7 +30103,7 @@
     "trabzon hurması toprağı ne zaman kullanılır",
     "trabzon hurması toprağı hangi bitkilerde kullanılır"
    ],
-   "cevap": "HG Trabzon Hurması (Cennet Hurması) Toprağı — 0), organik madde bakımından zengin ve mutlaka iyi drenajlı toprak isteyen bir meyve ağacıdır.\n\npH: 6.0–7.0\n\nÜrün bilgisine göre:\n• Biz de tam olarak bu sorunu çözmek için 5 farklı doğal bileşeni özenle harmanlayarak Trabzon hurmasına özel bir karışım hazırladık.\n• Yaz aylarında bitkinin susuz kalma riskini düşürür. ✅ Doğal beslenme: %10 solucan gübresi sayesinde ilk 3–4 ay ekstra gübreye ihtiyaç duymazsınız.\n• Karıştırma veya ek malzeme gerektirmez. 🪴 KULLANIM ALANLARI",
+   "cevap": "HG Trabzon Hurması (Cennet Hurması) Toprağı — 0), organik madde bakımından zengin ve mutlaka iyi drenajlı toprak isteyen bir meyve ağacıdır.\n\npH: 6.0–7.0\n\nÜrün bilgisine göre:\n• Biz de tam olarak bu sorunu çözmek için 5 farklı doğal bileşeni özenle harmanlayarak Trabzon hurmasına özel bir karışım hazırladık.\n• Yaz aylarında bitkinin susuz kalma riskini düşürür. ✅ Doğal beslenme: %10 solucan gübresi sayesinde ilk 3–4 ay ekstra gübreye ihtiyaç duymazsınız.\n• Karıştırma veya ek malzeme gerektirmez. 🪴 KULLANIM ALANLARI\n\nİçindekiler: orman toprağı, torf, pomza (volkanik taş), cocopeat ve solucan gübresi.",
    "urunler": [
     "trabzon-hurmasi-cennet-hurmasi-topragi"
    ],
@@ -43321,8 +43321,8 @@
    "cevap": "Mart ayında ekebilecekleriniz:\n\nTohum ekimi:\n• Domates (fide için, kapalı alanda)\n• Biber (fide için, kapalı alanda)\n• Patlıcan (fide için, kapalı alanda)\n• Bezelye (kışı soğuk geçen bölgelerde)\n• Havuç (ana ekim dönemi)\n• Turp (fındık turpu, 15 gün arayla)\n• Dereotu\n• Roka\n• Tere\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"domates nasıl ekilir\").",
    "urunler": [
     "altinvadi-roka-tohumu-toros-iri-yaprak",
-    "arom-dere-otu-ata-tohumu-50-adet",
     "ayas-beyaz-bodur-domates-ata-tohumu-50-adet",
+    "arom-dere-otu-ata-tohumu-50-adet",
     "altinvadi-dolma-biber-tohumu-10-gr"
    ],
    "dinamik": "stok",
@@ -43353,8 +43353,8 @@
    "cevap": "Nisan ayında ekebilecekleriniz:\n\nTohum ekimi:\n• Domates (fide için, kapalı alanda)\n• Kabak (doğrudan yerine)\n• Bal kabağı (doğrudan yerine)\n• Fasulye (doğrudan yerine)\n• Havuç (ana ekim dönemi)\n• Turp (fındık turpu, 15 gün arayla)\n• Dereotu\n• Roka\n• Tere\n\nFide dikimi:\n• Domates (fide dikimi; sıcak bölgelerde daha erken)\n• Biber (fide dikimi)\n• Patlıcan (fide dikimi)\n\nTarihler bölgeye göre değişir: soğuk bölgelerde biraz geç, sıcak bölgelerde biraz erken ekilir. Sıcak iklim sebzeleri son don tarihinden sonra ekilir/dikilir. Bir sebzenin ayrıntısını sorabilirsiniz (ör. \"domates nasıl ekilir\").",
    "urunler": [
     "altinvadi-roka-tohumu-toros-iri-yaprak",
-    "arom-dere-otu-ata-tohumu-50-adet",
     "ayas-beyaz-bodur-domates-ata-tohumu-50-adet",
+    "arom-dere-otu-ata-tohumu-50-adet",
     "altinvadi-dolma-biber-tohumu-10-gr"
    ],
    "dinamik": "stok",
@@ -43511,8 +43511,8 @@
    "urunler": [
     "eylul-ayi-sebze-tohumu-seti-kislik-tohum",
     "altinvadi-roka-tohumu-toros-iri-yaprak",
-    "altinvadi-toros-maydanozu-tohumu-10-gr",
-    "altinvadi-findik-turpu-tohumu-toros-kirmizi"
+    "altinvadi-findik-turpu-tohumu-toros-kirmizi",
+    "altinvadi-toros-maydanozu-tohumu-10-gr"
    ],
    "dinamik": "stok",
    "kaynak": "tohum:ay:9"
@@ -43543,8 +43543,8 @@
    "urunler": [
     "ekim-ayi-sebze-tohumu-seti-6-cesit-kislik-tohum",
     "altinvadi-roka-tohumu-toros-iri-yaprak",
-    "altinvadi-toros-maydanozu-tohumu-10-gr",
-    "altinvadi-bezelye-tohumu-25-gr"
+    "altinvadi-bezelye-tohumu-25-gr",
+    "altinvadi-arapsaci-marul-tohumu-kivircik"
    ],
    "dinamik": "stok",
    "kaynak": "tohum:ay:10"
@@ -49641,6 +49641,186 @@
   {
    "id": "h1848",
    "durum": "hazir",
+   "tur": "urun",
+   "urun": "salon-bitkilerine-ozel-toprak-karisimi",
+   "konu": "icerik",
+   "sorular": [
+    "salon bitkilerine özel toprak içeriği",
+    "salon bitkilerine özel toprak içinde ne var",
+    "salon bitkilerine özel toprak neden yapılmış",
+    "salon bitkilerine özel toprak bileşenleri",
+    "salon bitkilerine özel toprak neler içerir",
+    "salon bitkilerine özel toprak içinde neler var",
+    "salon bitkileri toprağı içeriği",
+    "salon bitkileri toprağı içinde ne var",
+    "salon bitkileri toprağı neden yapılmış",
+    "salon bitkileri toprağı bileşenleri",
+    "salon bitkileri toprağı neler içerir",
+    "salon bitkileri toprağı içinde neler var",
+    "salon toprağı içeriği",
+    "salon toprağı içinde ne var",
+    "salon toprağı neden yapılmış",
+    "salon toprağı bileşenleri",
+    "salon toprağı neler içerir",
+    "salon toprağı içinde neler var",
+    "salon bitkilerine özel toprak karışımı bitkilerine özel toprak içeriği",
+    "salon bitkilerine özel toprak karışımı bitkilerine özel toprak içinde ne var",
+    "salon bitkilerine özel toprak karışımı bitkilerine özel toprak neden yapılmış",
+    "salon bitkilerine özel toprak karışımı bitkilerine özel toprak bileşenleri",
+    "salon bitkilerine özel toprak karışımı bitkilerine özel toprak neler içerir",
+    "salon bitkilerine özel toprak karışımı bitkilerine özel toprak içinde neler var",
+    "salon bitkilerine özel toprak karışımı bitkileri toprağı içeriği",
+    "salon bitkilerine özel toprak karışımı bitkileri toprağı içinde ne var",
+    "salon bitkilerine özel toprak karışımı bitkileri toprağı neden yapılmış",
+    "salon bitkilerine özel toprak karışımı bitkileri toprağı bileşenleri",
+    "salon bitkilerine özel toprak karışımı bitkileri toprağı neler içerir",
+    "salon bitkilerine özel toprak karışımı bitkileri toprağı içinde neler var",
+    "salon bitkilerine özel toprak karışımı toprağı içeriği",
+    "salon bitkilerine özel toprak karışımı toprağı içinde ne var",
+    "salon bitkilerine özel toprak karışımı toprağı neden yapılmış",
+    "salon bitkilerine özel toprak karışımı toprağı bileşenleri",
+    "salon bitkilerine özel toprak karışımı toprağı neler içerir",
+    "salon bitkilerine özel toprak karışımı toprağı içinde neler var"
+   ],
+   "cevap": "HG Salon Bitkilerine Özel Toprak Karışımı şunlardan hazırlanır: torf, cocopeat (hindistan cevizi torfu), perlit, pomza ve solucan gübresi.",
+   "urunler": [
+    "salon-bitkilerine-ozel-toprak-karisimi"
+   ],
+   "kaynak": "toprak-icerik:salon-bitkilerine-ozel-toprak-karisimi"
+  },
+  {
+   "id": "h1849",
+   "durum": "hazir",
+   "tur": "urun",
+   "urun": "lotus-nilufer-cicegi-topragi",
+   "konu": "icerik",
+   "sorular": [
+    "lotus nilüfer toprağı içeriği",
+    "lotus nilüfer toprağı içinde ne var",
+    "lotus nilüfer toprağı neden yapılmış",
+    "lotus nilüfer toprağı bileşenleri",
+    "lotus nilüfer toprağı neler içerir",
+    "lotus nilüfer toprağı içinde neler var",
+    "nilüfer toprağı içeriği",
+    "nilüfer toprağı içinde ne var",
+    "nilüfer toprağı neden yapılmış",
+    "nilüfer toprağı bileşenleri",
+    "nilüfer toprağı neler içerir",
+    "nilüfer toprağı içinde neler var",
+    "lotus toprağı içeriği",
+    "lotus toprağı içinde ne var",
+    "lotus toprağı neden yapılmış",
+    "lotus toprağı bileşenleri",
+    "lotus toprağı neler içerir",
+    "lotus toprağı içinde neler var"
+   ],
+   "cevap": "HG Lotus Nilüfer Çiçeği Toprağı şunlardan hazırlanır: torf, bentonit, solucan gübresi, leonardit ve cocopeat.",
+   "urunler": [
+    "lotus-nilufer-cicegi-topragi"
+   ],
+   "kaynak": "toprak-icerik:lotus-nilufer-cicegi-topragi"
+  },
+  {
+   "id": "h1850",
+   "durum": "hazir",
+   "tur": "urun",
+   "urun": "trabzon-hurmasi-cennet-hurmasi-topragi",
+   "konu": "icerik",
+   "sorular": [
+    "trabzon hurması toprağı içeriği",
+    "trabzon hurması toprağı içinde ne var",
+    "trabzon hurması toprağı neden yapılmış",
+    "trabzon hurması toprağı bileşenleri",
+    "trabzon hurması toprağı neler içerir",
+    "trabzon hurması toprağı içinde neler var",
+    "cennet hurması toprağı içeriği",
+    "cennet hurması toprağı içinde ne var",
+    "cennet hurması toprağı neden yapılmış",
+    "cennet hurması toprağı bileşenleri",
+    "cennet hurması toprağı neler içerir",
+    "cennet hurması toprağı içinde neler var"
+   ],
+   "cevap": "HG Trabzon Hurması (Cennet Hurması) Toprağı şunlardan hazırlanır: orman toprağı, torf, pomza (volkanik taş), cocopeat ve solucan gübresi.",
+   "urunler": [
+    "trabzon-hurmasi-cennet-hurmasi-topragi"
+   ],
+   "kaynak": "toprak-icerik:trabzon-hurmasi-cennet-hurmasi-topragi"
+  },
+  {
+   "id": "h1851",
+   "durum": "hazir",
+   "tur": "urun",
+   "urun": "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi",
+   "konu": "icerik",
+   "sorular": [
+    "aronya toprağı içeriği",
+    "aronya toprağı içinde ne var",
+    "aronya toprağı neden yapılmış",
+    "aronya toprağı bileşenleri",
+    "aronya toprağı neler içerir",
+    "aronya toprağı içinde neler var"
+   ],
+   "cevap": "HG Aronya Toprağı şunlardan hazırlanır: asidik torf, perlit, orman toprağı ve solucan gübresi.",
+   "urunler": [
+    "aronya-bitkisi-topragi-ozel-asidik-torf-karisimi"
+   ],
+   "kaynak": "toprak-icerik:aronya-bitkisi-topragi-ozel-asidik-torf-karisimi"
+  },
+  {
+   "id": "h1852",
+   "durum": "hazir",
+   "tur": "urun",
+   "urun": "ortanca-bogurtlen-acelya-topragi",
+   "konu": "icerik",
+   "sorular": [
+    "asit seven bitkiler toprağı içeriği",
+    "asit seven bitkiler toprağı içinde ne var",
+    "asit seven bitkiler toprağı neden yapılmış",
+    "asit seven bitkiler toprağı bileşenleri",
+    "asit seven bitkiler toprağı neler içerir",
+    "asit seven bitkiler toprağı içinde neler var",
+    "asit seven toprak içeriği",
+    "asit seven toprak içinde ne var",
+    "asit seven toprak neden yapılmış",
+    "asit seven toprak bileşenleri",
+    "asit seven toprak neler içerir",
+    "asit seven toprak içinde neler var",
+    "açelya toprağı içeriği",
+    "açelya toprağı içinde ne var",
+    "açelya toprağı neden yapılmış",
+    "açelya toprağı bileşenleri",
+    "açelya toprağı neler içerir",
+    "açelya toprağı içinde neler var"
+   ],
+   "cevap": "HG Asit Seven Bikiler İçin Özel Karışım Organik Torf şunlardan hazırlanır: asidik torf, cocopeat, perlit ve solucan gübresi.",
+   "urunler": [
+    "ortanca-bogurtlen-acelya-topragi"
+   ],
+   "kaynak": "toprak-icerik:ortanca-bogurtlen-acelya-topragi"
+  },
+  {
+   "id": "h1853",
+   "durum": "hazir",
+   "tur": "urun",
+   "urun": "hg-gul-topragi-gullere-ozel-toprak-karisimi",
+   "konu": "icerik",
+   "sorular": [
+    "gül toprağı içeriği",
+    "gül toprağı içinde ne var",
+    "gül toprağı neden yapılmış",
+    "gül toprağı bileşenleri",
+    "gül toprağı neler içerir",
+    "gül toprağı içinde neler var"
+   ],
+   "cevap": "HG Gül Toprağı şunlardan hazırlanır: torf, cocopeat, perlit, solucan gübresi ve toz leonardit.",
+   "urunler": [
+    "hg-gul-topragi-gullere-ozel-toprak-karisimi"
+   ],
+   "kaynak": "toprak-icerik:hg-gul-topragi-gullere-ozel-toprak-karisimi"
+  },
+  {
+   "id": "h1854",
+   "durum": "hazir",
    "tur": "magaza",
    "sorular": [
     "indirim kodu",
@@ -49654,7 +49834,7 @@
    "kaynak": "config:promo"
   },
   {
-   "id": "h1849",
+   "id": "h1855",
    "durum": "hazir",
    "tur": "magaza",
    "konu": "kargo",
