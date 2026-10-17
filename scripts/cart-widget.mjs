@@ -123,6 +123,10 @@ const sor = async (q) => { const n0 = await p.evaluate(() => document.getElement
   for (let i = 0; i < 150; i++) { if (await p.evaluate((n) => document.getElementById('urun-arama-root').shadowRoot.querySelectorAll('.akpw').length > n, n0)) break; await p.waitForTimeout(100); } await p.waitForTimeout(1500); return sonKart(); };
 // 4) Kendi karışımını hazırlat (yalnız HasTürk): müşterinin gerçekte yazdığı gibi (yazım hatası, sesle yazma), tarifle sepete ekle
 if (!SITE.includes('tarim')) {
+  // 4.0) Listede olmayan bitki: Bilge Bey yapay zekâdan bitkinin toprak profilini alır, toprak kartı ve tarif çıkar
+  const mz = await sor('Mimoza ağacı için hangi toprak kullanmalıyım');
+  log(`4.0) Listede olmayan bitki (mimoza) → ${mz.t}`);
+  if (!/Mimoza/i.test(mz.t) || !/ölçü/.test(mz.t)) { bad++; log('   ✗ listede olmayan bitkiye toprak kartı / tarif çıkmadı'); }
   const bg = await sor('Bengovil toprağı lazım');
   log(`4a) "Bengovil toprağı lazım" → ${bg.t} · hepsini ekle: ${bg.hepsi}`);
   if (!/Begonvil Toprağı/.test(bg.t) || bg.hepsi) { bad++; log('   ✗ Begonvil toprağı önerilmedi'); }
@@ -149,10 +153,6 @@ if (!SITE.includes('tarim')) {
     log('   sepetteki karışım tutarı: ' + tutar);
     if (!/eklendi/.test(rk.t) || sonra.lines.length !== once.lines.length + 1) { bad++; log('   ✗ karışım eklenmedi'); }
   } else { bad++; log('   ✗ "Bu tarifle hazırlat" düğmesi çıkmadı'); }
-  // 4c) Listede olmayan bitki: Bilge Bey yapay zekâdan bitkinin toprak profilini alır, toprak kartı ve tarif çıkar
-  const mz = await sor('Mimoza ağacı için hangi toprak kullanmalıyım');
-  log(`4c) Listede olmayan bitki (mimoza) → ${mz.t}`);
-  if (!/Mimoza/i.test(mz.t) || !/ölçü/.test(mz.t)) { bad++; log('   ✗ listede olmayan bitkiye toprak kartı / tarif çıkmadı'); }
   // 5) Karışım sekmesi: tarif çipi + serbest litre (250 L → paketlere bölünür), sepette adet ve paket fiyatı
   await p.locator(R + '.tb[data-v="mix"]').click();
   await p.locator(R + '.mx-c button').first().waitFor({ timeout: 15000 });
