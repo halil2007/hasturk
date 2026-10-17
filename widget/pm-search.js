@@ -2545,10 +2545,13 @@
     if (/^ozel/.test(g)) { ek(6, 'sphagnum'); ek(4, 'ince-perlit'); return x; }
     if (/^su /.test(g)) { ek(4, 'sphagnum'); ek(3, 'bentonit'); ek(1, 'cocopeat'); ek(1, 'solucan'); ek(1, 'leonardit'); return x; }
     if (pf.yp === 'k') {
-      var m = (pf.dr >= 3 && pf.su <= 1 ? 7 : 6) - (sol ? 1 : 0); sol = Math.min(sol, 1);
-      ek(10 - m - sol, torf); ek(Math.ceil(m / 2), 'pomza'); ek(Math.floor(m / 2), 'kalin-perlit'); ek(sol, 'solucan');
+      // Kaktüs / sukulentte %70 mineral; kurak seven diğerlerinde %50–60; saksıda zeytin, badem, çam gibi ağaçlarda orman
+      // toprağı + %40–50 mineral
+      var agac = /^meyve/.test(g) || /^bahce/.test(g); sol = Math.min(sol, 1);
+      var m = (agac ? 5 : /^sukulent/.test(g) && pf.dr >= 3 && pf.su <= 1 ? 7 : pf.dr >= 3 && pf.su <= 1 ? 6 : 5) - sol;
+      ek(agac ? 3 : 0, 'orman'); ek(10 - (agac ? 3 : 0) - m - sol, torf); ek(Math.ceil(m / 2), 'pomza'); ek(Math.floor(m / 2), 'kalin-perlit'); ek(sol, 'solucan');
     } else if (pf.yp === 'h') {
-      var nem = pf.su >= 3, kuru = pf.su <= 1, d = pf.dr >= 3 || kuru ? 4 : 3, o = 10 - d - sol;
+      var nem = pf.su >= 3, kuru = pf.su <= 1, d = kuru ? 4 : 3, o = 10 - d - sol;
       ek(Math.ceil(o / 2), torf); ek(Math.floor(o / 2), 'cocopeat');
       if (kuru) { ek(2, 'pomza'); ek(2, 'kalin-perlit'); } else { ek(d - 1, nem ? 'ince-perlit' : 'kalin-perlit'); ek(1, nem ? 'vermikulit' : 'pomza'); }
       ek(sol, 'solucan');

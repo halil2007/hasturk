@@ -3,9 +3,6 @@ name: Perlit Market karışım tanısı
 # perlitmarket.com: kendi karışımını yap sistemi ve bitkiye özel toprakların içerik oranları (yalnız herkese açık sayfalar).
 on:
   workflow_dispatch:
-  push:
-    branches: ['claude/**']
-    paths: ['scripts/pm-tara.mjs', '.github/workflows/pm-tara.yml']
 
 permissions:
   contents: read
